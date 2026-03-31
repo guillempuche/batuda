@@ -1,0 +1,6 @@
+{
+    "private": true,
+    "types": "../dist/animate-activity.d.ts",
+    "main": "../dist/cjs/animate-activity.js",
+    "module": "../dist/es/animate-activity.mjs"
+}

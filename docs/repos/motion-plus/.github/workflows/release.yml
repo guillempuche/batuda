@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'motion-plus-dom@*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Build
+        run: yarn build --filter=motion-plus-dom
+
+      - name: Create release zip
+        run: |
+          cd packages/motion-plus-dom/dist
+          zip -r motion-plus-dom.zip motion-plus-dom.js motion-plus-dom.dev.js index.d.ts
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/motion-plus-dom@}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: motion-plus-dom v${{ steps.version.outputs.version }}
+          files: packages/motion-plus-dom/dist/motion-plus-dom.zip
+          body: |
+            ## Usage
+
+            Download `motion-plus-dom.zip` and include the script after Motion:
+
+            ```html
+            <script src="https://cdn.jsdelivr.net/npm/motion@latest/dist/motion.js"></script>
+            <script src="motion-plus-dom.js"></script>
+            <script>
+              const { chars, words, lines } = MotionPlus.splitText("#myElement")
+            </script>
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
