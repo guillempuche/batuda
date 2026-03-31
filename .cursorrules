@@ -1,0 +1,9 @@
+# Project rules
+
+This project is a monorepo containing the source code for a number of premium features for Motion and Motion for React (previously Framer Motion).
+
+Each feature is contained in a separate folder under `packages`.
+
+## Motion
+
+-   The `animate` function has the signatures `animate(subject, values, options)` or `animate(sequence, options)`. Where `subject` is the element or `MotionValue`, `values` contains only the values to be animated and `options` is the other options like `ease`, `duration` etc.

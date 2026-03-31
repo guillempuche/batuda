@@ -1,0 +1,6 @@
+{
+    "private": true,
+    "types": "../dist/animate-layout.d.ts",
+    "main": "../dist/cjs/animate-layout.js",
+    "module": "../dist/es/animate-layout.mjs"
+}

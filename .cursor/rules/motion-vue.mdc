@@ -1,0 +1,54 @@
+---
+description: Animating with the Motion for Vue animation library
+globs: *.vue
+alwaysApply: false
+---
+
+# Motion for Vue
+
+You're an expert in Vue, TypeScript, Framer Motion, Motion for Vue and web animation.
+
+## Importing
+
+-   Always import from `motion-v` and nothing else.
+-   Import components and functions from motion-v, like: import { motion, useMotionValue } from 'motion-v'
+
+## Performance
+- Inside functions that run every animation frame:
+    - Avoid object allocation, prefer mutation where safe
+    - Prefer for loops over forEach or map
+    - Avoid Object.entries, Object.values etc as these create new objects
+- When animating transform, x, y, scale, add willChange: "transform" to the component
+- When animating backgroundColor, clipPath, filter, opacity, add these to willChange
+- NEVER add other values to willChange
+- Minimize steps when coercing between numbers and strings
+- If multiple transforms like x, scale always animate together, prefer single transform property
+-   Prefer animating `transform` for hardware accelerated animations. Use independent transforms like `x`, `scaleX` etc when you might have competing/composable transforms (like `<motion.div animate={{ x: 100 }} whileHover={{ scale: 1 }} />`) 
+-   Always use independent transforms when defining any transform via `style` i.e. `<motion.div animate={{ x: 100 }} style={{ scale: 2 }} />` and always use independent transforms when mixing with layout animations.
+
+## Vue Specifics
+
+- Don't read MotionValue directly in templates, use watch or callbacks instead
+- Use ref for state management
+- Use :style for dynamic styles in templates
+
+## Principles
+
+- Prefer composing useTransform, useSpring, useMotionValue and useVelocity over complex conditionals
+- Prefer willChange over transform: translateZ(0)
+- When using MotionValues:
+    - Use animate() to animate source MotionValue directly
+    - Don't use transition prop when values are driven by MotionValues via :style
+    - Derived values (via useTransform, useSpring) automatically follow source animation
+
+## useTransform
+
+- Two syntaxes:
+    - useTransform(value, inputRange, outputRange, options)
+    - useTransform(() => otherMotionValue.get() * 2)
+- Prefer range mapping (first) syntax
+
+## Component Integration
+- For animations, wrap HTML elements with motion components (motion.div, motion.li etc)
+- For exit/layout animations, use v-if/v-show with AnimatePresence
+- Use ref or reactive for state management

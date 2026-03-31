@@ -1,0 +1,48 @@
+{
+    "compilerOptions": {
+        "target": "es2020",
+        "module": "esnext",
+        "moduleResolution": "node",
+        "isolatedModules": false,
+        "importHelpers": true,
+        "jsx": "react-jsx",
+        "esModuleInterop": true,
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true,
+        "declaration": true,
+        "baseUrl": "src",
+        "declarationDir": "types",
+        "outDir": "lib",
+        "rootDir": "src",
+        "noLib": false,
+        "preserveConstEnums": true,
+        "sourceMap": true,
+        "strictNullChecks": true,
+        "noImplicitAny": true,
+        "noImplicitThis": true,
+        "noImplicitUseStrict": false,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "removeComments": false,
+        "lib": ["es2017", "dom"],
+        "skipLibCheck": true,
+        "downlevelIteration": true,
+        "stripInternal": true
+    },
+    "compileOnSave": false,
+    "buildOnSave": false,
+    "exclude": [
+        "node_modules",
+        "build",
+        "**/__tests__/*",
+        "jest.setup.tsx",
+        "dev",
+        "types",
+        "test",
+        "dist",
+        "temp",
+        "cypress"
+    ],
+
+    "filesGlob": ["./src/**/*.ts"]
+}

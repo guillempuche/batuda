@@ -1,0 +1,40 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 100px 0;
+}
+
+.list {
+    padding: 0 15px;
+    margin: 0;
+    list-style: none;
+    background-color: #14171c;
+    border: 1px solid #2b323d;
+    border-radius: 10px;
+    width: 100%;
+    max-width: 500px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
+}
+
+.list li {
+    padding: 15px 0;
+    margin: 0;
+    border-bottom: 1px solid #2b323d;
+    display: flex;
+}
+
+.list li:last-child {
+    border: 0;
+}
+
+.list a {
+    text-decoration: none;
+    color: var(--white);
+    font-size: 14px;
+    width: 100%;
+}

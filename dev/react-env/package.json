@@ -1,0 +1,30 @@
+{
+    "name": "react-env",
+    "version": "2.0.2",
+    "private": true,
+    "scripts": {
+        "dev": "next dev",
+        "start": "next start",
+        "lint": "next lint"
+    },
+    "dependencies": {
+        "@radix-ui/react-slider": "^1.2.2",
+        "motion": "^12.25.0",
+        "motion-plus": "^2.2.0",
+        "next": "15.6.0-canary.57",
+        "react": "^19.2.0",
+        "react-dom": "^19.2.0"
+    },
+    "devDependencies": {
+        "@types/node": "^20",
+        "@types/react": "^19.2.0",
+        "@types/react-dom": "^19.2.0",
+        "eslint": "^8",
+        "eslint-config-next": "15.5.4",
+        "typescript": "^5"
+    },
+    "resolutions": {
+        "react": "^19.2.0",
+        "react-dom": "^19.2.0"
+    }
+}

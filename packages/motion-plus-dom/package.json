@@ -1,0 +1,51 @@
+{
+    "name": "motion-plus-dom",
+    "version": "2.11.2",
+    "description": "A collection of Motion functions and components, exclusive to Motion+ members.",
+    "main": "dist/index.js",
+    "module": "dist/index.mjs",
+    "types": "dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "require": "./dist/cjs/index.js",
+            "import": "./dist/es/index.mjs",
+            "default": "./dist/cjs/index.js"
+        }
+    },
+    "author": {
+        "name": "Matt Perry",
+        "url": "https://motion.dev"
+    },
+    "license": "MIT",
+    "scripts": {
+        "clean": "rm -rf types dist lib",
+        "build": "yarn clean && tsc -p . && rollup --config",
+        "dev": "concurrently -c blue,red -n tsc,rollup --kill-others \"tsc --watch -p . --preserveWatchOutput\" \"rollup --config --watch --no-watch.clearScreen\"",
+        "test": "bundlesize && yarn jest --passWithNoTests",
+        "new-alpha": "npm publish --tag alpha"
+    },
+    "files": [
+        "dist"
+    ],
+    "dependencies": {
+        "motion": "^12.25.0",
+        "motion-dom": "^12.24.11",
+        "motion-utils": "^12.24.10"
+    },
+    "devDependencies": {
+        "jest": "^29.7.0",
+        "jest-environment-jsdom": "^29.7.0",
+        "ts-jest": "^29.2.5"
+    },
+    "bundlesize": [
+        {
+            "path": "./dist/size.split-text.js",
+            "maxSize": "1.0 kB"
+        },
+        {
+            "path": "./dist/size.scramble-text.js",
+            "maxSize": "1.0 kB"
+        }
+    ]
+}

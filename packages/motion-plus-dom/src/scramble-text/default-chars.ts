@@ -1,0 +1,2 @@
+export const DEFAULT_SCRAMBLE_CHARS =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"

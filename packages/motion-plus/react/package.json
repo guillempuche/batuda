@@ -1,0 +1,6 @@
+{
+    "private": true,
+    "types": "../dist/react-entry.d.ts",
+    "main": "../dist/cjs/react-entry.js",
+    "module": "../dist/es/react-entry.mjs"
+}
