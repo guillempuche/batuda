@@ -1,0 +1,138 @@
+# Check https://circleci.com/docs/2.0/language-javascript/ for more details
+#
+jobs:
+    setup:
+        docker:
+            - image: cimg/node:20.11.1-browsers
+        working_directory: ~/repo
+        resource_class: large
+        environment:
+            CYPRESS_CACHE_FOLDER: ~/repo/.cache/Cypress
+        steps:
+            - checkout
+
+            - restore_cache:
+                  keys:
+                      - v3-yarn-{{ checksum "yarn.lock" }}
+                      - v3-yarn-
+            - run:
+                  name: Install dependencies (immutable)
+                  command: yarn install --immutable
+            - save_cache:
+                  paths:
+                      - .yarn/cache
+                      - .yarn/releases
+                      - .yarn/plugins
+                      - .yarn/patches
+                  key: v3-yarn-{{ checksum "yarn.lock" }}
+
+            - run:
+                  name: Build
+                  command: yarn build
+
+            - persist_to_workspace:
+                  root: .
+                  paths:
+                      - .
+
+    test:
+        docker:
+            - image: cimg/node:20.11.1-browsers
+        working_directory: ~/repo
+        resource_class: large
+        steps:
+            - attach_workspace:
+                  at: ~/repo
+
+            - run:
+                  name: Test Jest
+                  command: make test-jest
+
+            - store_test_results:
+                  path: test_reports
+
+    test-react:
+        docker:
+            - image: cimg/node:20.11.1-browsers
+        working_directory: ~/repo
+        parallelism: 4
+        resource_class: large
+        environment:
+            CYPRESS_CACHE_FOLDER: ~/repo/.cache/Cypress
+        steps:
+            - attach_workspace:
+                  at: ~/repo
+
+            - run:
+                  name: React tests
+                  command: make test-react
+                  environment:
+                      JEST_JUNIT_OUTPUT: test_reports/framer-motion-react.xml
+
+            - store_test_results:
+                  path: test_reports
+
+    test-react-19:
+        docker:
+            - image: cimg/node:20.11.1-browsers
+        working_directory: ~/repo
+        parallelism: 4
+        resource_class: large
+        environment:
+            CYPRESS_CACHE_FOLDER: ~/repo/.cache/Cypress
+        steps:
+            - attach_workspace:
+                  at: ~/repo
+
+            - run:
+                  name: React 19 tests
+                  command: make test-react-19
+                  environment:
+                      JEST_JUNIT_OUTPUT: test_reports/framer-motion-react-19.xml
+
+            - store_test_results:
+                  path: test_reports
+
+    test-html:
+        docker:
+            - image: cimg/node:20.11.1-browsers
+        resource_class: large
+        working_directory: ~/repo
+        environment:
+            CYPRESS_CACHE_FOLDER: ~/repo/.cache/Cypress
+        steps:
+            - attach_workspace:
+                  at: ~/repo
+
+            - run:
+                  name: HTML tests
+                  command: make test-html
+                  environment:
+                      JEST_JUNIT_OUTPUT: test_reports/framer-motion-html.xml
+
+            - run:
+                  name: Next.js tests
+                  command: make test-nextjs
+                  environment:
+                      JEST_JUNIT_OUTPUT: test_reports/framer-motion-next.xml
+
+            - store_test_results:
+                  path: test_reports
+
+workflows:
+    version: 2
+    build:
+        jobs:
+            - setup
+            - test:
+                  requires:
+                      - setup
+            - test-react:
+                  requires:
+                      - setup
+            - test-react-19:
+                  requires:
+                      - setup
+            - test-html:
+                  requires:
+                      - setup

@@ -1,0 +1,48 @@
+{
+    "pipeline": {
+        "clean": {},
+        "build": {
+            "dependsOn": ["^build"],
+            "outputs": ["dist/**", "lib/**", "types/**"]
+        },
+        "watch": {
+            "dependsOn": ["^watch"],
+            "outputs": ["dist/**", "types/**"]
+        },
+        "lint": {},
+        "test": {
+            "dependsOn": ["^build"]
+        },
+        "test-server": {
+            "dependsOn": ["^build"]
+        },
+        "test-e2e": {
+            "dependsOn": ["build"]
+        },
+        "test-ci": {
+            "dependsOn": ["^build"],
+            "cache": false,
+            "outputs": []
+        },
+        "deploy": {
+            "dependsOn": ["build", "test", "lint"],
+            "outputs": ["dist/**", "build/**"]
+        },
+        "measure": {
+            "dependsOn": ["build"],
+            "outputs": ["dist/**", "build/**"]
+        },
+        "publish": {
+            "dependsOn": [],
+            "outputs": ["dist/**", "build/**"]
+        },
+        "dev": {
+            "dependsOn": ["build"],
+            "cache": false,
+            "outputs": ["dist/**"]
+        },
+        "dev-server": {
+            "outputs": ["dist/**", "build/**"]
+        }
+    }
+}

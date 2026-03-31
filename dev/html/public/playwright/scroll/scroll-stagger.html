@@ -1,0 +1,92 @@
+<html>
+    <head>
+        <style>
+            body {
+                margin: 0;
+                font-family: sans-serif;
+                display: flex;
+                gap: 20px;
+                flex-direction: column;
+                height: 400vh;
+                padding-top: 50vh;
+            }
+
+            .group {
+                display: flex;
+                gap: 10px;
+                flex-direction: row;
+            }
+
+            .box {
+                width: 100px;
+                height: 100px;
+                background-color: #0077ff;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                text-align: center;
+                color: white;
+                font-weight: bold;
+            }
+
+            .container {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="group">
+                <div class="box mini">1</div>
+                <div class="box mini">2</div>
+                <div class="box mini">3</div>
+                <div class="box mini">4</div>
+            </div>
+            <div class="group">
+                <div class="box js">1</div>
+                <div class="box js">2</div>
+                <div class="box js">3</div>
+                <div class="box js">4</div>
+            </div>
+            <div class="group">
+                <div class="box waapi">1</div>
+                <div class="box waapi">2</div>
+                <div class="box waapi">3</div>
+                <div class="box waapi">4</div>
+            </div>
+        </div>
+        <script type="module" src="/src/inc.js"></script>
+        <script type="module">
+            const { animateMini, animate, scroll, stagger } = window.Motion
+
+            const options = {
+                duration: 1,
+                delay: stagger(0.4),
+            }
+
+            const miniElements = document.querySelectorAll(".mini")
+            const jsElements = document.querySelectorAll(".js")
+            const waapiElements = document.querySelectorAll(".waapi")
+
+            let mini = animateMini(
+                miniElements,
+                { transform: "translateX(100px)" },
+                options
+            )
+            let js = animate(jsElements, { x: 100 }, options)
+            let waapi = animate(
+                waapiElements,
+                { transform: "translateX(100px)" },
+                options
+            )
+
+            scroll(mini)
+            scroll(js)
+            scroll(waapi)
+        </script>
+    </body>
+</html>
