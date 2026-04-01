@@ -20,6 +20,7 @@ Never install Node or pnpm globally or via other package managers for this proje
 Use **`agent-browser`** (already installed) to test and debug the local web app.
 
 ### Open & navigate
+
 ```bash
 agent-browser open http://localhost:3000              # open pipeline dashboard
 agent-browser open http://localhost:3000/companies    # company list
@@ -29,6 +30,7 @@ agent-browser reload                                  # reload page
 ```
 
 ### Inspect page state
+
 ```bash
 agent-browser snapshot                  # accessibility tree with refs (best for AI)
 agent-browser screenshot                # screenshot to stdout
@@ -41,6 +43,7 @@ agent-browser get html ".pipeline"      # HTML of an element
 ```
 
 ### Interact with UI
+
 ```bash
 agent-browser click "button:has-text('Add company')"
 agent-browser fill "input[name='name']" "Can Joan"
@@ -53,6 +56,7 @@ agent-browser scrollintoview ".task-list"
 ```
 
 ### Find elements by role/text
+
 ```bash
 agent-browser find role "button" click             # click first button
 agent-browser find text "Save" click               # click element containing "Save"
@@ -61,6 +65,7 @@ agent-browser find testid "pipeline-card" click
 ```
 
 ### Verify state
+
 ```bash
 agent-browser is visible ".company-card"            # check element exists and visible
 agent-browser is enabled "button[type='submit']"    # check not disabled
@@ -71,6 +76,7 @@ agent-browser wait 2000                             # wait 2 seconds
 ```
 
 ### Debug
+
 ```bash
 agent-browser console                   # view console logs
 agent-browser errors                    # view JS errors
@@ -83,12 +89,33 @@ agent-browser set viewport 1440 900    # test desktop
 ```
 
 ### Network & requests
+
 ```bash
 agent-browser network requests                        # list network requests
 agent-browser network requests --filter "/api/"       # filter API calls
 agent-browser set offline on                          # test offline behavior
 agent-browser set offline off
 ```
+
+---
+
+## CLI
+
+Use the CLI for local environment management. No `--` needed between `pnpm cli` and the command.
+
+```bash
+pnpm cli setup            # copy .env files from examples
+pnpm cli doctor           # check environment health
+pnpm cli seed             # insert sample data (additive)
+pnpm cli db migrate       # run migrations
+pnpm cli db reset         # truncate + migrate + seed (clean slate)
+pnpm cli services up      # start Docker Postgres
+pnpm cli services down    # stop Docker services
+pnpm cli services status  # show Docker status
+pnpm cli:tui              # interactive TUI (same commands)
+```
+
+The CLI connects to Postgres via `DATABASE_URL` in `apps/cli/.env`. Commands that don't need the DB (`setup`, `services`) work without it.
 
 ---
 
@@ -112,6 +139,11 @@ get_documents(company_id)      → list (id, type, title) — no content
 get_document(id)               → full markdown content
 get_pipeline()                 → counts only
 get_next_steps(limit)          → due tasks + overdue next_action_at
+create_page(...)               → create a prospect sales page (draft) with Tiptap JSON content
+update_page(...)               → update page content, title, or meta
+publish_page(id)               → publish a draft page (makes it publicly accessible)
+list_pages(filters)            → list pages by company, status, or language
+get_page(id_or_slug_lang)      → get full page content by id or slug+lang
 ```
 
 Rule: always call `search_companies` before `get_company`. Fetch document content only when you need to read or rewrite it.
@@ -121,11 +153,13 @@ Rule: always call `search_companies` before `get_company`. Fetch document conten
 ## Working with companies
 
 **Status flow** (only moves forward):
+
 ```
 prospect → contacted → responded → meeting → proposal → client
                                                        → closed
                                                        → dead
 ```
+
 To re-engage a dead/closed company: set status back to `contacted`.
 
 **Slug format:** kebab-case from name. If duplicate, append city: `can-joan-girona`.
@@ -165,6 +199,7 @@ After `log_interaction`, update the company's `next_action` and `next_action_at`
 `documents.content` is full markdown. Write it as a human would — structured, scannable, no AI filler phrases.
 
 Document types:
+
 - `research` — scraped/researched company profile. Use Firecrawl/Exa first, then create this.
 - `prenote` — prep before a meeting. Link to the interaction via `interaction_id` once scheduled.
 - `postnote` — what happened. Always link to `interaction_id` of the meeting.
@@ -173,6 +208,7 @@ Document types:
 - `general` — anything else.
 
 When researching a new company with Firecrawl/Exa:
+
 1. `create_company(...)` with known fields
 2. `create_document({ type: "research", content: <scraped + structured markdown> })`
 
@@ -186,6 +222,7 @@ Text enum fields (status, industry, channel, etc.) are plain strings — not Pos
 Valid values are documented in `packages/domain/src/schema/`.
 
 `metadata jsonb` columns accept any valid JSON object. Always merge, never replace:
+
 ```
 update_company({ id, metadata: { ...existing, new_field: value } })
 ```
@@ -200,25 +237,39 @@ After completing a task, always check if a new task should be created for the ne
 
 ---
 
+## Working with pages
+
+Use `create_page` to generate prospect sales pages. Set `lang: 'ca'` first, then create translations for the same slug.
+
+Pages use Tiptap JSON with custom block nodes (hero, cta, valueProps, painPoints, socialProof). Standard rich text uses Tiptap StarterKit.
+
+Always `publish_page` after review — pages are draft by default.
+
+---
+
 ## Modifying code
 
 ### Backend (apps/server)
+
 - Effect patterns: see `docs/backend.md`
 - Every new route needs: handler + Effect Schema validation + error mapping
 - New MCP tool: add to `src/mcp/tools/`, register in `src/mcp/server.ts`
 
-### Frontend (apps/web)
+### Frontend (apps/internal)
+
 - Use design tokens, never hardcoded values: see `docs/frontend.md`
 - Use BaseUI for interactive components
 - Mobile-first: start with smallest viewport, expand with `@media (min-width: ...)`
 
 ### Schema changes
+
 1. Edit `packages/domain/src/schema/<table>.ts`
 2. Run `pnpm db:generate` to create migration
 3. Run `pnpm db:migrate` to apply
 4. Update affected MCP tools and routes
 
 ### Build & lint
+
 - Use `pnpm build` (runs `turbo build` with caching)
 - Use `pnpm check-types` for type checking across all packages
 - Use `pnpm lint` for Biome linting

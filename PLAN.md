@@ -1,7 +1,8 @@
 # Batuda — Build Plan
 
 Full scaffold for a B2B prospecting CRM + automation platform.
-Subdomain: `batuda.guillempuche.com`
+Brand: **Engranatge** (`engranatge.com`)
+Domains: `engranatge.com` (marketing) · `batuda.engranatge.com` (internal) · `api.engranatge.com` (server)
 
 ---
 
@@ -12,9 +13,11 @@ Subdomain: `batuda.guillempuche.com`
 | Monorepo | pnpm workspaces |
 | Dev environment | Nix flake (Node 24 + pnpm + kraft) |
 | Backend | Effect HTTP server + MCP server |
-| Frontend | TanStack Start → Cloudflare Pages |
-| Database | NeonDB (Postgres) via Drizzle ORM |
-| Server deploy | Unikraft (kraft CLI) |
+| Internal frontend | `apps/internal` — TanStack Start → Unikraft (Node.js SSR) |
+| Marketing frontend | `apps/marketing` — TanStack Start → Unikraft (Node.js SSR) |
+| Shared UI | `packages/ui` — design tokens + Tiptap block extensions |
+| Database | NeonDB (Postgres) via Effect SQL |
+| Deploy | Unikraft (kraft CLI) — both server and web |
 | Auth | API keys (hashed, per integration) |
 | AI access | MCP stdio (Claude Code) + HTTP/SSE (Claude.ai, ChatGPT) |
 
@@ -30,7 +33,7 @@ batuda/
 │   │   │   ├── main.ts           # HTTP server entry (Unikraft deploy)
 │   │   │   ├── mcp-stdio.ts      # MCP stdio entry (Claude Code)
 │   │   │   ├── db/
-│   │   │   │   └── client.ts     # Drizzle + NeonDB connection
+│   │   │   │   └── client.ts     # PgClient + Effect SQL connection
 │   │   │   ├── routes/
 │   │   │   │   ├── companies.ts
 │   │   │   │   ├── contacts.ts
@@ -39,6 +42,7 @@ batuda/
 │   │   │   │   ├── proposals.ts
 │   │   │   │   ├── products.ts
 │   │   │   │   ├── documents.ts
+│   │   │   │   ├── pages.ts
 │   │   │   │   └── webhooks.ts
 │   │   │   ├── mcp/
 │   │   │   │   ├── server.ts     # McpServer setup
@@ -48,6 +52,7 @@ batuda/
 │   │   │   │   │   ├── interactions.ts
 │   │   │   │   │   ├── tasks.ts
 │   │   │   │   │   ├── documents.ts
+│   │   │   │   │   ├── pages.ts
 │   │   │   │   │   └── pipeline.ts
 │   │   │   │   └── resources/
 │   │   │   │       ├── company.ts
@@ -56,6 +61,8 @@ batuda/
 │   │   │   │   └── api-key.ts    # HttpApiSecurity.apiKey
 │   │   │   └── services/
 │   │   │       ├── companies.ts
+│   │   │       ├── email.ts          # Resend: send + inbound reply handling
+│   │   │       ├── pages.ts          # page CRUD + view tracking
 │   │   │       ├── webhooks.ts
 │   │   │       └── pipeline.ts
 │   │   ├── Kraftfile             # Unikraft build definition
@@ -63,46 +70,99 @@ batuda/
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   │
-│   └── web/                      # TanStack Start → Cloudflare Pages
+│   ├── internal/                 # Batuda — internal sales tool (batuda.engranatge.com)
+│   │   ├── src/
+│   │   │   ├── router.tsx              # createRouter + routeTree.gen
+│   │   │   ├── routes/
+│   │   │   │   ├── __root.tsx
+│   │   │   │   ├── index.tsx           # Pipeline dashboard
+│   │   │   │   ├── companies/
+│   │   │   │   │   ├── index.tsx       # Company list
+│   │   │   │   │   └── $slug.tsx       # Company detail
+│   │   │   │   └── tasks/
+│   │   │   │       └── index.tsx       # Today's next steps
+│   │   │   ├── components/
+│   │   │   │   ├── pri/               # Pri* primitives (BaseUI + styled-components)
+│   │   │   │   │   ├── PriButton.tsx
+│   │   │   │   │   ├── PriInput.tsx
+│   │   │   │   │   ├── PriSelect.tsx
+│   │   │   │   │   ├── PriDialog.tsx
+│   │   │   │   │   ├── PriTabs.tsx
+│   │   │   │   │   ├── PriCheckbox.tsx
+│   │   │   │   │   └── PriMenu.tsx
+│   │   │   │   ├── Pipeline.tsx
+│   │   │   │   ├── CompanyCard.tsx
+│   │   │   │   ├── StatusBadge.tsx
+│   │   │   │   ├── CompanyMap.tsx       # react-map-gl + MapLibre
+│   │   │   │   └── TaskList.tsx
+│   │   │   ├── lib/
+│   │   │   │   └── api.ts              # Typed client → server
+│   │   │   └── styles/
+│   │   │       └── global.css          # imports @engranatge/ui tokens
+│   │   ├── vite.config.ts              # Vite + tanstackStart()
+│   │   ├── Dockerfile                  # Two-stage Node 24 build
+│   │   ├── Kraftfile                   # Unikraft deploy config
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   │
+│   └── marketing/                # Engranatge — public site (engranatge.com)
 │       ├── src/
+│       │   ├── router.tsx              # createRouter + routeTree.gen
 │       │   ├── routes/
 │       │   │   ├── __root.tsx
-│       │   │   ├── index.tsx           # Pipeline dashboard
-│       │   │   ├── companies/
-│       │   │   │   ├── index.tsx       # Company list
-│       │   │   │   └── $slug.tsx       # Company detail
-│       │   │   └── tasks/
-│       │   │       └── index.tsx       # Today's next steps
+│       │   │   ├── index.tsx           # Marketing homepage
+│       │   │   ├── $lang.tsx           # Language layout (ca/es/en)
+│       │   │   └── $lang/
+│       │   │       ├── index.tsx       # /:lang landing
+│       │   │       └── $slug.tsx       # /:lang/:slug prospect page
 │       │   ├── components/
-│       │   │   ├── Pipeline.tsx
-│       │   │   ├── CompanyCard.tsx
-│       │   │   ├── StatusBadge.tsx
-│       │   │   └── TaskList.tsx
+│       │   │   └── blocks/            # Tiptap block renderers
+│       │   │       ├── Hero.tsx
+│       │   │       ├── PainPoints.tsx
+│       │   │       ├── ValueProps.tsx
+│       │   │       ├── SocialProof.tsx
+│       │   │       ├── Cta.tsx
+│       │   │       └── RichText.tsx
 │       │   ├── lib/
 │       │   │   └── api.ts              # Typed client → server
 │       │   └── styles/
-│       │       ├── tokens.css          # MD3 tokens: typography, color, spacing
-│       │       └── global.css
-│       ├── wrangler.toml               # Cloudflare Pages config
+│       │       └── global.css          # imports @engranatge/ui tokens
+│       ├── vite.config.ts
+│       ├── Dockerfile
+│       ├── Kraftfile
 │       ├── package.json
 │       └── tsconfig.json
 │
 ├── packages/
-│   └── domain/                   # Shared: Drizzle schema + Effect Schema + types
+│   ├── domain/                   # Shared: Effect Schema types
+│   │   ├── src/
+│   │   │   ├── schema/
+│   │   │   │   ├── companies.ts
+│   │   │   │   ├── contacts.ts
+│   │   │   │   ├── interactions.ts
+│   │   │   │   ├── tasks.ts
+│   │   │   │   ├── products.ts
+│   │   │   │   ├── proposals.ts
+│   │   │   │   ├── documents.ts
+│   │   │   │   ├── pages.ts
+│   │   │   │   ├── api-keys.ts
+│   │   │   │   ├── webhook-endpoints.ts
+│   │   │   │   └── index.ts            # re-exports all tables
+│   │   │   └── index.ts
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   │
+│   └── ui/                       # Shared: design tokens + Tiptap block extensions
 │       ├── src/
-│       │   ├── schema/
-│       │   │   ├── companies.ts
-│       │   │   ├── contacts.ts
-│       │   │   ├── interactions.ts
-│       │   │   ├── tasks.ts
-│       │   │   ├── products.ts
-│       │   │   ├── proposals.ts
-│       │   │   ├── documents.ts
-│       │   │   ├── api-keys.ts
-│       │   │   ├── webhook-endpoints.ts
-│       │   │   └── index.ts            # re-exports all tables
+│       │   ├── tokens.css              # MD3 tokens: typography, color, spacing, shape
+│       │   ├── blocks/                 # Tiptap custom node extensions
+│       │   │   ├── hero.ts
+│       │   │   ├── cta.ts
+│       │   │   ├── value-props.ts
+│       │   │   ├── social-proof.ts
+│       │   │   ├── pain-points.ts
+│       │   │   └── index.ts
 │       │   └── index.ts
-│       ├── drizzle.config.ts
 │       ├── package.json
 │       └── tsconfig.json
 │
@@ -152,7 +212,8 @@ packages:
   },
   "scripts": {
     "dev:server": "pnpm --filter server dev",
-    "dev:web": "pnpm --filter web dev",
+    "dev:internal": "pnpm --filter internal dev",
+    "dev:marketing": "pnpm --filter marketing dev",
     "build": "turbo build",
     "check-types": "turbo check-types",
     "lint": "turbo lint",
@@ -183,7 +244,7 @@ Shared base — all packages extend this. Maximum strictness, bundler-mode (no `
 ```json
 {
   "compilerOptions": {
-    "target": "ES2024",
+    "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "bundler",
 
@@ -383,7 +444,7 @@ export default {
     },
     {
       label: 'Batuda',
-      dependencies: ['@batuda/*'],
+      dependencies: ['@engranatge/*'],
       policy: 'sameRange',
     },
     {
@@ -402,18 +463,13 @@ export default {
       policy: 'sameRange',
     },
     {
-      label: 'Drizzle',
-      dependencies: ['drizzle-orm', 'drizzle-kit'],
+      label: 'Effect SQL',
+      dependencies: ['@effect/sql-pg'],
       policy: 'sameRange',
     },
     {
       label: 'TanStack',
       dependencies: ['@tanstack/*'],
-      policy: 'sameRange',
-    },
-    {
-      label: 'Cloudflare',
-      dependencies: ['wrangler', '@cloudflare/*'],
       policy: 'sameRange',
     },
     {
@@ -591,25 +647,21 @@ Run `direnv allow` after cloning. The environment activates automatically on `cd
 ### `packages/domain/package.json`
 ```json
 {
-  "name": "@batuda/domain",
+  "name": "@engranatge/domain",
   "version": "0.0.1",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "build": "tsdown",
+    "build": "tsdown"
   },
   "dependencies": {
-    "drizzle-orm": "^0.45.2",
-    "@neondatabase/serverless": "^1.0.2",
-    "effect": "^3.21.0"
+    "effect": "^4.0.0-beta.43"
   },
   "devDependencies": {
-    "drizzle-kit": "^0.31.10",
+    "tsdown": "^0.21.7",
     "typescript": "^6.0.2",
     "dotenv": "^17.3.1"
   }
@@ -621,7 +673,7 @@ Run `direnv allow` after cloning. The environment activates automatically on `cd
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["ES2022"],
+    "lib": ["ESNext"],
     "outDir": "./dist",
     "rootDir": "./src"
   },
@@ -630,25 +682,11 @@ Run `direnv allow` after cloning. The environment activates automatically on `cd
 }
 ```
 
-### `packages/domain/drizzle.config.ts`
-```typescript
-import { defineConfig } from 'drizzle-kit'
-import * as dotenv from 'dotenv'
-dotenv.config({ path: '../../.env' })
-
-export default defineConfig({
-  schema: './src/schema/index.ts',
-  out: './migrations',
-  dialect: 'postgresql',
-  dbCredentials: {
-    url: process.env.DATABASE_URL!,
-  },
-})
-```
+<!-- drizzle.config.ts removed — migrations handled by Effect SQL Migrator -->
 
 ### `packages/domain/src/schema/companies.ts`
 ```typescript
-import { pgTable, uuid, text, integer, timestamp, jsonb } from 'drizzle-orm/pg-core'
+// Schema now uses Effect Schema (see packages/domain/src/schema/companies.ts)
 
 export const companies = pgTable('companies', {
   id:              uuid('id').primaryKey().defaultRandom(),
@@ -704,7 +742,7 @@ export const companies = pgTable('companies', {
 
 ### `packages/domain/src/schema/contacts.ts`
 ```typescript
-import { pgTable, uuid, text, boolean, timestamp, jsonb } from 'drizzle-orm/pg-core'
+// Schema now uses Effect Schema (see packages/domain/src/schema/)
 import { companies } from './companies'
 
 export const contacts = pgTable('contacts', {
@@ -731,7 +769,7 @@ export const contacts = pgTable('contacts', {
 
 ### `packages/domain/src/schema/interactions.ts`
 ```typescript
-import { pgTable, uuid, text, integer, date, timestamp, jsonb } from 'drizzle-orm/pg-core'
+// Schema now uses Effect Schema (see packages/domain/src/schema/)
 import { companies } from './companies'
 import { contacts } from './contacts'
 
@@ -767,7 +805,7 @@ export const interactions = pgTable('interactions', {
 
 ### `packages/domain/src/schema/tasks.ts`
 ```typescript
-import { pgTable, uuid, text, timestamp, jsonb } from 'drizzle-orm/pg-core'
+// Schema now uses Effect Schema (see packages/domain/src/schema/)
 import { companies } from './companies'
 import { contacts } from './contacts'
 
@@ -790,7 +828,7 @@ export const tasks = pgTable('tasks', {
 
 ### `packages/domain/src/schema/products.ts`
 ```typescript
-import { pgTable, uuid, text, numeric, timestamp, jsonb } from 'drizzle-orm/pg-core'
+// Schema now uses Effect Schema (see packages/domain/src/schema/)
 
 export const products = pgTable('products', {
   id:                 uuid('id').primaryKey().defaultRandom(),
@@ -817,7 +855,7 @@ export const products = pgTable('products', {
 
 ### `packages/domain/src/schema/proposals.ts`
 ```typescript
-import { pgTable, uuid, text, numeric, timestamp, jsonb } from 'drizzle-orm/pg-core'
+// Schema now uses Effect Schema (see packages/domain/src/schema/)
 import { companies } from './companies'
 import { contacts } from './contacts'
 
@@ -848,7 +886,7 @@ export const proposals = pgTable('proposals', {
 
 ### `packages/domain/src/schema/documents.ts`
 ```typescript
-import { pgTable, uuid, text, timestamp } from 'drizzle-orm/pg-core'
+// Schema now uses Effect Schema (see packages/domain/src/schema/)
 import { companies } from './companies'
 import { interactions } from './interactions'
 
@@ -869,9 +907,45 @@ export const documents = pgTable('documents', {
 })
 ```
 
+### `packages/domain/src/schema/pages.ts`
+```typescript
+// Schema now uses Effect Schema (see packages/domain/src/schema/)
+import { companies } from './companies'
+
+export const pages = pgTable('pages', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  companyId:     uuid('company_id').references(() => companies.id, { onDelete: 'set null' }),
+  // nullable — for generic pages not tied to a prospect
+
+  slug:          text('slug').notNull(),
+  lang:          text('lang').notNull(),
+  // values: ca | es | en
+
+  title:         text('title').notNull(),
+  status:        text('status').notNull().default('draft'),
+  // values: draft | published | archived
+  template:      text('template'),
+  // values: product-pitch | case-study | intro | landing | custom
+
+  content:       jsonb('content').notNull(),
+  // Tiptap JSON document with custom block nodes (hero, cta, value-props, etc.)
+  meta:          jsonb('meta'),
+  // SEO: { og_title, og_description, og_image }
+
+  publishedAt:   timestamp('published_at'),
+  expiresAt:     timestamp('expires_at'),
+  viewCount:     integer('view_count').notNull().default(0),
+
+  createdAt:     timestamp('created_at').defaultNow().notNull(),
+  updatedAt:     timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  unique('pages_slug_lang_unique').on(table.slug, table.lang),
+])
+```
+
 ### `packages/domain/src/schema/api-keys.ts`
 ```typescript
-import { pgTable, uuid, text, boolean, timestamp } from 'drizzle-orm/pg-core'
+// Schema now uses Effect Schema (see packages/domain/src/schema/)
 
 export const apiKeys = pgTable('api_keys', {
   id:         uuid('id').primaryKey().defaultRandom(),
@@ -889,7 +963,7 @@ export const apiKeys = pgTable('api_keys', {
 
 ### `packages/domain/src/schema/webhook-endpoints.ts`
 ```typescript
-import { pgTable, uuid, text, boolean, timestamp } from 'drizzle-orm/pg-core'
+// Schema now uses Effect Schema (see packages/domain/src/schema/)
 
 export const webhookEndpoints = pgTable('webhook_endpoints', {
   id:              uuid('id').primaryKey().defaultRandom(),
@@ -916,6 +990,7 @@ export * from './tasks'
 export * from './products'
 export * from './proposals'
 export * from './documents'
+export * from './pages'
 export * from './api-keys'
 export * from './webhook-endpoints'
 ```
@@ -932,31 +1007,30 @@ export * from './schema/index'
 ### `apps/server/package.json`
 ```json
 {
-  "name": "@batuda/server",
+  "name": "@engranatge/server",
   "version": "0.0.1",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/main.ts",
-    "dev:mcp": "tsx src/mcp-stdio.ts",
-    "build": "tsc",
+    "dev": "node --watch src/main.ts",
+    "dev:mcp": "node src/mcp-stdio.ts",
+    "build": "tsdown",
     "start": "node dist/main.js"
   },
   "dependencies": {
-    "@batuda/domain": "workspace:*",
+    "@engranatge/domain": "workspace:*",
     "effect": "^3.21.0",
     "@effect/platform": "^0.96.0",
     "@effect/platform-node": "^0.106.0",
     "@effect/sql": "^0.51.0",
-    "@effect/sql-pg": "^0.52.1",
-    "@effect/experimental": "^0.60.0",
-    "drizzle-orm": "^0.45.2",
-    "@neondatabase/serverless": "^1.0.2",
+    "@effect/sql-pg": "^4.0.0-beta.43",
+    "@effect/platform-node": "^4.0.0-beta.43",
+    "resend": "^6.10.0",
     "dotenv": "^17.3.1"
   },
   "devDependencies": {
+    "tsdown": "^0.21.7",
     "typescript": "^6.0.2",
-    "tsx": "^4.21.0",
     "@types/node": "^25.5.0"
   }
 }
@@ -967,7 +1041,7 @@ export * from './schema/index'
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["ES2022"],
+    "lib": ["ESNext"],
     "outDir": "./dist",
     "rootDir": "./src"
   },
@@ -976,7 +1050,7 @@ export * from './schema/index'
 }
 ```
 
-`tsx` respects `moduleResolution: "bundler"` — write imports without `.js`:
+Node 24 has built-in TypeScript type stripping (no `tsx` needed). The `erasableSyntaxOnly: true` flag in tsconfig ensures only Node-compatible TS syntax is used. Write imports without `.js`:
 ```typescript
 // correct — no extension needed
 import { CompanyService } from '../services/companies'
@@ -987,13 +1061,14 @@ import { db } from '../db/client'
 
 ### `apps/server/src/db/client.ts`
 ```typescript
-import { neon } from '@neondatabase/serverless'
-import { drizzle } from 'drizzle-orm/neon-http'
-import * as schema from '@batuda/domain'
+import { PgClient } from '@effect/sql-pg'
+import { Config } from 'effect'
 
-const sql = neon(process.env.DATABASE_URL!)
-export const db = drizzle(sql, { schema })
-export type DB = typeof db
+export const PgLive = PgClient.layerConfig({
+  url: Config.redacted('DATABASE_URL'),
+  transformResultNames: Config.succeed((s: string) => s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())),
+  transformQueryNames: Config.succeed((s: string) => s.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)),
+})
 ```
 
 ### `apps/server/src/middleware/api-key.ts`
@@ -1034,6 +1109,11 @@ Each tool returns the minimum data needed — never dumps full table.
 | `complete_task` | `{id}` | updated task |
 | `get_pipeline` | `{}` | counts by status, overdue tasks, companies without next action |
 | `get_next_steps` | `{limit?}` | tasks due soon + companies with overdue next_action_at |
+| `create_page` | `{company_id?, slug, lang, template?, title, content}` | created page (draft) |
+| `update_page` | `{id, content?, title?, meta?}` | updated page |
+| `publish_page` | `{id}` | sets status to published, sets published_at |
+| `list_pages` | `{company_id?, status?, lang?}` | page summaries |
+| `get_page` | `{id_or_slug, lang?}` | full page content |
 
 ### MCP Resources to implement
 
@@ -1050,6 +1130,12 @@ One file per entity. Each file exports an Effect `HttpApiGroup` with:
 - `POST /companies` — create
 - `PATCH /companies/:id` — update
 - (same pattern for contacts, interactions, tasks, proposals, products, documents)
+- `GET /pages/:slug` — public: returns published page content by slug+lang query param
+- `POST /pages/:slug/view` — public: increment view counter
+- `GET /pages` — internal: list pages with filters
+- `POST /pages` — internal: create page
+- `PATCH /pages/:id` — internal: update content/status
+- `DELETE /pages/:id` — internal: archive
 - `POST /webhooks/test/:id` — trigger a webhook manually for testing
 
 ### `apps/server/Kraftfile`
@@ -1101,8 +1187,8 @@ COPY ./packages ./packages
 RUN --mount=type=cache,target=/root/.pnpm-store \
     CI=true pnpm install --frozen-lockfile
 
-RUN pnpm --filter @batuda/domain build && \
-    pnpm --filter @batuda/server build
+RUN pnpm --filter @engranatge/domain build && \
+    pnpm --filter @engranatge/server build
 
 # Stage 2 — runtime
 FROM node:24-alpine
@@ -1125,81 +1211,195 @@ Key points from iapacte reference:
 
 ---
 
-## Phase 5 — apps/web
+## Phase 5 — apps/internal (Batuda)
 
-### `apps/web/package.json`
+### Step 1 — Scaffold with TanStack CLI
+
+```bash
+npx @tanstack/cli create web \
+  --toolchain biome \
+  --no-examples \
+  --no-git \
+  --no-install \
+  --package-manager pnpm \
+  --framework React \
+  --target-dir apps/internal
+```
+
+This creates a working TanStack Start + Biome project with Vite. No `--deployment` flag — we deploy to Unikraft (Node.js SSR), not Cloudflare.
+
+### Step 2 — Post-scaffold cleanup
+
+Remove Tailwind and Cloudflare (we use styled-components + MD3 tokens, deployed to Unikraft):
+```bash
+# In apps/internal/package.json, remove:
+#   tailwindcss, @tailwindcss/vite, @tailwindcss/typography
+#   @cloudflare/vite-plugin, wrangler (if scaffolded)
+
+# Remove devtools (we add them later if needed):
+#   @tanstack/react-devtools, @tanstack/devtools-vite, @tanstack/react-router-devtools
+
+# Remove demo files:
+rm src/components/Header.tsx src/components/Footer.tsx src/components/ThemeToggle.tsx
+rm src/routes/about.tsx
+rm wrangler.jsonc  # if created
+```
+
+Remove from `vite.config.ts`: `tailwindcss()`, `cloudflare()`, `devtools()` plugins + their imports.
+
+Replace `src/styles.css` content — remove Tailwind `@import "tailwindcss"` and the demo theme. This file will hold our MD3 token system (see docs/frontend.md).
+
+### Step 3 — Adapt for monorepo
+
+**`apps/internal/package.json`** — final shape after cleanup:
 ```json
 {
-  "name": "@batuda/web",
-  "version": "0.0.1",
+  "name": "@engranatge/internal",
   "private": true,
   "type": "module",
+  "imports": {
+    "#/*": "./src/*"
+  },
+  "description": "Batuda — internal sales prospecting tool",
   "scripts": {
-    "dev": "vinxi dev",
-    "build": "vinxi build",
-    "preview": "wrangler pages dev .output/public"
+    "dev": "vite dev --port 3000",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@batuda/domain": "workspace:*",
-    "@tanstack/start": "^1.120.20",
-    "@tanstack/react-router": "^1.168.8",
-    "@base-ui-components/react": "1.0.0-rc.0",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
+    "@engranatge/domain": "workspace:*",
+    "@engranatge/ui": "workspace:*",
+    "@tanstack/react-router": "latest",
+    "@tanstack/react-start": "latest",
+    "@tanstack/router-plugin": "^1.132.0",
+    "@base-ui-components/react": "^1.0.0",
+    "@tiptap/react": "^3.21.0",
+    "@tiptap/starter-kit": "^3.21.0",
+    "@tiptap/pm": "^3.21.0",
+    "styled-components": "^6.3.12",
+    "react-map-gl": "^8.1.0",
+    "maplibre-gl": "^5.21.1",
+    "supercluster": "^8.0.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
     "effect": "^3.21.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260329.1",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "wrangler": "^4.78.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@types/supercluster": "^7.1.3",
+    "@vitejs/plugin-react": "^5.1.4",
     "typescript": "^6.0.2",
-    "vite": "^8.0.3"
+    "vite": "^7.3.1",
+    "vite-tsconfig-paths": "^5.1.4"
   }
 }
 ```
 
-### `apps/web/tsconfig.json`
+**`apps/internal/tsconfig.json`** — extend monorepo base, keep CLI's bundler settings:
 ```json
 {
   "extends": "../../tsconfig.base.json",
+  "include": ["**/*.ts", "**/*.tsx"],
   "compilerOptions": {
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
-    "outDir": "./dist",
-    "rootDir": "./src"
-  },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist", ".output", ".wrangler"]
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "#/*": ["./src/*"]
+    },
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+  }
 }
 ```
 
-- `"jsx": "react-jsx"` — React 19 automatic JSX transform, no `import React` needed in every file
-- `"lib": ["ES2022", "DOM", "DOM.Iterable"]` — browser globals + modern JS
-- `@types/react@^19` — React 19 ships its own types but `@types/react` is still the DefinitelyTyped package; pin to `^19` to match the runtime
+### Step 4 — Key generated files
 
-**Note on TanStack Start + Cloudflare Pages:** Use the `cloudflare-pages` preset in `app.config.ts`. Verify the exact preset name in TanStack Start docs at scaffold time — it may be `vinxi`'s built-in Cloudflare preset.
-
-### `apps/web/app.config.ts`
+**`apps/internal/vite.config.ts`** (after cleanup):
 ```typescript
-import { defineConfig } from '@tanstack/start/config'
+import { defineConfig } from 'vite'
+import tsconfigPaths from 'vite-tsconfig-paths'
+import { tanstackStart } from '@tanstack/react-start/plugin/vite'
+import viteReact from '@vitejs/plugin-react'
 
-export default defineConfig({
-  server: {
-    preset: 'cloudflare-pages',
-  },
+const config = defineConfig({
+  plugins: [
+    tsconfigPaths({ projects: ['./tsconfig.json'] }),
+    tanstackStart(),
+    viteReact(),
+  ],
 })
+
+export default config
 ```
 
-### `apps/web/wrangler.toml`
-```toml
-name = "batuda-web"
-compatibility_date = "2025-01-01"
-pages_build_output_dir = ".output/public"
+**`apps/internal/Dockerfile`** (two-stage Node 24 build for Unikraft):
+```dockerfile
+FROM node:24-alpine AS build
+ENV NODE_OPTIONS=--no-network-family-autoselection
+WORKDIR /repo
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable && corepack prepare pnpm@latest --activate
+COPY ./package.json ./pnpm-lock.yaml ./pnpm-workspace.yaml ./
+COPY ./turbo.json ./
+RUN sed -i 's/"prepare": "lefthook install"/"prepare": ""/' package.json
+COPY ./apps ./apps
+COPY ./packages ./packages
+RUN --mount=type=cache,target=/root/.pnpm-store CI=true pnpm install --frozen-lockfile
+RUN DO_NOT_TRACK=1 TURBO_TELEMETRY_DISABLED=1 pnpm turbo run build --filter=@engranatge/internal
 
-[vars]
-SERVER_URL = "https://server.batuda.guillempuche.com"
+FROM node:24-alpine
+ENV NODE_OPTIONS=--no-network-family-autoselection
+WORKDIR /app
+COPY --from=build /repo/apps/internal/.output /app/.output
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV SERVER_URL=https://api.engranatge.com
+CMD ["node", ".output/server/index.mjs"]
 ```
+
+Note: The Dockerfile builds domain+ui+internal via Turborepo. The `SERVER_URL` points to `api.engranatge.com`.
+
+**`apps/internal/Kraftfile`**:
+```yaml
+spec: v0.6
+name: batuda-internal
+runtime: node:latest
+labels:
+  cloud.unikraft.v1.instances/scale_to_zero.policy: "on"
+  cloud.unikraft.v1.instances/scale_to_zero.stateful: "false"
+  cloud.unikraft.v1.instances/scale_to_zero.cooldown_time_ms: 1000
+rootfs: ./Dockerfile
+cmd: ["/usr/bin/node", "/app/.output/server/index.mjs"]
+```
+
+**`apps/internal/src/router.tsx`** (scaffolded by CLI):
+```typescript
+import { createRouter as createTanStackRouter } from '@tanstack/react-router'
+import { routeTree } from './routeTree.gen'
+
+export function getRouter() {
+  const router = createTanStackRouter({
+    routeTree,
+    scrollRestoration: true,
+    defaultPreload: 'intent',
+    defaultPreloadStaleTime: 0,
+  })
+
+  return router
+}
+
+declare module '@tanstack/react-router' {
+  interface Register {
+    router: ReturnType<typeof getRouter>
+  }
+}
+```
+
+`routeTree.gen.ts` is auto-generated by `@tanstack/router-plugin` from the `src/routes/` directory. Do not edit it manually.
 
 ### Route structure
 
@@ -1230,9 +1430,217 @@ SERVER_URL = "https://server.batuda.guillempuche.com"
 
 ### Design principles
 - Mobile-first, fluid layout
-- No UI library — plain CSS with custom tokens
+- styled-components for co-located CSS in .tsx files, using MD3 CSS custom property tokens
+- BaseUI headless components styled via styled-components
+- react-map-gl + MapLibre for company map view with clustering
 - Status colors consistent across all views
 - Minimal JS, mostly server-rendered
+
+---
+
+## Phase 5b — packages/ui
+
+Shared design tokens and Tiptap block extensions used by both `apps/internal` and `apps/marketing`.
+
+### `packages/ui/package.json`
+```json
+{
+  "name": "@engranatge/ui",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./tokens.css": "./src/tokens.css"
+  },
+  "scripts": {
+    "build": "tsdown"
+  },
+  "dependencies": {
+    "@tiptap/core": "^3.21.0",
+    "@tiptap/pm": "^3.21.0"
+  },
+  "devDependencies": {
+    "tsdown": "^0.21.7",
+    "typescript": "^6.0.2"
+  }
+}
+```
+
+### `packages/ui/src/tokens.css`
+
+Contains all MD3 design tokens (moved from apps/internal). See [frontend.md](docs/frontend.md) for the full token system:
+- Typography scale (display/headline/title/body/label × large/medium/small)
+- Color scheme (light + dark)
+- Fluid spacing scale
+- Shape tokens
+- Elevation tokens
+- Breakpoint tokens
+
+Both apps import tokens via:
+```css
+/* apps/internal/src/styles/global.css or apps/marketing/src/styles/global.css */
+@import '@engranatge/ui/tokens.css';
+```
+
+### `packages/ui/src/blocks/`
+
+Tiptap custom node extensions for marketing page blocks. Each file exports a Tiptap `Node.create()`:
+
+| Block | Attrs | Purpose |
+|-------|-------|---------|
+| `hero` | `heading`, `subheading`, `cta: { label, action }` | Page hero section |
+| `cta` | `heading`, `body`, `buttons: [{ label, action, url }]` | Call-to-action section |
+| `valueProps` | `heading`, `items: [{ title, body, image? }]` | Feature/benefit grid |
+| `painPoints` | `heading`, `items: [{ icon, title, body }]` | Problem statement list |
+| `socialProof` | `heading`, `testimonials: [{ quote, author, company }]` | Testimonials/logos |
+
+Standard rich text (paragraphs, headings, lists) is handled by Tiptap's built-in StarterKit — no custom nodes needed.
+
+---
+
+## Phase 5c — apps/marketing (Engranatge)
+
+Public-facing website at `engranatge.com`. Serves both the Engranatge marketing homepage and AI-generated prospect sales pages.
+
+### Scaffold
+
+```bash
+npx @tanstack/cli create marketing \
+  --toolchain biome \
+  --no-examples \
+  --no-git \
+  --no-install \
+  --package-manager pnpm \
+  --framework React \
+  --target-dir apps/marketing
+```
+
+Same post-scaffold cleanup as `apps/internal` (remove Tailwind, Cloudflare, devtools, demo files).
+
+### `apps/marketing/package.json`
+```json
+{
+  "name": "@engranatge/marketing",
+  "private": true,
+  "type": "module",
+  "description": "Engranatge — public marketing site + prospect pages",
+  "imports": {
+    "#/*": "./src/*"
+  },
+  "scripts": {
+    "dev": "vite dev --port 3001",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@engranatge/domain": "workspace:*",
+    "@engranatge/ui": "workspace:*",
+    "@tanstack/react-router": "latest",
+    "@tanstack/react-start": "latest",
+    "@tanstack/router-plugin": "^1.132.0",
+    "@tiptap/react": "^3.21.0",
+    "@tiptap/starter-kit": "^3.21.0",
+    "@tiptap/pm": "^3.21.0",
+    "styled-components": "^6.3.12",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.1.4",
+    "typescript": "^6.0.2",
+    "vite": "^7.3.1",
+    "vite-tsconfig-paths": "^5.1.4"
+  }
+}
+```
+
+### Route structure
+
+```
+/                   Marketing homepage (Engranatge)
+/:lang              Language landing (ca/es/en)
+/:lang/:slug        Prospect page — fetches from GET /pages/:slug?lang=:lang
+```
+
+### `$lang.tsx` — language layout
+
+Validates `lang` param against `ca | es | en`. Sets `<html lang>`. Returns 404 on invalid language code. Provides lang context to child routes.
+
+### `$lang/$slug.tsx` — prospect page
+
+1. Server function calls `GET ${SERVER_URL}/pages/${slug}?lang=${lang}`
+2. If page not published or not found → 404
+3. Renders Tiptap JSON content by mapping block types to React components
+4. Emits SEO tags from `meta` field: `<title>`, `og:title`, `og:description`, `og:image`, `og:locale`
+5. Emits `<link rel="alternate" hreflang="...">` for all available translations
+6. Fires `POST /pages/${slug}/view` on load (fire-and-forget)
+
+### Block renderer
+
+```tsx
+// apps/marketing/src/components/blocks/BlockRenderer.tsx
+import { Hero } from './Hero'
+import { Cta } from './Cta'
+import { ValueProps } from './ValueProps'
+import { PainPoints } from './PainPoints'
+import { SocialProof } from './SocialProof'
+import { RichText } from './RichText'
+
+const BLOCK_MAP = {
+  hero: Hero,
+  cta: Cta,
+  valueProps: ValueProps,
+  painPoints: PainPoints,
+  socialProof: SocialProof,
+} as const
+
+// For standard Tiptap content (paragraphs, headings, lists),
+// use generateHTML() from @tiptap/html with the shared block extensions.
+// Custom block nodes render via BLOCK_MAP.
+```
+
+### `apps/marketing/Dockerfile`
+```dockerfile
+FROM node:24-alpine AS build
+ENV NODE_OPTIONS=--no-network-family-autoselection
+WORKDIR /repo
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable && corepack prepare pnpm@latest --activate
+COPY ./package.json ./pnpm-lock.yaml ./pnpm-workspace.yaml ./
+COPY ./turbo.json ./
+RUN sed -i 's/"prepare": "lefthook install"/"prepare": ""/' package.json
+COPY ./apps ./apps
+COPY ./packages ./packages
+RUN --mount=type=cache,target=/root/.pnpm-store CI=true pnpm install --frozen-lockfile
+RUN DO_NOT_TRACK=1 TURBO_TELEMETRY_DISABLED=1 pnpm turbo run build --filter=@engranatge/marketing
+
+FROM node:24-alpine
+ENV NODE_OPTIONS=--no-network-family-autoselection
+WORKDIR /app
+COPY --from=build /repo/apps/marketing/.output /app/.output
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV SERVER_URL=https://api.engranatge.com
+CMD ["node", ".output/server/index.mjs"]
+```
+
+### `apps/marketing/Kraftfile`
+```yaml
+spec: v0.6
+name: engranatge-marketing
+runtime: node:latest
+labels:
+  cloud.unikraft.v1.instances/scale_to_zero.policy: "on"
+  cloud.unikraft.v1.instances/scale_to_zero.stateful: "false"
+  cloud.unikraft.v1.instances/scale_to_zero.cooldown_time_ms: 1000
+rootfs: ./Dockerfile
+cmd: ["/usr/bin/node", "/app/.output/server/index.mjs"]
+```
 
 ---
 
@@ -1248,7 +1656,7 @@ SERVER_URL = "https://server.batuda.guillempuche.com"
       "env": {
         "DATABASE_URL": "${DATABASE_URL}"
       },
-      "description": "Batuda CRM — companies, contacts, interactions, documents, pipeline"
+      "description": "Batuda — companies, contacts, interactions, documents, pages, pipeline"
     }
   }
 }
@@ -1280,6 +1688,8 @@ See PLAN.md § MCP Tools for the full list.
 - Use `search_companies` before `get_company` — it returns summaries only.
 - Use `get_documents` (list) before `get_document` (content) — fetch content only when needed.
 - `get_pipeline` for overviews. `get_next_steps` for daily planning.
+- Use `create_page` to generate prospect sales pages. Set `lang: "ca"` first, then create translations.
+- Always `publish_page` after review — pages are draft by default.
 ```
 
 ---
@@ -1306,8 +1716,11 @@ pnpm db:migrate
 # 5. Start server in dev
 pnpm dev:server
 
-# 6. Start web in dev (separate terminal)
-pnpm dev:web
+# 6. Start internal app in dev (separate terminal)
+pnpm dev:internal
+
+# 7. Start marketing app in dev (separate terminal)
+pnpm dev:marketing
 
 # 7. Test MCP locally
 pnpm --filter server dev:mcp
@@ -1319,9 +1732,11 @@ pnpm --filter server dev:mcp
 ## Open items at scaffold time
 
 1. **Effect MCP package** — verify whether MCP lives in `@effect/experimental` or a separate `@effect/mcp` package
-2. **TanStack Start Cloudflare preset** — confirm preset name in app.config.ts
+2. **TanStack Start deployment** — Unikraft (Node.js SSR) via Dockerfile + Kraftfile
 3. **Unikraft Node 24 base image** — check `catalog.unikraft.org` for availability of node:24
 4. **NeonDB project** — create project at neon.tech, copy connection string to `.env`
+5. **DNS setup** — `engranatge.com`, `batuda.engranatge.com`, `api.engranatge.com` pointing to respective Unikraft instances
+6. **Tiptap block extensions** — verify custom node API in Tiptap v3 for structured block content
 
 ---
 
@@ -1333,6 +1748,7 @@ companies ──< interactions >── contacts
 companies ──< tasks        >── contacts
 companies ──< proposals    >── contacts
 companies ──< documents    >── interactions
+companies ──< pages
 webhook_endpoints (standalone)
 api_keys (standalone)
 products (standalone, referenced by proposals.line_items jsonb)

@@ -8,28 +8,48 @@ For system context see [architecture.md](architecture.md).
 ## Project structure
 
 ```
-apps/server/src/
-├── main.ts               # HTTP server entry point
-├── mcp-stdio.ts          # MCP stdio entry point (Claude Code)
-├── db/
-│   └── client.ts         # Drizzle + NeonDB
-├── routes/               # HttpApiGroup per entity
+docker/
+└── postgres/
+    └── docker-compose.yml   # Local Postgres 17 for development
+
+packages/domain/src/          # Effect Schema types (no DB connection)
+├── schema/
 │   ├── companies.ts
 │   ├── contacts.ts
-│   ├── interactions.ts
-│   ├── tasks.ts
-│   ├── products.ts
-│   ├── proposals.ts
-│   ├── documents.ts
-│   └── webhooks.ts
+│   ├── ...
+│   └── index.ts
+└── index.ts
+
+packages/controllers/src/     # Shared HttpApiGroup specs (see TODO_BACKEND Phase 2b)
+
+apps/server/src/
+├── db/
+│   ├── client.ts             # PgClient layer (from DATABASE_URL)
+│   ├── migrator.ts           # PgMigrator layer (file system loader)
+│   ├── migrations/           # Effect SQL migration files
+│   │   └── 0001_initial.ts
+│   └── migrate.ts            # CLI entry point for running migrations
+├── main.ts                   # HTTP server entry point — imports db layers from ./db/
+├── mcp-stdio.ts              # MCP stdio entry point (Claude Code)
+├── api/
+│   ├── specs/
+│   │   └── api.ts            # Imports groups from @engranatge/controllers + server-only
+│   └── live/                 # HttpApiBuilder.group() implementations
+│       ├── api.ts            # ApiLive composing all handler layers
+│       ├── companies.ts
+│       ├── contacts.ts
+│       ├── ...
+│       └── health.ts
 ├── mcp/
-│   ├── server.ts         # McpServer, tool + resource registration
-│   ├── tools/            # one file per domain
+│   ├── server.ts             # McpServer, tool + resource registration
+│   ├── tools/                # one file per domain (incl. pages.ts)
 │   └── resources/
 ├── middleware/
-│   └── api-key.ts
-└── services/             # business logic, called by both routes and MCP tools
+│   └── api-key.ts            # Live implementation of ApiKeyMiddleware
+└── services/                 # business logic, called by both routes and MCP tools
     ├── companies.ts
+    ├── email.ts              # Resend: send outbound + handle inbound replies
+    ├── pages.ts              # page CRUD, view tracking, publish/archive
     ├── webhooks.ts
     └── pipeline.ts
 ```
@@ -46,7 +66,7 @@ moduleResolution: bundler   → write imports WITHOUT .js extensions
                               import { foo } from '../foo.js'     ✗
 
 verbatimModuleSyntax: true  → type-only imports MUST use `import type`
-                              import type { Company } from '@batuda/domain'
+                              import type { Company } from '@engranatge/domain'
 
 noUncheckedIndexedAccess    → arr[0] is T | undefined, not T
                               always null-check array/object access
@@ -58,82 +78,179 @@ exactOptionalPropertyTypes  → optional props cannot be set to undefined explic
 
 ---
 
+## Local development
+
+Use Docker Compose for local services. Start Postgres before running the server:
+
+```bash
+pnpm db:up        # docker compose -f docker/postgres/docker-compose.yml up -d
+pnpm db:migrate   # runs Effect Migrator via apps/server/src/db/migrate.ts
+pnpm dev:server   # starts the server (also runs migrations on startup)
+```
+
+For production, `DATABASE_URL` points to NeonDB (or any Postgres). The db layer works with any Postgres — local Docker or cloud.
+
+---
+
+## Database layer (`apps/server/src/db/`)
+
+Effect Layers for Postgres + Migrations. Lives inside the server — the only consumer.
+
+### Client layer (`@effect/sql-pg`)
+
+```typescript
+// apps/server/src/db/client.ts
+import { PgClient } from '@effect/sql-pg'
+import { Config } from 'effect'
+
+export const PgLive = PgClient.layerConfig({
+  url: Config.redacted('DATABASE_URL'),
+  transformResultNames: Config.succeed((s: string) => s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())),
+  transformQueryNames: Config.succeed((s: string) => s.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)),
+})
+```
+
+The transform functions handle snake_case ↔ camelCase mapping automatically — `sql.insert({ sizeRange: 'x' })` generates `INSERT INTO ... (size_range) VALUES ('x')`, and SELECT results map `size_range` → `sizeRange`.
+
+### Migrator layer (`@effect/sql-pg/PgMigrator`)
+
+```typescript
+// apps/server/src/db/migrator.ts
+import * as PgMigrator from '@effect/sql-pg/PgMigrator'
+import { Layer } from 'effect'
+import { fileURLToPath } from 'node:url'
+import { PgLive } from './client'
+
+export const MigratorLive = PgMigrator.layer({
+  loader: PgMigrator.fromFileSystem(
+    fileURLToPath(new URL('migrations', import.meta.url))
+  ),
+}).pipe(Layer.provide(PgLive))
+```
+
+### Migration files
+
+```typescript
+// apps/server/src/db/migrations/0001_initial.ts
+import { SqlClient } from 'effect/unstable/sql'
+import { Effect } from 'effect'
+
+export default Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient
+  yield* sql`
+    CREATE TABLE companies (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name VARCHAR(255) NOT NULL,
+      slug VARCHAR(255) NOT NULL UNIQUE,
+      ...
+    )
+  `
+})
+```
+
+### Server startup
+
+```typescript
+// apps/server/src/main.ts
+import { HttpApiBuilder } from 'effect/unstable/httpapi'
+import { HttpRouter } from 'effect/unstable/http'
+
+const ApiLive = HttpApiBuilder.layer(BatudaApi).pipe(Layer.provide([...handlers]))
+const ServicesLive = Layer.mergeAll(CompanyService.layer, PageService.layer, ...)
+
+const program = HttpRouter.serve(ApiLive).pipe(
+  Layer.provide(ServicesLive),
+  Layer.provide(PgLive),
+  Layer.provideMerge(ServerLive),
+  Layer.launch,
+)
+```
+
+---
+
 ## Effect v4 patterns
 
 ### Layer composition
 
 ```typescript
-import { Effect, Layer } from "effect"
+import { Effect, Layer, ServiceMap } from "effect"
+import { SqlClient } from 'effect/unstable/sql'
+import type { Statement } from 'effect/unstable/sql'
 
-// Service definition
-class CompanyService extends Effect.Service<CompanyService>()("CompanyService", {
-  effect: Effect.gen(function* () {
-    const db = yield* DbClient
+// Service definition — uses Effect SQL template literals
+class CompanyService extends ServiceMap.Service<CompanyService>()(
+  "CompanyService",
+  {
+    make: Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
 
-    return {
-      findBySlug: (slug: string) =>
-        Effect.tryPromise({
-          try: () => db.query.companies.findFirst({ where: eq(schema.companies.slug, slug) }),
-          catch: (e) => new DatabaseError({ cause: e })
-        }),
+      return {
+        findBySlug: (slug: string) =>
+          Effect.gen(function* () {
+            const rows = yield* sql`SELECT * FROM companies WHERE slug = ${slug} LIMIT 1`
+            return rows[0]
+          }),
 
-      search: (filters: CompanyFilters) =>
-        Effect.tryPromise({ ... })
-    }
-  }),
-  dependencies: [DbClient.Default]
-}) {}
+        search: (filters: CompanyFilters) => {
+          const conditions: Array<Statement.Fragment> = []
+          if (filters.status) conditions.push(sql`status = ${filters.status}`)
+          if (filters.region) conditions.push(sql`region = ${filters.region}`)
+          return sql`
+            SELECT * FROM companies
+            WHERE ${sql.and(conditions)}
+            ORDER BY priority, updated_at DESC
+          `
+        },
+      }
+    }),
+  },
+) {
+  static readonly layer = Layer.effect(this, this.make)
+}
 ```
 
 ### HTTP routes
 
 ```typescript
-import { HttpApiGroup, HttpApiEndpoint, HttpApiSchema } from "@effect/platform"
+import { HttpApiGroup, HttpApiEndpoint, HttpApiSchema } from "effect/unstable/httpapi"
 
-export const CompaniesApi = HttpApiGroup.make("companies").pipe(
-  HttpApiGroup.add(
-    HttpApiEndpoint.get("list", "/companies").pipe(
-      HttpApiEndpoint.setSuccess(Schema.Array(CompanySummary)),
-      HttpApiEndpoint.addError(HttpApiError.NotFound)
-    )
-  ),
-  HttpApiGroup.add(
-    HttpApiEndpoint.get("get", "/companies/:slug").pipe(
-      HttpApiEndpoint.setSuccess(CompanyDetail),
-      HttpApiEndpoint.addError(HttpApiError.NotFound)
-    )
-  ),
-  HttpApiGroup.add(
-    HttpApiEndpoint.post("create", "/companies").pipe(
-      HttpApiEndpoint.setPayload(CreateCompanyInput),
-      HttpApiEndpoint.setSuccess(Company)
-    )
-  )
+export const CompaniesApi = HttpApiGroup.make("companies").add(
+  HttpApiEndpoint.get("list", "/companies", {
+    query: { status: Schema.optional(Schema.String) },
+    success: Schema.Array(Schema.Unknown),
+  }),
+  HttpApiEndpoint.get("get", "/companies/:slug", {
+    params: { slug: Schema.String },
+    success: Schema.Unknown,
+    error: NotFound.pipe(HttpApiSchema.status(404)),
+  }),
+  HttpApiEndpoint.post("create", "/companies", {
+    payload: CreateCompanyInput,
+    success: Schema.Unknown,
+  }),
 )
 ```
 
 ### Route handlers
 
 ```typescript
-import { HttpApiBuilder } from "@effect/platform"
+import { HttpApiBuilder } from "effect/unstable/httpapi"
 
 export const CompaniesApiLive = HttpApiBuilder.group(
   BatudaApi,
   "companies",
   (handlers) =>
     handlers
-      .handle("list", ({ urlParams }) =>
+      .handle("list", (_) =>
         Effect.gen(function* () {
           const service = yield* CompanyService
-          return yield* service.search(urlParams)
+          return yield* service.search(_.query)
         })
       )
-      .handle("get", ({ path }) =>
+      .handle("get", (_) =>
         Effect.gen(function* () {
           const service = yield* CompanyService
-          const company = yield* service.findBySlug(path.slug)
-          if (!company) return yield* Effect.fail(new HttpApiError.NotFound())
-          return company
+          return yield* service.findBySlug(_.params.slug)
         })
       )
 )
@@ -146,18 +263,18 @@ Define domain errors with Effect Schema:
 ```typescript
 import { Schema } from "effect"
 
-export class DatabaseError extends Schema.TaggedError<DatabaseError>()(
+export class DatabaseError extends Schema.TaggedErrorClass<DatabaseError>()(
   "DatabaseError",
   { cause: Schema.Unknown }
 ) {}
 
-export class NotFoundError extends Schema.TaggedError<NotFoundError>()(
+export class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()(
   "NotFoundError",
   { entity: Schema.String, id: Schema.String }
 ) {}
 ```
 
-Map to HTTP responses in the route definition via `HttpApiEndpoint.addError`.
+Map to HTTP responses in the route definition via `HttpApiSchema.status()`.
 
 ### Effect Schema for validation
 
@@ -176,39 +293,13 @@ export const CreateCompanyInput = Schema.Struct({
 
 ---
 
-## Database client
-
-```typescript
-// src/db/client.ts
-import { neon } from "@neondatabase/serverless"
-import { drizzle } from "drizzle-orm/neon-http"
-import * as schema from "@batuda/domain"
-import { Effect, Layer, Context } from "effect"
-
-export class DbClient extends Context.Tag("DbClient")<
-  DbClient,
-  ReturnType<typeof drizzle>
->() {
-  static readonly Default = Layer.effect(
-    DbClient,
-    Effect.gen(function* () {
-      const url = yield* Effect.config(Config.string("DATABASE_URL"))
-      return drizzle(neon(url), { schema })
-    })
-  )
-}
-```
-
----
-
 ## MCP server
 
 ### Server setup
 
 ```typescript
 // src/mcp/server.ts
-import { McpServer } from "@effect/experimental/McpServer"
-// Note: verify import path for Effect v4 — may be @effect/mcp
+import { McpServer } from "effect/unstable/ai"
 
 export const BatudaMcpServer = McpServer.make({
   name: "batuda",
@@ -227,6 +318,11 @@ export const BatudaMcpServer = McpServer.make({
   McpServer.addTool(CompleteTaskTool),
   McpServer.addTool(GetPipelineTool),
   McpServer.addTool(GetNextStepsTool),
+  McpServer.addTool(CreatePageTool),
+  McpServer.addTool(UpdatePageTool),
+  McpServer.addTool(PublishPageTool),
+  McpServer.addTool(ListPagesTool),
+  McpServer.addTool(GetPageTool),
   McpServer.addResource(CompanyResource),
   McpServer.addResource(PipelineResource)
 )
@@ -236,13 +332,13 @@ export const BatudaMcpServer = McpServer.make({
 
 ```typescript
 // src/mcp/tools/companies.ts
-import { McpServer } from "@effect/experimental/McpServer"
+import { McpServer, Tool } from "effect/unstable/ai"
 import { Schema } from "effect"
 
-export const SearchCompaniesTool = McpServer.tool({
+export const SearchCompaniesTool = Tool.make({
   name: "search_companies",
   description: "Filter companies by status, region, industry, priority, or product fit. Returns summaries only — call get_company for full details.",
-  input: Schema.Struct({
+  parameters: Schema.Struct({
     status: Schema.optional(Schema.String),
     region: Schema.optional(Schema.Literal("cat", "ara", "cv")),
     industry: Schema.optional(Schema.String),
@@ -261,15 +357,20 @@ export const SearchCompaniesTool = McpServer.tool({
 ### Two MCP transports
 
 **stdio** (Claude Code — local):
+
 ```typescript
 // src/mcp-stdio.ts
-import { McpServer } from "@effect/experimental/McpServer"
-import { NodeRuntime } from "@effect/platform-node"
+import { NodeRuntime, NodeStdio } from "@effect/platform-node"
 
-BatudaMcpServer.pipe(
-  McpServer.serveStdio,
-  NodeRuntime.runMain
+const ServerLayer = McpToolsLive.pipe(
+  Layer.provide(McpServer.layerStdio({ name: 'batuda', version: '1.0.0' })),
+  Layer.provide(ServicesLive),
+  Layer.provide(PgLive),
+  Layer.provide(NodeStdio.layer),
+  Layer.provide(Layer.succeed(Logger.LogToStderr)(true)),
 )
+
+Layer.launch(ServerLayer).pipe(NodeRuntime.runMain)
 ```
 
 **HTTP/SSE** (Claude.ai, ChatGPT — remote):
@@ -294,6 +395,72 @@ Uses the SSE transport from `@effect/experimental`.
 
 ---
 
+## Email service (Resend)
+
+Outbound email (outreach, follow-ups) and inbound reply handling via [Resend](https://resend.com).
+
+### Sending
+
+```typescript
+// src/services/email.ts
+import { Resend } from "resend"
+import { Effect, Layer, Context } from "effect"
+
+export class EmailService extends ServiceMap.Service<EmailService>()(
+  "EmailService",
+  {
+    make: Effect.gen(function* () {
+      const apiKey = yield* Config.string("RESEND_API_KEY")
+      const fromAddress = yield* Config.string("EMAIL_FROM")
+      const resend = new Resend(apiKey)
+
+    return {
+      send: (to: string, subject: string, html: string, metadata: { companyId: string; contactId?: string }) =>
+        Effect.gen(function* () {
+          const result = yield* Effect.tryPromise({
+            try: () => resend.emails.send({ from: fromAddress, to, subject, html }),
+            catch: (e) => new EmailError({ cause: e })
+          })
+          // Auto-log as interaction
+          const interactionService = yield* InteractionService
+          yield* interactionService.create({
+            company_id: metadata.companyId,
+            contact_id: metadata.contactId,
+            channel: "email",
+            direction: "outbound",
+            type: "email",
+            summary: subject,
+            outcome: "sent",
+          })
+          return result
+        }),
+    }
+  }),
+  },
+) {
+  static readonly layer = Layer.effect(this, this.make)
+}
+```
+
+### Inbound replies (webhook)
+
+Resend forwards inbound emails to `POST /webhooks/email/inbound`. The handler:
+
+1. Parses the Resend webhook payload (verifies signature with `RESEND_WEBHOOK_SECRET`)
+2. Matches reply to a company/contact by `from` address
+3. Auto-creates an interaction with `channel: "email"`, `direction: "inbound"`
+4. Fires `interaction.logged` webhook event
+
+### Env vars
+
+```
+RESEND_API_KEY=re_...
+RESEND_WEBHOOK_SECRET=whsec_...
+EMAIL_FROM=batuda@guillempuche.com
+```
+
+---
+
 ## Webhook fan-out
 
 When a significant event occurs, fire webhooks asynchronously:
@@ -304,40 +471,41 @@ When a significant event occurs, fire webhooks asynchronously:
 
 const fireWebhooks = (event: string, payload: unknown) =>
   Effect.gen(function* () {
-    const db = yield* DbClient
-    const endpoints = yield* Effect.tryPromise(() =>
-      db.query.webhookEndpoints.findMany({
-        where: and(
-          arrayContains(schema.webhookEndpoints.events, [event]),
-          eq(schema.webhookEndpoints.isActive, true)
-        )
-      })
-    )
+    const sql = yield* SqlClient.SqlClient
+    const endpoints = yield* sql`
+      SELECT * FROM webhook_endpoints
+      WHERE ${event} = ANY(events) AND is_active = true
+    `
 
     yield* Effect.forEach(endpoints, (endpoint) =>
       Effect.tryPromise(() =>
-        fetch(endpoint.url, {
+        fetch(endpoint['url'] as string, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "X-Batuda-Event": event,
-            "X-Batuda-Signature": hmacSign(endpoint.secret, payload)
+            "X-Batuda-Signature": hmacSign(endpoint['secret'] as string, payload)
           },
           body: JSON.stringify({ event, payload, timestamp: new Date().toISOString() })
         })
-      ).pipe(Effect.ignoreLogged),
+      ).pipe(Effect.ignore({ log: true })),
       { concurrency: "unbounded" }
     )
-  }).pipe(Effect.forkDaemon)   // never awaited
+  }).pipe(Effect.forkDetach)   // never awaited
 ```
 
 Events fired:
+
 - `company.created`
 - `company.status_changed` (include `from` and `to` in payload)
 - `interaction.logged`
+- `email.sent`
+- `email.received` (inbound reply)
 - `proposal.sent`
 - `proposal.accepted`
 - `task.completed`
+- `page.published`
+- `page.viewed` (fired on first view or milestone counts)
 
 ---
 
@@ -369,10 +537,41 @@ Style: 2-space indent, 100-char line width, single quotes, ES5 trailing commas, 
 2. Register in `src/mcp/server.ts` via `McpServer.addTool`
 3. Document in `AGENTS.md` if it changes agent workflows
 
+## Pages API
+
+The pages API serves both public (marketing site) and internal (management) use cases:
+
+### Public routes (no auth)
+
+- `GET /pages/:slug?lang=ca` — returns published page content (Tiptap JSON + meta + available langs)
+- `POST /pages/:slug/view` — increments view counter (fire-and-forget)
+
+### Internal routes
+
+- `GET /pages?company_id=&status=&lang=` — list pages with filters
+- `POST /pages` — create page (draft)
+- `PATCH /pages/:id` — update content, title, meta, status
+- `PATCH /pages/:id/publish` — set status to published, set published_at
+- `DELETE /pages/:id` — archive (soft delete: status → archived)
+
+### Page content format
+
+Content is stored as Tiptap JSON in a JSONB column. Custom block nodes are defined in `packages/ui/src/blocks/`:
+
+- `hero` — heading, subheading, CTA button
+- `cta` — heading, body, action buttons
+- `valueProps` — feature/benefit grid
+- `painPoints` — problem statement list
+- `socialProof` — testimonials
+
+Standard rich text (paragraphs, headings, lists) uses Tiptap's built-in StarterKit nodes.
+
+---
+
 ## Changing the schema
 
 1. Edit `packages/domain/src/schema/<table>.ts`
-2. `pnpm db:generate` — creates migration file in `packages/domain/migrations/`
-3. `pnpm db:migrate` — applies to NeonDB
-4. Update affected Drizzle queries in services
+2. Write a new migration in `apps/server/src/db/migrations/`
+3. `pnpm db:migrate` — applies via Effect Migrator
+4. Update affected SQL queries in services
 5. Update Effect Schema validators if needed
