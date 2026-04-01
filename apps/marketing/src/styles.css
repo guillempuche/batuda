@@ -1,0 +1,19 @@
+@import "@engranatge/ui/tailwind.css";
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+	margin: 0;
+}
+
+body {
+	font-family: "Inter", system-ui, -apple-system, sans-serif;
+	font-size: var(--typescale-body-large-size);
+	line-height: var(--typescale-body-large-line);
+	letter-spacing: var(--typescale-body-large-tracking);
+	background: var(--color-surface);
+	color: var(--color-on-surface);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
