@@ -70,14 +70,14 @@ type(scope): subject in imperative mood
 
 Scope is derived from context and varies by type:
 
-| Type                      | Scope Convention                                    | Examples                                    |
-| ------------------------- | --------------------------------------------------- | ------------------------------------------- |
-| `feat`, `fix`, `refactor` | **Path-based**: derived from package path           | `feat(server):`, `fix(domain):`             |
-| `chore`, `docs`           | **Path-based** or omit if mixed                     | `chore(web):`, `docs:`                      |
-| `cicd`                    | **Functional**: `release`, `deploy`, or omit        | `cicd(release):`, `cicd(deploy):`, `cicd:`  |
-| `test`                    | **Path-based**: same scope as the code being tested | `test(domain):`, `test(server):`            |
-| `ai`                      | **Component**: `skills`, `mcp`, or omit             | `ai(skills):`, `ai(mcp):`, `ai:`            |
-| `revert`                  | **Match the original commit's scope**               | `revert(web):`                              |
+| Type                      | Scope Convention                                    | Examples                                   |
+| ------------------------- | --------------------------------------------------- | ------------------------------------------ |
+| `feat`, `fix`, `refactor` | **Path-based**: derived from package path           | `feat(server):`, `fix(domain):`            |
+| `chore`, `docs`           | **Path-based** or omit if mixed                     | `chore(web):`, `docs:`                     |
+| `cicd`                    | **Functional**: `release`, `deploy`, or omit        | `cicd(release):`, `cicd(deploy):`, `cicd:` |
+| `test`                    | **Path-based**: same scope as the code being tested | `test(domain):`, `test(server):`           |
+| `ai`                      | **Component**: `skills`, `mcp`, or omit             | `ai(skills):`, `ai(mcp):`, `ai:`           |
+| `revert`                  | **Match the original commit's scope**               | `revert(web):`                             |
 
 When changes span multiple scopes, omit the scope entirely.
 
@@ -164,7 +164,7 @@ feat(server): add company search with filters
 refactor(domain): migrate interactions to timestamptz columns
 
 - Replaced date columns with timestamp for timezone awareness.
-- Updated drizzle schema and generated new migration.
+- Replaced date columns with timestamptz for timezone awareness.
 ```
 
 ```
