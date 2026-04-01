@@ -1,0 +1,128 @@
+import { Effect, Schema } from 'effect'
+import { Tool, Toolkit } from 'effect/unstable/ai'
+
+import { CompanyService } from '../../services/companies'
+
+const SearchCompanies = Tool.make('search_companies', {
+	description:
+		'Filter companies by status, region, industry, priority, or search query. Returns summaries only — call get_company for full details.',
+	parameters: Schema.Struct({
+		status: Schema.optional(Schema.String),
+		region: Schema.optional(Schema.String),
+		industry: Schema.optional(Schema.String),
+		priority: Schema.optional(Schema.Number),
+		product_fit: Schema.optional(Schema.String),
+		query: Schema.optional(Schema.String),
+		limit: Schema.optional(Schema.Number),
+	}),
+	success: Schema.Unknown,
+})
+
+const GetCompany = Tool.make('get_company', {
+	description:
+		'Get full company profile including contacts and last 5 interactions. Use the slug or ID.',
+	parameters: Schema.Struct({
+		id_or_slug: Schema.String,
+	}),
+	success: Schema.Unknown,
+})
+
+const CreateCompany = Tool.make('create_company', {
+	description: 'Create a new company. Slug must be kebab-case from name.',
+	parameters: Schema.Struct({
+		name: Schema.String,
+		slug: Schema.String,
+		status: Schema.optional(Schema.String),
+		industry: Schema.optional(Schema.String),
+		sizeRange: Schema.optional(Schema.String),
+		region: Schema.optional(Schema.String),
+		location: Schema.optional(Schema.String),
+		source: Schema.optional(Schema.String),
+		priority: Schema.optional(Schema.Number),
+		website: Schema.optional(Schema.String),
+		email: Schema.optional(Schema.String),
+		phone: Schema.optional(Schema.String),
+		instagram: Schema.optional(Schema.String),
+		linkedin: Schema.optional(Schema.String),
+		googleMapsUrl: Schema.optional(Schema.String),
+		productsFit: Schema.optional(Schema.Array(Schema.String)),
+		tags: Schema.optional(Schema.Array(Schema.String)),
+		painPoints: Schema.optional(Schema.String),
+		currentTools: Schema.optional(Schema.String),
+		nextAction: Schema.optional(Schema.String),
+		nextActionAt: Schema.optional(Schema.String),
+		metadata: Schema.optional(Schema.Unknown),
+	}),
+	success: Schema.Unknown,
+})
+
+const UpdateCompany = Tool.make('update_company', {
+	description: 'Update company fields by ID.',
+	parameters: Schema.Struct({
+		id: Schema.String,
+		name: Schema.optional(Schema.String),
+		status: Schema.optional(Schema.String),
+		industry: Schema.optional(Schema.String),
+		sizeRange: Schema.optional(Schema.String),
+		region: Schema.optional(Schema.String),
+		location: Schema.optional(Schema.String),
+		source: Schema.optional(Schema.String),
+		priority: Schema.optional(Schema.Number),
+		website: Schema.optional(Schema.String),
+		email: Schema.optional(Schema.String),
+		phone: Schema.optional(Schema.String),
+		instagram: Schema.optional(Schema.String),
+		linkedin: Schema.optional(Schema.String),
+		googleMapsUrl: Schema.optional(Schema.String),
+		productsFit: Schema.optional(Schema.Array(Schema.String)),
+		tags: Schema.optional(Schema.Array(Schema.String)),
+		painPoints: Schema.optional(Schema.String),
+		currentTools: Schema.optional(Schema.String),
+		nextAction: Schema.optional(Schema.String),
+		nextActionAt: Schema.optional(Schema.String),
+		metadata: Schema.optional(Schema.Unknown),
+	}),
+	success: Schema.Unknown,
+})
+
+export const CompanyTools = Toolkit.make(
+	SearchCompanies,
+	GetCompany,
+	CreateCompany,
+	UpdateCompany,
+)
+
+export const CompanyHandlersLive = CompanyTools.toLayer(
+	Effect.gen(function* () {
+		const service = yield* CompanyService
+		return {
+			search_companies: params =>
+				Effect.gen(function* () {
+					return yield* service.search({
+						status: params.status,
+						region: params.region,
+						industry: params.industry,
+						priority: params.priority,
+						productFit: params.product_fit,
+						query: params.query,
+						limit: params.limit,
+					})
+				}).pipe(Effect.orDie),
+			get_company: ({ id_or_slug }) =>
+				service.getWithRelations(id_or_slug).pipe(
+					Effect.catchTag('NotFound', () => service.findById(id_or_slug)),
+					Effect.orDie,
+				),
+			create_company: params =>
+				Effect.gen(function* () {
+					const rows = yield* service.create(params as any)
+					return rows[0]
+				}).pipe(Effect.orDie),
+			update_company: ({ id, ...fields }) =>
+				Effect.gen(function* () {
+					const rows = yield* service.update(id, fields as any)
+					return rows[0]
+				}).pipe(Effect.orDie),
+		}
+	}),
+)
