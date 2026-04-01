@@ -1,4 +1,7 @@
 {
-  "model": "claude-opus-4-6",
-  "effortLevel": "high"
+	"model": "claude-opus-4-6",
+	"enabledPlugins": {
+		"ai-agent-readability-improver@ai-standards": true
+	},
+	"effortLevel": "high"
 }

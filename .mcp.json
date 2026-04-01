@@ -1,0 +1,12 @@
+{
+	"mcpServers": {
+		"batuda": {
+			"command": "pnpm",
+			"args": ["--filter", "@engranatge/server", "dev:mcp"],
+			"env": {
+				"DATABASE_URL": "${DATABASE_URL}"
+			},
+			"description": "Batuda — companies, contacts, interactions, documents, pages, pipeline"
+		}
+	}
+}
