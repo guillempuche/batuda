@@ -16,7 +16,6 @@ dist/
 
 # Database
 *.db
-migrations/
 
 # Cloudflare
 .wrangler/

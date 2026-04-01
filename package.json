@@ -1,0 +1,44 @@
+{
+	"name": "engranatge",
+	"type": "module",
+	"engines": {
+		"node": ">=24",
+		"pnpm": ">=10"
+	},
+	"scripts": {
+		"______ Development ______": "",
+		"cli": "pnpm --filter @engranatge/cli dev",
+		"cli:tui": "pnpm --filter @engranatge/cli dev:tui",
+		"dev:server": "pnpm --filter @engranatge/server dev",
+		"dev:internal": "pnpm --filter @engranatge/internal dev",
+		"dev:marketing": "pnpm --filter @engranatge/marketing dev",
+		"______ Build ______": "",
+		"build": "turbo build",
+		"check-types": "turbo check-types",
+		"______ Code Quality ______": "",
+		"lint": "pnpm lint-syncpack && pnpm lint-biome && pnpm lint-markdown",
+		"lint-biome": "biome check --write --no-errors-on-unmatched --max-diagnostics=none",
+		"lint-markdown": "dprint fmt",
+		"lint-syncpack": "syncpack format && syncpack fix",
+		"______ Check ______": "",
+		"check": "biome check . && dprint check",
+		"check-deps": "syncpack lint",
+		"______ Database ______": "",
+		"db:up": "docker compose -f docker/db/docker-compose.yml up -d",
+		"db:down": "docker compose -f docker/db/docker-compose.yml down",
+		"db:migrate": "pnpm --filter @engranatge/server run migrate",
+		"______ Setup ______": "",
+		"prepare": "lefthook install",
+		"setup": "pnpm cli -- setup"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.4.10",
+		"dprint": "^0.53.1",
+		"lefthook": "^2.1.4",
+		"syncpack": "^14.3.0",
+		"turbo": "^2.9.2",
+		"typescript": "^5.9.3"
+	},
+	"private": true,
+	"packageManager": "pnpm@10.33.0"
+}

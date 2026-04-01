@@ -1,0 +1,32 @@
+pre-commit:
+  commands:
+    check-deps:
+      run: |
+        pnpm check-deps
+      stage_fixed: true
+
+    check-types:
+      run: |
+        pnpm check-types
+
+    lint:
+      run: |
+        pnpm lint-biome {staged_files}
+      stage_fixed: true
+
+    format-packages:
+      run: |
+        pnpm lint-syncpack
+      stage_fixed: true
+
+    format-markdown:
+      glob: "**/*.md"
+      run: |
+        dprint fmt --config dprint.json --allow-no-files {staged_files}
+      stage_fixed: true
+
+pre-push:
+  commands:
+    test:
+      run: |
+        pnpm turbo test
