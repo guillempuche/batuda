@@ -1,0 +1,7 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+@theme {
+	--breakpoint-md: 768px;
+	--breakpoint-lg: 1024px;
+}
