@@ -1,6 +1,6 @@
 # TODO — Frontend
 
-Ordered implementation checklist for `apps/internal` (Batuda) and `apps/marketing` (Engranatge).
+Ordered implementation checklist for `apps/internal` (Forja) and `apps/marketing` (Engranatge).
 See [frontend.md](frontend.md) for internal app patterns. See [marketing.md](marketing.md) for public site.
 See [architecture.md](architecture.md) for data flow.
 
@@ -344,7 +344,7 @@ DESKTOP:
 - [ ] Run `kraft build` with `apps/internal/Kraftfile` and verify image builds
 - [ ] Run `kraft run` locally and verify SSR responds
 - [ ] Deploy to Unikraft Cloud with `kraft deploy`
-- [ ] Point `batuda.engranatge.com` to deployed instance
+- [ ] Point `forja.engranatge.com` to deployed instance
 - [ ] Set `SERVER_URL` env var to `https://api.engranatge.com`
 - [ ] Verify production deploy works end-to-end
 

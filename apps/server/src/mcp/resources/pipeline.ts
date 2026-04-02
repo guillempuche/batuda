@@ -4,7 +4,7 @@ import { McpServer } from 'effect/unstable/ai'
 import { PipelineService } from '../../services/pipeline'
 
 export const PipelineResource = McpServer.resource({
-	uri: 'batuda://pipeline',
+	uri: 'forja://pipeline',
 	name: 'Pipeline Summary',
 	description: 'Pipeline overview: status counts, overdue tasks, next steps',
 	content: Effect.gen(function* () {

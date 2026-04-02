@@ -6,13 +6,14 @@ Engranatge builds tools that let machines handle the work humans shouldn't waste
 
 We sell automations, AI integrations, and micro-SaaS tools to local businesses. The goal is simple: free up people to do the work that actually matters.
 
-Domains: `engranatge.com` (marketing) · `batuda.engranatge.com` (internal) · `api.engranatge.com` (server)
+Domains: `engranatge.com` (marketing) · `forja.engranatge.com` (internal) · `api.engranatge.com` (server)
 
 ## What we build
 
 **For clients** — automations, AI workflows, and small focused tools (micro-SaaS) that replace manual busywork in local businesses: auto-scheduling, smart invoicing, lead follow-up, inventory alerts, report generation, whatever the business needs.
 
-**For ourselves** — Batuda, our internal sales prospecting tool:
+**For ourselves** — Forja, our internal sales prospecting tool:
+
 - Track prospect companies through a pipeline
 - Log every interaction: cold visits, calls, emails, LinkedIn, Instagram
 - Store AI-researched company profiles and meeting notes
@@ -36,20 +37,20 @@ The philosophy: **machines do the low-value work, humans do the high-value work.
 
 ## Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Monorepo | pnpm workspaces |
-| Dev environment | Nix flake (Node 24 + pnpm + kraft) |
-| Shared schema | `packages/domain` — Effect Schema |
-| CLI | `apps/cli` — Effect CLI + @clack/prompts TUI |
-| Backend | `apps/server` — Effect v4 HTTP + MCP server |
-| Internal frontend | `apps/internal` — TanStack Start (Batuda) |
+| Layer              | Technology                                     |
+| ------------------ | ---------------------------------------------- |
+| Monorepo           | pnpm workspaces                                |
+| Dev environment    | Nix flake (Node 24 + pnpm + kraft)             |
+| Shared schema      | `packages/domain` — Effect Schema              |
+| CLI                | `apps/cli` — Effect CLI + @clack/prompts TUI   |
+| Backend            | `apps/server` — Effect v4 HTTP + MCP server    |
+| Internal frontend  | `apps/internal` — TanStack Start (Forja)       |
 | Marketing frontend | `apps/marketing` — TanStack Start (Engranatge) |
-| Shared UI | `packages/ui` — design tokens + Tiptap blocks |
-| Database | NeonDB (Postgres) |
-| Server deploy | Unikraft via kraft CLI |
-| Design system | MD3 tokens + BaseUI headless components |
-| Code quality | Biome (lint + format, root config) |
+| Shared UI          | `packages/ui` — design tokens + Tiptap blocks  |
+| Database           | NeonDB (Postgres)                              |
+| Server deploy      | Unikraft via kraft CLI                         |
+| Design system      | MD3 tokens + BaseUI headless components        |
+| Code quality       | Biome (lint + format, root config)             |
 
 ## Quick start
 
@@ -79,7 +80,7 @@ pnpm cli:tui         # interactive TUI menu (same commands)
 
 # Development
 pnpm dev:server      # start server (Effect HTTP + MCP)
-pnpm dev:internal    # start internal app (Batuda)
+pnpm dev:internal    # start internal app (Forja)
 pnpm dev:marketing   # start marketing app (Engranatge)
 
 # Build & lint

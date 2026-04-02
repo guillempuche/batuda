@@ -3,10 +3,10 @@ import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { BatudaApi } from '../api'
+import { ForjaApi } from '../api'
 
 export const ContactsLive = HttpApiBuilder.group(
-	BatudaApi,
+	ForjaApi,
 	'contacts',
 	handlers =>
 		Effect.gen(function* () {
@@ -24,6 +24,12 @@ export const ContactsLive = HttpApiBuilder.group(
 					Effect.gen(function* () {
 						const rows =
 							yield* sql`INSERT INTO contacts ${sql.insert(_.payload as any)} RETURNING *`
+						yield* Effect.logInfo('Contact created').pipe(
+							Effect.annotateLogs({
+								event: 'contact.created',
+								companyId: (_.payload as any).companyId,
+							}),
+						)
 						return rows[0]
 					}).pipe(Effect.orDie),
 				)
@@ -33,12 +39,24 @@ export const ContactsLive = HttpApiBuilder.group(
 							UPDATE contacts SET ${sql.update({ ...(_.payload as any), updatedAt: new Date() }, ['id'])}
 							WHERE id = ${_.params.id} RETURNING *
 						`
+						yield* Effect.logInfo('Contact updated').pipe(
+							Effect.annotateLogs({
+								event: 'contact.updated',
+								contactId: _.params.id,
+							}),
+						)
 						return rows[0]
 					}).pipe(Effect.orDie),
 				)
 				.handle('remove', _ =>
 					Effect.gen(function* () {
 						yield* sql`DELETE FROM contacts WHERE id = ${_.params.id}`
+						yield* Effect.logInfo('Contact removed').pipe(
+							Effect.annotateLogs({
+								event: 'contact.removed',
+								contactId: _.params.id,
+							}),
+						)
 					}).pipe(Effect.orDie),
 				)
 		}),

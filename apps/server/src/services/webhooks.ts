@@ -27,6 +27,14 @@ export class WebhookService extends ServiceMap.Service<WebhookService>()(
 							ep.events.includes(event),
 						)
 
+						yield* Effect.logInfo('Webhook fan-out').pipe(
+							Effect.annotateLogs({
+								event: 'webhook.fired',
+								webhookEvent: event,
+								endpointCount: matching.length,
+							}),
+						)
+
 						yield* Effect.forEach(
 							matching,
 							(endpoint: any) =>
@@ -36,11 +44,8 @@ export class WebhookService extends ServiceMap.Service<WebhookService>()(
 											method: 'POST',
 											headers: {
 												'Content-Type': 'application/json',
-												'X-Batuda-Event': event,
-												'X-Batuda-Signature': hmacSign(
-													endpoint.secret,
-													payload,
-												),
+												'X-Forja-Event': event,
+												'X-Forja-Signature': hmacSign(endpoint.secret, payload),
 											},
 											body: JSON.stringify({
 												event,
@@ -48,9 +53,20 @@ export class WebhookService extends ServiceMap.Service<WebhookService>()(
 												timestamp: new Date().toISOString(),
 											}),
 										}),
-									catch: () =>
-										new Error(`Webhook delivery failed: ${endpoint.url}`),
-								}).pipe(Effect.ignore({ log: true })),
+									catch: e =>
+										new Error(`Webhook delivery failed: ${endpoint.url}: ${e}`),
+								}).pipe(
+									Effect.catch((error: Error) =>
+										Effect.logError('Webhook delivery failed').pipe(
+											Effect.annotateLogs({
+												event: 'webhook.failed',
+												endpointUrl: endpoint.url,
+												webhookEvent: event,
+												error: error.message,
+											}),
+										),
+									),
+								),
 							{ concurrency: 'unbounded' },
 						)
 					}).pipe(Effect.forkDetach),

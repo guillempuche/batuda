@@ -1,9 +1,9 @@
 # Frontend
 
-TanStack Start SSR app for the internal Batuda sales tool. Deployed to Unikraft (Node.js). Mobile-first.
+TanStack Start SSR app for the internal Forja sales tool. Deployed to Unikraft (Node.js). Mobile-first.
 For system context see [architecture.md](architecture.md).
 
-Deployed at `batuda.engranatge.com`. For the public marketing site, see [marketing.md](marketing.md).
+Deployed at `forja.engranatge.com`. For the public marketing site, see [marketing.md](marketing.md).
 
 ---
 

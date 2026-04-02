@@ -1,25 +1,25 @@
-# Batuda — Build Plan
+# Forja — Build Plan
 
 Full scaffold for a B2B prospecting CRM + automation platform.
 Brand: **Engranatge** (`engranatge.com`)
-Domains: `engranatge.com` (marketing) · `batuda.engranatge.com` (internal) · `api.engranatge.com` (server)
+Domains: `engranatge.com` (marketing) · `forja.engranatge.com` (internal) · `api.engranatge.com` (server)
 
 ---
 
 ## Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Monorepo | pnpm workspaces |
-| Dev environment | Nix flake (Node 24 + pnpm + kraft) |
-| Backend | Effect HTTP server + MCP server |
-| Internal frontend | `apps/internal` — TanStack Start → Unikraft (Node.js SSR) |
+| Layer              | Technology                                                 |
+| ------------------ | ---------------------------------------------------------- |
+| Monorepo           | pnpm workspaces                                            |
+| Dev environment    | Nix flake (Node 24 + pnpm + kraft)                         |
+| Backend            | Effect HTTP server + MCP server                            |
+| Internal frontend  | `apps/internal` — TanStack Start → Unikraft (Node.js SSR)  |
 | Marketing frontend | `apps/marketing` — TanStack Start → Unikraft (Node.js SSR) |
-| Shared UI | `packages/ui` — design tokens + Tiptap block extensions |
-| Database | NeonDB (Postgres) via Effect SQL |
-| Deploy | Unikraft (kraft CLI) — both server and web |
-| Auth | API keys (hashed, per integration) |
-| AI access | MCP stdio (Claude Code) + HTTP/SSE (Claude.ai, ChatGPT) |
+| Shared UI          | `packages/ui` — design tokens + Tiptap block extensions    |
+| Database           | NeonDB (Postgres) via Effect SQL                           |
+| Deploy             | Unikraft (kraft CLI) — both server and web                 |
+| Auth               | API keys (hashed, per integration)                         |
+| AI access          | MCP stdio (Claude Code) + HTTP/SSE (Claude.ai, ChatGPT)    |
 
 ---
 
@@ -70,7 +70,7 @@ batuda/
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   │
-│   ├── internal/                 # Batuda — internal sales tool (batuda.engranatge.com)
+│   ├── internal/                 # Forja — internal sales tool (forja.engranatge.com)
 │   │   ├── src/
 │   │   │   ├── router.tsx              # createRouter + routeTree.gen
 │   │   │   ├── routes/
@@ -188,12 +188,14 @@ batuda/
 ## Phase 1 — Repo Init
 
 ### Commands
+
 ```bash
 cd /Users/guillem/programacio/codi/autonom/batuda
 git init
 ```
 
 ### `/pnpm-workspace.yaml`
+
 ```yaml
 packages:
   - 'apps/*'
@@ -201,9 +203,10 @@ packages:
 ```
 
 ### `/package.json`
+
 ```json
 {
-  "name": "batuda",
+  "name": "forja",
   "private": true,
   "type": "module",
   "engines": {
@@ -393,6 +396,7 @@ Shared base — all packages extend this. Maximum strictness, bundler-mode (no `
 ```
 
 ### `/turbo.json`
+
 ```json
 {
   "$schema": "https://turbo.build/schema.json",
@@ -431,6 +435,7 @@ Shared base — all packages extend this. Maximum strictness, bundler-mode (no `
 ```
 
 ### `/syncpack.config.js`
+
 ```javascript
 /** @type {import("syncpack").RcFile} */
 export default {
@@ -443,7 +448,7 @@ export default {
       dependencies: ['typescript'],
     },
     {
-      label: 'Batuda',
+      label: 'Forja',
       dependencies: ['@engranatge/*'],
       policy: 'sameRange',
     },
@@ -511,6 +516,7 @@ export default {
 ```
 
 ### `/lefthook.yml`
+
 ```yaml
 pre-commit:
   commands:
@@ -547,6 +553,7 @@ pre-push:
 ```
 
 ### `/dprint.json`
+
 ```json
 {
   "markdown": {
@@ -571,6 +578,7 @@ pre-push:
 ```
 
 ### `/.gitignore`
+
 ```
 node_modules/
 dist/
@@ -584,9 +592,10 @@ dist/
 ```
 
 ### `/.env.example`
+
 ```
 # NeonDB
-DATABASE_URL=postgres://user:pass@ep-xxx.us-east-2.aws.neon.tech/batuda?sslmode=require
+DATABASE_URL=postgres://user:pass@ep-xxx.us-east-2.aws.neon.tech/forja?sslmode=require
 
 # API key for MCP remote (Claude.ai, ChatGPT)
 MCP_SECRET=change-me
@@ -600,9 +609,10 @@ PORT=3000
 ## Phase 2 — Nix Flake + direnv
 
 ### `/flake.nix`
+
 ```nix
 {
-  description = "Batuda — B2B prospecting platform";
+  description = "Forja — B2B prospecting platform";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -623,7 +633,7 @@ PORT=3000
           ];
 
           shellHook = ''
-            echo "Batuda dev environment"
+            echo "Forja dev environment"
             echo "Node: $(node --version)"
             echo "pnpm: $(pnpm --version)"
           '';
@@ -634,6 +644,7 @@ PORT=3000
 ```
 
 ### `/.envrc`
+
 ```
 use flake
 ```
@@ -645,6 +656,7 @@ Run `direnv allow` after cloning. The environment activates automatically on `cd
 ## Phase 3 — packages/domain
 
 ### `packages/domain/package.json`
+
 ```json
 {
   "name": "@engranatge/domain",
@@ -669,6 +681,7 @@ Run `direnv allow` after cloning. The environment activates automatically on `cd
 ```
 
 ### `packages/domain/tsconfig.json`
+
 ```json
 {
   "extends": "../../tsconfig.base.json",
@@ -685,6 +698,7 @@ Run `direnv allow` after cloning. The environment activates automatically on `cd
 <!-- drizzle.config.ts removed — migrations handled by Effect SQL Migrator -->
 
 ### `packages/domain/src/schema/companies.ts`
+
 ```typescript
 // Schema now uses Effect Schema (see packages/domain/src/schema/companies.ts)
 
@@ -741,6 +755,7 @@ export const companies = pgTable('companies', {
 ```
 
 ### `packages/domain/src/schema/contacts.ts`
+
 ```typescript
 // Schema now uses Effect Schema (see packages/domain/src/schema/)
 import { companies } from './companies'
@@ -768,6 +783,7 @@ export const contacts = pgTable('contacts', {
 ```
 
 ### `packages/domain/src/schema/interactions.ts`
+
 ```typescript
 // Schema now uses Effect Schema (see packages/domain/src/schema/)
 import { companies } from './companies'
@@ -804,6 +820,7 @@ export const interactions = pgTable('interactions', {
 ```
 
 ### `packages/domain/src/schema/tasks.ts`
+
 ```typescript
 // Schema now uses Effect Schema (see packages/domain/src/schema/)
 import { companies } from './companies'
@@ -827,6 +844,7 @@ export const tasks = pgTable('tasks', {
 ```
 
 ### `packages/domain/src/schema/products.ts`
+
 ```typescript
 // Schema now uses Effect Schema (see packages/domain/src/schema/)
 
@@ -854,6 +872,7 @@ export const products = pgTable('products', {
 ```
 
 ### `packages/domain/src/schema/proposals.ts`
+
 ```typescript
 // Schema now uses Effect Schema (see packages/domain/src/schema/)
 import { companies } from './companies'
@@ -885,6 +904,7 @@ export const proposals = pgTable('proposals', {
 ```
 
 ### `packages/domain/src/schema/documents.ts`
+
 ```typescript
 // Schema now uses Effect Schema (see packages/domain/src/schema/)
 import { companies } from './companies'
@@ -908,6 +928,7 @@ export const documents = pgTable('documents', {
 ```
 
 ### `packages/domain/src/schema/pages.ts`
+
 ```typescript
 // Schema now uses Effect Schema (see packages/domain/src/schema/)
 import { companies } from './companies'
@@ -944,6 +965,7 @@ export const pages = pgTable('pages', {
 ```
 
 ### `packages/domain/src/schema/api-keys.ts`
+
 ```typescript
 // Schema now uses Effect Schema (see packages/domain/src/schema/)
 
@@ -962,6 +984,7 @@ export const apiKeys = pgTable('api_keys', {
 ```
 
 ### `packages/domain/src/schema/webhook-endpoints.ts`
+
 ```typescript
 // Schema now uses Effect Schema (see packages/domain/src/schema/)
 
@@ -982,6 +1005,7 @@ export const webhookEndpoints = pgTable('webhook_endpoints', {
 ```
 
 ### `packages/domain/src/schema/index.ts`
+
 ```typescript
 export * from './companies'
 export * from './contacts'
@@ -996,6 +1020,7 @@ export * from './webhook-endpoints'
 ```
 
 ### `packages/domain/src/index.ts`
+
 ```typescript
 export * from './schema/index'
 ```
@@ -1005,6 +1030,7 @@ export * from './schema/index'
 ## Phase 4 — apps/server
 
 ### `apps/server/package.json`
+
 ```json
 {
   "name": "@engranatge/server",
@@ -1037,6 +1063,7 @@ export * from './schema/index'
 ```
 
 ### `apps/server/tsconfig.json`
+
 ```json
 {
   "extends": "../../tsconfig.base.json",
@@ -1051,6 +1078,7 @@ export * from './schema/index'
 ```
 
 Node 24 has built-in TypeScript type stripping (no `tsx` needed). The `erasableSyntaxOnly: true` flag in tsconfig ensures only Node-compatible TS syntax is used. Write imports without `.js`:
+
 ```typescript
 // correct — no extension needed
 import { CompanyService } from '../services/companies'
@@ -1060,6 +1088,7 @@ import { db } from '../db/client'
 **Note on Effect package versions:** Verify exact versions on npm at scaffold time. Effect packages use coordinated version numbers. Check `@effect/experimental` for the `McpServer` export — it may be under `@effect/experimental/McpServer` or a dedicated `@effect/mcp` package by v4 release.
 
 ### `apps/server/src/db/client.ts`
+
 ```typescript
 import { PgClient } from '@effect/sql-pg'
 import { Config } from 'effect'
@@ -1072,6 +1101,7 @@ export const PgLive = PgClient.layerConfig({
 ```
 
 ### `apps/server/src/middleware/api-key.ts`
+
 ```typescript
 // Uses Effect's HttpApiSecurity to validate API key on protected routes.
 // Key arrives as header: x-api-key
@@ -1081,6 +1111,7 @@ export const PgLive = PgClient.layerConfig({
 ```
 
 ### `apps/server/src/mcp/server.ts`
+
 ```typescript
 // McpServer setup using @effect/experimental McpServer.
 // Register all tools and resources.
@@ -1094,37 +1125,38 @@ export const PgLive = PgClient.layerConfig({
 
 Each tool returns the minimum data needed — never dumps full table.
 
-| Tool | Input | Returns |
-|------|-------|---------|
-| `search_companies` | `{status?, region?, industry?, priority?, product_fit?, limit?}` | array of company summaries |
-| `get_company` | `{id_or_slug}` | full company + contacts + recent interactions (last 5) |
-| `create_company` | company fields | created company |
-| `update_company` | `{id, fields}` | updated company |
-| `log_interaction` | `{company_id, channel, direction, type, summary, outcome, next_action?, next_action_at?}` | created interaction + auto-updates `last_contacted_at` on company |
-| `get_documents` | `{company_id, type?}` | list of documents (id + title + type, NOT content) |
-| `get_document` | `{id}` | full document content |
-| `create_document` | `{company_id, interaction_id?, type, title?, content}` | created document |
-| `update_document` | `{id, content}` | updated document |
-| `create_task` | `{company_id, type, title, due_at?}` | created task |
-| `complete_task` | `{id}` | updated task |
-| `get_pipeline` | `{}` | counts by status, overdue tasks, companies without next action |
-| `get_next_steps` | `{limit?}` | tasks due soon + companies with overdue next_action_at |
-| `create_page` | `{company_id?, slug, lang, template?, title, content}` | created page (draft) |
-| `update_page` | `{id, content?, title?, meta?}` | updated page |
-| `publish_page` | `{id}` | sets status to published, sets published_at |
-| `list_pages` | `{company_id?, status?, lang?}` | page summaries |
-| `get_page` | `{id_or_slug, lang?}` | full page content |
+| Tool               | Input                                                                                     | Returns                                                           |
+| ------------------ | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `search_companies` | `{status?, region?, industry?, priority?, product_fit?, limit?}`                          | array of company summaries                                        |
+| `get_company`      | `{id_or_slug}`                                                                            | full company + contacts + recent interactions (last 5)            |
+| `create_company`   | company fields                                                                            | created company                                                   |
+| `update_company`   | `{id, fields}`                                                                            | updated company                                                   |
+| `log_interaction`  | `{company_id, channel, direction, type, summary, outcome, next_action?, next_action_at?}` | created interaction + auto-updates `last_contacted_at` on company |
+| `get_documents`    | `{company_id, type?}`                                                                     | list of documents (id + title + type, NOT content)                |
+| `get_document`     | `{id}`                                                                                    | full document content                                             |
+| `create_document`  | `{company_id, interaction_id?, type, title?, content}`                                    | created document                                                  |
+| `update_document`  | `{id, content}`                                                                           | updated document                                                  |
+| `create_task`      | `{company_id, type, title, due_at?}`                                                      | created task                                                      |
+| `complete_task`    | `{id}`                                                                                    | updated task                                                      |
+| `get_pipeline`     | `{}`                                                                                      | counts by status, overdue tasks, companies without next action    |
+| `get_next_steps`   | `{limit?}`                                                                                | tasks due soon + companies with overdue next_action_at            |
+| `create_page`      | `{company_id?, slug, lang, template?, title, content}`                                    | created page (draft)                                              |
+| `update_page`      | `{id, content?, title?, meta?}`                                                           | updated page                                                      |
+| `publish_page`     | `{id}`                                                                                    | sets status to published, sets published_at                       |
+| `list_pages`       | `{company_id?, status?, lang?}`                                                           | page summaries                                                    |
+| `get_page`         | `{id_or_slug, lang?}`                                                                     | full page content                                                 |
 
 ### MCP Resources to implement
 
-| Resource | URI | Returns |
-|----------|-----|---------|
-| Company profile | `batuda://company/{slug}` | full profile compressed for context |
-| Pipeline summary | `batuda://pipeline` | pipeline overview |
+| Resource         | URI                      | Returns                             |
+| ---------------- | ------------------------ | ----------------------------------- |
+| Company profile  | `forja://company/{slug}` | full profile compressed for context |
+| Pipeline summary | `forja://pipeline`       | pipeline overview                   |
 
 ### `apps/server/src/routes/`
 
 One file per entity. Each file exports an Effect `HttpApiGroup` with:
+
 - `GET /companies` — search with filters
 - `GET /companies/:slug` — single company
 - `POST /companies` — create
@@ -1145,7 +1177,7 @@ Based on the iapacte/iapacte production pattern (`infrastructure/kraftcloud/`):
 ```yaml
 spec: v0.6
 
-name: batuda-server
+name: forja-server
 
 runtime: node:latest
 
@@ -1204,6 +1236,7 @@ CMD ["node", "dist/main.js"]
 ```
 
 Key points from iapacte reference:
+
 - `NODE_OPTIONS=--no-network-family-autoselection` is required — Unikraft's network stack doesn't support Node's happy-eyeballs IPv4/IPv6 fallback
 - `pnpm@9.15.4` — pin exact version to match lockfile; update when upgrading pnpm
 - Build `domain` package first so `server` can import from it
@@ -1211,7 +1244,7 @@ Key points from iapacte reference:
 
 ---
 
-## Phase 5 — apps/internal (Batuda)
+## Phase 5 — apps/internal (Forja)
 
 ### Step 1 — Scaffold with TanStack CLI
 
@@ -1231,6 +1264,7 @@ This creates a working TanStack Start + Biome project with Vite. No `--deploymen
 ### Step 2 — Post-scaffold cleanup
 
 Remove Tailwind and Cloudflare (we use styled-components + MD3 tokens, deployed to Unikraft):
+
 ```bash
 # In apps/internal/package.json, remove:
 #   tailwindcss, @tailwindcss/vite, @tailwindcss/typography
@@ -1252,6 +1286,7 @@ Replace `src/styles.css` content — remove Tailwind `@import "tailwindcss"` and
 ### Step 3 — Adapt for monorepo
 
 **`apps/internal/package.json`** — final shape after cleanup:
+
 ```json
 {
   "name": "@engranatge/internal",
@@ -1260,7 +1295,7 @@ Replace `src/styles.css` content — remove Tailwind `@import "tailwindcss"` and
   "imports": {
     "#/*": "./src/*"
   },
-  "description": "Batuda — internal sales prospecting tool",
+  "description": "Forja — internal sales prospecting tool",
   "scripts": {
     "dev": "vite dev --port 3000",
     "build": "vite build",
@@ -1297,6 +1332,7 @@ Replace `src/styles.css` content — remove Tailwind `@import "tailwindcss"` and
 ```
 
 **`apps/internal/tsconfig.json`** — extend monorepo base, keep CLI's bundler settings:
+
 ```json
 {
   "extends": "../../tsconfig.base.json",
@@ -1319,6 +1355,7 @@ Replace `src/styles.css` content — remove Tailwind `@import "tailwindcss"` and
 ### Step 4 — Key generated files
 
 **`apps/internal/vite.config.ts`** (after cleanup):
+
 ```typescript
 import { defineConfig } from 'vite'
 import tsconfigPaths from 'vite-tsconfig-paths'
@@ -1337,6 +1374,7 @@ export default config
 ```
 
 **`apps/internal/Dockerfile`** (two-stage Node 24 build for Unikraft):
+
 ```dockerfile
 FROM node:24-alpine AS build
 ENV NODE_OPTIONS=--no-network-family-autoselection
@@ -1364,9 +1402,10 @@ CMD ["node", ".output/server/index.mjs"]
 Note: The Dockerfile builds domain+ui+internal via Turborepo. The `SERVER_URL` points to `api.engranatge.com`.
 
 **`apps/internal/Kraftfile`**:
+
 ```yaml
 spec: v0.6
-name: batuda-internal
+name: forja-internal
 runtime: node:latest
 labels:
   cloud.unikraft.v1.instances/scale_to_zero.policy: "on"
@@ -1377,6 +1416,7 @@ cmd: ["/usr/bin/node", "/app/.output/server/index.mjs"]
 ```
 
 **`apps/internal/src/router.tsx`** (scaffolded by CLI):
+
 ```typescript
 import { createRouter as createTanStackRouter } from '@tanstack/react-router'
 import { routeTree } from './routeTree.gen'
@@ -1429,6 +1469,7 @@ declare module '@tanstack/react-router' {
 ```
 
 ### Design principles
+
 - Mobile-first, fluid layout
 - styled-components for co-located CSS in .tsx files, using MD3 CSS custom property tokens
 - BaseUI headless components styled via styled-components
@@ -1443,6 +1484,7 @@ declare module '@tanstack/react-router' {
 Shared design tokens and Tiptap block extensions used by both `apps/internal` and `apps/marketing`.
 
 ### `packages/ui/package.json`
+
 ```json
 {
   "name": "@engranatge/ui",
@@ -1472,6 +1514,7 @@ Shared design tokens and Tiptap block extensions used by both `apps/internal` an
 ### `packages/ui/src/tokens.css`
 
 Contains all MD3 design tokens (moved from apps/internal). See [frontend.md](docs/frontend.md) for the full token system:
+
 - Typography scale (display/headline/title/body/label × large/medium/small)
 - Color scheme (light + dark)
 - Fluid spacing scale
@@ -1480,6 +1523,7 @@ Contains all MD3 design tokens (moved from apps/internal). See [frontend.md](doc
 - Breakpoint tokens
 
 Both apps import tokens via:
+
 ```css
 /* apps/internal/src/styles/global.css or apps/marketing/src/styles/global.css */
 @import '@engranatge/ui/tokens.css';
@@ -1489,13 +1533,13 @@ Both apps import tokens via:
 
 Tiptap custom node extensions for marketing page blocks. Each file exports a Tiptap `Node.create()`:
 
-| Block | Attrs | Purpose |
-|-------|-------|---------|
-| `hero` | `heading`, `subheading`, `cta: { label, action }` | Page hero section |
-| `cta` | `heading`, `body`, `buttons: [{ label, action, url }]` | Call-to-action section |
-| `valueProps` | `heading`, `items: [{ title, body, image? }]` | Feature/benefit grid |
-| `painPoints` | `heading`, `items: [{ icon, title, body }]` | Problem statement list |
-| `socialProof` | `heading`, `testimonials: [{ quote, author, company }]` | Testimonials/logos |
+| Block         | Attrs                                                   | Purpose                |
+| ------------- | ------------------------------------------------------- | ---------------------- |
+| `hero`        | `heading`, `subheading`, `cta: { label, action }`       | Page hero section      |
+| `cta`         | `heading`, `body`, `buttons: [{ label, action, url }]`  | Call-to-action section |
+| `valueProps`  | `heading`, `items: [{ title, body, image? }]`           | Feature/benefit grid   |
+| `painPoints`  | `heading`, `items: [{ icon, title, body }]`             | Problem statement list |
+| `socialProof` | `heading`, `testimonials: [{ quote, author, company }]` | Testimonials/logos     |
 
 Standard rich text (paragraphs, headings, lists) is handled by Tiptap's built-in StarterKit — no custom nodes needed.
 
@@ -1521,6 +1565,7 @@ npx @tanstack/cli create marketing \
 Same post-scaffold cleanup as `apps/internal` (remove Tailwind, Cloudflare, devtools, demo files).
 
 ### `apps/marketing/package.json`
+
 ```json
 {
   "name": "@engranatge/marketing",
@@ -1605,6 +1650,7 @@ const BLOCK_MAP = {
 ```
 
 ### `apps/marketing/Dockerfile`
+
 ```dockerfile
 FROM node:24-alpine AS build
 ENV NODE_OPTIONS=--no-network-family-autoselection
@@ -1630,6 +1676,7 @@ CMD ["node", ".output/server/index.mjs"]
 ```
 
 ### `apps/marketing/Kraftfile`
+
 ```yaml
 spec: v0.6
 name: engranatge-marketing
@@ -1647,16 +1694,17 @@ cmd: ["/usr/bin/node", "/app/.output/server/index.mjs"]
 ## Phase 6 — MCP Config
 
 ### `/.mcp.json`
+
 ```json
 {
   "mcpServers": {
-    "batuda": {
+    "forja": {
       "command": "pnpm",
       "args": ["--filter", "server", "dev:mcp"],
       "env": {
         "DATABASE_URL": "${DATABASE_URL}"
       },
-      "description": "Batuda — companies, contacts, interactions, documents, pages, pipeline"
+      "description": "Forja — companies, contacts, interactions, documents, pages, pipeline"
     }
   }
 }
@@ -1667,17 +1715,21 @@ cmd: ["/usr/bin/node", "/app/.output/server/index.mjs"]
 ## Phase 7 — .claude/CLAUDE.md
 
 ### `/.claude/CLAUDE.md`
+
 ```markdown
-# Batuda — AI Agent Instructions
+# Forja — AI Agent Instructions
 
 ## Source of truth
+
 All data lives in NeonDB (Postgres). Use MCP tools to read and write.
 Never generate SQL directly. Always use MCP tools.
 
 ## MCP tools available
+
 See PLAN.md § MCP Tools for the full list.
 
 ## Key rules
+
 - `documents.content` is full markdown. Write it as a human would.
 - When logging an interaction, always set `next_action` and `next_action_at` if known.
 - `metadata` jsonb is for data that doesn't fit existing columns yet — use it freely.
@@ -1685,6 +1737,7 @@ See PLAN.md § MCP Tools for the full list.
 - Never create a company without a `slug` (kebab-case from name + location if duplicate).
 
 ## Context efficiency
+
 - Use `search_companies` before `get_company` — it returns summaries only.
 - Use `get_documents` (list) before `get_document` (content) — fetch content only when needed.
 - `get_pipeline` for overviews. `get_next_steps` for daily planning.
@@ -1724,7 +1777,7 @@ pnpm dev:marketing
 
 # 7. Test MCP locally
 pnpm --filter server dev:mcp
-# Then in Claude Code: /mcp to verify batuda tools appear
+# Then in Claude Code: /mcp to verify forja tools appear
 ```
 
 ---
@@ -1735,7 +1788,7 @@ pnpm --filter server dev:mcp
 2. **TanStack Start deployment** — Unikraft (Node.js SSR) via Dockerfile + Kraftfile
 3. **Unikraft Node 24 base image** — check `catalog.unikraft.org` for availability of node:24
 4. **NeonDB project** — create project at neon.tech, copy connection string to `.env`
-5. **DNS setup** — `engranatge.com`, `batuda.engranatge.com`, `api.engranatge.com` pointing to respective Unikraft instances
+5. **DNS setup** — `engranatge.com`, `forja.engranatge.com`, `api.engranatge.com` pointing to respective Unikraft instances
 6. **Tiptap block extensions** — verify custom node API in Tiptap v3 for structured block content
 
 ---

@@ -3,10 +3,10 @@ import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { BatudaApi } from '../api'
+import { ForjaApi } from '../api'
 
 export const InteractionsLive = HttpApiBuilder.group(
-	BatudaApi,
+	ForjaApi,
 	'interactions',
 	handlers =>
 		Effect.gen(function* () {
@@ -46,6 +46,15 @@ export const InteractionsLive = HttpApiBuilder.group(
 							companyUpdate['nextActionAt'] = payload.nextActionAt
 
 						yield* sql`UPDATE companies SET ${sql.update(companyUpdate, ['id'])} WHERE id = ${payload.companyId}`
+
+						yield* Effect.logInfo('Interaction logged').pipe(
+							Effect.annotateLogs({
+								event: 'interaction.logged',
+								companyId: payload.companyId,
+								channel: payload.channel,
+								direction: payload.direction,
+							}),
+						)
 
 						return rows[0]
 					}).pipe(Effect.orDie),

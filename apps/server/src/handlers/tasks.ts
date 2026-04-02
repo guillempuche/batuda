@@ -3,9 +3,9 @@ import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { BatudaApi } from '../api'
+import { ForjaApi } from '../api'
 
-export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
+export const TasksLive = HttpApiBuilder.group(ForjaApi, 'tasks', handlers =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
 		return handlers
@@ -30,6 +30,12 @@ export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 				Effect.gen(function* () {
 					const rows =
 						yield* sql`INSERT INTO tasks ${sql.insert(_.payload as any)} RETURNING *`
+					yield* Effect.logInfo('Task created').pipe(
+						Effect.annotateLogs({
+							event: 'task.created',
+							companyId: (_.payload as any).companyId,
+						}),
+					)
 					return rows[0]
 				}).pipe(Effect.orDie),
 			)
@@ -39,6 +45,12 @@ export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 							UPDATE tasks SET completed_at = now()
 							WHERE id = ${_.params.id} RETURNING *
 						`
+					yield* Effect.logInfo('Task completed').pipe(
+						Effect.annotateLogs({
+							event: 'task.completed',
+							taskId: _.params.id,
+						}),
+					)
 					return rows[0]
 				}).pipe(Effect.orDie),
 			)

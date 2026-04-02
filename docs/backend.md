@@ -155,7 +155,7 @@ export default Effect.gen(function* () {
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import { HttpRouter } from 'effect/unstable/http'
 
-const ApiLive = HttpApiBuilder.layer(BatudaApi).pipe(Layer.provide([...handlers]))
+const ApiLive = HttpApiBuilder.layer(ForjaApi).pipe(Layer.provide([...handlers]))
 const ServicesLive = Layer.mergeAll(CompanyService.layer, PageService.layer, ...)
 
 const program = HttpRouter.serve(ApiLive).pipe(
@@ -169,6 +169,8 @@ const program = HttpRouter.serve(ApiLive).pipe(
 ---
 
 ## Effect v4 patterns
+
+Follow only the patterns documented here — do not mix in patterns from older Effect versions or community examples targeting v2/v3.
 
 ### Layer composition
 
@@ -237,7 +239,7 @@ export const CompaniesApi = HttpApiGroup.make("companies").add(
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 
 export const CompaniesApiLive = HttpApiBuilder.group(
-  BatudaApi,
+  ForjaApi,
   "companies",
   (handlers) =>
     handlers
@@ -301,8 +303,8 @@ export const CreateCompanyInput = Schema.Struct({
 // src/mcp/server.ts
 import { McpServer } from "effect/unstable/ai"
 
-export const BatudaMcpServer = McpServer.make({
-  name: "batuda",
+export const ForjaMcpServer = McpServer.make({
+  name: "forja",
   version: "1.0.0",
 }).pipe(
   McpServer.addTool(SearchCompaniesTool),
@@ -363,7 +365,7 @@ export const SearchCompaniesTool = Tool.make({
 import { NodeRuntime, NodeStdio } from "@effect/platform-node"
 
 const ServerLayer = McpToolsLive.pipe(
-  Layer.provide(McpServer.layerStdio({ name: 'batuda', version: '1.0.0' })),
+  Layer.provide(McpServer.layerStdio({ name: 'forja', version: '1.0.0' })),
   Layer.provide(ServicesLive),
   Layer.provide(PgLive),
   Layer.provide(NodeStdio.layer),
@@ -456,7 +458,7 @@ Resend forwards inbound emails to `POST /webhooks/email/inbound`. The handler:
 ```
 RESEND_API_KEY=re_...
 RESEND_WEBHOOK_SECRET=whsec_...
-EMAIL_FROM=batuda@guillempuche.com
+EMAIL_FROM=forja@guillempuche.com
 ```
 
 ---
@@ -483,8 +485,8 @@ const fireWebhooks = (event: string, payload: unknown) =>
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-Batuda-Event": event,
-            "X-Batuda-Signature": hmacSign(endpoint['secret'] as string, payload)
+            "X-Forja-Event": event,
+            "X-Forja-Signature": hmacSign(endpoint['secret'] as string, payload)
           },
           body: JSON.stringify({ event, payload, timestamp: new Date().toISOString() })
         })
@@ -527,7 +529,7 @@ Style: 2-space indent, 100-char line width, single quotes, ES5 trailing commas, 
 ## Adding a new route
 
 1. Create `src/routes/<entity>.ts` with `HttpApiGroup`
-2. Add group to `BatudaApi` in `src/main.ts`
+2. Add group to `ForjaApi` in `src/main.ts`
 3. Add handler implementation
 4. Add Effect Schema in `packages/domain/src/schema/<entity>.ts`
 

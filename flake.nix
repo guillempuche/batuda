@@ -1,5 +1,5 @@
 {
-  description = "Batuda — B2B prospecting platform";
+  description = "Forja — B2B prospecting platform";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -20,7 +20,7 @@
           ];
 
           shellHook = ''
-            echo "Batuda dev environment"
+            echo "Forja dev environment"
             echo "Node: $(node --version)"
             echo "pnpm: $(pnpm --version)"
           '';

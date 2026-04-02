@@ -3,6 +3,7 @@ import { type Effect, Layer, Logger } from 'effect'
 import { McpServer } from 'effect/unstable/ai'
 
 import { PgLive } from './db/client'
+import { McpLoggerLive } from './lib/logger'
 import { McpToolsLive } from './mcp/server'
 import { CompanyService } from './services/companies'
 import { PageService } from './services/pages'
@@ -19,7 +20,7 @@ const ServicesLive = Layer.mergeAll(
 const ServerLayer = McpToolsLive.pipe(
 	Layer.provide(
 		McpServer.layerStdio({
-			name: 'batuda',
+			name: 'forja',
 			version: '1.0.0',
 		}),
 	),
@@ -27,6 +28,7 @@ const ServerLayer = McpToolsLive.pipe(
 	Layer.provide(PgLive),
 	Layer.provide(NodeStdio.layer),
 	Layer.provide(Layer.succeed(Logger.LogToStderr)(true)),
+	Layer.provide(McpLoggerLive),
 )
 
 const program = Layer.launch(ServerLayer)

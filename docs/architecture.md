@@ -44,7 +44,7 @@
                     └─────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│  apps/internal  (Batuda — batuda.engranatge.com)                 │
+│  apps/internal  (Forja — forja.engranatge.com)                 │
 │  TanStack Start — Unikraft, Node.js SSR                          │
 │                                                                  │
 │  Pipeline  /companies  /companies/$slug  /tasks                 │
@@ -131,7 +131,7 @@ Effect v4 HTTP server deployed at `api.engranatge.com`. Responsibilities:
 
 ### `apps/internal`
 
-Batuda — internal sales prospecting tool at `batuda.engranatge.com`.
+Forja — internal sales prospecting tool at `forja.engranatge.com`.
 TanStack Start SSR app deployed to Unikraft (Node.js). Responsibilities:
 
 - Pipeline and company management UI
@@ -256,7 +256,7 @@ The server is stateless — all state in NeonDB. Scales to zero when idle.
 ```bash
 pnpm --filter internal build   # produces .output/server/index.mjs
 kraft build                     # builds unikernel image
-kraft deploy                    # deploys to Unikraft Cloud → batuda.engranatge.com
+kraft deploy                    # deploys to Unikraft Cloud → forja.engranatge.com
 ```
 
 ### Marketing (Unikraft)

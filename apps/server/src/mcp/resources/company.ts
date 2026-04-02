@@ -5,8 +5,8 @@ import { CompanyService } from '../../services/companies'
 
 const slugParam = Schema.String
 
-export const CompanyResource =
-	McpServer.resource`batuda://company/${slugParam}`({
+export const CompanyResource = McpServer.resource`forja://company/${slugParam}`(
+	{
 		name: 'Company Profile',
 		description: 'Full company profile compressed for LLM context',
 		content: Effect.fn(function* (_uri, slug) {
@@ -14,4 +14,5 @@ export const CompanyResource =
 			const data = yield* service.getWithRelations(slug)
 			return JSON.stringify(data, null, 2)
 		}),
-	})
+	},
+)

@@ -1,12 +1,12 @@
 {
 	"mcpServers": {
-		"batuda": {
+		"forja": {
 			"command": "pnpm",
 			"args": ["--filter", "@engranatge/server", "dev:mcp"],
 			"env": {
 				"DATABASE_URL": "${DATABASE_URL}"
 			},
-			"description": "Batuda — companies, contacts, interactions, documents, pages, pipeline"
+			"description": "Forja — companies, contacts, interactions, documents, pages, pipeline"
 		}
 	}
 }

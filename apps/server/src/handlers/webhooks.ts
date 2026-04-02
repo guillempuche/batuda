@@ -1,11 +1,11 @@
 import { Effect } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
-import { BatudaApi } from '../api'
+import { ForjaApi } from '../api'
 import { WebhookService } from '../services/webhooks'
 
 export const WebhooksLive = HttpApiBuilder.group(
-	BatudaApi,
+	ForjaApi,
 	'webhooks',
 	handlers =>
 		Effect.gen(function* () {
@@ -19,6 +19,9 @@ export const WebhooksLive = HttpApiBuilder.group(
 				.handle('create', _ =>
 					Effect.gen(function* () {
 						const rows = yield* svc.create(_.payload as any)
+						yield* Effect.logInfo('Webhook endpoint created').pipe(
+							Effect.annotateLogs({ event: 'webhook.created' }),
+						)
 						return rows[0]
 					}).pipe(Effect.orDie),
 				)
@@ -31,6 +34,12 @@ export const WebhooksLive = HttpApiBuilder.group(
 				.handle('remove', _ =>
 					Effect.gen(function* () {
 						yield* svc.remove(_.params.id)
+						yield* Effect.logInfo('Webhook endpoint removed').pipe(
+							Effect.annotateLogs({
+								event: 'webhook.removed',
+								webhookId: _.params.id,
+							}),
+						)
 					}).pipe(Effect.orDie),
 				)
 				.handle('test', _ =>

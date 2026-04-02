@@ -3,10 +3,10 @@ import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { BatudaApi } from '../api'
+import { ForjaApi } from '../api'
 
 export const ProposalsLive = HttpApiBuilder.group(
-	BatudaApi,
+	ForjaApi,
 	'proposals',
 	handlers =>
 		Effect.gen(function* () {
@@ -24,6 +24,12 @@ export const ProposalsLive = HttpApiBuilder.group(
 					Effect.gen(function* () {
 						const rows =
 							yield* sql`INSERT INTO proposals ${sql.insert(_.payload as any)} RETURNING *`
+						yield* Effect.logInfo('Proposal created').pipe(
+							Effect.annotateLogs({
+								event: 'proposal.created',
+								companyId: (_.payload as any).companyId,
+							}),
+						)
 						return rows[0]
 					}).pipe(Effect.orDie),
 				)
@@ -33,6 +39,12 @@ export const ProposalsLive = HttpApiBuilder.group(
 							UPDATE proposals SET ${sql.update({ ...(_.payload as any), updatedAt: new Date() }, ['id'])}
 							WHERE id = ${_.params.id} RETURNING *
 						`
+						yield* Effect.logInfo('Proposal updated').pipe(
+							Effect.annotateLogs({
+								event: 'proposal.updated',
+								proposalId: _.params.id,
+							}),
+						)
 						return rows[0]
 					}).pipe(Effect.orDie),
 				)

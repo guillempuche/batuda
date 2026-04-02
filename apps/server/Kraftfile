@@ -1,6 +1,6 @@
 spec: v0.6
 
-name: batuda-server
+name: forja-server
 
 runtime: node:latest
 

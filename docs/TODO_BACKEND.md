@@ -250,14 +250,14 @@ src/api/
 - [ ] Implement tool: `reply_email` — reply to a thread
 - [ ] Implement tool: `list_email_threads` — subject + participants + date + message count, no bodies; filterable by inbox/company (limit default 10)
 - [ ] Implement tool: `get_email_thread` — full thread with messages as `extractedText` (reply-stripped plain text, not HTML)
-- [ ] Implement resource: `batuda://company/{slug}`
-- [ ] Implement resource: `batuda://pipeline`
+- [ ] Implement resource: `forja://company/{slug}`
+- [ ] Implement resource: `forja://pipeline`
 
 ## Phase 8 — MCP transports
 
 - [ ] Implement `src/mcp-stdio.ts` — stdio transport for Claude Code
 - [ ] Write `.mcp.json` pointing to `mcp-stdio.ts`
-- [ ] Test: open Claude Code, run `/mcp`, verify batuda tools listed
+- [ ] Test: open Claude Code, run `/mcp`, verify forja tools listed
 - [ ] Implement HTTP/SSE transport on `/mcp` route — Bearer token from `MCP_SECRET`
 - [ ] Test remote MCP with a tunneled URL (Cloudflare Tunnel or ngrok)
 
