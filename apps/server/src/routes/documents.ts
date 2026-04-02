@@ -50,4 +50,4 @@ export const DocumentsGroup = HttpApiGroup.make('documents')
 			success: Schema.Unknown,
 		}),
 	)
-	.prefix('/api')
+	.prefix('/v1')

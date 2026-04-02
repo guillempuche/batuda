@@ -48,7 +48,7 @@ export const PagesGroup = HttpApiGroup.make('pages')
 	)
 	.add(
 		// Internal: list pages
-		HttpApiEndpoint.get('list', '/api/pages', {
+		HttpApiEndpoint.get('list', '/v1/pages', {
 			query: {
 				companyId: Schema.optional(Schema.String),
 				status: Schema.optional(Schema.String),
@@ -59,14 +59,14 @@ export const PagesGroup = HttpApiGroup.make('pages')
 	)
 	.add(
 		// Internal: create page
-		HttpApiEndpoint.post('create', '/api/pages', {
+		HttpApiEndpoint.post('create', '/v1/pages', {
 			payload: CreatePageInput,
 			success: Schema.Unknown,
 		}),
 	)
 	.add(
 		// Internal: update page
-		HttpApiEndpoint.patch('update', '/api/pages/:id', {
+		HttpApiEndpoint.patch('update', '/v1/pages/:id', {
 			params: { id: Schema.String },
 			payload: UpdatePageInput,
 			success: Schema.Unknown,
@@ -74,7 +74,7 @@ export const PagesGroup = HttpApiGroup.make('pages')
 	)
 	.add(
 		// Internal: publish page
-		HttpApiEndpoint.patch('publish', '/api/pages/:id/publish', {
+		HttpApiEndpoint.patch('publish', '/v1/pages/:id/publish', {
 			params: { id: Schema.String },
 			success: Schema.Unknown,
 		}),

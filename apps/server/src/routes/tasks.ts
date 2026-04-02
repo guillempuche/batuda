@@ -32,4 +32,4 @@ export const TasksGroup = HttpApiGroup.make('tasks')
 			success: Schema.Unknown,
 		}),
 	)
-	.prefix('/api')
+	.prefix('/v1')

@@ -30,7 +30,24 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								}),
 							catch: (e: unknown) =>
 								new Error(`Email send failed: ${String(e)}`),
-						})
+						}).pipe(
+							Effect.tap(() =>
+								Effect.logInfo('Email sent').pipe(
+									Effect.annotateLogs({
+										event: 'email.sent',
+										emailDomain: to.split('@')[1],
+									}),
+								),
+							),
+							Effect.tapError(error =>
+								Effect.logError('Email send failed').pipe(
+									Effect.annotateLogs({
+										event: 'email.failed',
+										error: error.message,
+									}),
+								),
+							),
+						)
 						return result
 					}),
 			}

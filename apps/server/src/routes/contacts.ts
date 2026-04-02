@@ -56,4 +56,4 @@ export const ContactsGroup = HttpApiGroup.make('contacts')
 			success: Schema.Void,
 		}),
 	)
-	.prefix('/api')
+	.prefix('/v1')

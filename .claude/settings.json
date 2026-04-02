@@ -3,5 +3,97 @@
 	"enabledPlugins": {
 		"ai-agent-readability-improver@ai-standards": true
 	},
-	"effortLevel": "high"
+	"effortLevel": "high",
+	"hooks": {
+		"PreToolUse": [
+			{
+				"matcher": "Edit",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "f=$(jq -r '.tool_input.file_path'); if [[ \"$f\" == *apps/server/src/db/migrations/0* ]]; then echo '{\"permissionDecision\": \"ask\", \"reason\": \"Modifying an existing Effect SQL migration can break deployments\"}'; else echo '{\"decision\": \"approve\"}'; fi"
+					}
+				]
+			},
+			{
+				"matcher": "Write",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "f=$(jq -r '.tool_input.file_path'); if [[ \"$f\" == *apps/server/src/db/migrations/* ]]; then if [[ \"$f\" =~ [0-9]{4}_[a-z_]+\\.ts$ ]]; then echo '{\"decision\": \"approve\"}'; else echo '{\"decision\": \"block\", \"reason\": \"Migration must match NNNN_description.ts (e.g. 0002_add_contacts.ts)\"}'; fi; else echo '{\"decision\": \"approve\"}'; fi"
+					}
+				]
+			},
+			{
+				"matcher": "Read",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "f=$(jq -r '.tool_input.file_path'); if [[ \"$f\" == *.env ]] && [[ \"$f\" != *.env.example ]]; then echo '{\"decision\": \"block\", \"reason\": \"Never read .env or credentials. Use Config.string() in Effect code.\"}'; else echo '{\"decision\": \"approve\"}'; fi"
+					}
+				]
+			},
+			{
+				"matcher": "Bash",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "cmd=$(jq -r '.tool_input.command'); if echo \"$cmd\" | grep -qE 'git push.*(--force|-f)'; then echo '{\"decision\": \"block\", \"reason\": \"Force push is destructive. Use --force-with-lease or ask the user first.\"}'; else echo '{\"decision\": \"approve\"}'; fi",
+						"if": "Bash(git push*)"
+					}
+				]
+			},
+			{
+				"matcher": "Agent",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "jq -r '[.tool_input.subagent_type // \"general\", .tool_input.description // \"no description\"] | @tsv' | while read -r type desc; do echo \"[$(date +'%Y-%m-%d %H:%M:%S')] Agent: $type | $desc\" >> /Users/guillem/programacio/codi/autonom/batuda/.claude/agent-audit.log; done; echo '{\"decision\": \"approve\"}'",
+						"async": true
+					}
+				]
+			}
+		],
+		"PostToolUse": [
+			{
+				"matcher": "Edit|Write",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "f=$(jq -r '.tool_input.file_path'); if [[ \"$f\" == *.ts || \"$f\" == *.tsx || \"$f\" == *.json ]]; then biome check --write --no-errors-on-unmatched \"$f\" 2>/dev/null; elif [[ \"$f\" == *.md ]]; then dprint fmt \"$f\" 2>/dev/null; fi; true",
+						"timeout": 10
+					}
+				]
+			},
+			{
+				"matcher": "Edit|Write",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "f=$(jq -r '.tool_input.file_path'); if [[ \"$f\" == *packages/domain/src/schema/*.ts ]] && [[ \"$f\" != *.test.ts ]]; then echo '{\"systemMessage\": \"Domain schema changed. Check if an Effect SQL migration is needed in apps/server/src/db/migrations/\"}'; fi; true"
+					}
+				]
+			},
+			{
+				"matcher": "Edit|Write",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "f=$(jq -r '.tool_input.file_path'); if [[ \"$f\" == *apps/server/src/db/migrations/* ]]; then echo \"[$(date +'%Y-%m-%d %H:%M:%S')] $f\" >> /Users/guillem/programacio/codi/autonom/batuda/.claude/migration-audit.log; fi; true",
+						"async": true
+					}
+				]
+			}
+		],
+		"SubagentStop": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "cd /Users/guillem/programacio/codi/autonom/batuda && git diff --name-only HEAD 2>/dev/null | grep -qE '\\.(ts|tsx)$' && echo '{\"systemMessage\": \"TypeScript files changed. Run: pnpm check-types\"}' || true"
+					}
+				]
+			}
+		]
+	}
 }

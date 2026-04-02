@@ -22,9 +22,9 @@ Use **`agent-browser`** (already installed) to test and debug the local web app.
 ### Open & navigate
 
 ```bash
-agent-browser open http://localhost:3000              # open pipeline dashboard
-agent-browser open http://localhost:3000/companies    # company list
-agent-browser open http://localhost:3000/tasks        # tasks view
+agent-browser open http://localhost:3010              # open pipeline dashboard
+agent-browser open http://localhost:3010/companies    # company list
+agent-browser open http://localhost:3010/tasks        # tasks view
 agent-browser back                                    # go back
 agent-browser reload                                  # reload page
 ```
@@ -119,134 +119,6 @@ The CLI connects to Postgres via `DATABASE_URL` in `apps/cli/.env`. Commands tha
 
 ---
 
-## MCP first
-
-Always use MCP tools to read and write data. Never write raw SQL.
-Never read `.env` or database credentials. Never call the HTTP API directly from agent code.
-
-The MCP server is registered in `.mcp.json`. In Claude Code, run `/mcp` to verify tools are loaded.
-
----
-
-## Context efficiency
-
-Data is large. Fetch only what you need:
-
-```
-search_companies(filters)      → summaries only, no full profiles
-get_company(id_or_slug)        → full profile + last 5 interactions (not documents)
-get_documents(company_id)      → list (id, type, title) — no content
-get_document(id)               → full markdown content
-get_pipeline()                 → counts only
-get_next_steps(limit)          → due tasks + overdue next_action_at
-create_page(...)               → create a prospect sales page (draft) with Tiptap JSON content
-update_page(...)               → update page content, title, or meta
-publish_page(id)               → publish a draft page (makes it publicly accessible)
-list_pages(filters)            → list pages by company, status, or language
-get_page(id_or_slug_lang)      → get full page content by id or slug+lang
-```
-
-Rule: always call `search_companies` before `get_company`. Fetch document content only when you need to read or rewrite it.
-
----
-
-## Working with companies
-
-**Status flow** (only moves forward):
-
-```
-prospect → contacted → responded → meeting → proposal → client
-                                                       → closed
-                                                       → dead
-```
-
-To re-engage a dead/closed company: set status back to `contacted`.
-
-**Slug format:** kebab-case from name. If duplicate, append city: `can-joan-girona`.
-
-**Priority:** 1 = hot (contact this week), 2 = medium, 3 = cold (backlog).
-
-**source field:** always set when creating a company. Use: `firecrawl | exa | google_maps | referral | linkedin | instagram | manual`.
-
-**metadata jsonb:** use freely for any data that doesn't fit existing columns. Future columns will be promoted from metadata. Examples: fiscal data (NIF), employee names not worth a full contact, scraped social stats, competitor notes.
-
----
-
-## Logging interactions
-
-Always set `next_action` and `next_action_at` when known. This drives the daily task list.
-
-```typescript
-log_interaction({
-  company_id: "...",
-  channel: "visit",        // email | phone | visit | linkedin | instagram | whatsapp | event
-  direction: "outbound",   // outbound | inbound
-  type: "cold",            // cold | followup | meeting | demo | check-in
-  summary: "...",
-  outcome: "interested",   // no_response | responded | interested | not_interested
-                           // | meeting_scheduled | proposal_requested
-  next_action: "Send proposal for delivery notes automation",
-  next_action_at: "2026-04-07"
-})
-```
-
-After `log_interaction`, update the company's `next_action` and `next_action_at` if they changed.
-
----
-
-## Writing documents
-
-`documents.content` is full markdown. Write it as a human would — structured, scannable, no AI filler phrases.
-
-Document types:
-
-- `research` — scraped/researched company profile. Use Firecrawl/Exa first, then create this.
-- `prenote` — prep before a meeting. Link to the interaction via `interaction_id` once scheduled.
-- `postnote` — what happened. Always link to `interaction_id` of the meeting.
-- `call_notes` — phone call notes. Link to interaction.
-- `visit_notes` — on-site visit notes. Link to interaction.
-- `general` — anything else.
-
-When researching a new company with Firecrawl/Exa:
-
-1. `create_company(...)` with known fields
-2. `create_document({ type: "research", content: <scraped + structured markdown> })`
-
----
-
-## Schema conventions
-
-All IDs are UUIDs. All timestamps are UTC.
-
-Text enum fields (status, industry, channel, etc.) are plain strings — not Postgres enums.
-Valid values are documented in `packages/domain/src/schema/`.
-
-`metadata jsonb` columns accept any valid JSON object. Always merge, never replace:
-
-```
-update_company({ id, metadata: { ...existing, new_field: value } })
-```
-
----
-
-## Working with tasks
-
-Tasks are the action queue. `get_next_steps` returns them sorted by due date.
-
-After completing a task, always check if a new task should be created for the next step.
-
----
-
-## Working with pages
-
-Use `create_page` to generate prospect sales pages. Set `lang: 'ca'` first, then create translations for the same slug.
-
-Pages use Tiptap JSON with custom block nodes (hero, cta, valueProps, painPoints, socialProof). Standard rich text uses Tiptap StarterKit.
-
-Always `publish_page` after review — pages are draft by default.
-
----
-
 ## Modifying code
 
 ### Backend (apps/server)
@@ -279,15 +151,9 @@ Always `publish_page` after review — pages are draft by default.
 
 ---
 
-## Dos and don'ts
+## Skills
 
-| Do | Don't |
-|----|-------|
-| Use MCP tools for all data access | Write raw SQL |
-| Set `next_action_at` on every interaction | Leave a company with no next action |
-| Use `metadata jsonb` for evolving data | Add DB columns for one-off fields |
-| Write documents in clean markdown | Dump raw scraped HTML |
-| Use design tokens in CSS | Hardcode colors, spacing, font sizes |
-| Mobile-first CSS | Desktop-first with override hacks |
-| Effect patterns from docs/backend.md | Mix patterns from older Effect versions |
-| Run `pnpm format` before committing | Commit unformatted code |
+| Skill      | Use for                                                                           |
+| ---------- | --------------------------------------------------------------------------------- |
+| `/crm`     | CRM data operations — MCP tools, companies, interactions, documents, tasks, pages |
+| `/commits` | Git commit messages following project conventions                                 |

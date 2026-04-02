@@ -91,4 +91,4 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 			success: Schema.Unknown,
 		}),
 	)
-	.prefix('/api')
+	.prefix('/v1')

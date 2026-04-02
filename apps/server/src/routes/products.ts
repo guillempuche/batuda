@@ -43,4 +43,4 @@ export const ProductsGroup = HttpApiGroup.make('products')
 			success: Schema.Unknown,
 		}),
 	)
-	.prefix('/api')
+	.prefix('/v1')

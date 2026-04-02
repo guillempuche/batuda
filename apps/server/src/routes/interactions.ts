@@ -33,4 +33,4 @@ export const InteractionsGroup = HttpApiGroup.make('interactions')
 			success: Schema.Unknown,
 		}),
 	)
-	.prefix('/api')
+	.prefix('/v1')

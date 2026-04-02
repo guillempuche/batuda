@@ -3,12 +3,12 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
-		"dev": "node --watch --import tsx src/main.ts",
+		"dev": "node --watch --env-file=../../.env --import tsx src/main.ts",
 		"dev:mcp": "node --import tsx src/mcp-stdio.ts",
 		"build": "tsdown src/main.ts src/mcp-stdio.ts src/db/migrate.ts",
 		"check-types": "tsc --noEmit",
 		"start": "node dist/main.js",
-		"migrate": "node --import tsx src/db/migrate.ts"
+		"migrate": "node --env-file=../../.env --import tsx src/db/migrate.ts"
 	},
 	"dependencies": {
 		"@effect/platform-node": "4.0.0-beta.43",

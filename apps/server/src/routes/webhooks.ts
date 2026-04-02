@@ -47,4 +47,4 @@ export const WebhooksGroup = HttpApiGroup.make('webhooks')
 			success: Schema.Void,
 		}),
 	)
-	.prefix('/api')
+	.prefix('/v1')
