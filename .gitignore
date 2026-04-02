@@ -18,11 +18,7 @@ dist/
 *.db
 
 # Logs
-server.log
-
-# Cloudflare
-.wrangler/
-.dev.vars
+*.log
 
 # Cache
 .cache/
