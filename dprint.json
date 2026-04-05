@@ -14,6 +14,7 @@
 		".cache",
 		".turbo",
 		"coverage",
+		"docs/repos",
 		"**/CHANGELOG.md"
 	],
 	"plugins": ["https://plugins.dprint.dev/markdown-0.21.1.wasm"]
