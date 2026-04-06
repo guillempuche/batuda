@@ -100,6 +100,16 @@
 	},
 	"overrides": [
 		{
+			"includes": [".release-it.*.cjs"],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noTemplateCurlyInString": "off"
+					}
+				}
+			}
+		},
+		{
 			"includes": ["**/test/**", "**/*.test.ts", "**/*.test.tsx"],
 			"linter": {
 				"rules": {

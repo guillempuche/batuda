@@ -1,0 +1,98 @@
+name: Deploy Marketing
+
+on:
+  push:
+    tags:
+      - "marketing-v*"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-marketing
+  cancel-in-progress: false
+
+env:
+  KRAFTCLOUD_METRO: fra
+
+jobs:
+  deploy:
+    name: Deploy to KraftCloud
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare files for KraftCloud
+        run: |
+          cp apps/marketing/Kraftfile Kraftfile
+          cp apps/marketing/Dockerfile Dockerfile
+
+      - name: Get KraftCloud CLI version
+        id: kraft-version
+        run: |
+          KRAFT_VERSION=$(curl -sS https://api.github.com/repos/unikraft/kraftkit/releases/latest | jq -r '.tag_name')
+          echo "version=${KRAFT_VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Cache KraftCloud CLI
+        id: kraft-cache
+        uses: actions/cache@v4
+        with:
+          path: kraft.deb
+          key: kraft-cli-${{ steps.kraft-version.outputs.version }}
+
+      - name: Download KraftCloud CLI
+        if: steps.kraft-cache.outputs.cache-hit != 'true'
+        run: |
+          KRAFT_VERSION=${{ steps.kraft-version.outputs.version }}
+          curl -sSfL "https://github.com/unikraft/kraftkit/releases/download/${KRAFT_VERSION}/kraftkit_${KRAFT_VERSION#v}_linux_amd64.deb" -o kraft.deb
+
+      - name: Install KraftCloud CLI
+        run: |
+          sudo dpkg -i kraft.deb
+          which kraft
+
+      - name: Extract version from tag
+        id: meta
+        run: |
+          if [[ "$GITHUB_REF_NAME" == marketing-v* ]]; then
+            echo "version=${GITHUB_REF_NAME#marketing-v}" >> $GITHUB_OUTPUT
+          else
+            echo "version=$(node -p "require('./apps/marketing/package.json').version")" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deploy to KraftCloud
+        uses: nick-fields/retry@v3
+        env:
+          KRAFTCLOUD_TOKEN: ${{ secrets.KRAFTCLOUD_TOKEN }}
+        with:
+          max_attempts: 2
+          retry_wait_seconds: 60
+          timeout_minutes: 10
+          command: |
+            if [ -n "${{ vars.KRAFTCLOUD_MARKETING_SERVICE }}" ]; then
+              kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
+                --timeout 5m \
+                --service ${{ vars.KRAFTCLOUD_MARKETING_SERVICE }} \
+                --rollout remove_sequential \
+                --rollout-wait 10s \
+                -M 512 \
+                .
+            else
+              kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
+                --timeout 5m \
+                --name engranatge-marketing \
+                -d engranatge.com \
+                -p 443:3000 \
+                -M 512 \
+                .
+            fi
+
+      - name: Verify deployment
+        env:
+          KRAFTCLOUD_TOKEN: ${{ secrets.KRAFTCLOUD_TOKEN }}
+        run: |
+          sleep 5
+          kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} service get engranatge-marketing || true
+          curl -sSf https://engranatge.com -o /dev/null && echo "Site is accessible" || echo "::warning::Site not accessible"

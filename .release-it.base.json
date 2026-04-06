@@ -1,0 +1,57 @@
+{
+	"$schema": "https://unpkg.com/release-it@19/schema/release-it.json",
+	"git": {
+		"commit": true,
+		"commitMessage": "cicd(release): v${version}",
+		"push": true,
+		"requireBranch": "main",
+		"requireCleanWorkingDir": true,
+		"requireCommits": true,
+		"requireUpstream": true,
+		"tag": true,
+		"tagAnnotation": "Release v${version}",
+		"tagName": "v${version}"
+	},
+	"github": {
+		"autoGenerate": false,
+		"draft": false,
+		"preRelease": false,
+		"release": true,
+		"releaseName": "v${version}",
+		"tokenRef": "GITHUB_TOKEN"
+	},
+	"hooks": {
+		"after:release": "echo '✅ Released ${name} v${version} to ${repo.repository}'",
+		"before:init": [
+			"pnpm check",
+			"pnpm check-deps",
+			"pnpm build",
+			"pnpm check-types"
+		]
+	},
+	"npm": {
+		"publish": false
+	},
+	"plugins": {
+		"@release-it/conventional-changelog": {
+			"header": "# Changelog\n\nAll notable changes to this project will be documented in this file.\n",
+			"ignoreRecommendedBump": true,
+			"infile": "CHANGELOG.md",
+			"preset": {
+				"name": "conventionalcommits",
+				"types": [
+					{ "type": "feat", "section": "Features" },
+					{ "type": "fix", "section": "Bug Fixes" },
+					{ "type": "refactor", "section": "Refactoring" },
+					{ "type": "docs", "section": "Documentation" },
+					{ "type": "test", "section": "Tests" },
+					{ "type": "cicd", "section": "CI/CD" },
+					{ "type": "chore", "section": "Chores" },
+					{ "type": "revert", "section": "Reverts" },
+					{ "type": "ai", "section": "AI" },
+					{ "type": "perf", "hidden": true }
+				]
+			}
+		}
+	}
+}

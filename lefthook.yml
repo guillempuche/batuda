@@ -22,7 +22,7 @@ pre-commit:
     format-markdown:
       glob: "**/*.md"
       run: |
-        dprint fmt --config dprint.json --allow-no-files {staged_files}
+        pnpm exec dprint fmt --config dprint.json --allow-no-files {staged_files}
       stage_fixed: true
 
 pre-push:
