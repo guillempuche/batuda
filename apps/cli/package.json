@@ -3,21 +3,26 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
-		"dev": "node --env-file-if-exists=.env --import tsx src/cli.ts",
+		"dev": "node --env-file-if-exists=../../.env --env-file-if-exists=.env --import tsx src/cli.ts",
 		"dev:tui": "node --env-file-if-exists=.env --import tsx src/tui.ts",
 		"build": "tsdown src/cli.ts src/tui.ts",
 		"check-types": "tsc --noEmit"
 	},
 	"dependencies": {
+		"@better-auth/api-key": "^1.5.6",
 		"@clack/prompts": "^1.2.0",
 		"@effect/platform-node": "4.0.0-beta.43",
 		"@effect/sql-pg": "4.0.0-beta.43",
 		"@engranatge/domain": "workspace:*",
+		"better-auth": "^1.5.6",
 		"effect": "4.0.0-beta.43",
+		"kysely": "^0.28.15",
+		"pg": "^8.20.0",
 		"picocolors": "^1.1.1"
 	},
 	"devDependencies": {
 		"@types/node": "^22.15.0",
+		"@types/pg": "^8.20.0",
 		"tsdown": "^0.12.4",
 		"tsx": "^4.20.3",
 		"typescript": "^5.9.3"

@@ -1,7 +1,40 @@
-import { Effect } from 'effect'
+/** biome-ignore-all lint/style/noNonNullAssertion: seed data */
+import { apiKey } from '@better-auth/api-key'
+import { betterAuth } from 'better-auth'
+import { admin, bearer, openAPI } from 'better-auth/plugins'
+import { Config, Effect, Redacted } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
+import { PostgresDialect } from 'kysely'
+import pg from 'pg'
 
-// ── Seed data ──────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────
+
+/** Ensure all objects in a batch have the same keys (required by sql.insert). */
+const normalizeRows = <T extends Record<string, unknown>>(rows: T[]): T[] => {
+	const allKeys = new Set<string>()
+	for (const row of rows) for (const k of Object.keys(row)) allKeys.add(k)
+	return rows.map(
+		row =>
+			Object.fromEntries(
+				[...allKeys].map(k => [k, k in row ? row[k] : null]),
+			) as T,
+	)
+}
+
+// ── Presets ───────────────────────────────────────────────
+
+export const PRESETS = ['minimal', 'full'] as const
+export type Preset = (typeof PRESETS)[number]
+
+// ── Test user ─────────────────────────────────────────────
+
+export const TEST_USER = {
+	email: 'dev@forja.cat',
+	password: 'forja-dev-2026',
+	name: 'Forja Dev',
+}
+
+// ── Seed data ─────────────────────────────────────────────
 
 const PRODUCTS = [
 	{
@@ -247,30 +280,25 @@ const COMPANIES = [
 	},
 ]
 
-// ── Seed effect ────────────────────────────────────────────
+const MINIMAL_COMPANY_SLUGS = new Set([
+	'cal-pep-fonda',
+	'ferros-baix-llobregat',
+])
 
-export const seed = Effect.gen(function* () {
-	const sql = yield* SqlClient.SqlClient
+const MINIMAL_CONTACT_NAMES = new Set([
+	'Pep Casals',
+	'Marta Soler',
+	'Jordi Puig',
+])
 
-	// 1. Products
-	yield* Effect.logInfo('Seeding products...')
-	const insertedProducts = yield* sql<{
-		id: string
-		slug: string
-	}>`INSERT INTO products ${sql.insert(PRODUCTS)} RETURNING id, slug`
+// ── Preset data builder ───────────────────────────────────
 
-	// 2. Companies
-	yield* Effect.logInfo('Seeding companies...')
-	const insertedCompanies = yield* sql<{
-		id: string
-		slug: string
-	}>`INSERT INTO companies ${sql.insert(COMPANIES)} RETURNING id, slug`
-
-	const companyMap = new Map(insertedCompanies.map(c => [c.slug, c.id]))
-
-	// 3. Contacts (one or two per company that has interactions)
-	yield* Effect.logInfo('Seeding contacts...')
-	const contactRows = [
+const getPresetData = (
+	preset: Preset,
+	companyMap: Map<string, string>,
+	contactMap: Map<string, string>,
+) => {
+	const allContacts = [
 		{
 			companyId: companyMap.get('cal-pep-fonda')!,
 			name: 'Pep Casals',
@@ -320,16 +348,8 @@ export const seed = Effect.gen(function* () {
 			phone: '+34 637 888 999',
 		},
 	]
-	const insertedContacts = yield* sql<{
-		id: string
-		name: string
-	}>`INSERT INTO contacts ${sql.insert(contactRows)} RETURNING id, name`
 
-	const contactMap = new Map(insertedContacts.map(c => [c.name, c.id]))
-
-	// 4. Interactions
-	yield* Effect.logInfo('Seeding interactions...')
-	const interactionRows = [
+	const allInteractions = [
 		{
 			companyId: companyMap.get('cal-pep-fonda')!,
 			contactId: contactMap.get('Pep Casals'),
@@ -422,13 +442,8 @@ export const seed = Effect.gen(function* () {
 			nextAction: 'Enviar info automatitzacions',
 		},
 	]
-	const insertedInteractions = yield* sql<{
-		id: string
-	}>`INSERT INTO interactions ${sql.insert(interactionRows)} RETURNING id`
 
-	// 5. Tasks
-	yield* Effect.logInfo('Seeding tasks...')
-	yield* sql`INSERT INTO tasks ${sql.insert([
+	const allTasks = [
 		{
 			companyId: companyMap.get('ferros-baix-llobregat')!,
 			contactId: contactMap.get('Jordi Puig'),
@@ -469,188 +484,323 @@ export const seed = Effect.gen(function* () {
 			notes: 'Revisar mètriques web i reserves del mes.',
 			dueAt: new Date('2026-04-15'),
 		},
-	])}`
+	]
 
-	// 6. Documents
-	yield* Effect.logInfo('Seeding documents...')
-	yield* sql`INSERT INTO documents ${sql.insert([
-		{
-			companyId: companyMap.get('cal-pep-fonda')!,
-			interactionId: insertedInteractions[0]!.id,
-			type: 'prenote',
-			title: 'Preparació visita Cal Pep',
-			content:
-				'## Objectiu\nVeure el restaurant, entendre flux de reserves actual.\n\n## Preguntes\n- Quants coberts per servei?\n- Fan reserves per WhatsApp o telèfon?\n- Tenen web?',
-		},
-		{
-			companyId: companyMap.get('cal-pep-fonda')!,
-			interactionId: insertedInteractions[0]!.id,
-			type: 'postnote',
-			title: 'Resum visita Cal Pep',
-			content:
-				'## Resum\n60 coberts, 2 serveis/dia. Reserves per telèfon, perden un 15% de clients que no esperen.\n\n## Decisió\nVol web + reserves. Pressupost aprovat fins a 1500 EUR.',
-		},
-		{
-			companyId: companyMap.get('ferros-baix-llobregat')!,
-			type: 'research',
-			title: 'Anàlisi Ferros BL',
-			content:
-				"## Empresa\n40 treballadors, 2 naus a Cornellà. Facturen ~3M EUR/any.\n\n## Problemes detectats\n- Facturació manual: 2 dies/mes\n- Errors de transcripció: ~5% factures\n- Sense control d'estocs en temps real",
-		},
-		{
-			companyId: companyMap.get('hostal-pirineu')!,
-			interactionId: insertedInteractions[5]!.id,
-			type: 'visit_notes',
-			title: 'Notes visita Hostal Pirineu',
-			content:
-				'## Context\n12 habitacions, temporada alta juny-setembre + esquí desembre-març.\n\n## Comissions\nBooking: 15-18%. Volen baixar a <5% amb canal directe.\n\n## Requisits\n- Calendari amb disponibilitat\n- Pagament anticipat (Stripe/Redsys)\n- Multi-idioma: ca, es, fr',
-		},
-	])}`
-
-	// 7. Proposals
-	yield* Effect.logInfo('Seeding proposals...')
-	const productMap = new Map(insertedProducts.map(p => [p.slug, p.id]))
-
-	yield* sql`INSERT INTO proposals ${sql.insert([
-		{
-			companyId: companyMap.get('cal-pep-fonda')!,
-			contactId: contactMap.get('Pep Casals'),
-			status: 'accepted',
-			title: 'Web + Gestió Reserves — Cal Pep Fonda',
-			lineItems: JSON.stringify([
-				{
-					product_id: productMap.get('web-starter'),
-					qty: 1,
-					price: '990.00',
-					notes: 'Web responsive amb SEO local',
-				},
-				{
-					product_id: productMap.get('gestio-reserves'),
-					qty: 12,
-					price: '49.00',
-					notes: '12 mesos gestió de reserves',
-				},
-			]),
-			totalValue: '1578.00',
-			sentAt: new Date('2026-02-22'),
-			respondedAt: new Date('2026-02-25'),
-			notes: 'Acceptat per telèfon. Inici projecte 1 de març.',
-		},
-		{
-			companyId: companyMap.get('ferros-baix-llobregat')!,
-			contactId: contactMap.get('Jordi Puig'),
-			status: 'draft',
-			title: 'Automatització facturació — Ferros BL',
-			lineItems: JSON.stringify([
-				{
-					product_id: productMap.get('automatitzacions'),
-					qty: 1,
-					price: '1500.00',
-					notes: 'Setup inicial + integració Contaplus',
-				},
-			]),
-			totalValue: '1500.00',
-			notes: 'Pendent de reunió presencial per tancar detalls.',
-		},
-	])}`
-
-	// 8. Pages
-	yield* Effect.logInfo('Seeding pages...')
-	yield* sql`INSERT INTO pages ${sql.insert([
-		{
-			companyId: companyMap.get('cal-pep-fonda'),
-			slug: 'cal-pep-reserves',
-			lang: 'ca',
-			title: 'Reserves Online — Cal Pep Fonda',
-			status: 'published',
-			template: 'product-pitch',
-			content: JSON.stringify({
-				type: 'doc',
-				content: [
-					{
-						type: 'hero',
-						attrs: {
-							title: 'Reserves Online per Cal Pep Fonda',
-							subtitle:
-								'Gestiona les teves reserves des del mòbil, sense trucades.',
-						},
-					},
-					{
-						type: 'value-props',
-						attrs: {
-							items: [
-								'Calendari en temps real',
-								'Recordatoris automàtics per SMS',
-								'Integració amb Google Maps',
-							],
-						},
-					},
-					{
-						type: 'cta',
-						attrs: {
-							text: 'Comença ara',
-							url: '/contacte',
-						},
-					},
-				],
-			}),
-			meta: JSON.stringify({
-				og_title: 'Reserves Online — Cal Pep Fonda',
-				og_description: 'Sistema de reserves online per al teu restaurant.',
-			}),
-			publishedAt: new Date('2026-03-01'),
-			viewCount: 47,
-		},
-		{
-			slug: 'automatitzacions-industria',
-			lang: 'ca',
-			title: 'Automatitzacions per a la Indústria',
-			status: 'draft',
-			template: 'landing',
-			content: JSON.stringify({
-				type: 'doc',
-				content: [
-					{
-						type: 'hero',
-						attrs: {
-							title: 'Automatitza la teva fàbrica',
-							subtitle:
-								'Redueix errors i estalvia temps amb workflows intel·ligents.',
-						},
-					},
-					{
-						type: 'value-props',
-						attrs: {
-							items: [
-								'Facturació automàtica',
-								"Control d'estocs en temps real",
-								'Integració amb ERP existent',
-							],
-						},
-					},
-				],
-			}),
-			meta: JSON.stringify({
-				og_title: 'Automatitzacions Industrials',
-				og_description:
-					"Solucions d'automatització per a empreses industrials catalanes.",
-			}),
-		},
-	])}`
-
-	// Summary
-	const counts = {
-		products: insertedProducts.length,
-		companies: insertedCompanies.length,
-		contacts: insertedContacts.length,
-		interactions: insertedInteractions.length,
-		tasks: 5,
-		documents: 4,
-		proposals: 2,
-		pages: 2,
+	if (preset === 'minimal') {
+		return {
+			contacts: allContacts.filter(c => MINIMAL_CONTACT_NAMES.has(c.name)),
+			interactions: allInteractions.filter(c =>
+				MINIMAL_COMPANY_SLUGS.has(
+					[...companyMap.entries()].find(([, id]) => id === c.companyId)?.[0] ??
+						'',
+				),
+			),
+			tasks: allTasks.filter(c =>
+				MINIMAL_COMPANY_SLUGS.has(
+					[...companyMap.entries()].find(([, id]) => id === c.companyId)?.[0] ??
+						'',
+				),
+			),
+		}
 	}
 
-	yield* Effect.logInfo('Seed complete!')
+	return {
+		contacts: allContacts,
+		interactions: allInteractions,
+		tasks: allTasks,
+	}
+}
 
-	return counts
+// ── Seed reset ────────────────────────────────────────────
+
+export const seedReset = Effect.gen(function* () {
+	const sql = yield* SqlClient.SqlClient
+	yield* Effect.logInfo('Truncating CRM tables...')
+	yield* sql`TRUNCATE companies, products, pages CASCADE`
 })
+
+// ── Seed auth ─────────────────────────────────────────────
+
+export const seedAuth = Effect.gen(function* () {
+	yield* Effect.logInfo('Seeding auth user...')
+	const dbUrl = yield* Config.redacted('DATABASE_URL')
+	const secret = yield* Config.string('BETTER_AUTH_SECRET').pipe(
+		Config.withDefault('change-me-in-production'),
+	)
+
+	const pool = new pg.Pool({ connectionString: Redacted.value(dbUrl) })
+	const auth = betterAuth({
+		basePath: '/auth',
+		secret,
+		database: { dialect: new PostgresDialect({ pool }), type: 'postgres' },
+		emailAndPassword: { enabled: true },
+		user: {
+			additionalFields: {
+				isAgent: { type: 'boolean', required: false, defaultValue: false },
+			},
+		},
+		plugins: [
+			openAPI(),
+			bearer(),
+			admin(),
+			apiKey({ enableSessionForAPIKeys: true }),
+		],
+	})
+
+	yield* Effect.promise(() => auth.api.signUpEmail({ body: TEST_USER })).pipe(
+		Effect.tap(() => Effect.logInfo(`Created auth user: ${TEST_USER.email}`)),
+		Effect.catchCause(() =>
+			Effect.logInfo(`Auth user already exists: ${TEST_USER.email}`),
+		),
+	)
+
+	yield* Effect.promise(() => pool.end())
+})
+
+// ── Seed effect ───────────────────────────────────────────
+
+export const seed = (preset: Preset) =>
+	Effect.gen(function* () {
+		const sql = yield* SqlClient.SqlClient
+
+		const companies =
+			preset === 'minimal'
+				? COMPANIES.filter(c => MINIMAL_COMPANY_SLUGS.has(c.slug))
+				: COMPANIES
+
+		const products =
+			preset === 'minimal'
+				? PRODUCTS.filter(c =>
+						['web-starter', 'automatitzacions'].includes(c.slug),
+					)
+				: PRODUCTS
+
+		// 1. Products
+		yield* Effect.logInfo(`Seeding products (${preset})...`)
+		const insertedProducts = yield* sql<{
+			id: string
+			slug: string
+		}>`INSERT INTO products ${sql.insert(normalizeRows(products))} RETURNING id, slug`
+
+		// 2. Companies
+		yield* Effect.logInfo(`Seeding companies (${preset})...`)
+		const insertedCompanies = yield* sql<{
+			id: string
+			slug: string
+		}>`INSERT INTO companies ${sql.insert(normalizeRows(companies))} RETURNING id, slug`
+
+		const companyMap = new Map(insertedCompanies.map(c => [c.slug, c.id]))
+
+		// 3. Contacts
+		yield* Effect.logInfo('Seeding contacts...')
+		// Pass empty contactMap for initial contact build — contactIds not needed yet
+		const data = getPresetData(preset, companyMap, new Map())
+		const insertedContacts = yield* sql<{
+			id: string
+			name: string
+		}>`INSERT INTO contacts ${sql.insert(normalizeRows(data.contacts))} RETURNING id, name`
+
+		const contactMap = new Map(insertedContacts.map(c => [c.name, c.id]))
+
+		// 4. Interactions (rebuild with real contactMap for contactId references)
+		yield* Effect.logInfo('Seeding interactions...')
+		const dataWithContacts = getPresetData(preset, companyMap, contactMap)
+		const insertedInteractions = yield* sql<{
+			id: string
+		}>`INSERT INTO interactions ${sql.insert(normalizeRows(dataWithContacts.interactions))} RETURNING id`
+
+		// 5. Tasks
+		yield* Effect.logInfo('Seeding tasks...')
+		yield* sql`INSERT INTO tasks ${sql.insert(normalizeRows(dataWithContacts.tasks))}`
+
+		// Full preset extras
+		if (preset === 'full') {
+			// 6. Documents
+			yield* Effect.logInfo('Seeding documents...')
+			yield* sql`INSERT INTO documents ${sql.insert(
+				normalizeRows([
+					{
+						companyId: companyMap.get('cal-pep-fonda')!,
+						interactionId: insertedInteractions[0]?.id,
+						type: 'prenote',
+						title: 'Preparació visita Cal Pep',
+						content:
+							'## Objectiu\nVeure el restaurant, entendre flux de reserves actual.\n\n## Preguntes\n- Quants coberts per servei?\n- Fan reserves per WhatsApp o telèfon?\n- Tenen web?',
+					},
+					{
+						companyId: companyMap.get('cal-pep-fonda')!,
+						interactionId: insertedInteractions[0]?.id,
+						type: 'postnote',
+						title: 'Resum visita Cal Pep',
+						content:
+							'## Resum\n60 coberts, 2 serveis/dia. Reserves per telèfon, perden un 15% de clients que no esperen.\n\n## Decisió\nVol web + reserves. Pressupost aprovat fins a 1500 EUR.',
+					},
+					{
+						companyId: companyMap.get('ferros-baix-llobregat')!,
+						interactionId: null,
+						type: 'research',
+						title: 'Anàlisi Ferros BL',
+						content:
+							"## Empresa\n40 treballadors, 2 naus a Cornellà. Facturen ~3M EUR/any.\n\n## Problemes detectats\n- Facturació manual: 2 dies/mes\n- Errors de transcripció: ~5% factures\n- Sense control d'estocs en temps real",
+					},
+					{
+						companyId: companyMap.get('hostal-pirineu')!,
+						interactionId: insertedInteractions[5]?.id,
+						type: 'visit_notes',
+						title: 'Notes visita Hostal Pirineu',
+						content:
+							'## Context\n12 habitacions, temporada alta juny-setembre + esquí desembre-març.\n\n## Comissions\nBooking: 15-18%. Volen baixar a <5% amb canal directe.\n\n## Requisits\n- Calendari amb disponibilitat\n- Pagament anticipat (Stripe/Redsys)\n- Multi-idioma: ca, es, fr',
+					},
+				]),
+			)}`
+
+			// 7. Proposals
+			yield* Effect.logInfo('Seeding proposals...')
+			const productMap = new Map(insertedProducts.map(p => [p.slug, p.id]))
+			yield* sql`INSERT INTO proposals ${sql.insert(
+				normalizeRows([
+					{
+						companyId: companyMap.get('cal-pep-fonda')!,
+						contactId: contactMap.get('Pep Casals'),
+						status: 'accepted',
+						title: 'Web + Gestió Reserves — Cal Pep Fonda',
+						lineItems: JSON.stringify([
+							{
+								product_id: productMap.get('web-starter'),
+								qty: 1,
+								price: '990.00',
+								notes: 'Web responsive amb SEO local',
+							},
+							{
+								product_id: productMap.get('gestio-reserves'),
+								qty: 12,
+								price: '49.00',
+								notes: '12 mesos gestió de reserves',
+							},
+						]),
+						totalValue: '1578.00',
+						sentAt: new Date('2026-02-22'),
+						respondedAt: new Date('2026-02-25'),
+						notes: 'Acceptat per telèfon. Inici projecte 1 de març.',
+					},
+					{
+						companyId: companyMap.get('ferros-baix-llobregat')!,
+						contactId: contactMap.get('Jordi Puig'),
+						status: 'draft',
+						title: 'Automatització facturació — Ferros BL',
+						lineItems: JSON.stringify([
+							{
+								product_id: productMap.get('automatitzacions'),
+								qty: 1,
+								price: '1500.00',
+								notes: 'Setup inicial + integració Contaplus',
+							},
+						]),
+						totalValue: '1500.00',
+						sentAt: null,
+						respondedAt: null,
+						notes: 'Pendent de reunió presencial per tancar detalls.',
+					},
+				]),
+			)}`
+
+			// 8. Pages
+			yield* Effect.logInfo('Seeding pages...')
+			const pageRows = [
+				{
+					companyId: companyMap.get('cal-pep-fonda'),
+					slug: 'cal-pep-reserves',
+					lang: 'ca',
+					title: 'Reserves Online — Cal Pep Fonda',
+					status: 'published',
+					template: 'product-pitch',
+					content: JSON.stringify({
+						type: 'doc',
+						content: [
+							{
+								type: 'hero',
+								attrs: {
+									title: 'Reserves Online per Cal Pep Fonda',
+									subtitle:
+										'Gestiona les teves reserves des del mòbil, sense trucades.',
+								},
+							},
+							{
+								type: 'value-props',
+								attrs: {
+									items: [
+										'Calendari en temps real',
+										'Recordatoris automàtics per SMS',
+										'Integració amb Google Maps',
+									],
+								},
+							},
+							{
+								type: 'cta',
+								attrs: { text: 'Comença ara', url: '/contacte' },
+							},
+						],
+					}),
+					meta: JSON.stringify({
+						og_title: 'Reserves Online — Cal Pep Fonda',
+						og_description: 'Sistema de reserves online per al teu restaurant.',
+					}),
+					publishedAt: new Date('2026-03-01'),
+					viewCount: 47,
+				},
+				{
+					companyId: null,
+					slug: 'automatitzacions-industria',
+					lang: 'ca',
+					title: 'Automatitzacions per a la Indústria',
+					status: 'draft',
+					template: 'landing',
+					content: JSON.stringify({
+						type: 'doc',
+						content: [
+							{
+								type: 'hero',
+								attrs: {
+									title: 'Automatitza la teva fàbrica',
+									subtitle:
+										'Redueix errors i estalvia temps amb workflows intel·ligents.',
+								},
+							},
+							{
+								type: 'value-props',
+								attrs: {
+									items: [
+										'Facturació automàtica',
+										"Control d'estocs en temps real",
+										'Integració amb ERP existent',
+									],
+								},
+							},
+						],
+					}),
+					meta: JSON.stringify({
+						og_title: 'Automatitzacions Industrials',
+						og_description:
+							"Solucions d'automatització per a empreses industrials catalanes.",
+					}),
+					publishedAt: null,
+					viewCount: 0,
+				},
+			]
+			yield* sql`INSERT INTO pages ${sql.insert(pageRows)}`
+		}
+
+		const counts = {
+			products: insertedProducts.length,
+			companies: insertedCompanies.length,
+			contacts: insertedContacts.length,
+			interactions: insertedInteractions.length,
+			tasks: dataWithContacts.tasks.length,
+			documents: preset === 'full' ? 4 : 0,
+			proposals: preset === 'full' ? 2 : 0,
+			pages: preset === 'full' ? 2 : 0,
+		}
+
+		yield* Effect.logInfo('Seed complete!')
+		return counts
+	})

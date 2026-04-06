@@ -86,7 +86,7 @@ const tui = Effect.gen(function* () {
 				Effect.gen(function* () {
 					const s = p.spinner()
 					s.start('Inserting data...')
-					const counts = yield* seed
+					const counts = yield* seed('full')
 					s.stop('Seed complete!')
 
 					p.note(
@@ -209,10 +209,12 @@ const tui = Effect.gen(function* () {
 
 // ── Run ────────────────────────────────────────────────────
 
-tui.pipe(
+const program = tui.pipe(
 	Effect.provide(NodeServices.layer),
 	Effect.tapError(e =>
 		Effect.sync(() => p.cancel(e instanceof Error ? e.message : String(e))),
 	),
-	NodeRuntime.runMain({ disableErrorReporting: true }),
 )
+NodeRuntime.runMain(program as unknown as Effect.Effect<void, unknown, never>, {
+	disableErrorReporting: true,
+})

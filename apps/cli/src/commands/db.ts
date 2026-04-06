@@ -2,7 +2,7 @@ import { Effect } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { execIn, ROOT } from '../shell'
-import { seed } from './seed'
+import { seed, seedAuth } from './seed'
 
 export const dbMigrate = execIn(ROOT, 'pnpm', 'db:migrate')
 
@@ -16,8 +16,11 @@ export const dbReset = Effect.gen(function* () {
 	yield* Effect.logInfo('Running migrations...')
 	yield* dbMigrate
 
-	yield* Effect.logInfo('Seeding...')
-	yield* seed
+	yield* Effect.logInfo('Seeding (full)...')
+	yield* seed('full')
+
+	yield* Effect.logInfo('Seeding auth...')
+	yield* seedAuth
 
 	yield* Effect.logInfo('Database reset complete.')
 })
