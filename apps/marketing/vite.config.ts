@@ -10,7 +10,20 @@ const config = defineConfig({
 	ssr: {
 		noExternal: ['styled-components'],
 	},
-	plugins: [tanstackStart(), viteReact(), tailwindcss()],
+	plugins: [
+		tanstackStart(),
+		viteReact({
+			babel: {
+				plugins: [
+					[
+						'babel-plugin-styled-components',
+						{ displayName: true, fileName: false },
+					],
+				],
+			},
+		}),
+		tailwindcss(),
+	],
 })
 
 export default config

@@ -121,6 +121,15 @@ The CLI connects to Postgres via `DATABASE_URL` in `apps/cli/.env`. Commands tha
 
 ## Modifying code
 
+### File naming
+
+Use **kebab-case** for all filenames, including React components:
+- `workshop-nav.tsx` not `WorkshopNav.tsx`
+- `indicator-light.tsx` not `IndicatorLight.tsx`
+- `lang-provider.tsx` not `LangProvider.tsx`
+
+This applies to `.ts`, `.tsx`, `.css`, and all other source files.
+
 ### Backend (apps/server)
 
 - Effect patterns: see `docs/backend.md`

@@ -40,3 +40,6 @@ coverage/
 
 # Direnv
 .direnv/
+
+# Web
+.tanstack
