@@ -18,11 +18,12 @@
 │                                                                  │
 │  ┌─────────────────────┐   ┌──────────────────────────────────┐ │
 │  │   MCP Server        │   │   HTTP API                       │ │
-│  │   stdio transport   │   │   /companies /contacts           │ │
-│  │   HTTP/SSE transport│   │   /interactions /tasks           │ │
-│  │                     │   │   /proposals /documents          │ │
-│  │   14 tools          │   │   /products /webhooks            │ │
-│  │   2 resources       │   │                                  │ │
+│  │   stdio transport   │   │   /auth/* (Better Auth)          │ │
+│  │   HTTP transport    │   │   /v1/companies /v1/contacts     │ │
+│  │     at /mcp         │   │   /v1/interactions /v1/tasks     │ │
+│  │                     │   │   /v1/proposals /v1/documents    │ │
+│  │   tools + resources │   │   /v1/products /v1/webhooks      │ │
+│  │   + prompts         │   │   /health /docs                  │ │
 │  └──────────┬──────────┘   └────────────────┬─────────────────┘ │
 │             │                                │                   │
 │             └──────────────┬─────────────────┘                   │
@@ -220,22 +221,40 @@ Company status updated to "client" via MCP or web
 
 ---
 
-## Authentication
+## Authentication (Better Auth)
 
-**Internal frontend → server:** No auth for now (personal tool, private deployment).
+All auth is handled by [Better Auth](https://www.better-auth.com/) v1.5.6 with plugins: `openAPI`, `bearer`, `admin`, `apiKey`.
 
-**Marketing frontend → server:** Public page routes (`GET /pages/:slug`, `POST /pages/:slug/view`) require no auth. Internal page management routes are not exposed to marketing app.
+**Two user types:**
 
-**External services (n8n, Zapier) → server:** API key in `x-api-key` header.
+- **Team members** — email/password sign-in, browser session cookies
+- **AI agents** — admin-created users (`isAgent: true`), long-lived API keys via `x-api-key` header
 
-- Keys stored hashed (SHA-256) in `api_keys` table
-- Each key has a `scopes` array
-- Middleware validates key and attaches scopes to request context
+**Route protection:**
 
-**Remote MCP (Claude.ai, ChatGPT) → server:** Bearer token in `Authorization` header.
+| Routes                                                      | Auth                                                                              |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `GET /health`, `GET /pages/:slug`, `POST /pages/:slug/view` | Public — no auth                                                                  |
+| `/auth/*`                                                   | Better Auth endpoints (sign-up, sign-in, session, API key management)             |
+| All `/v1/*` routes                                          | Protected — `SessionMiddleware` validates cookie, bearer token, or API key        |
+| `/mcp` (HTTP transport)                                     | Protected — HTTP middleware validates Better Auth session, provides `CurrentUser` |
+| MCP stdio                                                   | Trusted local process — static `CurrentUser`                                      |
 
-- Single secret from `MCP_SECRET` env var
-- Checked on the `/mcp` SSE endpoint
+**API key flow for AI agents and external services (n8n, Zapier):**
+
+1. Admin creates agent user: `POST /auth/admin/create-user`
+2. Admin creates API key: `POST /auth/api-key/create`
+3. Agent/service sends `x-api-key: sk_...` header
+4. `@better-auth/api-key` plugin with `enableSessionForAPIKeys: true` mocks a session
+5. `SessionMiddleware` validates uniformly via `auth.api.getSession()`
+
+**MCP auth on behalf of user:**
+
+MCP protocol has no built-in auth. Auth happens at the transport level:
+
+- **HTTP** (`/mcp`): middleware validates Better Auth session on each POST, provides `CurrentUser` context to tool handlers
+- **Stdio**: `CurrentUser` provided statically (trusted local user)
+- Tool handlers can `yield* CurrentUser` for audit logging and permissions
 
 ---
 
@@ -277,7 +296,9 @@ All three apps run on Unikraft — stateless Node.js SSR. Scales to zero when id
 
 ---
 
-## 10 tables
+## Tables
+
+### CRM tables (Effect SQL migrations)
 
 ```
 companies           — core entity, all prospect/client data
@@ -288,8 +309,17 @@ products            — service/product catalog
 proposals           — quotes sent to companies
 documents           — long-form markdown (research, meeting notes)
 pages               — public prospect sales pages (Tiptap JSON, multilingual)
-api_keys            — external integration auth
 webhook_endpoints   — outgoing webhook configuration
+```
+
+### Better Auth tables (auto-managed)
+
+```
+user                — auth users (team members + AI agents, with isAgent field)
+session             — active sessions
+account             �� auth provider accounts
+verification        — email verification tokens
+api_key             — hashed API keys (referenceId, configId, quotas, rate limits)
 ```
 
 Relations: see `PLAN.md` § Entity relationships summary.

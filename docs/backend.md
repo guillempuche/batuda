@@ -28,25 +28,54 @@ apps/server/src/
 │   ├── migrator.ts           # PgMigrator layer (file system loader)
 │   ├── migrations/           # Effect SQL migration files
 │   │   └── 0001_initial.ts
-│   └── migrate.ts            # CLI entry point for running migrations
-├── main.ts                   # HTTP server entry point — imports db layers from ./db/
-├── mcp-stdio.ts              # MCP stdio entry point (Claude Code)
-├── api/
-│   ├── specs/
-│   │   └── api.ts            # Imports groups from @engranatge/controllers + server-only
-│   └── live/                 # HttpApiBuilder.group() implementations
-│       ├── api.ts            # ApiLive composing all handler layers
-│       ├── companies.ts
-│       ├── contacts.ts
-│       ├── ...
-│       └── health.ts
+│   └── migrate.ts            # CRM + Better Auth migrations
+├── main.ts                   # HTTP server entry point (REST API + MCP HTTP)
+├── mcp-stdio.ts              # MCP stdio entry point (Claude Code local)
+├── api.ts                    # ForjaApi — HttpApi groups composition
+├── errors.ts                 # Domain error schemas (Unauthorized, NotFound, etc.)
+├── routes/                   # HttpApiGroup definitions
+│   ├── auth.ts               # /auth/* wildcard (Better Auth proxy)
+│   ├── companies.ts
+│   ├── contacts.ts
+│   ├── ...
+│   └── pages.ts              # Mixed: /v1/pages (protected) + /pages/:slug (public)
+├── handlers/                 # HttpApiBuilder.group() implementations
+│   ├── auth.ts               # Proxy to Better Auth handler
+│   ├── companies.ts
+│   ├── contacts.ts
+│   ├── ...
+│   └── health.ts
+├── lib/
+│   ├── auth.ts               # Better Auth instance as ServiceMap.Service
+│   └── env.ts                # EnvVars service (DATABASE_URL, BETTER_AUTH_SECRET, etc.)
 ├── mcp/
-│   ├── server.ts             # McpServer, tool + resource registration
-│   ├── tools/                # one file per domain (incl. pages.ts)
-│   └── resources/
+│   ├── server.ts             # McpToolsLive — toolkits + resources + prompts
+│   ├── http.ts               # McpHttpLive — HTTP transport at /mcp
+│   ├── current-user.ts       # CurrentUser context tag for auth-on-behalf-of
+│   ├── tools/                # one file per domain
+│   │   ├── companies.ts
+│   │   ├── contacts.ts
+│   │   ├── interactions.ts
+│   │   ├── tasks.ts
+│   │   ├── documents.ts
+│   │   ├── pages.ts
+│   │   └── pipeline.ts
+│   ├── resources/
+│   │   ├── company.ts        # forja://company/{slug} (parameterized)
+│   │   ├── pipeline.ts       # forja://pipeline (static)
+│   │   └── document.ts       # forja://document/{id} (parameterized)
+│   └── prompts/
+│       ├── _lang.ts           # LangParam + langDirective helper (ca/es/en)
+│       ├── _completions.ts    # Shared auto-completion (company slugs)
+│       ├── company-research.ts
+│       ├── daily-briefing.ts
+│       ├── proposal-draft.ts
+│       └── interaction-follow-up.ts
 ├── middleware/
-│   └── api-key.ts            # Live implementation of ApiKeyMiddleware
-└── services/                 # business logic, called by both routes and MCP tools
+│   └── session.ts            # SessionMiddleware — validates Better Auth sessions
+├── types/
+│   └── better-auth.d.ts      # Type declarations for Better Auth
+└── services/                 # Business logic, called by both routes and MCP tools
     ├── companies.ts
     ├── email.ts              # Resend: send outbound + handle inbound replies
     ├── pages.ts              # page CRUD, view tracking, publish/archive
@@ -152,16 +181,26 @@ export default Effect.gen(function* () {
 
 ```typescript
 // apps/server/src/main.ts
-import { HttpApiBuilder } from 'effect/unstable/httpapi'
-import { HttpRouter } from 'effect/unstable/http'
+const ApiLive = HttpApiBuilder.layer(ForjaApi).pipe(
+  Layer.provide([HealthLive, AuthHandlerLive, CompaniesLive, ...]),
+)
 
-const ApiLive = HttpApiBuilder.layer(ForjaApi).pipe(Layer.provide([...handlers]))
-const ServicesLive = Layer.mergeAll(CompanyService.layer, PageService.layer, ...)
+const ServicesLive = Layer.mergeAll(
+  CompanyService.layer, PipelineService.layer, PageService.layer, WebhookService.layer,
+)
 
-const program = HttpRouter.serve(ApiLive).pipe(
+// REST API + MCP HTTP on the same router
+const AppLive = Layer.merge(ApiLive, McpHttpLive)
+
+const program = HttpRouter.serve(AppLive).pipe(
   Layer.provide(ServicesLive),
+  Layer.provide(SessionMiddlewareLive),
+  Layer.provide(Auth.layer),
+  Layer.provide(EnvVars.layer),
   Layer.provide(PgLive),
   Layer.provideMerge(ServerLive),
+  Layer.provide(LoggerLive),
+  Layer.provide(OtlpObservability),
   Layer.launch,
 )
 ```
@@ -295,105 +334,241 @@ export const CreateCompanyInput = Schema.Struct({
 
 ---
 
-## MCP server
+## MCP server (Effect AI)
 
-### Server setup
+The MCP server uses `effect/unstable/ai` — tools, resources, prompts, and elicitation. Source reference: `docs/repos/effect/packages/effect/MCP.md`.
 
-```typescript
-// src/mcp/server.ts
-import { McpServer } from "effect/unstable/ai"
+### Architecture
 
-export const ForjaMcpServer = McpServer.make({
-  name: "forja",
-  version: "1.0.0",
-}).pipe(
-  McpServer.addTool(SearchCompaniesTool),
-  McpServer.addTool(GetCompanyTool),
-  McpServer.addTool(CreateCompanyTool),
-  McpServer.addTool(UpdateCompanyTool),
-  McpServer.addTool(LogInteractionTool),
-  McpServer.addTool(GetDocumentsTool),
-  McpServer.addTool(GetDocumentTool),
-  McpServer.addTool(CreateDocumentTool),
-  McpServer.addTool(UpdateDocumentTool),
-  McpServer.addTool(CreateTaskTool),
-  McpServer.addTool(CompleteTaskTool),
-  McpServer.addTool(GetPipelineTool),
-  McpServer.addTool(GetNextStepsTool),
-  McpServer.addTool(CreatePageTool),
-  McpServer.addTool(UpdatePageTool),
-  McpServer.addTool(PublishPageTool),
-  McpServer.addTool(ListPagesTool),
-  McpServer.addTool(GetPageTool),
-  McpServer.addResource(CompanyResource),
-  McpServer.addResource(PipelineResource)
-)
 ```
+McpToolsLive (src/mcp/server.ts)
+├── Toolkits: companies, contacts, interactions, tasks, documents, pages, pipeline
+├── Resources: forja://company/{slug}, forja://pipeline, forja://document/{id}
+└── Prompts: company-research, daily-briefing, proposal-draft, interaction-follow-up
+    │
+    ├── stdio transport (mcp-stdio.ts) — local Claude Code
+    └── HTTP transport (mcp/http.ts) — remote AI at /mcp on main server
+```
+
+`McpToolsLive` is transport-agnostic — shared between both transports.
 
 ### Tool definition pattern
 
+Tools are defined with `Tool.make()`, grouped into `Toolkit.make()`, and registered via `McpServer.toolkit()`. Handlers are separate from definitions via `Toolkit.toLayer()`.
+
 ```typescript
 // src/mcp/tools/companies.ts
-import { McpServer, Tool } from "effect/unstable/ai"
-import { Schema } from "effect"
+import { Effect, Schema } from 'effect'
+import { Tool, Toolkit } from 'effect/unstable/ai'
 
-export const SearchCompaniesTool = Tool.make({
-  name: "search_companies",
-  description: "Filter companies by status, region, industry, priority, or product fit. Returns summaries only — call get_company for full details.",
+const SearchCompanies = Tool.make('search_companies', {
+  description: 'Filter companies by status, region, industry, priority, or query.',
   parameters: Schema.Struct({
     status: Schema.optional(Schema.String),
-    region: Schema.optional(Schema.Literal("cat", "ara", "cv")),
-    industry: Schema.optional(Schema.String),
-    priority: Schema.optional(Schema.Int),
-    product_fit: Schema.optional(Schema.String),
-    limit: Schema.optional(Schema.Int.pipe(Schema.between(1, 100)))
+    region: Schema.optional(Schema.String),
+    limit: Schema.optional(Schema.Number),
   }),
-  handler: ({ status, region, industry, priority, product_fit, limit }) =>
-    Effect.gen(function* () {
-      const service = yield* CompanyService
-      return yield* service.search({ status, region, industry, priority, product_fit, limit: limit ?? 20 })
-    })
+  success: Schema.Unknown,
+}).annotate(Tool.Title, 'Search Companies')
+  .annotate(Tool.Readonly, true)
+  .annotate(Tool.Destructive, false)    // default is true — must set false explicitly
+  .annotate(Tool.OpenWorld, false)
+
+export const CompanyTools = Toolkit.make(SearchCompanies, GetCompany, CreateCompany, UpdateCompany)
+
+export const CompanyHandlersLive = CompanyTools.toLayer(
+  Effect.gen(function* () {
+    const service = yield* CompanyService
+    return {
+      search_companies: params =>
+        service.search({ ...params }).pipe(Effect.orDie),
+      // ...
+    }
+  }),
+)
+```
+
+### Tool annotations
+
+All tools MUST set `Tool.Destructive` explicitly — it defaults to `true`.
+
+| Annotation         | Default    | Purpose                                            |
+| ------------------ | ---------- | -------------------------------------------------- |
+| `Tool.Title`       | —          | Human-readable display name                        |
+| `Tool.Readonly`    | `false`    | Read-only, no side effects                         |
+| `Tool.Destructive` | **`true`** | Destructive/write operation                        |
+| `Tool.Idempotent`  | `false`    | Safe to call multiple times                        |
+| `Tool.OpenWorld`   | `true`     | Can access external data (set `false` for DB-only) |
+| `Tool.Meta`        | —          | Custom metadata for MCP clients                    |
+
+### Resource definition pattern
+
+Static resources use `McpServer.resource({...})`. Parameterized resources use template literals with `McpSchema.param()`:
+
+```typescript
+import { McpSchema, McpServer } from 'effect/unstable/ai'
+
+const slugParam = McpSchema.param('slug', Schema.String)
+
+export const CompanyResource = McpServer.resource`forja://company/${slugParam}`({
+  name: 'Company Profile',
+  description: 'Full company profile with contacts and recent interactions.',
+  mimeType: 'application/json',
+  audience: ['assistant'],
+  completion: {
+    slug: (input) => Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+      const rows = yield* sql`SELECT slug FROM companies WHERE slug ILIKE ${input + '%'} LIMIT 10`
+      return rows.map((r: any) => r.slug as string)
+    }),
+  },
+  content: Effect.fn(function* (_uri, slug) {
+    const service = yield* CompanyService
+    return JSON.stringify(yield* service.getWithRelations(slug), null, 2)
+  }),
 })
 ```
 
-### Two MCP transports
+### Prompt definition pattern
+
+Prompts are parameterized templates with auto-completion. All prompts accept `lang: 'ca' | 'es' | 'en'` (default `en`) for multilingual output.
+
+```typescript
+import { McpServer } from 'effect/unstable/ai'
+import { LangParam, langDirective } from './_lang'
+import { completeCompanySlug } from './_completions'
+
+export const CompanyResearchPrompt = McpServer.prompt({
+  name: 'company-research',
+  description: 'Build a research brief for a company.',
+  parameters: { slug: Schema.String, lang: LangParam },
+  completion: { slug: completeCompanySlug },
+  content: ({ slug, lang }) => Effect.gen(function* () {
+    const service = yield* CompanyService
+    const data = yield* service.getWithRelations(slug)
+    return `${langDirective(lang)}\n\n## Company: ${data.name}\n${JSON.stringify(data, null, 2)}\n\nProduce: overview, contacts, interaction trajectory, next steps.`
+  }),
+})
+```
+
+### Elicitation
+
+Tool handlers can request user confirmation for destructive operations via `McpServer.elicit()`:
+
+```typescript
+publish_page: ({ id }) => Effect.gen(function* () {
+  const page = yield* service.getById(id)
+  const { confirm } = yield* McpServer.elicit({
+    message: `Publish "${page.title}"? This makes it publicly visible.`,
+    schema: Schema.Struct({ confirm: Schema.Literal('yes', 'no') }),
+  }).pipe(Effect.catchTag('ElicitationDeclined', () => Effect.succeed({ confirm: 'no' as const })))
+  if (confirm === 'no') return { status: 'cancelled' }
+  return yield* service.publish(id)
+}).pipe(Effect.orDie),
+```
+
+### Auth on behalf of user (CurrentUser)
+
+MCP protocol has no built-in auth. A `CurrentUser` context tag bridges transport-level auth into tool handlers:
+
+```typescript
+// src/mcp/current-user.ts
+export class CurrentUser extends Context.Tag('CurrentUser')<CurrentUser, {
+  readonly userId: string
+  readonly email: string
+  readonly name: string
+  readonly isAgent: boolean
+}>() {}
+```
+
+- **HTTP transport**: middleware validates Better Auth session → provides `CurrentUser` per-request
+- **Stdio transport**: static `CurrentUser` (trusted local user)
+- Tool handlers: `const user = yield* CurrentUser` for audit/permissions
+
+### Two transports
 
 **stdio** (Claude Code — local):
 
 ```typescript
 // src/mcp-stdio.ts
-import { NodeRuntime, NodeStdio } from "@effect/platform-node"
-
 const ServerLayer = McpToolsLive.pipe(
   Layer.provide(McpServer.layerStdio({ name: 'forja', version: '1.0.0' })),
   Layer.provide(ServicesLive),
   Layer.provide(PgLive),
   Layer.provide(NodeStdio.layer),
-  Layer.provide(Layer.succeed(Logger.LogToStderr)(true)),
+  Layer.provide(Layer.succeed(CurrentUser, { userId: 'local', ... })),
 )
-
 Layer.launch(ServerLayer).pipe(NodeRuntime.runMain)
 ```
 
-**HTTP/SSE** (Claude.ai, ChatGPT — remote):
-Mounted at `/mcp` on the main HTTP server. Protected by `MCP_SECRET` env var as Bearer token.
-Uses the SSE transport from `@effect/experimental`.
+**HTTP** (remote AI — Claude.ai, ChatGPT):
+
+```typescript
+// src/mcp/http.ts
+export const McpHttpLive = McpToolsLive.pipe(
+  Layer.provide(McpServer.layerHttp({ name: 'forja', version: '1.0.0', path: '/mcp' })),
+)
+
+// In main.ts — merged with REST API on the same HttpRouter:
+const AppLive = Layer.merge(ApiLive, McpHttpLive)
+const program = HttpRouter.serve(AppLive).pipe(...)
+```
+
+### MCP server composition (src/mcp/server.ts)
+
+```typescript
+export const McpToolsLive = Layer.mergeAll(
+  McpServer.toolkit(CompanyTools),
+  McpServer.toolkit(ContactTools),
+  McpServer.toolkit(InteractionTools),
+  McpServer.toolkit(TaskTools),
+  McpServer.toolkit(DocumentTools),
+  McpServer.toolkit(PageTools),
+  McpServer.toolkit(PipelineTools),
+  CompanyResource,
+  PipelineResource,
+  DocumentResource,
+  CompanyResearchPrompt,
+  DailyBriefingPrompt,
+  ProposalDraftPrompt,
+  InteractionFollowUpPrompt,
+).pipe(
+  Layer.provide(CompanyHandlersLive),
+  Layer.provide(ContactHandlersLive),
+  // ... all handler layers
+)
+```
+
+### Testing MCP locally
+
+```bash
+# MCP Inspector (interactive web UI)
+npx @modelcontextprotocol/inspector -- pnpm --filter @engranatge/server dev:mcp
+
+# JSON-RPC pipe (smoke test)
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{"elicitation":{}},"clientInfo":{"name":"test","version":"0.1"}}}' | pnpm --filter @engranatge/server dev:mcp
+
+# HTTP endpoint
+curl -X POST http://localhost:3010/mcp -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{...}}'
+
+# Claude Code — .mcp.json already configures the forja stdio server
+```
 
 ---
 
-## API key middleware
+## Authentication (Better Auth)
 
-```typescript
-// src/middleware/api-key.ts
-// Flow:
-// 1. Read x-api-key header
-// 2. SHA-256 hash the incoming key
-// 3. Query api_keys table: WHERE key_hash = ? AND is_active = true
-// 4. Check expiry if expires_at is set
-// 5. Update last_used_at (fire-and-forget, don't block response)
-// 6. Attach scopes to HttpServerRequest context
-// 7. On failure: return 401 with no detail (don't leak existence)
-```
+Better Auth v1.5.6 handles all authentication. See [architecture.md](architecture.md) for the full auth section.
+
+Key files:
+
+- `src/lib/auth.ts` — Better Auth instance as `ServiceMap.Service`, with plugins: `openAPI`, `bearer`, `admin`, `apiKey`
+- `src/lib/env.ts` — Centralized environment variables (DATABASE_URL, BETTER_AUTH_SECRET, etc.)
+- `src/middleware/session.ts` — `SessionMiddleware` validates sessions via `auth.api.getSession()`, provides `SessionContext`
+- `src/routes/auth.ts` — Wildcard `/auth/*` GET/POST routes
+- `src/handlers/auth.ts` — Proxy: Effect request → fetch Request → Better Auth handler → Effect response
+
+`SessionMiddleware` is applied to all `/v1/*` route groups. It works uniformly for cookies (team members), bearer tokens, and API keys (`enableSessionForAPIKeys: true`).
 
 ---
 
@@ -535,9 +710,26 @@ Style: 2-space indent, 100-char line width, single quotes, ES5 trailing commas, 
 
 ## Adding a new MCP tool
 
-1. Create or add to `src/mcp/tools/<domain>.ts`
-2. Register in `src/mcp/server.ts` via `McpServer.addTool`
-3. Document in `AGENTS.md` if it changes agent workflows
+1. Define tool with `Tool.make(name, { description, parameters, success })` in `src/mcp/tools/<domain>.ts`
+2. Add annotations: `.annotate(Tool.Title, ...)`, `.annotate(Tool.Readonly, ...)`, `.annotate(Tool.Destructive, false)`, `.annotate(Tool.OpenWorld, false)`
+3. Add to a `Toolkit.make(...)` and export both `*Tools` and `*HandlersLive`
+4. Register in `src/mcp/server.ts` via `McpServer.toolkit(Tools)` + `Layer.provide(HandlersLive)`
+5. Document in `AGENTS.md` if it changes agent workflows
+
+## Adding a new MCP resource
+
+1. Define in `src/mcp/resources/<name>.ts`
+2. Static: `McpServer.resource({ uri, name, description, mimeType, audience, content })`
+3. Parameterized: `McpServer.resource\`forja://entity/${McpSchema.param('id', Schema.String)}\`({...})`
+4. Add `completion` for parameterized resources
+5. Add to `McpToolsLive` in `src/mcp/server.ts`
+
+## Adding a new MCP prompt
+
+1. Define in `src/mcp/prompts/<name>.ts`
+2. Include `lang: LangParam` in parameters, prepend `langDirective(lang)` to output
+3. Use `completeCompanySlug` from `_completions.ts` for slug auto-completion
+4. Add to `McpToolsLive` in `src/mcp/server.ts`
 
 ## Pages API
 
