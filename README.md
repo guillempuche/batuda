@@ -1,115 +1,99 @@
 # Engranatge
 
-**Make your business run itself.**
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Engranatge builds tools that let machines handle the work humans shouldn't waste time on — repetitive tasks, manual processes, data that nobody looks at until it's too late.
+**Open-source automation platform for agencies serving local businesses.**
 
-We sell automations, AI integrations, and micro-SaaS tools to local businesses. The goal is simple: free up people to do the work that actually matters.
+Build and sell automations, AI workflows, and micro-SaaS tools to restaurants, clinics, shops, and service businesses — with a built-in CRM to manage your sales pipeline.
 
-Domains: `engranatge.com` (marketing) · `forja.engranatge.com` (internal) · `api.engranatge.com` (server)
+## Why Engranatge
 
-## What we build
+Most local businesses run on manual work a machine could handle: copying spreadsheets, sending follow-up emails by hand, checking inventory by walking to the back room. Enterprise software is too expensive and too complex for them.
 
-**For clients** — automations, AI workflows, and small focused tools (micro-SaaS) that replace manual busywork in local businesses: auto-scheduling, smart invoicing, lead follow-up, inventory alerts, report generation, whatever the business needs.
+Engranatge gives agencies like yours everything you need to fill that gap:
 
-**For ourselves** — Forja, our internal sales prospecting tool:
+- **Automations** — connect the tools your clients already use. When X happens, do Y.
+- **AI integrations** — let AI handle tasks that require judgment but not creativity: categorizing emails, drafting invoices, summarizing feedback.
+- **Micro-SaaS** — small, focused tools that do one thing well. Booking widgets, inventory alerts, client follow-up trackers.
+- **Built-in CRM (Forja)** — track prospects, log interactions (visits, calls, emails, LinkedIn, Instagram), and manage your pipeline.
+- **AI-agent ready** — expose all data to AI agents via MCP (Claude, ChatGPT) and connect to n8n/Zapier via webhooks.
+- **Multilingual prospect pages** — generate AI-powered pages for prospects with i18n support (ca/es/en).
 
-- Track prospect companies through a pipeline
-- Log every interaction: cold visits, calls, emails, LinkedIn, Instagram
-- Store AI-researched company profiles and meeting notes
-- Connect to n8n/Zapier via webhooks and API keys
-- Expose all data to AI agents via MCP (Claude Code, Claude.ai, ChatGPT)
-- Generate AI-powered prospect pages with multilingual support (ca/es/en)
+## Tech stack
 
-## The idea
-
-Most local businesses — restaurants, clinics, shops, agencies — run on manual labor that a machine could do better. Someone copies data from one spreadsheet to another. Someone sends the same follow-up email by hand. Someone checks inventory by walking to the back room.
-
-These aren't hard problems. They're just problems nobody has solved for them yet, because enterprise software is too expensive and too complex, and their "tech guy" cousin set up a WordPress site in 2016.
-
-Engranatge fills that gap:
-
-1. **Automations** — Connect the tools they already use. When X happens, do Y. No code, no maintenance.
-2. **AI integrations** — Let AI handle the stuff that requires judgment but not creativity: categorizing emails, writing first-draft invoices, summarizing customer feedback.
-3. **Micro-SaaS** — Small, focused tools that do one thing well. A booking widget. An inventory alert system. A client follow-up tracker. Built fast, priced fair, maintained forever.
-
-The philosophy: **machines do the low-value work, humans do the high-value work.** We don't replace people — we give them their time back.
-
-## Stack
-
-| Layer              | Technology                                     |
-| ------------------ | ---------------------------------------------- |
-| Monorepo           | pnpm workspaces                                |
-| Dev environment    | Nix flake (Node 24 + pnpm + kraft)             |
-| Shared schema      | `packages/domain` — Effect Schema              |
-| CLI                | `apps/cli` — Effect CLI + @clack/prompts TUI   |
-| Backend            | `apps/server` — Effect v4 HTTP + MCP server    |
-| Internal frontend  | `apps/internal` — TanStack Start (Forja)       |
-| Marketing frontend | `apps/marketing` — TanStack Start (Engranatge) |
-| Shared UI          | `packages/ui` — design tokens + Tiptap blocks  |
-| Database           | NeonDB (Postgres)                              |
-| Server deploy      | Unikraft via kraft CLI                         |
-| Design system      | MD3 tokens + BaseUI headless components        |
-| Code quality       | Biome (lint + format, root config)             |
+| Layer           | Technology                                          |
+| --------------- | --------------------------------------------------- |
+| Monorepo        | pnpm workspaces + Turborepo                         |
+| Dev environment | Nix flake (Node 24 + pnpm + kraft)                  |
+| Shared schema   | `packages/domain` — Effect Schema                   |
+| CLI             | `apps/cli` — Effect CLI + @clack/prompts TUI        |
+| Backend         | `apps/server` — Effect HTTP + MCP server            |
+| Marketing site  | `apps/marketing` — TanStack Start                   |
+| CRM frontend    | `apps/internal` — TanStack Start (Forja)            |
+| Shared UI       | `packages/ui` — MD3 design tokens + BaseUI + Tiptap |
+| Database        | Postgres (NeonDB)                                   |
+| Deploy          | Unikraft via kraft CLI                              |
+| Code quality    | Biome (lint + format) + dprint (markdown)           |
 
 ## Quick start
 
 ```bash
-nix develop          # enter dev environment
-pnpm install         # install deps
+nix develop          # enter dev environment (or install Node 24 + pnpm manually)
+pnpm install         # install dependencies
 pnpm cli setup       # copy .env files from examples
-# edit .env — fill in DATABASE_URL, etc.
+# edit .env files — fill in DATABASE_URL, etc.
 pnpm cli services up # start local Postgres via Docker
 pnpm cli doctor      # verify everything is healthy
 pnpm db:migrate      # apply migrations
-pnpm dev:server      # terminal 1
-pnpm dev:internal    # terminal 2
+pnpm dev:server      # terminal 1 — API + MCP server
+pnpm dev:internal    # terminal 2 — CRM (Forja)
+pnpm dev:marketing   # terminal 3 — marketing site
 ```
 
 ## Scripts
 
 ```bash
-# CLI (no -- needed)
-pnpm cli setup       # copy .env files from examples
-pnpm cli doctor      # check environment health (DB, Docker, server)
-pnpm cli seed        # insert sample data (additive)
-pnpm cli db migrate  # run database migrations
-pnpm cli db reset    # truncate + migrate + seed (clean slate)
-pnpm cli services up # start Docker services
-pnpm cli:tui         # interactive TUI menu (same commands)
+# CLI
+pnpm cli setup         # copy .env files from examples
+pnpm cli doctor        # check environment health
+pnpm cli seed          # insert sample data
+pnpm cli db migrate    # run database migrations
+pnpm cli db reset      # truncate + migrate + seed
+pnpm cli services up   # start Docker services
+pnpm cli:tui           # interactive TUI menu
 
 # Development
-pnpm dev:server      # start server (Effect HTTP + MCP)
-pnpm dev:internal    # start internal app (Forja)
-pnpm dev:marketing   # start marketing app (Engranatge)
+pnpm dev:server        # start API + MCP server
+pnpm dev:internal      # start CRM app (Forja)
+pnpm dev:marketing     # start marketing site
 
 # Build & lint
-pnpm build           # build all packages in order
-pnpm lint            # Biome lint check
-pnpm format          # Biome auto-format
-pnpm check           # Biome lint + format (use in CI)
+pnpm build             # build all packages
+pnpm lint              # lint + format
+pnpm check             # lint + format (CI mode)
 ```
 
-## Docs
+## Documentation
 
 - [Architecture](docs/architecture.md) — system design, data flow, deployment
-- [Backend](docs/backend.md) — Effect v4 patterns, routes, MCP tools
+- [Backend](docs/backend.md) — Effect patterns, routes, MCP tools
 - [Frontend](docs/frontend.md) — design tokens, MD3, BaseUI, components
 - [Marketing](docs/marketing.md) — public site, prospect pages, i18n
-- [Brand proposal](docs/brand-proposal.md) — visual identity, tone, metaphor
-- [PostHog analysis](docs/posthog-analysis.md) — design reference study
-- [Build plan](PLAN.md) — full scaffold specification
-
-## AI agents
-
-See [AGENTS.md](AGENTS.md) for how AI agents should interact with this system.
+- [AI agents](AGENTS.md) — how AI agents interact with this system
 
 ## Environment variables
 
 ```bash
-DATABASE_URL      # NeonDB connection string
-MCP_SECRET        # Bearer token for remote MCP (Claude.ai, ChatGPT)
+DATABASE_URL      # Postgres connection string
+MCP_SECRET        # Bearer token for remote MCP
 PORT              # HTTP server port (default 3000)
 MAPTILER_KEY      # MapTiler API key for map tiles
-RESEND_API_KEY    # Resend email service
 ```
+
+## Contributing
+
+Contributions are welcome. Please open an issue first to discuss what you'd like to change.
+
+## License
+
+[MIT](LICENSE)
