@@ -8,7 +8,9 @@ const expressions = {
 	thinking: '🤔',
 } as const
 
-const Circle = styled.span<{ $size: number }>`
+const Circle = styled.span.attrs({ 'data-component': 'GearMascot' })<{
+	$size: number
+}>`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;

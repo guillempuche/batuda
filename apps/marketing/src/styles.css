@@ -8,12 +8,36 @@
 }
 
 body {
-	font-family: "Inter", system-ui, -apple-system, sans-serif;
+	font-family: var(--font-body);
 	font-size: var(--typescale-body-large-size);
 	line-height: var(--typescale-body-large-line);
 	letter-spacing: var(--typescale-body-large-tracking);
-	background: var(--color-surface);
+	background-color: var(--color-surface);
+	background-image:
+		repeating-linear-gradient(
+			0deg,
+			rgba(132, 125, 113, 0.06) 0,
+			rgba(132, 125, 113, 0.06) 0.5px,
+			transparent 0.5px,
+			transparent 24px
+		),
+		repeating-linear-gradient(
+			90deg,
+			rgba(132, 125, 113, 0.06) 0,
+			rgba(132, 125, 113, 0.06) 0.5px,
+			transparent 0.5px,
+			transparent 24px
+		);
 	color: var(--color-on-surface);
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
+}
+
+/* Workbench — lock viewport on desktop */
+@media (min-width: 1024px) {
+	html,
+	body {
+		height: 100dvh;
+		overflow: hidden;
+	}
 }

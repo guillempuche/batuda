@@ -6,7 +6,7 @@ interface ComparisonItem {
 	after: string
 }
 
-const Table = styled.div`
+const Table = styled.div.attrs({ 'data-component': 'BeforeAfter' })`
 	display: grid;
 	grid-template-columns: 1fr 1fr;
 	gap: 1px;

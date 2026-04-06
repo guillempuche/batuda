@@ -12,6 +12,7 @@ export const getRouter = () => {
 		scrollRestoration: true,
 		defaultPreloadStaleTime: 0,
 		defaultNotFoundComponent: NotFound,
+		defaultHashScrollIntoView: { behavior: 'smooth' },
 	})
 	return router
 }

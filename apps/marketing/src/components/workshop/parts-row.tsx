@@ -1,6 +1,9 @@
+import { useInView } from 'motion/react'
+import { AnimateNumber } from 'motion-plus/react'
+import { useRef } from 'react'
 import styled from 'styled-components'
 
-const Row = styled.div`
+const Row = styled.div.attrs({ 'data-component': 'PartsRow' })`
 	display: flex;
 	justify-content: space-between;
 	align-items: baseline;
@@ -48,6 +51,15 @@ const Unit = styled.span`
 	color: var(--color-on-surface-variant);
 `
 
+/** Extract the numeric value from a price string like "500 €" or "2.000 €" */
+function parsePrice(price: string): { value: number; suffix: string } {
+	const match = price.match(/^([\d.]+)\s*(.*)$/)
+	if (!match) return { value: 0, suffix: price }
+	// Remove thousands separator dots (European format: 2.000 = 2000)
+	const num = Number(match[1].replace(/\./g, ''))
+	return { value: num, suffix: ` ${match[2]}` }
+}
+
 export function PartsRow({
 	name,
 	description,
@@ -59,14 +71,30 @@ export function PartsRow({
 	price: string
 	unit?: string
 }) {
+	const ref = useRef<HTMLDivElement>(null)
+	const isInView = useInView(ref, { once: true, amount: 0.5 })
+	const { value, suffix } = parsePrice(price)
+
 	return (
-		<Row>
+		<Row ref={ref}>
 			<Info>
 				<Name>{name}</Name>
 				{description && <Description>{description}</Description>}
 			</Info>
 			<PriceGroup>
-				<Price>{price}</Price>
+				<Price>
+					<AnimateNumber
+						suffix={suffix}
+						locales='ca-ES'
+						format={{ useGrouping: true }}
+						transition={{
+							y: { type: 'spring', duration: 1.2, bounce: 0 },
+							opacity: { duration: 0.8 },
+						}}
+					>
+						{isInView ? value : 0}
+					</AnimateNumber>
+				</Price>
 				{unit && <Unit>{unit}</Unit>}
 			</PriceGroup>
 		</Row>
