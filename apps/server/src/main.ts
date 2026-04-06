@@ -7,6 +7,7 @@ import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
 import { ForjaApi } from './api'
 import { PgLive } from './db/client'
+import { AuthHandlerLive } from './handlers/auth'
 import { CompaniesLive } from './handlers/companies'
 import { ContactsLive } from './handlers/contacts'
 import { DocumentsLive } from './handlers/documents'
@@ -17,15 +18,21 @@ import { ProductsLive } from './handlers/products'
 import { ProposalsLive } from './handlers/proposals'
 import { TasksLive } from './handlers/tasks'
 import { WebhooksLive } from './handlers/webhooks'
+import { Auth } from './lib/auth'
+import { EnvVars } from './lib/env'
 import { LoggerLive } from './lib/logger'
 import { OtlpObservability } from './lib/observability'
+import { McpHttpLive } from './mcp/http'
+import { SessionMiddlewareLive } from './middleware/session'
 import { CompanyService } from './services/companies'
 import { PageService } from './services/pages'
+import { PipelineService } from './services/pipeline'
 import { WebhookService } from './services/webhooks'
 
 const ApiLive = HttpApiBuilder.layer(ForjaApi).pipe(
 	Layer.provide([
 		HealthLive,
+		AuthHandlerLive,
 		CompaniesLive,
 		ContactsLive,
 		InteractionsLive,
@@ -40,6 +47,7 @@ const ApiLive = HttpApiBuilder.layer(ForjaApi).pipe(
 
 const ServicesLive = Layer.mergeAll(
 	CompanyService.layer,
+	PipelineService.layer,
 	PageService.layer,
 	WebhookService.layer,
 )
@@ -51,8 +59,13 @@ const ServerLive = Layer.unwrap(
 	}),
 )
 
-const program = HttpRouter.serve(ApiLive).pipe(
+const AppLive = Layer.merge(ApiLive, McpHttpLive)
+
+const program = HttpRouter.serve(AppLive).pipe(
 	Layer.provide(ServicesLive),
+	Layer.provide(SessionMiddlewareLive),
+	Layer.provide(Auth.layer),
+	Layer.provide(EnvVars.layer),
 	Layer.provide(PgLive),
 	Layer.provideMerge(ServerLive),
 	Layer.provide(LoggerLive),

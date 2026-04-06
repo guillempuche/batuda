@@ -6,6 +6,7 @@ import {
 } from 'effect/unstable/httpapi'
 
 import { NotFound } from '../errors'
+import { SessionMiddleware } from '../middleware/session'
 
 const CreateDocumentInput = Schema.Struct({
 	companyId: Schema.String,
@@ -50,4 +51,5 @@ export const DocumentsGroup = HttpApiGroup.make('documents')
 			success: Schema.Unknown,
 		}),
 	)
+	.middleware(SessionMiddleware)
 	.prefix('/v1')

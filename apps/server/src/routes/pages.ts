@@ -6,6 +6,7 @@ import {
 } from 'effect/unstable/httpapi'
 
 import { NotFound } from '../errors'
+import { SessionMiddleware } from '../middleware/session'
 
 const CreatePageInput = Schema.Struct({
 	companyId: Schema.optional(Schema.String),
@@ -25,29 +26,8 @@ const UpdatePageInput = Schema.Struct({
 })
 
 export const PagesGroup = HttpApiGroup.make('pages')
+	// Protected endpoints FIRST
 	.add(
-		// Public: get published page by slug+lang
-		HttpApiEndpoint.get('getPublic', '/pages/:slug', {
-			params: { slug: Schema.String },
-			query: {
-				lang: Schema.optional(Schema.String),
-			},
-			success: Schema.Unknown,
-			error: NotFound.pipe(HttpApiSchema.status(404)),
-		}),
-	)
-	.add(
-		// Public: track page view
-		HttpApiEndpoint.post('view', '/pages/:slug/view', {
-			params: { slug: Schema.String },
-			query: {
-				lang: Schema.optional(Schema.String),
-			},
-			success: Schema.Void,
-		}),
-	)
-	.add(
-		// Internal: list pages
 		HttpApiEndpoint.get('list', '/v1/pages', {
 			query: {
 				companyId: Schema.optional(Schema.String),
@@ -58,14 +38,12 @@ export const PagesGroup = HttpApiGroup.make('pages')
 		}),
 	)
 	.add(
-		// Internal: create page
 		HttpApiEndpoint.post('create', '/v1/pages', {
 			payload: CreatePageInput,
 			success: Schema.Unknown,
 		}),
 	)
 	.add(
-		// Internal: update page
 		HttpApiEndpoint.patch('update', '/v1/pages/:id', {
 			params: { id: Schema.String },
 			payload: UpdatePageInput,
@@ -73,9 +51,29 @@ export const PagesGroup = HttpApiGroup.make('pages')
 		}),
 	)
 	.add(
-		// Internal: publish page
 		HttpApiEndpoint.patch('publish', '/v1/pages/:id/publish', {
 			params: { id: Schema.String },
 			success: Schema.Unknown,
+		}),
+	)
+	.middleware(SessionMiddleware)
+	// Public endpoints AFTER (no auth)
+	.add(
+		HttpApiEndpoint.get('getPublic', '/pages/:slug', {
+			params: { slug: Schema.String },
+			query: {
+				lang: Schema.optional(Schema.String),
+			},
+			success: Schema.Unknown,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
+		}),
+	)
+	.add(
+		HttpApiEndpoint.post('view', '/pages/:slug/view', {
+			params: { slug: Schema.String },
+			query: {
+				lang: Schema.optional(Schema.String),
+			},
+			success: Schema.Void,
 		}),
 	)

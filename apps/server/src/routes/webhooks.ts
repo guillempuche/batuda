@@ -1,6 +1,8 @@
 import { Schema } from 'effect'
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi'
 
+import { SessionMiddleware } from '../middleware/session'
+
 const CreateWebhookInput = Schema.Struct({
 	name: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
 	url: Schema.String,
@@ -47,4 +49,5 @@ export const WebhooksGroup = HttpApiGroup.make('webhooks')
 			success: Schema.Void,
 		}),
 	)
+	.middleware(SessionMiddleware)
 	.prefix('/v1')

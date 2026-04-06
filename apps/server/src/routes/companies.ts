@@ -6,6 +6,7 @@ import {
 } from 'effect/unstable/httpapi'
 
 import { NotFound } from '../errors'
+import { SessionMiddleware } from '../middleware/session'
 
 const CreateCompanyInput = Schema.Struct({
 	name: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
@@ -91,4 +92,5 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 			success: Schema.Unknown,
 		}),
 	)
+	.middleware(SessionMiddleware)
 	.prefix('/v1')

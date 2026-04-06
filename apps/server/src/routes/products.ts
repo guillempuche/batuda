@@ -1,6 +1,8 @@
 import { Schema } from 'effect'
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi'
 
+import { SessionMiddleware } from '../middleware/session'
+
 const CreateProductInput = Schema.Struct({
 	slug: Schema.String.pipe(Schema.check(Schema.isPattern(/^[a-z0-9-]+$/))),
 	name: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
@@ -43,4 +45,5 @@ export const ProductsGroup = HttpApiGroup.make('products')
 			success: Schema.Unknown,
 		}),
 	)
+	.middleware(SessionMiddleware)
 	.prefix('/v1')

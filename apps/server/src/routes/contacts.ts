@@ -1,6 +1,8 @@
 import { Schema } from 'effect'
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi'
 
+import { SessionMiddleware } from '../middleware/session'
+
 const CreateContactInput = Schema.Struct({
 	companyId: Schema.String,
 	name: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
@@ -56,4 +58,5 @@ export const ContactsGroup = HttpApiGroup.make('contacts')
 			success: Schema.Void,
 		}),
 	)
+	.middleware(SessionMiddleware)
 	.prefix('/v1')

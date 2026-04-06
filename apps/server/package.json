@@ -4,20 +4,25 @@
 	"type": "module",
 	"scripts": {
 		"dev": "node --watch --env-file=../../.env --import tsx src/main.ts",
-		"dev:mcp": "node --import tsx src/mcp-stdio.ts",
+		"dev:mcp": "node --env-file=../../.env --import tsx src/mcp-stdio.ts",
 		"build": "tsdown src/main.ts src/mcp-stdio.ts src/db/migrate.ts",
 		"check-types": "tsc --noEmit",
 		"start": "node dist/main.js",
 		"migrate": "node --env-file=../../.env --import tsx src/db/migrate.ts"
 	},
 	"dependencies": {
+		"@better-auth/api-key": "^1.5.6",
 		"@effect/platform-node": "4.0.0-beta.43",
 		"@effect/sql-pg": "4.0.0-beta.43",
 		"@engranatge/domain": "workspace:*",
-		"effect": "4.0.0-beta.43"
+		"better-auth": "^1.5.6",
+		"effect": "4.0.0-beta.43",
+		"kysely": "^0.28.15",
+		"pg": "^8.20.0"
 	},
 	"devDependencies": {
 		"@types/node": "^22.15.0",
+		"@types/pg": "^8.20.0",
 		"tsdown": "^0.12.4",
 		"tsx": "^4.20.3",
 		"typescript": "^5.9.3"

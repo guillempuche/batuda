@@ -1,5 +1,6 @@
 import { HttpApi } from 'effect/unstable/httpapi'
 
+import { AuthGroup } from './routes/auth'
 import { CompaniesGroup } from './routes/companies'
 import { ContactsGroup } from './routes/contacts'
 import { DocumentsGroup } from './routes/documents'
@@ -13,6 +14,7 @@ import { WebhooksGroup } from './routes/webhooks'
 
 export const ForjaApi = HttpApi.make('ForjaApi')
 	.add(HealthGroup)
+	.add(AuthGroup)
 	.add(CompaniesGroup)
 	.add(ContactsGroup)
 	.add(InteractionsGroup)
