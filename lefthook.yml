@@ -10,7 +10,6 @@ pre-commit:
         pnpm check-types
 
     lint:
-      glob: "!docs/repos/**"
       run: |
         pnpm lint-biome {staged_files}
       stage_fixed: true
@@ -21,7 +20,7 @@ pre-commit:
       stage_fixed: true
 
     format-markdown:
-      glob: "**/*.md !docs/repos/**"
+      glob: "**/*.md"
       run: |
         dprint fmt --config dprint.json --allow-no-files {staged_files}
       stage_fixed: true
