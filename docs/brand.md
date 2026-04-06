@@ -171,25 +171,109 @@ Borders and dividers. WCAG requires 3:1 for non-text UI components.
 
 ### Typography
 
-PostHog uses IBM Plex Sans. We need something that feels **mechanical but warm**:
+| Role    | Font                 | Why                                                 |
+| ------- | -------------------- | --------------------------------------------------- |
+| Display | **Barlow Condensed** | Narrow, industrial, reads like stamped metal labels |
+| Body    | **Barlow**           | Same family, warm and readable at body sizes        |
 
-| Role           | Option 1                                         | Option 2                                           |
-| -------------- | ------------------------------------------------ | -------------------------------------------------- |
-| Headings       | **DM Sans** (geometric, modern, clean)           | **Space Grotesk** (mechanical, techy but friendly) |
-| Body           | **Inter** (highly readable, neutral)             | **IBM Plex Sans** (proven, open source)            |
-| Technical/code | **JetBrains Mono**                               | **IBM Plex Mono**                                  |
-| Decorative     | **Instrument Serif** (for workshop logbook feel) | **Playfair Display** (elegant, artisan)            |
+Tokens: `--font-display` and `--font-body` in `@engranatge/ui/tokens.css`. Loaded via Google Fonts in `__root.tsx`.
 
 ### Mascot / Character
 
-PostHog has their hedgehog in every situation. We need a **gear character**:
+**GearMascot** — emoji-based gear character with switchable expressions (`default`, `happy`, `working`, etc.). Lives in the hero section. Simple colored circle with an emoji face — approachable, not over-designed. Component: `apps/marketing/src/components/workshop/gear-mascot.tsx`.
 
-- A single gear cog with eyes and simple expressions
-- Appears in different contexts: wearing a hard hat (building), holding a wrench (fixing), sleeping (automated process running itself), celebrating (client results)
-- Simple enough to be an icon, expressive enough to have personality
-- Name suggestion: **Roda** (Catalan for "wheel/gear") or **Dent** (gear tooth)
+---
 
-Alternative: a **small mechanical robot** made of visible gears, springs, and brass — steampunk-lite, friendly, helpful. Less abstract, more memorable.
+## Workshop Layout — Desktop & Mobile
+
+The layout IS the metaphor. No standard navbar, no standard cards, no standard footer. Every visual element maps to a physical workshop object.
+
+### Single-Page Sales Funnel
+
+One page, one goal, one CTA. Russell Brunson AIDA flow:
+
+1. **Hook** — Hero headline + conveyor belt animation
+2. **Problem** — Before/after comparison (manual vs automated)
+3. **Solution** — Service machines (Automatitzacions, IA, Micro-SaaS)
+4. **Proof** — Industry examples with results
+5. **Offer** — Transparent pricing (parts catalog style)
+6. **CTA** — "Parlem del teu negoci" → email
+
+No page navigation. Shadow board tools and tool belt tabs scroll to sections.
+
+### Desktop (>=1024px): Pegboard Wall
+
+You're standing at the workbench, looking at the pegboard wall.
+
+- **No navbar.** The pegboard IS the interface. Logo is a stamped metal plate bolted to the wall (top-left).
+- **Machine push buttons** on the left column. Colored dome caps in metal bezels with screw dots — scroll to funnel sections (Inici, Eines, Preus, Parla). Active section glows amber via IntersectionObserver.
+- **Blueprint sheet** as the content area. Aged cream paper (`#EDE5D0`) with grid lines (24px), ruler markings along top and left edges, masking tape strips at corners, corner fold cutout (clip-path). Paper shadow and vignette for depth.
+- **Sheet-metal footer plate** at bottom-right with stamped brand and copyright, screw dots.
+- No right column (single-page funnel has no "future pages" to hint at).
+
+### Interactive Elements — Stamped Metal
+
+Buttons are **stamped metal plates**, not flat web buttons:
+
+- Primary: terracotta metal gradient, embossed text (`text-shadow`), 2px radius, depth `box-shadow`, `:active` press effect
+- Secondary: dashed stencil outline, uppercase, no border-radius, no background
+
+### Mobile (<1024px): Clipboard
+
+You're walking around the shop floor, clipboard in hand.
+
+- **Metal binder clip** as the sticky header. Brushed chrome gradient with fine horizontal lines, engraved "ENGRANATGE" brand. Wider binder clip (64px) protruding above. Screw/rivet dots on edges. No hamburger menu.
+- **Paper surface** for content. Cream background with faint grid lines (body-level CSS). Normal scroll — you're flipping through the work order.
+- **Tool belt** as the fixed bottom bar. Dark leather/canvas texture (#3E2723), stitching dividers between tools. 4 tabs scroll to funnel sections. Active tab in terracotta tint.
+- **Label plate footer** — metal gradient (matching the clip header) with stamped brand, copyright, email. No multi-column grid. Sharp, minimal.
+
+### Why These Choices
+
+| Element                | Physical analog                        | Why it works                                      |
+| ---------------------- | -------------------------------------- | ------------------------------------------------- |
+| Shadow board           | How real workshops organize tools      | "Missing tool" active state is unique             |
+| Clipboard              | How shop floor workers carry documents | The phone IS something you hold                   |
+| Technical drawing grid | Engineering drawings on cream paper    | Stays warm/Mediterranean, not cold blueprint blue |
+| Metal plate logo       | Brand plates bolted to equipment       | No navbar = instantly breaks "website" feel       |
+| Tool belt tabs         | Reaching into a belt pouch for tools   | More tactile than a flat tab bar                  |
+| Bench edge ruler       | Workshop bench with built-in ruler     | Gives the bottom strip physical presence          |
+
+---
+
+## Workshop Visual Language
+
+The specific aesthetic vocabulary shared across Engranatge apps. Defined in `@engranatge/ui/tokens.css` so both marketing and Forja (future internal tool) use the same visual language.
+
+### Surfaces
+
+- **Metal palette** — 4 anchor tones (`--color-metal-light` → `--color-metal` → `--color-metal-dark` → `--color-metal-deep`) used in `linear-gradient()` at varying angles. Cards, plates, tags, screw dots all draw from this palette.
+- **Workshop elevation** — `--elevation-workshop-sm/md/lg`: inset white highlight on top + outer shadow underneath = top-lit metal depth effect. Replaces flat `box-shadow`.
+- **Brushed metal texture** — `--texture-brushed-metal`: fine horizontal `repeating-linear-gradient` overlay layered on top of metal gradients.
+- **Aged paper** — warm beige `#EDE5D0` with diagonal fiber + 24px grid textures. Used for the blueprint sheet content area.
+
+### Typography effects
+
+- **Embossed stamp** — `--text-shadow-emboss`: light highlight below text simulates stamped/pressed metal lettering.
+- **Engraved text** — `--text-shadow-engrave`: dark shadow above text simulates cut-in lettering.
+- **Display headings** — `var(--font-display)` (Barlow Condensed), uppercase, `0.04–0.12em` letter-spacing — reads like industrial stencil labels.
+- **Labels** — small, bold, uppercase, wide letter-spacing — stenciled markings on equipment.
+
+### Decorative elements
+
+- **Screw/rivet dots** — 5px circles with `radial-gradient(circle at 35% 35%, metal-dark, metal-deep)` at corners or edges of metal panels.
+- **Nail holes** — 8px circles with inner shadow at top-center of hanging tags (MachineCard).
+- **Pin tacks** — 10px red `radial-gradient` (#D4544A → #A03030) at top-center of pinned cards (ProofCard).
+- **Masking tape** — semi-transparent beige strips (`#D8D0B8` → `#E2DAC4`) at paper corners, rotated ±2deg.
+- **Rulers** — 14px strips along paper edges with repeating grid tick marks at 24px intervals.
+- **Corner fold** — `clip-path: polygon()` cuts bottom-right of blueprint paper, fold overlay triangle behind.
+
+### Interactive elements
+
+- **Machine push buttons** — circular metal bezel housing + colored dome cap (green/blue/orange/red). Spring physics via `motion/react` (`whileTap: { scale: 0.9 }`).
+- **Active glow** — warm amber `box-shadow` ring when section is in view (IntersectionObserver via `ActiveSectionProvider` context).
+- **Card hover** — cards have slight alternating rotation (`nth-child` ±0.3–0.6deg), straighten to 0deg on hover.
+- **Stamped metal buttons** — primary CTA uses terracotta gradient with `--elevation-workshop-md` and `--text-shadow-engrave`. Press effect via `:active { transform: translateY(1px) }`.
+- **Stencil outline buttons** — secondary CTA uses `border: 2px dashed`, no background, uppercase. Hover highlights in terracotta.
 
 ---
 
@@ -225,20 +309,14 @@ PostHog is irreverent and techy because they talk to developers. Engranatge talk
 
 ---
 
-## Site Structure (Workshop Metaphor Applied)
+## Site Structure
+
+Single-page sales funnel at `/`. No multi-page navigation — all content on one scrollable page. Shadow board tools and tool belt tabs use TanStack Router hash navigation (`Link` with `hash` prop + `defaultHashScrollIntoView: { behavior: 'smooth' }`).
 
 ```
 engranatge.com/
-  /                    — Workshop entrance (hero + what we do + proof)
-  /eines               — Tools catalog (services: automations, AI, micro-SaaS)
-  /eines/:slug         — Individual machine/tool page
-  /projectes           — Blueprints (case studies)
-  /projectes/:slug     — Individual blueprint
-  /diari               — Workshop logbook (blog)
-  /diari/:slug         — Individual entry
-  /taller              — About us (workshop tour)
-  /pressupost          — Pricing / quote request
-  /:lang/:slug         — Prospect-specific pages (existing)
+  /                    — Single-page funnel (hook → problem → solution → proof → pricing → CTA)
+  /:lang/:slug         — Prospect-specific pages (CMS, Tiptap blocks)
 ```
 
 ---

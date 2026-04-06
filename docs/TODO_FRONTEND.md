@@ -359,7 +359,7 @@ Workshop metaphor: the site IS a mechanical workshop. Each page is a room, each 
 ```
 apps/marketing/src/
 ├── routes/
-│   ├── __root.tsx                    # workshop shell — nav + footer
+│   ├── __root.tsx                    # workbench shell — pegboard + blueprint + bench
 │   ├── index.tsx                     # homepage — workshop entrance
 │   ├── tools/
 │   │   ├── index.tsx                 # service catalog — machine floor
@@ -376,35 +376,39 @@ apps/marketing/src/
 │       └── $slug.tsx                 # prospect pages (Tiptap-driven)
 ├── components/
 │   ├── layout/
-│   │   ├── WorkshopNav.tsx           # top nav — tool rack style
-│   │   ├── WorkshopFooter.tsx        # footer — workshop sign + contact
-│   │   └── Section.tsx               # reusable page section wrapper
+│   │   ├── workshop-nav.tsx          # top nav strip with CTA
+│   │   ├── workshop-footer.tsx       # footer (mobile only, hidden on desktop)
+│   │   ├── workshop-desktop.tsx      # desktop layout: pegboard bg + icon columns + blueprint
+│   │   ├── blueprint-sheet.tsx       # content sheet with pushpins + stencil title
+│   │   ├── pegboard-icon.tsx         # tool icon with hook (Lucide icons)
+│   │   ├── bench-edge.tsx            # bottom strip with indicator lights (desktop)
+│   │   ├── drawer-tabs.tsx           # fixed bottom tab bar (mobile)
+│   │   └── section.tsx              # reusable page section wrapper
 │   ├── workshop/
-│   │   ├── ConveyorBelt.tsx          # animated problem→solution flow
-│   │   ├── MachineCard.tsx           # service card with inputs/outputs
-│   │   ├── ControlPanel.tsx          # CTA styled as machine interface
-│   │   ├── BlueprintCard.tsx         # case study card — technical drawing
-│   │   ├── LogbookCard.tsx           # blog card — journal page style
-│   │   ├── BeforeAfter.tsx           # manual vs automated comparison
-│   │   ├── PartsRow.tsx              # pricing line item — catalog style
-│   │   ├── IndicatorLight.tsx        # status dot (green/amber/red)
-│   │   └── GearMascot.tsx            # Roda SVG with expression variants
+│   │   ├── conveyor-belt.tsx         # animated problem→solution flow
+│   │   ├── machine-card.tsx          # service card with inputs/outputs
+│   │   ├── control-panel.tsx         # CTA styled as machine interface
+│   │   ├── blueprint-card.tsx        # case study card — technical drawing
+│   │   ├── logbook-card.tsx          # blog card — journal page style
+│   │   ├── before-after.tsx          # manual vs automated comparison
+│   │   ├── parts-row.tsx             # pricing line item — catalog style
+│   │   ├── indicator-light.tsx       # status dot (green/amber/red)
+│   │   └── gear-mascot.tsx           # gear emoji mascot with expressions
 │   └── blocks/                       # Tiptap renderers (prospect pages only)
-│       ├── BlockRenderer.tsx         # type → component dispatch
-│       ├── HeroBlock.tsx
-│       ├── CtaBlock.tsx
-│       ├── ValuePropsBlock.tsx
-│       ├── PainPointsBlock.tsx
-│       ├── SocialProofBlock.tsx
-│       └── RichTextBlock.tsx
+│       ├── block-renderer.tsx        # type → component dispatch
+│       ├── hero-block.tsx
+│       ├── cta-block.tsx
+│       ├── value-props-block.tsx
+│       ├── pain-points-block.tsx
+│       ├── social-proof-block.tsx
+│       └── rich-text-block.tsx
 ├── data/
 │   ├── services.ts                   # service definitions (slug, name, inputs, outputs)
 │   ├── navigation.ts                 # nav items array
 │   └── copy.ts                       # shared marketing copy strings
 ├── lib/
 │   └── api.ts                        # typed fetch for prospect page API
-└── styles/
-    └── global.css                    # @import tokens + base reset
+└── styles.css                        # @import tokens + base reset + viewport lock
 ```
 
 ---
@@ -439,32 +443,45 @@ apps/marketing/src/
 - [ ] Create `Dockerfile` and `Kraftfile` for Unikraft deployment
 - [ ] Run `pnpm install` from root, verify `pnpm dev:marketing` starts
 
-## Phase 13 — Layout shell
+## Phase 13 — Layout shell (workbench)
 
-The root layout is the workshop building — nav on top (tool rack), content in the middle, footer (workshop sign).
+Fixed-viewport workbench layout. Desktop: pegboard wall with tools on hooks, blueprint sheet pinned with pushpins, bench edge strip. Mobile: normal scroll with drawer tab bar.
 
-- [ ] `src/routes/__root.tsx`:
-  - [ ] `<html lang="ca">` default
-  - [ ] Load `global.css`
-  - [ ] Render `<WorkshopNav />` + `<Outlet />` + `<WorkshopFooter />`
-  - [ ] Page wrapper: `max-width: var(--page-max-width)`, `padding-inline: var(--page-gutter)`, centered
-- [ ] `src/components/layout/WorkshopNav.tsx`:
-  - [ ] Logo: "Engranatge" wordmark (DM Sans / Space Grotesk bold) + small gear icon
-  - [ ] Links: Eines, Projectes, Diari, Taller, Pressupost
-  - [ ] Active link: `color: var(--color-primary)`, underline with `var(--color-primary)`
-  - [ ] Inactive: `color: var(--color-on-surface-variant)`
-  - [ ] Background: `var(--color-surface-container-lowest)`
-  - [ ] Border bottom: `1px solid var(--color-outline-variant)`
-  - [ ] Mobile: hamburger → slide-in panel, links stacked
-  - [ ] Desktop (≥1024px): horizontal link row
-- [ ] `src/components/layout/WorkshopFooter.tsx`:
-  - [ ] Background: `var(--color-inverse-surface)`, text: `var(--color-inverse-on-surface)`
-  - [ ] Company name, tagline in Catalan
-  - [ ] Contact: email, phone, location
-  - [ ] Link columns: Eines, Projectes, Legal
-  - [ ] Bottom: "Fet a Catalunya" + copyright
-- [ ] `src/components/layout/Section.tsx`:
-  - [ ] Reusable section wrapper with heading + optional subheading
+- [x] `src/routes/__root.tsx`:
+  - [x] `<html lang="ca">` default
+  - [x] Load `styles.css` (viewport lock for desktop)
+  - [x] Shell wrapper: flex column, `height: 100dvh` on desktop
+  - [x] Desktop: `<WorkshopNav />` + `<WorkshopDesktop>{children}</WorkshopDesktop>` + `<BenchEdge />`
+  - [x] Mobile: `<WorkshopFooter />` + `<DrawerTabs />` (footer hidden on desktop, tabs hidden on desktop)
+- [x] `src/components/layout/workshop-nav.tsx`:
+  - [x] Logo: "Engranatge" wordmark (DM Sans bold) + gear icon
+  - [x] Links: Eines, Pressupost
+  - [x] "Parlem" CTA button (desktop only, terracotta primary)
+  - [x] Mobile: hamburger → slide-in panel
+- [x] `src/components/layout/workshop-desktop.tsx`:
+  - [x] Pegboard background: `radial-gradient` dot pattern on `surface-dim`
+  - [x] Left icon column: Inici, Eines, Preus, Parla (Lucide icons on hooks)
+  - [x] Center: `<BlueprintSheet>` wrapping page content
+  - [x] Right icon column: Per què?, Projectes, Diari, Nosaltres, Paperera (disabled)
+- [x] `src/components/layout/blueprint-sheet.tsx`:
+  - [x] CSS pushpins at 4 corners (terracotta circles with shadow)
+  - [x] Stencil title derived from route (`INICI · ESQUEMA`, `EINES · CATÀLEG`, etc.)
+  - [x] Scrollable content area (desktop only)
+  - [x] Sheet styling: `surface-bright` bg, border, shadow (desktop only)
+- [x] `src/components/layout/pegboard-icon.tsx`:
+  - [x] Hook (CSS inverted-U), icon circle (48px), label
+  - [x] Active route highlighting with `primary-container` bg
+  - [x] Disabled state at 30% opacity
+- [x] `src/components/layout/bench-edge.tsx`:
+  - [x] Dark strip with indicator lights + copyright (desktop only)
+- [x] `src/components/layout/drawer-tabs.tsx`:
+  - [x] Fixed bottom tab bar (mobile only) with Lucide icons
+  - [x] Drawer pull indicator, active tab highlighting, safe area padding
+- [x] `src/components/layout/workshop-footer.tsx`:
+  - [x] Hidden on desktop (BenchEdge replaces it)
+  - [x] Bottom padding for drawer tabs on mobile
+- [x] `src/components/layout/section.tsx`:
+  - [x] Reusable section wrapper with heading + optional subheading
   - [ ] Props: `title`, `subtitle`, `background` (surface level token), `children`
   - [ ] Padding: `var(--space-12)` vertical, responsive
   - [ ] Heading: `typescale-headline-large`
@@ -477,7 +494,7 @@ Shared visual components that implement the workshop metaphor. Pure presentation
 
 The homepage hero animation. Shows a business problem entering one side and a solution exiting the other.
 
-- [ ] `src/components/workshop/ConveyorBelt.tsx`:
+- [ ] `src/components/workshop/conveyor-belt.tsx`:
   - [ ] Horizontal track with CSS dashed border (conveyor belt line)
   - [ ] Items slide left→right via CSS `@keyframes translateX`
   - [ ] Left side: problem label (e.g. "4h factures manuals")
@@ -491,7 +508,7 @@ The homepage hero animation. Shows a business problem entering one side and a so
 
 Each service displayed as a machine on the workshop floor.
 
-- [ ] `src/components/workshop/MachineCard.tsx`:
+- [ ] `src/components/workshop/machine-card.tsx`:
   - [ ] Props: `name`, `description`, `inputs: string[]`, `outputs: string[]`, `slug`, `status`
   - [ ] Card bg: `var(--color-surface-container-low)`, border: `var(--color-outline-variant)`
   - [ ] Top: machine name (`typescale-title-large`) + IndicatorLight (green = active)
@@ -506,7 +523,7 @@ Each service displayed as a machine on the workshop floor.
 
 CTA section styled as a machine control panel. Used at the bottom of pages.
 
-- [ ] `src/components/workshop/ControlPanel.tsx`:
+- [ ] `src/components/workshop/control-panel.tsx`:
   - [ ] Props: `heading`, `body`, `actions: { label, href, variant }[]`
   - [ ] Background: `var(--color-surface-container-high)` with `var(--color-outline)` border
   - [ ] Top bar: row of 3 IndicatorLight dots (decorative — red, amber, green)
@@ -520,7 +537,7 @@ CTA section styled as a machine control panel. Used at the bottom of pages.
 
 Case study teaser card. Technical drawing aesthetic.
 
-- [ ] `src/components/workshop/BlueprintCard.tsx`:
+- [ ] `src/components/workshop/blueprint-card.tsx`:
   - [ ] Props: `title`, `client` (anonymized), `industry`, `result`, `slug`
   - [ ] Background: `var(--color-surface-container-lowest)` — light, paper-like
   - [ ] Border: `1px dashed var(--color-outline)` — technical drawing style
@@ -533,7 +550,7 @@ Case study teaser card. Technical drawing aesthetic.
 
 Blog post teaser. Handwritten journal page feel.
 
-- [ ] `src/components/workshop/LogbookCard.tsx`:
+- [ ] `src/components/workshop/logbook-card.tsx`:
   - [ ] Props: `title`, `date`, `excerpt`, `slug`
   - [ ] Background: `var(--color-surface-container-lowest)`
   - [ ] Left border: `3px solid var(--color-primary-container)` — page binding
@@ -546,7 +563,7 @@ Blog post teaser. Handwritten journal page feel.
 
 Manual vs automated comparison. Two-column layout.
 
-- [ ] `src/components/workshop/BeforeAfter.tsx`:
+- [ ] `src/components/workshop/before-after.tsx`:
   - [ ] Props: `items: { manual: string, automated: string }[]`
   - [ ] Two columns: "Sense Engranatge" (without) vs "Amb Engranatge" (with)
   - [ ] Left column: `var(--color-surface-dim)` bg, strikethrough text style
@@ -555,20 +572,20 @@ Manual vs automated comparison. Two-column layout.
 
 ### Small utility components
 
-- [ ] `src/components/workshop/IndicatorLight.tsx`:
+- [ ] `src/components/workshop/indicator-light.tsx`:
   - [ ] Props: `color: 'green' | 'amber' | 'red'`
   - [ ] 8px circle, `border-radius: var(--shape-full)`
   - [ ] Green: `var(--color-secondary)`, Amber: `#C4851C`, Red: `var(--color-error)`
   - [ ] Subtle `box-shadow` glow in same color at 30% opacity
 
-- [ ] `src/components/workshop/PartsRow.tsx`:
+- [ ] `src/components/workshop/parts-row.tsx`:
   - [ ] Props: `name`, `description`, `price`, `unit`
   - [ ] Table-row style: name left, price right, description below in smaller text
   - [ ] Border bottom: `var(--color-outline-variant)`
   - [ ] Price: `typescale-title-medium`, `var(--color-on-surface)`
   - [ ] Unit: `typescale-label-small`, `var(--color-on-surface-variant)`
 
-- [ ] `src/components/workshop/GearMascot.tsx`:
+- [ ] `src/components/workshop/gear-mascot.tsx`:
   - [ ] Props: `expression: 'default' | 'building' | 'celebrating' | 'sleeping' | 'thinking'`
   - [ ] Inline SVG — gear cog with eyes + accessories per expression
   - [ ] `building`: hard hat, `celebrating`: confetti, `sleeping`: closed eyes + zzz, `thinking`: wrench
