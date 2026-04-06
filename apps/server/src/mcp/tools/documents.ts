@@ -11,6 +11,10 @@ const GetDocuments = Tool.make('get_documents', {
 	}),
 	success: Schema.Unknown,
 })
+	.annotate(Tool.Title, 'List Documents')
+	.annotate(Tool.Readonly, true)
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
 
 const GetDocument = Tool.make('get_document', {
 	description: 'Get a single document with full markdown content.',
@@ -19,10 +23,14 @@ const GetDocument = Tool.make('get_document', {
 	}),
 	success: Schema.Unknown,
 })
+	.annotate(Tool.Title, 'Get Document')
+	.annotate(Tool.Readonly, true)
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
 
 const CreateDocument = Tool.make('create_document', {
 	description:
-		'Create a document for a company. Content should be full markdown.',
+		'Create a document for a company. Type: note|proposal|contract|report|brief|other. Content: full markdown.',
 	parameters: Schema.Struct({
 		company_id: Schema.String,
 		interaction_id: Schema.optional(Schema.String),
@@ -32,6 +40,9 @@ const CreateDocument = Tool.make('create_document', {
 	}),
 	success: Schema.Unknown,
 })
+	.annotate(Tool.Title, 'Create Document')
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
 
 const UpdateDocument = Tool.make('update_document', {
 	description: 'Update a document content or title.',
@@ -42,6 +53,10 @@ const UpdateDocument = Tool.make('update_document', {
 	}),
 	success: Schema.Unknown,
 })
+	.annotate(Tool.Title, 'Update Document')
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.Idempotent, true)
+	.annotate(Tool.OpenWorld, false)
 
 export const DocumentTools = Toolkit.make(
 	GetDocuments,

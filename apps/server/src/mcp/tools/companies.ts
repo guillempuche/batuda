@@ -17,6 +17,10 @@ const SearchCompanies = Tool.make('search_companies', {
 	}),
 	success: Schema.Unknown,
 })
+	.annotate(Tool.Title, 'Search Companies')
+	.annotate(Tool.Readonly, true)
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
 
 const GetCompany = Tool.make('get_company', {
 	description:
@@ -26,9 +30,14 @@ const GetCompany = Tool.make('get_company', {
 	}),
 	success: Schema.Unknown,
 })
+	.annotate(Tool.Title, 'Get Company')
+	.annotate(Tool.Readonly, true)
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
 
 const CreateCompany = Tool.make('create_company', {
-	description: 'Create a new company. Slug must be kebab-case from name.',
+	description:
+		'Create a new company. Slug: unique kebab-case from name. Status: prospect|lead|qualified|proposal|negotiation|client|closed|dead (default: prospect). Priority: 1 (highest) to 5 (lowest, default: 2).',
 	parameters: Schema.Struct({
 		name: Schema.String,
 		slug: Schema.String,
@@ -55,9 +64,13 @@ const CreateCompany = Tool.make('create_company', {
 	}),
 	success: Schema.Unknown,
 })
+	.annotate(Tool.Title, 'Create Company')
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
 
 const UpdateCompany = Tool.make('update_company', {
-	description: 'Update company fields by ID.',
+	description:
+		'Update one or more fields on an existing company by UUID. Only include fields to change; omitted fields stay unchanged.',
 	parameters: Schema.Struct({
 		id: Schema.String,
 		name: Schema.optional(Schema.String),
@@ -84,6 +97,10 @@ const UpdateCompany = Tool.make('update_company', {
 	}),
 	success: Schema.Unknown,
 })
+	.annotate(Tool.Title, 'Update Company')
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.Idempotent, true)
+	.annotate(Tool.OpenWorld, false)
 
 export const CompanyTools = Toolkit.make(
 	SearchCompanies,

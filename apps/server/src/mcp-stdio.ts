@@ -4,6 +4,7 @@ import { McpServer } from 'effect/unstable/ai'
 
 import { PgLive } from './db/client'
 import { McpLoggerLive } from './lib/logger'
+import { CurrentUser } from './mcp/current-user'
 import { McpToolsLive } from './mcp/server'
 import { CompanyService } from './services/companies'
 import { PageService } from './services/pages'
@@ -26,6 +27,14 @@ const ServerLayer = McpToolsLive.pipe(
 	),
 	Layer.provide(ServicesLive),
 	Layer.provide(PgLive),
+	Layer.provide(
+		Layer.succeed(CurrentUser, {
+			userId: 'local',
+			email: 'local@forja',
+			name: 'Local Dev',
+			isAgent: false,
+		}),
+	),
 	Layer.provide(NodeStdio.layer),
 	Layer.provide(Layer.succeed(Logger.LogToStderr)(true)),
 	Layer.provide(McpLoggerLive),

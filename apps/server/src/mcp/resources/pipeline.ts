@@ -6,7 +6,9 @@ import { PipelineService } from '../../services/pipeline'
 export const PipelineResource = McpServer.resource({
 	uri: 'forja://pipeline',
 	name: 'Pipeline Summary',
-	description: 'Pipeline overview: status counts, overdue tasks, next steps',
+	description: 'Pipeline overview: status counts, overdue tasks, next steps.',
+	mimeType: 'application/json',
+	audience: ['assistant'],
 	content: Effect.gen(function* () {
 		const service = yield* PipelineService
 		const pipeline = yield* service.getPipeline()

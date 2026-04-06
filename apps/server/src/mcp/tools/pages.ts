@@ -1,5 +1,5 @@
 import { Effect, Schema } from 'effect'
-import { Tool, Toolkit } from 'effect/unstable/ai'
+import { McpSchema, McpServer, Tool, Toolkit } from 'effect/unstable/ai'
 
 import { PageService } from '../../services/pages'
 
@@ -16,6 +16,9 @@ const CreatePage = Tool.make('create_page', {
 	}),
 	success: Schema.Unknown,
 })
+	.annotate(Tool.Title, 'Create Page')
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
 
 const UpdatePage = Tool.make('update_page', {
 	description: 'Update page content, title, or meta.',
@@ -27,14 +30,24 @@ const UpdatePage = Tool.make('update_page', {
 	}),
 	success: Schema.Unknown,
 })
+	.annotate(Tool.Title, 'Update Page')
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.Idempotent, true)
+	.annotate(Tool.OpenWorld, false)
 
 const PublishPage = Tool.make('publish_page', {
-	description: 'Publish a draft page — sets status to published.',
+	description:
+		'Publish a draft page — sets status to published. This makes the page publicly visible.',
 	parameters: Schema.Struct({
 		id: Schema.String,
 	}),
 	success: Schema.Unknown,
+	dependencies: [McpSchema.McpServerClient],
 })
+	.annotate(Tool.Title, 'Publish Page')
+	.annotate(Tool.Destructive, true)
+	.annotate(Tool.Idempotent, true)
+	.annotate(Tool.OpenWorld, false)
 
 const ListPages = Tool.make('list_pages', {
 	description: 'List pages filtered by company, status, or language.',
@@ -45,6 +58,10 @@ const ListPages = Tool.make('list_pages', {
 	}),
 	success: Schema.Unknown,
 })
+	.annotate(Tool.Title, 'List Pages')
+	.annotate(Tool.Readonly, true)
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
 
 const GetPage = Tool.make('get_page', {
 	description: 'Get full page content by ID or slug+lang.',
@@ -54,6 +71,10 @@ const GetPage = Tool.make('get_page', {
 	}),
 	success: Schema.Unknown,
 })
+	.annotate(Tool.Title, 'Get Page')
+	.annotate(Tool.Readonly, true)
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
 
 export const PageTools = Toolkit.make(
 	CreatePage,
@@ -90,6 +111,18 @@ export const PageHandlersLive = PageTools.toLayer(
 				}).pipe(Effect.orDie),
 			publish_page: ({ id }) =>
 				Effect.gen(function* () {
+					const page = yield* service.getById(id)
+					const { confirm } = yield* McpServer.elicit({
+						message: `Publish page "${page['title']}" (${page['slug']}/${page['lang']})? This makes it publicly visible.`,
+						schema: Schema.Struct({
+							confirm: Schema.Literals(['yes', 'no']),
+						}),
+					}).pipe(
+						Effect.catchTag('ElicitationDeclined', () =>
+							Effect.succeed({ confirm: 'no' as const }),
+						),
+					)
+					if (confirm === 'no') return { status: 'cancelled' }
 					const rows = yield* service.publish(id)
 					return rows[0]
 				}).pipe(Effect.orDie),

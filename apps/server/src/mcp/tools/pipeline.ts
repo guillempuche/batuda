@@ -8,6 +8,10 @@ const GetPipeline = Tool.make('get_pipeline', {
 		'Get pipeline overview: counts by status, overdue tasks, companies without next action.',
 	success: Schema.Unknown,
 })
+	.annotate(Tool.Title, 'Pipeline Overview')
+	.annotate(Tool.Readonly, true)
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
 
 const GetNextSteps = Tool.make('get_next_steps', {
 	description:
@@ -17,6 +21,10 @@ const GetNextSteps = Tool.make('get_next_steps', {
 	}),
 	success: Schema.Unknown,
 })
+	.annotate(Tool.Title, 'Next Steps')
+	.annotate(Tool.Readonly, true)
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
 
 export const PipelineTools = Toolkit.make(GetPipeline, GetNextSteps)
 
