@@ -1,32 +1,24 @@
 /* ============================================================
    Engranatge Design Tokens
-   MD3 color roles + typography + fluid spacing + shape + elevation
+   Colors · Typography · Spacing · Shape · Elevation · Workshop
    ============================================================ */
 
 :root {
 	/* --- Primary — Terracotta --- */
 	--color-primary: #b05220;
 	--color-on-primary: #ffffff;
-	--color-primary-container: #ffdbc8;
-	--color-on-primary-container: #3b1500;
 
 	/* --- Secondary — Olive Green --- */
 	--color-secondary: #2e6b4f;
 	--color-on-secondary: #ffffff;
-	--color-secondary-container: #c8edd9;
-	--color-on-secondary-container: #002114;
 
 	/* --- Error --- */
 	--color-error: #ba1a1a;
 	--color-on-error: #ffffff;
-	--color-error-container: #ffdad6;
-	--color-on-error-container: #410002;
 
 	/* --- Surface system — warm cream --- */
 	--color-surface: #f5f0e8;
-	--color-surface-bright: #fdfaf4;
 	--color-surface-dim: #ded7c7;
-	--color-surface-container-lowest: #f8f3eb;
 	--color-surface-container-low: #ede6d6;
 	--color-surface-container: #e7e0d0;
 	--color-surface-container-high: #dfd8c8;
@@ -34,56 +26,48 @@
 	--color-on-surface: #2d2a24;
 	--color-on-surface-variant: #56524a;
 
-	/* --- Background --- */
-	--color-background: #f5f0e8;
-	--color-on-background: #2d2a24;
-
 	/* --- Outline --- */
 	--color-outline: #847d71;
 	--color-outline-variant: #ccc5b5;
 
-	/* --- Inverse (dark overlays, tooltips, snackbars) --- */
-	--color-inverse-surface: #33302a;
-	--color-inverse-on-surface: #f5f0e8;
-	--color-inverse-primary: #ffb68e;
+	/* --- Metal palette — workshop surfaces --- */
+	--color-metal-light: #e0d8c8;
+	--color-metal: #d0c8b8;
+	--color-metal-dark: #b8b0a0;
+	--color-metal-deep: #908878;
 
 	/* ============================================================
-	   Typography — MD3 type scale
+	   Typography
 	   ============================================================ */
+
+	/* Font families */
+	--font-display: "Barlow Condensed", system-ui, -apple-system, sans-serif;
+	--font-body: "Barlow", system-ui, -apple-system, sans-serif;
 
 	/* Display */
 	--typescale-display-large-size: 3.5625rem;
 	--typescale-display-large-line: 4rem;
-	--typescale-display-large-weight: 400;
 	--typescale-display-large-tracking: -0.016rem;
 
 	--typescale-display-medium-size: 2.8125rem;
 	--typescale-display-medium-line: 3.25rem;
-	--typescale-display-medium-weight: 400;
-	--typescale-display-medium-tracking: 0;
 
 	--typescale-display-small-size: 2.25rem;
 	--typescale-display-small-line: 2.75rem;
-	--typescale-display-small-weight: 400;
-	--typescale-display-small-tracking: 0;
 
 	/* Headline */
 	--typescale-headline-large-size: 2rem;
 	--typescale-headline-large-line: 2.5rem;
-	--typescale-headline-large-weight: 400;
 
 	--typescale-headline-medium-size: 1.75rem;
 	--typescale-headline-medium-line: 2.25rem;
-	--typescale-headline-medium-weight: 400;
 
 	--typescale-headline-small-size: 1.5rem;
 	--typescale-headline-small-line: 2rem;
-	--typescale-headline-small-weight: 400;
 
 	/* Title */
 	--typescale-title-large-size: 1.375rem;
 	--typescale-title-large-line: 1.75rem;
-	--typescale-title-large-weight: 400;
 
 	--typescale-title-medium-size: 1rem;
 	--typescale-title-medium-line: 1.5rem;
@@ -98,17 +82,14 @@
 	/* Body */
 	--typescale-body-large-size: 1rem;
 	--typescale-body-large-line: 1.5rem;
-	--typescale-body-large-weight: 400;
 	--typescale-body-large-tracking: 0.031rem;
 
 	--typescale-body-medium-size: 0.875rem;
 	--typescale-body-medium-line: 1.25rem;
-	--typescale-body-medium-weight: 400;
 	--typescale-body-medium-tracking: 0.016rem;
 
 	--typescale-body-small-size: 0.75rem;
 	--typescale-body-small-line: 1rem;
-	--typescale-body-small-weight: 400;
 	--typescale-body-small-tracking: 0.025rem;
 
 	/* Label */
@@ -151,7 +132,6 @@
 	   Shape — border radius
 	   ============================================================ */
 
-	--shape-none: 0;
 	--shape-2xs: 0.25rem;
 	--shape-xs: 0.5rem;
 	--shape-sm: 0.75rem;
@@ -163,10 +143,31 @@
 	   Elevation — box shadows
 	   ============================================================ */
 
-	--elevation-none: none;
 	--elevation-sm: 0 1px 2px 0 rgb(0 0 0 / 0.08);
 	--elevation-md:
 		0 1px 2px 0 rgb(0 0 0 / 0.08), 0 2px 6px 2px rgb(0 0 0 / 0.08);
 	--elevation-lg:
 		0 4px 8px 3px rgb(0 0 0 / 0.12), 0 1px 3px 0 rgb(0 0 0 / 0.12);
+
+	/* Workshop — top-lit metal with inset highlight */
+	--elevation-workshop-sm:
+		inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 3px rgba(0, 0, 0, 0.12);
+	--elevation-workshop-md:
+		inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 4px rgba(0, 0, 0, 0.15);
+	--elevation-workshop-lg:
+		inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 6px rgba(0, 0, 0, 0.2);
+
+	/* ============================================================
+	   Workshop effects — text shadows & surface textures
+	   ============================================================ */
+
+	--text-shadow-emboss: 0 1px 0 rgba(255, 255, 255, 0.4);
+	--text-shadow-engrave: 0 -1px 0 rgba(0, 0, 0, 0.2);
+	--texture-brushed-metal: repeating-linear-gradient(
+		0deg,
+		rgba(255, 255, 255, 0.03) 0,
+		rgba(255, 255, 255, 0.03) 1px,
+		transparent 1px,
+		transparent 3px
+	);
 }
