@@ -322,6 +322,8 @@ const getPresetData = (
 			role: 'Gerent',
 			isDecisionMaker: true,
 			email: 'gerencia@ferrosbl.com',
+			emailStatus: 'bounced',
+			emailStatusReason: 'Permanent/General',
 		},
 		{
 			companyId: companyMap.get('botiga-la-rambla')!,
@@ -486,9 +488,24 @@ const getPresetData = (
 		},
 	]
 
+	const withContactDefaults = <
+		T extends {
+			emailStatus?: string
+			emailSoftBounceCount?: number
+		},
+	>(
+		contact: T,
+	) => ({
+		emailStatus: 'unknown' as const,
+		emailSoftBounceCount: 0,
+		...contact,
+	})
+
 	if (preset === 'minimal') {
 		return {
-			contacts: allContacts.filter(c => MINIMAL_CONTACT_NAMES.has(c.name)),
+			contacts: allContacts
+				.filter(c => MINIMAL_CONTACT_NAMES.has(c.name))
+				.map(withContactDefaults),
 			interactions: allInteractions.filter(c =>
 				MINIMAL_COMPANY_SLUGS.has(
 					[...companyMap.entries()].find(([, id]) => id === c.companyId)?.[0] ??
@@ -505,7 +522,7 @@ const getPresetData = (
 	}
 
 	return {
-		contacts: allContacts,
+		contacts: allContacts.map(withContactDefaults),
 		interactions: allInteractions,
 		tasks: allTasks,
 	}

@@ -23,14 +23,9 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 			Config.map(s => (s ? s.split(',').map(o => o.trim()) : [])),
 		)
 
-		const RESEND_API_KEY = yield* Config.option(
-			Config.redacted('RESEND_API_KEY'),
-		)
-		const RESEND_WEBHOOK_SECRET = yield* Config.option(
-			Config.redacted('RESEND_WEBHOOK_SECRET'),
-		)
-		const EMAIL_FROM = yield* Config.string('EMAIL_FROM').pipe(
-			Config.withDefault(''),
+		const AGENTMAIL_API_KEY = yield* Config.redacted('AGENTMAIL_API_KEY')
+		const AGENTMAIL_WEBHOOK_SECRET = yield* Config.option(
+			Config.redacted('AGENTMAIL_WEBHOOK_SECRET'),
 		)
 
 		return {
@@ -42,9 +37,8 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 			BETTER_AUTH_BASE_URL,
 			BETTER_AUTH_INSECURE_COOKIES,
 			ALLOWED_ORIGINS,
-			RESEND_API_KEY,
-			RESEND_WEBHOOK_SECRET,
-			EMAIL_FROM,
+			AGENTMAIL_API_KEY,
+			AGENTMAIL_WEBHOOK_SECRET,
 		} as const
 	}),
 }) {

@@ -6,7 +6,9 @@ import { PgLive } from './db/client'
 import { McpLoggerLive } from './lib/logger'
 import { CurrentUser } from './mcp/current-user'
 import { McpToolsLive } from './mcp/server'
+import { AgentMailProviderLive } from './services/agentmail-provider'
 import { CompanyService } from './services/companies'
+import { EmailService } from './services/email'
 import { PageService } from './services/pages'
 import { PipelineService } from './services/pipeline'
 import { WebhookService } from './services/webhooks'
@@ -15,8 +17,8 @@ const ServicesLive = Layer.mergeAll(
 	CompanyService.layer,
 	PipelineService.layer,
 	PageService.layer,
-	WebhookService.layer,
-)
+	EmailService.layer,
+).pipe(Layer.provideMerge(WebhookService.layer))
 
 const ServerLayer = McpToolsLive.pipe(
 	Layer.provide(
@@ -26,6 +28,7 @@ const ServerLayer = McpToolsLive.pipe(
 		}),
 	),
 	Layer.provide(ServicesLive),
+	Layer.provide(AgentMailProviderLive),
 	Layer.provide(PgLive),
 	Layer.provide(
 		Layer.succeed(CurrentUser, {

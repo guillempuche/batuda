@@ -58,7 +58,7 @@ Effect Schema types. No runtime DB connection — just definitions.
 - [ ] Write Effect Schema: `pages.ts`
 - [ ] Write Effect Schema: `api-keys.ts`
 - [ ] Write Effect Schema: `webhook-endpoints.ts`
-- [ ] Write Effect Schema: `email-thread-links.ts` — `id`, `agentmailThreadId` (text, unique), `agentmailInboxId` (text), `companyId` (FK nullable), `contactId` (FK nullable), `status` (text: open|closed|archived, default open), `createdAt`, `updatedAt`
+- [x] Write Effect Schema: `email-thread-links.ts` — `id`, `agentmailThreadId` (text, unique), `agentmailInboxId` (text), `companyId` (FK nullable), `contactId` (FK nullable), `status` (text: open|closed|archived, default open), `createdAt`, `updatedAt`
 - [ ] Write `schema/index.ts` re-exporting all tables
 - [ ] Write `src/index.ts` — re-exports schema + Effect Schema types
 
@@ -86,8 +86,8 @@ Pattern: Xiroi `@xiroi/library-controllers`.
   - [ ] `src/pages.ts` — `PageCreateRequest`, `PageUpdateRequest`, `ApiGroupPages` (public + internal endpoints)
   - [ ] `src/webhooks.ts` — `WebhookEndpointCreateRequest`, `WebhookEndpointUpdateRequest`, `ApiGroupWebhooks`
   - [ ] `src/pipeline.ts` — `PipelineResponse`, `ApiGroupPipeline`
-  - [ ] `src/emails.ts` — `EmailSendRequest` (includes `inboxId`), `EmailReplyRequest`, `EmailThreadListQuery` (filterable by `inboxId`, `companyId`), `EmailThreadResponse`, `EmailThreadDetailResponse`, `InboxResponse`, `ApiGroupEmails`
-  - [ ] `src/email-webhooks.ts` — `AgentMailInboundPayload`, `ApiGroupEmailWebhooks` (no API key middleware — webhook auth only)
+  - [x] ~~`src/emails.ts` — `EmailSendRequest` (includes `inboxId`), `EmailReplyRequest`, `EmailThreadListQuery` (filterable by `inboxId`, `companyId`), `EmailThreadResponse`, `EmailThreadDetailResponse`, `InboxResponse`, `ApiGroupEmails`~~ — co-located in `apps/server/src/routes/email.ts`
+  - [x] ~~`src/email-webhooks.ts` — `AgentMailInboundPayload`, `ApiGroupEmailWebhooks` (no API key middleware — webhook auth only)~~ — co-located in `apps/server/src/routes/agentmail-webhook.ts`
 - [ ] Create `src/api.ts` — combined `EngranatgeApi` spec:
   ```ts
   export const EngranatgeApi = HttpApi.make('EngranatgeApi')
@@ -184,14 +184,14 @@ src/api/
 - [ ] `live/pages.ts` — handle getPageBySlug (public), viewPage (public), listPages (internal), createPage, updatePage, publishPage, deletePage
 - [ ] `live/webhooks.ts` — handle listWebhookEndpoints, createWebhookEndpoint, updateWebhookEndpoint, deleteWebhookEndpoint, testWebhookEndpoint
 - [ ] `live/pipeline.ts` — handle getPipeline
-- [ ] `live/emails.ts` — handle listInboxes, sendEmail (from specific inbox), replyEmail, listThreads (filterable by inbox + company), getThread, updateThreadLink
-- [ ] `live/email-webhooks.ts` — handle AgentMail inbound webhook (`POST /webhooks/agentmail/inbound`, no API key middleware)
+- [x] `live/emails.ts` — handle listInboxes, sendEmail (from specific inbox), replyEmail, listThreads (filterable by inbox + company), getThread, listMessages, getMessage (updateThreadLink deferred)
+- [x] `live/email-webhooks.ts` — handle AgentMail inbound webhook (`POST /webhooks/agentmail/inbound`, no API key middleware) plus `delivered`/`bounced`/`complained`/`rejected` lifecycle events
 - [ ] `live/health.ts` — server-only health check endpoint
 
 ## Phase 6 — Services
 
 - [ ] `services/companies.ts` — search (filters + pagination), findBySlug, create, update, updateStatus
-- [ ] `services/email-provider.ts` — abstract `EmailProvider` as `Context.Tag` (decoupled from AgentMail):
+- [x] `services/email-provider.ts` — abstract `EmailProvider` as `Context.Tag` (decoupled from AgentMail):
   - `send(inboxId, params)` → `Effect<{messageId, threadId}, EmailSendError>`
   - `reply(inboxId, messageId, params)` → `Effect<{messageId, threadId}, EmailSendError>`
   - `listThreads(inboxId, params?)` → `Effect<ThreadItem[], EmailError>`
@@ -201,23 +201,54 @@ src/api/
   - `listInboxes()` → `Effect<Inbox[], EmailError>`
   - `createInbox(params)` → `Effect<Inbox, EmailError>`
   - `updateLabels(inboxId, messageId, add, remove)` → `Effect<void, EmailError>`
-- [ ] `services/agentmail-provider.ts` — `AgentMailProviderLive` layer implementing `EmailProvider`:
+- [x] `services/agentmail-provider.ts` — `AgentMailProviderLive` layer implementing `EmailProvider`:
   - dep: `agentmail` npm package
   - Config: `AGENTMAIL_API_KEY` via `Effect.Config`
   - Wraps SDK calls in `Effect.tryPromise`
   - Thin layer, no business logic — only maps SDK types to Effect
-- [ ] `services/email.ts` — `EmailService` (ServiceMap.Service) depends on `EmailProvider` (Tag) + `SqlClient`:
-  - [ ] `send(to, subject, html, companyId, contactId?)` — sends via provider, creates/updates `email_thread_links` row, creates interaction (channel:email, direction:outbound), updates company.lastContactedAt, tags with AgentMail label `crm:company:{id}`
-  - [ ] `reply(agentmailThreadId, messageId, html)` — replies via provider, creates interaction, updates company.lastContactedAt
-  - [ ] `handleInboundWebhook(payload)` — receives AgentMail `message.received` webhook, matches sender to contact by email, creates/updates thread link, creates interaction (channel:email, direction:inbound), updates company.lastContactedAt, fires internal webhook
-  - [ ] `getThread(agentmailThreadId)` — fetches from provider, enriches with company/contact from `email_thread_links`
-  - [ ] `listThreads(inboxId?, companyId?)` — if companyId, query thread_links first then fetch from provider; if inboxId, scope to that inbox; otherwise fetch all and join with links
-  - [ ] `listInboxes()` — returns all configured inboxes from provider
+- [x] `services/email.ts` — `EmailService` (ServiceMap.Service) depends on `EmailProvider` (Tag) + `SqlClient`:
+  - [x] `send(to, subject, html, companyId, contactId?)` — sends via provider, creates/updates `email_thread_links` row, creates interaction (channel:email, direction:outbound), updates company.lastContactedAt, tags with AgentMail label `crm:company:{id}`
+  - [x] `reply(agentmailThreadId, messageId, html)` — replies via provider, creates interaction, updates company.lastContactedAt
+  - [x] `handleInboundWebhook(payload)` — receives AgentMail `message.received` webhook, matches sender to contact by email, creates/updates thread link, creates interaction (channel:email, direction:inbound), updates company.lastContactedAt, fires internal webhook
+  - [x] `getThread(agentmailThreadId)` — fetches from provider, enriches with company/contact from `email_thread_links`
+  - [x] `listThreads(inboxId?, companyId?)` — if companyId, query thread_links first then fetch from provider; if inboxId, scope to that inbox; otherwise fetch all and join with links
+  - [x] `listInboxes()` — returns all configured inboxes from provider
 - [ ] `services/webhooks.ts` — fireWebhooks(event, payload) fire-and-forget fan-out
 - [ ] `services/pages.ts` — create, update, publish, archive, getBySlug(slug, lang), list(filters), incrementView
 - [ ] `services/pipeline.ts` — getCounts(), getOverdue(), getNextSteps(limit)
 - [ ] Wire webhook firing into: company status change, interaction created, email sent/received, proposal status change, task completed, page published
-- [ ] Add `AGENTMAIL_API_KEY` to `.env.example` (inboxes discovered via `listInboxes()`, no hardcoded IDs)
+- [x] Add `AGENTMAIL_API_KEY` to `.env.example` (inboxes discovered via `listInboxes()`, no hardcoded IDs)
+
+## Phase 6b — Email deliverability tracking
+
+Per-message lifecycle mirror plus contact-level deliverability state, so the system stops sending to dead addresses and surfaces delivery state to UI/agents. Source of truth is AgentMail (server-side suppression); local state is a self-healing cache.
+
+- [x] Extend `contacts.ts` schema with `email_status` (unknown|valid|bounced|complained), `email_status_reason`, `email_status_updated_at`, `email_soft_bounce_count`
+- [x] Write Effect Schema: `email-messages.ts` — per-message lifecycle mirror (`sent`/`delivered`/`bounced`/`bounced_soft`/`complained`/`rejected`)
+- [x] Add `email_messages` table to `0001_initial.ts` with indexes on `agentmail_thread_id`, `contact_id`, `status` and unique constraint on `agentmail_message_id`
+- [x] Add `EmailSuppressed` tagged error and `EmailSendError.kind` discriminator (`suppressed`/`invalid_recipient`/`rate_limited`/`unknown`)
+- [x] `services/agentmail-provider.ts` — classify SDK errors into `EmailSendErrorKind` at the boundary
+- [x] `services/email.ts` — belt-and-suspenders suppression: cache-first contact check + provider self-heal on stale cache
+- [x] `services/email.ts` — soft bounce counter promoted to hard at 3 consecutive failures (atomic SQL CASE)
+- [x] `services/email.ts` — `markDelivered`, `markBounced`, `markComplained`, `markRejected` (idempotent UPDATE-by-message-id)
+- [x] `services/email.ts` — inline `email_messages` INSERT on send/reply so the row exists immediately, before any webhook
+- [x] Webhook dispatch for `message.delivered`, `message.bounced`, `message.complained`, `message.rejected`
+- [x] HTTP `GET /v1/email/messages` and `GET /v1/email/messages/:messageId` endpoints
+- [x] `EmailSuppressed` returns HTTP 409 from `/v1/email/send` and `/v1/email/reply`
+- [x] MCP `list_email_messages` tool
+- [x] MCP `send_email` / `reply_email` return tagged-union `{_tag: 'sent' | 'suppressed'}` instead of failing the tool
+- [x] CLI `db reset` drops and recreates schema (was TRUNCATE) so migration changes apply on reset
+- [x] Seed bounced contact fixture (Jordi Puig) for local end-to-end testing
+- [ ] AgentMail dashboard: subscribe webhook to `message.delivered`, `message.bounced`, `message.complained`, `message.rejected` (manual setup step)
+- [ ] End-to-end test: send to a known-bouncing address → verify `email_messages.status = 'bounced'` and `contacts.email_status = 'bounced'`; retry → expect 409 / suppressed
+- [ ] Manual cache-staleness test: `UPDATE contacts SET email_status='unknown'` and retry send → expect provider rejection + cache self-heal back to `bounced`
+
+**Out of scope (intentional):**
+
+- Manual revival of bounced contacts — AgentMail blocks them permanently server-side; fix typos by adding a new contact
+- Unsubscribe handling — needs template-layer support + legal compliance work
+- Open/click tracking — not in AgentMail's event types
+- Soft bounce auto-retry — count only, no requeue
 
 ## Phase 7 — MCP server
 
@@ -246,10 +277,10 @@ src/api/
 - [ ] Implement tool: `publish_page`
 - [ ] Implement tool: `list_pages` (limit default 10)
 - [ ] Implement tool: `get_page`
-- [ ] Implement tool: `send_email` — send email to contact, auto-logs interaction
-- [ ] Implement tool: `reply_email` — reply to a thread
-- [ ] Implement tool: `list_email_threads` — subject + participants + date + message count, no bodies; filterable by inbox/company (limit default 10)
-- [ ] Implement tool: `get_email_thread` — full thread with messages as `extractedText` (reply-stripped plain text, not HTML)
+- [x] Implement tool: `send_email` — send email to contact, auto-logs interaction
+- [x] Implement tool: `reply_email` — reply to a thread
+- [x] Implement tool: `list_email_threads` — subject + participants + date + message count, no bodies; filterable by inbox/company (limit default 10)
+- [x] Implement tool: `get_email_thread` — full thread with messages as `extractedText` (reply-stripped plain text, not HTML)
 - [ ] Implement resource: `forja://company/{slug}`
 - [ ] Implement resource: `forja://pipeline`
 

@@ -46,6 +46,10 @@ export default Effect.gen(function* () {
 				whatsapp TEXT,
 				linkedin TEXT,
 				instagram TEXT,
+				email_status TEXT NOT NULL DEFAULT 'unknown',
+				email_status_reason TEXT,
+				email_status_updated_at TIMESTAMPTZ,
+				email_soft_bounce_count INTEGER NOT NULL DEFAULT 0,
 				notes TEXT,
 				metadata JSONB,
 				created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -163,5 +167,42 @@ export default Effect.gen(function* () {
 				created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 			)
 		`,
+		sql`
+			CREATE TABLE IF NOT EXISTS email_thread_links (
+				id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+				agentmail_thread_id TEXT NOT NULL UNIQUE,
+				agentmail_inbox_id TEXT NOT NULL,
+				company_id UUID REFERENCES companies(id) ON DELETE SET NULL,
+				contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
+				subject TEXT,
+				status TEXT NOT NULL DEFAULT 'open',
+				created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+				updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+			)
+		`,
+		sql`CREATE INDEX IF NOT EXISTS idx_email_thread_links_company_id ON email_thread_links(company_id)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_email_thread_links_inbox_id ON email_thread_links(agentmail_inbox_id)`,
+		sql`
+			CREATE TABLE IF NOT EXISTS email_messages (
+				id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+				agentmail_message_id TEXT NOT NULL UNIQUE,
+				agentmail_thread_id TEXT NOT NULL,
+				agentmail_inbox_id TEXT NOT NULL,
+				direction TEXT NOT NULL,
+				company_id UUID REFERENCES companies(id) ON DELETE SET NULL,
+				contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
+				recipients JSONB NOT NULL DEFAULT '[]'::jsonb,
+				status TEXT NOT NULL,
+				status_reason TEXT,
+				bounce_type TEXT,
+				bounce_sub_type TEXT,
+				status_updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+				created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+				updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+			)
+		`,
+		sql`CREATE INDEX IF NOT EXISTS idx_email_messages_thread_id ON email_messages(agentmail_thread_id)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_email_messages_contact_id ON email_messages(contact_id) WHERE contact_id IS NOT NULL`,
+		sql`CREATE INDEX IF NOT EXISTS idx_email_messages_status ON email_messages(status)`,
 	])
 })

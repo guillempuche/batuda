@@ -11,6 +11,7 @@ import { PipelineResource } from './resources/pipeline'
 import { CompanyHandlersLive, CompanyTools } from './tools/companies'
 import { ContactHandlersLive, ContactTools } from './tools/contacts'
 import { DocumentHandlersLive, DocumentTools } from './tools/documents'
+import { EmailHandlersLive, EmailTools } from './tools/email'
 import { InteractionHandlersLive, InteractionTools } from './tools/interactions'
 import { PageHandlersLive, PageTools } from './tools/pages'
 import { PipelineHandlersLive, PipelineTools } from './tools/pipeline'
@@ -24,6 +25,7 @@ export const McpToolsLive = Layer.mergeAll(
 	McpServer.toolkit(DocumentTools),
 	McpServer.toolkit(PageTools),
 	McpServer.toolkit(PipelineTools),
+	McpServer.toolkit(EmailTools),
 	CompanyResource,
 	PipelineResource,
 	DocumentResource,
@@ -39,4 +41,5 @@ export const McpToolsLive = Layer.mergeAll(
 	Layer.provide(DocumentHandlersLive),
 	Layer.provide(PageHandlersLive),
 	Layer.provide(PipelineHandlersLive),
+	Layer.provide(EmailHandlersLive),
 )
