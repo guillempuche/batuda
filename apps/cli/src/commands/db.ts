@@ -7,11 +7,10 @@ import { seed, seedAuth } from './seed'
 export const dbMigrate = execIn(ROOT, 'pnpm', 'db:migrate')
 
 export const dbReset = Effect.gen(function* () {
-	yield* Effect.logInfo('Truncating all tables...')
+	yield* Effect.logInfo('Dropping public schema...')
 	const sql = yield* SqlClient.SqlClient
-	yield* sql`TRUNCATE companies CASCADE`
-	yield* sql`TRUNCATE products CASCADE`
-	yield* sql`TRUNCATE pages CASCADE`
+	yield* sql`DROP SCHEMA IF EXISTS public CASCADE`
+	yield* sql`CREATE SCHEMA public`
 
 	yield* Effect.logInfo('Running migrations...')
 	yield* dbMigrate
