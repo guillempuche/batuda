@@ -4,12 +4,13 @@ import styled from 'styled-components'
 
 import { useSectionRef } from '#/components/layout/active-section-context'
 import { Section } from '#/components/layout/section'
+import { workshopButtonStyles } from '#/components/layout/workshop-button'
 import { BeforeAfter } from '#/components/workshop/before-after'
 import { ControlPanel } from '#/components/workshop/control-panel'
 import { ConveyorBelt } from '#/components/workshop/conveyor-belt'
-import { GearMascot } from '#/components/workshop/gear-mascot'
 import { MachineCard } from '#/components/workshop/machine-card'
 import { PartsRow } from '#/components/workshop/parts-row'
+import { scatter } from '#/data/scatter'
 import { services } from '#/data/services'
 import { useLang, useTranslations } from '#/i18n/lang-provider'
 
@@ -31,10 +32,15 @@ export const Route = createFileRoute('/')({
 
 /* ─── Styled components ─── */
 
-const HeroSection = styled.section.attrs({ 'data-component': 'HeroSection' })`
+const HeroSection = styled.section.withConfig({ displayName: 'HeroSection' })`
 	padding: var(--space-5xl) var(--page-gutter) var(--space-4xl);
 	max-width: var(--page-max-width);
 	margin: 0 auto;
+
+	@media (max-width: 767px) {
+		padding-top: var(--space-3xl);
+		padding-bottom: var(--space-2xl);
+	}
 `
 
 const HeroContent = styled.div`
@@ -75,52 +81,22 @@ const Subheadline = styled.p`
 `
 
 const HeroCta = styled(Link)`
-	display: inline-flex;
-	align-items: center;
-	padding: var(--space-sm) var(--space-2xl);
-	background: linear-gradient(135deg, #b85a28 0%, #c46a38 50%, #a04a18 100%);
-	border: 1px solid rgba(0, 0, 0, 0.2);
-	box-shadow: var(--elevation-workshop-md);
-	color: var(--color-on-primary);
-	border-radius: 2px;
-	font-size: var(--typescale-label-large-size);
-	font-weight: 700;
-	letter-spacing: 0.08em;
-	text-transform: uppercase;
-	text-shadow: var(--text-shadow-engrave);
-	text-decoration: none;
-	transition:
-		box-shadow 0.15s,
-		transform 0.1s;
-	cursor: pointer;
-
-	&:hover {
-		box-shadow:
-			inset 0 1px 0 rgba(255, 255, 255, 0.25),
-			0 3px 6px rgba(0, 0, 0, 0.2);
-	}
-
-	&:active {
-		transform: translateY(1px);
-		box-shadow:
-			inset 0 2px 4px rgba(0, 0, 0, 0.2),
-			0 1px 2px rgba(0, 0, 0, 0.1);
-	}
+	${workshopButtonStyles}
 `
 
-const ServiceGrid = styled(motion.div).attrs({
-	'data-component': 'ServiceGrid',
+const ServiceGrid = styled(motion.div).withConfig({
+	displayName: 'ServiceGrid',
 })`
 	display: grid;
 	grid-template-columns: 1fr;
 	gap: var(--space-lg);
 
-	@media (min-width: 1024px) {
+	@media (min-width: 768px) {
 		grid-template-columns: repeat(3, 1fr);
 	}
 `
 
-const ProofGrid = styled(motion.div).attrs({ 'data-component': 'ProofGrid' })`
+const ProofGrid = styled(motion.div).withConfig({ displayName: 'ProofGrid' })`
 	display: grid;
 	grid-template-columns: 1fr;
 	gap: var(--space-lg);
@@ -131,27 +107,32 @@ const ProofGrid = styled(motion.div).attrs({ 'data-component': 'ProofGrid' })`
 `
 
 /* Index card pinned to the board */
-const ProofCard = styled.div.attrs({ 'data-component': 'ProofCard' })`
+const ProofCard = styled.div.withConfig({ displayName: 'ProofCard' })`
 	padding: var(--space-lg);
 	padding-top: calc(var(--space-lg) + 6px);
 	background:
-		linear-gradient(160deg, var(--color-metal-light) 0%, var(--color-metal) 50%, var(--color-metal-dark) 100%);
+		linear-gradient(var(--scatter-grad, 160deg), var(--color-metal-light) 0%, var(--color-metal) 50%, var(--color-metal-dark) 100%);
 	border: 1px solid var(--color-outline);
+	box-shadow:
+		var(--scatter-shadow-x, 0px) var(--scatter-shadow-y, 2px) 6px rgba(0, 0, 0, 0.1);
 	position: relative;
+	transform-origin: top center;
+	transform:
+		rotate(var(--scatter-rotate, 0deg))
+		translate(var(--scatter-dx, 0px), var(--scatter-dy, 0px));
+	filter: hue-rotate(var(--scatter-hue, 0deg));
 	transition: transform 0.3s ease;
 
-	/* Alternating tilt */
-	&:nth-child(odd) { transform: rotate(0.5deg); }
-	&:nth-child(even) { transform: rotate(-0.4deg); }
+	@media (min-width: 768px) {
+		&:hover { transform: rotate(0deg) translate(0px, 0px); }
+	}
 
-	&:hover { transform: rotate(0deg); }
-
-	/* Pin/tack at top center */
+	/* Pin/tack — offset + color variation by scatter */
 	&::before {
 		content: '';
 		position: absolute;
 		top: 6px;
-		left: 50%;
+		left: calc(50% + var(--scatter-pin-dx, 0px));
 		transform: translateX(-50%);
 		width: 10px;
 		height: 10px;
@@ -161,13 +142,14 @@ const ProofCard = styled.div.attrs({ 'data-component': 'ProofCard' })`
 		box-shadow:
 			0 1px 2px rgba(0, 0, 0, 0.3),
 			inset 0 1px 0 rgba(255, 255, 255, 0.3);
+		filter: hue-rotate(var(--scatter-pin-hue, 0deg));
 	}
 `
 
 const ProofIndustry = styled.span`
 	display: inline-block;
 	font-size: var(--typescale-label-small-size);
-	font-weight: 700;
+	font-weight: var(--font-weight-bold);
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
 	color: var(--color-primary);
@@ -182,11 +164,11 @@ const ProofProblem = styled.p`
 
 const ProofResult = styled.p`
 	font-size: var(--typescale-body-medium-size);
-	font-weight: 500;
+	font-weight: var(--font-weight-medium);
 	color: var(--color-secondary);
 `
 
-const PricingBlock = styled.div.attrs({ 'data-component': 'PricingBlock' })`
+const PricingBlock = styled.div.withConfig({ displayName: 'PricingBlock' })`
 	margin-bottom: var(--space-2xl);
 `
 
@@ -216,7 +198,7 @@ const IncludesColumn = styled.div`
 
 const IncludesLabel = styled.h4`
 	font-size: var(--typescale-label-large-size);
-	font-weight: 700;
+	font-weight: var(--font-weight-bold);
 	color: var(--color-on-surface-variant);
 	text-transform: uppercase;
 	letter-spacing: 0.08em;
@@ -233,91 +215,6 @@ const IncludesItem = styled.p<{ $included: boolean }>`
 		margin-right: var(--space-xs);
 	}
 `
-
-/* ─── Data ─── */
-
-const includes: Record<string, { ca: string[]; es: string[]; en: string[] }> = {
-	automatitzacions: {
-		ca: [
-			'Disseny del flux',
-			'Implementació',
-			'Test i posada en marxa',
-			'Suport 30 dies',
-		],
-		es: [
-			'Diseño del flujo',
-			'Implementación',
-			'Test y puesta en marcha',
-			'Soporte 30 días',
-		],
-		en: ['Flow design', 'Implementation', 'Testing & launch', '30-day support'],
-	},
-	'intel-ligencia-artificial': {
-		ca: [
-			'Configuració del model',
-			'Integració amb les teves eines',
-			'Ajustaments inicials',
-			'Suport continu',
-		],
-		es: [
-			'Configuración del modelo',
-			'Integración con tus herramientas',
-			'Ajustes iniciales',
-			'Soporte continuo',
-		],
-		en: [
-			'Model configuration',
-			'Integration with your tools',
-			'Initial tuning',
-			'Ongoing support',
-		],
-	},
-	'micro-saas': {
-		ca: [
-			'Disseny UX',
-			'Desenvolupament',
-			'Deploy i hosting',
-			'Manteniment mensual',
-		],
-		es: [
-			'Diseño UX',
-			'Desarrollo',
-			'Deploy y hosting',
-			'Mantenimiento mensual',
-		],
-		en: ['UX design', 'Development', 'Deploy & hosting', 'Monthly maintenance'],
-	},
-}
-
-const excludes: Record<string, { ca: string[]; es: string[]; en: string[] }> = {
-	automatitzacions: {
-		ca: [
-			'Subscripcions a tercers (Zapier, Make...)',
-			"Canvis d'abast post-lliurament",
-		],
-		es: [
-			'Suscripciones a terceros (Zapier, Make...)',
-			'Cambios de alcance post-entrega',
-		],
-		en: [
-			'Third-party subscriptions (Zapier, Make...)',
-			'Scope changes after delivery',
-		],
-	},
-	'intel-ligencia-artificial': {
-		ca: ["Costos d'API d'IA (OpenAI, etc.)", 'Generació de contingut creatiu'],
-		es: [
-			'Costes de API de IA (OpenAI, etc.)',
-			'Generación de contenido creativo',
-		],
-		en: ['AI API costs (OpenAI, etc.)', 'Creative content generation'],
-	},
-	'micro-saas': {
-		ca: ['Contingut i dades inicials', 'Integracions no previstes'],
-		es: ['Contenido y datos iniciales', 'Integraciones no previstas'],
-		en: ['Initial content and data', 'Unplanned integrations'],
-	},
-}
 
 /* ─── Page ─── */
 
@@ -367,7 +264,6 @@ function Home() {
 							</HeroCta>
 						</motion.div>
 					</HeroText>
-					<GearMascot expression='default' size={120} />
 				</HeroContent>
 			</HeroSection>
 
@@ -399,11 +295,12 @@ function Home() {
 						whileInView='visible'
 						viewport={{ once: true, amount: 0.2 }}
 					>
-						{services.map(service => (
+						{services.map((service, i) => (
 							<motion.div
 								key={service.slug}
 								variants={fadeUp}
 								transition={{ duration: 0.4 }}
+								style={scatter(i)}
 							>
 								<MachineCard
 									name={service.name[lang]}
@@ -432,11 +329,12 @@ function Home() {
 						whileInView='visible'
 						viewport={{ once: true, amount: 0.1 }}
 					>
-						{allExamples.map(ex => (
+						{allExamples.map((ex, i) => (
 							<motion.div
 								key={ex.industry}
 								variants={fadeUp}
 								transition={{ duration: 0.4 }}
+								style={scatter(i + 3)}
 							>
 								<ProofCard>
 									<ProofIndustry>{ex.industry}</ProofIndustry>
@@ -475,7 +373,7 @@ function Home() {
 							<IncludesGrid>
 								<IncludesColumn>
 									<IncludesLabel>{t.pricing.includes}</IncludesLabel>
-									{includes[service.slug]?.[lang].map(item => (
+									{service.includes[lang].map(item => (
 										<IncludesItem key={item} $included>
 											{item}
 										</IncludesItem>
@@ -483,7 +381,7 @@ function Home() {
 								</IncludesColumn>
 								<IncludesColumn>
 									<IncludesLabel>{t.pricing.excludes}</IncludesLabel>
-									{excludes[service.slug]?.[lang].map(item => (
+									{service.excludes[lang].map(item => (
 										<IncludesItem key={item} $included={false}>
 											{item}
 										</IncludesItem>

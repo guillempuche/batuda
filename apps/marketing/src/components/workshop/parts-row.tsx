@@ -3,7 +3,10 @@ import { AnimateNumber } from 'motion-plus/react'
 import { useRef } from 'react'
 import styled from 'styled-components'
 
-const Row = styled.div.attrs({ 'data-component': 'PartsRow' })`
+import { htmlLang } from '#/i18n'
+import { useLang } from '#/i18n/lang-provider'
+
+const Row = styled.div.withConfig({ displayName: 'PartsRow' })`
 	display: flex;
 	justify-content: space-between;
 	align-items: baseline;
@@ -24,7 +27,7 @@ const Info = styled.div`
 
 const Name = styled.span`
 	font-size: var(--typescale-body-large-size);
-	font-weight: 500;
+	font-weight: var(--font-weight-medium);
 	color: var(--color-on-surface);
 `
 
@@ -55,9 +58,10 @@ const Unit = styled.span`
 function parsePrice(price: string): { value: number; suffix: string } {
 	const match = price.match(/^([\d.]+)\s*(.*)$/)
 	if (!match) return { value: 0, suffix: price }
+	const [, digits = '', tail = ''] = match
 	// Remove thousands separator dots (European format: 2.000 = 2000)
-	const num = Number(match[1].replace(/\./g, ''))
-	return { value: num, suffix: ` ${match[2]}` }
+	const num = Number(digits.replace(/\./g, ''))
+	return { value: num, suffix: ` ${tail}` }
 }
 
 export function PartsRow({
@@ -74,6 +78,7 @@ export function PartsRow({
 	const ref = useRef<HTMLDivElement>(null)
 	const isInView = useInView(ref, { once: true, amount: 0.5 })
 	const { value, suffix } = parsePrice(price)
+	const lang = useLang()
 
 	return (
 		<Row ref={ref}>
@@ -85,7 +90,7 @@ export function PartsRow({
 				<Price>
 					<AnimateNumber
 						suffix={suffix}
-						locales='ca-ES'
+						locales={htmlLang[lang]}
 						format={{ useGrouping: true }}
 						transition={{
 							y: { type: 'spring', duration: 1.2, bounce: 0 },

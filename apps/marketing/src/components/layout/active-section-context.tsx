@@ -1,13 +1,22 @@
-import { createContext, useCallback, useContext, useRef, useState } from 'react'
+import {
+	createContext,
+	useCallback,
+	useContext,
+	useEffect,
+	useRef,
+	useState,
+} from 'react'
 
 type ActiveSectionContextType = {
 	activeSection: string
 	observeSection: (id: string, el: HTMLElement | null) => void
+	setScrollRoot: (el: HTMLElement | null) => void
 }
 
 const ActiveSectionContext = createContext<ActiveSectionContextType>({
 	activeSection: 'hero',
 	observeSection: () => {},
+	setScrollRoot: () => {},
 })
 
 export function ActiveSectionProvider({
@@ -18,11 +27,17 @@ export function ActiveSectionProvider({
 	const [activeSection, setActiveSection] = useState('hero')
 	const observerRef = useRef<IntersectionObserver | null>(null)
 	const trackedRef = useRef<Map<string, HTMLElement>>(new Map())
+	const scrollRootRef = useRef<HTMLElement | null>(null)
 
-	const getObserver = useCallback(() => {
-		if (observerRef.current) return observerRef.current
+	/* Tear down the current observer and rebuild it against the active scroll
+	 * root. We re-observe every previously tracked section so callers don't
+	 * need to re-register when the root changes (e.g. on viewport breakpoint). */
+	const buildObserver = useCallback(() => {
+		if (observerRef.current) {
+			observerRef.current.disconnect()
+		}
 
-		observerRef.current = new IntersectionObserver(
+		const observer = new IntersectionObserver(
 			entries => {
 				for (const entry of entries) {
 					if (entry.isIntersecting) {
@@ -31,10 +46,23 @@ export function ActiveSectionProvider({
 					}
 				}
 			},
-			{ threshold: 0, rootMargin: '-10% 0px -80% 0px' },
+			{
+				root: scrollRootRef.current,
+				threshold: 0,
+				rootMargin: '-10% 0px -80% 0px',
+			},
 		)
-		return observerRef.current
+
+		observerRef.current = observer
+		for (const el of trackedRef.current.values()) {
+			observer.observe(el)
+		}
+		return observer
 	}, [])
+
+	const getObserver = useCallback(() => {
+		return observerRef.current ?? buildObserver()
+	}, [buildObserver])
 
 	const observeSection = useCallback(
 		(id: string, el: HTMLElement | null) => {
@@ -53,8 +81,30 @@ export function ActiveSectionProvider({
 		[getObserver],
 	)
 
+	const setScrollRoot = useCallback(
+		(el: HTMLElement | null) => {
+			if (scrollRootRef.current === el) return
+			scrollRootRef.current = el
+			/* Rebuild observer against the new root if we already have tracked
+			 * sections — otherwise it'll be created lazily on first observe. */
+			if (observerRef.current || trackedRef.current.size > 0) {
+				buildObserver()
+			}
+		},
+		[buildObserver],
+	)
+
+	useEffect(() => {
+		return () => {
+			observerRef.current?.disconnect()
+			observerRef.current = null
+		}
+	}, [])
+
 	return (
-		<ActiveSectionContext.Provider value={{ activeSection, observeSection }}>
+		<ActiveSectionContext.Provider
+			value={{ activeSection, observeSection, setScrollRoot }}
+		>
 			{children}
 		</ActiveSectionContext.Provider>
 	)
@@ -69,5 +119,13 @@ export function useSectionRef(id: string) {
 	return useCallback(
 		(el: HTMLElement | null) => observeSection(id, el),
 		[id, observeSection],
+	)
+}
+
+export function useScrollRootRef() {
+	const { setScrollRoot } = useContext(ActiveSectionContext)
+	return useCallback(
+		(el: HTMLElement | null) => setScrollRoot(el),
+		[setScrollRoot],
 	)
 }

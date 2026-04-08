@@ -1,11 +1,21 @@
 import type { Locale } from './ca'
 
 export const es = {
+	meta: {
+		title: 'Engranatge — Las máquinas hacen el trabajo',
+		description:
+			'Construimos automatizaciones, IA y micro-aplicaciones para que tu negocio trabaje solo.',
+	},
 	nav: {
 		tools: 'Herramientas',
 		projects: 'Proyectos',
 		about: 'Taller',
 		pricing: 'Presupuesto',
+		home: 'Inicio',
+		solution: 'Herramientas',
+		quote: 'Precios',
+		contact: 'Habla',
+		language: 'Idioma',
 	},
 	hero: {
 		headline: 'Las máquinas hacen el trabajo. Tú haces el negocio.',

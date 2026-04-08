@@ -17,6 +17,8 @@ export interface Service {
 	examples: Record<LangCode, ServiceExample[]>
 	startingPrice: string
 	priceUnit: Record<LangCode, string>
+	includes: Record<LangCode, string[]>
+	excludes: Record<LangCode, string[]>
 }
 
 export const services: Service[] = [
@@ -122,6 +124,40 @@ export const services: Service[] = [
 			es: 'por automatización',
 			en: 'per automation',
 		},
+		includes: {
+			ca: [
+				'Disseny del flux',
+				'Implementació',
+				'Test i posada en marxa',
+				'Suport 30 dies',
+			],
+			es: [
+				'Diseño del flujo',
+				'Implementación',
+				'Test y puesta en marcha',
+				'Soporte 30 días',
+			],
+			en: [
+				'Flow design',
+				'Implementation',
+				'Testing & launch',
+				'30-day support',
+			],
+		},
+		excludes: {
+			ca: [
+				'Subscripcions a tercers (Zapier, Make...)',
+				"Canvis d'abast post-lliurament",
+			],
+			es: [
+				'Suscripciones a terceros (Zapier, Make...)',
+				'Cambios de alcance post-entrega',
+			],
+			en: [
+				'Third-party subscriptions (Zapier, Make...)',
+				'Scope changes after delivery',
+			],
+		},
 	},
 	{
 		slug: 'intel-ligencia-artificial',
@@ -183,7 +219,7 @@ export const services: Service[] = [
 						'Cada matí, 30 min classificant correus i reenviant-los al departament correcte.',
 					solution:
 						'IA que llegeix el correu, el classifica i el reenvia automàticament.',
-					result: '30 min/dia estalvits',
+					result: '30 min/dia estalviats',
 				},
 			],
 			es: [
@@ -212,6 +248,37 @@ export const services: Service[] = [
 			ca: '/mes per integració',
 			es: '/mes por integración',
 			en: '/month per integration',
+		},
+		includes: {
+			ca: [
+				'Configuració del model',
+				'Integració amb les teves eines',
+				'Ajustaments inicials',
+				'Suport continu',
+			],
+			es: [
+				'Configuración del modelo',
+				'Integración con tus herramientas',
+				'Ajustes iniciales',
+				'Soporte continuo',
+			],
+			en: [
+				'Model configuration',
+				'Integration with your tools',
+				'Initial tuning',
+				'Ongoing support',
+			],
+		},
+		excludes: {
+			ca: [
+				"Costos d'API d'IA (OpenAI, etc.)",
+				'Generació de contingut creatiu',
+			],
+			es: [
+				'Costes de API de IA (OpenAI, etc.)',
+				'Generación de contenido creativo',
+			],
+			en: ['AI API costs (OpenAI, etc.)', 'Creative content generation'],
 		},
 	},
 	{
@@ -292,6 +359,31 @@ export const services: Service[] = [
 			ca: 'desenvolupament + 100 €/mes manteniment',
 			es: 'desarrollo + 100 €/mes mantenimiento',
 			en: 'development + €100/month maintenance',
+		},
+		includes: {
+			ca: [
+				'Disseny UX',
+				'Desenvolupament',
+				'Deploy i hosting',
+				'Manteniment mensual',
+			],
+			es: [
+				'Diseño UX',
+				'Desarrollo',
+				'Deploy y hosting',
+				'Mantenimiento mensual',
+			],
+			en: [
+				'UX design',
+				'Development',
+				'Deploy & hosting',
+				'Monthly maintenance',
+			],
+		},
+		excludes: {
+			ca: ['Contingut i dades inicials', 'Integracions no previstes'],
+			es: ['Contenido y datos iniciales', 'Integraciones no previstas'],
+			en: ['Initial content and data', 'Unplanned integrations'],
 		},
 	},
 ]

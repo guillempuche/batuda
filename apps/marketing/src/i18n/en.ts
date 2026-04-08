@@ -1,11 +1,21 @@
 import type { Locale } from './ca'
 
 export const en = {
+	meta: {
+		title: 'Engranatge — Machines do the work',
+		description:
+			'We build automations, AI and micro-apps so your business runs itself.',
+	},
 	nav: {
 		tools: 'Tools',
 		projects: 'Projects',
 		about: 'Workshop',
 		pricing: 'Pricing',
+		home: 'Home',
+		solution: 'Tools',
+		quote: 'Pricing',
+		contact: 'Talk',
+		language: 'Language',
 	},
 	hero: {
 		headline: 'Machines do the work. You run the business.',

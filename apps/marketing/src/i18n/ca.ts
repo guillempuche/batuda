@@ -1,9 +1,19 @@
 export const ca = {
+	meta: {
+		title: 'Engranatge — Les màquines fan la feina',
+		description:
+			'Construïm automatitzacions, IA i micro-aplicacions perquè el teu negoci treballi sol.',
+	},
 	nav: {
 		tools: 'Eines',
 		projects: 'Projectes',
 		about: 'Taller',
 		pricing: 'Pressupost',
+		home: 'Inici',
+		solution: 'Eines',
+		quote: 'Preus',
+		contact: 'Parla',
+		language: 'Idioma',
 	},
 	hero: {
 		headline: 'Les màquines fan la feina. Tu fas el negoci.',
@@ -63,4 +73,14 @@ export const ca = {
 	},
 } as const
 
-export type Locale = typeof ca
+/* Widens literal types in `typeof ca` so that `es` and `en` can satisfy
+ * Locale without their strings having to be byte-identical to Catalan. */
+type Widen<T> = T extends string
+	? string
+	: T extends readonly (infer U)[]
+		? readonly Widen<U>[]
+		: T extends object
+			? { [K in keyof T]: Widen<T[K]> }
+			: T
+
+export type Locale = Widen<typeof ca>

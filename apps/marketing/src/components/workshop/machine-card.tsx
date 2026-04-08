@@ -1,34 +1,38 @@
 import styled from 'styled-components'
 
+import { microScatter } from '#/data/scatter'
+import { useTranslations } from '#/i18n/lang-provider'
+
 /* Workshop machine nameplate — metal tag hanging from nail on pegboard */
-const Card = styled.div.attrs({ 'data-component': 'MachineCard' })`
+const Card = styled.div.withConfig({ displayName: 'MachineCard' })`
 	background:
 		var(--texture-brushed-metal),
-		linear-gradient(160deg, var(--color-metal-light) 0%, var(--color-metal) 50%, var(--color-metal-dark) 100%);
+		linear-gradient(var(--scatter-grad, 160deg), var(--color-metal-light) 0%, var(--color-metal) 50%, var(--color-metal-dark) 100%);
 	border: 1px solid var(--color-outline);
+	box-shadow:
+		var(--scatter-shadow-x, 0px) var(--scatter-shadow-y, 2px) 6px rgba(0, 0, 0, 0.1);
 	padding: var(--space-lg);
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
 	position: relative;
 	transform-origin: top center;
+	transform:
+		rotate(var(--scatter-rotate, 0deg))
+		translate(var(--scatter-dx, 0px), var(--scatter-dy, 0px));
+	filter: hue-rotate(var(--scatter-hue, 0deg));
 	transition: transform 0.3s ease;
 
-	/* Alternating slight rotation — things on pegboards are never straight */
-	&:nth-child(1) { transform: rotate(-0.6deg); }
-	&:nth-child(2) { transform: rotate(0.4deg); }
-	&:nth-child(3) { transform: rotate(-0.3deg); }
-
-	&:hover {
-		transform: rotate(0deg);
+	@media (min-width: 768px) {
+		&:hover { transform: rotate(0deg) translate(0px, 0px); }
 	}
 
-	/* Top-center nail hole */
+	/* Top-center nail hole — offset by scatter */
 	&::before {
 		content: '';
 		position: absolute;
 		top: var(--space-xs);
-		left: 50%;
+		left: calc(50% + var(--scatter-pin-dx, 0px));
 		transform: translateX(-50%);
 		width: 8px;
 		height: 8px;
@@ -49,7 +53,7 @@ const CardHeader = styled.div`
 const MachineName = styled.h3`
 	font-size: var(--typescale-title-large-size);
 	line-height: var(--typescale-title-large-line);
-	font-weight: 500;
+	font-weight: var(--font-weight-medium);
 	color: var(--color-on-surface);
 `
 
@@ -81,7 +85,7 @@ const IOList = styled.ul`
 	gap: var(--space-2xs);
 `
 
-/* Small stamped metal tag */
+/* Small stamped metal tag — micro-rotated via inline --tag-rotate */
 const IOItem = styled.li`
 	font-size: var(--typescale-body-small-size);
 	background:
@@ -89,9 +93,10 @@ const IOItem = styled.li`
 	padding: var(--space-3xs) var(--space-xs);
 	border: 1px solid rgba(0, 0, 0, 0.1);
 	box-shadow: var(--elevation-workshop-sm);
-	color: #555045;
-	font-weight: 500;
+	color: var(--color-on-surface);
+	font-weight: var(--font-weight-medium);
 	letter-spacing: 0.02em;
+	transform: rotate(var(--tag-rotate, 0deg));
 `
 
 export function MachineCard({
@@ -105,6 +110,7 @@ export function MachineCard({
 	inputs: string[]
 	outputs: string[]
 }) {
+	const t = useTranslations()
 	return (
 		<Card>
 			<CardHeader>
@@ -112,18 +118,22 @@ export function MachineCard({
 			</CardHeader>
 			<Description>{description}</Description>
 			<IOSection>
-				<IOLabel>Entrada</IOLabel>
+				<IOLabel>{t.toolDetail.inputs}</IOLabel>
 				<IOList>
-					{inputs.map(item => (
-						<IOItem key={item}>{item}</IOItem>
+					{inputs.map((item, i) => (
+						<IOItem key={item} style={microScatter(i)}>
+							{item}
+						</IOItem>
 					))}
 				</IOList>
 			</IOSection>
 			<IOSection>
-				<IOLabel>Sortida</IOLabel>
+				<IOLabel>{t.toolDetail.outputs}</IOLabel>
 				<IOList>
-					{outputs.map(item => (
-						<IOItem key={item}>{item}</IOItem>
+					{outputs.map((item, i) => (
+						<IOItem key={item} style={microScatter(i + inputs.length)}>
+							{item}
+						</IOItem>
 					))}
 				</IOList>
 			</IOSection>

@@ -6,18 +6,14 @@ interface ConveyorItem {
 	after: string
 }
 
-const Belt = styled.div.attrs({ 'data-component': 'ConveyorBelt' })`
+const Belt = styled.div.withConfig({ displayName: 'ConveyorBelt' })`
 	position: relative;
 	border-top: 2px dashed var(--color-outline-variant);
 	border-bottom: 2px dashed var(--color-outline-variant);
 	padding: var(--space-md) 0;
 
 	@media (max-width: 767px) {
-		border-top: none;
-		border-bottom: none;
-		border-left: 2px dashed var(--color-outline-variant);
-		padding: var(--space-md) 0 var(--space-md) var(--space-lg);
-		overflow-x: auto;
+		overflow: hidden;
 	}
 `
 
@@ -41,12 +37,12 @@ const Before = styled.span`
 
 const Arrow = styled.span`
 	color: var(--color-primary);
-	font-weight: 700;
+	font-weight: var(--font-weight-bold);
 `
 
 const After = styled.span`
 	font-size: var(--typescale-body-medium-size);
-	font-weight: 500;
+	font-weight: var(--font-weight-medium);
 	color: var(--color-secondary);
 `
 

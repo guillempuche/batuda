@@ -1,5 +1,11 @@
 @import "@engranatge/ui/tailwind.css";
 
+:root {
+	/* Mobile bottom nav height — referenced by ToolBelt and by anything that
+	 * needs clearance above it (e.g. WorkshopFooter). */
+	--toolbelt-height: 4.5rem;
+}
+
 *,
 *::before,
 *::after {
@@ -33,8 +39,8 @@ body {
 	-moz-osx-font-smoothing: grayscale;
 }
 
-/* Workbench — lock viewport on desktop */
-@media (min-width: 1024px) {
+/* Workbench — lock viewport on tablet+ */
+@media (min-width: 768px) {
 	html,
 	body {
 		height: 100dvh;

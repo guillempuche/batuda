@@ -1,7 +1,9 @@
 import styled from 'styled-components'
 
+import { workshopButtonStyles } from '#/components/layout/workshop-button'
+
 /* Workshop control panel — riveted metal plate mounted on pegboard */
-const Panel = styled.div.attrs({ 'data-component': 'ControlPanel' })`
+const Panel = styled.div.withConfig({ displayName: 'ControlPanel' })`
 	background:
 		var(--texture-brushed-metal),
 		linear-gradient(145deg, var(--color-metal) 0%, var(--color-metal) 40%, var(--color-metal-dark) 100%);
@@ -54,37 +56,8 @@ const Actions = styled.div`
 `
 
 const PrimaryButton = styled.a`
-	display: inline-flex;
-	align-items: center;
+	${workshopButtonStyles}
 	padding: var(--space-sm) var(--space-xl);
-	background: linear-gradient(135deg, #b85a28 0%, #c46a38 50%, #a04a18 100%);
-	border: 1px solid rgba(0, 0, 0, 0.2);
-	box-shadow: var(--elevation-workshop-md);
-	color: var(--color-on-primary);
-	border-radius: 2px;
-	font-size: var(--typescale-label-large-size);
-	font-weight: 700;
-	letter-spacing: 0.08em;
-	text-transform: uppercase;
-	text-shadow: var(--text-shadow-engrave);
-	text-decoration: none;
-	transition:
-		box-shadow 0.15s,
-		transform 0.1s;
-	cursor: pointer;
-
-	&:hover {
-		box-shadow:
-			inset 0 1px 0 rgba(255, 255, 255, 0.25),
-			0 3px 6px rgba(0, 0, 0, 0.2);
-	}
-
-	&:active {
-		transform: translateY(1px);
-		box-shadow:
-			inset 0 2px 4px rgba(0, 0, 0, 0.2),
-			0 1px 2px rgba(0, 0, 0, 0.1);
-	}
 `
 
 const SecondaryButton = styled.a`
@@ -96,7 +69,7 @@ const SecondaryButton = styled.a`
 	border: 2px dashed var(--color-outline);
 	border-radius: 0;
 	font-size: var(--typescale-label-large-size);
-	font-weight: 700;
+	font-weight: var(--font-weight-bold);
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
 	text-decoration: none;
@@ -108,6 +81,11 @@ const SecondaryButton = styled.a`
 	&:hover {
 		border-color: var(--color-primary);
 		color: var(--color-primary);
+	}
+
+	&:focus-visible {
+		outline: 2px solid var(--color-primary);
+		outline-offset: 3px;
 	}
 `
 

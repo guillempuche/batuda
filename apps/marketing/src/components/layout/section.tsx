@@ -1,6 +1,6 @@
 import styled from 'styled-components'
 
-const SectionWrapper = styled.section.attrs({ 'data-component': 'Section' })<{
+const SectionWrapper = styled.section.withConfig({ displayName: 'Section' })<{
 	$bg?: string
 }>`
 	padding: var(--space-4xl) var(--page-gutter);
@@ -16,11 +16,16 @@ const SectionHeading = styled.h2`
 	font-family: var(--font-display);
 	font-size: var(--typescale-headline-large-size);
 	line-height: var(--typescale-headline-large-line);
-	font-weight: 700;
+	font-weight: var(--font-weight-bold);
 	letter-spacing: 0.04em;
 	text-transform: uppercase;
 	color: var(--color-on-surface);
 	margin-bottom: var(--space-xs);
+
+	@media (max-width: 767px) {
+		font-size: var(--typescale-headline-medium-size);
+		line-height: var(--typescale-headline-medium-line);
+	}
 `
 
 const SectionSubtitle = styled.p`
@@ -43,8 +48,14 @@ export function Section({
 	background?: string
 	children: React.ReactNode
 }) {
+	/* `exactOptionalPropertyTypes` rejects `undefined` for optional props, so
+	 * spread each one only when it has a value rather than passing
+	 * `id={undefined}` / `$bg={undefined}`. */
 	return (
-		<SectionWrapper id={id} $bg={background}>
+		<SectionWrapper
+			{...(id !== undefined && { id })}
+			{...(background !== undefined && { $bg: background })}
+		>
 			<SectionInner>
 				{title && <SectionHeading>{title}</SectionHeading>}
 				{subtitle && <SectionSubtitle>{subtitle}</SectionSubtitle>}
