@@ -10,6 +10,7 @@
 			"**",
 			"!**/package.json",
 			"!.cache",
+			"!.claude/settings.local.json",
 			"!.output",
 			"!dist",
 			"!docs/repos",
