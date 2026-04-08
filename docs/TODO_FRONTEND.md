@@ -4,6 +4,23 @@ Ordered implementation checklist for `apps/internal` (Forja) and `apps/marketing
 See [frontend.md](frontend.md) for internal app patterns. See [marketing.md](marketing.md) for public site.
 See [architecture.md](architecture.md) for data flow.
 
+## Design system direction
+
+Two apps, one system.
+
+- **Marketing (Engranatge)** — *the workshop*. Theatrical workshop metaphor (machine buttons, blueprints, pegboards, brushed metal). Storytelling for prospects. Bespoke scene components stay inside `apps/marketing/`.
+- **Forja (internal CRM)** — *the workbench*. Data-dense, keyboard-first, compact rows, command palette. No theater. Desktop-first productivity idiom (closer to Linear/Attio/Height than to stock MD3).
+
+**Shared layer (`packages/ui`)**:
+
+- Tokens (`tokens.css`) — colors, typography, spacing, shape, elevation, motion.
+- **`Pri*` primitives** — `PriButton`, `PriInput`, `PriSelect`, `PriDialog`, `PriMenu`, `PriTooltip`, `PriTabs`, `PriCheckbox`, `PriRadio`, `PriSwitch`, `PriToast`, `PriCombobox`, `PriPopover`. Headless Base UI wrapped with styled-components. The `Pri` prefix (short for "Primitive") marks them as shared, low-level building blocks — both marketing forms and Forja forms use the same `<PriInput>`.
+- Tiptap block schemas (`blocks/`).
+
+**Not shared**: workshop-specific aesthetic tokens (`--texture-brushed-metal`, `--elevation-workshop-*`) and scene components (`MachineButton`, `BlueprintSheet`, `ConveyorBelt`) stay in `apps/marketing/`. Forja gets its own CRM patterns (`DataTable`, `CommandPalette`, `Sidebar`, `KanbanBoard`, `Timeline`).
+
+**MD3 stance**: we keep MD3's *structural* concepts that marketing already uses — color roles, typescale, shape, spacing — but reject MD3's stock components (mobile-first, too airy for a data-dense CRM). Marketing diverges via bespoke scene components; Forja diverges via a desktop-dense, keyboard-first idiom. We do **not** import MD3 concepts the codebase isn't already using (state layers, density scales) — if Forja needs them later, we add them with evidence, not speculation.
+
 ---
 
 ## Phase 1 — Project setup (TanStack CLI scaffold)
@@ -29,7 +46,7 @@ See [architecture.md](architecture.md) for data flow.
   - [ ] Replace `src/styles.css` demo content — `@import '@engranatge/ui/tailwind.css'` + app-level reset
 - [ ] Adapt for monorepo:
   - [ ] `package.json`: set name to `@engranatge/internal`, add `@engranatge/domain: "workspace:*"`, `@engranatge/controllers: "workspace:*"`, `@engranatge/ui: "workspace:*"`
-  - [ ] `package.json`: add `styled-components`, `@base-ui-components/react`, `motion`, `motion-plus`, `@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/pm`, `react-map-gl`, `maplibre-gl`, `supercluster`, `effect`, `@chenglou/pretext`
+  - [ ] `package.json`: add `styled-components`, `@base-ui/react`, `motion`, `motion-plus`, `@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/pm`, `react-map-gl`, `maplibre-gl`, `supercluster`, `effect`, `@chenglou/pretext`
   - [ ] `package.json`: add devDep `@types/supercluster`
   - [ ] `tsconfig.json`: add `"extends": "../../tsconfig.base.json"`
 - [ ] Create `Dockerfile` and `Kraftfile` for Unikraft deployment (see PLAN.md)
@@ -38,7 +55,7 @@ See [architecture.md](architecture.md) for data flow.
 
 ## Phase 1b — packages/ui
 
-- [ ] Create `packages/ui/package.json` — `@engranatge/ui`, deps: `@tiptap/core`, `@tiptap/pm`, peerDeps: `tailwindcss`
+- [ ] Create `packages/ui/package.json` — `@engranatge/ui`, deps: `@tiptap/core`, `@tiptap/pm`, `@base-ui/react`, `styled-components`, peerDeps: `tailwindcss`, `react`, `react-dom`
 - [ ] Create `packages/ui/tsconfig.json` extending `../../tsconfig.base.json`
 - [ ] Create `packages/ui/src/tokens.css` — MD3 CSS custom properties (shared by both apps)
 - [ ] Create `packages/ui/src/tailwind.css` — `@import "tailwindcss"` + `@import "./tokens.css"` + `@theme` with breakpoints only (see frontend.md)
@@ -49,7 +66,10 @@ See [architecture.md](architecture.md) for data flow.
   - [ ] `pain-points.ts` — problem list items
   - [ ] `social-proof.ts` — testimonials
   - [ ] `index.ts` — re-exports all block extensions
-- [ ] Create `packages/ui/src/index.ts` — re-exports blocks
+- [ ] Create `packages/ui/src/pri/` — shared `Pri*` primitive components (see Phase 5)
+  - [ ] `index.ts` — re-exports all primitives
+- [ ] Add subpath export `"./pri"` to `packages/ui/package.json` exports map
+- [ ] Create `packages/ui/src/index.ts` — re-exports blocks (primitives live under `@engranatge/ui/pri` subpath)
 
 ## Phase 2 — Design tokens
 
@@ -59,16 +79,19 @@ See [architecture.md](architecture.md) for data flow.
   - [ ] MD3 color tokens — light scheme (primary, secondary, tertiary, error, surface, background, outline)
   - [ ] MD3 color tokens — dark scheme (`@media prefers-color-scheme: dark`)
   - [ ] Pipeline status color tokens (prospect, contacted, responded, meeting, proposal, client, closed, dead)
-  - [ ] Fluid spacing scale (--space-1 through --space-16 using clamp())
-  - [ ] Shape tokens (none, extra-small, small, medium, large, extra-large, full)
+  - [ ] Semantic status aliases over MD3 roles (active → primary, won → secondary, lost → on-surface-variant, pending → tertiary)
+  - [ ] Fluid spacing scale (semantic names: 3xs/2xs/xs/sm/md/lg/xl/2xl/3xl/4xl/5xl, all `clamp()`)
+  - [ ] Shape tokens (2xs, xs, sm, md, lg, full)
   - [ ] Elevation tokens (0–3)
   - [ ] Breakpoint tokens (--bp-sm, --bp-md, --bp-lg, --bp-xl)
   - [ ] Page layout tokens (--page-gutter, --page-max-width, --card-radius)
+- [ ] Keep marketing-only aesthetic tokens **out** of shared `tokens.css` — `--texture-brushed-metal`, `--elevation-workshop-*` live in `apps/marketing/src/styles.css`
 - [ ] Create `src/styles/global.css`
   - [ ] Import tokens.css
   - [ ] CSS reset (box-sizing, margin 0, font-family)
   - [ ] Base body styles using color and typography tokens
   - [ ] Scrollbar styles
+  - [ ] `font-variant-numeric: tabular-nums` on `.numeric` utility for tables
 
 ## Phase 3 — Layout and navigation
 
@@ -106,17 +129,49 @@ Each component: styled-components co-located in `.tsx`, all values from CSS cust
   - [ ] Click marker → popup with company summary + link to detail
   - [ ] MapTiler free tier for vector tiles (`MAPTILER_KEY` env var)
 
-## Phase 5 — Pri* primitives (BaseUI + styled-components)
+## Phase 5 — Pri* primitives (Base UI + styled-components, shared in packages/ui)
 
-Install `@base-ui-components/react` and wrap each with styled-components in `src/components/pri/`.
+Primitives live in `packages/ui/src/pri/` and are consumed by **both** Forja and Marketing via the `@engranatge/ui/pri` subpath export. The `Pri` prefix (short for "Primitive") marks them as shared, low-level building blocks — one canonical `<PriInput>` for the whole monorepo.
 
-- [ ] `PriButton` — variants: filled, outlined, text
-- [ ] `PriInput` — text input with label + error state
-- [ ] `PriSelect` — status, region, industry, priority dropdowns
-- [ ] `PriDialog` — for log interaction modal, quick-edit
-- [ ] `PriTabs` — company detail tabs
-- [ ] `PriCheckbox` — task completion
-- [ ] `PriMenu` — action menu on company cards: edit, log interaction, add task
+Naming: always `Pri` + PascalCase component name (`PriButton`, not `PrimitiveButton` or `UiButton`). Filenames: kebab-case (`pri-button.tsx`). Compound primitives mirror Base UI's namespace exactly (e.g. `PriSelect.Root`, `PriSelect.Trigger`, `PriSelect.Popup`).
+
+Each primitive:
+
+- Wraps a headless Base UI primitive with styled-components
+- All values from CSS custom property tokens (no hex, no hardcoded px)
+- Variants via `$`-prefixed transient props (`$variant`, `$size`)
+- No business logic, no data fetching, no i18n — pure visual primitive
+- **Neutral defaults only**: structural tokens (shape, focus ring, spacing, typescale, transitions). No theme-specific gradients, textures, or accent colors. Consumers compose styled overrides on top to apply their own visual language (e.g. marketing's metal-skin wrappers).
+
+### Lazy-extraction rule
+
+A primitive is created **only** when at least one real consumer exists in `apps/marketing` or `apps/internal`. No speculative primitives — if Forja later needs a primitive that doesn't exist yet, we extract it then with a real consumer driving the API.
+
+This avoids the trap of building 14 primitives up-front, half of which would never be used or would need rework once a real consumer appears.
+
+### Status
+
+| Primitive        | Status    | First consumer                                             |
+| ---------------- | --------- | ---------------------------------------------------------- |
+| `PriSelect`      | extracted | `apps/marketing/src/components/layout/language-select.tsx` |
+| `PriButton`      | stub      | Forja `FormField`, marketing CTAs (if refactored)          |
+| `PriInput`       | stub      | Forja forms                                                |
+| `PriDialog`      | stub      | Forja quick-edit modals                                    |
+| `PriMenu`        | stub      | Forja row action menus                                     |
+| `PriTooltip`     | stub      | Forja keyboard-shortcut hints                              |
+| `PriPopover`     | stub      | Forja filter popovers                                      |
+| `PriTabs`        | stub      | Forja company detail tabs                                  |
+| `PriCheckbox`    | stub      | Forja task completion                                      |
+| `PriCombobox`    | stub      | Forja contact autocomplete                                 |
+| `PriRadio`       | stub      | Forja form options                                         |
+| `PriSwitch`      | stub      | Forja settings toggles                                     |
+| `PriToast`       | stub      | Forja success/error notifications                          |
+| `PriAlertDialog` | stub      | Forja destructive confirmations                            |
+
+### Consumption
+
+- Marketing's theatrical components (`MachineButton`, `BlueprintSheet`, `ConveyorBelt`) stay bespoke — they're not primitives, they're scene components
+- Forja imports everything from `@engranatge/ui/pri` — no local primitives
 
 ## Phase 5c — State management (effect-atom + SSR)
 

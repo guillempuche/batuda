@@ -349,7 +349,7 @@ BaseUI provides headless, accessible components. Style them with styled-componen
 
 ```tsx
 // src/components/pri/PriButton.tsx
-import * as Button from '@base-ui-components/react/button'
+import { Button } from '@base-ui/react/button'
 import styled, { css } from 'styled-components'
 
 const variants = {

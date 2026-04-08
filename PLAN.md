@@ -1307,7 +1307,7 @@ Replace `src/styles.css` content — remove Tailwind `@import "tailwindcss"` and
     "@tanstack/react-router": "latest",
     "@tanstack/react-start": "latest",
     "@tanstack/router-plugin": "^1.132.0",
-    "@base-ui-components/react": "^1.0.0",
+    "@base-ui/react": "^1.3.0",
     "@tiptap/react": "^3.21.0",
     "@tiptap/starter-kit": "^3.21.0",
     "@tiptap/pm": "^3.21.0",
