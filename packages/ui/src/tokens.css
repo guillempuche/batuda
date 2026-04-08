@@ -11,6 +11,8 @@
 	/* --- Secondary — Olive Green --- */
 	--color-secondary: #2e6b4f;
 	--color-on-secondary: #ffffff;
+	--color-secondary-container: #d8e4d0;
+	--color-on-secondary-container: #1e3524;
 
 	/* --- Error --- */
 	--color-error: #ba1a1a;
@@ -44,9 +46,15 @@
 	--font-display: "Barlow Condensed", system-ui, -apple-system, sans-serif;
 	--font-body: "Barlow", system-ui, -apple-system, sans-serif;
 
+	/* Font weight ladder — numeric axis, orthogonal to typescale role weights */
+	--font-weight-regular: 400;
+	--font-weight-medium: 500;
+	--font-weight-bold: 700;
+
 	/* Display */
 	--typescale-display-large-size: 3.5625rem;
 	--typescale-display-large-line: 4rem;
+	--typescale-display-large-weight: 700;
 	--typescale-display-large-tracking: -0.016rem;
 
 	--typescale-display-medium-size: 2.8125rem;
@@ -140,16 +148,9 @@
 	--shape-full: 999px;
 
 	/* ============================================================
-	   Elevation — box shadows
+	   Elevation — workshop top-lit metal with inset highlight
 	   ============================================================ */
 
-	--elevation-sm: 0 1px 2px 0 rgb(0 0 0 / 0.08);
-	--elevation-md:
-		0 1px 2px 0 rgb(0 0 0 / 0.08), 0 2px 6px 2px rgb(0 0 0 / 0.08);
-	--elevation-lg:
-		0 4px 8px 3px rgb(0 0 0 / 0.12), 0 1px 3px 0 rgb(0 0 0 / 0.12);
-
-	/* Workshop — top-lit metal with inset highlight */
 	--elevation-workshop-sm:
 		inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 3px rgba(0, 0, 0, 0.12);
 	--elevation-workshop-md:
