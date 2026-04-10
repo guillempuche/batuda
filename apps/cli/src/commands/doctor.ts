@@ -54,7 +54,7 @@ const composeCheck: Check = {
 		'docker',
 		'compose',
 		'-f',
-		resolve(ROOT, 'docker/db/docker-compose.yml'),
+		resolve(ROOT, 'docker/docker-compose.yml'),
 		'ps',
 		'--status',
 		'running',
@@ -125,6 +125,26 @@ const httpCheck = (name: string, port: number, hint: string): Check => ({
 	),
 })
 
+const storageCheck: Check = {
+	name: 'Storage (MinIO)',
+	run: Effect.tryPromise({
+		try: () =>
+			fetch('http://localhost:9000/minio/health/live', {
+				signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
+			}),
+		catch: () => null,
+	}).pipe(
+		Effect.map(res =>
+			res?.ok
+				? ok('listening on :9000')
+				: warn('stopped → run `pnpm cli services up`'),
+		),
+		Effect.catch(() =>
+			Effect.succeed(warn('stopped → run `pnpm cli services up`')),
+		),
+	),
+}
+
 const allChecks: Check[] = [
 	fileCheck('.env', '.env file'),
 	fileCheck('apps/cli/.env', 'apps/cli/.env file'),
@@ -132,6 +152,7 @@ const allChecks: Check[] = [
 	composeCheck,
 	dbConnectionCheck,
 	migrationCheck,
+	storageCheck,
 	httpCheck('Server', 3000, 'not running → run `pnpm dev:server`'),
 ]
 

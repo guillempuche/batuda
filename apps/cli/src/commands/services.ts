@@ -6,7 +6,7 @@ import { SqlClient } from 'effect/unstable/sql'
 import { PgLive } from '../db'
 import { exec, ROOT } from '../shell'
 
-const COMPOSE_FILE = resolve(ROOT, 'docker/db/docker-compose.yml')
+const COMPOSE_FILE = resolve(ROOT, 'docker/docker-compose.yml')
 
 const compose = (...args: string[]) =>
 	exec('docker', 'compose', '-f', COMPOSE_FILE, ...args).pipe(

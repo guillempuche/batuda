@@ -49,9 +49,43 @@ const seedCommand = Command.make(
 				if (reset) yield* seedReset
 				const counts = yield* seed(preset)
 				if (auth) yield* seedAuth
+				yield* Console.log('')
 				yield* Console.log(
 					`Seeded (${preset}): ${counts.products} products, ${counts.companies} companies, ${counts.contacts} contacts, ${counts.interactions} interactions, ${counts.tasks} tasks, ${counts.documents} documents, ${counts.proposals} proposals, ${counts.pages} pages`,
 				)
+				yield* Console.log('')
+				yield* Console.log('─── Access hints ───────────────────────────────')
+				yield* Console.log(
+					'  API server:   pnpm dev:server   → http://localhost:3010',
+				)
+				yield* Console.log(
+					'  Forja web:    pnpm dev:internal → http://localhost:3000',
+				)
+				yield* Console.log(
+					'  Marketing:    pnpm dev:marketing → http://localhost:3001',
+				)
+				yield* Console.log('')
+				yield* Console.log('  API docs (Scalar): http://localhost:3010/docs')
+				yield* Console.log(
+					'  OpenAPI spec:      http://localhost:3010/openapi.json',
+				)
+				yield* Console.log(
+					'  Auth docs:         http://localhost:3010/auth/reference',
+				)
+				yield* Console.log(
+					'  Auth OpenAPI:      http://localhost:3010/auth/open-api/generate-schema',
+				)
+				yield* Console.log('')
+				yield* Console.log(
+					'  Health check:    curl http://localhost:3010/health',
+				)
+				yield* Console.log(
+					'  List companies:  curl http://localhost:3010/v1/companies',
+				)
+				yield* Console.log(
+					'  Docker DB:       docker exec -it engranatge-postgres psql -U engranatge',
+				)
+				yield* Console.log('────────────────────────────────────────────────')
 			}),
 		),
 ).pipe(

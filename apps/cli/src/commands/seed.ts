@@ -546,11 +546,16 @@ export const seedAuth = Effect.gen(function* () {
 	)
 
 	const pool = new pg.Pool({ connectionString: Redacted.value(dbUrl) })
+	// Mirrors `apps/server/src/lib/auth.ts`: `emailAndPassword.disableSignUp`
+	// is `true` so the public `/auth/sign-up/email` endpoint is closed. The
+	// seed uses the admin plugin's server-side `auth.api.createUser`, which
+	// bypasses the signup gate entirely — this is the same escape hatch the
+	// invite flow will use in production to provision a new team member.
 	const auth = betterAuth({
 		basePath: '/auth',
 		secret,
 		database: { dialect: new PostgresDialect({ pool }), type: 'postgres' },
-		emailAndPassword: { enabled: true },
+		emailAndPassword: { enabled: true, disableSignUp: true },
 		user: {
 			additionalFields: {
 				isAgent: { type: 'boolean', required: false, defaultValue: false },
@@ -564,11 +569,37 @@ export const seedAuth = Effect.gen(function* () {
 		],
 	})
 
-	yield* Effect.promise(() => auth.api.signUpEmail({ body: TEST_USER })).pipe(
+	yield* Effect.promise(() =>
+		auth.api.createUser({
+			body: {
+				email: TEST_USER.email,
+				password: TEST_USER.password,
+				name: TEST_USER.name,
+				role: 'admin',
+			},
+		}),
+	).pipe(
 		Effect.tap(() => Effect.logInfo(`Created auth user: ${TEST_USER.email}`)),
 		Effect.catchCause(() =>
 			Effect.logInfo(`Auth user already exists: ${TEST_USER.email}`),
 		),
+	)
+
+	yield* Effect.logInfo('')
+	yield* Effect.logInfo('┌─── Auth credentials ───────────────────────┐')
+	yield* Effect.logInfo(`│  Email:    ${TEST_USER.email.padEnd(31)}│`)
+	yield* Effect.logInfo(`│  Password: ${TEST_USER.password.padEnd(31)}│`)
+	yield* Effect.logInfo(`│  Name:     ${TEST_USER.name.padEnd(31)}│`)
+	yield* Effect.logInfo('│  Role:     admin                           │')
+	yield* Effect.logInfo('└────────────────────────────────────────────┘')
+	yield* Effect.logInfo('')
+	yield* Effect.logInfo('Sign in:')
+	yield* Effect.logInfo(
+		`  curl -X POST http://localhost:3010/auth/sign-in/email \\`,
+	)
+	yield* Effect.logInfo(`    -H 'content-type: application/json' \\`)
+	yield* Effect.logInfo(
+		`    -d '{"email":"${TEST_USER.email}","password":"${TEST_USER.password}"}'`,
 	)
 
 	yield* Effect.promise(() => pool.end())
@@ -598,15 +629,22 @@ export const seed = (preset: Preset) =>
 			id: string
 			slug: string
 		}>`INSERT INTO products ${sql.insert(normalizeRows(products))} RETURNING id, slug`
+		for (const p of insertedProducts) {
+			yield* Effect.logInfo(`  product: ${p.slug} (${p.id})`)
+		}
 
 		// 2. Companies
 		yield* Effect.logInfo(`Seeding companies (${preset})...`)
 		const insertedCompanies = yield* sql<{
 			id: string
 			slug: string
-		}>`INSERT INTO companies ${sql.insert(normalizeRows(companies))} RETURNING id, slug`
+			status: string
+		}>`INSERT INTO companies ${sql.insert(normalizeRows(companies))} RETURNING id, slug, status`
 
 		const companyMap = new Map(insertedCompanies.map(c => [c.slug, c.id]))
+		for (const c of insertedCompanies) {
+			yield* Effect.logInfo(`  company: ${c.slug} [${c.status}] (${c.id})`)
+		}
 
 		// 3. Contacts
 		yield* Effect.logInfo('Seeding contacts...')
@@ -618,17 +656,37 @@ export const seed = (preset: Preset) =>
 		}>`INSERT INTO contacts ${sql.insert(normalizeRows(data.contacts))} RETURNING id, name`
 
 		const contactMap = new Map(insertedContacts.map(c => [c.name, c.id]))
+		for (const c of insertedContacts) {
+			yield* Effect.logInfo(`  contact: ${c.name} (${c.id})`)
+		}
 
 		// 4. Interactions (rebuild with real contactMap for contactId references)
 		yield* Effect.logInfo('Seeding interactions...')
 		const dataWithContacts = getPresetData(preset, companyMap, contactMap)
 		const insertedInteractions = yield* sql<{
 			id: string
-		}>`INSERT INTO interactions ${sql.insert(normalizeRows(dataWithContacts.interactions))} RETURNING id`
+			channel: string
+			type: string
+		}>`INSERT INTO interactions ${sql.insert(normalizeRows(dataWithContacts.interactions))} RETURNING id, channel, type`
+		for (const i of insertedInteractions.slice(0, 3)) {
+			yield* Effect.logInfo(`  interaction: ${i.channel}/${i.type} (${i.id})`)
+		}
+		if (insertedInteractions.length > 3) {
+			yield* Effect.logInfo(`  ... and ${insertedInteractions.length - 3} more`)
+		}
 
 		// 5. Tasks
 		yield* Effect.logInfo('Seeding tasks...')
-		yield* sql`INSERT INTO tasks ${sql.insert(normalizeRows(dataWithContacts.tasks))}`
+		const insertedTasks = yield* sql<{
+			id: string
+			title: string
+		}>`INSERT INTO tasks ${sql.insert(normalizeRows(dataWithContacts.tasks))} RETURNING id, title`
+		for (const t of insertedTasks.slice(0, 3)) {
+			yield* Effect.logInfo(`  task: ${t.title} (${t.id})`)
+		}
+		if (insertedTasks.length > 3) {
+			yield* Effect.logInfo(`  ... and ${insertedTasks.length - 3} more`)
+		}
 
 		// Full preset extras
 		if (preset === 'full') {
@@ -812,7 +870,7 @@ export const seed = (preset: Preset) =>
 			companies: insertedCompanies.length,
 			contacts: insertedContacts.length,
 			interactions: insertedInteractions.length,
-			tasks: dataWithContacts.tasks.length,
+			tasks: insertedTasks.length,
 			documents: preset === 'full' ? 4 : 0,
 			proposals: preset === 'full' ? 2 : 0,
 			pages: preset === 'full' ? 2 : 0,
