@@ -11,6 +11,10 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # Copy workspace manifests first for layer caching
 COPY ./package.json ./pnpm-lock.yaml ./pnpm-workspace.yaml ./tsconfig.base.json ./
+
+# Disable lefthook in Docker build (no git available)
+RUN sed -i 's/"prepare": "lefthook install"/"prepare": ""/' package.json
+
 COPY ./apps/server ./apps/server
 COPY ./packages ./packages
 
@@ -20,14 +24,20 @@ RUN --mount=type=cache,target=/root/.pnpm-store \
 RUN pnpm --filter @engranatge/domain build && \
     pnpm --filter @engranatge/server build
 
-# Stage 2 — runtime
+# Stage 2 — runtime (production-only, no devDependencies or source)
 FROM node:24-alpine
 
 ENV NODE_OPTIONS=--no-network-family-autoselection
 ENV NODE_ENV=production
 ENV PORT=3000
 
+# Run as non-root for security
+RUN addgroup -g 1001 -S app && adduser -u 1001 -S app -G app
+
 WORKDIR /app
-COPY --from=build /repo/apps/server/dist /app/dist
+
+COPY --from=build --chown=app:app /repo/apps/server/dist /app/dist
+
+USER app
 
 CMD ["node", "dist/main.mjs"]
