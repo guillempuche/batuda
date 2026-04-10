@@ -72,6 +72,10 @@ jobs:
           retry_wait_seconds: 30
           timeout_minutes: 10
           command: |
+            # Rolling update: new instance spins up, then old one is removed.
+            # When using --service, cannot specify -p (port already defined).
+            # For first deployment, KRAFTCLOUD_SERVER_SERVICE is empty — include -d and -p.
+
             if [ -n "${{ vars.KRAFTCLOUD_SERVER_SERVICE }}" ]; then
               kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
                 --timeout 5m \
@@ -81,6 +85,18 @@ jobs:
                 -M 512 \
                 -e NODE_ENV=production \
                 -e PORT=3000 \
+                -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+                -e BETTER_AUTH_SECRET="${{ secrets.BETTER_AUTH_SECRET }}" \
+                -e BETTER_AUTH_BASE_URL="${{ vars.BETTER_AUTH_BASE_URL }}" \
+                -e ALLOWED_ORIGINS="${{ vars.ALLOWED_ORIGINS }}" \
+                -e STORAGE_ENDPOINT="${{ vars.STORAGE_ENDPOINT }}" \
+                -e STORAGE_REGION="${{ vars.STORAGE_REGION }}" \
+                -e STORAGE_ACCESS_KEY_ID="${{ secrets.STORAGE_ACCESS_KEY_ID }}" \
+                -e STORAGE_SECRET_ACCESS_KEY="${{ secrets.STORAGE_SECRET_ACCESS_KEY }}" \
+                -e STORAGE_BUCKET="${{ vars.STORAGE_BUCKET }}" \
+                -e EMAIL_API_KEY="${{ secrets.EMAIL_API_KEY }}" \
+                -e EMAIL_WEBHOOK_SECRET="${{ secrets.EMAIL_WEBHOOK_SECRET }}" \
+                -e EMAIL_PROVIDER="${{ vars.EMAIL_PROVIDER }}" \
                 .
             else
               kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
@@ -91,6 +107,18 @@ jobs:
                 -M 512 \
                 -e NODE_ENV=production \
                 -e PORT=3000 \
+                -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+                -e BETTER_AUTH_SECRET="${{ secrets.BETTER_AUTH_SECRET }}" \
+                -e BETTER_AUTH_BASE_URL="${{ vars.BETTER_AUTH_BASE_URL }}" \
+                -e ALLOWED_ORIGINS="${{ vars.ALLOWED_ORIGINS }}" \
+                -e STORAGE_ENDPOINT="${{ vars.STORAGE_ENDPOINT }}" \
+                -e STORAGE_REGION="${{ vars.STORAGE_REGION }}" \
+                -e STORAGE_ACCESS_KEY_ID="${{ secrets.STORAGE_ACCESS_KEY_ID }}" \
+                -e STORAGE_SECRET_ACCESS_KEY="${{ secrets.STORAGE_SECRET_ACCESS_KEY }}" \
+                -e STORAGE_BUCKET="${{ vars.STORAGE_BUCKET }}" \
+                -e EMAIL_API_KEY="${{ secrets.EMAIL_API_KEY }}" \
+                -e EMAIL_WEBHOOK_SECRET="${{ secrets.EMAIL_WEBHOOK_SECRET }}" \
+                -e EMAIL_PROVIDER="${{ vars.EMAIL_PROVIDER }}" \
                 .
             fi
 
