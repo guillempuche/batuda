@@ -1,5 +1,8 @@
 {
 	"mcpServers": {
+		"cloudflare-api": {
+			"url": "https://mcp.cloudflare.com/mcp"
+		},
 		"forja": {
 			"command": "pnpm",
 			"args": ["--filter", "@engranatge/server", "dev:mcp"],
