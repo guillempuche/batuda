@@ -1,4 +1,9 @@
 export { ApiKey, ApiKeyId } from './api-keys'
+export {
+	CallRecording,
+	CallRecordingId,
+	TranscriptStatus,
+} from './call-recordings'
 export { Company, CompanyId } from './companies'
 export { Contact, ContactId, EmailStatus } from './contacts'
 export { Document, DocumentId } from './documents'

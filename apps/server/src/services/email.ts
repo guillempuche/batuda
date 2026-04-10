@@ -2,13 +2,17 @@ import { Effect, Layer, ServiceMap } from 'effect'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { EmailError, EmailSuppressed, NotFound } from '../errors.js'
+import { EmailError, EmailSuppressed, NotFound } from '@engranatge/controllers'
+
 import { EmailProvider } from './email-provider.js'
 import { WebhookService } from './webhooks.js'
 
+// PgClient.transformResultNames in apps/server/src/db/client.ts converts
+// snake_case columns to camelCase on read, so every row type in this file
+// is camelCase even though the SQL selects use snake_case.
 type ContactSuppressionRow = {
-	email_status: 'unknown' | 'valid' | 'bounced' | 'complained'
-	email_status_reason: string | null
+	emailStatus: 'unknown' | 'valid' | 'bounced' | 'complained'
+	emailStatusReason: string | null
 }
 
 const firstRecipient = (to: string | string[]): string =>
@@ -36,14 +40,13 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					const row = rows[0]
 					if (
 						row &&
-						(row.email_status === 'bounced' ||
-							row.email_status === 'complained')
+						(row.emailStatus === 'bounced' || row.emailStatus === 'complained')
 					) {
 						return yield* new EmailSuppressed({
 							contactId,
 							recipient: firstRecipient(recipient),
-							status: row.email_status,
-							reason: row.email_status_reason,
+							status: row.emailStatus,
+							reason: row.emailStatusReason,
 						})
 					}
 				})
@@ -172,13 +175,13 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							})
 						}
 						const link = links[0] as {
-							agentmail_inbox_id: string
-							company_id: string | null
-							contact_id: string | null
+							agentmailInboxId: string
+							companyId: string | null
+							contactId: string | null
 						}
 
 						const thread = yield* provider.getThread(
-							link.agentmail_inbox_id,
+							link.agentmailInboxId,
 							agentmailThreadId,
 						)
 						const lastMessage = thread.messages[thread.messages.length - 1]
@@ -194,15 +197,12 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							: lastMessage.to
 
 						// Fast-path cache check
-						if (link.contact_id) {
-							yield* assertContactNotSuppressed(
-								link.contact_id,
-								replyRecipients,
-							)
+						if (link.contactId) {
+							yield* assertContactNotSuppressed(link.contactId, replyRecipients)
 						}
 
 						const result = yield* provider
-							.reply(link.agentmail_inbox_id, lastMessage.messageId, {
+							.reply(link.agentmailInboxId, lastMessage.messageId, {
 								text: body.text,
 								html: body.html,
 							})
@@ -212,17 +212,17 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 										if (err.kind !== 'suppressed') {
 											return yield* Effect.fail(err)
 										}
-										if (link.contact_id) {
+										if (link.contactId) {
 											yield* sql`
 												UPDATE contacts
 												SET email_status = 'bounced',
 												    email_status_reason = ${err.message},
 												    email_status_updated_at = now()
-												WHERE id = ${link.contact_id}
+												WHERE id = ${link.contactId}
 											`
 										}
 										return yield* new EmailSuppressed({
-											contactId: link.contact_id,
+											contactId: link.contactId,
 											recipient:
 												err.recipient ?? firstRecipient(replyRecipients),
 											status: 'bounced',
@@ -232,11 +232,11 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								),
 							)
 
-						if (link.company_id) {
+						if (link.companyId) {
 							yield* sql`
 								INSERT INTO interactions ${sql.insert({
-									companyId: link.company_id,
-									contactId: link.contact_id,
+									companyId: link.companyId,
+									contactId: link.contactId,
 									date: new Date(),
 									channel: 'email',
 									direction: 'outbound',
@@ -252,7 +252,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							yield* sql`
 								UPDATE companies
 								SET last_contacted_at = now(), updated_at = now()
-								WHERE id = ${link.company_id}
+								WHERE id = ${link.companyId}
 							`
 						}
 
@@ -260,10 +260,10 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							INSERT INTO email_messages ${sql.insert({
 								agentmailMessageId: result.messageId,
 								agentmailThreadId,
-								agentmailInboxId: link.agentmail_inbox_id,
+								agentmailInboxId: link.agentmailInboxId,
 								direction: 'outbound',
-								companyId: link.company_id,
-								contactId: link.contact_id,
+								companyId: link.companyId,
+								contactId: link.contactId,
 								recipients: JSON.stringify(replyRecipients),
 								status: 'sent',
 								statusUpdatedAt: new Date(),
@@ -299,25 +299,25 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 
 						if (existingLinks.length > 0) {
 							const link = existingLinks[0] as {
-								company_id: string | null
-								contact_id: string | null
+								companyId: string | null
+								contactId: string | null
 							}
-							companyId = link.company_id
-							contactId = link.contact_id
+							companyId = link.companyId
+							contactId = link.contactId
 						} else {
 							const contacts = yield* sql`
-								SELECT c.id as contact_id, c.company_id
+								SELECT c.id, c.company_id
 								FROM contacts c
 								WHERE c.email = ${payload.from}
 								LIMIT 1
 							`
 							if (contacts.length > 0) {
 								const contact = contacts[0] as {
-									contact_id: string
-									company_id: string
+									id: string
+									companyId: string
 								}
-								contactId = contact.contact_id
-								companyId = contact.company_id
+								contactId = contact.id
+								companyId = contact.companyId
 							}
 
 							yield* sql`
@@ -551,13 +551,13 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							})
 						}
 						const link = links[0] as {
-							agentmail_inbox_id: string
-							company_id: string | null
-							contact_id: string | null
+							agentmailInboxId: string
+							companyId: string | null
+							contactId: string | null
 						}
 
 						const thread = yield* provider.getThread(
-							link.agentmail_inbox_id,
+							link.agentmailInboxId,
 							agentmailThreadId,
 						)
 
@@ -570,14 +570,14 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						const statusByMessageId = new Map(
 							(
 								storedMessages as Array<{
-									agentmail_message_id: string
+									agentmailMessageId: string
 									status: string
-									status_reason: string | null
-									bounce_type: string | null
-									bounce_sub_type: string | null
-									status_updated_at: Date
+									statusReason: string | null
+									bounceType: string | null
+									bounceSubType: string | null
+									statusUpdatedAt: Date
 								}>
-							).map(m => [m.agentmail_message_id, m]),
+							).map(m => [m.agentmailMessageId, m]),
 						)
 
 						const enrichedMessages = thread.messages.map(m => ({
@@ -588,8 +588,8 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						return {
 							...thread,
 							messages: enrichedMessages,
-							companyId: link.company_id,
-							contactId: link.contact_id,
+							companyId: link.companyId,
+							contactId: link.contactId,
 						}
 					}),
 

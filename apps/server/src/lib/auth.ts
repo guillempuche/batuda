@@ -23,7 +23,15 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 				dialect: new PostgresDialect({ pool }),
 				type: 'postgres',
 			},
-			emailAndPassword: { enabled: true },
+			// Sign-up is invite-only: the public `/auth/sign-up/email` endpoint
+			// is disabled (Better-Auth returns 400 `Email and password sign up
+			// is not enabled` — see `sign-up.ts:181-187` in the vendored
+			// source). New users must be created programmatically via the
+			// admin plugin (`auth.api.createUser`) by an already-authenticated
+			// admin or by a trusted server caller using an API key. See
+			// `docs/backend.md#authentication-better-auth` for the invite
+			// flow and `apps/cli/src/commands/seed.ts` for a working example.
+			emailAndPassword: { enabled: true, disableSignUp: true },
 			user: {
 				additionalFields: {
 					isAgent: {

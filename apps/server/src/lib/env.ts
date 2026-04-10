@@ -1,4 +1,4 @@
-import { Config, Effect, Layer, ServiceMap } from 'effect'
+import { Config, Effect, Layer, Schema, ServiceMap } from 'effect'
 
 export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 	make: Effect.gen(function* () {
@@ -23,9 +23,29 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 			Config.map(s => (s ? s.split(',').map(o => o.trim()) : [])),
 		)
 
-		const AGENTMAIL_API_KEY = yield* Config.redacted('AGENTMAIL_API_KEY')
-		const AGENTMAIL_WEBHOOK_SECRET = yield* Config.option(
-			Config.redacted('AGENTMAIL_WEBHOOK_SECRET'),
+		// S3-compatible object storage. Same code path serves MinIO (local
+		// dev) and Cloudflare R2 (prod) — only the endpoint/credentials
+		// change. All required, no defaults: storage credentials must be
+		// configured explicitly per environment.
+		const STORAGE_ENDPOINT = yield* Config.string('STORAGE_ENDPOINT')
+		const STORAGE_REGION = yield* Config.string('STORAGE_REGION')
+		const STORAGE_ACCESS_KEY_ID = yield* Config.string('STORAGE_ACCESS_KEY_ID')
+		const STORAGE_SECRET_ACCESS_KEY = yield* Config.redacted(
+			'STORAGE_SECRET_ACCESS_KEY',
+		)
+		const STORAGE_BUCKET = yield* Config.string('STORAGE_BUCKET')
+
+		const EMAIL_API_KEY = yield* Config.redacted('EMAIL_API_KEY')
+		const EMAIL_WEBHOOK_SECRET = yield* Config.option(
+			Config.redacted('EMAIL_WEBHOOK_SECRET'),
+		)
+		// No default — the developer must explicitly choose `local-inbox`
+		// (dev catcher) or `agentmail` (real send). Forcing the choice
+		// prevents local config from silently leaking into prod and vice
+		// versa. The .env.example suggests `local-inbox` for local dev.
+		const EMAIL_PROVIDER = yield* Config.schema(
+			Schema.Literals(['local-inbox', 'agentmail']),
+			'EMAIL_PROVIDER',
 		)
 
 		return {
@@ -37,8 +57,14 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 			BETTER_AUTH_BASE_URL,
 			BETTER_AUTH_INSECURE_COOKIES,
 			ALLOWED_ORIGINS,
-			AGENTMAIL_API_KEY,
-			AGENTMAIL_WEBHOOK_SECRET,
+			STORAGE_ENDPOINT,
+			STORAGE_REGION,
+			STORAGE_ACCESS_KEY_ID,
+			STORAGE_SECRET_ACCESS_KEY,
+			STORAGE_BUCKET,
+			EMAIL_API_KEY,
+			EMAIL_WEBHOOK_SECRET,
+			EMAIL_PROVIDER,
 		} as const
 	}),
 }) {
