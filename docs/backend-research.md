@@ -10,7 +10,7 @@ For system context see [architecture.md](architecture.md). For backend structure
 
 ## 1. Overview
 
-`/research` is a **first-class resource**, not a subroute of `/companies` or any other table. A research run is a standalone artifact: query, structured findings, human-readable brief, sources, citations, cost. It may optionally be *anchored* to domain rows (companies, contacts, documents) but its existence does not depend on them.
+`/research` is a **first-class resource**, not a subroute of `/companies` or any other table. A research run is a standalone artifact: query, structured findings, human-readable brief, sources, citations, cost. It may optionally be *anchored* to domain rows (companies, contacts) but its existence does not depend on them.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -18,21 +18,20 @@ For system context see [architecture.md](architecture.md). For backend structure
 │                                                                   │
 │  POST /research         → creates a row, forks a fiber           │
 │  GET  /research/:id     → current state + findings               │
-│  GET  /research/:id/events  → SSE tail (from persisted log)      │
+│  GET  /research/:id/events  → SSE live stream (in-memory PubSub) │
 │                                                                   │
 │  ┌────────────────────────────────────────────────────────────┐  │
 │  │  ResearchService (fiber)                                   │  │
 │  │   resolve context → build prompt → LLM tool loop           │  │
-│  │   ↓ streams tool calls to research_run_events              │  │
-│  │   ↓ writes findings, brief_md, sources incrementally       │  │
+│  │   ↓ streams tool calls via PubSub → SSE                    │  │
+│  │   ↓ writes findings, brief_md, sources, tool_log at end    │  │
 │  └────────────────────────────────────────────────────────────┘  │
 │           │                                                       │
 │           ▼                                                       │
 │  ┌────────────────────────────────────────────────────────────┐  │
 │  │  Toolkit (shared by LLM loop and MCP)                      │  │
-│  │   web_search / web_scrape / web_extract / web_discover     │  │
-│  │   lookup_company_registry / lookup_company_report          │  │
-│  │   search_companies / get_company / search_contacts  (read) │  │
+│  │   web_search / web_read / web_discover                     │  │
+│  │   lookup_registry / crm_lookup                             │  │
 │  │   propose_update / attach_finding / propose_paid_action    │  │
 │  └────────────────────────────────────────────────────────────┘  │
 │           │                                                       │
@@ -45,7 +44,7 @@ For system context see [architecture.md](architecture.md). For backend structure
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-The LLM sees capability tools (`web_scrape`, not `firecrawl_scrape`). Providers are swapped at boot via env vars. The same toolkit is exposed to Claude Desktop through MCP.
+The LLM sees capability tools (`web_read`, not `firecrawl_scrape`). Providers are swapped at boot via env vars. The same toolkit is exposed to Claude Desktop through MCP.
 
 ---
 
@@ -56,17 +55,17 @@ The LLM sees capability tools (`web_scrape`, not `firecrawl_scrape`). Providers 
 - **Cross-topic**: one endpoint handles "enrich this company," "find leads matching a description," "find competitors of X," "check registry data for a NIF." No per-topic routes.
 - **Tech-agnostic**: every external capability is an interface. Firecrawl, Exa, Tavily, Brave, libreBORME, einforma, Claude's native web_search are *implementations*.
 - **Links as source of truth**: every claim carries inline citations pointing at sources with content hashes and archived copies. A user can always answer "where did this come from?" and "is it still true?"
-- **Cost-aware**: tiered tools; per-run and per-day budget enforcement at the runtime level, not just in prompts. Default = strict, no paid spend without opt-in.
+- **Cost-aware**: tiered tools; per-run and per-day budget enforcement at the runtime level, not just in prompts. Default = €20/month cap, €5/run paid budget, auto-approved within budget.
 - **Safety rails**: research never mutates domain rows directly. It proposes updates that humans accept.
 - **Frontend-friendly**: users interact via the Forja UI; the server runs the agent loop, the browser streams tool calls via SSE.
 - **MCP parity**: Claude Desktop users reach the same capabilities via MCP tools + prompts.
 
 ### Non-goals (v1)
 
-- **No internal corpus**: no pgvector, no embeddings over Forja's own data, no RAG on interactions/documents/emails. Research is about pulling from the outside. CRM-read tools (`search_companies`, `get_company`, ...) stay because they are relational lookups, not corpus search.
+- **No internal corpus**: no pgvector, no embeddings over Forja's own data, no RAG on interactions/documents/emails. Research is about pulling from the outside. `crm_lookup` stays because it's a relational lookup, not corpus search.
 - **No multi-agent orchestration**: one LLM loop with a broad toolkit. No coordinator/sub-agent split.
 - **No agentic framework**: no LangChain, Mastra, LangGraph. Effect's `LanguageModel` + `Toolkit` + `Stream` is the whole loop.
-- **No scheduled watchers** (v1). Added in a later phase.
+- **No scheduled watchers** (v1).
 - **No knowledge graph** of discovered entities (v1). The shape leaves room to add one later.
 
 ---
@@ -81,8 +80,8 @@ POST /research
   query: string,                         // always required — the free-text question
   mode: 'deep',                          // v1 has a single mode (see §4.2)
   context?: {
-    subjects?: Array<{                   // anchor the run to known rows
-      table: 'companies' | 'contacts' | 'documents'
+    subjects?: Array<{                   // anchor the run to existing CRM rows
+      table: 'companies' | 'contacts'   // v1: just these two
       id: string
     }>
     selector?: {                         // or: "run for each row matching this filter"
@@ -108,7 +107,7 @@ POST /research
 { "query": "Catalan agroecology cooperatives complaining about spreadsheets in 2025" }
 ```
 
-No subjects, no selector. The LLM runs `web_search` → `web_scrape` → `search_companies` (to dedupe against Forja) → produces a list of new prospects. Findings live standalone; user imports matches.
+No subjects, no selector. The LLM runs `web_search` → `web_read` → `crm_lookup` (to dedupe against Forja) → produces a list of new prospects. Findings live standalone; user imports matches.
 
 ### 3.2 Subject-anchored
 
@@ -131,7 +130,7 @@ Server resolves the subject into a frozen snapshot (with `expected_version`), in
 }
 ```
 
-Server expands the filter into N rows, creates a **parent** `research_runs` row (`kind='group'`) and N **leaf** rows (`kind='leaf'`, `parent_id=parent.id`). Each leaf is a subject-anchored run. Parent aggregates cost and status. Fan-out is bounded by `Effect.withConcurrency(n)` and by `paid_daily_cap_cents`.
+Server expands the filter into N rows, creates a **parent** `research_runs` row (`kind='group'`) and N **leaf** rows (`kind='leaf'`, `parent_id=parent.id`). Each leaf is a subject-anchored run. Parent aggregates cost and status. Fan-out is bounded by `Effect.withConcurrency(n)` and by `paid_monthly_cap_cents`.
 
 ---
 
@@ -139,14 +138,14 @@ Server expands the filter into N rows, creates a **parent** `research_runs` row 
 
 ### 4.1 Tier matrix
 
-| Tier  | Name            | Cost/call     | Examples                                                                                                              | Gating                                                                                                     |
-| ----- | --------------- | ------------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| **0** | Free / internal | 0             | `lookup_company_registry` (libreBORME), `search_companies`, `get_company`, `wayback_snapshot`, Brave free-tier search | no gate                                                                                                    |
-| **1** | Cheap web       | ~€0.001–0.005 | `web_search` (Exa), `web_scrape` (Firecrawl markdown), `web_extract` (Firecrawl JSON)                                 | debited from `budget_cents`, fails with `BudgetExceeded`                                                   |
-| **2** | Moderate        | ~€0.01–0.05   | `web_discover` (Firecrawl agent, Claude web_search)                                                                   | debited from `budget_cents`; LLM sees warning when >50% consumed                                           |
-| **3** | Paid structured | €1–5          | `lookup_company_report` (einforma)                                                                                    | debited from **separate** `paid_budget_cents`; above `auto_approve_paid_cents`, uses `propose_paid_action` |
+| Tier  | Name            | Cost/call     | Examples                                                                   | Gating                                                                                                     |
+| ----- | --------------- | ------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **0** | Free / internal | 0             | `lookup_registry` basic (libreBORME), `crm_lookup`, Brave free-tier search | no gate                                                                                                    |
+| **1** | Cheap web       | ~€0.001–0.005 | `web_search` (Exa), `web_read` (Firecrawl markdown or structured extract)  | debited from `budget_cents`, fails with `BudgetExceeded`                                                   |
+| **2** | Moderate        | ~€0.01–0.05   | `web_discover` (Firecrawl agent, Claude web_search)                        | debited from `budget_cents`; LLM sees warning when >50% consumed                                           |
+| **3** | Paid structured | €1–5          | `lookup_registry` depth='financials'\|'full' (einforma)                    | debited from **separate** `paid_budget_cents`; above `auto_approve_paid_cents`, uses `propose_paid_action` |
 
-The rule: **climb tiers only when a lower one cannot answer the question.** libreBORME before web_scrape. web_scrape before einforma. Enforced by a prompt rule (soft) and by budget errors (hard).
+The rule: **climb tiers only when a lower one cannot answer the question.** `lookup_registry` basic before `web_read`. `web_read` before `lookup_registry` financials. Enforced by a prompt rule (soft) and by budget errors (hard).
 
 ### 4.2 Modes
 
@@ -182,11 +181,11 @@ apps/server/src/services/research/
 └── einforma-report.ts         ReportProvider impl (ES)
 ```
 
-Each interface is an Effect `Context.Tag` with a small method surface:
+Each interface uses Effect v4's `ServiceMap.Service` pattern (same as `EmailProvider` and `StorageProvider` in the existing codebase):
 
 ```ts
 // search-provider.ts
-export class SearchProvider extends Context.Tag('research/SearchProvider')<
+export class SearchProvider extends ServiceMap.Service<
   SearchProvider,
   {
     readonly search: (input: {
@@ -197,10 +196,10 @@ export class SearchProvider extends Context.Tag('research/SearchProvider')<
       languages?: string[]
     }) => Effect.Effect<SearchResult, ProviderError>
   }
->() {}
+>()('research/SearchProvider') {}
 
 // scrape-provider.ts
-export class ScrapeProvider extends Context.Tag('research/ScrapeProvider')<
+export class ScrapeProvider extends ServiceMap.Service<
   ScrapeProvider,
   {
     readonly scrape: (input: {
@@ -210,36 +209,39 @@ export class ScrapeProvider extends Context.Tag('research/ScrapeProvider')<
       location?: string
     }) => Effect.Effect<ScrapedPage, ProviderError>
   }
->() {}
+>()('research/ScrapeProvider') {}
 
 // extract-provider.ts
-export class ExtractProvider extends Context.Tag('research/ExtractProvider')<
+// Returns `unknown` — caller decodes with Schema.decodeUnknown(schema)(raw).
+// Generic methods on ServiceMap.Service lose type params through the tag.
+export class ExtractProvider extends ServiceMap.Service<
   ExtractProvider,
   {
-    readonly extract: <A, I>(input: {
+    readonly extract: (input: {
       url: string
-      schema: Schema.Schema<A, I>
+      schema: Schema.Schema.Any
       prompt?: string
-    }) => Effect.Effect<A, ProviderError>
+    }) => Effect.Effect<unknown, ProviderError>
   }
->() {}
+>()('research/ExtractProvider') {}
 
 // discover-provider.ts
-export class DiscoverProvider extends Context.Tag('research/DiscoverProvider')<
+// Same pattern: returns `unknown`, caller decodes.
+export class DiscoverProvider extends ServiceMap.Service<
   DiscoverProvider,
   {
-    readonly discover: <A, I>(input: {
+    readonly discover: (input: {
       prompt: string
       urls?: string[]
-      schema?: Schema.Schema<A, I>
+      schema?: Schema.Schema.Any
       maxCostCents?: number
-    }) => Effect.Effect<DiscoverResult<A>, ProviderError>
+    }) => Effect.Effect<DiscoverResult, ProviderError>
     readonly cancel: (jobRef: ExternalJobRef) => Effect.Effect<void, ProviderError>
   }
->() {}
+>()('research/DiscoverProvider') {}
 
 // registry-provider.ts — country-routed
-export class RegistryRouter extends Context.Tag('research/RegistryRouter')<
+export class RegistryRouter extends ServiceMap.Service<
   RegistryRouter,
   {
     readonly lookup: (input: {
@@ -248,10 +250,10 @@ export class RegistryRouter extends Context.Tag('research/RegistryRouter')<
       tax_id?: string
     }) => Effect.Effect<RegistryRecord, ProviderError>
   }
->() {}
+>()('research/RegistryRouter') {}
 
 // report-provider.ts — country-routed, paid
-export class ReportRouter extends Context.Tag('research/ReportRouter')<
+export class ReportRouter extends ServiceMap.Service<
   ReportRouter,
   {
     readonly report: (input: {
@@ -260,7 +262,7 @@ export class ReportRouter extends Context.Tag('research/ReportRouter')<
       depth: 'basic' | 'financials' | 'full'
     }) => Effect.Effect<CompanyReport, ProviderError>
   }
->() {}
+>()('research/ReportRouter') {}
 ```
 
 ### 5.2 Boot-time selection
@@ -294,41 +296,51 @@ Same shape for the other five capabilities.
 
 Tools are named by **capability**, not vendor. Each is defined once as an Effect `Tool.make` and annotated with the existing `Tool.Readonly` / `Tool.Destructive` / `Tool.OpenWorld` pattern (see `apps/server/src/mcp/tools/companies.ts:105`).
 
-### 6.1 Research tools
+### 6.1 Research tools (4 tools)
 
 ```ts
 // apps/server/src/mcp/tools/research-web.ts
+
 web_search({ query, limit?, recency_days?, location?, languages? })
   → Readonly, OpenWorld, tier 1
-web_scrape({ url, formats?, wait_for_selector?, location? })
+  // Search the web. Returns a list of URLs with titles and snippets.
+
+web_read({ url, schema? })
   → Readonly, OpenWorld, tier 1
-web_extract({ url, schema_name, prompt? })
-  → Readonly, OpenWorld, tier 1
-web_discover({ prompt, urls?, schema_name?, max_cost_cents? })
+  // Fetch a URL as markdown. With `schema`: extract structured JSON instead.
+  // Merges scrape + extract — same provider call, schema is the only difference.
+
+web_discover({ prompt, urls?, max_cost_cents? })
   → Readonly, OpenWorld, tier 2
+  // Autonomous browsing: follows links, reasons over pages, returns findings.
+  // Expensive — only use when search + read can't answer the question.
 
 // apps/server/src/mcp/tools/research-registry.ts
-lookup_company_registry({ country, query?, tax_id? })
-  → Readonly, OpenWorld, tier 0
-lookup_company_report({ country, tax_id, depth })
-  → Readonly, OpenWorld, tier 3
 
-// apps/server/src/mcp/tools/research-archive.ts
-wayback_snapshot({ url, at? })
-  → Readonly, OpenWorld, tier 0
+lookup_registry({ country, query?, tax_id?, depth? })
+  → Readonly, OpenWorld, tier 0 (basic) / tier 3 (financials|full)
+  // One tool, two backends. depth='basic' → free registry (libreBORME).
+  // depth='financials'|'full' → paid report (einforma), gated by budget.
 ```
 
-### 6.2 CRM-read tools (reused)
+### 6.2 CRM-read tool (1 tool)
 
-`search_companies`, `get_company`, `search_contacts`, `get_contact`, `get_document`, `search_pipeline` — already exist (`apps/server/src/mcp/tools/companies.ts`, etc.). Added to the research fiber's toolkit verbatim, read-only.
+```ts
+// apps/server/src/mcp/tools/research-crm.ts
 
-### 6.3 Sink tools (research writes)
+crm_lookup({ table: 'companies' | 'contacts', query?, id? })
+  → Readonly, !OpenWorld, tier 0
+  // With `id`: get a single row. With `query`: search by name/fields.
+  // Replaces separate search_companies + get_company + search_contacts + get_contact.
+```
+
+### 6.3 Sink tools (3 tools)
 
 ```ts
 // apps/server/src/mcp/tools/research-sink.ts
 
 propose_update({
-  subject_table: 'companies' | 'contacts' | 'documents',
+  subject_table: 'companies' | 'contacts',
   subject_id: string,
   expected_version: int,
   fields: Record<string, unknown>,
@@ -347,15 +359,18 @@ attach_finding({
   → !Destructive, Idempotent, !OpenWorld
 
 propose_paid_action({
-  tool: string,                 // 'lookup_company_report'
+  tool: string,                 // 'lookup_registry'
   args: unknown,
   estimated_cents: int,
-  reason: string,
-  blocking: boolean
+  reason: string
 })
+  → records the proposal, returns immediately — LLM continues without the data
+  → human approves/rejects after the run; can trigger a follow-up run if approved
   → writes to research_runs.findings.pending_paid_actions[]
   → !Destructive, !OpenWorld
 ```
+
+**8 tools total.** Effect's `toolChoice: { oneOf: [...] }` further restricts which tools the LLM sees at each step of the loop, so it typically works with 3–5 at a time.
 
 `propose_update` does **not** call `update_company`. Domain mutations only happen when a human clicks "Apply" in the UI, which fires the existing `update_company` endpoint with OCC via `expected_version`.
 
@@ -402,7 +417,10 @@ CREATE TABLE research_runs (
   created_at              timestamptz NOT NULL DEFAULT now(),
   started_at              timestamptz,
   completed_at            timestamptz,
-  updated_at              timestamptz NOT NULL DEFAULT now()
+  updated_at              timestamptz NOT NULL DEFAULT now(),
+
+  -- Written once at run completion; array of tool call/result events for audit
+  tool_log                jsonb NOT NULL DEFAULT '[]'::jsonb
 );
 
 CREATE INDEX research_runs_status_idx ON research_runs(status) WHERE status IN ('queued','running');
@@ -410,24 +428,12 @@ CREATE INDEX research_runs_parent_idx ON research_runs(parent_id);
 CREATE INDEX research_runs_created_by_idx ON research_runs(created_by);
 
 --
--- Event log (SSE backlog + audit)
---
-CREATE TABLE research_run_events (
-  research_id   uuid NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,
-  seq           int NOT NULL,
-  type          text NOT NULL,                                 -- 'tool.call'|'tool.result'|'tool.error'|'run.phase'|'run.completed'|'run.failed'
-  payload       jsonb NOT NULL,
-  at            timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (research_id, seq)
-);
-
---
 -- Sources (globally deduped by url_hash)
 --
 CREATE TABLE sources (
   id                text PRIMARY KEY,                          -- 'src_' + ulid
   kind              text NOT NULL CHECK (kind IN ('web','registry','archive','report')),
-  provider          text NOT NULL,                             -- 'firecrawl','librebor','wayback','einforma',...
+  provider          text NOT NULL,                             -- 'firecrawl','librebor','einforma',...
   url               text NOT NULL,
   url_hash          text NOT NULL UNIQUE,                      -- sha256(canonicalize(url))
   domain            text NOT NULL,                             -- registrable domain
@@ -439,7 +445,6 @@ CREATE TABLE sources (
   last_fetched_at   timestamptz NOT NULL DEFAULT now(),
   content_hash      text NOT NULL,                             -- sha256(normalized content)
   content_ref       text,                                      -- s3://.../sources/<hash>.md — archived copy
-  archive_url       text                                       -- web.archive.org snapshot URL if pushed
 );
 
 CREATE INDEX sources_domain_idx ON sources(domain);
@@ -457,11 +462,11 @@ CREATE TABLE research_run_sources (
 );
 
 --
--- Polymorphic link between a run and a subject row (companies/contacts/documents)
+-- Polymorphic link between a run and a subject row (companies/contacts)
 --
 CREATE TABLE research_links (
   research_id    uuid NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,
-  subject_table  text NOT NULL CHECK (subject_table IN ('companies','contacts','documents')),
+  subject_table  text NOT NULL CHECK (subject_table IN ('companies','contacts')),
   subject_id     uuid NOT NULL,
   link_kind      text NOT NULL CHECK (link_kind IN ('input','finding')),
   created_at     timestamptz NOT NULL DEFAULT now(),
@@ -491,27 +496,39 @@ CREATE TABLE research_paid_spend (
 CREATE INDEX research_paid_spend_user_at_idx ON research_paid_spend(user_id, at DESC);
 
 --
--- User-level research preferences
+-- User-level spending policy (one editable policy per user, see §11)
 --
-CREATE TABLE user_research_preferences (
+CREATE TABLE user_research_policy (
   user_id                    uuid PRIMARY KEY,                 -- → users(id)
-  mode                       text NOT NULL DEFAULT 'strict' CHECK (mode IN ('strict','custom')),
-  default_budget_cents       int NOT NULL DEFAULT 50,
-  default_paid_budget_cents  int NOT NULL DEFAULT 0,
-  auto_approve_paid_cents    int NOT NULL DEFAULT 0,
-  paid_daily_cap_cents       int NOT NULL DEFAULT 0,
-  overrides                  jsonb NOT NULL DEFAULT '{}'::jsonb,  -- reserved for per-provider rules (v2)
+  budget_cents               int NOT NULL DEFAULT 100,         -- €1/run cheap tier
+  paid_budget_cents          int NOT NULL DEFAULT 500,         -- €5/run paid tier
+  auto_approve_paid_cents    int NOT NULL DEFAULT 500,         -- auto-approve within run budget
+  paid_monthly_cap_cents     int NOT NULL DEFAULT 2000,        -- €20/month hard cap
   updated_at                 timestamptz NOT NULL DEFAULT now()
 );
 ```
 
-### 7.2 Polymorphic FK integrity
+### 7.2 Polymorphic FK integrity (soft-delete)
 
-`research_links.subject_id` is not a hard FK — Postgres doesn't support polymorphic references. Integrity is application-side. **Open decision**: soft-delete vs. triggers (see §17).
+`research_links` connects a research run to a company OR a contact via `subject_table` + `subject_id`. Postgres can't enforce a foreign key that checks different tables depending on a column value, so if you hard-delete a company, nothing stops `research_links` from pointing at a row that no longer exists.
+
+**Decision:** soft-delete. Add `deleted_at timestamptz` to `companies` and `contacts`. Rows are never physically removed — they get a timestamp instead. Queries filter them out (`WHERE deleted_at IS NULL`). Research links stay valid because the underlying row still exists.
+
+This also means the research UI can show "this company was deleted after this research ran" instead of a broken reference.
 
 ### 7.3 OCC on subject rows
 
-`propose_update` carries `expected_version`. Applying a proposal runs `update_company({ id, fields, expected_version })` which fails if the row changed. **Requires a `version int NOT NULL DEFAULT 0` column on `companies`/`contacts`/`documents`.** Not present today — see §17.
+Research proposes changes, but the human clicks "Apply" later — minutes, hours, maybe days after the run. If someone edited the company in between, the proposal would silently overwrite their work.
+
+**Fix:** a `version int NOT NULL DEFAULT 0` column on `companies` and `contacts`, bumped on every update. The flow:
+
+1. Research starts → snapshots the company at version 5
+2. `propose_update` carries `expected_version: 5`
+3. Meanwhile, someone edits the company → version bumps to 6
+4. Human clicks "Apply" → fires `UPDATE companies SET ... WHERE id = ? AND version = 5` → 0 rows affected → conflict error
+5. UI tells the user: "this company was modified since the research ran — review before applying"
+
+Requires a `version` column on `companies`/`contacts` (not present today) + a check in each update handler.
 
 ---
 
@@ -524,10 +541,10 @@ CREATE TABLE user_research_preferences (
 | `research_runs.schema_name`                                    | `text`              | registry key (see §8.1)                                                                 |
 | `research_runs.context`                                        | `jsonb`             | `{subjects?, selector?, hints?}`                                                        |
 | `research_runs.findings`                                       | `**jsonb`**         | structured, schema-valid, queryable, drives UI                                          |
-| `research_runs.brief_md`                                       | `**text**` markdown | human synthesis, regenerable per language                                               |
+| `research_runs.brief_md`                                       | `**text`** markdown | human synthesis, regenerable per language                                               |
 | `research_runs.cost_breakdown`                                 | `jsonb`             | per-provider cent counts                                                                |
 | `research_runs.paid_policy`                                    | `jsonb`             | resolved policy snapshot for audit                                                      |
-| `research_run_events.payload`                                  | `jsonb`             | per-event, feeds SSE replay + audit                                                     |
+| `research_runs.tool_log`                                       | `jsonb`             | array of tool call/result events, written once at completion for audit                  |
 | `sources` columns                                              | relational          | no JSON; normalized table                                                               |
 | `research_run_sources.local_ref`                               | `text`              | `"src_1"`, `"src_2"` — stable within a run for readable citations                       |
 | `documents.content` (only when user clicks "Save as document") | `**jsonb**` Tiptap  | existing project convention; lazy conversion from `brief_md` via `prosemirror-markdown` |
@@ -546,7 +563,7 @@ apps/server/src/services/research/schemas/
 └── freeform.ts                     // no schema — markdown only
 ```
 
-Versioned (`_v1`, `_v2`) so schemas can evolve without breaking old runs. Callers pass `schema_name: 'company_enrichment_v1'`; the service resolves it and uses it for `LanguageModel.generateText`'s structured output.
+Versioned (`_v1`, `_v2`) so schemas can evolve without breaking old runs. Callers pass `schema_name: 'company_enrichment_v1'`; the service resolves it and uses it for `LanguageModel.generateObject`'s structured output (see §13.1).
 
 ### 8.2 `findings` shape (example: `company_enrichment_v1`)
 
@@ -641,21 +658,11 @@ Enforced three ways:
 
 1. **Scrape/lookup fetches content.** Provider returns normalized content (markdown for web, JSON for registry).
 2. **Hash and dedupe.** Compute `url_hash = sha256(canonicalize(url))`. If an existing `sources` row has the same `url_hash` AND unchanged `content_hash`, reuse it. Otherwise insert or update.
-3. **Archive to S3.** Use existing `S3StorageProviderLive`. Write the normalized content to `s3://forja-sources/<content_hash>.md` (or `.json` for registry). Store the path in `content_ref`.
-4. **Push to Wayback (optional, fire-and-forget).** For web sources, `POST https://web.archive.org/save/<url>` and store the returned snapshot URL in `archive_url`. Best-effort, never blocks the run.
-5. **Link to the run.** Insert `research_run_sources(research_id, source_id, local_ref)` with `local_ref = 'src_1'`, `'src_2'`, ... — stable within the run so citations stay readable.
-6. **LLM cites.** Every claim references `source_id = 'src_reg_1'` etc.
+3. **Archive to S3.** Reuses the existing `StorageProvider` service (`apps/server/src/services/storage-provider.ts`) and its `S3StorageProviderLive` implementation — same bucket, same `put`/`get`/`signedUrl` code path used by recordings and documents. Write normalized content to `sources/<content_hash>.md` (or `.json` for registry). Store the key in `content_ref`. The UI retrieves the archived copy via `StorageProvider.signedUrl(content_ref, 600)` when the original URL is dead.
+4. **Link to the run.** Insert `research_run_sources(research_id, source_id, local_ref)` with `local_ref = 'src_1'`, `'src_2'`, ... — stable within the run so citations stay readable.
+5. **LLM cites.** Every claim references `source_id = 'src_reg_1'` etc.
 
-### 9.3 Content drift detection
-
-Re-scraping an existing source compares `content_hash`. If changed:
-
-- Keep the old `content_ref` (immutable history).
-- Write a new `content_ref` for the new hash.
-- Update `last_fetched_at`.
-- The `/research/:id` UI marks citations pointing at the old hash as *"source has changed since cited"*.
-
-### 9.4 UI treatment
+### 9.3 UI treatment
 
 - Every claim in the findings panel gets a `[1]`, `[2]` badge.
 - Clicking opens a side panel with the source's title, URL, archived snapshot link, and the exact quote highlighted.
@@ -668,80 +675,84 @@ Re-scraping an existing source compares `content_hash`. If changed:
 
 Collected here so they can be copy-pasted into the system prompt and into review.
 
-### 10.1 No direct domain mutation
+### 10.1 Who writes what (the LLM never touches the DB directly)
+
+The LLM produces *content*; `ResearchService` validates and persists it. The LLM never gets a SQL connection.
+
+| What                                                  | Who writes                                                                       | How                                                                     |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `research_runs` row (create, status, findings, brief) | `ResearchService` (server code)                                                  | creates at POST time, updates incrementally during fiber                |
+| `research_runs.tool_log`                              | `ResearchService`                                                                | written once at completion; accumulated in-memory during run            |
+| `sources` rows                                        | `ResearchService`                                                                | upserts after each scrape/registry call, hashes content, archives to S3 |
+| `research_run_sources` rows                           | `ResearchService`                                                                | links sources to the run with a stable `local_ref`                      |
+| `research_links` rows                                 | `attach_finding` tool (called BY the LLM, handled by `ResearchService`)          | insert-only, never deletes                                              |
+| `findings.proposed_updates`                           | LLM produces the proposal, `ResearchService` persists it inside `findings` jsonb | **never applied to domain tables** until human clicks Apply             |
+| Domain table mutations (`companies`, `contacts`)      | **Human** via the existing REST endpoints                                        | completely separate from research, uses OCC                             |
+
+### 10.2 No direct domain mutation
 
 The research agent **never** calls `update_company`, `create_company`, `delete_company`, `update_contact`, etc. Domain mutations are exclusively human-driven via the "Apply" button in the research UI, which fires the existing domain endpoints with OCC.
 
-The agent writes only to:
-
-- `research_runs.findings` (including `proposed_updates`, `pending_paid_actions`)
-- `research_run_events` (via the service, not a tool)
-- `research_run_sources` (via the service)
-- `research_links` (via `attach_finding`, `link_kind='finding'` only)
-
-### 10.2 Citations are mandatory
+### 10.3 Citations are mandatory
 
 See §9.1. No unsourced claims.
 
-### 10.3 Cost discipline
+### 10.4 Cost discipline
 
 - Try tier 0 first. Registry before scrape.
 - Never exceed `paid_budget_cents` without `propose_paid_action`.
 - `BudgetExceeded` errors are terminal for the exhausted tier — the agent should either finish with what it has or propose more budget.
 
-### 10.4 Subject snapshot freeze
+### 10.5 Subject snapshot freeze
 
 When a run starts, the current version of every subject row is captured into `context.subjects[i].snapshot` with `expected_version`. The agent reasons from the snapshot; if the underlying row changes mid-run, `propose_update` still references the old version and OCC blocks silent overwrites.
 
-### 10.5 Human-in-the-loop gates
+### 10.6 Human-in-the-loop gates
 
 | Action                                                | Gate                                  |
 | ----------------------------------------------------- | ------------------------------------- |
 | Write to Forja domain rows                            | Always human via "Apply"              |
 | Call tier-3 paid tool above `auto_approve_paid_cents` | `propose_paid_action` → human approve |
-| Fan-out over `paid_daily_cap_cents`                   | Hard block, no override               |
+| Fan-out over `paid_monthly_cap_cents`                 | Hard block, no override               |
 | Exceed system hard ceiling                            | Hard block, not overridable per-run   |
 
 ---
 
-## 11. Policy modes
+## 11. Spending policy
 
-Two modes only: **Strict** (default) and **Custom**.
+One editable policy per user. Four numbers, all editable in settings. The goal is to control spending.
 
-### 11.1 Mode definitions
+### 11.1 Table
 
-| Mode                 | `default_budget_cents` | `default_paid_budget_cents` | `auto_approve_paid_cents` | `paid_daily_cap_cents`             |
-| -------------------- | ---------------------- | --------------------------- | ------------------------- | ---------------------------------- |
-| **Strict** (default) | system env             | 0                           | 0                         | 0                                  |
-| **Custom**           | user-set               | user-set                    | user-set                  | user-set (bounded by hard ceiling) |
-
-**Strict** = the agent can spend cheap-tier budget freely (scraping, searching) within the per-run `default_budget_cents`, but **zero paid spend** without explicit per-run allocation *and* per-call approval. This is the safe default.
-
-**Custom** = the user sets all four numbers themselves. Enables pre-authorization:
-
-```jsonc
-// A power user who wants frictionless paid research
-{
-  "mode": "custom",
-  "default_budget_cents": 100,
-  "default_paid_budget_cents": 500,         // €5/run allocated by default
-  "auto_approve_paid_cents": 500,           // auto-approve anything within the run budget
-  "paid_daily_cap_cents": 2000              // hard cap: €20/day across all runs
-}
+```sql
+CREATE TABLE user_research_policy (
+  user_id                    uuid PRIMARY KEY,
+  budget_cents               int NOT NULL DEFAULT 100,     -- €1/run for cheap tier (scraping, search)
+  paid_budget_cents          int NOT NULL DEFAULT 500,     -- €5/run for paid tier (1-2 einforma calls)
+  auto_approve_paid_cents    int NOT NULL DEFAULT 500,     -- auto-approve within run budget, no interruptions
+  paid_monthly_cap_cents     int NOT NULL DEFAULT 2000,    -- €20/month hard cap
+  updated_at                 timestamptz NOT NULL DEFAULT now()
+);
 ```
+
+New user → row created with env defaults. User edits in settings. Per-run overrides via POST body. System env var `RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS` is the only non-editable limit.
+
+**Out-of-the-box behavior:** agent can spend up to €1/run on web scraping/search, up to €5/run on paid APIs (einforma), auto-approved, with a €20/month ceiling. No interruptions, no approval dialogs. User adjusts any number anytime.
 
 ### 11.2 Layered resolution
 
 ```
 system env defaults
-  → user preferences (research.mode + fields)
+  → user policy (four editable fields)
     → per-run POST body overrides
       → resolved policy snapshot → research_runs.paid_policy (captured for audit)
 ```
 
 Per-run wins over user, user wins over env. The snapshot is frozen on the row so "what policy was in effect for this run" is always answerable.
 
-### 11.3 The daily cap is the only non-overridable rail
+### 11.3 The monthly cap is the only non-overridable rail
+
+Monthly (not daily) because a small team shouldn't be blocked on Tuesday for researching hard on Monday.
 
 ```ts
 chargePaid: (provider, cents) => Effect.gen(function* () {
@@ -749,38 +760,29 @@ chargePaid: (provider, cents) => Effect.gen(function* () {
   if (runBudget.remaining < cents)
     return yield* new BudgetExceeded({ tier: 'paid-run', needed: cents, remaining: runBudget.remaining })
 
-  const dailySpent = yield* DailyPaidSpend.getFor(userId, 'today')
-  const systemCeiling = yield* Config.integer('RESEARCH_DAILY_CAP_HARD_CEILING_CENTS')
-  const effectiveCap = Math.min(policy.paidDailyCapCents ?? 0, systemCeiling)
+  const monthlySpent = yield* MonthlyPaidSpend.getFor(userId, 'current-month')
+  const systemCeiling = yield* Config.integer('RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS')
+  const effectiveCap = Math.min(policy.paidMonthlyCapCents, systemCeiling)
 
-  if (dailySpent + cents > effectiveCap)
-    return yield* new DailyCapExceeded({ dailySpent, cap: effectiveCap, needed: cents })
+  if (monthlySpent + cents > effectiveCap)
+    return yield* new MonthlyCapExceeded({ monthlySpent, cap: effectiveCap, needed: cents })
 
   yield* Ref.update(paidRef, b => ({ ...b, remaining: b.remaining - cents, spent: b.spent + cents }))
-  yield* DailyPaidSpend.add(userId, cents, runId, provider)
-  yield* ResearchPaidSpend.record({ ... })     // audit row
+  yield* MonthlyPaidSpend.add(userId, cents, runId, provider)
 })
 ```
 
-- `RESEARCH_DAILY_CAP_HARD_CEILING_CENTS` (env) is the absolute max. A user's `paid_daily_cap_cents` can only go *up to* but never past it.
-- Even Custom-mode users can't exceed the system ceiling. Prompt injection / runaway loops stop at the cap.
+- `RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS` (env) is the absolute max. A user's `paid_monthly_cap_cents` can only go *up to* but never past it.
+- Prompt injection / runaway loops stop at the monthly cap.
 
-### 11.4 First-time consent
-
-Switching from Strict → Custom for the first time pops a confirm:
-
-> **Enable Custom mode?** You're authorizing the agent to spend money on paid APIs (e.g. einforma at €3/call) according to the limits you set. Every paid action is logged on the research detail page. You can switch back to Strict anytime.
-
-One-time, explicit consent. Same shape as Claude Code's elevated permission modes.
-
-### 11.5 How the LLM experiences policy
+### 11.4 How the LLM experiences policy
 
 The LLM does **not** read the policy. It learns from tool errors:
 
 - Within budget & threshold → tool runs silently, charges budget.
 - Above threshold → tool errors with `ApprovalRequired`. System prompt: *"if you receive ApprovalRequired, call `propose_paid_action` instead."*
 - Above run budget → tool errors with `BudgetExceeded`. System prompt: *"finish with what you have or propose more budget."*
-- Above daily cap → tool errors with `DailyCapExceeded`. Terminal — run finishes.
+- Above monthly cap → tool errors with `MonthlyCapExceeded`. Terminal — run finishes.
 
 This keeps the prompt simple and policy-independent.
 
@@ -792,26 +794,15 @@ This keeps the prompt simple and policy-independent.
 
 ```ts
 // apps/server/src/services/research/budget.ts
-export class Budget extends Effect.Service<Budget>()('research/Budget', {
-  effect: Effect.gen(function* () {
-    const cheap = yield* Ref.make({ remaining: 0, spent: 0, breakdown: {} as Record<string, number> })
-    const paid  = yield* Ref.make({ remaining: 0, spent: 0, breakdown: {} as Record<string, number> })
-
-    return {
-      init: (cheapCents: number, paidCents: number) =>
-        Effect.all([
-          Ref.set(cheap, { remaining: cheapCents, spent: 0, breakdown: {} }),
-          Ref.set(paid,  { remaining: paidCents,  spent: 0, breakdown: {} }),
-        ]),
-
-      chargeCheap: (provider: string, cents: number) => /* see §11.3 */,
-      chargePaid:  (provider: string, cents: number) => /* see §11.3 */,
-
-      snapshot: () =>
-        Effect.all({ cheap: Ref.get(cheap), paid: Ref.get(paid) }),
-    } as const
-  }),
-}) {}
+export class Budget extends ServiceMap.Service<
+  Budget,
+  {
+    readonly init: (cheapCents: number, paidCents: number) => Effect.Effect<void>
+    readonly chargeCheap: (provider: string, cents: number) => Effect.Effect<void, BudgetExceeded>
+    readonly chargePaid: (provider: string, cents: number) => Effect.Effect<void, BudgetExceeded | MonthlyCapExceeded>
+    readonly snapshot: () => Effect.Effect<BudgetSnapshot>
+  }
+>()('research/Budget') {}
 ```
 
 ### 12.2 Provider instrumentation
@@ -863,31 +854,51 @@ POST /research
 ResearchService.run(id)
   ├── load row, hydrate snapshots (frozen, with expected_version)
   ├── update status='running', started_at
-  ├── build LanguageModel prompt: system + context + subject snapshots + schema + citation rule
+  ├── build LanguageModel prompt: system + context + subject snapshots + citation rule
+  │
+  │   Phase 1 — tool loop (streaming)
   ├── LanguageModel.streamText({
   │     model: anthropic('claude-opus-4-6'),
   │     toolkit: ResearchToolkit ∪ CrmReadToolkit ∪ SinkToolkit,
   │     maxIterations: 25,
   │   })
-  ├── on each tool call → write research_run_events(seq, 'tool.call', payload)
-  ├── on each tool result → write research_run_events(seq, 'tool.result', payload)
-  ├── on final → validate structured output against schema_name
+  ├── on each tool call → publish to PubSub + accumulate in Ref<ToolLogEntry[]>
+  ├── on each tool result → publish to PubSub + accumulate in Ref<ToolLogEntry[]>
+  │
+  │   Phase 2 — structured output
+  ├── LanguageModel.generateObject({
+  │     model: anthropic('claude-opus-4-6'),
+  │     schema: registry[schema_name],         // typed Effect Schema
+  │     prompt: gathered context from phase 1,
+  │   })
   ├── walk findings, verify all source_id references resolve
-  ├── generate brief_md via second LLM pass (cheap model)
-  ├── write findings, brief_md, cost totals, status='succeeded', completed_at
-  └── emit run.completed event
+  │
+  │   Phase 3 — brief + persist
+  ├── LanguageModel.generateText({ model: haiku, prompt: findings → markdown })
+  ├── write findings, brief_md, cost totals, tool_log, status='succeeded', completed_at
+  └── publish run.completed to PubSub
 ```
 
-### 13.2 SSE event streaming with replay
+### 13.2 SSE live streaming (in-memory PubSub, no replay)
 
-`GET /research/:id/events?since=<seq>` returns an SSE stream. Implementation:
+`GET /research/:id/events` returns an SSE stream backed by Effect `PubSub`. Implementation:
 
-1. Read persisted events from `research_run_events` where `seq > since`. Emit each.
-2. Subscribe to a Postgres `LISTEN research_run_<id>` channel (or in-memory `PubSub`) for new events.
-3. Emit as they arrive.
-4. Close on `run.completed` / `run.failed` / `run.cancelled` event or client disconnect.
+1. `ResearchService` creates a `PubSub.unbounded<ResearchEvent>()` per active run, stored in a `Map<id, PubSub>`.
+2. The SSE handler subscribes via `PubSub.subscribe(pubsub)` and pipes through `Sse.encode()`:
 
-This makes the stream **resumable**. User reloads the page mid-run, UI passes `since=<last seen seq>`, gets backlog + live tail. Events are the source of truth; SSE is just a tail mechanism.
+```ts
+const stream = Stream.fromPubSub(pubsub).pipe(
+  Stream.map((evt) => Sse.Event({ event: evt.type, data: JSON.stringify(evt) })),
+  Stream.pipeThroughChannel(Sse.encode()),
+)
+return HttpServerResponse.stream(stream, { contentType: "text/event-stream" })
+```
+
+3. Events flow live while the client is connected.
+4. Stream closes on `run.completed` / `run.failed` / `run.cancelled` or client disconnect.
+5. **No replay**: if the user reloads mid-run, they see events from the reconnect point onward. The complete log is available via `research_runs.tool_log` after the run finishes.
+
+This is deliberately simpler than a persisted event log. The trade-off: no mid-run resume on page reload. The `tool_log` jsonb column on `research_runs` gives full audit after completion.
 
 ### 13.3 Cancellation
 
@@ -933,7 +944,7 @@ POST   /research                              create + fork
   → 409 { error: 'ConfirmRequired', estimated_cost_cents, preview }   (fan-out > threshold)
 
 GET    /research/:id                          full row, findings, sources
-GET    /research/:id/events?since=<seq>       SSE tail, replayable
+GET    /research/:id/events                   SSE live stream (no replay)
 POST   /research/:id/cancel                   interrupt + upstream cancel
 POST   /research/:id/attach                   { subject_table, subject_id }  post-hoc link
 DELETE /research/:id                          soft-delete (sets status='deleted'; content retained)
@@ -954,7 +965,7 @@ POST   /research/:id/proposed-updates/:pu_id/reject
 
 -- Preferences
 GET    /research/preferences                  current user
-PUT    /research/preferences                  { mode: 'strict'|'custom', ...fields }
+PUT    /research/policy                        { budget_cents, paid_budget_cents, auto_approve_paid_cents, paid_monthly_cap_cents }
 ```
 
 All routes live in `apps/server/src/handlers/research.ts` and are declared in `@engranatge/controllers` as an HttpApiGroup, following the existing pattern.
@@ -1035,12 +1046,12 @@ Idempotency-Key: 01J9Z-submit-abc
 | T      | Tier | Step                                                                                                                                                                                         | Cost   |
 | ------ | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
 | +0ms   | —    | snapshot row (v5), init Budget(cheap=50, paid=0), status=running                                                                                                                             | —      |
-| +400ms | 0    | `lookup_company_registry({country:'ES', query:'Cooperativa Olivera de Vilanova'})` → libreBORME: NIF F08234567, capital €450k, 2 admins (Jordi Pla, Marta Soler) since 2019                  | 0      |
-| +800ms | 0    | `search_companies({query:'olivera', region:'es-CT'})` → finds L'Olivera SCCL already in DB                                                                                                   | 0      |
-| +1.5s  | 1    | `web_scrape({url:'olivera-vilanova.cat'})` → homepage markdown                                                                                                                               | 1 cr   |
-| +3.5s  | 1    | `web_scrape({url:'olivera-vilanova.cat/memoria-2024.pdf'})` → annual report text                                                                                                             | 1 cr   |
+| +400ms | 0    | `lookup_registry({country:'ES', query:'Cooperativa Olivera de Vilanova'})` → libreBORME: NIF F08234567, capital €450k, 2 admins (Jordi Pla, Marta Soler) since 2019                          | 0      |
+| +800ms | 0    | `crm_lookup({table:'companies', query:'olivera'})` → finds L'Olivera SCCL already in DB                                                                                                      | 0      |
+| +1.5s  | 1    | `web_read({url:'olivera-vilanova.cat'})` → homepage markdown                                                                                                                                 | 1 cr   |
+| +3.5s  | 1    | `web_read({url:'olivera-vilanova.cat/memoria-2024.pdf'})` → annual report text                                                                                                               | 1 cr   |
 | +5s    | 1    | `web_search({query:'cooperatives oli ecològic Bages', limit:10})`                                                                                                                            | 1 cr   |
-| +6s    | 1    | 3× `web_scrape` on competitor homepages (parallel, `withConcurrency(3)`)                                                                                                                     | 3 cr   |
+| +6s    | 1    | 3× `web_read` on competitor homepages (parallel, `withConcurrency(3)`)                                                                                                                       | 3 cr   |
 | +10s   | 0    | `attach_finding({subject_table:'companies', subject_id:'<L\'Olivera id>', kind:'already_in_db'})`                                                                                            | 0      |
 | +11s   | 0    | `propose_update({ subject_table:'companies', subject_id:'01J9T0QH6A...', expected_version:5, fields:{...}, reason:'...', citations:[{source_id:'src_reg_1',...},{source_id:'src_2',...}] })` | 0      |
 | +12s   | —    | final structured output emitted, validated against `company_enrichment_v1`, citation references resolved                                                                                     | —      |
@@ -1071,15 +1082,15 @@ POST /research
 No subjects, no selector. The LLM:
 
 1. `web_search({query: "..."})` → 10-15 URLs
-2. `web_scrape` on top candidates in parallel
-3. For each discovered cooperative name: `search_companies({query: name})`
-4. `lookup_company_registry` on the most promising ones to verify legal names and get NIFs
+2. `web_read` on top candidates in parallel
+3. For each discovered cooperative name: `crm_lookup({table: 'companies', query: name})`
+4. `lookup_registry` on the most promising ones to verify legal names and get NIFs
 5. `attach_finding` for the ones already in DB (kind='already_in_db')
 6. Final findings list new prospects with name, website, NIF, "why relevant," citations
 
 Cost: mostly cheap-tier. No paid spend.
 
-### 16.3 Scenario 3 — selector fan-out (phase 2)
+### 16.3 Scenario 3 — selector fan-out
 
 **Request.**
 
@@ -1150,6 +1161,48 @@ RESEARCH_REPORT_PROVIDER_ES=none            # disabled
 - **Anthropic web_search** — Claude's native tool, zero setup. Good fallback `DiscoverProvider`, but citations are model-maintained (no `content_ref` archive). Useful when budget is tight.
 - **Playwright local** — dev fallback. Slow and flaky, but free and works offline.
 
+### Provider landscape (researched April 2026)
+
+These are the top providers per capability, sorted by relevance for B2B company research in Spain/EU. Not all will be implemented — this is a reference for choosing providers.
+
+#### Search APIs (for `web_search`)
+
+| Provider         | Pricing          | Free tier         | Best for                                                           | TS SDK    |
+| ---------------- | ---------------- | ----------------- | ------------------------------------------------------------------ | --------- |
+| **Exa**          | $1.50/1k         | 1k/month          | Semantic search ("companies like X"), understands business context | Yes       |
+| **Tavily**       | $8/1k            | 1k/month          | Citation-ready, built for RAG/agent workflows                      | Yes       |
+| **Firecrawl**    | $83/100k credits | 500 credits       | Integrated search+scrape in one API                                | Yes       |
+| **Brave Search** | $5/1k            | None (very cheap) | Privacy-focused, independent index, GDPR-compliant                 | REST only |
+| **SerpAPI**      | $75/5k           | 250/month         | Multi-engine SERP (40+ engines), enterprise reliability            | REST      |
+| **Serper**       | $0.30/1k         | None              | Cheapest Google SERP option                                        | REST      |
+
+#### Scrape APIs (for `web_read`)
+
+| Provider        | Pricing                   | Best for                                                   | TS SDK |
+| --------------- | ------------------------- | ---------------------------------------------------------- | ------ |
+| **Firecrawl**   | Credit-based, from $16/mo | AI-native markdown, PDF parsing, JS sites, /agent endpoint | Yes    |
+| **ScrapingBee** | $49/mo                    | Anti-bot evasion, headless Chrome, LLM-ready markdown      | Yes    |
+| **Apify**       | $40/mo                    | 20k+ pre-built actors (LinkedIn, etc.), marketplace        | Yes    |
+| **Browserbase** | Custom                    | Real browser sessions, interactive workflows               | Yes    |
+| **Bright Data** | $250/mo                   | Enterprise proxy network, 150M+ IPs globally               | REST   |
+| **Zyte**        | Pay-per-use               | Large-scale extraction, 15+ years experience               | REST   |
+
+#### Company data / enrichment APIs (for registry + report providers)
+
+| Provider             | Pricing                | EU/ES coverage              | Best for                                                  | TS SDK  |
+| -------------------- | ---------------------- | --------------------------- | --------------------------------------------------------- | ------- |
+| **libreBORME**       | Free                   | Spain (BORME official data) | Official registry: NIF, directors, capital, incorporation | REST    |
+| **einforma**         | ~€1-5/report           | Spain (strong)              | Deep financials, risk scores, shareholders                | REST    |
+| **Dropcontact**      | €29/mo                 | France/EU, GDPR-native      | EU email enrichment + SIREN/SIRET legal entity data       | REST    |
+| **Cognism**          | Custom                 | Strong EMEA                 | Phone-verified contacts, intent data, GDPR compliant      | REST    |
+| **Apollo.io**        | $49/user/mo, free tier | Yes                         | Affordable all-rounder, waterfall enrichment              | REST    |
+| **Hunter.io**        | $0.01/lookup           | Yes                         | Email finder + verification, developer-friendly           | **Yes** |
+| **Proxycurl**        | Credit-based           | Yes                         | LinkedIn company/employee lookup via API                  | REST    |
+| **Crustdata**        | Credit-based           | Yes                         | Real-time company signals, webhook-based watchers         | REST    |
+| **People Data Labs** | $0.02-0.08/record      | Moderate (US-centric)       | Largest dataset (3B+ persons, 60M+ companies)             | REST    |
+
+**Notes on EU/Spanish market:** Most global enrichment providers (Clearbit, ZoomInfo, PDL) are US-centric and have poor coverage of Spanish cooperatives and SMBs. For our market, the hierarchy is: libreBORME (free, authoritative) > einforma (paid, comprehensive for ES) > web scraping (catches the long tail) > global enrichment APIs (supplementary at best). Dropcontact is worth adding when we expand to France.
+
 ---
 
 ## 18. Env vars (vendor-neutral, explicit)
@@ -1173,11 +1226,11 @@ RESEARCH_LLM_MODEL=claude-opus-4-6          # used for the agent loop
 RESEARCH_BRIEF_MODEL=claude-haiku-4-5       # used for the second-pass brief_md
 
 # --- Budget defaults (system) ---
-RESEARCH_DEFAULT_BUDGET_CENTS=50            # €0.50 per run cheap budget
-RESEARCH_DEFAULT_PAID_BUDGET_CENTS=0        # opt-in per run
-RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS=0  # opt-in per run
-RESEARCH_DEFAULT_PAID_DAILY_CAP_CENTS=0     # opt-in per user (Custom mode)
-RESEARCH_DAILY_CAP_HARD_CEILING_CENTS=10000 # €100/day absolute system max
+RESEARCH_DEFAULT_BUDGET_CENTS=100            # €1/run cheap tier
+RESEARCH_DEFAULT_PAID_BUDGET_CENTS=500       # €5/run paid tier
+RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS=500 # auto-approve within run budget
+RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS=2000 # €20/month per user
+RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS=10000 # €100/month absolute system max
 
 # --- Concurrency and safety ---
 RESEARCH_MAX_CONCURRENT_FIBERS_PER_USER=3
@@ -1193,59 +1246,32 @@ EINFORMA_API_KEY=
 # librebor has a public API — no key
 ```
 
-Boot fails loudly if any of the first six vars are unset. Strict mode works with zero paid providers configured.
+Boot fails loudly if any of the first six vars are unset.
 
 ---
 
-## 19. Phased build
+## 19. Build checklist
 
-Three vertical slices. Each ships end-to-end.
+Everything ships together as v1.
 
-### Phase 1 — skeleton + tier 0/1 web
-
-- Migrations: `research_runs`, `research_run_events`, `sources`, `research_run_sources`, `research_links`, `research_paid_spend`, `user_research_preferences`.
-- Tables on subject rows: add `version int NOT NULL DEFAULT 0` to `companies`, `contacts`, `documents`.
+- Migrations: `research_runs` (incl. `tool_log` jsonb), `sources`, `research_run_sources`, `research_links`, `research_paid_spend`, `user_research_policy`.
+- Tables on subject rows: add `version int NOT NULL DEFAULT 0` to `companies`, `contacts`.
 - Decide and implement soft-delete vs triggers for polymorphic integrity (§17 open decisions).
-- `SearchProvider`, `ScrapeProvider` interfaces + Firecrawl impls + Brave impl + local Playwright impl.
-- `Budget` service (cheap tier only).
-- Schema registry with `freeform` + `company_enrichment_v1`.
-- `ResearchService` with subject-anchored mode only (no selector fan-out).
-- Tools: `web_search`, `web_scrape`, `search_companies`, `get_company`, `propose_update`, `attach_finding`.
-- `LanguageModel.streamText` wired via `@effect/ai-anthropic`.
-- `POST /research`, `GET /research/:id`, `GET /research/:id/events` (SSE with replay), `POST /research/:id/cancel`.
-- UI: `/forja/research` create page, detail page with findings + brief + sources + proposals panel, by-subject tab on company detail.
-- Event log + SSE replay.
-- Basic observability (§20).
-
-**Ships:** a usable subject-anchored research flow for cheap web work. No paid spend, no fan-out, no registry.
-
-### Phase 2 — registry + paid tier + policy
-
-- `RegistryProvider` + libreBORME impl (ES).
-- `ReportProvider` + einforma impl (ES).
-- Tools: `lookup_company_registry`, `lookup_company_report`, `propose_paid_action`.
-- Budget service: paid tier, `DailyPaidSpend` counter.
-- Policy resolution: system env → `user_research_preferences` → per-run override.
-- Two modes: Strict (default), Custom. Settings UI with first-time consent dialog.
-- `ApprovalRequired` / `BudgetExceeded` / `DailyCapExceeded` error types and LLM prompt rules.
-- Paid action approval UI.
-- Audit log (`research_paid_spend`) and spend summaries.
+- `SearchProvider`, `ScrapeProvider`, `ExtractProvider`, `DiscoverProvider` interfaces + Firecrawl impls + Brave impl + local Playwright impl.
+- `RegistryProvider` + libreBORME impl (ES). `ReportProvider` + einforma impl (ES).
+- `Budget` service: cheap + paid tiers, `MonthlyPaidSpend` counter (queries `research_paid_spend`).
+- Policy resolution: system env → `user_research_policy` → per-run override.
+- `ApprovalRequired` / `BudgetExceeded` / `MonthlyCapExceeded` error types and LLM prompt rules.
+- Schema registry: `freeform`, `company_enrichment_v1`, `competitor_scan_v1`, `contact_discovery_v1`, `prospect_scan_v1`.
+- `ResearchService`: subject-anchored + selector fan-out (parent/leaf rows, concurrency cap, confirm threshold).
+- Tools: `web_search`, `web_read`, `web_discover`, `lookup_registry`, `crm_lookup`, `propose_update`, `attach_finding`, `propose_paid_action` (8 total).
+- `LanguageModel.streamText` + `LanguageModel.generateObject` wired via `@effect/ai-anthropic`.
+- HTTP: `POST /research`, `GET /research/:id`, `GET /research/:id/events` (SSE live), `POST /research/:id/cancel`, paid-action approval, proposed-update apply/reject.
+- In-memory PubSub for live SSE; `tool_log` jsonb for post-run audit.
 - MCP tools: `start_research`, `get_research`, `research_sync`.
-
-**Ships:** full cost-tier system with gated paid spend. Spain-market viable.
-
-### Phase 3 — fan-out + more providers + watchers
-
-- Selector-based input mode (parent/leaf rows).
-- Fan-out concurrency + confirm threshold + dry-run preview.
-- `ExtractProvider` + `DiscoverProvider` impls (Firecrawl, Tavily, Anthropic).
-- Tools: `web_extract`, `web_discover`, `wayback_snapshot`.
-- More schemas: `competitor_scan_v1`, `contact_discovery_v1`, `prospect_scan_v1`.
-- `research_watchers` table + cron-based scheduled re-runs with findings diffs and webhook events.
-- `sources` Wayback push integration.
+- UI: `/forja/research` create page, detail page with findings + brief + sources + proposals panel, by-subject tab on company detail, spending policy in settings, paid action approval UI.
+- Observability (§20).
 - More country registries (UK Companies House, FR Pappers).
-
-**Ships:** the full v1 feature set.
 
 ---
 
@@ -1275,7 +1301,7 @@ Additions to `docs/observability.md`:
 - `research.tool.call_count{tool,provider}`
 - `research.tool.error_count{tool,provider,error_kind}`
 - `research.cost.cents{tier,provider}` (histogram)
-- `research.paid_spend.daily{user}` (gauge)
+- `research.paid_spend.monthly{user}` (gauge)
 - `research.budget.exceeded_count{tier}`
 
 ### Log annotations
@@ -1292,24 +1318,9 @@ so logs can be filtered per run. Follows the pattern in `apps/server/server.log`
 
 ## 21. Open decisions
 
-These must be resolved before Phase 1 can ship. Listed here so they don't get lost.
+These must be resolved before v1 can ship. Listed here so they don't get lost.
 
-### 21.1 Soft-delete vs triggers for polymorphic FK integrity
-
-`research_links.subject_id` has no hard FK because Postgres doesn't support polymorphic references. Two options:
-
-- **(a) Soft-delete on `companies`, `contacts`, `documents`.** Add `deleted_at timestamptz` to each; filter everywhere. Research queries just naturally exclude soft-deleted subjects.
-- **(b) Postgres triggers per subject table.** On delete, cascade into `research_links`. More brittle, cleaner data.
-
-Engranatge doesn't have an established soft-delete pattern today. **Recommendation:** pick (a). Add `deleted_at` to subject tables as part of Phase 1.
-
-### 21.2 OCC column on subject rows
-
-`propose_update` carries `expected_version`. Requires `version int NOT NULL DEFAULT 0` on every table the research agent can propose updates for: at minimum `companies`, `contacts`, `documents`. Bumped on every update.
-
-**Recommendation:** add it. It's a ~10-line migration + 1-line change per update handler. Prevents the worst failure mode (silent clobbers).
-
-### 21.3 Schema registry format
+### 21.1 Schema registry format
 
 Where the compiled Effect Schemas live:
 
@@ -1318,13 +1329,13 @@ Where the compiled Effect Schemas live:
 
 **Recommendation:** (a). Revisit only if users start needing custom schemas.
 
-### 21.4 Durable execution
+### 21.2 Durable execution
 
 Server restart mid-run kills the fiber. v1 solution: on boot, mark `status='running'` rows older than N seconds as `failed`.
 
 **Future:** persist LLM stream state every K tool calls to `research_runs.resume_state jsonb` and have a sweeper re-enqueue long-running runs on boot. Not needed for v1 but plan the column.
 
-### 21.5 GDPR / data retention
+### 21.3 GDPR / data retention
 
 Research stores contact emails and personal details discovered from public sources. EU cooperatives = GDPR applies.
 
@@ -1332,11 +1343,7 @@ Research stores contact emails and personal details discovered from public sourc
 - **DSAR support**: ability to purge all sources + findings referencing a specific email/name.
 - **Consent record**: note in ToS that using research on a subject is a legitimate-interest processing activity.
 
-**Recommendation:** document the policy before shipping Phase 2 (when paid registry lookups start pulling more personal data). Don't ship Phase 2 until this is in writing.
-
-### 21.6 First-run consent copy for Custom mode
-
-Exact wording of the elevation dialog needs review by whoever owns legal/product messaging. Placeholder in §11.4.
+**Recommendation:** document the policy before shipping (paid registry lookups pull personal data). Don't ship until this is in writing.
 
 ---
 
@@ -1344,10 +1351,10 @@ Exact wording of the elevation dialog needs review by whoever owns legal/product
 
 Named so the v1 shape doesn't preclude them.
 
-- **Internal corpus** (pgvector + embeddings over interactions/documents/emails). Slots in as a tier-0 `corpus_search` tool alongside `search_companies`. No schema changes.
-- **Scheduled watchers** (`research_watchers` table, cron triggers, findings diff → webhook). Phase 3.
+- **Internal corpus** (pgvector + embeddings over interactions/documents/emails). Slots in as a tier-0 `corpus_search` tool alongside `crm_lookup`. No schema changes.
+- **Scheduled watchers** (`research_watchers` table, cron triggers, findings diff → webhook).
 - **Knowledge graph of discovered entities** (`research_entities` table, entity dedup across runs, graph traversal). Lets subsequent runs skip re-discovery.
-- **Per-provider trust** in `user_research_preferences.overrides` (v2). Already reserved as a `jsonb` column.
+- **Per-provider trust** in `user_research_policy` as additional jsonb column (v2).
 - **Multi-agent coordination**: coordinator + specialized sub-agents (web, registry, CRM, email). Only worth adding at ≥30 tools or long horizons.
 - **MCP-as-the-abstraction**: let ops add research sources by configuring MCP servers instead of writing providers. Useful if the provider ecosystem matures further.
 - **Email as research channel** via AgentMail: send a clarifying question to a prospect's public address and treat the reply as a source.
@@ -1394,13 +1401,18 @@ Named so the v1 shape doesn't preclude them.
   "tokens_in": 12400,
   "tokens_out": 3100,
   "paid_policy": {
-    "mode": "strict",
-    "default_budget_cents": 50,
-    "default_paid_budget_cents": 0,
-    "auto_approve_paid_cents": 0,
-    "paid_daily_cap_cents": 0,
+    "budget_cents": 100,
+    "paid_budget_cents": 500,
+    "auto_approve_paid_cents": 500,
+    "paid_monthly_cap_cents": 2000,
     "resolved_at": "2026-04-09T14:32:10Z"
   },
+  "tool_log": [
+    { "seq": 1, "type": "tool.call", "tool": "lookup_registry", "at": "…" },
+    { "seq": 2, "type": "tool.result", "tool": "lookup_registry", "cost_cents": 0, "at": "…" },
+    { "seq": 3, "type": "tool.call", "tool": "web_read", "at": "…" },
+    "… (full log of all tool calls/results)"
+  ],
   "idempotency_key": "01J9Z-submit-abc",
   "created_by": "usr_…",
   "created_at": "2026-04-09T14:32:10Z",
@@ -1424,24 +1436,43 @@ Named so the v1 shape doesn't preclude them.
   "last_fetched_at": "2026-04-09T14:32:10Z",
   "content_hash": "sha256:…",
   "content_ref": "s3://forja-sources/registry/librebor/F08234567.json",
-  "archive_url": null,
   "language": "es"
 }
 ```
 
-### 23.3 A `research_run_events` row
+### 23.3 A `research_runs.tool_log` value (written once at completion)
 
 ```jsonc
-{
-  "research_id": "01J9ZK8QYM…",
-  "seq": 4,
-  "type": "tool.call",
-  "payload": {
-    "tool": "web_scrape",
-    "args": { "url": "https://olivera-vilanova.cat", "formats": ["markdown","links"] }
+[
+  {
+    "seq": 1,
+    "type": "tool.call",
+    "tool": "web_search",
+    "args": { "query": "Cooperativa Olivera de Vilanova", "count": 10 },
+    "at": "2026-04-09T14:32:08.201Z"
   },
-  "at": "2026-04-09T14:32:12.103Z"
-}
+  {
+    "seq": 2,
+    "type": "tool.result",
+    "tool": "web_search",
+    "cost_cents": 1,
+    "at": "2026-04-09T14:32:09.530Z"
+  },
+  {
+    "seq": 3,
+    "type": "tool.call",
+    "tool": "web_read",
+    "args": { "url": "https://olivera-vilanova.cat" },
+    "at": "2026-04-09T14:32:12.103Z"
+  },
+  {
+    "seq": 4,
+    "type": "tool.result",
+    "tool": "web_read",
+    "cost_cents": 1,
+    "at": "2026-04-09T14:32:14.887Z"
+  }
+]
 ```
 
 ### 23.4 A `research_paid_spend` row
@@ -1452,7 +1483,7 @@ Named so the v1 shape doesn't preclude them.
   "research_id": "01J9ZK8QYM…",
   "user_id": "usr_…",
   "provider": "einforma",
-  "tool": "lookup_company_report",
+  "tool": "lookup_registry",
   "amount_cents": 300,
   "args": { "country": "ES", "tax_id": "F08234567", "depth": "financials" },
   "result_hash": "sha256:…",
@@ -1472,13 +1503,13 @@ Named so the v1 shape doesn't preclude them.
 - One research mode in v1: `deep` (LLM drives a tool loop).
 - Six capability providers (`Search`, `Scrape`, `Extract`, `Discover`, `Registry`, `Report`), selected per env var. Tech-agnostic.
 - Four tool tiers by cost: 0 (free), 1 (cheap web), 2 (moderate), 3 (paid structured). Climb only when needed.
-- Two policy modes: **Strict** (default, no paid spend without explicit per-run opt-in and approval) and **Custom** (user sets all four knobs). Custom mode enables pre-authorizing paid actions.
-- Links are first-class: `sources` table, content hashes, archived `content_ref` copies, optional Wayback snapshots, inline citations per claim, citation-validation at run completion.
+- One editable spending policy per user: four numbers (budget/run, paid budget/run, auto-approve threshold, monthly cap). Defaults allow €5/run paid spend, €20/month cap, auto-approved within budget.
+- Links are first-class: `sources` table, content hashes, archived `content_ref` copies, inline citations per claim, citation-validation at run completion.
 - Research never mutates domain rows. It writes `proposed_updates` that humans Apply via the existing update endpoints with OCC.
 - Effect handles the agent loop (`LanguageModel.streamText` + `Toolkit`), structured concurrency (`Fiber`, `onInterrupt`), observability, and persistence. No external agentic framework.
-- SSE event streaming is backed by a persisted log (`research_run_events`) so reloads replay cleanly.
-- Budget enforcement at the runtime level via `Ref`; daily cap is the only non-overridable rail.
+- SSE live streaming via in-memory `PubSub`; `tool_log` jsonb on `research_runs` for post-run audit (no replay on reload).
+- Budget enforcement at the runtime level via `Ref`; monthly cap is the only non-overridable rail.
 - MCP surface exposes `research_sync` (synchronous) and `start_research` / `get_research` (async) for Claude Desktop parity.
 - Output formats: jsonb for machine-facing data (`findings`, `sources`, events, policy), markdown text for human narrative (`brief_md`), Tiptap JSON only when saving to `documents.content`.
-- Phased in three slices: skeleton + cheap web → registry + paid + policy → fan-out + more providers + watchers.
-- Six open decisions need resolution before Phase 1 ships; the two cross-cutting ones are subject-table soft-delete and OCC `version` columns.
+- Ships as one vertical slice (§19).
+- Soft-delete on subject tables (§7.2). OCC via `version` column (§7.3). Three remaining open decisions (§21).
