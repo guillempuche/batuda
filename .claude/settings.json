@@ -94,8 +94,9 @@
 		]
 	},
 	"enabledPlugins": {
-		"ai-agent-readability-improver@ai-standards": true,
-		"frontend-design@claude-plugins-official": true
+		"frontend-design@claude-plugins-official": true,
+		"readability-improver@ai-standards": true,
+		"test-bdd@ai-standards": true
 	},
 	"effortLevel": "high"
 }

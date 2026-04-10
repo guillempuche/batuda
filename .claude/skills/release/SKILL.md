@@ -24,8 +24,9 @@ If any check fails, inform the developer and stop.
 Use `AskUserQuestion`:
 
 - **Server** — API at api.engranatge.com (`server-v*` tag → auto-deploys)
+- **Internal** — Forja CRM at forja.engranatge.com (`internal-v*` tag → auto-deploys)
 - **Marketing** — Site at engranatge.com (`marketing-v*` tag → auto-deploys)
-- **Both** — Server first, then Marketing
+- **All** — Server first, then Internal, then Marketing
 
 ## Step 3: Check Commits Exist
 
@@ -33,6 +34,10 @@ Use `AskUserQuestion`:
 # Server
 git describe --tags --match='server-v[0-9]*.[0-9]*.[0-9]*' --abbrev=0 2>/dev/null || echo "no-tag"
 git rev-list <tag>..HEAD --count -- apps/server packages/
+
+# Internal
+git describe --tags --match='internal-v[0-9]*.[0-9]*.[0-9]*' --abbrev=0 2>/dev/null || echo "no-tag"
+git rev-list <tag>..HEAD --count -- apps/internal packages/
 
 # Marketing
 git describe --tags --match='marketing-v[0-9]*.[0-9]*.[0-9]*' --abbrev=0 2>/dev/null || echo "no-tag"
@@ -44,7 +49,7 @@ If 0 commits, ask if they want to force with `--no-git.requireCommits`.
 ## Step 4: Dry Run
 
 ```bash
-pnpm release:server:dry   # or release:marketing:dry
+pnpm release:server:dry   # or release:internal:dry / release:marketing:dry
 ```
 
 Show the expected version and changelog. Ask for confirmation.
@@ -53,6 +58,7 @@ Show the expected version and changelog. Ask for confirmation.
 
 ```bash
 GITHUB_TOKEN=$(gh auth token) pnpm release:server --ci
+GITHUB_TOKEN=$(gh auth token) pnpm release:internal --ci
 GITHUB_TOKEN=$(gh auth token) pnpm release:marketing --ci
 ```
 
