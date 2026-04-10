@@ -30,4 +30,4 @@ ENV PORT=3000
 WORKDIR /app
 COPY --from=build /repo/apps/server/dist /app/dist
 
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/main.mjs"]
