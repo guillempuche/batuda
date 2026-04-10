@@ -1,6 +1,7 @@
 import tailwindcss from '@tailwindcss/vite'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import viteReact from '@vitejs/plugin-react'
+import { nitro } from 'nitro/vite'
 import { defineConfig } from 'vite'
 
 /* `@vitejs/plugin-react` v6 dropped the `babel` option in favour of
@@ -14,8 +15,9 @@ const config = defineConfig({
 	},
 	ssr: {
 		noExternal: ['styled-components'],
+		resolve: { conditions: ['module', 'import', 'default'] },
 	},
-	plugins: [tanstackStart(), viteReact(), tailwindcss()],
+	plugins: [tanstackStart(), nitro(), viteReact(), tailwindcss()],
 })
 
 export default config
