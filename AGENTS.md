@@ -19,12 +19,25 @@ Never install Node or pnpm globally or via other package managers for this proje
 
 Use **`agent-browser`** (already installed) to test and debug the local web app.
 
+Dev ports: **Forja (internal CRM) `:3000`**, Marketing `:3001`, API server `:3010`. Most debugging is against Forja at `:3000`.
+
+### Dev login
+
+A test user is created by `pnpm cli seed` (any preset). Use it to log in when debugging authenticated screens:
+
+- **Email:** `dev@forja.cat`
+- **Password:** `forja-dev-2026`
+
+Exported from `apps/cli/src/commands/seed.ts` as `TEST_USER`. If login fails, re-run `pnpm cli seed --preset minimal` — the seed is idempotent and will (re)create the user via Better-Auth's `signUpEmail`.
+
+Better-Auth lives on the API server at `:3010/auth/*`. The Forja browser sends cookies cross-origin via `credentials: 'include'`; on SSR, loaders forward the incoming `cookie` header server-to-server. Both flows require the API server (`pnpm dev:server`) to be running.
+
 ### Open & navigate
 
 ```bash
-agent-browser open http://localhost:3010              # open pipeline dashboard
-agent-browser open http://localhost:3010/companies    # company list
-agent-browser open http://localhost:3010/tasks        # tasks view
+agent-browser open http://localhost:3000              # open pipeline dashboard
+agent-browser open http://localhost:3000/companies    # company list
+agent-browser open http://localhost:3000/tasks        # tasks view
 agent-browser back                                    # go back
 agent-browser reload                                  # reload page
 ```
@@ -99,6 +112,21 @@ agent-browser set offline off
 
 ---
 
+## API documentation
+
+The server exposes auto-generated OpenAPI docs from the Effect HttpApi spec and Better Auth:
+
+| URL | What |
+|-----|------|
+| `http://localhost:3010/docs` | Scalar interactive docs (all CRM endpoints) |
+| `http://localhost:3010/openapi.json` | Raw OpenAPI 3.1 spec (machine-readable) |
+| `http://localhost:3010/auth/reference` | Better Auth Scalar docs (auth endpoints) |
+| `http://localhost:3010/auth/open-api/generate-schema` | Better Auth raw OpenAPI spec |
+
+The CRM spec is generated from `packages/controllers/src/api.ts` (`ForjaApi`). Adding a new route group or endpoint automatically appears in `/docs` and `/openapi.json`.
+
+---
+
 ## CLI
 
 Use the CLI for local environment management. No `--` needed between `pnpm cli` and the command.
@@ -124,6 +152,7 @@ The CLI connects to Postgres via `DATABASE_URL` in `apps/cli/.env`. Commands tha
 ### File naming
 
 Use **kebab-case** for all filenames, including React components:
+
 - `workshop-nav.tsx` not `WorkshopNav.tsx`
 - `indicator-light.tsx` not `IndicatorLight.tsx`
 - `lang-provider.tsx` not `LangProvider.tsx`
