@@ -39,6 +39,9 @@
 			"performance": {
 				"noAccumulatingSpread": "warn"
 			},
+			"complexity": {
+				"useLiteralKeys": "off"
+			},
 			"style": {
 				"noNonNullAssertion": "warn"
 			},
