@@ -109,10 +109,10 @@ exactOptionalPropertyTypes  → optional props cannot be set to undefined explic
 
 ## Local development
 
-Use Docker Compose for local services. Start Postgres before running the server:
+Use Docker Compose for local services. Start Postgres + MinIO before running the server:
 
 ```bash
-pnpm db:up        # docker compose -f docker/postgres/docker-compose.yml up -d
+pnpm db:up        # docker compose -f docker/docker-compose.yml up -d  (db + storage)
 pnpm db:migrate   # runs Effect Migrator via apps/server/src/db/migrate.ts
 pnpm dev:server   # starts the server (also runs migrations on startup)
 ```
@@ -570,11 +570,28 @@ Key files:
 
 `SessionMiddleware` is applied to all `/v1/*` route groups. It works uniformly for cookies (team members), bearer tokens, and API keys (`enableSessionForAPIKeys: true`).
 
+### Cross-origin policy
+
+Forja (web) lives on `:3000`, marketing on `:3001`, this API on `:3010` — every request is cross-origin. CORS is wired as a global `HttpRouter.middleware` in `src/main.ts` via `HttpMiddleware.cors({ allowedOrigins, credentials: true, ... })`, with `allowedOrigins` read from `ALLOWED_ORIGINS` env (comma-separated) and falling back to `http://localhost:3000,http://localhost:3001` in dev. The same env var is fed to Better-Auth as `trustedOrigins` in `src/lib/auth.ts` so both layers agree on what's legitimate. `credentials: true` is required for the browser to attach the `forja.session_token` cookie on fetch calls that use `credentials: 'include'`.
+
+### Invite-only signup
+
+Public signup is disabled: `emailAndPassword.disableSignUp = true` in `src/lib/auth.ts`. The `/auth/sign-up/email` endpoint returns `400 Email and password sign up is not enabled` (see `sign-up.ts:181-187` in the vendored better-auth source). The browser has no path to create accounts on its own.
+
+New users are created server-side via the admin plugin's `auth.api.createUser` endpoint, which bypasses the `disableSignUp` gate entirely. There are two ways to reach it:
+
+1. **From an authenticated admin session** — a logged-in user with `role: 'admin'` calls `POST /auth/admin/create-user` from any client. This is how a future "invite teammate" UI will work.
+2. **From a trusted server caller using an API key** — a script or MCP tool provisions an API key via `auth.api.createApiKey(...)`, then calls `auth.api.createUser({ body, headers: { 'x-api-key': <key> } })`. Because the `apiKey` plugin is configured with `enableSessionForAPIKeys: true`, an API key presented on a request opens a session carrying the owner's role — so the key must belong to a user with `role: 'admin'` for `createUser` to pass the admin plugin's access check.
+
+**Reference implementation**: `apps/cli/src/commands/seed.ts` uses direct `auth.api.createUser` inside the seed (the CLI has the DB directly, no HTTP) to provision the dev user `dev@forja.cat`. This is the template to copy when writing the production invite flow — same `createUser` call, different caller context (HTTP with API key instead of in-process DB).
+
+Sign-in is unaffected: `POST /auth/sign-in/email` still works for any existing user with `emailAndPassword` credentials. Only the `sign-up/email` path is closed.
+
 ---
 
-## Email service (Resend)
+## Email service (AgentMail)
 
-Outbound email (outreach, follow-ups) and inbound reply handling via [Resend](https://resend.com).
+Outbound email (outreach, follow-ups) and inbound reply handling via [AgentMail](https://agentmail.to). The deeper code samples below still reference the old Resend SDK shape and need a targeted refresh — see `apps/server/src/services/email.ts`, `apps/server/src/services/agentmail-provider.ts` and `apps/server/src/services/email-provider.ts` for the actual current implementation (Tag + Layer pattern with vendor swap at the boundary).
 
 ### Sending
 

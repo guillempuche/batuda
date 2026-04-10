@@ -1,4 +1,6 @@
-# Engranatge: Brand Proposal
+# Engranatge: Visual Brand
+
+The visual identity, central metaphor, layout vocabulary, and design rationale for the Engranatge brand. Paired with `docs/brand-voice.md` (copy voice rules, forbidden words, tone ladders, per-language native-voice rules for Catalan/Castilian/English). Together the two documents are the canonical brand.
 
 What PostHog taught us: the best marketing sites have a **central metaphor** that unifies everything. PostHog's entire site IS a retro PC operating system — every page is an app, the nav is a file browser, the blog is a spreadsheet. That metaphor makes every design decision coherent.
 
@@ -279,33 +281,9 @@ The specific aesthetic vocabulary shared across Engranatge apps. Defined in `@en
 
 ## Tone of Voice
 
-PostHog is irreverent and techy because they talk to developers. Engranatge talks to **local business owners** — people who don't care about tech, they care about results.
+Voice rules live in **`docs/brand-voice.md`**. That document covers the anti-consultant positioning, forbidden words, the workshop metaphor budget for copy, mission framing, tone ladders per funnel stage, and per-language native-voice rules (Catalan, Castilian, English, with Castilianism and anglicism traps).
 
-### Our tone
-
-| Principle              | In practice                                                                                                               |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| **Direct**             | "This saves you 10 hours a week" not "Leverage synergistic automation paradigms"                                          |
-| **Local**              | Catalan first, proud of it. Mediterranean sensibility. "Som del barri" not "We're a global platform"                      |
-| **Honest**             | "This won't work for everyone" — PostHog says "a competitor might suit you better if..."                                  |
-| **Workshop craftsman** | We talk like someone who builds things with their hands. "We built this." "Here's how it works." "This is what it costs." |
-| **Anti-consultant**    | No jargon, no buzzwords, no "digital transformation". Just: "Your invoicing takes 4 hours. We made it take 10 minutes."   |
-
-### Example copy
-
-**Bad (generic SaaS):**
-
-> "Empower your business with AI-driven automation solutions that transform your operational efficiency."
-
-**Good (Engranatge):**
-
-> "El teu negoci fa coses que una maquina podria fer. Nosaltres construim la maquina."
-> (Your business does things a machine could do. We build the machine.)
-
-**Hero headline options:**
-
-- "Les maquines fan la feina. Tu fas el negoci." (Machines do the work. You run the business.)
-- "Eines que treballen mentre tu dorms." (Tools that work while you sleep.)
+Quick orientation for designers working in `brand-visual.md` without opening the voice doc: the brand is **direct, local, honest, workshop-craftsman, anti-consultant**. Never use "empower", "leverage", "synergy", "digital transformation". The mission is *"Machines do the low-value work. Humans do the high-value work."* Every detailed voice rule is in `brand-voice.md`.
 
 ---
 

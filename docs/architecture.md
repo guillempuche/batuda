@@ -65,11 +65,21 @@
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│  Email (Resend)                                                  │
+│  Email (AgentMail)                                               │
 │  ┌──────────────────────────────────────────────────────────┐   │
-│  │  Outbound: apps/server → Resend API → recipient          │   │
-│  │  Inbound:  reply → Resend webhook → POST /webhooks/email │   │
+│  │  Outbound: apps/server → AgentMail API → recipient       │   │
+│  │  Inbound:  reply → AgentMail webhook → POST /webhooks/.. │   │
 │  │  Both auto-logged as interactions                         │   │
+│  └──────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│  Object storage (S3-compatible)                                  │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │  Local dev: MinIO via docker compose (:9000)             │   │
+│  │  Production: Cloudflare R2                                │   │
+│  │  Stores: call recording audio (m4a/mp4/wav)              │   │
+│  │  Linked to call interactions (existing or auto-created)  │   │
 │  └──────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
 
@@ -114,7 +124,7 @@ Local development CLI and TUI. Two entry points:
 - **CLI** (`pnpm cli <command>`) — scriptable commands via Effect CLI
 - **TUI** (`pnpm cli:tui`) — interactive menu via @clack/prompts
 
-Commands: `setup` (copy .env files), `doctor` (7 health checks), `seed` (sample data), `db migrate`/`db reset`, `services up`/`down`/`status` (Docker Compose).
+Commands: `setup` (copy .env files), `doctor` (health checks), `seed` (sample data), `db migrate`/`db reset`, `services up`/`down`/`status` (Docker Compose).
 
 Connects to Postgres via `@effect/sql-pg` using `DATABASE_URL` from `apps/cli/.env`. Commands that don't need the DB never require it.
 
@@ -125,8 +135,9 @@ Effect v4 HTTP server deployed at `api.engranatge.com`. Responsibilities:
 - REST API (consumed by both frontend apps)
 - MCP server — stdio for Claude Code, HTTP/SSE for remote AI
 - Page content API — public routes for prospect pages, internal routes for CRUD
-- Outbound email via Resend (outreach, follow-ups) — auto-logged as interactions
-- Inbound email reply handling via Resend webhooks — auto-logged as interactions
+- Outbound email via AgentMail (outreach, follow-ups) — auto-logged as interactions
+- Inbound email reply handling via AgentMail webhooks — auto-logged as interactions
+- Object storage for call recording audio (S3-compatible: MinIO local, R2 prod) — linked to call interactions (existing or auto-created on upload)
 - Webhook fan-out (fire-and-forget POST to registered endpoints)
 - API key authentication for external integrations
 
@@ -310,6 +321,7 @@ proposals           — quotes sent to companies
 documents           — long-form markdown (research, meeting notes)
 pages               — public prospect sales pages (Tiptap JSON, multilingual)
 webhook_endpoints   — outgoing webhook configuration
+call_recordings     — audio metadata per call (transcript columns nullable, populated in a later phase)
 ```
 
 ### Better Auth tables (auto-managed)
