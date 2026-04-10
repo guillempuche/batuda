@@ -6,7 +6,7 @@ import * as HttpApiClient from 'effect/unstable/httpapi/HttpApiClient'
 
 import { ForjaApi } from '@engranatge/controllers'
 
-const BASE_URL = process.env['SERVER_URL'] ?? 'http://localhost:3010'
+const BASE_URL = process.env['SERVER_URL'] ?? 'https://api.engranatge.localhost'
 
 /**
  * Server-side Forja API client used by route loaders during SSR.

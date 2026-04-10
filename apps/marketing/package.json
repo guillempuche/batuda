@@ -4,7 +4,7 @@
 	"description": "Engranatge — public marketing site",
 	"type": "module",
 	"scripts": {
-		"dev": "vite dev --port 3001",
+		"dev": "portless engranatge vite dev",
 		"build": "vite build",
 		"preview": "vite preview"
 	},

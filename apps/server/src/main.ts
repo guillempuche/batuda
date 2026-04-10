@@ -72,6 +72,15 @@ const ServicesLive = Layer.mergeAll(
 const ServerLive = Layer.unwrap(
 	Effect.gen(function* () {
 		const port = yield* Config.int('PORT').pipe(Config.withDefault(3010))
+		const portlessUrl = yield* Config.string('PORTLESS_URL').pipe(
+			Config.withDefault(''),
+		)
+		const base = portlessUrl || `http://localhost:${port}`
+
+		yield* Effect.logInfo(`docs:     ${base}/docs`)
+		yield* Effect.logInfo(`openapi:  ${base}/openapi.json`)
+		yield* Effect.logInfo(`auth:     ${base}/auth/reference`)
+
 		return NodeHttpServer.layer(createServer, { port })
 	}),
 )
@@ -97,24 +106,26 @@ const EmailProviderLive = Layer.unwrap(
 /**
  * Cross-origin policy for the API.
  *
- * Forja's web app lives on `:3000` and talks to this API on `:3010`, so
- * every request is cross-origin and must be allow-listed here. We also
- * expect the marketing site (`:3001`) to hit `/v1/pages` in the future,
- * so it's pre-registered in dev defaults.
+ * Forja (`forja.engranatge.localhost`) and the marketing site
+ * (`engranatge.localhost`) talk to this API at
+ * `api.engranatge.localhost` via portless. All three sit behind
+ * portless's HTTPS reverse proxy, so every request is cross-origin.
  *
- * `ALLOWED_ORIGINS` is a comma-separated env var and is also fed to
- * Better-Auth as `trustedOrigins` (see `lib/auth.ts`) — the two lists
- * must agree or Better-Auth will reject sign-in requests before this
- * middleware even runs.
+ * `ALLOWED_ORIGINS` is a comma-separated env var that supports glob
+ * wildcards (e.g. `https://*.engranatge.localhost`). Wildcards let
+ * portless git-worktree subdomains (like
+ * `fix-ui.forja.engranatge.localhost`) pass CORS without listing every
+ * branch. The same env var is fed to Better-Auth as `trustedOrigins`
+ * (see `lib/auth.ts`) — Better-Auth supports wildcards natively, and
+ * the two must agree or sign-in requests will be rejected.
  *
  * `credentials: true` is required because the browser will only attach
  * the `forja.*` session cookie when the request is `credentials:
  * 'include'` AND the server responds with
  * `Access-Control-Allow-Credentials: true` AND a specific origin (the
  * CORS spec forbids the `*` wildcard with credentials). Effect's
- * `HttpMiddleware.cors` picks the exact origin from the request's
- * `Origin` header when the allow list has 2+ entries, which is
- * automatic once both `:3000` and `:3001` are registered.
+ * `HttpMiddleware.cors` receives a predicate and echoes back the exact
+ * request `Origin` when it passes.
  *
  * `allowedHeaders` is intentionally left unset so preflight responses
  * echo back whatever the browser asks for (via the
@@ -133,11 +144,24 @@ const CorsLive = Layer.unwrap(
 		const allowedOrigins =
 			configured.length > 0
 				? configured
-				: ['http://localhost:3000', 'http://localhost:3001']
+				: ['https://forja.engranatge.localhost', 'https://engranatge.localhost']
+
+		// Predicate that supports glob wildcards (e.g. "https://*.engranatge.localhost")
+		// so portless git-worktree subdomains like fix-ui.forja.engranatge.localhost
+		// are accepted without listing every branch.
+		const isAllowedOrigin = (origin: string): boolean =>
+			allowedOrigins.some(pattern => {
+				if (!pattern.includes('*')) return origin === pattern
+				const re = new RegExp(
+					`^${pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\\\*/g, '[^/]*')}$`,
+				)
+				return re.test(origin)
+			})
+
 		yield* Effect.logInfo(`cors allowed origins: ${allowedOrigins.join(', ')}`)
 		return HttpRouter.middleware(
 			HttpMiddleware.cors({
-				allowedOrigins,
+				allowedOrigins: isAllowedOrigin,
 				credentials: true,
 				exposedHeaders: ['content-length', 'content-type'],
 				maxAge: 86400,

@@ -38,6 +38,7 @@ export class ForjaApiAtom extends AtomHttpApi.Service<ForjaApiAtom>()(
 	{
 		api: ForjaApi,
 		httpClient: ForjaHttpClientLive,
-		baseUrl: import.meta.env['VITE_SERVER_URL'] ?? 'http://localhost:3010',
+		baseUrl:
+			import.meta.env['VITE_SERVER_URL'] ?? 'https://api.engranatge.localhost',
 	},
 ) {}

@@ -23,6 +23,9 @@ importers:
       lefthook:
         specifier: ^2.1.4
         version: 2.1.4
+      portless:
+        specifier: ^0.10.1
+        version: 0.10.1
       release-it:
         specifier: ^19.0.0
         version: 19.2.4(@types/node@22.19.15)
@@ -155,7 +158,7 @@ importers:
         specifier: 19.2.3
         version: 19.2.3(@types/react@19.2.14)
       '@vitejs/plugin-react-swc':
-        specifier: ^4.3.0
+        specifier: 4.3.0
         version: 4.3.0(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(@types/node@22.19.15)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
       tailwindcss:
         specifier: '>=4'
@@ -3666,6 +3669,12 @@ packages:
 
   pofile@1.1.4:
     resolution: {integrity: sha512-r6Q21sKsY1AjTVVjOuU02VYKVNQGJNQHjTIvs4dEbeuuYfxgYk/DGD2mqqq4RDaVkwdSq0VEtmQUOPe/wH8X3g==}
+
+  portless@0.10.1:
+    resolution: {integrity: sha512-WSzw0bW5tKoK8TIrOr54T43jc0A35XR6RApGEhlbBOl8NgugfQTD3EGKwqE2jjEdcNtPG5WHH/dXzxgVIoY4hw==}
+    engines: {node: '>=20'}
+    os: [darwin, linux, win32]
+    hasBin: true
 
   postcss-value-parser@4.2.0:
     resolution: {integrity: sha512-1NNCs6uurfkVbeXG4S8JFT9t19m45ICnif8zWLd5oPSZ50QnwMfK+H3jv408d4jw/7Bttv5axS5IiHoLaVNHeQ==}
@@ -7900,6 +7909,8 @@ snapshots:
       pathe: 2.0.3
 
   pofile@1.1.4: {}
+
+  portless@0.10.1: {}
 
   postcss-value-parser@4.2.0: {}
 
