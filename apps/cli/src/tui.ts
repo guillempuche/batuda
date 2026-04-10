@@ -7,7 +7,7 @@ import { dbMigrate, dbReset } from './commands/db'
 import { doctor } from './commands/doctor'
 import { seed } from './commands/seed'
 import { servicesDown, servicesStatus, servicesUp } from './commands/services'
-import { setup } from './commands/setup'
+import { appendEnvKeys, resetEnvFile, setup } from './commands/setup'
 import { withDb } from './db'
 
 // ── TUI ────────────────────────────────────────────────────
@@ -59,7 +59,55 @@ const tui = Effect.gen(function* () {
 			s.start('Configuring environment...')
 			const results = yield* setup
 			s.stop('Environment configured!')
-			p.note(results.join('\n'), 'Summary')
+
+			for (const result of results) {
+				switch (result.status) {
+					case 'created':
+						p.log.success(`created ${result.target}`)
+						break
+					case 'up-to-date':
+						p.log.success(`${result.target} up to date`)
+						break
+					case 'skipped':
+						p.log.warn(`skip ${result.target} (no ${result.example})`)
+						break
+					case 'stale': {
+						const lines = result.missing.map(
+							e => `${pc.cyan(e.key)}=${e.line.slice(e.key.length + 1)}`,
+						)
+						p.note(lines.join('\n'), `Missing in ${result.target}`)
+
+						const action = yield* Effect.promise(() =>
+							p.select({
+								message: `${result.target} has ${result.missing.length} missing key(s)`,
+								options: [
+									{
+										value: 'append' as const,
+										label: 'Append missing keys',
+									},
+									{
+										value: 'reset' as const,
+										label: 'Replace entire file from .env.example',
+									},
+									{ value: 'skip' as const, label: 'Skip' },
+								],
+							}),
+						)
+
+						if (p.isCancel(action) || action === 'skip') break
+						if (action === 'append') {
+							yield* appendEnvKeys(result.target, result.missing)
+							p.log.success(
+								`Appended ${result.missing.length} key(s) to ${result.target}`,
+							)
+						} else {
+							yield* resetEnvFile(result.example, result.target)
+							p.log.success(`Replaced ${result.target} from ${result.example}`)
+						}
+						break
+					}
+				}
+			}
 			break
 		}
 

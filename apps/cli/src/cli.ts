@@ -6,7 +6,7 @@ import { dbMigrate, dbReset } from './commands/db'
 import { doctor } from './commands/doctor'
 import { seed, seedAuth, seedReset } from './commands/seed'
 import { servicesDown, servicesStatus, servicesUp } from './commands/services'
-import { setup } from './commands/setup'
+import { appendEnvKeys, resetEnvFile, setup } from './commands/setup'
 import { withDb } from './db'
 
 // ── Seed ───────────────────────────────────────────────────
@@ -56,31 +56,33 @@ const seedCommand = Command.make(
 				yield* Console.log('')
 				yield* Console.log('─── Access hints ───────────────────────────────')
 				yield* Console.log(
-					'  API server:   pnpm dev:server   → http://localhost:3010',
+					'  API server:   pnpm dev:server   → https://api.engranatge.localhost',
 				)
 				yield* Console.log(
-					'  Forja web:    pnpm dev:internal → http://localhost:3000',
+					'  Forja web:    pnpm dev:internal → https://forja.engranatge.localhost',
 				)
 				yield* Console.log(
-					'  Marketing:    pnpm dev:marketing → http://localhost:3001',
-				)
-				yield* Console.log('')
-				yield* Console.log('  API docs (Scalar): http://localhost:3010/docs')
-				yield* Console.log(
-					'  OpenAPI spec:      http://localhost:3010/openapi.json',
-				)
-				yield* Console.log(
-					'  Auth docs:         http://localhost:3010/auth/reference',
-				)
-				yield* Console.log(
-					'  Auth OpenAPI:      http://localhost:3010/auth/open-api/generate-schema',
+					'  Marketing:    pnpm dev:marketing → https://engranatge.localhost',
 				)
 				yield* Console.log('')
 				yield* Console.log(
-					'  Health check:    curl http://localhost:3010/health',
+					'  API docs (Scalar): https://api.engranatge.localhost/docs',
 				)
 				yield* Console.log(
-					'  List companies:  curl http://localhost:3010/v1/companies',
+					'  OpenAPI spec:      https://api.engranatge.localhost/openapi.json',
+				)
+				yield* Console.log(
+					'  Auth docs:         https://api.engranatge.localhost/auth/reference',
+				)
+				yield* Console.log(
+					'  Auth OpenAPI:      https://api.engranatge.localhost/auth/open-api/generate-schema',
+				)
+				yield* Console.log('')
+				yield* Console.log(
+					'  Health check:    curl https://api.engranatge.localhost/health',
+				)
+				yield* Console.log(
+					'  List companies:  curl https://api.engranatge.localhost/v1/companies',
 				)
 				yield* Console.log(
 					'  Docker DB:       docker exec -it engranatge-postgres psql -U engranatge',
@@ -96,15 +98,57 @@ const seedCommand = Command.make(
 
 // ── Setup ──────────────────────────────────────────────────
 
-const setupCommand = Command.make('setup', {}, () =>
-	Effect.gen(function* () {
-		yield* Effect.logInfo('Setting up project...')
-		const results = yield* setup
-		for (const r of results) {
-			yield* Console.log(`  ${r}`)
-		}
-		yield* Effect.logInfo('Setup complete.')
-	}),
+const setupCommand = Command.make(
+	'setup',
+	{
+		update: Flag.boolean('update').pipe(
+			Flag.withDescription('Append missing .env keys from .env.example'),
+			Flag.withDefault(false),
+		),
+		reset: Flag.boolean('reset').pipe(
+			Flag.withDescription('Replace .env files entirely from .env.example'),
+			Flag.withDefault(false),
+		),
+	},
+	({ update, reset }) =>
+		Effect.gen(function* () {
+			yield* Effect.logInfo('Setting up project...')
+			const results = yield* setup
+			for (const result of results) {
+				switch (result.status) {
+					case 'created':
+						yield* Console.log(`  created ${result.target}`)
+						break
+					case 'up-to-date':
+						yield* Console.log(`  ${result.target} up to date`)
+						break
+					case 'skipped':
+						yield* Console.log(`  skip ${result.target} (no ${result.example})`)
+						break
+					case 'stale': {
+						yield* Console.log(
+							`  ${result.target} has ${result.missing.length} missing key(s):`,
+						)
+						for (const e of result.missing) {
+							yield* Console.log(`    ${e.key}`)
+						}
+						if (reset) {
+							yield* resetEnvFile(result.example, result.target)
+							yield* Console.log(`  → replaced from ${result.example}`)
+						} else if (update) {
+							yield* appendEnvKeys(result.target, result.missing)
+							yield* Console.log(`  → appended ${result.missing.length} key(s)`)
+						} else {
+							yield* Console.log(
+								`  → run with --update to append or --reset to replace`,
+							)
+						}
+						break
+					}
+				}
+			}
+			yield* Effect.logInfo('Setup complete.')
+		}),
 ).pipe(Command.withDescription('Set up local environment (copy .env files)'))
 
 // ── Doctor ─────────────────────────────────────────────────
