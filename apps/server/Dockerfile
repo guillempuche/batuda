@@ -10,7 +10,7 @@ ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # Copy workspace manifests first for layer caching
-COPY ./package.json ./pnpm-lock.yaml ./pnpm-workspace.yaml ./
+COPY ./package.json ./pnpm-lock.yaml ./pnpm-workspace.yaml ./tsconfig.base.json ./
 COPY ./apps/server ./apps/server
 COPY ./packages ./packages
 

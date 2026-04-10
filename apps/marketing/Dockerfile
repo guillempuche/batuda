@@ -3,7 +3,7 @@ ENV NODE_OPTIONS=--no-network-family-autoselection
 WORKDIR /repo
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable && corepack prepare pnpm@latest --activate
-COPY ./package.json ./pnpm-lock.yaml ./pnpm-workspace.yaml ./
+COPY ./package.json ./pnpm-lock.yaml ./pnpm-workspace.yaml ./tsconfig.base.json ./
 COPY ./turbo.json ./
 RUN sed -i 's/"prepare": "lefthook install"/"prepare": ""/' package.json
 COPY ./apps ./apps
