@@ -7,6 +7,16 @@ export default {
 			dependencies: ['typescript'],
 		},
 		{
+			label: 'App versions (independently released)',
+			packages: [
+				'@engranatge/server',
+				'@engranatge/internal',
+				'@engranatge/marketing',
+			],
+			dependencyTypes: ['local'],
+			isIgnored: true,
+		},
+		{
 			label: 'Engranatge',
 			dependencies: ['@engranatge/*'],
 			policy: 'sameRange',
