@@ -5,7 +5,7 @@ import {
 	EmailError,
 	EmailSendError,
 	type EmailSendErrorKind,
-} from '../errors.js'
+} from '@engranatge/controllers'
 
 const classifyAgentMailError = (message: string): EmailSendErrorKind => {
 	const m = message.toLowerCase()
@@ -131,7 +131,7 @@ const mapInbox = (i: {
 export const AgentMailProviderLive = Layer.effect(
 	EmailProvider,
 	Effect.gen(function* () {
-		const apiKey = yield* Config.redacted('AGENTMAIL_API_KEY')
+		const apiKey = yield* Config.redacted('EMAIL_API_KEY')
 		const client = new AgentMailClient({
 			apiKey: Redacted.value(apiKey),
 		})

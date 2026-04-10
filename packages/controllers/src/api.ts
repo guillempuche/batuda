@@ -1,4 +1,4 @@
-import { HttpApi } from 'effect/unstable/httpapi'
+import { HttpApi, OpenApi } from 'effect/unstable/httpapi'
 
 import { AgentMailWebhookGroup } from './routes/agentmail-webhook'
 import { AuthGroup } from './routes/auth'
@@ -11,10 +11,19 @@ import { InteractionsGroup } from './routes/interactions'
 import { PagesGroup } from './routes/pages'
 import { ProductsGroup } from './routes/products'
 import { ProposalsGroup } from './routes/proposals'
+import { RecordingsGroup } from './routes/recordings'
 import { TasksGroup } from './routes/tasks'
 import { WebhooksGroup } from './routes/webhooks'
 
 export const ForjaApi = HttpApi.make('ForjaApi')
+	.annotateMerge(
+		OpenApi.annotations({
+			title: 'Engranatge API',
+			version: '0.1.0',
+			description:
+				'CRM and sales pipeline API for Engranatge. Covers companies, contacts, interactions, tasks, documents, proposals, products, email, and recordings.',
+		}),
+	)
 	.add(HealthGroup)
 	.add(AuthGroup)
 	.add(CompaniesGroup)
@@ -28,5 +37,6 @@ export const ForjaApi = HttpApi.make('ForjaApi')
 	.add(WebhooksGroup)
 	.add(EmailGroup)
 	.add(AgentMailWebhookGroup)
+	.add(RecordingsGroup)
 
 export type ForjaApi = typeof ForjaApi

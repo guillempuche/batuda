@@ -1,7 +1,8 @@
 import { Effect } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
-import { ForjaApi } from '../api'
+import { ForjaApi } from '@engranatge/controllers'
+
 import { buildMeta } from '../lib/build-meta'
 
 export const HealthLive = HttpApiBuilder.group(ForjaApi, 'health', handlers =>

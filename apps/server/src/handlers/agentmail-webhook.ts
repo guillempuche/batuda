@@ -3,7 +3,8 @@ import { HttpServerResponse } from 'effect/unstable/http'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import { Webhook } from 'svix'
 
-import { ForjaApi } from '../api'
+import { ForjaApi } from '@engranatge/controllers'
+
 import { EmailService } from '../services/email'
 
 type MessageReceivedPayload = {
@@ -80,7 +81,7 @@ export const AgentMailWebhookLive = HttpApiBuilder.group(
 		Effect.gen(function* () {
 			const svc = yield* EmailService
 			const secretOption = yield* Config.option(
-				Config.redacted('AGENTMAIL_WEBHOOK_SECRET'),
+				Config.redacted('EMAIL_WEBHOOK_SECRET'),
 			)
 
 			return handlers.handleRaw(

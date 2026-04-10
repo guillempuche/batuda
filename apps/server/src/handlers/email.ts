@@ -1,7 +1,8 @@
 import { Effect } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
-import { ForjaApi } from '../api'
+import { ForjaApi } from '@engranatge/controllers'
+
 import { EmailService } from '../services/email'
 
 export const EmailLive = HttpApiBuilder.group(ForjaApi, 'email', handlers =>

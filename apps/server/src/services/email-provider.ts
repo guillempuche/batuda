@@ -1,6 +1,6 @@
 import { type Effect, ServiceMap } from 'effect'
 
-import type { EmailError, EmailSendError } from '../errors.js'
+import type { EmailError, EmailSendError } from '@engranatge/controllers'
 
 // ── Provider-agnostic interfaces ──
 

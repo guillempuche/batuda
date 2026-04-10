@@ -11,6 +11,8 @@ import { CompanyService } from './services/companies'
 import { EmailService } from './services/email'
 import { PageService } from './services/pages'
 import { PipelineService } from './services/pipeline'
+import { RecordingService } from './services/recordings'
+import { S3StorageProviderLive } from './services/s3-storage-provider'
 import { WebhookService } from './services/webhooks'
 
 const ServicesLive = Layer.mergeAll(
@@ -18,6 +20,7 @@ const ServicesLive = Layer.mergeAll(
 	PipelineService.layer,
 	PageService.layer,
 	EmailService.layer,
+	RecordingService.layer,
 ).pipe(Layer.provideMerge(WebhookService.layer))
 
 const ServerLayer = McpToolsLive.pipe(
@@ -29,6 +32,7 @@ const ServerLayer = McpToolsLive.pipe(
 	),
 	Layer.provide(ServicesLive),
 	Layer.provide(AgentMailProviderLive),
+	Layer.provide(S3StorageProviderLive),
 	Layer.provide(PgLive),
 	Layer.provide(
 		Layer.succeed(CurrentUser, {

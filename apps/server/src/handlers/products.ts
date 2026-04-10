@@ -2,7 +2,7 @@ import { Effect } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { ForjaApi } from '../api'
+import { ForjaApi } from '@engranatge/controllers'
 
 export const ProductsLive = HttpApiBuilder.group(
 	ForjaApi,

@@ -3,7 +3,7 @@ import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { ForjaApi } from '../api'
+import { ForjaApi } from '@engranatge/controllers'
 
 export const ContactsLive = HttpApiBuilder.group(
 	ForjaApi,

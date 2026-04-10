@@ -1,7 +1,8 @@
 import { Effect } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
-import { ForjaApi } from '../api'
+import { ForjaApi } from '@engranatge/controllers'
+
 import { PageService } from '../services/pages'
 
 export const PagesLive = HttpApiBuilder.group(ForjaApi, 'pages', handlers =>

@@ -1,29 +1,23 @@
 import { NodeHttpServerRequest } from '@effect/platform-node'
 import { fromNodeHeaders } from 'better-auth/node'
-import { Effect, Layer, ServiceMap } from 'effect'
+import { Effect, Layer } from 'effect'
 import { HttpServerRequest } from 'effect/unstable/http'
-import { HttpApiMiddleware, HttpApiSchema } from 'effect/unstable/httpapi'
 
-import { Unauthorized } from '../errors'
+import {
+	SessionContext,
+	SessionMiddleware,
+	Unauthorized,
+} from '@engranatge/controllers'
+
 import { Auth } from '../lib/auth'
 
-export class SessionContext extends ServiceMap.Service<
-	SessionContext,
-	{
-		readonly userId: string
-		readonly email: string
-		readonly name: string | undefined
-		readonly isAgent: boolean
-	}
->()('SessionContext') {}
-
-export class SessionMiddleware extends HttpApiMiddleware.Service<
-	SessionMiddleware,
-	{ provides: SessionContext }
->()('SessionMiddleware', {
-	error: Unauthorized.pipe(HttpApiSchema.status(401)),
-}) {}
-
+/**
+ * Implementing Layer for the `SessionMiddleware` Tag declared in
+ * `@engranatge/controllers`. Lives here (not in the shared package)
+ * because it depends on Better-Auth and Node HTTP — pulling those into
+ * `packages/controllers` would make the spec package browser-hostile and
+ * defeat the point of sharing the same HttpApi with the frontend client.
+ */
 export const SessionMiddlewareLive = Layer.effect(
 	SessionMiddleware,
 	Effect.gen(function* () {

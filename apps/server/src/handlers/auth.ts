@@ -6,7 +6,8 @@ import { Effect, Layer } from 'effect'
 import { HttpServerRequest, HttpServerResponse } from 'effect/unstable/http'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
-import { ForjaApi } from '../api'
+import { ForjaApi } from '@engranatge/controllers'
+
 import { Auth } from '../lib/auth'
 import { EnvVars } from '../lib/env'
 
