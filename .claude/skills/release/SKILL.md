@@ -1,6 +1,6 @@
 ---
 name: release
-description: Interactive release workflow for Engranatge apps (server, marketing, or both). Handles CalVer versioning, independent deploys, and post-release verification. Use when the developer wants to release, deploy, or create a new version.
+description: This skill should be used when the user asks to "release", "deploy", "ship", "create a new version", "release server", "release marketing", "release internal", "release all", or mentions CalVer versioning. Handles interactive release workflow for Engranatge apps (server, internal, marketing, or all) with independent CalVer versioning, GitHub tag-based deploys, and post-release verification.
 allowed-tools: Bash(git:*) Bash(pnpm:*) Bash(gh:*) Bash(kraft:*) Bash(curl:*) Read AskUserQuestion
 ---
 
@@ -19,9 +19,11 @@ git log HEAD..origin/main --oneline  # Must be empty (up to date)
 
 If any check fails, inform the developer and stop.
 
-## Step 2: Ask Which App to Release
+## Step 2: Determine Which App to Release
 
-Use `AskUserQuestion`:
+If the user passed an argument (e.g. `/release server`, `/release marketing`, `/release all`), use it directly — skip the question. Accepted values: `server`, `internal`, `marketing`, `all`.
+
+Otherwise, use `AskUserQuestion`:
 
 - **Server** — API at api.engranatge.com (`server-v*` tag → auto-deploys)
 - **Internal** — Forja CRM at forja.engranatge.com (`internal-v*` tag → auto-deploys)
