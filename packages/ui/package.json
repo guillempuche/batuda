@@ -34,7 +34,7 @@
 	"devDependencies": {
 		"@types/react": "19.2.14",
 		"tailwindcss": ">=4",
-		"tsdown": "^0.12.4",
+		"tsdown": "^0.21.7",
 		"typescript": "^5.9.3"
 	},
 	"private": true

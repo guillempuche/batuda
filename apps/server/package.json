@@ -7,7 +7,7 @@
 		"dev:mcp": "node --env-file=../../.env --import tsx src/mcp-stdio.ts",
 		"build": "tsdown src/main.ts src/mcp-stdio.ts src/db/migrate.ts",
 		"check-types": "tsc --noEmit",
-		"start": "node dist/main.js",
+		"start": "node dist/main.mjs",
 		"migrate": "node --env-file=../../.env --import tsx src/db/migrate.ts"
 	},
 	"dependencies": {
@@ -28,7 +28,7 @@
 	"devDependencies": {
 		"@types/node": "^22.15.0",
 		"@types/pg": "^8.20.0",
-		"tsdown": "^0.12.4",
+		"tsdown": "^0.21.7",
 		"tsx": "^4.20.3",
 		"typescript": "^5.9.3"
 	},
