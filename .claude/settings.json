@@ -1,10 +1,6 @@
 {
-	"model": "claude-opus-4-6",
 	"respectGitignore": false,
-	"enabledPlugins": {
-		"ai-agent-readability-improver@ai-standards": true
-	},
-	"effortLevel": "high",
+	"model": "claude-opus-4-6",
 	"hooks": {
 		"PreToolUse": [
 			{
@@ -96,5 +92,10 @@
 				]
 			}
 		]
-	}
+	},
+	"enabledPlugins": {
+		"ai-agent-readability-improver@ai-standards": true,
+		"frontend-design@claude-plugins-official": true
+	},
+	"effortLevel": "high"
 }
