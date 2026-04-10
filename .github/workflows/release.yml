@@ -9,6 +9,7 @@ on:
         type: choice
         options:
           - server
+          - internal
           - marketing
           - all
       dry_run:
@@ -52,6 +53,12 @@ jobs:
       - name: Release Server
         if: inputs.app == 'server' || inputs.app == 'all'
         run: pnpm release:server --ci ${{ inputs.dry_run && '--dry-run' || '' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release Internal
+        if: inputs.app == 'internal' || inputs.app == 'all'
+        run: pnpm release:internal --ci ${{ inputs.dry_run && '--dry-run' || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
