@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-04-10 (marketing-v2026.4.11.1)
+
+### Features
+
+* **marketing:** enable Nitro for Node.js/Docker SSR deployment ([ad640c4](https://github.com/guillempuche/engranatge/commit/ad640c4e964a7ce218b4dcc563a04fb0b3c60ace))
+
+### CI/CD
+
+* **deploy:** copy tsconfig.base.json into Docker build context ([81c2414](https://github.com/guillempuche/engranatge/commit/81c2414e980f0b1548556273e64322be38d5d503))
+* **deploy:** harden Dockerfiles with non-root user and lefthook fix ([2116ac6](https://github.com/guillempuche/engranatge/commit/2116ac636b6837774935b54cbf98838e3851e38f))
+
 ## 2026-04-10 (marketing-v2026.4.11.0)
 
 ### Features
