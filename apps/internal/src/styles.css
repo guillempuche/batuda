@@ -1,0 +1,31 @@
+@import "@engranatge/ui/tailwind.css";
+@import "./forja-tokens.css";
+
+:root {
+	/* Layout dimensions — consumers that need clearance above the mobile
+	 * bottom nav, fixed widths for the desktop side nav, or sticky top-bar
+	 * offsets reference these tokens. */
+	--bottom-nav-height: 4.5rem;
+	--side-nav-width: 15rem; /* 240px at 16px root */
+	--top-bar-height: 3.5rem;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+	margin: 0;
+}
+
+body {
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-large-size);
+	line-height: var(--typescale-body-large-line);
+	letter-spacing: var(--typescale-body-large-tracking);
+	background: var(--color-surface);
+	color: var(--color-on-surface);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+/* Forja content must scroll — no viewport lock (marketing uses one) */

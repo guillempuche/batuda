@@ -1,0 +1,27 @@
+/*
+ * Forja — app-local design tokens
+ *
+ * Imported after @engranatge/ui/tailwind.css so shared tokens (palette,
+ * typography, spacing, shape, elevation) are available in the same cascade.
+ * Only domain-specific extensions belong here — if a token could plausibly
+ * be reused by marketing, promote it to packages/ui/src/tokens.css instead.
+ */
+
+:root {
+	/* ═══ Pipeline status ══════════════════════════════════════ */
+	/*    Tonal Mediterranean palette — maps 1:1 to the `status`  */
+	/*    enum in packages/domain/src/schema/companies.ts         */
+
+	--color-status-prospect: #78909c; /* cool blue-grey, untouched    */
+	--color-status-contacted: #5c9ce6; /* blue, reached out            */
+	--color-status-responded: #7e57c2; /* purple, engaged              */
+	--color-status-meeting: #f59e0b; /* amber, scheduled             */
+	--color-status-proposal: #ff8a65; /* warm coral, in negotiation   */
+	--color-status-client: #2e6b4f; /* olive (matches --secondary)  */
+	--color-status-closed: #9e9e9e; /* neutral grey, archived       */
+	--color-status-dead: #ba1a1a; /* error red                    */
+
+	/* Contrast pair for text-on-status (used by StatusBadge).
+	   Every tone above has enough contrast for white text at 14px/500. */
+	--color-on-status: #ffffff;
+}
