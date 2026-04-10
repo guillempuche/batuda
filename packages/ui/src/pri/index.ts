@@ -1,1 +1,6 @@
+export { PriButton, type PriButtonVariant } from './pri-button'
+export { PriCheckbox } from './pri-checkbox'
+export { PriDialog } from './pri-dialog'
+export { PriInput } from './pri-input'
 export { PriSelect } from './pri-select'
+export { PriTabs } from './pri-tabs'

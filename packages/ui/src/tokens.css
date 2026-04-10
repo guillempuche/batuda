@@ -1,9 +1,27 @@
 /* ============================================================
    Engranatge Design Tokens
    Colors · Typography · Spacing · Shape · Elevation · Workshop
+
+   Canonical breakpoints (must match @theme in tailwind.css):
+     --breakpoint-md: 768px
+     --breakpoint-lg: 1024px
+
+   CSS spec disallows var() inside @media, so the literal pixel
+   values are used in styled-components @media rules.
+
+   Scope rules:
+     Core sections below are shared by every consumer (marketing,
+     Forja internal, and future apps). Marketing — workshop metal
+     section is legacy theatrical chrome reserved for the public
+     site; Forja MUST NOT reference --color-metal-*, --texture-
+     brushed-metal, --text-shadow-*, or --elevation-workshop-*.
+     Domain-specific tokens (pipeline status, CRM accents) belong
+     in app-local files (e.g. apps/internal/src/forja-tokens.css).
    ============================================================ */
 
 :root {
+	/* ═══ Core — palette (Mediterranean) ═══════════════════════ */
+
 	/* --- Primary — Terracotta --- */
 	--color-primary: #b05220;
 	--color-on-primary: #ffffff;
@@ -32,15 +50,15 @@
 	--color-outline: #847d71;
 	--color-outline-variant: #ccc5b5;
 
+	/* ═══ Marketing — workshop metal (legacy; not for Forja) ═══ */
+
 	/* --- Metal palette — workshop surfaces --- */
 	--color-metal-light: #e0d8c8;
 	--color-metal: #d0c8b8;
 	--color-metal-dark: #b8b0a0;
 	--color-metal-deep: #908878;
 
-	/* ============================================================
-	   Typography
-	   ============================================================ */
+	/* ═══ Core — typography (Barlow, Barlow Condensed) ═════════ */
 
 	/* Font families */
 	--font-display: "Barlow Condensed", system-ui, -apple-system, sans-serif;
@@ -116,9 +134,8 @@
 	--typescale-label-small-weight: 500;
 	--typescale-label-small-tracking: 0.031rem;
 
-	/* ============================================================
-	   Spacing — fluid scale (8px base grid)
-	   ============================================================ */
+	/* ═══ Core — spacing (fluid clamp, 3xs → 5xl) ══════════════ */
+	/*    8px base grid                                          */
 
 	--space-3xs: clamp(0.125rem, 0.2vw, 0.25rem); /*  2–4px  */
 	--space-2xs: clamp(0.25rem, 0.4vw, 0.5rem); /*  4–8px  */
@@ -136,9 +153,7 @@
 	--page-gutter: clamp(1rem, 4vw, 2rem);
 	--page-max-width: 75rem;
 
-	/* ============================================================
-	   Shape — border radius
-	   ============================================================ */
+	/* ═══ Core — shape (border radius) ═════════════════════════ */
 
 	--shape-2xs: 0.25rem;
 	--shape-xs: 0.5rem;
@@ -147,9 +162,8 @@
 	--shape-lg: 1.75rem;
 	--shape-full: 999px;
 
-	/* ============================================================
-	   Elevation — workshop top-lit metal with inset highlight
-	   ============================================================ */
+	/* ═══ Marketing — workshop elevation (legacy) ══════════════ */
+	/*    Top-lit metal with inset highlight                     */
 
 	--elevation-workshop-sm:
 		inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 3px rgba(0, 0, 0, 0.12);
@@ -158,9 +172,8 @@
 	--elevation-workshop-lg:
 		inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 6px rgba(0, 0, 0, 0.2);
 
-	/* ============================================================
-	   Workshop effects — text shadows & surface textures
-	   ============================================================ */
+	/* ═══ Marketing — workshop effects (legacy) ════════════════ */
+	/*    Text shadows & surface textures                        */
 
 	--text-shadow-emboss: 0 1px 0 rgba(255, 255, 255, 0.4);
 	--text-shadow-engrave: 0 -1px 0 rgba(0, 0, 0, 0.2);
