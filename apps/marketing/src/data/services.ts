@@ -15,8 +15,10 @@ export interface Service {
 	inputs: Record<LangCode, string[]>
 	outputs: Record<LangCode, string[]>
 	examples: Record<LangCode, ServiceExample[]>
-	startingPrice: string
-	priceUnit: Record<LangCode, string>
+	/** Optional — during pilot discovery, pricing is not published. */
+	startingPrice?: string
+	/** Optional — paired with `startingPrice`. */
+	priceUnit?: Record<LangCode, string>
 	includes: Record<LangCode, string[]>
 	excludes: Record<LangCode, string[]>
 }
@@ -25,43 +27,79 @@ export const services: Service[] = [
 	{
 		slug: 'automatitzacions',
 		name: {
-			ca: 'Automatitzacions',
-			es: 'Automatizaciones',
-			en: 'Automations',
+			ca: 'Automatitzacions i micro-SaaS',
+			es: 'Automatizaciones y micro-SaaS',
+			en: 'Automation and micro-SaaS',
 		},
 		tagline: {
-			ca: 'Connectem les teves eines perquè quan passi X, passi Y.',
-			es: 'Conectamos tus herramientas para que cuando pase X, pase Y.',
-			en: 'We connect your tools so when X happens, Y happens.',
+			ca: 'Automatitzacions i micro-SaaS a mida per a les tasques setmanals i mensuals que avui et mengen hores i et deixen errors.',
+			es: 'Automatizaciones y micro-SaaS a medida para las tareas semanales y mensuales que hoy te comen horas y te dejan errores.',
+			en: 'Custom automation and micro-SaaS for the weekly and monthly tasks that today eat hours and leak errors.',
 		},
 		description: {
-			ca: 'Integrem els sistemes que ja fas servir — facturació, correu, fulls de càlcul, CRM — perquè la informació flueixi sola. Sense copiar i enganxar, sense oblidar-se de res.',
-			es: 'Integramos los sistemas que ya usas — facturación, correo, hojas de cálculo, CRM — para que la información fluya sola. Sin copiar y pegar, sin olvidarse de nada.',
-			en: 'We integrate the systems you already use — invoicing, email, spreadsheets, CRM — so information flows on its own. No copy-paste, nothing forgotten.',
+			ca: "Agafem les tasques manuals que es repeteixen cada setmana o cada mes — copiar factures, refer llistes de comandes, classificar PDFs, muntar informes des de cinc pestanyes — i les convertim en alguna cosa que es fa sola. Dos modes: **automatització** (connectem les eines que ja fas servir — facturació, correu, full de càlcul, CRM, TPV, formularis, WhatsApp — perquè la informació flueixi sola) o **micro-SaaS** (construïm una petita app web a mida quan et cal un lloc nou per a les dades o una UI mòbil, com escaneig de codis de barres al magatzem). Si el flux ho demana, hi afegim un model d'IA per llegir un correu, extreure dades d'un PDF o resumir una reunió — el judici el fa la màquina, la decisió final és teva.",
+			es: 'Cogemos las tareas manuales que se repiten cada semana o cada mes — copiar facturas, rehacer listas de pedidos, clasificar PDFs, montar informes desde cinco pestañas — y las convertimos en algo que se hace solo. Dos modos: **automatización** (conectamos las herramientas que ya usas — facturación, correo, hojas de cálculo, CRM, TPV, formularios, WhatsApp — para que la información fluya sola) o **micro-SaaS** (construimos una pequeña app web a medida cuando necesitas un sitio nuevo para los datos o una UI móvil, como escaneo de códigos de barras en el almacén). Si el flujo lo pide, añadimos un modelo de IA para leer un correo, extraer datos de un PDF o resumir una reunión — el juicio lo hace la máquina, la decisión final es tuya.',
+			en: 'We take the manual tasks that repeat every week or every month — copying invoices, rebuilding order lists, classifying PDFs, assembling reports from five tabs — and turn them into something that runs on its own. Two modes: **automation** (we connect the tools you already use — invoicing, email, spreadsheets, CRM, point of sale, web forms, WhatsApp — so information flows on its own) or **micro-SaaS** (we build a small custom web app when you need a new place for data or a mobile UI, like barcode scanning at the warehouse). If the flow calls for it, we add an AI model to read an email, extract data from a PDF, or summarise a meeting — the machine does the judgement, the final decision stays yours.',
 		},
 		inputs: {
-			ca: ['Factures', 'Correus', 'Formularis web', 'Fulls de càlcul'],
-			es: ['Facturas', 'Correos', 'Formularios web', 'Hojas de cálculo'],
-			en: ['Invoices', 'Emails', 'Web forms', 'Spreadsheets'],
+			ca: [
+				'Tasques manuals setmanals i mensuals',
+				'Factures',
+				'Correus',
+				'Formularis web',
+				'Fulls de càlcul',
+				'Documents PDF',
+				'Missatges de WhatsApp',
+				'Recomptes en paper',
+			],
+			es: [
+				'Tareas manuales semanales y mensuales',
+				'Facturas',
+				'Correos',
+				'Formularios web',
+				'Hojas de cálculo',
+				'Documentos PDF',
+				'Mensajes de WhatsApp',
+				'Conteos en papel',
+			],
+			en: [
+				'Weekly and monthly manual tasks',
+				'Invoices',
+				'Emails',
+				'Web forms',
+				'Spreadsheets',
+				'PDF documents',
+				'WhatsApp messages',
+				'Paper-based counts',
+			],
 		},
 		outputs: {
 			ca: [
-				'Registres actualitzats',
+				'Registres actualitzats sols',
 				'Notificacions automàtiques',
 				'Informes generats',
-				'Tasques assignades',
+				'Correus classificats i enrutats',
+				'Dades extretes de PDFs',
+				'Apps web a mida',
+				'Accés des del mòbil',
 			],
 			es: [
-				'Registros actualizados',
+				'Registros actualizados solos',
 				'Notificaciones automáticas',
 				'Informes generados',
-				'Tareas asignadas',
+				'Correos clasificados y enrutados',
+				'Datos extraídos de PDFs',
+				'Apps web a medida',
+				'Acceso desde el móvil',
 			],
 			en: [
-				'Updated records',
+				'Records updated on their own',
 				'Automatic notifications',
 				'Generated reports',
-				'Assigned tasks',
+				'Classified and routed emails',
+				'Data extracted from PDFs',
+				'Custom web apps',
+				'Mobile access',
 			],
 		},
 		examples: {
@@ -82,6 +120,22 @@ export const services: Service[] = [
 						"Formulari web connectat a la gestió d'estoc i avisos automàtics.",
 					result: 'Zero comandes perdudes',
 				},
+				{
+					industry: 'Assessoria',
+					problem:
+						'Cada matí, 30 min classificant correus i reenviant-los al departament correcte.',
+					solution:
+						'IA que llegeix el correu, el classifica i el reenvia automàticament.',
+					result: '30 min/dia estalviats',
+				},
+				{
+					industry: 'Logística',
+					problem:
+						"Control d'estoc en un Excel compartit que sempre estava desactualitzat.",
+					solution:
+						'App web a mida amb escàner de codis de barres i estoc en temps real.',
+					result: 'Estoc sempre actualitzat',
+				},
 			],
 			es: [
 				{
@@ -100,6 +154,22 @@ export const services: Service[] = [
 						'Formulario web conectado a la gestión de stock y avisos automáticos.',
 					result: 'Cero pedidos perdidos',
 				},
+				{
+					industry: 'Asesoría',
+					problem:
+						'Cada mañana, 30 min clasificando correos y reenviándolos al departamento correcto.',
+					solution:
+						'IA que lee el correo, lo clasifica y lo reenvía automáticamente.',
+					result: '30 min/día ahorrados',
+				},
+				{
+					industry: 'Logística',
+					problem:
+						'Control de stock en un Excel compartido que siempre estaba desactualizado.',
+					solution:
+						'App web a medida con escáner de códigos de barras y stock en tiempo real.',
+					result: 'Stock siempre actualizado',
+				},
 			],
 			en: [
 				{
@@ -116,30 +186,48 @@ export const services: Service[] = [
 						'Web form connected to stock management with automatic alerts.',
 					result: 'Zero lost orders',
 				},
+				{
+					industry: 'Accounting firm',
+					problem:
+						'Every morning, 30 min classifying emails and forwarding them to the right department.',
+					solution:
+						'AI reads the email, classifies it, and forwards it automatically.',
+					result: '30 min/day saved',
+				},
+				{
+					industry: 'Logistics',
+					problem:
+						'Stock control in a shared spreadsheet that was always outdated.',
+					solution: 'Custom web app with barcode scanner and real-time stock.',
+					result: 'Stock always up to date',
+				},
 			],
-		},
-		startingPrice: '500 €',
-		priceUnit: {
-			ca: 'per automatització',
-			es: 'por automatización',
-			en: 'per automation',
 		},
 		includes: {
 			ca: [
+				'Reunió de descobriment',
 				'Disseny del flux',
-				'Implementació',
+				'Implementació a mida',
+				"Model d'IA i ajustaments (quan cal)",
+				'Desenvolupament de micro-app (quan cal)',
 				'Test i posada en marxa',
 				'Suport 30 dies',
 			],
 			es: [
+				'Reunión de descubrimiento',
 				'Diseño del flujo',
-				'Implementación',
+				'Implementación a medida',
+				'Modelo de IA y ajustes (cuando hace falta)',
+				'Desarrollo de micro-app (cuando hace falta)',
 				'Test y puesta en marcha',
 				'Soporte 30 días',
 			],
 			en: [
+				'Discovery meeting',
 				'Flow design',
-				'Implementation',
+				'Custom implementation',
+				'AI model and tuning (when needed)',
+				'Micro-app development (when needed)',
 				'Testing & launch',
 				'30-day support',
 			],
@@ -147,243 +235,25 @@ export const services: Service[] = [
 		excludes: {
 			ca: [
 				'Subscripcions a tercers (Zapier, Make...)',
+				"Costos d'API d'IA (OpenAI, etc.)",
+				'Generació de contingut creatiu',
+				'Contingut i dades inicials de les apps',
 				"Canvis d'abast post-lliurament",
 			],
 			es: [
 				'Suscripciones a terceros (Zapier, Make...)',
+				'Costes de API de IA (OpenAI, etc.)',
+				'Generación de contenido creativo',
+				'Contenido y datos iniciales de las apps',
 				'Cambios de alcance post-entrega',
 			],
 			en: [
 				'Third-party subscriptions (Zapier, Make...)',
+				'AI API costs (OpenAI, etc.)',
+				'Creative content generation',
+				'Initial app content and data',
 				'Scope changes after delivery',
 			],
-		},
-	},
-	{
-		slug: 'intel-ligencia-artificial',
-		name: {
-			ca: 'Intel·ligència artificial',
-			es: 'Inteligencia artificial',
-			en: 'Artificial intelligence',
-		},
-		tagline: {
-			ca: 'La IA fa el judici, tu prens les decisions.',
-			es: 'La IA hace el juicio, tú tomas las decisiones.',
-			en: 'AI handles judgement, you make the decisions.',
-		},
-		description: {
-			ca: "Apliquem models d'IA a tasques que requereixen judici però no creativitat: classificar correus, extreure dades de documents, respondre preguntes freqüents, resumir reunions.",
-			es: 'Aplicamos modelos de IA a tareas que requieren juicio pero no creatividad: clasificar correos, extraer datos de documentos, responder preguntas frecuentes, resumir reuniones.',
-			en: 'We apply AI models to tasks that require judgement but not creativity: classifying emails, extracting data from documents, answering FAQs, summarising meetings.',
-		},
-		inputs: {
-			ca: [
-				'Correus',
-				'Documents PDF',
-				'Àudios de reunions',
-				'Consultes de clients',
-			],
-			es: [
-				'Correos',
-				'Documentos PDF',
-				'Audios de reuniones',
-				'Consultas de clientes',
-			],
-			en: ['Emails', 'PDF documents', 'Meeting recordings', 'Client queries'],
-		},
-		outputs: {
-			ca: [
-				'Correus classificats',
-				'Dades extretes',
-				'Respostes automàtiques',
-				'Resums de reunions',
-			],
-			es: [
-				'Correos clasificados',
-				'Datos extraídos',
-				'Respuestas automáticas',
-				'Resúmenes de reuniones',
-			],
-			en: [
-				'Classified emails',
-				'Extracted data',
-				'Automatic responses',
-				'Meeting summaries',
-			],
-		},
-		examples: {
-			ca: [
-				{
-					industry: 'Assessoria',
-					problem:
-						'Cada matí, 30 min classificant correus i reenviant-los al departament correcte.',
-					solution:
-						'IA que llegeix el correu, el classifica i el reenvia automàticament.',
-					result: '30 min/dia estalviats',
-				},
-			],
-			es: [
-				{
-					industry: 'Asesoría',
-					problem:
-						'Cada mañana, 30 min clasificando correos y reenviándolos al departamento correcto.',
-					solution:
-						'IA que lee el correo, lo clasifica y lo reenvía automáticamente.',
-					result: '30 min/día ahorrados',
-				},
-			],
-			en: [
-				{
-					industry: 'Consulting',
-					problem:
-						'Every morning, 30 min classifying emails and forwarding them to the right department.',
-					solution:
-						'AI reads the email, classifies it, and forwards it automatically.',
-					result: '30 min/day saved',
-				},
-			],
-		},
-		startingPrice: '300 €',
-		priceUnit: {
-			ca: '/mes per integració',
-			es: '/mes por integración',
-			en: '/month per integration',
-		},
-		includes: {
-			ca: [
-				'Configuració del model',
-				'Integració amb les teves eines',
-				'Ajustaments inicials',
-				'Suport continu',
-			],
-			es: [
-				'Configuración del modelo',
-				'Integración con tus herramientas',
-				'Ajustes iniciales',
-				'Soporte continuo',
-			],
-			en: [
-				'Model configuration',
-				'Integration with your tools',
-				'Initial tuning',
-				'Ongoing support',
-			],
-		},
-		excludes: {
-			ca: [
-				"Costos d'API d'IA (OpenAI, etc.)",
-				'Generació de contingut creatiu',
-			],
-			es: [
-				'Costes de API de IA (OpenAI, etc.)',
-				'Generación de contenido creativo',
-			],
-			en: ['AI API costs (OpenAI, etc.)', 'Creative content generation'],
-		},
-	},
-	{
-		slug: 'micro-saas',
-		name: {
-			ca: 'Micro-SaaS',
-			es: 'Micro-SaaS',
-			en: 'Micro-SaaS',
-		},
-		tagline: {
-			ca: 'Eines petites que fan una cosa bé.',
-			es: 'Herramientas pequeñas que hacen una cosa bien.',
-			en: 'Small tools that do one thing well.',
-		},
-		description: {
-			ca: "Construïm petites aplicacions web fetes a mida que resolen un problema concret del teu negoci. No són ERPs ni CRMs gegants — són eines petites, ràpides i fàcils d'usar.",
-			es: 'Construimos pequeñas aplicaciones web a medida que resuelven un problema concreto de tu negocio. No son ERPs ni CRMs gigantes — son herramientas pequeñas, rápidas y fáciles de usar.',
-			en: 'We build small custom web apps that solve a specific problem in your business. Not giant ERPs or CRMs — small, fast, and easy-to-use tools.',
-		},
-		inputs: {
-			ca: ['El teu problema', 'Reunió de descobriment', 'Feedback continu'],
-			es: ['Tu problema', 'Reunión de descubrimiento', 'Feedback continuo'],
-			en: ['Your problem', 'Discovery meeting', 'Continuous feedback'],
-		},
-		outputs: {
-			ca: [
-				'Aplicació web a mida',
-				'Accés des de mòbil',
-				'Manteniment inclòs',
-				'Formació al teu equip',
-			],
-			es: [
-				'Aplicación web a medida',
-				'Acceso desde móvil',
-				'Mantenimiento incluido',
-				'Formación a tu equipo',
-			],
-			en: [
-				'Custom web app',
-				'Mobile access',
-				'Maintenance included',
-				'Team training',
-			],
-		},
-		examples: {
-			ca: [
-				{
-					industry: 'Logística',
-					problem:
-						"Control d'estoc en un Excel compartit que sempre estava desactualitzat.",
-					solution:
-						'App web amb escàner de codis de barres i estoc en temps real.',
-					result: 'Estoc sempre actualitzat',
-				},
-			],
-			es: [
-				{
-					industry: 'Logística',
-					problem:
-						'Control de stock en un Excel compartido que siempre estaba desactualizado.',
-					solution:
-						'App web con escáner de códigos de barras y stock en tiempo real.',
-					result: 'Stock siempre actualizado',
-				},
-			],
-			en: [
-				{
-					industry: 'Logistics',
-					problem:
-						'Stock control in a shared spreadsheet that was always outdated.',
-					solution: 'Web app with barcode scanner and real-time stock.',
-					result: 'Stock always up to date',
-				},
-			],
-		},
-		startingPrice: '2.000 €',
-		priceUnit: {
-			ca: 'desenvolupament + 100 €/mes manteniment',
-			es: 'desarrollo + 100 €/mes mantenimiento',
-			en: 'development + €100/month maintenance',
-		},
-		includes: {
-			ca: [
-				'Disseny UX',
-				'Desenvolupament',
-				'Deploy i hosting',
-				'Manteniment mensual',
-			],
-			es: [
-				'Diseño UX',
-				'Desarrollo',
-				'Deploy y hosting',
-				'Mantenimiento mensual',
-			],
-			en: [
-				'UX design',
-				'Development',
-				'Deploy & hosting',
-				'Monthly maintenance',
-			],
-		},
-		excludes: {
-			ca: ['Contingut i dades inicials', 'Integracions no previstes'],
-			es: ['Contenido y datos iniciales', 'Integraciones no previstas'],
-			en: ['Initial content and data', 'Unplanned integrations'],
 		},
 	},
 ]

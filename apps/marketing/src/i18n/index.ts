@@ -6,10 +6,10 @@ export type { Locale } from './ca'
 
 export const locales = { ca, es, en } as const
 export type LangCode = keyof typeof locales
-/* SSR-rendered default. Castilian is the safest baseline for our audience —
+/* SSR-rendered default. English is the baseline for a global audience —
  * the client swaps to the user's actual preference on hydration via the
  * detection logic in `lang-provider`. */
-export const defaultLang: LangCode = 'es'
+export const defaultLang: LangCode = 'en'
 export const langCodes = ['ca', 'es', 'en'] as const
 
 /* BCP-47 region tags for the <html lang> attribute. The internal LangCode

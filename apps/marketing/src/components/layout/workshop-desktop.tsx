@@ -35,12 +35,25 @@ const IconColumn = styled.div.withConfig({ displayName: 'IconColumn' })`
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: var(--space-lg);
 		padding: var(--space-sm) var(--space-xs);
 		width: 7rem;
 		flex-shrink: 0;
-		overflow-y: auto;
+		min-height: 0;
 	}
+`
+
+/* Holds the machine buttons and lets them spread evenly down the pegboard
+ * column so the tools look hung across the whole shadow board — not crammed
+ * below the logo with empty wall underneath. */
+const ToolsRack = styled.div.withConfig({ displayName: 'ToolsRack' })`
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: space-around;
+	width: 100%;
+	min-height: 0;
+	padding: var(--space-md) 0;
 `
 
 const WindowArea = styled.div`
@@ -129,22 +142,24 @@ export function WorkshopDesktop({ children }: { children: React.ReactNode }) {
 						<Cog size={14} />
 						Engranatge
 					</LogoPlate>
-					<ShadowBoardTool icon={Gauge} label={t.nav.home} scrollTo='hero' />
-					<ShadowBoardTool
-						icon={Wrench}
-						label={t.nav.solution}
-						scrollTo='solution'
-					/>
-					<ShadowBoardTool
-						icon={Receipt}
-						label={t.nav.quote}
-						scrollTo='pricing'
-					/>
-					<ShadowBoardTool
-						icon={MessageCircle}
-						label={t.nav.contact}
-						scrollTo='contact'
-					/>
+					<ToolsRack>
+						<ShadowBoardTool icon={Gauge} label={t.nav.home} scrollTo='hero' />
+						<ShadowBoardTool
+							icon={Wrench}
+							label={t.nav.solution}
+							scrollTo='solution'
+						/>
+						<ShadowBoardTool
+							icon={Receipt}
+							label={t.nav.quote}
+							scrollTo='pricing'
+						/>
+						<ShadowBoardTool
+							icon={MessageCircle}
+							label={t.nav.contact}
+							scrollTo='contact'
+						/>
+					</ToolsRack>
 				</IconColumn>
 
 				<WindowArea>

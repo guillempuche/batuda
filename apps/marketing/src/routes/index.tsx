@@ -9,7 +9,6 @@ import { BeforeAfter } from '#/components/workshop/before-after'
 import { ControlPanel } from '#/components/workshop/control-panel'
 import { ConveyorBelt } from '#/components/workshop/conveyor-belt'
 import { MachineCard } from '#/components/workshop/machine-card'
-import { PartsRow } from '#/components/workshop/parts-row'
 import { scatter } from '#/data/scatter'
 import { services } from '#/data/services'
 import { useLang, useTranslations } from '#/i18n/lang-provider'
@@ -347,7 +346,7 @@ function Home() {
 				</Section>
 			</motion.div>
 
-			{/* ── 5. PRICING ── */}
+			{/* ── 5. WHAT'S INCLUDED ── */}
 			<motion.div
 				ref={pricingRef}
 				variants={fadeUp}
@@ -364,12 +363,6 @@ function Home() {
 					{services.map(service => (
 						<PricingBlock key={service.slug}>
 							<PricingName>{service.name[lang]}</PricingName>
-							<PartsRow
-								name={service.name[lang]}
-								description={service.tagline[lang]}
-								price={service.startingPrice}
-								unit={service.priceUnit[lang]}
-							/>
 							<IncludesGrid>
 								<IncludesColumn>
 									<IncludesLabel>{t.pricing.includes}</IncludesLabel>
