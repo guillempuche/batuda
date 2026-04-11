@@ -83,22 +83,47 @@ jobs:
           max_attempts: 2
           retry_wait_seconds: 60
           timeout_minutes: 10
+          # Rollout strategy (zero-downtime for the public site):
+          #
+          #   --rollout remove_sequential
+          #     KraftCloud spins up the new instance first, waits for it to
+          #     boot and bind :3000, then removes the old one. The old
+          #     instance keeps serving traffic until the new one is ready,
+          #     so visitors never hit a 502/504.
+          #
+          #   --rollout-wait 30s
+          #     Grace period between "new instance created" and "old
+          #     instance removed". Nitro + Node on a cold unikernel needs
+          #     ~5-15s to boot and accept connections; 30s is the safety
+          #     margin.
+          #
+          #   -M 1024
+          #     Memory budget. 512 MiB caused CPIO extraction to fail with
+          #     "No space left on device" — the 269 MiB image rootfs plus
+          #     the Node runtime needs ~800 MiB working set.
+          #
+          #   --name is OMITTED on the --service branch so kraft can
+          #   auto-generate a unique instance name; this is what lets the
+          #   old and new instances coexist during the rollout window.
           command: |
             if [ "${{ steps.service-check.outputs.exists }}" = "true" ]; then
               kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
                 --timeout 5m \
                 --service engranatge-marketing \
                 --rollout remove_sequential \
-                --rollout-wait 10s \
-                -M 512 \
+                --rollout-wait 30s \
+                -M 1024 \
                 .
             else
+              # First-time deploy: kraft creates the service + requests a
+              # Let's Encrypt cert via -d <domain>. Port 443:3000 maps TLS
+              # termination to Nitro's listen port.
               kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
                 --timeout 5m \
                 --name engranatge-marketing \
                 -d engranatge.com \
                 -p 443:3000 \
-                -M 512 \
+                -M 1024 \
                 .
             fi
 

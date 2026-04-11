@@ -84,18 +84,26 @@ jobs:
           max_attempts: 3
           retry_wait_seconds: 30
           timeout_minutes: 10
+          # Rollout strategy:
+          #   --rollout remove_sequential: new instance starts first, old
+          #     one is removed only after --rollout-wait, so the API keeps
+          #     serving traffic during the swap (zero downtime).
+          #   --rollout-wait 30s: Nitro + Node + DB pool needs ~10-20s to
+          #     warm up on a cold unikernel; 30s is the safety margin.
+          #   -M 1024: 512 MiB caused CPIO extraction to run out of space
+          #     on the marketing unikernel; matching 1024 here for the
+          #     server's larger runtime footprint (DB driver, R2 SDK,
+          #     AgentMail client).
+          #   --service is mutually exclusive with -p/-d; those are set
+          #   once during the first-time create branch below.
           command: |
-            # Rolling update: new instance spins up, then old one is removed.
-            # When using --service, cannot specify -p (port already defined).
-            # First deploy creates the service with -d and -p; subsequent ones update via --service.
-
             if [ "${{ steps.service-check.outputs.exists }}" = "true" ]; then
               kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
                 --timeout 5m \
                 --service engranatge-server \
                 --rollout remove_sequential \
-                --rollout-wait 10s \
-                -M 512 \
+                --rollout-wait 30s \
+                -M 1024 \
                 -e NODE_ENV=production \
                 -e PORT=3000 \
                 -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
@@ -117,7 +125,7 @@ jobs:
                 --name engranatge-server \
                 -d api.engranatge.com \
                 -p 443:3000 \
-                -M 512 \
+                -M 1024 \
                 -e NODE_ENV=production \
                 -e PORT=3000 \
                 -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \

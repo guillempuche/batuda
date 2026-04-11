@@ -83,14 +83,20 @@ jobs:
           max_attempts: 2
           retry_wait_seconds: 60
           timeout_minutes: 10
+          # Rolling update: --rollout remove_sequential brings up the new
+          # instance, waits 30s for it to bind :3000, then removes the old
+          # one. --name is omitted so both can coexist during the swap.
+          # -M 1024 because 512 was not enough for the CPIO rootfs + Node
+          # runtime. Scale-to-zero stays on via Kraftfile labels (internal
+          # tool, low traffic, 30s cooldown is fine).
           command: |
             if [ "${{ steps.service-check.outputs.exists }}" = "true" ]; then
               kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
                 --timeout 5m \
                 --service engranatge-internal \
                 --rollout remove_sequential \
-                --rollout-wait 10s \
-                -M 512 \
+                --rollout-wait 30s \
+                -M 1024 \
                 .
             else
               kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
@@ -98,7 +104,7 @@ jobs:
                 --name engranatge-internal \
                 -d forja.engranatge.com \
                 -p 443:3000 \
-                -M 512 \
+                -M 1024 \
                 .
             fi
 
