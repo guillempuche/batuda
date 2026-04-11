@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-04-11 (marketing-v2026.4.11.2)
+
+### CI/CD
+
+* **deploy:** harden rolling updates for zero-downtime deploys ([ffb4115](https://github.com/guillempuche/engranatge/commit/ffb4115bbd7517f8ff04af08008bc3450924c388))
+
 ## 2026-04-10 (marketing-v2026.4.11.1)
 
 ### Features
