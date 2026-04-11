@@ -121,20 +121,9 @@ These words and phrases are banned in all customer-facing copy. The left column 
 
 ## Tech stack words — banned in customer copy
 
-Internal tooling names must never appear in customer-facing copy. The reader does not know or care what powers the automation.
+Never name internal tools, frameworks, or vendors in customer-facing copy. The reader does not know or care what powers the automation, and the moment they have to ask, the copy has failed. The canonical list of internal tools lives in `docs/services.md` (Internal tooling stack section); if a name appears there, it must not appear in any landing page, hero, CTA, proposal, email, or social post.
 
-| Strike                              | Replace with                                       |
-| ----------------------------------- | -------------------------------------------------- |
-| n8n                                 | Connection between your tools                      |
-| Flowise                             | AI that reads / classifies / answers               |
-| LLM                                 | AI                                                 |
-| RAG                                 | AI that reads your documents                       |
-| Agent (as AI term)                  | Small machine that…                                |
-| Webhook                             | A signal that…                                     |
-| API                                 | (rephrase — the reader does not know what this is) |
-| Integration (acceptable but boring) | Connection                                         |
-| Model                               | AI                                                 |
-| Prompt                              | (rephrase — never exposed)                         |
+The same rule applies to generic AI and engineering jargon. Replace every term with the *outcome* the reader experiences: a connection, a signal, an AI that reads, a quieter inbox — never a model, prompt, agent, webhook, API, or integration.
 
 Tech names are acceptable only in:
 
