@@ -1,15 +1,8 @@
 {
 	"mcpServers": {
 		"cloudflare-api": {
+			"type": "http",
 			"url": "https://mcp.cloudflare.com/mcp"
-		},
-		"forja": {
-			"command": "pnpm",
-			"args": ["--filter", "@engranatge/server", "dev:mcp"],
-			"env": {
-				"DATABASE_URL": "${DATABASE_URL}"
-			},
-			"description": "Forja — companies, contacts, interactions, documents, pages, pipeline"
 		}
 	}
 }
