@@ -46,3 +46,7 @@ coverage/
 
 # Web
 .tanstack
+
+# AI
+.claude/worktrees
+.claude/*.lock
