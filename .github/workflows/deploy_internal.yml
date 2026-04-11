@@ -62,6 +62,19 @@ jobs:
             echo "version=$(node -p "require('./apps/internal/package.json').version")" >> $GITHUB_OUTPUT
           fi
 
+      - name: Check if KraftCloud service exists
+        id: service-check
+        env:
+          KRAFTCLOUD_TOKEN: ${{ secrets.KRAFTCLOUD_TOKEN }}
+        run: |
+          if kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} service get engranatge-internal >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Service engranatge-internal already exists — will perform rolling update"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Service engranatge-internal does not exist — will create it"
+          fi
+
       - name: Deploy to KraftCloud
         uses: nick-fields/retry@v3
         env:
@@ -71,10 +84,10 @@ jobs:
           retry_wait_seconds: 60
           timeout_minutes: 10
           command: |
-            if [ -n "${{ vars.KRAFTCLOUD_INTERNAL_SERVICE }}" ]; then
+            if [ "${{ steps.service-check.outputs.exists }}" = "true" ]; then
               kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
                 --timeout 5m \
-                --service ${{ vars.KRAFTCLOUD_INTERNAL_SERVICE }} \
+                --service engranatge-internal \
                 --rollout remove_sequential \
                 --rollout-wait 10s \
                 -M 512 \
