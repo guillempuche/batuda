@@ -1,20 +1,23 @@
 import { useLingui } from '@lingui/react/macro'
 import { Check, Plus } from 'lucide-react'
+import { motion } from 'motion/react'
 import styled from 'styled-components'
 
 import { PriCheckbox } from '@engranatge/ui/pri'
 
+import {
+	agedPaperRow,
+	brushedMetalPlate,
+	ruledLedgerRow,
+} from '#/lib/workshop-mixins'
 import { RelativeDate } from './relative-date'
 
 /**
- * Single task row with a PriCheckbox on the left, company + title +
- * due date in the middle, and a trailing "+ Interacció" icon button
- * that opens Quick Capture pre-filled for the task's company.
- *
- * Overdue variant paints an accent bar on the left using the error
- * token — the company's `dueAt < now` test is the caller's job so
- * the same component renders correctly in both "today" and "overdue"
- * list buckets.
+ * Ruled ledger row. Each entry sits on an aged-paper strip with a thin
+ * bottom rule; every fifth row gets a slightly bolder rule so long lists
+ * read as a real accounting sheet. Overdue tasks flash a thick terracotta
+ * rule on the left with a subtle glow, and completed rows fade to 55% with
+ * the title struck through.
  */
 export type TaskItemData = {
 	id: string
@@ -40,7 +43,7 @@ export function TaskItem({
 }) {
 	const { t } = useLingui()
 	return (
-		<Row $overdue={overdue} $completed={completed}>
+		<Row $overdue={overdue} $completed={completed} layout>
 			<PriCheckbox.Root
 				checked={completed}
 				onCheckedChange={next => onToggle(Boolean(next))}
@@ -56,7 +59,7 @@ export function TaskItem({
 			</PriCheckbox.Root>
 			<Body>
 				<Company>{task.companyName}</Company>
-				<Title>{task.title}</Title>
+				<Title $completed={completed}>{task.title}</Title>
 			</Body>
 			<Meta>
 				<RelativeDate value={task.dueAt ?? null} fallback={t`no date`} />
@@ -74,29 +77,28 @@ export function TaskItem({
 	)
 }
 
-const Row = styled.div.withConfig({
+const Row = styled(motion.div).withConfig({
 	displayName: 'TaskItemRow',
-	shouldForwardProp: prop => prop !== '$overdue' && prop !== '$completed',
+	shouldForwardProp: prop => !prop.startsWith('$'),
 })<{ $overdue: boolean; $completed: boolean }>`
+	${agedPaperRow}
+	${ruledLedgerRow}
+	position: relative;
 	display: grid;
 	grid-template-columns: auto 1fr auto auto;
 	align-items: center;
 	gap: var(--space-sm);
 	padding: var(--space-sm) var(--space-md);
-	background: var(--color-surface-container-low);
-	border: 1px solid var(--color-outline-variant);
-	border-left-width: ${p => (p.$overdue ? '3px' : '1px')};
-	border-left-color: ${p =>
-		p.$overdue ? 'var(--color-error)' : 'var(--color-outline-variant)'};
-	border-radius: var(--shape-sm);
 	opacity: ${p => (p.$completed ? 0.55 : 1)};
-	transition:
-		opacity 200ms ease,
-		background 120ms ease;
+	transition: opacity 200ms ease;
+	min-width: 0;
 
-	&:hover {
-		background: var(--color-surface-container);
-	}
+	${p =>
+		p.$overdue &&
+		`
+			border-left: 3px solid var(--color-error);
+			box-shadow: inset 4px 0 8px -4px color-mix(in srgb, var(--color-error) 60%, transparent);
+		`}
 `
 
 const Body = styled.div.withConfig({ displayName: 'TaskItemBody' })`
@@ -107,22 +109,27 @@ const Body = styled.div.withConfig({ displayName: 'TaskItemBody' })`
 `
 
 const Company = styled.span.withConfig({ displayName: 'TaskItemCompany' })`
-	font-family: var(--font-body);
+	font-family: var(--font-display);
 	font-size: var(--typescale-label-medium-size);
 	line-height: var(--typescale-label-medium-line);
 	font-weight: var(--font-weight-bold);
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
 	color: var(--color-on-surface);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 `
 
-const Title = styled.span.withConfig({ displayName: 'TaskItemTitle' })`
+const Title = styled.span.withConfig({
+	displayName: 'TaskItemTitle',
+	shouldForwardProp: prop => prop !== '$completed',
+})<{ $completed: boolean }>`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	line-height: var(--typescale-body-small-line);
-	letter-spacing: var(--typescale-body-small-tracking);
 	color: var(--color-on-surface-variant);
+	text-decoration: ${p => (p.$completed ? 'line-through' : 'none')};
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -131,34 +138,32 @@ const Title = styled.span.withConfig({ displayName: 'TaskItemTitle' })`
 const Meta = styled.span.withConfig({ displayName: 'TaskItemMeta' })`
 	display: inline-flex;
 	align-items: center;
+	font-family: var(--font-body);
+	font-size: var(--typescale-label-small-size);
+	color: var(--color-on-surface-variant);
+	font-style: italic;
 `
 
 const LogButton = styled.button.withConfig({
 	displayName: 'TaskItemLogButton',
 })`
+	${brushedMetalPlate}
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
 	width: 1.75rem;
 	height: 1.75rem;
-	border: 1px solid var(--color-outline-variant);
-	border-radius: var(--shape-full);
-	background: transparent;
-	color: var(--color-on-surface-variant);
+	padding: 0;
+	border-radius: var(--shape-2xs);
+	color: var(--color-on-surface);
 	cursor: pointer;
-	transition:
-		background 120ms ease,
-		color 120ms ease,
-		border-color 120ms ease;
 
-	&:hover {
-		background: var(--color-primary);
-		color: var(--color-on-primary);
-		border-color: var(--color-primary);
+	&:active {
+		transform: translateY(1px);
 	}
 
 	&:focus-visible {
-		outline: 2px solid var(--color-primary);
-		outline-offset: 2px;
+		outline: none;
+		box-shadow: var(--glow-active);
 	}
 `

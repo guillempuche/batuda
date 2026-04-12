@@ -1,15 +1,19 @@
 import styled from 'styled-components'
 
+import { BlueprintSheet } from './blueprint-sheet'
 import { BottomNav } from './bottom-nav'
 import { SideNav } from './side-nav'
 import { TopBar } from './top-bar'
 
 /**
- * Responsive CRM shell:
- *  - Mobile (<1024px): document scroll with fixed bottom nav, padding-bottom
- *    on main so content clears the bar. TopBar is sticky inside Main.
- *  - Desktop (≥1024px): flex row, 240px fixed-width side nav on the left,
- *    scrolling main on the right with sticky TopBar pinned to the top.
+ * Responsive workshop shell. The body is locked at ≥768px (see styles.css)
+ * so scrolling happens inside BlueprintSheet's PriScrollArea viewport —
+ * this lets the sticky rulers, brushed-metal rail scrollbar, and tape
+ * strips stay in place while content slides underneath.
+ *
+ *  - Mobile (<1024px): column layout, SideNav hidden, BottomNav visible.
+ *    BlueprintSheet still owns scroll; on ≥768px the body lock kicks in.
+ *  - Desktop (≥1024px): row layout, SideNav fixed to 240px on the left.
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
 	return (
@@ -17,7 +21,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 			<SideNav />
 			<Main>
 				<TopBar />
-				<Content>{children}</Content>
+				<BlueprintSheet>{children}</BlueprintSheet>
 			</Main>
 			<BottomNav />
 		</Shell>
@@ -29,30 +33,24 @@ const Shell = styled.div.withConfig({ displayName: 'AppShell' })`
 	flex-direction: column;
 	min-height: 100dvh;
 
+	@media (min-width: 768px) {
+		height: 100dvh;
+		min-height: 0;
+		overflow: hidden;
+	}
+
 	@media (min-width: 1024px) {
 		flex-direction: row;
-		height: 100dvh;
-		overflow: hidden;
 	}
 `
 
 const Main = styled.main.withConfig({ displayName: 'AppShellMain' })`
 	flex: 1;
 	min-width: 0;
-	padding-bottom: calc(
-		var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px)
-	);
-
-	@media (min-width: 1024px) {
-		overflow-y: auto;
-		padding-bottom: 0;
-	}
-`
-
-const Content = styled.div.withConfig({ displayName: 'AppShellContent' })`
-	padding: var(--space-lg) var(--space-md);
+	display: flex;
+	flex-direction: column;
 
 	@media (min-width: 768px) {
-		padding: var(--space-xl) var(--space-lg);
+		min-height: 0;
 	}
 `

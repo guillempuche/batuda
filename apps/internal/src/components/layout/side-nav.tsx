@@ -1,25 +1,34 @@
 import { useLingui } from '@lingui/react'
+import { Cog } from 'lucide-react'
+import { motion } from 'motion/react'
 import styled from 'styled-components'
 
+import { PriAvatar } from '@engranatge/ui/pri'
+
+import { ScrewDot } from '#/components/shared/workshop-decorations'
+import {
+	brushedMetalBezel,
+	brushedMetalPlate,
+	stenciledTitle,
+} from '#/lib/workshop-mixins'
 import { navItems } from './nav-items'
 import { NavLink } from './nav-link'
 
 /**
- * Desktop sidebar — visible at ≥1024px viewports via `@media` below.
- * On mobile the entire aside collapses (the bottom-nav takes over).
- *
- * Layout: brand header at the top, vertical nav list, user row pinned to
- * the bottom via `margin-top: auto`. 240px fixed width so the CRM body
- * has a stable writing column.
+ * Desktop sidebar — rendered as a pegboard rack with a metal LogoPlate up
+ * top, a column of shadow-board "tool" rows (metal bezel + colored dome
+ * cap + embossed stencil label), and a sheet-metal footer plate with the
+ * current user. Visible only at ≥1024px; mobile falls back to BottomNav.
  */
 export function SideNav() {
 	const { i18n } = useLingui()
 	return (
 		<Aside>
-			<Brand>
+			<LogoPlate>
+				<Cog size={20} aria-hidden />
 				<Wordmark>Engranatge</Wordmark>
-				<Subtitle>Forja — CRM</Subtitle>
-			</Brand>
+				<Subtitle>Forja</Subtitle>
+			</LogoPlate>
 			<NavList>
 				{navItems.map(item => {
 					const Icon = item.icon
@@ -28,20 +37,33 @@ export function SideNav() {
 						<NavItem key={item.path}>
 							<NavLink to={item.path} exact={item.exact} aria-label={label}>
 								{({ isActive }) => (
-									<NavRow $active={isActive}>
-										<Icon size={20} />
+									<ToolRow
+										as={motion.span}
+										$active={isActive}
+										whileHover={{ x: 2, scale: 1.01 }}
+										whileTap={{ scale: 0.98 }}
+									>
+										<Bezel $color={item.color} $active={isActive}>
+											<DomeCap $color={item.color} $active={isActive}>
+												<Icon size={18} />
+											</DomeCap>
+										</Bezel>
 										<Label>{label}</Label>
-									</NavRow>
+									</ToolRow>
 								)}
 							</NavLink>
 						</NavItem>
 					)
 				})}
 			</NavList>
-			<UserRow>
-				<Avatar aria-hidden>U</Avatar>
+			<FooterPlate>
+				<ScrewDot $position='top-left' $size={5} aria-hidden />
+				<ScrewDot $position='top-right' $size={5} aria-hidden />
+				<PriAvatar.Root>
+					<PriAvatar.Fallback>U</PriAvatar.Fallback>
+				</PriAvatar.Root>
 				<UserName>User</UserName>
-			</UserRow>
+			</FooterPlate>
 		</Aside>
 	)
 }
@@ -50,37 +72,56 @@ const Aside = styled.aside.withConfig({ displayName: 'SideNavAside' })`
 	display: none;
 
 	@media (min-width: 1024px) {
+		position: relative;
 		display: flex;
 		flex-direction: column;
 		width: var(--side-nav-width);
 		flex-shrink: 0;
 		height: 100dvh;
-		background: var(--color-surface-container-low);
-		border-right: 1px solid var(--color-outline-variant);
-		padding: var(--space-lg) var(--space-md);
+		padding: var(--space-lg) var(--space-md) var(--space-md);
+		background-color: var(--color-pegboard);
+		background-image:
+			radial-gradient(
+				circle at 2px 2px,
+				rgba(0, 0, 0, 0.18) 1.5px,
+				transparent 2px
+			),
+			radial-gradient(
+				circle at 14px 14px,
+				rgba(255, 255, 255, 0.05) 1px,
+				transparent 1.5px
+			);
+		background-size: 24px 24px;
+		box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.12);
 	}
 `
 
-const Brand = styled.div.withConfig({ displayName: 'SideNavBrand' })`
-	padding: var(--space-xs) var(--space-sm) var(--space-lg);
+const LogoPlate = styled.div.withConfig({ displayName: 'SideNavLogoPlate' })`
+	${brushedMetalPlate}
+	display: flex;
+	align-items: center;
+	gap: var(--space-sm);
+	padding: var(--space-md) var(--space-md);
+	margin-bottom: var(--space-lg);
+	border-radius: var(--shape-2xs);
+	box-shadow: var(--elevation-workshop-md);
+	color: var(--color-on-surface);
 `
 
 const Wordmark = styled.h1.withConfig({ displayName: 'SideNavWordmark' })`
-	font-family: var(--font-display);
-	font-size: var(--typescale-headline-small-size);
-	line-height: var(--typescale-headline-small-line);
-	font-weight: var(--font-weight-bold);
-	color: var(--color-primary);
-	letter-spacing: -0.01em;
+	${stenciledTitle}
+	font-size: var(--typescale-title-medium-size);
+	line-height: var(--typescale-title-medium-line);
+	letter-spacing: 0.12em;
 `
 
 const Subtitle = styled.p.withConfig({ displayName: 'SideNavSubtitle' })`
-	font-family: var(--font-body);
-	font-size: var(--typescale-label-medium-size);
-	line-height: var(--typescale-label-medium-line);
-	letter-spacing: var(--typescale-label-medium-tracking);
+	margin-left: auto;
+	font-family: var(--font-display);
+	font-size: var(--typescale-label-small-size);
+	line-height: var(--typescale-label-small-line);
+	letter-spacing: 0.08em;
 	color: var(--color-on-surface-variant);
-	margin-top: var(--space-3xs);
 	text-transform: uppercase;
 `
 
@@ -88,7 +129,7 @@ const NavList = styled.ul.withConfig({ displayName: 'SideNavList' })`
 	list-style: none;
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-3xs);
+	gap: var(--space-2xs);
 	margin: 0;
 	padding: 0;
 `
@@ -98,73 +139,95 @@ const NavItem = styled.li.withConfig({ displayName: 'SideNavItem' })`
 		display: block;
 		text-decoration: none;
 		color: inherit;
-		border-radius: var(--shape-sm);
 
 		&:focus-visible {
-			outline: 2px solid var(--color-primary);
-			outline-offset: 2px;
+			outline: none;
+		}
+		&:focus-visible > span {
+			box-shadow: var(--glow-active);
 		}
 	}
 `
 
-const NavRow = styled.span.withConfig({ displayName: 'SideNavRow' })<{
-	$active: boolean
-}>`
+const ToolRow = styled.span.withConfig({
+	displayName: 'SideNavToolRow',
+	shouldForwardProp: p => !p.startsWith('$'),
+})<{ $active: boolean }>`
 	display: flex;
 	align-items: center;
 	gap: var(--space-sm);
-	padding: var(--space-sm) var(--space-md);
-	border-radius: var(--shape-sm);
-	background: ${p =>
-		p.$active ? 'var(--color-secondary-container)' : 'transparent'};
-	color: ${p =>
-		p.$active
-			? 'var(--color-on-secondary-container)'
-			: 'var(--color-on-surface-variant)'};
-	transition:
-		background 120ms ease,
-		color 120ms ease;
+	padding: var(--space-2xs) var(--space-2xs);
+	border-radius: var(--shape-2xs);
+	transition: background 160ms ease;
+	will-change: transform;
 
-	&:hover {
-		background: var(--color-surface-container);
-		color: var(--color-on-surface);
-	}
+	${p =>
+		p.$active &&
+		`
+			background: rgba(245, 158, 11, 0.12);
+			box-shadow: var(--glow-active);
+		`}
+`
+
+const Bezel = styled.span.withConfig({
+	displayName: 'SideNavBezel',
+	shouldForwardProp: p => !p.startsWith('$'),
+})<{ $color: string; $active: boolean }>`
+	${brushedMetalBezel}
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 44px;
+	height: 44px;
+	border-radius: 50%;
+	flex-shrink: 0;
+`
+
+const DomeCap = styled.span.withConfig({
+	displayName: 'SideNavDomeCap',
+	shouldForwardProp: p => !p.startsWith('$'),
+})<{ $color: string; $active: boolean }>`
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 30px;
+	height: 30px;
+	border-radius: 50%;
+	background: radial-gradient(
+		circle at 35% 30%,
+		color-mix(in oklab, ${p => p.$color} 85%, white) 0%,
+		${p => p.$color} 55%,
+		color-mix(in oklab, ${p => p.$color} 70%, black) 100%
+	);
+	border: 1px solid color-mix(in oklab, ${p => p.$color} 60%, black);
+	color: #fff;
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.35),
+		0 1px 2px rgba(0, 0, 0, 0.3);
+	filter: ${p => (p.$active ? 'none' : 'saturate(0.85)')};
 `
 
 const Label = styled.span.withConfig({ displayName: 'SideNavLabel' })`
-	font-family: var(--font-body);
+	${stenciledTitle}
 	font-size: var(--typescale-label-large-size);
 	line-height: var(--typescale-label-large-line);
-	letter-spacing: var(--typescale-label-large-tracking);
-	font-weight: var(--typescale-label-large-weight);
 `
 
-const UserRow = styled.div.withConfig({ displayName: 'SideNavUserRow' })`
+const FooterPlate = styled.div.withConfig({
+	displayName: 'SideNavFooterPlate',
+})`
+	${brushedMetalPlate}
 	margin-top: auto;
 	display: flex;
 	align-items: center;
 	gap: var(--space-sm);
 	padding: var(--space-sm) var(--space-md);
-	border-top: 1px solid var(--color-outline-variant);
-`
-
-const Avatar = styled.span.withConfig({ displayName: 'SideNavAvatar' })`
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 2rem;
-	height: 2rem;
-	border-radius: var(--shape-full);
-	background: var(--color-primary);
-	color: var(--color-on-primary);
-	font-family: var(--font-display);
-	font-weight: var(--font-weight-bold);
-	font-size: var(--typescale-label-large-size);
+	border-radius: var(--shape-2xs);
 `
 
 const UserName = styled.span.withConfig({ displayName: 'SideNavUserName' })`
-	font-family: var(--font-body);
-	font-size: var(--typescale-body-medium-size);
-	line-height: var(--typescale-body-medium-line);
-	color: var(--color-on-surface);
+	${stenciledTitle}
+	font-size: var(--typescale-label-large-size);
+	letter-spacing: 0.06em;
 `

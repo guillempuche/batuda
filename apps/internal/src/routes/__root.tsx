@@ -9,9 +9,13 @@ import {
 	useLocation,
 	useMatches,
 } from '@tanstack/react-router'
+import { LayoutGroup } from 'motion/react'
+
+import { PriToast } from '@engranatge/ui/pri'
 
 import { QuickCaptureDialog } from '#/components/interactions/quick-capture-dialog'
 import { AppShell } from '#/components/layout/app-shell'
+import { ForjaMotionConfig } from '#/components/layout/motion-config'
 import { QuickCaptureProvider } from '#/context/quick-capture-context'
 import { i18n } from '#/i18n'
 import type { DehydratedAtomValue } from '#/lib/atom-hydration'
@@ -112,16 +116,23 @@ function RootComponent() {
 			<I18nProvider i18n={i18n}>
 				<RegistryProvider>
 					<HydrationBoundary state={dehydrated}>
-						{isAuthChrome ? (
-							<Outlet />
-						) : (
-							<QuickCaptureProvider>
-								<AppShell>
-									<Outlet />
-								</AppShell>
-								<QuickCaptureDialog />
-							</QuickCaptureProvider>
-						)}
+						<ForjaMotionConfig>
+							<LayoutGroup>
+								<PriToast.Provider>
+									{isAuthChrome ? (
+										<Outlet />
+									) : (
+										<QuickCaptureProvider>
+											<AppShell>
+												<Outlet />
+											</AppShell>
+											<QuickCaptureDialog />
+										</QuickCaptureProvider>
+									)}
+									<PriToast.Viewport />
+								</PriToast.Provider>
+							</LayoutGroup>
+						</ForjaMotionConfig>
 					</HydrationBoundary>
 				</RegistryProvider>
 			</I18nProvider>

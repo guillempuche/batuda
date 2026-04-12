@@ -12,7 +12,7 @@
 	/*    Tonal Mediterranean palette — maps 1:1 to the `status`  */
 	/*    enum in packages/domain/src/schema/companies.ts         */
 
-	--color-status-prospect: #78909c; /* cool blue-grey, untouched    */
+	--color-status-prospect: #8b9a9c; /* warm blue-grey, cold storage */
 	--color-status-contacted: #5c9ce6; /* blue, reached out            */
 	--color-status-responded: #7e57c2; /* purple, engaged              */
 	--color-status-meeting: #f59e0b; /* amber, scheduled             */
@@ -24,4 +24,28 @@
 	/* Contrast pair for text-on-status (used by StatusBadge).
 	   Every tone above has enough contrast for white text at 14px/500. */
 	--color-on-status: #ffffff;
+
+	/* ═══ Workshop surfaces — Forja chrome palette ════════════════ */
+	/*    Repeated in enough styled-components that renaming them in  */
+	/*    lockstep becomes the dominant cost; kept here (vs the       */
+	/*    shared token file) because marketing does not consume them  */
+	/*    — its metal plates sit on different base surfaces.          */
+
+	--color-paper-aged: #f0e8d0;
+	--color-paper-aged-hover: #ede2c6;
+	--color-pegboard: #b8a88c;
+	--color-leather-dark: #3e2723;
+
+	/* Ruled-ledger line tones (rgba — need alpha for overlay effect) */
+	--color-ledger-line-soft: rgba(120, 95, 60, 0.25);
+	--color-ledger-line: rgba(120, 95, 60, 0.3);
+	--color-ledger-line-strong: rgba(120, 95, 60, 0.5);
+
+	/* Paper fibre warm accent — used under radial-gradient for page grain */
+	--color-paper-fibre-a: rgba(180, 155, 120, 0.06);
+	--color-paper-fibre-b: rgba(180, 155, 120, 0.05);
+
+	/* Aged-paper inset/outer shadows (depth cue for file cards). */
+	--shadow-paper-inset: 0 1px 0 rgba(255, 255, 255, 0.55) inset;
+	--shadow-paper-card: 0 2px 6px rgba(0, 0, 0, 0.12);
 }

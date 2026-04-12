@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react'
 import styled from 'styled-components'
 
+import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
+
 /**
- * Section title used across the Pipeline dashboard and any other
- * page that groups lists into buckets. Optional count badge shows
- * the item total; optional action slot renders a right-aligned
- * element (typically a "Mostra tot" link or a mini-button).
+ * Stenciled display-font section title with a ruler under-rule. Optional
+ * count badge renders as a mini stamped-metal tag; the action slot stays
+ * right-aligned for "show all" links or toolbar buttons.
  */
 export function SectionHeader({
 	title,
@@ -18,10 +19,10 @@ export function SectionHeader({
 }) {
 	return (
 		<Wrapper>
-			<Heading>
-				{title}
+			<TitleRow>
+				<Heading>{title}</Heading>
 				{typeof count === 'number' && <Count>{count}</Count>}
-			</Heading>
+			</TitleRow>
 			{action && <Actions>{action}</Actions>}
 		</Wrapper>
 	)
@@ -32,35 +33,47 @@ const Wrapper = styled.div.withConfig({ displayName: 'SectionHeader' })`
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--space-sm);
-	padding-bottom: var(--space-xs);
+	padding-bottom: var(--space-sm);
+	background-image: repeating-linear-gradient(
+		90deg,
+		var(--color-ledger-line-strong) 0 4px,
+		transparent 4px 10px
+	);
+	background-repeat: no-repeat;
+	background-position: left bottom;
+	background-size: 100% 1px;
+`
+
+const TitleRow = styled.div.withConfig({
+	displayName: 'SectionHeaderTitleRow',
+})`
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-sm);
+	min-width: 0;
 `
 
 const Heading = styled.h3.withConfig({ displayName: 'SectionHeaderTitle' })`
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-2xs);
-	font-family: var(--font-body);
-	font-size: var(--typescale-title-small-size);
-	line-height: var(--typescale-title-small-line);
-	font-weight: var(--typescale-title-small-weight);
-	letter-spacing: var(--typescale-title-small-tracking);
-	color: var(--color-on-surface);
-	text-transform: uppercase;
+	${stenciledTitle}
 	margin: 0;
+	font-size: var(--typescale-title-medium-size);
+	line-height: var(--typescale-title-medium-line);
 `
 
 const Count = styled.span.withConfig({ displayName: 'SectionHeaderCount' })`
+	${brushedMetalPlate}
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	min-width: 1.5rem;
-	padding: 0 var(--space-2xs);
-	height: 1.25rem;
-	background: var(--color-surface-container);
-	color: var(--color-on-surface-variant);
-	border-radius: var(--shape-full);
+	min-width: 1.75rem;
+	padding: 2px var(--space-2xs);
+	border-radius: var(--shape-2xs);
+	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
-	font-weight: var(--font-weight-medium);
+	font-weight: var(--font-weight-bold);
+	letter-spacing: 0.04em;
+	color: var(--color-on-surface);
+	text-shadow: var(--text-shadow-emboss);
 `
 
 const Actions = styled.div.withConfig({ displayName: 'SectionHeaderActions' })`

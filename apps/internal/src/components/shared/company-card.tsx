@@ -1,22 +1,26 @@
-import { Trans } from '@lingui/react/macro'
+import { useLingui } from '@lingui/react/macro'
 import { Link } from '@tanstack/react-router'
-import { Plus } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { motion } from 'motion/react'
 import styled from 'styled-components'
 
+import { PriContextMenu } from '@engranatge/ui/pri'
+
+import { agedPaperSurface } from '#/lib/workshop-mixins'
 import { PriorityDot } from './priority-dot'
 import { RelativeDate } from './relative-date'
 import { StatusBadge } from './status-badge'
+import { ScrewDot } from './workshop-decorations'
 
 /**
- * Compact summary card for a single company. Clicking anywhere on the
- * card navigates to `/companies/$slug`; hover/tap reveals two inline
- * actions ("+ Interacció", "+ Tasca") that open dialogs without losing
- * the user's current scroll position.
+ * Aged-paper file card for a single company. Micro-rotated to break the
+ * grid rhythm, with a screw dot pinned to the top-left corner. Clicking
+ * the card navigates to `/companies/$slug`; hover straightens the card
+ * and lifts it slightly. The card shares a Motion `layoutId` with the
+ * detail-page header so navigation animates as a shared element.
  *
- * The inline action buttons are rendered through the `actions` render-
- * prop so the list container controls which actions appear — that keeps
- * this card agnostic of dialog wiring.
+ * Right-click opens a `PriContextMenu` with quick actions (log, add task,
+ * copy slug, open in new tab) — handlers come from the `actions` prop so
+ * the card stays agnostic of dialog/router wiring.
  */
 export type CompanyCardData = {
 	slug: string
@@ -29,107 +33,123 @@ export type CompanyCardData = {
 	lastContactedAt?: Date | string | null
 }
 
+export type CompanyCardActions = {
+	onLogInteraction?: () => void
+	onAddTask?: () => void
+	onMarkContacted?: () => void
+}
+
 export function CompanyCard({
 	company,
 	actions,
 }: {
 	company: CompanyCardData
-	actions?: ReactNode
+	actions?: CompanyCardActions
 }) {
+	const { t } = useLingui()
 	const subtitle = [company.location, company.industry]
 		.filter((part): part is string => Boolean(part))
 		.join(' · ')
 
+	const copySlug = () => {
+		void navigator.clipboard?.writeText(company.slug)
+	}
+
+	const openInNewTab = () => {
+		window.open(`/companies/${company.slug}`, '_blank', 'noopener')
+	}
+
 	return (
-		<Card>
-			<CardLinkOverlay>
-				<Link
-					to='/companies/$slug'
-					params={{ slug: company.slug }}
-					aria-label={company.name}
-				/>
-			</CardLinkOverlay>
-			<Header>
-				<Identity>
-					<Name>{company.name}</Name>
-					{subtitle && <Subtitle>{subtitle}</Subtitle>}
-				</Identity>
-				<PriorityDot priority={company.priority ?? null} />
-			</Header>
-			<Footer>
-				<StatusBadge status={company.status} />
-				<LastContact>
-					<span>
-						<Trans>Last contact:</Trans>
-					</span>
-					<RelativeDate
-						value={company.lastContactedAt ?? null}
-						fallback='never'
+		<PriContextMenu.Root>
+			<PriContextMenu.Trigger
+				render={
+					<Card
+						layoutId={`company-${company.slug}`}
+						whileHover={{
+							rotate: 0,
+							y: -3,
+							transition: { type: 'spring', stiffness: 400, damping: 28 },
+						}}
 					/>
-				</LastContact>
-			</Footer>
-			{actions && <Actions>{actions}</Actions>}
-		</Card>
+				}
+			>
+				<CardLinkOverlay>
+					<Link
+						to='/companies/$slug'
+						params={{ slug: company.slug }}
+						aria-label={company.name}
+					/>
+				</CardLinkOverlay>
+				<ScrewDot $position='top-left' aria-hidden />
+				<Header>
+					<Identity>
+						<Name>{company.name}</Name>
+						{subtitle && <Subtitle>{subtitle}</Subtitle>}
+					</Identity>
+					<PriorityDot priority={company.priority ?? null} />
+				</Header>
+				<Footer>
+					<StatusBadge status={company.status} />
+					<LastContact>
+						<LastContactLabel>{t`Last contact`}</LastContactLabel>
+						<RelativeDate
+							value={company.lastContactedAt ?? null}
+							fallback='never'
+						/>
+					</LastContact>
+				</Footer>
+			</PriContextMenu.Trigger>
+			<PriContextMenu.Portal>
+				<PriContextMenu.Positioner>
+					<PriContextMenu.Popup>
+						{actions?.onLogInteraction && (
+							<PriContextMenu.Item onClick={() => actions.onLogInteraction?.()}>
+								{t`Log interaction`}
+							</PriContextMenu.Item>
+						)}
+						{actions?.onAddTask && (
+							<PriContextMenu.Item onClick={() => actions.onAddTask?.()}>
+								{t`Add task`}
+							</PriContextMenu.Item>
+						)}
+						{actions?.onMarkContacted && (
+							<PriContextMenu.Item onClick={() => actions.onMarkContacted?.()}>
+								{t`Mark contacted`}
+							</PriContextMenu.Item>
+						)}
+						<PriContextMenu.Item onClick={openInNewTab}>
+							{t`Open in new tab`}
+						</PriContextMenu.Item>
+						<PriContextMenu.Item onClick={copySlug}>
+							{t`Copy slug`}
+						</PriContextMenu.Item>
+					</PriContextMenu.Popup>
+				</PriContextMenu.Positioner>
+			</PriContextMenu.Portal>
+		</PriContextMenu.Root>
 	)
 }
 
-/**
- * Pre-built inline action button used by lists that want to render
- * "+ Interacció" / "+ Tasca" pills on the card. Wrap in a click handler
- * that calls `event.stopPropagation()` + `event.preventDefault()` so
- * the card link doesn't intercept the action.
- */
-export function CompanyCardAction({
-	label,
-	onClick,
-}: {
-	label: string
-	onClick: () => void
-}) {
-	return (
-		<ActionButton
-			type='button'
-			onClick={event => {
-				event.preventDefault()
-				event.stopPropagation()
-				onClick()
-			}}
-		>
-			<Plus size={14} />
-			<span>{label}</span>
-		</ActionButton>
-	)
-}
-
-const Card = styled.article.withConfig({ displayName: 'CompanyCard' })`
+const Card = styled(motion.article).withConfig({ displayName: 'CompanyCard' })`
+	${agedPaperSurface}
 	position: relative;
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-sm);
-	background: var(--color-surface-container-low);
-	border: 1px solid var(--color-outline-variant);
-	border-radius: var(--shape-md);
-	padding: var(--space-md);
-	transition:
-		background 120ms ease,
-		border-color 120ms ease,
-		transform 120ms ease;
+	padding: var(--space-md) var(--space-md) var(--space-sm);
+	color: var(--color-on-surface);
+	transform-origin: 50% 0;
+	rotate: var(--card-rotate, 0deg);
+	will-change: transform;
 
-	&:hover,
 	&:focus-within {
-		background: var(--color-surface-container);
-		border-color: var(--color-outline);
+		box-shadow:
+			var(--shadow-paper-inset),
+			var(--shadow-paper-card),
+			var(--glow-active);
 	}
 `
 
-/* Full-card link — absolutely positioned so it covers the card without
- * stealing text-selection or preventing the action buttons from being
- * clickable (they use stopPropagation to override the overlay).
- *
- * We style a wrapper div and target the nested <a> via descendant
- * selector because `styled(Link)` loses TanStack Router's typed `params`
- * inference (the generic `to` → params mapping falls back to AnyRouter).
- */
 const CardLinkOverlay = styled.div.withConfig({
 	displayName: 'CompanyCardLinkOverlay',
 })`
@@ -141,14 +161,12 @@ const CardLinkOverlay = styled.div.withConfig({
 		display: block;
 		position: absolute;
 		inset: 0;
-		border-radius: var(--shape-md);
 		text-indent: -9999px;
 		overflow: hidden;
 	}
 
 	a:focus-visible {
-		outline: 2px solid var(--color-primary);
-		outline-offset: 2px;
+		outline: none;
 	}
 `
 
@@ -159,6 +177,7 @@ const Header = styled.div.withConfig({ displayName: 'CompanyCardHeader' })`
 	align-items: flex-start;
 	justify-content: space-between;
 	gap: var(--space-sm);
+	padding-left: var(--space-sm);
 	pointer-events: none;
 `
 
@@ -170,25 +189,26 @@ const Identity = styled.div.withConfig({ displayName: 'CompanyCardIdentity' })`
 `
 
 const Name = styled.h3.withConfig({ displayName: 'CompanyCardName' })`
+	margin: 0;
 	font-family: var(--font-display);
 	font-size: var(--typescale-title-medium-size);
 	line-height: var(--typescale-title-medium-line);
-	font-weight: var(--typescale-title-medium-weight);
-	letter-spacing: var(--typescale-title-medium-tracking);
+	font-weight: var(--font-weight-bold);
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
 	color: var(--color-on-surface);
-	margin: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 `
 
 const Subtitle = styled.p.withConfig({ displayName: 'CompanyCardSubtitle' })`
+	margin: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	line-height: var(--typescale-body-small-line);
-	letter-spacing: var(--typescale-body-small-tracking);
 	color: var(--color-on-surface-variant);
-	margin: 0;
+	font-style: italic;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -213,50 +233,17 @@ const LastContact = styled.span.withConfig({
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
-
-	span {
-		opacity: 0.7;
-	}
+	font-style: italic;
 `
 
-const Actions = styled.div.withConfig({ displayName: 'CompanyCardActions' })`
-	position: relative;
-	z-index: 2;
-	display: flex;
-	flex-wrap: wrap;
-	gap: var(--space-2xs);
-	pointer-events: auto;
-`
-
-const ActionButton = styled.button.withConfig({
-	displayName: 'CompanyCardActionButton',
+const LastContactLabel = styled.span.withConfig({
+	displayName: 'CompanyCardLastContactLabel',
 })`
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-3xs);
-	padding: var(--space-3xs) var(--space-xs);
-	background: var(--color-surface);
-	color: var(--color-on-surface-variant);
-	border: 1px solid var(--color-outline-variant);
-	border-radius: var(--shape-full);
-	font-family: var(--font-body);
-	font-size: var(--typescale-label-small-size);
-	font-weight: var(--typescale-label-small-weight);
-	letter-spacing: var(--typescale-label-small-tracking);
-	cursor: pointer;
-	transition:
-		background 120ms ease,
-		color 120ms ease,
-		border-color 120ms ease;
-
-	&:hover {
-		background: var(--color-primary);
-		color: var(--color-on-primary);
-		border-color: var(--color-primary);
-	}
-
-	&:focus-visible {
-		outline: 2px solid var(--color-primary);
-		outline-offset: 2px;
-	}
+	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	font-style: normal;
+	color: var(--color-on-surface);
+	opacity: 0.7;
 `

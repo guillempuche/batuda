@@ -3,11 +3,16 @@ import { msg } from '@lingui/core/macro'
 import { useLingui } from '@lingui/react'
 import styled from 'styled-components'
 
+import { PriTooltip } from '@engranatge/ui/pri'
+
+import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
+
 /**
- * Pipeline status pill using the `--color-status-*` tokens from
- * `forja-tokens.css`. The transient `$status` prop is typed against
- * the exact enum values stored in the `companies.status` column (see
- * `packages/domain/src/schema/companies.ts`).
+ * Stamped-metal status tag. The chrome is a brushed-metal gradient with a
+ * thick left rule tinted by `--color-status-*`, so the status palette
+ * still reads at a glance without swamping the workshop chrome. Label is
+ * embossed display-font uppercase. Wrapped in `PriTooltip` for the
+ * long-press / hover explanation of the abbreviated status.
  */
 export type CompanyStatus =
 	| 'prospect'
@@ -30,6 +35,17 @@ const statusLabels: Record<CompanyStatus, MessageDescriptor> = {
 	dead: msg`Dead`,
 }
 
+const statusDescriptions: Record<CompanyStatus, MessageDescriptor> = {
+	prospect: msg`Cold lead — no contact yet`,
+	contacted: msg`First outreach sent`,
+	responded: msg`They replied — keep the thread warm`,
+	meeting: msg`Meeting booked`,
+	proposal: msg`Proposal in review`,
+	client: msg`Active client`,
+	closed: msg`Closed — won or lost`,
+	dead: msg`Archived — not pursuing`,
+}
+
 const statusTokens: Record<CompanyStatus, string> = {
 	prospect: 'var(--color-status-prospect)',
 	contacted: 'var(--color-status-contacted)',
@@ -41,7 +57,6 @@ const statusTokens: Record<CompanyStatus, string> = {
 	dead: 'var(--color-status-dead)',
 }
 
-/** Normalize any string into a known status, falling back to `prospect`. */
 export function asCompanyStatus(value: string): CompanyStatus {
 	return value in statusTokens ? (value as CompanyStatus) : 'prospect'
 }
@@ -58,28 +73,40 @@ export function StatusBadge({
 		typeof status === 'string' ? status : 'prospect',
 	)
 	return (
-		<Pill $status={normalized} $size={size}>
-			{i18n._(statusLabels[normalized])}
-		</Pill>
+		<PriTooltip.Provider delay={400}>
+			<PriTooltip.Root>
+				<PriTooltip.Trigger render={<Tag $status={normalized} $size={size} />}>
+					{i18n._(statusLabels[normalized])}
+				</PriTooltip.Trigger>
+				<PriTooltip.Portal>
+					<PriTooltip.Positioner side='top' sideOffset={6}>
+						<PriTooltip.Popup>
+							{i18n._(statusDescriptions[normalized])}
+						</PriTooltip.Popup>
+					</PriTooltip.Positioner>
+				</PriTooltip.Portal>
+			</PriTooltip.Root>
+		</PriTooltip.Provider>
 	)
 }
 
-const Pill = styled.span.withConfig({
-	displayName: 'StatusBadge',
+const Tag = styled.span.withConfig({
+	displayName: 'StatusBadgeTag',
 	shouldForwardProp: prop => prop !== '$status' && prop !== '$size',
 })<{ $status: CompanyStatus; $size: 'sm' | 'lg' }>`
+	${brushedMetalPlate}
+	${stenciledTitle}
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-3xs);
-	background: ${p => statusTokens[p.$status]};
-	color: var(--color-on-status);
-	border-radius: var(--shape-full);
-	font-family: var(--font-body);
-	font-weight: var(--font-weight-medium);
-	text-transform: uppercase;
-	letter-spacing: var(--typescale-label-small-tracking);
+	padding: ${p =>
+		p.$size === 'lg'
+			? 'var(--space-2xs) var(--space-md) var(--space-2xs) calc(var(--space-md) + 4px)'
+			: 'var(--space-3xs) var(--space-sm) var(--space-3xs) calc(var(--space-sm) + 4px)'};
+	border-left: 4px solid ${p => statusTokens[p.$status]};
+	border-radius: var(--shape-2xs);
 	white-space: nowrap;
-	padding: ${p => (p.$size === 'lg' ? 'var(--space-2xs) var(--space-md)' : 'var(--space-3xs) var(--space-sm)')};
+	transform: rotate(-0.5deg);
 	font-size: ${p =>
 		p.$size === 'lg'
 			? 'var(--typescale-label-medium-size)'

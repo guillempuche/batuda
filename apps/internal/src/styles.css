@@ -22,10 +22,35 @@ body {
 	font-size: var(--typescale-body-large-size);
 	line-height: var(--typescale-body-large-line);
 	letter-spacing: var(--typescale-body-large-tracking);
-	background: var(--color-surface);
 	color: var(--color-on-surface);
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
+
+	/* Pegboard workshop body — warm tan + perforated radial-dot grid.
+	 * The brand doc's workshop metaphor starts here: every Forja chrome
+	 * element sits on top of this as if bolted to the board. */
+	background-color: var(--color-pegboard);
+	background-image:
+		radial-gradient(
+			circle at 2px 2px,
+			rgba(0, 0, 0, 0.14) 1.5px,
+			transparent 2px
+		),
+		radial-gradient(
+			circle at 14px 14px,
+			rgba(255, 255, 255, 0.04) 1px,
+			transparent 1.5px
+		);
+	background-size: 24px 24px;
 }
 
-/* Forja content must scroll — no viewport lock (marketing uses one) */
+/* Tablet + desktop lock the viewport so BlueprintSheet owns the scroll.
+ * Mobile stays document-scroll so pull-to-refresh and address-bar hiding
+ * still work. */
+@media (min-width: 768px) {
+	html,
+	body {
+		height: 100dvh;
+		overflow: hidden;
+	}
+}

@@ -1,9 +1,14 @@
-import styled, { keyframes } from 'styled-components'
+import { Cog } from 'lucide-react'
+import { motion, useReducedMotion } from 'motion/react'
+import { Typewriter } from 'motion-plus/react'
+import styled from 'styled-components'
 
 /**
- * Lightweight CSS-only spinner. Rare on SSR-hydrated screens — used
- * mainly for post-mutation refreshes and parameterized atoms that
- * can't be seeded from route loaders.
+ * Workshop-flavored busy indicator. A `Cog` icon spins in primary
+ * terracotta; when a label is provided it types out beneath the cog
+ * using the `Typewriter` primitive, so the "loading…" text reads as
+ * if someone is stamping it onto the paper. Respects `prefers-reduced-
+ * motion` — the cog freezes and the label renders plain.
  */
 export function LoadingSpinner({
 	size = 'md',
@@ -12,35 +17,47 @@ export function LoadingSpinner({
 	size?: 'sm' | 'md' | 'lg'
 	label?: string
 }) {
+	const reduced = useReducedMotion()
+	const cogStyle = { display: 'inline-flex', color: 'var(--color-primary)' }
 	return (
 		<Wrapper role='status' aria-label={label}>
-			<Circle $size={size} />
+			{reduced ? (
+				<span style={cogStyle}>
+					<Cog size={sizeMap[size]} aria-hidden />
+				</span>
+			) : (
+				<motion.div
+					animate={{ rotate: 360 }}
+					transition={{ repeat: Infinity, duration: 2.2, ease: 'linear' }}
+					style={cogStyle}
+				>
+					<Cog size={sizeMap[size]} aria-hidden />
+				</motion.div>
+			)}
+			{label && (
+				<Label>{reduced ? label : <Typewriter>{label}</Typewriter>}</Label>
+			)}
 		</Wrapper>
 	)
 }
 
-const spin = keyframes`
-	to { transform: rotate(360deg); }
-`
+const sizeMap = { sm: 16, md: 28, lg: 40 } as const
 
 const Wrapper = styled.div.withConfig({ displayName: 'LoadingSpinnerWrapper' })`
 	display: inline-flex;
+	flex-direction: column;
 	align-items: center;
 	justify-content: center;
+	gap: var(--space-xs);
 `
 
-const sizeMap = { sm: '1rem', md: '1.5rem', lg: '2.25rem' } as const
-
-const Circle = styled.span.withConfig({
-	displayName: 'LoadingSpinnerCircle',
-	shouldForwardProp: prop => prop !== '$size',
-})<{ $size: 'sm' | 'md' | 'lg' }>`
-	display: inline-block;
-	width: ${p => sizeMap[p.$size]};
-	height: ${p => sizeMap[p.$size]};
-	border: 2px solid
-		color-mix(in srgb, var(--color-primary) 24%, transparent);
-	border-top-color: var(--color-primary);
-	border-radius: var(--shape-full);
-	animation: ${spin} 800ms linear infinite;
+const Label = styled.span.withConfig({ displayName: 'LoadingSpinnerLabel' })`
+	font-family: var(--font-display);
+	font-size: var(--typescale-label-small-size);
+	line-height: var(--typescale-label-small-line);
+	letter-spacing: 0.08em;
+	font-weight: var(--font-weight-bold);
+	text-transform: uppercase;
+	color: var(--color-on-surface-variant);
+	text-shadow: var(--text-shadow-emboss);
 `
