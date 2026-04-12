@@ -854,7 +854,7 @@ export const products = pgTable('products', {
   name:               text('name').notNull(),
 
   type:               text('type').notNull(),
-  // values: service | product | microsaas
+  // values: service | product
   status:             text('status').notNull().default('active'),
   // values: active | beta | idea
 

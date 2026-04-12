@@ -4,7 +4,7 @@
 
 **Open-source automation platform for agencies serving local businesses.**
 
-Build and sell automations, AI workflows, and micro-SaaS tools to restaurants, clinics, shops, and service businesses — with a built-in CRM to manage your sales pipeline.
+Build and sell automations and AI workflows to restaurants, clinics, shops, and service businesses — with a built-in CRM to manage your sales pipeline.
 
 ## Contents
 
@@ -25,7 +25,6 @@ Engranatge gives agencies like yours everything you need to fill that gap:
 
 - **Automations** — connect the tools your clients already use. When X happens, do Y.
 - **AI integrations** — let AI handle tasks that require judgment but not creativity: categorizing emails, drafting invoices, summarizing feedback.
-- **Micro-SaaS** — small, focused tools that do one thing well. Booking widgets, inventory alerts, client follow-up trackers.
 - **Built-in CRM (Forja)** — track prospects, log interactions (visits, calls, emails, LinkedIn, Instagram), and manage your pipeline.
 - **AI-agent ready** — expose all data to AI agents via MCP (Claude, ChatGPT) and connect to n8n/Zapier via webhooks.
 - **Multilingual prospect pages** — generate AI-powered pages for prospects with i18n support (ca/es/en).

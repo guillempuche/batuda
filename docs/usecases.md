@@ -4,7 +4,7 @@ Catalogue of the recurring problems that mid-sized businesses bring to Engranatg
 
 Written in English regardless of sales language; translations are produced on demand by the drafter. Written for internal use — to brief proposals, anchor discovery calls, spark sales conversations, and help a business owner recognise themselves in a problem before any solution is discussed.
 
-This file is **customer-side only**. It intentionally contains no service names, no solution shapes, no mentions of internal tools (n8n, Mastra, Forja monorepo), no brand positioning, no metaphor guidance, and no copywriting rules. Mapping a customer problem to a service (automation, micro-SaaS, AI agent, or a combination of them) is a judgement call made during a discovery call, never encoded here.
+This file is **customer-side only**. It intentionally contains no service names, no solution shapes, no mentions of internal tools (n8n, Mastra, Forja monorepo), no brand positioning, no metaphor guidance, and no copywriting rules. Mapping a customer problem to a service (automation, AI agent, or a combination of them) is a judgement call made during a discovery call, never encoded here.
 
 ## The 80/20 filter
 
@@ -21,8 +21,8 @@ The file has five parts:
 
 1. **Department diagnostic** — the 10 functional departments of a mid-sized business and where the recurring manual cost usually concentrates in each. Use this to orient a new conversation before diving into specific problems.
 2. **Block catalogue** — by department, 3–5 tight cards per department. Each card is one recurring task that many mid-sized owners will recognise immediately. Read the title first; read the rest only if the title lands.
-3. **Case studies** — real before/after examples with volumes, outcomes, and numbers. Grouped by the kind of solution Engranatge built (automation, micro-SaaS, AI agents) to show the shape of each service in practice.
-4. **Dream customer archetypes** — five named personas combining a role, a sector, and a specific recurring pain. Anchor any proposal or sales conversation on one of them rather than on a vague "SMB" framing.
+3. **Case studies** — real before/after examples with volumes, outcomes, and numbers. Grouped by the kind of solution Engranatge built (automation, AI agents) to show the shape of each service in practice.
+4. **Dream customer archetypes** — three named personas combining a role, a sector, and a specific recurring pain. Anchor any proposal or sales conversation on one of them rather than on a vague "SMB" framing.
 5. **Proof inventory** — what can and cannot be cited publicly today, so nothing in the catalogue gets used dishonestly.
 
 ## Department diagnostic
@@ -359,11 +359,6 @@ Real before/after examples from Engranatge's prior work and pilot conversations.
 - **Architecture studio (~40 people, ~90 active projects).** Project documentation from clients, suppliers, and the municipality was landing in a shared mailbox and filed by hand into shared-drive folders by project code. Solution: a flow that reads incoming email, detects the project code, files the attachments into the right folder, and notifies the project lead. Result: **around 8 hours per week freed across the ops team, filing always complete.**
 - **Automotive workshop group (~4 locations, shared finance team).** Supplier invoices and delivery notes were typed into the accounting system every Friday afternoon by the finance team. Solution: automatic extraction from supplier PDFs into the accounting system, one pipeline per supplier. Result: **Friday afternoons back across the 3-person finance team.**
 
-### Micro-SaaS in practice
-
-- **Component manufacturer (~120 employees, ~200 regular B2B customers) — customer order portal.** Regular B2B customers were placing orders by phone and email; the 4-person office team re-keyed each order into the ERP and chased payment status on the phone. Solution: a small custom web portal where customers log in, place orders, check status, and download past invoices themselves. Result: **phone/email order load down around 60%, the office team moved from re-keying to handling complex cases and new accounts.**
-- **Mid-sized legal firm (~35 lawyers, 3 offices) — client case tracker.** Client intake in a spreadsheet, case timeline in a Word doc per case; handoffs between lawyers and offices cost hours of re-reading per case. Solution: a small custom web app with a client intake form feeding a per-case dashboard accessible from any office. Result: **case context available in under 30 seconds from any office, smoother handoffs when a lawyer is out.**
-
 ### AI agents in practice
 
 - **Engineering consultancy (~50 people, multi-discipline).** Incoming requests for quotes arrived as free-text emails with attached specs; the ops team spent around 90 minutes every morning classifying them by discipline and routing to the right engineer. Solution: an AI agent that reads each RFQ, extracts the key specs, classifies the discipline, and drafts a routing suggestion the partner approves. Result: **around 1.5 hours per day freed across the ops team, faster first response to clients.**
@@ -378,8 +373,6 @@ When briefing a proposal or a sales conversation, anchor on one archetype. A vag
 1. **Xavi, COO of a metalworking fabricator.** Runs ops at a 60-person stainless-steel fabricator near Girona — three shifts, two production lines. Incoming jobs still arrive as WhatsApp photos and emailed PDFs landing in multiple inboxes; the production planner is a shared spreadsheet updated by hand each morning. Two jobs fell through the cracks last quarter. Xavi wants a single intake lane that lands every new job in the planner automatically and notifies the shift lead. *Likely service fit: automation.*
 2. **Núria, managing partner at an architecture studio.** Runs a 40-person multi-discipline studio near Barcelona — buildings, urban planning, interiors. Project documentation from clients, suppliers, and the municipality lands in a shared mailbox that no one really owns; someone has to file every attachment under the right project code. At 90 active projects, "someone" is losing two full days a week across the ops team. *Likely service fit: automation.*
 3. **Roser, partner at an engineering consultancy.** Partner at a 50-person multi-discipline engineering consultancy in Barcelona — civil, structural, energy. Incoming requests for quotes arrive as free-text emails with attached specs; the ops team spends roughly 90 minutes each morning classifying them by discipline and routing to the right engineer. Roser wants that time back without losing the partner-level review at the end. *Likely service fit: AI agent.*
-4. **Joan, CFO of a component manufacturer.** Runs finance and operations at a 120-person B2B component supplier near Barcelona, serving around 200 regular customers. Orders still arrive by phone and email; the 4-person office team spends half the week re-keying them into the ERP and chasing payment status on the phone. Joan wants the regular customers to serve themselves for routine orders so his team can focus on complex cases and new accounts. *Likely service fit: micro-SaaS.*
-5. **Laia, managing partner at a mid-sized legal firm.** Heads a 35-lawyer regional firm split across three offices. Client intake is tracked in a spreadsheet; each case timeline lives in a Word doc per case. Handoffs between lawyers and offices cost hours of re-reading per case. She wants one place per case, accessible from any office, and no more spreadsheets. *Likely service fit: micro-SaaS.*
 
 ---
 

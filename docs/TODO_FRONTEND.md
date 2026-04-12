@@ -409,16 +409,13 @@ DESKTOP:
 
 See [marketing.md](marketing.md) for architecture, [brand-proposal.md](brand-proposal.md) for visual identity.
 
-Workshop metaphor: the site IS a mechanical workshop. Each page is a room, each service is a machine, the blog is a logbook, case studies are blueprints. All static marketing pages live as route components with hardcoded content — no CMS, no Tiptap (except prospect pages). Marketing copy is Catalan-first.
+Workshop metaphor: the site IS a mechanical workshop. Each page is a room, the blog is a logbook, case studies are blueprints. All static marketing pages live as route components with hardcoded content — no CMS, no Tiptap (except prospect pages). Marketing copy is Catalan-first.
 
 ```
 apps/marketing/src/
 ├── routes/
 │   ├── __root.tsx                    # workbench shell — pegboard + blueprint + bench
 │   ├── index.tsx                     # homepage — workshop entrance
-│   ├── tools/
-│   │   ├── index.tsx                 # service catalog — machine floor
-│   │   └── $slug.tsx                 # single service — machine detail
 │   ├── projects/
 │   │   ├── index.tsx                 # case study list — blueprint wall
 │   │   └── $slug.tsx                 # single case study — blueprint
@@ -441,7 +438,6 @@ apps/marketing/src/
 │   │   └── section.tsx              # reusable page section wrapper
 │   ├── workshop/
 │   │   ├── conveyor-belt.tsx         # animated problem→solution flow
-│   │   ├── machine-card.tsx          # service card with inputs/outputs
 │   │   ├── control-panel.tsx         # CTA styled as machine interface
 │   │   ├── blueprint-card.tsx        # case study card — technical drawing
 │   │   ├── logbook-card.tsx          # blog card — journal page style
@@ -458,7 +454,6 @@ apps/marketing/src/
 │       ├── social-proof-block.tsx
 │       └── rich-text-block.tsx
 ├── data/
-│   ├── services.ts                   # service definitions (slug, name, inputs, outputs)
 │   ├── navigation.ts                 # nav items array
 │   └── copy.ts                       # shared marketing copy strings
 ├── lib/
@@ -559,21 +554,6 @@ The homepage hero animation. Shows a business problem entering one side and a so
   - [ ] `prefers-reduced-motion: reduce` → no animation, show static before/after
   - [ ] Mobile: vertical flow (top→bottom) instead of horizontal
 
-### MachineCard
-
-Each service displayed as a machine on the workshop floor.
-
-- [ ] `src/components/workshop/machine-card.tsx`:
-  - [ ] Props: `name`, `description`, `inputs: string[]`, `outputs: string[]`, `slug`, `status`
-  - [ ] Card bg: `var(--color-surface-container-low)`, border: `var(--color-outline-variant)`
-  - [ ] Top: machine name (`typescale-title-large`) + IndicatorLight (green = active)
-  - [ ] Middle: description (`typescale-body-medium`)
-  - [ ] Inputs section: label "Entrada" + list of input items
-  - [ ] Outputs section: label "Sortida" + list of output items
-  - [ ] Bottom: link styled as control button → `/tools/${slug}`
-  - [ ] Button: `var(--color-primary)` bg, `var(--color-on-primary)` text, `var(--shape-small)` radius
-  - [ ] Hover: subtle elevation shift (`var(--elevation-1)` → `var(--elevation-2)`)
-
 ### ControlPanel
 
 CTA section styled as a machine control panel. Used at the bottom of pages.
@@ -651,18 +631,9 @@ Manual vs automated comparison. Two-column layout.
 
 Marketing content lives as typed constants. No CMS. Changes require a deploy.
 
-- [ ] `src/data/services.ts`:
-  - [ ] Type: `Service = { slug, name, tagline, description, inputs, outputs, icon, examples }`
-  - [ ] Three services:
-    - `automatitzacions` — connect existing tools, when X happens do Y
-    - `intel·ligencia-artificial` — AI handles judgment without creativity
-    - `micro-saas` — small focused tools that do one thing well
-  - [ ] Each with 3-4 concrete `inputs` and `outputs` strings (Catalan)
-  - [ ] Each with 2-3 `examples` — real-world use cases
-
 - [ ] `src/data/navigation.ts`:
   - [ ] Type: `NavItem = { label, href, description }`
-  - [ ] Items: Eines, Projectes, Diari, Taller, Pressupost
+  - [ ] Items: Projectes, Diari, Taller, Pressupost
 
 - [ ] `src/data/copy.ts`:
   - [ ] Hero headline: "Les màquines fan la feina. Tu fas el negoci."
@@ -686,13 +657,6 @@ Marketing content lives as typed constants. No CMS. Changes require a deploy.
 - [ ] CTA button: "Parlem" (Let's talk) → `/pricing`
 - [ ] GearMascot in `default` expression, positioned beside CTA (desktop) or below (mobile)
 
-### Services preview
-
-- [ ] Section heading: "Què construïm" (What we build)
-- [ ] 3 MachineCard components from `data/services.ts`
-- [ ] Grid: 1 column mobile, 3 columns desktop (≥1024px)
-- [ ] Link at bottom: "Veure totes les eines →" → `/tools`
-
 ### BeforeAfter section
 
 - [ ] Section heading: "Abans i després" (Before and after)
@@ -714,29 +678,6 @@ Marketing content lives as typed constants. No CMS. Changes require a deploy.
 - [ ] Heading: "Parlem del teu negoci" (Let's talk about your business)
 - [ ] Body: one sentence about free consultation
 - [ ] Actions: primary "Demana pressupost" → `/pricing`, secondary "Escriu-nos" → email
-
-## Phase 17 — Services pages (/tools)
-
-### Catalog page — `/tools`
-
-- [ ] `src/routes/tools/index.tsx`:
-  - [ ] Page heading: "Eines" (Tools), `typescale-display-medium`
-  - [ ] Subheading: one line explaining the three service types
-  - [ ] MachineCard grid from `data/services.ts`
-  - [ ] Grid: 1 col mobile, 2 col tablet (≥768px), 3 col desktop
-  - [ ] Bottom ControlPanel CTA
-
-### Service detail — `/tools/$slug`
-
-- [ ] `src/routes/tools/$slug.tsx`:
-  - [ ] Loader: find service by slug from `data/services.ts`, throw 404 if not found
-  - [ ] Hero: service name (`typescale-display-small`) + tagline
-  - [ ] IndicatorLight row (decorative, green = service active)
-  - [ ] Description section: `typescale-body-large`, 2-3 paragraphs
-  - [ ] Inputs/Outputs panel: two-column layout showing what goes in → what comes out
-  - [ ] Examples section: concrete use cases as cards
-  - [ ] Each example: industry tag, problem statement, solution, result metric
-  - [ ] Bottom ControlPanel CTA: "Vols aquesta eina?" (Want this tool?) → `/pricing`
 
 ## Phase 18 — Case studies (/projects)
 
@@ -806,10 +747,8 @@ Parts catalog. Clean, honest, no-nonsense. Also doubles as a contact/quote form.
 
 - [ ] `src/routes/pricing.tsx`:
   - [ ] Hero: "Pressupost" heading + "Sense lletra petita" (No fine print) subheading
-  - [ ] PartsRow list for each service type:
-    - Automatitzacions: starting price, per-automation pricing
-    - IA: monthly retainer or per-integration pricing
-    - Micro-SaaS: development fee + monthly maintenance
+  - [ ] PartsRow list for each service (from `data/services.ts` — loop, not hardcoded)
+  - [ ] Annual support contract row (optional add-on, per service)
   - [ ] Clear "Què inclou" (What's included) and "Què no inclou" (What's not included) per service
   - [ ] Contact section: email, phone, WhatsApp link
   - [ ] Optional: simple contact form (name, business, what they need) — POST to server API

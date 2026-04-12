@@ -33,7 +33,7 @@ The site IS a **taller mecànic** (mechanical workshop) where business processes
 
 **Homepage** — You enter the workshop. Machines are running. A conveyor belt shows client problems going in one end, solutions coming out the other. The message: "We build the machines so you don't have to do the work."
 
-**Services/Tools** — Each service is a **machine** on the workshop floor. Automations = conveyor belt. AI = a robot arm. Micro-SaaS = a precision instrument. Each one has a "control panel" showing what it does, inputs/outputs, and a big START button.
+**Services/Tools** — Each service is a **machine** on the workshop floor. Automations = conveyor belt. AI = a robot arm. Each one has a "control panel" showing what it does, inputs/outputs, and a big START button.
 
 **Case studies** — **Blueprints** that show how we built a specific machine for a specific client. Technical drawings, before/after flow diagrams, measurable results.
 
@@ -196,7 +196,7 @@ One page, one goal, one CTA. Russell Brunson AIDA flow:
 
 1. **Hook** — Hero headline + conveyor belt animation
 2. **Problem** — Before/after comparison (manual vs automated)
-3. **Solution** — Service machines (Automatitzacions, IA, Micro-SaaS)
+3. **Solution** — Service machines (Automatitzacions, IA)
 4. **Proof** — Industry examples with results
 5. **Offer** — Transparent pricing (parts catalog style)
 6. **CTA** — "Parlem del teu negoci" → email

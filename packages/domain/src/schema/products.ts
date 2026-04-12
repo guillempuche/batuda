@@ -9,7 +9,7 @@ export class Product extends Model.Class<Product>('Product')({
 	name: Schema.String,
 
 	type: Schema.String,
-	// values: service | product | microsaas
+	// values: service | product
 	status: Schema.String,
 	// values: active | beta | idea
 
