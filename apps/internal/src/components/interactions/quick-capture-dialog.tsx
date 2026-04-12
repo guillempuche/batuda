@@ -9,7 +9,14 @@ import type { FormEvent } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
-import { PriButton, PriDialog, PriInput } from '@engranatge/ui/pri'
+import {
+	PriButton,
+	PriDialog,
+	PriInput,
+	PriNumberField,
+	PriToggleGroup,
+	usePriToast,
+} from '@engranatge/ui/pri'
 
 import {
 	ChannelIcon,
@@ -17,11 +24,27 @@ import {
 } from '#/components/shared/channel-icon'
 import { useQuickCapture } from '#/context/quick-capture-context'
 import { ForjaApiAtom } from '#/lib/forja-api-atom'
+import {
+	brushedMetalPlate,
+	rulerUnderRule,
+	stenciledTitle,
+} from '#/lib/workshop-mixins'
 
 type CompanyOption = {
 	readonly id: string
 	readonly name: string
 }
+
+const CHANNELS: ReadonlyArray<InteractionChannel> = [
+	'phone',
+	'email',
+	'visit',
+	'linkedin',
+	'instagram',
+	'whatsapp',
+	'event',
+	'other',
+]
 
 /**
  * Quick Capture — the global interaction-logging dialog.
@@ -30,21 +53,13 @@ type CompanyOption = {
  * instance in the tree). Reads open-state from context and submits via
  * `ForjaApiAtom.mutation('interactions', 'create')` — the server handler
  * writes the interaction AND updates `company.lastContactedAt` +
- * `nextAction`/`nextActionAt` in the same transaction, so we only need
- * the one mutation call here.
- *
- * Company selection has two paths:
- *   - Pre-filled (via `open({ companyId, companyName })`) → read-only
- *     chip at the top of the dialog, no lookup needed.
- *   - Empty → load all companies once via a module-level atom and render
- *     a native `<select>` so the user can pick. Avoids the complexity of
- *     a debounced autocomplete for the first pass; the company list is
- *     tiny enough (hundreds, not thousands) that a full list is fine.
+ * `nextAction`/`nextActionAt` in the same transaction.
  */
 export function QuickCaptureDialog() {
 	const { t } = useLingui()
 	const { i18n } = useLinguiCore()
 	const { isOpen, prefill, close } = useQuickCapture()
+	const toastManager = usePriToast()
 
 	const createInteraction = useAtomSet(
 		ForjaApiAtom.mutation('interactions', 'create'),
@@ -64,13 +79,10 @@ export function QuickCaptureDialog() {
 	const [outcome, setOutcome] = useState('')
 	const [nextAction, setNextAction] = useState('')
 	const [nextActionAt, setNextActionAt] = useState('')
-	const [durationMin, setDurationMin] = useState('')
+	const [durationMin, setDurationMin] = useState<number | null>(null)
 	const [submitting, setSubmitting] = useState(false)
 	const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-	// Load companies for the fallback select (only when the dialog is
-	// open and there is no pre-filled company). Using useMemo so the atom
-	// identity is stable across renders while the dialog is mounted.
 	const companiesAtom = useMemo(
 		() =>
 			ForjaApiAtom.query('companies', 'list', {
@@ -94,7 +106,6 @@ export function QuickCaptureDialog() {
 		return result.sort((a, b) => a.name.localeCompare(b.name, 'ca'))
 	}, [companiesResult])
 
-	// Reset form whenever the dialog opens. Prefill wins over empty defaults.
 	useEffect(() => {
 		if (!isOpen) return
 		setCompanyId(prefill?.companyId ?? '')
@@ -107,7 +118,7 @@ export function QuickCaptureDialog() {
 		setOutcome('')
 		setNextAction('')
 		setNextActionAt('')
-		setDurationMin('')
+		setDurationMin(null)
 		setErrorMessage(null)
 		setSubmitting(false)
 	}, [isOpen, prefill])
@@ -132,17 +143,18 @@ export function QuickCaptureDialog() {
 		if (outcome) payload['outcome'] = outcome
 		if (nextAction) payload['nextAction'] = nextAction
 		if (nextActionAt) payload['nextActionAt'] = nextActionAt
-		if (durationMin) {
-			const parsed = Number(durationMin)
-			if (Number.isFinite(parsed)) payload['durationMin'] = parsed
+		if (durationMin !== null && Number.isFinite(durationMin)) {
+			payload['durationMin'] = durationMin
 		}
 
 		const exit = await createInteraction({ payload } as never)
 		if (exit._tag === 'Success') {
-			// Fire the caller-supplied post-submit hook *before* close(),
-			// so page atoms refresh while the prefill is still on the
-			// context (close() clears the dialog state).
 			prefill?.onSubmitted?.()
+			toastManager.add({
+				title: t`Interaction logged`,
+				description: t`Stamped into the workshop ledger.`,
+				type: 'success',
+			})
 			close()
 			return
 		}
@@ -179,9 +191,9 @@ export function QuickCaptureDialog() {
 					</Header>
 					{prefill && (
 						<PrefillChip>
-							<span>
-								<Trans>Company:</Trans>
-							</span>
+							<PrefillLabel>
+								<Trans>Company</Trans>
+							</PrefillLabel>
 							<strong>{prefill.companyName}</strong>
 						</PrefillChip>
 					)}
@@ -209,77 +221,77 @@ export function QuickCaptureDialog() {
 							</Field>
 						)}
 
-						<Row>
-							<Field>
-								<Label>
-									<Trans>Channel</Trans>
-								</Label>
-								<ChannelPills>
-									{(
-										[
-											'phone',
-											'email',
-											'visit',
-											'linkedin',
-											'instagram',
-											'whatsapp',
-											'event',
-											'other',
-										] as const
-									).map(value => (
-										<ChannelPill
-											key={value}
-											type='button'
-											$active={channel === value}
-											onClick={() => setChannel(value)}
-										>
-											<ChannelIcon channel={value} size={14} />
-										</ChannelPill>
-									))}
-								</ChannelPills>
-							</Field>
-						</Row>
+						<Field>
+							<Label>
+								<Trans>Channel</Trans>
+							</Label>
+							<PriToggleGroup.Root
+								value={[channel]}
+								onValueChange={(values: string[]) => {
+									const next = values[0]
+									if (next) setChannel(next as InteractionChannel)
+								}}
+							>
+								{CHANNELS.map(value => (
+									<PriToggleGroup.Item
+										key={value}
+										value={value}
+										aria-label={value}
+									>
+										<ChannelIcon channel={value} size={14} />
+									</PriToggleGroup.Item>
+								))}
+							</PriToggleGroup.Root>
+						</Field>
 
 						<Row>
 							<Field>
 								<Label>
 									<Trans>Direction</Trans>
 								</Label>
-								<Toggle>
-									<ToggleButton
-										type='button'
-										$active={direction === 'outbound'}
-										onClick={() => setDirection('outbound')}
-									>
+								<PriToggleGroup.Root
+									value={[direction]}
+									onValueChange={(values: string[]) => {
+										const next = values[0]
+										if (next === 'outbound' || next === 'inbound') {
+											setDirection(next)
+										}
+									}}
+								>
+									<PriToggleGroup.Item value='outbound'>
 										<Trans>Outbound</Trans>
-									</ToggleButton>
-									<ToggleButton
-										type='button'
-										$active={direction === 'inbound'}
-										onClick={() => setDirection('inbound')}
-									>
+									</PriToggleGroup.Item>
+									<PriToggleGroup.Item value='inbound'>
 										<Trans>Inbound</Trans>
-									</ToggleButton>
-								</Toggle>
+									</PriToggleGroup.Item>
+								</PriToggleGroup.Root>
 							</Field>
 							<Field>
 								<Label>
 									<Trans>Type</Trans>
 								</Label>
-								<Toggle>
+								<PriToggleGroup.Root
+									value={[type]}
+									onValueChange={(values: string[]) => {
+										const next = values[0]
+										if (
+											next === 'call' ||
+											next === 'meeting' ||
+											next === 'email' ||
+											next === 'note'
+										) {
+											setType(next)
+										}
+									}}
+								>
 									{(['call', 'meeting', 'email', 'note'] as const).map(
 										value => (
-											<ToggleButton
-												key={value}
-												type='button'
-												$active={type === value}
-												onClick={() => setType(value)}
-											>
+											<PriToggleGroup.Item key={value} value={value}>
 												{i18n._(typeLabels[value])}
-											</ToggleButton>
+											</PriToggleGroup.Item>
 										),
 									)}
-								</Toggle>
+								</PriToggleGroup.Root>
 							</Field>
 						</Row>
 
@@ -353,13 +365,17 @@ export function QuickCaptureDialog() {
 								<Label htmlFor='qc-duration'>
 									<Trans>Duration (min)</Trans>
 								</Label>
-								<PriInput
-									id='qc-duration'
-									type='number'
+								<PriNumberField.Root
 									min={0}
 									value={durationMin}
-									onChange={event => setDurationMin(event.target.value)}
-								/>
+									onValueChange={next => setDurationMin(next)}
+								>
+									<PriNumberField.Group>
+										<PriNumberField.Decrement>−</PriNumberField.Decrement>
+										<PriNumberField.Input id='qc-duration' />
+										<PriNumberField.Increment>+</PriNumberField.Increment>
+									</PriNumberField.Group>
+								</PriNumberField.Root>
 							</Field>
 						)}
 
@@ -405,47 +421,58 @@ const Header = styled.div.withConfig({ displayName: 'QuickCaptureHeader' })`
 const CloseButton = styled.button.withConfig({
 	displayName: 'QuickCaptureClose',
 })`
+	${brushedMetalPlate}
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
 	width: 2rem;
 	height: 2rem;
 	padding: 0;
-	background: transparent;
-	border: none;
-	color: var(--color-on-surface-variant);
-	border-radius: var(--shape-full);
+	color: var(--color-on-surface);
 	cursor: pointer;
 
 	&:hover {
-		background: color-mix(in srgb, var(--color-on-surface) 8%, transparent);
-		color: var(--color-on-surface);
+		box-shadow: var(--elevation-workshop-md);
+	}
+
+	&:active {
+		transform: translateY(1px);
 	}
 
 	&:focus-visible {
-		outline: 2px solid var(--color-primary);
-		outline-offset: 2px;
+		outline: none;
+		box-shadow: var(--glow-active);
 	}
 `
 
 const PrefillChip = styled.div.withConfig({
 	displayName: 'QuickCapturePrefillChip',
 })`
+	${brushedMetalPlate}
 	display: inline-flex;
-	align-items: baseline;
+	align-items: center;
 	gap: var(--space-2xs);
 	padding: var(--space-2xs) var(--space-sm);
-	border-radius: var(--shape-full);
-	background: var(--color-surface-container);
-	color: var(--color-on-surface-variant);
-	font-family: var(--font-body);
-	font-size: var(--typescale-label-medium-size);
+	border-left: 3px solid var(--color-primary);
+	color: var(--color-on-surface);
+	font-family: var(--font-display);
 	align-self: flex-start;
+	transform: rotate(-0.5deg);
 
 	strong {
-		color: var(--color-on-surface);
-		font-weight: var(--typescale-title-small-weight);
+		${stenciledTitle}
+		letter-spacing: 0.04em;
 	}
+`
+
+const PrefillLabel = styled.span.withConfig({
+	displayName: 'QuickCapturePrefillLabel',
+})`
+	font-size: var(--typescale-label-small-size);
+	font-weight: var(--font-weight-bold);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	opacity: 0.75;
 `
 
 const Form = styled.form.withConfig({ displayName: 'QuickCaptureForm' })`
@@ -469,12 +496,8 @@ const Row = styled.div.withConfig({ displayName: 'QuickCaptureRow' })`
 `
 
 const Label = styled.label.withConfig({ displayName: 'QuickCaptureLabel' })`
-	font-family: var(--font-body);
+	${stenciledTitle}
 	font-size: var(--typescale-label-small-size);
-	font-weight: var(--typescale-label-small-weight);
-	letter-spacing: var(--typescale-label-small-tracking);
-	color: var(--color-on-surface-variant);
-	text-transform: uppercase;
 `
 
 const Select = styled.select.withConfig({ displayName: 'QuickCaptureSelect' })`
@@ -482,17 +505,18 @@ const Select = styled.select.withConfig({ displayName: 'QuickCaptureSelect' })`
 	width: 100%;
 	padding: var(--space-2xs) var(--space-sm);
 	min-height: 2.25rem;
-	border: 1px solid var(--color-outline);
-	border-radius: var(--shape-sm);
-	background: var(--color-surface);
+	border: none;
+	border-bottom: 2px solid var(--color-outline);
+	background: var(--color-paper-aged);
 	color: var(--color-on-surface);
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	line-height: var(--typescale-body-medium-line);
+	border-radius: 0;
 
 	&:focus-visible {
-		outline: 2px solid var(--color-primary);
-		outline-offset: 1px;
+		outline: none;
+		border-bottom-color: var(--color-primary);
 	}
 `
 
@@ -502,108 +526,45 @@ const Textarea = styled.textarea.withConfig({
 	display: block;
 	width: 100%;
 	padding: var(--space-xs) var(--space-sm);
-	border: 1px solid var(--color-outline);
-	border-radius: var(--shape-sm);
-	background: var(--color-surface);
+	border: none;
+	border-bottom: 2px solid var(--color-outline);
+	background: var(--color-paper-aged);
 	color: var(--color-on-surface);
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	line-height: var(--typescale-body-medium-line);
 	resize: vertical;
 	min-height: 4rem;
+	border-radius: 0;
 
 	&:focus-visible {
-		outline: 2px solid var(--color-primary);
-		outline-offset: 1px;
+		outline: none;
+		border-bottom-color: var(--color-primary);
 	}
-`
 
-const ChannelPills = styled.div.withConfig({
-	displayName: 'QuickCaptureChannelPills',
-})`
-	display: flex;
-	flex-wrap: wrap;
-	gap: var(--space-2xs);
-`
-
-const ChannelPill = styled.button.withConfig({
-	displayName: 'QuickCaptureChannelPill',
-	shouldForwardProp: prop => prop !== '$active',
-})<{ $active: boolean }>`
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 2.25rem;
-	height: 2.25rem;
-	padding: 0;
-	border: 1px solid
-		${props => (props.$active ? 'var(--color-primary)' : 'var(--color-outline)')};
-	background: ${props =>
-		props.$active ? 'var(--color-primary)' : 'var(--color-surface)'};
-	color: ${props =>
-		props.$active
-			? 'var(--color-on-primary)'
-			: 'var(--color-on-surface-variant)'};
-	border-radius: var(--shape-full);
-	cursor: pointer;
-	transition:
-		background 120ms ease,
-		color 120ms ease,
-		border-color 120ms ease;
-
-	&:focus-visible {
-		outline: 2px solid var(--color-primary);
-		outline-offset: 2px;
-	}
-`
-
-const Toggle = styled.div.withConfig({ displayName: 'QuickCaptureToggle' })`
-	display: inline-flex;
-	border: 1px solid var(--color-outline);
-	border-radius: var(--shape-full);
-	padding: 2px;
-	gap: 2px;
-	flex-wrap: wrap;
-`
-
-const ToggleButton = styled.button.withConfig({
-	displayName: 'QuickCaptureToggleButton',
-	shouldForwardProp: prop => prop !== '$active',
-})<{ $active: boolean }>`
-	padding: var(--space-3xs) var(--space-sm);
-	border: none;
-	border-radius: var(--shape-full);
-	background: ${props =>
-		props.$active ? 'var(--color-primary)' : 'transparent'};
-	color: ${props =>
-		props.$active
-			? 'var(--color-on-primary)'
-			: 'var(--color-on-surface-variant)'};
-	font-family: var(--font-body);
-	font-size: var(--typescale-label-small-size);
-	font-weight: var(--typescale-label-small-weight);
-	cursor: pointer;
-	transition:
-		background 120ms ease,
-		color 120ms ease;
-
-	&:focus-visible {
-		outline: 2px solid var(--color-primary);
-		outline-offset: 2px;
+	&::placeholder {
+		color: var(--color-on-surface-variant);
+		opacity: 0.7;
+		font-style: italic;
 	}
 `
 
 const ErrorText = styled.p.withConfig({ displayName: 'QuickCaptureError' })`
 	margin: 0;
+	padding: var(--space-2xs) var(--space-sm);
+	border-left: 3px solid var(--color-error);
+	background: color-mix(in srgb, var(--color-error) 6%, transparent);
 	color: var(--color-error);
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
+	font-style: italic;
 `
 
 const Footer = styled.div.withConfig({ displayName: 'QuickCaptureFooter' })`
+	${rulerUnderRule}
 	display: flex;
 	justify-content: flex-end;
 	gap: var(--space-sm);
 	padding-top: var(--space-sm);
-	border-top: 1px solid var(--color-outline-variant);
+	background-position: left top;
 `

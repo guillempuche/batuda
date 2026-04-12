@@ -2,15 +2,14 @@ import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
+import { motion } from 'motion/react'
 import { useCallback, useMemo } from 'react'
 import styled from 'styled-components'
 
 import { companiesListAtom, openTasksAtom } from '#/atoms/pipeline-atoms'
-import {
-	CompanyCard,
-	CompanyCardAction,
-} from '#/components/shared/company-card'
+import { CompanyCard } from '#/components/shared/company-card'
 import { EmptyState } from '#/components/shared/empty-state'
+import { KpiCounter } from '#/components/shared/kpi-counter'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { SectionHeader } from '#/components/shared/section-header'
 import {
@@ -21,6 +20,7 @@ import { TaskItem } from '#/components/shared/task-item'
 import { useQuickCapture } from '#/context/quick-capture-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { ForjaApiAtom } from '#/lib/forja-api-atom'
+import { rulerUnderRule, stenciledTitle } from '#/lib/workshop-mixins'
 
 /**
  * Narrow shapes the dashboard needs. The server API currently encodes
@@ -252,6 +252,8 @@ function PipelinePage() {
 		)
 	}
 
+	const overdueTasksCount = overdueTasks.length
+
 	return (
 		<Page>
 			<Intro>
@@ -259,11 +261,15 @@ function PipelinePage() {
 					<Trans>Pipeline</Trans>
 				</Title>
 				<Subtitle>
-					<Trans>
-						{companies.length} active companies. {openTasks.length} open tasks.
-					</Trans>
+					<Trans>Workshop floor — live counters on the bench.</Trans>
 				</Subtitle>
 			</Intro>
+
+			<KpiRow>
+				<KpiCounter value={companies.length} label={t`Active companies`} />
+				<KpiCounter value={openTasks.length} label={t`Open tasks`} />
+				<KpiCounter value={overdueTasksCount} label={t`Overdue`} />
+			</KpiRow>
 
 			<StatusStrip>
 				{STATUS_ORDER.map(status => (
@@ -274,7 +280,11 @@ function PipelinePage() {
 				))}
 			</StatusStrip>
 
-			<Section>
+			<Section
+				initial={{ opacity: 0, y: 12 }}
+				whileInView={{ opacity: 1, y: 0 }}
+				viewport={{ once: true, amount: 0.2 }}
+			>
 				<SectionHeader
 					title={t`Needs attention`}
 					count={
@@ -332,12 +342,9 @@ function PipelinePage() {
 									priority: company.priority,
 									lastContactedAt: company.lastContactedAt,
 								}}
-								actions={
-									<CompanyCardAction
-										label={t`Log`}
-										onClick={() => handleLogInteraction(company)}
-									/>
-								}
+								actions={{
+									onLogInteraction: () => handleLogInteraction(company),
+								}}
 							/>
 						))}
 						{staleInPipeline.slice(0, 5).map(company => (
@@ -352,12 +359,9 @@ function PipelinePage() {
 									priority: company.priority,
 									lastContactedAt: company.lastContactedAt,
 								}}
-								actions={
-									<CompanyCardAction
-										label={t`Log`}
-										onClick={() => handleLogInteraction(company)}
-									/>
-								}
+								actions={{
+									onLogInteraction: () => handleLogInteraction(company),
+								}}
 							/>
 						))}
 					</Stack>
@@ -365,7 +369,11 @@ function PipelinePage() {
 			</Section>
 
 			<TwoColumn>
-				<Section>
+				<Section
+					initial={{ opacity: 0, y: 12 }}
+					whileInView={{ opacity: 1, y: 0 }}
+					viewport={{ once: true, amount: 0.2 }}
+				>
 					<SectionHeader title={t`Today`} count={todayTasks.length} />
 					{todayTasks.length === 0 ? (
 						<EmptyState title={t`No tasks for today`} />
@@ -401,7 +409,11 @@ function PipelinePage() {
 						</Stack>
 					)}
 				</Section>
-				<Section>
+				<Section
+					initial={{ opacity: 0, y: 12 }}
+					whileInView={{ opacity: 1, y: 0 }}
+					viewport={{ once: true, amount: 0.2 }}
+				>
 					<SectionHeader title={t`This week`} count={weekTasks.length} />
 					{weekTasks.length === 0 ? (
 						<EmptyState title={t`No upcoming due dates`} />
@@ -439,7 +451,11 @@ function PipelinePage() {
 				</Section>
 			</TwoColumn>
 
-			<Section>
+			<Section
+				initial={{ opacity: 0, y: 12 }}
+				whileInView={{ opacity: 1, y: 0 }}
+				viewport={{ once: true, amount: 0.2 }}
+			>
 				<SectionHeader title={t`High priority`} count={topPriorities.length} />
 				{topPriorities.length === 0 ? (
 					<EmptyState
@@ -459,12 +475,9 @@ function PipelinePage() {
 									priority: company.priority,
 									lastContactedAt: company.lastContactedAt,
 								}}
-								actions={
-									<CompanyCardAction
-										label={t`Log`}
-										onClick={() => handleLogInteraction(company)}
-									/>
-								}
+								actions={{
+									onLogInteraction: () => handleLogInteraction(company),
+								}}
 							/>
 						))}
 					</CompanyGrid>
@@ -573,27 +586,38 @@ const Page = styled.div.withConfig({ displayName: 'PipelinePage' })`
 `
 
 const Intro = styled.div.withConfig({ displayName: 'PipelineIntro' })`
+	${rulerUnderRule}
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-3xs);
+	gap: var(--space-2xs);
+	padding-bottom: var(--space-sm);
 `
 
 const Title = styled.h2.withConfig({ displayName: 'PipelineTitle' })`
-	font-family: var(--font-display);
+	${stenciledTitle}
+	margin: 0;
 	font-size: var(--typescale-headline-large-size);
 	line-height: var(--typescale-headline-large-line);
-	font-weight: var(--font-weight-bold);
-	color: var(--color-on-surface);
-	margin: 0;
 `
 
 const Subtitle = styled.p.withConfig({ displayName: 'PipelineSubtitle' })`
+	margin: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-large-size);
 	line-height: var(--typescale-body-large-line);
 	letter-spacing: var(--typescale-body-large-tracking);
 	color: var(--color-on-surface-variant);
-	margin: 0;
+	font-style: italic;
+`
+
+const KpiRow = styled.div.withConfig({ displayName: 'PipelineKpiRow' })`
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--space-md);
+
+	@media (min-width: 640px) {
+		grid-template-columns: repeat(3, 1fr);
+	}
 `
 
 const StatusStrip = styled.div.withConfig({
@@ -615,11 +639,14 @@ const StatusCount = styled.span.withConfig({
 })`
 	font-family: var(--font-display);
 	font-size: var(--typescale-title-small-size);
-	font-weight: var(--typescale-title-small-weight);
+	font-weight: var(--font-weight-bold);
 	color: var(--color-on-surface);
+	text-shadow: var(--text-shadow-emboss);
 `
 
-const Section = styled.section.withConfig({ displayName: 'PipelineSection' })`
+const Section = styled(motion.section).withConfig({
+	displayName: 'PipelineSection',
+})`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-sm);
@@ -654,5 +681,20 @@ const CompanyGrid = styled.div.withConfig({
 
 	@media (min-width: 1024px) {
 		grid-template-columns: 1fr 1fr 1fr;
+	}
+
+	/* Micro-rotate file cards to break grid rhythm — each card straightens
+	 * on hover via whileHover={{ rotate: 0 }}. */
+	& > * {
+		--card-rotate: 0deg;
+	}
+	& > :nth-child(3n + 1) {
+		--card-rotate: -0.35deg;
+	}
+	& > :nth-child(3n + 2) {
+		--card-rotate: 0.25deg;
+	}
+	& > :nth-child(3n + 3) {
+		--card-rotate: -0.15deg;
 	}
 `

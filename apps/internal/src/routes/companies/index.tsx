@@ -3,19 +3,20 @@ import { useLingui } from '@lingui/react/macro'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { Search, X } from 'lucide-react'
+import { LayoutGroup, motion } from 'motion/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
+
+import { PriButton, PriInput } from '@engranatge/ui/pri'
 
 import {
 	type CompaniesSearch,
 	canonicalSearchKey,
 	companiesSearchAtom,
 } from '#/atoms/companies-atoms'
-import {
-	CompanyCard,
-	CompanyCardAction,
-} from '#/components/shared/company-card'
+import { CompanyCard } from '#/components/shared/company-card'
 import { EmptyState } from '#/components/shared/empty-state'
+import { KpiCounter } from '#/components/shared/kpi-counter'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import {
 	type CompanyStatus,
@@ -23,6 +24,11 @@ import {
 } from '#/components/shared/status-badge'
 import { useQuickCapture } from '#/context/quick-capture-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
+import {
+	brushedMetalPlate,
+	rulerUnderRule,
+	stenciledTitle,
+} from '#/lib/workshop-mixins'
 
 /**
  * Narrow row shape for the list view. The server returns `Schema.Unknown`
@@ -252,21 +258,25 @@ function CompaniesListPage() {
 	return (
 		<Page>
 			<Intro>
-				<Title>{t`Companies`}</Title>
-				<Subtitle>{countLabel}</Subtitle>
+				<TitleRow>
+					<Title>{t`Companies`}</Title>
+					<Subtitle>{countLabel}</Subtitle>
+				</TitleRow>
+				<KpiCounter value={companies.length} label={t`In pipeline`} />
 			</Intro>
 
-			<Filters>
+			<Filters role='group' aria-label={t`Filter companies`}>
 				<SearchWrap>
 					<SearchIcon>
 						<Search size={16} aria-hidden />
 					</SearchIcon>
-					<SearchInput
+					<PriInput
 						type='search'
 						placeholder={t`Search by name, industry, or location…`}
 						value={searchInput}
 						onChange={event => setSearchInput(event.target.value)}
 						aria-label={t`Search companies`}
+						style={{ paddingLeft: 'calc(var(--space-sm) * 2 + 16px)' }}
 					/>
 				</SearchWrap>
 
@@ -296,15 +306,19 @@ function CompaniesListPage() {
 				</StatusFilters>
 
 				{activeFilters && (
-					<ClearButton type='button' onClick={handleClearFilters}>
+					<PriButton
+						type='button'
+						$variant='outlined'
+						onClick={handleClearFilters}
+					>
 						<X size={14} aria-hidden />
 						<span>{t`Clear filters`}</span>
-					</ClearButton>
+					</PriButton>
 				)}
 			</Filters>
 
 			{isLoading ? (
-				<LoadingSpinner />
+				<LoadingSpinner label={t`Loading companies…`} />
 			) : isFailure ? (
 				<EmptyState
 					title={t`Could not load companies`}
@@ -321,38 +335,41 @@ function CompaniesListPage() {
 						? {
 								description: t`Try different criteria or clear the filters.`,
 								action: (
-									<ClearButton type='button' onClick={handleClearFilters}>
+									<PriButton
+										type='button'
+										$variant='outlined'
+										onClick={handleClearFilters}
+									>
 										<X size={14} aria-hidden />
 										<span>{t`Clear filters`}</span>
-									</ClearButton>
+									</PriButton>
 								),
 							}
 						: {})}
 				/>
 			) : (
-				<Grid>
-					{sorted.map(company => (
-						<CompanyCard
-							key={company.id}
-							company={{
-								slug: company.slug,
-								name: company.name,
-								status: company.status,
-								industry: company.industry,
-								location: company.location,
-								region: company.region,
-								priority: company.priority,
-								lastContactedAt: company.lastContactedAt,
-							}}
-							actions={
-								<CompanyCardAction
-									label={t`Log`}
-									onClick={() => handleLogInteraction(company)}
-								/>
-							}
-						/>
-					))}
-				</Grid>
+				<LayoutGroup>
+					<Grid layout>
+						{sorted.map(company => (
+							<CompanyCard
+								key={company.id}
+								company={{
+									slug: company.slug,
+									name: company.name,
+									status: company.status,
+									industry: company.industry,
+									location: company.location,
+									region: company.region,
+									priority: company.priority,
+									lastContactedAt: company.lastContactedAt,
+								}}
+								actions={{
+									onLogInteraction: () => handleLogInteraction(company),
+								}}
+							/>
+						))}
+					</Grid>
+				</LayoutGroup>
 			)}
 		</Page>
 	)
@@ -449,38 +466,49 @@ const Page = styled.div.withConfig({ displayName: 'CompaniesListPage' })`
 `
 
 const Intro = styled.div.withConfig({ displayName: 'CompaniesListIntro' })`
+	display: grid;
+	gap: var(--space-md);
+	align-items: end;
+
+	@media (min-width: 768px) {
+		grid-template-columns: 1fr auto;
+	}
+`
+
+const TitleRow = styled.div.withConfig({
+	displayName: 'CompaniesListTitleRow',
+})`
+	${rulerUnderRule}
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-3xs);
+	gap: var(--space-2xs);
+	padding-bottom: var(--space-sm);
 `
 
 const Title = styled.h2.withConfig({ displayName: 'CompaniesListTitle' })`
-	font-family: var(--font-display);
+	${stenciledTitle}
+	margin: 0;
 	font-size: var(--typescale-headline-large-size);
 	line-height: var(--typescale-headline-large-line);
-	font-weight: var(--font-weight-bold);
-	color: var(--color-on-surface);
-	margin: 0;
 `
 
 const Subtitle = styled.p.withConfig({ displayName: 'CompaniesListSubtitle' })`
+	margin: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-large-size);
 	line-height: var(--typescale-body-large-line);
 	letter-spacing: var(--typescale-body-large-tracking);
 	color: var(--color-on-surface-variant);
-	margin: 0;
+	font-style: italic;
 `
 
 const Filters = styled.div.withConfig({ displayName: 'CompaniesListFilters' })`
-	position: sticky;
-	top: var(--top-bar-height);
-	z-index: 4;
+	${brushedMetalPlate}
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-sm);
-	padding: var(--space-sm) 0;
-	background: var(--color-surface);
+	padding: var(--space-md);
+	border-radius: var(--shape-2xs);
 `
 
 const SearchWrap = styled.div.withConfig({
@@ -499,31 +527,7 @@ const SearchIcon = styled.span.withConfig({
 	display: inline-flex;
 	color: var(--color-on-surface-variant);
 	pointer-events: none;
-`
-
-const SearchInput = styled.input.withConfig({
-	displayName: 'CompaniesListSearchInput',
-})`
-	width: 100%;
-	padding: var(--space-sm) var(--space-sm) var(--space-sm)
-		calc(var(--space-sm) * 2 + 16px);
-	background: var(--color-surface-container);
-	color: var(--color-on-surface);
-	border: 1px solid var(--color-outline-variant);
-	border-radius: var(--shape-full);
-	font-family: var(--font-body);
-	font-size: var(--typescale-body-large-size);
-	line-height: var(--typescale-body-large-line);
-
-	&::placeholder {
-		color: var(--color-on-surface-variant);
-	}
-
-	&:focus-visible {
-		outline: 2px solid var(--color-primary);
-		outline-offset: 2px;
-		border-color: var(--color-primary);
-	}
+	z-index: 2;
 `
 
 const StatusFilters = styled.div.withConfig({
@@ -541,67 +545,54 @@ const StatusFilterButton = styled.button.withConfig({
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
-	padding: var(--space-3xs) var(--space-sm);
-	background: ${p =>
-		p.$active ? 'var(--color-primary)' : 'var(--color-surface-container)'};
+	padding: var(--space-2xs) var(--space-sm);
+	background: ${p => (p.$active ? 'var(--color-primary)' : 'transparent')};
 	color: ${p =>
 		p.$active ? 'var(--color-on-primary)' : 'var(--color-on-surface)'};
-	border: 1px solid
+	border: 2px
+		${p => (p.$active ? 'solid' : 'dashed')}
 		${p =>
-			p.$active ? 'var(--color-primary)' : 'var(--color-outline-variant)'};
-	border-radius: var(--shape-full);
-	font-family: var(--font-body);
-	font-size: var(--typescale-label-medium-size);
-	line-height: var(--typescale-label-medium-line);
-	font-weight: var(--typescale-label-medium-weight);
-	letter-spacing: var(--typescale-label-medium-tracking);
+			p.$active
+				? 'color-mix(in oklab, var(--color-primary) 70%, black)'
+				: 'var(--color-outline)'};
+	border-radius: var(--shape-2xs);
+	font-family: var(--font-display);
+	font-size: var(--typescale-label-small-size);
+	line-height: var(--typescale-label-small-line);
+	font-weight: var(--font-weight-bold);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
 	cursor: pointer;
 	transition:
-		background 120ms ease,
-		color 120ms ease,
-		border-color 120ms ease;
+		background 160ms ease,
+		color 160ms ease,
+		border-color 160ms ease;
 
-	&:hover {
+	${p =>
+		p.$active &&
+		`
+			text-shadow: var(--text-shadow-engrave);
+			box-shadow:
+				inset 0 1px 3px rgba(0, 0, 0, 0.25),
+				0 1px 0 rgba(255, 255, 255, 0.15);
+		`}
+
+	&:hover:not(:disabled) {
 		border-color: var(--color-primary);
 	}
 
 	&:focus-visible {
-		outline: 2px solid var(--color-primary);
-		outline-offset: 2px;
+		outline: none;
+		box-shadow: var(--glow-active);
 	}
 `
 
-const ClearButton = styled.button.withConfig({
-	displayName: 'CompaniesListClearButton',
+const Grid = styled(motion.div).withConfig({
+	displayName: 'CompaniesListGrid',
 })`
-	align-self: flex-start;
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-2xs);
-	padding: var(--space-3xs) var(--space-sm);
-	background: transparent;
-	color: var(--color-on-surface-variant);
-	border: 1px solid var(--color-outline-variant);
-	border-radius: var(--shape-full);
-	font-family: var(--font-body);
-	font-size: var(--typescale-label-small-size);
-	cursor: pointer;
-
-	&:hover {
-		color: var(--color-on-surface);
-		border-color: var(--color-outline);
-	}
-
-	&:focus-visible {
-		outline: 2px solid var(--color-primary);
-		outline-offset: 2px;
-	}
-`
-
-const Grid = styled.div.withConfig({ displayName: 'CompaniesListGrid' })`
 	display: grid;
 	grid-template-columns: 1fr;
-	gap: var(--space-sm);
+	gap: var(--space-md);
 
 	@media (min-width: 768px) {
 		grid-template-columns: 1fr 1fr;
@@ -609,5 +600,20 @@ const Grid = styled.div.withConfig({ displayName: 'CompaniesListGrid' })`
 
 	@media (min-width: 1024px) {
 		grid-template-columns: 1fr 1fr 1fr;
+	}
+
+	/* Micro-rotation to break grid rhythm. See CompanyCard for the
+	 * --card-rotate hook and hover straighten. */
+	& > * {
+		--card-rotate: 0deg;
+	}
+	& > :nth-child(3n + 1) {
+		--card-rotate: -0.35deg;
+	}
+	& > :nth-child(3n + 2) {
+		--card-rotate: 0.25deg;
+	}
+	& > :nth-child(3n + 3) {
+		--card-rotate: -0.15deg;
 	}
 `

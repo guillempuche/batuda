@@ -2,17 +2,26 @@ import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
+import { ChevronRight } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { useCallback, useMemo } from 'react'
 import styled from 'styled-components'
 
+import { PriCollapsible } from '@engranatge/ui/pri'
+
 import { companiesListAtom, openTasksAtom } from '#/atoms/pipeline-atoms'
 import { EmptyState } from '#/components/shared/empty-state'
+import { KpiCounter } from '#/components/shared/kpi-counter'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
-import { SectionHeader } from '#/components/shared/section-header'
 import { TaskItem, type TaskItemData } from '#/components/shared/task-item'
 import { useQuickCapture } from '#/context/quick-capture-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { ForjaApiAtom } from '#/lib/forja-api-atom'
+import {
+	brushedMetalPlate,
+	rulerUnderRule,
+	stenciledTitle,
+} from '#/lib/workshop-mixins'
 
 type TaskRow = {
 	readonly id: string
@@ -211,9 +220,14 @@ function TasksPage() {
 		return (
 			<Page>
 				<Intro>
-					<Title>
-						<Trans>Tasks</Trans>
-					</Title>
+					<IntroText>
+						<Title>
+							<Trans>Tasks</Trans>
+						</Title>
+						<Subtitle>
+							<Trans>The workshop ledger — tear off one strip at a time.</Trans>
+						</Subtitle>
+					</IntroText>
 				</Intro>
 				<EmptyState
 					title={t`All under control`}
@@ -223,23 +237,30 @@ function TasksPage() {
 		)
 	}
 
+	const overdueCount = overdue.length
+
 	return (
 		<Page>
 			<Intro>
-				<Title>
-					<Trans>Tasks</Trans>
-				</Title>
-				<Subtitle>
-					<Trans>
-						{tasks.length} open {tasks.length === 1 ? 'task' : 'tasks'}
-					</Trans>
-				</Subtitle>
+				<IntroText>
+					<Title>
+						<Trans>Tasks</Trans>
+					</Title>
+					<Subtitle>
+						<Trans>The workshop ledger — tear off one strip at a time.</Trans>
+					</Subtitle>
+				</IntroText>
+				<KpiRow>
+					<KpiCounter value={tasks.length} label={t`Open`} />
+					{overdueCount > 0 && (
+						<KpiCounter value={overdueCount} label={t`Overdue`} />
+					)}
+				</KpiRow>
 			</Intro>
 
-			{overdue.length > 0 && (
-				<BucketSection>
-					<SectionHeader title={t`Overdue`} count={overdue.length} />
-					<Stack>
+			<Buckets>
+				{overdue.length > 0 && (
+					<Bucket label={t`Overdue`} count={overdue.length} defaultOpen>
 						{overdue.map(task => (
 							<TaskItem
 								key={task.id}
@@ -252,14 +273,11 @@ function TasksPage() {
 								onLogInteraction={() => handleLogInteraction(task.companyId)}
 							/>
 						))}
-					</Stack>
-				</BucketSection>
-			)}
+					</Bucket>
+				)}
 
-			{today.length > 0 && (
-				<BucketSection>
-					<SectionHeader title={t`Today`} count={today.length} />
-					<Stack>
+				{today.length > 0 && (
+					<Bucket label={t`Today`} count={today.length} defaultOpen>
 						{today.map(task => (
 							<TaskItem
 								key={task.id}
@@ -271,14 +289,11 @@ function TasksPage() {
 								onLogInteraction={() => handleLogInteraction(task.companyId)}
 							/>
 						))}
-					</Stack>
-				</BucketSection>
-			)}
+					</Bucket>
+				)}
 
-			{thisWeek.length > 0 && (
-				<BucketSection>
-					<SectionHeader title={t`This week`} count={thisWeek.length} />
-					<Stack>
+				{thisWeek.length > 0 && (
+					<Bucket label={t`This week`} count={thisWeek.length} defaultOpen>
 						{thisWeek.map(task => (
 							<TaskItem
 								key={task.id}
@@ -290,14 +305,11 @@ function TasksPage() {
 								onLogInteraction={() => handleLogInteraction(task.companyId)}
 							/>
 						))}
-					</Stack>
-				</BucketSection>
-			)}
+					</Bucket>
+				)}
 
-			{later.length > 0 && (
-				<BucketSection>
-					<SectionHeader title={t`Later`} count={later.length} />
-					<Stack>
+				{later.length > 0 && (
+					<Bucket label={t`Later`} count={later.length}>
 						{later.map(task => (
 							<TaskItem
 								key={task.id}
@@ -309,14 +321,11 @@ function TasksPage() {
 								onLogInteraction={() => handleLogInteraction(task.companyId)}
 							/>
 						))}
-					</Stack>
-				</BucketSection>
-			)}
+					</Bucket>
+				)}
 
-			{noDue.length > 0 && (
-				<BucketSection>
-					<SectionHeader title={t`No due date`} count={noDue.length} />
-					<Stack>
+				{noDue.length > 0 && (
+					<Bucket label={t`No due date`} count={noDue.length}>
 						{noDue.map(task => (
 							<TaskItem
 								key={task.id}
@@ -328,10 +337,39 @@ function TasksPage() {
 								onLogInteraction={() => handleLogInteraction(task.companyId)}
 							/>
 						))}
-					</Stack>
-				</BucketSection>
-			)}
+					</Bucket>
+				)}
+			</Buckets>
 		</Page>
+	)
+}
+
+function Bucket({
+	label,
+	count,
+	defaultOpen = false,
+	children,
+}: {
+	label: string
+	count: number
+	defaultOpen?: boolean
+	children: ReactNode
+}) {
+	return (
+		<BucketSection>
+			<PriCollapsible.Root defaultOpen={defaultOpen}>
+				<BucketHeaderRow>
+					<PriCollapsible.Trigger>
+						<ChevronRight size={14} aria-hidden />
+						{label}
+					</PriCollapsible.Trigger>
+					<BucketCount>{count}</BucketCount>
+				</BucketHeaderRow>
+				<PriCollapsible.Panel>
+					<Stack>{children}</Stack>
+				</PriCollapsible.Panel>
+			</PriCollapsible.Root>
+		</BucketSection>
 	)
 }
 
@@ -384,17 +422,28 @@ const Page = styled.div.withConfig({ displayName: 'TasksPage' })`
 `
 
 const Intro = styled.div.withConfig({ displayName: 'TasksIntro' })`
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--space-lg);
+	align-items: end;
+
+	@media (min-width: 768px) {
+		grid-template-columns: 1fr auto;
+	}
+`
+
+const IntroText = styled.div.withConfig({ displayName: 'TasksIntroText' })`
+	${rulerUnderRule}
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-3xs);
+	gap: var(--space-2xs);
+	padding-bottom: var(--space-xs);
 `
 
 const Title = styled.h2.withConfig({ displayName: 'TasksTitle' })`
-	font-family: var(--font-display);
+	${stenciledTitle}
 	font-size: var(--typescale-headline-large-size);
 	line-height: var(--typescale-headline-large-line);
-	font-weight: var(--font-weight-bold);
-	color: var(--color-on-surface);
 	margin: 0;
 `
 
@@ -402,9 +451,21 @@ const Subtitle = styled.p.withConfig({ displayName: 'TasksSubtitle' })`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-large-size);
 	line-height: var(--typescale-body-large-line);
-	letter-spacing: var(--typescale-body-large-tracking);
+	font-style: italic;
 	color: var(--color-on-surface-variant);
 	margin: 0;
+`
+
+const KpiRow = styled.div.withConfig({ displayName: 'TasksKpiRow' })`
+	display: flex;
+	gap: var(--space-sm);
+	flex-wrap: wrap;
+`
+
+const Buckets = styled.div.withConfig({ displayName: 'TasksBuckets' })`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-lg);
 `
 
 const BucketSection = styled.section.withConfig({
@@ -415,8 +476,35 @@ const BucketSection = styled.section.withConfig({
 	gap: var(--space-sm);
 `
 
+const BucketHeaderRow = styled.div.withConfig({
+	displayName: 'TasksBucketHeaderRow',
+})`
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-sm);
+	padding-right: var(--space-sm);
+`
+
+const BucketCount = styled.span.withConfig({
+	displayName: 'TasksBucketCount',
+})`
+	${brushedMetalPlate}
+	display: inline-flex;
+	align-items: center;
+	padding: var(--space-3xs) var(--space-xs);
+	color: var(--color-on-surface);
+	font-family: var(--font-display);
+	font-size: var(--typescale-label-medium-size);
+	font-weight: var(--font-weight-bold);
+	letter-spacing: 0.06em;
+	text-shadow: var(--text-shadow-emboss);
+	transform: rotate(1deg);
+`
+
 const Stack = styled.div.withConfig({ displayName: 'TasksStack' })`
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-sm);
+	gap: 0;
+	margin-top: var(--space-sm);
 `
