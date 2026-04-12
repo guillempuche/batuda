@@ -2,43 +2,47 @@ import { Input } from '@base-ui/react/input'
 import styled from 'styled-components'
 
 /**
- * Neutral single-line input. Pairs naturally with a BaseUI Field
- * (Field.Root + Field.Label + Field.Error) when label/error semantics
- * are needed — consumers wire that at the call site so this primitive
- * stays focused on the visible box.
+ * Aged-paper ledger input. No border-radius, cream fill, thick bottom rule
+ * that darkens to terracotta on focus (drafting pencil on paper). Pairs with
+ * PriField for label/error semantics.
  */
 export const PriInput = styled(Input).withConfig({
 	displayName: 'PriInput',
 })`
 	width: 100%;
 	padding: var(--space-xs) var(--space-sm);
-	background: var(--color-surface);
+	background: #f0e8d0;
 	color: var(--color-on-surface);
-	border: 1px solid var(--color-outline);
-	border-radius: var(--shape-xs);
+	border: none;
+	border-bottom: 2px solid var(--color-outline);
+	border-radius: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-large-size);
 	line-height: var(--typescale-body-large-line);
 	letter-spacing: var(--typescale-body-large-tracking);
+	box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
 	transition:
-		border-color 120ms ease,
-		box-shadow 120ms ease;
+		border-color 160ms ease,
+		background 160ms ease;
 
 	&::placeholder {
 		color: var(--color-on-surface-variant);
 		opacity: 0.7;
+		font-style: italic;
 	}
 
 	&:hover:not(:disabled) {
-		border-color: var(--color-on-surface-variant);
+		border-bottom-color: var(--color-on-surface-variant);
 	}
 
 	&:focus,
 	&:focus-visible {
 		outline: none;
-		border-color: var(--color-primary);
-		box-shadow: 0 0 0 2px
-			color-mix(in srgb, var(--color-primary) 24%, transparent);
+		border-bottom-color: var(--color-primary);
+		background: #f5ecd6;
+		box-shadow:
+			inset 0 1px 2px rgba(0, 0, 0, 0.06),
+			0 2px 0 -1px color-mix(in srgb, var(--color-primary) 40%, transparent);
 	}
 
 	&:disabled {
@@ -48,6 +52,6 @@ export const PriInput = styled(Input).withConfig({
 	}
 
 	&[data-invalid] {
-		border-color: var(--color-error);
+		border-bottom-color: var(--color-error);
 	}
 `

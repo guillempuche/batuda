@@ -2,10 +2,9 @@ import { Tabs } from '@base-ui/react/tabs'
 import styled from 'styled-components'
 
 /**
- * Neutral tabs primitive following Base UI's compound namespace.
- * Structural parts (Root, Panel) are re-exported as-is; visually
- * significant parts (List, Tab, Indicator) come pre-styled with
- * design tokens.
+ * Workshop tabs rendered as file-folder tabs. Each tab is an aged-paper
+ * folder with a slanted leading edge (via clip-path); the selected tab
+ * lifts forward with a subtle metal elevation and an amber under-rule.
  *
  * Usage:
  *   <PriTabs.Root defaultValue="profile">
@@ -22,39 +21,60 @@ const PriList = styled(Tabs.List).withConfig({
 })`
 	position: relative;
 	display: flex;
-	gap: var(--space-xs);
-	border-bottom: 1px solid var(--color-outline-variant);
-	padding: 0 var(--space-2xs);
+	gap: 2px;
+	padding: 0 var(--space-sm);
+	border-bottom: 2px solid rgba(0, 0, 0, 0.18);
+	background: transparent;
 `
 
 const PriTab = styled(Tabs.Tab).withConfig({
 	displayName: 'PriTabsTab',
 })`
 	position: relative;
-	background: transparent;
+	background: #e7dec4;
 	border: none;
-	padding: var(--space-sm) var(--space-md);
-	font-family: var(--font-body);
+	padding: var(--space-sm) var(--space-lg) var(--space-xs);
+	margin-bottom: -2px;
+	min-height: 2.5rem;
+	clip-path: polygon(
+		12px 0,
+		calc(100% - 12px) 0,
+		100% 100%,
+		0 100%
+	);
+	font-family: var(--font-display);
 	font-size: var(--typescale-label-large-size);
 	line-height: var(--typescale-label-large-line);
-	letter-spacing: var(--typescale-label-large-tracking);
-	font-weight: var(--typescale-label-large-weight);
+	letter-spacing: 0.06em;
+	font-weight: var(--font-weight-bold);
+	text-transform: uppercase;
 	color: var(--color-on-surface-variant);
 	cursor: pointer;
-	transition: color 120ms ease;
+	box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.12);
+	transition:
+		color 160ms ease,
+		background 160ms ease,
+		transform 160ms ease;
 
 	&:hover {
 		color: var(--color-on-surface);
+		background: #ede3c8;
 	}
 
 	&[data-selected] {
-		color: var(--color-primary);
+		background: #f0e8d0;
+		color: var(--color-on-surface);
+		text-shadow: var(--text-shadow-emboss);
+		transform: translateY(-1px);
+		box-shadow: inset 0 -2px 0 var(--color-primary);
+		z-index: 1;
 	}
 
 	&:focus-visible {
-		outline: 2px solid var(--color-primary);
-		outline-offset: 2px;
-		border-radius: var(--shape-xs);
+		outline: none;
+		box-shadow:
+			inset 0 -2px 0 var(--color-primary),
+			var(--glow-active);
 	}
 `
 
@@ -62,16 +82,15 @@ const PriIndicator = styled(Tabs.Indicator).withConfig({
 	displayName: 'PriTabsIndicator',
 })`
 	position: absolute;
-	bottom: -1px;
+	bottom: 0;
 	left: 0;
 	height: 2px;
 	width: var(--active-tab-width);
 	transform: translateX(var(--active-tab-left));
 	background: var(--color-primary);
-	border-radius: var(--shape-full);
 	transition:
-		transform 200ms cubic-bezier(0.4, 0, 0.2, 1),
-		width 200ms cubic-bezier(0.4, 0, 0.2, 1);
+		transform 220ms cubic-bezier(0.4, 0, 0.2, 1),
+		width 220ms cubic-bezier(0.4, 0, 0.2, 1);
 `
 
 export const PriTabs = {
