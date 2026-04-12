@@ -10,11 +10,11 @@
    values are used in styled-components @media rules.
 
    Scope rules:
-     Core sections below are shared by every consumer (marketing,
-     Forja internal, and future apps). Marketing — workshop metal
-     section is legacy theatrical chrome reserved for the public
-     site; Forja MUST NOT reference --color-metal-*, --texture-
-     brushed-metal, --text-shadow-*, or --elevation-workshop-*.
+     All tokens below are shared by every consumer (marketing,
+     Forja internal, and future apps). The workshop visual
+     language — metal surfaces, elevation, embossing, brushed
+     textures — is the canonical brand system per
+     docs/brand-visual.md §Workshop Visual Language.
      Domain-specific tokens (pipeline status, CRM accents) belong
      in app-local files (e.g. apps/internal/src/forja-tokens.css).
    ============================================================ */
@@ -50,7 +50,7 @@
 	--color-outline: #847d71;
 	--color-outline-variant: #ccc5b5;
 
-	/* ═══ Marketing — workshop metal (legacy; not for Forja) ═══ */
+	/* ═══ Workshop — metal surfaces (shared) ═══════════════════ */
 
 	/* --- Metal palette — workshop surfaces --- */
 	--color-metal-light: #e0d8c8;
@@ -162,7 +162,7 @@
 	--shape-lg: 1.75rem;
 	--shape-full: 999px;
 
-	/* ═══ Marketing — workshop elevation (legacy) ══════════════ */
+	/* ═══ Workshop — elevation (shared) ════════════════════════ */
 	/*    Top-lit metal with inset highlight                     */
 
 	--elevation-workshop-sm:
@@ -172,7 +172,7 @@
 	--elevation-workshop-lg:
 		inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 6px rgba(0, 0, 0, 0.2);
 
-	/* ═══ Marketing — workshop effects (legacy) ════════════════ */
+	/* ═══ Workshop — effects (shared) ══════════════════════════ */
 	/*    Text shadows & surface textures                        */
 
 	--text-shadow-emboss: 0 1px 0 rgba(255, 255, 255, 0.4);
@@ -184,4 +184,8 @@
 		transparent 1px,
 		transparent 3px
 	);
+
+	/* Warm amber focus/active glow — used by nav active state,
+	   focus rings on metal surfaces, and stencil highlights. */
+	--glow-active: 0 0 0 3px rgba(245, 158, 11, 0.35);
 }
