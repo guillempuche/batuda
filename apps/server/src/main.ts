@@ -1,7 +1,7 @@
 import { createServer } from 'node:http'
 
 import { NodeHttpServer, NodeRuntime } from '@effect/platform-node'
-import { Config, Effect, Layer, Schema } from 'effect'
+import { Config, Effect, Layer } from 'effect'
 import {
 	HttpMiddleware,
 	HttpRouter,
@@ -32,10 +32,9 @@ import { LoggerLive } from './lib/logger'
 import { OtlpObservability } from './lib/observability'
 import { McpHttpLive } from './mcp/http'
 import { SessionMiddlewareLive } from './middleware/session'
-import { AgentMailProviderLive } from './services/agentmail-provider'
 import { CompanyService } from './services/companies'
 import { EmailService } from './services/email'
-import { LocalInboxProviderLive } from './services/local-inbox-provider'
+import { EmailProviderLive } from './services/email-provider-live'
 import { PageService } from './services/pages'
 import { PipelineService } from './services/pipeline'
 import { RecordingService } from './services/recordings'
@@ -82,24 +81,6 @@ const ServerLive = Layer.unwrap(
 		yield* Effect.logInfo(`auth:     ${base}/auth/reference`)
 
 		return NodeHttpServer.layer(createServer, { port })
-	}),
-)
-
-// Pick the EmailProvider layer at boot from EMAIL_PROVIDER. There is **no**
-// auto/default — the developer must explicitly choose `local-inbox` (dev
-// catcher) or `agentmail` (real send). Forcing the choice keeps the
-// developer conscious of which side of the network they're on and prevents
-// local config from silently leaking into prod or vice versa.
-const EmailProviderLive = Layer.unwrap(
-	Effect.gen(function* () {
-		const provider = yield* Config.schema(
-			Schema.Literals(['local-inbox', 'agentmail']),
-			'EMAIL_PROVIDER',
-		)
-		yield* Effect.logInfo(`email provider: ${provider}`)
-		return provider === 'agentmail'
-			? AgentMailProviderLive
-			: LocalInboxProviderLive
 	}),
 )
 

@@ -32,6 +32,7 @@ import {
 	type CreateInboxParams,
 	EmailProvider,
 	type ListParams,
+	type MagicLinkParams,
 	type ProviderInbox,
 	type ProviderMessage,
 	type ProviderMessageItem,
@@ -310,6 +311,53 @@ export const AgentMailProviderLive = Layer.effect(
 					}),
 			}).pipe(Effect.asVoid)
 
+		// Magic-link sender — uses the first configured AgentMail inbox as
+		// the "from" address. AgentMail does not have a concept of a global
+		// sender, so we pick deterministically from listInboxes(). If the
+		// workspace has no inboxes this fails loudly at send time.
+		const sendMagicLink = (
+			params: MagicLinkParams,
+		): Effect.Effect<void, EmailSendError> =>
+			Effect.gen(function* () {
+				const list = yield* Effect.tryPromise({
+					try: () => client.inboxes.list(),
+					catch: e =>
+						new EmailSendError({
+							message: `magic-link: cannot list inboxes: ${e instanceof Error ? e.message : String(e)}`,
+							kind: 'unknown',
+							recipient: params.email,
+						}),
+				})
+				const sender = list.inboxes[0]
+				if (!sender) {
+					return yield* Effect.fail(
+						new EmailSendError({
+							message:
+								'magic-link: no AgentMail inbox configured for outbound mail',
+							kind: 'unknown',
+							recipient: params.email,
+						}),
+					)
+				}
+				yield* Effect.tryPromise({
+					try: () =>
+						client.inboxes.messages.send(sender.inboxId, {
+							to: params.email,
+							subject: 'Sign in to Engranatge',
+							text: `Click the link below to sign in:\n\n${params.url}\n\nThis link will expire shortly.`,
+							html: `<p>Click the link below to sign in:</p><p><a href="${params.url}">${params.url}</a></p><p>This link will expire shortly.</p>`,
+						}),
+					catch: e => {
+						const message = e instanceof Error ? e.message : String(e)
+						return new EmailSendError({
+							message,
+							kind: classifyAgentMailError(message),
+							recipient: params.email,
+						})
+					},
+				})
+			})
+
 		return {
 			send,
 			reply,
@@ -320,6 +368,7 @@ export const AgentMailProviderLive = Layer.effect(
 			listInboxes,
 			createInbox,
 			updateLabels,
+			sendMagicLink,
 		} as const
 	}),
 )

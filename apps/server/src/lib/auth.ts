@@ -1,73 +1,65 @@
 import { apiKey } from '@better-auth/api-key'
 import { betterAuth } from 'better-auth'
-import { admin, bearer, openAPI } from 'better-auth/plugins'
+import { admin, bearer, magicLink, openAPI } from 'better-auth/plugins'
 import { Effect, Layer, Redacted, ServiceMap } from 'effect'
-import { PostgresDialect } from 'kysely'
 import pg from 'pg'
 
+import { buildBetterAuthConfig } from '@engranatge/auth'
+
+import { EmailProvider } from '../services/email-provider'
+import { EmailProviderLive } from '../services/email-provider-live'
 import { EnvVars } from './env'
 
 export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 	make: Effect.gen(function* () {
 		const env = yield* EnvVars
+		const emailProvider = yield* EmailProvider
 
 		const pool = new pg.Pool({
 			connectionString: Redacted.value(env.DATABASE_URL),
 		})
 
-		const instance = betterAuth({
-			basePath: '/auth',
-			baseURL: env.BETTER_AUTH_BASE_URL,
-			secret: Redacted.value(env.BETTER_AUTH_SECRET),
-			database: {
-				dialect: new PostgresDialect({ pool }),
-				type: 'postgres',
-			},
-			// Sign-up is invite-only: the public `/auth/sign-up/email` endpoint
-			// is disabled (Better-Auth returns 400 `Email and password sign up
-			// is not enabled` — see `sign-up.ts:181-187` in the vendored
-			// source). New users must be created programmatically via the
-			// admin plugin (`auth.api.createUser`) by an already-authenticated
-			// admin or by a trusted server caller using an API key. See
-			// `docs/backend.md#authentication-better-auth` for the invite
-			// flow and `apps/cli/src/commands/seed.ts` for a working example.
-			emailAndPassword: { enabled: true, disableSignUp: true },
-			user: {
-				additionalFields: {
-					isAgent: {
-						type: 'boolean',
-						required: false,
-						defaultValue: false,
-					},
+		// The shared builder is the single source of truth for Engranatge's
+		// Better-Auth config. CLI commands use the same builder with a
+		// narrower plugin list (no magicLink) so that API keys and sessions
+		// created out-of-band validate against the running server here.
+		// Sign-up is invite-only: `emailAndPassword.disableSignUp` closes the
+		// public `/auth/sign-up/email` endpoint. New users are created via
+		// `auth.api.createUser` (admin plugin escape hatch) — see
+		// `pnpm cli auth bootstrap` for the production path.
+		const instance = betterAuth(
+			buildBetterAuthConfig({
+				env: {
+					secret: Redacted.value(env.BETTER_AUTH_SECRET),
+					baseURL: env.BETTER_AUTH_BASE_URL || undefined,
+					useSecureCookies: !env.BETTER_AUTH_INSECURE_COOKIES,
+					trustedOrigins: env.ALLOWED_ORIGINS,
 				},
-			},
-			session: {
-				expiresIn: 60 * 60 * 24 * 30, // 30 days
-				updateAge: 60 * 60 * 24 * 7, // renew weekly
-			},
-			plugins: [
-				openAPI(),
-				bearer(),
-				admin(),
-				apiKey({ enableSessionForAPIKeys: true }),
-			],
-			rateLimit: {
-				enabled: true,
-				storage: 'memory',
-				window: 60,
-				max: 100,
-			},
-			advanced: {
-				cookiePrefix: 'forja',
-				useSecureCookies: !env.BETTER_AUTH_INSECURE_COOKIES,
-			},
-			trustedOrigins: env.ALLOWED_ORIGINS,
-		})
+				pool,
+				plugins: [
+					openAPI(),
+					bearer(),
+					admin(),
+					apiKey({ enableSessionForAPIKeys: true }),
+					magicLink({
+						sendMagicLink: data =>
+							Effect.runPromise(
+								emailProvider.sendMagicLink({
+									email: data.email,
+									url: data.url,
+									token: data.token,
+								}),
+							),
+					}),
+				],
+			}),
+		)
 
 		return { instance } as const
 	}),
 }) {
 	static readonly layer = Layer.effect(this, this.make).pipe(
 		Layer.provide(EnvVars.layer),
+		Layer.provide(EmailProviderLive),
 	)
 }

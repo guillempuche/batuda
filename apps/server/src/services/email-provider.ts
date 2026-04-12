@@ -79,6 +79,12 @@ export interface ProviderMessage extends ProviderMessageItem {
 	readonly extractedText?: string | undefined
 }
 
+export interface MagicLinkParams {
+	readonly email: string
+	readonly url: string
+	readonly token: string
+}
+
 // ── Abstract provider tag ──
 
 export class EmailProvider extends ServiceMap.Service<
@@ -119,5 +125,8 @@ export class EmailProvider extends ServiceMap.Service<
 			add: string[],
 			remove: string[],
 		) => Effect.Effect<void, EmailError>
+		readonly sendMagicLink: (
+			params: MagicLinkParams,
+		) => Effect.Effect<void, EmailSendError>
 	}
 >()('EmailProvider') {}
