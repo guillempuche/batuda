@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs'
+import { request } from 'node:https'
 import { resolve } from 'node:path'
 
 import { Effect } from 'effect'
@@ -6,6 +7,7 @@ import type { ChildProcessSpawner } from 'effect/unstable/process'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { SqlLive } from '../db'
+import { getTarget } from '../lib/load-env'
 import { execSilent, ROOT } from '../shell'
 
 export type Status = 'ok' | 'warn' | 'fail'
@@ -111,16 +113,42 @@ const migrationCheck: Check = {
 
 const HTTP_TIMEOUT_MS = 2_000
 
-const httpCheck = (name: string, port: number, hint: string): Check => ({
+// Probes the public portless URL (not the internal node port) so the
+// check passes iff `portless` is also running and routing traffic — that
+// is the URL docs tell operators to hit. Uses node:https directly with
+// `rejectUnauthorized: false` because dev environments use self-signed
+// certs for `*.localhost` — same pragmatism as `curl -k`.
+const probe = (url: string): Promise<number | null> =>
+	new Promise(resolvePromise => {
+		const req = request(
+			url,
+			{ method: 'GET', rejectUnauthorized: false },
+			res => {
+				resolvePromise(res.statusCode ?? null)
+				res.resume()
+			},
+		)
+		req.on('error', () => resolvePromise(null))
+		req.setTimeout(HTTP_TIMEOUT_MS, () => {
+			req.destroy()
+			resolvePromise(null)
+		})
+		req.end()
+	})
+
+const urlCheck = (name: string, url: string, hint: string): Check => ({
 	name,
 	run: Effect.tryPromise({
-		try: () =>
-			fetch(`http://localhost:${port}`, {
-				signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
-			}),
+		try: () => probe(url),
 		catch: () => null,
 	}).pipe(
-		Effect.map(res => (res ? ok(`listening on :${port}`) : warn(hint))),
+		Effect.map(status =>
+			status !== null && status < 400
+				? ok(url)
+				: status !== null
+					? warn(`${url} → ${status}`)
+					: warn(hint),
+		),
 		Effect.catch(() => Effect.succeed(warn(hint))),
 	),
 })
@@ -145,7 +173,36 @@ const storageCheck: Check = {
 	),
 }
 
-const allChecks: Check[] = [
+const cloudDbHostCheck: Check = {
+	name: 'Cloud DB host',
+	run: Effect.sync(() => {
+		const url = process.env['DATABASE_URL'] ?? ''
+		if (!url) return fail('DATABASE_URL missing')
+		try {
+			const host = new URL(url).hostname
+			if (host === 'localhost' || host === '127.0.0.1') {
+				return fail(`points to ${host} — local value in cloud env file?`)
+			}
+			return ok(host)
+		} catch {
+			return fail('DATABASE_URL is not a valid URL')
+		}
+	}),
+}
+
+const cloudAuthUrlCheck: Check = {
+	name: 'BETTER_AUTH_BASE_URL',
+	run: Effect.sync(() => {
+		const url = process.env['BETTER_AUTH_BASE_URL'] ?? ''
+		if (!url) return fail('not set — required for cloud')
+		if (!url.startsWith('https://')) {
+			return fail(`must be https:// (got ${url})`)
+		}
+		return ok(url)
+	}),
+}
+
+const localChecks: Check[] = [
 	fileCheck('.env', '.env file'),
 	fileCheck('apps/cli/.env', 'apps/cli/.env file'),
 	dockerCheck,
@@ -153,12 +210,31 @@ const allChecks: Check[] = [
 	dbConnectionCheck,
 	migrationCheck,
 	storageCheck,
-	httpCheck('Server', 3000, 'not running → run `pnpm dev:server`'),
+	urlCheck(
+		'Server',
+		'https://api.engranatge.localhost/health',
+		'not running → run `pnpm dev:server`',
+	),
+]
+
+const cloudChecks: Check[] = [
+	fileCheck('.env.cloud', '.env.cloud file'),
+	cloudDbHostCheck,
+	cloudAuthUrlCheck,
+	dbConnectionCheck,
+	migrationCheck,
 ]
 
 export const doctor = Effect.gen(function* () {
-	const results: CheckResult[] = []
-	for (const check of allChecks) {
+	const target = getTarget()
+	const targetResult: CheckResult = {
+		name: 'Target',
+		status: 'ok',
+		detail: target === 'cloud' ? 'CLOUD ⚠' : 'local',
+	}
+	const checks = target === 'cloud' ? cloudChecks : localChecks
+	const results: CheckResult[] = [targetResult]
+	for (const check of checks) {
 		const result = yield* check.run
 		results.push({ name: check.name, ...result })
 	}

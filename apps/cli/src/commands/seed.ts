@@ -4,8 +4,9 @@ import { betterAuth } from 'better-auth'
 import { admin, bearer, openAPI } from 'better-auth/plugins'
 import { Config, Effect, Redacted } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
-import { PostgresDialect } from 'kysely'
 import pg from 'pg'
+
+import { buildBetterAuthConfig } from '@engranatge/auth'
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -51,7 +52,7 @@ const PRODUCTS = [
 	{
 		slug: 'gestio-reserves',
 		name: 'Gestió de Reserves',
-		type: 'microsaas',
+		type: 'service',
 		status: 'active',
 		description:
 			'Sistema de reserves online amb calendari, recordatoris i pagaments.',
@@ -541,33 +542,33 @@ export const seedReset = Effect.gen(function* () {
 export const seedAuth = Effect.gen(function* () {
 	yield* Effect.logInfo('Seeding auth user...')
 	const dbUrl = yield* Config.redacted('DATABASE_URL')
-	const secret = yield* Config.string('BETTER_AUTH_SECRET').pipe(
-		Config.withDefault('change-me-in-production'),
+	const secret = yield* Config.string('BETTER_AUTH_SECRET')
+	const baseURL = yield* Config.string('BETTER_AUTH_BASE_URL').pipe(
+		Config.withDefault('http://localhost:3010'),
 	)
 
 	const pool = new pg.Pool({ connectionString: Redacted.value(dbUrl) })
-	// Mirrors `apps/server/src/lib/auth.ts`: `emailAndPassword.disableSignUp`
-	// is `true` so the public `/auth/sign-up/email` endpoint is closed. The
-	// seed uses the admin plugin's server-side `auth.api.createUser`, which
-	// bypasses the signup gate entirely — this is the same escape hatch the
-	// invite flow will use in production to provision a new team member.
-	const auth = betterAuth({
-		basePath: '/auth',
-		secret,
-		database: { dialect: new PostgresDialect({ pool }), type: 'postgres' },
-		emailAndPassword: { enabled: true, disableSignUp: true },
-		user: {
-			additionalFields: {
-				isAgent: { type: 'boolean', required: false, defaultValue: false },
+	// Uses the shared `buildBetterAuthConfig` — same plugins/config as the
+	// server, so API keys / users created here validate against the running
+	// /auth/* routes. `disableSignUp: true` closes the public signup endpoint;
+	// the admin plugin's `auth.api.createUser` below is the bypass.
+	const auth = betterAuth(
+		buildBetterAuthConfig({
+			env: {
+				secret,
+				baseURL,
+				useSecureCookies: false,
+				trustedOrigins: [],
 			},
-		},
-		plugins: [
-			openAPI(),
-			bearer(),
-			admin(),
-			apiKey({ enableSessionForAPIKeys: true }),
-		],
-	})
+			pool,
+			plugins: [
+				openAPI(),
+				bearer(),
+				admin(),
+				apiKey({ enableSessionForAPIKeys: true }),
+			],
+		}),
+	)
 
 	yield* Effect.promise(() =>
 		auth.api.createUser({

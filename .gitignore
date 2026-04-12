@@ -13,6 +13,11 @@ dist/
 .env
 .env.local
 .env.*.local
+.env.cloud
+apps/*/.env.cloud
+
+# Cloud CLI audit log (appended by confirm-cloud on every --env cloud write)
+cloud-audit.log
 
 # Database
 *.db

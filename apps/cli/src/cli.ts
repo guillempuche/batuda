@@ -1,13 +1,23 @@
 import { NodeRuntime, NodeServices } from '@effect/platform-node'
-import { Console, Effect } from 'effect'
+import { Console, Effect, Option, Redacted } from 'effect'
 import { Command, Flag, Prompt } from 'effect/unstable/cli'
 
+import { authCreateKey } from './commands/auth'
+import { authBootstrap } from './commands/auth-bootstrap'
+import { authInvite } from './commands/auth-invite'
+import { authListKeys } from './commands/auth-list-keys'
+import { authListUsers } from './commands/auth-list-users'
+import { authPromote } from './commands/auth-promote'
+import { authResetPassword } from './commands/auth-reset-password'
+import { authRevokeKey } from './commands/auth-revoke-key'
+import { authSessions } from './commands/auth-sessions'
 import { dbMigrate, dbReset } from './commands/db'
 import { doctor } from './commands/doctor'
 import { seed, seedAuth, seedReset } from './commands/seed'
 import { servicesDown, servicesStatus, servicesUp } from './commands/services'
 import { appendEnvKeys, resetEnvFile, setup } from './commands/setup'
 import { withDb } from './db'
+import { loadEnv } from './lib/load-env'
 
 // ── Seed ───────────────────────────────────────────────────
 
@@ -186,6 +196,197 @@ const dbCommand = Command.make('db').pipe(
 	Command.withSubcommands([dbMigrateCommand, dbResetCommand]),
 )
 
+// ── Auth ───────────────────────────────────────────────────
+
+const authCreateKeyCommand = Command.make(
+	'create-key',
+	{
+		email: Flag.string('email').pipe(
+			Flag.withDescription('User email that will own the key'),
+			Flag.withDefault('dev@forja.cat'),
+		),
+		name: Flag.string('name').pipe(
+			Flag.withDescription('Key name (used for listing/revoking later)'),
+			Flag.withDefault('local-dev'),
+		),
+		prefix: Flag.string('prefix').pipe(
+			Flag.withDescription('Plaintext prefix shown on every generated key'),
+			Flag.withDefault('forja_'),
+		),
+		expiresIn: Flag.integer('expires-in').pipe(
+			Flag.withDescription('Expiration in seconds (omit for no expiry)'),
+			Flag.optional,
+		),
+	},
+	({ email, name, prefix, expiresIn }) =>
+		authCreateKey({
+			email,
+			name,
+			prefix,
+			expiresIn: Option.getOrUndefined(expiresIn),
+		}),
+).pipe(
+	Command.withDescription(
+		'Create a Better Auth API key for a user (local dev signup bypass)',
+	),
+)
+
+const authBootstrapCommand = Command.make(
+	'bootstrap',
+	{
+		email: Flag.string('email').pipe(
+			Flag.withDescription('Admin email address'),
+			Flag.withFallbackPrompt(Prompt.text({ message: 'Admin email:' })),
+		),
+		name: Flag.string('name').pipe(
+			Flag.withDescription('Admin display name'),
+			Flag.withFallbackPrompt(Prompt.text({ message: 'Admin name:' })),
+		),
+		password: Flag.redacted('password').pipe(
+			Flag.withDescription('Admin password (prompted if omitted)'),
+			Flag.withFallbackPrompt(Prompt.hidden({ message: 'Admin password:' })),
+		),
+	},
+	({ email, name, password }) =>
+		authBootstrap({
+			email,
+			name,
+			password: Redacted.value(password),
+		}),
+).pipe(
+	Command.withDescription(
+		'Create the first admin user (refuses if any user already exists)',
+	),
+)
+
+const authInviteCommand = Command.make(
+	'invite',
+	{
+		email: Flag.string('email').pipe(
+			Flag.withDescription('Email address of the user to invite'),
+			Flag.withFallbackPrompt(Prompt.text({ message: 'Invitee email:' })),
+		),
+		name: Flag.string('name').pipe(
+			Flag.withDescription('Display name'),
+			Flag.withFallbackPrompt(Prompt.text({ message: 'Invitee name:' })),
+		),
+		role: Flag.choice('role', ['admin', 'user'] as const).pipe(
+			Flag.withDescription('Role to grant'),
+			Flag.withDefault('user' as const),
+		),
+	},
+	({ email, name, role }) => authInvite({ email, name, role }),
+).pipe(
+	Command.withDescription(
+		'Create a passwordless user and issue a magic link (local prints the URL)',
+	),
+)
+
+const authListUsersCommand = Command.make(
+	'list-users',
+	{},
+	() => authListUsers,
+).pipe(Command.withDescription('List every user in the auth database'))
+
+const authListKeysCommand = Command.make(
+	'list-keys',
+	{
+		email: Flag.string('email').pipe(
+			Flag.withDescription('Scope the listing to a single user'),
+			Flag.optional,
+		),
+	},
+	({ email }) => authListKeys({ email: Option.getOrUndefined(email) }),
+).pipe(Command.withDescription('List API keys (all, or filtered by --email)'))
+
+const authPromoteCommand = Command.make(
+	'promote',
+	{
+		email: Flag.string('email').pipe(
+			Flag.withDescription('User to promote'),
+			Flag.withFallbackPrompt(Prompt.text({ message: 'Email:' })),
+		),
+		role: Flag.choice('role', ['admin', 'user'] as const).pipe(
+			Flag.withDescription('Target role'),
+			Flag.withDefault('admin' as const),
+		),
+	},
+	({ email, role }) => authPromote({ email, role }),
+).pipe(Command.withDescription("Change a user's role (admin|user)"))
+
+const authDemoteCommand = Command.make(
+	'demote',
+	{
+		email: Flag.string('email').pipe(
+			Flag.withDescription('User to demote'),
+			Flag.withFallbackPrompt(Prompt.text({ message: 'Email:' })),
+		),
+	},
+	({ email }) => authPromote({ email, role: 'user' }),
+).pipe(
+	Command.withDescription(
+		"Set a user's role to 'user' (alias for promote --role user)",
+	),
+)
+
+const authRevokeKeyCommand = Command.make(
+	'revoke-key',
+	{
+		keyId: Flag.string('key-id').pipe(
+			Flag.withDescription('The id of the API key to revoke'),
+			Flag.withFallbackPrompt(Prompt.text({ message: 'Key id:' })),
+		),
+	},
+	({ keyId }) => authRevokeKey({ keyId }),
+).pipe(Command.withDescription('Disable an API key (enabled=false)'))
+
+const authResetPasswordCommand = Command.make(
+	'reset-password',
+	{
+		email: Flag.string('email').pipe(
+			Flag.withDescription('User whose password to reset'),
+			Flag.withFallbackPrompt(Prompt.text({ message: 'Email:' })),
+		),
+		password: Flag.redacted('password').pipe(
+			Flag.withDescription('New password (prompted if omitted)'),
+			Flag.withFallbackPrompt(Prompt.hidden({ message: 'New password:' })),
+		),
+	},
+	({ email, password }) =>
+		authResetPassword({ email, password: Redacted.value(password) }),
+).pipe(
+	Command.withDescription("Overwrite a user's credential in the account table"),
+)
+
+const authSessionsCommand = Command.make(
+	'sessions',
+	{
+		email: Flag.string('email').pipe(
+			Flag.withDescription('Scope the listing to a single user'),
+			Flag.optional,
+		),
+	},
+	({ email }) => authSessions({ email: Option.getOrUndefined(email) }),
+).pipe(
+	Command.withDescription('List active sessions (all, or filtered by --email)'),
+)
+
+const authCommand = Command.make('auth').pipe(
+	Command.withDescription('Better Auth utilities'),
+	Command.withSubcommands([
+		authBootstrapCommand,
+		authInviteCommand,
+		authListUsersCommand,
+		authListKeysCommand,
+		authCreateKeyCommand,
+		authPromoteCommand,
+		authDemoteCommand,
+		authRevokeKeyCommand,
+		authResetPasswordCommand,
+		authSessionsCommand,
+	]),
+)
+
 // ── Services ───────────────────────────────────────────────
 
 const servicesUpCommand = Command.make('up', {}, () =>
@@ -226,24 +427,45 @@ const engranatge = Command.make('engranatge').pipe(
 		doctorCommand,
 		seedCommand,
 		dbCommand,
+		authCommand,
 		servicesCommand,
 	]),
 )
 
 // ── Run ────────────────────────────────────────────────────
 
-// pnpm injects '--' between script command and user args.
-// Strip it so Effect CLI parses subcommands correctly
-// and `pnpm cli doctor` works without manual `--`.
-const dashIdx = process.argv.indexOf('--')
-if (dashIdx !== -1) process.argv.splice(dashIdx, 1)
+// Parse `--env local|cloud` (default local), strip the flag + pnpm's `--`
+// separator, and populate process.env via dotenv BEFORE Effect Config
+// resolves any variable. Every subsequent `Config.redacted('DATABASE_URL')`
+// / `Config.string(...)` read hits a fully-loaded process.env.
+loadEnv()
 
-// Config services are resolved from process.env at runtime by NodeRuntime
+// Format tagged errors as `Tag(field=…)`. `Schema.TaggedErrorClass` instances
+// extend the native `Error`, so schema fields that collide with built-ins
+// (`message`) land as non-enumerable own properties — `Object.entries` drops
+// them. `core.Error#toJSON` exposes the original construction args through a
+// `plainArgs` symbol, so we prefer that when available.
+const formatError = (e: unknown): string => {
+	if (e && typeof e === 'object' && '_tag' in e) {
+		const tag = String((e as { _tag: unknown })._tag)
+		const withJson = e as { toJSON?: () => unknown }
+		const raw =
+			typeof withJson.toJSON === 'function'
+				? (withJson.toJSON() as Record<string, unknown>)
+				: (e as Record<string, unknown>)
+		const fields = Object.entries(raw)
+			.filter(([k]) => k !== '_tag' && !k.startsWith('_'))
+			.map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
+			.join(', ')
+		return fields ? `${tag}(${fields})` : tag
+	}
+	if (e instanceof Error) return e.message
+	return String(e)
+}
+
 const program = Command.run(engranatge, { version: '0.0.1' }).pipe(
 	Effect.provide(NodeServices.layer),
-	Effect.tapError(e =>
-		Console.error(e instanceof Error ? e.message : String(e)),
-	),
+	Effect.tapError(e => Console.error(formatError(e))),
 )
 NodeRuntime.runMain(program as unknown as Effect.Effect<void, unknown, never>, {
 	disableErrorReporting: true,

@@ -15,7 +15,12 @@ const SKIP_DIRS = new Set([
 	'.vinxi',
 ])
 
-/** Walk the repo tree and return relative paths to every .env.example file. */
+const ENV_EXAMPLE_RE = /^\.env(?:\..+)?\.example$/
+
+/**
+ * Walk the repo tree and return relative paths to every .env*.example file
+ * (.env.example, .env.cloud.example, .env.github.example, …).
+ */
 const findEnvExamples = (dir: string): string[] => {
 	const results: string[] = []
 	for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -23,7 +28,7 @@ const findEnvExamples = (dir: string): string[] => {
 			if (!SKIP_DIRS.has(entry.name)) {
 				results.push(...findEnvExamples(join(dir, entry.name)))
 			}
-		} else if (entry.name === '.env.example') {
+		} else if (ENV_EXAMPLE_RE.test(entry.name)) {
 			results.push(relative(ROOT, join(dir, entry.name)))
 		}
 	}

@@ -3,8 +3,8 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
-		"dev": "node --env-file-if-exists=../../.env --env-file-if-exists=.env --import tsx src/cli.ts",
-		"dev:tui": "node --env-file-if-exists=.env --import tsx src/tui.ts",
+		"dev": "tsx src/cli.ts",
+		"dev:tui": "tsx src/tui.ts",
 		"build": "tsdown src/cli.ts src/tui.ts",
 		"check-types": "tsc --noEmit"
 	},
@@ -13,8 +13,10 @@
 		"@clack/prompts": "^1.2.0",
 		"@effect/platform-node": "4.0.0-beta.43",
 		"@effect/sql-pg": "4.0.0-beta.43",
+		"@engranatge/auth": "workspace:*",
 		"@engranatge/domain": "workspace:*",
 		"better-auth": "^1.5.6",
+		"dotenv": "^16.4.7",
 		"effect": "4.0.0-beta.43",
 		"kysely": "^0.28.15",
 		"pg": "^8.20.0",
