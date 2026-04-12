@@ -1,0 +1,32 @@
+{
+	"name": "@engranatge/auth",
+	"version": "0.0.1",
+	"description": "Engranatge — auth bounded context (Better-Auth config builder + CLI-side use cases)",
+	"type": "module",
+	"types": "./src/index.ts",
+	"main": "./src/index.ts",
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"import": "./src/index.ts"
+		}
+	},
+	"scripts": {
+		"build": "tsdown",
+		"check-types": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@better-auth/api-key": "^1.5.6",
+		"better-auth": "^1.5.6",
+		"effect": "4.0.0-beta.43",
+		"kysely": "^0.28.15",
+		"pg": "^8.20.0"
+	},
+	"devDependencies": {
+		"@types/node": "^22.15.0",
+		"@types/pg": "^8.20.0",
+		"tsdown": "^0.21.7",
+		"typescript": "^5.9.3"
+	},
+	"private": true
+}
