@@ -3,14 +3,15 @@ import { useLingui as useLinguiMacro } from '@lingui/react/macro'
 import { useState } from 'react'
 import styled from 'styled-components'
 
+import { agedPaperRow, brushedMetalBezel } from '#/lib/workshop-mixins'
 import { ChannelIcon, channelLabelFor } from './channel-icon'
 import { RelativeDate } from './relative-date'
 
 /**
- * Single row in the company-detail timeline. Left: a circular
- * surface-container chip with the channel icon. Right: title +
- * summary + relative date. Long summaries collapse by default and
- * expand on click — no route change, no modal.
+ * Journal entry on aged paper. Left column = metal bezel with the channel
+ * icon (brushed texture + ring); right column = stenciled title + italic
+ * summary + optional outcome/next-action meta lines. Long summaries
+ * collapse to a preview and expand on click — no modal, no route change.
  */
 export type TimelineEntryData = {
 	id: string
@@ -37,13 +38,15 @@ export function TimelineEntry({ entry }: { entry: TimelineEntryData }) {
 
 	return (
 		<Row type='button' onClick={() => isLong && setExpanded(e => !e)}>
-			<IconChip aria-hidden>
+			<IconBezel aria-hidden>
 				<ChannelIcon channel={entry.channel} size={18} />
-			</IconChip>
+			</IconBezel>
 			<Body>
 				<Title>
 					<span>{title}</span>
-					<RelativeDate value={entry.date} />
+					<DateSpan>
+						<RelativeDate value={entry.date} />
+					</DateSpan>
 				</Title>
 				{summary && <Summary>{displaySummary}</Summary>}
 				{entry.outcome && <Meta>{t`Outcome: ${entry.outcome}`}</Meta>}
@@ -57,39 +60,44 @@ export function TimelineEntry({ entry }: { entry: TimelineEntryData }) {
 }
 
 const Row = styled.button.withConfig({ displayName: 'TimelineEntry' })`
+	${agedPaperRow}
 	display: grid;
 	grid-template-columns: auto 1fr;
 	gap: var(--space-md);
 	width: 100%;
 	text-align: left;
-	background: transparent;
 	border: none;
-	padding: var(--space-sm) 0;
+	border-bottom: 1px solid var(--color-ledger-line);
+	padding: var(--space-md) var(--space-md);
 	cursor: pointer;
+	color: var(--color-on-surface);
+
+	&:hover {
+		background-color: var(--color-paper-aged-hover);
+	}
 
 	&:focus-visible {
-		outline: 2px solid var(--color-primary);
-		outline-offset: 2px;
-		border-radius: var(--shape-sm);
+		outline: none;
+		box-shadow: var(--glow-active);
 	}
 `
 
-const IconChip = styled.span.withConfig({ displayName: 'TimelineEntryIcon' })`
+const IconBezel = styled.span.withConfig({ displayName: 'TimelineEntryIcon' })`
+	${brushedMetalBezel}
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 2.25rem;
-	height: 2.25rem;
+	width: 2.5rem;
+	height: 2.5rem;
 	flex-shrink: 0;
-	background: var(--color-surface-container);
-	color: var(--color-on-surface-variant);
-	border-radius: var(--shape-full);
+	border-radius: 50%;
+	color: var(--color-on-surface);
 `
 
 const Body = styled.div.withConfig({ displayName: 'TimelineEntryBody' })`
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-3xs);
+	gap: var(--space-2xs);
 	min-width: 0;
 `
 
@@ -98,25 +106,38 @@ const Title = styled.div.withConfig({ displayName: 'TimelineEntryTitle' })`
 	align-items: baseline;
 	justify-content: space-between;
 	gap: var(--space-sm);
-	font-family: var(--font-body);
-	font-size: var(--typescale-label-large-size);
-	line-height: var(--typescale-label-large-line);
-	font-weight: var(--font-weight-medium);
+	font-family: var(--font-display);
+	font-size: var(--typescale-title-small-size);
+	line-height: var(--typescale-title-small-line);
+	font-weight: var(--font-weight-bold);
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
 	color: var(--color-on-surface);
 
-	> span {
+	> span:first-child {
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 `
 
+const DateSpan = styled.span.withConfig({ displayName: 'TimelineEntryDate' })`
+	flex-shrink: 0;
+	font-family: var(--font-body);
+	font-size: var(--typescale-label-small-size);
+	font-weight: var(--font-weight-regular);
+	letter-spacing: 0;
+	text-transform: none;
+	color: var(--color-on-surface-variant);
+	font-style: italic;
+`
+
 const Summary = styled.p.withConfig({ displayName: 'TimelineEntrySummary' })`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	line-height: var(--typescale-body-medium-line);
-	letter-spacing: var(--typescale-body-medium-tracking);
-	color: var(--color-on-surface);
+	color: var(--color-on-surface-variant);
+	font-style: italic;
 	margin: 0;
 `
 
@@ -132,9 +153,10 @@ const ToggleHint = styled.span.withConfig({
 	displayName: 'TimelineEntryToggleHint',
 })`
 	margin-top: var(--space-3xs);
-	font-family: var(--font-body);
+	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
-	font-weight: var(--typescale-label-small-weight);
-	letter-spacing: var(--typescale-label-small-tracking);
+	font-weight: var(--font-weight-bold);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
 	color: var(--color-primary);
 `

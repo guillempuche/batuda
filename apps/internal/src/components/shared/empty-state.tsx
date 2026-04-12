@@ -1,10 +1,17 @@
 import type { ComponentType, ReactNode } from 'react'
 import styled from 'styled-components'
 
+import {
+	agedPaperSurface,
+	brushedMetalBezel,
+	maskingTapeCorner,
+} from '#/lib/workshop-mixins'
+
 /**
- * Generic empty-state block. Use whenever a list, filter, or feed has
- * no results — the goal is to explain the absence and (optionally)
- * surface a call-to-action that would populate it.
+ * Aged-paper empty-state note. The outer card is taped to the workspace
+ * via a beige masking-tape strip rotated at the top-left corner, and
+ * the icon slot sits inside a brushed-metal bezel so it reads as a
+ * tool pinned to the paper.
  */
 export function EmptyState({
 	icon: Icon,
@@ -19,10 +26,11 @@ export function EmptyState({
 }) {
 	return (
 		<Wrapper>
+			<Tape aria-hidden />
 			{Icon && (
-				<IconWrap>
-					<Icon size={32} aria-hidden />
-				</IconWrap>
+				<Bezel>
+					<Icon size={30} aria-hidden />
+				</Bezel>
 			)}
 			<Title>{title}</Title>
 			{description && <Description>{description}</Description>}
@@ -32,48 +40,60 @@ export function EmptyState({
 }
 
 const Wrapper = styled.div.withConfig({ displayName: 'EmptyState' })`
+	${agedPaperSurface}
+	position: relative;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	gap: var(--space-xs);
-	padding: var(--space-2xl) var(--space-lg);
+	gap: var(--space-sm);
+	padding: var(--space-2xl) var(--space-lg) var(--space-xl);
+	margin: var(--space-md) auto;
+	max-width: 32rem;
 	text-align: center;
-	color: var(--color-on-surface-variant);
+	color: var(--color-on-surface);
 `
 
-const IconWrap = styled.div.withConfig({ displayName: 'EmptyStateIcon' })`
+const Tape = styled.span.withConfig({ displayName: 'EmptyStateTape' })`
+	${maskingTapeCorner}
+`
+
+const Bezel = styled.span.withConfig({ displayName: 'EmptyStateBezel' })`
+	${brushedMetalBezel}
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 4rem;
-	height: 4rem;
-	margin-bottom: var(--space-xs);
-	border-radius: var(--shape-full);
-	background: var(--color-surface-container);
-	color: var(--color-on-surface-variant);
+	width: 3.5rem;
+	height: 3.5rem;
+	margin-bottom: var(--space-2xs);
+	border-radius: 50%;
+	color: var(--color-on-surface);
 `
 
 const Title = styled.p.withConfig({ displayName: 'EmptyStateTitle' })`
+	margin: 0;
 	font-family: var(--font-display);
 	font-size: var(--typescale-title-medium-size);
 	line-height: var(--typescale-title-medium-line);
-	font-weight: var(--font-weight-medium);
+	font-weight: var(--font-weight-bold);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
 	color: var(--color-on-surface);
-	margin: 0;
+	text-shadow: var(--text-shadow-emboss);
 `
 
 const Description = styled.p.withConfig({
 	displayName: 'EmptyStateDescription',
 })`
+	margin: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	line-height: var(--typescale-body-medium-line);
 	color: var(--color-on-surface-variant);
 	max-width: 28rem;
-	margin: 0;
+	font-style: italic;
 `
 
 const Actions = styled.div.withConfig({ displayName: 'EmptyStateActions' })`
-	margin-top: var(--space-sm);
+	margin-top: var(--space-xs);
 `
