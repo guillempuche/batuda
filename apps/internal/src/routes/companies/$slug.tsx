@@ -5,6 +5,7 @@ import { AsyncResult } from 'effect/unstable/reactivity'
 import {
 	Briefcase,
 	Camera,
+	ChevronRight,
 	ExternalLink,
 	FileText,
 	Globe,
@@ -13,10 +14,11 @@ import {
 	Phone,
 	Plus,
 } from 'lucide-react'
+import { motion } from 'motion/react'
 import { useCallback, useMemo } from 'react'
 import styled from 'styled-components'
 
-import { PriTabs } from '@engranatge/ui/pri'
+import { PriButton, PriCollapsible, PriTabs } from '@engranatge/ui/pri'
 
 import {
 	companyAtomFor,
@@ -33,8 +35,16 @@ import {
 	TimelineEntry,
 	type TimelineEntryData,
 } from '#/components/shared/timeline-entry'
+import { ScrewDot } from '#/components/shared/workshop-decorations'
 import { useQuickCapture } from '#/context/quick-capture-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
+import {
+	agedPaperSurface,
+	brushedMetalBezel,
+	brushedMetalPlate,
+	ruledLedgerRow,
+	stenciledTitle,
+} from '#/lib/workshop-mixins'
 
 /**
  * Narrow shapes for the detail view. The server returns `Schema.Unknown`
@@ -337,7 +347,9 @@ function DetailBody({
 
 	return (
 		<Page>
-			<Header>
+			<Header layoutId={`company-${company.slug}`}>
+				<ScrewDot $position='top-left' $size={8} aria-hidden />
+				<ScrewDot $position='top-right' $size={8} aria-hidden />
 				<IdentityRow>
 					<Identity>
 						<Name>{company.name}</Name>
@@ -417,18 +429,24 @@ function DetailBody({
 				</HeaderChrome>
 
 				<PrimaryActions>
-					<PrimaryAction type='button' onClick={handleLogInteraction}>
-						<Plus size={16} aria-hidden />
-						<Trans>Log interaction</Trans>
-					</PrimaryAction>
-					<SecondaryAction type='button' disabled aria-disabled='true'>
+					<motion.div whileTap={{ scale: 0.96 }}>
+						<PriButton
+							type='button'
+							$variant='filled'
+							onClick={handleLogInteraction}
+						>
+							<Plus size={16} aria-hidden />
+							<Trans>Log interaction</Trans>
+						</PriButton>
+					</motion.div>
+					<PriButton type='button' $variant='outlined' disabled>
 						<Plus size={16} aria-hidden />
 						<Trans>Add task</Trans>
-					</SecondaryAction>
-					<SecondaryAction type='button' disabled aria-disabled='true'>
+					</PriButton>
+					<PriButton type='button' $variant='outlined' disabled>
 						<Plus size={16} aria-hidden />
 						<Trans>New proposal</Trans>
-					</SecondaryAction>
+					</PriButton>
 				</PrimaryActions>
 			</Header>
 
@@ -571,30 +589,37 @@ function DetailBody({
 			</PriTabs.Root>
 
 			<TimelineSection>
-				<TimelineHeading>
-					<Trans>Timeline</Trans>
-				</TimelineHeading>
-				{interactions.length === 0 ? (
-					<EmptyState
-						title={t`No interactions logged yet`}
-						description={t`Use “Log interaction” above to record the first touch.`}
-					/>
-				) : (
-					<TimelineList>
-						{interactions.map(interaction => {
-							const entry: TimelineEntryData = {
-								id: interaction.id,
-								channel: interaction.channel,
-								subject: interaction.subject,
-								summary: interaction.summary,
-								outcome: interaction.outcome,
-								nextAction: interaction.nextAction,
-								date: interaction.date,
-							}
-							return <TimelineEntry key={interaction.id} entry={entry} />
-						})}
-					</TimelineList>
-				)}
+				<PriCollapsible.Root defaultOpen>
+					<PriCollapsible.Trigger>
+						<ChevronRight size={14} aria-hidden />
+						<Trans>Timeline</Trans>
+					</PriCollapsible.Trigger>
+					<PriCollapsible.Panel>
+						<TimelinePanelInner>
+							{interactions.length === 0 ? (
+								<EmptyState
+									title={t`No interactions logged yet`}
+									description={t`Use “Log interaction” above to record the first touch.`}
+								/>
+							) : (
+								<TimelineList>
+									{interactions.map(interaction => {
+										const entry: TimelineEntryData = {
+											id: interaction.id,
+											channel: interaction.channel,
+											subject: interaction.subject,
+											summary: interaction.summary,
+											outcome: interaction.outcome,
+											nextAction: interaction.nextAction,
+											date: interaction.date,
+										}
+										return <TimelineEntry key={interaction.id} entry={entry} />
+									})}
+								</TimelineList>
+							)}
+						</TimelinePanelInner>
+					</PriCollapsible.Panel>
+				</PriCollapsible.Root>
 			</TimelineSection>
 		</Page>
 	)
@@ -745,24 +770,22 @@ const Page = styled.div.withConfig({ displayName: 'CompanyDetailPage' })`
 	gap: var(--space-lg);
 `
 
-const Header = styled.header.withConfig({
+const Header = styled(motion.header).withConfig({
 	displayName: 'CompanyDetailHeader',
 })`
-	position: sticky;
-	top: var(--top-bar-height);
-	z-index: 3;
+	${brushedMetalPlate}
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-sm);
-	padding: var(--space-md) 0 var(--space-sm);
-	background: var(--color-surface);
-	border-bottom: 1px solid var(--color-outline-variant);
+	gap: var(--space-md);
+	padding: var(--space-lg) var(--space-lg) var(--space-md);
+	box-shadow: var(--elevation-workshop-md);
 `
 
 const IdentityRow = styled.div.withConfig({
 	displayName: 'CompanyDetailIdentityRow',
 })`
 	display: flex;
+	flex-wrap: wrap;
 	align-items: flex-start;
 	justify-content: space-between;
 	gap: var(--space-md);
@@ -775,15 +798,16 @@ const Identity = styled.div.withConfig({
 	flex-direction: column;
 	gap: var(--space-3xs);
 	min-width: 0;
+	flex: 1 1 240px;
 `
 
 const Name = styled.h2.withConfig({ displayName: 'CompanyDetailName' })`
-	font-family: var(--font-display);
+	${stenciledTitle}
 	font-size: var(--typescale-headline-large-size);
 	line-height: var(--typescale-headline-large-line);
-	font-weight: var(--font-weight-bold);
-	color: var(--color-on-surface);
+	letter-spacing: 0.06em;
 	margin: 0;
+	overflow-wrap: anywhere;
 `
 
 const SubtitleText = styled.p.withConfig({
@@ -792,6 +816,7 @@ const SubtitleText = styled.p.withConfig({
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-large-size);
 	line-height: var(--typescale-body-large-line);
+	font-style: italic;
 	color: var(--color-on-surface-variant);
 	margin: 0;
 `
@@ -825,29 +850,30 @@ const ExternalLinks = styled.div.withConfig({
 const ExternalLinkButton = styled.a.withConfig({
 	displayName: 'CompanyDetailExternalLinkButton',
 })`
+	${brushedMetalBezel}
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 2rem;
-	height: 2rem;
-	border-radius: var(--shape-full);
-	border: 1px solid var(--color-outline-variant);
-	background: transparent;
-	color: var(--color-on-surface-variant);
-	transition:
-		background 120ms ease,
-		color 120ms ease,
-		border-color 120ms ease;
+	width: 2.25rem;
+	height: 2.25rem;
+	border-radius: 50%;
+	color: var(--color-on-surface);
+	transition: transform 160ms ease;
+
+	& svg {
+		position: relative;
+		z-index: 1;
+		filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.4));
+	}
 
 	&:hover {
-		background: var(--color-primary);
-		color: var(--color-on-primary);
-		border-color: var(--color-primary);
+		transform: translateY(-1px);
+		color: var(--color-primary);
 	}
 
 	&:focus-visible {
-		outline: 2px solid var(--color-primary);
-		outline-offset: 2px;
+		outline: none;
+		box-shadow: var(--glow-active);
 	}
 `
 
@@ -859,13 +885,16 @@ const LastContact = styled.div.withConfig({
 	gap: var(--space-2xs);
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-medium-size);
+	font-style: italic;
 	color: var(--color-on-surface-variant);
 `
 
 const LastContactLabel = styled.span.withConfig({
 	displayName: 'CompanyDetailLastContactLabel',
 })`
-	opacity: 0.7;
+	${stenciledTitle}
+	font-style: normal;
+	opacity: 0.75;
 `
 
 const PrimaryActions = styled.div.withConfig({
@@ -873,65 +902,8 @@ const PrimaryActions = styled.div.withConfig({
 })`
 	display: flex;
 	flex-wrap: wrap;
+	align-items: center;
 	gap: var(--space-sm);
-`
-
-const PrimaryAction = styled.button.withConfig({
-	displayName: 'CompanyDetailPrimaryAction',
-})`
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-2xs);
-	padding: var(--space-xs) var(--space-md);
-	background: var(--color-primary);
-	color: var(--color-on-primary);
-	border: none;
-	border-radius: var(--shape-full);
-	font-family: var(--font-body);
-	font-size: var(--typescale-label-large-size);
-	line-height: var(--typescale-label-large-line);
-	font-weight: var(--typescale-label-large-weight);
-	letter-spacing: var(--typescale-label-large-tracking);
-	cursor: pointer;
-	transition:
-		background 120ms ease,
-		transform 120ms ease;
-
-	&:hover {
-		background: color-mix(in oklab, var(--color-primary) 90%, black);
-	}
-
-	&:active {
-		transform: translateY(1px);
-	}
-
-	&:focus-visible {
-		outline: 2px solid var(--color-primary);
-		outline-offset: 2px;
-	}
-`
-
-const SecondaryAction = styled.button.withConfig({
-	displayName: 'CompanyDetailSecondaryAction',
-})`
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-2xs);
-	padding: var(--space-xs) var(--space-md);
-	background: var(--color-surface-container);
-	color: var(--color-on-surface);
-	border: 1px solid var(--color-outline-variant);
-	border-radius: var(--shape-full);
-	font-family: var(--font-body);
-	font-size: var(--typescale-label-large-size);
-	font-weight: var(--typescale-label-large-weight);
-	letter-spacing: var(--typescale-label-large-tracking);
-	cursor: pointer;
-
-	&:disabled {
-		cursor: not-allowed;
-		opacity: 0.55;
-	}
 `
 
 const PanelWrap = styled.div.withConfig({
@@ -953,18 +925,19 @@ const ProfileGrid = styled.div.withConfig({
 `
 
 const Field = styled.div.withConfig({ displayName: 'CompanyDetailField' })`
+	${agedPaperSurface}
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
+	padding: var(--space-sm) var(--space-md);
+	border-bottom-width: 2px;
 `
 
 const FieldLabel = styled.span.withConfig({
 	displayName: 'CompanyDetailFieldLabel',
 })`
-	font-family: var(--font-body);
+	${stenciledTitle}
 	font-size: var(--typescale-label-small-size);
-	letter-spacing: var(--typescale-label-small-tracking);
-	text-transform: uppercase;
 	color: var(--color-on-surface-variant);
 `
 
@@ -993,6 +966,7 @@ const FieldEmpty = styled.span.withConfig({
 })`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
+	font-style: italic;
 	color: var(--color-on-surface-variant);
 	opacity: 0.55;
 `
@@ -1011,13 +985,32 @@ const ContactList = styled.ul.withConfig({
 const ContactCard = styled.li.withConfig({
 	displayName: 'CompanyDetailContactCard',
 })`
+	${agedPaperSurface}
+	position: relative;
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-xs);
-	padding: var(--space-md);
-	background: var(--color-surface-container-low);
-	border: 1px solid var(--color-outline-variant);
-	border-radius: var(--shape-md);
+	padding: var(--space-md) var(--space-md) var(--space-sm);
+
+	/* Paperclip corner */
+	&::before {
+		content: '';
+		position: absolute;
+		top: -4px;
+		right: 18px;
+		width: 14px;
+		height: 28px;
+		border: 2px solid rgba(120, 110, 95, 0.65);
+		border-top-color: rgba(120, 110, 95, 0.9);
+		border-radius: 6px 6px 3px 3px;
+		background: linear-gradient(
+			180deg,
+			rgba(220, 210, 190, 0.4) 0%,
+			rgba(180, 170, 150, 0.25) 100%
+		);
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+		pointer-events: none;
+	}
 `
 
 const ContactHeader = styled.div.withConfig({
@@ -1031,29 +1024,27 @@ const ContactHeader = styled.div.withConfig({
 const ContactName = styled.span.withConfig({
 	displayName: 'CompanyDetailContactName',
 })`
+	${stenciledTitle}
 	display: inline-flex;
+	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--space-xs);
-	font-family: var(--font-display);
 	font-size: var(--typescale-title-small-size);
 	line-height: var(--typescale-title-small-line);
-	font-weight: var(--typescale-title-small-weight);
-	color: var(--color-on-surface);
+	letter-spacing: 0.04em;
+	overflow-wrap: anywhere;
 `
 
 const DecisionBadge = styled.span.withConfig({
 	displayName: 'CompanyDetailDecisionBadge',
 })`
+	${brushedMetalPlate}
+	${stenciledTitle}
 	display: inline-flex;
 	padding: var(--space-3xs) var(--space-2xs);
-	background: var(--color-secondary);
-	color: var(--color-on-secondary);
-	border-radius: var(--shape-full);
-	font-family: var(--font-body);
+	border-left: 3px solid var(--color-secondary);
 	font-size: var(--typescale-label-small-size);
-	font-weight: var(--typescale-label-small-weight);
-	letter-spacing: var(--typescale-label-small-tracking);
-	text-transform: uppercase;
+	transform: rotate(-0.5deg);
 `
 
 const ContactRole = styled.span.withConfig({
@@ -1062,6 +1053,7 @@ const ContactRole = styled.span.withConfig({
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	line-height: var(--typescale-body-small-line);
+	font-style: italic;
 	color: var(--color-on-surface-variant);
 `
 
@@ -1079,13 +1071,15 @@ const ContactLink = styled.a.withConfig({
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-3xs);
+	padding: 2px 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-medium-size);
 	color: var(--color-primary);
 	text-decoration: none;
+	border-bottom: 1px dashed color-mix(in srgb, var(--color-primary) 40%, transparent);
 
 	&:hover {
-		text-decoration: underline;
+		border-bottom-style: solid;
 	}
 `
 
@@ -1094,7 +1088,7 @@ const TaskList = styled.ul.withConfig({
 })`
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-xs);
+	gap: 0;
 	list-style: none;
 	padding: 0;
 	margin: 0;
@@ -1104,15 +1098,18 @@ const TaskRow = styled.li.withConfig({
 	displayName: 'CompanyDetailTaskRow',
 	shouldForwardProp: prop => prop !== '$completed',
 })<{ $completed: boolean }>`
+	${ruledLedgerRow}
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--space-sm);
 	padding: var(--space-sm) var(--space-md);
-	background: var(--color-surface-container-low);
-	border: 1px solid var(--color-outline-variant);
-	border-radius: var(--shape-sm);
+	background-color: var(--color-paper-aged);
 	opacity: ${p => (p.$completed ? 0.55 : 1)};
+
+	&:first-child {
+		border-top: 1px solid var(--color-ledger-line);
+	}
 `
 
 const TaskTitle = styled.span.withConfig({
@@ -1131,8 +1128,11 @@ const TaskTitle = styled.span.withConfig({
 const TaskMeta = styled.span.withConfig({
 	displayName: 'CompanyDetailTaskMeta',
 })`
-	font-family: var(--font-body);
+	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
+	font-weight: var(--font-weight-bold);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
 	color: var(--color-on-surface-variant);
 	flex-shrink: 0;
 `
@@ -1142,20 +1142,13 @@ const TimelineSection = styled.section.withConfig({
 })`
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-sm);
+	gap: var(--space-md);
 `
 
-const TimelineHeading = styled.h3.withConfig({
-	displayName: 'CompanyDetailTimelineHeading',
+const TimelinePanelInner = styled.div.withConfig({
+	displayName: 'CompanyDetailTimelinePanelInner',
 })`
-	font-family: var(--font-body);
-	font-size: var(--typescale-title-small-size);
-	line-height: var(--typescale-title-small-line);
-	font-weight: var(--typescale-title-small-weight);
-	letter-spacing: var(--typescale-title-small-tracking);
-	text-transform: uppercase;
-	color: var(--color-on-surface);
-	margin: 0;
+	padding: var(--space-sm) 0 0;
 `
 
 const TimelineList = styled.div.withConfig({

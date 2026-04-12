@@ -6,6 +6,7 @@ import styled from 'styled-components'
 import { PriButton, PriInput } from '@engranatge/ui/pri'
 
 import { fetchSession } from '#/lib/session-check'
+import { rulerUnderRule, stenciledTitle } from '#/lib/workshop-mixins'
 
 /**
  * Login page search params. `returnTo` captures the full relative URL
@@ -186,28 +187,66 @@ const Page = styled.div.withConfig({ displayName: 'LoginPage' })`
 	align-items: center;
 	justify-content: center;
 	padding: var(--space-lg);
-	background: var(--color-surface);
+	background-color: var(--color-pegboard);
+	background-image:
+		radial-gradient(
+			circle,
+			rgba(80, 60, 40, 0.18) 1px,
+			transparent 1px
+		);
+	background-size: 24px 24px;
 `
 
 const Card = styled.div.withConfig({ displayName: 'LoginCard' })`
+	position: relative;
 	width: 100%;
-	max-width: 24rem;
-	padding: var(--space-xl);
-	background: var(--color-surface-container);
-	border: 1px solid var(--color-outline);
-	border-radius: var(--shape-large);
-	box-shadow: var(--elevation-2);
+	max-width: 26rem;
+	padding: var(--space-xl) var(--space-xl) var(--space-lg);
+	background-color: var(--color-paper-aged);
+	background-image:
+		radial-gradient(
+			ellipse 80px 60px at 15% 20%,
+			rgba(180, 155, 120, 0.08) 0%,
+			transparent 100%
+		),
+		radial-gradient(
+			ellipse 80px 60px at 85% 80%,
+			var(--color-paper-fibre-a) 0%,
+			transparent 100%
+		);
+	border: 1px solid rgba(120, 95, 60, 0.45);
+	box-shadow:
+		var(--shadow-paper-inset),
+		0 6px 20px rgba(0, 0, 0, 0.28);
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
+
+	/* Masking tape strip at top-left */
+	&::before {
+		content: '';
+		position: absolute;
+		top: -10px;
+		left: -10px;
+		width: 82px;
+		height: 22px;
+		background: linear-gradient(
+			180deg,
+			rgba(244, 232, 196, 0.88) 0%,
+			rgba(226, 210, 166, 0.85) 100%
+		);
+		border: 1px solid rgba(0, 0, 0, 0.08);
+		transform: rotate(-4deg);
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+		pointer-events: none;
+	}
 `
 
 const Brand = styled.h1.withConfig({ displayName: 'LoginBrand' })`
-	font-family: var(--font-display);
+	${stenciledTitle}
 	font-size: var(--typescale-display-small-size);
 	line-height: var(--typescale-display-small-line);
-	letter-spacing: var(--typescale-display-small-tracking);
-	font-weight: var(--typescale-display-small-weight);
+	letter-spacing: 0.1em;
 	color: var(--color-primary);
 	margin: 0;
 `
@@ -216,6 +255,7 @@ const Subtitle = styled.p.withConfig({ displayName: 'LoginSubtitle' })`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-medium-size);
 	line-height: var(--typescale-body-medium-line);
+	font-style: italic;
 	color: var(--color-on-surface-variant);
 	margin: 0;
 `
@@ -223,7 +263,7 @@ const Subtitle = styled.p.withConfig({ displayName: 'LoginSubtitle' })`
 const Form = styled.form.withConfig({ displayName: 'LoginForm' })`
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-sm);
+	gap: var(--space-md);
 	margin-top: var(--space-sm);
 `
 
@@ -234,18 +274,18 @@ const Field = styled.div.withConfig({ displayName: 'LoginField' })`
 `
 
 const Label = styled.label.withConfig({ displayName: 'LoginLabel' })`
-	font-family: var(--font-body);
-	font-size: var(--typescale-label-medium-size);
-	line-height: var(--typescale-label-medium-line);
-	letter-spacing: var(--typescale-label-medium-tracking);
-	font-weight: var(--typescale-label-medium-weight);
-	color: var(--color-on-surface-variant);
+	${stenciledTitle}
+	font-size: var(--typescale-label-small-size);
 `
 
 const ErrorText = styled.p.withConfig({ displayName: 'LoginError' })`
+	padding: var(--space-2xs) var(--space-sm);
+	border-left: 3px solid var(--color-error);
+	background: color-mix(in srgb, var(--color-error) 6%, transparent);
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	line-height: var(--typescale-body-small-line);
+	font-style: italic;
 	color: var(--color-error);
 	margin: 0;
 `
@@ -257,12 +297,14 @@ const SubmitButton = styled(PriButton).withConfig({
 `
 
 const Hint = styled.p.withConfig({ displayName: 'LoginHint' })`
+	${rulerUnderRule}
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	line-height: var(--typescale-body-small-line);
+	font-style: italic;
 	color: var(--color-on-surface-variant);
 	text-align: center;
 	margin: 0;
 	padding-top: var(--space-xs);
-	border-top: 1px solid var(--color-outline);
+	background-position: left top;
 `
