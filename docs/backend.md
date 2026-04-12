@@ -562,7 +562,7 @@ Better Auth v1.5.6 handles all authentication. See [architecture.md](architectur
 
 Key files:
 
-- `src/lib/auth.ts` — Better Auth instance as `ServiceMap.Service`, with plugins: `openAPI`, `bearer`, `admin`, `apiKey`
+- `src/lib/auth.ts` — Better Auth instance as `ServiceMap.Service`, with plugins: `openAPI`, `bearer`, `admin`, `apiKey`, `magicLink` (links are dispatched through `EmailProvider.sendMagicLink` — locally they land in `apps/server/.dev-inbox/` as `*sign-in-to-engranatge*.md` files; in cloud they go through AgentMail)
 - `src/lib/env.ts` — Centralized environment variables (DATABASE_URL, BETTER_AUTH_SECRET, etc.)
 - `src/middleware/session.ts` — `SessionMiddleware` validates sessions via `auth.api.getSession()`, provides `SessionContext`
 - `src/routes/auth.ts` — Wildcard `/auth/*` GET/POST routes

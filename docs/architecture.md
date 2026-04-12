@@ -108,6 +108,20 @@ Shared between server and web. Contains:
 
 No runtime code. Build output consumed by all apps.
 
+### `packages/auth`
+
+Bounded context for authentication. Owns the Better-Auth config builder plus a set of use cases (`bootstrapFirstAdmin`, `inviteUser`, `createApiKey`, `listUsers`, `promoteUser`, `revokeApiKey`, `resetPassword`, `listSessions`) consumed by both `apps/server` and `apps/cli`. Layered as:
+
+- `domain/` — tagged errors (`UsersAlreadyExist`, `UserAlreadyExists`, `UserNotFound`, `ApiKeyNotFound`, `MagicLinkFailed`, `AuthConfigError`) + role/user/session value types
+- `application/` — use cases + ports (`UserRepository`, `ApiKeyRepository`, `SessionRepository`, `MagicLinkSender`)
+- `infrastructure/` — `buildBetterAuthConfig` (shared config builder), `makeBetterAuthAdapter` (pg + `betterAuth()` instance implementing the ports), scoped `acquirePgPool`
+
+The shared builder is why CLI-minted API keys validate against the running server: any drift in plugin list, prefix scheme, or rate-limit shape would break the apiKey plugin's verification path.
+
+### `packages/controllers`
+
+Shared HttpApi spec (route groups, tagged HTTP errors, middleware tag). Consumed by the server as handler targets and by the frontend as a typed Atom client.
+
 ### `packages/ui`
 
 Shared between internal and marketing apps. Contains:
@@ -165,6 +179,42 @@ TanStack Start SSR app deployed to Unikraft (Node.js). Responsibilities:
 - SSR for SEO: hreflang, og tags, canonical URLs
 - View tracking (fire-and-forget POST on page load)
 - No backend logic — calls `apps/server` HTTP API
+
+---
+
+## Bounded contexts
+
+Engranatge has two bounded contexts. Each owns its own domain errors and types; dependencies only flow from consumers (apps) into the packages, never sideways.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  CRM context                                                     │
+│                                                                  │
+│    packages/domain  ──┐                                          │
+│    packages/controllers ──┐                                      │
+│                           ├──► apps/server (services, routes)    │
+│                           └──► apps/internal (typed API client)  │
+│                                apps/marketing (typed API client) │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│  Auth context                                                    │
+│                                                                  │
+│    packages/auth  ──┬──► apps/server/src/lib/auth.ts             │
+│                     │     (serves /auth/*, wires magicLink +     │
+│                     │      EmailProvider)                         │
+│                     │                                             │
+│                     └──► apps/cli/src/commands/auth-*.ts         │
+│                           (bootstrap, invite, list, create-key,  │
+│                            promote, revoke, reset, sessions)     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Dependency direction.** `packages/auth` and `packages/domain` have no dependency between them. Both are consumed by the apps; the apps do not consume each other. Auth-domain errors (`UserNotFound`, `UsersAlreadyExist`, `MagicLinkFailed`) never cross into the CRM context — if the server ever needs to map them to HTTP-surface errors, that mapping lives at the edge in `apps/server`, not in either package.
+
+**Why a shared `buildBetterAuthConfig`.** The CLI and server both instantiate `betterAuth(...)` — the CLI because it mints users/keys out-of-band, the server because it serves `/auth/*`. If the plugin list or field set drifts between the two, the apiKey plugin's verification path breaks at runtime (keys minted in one process fail to validate in the other). Keeping the builder in one place makes that drift impossible.
+
+**Why the CLI omits `magicLink()`.** The magic-link sender depends on the server's `EmailProvider` service (local inbox catcher in dev, AgentMail in prod). The CLI doesn't run that service, so it injects its own `MagicLinkSender` port implementation when it needs to issue a link (see `pnpm cli auth invite`). The builder takes `plugins` as a parameter precisely so each caller supplies the plugin list it can back.
 
 ---
 
