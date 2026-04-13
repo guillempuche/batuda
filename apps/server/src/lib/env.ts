@@ -78,30 +78,30 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 		// Budget defaults (system-level)
 		const RESEARCH_DEFAULT_BUDGET_CENTS = yield* Config.int(
 			'RESEARCH_DEFAULT_BUDGET_CENTS',
-		).pipe(Config.withDefault(100))
+		)
 		const RESEARCH_DEFAULT_PAID_BUDGET_CENTS = yield* Config.int(
 			'RESEARCH_DEFAULT_PAID_BUDGET_CENTS',
-		).pipe(Config.withDefault(500))
+		)
 		const RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS = yield* Config.int(
 			'RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS',
-		).pipe(Config.withDefault(200))
+		)
 		const RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS = yield* Config.int(
 			'RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS',
-		).pipe(Config.withDefault(2000))
+		)
 		const RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS = yield* Config.int(
 			'RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS',
-		).pipe(Config.withDefault(10000))
+		)
 
 		// Concurrency and safety
 		const RESEARCH_MAX_CONCURRENT_FIBERS_PER_USER = yield* Config.int(
 			'RESEARCH_MAX_CONCURRENT_FIBERS_PER_USER',
-		).pipe(Config.withDefault(3))
+		)
 		const RESEARCH_MAX_CONCURRENCY_FANOUT = yield* Config.int(
 			'RESEARCH_MAX_CONCURRENCY_FANOUT',
-		).pipe(Config.withDefault(3))
+		)
 		const RESEARCH_CONFIRM_THRESHOLD_FANOUT = yield* Config.int(
 			'RESEARCH_CONFIRM_THRESHOLD_FANOUT',
-		).pipe(Config.withDefault(10))
+		)
 
 		// Provider API keys (optional — only needed for selected providers)
 		const FIRECRAWL_API_KEY = yield* Config.option(
@@ -115,9 +115,7 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 		)
 
 		// LLM inference provider (for research agent loop)
-		const RESEARCH_LLM_PROVIDER = yield* Config.string(
-			'RESEARCH_LLM_PROVIDER',
-		).pipe(Config.withDefault('stub'))
+		const RESEARCH_LLM_PROVIDER = yield* Config.string('RESEARCH_LLM_PROVIDER')
 		const RESEARCH_LLM_MODEL = yield* Config.option(
 			Config.string('RESEARCH_LLM_MODEL'),
 		)
