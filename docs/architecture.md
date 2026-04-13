@@ -84,6 +84,19 @@
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
+│  Research providers (packages/research infrastructure)           │
+│  Selected at boot via RESEARCH_*_PROVIDER env vars               │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
+│  │ Brave Search │  │  Firecrawl   │  │  libreBORME/einforma │  │
+│  │  (web search)│  │ (scrape/ext) │  │  (ES registries)     │  │
+│  └──────────────┘  └──────────────┘  └──────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────────┐   ���
+│  │  LLM inference (Groq, Nebius, Fireworks, Together, etc.) │   │
+│  │  via @effect/ai-openai-compat (OpenAI-compatible API)    │   │
+│  └──────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
 │  External automations                                            │
 │  ┌──────────────┐  ┌──────────────┐                            │
 │  │     n8n      │  │    Zapier    │  ← authenticate via API key │
@@ -117,6 +130,16 @@ Bounded context for authentication. Owns the Better-Auth config builder plus a s
 - `infrastructure/` — `buildBetterAuthConfig` (shared config builder), `makeBetterAuthAdapter` (pg + `betterAuth()` instance implementing the ports), scoped `acquirePgPool`
 
 The shared builder is why CLI-minted API keys validate against the running server: any drift in plugin list, prefix scheme, or rate-limit shape would break the apiKey plugin's verification path.
+
+### `packages/research`
+
+Bounded context for company research. Owns the research agent loop, provider port interfaces, budget/quota services, output schemas, and infrastructure implementations. Layered as:
+
+- `domain/` — tagged errors (`ProviderError`, `BudgetExceeded`, `MonthlyCapExceeded`, `QuotaExhausted`, `ApprovalRequired`) + value types (`SearchResult`, `ScrapedPage`, `DiscoverResult`, `RegistryRecord`, `CompanyReport`, etc.)
+- `application/` — ports (`SearchProvider`, `ScrapeProvider`, `ExtractProvider`, `DiscoverProvider`, `RegistryRouter`, `ReportRouter`, `Budget`, `ProviderQuota`), `ResearchService` (fiber-per-run agent loop with PubSub for SSE), policy resolution, output schema registry (freeform, company-enrichment-v1, competitor-scan-v1, contact-discovery-v1, prospect-scan-v1)
+- `infrastructure/` — boot-time provider selection (`providers-live.ts` for 6 capability ports, `llm-live.ts` for LLM inference), stub providers for zero-cost local dev, real providers (Brave Search, Firecrawl, libreBORME, einforma), cached search wrapper, OpenAI-compatible LLM layer via `@effect/ai-openai-compat`
+
+Provider selection uses `Layer.unwrap + Config.schema` — env vars pick the implementation at startup, same pattern as `EmailProviderLive`. Each provider is a `Layer<PortTag, E, R>` with R declaring its dependencies (stubs need nothing, real providers need `HttpClient` + `Config`).
 
 ### `packages/controllers`
 
@@ -184,7 +207,7 @@ TanStack Start SSR app deployed to Unikraft (Node.js). Responsibilities:
 
 ## Bounded contexts
 
-Engranatge has two bounded contexts. Each owns its own domain errors and types; dependencies only flow from consumers (apps) into the packages, never sideways.
+Engranatge has three bounded contexts. Each owns its own domain errors and types; dependencies only flow from consumers (apps) into the packages, never sideways.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -208,13 +231,36 @@ Engranatge has two bounded contexts. Each owns its own domain errors and types; 
 │                           (bootstrap, invite, list, create-key,  │
 │                            promote, revoke, reset, sessions)     │
 └─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│  Research context                                                │
+│                                                                  │
+│    packages/research  ──► apps/server                            │
+│      domain/     errors, value types (SearchResult, etc.)        │
+│      application/                                                │
+│        ports     6 capability ports + Budget + ProviderQuota     │
+│        schemas/  output schemas (freeform, enrichment, etc.)     │
+│        research-service  fiber-per-run agent loop + PubSub       │
+│        budget    per-run + monthly spending control               │
+│        policy    system defaults → user policy → per-run clamp   │
+│      infrastructure/                                             │
+│        stub/     7 stubs (zero-cost local dev)                   │
+│        brave/    Brave Search API                                │
+│        providers-live  boot-time selection (6 capabilities)      │
+│        llm-live        boot-time LLM provider selection          │
+│        cached-search   TTL cache wrapping SearchProvider         │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-**Dependency direction.** `packages/auth` and `packages/domain` have no dependency between them. Both are consumed by the apps; the apps do not consume each other. Auth-domain errors (`UserNotFound`, `UsersAlreadyExist`, `MagicLinkFailed`) never cross into the CRM context — if the server ever needs to map them to HTTP-surface errors, that mapping lives at the edge in `apps/server`, not in either package.
+**Dependency direction.** `packages/auth`, `packages/domain`, and `packages/research` have no dependency between them. All are consumed by the apps; the apps do not consume each other. Each context's domain errors stay within the context — if the server needs to map them to HTTP-surface errors, that mapping lives at the edge in `apps/server`, not in the packages.
 
 **Why a shared `buildBetterAuthConfig`.** The CLI and server both instantiate `betterAuth(...)` — the CLI because it mints users/keys out-of-band, the server because it serves `/auth/*`. If the plugin list or field set drifts between the two, the apiKey plugin's verification path breaks at runtime (keys minted in one process fail to validate in the other). Keeping the builder in one place makes that drift impossible.
 
 **Why the CLI omits `magicLink()`.** The magic-link sender depends on the server's `EmailProvider` service (local inbox catcher in dev, AgentMail in prod). The CLI doesn't run that service, so it injects its own `MagicLinkSender` port implementation when it needs to issue a link (see `pnpm cli auth invite`). The builder takes `plugins` as a parameter precisely so each caller supplies the plugin list it can back.
+
+**Why research is a separate bounded context.** Research has its own domain model (providers, budgets, quotas, schemas), its own error hierarchy (`ProviderError`, `BudgetExceeded`, `QuotaExhausted`), and its own infrastructure concerns (external API keys, LLM inference, cost tracking). It reads CRM data (companies, contacts) but never writes directly — proposed changes go through the `propose_update` tool, reviewed by the outer AI or user before applying. This separation means research provider implementations, pricing models, and LLM providers can evolve independently of the CRM schema.
+
+**Provider selection pattern.** Each of the 6 research capabilities (search, scrape, extract, discover, registry, report) plus LLM inference is configured by an env var (`RESEARCH_*_PROVIDER`) that picks the implementation at boot time. The pattern is `Layer.unwrap(Config.schema(...) → switch → return Layer)` — same as `EmailProviderLive`. Stubs provide zero-cost deterministic data for local dev. Real providers (Brave, Firecrawl, libreBORME, einforma) declare their dependencies (`HttpClient`, `Config`) in the R type, satisfied at the composition root.
 
 ---
 
@@ -232,10 +278,33 @@ Agent calls get_company(slug)
 ### AI agent researches a new prospect
 
 ```
-Agent uses Firecrawl/Exa MCP to scrape company website
-  → Agent calls create_company(...) with structured fields
-  → Agent calls create_document({ type: "research", content: <markdown> })
-  → Agent calls create_task({ type: "call", title: "First cold call", due_at: ... })
+Agent calls start_research(query, schemaName, subjects)
+  → POST /v1/research → creates research_runs row (status: queued)
+  → Server forks an Effect Fiber for the run
+
+  Fiber phases (inside packages/research ResearchService):
+    Phase 1 — Tool loop: LLM calls web_search, web_read, lookup_registry, crm_lookup
+      Each tool call → routes through the matching provider port (Brave, Firecrawl, etc.)
+      Findings accumulated, sources deduped and archived
+    Phase 2 — Structured output: LLM.generateObject with the run's schema
+      Findings → typed JSON (e.g. CompanyEnrichmentV1)
+    Phase 3 — Brief generation: LLM.generateText → markdown summary
+
+  → SSE events streamed to GET /v1/research/:id/events
+  → Agent reads findings via get_research(id)
+  → Agent calls propose_update to suggest CRM changes (reviewed before applying)
+  → Agent calls create_task({ type: "call", ... }) for follow-up
+```
+
+### AI agent runs a fan-out prospect scan
+
+```
+Agent calls start_research(query, schemaName, selector: { table: companies, filter })
+  → Server creates a parent group run + N leaf runs (one per matching company)
+  → Leaf fibers run concurrently (capped by RESEARCH_MAX_CONCURRENCY_FANOUT)
+  → Each leaf completion merges findings onto parent row (advisory-locked)
+  → Parent status rolls up automatically (running → succeeded/failed)
+  → Agent calls get_research(parentId) → gets full group with children inline
 ```
 
 ### User logs a visit in the web UI
@@ -372,6 +441,22 @@ documents           — long-form markdown (research, meeting notes)
 pages               — public prospect sales pages (Tiptap JSON, multilingual)
 webhook_endpoints   — outgoing webhook configuration
 call_recordings     — audio metadata per call (transcript columns nullable, populated in a later phase)
+```
+
+### Research tables (migration 0003_research)
+
+```
+research_runs       — one row per research run (leaf, group, or followup)
+                      parent_id for fan-out groups, kind = leaf|group|followup
+                      status = queued|running|succeeded|failed|cancelled|deleted
+                      findings (jsonb), brief_md, tool_log, cost tracking columns
+sources             — globally deduped web/registry/report sources (keyed by url_hash)
+research_run_sources — many-to-many: runs ↔ sources (with local_ref citation key)
+research_links      — polymorphic: runs ↔ companies/contacts (input or finding)
+research_paid_spend — audit log: every paid API call with idempotency_key
+user_research_policy — per-user budget/quota preferences
+provider_quotas     — per-user per-provider quota config (monthly plan or pay-per-call)
+provider_usage      — consumption counter per provider per billing period
 ```
 
 ### Better Auth tables (auto-managed)
