@@ -118,6 +118,17 @@ jobs:
                 -e EMAIL_API_KEY="${{ secrets.EMAIL_API_KEY }}" \
                 -e EMAIL_WEBHOOK_SECRET="${{ secrets.EMAIL_WEBHOOK_SECRET }}" \
                 -e EMAIL_PROVIDER="${{ vars.EMAIL_PROVIDER }}" \
+                -e RESEARCH_SEARCH_PROVIDER="${{ vars.RESEARCH_SEARCH_PROVIDER }}" \
+                -e RESEARCH_SCRAPE_PROVIDER="${{ vars.RESEARCH_SCRAPE_PROVIDER }}" \
+                -e RESEARCH_EXTRACT_PROVIDER="${{ vars.RESEARCH_EXTRACT_PROVIDER }}" \
+                -e RESEARCH_DISCOVER_PROVIDER="${{ vars.RESEARCH_DISCOVER_PROVIDER }}" \
+                -e RESEARCH_REGISTRY_PROVIDER_ES="${{ vars.RESEARCH_REGISTRY_PROVIDER_ES }}" \
+                -e RESEARCH_REPORT_PROVIDER_ES="${{ vars.RESEARCH_REPORT_PROVIDER_ES }}" \
+                -e BRAVE_SEARCH_API_KEY="${{ secrets.BRAVE_SEARCH_API_KEY }}" \
+                -e FIRECRAWL_API_KEY="${{ secrets.FIRECRAWL_API_KEY }}" \
+                -e RESEARCH_LLM_PROVIDER="${{ vars.RESEARCH_LLM_PROVIDER }}" \
+                -e RESEARCH_LLM_MODEL="${{ vars.RESEARCH_LLM_MODEL }}" \
+                -e RESEARCH_LLM_API_KEY="${{ secrets.RESEARCH_LLM_API_KEY }}" \
                 .
             else
               kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
@@ -140,6 +151,17 @@ jobs:
                 -e EMAIL_API_KEY="${{ secrets.EMAIL_API_KEY }}" \
                 -e EMAIL_WEBHOOK_SECRET="${{ secrets.EMAIL_WEBHOOK_SECRET }}" \
                 -e EMAIL_PROVIDER="${{ vars.EMAIL_PROVIDER }}" \
+                -e RESEARCH_SEARCH_PROVIDER="${{ vars.RESEARCH_SEARCH_PROVIDER }}" \
+                -e RESEARCH_SCRAPE_PROVIDER="${{ vars.RESEARCH_SCRAPE_PROVIDER }}" \
+                -e RESEARCH_EXTRACT_PROVIDER="${{ vars.RESEARCH_EXTRACT_PROVIDER }}" \
+                -e RESEARCH_DISCOVER_PROVIDER="${{ vars.RESEARCH_DISCOVER_PROVIDER }}" \
+                -e RESEARCH_REGISTRY_PROVIDER_ES="${{ vars.RESEARCH_REGISTRY_PROVIDER_ES }}" \
+                -e RESEARCH_REPORT_PROVIDER_ES="${{ vars.RESEARCH_REPORT_PROVIDER_ES }}" \
+                -e BRAVE_SEARCH_API_KEY="${{ secrets.BRAVE_SEARCH_API_KEY }}" \
+                -e FIRECRAWL_API_KEY="${{ secrets.FIRECRAWL_API_KEY }}" \
+                -e RESEARCH_LLM_PROVIDER="${{ vars.RESEARCH_LLM_PROVIDER }}" \
+                -e RESEARCH_LLM_MODEL="${{ vars.RESEARCH_LLM_MODEL }}" \
+                -e RESEARCH_LLM_API_KEY="${{ secrets.RESEARCH_LLM_API_KEY }}" \
                 .
             fi
 
