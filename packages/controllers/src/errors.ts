@@ -73,3 +73,27 @@ export class StorageError extends Schema.TaggedErrorClass<StorageError>()(
 		key: Schema.NullOr(Schema.String),
 	},
 ) {}
+
+// ── Research HTTP errors (route-level, status-mapped) ──
+// Domain-level research errors (ProviderError, BudgetExceeded, etc.) live
+// in @engranatge/research. These are the HTTP-facing subset used in route
+// definitions for 409 responses.
+
+/** Pre-run estimate exceeds available budget. Returned as 409. */
+export class InsufficientBudget extends Schema.TaggedErrorClass<InsufficientBudget>()(
+	'InsufficientBudget',
+	{
+		estimatedCents: Schema.Number,
+		availableCents: Schema.Number,
+		shortfallCents: Schema.Number,
+	},
+) {}
+
+/** Fan-out exceeds confirm threshold. Returned as 409 with preview. */
+export class ConfirmRequired extends Schema.TaggedErrorClass<ConfirmRequired>()(
+	'ConfirmRequired',
+	{
+		estimatedCostCents: Schema.Number,
+		subjectCount: Schema.Number,
+	},
+) {}

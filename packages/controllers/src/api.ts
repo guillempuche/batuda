@@ -12,6 +12,7 @@ import { PagesGroup } from './routes/pages'
 import { ProductsGroup } from './routes/products'
 import { ProposalsGroup } from './routes/proposals'
 import { RecordingsGroup } from './routes/recordings'
+import { ResearchGroup } from './routes/research'
 import { TasksGroup } from './routes/tasks'
 import { WebhooksGroup } from './routes/webhooks'
 
@@ -38,5 +39,6 @@ export const ForjaApi = HttpApi.make('ForjaApi')
 	.add(EmailGroup)
 	.add(AgentMailWebhookGroup)
 	.add(RecordingsGroup)
+	.add(ResearchGroup)
 
 export type ForjaApi = typeof ForjaApi

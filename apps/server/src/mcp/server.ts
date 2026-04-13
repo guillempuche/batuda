@@ -5,9 +5,11 @@ import { CompanyResearchPrompt } from './prompts/company-research'
 import { DailyBriefingPrompt } from './prompts/daily-briefing'
 import { InteractionFollowUpPrompt } from './prompts/interaction-follow-up'
 import { ProposalDraftPrompt } from './prompts/proposal-draft'
+import { ResearchDesignerPrompt } from './prompts/research-designer'
 import { CompanyResource } from './resources/company'
 import { DocumentResource } from './resources/document'
 import { PipelineResource } from './resources/pipeline'
+import { ResearchResource } from './resources/research'
 import { CompanyHandlersLive, CompanyTools } from './tools/companies'
 import { ContactHandlersLive, ContactTools } from './tools/contacts'
 import { DocumentHandlersLive, DocumentTools } from './tools/documents'
@@ -16,6 +18,7 @@ import { InteractionHandlersLive, InteractionTools } from './tools/interactions'
 import { PageHandlersLive, PageTools } from './tools/pages'
 import { PipelineHandlersLive, PipelineTools } from './tools/pipeline'
 import { RecordingHandlersLive, RecordingTools } from './tools/recordings'
+import { ResearchMcpHandlersLive, ResearchMcpTools } from './tools/research-mcp'
 import { TaskHandlersLive, TaskTools } from './tools/tasks'
 
 export const McpToolsLive = Layer.mergeAll(
@@ -28,13 +31,16 @@ export const McpToolsLive = Layer.mergeAll(
 	McpServer.toolkit(PipelineTools),
 	McpServer.toolkit(EmailTools),
 	McpServer.toolkit(RecordingTools),
+	McpServer.toolkit(ResearchMcpTools),
 	CompanyResource,
 	PipelineResource,
 	DocumentResource,
+	ResearchResource,
 	CompanyResearchPrompt,
 	DailyBriefingPrompt,
 	ProposalDraftPrompt,
 	InteractionFollowUpPrompt,
+	ResearchDesignerPrompt,
 ).pipe(
 	Layer.provide(CompanyHandlersLive),
 	Layer.provide(ContactHandlersLive),
@@ -45,4 +51,5 @@ export const McpToolsLive = Layer.mergeAll(
 	Layer.provide(PipelineHandlersLive),
 	Layer.provide(EmailHandlersLive),
 	Layer.provide(RecordingHandlersLive),
+	Layer.provide(ResearchMcpHandlersLive),
 )
