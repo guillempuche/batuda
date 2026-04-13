@@ -19,6 +19,7 @@ import { ForjaMotionConfig } from '#/components/layout/motion-config'
 import { QuickCaptureProvider } from '#/context/quick-capture-context'
 import { i18n } from '#/i18n'
 import type { DehydratedAtomValue } from '#/lib/atom-hydration'
+import { getServerCookieHeader } from '#/lib/server-cookie'
 import { fetchSession } from '#/lib/session-check'
 import appCss from '../styles.css?url'
 
@@ -52,8 +53,7 @@ export const Route = createRootRoute({
 		if (location.pathname === '/login') return
 		let cookieHeader: string | undefined
 		if (import.meta.env.SSR) {
-			const { getRequestHeader } = await import('@tanstack/react-start/server')
-			cookieHeader = getRequestHeader('cookie')
+			cookieHeader = (await getServerCookieHeader()) ?? undefined
 		}
 		const user = await fetchSession(cookieHeader)
 		if (!user) {

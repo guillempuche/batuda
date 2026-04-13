@@ -17,6 +17,7 @@ import { TaskItem, type TaskItemData } from '#/components/shared/task-item'
 import { useQuickCapture } from '#/context/quick-capture-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { ForjaApiAtom } from '#/lib/forja-api-atom'
+import { getServerCookieHeader } from '#/lib/server-cookie'
 import {
 	brushedMetalPlate,
 	rulerUnderRule,
@@ -47,15 +48,13 @@ async function loadTasksOnServer(): Promise<{
 	tasks: ReadonlyArray<unknown>
 	companies: ReadonlyArray<unknown>
 }> {
-	const [{ Effect }, { getRequestHeader }, { makeForjaApiServer }] =
-		await Promise.all([
-			import('effect'),
-			import('@tanstack/react-start/server'),
-			import('#/lib/forja-api-server'),
-		])
-	const cookie = getRequestHeader('cookie')
+	const [{ Effect }, { makeForjaApiServer }, cookie] = await Promise.all([
+		import('effect'),
+		import('#/lib/forja-api-server'),
+		getServerCookieHeader(),
+	])
 	const program = Effect.gen(function* () {
-		const client = yield* makeForjaApiServer(cookie)
+		const client = yield* makeForjaApiServer(cookie ?? undefined)
 		const [tasks, companies] = yield* Effect.all(
 			[
 				client.tasks.list({ query: { completed: 'false' } }),

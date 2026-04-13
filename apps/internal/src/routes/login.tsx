@@ -5,6 +5,7 @@ import styled from 'styled-components'
 
 import { PriButton, PriInput } from '@engranatge/ui/pri'
 
+import { getServerCookieHeader } from '#/lib/server-cookie'
 import { fetchSession } from '#/lib/session-check'
 import { rulerUnderRule, stenciledTitle } from '#/lib/workshop-mixins'
 
@@ -62,8 +63,7 @@ export const Route = createFileRoute('/login')({
 	beforeLoad: async ({ search }) => {
 		let cookieHeader: string | undefined
 		if (import.meta.env.SSR) {
-			const { getRequestHeader } = await import('@tanstack/react-start/server')
-			cookieHeader = getRequestHeader('cookie')
+			cookieHeader = (await getServerCookieHeader()) ?? undefined
 		}
 		const user = await fetchSession(cookieHeader)
 		if (user) {

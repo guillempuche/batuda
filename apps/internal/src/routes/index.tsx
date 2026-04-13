@@ -20,6 +20,7 @@ import { TaskItem } from '#/components/shared/task-item'
 import { useQuickCapture } from '#/context/quick-capture-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { ForjaApiAtom } from '#/lib/forja-api-atom'
+import { getServerCookieHeader } from '#/lib/server-cookie'
 import { rulerUnderRule, stenciledTitle } from '#/lib/workshop-mixins'
 
 /**
@@ -62,15 +63,13 @@ type PipelineData = {
  * session on to the API server.
  */
 async function loadPipelineDataOnServer(): Promise<PipelineData> {
-	const [{ Effect }, { getRequestHeader }, { makeForjaApiServer }] =
-		await Promise.all([
-			import('effect'),
-			import('@tanstack/react-start/server'),
-			import('#/lib/forja-api-server'),
-		])
-	const cookie = getRequestHeader('cookie')
+	const [{ Effect }, { makeForjaApiServer }, cookie] = await Promise.all([
+		import('effect'),
+		import('#/lib/forja-api-server'),
+		getServerCookieHeader(),
+	])
 	const program = Effect.gen(function* () {
-		const client = yield* makeForjaApiServer(cookie)
+		const client = yield* makeForjaApiServer(cookie ?? undefined)
 		const [companies, openTasks] = yield* Effect.all(
 			[
 				client.companies.list({ query: { limit: 500 } }),
