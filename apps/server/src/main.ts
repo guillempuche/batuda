@@ -10,6 +10,12 @@ import {
 import { HttpApiBuilder, HttpApiScalar, OpenApi } from 'effect/unstable/httpapi'
 
 import { ForjaApi } from '@engranatge/controllers'
+import {
+	makeResearchLlmLive,
+	makeResearchProvidersLive,
+	ResearchEventSink,
+	ResearchService,
+} from '@engranatge/research'
 
 import { PgLive } from './db/client'
 import { AgentMailWebhookLive } from './handlers/agentmail-webhook'
@@ -24,6 +30,7 @@ import { PagesLive } from './handlers/pages'
 import { ProductsLive } from './handlers/products'
 import { ProposalsLive } from './handlers/proposals'
 import { RecordingsLive } from './handlers/recordings'
+import { ResearchLive } from './handlers/research'
 import { TasksLive } from './handlers/tasks'
 import { WebhooksLive } from './handlers/webhooks'
 import { Auth } from './lib/auth'
@@ -57,7 +64,19 @@ const ApiLive = HttpApiBuilder.layer(ForjaApi).pipe(
 		EmailLive,
 		AgentMailWebhookLive,
 		RecordingsLive,
+		ResearchLive,
 	]),
+)
+
+// Wire research event sink → WebhookService
+const ResearchEventSinkLive = Layer.effect(
+	ResearchEventSink,
+	Effect.gen(function* () {
+		const webhooks = yield* WebhookService
+		return ResearchEventSink.of({
+			fire: (event, payload) => webhooks.fire(event, payload),
+		})
+	}),
 )
 
 const ServicesLive = Layer.mergeAll(
@@ -66,7 +85,11 @@ const ServicesLive = Layer.mergeAll(
 	PageService.layer,
 	EmailService.layer,
 	RecordingService.layer,
-).pipe(Layer.provideMerge(WebhookService.layer))
+	ResearchService.layer,
+).pipe(
+	Layer.provideMerge(ResearchEventSinkLive),
+	Layer.provideMerge(WebhookService.layer),
+)
 
 const ServerLive = Layer.unwrap(
 	Effect.gen(function* () {
@@ -180,6 +203,8 @@ const program = HttpRouter.serve(AppLive).pipe(
 	Layer.provide(ServicesLive),
 	Layer.provide(EmailProviderLive),
 	Layer.provide(S3StorageProviderLive),
+	Layer.provide(makeResearchProvidersLive),
+	Layer.provide(makeResearchLlmLive),
 	Layer.provide(SessionMiddlewareLive),
 	Layer.provide(Auth.layer),
 	Layer.provide(EnvVars.layer),

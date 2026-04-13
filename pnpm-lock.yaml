@@ -263,6 +263,9 @@ importers:
       '@engranatge/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@engranatge/research':
+        specifier: workspace:*
+        version: link:../../packages/research
       agentmail:
         specifier: ^0.4.18
         version: 0.4.18
@@ -347,6 +350,22 @@ importers:
 
   packages/domain:
     dependencies:
+      effect:
+        specifier: 4.0.0-beta.43
+        version: 4.0.0-beta.43
+    devDependencies:
+      tsdown:
+        specifier: ^0.21.7
+        version: 0.21.7(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/research:
+    dependencies:
+      '@effect/ai-openai-compat':
+        specifier: 4.0.0-beta.43
+        version: 4.0.0-beta.43(effect@4.0.0-beta.43)
       effect:
         specifier: 4.0.0-beta.43
         version: 4.0.0-beta.43
@@ -916,6 +935,11 @@ packages:
     resolution: {integrity: sha512-KlTR+gv+UX1d4X1+PBV9tZ6NQRkt/KspyUjbM/5gcIKIcFHVehds3iQWjT5G46ExEvXpGd0hZPMmv7uHqynbyw==}
     cpu: [x64]
     os: [win32]
+
+  '@effect/ai-openai-compat@4.0.0-beta.43':
+    resolution: {integrity: sha512-p/ODiq5Kfv7OrQOAXwFenTOVU0HfozsmG5W6KdQcazPtTn9dLI5tb+NvQfq4bKY7NGzcIMrzDXbWbBgD3nDk8Q==}
+    peerDependencies:
+      effect: ^4.0.0-beta.43
 
   '@effect/atom-react@4.0.0-beta.43':
     resolution: {integrity: sha512-xSrRbGXuo4d0g4ph66TQST1GNSjtQZrZj8V7OiAQFuzMYcZ0kwRIPUUFwOBtbWHK43/zNENdNWOnlXh/iYM1dw==}
@@ -5465,6 +5489,10 @@ snapshots:
 
   '@dprint/win32-x64@0.53.1':
     optional: true
+
+  '@effect/ai-openai-compat@4.0.0-beta.43(effect@4.0.0-beta.43)':
+    dependencies:
+      effect: 4.0.0-beta.43
 
   '@effect/atom-react@4.0.0-beta.43(effect@4.0.0-beta.43)(react@19.2.4)(scheduler@0.27.0)':
     dependencies:

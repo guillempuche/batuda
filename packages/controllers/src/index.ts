@@ -5,11 +5,13 @@ export { ForjaApi } from './api'
 // pattern-match on these via `_tag`.
 export {
 	BadRequest,
+	ConfirmRequired,
 	Conflict,
 	EmailError,
 	EmailSendError,
 	EmailSendErrorKind,
 	EmailSuppressed,
+	InsufficientBudget,
 	NotFound,
 	StorageError,
 	StorageErrorOperation,
@@ -35,5 +37,6 @@ export { PagesGroup } from './routes/pages'
 export { ProductsGroup } from './routes/products'
 export { ProposalsGroup } from './routes/proposals'
 export { RecordingMetadata, RecordingsGroup } from './routes/recordings'
+export { ResearchGroup } from './routes/research'
 export { TasksGroup } from './routes/tasks'
 export { WebhooksGroup } from './routes/webhooks'
