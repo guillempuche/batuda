@@ -4,7 +4,7 @@ Generic, cross-topic research feature for Forja. An LLM-driven agent loop that c
 
 For system context see [architecture.md](architecture.md). For backend structure see [backend.md](backend.md).
 
-> Status: design doc, v0. Not yet implemented. We'll improve it later on.
+> Status: v0 implementation in progress. See [backend-research-todo.md](backend-research-todo.md) for progress.
 
 ---
 
@@ -138,12 +138,14 @@ Server expands the filter into N rows, creates a **parent** `research_runs` row 
 
 ### 4.1 Tier matrix
 
-| Tier  | Name            | Cost/call     | Examples                                                                   | Gating                                                                                                     |
-| ----- | --------------- | ------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| **0** | Free / internal | 0             | `lookup_registry` basic (libreBORME), `crm_lookup`, Brave free-tier search | no gate                                                                                                    |
-| **1** | Cheap web       | ~€0.001–0.005 | `web_search` (Exa), `web_read` (Firecrawl markdown or structured extract)  | debited from `budget_cents`, fails with `BudgetExceeded`                                                   |
-| **2** | Moderate        | ~€0.01–0.05   | `web_discover` (Firecrawl agent, Claude web_search)                        | debited from `budget_cents`; LLM sees warning when >50% consumed                                           |
-| **3** | Paid structured | €1–5          | `lookup_registry` depth='financials'\|'full' (einforma)                    | debited from **separate** `paid_budget_cents`; above `auto_approve_paid_cents`, uses `propose_paid_action` |
+| Tier  | Name            | Cost/call     | Examples                                                                   | Gating                                                                                                                  |
+| ----- | --------------- | ------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **0** | Free / internal | 0             | `lookup_registry` basic (libreBORME), `crm_lookup`, Brave free-tier search | no gate                                                                                                                 |
+| **1** | Cheap web       | ~€0.001–0.005 | `web_search` (Exa), `web_read` (Firecrawl markdown or structured extract)  | debited from `budget_cents`, fails with `BudgetExceeded`                                                                |
+| **2** | Moderate        | ~€0.01–0.05   | `web_discover` (Firecrawl agent, Claude web_search)                        | debited from `budget_cents`; LLM sees warning when >50% consumed                                                        |
+| **3** | Paid structured | €1–5          | `lookup_registry` depth='financials'\|'full' (einforma)                    | debited from **separate** `paid_budget_cents`; above `auto_approve_paid_cents` (default €2), uses `propose_paid_action` |
+
+The "Cost/call" column is **notional** — it drives the resource-budget governor (§11), not actual spend. Real billing depends on each provider's pricing model (credit blocks, monthly plans, per-call). See §11.6 for how provider quotas track actual consumption in native units.
 
 The rule: **climb tiers only when a lower one cannot answer the question.** `lookup_registry` basic before `web_read`. `web_read` before `lookup_registry` financials. Enforced by a prompt rule (soft) and by budget errors (hard).
 
@@ -290,6 +292,10 @@ const SearchProviderLive = Layer.unwrap(
 
 Same shape for the other five capabilities.
 
+### 5.3 Quota awareness
+
+Provider interfaces stay clean — they don't know about quotas. Quota tracking lives in a separate `ProviderQuota` service (§11.6) that wraps provider calls at the instrumentation layer (§12.2). Each provider impl reports how many native units a call consumed via a `units` field on its return type, so the quota service can record it.
+
 ---
 
 ## 6. Tool surface
@@ -365,7 +371,7 @@ propose_paid_action({
   reason: string
 })
   → records the proposal, returns immediately — LLM continues without the data
-  → human approves/rejects after the run; can trigger a follow-up run if approved
+  → human approves/skips after the run (see §11.5 for follow-up mechanics)
   → writes to research_runs.findings.pending_paid_actions[]
   → !Destructive, !OpenWorld
 ```
@@ -389,24 +395,25 @@ propose_paid_action({
 CREATE TABLE research_runs (
   id                      uuid PRIMARY KEY,
   parent_id               uuid REFERENCES research_runs(id) ON DELETE CASCADE,
-  kind                    text NOT NULL CHECK (kind IN ('leaf','group')) DEFAULT 'leaf',
+  kind                    text NOT NULL CHECK (kind IN ('leaf','group','followup')) DEFAULT 'leaf',
 
   query                   text NOT NULL,
   mode                    text NOT NULL DEFAULT 'deep',       -- v1: only 'deep'
   schema_name             text,                                -- §8
 
-  status                  text NOT NULL CHECK (status IN ('queued','running','succeeded','failed','cancelled')),
+  status                  text NOT NULL CHECK (status IN ('queued','running','succeeded','failed','cancelled','deleted')),
   context                 jsonb NOT NULL DEFAULT '{}'::jsonb,  -- {subjects?, selector?, hints?}
 
   findings                jsonb NOT NULL DEFAULT '{}'::jsonb,  -- structured output (§8)
   brief_md                text,                                -- human narrative (§8)
 
-  -- Budget / cost
+  -- Budget / cost (cents are notional — volume governor, not actual spend; see §11)
   budget_cents            int NOT NULL DEFAULT 0,
   paid_budget_cents       int NOT NULL DEFAULT 0,
   cost_cents              int NOT NULL DEFAULT 0,
   paid_cost_cents         int NOT NULL DEFAULT 0,
-  cost_breakdown          jsonb NOT NULL DEFAULT '{}'::jsonb,  -- { provider: cents, ... }
+  cost_breakdown          jsonb NOT NULL DEFAULT '{}'::jsonb,  -- { provider: notional_cents, ... }
+  quota_breakdown         jsonb NOT NULL DEFAULT '{}'::jsonb,  -- { provider: { units: N, unit: 'credits' }, ... } — native units consumed
   tokens_in               int NOT NULL DEFAULT 0,
   tokens_out              int NOT NULL DEFAULT 0,
   paid_policy             jsonb NOT NULL DEFAULT '{}'::jsonb,  -- resolved policy snapshot
@@ -479,18 +486,22 @@ CREATE INDEX research_links_subject_idx ON research_links(subject_table, subject
 -- Paid-spend audit log (even for auto-approved calls)
 --
 CREATE TABLE research_paid_spend (
-  id             uuid PRIMARY KEY,
-  research_id    uuid NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,
-  user_id        uuid NOT NULL,
-  provider       text NOT NULL,
-  tool           text NOT NULL,
-  amount_cents   int NOT NULL,
-  args           jsonb NOT NULL,                               -- redacted of secrets
-  result_hash    text,                                         -- sha256 of normalized response
-  source_id      text REFERENCES sources(id),
-  auto_approved  boolean NOT NULL,
-  approved_by    uuid,                                         -- if manual
-  at             timestamptz NOT NULL DEFAULT now()
+  id               uuid PRIMARY KEY,
+  research_id      uuid NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,
+  user_id          uuid NOT NULL,
+  provider         text NOT NULL,
+  tool             text NOT NULL,
+  idempotency_key  text NOT NULL UNIQUE,                       -- '{research_id}:{tool}:{hash(args)}' — prevents double-charge on retry
+  amount_cents     int NOT NULL,                                -- notional cents (volume governor)
+  quota_units      int,                                         -- provider-native units consumed (e.g., 1 credit, 1 report)
+  quota_unit       text,                                        -- 'credits', 'reports', 'requests' — matches provider_quotas.quota_unit
+  args             jsonb NOT NULL,                              -- redacted of secrets
+  result_hash      text,                                       -- sha256 of normalized response
+  result_data      jsonb,                                      -- write-ahead: full provider response, persisted immediately after provider returns
+  source_id        text REFERENCES sources(id),
+  auto_approved    boolean NOT NULL,
+  approved_by      uuid,                                       -- if manual
+  at               timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE INDEX research_paid_spend_user_at_idx ON research_paid_spend(user_id, at DESC);
@@ -502,9 +513,40 @@ CREATE TABLE user_research_policy (
   user_id                    uuid PRIMARY KEY,                 -- → users(id)
   budget_cents               int NOT NULL DEFAULT 100,         -- €1/run cheap tier
   paid_budget_cents          int NOT NULL DEFAULT 500,         -- €5/run paid tier
-  auto_approve_paid_cents    int NOT NULL DEFAULT 500,         -- auto-approve within run budget
+  auto_approve_paid_cents    int NOT NULL DEFAULT 200,         -- €2 auto-approve; first einforma call silent, second triggers propose_paid_action
   paid_monthly_cap_cents     int NOT NULL DEFAULT 2000,        -- €20/month hard cap
   updated_at                 timestamptz NOT NULL DEFAULT now()
+);
+
+--
+-- Provider quota config (one row per user per provider, see §11.6)
+--
+CREATE TABLE provider_quotas (
+  user_id          uuid NOT NULL,
+  provider         text NOT NULL,                               -- 'firecrawl', 'einforma', 'exa', etc.
+  billing_model    text NOT NULL CHECK (billing_model IN ('monthly_plan', 'pay_per_call')),
+  sync_mode        text NOT NULL CHECK (sync_mode IN ('api', 'manual')) DEFAULT 'manual',
+                                                                -- 'api' = auto-sync from provider balance API; 'manual' = user maintains quota_total
+  quota_total      int NOT NULL,                                -- units per period: credits, reports, requests
+  quota_unit       text NOT NULL,                               -- 'credits', 'reports', 'requests'
+  period_months    int NOT NULL DEFAULT 1,                      -- 1 = monthly (most providers)
+  period_anchor    date,                                        -- first day of current period (auto-synced from provider for sync_mode='api')
+  cents_per_unit   int NOT NULL DEFAULT 0,                      -- notional conversion for budget governor
+  warn_at_pct      int NOT NULL DEFAULT 80,                     -- UI warns when usage exceeds this %
+  last_synced_at   timestamptz,                                 -- last successful API sync (null for manual)
+  updated_at       timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, provider)
+);
+
+--
+-- Provider usage counter (tracks consumption in native units, see §11.6)
+--
+CREATE TABLE provider_usage (
+  user_id          uuid NOT NULL,
+  provider         text NOT NULL,
+  period_start     date NOT NULL,                               -- first day of period (monthly providers: month start; lifetime: epoch)
+  units_consumed   int NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, provider, period_start)
 );
 ```
 
@@ -542,7 +584,8 @@ Requires a `version` column on `companies`/`contacts` (not present today) + a ch
 | `research_runs.context`                                        | `jsonb`             | `{subjects?, selector?, hints?}`                                                        |
 | `research_runs.findings`                                       | `**jsonb`**         | structured, schema-valid, queryable, drives UI                                          |
 | `research_runs.brief_md`                                       | `**text`** markdown | human synthesis, regenerable per language                                               |
-| `research_runs.cost_breakdown`                                 | `jsonb`             | per-provider cent counts                                                                |
+| `research_runs.cost_breakdown`                                 | `jsonb`             | per-provider notional cents (volume governor, not actual spend)                         |
+| `research_runs.quota_breakdown`                                | `jsonb`             | per-provider native units consumed: `{ firecrawl: { units: 6, unit: 'credits' } }`      |
 | `research_runs.paid_policy`                                    | `jsonb`             | resolved policy snapshot for audit                                                      |
 | `research_runs.tool_log`                                       | `jsonb`             | array of tool call/result events, written once at completion for audit                  |
 | `sources` columns                                              | relational          | no JSON; normalized table                                                               |
@@ -699,9 +742,17 @@ See §9.1. No unsourced claims.
 
 ### 10.4 Cost discipline
 
+Two independent layers gate every external call (see §12.2):
+
+1. **Provider quota** (hard limit) — does the user have remaining units with this provider? Checked first. `QuotaExhausted` is recoverable: the LLM should try an alternative provider or tool.
+2. **Resource budget** (volume governor) — notional cents, prevents a single run from consuming disproportionate resources even when those resources are prepaid. `BudgetExceeded` is terminal for the exhausted tier.
+
+Rules:
+
 - Try tier 0 first. Registry before scrape.
 - Never exceed `paid_budget_cents` without `propose_paid_action`.
-- `BudgetExceeded` errors are terminal for the exhausted tier — the agent should either finish with what it has or propose more budget.
+- `BudgetExceeded` → finish with what you have.
+- `QuotaExhausted` → try an alternative (e.g., Brave if Firecrawl credits are gone).
 
 ### 10.5 Subject snapshot freeze
 
@@ -709,18 +760,24 @@ When a run starts, the current version of every subject row is captured into `co
 
 ### 10.6 Human-in-the-loop gates
 
-| Action                                                | Gate                                  |
-| ----------------------------------------------------- | ------------------------------------- |
-| Write to Forja domain rows                            | Always human via "Apply"              |
-| Call tier-3 paid tool above `auto_approve_paid_cents` | `propose_paid_action` → human approve |
-| Fan-out over `paid_monthly_cap_cents`                 | Hard block, no override               |
-| Exceed system hard ceiling                            | Hard block, not overridable per-run   |
+| Action                                                | Gate                                                   |
+| ----------------------------------------------------- | ------------------------------------------------------ |
+| Write to Forja domain rows                            | Always human via "Apply"                               |
+| Call tier-3 paid tool above `auto_approve_paid_cents` | `propose_paid_action` → human approve                  |
+| Provider quota exhausted                              | `QuotaExhausted` → LLM tries alternative provider/tool |
+| Fan-out over `paid_monthly_cap_cents`                 | Hard block, no override                                |
+| Exceed system hard ceiling                            | Hard block, not overridable per-run                    |
 
 ---
 
 ## 11. Spending policy
 
-One editable policy per user. Four numbers, all editable in settings. The goal is to control spending.
+Two independent layers control resource consumption:
+
+1. **Resource budget** (§11.1–11.5) — notional cents. A volume governor that limits how much a single run or a month of runs can consume, regardless of actual billing. Useful even when resources are prepaid: prevents one run from burning half your Firecrawl credits.
+2. **Provider quotas** (§11.6) — native units (credits, reports, requests). Tracks actual consumption against the user's plan with each provider. Prevents hitting plan limits or triggering overage charges.
+
+The two layers are checked independently. A call can pass the budget check but fail the quota check (provider out of credits), or pass the quota check but fail the budget check (run budget exhausted).
 
 ### 11.1 Table
 
@@ -729,26 +786,28 @@ CREATE TABLE user_research_policy (
   user_id                    uuid PRIMARY KEY,
   budget_cents               int NOT NULL DEFAULT 100,     -- €1/run for cheap tier (scraping, search)
   paid_budget_cents          int NOT NULL DEFAULT 500,     -- €5/run for paid tier (1-2 einforma calls)
-  auto_approve_paid_cents    int NOT NULL DEFAULT 500,     -- auto-approve within run budget, no interruptions
+  auto_approve_paid_cents    int NOT NULL DEFAULT 200,     -- €2 auto-approve; first einforma call silent, second triggers propose_paid_action
   paid_monthly_cap_cents     int NOT NULL DEFAULT 2000,    -- €20/month hard cap
   updated_at                 timestamptz NOT NULL DEFAULT now()
 );
 ```
 
-New user → row created with env defaults. User edits in settings. Per-run overrides via POST body. System env var `RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS` is the only non-editable limit.
+New user → row created with env defaults. User edits in settings. Per-run overrides via POST body (clamped — see §11.2). System env var `RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS` is the only non-editable limit.
 
-**Out-of-the-box behavior:** agent can spend up to €1/run on web scraping/search, up to €5/run on paid APIs (einforma), auto-approved, with a €20/month ceiling. No interruptions, no approval dialogs. User adjusts any number anytime.
+**Out-of-the-box behavior:** agent can spend up to €1/run on web scraping/search, up to €5/run on paid APIs (einforma). The first ~€2 of paid calls are auto-approved silently; beyond that the agent calls `propose_paid_action` and the user approves or skips after the run. €20/month hard cap. User adjusts any number anytime in settings.
 
 ### 11.2 Layered resolution
 
 ```
 system env defaults
   → user policy (four editable fields)
-    → per-run POST body overrides
+    → per-run POST body overrides (clamped: see below)
       → resolved policy snapshot → research_runs.paid_policy (captured for audit)
 ```
 
 Per-run wins over user, user wins over env. The snapshot is frozen on the row so "what policy was in effect for this run" is always answerable.
+
+**Per-run override clamping.** Per-run overrides in the POST body are clamped to the user's own policy, not the system ceiling. A request with `paid_budget_cents: 10000` when the user's policy says 500 resolves to 500. The user must update their policy first (via `PUT /research/policy`) to raise their ceiling. This prevents a buggy or compromised frontend from bypassing the user's own spending limits. The system hard ceiling (`RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS`) remains the absolute max that even the user policy cannot exceed.
 
 ### 11.3 The monthly cap is the only non-overridable rail
 
@@ -760,31 +819,103 @@ chargePaid: (provider, cents) => Effect.gen(function* () {
   if (runBudget.remaining < cents)
     return yield* new BudgetExceeded({ tier: 'paid-run', needed: cents, remaining: runBudget.remaining })
 
-  const monthlySpent = yield* MonthlyPaidSpend.getFor(userId, 'current-month')
-  const systemCeiling = yield* Config.integer('RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS')
-  const effectiveCap = Math.min(policy.paidMonthlyCapCents, systemCeiling)
-
-  if (monthlySpent + cents > effectiveCap)
-    return yield* new MonthlyCapExceeded({ monthlySpent, cap: effectiveCap, needed: cents })
+  // Monthly cap check-and-debit is serialized per user via pg advisory lock.
+  // Multiple concurrent fibers for the same user all hit this lock, so only
+  // one can read-check-debit at a time. Without this, N concurrent fibers
+  // could each see room and overshoot the cap by up to N * paid_budget_cents.
+  yield* MonthlyPaidSpend.chargeWithinCap(userId, cents, runId, provider, policy.paidMonthlyCapCents)
 
   yield* Ref.update(paidRef, b => ({ ...b, remaining: b.remaining - cents, spent: b.spent + cents }))
-  yield* MonthlyPaidSpend.add(userId, cents, runId, provider)
 })
 ```
 
+`MonthlyPaidSpend.chargeWithinCap` runs inside a single Postgres transaction:
+
+```sql
+SELECT pg_advisory_xact_lock(hashtext('research_monthly_cap:' || $user_id));
+SELECT COALESCE(SUM(amount_cents), 0) AS spent
+  FROM research_paid_spend
+ WHERE user_id = $user_id
+   AND at >= date_trunc('month', now());
+-- if spent + $cents > LEAST($user_cap, $system_ceiling) → raise MonthlyCapExceeded
+INSERT INTO research_paid_spend (id, research_id, user_id, provider, tool, idempotency_key, amount_cents, args, auto_approved, at)
+VALUES (...);
+```
+
+The advisory lock is transaction-scoped (`pg_advisory_xact_lock`), so it releases automatically on commit or rollback. No risk of orphaned locks.
+
 - `RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS` (env) is the absolute max. A user's `paid_monthly_cap_cents` can only go *up to* but never past it.
 - Prompt injection / runaway loops stop at the monthly cap.
+- Concurrent fibers serialize on the advisory lock, so the cap is exact — no overshoot.
 
 ### 11.4 How the LLM experiences policy
 
-The LLM does **not** read the policy. It learns from tool errors:
+The LLM does **not** read the policy or quotas. It learns from tool errors:
 
-- Within budget & threshold → tool runs silently, charges budget.
-- Above threshold → tool errors with `ApprovalRequired`. System prompt: *"if you receive ApprovalRequired, call `propose_paid_action` instead."*
-- Above run budget → tool errors with `BudgetExceeded`. System prompt: *"finish with what you have or propose more budget."*
+- Within budget & quota → tool runs silently, charges both layers.
+- Provider quota exhausted → tool errors with `QuotaExhausted { provider, unit, remaining: 0 }`. System prompt: *"if you receive QuotaExhausted, try an alternative tool or provider for the same information. Do not retry the same tool."*
+- Above approval threshold → tool errors with `ApprovalRequired`. System prompt: *"if you receive ApprovalRequired, call `propose_paid_action` instead."*
+- Above run budget → tool errors with `BudgetExceeded`. System prompt: *"finish with what you have."*
 - Above monthly cap → tool errors with `MonthlyCapExceeded`. Terminal — run finishes.
 
-This keeps the prompt simple and policy-independent.
+This keeps the prompt simple and policy-independent. The LLM doesn't need to know whether a failure is a quota issue or a budget issue — it just knows the tool failed and gets guidance on what to do next.
+
+### 11.5 Follow-up run after paid action approval
+
+When the user approves a `pending_paid_action` via `POST /research/:id/paid-actions/:pa_id/approve`:
+
+1. Server creates a **new** `research_runs` row (`kind='followup'`, `parent_id=original.id`).
+2. The new run's `context` inherits the original's `context.subjects` (same snapshots, same `expected_version`). It does **not** inherit the original's findings or tool log — it starts with a clean slate.
+3. The new run's prompt includes: the approved paid action's `tool`, `args`, and `reason`, plus a summary of what the original run already found (extracted from `findings`). The system prompt says: *"Execute the approved paid action, then integrate its results with the prior findings summary into your final output."*
+4. Budget: the follow-up run draws from the user's current policy (not the original run's snapshot). The approved paid action's `estimated_cents` was already validated against the monthly cap at approval time.
+5. The follow-up run appears in the UI as a child of the original, with a link back. The original run's `pending_paid_actions` entry is updated with `status='approved'` and `followup_run_id`.
+
+If the user skips all pending paid actions, no follow-up run is created. If multiple actions are approved, they are batched into a single follow-up run.
+
+### 11.6 Provider quotas
+
+External providers bill in two ways, neither of which maps cleanly to "€X per call":
+
+| Billing model  | Examples                                                             | What the user actually buys                |
+| -------------- | -------------------------------------------------------------------- | ------------------------------------------ |
+| `monthly_plan` | Firecrawl ($19/mo Hobby, 3k credits), Exa (1k req/mo free), eInforma | N units/month included; resets each period |
+| `pay_per_call` | Brave Search ($5/1k), Exa beyond free tier ($7/1k search)            | Each call billed at a fixed rate           |
+
+Most providers are `monthly_plan` with a free or paid tier that includes N units/month. `pay_per_call` applies to providers with no subscription tier or once a plan's included units are exhausted (overage).
+
+The resource budget (§11.1–11.3) is the **volume governor** — it limits how much a single run can consume regardless of billing model. Provider quotas are the **hard limits** — they track actual consumption in native units against the user's plan.
+
+**`ProviderQuota` service:**
+
+```ts
+// apps/server/src/services/research/provider-quota.ts
+export class ProviderQuota extends ServiceMap.Service<
+  ProviderQuota,
+  {
+    readonly check: (provider: string, units: number) => Effect.Effect<void, QuotaExhausted>
+    readonly consume: (provider: string, units: number) => Effect.Effect<void, QuotaExhausted>
+    readonly remaining: (provider: string) => Effect.Effect<{ total: number; used: number; unit: string }>
+    readonly sync: (provider: string) => Effect.Effect<void, ProviderError>
+  }
+>()('research/ProviderQuota') {}
+```
+
+`check` is a dry run (no side effects). `consume` atomically checks and decrements. `sync` fetches the current balance from the provider's API (for `sync_mode='api'` providers).
+
+**Two sync modes:**
+
+| `sync_mode` | How quota is tracked                                                           | Who maintains it  |
+| ----------- | ------------------------------------------------------------------------------ | ----------------- |
+| `api`       | System calls provider balance API, caches result (TTL 60s)                     | Automatic         |
+| `manual`    | System tracks consumption locally in `provider_usage`; user sets `quota_total` | Admin in settings |
+
+**`api` mode (Firecrawl, and any provider with a balance endpoint):** The system calls the provider's balance API to get remaining units. For Firecrawl: `GET /v2/team/credit-usage` → `{ remainingCredits, planCredits, billingPeriodStart, billingPeriodEnd }`. The response is cached in-memory (TTL 60s). `check` reads the cached balance; `consume` invalidates the cache. `provider_usage` is not used — the provider is the source of truth.
+
+On first API key setup, the system auto-creates a `provider_quotas` row with `sync_mode='api'`, populating `quota_total`, `quota_unit`, `period_anchor` from the provider response. No manual config needed.
+
+**`manual` mode (eInforma, providers without a balance API):** Admin enters their plan details in settings (quota total, unit, period). `check` and `consume` read/write the local `provider_usage` counter. Period resets are implicit: if `period_start` for the current period doesn't exist, the counter starts at 0 (no cron job).
+
+**When no quota is configured.** If `provider_quotas` has no row for a (user, provider) pair, the quota check is skipped — the resource budget is the only gate. This means the system works out of the box without quota configuration; quotas are opt-in protection.
 
 ---
 
@@ -807,19 +938,49 @@ export class Budget extends ServiceMap.Service<
 
 ### 12.2 Provider instrumentation
 
-Every provider wraps its call:
+Every provider call goes through two layers: **quota check → budget charge → provider call → quota consume**. Quota check fires first (hard limit), then budget (volume governor).
 
 ```ts
-// firecrawl-scrape.ts
+// firecrawl-scrape.ts (cheap tier)
 const scrape = (input: ScrapeInput) =>
   Effect.gen(function* () {
+    const quota = yield* ProviderQuota
     const budget = yield* Budget
-    const estimate = estimateScrapeCents(input)        // fmt + JSON extract etc.
-    yield* budget.chargeCheap('firecrawl', estimate)
+    const estimatedUnits = estimateScrapeCredits(input)  // 1 credit per scrape, more for complex extracts
+    const estimatedCents = estimatedUnits * centsPerCredit  // notional, from provider_quotas.cents_per_unit
+
+    yield* quota.check('firecrawl', estimatedUnits)       // fail fast if quota exhausted (QuotaExhausted)
+    yield* budget.chargeCheap('firecrawl', estimatedCents) // volume governor (BudgetExceeded)
     const result = yield* http.post('/v1/scrape', input)
+    yield* quota.consume('firecrawl', result.creditsUsed)  // record actual units (may differ from estimate)
     return result
   })
 ```
+
+Paid providers add idempotency to prevent double-charging on retry:
+
+```ts
+// einforma-report.ts (paid tier)
+const fetchReport = (input: ReportInput) =>
+  Effect.gen(function* () {
+    const quota = yield* ProviderQuota
+    const budget = yield* Budget
+    const estimatedUnits = 1                               // 1 report
+    const key = `${runId}:lookup_registry:${stableHash(input)}`
+
+    yield* quota.check('einforma', estimatedUnits)         // fail fast if no reports left
+    // chargePaid is atomic: advisory lock + INSERT with idempotency_key UNIQUE.
+    // If the key already exists (retry after timeout), the INSERT is a no-op.
+    yield* budget.chargePaid('einforma', estimateReportCents(input), key)
+    const result = yield* http.post('/api/report', input)
+    yield* quota.consume('einforma', 1)
+    return result
+  })
+```
+
+**Idempotency.** The `idempotency_key` on `research_paid_spend` (`'{research_id}:{tool}:{hash(args)}'`) ensures that if a fiber retries after a network timeout, the budget row already exists and the INSERT is a conflict no-op. The provider may still double-charge externally, but our budget accounting stays correct. For providers that support client-side idempotency keys (eInforma does not in v1), pass the same key to the provider API.
+
+**Quota vs budget ordering.** Quota is checked first because it's a hard external limit — burning budget cents on a call that will fail due to quota exhaustion wastes the volume governor. If quota passes but budget fails, no quota units are consumed (the provider was never called).
 
 ### 12.3 Pre-run estimate
 
@@ -930,7 +1091,7 @@ Effect's structured concurrency guarantees the cleanup runs on interrupt.
 - Provider error → tool result with `{ error, recoverable }`. LLM decides whether to retry with different params, switch tools, or give up.
 - Schema validation failure on final output → retry once with the validation errors fed back; fail if second attempt also invalid.
 - Fiber crash → `status='failed'`, error captured to `findings.error`, event `run.failed` emitted.
-- Server restart mid-run → **not survivable in v1**. `status='running'` rows older than N seconds on boot are marked `failed` by a startup sweeper. Durable execution is a future extension.
+- Server restart mid-run → **not survivable in v1**. `status='running'` rows older than N seconds on boot are marked `failed` by a startup sweeper. Durable execution is a future extension. However, paid call results are **write-ahead persisted**: each successful paid provider response is written to `research_paid_spend.result_hash` and to a `research_paid_results` jsonb column on the spend row immediately after the provider returns, before the fiber continues. On restart, the sweeper marks the run as failed but the paid results are recoverable — the UI shows them with a "run interrupted, partial paid results available" state, and the user can start a follow-up run that re-uses the cached results instead of re-purchasing.
 
 ---
 
@@ -939,6 +1100,7 @@ Effect's structured concurrency guarantees the cleanup runs on interrupt.
 ```
 POST   /research                              create + fork
   body: { query, mode?, context?, schema_name?, budget_cents?, paid_budget_cents?, auto_approve_paid_cents? }
+  note: per-run budget overrides are clamped to the user's policy (§11.2), not the system ceiling
   → 202 { id, status: 'queued' }
   → 409 { error: 'InsufficientBudget', estimated, available, shortfall }
   → 409 { error: 'ConfirmRequired', estimated_cost_cents, preview }   (fan-out > threshold)
@@ -954,9 +1116,9 @@ GET    /research                              list, filter, paginate
 
 GET    /research/by-subject/:table/:id        all runs linked to a subject row
 
--- Paid action approval workflow
-POST   /research/:id/paid-actions/:pa_id/approve
-POST   /research/:id/paid-actions/:pa_id/skip
+-- Paid action approval workflow (see §11.5 for follow-up mechanics)
+POST   /research/:id/paid-actions/:pa_id/approve   → creates a followup run (§11.5), returns { followup_run_id }
+POST   /research/:id/paid-actions/:pa_id/skip      → marks action as skipped, no follow-up
 
 -- Proposed update workflow
 GET    /research/:id/proposed-updates         list proposals
@@ -1155,8 +1317,8 @@ RESEARCH_REPORT_PROVIDER_ES=none            # disabled
 
 - **libreBORME** — free Spanish company registry mirror. BORME = Boletín Oficial del Registro Mercantil. Returns legal name, NIF, capital, incorporation date, directors (admins), address, status. Always prefer over scraping for Spanish companies.
 - **einforma** — paid commercial report, ~€1–5/call depending on depth. Financials, shareholders, risk score. Use only for due-diligence deep dives where libreBORME + web scraping are insufficient.
-- **Firecrawl** — best all-rounder: scrape, search, extract, agent. Credit-based. Use as scrape/extract default; use agent (via `web_discover`) sparingly.
-- **Exa** — best-in-class semantic search. Use as primary `SearchProvider` when quality matters more than free tier.
+- **Firecrawl** — best all-rounder: scrape, search, extract, agent. Monthly credit plans (Hobby $19/mo = 3k credits, Standard $83/mo = 100k credits). Credits: 1/scrape, 2/search(10 results), 5/agent run. Credits reset monthly, don't roll over. Auto-recharge packs ($9/1k) carry forward. Balance API: `GET /v2/team/credit-usage` → auto-sync. Use as scrape/extract default; use agent (via `web_discover`) sparingly.
+- **Exa** — best-in-class semantic search. $7/1k search requests, 1k/month free. Use as primary `SearchProvider` when quality matters more than free tier.
 - **Brave Search** — free tier, workable for dev and for cost-sensitive production.
 - **Anthropic web_search** — Claude's native tool, zero setup. Good fallback `DiscoverProvider`, but citations are model-maintained (no `content_ref` archive). Useful when budget is tight.
 - **Playwright local** — dev fallback. Slow and flaky, but free and works offline.
@@ -1167,14 +1329,14 @@ These are the top providers per capability, sorted by relevance for B2B company 
 
 #### Search APIs (for `web_search`)
 
-| Provider         | Pricing          | Free tier         | Best for                                                           | TS SDK    |
-| ---------------- | ---------------- | ----------------- | ------------------------------------------------------------------ | --------- |
-| **Exa**          | $1.50/1k         | 1k/month          | Semantic search ("companies like X"), understands business context | Yes       |
-| **Tavily**       | $8/1k            | 1k/month          | Citation-ready, built for RAG/agent workflows                      | Yes       |
-| **Firecrawl**    | $83/100k credits | 500 credits       | Integrated search+scrape in one API                                | Yes       |
-| **Brave Search** | $5/1k            | None (very cheap) | Privacy-focused, independent index, GDPR-compliant                 | REST only |
-| **SerpAPI**      | $75/5k           | 250/month         | Multi-engine SERP (40+ engines), enterprise reliability            | REST      |
-| **Serper**       | $0.30/1k         | None              | Cheapest Google SERP option                                        | REST      |
+| Provider         | Pricing                  | Free tier              | Best for                                                           | TS SDK    |
+| ---------------- | ------------------------ | ---------------------- | ------------------------------------------------------------------ | --------- |
+| **Exa**          | $7/1k search             | 1k req/month           | Semantic search ("companies like X"), understands business context | Yes       |
+| **Tavily**       | $0.008/credit            | 1k credits/month       | Citation-ready, built for RAG/agent workflows                      | Yes       |
+| **Firecrawl**    | From $19/mo (3k credits) | 500 credits (one-time) | Integrated search+scrape in one API; 2 credits per search          | Yes       |
+| **Brave Search** | $5/1k                    | None (very cheap)      | Privacy-focused, independent index, GDPR-compliant                 | REST only |
+| **SerpAPI**      | $75/5k                   | 250/month              | Multi-engine SERP (40+ engines), enterprise reliability            | REST      |
+| **Serper**       | $0.30/1k                 | None                   | Cheapest Google SERP option                                        | REST      |
 
 #### Scrape APIs (for `web_read`)
 
@@ -1228,9 +1390,23 @@ RESEARCH_BRIEF_MODEL=claude-haiku-4-5       # used for the second-pass brief_md
 # --- Budget defaults (system) ---
 RESEARCH_DEFAULT_BUDGET_CENTS=100            # €1/run cheap tier
 RESEARCH_DEFAULT_PAID_BUDGET_CENTS=500       # €5/run paid tier
-RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS=500 # auto-approve within run budget
+RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS=200 # €2 auto-approve; first einforma call silent, second triggers propose_paid_action
 RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS=2000 # €20/month per user
 RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS=10000 # €100/month absolute system max
+
+# --- Provider quota defaults (for new users; see §11.6) ---
+# Firecrawl: sync_mode=api — auto-created on first API key setup, no manual config needed.
+# System calls GET /v2/team/credit-usage to get plan details and remaining credits.
+RESEARCH_QUOTA_FIRECRAWL_SYNC=api           # auto-sync from Firecrawl balance API
+RESEARCH_QUOTA_FIRECRAWL_UNIT=credits
+RESEARCH_QUOTA_FIRECRAWL_CENTS_PER_UNIT=1   # notional ~$0.01/credit (varies by plan)
+# eInforma: sync_mode=manual — admin enters plan details in settings.
+RESEARCH_QUOTA_EINFORMA_SYNC=manual
+RESEARCH_QUOTA_EINFORMA_TOTAL=5             # reports/month (admin overrides in settings)
+RESEARCH_QUOTA_EINFORMA_UNIT=reports
+RESEARCH_QUOTA_EINFORMA_BILLING=monthly_plan
+RESEARCH_QUOTA_EINFORMA_PERIOD_MONTHS=1
+RESEARCH_QUOTA_EINFORMA_CENTS_PER_UNIT=300  # ~€3/report notional
 
 # --- Concurrency and safety ---
 RESEARCH_MAX_CONCURRENT_FIBERS_PER_USER=3
@@ -1254,14 +1430,16 @@ Boot fails loudly if any of the first six vars are unset.
 
 Everything ships together as v1.
 
-- Migrations: `research_runs` (incl. `tool_log` jsonb), `sources`, `research_run_sources`, `research_links`, `research_paid_spend`, `user_research_policy`.
+- Migrations: `research_runs` (incl. `tool_log`, `quota_breakdown` jsonb), `sources`, `research_run_sources`, `research_links`, `research_paid_spend` (incl. `idempotency_key`, `quota_units`, `quota_unit`), `user_research_policy`, `provider_quotas`, `provider_usage`.
 - Tables on subject rows: add `version int NOT NULL DEFAULT 0` to `companies`, `contacts`.
 - Decide and implement soft-delete vs triggers for polymorphic integrity (§17 open decisions).
 - `SearchProvider`, `ScrapeProvider`, `ExtractProvider`, `DiscoverProvider` interfaces + Firecrawl impls + Brave impl + local Playwright impl.
 - `RegistryProvider` + libreBORME impl (ES). `ReportProvider` + einforma impl (ES).
-- `Budget` service: cheap + paid tiers, `MonthlyPaidSpend` counter (queries `research_paid_spend`).
-- Policy resolution: system env → `user_research_policy` → per-run override.
-- `ApprovalRequired` / `BudgetExceeded` / `MonthlyCapExceeded` error types and LLM prompt rules.
+- `Budget` service: cheap + paid tiers. `MonthlyPaidSpend.chargeWithinCap` uses `pg_advisory_xact_lock` per user to serialize concurrent fibers. Paid calls use `idempotency_key` on `research_paid_spend` to prevent double-charge on retry.
+- Policy resolution: system env → `user_research_policy` → per-run override (clamped to user policy, not system ceiling).
+- Follow-up run mechanic: `POST /research/:id/paid-actions/:pa_id/approve` creates a `kind='followup'` run with the approved action's tool/args plus a findings summary from the parent (§11.5). Write-ahead persist paid results to `research_paid_spend` immediately after provider returns.
+- `ProviderQuota` service: `check` / `consume` / `remaining` / `sync` against `provider_quotas` + `provider_usage`. Two sync modes: `api` (auto-sync from provider balance API, e.g., Firecrawl `GET /v2/team/credit-usage`) and `manual` (admin configures in settings, e.g., eInforma). Quota check fires before budget charge in provider instrumentation (§12.2).
+- `QuotaExhausted` / `ApprovalRequired` / `BudgetExceeded` / `MonthlyCapExceeded` error types and LLM prompt rules.
 - Schema registry: `freeform`, `company_enrichment_v1`, `competitor_scan_v1`, `contact_discovery_v1`, `prospect_scan_v1`.
 - `ResearchService`: subject-anchored + selector fan-out (parent/leaf rows, concurrency cap, confirm threshold).
 - Tools: `web_search`, `web_read`, `web_discover`, `lookup_registry`, `crm_lookup`, `propose_update`, `attach_finding`, `propose_paid_action` (8 total).
@@ -1293,6 +1471,8 @@ Additions to `docs/observability.md`:
 | `research.cancelled`               | user cancels                     |
 | `research.proposed_update_applied` | user clicks Apply on a proposal  |
 | `research.paid_spend_recorded`     | any paid call (auto or approved) |
+| `research.quota_exhausted`         | provider quota depleted          |
+| `research.quota_warn`              | provider usage > warn_at_pct     |
 
 ### Metrics
 
@@ -1303,6 +1483,8 @@ Additions to `docs/observability.md`:
 - `research.cost.cents{tier,provider}` (histogram)
 - `research.paid_spend.monthly{user}` (gauge)
 - `research.budget.exceeded_count{tier}`
+- `research.quota.remaining{provider,unit}` (gauge)
+- `research.quota.exhausted_count{provider}`
 
 ### Log annotations
 
@@ -1397,13 +1579,14 @@ Named so the v1 shape doesn't preclude them.
   "paid_budget_cents": 0,
   "cost_cents": 3,
   "paid_cost_cents": 0,
-  "cost_breakdown": { "firecrawl": 3 },
+  "cost_breakdown": { "firecrawl": 3 },                               // notional cents (volume governor)
+  "quota_breakdown": { "firecrawl": { "units": 6, "unit": "credits" } }, // actual provider units consumed
   "tokens_in": 12400,
   "tokens_out": 3100,
   "paid_policy": {
     "budget_cents": 100,
     "paid_budget_cents": 500,
-    "auto_approve_paid_cents": 500,
+    "auto_approve_paid_cents": 200,
     "paid_monthly_cap_cents": 2000,
     "resolved_at": "2026-04-09T14:32:10Z"
   },
@@ -1484,9 +1667,13 @@ Named so the v1 shape doesn't preclude them.
   "user_id": "usr_…",
   "provider": "einforma",
   "tool": "lookup_registry",
-  "amount_cents": 300,
+  "idempotency_key": "01J9ZK8QYM:lookup_registry:a1b2c3d4",
+  "amount_cents": 300,                                                    // notional (volume governor)
+  "quota_units": 1,                                                        // native: 1 report consumed
+  "quota_unit": "reports",
   "args": { "country": "ES", "tax_id": "F08234567", "depth": "financials" },
   "result_hash": "sha256:…",
+  "result_data": { "…": "full provider response, write-ahead persisted" },
   "source_id": "src_rep_1",
   "auto_approved": true,
   "approved_by": null,
@@ -1503,12 +1690,14 @@ Named so the v1 shape doesn't preclude them.
 - One research mode in v1: `deep` (LLM drives a tool loop).
 - Six capability providers (`Search`, `Scrape`, `Extract`, `Discover`, `Registry`, `Report`), selected per env var. Tech-agnostic.
 - Four tool tiers by cost: 0 (free), 1 (cheap web), 2 (moderate), 3 (paid structured). Climb only when needed.
-- One editable spending policy per user: four numbers (budget/run, paid budget/run, auto-approve threshold, monthly cap). Defaults allow €5/run paid spend, €20/month cap, auto-approved within budget.
+- Two-layer cost control: **resource budget** (notional cents, volume governor — limits how much a single run can consume) + **provider quotas** (native units — credits, reports, requests — tracks actual consumption against the user's plan). Layers are independent; a call can pass budget but fail quota or vice versa.
+- Resource budget: four numbers per user (budget/run, paid budget/run, auto-approve threshold, monthly cap). Defaults: €5/run paid budget, €2 auto-approve (first einforma call silent, second triggers propose_paid_action), €20/month cap. Per-run overrides clamped to user policy.
+- Provider quotas: per-provider plan config (total units, billing model, period). Opt-in — no quota row = budget-only gating.
 - Links are first-class: `sources` table, content hashes, archived `content_ref` copies, inline citations per claim, citation-validation at run completion.
 - Research never mutates domain rows. It writes `proposed_updates` that humans Apply via the existing update endpoints with OCC.
 - Effect handles the agent loop (`LanguageModel.streamText` + `Toolkit`), structured concurrency (`Fiber`, `onInterrupt`), observability, and persistence. No external agentic framework.
 - SSE live streaming via in-memory `PubSub`; `tool_log` jsonb on `research_runs` for post-run audit (no replay on reload).
-- Budget enforcement at the runtime level via `Ref`; monthly cap is the only non-overridable rail.
+- Monthly cap serialized via `pg_advisory_xact_lock` per user — no overshoot under concurrent fibers. Paid calls idempotent via `idempotency_key` on `research_paid_spend`.
 - MCP surface exposes `research_sync` (synchronous) and `start_research` / `get_research` (async) for Claude Desktop parity.
 - Output formats: jsonb for machine-facing data (`findings`, `sources`, events, policy), markdown text for human narrative (`brief_md`), Tiptap JSON only when saving to `documents.content`.
 - Ships as one vertical slice (§19).

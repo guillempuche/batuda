@@ -20,14 +20,52 @@ packages/domain/src/          # Effect Schema types (no DB connection)
 │   └── index.ts
 └── index.ts
 
-packages/controllers/src/     # Shared HttpApiGroup specs (see TODO_BACKEND Phase 2b)
+packages/controllers/src/     # Shared HttpApiGroup specs
+├── routes/
+│   ├── research.ts           # ResearchGroup — /v1/research endpoints
+│   └── ...
+
+packages/research/src/        # Research bounded context
+├── domain/
+│   ├── errors.ts             # ProviderError, BudgetExceeded, QuotaExhausted, ...
+│   └── types.ts              # SearchResult, ScrapedPage, RegistryRecord, ...
+├── application/
+│   ├── ports.ts              # 6 capability ports + Budget + ProviderQuota
+│   ├── research-service.ts   # ResearchService — fiber-per-run agent loop
+│   ├── budget.ts             # Per-run + monthly spending control
+│   ├── provider-quota.ts     # Per-provider quota tracking
+│   ├── policy.ts             # System → user → per-run policy resolution
+│   └── schemas/              # Output schema registry
+│       ├── index.ts           # schemaRegistry Record<string, Schema>
+│       ├── freeform.ts
+│       ├── company-enrichment-v1.ts
+│       ├── competitor-scan-v1.ts
+│       ├── contact-discovery-v1.ts
+│       └── prospect-scan-v1.ts
+├── infrastructure/
+│   ├── _shared.ts            # disabledError, notYetImplementedError factories
+│   ├── providers-live.ts     # Boot-time selection for 6 capability ports
+│   ├── llm-live.ts           # Boot-time LLM provider selection
+│   ├── cached-search.ts      # TTL cache wrapping SearchProvider
+│   ├── stub/                 # Zero-cost deterministic fake data (local dev)
+│   │   ├── search.ts
+│   │   ├── scrape.ts
+│   │   ├── extract.ts
+│   │   ├── discover.ts
+│   │   ├── registry-es.ts
+│   │   ├── report-es.ts
+│   │   └── llm.ts
+│   └── brave/
+│       └── search.ts         # Real Brave Search API (template for newcomers)
+└── index.ts                  # Public exports
 
 apps/server/src/
 ├── db/
 │   ├── client.ts             # PgClient layer (from DATABASE_URL)
 │   ├── migrator.ts           # PgMigrator layer (file system loader)
 │   ├── migrations/           # Effect SQL migration files
-│   │   └── 0001_initial.ts
+│   │   ├── 0001_initial.ts
+│   │   └── 0003_research.ts  # research_runs, sources, paid_spend, quotas
 │   └── migrate.ts            # CRM + Better Auth migrations
 ├── main.ts                   # HTTP server entry point (REST API + MCP HTTP)
 ├── mcp-stdio.ts              # MCP stdio entry point (Claude Code local)
@@ -43,11 +81,12 @@ apps/server/src/
 │   ├── auth.ts               # Proxy to Better Auth handler
 │   ├── companies.ts
 │   ├── contacts.ts
+│   ├── research.ts           # Research API handler
 │   ├── ...
 │   └── health.ts
 ├── lib/
 │   ├── auth.ts               # Better Auth instance as ServiceMap.Service
-│   └── env.ts                # EnvVars service (DATABASE_URL, BETTER_AUTH_SECRET, etc.)
+│   └── env.ts                # EnvVars service (DATABASE_URL, RESEARCH_*, etc.)
 ├── mcp/
 │   ├── server.ts             # McpToolsLive — toolkits + resources + prompts
 │   ├── http.ts               # McpHttpLive — HTTP transport at /mcp
@@ -59,15 +98,22 @@ apps/server/src/
 │   │   ├── tasks.ts
 │   │   ├── documents.ts
 │   │   ├── pages.ts
-│   │   └── pipeline.ts
+│   │   ├── pipeline.ts
+│   │   ├── research-web.ts   # web_search, web_read, web_discover
+│   │   ├── research-registry.ts  # lookup_registry
+│   │   ├── research-crm.ts  # crm_lookup
+│   │   ├── research-sink.ts # propose_update, attach_finding, propose_paid_action
+│   │   └── research-mcp.ts  # start_research, get_research, research_sync
 │   ├── resources/
 │   │   ├── company.ts        # forja://company/{slug} (parameterized)
 │   │   ├── pipeline.ts       # forja://pipeline (static)
-│   │   └── document.ts       # forja://document/{id} (parameterized)
+│   │   ├── document.ts       # forja://document/{id} (parameterized)
+│   │   └── research.ts       # forja://research/{id} (parameterized)
 │   └── prompts/
 │       ├── _lang.ts           # LangParam + langDirective helper (ca/es/en)
 │       ├── _completions.ts    # Shared auto-completion (company slugs)
 │       ├── company-research.ts
+│       ├── research-designer.ts  # Research plan design prompt
 │       ├── daily-briefing.ts
 │       ├── proposal-draft.ts
 │       └── interaction-follow-up.ts
@@ -77,8 +123,10 @@ apps/server/src/
 │   └── better-auth.d.ts      # Type declarations for Better Auth
 └── services/                 # Business logic, called by both routes and MCP tools
     ├── companies.ts
-    ├── email.ts              # Resend: send outbound + handle inbound replies
+    ├── email.ts              # AgentMail: send outbound + handle inbound replies
+    ├── email-provider-live.ts # Boot-time email provider selection (Layer.unwrap)
     ├── pages.ts              # page CRUD, view tracking, publish/archive
+    ├── recordings.ts
     ├── webhooks.ts
     └── pipeline.ts
 ```
@@ -181,19 +229,26 @@ export default Effect.gen(function* () {
 
 ```typescript
 // apps/server/src/main.ts
+import { makeResearchLlmLive, makeResearchProvidersLive, ResearchService } from '@engranatge/research'
+
 const ApiLive = HttpApiBuilder.layer(ForjaApi).pipe(
-  Layer.provide([HealthLive, AuthHandlerLive, CompaniesLive, ...]),
+  Layer.provide([HealthLive, AuthHandlerLive, CompaniesLive, ResearchLive, ...]),
 )
 
 const ServicesLive = Layer.mergeAll(
-  CompanyService.layer, PipelineService.layer, PageService.layer, WebhookService.layer,
-)
+  CompanyService.layer, PipelineService.layer, PageService.layer,
+  EmailService.layer, RecordingService.layer, ResearchService.layer,
+).pipe(Layer.provideMerge(WebhookService.layer))
 
-// REST API + MCP HTTP on the same router
-const AppLive = Layer.merge(ApiLive, McpHttpLive)
+// REST API + MCP HTTP + CORS + docs on the same router
+const AppLive = Layer.mergeAll(ApiLive, McpHttpLive, CorsLive, DocsLive, OpenApiJsonLive)
 
 const program = HttpRouter.serve(AppLive).pipe(
   Layer.provide(ServicesLive),
+  Layer.provide(EmailProviderLive),
+  Layer.provide(S3StorageProviderLive),
+  Layer.provide(makeResearchProvidersLive),  // 6 capability ports (search, scrape, etc.)
+  Layer.provide(makeResearchLlmLive),        // LanguageModel for agent loop
   Layer.provide(SessionMiddlewareLive),
   Layer.provide(Auth.layer),
   Layer.provide(EnvVars.layer),
@@ -703,6 +758,107 @@ Events fired:
 
 ---
 
+## Research bounded context (`packages/research`)
+
+The research system lets AI agents autonomously gather and structure company intelligence. It runs as a fiber-per-research-run inside the server process, with SSE streaming and budget controls.
+
+### Provider matrix
+
+Each capability is backed by a swappable provider, selected at boot via env vars:
+
+```
+Search:    stub | brave | firecrawl
+Scrape:    stub | firecrawl | local
+Extract:   stub | firecrawl | local
+Discover:  stub | firecrawl | anthropic | none
+Registry:  stub | librebor | none
+Report:    stub | einforma | none
+LLM:       stub | groq | fireworks | nebius | together | sambanova | custom
+```
+
+`stub` = zero-cost deterministic fake data (default for local dev). `none` = capability disabled, fails with a clear error on call.
+
+### Env vars
+
+```bash
+# Capability providers (required, no defaults — boot fails if unset)
+RESEARCH_SEARCH_PROVIDER=stub
+RESEARCH_SCRAPE_PROVIDER=stub
+RESEARCH_EXTRACT_PROVIDER=stub
+RESEARCH_DISCOVER_PROVIDER=stub
+RESEARCH_REGISTRY_PROVIDER_ES=stub
+RESEARCH_REPORT_PROVIDER_ES=stub
+
+# Provider API keys (only needed for selected providers)
+# BRAVE_SEARCH_API_KEY=BSA...
+# FIRECRAWL_API_KEY=fc-...
+# EINFORMA_API_KEY=...
+
+# LLM inference (for agent loop — open source models via OpenAI-compatible APIs)
+RESEARCH_LLM_PROVIDER=stub
+# RESEARCH_LLM_MODEL=qwen/qwen3-32b
+# RESEARCH_LLM_API_KEY=gsk_...
+# RESEARCH_LLM_BASE_URL=         # only for custom provider
+
+# Budget defaults (system-level, overridable per-user via user_research_policy)
+RESEARCH_DEFAULT_BUDGET_CENTS=100
+RESEARCH_DEFAULT_PAID_BUDGET_CENTS=500
+RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS=200
+RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS=2000
+RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS=10000
+
+# Concurrency
+RESEARCH_MAX_CONCURRENT_FIBERS_PER_USER=3
+RESEARCH_MAX_CONCURRENCY_FANOUT=3
+RESEARCH_CONFIRM_THRESHOLD_FANOUT=10
+```
+
+### Layer composition
+
+```
+                     main.ts (composition root)
+                           │
+           ┌───────────────┼──────────────────┐
+           │               │                  │
+    FetchHttpClient     PgLive            EnvVars
+    (satisfies           (satisfies       (satisfies
+     HttpClient)          SqlClient)       Config)
+           │               │                  │
+           └───────────────┼──────────────────┘
+                   ┌───────┴───────┐
+                   │               │
+      makeResearchProvidersLive  makeResearchLlmLive
+      (6x Layer.unwrap)         (1x Layer.unwrap)
+                   │               │
+      ┌────────┬───┘          ┌────┴────┐
+      │        │              │         │
+StubSearch BraveSearch   StubLlm  OpenAiCompat
+R=never   R=HttpClient  R=never  R=HttpClient
+```
+
+Three kinds of provider layers:
+
+1. **Stub** — `Layer.succeed`, zero deps (`R = never`), deterministic fake data
+2. **Disabled** — `Layer.succeed`, zero deps, methods fail with `ProviderError`
+3. **Real** — `Layer.effect`, declares `R = HttpClient + Config`, real API calls
+
+### Research run lifecycle
+
+```
+POST /v1/research → create run row (status: queued) → fork fiber
+  Fiber:
+    Phase 1 — Tool loop (LLM calls tools: web_search, web_read, lookup_registry, ...)
+    Phase 2 — Structured output (LLM.generateObject with run's schema)
+    Phase 3 — Brief generation (markdown summary)
+  → SSE events via GET /v1/research/:id/events
+  → Findings persisted to research_runs.findings (jsonb)
+  → Sources deduped and archived to sources table
+```
+
+Fan-out groups: a `kind='group'` parent creates N `kind='leaf'` children. Each leaf completion merges findings onto the parent (`pg_advisory_xact_lock` for serialization) and rolls up the parent status.
+
+---
+
 ## Code quality — Biome
 
 Biome runs at the repo root and covers all packages. Config in `/biome.json`.
@@ -747,6 +903,29 @@ Style: 2-space indent, 100-char line width, single quotes, ES5 trailing commas, 
 2. Include `lang: LangParam` in parameters, prepend `langDirective(lang)` to output
 3. Use `completeCompanySlug` from `_completions.ts` for slug auto-completion
 4. Add to `McpToolsLive` in `src/mcp/server.ts`
+
+## Adding a new research capability provider
+
+Research capability providers implement one of the 6 ports in `packages/research/src/application/ports.ts`. Use `brave/search.ts` as a template.
+
+1. Create `packages/research/src/infrastructure/{vendor}/{capability}.ts`
+2. Use `Layer.effect(PortTag, Effect.gen(function* () { ... }))` pattern
+3. `yield*` any services you need (`HttpClient.HttpClient`, `Config.redacted(...)`)
+4. Return `PortTag.of({ methodName: (input) => Effect.gen(...) })`
+5. Map all errors to `new ProviderError({ provider: 'name', message, recoverable: bool })`
+6. Import in `providers-live.ts`, add a case to the relevant switch block
+7. Add the value to `Schema.Literals` for the matching `RESEARCH_*_PROVIDER` in `apps/server/src/lib/env.ts`
+
+The R type flows automatically — stubs have `R = never`, real providers declare `R = HttpClient` (or whatever they need), and the composition root in `main.ts` satisfies all requirements.
+
+## Adding a new LLM inference provider
+
+All inference providers (Groq, Nebius, Fireworks, Together, SambaNova) expose OpenAI-compatible APIs, so `@effect/ai-openai-compat` handles them with just a base URL.
+
+1. Add the provider name + base URL to `LLM_BASE_URLS` in `packages/research/src/infrastructure/llm-live.ts`
+2. Add the value to `Schema.Literals` for `RESEARCH_LLM_PROVIDER` in `apps/server/src/lib/env.ts`
+
+That's it — `OpenAiLanguageModel.model(name)` + `OpenAiClient.layer({ apiKey, apiUrl })` does the rest.
 
 ## Pages API
 
