@@ -35,7 +35,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "cmd=$(jq -r '.tool_input.command'); if echo \"$cmd\" | grep -qE 'git push.*(--force|-f)'; then echo '{\"decision\": \"block\", \"reason\": \"Force push is destructive. Use --force-with-lease or ask the user first.\"}'; else echo '{\"decision\": \"approve\"}'; fi",
+						"command": "cmd=$(jq -r '.tool_input.command'); if echo \"$cmd\" | grep -qE 'git push.*(--force-with-lease)'; then echo '{\"decision\": \"approve\"}'; elif echo \"$cmd\" | grep -qE 'git push.*(--force|-f)'; then echo '{\"decision\": \"block\", \"reason\": \"Force push is destructive. Use --force-with-lease or ask the user first.\"}'; else echo '{\"decision\": \"approve\"}'; fi",
 						"if": "Bash(git push*)"
 					}
 				]
