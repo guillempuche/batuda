@@ -136,23 +136,23 @@ const COMPANIES = [
 		nextAction: 'Presentar proposta automatització',
 	},
 	{
-		slug: 'botiga-la-rambla',
-		name: 'Botiga La Rambla',
+		slug: 'bright-lane-boutique',
+		name: 'Bright Lane Boutique',
 		status: 'meeting',
 		industry: 'retail',
 		sizeRange: '1-5',
 		region: 'cat',
-		location: 'Igualada',
+		location: 'Barcelona',
 		source: 'instagram',
 		priority: 2,
-		email: 'hola@botigalarambla.cat',
+		email: 'hello@brightlane.cat',
 		phone: '+34 938 777 222',
-		instagram: '@botigalarambla',
+		instagram: '@brightlanebcn',
 		productsFit: ['ecommerce-local', 'web-starter'],
-		tags: ['moda', 'anoia'],
-		painPoints: 'Volen vendre online però no saben per on començar.',
+		tags: ['fashion', 'barcelona'],
+		painPoints: 'Want to sell online but unsure where to start.',
 		currentTools: 'Instagram direct',
-		nextAction: 'Reunió demo ecommerce',
+		nextAction: 'Schedule ecommerce demo',
 	},
 	{
 		slug: 'electricitat-del-valles',
@@ -189,8 +189,8 @@ const COMPANIES = [
 		tags: ['obrador', 'berguedà'],
 	},
 	{
-		slug: 'transport-maresme',
-		name: 'Transport Maresme SL',
+		slug: 'coastal-freight',
+		name: 'Coastal Freight SL',
 		status: 'responded',
 		industry: 'transport',
 		sizeRange: '11-25',
@@ -198,14 +198,14 @@ const COMPANIES = [
 		location: 'Mataró',
 		source: 'exa',
 		priority: 2,
-		website: 'https://transportmaresme.com',
-		email: 'logistica@transportmaresme.com',
+		website: 'https://coastalfreight.es',
+		email: 'ops@coastalfreight.es',
 		phone: '+34 937 888 999',
 		productsFit: ['automatitzacions'],
-		tags: ['logística', 'maresme'],
-		painPoints: 'Albarans en paper, difícil traçabilitat.',
+		tags: ['logistics', 'maresme'],
+		painPoints: 'Paper-based delivery notes, hard to trace shipments.',
 		currentTools: 'Paper + fax',
-		nextAction: 'Trucada de seguiment',
+		nextAction: 'Follow-up call',
 	},
 	{
 		slug: 'hostal-pirineu',
@@ -228,8 +228,8 @@ const COMPANIES = [
 		nextAction: 'Demo sistema de reserves',
 	},
 	{
-		slug: 'fruites-valencia',
-		name: 'Fruites València',
+		slug: 'distribuciones-martinez',
+		name: 'Distribuciones Martínez',
 		status: 'contacted',
 		industry: 'distribució',
 		sizeRange: '26-50',
@@ -237,17 +237,17 @@ const COMPANIES = [
 		location: 'Alzira',
 		source: 'manual',
 		priority: 2,
-		website: 'https://fruitesvalencia.es',
-		email: 'vendes@fruitesvalencia.es',
+		website: 'https://dismartinez.es',
+		email: 'ventas@dismartinez.es',
 		phone: '+34 962 441 555',
 		productsFit: ['automatitzacions', 'ecommerce-local'],
 		tags: ['agroalimentari', 'ribera'],
-		painPoints: 'Comandes per telèfon, fulls de ruta manuals.',
+		painPoints: 'Pedidos por teléfono, hojas de ruta manuales.',
 		currentTools: 'WhatsApp + Excel',
 	},
 	{
-		slug: 'disseny-eixample',
-		name: 'Disseny Eixample',
+		slug: 'park-stone-design',
+		name: 'Park & Stone Design',
 		status: 'dead',
 		industry: 'serveis',
 		sizeRange: '1-5',
@@ -255,11 +255,11 @@ const COMPANIES = [
 		location: 'Barcelona',
 		source: 'linkedin',
 		priority: 3,
-		email: 'hola@dissenyeixample.com',
-		instagram: '@dissenyeixample',
+		email: 'hello@parkstonedesign.com',
+		instagram: '@parkstonedesign',
 		productsFit: ['web-starter'],
-		tags: ['disseny', 'barcelona'],
-		painPoints: 'Ja tenien proveïdor web.',
+		tags: ['design', 'barcelona'],
+		painPoints: 'Already had a web provider.',
 	},
 	{
 		slug: 'ceramiques-emporda',
@@ -327,12 +327,12 @@ const getPresetData = (
 			emailStatusReason: 'Permanent/General',
 		},
 		{
-			companyId: companyMap.get('botiga-la-rambla')!,
-			name: 'Laia Font',
-			role: 'Propietària',
+			companyId: companyMap.get('bright-lane-boutique')!,
+			name: 'Sarah Mitchell',
+			role: 'Owner',
 			isDecisionMaker: true,
-			email: 'hola@botigalarambla.cat',
-			instagram: '@laiafont',
+			email: 'hello@brightlane.cat',
+			instagram: '@sarahm_bcn',
 		},
 		{
 			companyId: companyMap.get('hostal-pirineu')!,
@@ -343,11 +343,11 @@ const getPresetData = (
 			phone: '+34 674 551 234',
 		},
 		{
-			companyId: companyMap.get('transport-maresme')!,
-			name: 'Ramon Vidal',
-			role: 'Cap de Logística',
+			companyId: companyMap.get('coastal-freight')!,
+			name: 'Tom Parker',
+			role: 'Head of Logistics',
 			isDecisionMaker: false,
-			email: 'logistica@transportmaresme.com',
+			email: 'ops@coastalfreight.es',
 			phone: '+34 637 888 999',
 		},
 	]
@@ -405,17 +405,16 @@ const getPresetData = (
 			nextAction: 'Reunió presencial a la fàbrica',
 		},
 		{
-			companyId: companyMap.get('botiga-la-rambla')!,
-			contactId: contactMap.get('Laia Font'),
+			companyId: companyMap.get('bright-lane-boutique')!,
+			contactId: contactMap.get('Sarah Mitchell'),
 			date: new Date('2026-03-20'),
 			channel: 'instagram',
 			direction: 'inbound',
 			type: 'cold',
-			subject: 'DM per Instagram',
-			summary:
-				'Laia ens va escriure per Instagram preguntant per botigues online.',
+			subject: 'Instagram DM',
+			summary: 'Sarah reached out on Instagram asking about online shops.',
 			outcome: 'interested',
-			nextAction: 'Programar demo ecommerce',
+			nextAction: 'Schedule ecommerce demo',
 		},
 		{
 			companyId: companyMap.get('hostal-pirineu')!,
@@ -432,17 +431,17 @@ const getPresetData = (
 			nextAction: 'Preparar demo online',
 		},
 		{
-			companyId: companyMap.get('transport-maresme')!,
-			contactId: contactMap.get('Ramon Vidal'),
+			companyId: companyMap.get('coastal-freight')!,
+			contactId: contactMap.get('Tom Parker'),
 			date: new Date('2026-03-25'),
 			channel: 'phone',
 			direction: 'inbound',
 			type: 'cold',
-			subject: 'Trucada entrant',
+			subject: 'Inbound call',
 			summary:
-				"Ramon ens va trucar després de veure'ns a un directori. Interessat en digitalitzar albarans.",
+				'Tom called after finding us in a directory. Interested in digitising delivery notes.',
 			outcome: 'responded',
-			nextAction: 'Enviar info automatitzacions',
+			nextAction: 'Send automation info pack',
 		},
 	]
 
@@ -456,11 +455,11 @@ const getPresetData = (
 			dueAt: new Date('2026-04-05'),
 		},
 		{
-			companyId: companyMap.get('botiga-la-rambla')!,
-			contactId: contactMap.get('Laia Font'),
+			companyId: companyMap.get('bright-lane-boutique')!,
+			contactId: contactMap.get('Sarah Mitchell'),
 			type: 'call',
-			title: 'Demo ecommerce per videocall',
-			notes: 'Mostrar plantilla retail + integració Instagram Shop.',
+			title: 'Ecommerce demo videocall',
+			notes: 'Show retail template + Instagram Shop integration.',
 			dueAt: new Date('2026-04-03'),
 		},
 		{
@@ -472,11 +471,11 @@ const getPresetData = (
 			dueAt: new Date('2026-04-02'),
 		},
 		{
-			companyId: companyMap.get('transport-maresme')!,
-			contactId: contactMap.get('Ramon Vidal'),
+			companyId: companyMap.get('coastal-freight')!,
+			contactId: contactMap.get('Tom Parker'),
 			type: 'email',
-			title: 'Enviar informació automatitzacions',
-			notes: "PDF amb casos d'ús logística + preus.",
+			title: 'Send automation info pack',
+			notes: 'PDF with logistics use cases + pricing.',
 			dueAt: new Date('2026-04-01'),
 		},
 		{
@@ -534,7 +533,7 @@ const getPresetData = (
 export const seedReset = Effect.gen(function* () {
 	const sql = yield* SqlClient.SqlClient
 	yield* Effect.logInfo('Truncating CRM tables...')
-	yield* sql`TRUNCATE companies, products, pages CASCADE`
+	yield* sql`TRUNCATE companies, products, pages, research_runs, sources, user_research_policy, provider_quotas, provider_usage CASCADE`
 })
 
 // ── Seed auth ─────────────────────────────────────────────
@@ -687,6 +686,28 @@ export const seed = (preset: Preset) =>
 		}
 		if (insertedTasks.length > 3) {
 			yield* Effect.logInfo(`  ... and ${insertedTasks.length - 3} more`)
+		}
+
+		// 6. Research policy
+		yield* Effect.logInfo('Seeding research policy...')
+		const [testUser] = yield* sql<{
+			id: string
+		}>`SELECT id FROM "user" WHERE email = ${TEST_USER.email} LIMIT 1`
+		if (testUser) {
+			yield* sql`INSERT INTO user_research_policy ${sql.insert([
+				{
+					userId: testUser.id,
+					budgetCents: 100,
+					paidBudgetCents: 500,
+					autoApprovePaidCents: 200,
+					paidMonthlyCapCents: 2000,
+				},
+			])} ON CONFLICT (user_id) DO NOTHING`
+			yield* Effect.logInfo(`  policy: user ${testUser.id}`)
+		} else {
+			yield* Effect.logInfo(
+				'  (skipped — auth user not found, run seed auth first)',
+			)
 		}
 
 		// Full preset extras
@@ -872,6 +893,7 @@ export const seed = (preset: Preset) =>
 			contacts: insertedContacts.length,
 			interactions: insertedInteractions.length,
 			tasks: insertedTasks.length,
+			researchPolicy: testUser ? 1 : 0,
 			documents: preset === 'full' ? 4 : 0,
 			proposals: preset === 'full' ? 2 : 0,
 			pages: preset === 'full' ? 2 : 0,
