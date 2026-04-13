@@ -13,7 +13,6 @@ Build and sell automations and AI workflows to restaurants, clinics, shops, and 
 - [Quick start](#quick-start) · [Detailed walkthrough →](docs/getting-started.md)
 - [Scripts](#scripts)
 - [Documentation](#documentation)
-- [Environment variables](#environment-variables)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -96,15 +95,6 @@ pnpm check             # lint + format (CI mode)
 - [Frontend](docs/frontend.md) — design tokens, MD3, BaseUI, components
 - [Marketing](docs/marketing.md) — public site, prospect pages, i18n
 - [AI agents](AGENTS.md) — how AI agents interact with this system
-
-## Environment variables
-
-```bash
-DATABASE_URL      # Postgres connection string
-MCP_SECRET        # Bearer token for remote MCP
-PORT              # HTTP server port (default 3000)
-MAPTILER_KEY      # MapTiler API key for map tiles
-```
 
 ## Contributing
 
