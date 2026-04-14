@@ -31,7 +31,7 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 			buildBetterAuthConfig({
 				env: {
 					secret: Redacted.value(env.BETTER_AUTH_SECRET),
-					baseURL: env.BETTER_AUTH_BASE_URL || undefined,
+					baseURL: env.BETTER_AUTH_BASE_URL,
 					useSecureCookies: !env.BETTER_AUTH_INSECURE_COOKIES,
 					trustedOrigins: env.ALLOWED_ORIGINS,
 				},
