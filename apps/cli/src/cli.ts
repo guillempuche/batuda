@@ -13,11 +13,12 @@ import { authRevokeKey } from './commands/auth-revoke-key'
 import { authSessions } from './commands/auth-sessions'
 import { dbMigrate, dbReset } from './commands/db'
 import { doctor } from './commands/doctor'
-import { seed, seedAuth, seedReset } from './commands/seed'
+import { seed, seedAuth } from './commands/seed'
 import { servicesDown, servicesStatus, servicesUp } from './commands/services'
 import { appendEnvKeys, resetEnvFile, setup } from './commands/setup'
 import { withDb } from './db'
 import { loadEnv } from './lib/load-env'
+import { recoveryHint } from './lib/recovery-hint'
 
 // ── Seed ───────────────────────────────────────────────────
 
@@ -28,40 +29,21 @@ const seedCommand = Command.make(
 			Flag.withDescription(
 				'Data preset: minimal (2 companies) or full (10 companies)',
 			),
-			Flag.withFallbackPrompt(
-				Prompt.select({
-					message: 'Which seed preset?',
-					choices: [
-						{
-							title: 'minimal — 2 companies, enough to test MCP',
-							value: 'minimal' as const,
-						},
-						{
-							title: 'full — 10 companies, full CRM dataset',
-							value: 'full' as const,
-						},
-					],
-				}),
-			),
-		),
-		reset: Flag.boolean('reset').pipe(
-			Flag.withDescription('Truncate CRM tables before seeding'),
-			Flag.withDefault(false),
+			Flag.withDefault('full' as const),
 		),
 		auth: Flag.boolean('auth').pipe(
 			Flag.withDescription('Create test auth user (dev@forja.cat)'),
 			Flag.withDefault(false),
 		),
 	},
-	({ preset, reset, auth }) =>
+	({ preset, auth }) =>
 		withDb(
 			Effect.gen(function* () {
-				if (reset) yield* seedReset
 				const counts = yield* seed(preset)
 				if (auth) yield* seedAuth
 				yield* Console.log('')
 				yield* Console.log(
-					`Seeded (${preset}): ${counts.products} products, ${counts.companies} companies, ${counts.contacts} contacts, ${counts.interactions} interactions, ${counts.tasks} tasks, ${counts.documents} documents, ${counts.proposals} proposals, ${counts.pages} pages`,
+					`Seeded (${preset}): ${counts.products} products, ${counts.companies} companies, ${counts.contacts} contacts, ${counts.interactions} interactions, ${counts.tasks} tasks, ${counts.documents} documents, ${counts.proposals} proposals, ${counts.pages} pages, ${counts.callRecordings} call recordings`,
 				)
 				yield* Console.log('')
 				yield* Console.log('─── Access hints ───────────────────────────────')
@@ -465,7 +447,18 @@ const formatError = (e: unknown): string => {
 
 const program = Command.run(engranatge, { version: '0.0.1' }).pipe(
 	Effect.provide(NodeServices.layer),
-	Effect.tapError(e => Console.error(formatError(e))),
+	Effect.tapError(e => {
+		const hint = recoveryHint(e)
+		if (hint) {
+			const tag =
+				e && typeof e === 'object' && '_tag' in e
+					? String((e as { _tag: unknown })._tag)
+					: undefined
+			const short = tag ?? (e instanceof Error ? e.message : String(e))
+			return Console.error(`${short}\n\n  Hint: ${hint}`)
+		}
+		return Console.error(formatError(e))
+	}),
 )
 NodeRuntime.runMain(program as unknown as Effect.Effect<void, unknown, never>, {
 	disableErrorReporting: true,

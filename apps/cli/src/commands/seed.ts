@@ -1,4 +1,7 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: seed data */
+import { randomUUID } from 'node:crypto'
+
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { apiKey } from '@better-auth/api-key'
 import { betterAuth } from 'better-auth'
 import { admin, bearer, openAPI } from 'better-auth/plugins'
@@ -10,6 +13,17 @@ import { buildBetterAuthConfig } from '@engranatge/auth'
 
 // ── Helpers ──────────────────────────────────────────────
 
+/** AgentMail-shaped thread ID: `thd_<16 chars>` — mirrors real wire data. */
+const amThreadId = (slug: string): string =>
+	`thd_${slug
+		.replace(/[^a-z0-9]/gi, '')
+		.toLowerCase()
+		.slice(0, 16)}`
+
+/** AgentMail-shaped RFC-5322 message ID: `<…@agentmail.to>`. */
+const amMessageId = (slug: string): string =>
+	`<${slug.replace(/[^a-z0-9]/gi, '').toLowerCase()}@agentmail.to>`
+
 /** Ensure all objects in a batch have the same keys (required by sql.insert). */
 const normalizeRows = <T extends Record<string, unknown>>(rows: T[]): T[] => {
 	const allKeys = new Set<string>()
@@ -20,6 +34,31 @@ const normalizeRows = <T extends Record<string, unknown>>(rows: T[]): T[] => {
 				[...allKeys].map(k => [k, k in row ? row[k] : null]),
 			) as T,
 	)
+}
+
+/**
+ * Build a minimal silent WAV file in-memory. 8 kHz mono 16-bit PCM, ~0.1 s.
+ * Good enough for the seed — tiny (~1.6 KB) and a real player opens it without
+ * complaint, so the "has audio" UI path is exercisable.
+ */
+const silentWav = (durationSec = 0.1, sampleRate = 8000): Buffer => {
+	const samples = Math.floor(durationSec * sampleRate)
+	const dataSize = samples * 2
+	const buf = Buffer.alloc(44 + dataSize)
+	buf.write('RIFF', 0)
+	buf.writeUInt32LE(36 + dataSize, 4)
+	buf.write('WAVE', 8)
+	buf.write('fmt ', 12)
+	buf.writeUInt32LE(16, 16)
+	buf.writeUInt16LE(1, 20)
+	buf.writeUInt16LE(1, 22)
+	buf.writeUInt32LE(sampleRate, 24)
+	buf.writeUInt32LE(sampleRate * 2, 28)
+	buf.writeUInt16LE(2, 32)
+	buf.writeUInt16LE(16, 34)
+	buf.write('data', 36)
+	buf.writeUInt32LE(dataSize, 40)
+	return buf
 }
 
 // ── Presets ───────────────────────────────────────────────
@@ -91,6 +130,30 @@ const PRODUCTS = [
 		defaultPrice: '300.00',
 		priceType: 'monthly',
 		targetIndustries: ['restauració', 'retail', 'hostaleria'],
+	},
+	// ── Edge-case products ──
+	{
+		slug: 'consultoria-custom',
+		name: 'Consultoria a Mida',
+		type: 'service',
+		status: 'active',
+		description: 'Projectes de consultoria digital amb abast i preu negociats.',
+		defaultPrice: null,
+		priceType: 'custom',
+		targetIndustries: ['serveis', 'other'],
+		metadata: { requiresDiscoveryCall: true },
+	},
+	{
+		slug: 'crm-intern',
+		name: 'CRM Intern (Dogfood)',
+		type: 'product',
+		status: 'beta',
+		description:
+			'El nostre propi CRM — usat internament per validar funcionalitats.',
+		defaultPrice: null,
+		priceType: null,
+		targetIndustries: null,
+		metadata: { internal: true },
 	},
 ]
 
@@ -279,6 +342,71 @@ const COMPANIES = [
 		tags: ['artesania', 'empordà'],
 		painPoints: 'Venen només a la botiga física, volen obrir canal online.',
 	},
+	// ── Edge-case companies ──
+	{
+		slug: 'tancaments-garraf',
+		name: 'Tancaments Garraf SL',
+		status: 'closed',
+		industry: 'construcció',
+		sizeRange: '11-25',
+		region: 'cat',
+		location: 'Sitges',
+		source: 'referral',
+		priority: 1,
+		website: 'https://tancamentsgarraf.cat',
+		email: 'info@tancamentsgarraf.cat',
+		phone: '+34 938 111 222',
+		productsFit: ['automatitzacions', 'web-starter'],
+		tags: ['tancaments', 'garraf'],
+		painPoints: 'Gestió de projectes amb fulls de càlcul compartits.',
+		currentTools: 'Google Sheets + WhatsApp',
+		nextAction: 'Tancar contracte anual',
+		nextActionAt: new Date('2026-03-01'),
+		lastContactedAt: new Date('2026-03-28'),
+	},
+	{
+		slug: 'consultoria-beta',
+		name: 'Consultoria Beta',
+		status: 'contacted',
+		industry: 'other',
+		sizeRange: '1-5',
+		region: 'cv',
+		location: 'València',
+		source: 'manual',
+		priority: 3,
+		email: 'hola@consultoriabeta.es',
+		productsFit: ['web-starter'],
+		tags: ['consultoria'],
+	},
+	{
+		slug: 'empresa-fantasma',
+		name: "L'Ànec d'Or — Distribucions & Logística, S.L.",
+		status: 'prospect',
+		industry: 'distribució',
+		sizeRange: '51-200',
+		region: 'cat',
+		location: 'Manresa',
+		source: 'google_maps',
+		priority: 3,
+		metadata: { notes: 'Found via Maps but no contact info available yet.' },
+	},
+	{
+		slug: 'taller-mecanic-jove',
+		name: 'Taller Mecànic Jove',
+		status: 'responded',
+		industry: 'serveis',
+		sizeRange: '6-10',
+		region: 'cat',
+		location: 'Granollers',
+		source: 'instagram',
+		priority: 2,
+		instagram: '@tallerjove',
+		productsFit: ['web-starter'],
+		tags: ['automoció', 'vallès'],
+		lastContactedAt: new Date('2025-09-15'),
+		nextAction: 'Recontactar — 6 mesos sense resposta',
+		nextActionAt: new Date('2026-03-15'),
+	},
 ]
 
 const MINIMAL_COMPANY_SLUGS = new Set([
@@ -349,6 +477,80 @@ const getPresetData = (
 			isDecisionMaker: false,
 			email: 'ops@coastalfreight.es',
 			phone: '+34 637 888 999',
+		},
+		// ── Edge-case contacts ──
+		{
+			companyId: companyMap.get('tancaments-garraf')!,
+			name: 'Ramon Vila',
+			role: 'Gerent',
+			isDecisionMaker: true,
+			email: 'ramon@tancamentsgarraf.cat',
+			phone: '+34 938 111 222',
+			emailStatus: 'valid' as const,
+			emailStatusReason: 'SMTP verified',
+			emailStatusUpdatedAt: new Date('2026-03-20'),
+			notes: 'Prefereix trucades al matí, abans de les 10h.',
+		},
+		{
+			companyId: companyMap.get('tancaments-garraf')!,
+			name: 'Laia Ferrer',
+			role: 'Administrativa',
+			isDecisionMaker: false,
+			email: 'admin@tancamentsgarraf.cat',
+			emailStatus: 'complained' as const,
+			emailStatusReason: 'Marked as spam 2026-03-10',
+			emailStatusUpdatedAt: new Date('2026-03-10'),
+			emailSoftBounceCount: 0,
+		},
+		{
+			companyId: companyMap.get('tancaments-garraf')!,
+			name: 'Oriol Camps',
+			role: 'Cap de projectes',
+			isDecisionMaker: false,
+			email: 'oriol@tancamentsgarraf.cat',
+			phone: '+34 638 111 333',
+			whatsapp: '+34 638 111 333',
+			emailStatus: 'bounced' as const,
+			emailStatusReason: 'Mailbox full',
+			emailSoftBounceCount: 5,
+			emailStatusUpdatedAt: new Date('2026-04-01'),
+		},
+		{
+			companyId: companyMap.get('empresa-fantasma')!,
+			name: 'Desconegut',
+			role: null,
+			isDecisionMaker: false,
+			notes:
+				'No contact info found — company discovered via Google Maps scrape.',
+		},
+		{
+			companyId: companyMap.get('distribuciones-martinez')!,
+			name: 'Carlos Martínez',
+			role: 'Director Comercial',
+			isDecisionMaker: true,
+			email: 'carlos@dismartinez.es',
+			phone: '+34 662 441 555',
+			linkedin: 'carlos-martinez-dismartinez',
+			emailStatus: 'valid' as const,
+			emailStatusUpdatedAt: new Date('2026-03-25'),
+		},
+		{
+			companyId: companyMap.get('distribuciones-martinez')!,
+			name: 'Ana López',
+			role: 'Responsable IT',
+			isDecisionMaker: false,
+			email: 'ana.lopez@dismartinez.es',
+			emailStatus: 'unknown' as const,
+			emailSoftBounceCount: 2,
+			notes: 'Only responds on LinkedIn, rarely checks email.',
+		},
+		{
+			companyId: companyMap.get('taller-mecanic-jove')!,
+			name: 'Marc Jove',
+			role: 'Propietari',
+			isDecisionMaker: true,
+			instagram: '@marcjove_tallerjove',
+			notes: 'Instagram only — no email or phone provided.',
 		},
 	]
 
@@ -443,6 +645,98 @@ const getPresetData = (
 			outcome: 'responded',
 			nextAction: 'Send automation info pack',
 		},
+		// ── Edge-case interactions ──
+		{
+			companyId: companyMap.get('tancaments-garraf')!,
+			contactId: contactMap.get('Ramon Vila'),
+			date: new Date('2026-03-18'),
+			channel: 'whatsapp',
+			direction: 'inbound',
+			type: 'followup',
+			subject: 'WhatsApp follow-up',
+			summary:
+				'Ramon va enviar fotos del seu sistema actual de fulls de càlcul per WhatsApp.',
+			outcome: 'interested',
+			nextAction: 'Preparar proposta',
+			nextActionAt: '2026-04-05',
+		},
+		{
+			companyId: companyMap.get('tancaments-garraf')!,
+			contactId: contactMap.get('Ramon Vila'),
+			date: new Date('2026-04-02'),
+			durationMin: 120,
+			channel: 'visit',
+			direction: 'outbound',
+			type: 'demo',
+			subject: 'Demo presencial a Sitges',
+			summary:
+				'Demo de 2h a les oficines. Van voler veure integració amb Google Sheets. Molt positiu.',
+			outcome: 'proposal_requested',
+			nextAction: 'Enviar proposta formal',
+			nextActionAt: '2026-04-10',
+			metadata: { attendees: ['Ramon Vila', 'Oriol Camps'] },
+		},
+		{
+			companyId: companyMap.get('distribuciones-martinez')!,
+			contactId: contactMap.get('Carlos Martínez'),
+			date: new Date('2026-03-28'),
+			channel: 'email',
+			direction: 'outbound',
+			type: 'cold',
+			subject: 'Primer contacte per email',
+			summary: 'Email fred enviat. Sense resposta.',
+			outcome: 'no_response',
+		},
+		{
+			companyId: companyMap.get('park-stone-design')!,
+			contactId: null,
+			date: new Date('2026-02-15'),
+			channel: 'linkedin',
+			direction: 'outbound',
+			type: 'cold',
+			subject: 'LinkedIn outreach',
+			summary: 'Contacted via LinkedIn. They already have a web provider.',
+			outcome: 'not_interested',
+		},
+		{
+			companyId: companyMap.get('ceramiques-emporda')!,
+			contactId: null,
+			date: new Date('2026-04-08'),
+			channel: 'event',
+			direction: 'inbound',
+			type: 'meeting',
+			subject: 'Fira de Ceràmica Empordà',
+			summary: 'Trobada casual a la fira. Van mostrar interès en venda online.',
+			outcome: 'interested',
+			metadata: { eventName: 'Fira de Ceràmica 2026', booth: 'A12' },
+		},
+		{
+			companyId: companyMap.get('taller-mecanic-jove')!,
+			contactId: contactMap.get('Marc Jove'),
+			date: new Date('2026-04-10'),
+			channel: 'instagram',
+			direction: 'inbound',
+			type: 'check-in',
+			subject: 'DM de seguiment',
+			summary:
+				'Marc va preguntar per Instagram si tenim plantilles per a tallers mecànics.',
+			outcome: 'responded',
+		},
+		{
+			companyId: companyMap.get('hostal-pirineu')!,
+			contactId: contactMap.get('Arnau Ribas'),
+			date: new Date('2026-04-05'),
+			durationMin: 25,
+			channel: 'phone',
+			direction: 'outbound',
+			type: 'check-in',
+			subject: 'Seguiment post-demo',
+			summary:
+				'Arnau confirma que vol tirar endavant amb el sistema de reserves. Falta pressupost final.',
+			outcome: 'meeting_scheduled',
+			nextAction: 'Reunió final per tancar pressupost',
+			nextActionAt: '2026-04-12',
+		},
 	]
 
 	const allTasks = [
@@ -485,6 +779,47 @@ const getPresetData = (
 			title: 'Revisió mensual amb Cal Pep',
 			notes: 'Revisar mètriques web i reserves del mes.',
 			dueAt: new Date('2026-04-15'),
+		},
+		// ── Edge-case tasks ──
+		{
+			companyId: companyMap.get('tancaments-garraf')!,
+			contactId: contactMap.get('Ramon Vila'),
+			type: 'proposal',
+			title: 'Enviar proposta automatització Tancaments Garraf',
+			notes: 'Incloure integració Google Sheets + facturació.',
+			dueAt: new Date('2026-04-10'),
+		},
+		{
+			companyId: companyMap.get('cal-pep-fonda')!,
+			contactId: contactMap.get('Pep Casals'),
+			type: 'call',
+			title: 'Trucada onboarding Cal Pep',
+			notes: 'Fet — vam configurar el calendari de reserves.',
+			dueAt: new Date('2026-03-05'),
+			completedAt: new Date('2026-03-05'),
+		},
+		{
+			companyId: companyMap.get('ferros-baix-llobregat')!,
+			contactId: contactMap.get('Marta Soler'),
+			type: 'email',
+			title: 'Enviar cas pràctic facturació automàtica',
+			notes: "Hauria d'haver sortit fa dues setmanes.",
+			dueAt: new Date('2026-03-20'),
+		},
+		{
+			companyId: companyMap.get('distribuciones-martinez')!,
+			contactId: null,
+			type: 'other',
+			title: 'Investigar competència logística a Alzira',
+			notes: 'Buscar si tenen proveïdor IT actual.',
+		},
+		{
+			companyId: companyMap.get('ceramiques-emporda')!,
+			contactId: null,
+			type: 'visit',
+			title: 'Visitar taller a La Bisbal',
+			dueAt: new Date('2026-05-01'),
+			metadata: { travelRequired: true, estimatedKm: 130 },
 		},
 	]
 
@@ -533,7 +868,7 @@ const getPresetData = (
 export const seedReset = Effect.gen(function* () {
 	const sql = yield* SqlClient.SqlClient
 	yield* Effect.logInfo('Truncating CRM tables...')
-	yield* sql`TRUNCATE companies, products, pages, research_runs, sources, user_research_policy, provider_quotas, provider_usage CASCADE`
+	yield* sql`TRUNCATE companies, products, pages, research_runs, sources, user_research_policy, provider_quotas, provider_usage, email_thread_links, email_messages, call_recordings CASCADE`
 })
 
 // ── Seed auth ─────────────────────────────────────────────
@@ -610,6 +945,9 @@ export const seedAuth = Effect.gen(function* () {
 export const seed = (preset: Preset) =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
+
+		// Always truncate before seeding so the command is idempotent.
+		yield* seedReset
 
 		const companies =
 			preset === 'minimal'
@@ -720,33 +1058,49 @@ export const seed = (preset: Preset) =>
 						companyId: companyMap.get('cal-pep-fonda')!,
 						interactionId: insertedInteractions[0]?.id,
 						type: 'prenote',
-						title: 'Preparació visita Cal Pep',
+						title: 'Visit prep — Cal Pep',
 						content:
-							'## Objectiu\nVeure el restaurant, entendre flux de reserves actual.\n\n## Preguntes\n- Quants coberts per servei?\n- Fan reserves per WhatsApp o telèfon?\n- Tenen web?',
+							'## Goal\nSee the restaurant, understand current booking flow.\n\n## Questions\n- How many covers per service?\n- Do they take reservations via WhatsApp or phone?\n- Do they have a website?',
 					},
 					{
 						companyId: companyMap.get('cal-pep-fonda')!,
 						interactionId: insertedInteractions[0]?.id,
 						type: 'postnote',
-						title: 'Resum visita Cal Pep',
+						title: 'Visit summary — Cal Pep',
 						content:
-							'## Resum\n60 coberts, 2 serveis/dia. Reserves per telèfon, perden un 15% de clients que no esperen.\n\n## Decisió\nVol web + reserves. Pressupost aprovat fins a 1500 EUR.',
+							"## Summary\n60 covers, 2 services/day. Phone-only reservations — they lose ~15% of walk-ups who won't wait.\n\n## Decision\nWants website + booking. Budget approved up to 1500 EUR.",
 					},
 					{
 						companyId: companyMap.get('ferros-baix-llobregat')!,
 						interactionId: null,
 						type: 'research',
-						title: 'Anàlisi Ferros BL',
+						title: 'Company analysis — Ferros BL',
 						content:
-							"## Empresa\n40 treballadors, 2 naus a Cornellà. Facturen ~3M EUR/any.\n\n## Problemes detectats\n- Facturació manual: 2 dies/mes\n- Errors de transcripció: ~5% factures\n- Sense control d'estocs en temps real",
+							'## Company\n40 employees, 2 warehouses in Cornellà. Revenue ~3M EUR/year.\n\n## Pain points detected\n- Manual invoicing: 2 days/month\n- Transcription errors: ~5% of invoices\n- No real-time stock control',
 					},
 					{
 						companyId: companyMap.get('hostal-pirineu')!,
 						interactionId: insertedInteractions[5]?.id,
 						type: 'visit_notes',
-						title: 'Notes visita Hostal Pirineu',
+						title: 'Visit notes — Hostal Pirineu',
 						content:
-							'## Context\n12 habitacions, temporada alta juny-setembre + esquí desembre-març.\n\n## Comissions\nBooking: 15-18%. Volen baixar a <5% amb canal directe.\n\n## Requisits\n- Calendari amb disponibilitat\n- Pagament anticipat (Stripe/Redsys)\n- Multi-idioma: ca, es, fr',
+							'## Context\n12 rooms, high season June–September + ski December–March.\n\n## Commissions\nBooking: 15–18%. They want to drop below 5% with a direct channel.\n\n## Requirements\n- Availability calendar\n- Upfront payment (Stripe/Redsys)\n- Multi-language: ca, es, fr',
+					},
+					{
+						companyId: companyMap.get('tancaments-garraf')!,
+						interactionId: null,
+						type: 'call_notes',
+						title: 'Demo debrief — Tancaments Garraf',
+						content:
+							'## Attendees\nRamon Vila (owner), Oriol Camps (project manager)\n\n## Key points\n- Currently tracking 12 concurrent projects in shared Google Sheets\n- Lost a client last month due to a missed deadline nobody saw in the spreadsheet\n- Want a dashboard with alerts per project phase\n\n## Objections\n- Worried about migration effort from existing sheets\n- Need offline access for site visits',
+					},
+					{
+						companyId: companyMap.get('distribuciones-martinez')!,
+						interactionId: null,
+						type: 'general',
+						title: 'Competitor landscape — logistics in Alzira',
+						content:
+							'## Notes\nNo direct competitor offering digital delivery notes in this area.\nClosest: a Valencia-based firm doing fleet GPS, but not document digitisation.\n\n## Opportunity\nFirst-mover advantage if we land Distribuciones Martínez as a reference client.',
 					},
 				]),
 			)}`
@@ -760,43 +1114,176 @@ export const seed = (preset: Preset) =>
 						companyId: companyMap.get('cal-pep-fonda')!,
 						contactId: contactMap.get('Pep Casals'),
 						status: 'accepted',
-						title: 'Web + Gestió Reserves — Cal Pep Fonda',
+						title: 'Web + Booking — Cal Pep Fonda',
 						lineItems: JSON.stringify([
 							{
 								product_id: productMap.get('web-starter'),
 								qty: 1,
 								price: '990.00',
-								notes: 'Web responsive amb SEO local',
+								notes: 'Responsive website with local SEO',
 							},
 							{
 								product_id: productMap.get('gestio-reserves'),
 								qty: 12,
 								price: '49.00',
-								notes: '12 mesos gestió de reserves',
+								notes: '12 months booking management',
 							},
 						]),
 						totalValue: '1578.00',
 						sentAt: new Date('2026-02-22'),
 						respondedAt: new Date('2026-02-25'),
-						notes: 'Acceptat per telèfon. Inici projecte 1 de març.',
+						notes: 'Accepted by phone. Project start March 1st.',
 					},
 					{
 						companyId: companyMap.get('ferros-baix-llobregat')!,
 						contactId: contactMap.get('Jordi Puig'),
 						status: 'draft',
-						title: 'Automatització facturació — Ferros BL',
+						title: 'Invoicing automation — Ferros BL',
 						lineItems: JSON.stringify([
 							{
 								product_id: productMap.get('automatitzacions'),
 								qty: 1,
 								price: '1500.00',
-								notes: 'Setup inicial + integració Contaplus',
+								notes: 'Initial setup + Contaplus integration',
 							},
 						]),
 						totalValue: '1500.00',
 						sentAt: null,
 						respondedAt: null,
-						notes: 'Pendent de reunió presencial per tancar detalls.',
+						notes: 'Pending on-site meeting to finalise details.',
+					},
+					{
+						companyId: companyMap.get('hostal-pirineu')!,
+						contactId: contactMap.get('Arnau Ribas'),
+						status: 'sent',
+						title: 'Direct booking system — Hostal del Pirineu',
+						lineItems: JSON.stringify([
+							{
+								product_id: productMap.get('web-starter'),
+								qty: 1,
+								price: '990.00',
+								notes: 'Multi-language site (ca/es/fr)',
+							},
+							{
+								product_id: productMap.get('gestio-reserves'),
+								qty: 12,
+								price: '49.00',
+								notes: 'Booking engine, 12 months',
+							},
+						]),
+						totalValue: '1578.00',
+						sentAt: new Date('2026-04-06'),
+						expiresAt: new Date('2026-05-06'),
+						notes: 'Sent after the on-site visit. Waiting for reply.',
+					},
+					{
+						companyId: companyMap.get('bright-lane-boutique')!,
+						contactId: contactMap.get('Sarah Mitchell'),
+						status: 'viewed',
+						title: 'Ecommerce setup — Bright Lane Boutique',
+						lineItems: JSON.stringify([
+							{
+								product_id: productMap.get('ecommerce-local'),
+								qty: 1,
+								price: '2500.00',
+								notes: 'Online store with Instagram Shop integration',
+							},
+							{
+								product_id: productMap.get('web-starter'),
+								qty: 1,
+								price: '990.00',
+								notes: 'Landing page + SEO',
+							},
+							{
+								product_id: productMap.get('social-media-pack'),
+								qty: 3,
+								price: '300.00',
+								notes: '3 months social media management',
+							},
+						]),
+						totalValue: '4390.00',
+						sentAt: new Date('2026-04-01'),
+						expiresAt: new Date('2026-04-30'),
+						notes: 'Sarah opened the proposal link on April 3rd.',
+					},
+					{
+						companyId: companyMap.get('tancaments-garraf')!,
+						contactId: contactMap.get('Ramon Vila'),
+						status: 'negotiating',
+						title: 'Project management automation — Tancaments Garraf',
+						lineItems: JSON.stringify([
+							{
+								product_id: productMap.get('automatitzacions'),
+								qty: 1,
+								price: '1500.00',
+								notes: 'Google Sheets to dashboard migration',
+							},
+							{
+								product_id: productMap.get('web-starter'),
+								qty: 1,
+								price: '990.00',
+								notes: 'Corporate website refresh',
+							},
+							{
+								product_id: productMap.get('consultoria-custom'),
+								qty: 1,
+								price: '800.00',
+								notes: 'Discovery + custom workflow mapping',
+							},
+							{
+								product_id: productMap.get('consultoria-custom'),
+								qty: 1,
+								price: '600.00',
+								notes: 'Staff training (2 sessions)',
+							},
+							{
+								product_id: productMap.get('gestio-reserves'),
+								qty: 6,
+								price: '49.00',
+								notes: '6 months appointment scheduling pilot',
+							},
+						]),
+						totalValue: '4184.00',
+						sentAt: new Date('2026-04-08'),
+						expiresAt: new Date('2026-05-08'),
+						notes: 'Ramon wants to reduce scope. Negotiating line items.',
+					},
+					{
+						companyId: companyMap.get('park-stone-design')!,
+						contactId: null,
+						status: 'rejected',
+						title: 'Website redesign — Park & Stone Design',
+						lineItems: JSON.stringify([
+							{
+								product_id: productMap.get('web-starter'),
+								qty: 1,
+								price: '990.00',
+								notes: 'Portfolio website',
+							},
+						]),
+						totalValue: '990.00',
+						sentAt: new Date('2026-02-18'),
+						respondedAt: new Date('2026-02-20'),
+						notes: 'Already had a web provider. Polite decline.',
+					},
+					{
+						companyId: companyMap.get('coastal-freight')!,
+						contactId: contactMap.get('Tom Parker'),
+						status: 'expired',
+						title: 'Delivery note digitisation — Coastal Freight',
+						lineItems: JSON.stringify([
+							{
+								product_id: productMap.get('automatitzacions'),
+								qty: 1,
+								price: '1500.00',
+								notes: 'Paper to digital workflow',
+							},
+						]),
+						totalValue: '1500.00',
+						currency: 'USD',
+						sentAt: new Date('2026-02-01'),
+						expiresAt: new Date('2026-03-01'),
+						notes: 'Tom never responded. Proposal expired.',
 					},
 				]),
 			)}`
@@ -804,6 +1291,48 @@ export const seed = (preset: Preset) =>
 			// 8. Pages
 			yield* Effect.logInfo('Seeding pages...')
 			const pageRows = [
+				// ── Published pages ──
+				{
+					companyId: companyMap.get('cal-pep-fonda'),
+					slug: 'cal-pep-reserves',
+					lang: 'en',
+					title: 'Online Booking — Cal Pep Fonda',
+					status: 'published',
+					template: 'product-pitch',
+					content: JSON.stringify({
+						type: 'doc',
+						content: [
+							{
+								type: 'hero',
+								attrs: {
+									title: 'Online Booking for Cal Pep Fonda',
+									subtitle:
+										'Manage your reservations from your phone — no more phone calls.',
+								},
+							},
+							{
+								type: 'value-props',
+								attrs: {
+									items: [
+										'Real-time calendar',
+										'Automatic SMS reminders',
+										'Google Maps integration',
+									],
+								},
+							},
+							{
+								type: 'cta',
+								attrs: { text: 'Get started', url: '/contact' },
+							},
+						],
+					}),
+					meta: JSON.stringify({
+						og_title: 'Online Booking — Cal Pep Fonda',
+						og_description: 'Online reservation system for your restaurant.',
+					}),
+					publishedAt: new Date('2026-03-01'),
+					viewCount: 47,
+				},
 				{
 					companyId: companyMap.get('cal-pep-fonda'),
 					slug: 'cal-pep-reserves',
@@ -843,13 +1372,55 @@ export const seed = (preset: Preset) =>
 						og_description: 'Sistema de reserves online per al teu restaurant.',
 					}),
 					publishedAt: new Date('2026-03-01'),
-					viewCount: 47,
+					viewCount: 23,
 				},
 				{
+					companyId: companyMap.get('cal-pep-fonda'),
+					slug: 'cal-pep-reserves',
+					lang: 'es',
+					title: 'Reservas Online — Cal Pep Fonda',
+					status: 'published',
+					template: 'product-pitch',
+					content: JSON.stringify({
+						type: 'doc',
+						content: [
+							{
+								type: 'hero',
+								attrs: {
+									title: 'Reservas Online para Cal Pep Fonda',
+									subtitle:
+										'Gestiona tus reservas desde el móvil, sin llamadas.',
+								},
+							},
+							{
+								type: 'value-props',
+								attrs: {
+									items: [
+										'Calendario en tiempo real',
+										'Recordatorios automáticos por SMS',
+										'Integración con Google Maps',
+									],
+								},
+							},
+							{
+								type: 'cta',
+								attrs: { text: 'Empieza ahora', url: '/contacto' },
+							},
+						],
+					}),
+					meta: JSON.stringify({
+						og_title: 'Reservas Online — Cal Pep Fonda',
+						og_description: 'Sistema de reservas online para tu restaurante.',
+					}),
+					publishedAt: new Date('2026-03-01'),
+					viewCount: 12,
+				},
+				// ── Draft pages ──
+				{
 					companyId: null,
-					slug: 'automatitzacions-industria',
-					lang: 'ca',
-					title: 'Automatitzacions per a la Indústria',
+					slug: 'industrial-automation',
+					lang: 'en',
+					title: 'Automation for Industry',
 					status: 'draft',
 					template: 'landing',
 					content: JSON.stringify({
@@ -858,33 +1429,1267 @@ export const seed = (preset: Preset) =>
 							{
 								type: 'hero',
 								attrs: {
-									title: 'Automatitza la teva fàbrica',
+									title: 'Automate your factory',
 									subtitle:
-										'Redueix errors i estalvia temps amb workflows intel·ligents.',
+										'Reduce errors and save time with intelligent workflows.',
 								},
 							},
 							{
 								type: 'value-props',
 								attrs: {
 									items: [
-										'Facturació automàtica',
-										"Control d'estocs en temps real",
-										'Integració amb ERP existent',
+										'Automated invoicing',
+										'Real-time stock control',
+										'Existing ERP integration',
 									],
 								},
 							},
 						],
 					}),
 					meta: JSON.stringify({
-						og_title: 'Automatitzacions Industrials',
+						og_title: 'Industrial Automation',
+						og_description: 'Automation solutions for industrial companies.',
+					}),
+					publishedAt: null,
+					viewCount: 0,
+				},
+				// ── Case study (published, high views) ──
+				{
+					companyId: companyMap.get('cal-pep-fonda'),
+					slug: 'case-study-cal-pep',
+					lang: 'en',
+					title: 'Case Study: How Cal Pep Fonda Cut No-Shows by 40%',
+					status: 'published',
+					template: 'case-study',
+					content: JSON.stringify({
+						type: 'doc',
+						content: [
+							{
+								type: 'hero',
+								attrs: {
+									title: 'Cal Pep Fonda: 40% fewer no-shows',
+									subtitle:
+										"A Vilanova restaurant's journey to online booking.",
+								},
+							},
+							{
+								type: 'paragraph',
+								content: [
+									{
+										type: 'text',
+										text: 'Cal Pep Fonda had a problem familiar to many Catalan restaurants: phone-only reservations, lost weekend clients, and no way to send reminders. After implementing our Web Starter + Booking system, no-shows dropped by 40% in the first month.',
+									},
+								],
+							},
+							{
+								type: 'value-props',
+								attrs: {
+									items: [
+										'Before: 60 covers, 15% no-show rate',
+										'After: 60 covers, 9% no-show rate',
+										'ROI: positive in 6 weeks',
+									],
+								},
+							},
+							{
+								type: 'blockquote',
+								content: [
+									{
+										type: 'text',
+										text: '"Now I can focus on cooking instead of answering the phone." — Pep Casals, Owner',
+									},
+								],
+							},
+							{
+								type: 'cta',
+								attrs: {
+									text: 'See how we can help your restaurant',
+									url: '/contact',
+								},
+							},
+						],
+					}),
+					meta: JSON.stringify({
+						og_title: 'Case Study: Cal Pep Fonda — 40% fewer no-shows',
 						og_description:
-							"Solucions d'automatització per a empreses industrials catalanes.",
+							'How a Vilanova restaurant switched to online booking and cut no-shows by 40%.',
+						og_image: '/images/case-studies/cal-pep.jpg',
+					}),
+					publishedAt: new Date('2026-03-15'),
+					viewCount: 12847,
+				},
+				// ── Intro page ──
+				{
+					companyId: companyMap.get('ferros-baix-llobregat'),
+					slug: 'intro-ferros-bl',
+					lang: 'en',
+					title: 'Introduction — Engranatge for Ferros BL',
+					status: 'published',
+					template: 'intro',
+					content: JSON.stringify({
+						type: 'doc',
+						content: [
+							{
+								type: 'hero',
+								attrs: {
+									title: 'Nice to meet you, Ferros Baix Llobregat',
+									subtitle: "Here's how we can help streamline your invoicing.",
+								},
+							},
+							{
+								type: 'paragraph',
+								content: [
+									{
+										type: 'text',
+										text: 'We specialise in automation for mid-size industrial companies. After speaking with Marta and Jordi, we identified that manual invoicing is costing you 2 full days every month. This page outlines our approach.',
+									},
+								],
+							},
+							{
+								type: 'cta',
+								attrs: {
+									text: 'View our proposal',
+									url: '/proposals/ferros-bl',
+								},
+							},
+						],
+					}),
+					meta: JSON.stringify({
+						og_title: 'Engranatge for Ferros BL',
+						og_description:
+							'Custom automation proposal for Ferros Baix Llobregat.',
+					}),
+					publishedAt: new Date('2026-03-20'),
+					viewCount: 8,
+				},
+				// ── Custom template page ──
+				{
+					companyId: null,
+					slug: 'about',
+					lang: 'en',
+					title: 'About Engranatge',
+					status: 'published',
+					template: 'custom',
+					content: JSON.stringify({
+						type: 'doc',
+						content: [
+							{
+								type: 'hero',
+								attrs: {
+									title: 'I build digital tools for small businesses',
+									subtitle: 'One-person workshop. Mediterranean work ethic.',
+								},
+							},
+							{
+								type: 'paragraph',
+								content: [
+									{
+										type: 'text',
+										text: 'Engranatge is a one-person digital workshop based in Catalonia. I help small and mid-size businesses automate their operations, get found online, and stop losing clients to manual processes.',
+									},
+								],
+							},
+						],
+					}),
+					meta: JSON.stringify({
+						og_title: 'About Engranatge',
+						og_description: 'One-person digital workshop for small businesses.',
+					}),
+					publishedAt: new Date('2026-01-15'),
+					viewCount: 531,
+				},
+				{
+					companyId: null,
+					slug: 'about',
+					lang: 'ca',
+					title: 'Sobre Engranatge',
+					status: 'published',
+					template: 'custom',
+					content: JSON.stringify({
+						type: 'doc',
+						content: [
+							{
+								type: 'hero',
+								attrs: {
+									title: 'Construeixo eines digitals per a petits negocis',
+									subtitle:
+										'Taller unipersonal. Ètica de treball mediterrània.',
+								},
+							},
+							{
+								type: 'paragraph',
+								content: [
+									{
+										type: 'text',
+										text: 'Engranatge és un taller digital unipersonal amb seu a Catalunya. Ajudo petites i mitjanes empreses a automatitzar les seves operacions, a ser trobades online i a deixar de perdre clients per processos manuals.',
+									},
+								],
+							},
+						],
+					}),
+					meta: JSON.stringify({
+						og_title: 'Sobre Engranatge',
+						og_description: 'Taller digital unipersonal per a petits negocis.',
+					}),
+					publishedAt: new Date('2026-01-15'),
+					viewCount: 189,
+				},
+				{
+					companyId: null,
+					slug: 'about',
+					lang: 'es',
+					title: 'Sobre Engranatge',
+					status: 'published',
+					template: 'custom',
+					content: JSON.stringify({
+						type: 'doc',
+						content: [
+							{
+								type: 'hero',
+								attrs: {
+									title:
+										'Construyo herramientas digitales para pequeños negocios',
+									subtitle:
+										'Taller unipersonal. Ética de trabajo mediterránea.',
+								},
+							},
+							{
+								type: 'paragraph',
+								content: [
+									{
+										type: 'text',
+										text: 'Engranatge es un taller digital unipersonal con sede en Cataluña. Ayudo a pequeñas y medianas empresas a automatizar sus operaciones, a ser encontradas online y a dejar de perder clientes por procesos manuales.',
+									},
+								],
+							},
+						],
+					}),
+					meta: JSON.stringify({
+						og_title: 'Sobre Engranatge',
+						og_description:
+							'Taller digital unipersonal para pequeños negocios.',
+					}),
+					publishedAt: new Date('2026-01-15'),
+					viewCount: 76,
+				},
+				// ── Archived page ──
+				{
+					companyId: null,
+					slug: 'summer-promo-2025',
+					lang: 'en',
+					title: 'Summer 2025 Promo — 20% Off Web Starter',
+					status: 'archived',
+					template: 'landing',
+					content: JSON.stringify({
+						type: 'doc',
+						content: [
+							{
+								type: 'hero',
+								attrs: {
+									title: 'Summer special: 20% off Web Starter',
+									subtitle: 'Offer ended September 30, 2025.',
+								},
+							},
+						],
+					}),
+					meta: JSON.stringify({
+						og_title: 'Summer 2025 Promo',
+						og_description: 'Limited time offer — 20% off Web Starter package.',
+					}),
+					publishedAt: new Date('2025-07-01'),
+					expiresAt: new Date('2025-09-30'),
+					viewCount: 2341,
+				},
+				// ── Page with expiry in the future ──
+				{
+					companyId: null,
+					slug: 'spring-launch-2026',
+					lang: 'en',
+					title: 'Spring 2026 Launch — Free Discovery Call',
+					status: 'published',
+					template: 'landing',
+					content: JSON.stringify({
+						type: 'doc',
+						content: [
+							{
+								type: 'hero',
+								attrs: {
+									title: 'Free 30-minute discovery call',
+									subtitle: 'Book before May 31st and get a free audit.',
+								},
+							},
+							{
+								type: 'cta',
+								attrs: { text: 'Book now', url: '/contact' },
+							},
+						],
+					}),
+					meta: JSON.stringify({
+						og_title: 'Spring 2026 — Free Discovery Call',
+						og_description:
+							'Book a free 30-minute discovery call before May 31st.',
+					}),
+					publishedAt: new Date('2026-04-01'),
+					expiresAt: new Date('2026-05-31'),
+					viewCount: 89,
+				},
+				// ── Product pitch for Hostal (multi-lang) ──
+				{
+					companyId: companyMap.get('hostal-pirineu'),
+					slug: 'hostal-pirineu-booking',
+					lang: 'en',
+					title: 'Direct Booking — Hostal del Pirineu',
+					status: 'draft',
+					template: 'product-pitch',
+					content: JSON.stringify({
+						type: 'doc',
+						content: [
+							{
+								type: 'hero',
+								attrs: {
+									title: 'Stop paying 18% to Booking.com',
+									subtitle:
+										'Your own direct booking channel for under 5% cost.',
+								},
+							},
+							{
+								type: 'value-props',
+								attrs: {
+									items: [
+										'Real-time availability calendar',
+										'Upfront payment via Stripe or Redsys',
+										'Multi-language: Catalan, Spanish, French',
+									],
+								},
+							},
+							{
+								type: 'cta',
+								attrs: { text: 'See the demo', url: '/demo/booking' },
+							},
+						],
+					}),
+					meta: JSON.stringify({
+						og_title: 'Direct Booking — Hostal del Pirineu',
+						og_description: 'Direct reservation system for Hostal del Pirineu.',
+					}),
+					publishedAt: null,
+					viewCount: 0,
+				},
+				{
+					companyId: companyMap.get('hostal-pirineu'),
+					slug: 'hostal-pirineu-booking',
+					lang: 'ca',
+					title: 'Reserves directes — Hostal del Pirineu',
+					status: 'draft',
+					template: 'product-pitch',
+					content: JSON.stringify({
+						type: 'doc',
+						content: [
+							{
+								type: 'hero',
+								attrs: {
+									title: 'Deixa de pagar un 18% a Booking.com',
+									subtitle: 'El teu propi canal de reserves per menys del 5%.',
+								},
+							},
+							{
+								type: 'value-props',
+								attrs: {
+									items: [
+										'Calendari de disponibilitat en temps real',
+										'Pagament anticipat via Stripe o Redsys',
+										'Multi-idioma: català, castellà, francès',
+									],
+								},
+							},
+							{
+								type: 'cta',
+								attrs: { text: 'Veure la demo', url: '/demo/booking' },
+							},
+						],
+					}),
+					meta: JSON.stringify({
+						og_title: 'Reserves directes — Hostal del Pirineu',
+						og_description:
+							'Sistema de reserves directes per a Hostal del Pirineu.',
 					}),
 					publishedAt: null,
 					viewCount: 0,
 				},
 			]
-			yield* sql`INSERT INTO pages ${sql.insert(pageRows)}`
+			yield* sql`INSERT INTO pages ${sql.insert(normalizeRows(pageRows))}`
+
+			// 9. Email threads + messages
+			yield* Effect.logInfo('Seeding email threads & messages...')
+			const inboxId = 'info@engranatge.com'
+
+			const emailThreadRows = [
+				{
+					provider: 'agentmail',
+					providerThreadId: amThreadId('calpep01'),
+					providerInboxId: inboxId,
+					companyId: companyMap.get('cal-pep-fonda')!,
+					contactId: contactMap.get('Pep Casals'),
+					subject: 'Proposal: Web + Booking for Cal Pep Fonda',
+					status: 'open',
+				},
+				{
+					provider: 'agentmail',
+					providerThreadId: amThreadId('ferros01'),
+					providerInboxId: inboxId,
+					companyId: companyMap.get('ferros-baix-llobregat')!,
+					contactId: contactMap.get('Marta Soler'),
+					subject: 'Automation enquiry — Ferros BL',
+					status: 'open',
+				},
+				{
+					provider: 'agentmail',
+					providerThreadId: amThreadId('ferros02'),
+					providerInboxId: inboxId,
+					companyId: companyMap.get('ferros-baix-llobregat')!,
+					contactId: contactMap.get('Jordi Puig'),
+					subject: 'Meeting follow-up — invoicing demo',
+					status: 'open',
+				},
+				{
+					provider: 'agentmail',
+					providerThreadId: amThreadId('coastal01'),
+					providerInboxId: inboxId,
+					companyId: companyMap.get('coastal-freight')!,
+					contactId: contactMap.get('Tom Parker'),
+					subject: 'Delivery note digitisation info',
+					status: 'open',
+				},
+				{
+					provider: 'agentmail',
+					providerThreadId: amThreadId('hostal01'),
+					providerInboxId: inboxId,
+					companyId: companyMap.get('hostal-pirineu')!,
+					contactId: contactMap.get('Arnau Ribas'),
+					subject: 'Booking system proposal — Hostal del Pirineu',
+					status: 'open',
+				},
+				{
+					provider: 'agentmail',
+					providerThreadId: amThreadId('brightlane01'),
+					providerInboxId: inboxId,
+					companyId: companyMap.get('bright-lane-boutique')!,
+					contactId: contactMap.get('Sarah Mitchell'),
+					subject: 'Ecommerce setup — next steps',
+					status: 'open',
+				},
+				{
+					provider: 'agentmail',
+					providerThreadId: amThreadId('dismartinez01'),
+					providerInboxId: inboxId,
+					companyId: companyMap.get('distribuciones-martinez')!,
+					contactId: contactMap.get('Carlos Martínez'),
+					subject: 'Cold outreach — logistics automation',
+					status: 'open',
+				},
+				{
+					provider: 'agentmail',
+					providerThreadId: amThreadId('parkstone01'),
+					providerInboxId: inboxId,
+					companyId: companyMap.get('park-stone-design')!,
+					contactId: null,
+					subject: 'Website redesign offer',
+					status: 'closed',
+				},
+				{
+					provider: 'agentmail',
+					providerThreadId: amThreadId('nocompany01'),
+					providerInboxId: inboxId,
+					companyId: null,
+					contactId: null,
+					subject: 'General enquiry from website form',
+					status: 'open',
+				},
+				{
+					provider: 'agentmail',
+					providerThreadId: amThreadId('tancaments01'),
+					providerInboxId: inboxId,
+					companyId: companyMap.get('tancaments-garraf')!,
+					contactId: contactMap.get('Ramon Vila'),
+					subject: 'Automation proposal — Tancaments Garraf',
+					status: 'open',
+				},
+				// Unsolicited pitch that AgentMail flagged as spam on receive.
+				{
+					provider: 'agentmail',
+					providerThreadId: amThreadId('spamreject'),
+					providerInboxId: inboxId,
+					companyId: null,
+					contactId: null,
+					subject: '🔥 Boost your sales 10x with our SEO magic',
+					status: 'open',
+				},
+				// Sender hit an AgentMail block list on receive.
+				{
+					provider: 'agentmail',
+					providerThreadId: amThreadId('blocklist'),
+					providerInboxId: inboxId,
+					companyId: null,
+					contactId: null,
+					subject: 'RE: urgent wire transfer needed',
+					status: 'open',
+				},
+			]
+			yield* sql`INSERT INTO email_thread_links ${sql.insert(normalizeRows(emailThreadRows))}`
+
+			const emailMessageRows = [
+				// Thread: Cal Pep — delivered outbound + delivered inbound reply
+				{
+					provider: 'agentmail',
+					providerMessageId: amMessageId('calpep01'),
+					providerThreadId: amThreadId('calpep01'),
+					providerInboxId: inboxId,
+					direction: 'outbound',
+					companyId: companyMap.get('cal-pep-fonda')!,
+					contactId: contactMap.get('Pep Casals'),
+					recipients: JSON.stringify(['pep@calpepfonda.cat']),
+					status: 'delivered',
+					inboundClassification: null,
+					statusUpdatedAt: new Date('2026-02-20T10:00:00Z'),
+				},
+				{
+					provider: 'agentmail',
+					providerMessageId: amMessageId('calpep02'),
+					providerThreadId: amThreadId('calpep01'),
+					providerInboxId: inboxId,
+					direction: 'inbound',
+					companyId: companyMap.get('cal-pep-fonda')!,
+					contactId: contactMap.get('Pep Casals'),
+					recipients: JSON.stringify(['dev@forja.cat']),
+					status: 'delivered',
+					inboundClassification: 'normal',
+					statusUpdatedAt: new Date('2026-02-21T08:30:00Z'),
+				},
+				// Thread: Ferros (Marta) — sent, not yet delivered
+				{
+					provider: 'agentmail',
+					providerMessageId: amMessageId('ferrosmarta01'),
+					providerThreadId: amThreadId('ferros01'),
+					providerInboxId: inboxId,
+					direction: 'outbound',
+					companyId: companyMap.get('ferros-baix-llobregat')!,
+					contactId: contactMap.get('Marta Soler'),
+					recipients: JSON.stringify(['marta@ferrosbl.com']),
+					status: 'sent',
+					inboundClassification: null,
+					statusUpdatedAt: new Date('2026-03-06T14:00:00Z'),
+				},
+				// Thread: Ferros (Jordi) — hard bounce
+				{
+					provider: 'agentmail',
+					providerMessageId: amMessageId('ferrosjordi01'),
+					providerThreadId: amThreadId('ferros02'),
+					providerInboxId: inboxId,
+					direction: 'outbound',
+					companyId: companyMap.get('ferros-baix-llobregat')!,
+					contactId: contactMap.get('Jordi Puig'),
+					recipients: JSON.stringify(['gerencia@ferrosbl.com']),
+					status: 'bounced',
+					statusReason: 'Permanent/General — mailbox does not exist',
+					bounceType: 'Permanent',
+					bounceSubType: 'General',
+					inboundClassification: null,
+					statusUpdatedAt: new Date('2026-03-16T09:00:00Z'),
+				},
+				// Thread: Coastal — soft bounce
+				{
+					provider: 'agentmail',
+					providerMessageId: amMessageId('coastal01'),
+					providerThreadId: amThreadId('coastal01'),
+					providerInboxId: inboxId,
+					direction: 'outbound',
+					companyId: companyMap.get('coastal-freight')!,
+					contactId: contactMap.get('Tom Parker'),
+					recipients: JSON.stringify(['ops@coastalfreight.es']),
+					status: 'bounced_soft',
+					statusReason: 'Transient/MailboxFull',
+					bounceType: 'Transient',
+					bounceSubType: 'MailboxFull',
+					inboundClassification: null,
+					statusUpdatedAt: new Date('2026-03-26T11:00:00Z'),
+				},
+				// Thread: Hostal — delivered outbound + inbound reply
+				{
+					provider: 'agentmail',
+					providerMessageId: amMessageId('hostal01'),
+					providerThreadId: amThreadId('hostal01'),
+					providerInboxId: inboxId,
+					direction: 'outbound',
+					companyId: companyMap.get('hostal-pirineu')!,
+					contactId: contactMap.get('Arnau Ribas'),
+					recipients: JSON.stringify(['reserves@hostalpirineu.com']),
+					status: 'delivered',
+					inboundClassification: null,
+					statusUpdatedAt: new Date('2026-04-06T15:00:00Z'),
+				},
+				{
+					provider: 'agentmail',
+					providerMessageId: amMessageId('hostal02'),
+					providerThreadId: amThreadId('hostal01'),
+					providerInboxId: inboxId,
+					direction: 'inbound',
+					companyId: companyMap.get('hostal-pirineu')!,
+					contactId: contactMap.get('Arnau Ribas'),
+					recipients: JSON.stringify(['dev@forja.cat']),
+					status: 'delivered',
+					inboundClassification: 'normal',
+					statusUpdatedAt: new Date('2026-04-07T09:15:00Z'),
+				},
+				// Thread: Bright Lane — complained (spam)
+				{
+					provider: 'agentmail',
+					providerMessageId: amMessageId('brightlane01'),
+					providerThreadId: amThreadId('brightlane01'),
+					providerInboxId: inboxId,
+					direction: 'outbound',
+					companyId: companyMap.get('bright-lane-boutique')!,
+					contactId: contactMap.get('Sarah Mitchell'),
+					recipients: JSON.stringify(['hello@brightlane.cat']),
+					status: 'complained',
+					statusReason: 'Recipient marked as spam',
+					inboundClassification: null,
+					statusUpdatedAt: new Date('2026-04-02T10:00:00Z'),
+				},
+				// Thread: Distribuciones — rejected (provider rejected sending)
+				{
+					provider: 'agentmail',
+					providerMessageId: amMessageId('dismartinez01'),
+					providerThreadId: amThreadId('dismartinez01'),
+					providerInboxId: inboxId,
+					direction: 'outbound',
+					companyId: companyMap.get('distribuciones-martinez')!,
+					contactId: contactMap.get('Carlos Martínez'),
+					recipients: JSON.stringify(['carlos@dismartinez.es']),
+					status: 'rejected',
+					statusReason: 'Sending quota exceeded',
+					inboundClassification: null,
+					statusUpdatedAt: new Date('2026-03-28T16:00:00Z'),
+				},
+				// Thread: Park & Stone — delivered then no reply (closed thread)
+				{
+					provider: 'agentmail',
+					providerMessageId: amMessageId('parkstone01'),
+					providerThreadId: amThreadId('parkstone01'),
+					providerInboxId: inboxId,
+					direction: 'outbound',
+					companyId: companyMap.get('park-stone-design')!,
+					contactId: null,
+					recipients: JSON.stringify(['hello@parkstonedesign.com']),
+					status: 'delivered',
+					inboundClassification: null,
+					statusUpdatedAt: new Date('2026-02-15T12:00:00Z'),
+				},
+				// Thread: No company — inbound from unknown sender
+				{
+					provider: 'agentmail',
+					providerMessageId: amMessageId('nocompany01'),
+					providerThreadId: amThreadId('nocompany01'),
+					providerInboxId: inboxId,
+					direction: 'inbound',
+					companyId: null,
+					contactId: null,
+					recipients: JSON.stringify(['dev@forja.cat']),
+					status: 'delivered',
+					inboundClassification: 'normal',
+					statusUpdatedAt: new Date('2026-04-10T08:00:00Z'),
+				},
+				// Thread: Tancaments — multi-message thread (outbound delivered, inbound delivered, outbound delivered)
+				{
+					provider: 'agentmail',
+					providerMessageId: amMessageId('tancaments01'),
+					providerThreadId: amThreadId('tancaments01'),
+					providerInboxId: inboxId,
+					direction: 'outbound',
+					companyId: companyMap.get('tancaments-garraf')!,
+					contactId: contactMap.get('Ramon Vila'),
+					recipients: JSON.stringify(['ramon@tancamentsgarraf.cat']),
+					status: 'delivered',
+					inboundClassification: null,
+					statusUpdatedAt: new Date('2026-03-19T09:00:00Z'),
+				},
+				{
+					provider: 'agentmail',
+					providerMessageId: amMessageId('tancaments02'),
+					providerThreadId: amThreadId('tancaments01'),
+					providerInboxId: inboxId,
+					direction: 'inbound',
+					companyId: companyMap.get('tancaments-garraf')!,
+					contactId: contactMap.get('Ramon Vila'),
+					recipients: JSON.stringify(['dev@forja.cat']),
+					status: 'delivered',
+					inboundClassification: 'normal',
+					statusUpdatedAt: new Date('2026-03-19T14:30:00Z'),
+				},
+				{
+					provider: 'agentmail',
+					providerMessageId: amMessageId('tancaments03'),
+					providerThreadId: amThreadId('tancaments01'),
+					providerInboxId: inboxId,
+					direction: 'outbound',
+					companyId: companyMap.get('tancaments-garraf')!,
+					contactId: contactMap.get('Ramon Vila'),
+					recipients: JSON.stringify(['ramon@tancamentsgarraf.cat']),
+					status: 'delivered',
+					inboundClassification: null,
+					statusUpdatedAt: new Date('2026-03-20T10:00:00Z'),
+				},
+				// Inbound spam — unsolicited pitch, flagged by AgentMail
+				{
+					provider: 'agentmail',
+					providerMessageId: amMessageId('spamreject01'),
+					providerThreadId: amThreadId('spamreject'),
+					providerInboxId: inboxId,
+					direction: 'inbound',
+					companyId: null,
+					contactId: null,
+					recipients: JSON.stringify(['info@engranatge.com']),
+					status: 'delivered',
+					inboundClassification: 'spam',
+					statusUpdatedAt: new Date('2026-04-11T02:14:00Z'),
+				},
+				// Inbound from blocked sender — AgentMail block list match
+				{
+					provider: 'agentmail',
+					providerMessageId: amMessageId('blocklist01'),
+					providerThreadId: amThreadId('blocklist'),
+					providerInboxId: inboxId,
+					direction: 'inbound',
+					companyId: null,
+					contactId: null,
+					recipients: JSON.stringify(['info@engranatge.com']),
+					status: 'delivered',
+					inboundClassification: 'blocked',
+					statusUpdatedAt: new Date('2026-04-12T03:47:00Z'),
+				},
+			]
+			yield* sql`INSERT INTO email_messages ${sql.insert(normalizeRows(emailMessageRows))}`
+			yield* Effect.logInfo(
+				`  ${emailThreadRows.length} threads, ${emailMessageRows.length} messages`,
+			)
+
+			// 10. Research runs + sources
+			yield* Effect.logInfo('Seeding research runs & sources...')
+			const researchRunRows = [
+				{
+					kind: 'leaf',
+					query:
+						'restaurants in Vilanova i la Geltrú looking for online booking',
+					mode: 'deep',
+					status: 'succeeded',
+					context: JSON.stringify({
+						industry: 'restauració',
+						region: 'garraf',
+					}),
+					findings: JSON.stringify({
+						summary: 'Found 12 restaurants, 3 already have booking systems.',
+						prospects: ['cal-pep-fonda', 'forn-de-pa-queralt'],
+					}),
+					briefMd:
+						'## Results\nFound 12 restaurants in Vilanova. 3 already have online booking (TheFork, ElTenedor). 9 are phone-only — strong opportunity.\n\n### Top prospects\n1. Cal Pep Fonda — 60 covers, no web\n2. Forn de Pa Queralt — artisan bakery, Instagram only',
+					budgetCents: 50,
+					costCents: 35,
+					tokensIn: 12400,
+					tokensOut: 3200,
+					createdBy: testUser?.id ?? 'seed',
+					startedAt: new Date('2026-02-08T10:00:00Z'),
+					completedAt: new Date('2026-02-08T10:02:30Z'),
+				},
+				{
+					kind: 'leaf',
+					query: 'industrial companies Baix Llobregat manual invoicing',
+					mode: 'quick',
+					status: 'failed',
+					context: JSON.stringify({
+						industry: 'manufactura',
+						region: 'baix-llobregat',
+					}),
+					findings: JSON.stringify({}),
+					briefMd: null,
+					budgetCents: 30,
+					costCents: 12,
+					tokensIn: 4500,
+					tokensOut: 800,
+					createdBy: testUser?.id ?? 'seed',
+					startedAt: new Date('2026-03-01T14:00:00Z'),
+					completedAt: new Date('2026-03-01T14:00:45Z'),
+				},
+				{
+					kind: 'leaf',
+					query: 'ecommerce platforms for small retail in Barcelona',
+					mode: 'deep',
+					status: 'queued',
+					context: JSON.stringify({ industry: 'retail', region: 'barcelona' }),
+					findings: JSON.stringify({}),
+					budgetCents: 50,
+					costCents: 0,
+					tokensIn: 0,
+					tokensOut: 0,
+					createdBy: testUser?.id ?? 'seed',
+				},
+				{
+					kind: 'leaf',
+					query: 'logistics digitisation companies Maresme',
+					mode: 'deep',
+					status: 'running',
+					context: JSON.stringify({ industry: 'transport', region: 'maresme' }),
+					findings: JSON.stringify({}),
+					budgetCents: 40,
+					costCents: 18,
+					tokensIn: 8000,
+					tokensOut: 0,
+					createdBy: testUser?.id ?? 'seed',
+					startedAt: new Date('2026-04-12T09:00:00Z'),
+				},
+				{
+					kind: 'leaf',
+					query: 'hostaleria Pirineu reserves directes',
+					mode: 'quick',
+					status: 'cancelled',
+					context: JSON.stringify({
+						industry: 'hostaleria',
+						region: 'pirineu',
+					}),
+					findings: JSON.stringify({}),
+					budgetCents: 20,
+					costCents: 5,
+					tokensIn: 2000,
+					tokensOut: 400,
+					createdBy: testUser?.id ?? 'seed',
+					startedAt: new Date('2026-03-08T11:00:00Z'),
+					completedAt: new Date('2026-03-08T11:00:20Z'),
+				},
+				{
+					kind: 'leaf',
+					query: 'ceramics ecommerce La Bisbal',
+					mode: 'deep',
+					status: 'deleted',
+					context: JSON.stringify({ industry: 'manufactura' }),
+					findings: JSON.stringify({}),
+					budgetCents: 30,
+					costCents: 0,
+					tokensIn: 0,
+					tokensOut: 0,
+					createdBy: testUser?.id ?? 'seed',
+				},
+			]
+			const insertedRuns = yield* sql<{
+				id: string
+				status: string
+			}>`INSERT INTO research_runs ${sql.insert(normalizeRows(researchRunRows))} RETURNING id, status`
+			yield* Effect.logInfo(`  ${insertedRuns.length} research runs`)
+
+			// Group run with children
+			const groupRun = yield* sql<{
+				id: string
+			}>`INSERT INTO research_runs ${sql.insert([
+				{
+					kind: 'group',
+					query: 'Full market scan: small businesses in Catalonia',
+					mode: 'deep',
+					status: 'succeeded',
+					context: JSON.stringify({ scope: 'catalonia' }),
+					findings: JSON.stringify({ childCount: 2 }),
+					briefMd:
+						'## Market scan\nGrouped 2 sub-queries covering restaurants and retail in Catalonia.',
+					budgetCents: 100,
+					costCents: 47,
+					tokensIn: 16900,
+					tokensOut: 4000,
+					createdBy: testUser?.id ?? 'seed',
+					startedAt: new Date('2026-02-05T09:00:00Z'),
+					completedAt: new Date('2026-02-05T09:05:00Z'),
+				},
+			])} RETURNING id`
+			yield* sql`INSERT INTO research_runs ${sql.insert(
+				normalizeRows([
+					{
+						parentId: groupRun[0]!.id,
+						kind: 'leaf',
+						query: 'restaurants Catalonia without websites',
+						mode: 'deep',
+						status: 'succeeded',
+						findings: JSON.stringify({ count: 45 }),
+						briefMd:
+							'Found 45 restaurants in Catalonia without a website or with outdated sites.',
+						budgetCents: 50,
+						costCents: 25,
+						tokensIn: 9000,
+						tokensOut: 2200,
+						createdBy: testUser?.id ?? 'seed',
+						startedAt: new Date('2026-02-05T09:00:30Z'),
+						completedAt: new Date('2026-02-05T09:03:00Z'),
+					},
+					{
+						parentId: groupRun[0]!.id,
+						kind: 'followup',
+						query: 'retail shops Barcelona Instagram-only',
+						mode: 'deep',
+						status: 'succeeded',
+						findings: JSON.stringify({ count: 18 }),
+						briefMd:
+							'Found 18 retail shops in Barcelona selling only via Instagram DM.',
+						budgetCents: 50,
+						costCents: 22,
+						tokensIn: 7900,
+						tokensOut: 1800,
+						createdBy: testUser?.id ?? 'seed',
+						startedAt: new Date('2026-02-05T09:03:00Z'),
+						completedAt: new Date('2026-02-05T09:05:00Z'),
+					},
+				]),
+			)}`
+			yield* Effect.logInfo('  + 1 group with 2 children')
+
+			// Sources
+			yield* Effect.logInfo('Seeding sources...')
+			yield* sql`INSERT INTO sources ${sql.insert(
+				normalizeRows([
+					{
+						id: 'src_firecrawl_001',
+						kind: 'web',
+						provider: 'firecrawl',
+						url: 'https://calpepfonda.cat',
+						urlHash: 'fc_hash_001',
+						domain: 'calpepfonda.cat',
+						title: 'Cal Pep Fonda — Restaurant a Vilanova',
+						language: 'ca',
+						contentHash: 'sha256_aabbcc001',
+						contentRef: 'sources/fc_001.md',
+					},
+					{
+						id: 'src_exa_001',
+						kind: 'web',
+						provider: 'exa',
+						url: 'https://coastalfreight.es/about',
+						urlHash: 'exa_hash_001',
+						domain: 'coastalfreight.es',
+						title: 'Coastal Freight — About Us',
+						language: 'en',
+						contentHash: 'sha256_ddeeff001',
+						contentRef: 'sources/exa_001.md',
+					},
+					{
+						id: 'src_firecrawl_002',
+						kind: 'web',
+						provider: 'firecrawl',
+						url: 'https://ceramiquesemporda.cat/taller',
+						urlHash: 'fc_hash_002',
+						domain: 'ceramiquesemporda.cat',
+						title: 'Ceràmiques Empordà — El Taller',
+						language: 'ca',
+						contentHash: 'sha256_112233001',
+						contentRef: 'sources/fc_002.md',
+					},
+					{
+						id: 'src_registry_001',
+						kind: 'registry',
+						provider: 'libreborme',
+						url: 'https://libreborme.net/borme/empresa/ferros-baix-llobregat/',
+						urlHash: 'reg_hash_001',
+						domain: 'libreborme.net',
+						title: 'Ferros Baix Llobregat SL — libreBORME',
+						language: 'es',
+						contentHash: 'sha256_445566001',
+						contentRef: 'sources/reg_001.json',
+					},
+					{
+						id: 'src_report_001',
+						kind: 'report',
+						provider: 'einforma',
+						url: 'https://einforma.com/reports/ferros-bl-basic',
+						urlHash: 'rep_hash_001',
+						domain: 'einforma.com',
+						title: 'Basic report — Ferros BL',
+						language: 'es',
+						contentHash: 'sha256_778899001',
+						contentRef: 'sources/rep_001.json',
+					},
+					{
+						id: 'src_archive_001',
+						kind: 'archive',
+						provider: 'wayback',
+						url: 'https://web.archive.org/web/2024/https://tancamentsgarraf.cat',
+						urlHash: 'arc_hash_001',
+						domain: 'web.archive.org',
+						title: 'Archived — Tancaments Garraf (2024)',
+						language: 'ca',
+						contentHash: 'sha256_aabb11001',
+						contentRef: 'sources/arc_001.html',
+					},
+				]),
+			)}`
+			yield* Effect.logInfo('  6 sources')
+
+			// Provider quotas + usage
+			if (testUser) {
+				yield* Effect.logInfo('Seeding provider quotas & usage...')
+				yield* sql`INSERT INTO provider_quotas ${sql.insert(
+					normalizeRows([
+						{
+							userId: testUser.id,
+							provider: 'firecrawl',
+							billingModel: 'monthly_plan',
+							syncMode: 'api',
+							quotaTotal: 500,
+							quotaUnit: 'credits',
+							periodMonths: 1,
+							periodAnchor: '2026-04-01',
+							centsPerUnit: 0,
+							warnAtPct: 80,
+						},
+						{
+							userId: testUser.id,
+							provider: 'exa',
+							billingModel: 'monthly_plan',
+							syncMode: 'api',
+							quotaTotal: 1000,
+							quotaUnit: 'searches',
+							periodMonths: 1,
+							periodAnchor: '2026-04-01',
+							centsPerUnit: 0,
+							warnAtPct: 80,
+						},
+						{
+							userId: testUser.id,
+							provider: 'einforma',
+							billingModel: 'pay_per_call',
+							syncMode: 'manual',
+							quotaTotal: 10,
+							quotaUnit: 'reports',
+							periodMonths: 1,
+							periodAnchor: '2026-04-01',
+							centsPerUnit: 150,
+							warnAtPct: 90,
+						},
+					]),
+				)}`
+				yield* sql`INSERT INTO provider_usage ${sql.insert(
+					normalizeRows([
+						{
+							userId: testUser.id,
+							provider: 'firecrawl',
+							periodStart: '2026-04-01',
+							unitsConsumed: 387,
+						},
+						{
+							userId: testUser.id,
+							provider: 'exa',
+							periodStart: '2026-04-01',
+							unitsConsumed: 142,
+						},
+						{
+							userId: testUser.id,
+							provider: 'exa',
+							periodStart: '2026-03-01',
+							unitsConsumed: 890,
+						},
+						{
+							userId: testUser.id,
+							provider: 'einforma',
+							periodStart: '2026-04-01',
+							unitsConsumed: 1,
+						},
+					]),
+				)}`
+				yield* Effect.logInfo('  3 quotas, 4 usage rows')
+			}
+
+			// Call recordings — mix of MinIO-uploaded + missing/deleted so the UI
+			// exercises both "playable" and "file gone" paths. interaction_id is
+			// UNIQUE, so we can only attach one recording per interaction; we
+			// target the 6 phone/visit interactions seeded above.
+			yield* Effect.logInfo('Seeding call recordings...')
+			const phoneVisitRows = yield* sql<{
+				id: string
+				subject: string | null
+			}>`SELECT id, subject FROM interactions WHERE channel IN ('phone', 'visit')`
+			const idBySubject = new Map<string, string>()
+			for (const row of phoneVisitRows) {
+				if (row.subject) idBySubject.set(row.subject, row.id)
+			}
+
+			const storageEndpoint = yield* Config.string('STORAGE_ENDPOINT')
+			const storageRegion = yield* Config.string('STORAGE_REGION')
+			const storageAccessKeyId = yield* Config.string('STORAGE_ACCESS_KEY_ID')
+			const storageSecretAccessKey = yield* Config.redacted(
+				'STORAGE_SECRET_ACCESS_KEY',
+			)
+			const storageBucket = yield* Config.string('STORAGE_BUCKET')
+			const s3 = new S3Client({
+				endpoint: storageEndpoint,
+				region: storageRegion,
+				credentials: {
+					accessKeyId: storageAccessKeyId,
+					secretAccessKey: Redacted.value(storageSecretAccessKey),
+				},
+				forcePathStyle: true,
+			})
+			const wavBody = silentWav(0.1)
+
+			type RecordingSpec = {
+				subject: string
+				companySlug: string
+				upload: boolean
+				durationSec: number
+				transcriptStatus?: 'pending' | 'done' | 'failed'
+				transcriptText?: string
+				transcriptError?: string
+				transcriptSegments?: unknown
+				detectedLanguages?: unknown
+				transcribedAt?: Date
+				provider?: string
+				providerRequestId?: string
+				callerSpeakerId?: string
+				deletedAt?: Date
+			}
+
+			const recordingSpecs: RecordingSpec[] = [
+				// Uploaded, transcription not attempted (transcript_status = null).
+				{
+					subject: 'Visita al restaurant',
+					companySlug: 'cal-pep-fonda',
+					upload: true,
+					durationSec: 240,
+				},
+				// Uploaded, transcription done with full text + language detected.
+				{
+					subject: 'Trucada amb gerent',
+					companySlug: 'ferros-baix-llobregat',
+					upload: true,
+					durationSec: 1820,
+					transcriptStatus: 'done',
+					transcriptText:
+						"Jordi Puig: Bon dia, gràcies per la trucada.\nComercial: Bon dia Jordi, tenim la proposta que comentàvem la setmana passada. Volia confirmar que les dates encaixen.\nJordi: Sí, d'acord, podem començar al maig.",
+					transcribedAt: new Date('2026-03-15T10:42:00Z'),
+					provider: 'whisper-large-v3',
+					providerRequestId: 'wh_req_ferros_001',
+					detectedLanguages: { primary: 'ca', confidence: 0.97 },
+				},
+				// Missing file, transcription stuck pending (the provider never
+				// completed — exercises the "still working" spinner path).
+				{
+					subject: "Visita a l'hostal",
+					companySlug: 'hostal-pirineu',
+					upload: false,
+					durationSec: 2700,
+					transcriptStatus: 'pending',
+					provider: 'whisper-large-v3',
+					providerRequestId: 'wh_req_hostal_pending',
+				},
+				// Missing file, transcription failed with a provider error.
+				{
+					subject: 'Inbound call',
+					companySlug: 'coastal-freight',
+					upload: false,
+					durationSec: 180,
+					transcriptStatus: 'failed',
+					transcriptError:
+						'audio too quiet to transcribe (SNR < 3 dB on primary channel)',
+					provider: 'whisper-large-v3',
+					providerRequestId: 'wh_req_coastal_001',
+				},
+				// GDPR soft-delete — audio file purged, metadata kept for audit.
+				{
+					subject: 'Demo presencial a Sitges',
+					companySlug: 'tancaments-garraf',
+					upload: false,
+					durationSec: 7200,
+					deletedAt: new Date('2026-04-05T00:00:00Z'),
+				},
+				// Uploaded, transcription done with diarized segments + multi-lang.
+				{
+					subject: 'Seguiment post-demo',
+					companySlug: 'hostal-pirineu',
+					upload: true,
+					durationSec: 1480,
+					transcriptStatus: 'done',
+					transcriptText:
+						'Comercial: Hola Arnau, com ha anat la prova amb el personal?\nArnau Ribas: Bé, molt bé. A veure, té moltes funcions, ens anirà bé.',
+					transcribedAt: new Date('2026-04-05T15:30:00Z'),
+					provider: 'whisper-large-v3',
+					providerRequestId: 'wh_req_hostal_002',
+					callerSpeakerId: 'speaker_0',
+					detectedLanguages: {
+						primary: 'ca',
+						secondary: 'es',
+						confidence: 0.92,
+					},
+					transcriptSegments: [
+						{
+							start: 0,
+							end: 3.2,
+							speaker: 'speaker_0',
+							text: 'Hola Arnau, com ha anat la prova amb el personal?',
+						},
+						{
+							start: 3.2,
+							end: 8.5,
+							speaker: 'speaker_1',
+							text: 'Bé, molt bé. A veure, té moltes funcions, ens anirà bé.',
+						},
+					],
+				},
+			]
+
+			const recordingRows: Array<Record<string, unknown>> = []
+			let uploadedCount = 0
+			for (const spec of recordingSpecs) {
+				const interactionId = idBySubject.get(spec.subject)
+				if (!interactionId) continue
+				const companyId = companyMap.get(spec.companySlug)!
+				const storageKey = `recordings/${companyId}/${randomUUID()}.wav`
+				if (spec.upload) {
+					yield* Effect.tryPromise(() =>
+						s3.send(
+							new PutObjectCommand({
+								Bucket: storageBucket,
+								Key: storageKey,
+								Body: wavBody,
+								ContentType: 'audio/wav',
+								ContentLength: wavBody.byteLength,
+							}),
+						),
+					)
+					uploadedCount += 1
+				}
+				recordingRows.push({
+					interactionId,
+					storageKey,
+					mimeType: 'audio/wav',
+					byteSize: wavBody.byteLength,
+					durationSec: spec.durationSec,
+					transcriptStatus: spec.transcriptStatus ?? null,
+					transcriptText: spec.transcriptText ?? null,
+					transcriptError: spec.transcriptError ?? null,
+					transcriptSegments:
+						spec.transcriptSegments != null
+							? JSON.stringify(spec.transcriptSegments)
+							: null,
+					detectedLanguages:
+						spec.detectedLanguages != null
+							? JSON.stringify(spec.detectedLanguages)
+							: null,
+					transcribedAt: spec.transcribedAt ?? null,
+					provider: spec.provider ?? null,
+					providerRequestId: spec.providerRequestId ?? null,
+					callerSpeakerId: spec.callerSpeakerId ?? null,
+					deletedAt: spec.deletedAt ?? null,
+				})
+			}
+
+			if (recordingRows.length > 0) {
+				yield* sql`INSERT INTO call_recordings ${sql.insert(
+					normalizeRows(recordingRows),
+				)}`
+				yield* Effect.logInfo(
+					`  ${recordingRows.length} recordings (${uploadedCount} uploaded, ${recordingRows.length - uploadedCount} missing/deleted)`,
+				)
+			}
 		}
 
 		const counts = {
@@ -894,9 +2699,14 @@ export const seed = (preset: Preset) =>
 			interactions: insertedInteractions.length,
 			tasks: insertedTasks.length,
 			researchPolicy: testUser ? 1 : 0,
-			documents: preset === 'full' ? 4 : 0,
-			proposals: preset === 'full' ? 2 : 0,
-			pages: preset === 'full' ? 2 : 0,
+			documents: preset === 'full' ? 6 : 0,
+			proposals: preset === 'full' ? 7 : 0,
+			pages: preset === 'full' ? 14 : 0,
+			emailThreads: preset === 'full' ? 12 : 0,
+			emailMessages: preset === 'full' ? 16 : 0,
+			researchRuns: preset === 'full' ? 9 : 0,
+			sources: preset === 'full' ? 6 : 0,
+			callRecordings: preset === 'full' ? 6 : 0,
 		}
 
 		yield* Effect.logInfo('Seed complete!')

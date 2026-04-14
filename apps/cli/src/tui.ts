@@ -1,6 +1,6 @@
 import * as p from '@clack/prompts'
 import { NodeRuntime, NodeServices } from '@effect/platform-node'
-import { Effect } from 'effect'
+import { Cause, Effect } from 'effect'
 import pc from 'picocolors'
 
 import { authCreateKey } from './commands/auth'
@@ -19,9 +19,28 @@ import { servicesDown, servicesStatus, servicesUp } from './commands/services'
 import { appendEnvKeys, resetEnvFile, setup } from './commands/setup'
 import { withDb } from './db'
 import { getTarget, loadEnv } from './lib/load-env'
+import { recoveryHint } from './lib/recovery-hint'
 
 // Populate process.env + resolve --env before any Effect Config reads.
 loadEnv()
+
+// ── Error recovery ────────────────────────────────────────
+
+const withRecovery = <A, E, R>(
+	effect: Effect.Effect<A, E, R>,
+): Effect.Effect<void, E, R> =>
+	effect.pipe(
+		Effect.catchCause((cause: Cause.Cause<E>) => {
+			const error = Cause.squash(cause)
+			const hint = recoveryHint(error)
+			const message = error instanceof Error ? error.message : String(error)
+			p.log.error(
+				hint ? `${message}\n\n  ${pc.yellow('Hint:')} ${hint}` : message,
+			)
+			return Effect.void
+		}),
+		Effect.asVoid,
+	)
 
 // ── TUI ────────────────────────────────────────────────────
 
@@ -162,27 +181,30 @@ const tui = Effect.gen(function* () {
 			}
 
 			case 'seed': {
-				yield* withDb(
-					Effect.gen(function* () {
-						const s = p.spinner()
-						s.start('Inserting data...')
-						const counts = yield* seed('full')
-						s.stop('Seed complete!')
+				yield* withRecovery(
+					withDb(
+						Effect.gen(function* () {
+							const s = p.spinner()
+							s.start('Inserting data...')
+							const counts = yield* seed('full')
+							s.stop('Seed complete!')
 
-						p.note(
-							[
-								`${pc.cyan(String(counts.products))} products`,
-								`${pc.cyan(String(counts.companies))} companies`,
-								`${pc.cyan(String(counts.contacts))} contacts`,
-								`${pc.cyan(String(counts.interactions))} interactions`,
-								`${pc.cyan(String(counts.tasks))} tasks`,
-								`${pc.cyan(String(counts.documents))} documents`,
-								`${pc.cyan(String(counts.proposals))} proposals`,
-								`${pc.cyan(String(counts.pages))} pages`,
-							].join('\n'),
-							'Summary',
-						)
-					}),
+							p.note(
+								[
+									`${pc.cyan(String(counts.products))} products`,
+									`${pc.cyan(String(counts.companies))} companies`,
+									`${pc.cyan(String(counts.contacts))} contacts`,
+									`${pc.cyan(String(counts.interactions))} interactions`,
+									`${pc.cyan(String(counts.tasks))} tasks`,
+									`${pc.cyan(String(counts.documents))} documents`,
+									`${pc.cyan(String(counts.proposals))} proposals`,
+									`${pc.cyan(String(counts.pages))} pages`,
+									`${pc.cyan(String(counts.callRecordings))} call recordings`,
+								].join('\n'),
+								'Summary',
+							)
+						}),
+					),
 				)
 				break
 			}
@@ -212,10 +234,14 @@ const tui = Effect.gen(function* () {
 
 				switch (action) {
 					case 'migrate': {
-						const s = p.spinner()
-						s.start('Running migrations...')
-						yield* dbMigrate
-						s.stop('Migrations complete!')
+						yield* withRecovery(
+							Effect.gen(function* () {
+								const s = p.spinner()
+								s.start('Running migrations...')
+								yield* dbMigrate
+								s.stop('Migrations complete!')
+							}),
+						)
 						break
 					}
 					case 'reset': {
@@ -228,10 +254,14 @@ const tui = Effect.gen(function* () {
 						if (p.isCancel(confirm) || !confirm) {
 							continue mainLoop
 						}
-						const s = p.spinner()
-						s.start('Resetting database...')
-						yield* withDb(dbReset)
-						s.stop('Database reset!')
+						yield* withRecovery(
+							Effect.gen(function* () {
+								const s = p.spinner()
+								s.start('Resetting database...')
+								yield* withDb(dbReset)
+								s.stop('Database reset!')
+							}),
+						)
 						break
 					}
 				}
@@ -268,13 +298,13 @@ const tui = Effect.gen(function* () {
 
 				switch (action) {
 					case 'up':
-						yield* servicesUp
+						yield* withRecovery(servicesUp)
 						break
 					case 'down':
-						yield* servicesDown
+						yield* withRecovery(servicesDown)
 						break
 					case 'status':
-						yield* servicesStatus
+						yield* withRecovery(servicesStatus)
 						break
 				}
 				break
@@ -369,7 +399,7 @@ const tui = Effect.gen(function* () {
 						if (p.isCancel(password)) {
 							continue mainLoop
 						}
-						yield* authBootstrap({ email, name, password })
+						yield* withRecovery(authBootstrap({ email, name, password }))
 						break
 					}
 					case 'invite': {
@@ -405,11 +435,11 @@ const tui = Effect.gen(function* () {
 						if (p.isCancel(role)) {
 							continue mainLoop
 						}
-						yield* authInvite({ email, name, role })
+						yield* withRecovery(authInvite({ email, name, role }))
 						break
 					}
 					case 'list-users': {
-						yield* authListUsers
+						yield* withRecovery(authListUsers)
 						break
 					}
 					case 'list-keys': {
@@ -442,7 +472,7 @@ const tui = Effect.gen(function* () {
 							}
 							email = input
 						}
-						yield* authListKeys({ email })
+						yield* withRecovery(authListKeys({ email }))
 						break
 					}
 					case 'create-key': {
@@ -476,12 +506,14 @@ const tui = Effect.gen(function* () {
 						if (p.isCancel(prefix)) {
 							continue mainLoop
 						}
-						yield* authCreateKey({
-							email,
-							name,
-							prefix,
-							expiresIn: undefined,
-						})
+						yield* withRecovery(
+							authCreateKey({
+								email,
+								name,
+								prefix,
+								expiresIn: undefined,
+							}),
+						)
 						break
 					}
 					case 'promote': {
@@ -508,7 +540,7 @@ const tui = Effect.gen(function* () {
 						if (p.isCancel(role)) {
 							continue mainLoop
 						}
-						yield* authPromote({ email, role })
+						yield* withRecovery(authPromote({ email, role }))
 						break
 					}
 					case 'revoke-key': {
@@ -521,7 +553,7 @@ const tui = Effect.gen(function* () {
 						if (p.isCancel(keyId)) {
 							continue mainLoop
 						}
-						yield* authRevokeKey({ keyId })
+						yield* withRecovery(authRevokeKey({ keyId }))
 						break
 					}
 					case 'reset-password': {
@@ -545,7 +577,7 @@ const tui = Effect.gen(function* () {
 						if (p.isCancel(password)) {
 							continue mainLoop
 						}
-						yield* authResetPassword({ email, password })
+						yield* withRecovery(authResetPassword({ email, password }))
 						break
 					}
 					case 'sessions': {
@@ -578,7 +610,7 @@ const tui = Effect.gen(function* () {
 							}
 							email = input
 						}
-						yield* authSessions({ email })
+						yield* withRecovery(authSessions({ email }))
 						break
 					}
 				}
