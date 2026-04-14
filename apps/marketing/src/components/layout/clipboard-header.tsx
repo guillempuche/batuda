@@ -1,6 +1,8 @@
-import { Link } from '@tanstack/react-router'
+import { createLink } from '@tanstack/react-router'
 import { Cog } from 'lucide-react'
 import styled from 'styled-components'
+
+import { useLang } from '#/i18n/lang-provider'
 
 /* Compact metal plate pinned to the pegboard — phone only.
  * Matches desktop LogoPlate: small plate, not a full-width bar. */
@@ -17,7 +19,7 @@ const PlateWrapper = styled.header.withConfig({
 	}
 `
 
-const Plate = styled(Link)`
+const PlateAnchor = styled.a`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -47,10 +49,13 @@ const Plate = styled(Link)`
 	}
 `
 
+const Plate = createLink(PlateAnchor)
+
 export function ClipboardHeader() {
+	const lang = useLang()
 	return (
 		<PlateWrapper>
-			<Plate to='/' hash='hero'>
+			<Plate to='/$lang' params={{ lang }} hash='hero'>
 				<Cog size={16} />
 				Engranatge
 			</Plate>

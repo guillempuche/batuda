@@ -1,9 +1,9 @@
-import { Link } from '@tanstack/react-router'
+import { createLink } from '@tanstack/react-router'
 import type { LucideIcon } from 'lucide-react'
 import { Gauge, MessageCircle, Receipt, Wrench } from 'lucide-react'
 import styled from 'styled-components'
 
-import { useTranslations } from '#/i18n/lang-provider'
+import { useLang, useTranslations } from '#/i18n/lang-provider'
 import { useActiveSection } from './active-section-context'
 import { MachineButton, type NavTarget } from './machine-button'
 
@@ -33,17 +33,6 @@ const Belt = styled.nav.withConfig({ displayName: 'ToolBelt' })`
 	}
 `
 
-const SlotLink = styled(Link)`
-	text-decoration: none;
-	display: flex;
-	border-radius: var(--shape-full);
-
-	&:focus-visible {
-		outline: 2px solid var(--color-primary);
-		outline-offset: 4px;
-	}
-`
-
 const SlotAnchor = styled.a`
 	text-decoration: none;
 	display: flex;
@@ -55,6 +44,8 @@ const SlotAnchor = styled.a`
 	}
 `
 
+const SlotLink = createLink(SlotAnchor)
+
 interface TabDef {
 	icon: LucideIcon
 	target: NavTarget
@@ -65,6 +56,7 @@ interface TabDef {
 export function ToolBelt() {
 	const activeSection = useActiveSection()
 	const t = useTranslations()
+	const lang = useLang()
 
 	const tabs: TabDef[] = [
 		{ icon: Gauge, target: 'hero', label: t.nav.home },
@@ -98,7 +90,12 @@ export function ToolBelt() {
 				}
 
 				return (
-					<SlotLink key={tab.target} to='/' hash={tab.target}>
+					<SlotLink
+						key={tab.target}
+						to='/$lang'
+						params={{ lang }}
+						hash={tab.target}
+					>
 						{button}
 					</SlotLink>
 				)

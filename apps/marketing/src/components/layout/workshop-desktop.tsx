@@ -1,8 +1,8 @@
-import { Link } from '@tanstack/react-router'
+import { createLink } from '@tanstack/react-router'
 import { Cog, Gauge, MessageCircle, Receipt, Wrench } from 'lucide-react'
 import styled from 'styled-components'
 
-import { useTranslations } from '#/i18n/lang-provider'
+import { useLang, useTranslations } from '#/i18n/lang-provider'
 import { BlueprintSheet } from './blueprint-sheet'
 import { FooterStampContent } from './footer-stamp'
 import { LanguageSelect } from './language-select'
@@ -102,7 +102,7 @@ const FooterPlate = styled.div.withConfig({ displayName: 'FooterPlate' })`
 `
 
 /* Metal plate stamped onto the pegboard wall */
-const LogoPlate = styled(Link).withConfig({ displayName: 'LogoPlate' })`
+const LogoPlateAnchor = styled.a.withConfig({ displayName: 'LogoPlate' })`
 	display: none;
 
 	@media (min-width: 768px) {
@@ -131,14 +131,17 @@ const LogoPlate = styled(Link).withConfig({ displayName: 'LogoPlate' })`
 	}
 `
 
+const LogoPlate = createLink(LogoPlateAnchor)
+
 export function WorkshopDesktop({ children }: { children: React.ReactNode }) {
 	const t = useTranslations()
+	const lang = useLang()
 
 	return (
 		<Layout>
 			<Main>
 				<IconColumn>
-					<LogoPlate to='/' hash='hero'>
+					<LogoPlate to='/$lang' params={{ lang }} hash='hero'>
 						<Cog size={14} />
 						Engranatge
 					</LogoPlate>

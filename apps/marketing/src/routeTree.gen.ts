@@ -9,38 +9,72 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LangRouteRouteImport } from './routes/$lang/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LangIndexRouteImport } from './routes/$lang/index'
+import { Route as LangSplatRouteImport } from './routes/$lang/$'
 
+const LangRouteRoute = LangRouteRouteImport.update({
+  id: '/$lang',
+  path: '/$lang',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LangIndexRoute = LangIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => LangRouteRoute,
+} as any)
+const LangSplatRoute = LangSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
+  getParentRoute: () => LangRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/$lang': typeof LangRouteRouteWithChildren
+  '/$lang/$': typeof LangSplatRoute
+  '/$lang/': typeof LangIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/$lang/$': typeof LangSplatRoute
+  '/$lang': typeof LangIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/$lang': typeof LangRouteRouteWithChildren
+  '/$lang/$': typeof LangSplatRoute
+  '/$lang/': typeof LangIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/$lang' | '/$lang/$' | '/$lang/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/$lang/$' | '/$lang'
+  id: '__root__' | '/' | '/$lang' | '/$lang/$' | '/$lang/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LangRouteRoute: typeof LangRouteRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/$lang': {
+      id: '/$lang'
+      path: '/$lang'
+      fullPath: '/$lang'
+      preLoaderRoute: typeof LangRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +82,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/$lang/': {
+      id: '/$lang/'
+      path: '/'
+      fullPath: '/$lang/'
+      preLoaderRoute: typeof LangIndexRouteImport
+      parentRoute: typeof LangRouteRoute
+    }
+    '/$lang/$': {
+      id: '/$lang/$'
+      path: '/$'
+      fullPath: '/$lang/$'
+      preLoaderRoute: typeof LangSplatRouteImport
+      parentRoute: typeof LangRouteRoute
+    }
   }
 }
 
+interface LangRouteRouteChildren {
+  LangSplatRoute: typeof LangSplatRoute
+  LangIndexRoute: typeof LangIndexRoute
+}
+
+const LangRouteRouteChildren: LangRouteRouteChildren = {
+  LangSplatRoute: LangSplatRoute,
+  LangIndexRoute: LangIndexRoute,
+}
+
+const LangRouteRouteWithChildren = LangRouteRoute._addFileChildren(
+  LangRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LangRouteRoute: LangRouteRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -1,15 +1,15 @@
-import { createContext, use, useCallback, useEffect, useState } from 'react'
+import { useRouter } from '@tanstack/react-router'
+import { createContext, use, useCallback, useEffect } from 'react'
 
+import { writeStoredLang } from './detect-lang'
 import {
 	defaultLang,
 	htmlLang,
+	isLangCode,
 	type LangCode,
 	type Locale,
-	langCodes,
 	locales,
 } from './index'
-
-const STORAGE_KEY = 'engranatge.lang'
 
 type LangContextValue = {
 	lang: LangCode
@@ -21,89 +21,47 @@ const LangContext = createContext<LangContextValue>({
 	setLang: () => {},
 })
 
-function isLangCode(value: unknown): value is LangCode {
-	return (
-		typeof value === 'string' &&
-		(langCodes as readonly string[]).includes(value)
-	)
-}
-
-function readStoredLang(): LangCode | null {
-	if (typeof window === 'undefined') return null
-	try {
-		const stored = window.localStorage.getItem(STORAGE_KEY)
-		return isLangCode(stored) ? stored : null
-	} catch {
-		return null
-	}
-}
-
-/* Walk the browser's preferred languages and pick the first one we support.
- * Catalan (any region) → 'ca'. Spanish from Spain or any LATAM country → 'es'.
- * Anything English-ish → 'en'. Returns null if nothing matches so the caller
- * can apply its own fallback. */
-function detectBrowserLang(): LangCode | null {
-	if (typeof navigator === 'undefined') return null
-	const preferred =
-		navigator.languages && navigator.languages.length > 0
-			? navigator.languages
-			: navigator.language
-				? [navigator.language]
-				: []
-
-	for (const tag of preferred) {
-		const base = tag.toLowerCase().split('-')[0]
-		if (base === 'ca') return 'ca'
-		if (base === 'es') return 'es'
-		if (base === 'en') return 'en'
-	}
-	return null
-}
-
 export function LangProvider({
-	lang: initialLang,
+	lang,
 	children,
 }: {
 	lang: LangCode
 	children: React.ReactNode
 }) {
-	const [lang, setLangState] = useState<LangCode>(initialLang)
+	const router = useRouter()
 
-	/* Resolve the user's language on mount. Priority:
-	 *   1. Explicit prior choice in localStorage
-	 *   2. Browser-preferred language (Accept-Language)
-	 *   3. English fallback
-	 * We do this in an effect so the SSR output stays deterministic — the
-	 * server always renders the static `initialLang`, and the client swaps
-	 * to the resolved value during hydration. */
-	// biome-ignore lint/correctness/useExhaustiveDependencies: hydration-only effect; reading `lang` here would re-run on every change and undo user choice
-	useEffect(() => {
-		const stored = readStoredLang()
-		if (stored) {
-			if (stored !== lang) setLangState(stored)
-			return
-		}
-		const detected = detectBrowserLang() ?? 'en'
-		if (detected !== lang) setLangState(detected)
-	}, [])
-
-	/* Keep <html lang> in sync so screen readers and translation tools see
-	 * the same language as the rendered UI. We use the BCP-47 region tag
-	 * (e.g. 'es-ES') so the SSR default and runtime values stay consistent. */
+	/* Keep <html lang> in sync client-side when lang changes via navigation.
+	 * `__root.tsx` already sets this attribute server-side from the URL, so
+	 * this effect is defensive — it catches cases where some imperative code
+	 * updated the attribute directly and would otherwise drift. */
 	useEffect(() => {
 		if (typeof document !== 'undefined') {
 			document.documentElement.lang = htmlLang[lang]
 		}
 	}, [lang])
 
-	const setLang = useCallback((next: LangCode) => {
-		setLangState(next)
-		try {
-			window.localStorage.setItem(STORAGE_KEY, next)
-		} catch {
-			/* localStorage may be unavailable (private mode, quota) — fail silently. */
-		}
-	}, [])
+	const setLang = useCallback(
+		(next: LangCode) => {
+			if (next === lang) return
+			writeStoredLang(next)
+
+			/* We navigate using the internal (canonical) path with the new
+			 * lang segment swapped in. The slug stays as-is because it's
+			 * already canonical English inside `router.state.location`; the
+			 * output rewrite handles localising it back for the browser URL.
+			 * `searchStr` keeps its leading '?' but `hash` is stripped of '#'
+			 * by the router parser, so we re-prefix it before concatenation. */
+			const { pathname, searchStr, hash } = router.state.location
+			const segments = pathname.split('/').filter(Boolean)
+			const rest = isLangCode(segments[0])
+				? segments.slice(1).join('/')
+				: segments.join('/')
+			const nextPath = rest ? `/${next}/${rest}` : `/${next}`
+			const hashStr = hash ? `#${hash}` : ''
+			router.navigate({ href: `${nextPath}${searchStr}${hashStr}` })
+		},
+		[lang, router],
+	)
 
 	return <LangContext value={{ lang, setLang }}>{children}</LangContext>
 }

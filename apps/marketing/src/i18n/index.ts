@@ -20,3 +20,10 @@ export const htmlLang: Record<LangCode, string> = {
 	es: 'es-ES',
 	en: 'en-US',
 }
+
+export function isLangCode(value: unknown): value is LangCode {
+	return (
+		typeof value === 'string' &&
+		(langCodes as readonly string[]).includes(value)
+	)
+}
