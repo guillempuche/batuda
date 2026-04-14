@@ -16,11 +16,15 @@
  * instantiated — a plain fetch keeps the gate free of Effect runtime.
  */
 
+// Both SSR and client use the same public URL. SSR can reach portless's
+// HTTPS because the dev script sets NODE_EXTRA_CA_CERTS to trust the
+// local CA. In production both hit real TLS with valid certs.
+// TODO(portless): remove NODE_EXTRA_CA_CERTS from the dev script once
+// portless ships vercel-labs/portless#220 (auto-injects it for children).
 const SERVER_URL =
-	(typeof process !== 'undefined' && process.env?.['SERVER_URL']) ||
 	(typeof import.meta !== 'undefined' &&
 		import.meta.env?.['VITE_SERVER_URL']) ||
-	'http://localhost:3010'
+	''
 
 export type SessionUser = {
 	readonly id: string
@@ -40,6 +44,7 @@ export type SessionUser = {
 export async function fetchSession(
 	cookieHeader: string | undefined,
 ): Promise<SessionUser | null> {
+	if (!SERVER_URL) return null // VITE_SERVER_URL must be set
 	try {
 		const headers: Record<string, string> = { accept: 'application/json' }
 		if (cookieHeader) headers['cookie'] = cookieHeader
@@ -60,7 +65,16 @@ export async function fetchSession(
 			email: u.email,
 			name: typeof u.name === 'string' ? u.name : u.email,
 		}
-	} catch {
+	} catch (err) {
+		if (
+			typeof process !== 'undefined' &&
+			process.versions?.node &&
+			err instanceof TypeError
+		) {
+			console.error(
+				'[session-check] SSR fetch failed — if TLS, run: portless trust',
+			)
+		}
 		return null
 	}
 }

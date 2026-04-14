@@ -4,22 +4,15 @@ import { AtomHttpApi } from 'effect/unstable/reactivity'
 
 import { ForjaApi } from '@engranatge/controllers'
 
-/**
- * Browser-side HttpClient Layer for Forja.
- *
- * `FetchHttpClient.layer` reads the `FetchHttpClient.RequestInit` service
- * from fiber services on every call and spreads it into the fetch options
- * (see FetchHttpClient.ts:31). To forward Better-Auth session cookies on
- * every request we merge in a Layer providing `RequestInit` with
- * `credentials: 'include'`. The server's `SessionMiddlewareLive` reads
- * the cookie and populates `SessionContext` — our side does nothing with
- * the cookie directly.
- */
-const ForjaHttpClientLive = Layer.mergeAll(
-	FetchHttpClient.layer,
-	Layer.succeed(FetchHttpClient.RequestInit, {
-		credentials: 'include',
-	} satisfies globalThis.RequestInit),
+// Wrap the native fetch to always include credentials. We override the
+// FetchHttpClient.Fetch reference instead of providing RequestInit
+// because AtomHttpApi.Service prunes unrequired services from the layer
+// — RequestInit never reaches the fiber, but Fetch does (it's a Ref).
+const credentialsFetch: typeof globalThis.fetch = (input, init) =>
+	globalThis.fetch(input, { ...init, credentials: 'include' })
+
+const ForjaHttpClientLive = FetchHttpClient.layer.pipe(
+	Layer.provide(Layer.succeed(FetchHttpClient.Fetch, credentialsFetch)),
 )
 
 /**
