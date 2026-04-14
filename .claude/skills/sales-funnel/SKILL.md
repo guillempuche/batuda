@@ -1,13 +1,15 @@
 ---
 name: sales-funnel
-description: Drafts sales-funnel copy (hero, CTA, landing page, about page, lead magnet, pricing page, email sequence, manifesto, webinar) using Russell Brunson's DotCom / Expert / Traffic Secrets frameworks — Hook-Story-Offer, Epiphany Bridge, Value Ladder, Application Funnel, Attractive Character, New Opportunity vs Improvement Offer, Big Domino, False Belief Patterns, Stack Slide, Hormozi Value Equation, Schwartz awareness levels, Soap Opera Sequence. Use when the user asks to write copy, draft a hero, rewrite the landing page, generate sales copy, write a CTA, write a lead magnet, write the about page, improve the homepage wording, fix the copy on X, or draft an email sequence for any marketing surface. Product-agnostic — loads project-specific context (services catalogue, brand voice, per-language native-voice rules) from the project's docs/ folder before drafting.
-argument-hint: [target-language or "all"]
-allowed-tools: Read Grep Glob Edit Write AskUserQuestion
+description: Drafts, reviews, and advises on sales-funnel copy (hero, CTA, landing page, about page, lead magnet, pricing page, email sequence, manifesto, webinar) using Russell Brunson's DotCom / Expert / Traffic Secrets frameworks — Hook-Story-Offer, Epiphany Bridge, Value Ladder, Application Funnel, Attractive Character, New Opportunity vs Improvement Offer, Big Domino, False Belief Patterns, Stack Slide, Hormozi Value Equation, Schwartz awareness levels, Soap Opera Sequence. Use when the user asks to write copy, draft a hero, rewrite the landing page, generate sales copy, write a CTA, write a lead magnet, write the about page, improve the homepage wording, fix the copy on X, draft an email sequence, OR asks a review/advise question about an existing artefact they present (a markdown doc, an i18n file, a pasted block of copy, a URL) such as "what would you change of X based on Y", "review this landing page", "is this hook strong", "which framework for...". Product-agnostic — loads project-specific context (services catalogue, brand voice, per-language native-voice rules) from the project's docs/ folder before responding.
+argument-hint: [lang (ca|es|en|all) | @path/to/file | https://url | "pasted text or question"]
+allowed-tools: Read Grep Glob Edit Write AskUserQuestion WebFetch
 ---
 
-# Sales Funnel Copywriting
+# Sales Funnel Copywriting, Review, and Advice
 
-Draft high-converting sales copy for any marketing surface using Russell Brunson's frameworks. The skill is **product-agnostic**: framework theory lives in `references/`, and project-specific knowledge (what the project sells, how it talks, which languages it supports) lives in the project's `docs/` folder and is read on demand.
+Draft, review, or advise on high-converting sales copy for any marketing surface using Russell Brunson's frameworks. The skill is **product-agnostic**: framework theory lives in `references/`, and project-specific knowledge (what the project sells, how it talks, which languages it supports) lives in the project's `docs/` folder and is read on demand.
+
+The skill accepts any artefact the user presents — a file path, a pasted block of text, a URL, a doc referenced by `@path` — reads it first, then answers from framework knowledge.
 
 ## Framework reference files
 
@@ -16,6 +18,40 @@ Pick the right file for the surface being drafted. Each file is self-contained, 
 - [`references/dotcom-secrets.md`](references/dotcom-secrets.md) — **landing-page mechanics**: Secret Formula, Hook-Story-Offer, Epiphany Bridge (5 beats), Value Ladder, Application Funnel, common failure modes. Load this for heroes, service detail pages, before/after sections, CTA blocks, and anywhere that needs the Hook-Story-Offer shape.
 - [`references/expert-secrets.md`](references/expert-secrets.md) — **mass movement and offer construction**: Attractive Character (4 elements, 4 archetypes, 6 storylines), Cause, New Opportunity vs Improvement Offer, Big Domino Statement, False Belief Patterns (Vehicle / Internal / External), Hero's Two Journeys, Stack Slide, Hormozi Value Equation, Perfect Webinar, Trial Closes. Load this when the surface is about *who the narrator is* or *how the offer is constructed*: about pages, manifesto pages, pricing pages, webinars, long-form sales letters.
 - [`references/traffic-secrets.md`](references/traffic-secrets.md) — **audience, temperature, and nurture sequences**: 3 Markets, Traffic Temperature (Cold / Warm / Hot), Schwartz 5 Awareness Levels, 3 Traffic Types, Dream 100, Soap Opera Sequence, Seinfeld Sequence, Funnel Hacking. Load this for ads, lead magnets, welcome sequences, daily nurture emails, and any decision about what tone and awareness level to write for.
+
+## Modes
+
+The skill operates in three modes. Pick one from the user's request before doing anything else.
+
+| Mode       | User signal                                                                                                | Output                                                                |
+| ---------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| **Draft**  | "write the hero", "draft a CTA", "generate the about page", "create the lead magnet"                       | New copy in the [Draft output block](#step-8--format-the-output)      |
+| **Review** | "what would you change of X", "review this landing page", "is this hook strong", "audit my copy"           | Diagnosis + 2–3 framework-based revision options, educational framing |
+| **Advise** | "should the hook be X or Y", "which framework for...", "how should I structure...", "what's wrong with..." | 2–3 options with trade-offs, framework citations, recommendation      |
+
+### Reading whatever the user presents
+
+Before responding in any mode, read the artefact the user is asking about. Never answer from the filename alone.
+
+- **File path or `@path` reference** → `Read`. For long files use `offset`/`limit` or `Grep` to extract the relevant sections.
+- **URL** → `WebFetch`. If the fetch fails or returns stripped content, ask the user to paste the relevant text.
+- **Pasted text block** → use as-is, quote lines back when relevant.
+- **Multiple artefacts** (e.g. "update X based on Y") → read all of them in parallel before drawing conclusions.
+
+If the artefact is large, read enough to form a grounded answer; do not skim and guess. If the user references something ambiguously ("the landing page"), use `Glob`/`Grep` to locate the file, or ask once with `AskUserQuestion`.
+
+### Review / Advise workflow
+
+When operating in Review or Advise mode:
+
+1. **Read the artefact(s)** the user presented (per rules above) and the project context docs (`docs/services.md`, `docs/brand-voice.md`, and any project-specific doc the artefact references).
+2. **Identify the surface, funnel stage, dream customer, and awareness level** the artefact is (or should be) targeting — same as [Step 3](#step-3--identify-the-surface-and-the-speaker-register) of the Draft workflow.
+3. **Diagnose against the validation checklist** in [Step 9](#step-9--run-the-validation-checklist). Note which checks pass and which fail, citing the exact line or phrase in the artefact.
+4. **Generate 2–3 options** for any change you recommend. Each option must name the framework it comes from and link to the reference file. Options should represent genuinely different bets (e.g. "lean harder on proof of mechanism" vs "lead with Attractive Character backstory"), not cosmetic variants.
+5. **Explain, don't just prescribe.** For each option, write a one-line "why this works" rooted in the framework. The developer should finish the answer understanding the *framework* better, not just the specific fix.
+6. **Recommend one** option at the end, with the trade-off that decided it. Being non-committal is worse than being wrong — the developer can push back.
+
+Use the [Review/Advise output shape](#review-advise-output-shape) instead of the Draft block.
 
 ## Workflow
 
@@ -37,11 +73,26 @@ Resolution order:
 
 ### Step 2 — Resolve the target language(s)
 
-The skill argument is a language code (e.g. `ca`, `es`, `en`, `de`, `fr`) or the literal `all`.
+The skill argument is free-form. Parse it into one or more of the following, in this order:
 
-- Single code → produce that language only.
-- `all` → produce every language the project supports. Discover supported languages from the per-language section in `docs/brand-voice.md` (or a sibling `docs/language-voice.md`) or from the i18n files (`apps/**/i18n/*.ts`, `locales/*.json`, `public/locales/*`).
-- Missing or ambiguous → ask the developer with `AskUserQuestion`.
+1. **Language code** (`ca`, `es`, `en`, `de`, `fr`, …) or the literal `all` → target language for the output.
+   - Single code → produce that language only.
+   - `all` → produce every language the project supports. Discover supported languages from the per-language section in `docs/brand-voice.md` (or a sibling `docs/language-voice.md`) or from the i18n files (`apps/**/i18n/*.ts`, `locales/*.json`, `public/locales/*`).
+2. **Repo path or `@path` reference** (e.g. `apps/marketing/src/routes/index.tsx`, `@docs/website.md`) → the artefact to draft into or to review. `Read` it (with `Grep`/`Glob` if it's a directory or a glob).
+3. **URL** (`https://…`) → external page to review. Use `WebFetch`; if it returns stripped content, ask the developer to paste the relevant text.
+4. **Quoted text block** (`"…"`) → treat as pasted copy to review, or as a free-form question to answer in Advise mode.
+5. **Free-form phrase** (e.g. `hero`, `pricing page`, `which framework for cold ads`) → surface name or question. Resolve the surface with `Glob`/`Grep`; treat a question as Advise mode input.
+
+Arguments can be combined. Examples:
+
+- `/sales-funnel ca` → Draft mode, Catalan only.
+- `/sales-funnel all hero` → Draft mode, all languages, homepage hero.
+- `/sales-funnel @docs/website.md` → Review mode on the presented doc.
+- `/sales-funnel en apps/marketing/src/i18n/en.ts` → Draft/Review on an i18n file in English.
+- `/sales-funnel https://example.com/pricing` → Review mode on a live page.
+- `/sales-funnel "is this hook too clever?"` → Advise mode.
+
+If the argument is missing or ambiguous (e.g. only a language and no surface, or only a question and no artefact), ask exactly one targeted question with `AskUserQuestion`. Do not guess the surface or the language.
 
 Each language is written **natively from the same brief**, not translated. Follow the project's per-language traps and register choices strictly.
 
@@ -149,9 +200,63 @@ For each piece of copy produced, return a block in this exact shape:
 
 When editing an existing file, show the preview block first, then propose the exact `Edit` diff. Never apply edits before the developer approves the preview.
 
+#### Review / Advise output shape
+
+In **Review** and **Advise** modes, skip the Draft block and return this shape instead. The point is to teach the framework, not just hand over a fix.
+
+```
+### <Artefact or question> — Review / Advise
+
+**Artefact read:** <path, URL, or "pasted text">
+**Surface inferred:** <homepage hero | landing page | pricing | about | email | ...>
+**Funnel stage:** <ToFu | MoFu | BoFu>
+**Awareness level:** <Unaware | Problem-Aware | Solution-Aware | Product-Aware | Most Aware>
+**Project docs loaded:** <docs/services.md, docs/brand-voice.md, ...>
+
+**Diagnosis (what the frameworks say about the current state)**
+- ✅ <check that passes>  — <one-line reason citing the framework>
+- ⚠ <check that fails>    — <one-line reason citing the framework + exact line/phrase>
+- ⚠ <check that fails>    — <...>
+
+**Options**
+
+**Option A — <one-line label, e.g. "Lean harder on proof of mechanism">**
+- Framework: <Hook-Story-Offer | Epiphany Bridge | Stack Slide | ...> — see [`<ref>.md`](references/<ref>.md#<anchor>)
+- Why this works: <one sentence grounded in the framework>
+- What you'd change: <concrete edit or restructure>
+- Trade-off: <what you give up by choosing this>
+
+**Option B — <different bet, not a cosmetic variant>**
+- Framework: ...
+- Why this works: ...
+- What you'd change: ...
+- Trade-off: ...
+
+**Option C — <optional third bet, only if genuinely distinct>**
+- ...
+
+**Recommendation**
+<one option, with the trade-off that decided it. Be specific — "A because proof is the Vehicle-belief break the page is missing" beats "A seems best">
+
+**Notes**
+<anything the developer needs to verify or decide before you can draft the actual copy>
+```
+
+Rules for multi-option answers:
+
+- **Options must be genuinely different bets.** "Rewrite the hook" and "Tighten the hook" are the same bet. "Lead with pain (Problem-Aware hook)" and "Lead with the new opportunity (Solution-Aware hook)" are different bets.
+- **Every option cites a framework and links to the reference file.** No framework citation = not an option, it's an opinion.
+- **"Why this works" must be in framework terms**, not taste terms. Say "breaks the Vehicle false belief by citing a measured mechanism", not "feels more credible".
+- **Always recommend one** at the end. Indecision is worse than a wrong call the developer can push back on.
+- **Teach once, don't lecture.** When you cite a framework for the first time in the answer, give a one-line gloss. Don't re-explain it for every option.
+
 ### Step 9 — Run the validation checklist
 
-Copy this checklist and track each check before returning any copy. If any check fails, fix it before responding.
+In **Draft** mode: track each check before returning the copy. If any check fails, fix it before responding.
+
+In **Review** mode: run the same checklist *against the artefact the user presented* and report pass/fail in the Diagnosis section. The checklist is the diagnosis instrument — don't skip it even if the user only asked one question about one part of the page.
+
+In **Advise** mode: run the subset of checks that apply to the question asked (e.g. if the question is "which hook is stronger", run Hook + Awareness-level + New Opportunity; skip File-fit).
 
 ```
 Validation progress:
