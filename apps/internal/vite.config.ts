@@ -4,18 +4,14 @@ import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import viteReact from '@vitejs/plugin-react-swc'
 import { defineConfig } from 'vite'
 
-/* Forja uses `@vitejs/plugin-react-swc` instead of the default
- * `@vitejs/plugin-react` so that `@lingui/swc-plugin` can run as part
- * of the SWC transform pipeline. That plugin is what turns
- * `import { Trans } from '@lingui/react/macro'` + `<Trans>Hello</Trans>`
- * into the runtime form with auto-generated message IDs.
- *
- * The earlier plugin-react v6 build dropped its `babel` option, so
- * the SWC path is the only clean way to get Lingui's macro support
- * without reverting to the verbose runtime API. styled-components
- * `displayName` is applied manually via `withConfig({ displayName })`
- * on each styled component (same as before — react-swc doesn't run
- * babel-plugin-styled-components either, so nothing changes there). */
+/* Forja uses `@vitejs/plugin-react-swc` so two SWC transforms can run at
+ * compile time:
+ * - `@lingui/swc-plugin` turns `<Trans>…</Trans>` (from `@lingui/react/macro`)
+ *   into the runtime form with auto-generated message IDs.
+ * - `@swc/plugin-styled-components` gives every `styled.*` call a stable
+ *   `componentId` + `displayName`, so SSR class names match the emitted
+ *   `<style data-styled>` rules (otherwise hashes drift and elements fall
+ *   back to unstyled defaults). */
 const config = defineConfig({
 	resolve: {
 		tsconfigPaths: true,
@@ -26,7 +22,19 @@ const config = defineConfig({
 	plugins: [
 		tanstackStart(),
 		viteReact({
-			plugins: [['@lingui/swc-plugin', {}]],
+			plugins: [
+				['@lingui/swc-plugin', {}],
+				[
+					'@swc/plugin-styled-components',
+					{
+						displayName: true,
+						ssr: true,
+						fileName: true,
+						pure: false,
+						transpileTemplateLiterals: true,
+					},
+				],
+			],
 		}),
 		lingui(),
 		tailwindcss(),

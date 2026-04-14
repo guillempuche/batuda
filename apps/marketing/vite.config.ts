@@ -1,14 +1,14 @@
 import tailwindcss from '@tailwindcss/vite'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
-import viteReact from '@vitejs/plugin-react'
+import viteReact from '@vitejs/plugin-react-swc'
 import { nitro } from 'nitro/vite'
 import { defineConfig } from 'vite'
 
-/* `@vitejs/plugin-react` v6 dropped the `babel` option in favour of
- * oxc/rolldown transforms, so `babel-plugin-styled-components` no longer
- * runs here. The `displayName: true` behaviour we used to get from it is
- * applied manually via `withConfig({ displayName: 'X' })` on each styled
- * component — see e.g. `components/layout/section.tsx`. */
+/* The SWC React plugin runs `@swc/plugin-styled-components` at compile time
+ * so every `styled.*` call gets a stable `componentId` + `displayName`.
+ * Without this, the SSR stylesheet-collection pass and the render pass drift,
+ * producing class names on elements that don't match the emitted CSS rules
+ * (e.g. H1 rendered as `hYisUL` while its rule is keyed by `cehExt`). */
 const config = defineConfig({
 	resolve: {
 		tsconfigPaths: true,
@@ -17,7 +17,25 @@ const config = defineConfig({
 		noExternal: ['styled-components'],
 		resolve: { conditions: ['module', 'import', 'default'] },
 	},
-	plugins: [tanstackStart(), nitro(), viteReact(), tailwindcss()],
+	plugins: [
+		tanstackStart(),
+		nitro(),
+		viteReact({
+			plugins: [
+				[
+					'@swc/plugin-styled-components',
+					{
+						displayName: true,
+						ssr: true,
+						fileName: true,
+						pure: false,
+						transpileTemplateLiterals: true,
+					},
+				],
+			],
+		}),
+		tailwindcss(),
+	],
 })
 
 export default config
