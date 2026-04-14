@@ -12,6 +12,7 @@ export {
 	EmailMessage,
 	EmailMessageId,
 	EmailMessageStatus,
+	InboundClassification,
 } from './email-messages'
 export { EmailThreadLink, EmailThreadLinkId } from './email-thread-links'
 export { Interaction, InteractionId } from './interactions'

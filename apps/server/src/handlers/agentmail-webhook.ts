@@ -1,4 +1,4 @@
-import { Config, Effect, Option, Redacted } from 'effect'
+import { Config, Effect, Redacted } from 'effect'
 import { HttpServerResponse } from 'effect/unstable/http'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import { Webhook } from 'svix'
@@ -8,7 +8,10 @@ import { ForjaApi } from '@engranatge/controllers'
 import { EmailService } from '../services/email'
 
 type MessageReceivedPayload = {
-	event_type: 'message.received' | 'message.received.spam'
+	event_type:
+		| 'message.received'
+		| 'message.received.spam'
+		| 'message.received.blocked'
 	message: {
 		inbox_id: string
 		thread_id: string
@@ -80,9 +83,13 @@ export const AgentMailWebhookLive = HttpApiBuilder.group(
 	handlers =>
 		Effect.gen(function* () {
 			const svc = yield* EmailService
-			const secretOption = yield* Config.option(
-				Config.redacted('EMAIL_WEBHOOK_SECRET'),
+			// Required, no default: webhook integrity depends on it. Treating
+			// an unset or empty secret as "skip verification" is a silent
+			// security regression — boot fails instead.
+			const secret = Redacted.value(
+				yield* Config.redacted('EMAIL_WEBHOOK_SECRET'),
 			)
+			const wh = new Webhook(secret)
 
 			return handlers.handleRaw(
 				'inbound',
@@ -90,35 +97,40 @@ export const AgentMailWebhookLive = HttpApiBuilder.group(
 					const rawBody = yield* Effect.orDie(request.text)
 					const headers = request.headers
 
-					if (Option.isSome(secretOption)) {
-						const secret = Redacted.value(secretOption.value)
-						const wh = new Webhook(secret)
-						try {
-							wh.verify(rawBody, {
-								'svix-id': headers['svix-id'] ?? '',
-								'svix-timestamp': headers['svix-timestamp'] ?? '',
-								'svix-signature': headers['svix-signature'] ?? '',
-							})
-						} catch {
-							return HttpServerResponse.jsonUnsafe(
-								{ error: 'Invalid webhook signature' },
-								{ status: 400 },
-							)
-						}
+					try {
+						wh.verify(rawBody, {
+							'svix-id': headers['svix-id'] ?? '',
+							'svix-timestamp': headers['svix-timestamp'] ?? '',
+							'svix-signature': headers['svix-signature'] ?? '',
+						})
+					} catch {
+						return HttpServerResponse.jsonUnsafe(
+							{ error: 'Invalid webhook signature' },
+							{ status: 400 },
+						)
 					}
 
 					const payload = JSON.parse(rawBody) as WebhookPayload
 
 					switch (payload.event_type) {
 						case 'message.received':
-						case 'message.received.spam': {
+						case 'message.received.spam':
+						case 'message.received.blocked': {
 							const p = payload as MessageReceivedPayload
+							const classification =
+								p.event_type === 'message.received.spam'
+									? 'spam'
+									: p.event_type === 'message.received.blocked'
+										? 'blocked'
+										: 'normal'
 							yield* svc
 								.handleInboundWebhook({
-									inbox_id: p.message.inbox_id,
-									thread_id: p.message.thread_id,
-									message_id: p.message.message_id,
+									provider: 'agentmail',
+									providerInboxId: p.message.inbox_id,
+									providerThreadId: p.message.thread_id,
+									providerMessageId: p.message.message_id,
 									from: p.message.from ?? '',
+									classification,
 									...(p.message.subject !== undefined && {
 										subject: p.message.subject,
 									}),
@@ -140,11 +152,15 @@ export const AgentMailWebhookLive = HttpApiBuilder.group(
 
 						case 'message.bounced': {
 							const p = payload as BouncePayload
+							const rawType = p.bounce.type ?? null
+							const rawSubType = p.bounce.sub_type ?? null
+							const isHard = (rawType ?? '').toLowerCase() === 'permanent'
 							yield* svc
 								.markBounced(
 									p.bounce.message_id,
-									p.bounce.type,
-									p.bounce.sub_type ?? null,
+									isHard,
+									rawType,
+									rawSubType,
 									new Date(p.bounce.timestamp),
 								)
 								.pipe(Effect.orDie)

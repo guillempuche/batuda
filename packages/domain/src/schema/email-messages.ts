@@ -16,11 +16,19 @@ export const EmailMessageStatus = Schema.Literals([
 ])
 export type EmailMessageStatus = typeof EmailMessageStatus.Type
 
+export const InboundClassification = Schema.Literals([
+	'normal',
+	'spam',
+	'blocked',
+])
+export type InboundClassification = typeof InboundClassification.Type
+
 export class EmailMessage extends Model.Class<EmailMessage>('EmailMessage')({
 	id: Model.Generated(EmailMessageId),
-	agentmailMessageId: Schema.String,
-	agentmailThreadId: Schema.String,
-	agentmailInboxId: Schema.String,
+	provider: Schema.String,
+	providerMessageId: Schema.String,
+	providerThreadId: Schema.String,
+	providerInboxId: Schema.String,
 	direction: EmailDirection,
 	companyId: Schema.NullOr(Schema.String),
 	contactId: Schema.NullOr(Schema.String),
@@ -29,6 +37,7 @@ export class EmailMessage extends Model.Class<EmailMessage>('EmailMessage')({
 	statusReason: Schema.NullOr(Schema.String),
 	bounceType: Schema.NullOr(Schema.String),
 	bounceSubType: Schema.NullOr(Schema.String),
+	inboundClassification: Schema.NullOr(InboundClassification),
 	statusUpdatedAt: Schema.DateTimeUtcFromDate,
 	createdAt: Model.DateTimeInsertFromDate,
 	updatedAt: Model.DateTimeInsertFromDate,

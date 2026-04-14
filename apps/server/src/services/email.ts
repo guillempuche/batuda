@@ -1,8 +1,9 @@
-import { Effect, Layer, ServiceMap } from 'effect'
+import { Config, Effect, Layer, Schema, ServiceMap } from 'effect'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { EmailError, EmailSuppressed, NotFound } from '@engranatge/controllers'
+import type { InboundClassification } from '@engranatge/domain'
 
 import { EmailProvider } from './email-provider.js'
 import { WebhookService } from './webhooks.js'
@@ -25,6 +26,10 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 			const provider = yield* EmailProvider
 			const sql = yield* SqlClient.SqlClient
 			const webhooks = yield* WebhookService
+			const providerName = yield* Config.schema(
+				Schema.Literals(['local-inbox', 'agentmail']),
+				'EMAIL_PROVIDER',
+			)
 
 			const assertContactNotSuppressed = (
 				contactId: string,
@@ -102,8 +107,9 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						// 3) Persist thread link, interaction, contact freshness, message row
 						yield* sql`
 							INSERT INTO email_thread_links ${sql.insert({
-								agentmailThreadId: result.threadId,
-								agentmailInboxId: inboxId,
+								provider: providerName,
+								providerThreadId: result.threadId,
+								providerInboxId: inboxId,
 								companyId,
 								contactId: contactId ?? null,
 								subject,
@@ -121,8 +127,8 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								type: 'email',
 								subject,
 								metadata: JSON.stringify({
-									agentmailThreadId: result.threadId,
-									agentmailMessageId: result.messageId,
+									providerThreadId: result.threadId,
+									providerMessageId: result.messageId,
 								}),
 							})}
 						`
@@ -135,9 +141,10 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 
 						yield* sql`
 							INSERT INTO email_messages ${sql.insert({
-								agentmailMessageId: result.messageId,
-								agentmailThreadId: result.threadId,
-								agentmailInboxId: inboxId,
+								provider: providerName,
+								providerMessageId: result.messageId,
+								providerThreadId: result.threadId,
+								providerInboxId: inboxId,
 								direction: 'outbound',
 								companyId,
 								contactId: contactId ?? null,
@@ -159,35 +166,35 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					}),
 
 				reply: (
-					agentmailThreadId: string,
+					providerThreadId: string,
 					body: { text?: string; html?: string },
 				) =>
 					Effect.gen(function* () {
 						const links = yield* sql`
 							SELECT * FROM email_thread_links
-							WHERE agentmail_thread_id = ${agentmailThreadId}
+							WHERE provider_thread_id = ${providerThreadId}
 							LIMIT 1
 						`
 						if (links.length === 0) {
 							return yield* new NotFound({
 								entity: 'EmailThreadLink',
-								id: agentmailThreadId,
+								id: providerThreadId,
 							})
 						}
 						const link = links[0] as {
-							agentmailInboxId: string
+							providerInboxId: string
 							companyId: string | null
 							contactId: string | null
 						}
 
 						const thread = yield* provider.getThread(
-							link.agentmailInboxId,
-							agentmailThreadId,
+							link.providerInboxId,
+							providerThreadId,
 						)
 						const lastMessage = thread.messages[thread.messages.length - 1]
 						if (!lastMessage) {
 							return yield* new EmailError({
-								message: `Thread ${agentmailThreadId} has no messages`,
+								message: `Thread ${providerThreadId} has no messages`,
 							})
 						}
 
@@ -202,7 +209,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						}
 
 						const result = yield* provider
-							.reply(link.agentmailInboxId, lastMessage.messageId, {
+							.reply(link.providerInboxId, lastMessage.messageId, {
 								text: body.text,
 								html: body.html,
 							})
@@ -243,8 +250,8 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 									type: 'email',
 									subject: thread.subject ?? null,
 									metadata: JSON.stringify({
-										agentmailThreadId,
-										agentmailMessageId: result.messageId,
+										providerThreadId,
+										providerMessageId: result.messageId,
 									}),
 								})}
 							`
@@ -258,9 +265,10 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 
 						yield* sql`
 							INSERT INTO email_messages ${sql.insert({
-								agentmailMessageId: result.messageId,
-								agentmailThreadId,
-								agentmailInboxId: link.agentmailInboxId,
+								provider: providerName,
+								providerMessageId: result.messageId,
+								providerThreadId,
+								providerInboxId: link.providerInboxId,
 								direction: 'outbound',
 								companyId: link.companyId,
 								contactId: link.contactId,
@@ -273,7 +281,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						yield* Effect.logInfo('Email reply sent').pipe(
 							Effect.annotateLogs({
 								event: 'email.replied',
-								threadId: agentmailThreadId,
+								threadId: providerThreadId,
 							}),
 						)
 
@@ -281,16 +289,18 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					}),
 
 				handleInboundWebhook: (payload: {
-					inbox_id: string
-					thread_id: string
-					message_id: string
+					provider: string
+					providerInboxId: string
+					providerThreadId: string
+					providerMessageId: string
 					from: string
 					subject?: string
+					classification?: InboundClassification
 				}) =>
 					Effect.gen(function* () {
 						const existingLinks = yield* sql`
 							SELECT * FROM email_thread_links
-							WHERE agentmail_thread_id = ${payload.thread_id}
+							WHERE provider_thread_id = ${payload.providerThreadId}
 							LIMIT 1
 						`
 
@@ -322,8 +332,9 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 
 							yield* sql`
 								INSERT INTO email_thread_links ${sql.insert({
-									agentmailThreadId: payload.thread_id,
-									agentmailInboxId: payload.inbox_id,
+									provider: payload.provider,
+									providerThreadId: payload.providerThreadId,
+									providerInboxId: payload.providerInboxId,
 									companyId,
 									contactId,
 									subject: payload.subject ?? null,
@@ -343,8 +354,8 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 									type: 'email',
 									subject: payload.subject ?? null,
 									metadata: JSON.stringify({
-										agentmailThreadId: payload.thread_id,
-										agentmailMessageId: payload.message_id,
+										providerThreadId: payload.providerThreadId,
+										providerMessageId: payload.providerMessageId,
 										from: payload.from,
 									}),
 								})}
@@ -359,33 +370,37 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 
 						yield* sql`
 							INSERT INTO email_messages ${sql.insert({
-								agentmailMessageId: payload.message_id,
-								agentmailThreadId: payload.thread_id,
-								agentmailInboxId: payload.inbox_id,
+								provider: payload.provider,
+								providerMessageId: payload.providerMessageId,
+								providerThreadId: payload.providerThreadId,
+								providerInboxId: payload.providerInboxId,
 								direction: 'inbound',
 								companyId,
 								contactId,
 								recipients: JSON.stringify([payload.from]),
 								status: 'delivered',
+								inboundClassification: payload.classification ?? 'normal',
 								statusUpdatedAt: new Date(),
 							})}
-							ON CONFLICT (agentmail_message_id) DO NOTHING
+							ON CONFLICT (provider_message_id) DO NOTHING
 						`
 
 						yield* webhooks.fire('email.received', {
-							threadId: payload.thread_id,
-							messageId: payload.message_id,
+							threadId: payload.providerThreadId,
+							messageId: payload.providerMessageId,
 							from: payload.from,
 							subject: payload.subject,
 							companyId,
 							contactId,
+							classification: payload.classification ?? 'normal',
 						})
 
 						yield* Effect.logInfo('Inbound email processed').pipe(
 							Effect.annotateLogs({
 								event: 'email.received',
-								threadId: payload.thread_id,
+								threadId: payload.providerThreadId,
 								from: payload.from,
+								classification: payload.classification ?? 'normal',
 							}),
 						)
 					}),
@@ -397,7 +412,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							SET status = 'delivered',
 							    status_updated_at = ${timestamp},
 							    updated_at = now()
-							WHERE agentmail_message_id = ${messageId}
+							WHERE provider_message_id = ${messageId}
 						`
 						yield* sql`
 							UPDATE contacts
@@ -406,7 +421,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							WHERE email_status = 'unknown'
 							  AND id IN (
 							    SELECT contact_id FROM email_messages
-							    WHERE agentmail_message_id = ${messageId}
+							    WHERE provider_message_id = ${messageId}
 							      AND contact_id IS NOT NULL
 							  )
 						`
@@ -420,24 +435,26 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 
 				markBounced: (
 					messageId: string,
-					type: string,
-					subType: string | null,
+					isHard: boolean,
+					rawType: string | null,
+					rawSubType: string | null,
 					timestamp: Date,
 				) =>
 					Effect.gen(function* () {
-						const isHard = type.toLowerCase() === 'permanent'
 						const newStatus = isHard ? 'bounced' : 'bounced_soft'
-						const reason = subType ? `${type}/${subType}` : type
+						const reason = rawSubType
+							? `${rawType ?? ''}/${rawSubType}`
+							: rawType
 
 						yield* sql`
 							UPDATE email_messages
 							SET status = ${newStatus},
 							    status_reason = ${reason},
-							    bounce_type = ${type},
-							    bounce_sub_type = ${subType},
+							    bounce_type = ${rawType},
+							    bounce_sub_type = ${rawSubType},
 							    status_updated_at = ${timestamp},
 							    updated_at = now()
-							WHERE agentmail_message_id = ${messageId}
+							WHERE provider_message_id = ${messageId}
 						`
 
 						if (isHard) {
@@ -448,7 +465,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								    email_status_updated_at = now()
 								WHERE id IN (
 								  SELECT contact_id FROM email_messages
-								  WHERE agentmail_message_id = ${messageId}
+								  WHERE provider_message_id = ${messageId}
 								    AND contact_id IS NOT NULL
 								)
 							`
@@ -468,7 +485,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								    email_status_updated_at = now()
 								WHERE id IN (
 								  SELECT contact_id FROM email_messages
-								  WHERE agentmail_message_id = ${messageId}
+								  WHERE provider_message_id = ${messageId}
 								    AND contact_id IS NOT NULL
 								)
 							`
@@ -478,8 +495,8 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							Effect.annotateLogs({
 								event: 'email.bounced',
 								messageId,
-								bounceType: type,
-								bounceSubType: subType,
+								bounceType: rawType,
+								bounceSubType: rawSubType,
 								isHard,
 							}),
 						)
@@ -493,7 +510,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							    status_reason = 'spam_complaint',
 							    status_updated_at = ${timestamp},
 							    updated_at = now()
-							WHERE agentmail_message_id = ${messageId}
+							WHERE provider_message_id = ${messageId}
 						`
 						yield* sql`
 							UPDATE contacts
@@ -502,7 +519,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							    email_status_updated_at = now()
 							WHERE id IN (
 							  SELECT contact_id FROM email_messages
-							  WHERE agentmail_message_id = ${messageId}
+							  WHERE provider_message_id = ${messageId}
 							    AND contact_id IS NOT NULL
 							)
 						`
@@ -526,7 +543,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							    status_reason = ${reason},
 							    status_updated_at = ${timestamp},
 							    updated_at = now()
-							WHERE agentmail_message_id = ${messageId}
+							WHERE provider_message_id = ${messageId}
 						`
 						yield* Effect.logWarning('Email rejected').pipe(
 							Effect.annotateLogs({
@@ -537,47 +554,47 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						)
 					}),
 
-				getThread: (agentmailThreadId: string) =>
+				getThread: (providerThreadId: string) =>
 					Effect.gen(function* () {
 						const links = yield* sql`
 							SELECT * FROM email_thread_links
-							WHERE agentmail_thread_id = ${agentmailThreadId}
+							WHERE provider_thread_id = ${providerThreadId}
 							LIMIT 1
 						`
 						if (links.length === 0) {
 							return yield* new NotFound({
 								entity: 'EmailThreadLink',
-								id: agentmailThreadId,
+								id: providerThreadId,
 							})
 						}
 						const link = links[0] as {
-							agentmailInboxId: string
+							providerInboxId: string
 							companyId: string | null
 							contactId: string | null
 						}
 
 						const thread = yield* provider.getThread(
-							link.agentmailInboxId,
-							agentmailThreadId,
+							link.providerInboxId,
+							providerThreadId,
 						)
 
 						// Enrich messages with stored deliverability state
 						const storedMessages = yield* sql`
-							SELECT agentmail_message_id, status, status_reason, bounce_type, bounce_sub_type, status_updated_at
+							SELECT provider_message_id, status, status_reason, bounce_type, bounce_sub_type, status_updated_at
 							FROM email_messages
-							WHERE agentmail_thread_id = ${agentmailThreadId}
+							WHERE provider_thread_id = ${providerThreadId}
 						`
 						const statusByMessageId = new Map(
 							(
 								storedMessages as Array<{
-									agentmailMessageId: string
+									providerMessageId: string
 									status: string
 									statusReason: string | null
 									bounceType: string | null
 									bounceSubType: string | null
 									statusUpdatedAt: Date
 								}>
-							).map(m => [m.agentmailMessageId, m]),
+							).map(m => [m.providerMessageId, m]),
 						)
 
 						const enrichedMessages = thread.messages.map(m => ({
@@ -602,7 +619,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					Effect.gen(function* () {
 						const conditions: Array<Statement.Fragment> = []
 						if (filters?.inboxId)
-							conditions.push(sql`agentmail_inbox_id = ${filters.inboxId}`)
+							conditions.push(sql`provider_inbox_id = ${filters.inboxId}`)
 						if (filters?.companyId)
 							conditions.push(sql`company_id = ${filters.companyId}`)
 
@@ -644,7 +661,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					Effect.gen(function* () {
 						const rows = yield* sql`
 							SELECT * FROM email_messages
-							WHERE agentmail_message_id = ${messageId}
+							WHERE provider_message_id = ${messageId}
 							LIMIT 1
 						`
 						if (rows.length === 0) {

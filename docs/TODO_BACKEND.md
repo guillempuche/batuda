@@ -58,7 +58,7 @@ Effect Schema types. No runtime DB connection — just definitions.
 - [x] Write Effect Schema: `pages.ts`
 - [x] Write Effect Schema: `api-keys.ts`
 - [x] Write Effect Schema: `webhook-endpoints.ts`
-- [x] Write Effect Schema: `email-thread-links.ts` — `id`, `agentmailThreadId` (text, unique), `agentmailInboxId` (text), `companyId` (FK nullable), `contactId` (FK nullable), `status` (text: open|closed|archived, default open), `createdAt`, `updatedAt`
+- [x] Write Effect Schema: `email-thread-links.ts` — `id`, `provider` (text), `providerThreadId` (text, unique), `providerInboxId` (text), `companyId` (FK nullable), `contactId` (FK nullable), `status` (text: open|closed|archived, default open), `createdAt`, `updatedAt`
 - [x] Write `schema/index.ts` re-exporting all tables
 - [x] Write `src/index.ts` — re-exports schema + Effect Schema types
 
@@ -225,7 +225,7 @@ Per-message lifecycle mirror plus contact-level deliverability state, so the sys
 
 - [x] Extend `contacts.ts` schema with `email_status` (unknown|valid|bounced|complained), `email_status_reason`, `email_status_updated_at`, `email_soft_bounce_count`
 - [x] Write Effect Schema: `email-messages.ts` — per-message lifecycle mirror (`sent`/`delivered`/`bounced`/`bounced_soft`/`complained`/`rejected`)
-- [x] Add `email_messages` table to `0001_initial.ts` with indexes on `agentmail_thread_id`, `contact_id`, `status` and unique constraint on `agentmail_message_id`
+- [x] Add `email_messages` table to `0001_initial.ts` with indexes on `provider_thread_id` (renamed from `agentmail_thread_id` in migration 0004), `contact_id`, `status` and unique constraint on `provider_message_id`
 - [x] Add `EmailSuppressed` tagged error and `EmailSendError.kind` discriminator (`suppressed`/`invalid_recipient`/`rate_limited`/`unknown`)
 - [x] `services/agentmail-provider.ts` — classify SDK errors into `EmailSendErrorKind` at the boundary
 - [x] `services/email.ts` — belt-and-suspenders suppression: cache-first contact check + provider self-heal on stale cache

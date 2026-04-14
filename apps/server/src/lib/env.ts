@@ -12,9 +12,9 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 		)
 
 		const BETTER_AUTH_SECRET = yield* Config.redacted('BETTER_AUTH_SECRET')
-		const BETTER_AUTH_BASE_URL = yield* Config.string(
-			'BETTER_AUTH_BASE_URL',
-		).pipe(Config.withDefault(''))
+		// Required (no default): cookie-domain derivation depends on this,
+		// so a missing value in prod would ship broken auth silently.
+		const BETTER_AUTH_BASE_URL = yield* Config.string('BETTER_AUTH_BASE_URL')
 		const BETTER_AUTH_INSECURE_COOKIES = yield* Config.boolean(
 			'BETTER_AUTH_INSECURE_COOKIES',
 		).pipe(Config.withDefault(false))
@@ -36,9 +36,10 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 		const STORAGE_BUCKET = yield* Config.string('STORAGE_BUCKET')
 
 		const EMAIL_API_KEY = yield* Config.redacted('EMAIL_API_KEY')
-		const EMAIL_WEBHOOK_SECRET = yield* Config.option(
-			Config.redacted('EMAIL_WEBHOOK_SECRET'),
-		)
+		// Required, no default: webhook signature verification is not
+		// opt-in. Missing secret would force a silent "skip verification"
+		// branch — boot fails instead.
+		const EMAIL_WEBHOOK_SECRET = yield* Config.redacted('EMAIL_WEBHOOK_SECRET')
 		// No default — the developer must explicitly choose `local-inbox`
 		// (dev catcher) or `agentmail` (real send). Forcing the choice
 		// prevents local config from silently leaking into prod and vice
