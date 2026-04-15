@@ -1,0 +1,444 @@
+import {
+  type Extensions,
+  combineTransactionSteps,
+  Extension,
+  findChildren,
+  findChildrenInRange,
+  getChangedRanges,
+  splitExtensions,
+} from '@tiptap/core'
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
+import { Fragment, Slice } from '@tiptap/pm/model'
+import type { Transaction } from '@tiptap/pm/state'
+import { Plugin, PluginKey } from '@tiptap/pm/state'
+import { v4 as uuidv4 } from 'uuid'
+
+import { findDuplicates } from './helpers/findDuplicates.js'
+
+export type UniqueIDGenerationContext = {
+  node: ProseMirrorNode
+  pos: number
+}
+
+export interface UniqueIDOptions {
+  /**
+   * The name of the attribute to add the unique ID to.
+   * @default "id"
+   */
+  attributeName: string
+  /**
+   * The types of nodes to add unique IDs to.
+   * Use `"all"` to add IDs to every node type except `doc` and `text`.
+   * @default []
+   */
+  types: string[] | 'all'
+  /**
+   * The function that generates the unique ID. By default, a UUID v4 is
+   * generated. However, you can provide your own function to generate the
+   * unique ID based on the node type and the position.
+   */
+  generateID: (ctx: UniqueIDGenerationContext) => any
+  /**
+   * Ignore some mutations, for example applied from other users through the collaboration plugin.
+   *
+   * @default null
+   */
+  filterTransaction: ((transaction: Transaction) => boolean) | null
+  /**
+   * Whether to update the document by adding unique IDs to the nodes. Set this
+   * property to `false` if the document is in `readonly` mode, is immutable, or
+   * you don't want it to be modified.
+   *
+   * @default true
+   */
+  updateDocument: boolean
+}
+
+const resolveTypes = (types: UniqueIDOptions['types'], extensions: Extensions): string[] => {
+  if (types !== 'all') {
+    return types
+  }
+
+  const { nodeExtensions } = splitExtensions(extensions)
+
+  return nodeExtensions.map(extension => extension.name).filter(type => type !== 'doc' && type !== 'text')
+}
+
+export const UniqueID = Extension.create<UniqueIDOptions>({
+  name: 'uniqueID',
+
+  // we’ll set a very high priority to make sure this runs first
+  // and is compatible with `appendTransaction` hooks of other extensions
+  priority: 10000,
+
+  addOptions() {
+    return {
+      attributeName: 'id',
+      types: [],
+      generateID: () => uuidv4(),
+      filterTransaction: null,
+      updateDocument: true,
+    }
+  },
+
+  /**
+   * Extension storage for coordination between `addProseMirrorPlugins` and `appendTransaction`.
+   * `needsInitialIdGeneration` is set to `true` when the Collaboration extension is
+   * detected but no provider is available in its options, deferring ID creation
+   * to the first `y-sync$` transaction.
+   */
+  addStorage() {
+    return {
+      needsInitialIdGeneration: false,
+    }
+  },
+
+  addGlobalAttributes() {
+    const types = resolveTypes(this.options.types, this.extensions)
+
+    return [
+      {
+        types,
+        attributes: {
+          [this.options.attributeName]: {
+            default: null,
+            parseHTML: element => element.getAttribute(`data-${this.options.attributeName}`),
+            renderHTML: attributes => {
+              if (!attributes[this.options.attributeName]) {
+                return {}
+              }
+
+              return {
+                [`data-${this.options.attributeName}`]: attributes[this.options.attributeName],
+              }
+            },
+          },
+        },
+      },
+    ]
+  },
+
+  // check initial content for missing ids
+  onCreate() {
+    if (!this.options.updateDocument) {
+      return
+    }
+
+    const collaboration = this.editor.extensionManager.extensions.find(ext => ext.name === 'collaboration')
+    const collaborationCaret = this.editor.extensionManager.extensions.find(ext => ext.name === 'collaborationCaret')
+
+    const collabExtensions = [collaboration, collaborationCaret].filter(Boolean)
+    const collab = collabExtensions.find(ext => ext?.options?.provider)
+    const provider = collab?.options?.provider
+
+    const createIds = () => {
+      const { view, state } = this.editor
+      const { tr, doc } = state
+      const types = resolveTypes(this.options.types, this.editor.extensionManager.extensions)
+      const { attributeName, generateID } = this.options
+      const nodesWithoutId = findChildren(doc, node => {
+        return types.includes(node.type.name) && node.attrs[attributeName] === null
+      })
+
+      nodesWithoutId.forEach(({ node, pos }) => {
+        tr.setNodeMarkup(pos, undefined, {
+          ...node.attrs,
+          [attributeName]: generateID({ node, pos }),
+        })
+      })
+
+      tr.setMeta('addToHistory', false)
+
+      view.dispatch(tr)
+
+      if (provider) {
+        provider.off('synced', createIds)
+      }
+    }
+
+    /**
+     * We need to handle collaboration a bit different here
+     * because we can't automatically add IDs when the provider is not yet synced
+     * otherwise we end up with empty paragraphs
+     */
+    if (collaboration) {
+      if (provider) {
+        provider.on('synced', createIds)
+      }
+      // When collaboration is present but no provider is in extension options,
+      // needsInitialIdGeneration was already set in addProseMirrorPlugins
+      // (which runs synchronously during editor construction, before any
+      // y-sync$ transaction can arrive).
+    } else {
+      return createIds()
+    }
+  },
+
+  addProseMirrorPlugins() {
+    if (!this.options.updateDocument) {
+      return []
+    }
+
+    // Capture storage via closure so appendTransaction can access `needsInitialIdGeneration`.
+    // `extensionManager.extensions` returns different objects than `this` due to
+    // Tiptap's child-extension flattening, so we capture the reference directly.
+    const extensionStorage = this.storage
+
+    // Detect collaboration early — before any y-sync$ transaction can arrive.
+    // onCreate runs on a deferred setTimeout(0), so a y-sync$ transaction could
+    // be applied before it. Setting the flag here (synchronous during editor
+    // construction) ensures the first y-sync$ is always handled.
+    const collaboration = this.editor.extensionManager.extensions.find(ext => ext.name === 'collaboration')
+    const collaborationCaret = this.editor.extensionManager.extensions.find(ext => ext.name === 'collaborationCaret')
+    const collabExtensions = [collaboration, collaborationCaret].filter(Boolean)
+    const collabWithProvider = collabExtensions.find(ext => ext?.options?.provider)
+
+    if (collaboration && !collabWithProvider) {
+      extensionStorage.needsInitialIdGeneration = true
+    }
+
+    let dragSourceElement: Element | null = null
+    let transformPasted = false
+    const types = resolveTypes(this.options.types, this.editor.extensionManager.extensions)
+
+    return [
+      new Plugin({
+        key: new PluginKey('uniqueID'),
+
+        appendTransaction: (transactions, oldState, newState) => {
+          const hasDocChanges =
+            transactions.some(transaction => transaction.docChanged) && !oldState.doc.eq(newState.doc)
+          const filterTransactions =
+            this.options.filterTransaction && transactions.some(tr => !this.options.filterTransaction?.(tr))
+
+          const isCollabTransaction = transactions.find(tr => tr.getMeta('y-sync$'))
+
+          if (isCollabTransaction) {
+            if (extensionStorage.needsInitialIdGeneration) {
+              extensionStorage.needsInitialIdGeneration = false
+
+              // Run full-document ID creation after the first Yjs sync.
+              // Use a seen-set so only the second+ occurrence of a duplicated
+              // ID is regenerated, preserving one existing ID per value.
+              const { tr } = newState
+              const { attributeName, generateID } = this.options
+              const allNodes = findChildren(newState.doc, node => types.includes(node.type.name))
+              const seen = new Set<string>()
+
+              allNodes.forEach(({ node, pos }) => {
+                const currentId = node.attrs[attributeName]
+
+                if (currentId === null || seen.has(currentId)) {
+                  tr.setNodeMarkup(pos, undefined, {
+                    ...node.attrs,
+                    [attributeName]: generateID({ node, pos }),
+                  })
+                } else {
+                  seen.add(currentId)
+                }
+              })
+
+              if (!tr.steps.length) {
+                return
+              }
+
+              // Restore stored marks since setNodeMarkup resets them
+              tr.setStoredMarks(newState.tr.storedMarks)
+              // Mark this transaction as coming from UniqueID to prevent
+              // infinite loops with other extensions (e.g., TrailingNode)
+              tr.setMeta('__uniqueIDTransaction', true)
+              tr.setMeta('addToHistory', false)
+              return tr
+            }
+
+            return
+          }
+
+          if (!hasDocChanges || filterTransactions) {
+            return
+          }
+
+          const { tr } = newState
+
+          const { attributeName, generateID } = this.options
+          const transform = combineTransactionSteps(oldState.doc, transactions as Transaction[])
+          const { mapping } = transform
+
+          // get changed ranges based on the old state
+          const changes = getChangedRanges(transform)
+
+          changes.forEach(({ newRange }) => {
+            const newNodes = findChildrenInRange(newState.doc, newRange, node => {
+              return types.includes(node.type.name)
+            })
+
+            const newIds = newNodes.map(({ node }) => node.attrs[attributeName]).filter(id => id !== null)
+
+            newNodes.forEach(({ node, pos }, i) => {
+              // instead of checking `node.attrs[attributeName]` directly
+              // we look at the current state of the node within `tr.doc`.
+              // this helps to prevent adding new ids to the same node
+              // if the node changed multiple times within one transaction
+              const id = tr.doc.nodeAt(pos)?.attrs[attributeName]
+
+              if (id === null) {
+                tr.setNodeMarkup(pos, undefined, {
+                  ...node.attrs,
+                  [attributeName]: generateID({ node, pos }),
+                })
+
+                return
+              }
+
+              const nextNode = newNodes[i + 1]
+
+              if (nextNode && node.content.size === 0) {
+                const nextNodeInTr = tr.doc.nodeAt(nextNode.pos)
+                if (nextNodeInTr?.attrs[attributeName] && nextNodeInTr.attrs[attributeName] !== id) {
+                  return
+                }
+
+                tr.setNodeMarkup(nextNode.pos, undefined, {
+                  ...nextNode.node.attrs,
+                  [attributeName]: id,
+                })
+                newIds[i + 1] = id
+
+                const generatedId = generateID({ node, pos })
+
+                tr.setNodeMarkup(pos, undefined, {
+                  ...node.attrs,
+                  [attributeName]: generatedId,
+                })
+                newIds[i] = generatedId
+
+                return tr
+              }
+
+              const duplicatedNewIds = findDuplicates(newIds)
+
+              // check if the node doesn’t exist in the old state
+              const { deleted } = mapping.invert().mapResult(pos)
+
+              const newNode = deleted && duplicatedNewIds.includes(id)
+
+              if (newNode) {
+                tr.setNodeMarkup(pos, undefined, {
+                  ...node.attrs,
+                  [attributeName]: generateID({ node, pos }),
+                })
+              }
+            })
+          })
+
+          if (!tr.steps.length) {
+            return
+          }
+
+          // `tr.setNodeMarkup` resets the stored marks
+          // so we'll restore them if they exist
+          tr.setStoredMarks(newState.tr.storedMarks)
+
+          // Mark this transaction as coming from UniqueID
+          // to prevent infinite loops with other extensions (e.g., TrailingNode)
+          tr.setMeta('__uniqueIDTransaction', true)
+
+          return tr
+        },
+
+        // we register a global drag handler to track the current drag source element
+        view(view) {
+          const handleDragstart = (event: DragEvent) => {
+            dragSourceElement = view.dom.parentElement?.contains(event.target as Element)
+              ? view.dom.parentElement
+              : null
+          }
+
+          window.addEventListener('dragstart', handleDragstart)
+
+          return {
+            destroy() {
+              window.removeEventListener('dragstart', handleDragstart)
+            },
+          }
+        },
+
+        props: {
+          // `handleDOMEvents` is called before `transformPasted`
+          // so we can do some checks before
+          handleDOMEvents: {
+            // only create new ids for dropped content
+            // or dropped content while holding `alt`
+            // or content is dragged from another editor
+            drop: (view, event) => {
+              if (
+                dragSourceElement !== view.dom.parentElement ||
+                event.dataTransfer?.effectAllowed === 'copyMove' ||
+                event.dataTransfer?.effectAllowed === 'copy'
+              ) {
+                dragSourceElement = null
+                transformPasted = true
+              }
+
+              return false
+            },
+            // always create new ids on pasted content
+            paste: () => {
+              transformPasted = true
+
+              return false
+            },
+          },
+
+          // we’ll remove ids for every pasted node
+          // so we can create a new one within `appendTransaction`
+          transformPasted: slice => {
+            if (!transformPasted) {
+              return slice
+            }
+
+            const { attributeName } = this.options
+            const removeId = (fragment: Fragment): Fragment => {
+              const list: ProseMirrorNode[] = []
+
+              fragment.forEach(node => {
+                // don’t touch text nodes
+                if (node.isText) {
+                  list.push(node)
+
+                  return
+                }
+
+                // check for any other child nodes
+                if (!types.includes(node.type.name)) {
+                  list.push(node.copy(removeId(node.content)))
+
+                  return
+                }
+
+                // remove id
+                const nodeWithoutId = node.type.create(
+                  {
+                    ...node.attrs,
+                    [attributeName]: null,
+                  },
+                  removeId(node.content),
+                  node.marks,
+                )
+
+                list.push(nodeWithoutId)
+              })
+
+              return Fragment.from(list)
+            }
+
+            // reset check
+            transformPasted = false
+
+            return new Slice(removeId(slice.content), slice.openStart, slice.openEnd)
+          },
+        },
+      }),
+    ]
+  },
+})
