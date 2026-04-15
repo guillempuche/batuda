@@ -1,33 +1,29 @@
 import { useLingui } from '@lingui/react'
+import { Link } from '@tanstack/react-router'
 import { Cog } from 'lucide-react'
-import { motion } from 'motion/react'
 import styled from 'styled-components'
 
-import { PriAvatar } from '@engranatge/ui/pri'
-
 import { ScrewDot } from '#/components/shared/workshop-decorations'
-import {
-	brushedMetalBezel,
-	brushedMetalPlate,
-	stenciledTitle,
-} from '#/lib/workshop-mixins'
+import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
+import { MachineButton } from './machine-button'
 import { navItems } from './nav-items'
 import { NavLink } from './nav-link'
 
 /**
- * Desktop sidebar — rendered as a pegboard rack with a metal LogoPlate up
- * top, a column of shadow-board "tool" rows (metal bezel + colored dome
- * cap + embossed stencil label), and a sheet-metal footer plate with the
- * current user. Visible only at ≥1024px; mobile falls back to BottomNav.
+ * Desktop sidebar — a narrow pegboard column matching marketing's
+ * `WorkshopDesktop`. A compact stamped-metal "Forja" plate sits at the
+ * top (styled after the marketing `LogoPlateAnchor`), followed by a
+ * scrollable rack of MachineButton knobs (shared with the mobile
+ * BottomNav so Forja reads as one shadow-board across breakpoints),
+ * and a brushed-metal profile plate anchored at the bottom.
  */
 export function SideNav() {
 	const { i18n } = useLingui()
 	return (
 		<Aside>
-			<LogoPlate>
-				<Cog size={20} aria-hidden />
-				<Wordmark>Engranatge</Wordmark>
-				<Subtitle>Forja</Subtitle>
+			<LogoPlate to='/' aria-label='Forja home'>
+				<Cog size={12} aria-hidden />
+				<span>Forja</span>
 			</LogoPlate>
 			<NavList>
 				{navItems.map(item => {
@@ -37,33 +33,29 @@ export function SideNav() {
 						<NavItem key={item.path}>
 							<NavLink to={item.path} exact={item.exact} aria-label={label}>
 								{({ isActive }) => (
-									<ToolRow
-										as={motion.span}
-										$active={isActive}
-										whileHover={{ x: 2, scale: 1.01 }}
-										whileTap={{ scale: 0.98 }}
-									>
-										<Bezel $color={item.color} $active={isActive}>
-											<DomeCap $color={item.color} $active={isActive}>
-												<Icon size={18} />
-											</DomeCap>
-										</Bezel>
-										<Label>{label}</Label>
-									</ToolRow>
+									<MachineButton
+										icon={Icon}
+										label={label}
+										color={item.color}
+										active={isActive}
+										size='full'
+									/>
 								)}
 							</NavLink>
 						</NavItem>
 					)
 				})}
 			</NavList>
-			<FooterPlate>
-				<ScrewDot $position='top-left' $size={5} aria-hidden />
-				<ScrewDot $position='top-right' $size={5} aria-hidden />
-				<PriAvatar.Root>
-					<PriAvatar.Fallback>U</PriAvatar.Fallback>
-				</PriAvatar.Root>
-				<UserName>User</UserName>
-			</FooterPlate>
+			<FooterLink to='/profile' aria-label='Open profile'>
+				<FooterPlate>
+					<ScrewDot $position='top-left' $size={4} aria-hidden />
+					<ScrewDot $position='top-right' $size={4} aria-hidden />
+					<AvatarDome>
+						<Initial>U</Initial>
+					</AvatarDome>
+					<UserLabel>Profile</UserLabel>
+				</FooterPlate>
+			</FooterLink>
 		</Aside>
 	)
 }
@@ -75,10 +67,12 @@ const Aside = styled.aside.withConfig({ displayName: 'SideNavAside' })`
 		position: relative;
 		display: flex;
 		flex-direction: column;
+		align-items: center;
 		width: var(--side-nav-width);
 		flex-shrink: 0;
 		height: 100dvh;
-		padding: var(--space-lg) var(--space-md) var(--space-md);
+		min-height: 0;
+		padding: var(--space-md) var(--space-xs) var(--space-sm);
 		background-color: var(--color-pegboard);
 		background-image:
 			radial-gradient(
@@ -96,138 +90,143 @@ const Aside = styled.aside.withConfig({ displayName: 'SideNavAside' })`
 	}
 `
 
-const LogoPlate = styled.div.withConfig({ displayName: 'SideNavLogoPlate' })`
-	${brushedMetalPlate}
-	display: flex;
+const LogoPlate = styled(Link).withConfig({ displayName: 'SideNavLogoPlate' })`
+	display: inline-flex;
 	align-items: center;
-	gap: var(--space-sm);
-	padding: var(--space-md) var(--space-md);
-	margin-bottom: var(--space-lg);
-	border-radius: var(--shape-2xs);
+	justify-content: center;
+	gap: var(--space-2xs);
+	background: linear-gradient(
+		135deg,
+		var(--color-metal-dark) 0%,
+		var(--color-metal-light) 50%,
+		var(--color-metal-dark) 100%
+	);
+	border: 1px solid var(--color-outline);
+	padding: var(--space-3xs) var(--space-xs);
+	margin-bottom: var(--space-sm);
 	box-shadow: var(--elevation-workshop-md);
-	color: var(--color-on-surface);
-`
-
-const Wordmark = styled.h1.withConfig({ displayName: 'SideNavWordmark' })`
-	${stenciledTitle}
-	font-size: var(--typescale-title-medium-size);
-	line-height: var(--typescale-title-medium-line);
-	letter-spacing: 0.12em;
-`
-
-const Subtitle = styled.p.withConfig({ displayName: 'SideNavSubtitle' })`
-	margin-left: auto;
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
-	line-height: var(--typescale-label-small-line);
-	letter-spacing: 0.08em;
-	color: var(--color-on-surface-variant);
+	font-weight: var(--font-weight-bold);
+	letter-spacing: 0.12em;
 	text-transform: uppercase;
+	color: var(--color-on-surface);
+	text-shadow: var(--text-shadow-emboss);
+	text-decoration: none;
+
+	&:focus-visible {
+		outline: 2px solid var(--color-primary);
+		outline-offset: 3px;
+	}
 `
 
 const NavList = styled.ul.withConfig({ displayName: 'SideNavList' })`
 	list-style: none;
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-2xs);
+	align-items: center;
+	gap: var(--space-md);
 	margin: 0;
-	padding: 0;
+	padding: var(--space-sm) 0;
+	flex: 1;
+	min-height: 0;
+	width: 100%;
+	overflow-y: auto;
+	overflow-x: hidden;
+	scrollbar-width: thin;
+	scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
+
+	&::-webkit-scrollbar {
+		width: 6px;
+	}
+	&::-webkit-scrollbar-thumb {
+		background-color: rgba(0, 0, 0, 0.25);
+		border-radius: var(--shape-full);
+	}
 `
 
 const NavItem = styled.li.withConfig({ displayName: 'SideNavItem' })`
 	a {
-		display: block;
+		display: inline-flex;
+		border-radius: var(--shape-full);
 		text-decoration: none;
 		color: inherit;
 
 		&:focus-visible {
 			outline: none;
-		}
-		&:focus-visible > span {
 			box-shadow: var(--glow-active);
 		}
 	}
 `
 
-const ToolRow = styled.span.withConfig({
-	displayName: 'SideNavToolRow',
-	shouldForwardProp: p => !p.startsWith('$'),
-})<{ $active: boolean }>`
-	display: flex;
-	align-items: center;
-	gap: var(--space-sm);
-	padding: var(--space-2xs) var(--space-2xs);
+const FooterLink = styled(NavLink).withConfig({
+	displayName: 'SideNavFooterLink',
+})`
+	display: block;
+	margin-top: var(--space-sm);
+	text-decoration: none;
+	color: inherit;
 	border-radius: var(--shape-2xs);
-	transition: background 160ms ease;
-	will-change: transform;
 
-	${p =>
-		p.$active &&
-		`
-			background: rgba(245, 158, 11, 0.12);
-			box-shadow: var(--glow-active);
-		`}
-`
-
-const Bezel = styled.span.withConfig({
-	displayName: 'SideNavBezel',
-	shouldForwardProp: p => !p.startsWith('$'),
-})<{ $color: string; $active: boolean }>`
-	${brushedMetalBezel}
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 44px;
-	height: 44px;
-	border-radius: 50%;
-	flex-shrink: 0;
-`
-
-const DomeCap = styled.span.withConfig({
-	displayName: 'SideNavDomeCap',
-	shouldForwardProp: p => !p.startsWith('$'),
-})<{ $color: string; $active: boolean }>`
-	position: relative;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 30px;
-	height: 30px;
-	border-radius: 50%;
-	background: radial-gradient(
-		circle at 35% 30%,
-		color-mix(in oklab, ${p => p.$color} 85%, white) 0%,
-		${p => p.$color} 55%,
-		color-mix(in oklab, ${p => p.$color} 70%, black) 100%
-	);
-	border: 1px solid color-mix(in oklab, ${p => p.$color} 60%, black);
-	color: #fff;
-	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.35),
-		0 1px 2px rgba(0, 0, 0, 0.3);
-	filter: ${p => (p.$active ? 'none' : 'saturate(0.85)')};
-`
-
-const Label = styled.span.withConfig({ displayName: 'SideNavLabel' })`
-	${stenciledTitle}
-	font-size: var(--typescale-label-large-size);
-	line-height: var(--typescale-label-large-line);
+	&:focus-visible {
+		outline: none;
+		box-shadow: var(--glow-active);
+	}
 `
 
 const FooterPlate = styled.div.withConfig({
 	displayName: 'SideNavFooterPlate',
 })`
 	${brushedMetalPlate}
-	margin-top: auto;
+	position: relative;
 	display: flex;
+	flex-direction: column;
 	align-items: center;
-	gap: var(--space-sm);
-	padding: var(--space-sm) var(--space-md);
+	gap: var(--space-3xs);
+	padding: var(--space-xs) var(--space-2xs) var(--space-2xs);
 	border-radius: var(--shape-2xs);
+	transition:
+		box-shadow 160ms ease,
+		transform 160ms ease;
+
+	&:hover {
+		box-shadow: var(--elevation-workshop-md);
+		transform: translateY(-1px);
+	}
 `
 
-const UserName = styled.span.withConfig({ displayName: 'SideNavUserName' })`
-	${stenciledTitle}
+const AvatarDome = styled.div.withConfig({ displayName: 'SideNavAvatarDome' })`
+	width: 36px;
+	height: 36px;
+	border-radius: var(--shape-full);
+	background: radial-gradient(
+		circle at 35% 30%,
+		color-mix(in oklab, var(--color-status-prospect) 88%, white) 0%,
+		var(--color-status-prospect) 55%,
+		color-mix(in oklab, var(--color-status-prospect) 68%, black) 100%
+	);
+	border: 1px solid color-mix(in oklab, var(--color-status-prospect) 60%, black);
+	box-shadow:
+		inset 0 1px 2px rgba(255, 255, 255, 0.35),
+		inset 0 -1px 2px rgba(0, 0, 0, 0.2),
+		0 1px 2px rgba(0, 0, 0, 0.25);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: #fff;
+`
+
+const Initial = styled.span.withConfig({ displayName: 'SideNavInitial' })`
+	font-family: var(--font-display);
 	font-size: var(--typescale-label-large-size);
-	letter-spacing: 0.06em;
+	font-weight: var(--font-weight-bold);
+	line-height: 1;
+	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+`
+
+const UserLabel = styled.span.withConfig({ displayName: 'SideNavUserLabel' })`
+	${stenciledTitle}
+	font-size: var(--typescale-label-small-size);
+	line-height: var(--typescale-label-small-line);
+	letter-spacing: 0.08em;
 `

@@ -13,7 +13,7 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/components/interactions/quick-capture-dialog.tsx:208
+#: src/components/interactions/quick-capture-dialog.tsx:213
 msgid "— Select a company —"
 msgstr "— Select a company —"
 
@@ -22,12 +22,12 @@ msgstr "— Select a company —"
 #~ msgstr "{0} active companies. {1} open tasks."
 
 #. placeholder {0}: companies.length
-#: src/routes/companies/index.tsx:251
+#: src/routes/companies/index.tsx:255
 msgid "{0} companies"
 msgstr "{0} companies"
 
 #. placeholder {0}: companies.length
-#: src/routes/companies/index.tsx:248
+#: src/routes/companies/index.tsx:252
 msgid "{0} companies with filters applied"
 msgstr "{0} companies with filters applied"
 
@@ -35,11 +35,11 @@ msgstr "{0} companies with filters applied"
 #~ msgid "{0} open {1}"
 #~ msgstr "{0} open {1}"
 
-#: src/routes/companies/index.tsx:250
+#: src/routes/companies/index.tsx:254
 msgid "1 company"
 msgstr "1 company"
 
-#: src/components/shared/status-badge.tsx:42
+#: src/components/shared/status-badge.tsx:44
 msgid "Active client"
 msgstr "Active client"
 
@@ -47,89 +47,89 @@ msgstr "Active client"
 msgid "Active companies"
 msgstr "Active companies"
 
-#: src/components/shared/company-card.tsx:110
-#: src/routes/companies/$slug.tsx:436
+#: src/components/shared/company-card.tsx:112
+#: src/routes/companies/$slug.tsx:443
 msgid "Add task"
 msgstr "Add task"
 
-#: src/routes/companies/$slug.tsx:493
+#: src/routes/companies/$slug.tsx:500
 msgid "Add the first decision-maker to keep track of who to reach."
 msgstr "Add the first decision-maker to keep track of who to reach."
 
-#: src/routes/companies/index.tsx:284
+#: src/routes/companies/index.tsx:288
 msgid "All"
 msgstr "All"
 
 #: src/routes/index.tsx:299
-#: src/routes/tasks/index.tsx:228
+#: src/routes/tasks/index.tsx:232
 msgid "All under control"
 msgstr "All under control"
 
-#: src/components/shared/status-badge.tsx:44
+#: src/components/shared/status-badge.tsx:46
 msgid "Archived — not pursuing"
 msgstr "Archived — not pursuing"
 
-#: src/components/interactions/quick-capture-dialog.tsx:302
+#: src/components/interactions/quick-capture-dialog.tsx:307
 msgid "Brief summary (optional)"
 msgstr "Brief summary (optional)"
 
-#: src/components/interactions/quick-capture-dialog.tsx:403
+#: src/components/interactions/quick-capture-dialog.tsx:408
 #: src/components/shared/channel-icon.tsx:50
 msgid "Call"
 msgstr "Call"
 
-#: src/routes/companies/$slug.tsx:379
+#: src/routes/companies/$slug.tsx:386
 msgid "Call phone"
 msgstr "Call phone"
 
-#: src/components/interactions/quick-capture-dialog.tsx:386
+#: src/components/interactions/quick-capture-dialog.tsx:391
 msgid "Cancel"
 msgstr "Cancel"
 
-#: src/components/interactions/quick-capture-dialog.tsx:221
+#: src/components/interactions/quick-capture-dialog.tsx:226
 msgid "Channel"
 msgstr "Channel"
 
-#: src/routes/companies/$slug.tsx:250
+#: src/routes/companies/$slug.tsx:257
 msgid "Check that the session is valid or try again."
 msgstr "Check that the session is valid or try again."
 
-#: src/routes/companies/index.tsx:320
+#: src/routes/companies/index.tsx:324
 msgid "Check that your session is valid or try again."
 msgstr "Check that your session is valid or try again."
 
-#: src/routes/companies/index.tsx:310
-#: src/routes/companies/index.tsx:339
+#: src/routes/companies/index.tsx:314
+#: src/routes/companies/index.tsx:343
 msgid "Clear filters"
 msgstr "Clear filters"
 
-#: src/components/shared/status-badge.tsx:31
+#: src/components/shared/status-badge.tsx:33
 msgid "Client"
 msgstr "Client"
 
-#: src/components/interactions/quick-capture-dialog.tsx:181
+#: src/components/interactions/quick-capture-dialog.tsx:186
 msgid "Close"
 msgstr "Close"
 
-#: src/components/shared/status-badge.tsx:32
+#: src/components/shared/status-badge.tsx:34
 msgid "Closed"
 msgstr "Closed"
 
-#: src/components/shared/status-badge.tsx:43
+#: src/components/shared/status-badge.tsx:45
 msgid "Closed — won or lost"
 msgstr "Closed — won or lost"
 
-#: src/components/shared/status-badge.tsx:37
+#: src/components/shared/status-badge.tsx:39
 msgid "Cold lead — no contact yet"
 msgstr "Cold lead — no contact yet"
 
 #: src/components/layout/nav-items.ts:35
-#: src/routes/companies/index.tsx:257
+#: src/routes/companies/index.tsx:261
 msgid "Companies"
 msgstr "Companies"
 
-#: src/components/interactions/quick-capture-dialog.tsx:190
-#: src/components/interactions/quick-capture-dialog.tsx:199
+#: src/components/interactions/quick-capture-dialog.tsx:195
+#: src/components/interactions/quick-capture-dialog.tsx:204
 #: src/routes/index.tsx:314
 #: src/routes/index.tsx:391
 #: src/routes/index.tsx:431
@@ -140,82 +140,82 @@ msgstr "Company"
 #~ msgid "Company:"
 #~ msgstr "Company:"
 
-#: src/routes/companies/$slug.tsx:557
+#: src/routes/companies/$slug.tsx:564
 msgid "Completed"
 msgstr "Completed"
 
-#: src/components/interactions/quick-capture-dialog.tsx:328
+#: src/components/interactions/quick-capture-dialog.tsx:333
 msgid "Conclusion or commitment (optional)"
 msgstr "Conclusion or commitment (optional)"
 
-#: src/components/shared/status-badge.tsx:27
+#: src/components/shared/status-badge.tsx:29
 msgid "Contacted"
 msgstr "Contacted"
 
-#: src/routes/companies/$slug.tsx:451
+#: src/routes/companies/$slug.tsx:458
 msgid "Contacts"
 msgstr "Contacts"
 
-#: src/components/shared/company-card.tsx:122
+#: src/components/shared/company-card.tsx:124
 msgid "Copy slug"
 msgstr "Copy slug"
 
-#: src/routes/companies/index.tsx:319
+#: src/routes/companies/index.tsx:323
 msgid "Could not load companies"
 msgstr "Could not load companies"
 
-#: src/routes/companies/$slug.tsx:249
+#: src/routes/companies/$slug.tsx:256
 msgid "Could not load this company"
 msgstr "Could not load this company"
 
-#: src/components/interactions/quick-capture-dialog.tsx:157
+#: src/components/interactions/quick-capture-dialog.tsx:162
 msgid "Could not log the interaction. Please try again."
 msgstr "Could not log the interaction. Please try again."
 
-#: src/routes/login.tsx:106
+#: src/routes/login.tsx:107
 msgid "Could not sign in. Check your email and password."
 msgstr "Could not sign in. Check your email and password."
 
-#: src/routes/companies/$slug.tsx:471
+#: src/routes/companies/$slug.tsx:478
 msgid "Current tools"
 msgstr "Current tools"
 
-#: src/components/interactions/quick-capture-dialog.tsx:347
+#: src/components/interactions/quick-capture-dialog.tsx:352
 msgid "Date"
 msgstr "Date"
 
-#: src/components/shared/status-badge.tsx:33
+#: src/components/shared/status-badge.tsx:35
 msgid "Dead"
 msgstr "Dead"
 
-#: src/routes/companies/$slug.tsx:504
+#: src/routes/companies/$slug.tsx:511
 msgid "Decision maker"
 msgstr "Decision maker"
 
-#: src/components/interactions/quick-capture-dialog.tsx:245
+#: src/components/interactions/quick-capture-dialog.tsx:250
 msgid "Direction"
 msgstr "Direction"
 
-#: src/routes/companies/$slug.tsx:457
+#: src/routes/companies/$slug.tsx:464
 msgid "Documents"
 msgstr "Documents"
 
-#: src/components/interactions/quick-capture-dialog.tsx:361
+#: src/components/interactions/quick-capture-dialog.tsx:366
 msgid "Duration (min)"
 msgstr "Duration (min)"
 
-#: src/components/interactions/quick-capture-dialog.tsx:405
+#: src/components/interactions/quick-capture-dialog.tsx:410
 #: src/components/shared/channel-icon.tsx:51
-#: src/routes/login.tsx:140
+#: src/routes/login.tsx:141
 msgid "Email"
 msgstr "Email"
 
 #: src/components/layout/nav-items.ts:41
-#: src/routes/emails/index.tsx:18
+#: src/routes/emails/index.tsx:19
 msgid "Emails"
 msgstr "Emails"
 
-#: src/routes/login.tsx:135
+#: src/routes/login.tsx:136
 msgid "Engranatge internal CRM"
 msgstr "Engranatge internal CRM"
 
@@ -223,19 +223,19 @@ msgstr "Engranatge internal CRM"
 msgid "Event"
 msgstr "Event"
 
-#: src/routes/companies/index.tsx:278
+#: src/routes/companies/index.tsx:282
 msgid "Filter by status"
 msgstr "Filter by status"
 
-#: src/routes/companies/index.tsx:263
+#: src/routes/companies/index.tsx:267
 msgid "Filter companies"
 msgstr "Filter companies"
 
-#: src/components/shared/status-badge.tsx:38
+#: src/components/shared/status-badge.tsx:40
 msgid "First outreach sent"
 msgstr "First outreach sent"
 
-#: src/routes/login.tsx:174
+#: src/routes/login.tsx:175
 msgid "Forja is invite-only. Request access from the Engranatge team."
 msgstr "Forja is invite-only. Request access from the Engranatge team."
 
@@ -244,19 +244,19 @@ msgstr "Forja is invite-only. Request access from the Engranatge team."
 msgid "High priority"
 msgstr "High priority"
 
-#: src/routes/companies/index.tsx:260
+#: src/routes/companies/index.tsx:264
 msgid "In pipeline"
 msgstr "In pipeline"
 
-#: src/components/interactions/quick-capture-dialog.tsx:260
+#: src/components/interactions/quick-capture-dialog.tsx:265
 msgid "Inbound"
 msgstr "Inbound"
 
-#: src/routes/emails/index.tsx:26
+#: src/routes/emails/index.tsx:27
 msgid "Inbox pending wiring"
 msgstr "Inbox pending wiring"
 
-#: src/routes/companies/$slug.tsx:465
+#: src/routes/companies/$slug.tsx:472
 msgid "Industry"
 msgstr "Industry"
 
@@ -264,12 +264,12 @@ msgstr "Industry"
 msgid "Instagram"
 msgstr "Instagram"
 
-#: src/components/interactions/quick-capture-dialog.tsx:149
+#: src/components/interactions/quick-capture-dialog.tsx:154
 msgid "Interaction logged"
 msgstr "Interaction logged"
 
-#: src/components/shared/company-card.tsx:92
-#: src/routes/companies/$slug.tsx:417
+#: src/components/shared/company-card.tsx:94
+#: src/routes/companies/$slug.tsx:424
 msgid "Last contact"
 msgstr "Last contact"
 
@@ -277,7 +277,7 @@ msgstr "Last contact"
 #~ msgid "Last contact:"
 #~ msgstr "Last contact:"
 
-#: src/routes/tasks/index.tsx:307
+#: src/routes/tasks/index.tsx:311
 msgid "Later"
 msgstr "Later"
 
@@ -285,30 +285,30 @@ msgstr "Later"
 msgid "LinkedIn"
 msgstr "LinkedIn"
 
-#: src/routes/companies/index.tsx:316
+#: src/routes/companies/index.tsx:320
 msgid "Loading companies…"
 msgstr "Loading companies…"
 
-#: src/routes/companies/$slug.tsx:467
+#: src/routes/companies/$slug.tsx:474
 msgid "Location"
 msgstr "Location"
 
-#: src/components/interactions/quick-capture-dialog.tsx:389
-#: src/components/layout/top-bar.tsx:38
+#: src/components/interactions/quick-capture-dialog.tsx:394
+#: src/components/layout/top-bar.tsx:42
 msgid "Log"
 msgstr "Log"
 
-#: src/components/shared/task-item.tsx:66
+#: src/components/shared/task-item.tsx:71
 msgid "Log an interaction for this task"
 msgstr "Log an interaction for this task"
 
-#: src/components/interactions/quick-capture-dialog.tsx:177
-#: src/components/shared/company-card.tsx:105
-#: src/routes/companies/$slug.tsx:431
+#: src/components/interactions/quick-capture-dialog.tsx:182
+#: src/components/shared/company-card.tsx:107
+#: src/routes/companies/$slug.tsx:438
 msgid "Log interaction"
 msgstr "Log interaction"
 
-#: src/components/interactions/quick-capture-dialog.tsx:389
+#: src/components/interactions/quick-capture-dialog.tsx:394
 msgid "Logging…"
 msgstr "Logging…"
 
@@ -317,16 +317,16 @@ msgid "Low priority"
 msgstr "Low priority"
 
 #. placeholder {0}: task.title
-#: src/components/shared/task-item.tsx:48
+#: src/components/shared/task-item.tsx:53
 msgid "Mark \"{0}\" as complete"
 msgstr "Mark \"{0}\" as complete"
 
 #. placeholder {0}: task.title
-#: src/components/shared/task-item.tsx:47
+#: src/components/shared/task-item.tsx:52
 msgid "Mark \"{0}\" as pending"
 msgstr "Mark \"{0}\" as pending"
 
-#: src/components/shared/company-card.tsx:115
+#: src/components/shared/company-card.tsx:117
 msgid "Mark contacted"
 msgstr "Mark contacted"
 
@@ -334,12 +334,12 @@ msgstr "Mark contacted"
 msgid "Medium priority"
 msgstr "Medium priority"
 
-#: src/components/interactions/quick-capture-dialog.tsx:404
-#: src/components/shared/status-badge.tsx:29
+#: src/components/interactions/quick-capture-dialog.tsx:409
+#: src/components/shared/status-badge.tsx:31
 msgid "Meeting"
 msgstr "Meeting"
 
-#: src/components/shared/status-badge.tsx:40
+#: src/components/shared/status-badge.tsx:42
 msgid "Meeting booked"
 msgstr "Meeting booked"
 
@@ -347,53 +347,54 @@ msgstr "Meeting booked"
 msgid "Needs attention"
 msgstr "Needs attention"
 
-#: src/routes/companies/$slug.tsx:419
+#: src/routes/companies/$slug.tsx:426
 msgid "never"
 msgstr "never"
 
-#: src/routes/companies/$slug.tsx:440
+#: src/routes/companies/$slug.tsx:447
 msgid "New proposal"
 msgstr "New proposal"
 
-#: src/components/interactions/quick-capture-dialog.tsx:335
-#: src/routes/companies/$slug.tsx:480
+#: src/components/interactions/quick-capture-dialog.tsx:340
+#: src/routes/companies/$slug.tsx:487
 msgid "Next action"
 msgstr "Next action"
 
 #. placeholder {0}: entry.nextAction
-#: src/components/shared/timeline-entry.tsx:52
+#: src/components/shared/timeline-entry.tsx:53
 msgid "Next: {0}"
 msgstr "Next: {0}"
 
-#: src/routes/companies/index.tsx:326
+#: src/routes/companies/index.tsx:330
 msgid "No companies match the filters"
 msgstr "No companies match the filters"
 
-#: src/routes/companies/index.tsx:327
+#: src/routes/companies/index.tsx:331
 msgid "No companies yet"
 msgstr "No companies yet"
 
-#: src/routes/login.tsx:122
+#: src/routes/login.tsx:123
+#: src/routes/profile/index.tsx:67
 msgid "No connection to the server. Try again in a few seconds."
 msgstr "No connection to the server. Try again in a few seconds."
 
-#: src/routes/companies/$slug.tsx:492
+#: src/routes/companies/$slug.tsx:499
 msgid "No contacts yet"
 msgstr "No contacts yet"
 
-#: src/components/shared/task-item.tsx:60
+#: src/components/shared/task-item.tsx:65
 msgid "no date"
 msgstr "no date"
 
-#: src/routes/companies/$slug.tsx:576
+#: src/routes/companies/$slug.tsx:583
 msgid "No documents yet"
 msgstr "No documents yet"
 
-#: src/routes/companies/$slug.tsx:561
+#: src/routes/companies/$slug.tsx:568
 msgid "no due date"
 msgstr "no due date"
 
-#: src/routes/tasks/index.tsx:323
+#: src/routes/tasks/index.tsx:327
 msgid "No due date"
 msgstr "No due date"
 
@@ -401,7 +402,7 @@ msgstr "No due date"
 msgid "No high-priority companies without a scheduled follow-up"
 msgstr "No high-priority companies without a scheduled follow-up"
 
-#: src/routes/companies/$slug.tsx:593
+#: src/routes/companies/$slug.tsx:600
 msgid "No interactions logged yet"
 msgstr "No interactions logged yet"
 
@@ -409,11 +410,11 @@ msgstr "No interactions logged yet"
 msgid "No overdue tasks, no pending follow-ups, no neglected companies."
 msgstr "No overdue tasks, no pending follow-ups, no neglected companies."
 
-#: src/routes/tasks/index.tsx:229
+#: src/routes/tasks/index.tsx:233
 msgid "No pending tasks. Time to celebrate or prospect new leads."
 msgstr "No pending tasks. Time to celebrate or prospect new leads."
 
-#: src/routes/companies/$slug.tsx:549
+#: src/routes/companies/$slug.tsx:556
 msgid "No tasks for this company"
 msgstr "No tasks for this company"
 
@@ -425,31 +426,31 @@ msgstr "No tasks for today"
 msgid "No upcoming due dates"
 msgstr "No upcoming due dates"
 
-#: src/components/interactions/quick-capture-dialog.tsx:406
+#: src/components/interactions/quick-capture-dialog.tsx:411
 msgid "Note"
 msgstr "Note"
 
-#: src/routes/emails/index.tsx:27
+#: src/routes/emails/index.tsx:28
 msgid "Once AgentMail is linked, incoming threads will pin to this board."
 msgstr "Once AgentMail is linked, incoming threads will pin to this board."
 
-#: src/routes/tasks/index.tsx:249
+#: src/routes/tasks/index.tsx:253
 msgid "Open"
 msgstr "Open"
 
-#: src/routes/companies/$slug.tsx:409
+#: src/routes/companies/$slug.tsx:416
 msgid "Open in Google Maps"
 msgstr "Open in Google Maps"
 
-#: src/components/shared/company-card.tsx:119
+#: src/components/shared/company-card.tsx:121
 msgid "Open in new tab"
 msgstr "Open in new tab"
 
-#: src/routes/companies/$slug.tsx:399
+#: src/routes/companies/$slug.tsx:406
 msgid "Open Instagram"
 msgstr "Open Instagram"
 
-#: src/routes/companies/$slug.tsx:389
+#: src/routes/companies/$slug.tsx:396
 msgid "Open LinkedIn"
 msgstr "Open LinkedIn"
 
@@ -457,7 +458,7 @@ msgstr "Open LinkedIn"
 msgid "Open tasks"
 msgstr "Open tasks"
 
-#: src/routes/companies/$slug.tsx:363
+#: src/routes/companies/$slug.tsx:370
 msgid "Open website"
 msgstr "Open website"
 
@@ -465,30 +466,30 @@ msgstr "Open website"
 msgid "Other"
 msgstr "Other"
 
-#: src/components/interactions/quick-capture-dialog.tsx:257
+#: src/components/interactions/quick-capture-dialog.tsx:262
 msgid "Outbound"
 msgstr "Outbound"
 
-#: src/components/interactions/quick-capture-dialog.tsx:321
+#: src/components/interactions/quick-capture-dialog.tsx:326
 msgid "Outcome"
 msgstr "Outcome"
 
 #. placeholder {0}: entry.outcome
-#: src/components/shared/timeline-entry.tsx:51
+#: src/components/shared/timeline-entry.tsx:52
 msgid "Outcome: {0}"
 msgstr "Outcome: {0}"
 
 #: src/routes/index.tsx:270
-#: src/routes/tasks/index.tsx:251
-#: src/routes/tasks/index.tsx:258
+#: src/routes/tasks/index.tsx:255
+#: src/routes/tasks/index.tsx:262
 msgid "Overdue"
 msgstr "Overdue"
 
-#: src/routes/companies/$slug.tsx:475
+#: src/routes/companies/$slug.tsx:482
 msgid "Pain points"
 msgstr "Pain points"
 
-#: src/routes/login.tsx:155
+#: src/routes/login.tsx:156
 msgid "Password"
 msgstr "Password"
 
@@ -497,151 +498,169 @@ msgstr "Password"
 msgid "Pipeline"
 msgstr "Pipeline"
 
-#: src/components/layout/bottom-nav.tsx:20
+#: src/components/layout/bottom-nav.tsx:18
 msgid "Primary navigation"
 msgstr "Primary navigation"
 
-#: src/routes/companies/$slug.tsx:448
-#: src/routes/companies/$slug.tsx:533
+#: src/components/layout/nav-items.ts:53
+#: src/routes/companies/$slug.tsx:455
+#: src/routes/companies/$slug.tsx:540
+#: src/routes/profile/index.tsx:80
 msgid "Profile"
 msgstr "Profile"
 
-#: src/components/shared/status-badge.tsx:30
+#: src/components/shared/status-badge.tsx:32
 msgid "Proposal"
 msgstr "Proposal"
 
-#: src/components/shared/status-badge.tsx:41
+#: src/components/shared/status-badge.tsx:43
 msgid "Proposal in review"
 msgstr "Proposal in review"
 
-#: src/routes/companies/$slug.tsx:577
+#: src/routes/companies/$slug.tsx:584
 msgid "Proposals, meeting notes and attachments will show up here."
 msgstr "Proposals, meeting notes and attachments will show up here."
 
-#: src/components/shared/status-badge.tsx:26
+#: src/components/shared/status-badge.tsx:28
 msgid "Prospect"
 msgstr "Prospect"
 
-#: src/routes/companies/$slug.tsx:466
+#: src/routes/companies/$slug.tsx:473
 msgid "Region"
 msgstr "Region"
 
-#: src/components/shared/status-badge.tsx:28
+#: src/components/shared/status-badge.tsx:30
 msgid "Responded"
 msgstr "Responded"
 
-#: src/routes/companies/index.tsx:270
+#: src/routes/companies/index.tsx:274
 msgid "Search by name, industry, or location…"
 msgstr "Search by name, industry, or location…"
 
-#: src/routes/companies/index.tsx:273
+#: src/routes/companies/index.tsx:277
 msgid "Search companies"
 msgstr "Search companies"
 
-#: src/routes/companies/$slug.tsx:371
+#: src/routes/companies/$slug.tsx:378
 msgid "Send email"
 msgstr "Send email"
 
-#: src/components/shared/timeline-entry.tsx:54
+#: src/components/shared/timeline-entry.tsx:55
 msgid "Show less"
 msgstr "Show less"
 
-#: src/components/shared/timeline-entry.tsx:54
+#: src/components/shared/timeline-entry.tsx:55
 msgid "Show more"
 msgstr "Show more"
 
-#: src/routes/login.tsx:170
+#: src/routes/login.tsx:171
 msgid "Sign in"
 msgstr "Sign in"
 
-#: src/routes/login.tsx:170
+#: src/routes/profile/index.tsx:118
+msgid "Sign out"
+msgstr "Sign out"
+
+#: src/routes/profile/index.tsx:62
+msgid "Sign-out failed. Please try again."
+msgstr "Sign-out failed. Please try again."
+
+#: src/routes/login.tsx:171
 msgid "Signing in…"
 msgstr "Signing in…"
 
-#: src/routes/companies/$slug.tsx:468
+#: src/routes/profile/index.tsx:118
+msgid "Signing out…"
+msgstr "Signing out…"
+
+#: src/routes/companies/$slug.tsx:475
 msgid "Size"
 msgstr "Size"
 
-#: src/routes/companies/$slug.tsx:469
+#: src/routes/companies/$slug.tsx:476
 msgid "Source"
 msgstr "Source"
 
-#: src/components/interactions/quick-capture-dialog.tsx:150
+#: src/components/interactions/quick-capture-dialog.tsx:155
 msgid "Stamped into the workshop ledger."
 msgstr "Stamped into the workshop ledger."
 
-#: src/components/interactions/quick-capture-dialog.tsx:295
+#: src/components/interactions/quick-capture-dialog.tsx:300
 msgid "Subject"
 msgstr "Subject"
 
-#: src/components/interactions/quick-capture-dialog.tsx:308
+#: src/components/interactions/quick-capture-dialog.tsx:313
 msgid "Summary"
 msgstr "Summary"
 
 #: src/components/layout/nav-items.ts:47
-#: src/routes/companies/$slug.tsx:454
-#: src/routes/tasks/index.tsx:220
-#: src/routes/tasks/index.tsx:242
+#: src/routes/companies/$slug.tsx:461
+#: src/routes/tasks/index.tsx:224
+#: src/routes/tasks/index.tsx:246
 msgid "Tasks"
 msgstr "Tasks"
 
-#: src/routes/emails/index.tsx:21
+#: src/routes/emails/index.tsx:22
 msgid "The inbox will be connected in a future session."
 msgstr "The inbox will be connected in a future session."
 
-#: src/routes/tasks/index.tsx:223
-#: src/routes/tasks/index.tsx:245
+#: src/routes/tasks/index.tsx:227
+#: src/routes/tasks/index.tsx:249
 msgid "The workshop ledger — tear off one strip at a time."
 msgstr "The workshop ledger — tear off one strip at a time."
 
-#: src/components/shared/status-badge.tsx:39
+#: src/components/shared/status-badge.tsx:41
 msgid "They replied — keep the thread warm"
 msgstr "They replied — keep the thread warm"
 
 #: src/routes/index.tsx:416
-#: src/routes/tasks/index.tsx:291
+#: src/routes/tasks/index.tsx:295
 msgid "This week"
 msgstr "This week"
 
-#: src/routes/companies/$slug.tsx:587
+#: src/routes/companies/$slug.tsx:594
 msgid "Timeline"
 msgstr "Timeline"
 
 #: src/routes/index.tsx:376
-#: src/routes/tasks/index.tsx:275
+#: src/routes/tasks/index.tsx:279
 msgid "Today"
 msgstr "Today"
 
-#: src/routes/companies/index.tsx:331
+#: src/routes/companies/index.tsx:335
 msgid "Try different criteria or clear the filters."
 msgstr "Try different criteria or clear the filters."
 
-#: src/components/interactions/quick-capture-dialog.tsx:266
+#: src/components/interactions/quick-capture-dialog.tsx:271
 msgid "Type"
 msgstr "Type"
 
-#: src/routes/tasks/index.tsx:199
+#: src/routes/tasks/index.tsx:203
 msgid "Unknown company"
 msgstr "Unknown company"
 
-#: src/routes/companies/$slug.tsx:594
+#: src/routes/profile/index.tsx:73
+msgid "Unknown user"
+msgstr "Unknown user"
+
+#: src/routes/companies/$slug.tsx:601
 msgid "Use “Log interaction” above to record the first touch."
 msgstr "Use “Log interaction” above to record the first touch."
 
 #: src/components/layout/top-bar.tsx:46
 #: src/components/layout/top-bar.tsx:55
-msgid "User menu"
-msgstr "User menu"
+#~ msgid "User menu"
+#~ msgstr "User menu"
 
 #: src/components/shared/channel-icon.tsx:52
 msgid "Visit"
 msgstr "Visit"
 
-#: src/components/interactions/quick-capture-dialog.tsx:315
+#: src/components/interactions/quick-capture-dialog.tsx:320
 msgid "What happened?"
 msgstr "What happened?"
 
-#: src/components/interactions/quick-capture-dialog.tsx:342
+#: src/components/interactions/quick-capture-dialog.tsx:347
 msgid "What needs to happen?"
 msgstr "What needs to happen?"
 
@@ -652,3 +671,7 @@ msgstr "WhatsApp"
 #: src/routes/index.tsx:263
 msgid "Workshop floor — live counters on the bench."
 msgstr "Workshop floor — live counters on the bench."
+
+#: src/routes/profile/index.tsx:83
+msgid "Your Forja workbench identity."
+msgstr "Your Forja workbench identity."

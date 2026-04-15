@@ -29,6 +29,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 const Shell = styled.div.withConfig({ displayName: 'AppShell' })`
+	/* Create a root stacking context for all app chrome so the PriDialog
+	 * portal (appended to <body>, outside this subtree) can sit above
+	 * z-indexed app elements like TopBar and BottomNav — matches the
+	 * pattern Base UI recommends in its dialog docs. */
+	isolation: isolate;
+
 	display: flex;
 	flex-direction: column;
 	min-height: 100dvh;

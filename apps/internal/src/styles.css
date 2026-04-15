@@ -6,7 +6,7 @@
 	 * bottom nav, fixed widths for the desktop side nav, or sticky top-bar
 	 * offsets reference these tokens. */
 	--bottom-nav-height: 4.5rem;
-	--side-nav-width: 15rem; /* 240px at 16px root */
+	--side-nav-width: 8rem; /* 128px — narrow pegboard: knob + label below */
 	--top-bar-height: 3.5rem;
 }
 

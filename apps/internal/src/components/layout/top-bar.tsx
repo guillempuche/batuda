@@ -1,11 +1,11 @@
 import { useLingui as useLinguiCore } from '@lingui/react'
-import { Trans, useLingui } from '@lingui/react/macro'
+import { Trans } from '@lingui/react/macro'
 import { useRouterState } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import { motion } from 'motion/react'
 import styled from 'styled-components'
 
-import { PriAvatar, PriButton, PriTooltip } from '@engranatge/ui/pri'
+import { PriButton } from '@engranatge/ui/pri'
 
 import { ScrewDot } from '#/components/shared/workshop-decorations'
 import { useQuickCapture } from '#/context/quick-capture-context'
@@ -16,7 +16,8 @@ import { navItems } from './nav-items'
  * Sheet-metal label strip across the top of the content column. Renders
  * the current page title in stenciled display-font with an embossed
  * shadow, plus a stamped-metal "Log" CTA that opens the QuickCapture
- * dialog.
+ * dialog. The current user lives on the sidebar/bottom-nav Profile
+ * entry — this bar intentionally stays focused on page title + Log.
  *
  * Page title is derived from the longest-prefix match in `navItems` so
  * sub-routes (e.g. `/companies/$slug`) still read as their parent area.
@@ -24,7 +25,6 @@ import { navItems } from './nav-items'
 export function TopBar() {
 	const pathname = useRouterState({ select: state => state.location.pathname })
 	const { open } = useQuickCapture()
-	const { t } = useLingui()
 	const { i18n } = useLinguiCore()
 	const descriptor = deriveTitleDescriptor(pathname)
 	const title = descriptor ? i18n._(descriptor) : 'Forja'
@@ -43,24 +43,6 @@ export function TopBar() {
 						</span>
 					</PriButton>
 				</motion.div>
-				<PriTooltip.Provider delay={300}>
-					<PriTooltip.Root>
-						<PriTooltip.Trigger
-							render={
-								<UserMenuButton type='button' aria-label={t`User menu`} />
-							}
-						>
-							<PriAvatar.Root>
-								<PriAvatar.Fallback>U</PriAvatar.Fallback>
-							</PriAvatar.Root>
-						</PriTooltip.Trigger>
-						<PriTooltip.Portal>
-							<PriTooltip.Positioner sideOffset={6}>
-								<PriTooltip.Popup>{t`User menu`}</PriTooltip.Popup>
-							</PriTooltip.Positioner>
-						</PriTooltip.Portal>
-					</PriTooltip.Root>
-				</PriTooltip.Provider>
 			</Actions>
 		</Bar>
 	)
@@ -120,22 +102,4 @@ const Actions = styled.div.withConfig({ displayName: 'TopBarActions' })`
 	flex-shrink: 0;
 	align-items: center;
 	gap: var(--space-sm);
-`
-
-const UserMenuButton = styled.button.withConfig({
-	displayName: 'TopBarUserMenu',
-})`
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	padding: 0;
-	border: none;
-	background: transparent;
-	border-radius: 50%;
-	cursor: pointer;
-
-	&:focus-visible {
-		outline: none;
-		box-shadow: var(--glow-active);
-	}
 `

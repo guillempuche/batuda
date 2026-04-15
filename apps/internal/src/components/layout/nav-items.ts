@@ -1,6 +1,6 @@
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
-import { Building2, CheckSquare, Gauge, Mail } from 'lucide-react'
+import { Building2, CheckSquare, Gauge, Mail, User } from 'lucide-react'
 import type { ComponentType } from 'react'
 
 /**
@@ -48,5 +48,11 @@ export const navItems: ReadonlyArray<NavItem> = [
 		path: '/tasks',
 		icon: CheckSquare,
 		color: 'var(--color-status-responded)',
+	},
+	{
+		label: msg`Profile`,
+		path: '/profile',
+		icon: User,
+		color: 'var(--color-status-prospect)',
 	},
 ]
