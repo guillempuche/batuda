@@ -2004,9 +2004,52 @@ export const seed = (preset: Preset) =>
 			]
 			yield* sql`INSERT INTO pages ${sql.insert(normalizeRows(pageRows))}`
 
-			// 9. Email threads + messages
+			// 9. Email inboxes (local metadata mirroring provider inboxes).
+			// Two seed inboxes to start: a human inbox (default) and an agent
+			// inbox for AI workflows. Operators add/remove more via the inbox
+			// management UI.
+			yield* Effect.logInfo('Seeding email inboxes...')
+			const humanInboxId = 'guillem@engranatge.com'
+			const agentInboxId = 'hola@engranatge.com'
+
+			const inboxRows = [
+				{
+					provider: 'agentmail',
+					providerInboxId: humanInboxId,
+					email: humanInboxId,
+					displayName: 'Guillem Puche',
+					purpose: 'human',
+					ownerUserId: null,
+					isDefault: true,
+					active: true,
+					clientId: 'forja:human',
+				},
+				{
+					provider: 'agentmail',
+					providerInboxId: agentInboxId,
+					email: agentInboxId,
+					displayName: 'Forja AI assistant',
+					purpose: 'agent',
+					ownerUserId: null,
+					isDefault: false,
+					active: true,
+					clientId: 'forja:agent',
+				},
+			]
+			yield* sql`INSERT INTO inboxes ${sql.insert(normalizeRows(inboxRows))}`
+
+			const inboxIdRows = yield* sql<{
+				id: string
+				providerInboxId: string
+			}>`SELECT id, provider_inbox_id FROM inboxes`
+			const inboxIdMap = new Map(
+				inboxIdRows.map(r => [r.providerInboxId, r.id]),
+			)
+			const humanInboxUuid = inboxIdMap.get(humanInboxId)!
+
+			// 10. Email threads + messages
 			yield* Effect.logInfo('Seeding email threads & messages...')
-			const inboxId = 'info@engranatge.com'
+			const inboxId = humanInboxId
 
 			const emailThreadRows = [
 				{
@@ -2120,7 +2163,11 @@ export const seed = (preset: Preset) =>
 					status: 'open',
 				},
 			]
-			yield* sql`INSERT INTO email_thread_links ${sql.insert(normalizeRows(emailThreadRows))}`
+			const emailThreadRowsWithInbox = emailThreadRows.map(r => ({
+				...r,
+				inboxId: humanInboxUuid,
+			}))
+			yield* sql`INSERT INTO email_thread_links ${sql.insert(normalizeRows(emailThreadRowsWithInbox))}`
 
 			const emailMessageRows = [
 				// Thread: Cal Pep — delivered outbound + delivered inbound reply
@@ -2132,7 +2179,11 @@ export const seed = (preset: Preset) =>
 					direction: 'outbound',
 					companyId: companyMap.get('cal-pep-fonda')!,
 					contactId: contactMap.get('Pep Casals'),
-					recipients: JSON.stringify(['pep@calpepfonda.cat']),
+					recipients: JSON.stringify({
+						to: ['pep@calpepfonda.cat'],
+						cc: [],
+						bcc: [],
+					}),
 					status: 'delivered',
 					inboundClassification: null,
 					statusUpdatedAt: new Date('2026-02-20T10:00:00Z'),
@@ -2145,7 +2196,11 @@ export const seed = (preset: Preset) =>
 					direction: 'inbound',
 					companyId: companyMap.get('cal-pep-fonda')!,
 					contactId: contactMap.get('Pep Casals'),
-					recipients: JSON.stringify(['dev@forja.cat']),
+					recipients: JSON.stringify({
+						to: ['dev@forja.cat'],
+						cc: [],
+						bcc: [],
+					}),
 					status: 'delivered',
 					inboundClassification: 'normal',
 					statusUpdatedAt: new Date('2026-02-21T08:30:00Z'),
@@ -2159,7 +2214,11 @@ export const seed = (preset: Preset) =>
 					direction: 'outbound',
 					companyId: companyMap.get('ferros-baix-llobregat')!,
 					contactId: contactMap.get('Marta Soler'),
-					recipients: JSON.stringify(['marta@ferrosbl.com']),
+					recipients: JSON.stringify({
+						to: ['marta@ferrosbl.com'],
+						cc: [],
+						bcc: [],
+					}),
 					status: 'sent',
 					inboundClassification: null,
 					statusUpdatedAt: new Date('2026-03-06T14:00:00Z'),
@@ -2173,7 +2232,11 @@ export const seed = (preset: Preset) =>
 					direction: 'outbound',
 					companyId: companyMap.get('ferros-baix-llobregat')!,
 					contactId: contactMap.get('Jordi Puig'),
-					recipients: JSON.stringify(['gerencia@ferrosbl.com']),
+					recipients: JSON.stringify({
+						to: ['gerencia@ferrosbl.com'],
+						cc: [],
+						bcc: [],
+					}),
 					status: 'bounced',
 					statusReason: 'Permanent/General — mailbox does not exist',
 					bounceType: 'Permanent',
@@ -2190,7 +2253,11 @@ export const seed = (preset: Preset) =>
 					direction: 'outbound',
 					companyId: companyMap.get('coastal-freight')!,
 					contactId: contactMap.get('Tom Parker'),
-					recipients: JSON.stringify(['ops@coastalfreight.es']),
+					recipients: JSON.stringify({
+						to: ['ops@coastalfreight.es'],
+						cc: [],
+						bcc: [],
+					}),
 					status: 'bounced_soft',
 					statusReason: 'Transient/MailboxFull',
 					bounceType: 'Transient',
@@ -2207,7 +2274,11 @@ export const seed = (preset: Preset) =>
 					direction: 'outbound',
 					companyId: companyMap.get('hostal-pirineu')!,
 					contactId: contactMap.get('Arnau Ribas'),
-					recipients: JSON.stringify(['reserves@hostalpirineu.com']),
+					recipients: JSON.stringify({
+						to: ['reserves@hostalpirineu.com'],
+						cc: [],
+						bcc: [],
+					}),
 					status: 'delivered',
 					inboundClassification: null,
 					statusUpdatedAt: new Date('2026-04-06T15:00:00Z'),
@@ -2220,7 +2291,11 @@ export const seed = (preset: Preset) =>
 					direction: 'inbound',
 					companyId: companyMap.get('hostal-pirineu')!,
 					contactId: contactMap.get('Arnau Ribas'),
-					recipients: JSON.stringify(['dev@forja.cat']),
+					recipients: JSON.stringify({
+						to: ['dev@forja.cat'],
+						cc: [],
+						bcc: [],
+					}),
 					status: 'delivered',
 					inboundClassification: 'normal',
 					statusUpdatedAt: new Date('2026-04-07T09:15:00Z'),
@@ -2234,7 +2309,11 @@ export const seed = (preset: Preset) =>
 					direction: 'outbound',
 					companyId: companyMap.get('bright-lane-boutique')!,
 					contactId: contactMap.get('Sarah Mitchell'),
-					recipients: JSON.stringify(['hello@brightlane.cat']),
+					recipients: JSON.stringify({
+						to: ['hello@brightlane.cat'],
+						cc: [],
+						bcc: [],
+					}),
 					status: 'complained',
 					statusReason: 'Recipient marked as spam',
 					inboundClassification: null,
@@ -2249,7 +2328,11 @@ export const seed = (preset: Preset) =>
 					direction: 'outbound',
 					companyId: companyMap.get('distribuciones-martinez')!,
 					contactId: contactMap.get('Carlos Martínez'),
-					recipients: JSON.stringify(['carlos@dismartinez.es']),
+					recipients: JSON.stringify({
+						to: ['carlos@dismartinez.es'],
+						cc: [],
+						bcc: [],
+					}),
 					status: 'rejected',
 					statusReason: 'Sending quota exceeded',
 					inboundClassification: null,
@@ -2264,7 +2347,11 @@ export const seed = (preset: Preset) =>
 					direction: 'outbound',
 					companyId: companyMap.get('park-stone-design')!,
 					contactId: null,
-					recipients: JSON.stringify(['hello@parkstonedesign.com']),
+					recipients: JSON.stringify({
+						to: ['hello@parkstonedesign.com'],
+						cc: [],
+						bcc: [],
+					}),
 					status: 'delivered',
 					inboundClassification: null,
 					statusUpdatedAt: new Date('2026-02-15T12:00:00Z'),
@@ -2278,7 +2365,11 @@ export const seed = (preset: Preset) =>
 					direction: 'inbound',
 					companyId: null,
 					contactId: null,
-					recipients: JSON.stringify(['dev@forja.cat']),
+					recipients: JSON.stringify({
+						to: ['dev@forja.cat'],
+						cc: [],
+						bcc: [],
+					}),
 					status: 'delivered',
 					inboundClassification: 'normal',
 					statusUpdatedAt: new Date('2026-04-10T08:00:00Z'),
@@ -2292,7 +2383,11 @@ export const seed = (preset: Preset) =>
 					direction: 'outbound',
 					companyId: companyMap.get('tancaments-garraf')!,
 					contactId: contactMap.get('Ramon Vila'),
-					recipients: JSON.stringify(['ramon@tancamentsgarraf.cat']),
+					recipients: JSON.stringify({
+						to: ['ramon@tancamentsgarraf.cat'],
+						cc: [],
+						bcc: [],
+					}),
 					status: 'delivered',
 					inboundClassification: null,
 					statusUpdatedAt: new Date('2026-03-19T09:00:00Z'),
@@ -2305,7 +2400,11 @@ export const seed = (preset: Preset) =>
 					direction: 'inbound',
 					companyId: companyMap.get('tancaments-garraf')!,
 					contactId: contactMap.get('Ramon Vila'),
-					recipients: JSON.stringify(['dev@forja.cat']),
+					recipients: JSON.stringify({
+						to: ['dev@forja.cat'],
+						cc: [],
+						bcc: [],
+					}),
 					status: 'delivered',
 					inboundClassification: 'normal',
 					statusUpdatedAt: new Date('2026-03-19T14:30:00Z'),
@@ -2318,7 +2417,11 @@ export const seed = (preset: Preset) =>
 					direction: 'outbound',
 					companyId: companyMap.get('tancaments-garraf')!,
 					contactId: contactMap.get('Ramon Vila'),
-					recipients: JSON.stringify(['ramon@tancamentsgarraf.cat']),
+					recipients: JSON.stringify({
+						to: ['ramon@tancamentsgarraf.cat'],
+						cc: [],
+						bcc: [],
+					}),
 					status: 'delivered',
 					inboundClassification: null,
 					statusUpdatedAt: new Date('2026-03-20T10:00:00Z'),
@@ -2332,7 +2435,11 @@ export const seed = (preset: Preset) =>
 					direction: 'inbound',
 					companyId: null,
 					contactId: null,
-					recipients: JSON.stringify(['info@engranatge.com']),
+					recipients: JSON.stringify({
+						to: ['info@engranatge.com'],
+						cc: [],
+						bcc: [],
+					}),
 					status: 'delivered',
 					inboundClassification: 'spam',
 					statusUpdatedAt: new Date('2026-04-11T02:14:00Z'),
@@ -2346,7 +2453,11 @@ export const seed = (preset: Preset) =>
 					direction: 'inbound',
 					companyId: null,
 					contactId: null,
-					recipients: JSON.stringify(['info@engranatge.com']),
+					recipients: JSON.stringify({
+						to: ['info@engranatge.com'],
+						cc: [],
+						bcc: [],
+					}),
 					status: 'delivered',
 					inboundClassification: 'blocked',
 					statusUpdatedAt: new Date('2026-04-12T03:47:00Z'),

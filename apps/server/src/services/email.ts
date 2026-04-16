@@ -148,7 +148,11 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								direction: 'outbound',
 								companyId,
 								contactId: contactId ?? null,
-								recipients: JSON.stringify(Array.isArray(to) ? to : [to]),
+								recipients: JSON.stringify({
+									to: Array.isArray(to) ? to : [to],
+									cc: [],
+									bcc: [],
+								}),
 								status: 'sent',
 								statusUpdatedAt: new Date(),
 							})}
@@ -272,7 +276,11 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								direction: 'outbound',
 								companyId: link.companyId,
 								contactId: link.contactId,
-								recipients: JSON.stringify(replyRecipients),
+								recipients: JSON.stringify({
+									to: replyRecipients,
+									cc: [],
+									bcc: [],
+								}),
 								status: 'sent',
 								statusUpdatedAt: new Date(),
 							})}
@@ -298,6 +306,20 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					classification?: InboundClassification
 				}) =>
 					Effect.gen(function* () {
+						// Fetch the full message from the provider so we record
+						// authoritative To/Cc (our inbox + anyone else on the
+						// thread) rather than faking recipients from the sender.
+						const providerMessage = yield* provider
+							.getMessage(payload.providerInboxId, payload.providerMessageId)
+							.pipe(
+								Effect.catch(() =>
+									Effect.succeed({
+										to: [] as string[],
+										cc: undefined as string[] | undefined,
+									}),
+								),
+							)
+
 						const existingLinks = yield* sql`
 							SELECT * FROM email_thread_links
 							WHERE provider_thread_id = ${payload.providerThreadId}
@@ -377,7 +399,11 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								direction: 'inbound',
 								companyId,
 								contactId,
-								recipients: JSON.stringify([payload.from]),
+								recipients: JSON.stringify({
+									to: providerMessage.to,
+									cc: providerMessage.cc ?? [],
+									bcc: [],
+								}),
 								status: 'delivered',
 								inboundClassification: payload.classification ?? 'normal',
 								statusUpdatedAt: new Date(),
