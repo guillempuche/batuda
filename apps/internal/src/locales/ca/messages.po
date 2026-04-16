@@ -1,0 +1,650 @@
+msgid ""
+msgstr ""
+"POT-Creation-Date: 2026-04-16 22:38+0200\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: @lingui/cli\n"
+"Language: ca\n"
+
+#: src/components/interactions/quick-capture-dialog.tsx:213
+msgid "— Select a company —"
+msgstr ""
+
+#. placeholder {0}: companies.length
+#: src/routes/companies/index.tsx:255
+msgid "{0} companies"
+msgstr ""
+
+#. placeholder {0}: companies.length
+#: src/routes/companies/index.tsx:252
+msgid "{0} companies with filters applied"
+msgstr ""
+
+#: src/routes/companies/index.tsx:254
+msgid "1 company"
+msgstr ""
+
+#: src/components/shared/status-badge.tsx:44
+msgid "Active client"
+msgstr ""
+
+#: src/routes/index.tsx:268
+msgid "Active companies"
+msgstr ""
+
+#: src/components/shared/company-card.tsx:112
+#: src/routes/companies/$slug.tsx:443
+msgid "Add task"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:500
+msgid "Add the first decision-maker to keep track of who to reach."
+msgstr ""
+
+#: src/routes/companies/index.tsx:288
+msgid "All"
+msgstr ""
+
+#: src/routes/index.tsx:299
+#: src/routes/tasks/index.tsx:232
+msgid "All under control"
+msgstr ""
+
+#: src/components/shared/status-badge.tsx:46
+msgid "Archived — not pursuing"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:307
+msgid "Brief summary (optional)"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:408
+#: src/components/shared/channel-icon.tsx:50
+msgid "Call"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:386
+msgid "Call phone"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:391
+msgid "Cancel"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:226
+msgid "Channel"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:257
+msgid "Check that the session is valid or try again."
+msgstr ""
+
+#: src/routes/companies/index.tsx:324
+msgid "Check that your session is valid or try again."
+msgstr ""
+
+#: src/routes/companies/index.tsx:314
+#: src/routes/companies/index.tsx:343
+msgid "Clear filters"
+msgstr ""
+
+#: src/components/shared/status-badge.tsx:33
+msgid "Client"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:186
+msgid "Close"
+msgstr ""
+
+#: src/components/shared/status-badge.tsx:34
+msgid "Closed"
+msgstr ""
+
+#: src/components/shared/status-badge.tsx:45
+msgid "Closed — won or lost"
+msgstr ""
+
+#: src/components/shared/status-badge.tsx:39
+msgid "Cold lead — no contact yet"
+msgstr ""
+
+#: src/components/layout/nav-items.ts:35
+#: src/routes/companies/index.tsx:261
+msgid "Companies"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:195
+#: src/components/interactions/quick-capture-dialog.tsx:204
+#: src/routes/index.tsx:314
+#: src/routes/index.tsx:391
+#: src/routes/index.tsx:431
+msgid "Company"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:564
+msgid "Completed"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:333
+msgid "Conclusion or commitment (optional)"
+msgstr ""
+
+#: src/components/shared/status-badge.tsx:29
+msgid "Contacted"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:458
+msgid "Contacts"
+msgstr ""
+
+#: src/components/shared/company-card.tsx:124
+msgid "Copy slug"
+msgstr ""
+
+#: src/routes/companies/index.tsx:323
+msgid "Could not load companies"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:256
+msgid "Could not load this company"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:162
+msgid "Could not log the interaction. Please try again."
+msgstr ""
+
+#: src/routes/login.tsx:107
+msgid "Could not sign in. Check your email and password."
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:478
+msgid "Current tools"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:352
+msgid "Date"
+msgstr ""
+
+#: src/components/shared/status-badge.tsx:35
+msgid "Dead"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:511
+msgid "Decision maker"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:250
+msgid "Direction"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:464
+msgid "Documents"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:366
+msgid "Duration (min)"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:410
+#: src/components/shared/channel-icon.tsx:51
+#: src/routes/login.tsx:141
+msgid "Email"
+msgstr ""
+
+#: src/components/layout/nav-items.ts:41
+#: src/routes/emails/index.tsx:19
+msgid "Emails"
+msgstr ""
+
+#: src/routes/login.tsx:136
+msgid "Engranatge internal CRM"
+msgstr ""
+
+#: src/components/shared/channel-icon.tsx:56
+msgid "Event"
+msgstr ""
+
+#: src/routes/companies/index.tsx:282
+msgid "Filter by status"
+msgstr ""
+
+#: src/routes/companies/index.tsx:267
+msgid "Filter companies"
+msgstr ""
+
+#: src/components/shared/status-badge.tsx:40
+msgid "First outreach sent"
+msgstr ""
+
+#: src/routes/login.tsx:175
+msgid "Forja is invite-only. Request access from the Engranatge team."
+msgstr ""
+
+#: src/components/shared/priority-dot.tsx:47
+#: src/routes/index.tsx:458
+msgid "High priority"
+msgstr ""
+
+#: src/routes/companies/index.tsx:264
+msgid "In pipeline"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:265
+msgid "Inbound"
+msgstr ""
+
+#: src/routes/emails/index.tsx:27
+msgid "Inbox pending wiring"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:472
+msgid "Industry"
+msgstr ""
+
+#: src/components/shared/channel-icon.tsx:54
+msgid "Instagram"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:154
+msgid "Interaction logged"
+msgstr ""
+
+#: src/components/shared/company-card.tsx:94
+#: src/routes/companies/$slug.tsx:424
+msgid "Last contact"
+msgstr ""
+
+#: src/routes/tasks/index.tsx:311
+msgid "Later"
+msgstr ""
+
+#: src/components/shared/channel-icon.tsx:53
+msgid "LinkedIn"
+msgstr ""
+
+#: src/routes/companies/index.tsx:320
+msgid "Loading companies…"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:474
+msgid "Location"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:394
+#: src/components/layout/top-bar.tsx:42
+msgid "Log"
+msgstr ""
+
+#: src/components/shared/task-item.tsx:71
+msgid "Log an interaction for this task"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:182
+#: src/components/shared/company-card.tsx:107
+#: src/routes/companies/$slug.tsx:438
+msgid "Log interaction"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:394
+msgid "Logging…"
+msgstr ""
+
+#: src/components/shared/priority-dot.tsx:49
+msgid "Low priority"
+msgstr ""
+
+#. placeholder {0}: task.title
+#: src/components/shared/task-item.tsx:53
+msgid "Mark \"{0}\" as complete"
+msgstr ""
+
+#. placeholder {0}: task.title
+#: src/components/shared/task-item.tsx:52
+msgid "Mark \"{0}\" as pending"
+msgstr ""
+
+#: src/components/shared/company-card.tsx:117
+msgid "Mark contacted"
+msgstr ""
+
+#: src/components/shared/priority-dot.tsx:48
+msgid "Medium priority"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:409
+#: src/components/shared/status-badge.tsx:31
+msgid "Meeting"
+msgstr ""
+
+#: src/components/shared/status-badge.tsx:42
+msgid "Meeting booked"
+msgstr ""
+
+#: src/routes/index.tsx:288
+msgid "Needs attention"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:426
+msgid "never"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:447
+msgid "New proposal"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:340
+#: src/routes/companies/$slug.tsx:487
+msgid "Next action"
+msgstr ""
+
+#. placeholder {0}: entry.nextAction
+#: src/components/shared/timeline-entry.tsx:53
+msgid "Next: {0}"
+msgstr ""
+
+#: src/routes/companies/index.tsx:330
+msgid "No companies match the filters"
+msgstr ""
+
+#: src/routes/companies/index.tsx:331
+msgid "No companies yet"
+msgstr ""
+
+#: src/routes/login.tsx:123
+#: src/routes/profile/index.tsx:67
+msgid "No connection to the server. Try again in a few seconds."
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:499
+msgid "No contacts yet"
+msgstr ""
+
+#: src/components/shared/task-item.tsx:65
+msgid "no date"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:583
+msgid "No documents yet"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:568
+msgid "no due date"
+msgstr ""
+
+#: src/routes/tasks/index.tsx:327
+msgid "No due date"
+msgstr ""
+
+#: src/routes/index.tsx:461
+msgid "No high-priority companies without a scheduled follow-up"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:600
+msgid "No interactions logged yet"
+msgstr ""
+
+#: src/routes/index.tsx:300
+msgid "No overdue tasks, no pending follow-ups, no neglected companies."
+msgstr ""
+
+#: src/routes/tasks/index.tsx:233
+msgid "No pending tasks. Time to celebrate or prospect new leads."
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:556
+msgid "No tasks for this company"
+msgstr ""
+
+#: src/routes/index.tsx:378
+msgid "No tasks for today"
+msgstr ""
+
+#: src/routes/index.tsx:418
+msgid "No upcoming due dates"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:411
+msgid "Note"
+msgstr ""
+
+#: src/routes/emails/index.tsx:28
+msgid "Once AgentMail is linked, incoming threads will pin to this board."
+msgstr ""
+
+#: src/routes/tasks/index.tsx:253
+msgid "Open"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:416
+msgid "Open in Google Maps"
+msgstr ""
+
+#: src/components/shared/company-card.tsx:121
+msgid "Open in new tab"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:406
+msgid "Open Instagram"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:396
+msgid "Open LinkedIn"
+msgstr ""
+
+#: src/routes/index.tsx:269
+msgid "Open tasks"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:370
+msgid "Open website"
+msgstr ""
+
+#: src/components/shared/channel-icon.tsx:57
+msgid "Other"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:262
+msgid "Outbound"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:326
+msgid "Outcome"
+msgstr ""
+
+#. placeholder {0}: entry.outcome
+#: src/components/shared/timeline-entry.tsx:52
+msgid "Outcome: {0}"
+msgstr ""
+
+#: src/routes/index.tsx:270
+#: src/routes/tasks/index.tsx:255
+#: src/routes/tasks/index.tsx:262
+msgid "Overdue"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:482
+msgid "Pain points"
+msgstr ""
+
+#: src/routes/login.tsx:156
+msgid "Password"
+msgstr ""
+
+#: src/components/layout/nav-items.ts:28
+#: src/routes/index.tsx:260
+msgid "Pipeline"
+msgstr ""
+
+#: src/components/layout/bottom-nav.tsx:18
+msgid "Primary navigation"
+msgstr ""
+
+#: src/components/layout/nav-items.ts:53
+#: src/routes/companies/$slug.tsx:455
+#: src/routes/companies/$slug.tsx:540
+#: src/routes/profile/index.tsx:80
+msgid "Profile"
+msgstr ""
+
+#: src/components/shared/status-badge.tsx:32
+msgid "Proposal"
+msgstr ""
+
+#: src/components/shared/status-badge.tsx:43
+msgid "Proposal in review"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:584
+msgid "Proposals, meeting notes and attachments will show up here."
+msgstr ""
+
+#: src/components/shared/status-badge.tsx:28
+msgid "Prospect"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:473
+msgid "Region"
+msgstr ""
+
+#: src/components/shared/status-badge.tsx:30
+msgid "Responded"
+msgstr ""
+
+#: src/routes/companies/index.tsx:274
+msgid "Search by name, industry, or location…"
+msgstr ""
+
+#: src/routes/companies/index.tsx:277
+msgid "Search companies"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:378
+msgid "Send email"
+msgstr ""
+
+#: src/components/shared/timeline-entry.tsx:55
+msgid "Show less"
+msgstr ""
+
+#: src/components/shared/timeline-entry.tsx:55
+msgid "Show more"
+msgstr ""
+
+#: src/routes/login.tsx:171
+msgid "Sign in"
+msgstr ""
+
+#: src/routes/profile/index.tsx:118
+msgid "Sign out"
+msgstr ""
+
+#: src/routes/profile/index.tsx:62
+msgid "Sign-out failed. Please try again."
+msgstr ""
+
+#: src/routes/login.tsx:171
+msgid "Signing in…"
+msgstr ""
+
+#: src/routes/profile/index.tsx:118
+msgid "Signing out…"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:475
+msgid "Size"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:476
+msgid "Source"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:155
+msgid "Stamped into the workshop ledger."
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:300
+msgid "Subject"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:313
+msgid "Summary"
+msgstr ""
+
+#: src/components/layout/nav-items.ts:47
+#: src/routes/companies/$slug.tsx:461
+#: src/routes/tasks/index.tsx:224
+#: src/routes/tasks/index.tsx:246
+msgid "Tasks"
+msgstr ""
+
+#: src/routes/emails/index.tsx:22
+msgid "The inbox will be connected in a future session."
+msgstr ""
+
+#: src/routes/tasks/index.tsx:227
+#: src/routes/tasks/index.tsx:249
+msgid "The workshop ledger — tear off one strip at a time."
+msgstr ""
+
+#: src/components/shared/status-badge.tsx:41
+msgid "They replied — keep the thread warm"
+msgstr ""
+
+#: src/routes/index.tsx:416
+#: src/routes/tasks/index.tsx:295
+msgid "This week"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:594
+msgid "Timeline"
+msgstr ""
+
+#: src/routes/index.tsx:376
+#: src/routes/tasks/index.tsx:279
+msgid "Today"
+msgstr ""
+
+#: src/routes/companies/index.tsx:335
+msgid "Try different criteria or clear the filters."
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:271
+msgid "Type"
+msgstr ""
+
+#: src/routes/tasks/index.tsx:203
+msgid "Unknown company"
+msgstr ""
+
+#: src/routes/profile/index.tsx:73
+msgid "Unknown user"
+msgstr ""
+
+#: src/routes/companies/$slug.tsx:601
+msgid "Use “Log interaction” above to record the first touch."
+msgstr ""
+
+#: src/components/shared/channel-icon.tsx:52
+msgid "Visit"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:320
+msgid "What happened?"
+msgstr ""
+
+#: src/components/interactions/quick-capture-dialog.tsx:347
+msgid "What needs to happen?"
+msgstr ""
+
+#: src/components/shared/channel-icon.tsx:55
+msgid "WhatsApp"
+msgstr ""
+
+#: src/routes/index.tsx:263
+msgid "Workshop floor — live counters on the bench."
+msgstr ""
+
+#: src/routes/profile/index.tsx:83
+msgid "Your Forja workbench identity."
+msgstr ""
