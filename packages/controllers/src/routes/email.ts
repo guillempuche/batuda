@@ -119,7 +119,47 @@ export const EmailGroup = HttpApiGroup.make('email')
 	)
 	.add(
 		HttpApiEndpoint.get('listInboxes', '/email/inboxes', {
+			query: {
+				purpose: Schema.optional(InboxPurpose),
+				active: Schema.optional(Schema.Literals(['true', 'false'])),
+				ownerUserId: Schema.optional(Schema.String),
+			},
 			success: Schema.Array(Schema.Unknown),
+		}),
+	)
+	.add(
+		HttpApiEndpoint.post('createInbox', '/email/inboxes', {
+			payload: Schema.Struct({
+				username: Schema.optional(Schema.String),
+				domain: Schema.optional(Schema.String),
+				displayName: Schema.optional(Schema.String),
+				purpose: InboxPurpose,
+				ownerUserId: Schema.optional(Schema.String),
+				isDefault: Schema.optional(Schema.Boolean),
+			}),
+			success: Schema.Unknown,
+		}),
+	)
+	.add(
+		HttpApiEndpoint.patch('updateInbox', '/email/inboxes/:id', {
+			params: { id: Schema.String },
+			payload: Schema.Struct({
+				displayName: Schema.optional(Schema.NullOr(Schema.String)),
+				purpose: Schema.optional(InboxPurpose),
+				ownerUserId: Schema.optional(Schema.NullOr(Schema.String)),
+				isDefault: Schema.optional(Schema.Boolean),
+				active: Schema.optional(Schema.Boolean),
+			}),
+			success: Schema.Unknown,
+		}),
+	)
+	.add(
+		HttpApiEndpoint.post('syncInboxes', '/email/inboxes/sync', {
+			success: Schema.Struct({
+				added: Schema.Number,
+				retired: Schema.Number,
+				total: Schema.Number,
+			}),
 		}),
 	)
 	.middleware(SessionMiddleware)

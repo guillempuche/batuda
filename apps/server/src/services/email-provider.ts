@@ -36,6 +36,7 @@ export interface CreateInboxParams {
 	readonly username?: string | undefined
 	readonly domain?: string | undefined
 	readonly displayName?: string | undefined
+	readonly clientId?: string | undefined
 }
 
 export interface ProviderInbox {

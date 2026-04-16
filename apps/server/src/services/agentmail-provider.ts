@@ -285,6 +285,7 @@ export const AgentMailProviderLive = Layer.effect(
 							username: params.username,
 							domain: params.domain,
 							displayName: params.displayName,
+							clientId: params.clientId,
 						}),
 					),
 				catch: e =>

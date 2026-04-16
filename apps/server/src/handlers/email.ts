@@ -119,6 +119,68 @@ export const EmailLive = HttpApiBuilder.group(ForjaApi, 'email', handlers =>
 			.handle('getMessage', _ =>
 				svc.getMessage(_.params.messageId).pipe(Effect.orDie),
 			)
-			.handle('listInboxes', () => svc.listInboxes().pipe(Effect.orDie))
+			.handle('listInboxes', _ =>
+				svc.listLocalInboxes({
+					...(_.query.purpose !== undefined && {
+						purpose: _.query.purpose,
+					}),
+					...(_.query.active !== undefined && {
+						active: _.query.active === 'true',
+					}),
+					...(_.query.ownerUserId !== undefined && {
+						ownerUserId: _.query.ownerUserId,
+					}),
+				}),
+			)
+			.handle('createInbox', _ =>
+				svc
+					.createInbox({
+						...(_.payload.username !== undefined && {
+							username: _.payload.username,
+						}),
+						...(_.payload.domain !== undefined && {
+							domain: _.payload.domain,
+						}),
+						...(_.payload.displayName !== undefined && {
+							displayName: _.payload.displayName,
+						}),
+						purpose: _.payload.purpose,
+						...(_.payload.ownerUserId !== undefined && {
+							ownerUserId: _.payload.ownerUserId,
+						}),
+						...(_.payload.isDefault !== undefined && {
+							isDefault: _.payload.isDefault,
+						}),
+					})
+					.pipe(
+						Effect.catchTag('EmailError', e => Effect.die(e)),
+						Effect.catchTag('SqlError', e => Effect.die(e)),
+					),
+			)
+			.handle('updateInbox', _ =>
+				svc
+					.updateInbox(_.params.id, {
+						...(_.payload.displayName !== undefined && {
+							displayName: _.payload.displayName,
+						}),
+						...(_.payload.purpose !== undefined && {
+							purpose: _.payload.purpose,
+						}),
+						...(_.payload.ownerUserId !== undefined && {
+							ownerUserId: _.payload.ownerUserId,
+						}),
+						...(_.payload.isDefault !== undefined && {
+							isDefault: _.payload.isDefault,
+						}),
+						...(_.payload.active !== undefined && {
+							active: _.payload.active,
+						}),
+					})
+					.pipe(
+						Effect.catchTag('NotFound', e => Effect.die(e)),
+						Effect.catchTag('SqlError', e => Effect.die(e)),
+					),
+			)
+			.handle('syncInboxes', () => svc.syncInboxes())
 	}),
 )

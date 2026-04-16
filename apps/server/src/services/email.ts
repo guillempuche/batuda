@@ -865,6 +865,245 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					}),
 
 				listInboxes: () => provider.listInboxes(),
+
+				// ── Local inbox CRUD ──────────────────────────────────────────
+				// `inboxes` is our local mirror of the provider's inbox set,
+				// enriched with CRM-only metadata (purpose, owner, default flag,
+				// active flag). The provider owns provider_inbox_id + email; we
+				// own the rest.
+
+				listLocalInboxes: (filters?: {
+					purpose?: 'human' | 'agent' | 'shared'
+					active?: boolean
+					ownerUserId?: string
+				}) =>
+					Effect.gen(function* () {
+						const conditions: Array<Statement.Fragment> = []
+						if (filters?.purpose)
+							conditions.push(sql`purpose = ${filters.purpose}`)
+						if (filters?.active !== undefined)
+							conditions.push(sql`active = ${filters.active}`)
+						if (filters?.ownerUserId)
+							conditions.push(sql`owner_user_id = ${filters.ownerUserId}`)
+						const where =
+							conditions.length > 0 ? sql`WHERE ${sql.and(conditions)}` : sql``
+						return yield* sql`
+							SELECT id, provider, provider_inbox_id, email, display_name,
+							       purpose, owner_user_id, is_default, active, client_id,
+							       created_at, updated_at
+							FROM inboxes
+							${where}
+							ORDER BY is_default DESC, purpose, email
+						`
+					}).pipe(Effect.orDie),
+
+				createInbox: (input: {
+					username?: string
+					domain?: string
+					displayName?: string
+					purpose: 'human' | 'agent' | 'shared'
+					ownerUserId?: string
+					isDefault?: boolean
+				}) =>
+					Effect.gen(function* () {
+						// Client-side classification tag so the provider can
+						// reverse-look up our purpose without reading our DB.
+						const clientId = `forja:${input.purpose}:${
+							input.ownerUserId ?? 'shared'
+						}`
+						const created = yield* provider.createInbox({
+							...(input.username !== undefined && {
+								username: input.username,
+							}),
+							...(input.domain !== undefined && { domain: input.domain }),
+							...(input.displayName !== undefined && {
+								displayName: input.displayName,
+							}),
+							clientId,
+						})
+
+						// If the caller asked for default, unset the current default
+						// in the same purpose bucket before inserting the new row so
+						// the single-default unique index doesn't trip.
+						if (input.isDefault) {
+							yield* sql`
+								UPDATE inboxes
+								SET is_default = false, updated_at = now()
+								WHERE purpose = ${input.purpose} AND is_default = true
+							`
+						}
+
+						const rows = yield* sql`
+							INSERT INTO inboxes ${sql.insert({
+								provider: providerName,
+								providerInboxId: created.inboxId,
+								email: created.email,
+								displayName: created.displayName ?? input.displayName ?? null,
+								purpose: input.purpose,
+								ownerUserId: input.ownerUserId ?? null,
+								isDefault: input.isDefault ?? false,
+								active: true,
+								clientId,
+							})}
+							RETURNING id, provider, provider_inbox_id, email, display_name,
+							          purpose, owner_user_id, is_default, active, client_id,
+							          created_at, updated_at
+						`
+						yield* Effect.logInfo('Inbox created').pipe(
+							Effect.annotateLogs({
+								event: 'inbox.created',
+								email: created.email,
+								purpose: input.purpose,
+							}),
+						)
+						return rows[0]!
+					}),
+
+				updateInbox: (
+					id: string,
+					patch: {
+						displayName?: string | null
+						purpose?: 'human' | 'agent' | 'shared'
+						ownerUserId?: string | null
+						isDefault?: boolean
+						active?: boolean
+					},
+				) =>
+					Effect.gen(function* () {
+						const sets: Array<Statement.Fragment> = []
+						if (patch.displayName !== undefined)
+							sets.push(sql`display_name = ${patch.displayName}`)
+						if (patch.purpose !== undefined)
+							sets.push(sql`purpose = ${patch.purpose}`)
+						if (patch.ownerUserId !== undefined)
+							sets.push(sql`owner_user_id = ${patch.ownerUserId}`)
+						if (patch.isDefault !== undefined)
+							sets.push(sql`is_default = ${patch.isDefault}`)
+						if (patch.active !== undefined)
+							sets.push(sql`active = ${patch.active}`)
+
+						if (sets.length === 0) {
+							const existing = yield* sql`
+								SELECT * FROM inboxes WHERE id = ${id} LIMIT 1
+							`
+							if (existing.length === 0) {
+								return yield* new NotFound({ entity: 'Inbox', id })
+							}
+							return existing[0]!
+						}
+
+						// If flipping to default, clear any other default in the
+						// same purpose bucket first. We look up the row's purpose
+						// (either the new one or the existing one) to scope the
+						// reset correctly.
+						if (patch.isDefault === true) {
+							const targetPurpose =
+								patch.purpose ??
+								((yield* sql<{ purpose: string }>`
+									SELECT purpose FROM inboxes WHERE id = ${id} LIMIT 1
+								`)[0]?.purpose as 'human' | 'agent' | 'shared' | undefined)
+							if (targetPurpose) {
+								yield* sql`
+									UPDATE inboxes
+									SET is_default = false, updated_at = now()
+									WHERE purpose = ${targetPurpose}
+									  AND is_default = true
+									  AND id <> ${id}
+								`
+							}
+						}
+
+						sets.push(sql`updated_at = now()`)
+
+						const rows = yield* sql`
+							UPDATE inboxes
+							SET ${sql.csv(sets)}
+							WHERE id = ${id}
+							RETURNING id, provider, provider_inbox_id, email, display_name,
+							          purpose, owner_user_id, is_default, active, client_id,
+							          created_at, updated_at
+						`
+						if (rows.length === 0) {
+							return yield* new NotFound({ entity: 'Inbox', id })
+						}
+						return rows[0]!
+					}),
+
+				// Reconcile the local `inboxes` table against the provider's
+				// authoritative list. Rows missing upstream are inserted with
+				// `purpose='shared'` by default; local rows whose provider id
+				// has disappeared are marked `active=false` (we keep them so
+				// historical thread links still resolve).
+				syncInboxes: () =>
+					Effect.gen(function* () {
+						const upstream = yield* provider.listInboxes()
+						const upstreamIds = new Set(upstream.map(i => i.inboxId))
+
+						const localRows = yield* sql<{
+							id: string
+							providerInboxId: string
+							active: boolean
+						}>`
+							SELECT id, provider_inbox_id, active FROM inboxes
+						`
+						const localByProviderId = new Map(
+							localRows.map(r => [r.providerInboxId, r]),
+						)
+
+						let added = 0
+						let retired = 0
+
+						for (const up of upstream) {
+							const existing = localByProviderId.get(up.inboxId)
+							if (existing) {
+								// Refresh denormalized email/display_name in case
+								// the upstream row changed.
+								yield* sql`
+									UPDATE inboxes
+									SET email = ${up.email},
+									    display_name = ${up.displayName ?? null},
+									    active = true,
+									    updated_at = now()
+									WHERE id = ${existing.id}
+								`
+							} else {
+								yield* sql`
+									INSERT INTO inboxes ${sql.insert({
+										provider: providerName,
+										providerInboxId: up.inboxId,
+										email: up.email,
+										displayName: up.displayName ?? null,
+										purpose: 'shared',
+										ownerUserId: null,
+										isDefault: false,
+										active: true,
+										clientId: null,
+									})}
+								`
+								added++
+							}
+						}
+
+						for (const local of localRows) {
+							if (!upstreamIds.has(local.providerInboxId) && local.active) {
+								yield* sql`
+									UPDATE inboxes
+									SET active = false, updated_at = now()
+									WHERE id = ${local.id}
+								`
+								retired++
+							}
+						}
+
+						yield* Effect.logInfo('Inboxes synced').pipe(
+							Effect.annotateLogs({
+								event: 'inbox.synced',
+								added,
+								retired,
+							}),
+						)
+						return { added, retired, total: upstream.length }
+					}).pipe(Effect.orDie),
 			}
 		}),
 	},
