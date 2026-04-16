@@ -2028,12 +2028,12 @@ export const seed = (preset: Preset) =>
 					provider: 'agentmail',
 					providerInboxId: agentInboxId,
 					email: agentInboxId,
-					displayName: 'Forja AI assistant',
-					purpose: 'agent',
+					displayName: 'Forja team (shared with AI)',
+					purpose: 'shared',
 					ownerUserId: null,
 					isDefault: false,
 					active: true,
-					clientId: 'forja:agent',
+					clientId: 'forja:shared',
 				},
 			]
 			yield* sql`INSERT INTO inboxes ${sql.insert(normalizeRows(inboxRows))}`
