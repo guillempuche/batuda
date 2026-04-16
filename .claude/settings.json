@@ -76,6 +76,15 @@
 				"hooks": [
 					{
 						"type": "command",
+						"command": "$CLAUDE_PROJECT_DIR/.claude/hooks/lingui-remind.sh"
+					}
+				]
+			},
+			{
+				"matcher": "Edit|Write",
+				"hooks": [
+					{
+						"type": "command",
 						"command": "f=$(jq -r '.tool_input.file_path'); if [[ \"$f\" == *apps/server/src/db/migrations/* ]]; then echo \"[$(date +'%Y-%m-%d %H:%M:%S')] $f\" >> /Users/guillem/programacio/codi/autonom/batuda/.claude/migration-audit.log; fi; true",
 						"async": true
 					}
