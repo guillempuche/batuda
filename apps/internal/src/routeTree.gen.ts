@@ -13,8 +13,10 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TasksIndexRouteImport } from './routes/tasks/index'
 import { Route as ProfileIndexRouteImport } from './routes/profile/index'
+import { Route as PagesIndexRouteImport } from './routes/pages/index'
 import { Route as EmailsIndexRouteImport } from './routes/emails/index'
 import { Route as CompaniesIndexRouteImport } from './routes/companies/index'
+import { Route as PagesIdRouteImport } from './routes/pages/$id'
 import { Route as CompaniesSlugRouteImport } from './routes/companies/$slug'
 
 const LoginRoute = LoginRouteImport.update({
@@ -37,6 +39,11 @@ const ProfileIndexRoute = ProfileIndexRouteImport.update({
   path: '/profile/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PagesIndexRoute = PagesIndexRouteImport.update({
+  id: '/pages/',
+  path: '/pages/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EmailsIndexRoute = EmailsIndexRouteImport.update({
   id: '/emails/',
   path: '/emails/',
@@ -45,6 +52,11 @@ const EmailsIndexRoute = EmailsIndexRouteImport.update({
 const CompaniesIndexRoute = CompaniesIndexRouteImport.update({
   id: '/companies/',
   path: '/companies/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PagesIdRoute = PagesIdRouteImport.update({
+  id: '/pages/$id',
+  path: '/pages/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CompaniesSlugRoute = CompaniesSlugRouteImport.update({
@@ -57,8 +69,10 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/companies/$slug': typeof CompaniesSlugRoute
+  '/pages/$id': typeof PagesIdRoute
   '/companies/': typeof CompaniesIndexRoute
   '/emails/': typeof EmailsIndexRoute
+  '/pages/': typeof PagesIndexRoute
   '/profile/': typeof ProfileIndexRoute
   '/tasks/': typeof TasksIndexRoute
 }
@@ -66,8 +80,10 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/companies/$slug': typeof CompaniesSlugRoute
+  '/pages/$id': typeof PagesIdRoute
   '/companies': typeof CompaniesIndexRoute
   '/emails': typeof EmailsIndexRoute
+  '/pages': typeof PagesIndexRoute
   '/profile': typeof ProfileIndexRoute
   '/tasks': typeof TasksIndexRoute
 }
@@ -76,8 +92,10 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/companies/$slug': typeof CompaniesSlugRoute
+  '/pages/$id': typeof PagesIdRoute
   '/companies/': typeof CompaniesIndexRoute
   '/emails/': typeof EmailsIndexRoute
+  '/pages/': typeof PagesIndexRoute
   '/profile/': typeof ProfileIndexRoute
   '/tasks/': typeof TasksIndexRoute
 }
@@ -87,8 +105,10 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/companies/$slug'
+    | '/pages/$id'
     | '/companies/'
     | '/emails/'
+    | '/pages/'
     | '/profile/'
     | '/tasks/'
   fileRoutesByTo: FileRoutesByTo
@@ -96,8 +116,10 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/companies/$slug'
+    | '/pages/$id'
     | '/companies'
     | '/emails'
+    | '/pages'
     | '/profile'
     | '/tasks'
   id:
@@ -105,8 +127,10 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/companies/$slug'
+    | '/pages/$id'
     | '/companies/'
     | '/emails/'
+    | '/pages/'
     | '/profile/'
     | '/tasks/'
   fileRoutesById: FileRoutesById
@@ -115,8 +139,10 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
   CompaniesSlugRoute: typeof CompaniesSlugRoute
+  PagesIdRoute: typeof PagesIdRoute
   CompaniesIndexRoute: typeof CompaniesIndexRoute
   EmailsIndexRoute: typeof EmailsIndexRoute
+  PagesIndexRoute: typeof PagesIndexRoute
   ProfileIndexRoute: typeof ProfileIndexRoute
   TasksIndexRoute: typeof TasksIndexRoute
 }
@@ -151,6 +177,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProfileIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pages/': {
+      id: '/pages/'
+      path: '/pages'
+      fullPath: '/pages/'
+      preLoaderRoute: typeof PagesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/emails/': {
       id: '/emails/'
       path: '/emails'
@@ -163,6 +196,13 @@ declare module '@tanstack/react-router' {
       path: '/companies'
       fullPath: '/companies/'
       preLoaderRoute: typeof CompaniesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pages/$id': {
+      id: '/pages/$id'
+      path: '/pages/$id'
+      fullPath: '/pages/$id'
+      preLoaderRoute: typeof PagesIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/companies/$slug': {
@@ -179,8 +219,10 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
   CompaniesSlugRoute: CompaniesSlugRoute,
+  PagesIdRoute: PagesIdRoute,
   CompaniesIndexRoute: CompaniesIndexRoute,
   EmailsIndexRoute: EmailsIndexRoute,
+  PagesIndexRoute: PagesIndexRoute,
   ProfileIndexRoute: ProfileIndexRoute,
   TasksIndexRoute: TasksIndexRoute,
 }

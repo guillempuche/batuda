@@ -1,6 +1,6 @@
 import { useAtomRefresh, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { createFileRoute, notFound } from '@tanstack/react-router'
+import { createFileRoute, Link, notFound } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import {
 	Briefcase,
@@ -26,6 +26,7 @@ import {
 	contactsAtomFor,
 	interactionsAtomFor,
 } from '#/atoms/company-atoms'
+import { pagesSearchAtom } from '#/atoms/pages-atoms'
 import { EmptyState } from '#/components/shared/empty-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { PriorityDot } from '#/components/shared/priority-dot'
@@ -285,10 +286,15 @@ function DetailBody({
 		[company.id],
 	)
 	const tasksAtom = useMemo(() => companyTasksAtomFor(company.id), [company.id])
+	const companyPagesAtom = useMemo(
+		() => pagesSearchAtom({ companyId: company.id }),
+		[company.id],
+	)
 
 	const contactsResult = useAtomValue(contactsAtom)
 	const interactionsResult = useAtomValue(interactionsAtom)
 	const tasksResult = useAtomValue(tasksAtom)
+	const pagesResult = useAtomValue(companyPagesAtom)
 
 	const refreshInteractions = useAtomRefresh(interactionsAtom)
 
@@ -311,6 +317,31 @@ function DetailBody({
 			AsyncResult.isSuccess(tasksResult) ? narrowTasks(tasksResult.value) : [],
 		[tasksResult],
 	)
+	type PageEntry = {
+		readonly id: string
+		readonly title: string
+		readonly slug: string
+		readonly status: string
+		readonly lang: string
+	}
+	const companyPages = useMemo<ReadonlyArray<PageEntry>>(() => {
+		if (!AsyncResult.isSuccess(pagesResult)) return []
+		const out: Array<PageEntry> = []
+		for (const row of pagesResult.value as ReadonlyArray<unknown>) {
+			if (!row || typeof row !== 'object') continue
+			const r = row as Record<string, unknown>
+			if (typeof r['id'] !== 'string') continue
+			if (typeof r['title'] !== 'string') continue
+			out.push({
+				id: r['id'],
+				title: r['title'],
+				slug: typeof r['slug'] === 'string' ? r['slug'] : '',
+				status: typeof r['status'] === 'string' ? r['status'] : 'draft',
+				lang: typeof r['lang'] === 'string' ? r['lang'] : 'en',
+			})
+		}
+		return out
+	}, [pagesResult])
 
 	const openTaskCount = useMemo(
 		() => tasks.filter(task => task.completedAt === null).length,
@@ -460,6 +491,9 @@ function DetailBody({
 					<PriTabs.Tab value='tasks'>
 						<Trans>Tasks</Trans> ({openTaskCount})
 					</PriTabs.Tab>
+					<PriTabs.Tab value='pages'>
+						<Trans>Pages</Trans> ({companyPages.length})
+					</PriTabs.Tab>
 					<PriTabs.Tab value='documents'>
 						<Trans>Documents</Trans>
 					</PriTabs.Tab>
@@ -572,6 +606,36 @@ function DetailBody({
 									</TaskRow>
 								))}
 							</TaskList>
+						)}
+					</PanelWrap>
+				</PriTabs.Panel>
+
+				<PriTabs.Panel value='pages'>
+					<PanelWrap>
+						{companyPages.length === 0 ? (
+							<EmptyState
+								icon={FileText}
+								title={t`No pages yet`}
+								description={t`Create a prospect landing page to share with this company.`}
+							/>
+						) : (
+							<PagesList>
+								{companyPages.map(pg => (
+									<PageRow key={pg.id}>
+										<PageRowTitle>
+											<Link to='/pages/$id' params={{ id: pg.id }}>
+												{pg.title}
+											</Link>
+										</PageRowTitle>
+										<PageRowMeta>
+											<PageLangBadge>{pg.lang}</PageLangBadge>
+											<PageStatusBadge $published={pg.status === 'published'}>
+												{pg.status}
+											</PageStatusBadge>
+										</PageRowMeta>
+									</PageRow>
+								))}
+							</PagesList>
 						)}
 					</PanelWrap>
 				</PriTabs.Panel>
@@ -1156,4 +1220,74 @@ const TimelineList = styled.div.withConfig({
 	display: flex;
 	flex-direction: column;
 	gap: 0;
+`
+
+const PagesList = styled.ul.withConfig({
+	displayName: 'CompanyDetailPagesList',
+})`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-sm);
+	list-style: none;
+	padding: 0;
+	margin: 0;
+`
+
+const PageRow = styled.li.withConfig({ displayName: 'CompanyDetailPageRow' })`
+	${agedPaperSurface}
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: var(--space-sm) var(--space-md);
+	gap: var(--space-md);
+`
+
+const PageRowTitle = styled.span.withConfig({
+	displayName: 'CompanyDetailPageRowTitle',
+})`
+	& a {
+		color: var(--color-primary);
+		font-weight: var(--font-weight-medium);
+		text-decoration: none;
+	}
+
+	& a:hover {
+		text-decoration: underline;
+	}
+`
+
+const PageRowMeta = styled.div.withConfig({
+	displayName: 'CompanyDetailPageRowMeta',
+})`
+	display: flex;
+	align-items: center;
+	gap: var(--space-xs);
+`
+
+const PageLangBadge = styled.span.withConfig({
+	displayName: 'CompanyDetailPageLangBadge',
+})`
+	font-size: var(--typescale-label-small-size);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--color-on-surface-variant);
+`
+
+const PageStatusBadge = styled.span.withConfig({
+	displayName: 'CompanyDetailPageStatusBadge',
+	shouldForwardProp: prop => prop !== '$published',
+})<{ $published: boolean }>`
+	font-size: var(--typescale-label-small-size);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	padding: var(--space-3xs) var(--space-xs);
+	border-radius: 4px;
+	background: ${p =>
+		p.$published
+			? 'color-mix(in oklab, var(--color-status-client) 20%, transparent)'
+			: 'color-mix(in oklab, var(--color-status-prospect) 20%, transparent)'};
+	color: ${p =>
+		p.$published
+			? 'var(--color-status-client)'
+			: 'var(--color-on-surface-variant)'};
 `
