@@ -77,6 +77,27 @@ export const inboxesListAtom = ForjaApiAtom.query('email', 'listInboxes', {
 })
 
 /**
+ * Id-keyed atom factory for the thread detail page. The loader and the
+ * component call this with the same `threadId` to get the *same* atom
+ * identity, which is how the SSR hydration lands on the atom the
+ * component reads. Entries are cached forever — one atom per thread per
+ * session is fine.
+ */
+const threadCache = new Map<string, ReturnType<typeof makeThreadAtom>>()
+function makeThreadAtom(threadId: string) {
+	return ForjaApiAtom.query('email', 'getThread', {
+		params: { threadId },
+	})
+}
+export function threadAtomFor(threadId: string) {
+	const existing = threadCache.get(threadId)
+	if (existing !== undefined) return existing
+	const atom = makeThreadAtom(threadId)
+	threadCache.set(threadId, atom)
+	return atom
+}
+
+/**
  * Mutation atoms for thread state changes. Held at module scope so every
  * render (the list page, the bulk toolbar, the row context menu) shares
  * a single writable setter instance.

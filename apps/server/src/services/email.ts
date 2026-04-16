@@ -607,59 +607,106 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						)
 					}),
 
-				getThread: (providerThreadId: string) =>
+				getThread: (threadId: string) =>
 					Effect.gen(function* () {
 						const links = yield* sql`
-							SELECT * FROM email_thread_links
-							WHERE provider_thread_id = ${providerThreadId}
+							SELECT tl.*, i.email AS inbox_email, i.display_name AS inbox_display_name, i.purpose AS inbox_purpose
+							FROM email_thread_links tl
+							LEFT JOIN inboxes i ON i.id = tl.inbox_id
+							WHERE tl.id = ${threadId}
 							LIMIT 1
 						`
 						if (links.length === 0) {
 							return yield* new NotFound({
 								entity: 'EmailThreadLink',
-								id: providerThreadId,
+								id: threadId,
 							})
 						}
 						const link = links[0] as {
+							id: string
 							providerInboxId: string
+							providerThreadId: string
 							companyId: string | null
 							contactId: string | null
+							subject: string | null
+							status: string
+							lastReadAt: Date | null
+							createdAt: Date
+							updatedAt: Date
+							inboxEmail: string | null
+							inboxDisplayName: string | null
+							inboxPurpose: 'human' | 'agent' | 'shared' | null
 						}
 
 						const thread = yield* provider.getThread(
 							link.providerInboxId,
-							providerThreadId,
+							link.providerThreadId,
 						)
 
-						// Enrich messages with stored deliverability state
+						// Enrich messages with stored direction, classification, and
+						// deliverability state. `direction` and `inbound_classification`
+						// aren't part of the provider payload — they're ours.
 						const storedMessages = yield* sql`
-							SELECT provider_message_id, status, status_reason, bounce_type, bounce_sub_type, status_updated_at
+							SELECT provider_message_id, direction, inbound_classification,
+							       status, status_reason, bounce_type, bounce_sub_type, status_updated_at
 							FROM email_messages
-							WHERE provider_thread_id = ${providerThreadId}
+							WHERE provider_thread_id = ${link.providerThreadId}
 						`
-						const statusByMessageId = new Map(
-							(
-								storedMessages as Array<{
-									providerMessageId: string
-									status: string
-									statusReason: string | null
-									bounceType: string | null
-									bounceSubType: string | null
-									statusUpdatedAt: Date
-								}>
-							).map(m => [m.providerMessageId, m]),
+						type StoredRow = {
+							providerMessageId: string
+							direction: 'outbound' | 'inbound'
+							inboundClassification: 'normal' | 'spam' | 'blocked' | null
+							status: string
+							statusReason: string | null
+							bounceType: string | null
+							bounceSubType: string | null
+							statusUpdatedAt: Date
+						}
+						const storedByMessageId = new Map(
+							(storedMessages as Array<StoredRow>).map(m => [
+								m.providerMessageId,
+								m,
+							]),
 						)
 
-						const enrichedMessages = thread.messages.map(m => ({
-							...m,
-							deliverability: statusByMessageId.get(m.messageId) ?? null,
-						}))
+						const enrichedMessages = thread.messages.map(m => {
+							const stored = storedByMessageId.get(m.messageId) ?? null
+							return {
+								...m,
+								direction: stored?.direction ?? 'inbound',
+								inboundClassification: stored?.inboundClassification ?? null,
+								deliverability: stored
+									? {
+											status: stored.status,
+											statusReason: stored.statusReason,
+											bounceType: stored.bounceType,
+											bounceSubType: stored.bounceSubType,
+											statusUpdatedAt: stored.statusUpdatedAt,
+										}
+									: null,
+							}
+						})
 
 						return {
 							...thread,
 							messages: enrichedMessages,
+							id: link.id,
+							providerThreadId: link.providerThreadId,
+							subject: link.subject,
+							status: link.status,
+							lastReadAt: link.lastReadAt,
+							createdAt: link.createdAt,
+							updatedAt: link.updatedAt,
 							companyId: link.companyId,
 							contactId: link.contactId,
+							inbox:
+								link.inboxEmail && link.inboxPurpose
+									? {
+											email: link.inboxEmail,
+											displayName: link.inboxDisplayName,
+											purpose: link.inboxPurpose,
+										}
+									: null,
 						}
 					}),
 
