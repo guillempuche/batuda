@@ -38,7 +38,7 @@ msgstr "Engranatge — Les màquines fan la feina"
 msgid "Examples"
 msgstr "Exemples"
 
-#: src/routes/$lang/index.tsx:466
+#: src/routes/$lang/index.tsx:462
 msgid "Get a quote"
 msgstr "Demana pressupost"
 
@@ -59,7 +59,7 @@ msgstr "Idioma"
 msgid "Let's talk"
 msgstr "Parlem"
 
-#: src/routes/$lang/index.tsx:464
+#: src/routes/$lang/index.tsx:460
 msgid "Let's talk about your business"
 msgstr "Parlem del teu negoci"
 
@@ -71,7 +71,7 @@ msgstr "Les màquines fan la feina. Tu fas el negoci."
 msgid "Made in Girona"
 msgstr "Fet a Girona"
 
-#: src/routes/$lang/index.tsx:421
+#: src/routes/$lang/index.tsx:418
 msgid "No fine print."
 msgstr "Sense lletra petita."
 
@@ -89,7 +89,7 @@ msgstr "Sortida"
 
 #: src/components/layout/tool-belt.tsx:65
 #: src/components/layout/workshop-desktop.tsx:158
-#: src/routes/$lang/index.tsx:420
+#: src/routes/$lang/index.tsx:418
 msgid "Pricing"
 msgstr "Preus"
 
@@ -102,7 +102,7 @@ msgstr "Recordatoris intel·ligents"
 msgid "Talk"
 msgstr "Parla"
 
-#: src/routes/$lang/index.tsx:465
+#: src/routes/$lang/index.tsx:461
 msgid "Tell us what you need and we'll tell you how we can automate it. No strings attached."
 msgstr "Explica'ns què necessites i et direm com ho podem automatitzar. Sense compromís."
 
@@ -125,11 +125,11 @@ msgstr "Construïm eines que treballen mentre tu dorms."
 msgid "What we build"
 msgstr "Què construïm"
 
-#: src/routes/$lang/index.tsx:429
+#: src/routes/$lang/index.tsx:425
 msgid "What's included"
 msgstr "Què inclou"
 
-#: src/routes/$lang/index.tsx:439
+#: src/routes/$lang/index.tsx:435
 msgid "What's not included"
 msgstr "Què no inclou"
 

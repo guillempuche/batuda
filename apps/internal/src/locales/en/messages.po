@@ -34,10 +34,6 @@ msgstr "(no subject)"
 msgid "(provider assigns)"
 msgstr "(provider assigns)"
 
-#: src/routes/index.tsx:268
-#~ msgid "{0} active companies. {1} open tasks."
-#~ msgstr "{0} active companies. {1} open tasks."
-
 #. placeholder {0}: companies.length
 #: src/routes/companies/index.tsx:255
 msgid "{0} companies"
@@ -47,10 +43,6 @@ msgstr "{0} companies"
 #: src/routes/companies/index.tsx:252
 msgid "{0} companies with filters applied"
 msgstr "{0} companies with filters applied"
-
-#: src/routes/tasks/index.tsx:245
-#~ msgid "{0} open {1}"
-#~ msgstr "{0} open {1}"
 
 #. placeholder {0}: failedIds.length
 #: src/routes/emails/index.tsx:468
@@ -330,10 +322,6 @@ msgstr "Companies"
 #: src/routes/index.tsx:431
 msgid "Company"
 msgstr "Company"
-
-#: src/components/interactions/quick-capture-dialog.tsx:186
-#~ msgid "Company:"
-#~ msgstr "Company:"
 
 #: src/components/emails/compose-form.tsx:319
 msgid "complained"
@@ -656,10 +644,6 @@ msgstr "Inbox created"
 msgid "Inbox management"
 msgstr "Inbox management"
 
-#: src/routes/emails/index.tsx:27
-#~ msgid "Inbox pending wiring"
-#~ msgstr "Inbox pending wiring"
-
 #: src/routes/emails/inboxes.tsx:369
 msgid "Inbox updated"
 msgstr "Inbox updated"
@@ -701,10 +685,6 @@ msgstr "Last activity"
 msgid "Last contact"
 msgstr "Last contact"
 
-#: src/components/shared/company-card.tsx:62
-#~ msgid "Last contact:"
-#~ msgstr "Last contact:"
-
 #: src/routes/emails/index.tsx:776
 msgid "Last direction"
 msgstr "Last direction"
@@ -728,19 +708,6 @@ msgstr "LinkedIn"
 #: src/routes/companies/index.tsx:320
 msgid "Loading companies…"
 msgstr "Loading companies…"
-
-#: src/routes/emails/inboxes.tsx:225
-msgid "Loading inboxes…"
-msgstr "Loading inboxes…"
-
-#: src/routes/emails/$threadId.tsx:250
-#: src/routes/emails/$threadId.tsx:274
-msgid "Loading thread…"
-msgstr "Loading thread…"
-
-#: src/routes/emails/index.tsx:723
-msgid "Loading threads…"
-msgstr "Loading threads…"
 
 #: src/routes/emails/inboxes.tsx:244
 msgid "Local inboxes"
@@ -977,10 +944,6 @@ msgstr "Note"
 #: src/components/emails/email-composer.tsx:110
 msgid "Numbered list"
 msgstr "Numbered list"
-
-#: src/routes/emails/index.tsx:28
-#~ msgid "Once AgentMail is linked, incoming threads will pin to this board."
-#~ msgstr "Once AgentMail is linked, incoming threads will pin to this board."
 
 #: src/routes/emails/$threadId.tsx:293
 #: src/routes/emails/index.tsx:583
@@ -1370,10 +1333,6 @@ msgstr "Tasks"
 msgid "Template"
 msgstr "Template"
 
-#: src/routes/emails/index.tsx:22
-#~ msgid "The inbox will be connected in a future session."
-#~ msgstr "The inbox will be connected in a future session."
-
 #: src/routes/emails/inboxes.tsx:354
 msgid "The new inbox is ready."
 msgstr "The new inbox is ready."
@@ -1479,11 +1438,6 @@ msgstr "Use “Log interaction” above to record the first touch."
 #: src/routes/emails/inboxes.tsx:602
 msgid "Use as default for this purpose"
 msgstr "Use as default for this purpose"
-
-#: src/components/layout/top-bar.tsx:46
-#: src/components/layout/top-bar.tsx:55
-#~ msgid "User menu"
-#~ msgstr "User menu"
 
 #: src/routes/emails/inboxes.tsx:495
 msgid "Username"

@@ -25,6 +25,16 @@ pre-commit:
         pnpm exec dprint fmt --config dprint.json --allow-no-files {staged_files}
       stage_fixed: true
 
+    i18n-check:
+      # Fires when any Lingui-touched file under the web apps is staged. Runs
+      # `i18n:check` in every workspace that defines it via pnpm's
+      # `--if-present` filter — marketing + internal today, any new web app
+      # tomorrow without editing this file.
+      glob: "apps/{marketing,internal}/**/*.{tsx,ts,po}"
+      run: |
+        pnpm -r --parallel --if-present run i18n:check
+      stage_fixed: true
+
 pre-push:
   commands:
     test:

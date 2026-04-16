@@ -38,7 +38,7 @@ msgstr "Engranatge — Las máquinas hacen el trabajo"
 msgid "Examples"
 msgstr "Ejemplos"
 
-#: src/routes/$lang/index.tsx:466
+#: src/routes/$lang/index.tsx:462
 msgid "Get a quote"
 msgstr "Pide presupuesto"
 
@@ -59,7 +59,7 @@ msgstr "Idioma"
 msgid "Let's talk"
 msgstr "Hablemos"
 
-#: src/routes/$lang/index.tsx:464
+#: src/routes/$lang/index.tsx:460
 msgid "Let's talk about your business"
 msgstr "Hablemos de tu negocio"
 
@@ -71,7 +71,7 @@ msgstr "Las máquinas hacen el trabajo. Tú haces el negocio."
 msgid "Made in Girona"
 msgstr "Hecho en Girona"
 
-#: src/routes/$lang/index.tsx:421
+#: src/routes/$lang/index.tsx:418
 msgid "No fine print."
 msgstr "Sin letra pequeña."
 
@@ -89,7 +89,7 @@ msgstr "Salida"
 
 #: src/components/layout/tool-belt.tsx:65
 #: src/components/layout/workshop-desktop.tsx:158
-#: src/routes/$lang/index.tsx:420
+#: src/routes/$lang/index.tsx:418
 msgid "Pricing"
 msgstr "Precios"
 
@@ -102,7 +102,7 @@ msgstr "Recordatorios inteligentes"
 msgid "Talk"
 msgstr "Habla"
 
-#: src/routes/$lang/index.tsx:465
+#: src/routes/$lang/index.tsx:461
 msgid "Tell us what you need and we'll tell you how we can automate it. No strings attached."
 msgstr "Cuéntanos qué necesitas y te diremos cómo podemos automatizarlo. Sin compromiso."
 
@@ -125,11 +125,11 @@ msgstr "Construimos herramientas que trabajan mientras duermes."
 msgid "What we build"
 msgstr "Qué construimos"
 
-#: src/routes/$lang/index.tsx:429
+#: src/routes/$lang/index.tsx:425
 msgid "What's included"
 msgstr "Qué incluye"
 
-#: src/routes/$lang/index.tsx:439
+#: src/routes/$lang/index.tsx:435
 msgid "What's not included"
 msgstr "Qué no incluye"
 
