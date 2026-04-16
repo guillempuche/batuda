@@ -205,6 +205,12 @@ importers:
       '@engranatge/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@lingui/core':
+        specifier: 6.0.0-next.3
+        version: 6.0.0-next.3
+      '@lingui/react':
+        specifier: 6.0.0-next.3
+        version: 6.0.0-next.3(react@19.2.4)
       '@tanstack/react-router':
         specifier: 1.168.10
         version: 1.168.10(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -236,6 +242,15 @@ importers:
         specifier: 6.3.12
         version: 6.3.12(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
     devDependencies:
+      '@lingui/cli':
+        specifier: 6.0.0-next.3
+        version: 6.0.0-next.3
+      '@lingui/swc-plugin':
+        specifier: 6.0.0-next.2
+        version: 6.0.0-next.2(@lingui/core@6.0.0-next.3)
+      '@lingui/vite-plugin':
+        specifier: 6.0.0-next.3
+        version: 6.0.0-next.3(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(@types/node@22.19.15)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
       '@swc/plugin-styled-components':
         specifier: 12.8.0
         version: 12.8.0

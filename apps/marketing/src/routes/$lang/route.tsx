@@ -14,6 +14,7 @@ import { WorkshopFooter } from '#/components/layout/workshop-footer'
 import { isLangCode, type LangCode } from '#/i18n'
 import { detectLang } from '#/i18n/detect-lang'
 import { LangProvider } from '#/i18n/lang-provider'
+import { LinguiProvider } from '#/i18n/lingui'
 import { buildPublicPath, findPageByBareSlug } from '#/i18n/slugs'
 
 export const Route = createFileRoute('/$lang')({
@@ -52,18 +53,21 @@ const Shell = styled.div`
 
 function LangLayout() {
 	const { lang } = Route.useParams()
+	const langCode = lang as LangCode
 	return (
-		<LangProvider lang={lang as LangCode}>
-			<ActiveSectionProvider>
-				<Shell>
-					<ClipboardHeader />
-					<WorkshopDesktop>
-						<Outlet />
-					</WorkshopDesktop>
-					<WorkshopFooter />
-				</Shell>
-				<ToolBelt />
-			</ActiveSectionProvider>
+		<LangProvider lang={langCode}>
+			<LinguiProvider lang={langCode}>
+				<ActiveSectionProvider>
+					<Shell>
+						<ClipboardHeader />
+						<WorkshopDesktop>
+							<Outlet />
+						</WorkshopDesktop>
+						<WorkshopFooter />
+					</Shell>
+					<ToolBelt />
+				</ActiveSectionProvider>
+			</LinguiProvider>
 		</LangProvider>
 	)
 }

@@ -1,9 +1,10 @@
+import { useLingui } from '@lingui/react/macro'
 import { createLink } from '@tanstack/react-router'
 import type { LucideIcon } from 'lucide-react'
 import { Gauge, MessageCircle, Receipt, Wrench } from 'lucide-react'
 import styled from 'styled-components'
 
-import { useLang, useTranslations } from '#/i18n/lang-provider'
+import { useLang } from '#/i18n/lang-provider'
 import { useActiveSection } from './active-section-context'
 import { MachineButton, type NavTarget } from './machine-button'
 
@@ -55,14 +56,14 @@ interface TabDef {
 
 export function ToolBelt() {
 	const activeSection = useActiveSection()
-	const t = useTranslations()
+	const { t } = useLingui()
 	const lang = useLang()
 
 	const tabs: TabDef[] = [
-		{ icon: Gauge, target: 'hero', label: t.nav.home },
-		{ icon: Wrench, target: 'solution', label: t.nav.solution },
-		{ icon: Receipt, target: 'pricing', label: t.nav.quote },
-		{ icon: MessageCircle, target: 'contact', label: t.nav.contact },
+		{ icon: Gauge, target: 'hero', label: t`Home` },
+		{ icon: Wrench, target: 'solution', label: t`Tools` },
+		{ icon: Receipt, target: 'pricing', label: t`Pricing` },
+		{ icon: MessageCircle, target: 'contact', label: t`Talk` },
 	]
 
 	return (

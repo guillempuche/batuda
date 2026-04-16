@@ -1,3 +1,4 @@
+import { Trans } from '@lingui/react/macro'
 import styled from 'styled-components'
 
 import type { EpiphanyBridgeAttrs } from '@engranatge/ui/blocks'
@@ -86,11 +87,15 @@ export function EpiphanyBridgeBlock({ attrs }: { attrs: EpiphanyBridgeAttrs }) {
 		<Section>
 			<WayRow>
 				<WayCard>
-					<WayLabel>Before</WayLabel>
+					<WayLabel>
+						<Trans>Before</Trans>
+					</WayLabel>
 					<WayText>{attrs.oldWay}</WayText>
 				</WayCard>
 				<WayCard $accent>
-					<WayLabel>After</WayLabel>
+					<WayLabel>
+						<Trans>After</Trans>
+					</WayLabel>
 					<WayText>{attrs.newWay}</WayText>
 				</WayCard>
 			</WayRow>

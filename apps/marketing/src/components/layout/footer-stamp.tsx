@@ -1,6 +1,5 @@
+import { Trans } from '@lingui/react/macro'
 import styled from 'styled-components'
-
-import { useTranslations } from '#/i18n/lang-provider'
 
 const Stamp = styled.span`
 	font-family: var(--font-display);
@@ -16,10 +15,11 @@ const Stamp = styled.span`
  * WorkshopFooter — kept identical so the brand reads the same on every
  * surface. */
 export function FooterStampContent() {
-	const t = useTranslations()
 	return (
 		<>
-			<Stamp>{t.footer.madeIn}</Stamp>
+			<Stamp>
+				<Trans>Made in Girona</Trans>
+			</Stamp>
 			<Stamp>&middot;</Stamp>
 			<Stamp>&copy; {new Date().getFullYear()} Engranatge</Stamp>
 		</>

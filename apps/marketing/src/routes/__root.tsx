@@ -6,16 +6,25 @@ import {
 	useRouterState,
 } from '@tanstack/react-router'
 
-import { defaultLang, htmlLang, isLangCode, locales } from '#/i18n'
+import { defaultLang, htmlLang, isLangCode } from '#/i18n'
 import appCss from '../styles.css?url'
 
+/* Root `head()` runs for routes that don't match under `$lang/*` (the bare
+ * `/` redirect, `/sitemap.xml`, error boundaries). Child routes always
+ * override title + description, so these defaults are only visible in edge
+ * cases — hardcoded English is fine, and the same strings already exist in
+ * ca/es catalogs through the matching macros in `$lang/index.tsx`. */
 export const Route = createRootRoute({
 	head: () => ({
 		meta: [
 			{ charSet: 'utf-8' },
 			{ name: 'viewport', content: 'width=device-width, initial-scale=1' },
-			{ title: locales[defaultLang].meta.title },
-			{ name: 'description', content: locales[defaultLang].meta.description },
+			{ title: 'Engranatge — Machines do the work' },
+			{
+				name: 'description',
+				content:
+					'We build automations, AI and micro-apps so your business runs itself.',
+			},
 		],
 		links: [
 			{ rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },

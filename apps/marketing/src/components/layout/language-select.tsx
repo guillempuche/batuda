@@ -1,10 +1,11 @@
+import { Trans } from '@lingui/react/macro'
 import { Check, ChevronsUpDown, Globe } from 'lucide-react'
 import styled from 'styled-components'
 
 import { PriSelect } from '@engranatge/ui/pri'
 
 import { type LangCode, langCodes } from '#/i18n'
-import { useLang, useSetLang, useTranslations } from '#/i18n/lang-provider'
+import { useLang, useSetLang } from '#/i18n/lang-provider'
 
 const LANG_LABELS: Record<LangCode, string> = {
 	ca: 'Català',
@@ -75,7 +76,6 @@ const MetalItem = styled(PriSelect.Item)`
 export function LanguageSelect() {
 	const lang = useLang()
 	const setLang = useSetLang()
-	const t = useTranslations()
 
 	return (
 		<Field>
@@ -86,7 +86,9 @@ export function LanguageSelect() {
 					if (typeof value === 'string') setLang(value as LangCode)
 				}}
 			>
-				<SrLabel>{t.nav.language}</SrLabel>
+				<SrLabel>
+					<Trans>Language</Trans>
+				</SrLabel>
 				<MetalTrigger>
 					<Globe size={12} aria-hidden />
 					<PriSelect.Value />
