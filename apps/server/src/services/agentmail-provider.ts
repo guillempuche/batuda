@@ -33,12 +33,15 @@ import {
 	EmailProvider,
 	type ListParams,
 	type MagicLinkParams,
+	type ProviderAttachmentMeta,
+	type ProviderAttachmentStream,
 	type ProviderInbox,
 	type ProviderMessage,
 	type ProviderMessageItem,
 	type ProviderThread,
 	type ProviderThreadItem,
 	type ReplyParams,
+	type SendAttachmentInput,
 	type SendParams,
 	type SendResult,
 } from './email-provider.js'
@@ -97,6 +100,20 @@ const mapMessageItem = (m: {
 	timestamp: m.timestamp,
 })
 
+const mapAttachment = (a: {
+	attachmentId: string
+	filename?: string
+	size: number
+	contentType?: string
+	contentId?: string
+}): ProviderAttachmentMeta => ({
+	attachmentId: a.attachmentId,
+	filename: a.filename,
+	size: a.size,
+	contentType: a.contentType,
+	contentId: a.contentId,
+})
+
 const mapMessage = (m: {
 	inboxId: string
 	threadId: string
@@ -109,12 +126,29 @@ const mapMessage = (m: {
 	text?: string
 	html?: string
 	extractedText?: string
+	attachments?: {
+		attachmentId: string
+		filename?: string
+		size: number
+		contentType?: string
+		contentId?: string
+	}[]
 	timestamp: Date
 }): ProviderMessage => ({
 	...mapMessageItem(m),
 	text: m.text,
 	html: m.html,
 	extractedText: m.extractedText,
+	attachments: m.attachments?.map(mapAttachment),
+})
+
+// Convert our provider-agnostic SendAttachmentInput into AgentMail's
+// `SendAttachment` shape (base64 string via `content`).
+const toAgentMailAttachment = (a: SendAttachmentInput) => ({
+	filename: a.filename,
+	contentType: a.contentType,
+	content: a.contentBase64,
+	...(a.contentId !== undefined && { contentId: a.contentId }),
 })
 
 const mapInbox = (i: {
@@ -153,6 +187,7 @@ export const AgentMailProviderLive = Layer.effect(
 							cc: params.cc,
 							bcc: params.bcc,
 							replyTo: params.replyTo,
+							attachments: params.attachments?.map(toAgentMailAttachment),
 						}),
 					),
 				catch: e => {
@@ -183,6 +218,7 @@ export const AgentMailProviderLive = Layer.effect(
 							to: params.to,
 							cc: params.cc,
 							bcc: params.bcc,
+							attachments: params.attachments?.map(toAgentMailAttachment),
 						}),
 					),
 				catch: e => {
@@ -294,6 +330,49 @@ export const AgentMailProviderLive = Layer.effect(
 					}),
 			}).pipe(Effect.map(mapInbox))
 
+		// Fetches a signed download URL from AgentMail, then pipes the body
+		// through our response. We proxy (rather than redirecting the
+		// browser) so session cookies stay on the Forja origin.
+		const streamAttachment = (
+			inboxId: string,
+			messageId: string,
+			attachmentId: string,
+		): Effect.Effect<ProviderAttachmentStream, EmailError> =>
+			Effect.gen(function* () {
+				const meta = yield* Effect.tryPromise({
+					try: () =>
+						client.inboxes.messages.getAttachment(
+							inboxId,
+							messageId,
+							attachmentId,
+						),
+					catch: e =>
+						new EmailError({
+							message: e instanceof Error ? e.message : String(e),
+						}),
+				})
+				const response = yield* Effect.tryPromise({
+					try: () => fetch(meta.downloadUrl),
+					catch: e =>
+						new EmailError({
+							message: `attachment download: ${e instanceof Error ? e.message : String(e)}`,
+						}),
+				})
+				if (!response.ok || !response.body) {
+					return yield* Effect.fail(
+						new EmailError({
+							message: `attachment download: HTTP ${response.status}`,
+						}),
+					)
+				}
+				return {
+					stream: response.body,
+					contentType: meta.contentType ?? 'application/octet-stream',
+					filename: meta.filename,
+					size: meta.size,
+				}
+			})
+
 		const updateLabels = (
 			inboxId: string,
 			messageId: string,
@@ -368,6 +447,7 @@ export const AgentMailProviderLive = Layer.effect(
 			getMessage,
 			listInboxes,
 			createInbox,
+			streamAttachment,
 			updateLabels,
 			sendMagicLink,
 		} as const

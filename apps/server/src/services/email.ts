@@ -5,6 +5,7 @@ import { SqlClient } from 'effect/unstable/sql'
 import { EmailError, EmailSuppressed, NotFound } from '@engranatge/controllers'
 import type { InboundClassification } from '@engranatge/domain'
 
+import type { SendAttachmentInput } from './email-provider.js'
 import { EmailProvider } from './email-provider.js'
 import { WebhookService } from './webhooks.js'
 
@@ -68,11 +69,13 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						cc?: string[] | undefined
 						bcc?: string[] | undefined
 						replyTo?: string | undefined
+						attachments?: readonly SendAttachmentInput[] | undefined
 					},
 				) =>
 					Effect.gen(function* () {
 						const cc = extras?.cc ?? []
 						const bcc = extras?.bcc ?? []
+						const attachments = extras?.attachments ?? []
 						// 1) Fast-path cache check
 						if (contactId) {
 							yield* assertContactNotSuppressed(contactId, to)
@@ -90,6 +93,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								...(extras?.replyTo !== undefined && {
 									replyTo: extras.replyTo,
 								}),
+								...(attachments.length > 0 && { attachments }),
 							})
 							.pipe(
 								Effect.catchTag('EmailSendError', err =>
@@ -187,11 +191,13 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					extras?: {
 						cc?: string[] | undefined
 						bcc?: string[] | undefined
+						attachments?: readonly SendAttachmentInput[] | undefined
 					},
 				) =>
 					Effect.gen(function* () {
 						const cc = extras?.cc ?? []
 						const bcc = extras?.bcc ?? []
+						const attachments = extras?.attachments ?? []
 						const links = yield* sql`
 							SELECT * FROM email_thread_links
 							WHERE provider_thread_id = ${providerThreadId}
@@ -236,6 +242,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								...(body.html !== undefined && { html: body.html }),
 								...(cc.length > 0 && { cc }),
 								...(bcc.length > 0 && { bcc }),
+								...(attachments.length > 0 && { attachments }),
 							})
 							.pipe(
 								Effect.catchTag('EmailSendError', err =>
@@ -865,6 +872,32 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					}),
 
 				listInboxes: () => provider.listInboxes(),
+
+				// Provider-agnostic inbound attachment byte stream. The caller
+				// (the REST download endpoint) pipes `stream` into the HTTP
+				// response so the provider's storage is never exposed to the
+				// browser directly.
+				streamAttachment: (messageId: string, attachmentId: string) =>
+					Effect.gen(function* () {
+						const rows = yield* sql`
+							SELECT provider_inbox_id
+							FROM email_messages
+							WHERE provider_message_id = ${messageId}
+							LIMIT 1
+						`
+						const row = rows[0] as { providerInboxId: string } | undefined
+						if (!row) {
+							return yield* new NotFound({
+								entity: 'EmailMessage',
+								id: messageId,
+							})
+						}
+						return yield* provider.streamAttachment(
+							row.providerInboxId,
+							messageId,
+							attachmentId,
+						)
+					}),
 
 				// ── Local inbox CRUD ──────────────────────────────────────────
 				// `inboxes` is our local mirror of the provider's inbox set,

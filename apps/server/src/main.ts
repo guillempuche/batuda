@@ -38,6 +38,7 @@ import { McpHttpLive } from './mcp/http'
 import { SessionMiddlewareLive } from './middleware/session'
 import { CompanyService } from './services/companies'
 import { EmailService } from './services/email'
+import { EmailAttachmentStaging } from './services/email-attachment-staging'
 import { EmailProviderLive } from './services/email-provider-live'
 import { PageService } from './services/pages'
 import { PipelineService } from './services/pipeline'
@@ -81,6 +82,7 @@ const ServicesLive = Layer.mergeAll(
 	PipelineService.layer,
 	PageService.layer,
 	EmailService.layer,
+	EmailAttachmentStaging.layer,
 	RecordingService.layer,
 	ResearchService.layer,
 ).pipe(

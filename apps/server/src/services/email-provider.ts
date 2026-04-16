@@ -4,6 +4,16 @@ import type { EmailError, EmailSendError } from '@engranatge/controllers'
 
 // ── Provider-agnostic interfaces ──
 
+// Outbound attachments — providers accept base64-encoded content. The
+// service layer (staging resolver) always gives us bytes; we never pass
+// URLs through so the provider contract stays one-shaped.
+export interface SendAttachmentInput {
+	readonly filename: string
+	readonly contentType: string
+	readonly contentBase64: string
+	readonly contentId?: string | undefined
+}
+
 export interface SendParams {
 	readonly to: string | string[]
 	readonly subject: string
@@ -12,6 +22,7 @@ export interface SendParams {
 	readonly cc?: string | string[] | undefined
 	readonly bcc?: string | string[] | undefined
 	readonly replyTo?: string | string[] | undefined
+	readonly attachments?: readonly SendAttachmentInput[] | undefined
 }
 
 export interface ReplyParams {
@@ -20,6 +31,27 @@ export interface ReplyParams {
 	readonly to?: string | string[] | undefined
 	readonly cc?: string | string[] | undefined
 	readonly bcc?: string | string[] | undefined
+	readonly attachments?: readonly SendAttachmentInput[] | undefined
+}
+
+// Inbound attachment metadata — what the provider surfaces on a message
+// without downloading the bytes. The bytes are fetched separately via
+// `streamAttachment`.
+export interface ProviderAttachmentMeta {
+	readonly attachmentId: string
+	readonly filename: string | undefined
+	readonly size: number
+	readonly contentType: string | undefined
+	readonly contentId?: string | undefined
+}
+
+// Byte stream returned by `streamAttachment`. `Web ReadableStream` so it
+// pipes directly into the HTTP response without provider-specific glue.
+export interface ProviderAttachmentStream {
+	readonly stream: ReadableStream<Uint8Array>
+	readonly contentType: string
+	readonly filename: string | undefined
+	readonly size: number | undefined
 }
 
 export interface SendResult {
@@ -78,6 +110,7 @@ export interface ProviderMessage extends ProviderMessageItem {
 	readonly text?: string | undefined
 	readonly html?: string | undefined
 	readonly extractedText?: string | undefined
+	readonly attachments?: readonly ProviderAttachmentMeta[] | undefined
 }
 
 export interface MagicLinkParams {
@@ -120,6 +153,11 @@ export class EmailProvider extends ServiceMap.Service<
 		readonly createInbox: (
 			params: CreateInboxParams,
 		) => Effect.Effect<ProviderInbox, EmailError>
+		readonly streamAttachment: (
+			inboxId: string,
+			messageId: string,
+			attachmentId: string,
+		) => Effect.Effect<ProviderAttachmentStream, EmailError>
 		readonly updateLabels: (
 			inboxId: string,
 			messageId: string,

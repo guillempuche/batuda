@@ -2,6 +2,24 @@ import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 
 import { EmailService } from '../../services/email'
+import type { SendAttachmentInput } from '../../services/email-provider'
+
+const mapAttachments = (
+	list:
+		| readonly {
+				readonly filename: string
+				readonly content_type: string
+				readonly content_base64: string
+				readonly content_id?: string | undefined
+		  }[]
+		| undefined,
+): readonly SendAttachmentInput[] =>
+	(list ?? []).map(a => ({
+		filename: a.filename,
+		contentType: a.content_type,
+		contentBase64: a.content_base64,
+		...(a.content_id !== undefined && { contentId: a.content_id }),
+	}))
 
 // ── Shared result schemas ────────────────────────────────────────
 // Keeping these narrow (discriminated unions, explicit enums) so AI
@@ -25,11 +43,21 @@ const ThreadStatus = Schema.Literals(['open', 'closed', 'archived'])
 const InboxPurpose = Schema.Literals(['human', 'agent', 'shared'])
 const Recipients = Schema.Union([Schema.String, Schema.Array(Schema.String)])
 
+// MCP attachments are inline base64 (no multipart staging hop — MCP tools
+// are a direct call so the AI already has the bytes). The HTTP composer
+// uses stagingIds instead; both routes hit the same provider interface.
+const InlineAttachment = Schema.Struct({
+	filename: Schema.String,
+	content_type: Schema.String,
+	content_base64: Schema.String,
+	content_id: Schema.optional(Schema.String),
+})
+
 // ── Compose tools ────────────────────────────────────────────────
 
 const SendEmail = Tool.make('send_email', {
 	description:
-		'Send a new email from a specific inbox. Accepts a single recipient or array for To/Cc/Bcc. Creates a thread link and logs an outbound interaction. Returns {_tag:"sent"} on success or {_tag:"suppressed"} if a recipient is suppressed.',
+		'Send a new email from a specific inbox. Accepts a single recipient or array for To/Cc/Bcc. Attachments are inline base64 (filename + content_type + content_base64 + optional content_id for cid-referenced inline images). Creates a thread link and logs an outbound interaction. Returns {_tag:"sent"} on success or {_tag:"suppressed"} if a recipient is suppressed.',
 	parameters: Schema.Struct({
 		inbox_id: Schema.String,
 		to: Recipients,
@@ -41,6 +69,7 @@ const SendEmail = Tool.make('send_email', {
 		html: Schema.optional(Schema.String),
 		company_id: Schema.String,
 		contact_id: Schema.optional(Schema.String),
+		attachments: Schema.optional(Schema.Array(InlineAttachment)),
 	}),
 	success: SendEmailResult,
 })
@@ -50,13 +79,14 @@ const SendEmail = Tool.make('send_email', {
 
 const ReplyEmail = Tool.make('reply_email', {
 	description:
-		'Reply to the latest message in an existing email thread. Optional Cc/Bcc extend the thread. Returns {_tag:"sent"} on success or {_tag:"suppressed"} if the recipient is suppressed.',
+		'Reply to the latest message in an existing email thread. Optional Cc/Bcc extend the thread. Attachments are inline base64 (filename + content_type + content_base64). Returns {_tag:"sent"} on success or {_tag:"suppressed"} if the recipient is suppressed.',
 	parameters: Schema.Struct({
 		thread_id: Schema.String,
 		text: Schema.optional(Schema.String),
 		html: Schema.optional(Schema.String),
 		cc: Schema.optional(Schema.Array(Schema.String)),
 		bcc: Schema.optional(Schema.Array(Schema.String)),
+		attachments: Schema.optional(Schema.Array(InlineAttachment)),
 	}),
 	success: SendEmailResult,
 })
@@ -248,8 +278,9 @@ export const EmailHandlersLive = EmailTools.toLayer(
 	Effect.gen(function* () {
 		const svc = yield* EmailService
 		return {
-			send_email: params =>
-				svc
+			send_email: params => {
+				const attachments = mapAttachments(params.attachments)
+				return svc
 					.send(
 						params.inbox_id,
 						typeof params.to === 'string' ? params.to : [...params.to],
@@ -266,6 +297,7 @@ export const EmailHandlersLive = EmailTools.toLayer(
 							...(params.reply_to !== undefined && {
 								replyTo: params.reply_to,
 							}),
+							...(attachments.length > 0 && { attachments }),
 						},
 					)
 					.pipe(
@@ -283,9 +315,11 @@ export const EmailHandlersLive = EmailTools.toLayer(
 							}),
 						),
 						Effect.orDie,
-					),
-			reply_email: params =>
-				svc
+					)
+			},
+			reply_email: params => {
+				const attachments = mapAttachments(params.attachments)
+				return svc
 					.reply(
 						params.thread_id,
 						{
@@ -295,6 +329,7 @@ export const EmailHandlersLive = EmailTools.toLayer(
 						{
 							...(params.cc !== undefined && { cc: [...params.cc] }),
 							...(params.bcc !== undefined && { bcc: [...params.bcc] }),
+							...(attachments.length > 0 && { attachments }),
 						},
 					)
 					.pipe(
@@ -312,7 +347,8 @@ export const EmailHandlersLive = EmailTools.toLayer(
 							}),
 						),
 						Effect.orDie,
-					),
+					)
+			},
 			list_email_threads: params =>
 				svc
 					.listThreads({

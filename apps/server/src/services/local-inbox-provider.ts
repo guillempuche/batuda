@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
+import { createReadStream } from 'node:fs'
+import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { Readable } from 'node:stream'
 
 import { Effect, Layer } from 'effect'
 
@@ -11,12 +13,15 @@ import {
 	EmailProvider,
 	type ListParams,
 	type MagicLinkParams,
+	type ProviderAttachmentMeta,
+	type ProviderAttachmentStream,
 	type ProviderInbox,
 	type ProviderMessage,
 	type ProviderMessageItem,
 	type ProviderThread,
 	type ProviderThreadItem,
 	type ReplyParams,
+	type SendAttachmentInput,
 	type SendParams,
 	type SendResult,
 } from './email-provider.js'
@@ -37,6 +42,7 @@ const DEV_INBOX_CREATED_AT = new Date('2024-01-01T00:00:00Z')
 // started from (root, apps/server, ...). Using process.cwd() doubled the path
 // when running via `pnpm --filter @engranatge/server dev`.
 const INBOX_DIR = resolve(import.meta.dirname, '..', '..', '.dev-inbox')
+const ATTACHMENTS_DIR = resolve(INBOX_DIR, 'attachments')
 
 // ── Filename + slug helpers ──
 
@@ -63,6 +69,13 @@ const firstRecipient = (to: string | string[]): string =>
 
 // ── Frontmatter parsing ──
 
+interface StoredAttachment {
+	readonly attachmentId: string
+	readonly filename: string
+	readonly contentType: string
+	readonly size: number
+}
+
 interface MessageRecord {
 	readonly sentAt: string
 	readonly messageId: string
@@ -77,6 +90,7 @@ interface MessageRecord {
 	readonly html: string | null
 	readonly labels: string[]
 	readonly bodyText: string
+	readonly attachments: StoredAttachment[]
 }
 
 const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/
@@ -136,6 +150,29 @@ const parseFrontmatter = (raw: string): MessageRecord => {
 		return Array.isArray(v) ? v : []
 	}
 
+	// Attachments serialize as `id=...|filename=...|contentType=...|size=...`
+	// in the per-item list. Round-trip keeps the on-disk format greppable.
+	const parseAttachment = (line: string): StoredAttachment | null => {
+		const parts = Object.fromEntries(
+			line.split('|').map(kv => {
+				const eq = kv.indexOf('=')
+				return eq === -1
+					? [kv.trim(), '']
+					: [kv.slice(0, eq).trim(), kv.slice(eq + 1).trim()]
+			}),
+		)
+		if (!parts['id'] || !parts['filename']) return null
+		return {
+			attachmentId: parts['id'],
+			filename: parts['filename'],
+			contentType: parts['contentType'] ?? 'application/octet-stream',
+			size: Number(parts['size'] ?? 0),
+		}
+	}
+	const attachments = asList('attachments')
+		.map(parseAttachment)
+		.filter((a): a is StoredAttachment => a !== null)
+
 	return {
 		sentAt: asString('sentAt', new Date().toISOString()),
 		messageId: asString('messageId'),
@@ -150,6 +187,7 @@ const parseFrontmatter = (raw: string): MessageRecord => {
 		html: asNullableString('html'),
 		labels: asList('labels'),
 		bodyText: body.trimStart(),
+		attachments,
 	}
 }
 
@@ -157,6 +195,9 @@ const formatList = (items: string[], indent = '  '): string => {
 	if (items.length === 0) return '[]'
 	return `\n${items.map(item => `${indent}- ${item}`).join('\n')}`
 }
+
+const formatAttachmentLine = (a: StoredAttachment): string =>
+	`id=${a.attachmentId}|filename=${a.filename}|contentType=${a.contentType}|size=${a.size}`
 
 const formatMessage = (rec: MessageRecord): string => {
 	const fm = [
@@ -173,6 +214,7 @@ const formatMessage = (rec: MessageRecord): string => {
 		`text: ${rec.text === null ? 'null' : rec.text}`,
 		`html: ${rec.html === null ? 'null' : rec.html}`,
 		`labels: ${formatList(rec.labels)}`,
+		`attachments: ${formatList(rec.attachments.map(formatAttachmentLine))}`,
 	].join('\n')
 	return `---\n${fm}\n---\n\n${rec.bodyText}\n`
 }
@@ -277,6 +319,14 @@ const toMessage = (rec: MessageRecord): ProviderMessage => ({
 	text: rec.text ?? rec.bodyText ?? undefined,
 	html: rec.html ?? undefined,
 	extractedText: rec.text ?? rec.bodyText ?? undefined,
+	attachments: rec.attachments.map(
+		(a): ProviderAttachmentMeta => ({
+			attachmentId: a.attachmentId,
+			filename: a.filename,
+			size: a.size,
+			contentType: a.contentType,
+		}),
+	),
 })
 
 const toThreadItem = (
@@ -309,6 +359,49 @@ const groupByThread = (
 	}
 	return map
 }
+
+// Persist outbound attachments to disk so `streamAttachment` can later
+// serve them from the same filesystem that holds the .md frontmatter.
+const persistAttachments = (
+	messageId: string,
+	attachments: readonly SendAttachmentInput[] | undefined,
+) =>
+	Effect.gen(function* () {
+		if (!attachments || attachments.length === 0)
+			return [] as StoredAttachment[]
+		const dir = resolve(ATTACHMENTS_DIR, messageId)
+		yield* Effect.tryPromise({
+			try: () => mkdir(dir, { recursive: true }),
+			catch: e =>
+				new EmailSendError({
+					message: `local-inbox: cannot create ${dir}: ${e instanceof Error ? e.message : String(e)}`,
+					kind: 'unknown',
+					recipient: 'unknown',
+				}),
+		})
+		const stored: StoredAttachment[] = []
+		for (const a of attachments) {
+			const attachmentId = `att_local_${randomUUID()}`
+			const bytes = Buffer.from(a.contentBase64, 'base64')
+			const path = resolve(dir, attachmentId)
+			yield* Effect.tryPromise({
+				try: () => writeFile(path, bytes),
+				catch: e =>
+					new EmailSendError({
+						message: `local-inbox: cannot write attachment ${a.filename}: ${e instanceof Error ? e.message : String(e)}`,
+						kind: 'unknown',
+						recipient: 'unknown',
+					}),
+			})
+			stored.push({
+				attachmentId,
+				filename: a.filename,
+				contentType: a.contentType,
+				size: bytes.byteLength,
+			})
+		}
+		return stored
+	})
 
 // ── Layer ──
 
@@ -343,6 +436,7 @@ export const LocalInboxProviderLive = Layer.effect(
 						? (params.replyTo[0] ?? null)
 						: params.replyTo
 					: null
+				const stored = yield* persistAttachments(messageId, params.attachments)
 				const rec: MessageRecord = {
 					sentAt: sentAt.toISOString(),
 					messageId,
@@ -357,6 +451,7 @@ export const LocalInboxProviderLive = Layer.effect(
 					html: params.html ?? null,
 					labels: [],
 					bodyText: params.text ?? params.html ?? '',
+					attachments: stored,
 				}
 				yield* writeRecord(rec, sentAt)
 				return { messageId, threadId }
@@ -397,6 +492,10 @@ export const LocalInboxProviderLive = Layer.effect(
 						? params.bcc
 						: [params.bcc]
 					: []
+				const stored = yield* persistAttachments(
+					newMessageId,
+					params.attachments,
+				)
 				const rec: MessageRecord = {
 					sentAt: sentAt.toISOString(),
 					messageId: newMessageId,
@@ -411,6 +510,7 @@ export const LocalInboxProviderLive = Layer.effect(
 					html: params.html ?? null,
 					labels: [],
 					bodyText: params.text ?? params.html ?? '',
+					attachments: stored,
 				}
 				yield* writeRecord(rec, sentAt)
 				return { messageId: newMessageId, threadId }
@@ -505,6 +605,51 @@ export const LocalInboxProviderLive = Layer.effect(
 				createdAt: DEV_INBOX_CREATED_AT,
 			})
 
+		const streamAttachment = (
+			_inboxId: string,
+			messageId: string,
+			attachmentId: string,
+		): Effect.Effect<ProviderAttachmentStream, EmailError> =>
+			Effect.gen(function* () {
+				const all = yield* readAllRecords
+				const found = all.find(r => r.record.messageId === messageId)
+				if (!found) {
+					return yield* Effect.fail(
+						new EmailError({
+							message: `local-inbox: message ${messageId} not found`,
+						}),
+					)
+				}
+				const meta = found.record.attachments.find(
+					a => a.attachmentId === attachmentId,
+				)
+				if (!meta) {
+					return yield* Effect.fail(
+						new EmailError({
+							message: `local-inbox: attachment ${attachmentId} not found on ${messageId}`,
+						}),
+					)
+				}
+				const path = resolve(ATTACHMENTS_DIR, messageId, attachmentId)
+				const size = yield* Effect.tryPromise({
+					try: () => stat(path).then(s => s.size),
+					catch: e =>
+						new EmailError({
+							message: `local-inbox: cannot stat ${path}: ${e instanceof Error ? e.message : String(e)}`,
+						}),
+				})
+				const nodeStream = createReadStream(path)
+				const webStream = Readable.toWeb(
+					nodeStream,
+				) as ReadableStream<Uint8Array>
+				return {
+					stream: webStream,
+					contentType: meta.contentType,
+					filename: meta.filename,
+					size,
+				}
+			})
+
 		const updateLabels = (
 			_inboxId: string,
 			messageId: string,
@@ -569,6 +714,7 @@ export const LocalInboxProviderLive = Layer.effect(
 					html: null,
 					labels: ['magic-link'],
 					bodyText,
+					attachments: [],
 				}
 				yield* writeRecord(rec, sentAt)
 			})
@@ -582,6 +728,7 @@ export const LocalInboxProviderLive = Layer.effect(
 			getMessage,
 			listInboxes,
 			createInbox,
+			streamAttachment,
 			updateLabels,
 			sendMagicLink,
 		} as const

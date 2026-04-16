@@ -5,13 +5,22 @@ import {
 	HttpApiSchema,
 } from 'effect/unstable/httpapi'
 
-import { EmailSuppressed } from '../errors'
+import { BadRequest, EmailSuppressed, NotFound } from '../errors'
 import { SessionMiddleware } from '../middleware/session'
 
 const Recipients = Schema.Union([Schema.String, Schema.Array(Schema.String)])
 
 const ThreadStatus = Schema.Literals(['open', 'closed', 'archived'])
 const InboxPurpose = Schema.Literals(['human', 'agent', 'shared'])
+
+// Outbound attachment reference — the browser uploads bytes via the
+// staging endpoint first, then sends the thread with an array of
+// stagingIds. Keeps the send payload JSON-clean and sidesteps multipart
+// from the send path. Provider-agnostic: the server materializes the
+// base64 bytes and hands them to whichever provider is active.
+const SendAttachmentRef = Schema.Struct({
+	stagingId: Schema.String,
+})
 
 export const EmailGroup = HttpApiGroup.make('email')
 	.add(
@@ -27,12 +36,16 @@ export const EmailGroup = HttpApiGroup.make('email')
 				html: Schema.optional(Schema.String),
 				companyId: Schema.String,
 				contactId: Schema.optional(Schema.String),
+				attachments: Schema.optional(Schema.Array(SendAttachmentRef)),
 			}),
 			success: Schema.Struct({
 				messageId: Schema.String,
 				threadId: Schema.String,
 			}),
-			error: EmailSuppressed.pipe(HttpApiSchema.status(409)),
+			error: Schema.Union([
+				EmailSuppressed.pipe(HttpApiSchema.status(409)),
+				BadRequest.pipe(HttpApiSchema.status(400)),
+			]),
 		}),
 	)
 	.add(
@@ -43,12 +56,16 @@ export const EmailGroup = HttpApiGroup.make('email')
 				html: Schema.optional(Schema.String),
 				cc: Schema.optional(Schema.Array(Schema.String)),
 				bcc: Schema.optional(Schema.Array(Schema.String)),
+				attachments: Schema.optional(Schema.Array(SendAttachmentRef)),
 			}),
 			success: Schema.Struct({
 				messageId: Schema.String,
 				threadId: Schema.String,
 			}),
-			error: EmailSuppressed.pipe(HttpApiSchema.status(409)),
+			error: Schema.Union([
+				EmailSuppressed.pipe(HttpApiSchema.status(409)),
+				BadRequest.pipe(HttpApiSchema.status(400)),
+			]),
 		}),
 	)
 	.add(
@@ -161,6 +178,38 @@ export const EmailGroup = HttpApiGroup.make('email')
 				total: Schema.Number,
 			}),
 		}),
+	)
+	.add(
+		// Multipart upload — the body is parsed by the raw handler, so the
+		// declared payload is Unknown. Expected parts: one File part keyed
+		// `file` (the attachment bytes + filename + contentType).
+		HttpApiEndpoint.post('stageAttachment', '/email/attachments/staging', {
+			payload: Schema.Unknown,
+			success: Schema.Struct({
+				stagingId: Schema.String,
+				filename: Schema.String,
+				contentType: Schema.String,
+				size: Schema.Number,
+			}),
+			error: BadRequest.pipe(HttpApiSchema.status(400)),
+		}),
+	)
+	.add(
+		// Raw passthrough — the handler pipes the provider's attachment
+		// bytes straight into the HTTP response, so the declared success
+		// shape is Unknown (the real content-type is set at write time).
+		HttpApiEndpoint.get(
+			'downloadAttachment',
+			'/email/messages/:messageId/attachments/:attachmentId/download',
+			{
+				params: {
+					messageId: Schema.String,
+					attachmentId: Schema.String,
+				},
+				success: Schema.Unknown,
+				error: NotFound.pipe(HttpApiSchema.status(404)),
+			},
+		),
 	)
 	.middleware(SessionMiddleware)
 	.prefix('/v1')

@@ -1,17 +1,32 @@
-import { Effect } from 'effect'
+import { Effect, Stream } from 'effect'
+import { HttpServerResponse, Multipart } from 'effect/unstable/http'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
-import { ForjaApi } from '@engranatge/controllers'
+import { type BadRequest, ForjaApi } from '@engranatge/controllers'
 
 import { EmailService } from '../services/email'
+import { EmailAttachmentStaging } from '../services/email-attachment-staging'
+import type { SendAttachmentInput } from '../services/email-provider'
 
 export const EmailLive = HttpApiBuilder.group(ForjaApi, 'email', handlers =>
 	Effect.gen(function* () {
 		const svc = yield* EmailService
+		const staging = yield* EmailAttachmentStaging
+
+		// Resolve an array of { stagingId } refs into the provider-agnostic
+		// SendAttachmentInput shape that the service accepts. Consumed in
+		// both send + reply handlers; pulled out for readability.
+		const resolveAttachments = (
+			refs: ReadonlyArray<{ readonly stagingId: string }> | undefined,
+		): Effect.Effect<readonly SendAttachmentInput[], BadRequest> =>
+			refs && refs.length > 0
+				? staging.resolve(refs.map(r => r.stagingId))
+				: Effect.succeed([])
 		return handlers
 			.handle('send', _ =>
-				svc
-					.send(
+				Effect.gen(function* () {
+					const attachments = yield* resolveAttachments(_.payload.attachments)
+					return yield* svc.send(
 						_.payload.inboxId,
 						typeof _.payload.to === 'string' ? _.payload.to : [..._.payload.to],
 						_.payload.subject,
@@ -33,18 +48,20 @@ export const EmailLive = HttpApiBuilder.group(ForjaApi, 'email', handlers =>
 							...(_.payload.replyTo !== undefined && {
 								replyTo: _.payload.replyTo,
 							}),
+							...(attachments.length > 0 && { attachments }),
 						},
 					)
-					.pipe(
-						// EmailSuppressed flows through the typed error channel (409).
-						// Anything else (EmailSendError, SqlError) becomes a defect.
-						Effect.catchTag('EmailSendError', e => Effect.die(e)),
-						Effect.catchTag('SqlError', e => Effect.die(e)),
-					),
+				}).pipe(
+					// EmailSuppressed + BadRequest flow through the typed error channel.
+					// Anything else (EmailSendError, SqlError) becomes a defect.
+					Effect.catchTag('EmailSendError', e => Effect.die(e)),
+					Effect.catchTag('SqlError', e => Effect.die(e)),
+				),
 			)
 			.handle('reply', _ =>
-				svc
-					.reply(
+				Effect.gen(function* () {
+					const attachments = yield* resolveAttachments(_.payload.attachments)
+					return yield* svc.reply(
 						_.payload.threadId,
 						{
 							...(_.payload.text !== undefined && {
@@ -59,14 +76,15 @@ export const EmailLive = HttpApiBuilder.group(ForjaApi, 'email', handlers =>
 							...(_.payload.bcc !== undefined && {
 								bcc: [..._.payload.bcc],
 							}),
+							...(attachments.length > 0 && { attachments }),
 						},
 					)
-					.pipe(
-						Effect.catchTag('EmailSendError', e => Effect.die(e)),
-						Effect.catchTag('NotFound', e => Effect.die(e)),
-						Effect.catchTag('EmailError', e => Effect.die(e)),
-						Effect.catchTag('SqlError', e => Effect.die(e)),
-					),
+				}).pipe(
+					Effect.catchTag('EmailSendError', e => Effect.die(e)),
+					Effect.catchTag('NotFound', e => Effect.die(e)),
+					Effect.catchTag('EmailError', e => Effect.die(e)),
+					Effect.catchTag('SqlError', e => Effect.die(e)),
+				),
 			)
 			.handle('listThreads', _ =>
 				svc.listThreads({
@@ -182,5 +200,108 @@ export const EmailLive = HttpApiBuilder.group(ForjaApi, 'email', handlers =>
 					),
 			)
 			.handle('syncInboxes', () => svc.syncInboxes())
+			.handleRaw(
+				'stageAttachment',
+				Effect.fnUntraced(function* ({ request }) {
+					let bytes: Uint8Array | undefined
+					let filename: string | undefined
+					let contentType: string | undefined
+
+					yield* request.multipartStream.pipe(
+						Stream.runForEach(part =>
+							Effect.gen(function* () {
+								if (Multipart.isFile(part) && part.key === 'file') {
+									bytes = yield* part.contentEffect
+									filename = part.name ?? 'attachment'
+									contentType = part.contentType
+								}
+							}),
+						),
+						Effect.orDie,
+					)
+
+					if (!bytes || !contentType) {
+						return HttpServerResponse.jsonUnsafe(
+							{
+								_tag: 'BadRequest',
+								message: 'Missing file part in multipart upload',
+							},
+							{ status: 400 },
+						)
+					}
+
+					const result = yield* staging
+						.stage({
+							bytes,
+							filename: filename ?? 'attachment',
+							contentType,
+						})
+						.pipe(
+							Effect.catchTag('BadRequest', err =>
+								Effect.succeed(
+									HttpServerResponse.jsonUnsafe(
+										{ _tag: 'BadRequest', message: err.message },
+										{ status: 400 },
+									),
+								),
+							),
+						)
+
+					if (
+						typeof result === 'object' &&
+						result !== null &&
+						'stagingId' in result
+					) {
+						return HttpServerResponse.jsonUnsafe(result)
+					}
+					return result
+				}),
+			)
+			.handleRaw(
+				'downloadAttachment',
+				Effect.fnUntraced(function* ({ params }) {
+					const piped = yield* svc
+						.streamAttachment(params.messageId, params.attachmentId)
+						.pipe(
+							Effect.catchTag('NotFound', err =>
+								Effect.succeed(
+									HttpServerResponse.jsonUnsafe(
+										{ _tag: 'NotFound', entity: err.entity, id: err.id },
+										{ status: 404 },
+									),
+								),
+							),
+							Effect.catchTag('EmailError', err =>
+								Effect.succeed(
+									HttpServerResponse.jsonUnsafe(
+										{ _tag: 'EmailError', message: err.message },
+										{ status: 502 },
+									),
+								),
+							),
+							Effect.catchTag('SqlError', e => Effect.die(e)),
+						)
+					// If `piped` is already an HTTP response (one of the catch arms)
+					// hand it back unchanged. Otherwise wrap the provider stream.
+					if (HttpServerResponse.isHttpServerResponse(piped)) {
+						return piped
+					}
+					const disposition = piped.filename
+						? `attachment; filename="${piped.filename.replace(/"/g, '')}"`
+						: 'attachment'
+					const body = Stream.fromReadableStream({
+						evaluate: () => piped.stream,
+						onError: e =>
+							new Error(
+								`attachment stream: ${e instanceof Error ? e.message : String(e)}`,
+							),
+					})
+					return HttpServerResponse.stream(body, {
+						contentType: piped.contentType,
+						...(piped.size !== undefined && { contentLength: piped.size }),
+						headers: { 'content-disposition': disposition },
+					})
+				}),
+			)
 	}),
 )
