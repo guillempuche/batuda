@@ -16,11 +16,6 @@
  * instantiated — a plain fetch keeps the gate free of Effect runtime.
  */
 
-// Both SSR and client use the same public URL. SSR can reach portless's
-// HTTPS because the dev script sets NODE_EXTRA_CA_CERTS to trust the
-// local CA. In production both hit real TLS with valid certs.
-// TODO(portless): remove NODE_EXTRA_CA_CERTS from the dev script once
-// portless ships vercel-labs/portless#220 (auto-injects it for children).
 const SERVER_URL =
 	(typeof import.meta !== 'undefined' &&
 		import.meta.env?.['VITE_SERVER_URL']) ||

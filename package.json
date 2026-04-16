@@ -45,7 +45,7 @@
 		"@release-it/conventional-changelog": "^10.0.0",
 		"dprint": "^0.53.1",
 		"lefthook": "^2.1.4",
-		"portless": "^0.10.1",
+		"portless": "^0.10.2",
 		"release-it": "^19.0.0",
 		"syncpack": "^14.3.0",
 		"turbo": "^2.9.2",

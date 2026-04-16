@@ -24,8 +24,8 @@ importers:
         specifier: ^2.1.4
         version: 2.1.4
       portless:
-        specifier: ^0.10.1
-        version: 0.10.1
+        specifier: ^0.10.2
+        version: 0.10.3
       release-it:
         specifier: ^19.0.0
         version: 19.2.4(@types/node@22.19.15)
@@ -199,6 +199,9 @@ importers:
       '@tanstack/react-start':
         specifier: 1.167.16
         version: 1.167.16(crossws@0.4.5(srvx@0.11.15))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(@types/node@22.19.15)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
+      effect:
+        specifier: 4.0.0-beta.43
+        version: 4.0.0-beta.43
       lucide-react:
         specifier: ^1.7.0
         version: 1.7.0(react@19.2.4)
@@ -275,6 +278,9 @@ importers:
       '@engranatge/research':
         specifier: workspace:*
         version: link:../../packages/research
+      '@engranatge/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       agentmail:
         specifier: ^0.4.18
         version: 0.4.18
@@ -346,6 +352,9 @@ importers:
       '@engranatge/domain':
         specifier: workspace:*
         version: link:../domain
+      '@engranatge/ui':
+        specifier: workspace:*
+        version: link:../ui
       effect:
         specifier: 4.0.0-beta.43
         version: 4.0.0-beta.43
@@ -397,6 +406,9 @@ importers:
       '@tiptap/pm':
         specifier: ^3.21.0
         version: 3.22.0
+      effect:
+        specifier: 4.0.0-beta.43
+        version: 4.0.0-beta.43
       react:
         specifier: ^19
         version: 19.2.4
@@ -3862,8 +3874,8 @@ packages:
   pofile@1.1.4:
     resolution: {integrity: sha512-r6Q21sKsY1AjTVVjOuU02VYKVNQGJNQHjTIvs4dEbeuuYfxgYk/DGD2mqqq4RDaVkwdSq0VEtmQUOPe/wH8X3g==}
 
-  portless@0.10.1:
-    resolution: {integrity: sha512-WSzw0bW5tKoK8TIrOr54T43jc0A35XR6RApGEhlbBOl8NgugfQTD3EGKwqE2jjEdcNtPG5WHH/dXzxgVIoY4hw==}
+  portless@0.10.3:
+    resolution: {integrity: sha512-lXbVUsNiwWMKJGMi49HhTMW0lS7u0EzawonDZQ+yglSnHioiQK18Y4Fe0Ilk+TuXej71E/nTOHIFIBjUGvTm9w==}
     engines: {node: '>=20'}
     os: [darwin, linux, win32]
     hasBin: true
@@ -8325,7 +8337,7 @@ snapshots:
 
   pofile@1.1.4: {}
 
-  portless@0.10.1: {}
+  portless@0.10.3: {}
 
   postcss-value-parser@4.2.0: {}
 
