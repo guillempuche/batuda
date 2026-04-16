@@ -1,3 +1,5 @@
+import { msg } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, createLink } from '@tanstack/react-router'
 import { motion } from 'motion/react'
 import styled from 'styled-components'
@@ -11,8 +13,9 @@ import { ConveyorBelt } from '#/components/workshop/conveyor-belt'
 import { MachineCard } from '#/components/workshop/machine-card'
 import { scatter } from '#/data/scatter'
 import { services } from '#/data/services'
-import { isLangCode, type LangCode, locales } from '#/i18n'
-import { useLang, useTranslations } from '#/i18n/lang-provider'
+import { isLangCode, type LangCode } from '#/i18n'
+import { useLang } from '#/i18n/lang-provider'
+import { makeI18n } from '#/i18n/lingui'
 import { buildPublicPath, getAlternates } from '#/i18n/slugs'
 
 /* ─── Animation variants ─── */
@@ -29,16 +32,27 @@ const staggerContainer = {
 
 export const Route = createFileRoute('/$lang/')({
 	component: Home,
-	head: ({ params }) => {
+	loader: ({ params }) => {
 		const lang: LangCode = isLangCode(params.lang) ? params.lang : 'en'
-		const t = locales[lang]
+		const i18n = makeI18n(lang)
+		return {
+			title: i18n._(msg`Engranatge — Machines do the work`),
+			description: i18n._(
+				msg`We build automations, AI and micro-apps so your business runs itself.`,
+			),
+		}
+	},
+	head: ({ params, loaderData }) => {
+		const lang: LangCode = isLangCode(params.lang) ? params.lang : 'en'
+		const title = loaderData?.title ?? ''
+		const description = loaderData?.description ?? ''
 		const alternates = getAlternates('home')
 		return {
 			meta: [
-				{ title: t.meta.title },
-				{ name: 'description', content: t.meta.description },
-				{ property: 'og:title', content: t.meta.title },
-				{ property: 'og:description', content: t.meta.description },
+				{ title },
+				{ name: 'description', content: description },
+				{ property: 'og:title', content: title },
+				{ property: 'og:description', content: description },
 				{ property: 'og:type', content: 'website' },
 				{ property: 'og:url', content: buildPublicPath('home', lang) },
 				{ property: 'og:locale', content: lang },
@@ -251,7 +265,7 @@ const IncludesItem = styled.p<{ $included: boolean }>`
 /* ─── Page ─── */
 
 function Home() {
-	const t = useTranslations()
+	const { t } = useLingui()
 	const lang = useLang()
 	const heroRef = useSectionRef('hero')
 	const solutionRef = useSectionRef('solution')
@@ -259,9 +273,18 @@ function Home() {
 	const contactRef = useSectionRef('contact')
 
 	const beforeAfterItems = [
-		t.beforeAfter.invoices,
-		t.beforeAfter.followUp,
-		t.beforeAfter.orders,
+		{
+			before: t`4h copying invoices by hand`,
+			after: t`10 min, automated`,
+		},
+		{
+			before: t`Client follow-up in a spreadsheet`,
+			after: t`Smart reminders`,
+		},
+		{
+			before: t`Orders via WhatsApp, counted by hand`,
+			after: t`Order system with real-time stock`,
+		},
 	]
 
 	const conveyorItems = beforeAfterItems.map(item => ({
@@ -283,8 +306,12 @@ function Home() {
 			<HeroSection id='hero' ref={heroRef}>
 				<HeroContent>
 					<HeroText>
-						<Headline>{t.hero.headline}</Headline>
-						<Subheadline>{t.hero.subheadline}</Subheadline>
+						<Headline>
+							<Trans>Machines do the work. You run the business.</Trans>
+						</Headline>
+						<Subheadline>
+							<Trans>We build tools that work while you sleep.</Trans>
+						</Subheadline>
 						<motion.div
 							style={{ display: 'inline-block' }}
 							whileHover={{ scale: 1.03 }}
@@ -292,7 +319,7 @@ function Home() {
 							transition={{ type: 'spring', stiffness: 400, damping: 20 }}
 						>
 							<HeroCta to='/$lang' params={{ lang }} hash='contact'>
-								{t.hero.cta}
+								<Trans>Let's talk</Trans>
 							</HeroCta>
 						</motion.div>
 					</HeroText>
@@ -309,18 +336,18 @@ function Home() {
 				viewport={{ once: true, amount: 0.2 }}
 				transition={{ duration: 0.5 }}
 			>
-				<Section id='problem' title={t.sections.beforeAfter}>
+				<Section id='problem' title={t`Before and after`}>
 					<BeforeAfter
 						items={beforeAfterItems}
-						beforeLabel={t.sections.beforeLabel}
-						afterLabel={t.sections.afterLabel}
+						beforeLabel={t`Without Engranatge`}
+						afterLabel={t`With Engranatge`}
 					/>
 				</Section>
 			</motion.div>
 
 			{/* ── 3. SOLUTION ── */}
 			<div ref={solutionRef}>
-				<Section id='solution' title={t.sections.services}>
+				<Section id='solution' title={t`What we build`}>
 					<ServiceGrid
 						variants={staggerContainer}
 						initial='hidden'
@@ -354,7 +381,7 @@ function Home() {
 				viewport={{ once: true, amount: 0.2 }}
 				transition={{ duration: 0.5 }}
 			>
-				<Section title={t.toolDetail.examples}>
+				<Section title={t`Examples`}>
 					<ProofGrid
 						variants={staggerContainer}
 						initial='hidden'
@@ -388,17 +415,15 @@ function Home() {
 				viewport={{ once: true, amount: 0.2 }}
 				transition={{ duration: 0.5 }}
 			>
-				<Section
-					id='pricing'
-					title={t.pricing.pageTitle}
-					subtitle={t.pricing.pageSubtitle}
-				>
+				<Section id='pricing' title={t`Pricing`} subtitle={t`No fine print.`}>
 					{services.map(service => (
 						<PricingBlock key={service.slug}>
 							<PricingName>{service.name[lang]}</PricingName>
 							<IncludesGrid>
 								<IncludesColumn>
-									<IncludesLabel>{t.pricing.includes}</IncludesLabel>
+									<IncludesLabel>
+										<Trans>What's included</Trans>
+									</IncludesLabel>
 									{service.includes[lang].map(item => (
 										<IncludesItem key={item} $included>
 											{item}
@@ -406,7 +431,9 @@ function Home() {
 									))}
 								</IncludesColumn>
 								<IncludesColumn>
-									<IncludesLabel>{t.pricing.excludes}</IncludesLabel>
+									<IncludesLabel>
+										<Trans>What's not included</Trans>
+									</IncludesLabel>
 									{service.excludes[lang].map(item => (
 										<IncludesItem key={item} $included={false}>
 											{item}
@@ -430,9 +457,9 @@ function Home() {
 			>
 				<Section id='contact'>
 					<ControlPanel
-						heading={t.sections.cta}
-						body={t.sections.ctaBody}
-						primaryLabel={t.sections.ctaPrimary}
+						heading={t`Let's talk about your business`}
+						body={t`Tell us what you need and we'll tell you how we can automate it. No strings attached.`}
+						primaryLabel={t`Get a quote`}
 						primaryHref='mailto:hola@engranatge.com'
 					/>
 				</Section>

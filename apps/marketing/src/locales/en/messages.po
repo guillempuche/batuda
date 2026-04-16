@@ -1,0 +1,142 @@
+msgid ""
+msgstr ""
+"POT-Creation-Date: 2026-04-16 22:29+0200\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: @lingui/cli\n"
+"Language: en\n"
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Plural-Forms: \n"
+
+#: src/routes/$lang/index.tsx:278
+msgid "10 min, automated"
+msgstr "10 min, automated"
+
+#: src/routes/$lang/index.tsx:277
+msgid "4h copying invoices by hand"
+msgstr "4h copying invoices by hand"
+
+#: src/routes/$lang/index.tsx:339
+msgid "Before and after"
+msgstr "Before and after"
+
+#: src/routes/$lang/index.tsx:281
+msgid "Client follow-up in a spreadsheet"
+msgstr "Client follow-up in a spreadsheet"
+
+#: src/routes/$lang/$.tsx:24
+#: src/routes/$lang/index.tsx:39
+msgid "Engranatge — Machines do the work"
+msgstr "Engranatge — Machines do the work"
+
+#: src/routes/$lang/index.tsx:384
+msgid "Examples"
+msgstr "Examples"
+
+#: src/routes/$lang/index.tsx:466
+msgid "Get a quote"
+msgstr "Get a quote"
+
+#: src/components/layout/tool-belt.tsx:63
+#: src/components/layout/workshop-desktop.tsx:150
+msgid "Home"
+msgstr "Home"
+
+#: src/components/workshop/machine-card.tsx:121
+msgid "Input"
+msgstr "Input"
+
+#: src/components/layout/language-select.tsx:90
+msgid "Language"
+msgstr "Language"
+
+#: src/routes/$lang/index.tsx:322
+msgid "Let's talk"
+msgstr "Let's talk"
+
+#: src/routes/$lang/index.tsx:464
+msgid "Let's talk about your business"
+msgstr "Let's talk about your business"
+
+#: src/routes/$lang/index.tsx:310
+msgid "Machines do the work. You run the business."
+msgstr "Machines do the work. You run the business."
+
+#: src/components/layout/footer-stamp.tsx:21
+msgid "Made in Girona"
+msgstr "Made in Girona"
+
+#: src/routes/$lang/index.tsx:421
+msgid "No fine print."
+msgstr "No fine print."
+
+#: src/routes/$lang/index.tsx:286
+msgid "Order system with real-time stock"
+msgstr "Order system with real-time stock"
+
+#: src/routes/$lang/index.tsx:285
+msgid "Orders via WhatsApp, counted by hand"
+msgstr "Orders via WhatsApp, counted by hand"
+
+#: src/components/workshop/machine-card.tsx:133
+msgid "Output"
+msgstr "Output"
+
+#: src/components/layout/tool-belt.tsx:65
+#: src/components/layout/workshop-desktop.tsx:158
+#: src/routes/$lang/index.tsx:420
+msgid "Pricing"
+msgstr "Pricing"
+
+#: src/routes/$lang/index.tsx:282
+msgid "Smart reminders"
+msgstr "Smart reminders"
+
+#: src/components/layout/tool-belt.tsx:66
+#: src/components/layout/workshop-desktop.tsx:163
+msgid "Talk"
+msgstr "Talk"
+
+#: src/routes/$lang/index.tsx:465
+msgid "Tell us what you need and we'll tell you how we can automate it. No strings attached."
+msgstr "Tell us what you need and we'll tell you how we can automate it. No strings attached."
+
+#: src/components/layout/tool-belt.tsx:64
+#: src/components/layout/workshop-desktop.tsx:153
+msgid "Tools"
+msgstr "Tools"
+
+#: src/routes/$lang/$.tsx:26
+#: src/routes/$lang/$.tsx:94
+#: src/routes/$lang/index.tsx:41
+msgid "We build automations, AI and micro-apps so your business runs itself."
+msgstr "We build automations, AI and micro-apps so your business runs itself."
+
+#: src/routes/$lang/index.tsx:313
+msgid "We build tools that work while you sleep."
+msgstr "We build tools that work while you sleep."
+
+#: src/routes/$lang/index.tsx:350
+msgid "What we build"
+msgstr "What we build"
+
+#: src/routes/$lang/index.tsx:429
+msgid "What's included"
+msgstr "What's included"
+
+#: src/routes/$lang/index.tsx:439
+msgid "What's not included"
+msgstr "What's not included"
+
+#: src/routes/$lang/index.tsx:343
+msgid "With Engranatge"
+msgstr "With Engranatge"
+
+#: src/routes/$lang/index.tsx:342
+msgid "Without Engranatge"
+msgstr "Without Engranatge"

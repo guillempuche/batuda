@@ -1,0 +1,142 @@
+msgid ""
+msgstr ""
+"POT-Creation-Date: 2026-04-16 22:29+0200\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: @lingui/cli\n"
+"Language: ca\n"
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Plural-Forms: \n"
+
+#: src/routes/$lang/index.tsx:278
+msgid "10 min, automated"
+msgstr "10 min, automàtic"
+
+#: src/routes/$lang/index.tsx:277
+msgid "4h copying invoices by hand"
+msgstr "4h copiant factures a mà"
+
+#: src/routes/$lang/index.tsx:339
+msgid "Before and after"
+msgstr "Abans i després"
+
+#: src/routes/$lang/index.tsx:281
+msgid "Client follow-up in a spreadsheet"
+msgstr "Seguiment de clients en un Excel"
+
+#: src/routes/$lang/$.tsx:24
+#: src/routes/$lang/index.tsx:39
+msgid "Engranatge — Machines do the work"
+msgstr "Engranatge — Les màquines fan la feina"
+
+#: src/routes/$lang/index.tsx:384
+msgid "Examples"
+msgstr "Exemples"
+
+#: src/routes/$lang/index.tsx:466
+msgid "Get a quote"
+msgstr "Demana pressupost"
+
+#: src/components/layout/tool-belt.tsx:63
+#: src/components/layout/workshop-desktop.tsx:150
+msgid "Home"
+msgstr "Inici"
+
+#: src/components/workshop/machine-card.tsx:121
+msgid "Input"
+msgstr "Entrada"
+
+#: src/components/layout/language-select.tsx:90
+msgid "Language"
+msgstr "Idioma"
+
+#: src/routes/$lang/index.tsx:322
+msgid "Let's talk"
+msgstr "Parlem"
+
+#: src/routes/$lang/index.tsx:464
+msgid "Let's talk about your business"
+msgstr "Parlem del teu negoci"
+
+#: src/routes/$lang/index.tsx:310
+msgid "Machines do the work. You run the business."
+msgstr "Les màquines fan la feina. Tu fas el negoci."
+
+#: src/components/layout/footer-stamp.tsx:21
+msgid "Made in Girona"
+msgstr "Fet a Girona"
+
+#: src/routes/$lang/index.tsx:421
+msgid "No fine print."
+msgstr "Sense lletra petita."
+
+#: src/routes/$lang/index.tsx:286
+msgid "Order system with real-time stock"
+msgstr "Sistema de comandes amb estoc en temps real"
+
+#: src/routes/$lang/index.tsx:285
+msgid "Orders via WhatsApp, counted by hand"
+msgstr "Comandes per WhatsApp, comptades a mà"
+
+#: src/components/workshop/machine-card.tsx:133
+msgid "Output"
+msgstr "Sortida"
+
+#: src/components/layout/tool-belt.tsx:65
+#: src/components/layout/workshop-desktop.tsx:158
+#: src/routes/$lang/index.tsx:420
+msgid "Pricing"
+msgstr "Preus"
+
+#: src/routes/$lang/index.tsx:282
+msgid "Smart reminders"
+msgstr "Recordatoris intel·ligents"
+
+#: src/components/layout/tool-belt.tsx:66
+#: src/components/layout/workshop-desktop.tsx:163
+msgid "Talk"
+msgstr "Parla"
+
+#: src/routes/$lang/index.tsx:465
+msgid "Tell us what you need and we'll tell you how we can automate it. No strings attached."
+msgstr "Explica'ns què necessites i et direm com ho podem automatitzar. Sense compromís."
+
+#: src/components/layout/tool-belt.tsx:64
+#: src/components/layout/workshop-desktop.tsx:153
+msgid "Tools"
+msgstr "Eines"
+
+#: src/routes/$lang/$.tsx:26
+#: src/routes/$lang/$.tsx:94
+#: src/routes/$lang/index.tsx:41
+msgid "We build automations, AI and micro-apps so your business runs itself."
+msgstr "Construïm automatitzacions, IA i micro-aplicacions perquè el teu negoci treballi sol."
+
+#: src/routes/$lang/index.tsx:313
+msgid "We build tools that work while you sleep."
+msgstr "Construïm eines que treballen mentre tu dorms."
+
+#: src/routes/$lang/index.tsx:350
+msgid "What we build"
+msgstr "Què construïm"
+
+#: src/routes/$lang/index.tsx:429
+msgid "What's included"
+msgstr "Què inclou"
+
+#: src/routes/$lang/index.tsx:439
+msgid "What's not included"
+msgstr "Què no inclou"
+
+#: src/routes/$lang/index.tsx:343
+msgid "With Engranatge"
+msgstr "Amb Engranatge"
+
+#: src/routes/$lang/index.tsx:342
+msgid "Without Engranatge"
+msgstr "Sense Engranatge"

@@ -1,7 +1,7 @@
+import { Trans } from '@lingui/react/macro'
 import styled from 'styled-components'
 
 import { microScatter } from '#/data/scatter'
-import { useTranslations } from '#/i18n/lang-provider'
 
 /* Workshop machine nameplate — metal tag hanging from nail on pegboard */
 const Card = styled.div.withConfig({ displayName: 'MachineCard' })`
@@ -110,7 +110,6 @@ export function MachineCard({
 	inputs: string[]
 	outputs: string[]
 }) {
-	const t = useTranslations()
 	return (
 		<Card>
 			<CardHeader>
@@ -118,7 +117,9 @@ export function MachineCard({
 			</CardHeader>
 			<Description>{description}</Description>
 			<IOSection>
-				<IOLabel>{t.toolDetail.inputs}</IOLabel>
+				<IOLabel>
+					<Trans>Input</Trans>
+				</IOLabel>
 				<IOList>
 					{inputs.map((item, i) => (
 						<IOItem key={item} style={microScatter(i)}>
@@ -128,7 +129,9 @@ export function MachineCard({
 				</IOList>
 			</IOSection>
 			<IOSection>
-				<IOLabel>{t.toolDetail.outputs}</IOLabel>
+				<IOLabel>
+					<Trans>Output</Trans>
+				</IOLabel>
 				<IOList>
 					{outputs.map((item, i) => (
 						<IOItem key={item} style={microScatter(i + inputs.length)}>

@@ -1,8 +1,9 @@
+import { useLingui } from '@lingui/react/macro'
 import { createLink } from '@tanstack/react-router'
 import { Cog, Gauge, MessageCircle, Receipt, Wrench } from 'lucide-react'
 import styled from 'styled-components'
 
-import { useLang, useTranslations } from '#/i18n/lang-provider'
+import { useLang } from '#/i18n/lang-provider'
 import { BlueprintSheet } from './blueprint-sheet'
 import { FooterStampContent } from './footer-stamp'
 import { LanguageSelect } from './language-select'
@@ -134,7 +135,7 @@ const LogoPlateAnchor = styled.a.withConfig({ displayName: 'LogoPlate' })`
 const LogoPlate = createLink(LogoPlateAnchor)
 
 export function WorkshopDesktop({ children }: { children: React.ReactNode }) {
-	const t = useTranslations()
+	const { t } = useLingui()
 	const lang = useLang()
 
 	return (
@@ -146,20 +147,20 @@ export function WorkshopDesktop({ children }: { children: React.ReactNode }) {
 						Engranatge
 					</LogoPlate>
 					<ToolsRack>
-						<ShadowBoardTool icon={Gauge} label={t.nav.home} scrollTo='hero' />
+						<ShadowBoardTool icon={Gauge} label={t`Home`} scrollTo='hero' />
 						<ShadowBoardTool
 							icon={Wrench}
-							label={t.nav.solution}
+							label={t`Tools`}
 							scrollTo='solution'
 						/>
 						<ShadowBoardTool
 							icon={Receipt}
-							label={t.nav.quote}
+							label={t`Pricing`}
 							scrollTo='pricing'
 						/>
 						<ShadowBoardTool
 							icon={MessageCircle}
-							label={t.nav.contact}
+							label={t`Talk`}
 							scrollTo='contact'
 						/>
 					</ToolsRack>

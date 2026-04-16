@@ -2,14 +2,7 @@ import { useRouter } from '@tanstack/react-router'
 import { createContext, use, useCallback, useEffect } from 'react'
 
 import { writeStoredLang } from './detect-lang'
-import {
-	defaultLang,
-	htmlLang,
-	isLangCode,
-	type LangCode,
-	type Locale,
-	locales,
-} from './index'
+import { defaultLang, htmlLang, isLangCode, type LangCode } from './index'
 
 type LangContextValue = {
 	lang: LangCode
@@ -72,9 +65,4 @@ export function useLang(): LangCode {
 
 export function useSetLang(): (next: LangCode) => void {
 	return use(LangContext).setLang
-}
-
-export function useTranslations(): Locale {
-	const lang = useLang()
-	return locales[lang]
 }
