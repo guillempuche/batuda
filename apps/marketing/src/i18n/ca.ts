@@ -71,6 +71,75 @@ export const ca = {
 		contact: 'Contacte',
 		legal: 'Legal',
 	},
+	pageMeta: {
+		home: {
+			title: 'Engranatge — Les màquines fan la feina',
+			description:
+				'Construïm automatitzacions, IA i micro-aplicacions perquè el teu negoci treballi sol.',
+		},
+		automations: {
+			title: 'Automatitzacions — Engranatge',
+			description:
+				'Connectem els teus sistemes perquè la feina repetitiva es faci sola.',
+		},
+		'ai-agents': {
+			title: 'Agents IA — Engranatge',
+			description: 'Agents intel·ligents que treballen 24/7 pel teu negoci.',
+		},
+		about: {
+			title: 'El taller — Engranatge',
+			description: 'Qui som i per què construïm eines que treballen soles.',
+		},
+		'discovery-call': {
+			title: 'Parlem — Engranatge',
+			description: "Explica'ns el teu cas i veurem com podem ajudar-te.",
+		},
+		'dept-finance': {
+			title: 'Finances — Engranatge',
+			description: 'Automatitzacions per a departaments de finances.',
+		},
+		'dept-operations': {
+			title: 'Operacions — Engranatge',
+			description: 'Eines per optimitzar les operacions del dia a dia.',
+		},
+		'dept-sales': {
+			title: 'Vendes — Engranatge',
+			description: 'Automatitzacions per accelerar el teu cicle de vendes.',
+		},
+		'dept-admin': {
+			title: 'Administració — Engranatge',
+			description: 'Eines per a la gestió administrativa sense feina manual.',
+		},
+		'dept-customer-service': {
+			title: 'Atenció al client — Engranatge',
+			description: 'Respon més ràpid amb menys esforç.',
+		},
+		'dept-procurement': {
+			title: 'Compres — Engranatge',
+			description: 'Automatitza les comandes i el seguiment de proveïdors.',
+		},
+		'dept-hr': {
+			title: 'Recursos humans — Engranatge',
+			description: 'Eines per a RRHH: onboarding, nòmines, fitxatge.',
+		},
+		'dept-legal': {
+			title: 'Legal — Engranatge',
+			description:
+				'Automatitza la revisió de contractes i el compliment normatiu.',
+		},
+		'dept-marketing': {
+			title: 'Màrqueting — Engranatge',
+			description: 'Automatitzacions per a campanyes, contingut i anàlisi.',
+		},
+		'dept-management': {
+			title: 'Direcció — Engranatge',
+			description: "Dashboards i alertes perquè no se t'escapi res.",
+		},
+		'cases-index': {
+			title: 'Casos — Engranatge',
+			description: "Exemples reals d'automatitzacions en funcionament.",
+		},
+	},
 } as const
 
 /* Widens literal types in `typeof ca` so that `es` and `en` can satisfy

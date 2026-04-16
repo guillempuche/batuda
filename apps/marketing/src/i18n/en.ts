@@ -73,4 +73,71 @@ export const en = {
 		contact: 'Contact',
 		legal: 'Legal',
 	},
+	pageMeta: {
+		home: {
+			title: 'Engranatge — Machines do the work',
+			description:
+				'We build automations, AI and micro-apps so your business runs itself.',
+		},
+		automations: {
+			title: 'Automations — Engranatge',
+			description: 'We connect your systems so repetitive work does itself.',
+		},
+		'ai-agents': {
+			title: 'AI Agents — Engranatge',
+			description: 'Intelligent agents that work 24/7 for your business.',
+		},
+		about: {
+			title: 'The Workshop — Engranatge',
+			description: 'Who I am and why I build tools that work on their own.',
+		},
+		'discovery-call': {
+			title: "Let's talk — Engranatge",
+			description: 'Tell me about your case and we will see how I can help.',
+		},
+		'dept-finance': {
+			title: 'Finance — Engranatge',
+			description: 'Automations for finance departments.',
+		},
+		'dept-operations': {
+			title: 'Operations — Engranatge',
+			description: 'Tools to optimise day-to-day operations.',
+		},
+		'dept-sales': {
+			title: 'Sales — Engranatge',
+			description: 'Automations to accelerate your sales cycle.',
+		},
+		'dept-admin': {
+			title: 'Administration — Engranatge',
+			description: 'Tools for paperwork-free admin management.',
+		},
+		'dept-customer-service': {
+			title: 'Customer Service — Engranatge',
+			description: 'Respond faster with less effort.',
+		},
+		'dept-procurement': {
+			title: 'Procurement — Engranatge',
+			description: 'Automate purchase orders and supplier tracking.',
+		},
+		'dept-hr': {
+			title: 'HR — Engranatge',
+			description: 'Tools for HR: onboarding, payroll, time tracking.',
+		},
+		'dept-legal': {
+			title: 'Legal — Engranatge',
+			description: 'Automate contract review and compliance tracking.',
+		},
+		'dept-marketing': {
+			title: 'Marketing — Engranatge',
+			description: 'Automations for campaigns, content and analytics.',
+		},
+		'dept-management': {
+			title: 'Management — Engranatge',
+			description: 'Dashboards and alerts so nothing slips through.',
+		},
+		'cases-index': {
+			title: 'Cases — Engranatge',
+			description: 'Real examples of automations in production.',
+		},
+	},
 } as const satisfies Locale
