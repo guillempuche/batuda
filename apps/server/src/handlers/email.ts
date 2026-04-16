@@ -13,7 +13,7 @@ export const EmailLive = HttpApiBuilder.group(ForjaApi, 'email', handlers =>
 				svc
 					.send(
 						_.payload.inboxId,
-						_.payload.to,
+						typeof _.payload.to === 'string' ? _.payload.to : [..._.payload.to],
 						_.payload.subject,
 						{
 							...(_.payload.text !== undefined && {
@@ -25,6 +25,15 @@ export const EmailLive = HttpApiBuilder.group(ForjaApi, 'email', handlers =>
 						},
 						_.payload.companyId,
 						_.payload.contactId,
+						{
+							...(_.payload.cc !== undefined && { cc: [..._.payload.cc] }),
+							...(_.payload.bcc !== undefined && {
+								bcc: [..._.payload.bcc],
+							}),
+							...(_.payload.replyTo !== undefined && {
+								replyTo: _.payload.replyTo,
+							}),
+						},
 					)
 					.pipe(
 						// EmailSuppressed flows through the typed error channel (409).
@@ -35,14 +44,23 @@ export const EmailLive = HttpApiBuilder.group(ForjaApi, 'email', handlers =>
 			)
 			.handle('reply', _ =>
 				svc
-					.reply(_.payload.threadId, {
-						...(_.payload.text !== undefined && {
-							text: _.payload.text,
-						}),
-						...(_.payload.html !== undefined && {
-							html: _.payload.html,
-						}),
-					})
+					.reply(
+						_.payload.threadId,
+						{
+							...(_.payload.text !== undefined && {
+								text: _.payload.text,
+							}),
+							...(_.payload.html !== undefined && {
+								html: _.payload.html,
+							}),
+						},
+						{
+							...(_.payload.cc !== undefined && { cc: [..._.payload.cc] }),
+							...(_.payload.bcc !== undefined && {
+								bcc: [..._.payload.bcc],
+							}),
+						},
+					)
 					.pipe(
 						Effect.catchTag('EmailSendError', e => Effect.die(e)),
 						Effect.catchTag('NotFound', e => Effect.die(e)),
@@ -58,17 +76,27 @@ export const EmailLive = HttpApiBuilder.group(ForjaApi, 'email', handlers =>
 					...(_.query.companyId !== undefined && {
 						companyId: _.query.companyId,
 					}),
-					...(_.query.limit !== undefined && {
-						limit: _.query.limit,
+					...(_.query.status !== undefined && { status: _.query.status }),
+					...(_.query.purpose !== undefined && {
+						purpose: _.query.purpose,
 					}),
-					...(_.query.offset !== undefined && {
-						offset: _.query.offset,
-					}),
+					...(_.query.query !== undefined && { query: _.query.query }),
+					...(_.query.limit !== undefined && { limit: _.query.limit }),
+					...(_.query.offset !== undefined && { offset: _.query.offset }),
 				}),
 			)
 			.handle('getThread', _ =>
 				svc.getThread(_.params.threadId).pipe(Effect.orDie),
 			)
+			.handle('updateThreadStatus', _ =>
+				svc.updateThreadStatus(_.params.threadId, _.payload.status).pipe(
+					Effect.catchTag('NotFound', e => Effect.die(e)),
+					Effect.catchTag('SqlError', e => Effect.die(e)),
+					Effect.orDie,
+				),
+			)
+			.handle('markThreadRead', _ => svc.markThreadRead(_.params.threadId))
+			.handle('markThreadUnread', _ => svc.markThreadUnread(_.params.threadId))
 			.handle('listMessages', _ =>
 				svc.listMessages({
 					...(_.query.contactId !== undefined && {

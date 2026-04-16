@@ -64,8 +64,15 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					body: { text?: string; html?: string },
 					companyId: string,
 					contactId?: string,
+					extras?: {
+						cc?: string[] | undefined
+						bcc?: string[] | undefined
+						replyTo?: string | undefined
+					},
 				) =>
 					Effect.gen(function* () {
+						const cc = extras?.cc ?? []
+						const bcc = extras?.bcc ?? []
 						// 1) Fast-path cache check
 						if (contactId) {
 							yield* assertContactNotSuppressed(contactId, to)
@@ -76,8 +83,13 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							.send(inboxId, {
 								to,
 								subject,
-								text: body.text,
-								html: body.html,
+								...(body.text !== undefined && { text: body.text }),
+								...(body.html !== undefined && { html: body.html }),
+								...(cc.length > 0 && { cc }),
+								...(bcc.length > 0 && { bcc }),
+								...(extras?.replyTo !== undefined && {
+									replyTo: extras.replyTo,
+								}),
 							})
 							.pipe(
 								Effect.catchTag('EmailSendError', err =>
@@ -150,8 +162,8 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								contactId: contactId ?? null,
 								recipients: JSON.stringify({
 									to: Array.isArray(to) ? to : [to],
-									cc: [],
-									bcc: [],
+									cc,
+									bcc,
 								}),
 								status: 'sent',
 								statusUpdatedAt: new Date(),
@@ -172,8 +184,14 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 				reply: (
 					providerThreadId: string,
 					body: { text?: string; html?: string },
+					extras?: {
+						cc?: string[] | undefined
+						bcc?: string[] | undefined
+					},
 				) =>
 					Effect.gen(function* () {
+						const cc = extras?.cc ?? []
+						const bcc = extras?.bcc ?? []
 						const links = yield* sql`
 							SELECT * FROM email_thread_links
 							WHERE provider_thread_id = ${providerThreadId}
@@ -214,8 +232,10 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 
 						const result = yield* provider
 							.reply(link.providerInboxId, lastMessage.messageId, {
-								text: body.text,
-								html: body.html,
+								...(body.text !== undefined && { text: body.text }),
+								...(body.html !== undefined && { html: body.html }),
+								...(cc.length > 0 && { cc }),
+								...(bcc.length > 0 && { bcc }),
 							})
 							.pipe(
 								Effect.catchTag('EmailSendError', err =>
@@ -278,8 +298,8 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								contactId: link.contactId,
 								recipients: JSON.stringify({
 									to: replyRecipients,
-									cc: [],
-									bcc: [],
+									cc,
+									bcc,
 								}),
 								status: 'sent',
 								statusUpdatedAt: new Date(),
@@ -636,26 +656,171 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						}
 					}),
 
+				updateThreadStatus: (
+					threadId: string,
+					status: 'open' | 'closed' | 'archived',
+				) =>
+					Effect.gen(function* () {
+						const rows = yield* sql`
+							UPDATE email_thread_links
+							SET status = ${status}, updated_at = now()
+							WHERE id = ${threadId}
+							RETURNING id, status, updated_at
+						`
+						if (rows.length === 0) {
+							return yield* new NotFound({
+								entity: 'EmailThreadLink',
+								id: threadId,
+							})
+						}
+						return rows[0]!
+					}),
+
+				markThreadRead: (threadId: string) =>
+					Effect.gen(function* () {
+						yield* sql`
+							UPDATE email_thread_links
+							SET last_read_at = now()
+							WHERE id = ${threadId}
+						`
+					}).pipe(Effect.orDie),
+
+				markThreadUnread: (threadId: string) =>
+					Effect.gen(function* () {
+						yield* sql`
+							UPDATE email_thread_links
+							SET last_read_at = NULL
+							WHERE id = ${threadId}
+						`
+					}).pipe(Effect.orDie),
+
 				listThreads: (filters?: {
 					inboxId?: string
 					companyId?: string
+					status?: string
+					purpose?: 'human' | 'agent' | 'shared'
+					query?: string
 					limit?: number
 					offset?: number
 				}) =>
 					Effect.gen(function* () {
+						const limit = filters?.limit ?? 100
+						const offset = filters?.offset ?? 0
 						const conditions: Array<Statement.Fragment> = []
 						if (filters?.inboxId)
-							conditions.push(sql`provider_inbox_id = ${filters.inboxId}`)
+							conditions.push(sql`tl.provider_inbox_id = ${filters.inboxId}`)
 						if (filters?.companyId)
-							conditions.push(sql`company_id = ${filters.companyId}`)
+							conditions.push(sql`tl.company_id = ${filters.companyId}`)
+						if (filters?.status)
+							conditions.push(sql`tl.status = ${filters.status}`)
+						if (filters?.purpose)
+							conditions.push(sql`i.purpose = ${filters.purpose}`)
+						if (filters?.query) {
+							const pattern = `%${filters.query.toLowerCase()}%`
+							conditions.push(sql`lower(tl.subject) LIKE ${pattern}`)
+						}
 
-						return yield* sql`
-							SELECT * FROM email_thread_links
-							WHERE ${sql.and(conditions)}
-							ORDER BY updated_at DESC
-							LIMIT ${filters?.limit ?? 20}
-							OFFSET ${filters?.offset ?? 0}
+						const whereClause =
+							conditions.length > 0 ? sql`WHERE ${sql.and(conditions)}` : sql``
+
+						// Single query produces items + total via window COUNT(*) OVER ().
+						// Subqueries enrich each row with message counts, last-activity
+						// markers, inbound classification, and unread state.
+						const rows = yield* sql<{
+							id: string
+							providerThreadId: string
+							providerInboxId: string
+							companyId: string | null
+							contactId: string | null
+							subject: string | null
+							status: string
+							provider: string
+							inboxId: string | null
+							lastReadAt: Date | null
+							createdAt: Date
+							updatedAt: Date
+							inboxEmail: string | null
+							inboxDisplayName: string | null
+							inboxPurpose: 'human' | 'agent' | 'shared' | null
+							messageCount: string | number
+							lastMessageAt: Date | null
+							lastMessageDirection: 'inbound' | 'outbound' | null
+							lastInboundAt: Date | null
+							lastInboundClassification: 'normal' | 'spam' | 'blocked' | null
+							isUnread: boolean
+							total: string | number
+						}>`
+							SELECT
+								tl.*,
+								i.email AS inbox_email,
+								i.display_name AS inbox_display_name,
+								i.purpose AS inbox_purpose,
+								(
+									SELECT COUNT(*) FROM email_messages m
+									WHERE m.provider_thread_id = tl.provider_thread_id
+								) AS message_count,
+								(
+									SELECT MAX(m.status_updated_at) FROM email_messages m
+									WHERE m.provider_thread_id = tl.provider_thread_id
+								) AS last_message_at,
+								(
+									SELECT m.direction FROM email_messages m
+									WHERE m.provider_thread_id = tl.provider_thread_id
+									ORDER BY m.status_updated_at DESC
+									LIMIT 1
+								) AS last_message_direction,
+								(
+									SELECT MAX(m.status_updated_at) FROM email_messages m
+									WHERE m.provider_thread_id = tl.provider_thread_id
+									  AND m.direction = 'inbound'
+								) AS last_inbound_at,
+								(
+									SELECT m.inbound_classification FROM email_messages m
+									WHERE m.provider_thread_id = tl.provider_thread_id
+									  AND m.direction = 'inbound'
+									ORDER BY m.status_updated_at DESC
+									LIMIT 1
+								) AS last_inbound_classification,
+								(
+									(
+										SELECT MAX(m.status_updated_at) FROM email_messages m
+										WHERE m.provider_thread_id = tl.provider_thread_id
+										  AND m.direction = 'inbound'
+									) > COALESCE(tl.last_read_at, 'epoch'::timestamptz)
+								) AS is_unread,
+								COUNT(*) OVER () AS total
+							FROM email_thread_links tl
+							LEFT JOIN inboxes i ON i.id = tl.inbox_id
+							${whereClause}
+							ORDER BY tl.updated_at DESC
+							LIMIT ${limit}
+							OFFSET ${offset}
 						`
+
+						const total = rows.length > 0 ? Number(rows[0]!.total) : 0
+						const items = rows.map(r => {
+							const {
+								total: _t,
+								inboxEmail,
+								inboxDisplayName,
+								inboxPurpose,
+								messageCount,
+								...rest
+							} = r
+							return {
+								...rest,
+								messageCount: Number(messageCount),
+								inbox:
+									inboxEmail && inboxPurpose
+										? {
+												email: inboxEmail,
+												displayName: inboxDisplayName,
+												purpose: inboxPurpose,
+											}
+										: null,
+							}
+						})
+						return { items, total, limit, offset }
 					}).pipe(Effect.orDie),
 
 				listMessages: (filters?: {

@@ -8,12 +8,20 @@ import {
 import { EmailSuppressed } from '../errors'
 import { SessionMiddleware } from '../middleware/session'
 
+const Recipients = Schema.Union([Schema.String, Schema.Array(Schema.String)])
+
+const ThreadStatus = Schema.Literals(['open', 'closed', 'archived'])
+const InboxPurpose = Schema.Literals(['human', 'agent', 'shared'])
+
 export const EmailGroup = HttpApiGroup.make('email')
 	.add(
 		HttpApiEndpoint.post('send', '/email/send', {
 			payload: Schema.Struct({
 				inboxId: Schema.String,
-				to: Schema.String,
+				to: Recipients,
+				cc: Schema.optional(Schema.Array(Schema.String)),
+				bcc: Schema.optional(Schema.Array(Schema.String)),
+				replyTo: Schema.optional(Schema.String),
 				subject: Schema.String,
 				text: Schema.optional(Schema.String),
 				html: Schema.optional(Schema.String),
@@ -33,6 +41,8 @@ export const EmailGroup = HttpApiGroup.make('email')
 				threadId: Schema.String,
 				text: Schema.optional(Schema.String),
 				html: Schema.optional(Schema.String),
+				cc: Schema.optional(Schema.Array(Schema.String)),
+				bcc: Schema.optional(Schema.Array(Schema.String)),
 			}),
 			success: Schema.Struct({
 				messageId: Schema.String,
@@ -46,11 +56,42 @@ export const EmailGroup = HttpApiGroup.make('email')
 			query: {
 				inboxId: Schema.optional(Schema.String),
 				companyId: Schema.optional(Schema.String),
+				status: Schema.optional(ThreadStatus),
+				purpose: Schema.optional(InboxPurpose),
+				query: Schema.optional(Schema.String),
 				limit: Schema.optional(Schema.NumberFromString),
 				offset: Schema.optional(Schema.NumberFromString),
 			},
-			success: Schema.Array(Schema.Unknown),
+			success: Schema.Struct({
+				items: Schema.Array(Schema.Unknown),
+				total: Schema.Number,
+				limit: Schema.Number,
+				offset: Schema.Number,
+			}),
 		}),
+	)
+	.add(
+		HttpApiEndpoint.patch('updateThreadStatus', '/email/threads/:threadId', {
+			params: { threadId: Schema.String },
+			payload: Schema.Struct({ status: ThreadStatus }),
+			success: Schema.Unknown,
+		}),
+	)
+	.add(
+		HttpApiEndpoint.post('markThreadRead', '/email/threads/:threadId/read', {
+			params: { threadId: Schema.String },
+			success: Schema.Void,
+		}),
+	)
+	.add(
+		HttpApiEndpoint.delete(
+			'markThreadUnread',
+			'/email/threads/:threadId/read',
+			{
+				params: { threadId: Schema.String },
+				success: Schema.Void,
+			},
+		),
 	)
 	.add(
 		HttpApiEndpoint.get('getThread', '/email/threads/:threadId', {
