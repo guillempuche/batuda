@@ -1,18 +1,20 @@
 import { Effect, Schema } from 'effect'
 import { McpSchema, McpServer, Tool, Toolkit } from 'effect/unstable/ai'
 
+import { BlockNode, TiptapDocument } from '@engranatge/ui/blocks'
+
 import { PageService } from '../../services/pages'
 
 const CreatePage = Tool.make('create_page', {
 	description:
-		'Create a prospect sales page (draft). Set lang to "ca" first, then create translations for the same slug.',
+		'Create a prospect sales page (draft). One language per prospect is the norm; default lang is "en". slug is optional — omit it for prospect pages (company_id set) and the server generates a safe random URL like "acme-a3f2k1"; pass it explicitly only when cloning an existing prospect page into another language or creating a generic page without a company.',
 	parameters: Schema.Struct({
 		company_id: Schema.optional(Schema.String),
-		slug: Schema.String,
+		slug: Schema.optional(Schema.String),
 		lang: Schema.String,
 		template: Schema.optional(Schema.String),
 		title: Schema.String,
-		content: Schema.Unknown,
+		content: TiptapDocument,
 	}),
 	success: Schema.Unknown,
 })
@@ -25,7 +27,7 @@ const UpdatePage = Tool.make('update_page', {
 	parameters: Schema.Struct({
 		id: Schema.String,
 		title: Schema.optional(Schema.String),
-		content: Schema.optional(Schema.Unknown),
+		content: Schema.optional(TiptapDocument),
 		meta: Schema.optional(Schema.Unknown),
 	}),
 	success: Schema.Unknown,
@@ -76,12 +78,73 @@ const GetPage = Tool.make('get_page', {
 	.annotate(Tool.Destructive, false)
 	.annotate(Tool.OpenWorld, false)
 
+const InsertBlock = Tool.make('insert_block', {
+	description:
+		'Insert a block at a specific position in a page document. Defaults to appending at the end.',
+	parameters: Schema.Struct({
+		page_id: Schema.String,
+		position: Schema.optional(Schema.Number),
+		block: BlockNode,
+	}),
+	success: Schema.Unknown,
+})
+	.annotate(Tool.Title, 'Insert Block')
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.Idempotent, false)
+	.annotate(Tool.OpenWorld, false)
+
+const UpdateBlock = Tool.make('update_block', {
+	description:
+		'Update the attrs of a block at a specific position. Only the provided attrs fields are merged — omitted fields keep their current value.',
+	parameters: Schema.Struct({
+		page_id: Schema.String,
+		position: Schema.Number,
+		attrs: Schema.Unknown,
+	}),
+	success: Schema.Unknown,
+})
+	.annotate(Tool.Title, 'Update Block')
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.Idempotent, true)
+	.annotate(Tool.OpenWorld, false)
+
+const MoveBlock = Tool.make('move_block', {
+	description: 'Move a block from one position to another within the document.',
+	parameters: Schema.Struct({
+		page_id: Schema.String,
+		from: Schema.Number,
+		to: Schema.Number,
+	}),
+	success: Schema.Unknown,
+})
+	.annotate(Tool.Title, 'Move Block')
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.Idempotent, true)
+	.annotate(Tool.OpenWorld, false)
+
+const RemoveBlock = Tool.make('remove_block', {
+	description: 'Remove a block at a specific position from the document.',
+	parameters: Schema.Struct({
+		page_id: Schema.String,
+		position: Schema.Number,
+	}),
+	success: Schema.Unknown,
+})
+	.annotate(Tool.Title, 'Remove Block')
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.Idempotent, false)
+	.annotate(Tool.OpenWorld, false)
+
 export const PageTools = Toolkit.make(
 	CreatePage,
 	UpdatePage,
 	PublishPage,
 	ListPages,
 	GetPage,
+	InsertBlock,
+	UpdateBlock,
+	MoveBlock,
+	RemoveBlock,
 )
 
 export const PageHandlersLive = PageTools.toLayer(
@@ -141,6 +204,62 @@ export const PageHandlersLive = PageTools.toLayer(
 					}
 					return yield* service.getById(id_or_slug)
 				}).pipe(Effect.orDie),
+			insert_block: ({ page_id, position, block }) =>
+				service
+					.mutateContent(page_id, doc => {
+						const content = [...doc.content]
+						const idx = position ?? content.length
+						content.splice(idx, 0, block)
+						return { ...doc, content }
+					})
+					.pipe(
+						Effect.map(r => r[0]),
+						Effect.orDie,
+					),
+			update_block: ({ page_id, position, attrs }) =>
+				service
+					.mutateContent(page_id, doc => {
+						const content = [...doc.content]
+						const existing = content[position]
+						if (!existing || !('attrs' in existing)) return doc
+						content[position] = {
+							...existing,
+							attrs: {
+								...existing.attrs,
+								...(attrs as Record<string, unknown>),
+							},
+						} as typeof existing
+						return { ...doc, content }
+					})
+					.pipe(
+						Effect.map(r => r[0]),
+						Effect.orDie,
+					),
+			move_block: ({ page_id, from, to }) =>
+				service
+					.mutateContent(page_id, doc => {
+						const content = [...doc.content]
+						if (from < 0 || from >= content.length) return doc
+						const [block] = content.splice(from, 1)
+						content.splice(to, 0, block!)
+						return { ...doc, content }
+					})
+					.pipe(
+						Effect.map(r => r[0]),
+						Effect.orDie,
+					),
+			remove_block: ({ page_id, position }) =>
+				service
+					.mutateContent(page_id, doc => {
+						const content = [...doc.content]
+						if (position < 0 || position >= content.length) return doc
+						content.splice(position, 1)
+						return { ...doc, content }
+					})
+					.pipe(
+						Effect.map(r => r[0]),
+						Effect.orDie,
+					),
 		}
 	}),
 )

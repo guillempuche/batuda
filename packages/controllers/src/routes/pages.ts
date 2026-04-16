@@ -5,22 +5,26 @@ import {
 	HttpApiSchema,
 } from 'effect/unstable/httpapi'
 
+import { TiptapDocument } from '@engranatge/ui/blocks'
+
 import { NotFound } from '../errors'
 import { SessionMiddleware } from '../middleware/session'
 
 const CreatePageInput = Schema.Struct({
 	companyId: Schema.optional(Schema.String),
-	slug: Schema.String.pipe(Schema.check(Schema.isPattern(/^[a-z0-9-]+$/))),
+	slug: Schema.optional(
+		Schema.String.pipe(Schema.check(Schema.isPattern(/^[a-z0-9-]+$/))),
+	),
 	lang: Schema.String,
 	title: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
 	template: Schema.optional(Schema.String),
-	content: Schema.Unknown,
+	content: TiptapDocument,
 	meta: Schema.optional(Schema.Unknown),
 })
 
 const UpdatePageInput = Schema.Struct({
 	title: Schema.optional(Schema.String),
-	content: Schema.optional(Schema.Unknown),
+	content: Schema.optional(TiptapDocument),
 	meta: Schema.optional(Schema.Unknown),
 	status: Schema.optional(Schema.String),
 })
@@ -35,6 +39,13 @@ export const PagesGroup = HttpApiGroup.make('pages')
 				lang: Schema.optional(Schema.String),
 			},
 			success: Schema.Array(Schema.Unknown),
+		}),
+	)
+	.add(
+		HttpApiEndpoint.get('get', '/v1/pages/:id', {
+			params: { id: Schema.String },
+			success: Schema.Unknown,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(

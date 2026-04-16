@@ -11,7 +11,7 @@ export const PagesLive = HttpApiBuilder.group(ForjaApi, 'pages', handlers =>
 		return handlers
 			.handle('getPublic', _ =>
 				svc
-					.getBySlugAndLang(_.params.slug, _.query.lang ?? 'ca')
+					.getBySlugAndLang(_.params.slug, _.query.lang ?? 'en')
 					.pipe(
 						Effect.catch(e =>
 							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
@@ -19,13 +19,13 @@ export const PagesLive = HttpApiBuilder.group(ForjaApi, 'pages', handlers =>
 					),
 			)
 			.handle('view', _ =>
-				svc.incrementView(_.params.slug, _.query.lang ?? 'ca').pipe(
+				svc.incrementView(_.params.slug, _.query.lang ?? 'en').pipe(
 					Effect.tap(() =>
 						Effect.logInfo('Page viewed').pipe(
 							Effect.annotateLogs({
 								event: 'page.viewed',
 								slug: _.params.slug,
-								lang: _.query.lang ?? 'ca',
+								lang: _.query.lang ?? 'en',
 							}),
 						),
 					),
@@ -34,14 +34,23 @@ export const PagesLive = HttpApiBuilder.group(ForjaApi, 'pages', handlers =>
 				),
 			)
 			.handle('list', _ => svc.list(_.query).pipe(Effect.orDie))
+			.handle('get', _ =>
+				svc
+					.getById(_.params.id)
+					.pipe(
+						Effect.catch(e =>
+							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+						),
+					),
+			)
 			.handle('create', _ =>
-				svc.create(_.payload as any).pipe(
+				svc.create(_.payload).pipe(
 					Effect.tap(r =>
 						Effect.logInfo('Page created').pipe(
 							Effect.annotateLogs({
 								event: 'page.created',
-								slug: (r as any)[0]?.slug,
-								lang: (r as any)[0]?.lang,
+								slug: r[0]?.['slug'],
+								lang: r[0]?.['lang'],
 							}),
 						),
 					),
@@ -50,7 +59,7 @@ export const PagesLive = HttpApiBuilder.group(ForjaApi, 'pages', handlers =>
 				),
 			)
 			.handle('update', _ =>
-				svc.update(_.params.id, _.payload as any).pipe(
+				svc.update(_.params.id, _.payload).pipe(
 					Effect.tap(() =>
 						Effect.logInfo('Page updated').pipe(
 							Effect.annotateLogs({

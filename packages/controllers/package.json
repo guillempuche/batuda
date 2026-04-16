@@ -17,6 +17,7 @@
 	},
 	"dependencies": {
 		"@engranatge/domain": "workspace:*",
+		"@engranatge/ui": "workspace:*",
 		"effect": "4.0.0-beta.43"
 	},
 	"devDependencies": {
