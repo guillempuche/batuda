@@ -1,15 +1,24 @@
 import { Node } from '@tiptap/core'
+import { Schema } from 'effect'
 
-export interface Testimonial {
-	quote: string
-	author: string
-	company: string
-}
+export const Testimonial = Schema.Struct({
+	quote: Schema.String,
+	author: Schema.String,
+	company: Schema.String,
+})
+export type Testimonial = Schema.Schema.Type<typeof Testimonial>
 
-export interface SocialProofAttrs {
-	heading: string
-	testimonials: Testimonial[]
-}
+export const SocialProofAttrs = Schema.Struct({
+	heading: Schema.String,
+	testimonials: Schema.Array(Testimonial),
+})
+export type SocialProofAttrs = Schema.Schema.Type<typeof SocialProofAttrs>
+
+export const SocialProofNode = Schema.Struct({
+	type: Schema.Literal('socialProof'),
+	attrs: SocialProofAttrs,
+})
+export type SocialProofNode = Schema.Schema.Type<typeof SocialProofNode>
 
 export const SocialProof = Node.create({
 	name: 'socialProof',

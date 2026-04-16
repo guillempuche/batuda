@@ -1,16 +1,25 @@
 import { Node } from '@tiptap/core'
+import { Schema } from 'effect'
 
-export interface CtaButton {
-	label: string
-	action: string
-	url: string
-}
+export const CtaButton = Schema.Struct({
+	label: Schema.String,
+	action: Schema.String,
+	url: Schema.String,
+})
+export type CtaButton = Schema.Schema.Type<typeof CtaButton>
 
-export interface CtaAttrs {
-	heading: string
-	body: string
-	buttons: CtaButton[]
-}
+export const CtaAttrs = Schema.Struct({
+	heading: Schema.String,
+	body: Schema.String,
+	buttons: Schema.Array(CtaButton),
+})
+export type CtaAttrs = Schema.Schema.Type<typeof CtaAttrs>
+
+export const CtaNode = Schema.Struct({
+	type: Schema.Literal('cta'),
+	attrs: CtaAttrs,
+})
+export type CtaNode = Schema.Schema.Type<typeof CtaNode>
 
 export const Cta = Node.create({
 	name: 'cta',

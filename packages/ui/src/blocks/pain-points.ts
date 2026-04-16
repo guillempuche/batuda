@@ -1,15 +1,24 @@
 import { Node } from '@tiptap/core'
+import { Schema } from 'effect'
 
-export interface PainPointItem {
-	icon: string
-	title: string
-	body: string
-}
+export const PainPointItem = Schema.Struct({
+	icon: Schema.String,
+	title: Schema.String,
+	body: Schema.String,
+})
+export type PainPointItem = Schema.Schema.Type<typeof PainPointItem>
 
-export interface PainPointsAttrs {
-	heading: string
-	items: PainPointItem[]
-}
+export const PainPointsAttrs = Schema.Struct({
+	heading: Schema.String,
+	items: Schema.Array(PainPointItem),
+})
+export type PainPointsAttrs = Schema.Schema.Type<typeof PainPointsAttrs>
+
+export const PainPointsNode = Schema.Struct({
+	type: Schema.Literal('painPoints'),
+	attrs: PainPointsAttrs,
+})
+export type PainPointsNode = Schema.Schema.Type<typeof PainPointsNode>
 
 export const PainPoints = Node.create({
 	name: 'painPoints',
