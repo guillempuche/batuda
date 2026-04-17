@@ -20,11 +20,15 @@ msgstr ""
 msgid "—"
 msgstr "—"
 
+#: src/routes/companies/$slug.tsx:769
+msgid "— not set —"
+msgstr "— not set —"
+
 #: src/components/interactions/quick-capture-dialog.tsx:213
 msgid "— Select a company —"
 msgstr "— Select a company —"
 
-#: src/routes/companies/$slug.tsx:706
+#: src/routes/companies/$slug.tsx:900
 #: src/routes/emails/$threadId.tsx:303
 #: src/routes/emails/index.tsx:821
 msgid "(no subject)"
@@ -86,6 +90,10 @@ msgstr "Active client"
 msgid "Active companies"
 msgstr "Active companies"
 
+#: src/components/shared/editable-field.tsx:322
+msgid "Add {label}"
+msgstr "Add {label}"
+
 #: src/components/emails/attachment-picker.tsx:107
 msgid "Add attachment"
 msgstr "Add attachment"
@@ -99,11 +107,11 @@ msgid "Add link"
 msgstr "Add link"
 
 #: src/components/shared/company-card.tsx:112
-#: src/routes/companies/$slug.tsx:552
+#: src/routes/companies/$slug.tsx:700
 msgid "Add task"
 msgstr "Add task"
 
-#: src/routes/companies/$slug.tsx:615
+#: src/routes/companies/$slug.tsx:809
 msgid "Add the first decision-maker to keep track of who to reach."
 msgstr "Add the first decision-maker to keep track of who to reach."
 
@@ -217,7 +225,7 @@ msgstr "Bullet list"
 msgid "Call"
 msgstr "Call"
 
-#: src/routes/companies/$slug.tsx:487
+#: src/routes/companies/$slug.tsx:635
 msgid "Call phone"
 msgstr "Call phone"
 
@@ -235,6 +243,14 @@ msgstr "Cancel upload"
 msgid "Cc"
 msgstr "Cc"
 
+#: src/routes/companies/$slug.tsx:538
+msgid "Change priority"
+msgstr "Change priority"
+
+#: src/routes/companies/$slug.tsx:580
+msgid "Change status"
+msgstr "Change status"
+
 #: src/routes/pages/$id.tsx:149
 msgid "Changes have been saved."
 msgstr "Changes have been saved."
@@ -243,7 +259,7 @@ msgstr "Changes have been saved."
 msgid "Channel"
 msgstr "Channel"
 
-#: src/routes/companies/$slug.tsx:262
+#: src/routes/companies/$slug.tsx:278
 #: src/routes/emails/index.tsx:727
 #: src/routes/pages/$id.tsx:105
 msgid "Check that the session is valid or try again."
@@ -273,6 +289,7 @@ msgid "Clicked"
 msgstr "Clicked"
 
 #: src/components/shared/status-badge.tsx:33
+#: src/routes/companies/$slug.tsx:360
 msgid "Client"
 msgstr "Client"
 
@@ -292,6 +309,7 @@ msgid "Close thread"
 msgstr "Close thread"
 
 #: src/components/shared/status-badge.tsx:34
+#: src/routes/companies/$slug.tsx:361
 #: src/routes/emails/$threadId.tsx:296
 #: src/routes/emails/index.tsx:585
 #: src/routes/emails/index.tsx:856
@@ -339,11 +357,11 @@ msgstr "complained"
 msgid "Complained"
 msgstr "Complained"
 
-#: src/routes/companies/$slug.tsx:737
+#: src/routes/companies/$slug.tsx:931
 msgid "Completed"
 msgstr "Completed"
 
-#: src/routes/companies/$slug.tsx:688
+#: src/routes/companies/$slug.tsx:882
 #: src/routes/emails/index.tsx:555
 msgid "Compose"
 msgstr "Compose"
@@ -353,10 +371,11 @@ msgid "Conclusion or commitment (optional)"
 msgstr "Conclusion or commitment (optional)"
 
 #: src/components/shared/status-badge.tsx:29
+#: src/routes/companies/$slug.tsx:356
 msgid "Contacted"
 msgstr "Contacted"
 
-#: src/routes/companies/$slug.tsx:567
+#: src/routes/companies/$slug.tsx:715
 msgid "Contacts"
 msgstr "Contacts"
 
@@ -376,7 +395,7 @@ msgstr "Could not load companies"
 msgid "Could not load inboxes"
 msgstr "Could not load inboxes"
 
-#: src/routes/companies/$slug.tsx:261
+#: src/routes/companies/$slug.tsx:277
 msgid "Could not load this company"
 msgstr "Could not load this company"
 
@@ -399,6 +418,10 @@ msgstr "Could not publish the page. Please try again."
 #: src/routes/emails/inboxes.tsx:135
 msgid "Could not reach the email provider. Check logs."
 msgstr "Could not reach the email provider. Check logs."
+
+#: src/routes/companies/$slug.tsx:343
+msgid "Could not save"
+msgstr "Could not save"
 
 #: src/routes/emails/inboxes.tsx:365
 msgid "Could not save the inbox."
@@ -428,7 +451,7 @@ msgstr "Create"
 msgid "Create a prospect landing page from a company detail view or via the MCP tools."
 msgstr "Create a prospect landing page from a company detail view or via the MCP tools."
 
-#: src/routes/companies/$slug.tsx:758
+#: src/routes/companies/$slug.tsx:952
 msgid "Create a prospect landing page to share with this company."
 msgstr "Create a prospect landing page to share with this company."
 
@@ -447,7 +470,7 @@ msgstr "Create one or run sync to pull mailboxes from the provider."
 msgid "Created"
 msgstr "Created"
 
-#: src/routes/companies/$slug.tsx:593
+#: src/routes/companies/$slug.tsx:772
 msgid "Current tools"
 msgstr "Current tools"
 
@@ -456,10 +479,11 @@ msgid "Date"
 msgstr "Date"
 
 #: src/components/shared/status-badge.tsx:35
+#: src/routes/companies/$slug.tsx:362
 msgid "Dead"
 msgstr "Dead"
 
-#: src/routes/companies/$slug.tsx:626
+#: src/routes/companies/$slug.tsx:820
 msgid "Decision maker"
 msgstr "Decision maker"
 
@@ -487,7 +511,7 @@ msgstr "Discard"
 msgid "Display name"
 msgstr "Display name"
 
-#: src/routes/companies/$slug.tsx:579
+#: src/routes/companies/$slug.tsx:727
 msgid "Documents"
 msgstr "Documents"
 
@@ -515,6 +539,10 @@ msgstr "e.g. hola"
 msgid "e.g. Hola — Engranatge"
 msgstr "e.g. Hola — Engranatge"
 
+#: src/components/shared/editable-field.tsx:141
+msgid "Edit {label}"
+msgstr "Edit {label}"
+
 #: src/routes/emails/inboxes.tsx:480
 msgid "Edit inbox"
 msgstr "Edit inbox"
@@ -534,7 +562,7 @@ msgstr "Editor"
 
 #: src/components/interactions/quick-capture-dialog.tsx:410
 #: src/components/shared/channel-icon.tsx:51
-#: src/routes/companies/$slug.tsx:548
+#: src/routes/companies/$slug.tsx:696
 #: src/routes/emails/inboxes.tsx:246
 #: src/routes/login.tsx:141
 msgid "Email"
@@ -544,12 +572,12 @@ msgstr "Email"
 msgid "Email threads"
 msgstr "Email threads"
 
-#: src/routes/companies/$slug.tsx:649
+#: src/routes/companies/$slug.tsx:843
 msgid "Email via Forja"
 msgstr "Email via Forja"
 
 #: src/components/layout/nav-items.ts:48
-#: src/routes/companies/$slug.tsx:570
+#: src/routes/companies/$slug.tsx:718
 #: src/routes/emails/index.tsx:533
 msgid "Emails"
 msgstr "Emails"
@@ -639,6 +667,10 @@ msgstr "Heading 3"
 msgid "Hide Cc"
 msgstr "Hide Cc"
 
+#: src/routes/companies/$slug.tsx:368
+msgid "High"
+msgstr "High"
+
 #: src/components/shared/priority-dot.tsx:47
 #: src/routes/index.tsx:458
 msgid "High priority"
@@ -692,7 +724,7 @@ msgstr "Inbox updated"
 msgid "Inboxes synced"
 msgstr "Inboxes synced"
 
-#: src/routes/companies/$slug.tsx:587
+#: src/routes/companies/$slug.tsx:736
 msgid "Industry"
 msgstr "Industry"
 
@@ -727,7 +759,7 @@ msgid "Last activity"
 msgstr "Last activity"
 
 #: src/components/shared/company-card.tsx:94
-#: src/routes/companies/$slug.tsx:525
+#: src/routes/companies/$slug.tsx:673
 msgid "Last contact"
 msgstr "Last contact"
 
@@ -767,7 +799,7 @@ msgstr "Loading…"
 msgid "Local inboxes"
 msgstr "Local inboxes"
 
-#: src/routes/companies/$slug.tsx:589
+#: src/routes/companies/$slug.tsx:746
 msgid "Location"
 msgstr "Location"
 
@@ -782,13 +814,17 @@ msgstr "Log an interaction for this task"
 
 #: src/components/interactions/quick-capture-dialog.tsx:182
 #: src/components/shared/company-card.tsx:107
-#: src/routes/companies/$slug.tsx:539
+#: src/routes/companies/$slug.tsx:687
 msgid "Log interaction"
 msgstr "Log interaction"
 
 #: src/components/interactions/quick-capture-dialog.tsx:394
 msgid "Logging…"
 msgstr "Logging…"
+
+#: src/routes/companies/$slug.tsx:370
+msgid "Low"
+msgstr "Low"
 
 #: src/components/shared/priority-dot.tsx:49
 msgid "Low priority"
@@ -838,12 +874,17 @@ msgstr "Mark read"
 msgid "Mark unread"
 msgstr "Mark unread"
 
+#: src/routes/companies/$slug.tsx:369
+msgid "Medium"
+msgstr "Medium"
+
 #: src/components/shared/priority-dot.tsx:48
 msgid "Medium priority"
 msgstr "Medium priority"
 
 #: src/components/interactions/quick-capture-dialog.tsx:409
 #: src/components/shared/status-badge.tsx:31
+#: src/routes/companies/$slug.tsx:358
 msgid "Meeting"
 msgstr "Meeting"
 
@@ -859,7 +900,7 @@ msgstr "Message"
 msgid "Messages"
 msgstr "Messages"
 
-#: src/routes/companies/$slug.tsx:695
+#: src/routes/companies/$slug.tsx:889
 msgid "Messages sent or received with this company will appear here."
 msgstr "Messages sent or received with this company will appear here."
 
@@ -867,11 +908,11 @@ msgstr "Messages sent or received with this company will appear here."
 msgid "Minimize"
 msgstr "Minimize"
 
-#: src/routes/companies/$slug.tsx:715
+#: src/routes/companies/$slug.tsx:909
 msgid "msg"
 msgstr "msg"
 
-#: src/routes/companies/$slug.tsx:715
+#: src/routes/companies/$slug.tsx:909
 msgid "msgs"
 msgstr "msgs"
 
@@ -883,11 +924,11 @@ msgstr "Msgs"
 msgid "Needs attention"
 msgstr "Needs attention"
 
-#: src/routes/companies/$slug.tsx:527
+#: src/routes/companies/$slug.tsx:675
 msgid "never"
 msgstr "never"
 
-#: src/routes/companies/$slug.tsx:556
+#: src/routes/companies/$slug.tsx:704
 msgid "New proposal"
 msgstr "New proposal"
 
@@ -896,7 +937,7 @@ msgid "Next"
 msgstr "Next"
 
 #: src/components/interactions/quick-capture-dialog.tsx:340
-#: src/routes/companies/$slug.tsx:602
+#: src/routes/companies/$slug.tsx:783
 msgid "Next action"
 msgstr "Next action"
 
@@ -918,7 +959,7 @@ msgstr "No companies yet"
 msgid "No connection to the server. Try again in a few seconds."
 msgstr "No connection to the server. Try again in a few seconds."
 
-#: src/routes/companies/$slug.tsx:614
+#: src/routes/companies/$slug.tsx:808
 msgid "No contacts yet"
 msgstr "No contacts yet"
 
@@ -926,11 +967,11 @@ msgstr "No contacts yet"
 msgid "no date"
 msgstr "no date"
 
-#: src/routes/companies/$slug.tsx:786
+#: src/routes/companies/$slug.tsx:980
 msgid "No documents yet"
 msgstr "No documents yet"
 
-#: src/routes/companies/$slug.tsx:741
+#: src/routes/companies/$slug.tsx:935
 msgid "no due date"
 msgstr "no due date"
 
@@ -938,7 +979,7 @@ msgstr "no due date"
 msgid "No due date"
 msgstr "No due date"
 
-#: src/routes/companies/$slug.tsx:694
+#: src/routes/companies/$slug.tsx:888
 msgid "No email threads yet"
 msgstr "No email threads yet"
 
@@ -950,7 +991,7 @@ msgstr "No high-priority companies without a scheduled follow-up"
 msgid "No inboxes yet"
 msgstr "No inboxes yet"
 
-#: src/routes/companies/$slug.tsx:803
+#: src/routes/companies/$slug.tsx:997
 msgid "No interactions logged yet"
 msgstr "No interactions logged yet"
 
@@ -962,7 +1003,7 @@ msgstr "No messages in this thread"
 msgid "No overdue tasks, no pending follow-ups, no neglected companies."
 msgstr "No overdue tasks, no pending follow-ups, no neglected companies."
 
-#: src/routes/companies/$slug.tsx:757
+#: src/routes/companies/$slug.tsx:951
 #: src/routes/pages/index.tsx:139
 msgid "No pages yet"
 msgstr "No pages yet"
@@ -971,7 +1012,15 @@ msgstr "No pages yet"
 msgid "No pending tasks. Time to celebrate or prospect new leads."
 msgstr "No pending tasks. Time to celebrate or prospect new leads."
 
-#: src/routes/companies/$slug.tsx:729
+#: src/routes/companies/$slug.tsx:798
+msgid "No products linked yet"
+msgstr "No products linked yet"
+
+#: src/routes/companies/$slug.tsx:792
+msgid "No tags yet"
+msgstr "No tags yet"
+
+#: src/routes/companies/$slug.tsx:923
 msgid "No tasks for this company"
 msgstr "No tasks for this company"
 
@@ -1006,7 +1055,7 @@ msgstr "Numbered list"
 msgid "Open"
 msgstr "Open"
 
-#: src/routes/companies/$slug.tsx:517
+#: src/routes/companies/$slug.tsx:665
 msgid "Open in Google Maps"
 msgstr "Open in Google Maps"
 
@@ -1014,11 +1063,11 @@ msgstr "Open in Google Maps"
 msgid "Open in new tab"
 msgstr "Open in new tab"
 
-#: src/routes/companies/$slug.tsx:507
+#: src/routes/companies/$slug.tsx:655
 msgid "Open Instagram"
 msgstr "Open Instagram"
 
-#: src/routes/companies/$slug.tsx:497
+#: src/routes/companies/$slug.tsx:645
 msgid "Open LinkedIn"
 msgstr "Open LinkedIn"
 
@@ -1026,7 +1075,7 @@ msgstr "Open LinkedIn"
 msgid "Open tasks"
 msgstr "Open tasks"
 
-#: src/routes/companies/$slug.tsx:471
+#: src/routes/companies/$slug.tsx:619
 msgid "Open website"
 msgstr "Open website"
 
@@ -1087,13 +1136,13 @@ msgid "Page title"
 msgstr "Page title"
 
 #: src/components/layout/nav-items.ts:54
-#: src/routes/companies/$slug.tsx:576
+#: src/routes/companies/$slug.tsx:724
 #: src/routes/pages/$id.tsx:194
 #: src/routes/pages/index.tsx:111
 msgid "Pages"
 msgstr "Pages"
 
-#: src/routes/companies/$slug.tsx:597
+#: src/routes/companies/$slug.tsx:777
 msgid "Pain points"
 msgstr "Pain points"
 
@@ -1119,14 +1168,23 @@ msgstr "Previous"
 msgid "Primary navigation"
 msgstr "Primary navigation"
 
+#: src/routes/companies/$slug.tsx:761
+msgid "Priority"
+msgstr "Priority"
+
+#: src/routes/companies/$slug.tsx:795
+msgid "Products fit"
+msgstr "Products fit"
+
 #: src/components/layout/nav-items.ts:66
-#: src/routes/companies/$slug.tsx:564
-#: src/routes/companies/$slug.tsx:666
+#: src/routes/companies/$slug.tsx:712
+#: src/routes/companies/$slug.tsx:860
 #: src/routes/profile/index.tsx:81
 msgid "Profile"
 msgstr "Profile"
 
 #: src/components/shared/status-badge.tsx:32
+#: src/routes/companies/$slug.tsx:359
 msgid "Proposal"
 msgstr "Proposal"
 
@@ -1134,11 +1192,12 @@ msgstr "Proposal"
 msgid "Proposal in review"
 msgstr "Proposal in review"
 
-#: src/routes/companies/$slug.tsx:787
+#: src/routes/companies/$slug.tsx:981
 msgid "Proposals, meeting notes and attachments will show up here."
 msgstr "Proposals, meeting notes and attachments will show up here."
 
 #: src/components/shared/status-badge.tsx:28
+#: src/routes/companies/$slug.tsx:355
 msgid "Prospect"
 msgstr "Prospect"
 
@@ -1185,7 +1244,7 @@ msgstr "Read state update failed"
 msgid "Redo"
 msgstr "Redo"
 
-#: src/routes/companies/$slug.tsx:588
+#: src/routes/companies/$slug.tsx:741
 msgid "Region"
 msgstr "Region"
 
@@ -1193,6 +1252,10 @@ msgstr "Region"
 #: src/components/emails/attachment-picker.tsx:135
 msgid "Remove {0}"
 msgstr "Remove {0}"
+
+#: src/components/shared/editable-field.tsx:300
+msgid "Remove {chip}"
+msgstr "Remove {chip}"
 
 #: src/components/emails/email-composer.tsx:178
 msgid "Remove link"
@@ -1216,6 +1279,7 @@ msgid "Reply all"
 msgstr "Reply all"
 
 #: src/components/shared/status-badge.tsx:30
+#: src/routes/companies/$slug.tsx:357
 msgid "Responded"
 msgstr "Responded"
 
@@ -1274,7 +1338,7 @@ msgstr "Send"
 msgid "Send blocked: these recipients cannot receive email"
 msgstr "Send blocked: these recipients cannot receive email"
 
-#: src/routes/companies/$slug.tsx:479
+#: src/routes/companies/$slug.tsx:627
 msgid "Send email"
 msgstr "Send email"
 
@@ -1332,7 +1396,7 @@ msgstr "Signing in…"
 msgid "Signing out…"
 msgstr "Signing out…"
 
-#: src/routes/companies/$slug.tsx:590
+#: src/routes/companies/$slug.tsx:751
 msgid "Size"
 msgstr "Size"
 
@@ -1341,7 +1405,7 @@ msgstr "Size"
 msgid "Slug"
 msgstr "Slug"
 
-#: src/routes/companies/$slug.tsx:591
+#: src/routes/companies/$slug.tsx:756
 msgid "Source"
 msgstr "Source"
 
@@ -1388,8 +1452,12 @@ msgstr "Sync now"
 msgid "Syncing…"
 msgstr "Syncing…"
 
+#: src/routes/companies/$slug.tsx:789
+msgid "Tags"
+msgstr "Tags"
+
 #: src/components/layout/nav-items.ts:60
-#: src/routes/companies/$slug.tsx:573
+#: src/routes/companies/$slug.tsx:721
 #: src/routes/tasks/index.tsx:224
 #: src/routes/tasks/index.tsx:246
 msgid "Tasks"
@@ -1420,6 +1488,10 @@ msgstr "The thread may have been archived upstream or the link is stale."
 msgid "The workshop ledger — tear off one strip at a time."
 msgstr "The workshop ledger — tear off one strip at a time."
 
+#: src/routes/companies/$slug.tsx:344
+msgid "The workshop rejected the change. Try again."
+msgstr "The workshop rejected the change. Try again."
+
 #: src/components/shared/status-badge.tsx:41
 msgid "They replied — keep the thread warm"
 msgstr "They replied — keep the thread warm"
@@ -1441,7 +1513,7 @@ msgstr "Thread metadata"
 msgid "Thread not found"
 msgstr "Thread not found"
 
-#: src/routes/companies/$slug.tsx:797
+#: src/routes/companies/$slug.tsx:991
 msgid "Timeline"
 msgstr "Timeline"
 
@@ -1467,6 +1539,10 @@ msgstr "Try different criteria or clear the filters."
 #: src/components/interactions/quick-capture-dialog.tsx:271
 msgid "Type"
 msgstr "Type"
+
+#: src/components/shared/editable-field.tsx:320
+msgid "Type and press Enter"
+msgstr "Type and press Enter"
 
 #: src/components/emails/email-composer.tsx:291
 msgid "Undo"
@@ -1501,7 +1577,7 @@ msgstr "Upload failed"
 msgid "Uploading…"
 msgstr "Uploading…"
 
-#: src/routes/companies/$slug.tsx:804
+#: src/routes/companies/$slug.tsx:998
 msgid "Use “Log interaction” above to record the first touch."
 msgstr "Use “Log interaction” above to record the first touch."
 

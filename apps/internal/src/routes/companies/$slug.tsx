@@ -1,10 +1,12 @@
-import { useAtomRefresh, useAtomValue } from '@effect/atom-react'
+import { Select } from '@base-ui/react/select'
+import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link, notFound } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import {
 	Briefcase,
 	Camera,
+	Check,
 	ChevronRight,
 	ExternalLink,
 	FileText,
@@ -19,7 +21,13 @@ import { motion } from 'motion/react'
 import { useCallback, useMemo } from 'react'
 import styled from 'styled-components'
 
-import { PriButton, PriCollapsible, PriTabs } from '@engranatge/ui/pri'
+import {
+	PriButton,
+	PriCollapsible,
+	PriSelect,
+	PriTabs,
+	usePriToast,
+} from '@engranatge/ui/pri'
 
 import {
 	companyAtomFor,
@@ -29,6 +37,11 @@ import {
 } from '#/atoms/company-atoms'
 import { emailsSearchAtom } from '#/atoms/emails-atoms'
 import { pagesSearchAtom } from '#/atoms/pages-atoms'
+import {
+	EditableChips,
+	EditableField,
+	EditableSelect,
+} from '#/components/shared/editable-field'
 import { EmptyState } from '#/components/shared/empty-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { PriorityDot } from '#/components/shared/priority-dot'
@@ -42,6 +55,7 @@ import { ScrewDot } from '#/components/shared/workshop-decorations'
 import { useComposeEmail } from '#/context/compose-email-context'
 import { useQuickCapture } from '#/context/quick-capture-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
+import { ForjaApiAtom } from '#/lib/forja-api-atom'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import {
 	agedPaperSurface,
@@ -79,6 +93,8 @@ type CompanyDetail = {
 	readonly nextAction: string | null
 	readonly nextActionAt: string | null
 	readonly lastContactedAt: string | null
+	readonly tags: ReadonlyArray<string>
+	readonly productsFit: ReadonlyArray<string>
 }
 
 type ContactRow = {
@@ -308,6 +324,54 @@ function DetailBody({
 
 	const refreshInteractions = useAtomRefresh(interactionsAtom)
 
+	const toast = usePriToast()
+	const updateCompany = useAtomSet(
+		ForjaApiAtom.mutation('companies', 'update'),
+		{ mode: 'promiseExit' },
+	)
+	const saveField = useCallback(
+		async (field: string, next: unknown) => {
+			const exit = await updateCompany({
+				params: { id: company.id },
+				payload: { [field]: next },
+			} as never)
+			if (exit._tag === 'Success') {
+				refreshCompany()
+				return
+			}
+			toast.add({
+				title: t`Could not save`,
+				description: t`The workshop rejected the change. Try again.`,
+				type: 'error',
+			})
+			console.error('[forja] companies.update failed', exit.cause)
+			throw new Error('update-failed')
+		},
+		[updateCompany, company.id, refreshCompany, toast, t],
+	)
+
+	const statusOptions = useMemo(
+		() => [
+			{ value: 'prospect', label: t`Prospect` },
+			{ value: 'contacted', label: t`Contacted` },
+			{ value: 'responded', label: t`Responded` },
+			{ value: 'meeting', label: t`Meeting` },
+			{ value: 'proposal', label: t`Proposal` },
+			{ value: 'client', label: t`Client` },
+			{ value: 'closed', label: t`Closed` },
+			{ value: 'dead', label: t`Dead` },
+		],
+		[t],
+	)
+	const priorityOptions = useMemo(
+		() => [
+			{ value: '1', label: t`High` },
+			{ value: '2', label: t`Medium` },
+			{ value: '3', label: t`Low` },
+		],
+		[t],
+	)
+
 	const contacts = useMemo<ReadonlyArray<ContactRow>>(
 		() =>
 			AsyncResult.isSuccess(contactsResult)
@@ -456,8 +520,92 @@ function DetailBody({
 						{subtitle && <SubtitleText>{subtitle}</SubtitleText>}
 					</Identity>
 					<HeaderMeta>
-						<PriorityDot priority={company.priority} />
-						<StatusBadge status={asCompanyStatus(company.status)} size='lg' />
+						<PriSelect.Root
+							items={priorityOptions}
+							value={company.priority === null ? '' : String(company.priority)}
+							onValueChange={next => {
+								if (typeof next !== 'string') return
+								void saveField(
+									'priority',
+									next.length === 0 ? null : Number(next),
+								)
+							}}
+						>
+							<HeaderSelectTrigger
+								render={
+									<HeaderInlineButton
+										type='button'
+										aria-label={t`Change priority`}
+									>
+										{company.priority === null ? (
+											<GhostPriorityDot aria-hidden />
+										) : (
+											<PriorityDot priority={company.priority} />
+										)}
+									</HeaderInlineButton>
+								}
+							/>
+							<PriSelect.Portal>
+								<PriSelect.Positioner
+									alignItemWithTrigger={false}
+									sideOffset={6}
+								>
+									<PriSelect.Popup>
+										<PriSelect.List>
+											{priorityOptions.map(opt => (
+												<PriSelect.Item key={opt.value} value={opt.value}>
+													<PriSelect.ItemIndicator>
+														<Check size={12} />
+													</PriSelect.ItemIndicator>
+													<PriSelect.ItemText>{opt.label}</PriSelect.ItemText>
+												</PriSelect.Item>
+											))}
+										</PriSelect.List>
+									</PriSelect.Popup>
+								</PriSelect.Positioner>
+							</PriSelect.Portal>
+						</PriSelect.Root>
+						<PriSelect.Root
+							items={statusOptions}
+							value={company.status}
+							onValueChange={next => {
+								if (typeof next !== 'string' || next.length === 0) return
+								void saveField('status', next)
+							}}
+						>
+							<HeaderSelectTrigger
+								render={
+									<HeaderInlineButton
+										type='button'
+										aria-label={t`Change status`}
+									>
+										<StatusBadge
+											status={asCompanyStatus(company.status)}
+											size='lg'
+										/>
+									</HeaderInlineButton>
+								}
+							/>
+							<PriSelect.Portal>
+								<PriSelect.Positioner
+									alignItemWithTrigger={false}
+									sideOffset={6}
+								>
+									<PriSelect.Popup>
+										<PriSelect.List>
+											{statusOptions.map(opt => (
+												<PriSelect.Item key={opt.value} value={opt.value}>
+													<PriSelect.ItemIndicator>
+														<Check size={12} />
+													</PriSelect.ItemIndicator>
+													<PriSelect.ItemText>{opt.label}</PriSelect.ItemText>
+												</PriSelect.Item>
+											))}
+										</PriSelect.List>
+									</PriSelect.Popup>
+								</PriSelect.Positioner>
+							</PriSelect.Portal>
+						</PriSelect.Root>
 					</HeaderMeta>
 				</IdentityRow>
 
@@ -584,24 +732,70 @@ function DetailBody({
 				<PriTabs.Panel value='profile'>
 					<PanelWrap>
 						<ProfileGrid>
-							<ProfileField label={t`Industry`} value={company.industry} />
-							<ProfileField label={t`Region`} value={company.region} />
-							<ProfileField label={t`Location`} value={company.location} />
-							<ProfileField label={t`Size`} value={company.sizeRange} />
-							<ProfileField label={t`Source`} value={company.source} />
-							<ProfileField
+							<EditableField
+								label={t`Industry`}
+								value={company.industry}
+								onSave={next => saveField('industry', next)}
+							/>
+							<EditableField
+								label={t`Region`}
+								value={company.region}
+								onSave={next => saveField('region', next)}
+							/>
+							<EditableField
+								label={t`Location`}
+								value={company.location}
+								onSave={next => saveField('location', next)}
+							/>
+							<EditableField
+								label={t`Size`}
+								value={company.sizeRange}
+								onSave={next => saveField('sizeRange', next)}
+							/>
+							<EditableField
+								label={t`Source`}
+								value={company.source}
+								onSave={next => saveField('source', next)}
+							/>
+							<EditableSelect
+								label={t`Priority`}
+								value={
+									company.priority === null ? null : String(company.priority)
+								}
+								options={priorityOptions}
+								onSave={next =>
+									saveField('priority', next === null ? null : Number(next))
+								}
+								placeholder={t`— not set —`}
+							/>
+							<EditableField
 								label={t`Current tools`}
 								value={company.currentTools}
+								onSave={next => saveField('currentTools', next)}
 							/>
-							<ProfileField
+							<EditableField
 								label={t`Pain points`}
 								value={company.painPoints}
+								onSave={next => saveField('painPoints', next)}
 								multiline
 							/>
-							<ProfileField
+							<EditableField
 								label={t`Next action`}
 								value={company.nextAction}
+								onSave={next => saveField('nextAction', next)}
 								multiline
+							/>
+							<EditableChips
+								label={t`Tags`}
+								values={company.tags}
+								onSave={next => saveField('tags', next)}
+								emptyHint={t`No tags yet`}
+							/>
+							<EditableChips
+								label={t`Products fit`}
+								values={company.productsFit}
+								onSave={next => saveField('productsFit', next)}
+								emptyHint={t`No products linked yet`}
 							/>
 						</ProfileGrid>
 					</PanelWrap>
@@ -834,36 +1028,6 @@ function DetailBody({
 	)
 }
 
-/**
- * Read-only profile field used by the Profile tab. `multiline` switches
- * the value from a one-line clamped span to a `<p>` that preserves line
- * breaks via `white-space: pre-wrap`.
- */
-function ProfileField({
-	label,
-	value,
-	multiline = false,
-}: {
-	label: string
-	value: string | null
-	multiline?: boolean
-}) {
-	return (
-		<Field>
-			<FieldLabel>{label}</FieldLabel>
-			{value ? (
-				multiline ? (
-					<FieldValueMultiline>{value}</FieldValueMultiline>
-				) : (
-					<FieldValue>{value}</FieldValue>
-				)
-			) : (
-				<FieldEmpty>—</FieldEmpty>
-			)}
-		</Field>
-	)
-}
-
 // ── Narrowers ─────────────────────────────────────────────────────
 
 function narrowCompany(raw: unknown): CompanyDetail | null {
@@ -877,6 +1041,11 @@ function narrowCompany(raw: unknown): CompanyDetail | null {
 		typeof r[key] === 'string' ? (r[key] as string) : null
 	const num = (key: string) =>
 		typeof r[key] === 'number' ? (r[key] as number) : null
+	const strArr = (key: string): ReadonlyArray<string> => {
+		const raw = r[key]
+		if (!Array.isArray(raw)) return []
+		return raw.filter((v): v is string => typeof v === 'string')
+	}
 	return {
 		id: r['id'],
 		slug: r['slug'],
@@ -899,6 +1068,8 @@ function narrowCompany(raw: unknown): CompanyDetail | null {
 		nextAction: str('nextAction'),
 		nextActionAt: str('nextActionAt'),
 		lastContactedAt: str('lastContactedAt'),
+		tags: strArr('tags'),
+		productsFit: strArr('productsFit'),
 	}
 }
 
@@ -1047,6 +1218,52 @@ const HeaderMeta = styled.div.withConfig({
 	gap: var(--space-sm);
 `
 
+const HeaderSelectTrigger = styled(Select.Trigger).withConfig({
+	displayName: 'CompanyDetailHeaderSelectTrigger',
+})`
+	display: inline-flex;
+	background: transparent;
+	border: none;
+	padding: 0;
+	cursor: pointer;
+
+	&:focus-visible {
+		outline: none;
+		box-shadow: var(--glow-active);
+		border-radius: var(--shape-2xs);
+	}
+`
+
+const HeaderInlineButton = styled.button.withConfig({
+	displayName: 'CompanyDetailHeaderInlineButton',
+})`
+	display: inline-flex;
+	align-items: center;
+	background: transparent;
+	border: none;
+	padding: 0;
+	cursor: pointer;
+	color: inherit;
+	font: inherit;
+`
+
+const GhostPriorityDot = styled.span.withConfig({
+	displayName: 'CompanyDetailGhostPriorityDot',
+})`
+	display: inline-block;
+	width: 10px;
+	height: 10px;
+	flex-shrink: 0;
+	border-radius: 50%;
+	border: 1px dashed color-mix(in srgb, var(--color-on-surface) 35%, transparent);
+	background: transparent;
+	opacity: 0.6;
+
+	${HeaderInlineButton}:hover & {
+		opacity: 1;
+	}
+`
+
 const HeaderChrome = styled.div.withConfig({
 	displayName: 'CompanyDetailHeaderChrome',
 })`
@@ -1140,53 +1357,6 @@ const ProfileGrid = styled.div.withConfig({
 	@media (min-width: 768px) {
 		grid-template-columns: 1fr 1fr;
 	}
-`
-
-const Field = styled.div.withConfig({ displayName: 'CompanyDetailField' })`
-	${agedPaperSurface}
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-3xs);
-	padding: var(--space-sm) var(--space-md);
-	border-bottom-width: 2px;
-`
-
-const FieldLabel = styled.span.withConfig({
-	displayName: 'CompanyDetailFieldLabel',
-})`
-	${stenciledTitle}
-	font-size: var(--typescale-label-small-size);
-	color: var(--color-on-surface-variant);
-`
-
-const FieldValue = styled.span.withConfig({
-	displayName: 'CompanyDetailFieldValue',
-})`
-	font-family: var(--font-body);
-	font-size: var(--typescale-body-medium-size);
-	line-height: var(--typescale-body-medium-line);
-	color: var(--color-on-surface);
-`
-
-const FieldValueMultiline = styled.p.withConfig({
-	displayName: 'CompanyDetailFieldValueMultiline',
-})`
-	font-family: var(--font-body);
-	font-size: var(--typescale-body-medium-size);
-	line-height: var(--typescale-body-medium-line);
-	color: var(--color-on-surface);
-	white-space: pre-wrap;
-	margin: 0;
-`
-
-const FieldEmpty = styled.span.withConfig({
-	displayName: 'CompanyDetailFieldEmpty',
-})`
-	font-family: var(--font-body);
-	font-size: var(--typescale-body-medium-size);
-	font-style: italic;
-	color: var(--color-on-surface-variant);
-	opacity: 0.55;
 `
 
 const ContactList = styled.ul.withConfig({
