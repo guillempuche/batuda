@@ -29,12 +29,15 @@ const firstRecipient = (to: string | string[]): string =>
 	Array.isArray(to) ? (to[0] ?? '') : to
 
 import {
+	type CreateDraftParams,
 	type CreateInboxParams,
 	EmailProvider,
 	type ListParams,
 	type MagicLinkParams,
 	type ProviderAttachmentMeta,
 	type ProviderAttachmentStream,
+	type ProviderDraft,
+	type ProviderDraftItem,
 	type ProviderInbox,
 	type ProviderMessage,
 	type ProviderMessageItem,
@@ -44,6 +47,7 @@ import {
 	type SendAttachmentInput,
 	type SendParams,
 	type SendResult,
+	type UpdateDraftParams,
 } from './email-provider.js'
 
 /** Strip keys whose value is `undefined` so exactOptionalPropertyTypes is satisfied. */
@@ -161,6 +165,72 @@ const mapInbox = (i: {
 	email: i.email,
 	displayName: i.displayName,
 	createdAt: i.createdAt,
+})
+
+const mapDraftItem = (d: {
+	inboxId: string
+	draftId: string
+	to?: string[]
+	cc?: string[]
+	bcc?: string[]
+	subject?: string
+	preview?: string
+	attachments?: {
+		attachmentId: string
+		filename?: string
+		size: number
+		contentType?: string
+		contentId?: string
+	}[]
+	inReplyTo?: string
+	sendStatus?: 'scheduled' | 'sending' | 'failed'
+	sendAt?: Date
+	updatedAt: Date
+	clientId?: string
+}): ProviderDraftItem => ({
+	draftId: d.draftId,
+	inboxId: d.inboxId,
+	clientId: d.clientId,
+	to: d.to,
+	cc: d.cc,
+	bcc: d.bcc,
+	subject: d.subject,
+	preview: d.preview,
+	attachments: d.attachments?.map(mapAttachment),
+	inReplyTo: d.inReplyTo,
+	sendStatus: d.sendStatus,
+	sendAt: d.sendAt,
+	updatedAt: d.updatedAt,
+})
+
+const mapDraft = (d: {
+	inboxId: string
+	draftId: string
+	to?: string[]
+	cc?: string[]
+	bcc?: string[]
+	subject?: string
+	preview?: string
+	text?: string
+	html?: string
+	attachments?: {
+		attachmentId: string
+		filename?: string
+		size: number
+		contentType?: string
+		contentId?: string
+	}[]
+	inReplyTo?: string
+	sendStatus?: 'scheduled' | 'sending' | 'failed'
+	sendAt?: Date
+	updatedAt: Date
+	createdAt: Date
+	clientId?: string
+}): ProviderDraft => ({
+	...mapDraftItem(d),
+	text: d.text,
+	html: d.html,
+	createdAt: d.createdAt,
 })
 
 export const AgentMailProviderLive = Layer.effect(
@@ -438,6 +508,119 @@ export const AgentMailProviderLive = Layer.effect(
 				})
 			})
 
+		const createDraft = (
+			inboxId: string,
+			params: CreateDraftParams,
+		): Effect.Effect<ProviderDraft, EmailError> =>
+			Effect.tryPromise({
+				try: () =>
+					client.inboxes.drafts.create(
+						inboxId,
+						compact({
+							to: params.to,
+							cc: params.cc,
+							bcc: params.bcc,
+							subject: params.subject,
+							text: params.text,
+							html: params.html,
+							attachments: params.attachments?.map(toAgentMailAttachment),
+							inReplyTo: params.inReplyTo,
+							clientId: params.clientId,
+						}),
+					),
+				catch: e =>
+					new EmailError({
+						message: e instanceof Error ? e.message : String(e),
+					}),
+			}).pipe(Effect.map(mapDraft))
+
+		const updateDraft = (
+			inboxId: string,
+			draftId: string,
+			params: UpdateDraftParams,
+		): Effect.Effect<ProviderDraft, EmailError> =>
+			Effect.tryPromise({
+				try: () =>
+					client.inboxes.drafts.update(
+						inboxId,
+						draftId,
+						compact({
+							to: params.to,
+							cc: params.cc,
+							bcc: params.bcc,
+							subject: params.subject,
+							text: params.text,
+							html: params.html,
+							sendAt: params.sendAt,
+						}),
+					),
+				catch: e =>
+					new EmailError({
+						message: e instanceof Error ? e.message : String(e),
+					}),
+			}).pipe(Effect.map(mapDraft))
+
+		const deleteDraft = (
+			inboxId: string,
+			draftId: string,
+		): Effect.Effect<void, EmailError> =>
+			Effect.tryPromise({
+				try: () => client.inboxes.drafts.delete(inboxId, draftId),
+				catch: e =>
+					new EmailError({
+						message: e instanceof Error ? e.message : String(e),
+					}),
+			}).pipe(Effect.asVoid)
+
+		const sendDraft = (
+			inboxId: string,
+			draftId: string,
+		): Effect.Effect<SendResult, EmailSendError> =>
+			Effect.tryPromise({
+				try: () => client.inboxes.drafts.send(inboxId, draftId, {}),
+				catch: e => {
+					const message = e instanceof Error ? e.message : String(e)
+					return new EmailSendError({
+						message,
+						kind: classifyAgentMailError(message),
+						recipient: null,
+					})
+				},
+			}).pipe(
+				Effect.map(r => ({ messageId: r.messageId, threadId: r.threadId })),
+			)
+
+		const listDrafts = (
+			inboxId: string,
+			params?: ListParams,
+		): Effect.Effect<ProviderDraftItem[], EmailError> =>
+			Effect.tryPromise({
+				try: () =>
+					client.inboxes.drafts.list(
+						inboxId,
+						compact({
+							limit: params?.limit,
+							pageToken: params?.pageToken,
+						}),
+					),
+				catch: e =>
+					new EmailError({
+						message: e instanceof Error ? e.message : String(e),
+					}),
+			}).pipe(Effect.map(r => r.drafts.map(mapDraftItem)))
+
+		const getDraft = (
+			inboxId: string,
+			draftId: string,
+		): Effect.Effect<ProviderDraft, EmailError> =>
+			Effect.tryPromise({
+				try: () => client.inboxes.drafts.get(inboxId, draftId),
+				catch: e =>
+					new EmailError({
+						message: e instanceof Error ? e.message : String(e),
+					}),
+			}).pipe(Effect.map(mapDraft))
+
 		return {
 			send,
 			reply,
@@ -450,6 +633,12 @@ export const AgentMailProviderLive = Layer.effect(
 			streamAttachment,
 			updateLabels,
 			sendMagicLink,
+			createDraft,
+			updateDraft,
+			deleteDraft,
+			sendDraft,
+			listDrafts,
+			getDraft,
 		} as const
 	}),
 )

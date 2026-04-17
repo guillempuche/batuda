@@ -119,6 +119,52 @@ export interface MagicLinkParams {
 	readonly token: string
 }
 
+// ── Draft interfaces ──
+
+export interface CreateDraftParams {
+	readonly to?: string | string[] | undefined
+	readonly cc?: string | string[] | undefined
+	readonly bcc?: string | string[] | undefined
+	readonly subject?: string | undefined
+	readonly text?: string | undefined
+	readonly html?: string | undefined
+	readonly attachments?: readonly SendAttachmentInput[] | undefined
+	readonly inReplyTo?: string | undefined
+	readonly clientId?: string | undefined
+}
+
+export interface UpdateDraftParams {
+	readonly to?: string | string[] | undefined
+	readonly cc?: string | string[] | undefined
+	readonly bcc?: string | string[] | undefined
+	readonly subject?: string | undefined
+	readonly text?: string | undefined
+	readonly html?: string | undefined
+	readonly sendAt?: Date | undefined
+}
+
+export interface ProviderDraftItem {
+	readonly draftId: string
+	readonly inboxId: string
+	readonly clientId?: string | undefined
+	readonly to?: string[] | undefined
+	readonly cc?: string[] | undefined
+	readonly bcc?: string[] | undefined
+	readonly subject?: string | undefined
+	readonly preview?: string | undefined
+	readonly attachments?: readonly ProviderAttachmentMeta[] | undefined
+	readonly inReplyTo?: string | undefined
+	readonly sendStatus?: 'scheduled' | 'sending' | 'failed' | undefined
+	readonly sendAt?: Date | undefined
+	readonly updatedAt: Date
+}
+
+export interface ProviderDraft extends ProviderDraftItem {
+	readonly text?: string | undefined
+	readonly html?: string | undefined
+	readonly createdAt: Date
+}
+
 // ── Abstract provider tag ──
 
 export class EmailProvider extends ServiceMap.Service<
@@ -167,5 +213,30 @@ export class EmailProvider extends ServiceMap.Service<
 		readonly sendMagicLink: (
 			params: MagicLinkParams,
 		) => Effect.Effect<void, EmailSendError>
+		readonly createDraft: (
+			inboxId: string,
+			params: CreateDraftParams,
+		) => Effect.Effect<ProviderDraft, EmailError>
+		readonly updateDraft: (
+			inboxId: string,
+			draftId: string,
+			params: UpdateDraftParams,
+		) => Effect.Effect<ProviderDraft, EmailError>
+		readonly deleteDraft: (
+			inboxId: string,
+			draftId: string,
+		) => Effect.Effect<void, EmailError>
+		readonly sendDraft: (
+			inboxId: string,
+			draftId: string,
+		) => Effect.Effect<SendResult, EmailSendError>
+		readonly listDrafts: (
+			inboxId: string,
+			params?: ListParams,
+		) => Effect.Effect<ProviderDraftItem[], EmailError>
+		readonly getDraft: (
+			inboxId: string,
+			draftId: string,
+		) => Effect.Effect<ProviderDraft, EmailError>
 	}
 >()('EmailProvider') {}

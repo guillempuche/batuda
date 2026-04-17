@@ -5,7 +5,11 @@ import { SqlClient } from 'effect/unstable/sql'
 import { EmailError, EmailSuppressed, NotFound } from '@engranatge/controllers'
 import type { InboundClassification } from '@engranatge/domain'
 
-import type { SendAttachmentInput } from './email-provider.js'
+import type {
+	CreateDraftParams,
+	SendAttachmentInput,
+	UpdateDraftParams,
+} from './email-provider.js'
 import { EmailProvider } from './email-provider.js'
 import { WebhookService } from './webhooks.js'
 
@@ -19,6 +23,77 @@ type ContactSuppressionRow = {
 
 const firstRecipient = (to: string | string[]): string =>
 	Array.isArray(to) ? (to[0] ?? '') : to
+
+const encodeClientId = (ctx: {
+	companyId?: string
+	contactId?: string
+	mode?: string
+	threadLinkId?: string
+}): string => {
+	const parts = ['forja:draft']
+	if (ctx.companyId) parts.push(`companyId=${ctx.companyId}`)
+	if (ctx.contactId) parts.push(`contactId=${ctx.contactId}`)
+	if (ctx.mode) parts.push(`mode=${ctx.mode}`)
+	if (ctx.threadLinkId) parts.push(`threadLinkId=${ctx.threadLinkId}`)
+	return parts.join(';')
+}
+
+const parseClientId = (
+	clientId: string | undefined,
+): {
+	companyId: string | null
+	contactId: string | null
+	mode: string | null
+	threadLinkId: string | null
+} => {
+	const empty: {
+		companyId: string | null
+		contactId: string | null
+		mode: string | null
+		threadLinkId: string | null
+	} = {
+		companyId: null,
+		contactId: null,
+		mode: null,
+		threadLinkId: null,
+	}
+	if (!clientId?.startsWith('forja:draft')) return empty
+	const result = { ...empty }
+	for (const part of clientId.split(';')) {
+		const eq = part.indexOf('=')
+		if (eq === -1) continue
+		const key = part.slice(0, eq)
+		const val = part.slice(eq + 1)
+		if (key === 'companyId') result.companyId = val
+		else if (key === 'contactId') result.contactId = val
+		else if (key === 'mode') result.mode = val
+		else if (key === 'threadLinkId') result.threadLinkId = val
+	}
+	return result
+}
+
+const injectFooter = (
+	body: { text?: string; html?: string },
+	footer: { html: string; textFallback: string },
+): { text?: string; html?: string } => {
+	let html = body.html
+	if (html !== undefined) {
+		const closingBody = html.lastIndexOf('</body>')
+		if (closingBody !== -1) {
+			html = `${html.slice(0, closingBody)}<div>${footer.html}</div>${html.slice(closingBody)}`
+		} else {
+			html = `${html}<div>${footer.html}</div>`
+		}
+	}
+	let text = body.text
+	if (text !== undefined && footer.textFallback) {
+		text = `${text}\n\n${footer.textFallback}`
+	}
+	return {
+		...(text !== undefined && { text }),
+		...(html !== undefined && { html }),
+	}
+}
 
 export class EmailService extends ServiceMap.Service<EmailService>()(
 	'EmailService',
@@ -57,6 +132,106 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					}
 				})
 
+			const resolveInbox = (inboxId: string) =>
+				sql<{ id: string; providerInboxId: string }>`
+					SELECT id, provider_inbox_id FROM inboxes
+					WHERE id = ${inboxId} LIMIT 1
+				`.pipe(
+					Effect.map(rows => rows[0] ?? null),
+					Effect.orDie,
+				)
+
+			const resolveLocalInboxId = (providerInboxId: string) =>
+				sql<{ id: string }>`
+					SELECT id FROM inboxes
+					WHERE provider_inbox_id = ${providerInboxId} LIMIT 1
+				`.pipe(
+					Effect.map(rows => rows[0]?.id ?? null),
+					Effect.orDie,
+				)
+
+			type FooterRow = { html: string; textFallback: string }
+			const resolveDefaultFooter = (localInboxId: string) =>
+				sql<FooterRow>`
+					SELECT html, text_fallback FROM inbox_footers
+					WHERE inbox_id = ${localInboxId} AND is_default = true
+					LIMIT 1
+				`.pipe(
+					Effect.map(rows => rows[0] ?? null),
+					Effect.orDie,
+				)
+
+			const recordOutbound = (args: {
+				result: { messageId: string; threadId: string }
+				providerInboxId: string
+				localInboxId: string | null
+				companyId: string | null
+				contactId: string | null
+				subject: string | null
+				to: string[]
+				cc: string[]
+				bcc: string[]
+				isNewThread: boolean
+			}) =>
+				Effect.gen(function* () {
+					if (args.isNewThread) {
+						yield* sql`
+							INSERT INTO email_thread_links ${sql.insert({
+								provider: providerName,
+								providerThreadId: args.result.threadId,
+								providerInboxId: args.providerInboxId,
+								inboxId: args.localInboxId,
+								companyId: args.companyId,
+								contactId: args.contactId,
+								subject: args.subject,
+								status: 'open',
+							})}
+						`
+					}
+
+					if (args.companyId) {
+						yield* sql`
+							INSERT INTO interactions ${sql.insert({
+								companyId: args.companyId,
+								contactId: args.contactId,
+								date: new Date(),
+								channel: 'email',
+								direction: 'outbound',
+								type: 'email',
+								subject: args.subject,
+								metadata: JSON.stringify({
+									providerThreadId: args.result.threadId,
+									providerMessageId: args.result.messageId,
+								}),
+							})}
+						`
+						yield* sql`
+							UPDATE companies
+							SET last_contacted_at = now(), updated_at = now()
+							WHERE id = ${args.companyId}
+						`
+					}
+
+					yield* sql`
+						INSERT INTO email_messages ${sql.insert({
+							provider: providerName,
+							providerMessageId: args.result.messageId,
+							providerThreadId: args.result.threadId,
+							providerInboxId: args.providerInboxId,
+							direction: 'outbound',
+							companyId: args.companyId,
+							contactId: args.contactId,
+							recipients: JSON.stringify({
+								to: args.to,
+								cc: args.cc,
+								bcc: args.bcc,
+							}),
+							status: 'sent',
+							statusUpdatedAt: new Date(),
+						})}
+					`
+				})
+
 			return {
 				send: (
 					inboxId: string,
@@ -70,6 +245,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						bcc?: string[] | undefined
 						replyTo?: string | undefined
 						attachments?: readonly SendAttachmentInput[] | undefined
+						skipFooter?: boolean | undefined
 					},
 				) =>
 					Effect.gen(function* () {
@@ -77,18 +253,26 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						const bcc = extras?.bcc ?? []
 						const attachments = extras?.attachments ?? []
 
+						const inbox = yield* resolveInbox(inboxId)
+						const providerInboxId = inbox?.providerInboxId ?? inboxId
+						const localInboxId = inbox?.id ?? null
+
 						if (contactId) {
 							yield* assertContactNotSuppressed(contactId, to)
 						}
 
-						// Self-heal the suppression cache if the provider rejects for a
-						// recipient we had not yet marked as bounced locally.
+						let finalBody = body
+						if (!extras?.skipFooter && localInboxId) {
+							const footer = yield* resolveDefaultFooter(localInboxId)
+							if (footer) finalBody = injectFooter(body, footer)
+						}
+
 						const result = yield* provider
-							.send(inboxId, {
+							.send(providerInboxId, {
 								to,
 								subject,
-								...(body.text !== undefined && { text: body.text }),
-								...(body.html !== undefined && { html: body.html }),
+								...(finalBody.text !== undefined && { text: finalBody.text }),
+								...(finalBody.html !== undefined && { html: finalBody.html }),
 								...(cc.length > 0 && { cc }),
 								...(bcc.length > 0 && { bcc }),
 								...(extras?.replyTo !== undefined && {
@@ -121,58 +305,18 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								),
 							)
 
-						yield* sql`
-							INSERT INTO email_thread_links ${sql.insert({
-								provider: providerName,
-								providerThreadId: result.threadId,
-								providerInboxId: inboxId,
-								companyId,
-								contactId: contactId ?? null,
-								subject,
-								status: 'open',
-							})}
-						`
-
-						yield* sql`
-							INSERT INTO interactions ${sql.insert({
-								companyId,
-								contactId: contactId ?? null,
-								date: new Date(),
-								channel: 'email',
-								direction: 'outbound',
-								type: 'email',
-								subject,
-								metadata: JSON.stringify({
-									providerThreadId: result.threadId,
-									providerMessageId: result.messageId,
-								}),
-							})}
-						`
-
-						yield* sql`
-							UPDATE companies
-							SET last_contacted_at = now(), updated_at = now()
-							WHERE id = ${companyId}
-						`
-
-						yield* sql`
-							INSERT INTO email_messages ${sql.insert({
-								provider: providerName,
-								providerMessageId: result.messageId,
-								providerThreadId: result.threadId,
-								providerInboxId: inboxId,
-								direction: 'outbound',
-								companyId,
-								contactId: contactId ?? null,
-								recipients: JSON.stringify({
-									to: Array.isArray(to) ? to : [to],
-									cc,
-									bcc,
-								}),
-								status: 'sent',
-								statusUpdatedAt: new Date(),
-							})}
-						`
+						yield* recordOutbound({
+							result,
+							providerInboxId,
+							localInboxId,
+							companyId,
+							contactId: contactId ?? null,
+							subject,
+							to: Array.isArray(to) ? to : [to],
+							cc,
+							bcc,
+							isNewThread: true,
+						})
 
 						yield* Effect.logInfo('Email sent').pipe(
 							Effect.annotateLogs({
@@ -192,6 +336,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						cc?: string[] | undefined
 						bcc?: string[] | undefined
 						attachments?: readonly SendAttachmentInput[] | undefined
+						skipFooter?: boolean | undefined
 					},
 				) =>
 					Effect.gen(function* () {
@@ -211,6 +356,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						}
 						const link = links[0] as {
 							providerInboxId: string
+							inboxId: string | null
 							companyId: string | null
 							contactId: string | null
 						}
@@ -226,8 +372,6 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							})
 						}
 
-						// When the last message is inbound, reply to its sender; when it's
-						// outbound, keep the original recipients.
 						const replyRecipients = lastMessage.from
 							? [lastMessage.from]
 							: lastMessage.to
@@ -236,10 +380,19 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							yield* assertContactNotSuppressed(link.contactId, replyRecipients)
 						}
 
+						const localInboxId =
+							link.inboxId ?? (yield* resolveLocalInboxId(link.providerInboxId))
+
+						let finalBody = body
+						if (!extras?.skipFooter && localInboxId) {
+							const footer = yield* resolveDefaultFooter(localInboxId)
+							if (footer) finalBody = injectFooter(body, footer)
+						}
+
 						const result = yield* provider
 							.reply(link.providerInboxId, lastMessage.messageId, {
-								...(body.text !== undefined && { text: body.text }),
-								...(body.html !== undefined && { html: body.html }),
+								...(finalBody.text !== undefined && { text: finalBody.text }),
+								...(finalBody.html !== undefined && { html: finalBody.html }),
 								...(cc.length > 0 && { cc }),
 								...(bcc.length > 0 && { bcc }),
 								...(attachments.length > 0 && { attachments }),
@@ -270,48 +423,18 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								),
 							)
 
-						if (link.companyId) {
-							yield* sql`
-								INSERT INTO interactions ${sql.insert({
-									companyId: link.companyId,
-									contactId: link.contactId,
-									date: new Date(),
-									channel: 'email',
-									direction: 'outbound',
-									type: 'email',
-									subject: thread.subject ?? null,
-									metadata: JSON.stringify({
-										providerThreadId,
-										providerMessageId: result.messageId,
-									}),
-								})}
-							`
-
-							yield* sql`
-								UPDATE companies
-								SET last_contacted_at = now(), updated_at = now()
-								WHERE id = ${link.companyId}
-							`
-						}
-
-						yield* sql`
-							INSERT INTO email_messages ${sql.insert({
-								provider: providerName,
-								providerMessageId: result.messageId,
-								providerThreadId,
-								providerInboxId: link.providerInboxId,
-								direction: 'outbound',
-								companyId: link.companyId,
-								contactId: link.contactId,
-								recipients: JSON.stringify({
-									to: replyRecipients,
-									cc,
-									bcc,
-								}),
-								status: 'sent',
-								statusUpdatedAt: new Date(),
-							})}
-						`
+						yield* recordOutbound({
+							result,
+							providerInboxId: link.providerInboxId,
+							localInboxId,
+							companyId: link.companyId,
+							contactId: link.contactId,
+							subject: thread.subject ?? null,
+							to: replyRecipients,
+							cc,
+							bcc,
+							isNewThread: false,
+						})
 
 						yield* Effect.logInfo('Email reply sent').pipe(
 							Effect.annotateLogs({
@@ -379,11 +502,16 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								companyId = contact.companyId
 							}
 
+							const localInboxId = yield* resolveLocalInboxId(
+								payload.providerInboxId,
+							)
+
 							yield* sql`
 								INSERT INTO email_thread_links ${sql.insert({
 									provider: payload.provider,
 									providerThreadId: payload.providerThreadId,
 									providerInboxId: payload.providerInboxId,
+									inboxId: localInboxId,
 									companyId,
 									contactId,
 									subject: payload.subject ?? null,
@@ -1184,6 +1312,243 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						)
 						return { added, retired, total: upstream.length }
 					}).pipe(Effect.orDie),
+
+				// ── Drafts ──────────────────────────────────────────────────
+
+				createDraft: (
+					inboxId: string,
+					params: CreateDraftParams,
+					context?: {
+						companyId?: string
+						contactId?: string
+						mode?: string
+						threadLinkId?: string
+					},
+				) =>
+					Effect.gen(function* () {
+						const inbox = yield* resolveInbox(inboxId)
+						const providerInboxId = inbox?.providerInboxId ?? inboxId
+						const clientId = context ? encodeClientId(context) : undefined
+						return yield* provider.createDraft(providerInboxId, {
+							...params,
+							...(clientId !== undefined && { clientId }),
+						})
+					}),
+
+				updateDraft: (
+					inboxId: string,
+					draftId: string,
+					params: UpdateDraftParams,
+				) =>
+					Effect.gen(function* () {
+						const inbox = yield* resolveInbox(inboxId)
+						const providerInboxId = inbox?.providerInboxId ?? inboxId
+						return yield* provider.updateDraft(providerInboxId, draftId, params)
+					}),
+
+				deleteDraft: (inboxId: string, draftId: string) =>
+					Effect.gen(function* () {
+						const inbox = yield* resolveInbox(inboxId)
+						const providerInboxId = inbox?.providerInboxId ?? inboxId
+						yield* provider.deleteDraft(providerInboxId, draftId)
+					}),
+
+				getDraft: (inboxId: string, draftId: string) =>
+					Effect.gen(function* () {
+						const inbox = yield* resolveInbox(inboxId)
+						const providerInboxId = inbox?.providerInboxId ?? inboxId
+						return yield* provider.getDraft(providerInboxId, draftId)
+					}),
+
+				listDrafts: (inboxId?: string) =>
+					Effect.gen(function* () {
+						if (inboxId) {
+							const inbox = yield* resolveInbox(inboxId)
+							const providerInboxId = inbox?.providerInboxId ?? inboxId
+							return yield* provider.listDrafts(providerInboxId)
+						}
+						const inboxes = yield* sql<{
+							providerInboxId: string
+						}>`
+							SELECT provider_inbox_id FROM inboxes
+							WHERE active = true
+						`
+						const results = yield* Effect.all(
+							inboxes.map(i =>
+								provider
+									.listDrafts(i.providerInboxId)
+									.pipe(
+										Effect.catch(() =>
+											Effect.succeed(
+												[] as import('./email-provider.js').ProviderDraftItem[],
+											),
+										),
+									),
+							),
+						)
+						return results
+							.flat()
+							.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+					}).pipe(Effect.orDie),
+
+				sendDraft: (inboxId: string, draftId: string) =>
+					Effect.gen(function* () {
+						const inbox = yield* resolveInbox(inboxId)
+						const providerInboxId = inbox?.providerInboxId ?? inboxId
+						const localInboxId = inbox?.id ?? null
+
+						const draft = yield* provider.getDraft(providerInboxId, draftId)
+
+						const ctx = parseClientId(draft.clientId)
+
+						if (ctx.contactId) {
+							yield* assertContactNotSuppressed(ctx.contactId, draft.to ?? [])
+						}
+
+						const result = yield* provider.sendDraft(providerInboxId, draftId)
+
+						yield* recordOutbound({
+							result,
+							providerInboxId,
+							localInboxId,
+							companyId: ctx.companyId,
+							contactId: ctx.contactId,
+							subject: draft.subject ?? null,
+							to: draft.to ?? [],
+							cc: draft.cc ?? [],
+							bcc: draft.bcc ?? [],
+							isNewThread: ctx.mode !== 'reply',
+						})
+
+						yield* Effect.logInfo('Draft sent').pipe(
+							Effect.annotateLogs({
+								event: 'email.draft_sent',
+								draftId,
+								threadId: result.threadId,
+							}),
+						)
+
+						return result
+					}),
+
+				// ── Footers ─────────────────────────────────────────────────
+
+				listFooters: (inboxId: string) =>
+					sql`
+						SELECT * FROM inbox_footers
+						WHERE inbox_id = ${inboxId}
+						ORDER BY is_default DESC, name
+					`.pipe(Effect.orDie),
+
+				getFooter: (id: string) =>
+					Effect.gen(function* () {
+						const rows = yield* sql`
+							SELECT * FROM inbox_footers
+							WHERE id = ${id} LIMIT 1
+						`
+						if (rows.length === 0) {
+							return yield* new NotFound({
+								entity: 'InboxFooter',
+								id,
+							})
+						}
+						return rows[0]!
+					}),
+
+				createFooter: (input: {
+					inboxId: string
+					name: string
+					html: string
+					textFallback?: string
+					isDefault?: boolean
+				}) =>
+					Effect.gen(function* () {
+						if (input.isDefault) {
+							yield* sql`
+								UPDATE inbox_footers
+								SET is_default = false, updated_at = now()
+								WHERE inbox_id = ${input.inboxId} AND is_default = true
+							`
+						}
+						const rows = yield* sql`
+							INSERT INTO inbox_footers ${sql.insert({
+								inboxId: input.inboxId,
+								name: input.name,
+								html: input.html,
+								textFallback: input.textFallback ?? '',
+								isDefault: input.isDefault ?? false,
+							})}
+							RETURNING *
+						`
+						return rows[0]!
+					}),
+
+				updateFooter: (
+					id: string,
+					patch: {
+						name?: string
+						html?: string
+						textFallback?: string
+						isDefault?: boolean
+					},
+				) =>
+					Effect.gen(function* () {
+						if (patch.isDefault === true) {
+							const existing = yield* sql<{ inboxId: string }>`
+								SELECT inbox_id FROM inbox_footers
+								WHERE id = ${id} LIMIT 1
+							`
+							if (existing[0]) {
+								yield* sql`
+									UPDATE inbox_footers
+									SET is_default = false, updated_at = now()
+									WHERE inbox_id = ${existing[0].inboxId}
+									  AND is_default = true AND id <> ${id}
+								`
+							}
+						}
+						const sets: Array<Statement.Fragment> = []
+						if (patch.name !== undefined) sets.push(sql`name = ${patch.name}`)
+						if (patch.html !== undefined) sets.push(sql`html = ${patch.html}`)
+						if (patch.textFallback !== undefined)
+							sets.push(sql`text_fallback = ${patch.textFallback}`)
+						if (patch.isDefault !== undefined)
+							sets.push(sql`is_default = ${patch.isDefault}`)
+						if (sets.length === 0) {
+							return yield* Effect.gen(function* () {
+								const r = yield* sql`
+									SELECT * FROM inbox_footers WHERE id = ${id} LIMIT 1
+								`
+								if (r.length === 0) {
+									return yield* new NotFound({
+										entity: 'InboxFooter',
+										id,
+									})
+								}
+								return r[0]!
+							})
+						}
+						sets.push(sql`updated_at = now()`)
+						const rows = yield* sql`
+							UPDATE inbox_footers
+							SET ${sql.csv(sets)}
+							WHERE id = ${id}
+							RETURNING *
+						`
+						if (rows.length === 0) {
+							return yield* new NotFound({
+								entity: 'InboxFooter',
+								id,
+							})
+						}
+						return rows[0]!
+					}),
+
+				deleteFooter: (id: string) =>
+					sql`DELETE FROM inbox_footers WHERE id = ${id}`.pipe(
+						Effect.asVoid,
+						Effect.orDie,
+					),
 			}
 		}),
 	},

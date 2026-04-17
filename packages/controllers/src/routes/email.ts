@@ -37,6 +37,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 				companyId: Schema.String,
 				contactId: Schema.optional(Schema.String),
 				attachments: Schema.optional(Schema.Array(SendAttachmentRef)),
+				skipFooter: Schema.optional(Schema.Boolean),
 			}),
 			success: Schema.Struct({
 				messageId: Schema.String,
@@ -57,6 +58,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 				cc: Schema.optional(Schema.Array(Schema.String)),
 				bcc: Schema.optional(Schema.Array(Schema.String)),
 				attachments: Schema.optional(Schema.Array(SendAttachmentRef)),
+				skipFooter: Schema.optional(Schema.Boolean),
 			}),
 			success: Schema.Struct({
 				messageId: Schema.String,
@@ -210,6 +212,124 @@ export const EmailGroup = HttpApiGroup.make('email')
 				error: NotFound.pipe(HttpApiSchema.status(404)),
 			},
 		),
+	)
+	// ── Drafts ──
+	.add(
+		HttpApiEndpoint.post('createDraft', '/email/drafts', {
+			payload: Schema.Struct({
+				inboxId: Schema.String,
+				to: Schema.optional(Recipients),
+				cc: Schema.optional(Schema.Array(Schema.String)),
+				bcc: Schema.optional(Schema.Array(Schema.String)),
+				subject: Schema.optional(Schema.String),
+				text: Schema.optional(Schema.String),
+				html: Schema.optional(Schema.String),
+				inReplyTo: Schema.optional(Schema.String),
+				companyId: Schema.optional(Schema.String),
+				contactId: Schema.optional(Schema.String),
+				mode: Schema.optional(Schema.String),
+				threadLinkId: Schema.optional(Schema.String),
+			}),
+			success: Schema.Unknown,
+		}),
+	)
+	.add(
+		HttpApiEndpoint.get('listDrafts', '/email/drafts', {
+			query: {
+				inboxId: Schema.optional(Schema.String),
+			},
+			success: Schema.Array(Schema.Unknown),
+		}),
+	)
+	.add(
+		HttpApiEndpoint.get('getDraft', '/email/drafts/:draftId', {
+			params: { draftId: Schema.String },
+			query: { inboxId: Schema.String },
+			success: Schema.Unknown,
+		}),
+	)
+	.add(
+		HttpApiEndpoint.patch('updateDraft', '/email/drafts/:draftId', {
+			params: { draftId: Schema.String },
+			payload: Schema.Struct({
+				inboxId: Schema.String,
+				to: Schema.optional(Recipients),
+				cc: Schema.optional(Schema.Array(Schema.String)),
+				bcc: Schema.optional(Schema.Array(Schema.String)),
+				subject: Schema.optional(Schema.String),
+				text: Schema.optional(Schema.String),
+				html: Schema.optional(Schema.String),
+			}),
+			success: Schema.Unknown,
+		}),
+	)
+	.add(
+		HttpApiEndpoint.delete('deleteDraft', '/email/drafts/:draftId', {
+			params: { draftId: Schema.String },
+			query: { inboxId: Schema.String },
+			success: Schema.Void,
+		}),
+	)
+	.add(
+		HttpApiEndpoint.post('sendDraft', '/email/drafts/:draftId/send', {
+			params: { draftId: Schema.String },
+			payload: Schema.Struct({
+				inboxId: Schema.String,
+			}),
+			success: Schema.Struct({
+				messageId: Schema.String,
+				threadId: Schema.String,
+			}),
+			error: Schema.Union([
+				EmailSuppressed.pipe(HttpApiSchema.status(409)),
+				BadRequest.pipe(HttpApiSchema.status(400)),
+			]),
+		}),
+	)
+	// ── Footers ──
+	.add(
+		HttpApiEndpoint.get('listFooters', '/email/inboxes/:inboxId/footers', {
+			params: { inboxId: Schema.String },
+			success: Schema.Array(Schema.Unknown),
+		}),
+	)
+	.add(
+		HttpApiEndpoint.post('createFooter', '/email/inboxes/:inboxId/footers', {
+			params: { inboxId: Schema.String },
+			payload: Schema.Struct({
+				name: Schema.String,
+				html: Schema.String,
+				textFallback: Schema.optional(Schema.String),
+				isDefault: Schema.optional(Schema.Boolean),
+			}),
+			success: Schema.Unknown,
+		}),
+	)
+	.add(
+		HttpApiEndpoint.get('getFooter', '/email/footers/:id', {
+			params: { id: Schema.String },
+			success: Schema.Unknown,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
+		}),
+	)
+	.add(
+		HttpApiEndpoint.patch('updateFooter', '/email/footers/:id', {
+			params: { id: Schema.String },
+			payload: Schema.Struct({
+				name: Schema.optional(Schema.String),
+				html: Schema.optional(Schema.String),
+				textFallback: Schema.optional(Schema.String),
+				isDefault: Schema.optional(Schema.Boolean),
+			}),
+			success: Schema.Unknown,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
+		}),
+	)
+	.add(
+		HttpApiEndpoint.delete('deleteFooter', '/email/footers/:id', {
+			params: { id: Schema.String },
+			success: Schema.Void,
+		}),
 	)
 	.middleware(SessionMiddleware)
 	.prefix('/v1')
