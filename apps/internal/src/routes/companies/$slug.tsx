@@ -37,6 +37,7 @@ import {
 } from '#/atoms/company-atoms'
 import { emailsSearchAtom } from '#/atoms/emails-atoms'
 import { pagesSearchAtom } from '#/atoms/pages-atoms'
+import { WherePanel } from '#/components/companies/where-panel'
 import {
 	EditableChips,
 	EditableField,
@@ -95,6 +96,10 @@ type CompanyDetail = {
 	readonly lastContactedAt: string | null
 	readonly tags: ReadonlyArray<string>
 	readonly productsFit: ReadonlyArray<string>
+	readonly latitude: number | null
+	readonly longitude: number | null
+	readonly geocodedAt: string | null
+	readonly geocodeSource: string | null
 }
 
 type ContactRow = {
@@ -711,6 +716,12 @@ function DetailBody({
 					<PriTabs.Tab value='profile'>
 						<Trans>Profile</Trans>
 					</PriTabs.Tab>
+					<PriTabs.Tab value='where'>
+						<Trans>Where</Trans>
+						{company.latitude !== null && company.longitude !== null ? (
+							<MapPin size={12} aria-hidden />
+						) : null}
+					</PriTabs.Tab>
 					<PriTabs.Tab value='contacts'>
 						<Trans>Contacts</Trans> ({contacts.length})
 					</PriTabs.Tab>
@@ -798,6 +809,12 @@ function DetailBody({
 								emptyHint={t`No products linked yet`}
 							/>
 						</ProfileGrid>
+					</PanelWrap>
+				</PriTabs.Panel>
+
+				<PriTabs.Panel value='where'>
+					<PanelWrap>
+						<WherePanel company={company} />
 					</PanelWrap>
 				</PriTabs.Panel>
 
@@ -1041,6 +1058,17 @@ function narrowCompany(raw: unknown): CompanyDetail | null {
 		typeof r[key] === 'string' ? (r[key] as string) : null
 	const num = (key: string) =>
 		typeof r[key] === 'number' ? (r[key] as number) : null
+	// Postgres numeric columns (lat/lng) arrive as strings via the SQL
+	// client; fall back to Number() when the raw value is a string.
+	const numeric = (key: string): number | null => {
+		const v = r[key]
+		if (typeof v === 'number' && Number.isFinite(v)) return v
+		if (typeof v === 'string') {
+			const parsed = Number(v)
+			return Number.isFinite(parsed) ? parsed : null
+		}
+		return null
+	}
 	const strArr = (key: string): ReadonlyArray<string> => {
 		const raw = r[key]
 		if (!Array.isArray(raw)) return []
@@ -1070,6 +1098,10 @@ function narrowCompany(raw: unknown): CompanyDetail | null {
 		lastContactedAt: str('lastContactedAt'),
 		tags: strArr('tags'),
 		productsFit: strArr('productsFit'),
+		latitude: numeric('latitude'),
+		longitude: numeric('longitude'),
+		geocodedAt: str('geocodedAt'),
+		geocodeSource: str('geocodeSource'),
 	}
 }
 

@@ -2,7 +2,11 @@ import { createServer } from 'node:http'
 
 import { NodeHttpServer, NodeRuntime } from '@effect/platform-node'
 import { Config, Effect, Layer } from 'effect'
-import { HttpRouter, HttpServerResponse } from 'effect/unstable/http'
+import {
+	FetchHttpClient,
+	HttpRouter,
+	HttpServerResponse,
+} from 'effect/unstable/http'
 import { HttpApiBuilder, HttpApiScalar, OpenApi } from 'effect/unstable/httpapi'
 
 import { ForjaApi } from '@engranatge/controllers'
@@ -40,6 +44,7 @@ import { CompanyService } from './services/companies'
 import { EmailService } from './services/email'
 import { EmailAttachmentStaging } from './services/email-attachment-staging'
 import { EmailProviderLive } from './services/email-provider-live'
+import { Geocoder } from './services/geocoder'
 import { PageService } from './services/pages'
 import { PipelineService } from './services/pipeline'
 import { RecordingService } from './services/recordings'
@@ -85,6 +90,7 @@ const ServicesLive = Layer.mergeAll(
 	EmailAttachmentStaging.layer,
 	RecordingService.layer,
 	ResearchService.layer,
+	Geocoder.layer.pipe(Layer.provide(FetchHttpClient.layer)),
 ).pipe(
 	Layer.provideMerge(ResearchEventSinkLive),
 	Layer.provideMerge(WebhookService.layer),

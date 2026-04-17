@@ -100,5 +100,12 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 			success: Schema.Unknown,
 		}),
 	)
+	.add(
+		HttpApiEndpoint.post('geocode', '/companies/:id/geocode', {
+			params: { id: Schema.String },
+			success: Schema.Unknown,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
+		}),
+	)
 	.middleware(SessionMiddleware)
 	.prefix('/v1')

@@ -49,6 +49,14 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 			'EMAIL_PROVIDER',
 		)
 
+		// No default — the developer must explicitly opt into a geocoding
+		// provider. Nominatim is the only option today; the variable is
+		// vendor-neutral so a swap doesn't require renaming.
+		const GEOCODER_PROVIDER = yield* Config.schema(
+			Schema.Literals(['nominatim']),
+			'GEOCODER_PROVIDER',
+		)
+
 		// Budget defaults (system-level)
 		const RESEARCH_DEFAULT_BUDGET_CENTS = yield* Config.int(
 			'RESEARCH_DEFAULT_BUDGET_CENTS',
@@ -94,6 +102,7 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 			EMAIL_API_KEY,
 			EMAIL_WEBHOOK_SECRET,
 			EMAIL_PROVIDER,
+			GEOCODER_PROVIDER,
 			RESEARCH_DEFAULT_BUDGET_CENTS,
 			RESEARCH_DEFAULT_PAID_BUDGET_CENTS,
 			RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS,
