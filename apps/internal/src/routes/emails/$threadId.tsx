@@ -33,6 +33,7 @@ import { companiesListAtom } from '#/atoms/pipeline-atoms'
 import { EmptyState } from '#/components/shared/empty-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { RelativeDate } from '#/components/shared/relative-date'
+import { useComposeEmail } from '#/context/compose-email-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import {
@@ -207,6 +208,41 @@ function ThreadDetailPage() {
 		refreshList()
 	}, [threadId, markUnread, refreshList])
 
+	const { openCompose } = useComposeEmail()
+	const handleReply = useCallback(
+		(replyAll: boolean) => {
+			if (detail === null) return
+			const lastInbound = findLastInbound(detail.messages)
+			const last = detail.messages[detail.messages.length - 1] ?? null
+			const seed = lastInbound ?? last
+			const selfEmail = detail.inbox?.email.toLowerCase() ?? null
+			const toList =
+				seed !== null
+					? seed.direction === 'inbound'
+						? [seed.from]
+						: seed.to
+					: []
+			const ccList =
+				replyAll && seed !== null
+					? [
+							...(seed.direction === 'inbound' ? seed.to : []),
+							...seed.cc,
+						].filter(addr => addr.toLowerCase() !== selfEmail)
+					: []
+			const subject = prefixSubject(detail.subject ?? '', 'Re: ')
+			openCompose({
+				mode: 'reply',
+				threadId,
+				...(detail.companyId !== null && { companyId: detail.companyId }),
+				...(detail.contactId !== null && { contactId: detail.contactId }),
+				to: toList.join(', '),
+				...(ccList.length > 0 && { cc: ccList.join(', ') }),
+				subject,
+			})
+		},
+		[detail, threadId, openCompose],
+	)
+
 	if (AsyncResult.isInitial(result) && detail === null) {
 		return (
 			<Page>
@@ -310,10 +346,26 @@ function ThreadDetailPage() {
 						<EyeOff size={14} aria-hidden />
 						<span>{t`Mark unread`}</span>
 					</PriButton>
-					<ReplyHint aria-disabled title={t`Reply composer ships with Phase 4`}>
+					<PriButton
+						type='button'
+						$variant='filled'
+						onClick={() => {
+							handleReply(false)
+						}}
+					>
 						<Reply size={14} aria-hidden />
 						<span>{t`Reply`}</span>
-					</ReplyHint>
+					</PriButton>
+					<PriButton
+						type='button'
+						$variant='outlined'
+						onClick={() => {
+							handleReply(true)
+						}}
+					>
+						<Reply size={14} aria-hidden />
+						<span>{t`Reply all`}</span>
+					</PriButton>
 				</Actions>
 			</HeaderPlate>
 
@@ -761,6 +813,25 @@ function formatBytes(bytes: number): string {
 	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function findLastInbound(
+	messages: ReadonlyArray<ThreadMessage>,
+): ThreadMessage | null {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]
+		if (m !== undefined && m.direction === 'inbound') return m
+	}
+	return null
+}
+
+function prefixSubject(subject: string, prefix: string): string {
+	const trimmed = subject.trim()
+	if (trimmed === '') return prefix.trim()
+	if (trimmed.toLowerCase().startsWith(prefix.trim().toLowerCase())) {
+		return trimmed
+	}
+	return `${prefix}${trimmed}`
+}
+
 // ── Styled components ─────────────────────────────────────────────
 
 const Page = styled.div.withConfig({ displayName: 'EmailsThreadDetailPage' })`
@@ -856,22 +927,6 @@ const StatusChip = styled.span.withConfig({ displayName: 'ThreadStatusChip' })<{
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
 	${({ $status }) => statusTone($status)}
-`
-
-const ReplyHint = styled.span.withConfig({ displayName: 'ThreadReplyHint' })`
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-2xs);
-	padding: var(--space-2xs) var(--space-sm);
-	border: 1px dashed var(--color-outline);
-	border-radius: var(--shape-2xs);
-	font-family: var(--font-display);
-	font-size: var(--typescale-label-medium-size);
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-	color: var(--color-on-surface-variant);
-	cursor: not-allowed;
-	opacity: 0.7;
 `
 
 const Layout = styled.div.withConfig({ displayName: 'ThreadLayout' })`
