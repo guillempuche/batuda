@@ -30,6 +30,10 @@ const CreateCompanyInput = Schema.Struct({
 	currentTools: Schema.optional(Schema.String),
 	nextAction: Schema.optional(Schema.String),
 	nextActionAt: Schema.optional(Schema.DateTimeUtc),
+	latitude: Schema.optional(Schema.Number),
+	longitude: Schema.optional(Schema.Number),
+	geocodedAt: Schema.optional(Schema.DateTimeUtc),
+	geocodeSource: Schema.optional(Schema.String),
 	metadata: Schema.optional(Schema.Unknown),
 })
 
@@ -54,6 +58,10 @@ const UpdateCompanyInput = Schema.Struct({
 	currentTools: Schema.optional(Schema.String),
 	nextAction: Schema.optional(Schema.String),
 	nextActionAt: Schema.optional(Schema.DateTimeUtc),
+	latitude: Schema.optional(Schema.Number),
+	longitude: Schema.optional(Schema.Number),
+	geocodedAt: Schema.optional(Schema.DateTimeUtc),
+	geocodeSource: Schema.optional(Schema.String),
 	metadata: Schema.optional(Schema.Unknown),
 })
 

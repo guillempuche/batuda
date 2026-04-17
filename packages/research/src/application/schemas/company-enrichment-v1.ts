@@ -14,6 +14,11 @@ export const CompanyEnrichmentV1Schema = Schema.Struct({
 		current_tools: Schema.optional(Schema.String),
 		products_fit: Schema.optional(Schema.Array(Schema.String)),
 		tags: Schema.optional(Schema.Array(Schema.String)),
+		location: Schema.optional(Schema.String),
+		region: Schema.optional(Schema.String),
+		address: Schema.optional(Schema.String),
+		latitude: Schema.optional(Schema.Number),
+		longitude: Schema.optional(Schema.Number),
 		citations: Schema.Array(Citation),
 	}),
 	competitors: Schema.optional(

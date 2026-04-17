@@ -30,11 +30,19 @@ export default Effect.gen(function* () {
 			next_action TEXT,
 			next_action_at TIMESTAMPTZ,
 			last_contacted_at TIMESTAMPTZ,
+			latitude NUMERIC(9,6),
+			longitude NUMERIC(9,6),
+			geocoded_at TIMESTAMPTZ,
+			geocode_source TEXT,
 			metadata JSONB,
 			version INT NOT NULL DEFAULT 0,
 			deleted_at TIMESTAMPTZ,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			CONSTRAINT companies_latlng_chk CHECK (
+				(latitude IS NULL AND longitude IS NULL)
+				OR (latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180)
+			)
 		)
 	`
 	yield* sql`

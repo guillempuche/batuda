@@ -47,6 +47,12 @@ export class Company extends Model.Class<Company>('Company')({
 	nextActionAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
 	lastContactedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
 
+	// Geocoded place (optional — populated via Nominatim or seed)
+	latitude: Schema.NullOr(Schema.Number),
+	longitude: Schema.NullOr(Schema.Number),
+	geocodedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+	geocodeSource: Schema.NullOr(Schema.String),
+
 	// Catch-all for evolving data
 	metadata: Schema.NullOr(Schema.Unknown),
 
