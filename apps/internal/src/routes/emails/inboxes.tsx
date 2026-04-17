@@ -30,8 +30,8 @@ import {
 	updateInboxAtom,
 } from '#/atoms/emails-atoms'
 import { EmptyState } from '#/components/shared/empty-state'
-import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { RelativeDate } from '#/components/shared/relative-date'
+import { SkeletonRows } from '#/components/shared/skeleton-row'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import {
@@ -222,7 +222,7 @@ function InboxesPage() {
 			</Intro>
 
 			{isLoading ? (
-				<LoadingSpinner label={t`Loading inboxes…`} />
+				<SkeletonRows count={5} height='3rem' />
 			) : isFailure ? (
 				<EmptyState
 					title={t`Could not load inboxes`}

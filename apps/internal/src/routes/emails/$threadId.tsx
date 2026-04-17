@@ -31,8 +31,8 @@ import {
 } from '#/atoms/emails-atoms'
 import { companiesListAtom } from '#/atoms/pipeline-atoms'
 import { EmptyState } from '#/components/shared/empty-state'
-import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { RelativeDate } from '#/components/shared/relative-date'
+import { SkeletonRows } from '#/components/shared/skeleton-row'
 import { useComposeEmail } from '#/context/compose-email-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { downloadUrlFor } from '#/lib/email-attachments'
@@ -247,7 +247,7 @@ function ThreadDetailPage() {
 	if (AsyncResult.isInitial(result) && detail === null) {
 		return (
 			<Page>
-				<LoadingSpinner label={t`Loading thread…`} />
+				<SkeletonRows count={6} height='5rem' />
 			</Page>
 		)
 	}
@@ -271,7 +271,7 @@ function ThreadDetailPage() {
 	if (detail === null) {
 		return (
 			<Page>
-				<LoadingSpinner label={t`Loading thread…`} />
+				<SkeletonRows count={6} height='5rem' />
 			</Page>
 		)
 	}
