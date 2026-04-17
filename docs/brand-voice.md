@@ -1,26 +1,26 @@
 # Engranatge — brand voice
 
-Copy voice rules for all Engranatge customer-facing surfaces. Covers the speaker (first-person singular vs plural), the tone flavour, forbidden vocabulary, the workshop metaphor budget, mission framing, sentence-level rules, tone ladders per funnel stage, and per-locale native voice (Catalan, Castilian, English). Any piece of copy must pass these before shipping.
+Copy voice rules for all Engranatge customer-facing surfaces. This document covers the speaker (first-person singular vs plural), the tone flavour, forbidden vocabulary, the workshop metaphor budget, mission framing, sentence-level rules, tone ladders per funnel stage, and per-locale native voice for Catalan, Castilian, and English. Any piece of copy must pass these before shipping.
 
 Companion documents:
 
-- **`docs/services.md`** — what Engranatge sells and the proof inventory.
-- **`docs/brand-visual.md`** — visual brand (colours, typography, layout, the workshop metaphor applied to UI).
+- **`docs/services.md`** covers what Engranatge sells and the proof inventory.
+- **`docs/brand-visual.md`** covers the visual brand (colours, typography, layout, and the workshop metaphor applied to UI).
 
 ## Core voice positioning
 
-Engranatge is a **Mediterranean mechanical workshop**, not a consultancy. The central metaphor is *taller mecànic* — a workshop where small machines are built, tuned, and set running to take low-value work off the owner's plate. The mission is always framed the same way:
+Engranatge is a **Mediterranean mechanical workshop**. It is not a consultancy. The central metaphor is *taller mecànic*, a workshop where small machines get built, tuned, and set running to take low-value work off the owner's plate. The mission is always framed the same way:
 
 > Machines do low-value work. Humans do high-value work.
 
-Never frame this as cost-cutting, headcount reduction, or "replacing staff". Frame it as giving people their time, their weekends, their evenings, and their higher-value attention back.
+Never frame this as cost-cutting, headcount reduction, or "replacing staff". The frame is reclamation: the reader gets time, weekends, evenings, and higher-value attention back.
 
 ## Speaker — first person, solo or team
 
-The copy is written in the **first person**. The speaker is the workshop itself, talking to one owner on the other side of the table. Which first person depends on the size of the workshop at the moment of writing:
+The copy is written in the **first person**. The speaker is the workshop itself, talking to one owner on the other side of the table. Which first person depends on the size of the workshop at the moment of writing.
 
 - **Solo workshop → "I" (*jo* / *yo*).** Singular first person. The reader is being spoken to by one craftsman, not a faceless company. Honest, direct, and rare enough in B2B to be memorable.
-- **Team workshop → "we" (*nosaltres* / *nosotros*).** Plural first person. Still never *"we are a company that…"* — the voice is a small team, not a corporate entity.
+- **Team workshop → "we" (*nosaltres* / *nosotros*).** Plural first person. Still never *"we are a company that…"*. The voice is a small team, not a corporate entity.
 
 **Resolving the register at draft time.** This document does not hard-code which register Engranatge uses today. The drafter picks by:
 
@@ -37,30 +37,30 @@ Never use third-person corporate voice regardless of which register is chosen:
 
 ## Tone — funny, personal, approachable, authentic
 
-The voice has a flavour, and the flavour comes from a place. The Engranatge creator is from **Girona**, on the Mediterranean coast of Catalonia. That roots the voice in four specific moves:
+The voice has a specific flavour, and that flavour comes from a specific place. The Engranatge creator is from **Girona**, on the Mediterranean coast of Catalonia. That roots the voice in four moves.
 
-- **Funny.** Dry, observational, owner-to-owner. A wink, not a joke. The humour comes from naming the absurdity of Sunday-night invoicing, not from punchlines. When in doubt, understate.
-- **Personal.** Name specific moments. 22:30 on a Sunday after closing the shop. The family lunch that got missed. The 340 € typo the gestoria found. Specificity is the shortcut to personal.
-- **Approachable.** The reader should feel like they could send a message and get a real reply. No "Contact Sales", no gated forms that feel like a qualification test, no *"we will respond within 48 business hours"*. Sound reachable.
-- **Authentic.** No stock-photo optimism, no fake humility, no performative transparency. If something is a placeholder, say it is. If the pilot case is illustrative, say it is. Honesty is a feature of the voice, not a risk.
+- **Funny.** Dry, observational, owner-to-owner. A wink rather than a joke. The humour comes from naming the absurdity of Sunday-night invoicing. When in doubt, understate.
+- **Personal.** Name specific moments: 22:30 on a Sunday after closing the shop, the family lunch that got missed, the 340 € typo the gestoria found. Specificity is how copy becomes personal.
+- **Approachable.** The reader should feel like they could send a message and get a real reply. No "Contact Sales", no gated forms that feel like a qualification test, no *"we will respond within 48 business hours"*. The copy should sound reachable.
+- **Authentic.** Skip stock-photo optimism, fake humility, and performative transparency. If something is a placeholder, say it is. If the pilot case is illustrative, say it is. Honesty is a feature of the voice, not a risk.
 
-**Mediterranean, not cold European.** The closest voice references are small Catalan shops and workshops — *ca l'Antoni*, *la ferreteria del barri* — not German engineering catalogues or Silicon Valley SaaS. Warmth is explicit. The copy can smile.
+**Mediterranean, not cold European.** The closest voice references are small Catalan shops and workshops such as *ca l'Antoni* or *la ferreteria del barri*. Not German engineering catalogues. Not Silicon Valley SaaS. Warmth is explicit. The copy can smile.
 
 ## Workshop metaphor — the budget
 
-The workshop metaphor is the brand's signature but it is easy to over-use. The rule is a budget: **at most two metaphor moves per page**. Pick the two moments with the highest return and leave the rest plain.
+The workshop metaphor is the brand's signature, and it is also easy to over-use. The rule is a budget: **at most two metaphor moves per page**. Pick the two moments with the highest return and leave the rest plain.
 
 High-return metaphor moments:
 
-- **The hero subhead** — one mechanical verb in the subhead is usually enough (*"I build tools that work while you sleep"*).
-- **A service framing line** — "one small machine, one job" as the framing for a service card.
-- **The transformation line in a story** — "one small machine, running every night".
+- **The hero subhead.** One mechanical verb in the subhead is usually enough, like *"I build tools that work while you sleep"*.
+- **A service framing line.** "One small machine, one job" as the framing for a service card.
+- **The transformation line in a story.** "One small machine, running every night".
 
-Low-return moments (do not spend the budget here):
+Low-return moments where you should not spend the budget:
 
-- Paragraph bodies — keep them plain.
-- CTA buttons — "Parlem" is sharper than "Entra al taller".
-- Footer taglines — already covered by `footer.tagline` in the i18n files.
+- Paragraph bodies. Keep them plain.
+- CTA buttons. "Parlem" is sharper than "Entra al taller".
+- Footer taglines. Already covered by `footer.tagline` in the i18n files.
 
 When in doubt, cut the metaphor. The brand is strong enough that the reader does not need to be reminded every paragraph.
 
@@ -121,9 +121,9 @@ These words and phrases are banned in all customer-facing copy. The left column 
 
 ## Tech stack words — banned in customer copy
 
-Never name internal tools, frameworks, or vendors in customer-facing copy. The reader does not know or care what powers the automation, and the moment they have to ask, the copy has failed. The canonical list of internal tools lives in `docs/services.md` (Internal tooling stack section); if a name appears there, it must not appear in any landing page, hero, CTA, proposal, email, or social post.
+Never name internal tools, frameworks, or vendors in customer-facing copy. The reader does not know or care what powers the automation, and the moment they have to ask, the copy has failed. The canonical list of internal tools lives in `docs/services.md` in the Internal tooling stack section. If a name appears there, it must not appear in any landing page, hero, CTA, proposal, email, or social post.
 
-The same rule applies to generic AI and engineering jargon. Replace every term with the *outcome* the reader experiences: a connection, a signal, an AI that reads, a quieter inbox — never a model, prompt, agent, webhook, API, or integration.
+The same rule applies to generic AI and engineering jargon. Replace every term with the *outcome* the reader experiences: a connection, a signal, an AI that reads, a quieter inbox. Never a model, prompt, agent, webhook, API, or integration.
 
 Tech names are acceptable only in:
 
@@ -176,13 +176,13 @@ The mission has a fixed framing across all languages. Do not drift from it.
 | `es` | Las máquinas hacen el trabajo de bajo valor. Los humanos hacen el trabajo de alto valor. |
 | `en` | Machines do the low-value work. Humans do the high-value work.                           |
 
-Always pair the mission with a reclamation framing, not a displacement framing. The reader gets time back; nobody loses their job.
+Always pair the mission with a reclamation framing rather than a displacement framing. The reader gets time back, and nobody loses their job.
 
 ## Sentence-level rules
 
 - **Short sentences.** If a sentence has two commas, it is probably two sentences.
 - **No semicolons.** Ever.
-- **Em-dashes are allowed** but at most one per paragraph, and only when the aside is sharper than a separate sentence.
+- **Em-dashes are rare.** Aim for one per page, maximum. The em-dash is a tell of AI writing, so prefer a comma, a colon, parentheses, or a new sentence. Use an em-dash only when the aside is genuinely sharper than any alternative.
 - **Active voice.** Passive voice kills trust. *"Invoices get copied"* → *"Your accountant copies invoices every Sunday."*
 - **Numbers in digits, not words.** "4 hours" beats "four hours" for scannability.
 - **Read aloud test.** If a sentence would not survive being read aloud to a shop owner over coffee, rewrite it.
@@ -197,11 +197,11 @@ Always pair the mission with a reclamation framing, not a displacement framing. 
 | Metaphor    | Medium          | Low                    | Low                                |
 | Urgency     | Zero            | Zero                   | Mild, only if real                 |
 
-Empathy is highest at ToFu because the reader does not know you yet. Specificity and proof rise as the reader moves down the funnel. Metaphor fades — by the CTA block the reader needs plain trust-building language, not workshop imagery.
+Empathy is highest at ToFu because the reader does not know you yet. Specificity and proof rise as the reader moves down the funnel. Metaphor fades. By the CTA block the reader needs plain trust-building language, not workshop imagery.
 
 ## Native language voice — per-locale rules
 
-Engranatge ships copy in three languages: Catalan, Castilian, and English. Catalan is the source voice (the `Locale` type lives in `apps/marketing/src/i18n/ca.ts`), Castilian is the widest-reach market, English is the outreach and future-international surface.
+Engranatge ships copy in three languages: Catalan, Castilian, and English. Catalan is the source voice (the `Locale` type lives in `apps/marketing/src/i18n/ca.ts`), Castilian is the widest-reach market, and English is the outreach and future-international surface.
 
 **The rule that beats all other rules:** do not translate. Write each language from scratch as a local copywriter would. If a sentence reads like a translation, throw it out.
 
@@ -209,7 +209,7 @@ Engranatge ships copy in three languages: Catalan, Castilian, and English. Catal
 
 #### Register
 
-Use **tu** (not *vostè*, not *vosaltres*). Engranatge talks to one owner, not to a company. The tone is respectful but close — the tone you would use with a shop owner you have known for two months, not someone you just met at a conference.
+Use **tu**, not *vostè*, and not *vosaltres*. Engranatge talks to one owner, not to a company. The tone is respectful but close, the tone you would use with a shop owner you have known for two months rather than someone you just met at a conference.
 
 - ✅ *"Explica'm el teu cas."* (tu + *em*, solo speaker)
 - ❌ *"Expliqui'm el seu cas."* (vostè + *seu*, too formal, sounds like a bank)
@@ -259,23 +259,23 @@ Catalan copy written by Castilian-first writers almost always lands on the same 
 
 #### Rhythm and feel
 
-Catalan sentences in copy should be **short and grounded**. Avoid the academic rhythm of newspaper Catalan — no *per altra banda*, no *cal tenir en compte que*, no *en aquest sentit*. The reader is an owner reading on their phone at 22:30 after closing the shop.
+Catalan sentences in copy should be **short and grounded**. Avoid the academic rhythm of newspaper Catalan. No *per altra banda*, no *cal tenir en compte que*, no *en aquest sentit*. The reader is an owner reading on their phone at 22:30 after closing the shop.
 
 - ✅ *"Les màquines fan la feina. Tu fas el negoci."*
 - ❌ *"Cal tenir en compte que les màquines poden realitzar diverses tasques mentre vostè es dedica al seu negoci."*
 
-Em-dash (—) is allowed in Catalan copy (not the ASCII `--`). One per paragraph maximum.
+Em-dash (—) is rare in Catalan copy. Aim for one per page at most. Never use the ASCII `--`.
 
 ### Castilian (`es.ts`) — the widest market
 
 #### Register
 
-Use **tú**, not *usted*. Same reasoning as Catalan: Engranatge is a workshop, not a bank. The one exception is if the specific surface is a formal proposal document (not within scope today — keep the tú default).
+Use **tú**, not *usted*. Same reasoning as Catalan: Engranatge is a workshop, not a bank. The one exception is if the specific surface is a formal proposal document, which is not in scope today, so keep the tú default.
 
 - ✅ *"Cuéntame tu caso."* (tú + *me*, solo speaker)
 - ❌ *"Cuénteme su caso."* (usted + *su*, too distant)
 
-Do not use *vosotros* — it sounds Peninsular in a way that excludes Latin American readers who may land on the site, and it clashes with the intimate *tú* address.
+Do not use *vosotros*. It sounds Peninsular in a way that excludes Latin American readers who may land on the site, and it clashes with the intimate *tú* address.
 
 #### Vocabulary — Spain-first SMB register
 
@@ -318,7 +318,7 @@ Castilian marketing copy is flooded with anglicisms. Strike them.
 
 #### Castilianism-in-the-wrong-direction traps
 
-There is a mirror failure mode: writers who over-correct Catalan-first instincts and end up writing stiff, academic Castilian that reads like an EU directive.
+There is a mirror failure mode. Writers who over-correct Catalan-first instincts end up writing stiff, academic Castilian that reads like an EU directive.
 
 - ❌ *"En aras de optimizar sus procesos..."*
 - ❌ *"A tal efecto, procedemos a..."*
@@ -328,7 +328,7 @@ If any of these phrasings appear, the sentence is wrong. Rewrite as a shop owner
 
 #### Rhythm and feel
 
-Castilian copy for SMB owners should be **conversational with bite**. Short sentences, digits not words, occasional em-dash. The reader is tired. Do not make them work.
+Castilian copy for SMB owners should be **conversational with bite**. Short sentences, digits not words, no em-dashes. The reader is tired, so do not make them work.
 
 - ✅ *"Cuéntame tu caso. Te digo, honestamente, si puedo construirlo. 20 minutos, gratis."*
 - ❌ *"Rogamos se ponga en contacto con nuestro equipo para concertar una reunión informativa en la que analizaremos conjuntamente su situación."*
@@ -339,7 +339,7 @@ Castilian copy for SMB owners should be **conversational with bite**. Short sent
 
 Use **you** (singular, implicit). Never *we are a company that…*. Never *our clients*. The target is a founder or owner-operator, not a buyer at an enterprise.
 
-Prefer British spelling in Europe-facing copy (*organisation*, *personalised*, *optimise*) unless the specific surface is targeted at US readers. The `en.ts` file today uses the same English for all English readers, so default to **international English** — which in practice means British spelling and vocabulary choices that do not sound aggressively American.
+Prefer British spelling in Europe-facing copy (*organisation*, *personalised*, *optimise*) unless the specific surface is targeted at US readers. The `en.ts` file today uses the same English for all English readers, so default to **international English**, which in practice means British spelling and vocabulary choices that do not sound aggressively American.
 
 - ✅ *"Tell me your case."* (singular, solo speaker)
 - ❌ *"Let our team assess your business needs."* (corporate third-person team voice)
@@ -390,10 +390,10 @@ English Engranatge copy should feel **dry, concrete, and slightly understated**.
 
 Some rules apply to all three languages equally and must hold regardless of native feel. These extend the sentence-level rules above with locale-specific formatting.
 
-- **Digits, not words.** "4 hours", "4 hores", "4 horas" — never "four hours" / "quatre hores" / "cuatro horas".
+- **Digits, not words.** "4 hours", "4 hores", "4 horas". Never "four hours" / "quatre hores" / "cuatro horas".
 - **Currency with the locale's symbol placement.** Catalan and Castilian: *500 €* (number + space + symbol). English: *€500* (symbol + number, no space).
 - **Time formats.** Catalan/Castilian: *19:00*. English: *7pm* or *19:00* (both acceptable for international English).
-- **Em-dash, not hyphens.** Use — (U+2014) not `--`. Applies to all languages.
+- **Em-dashes are rare in every language.** Aim for one per page at most. The em-dash reads as AI writing, so prefer a comma, a colon, parentheses, or a new sentence. When an em-dash really is needed, use the typographic — (U+2014), never the ASCII `--`.
 - **No exclamation marks.** They read as salesy in all three languages. Remove them.
 - **Question marks are fine.** A question is often a better hook than a statement.
 - **Numbers in prices use the locale's thousands separator.** Catalan/Castilian: *2.000 €*. English: *€2,000*. Never mix.
@@ -416,4 +416,4 @@ Before returning any copy, read each language out loud (mentally is fine) and as
 - **Castilian:** Would a panadero in Valencia say this to a regular customer?
 - **English:** Would a shop owner in Bristol say this without rolling their eyes?
 
-If the answer is no, rewrite. If the three languages sound like the same person translated three times, they are all wrong — rewrite.
+If the answer is no, rewrite. If the three languages sound like the same person translated three times, they are all wrong. Rewrite.
