@@ -21,15 +21,67 @@ msgstr "10 min, automated"
 msgid "4h copying invoices by hand"
 msgstr "4h copying invoices by hand"
 
+#: src/routes/$lang/$.tsx:75
+msgid "Administration — Engranatge"
+msgstr "Administration — Engranatge"
+
+#: src/components/blocks/epiphany-bridge-block.tsx:97
+msgid "After"
+msgstr "After"
+
+#: src/routes/$lang/$.tsx:51
+msgid "AI Agents — Engranatge"
+msgstr "AI Agents — Engranatge"
+
+#: src/routes/$lang/$.tsx:92
+msgid "Automate contract review and compliance tracking."
+msgstr "Automate contract review and compliance tracking."
+
+#: src/routes/$lang/$.tsx:84
+msgid "Automate purchase orders and supplier tracking."
+msgstr "Automate purchase orders and supplier tracking."
+
+#: src/routes/$lang/$.tsx:47
+msgid "Automations — Engranatge"
+msgstr "Automations — Engranatge"
+
+#: src/routes/$lang/$.tsx:96
+msgid "Automations for campaigns, content and analytics."
+msgstr "Automations for campaigns, content and analytics."
+
+#: src/routes/$lang/$.tsx:64
+msgid "Automations for finance departments."
+msgstr "Automations for finance departments."
+
+#: src/routes/$lang/$.tsx:72
+msgid "Automations to accelerate your sales cycle."
+msgstr "Automations to accelerate your sales cycle."
+
+#: src/components/blocks/epiphany-bridge-block.tsx:91
+msgid "Before"
+msgstr "Before"
+
 #: src/routes/$lang/index.tsx:339
 msgid "Before and after"
 msgstr "Before and after"
+
+#: src/routes/$lang/$.tsx:103
+msgid "Cases — Engranatge"
+msgstr "Cases — Engranatge"
 
 #: src/routes/$lang/index.tsx:281
 msgid "Client follow-up in a spreadsheet"
 msgstr "Client follow-up in a spreadsheet"
 
-#: src/routes/$lang/$.tsx:24
+#: src/routes/$lang/$.tsx:79
+msgid "Customer Service — Engranatge"
+msgstr "Customer Service — Engranatge"
+
+#: src/routes/$lang/$.tsx:100
+msgid "Dashboards and alerts so nothing slips through."
+msgstr "Dashboards and alerts so nothing slips through."
+
+#: src/routes/$lang/$.tsx:43
 #: src/routes/$lang/index.tsx:39
 msgid "Engranatge — Machines do the work"
 msgstr "Engranatge — Machines do the work"
@@ -37,6 +89,10 @@ msgstr "Engranatge — Machines do the work"
 #: src/routes/$lang/index.tsx:384
 msgid "Examples"
 msgstr "Examples"
+
+#: src/routes/$lang/$.tsx:63
+msgid "Finance — Engranatge"
+msgstr "Finance — Engranatge"
 
 #: src/routes/$lang/index.tsx:462
 msgid "Get a quote"
@@ -47,17 +103,33 @@ msgstr "Get a quote"
 msgid "Home"
 msgstr "Home"
 
+#: src/routes/$lang/$.tsx:87
+msgid "HR — Engranatge"
+msgstr "HR — Engranatge"
+
 #: src/components/workshop/machine-card.tsx:121
 msgid "Input"
 msgstr "Input"
+
+#: src/routes/$lang/$.tsx:52
+msgid "Intelligent agents that work 24/7 for your business."
+msgstr "Intelligent agents that work 24/7 for your business."
 
 #: src/components/layout/language-select.tsx:90
 msgid "Language"
 msgstr "Language"
 
+#: src/routes/$lang/$.tsx:91
+msgid "Legal — Engranatge"
+msgstr "Legal — Engranatge"
+
 #: src/routes/$lang/index.tsx:322
 msgid "Let's talk"
 msgstr "Let's talk"
+
+#: src/routes/$lang/$.tsx:59
+msgid "Let's talk — Engranatge"
+msgstr "Let's talk — Engranatge"
 
 #: src/routes/$lang/index.tsx:460
 msgid "Let's talk about your business"
@@ -71,9 +143,21 @@ msgstr "Machines do the work. You run the business."
 msgid "Made in Girona"
 msgstr "Made in Girona"
 
+#: src/routes/$lang/$.tsx:99
+msgid "Management — Engranatge"
+msgstr "Management — Engranatge"
+
+#: src/routes/$lang/$.tsx:95
+msgid "Marketing — Engranatge"
+msgstr "Marketing — Engranatge"
+
 #: src/routes/$lang/index.tsx:418
 msgid "No fine print."
 msgstr "No fine print."
+
+#: src/routes/$lang/$.tsx:67
+msgid "Operations — Engranatge"
+msgstr "Operations — Engranatge"
 
 #: src/routes/$lang/index.tsx:286
 msgid "Order system with real-time stock"
@@ -93,6 +177,22 @@ msgstr "Output"
 msgid "Pricing"
 msgstr "Pricing"
 
+#: src/routes/$lang/$.tsx:83
+msgid "Procurement — Engranatge"
+msgstr "Procurement — Engranatge"
+
+#: src/routes/$lang/$.tsx:104
+msgid "Real examples of automations in production."
+msgstr "Real examples of automations in production."
+
+#: src/routes/$lang/$.tsx:80
+msgid "Respond faster with less effort."
+msgstr "Respond faster with less effort."
+
+#: src/routes/$lang/$.tsx:71
+msgid "Sales — Engranatge"
+msgstr "Sales — Engranatge"
+
 #: src/routes/$lang/index.tsx:282
 msgid "Smart reminders"
 msgstr "Smart reminders"
@@ -102,17 +202,37 @@ msgstr "Smart reminders"
 msgid "Talk"
 msgstr "Talk"
 
+#: src/routes/$lang/$.tsx:60
+msgid "Tell me about your case and we will see how I can help."
+msgstr "Tell me about your case and we will see how I can help."
+
 #: src/routes/$lang/index.tsx:461
 msgid "Tell us what you need and we'll tell you how we can automate it. No strings attached."
 msgstr "Tell us what you need and we'll tell you how we can automate it. No strings attached."
+
+#: src/routes/$lang/$.tsx:55
+msgid "The Workshop — Engranatge"
+msgstr "The Workshop — Engranatge"
 
 #: src/components/layout/tool-belt.tsx:64
 #: src/components/layout/workshop-desktop.tsx:153
 msgid "Tools"
 msgstr "Tools"
 
-#: src/routes/$lang/$.tsx:26
-#: src/routes/$lang/$.tsx:94
+#: src/routes/$lang/$.tsx:88
+msgid "Tools for HR: onboarding, payroll, time tracking."
+msgstr "Tools for HR: onboarding, payroll, time tracking."
+
+#: src/routes/$lang/$.tsx:76
+msgid "Tools for paperwork-free admin management."
+msgstr "Tools for paperwork-free admin management."
+
+#: src/routes/$lang/$.tsx:68
+msgid "Tools to optimise day-to-day operations."
+msgstr "Tools to optimise day-to-day operations."
+
+#: src/routes/$lang/$.tsx:44
+#: src/routes/$lang/$.tsx:207
 #: src/routes/$lang/index.tsx:41
 msgid "We build automations, AI and micro-apps so your business runs itself."
 msgstr "We build automations, AI and micro-apps so your business runs itself."
@@ -120,6 +240,10 @@ msgstr "We build automations, AI and micro-apps so your business runs itself."
 #: src/routes/$lang/index.tsx:313
 msgid "We build tools that work while you sleep."
 msgstr "We build tools that work while you sleep."
+
+#: src/routes/$lang/$.tsx:48
+msgid "We connect your systems so repetitive work does itself."
+msgstr "We connect your systems so repetitive work does itself."
 
 #: src/routes/$lang/index.tsx:350
 msgid "What we build"
@@ -132,6 +256,10 @@ msgstr "What's included"
 #: src/routes/$lang/index.tsx:435
 msgid "What's not included"
 msgstr "What's not included"
+
+#: src/routes/$lang/$.tsx:56
+msgid "Who I am and why I build tools that work on their own."
+msgstr "Who I am and why I build tools that work on their own."
 
 #: src/routes/$lang/index.tsx:343
 msgid "With Engranatge"
