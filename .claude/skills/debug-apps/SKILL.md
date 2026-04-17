@@ -69,8 +69,8 @@ After pre-flight, check these in order. Stop when the cause is found.
 ### Environment
 
 - `.env` exists at repo root (copy from `.env.example` if missing: `pnpm cli setup`)
-- All `RESEARCH_*_PROVIDER` vars set (server crashes without them; use `stub` for local dev)
-- `RESEARCH_LLM_PROVIDER` set (no auto-default; use `stub`)
+- All `RESEARCH_PROVIDER_*` vars set (server crashes without them; use `stub` for local dev)
+- `RESEARCH_PROVIDER_LLM` set (no auto-default; use `stub`)
 - All `RESEARCH_DEFAULT_*` and `RESEARCH_MAX_*` budget/concurrency vars set
 - `ALLOWED_ORIGINS` matches portless URLs (`https://*.engranatge.localhost`)
 - `BETTER_AUTH_BASE_URL=https://api.engranatge.localhost`
