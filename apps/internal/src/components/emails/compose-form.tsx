@@ -2,11 +2,12 @@ import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { useLingui } from '@lingui/react/macro'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { AlertTriangle, Paperclip, Plus, Send, X } from 'lucide-react'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
 import { PriButton, PriInput, PriSelect } from '@engranatge/ui/pri'
 
+import { contactsAtomFor } from '#/atoms/company-atoms'
 import {
 	emailsSearchAtom,
 	inboxesListAtom,
@@ -26,6 +27,12 @@ type InboxOption = {
 }
 
 type SendState = 'idle' | 'sending' | 'error'
+
+type SuppressedAddress = {
+	readonly email: string
+	readonly name: string
+	readonly reason: 'bounced' | 'complained'
+}
 
 export function ComposeForm({ draft }: { readonly draft: Draft }) {
 	const { t } = useLingui()
@@ -63,17 +70,21 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 	)
 	const [sendState, setSendState] = useState<SendState>('idle')
 	const [errorMessage, setErrorMessage] = useState<string | null>(null)
+	const [suppressed, setSuppressed] = useState<
+		ReadonlyArray<SuppressedAddress>
+	>([])
 
 	const canSend = useMemo(() => {
 		if (sendState === 'sending') return false
 		if (draft.form.body.trim() === '') return false
+		if (suppressed.length > 0) return false
 		if (draft.mode === 'reply') {
 			return draft.threadId !== undefined
 		}
 		if (effectiveInboxId === null) return false
 		if (draft.form.to.trim() === '') return false
 		return true
-	}, [sendState, draft, effectiveInboxId])
+	}, [sendState, draft, effectiveInboxId, suppressed])
 
 	const handleSend = useCallback(async () => {
 		setSendState('sending')
@@ -273,6 +284,34 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 				/>
 			</BodyField>
 
+			{draft.companyId !== undefined ? (
+				<SuppressionGuard
+					companyId={draft.companyId}
+					to={draft.form.to}
+					cc={draft.form.cc}
+					bcc={draft.form.bcc}
+					onChange={setSuppressed}
+				/>
+			) : null}
+
+			{suppressed.length > 0 ? (
+				<SuppressionBanner role='alert'>
+					<AlertTriangle size={14} aria-hidden />
+					<SuppressionList>
+						<SuppressionTitle>
+							{t`Send blocked: these recipients cannot receive email`}
+						</SuppressionTitle>
+						{suppressed.map(s => (
+							<li key={s.email}>
+								<strong>{s.email}</strong>
+								{' — '}
+								{s.reason === 'bounced' ? t`bounced` : t`complained`}
+							</li>
+						))}
+					</SuppressionList>
+				</SuppressionBanner>
+			) : null}
+
 			{errorMessage !== null ? (
 				<ErrorBanner role='alert'>
 					<AlertTriangle size={14} aria-hidden />
@@ -300,6 +339,61 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 			</Footer>
 		</Form>
 	)
+}
+
+function SuppressionGuard({
+	companyId,
+	to,
+	cc,
+	bcc,
+	onChange,
+}: {
+	readonly companyId: string
+	readonly to: string
+	readonly cc: string
+	readonly bcc: string
+	readonly onChange: (next: ReadonlyArray<SuppressedAddress>) => void
+}) {
+	const contactsResult = useAtomValue(contactsAtomFor(companyId))
+	const contacts = useMemo(
+		() =>
+			AsyncResult.isSuccess(contactsResult) ? contactsResult.value : undefined,
+		[contactsResult],
+	)
+
+	useEffect(() => {
+		if (contacts === undefined) {
+			onChange([])
+			return
+		}
+		const suppressedMap = new Map<string, SuppressedAddress>()
+		for (const raw of contacts) {
+			if (raw === null || typeof raw !== 'object') continue
+			const r = raw as Record<string, unknown>
+			const email = typeof r['email'] === 'string' ? r['email'] : null
+			const status = r['emailStatus']
+			if (email === null) continue
+			if (status !== 'bounced' && status !== 'complained') continue
+			const name = typeof r['name'] === 'string' ? r['name'] : email
+			suppressedMap.set(email.toLowerCase(), { email, name, reason: status })
+		}
+		const seen = new Set<string>()
+		const out: SuppressedAddress[] = []
+		for (const raw of [
+			...splitAddresses(to),
+			...splitAddresses(cc),
+			...splitAddresses(bcc),
+		]) {
+			const key = raw.toLowerCase()
+			if (seen.has(key)) continue
+			seen.add(key)
+			const match = suppressedMap.get(key)
+			if (match !== undefined) out.push(match)
+		}
+		onChange(out)
+	}, [contacts, to, cc, bcc, onChange])
+
+	return null
 }
 
 function splitAddresses(raw: string): ReadonlyArray<string> {
@@ -450,6 +544,47 @@ const AttachmentHint = styled.button.withConfig({
 	text-transform: uppercase;
 	cursor: not-allowed;
 	opacity: 0.7;
+`
+
+const SuppressionBanner = styled.div.withConfig({
+	displayName: 'ComposeSuppressionBanner',
+})`
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-2xs);
+	padding: var(--space-2xs) var(--space-sm);
+	border: 1px solid
+		color-mix(in oklab, var(--color-error, #c6664b) 40%, transparent);
+	background: color-mix(in oklab, var(--color-error, #c6664b) 8%, transparent);
+	color: var(--color-error, #c6664b);
+	border-radius: var(--shape-xs);
+	font-size: var(--typescale-body-small-size);
+
+	> svg {
+		margin-top: 2px;
+		flex: 0 0 auto;
+	}
+`
+
+const SuppressionList = styled.ul.withConfig({
+	displayName: 'ComposeSuppressionList',
+})`
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3xs);
+`
+
+const SuppressionTitle = styled.div.withConfig({
+	displayName: 'ComposeSuppressionTitle',
+})`
+	font-family: var(--font-display);
+	font-size: var(--typescale-label-small-size);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	margin-bottom: var(--space-3xs);
 `
 
 const ErrorBanner = styled.div.withConfig({
