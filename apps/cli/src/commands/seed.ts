@@ -2169,6 +2169,11 @@ export const seed = (preset: Preset) =>
 			}))
 			yield* sql`INSERT INTO email_thread_links ${sql.insert(normalizeRows(emailThreadRowsWithInbox))}`
 
+			const seededAt = new Date()
+			const hoursAgo = (h: number) =>
+				new Date(seededAt.getTime() - h * 60 * 60 * 1000)
+			const daysAgo = (d: number) => hoursAgo(d * 24)
+
 			const emailMessageRows = [
 				// Thread: Cal Pep — delivered outbound + delivered inbound reply
 				{
@@ -2186,7 +2191,7 @@ export const seed = (preset: Preset) =>
 					}),
 					status: 'delivered',
 					inboundClassification: null,
-					statusUpdatedAt: new Date('2026-02-20T10:00:00Z'),
+					statusUpdatedAt: daysAgo(56),
 				},
 				{
 					provider: 'agentmail',
@@ -2203,7 +2208,7 @@ export const seed = (preset: Preset) =>
 					}),
 					status: 'delivered',
 					inboundClassification: 'normal',
-					statusUpdatedAt: new Date('2026-02-21T08:30:00Z'),
+					statusUpdatedAt: daysAgo(55),
 				},
 				// Thread: Ferros (Marta) — sent, not yet delivered
 				{
@@ -2221,7 +2226,7 @@ export const seed = (preset: Preset) =>
 					}),
 					status: 'sent',
 					inboundClassification: null,
-					statusUpdatedAt: new Date('2026-03-06T14:00:00Z'),
+					statusUpdatedAt: daysAgo(42),
 				},
 				// Thread: Ferros (Jordi) — hard bounce
 				{
@@ -2242,7 +2247,7 @@ export const seed = (preset: Preset) =>
 					bounceType: 'Permanent',
 					bounceSubType: 'General',
 					inboundClassification: null,
-					statusUpdatedAt: new Date('2026-03-16T09:00:00Z'),
+					statusUpdatedAt: daysAgo(32),
 				},
 				// Thread: Coastal — soft bounce
 				{
@@ -2263,7 +2268,7 @@ export const seed = (preset: Preset) =>
 					bounceType: 'Transient',
 					bounceSubType: 'MailboxFull',
 					inboundClassification: null,
-					statusUpdatedAt: new Date('2026-03-26T11:00:00Z'),
+					statusUpdatedAt: daysAgo(22),
 				},
 				// Thread: Hostal — delivered outbound + inbound reply
 				{
@@ -2281,7 +2286,7 @@ export const seed = (preset: Preset) =>
 					}),
 					status: 'delivered',
 					inboundClassification: null,
-					statusUpdatedAt: new Date('2026-04-06T15:00:00Z'),
+					statusUpdatedAt: daysAgo(11),
 				},
 				{
 					provider: 'agentmail',
@@ -2298,7 +2303,7 @@ export const seed = (preset: Preset) =>
 					}),
 					status: 'delivered',
 					inboundClassification: 'normal',
-					statusUpdatedAt: new Date('2026-04-07T09:15:00Z'),
+					statusUpdatedAt: hoursAgo(10 * 24 + 6),
 				},
 				// Thread: Bright Lane — complained (spam)
 				{
@@ -2317,7 +2322,7 @@ export const seed = (preset: Preset) =>
 					status: 'complained',
 					statusReason: 'Recipient marked as spam',
 					inboundClassification: null,
-					statusUpdatedAt: new Date('2026-04-02T10:00:00Z'),
+					statusUpdatedAt: daysAgo(15),
 				},
 				// Thread: Distribuciones — rejected (provider rejected sending)
 				{
@@ -2336,7 +2341,7 @@ export const seed = (preset: Preset) =>
 					status: 'rejected',
 					statusReason: 'Sending quota exceeded',
 					inboundClassification: null,
-					statusUpdatedAt: new Date('2026-03-28T16:00:00Z'),
+					statusUpdatedAt: daysAgo(20),
 				},
 				// Thread: Park & Stone — delivered then no reply (closed thread)
 				{
@@ -2354,7 +2359,7 @@ export const seed = (preset: Preset) =>
 					}),
 					status: 'delivered',
 					inboundClassification: null,
-					statusUpdatedAt: new Date('2026-02-15T12:00:00Z'),
+					statusUpdatedAt: daysAgo(61),
 				},
 				// Thread: No company — inbound from unknown sender
 				{
@@ -2372,7 +2377,7 @@ export const seed = (preset: Preset) =>
 					}),
 					status: 'delivered',
 					inboundClassification: 'normal',
-					statusUpdatedAt: new Date('2026-04-10T08:00:00Z'),
+					statusUpdatedAt: daysAgo(7),
 				},
 				// Thread: Tancaments — multi-message thread (outbound delivered, inbound delivered, outbound delivered)
 				{
@@ -2390,7 +2395,7 @@ export const seed = (preset: Preset) =>
 					}),
 					status: 'delivered',
 					inboundClassification: null,
-					statusUpdatedAt: new Date('2026-03-19T09:00:00Z'),
+					statusUpdatedAt: daysAgo(29),
 				},
 				{
 					provider: 'agentmail',
@@ -2407,7 +2412,7 @@ export const seed = (preset: Preset) =>
 					}),
 					status: 'delivered',
 					inboundClassification: 'normal',
-					statusUpdatedAt: new Date('2026-03-19T14:30:00Z'),
+					statusUpdatedAt: hoursAgo(29 * 24 - 6),
 				},
 				{
 					provider: 'agentmail',
@@ -2424,7 +2429,7 @@ export const seed = (preset: Preset) =>
 					}),
 					status: 'delivered',
 					inboundClassification: null,
-					statusUpdatedAt: new Date('2026-03-20T10:00:00Z'),
+					statusUpdatedAt: daysAgo(28),
 				},
 				// Inbound spam — unsolicited pitch, flagged by AgentMail
 				{
@@ -2442,7 +2447,7 @@ export const seed = (preset: Preset) =>
 					}),
 					status: 'delivered',
 					inboundClassification: 'spam',
-					statusUpdatedAt: new Date('2026-04-11T02:14:00Z'),
+					statusUpdatedAt: daysAgo(6),
 				},
 				// Inbound from blocked sender — AgentMail block list match
 				{
@@ -2460,7 +2465,7 @@ export const seed = (preset: Preset) =>
 					}),
 					status: 'delivered',
 					inboundClassification: 'blocked',
-					statusUpdatedAt: new Date('2026-04-12T03:47:00Z'),
+					statusUpdatedAt: daysAgo(5),
 				},
 			]
 			yield* sql`INSERT INTO email_messages ${sql.insert(normalizeRows(emailMessageRows))}`
