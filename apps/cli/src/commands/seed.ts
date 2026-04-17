@@ -1,5 +1,7 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: seed data */
 import { randomUUID } from 'node:crypto'
+import { mkdir, readdir, readFile, unlink, writeFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
 
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { apiKey } from '@better-auth/api-key'
@@ -65,6 +67,193 @@ const silentWav = (durationSec = 0.1, sampleRate = 8000): Buffer => {
 
 export const PRESETS = ['minimal', 'full'] as const
 export type Preset = (typeof PRESETS)[number]
+
+// ── Local-inbox file writer ───────────────────────────────
+// The local-inbox provider reads bodies from apps/server/.dev-inbox/*.md,
+// so seeded threads need matching files on disk for getThread to serve them.
+
+const DEV_INBOX_DIR = resolve(
+	import.meta.dirname,
+	'..',
+	'..',
+	'..',
+	'server',
+	'.dev-inbox',
+)
+
+const pad = (n: number, width = 2) => n.toString().padStart(width, '0')
+const filenameStamp = (d: Date) =>
+	`${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}-${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}-${pad(d.getUTCMilliseconds(), 3)}`
+
+const slugify = (s: string) =>
+	s
+		.toLowerCase()
+		.normalize('NFKD')
+		.replace(/[\u0300-\u036f]/g, '')
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/^-+|-+$/g, '')
+		.slice(0, 50) || 'untitled'
+
+const formatList = (items: readonly string[]): string =>
+	items.length === 0 ? '[]' : `\n${items.map(i => `  - ${i}`).join('\n')}`
+
+const messageSlugFromId = (providerMessageId: string): string =>
+	providerMessageId.replace(/^</, '').replace(/@agentmail\.to>$/, '')
+
+const SEED_MESSAGE_BODIES: Record<string, { from: string; body: string }> = {
+	calpep01: {
+		from: 'dev@forja.cat',
+		body: 'Hola Pep,\n\nT’envio la proposta per la web i el sistema de reserves. Avisa’m quan tinguis un moment per revisar-la.\n\nSalutacions,\nForja',
+	},
+	calpep02: {
+		from: 'pep@calpepfonda.cat',
+		body: 'Hola,\n\nGràcies per la proposta. Ens reunim dijous per parlar-ne?',
+	},
+	ferrosmarta01: {
+		from: 'dev@forja.cat',
+		body: 'Hola Marta,\n\nAquesta és una primera aproximació per l’automatització de processos comercials. Adjunto un esborrany d’agenda.',
+	},
+	ferrosjordi01: {
+		from: 'dev@forja.cat',
+		body: 'Hola Jordi,\n\nSeguim amb la demo de facturació. Et va bé dimarts a les 10?',
+	},
+	coastal01: {
+		from: 'dev@forja.cat',
+		body: 'Hi Tom,\n\nHere is a quick write-up on our delivery-note digitisation pilot. Happy to jump on a call.',
+	},
+	hostal01: {
+		from: 'dev@forja.cat',
+		body: 'Hola Arnau,\n\nProposta inicial per al sistema de reserves de l’Hostal. Repassem-la quan puguis.',
+	},
+	hostal02: {
+		from: 'reserves@hostalpirineu.com',
+		body: 'Hola,\n\nMolt bé, ens encaixa. Podries enviar un pressupost detallat?',
+	},
+	brightlane01: {
+		from: 'dev@forja.cat',
+		body: 'Hi Sarah,\n\nFollowing up on the ecommerce roadmap — let me know if Tuesday works for the review call.',
+	},
+	dismartinez01: {
+		from: 'dev@forja.cat',
+		body: 'Hola Carlos,\n\nPrimera presa de contacte sobre automatització logística. Quedo pendent de la teva resposta.',
+	},
+	parkstone01: {
+		from: 'dev@forja.cat',
+		body: 'Hi,\n\nSharing our website redesign offer as discussed. Full scope inside.',
+	},
+	nocompany01: {
+		from: 'visitor@example.org',
+		body: 'Hola,\n\nTinc interes en els vostres serveis. Podem parlar aquesta setmana?',
+	},
+	tancaments01: {
+		from: 'dev@forja.cat',
+		body: 'Hola Ramon,\n\nAdjunto la proposta d’automatització per a Tancaments Garraf.',
+	},
+	tancaments02: {
+		from: 'ramon@tancamentsgarraf.cat',
+		body: 'Hola,\n\nGràcies. Tenim alguns dubtes sobre el calendari — te’ls envio aviat.',
+	},
+	tancaments03: {
+		from: 'dev@forja.cat',
+		body: 'Hola Ramon,\n\nRespostes als teus dubtes sobre el calendari, punt per punt.',
+	},
+	spamreject01: {
+		from: 'marketing@spam-sender.biz',
+		body: '🔥 Boost your sales 10x with our magical SEO funnel. Reply STOP to unsubscribe.',
+	},
+	blocklist01: {
+		from: 'scammer@blocked-domain.tld',
+		body: 'Urgent wire transfer required immediately. Please confirm bank details.',
+	},
+}
+
+type DevInboxThreadLike = { providerThreadId: string; subject: string }
+type DevInboxMessageLike = {
+	providerMessageId: string
+	providerThreadId: string
+	direction: string
+	recipients: string
+	inboundClassification: string | null
+	statusUpdatedAt: Date
+}
+
+const writeDevInboxFiles = (
+	threadRows: readonly DevInboxThreadLike[],
+	messageRows: readonly DevInboxMessageLike[],
+) =>
+	Effect.gen(function* () {
+		yield* Effect.tryPromise(() =>
+			mkdir(DEV_INBOX_DIR, { recursive: true }),
+		).pipe(Effect.orDie)
+
+		// Drop any previously seeded files so rolling-date reseeds don't
+		// accumulate duplicates under different timestamp prefixes. Hand-dropped
+		// dev files (magic-link captures, ad-hoc probes) are preserved.
+		const seedMessageIds = new Set(messageRows.map(m => m.providerMessageId))
+		const existing = yield* Effect.tryPromise(() =>
+			readdir(DEV_INBOX_DIR),
+		).pipe(Effect.orDie)
+		for (const name of existing) {
+			if (!name.endsWith('.md')) continue
+			const path = resolve(DEV_INBOX_DIR, name)
+			const contents = yield* Effect.tryPromise(() =>
+				readFile(path, 'utf8'),
+			).pipe(Effect.orDie)
+			const match = contents.match(/^messageId:\s*(.+)$/m)
+			if (match && seedMessageIds.has(match[1]!.trim())) {
+				yield* Effect.tryPromise(() => unlink(path)).pipe(Effect.orDie)
+			}
+		}
+
+		const subjectByThread = new Map(
+			threadRows.map(t => [t.providerThreadId, t.subject]),
+		)
+
+		for (const msg of messageRows) {
+			const slug = messageSlugFromId(msg.providerMessageId)
+			const meta = SEED_MESSAGE_BODIES[slug] ?? {
+				from:
+					msg.direction === 'outbound' ? 'dev@forja.cat' : 'sender@example.com',
+				body: 'Seeded dev message.',
+			}
+			const recipients = JSON.parse(msg.recipients) as {
+				to: string[]
+				cc: string[]
+				bcc: string[]
+			}
+			const subject =
+				subjectByThread.get(msg.providerThreadId) ?? '(no subject)'
+			const stamp = filenameStamp(msg.statusUpdatedAt)
+			const recipient = slugify(recipients.to[0] ?? 'unknown')
+			const filename = `${stamp}__${recipient}__${slugify(subject)}.md`
+			const labels =
+				msg.inboundClassification === 'spam'
+					? ['spam']
+					: msg.inboundClassification === 'blocked'
+						? ['blocked']
+						: []
+			const fm = [
+				`sentAt: ${msg.statusUpdatedAt.toISOString()}`,
+				`provider: local-inbox`,
+				`messageId: ${msg.providerMessageId}`,
+				`threadId: ${msg.providerThreadId}`,
+				`from: ${meta.from}`,
+				`to: ${formatList(recipients.to)}`,
+				`cc: ${formatList(recipients.cc)}`,
+				`bcc: ${formatList(recipients.bcc)}`,
+				`replyTo: null`,
+				`subject: ${subject}`,
+				`text: null`,
+				`html: null`,
+				`labels: ${formatList(labels)}`,
+				`attachments: []`,
+			].join('\n')
+			const content = `---\n${fm}\n---\n\n${meta.body}\n`
+			yield* Effect.tryPromise(() =>
+				writeFile(resolve(DEV_INBOX_DIR, filename), content, 'utf8'),
+			).pipe(Effect.orDie)
+		}
+	})
 
 // ── Test user ─────────────────────────────────────────────
 
@@ -868,7 +1057,7 @@ const getPresetData = (
 export const seedReset = Effect.gen(function* () {
 	const sql = yield* SqlClient.SqlClient
 	yield* Effect.logInfo('Truncating CRM tables...')
-	yield* sql`TRUNCATE companies, products, pages, research_runs, sources, user_research_policy, provider_quotas, provider_usage, email_thread_links, email_messages, call_recordings CASCADE`
+	yield* sql`TRUNCATE companies, products, pages, research_runs, sources, user_research_policy, provider_quotas, provider_usage, inboxes, email_thread_links, email_messages, call_recordings CASCADE`
 })
 
 // ── Seed auth ─────────────────────────────────────────────
@@ -2472,6 +2661,8 @@ export const seed = (preset: Preset) =>
 			yield* Effect.logInfo(
 				`  ${emailThreadRows.length} threads, ${emailMessageRows.length} messages`,
 			)
+
+			yield* writeDevInboxFiles(emailThreadRows, emailMessageRows)
 
 			// 10. Research runs + sources
 			yield* Effect.logInfo('Seeding research runs & sources...')
