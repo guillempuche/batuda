@@ -111,3 +111,31 @@ export const markThreadUnreadAtom = ForjaApiAtom.mutation(
 export const createInboxAtom = ForjaApiAtom.mutation('email', 'createInbox')
 export const updateInboxAtom = ForjaApiAtom.mutation('email', 'updateInbox')
 export const syncInboxesAtom = ForjaApiAtom.mutation('email', 'syncInboxes')
+
+// ── Drafts ──
+export const createDraftAtom = ForjaApiAtom.mutation('email', 'createDraft')
+export const updateDraftAtom = ForjaApiAtom.mutation('email', 'updateDraft')
+export const deleteDraftAtom = ForjaApiAtom.mutation('email', 'deleteDraft')
+export const sendDraftAtom = ForjaApiAtom.mutation('email', 'sendDraft')
+export const listDraftsAtom = ForjaApiAtom.query('email', 'listDrafts', {
+	query: {},
+})
+
+// ── Footers ──
+export const createFooterAtom = ForjaApiAtom.mutation('email', 'createFooter')
+export const updateFooterAtom = ForjaApiAtom.mutation('email', 'updateFooter')
+export const deleteFooterAtom = ForjaApiAtom.mutation('email', 'deleteFooter')
+
+const footerCache = new Map<string, ReturnType<typeof makeFooterAtom>>()
+function makeFooterAtom(inboxId: string) {
+	return ForjaApiAtom.query('email', 'listFooters', {
+		params: { inboxId },
+	})
+}
+export function footersAtomFor(inboxId: string) {
+	const existing = footerCache.get(inboxId)
+	if (existing !== undefined) return existing
+	const atom = makeFooterAtom(inboxId)
+	footerCache.set(inboxId, atom)
+	return atom
+}

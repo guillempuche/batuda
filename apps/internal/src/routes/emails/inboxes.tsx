@@ -5,11 +5,13 @@ import { AsyncResult } from 'effect/unstable/reactivity'
 import {
 	Check,
 	ChevronLeft,
+	FileText,
 	Inbox as InboxIcon,
 	Pencil,
 	Plus,
 	RefreshCw,
 	Star,
+	Trash2,
 	X,
 } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
@@ -24,11 +26,16 @@ import {
 } from '@engranatge/ui/pri'
 
 import {
+	createFooterAtom,
 	createInboxAtom,
+	deleteFooterAtom,
+	footersAtomFor,
 	inboxesListAtom,
 	syncInboxesAtom,
+	updateFooterAtom,
 	updateInboxAtom,
 } from '#/atoms/emails-atoms'
+import { EmailComposer } from '#/components/emails/email-composer'
 import { EmptyState } from '#/components/shared/empty-state'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { SkeletonRows } from '#/components/shared/skeleton-row'
@@ -91,6 +98,7 @@ type DialogMode =
 	| { readonly kind: 'closed' }
 	| { readonly kind: 'create' }
 	| { readonly kind: 'edit'; readonly row: InboxRow }
+	| { readonly kind: 'footers'; readonly row: InboxRow }
 
 function InboxesPage() {
 	const { t } = useLingui()
@@ -120,6 +128,9 @@ function InboxesPage() {
 	}, [])
 	const openEdit = useCallback((row: InboxRow) => {
 		setDialog({ kind: 'edit', row })
+	}, [])
+	const openFooters = useCallback((row: InboxRow) => {
+		setDialog({ kind: 'footers', row })
 	}, [])
 	const closeDialog = useCallback(() => {
 		setDialog({ kind: 'closed' })
@@ -325,6 +336,13 @@ function InboxesPage() {
 							<CellActions role='cell'>
 								<IconAction
 									type='button'
+									onClick={() => openFooters(row)}
+									aria-label={t`Manage footers for ${row.email}`}
+								>
+									<FileText size={14} aria-hidden />
+								</IconAction>
+								<IconAction
+									type='button'
 									onClick={() => openEdit(row)}
 									aria-label={t`Edit inbox ${row.email}`}
 								>
@@ -336,7 +354,7 @@ function InboxesPage() {
 				</InboxesTable>
 			)}
 
-			{dialog.kind !== 'closed' && (
+			{(dialog.kind === 'create' || dialog.kind === 'edit') && (
 				<InboxFormDialog
 					mode={dialog}
 					onClose={closeDialog}
@@ -372,6 +390,10 @@ function InboxesPage() {
 						return { ok: true }
 					}}
 				/>
+			)}
+
+			{dialog.kind === 'footers' && (
+				<FooterManageDialog row={dialog.row} onClose={closeDialog} />
 			)}
 		</Page>
 	)
@@ -630,6 +652,339 @@ function InboxFormDialog({
 	)
 }
 
+// ── Footer management dialog ────────────────────────────────────
+
+type FooterRow = {
+	readonly id: string
+	readonly name: string
+	readonly html: string
+	readonly textFallback: string
+	readonly isDefault: boolean
+}
+
+type FooterEditing =
+	| { readonly kind: 'none' }
+	| { readonly kind: 'create' }
+	| { readonly kind: 'edit'; readonly footer: FooterRow }
+
+function FooterManageDialog({
+	row,
+	onClose,
+}: {
+	readonly row: InboxRow
+	readonly onClose: () => void
+}) {
+	const { t } = useLingui()
+	const toastManager = usePriToast()
+	const footersResult = useAtomValue(footersAtomFor(row.id))
+	const refreshFooters = useAtomRefresh(footersAtomFor(row.id))
+
+	const createFooter = useAtomSet(createFooterAtom, { mode: 'promiseExit' })
+	const updateFooter = useAtomSet(updateFooterAtom, { mode: 'promiseExit' })
+	const deleteFooter = useAtomSet(deleteFooterAtom, { mode: 'promiseExit' })
+
+	const footers = useMemo<ReadonlyArray<FooterRow>>(
+		() =>
+			AsyncResult.isSuccess(footersResult)
+				? narrowFooterRows(footersResult.value)
+				: [],
+		[footersResult],
+	)
+
+	const [editing, setEditing] = useState<FooterEditing>({ kind: 'none' })
+	const [name, setName] = useState('')
+	const [html, setHtml] = useState('')
+	const [textFallback, setTextFallback] = useState('')
+	const [isDefault, setIsDefault] = useState(false)
+	const [submitting, setSubmitting] = useState(false)
+
+	const startCreate = useCallback(() => {
+		setName('')
+		setHtml('')
+		setTextFallback('')
+		setIsDefault(false)
+		setEditing({ kind: 'create' })
+	}, [])
+
+	const startEdit = useCallback((footer: FooterRow) => {
+		setName(footer.name)
+		setHtml(footer.html)
+		setTextFallback(footer.textFallback)
+		setIsDefault(footer.isDefault)
+		setEditing({ kind: 'edit', footer })
+	}, [])
+
+	const cancelEdit = useCallback(() => {
+		setEditing({ kind: 'none' })
+	}, [])
+
+	const handleSave = useCallback(async () => {
+		if (name.trim() === '' || html.trim() === '') return
+		setSubmitting(true)
+		if (editing.kind === 'create') {
+			const exit = await createFooter({
+				params: { inboxId: row.id },
+				payload: {
+					name,
+					html,
+					...(textFallback !== '' && { textFallback }),
+					...(isDefault && { isDefault: true }),
+				},
+			} as never)
+			if (exit._tag !== 'Success') {
+				toastManager.add({
+					title: t`Create failed`,
+					type: 'error',
+				})
+				setSubmitting(false)
+				return
+			}
+		} else if (editing.kind === 'edit') {
+			const exit = await updateFooter({
+				params: { id: editing.footer.id },
+				payload: {
+					name,
+					html,
+					textFallback,
+					isDefault,
+				},
+			} as never)
+			if (exit._tag !== 'Success') {
+				toastManager.add({
+					title: t`Update failed`,
+					type: 'error',
+				})
+				setSubmitting(false)
+				return
+			}
+		}
+		refreshFooters()
+		setEditing({ kind: 'none' })
+		setSubmitting(false)
+	}, [
+		editing,
+		name,
+		html,
+		textFallback,
+		isDefault,
+		row.id,
+		createFooter,
+		updateFooter,
+		refreshFooters,
+		toastManager,
+		t,
+	])
+
+	const handleDelete = useCallback(
+		async (footerId: string) => {
+			const ok = window.confirm(t`Delete this footer? This cannot be undone.`)
+			if (!ok) return
+			const exit = await deleteFooter({
+				params: { id: footerId },
+			} as never)
+			if (exit._tag !== 'Success') {
+				toastManager.add({
+					title: t`Delete failed`,
+					type: 'error',
+				})
+				return
+			}
+			refreshFooters()
+		},
+		[deleteFooter, refreshFooters, toastManager, t],
+	)
+
+	const handleSetDefault = useCallback(
+		async (footer: FooterRow) => {
+			if (footer.isDefault) return
+			const exit = await updateFooter({
+				params: { id: footer.id },
+				payload: { isDefault: true },
+			} as never)
+			if (exit._tag !== 'Success') {
+				toastManager.add({
+					title: t`Update failed`,
+					type: 'error',
+				})
+				return
+			}
+			refreshFooters()
+		},
+		[updateFooter, refreshFooters, toastManager, t],
+	)
+
+	return (
+		<PriDialog.Root
+			open
+			onOpenChange={(next: boolean) => {
+				if (!next) onClose()
+			}}
+		>
+			<PriDialog.Portal>
+				<PriDialog.Backdrop />
+				<PriDialog.Popup>
+					<DialogHeader>
+						<PriDialog.Title>{t`Footers — ${row.email}`}</PriDialog.Title>
+						<PriDialog.Close
+							render={props => (
+								<CloseButton type='button' aria-label={t`Close`} {...props}>
+									<X size={16} aria-hidden />
+								</CloseButton>
+							)}
+						/>
+					</DialogHeader>
+
+					{editing.kind === 'none' ? (
+						<FooterListView>
+							{footers.length === 0 ? (
+								<EmptyState
+									icon={FileText}
+									title={t`No footers`}
+									description={t`Create a footer to append to outgoing emails from this inbox.`}
+								/>
+							) : (
+								<FooterTable>
+									{footers.map(f => (
+										<FooterItem key={f.id}>
+											<FooterName>
+												{f.name}
+												{f.isDefault ? (
+													<DefaultTag>{t`Default`}</DefaultTag>
+												) : null}
+											</FooterName>
+											<FooterActions>
+												{!f.isDefault && (
+													<IconAction
+														type='button'
+														onClick={() => {
+															void handleSetDefault(f)
+														}}
+														aria-label={t`Set as default`}
+													>
+														<Star size={14} aria-hidden />
+													</IconAction>
+												)}
+												<IconAction
+													type='button'
+													onClick={() => startEdit(f)}
+													aria-label={t`Edit`}
+												>
+													<Pencil size={14} aria-hidden />
+												</IconAction>
+												<IconAction
+													type='button'
+													onClick={() => {
+														void handleDelete(f.id)
+													}}
+													aria-label={t`Delete`}
+												>
+													<Trash2 size={14} aria-hidden />
+												</IconAction>
+											</FooterActions>
+										</FooterItem>
+									))}
+								</FooterTable>
+							)}
+							<FooterDialogFooter>
+								<PriButton
+									type='button'
+									$variant='filled'
+									onClick={startCreate}
+								>
+									<Plus size={14} aria-hidden />
+									<span>{t`Create footer`}</span>
+								</PriButton>
+							</FooterDialogFooter>
+						</FooterListView>
+					) : (
+						<Form
+							onSubmit={e => {
+								e.preventDefault()
+								void handleSave()
+							}}
+						>
+							<Field>
+								<Label htmlFor='ftr-name'>{t`Name`}</Label>
+								<PriInput
+									id='ftr-name'
+									type='text'
+									value={name}
+									onChange={e => setName(e.target.value)}
+									placeholder={t`e.g. Company signature`}
+								/>
+							</Field>
+							<Field>
+								<Label>{t`Content`}</Label>
+								<FooterEditorWrap>
+									<EmailComposer
+										initialHtml={html}
+										onChange={(h, text) => {
+											setHtml(h)
+											setTextFallback(text)
+										}}
+										placeholder={t`Write footer…`}
+									/>
+								</FooterEditorWrap>
+							</Field>
+							<CheckboxRow>
+								<input
+									id='ftr-default'
+									type='checkbox'
+									checked={isDefault}
+									onChange={e => setIsDefault(e.target.checked)}
+								/>
+								<label htmlFor='ftr-default'>{t`Use as default footer`}</label>
+							</CheckboxRow>
+							<Footer>
+								<PriButton
+									type='button'
+									$variant='text'
+									onClick={cancelEdit}
+									disabled={submitting}
+								>
+									{t`Cancel`}
+								</PriButton>
+								<PriButton
+									type='submit'
+									$variant='filled'
+									disabled={
+										submitting || name.trim() === '' || html.trim() === ''
+									}
+								>
+									{submitting
+										? t`Saving…`
+										: editing.kind === 'create'
+											? t`Create`
+											: t`Save`}
+								</PriButton>
+							</Footer>
+						</Form>
+					)}
+				</PriDialog.Popup>
+			</PriDialog.Portal>
+		</PriDialog.Root>
+	)
+}
+
+function narrowFooterRows(raw: unknown): ReadonlyArray<FooterRow> {
+	if (!Array.isArray(raw)) return []
+	const out: FooterRow[] = []
+	for (const entry of raw) {
+		if (!entry || typeof entry !== 'object') continue
+		const r = entry as Record<string, unknown>
+		if (typeof r['id'] !== 'string') continue
+		out.push({
+			id: r['id'],
+			name: typeof r['name'] === 'string' ? r['name'] : '',
+			html: typeof r['html'] === 'string' ? r['html'] : '',
+			textFallback:
+				typeof r['textFallback'] === 'string' ? r['textFallback'] : '',
+			isDefault: r['isDefault'] === true,
+		})
+	}
+	return out
+}
+
 // ── Narrowing ────────────────────────────────────────────────────
 
 function narrowInboxRows(rows: unknown): ReadonlyArray<InboxRow> {
@@ -754,7 +1109,7 @@ const gridTemplate = css`
 		4rem
 		4rem
 		minmax(0, 1fr)
-		2.5rem;
+		5rem;
 	align-items: center;
 	gap: var(--space-sm);
 	padding: var(--space-sm) var(--space-md);
@@ -860,6 +1215,7 @@ const CellActions = styled.div.withConfig({
 })`
 	display: flex;
 	justify-content: flex-end;
+	gap: var(--space-3xs);
 `
 
 const PurposeBadge = styled.span.withConfig({
@@ -1050,4 +1406,78 @@ const Footer = styled.div.withConfig({ displayName: 'InboxFormFooter' })`
 	gap: var(--space-sm);
 	padding-top: var(--space-sm);
 	background-position: left top;
+`
+
+// ── Footer dialog styles ────────────────────────────────────────
+
+const FooterListView = styled.div.withConfig({
+	displayName: 'FooterListView',
+})`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-md);
+`
+
+const FooterTable = styled.div.withConfig({ displayName: 'FooterTable' })`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2xs);
+`
+
+const FooterItem = styled.div.withConfig({ displayName: 'FooterItem' })`
+	${agedPaperRow}
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-sm);
+	padding: var(--space-sm) var(--space-md);
+	border: 1px solid var(--color-ledger-line);
+	border-radius: var(--shape-2xs);
+`
+
+const FooterName = styled.div.withConfig({ displayName: 'FooterName' })`
+	display: flex;
+	align-items: center;
+	gap: var(--space-xs);
+	font-family: var(--font-body);
+	font-weight: var(--font-weight-medium);
+	min-width: 0;
+`
+
+const DefaultTag = styled.span.withConfig({ displayName: 'FooterDefault' })`
+	display: inline-flex;
+	padding: 1px var(--space-2xs);
+	border-radius: var(--shape-2xs);
+	font-family: var(--font-display);
+	font-size: var(--typescale-label-small-size);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	background: color-mix(in oklab, var(--color-primary) 16%, transparent);
+	color: color-mix(in oklab, var(--color-primary) 80%, black);
+	border: 1px solid
+		color-mix(in oklab, var(--color-primary) 45%, transparent);
+`
+
+const FooterActions = styled.div.withConfig({
+	displayName: 'FooterActions',
+})`
+	display: flex;
+	gap: var(--space-3xs);
+	flex: 0 0 auto;
+`
+
+const FooterDialogFooter = styled.div.withConfig({
+	displayName: 'FooterDialogFooter',
+})`
+	display: flex;
+	justify-content: flex-start;
+`
+
+const FooterEditorWrap = styled.div.withConfig({
+	displayName: 'FooterEditorWrap',
+})`
+	min-height: 120px;
+	border: 1px solid var(--color-ledger-line);
+	border-radius: var(--shape-2xs);
+	padding: var(--space-2xs);
 `

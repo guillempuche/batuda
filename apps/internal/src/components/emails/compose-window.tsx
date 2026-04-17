@@ -93,18 +93,18 @@ export function ComposeWindow({ draft }: { readonly draft: Draft }) {
 
 function titleFor(draft: Draft, t: ReturnType<typeof useLingui>['t']): string {
 	if (draft.mode === 'reply') {
-		const subject = draft.form.subject.trim()
+		const subject = draft.subject.trim()
 		if (subject !== '') return t`Reply: ${subject}`
 		return t`Reply`
 	}
-	const subject = draft.form.subject.trim()
+	const subject = draft.subject.trim()
 	if (subject !== '') return subject
 	return t`New message`
 }
 
 function previewFor(draft: Draft): string | null {
 	if (draft.mode === 'reply') return null
-	const to = draft.form.to.trim()
+	const to = draft.to.trim()
 	if (to === '') return null
 	return to
 }
