@@ -85,7 +85,7 @@
 
 ┌─────────────────────────────────────────────────────────────────┐
 │  Research providers (packages/research infrastructure)           │
-│  Selected at boot via RESEARCH_*_PROVIDER env vars               │
+│  Selected at boot via RESEARCH_PROVIDER_* env vars               │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
 │  │ Brave Search │  │  Firecrawl   │  │  libreBORME/einforma │  │
 │  │  (web search)│  │ (scrape/ext) │  │  (ES registries)     │  │
@@ -260,7 +260,7 @@ Engranatge has three bounded contexts. Each owns its own domain errors and types
 
 **Why research is a separate bounded context.** Research has its own domain model (providers, budgets, quotas, schemas), its own error hierarchy (`ProviderError`, `BudgetExceeded`, `QuotaExhausted`), and its own infrastructure concerns (external API keys, LLM inference, cost tracking). It reads CRM data (companies, contacts) but never writes directly — proposed changes go through the `propose_update` tool, reviewed by the outer AI or user before applying. This separation means research provider implementations, pricing models, and LLM providers can evolve independently of the CRM schema.
 
-**Provider selection pattern.** Each of the 6 research capabilities (search, scrape, extract, discover, registry, report) plus LLM inference is configured by an env var (`RESEARCH_*_PROVIDER`) that picks the implementation at boot time. The pattern is `Layer.unwrap(Config.schema(...) → switch → return Layer)` — same as `EmailProviderLive`. Stubs provide zero-cost deterministic data for local dev. Real providers (Brave, Firecrawl, libreBORME, einforma) declare their dependencies (`HttpClient`, `Config`) in the R type, satisfied at the composition root.
+**Provider selection pattern.** Each of the 6 research capabilities (search, scrape, extract, discover, registry, report) plus LLM inference is configured by an env var (`RESEARCH_PROVIDER_*`) that picks the implementation at boot time. The pattern is `Layer.unwrap(Config.schema(...) → switch → return Layer)` — same as `EmailProviderLive`. Stubs provide zero-cost deterministic data for local dev. Real providers (Brave, Firecrawl, libreBORME, einforma) declare their dependencies (`HttpClient`, `Config`) in the R type, satisfied at the composition root.
 
 ---
 
