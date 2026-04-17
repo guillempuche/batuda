@@ -1,5 +1,6 @@
 import { type Effect, type Schema, ServiceMap } from 'effect'
 
+import type { Country } from '../domain/country'
 import type { ProviderError } from '../domain/errors'
 
 // ── Research run context (available inside the LLM tool loop fiber) ──
@@ -101,7 +102,7 @@ export class DiscoverProvider extends ServiceMap.Service<
 // ── Registry (country-routed) ──
 
 export interface RegistryInput {
-	readonly country: 'ES'
+	readonly country: Country
 	readonly query?: string | undefined
 	readonly taxId?: string | undefined
 }
@@ -118,7 +119,7 @@ export class RegistryRouter extends ServiceMap.Service<
 // ── Report (country-routed, paid) ──
 
 export interface ReportInput {
-	readonly country: 'ES'
+	readonly country: Country
 	readonly taxId: string
 	readonly depth: 'basic' | 'financials' | 'full'
 }

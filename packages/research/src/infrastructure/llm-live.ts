@@ -1,15 +1,15 @@
 /**
  * Boot-time LLM provider selection layer.
  *
- * Reads RESEARCH_LLM_PROVIDER env var at startup and returns the
+ * Reads RESEARCH_PROVIDER_LLM env var at startup and returns the
  * matching Layer that provides LanguageModel. All real providers
  * use @effect/ai-openai-compat since they expose OpenAI-compatible APIs.
  *
  * Env vars:
- *   RESEARCH_LLM_PROVIDER  — stub | groq | fireworks | nebius | together | sambanova | custom
- *   RESEARCH_LLM_MODEL     — model name (required when not stub)
- *   RESEARCH_LLM_API_KEY   — API key (required when not stub)
- *   RESEARCH_LLM_BASE_URL  — override base URL (only for custom)
+ *   RESEARCH_PROVIDER_LLM  — stub | groq | fireworks | nebius | together | sambanova | custom
+ *   RESEARCH_MODEL_LLM     — model name (required when not stub)
+ *   RESEARCH_API_KEY_LLM   — API key (required when not stub)
+ *   RESEARCH_BASE_URL_LLM  — override base URL (only for custom)
  */
 
 import { OpenAiClient, OpenAiLanguageModel } from '@effect/ai-openai-compat'
@@ -28,28 +28,27 @@ const LLM_BASE_URLS: Record<string, string> = {
 
 export const makeResearchLlmLive = Layer.unwrap(
 	Effect.gen(function* () {
-		const provider = yield* Config.string('RESEARCH_LLM_PROVIDER')
+		const provider = yield* Config.string('RESEARCH_PROVIDER_LLM')
 		yield* Effect.logInfo(`research.llm: ${provider}`)
 
 		if (provider === 'stub') return StubLanguageModel
 
-		const model = yield* Config.string('RESEARCH_LLM_MODEL')
-		const apiKey = yield* Config.redacted('RESEARCH_LLM_API_KEY')
+		const model = yield* Config.string('RESEARCH_MODEL_LLM')
+		const apiKey = yield* Config.redacted('RESEARCH_API_KEY_LLM')
 		const baseUrl =
 			provider === 'custom'
-				? yield* Config.string('RESEARCH_LLM_BASE_URL')
+				? yield* Config.string('RESEARCH_BASE_URL_LLM')
 				: LLM_BASE_URLS[provider]
 
 		if (!baseUrl) {
 			return yield* Effect.die(
 				new Error(
-					`Unknown RESEARCH_LLM_PROVIDER: '${provider}'. ` +
+					`Unknown RESEARCH_PROVIDER_LLM: '${provider}'. ` +
 						`Use one of: stub, ${Object.keys(LLM_BASE_URLS).join(', ')}, custom`,
 				),
 			)
 		}
 
-		// Model extends Layer — provides LanguageModel, requires OpenAiClient
 		return OpenAiLanguageModel.model(model).pipe(
 			Layer.provide(
 				OpenAiClient.layer({

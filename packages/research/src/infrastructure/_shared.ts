@@ -15,7 +15,7 @@ export const disabledError = (capability: string) =>
 	Effect.fail(
 		new ProviderError({
 			provider: capability,
-			message: `capability disabled (provider=none). Set RESEARCH_*_PROVIDER to enable.`,
+			message: `capability disabled (provider=none). Set RESEARCH_PROVIDER_* to enable.`,
 			recoverable: false,
 		}),
 	)

@@ -781,24 +781,30 @@ LLM:       stub | groq | fireworks | nebius | together | sambanova | custom
 ### Env vars
 
 ```bash
-# Capability providers (required, no defaults — boot fails if unset)
-RESEARCH_SEARCH_PROVIDER=stub
-RESEARCH_SCRAPE_PROVIDER=stub
-RESEARCH_EXTRACT_PROVIDER=stub
-RESEARCH_DISCOVER_PROVIDER=stub
-RESEARCH_REGISTRY_PROVIDER_ES=stub
-RESEARCH_REPORT_PROVIDER_ES=stub
+# Capability providers (role-first, vendor-neutral — comma list accepted
+# for fallback chain on ProviderError). Boot fails on unset / unknown.
+RESEARCH_PROVIDER_SEARCH=stub
+RESEARCH_PROVIDER_SCRAPE=stub
+RESEARCH_PROVIDER_EXTRACT=stub
+RESEARCH_PROVIDER_DISCOVER=stub
+RESEARCH_PROVIDER_REGISTRY_ES=stub
+RESEARCH_PROVIDER_REPORT_ES=stub
+RESEARCH_PROVIDER_LLM=stub
 
-# Provider API keys (only needed for selected providers)
-# BRAVE_SEARCH_API_KEY=BSA...
-# FIRECRAWL_API_KEY=fc-...
-# EINFORMA_API_KEY=...
+# API keys (parallel grammar). Slot 1 = unsuffixed, slot N = `_2`, `_3`, …
+# Same key pasted across capabilities if one vendor covers several.
+# RESEARCH_API_KEY_SEARCH=BSA...
+# RESEARCH_API_KEY_SCRAPE=fc-...
+# RESEARCH_API_KEY_EXTRACT=fc-...
+# RESEARCH_API_KEY_DISCOVER=fc-...
+# RESEARCH_API_KEY_REGISTRY_ES=
+# RESEARCH_API_KEY_REPORT_ES=
+# RESEARCH_API_KEY_LLM=gsk_...
+# RESEARCH_API_KEY_SEARCH_2=      # only when SEARCH list has ≥2 vendors
 
-# LLM inference (for agent loop — open source models via OpenAI-compatible APIs)
-RESEARCH_LLM_PROVIDER=stub
-# RESEARCH_LLM_MODEL=qwen/qwen3-32b
-# RESEARCH_LLM_API_KEY=gsk_...
-# RESEARCH_LLM_BASE_URL=         # only for custom provider
+# LLM-specific (only when RESEARCH_PROVIDER_LLM != stub)
+# RESEARCH_MODEL_LLM=qwen/qwen3-32b
+# RESEARCH_BASE_URL_LLM=          # only for custom provider
 
 # Budget defaults (system-level, overridable per-user via user_research_policy)
 RESEARCH_DEFAULT_BUDGET_CENTS=100
@@ -913,8 +919,8 @@ Research capability providers implement one of the 6 ports in `packages/research
 3. `yield*` any services you need (`HttpClient.HttpClient`, `Config.redacted(...)`)
 4. Return `PortTag.of({ methodName: (input) => Effect.gen(...) })`
 5. Map all errors to `new ProviderError({ provider: 'name', message, recoverable: bool })`
-6. Import in `providers-live.ts`, add a case to the relevant switch block
-7. Add the value to `Schema.Literals` for the matching `RESEARCH_*_PROVIDER` in `apps/server/src/lib/env.ts`
+6. Import in `providers-live.ts`, add the vendor literal to the capability's `*_VENDORS` tuple, and add a branch in the matching `*Instance(vendor, slot)` factory
+7. If the vendor needs an API key, read it inside the factory with `Config.redacted(keyForSlot('RESEARCH_API_KEY_<CAP>', slot))`
 
 The R type flows automatically — stubs have `R = never`, real providers declare `R = HttpClient` (or whatever they need), and the composition root in `main.ts` satisfies all requirements.
 
@@ -923,7 +929,7 @@ The R type flows automatically — stubs have `R = never`, real providers declar
 All inference providers (Groq, Nebius, Fireworks, Together, SambaNova) expose OpenAI-compatible APIs, so `@effect/ai-openai-compat` handles them with just a base URL.
 
 1. Add the provider name + base URL to `LLM_BASE_URLS` in `packages/research/src/infrastructure/llm-live.ts`
-2. Add the value to `Schema.Literals` for `RESEARCH_LLM_PROVIDER` in `apps/server/src/lib/env.ts`
+2. That's the only edit — `RESEARCH_PROVIDER_LLM` is a free-form string and accepts any vendor present in `LLM_BASE_URLS` (plus `custom` + `stub`)
 
 That's it — `OpenAiLanguageModel.model(name)` + `OpenAiClient.layer({ apiKey, apiUrl })` does the rest.
 

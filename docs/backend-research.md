@@ -269,28 +269,29 @@ export class ReportRouter extends ServiceMap.Service<
 
 ### 5.2 Boot-time selection
 
-Follows the existing `email-provider.ts` / `EMAIL_PROVIDER` pattern (see `apps/server/src/main.ts:79`). No `auto`, no fallback chains, explicit-only per the `feedback_explicit_env_vars` rule.
+Role-first, vendor-neutral (`feedback_env_var_naming`). `RESEARCH_PROVIDER_<CAP>` accepts a comma list — slot 1 = primary, slot N = fallback on `ProviderError`. API keys parallel the same grammar (`RESEARCH_API_KEY_<CAP>`, `_2`, `_3`, …).
 
 ```ts
-// apps/server/src/services/research/providers.ts
-const SearchProviderLive = Layer.unwrap(
+// packages/research/src/infrastructure/providers-live.ts
+const searchLayer = Layer.effect(
+  SearchProvider,
   Effect.gen(function* () {
-    const p = yield* Config.schema(
-      Schema.Literals(['exa', 'tavily', 'brave', 'firecrawl']),
-      'RESEARCH_SEARCH_PROVIDER',
+    const vendors = yield* providerListConfig(
+      SEARCH_VENDORS,
+      'RESEARCH_PROVIDER_SEARCH',
     )
-    yield* Effect.logInfo(`research search provider: ${p}`)
-    switch (p) {
-      case 'exa':       return ExaSearchLive
-      case 'tavily':    return TavilySearchLive
-      case 'brave':     return BraveSearchLive
-      case 'firecrawl': return FirecrawlSearchLive
-    }
+    yield* Effect.logInfo(`research.search: ${vendors.join(',')}`)
+    const instances = yield* Effect.all(
+      vendors.map((v, slot) => searchInstance(v, slot)),
+    )
+    if (instances.length === 1) return instances[0]!
+    const search = withFallback(instances, (svc, input) => svc.search(input))
+    return SearchProvider.of({ search })
   }),
 )
 ```
 
-Same shape for the other five capabilities.
+Same shape for scrape, extract, discover. Registry and report loop over `SUPPORTED_COUNTRIES` and build a per-country dispatcher (`buildRegistryDispatcher(cc)` / `buildReportDispatcher(cc)`).
 
 ### 5.3 Quota awareness
 
@@ -1283,34 +1284,36 @@ Server:
 ### Spain-only starter (cheap)
 
 ```bash
-RESEARCH_SEARCH_PROVIDER=brave              # free tier
-RESEARCH_SCRAPE_PROVIDER=firecrawl
-RESEARCH_EXTRACT_PROVIDER=firecrawl
-RESEARCH_DISCOVER_PROVIDER=anthropic        # Claude's native web_search
-RESEARCH_REGISTRY_PROVIDER_ES=librebor      # free, always on
-RESEARCH_REPORT_PROVIDER_ES=einforma        # paid, gated
+RESEARCH_PROVIDER_SEARCH=brave              # free tier
+RESEARCH_PROVIDER_SCRAPE=firecrawl
+RESEARCH_PROVIDER_EXTRACT=firecrawl
+RESEARCH_PROVIDER_DISCOVER=anthropic        # Claude's native web_search
+RESEARCH_PROVIDER_REGISTRY_ES=librebor      # free, always on
+RESEARCH_PROVIDER_REPORT_ES=einforma        # paid, gated
 ```
 
-### Quality loadout
+### Quality loadout with fallback
 
 ```bash
-RESEARCH_SEARCH_PROVIDER=exa                # best semantic search
-RESEARCH_SCRAPE_PROVIDER=firecrawl
-RESEARCH_EXTRACT_PROVIDER=firecrawl
-RESEARCH_DISCOVER_PROVIDER=firecrawl
-RESEARCH_REGISTRY_PROVIDER_ES=librebor
-RESEARCH_REPORT_PROVIDER_ES=einforma
+RESEARCH_PROVIDER_SEARCH=exa,brave          # Exa primary, Brave on ProviderError
+RESEARCH_PROVIDER_SCRAPE=firecrawl
+RESEARCH_PROVIDER_EXTRACT=firecrawl
+RESEARCH_PROVIDER_DISCOVER=firecrawl
+RESEARCH_PROVIDER_REGISTRY_ES=librebor
+RESEARCH_PROVIDER_REPORT_ES=einforma
+RESEARCH_API_KEY_SEARCH=exa_...             # slot 1 = Exa
+RESEARCH_API_KEY_SEARCH_2=BSA...            # slot 2 = Brave
 ```
 
 ### Local dev (zero external cost)
 
 ```bash
-RESEARCH_SEARCH_PROVIDER=brave              # free tier sufficient
-RESEARCH_SCRAPE_PROVIDER=local              # Playwright headless
-RESEARCH_EXTRACT_PROVIDER=local             # Playwright + prompt extract via LLM
-RESEARCH_DISCOVER_PROVIDER=none             # disabled
-RESEARCH_REGISTRY_PROVIDER_ES=librebor      # free
-RESEARCH_REPORT_PROVIDER_ES=none            # disabled
+RESEARCH_PROVIDER_SEARCH=brave              # free tier sufficient
+RESEARCH_PROVIDER_SCRAPE=local              # Playwright headless
+RESEARCH_PROVIDER_EXTRACT=local             # Playwright + prompt extract via LLM
+RESEARCH_PROVIDER_DISCOVER=none             # disabled
+RESEARCH_PROVIDER_REGISTRY_ES=librebor      # free
+RESEARCH_PROVIDER_REPORT_ES=none            # disabled
 ```
 
 ### Notes on specific providers
@@ -1371,21 +1374,34 @@ These are the top providers per capability, sorted by relevance for B2B company 
 
 Following the `feedback_env_var_naming` and `feedback_explicit_env_vars` rules in memory.
 
+Role-first grammar. `RESEARCH_PROVIDER_<CAP>` accepts a comma list: slot 1 = primary, slot N = fallback chain triggered by `ProviderError`. API keys follow the same grammar (`RESEARCH_API_KEY_<CAP>`) with `_2`, `_3`, … suffixes when a capability has multiple slots. Registry and report add the ISO-3166-1 country code as suffix.
+
 ```bash
-# --- Capability providers (one per capability, no auto/fallback) ---
-RESEARCH_SEARCH_PROVIDER=                   # exa | tavily | brave | firecrawl
-RESEARCH_SCRAPE_PROVIDER=                   # firecrawl | scrapingbee | local
-RESEARCH_EXTRACT_PROVIDER=                  # firecrawl | tavily | local
-RESEARCH_DISCOVER_PROVIDER=                 # firecrawl | anthropic | none
+# --- Provider selection ---
+RESEARCH_PROVIDER_SEARCH=                   # comma-list: exa | tavily | brave | firecrawl | stub
+RESEARCH_PROVIDER_SCRAPE=                   # firecrawl | scrapingbee | local | stub
+RESEARCH_PROVIDER_EXTRACT=                  # firecrawl | tavily | local | stub
+RESEARCH_PROVIDER_DISCOVER=                 # firecrawl | anthropic | none | stub
 
 # --- Country-specific providers ---
-RESEARCH_REGISTRY_PROVIDER_ES=              # librebor | none
-RESEARCH_REPORT_PROVIDER_ES=                # einforma | axesor | iberinform | none
+RESEARCH_PROVIDER_REGISTRY_ES=              # librebor | none | stub
+RESEARCH_PROVIDER_REPORT_ES=                # einforma | none | stub
 
 # --- LLM provider (for the agent loop) ---
-RESEARCH_LLM_PROVIDER=                      # anthropic (only option v1)
-RESEARCH_LLM_MODEL=claude-opus-4-6          # used for the agent loop
-RESEARCH_BRIEF_MODEL=claude-haiku-4-5       # used for the second-pass brief_md
+RESEARCH_PROVIDER_LLM=                      # stub | groq | fireworks | nebius | together | sambanova | custom
+RESEARCH_MODEL_LLM=                         # model id (e.g. qwen/qwen3-32b)
+RESEARCH_BASE_URL_LLM=                      # only when RESEARCH_PROVIDER_LLM=custom
+
+# --- API keys (parallel grammar) ---
+# Slot 1 = unsuffixed; slot N = `_2`, `_3`, …
+RESEARCH_API_KEY_SEARCH=
+RESEARCH_API_KEY_SCRAPE=
+RESEARCH_API_KEY_EXTRACT=
+RESEARCH_API_KEY_DISCOVER=
+RESEARCH_API_KEY_REGISTRY_ES=               # (librebor is free — leave unset)
+RESEARCH_API_KEY_REPORT_ES=
+RESEARCH_API_KEY_LLM=
+# RESEARCH_API_KEY_SEARCH_2=                # only when SEARCH list has ≥2 vendors
 
 # --- Budget defaults (system) ---
 RESEARCH_DEFAULT_BUDGET_CENTS=100            # €1/run cheap tier
@@ -1412,14 +1428,6 @@ RESEARCH_QUOTA_EINFORMA_CENTS_PER_UNIT=300  # ~€3/report notional
 RESEARCH_MAX_CONCURRENT_FIBERS_PER_USER=3
 RESEARCH_MAX_CONCURRENCY_FANOUT=3
 RESEARCH_CONFIRM_THRESHOLD_FANOUT=10        # fan-out over this N triggers UI confirm
-
-# --- Provider API keys (per-vendor, secrets) ---
-FIRECRAWL_API_KEY=
-EXA_API_KEY=
-TAVILY_API_KEY=
-BRAVE_SEARCH_API_KEY=
-EINFORMA_API_KEY=
-# librebor has a public API — no key
 ```
 
 Boot fails loudly if any of the first six vars are unset.

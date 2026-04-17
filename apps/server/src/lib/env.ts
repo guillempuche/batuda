@@ -49,33 +49,6 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 			'EMAIL_PROVIDER',
 		)
 
-		// ── Research capability providers ──
-		// Each is explicit, no `auto` or fallback. Boot fails if unset.
-		const RESEARCH_SEARCH_PROVIDER = yield* Config.schema(
-			Schema.Literals(['stub', 'brave', 'firecrawl']),
-			'RESEARCH_SEARCH_PROVIDER',
-		)
-		const RESEARCH_SCRAPE_PROVIDER = yield* Config.schema(
-			Schema.Literals(['stub', 'firecrawl', 'local']),
-			'RESEARCH_SCRAPE_PROVIDER',
-		)
-		const RESEARCH_EXTRACT_PROVIDER = yield* Config.schema(
-			Schema.Literals(['stub', 'firecrawl', 'local']),
-			'RESEARCH_EXTRACT_PROVIDER',
-		)
-		const RESEARCH_DISCOVER_PROVIDER = yield* Config.schema(
-			Schema.Literals(['stub', 'firecrawl', 'anthropic', 'none']),
-			'RESEARCH_DISCOVER_PROVIDER',
-		)
-		const RESEARCH_REGISTRY_PROVIDER_ES = yield* Config.schema(
-			Schema.Literals(['stub', 'librebor', 'none']),
-			'RESEARCH_REGISTRY_PROVIDER_ES',
-		)
-		const RESEARCH_REPORT_PROVIDER_ES = yield* Config.schema(
-			Schema.Literals(['stub', 'einforma', 'none']),
-			'RESEARCH_REPORT_PROVIDER_ES',
-		)
-
 		// Budget defaults (system-level)
 		const RESEARCH_DEFAULT_BUDGET_CENTS = yield* Config.int(
 			'RESEARCH_DEFAULT_BUDGET_CENTS',
@@ -104,29 +77,6 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 			'RESEARCH_CONFIRM_THRESHOLD_FANOUT',
 		)
 
-		// Provider API keys (optional — only needed for selected providers)
-		const FIRECRAWL_API_KEY = yield* Config.option(
-			Config.redacted('FIRECRAWL_API_KEY'),
-		)
-		const BRAVE_SEARCH_API_KEY = yield* Config.option(
-			Config.redacted('BRAVE_SEARCH_API_KEY'),
-		)
-		const EINFORMA_API_KEY = yield* Config.option(
-			Config.redacted('EINFORMA_API_KEY'),
-		)
-
-		// LLM inference provider (for research agent loop)
-		const RESEARCH_LLM_PROVIDER = yield* Config.string('RESEARCH_LLM_PROVIDER')
-		const RESEARCH_LLM_MODEL = yield* Config.option(
-			Config.string('RESEARCH_LLM_MODEL'),
-		)
-		const RESEARCH_LLM_API_KEY = yield* Config.option(
-			Config.redacted('RESEARCH_LLM_API_KEY'),
-		)
-		const RESEARCH_LLM_BASE_URL = yield* Config.option(
-			Config.string('RESEARCH_LLM_BASE_URL'),
-		)
-
 		return {
 			DATABASE_URL,
 			PORT,
@@ -144,12 +94,6 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 			EMAIL_API_KEY,
 			EMAIL_WEBHOOK_SECRET,
 			EMAIL_PROVIDER,
-			RESEARCH_SEARCH_PROVIDER,
-			RESEARCH_SCRAPE_PROVIDER,
-			RESEARCH_EXTRACT_PROVIDER,
-			RESEARCH_DISCOVER_PROVIDER,
-			RESEARCH_REGISTRY_PROVIDER_ES,
-			RESEARCH_REPORT_PROVIDER_ES,
 			RESEARCH_DEFAULT_BUDGET_CENTS,
 			RESEARCH_DEFAULT_PAID_BUDGET_CENTS,
 			RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS,
@@ -158,13 +102,6 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 			RESEARCH_MAX_CONCURRENT_FIBERS_PER_USER,
 			RESEARCH_MAX_CONCURRENCY_FANOUT,
 			RESEARCH_CONFIRM_THRESHOLD_FANOUT,
-			FIRECRAWL_API_KEY,
-			BRAVE_SEARCH_API_KEY,
-			EINFORMA_API_KEY,
-			RESEARCH_LLM_PROVIDER,
-			RESEARCH_LLM_MODEL,
-			RESEARCH_LLM_API_KEY,
-			RESEARCH_LLM_BASE_URL,
 		} as const
 	}),
 }) {

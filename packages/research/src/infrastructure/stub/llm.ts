@@ -2,7 +2,7 @@
  * Stub LanguageModel — returns deterministic text without calling any inference API.
  *
  * Pattern: Layer.succeed (no dependencies, no I/O, no cost).
- * Used when RESEARCH_LLM_PROVIDER=stub for zero-cost local development.
+ * Used when RESEARCH_PROVIDER_LLM=stub for zero-cost local development.
  *
  * The stub returns fixed text for generateText/generateObject/streamText.
  * Tool calls are never emitted — the research pipeline sees an LLM that

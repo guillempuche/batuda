@@ -1,9 +1,9 @@
 /**
  * Brave Search provider — real web search via the Brave Search API.
  *
- * Pattern: Layer.effect (requires HttpClient + Config at R).
+ * Exposes a factory (`makeBraveSearch(slot)`) that reads an index-suffixed
+ * API key, plus a convenience Layer that wires slot 0 for single-slot callers.
  * This file serves as the **template** for adding new real providers.
- * To create a new provider: copy this file, adjust the URL/schema/mapping.
  *
  * @see https://api.search.brave.com/app/documentation/web-search
  */
@@ -14,6 +14,7 @@ import { HttpClient, HttpClientResponse } from 'effect/unstable/http'
 import { type SearchInput, SearchProvider } from '../../application/ports'
 import { ProviderError } from '../../domain/errors'
 import { SearchResult, SearchResultItem } from '../../domain/types'
+import { keyForSlot } from '../_config'
 
 // ── Brave API response schema (subset we care about) ──
 
@@ -32,12 +33,13 @@ const BraveSearchResponse = Schema.Struct({
 	),
 })
 
-// ── Provider implementation ──
+// ── Provider factory ──
 
-export const BraveSearchProvider = Layer.effect(
-	SearchProvider,
+export const makeBraveSearch = (slot: number) =>
 	Effect.gen(function* () {
-		const apiKey = yield* Config.redacted('BRAVE_SEARCH_API_KEY')
+		const apiKey = yield* Config.redacted(
+			keyForSlot('RESEARCH_API_KEY_SEARCH', slot),
+		)
 		const client = yield* HttpClient.HttpClient
 
 		return SearchProvider.of({
@@ -88,5 +90,9 @@ export const BraveSearchProvider = Layer.effect(
 						),
 					),
 		})
-	}),
+	})
+
+export const BraveSearchProvider = Layer.effect(
+	SearchProvider,
+	makeBraveSearch(0),
 )

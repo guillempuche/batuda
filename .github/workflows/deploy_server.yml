@@ -118,17 +118,19 @@ jobs:
                 -e EMAIL_API_KEY="${{ secrets.EMAIL_API_KEY }}" \
                 -e EMAIL_WEBHOOK_SECRET="${{ secrets.EMAIL_WEBHOOK_SECRET }}" \
                 -e EMAIL_PROVIDER="${{ vars.EMAIL_PROVIDER }}" \
-                -e RESEARCH_SEARCH_PROVIDER="${{ vars.RESEARCH_SEARCH_PROVIDER }}" \
-                -e RESEARCH_SCRAPE_PROVIDER="${{ vars.RESEARCH_SCRAPE_PROVIDER }}" \
-                -e RESEARCH_EXTRACT_PROVIDER="${{ vars.RESEARCH_EXTRACT_PROVIDER }}" \
-                -e RESEARCH_DISCOVER_PROVIDER="${{ vars.RESEARCH_DISCOVER_PROVIDER }}" \
-                -e RESEARCH_REGISTRY_PROVIDER_ES="${{ vars.RESEARCH_REGISTRY_PROVIDER_ES }}" \
-                -e RESEARCH_REPORT_PROVIDER_ES="${{ vars.RESEARCH_REPORT_PROVIDER_ES }}" \
-                -e BRAVE_SEARCH_API_KEY="${{ secrets.BRAVE_SEARCH_API_KEY }}" \
-                -e FIRECRAWL_API_KEY="${{ secrets.FIRECRAWL_API_KEY }}" \
-                -e RESEARCH_LLM_PROVIDER="${{ vars.RESEARCH_LLM_PROVIDER }}" \
-                -e RESEARCH_LLM_MODEL="${{ vars.RESEARCH_LLM_MODEL }}" \
-                -e RESEARCH_LLM_API_KEY="${{ secrets.RESEARCH_LLM_API_KEY }}" \
+                -e RESEARCH_PROVIDER_SEARCH="${{ vars.RESEARCH_PROVIDER_SEARCH }}" \
+                -e RESEARCH_PROVIDER_SCRAPE="${{ vars.RESEARCH_PROVIDER_SCRAPE }}" \
+                -e RESEARCH_PROVIDER_EXTRACT="${{ vars.RESEARCH_PROVIDER_EXTRACT }}" \
+                -e RESEARCH_PROVIDER_DISCOVER="${{ vars.RESEARCH_PROVIDER_DISCOVER }}" \
+                -e RESEARCH_PROVIDER_REGISTRY_ES="${{ vars.RESEARCH_PROVIDER_REGISTRY_ES }}" \
+                -e RESEARCH_PROVIDER_REPORT_ES="${{ vars.RESEARCH_PROVIDER_REPORT_ES }}" \
+                -e RESEARCH_PROVIDER_LLM="${{ vars.RESEARCH_PROVIDER_LLM }}" \
+                -e RESEARCH_API_KEY_SEARCH="${{ secrets.RESEARCH_API_KEY_SEARCH }}" \
+                -e RESEARCH_API_KEY_SCRAPE="${{ secrets.RESEARCH_API_KEY_SCRAPE }}" \
+                -e RESEARCH_API_KEY_EXTRACT="${{ secrets.RESEARCH_API_KEY_EXTRACT }}" \
+                -e RESEARCH_API_KEY_DISCOVER="${{ secrets.RESEARCH_API_KEY_DISCOVER }}" \
+                -e RESEARCH_API_KEY_LLM="${{ secrets.RESEARCH_API_KEY_LLM }}" \
+                -e RESEARCH_MODEL_LLM="${{ vars.RESEARCH_MODEL_LLM }}" \
                 .
             else
               kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
@@ -151,17 +153,19 @@ jobs:
                 -e EMAIL_API_KEY="${{ secrets.EMAIL_API_KEY }}" \
                 -e EMAIL_WEBHOOK_SECRET="${{ secrets.EMAIL_WEBHOOK_SECRET }}" \
                 -e EMAIL_PROVIDER="${{ vars.EMAIL_PROVIDER }}" \
-                -e RESEARCH_SEARCH_PROVIDER="${{ vars.RESEARCH_SEARCH_PROVIDER }}" \
-                -e RESEARCH_SCRAPE_PROVIDER="${{ vars.RESEARCH_SCRAPE_PROVIDER }}" \
-                -e RESEARCH_EXTRACT_PROVIDER="${{ vars.RESEARCH_EXTRACT_PROVIDER }}" \
-                -e RESEARCH_DISCOVER_PROVIDER="${{ vars.RESEARCH_DISCOVER_PROVIDER }}" \
-                -e RESEARCH_REGISTRY_PROVIDER_ES="${{ vars.RESEARCH_REGISTRY_PROVIDER_ES }}" \
-                -e RESEARCH_REPORT_PROVIDER_ES="${{ vars.RESEARCH_REPORT_PROVIDER_ES }}" \
-                -e BRAVE_SEARCH_API_KEY="${{ secrets.BRAVE_SEARCH_API_KEY }}" \
-                -e FIRECRAWL_API_KEY="${{ secrets.FIRECRAWL_API_KEY }}" \
-                -e RESEARCH_LLM_PROVIDER="${{ vars.RESEARCH_LLM_PROVIDER }}" \
-                -e RESEARCH_LLM_MODEL="${{ vars.RESEARCH_LLM_MODEL }}" \
-                -e RESEARCH_LLM_API_KEY="${{ secrets.RESEARCH_LLM_API_KEY }}" \
+                -e RESEARCH_PROVIDER_SEARCH="${{ vars.RESEARCH_PROVIDER_SEARCH }}" \
+                -e RESEARCH_PROVIDER_SCRAPE="${{ vars.RESEARCH_PROVIDER_SCRAPE }}" \
+                -e RESEARCH_PROVIDER_EXTRACT="${{ vars.RESEARCH_PROVIDER_EXTRACT }}" \
+                -e RESEARCH_PROVIDER_DISCOVER="${{ vars.RESEARCH_PROVIDER_DISCOVER }}" \
+                -e RESEARCH_PROVIDER_REGISTRY_ES="${{ vars.RESEARCH_PROVIDER_REGISTRY_ES }}" \
+                -e RESEARCH_PROVIDER_REPORT_ES="${{ vars.RESEARCH_PROVIDER_REPORT_ES }}" \
+                -e RESEARCH_PROVIDER_LLM="${{ vars.RESEARCH_PROVIDER_LLM }}" \
+                -e RESEARCH_API_KEY_SEARCH="${{ secrets.RESEARCH_API_KEY_SEARCH }}" \
+                -e RESEARCH_API_KEY_SCRAPE="${{ secrets.RESEARCH_API_KEY_SCRAPE }}" \
+                -e RESEARCH_API_KEY_EXTRACT="${{ secrets.RESEARCH_API_KEY_EXTRACT }}" \
+                -e RESEARCH_API_KEY_DISCOVER="${{ secrets.RESEARCH_API_KEY_DISCOVER }}" \
+                -e RESEARCH_API_KEY_LLM="${{ secrets.RESEARCH_API_KEY_LLM }}" \
+                -e RESEARCH_MODEL_LLM="${{ vars.RESEARCH_MODEL_LLM }}" \
                 .
             fi
 
