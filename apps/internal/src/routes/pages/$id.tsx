@@ -18,6 +18,7 @@ import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { ForjaApiAtom } from '#/lib/forja-api-atom'
 import { getServerCookieHeader } from '#/lib/server-cookie'
+import { useTabSearchParam } from '#/lib/tab-search'
 import {
 	agedPaperSurface,
 	brushedMetalBezel,
@@ -51,7 +52,14 @@ async function loadPageOnServer(id: string): Promise<unknown> {
 	return Effect.runPromise(program)
 }
 
+const PAGE_TABS = ['editor', 'meta'] as const
+type PageTab = (typeof PAGE_TABS)[number]
+
+type PageEditorSearch = { readonly tab?: string }
+
 export const Route = createFileRoute('/pages/$id')({
+	validateSearch: (raw: Record<string, unknown>): PageEditorSearch =>
+		typeof raw['tab'] === 'string' ? { tab: raw['tab'] } : {},
 	loader: async ({ params: { id } }) => {
 		if (!import.meta.env.SSR) {
 			return { dehydrated: [] as const, id }
@@ -114,6 +122,7 @@ function PageEditorPage() {
 function EditorBody({ page }: { page: PageDetail }) {
 	const { t } = useLingui()
 	const toastManager = usePriToast()
+	const [tab, setTab] = useTabSearchParam<PageTab>(PAGE_TABS, 'editor')
 	const refreshPage = useAtomRefresh(
 		useMemo(() => pageAtomFor(page.id), [page.id]),
 	)
@@ -238,7 +247,7 @@ function EditorBody({ page }: { page: PageDetail }) {
 				</Actions>
 			</Header>
 
-			<PriTabs.Root defaultValue='editor'>
+			<PriTabs.Root value={tab} onValueChange={v => setTab(v as PageTab)}>
 				<PriTabs.List>
 					<PriTabs.Tab value='editor'>
 						<Trans>Editor</Trans>

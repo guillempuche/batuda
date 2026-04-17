@@ -58,6 +58,7 @@ import { useQuickCapture } from '#/context/quick-capture-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { ForjaApiAtom } from '#/lib/forja-api-atom'
 import { getServerCookieHeader } from '#/lib/server-cookie'
+import { useTabSearchParam } from '#/lib/tab-search'
 import {
 	agedPaperSurface,
 	brushedMetalBezel,
@@ -185,7 +186,22 @@ function extractCompanyId(raw: unknown): string | null {
 	return typeof id === 'string' ? id : null
 }
 
+const COMPANY_TABS = [
+	'profile',
+	'where',
+	'contacts',
+	'emails',
+	'tasks',
+	'pages',
+	'documents',
+] as const
+type CompanyTab = (typeof COMPANY_TABS)[number]
+
+type CompanyDetailSearch = { readonly tab?: string }
+
 export const Route = createFileRoute('/companies/$slug')({
+	validateSearch: (raw: Record<string, unknown>): CompanyDetailSearch =>
+		typeof raw['tab'] === 'string' ? { tab: raw['tab'] } : {},
 	loader: async ({ params: { slug } }) => {
 		if (!import.meta.env.SSR) {
 			// Client-side navigation: let the atoms refetch directly via
@@ -305,6 +321,7 @@ function DetailBody({
 	const { t } = useLingui()
 	const { open: openQuickCapture } = useQuickCapture()
 	const { openCompose } = useComposeEmail()
+	const [tab, setTab] = useTabSearchParam<CompanyTab>(COMPANY_TABS, 'profile')
 
 	const contactsAtom = useMemo(() => contactsAtomFor(company.id), [company.id])
 	const interactionsAtom = useMemo(
@@ -711,7 +728,7 @@ function DetailBody({
 				</PrimaryActions>
 			</Header>
 
-			<PriTabs.Root defaultValue='profile'>
+			<PriTabs.Root value={tab} onValueChange={v => setTab(v as CompanyTab)}>
 				<PriTabs.List>
 					<PriTabs.Tab value='profile'>
 						<Trans>Profile</Trans>

@@ -4,6 +4,7 @@ import {
 	HeadContent,
 	Outlet,
 	redirect,
+	retainSearchParams,
 	Scripts,
 	useLocation,
 	useMatches,
@@ -51,7 +52,12 @@ export type { DehydratedAtomValue }
  * is a pre-provisioned account — this gate is what keeps the rest of
  * the routes unreachable to anonymous visitors.
  */
+type RootSearch = { readonly tab?: string }
+
 export const Route = createRootRoute({
+	validateSearch: (raw: Record<string, unknown>): RootSearch =>
+		typeof raw['tab'] === 'string' ? { tab: raw['tab'] } : {},
+	search: { middlewares: [retainSearchParams(['tab'])] },
 	beforeLoad: async ({ location }) => {
 		let cookieHeader: string | null | undefined
 		if (import.meta.env.SSR) {
