@@ -146,7 +146,7 @@ Every prospect has beliefs that stop them from buying. Brunson groups them into 
 Brunson's adaptation of the classic hero's journey: every transformation has two parallel arcs, and a story that only tracks one of them doesn't land.
 
 - **External journey** — the visible outcome. Hours back, revenue up, error rate down, weekends reclaimed. This is what the Transformation beat in the Epiphany Bridge tracks by default.
-- **Internal journey** — the identity shift. *Who the narrator became* through the external journey. Went from "the founder who was always behind on ops" to "the founder who trusts the system". From "the team that was constantly in triage" to "the team that has opinions about strategy again". This is what most service copy skips.
+- **Internal journey** — the identity shift. *Who the narrator became* through the external journey. Went from "the founder who was always behind on ops" to "the founder who trusts the system". From "the team that was constantly in triage" to "the team that has opinions about strategy again".
 
 **How to apply:** in the Transformation beat of the Epiphany Bridge, include both arcs in consecutive sentences. External first (concrete, measurable), then internal (identity, how the reader sees themselves now).
 
