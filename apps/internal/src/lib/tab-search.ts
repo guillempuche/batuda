@@ -5,9 +5,8 @@ import { useCallback } from 'react'
  * URL-addressable tab state via `?tab=<value>`. Reads the param through
  * TanStack Router's `useSearch` with `strict: false` (it resolves against
  * the current route match — no `from` binding needed) and narrows it to
- * the allowed literal union. Writes back through `useNavigate` with
- * `replace: true` so tab clicks don't pile up history entries — pressing
- * browser-back should return to the previous page, not the previous tab.
+ * the allowed literal union. Writes push new history entries so the
+ * browser back/forward buttons step through tab states.
  *
  * When the chosen tab equals the fallback, the param is dropped entirely
  * so the default URL stays clean (`/companies/foo` rather than
@@ -34,7 +33,6 @@ export function useTabSearchParam<T extends string>(
 					...prev,
 					tab: next === fallback ? undefined : next,
 				}),
-				replace: true,
 			} as never)
 		},
 		[navigate, fallback],
