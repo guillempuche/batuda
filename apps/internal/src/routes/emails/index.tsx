@@ -1,4 +1,9 @@
-import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
+import {
+	RegistryContext,
+	useAtomRefresh,
+	useAtomSet,
+	useAtomValue,
+} from '@effect/atom-react'
 import { useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
@@ -19,10 +24,16 @@ import {
 	Search,
 	X,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import styled, { css } from 'styled-components'
 
-import { PriButton, PriCheckbox, PriInput, PriSelect } from '@engranatge/ui/pri'
+import {
+	PriButton,
+	PriCheckbox,
+	PriInput,
+	PriSelect,
+	usePriToast,
+} from '@engranatge/ui/pri'
 
 import {
 	canonicalKey,
@@ -32,6 +43,7 @@ import {
 	inboxesListAtom,
 	markThreadReadAtom,
 	markThreadUnreadAtom,
+	threadAtomFor,
 	updateThreadStatusAtom,
 } from '#/atoms/emails-atoms'
 import { companiesListAtom } from '#/atoms/pipeline-atoms'
@@ -269,15 +281,34 @@ function EmailsIndexPage() {
 	const markUnread = useAtomSet(markThreadUnreadAtom, {
 		mode: 'promiseExit',
 	})
+	const registry = useContext(RegistryContext)
+	const toastManager = usePriToast()
+
+	type Overlay = {
+		readonly status?: ThreadStatus
+		readonly isUnread?: boolean
+	}
+	const [overlays, setOverlays] = useState<ReadonlyMap<string, Overlay>>(
+		new Map(),
+	)
 
 	const envelope = useMemo<ListEnvelope | null>(
 		() => (AsyncResult.isSuccess(result) ? narrowEnvelope(result.value) : null),
 		[result],
 	)
-	const threads = useMemo<ReadonlyArray<ThreadRow>>(
-		() => (envelope !== null ? narrowThreads(envelope.items) : []),
-		[envelope],
-	)
+	const threads = useMemo<ReadonlyArray<ThreadRow>>(() => {
+		const rows = envelope !== null ? narrowThreads(envelope.items) : []
+		if (overlays.size === 0) return rows
+		return rows.map(row => {
+			const patch = overlays.get(row.id)
+			if (patch === undefined) return row
+			return {
+				...row,
+				...(patch.status !== undefined && { status: patch.status }),
+				...(patch.isUnread !== undefined && { isUnread: patch.isUnread }),
+			}
+		})
+	}, [envelope, overlays])
 	const total = envelope?.total ?? 0
 	const isLoading = AsyncResult.isInitial(result)
 	const isFailure = AsyncResult.isFailure(result)
@@ -395,10 +426,32 @@ function EmailsIndexPage() {
 		setSelected(new Set())
 	}, [])
 
-	// ── Mutations ──────────────────────────────────────────────
+	// ── Mutations with optimistic overlays ─────────────────────
+	const mergeOverlay = useCallback(
+		(ids: ReadonlyArray<string>, patch: Overlay) => {
+			setOverlays(prev => {
+				const next = new Map(prev)
+				for (const id of ids) {
+					next.set(id, { ...(next.get(id) ?? {}), ...patch })
+				}
+				return next
+			})
+		},
+		[],
+	)
+	const clearOverlay = useCallback((ids: ReadonlyArray<string>) => {
+		setOverlays(prev => {
+			if (prev.size === 0) return prev
+			const next = new Map(prev)
+			for (const id of ids) next.delete(id)
+			return next
+		})
+	}, [])
+
 	const applyStatus = useCallback(
 		async (ids: ReadonlyArray<string>, status: ThreadStatus) => {
-			await Promise.all(
+			mergeOverlay(ids, { status })
+			const exits = await Promise.all(
 				ids.map(id =>
 					updateStatus({
 						params: { threadId: id },
@@ -406,22 +459,60 @@ function EmailsIndexPage() {
 					}),
 				),
 			)
+			const failedIds = ids.filter((_, i) => exits[i]?._tag !== 'Success')
+			clearOverlay(ids)
+			if (failedIds.length > 0) {
+				toastManager.add({
+					title: t`Status update failed`,
+					description: t`${failedIds.length} thread could not be updated.`,
+					type: 'error',
+				})
+			}
 			refreshList()
+			for (const id of ids) registry.refresh(threadAtomFor(id))
 		},
-		[updateStatus, refreshList],
+		[
+			updateStatus,
+			refreshList,
+			registry,
+			toastManager,
+			mergeOverlay,
+			clearOverlay,
+			t,
+		],
 	)
 	const applyRead = useCallback(
 		async (ids: ReadonlyArray<string>, read: boolean) => {
-			await Promise.all(
+			mergeOverlay(ids, { isUnread: !read })
+			const exits = await Promise.all(
 				ids.map(id =>
 					read
 						? markRead({ params: { threadId: id } })
 						: markUnread({ params: { threadId: id } }),
 				),
 			)
+			const failedIds = ids.filter((_, i) => exits[i]?._tag !== 'Success')
+			clearOverlay(ids)
+			if (failedIds.length > 0) {
+				toastManager.add({
+					title: t`Read state update failed`,
+					description: t`${failedIds.length} thread could not be updated.`,
+					type: 'error',
+				})
+			}
 			refreshList()
+			for (const id of ids) registry.refresh(threadAtomFor(id))
 		},
-		[markRead, markUnread, refreshList],
+		[
+			markRead,
+			markUnread,
+			refreshList,
+			registry,
+			toastManager,
+			mergeOverlay,
+			clearOverlay,
+			t,
+		],
 	)
 
 	// ── Pagination math ────────────────────────────────────────
