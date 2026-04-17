@@ -15,6 +15,7 @@ import {
 	sendEmailAtom,
 	threadAtomFor,
 } from '#/atoms/emails-atoms'
+import { EmailComposer } from '#/components/emails/email-composer'
 import { type Draft, useComposeEmail } from '#/context/compose-email-context'
 
 type InboxOption = {
@@ -100,6 +101,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 					payload: {
 						threadId: draft.threadId,
 						text: draft.form.body,
+						...(draft.form.bodyHtml !== '' && { html: draft.form.bodyHtml }),
 						...(cc.length > 0 && { cc }),
 						...(bcc.length > 0 && { bcc }),
 					},
@@ -127,6 +129,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 						to,
 						subject: draft.form.subject,
 						text: draft.form.body,
+						...(draft.form.bodyHtml !== '' && { html: draft.form.bodyHtml }),
 						companyId: draft.companyId ?? '',
 						...(draft.contactId !== undefined && {
 							contactId: draft.contactId,
@@ -273,14 +276,13 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 			) : null}
 
 			<BodyField>
-				<BodyLabel htmlFor={`body-${draft.id}`}>{t`Message`}</BodyLabel>
-				<BodyTextarea
-					id={`body-${draft.id}`}
-					value={draft.form.body}
-					placeholder={t`Write your message…`}
-					onChange={event => {
-						updateForm(draft.id, { body: event.target.value })
+				<BodyLabel>{t`Message`}</BodyLabel>
+				<EmailComposer
+					initialHtml={draft.form.bodyHtml}
+					onChange={(html, text) => {
+						updateForm(draft.id, { body: text, bodyHtml: html })
 					}}
+					placeholder={t`Write your message…`}
 				/>
 			</BodyField>
 
@@ -489,34 +491,12 @@ const BodyField = styled.div.withConfig({ displayName: 'ComposeBodyField' })`
 	min-height: 160px;
 `
 
-const BodyLabel = styled.label.withConfig({ displayName: 'ComposeBodyLabel' })`
+const BodyLabel = styled.div.withConfig({ displayName: 'ComposeBodyLabel' })`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
 	color: var(--color-on-surface-variant);
-`
-
-const BodyTextarea = styled.textarea.withConfig({
-	displayName: 'ComposeBodyTextarea',
-})`
-	flex: 1 1 auto;
-	min-height: 160px;
-	padding: var(--space-sm);
-	border: 1px solid var(--color-outline);
-	border-radius: var(--shape-xs);
-	background: var(--color-surface);
-	color: var(--color-on-surface);
-	font-family: inherit;
-	font-size: var(--typescale-body-medium-size);
-	line-height: 1.55;
-	resize: vertical;
-
-	&:focus {
-		outline: none;
-		border-color: var(--color-primary);
-		box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-primary) 30%, transparent);
-	}
 `
 
 const Footer = styled.div.withConfig({ displayName: 'ComposeFooter' })`

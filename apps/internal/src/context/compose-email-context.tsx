@@ -25,6 +25,7 @@ export type DraftForm = {
 	readonly bcc: string
 	readonly subject: string
 	readonly body: string
+	readonly bodyHtml: string
 }
 
 export type Draft = {
@@ -49,6 +50,7 @@ export type OpenComposeInput = {
 	readonly bcc?: string
 	readonly subject?: string
 	readonly body?: string
+	readonly bodyHtml?: string
 }
 
 const EMPTY_FORM: DraftForm = {
@@ -58,6 +60,7 @@ const EMPTY_FORM: DraftForm = {
 	bcc: '',
 	subject: '',
 	body: '',
+	bodyHtml: '',
 }
 
 export type ComposeEmailContextValue = {
@@ -103,6 +106,7 @@ export function ComposeEmailProvider({
 			...(input.bcc !== undefined && { bcc: input.bcc }),
 			...(input.subject !== undefined && { subject: input.subject }),
 			...(input.body !== undefined && { body: input.body }),
+			...(input.bodyHtml !== undefined && { bodyHtml: input.bodyHtml }),
 		}
 		const draft: Draft = {
 			id,
