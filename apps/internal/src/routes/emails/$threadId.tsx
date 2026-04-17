@@ -36,6 +36,7 @@ import { SkeletonRows } from '#/components/shared/skeleton-row'
 import { useComposeEmail } from '#/context/compose-email-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { downloadUrlFor } from '#/lib/email-attachments'
+import { sanitizeEmailHtml } from '#/lib/sanitize-email'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import {
 	agedPaperSurface,
@@ -406,11 +407,7 @@ function ThreadDetailPage() {
 							/>
 						) : (
 							detail.messages.map(msg => (
-								<MessageItem
-									key={msg.messageId}
-									msg={msg}
-									inboxEmail={detail.inbox?.email ?? null}
-								/>
+								<MessageItem key={msg.messageId} msg={msg} />
 							))
 						)}
 					</Timeline>
@@ -487,20 +484,14 @@ function useMarkReadOnce(
 	return fired
 }
 
-function MessageItem({
-	msg,
-	inboxEmail,
-}: {
-	readonly msg: ThreadMessage
-	readonly inboxEmail: string | null
-}) {
+function MessageItem({ msg }: { readonly msg: ThreadMessage }) {
 	const { t } = useLingui()
 	const [ccOpen, setCcOpen] = useState(false)
 	const suspicious =
 		msg.inboundClassification === 'spam' ||
 		msg.inboundClassification === 'blocked'
 
-	const body = pickBody(msg, inboxEmail)
+	const body = pickBody(msg)
 
 	return (
 		<MessageCard
@@ -577,7 +568,15 @@ function MessageItem({
 				</SuspiciousBanner>
 			) : null}
 
-			<MessageBody>{body}</MessageBody>
+			{body.kind === 'html' ? (
+				<MessageBody
+					$rich
+					// biome-ignore lint/security/noDangerouslySetInnerHtml: sanitized via DOMPurify in sanitizeEmailHtml
+					dangerouslySetInnerHTML={{ __html: body.value }}
+				/>
+			) : (
+				<MessageBody>{body.value}</MessageBody>
+			)}
 
 			{msg.attachments.length > 0 ? (
 				<AttachmentList>
@@ -787,32 +786,28 @@ function toDateStringOrNull(raw: unknown): string | null {
 	return null
 }
 
-/**
- * Prefer plain text when the provider gives us both. HTML from inbound
- * messages is rendered only via `stripHtml` because no sanitizer is
- * wired in yet.
- */
-function pickBody(msg: ThreadMessage, _inboxEmail: string | null): string {
-	if (msg.text && msg.text.trim() !== '') return msg.text
-	if (msg.html && msg.html.trim() !== '') return stripHtml(msg.html)
-	if (msg.preview && msg.preview.trim() !== '') return msg.preview
-	return ''
-}
+type RenderableBody =
+	| { readonly kind: 'html'; readonly value: string }
+	| { readonly kind: 'text'; readonly value: string }
 
-/** Minimal HTML strip — not a sanitizer, just readable fallback text. */
-function stripHtml(html: string): string {
-	return html
-		.replace(/<style[\s\S]*?<\/style>/gi, '')
-		.replace(/<script[\s\S]*?<\/script>/gi, '')
-		.replace(/<[^>]+>/g, ' ')
-		.replace(/&nbsp;/g, ' ')
-		.replace(/&amp;/g, '&')
-		.replace(/&lt;/g, '<')
-		.replace(/&gt;/g, '>')
-		.replace(/&quot;/g, '"')
-		.replace(/&#39;/g, "'")
-		.replace(/\s+/g, ' ')
-		.trim()
+/**
+ * Prefer HTML when the provider gives us rich content — it survives
+ * headings, lists, blockquotes, links, and inline formatting. Fall
+ * back to plain text (or the preview line) when HTML is absent or
+ * sanitization leaves nothing renderable.
+ */
+function pickBody(msg: ThreadMessage): RenderableBody {
+	if (msg.html && msg.html.trim() !== '') {
+		const clean = sanitizeEmailHtml(msg.html).trim()
+		if (clean !== '') return { kind: 'html', value: clean }
+	}
+	if (msg.text && msg.text.trim() !== '') {
+		return { kind: 'text', value: msg.text }
+	}
+	if (msg.preview && msg.preview.trim() !== '') {
+		return { kind: 'text', value: msg.preview }
+	}
+	return { kind: 'text', value: '' }
 }
 
 function formatBytes(bytes: number): string {
@@ -1260,12 +1255,128 @@ const SuspiciousBanner = styled.div.withConfig({
 	font-size: var(--typescale-body-small-size);
 `
 
-const MessageBody = styled.div.withConfig({ displayName: 'ThreadMessageBody' })`
-	white-space: pre-wrap;
+const MessageBody = styled.div.withConfig({
+	displayName: 'ThreadMessageBody',
+	shouldForwardProp: prop => prop !== '$rich',
+})<{ $rich?: boolean }>`
+	white-space: ${p => (p.$rich ? 'normal' : 'pre-wrap')};
 	word-break: break-word;
 	font-size: var(--typescale-body-medium-size);
 	line-height: 1.55;
 	color: var(--color-on-surface);
+
+	${p =>
+		p.$rich
+			? css`
+					p {
+						margin: 0 0 var(--space-2xs);
+					}
+
+					h1,
+					h2,
+					h3,
+					h4,
+					h5,
+					h6 {
+						font-family: var(--font-display);
+						line-height: 1.25;
+						margin: var(--space-xs) 0 var(--space-2xs);
+						color: var(--color-on-surface);
+					}
+
+					h1 {
+						font-size: var(--typescale-title-large-size, 1.5rem);
+					}
+
+					h2 {
+						font-size: var(--typescale-title-medium-size, 1.25rem);
+					}
+
+					h3,
+					h4,
+					h5,
+					h6 {
+						font-size: var(--typescale-title-small-size, 1.1rem);
+					}
+
+					ul,
+					ol {
+						padding-left: var(--space-md);
+						margin: 0 0 var(--space-2xs);
+					}
+
+					blockquote {
+						margin: 0 0 var(--space-2xs);
+						padding: var(--space-2xs) var(--space-sm);
+						border-left: 3px solid var(--color-outline);
+						color: var(--color-on-surface-variant);
+						font-style: italic;
+					}
+
+					code {
+						font-family: var(--font-mono, ui-monospace, monospace);
+						font-size: 0.9em;
+						padding: 0.1em 0.3em;
+						border-radius: var(--shape-2xs);
+						background: color-mix(
+							in oklab,
+							var(--color-on-surface) 8%,
+							transparent
+						);
+					}
+
+					pre {
+						font-family: var(--font-mono, ui-monospace, monospace);
+						font-size: 0.9em;
+						margin: 0 0 var(--space-2xs);
+						padding: var(--space-xs) var(--space-sm);
+						border-radius: var(--shape-xs);
+						background: color-mix(
+							in oklab,
+							var(--color-on-surface) 6%,
+							transparent
+						);
+						overflow-x: auto;
+					}
+
+					pre code {
+						background: transparent;
+						padding: 0;
+						border-radius: 0;
+						font-size: inherit;
+					}
+
+					hr {
+						border: 0;
+						border-top: 1px dashed var(--color-outline);
+						margin: var(--space-sm) 0;
+					}
+
+					a {
+						color: var(--color-primary);
+						text-decoration: underline;
+						text-underline-offset: 2px;
+					}
+
+					img {
+						max-width: 100%;
+						height: auto;
+						border-radius: var(--shape-2xs);
+					}
+
+					table {
+						border-collapse: collapse;
+						margin: 0 0 var(--space-2xs);
+					}
+
+					th,
+					td {
+						border: 1px solid var(--color-outline);
+						padding: var(--space-3xs) var(--space-2xs);
+						text-align: left;
+					}
+				`
+			: ''}
 `
 
 const AttachmentList = styled.div.withConfig({

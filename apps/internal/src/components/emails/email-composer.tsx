@@ -1,15 +1,34 @@
 import { useLingui } from '@lingui/react/macro'
+import Link from '@tiptap/extension-link'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
-import { Bold, Italic, List, ListOrdered, Strikethrough } from 'lucide-react'
-import { useEffect } from 'react'
+import {
+	Bold,
+	Code,
+	Code2,
+	Heading1,
+	Heading2,
+	Heading3,
+	Italic,
+	Link as LinkIcon,
+	List,
+	ListOrdered,
+	Minus,
+	Quote,
+	Redo,
+	Strikethrough,
+	Undo,
+	Unlink,
+} from 'lucide-react'
+import { useCallback, useEffect } from 'react'
 import styled from 'styled-components'
 
 /**
- * Minimal Tiptap StarterKit editor for email composition. Emits
- * HTML + plain text on every change so the compose form can send
- * multipart messages. Internal state is uncontrolled — callers
- * pass `initialHtml` once; the editor tracks mutations from there.
+ * Tiptap editor for email composition. Emits HTML + plain text on every
+ * change so the compose form can send multipart messages. Ships every
+ * StarterKit node (headings 1–3, blockquote, inline/block code, lists,
+ * horizontal rule, hard break, history) plus the Link mark so outbound
+ * HTML survives through the server → AgentMail path unchanged.
  */
 export function EmailComposer({
 	initialHtml,
@@ -22,7 +41,20 @@ export function EmailComposer({
 }) {
 	const { t } = useLingui()
 	const editor = useEditor({
-		extensions: [StarterKit],
+		extensions: [
+			StarterKit.configure({
+				heading: { levels: [1, 2, 3] },
+			}),
+			Link.configure({
+				openOnClick: false,
+				autolink: true,
+				protocols: ['http', 'https', 'mailto'],
+				HTMLAttributes: {
+					rel: 'noopener noreferrer',
+					target: '_blank',
+				},
+			}),
+		],
 		content: initialHtml ?? '',
 		immediatelyRender: false,
 		editorProps: {
@@ -42,6 +74,31 @@ export function EmailComposer({
 		[editor],
 	)
 
+	const handleSetLink = useCallback(() => {
+		if (editor === null) return
+		const previousHref =
+			typeof editor.getAttributes('link')['href'] === 'string'
+				? (editor.getAttributes('link')['href'] as string)
+				: ''
+		const url = window.prompt(t`Link URL`, previousHref || 'https://')
+		if (url === null) return
+		if (url.trim() === '') {
+			editor.chain().focus().extendMarkRange('link').unsetLink().run()
+			return
+		}
+		editor
+			.chain()
+			.focus()
+			.extendMarkRange('link')
+			.setLink({ href: url.trim() })
+			.run()
+	}, [editor, t])
+
+	const handleUnlink = useCallback(() => {
+		if (editor === null) return
+		editor.chain().focus().extendMarkRange('link').unsetLink().run()
+	}, [editor])
+
 	if (editor === null) {
 		return (
 			<Shell>
@@ -51,6 +108,8 @@ export function EmailComposer({
 			</Shell>
 		)
 	}
+
+	const linkActive = editor.isActive('link')
 
 	return (
 		<Shell>
@@ -88,7 +147,102 @@ export function EmailComposer({
 				>
 					<Strikethrough size={14} aria-hidden />
 				</ToolbarButton>
+				<ToolbarButton
+					type='button'
+					onClick={() => {
+						editor.chain().focus().toggleCode().run()
+					}}
+					$active={editor.isActive('code')}
+					aria-pressed={editor.isActive('code')}
+					aria-label={t`Inline code`}
+				>
+					<Code size={14} aria-hidden />
+				</ToolbarButton>
+
 				<Separator aria-hidden />
+
+				<ToolbarButton
+					type='button'
+					onClick={handleSetLink}
+					$active={linkActive}
+					aria-pressed={linkActive}
+					aria-label={linkActive ? t`Edit link` : t`Add link`}
+				>
+					<LinkIcon size={14} aria-hidden />
+				</ToolbarButton>
+				<ToolbarButton
+					type='button'
+					onClick={handleUnlink}
+					$active={false}
+					disabled={!linkActive}
+					aria-label={t`Remove link`}
+				>
+					<Unlink size={14} aria-hidden />
+				</ToolbarButton>
+
+				<Separator aria-hidden />
+
+				<ToolbarButton
+					type='button'
+					onClick={() => {
+						editor.chain().focus().toggleHeading({ level: 1 }).run()
+					}}
+					$active={editor.isActive('heading', { level: 1 })}
+					aria-pressed={editor.isActive('heading', { level: 1 })}
+					aria-label={t`Heading 1`}
+				>
+					<Heading1 size={14} aria-hidden />
+				</ToolbarButton>
+				<ToolbarButton
+					type='button'
+					onClick={() => {
+						editor.chain().focus().toggleHeading({ level: 2 }).run()
+					}}
+					$active={editor.isActive('heading', { level: 2 })}
+					aria-pressed={editor.isActive('heading', { level: 2 })}
+					aria-label={t`Heading 2`}
+				>
+					<Heading2 size={14} aria-hidden />
+				</ToolbarButton>
+				<ToolbarButton
+					type='button'
+					onClick={() => {
+						editor.chain().focus().toggleHeading({ level: 3 }).run()
+					}}
+					$active={editor.isActive('heading', { level: 3 })}
+					aria-pressed={editor.isActive('heading', { level: 3 })}
+					aria-label={t`Heading 3`}
+				>
+					<Heading3 size={14} aria-hidden />
+				</ToolbarButton>
+
+				<Separator aria-hidden />
+
+				<ToolbarButton
+					type='button'
+					onClick={() => {
+						editor.chain().focus().toggleBlockquote().run()
+					}}
+					$active={editor.isActive('blockquote')}
+					aria-pressed={editor.isActive('blockquote')}
+					aria-label={t`Quote`}
+				>
+					<Quote size={14} aria-hidden />
+				</ToolbarButton>
+				<ToolbarButton
+					type='button'
+					onClick={() => {
+						editor.chain().focus().toggleCodeBlock().run()
+					}}
+					$active={editor.isActive('codeBlock')}
+					aria-pressed={editor.isActive('codeBlock')}
+					aria-label={t`Code block`}
+				>
+					<Code2 size={14} aria-hidden />
+				</ToolbarButton>
+
+				<Separator aria-hidden />
+
 				<ToolbarButton
 					type='button'
 					onClick={() => {
@@ -110,6 +264,44 @@ export function EmailComposer({
 					aria-label={t`Numbered list`}
 				>
 					<ListOrdered size={14} aria-hidden />
+				</ToolbarButton>
+
+				<Separator aria-hidden />
+
+				<ToolbarButton
+					type='button'
+					onClick={() => {
+						editor.chain().focus().setHorizontalRule().run()
+					}}
+					$active={false}
+					aria-label={t`Horizontal rule`}
+				>
+					<Minus size={14} aria-hidden />
+				</ToolbarButton>
+
+				<Separator aria-hidden />
+
+				<ToolbarButton
+					type='button'
+					onClick={() => {
+						editor.chain().focus().undo().run()
+					}}
+					$active={false}
+					disabled={!editor.can().undo()}
+					aria-label={t`Undo`}
+				>
+					<Undo size={14} aria-hidden />
+				</ToolbarButton>
+				<ToolbarButton
+					type='button'
+					onClick={() => {
+						editor.chain().focus().redo().run()
+					}}
+					$active={false}
+					disabled={!editor.can().redo()}
+					aria-label={t`Redo`}
+				>
+					<Redo size={14} aria-hidden />
 				</ToolbarButton>
 			</Toolbar>
 			<EditorSurface>
@@ -165,13 +357,18 @@ const ToolbarButton = styled.button.withConfig({
 	color: var(--color-on-surface);
 	cursor: pointer;
 
-	&:hover {
+	&:hover:not(:disabled) {
 		background: color-mix(in oklab, var(--color-on-surface) 10%, transparent);
 	}
 
 	&:focus-visible {
 		outline: none;
 		border-color: var(--color-primary);
+	}
+
+	&:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
 	}
 `
 
@@ -213,10 +410,76 @@ const EditorSurface = styled.div.withConfig({
 		height: 0;
 	}
 
+	.tiptap h1,
+	.tiptap h2,
+	.tiptap h3 {
+		font-family: var(--font-display);
+		line-height: 1.25;
+		margin: var(--space-xs) 0 var(--space-2xs);
+		color: var(--color-on-surface);
+	}
+
+	.tiptap h1 {
+		font-size: var(--typescale-title-large-size, 1.5rem);
+	}
+
+	.tiptap h2 {
+		font-size: var(--typescale-title-medium-size, 1.25rem);
+	}
+
+	.tiptap h3 {
+		font-size: var(--typescale-title-small-size, 1.1rem);
+	}
+
 	.tiptap ul,
 	.tiptap ol {
 		padding-left: var(--space-md);
 		margin: 0 0 var(--space-2xs);
+	}
+
+	.tiptap blockquote {
+		margin: 0 0 var(--space-2xs);
+		padding: var(--space-2xs) var(--space-sm);
+		border-left: 3px solid var(--color-outline);
+		color: var(--color-on-surface-variant);
+		font-style: italic;
+	}
+
+	.tiptap code {
+		font-family: var(--font-mono, ui-monospace, monospace);
+		font-size: 0.9em;
+		padding: 0.1em 0.3em;
+		border-radius: var(--shape-2xs);
+		background: color-mix(in oklab, var(--color-on-surface) 8%, transparent);
+	}
+
+	.tiptap pre {
+		font-family: var(--font-mono, ui-monospace, monospace);
+		font-size: 0.9em;
+		margin: 0 0 var(--space-2xs);
+		padding: var(--space-xs) var(--space-sm);
+		border-radius: var(--shape-xs);
+		background: color-mix(in oklab, var(--color-on-surface) 6%, transparent);
+		overflow-x: auto;
+	}
+
+	.tiptap pre code {
+		background: transparent;
+		padding: 0;
+		border-radius: 0;
+		font-size: inherit;
+	}
+
+	.tiptap hr {
+		border: 0;
+		border-top: 1px dashed var(--color-outline);
+		margin: var(--space-sm) 0;
+	}
+
+	.tiptap a {
+		color: var(--color-primary);
+		text-decoration: underline;
+		text-underline-offset: 2px;
 	}
 `
 
