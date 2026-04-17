@@ -239,6 +239,19 @@ export default Effect.gen(function* () {
 		)
 	`
 
+	yield* sql`
+		CREATE TABLE IF NOT EXISTS inbox_footers (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			inbox_id UUID NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE,
+			name TEXT NOT NULL,
+			html TEXT NOT NULL,
+			text_fallback TEXT NOT NULL DEFAULT '',
+			is_default BOOLEAN NOT NULL DEFAULT false,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+		)
+	`
+
 	// ── Call recordings ──────────────────────────────────────────────
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS call_recordings (
@@ -420,6 +433,10 @@ export default Effect.gen(function* () {
 		sql`CREATE INDEX IF NOT EXISTS idx_inboxes_purpose ON inboxes(purpose) WHERE active = true`,
 		sql`CREATE INDEX IF NOT EXISTS idx_inboxes_owner_user_id ON inboxes(owner_user_id) WHERE owner_user_id IS NOT NULL`,
 		sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_inboxes_single_default ON inboxes((1)) WHERE is_default = true`,
+
+		// inbox_footers
+		sql`CREATE INDEX IF NOT EXISTS idx_inbox_footers_inbox_id ON inbox_footers(inbox_id)`,
+		sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_inbox_footers_single_default ON inbox_footers(inbox_id) WHERE is_default = true`,
 
 		// call_recordings — partial index on the common "active" path.
 		sql`CREATE INDEX IF NOT EXISTS idx_call_recordings_active ON call_recordings(deleted_at) WHERE deleted_at IS NULL`,
