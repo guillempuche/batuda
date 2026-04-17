@@ -1,6 +1,25 @@
 {
 	"respectGitignore": false,
-	"model": "claude-opus-4-6",
+	"model": "claude-opus-4-7",
+	"permissions": {
+		"allow": [
+			"Bash(curl -s* https://*engranatge.localhost/*)",
+			"Bash(curl -s* http://*engranatge.localhost/*)",
+			"Bash(curl -s* http://localhost:3001/*)",
+			"Bash(pnpm --filter * check-types)",
+			"Bash(pnpm --filter * build)",
+			"Bash(pnpm cli *)",
+			"Bash(pnpm check-types)",
+			"Bash(npm view *)",
+			"Bash(agent-browser open *)",
+			"Bash(agent-browser close *)",
+			"Bash(agent-browser snapshot *)",
+			"Bash(agent-browser network *)",
+			"Bash(agent-browser screenshot *)",
+			"Bash(agent-browser console *)",
+			"Bash(agent-browser --help)"
+		]
+	},
 	"hooks": {
 		"PreToolUse": [
 			{
@@ -106,6 +125,5 @@
 		"frontend-design@claude-plugins-official": true,
 		"readability-improver@ai-standards": true,
 		"test-bdd@ai-standards": true
-	},
-	"effortLevel": "high"
+	}
 }

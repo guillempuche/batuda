@@ -56,6 +56,23 @@ pnpm release:server:dry   # or release:internal:dry / release:marketing:dry
 
 Show the expected version and changelog. Ask for confirmation.
 
+## Step 4.5: Apply DB Migrations (if schema changed)
+
+Only for `server` or `all` releases. Check whether migration files changed since the last server tag:
+
+```bash
+last_tag=$(git describe --tags --match='server-v[0-9]*.[0-9]*.[0-9]*' --abbrev=0 2>/dev/null)
+git diff --name-only "$last_tag"..HEAD -- apps/server/src/db/migrations/
+```
+
+If non-empty **and** a production DB is provisioned, run migrations against the direct (non-pooled) NeonDB URL from your machine before tagging:
+
+```bash
+DATABASE_URL="<neon-direct-url>" pnpm db:migrate
+```
+
+The deploy workflow does not run migrations — deploying new server code against an unmigrated schema will crash on boot. Skip this step until Phase 2 of `docs/TODO_DEPLOYMENT.md` is done (prod DB not yet provisioned).
+
 ## Step 5: Execute Release
 
 ```bash

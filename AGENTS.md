@@ -127,6 +127,24 @@ The CRM spec is generated from `packages/controllers/src/api.ts` (`ForjaApi`). A
 
 ---
 
+## Reference source
+
+Key libraries are vendored as git subtrees under `docs/repos/` so agents can read real source when an API is unclear, instead of guessing. Read the source first; fall back to WebFetch only if the answer isn't in the tree.
+
+| Path                         | Library                                                                                    | Use when                                                                                                          |
+| ---------------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `docs/repos/effect`          | Effect v4 (`effect` package, unstable modules)                                             | Any Effect / Schema / ServiceMap / HttpApi / SQL / AI question — read `packages/effect/src/*.ts` directly         |
+| `docs/repos/tanstack-router` | TanStack Router + Start + Nitro plugin                                                     | File routes, rewrites, i18n, SSR, `createServerFn`, loader types                                                  |
+| `docs/repos/better-auth`     | Better Auth                                                                                | Session handling, cookies, sign-in flows, adapter contracts                                                       |
+| `docs/repos/base-ui`         | Base UI                                                                                    | Unstyled primitive internals behind `@engranatge/ui/pri` wrappers                                                 |
+| `docs/repos/tiptap`          | Tiptap v3 monorepo (`@tiptap/core`, `/html`, `/react`, `/static-renderer`, all extensions) | Node/Mark API, `generateHTML`/`generateJSON`, schema checks, extension authoring — relevant for the pages feature |
+| `docs/repos/motion`          | Motion (framer-motion successor)                                                           | Animation primitives                                                                                              |
+| `docs/repos/motion-plus`     | Motion Plus                                                                                | Commercial Motion features                                                                                        |
+
+To add a new reference: `git subtree add --prefix=docs/repos/<name> <git-url> <branch> --squash`. To update an existing one: `git subtree pull --prefix=docs/repos/<name> <git-url> <branch> --squash`.
+
+---
+
 ## CLI
 
 Use the CLI for local environment management. No `--` needed between `pnpm cli` and the command.
@@ -195,3 +213,4 @@ This applies to `.ts`, `.tsx`, `.css`, and all other source files.
 | ---------- | --------------------------------------------------------------------------------- |
 | `/crm`     | CRM data operations — MCP tools, companies, interactions, documents, tasks, pages |
 | `/commits` | Git commit messages following project conventions                                 |
+| `/debug`   | Diagnose server, internal, and marketing apps — health checks, logs, Docker, auth |
