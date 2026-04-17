@@ -215,7 +215,7 @@ function LeafletMap({
 	return (
 		<MapContainer
 			center={[latitude, longitude]}
-			zoom={15}
+			zoom={12}
 			scrollWheelZoom={false}
 			style={{ width: '100%', height: '100%' }}
 		>
