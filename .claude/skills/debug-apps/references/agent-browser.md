@@ -71,6 +71,32 @@ agent-browser find placeholder "Search companies" fill "restaurant"
 agent-browser find testid "pipeline-card" click
 ```
 
+### Stable `data-testid` hooks in Forja
+
+Prefer `find testid` over text — immune to i18n (en/ca) and layout churn. Conventions Forja uses consistently:
+
+- **Nav:** `nav-<slug>` (mobile bottom) and `nav-desktop-<slug>` (sidebar) — kept distinct so testids resolve to the currently visible element.
+- **Tabs:** `tab-<value>` auto-emitted by `PriTabs.Tab` from its `value` prop.
+- **Rows / cards:** `<thing>-row-<id>` or `<thing>-card-<slug>` (e.g. `thread-row-<uuid>`, `company-card-tancaments-garraf`).
+- **Surface parts:** `<surface>-<part>` (e.g. `login-submit`, `emails-search`, `compose-send`, `where-locate`).
+
+The authoritative list is the source — `grep -r data-testid apps/internal/src` — not this doc. Don't hand-maintain a table here.
+
+Quick mobile login → navigate → drill-in, all via testids:
+
+```bash
+agent-browser set device "iPhone 16 Pro"
+agent-browser open https://forja.engranatge.localhost/
+agent-browser find testid "login-email" fill "dev@forja.cat"
+agent-browser find testid "login-password" fill "forja-dev-2026"
+agent-browser find testid "login-submit" click
+agent-browser wait 2500
+agent-browser find testid "nav-companies" click
+agent-browser find testid "companies-search" fill "tancaments"
+agent-browser find testid "company-card-tancaments-garraf" click
+agent-browser find testid "tab-where" click
+```
+
 ## Verify state
 
 ```bash
