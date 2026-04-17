@@ -117,3 +117,13 @@ export const markThreadUnreadAtom = ForjaApiAtom.mutation(
 	'email',
 	'markThreadUnread',
 )
+
+/**
+ * Inbox CRUD mutations. The `/emails/inboxes` management page reads
+ * `inboxesListAtom` for the listing and calls these setters to
+ * create / edit / trigger a provider sync. After any write the caller
+ * refreshes `inboxesListAtom` so the table reflects the change.
+ */
+export const createInboxAtom = ForjaApiAtom.mutation('email', 'createInbox')
+export const updateInboxAtom = ForjaApiAtom.mutation('email', 'updateInbox')
+export const syncInboxesAtom = ForjaApiAtom.mutation('email', 'syncInboxes')

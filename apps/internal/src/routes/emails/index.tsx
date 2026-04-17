@@ -19,6 +19,7 @@ import {
 	ChevronRight,
 	Eye,
 	EyeOff,
+	Inbox as InboxIcon,
 	Mail,
 	Pencil,
 	Search,
@@ -533,6 +534,16 @@ function EmailsIndexPage() {
 					<Subtitle>{total === 1 ? t`1 thread` : t`${total} threads`}</Subtitle>
 				</IntroText>
 				<IntroActions>
+					<PriButton
+						type='button'
+						$variant='outlined'
+						onClick={() => {
+							void navigate({ to: '/emails/inboxes' })
+						}}
+					>
+						<InboxIcon size={14} aria-hidden />
+						<span>{t`Manage inboxes`}</span>
+					</PriButton>
 					<PriButton
 						type='button'
 						$variant='filled'

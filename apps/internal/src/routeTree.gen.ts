@@ -17,6 +17,7 @@ import { Route as PagesIndexRouteImport } from './routes/pages/index'
 import { Route as EmailsIndexRouteImport } from './routes/emails/index'
 import { Route as CompaniesIndexRouteImport } from './routes/companies/index'
 import { Route as PagesIdRouteImport } from './routes/pages/$id'
+import { Route as EmailsInboxesRouteImport } from './routes/emails/inboxes'
 import { Route as EmailsThreadIdRouteImport } from './routes/emails/$threadId'
 import { Route as CompaniesSlugRouteImport } from './routes/companies/$slug'
 
@@ -60,6 +61,11 @@ const PagesIdRoute = PagesIdRouteImport.update({
   path: '/pages/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EmailsInboxesRoute = EmailsInboxesRouteImport.update({
+  id: '/emails/inboxes',
+  path: '/emails/inboxes',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EmailsThreadIdRoute = EmailsThreadIdRouteImport.update({
   id: '/emails/$threadId',
   path: '/emails/$threadId',
@@ -76,6 +82,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/emails/$threadId': typeof EmailsThreadIdRoute
+  '/emails/inboxes': typeof EmailsInboxesRoute
   '/pages/$id': typeof PagesIdRoute
   '/companies/': typeof CompaniesIndexRoute
   '/emails/': typeof EmailsIndexRoute
@@ -88,6 +95,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/emails/$threadId': typeof EmailsThreadIdRoute
+  '/emails/inboxes': typeof EmailsInboxesRoute
   '/pages/$id': typeof PagesIdRoute
   '/companies': typeof CompaniesIndexRoute
   '/emails': typeof EmailsIndexRoute
@@ -101,6 +109,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/emails/$threadId': typeof EmailsThreadIdRoute
+  '/emails/inboxes': typeof EmailsInboxesRoute
   '/pages/$id': typeof PagesIdRoute
   '/companies/': typeof CompaniesIndexRoute
   '/emails/': typeof EmailsIndexRoute
@@ -115,6 +124,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/companies/$slug'
     | '/emails/$threadId'
+    | '/emails/inboxes'
     | '/pages/$id'
     | '/companies/'
     | '/emails/'
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/companies/$slug'
     | '/emails/$threadId'
+    | '/emails/inboxes'
     | '/pages/$id'
     | '/companies'
     | '/emails'
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/companies/$slug'
     | '/emails/$threadId'
+    | '/emails/inboxes'
     | '/pages/$id'
     | '/companies/'
     | '/emails/'
@@ -152,6 +164,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   CompaniesSlugRoute: typeof CompaniesSlugRoute
   EmailsThreadIdRoute: typeof EmailsThreadIdRoute
+  EmailsInboxesRoute: typeof EmailsInboxesRoute
   PagesIdRoute: typeof PagesIdRoute
   CompaniesIndexRoute: typeof CompaniesIndexRoute
   EmailsIndexRoute: typeof EmailsIndexRoute
@@ -218,6 +231,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PagesIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/emails/inboxes': {
+      id: '/emails/inboxes'
+      path: '/emails/inboxes'
+      fullPath: '/emails/inboxes'
+      preLoaderRoute: typeof EmailsInboxesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/emails/$threadId': {
       id: '/emails/$threadId'
       path: '/emails/$threadId'
@@ -240,6 +260,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   CompaniesSlugRoute: CompaniesSlugRoute,
   EmailsThreadIdRoute: EmailsThreadIdRoute,
+  EmailsInboxesRoute: EmailsInboxesRoute,
   PagesIdRoute: PagesIdRoute,
   CompaniesIndexRoute: CompaniesIndexRoute,
   EmailsIndexRoute: EmailsIndexRoute,
