@@ -1,5 +1,4 @@
 import { HydrationBoundary, RegistryProvider } from '@effect/atom-react'
-import { I18nProvider } from '@lingui/react'
 import {
 	createRootRoute,
 	HeadContent,
@@ -19,7 +18,10 @@ import { AppShell } from '#/components/layout/app-shell'
 import { ForjaMotionConfig } from '#/components/layout/motion-config'
 import { ComposeEmailProvider } from '#/context/compose-email-context'
 import { QuickCaptureProvider } from '#/context/quick-capture-context'
-import { i18n } from '#/i18n'
+import { readLangCookieFromHeader } from '#/i18n/cookie'
+import { defaultLang, htmlLang, type LangCode } from '#/i18n/index'
+import { LangProvider } from '#/i18n/lang-provider'
+import { translatedHead } from '#/i18n/lingui'
 import type { DehydratedAtomValue } from '#/lib/atom-hydration'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import { fetchSession } from '#/lib/session-check'
@@ -50,63 +52,72 @@ export type { DehydratedAtomValue }
  */
 export const Route = createRootRoute({
 	beforeLoad: async ({ location }) => {
-		// `/login` is the one public surface. Don't gate it or we'll
-		// bounce forever.
-		if (location.pathname === '/login') return
-		let cookieHeader: string | undefined
+		let cookieHeader: string | null | undefined
 		if (import.meta.env.SSR) {
-			cookieHeader = (await getServerCookieHeader()) ?? undefined
+			cookieHeader = await getServerCookieHeader()
+		} else if (typeof document !== 'undefined') {
+			cookieHeader = document.cookie
 		}
-		const user = await fetchSession(cookieHeader)
-		if (!user) {
-			throw redirect({
-				to: '/login',
-				search: { returnTo: location.href },
-			})
+		const lang: LangCode = readLangCookieFromHeader(cookieHeader) ?? defaultLang
+
+		if (location.pathname !== '/login') {
+			const user = await fetchSession(cookieHeader ?? undefined)
+			if (!user) {
+				throw redirect({
+					to: '/login',
+					search: { returnTo: location.href },
+				})
+			}
+		}
+		return { lang }
+	},
+	loader: ({ context }) => ({ lang: context.lang }),
+	head: ({ loaderData }) => {
+		const lang: LangCode = loaderData?.lang ?? defaultLang
+		const { title, description } = translatedHead[lang]
+		return {
+			meta: [
+				{ charSet: 'utf-8' },
+				{ name: 'viewport', content: 'width=device-width, initial-scale=1' },
+				{ title },
+				{
+					name: 'description',
+					content: description,
+				},
+			],
+			links: [
+				{ rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+				{
+					rel: 'icon',
+					type: 'image/png',
+					sizes: '32x32',
+					href: '/favicon-32x32.png',
+				},
+				{
+					rel: 'icon',
+					type: 'image/png',
+					sizes: '16x16',
+					href: '/favicon-16x16.png',
+				},
+				{
+					rel: 'apple-touch-icon',
+					sizes: '180x180',
+					href: '/apple-touch-icon.png',
+				},
+				{ rel: 'stylesheet', href: appCss },
+				{ rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+				{
+					rel: 'preconnect',
+					href: 'https://fonts.gstatic.com',
+					crossOrigin: 'anonymous',
+				},
+				{
+					rel: 'stylesheet',
+					href: 'https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;700&family=Barlow:wght@400;500;700&display=swap',
+				},
+			],
 		}
 	},
-	head: () => ({
-		meta: [
-			{ charSet: 'utf-8' },
-			{ name: 'viewport', content: 'width=device-width, initial-scale=1' },
-			{ title: 'Forja — Engranatge CRM' },
-			{
-				name: 'description',
-				content: "Forja — Engranatge's internal sales CRM.",
-			},
-		],
-		links: [
-			{ rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
-			{
-				rel: 'icon',
-				type: 'image/png',
-				sizes: '32x32',
-				href: '/favicon-32x32.png',
-			},
-			{
-				rel: 'icon',
-				type: 'image/png',
-				sizes: '16x16',
-				href: '/favicon-16x16.png',
-			},
-			{
-				rel: 'apple-touch-icon',
-				sizes: '180x180',
-				href: '/apple-touch-icon.png',
-			},
-			{ rel: 'stylesheet', href: appCss },
-			{ rel: 'preconnect', href: 'https://fonts.googleapis.com' },
-			{
-				rel: 'preconnect',
-				href: 'https://fonts.gstatic.com',
-				crossOrigin: 'anonymous',
-			},
-			{
-				rel: 'stylesheet',
-				href: 'https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;700&family=Barlow:wght@400;500;700&display=swap',
-			},
-		],
-	}),
 	component: RootComponent,
 })
 
@@ -118,6 +129,7 @@ function RootComponent() {
 	// harmless.
 	const matches = useMatches()
 	const location = useLocation()
+	const { lang } = Route.useLoaderData()
 	const dehydrated = matches.flatMap(m => {
 		const data = m.loaderData as
 			| { dehydrated?: ReadonlyArray<DehydratedAtomValue> }
@@ -132,8 +144,8 @@ function RootComponent() {
 	const isAuthChrome = location.pathname === '/login'
 
 	return (
-		<RootDocument>
-			<I18nProvider i18n={i18n}>
+		<RootDocument lang={lang}>
+			<LangProvider initialLang={lang}>
 				<RegistryProvider>
 					<HydrationBoundary state={dehydrated}>
 						<ForjaMotionConfig>
@@ -158,14 +170,20 @@ function RootComponent() {
 						</ForjaMotionConfig>
 					</HydrationBoundary>
 				</RegistryProvider>
-			</I18nProvider>
+			</LangProvider>
 		</RootDocument>
 	)
 }
 
-function RootDocument({ children }: { children: React.ReactNode }) {
+function RootDocument({
+	lang,
+	children,
+}: {
+	lang: LangCode
+	children: React.ReactNode
+}) {
 	return (
-		<html lang='en'>
+		<html lang={htmlLang[lang]}>
 			<head>
 				<HeadContent />
 			</head>

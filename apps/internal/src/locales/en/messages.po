@@ -13,9 +13,9 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/routes/emails/$threadId.tsx:385
-#: src/routes/emails/$threadId.tsx:395
-#: src/routes/emails/$threadId.tsx:444
+#: src/routes/emails/$threadId.tsx:386
+#: src/routes/emails/$threadId.tsx:396
+#: src/routes/emails/$threadId.tsx:441
 #: src/routes/pages/index.tsx:173
 msgid "—"
 msgstr "—"
@@ -25,7 +25,7 @@ msgid "— Select a company —"
 msgstr "— Select a company —"
 
 #: src/routes/companies/$slug.tsx:706
-#: src/routes/emails/$threadId.tsx:302
+#: src/routes/emails/$threadId.tsx:303
 #: src/routes/emails/index.tsx:821
 msgid "(no subject)"
 msgstr "(no subject)"
@@ -94,6 +94,10 @@ msgstr "Add attachment"
 msgid "Add Cc / Bcc"
 msgstr "Add Cc / Bcc"
 
+#: src/components/emails/email-composer.tsx:169
+msgid "Add link"
+msgstr "Add link"
+
 #: src/components/shared/company-card.tsx:112
 #: src/routes/companies/$slug.tsx:552
 msgid "Add task"
@@ -135,7 +139,7 @@ msgstr "All statuses"
 msgid "All under control"
 msgstr "All under control"
 
-#: src/routes/emails/$threadId.tsx:337
+#: src/routes/emails/$threadId.tsx:338
 #: src/routes/emails/index.tsx:702
 msgid "Archive"
 msgstr "Archive"
@@ -144,7 +148,7 @@ msgstr "Archive"
 msgid "Archive thread"
 msgstr "Archive thread"
 
-#: src/routes/emails/$threadId.tsx:296
+#: src/routes/emails/$threadId.tsx:297
 #: src/routes/emails/index.tsx:586
 #: src/routes/emails/index.tsx:857
 msgid "Archived"
@@ -158,8 +162,8 @@ msgstr "Archived — not pursuing"
 msgid "Attach"
 msgstr "Attach"
 
-#: src/routes/emails/$threadId.tsx:591
-#: src/routes/emails/$threadId.tsx:594
+#: src/routes/emails/$threadId.tsx:590
+#: src/routes/emails/$threadId.tsx:593
 msgid "attachment"
 msgstr "attachment"
 
@@ -167,8 +171,8 @@ msgstr "attachment"
 msgid "Back to emails"
 msgstr "Back to emails"
 
-#: src/routes/emails/$threadId.tsx:264
-#: src/routes/emails/$threadId.tsx:289
+#: src/routes/emails/$threadId.tsx:265
+#: src/routes/emails/$threadId.tsx:290
 msgid "Back to inbox"
 msgstr "Back to inbox"
 
@@ -180,11 +184,11 @@ msgstr "Bcc"
 msgid "Blocked"
 msgstr "Blocked"
 
-#: src/routes/emails/$threadId.tsx:575
+#: src/routes/emails/$threadId.tsx:566
 msgid "Blocked by the provider. The body is shown for review only."
 msgstr "Blocked by the provider. The body is shown for review only."
 
-#: src/components/emails/email-composer.tsx:65
+#: src/components/emails/email-composer.tsx:124
 msgid "Bold"
 msgstr "Bold"
 
@@ -192,7 +196,7 @@ msgstr "Bold"
 msgid "bounced"
 msgstr "bounced"
 
-#: src/routes/emails/$threadId.tsx:624
+#: src/routes/emails/$threadId.tsx:623
 msgid "Bounced"
 msgstr "Bounced"
 
@@ -204,7 +208,7 @@ msgstr "Brief summary (optional)"
 msgid "Bulk thread actions"
 msgstr "Bulk thread actions"
 
-#: src/components/emails/email-composer.tsx:99
+#: src/components/emails/email-composer.tsx:253
 msgid "Bullet list"
 msgstr "Bullet list"
 
@@ -227,7 +231,7 @@ msgid "Cancel upload"
 msgstr "Cancel upload"
 
 #: src/components/emails/compose-form.tsx:246
-#: src/routes/emails/$threadId.tsx:552
+#: src/routes/emails/$threadId.tsx:543
 msgid "Cc"
 msgstr "Cc"
 
@@ -264,7 +268,7 @@ msgstr "Clear"
 msgid "Clear filters"
 msgstr "Clear filters"
 
-#: src/routes/emails/$threadId.tsx:636
+#: src/routes/emails/$threadId.tsx:635
 msgid "Clicked"
 msgstr "Clicked"
 
@@ -273,7 +277,7 @@ msgid "Client"
 msgstr "Client"
 
 #: src/components/interactions/quick-capture-dialog.tsx:186
-#: src/routes/emails/$threadId.tsx:314
+#: src/routes/emails/$threadId.tsx:315
 #: src/routes/emails/inboxes.tsx:484
 #: src/routes/emails/index.tsx:680
 msgid "Close"
@@ -288,7 +292,7 @@ msgid "Close thread"
 msgstr "Close thread"
 
 #: src/components/shared/status-badge.tsx:34
-#: src/routes/emails/$threadId.tsx:295
+#: src/routes/emails/$threadId.tsx:296
 #: src/routes/emails/index.tsx:585
 #: src/routes/emails/index.tsx:856
 msgid "Closed"
@@ -297,6 +301,10 @@ msgstr "Closed"
 #: src/components/shared/status-badge.tsx:45
 msgid "Closed — won or lost"
 msgstr "Closed — won or lost"
+
+#: src/components/emails/email-composer.tsx:239
+msgid "Code block"
+msgstr "Code block"
 
 #: src/components/shared/status-badge.tsx:39
 msgid "Cold lead — no contact yet"
@@ -314,8 +322,8 @@ msgstr "Companies"
 
 #: src/components/interactions/quick-capture-dialog.tsx:195
 #: src/components/interactions/quick-capture-dialog.tsx:204
-#: src/routes/emails/$threadId.tsx:377
-#: src/routes/emails/$threadId.tsx:421
+#: src/routes/emails/$threadId.tsx:378
+#: src/routes/emails/$threadId.tsx:418
 #: src/routes/emails/index.tsx:773
 #: src/routes/index.tsx:314
 #: src/routes/index.tsx:391
@@ -327,7 +335,7 @@ msgstr "Company"
 msgid "complained"
 msgstr "complained"
 
-#: src/routes/emails/$threadId.tsx:626
+#: src/routes/emails/$threadId.tsx:625
 msgid "Complained"
 msgstr "Complained"
 
@@ -434,7 +442,7 @@ msgstr "Create inbox"
 msgid "Create one or run sync to pull mailboxes from the provider."
 msgstr "Create one or run sync to pull mailboxes from the provider."
 
-#: src/routes/emails/$threadId.tsx:452
+#: src/routes/emails/$threadId.tsx:449
 #: src/routes/emails/inboxes.tsx:251
 msgid "Created"
 msgstr "Created"
@@ -463,7 +471,7 @@ msgstr "Default"
 msgid "Default inbox"
 msgstr "Default inbox"
 
-#: src/routes/emails/$threadId.tsx:622
+#: src/routes/emails/$threadId.tsx:621
 msgid "Delivered"
 msgstr "Delivered"
 
@@ -516,6 +524,10 @@ msgstr "Edit inbox"
 msgid "Edit inbox {0}"
 msgstr "Edit inbox {0}"
 
+#: src/components/emails/email-composer.tsx:169
+msgid "Edit link"
+msgstr "Edit link"
+
 #: src/routes/pages/$id.tsx:244
 msgid "Editor"
 msgstr "Editor"
@@ -554,7 +566,7 @@ msgstr "Event"
 msgid "Exit full screen"
 msgstr "Exit full screen"
 
-#: src/routes/emails/$threadId.tsx:628
+#: src/routes/emails/$threadId.tsx:627
 msgid "Failed"
 msgstr "Failed"
 
@@ -579,19 +591,31 @@ msgstr "Filter emails"
 msgid "First outreach sent"
 msgstr "First outreach sent"
 
-#: src/routes/emails/$threadId.tsx:574
+#: src/routes/emails/$threadId.tsx:565
 msgid "Flagged as spam by the provider. The body is shown for review only."
 msgstr "Flagged as spam by the provider. The body is shown for review only."
+
+#: src/i18n/lingui.tsx:56
+msgid "Forja — Engranatge CRM"
+msgstr "Forja — Engranatge CRM"
+
+#: src/i18n/lingui.tsx:57
+msgid "Forja — Engranatge's internal sales CRM."
+msgstr "Forja — Engranatge's internal sales CRM."
+
+#: src/components/layout/side-nav.tsx:21
+msgid "Forja home"
+msgstr "Forja home"
 
 #: src/routes/login.tsx:175
 msgid "Forja is invite-only. Request access from the Engranatge team."
 msgstr "Forja is invite-only. Request access from the Engranatge team."
 
-#: src/components/emails/email-composer.tsx:57
+#: src/components/emails/email-composer.tsx:116
 msgid "Formatting"
 msgstr "Formatting"
 
-#: src/routes/emails/$threadId.tsx:525
+#: src/routes/emails/$threadId.tsx:516
 msgid "From"
 msgstr "From"
 
@@ -599,7 +623,19 @@ msgstr "From"
 msgid "Full screen"
 msgstr "Full screen"
 
-#: src/routes/emails/$threadId.tsx:547
+#: src/components/emails/email-composer.tsx:192
+msgid "Heading 1"
+msgstr "Heading 1"
+
+#: src/components/emails/email-composer.tsx:203
+msgid "Heading 2"
+msgstr "Heading 2"
+
+#: src/components/emails/email-composer.tsx:214
+msgid "Heading 3"
+msgstr "Heading 3"
+
+#: src/routes/emails/$threadId.tsx:538
 msgid "Hide Cc"
 msgstr "Hide Cc"
 
@@ -607,6 +643,10 @@ msgstr "Hide Cc"
 #: src/routes/index.tsx:458
 msgid "High priority"
 msgstr "High priority"
+
+#: src/components/emails/email-composer.tsx:277
+msgid "Horizontal rule"
+msgstr "Horizontal rule"
 
 #: src/routes/emails/inboxes.tsx:267
 #: src/routes/emails/inboxes.tsx:562
@@ -626,13 +666,13 @@ msgid "Inbound and outbound emails will pin to this board once a thread exists."
 msgstr "Inbound and outbound emails will pin to this board once a thread exists."
 
 #. placeholder {0}: msg.from
-#: src/routes/emails/$threadId.tsx:511
+#: src/routes/emails/$threadId.tsx:502
 msgid "Inbound message from {0}"
 msgstr "Inbound message from {0}"
 
 #: src/components/emails/compose-form.tsx:188
-#: src/routes/emails/$threadId.tsx:389
-#: src/routes/emails/$threadId.tsx:433
+#: src/routes/emails/$threadId.tsx:390
+#: src/routes/emails/$threadId.tsx:430
 msgid "Inbox"
 msgstr "Inbox"
 
@@ -656,6 +696,10 @@ msgstr "Inboxes synced"
 msgid "Industry"
 msgstr "Industry"
 
+#: src/components/emails/email-composer.tsx:157
+msgid "Inline code"
+msgstr "Inline code"
+
 #: src/components/shared/channel-icon.tsx:54
 msgid "Instagram"
 msgstr "Instagram"
@@ -664,7 +708,7 @@ msgstr "Instagram"
 msgid "Interaction logged"
 msgstr "Interaction logged"
 
-#: src/components/emails/email-composer.tsx:76
+#: src/components/emails/email-composer.tsx:135
 msgid "Italic"
 msgstr "Italic"
 
@@ -672,11 +716,13 @@ msgstr "Italic"
 msgid "Lang"
 msgstr "Lang"
 
+#: src/components/profile/language-select.tsx:34
 #: src/routes/pages/$id.tsx:268
+#: src/routes/profile/index.tsx:111
 msgid "Language"
 msgstr "Language"
 
-#: src/routes/emails/$threadId.tsx:458
+#: src/routes/emails/$threadId.tsx:455
 msgid "Last activity"
 msgstr "Last activity"
 
@@ -701,6 +747,10 @@ msgstr "Last message outbound"
 msgid "Later"
 msgstr "Later"
 
+#: src/components/emails/email-composer.tsx:83
+msgid "Link URL"
+msgstr "Link URL"
+
 #: src/components/shared/channel-icon.tsx:53
 msgid "LinkedIn"
 msgstr "LinkedIn"
@@ -708,6 +758,10 @@ msgstr "LinkedIn"
 #: src/routes/companies/index.tsx:320
 msgid "Loading companies…"
 msgstr "Loading companies…"
+
+#: src/components/shared/loading-spinner.tsx:23
+msgid "Loading…"
+msgstr "Loading…"
 
 #: src/routes/emails/inboxes.tsx:244
 msgid "Local inboxes"
@@ -779,7 +833,7 @@ msgstr "Mark inactive"
 msgid "Mark read"
 msgstr "Mark read"
 
-#: src/routes/emails/$threadId.tsx:348
+#: src/routes/emails/$threadId.tsx:349
 #: src/routes/emails/index.tsx:896
 msgid "Mark unread"
 msgstr "Mark unread"
@@ -801,7 +855,7 @@ msgstr "Meeting booked"
 msgid "Message"
 msgstr "Message"
 
-#: src/routes/emails/$threadId.tsx:448
+#: src/routes/emails/$threadId.tsx:445
 msgid "Messages"
 msgstr "Messages"
 
@@ -860,7 +914,7 @@ msgid "No companies yet"
 msgstr "No companies yet"
 
 #: src/routes/login.tsx:123
-#: src/routes/profile/index.tsx:67
+#: src/routes/profile/index.tsx:68
 msgid "No connection to the server. Try again in a few seconds."
 msgstr "No connection to the server. Try again in a few seconds."
 
@@ -900,7 +954,7 @@ msgstr "No inboxes yet"
 msgid "No interactions logged yet"
 msgstr "No interactions logged yet"
 
-#: src/routes/emails/$threadId.tsx:404
+#: src/routes/emails/$threadId.tsx:405
 msgid "No messages in this thread"
 msgstr "No messages in this thread"
 
@@ -941,11 +995,11 @@ msgstr "No upcoming due dates"
 msgid "Note"
 msgstr "Note"
 
-#: src/components/emails/email-composer.tsx:110
+#: src/components/emails/email-composer.tsx:264
 msgid "Numbered list"
 msgstr "Numbered list"
 
-#: src/routes/emails/$threadId.tsx:293
+#: src/routes/emails/$threadId.tsx:294
 #: src/routes/emails/index.tsx:583
 #: src/routes/emails/index.tsx:854
 #: src/routes/tasks/index.tsx:253
@@ -976,7 +1030,7 @@ msgstr "Open tasks"
 msgid "Open website"
 msgstr "Open website"
 
-#: src/routes/emails/$threadId.tsx:634
+#: src/routes/emails/$threadId.tsx:633
 msgid "Opened"
 msgstr "Opened"
 
@@ -989,7 +1043,7 @@ msgid "Outbound"
 msgstr "Outbound"
 
 #. placeholder {0}: msg.to.join(', ')
-#: src/routes/emails/$threadId.tsx:512
+#: src/routes/emails/$threadId.tsx:503
 msgid "Outbound message to {0}"
 msgstr "Outbound message to {0}"
 
@@ -1068,7 +1122,7 @@ msgstr "Primary navigation"
 #: src/components/layout/nav-items.ts:66
 #: src/routes/companies/$slug.tsx:564
 #: src/routes/companies/$slug.tsx:666
-#: src/routes/profile/index.tsx:80
+#: src/routes/profile/index.tsx:81
 msgid "Profile"
 msgstr "Profile"
 
@@ -1115,13 +1169,21 @@ msgstr "Publishing…"
 msgid "Purpose"
 msgstr "Purpose"
 
-#: src/routes/emails/$threadId.tsx:632
+#: src/routes/emails/$threadId.tsx:631
 msgid "Queued"
 msgstr "Queued"
+
+#: src/components/emails/email-composer.tsx:228
+msgid "Quote"
+msgstr "Quote"
 
 #: src/routes/emails/index.tsx:499
 msgid "Read state update failed"
 msgstr "Read state update failed"
+
+#: src/components/emails/email-composer.tsx:302
+msgid "Redo"
+msgstr "Redo"
 
 #: src/routes/companies/$slug.tsx:588
 msgid "Region"
@@ -1132,7 +1194,11 @@ msgstr "Region"
 msgid "Remove {0}"
 msgstr "Remove {0}"
 
-#: src/routes/emails/$threadId.tsx:325
+#: src/components/emails/email-composer.tsx:178
+msgid "Remove link"
+msgstr "Remove link"
+
+#: src/routes/emails/$threadId.tsx:326
 #: src/routes/emails/index.tsx:691
 msgid "Reopen"
 msgstr "Reopen"
@@ -1141,11 +1207,11 @@ msgstr "Reopen"
 msgid "Reopen thread"
 msgstr "Reopen thread"
 
-#: src/routes/emails/$threadId.tsx:358
+#: src/routes/emails/$threadId.tsx:359
 msgid "Reply"
 msgstr "Reply"
 
-#: src/routes/emails/$threadId.tsx:368
+#: src/routes/emails/$threadId.tsx:369
 msgid "Reply all"
 msgstr "Reply all"
 
@@ -1216,7 +1282,7 @@ msgstr "Send email"
 msgid "Sending…"
 msgstr "Sending…"
 
-#: src/routes/emails/$threadId.tsx:630
+#: src/routes/emails/$threadId.tsx:629
 msgid "Sent"
 msgstr "Sent"
 
@@ -1230,7 +1296,7 @@ msgid "Shared"
 msgstr "Shared"
 
 #. placeholder {0}: msg.cc.length
-#: src/routes/emails/$threadId.tsx:547
+#: src/routes/emails/$threadId.tsx:538
 msgid "Show Cc ({0})"
 msgstr "Show Cc ({0})"
 
@@ -1250,11 +1316,11 @@ msgstr "Showing {firstRow}–{lastRow} of {total}"
 msgid "Sign in"
 msgstr "Sign in"
 
-#: src/routes/profile/index.tsx:118
+#: src/routes/profile/index.tsx:126
 msgid "Sign out"
 msgstr "Sign out"
 
-#: src/routes/profile/index.tsx:62
+#: src/routes/profile/index.tsx:63
 msgid "Sign-out failed. Please try again."
 msgstr "Sign-out failed. Please try again."
 
@@ -1262,7 +1328,7 @@ msgstr "Sign-out failed. Please try again."
 msgid "Signing in…"
 msgstr "Signing in…"
 
-#: src/routes/profile/index.tsx:118
+#: src/routes/profile/index.tsx:126
 msgid "Signing out…"
 msgstr "Signing out…"
 
@@ -1296,7 +1362,7 @@ msgstr "Status"
 msgid "Status update failed"
 msgstr "Status update failed"
 
-#: src/components/emails/email-composer.tsx:87
+#: src/components/emails/email-composer.tsx:146
 msgid "Strikethrough"
 msgstr "Strikethrough"
 
@@ -1341,11 +1407,11 @@ msgstr "The new inbox is ready."
 msgid "The page is now live."
 msgstr "The page is now live."
 
-#: src/routes/emails/$threadId.tsx:405
+#: src/routes/emails/$threadId.tsx:406
 msgid "The thread exists but the provider returned no messages."
 msgstr "The thread exists but the provider returned no messages."
 
-#: src/routes/emails/$threadId.tsx:260
+#: src/routes/emails/$threadId.tsx:261
 msgid "The thread may have been archived upstream or the link is stale."
 msgstr "The thread may have been archived upstream or the link is stale."
 
@@ -1363,15 +1429,15 @@ msgstr "They replied — keep the thread warm"
 msgid "This week"
 msgstr "This week"
 
-#: src/routes/emails/$threadId.tsx:304
+#: src/routes/emails/$threadId.tsx:305
 msgid "Thread actions"
 msgstr "Thread actions"
 
-#: src/routes/emails/$threadId.tsx:419
+#: src/routes/emails/$threadId.tsx:416
 msgid "Thread metadata"
 msgstr "Thread metadata"
 
-#: src/routes/emails/$threadId.tsx:259
+#: src/routes/emails/$threadId.tsx:260
 msgid "Thread not found"
 msgstr "Thread not found"
 
@@ -1384,7 +1450,7 @@ msgid "Title"
 msgstr "Title"
 
 #: src/components/emails/compose-form.tsx:220
-#: src/routes/emails/$threadId.tsx:529
+#: src/routes/emails/$threadId.tsx:520
 msgid "To"
 msgstr "To"
 
@@ -1402,15 +1468,19 @@ msgstr "Try different criteria or clear the filters."
 msgid "Type"
 msgstr "Type"
 
+#: src/components/emails/email-composer.tsx:291
+msgid "Undo"
+msgstr "Undo"
+
 #: src/routes/tasks/index.tsx:203
 msgid "Unknown company"
 msgstr "Unknown company"
 
-#: src/routes/profile/index.tsx:73
+#: src/routes/profile/index.tsx:74
 msgid "Unknown user"
 msgstr "Unknown user"
 
-#: src/routes/emails/$threadId.tsx:429
+#: src/routes/emails/$threadId.tsx:426
 msgid "Unlinked"
 msgstr "Unlinked"
 
@@ -1481,10 +1551,10 @@ msgid "Workshop floor — live counters on the bench."
 msgstr "Workshop floor — live counters on the bench."
 
 #: src/components/emails/compose-form.tsx:294
-#: src/components/emails/email-composer.tsx:30
+#: src/components/emails/email-composer.tsx:62
 msgid "Write your message…"
 msgstr "Write your message…"
 
-#: src/routes/profile/index.tsx:83
+#: src/routes/profile/index.tsx:84
 msgid "Your Forja workbench identity."
 msgstr "Your Forja workbench identity."

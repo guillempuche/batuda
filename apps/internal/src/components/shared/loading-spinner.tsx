@@ -1,3 +1,4 @@
+import { useLingui } from '@lingui/react/macro'
 import { Cog } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import { Typewriter } from 'motion-plus/react'
@@ -12,15 +13,17 @@ import styled from 'styled-components'
  */
 export function LoadingSpinner({
 	size = 'md',
-	label = 'Loading…',
+	label,
 }: {
 	size?: 'sm' | 'md' | 'lg'
 	label?: string
 }) {
 	const reduced = useReducedMotion()
+	const { t } = useLingui()
+	const resolvedLabel = label ?? t`Loading…`
 	const cogStyle = { display: 'inline-flex', color: 'var(--color-primary)' }
 	return (
-		<Wrapper role='status' aria-label={label}>
+		<Wrapper role='status' aria-label={resolvedLabel}>
 			{reduced ? (
 				<span style={cogStyle}>
 					<Cog size={sizeMap[size]} aria-hidden />
@@ -34,9 +37,9 @@ export function LoadingSpinner({
 					<Cog size={sizeMap[size]} aria-hidden />
 				</motion.div>
 			)}
-			{label && (
-				<Label>{reduced ? label : <Typewriter>{label}</Typewriter>}</Label>
-			)}
+			<Label>
+				{reduced ? resolvedLabel : <Typewriter>{resolvedLabel}</Typewriter>}
+			</Label>
 		</Wrapper>
 	)
 }

@@ -6,6 +6,7 @@ import styled from 'styled-components'
 
 import { PriButton } from '@engranatge/ui/pri'
 
+import { LanguageSelect } from '#/components/profile/language-select'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import { fetchSession, type SessionUser } from '#/lib/session-check'
 import {
@@ -104,6 +105,13 @@ function ProfilePage() {
 					) : null}
 				</Info>
 			</Card>
+
+			<LanguageRow>
+				<LanguageRowLabel>
+					<Trans>Language</Trans>
+				</LanguageRowLabel>
+				<LanguageSelect />
+			</LanguageRow>
 
 			{error ? <ErrorText role='alert'>{error}</ErrorText> : null}
 
@@ -231,6 +239,27 @@ const IdText = styled.span.withConfig({ displayName: 'ProfileIdText' })`
 const Actions = styled.div.withConfig({ displayName: 'ProfileActions' })`
 	display: flex;
 	gap: var(--space-sm);
+`
+
+const LanguageRow = styled.div.withConfig({
+	displayName: 'ProfileLanguageRow',
+})`
+	${brushedMetalPlate}
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-md);
+	padding: var(--space-sm) var(--space-md);
+	border-radius: var(--shape-2xs);
+`
+
+const LanguageRowLabel = styled.span.withConfig({
+	displayName: 'ProfileLanguageRowLabel',
+})`
+	${stenciledTitle}
+	font-size: var(--typescale-label-large-size);
+	line-height: var(--typescale-label-large-line);
+	letter-spacing: 0.08em;
 `
 
 const ErrorText = styled.p.withConfig({ displayName: 'ProfileError' })`
