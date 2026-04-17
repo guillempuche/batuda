@@ -18,7 +18,8 @@
 			"!flake.nix",
 			"!migrations",
 			"!node_modules",
-			"!**/routeTree.gen.ts"
+			"!**/routeTree.gen.ts",
+			"!**/locales/**/messages.js"
 		],
 		"ignoreUnknown": true
 	},
