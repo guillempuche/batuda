@@ -302,32 +302,40 @@ const writeRecord = (rec: MessageRecord, sentAt: Date) =>
 
 // ── Mappers ──
 
-const toMessageItem = (rec: MessageRecord): ProviderMessageItem => ({
-	inboxId: DEV_INBOX_ID,
-	threadId: rec.threadId,
-	messageId: rec.messageId,
-	from: rec.from,
-	to: rec.to,
-	cc: rec.cc.length > 0 ? rec.cc : undefined,
-	subject: rec.subject || undefined,
-	preview: rec.bodyText.slice(0, 140) || undefined,
-	timestamp: new Date(rec.sentAt),
-})
+// The HttpApi response encoder (Schema.Unknown) rejects object properties
+// whose value is `undefined`. Only include optional fields when they carry
+// a concrete value so the JSON shape stays encodable.
+const toMessageItem = (rec: MessageRecord): ProviderMessageItem => {
+	const preview = rec.bodyText.slice(0, 140)
+	return {
+		inboxId: DEV_INBOX_ID,
+		threadId: rec.threadId,
+		messageId: rec.messageId,
+		from: rec.from,
+		to: rec.to,
+		timestamp: new Date(rec.sentAt),
+		...(rec.cc.length > 0 && { cc: rec.cc }),
+		...(rec.subject && { subject: rec.subject }),
+		...(preview && { preview }),
+	}
+}
 
-const toMessage = (rec: MessageRecord): ProviderMessage => ({
-	...toMessageItem(rec),
-	text: rec.text ?? rec.bodyText ?? undefined,
-	html: rec.html ?? undefined,
-	extractedText: rec.text ?? rec.bodyText ?? undefined,
-	attachments: rec.attachments.map(
-		(a): ProviderAttachmentMeta => ({
-			attachmentId: a.attachmentId,
-			filename: a.filename,
-			size: a.size,
-			contentType: a.contentType,
-		}),
-	),
-})
+const toMessage = (rec: MessageRecord): ProviderMessage => {
+	const body = rec.text ?? rec.bodyText
+	return {
+		...toMessageItem(rec),
+		...(body && { text: body, extractedText: body }),
+		...(rec.html && { html: rec.html }),
+		attachments: rec.attachments.map(
+			(a): ProviderAttachmentMeta => ({
+				attachmentId: a.attachmentId,
+				filename: a.filename,
+				size: a.size,
+				contentType: a.contentType,
+			}),
+		),
+	}
+}
 
 const toThreadItem = (
 	threadId: string,
