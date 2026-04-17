@@ -85,7 +85,7 @@ function ProfilePage() {
 				</Subtitle>
 			</Intro>
 
-			<Card>
+			<Card data-testid='profile-card'>
 				<AvatarPlate>
 					<Initial>{initial}</Initial>
 				</AvatarPlate>
@@ -106,7 +106,7 @@ function ProfilePage() {
 				</Info>
 			</Card>
 
-			<LanguageRow>
+			<LanguageRow data-testid='profile-language'>
 				<LanguageRowLabel>
 					<Trans>Language</Trans>
 				</LanguageRowLabel>
@@ -119,6 +119,7 @@ function ProfilePage() {
 				<PriButton
 					type='button'
 					$variant='filled'
+					data-testid='profile-signout'
 					disabled={signingOut}
 					onClick={handleSignOut}
 				>

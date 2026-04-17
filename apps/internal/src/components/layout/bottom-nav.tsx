@@ -25,6 +25,7 @@ export function BottomNav() {
 						to={item.path}
 						exact={item.exact}
 						aria-label={label}
+						data-testid={`nav-${item.testId}`}
 					>
 						{({ isActive }) => (
 							<MachineButton

@@ -178,6 +178,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 
 	return (
 		<Form
+			data-testid='compose-form'
 			onSubmit={event => {
 				event.preventDefault()
 				if (canSend) void handleSend()
@@ -220,9 +221,10 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 					<FieldLabel htmlFor={`to-${draft.id}`}>{t`To`}</FieldLabel>
 					<PriInput
 						id={`to-${draft.id}`}
+						data-testid='compose-to'
 						type='text'
 						value={draft.form.to}
-						placeholder='name@example.com, another@example.com'
+						placeholder={t`name@example.com, another@example.com`}
 						onChange={event => {
 							updateForm(draft.id, { to: event.target.value })
 						}}
@@ -274,6 +276,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 					<FieldLabel htmlFor={`subject-${draft.id}`}>{t`Subject`}</FieldLabel>
 					<PriInput
 						id={`subject-${draft.id}`}
+						data-testid='compose-subject'
 						type='text'
 						value={draft.form.subject}
 						placeholder={t`What is this about?`}
@@ -338,11 +341,21 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 			/>
 
 			<Footer>
-				<PriButton type='submit' $variant='filled' disabled={!canSend}>
+				<PriButton
+					type='submit'
+					$variant='filled'
+					data-testid='compose-send'
+					disabled={!canSend}
+				>
 					<Send size={14} aria-hidden />
 					<span>{sendState === 'sending' ? t`Sending…` : t`Send`}</span>
 				</PriButton>
-				<PriButton type='button' $variant='text' onClick={handleDiscard}>
+				<PriButton
+					type='button'
+					$variant='text'
+					data-testid='compose-discard'
+					onClick={handleDiscard}
+				>
 					<X size={14} aria-hidden />
 					<span>{t`Discard`}</span>
 				</PriButton>

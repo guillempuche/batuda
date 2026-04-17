@@ -1,4 +1,5 @@
 import { Tabs } from '@base-ui/react/tabs'
+import type { ComponentProps } from 'react'
 import styled from 'styled-components'
 
 /**
@@ -93,10 +94,24 @@ const PriIndicator = styled(Tabs.Indicator).withConfig({
 		width 220ms cubic-bezier(0.4, 0, 0.2, 1);
 `
 
+type PriTabProps = ComponentProps<typeof PriTab> & {
+	'data-testid'?: string
+}
+
+function PriTabWithTestId({
+	value,
+	'data-testid': testId,
+	...rest
+}: PriTabProps) {
+	const derived =
+		typeof value === 'string' && value.length > 0 ? `tab-${value}` : undefined
+	return <PriTab value={value} data-testid={testId ?? derived} {...rest} />
+}
+
 export const PriTabs = {
 	Root: Tabs.Root,
 	Panel: Tabs.Panel,
 	List: PriList,
-	Tab: PriTab,
+	Tab: PriTabWithTestId,
 	Indicator: PriIndicator,
 }

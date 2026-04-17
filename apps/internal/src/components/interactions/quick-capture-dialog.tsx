@@ -176,14 +176,19 @@ export function QuickCaptureDialog() {
 		>
 			<PriDialog.Portal>
 				<PriDialog.Backdrop />
-				<PriDialog.Popup>
+				<PriDialog.Popup data-testid='quick-capture'>
 					<Header>
 						<PriDialog.Title>
 							<Trans>Log interaction</Trans>
 						</PriDialog.Title>
 						<PriDialog.Close
 							render={props => (
-								<CloseButton type='button' aria-label={t`Close`} {...props}>
+								<CloseButton
+									type='button'
+									aria-label={t`Close`}
+									data-testid='quick-capture-close'
+									{...props}
+								>
 									<X size={18} />
 								</CloseButton>
 							)}
@@ -197,7 +202,7 @@ export function QuickCaptureDialog() {
 							<strong>{prefill.companyName}</strong>
 						</PrefillChip>
 					)}
-					<Form onSubmit={handleSubmit}>
+					<Form onSubmit={handleSubmit} data-testid='quick-capture-form'>
 						{showCompanyPicker && (
 							<Field>
 								<Label htmlFor='qc-company'>
@@ -205,6 +210,7 @@ export function QuickCaptureDialog() {
 								</Label>
 								<Select
 									id='qc-company'
+									data-testid='quick-capture-company'
 									value={companyId}
 									onChange={event => setCompanyId(event.target.value)}
 									required
@@ -301,6 +307,7 @@ export function QuickCaptureDialog() {
 							</Label>
 							<PriInput
 								id='qc-subject'
+								data-testid='quick-capture-subject'
 								type='text'
 								value={subject}
 								onChange={event => setSubject(event.target.value)}
@@ -314,6 +321,7 @@ export function QuickCaptureDialog() {
 							</Label>
 							<Textarea
 								id='qc-summary'
+								data-testid='quick-capture-summary'
 								rows={3}
 								value={summary}
 								onChange={event => setSummary(event.target.value)}
@@ -385,12 +393,18 @@ export function QuickCaptureDialog() {
 							<PriButton
 								type='button'
 								$variant='text'
+								data-testid='quick-capture-cancel'
 								onClick={close}
 								disabled={submitting}
 							>
 								<Trans>Cancel</Trans>
 							</PriButton>
-							<PriButton type='submit' $variant='filled' disabled={!canSubmit}>
+							<PriButton
+								type='submit'
+								$variant='filled'
+								data-testid='quick-capture-submit'
+								disabled={!canSubmit}
+							>
 								{submitting ? t`Logging…` : t`Log`}
 							</PriButton>
 						</Footer>

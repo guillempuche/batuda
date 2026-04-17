@@ -93,6 +93,7 @@ export function WherePanel({
 						href={googleHref}
 						target='_blank'
 						rel='noopener noreferrer'
+						data-testid='where-google-maps'
 					>
 						<ExternalLink size={14} aria-hidden />
 						<Trans>Open in Google Maps</Trans>
@@ -133,6 +134,7 @@ export function WherePanel({
 						$variant='filled'
 						onClick={onLocate}
 						disabled={pending || !company.location}
+						data-testid='where-locate'
 					>
 						<Crosshair size={14} aria-hidden />
 						{pending ? (

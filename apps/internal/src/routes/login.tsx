@@ -135,7 +135,7 @@ function LoginPage() {
 				<Subtitle>
 					<Trans>Engranatge internal CRM</Trans>
 				</Subtitle>
-				<Form onSubmit={handleSubmit}>
+				<Form onSubmit={handleSubmit} data-testid='login-form'>
 					<Field>
 						<Label htmlFor='email'>
 							<Trans>Email</Trans>
@@ -149,6 +149,7 @@ function LoginPage() {
 							value={email}
 							onChange={e => setEmail(e.currentTarget.value)}
 							disabled={submitting}
+							data-testid='login-email'
 						/>
 					</Field>
 					<Field>
@@ -164,10 +165,20 @@ function LoginPage() {
 							value={password}
 							onChange={e => setPassword(e.currentTarget.value)}
 							disabled={submitting}
+							data-testid='login-password'
 						/>
 					</Field>
-					{error ? <ErrorText role='alert'>{error}</ErrorText> : null}
-					<SubmitButton type='submit' disabled={submitting} $variant='filled'>
+					{error ? (
+						<ErrorText role='alert' data-testid='login-error'>
+							{error}
+						</ErrorText>
+					) : null}
+					<SubmitButton
+						type='submit'
+						disabled={submitting}
+						$variant='filled'
+						data-testid='login-submit'
+					>
 						{submitting ? t`Signing in…` : t`Sign in`}
 					</SubmitButton>
 				</Form>

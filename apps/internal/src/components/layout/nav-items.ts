@@ -28,6 +28,8 @@ export type NavItem = {
 	icon: ComponentType<{ size?: number | string }>
 	exact?: boolean
 	color: string
+	/** Locale-independent id for `data-testid` so agent-browser can target it. */
+	testId: string
 }
 
 export const navItems: ReadonlyArray<NavItem> = [
@@ -37,35 +39,41 @@ export const navItems: ReadonlyArray<NavItem> = [
 		icon: Gauge,
 		exact: true,
 		color: 'var(--color-status-meeting)',
+		testId: 'pipeline',
 	},
 	{
 		label: msg`Companies`,
 		path: '/companies',
 		icon: Building2,
 		color: 'var(--color-status-client)',
+		testId: 'companies',
 	},
 	{
 		label: msg`Emails`,
 		path: '/emails',
 		icon: Mail,
 		color: 'var(--color-status-contacted)',
+		testId: 'emails',
 	},
 	{
 		label: msg`Pages`,
 		path: '/pages',
 		icon: FileText,
 		color: 'var(--color-status-proposal)',
+		testId: 'pages',
 	},
 	{
 		label: msg`Tasks`,
 		path: '/tasks',
 		icon: CheckSquare,
 		color: 'var(--color-status-responded)',
+		testId: 'tasks',
 	},
 	{
 		label: msg`Profile`,
 		path: '/profile',
 		icon: User,
 		color: 'var(--color-status-prospect)',
+		testId: 'profile',
 	},
 ]

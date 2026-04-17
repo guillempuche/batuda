@@ -47,6 +47,7 @@ export function ComposeWindow({ draft }: { readonly draft: Draft }) {
 			onMouseDown={handleFocus}
 			role='dialog'
 			aria-label={titleText}
+			data-testid='compose-window'
 		>
 			<Header>
 				<TapeCorner aria-hidden />
@@ -75,6 +76,7 @@ export function ComposeWindow({ draft }: { readonly draft: Draft }) {
 					</ChromeButton>
 					<ChromeButton
 						type='button'
+						data-testid='compose-close'
 						onClick={handleClose}
 						aria-label={t`Close draft`}
 					>

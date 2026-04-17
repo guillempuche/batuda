@@ -43,7 +43,12 @@ export function TaskItem({
 }) {
 	const { t } = useLingui()
 	return (
-		<Row $overdue={overdue} $completed={completed} layout>
+		<Row
+			$overdue={overdue}
+			$completed={completed}
+			layout
+			data-testid={`task-row-${task.id}`}
+		>
 			<PriCheckbox.Root
 				checked={completed}
 				onCheckedChange={next => onToggle(Boolean(next))}

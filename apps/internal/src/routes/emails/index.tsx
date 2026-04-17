@@ -354,6 +354,9 @@ function EmailsIndexPage() {
 						query: searchInput === '' ? undefined : searchInput,
 						page: undefined,
 					}),
+				// Typing collapses into one history entry; status pills,
+				// inbox select, pagination, and Clear still push.
+				replace: true,
 			})
 		}, SEARCH_DEBOUNCE_MS)
 		return () => {
@@ -537,6 +540,7 @@ function EmailsIndexPage() {
 					<PriButton
 						type='button'
 						$variant='outlined'
+						data-testid='emails-manage-inboxes'
 						onClick={() => {
 							void navigate({ to: '/emails/inboxes' })
 						}}
@@ -547,6 +551,7 @@ function EmailsIndexPage() {
 					<PriButton
 						type='button'
 						$variant='filled'
+						data-testid='emails-compose'
 						onClick={() => {
 							openCompose({ mode: 'new' })
 						}}
@@ -564,6 +569,7 @@ function EmailsIndexPage() {
 					</SearchIcon>
 					<PriInput
 						type='search'
+						data-testid='emails-search'
 						placeholder={t`Search by subject…`}
 						value={searchInput}
 						onChange={event => setSearchInput(event.target.value)}
@@ -590,6 +596,7 @@ function EmailsIndexPage() {
 								type='button'
 								$active={active}
 								aria-pressed={active}
+								data-testid={`emails-status-${opt.value}`}
 								onClick={() =>
 									handleStatusFilter(
 										opt.value === 'all' ? undefined : opt.value,
@@ -793,6 +800,7 @@ function EmailsIndexPage() {
 							<ThreadRowEl
 								key={thread.id}
 								role='row'
+								data-testid={`thread-row-${thread.id}`}
 								$unread={thread.isUnread}
 								$muted={suspicious}
 								$selected={checked}

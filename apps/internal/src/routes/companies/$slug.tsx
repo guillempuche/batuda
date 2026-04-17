@@ -704,6 +704,7 @@ function DetailBody({
 							type='button'
 							$variant='filled'
 							onClick={handleLogInteraction}
+							data-testid='action-log-interaction'
 						>
 							<Plus size={16} aria-hidden />
 							<Trans>Log interaction</Trans>
@@ -713,15 +714,26 @@ function DetailBody({
 						type='button'
 						$variant='outlined'
 						onClick={handleComposeEmail}
+						data-testid='action-compose-email'
 					>
 						<MailPlus size={16} aria-hidden />
 						<Trans>Email</Trans>
 					</PriButton>
-					<PriButton type='button' $variant='outlined' disabled>
+					<PriButton
+						type='button'
+						$variant='outlined'
+						disabled
+						data-testid='action-add-task'
+					>
 						<Plus size={16} aria-hidden />
 						<Trans>Add task</Trans>
 					</PriButton>
-					<PriButton type='button' $variant='outlined' disabled>
+					<PriButton
+						type='button'
+						$variant='outlined'
+						disabled
+						data-testid='action-new-proposal'
+					>
 						<Plus size={16} aria-hidden />
 						<Trans>New proposal</Trans>
 					</PriButton>

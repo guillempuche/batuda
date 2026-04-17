@@ -28,7 +28,12 @@ export function SideNav() {
 					const label = i18n._(item.label)
 					return (
 						<NavItem key={item.path}>
-							<NavLink to={item.path} exact={item.exact} aria-label={label}>
+							<NavLink
+								to={item.path}
+								exact={item.exact}
+								aria-label={label}
+								data-testid={`nav-desktop-${item.testId}`}
+							>
 								{({ isActive }) => (
 									<MachineButton
 										icon={Icon}

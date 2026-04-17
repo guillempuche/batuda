@@ -112,6 +112,7 @@ function PagesListPage() {
 				</Title>
 				<HeaderActions>
 					<StatusFilter
+						data-testid='pages-status-filter'
 						value={statusFilter}
 						onChange={e => {
 							const val = e.target.value
@@ -154,7 +155,7 @@ function PagesListPage() {
 					</thead>
 					<tbody>
 						{pages.map(page => (
-							<Row key={page.id}>
+							<Row key={page.id} data-testid={`page-row-${page.slug}`}>
 								<Td>
 									<PageTitleCell>
 										<Link to='/pages/$id' params={{ id: page.id }}>

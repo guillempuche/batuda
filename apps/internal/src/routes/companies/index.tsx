@@ -189,7 +189,10 @@ function CompaniesListPage() {
 
 	// Push the debounced input to the URL. Only navigates when the value
 	// actually differs from what's already in the URL, otherwise we'd
-	// loop through the URL-sync effect above.
+	// loop through the URL-sync effect above. Uses `replace: true` so a
+	// typing session collapses into a single history entry — the back
+	// button escapes the whole search, not one keystroke at a time.
+	// Status pills and Clear still push (deliberate filter choices).
 	useEffect(() => {
 		const current = search.query ?? ''
 		if (searchInput === current) return
@@ -197,6 +200,7 @@ function CompaniesListPage() {
 			void navigate({
 				to: '/companies',
 				search: prev => mergeSearch(prev, { query: searchInput }),
+				replace: true,
 			})
 		}, SEARCH_DEBOUNCE_MS)
 		return () => {
@@ -276,6 +280,7 @@ function CompaniesListPage() {
 						onChange={event => setSearchInput(event.target.value)}
 						aria-label={t`Search companies`}
 						style={{ paddingLeft: 'calc(var(--space-sm) * 2 + 16px)' }}
+						data-testid='companies-search'
 					/>
 				</SearchWrap>
 

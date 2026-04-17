@@ -17,6 +17,7 @@ import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
  * Mobile (<640px): one window at a time as a bottom sheet.
  */
 export function ComposeDock() {
+	const { t } = useLingui()
 	const { drafts } = useComposeEmail()
 	if (drafts.length === 0) return null
 	const fullscreen = drafts.find(d => d.windowState === 'fullscreen')
@@ -28,7 +29,7 @@ export function ComposeDock() {
 	}
 
 	return (
-		<DockLayer aria-label='Email drafts'>
+		<DockLayer aria-label={t`Email drafts`}>
 			<OpenStack>
 				{open.map(draft => (
 					<ComposeWindow key={draft.id} draft={draft} />

@@ -259,7 +259,12 @@ function TasksPage() {
 
 			<Buckets>
 				{overdue.length > 0 && (
-					<Bucket label={t`Overdue`} count={overdue.length} defaultOpen>
+					<Bucket
+						slug='overdue'
+						label={t`Overdue`}
+						count={overdue.length}
+						defaultOpen
+					>
 						{overdue.map(task => (
 							<TaskItem
 								key={task.id}
@@ -276,7 +281,12 @@ function TasksPage() {
 				)}
 
 				{today.length > 0 && (
-					<Bucket label={t`Today`} count={today.length} defaultOpen>
+					<Bucket
+						slug='today'
+						label={t`Today`}
+						count={today.length}
+						defaultOpen
+					>
 						{today.map(task => (
 							<TaskItem
 								key={task.id}
@@ -292,7 +302,12 @@ function TasksPage() {
 				)}
 
 				{thisWeek.length > 0 && (
-					<Bucket label={t`This week`} count={thisWeek.length} defaultOpen>
+					<Bucket
+						slug='this-week'
+						label={t`This week`}
+						count={thisWeek.length}
+						defaultOpen
+					>
 						{thisWeek.map(task => (
 							<TaskItem
 								key={task.id}
@@ -308,7 +323,7 @@ function TasksPage() {
 				)}
 
 				{later.length > 0 && (
-					<Bucket label={t`Later`} count={later.length}>
+					<Bucket slug='later' label={t`Later`} count={later.length}>
 						{later.map(task => (
 							<TaskItem
 								key={task.id}
@@ -324,7 +339,11 @@ function TasksPage() {
 				)}
 
 				{noDue.length > 0 && (
-					<Bucket label={t`No due date`} count={noDue.length}>
+					<Bucket
+						slug='no-due-date'
+						label={t`No due date`}
+						count={noDue.length}
+					>
 						{noDue.map(task => (
 							<TaskItem
 								key={task.id}
@@ -344,18 +363,20 @@ function TasksPage() {
 }
 
 function Bucket({
+	slug,
 	label,
 	count,
 	defaultOpen = false,
 	children,
 }: {
+	slug: string
 	label: string
 	count: number
 	defaultOpen?: boolean
 	children: ReactNode
 }) {
 	return (
-		<BucketSection>
+		<BucketSection data-testid={`tasks-bucket-${slug}`}>
 			<PriCollapsible.Root defaultOpen={defaultOpen}>
 				<BucketHeaderRow>
 					<PriCollapsible.Trigger>

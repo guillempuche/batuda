@@ -65,6 +65,7 @@ export function CompanyCard({
 				render={
 					<Card
 						layoutId={`company-${company.slug}`}
+						data-testid={`company-card-${company.slug}`}
 						whileHover={{
 							rotate: 0,
 							y: -3,
