@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from 'node:fs'
+import { existsSync, readdirSync, statSync } from 'node:fs'
 import { copyFile, readFile, writeFile } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 
@@ -6,32 +6,32 @@ import { Effect } from 'effect'
 
 const ROOT = resolve(import.meta.dirname, '../../../..')
 
-const SKIP_DIRS = new Set([
-	'node_modules',
-	'docs',
-	'.git',
-	'dist',
-	'.output',
-	'.vinxi',
-])
-
-const ENV_EXAMPLE_RE = /^\.env(?:\..+)?\.example$/
+const WORKSPACE_DIRS = ['apps', 'packages'] as const
 
 /**
- * Walk the repo tree and return relative paths to every .env*.example file
- * (.env.example, .env.cloud.example, .env.github.example, …).
+ * Return repo-relative paths to every `.env.example` (exact name) located at
+ * the repo root or one level deep inside `apps/` and `packages/`. Variants
+ * like `.env.cloud.example` or `.env.example.github` are intentionally
+ * ignored so the sync surface stays narrow.
  */
-const findEnvExamples = (dir: string): string[] => {
+const findEnvExamples = (): string[] => {
 	const results: string[] = []
-	for (const entry of readdirSync(dir, { withFileTypes: true })) {
-		if (entry.isDirectory()) {
-			if (!SKIP_DIRS.has(entry.name)) {
-				results.push(...findEnvExamples(join(dir, entry.name)))
+
+	const rootExample = join(ROOT, '.env.example')
+	if (existsSync(rootExample)) results.push('.env.example')
+
+	for (const workspace of WORKSPACE_DIRS) {
+		const workspaceDir = join(ROOT, workspace)
+		if (!existsSync(workspaceDir)) continue
+		for (const entry of readdirSync(workspaceDir, { withFileTypes: true })) {
+			if (!entry.isDirectory()) continue
+			const example = join(workspaceDir, entry.name, '.env.example')
+			if (existsSync(example) && statSync(example).isFile()) {
+				results.push(relative(ROOT, example))
 			}
-		} else if (ENV_EXAMPLE_RE.test(entry.name)) {
-			results.push(relative(ROOT, join(dir, entry.name)))
 		}
 	}
+
 	return results
 }
 
@@ -97,7 +97,7 @@ const parseEnvEntries = (content: string): EnvEntry[] => {
 export const setup: Effect.Effect<EnvFileResult[]> = Effect.gen(function* () {
 	const results: EnvFileResult[] = []
 
-	for (const example of findEnvExamples(ROOT)) {
+	for (const example of findEnvExamples()) {
 		const target = example.replace(/\.example$/, '')
 		const src = resolve(ROOT, example)
 		const dst = resolve(ROOT, target)
@@ -130,14 +130,17 @@ export const setup: Effect.Effect<EnvFileResult[]> = Effect.gen(function* () {
 })
 
 /** Append missing entries (with their comments) to an existing .env file. */
-export const appendEnvKeys = (targetPath: string, entries: EnvEntry[]) =>
+export const appendEnvKeys = (targetRel: string, entries: EnvEntry[]) =>
 	Effect.promise(async () => {
-		const existing = await readFile(targetPath, 'utf-8')
+		const dst = resolve(ROOT, targetRel)
+		const existing = await readFile(dst, 'utf-8')
 		const block = entries.flatMap(e => [...e.comments, e.line]).join('\n')
 		const separator = existing.endsWith('\n') ? '\n' : '\n\n'
-		await writeFile(targetPath, `${existing}${separator}${block}\n`)
+		await writeFile(dst, `${existing}${separator}${block}\n`)
 	})
 
 /** Replace target .env entirely with .env.example content. */
-export const resetEnvFile = (exampleRel: string, targetPath: string) =>
-	Effect.promise(() => copyFile(resolve(ROOT, exampleRel), targetPath))
+export const resetEnvFile = (exampleRel: string, targetRel: string) =>
+	Effect.promise(() =>
+		copyFile(resolve(ROOT, exampleRel), resolve(ROOT, targetRel)),
+	)
