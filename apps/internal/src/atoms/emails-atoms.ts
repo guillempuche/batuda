@@ -22,10 +22,7 @@ export const EMAILS_PAGE_SIZE = 100
 const cache = new Map<string, ReturnType<typeof makeListAtom>>()
 
 function makeListAtom(search: EmailsSearch) {
-	// The atom reads string values for numeric fields because the query
-	// schema uses `Schema.NumberFromString`. Serialize here so the request
-	// payload matches the wire format.
-	const query: Record<string, string> = {}
+	const query: Record<string, string | number> = {}
 	if (search.inboxId !== undefined && search.inboxId !== '') {
 		query['inboxId'] = search.inboxId
 	}
@@ -37,8 +34,8 @@ function makeListAtom(search: EmailsSearch) {
 	if (search.query !== undefined && search.query !== '') {
 		query['query'] = search.query
 	}
-	if (search.limit !== undefined) query['limit'] = String(search.limit)
-	if (search.offset !== undefined) query['offset'] = String(search.offset)
+	if (search.limit !== undefined) query['limit'] = search.limit
+	if (search.offset !== undefined) query['offset'] = search.offset
 	return ForjaApiAtom.query('email', 'listThreads', { query })
 }
 

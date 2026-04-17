@@ -197,14 +197,14 @@ async function loadThreadsOnServer(wire: EmailsSearch): Promise<{
 		import('#/lib/forja-api-server'),
 		getServerCookieHeader(),
 	])
-	const queryForServer: Record<string, string> = {}
+	const queryForServer: Record<string, string | number> = {}
 	if (wire.inboxId !== undefined) queryForServer['inboxId'] = wire.inboxId
 	if (wire.companyId !== undefined) queryForServer['companyId'] = wire.companyId
 	if (wire.status !== undefined) queryForServer['status'] = wire.status
 	if (wire.purpose !== undefined) queryForServer['purpose'] = wire.purpose
 	if (wire.query !== undefined) queryForServer['query'] = wire.query
-	if (wire.limit !== undefined) queryForServer['limit'] = String(wire.limit)
-	if (wire.offset !== undefined) queryForServer['offset'] = String(wire.offset)
+	if (wire.limit !== undefined) queryForServer['limit'] = wire.limit
+	if (wire.offset !== undefined) queryForServer['offset'] = wire.offset
 	const program = Effect.gen(function* () {
 		const client = yield* makeForjaApiServer(cookie ?? undefined)
 		const [envelope, inboxes] = yield* Effect.all(
