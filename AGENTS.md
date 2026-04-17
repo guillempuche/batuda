@@ -177,6 +177,47 @@ Use **kebab-case** for all filenames, including React components:
 
 This applies to `.ts`, `.tsx`, `.css`, and all other source files.
 
+### Env var naming
+
+Env vars name the **capability**, not the vendor. Swapping from one vendor to another must not require renaming secrets.
+
+**Grammar:** `<DOMAIN>_<ROLE>[_<CAPABILITY>][_<CC>][_<N>]`
+
+- **`<DOMAIN>`** — one of `STORAGE`, `EMAIL`, `RESEARCH`, `BETTER_AUTH`, …
+- **`<ROLE>`** — what kind of knob: `PROVIDER`, `API_KEY`, `BASE_URL`, `MODEL`, `ENDPOINT`, `REGION`, `BUCKET`, `SECRET`, `WEBHOOK_SECRET`. Role comes before capability so grepping `RESEARCH_API_KEY_` picks up every secret in the family at once.
+- **`<CAPABILITY>`** (optional) — what's being provided: `SEARCH`, `SCRAPE`, `EXTRACT`, `DISCOVER`, `REGISTRY`, `REPORT`, `LLM`. Present when the domain has multiple capabilities; absent when the domain has only one (e.g. `STORAGE_ENDPOINT`, not `STORAGE_ENDPOINT_S3`).
+- **`<CC>`** (optional) — ISO-3166-1 alpha-2 suffix when the capability is per-country: `_ES`, `_FR`. Placed after capability so adding a country doesn't disturb the rest of the name.
+- **`<N>`** (optional) — slot index for multi-provider fallback chains. Slot 0 (primary) is unsuffixed; slot N ≥ 1 uses `_${N + 1}` (e.g. `RESEARCH_API_KEY_SEARCH_2` = slot 1).
+
+**Examples (good):**
+
+| Var                             | Domain   | Role     | Capability | CC | Slot |
+| ------------------------------- | -------- | -------- | ---------- | -- | ---- |
+| `STORAGE_ENDPOINT`              | STORAGE  | ENDPOINT | —          | —  | —    |
+| `EMAIL_PROVIDER`                | EMAIL    | PROVIDER | —          | —  | —    |
+| `EMAIL_API_KEY`                 | EMAIL    | API_KEY  | —          | —  | —    |
+| `RESEARCH_PROVIDER_SEARCH`      | RESEARCH | PROVIDER | SEARCH     | —  | —    |
+| `RESEARCH_API_KEY_SEARCH`       | RESEARCH | API_KEY  | SEARCH     | —  | —    |
+| `RESEARCH_PROVIDER_REGISTRY_ES` | RESEARCH | PROVIDER | REGISTRY   | ES | —    |
+| `RESEARCH_API_KEY_SEARCH_2`     | RESEARCH | API_KEY  | SEARCH     | —  | 1    |
+| `RESEARCH_MODEL_LLM`            | RESEARCH | MODEL    | LLM        | —  | —    |
+
+**Anti-patterns (don't do):**
+
+- `BRAVE_SEARCH_API_KEY`, `FIRECRAWL_API_KEY`, `AGENTMAIL_API_KEY`, `R2_ACCESS_KEY_ID` — vendor in the name. Swapping Brave → something else now requires a secret rename in every deployment.
+- `SEARCH_PROVIDER` (capability first) — breaks "grep by role" because `RESEARCH_PROVIDER_*` across all capabilities no longer clusters.
+- `RESEARCH_PROVIDER_SEARCH_FIRECRAWL` — vendor as a suffix. The vendor goes in the **value**, never the key.
+
+**Multi-provider fallback (comma-list values).** Any `RESEARCH_PROVIDER_<CAP>` var accepts a comma list: first value = primary, rest = fallback chain on `ProviderError`. One entry means single provider. No separate `*_STRATEGY` knob — list length drives behaviour.
+
+```
+RESEARCH_PROVIDER_SEARCH=brave,firecrawl   # primary + fallback
+RESEARCH_API_KEY_SEARCH=bsa_...            # slot 0 key
+RESEARCH_API_KEY_SEARCH_2=fc_...           # slot 1 key
+```
+
+**No backwards-compat shims.** When an env var is renamed, update `.env.example`, `.env.example.github`, all consumers, and every deployment in one atomic commit. Do not add a fallback that reads the old name.
+
 ### Backend (apps/server)
 
 - Effect patterns: see `docs/backend.md`
