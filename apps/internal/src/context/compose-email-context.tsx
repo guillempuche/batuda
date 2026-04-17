@@ -17,6 +17,8 @@ export type DraftMode = 'new' | 'reply'
 /** Window chrome state. Drafts move between these three. */
 export type DraftWindowState = 'open' | 'minimized' | 'fullscreen'
 
+import type { StagedAttachment } from '#/lib/email-attachments'
+
 /** Per-draft form fields. Reply drafts only write `body`, `cc`, `bcc`. */
 export type DraftForm = {
 	readonly inboxId: string | null
@@ -26,6 +28,7 @@ export type DraftForm = {
 	readonly subject: string
 	readonly body: string
 	readonly bodyHtml: string
+	readonly attachments: ReadonlyArray<StagedAttachment>
 }
 
 export type Draft = {
@@ -61,6 +64,7 @@ const EMPTY_FORM: DraftForm = {
 	subject: '',
 	body: '',
 	bodyHtml: '',
+	attachments: [],
 }
 
 export type ComposeEmailContextValue = {

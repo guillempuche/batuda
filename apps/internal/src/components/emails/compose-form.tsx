@@ -1,7 +1,7 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { useLingui } from '@lingui/react/macro'
 import { AsyncResult } from 'effect/unstable/reactivity'
-import { AlertTriangle, Paperclip, Plus, Send, X } from 'lucide-react'
+import { AlertTriangle, Plus, Send, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
@@ -15,6 +15,7 @@ import {
 	sendEmailAtom,
 	threadAtomFor,
 } from '#/atoms/emails-atoms'
+import { AttachmentPicker } from '#/components/emails/attachment-picker'
 import { EmailComposer } from '#/components/emails/email-composer'
 import { type Draft, useComposeEmail } from '#/context/compose-email-context'
 
@@ -97,6 +98,9 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 				}
 				const cc = splitAddresses(draft.form.cc)
 				const bcc = splitAddresses(draft.form.bcc)
+				const attachments = draft.form.attachments.map(a => ({
+					stagingId: a.stagingId,
+				}))
 				await reply({
 					payload: {
 						threadId: draft.threadId,
@@ -104,6 +108,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 						...(draft.form.bodyHtml !== '' && { html: draft.form.bodyHtml }),
 						...(cc.length > 0 && { cc }),
 						...(bcc.length > 0 && { bcc }),
+						...(attachments.length > 0 && { attachments }),
 					},
 				})
 				refreshThread()
@@ -123,6 +128,9 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 					toList.length === 1 ? firstTo : toList
 				const cc = splitAddresses(draft.form.cc)
 				const bcc = splitAddresses(draft.form.bcc)
+				const attachments = draft.form.attachments.map(a => ({
+					stagingId: a.stagingId,
+				}))
 				await send({
 					payload: {
 						inboxId: effectiveInboxId,
@@ -136,6 +144,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 						}),
 						...(cc.length > 0 && { cc }),
 						...(bcc.length > 0 && { bcc }),
+						...(attachments.length > 0 && { attachments }),
 					},
 				})
 			}
@@ -321,19 +330,18 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 				</ErrorBanner>
 			) : null}
 
+			<AttachmentPicker
+				value={draft.form.attachments}
+				onChange={next => {
+					updateForm(draft.id, { attachments: next })
+				}}
+			/>
+
 			<Footer>
 				<PriButton type='submit' $variant='filled' disabled={!canSend}>
 					<Send size={14} aria-hidden />
 					<span>{sendState === 'sending' ? t`Sending…` : t`Send`}</span>
 				</PriButton>
-				<AttachmentHint
-					type='button'
-					disabled
-					title={t`Attachments ship with the next compose update`}
-				>
-					<Paperclip size={14} aria-hidden />
-					<span>{t`Attach`}</span>
-				</AttachmentHint>
 				<PriButton type='button' $variant='text' onClick={handleDiscard}>
 					<X size={14} aria-hidden />
 					<span>{t`Discard`}</span>
@@ -505,25 +513,6 @@ const Footer = styled.div.withConfig({ displayName: 'ComposeFooter' })`
 	gap: var(--space-xs);
 	padding-top: var(--space-xs);
 	border-top: 1px dashed var(--color-outline);
-`
-
-const AttachmentHint = styled.button.withConfig({
-	displayName: 'ComposeAttachmentHint',
-})`
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-2xs);
-	padding: var(--space-2xs) var(--space-sm);
-	border: 1px dashed var(--color-outline);
-	border-radius: var(--shape-2xs);
-	background: transparent;
-	color: var(--color-on-surface-variant);
-	font-family: var(--font-display);
-	font-size: var(--typescale-label-medium-size);
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-	cursor: not-allowed;
-	opacity: 0.7;
 `
 
 const SuppressionBanner = styled.div.withConfig({

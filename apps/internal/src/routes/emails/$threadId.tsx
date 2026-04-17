@@ -35,6 +35,7 @@ import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { useComposeEmail } from '#/context/compose-email-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
+import { downloadUrlFor } from '#/lib/email-attachments'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import {
 	agedPaperSurface,
@@ -581,7 +582,14 @@ function MessageItem({
 			{msg.attachments.length > 0 ? (
 				<AttachmentList>
 					{msg.attachments.map(att => (
-						<AttachmentChip key={att.attachmentId}>
+						<AttachmentChip
+							key={att.attachmentId}
+							href={downloadUrlFor(msg.messageId, att.attachmentId)}
+							target='_blank'
+							rel='noreferrer'
+							download={att.filename ?? undefined}
+							title={att.filename ?? t`attachment`}
+						>
 							<Paperclip size={12} aria-hidden />
 							<AttachmentName>{att.filename ?? t`attachment`}</AttachmentName>
 							<AttachmentSize>{formatBytes(att.size)}</AttachmentSize>
@@ -1270,7 +1278,7 @@ const AttachmentList = styled.div.withConfig({
 	border-top: 1px dashed var(--color-outline);
 `
 
-const AttachmentChip = styled.span.withConfig({
+const AttachmentChip = styled.a.withConfig({
 	displayName: 'ThreadAttachmentChip',
 })`
 	display: inline-flex;
@@ -1282,6 +1290,13 @@ const AttachmentChip = styled.span.withConfig({
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface);
 	background: var(--color-surface);
+	text-decoration: none;
+	cursor: pointer;
+
+	&:hover {
+		border-color: var(--color-primary);
+		color: var(--color-primary);
+	}
 `
 
 const AttachmentName = styled.span.withConfig({
