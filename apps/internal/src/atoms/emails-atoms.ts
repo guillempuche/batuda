@@ -102,6 +102,9 @@ export function threadAtomFor(threadId: string) {
  * render (the list page, the bulk toolbar, the row context menu) shares
  * a single writable setter instance.
  */
+export const sendEmailAtom = ForjaApiAtom.mutation('email', 'send')
+export const replyEmailAtom = ForjaApiAtom.mutation('email', 'reply')
+
 export const updateThreadStatusAtom = ForjaApiAtom.mutation(
 	'email',
 	'updateThreadStatus',

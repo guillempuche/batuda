@@ -15,6 +15,7 @@ import {
 	Eye,
 	EyeOff,
 	Mail,
+	Pencil,
 	Search,
 	X,
 } from 'lucide-react'
@@ -37,6 +38,7 @@ import { companiesListAtom } from '#/atoms/pipeline-atoms'
 import { EmptyState } from '#/components/shared/empty-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { RelativeDate } from '#/components/shared/relative-date'
+import { useComposeEmail } from '#/context/compose-email-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import {
@@ -246,6 +248,7 @@ function EmailsIndexPage() {
 	const { t } = useLingui()
 	const search = Route.useSearch()
 	const navigate = useNavigate({ from: Route.fullPath })
+	const { openCompose } = useComposeEmail()
 	const wire = useMemo(() => toWireSearch(search), [search])
 
 	// Atom identity is keyed by the canonical wire-shape key, not by the
@@ -438,6 +441,18 @@ function EmailsIndexPage() {
 					<Title>{t`Emails`}</Title>
 					<Subtitle>{total === 1 ? t`1 thread` : t`${total} threads`}</Subtitle>
 				</IntroText>
+				<IntroActions>
+					<PriButton
+						type='button'
+						$variant='filled'
+						onClick={() => {
+							openCompose({ mode: 'new' })
+						}}
+					>
+						<Pencil size={14} aria-hidden />
+						<span>{t`Compose`}</span>
+					</PriButton>
+				</IntroActions>
 			</Intro>
 
 			<Filters role='group' aria-label={t`Filter emails`}>
@@ -1011,6 +1026,18 @@ const Intro = styled.div.withConfig({ displayName: 'EmailsIndexIntro' })`
 
 	@media (min-width: 768px) {
 		grid-template-columns: 1fr auto;
+	}
+`
+
+const IntroActions = styled.div.withConfig({
+	displayName: 'EmailsIndexIntroActions',
+})`
+	display: flex;
+	gap: var(--space-xs);
+	justify-self: start;
+
+	@media (min-width: 768px) {
+		justify-self: end;
 	}
 `
 

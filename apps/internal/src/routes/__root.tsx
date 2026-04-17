@@ -13,9 +13,11 @@ import { LayoutGroup } from 'motion/react'
 
 import { PriToast } from '@engranatge/ui/pri'
 
+import { ComposeDock } from '#/components/emails/compose-dock'
 import { QuickCaptureDialog } from '#/components/interactions/quick-capture-dialog'
 import { AppShell } from '#/components/layout/app-shell'
 import { ForjaMotionConfig } from '#/components/layout/motion-config'
+import { ComposeEmailProvider } from '#/context/compose-email-context'
 import { QuickCaptureProvider } from '#/context/quick-capture-context'
 import { i18n } from '#/i18n'
 import type { DehydratedAtomValue } from '#/lib/atom-hydration'
@@ -141,10 +143,13 @@ function RootComponent() {
 										<Outlet />
 									) : (
 										<QuickCaptureProvider>
-											<AppShell>
-												<Outlet />
-											</AppShell>
-											<QuickCaptureDialog />
+											<ComposeEmailProvider>
+												<AppShell>
+													<Outlet />
+												</AppShell>
+												<QuickCaptureDialog />
+												<ComposeDock />
+											</ComposeEmailProvider>
 										</QuickCaptureProvider>
 									)}
 									<PriToast.Viewport />
