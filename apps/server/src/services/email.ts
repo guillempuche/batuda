@@ -76,12 +76,13 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						const cc = extras?.cc ?? []
 						const bcc = extras?.bcc ?? []
 						const attachments = extras?.attachments ?? []
-						// 1) Fast-path cache check
+
 						if (contactId) {
 							yield* assertContactNotSuppressed(contactId, to)
 						}
 
-						// 2) Provider call — self-heal cache on stale-suppressed rejection
+						// Self-heal the suppression cache if the provider rejects for a
+						// recipient we had not yet marked as bounced locally.
 						const result = yield* provider
 							.send(inboxId, {
 								to,
@@ -120,7 +121,6 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								),
 							)
 
-						// 3) Persist thread link, interaction, contact freshness, message row
 						yield* sql`
 							INSERT INTO email_thread_links ${sql.insert({
 								provider: providerName,
@@ -226,12 +226,12 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							})
 						}
 
-						// Pull recipient address(es) for the reply target
+						// When the last message is inbound, reply to its sender; when it's
+						// outbound, keep the original recipients.
 						const replyRecipients = lastMessage.from
 							? [lastMessage.from]
 							: lastMessage.to
 
-						// Fast-path cache check
 						if (link.contactId) {
 							yield* assertContactNotSuppressed(link.contactId, replyRecipients)
 						}

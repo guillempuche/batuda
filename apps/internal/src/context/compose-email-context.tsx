@@ -82,16 +82,10 @@ export type ComposeEmailContextValue = {
 const ComposeEmailContext = createContext<ComposeEmailContextValue | null>(null)
 
 /**
- * Draft state for the floating compose dock. Owns the draft map, the
- * ordering (focus order moves a draft to the front), and the global
- * `Shift+E` keyboard shortcut. The dock and each compose window read
- * from this context so there is a single source of truth for draft
- * state even as the user navigates between routes.
- *
- * Drafts do not auto-save in v1. Closing a dirty draft prompts for
- * confirmation; a forced close skips the prompt (used when a send
- * succeeds). v2 will persist drafts to localStorage or the provider
- * `drafts` resource.
+ * Draft state for the floating compose dock. Mounting the provider high
+ * in the tree lets drafts survive route navigations. Drafts live only in
+ * memory — closing a dirty draft prompts for confirmation, and a forced
+ * close (used after a successful send) skips the prompt.
  */
 export function ComposeEmailProvider({
 	children,

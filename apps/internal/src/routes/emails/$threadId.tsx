@@ -788,9 +788,9 @@ function toDateStringOrNull(raw: unknown): string | null {
 }
 
 /**
- * Prefer plain text when the provider gives us both. HTML rendering
- * without a sanitizer is unsafe for inbound content; Phase 7 polish
- * swaps this for a sanitized HTML renderer.
+ * Prefer plain text when the provider gives us both. HTML from inbound
+ * messages is rendered only via `stripHtml` because no sanitizer is
+ * wired in yet.
  */
 function pickBody(msg: ThreadMessage, _inboxEmail: string | null): string {
 	if (msg.text && msg.text.trim() !== '') return msg.text

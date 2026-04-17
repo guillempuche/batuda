@@ -14,8 +14,7 @@ export const EmailLive = HttpApiBuilder.group(ForjaApi, 'email', handlers =>
 		const staging = yield* EmailAttachmentStaging
 
 		// Resolve an array of { stagingId } refs into the provider-agnostic
-		// SendAttachmentInput shape that the service accepts. Consumed in
-		// both send + reply handlers; pulled out for readability.
+		// SendAttachmentInput shape that the service accepts.
 		const resolveAttachments = (
 			refs: ReadonlyArray<{ readonly stagingId: string }> | undefined,
 		): Effect.Effect<readonly SendAttachmentInput[], BadRequest> =>

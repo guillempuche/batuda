@@ -17,7 +17,6 @@ export type EmailsSearch = {
 	readonly offset?: number
 }
 
-/** Page size for the list view — plan pegs this at 100 / page. */
 export const EMAILS_PAGE_SIZE = 100
 
 const cache = new Map<string, ReturnType<typeof makeListAtom>>()
@@ -71,17 +70,14 @@ export function canonicalKey(search: EmailsSearch): string {
 	return JSON.stringify(Object.fromEntries(entries))
 }
 
-/** Module-scoped atom for the list of inboxes shown in the inbox picker. */
 export const inboxesListAtom = ForjaApiAtom.query('email', 'listInboxes', {
 	query: {},
 })
 
 /**
- * Id-keyed atom factory for the thread detail page. The loader and the
- * component call this with the same `threadId` to get the *same* atom
- * identity, which is how the SSR hydration lands on the atom the
- * component reads. Entries are cached forever — one atom per thread per
- * session is fine.
+ * Id-keyed atom factory. The same `threadId` must return the same atom
+ * identity so SSR hydration lands on the atom the component subscribes
+ * to.
  */
 const threadCache = new Map<string, ReturnType<typeof makeThreadAtom>>()
 function makeThreadAtom(threadId: string) {
@@ -97,11 +93,8 @@ export function threadAtomFor(threadId: string) {
 	return atom
 }
 
-/**
- * Mutation atoms for thread state changes. Held at module scope so every
- * render (the list page, the bulk toolbar, the row context menu) shares
- * a single writable setter instance.
- */
+// Module-scoped mutation atoms — a single writable setter instance is
+// shared across every component that fires the same mutation.
 export const sendEmailAtom = ForjaApiAtom.mutation('email', 'send')
 export const replyEmailAtom = ForjaApiAtom.mutation('email', 'reply')
 
@@ -118,12 +111,6 @@ export const markThreadUnreadAtom = ForjaApiAtom.mutation(
 	'markThreadUnread',
 )
 
-/**
- * Inbox CRUD mutations. The `/emails/inboxes` management page reads
- * `inboxesListAtom` for the listing and calls these setters to
- * create / edit / trigger a provider sync. After any write the caller
- * refreshes `inboxesListAtom` so the table reflects the change.
- */
 export const createInboxAtom = ForjaApiAtom.mutation('email', 'createInbox')
 export const updateInboxAtom = ForjaApiAtom.mutation('email', 'updateInbox')
 export const syncInboxesAtom = ForjaApiAtom.mutation('email', 'syncInboxes')

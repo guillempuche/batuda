@@ -404,11 +404,6 @@ function DetailBody({
 		[tasks],
 	)
 
-	// After a successful Quick Capture submit, refresh both the interactions
-	// feed and the company row — the server copies nextAction +
-	// lastContactedAt onto the company in the same transaction (see
-	// interactions handler), so both atoms are stale until we refresh.
-	// `onSubmitted` is invoked by the dialog via the prefill payload.
 	const handleComposeEmail = useCallback(() => {
 		openCompose({ mode: 'new', companyId: company.id })
 	}, [openCompose, company.id])
@@ -425,6 +420,9 @@ function DetailBody({
 		[openCompose, company.id],
 	)
 
+	// Both the interactions feed and the company row become stale after
+	// Quick Capture submits — the server copies nextAction + lastContactedAt
+	// onto the company in the same transaction as the interaction insert.
 	const handleLogInteraction = useCallback(() => {
 		openQuickCapture({
 			companyId: company.id,
