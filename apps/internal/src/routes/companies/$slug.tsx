@@ -10,6 +10,7 @@ import {
 	FileText,
 	Globe,
 	Mail,
+	MailPlus,
 	MapPin,
 	Phone,
 	Plus,
@@ -26,6 +27,7 @@ import {
 	contactsAtomFor,
 	interactionsAtomFor,
 } from '#/atoms/company-atoms'
+import { emailsSearchAtom } from '#/atoms/emails-atoms'
 import { pagesSearchAtom } from '#/atoms/pages-atoms'
 import { EmptyState } from '#/components/shared/empty-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
@@ -37,6 +39,7 @@ import {
 	type TimelineEntryData,
 } from '#/components/shared/timeline-entry'
 import { ScrewDot } from '#/components/shared/workshop-decorations'
+import { useComposeEmail } from '#/context/compose-email-context'
 import { useQuickCapture } from '#/context/quick-capture-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { getServerCookieHeader } from '#/lib/server-cookie'
@@ -96,6 +99,7 @@ type InteractionRow = {
 	readonly summary: string | null
 	readonly outcome: string | null
 	readonly nextAction: string | null
+	readonly providerThreadId: string | null
 }
 
 type TaskEntry = {
@@ -279,6 +283,7 @@ function DetailBody({
 }) {
 	const { t } = useLingui()
 	const { open: openQuickCapture } = useQuickCapture()
+	const { openCompose } = useComposeEmail()
 
 	const contactsAtom = useMemo(() => contactsAtomFor(company.id), [company.id])
 	const interactionsAtom = useMemo(
@@ -290,11 +295,16 @@ function DetailBody({
 		() => pagesSearchAtom({ companyId: company.id }),
 		[company.id],
 	)
+	const companyEmailsAtom = useMemo(
+		() => emailsSearchAtom({ companyId: company.id, limit: 100 }),
+		[company.id],
+	)
 
 	const contactsResult = useAtomValue(contactsAtom)
 	const interactionsResult = useAtomValue(interactionsAtom)
 	const tasksResult = useAtomValue(tasksAtom)
 	const pagesResult = useAtomValue(companyPagesAtom)
+	const emailsResult = useAtomValue(companyEmailsAtom)
 
 	const refreshInteractions = useAtomRefresh(interactionsAtom)
 
@@ -343,6 +353,52 @@ function DetailBody({
 		return out
 	}, [pagesResult])
 
+	type CompanyThreadRow = {
+		readonly id: string
+		readonly providerThreadId: string
+		readonly subject: string | null
+		readonly status: 'open' | 'closed' | 'archived'
+		readonly updatedAt: string
+		readonly messageCount: number
+	}
+	const companyThreads = useMemo<ReadonlyArray<CompanyThreadRow>>(() => {
+		if (!AsyncResult.isSuccess(emailsResult)) return []
+		const envelope = emailsResult.value
+		if (!envelope || typeof envelope !== 'object') return []
+		const items = (envelope as Record<string, unknown>)['items']
+		if (!Array.isArray(items)) return []
+		const out: Array<CompanyThreadRow> = []
+		for (const row of items) {
+			if (!row || typeof row !== 'object') continue
+			const r = row as Record<string, unknown>
+			if (typeof r['id'] !== 'string') continue
+			if (typeof r['providerThreadId'] !== 'string') continue
+			const status = r['status']
+			if (status !== 'open' && status !== 'closed' && status !== 'archived') {
+				continue
+			}
+			out.push({
+				id: r['id'],
+				providerThreadId: r['providerThreadId'],
+				subject: typeof r['subject'] === 'string' ? r['subject'] : null,
+				status,
+				updatedAt:
+					typeof r['updatedAt'] === 'string'
+						? r['updatedAt']
+						: new Date(0).toISOString(),
+				messageCount:
+					typeof r['messageCount'] === 'number' ? r['messageCount'] : 0,
+			})
+		}
+		return out
+	}, [emailsResult])
+
+	const threadIdByProviderId = useMemo(() => {
+		const map = new Map<string, string>()
+		for (const t of companyThreads) map.set(t.providerThreadId, t.id)
+		return map
+	}, [companyThreads])
+
 	const openTaskCount = useMemo(
 		() => tasks.filter(task => task.completedAt === null).length,
 		[tasks],
@@ -353,6 +409,22 @@ function DetailBody({
 	// lastContactedAt onto the company in the same transaction (see
 	// interactions handler), so both atoms are stale until we refresh.
 	// `onSubmitted` is invoked by the dialog via the prefill payload.
+	const handleComposeEmail = useCallback(() => {
+		openCompose({ mode: 'new', companyId: company.id })
+	}, [openCompose, company.id])
+
+	const handleEmailContact = useCallback(
+		(contactId: string, email: string | null) => {
+			openCompose({
+				mode: 'new',
+				companyId: company.id,
+				contactId,
+				...(email ? { to: email } : {}),
+			})
+		},
+		[openCompose, company.id],
+	)
+
 	const handleLogInteraction = useCallback(() => {
 		openQuickCapture({
 			companyId: company.id,
@@ -469,6 +541,14 @@ function DetailBody({
 							<Trans>Log interaction</Trans>
 						</PriButton>
 					</motion.div>
+					<PriButton
+						type='button'
+						$variant='outlined'
+						onClick={handleComposeEmail}
+					>
+						<MailPlus size={16} aria-hidden />
+						<Trans>Email</Trans>
+					</PriButton>
 					<PriButton type='button' $variant='outlined' disabled>
 						<Plus size={16} aria-hidden />
 						<Trans>Add task</Trans>
@@ -487,6 +567,9 @@ function DetailBody({
 					</PriTabs.Tab>
 					<PriTabs.Tab value='contacts'>
 						<Trans>Contacts</Trans> ({contacts.length})
+					</PriTabs.Tab>
+					<PriTabs.Tab value='emails'>
+						<Trans>Emails</Trans> ({companyThreads.length})
 					</PriTabs.Tab>
 					<PriTabs.Tab value='tasks'>
 						<Trans>Tasks</Trans> ({openTaskCount})
@@ -557,6 +640,17 @@ function DetailBody({
 													<span>{contact.email}</span>
 												</ContactLink>
 											)}
+											<ContactLinkButton
+												type='button'
+												onClick={() =>
+													handleEmailContact(contact.id, contact.email)
+												}
+											>
+												<MailPlus size={14} aria-hidden />
+												<span>
+													<Trans>Email via Forja</Trans>
+												</span>
+											</ContactLinkButton>
 											{contact.phone && (
 												<ContactLink href={`tel:${contact.phone}`}>
 													<Phone size={14} aria-hidden />
@@ -580,6 +674,53 @@ function DetailBody({
 									</ContactCard>
 								))}
 							</ContactList>
+						)}
+					</PanelWrap>
+				</PriTabs.Panel>
+
+				<PriTabs.Panel value='emails'>
+					<PanelWrap>
+						<EmailsPanelToolbar>
+							<PriButton
+								type='button'
+								$variant='outlined'
+								onClick={handleComposeEmail}
+							>
+								<MailPlus size={14} aria-hidden />
+								<Trans>Compose</Trans>
+							</PriButton>
+						</EmailsPanelToolbar>
+						{companyThreads.length === 0 ? (
+							<EmptyState
+								icon={Mail}
+								title={t`No email threads yet`}
+								description={t`Messages sent or received with this company will appear here.`}
+							/>
+						) : (
+							<ThreadList>
+								{companyThreads.map(thread => (
+									<ThreadRow key={thread.id}>
+										<ThreadTitle>
+											<Link
+												to='/emails/$threadId'
+												params={{ threadId: thread.id }}
+											>
+												{thread.subject?.trim() || t`(no subject)`}
+											</Link>
+										</ThreadTitle>
+										<ThreadMeta>
+											<ThreadStatusBadge $status={thread.status}>
+												{thread.status}
+											</ThreadStatusBadge>
+											<span>
+												{thread.messageCount}{' '}
+												{thread.messageCount === 1 ? t`msg` : t`msgs`}
+											</span>
+											<RelativeDate value={thread.updatedAt} />
+										</ThreadMeta>
+									</ThreadRow>
+								))}
+							</ThreadList>
 						)}
 					</PanelWrap>
 				</PriTabs.Panel>
@@ -667,6 +808,12 @@ function DetailBody({
 							) : (
 								<TimelineList>
 									{interactions.map(interaction => {
+										const localThreadId =
+											interaction.providerThreadId !== null
+												? (threadIdByProviderId.get(
+														interaction.providerThreadId,
+													) ?? null)
+												: null
 										const entry: TimelineEntryData = {
 											id: interaction.id,
 											channel: interaction.channel,
@@ -675,6 +822,7 @@ function DetailBody({
 											outcome: interaction.outcome,
 											nextAction: interaction.nextAction,
 											date: interaction.date,
+											threadId: localThreadId,
 										}
 										return <TimelineEntry key={interaction.id} entry={entry} />
 									})}
@@ -788,6 +936,14 @@ function narrowInteractions(
 		if (typeof r['id'] !== 'string') continue
 		if (typeof r['channel'] !== 'string') continue
 		if (typeof r['date'] !== 'string') continue
+		const meta = r['metadata']
+		let providerThreadId: string | null = null
+		if (meta && typeof meta === 'object') {
+			const m = meta as Record<string, unknown>
+			if (typeof m['providerThreadId'] === 'string') {
+				providerThreadId = m['providerThreadId']
+			}
+		}
 		out.push({
 			id: r['id'],
 			channel: r['channel'],
@@ -796,6 +952,7 @@ function narrowInteractions(
 			summary: typeof r['summary'] === 'string' ? r['summary'] : null,
 			outcome: typeof r['outcome'] === 'string' ? r['outcome'] : null,
 			nextAction: typeof r['nextAction'] === 'string' ? r['nextAction'] : null,
+			providerThreadId,
 		})
 	}
 	// Sort interactions most-recent-first — the server does not guarantee
@@ -1144,6 +1301,113 @@ const ContactLink = styled.a.withConfig({
 	&:hover {
 		border-bottom-style: solid;
 	}
+`
+
+const ContactLinkButton = styled.button.withConfig({
+	displayName: 'CompanyDetailContactLinkButton',
+})`
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-3xs);
+	padding: 2px 0;
+	border: none;
+	background: transparent;
+	font-family: var(--font-body);
+	font-size: var(--typescale-label-medium-size);
+	color: var(--color-primary);
+	cursor: pointer;
+	border-bottom: 1px dashed color-mix(in srgb, var(--color-primary) 40%, transparent);
+
+	&:hover {
+		border-bottom-style: solid;
+	}
+`
+
+const EmailsPanelToolbar = styled.div.withConfig({
+	displayName: 'CompanyDetailEmailsPanelToolbar',
+})`
+	display: flex;
+	justify-content: flex-end;
+	margin-bottom: var(--space-sm);
+`
+
+const ThreadList = styled.ul.withConfig({
+	displayName: 'CompanyDetailThreadList',
+})`
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+	list-style: none;
+	padding: 0;
+	margin: 0;
+`
+
+const ThreadRow = styled.li.withConfig({
+	displayName: 'CompanyDetailThreadRow',
+})`
+	${ruledLedgerRow}
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-sm);
+	padding: var(--space-sm) var(--space-md);
+	background-color: var(--color-paper-aged);
+
+	&:first-child {
+		border-top: 1px solid var(--color-ledger-line);
+	}
+`
+
+const ThreadTitle = styled.span.withConfig({
+	displayName: 'CompanyDetailThreadTitle',
+})`
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+
+	& a {
+		color: var(--color-primary);
+		font-weight: var(--font-weight-medium);
+		text-decoration: none;
+	}
+
+	& a:hover {
+		text-decoration: underline;
+	}
+`
+
+const ThreadMeta = styled.div.withConfig({
+	displayName: 'CompanyDetailThreadMeta',
+})`
+	display: flex;
+	align-items: center;
+	gap: var(--space-sm);
+	font-family: var(--font-display);
+	font-size: var(--typescale-label-small-size);
+	font-weight: var(--font-weight-bold);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--color-on-surface-variant);
+	flex-shrink: 0;
+`
+
+const ThreadStatusBadge = styled.span.withConfig({
+	displayName: 'CompanyDetailThreadStatusBadge',
+	shouldForwardProp: prop => prop !== '$status',
+})<{ $status: 'open' | 'closed' | 'archived' }>`
+	padding: var(--space-3xs) var(--space-xs);
+	border-radius: 4px;
+	background: ${p =>
+		p.$status === 'open'
+			? 'color-mix(in oklab, var(--color-status-client) 20%, transparent)'
+			: p.$status === 'closed'
+				? 'color-mix(in oklab, var(--color-status-prospect) 20%, transparent)'
+				: 'color-mix(in oklab, var(--color-on-surface) 12%, transparent)'};
+	color: ${p =>
+		p.$status === 'open'
+			? 'var(--color-status-client)'
+			: 'var(--color-on-surface-variant)'};
 `
 
 const TaskList = styled.ul.withConfig({

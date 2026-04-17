@@ -1,5 +1,7 @@
 import { useLingui } from '@lingui/react'
 import { useLingui as useLinguiMacro } from '@lingui/react/macro'
+import { useNavigate } from '@tanstack/react-router'
+import { ExternalLink } from 'lucide-react'
 import { useState } from 'react'
 import styled from 'styled-components'
 
@@ -21,6 +23,12 @@ export type TimelineEntryData = {
 	outcome?: string | null
 	nextAction?: string | null
 	date: Date | string
+	/**
+	 * When the entry came from an email interaction and we could resolve the
+	 * local `email_thread_links.id`, this hyperlinks the row to the thread
+	 * detail page.
+	 */
+	threadId?: string | null
 }
 
 const COLLAPSE_THRESHOLD = 140
@@ -29,6 +37,7 @@ export function TimelineEntry({ entry }: { entry: TimelineEntryData }) {
 	const [expanded, setExpanded] = useState(false)
 	const { i18n } = useLingui()
 	const { t } = useLinguiMacro()
+	const navigate = useNavigate()
 	const channelLabel = i18n._(channelLabelFor(entry.channel))
 	const title = entry.subject?.trim() || channelLabel
 	const summary = entry.summary ?? ''
@@ -51,6 +60,21 @@ export function TimelineEntry({ entry }: { entry: TimelineEntryData }) {
 				{summary && <Summary>{displaySummary}</Summary>}
 				{entry.outcome && <Meta>{t`Outcome: ${entry.outcome}`}</Meta>}
 				{entry.nextAction && <Meta>{t`Next: ${entry.nextAction}`}</Meta>}
+				{entry.threadId && (
+					<ThreadLink
+						type='button'
+						onClick={e => {
+							e.stopPropagation()
+							void navigate({
+								to: '/emails/$threadId',
+								params: { threadId: entry.threadId ?? '' },
+							})
+						}}
+					>
+						<ExternalLink size={12} aria-hidden />
+						<span>{t`View thread`}</span>
+					</ThreadLink>
+				)}
 				{isLong && (
 					<ToggleHint>{expanded ? t`Show less` : t`Show more`}</ToggleHint>
 				)}
@@ -147,6 +171,30 @@ const Meta = styled.p.withConfig({ displayName: 'TimelineEntryMeta' })`
 	line-height: var(--typescale-body-small-line);
 	color: var(--color-on-surface-variant);
 	margin: 0;
+`
+
+const ThreadLink = styled.button.withConfig({
+	displayName: 'TimelineEntryThreadLink',
+})`
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-3xs);
+	margin-top: var(--space-3xs);
+	padding: 0;
+	border: none;
+	background: transparent;
+	font-family: var(--font-display);
+	font-size: var(--typescale-label-small-size);
+	font-weight: var(--font-weight-bold);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--color-primary);
+	cursor: pointer;
+	align-self: flex-start;
+
+	&:hover {
+		text-decoration: underline;
+	}
 `
 
 const ToggleHint = styled.span.withConfig({
