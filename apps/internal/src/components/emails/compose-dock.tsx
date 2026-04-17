@@ -69,11 +69,11 @@ function MinimizedPill({ draft }: { readonly draft: Draft }) {
 
 function pillLabel(draft: Draft, t: ReturnType<typeof useLingui>['t']): string {
 	if (draft.mode === 'reply') {
-		const subject = draft.form.subject.trim()
+		const subject = draft.subject.trim()
 		if (subject !== '') return t`Reply: ${subject}`
 		return t`Reply`
 	}
-	const subject = draft.form.subject.trim()
+	const subject = draft.subject.trim()
 	if (subject !== '') return subject
 	return t`New message`
 }

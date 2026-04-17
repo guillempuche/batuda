@@ -4,42 +4,25 @@ import {
 	useContext,
 	useEffect,
 	useMemo,
+	useRef,
 	useState,
 } from 'react'
 
-/**
- * Draft mode. `new` writes a fresh thread (requires inbox + to +
- * subject). `reply` replies into an existing thread (inbox + subject
- * are locked to the thread so the payload is smaller).
- */
 export type DraftMode = 'new' | 'reply'
-
-/** Window chrome state. Drafts move between these three. */
 export type DraftWindowState = 'open' | 'minimized' | 'fullscreen'
-
-import type { StagedAttachment } from '#/lib/email-attachments'
-
-/** Per-draft form fields. Reply drafts only write `body`, `cc`, `bcc`. */
-export type DraftForm = {
-	readonly inboxId: string | null
-	readonly to: string
-	readonly cc: string
-	readonly bcc: string
-	readonly subject: string
-	readonly body: string
-	readonly bodyHtml: string
-	readonly attachments: ReadonlyArray<StagedAttachment>
-}
 
 export type Draft = {
 	readonly id: string
+	readonly serverId: string | null
+	readonly inboxId: string
 	readonly mode: DraftMode
 	readonly windowState: DraftWindowState
-	readonly form: DraftForm
-	readonly dirty: boolean
+	readonly saving: boolean
 	readonly threadId?: string
 	readonly companyId?: string
 	readonly contactId?: string
+	readonly subject: string
+	readonly to: string
 }
 
 export type OpenComposeInput = {
@@ -56,62 +39,91 @@ export type OpenComposeInput = {
 	readonly bodyHtml?: string
 }
 
-const EMPTY_FORM: DraftForm = {
-	inboxId: null,
-	to: '',
-	cc: '',
-	bcc: '',
-	subject: '',
-	body: '',
-	bodyHtml: '',
-	attachments: [],
-}
-
 export type ComposeEmailContextValue = {
 	readonly drafts: ReadonlyArray<Draft>
 	readonly openCompose: (input: OpenComposeInput) => string
-	readonly close: (id: string, options?: { readonly force?: boolean }) => void
+	readonly close: (id: string) => void
 	readonly minimize: (id: string) => void
 	readonly restore: (id: string) => void
 	readonly toggleFullscreen: (id: string) => void
 	readonly focus: (id: string) => void
-	readonly updateForm: (id: string, patch: Partial<DraftForm>) => void
-	readonly markClean: (id: string) => void
+	readonly updateMeta: (
+		id: string,
+		patch: Partial<Pick<Draft, 'serverId' | 'saving' | 'subject' | 'to'>>,
+	) => void
 }
 
 const ComposeEmailContext = createContext<ComposeEmailContextValue | null>(null)
 
-/**
- * Draft state for the floating compose dock. Mounting the provider high
- * in the tree lets drafts survive route navigations. Drafts live only in
- * memory — closing a dirty draft prompts for confirmation, and a forced
- * close (used after a successful send) skips the prompt.
- */
+const SERVER_URL =
+	import.meta.env['VITE_SERVER_URL'] ?? 'https://api.engranatge.localhost'
+
 export function ComposeEmailProvider({
 	children,
 }: {
 	children: React.ReactNode
 }) {
 	const [drafts, setDrafts] = useState<ReadonlyArray<Draft>>([])
+	const recoveredRef = useRef(false)
+
+	useEffect(() => {
+		if (recoveredRef.current) return
+		recoveredRef.current = true
+		fetch(`${SERVER_URL}/v1/email/drafts`, { credentials: 'include' })
+			.then(res => (res.ok ? res.json() : []))
+			.then((serverDrafts: unknown) => {
+				if (!Array.isArray(serverDrafts)) return
+				setDrafts(prev => {
+					const existingServerIds = new Set(
+						prev.map(d => d.serverId).filter((s): s is string => s !== null),
+					)
+					const recovered: Draft[] = []
+					for (const raw of serverDrafts) {
+						if (!raw || typeof raw !== 'object') continue
+						const sd = raw as Record<string, unknown>
+						const draftId =
+							typeof sd['draftId'] === 'string' ? sd['draftId'] : null
+						if (draftId === null || existingServerIds.has(draftId)) continue
+						const clientId =
+							typeof sd['clientId'] === 'string' ? sd['clientId'] : undefined
+						const ctx = parseClientId(clientId)
+						const toRaw = sd['to']
+						recovered.push({
+							id: generateDraftId(),
+							serverId: draftId,
+							inboxId: typeof sd['inboxId'] === 'string' ? sd['inboxId'] : '',
+							mode: ctx.mode === 'reply' ? 'reply' : 'new',
+							windowState: 'minimized',
+							saving: false,
+							subject: typeof sd['subject'] === 'string' ? sd['subject'] : '',
+							to:
+								typeof toRaw === 'string'
+									? toRaw
+									: Array.isArray(toRaw)
+										? toRaw.join(', ')
+										: '',
+							...(ctx.companyId !== null && { companyId: ctx.companyId }),
+							...(ctx.contactId !== null && { contactId: ctx.contactId }),
+						})
+					}
+					if (recovered.length === 0) return prev
+					return [...prev, ...recovered]
+				})
+			})
+			.catch(() => {})
+	}, [])
 
 	const openCompose = useCallback((input: OpenComposeInput): string => {
 		const id = generateDraftId()
-		const base: DraftForm = {
-			...EMPTY_FORM,
-			...(input.inboxId !== undefined && { inboxId: input.inboxId }),
-			...(input.to !== undefined && { to: input.to }),
-			...(input.cc !== undefined && { cc: input.cc }),
-			...(input.bcc !== undefined && { bcc: input.bcc }),
-			...(input.subject !== undefined && { subject: input.subject }),
-			...(input.body !== undefined && { body: input.body }),
-			...(input.bodyHtml !== undefined && { bodyHtml: input.bodyHtml }),
-		}
 		const draft: Draft = {
 			id,
+			serverId: null,
+			inboxId: input.inboxId ?? '',
 			mode: input.mode,
 			windowState: 'open',
-			form: base,
-			dirty: false,
+			saving: false,
+			subject: input.subject ?? '',
+			to: input.to ?? '',
 			...(input.threadId !== undefined && { threadId: input.threadId }),
 			...(input.companyId !== undefined && { companyId: input.companyId }),
 			...(input.contactId !== undefined && { contactId: input.contactId }),
@@ -120,26 +132,15 @@ export function ComposeEmailProvider({
 		return id
 	}, [])
 
-	const close = useCallback(
-		(id: string, options?: { readonly force?: boolean }) => {
-			setDrafts(prev => {
-				const target = prev.find(d => d.id === id)
-				if (target === undefined) return prev
-				if (target.dirty && options?.force !== true) {
-					const ok = window.confirm(
-						'Discard this draft? Unsaved changes will be lost.',
-					)
-					if (!ok) return prev
-				}
-				return prev.filter(d => d.id !== id)
-			})
-		},
-		[],
-	)
+	const close = useCallback((id: string) => {
+		setDrafts(prev => prev.filter(d => d.id !== id))
+	}, [])
 
 	const minimize = useCallback((id: string) => {
 		setDrafts(prev =>
-			prev.map(d => (d.id === id ? { ...d, windowState: 'minimized' } : d)),
+			prev.map(d =>
+				d.id === id ? { ...d, windowState: 'minimized' as const } : d,
+			),
 		)
 	}, [])
 
@@ -148,7 +149,7 @@ export function ComposeEmailProvider({
 			const target = prev.find(d => d.id === id)
 			if (target === undefined) return prev
 			const rest = prev.filter(d => d.id !== id)
-			return [{ ...target, windowState: 'open' }, ...rest]
+			return [{ ...target, windowState: 'open' as const }, ...rest]
 		})
 	}, [])
 
@@ -159,7 +160,9 @@ export function ComposeEmailProvider({
 					? {
 							...d,
 							windowState:
-								d.windowState === 'fullscreen' ? 'open' : 'fullscreen',
+								d.windowState === 'fullscreen'
+									? ('open' as const)
+									: ('fullscreen' as const),
 						}
 					: d,
 			),
@@ -176,21 +179,16 @@ export function ComposeEmailProvider({
 		})
 	}, [])
 
-	const updateForm = useCallback((id: string, patch: Partial<DraftForm>) => {
-		setDrafts(prev =>
-			prev.map(d =>
-				d.id === id ? { ...d, form: { ...d.form, ...patch }, dirty: true } : d,
-			),
-		)
-	}, [])
+	const updateMeta = useCallback(
+		(
+			id: string,
+			patch: Partial<Pick<Draft, 'serverId' | 'saving' | 'subject' | 'to'>>,
+		) => {
+			setDrafts(prev => prev.map(d => (d.id === id ? { ...d, ...patch } : d)))
+		},
+		[],
+	)
 
-	const markClean = useCallback((id: string) => {
-		setDrafts(prev => prev.map(d => (d.id === id ? { ...d, dirty: false } : d)))
-	}, [])
-
-	// Global Shift+E shortcut for "new compose". Skipped when the user
-	// is typing in an input/textarea/contenteditable so it doesn't
-	// interrupt editing — matches the Shift+I pattern from Quick Capture.
 	useEffect(() => {
 		const handler = (event: KeyboardEvent) => {
 			if (!event.shiftKey) return
@@ -225,8 +223,7 @@ export function ComposeEmailProvider({
 			restore,
 			toggleFullscreen,
 			focus,
-			updateForm,
-			markClean,
+			updateMeta,
 		}),
 		[
 			drafts,
@@ -236,8 +233,7 @@ export function ComposeEmailProvider({
 			restore,
 			toggleFullscreen,
 			focus,
-			updateForm,
-			markClean,
+			updateMeta,
 		],
 	)
 
@@ -260,4 +256,28 @@ export function useComposeEmail(): ComposeEmailContextValue {
 
 function generateDraftId(): string {
 	return `draft-${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`
+}
+
+function parseClientId(clientId: string | undefined): {
+	companyId: string | null
+	contactId: string | null
+	mode: string | null
+} {
+	const empty = { companyId: null, contactId: null, mode: null }
+	if (!clientId?.startsWith('forja:draft')) return empty
+	const result: {
+		companyId: string | null
+		contactId: string | null
+		mode: string | null
+	} = { ...empty }
+	for (const part of clientId.split(';')) {
+		const eq = part.indexOf('=')
+		if (eq === -1) continue
+		const key = part.slice(0, eq)
+		const val = part.slice(eq + 1)
+		if (key === 'companyId') result.companyId = val
+		else if (key === 'contactId') result.contactId = val
+		else if (key === 'mode') result.mode = val
+	}
+	return result
 }

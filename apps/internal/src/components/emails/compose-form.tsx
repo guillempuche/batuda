@@ -2,22 +2,25 @@ import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { useLingui } from '@lingui/react/macro'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { AlertTriangle, Plus, Send, X } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 
 import { PriButton, PriInput, PriSelect } from '@engranatge/ui/pri'
 
 import { contactsAtomFor } from '#/atoms/company-atoms'
 import {
+	createDraftAtom,
+	deleteDraftAtom,
 	emailsSearchAtom,
 	inboxesListAtom,
-	replyEmailAtom,
-	sendEmailAtom,
+	sendDraftAtom,
 	threadAtomFor,
+	updateDraftAtom,
 } from '#/atoms/emails-atoms'
 import { AttachmentPicker } from '#/components/emails/attachment-picker'
 import { EmailComposer } from '#/components/emails/email-composer'
 import { type Draft, useComposeEmail } from '#/context/compose-email-context'
+import type { StagedAttachment } from '#/lib/email-attachments'
 
 type InboxOption = {
 	readonly id: string
@@ -28,6 +31,17 @@ type InboxOption = {
 	readonly active: boolean
 }
 
+type DraftForm = {
+	inboxId: string | null
+	to: string
+	cc: string
+	bcc: string
+	subject: string
+	body: string
+	bodyHtml: string
+	attachments: ReadonlyArray<StagedAttachment>
+}
+
 type SendState = 'idle' | 'sending' | 'error'
 
 type SuppressedAddress = {
@@ -36,13 +50,17 @@ type SuppressedAddress = {
 	readonly reason: 'bounced' | 'complained'
 }
 
+const SAVE_DEBOUNCE_MS = 300
+
 export function ComposeForm({ draft }: { readonly draft: Draft }) {
 	const { t } = useLingui()
-	const { updateForm, close, markClean } = useComposeEmail()
+	const { close, updateMeta } = useComposeEmail()
 	const inboxesResult = useAtomValue(inboxesListAtom)
 
-	const send = useAtomSet(sendEmailAtom, { mode: 'promiseExit' })
-	const reply = useAtomSet(replyEmailAtom, { mode: 'promiseExit' })
+	const createDraft = useAtomSet(createDraftAtom, { mode: 'promiseExit' })
+	const updateDraft = useAtomSet(updateDraftAtom, { mode: 'promiseExit' })
+	const deleteDraft = useAtomSet(deleteDraftAtom, { mode: 'promiseExit' })
+	const sendDraft = useAtomSet(sendDraftAtom, { mode: 'promiseExit' })
 	const refreshList = useAtomRefresh(emailsSearchAtom({}))
 	const refreshThread = useAtomRefresh(
 		threadAtomFor(draft.threadId ?? '__unused__'),
@@ -56,20 +74,136 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 		[inboxesResult],
 	)
 
-	// Lock the inbox in reply mode — replies must ship from the thread's
-	// inbox. For `new` drafts, fall back to the user's default human
-	// inbox if the form hasn't been touched.
-	const effectiveInboxId = useMemo(() => {
-		if (draft.form.inboxId !== null) return draft.form.inboxId
-		const fallback =
-			inboxes.find(i => i.purpose === 'human' && i.isDefault && i.active) ??
-			inboxes.find(i => i.purpose === 'human' && i.active)
-		return fallback?.id ?? null
-	}, [draft.form.inboxId, inboxes])
-
-	const [ccBccOpen, setCcBccOpen] = useState(
-		draft.form.cc.length > 0 || draft.form.bcc.length > 0,
+	const defaultInboxId = useMemo(
+		() =>
+			(
+				inboxes.find(i => i.purpose === 'human' && i.isDefault && i.active) ??
+				inboxes.find(i => i.purpose === 'human' && i.active)
+			)?.id ?? null,
+		[inboxes],
 	)
+
+	const [form, setForm] = useState<DraftForm>(() => ({
+		inboxId: draft.inboxId || null,
+		to: draft.to,
+		cc: '',
+		bcc: '',
+		subject: draft.subject,
+		body: '',
+		bodyHtml: '',
+		attachments: [],
+	}))
+
+	const effectiveInboxId = form.inboxId ?? defaultInboxId
+
+	const serverIdRef = useRef<string | null>(draft.serverId)
+	const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+	const mountedRef = useRef(true)
+	useEffect(
+		() => () => {
+			mountedRef.current = false
+		},
+		[],
+	)
+
+	// Create server draft on mount if none exists
+	useEffect(() => {
+		if (serverIdRef.current !== null) return
+		const inboxId = effectiveInboxId
+		if (inboxId === null) return
+
+		updateMeta(draft.id, { saving: true })
+
+		const params: Record<string, unknown> = { inboxId }
+		if (draft.to) params['to'] = draft.to
+		if (draft.subject) params['subject'] = draft.subject
+		if (draft.companyId) params['companyId'] = draft.companyId
+		if (draft.contactId) params['contactId'] = draft.contactId
+		if (draft.mode === 'reply') params['mode'] = 'reply'
+		if (draft.threadId) params['threadLinkId'] = draft.threadId
+
+		void createDraft({ payload: params } as never).then(exit => {
+			if (!mountedRef.current) return
+			if (exit._tag === 'Success') {
+				const result = exit.value as Record<string, unknown> | null
+				const serverId =
+					typeof result?.['draftId'] === 'string' ? result['draftId'] : null
+				serverIdRef.current = serverId
+				updateMeta(draft.id, { serverId, saving: false })
+			} else {
+				updateMeta(draft.id, { saving: false })
+			}
+		})
+	}, [
+		effectiveInboxId,
+		draft.id,
+		draft.to,
+		draft.subject,
+		draft.companyId,
+		draft.contactId,
+		draft.mode,
+		draft.threadId,
+		createDraft,
+		updateMeta,
+	])
+
+	const debouncedSave = useCallback(
+		(patch: Partial<DraftForm>) => {
+			if (saveTimerRef.current !== null) {
+				clearTimeout(saveTimerRef.current)
+			}
+			saveTimerRef.current = setTimeout(() => {
+				const serverId = serverIdRef.current
+				const inboxId = effectiveInboxId
+				if (serverId === null || inboxId === null) return
+
+				updateMeta(draft.id, { saving: true })
+				const payload: Record<string, unknown> = { inboxId }
+				if (patch.to !== undefined) payload['to'] = patch.to
+				if (patch.cc !== undefined) {
+					const list = splitAddresses(patch.cc)
+					if (list.length > 0) payload['cc'] = list
+				}
+				if (patch.bcc !== undefined) {
+					const list = splitAddresses(patch.bcc)
+					if (list.length > 0) payload['bcc'] = list
+				}
+				if (patch.subject !== undefined) payload['subject'] = patch.subject
+				if (patch.body !== undefined) payload['text'] = patch.body
+				if (patch.bodyHtml !== undefined) payload['html'] = patch.bodyHtml
+
+				void updateDraft({
+					params: { draftId: serverId },
+					payload,
+				} as never).then(() => {
+					if (mountedRef.current) {
+						updateMeta(draft.id, { saving: false })
+					}
+				})
+			}, SAVE_DEBOUNCE_MS)
+		},
+		[effectiveInboxId, draft.id, updateDraft, updateMeta],
+	)
+
+	useEffect(
+		() => () => {
+			if (saveTimerRef.current !== null) clearTimeout(saveTimerRef.current)
+		},
+		[],
+	)
+
+	const patchForm = useCallback(
+		(patch: Partial<DraftForm>) => {
+			setForm(prev => ({ ...prev, ...patch }))
+			if (patch.subject !== undefined)
+				updateMeta(draft.id, { subject: patch.subject })
+			if (patch.to !== undefined) updateMeta(draft.id, { to: patch.to })
+			debouncedSave(patch)
+		},
+		[draft.id, debouncedSave, updateMeta],
+	)
+
+	const [ccBccOpen, setCcBccOpen] = useState(false)
 	const [sendState, setSendState] = useState<SendState>('idle')
 	const [errorMessage, setErrorMessage] = useState<string | null>(null)
 	const [suppressed, setSuppressed] = useState<
@@ -78,101 +212,65 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 
 	const canSend = useMemo(() => {
 		if (sendState === 'sending') return false
-		if (draft.form.body.trim() === '') return false
+		if (form.body.trim() === '') return false
 		if (suppressed.length > 0) return false
+		if (serverIdRef.current === null) return false
 		if (draft.mode === 'reply') {
 			return draft.threadId !== undefined
 		}
 		if (effectiveInboxId === null) return false
-		if (draft.form.to.trim() === '') return false
+		if (form.to.trim() === '') return false
 		return true
-	}, [sendState, draft, effectiveInboxId, suppressed])
+	}, [sendState, form.body, form.to, suppressed, effectiveInboxId, draft])
 
 	const handleSend = useCallback(async () => {
+		const serverId = serverIdRef.current
+		if (serverId === null || effectiveInboxId === null) return
+
+		if (saveTimerRef.current !== null) {
+			clearTimeout(saveTimerRef.current)
+			saveTimerRef.current = null
+		}
+
 		setSendState('sending')
 		setErrorMessage(null)
 		try {
-			if (draft.mode === 'reply') {
-				if (draft.threadId === undefined) {
-					throw new Error('Reply draft missing threadId')
-				}
-				const cc = splitAddresses(draft.form.cc)
-				const bcc = splitAddresses(draft.form.bcc)
-				const attachments = draft.form.attachments.map(a => ({
-					stagingId: a.stagingId,
-				}))
-				await reply({
-					payload: {
-						threadId: draft.threadId,
-						text: draft.form.body,
-						...(draft.form.bodyHtml !== '' && { html: draft.form.bodyHtml }),
-						...(cc.length > 0 && { cc }),
-						...(bcc.length > 0 && { bcc }),
-						...(attachments.length > 0 && { attachments }),
-					},
-				})
-				refreshThread()
-			} else {
-				if (effectiveInboxId === null) {
-					throw new Error('Compose draft missing inboxId')
-				}
-				const toList = splitAddresses(draft.form.to)
-				if (toList.length === 0) {
-					throw new Error('At least one recipient required')
-				}
-				const firstTo = toList[0]
-				if (firstTo === undefined) {
-					throw new Error('At least one recipient required')
-				}
-				const to: string | ReadonlyArray<string> =
-					toList.length === 1 ? firstTo : toList
-				const cc = splitAddresses(draft.form.cc)
-				const bcc = splitAddresses(draft.form.bcc)
-				const attachments = draft.form.attachments.map(a => ({
-					stagingId: a.stagingId,
-				}))
-				await send({
-					payload: {
-						inboxId: effectiveInboxId,
-						to,
-						subject: draft.form.subject,
-						text: draft.form.body,
-						...(draft.form.bodyHtml !== '' && { html: draft.form.bodyHtml }),
-						companyId: draft.companyId ?? '',
-						...(draft.contactId !== undefined && {
-							contactId: draft.contactId,
-						}),
-						...(cc.length > 0 && { cc }),
-						...(bcc.length > 0 && { bcc }),
-						...(attachments.length > 0 && { attachments }),
-					},
-				})
+			const exit = await sendDraft({
+				params: { draftId: serverId },
+				payload: { inboxId: effectiveInboxId },
+			})
+			if (exit._tag !== 'Success') {
+				throw new Error('Send failed')
 			}
-			markClean(draft.id)
 			refreshList()
-			close(draft.id, { force: true })
+			if (draft.threadId) refreshThread()
+			close(draft.id)
 		} catch (error) {
 			setSendState('error')
 			setErrorMessage(
 				error instanceof Error ? error.message : 'Failed to send email',
 			)
-			return
 		}
-		setSendState('idle')
 	}, [
-		draft,
 		effectiveInboxId,
-		send,
-		reply,
+		sendDraft,
 		refreshList,
 		refreshThread,
-		markClean,
 		close,
+		draft.id,
+		draft.threadId,
 	])
 
-	const handleDiscard = useCallback(() => {
+	const handleDiscard = useCallback(async () => {
+		const serverId = serverIdRef.current
+		if (serverId !== null && effectiveInboxId !== null) {
+			await deleteDraft({
+				params: { draftId: serverId },
+				query: { inboxId: effectiveInboxId },
+			} as never)
+		}
 		close(draft.id)
-	}, [close, draft.id])
+	}, [effectiveInboxId, deleteDraft, close, draft.id])
 
 	const isReply = draft.mode === 'reply'
 
@@ -190,7 +288,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 					<PriSelect.Root
 						value={effectiveInboxId ?? ''}
 						onValueChange={value => {
-							updateForm(draft.id, { inboxId: value === '' ? null : value })
+							patchForm({ inboxId: value === '' ? null : value })
 						}}
 					>
 						<PriSelect.Trigger id={`inbox-${draft.id}`}>
@@ -223,10 +321,10 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 						id={`to-${draft.id}`}
 						data-testid='compose-to'
 						type='text'
-						value={draft.form.to}
+						value={form.to}
 						placeholder={t`name@example.com, another@example.com`}
 						onChange={event => {
-							updateForm(draft.id, { to: event.target.value })
+							patchForm({ to: event.target.value })
 						}}
 					/>
 				</Field>
@@ -249,10 +347,10 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 						<PriInput
 							id={`cc-${draft.id}`}
 							type='text'
-							value={draft.form.cc}
+							value={form.cc}
 							placeholder={t`Comma-separated`}
 							onChange={event => {
-								updateForm(draft.id, { cc: event.target.value })
+								patchForm({ cc: event.target.value })
 							}}
 						/>
 					</Field>
@@ -261,10 +359,10 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 						<PriInput
 							id={`bcc-${draft.id}`}
 							type='text'
-							value={draft.form.bcc}
+							value={form.bcc}
 							placeholder={t`Comma-separated`}
 							onChange={event => {
-								updateForm(draft.id, { bcc: event.target.value })
+								patchForm({ bcc: event.target.value })
 							}}
 						/>
 					</Field>
@@ -278,10 +376,10 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 						id={`subject-${draft.id}`}
 						data-testid='compose-subject'
 						type='text'
-						value={draft.form.subject}
+						value={form.subject}
 						placeholder={t`What is this about?`}
 						onChange={event => {
-							updateForm(draft.id, { subject: event.target.value })
+							patchForm({ subject: event.target.value })
 						}}
 					/>
 				</Field>
@@ -290,9 +388,9 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 			<BodyField>
 				<BodyLabel>{t`Message`}</BodyLabel>
 				<EmailComposer
-					initialHtml={draft.form.bodyHtml}
+					initialHtml={form.bodyHtml}
 					onChange={(html, text) => {
-						updateForm(draft.id, { body: text, bodyHtml: html })
+						patchForm({ body: text, bodyHtml: html })
 					}}
 					placeholder={t`Write your message…`}
 				/>
@@ -301,9 +399,9 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 			{draft.companyId !== undefined ? (
 				<SuppressionGuard
 					companyId={draft.companyId}
-					to={draft.form.to}
-					cc={draft.form.cc}
-					bcc={draft.form.bcc}
+					to={form.to}
+					cc={form.cc}
+					bcc={form.bcc}
 					onChange={setSuppressed}
 				/>
 			) : null}
@@ -334,9 +432,9 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 			) : null}
 
 			<AttachmentPicker
-				value={draft.form.attachments}
+				value={form.attachments}
 				onChange={next => {
-					updateForm(draft.id, { attachments: next })
+					patchForm({ attachments: next })
 				}}
 			/>
 
@@ -354,11 +452,14 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 					type='button'
 					$variant='text'
 					data-testid='compose-discard'
-					onClick={handleDiscard}
+					onClick={() => {
+						void handleDiscard()
+					}}
 				>
 					<X size={14} aria-hidden />
 					<span>{t`Discard`}</span>
 				</PriButton>
+				{draft.saving ? <SavingIndicator>{t`Saving…`}</SavingIndicator> : null}
 			</Footer>
 		</Form>
 	)
@@ -526,6 +627,18 @@ const Footer = styled.div.withConfig({ displayName: 'ComposeFooter' })`
 	gap: var(--space-xs);
 	padding-top: var(--space-xs);
 	border-top: 1px dashed var(--color-outline);
+`
+
+const SavingIndicator = styled.span.withConfig({
+	displayName: 'ComposeSaving',
+})`
+	margin-left: auto;
+	font-family: var(--font-display);
+	font-size: var(--typescale-label-small-size);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--color-on-surface-variant);
+	opacity: 0.7;
 `
 
 const SuppressionBanner = styled.div.withConfig({
