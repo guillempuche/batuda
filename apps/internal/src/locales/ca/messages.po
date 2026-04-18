@@ -20,7 +20,7 @@ msgstr ""
 msgid "—"
 msgstr "—"
 
-#: src/routes/companies/$slug.tsx:867
+#: src/routes/companies/$slug.tsx:874
 msgid "— not set —"
 msgstr "— sense establir —"
 
@@ -28,7 +28,7 @@ msgstr "— sense establir —"
 msgid "— Select a company —"
 msgstr "— Tria una empresa —"
 
-#: src/routes/companies/$slug.tsx:1004
+#: src/routes/companies/$slug.tsx:1011
 #: src/routes/emails/$threadId.tsx:303
 #: src/routes/emails/index.tsx:797
 msgid "(no subject)"
@@ -111,11 +111,11 @@ msgid "Add link"
 msgstr "Afegeix enllaç"
 
 #: src/components/shared/company-card.tsx:113
-#: src/routes/companies/$slug.tsx:744
+#: src/routes/companies/$slug.tsx:751
 msgid "Add task"
 msgstr "Afegeix tasca"
 
-#: src/routes/companies/$slug.tsx:913
+#: src/routes/companies/$slug.tsx:920
 msgid "Add the first decision-maker to keep track of who to reach."
 msgstr "Afegeix el primer responsable de decisió per saber a qui adreçar-te."
 
@@ -224,16 +224,16 @@ msgstr "Accions massives de fils"
 msgid "Bullet list"
 msgstr "Llista amb vinyetes"
 
-#: src/routes/companies/$slug.tsx:791
+#: src/routes/companies/$slug.tsx:798
 msgid "Cadence"
 msgstr "Cadència"
 
 #: src/components/interactions/quick-capture-dialog.tsx:422
-#: src/components/shared/channel-icon.tsx:50
+#: src/components/shared/channel-icon.tsx:62
 msgid "Call"
 msgstr "Trucada"
 
-#: src/routes/companies/$slug.tsx:672
+#: src/routes/companies/$slug.tsx:679
 msgid "Call phone"
 msgstr "Truca al telèfon"
 
@@ -252,11 +252,11 @@ msgstr "Cancel·la la pujada"
 msgid "Cc"
 msgstr "Cc"
 
-#: src/routes/companies/$slug.tsx:575
+#: src/routes/companies/$slug.tsx:582
 msgid "Change priority"
 msgstr "Canvia la prioritat"
 
-#: src/routes/companies/$slug.tsx:617
+#: src/routes/companies/$slug.tsx:624
 msgid "Change status"
 msgstr "Canvia l'estat"
 
@@ -298,7 +298,7 @@ msgid "Clicked"
 msgstr "Clicat"
 
 #: src/components/shared/status-badge.tsx:33
-#: src/routes/companies/$slug.tsx:397
+#: src/routes/companies/$slug.tsx:399
 msgid "Client"
 msgstr "Client"
 
@@ -319,7 +319,7 @@ msgid "Close thread"
 msgstr "Tanca el fil"
 
 #: src/components/shared/status-badge.tsx:34
-#: src/routes/companies/$slug.tsx:398
+#: src/routes/companies/$slug.tsx:400
 #: src/routes/emails/$threadId.tsx:296
 #: src/routes/emails/index.tsx:559
 #: src/routes/emails/index.tsx:832
@@ -367,11 +367,11 @@ msgstr "marcat com a brossa"
 msgid "Complained"
 msgstr "Marcat com a brossa"
 
-#: src/routes/companies/$slug.tsx:1035
+#: src/routes/companies/$slug.tsx:1042
 msgid "Completed"
 msgstr "Completada"
 
-#: src/routes/companies/$slug.tsx:986
+#: src/routes/companies/$slug.tsx:993
 #: src/routes/emails/index.tsx:528
 msgid "Compose"
 msgstr "Redacta"
@@ -381,11 +381,11 @@ msgid "Conclusion or commitment (optional)"
 msgstr "Conclusió o compromís (opcional)"
 
 #: src/components/shared/status-badge.tsx:29
-#: src/routes/companies/$slug.tsx:393
+#: src/routes/companies/$slug.tsx:395
 msgid "Contacted"
 msgstr "Contactat"
 
-#: src/routes/companies/$slug.tsx:770
+#: src/routes/companies/$slug.tsx:777
 msgid "Contacts"
 msgstr "Contactes"
 
@@ -441,7 +441,7 @@ msgstr "No s'ha pogut publicar la pàgina. Torna-ho a provar."
 msgid "Could not reach the email provider. Check logs."
 msgstr "No he pogut connectar amb el proveïdor de correu. Revisa els registres."
 
-#: src/routes/companies/$slug.tsx:380
+#: src/routes/companies/$slug.tsx:382
 msgid "Could not save"
 msgstr "No s'ha pogut desar"
 
@@ -478,7 +478,7 @@ msgstr "Crea un peu de pàgina per afegir als correus sortints d'aquesta bústia
 msgid "Create a prospect landing page from a company detail view or via the MCP tools."
 msgstr "Crea una pàgina d'aterratge per a un prospecte des del detall d'una empresa o amb les eines MCP."
 
-#: src/routes/companies/$slug.tsx:1056
+#: src/routes/companies/$slug.tsx:1063
 msgid "Create a prospect landing page to share with this company."
 msgstr "Crea una pàgina d'aterratge per a un prospecte per compartir amb aquesta empresa."
 
@@ -505,7 +505,7 @@ msgstr "Crea'n una o sincronitza per portar les bústies del proveïdor."
 msgid "Created"
 msgstr "Creada"
 
-#: src/routes/companies/$slug.tsx:870
+#: src/routes/companies/$slug.tsx:877
 msgid "Current tools"
 msgstr "Eines actuals"
 
@@ -514,11 +514,11 @@ msgid "Date"
 msgstr "Data"
 
 #: src/components/shared/status-badge.tsx:35
-#: src/routes/companies/$slug.tsx:399
+#: src/routes/companies/$slug.tsx:401
 msgid "Dead"
 msgstr "Descartat"
 
-#: src/routes/companies/$slug.tsx:924
+#: src/routes/companies/$slug.tsx:931
 msgid "Decision maker"
 msgstr "Responsable de decisió"
 
@@ -559,7 +559,11 @@ msgstr "Descarta"
 msgid "Display name"
 msgstr "Nom a mostrar"
 
-#: src/routes/companies/$slug.tsx:782
+#: src/components/shared/channel-icon.tsx:69
+msgid "Document"
+msgstr "Document"
+
+#: src/routes/companies/$slug.tsx:789
 msgid "Documents"
 msgstr "Documents"
 
@@ -617,8 +621,8 @@ msgid "Editor"
 msgstr "Editor"
 
 #: src/components/interactions/quick-capture-dialog.tsx:424
-#: src/components/shared/channel-icon.tsx:51
-#: src/routes/companies/$slug.tsx:735
+#: src/components/shared/channel-icon.tsx:63
+#: src/routes/companies/$slug.tsx:742
 #: src/routes/emails/inboxes.tsx:257
 #: src/routes/login.tsx:138
 msgid "Email"
@@ -632,21 +636,25 @@ msgstr "Esborranys de correu"
 msgid "Email threads"
 msgstr "Fils de correu"
 
-#: src/routes/companies/$slug.tsx:947
+#: src/routes/companies/$slug.tsx:954
 msgid "Email via Forja"
 msgstr "Correu via Forja"
 
 #: src/components/layout/nav-items.ts:52
-#: src/routes/companies/$slug.tsx:773
+#: src/routes/companies/$slug.tsx:780
 #: src/routes/emails/index.tsx:504
 msgid "Emails"
 msgstr "Correus"
+
+#: src/routes/companies/$slug.tsx:1119
+msgid "Emails, calls, documents, and proposals will appear here as they happen."
+msgstr "Els emails, trucades, documents i propostes apareixeran aquí a mesura que passin."
 
 #: src/routes/login.tsx:133
 msgid "Engranatge internal CRM"
 msgstr "CRM intern d'Engranatge"
 
-#: src/components/shared/channel-icon.tsx:56
+#: src/components/shared/channel-icon.tsx:68
 msgid "Event"
 msgstr "Esdeveniment"
 
@@ -732,7 +740,7 @@ msgstr "Encapçalament 3"
 msgid "Hide Cc"
 msgstr "Amaga Cc"
 
-#: src/routes/companies/$slug.tsx:405
+#: src/routes/companies/$slug.tsx:407
 msgid "High"
 msgstr "Alta"
 
@@ -789,7 +797,7 @@ msgstr "Safata actualitzada"
 msgid "Inboxes synced"
 msgstr "Safates sincronitzades"
 
-#: src/routes/companies/$slug.tsx:834
+#: src/routes/companies/$slug.tsx:841
 msgid "Industry"
 msgstr "Sector"
 
@@ -797,7 +805,7 @@ msgstr "Sector"
 msgid "Inline code"
 msgstr "Codi en línia"
 
-#: src/components/shared/channel-icon.tsx:54
+#: src/components/shared/channel-icon.tsx:66
 msgid "Instagram"
 msgstr "Instagram"
 
@@ -823,12 +831,12 @@ msgstr "Idioma"
 msgid "Last activity"
 msgstr "Última activitat"
 
-#: src/routes/companies/$slug.tsx:805
+#: src/routes/companies/$slug.tsx:812
 msgid "Last call"
 msgstr "Última trucada"
 
 #: src/components/shared/company-card.tsx:95
-#: src/routes/companies/$slug.tsx:710
+#: src/routes/companies/$slug.tsx:717
 msgid "Last contact"
 msgstr "Últim contacte"
 
@@ -836,11 +844,11 @@ msgstr "Últim contacte"
 msgid "Last direction"
 msgstr "Última direcció"
 
-#: src/routes/companies/$slug.tsx:796
+#: src/routes/companies/$slug.tsx:803
 msgid "Last email"
 msgstr "Últim email"
 
-#: src/routes/companies/$slug.tsx:814
+#: src/routes/companies/$slug.tsx:821
 msgid "Last meet"
 msgstr "Última visita"
 
@@ -860,7 +868,7 @@ msgstr "Més tard"
 msgid "Link URL"
 msgstr "URL de l'enllaç"
 
-#: src/components/shared/channel-icon.tsx:53
+#: src/components/shared/channel-icon.tsx:65
 msgid "LinkedIn"
 msgstr "LinkedIn"
 
@@ -888,7 +896,7 @@ msgstr "Localitzada al mapa"
 msgid "Locating…"
 msgstr "Localitzant…"
 
-#: src/routes/companies/$slug.tsx:844
+#: src/routes/companies/$slug.tsx:851
 msgid "Location"
 msgstr "Ubicació"
 
@@ -903,7 +911,7 @@ msgstr "Registra una interacció per a aquesta tasca"
 
 #: src/components/interactions/quick-capture-dialog.tsx:182
 #: src/components/shared/company-card.tsx:108
-#: src/routes/companies/$slug.tsx:725
+#: src/routes/companies/$slug.tsx:732
 msgid "Log interaction"
 msgstr "Registra interacció"
 
@@ -911,7 +919,7 @@ msgstr "Registra interacció"
 msgid "Logging…"
 msgstr "Registrant…"
 
-#: src/routes/companies/$slug.tsx:407
+#: src/routes/companies/$slug.tsx:409
 msgid "Low"
 msgstr "Baixa"
 
@@ -968,7 +976,7 @@ msgstr "Marca com a llegit"
 msgid "Mark unread"
 msgstr "Marca com a no llegit"
 
-#: src/routes/companies/$slug.tsx:406
+#: src/routes/companies/$slug.tsx:408
 msgid "Medium"
 msgstr "Mitjana"
 
@@ -978,7 +986,7 @@ msgstr "Prioritat mitjana"
 
 #: src/components/interactions/quick-capture-dialog.tsx:423
 #: src/components/shared/status-badge.tsx:31
-#: src/routes/companies/$slug.tsx:395
+#: src/routes/companies/$slug.tsx:397
 msgid "Meeting"
 msgstr "Reunió"
 
@@ -994,7 +1002,7 @@ msgstr "Missatge"
 msgid "Messages"
 msgstr "Missatges"
 
-#: src/routes/companies/$slug.tsx:993
+#: src/routes/companies/$slug.tsx:1000
 msgid "Messages sent or received with this company will appear here."
 msgstr "Els missatges enviats o rebuts amb aquesta empresa apareixeran aquí."
 
@@ -1002,11 +1010,11 @@ msgstr "Els missatges enviats o rebuts amb aquesta empresa apareixeran aquí."
 msgid "Minimize"
 msgstr "Minimitza"
 
-#: src/routes/companies/$slug.tsx:1013
+#: src/routes/companies/$slug.tsx:1020
 msgid "msg"
 msgstr "missatge"
 
-#: src/routes/companies/$slug.tsx:1013
+#: src/routes/companies/$slug.tsx:1020
 msgid "msgs"
 msgstr "missatges"
 
@@ -1026,14 +1034,14 @@ msgstr "nom@exemple.cat, altre@exemple.cat"
 msgid "Needs attention"
 msgstr "Necessita atenció"
 
-#: src/routes/companies/$slug.tsx:712
-#: src/routes/companies/$slug.tsx:800
-#: src/routes/companies/$slug.tsx:809
-#: src/routes/companies/$slug.tsx:818
+#: src/routes/companies/$slug.tsx:719
+#: src/routes/companies/$slug.tsx:807
+#: src/routes/companies/$slug.tsx:816
+#: src/routes/companies/$slug.tsx:825
 msgid "never"
 msgstr "mai"
 
-#: src/routes/companies/$slug.tsx:753
+#: src/routes/companies/$slug.tsx:760
 msgid "New proposal"
 msgstr "Nova proposta"
 
@@ -1042,11 +1050,11 @@ msgid "Next"
 msgstr "Següent"
 
 #: src/components/interactions/quick-capture-dialog.tsx:348
-#: src/routes/companies/$slug.tsx:881
+#: src/routes/companies/$slug.tsx:888
 msgid "Next action"
 msgstr "Següent acció"
 
-#: src/routes/companies/$slug.tsx:823
+#: src/routes/companies/$slug.tsx:830
 msgid "Next event"
 msgstr "Pròxim esdeveniment"
 
@@ -1054,6 +1062,10 @@ msgstr "Pròxim esdeveniment"
 #: src/components/shared/timeline-entry.tsx:62
 msgid "Next: {0}"
 msgstr "Següent: {0}"
+
+#: src/routes/companies/$slug.tsx:1118
+msgid "No activity yet"
+msgstr "Encara no hi ha activitat"
 
 #: src/routes/companies/index.tsx:318
 msgid "No companies match the filters"
@@ -1068,7 +1080,7 @@ msgstr "Encara no hi ha empreses"
 msgid "No connection to the server. Try again in a few seconds."
 msgstr "Sense connexió al servidor. Torna-ho a provar d'aquí a uns segons."
 
-#: src/routes/companies/$slug.tsx:912
+#: src/routes/companies/$slug.tsx:919
 msgid "No contacts yet"
 msgstr "Encara no hi ha contactes"
 
@@ -1080,11 +1092,11 @@ msgstr "Encara sense coordenades. Localitza aquesta empresa per situar-la al map
 msgid "no date"
 msgstr "sense data"
 
-#: src/routes/companies/$slug.tsx:1084
+#: src/routes/companies/$slug.tsx:1091
 msgid "No documents yet"
 msgstr "Encara no hi ha documents"
 
-#: src/routes/companies/$slug.tsx:1039
+#: src/routes/companies/$slug.tsx:1046
 msgid "no due date"
 msgstr "sense data de venciment"
 
@@ -1092,7 +1104,7 @@ msgstr "sense data de venciment"
 msgid "No due date"
 msgstr "Sense data de venciment"
 
-#: src/routes/companies/$slug.tsx:992
+#: src/routes/companies/$slug.tsx:999
 msgid "No email threads yet"
 msgstr "Encara no hi ha fils de correu"
 
@@ -1108,10 +1120,6 @@ msgstr "Cap empresa d'alta prioritat sense seguiment programat"
 msgid "No inboxes yet"
 msgstr "Encara no hi ha safates"
 
-#: src/routes/companies/$slug.tsx:1101
-msgid "No interactions logged yet"
-msgstr "Encara no hi ha interaccions registrades"
-
 #: src/routes/emails/$threadId.tsx:405
 msgid "No messages in this thread"
 msgstr "No hi ha missatges en aquest fil"
@@ -1120,7 +1128,7 @@ msgstr "No hi ha missatges en aquest fil"
 msgid "No overdue tasks, no pending follow-ups, no neglected companies."
 msgstr "Sense tasques endarrerides, sense seguiments pendents, sense empreses oblidades."
 
-#: src/routes/companies/$slug.tsx:1055
+#: src/routes/companies/$slug.tsx:1062
 #: src/routes/pages/index.tsx:136
 msgid "No pages yet"
 msgstr "Encara no hi ha pàgines"
@@ -1129,15 +1137,15 @@ msgstr "Encara no hi ha pàgines"
 msgid "No pending tasks. Time to celebrate or prospect new leads."
 msgstr "Sense tasques pendents. És hora de celebrar-ho o de buscar nous prospectes."
 
-#: src/routes/companies/$slug.tsx:896
+#: src/routes/companies/$slug.tsx:903
 msgid "No products linked yet"
 msgstr "Encara sense productes vinculats"
 
-#: src/routes/companies/$slug.tsx:890
+#: src/routes/companies/$slug.tsx:897
 msgid "No tags yet"
 msgstr "Encara sense etiquetes"
 
-#: src/routes/companies/$slug.tsx:1027
+#: src/routes/companies/$slug.tsx:1034
 msgid "No tasks for this company"
 msgstr "Cap tasca per a aquesta empresa"
 
@@ -1157,7 +1165,7 @@ msgstr "Encara no hi ha fils"
 msgid "No upcoming due dates"
 msgstr "Sense venciments propers"
 
-#: src/routes/companies/$slug.tsx:827
+#: src/routes/companies/$slug.tsx:834
 msgid "none scheduled"
 msgstr "cap planificat"
 
@@ -1177,7 +1185,7 @@ msgid "Open"
 msgstr "Obert"
 
 #: src/components/companies/where-panel.tsx:99
-#: src/routes/companies/$slug.tsx:702
+#: src/routes/companies/$slug.tsx:709
 msgid "Open in Google Maps"
 msgstr "Obre a Google Maps"
 
@@ -1185,11 +1193,11 @@ msgstr "Obre a Google Maps"
 msgid "Open in new tab"
 msgstr "Obre en una pestanya nova"
 
-#: src/routes/companies/$slug.tsx:692
+#: src/routes/companies/$slug.tsx:699
 msgid "Open Instagram"
 msgstr "Obre Instagram"
 
-#: src/routes/companies/$slug.tsx:682
+#: src/routes/companies/$slug.tsx:689
 msgid "Open LinkedIn"
 msgstr "Obre LinkedIn"
 
@@ -1197,7 +1205,7 @@ msgstr "Obre LinkedIn"
 msgid "Open tasks"
 msgstr "Tasques obertes"
 
-#: src/routes/companies/$slug.tsx:656
+#: src/routes/companies/$slug.tsx:663
 msgid "Open website"
 msgstr "Obre el lloc web"
 
@@ -1205,7 +1213,7 @@ msgstr "Obre el lloc web"
 msgid "Opened"
 msgstr "Obert"
 
-#: src/components/shared/channel-icon.tsx:57
+#: src/components/shared/channel-icon.tsx:73
 msgid "Other"
 msgstr "Altres"
 
@@ -1258,13 +1266,13 @@ msgid "Page title"
 msgstr "Títol de la pàgina"
 
 #: src/components/layout/nav-items.ts:59
-#: src/routes/companies/$slug.tsx:779
+#: src/routes/companies/$slug.tsx:786
 #: src/routes/pages/$id.tsx:214
 #: src/routes/pages/index.tsx:105
 msgid "Pages"
 msgstr "Pàgines"
 
-#: src/routes/companies/$slug.tsx:875
+#: src/routes/companies/$slug.tsx:882
 msgid "Pain points"
 msgstr "Punts febles"
 
@@ -1290,23 +1298,24 @@ msgstr "Anterior"
 msgid "Primary navigation"
 msgstr "Navegació principal"
 
-#: src/routes/companies/$slug.tsx:859
+#: src/routes/companies/$slug.tsx:866
 msgid "Priority"
 msgstr "Prioritat"
 
-#: src/routes/companies/$slug.tsx:893
+#: src/routes/companies/$slug.tsx:900
 msgid "Products fit"
 msgstr "Encaix de productes"
 
 #: src/components/layout/nav-items.ts:73
-#: src/routes/companies/$slug.tsx:761
-#: src/routes/companies/$slug.tsx:964
+#: src/routes/companies/$slug.tsx:768
+#: src/routes/companies/$slug.tsx:971
 #: src/routes/profile/index.tsx:81
 msgid "Profile"
 msgstr "Perfil"
 
+#: src/components/shared/channel-icon.tsx:70
 #: src/components/shared/status-badge.tsx:32
-#: src/routes/companies/$slug.tsx:396
+#: src/routes/companies/$slug.tsx:398
 msgid "Proposal"
 msgstr "Proposta"
 
@@ -1314,12 +1323,12 @@ msgstr "Proposta"
 msgid "Proposal in review"
 msgstr "Proposta en revisió"
 
-#: src/routes/companies/$slug.tsx:1085
+#: src/routes/companies/$slug.tsx:1092
 msgid "Proposals, meeting notes and attachments will show up here."
 msgstr "Les propostes, notes de reunió i adjunts apareixeran aquí."
 
 #: src/components/shared/status-badge.tsx:28
-#: src/routes/companies/$slug.tsx:392
+#: src/routes/companies/$slug.tsx:394
 msgid "Prospect"
 msgstr "Prospecte"
 
@@ -1366,7 +1375,7 @@ msgstr "Ha fallat l'actualització de l'estat de lectura"
 msgid "Redo"
 msgstr "Refés"
 
-#: src/routes/companies/$slug.tsx:839
+#: src/routes/companies/$slug.tsx:846
 msgid "Region"
 msgstr "Regió"
 
@@ -1400,8 +1409,12 @@ msgstr "Respon"
 msgid "Reply all"
 msgstr "Respon a tots"
 
+#: src/components/shared/channel-icon.tsx:71
+msgid "Research"
+msgstr "Recerca"
+
 #: src/components/shared/status-badge.tsx:30
-#: src/routes/companies/$slug.tsx:394
+#: src/routes/companies/$slug.tsx:396
 msgid "Responded"
 msgstr "Respost"
 
@@ -1463,7 +1476,7 @@ msgstr "Envia"
 msgid "Send blocked: these recipients cannot receive email"
 msgstr "Enviament bloquejat: aquests destinataris no poden rebre correu"
 
-#: src/routes/companies/$slug.tsx:664
+#: src/routes/companies/$slug.tsx:671
 msgid "Send email"
 msgstr "Envia correu"
 
@@ -1501,6 +1514,10 @@ msgstr "Mostra menys"
 msgid "Show more"
 msgstr "Mostra més"
 
+#: src/routes/companies/$slug.tsx:1113
+msgid "Show system events"
+msgstr "Mostra esdeveniments del sistema"
+
 #: src/routes/emails/index.tsx:919
 msgid "Showing {firstRow}–{lastRow} of {total}"
 msgstr "Mostrant {firstRow}–{lastRow} de {total}"
@@ -1525,7 +1542,7 @@ msgstr "Iniciant sessió…"
 msgid "Signing out…"
 msgstr "Tancant sessió…"
 
-#: src/routes/companies/$slug.tsx:849
+#: src/routes/companies/$slug.tsx:856
 msgid "Size"
 msgstr "Mida"
 
@@ -1534,7 +1551,7 @@ msgstr "Mida"
 msgid "Slug"
 msgstr "Slug"
 
-#: src/routes/companies/$slug.tsx:854
+#: src/routes/companies/$slug.tsx:861
 msgid "Source"
 msgstr "Origen"
 
@@ -1581,12 +1598,16 @@ msgstr "Sincronitza ara"
 msgid "Syncing…"
 msgstr "Sincronitzant…"
 
-#: src/routes/companies/$slug.tsx:887
+#: src/components/shared/channel-icon.tsx:72
+msgid "System"
+msgstr "Sistema"
+
+#: src/routes/companies/$slug.tsx:894
 msgid "Tags"
 msgstr "Etiquetes"
 
 #: src/components/layout/nav-items.ts:66
-#: src/routes/companies/$slug.tsx:776
+#: src/routes/companies/$slug.tsx:783
 #: src/routes/tasks/index.tsx:224
 #: src/routes/tasks/index.tsx:246
 msgid "Tasks"
@@ -1621,7 +1642,7 @@ msgstr "Potser el fil s'ha arxivat al proveïdor o l'enllaç és obsolet."
 msgid "The workshop ledger — tear off one strip at a time."
 msgstr "El llibre del taller — arrenca-n'hi una tira cada vegada."
 
-#: src/routes/companies/$slug.tsx:381
+#: src/routes/companies/$slug.tsx:383
 msgid "The workshop rejected the change. Try again."
 msgstr "El taller ha rebutjat el canvi. Torna-ho a provar."
 
@@ -1646,7 +1667,7 @@ msgstr "Metadades del fil"
 msgid "Thread not found"
 msgstr "Fil no trobat"
 
-#: src/routes/companies/$slug.tsx:1095
+#: src/routes/companies/$slug.tsx:1102
 msgid "Timeline"
 msgstr "Cronologia"
 
@@ -1712,10 +1733,6 @@ msgstr "Ha fallat la pujada"
 msgid "Uploading…"
 msgstr "Pujant…"
 
-#: src/routes/companies/$slug.tsx:1102
-msgid "Use “Log interaction” above to record the first touch."
-msgstr "Fes servir «Registra interacció» a dalt per anotar el primer contacte."
-
 #: src/routes/emails/inboxes.tsx:936
 msgid "Use as default footer"
 msgstr "Utilitza com a peu de pàgina predeterminat"
@@ -1741,7 +1758,7 @@ msgstr "Veure el fil"
 msgid "Views"
 msgstr "Visites"
 
-#: src/components/shared/channel-icon.tsx:52
+#: src/components/shared/channel-icon.tsx:64
 msgid "Visit"
 msgstr "Visita"
 
@@ -1757,12 +1774,12 @@ msgstr "De què tracta?"
 msgid "What needs to happen?"
 msgstr "Què cal fer?"
 
-#: src/components/shared/channel-icon.tsx:55
+#: src/components/shared/channel-icon.tsx:67
 msgid "WhatsApp"
 msgstr "WhatsApp"
 
 #: src/components/companies/where-panel.tsx:88
-#: src/routes/companies/$slug.tsx:764
+#: src/routes/companies/$slug.tsx:771
 msgid "Where"
 msgstr "On"
 

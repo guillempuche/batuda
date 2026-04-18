@@ -34,6 +34,7 @@ import { ProposalsLive } from './handlers/proposals'
 import { RecordingsLive } from './handlers/recordings'
 import { ResearchLive } from './handlers/research'
 import { TasksLive } from './handlers/tasks'
+import { TimelineLive } from './handlers/timeline'
 import { WebhooksLive } from './handlers/webhooks'
 import { Auth } from './lib/auth'
 import { CorsLive } from './lib/cors'
@@ -76,6 +77,7 @@ const ApiLive = HttpApiBuilder.layer(ForjaApi).pipe(
 		AgentMailWebhookLive,
 		RecordingsLive,
 		ResearchLive,
+		TimelineLive,
 	]),
 )
 

@@ -5,10 +5,14 @@ import {
 	Calendar,
 	Camera,
 	Circle,
+	FileSignature,
+	FileText,
 	Mail,
 	MapPin,
 	MessageCircle,
 	Phone,
+	Search,
+	Settings,
 } from 'lucide-react'
 
 /**
@@ -30,6 +34,10 @@ export type InteractionChannel =
 	| 'instagram'
 	| 'whatsapp'
 	| 'event'
+	| 'document'
+	| 'proposal'
+	| 'research'
+	| 'system'
 	| 'other'
 
 const channelIcons: Record<
@@ -43,6 +51,10 @@ const channelIcons: Record<
 	instagram: Camera,
 	whatsapp: MessageCircle,
 	event: Calendar,
+	document: FileText,
+	proposal: FileSignature,
+	research: Search,
+	system: Settings,
 	other: Circle,
 }
 
@@ -54,6 +66,10 @@ const channelLabels: Record<InteractionChannel, MessageDescriptor> = {
 	instagram: msg`Instagram`,
 	whatsapp: msg`WhatsApp`,
 	event: msg`Event`,
+	document: msg`Document`,
+	proposal: msg`Proposal`,
+	research: msg`Research`,
+	system: msg`System`,
 	other: msg`Other`,
 }
 

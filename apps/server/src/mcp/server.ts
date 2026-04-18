@@ -10,6 +10,7 @@ import { CompanyResource } from './resources/company'
 import { DocumentResource } from './resources/document'
 import { PipelineResource } from './resources/pipeline'
 import { ResearchResource } from './resources/research'
+import { TimelineResource } from './resources/timeline'
 import { CompanyHandlersLive, CompanyTools } from './tools/companies'
 import { ContactHandlersLive, ContactTools } from './tools/contacts'
 import { DocumentHandlersLive, DocumentTools } from './tools/documents'
@@ -20,6 +21,7 @@ import { PipelineHandlersLive, PipelineTools } from './tools/pipeline'
 import { RecordingHandlersLive, RecordingTools } from './tools/recordings'
 import { ResearchMcpHandlersLive, ResearchMcpTools } from './tools/research-mcp'
 import { TaskHandlersLive, TaskTools } from './tools/tasks'
+import { TimelineHandlersLive, TimelineTools } from './tools/timeline'
 
 export const McpToolsLive = Layer.mergeAll(
 	McpServer.toolkit(CompanyTools),
@@ -32,10 +34,12 @@ export const McpToolsLive = Layer.mergeAll(
 	McpServer.toolkit(EmailTools),
 	McpServer.toolkit(RecordingTools),
 	McpServer.toolkit(ResearchMcpTools),
+	McpServer.toolkit(TimelineTools),
 	CompanyResource,
 	PipelineResource,
 	DocumentResource,
 	ResearchResource,
+	TimelineResource,
 	CompanyResearchPrompt,
 	DailyBriefingPrompt,
 	ProposalDraftPrompt,
@@ -52,4 +56,5 @@ export const McpToolsLive = Layer.mergeAll(
 	Layer.provide(EmailHandlersLive),
 	Layer.provide(RecordingHandlersLive),
 	Layer.provide(ResearchMcpHandlersLive),
+	Layer.provide(TimelineHandlersLive),
 )

@@ -31,6 +31,7 @@ const companyTasksCache = new Map<
 	string,
 	ReturnType<typeof makeCompanyTasksAtom>
 >()
+const timelineCache = new Map<string, ReturnType<typeof makeTimelineAtom>>()
 
 function makeCompanyAtom(slug: string) {
 	return ForjaApiAtom.query('companies', 'get', { params: { slug } })
@@ -51,6 +52,12 @@ function makeInteractionsAtom(companyId: string) {
 function makeCompanyTasksAtom(companyId: string) {
 	return ForjaApiAtom.query('tasks', 'list', {
 		query: { companyId },
+	})
+}
+
+function makeTimelineAtom(companyId: string) {
+	return ForjaApiAtom.query('timeline', 'list', {
+		query: { companyId, limit: 50 },
 	})
 }
 
@@ -104,5 +111,19 @@ export function companyTasksAtomFor(companyId: string) {
 	if (existing !== undefined) return existing
 	const atom = makeCompanyTasksAtom(companyId)
 	companyTasksCache.set(companyId, atom)
+	return atom
+}
+
+/**
+ * Timeline-by-company atom (one per companyId, limit 50). Surfaces the
+ * polymorphic activity log — emails, calls, meetings, documents,
+ * proposals, research runs, system events — ordered by `occurredAt DESC`.
+ * Refresh alongside the interactions atom after logging new activity.
+ */
+export function timelineAtomFor(companyId: string) {
+	const existing = timelineCache.get(companyId)
+	if (existing !== undefined) return existing
+	const atom = makeTimelineAtom(companyId)
+	timelineCache.set(companyId, atom)
 	return atom
 }

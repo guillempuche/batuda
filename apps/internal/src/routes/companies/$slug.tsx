@@ -24,7 +24,7 @@ import {
 	Plus,
 } from 'lucide-react'
 import { motion } from 'motion/react'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
 import {
@@ -40,6 +40,7 @@ import {
 	companyTasksAtomFor,
 	contactsAtomFor,
 	interactionsAtomFor,
+	timelineAtomFor,
 } from '#/atoms/company-atoms'
 import { emailsSearchAtom } from '#/atoms/emails-atoms'
 import { pagesSearchAtom } from '#/atoms/pages-atoms'
@@ -124,15 +125,14 @@ type ContactRow = {
 	readonly linkedin: string | null
 }
 
-type InteractionRow = {
+type TimelineRow = {
 	readonly id: string
+	readonly kind: string
 	readonly channel: string
 	readonly date: string
-	readonly subject: string | null
 	readonly summary: string | null
-	readonly outcome: string | null
-	readonly nextAction: string | null
-	readonly providerThreadId: string | null
+	readonly entityType: string
+	readonly entityId: string
 }
 
 type TaskEntry = {
@@ -343,6 +343,7 @@ function DetailBody({
 		() => interactionsAtomFor(company.id),
 		[company.id],
 	)
+	const timelineAtom = useMemo(() => timelineAtomFor(company.id), [company.id])
 	const tasksAtom = useMemo(() => companyTasksAtomFor(company.id), [company.id])
 	const companyPagesAtom = useMemo(
 		() => pagesSearchAtom({ companyId: company.id }),
@@ -354,12 +355,13 @@ function DetailBody({
 	)
 
 	const contactsResult = useAtomValue(contactsAtom)
-	const interactionsResult = useAtomValue(interactionsAtom)
+	const timelineResult = useAtomValue(timelineAtom)
 	const tasksResult = useAtomValue(tasksAtom)
 	const pagesResult = useAtomValue(companyPagesAtom)
 	const emailsResult = useAtomValue(companyEmailsAtom)
 
 	const refreshInteractions = useAtomRefresh(interactionsAtom)
+	const refreshTimeline = useAtomRefresh(timelineAtom)
 
 	const toast = usePriToast()
 	const updateCompany = useAtomSet(
@@ -416,12 +418,12 @@ function DetailBody({
 				: [],
 		[contactsResult],
 	)
-	const interactions = useMemo<ReadonlyArray<InteractionRow>>(
+	const timelineEntries = useMemo<ReadonlyArray<TimelineRow>>(
 		() =>
-			AsyncResult.isSuccess(interactionsResult)
-				? narrowInteractions(interactionsResult.value)
+			AsyncResult.isSuccess(timelineResult)
+				? narrowTimeline(timelineResult.value)
 				: [],
-		[interactionsResult],
+		[timelineResult],
 	)
 	const tasks = useMemo<ReadonlyArray<TaskEntry>>(
 		() =>
@@ -494,15 +496,18 @@ function DetailBody({
 		return out
 	}, [emailsResult])
 
-	const threadIdByProviderId = useMemo(() => {
-		const map = new Map<string, string>()
-		for (const t of companyThreads) map.set(t.providerThreadId, t.id)
-		return map
-	}, [companyThreads])
-
 	const openTaskCount = useMemo(
 		() => tasks.filter(task => task.completedAt === null).length,
 		[tasks],
+	)
+
+	const [showSystemEvents, setShowSystemEvents] = useState(false)
+	const visibleTimeline = useMemo(
+		() =>
+			showSystemEvents
+				? timelineEntries
+				: timelineEntries.filter(entry => entry.kind !== 'system_event'),
+		[timelineEntries, showSystemEvents],
 	)
 
 	const handleComposeEmail = useCallback(() => {
@@ -530,6 +535,7 @@ function DetailBody({
 			companyName: company.name,
 			onSubmitted: () => {
 				refreshInteractions()
+				refreshTimeline()
 				refreshCompany()
 			},
 		})
@@ -538,6 +544,7 @@ function DetailBody({
 		company.id,
 		company.name,
 		refreshInteractions,
+		refreshTimeline,
 		refreshCompany,
 	])
 
@@ -1096,31 +1103,35 @@ function DetailBody({
 					</PriCollapsible.Trigger>
 					<PriCollapsible.Panel>
 						<TimelinePanelInner>
-							{interactions.length === 0 ? (
+							<TimelineToolbar>
+								<SystemEventsToggle>
+									<input
+										type='checkbox'
+										checked={showSystemEvents}
+										onChange={e => setShowSystemEvents(e.target.checked)}
+									/>
+									<Trans>Show system events</Trans>
+								</SystemEventsToggle>
+							</TimelineToolbar>
+							{visibleTimeline.length === 0 ? (
 								<EmptyState
-									title={t`No interactions logged yet`}
-									description={t`Use “Log interaction” above to record the first touch.`}
+									title={t`No activity yet`}
+									description={t`Emails, calls, documents, and proposals will appear here as they happen.`}
 								/>
 							) : (
 								<TimelineList>
-									{interactions.map(interaction => {
-										const localThreadId =
-											interaction.providerThreadId !== null
-												? (threadIdByProviderId.get(
-														interaction.providerThreadId,
-													) ?? null)
-												: null
+									{visibleTimeline.map(row => {
 										const entry: TimelineEntryData = {
-											id: interaction.id,
-											channel: interaction.channel,
-											subject: interaction.subject,
-											summary: interaction.summary,
-											outcome: interaction.outcome,
-											nextAction: interaction.nextAction,
-											date: interaction.date,
-											threadId: localThreadId,
+											id: row.id,
+											channel: row.channel,
+											subject: null,
+											summary: row.summary,
+											outcome: null,
+											nextAction: null,
+											date: row.date,
+											threadId: null,
 										}
-										return <TimelineEntry key={interaction.id} entry={entry} />
+										return <TimelineEntry key={row.id} entry={entry} />
 									})}
 								</TimelineList>
 							)}
@@ -1218,38 +1229,52 @@ function narrowContacts(
 	return out
 }
 
-function narrowInteractions(
+function timelineKindToChannel(kind: string, fallback: string | null): string {
+	switch (kind) {
+		case 'email_sent':
+		case 'email_received':
+			return 'email'
+		case 'call_logged':
+			return fallback ?? 'phone'
+		case 'document_created':
+			return 'document'
+		case 'proposal_sent':
+		case 'proposal_viewed':
+		case 'proposal_responded':
+			return 'proposal'
+		case 'research_run':
+			return 'research'
+		case 'system_event':
+			return 'system'
+		default:
+			return fallback ?? 'other'
+	}
+}
+
+function narrowTimeline(
 	rows: ReadonlyArray<unknown>,
-): ReadonlyArray<InteractionRow> {
-	const out: Array<InteractionRow> = []
+): ReadonlyArray<TimelineRow> {
+	const out: Array<TimelineRow> = []
 	for (const row of rows) {
 		if (!row || typeof row !== 'object') continue
 		const r = row as Record<string, unknown>
 		if (typeof r['id'] !== 'string') continue
-		if (typeof r['channel'] !== 'string') continue
-		if (typeof r['date'] !== 'string') continue
-		const meta = r['metadata']
-		let providerThreadId: string | null = null
-		if (meta && typeof meta === 'object') {
-			const m = meta as Record<string, unknown>
-			if (typeof m['providerThreadId'] === 'string') {
-				providerThreadId = m['providerThreadId']
-			}
-		}
+		if (typeof r['kind'] !== 'string') continue
+		if (typeof r['entityType'] !== 'string') continue
+		if (typeof r['entityId'] !== 'string') continue
+		const occurredAt = r['occurredAt']
+		if (typeof occurredAt !== 'string') continue
+		const rawChannel = typeof r['channel'] === 'string' ? r['channel'] : null
 		out.push({
 			id: r['id'],
-			channel: r['channel'],
-			date: r['date'],
-			subject: typeof r['subject'] === 'string' ? r['subject'] : null,
+			kind: r['kind'],
+			channel: timelineKindToChannel(r['kind'], rawChannel),
+			date: occurredAt,
 			summary: typeof r['summary'] === 'string' ? r['summary'] : null,
-			outcome: typeof r['outcome'] === 'string' ? r['outcome'] : null,
-			nextAction: typeof r['nextAction'] === 'string' ? r['nextAction'] : null,
-			providerThreadId,
+			entityType: r['entityType'],
+			entityId: r['entityId'],
 		})
 	}
-	// Sort interactions most-recent-first — the server does not guarantee
-	// ordering and the timeline is useless unless the top row is the
-	// freshest thing we know about this company.
 	out.sort((a, b) => Date.parse(b.date) - Date.parse(a.date))
 	return out
 }
@@ -1862,6 +1887,32 @@ const TimelinePanelInner = styled.div.withConfig({
 	displayName: 'CompanyDetailTimelinePanelInner',
 })`
 	padding: var(--space-sm) 0 0;
+`
+
+const TimelineToolbar = styled.div.withConfig({
+	displayName: 'CompanyDetailTimelineToolbar',
+})`
+	display: flex;
+	justify-content: flex-end;
+	padding: 0 var(--space-md) var(--space-xs);
+`
+
+const SystemEventsToggle = styled.label.withConfig({
+	displayName: 'CompanyDetailSystemEventsToggle',
+})`
+	${stenciledTitle}
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2xs);
+	font-size: var(--typescale-label-small-size);
+	opacity: 0.75;
+	cursor: pointer;
+	user-select: none;
+
+	input {
+		accent-color: var(--color-primary);
+		cursor: pointer;
+	}
 `
 
 const TimelineList = styled.div.withConfig({
