@@ -1222,6 +1222,41 @@ export const seed = (preset: Preset) =>
 			yield* Effect.logInfo(`  ... and ${insertedInteractions.length - 3} more`)
 		}
 
+		// Mirror TimelineActivityService: one timeline_activity row per seeded
+		// interaction, plus the cadence-column bump on companies/contacts.
+		// Kept as SQL here so we don't have to import the server service into
+		// the CLI bundle.
+		yield* sql`
+			INSERT INTO timeline_activity (
+				kind, entity_type, entity_id, company_id, contact_id,
+				channel, direction, occurred_at, summary, payload
+			)
+			SELECT
+				CASE WHEN channel IN ('phone','call') THEN 'call_logged'
+				     ELSE 'system_event' END,
+				'interaction', id, company_id, contact_id,
+				channel, direction, date, summary,
+				jsonb_build_object(
+					'type', type, 'subject', subject, 'outcome', outcome,
+					'nextAction', next_action, 'nextActionAt', next_action_at,
+					'durationMin', duration_min
+				)
+			FROM interactions
+		`
+		yield* sql`
+			UPDATE companies c SET
+				last_email_at   = (SELECT MAX(date) FROM interactions WHERE company_id = c.id AND channel = 'email'),
+				last_call_at    = (SELECT MAX(date) FROM interactions WHERE company_id = c.id AND channel IN ('phone', 'call')),
+				last_meeting_at = (SELECT MAX(date) FROM interactions WHERE company_id = c.id AND channel IN ('visit', 'event')),
+				last_contacted_at = GREATEST(last_contacted_at, (SELECT MAX(date) FROM interactions WHERE company_id = c.id))
+		`
+		yield* sql`
+			UPDATE contacts co SET
+				last_email_at   = (SELECT MAX(date) FROM interactions WHERE contact_id = co.id AND channel = 'email'),
+				last_call_at    = (SELECT MAX(date) FROM interactions WHERE contact_id = co.id AND channel IN ('phone', 'call')),
+				last_meeting_at = (SELECT MAX(date) FROM interactions WHERE contact_id = co.id AND channel IN ('visit', 'event'))
+		`
+
 		// 5. Tasks
 		yield* Effect.logInfo('Seeding tasks...')
 		const insertedTasks = yield* sql<{
@@ -2681,6 +2716,69 @@ export const seed = (preset: Preset) =>
 			yield* Effect.logInfo(
 				`  ${emailThreadRows.length} threads, ${emailMessageRows.length} messages`,
 			)
+
+			// message_participants — one row per (email × address × role).
+			// Uses the same shape as the migration backfill so dev seeds and
+			// real production data are read back identically.
+			yield* sql`
+				INSERT INTO message_participants (email_message_id, email_address, role)
+				SELECT m.id, lower(addr.value), roles.role_name
+				FROM email_messages m
+				CROSS JOIN LATERAL (VALUES ('to'), ('cc'), ('bcc')) AS roles(role_name)
+				CROSS JOIN LATERAL jsonb_array_elements_text(
+					COALESCE(m.recipients->roles.role_name, '[]'::jsonb)
+				) AS addr(value)
+				WHERE addr.value IS NOT NULL AND addr.value <> ''
+				ON CONFLICT DO NOTHING
+			`
+			yield* sql`
+				INSERT INTO message_participants (email_message_id, email_address, role)
+				SELECT m.id, lower(i.email), 'from'
+				FROM email_messages m
+				JOIN inboxes i ON i.provider_inbox_id = m.provider_inbox_id
+				WHERE m.direction = 'outbound'
+				ON CONFLICT DO NOTHING
+			`
+			yield* sql`
+				UPDATE message_participants mp SET contact_id = c.id
+				FROM contacts c
+				WHERE lower(c.email) = mp.email_address AND mp.contact_id IS NULL
+			`
+
+			// timeline_activity rows for each seeded email — matches the
+			// service's kind mapping so list_timeline returns email events
+			// alongside interactions.
+			yield* sql`
+				INSERT INTO timeline_activity (
+					kind, entity_type, entity_id, company_id, contact_id,
+					channel, direction, occurred_at, payload
+				)
+				SELECT
+					CASE WHEN direction = 'outbound' THEN 'email_sent'
+					     ELSE 'email_received' END,
+					'email_message', id, company_id, contact_id,
+					'email', direction, status_updated_at,
+					jsonb_build_object('classification', inbound_classification)
+				FROM email_messages
+			`
+			yield* sql`
+				UPDATE companies c SET
+					last_email_at = GREATEST(
+						last_email_at,
+						(SELECT MAX(status_updated_at) FROM email_messages WHERE company_id = c.id)
+					),
+					last_contacted_at = GREATEST(
+						last_contacted_at,
+						(SELECT MAX(status_updated_at) FROM email_messages WHERE company_id = c.id)
+					)
+			`
+			yield* sql`
+				UPDATE contacts co SET
+					last_email_at = GREATEST(
+						last_email_at,
+						(SELECT MAX(status_updated_at) FROM email_messages WHERE contact_id = co.id)
+					)
+			`
 
 			yield* writeDevInboxFiles(emailThreadRows, emailMessageRows)
 

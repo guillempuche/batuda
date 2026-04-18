@@ -8,6 +8,7 @@ import {
 	HttpServerResponse,
 } from 'effect/unstable/http'
 import { HttpApiBuilder, HttpApiScalar, OpenApi } from 'effect/unstable/httpapi'
+import { SqlClient } from 'effect/unstable/sql'
 
 import { ForjaApi } from '@engranatge/controllers'
 import {
@@ -52,7 +53,10 @@ import { PipelineService } from './services/pipeline'
 import { RecordingService } from './services/recordings'
 import { ResearchBlobStorageLive } from './services/research-blob-storage'
 import { S3StorageProviderLive } from './services/s3-storage-provider'
-import { TimelineActivityService } from './services/timeline-activity'
+import {
+	ResearchRunCompleted,
+	TimelineActivityService,
+} from './services/timeline-activity'
 import { WebhookService } from './services/webhooks'
 
 const ApiLive = HttpApiBuilder.layer(ForjaApi).pipe(
@@ -75,13 +79,60 @@ const ApiLive = HttpApiBuilder.layer(ForjaApi).pipe(
 	]),
 )
 
-// Wire research event sink → WebhookService
+// Wire research event sink → WebhookService + TimelineActivityService
+// Lifecycle events (succeeded/failed/cancelled) land on the timeline so the
+// company activity view surfaces completed research alongside emails and
+// calls; cost rows stay in research_runs / research_paid_spend.
+const TIMELINE_STATUS_FOR_EVENT: Record<
+	string,
+	'succeeded' | 'failed' | 'cancelled' | null
+> = {
+	'research.succeeded': 'succeeded',
+	'research.failed': 'failed',
+	'research.cancelled': 'cancelled',
+}
+
 const ResearchEventSinkLive = Layer.effect(
 	ResearchEventSink,
 	Effect.gen(function* () {
 		const webhooks = yield* WebhookService
+		const timeline = yield* TimelineActivityService
+		const sql = yield* SqlClient.SqlClient
 		return ResearchEventSink.of({
-			fire: (event, payload) => webhooks.fire(event, payload),
+			fire: (event, payload) =>
+				Effect.gen(function* () {
+					yield* webhooks.fire(event, payload)
+					const status = TIMELINE_STATUS_FOR_EVENT[event] ?? null
+					if (!status) return
+					const researchId = (payload as { researchId?: string }).researchId
+					if (!researchId) return
+					const rows = yield* sql<{
+						query: string
+						briefMd: string | null
+					}>`
+						SELECT query, brief_md FROM research_runs
+						WHERE id = ${researchId} LIMIT 1
+					`
+					const [run] = rows
+					if (!run) return
+					const linkRows = yield* sql<{ subjectId: string }>`
+						SELECT subject_id FROM research_links
+						WHERE research_id = ${researchId}
+						  AND subject_table = 'companies'
+						  AND link_kind = 'input'
+						LIMIT 1
+					`
+					const companyId = linkRows[0]?.subjectId ?? null
+					yield* timeline.record(
+						new ResearchRunCompleted({
+							researchRunId: researchId,
+							companyId,
+							summary: run.briefMd ?? run.query,
+							status,
+							occurredAt: new Date(),
+						}),
+					)
+				}).pipe(Effect.orDie),
 		})
 	}),
 )

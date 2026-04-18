@@ -11,6 +11,12 @@ import type {
 	UpdateDraftParams,
 } from './email-provider.js'
 import { EmailProvider } from './email-provider.js'
+import { ParticipantMatcher } from './participant-matcher.js'
+import {
+	EmailReceived,
+	EmailSent,
+	TimelineActivityService,
+} from './timeline-activity.js'
 import { WebhookService } from './webhooks.js'
 
 // PgClient.transformResultNames in apps/server/src/db/client.ts converts
@@ -102,6 +108,8 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 			const provider = yield* EmailProvider
 			const sql = yield* SqlClient.SqlClient
 			const webhooks = yield* WebhookService
+			const timeline = yield* TimelineActivityService
+			const participantMatcher = yield* ParticipantMatcher
 			const providerName = yield* Config.schema(
 				Schema.Literals(['local-inbox', 'agentmail']),
 				'EMAIL_PROVIDER',
@@ -133,8 +141,8 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 				})
 
 			const resolveInbox = (inboxId: string) =>
-				sql<{ id: string; providerInboxId: string }>`
-					SELECT id, provider_inbox_id FROM inboxes
+				sql<{ id: string; providerInboxId: string; email: string }>`
+					SELECT id, provider_inbox_id, email FROM inboxes
 					WHERE id = ${inboxId} LIMIT 1
 				`.pipe(
 					Effect.map(rows => rows[0] ?? null),
@@ -150,6 +158,15 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					Effect.orDie,
 				)
 
+			const resolveInboxEmail = (providerInboxId: string) =>
+				sql<{ email: string }>`
+					SELECT email FROM inboxes
+					WHERE provider_inbox_id = ${providerInboxId} LIMIT 1
+				`.pipe(
+					Effect.map(rows => rows[0]?.email ?? null),
+					Effect.orDie,
+				)
+
 			type FooterRow = { html: string; textFallback: string }
 			const resolveDefaultFooter = (localInboxId: string) =>
 				sql<FooterRow>`
@@ -161,10 +178,45 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					Effect.orDie,
 				)
 
+			type ParticipantRow = {
+				emailMessageId: string
+				emailAddress: string
+				displayName: string | null
+				role: 'from' | 'to' | 'cc' | 'bcc'
+				contactId: string | null
+			}
+
+			const buildParticipants = (
+				emailMessageId: string,
+				fromAddress: string | null,
+				to: readonly string[],
+				cc: readonly string[],
+				bcc: readonly string[],
+			): ParticipantRow[] => {
+				const rows: ParticipantRow[] = []
+				const push = (address: string, role: 'from' | 'to' | 'cc' | 'bcc') => {
+					const trimmed = address.trim()
+					if (!trimmed) return
+					rows.push({
+						emailMessageId,
+						emailAddress: trimmed.toLowerCase(),
+						displayName: null,
+						role,
+						contactId: null,
+					})
+				}
+				if (fromAddress) push(fromAddress, 'from')
+				for (const a of to) push(a, 'to')
+				for (const a of cc) push(a, 'cc')
+				for (const a of bcc) push(a, 'bcc')
+				return rows
+			}
+
 			const recordOutbound = (args: {
 				result: { messageId: string; threadId: string }
 				providerInboxId: string
 				localInboxId: string | null
+				inboxEmail: string | null
 				companyId: string | null
 				contactId: string | null
 				subject: string | null
@@ -173,64 +225,79 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 				bcc: string[]
 				isNewThread: boolean
 			}) =>
-				Effect.gen(function* () {
-					if (args.isNewThread) {
-						yield* sql`
-							INSERT INTO email_thread_links ${sql.insert({
+				sql.withTransaction(
+					Effect.gen(function* () {
+						if (args.isNewThread) {
+							yield* sql`
+								INSERT INTO email_thread_links ${sql.insert({
+									provider: providerName,
+									providerThreadId: args.result.threadId,
+									providerInboxId: args.providerInboxId,
+									inboxId: args.localInboxId,
+									companyId: args.companyId,
+									contactId: args.contactId,
+									subject: args.subject,
+									status: 'open',
+								})}
+							`
+						}
+
+						const sentAt = new Date()
+						const emailRows = yield* sql<{ id: string }>`
+							INSERT INTO email_messages ${sql.insert({
 								provider: providerName,
+								providerMessageId: args.result.messageId,
 								providerThreadId: args.result.threadId,
 								providerInboxId: args.providerInboxId,
-								inboxId: args.localInboxId,
-								companyId: args.companyId,
-								contactId: args.contactId,
-								subject: args.subject,
-								status: 'open',
-							})}
-						`
-					}
-
-					if (args.companyId) {
-						yield* sql`
-							INSERT INTO interactions ${sql.insert({
-								companyId: args.companyId,
-								contactId: args.contactId,
-								date: new Date(),
-								channel: 'email',
 								direction: 'outbound',
-								type: 'email',
-								subject: args.subject,
-								metadata: JSON.stringify({
-									providerThreadId: args.result.threadId,
-									providerMessageId: args.result.messageId,
+								companyId: args.companyId,
+								contactId: args.contactId,
+								recipients: JSON.stringify({
+									to: args.to,
+									cc: args.cc,
+									bcc: args.bcc,
 								}),
-							})}
+								status: 'sent',
+								statusUpdatedAt: sentAt,
+							})} RETURNING id
 						`
-						yield* sql`
-							UPDATE companies
-							SET last_contacted_at = now(), updated_at = now()
-							WHERE id = ${args.companyId}
-						`
-					}
+						const [emailMessage] = emailRows
+						if (!emailMessage) {
+							return yield* Effect.die(
+								new Error(
+									'INSERT INTO email_messages RETURNING id yielded no row',
+								),
+							)
+						}
 
-					yield* sql`
-						INSERT INTO email_messages ${sql.insert({
-							provider: providerName,
-							providerMessageId: args.result.messageId,
-							providerThreadId: args.result.threadId,
-							providerInboxId: args.providerInboxId,
-							direction: 'outbound',
-							companyId: args.companyId,
-							contactId: args.contactId,
-							recipients: JSON.stringify({
-								to: args.to,
-								cc: args.cc,
-								bcc: args.bcc,
-							}),
-							status: 'sent',
-							statusUpdatedAt: new Date(),
-						})}
-					`
-				})
+						const participants = buildParticipants(
+							emailMessage.id,
+							args.inboxEmail,
+							args.to,
+							args.cc,
+							args.bcc,
+						)
+						if (participants.length > 0) {
+							yield* sql`
+								INSERT INTO message_participants ${sql.insert(participants)}
+							`
+						}
+
+						if (args.companyId) {
+							yield* timeline.record(
+								new EmailSent({
+									emailMessageId: emailMessage.id,
+									companyId: args.companyId,
+									contactId: args.contactId,
+									subject: args.subject,
+									summary: null,
+									actorUserId: null,
+									occurredAt: sentAt,
+								}),
+							)
+						}
+					}),
+				)
 
 			return {
 				send: (
@@ -256,6 +323,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						const inbox = yield* resolveInbox(inboxId)
 						const providerInboxId = inbox?.providerInboxId ?? inboxId
 						const localInboxId = inbox?.id ?? null
+						const inboxEmail = inbox?.email ?? null
 
 						if (contactId) {
 							yield* assertContactNotSuppressed(contactId, to)
@@ -309,6 +377,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							result,
 							providerInboxId,
 							localInboxId,
+							inboxEmail,
 							companyId,
 							contactId: contactId ?? null,
 							subject,
@@ -382,6 +451,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 
 						const localInboxId =
 							link.inboxId ?? (yield* resolveLocalInboxId(link.providerInboxId))
+						const inboxEmail = yield* resolveInboxEmail(link.providerInboxId)
 
 						let finalBody = body
 						if (!extras?.skipFooter && localInboxId) {
@@ -427,6 +497,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							result,
 							providerInboxId: link.providerInboxId,
 							localInboxId,
+							inboxEmail,
 							companyId: link.companyId,
 							contactId: link.contactId,
 							subject: thread.subject ?? null,
@@ -487,84 +558,126 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							companyId = link.companyId
 							contactId = link.contactId
 						} else {
-							const contacts = yield* sql`
-								SELECT c.id, c.company_id
-								FROM contacts c
-								WHERE c.email = ${payload.from}
-								LIMIT 1
-							`
-							if (contacts.length > 0) {
-								const contact = contacts[0] as {
-									id: string
-									companyId: string
+							// ParticipantMatcher replaces the previous plain contact
+							// lookup with an explicit discriminated outcome: direct
+							// contact match, domain-only match, ambiguous candidates,
+							// or no match at all. createPolicy='never' keeps inbound
+							// webhooks from silently creating contact rows.
+							const match = yield* participantMatcher.match({
+								email: payload.from,
+								createPolicy: 'never',
+							})
+							switch (match._tag) {
+								case 'MatchedContact':
+									contactId = match.contactId
+									companyId = match.companyId
+									break
+								case 'MatchedCompanyOnly':
+									companyId = match.companyId
+									break
+								case 'Ambiguous': {
+									const [first] = match.candidates
+									if (first) {
+										contactId = first.contactId
+										companyId = first.companyId
+									}
+									break
 								}
-								contactId = contact.id
-								companyId = contact.companyId
+								case 'NoMatch':
+								case 'CreatedContact':
+								case 'CreatedBoth':
+									break
 							}
-
-							const localInboxId = yield* resolveLocalInboxId(
-								payload.providerInboxId,
-							)
-
-							yield* sql`
-								INSERT INTO email_thread_links ${sql.insert({
-									provider: payload.provider,
-									providerThreadId: payload.providerThreadId,
-									providerInboxId: payload.providerInboxId,
-									inboxId: localInboxId,
-									companyId,
-									contactId,
-									subject: payload.subject ?? null,
-									status: 'open',
-								})}
-							`
 						}
 
-						if (companyId) {
-							yield* sql`
-								INSERT INTO interactions ${sql.insert({
-									companyId,
-									contactId,
-									date: new Date(),
-									channel: 'email',
-									direction: 'inbound',
-									type: 'email',
-									subject: payload.subject ?? null,
-									metadata: JSON.stringify({
-										providerThreadId: payload.providerThreadId,
+						const inboxEmail = yield* resolveInboxEmail(payload.providerInboxId)
+
+						yield* sql.withTransaction(
+							Effect.gen(function* () {
+								if (existingLinks.length === 0) {
+									const localInboxId = yield* resolveLocalInboxId(
+										payload.providerInboxId,
+									)
+									yield* sql`
+										INSERT INTO email_thread_links ${sql.insert({
+											provider: payload.provider,
+											providerThreadId: payload.providerThreadId,
+											providerInboxId: payload.providerInboxId,
+											inboxId: localInboxId,
+											companyId,
+											contactId,
+											subject: payload.subject ?? null,
+											status: 'open',
+										})}
+									`
+								}
+
+								const receivedAt = new Date()
+								const inserted = yield* sql<{ id: string }>`
+									INSERT INTO email_messages ${sql.insert({
+										provider: payload.provider,
 										providerMessageId: payload.providerMessageId,
-										from: payload.from,
+										providerThreadId: payload.providerThreadId,
+										providerInboxId: payload.providerInboxId,
+										direction: 'inbound',
+										companyId,
+										contactId,
+										recipients: JSON.stringify({
+											to: providerMessage.to,
+											cc: providerMessage.cc ?? [],
+											bcc: [],
+										}),
+										status: 'delivered',
+										inboundClassification: payload.classification ?? 'normal',
+										statusUpdatedAt: receivedAt,
+									})}
+									ON CONFLICT (provider_message_id) DO NOTHING
+									RETURNING id
+								`
+								const [emailMessage] = inserted
+								// Dup webhook: message already recorded. Skip participants
+								// + timeline so we don't double-bump cadence columns.
+								if (!emailMessage) return
+
+								const participants = buildParticipants(
+									emailMessage.id,
+									payload.from,
+									providerMessage.to,
+									providerMessage.cc ?? [],
+									[],
+								)
+								// inboxEmail is the recipient 'to' from the thread's
+								// side of the wire; participants already include it via
+								// providerMessage.to, but fall back to the inbox email
+								// when the provider payload omits recipients.
+								if (inboxEmail && participants.every(p => p.role !== 'to')) {
+									participants.push({
+										emailMessageId: emailMessage.id,
+										emailAddress: inboxEmail.toLowerCase(),
+										displayName: null,
+										role: 'to',
+										contactId: null,
+									})
+								}
+								if (participants.length > 0) {
+									yield* sql`
+										INSERT INTO message_participants ${sql.insert(participants)}
+									`
+								}
+
+								yield* timeline.record(
+									new EmailReceived({
+										emailMessageId: emailMessage.id,
+										companyId,
+										contactId,
+										subject: payload.subject ?? null,
+										summary: null,
+										occurredAt: receivedAt,
+										classification: payload.classification ?? 'normal',
 									}),
-								})}
-							`
-
-							yield* sql`
-								UPDATE companies
-								SET last_contacted_at = now(), updated_at = now()
-								WHERE id = ${companyId}
-							`
-						}
-
-						yield* sql`
-							INSERT INTO email_messages ${sql.insert({
-								provider: payload.provider,
-								providerMessageId: payload.providerMessageId,
-								providerThreadId: payload.providerThreadId,
-								providerInboxId: payload.providerInboxId,
-								direction: 'inbound',
-								companyId,
-								contactId,
-								recipients: JSON.stringify({
-									to: providerMessage.to,
-									cc: providerMessage.cc ?? [],
-									bcc: [],
-								}),
-								status: 'delivered',
-								inboundClassification: payload.classification ?? 'normal',
-								statusUpdatedAt: new Date(),
-							})}
-							ON CONFLICT (provider_message_id) DO NOTHING
-						`
+								)
+							}),
+						)
 
 						yield* webhooks.fire('email.received', {
 							threadId: payload.providerThreadId,
@@ -1396,6 +1509,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						const inbox = yield* resolveInbox(inboxId)
 						const providerInboxId = inbox?.providerInboxId ?? inboxId
 						const localInboxId = inbox?.id ?? null
+						const inboxEmail = inbox?.email ?? null
 
 						const draft = yield* provider.getDraft(providerInboxId, draftId)
 
@@ -1411,6 +1525,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							result,
 							providerInboxId,
 							localInboxId,
+							inboxEmail,
 							companyId: ctx.companyId,
 							contactId: ctx.contactId,
 							subject: draft.subject ?? null,

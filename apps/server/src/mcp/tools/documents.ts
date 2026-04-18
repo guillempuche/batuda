@@ -2,6 +2,11 @@ import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
+import {
+	DocumentCreated,
+	TimelineActivityService,
+} from '../../services/timeline-activity'
+
 const GetDocuments = Tool.make('get_documents', {
 	description:
 		'List documents for a company. Returns id, type, and title only — NOT content. Call get_document for full content.',
@@ -68,6 +73,7 @@ export const DocumentTools = Toolkit.make(
 export const DocumentHandlersLive = DocumentTools.toLayer(
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
+		const timeline = yield* TimelineActivityService
 		return {
 			get_documents: params =>
 				Effect.gen(function* () {
@@ -85,14 +91,34 @@ export const DocumentHandlersLive = DocumentTools.toLayer(
 				}).pipe(Effect.orDie),
 			create_document: params =>
 				Effect.gen(function* () {
-					const rows = yield* sql`INSERT INTO documents ${sql.insert({
-						companyId: params.company_id,
-						interactionId: params.interaction_id,
-						type: params.type,
-						title: params.title,
-						content: params.content,
-					})} RETURNING *`
-					return rows[0]
+					const rows = yield* sql<{ id: string; title: string | null }>`
+						INSERT INTO documents ${sql.insert({
+							companyId: params.company_id,
+							interactionId: params.interaction_id,
+							type: params.type,
+							title: params.title,
+							content: params.content,
+						})} RETURNING id, title
+					`
+					const created = rows[0]
+					if (!created) {
+						return yield* Effect.die(
+							new Error('INSERT INTO documents RETURNING yielded no row'),
+						)
+					}
+					yield* timeline.record(
+						new DocumentCreated({
+							documentId: created.id,
+							companyId: params.company_id,
+							contactId: null,
+							title: created.title ?? params.type,
+							actorUserId: null,
+							occurredAt: new Date(),
+						}),
+					)
+					const full =
+						yield* sql`SELECT * FROM documents WHERE id = ${created.id} LIMIT 1`
+					return full[0]
 				}).pipe(Effect.orDie),
 			update_document: ({ id, ...fields }) =>
 				Effect.gen(function* () {

@@ -6,6 +6,10 @@ import { SqlClient } from 'effect/unstable/sql'
 import { BadRequest, Conflict, NotFound } from '@engranatge/controllers'
 
 import { StorageProvider } from './storage-provider.js'
+import {
+	InteractionLogged,
+	TimelineActivityService,
+} from './timeline-activity.js'
 import { WebhookService } from './webhooks.js'
 
 export interface IngestParams {
@@ -48,6 +52,7 @@ export class RecordingService extends ServiceMap.Service<RecordingService>()(
 			const storage = yield* StorageProvider
 			const sql = yield* SqlClient.SqlClient
 			const webhooks = yield* WebhookService
+			const timeline = yield* TimelineActivityService
 
 			const ingest = (params: IngestParams) =>
 				Effect.gen(function* () {
@@ -66,8 +71,9 @@ export class RecordingService extends ServiceMap.Service<RecordingService>()(
 					// catch any leftovers.
 					const result = yield* sql.withTransaction(
 						Effect.gen(function* () {
-							let interactionId: string
+							let attachInteractionId: string | null = null
 							let companyId: string
+							let contactId: string | null
 
 							if (params.interactionId) {
 								// Attach to an existing call interaction.
@@ -77,9 +83,10 @@ export class RecordingService extends ServiceMap.Service<RecordingService>()(
 								const rows = yield* sql<{
 									id: string
 									companyId: string
+									contactId: string | null
 									channel: string
 								}>`
-									SELECT id, company_id, channel
+									SELECT id, company_id, contact_id, channel
 									FROM interactions
 									WHERE id = ${params.interactionId}
 									LIMIT 1
@@ -117,26 +124,43 @@ export class RecordingService extends ServiceMap.Service<RecordingService>()(
 									})
 								}
 
-								interactionId = row.id
+								attachInteractionId = row.id
 								companyId = row.companyId
+								contactId = row.contactId
 							} else {
-								// No interactionId → create a fresh call interaction
-								// for this recording. companyId is required (validated
-								// above).
+								// No interactionId → a fresh call interaction will be
+								// created for this recording. companyId is required
+								// (validated above).
 								companyId = params.companyId as string
-								const inserted = yield* sql<{ id: string }>`
-									INSERT INTO interactions ${sql.insert({
-										companyId,
-										contactId: params.contactId ?? null,
-										date: new Date(),
-										channel: 'call',
-										direction: 'outbound',
-										type: 'call',
-										summary: 'Call recording',
-									})}
-									RETURNING id
-								`
-								interactionId = inserted[0]!.id
+								contactId = params.contactId ?? null
+							}
+
+							const recordedAt = new Date()
+							const activityResult = yield* timeline.record(
+								new InteractionLogged({
+									companyId,
+									contactId,
+									channel: 'call',
+									direction: 'outbound',
+									type: 'call',
+									subject: null,
+									summary: 'Call recording',
+									outcome: null,
+									nextAction: null,
+									nextActionAt: null,
+									durationMin: null,
+									occurredAt: recordedAt,
+									actorUserId: null,
+									attachInteractionId,
+								}),
+							)
+							const interactionId = activityResult.interactionId
+							if (!interactionId) {
+								return yield* Effect.die(
+									new Error(
+										'TimelineActivityService produced no interactionId for InteractionLogged{channel:call}',
+									),
+								)
 							}
 
 							const ext = extForMimeType(params.mimeType)
@@ -161,12 +185,6 @@ export class RecordingService extends ServiceMap.Service<RecordingService>()(
 								body: params.audio,
 								contentType: params.mimeType,
 							})
-
-							yield* sql`
-								UPDATE companies
-								SET last_contacted_at = now(), updated_at = now()
-								WHERE id = ${companyId}
-							`
 
 							return { recordingId, interactionId, companyId }
 						}),

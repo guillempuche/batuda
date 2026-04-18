@@ -5,12 +5,26 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import { ForjaApi } from '@engranatge/controllers'
 
+import {
+	ProposalEvent,
+	TimelineActivityService,
+} from '../services/timeline-activity'
+
+type ProposalEventKind = 'sent' | 'viewed' | 'responded'
+
+const statusToEventKind = (status: string): ProposalEventKind | null => {
+	if (status === 'sent' || status === 'viewed' || status === 'responded')
+		return status
+	return null
+}
+
 export const ProposalsLive = HttpApiBuilder.group(
 	ForjaApi,
 	'proposals',
 	handlers =>
 		Effect.gen(function* () {
 			const sql = yield* SqlClient.SqlClient
+			const timeline = yield* TimelineActivityService
 			return handlers
 				.handle('list', _ =>
 					Effect.gen(function* () {
@@ -35,10 +49,38 @@ export const ProposalsLive = HttpApiBuilder.group(
 				)
 				.handle('update', _ =>
 					Effect.gen(function* () {
+						const payload = _.payload as { status?: string }
+
+						const existing = yield* sql<{
+							status: string
+							companyId: string
+							contactId: string | null
+						}>`
+							SELECT status, company_id, contact_id FROM proposals
+							WHERE id = ${_.params.id} LIMIT 1
+						`
+						const before = existing[0]
+
 						const rows = yield* sql`
 							UPDATE proposals SET ${sql.update({ ...(_.payload as any), updatedAt: new Date() }, ['id'])}
 							WHERE id = ${_.params.id} RETURNING *
 						`
+
+						const newStatus = payload.status
+						const eventKind = newStatus ? statusToEventKind(newStatus) : null
+						if (before && eventKind && before.status !== newStatus) {
+							yield* timeline.record(
+								new ProposalEvent({
+									proposalId: _.params.id,
+									kind: eventKind,
+									companyId: before.companyId,
+									contactId: before.contactId,
+									actorUserId: null,
+									occurredAt: new Date(),
+								}),
+							)
+						}
+
 						yield* Effect.logInfo('Proposal updated').pipe(
 							Effect.annotateLogs({
 								event: 'proposal.updated',

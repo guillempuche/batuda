@@ -2,6 +2,11 @@ import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
+import {
+	InteractionLogged,
+	TimelineActivityService,
+} from '../../services/timeline-activity'
+
 const LogInteraction = Tool.make('log_interaction', {
 	description:
 		'Log a sales interaction. Channel: email|phone|whatsapp|linkedin|instagram|in_person|other. Direction: inbound|outbound. Type: call|email|meeting|demo|follow_up|other. Auto-updates company last_contacted_at and next_action.',
@@ -42,38 +47,64 @@ const ListInteractions = Tool.make('list_interactions', {
 
 export const InteractionTools = Toolkit.make(LogInteraction, ListInteractions)
 
+// MCP channel 'in_person' normalises to 'visit' so the cadence column picker
+// lands on last_meeting_at. The rest of the MCP vocabulary is already aligned
+// with the interactions schema.
+const normaliseChannel = (channel: string): string =>
+	channel === 'in_person' ? 'visit' : channel
+
 export const InteractionHandlersLive = InteractionTools.toLayer(
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
+		const timeline = yield* TimelineActivityService
 		return {
 			log_interaction: params =>
 				Effect.gen(function* () {
-					const rows = yield* sql`INSERT INTO interactions ${sql.insert({
-						companyId: params.company_id,
-						contactId: params.contact_id,
-						channel: params.channel,
-						direction: params.direction,
-						type: params.type,
-						subject: params.subject,
-						summary: params.summary,
-						outcome: params.outcome,
-						nextAction: params.next_action,
-						nextActionAt: params.next_action_at,
-						durationMin: params.duration_min,
-						date: new Date(),
-					})} RETURNING *`
+					const occurredAt = new Date()
+					const nextActionAt = params.next_action_at
+						? new Date(params.next_action_at)
+						: null
 
-					const companyUpdate: Record<string, unknown> = {
-						lastContactedAt: new Date(),
-						updatedAt: new Date(),
+					const { interactionId } = yield* timeline.record(
+						new InteractionLogged({
+							companyId: params.company_id,
+							contactId: params.contact_id ?? null,
+							channel: normaliseChannel(params.channel),
+							direction: params.direction as 'inbound' | 'outbound',
+							type: params.type,
+							subject: params.subject ?? null,
+							summary: params.summary ?? null,
+							outcome: params.outcome ?? null,
+							nextAction: params.next_action ?? null,
+							nextActionAt,
+							durationMin: params.duration_min ?? null,
+							occurredAt,
+							actorUserId: null,
+							attachInteractionId: null,
+						}),
+					)
+
+					if (!interactionId) {
+						return yield* Effect.die(
+							new Error(
+								'TimelineActivityService produced no interactionId for InteractionLogged',
+							),
+						)
 					}
-					if (params.next_action)
-						companyUpdate['nextAction'] = params.next_action
-					if (params.next_action_at)
-						companyUpdate['nextActionAt'] = new Date(params.next_action_at)
 
-					yield* sql`UPDATE companies SET ${sql.update(companyUpdate, [])} WHERE id = ${params.company_id}`
+					if (params.next_action || nextActionAt) {
+						const companyUpdate: Record<string, unknown> = {
+							updatedAt: new Date(),
+						}
+						if (params.next_action)
+							companyUpdate['nextAction'] = params.next_action
+						if (nextActionAt) companyUpdate['nextActionAt'] = nextActionAt
+						yield* sql`UPDATE companies SET ${sql.update(companyUpdate, [])} WHERE id = ${params.company_id}`
+					}
 
+					const rows = yield* sql`
+						SELECT * FROM interactions WHERE id = ${interactionId} LIMIT 1
+					`
 					return rows[0]
 				}).pipe(Effect.orDie),
 			list_interactions: params =>
