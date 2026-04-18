@@ -283,7 +283,7 @@ export default Effect.gen(function* () {
 		CREATE TABLE IF NOT EXISTS research_runs (
 			id                      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 			parent_id               uuid REFERENCES research_runs(id) ON DELETE CASCADE,
-			kind                    text NOT NULL CHECK (kind IN ('leaf','group','followup')) DEFAULT 'leaf',
+			kind                    text NOT NULL CHECK (kind IN ('leaf','group','followup','cache_hit')) DEFAULT 'leaf',
 
 			query                   text NOT NULL,
 			mode                    text NOT NULL DEFAULT 'deep',
@@ -410,6 +410,60 @@ export default Effect.gen(function* () {
 		)
 	`
 
+	// ── Research checkpoint columns + cache tables ─────────────────
+	yield* sql`ALTER TABLE research_runs ADD COLUMN IF NOT EXISTS research_text text`
+	yield* sql`ALTER TABLE research_runs ADD COLUMN IF NOT EXISTS phase smallint NOT NULL DEFAULT 0`
+	yield* sql`ALTER TABLE research_runs ADD COLUMN IF NOT EXISTS schema_version int`
+
+	yield* sql`
+		CREATE TABLE IF NOT EXISTS search_cache (
+			key_hash    text PRIMARY KEY,
+			provider    text NOT NULL,
+			query       text NOT NULL,
+			items       jsonb NOT NULL,
+			units_cost  int NOT NULL DEFAULT 0,
+			cached_at   timestamptz NOT NULL DEFAULT now(),
+			expires_at  timestamptz NOT NULL,
+			hit_count   int NOT NULL DEFAULT 0
+		)
+	`
+	yield* sql`
+		CREATE TABLE IF NOT EXISTS extraction_cache (
+			key_hash       text PRIMARY KEY,
+			content_hash   text NOT NULL,
+			schema_name    text NOT NULL,
+			schema_version int NOT NULL,
+			model          text NOT NULL,
+			result         jsonb NOT NULL,
+			tokens_in      int NOT NULL DEFAULT 0,
+			tokens_out     int NOT NULL DEFAULT 0,
+			cached_at      timestamptz NOT NULL DEFAULT now()
+		)
+	`
+	yield* sql`
+		CREATE TABLE IF NOT EXISTS llm_cache (
+			key_hash       text PRIMARY KEY,
+			tier           text NOT NULL CHECK (tier IN ('agent','extract','writer')),
+			model          text NOT NULL,
+			prompt_preview text NOT NULL,
+			response       jsonb NOT NULL,
+			tokens_in      int NOT NULL DEFAULT 0,
+			tokens_out     int NOT NULL DEFAULT 0,
+			cached_at      timestamptz NOT NULL DEFAULT now(),
+			expires_at     timestamptz NOT NULL,
+			hit_count      int NOT NULL DEFAULT 0
+		)
+	`
+	yield* sql`
+		CREATE TABLE IF NOT EXISTS research_cache (
+			key_hash    text PRIMARY KEY,
+			user_id     text NOT NULL,
+			research_id uuid NOT NULL REFERENCES research_runs(id),
+			cached_at   timestamptz NOT NULL DEFAULT now(),
+			expires_at  timestamptz NOT NULL
+		)
+	`
+
 	// ── Indexes ──────────────────────────────────────────────────────
 	yield* Effect.all([
 		// email_thread_links
@@ -450,5 +504,11 @@ export default Effect.gen(function* () {
 		sql`CREATE INDEX IF NOT EXISTS sources_domain_idx ON sources(domain)`,
 		sql`CREATE INDEX IF NOT EXISTS research_links_subject_idx ON research_links(subject_table, subject_id)`,
 		sql`CREATE INDEX IF NOT EXISTS research_paid_spend_user_at_idx ON research_paid_spend(user_id, at DESC)`,
+
+		// research cache tables
+		sql`CREATE INDEX IF NOT EXISTS search_cache_expires_idx ON search_cache(expires_at)`,
+		sql`CREATE INDEX IF NOT EXISTS llm_cache_tier_expires_idx ON llm_cache(tier, expires_at)`,
+		sql`CREATE INDEX IF NOT EXISTS research_cache_user_expires_idx ON research_cache(user_id, expires_at)`,
+		sql`CREATE INDEX IF NOT EXISTS extraction_cache_content_schema_idx ON extraction_cache(content_hash, schema_name)`,
 	])
 })
