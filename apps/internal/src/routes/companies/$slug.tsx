@@ -1,7 +1,13 @@
 import { Select } from '@base-ui/react/select'
 import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { createFileRoute, Link, notFound } from '@tanstack/react-router'
+import {
+	createFileRoute,
+	Link,
+	notFound,
+	stripSearchParams,
+} from '@tanstack/react-router'
+import { Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import {
 	Briefcase,
@@ -57,6 +63,7 @@ import { useComposeEmail } from '#/context/compose-email-context'
 import { useQuickCapture } from '#/context/quick-capture-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { ForjaApiAtom } from '#/lib/forja-api-atom'
+import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import { useTabSearchParam } from '#/lib/tab-search'
 import {
@@ -197,11 +204,15 @@ const COMPANY_TABS = [
 ] as const
 type CompanyTab = (typeof COMPANY_TABS)[number]
 
-type CompanyDetailSearch = { readonly tab?: string }
+const validateSearch = validateSearchWith({
+	tab: Schema.Literals(COMPANY_TABS),
+})
 
 export const Route = createFileRoute('/companies/$slug')({
-	validateSearch: (raw: Record<string, unknown>): CompanyDetailSearch =>
-		typeof raw['tab'] === 'string' ? { tab: raw['tab'] } : {},
+	validateSearch,
+	// Strip the default tab from the URL so `useTabSearchParam` can write
+	// `tab: next` unconditionally without leaving `?tab=profile` behind.
+	search: { middlewares: [stripSearchParams({ tab: 'profile' })] },
 	loader: async ({ params: { slug } }) => {
 		if (!import.meta.env.SSR) {
 			// Client-side navigation: let the atoms refetch directly via

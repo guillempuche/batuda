@@ -1,8 +1,14 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { createFileRoute, Link, notFound } from '@tanstack/react-router'
+import {
+	createFileRoute,
+	Link,
+	notFound,
+	stripSearchParams,
+} from '@tanstack/react-router'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
+import { Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { ArrowLeft, Eye, Globe, Save } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
@@ -17,6 +23,7 @@ import { EmptyState } from '#/components/shared/empty-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { ForjaApiAtom } from '#/lib/forja-api-atom'
+import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import { useTabSearchParam } from '#/lib/tab-search'
 import {
@@ -55,11 +62,15 @@ async function loadPageOnServer(id: string): Promise<unknown> {
 const PAGE_TABS = ['editor', 'meta'] as const
 type PageTab = (typeof PAGE_TABS)[number]
 
-type PageEditorSearch = { readonly tab?: string }
+const validateSearch = validateSearchWith({
+	tab: Schema.Literals(PAGE_TABS),
+})
 
 export const Route = createFileRoute('/pages/$id')({
-	validateSearch: (raw: Record<string, unknown>): PageEditorSearch =>
-		typeof raw['tab'] === 'string' ? { tab: raw['tab'] } : {},
+	validateSearch,
+	// Strip the default tab from the URL so `useTabSearchParam` can write
+	// `tab: next` unconditionally without leaving `?tab=editor` behind.
+	search: { middlewares: [stripSearchParams({ tab: 'editor' })] },
 	loader: async ({ params: { id } }) => {
 		if (!import.meta.env.SSR) {
 			return { dehydrated: [] as const, id }

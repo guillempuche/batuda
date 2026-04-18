@@ -1,29 +1,23 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
+import { Schema } from 'effect'
 import { useCallback, useState } from 'react'
 import styled from 'styled-components'
 
 import { PriButton, PriInput } from '@engranatge/ui/pri'
 
+import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import { fetchSession } from '#/lib/session-check'
 import { rulerUnderRule, stenciledTitle } from '#/lib/workshop-mixins'
 
 /**
- * Login page search params. `returnTo` captures the full relative URL
- * (pathname + search string) the user was trying to reach when the
- * `__root.tsx` guard bounced them here, so we can send them back to
- * exactly where they wanted to be after a successful sign-in. Only
- * same-origin relative paths are honored (leading `/` and no
- * protocol/host) — anything else falls back to `/` to defeat open-
- * redirect abuse.
+ * `returnTo` carries the relative URL the user was trying to reach when
+ * the root guard bounced them here, so we can restore their destination
+ * after sign-in. Only same-origin relative paths pass — protocol-relative
+ * (`//host`) and absolute URLs would be open-redirect vectors.
  */
-type LoginSearch = { returnTo?: string }
-
 function isSafeReturnTo(value: string): boolean {
-	// Must be a same-origin relative URL: starts with `/` and doesn't
-	// start with `//` (which would be a protocol-relative URL that the
-	// browser resolves to a different host).
 	return value.startsWith('/') && !value.startsWith('//')
 }
 
@@ -49,11 +43,14 @@ const SERVER_URL =
 		import.meta.env?.['VITE_SERVER_URL']) ||
 	'http://localhost:3010'
 
+// Hoisted to module scope so TanStack infers the search type correctly;
+// inline it and the `search` param in `beforeLoad` widens to `{}`.
+const validateSearch = validateSearchWith({
+	returnTo: Schema.NonEmptyString,
+})
+
 export const Route = createFileRoute('/login')({
-	validateSearch: (search: Record<string, unknown>): LoginSearch => {
-		const raw = search['returnTo']
-		return typeof raw === 'string' ? { returnTo: raw } : {}
-	},
+	validateSearch,
 	/**
 	 * If the user is already signed in, bounce them to the dashboard
 	 * (or to `returnTo` if it's a safe same-origin relative URL). Runs

@@ -6,6 +6,7 @@ import {
 } from '@effect/atom-react'
 import { useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import {
 	AlertTriangle,
@@ -53,6 +54,7 @@ import { RelativeDate } from '#/components/shared/relative-date'
 import { SkeletonRows } from '#/components/shared/skeleton-row'
 import { useComposeEmail } from '#/context/compose-email-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
+import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import {
 	agedPaperRow,
@@ -113,56 +115,19 @@ const SEARCH_DEBOUNCE_MS = 300
  * TanStack Router `validateSearch` — runs on every search-param change
  * and produces a canonical `EmailsSearch` plus the `page` URL param.
  * Empty strings and invalid values are dropped entirely so the URL stays
- * clean.
+ * clean. `page` accepts either a number or a numeric string (raw URL)
+ * and is filtered to positive finite values.
  */
-function validateSearch(raw: Record<string, unknown>): EmailsSearch & {
-	readonly page?: number
-} {
-	const out: {
-		inboxId?: string
-		companyId?: string
-		status?: 'open' | 'closed' | 'archived'
-		purpose?: 'human' | 'agent' | 'shared'
-		query?: string
-		page?: number
-	} = {}
-
-	if (typeof raw['inboxId'] === 'string' && raw['inboxId'] !== '') {
-		out.inboxId = raw['inboxId']
-	}
-	if (typeof raw['companyId'] === 'string' && raw['companyId'] !== '') {
-		out.companyId = raw['companyId']
-	}
-	if (
-		raw['status'] === 'open' ||
-		raw['status'] === 'closed' ||
-		raw['status'] === 'archived'
-	) {
-		out.status = raw['status']
-	}
-	if (
-		raw['purpose'] === 'human' ||
-		raw['purpose'] === 'agent' ||
-		raw['purpose'] === 'shared'
-	) {
-		out.purpose = raw['purpose']
-	}
-	if (typeof raw['query'] === 'string' && raw['query'] !== '') {
-		out.query = raw['query']
-	}
-	const rawPage = raw['page']
-	const page =
-		typeof rawPage === 'number'
-			? rawPage
-			: typeof rawPage === 'string' && rawPage !== ''
-				? Number(rawPage)
-				: NaN
-	if (Number.isFinite(page) && page >= 1) {
-		out.page = Math.floor(page)
-	}
-
-	return out
-}
+const validateSearch = validateSearchWith({
+	inboxId: Schema.NonEmptyString,
+	companyId: Schema.NonEmptyString,
+	status: Schema.Literals(['open', 'closed', 'archived'] as const),
+	purpose: Schema.Literals(['human', 'agent', 'shared'] as const),
+	query: Schema.NonEmptyString,
+	page: Schema.Union([Schema.Number, Schema.NumberFromString]).pipe(
+		Schema.refine((n): n is number => Number.isFinite(n) && n >= 1),
+	),
+})
 
 /** Convert URL search (with `page`) to the wire-level `EmailsSearch`. */
 function toWireSearch(
@@ -343,6 +308,11 @@ function EmailsIndexPage() {
 	useEffect(() => {
 		setSearchInput(search.query ?? '')
 	}, [search.query])
+	// Push the debounced input to the URL. Guard against the URL-sync
+	// effect above to avoid a loop. Uses `replace: true` so a typing
+	// session collapses into one history entry — back escapes the whole
+	// search, not one keystroke. Status pills, inbox select, pagination,
+	// and Clear all still push (deliberate filter choices).
 	useEffect(() => {
 		const current = search.query ?? ''
 		if (searchInput === current) return
@@ -354,8 +324,6 @@ function EmailsIndexPage() {
 						query: searchInput === '' ? undefined : searchInput,
 						page: undefined,
 					}),
-				// Typing collapses into one history entry; status pills,
-				// inbox select, pagination, and Clear still push.
 				replace: true,
 			})
 		}, SEARCH_DEBOUNCE_MS)

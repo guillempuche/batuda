@@ -1,6 +1,7 @@
 import { useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { ExternalLink } from 'lucide-react'
 import { useMemo, useState } from 'react'
@@ -15,6 +16,7 @@ import { EmptyState } from '#/components/shared/empty-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { dehydrateAtom } from '#/lib/atom-hydration'
+import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import {
 	agedPaperSurface,
@@ -35,19 +37,11 @@ type PageRow = {
 	readonly companyId: string | null
 }
 
-function validateSearch(raw: Record<string, unknown>): PagesSearch {
-	const out: { companyId?: string; status?: string; lang?: string } = {}
-	if (typeof raw['companyId'] === 'string' && raw['companyId'] !== '') {
-		out.companyId = raw['companyId']
-	}
-	if (typeof raw['status'] === 'string' && raw['status'] !== '') {
-		out.status = raw['status']
-	}
-	if (typeof raw['lang'] === 'string' && raw['lang'] !== '') {
-		out.lang = raw['lang']
-	}
-	return out
-}
+const validateSearch = validateSearchWith({
+	companyId: Schema.NonEmptyString,
+	status: Schema.NonEmptyString,
+	lang: Schema.NonEmptyString,
+})
 
 async function loadPagesOnServer(
 	search: PagesSearch,
@@ -115,13 +109,15 @@ function PagesListPage() {
 						data-testid='pages-status-filter'
 						value={statusFilter}
 						onChange={e => {
-							const val = e.target.value
-							setStatusFilter(val)
-							const next: PagesSearch = { ...search }
-							if (val) {
-								void navigate({ search: { ...next, status: val } })
+							const nextStatus = e.target.value
+							setStatusFilter(nextStatus)
+							if (nextStatus) {
+								void navigate({ search: { ...search, status: nextStatus } })
 							} else {
-								const { status: _, ...rest } = next
+								// Drop `status` entirely rather than setting it to '' —
+								// `exactOptionalPropertyTypes` rejects `undefined` here
+								// and an empty string would show up in the URL.
+								const { status: _, ...rest } = search
 								void navigate({ search: rest })
 							}
 						}}

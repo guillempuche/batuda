@@ -1,6 +1,7 @@
 import { useAtomValue } from '@effect/atom-react'
 import { useLingui } from '@lingui/react/macro'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { Search, X } from 'lucide-react'
 import { LayoutGroup, motion } from 'motion/react'
@@ -24,6 +25,7 @@ import {
 } from '#/components/shared/status-badge'
 import { useQuickCapture } from '#/context/quick-capture-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
+import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import {
 	brushedMetalPlate,
@@ -53,37 +55,18 @@ type CompanyRow = {
  * and produces the canonical `CompaniesSearch` shape. Empty strings and
  * non-numeric priorities are dropped entirely so the URL stays clean
  * (`?status=prospect` instead of `?status=prospect&query=&priority=`).
+ *
+ * `priority` accepts either a parsed number (client navigations where
+ * TanStack already decoded the param) or a numeric string (raw URL on
+ * first hit). Both decode to `number`.
  */
-function validateSearch(raw: Record<string, unknown>): CompaniesSearch {
-	const out: {
-		status?: string
-		region?: string
-		industry?: string
-		priority?: number
-		query?: string
-	} = {}
-
-	if (typeof raw['status'] === 'string' && raw['status'] !== '') {
-		out.status = raw['status']
-	}
-	if (typeof raw['region'] === 'string' && raw['region'] !== '') {
-		out.region = raw['region']
-	}
-	if (typeof raw['industry'] === 'string' && raw['industry'] !== '') {
-		out.industry = raw['industry']
-	}
-	if (typeof raw['priority'] === 'number' && Number.isFinite(raw['priority'])) {
-		out.priority = raw['priority']
-	} else if (typeof raw['priority'] === 'string' && raw['priority'] !== '') {
-		const parsed = Number(raw['priority'])
-		if (Number.isFinite(parsed)) out.priority = parsed
-	}
-	if (typeof raw['query'] === 'string' && raw['query'] !== '') {
-		out.query = raw['query']
-	}
-
-	return out
-}
+const validateSearch = validateSearchWith({
+	status: Schema.NonEmptyString,
+	region: Schema.NonEmptyString,
+	industry: Schema.NonEmptyString,
+	priority: Schema.Union([Schema.Number, Schema.NumberFromString]),
+	query: Schema.NonEmptyString,
+})
 
 /**
  * Server-only load: forwards the incoming Better-Auth cookie and runs

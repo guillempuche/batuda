@@ -2,15 +2,14 @@ import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useCallback } from 'react'
 
 /**
- * URL-addressable tab state via `?tab=<value>`. Reads the param through
- * TanStack Router's `useSearch` with `strict: false` (it resolves against
- * the current route match — no `from` binding needed) and narrows it to
- * the allowed literal union. Writes push new history entries so the
- * browser back/forward buttons step through tab states.
+ * URL-addressable tab state via `?tab=<value>`. `strict: false` resolves
+ * against the current route match so callers don't have to bind `from`.
+ * Writes push history entries so back/forward steps through tab states.
  *
- * When the chosen tab equals the fallback, the param is dropped entirely
- * so the default URL stays clean (`/companies/foo` rather than
- * `/companies/foo?tab=profile`).
+ * The consuming route must pair this with a `stripSearchParams({ tab:
+ * <fallback> })` middleware — the middleware drops the default from both
+ * the URL and the `useSearch()` result, which lets `setTab` write
+ * `tab: next` unconditionally (no branch on `next === fallback`).
  */
 export function useTabSearchParam<T extends string>(
 	tabs: ReadonlyArray<T>,
@@ -19,24 +18,22 @@ export function useTabSearchParam<T extends string>(
 	const search = useSearch({ strict: false }) as
 		| { readonly tab?: unknown }
 		| undefined
-	const raw = search?.tab
-	const current: T =
-		typeof raw === 'string' && (tabs as ReadonlyArray<string>).includes(raw)
-			? (raw as T)
+	const rawTab = search?.tab
+	const currentTab: T =
+		typeof rawTab === 'string' &&
+		(tabs as ReadonlyArray<string>).includes(rawTab)
+			? (rawTab as T)
 			: fallback
 
 	const navigate = useNavigate()
 	const setTab = useCallback(
 		(next: T) => {
 			void navigate({
-				search: (prev: Record<string, unknown>) => ({
-					...prev,
-					tab: next === fallback ? undefined : next,
-				}),
+				search: (prev: Record<string, unknown>) => ({ ...prev, tab: next }),
 			} as never)
 		},
-		[navigate, fallback],
+		[navigate],
 	)
 
-	return [current, setTab] as const
+	return [currentTab, setTab] as const
 }
