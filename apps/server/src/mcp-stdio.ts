@@ -10,6 +10,7 @@ import { AgentMailProviderLive } from './services/agentmail-provider'
 import { CompanyService } from './services/companies'
 import { EmailService } from './services/email'
 import { PageService } from './services/pages'
+import { ParticipantMatcher } from './services/participant-matcher'
 import { PipelineService } from './services/pipeline'
 import { RecordingService } from './services/recordings'
 import { S3StorageProviderLive } from './services/s3-storage-provider'
@@ -20,6 +21,7 @@ const ServicesLive = Layer.mergeAll(
 	PipelineService.layer,
 	PageService.layer,
 	EmailService.layer,
+	ParticipantMatcher.layer,
 	RecordingService.layer,
 ).pipe(Layer.provideMerge(WebhookService.layer))
 

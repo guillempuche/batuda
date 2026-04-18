@@ -47,6 +47,7 @@ import { EmailAttachmentStaging } from './services/email-attachment-staging'
 import { EmailProviderLive } from './services/email-provider-live'
 import { Geocoder } from './services/geocoder'
 import { PageService } from './services/pages'
+import { ParticipantMatcher } from './services/participant-matcher'
 import { PipelineService } from './services/pipeline'
 import { RecordingService } from './services/recordings'
 import { ResearchBlobStorageLive } from './services/research-blob-storage'
@@ -90,6 +91,7 @@ const ServicesLive = Layer.mergeAll(
 	PageService.layer,
 	EmailService.layer,
 	EmailAttachmentStaging.layer,
+	ParticipantMatcher.layer,
 	RecordingService.layer,
 	ResearchService.layer,
 	Geocoder.layer.pipe(Layer.provide(FetchHttpClient.layer)),
