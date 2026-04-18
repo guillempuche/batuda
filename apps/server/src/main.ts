@@ -15,6 +15,7 @@ import {
 	makeResearchProvidersLive,
 	ResearchEventSink,
 	ResearchService,
+	researchToolkitLayer,
 } from '@engranatge/research'
 
 import { PgLive } from './db/client'
@@ -48,6 +49,7 @@ import { Geocoder } from './services/geocoder'
 import { PageService } from './services/pages'
 import { PipelineService } from './services/pipeline'
 import { RecordingService } from './services/recordings'
+import { ResearchBlobStorageLive } from './services/research-blob-storage'
 import { S3StorageProviderLive } from './services/s3-storage-provider'
 import { WebhookService } from './services/webhooks'
 
@@ -139,9 +141,11 @@ const AppLive = Layer.mergeAll(
 const program = HttpRouter.serve(AppLive).pipe(
 	Layer.provide(ServicesLive),
 	Layer.provide(EmailProviderLive),
-	Layer.provide(S3StorageProviderLive),
+	Layer.provide(researchToolkitLayer),
 	Layer.provide(makeResearchProvidersLive),
 	Layer.provide(makeResearchLlmLive),
+	Layer.provide(ResearchBlobStorageLive),
+	Layer.provide(S3StorageProviderLive),
 	Layer.provide(SessionMiddlewareLive),
 	Layer.provide(Auth.layer),
 	Layer.provide(EnvVars.layer),
