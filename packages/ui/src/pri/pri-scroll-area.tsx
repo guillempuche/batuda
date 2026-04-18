@@ -26,7 +26,9 @@ const PriViewport = styled(ScrollArea.Viewport).withConfig({
 })`
 	width: 100%;
 	height: 100%;
-	overscroll-behavior: contain;
+	/* Contain only the y-axis. Containing the x-axis swallows the macOS
+	 * two-finger swipe-back gesture at the left edge of the viewport. */
+	overscroll-behavior-y: contain;
 `
 
 const PriScrollbar = styled(ScrollArea.Scrollbar).withConfig({
