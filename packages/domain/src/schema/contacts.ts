@@ -33,6 +33,11 @@ export class Contact extends Model.Class<Contact>('Contact')({
 	notes: Schema.NullOr(Schema.String),
 	metadata: Schema.NullOr(Schema.Unknown),
 
+	lastEmailAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+	lastCallAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+	lastMeetingAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+	nextCalendarEventAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+
 	createdAt: Model.DateTimeInsertFromDate,
 	updatedAt: Model.DateTimeUpdateFromDate,
 }) {}

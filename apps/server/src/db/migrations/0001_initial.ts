@@ -252,6 +252,94 @@ export default Effect.gen(function* () {
 		)
 	`
 
+	// ── Activity event log ───────────────────────────────────────────
+	// Polymorphic timeline of every notable event (emails, calls, documents,
+	// proposals, research runs, system events).
+	yield* sql`
+		CREATE TABLE IF NOT EXISTS timeline_activity (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			kind TEXT NOT NULL,
+			entity_type TEXT NOT NULL,
+			entity_id UUID NOT NULL,
+			company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+			contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
+			channel TEXT,
+			direction TEXT,
+			actor_user_id UUID,
+			occurred_at TIMESTAMPTZ NOT NULL,
+			summary TEXT,
+			payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+		)
+	`
+
+	// One row per (email_message × email_address × role) so every CC'd
+	// participant is addressable, even when no contact exists yet.
+	yield* sql`
+		CREATE TABLE IF NOT EXISTS message_participants (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			email_message_id UUID NOT NULL REFERENCES email_messages(id) ON DELETE CASCADE,
+			email_address TEXT NOT NULL,
+			display_name TEXT,
+			role TEXT NOT NULL,
+			contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+		)
+	`
+
+	// Denormalised cadence columns so "who haven't I emailed in 30 days?"
+	// is a single-table scan.
+	yield* sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS last_email_at TIMESTAMPTZ`
+	yield* sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS last_call_at TIMESTAMPTZ`
+	yield* sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS last_meeting_at TIMESTAMPTZ`
+	yield* sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS next_calendar_event_at TIMESTAMPTZ`
+	yield* sql`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS last_email_at TIMESTAMPTZ`
+	yield* sql`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS last_call_at TIMESTAMPTZ`
+	yield* sql`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS last_meeting_at TIMESTAMPTZ`
+	yield* sql`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS next_calendar_event_at TIMESTAMPTZ`
+
+	// Backfill cadence columns from existing interactions (pre-prod, safe).
+	// recordings.ts writes channel='call' while the docs say 'phone' — include both.
+	yield* sql`
+		UPDATE companies c SET
+			last_email_at   = (SELECT MAX(date) FROM interactions WHERE company_id = c.id AND channel = 'email'),
+			last_call_at    = (SELECT MAX(date) FROM interactions WHERE company_id = c.id AND channel IN ('phone', 'call')),
+			last_meeting_at = (SELECT MAX(date) FROM interactions WHERE company_id = c.id AND channel IN ('visit', 'event'))
+	`
+	yield* sql`
+		UPDATE contacts co SET
+			last_email_at   = (SELECT MAX(date) FROM interactions WHERE contact_id = co.id AND channel = 'email'),
+			last_call_at    = (SELECT MAX(date) FROM interactions WHERE contact_id = co.id AND channel IN ('phone', 'call')),
+			last_meeting_at = (SELECT MAX(date) FROM interactions WHERE contact_id = co.id AND channel IN ('visit', 'event'))
+	`
+
+	// Backfill message_participants from existing email_messages.recipients.
+	// Current shape: { to: [string], cc: [string], bcc: [string] } of email strings.
+	yield* sql`
+		INSERT INTO message_participants (email_message_id, email_address, role)
+		SELECT m.id, lower(addr.value), roles.role_name
+		FROM email_messages m
+		CROSS JOIN LATERAL (VALUES ('to'), ('cc'), ('bcc')) AS roles(role_name)
+		CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(m.recipients->roles.role_name, '[]'::jsonb)) AS addr(value)
+		WHERE addr.value IS NOT NULL AND addr.value <> ''
+		ON CONFLICT DO NOTHING
+	`
+	// Outbound 'from' can be recovered via the sending inbox.
+	yield* sql`
+		INSERT INTO message_participants (email_message_id, email_address, role)
+		SELECT m.id, lower(i.email), 'from'
+		FROM email_messages m
+		JOIN inboxes i ON i.provider_inbox_id = m.provider_inbox_id
+		WHERE m.direction = 'outbound'
+		ON CONFLICT DO NOTHING
+	`
+	// Link each participant to an existing contact row when the email matches.
+	yield* sql`
+		UPDATE message_participants mp SET contact_id = c.id
+		FROM contacts c
+		WHERE lower(c.email) = mp.email_address AND mp.contact_id IS NULL
+	`
+
 	// ── Call recordings ──────────────────────────────────────────────
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS call_recordings (
@@ -494,6 +582,17 @@ export default Effect.gen(function* () {
 
 		// call_recordings — partial index on the common "active" path.
 		sql`CREATE INDEX IF NOT EXISTS idx_call_recordings_active ON call_recordings(deleted_at) WHERE deleted_at IS NULL`,
+
+		// timeline_activity — company/contact/kind feeds are the hot queries.
+		sql`CREATE INDEX IF NOT EXISTS idx_timeline_activity_company ON timeline_activity(company_id, occurred_at DESC)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_timeline_activity_contact ON timeline_activity(contact_id, occurred_at DESC) WHERE contact_id IS NOT NULL`,
+		sql`CREATE INDEX IF NOT EXISTS idx_timeline_activity_entity ON timeline_activity(entity_type, entity_id)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_timeline_activity_kind ON timeline_activity(kind, occurred_at DESC)`,
+
+		// message_participants — case-insensitive uniqueness + fast lookup by email/contact.
+		sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_message_participants_msg_addr_role ON message_participants(email_message_id, lower(email_address), role)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_message_participants_email ON message_participants(lower(email_address))`,
+		sql`CREATE INDEX IF NOT EXISTS idx_message_participants_contact ON message_participants(contact_id) WHERE contact_id IS NOT NULL`,
 
 		// research_runs
 		sql`CREATE INDEX IF NOT EXISTS research_runs_status_idx ON research_runs(status) WHERE status IN ('queued','running')`,

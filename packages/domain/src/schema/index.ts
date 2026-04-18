@@ -16,8 +16,20 @@ export {
 } from './email-messages'
 export { EmailThreadLink, EmailThreadLinkId } from './email-thread-links'
 export { Interaction, InteractionId } from './interactions'
+export {
+	MessageParticipant,
+	MessageParticipantId,
+	ParticipantRole,
+} from './message-participants'
 export { Page, PageId } from './pages'
 export { Product, ProductId } from './products'
 export { Proposal, ProposalId } from './proposals'
 export { Task, TaskId } from './tasks'
+export {
+	TimelineActivity,
+	TimelineActivityId,
+	TimelineDirection,
+	TimelineEntityType,
+	TimelineKind,
+} from './timeline-activity'
 export { WebhookEndpoint, WebhookEndpointId } from './webhook-endpoints'

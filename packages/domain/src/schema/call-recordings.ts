@@ -27,9 +27,6 @@ export class CallRecording extends Model.Class<CallRecording>('CallRecording')({
 	// transcription extracts it. Audio files alone don't always carry it.
 	durationSec: Schema.NullOr(Schema.Number),
 
-	// --- Transcription columns. All nullable, no DEFAULT. Populated when
-	// the transcription provider phase lands. Schema lives here now so the
-	// future addition is one provider Layer + one service method, no migration.
 	transcriptStatus: Schema.NullOr(TranscriptStatus),
 	transcriptText: Schema.NullOr(Schema.String),
 	transcriptSegments: Schema.NullOr(Schema.Unknown),
