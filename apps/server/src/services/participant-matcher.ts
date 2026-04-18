@@ -66,13 +66,14 @@ export class ParticipantMatcher extends ServiceMap.Service<ParticipantMatcher>()
 							WHERE lower(email) = ${email}
 							ORDER BY updated_at DESC
 						`
-						if (contacts.length === 1) {
+						const [firstContact, secondContact] = contacts
+						if (firstContact && !secondContact) {
 							return new MatchedContact({
-								contactId: contacts[0]!.id,
-								companyId: contacts[0]!.companyId,
+								contactId: firstContact.id,
+								companyId: firstContact.companyId,
 							})
 						}
-						if (contacts.length > 1) {
+						if (firstContact && secondContact) {
 							return new Ambiguous({
 								candidates: contacts.map(c => ({
 									contactId: c.id,
@@ -91,8 +92,9 @@ export class ParticipantMatcher extends ServiceMap.Service<ParticipantMatcher>()
 							ORDER BY updated_at DESC
 							LIMIT 1
 						`
-						if (companies.length === 0) return new NoMatch({ email })
-						const companyId = companies[0]!.id
+						const [company] = companies
+						if (!company) return new NoMatch({ email })
+						const companyId = company.id
 
 						if (args.createPolicy === 'never') {
 							return new MatchedCompanyOnly({ companyId })
@@ -117,8 +119,14 @@ export class ParticipantMatcher extends ServiceMap.Service<ParticipantMatcher>()
 								metadata: null,
 							})} RETURNING id
 						`
+						const [createdContact] = inserted
+						if (!createdContact) {
+							return yield* Effect.die(
+								new Error('INSERT INTO contacts RETURNING id yielded no row'),
+							)
+						}
 						return new CreatedContact({
-							contactId: inserted[0]!.id,
+							contactId: createdContact.id,
 							companyId,
 						})
 					}).pipe(Effect.orDie),
