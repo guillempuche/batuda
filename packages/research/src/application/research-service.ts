@@ -184,7 +184,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 				).pipe(
 					Effect.annotateLogs({
 						count: swept.length,
-						ids: swept.map((r: any) => r.id),
+						ids: swept.map(r => (r as { readonly id: string }).id),
 					}),
 				)
 			}
