@@ -22,10 +22,12 @@ const ServicesLive = Layer.mergeAll(
 	PipelineService.layer,
 	PageService.layer,
 	EmailService.layer,
-	ParticipantMatcher.layer,
 	RecordingService.layer,
-	TimelineActivityService.layer,
-).pipe(Layer.provideMerge(WebhookService.layer))
+).pipe(
+	Layer.provideMerge(ParticipantMatcher.layer),
+	Layer.provideMerge(TimelineActivityService.layer),
+	Layer.provideMerge(WebhookService.layer),
+)
 
 const ServerLayer = McpToolsLive.pipe(
 	Layer.provide(
