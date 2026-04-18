@@ -14,6 +14,7 @@ import { ParticipantMatcher } from './services/participant-matcher'
 import { PipelineService } from './services/pipeline'
 import { RecordingService } from './services/recordings'
 import { S3StorageProviderLive } from './services/s3-storage-provider'
+import { TimelineActivityService } from './services/timeline-activity'
 import { WebhookService } from './services/webhooks'
 
 const ServicesLive = Layer.mergeAll(
@@ -23,6 +24,7 @@ const ServicesLive = Layer.mergeAll(
 	EmailService.layer,
 	ParticipantMatcher.layer,
 	RecordingService.layer,
+	TimelineActivityService.layer,
 ).pipe(Layer.provideMerge(WebhookService.layer))
 
 const ServerLayer = McpToolsLive.pipe(

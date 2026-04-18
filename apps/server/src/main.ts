@@ -52,6 +52,7 @@ import { PipelineService } from './services/pipeline'
 import { RecordingService } from './services/recordings'
 import { ResearchBlobStorageLive } from './services/research-blob-storage'
 import { S3StorageProviderLive } from './services/s3-storage-provider'
+import { TimelineActivityService } from './services/timeline-activity'
 import { WebhookService } from './services/webhooks'
 
 const ApiLive = HttpApiBuilder.layer(ForjaApi).pipe(
@@ -94,6 +95,7 @@ const ServicesLive = Layer.mergeAll(
 	ParticipantMatcher.layer,
 	RecordingService.layer,
 	ResearchService.layer,
+	TimelineActivityService.layer,
 	Geocoder.layer.pipe(Layer.provide(FetchHttpClient.layer)),
 ).pipe(
 	Layer.provideMerge(ResearchEventSinkLive),
