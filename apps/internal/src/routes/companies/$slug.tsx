@@ -102,6 +102,10 @@ type CompanyDetail = {
 	readonly nextAction: string | null
 	readonly nextActionAt: string | null
 	readonly lastContactedAt: string | null
+	readonly lastEmailAt: string | null
+	readonly lastCallAt: string | null
+	readonly lastMeetingAt: string | null
+	readonly nextCalendarEventAt: string | null
 	readonly tags: ReadonlyArray<string>
 	readonly productsFit: ReadonlyArray<string>
 	readonly latitude: number | null
@@ -782,6 +786,49 @@ function DetailBody({
 
 				<PriTabs.Panel value='profile'>
 					<PanelWrap>
+						<CadenceBlock>
+							<CadenceTitle>
+								<Trans>Cadence</Trans>
+							</CadenceTitle>
+							<CadenceGrid>
+								<CadenceRow>
+									<CadenceLabel>
+										<Trans>Last email</Trans>
+									</CadenceLabel>
+									<RelativeDate
+										value={company.lastEmailAt}
+										fallback={t`never`}
+									/>
+								</CadenceRow>
+								<CadenceRow>
+									<CadenceLabel>
+										<Trans>Last call</Trans>
+									</CadenceLabel>
+									<RelativeDate
+										value={company.lastCallAt}
+										fallback={t`never`}
+									/>
+								</CadenceRow>
+								<CadenceRow>
+									<CadenceLabel>
+										<Trans>Last meet</Trans>
+									</CadenceLabel>
+									<RelativeDate
+										value={company.lastMeetingAt}
+										fallback={t`never`}
+									/>
+								</CadenceRow>
+								<CadenceRow>
+									<CadenceLabel>
+										<Trans>Next event</Trans>
+									</CadenceLabel>
+									<RelativeDate
+										value={company.nextCalendarEventAt}
+										fallback={t`none scheduled`}
+									/>
+								</CadenceRow>
+							</CadenceGrid>
+						</CadenceBlock>
 						<ProfileGrid>
 							<EditableField
 								label={t`Industry`}
@@ -1136,6 +1183,10 @@ function narrowCompany(raw: unknown): CompanyDetail | null {
 		nextAction: str('nextAction'),
 		nextActionAt: str('nextActionAt'),
 		lastContactedAt: str('lastContactedAt'),
+		lastEmailAt: str('lastEmailAt'),
+		lastCallAt: str('lastCallAt'),
+		lastMeetingAt: str('lastMeetingAt'),
+		nextCalendarEventAt: str('nextCalendarEventAt'),
 		tags: strArr('tags'),
 		productsFit: strArr('productsFit'),
 		latitude: numeric('latitude'),
@@ -1429,6 +1480,101 @@ const ProfileGrid = styled.div.withConfig({
 	@media (min-width: 768px) {
 		grid-template-columns: 1fr 1fr;
 	}
+`
+
+const CadenceBlock = styled.section.withConfig({
+	displayName: 'CompanyDetailCadenceBlock',
+})`
+	${agedPaperSurface}
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-sm);
+	margin-bottom: var(--space-lg);
+	padding: var(--space-md) var(--space-md) var(--space-xs);
+
+	/* Screw dot top-left — stamped log-plate feel */
+	&::before {
+		content: '';
+		position: absolute;
+		top: 6px;
+		left: 6px;
+		width: 5px;
+		height: 5px;
+		border-radius: 50%;
+		background: radial-gradient(
+			circle at 35% 35%,
+			var(--color-metal-dark),
+			var(--color-metal-deep)
+		);
+	}
+
+	&::after {
+		content: '';
+		position: absolute;
+		top: 6px;
+		right: 6px;
+		width: 5px;
+		height: 5px;
+		border-radius: 50%;
+		background: radial-gradient(
+			circle at 35% 35%,
+			var(--color-metal-dark),
+			var(--color-metal-deep)
+		);
+	}
+`
+
+const CadenceTitle = styled.h3.withConfig({
+	displayName: 'CompanyDetailCadenceTitle',
+})`
+	${stenciledTitle}
+	margin: 0;
+	font-size: var(--typescale-label-medium-size);
+	opacity: 0.85;
+`
+
+const CadenceGrid = styled.dl.withConfig({
+	displayName: 'CompanyDetailCadenceGrid',
+})`
+	display: grid;
+	grid-template-columns: 1fr;
+	margin: 0;
+
+	@media (min-width: 640px) {
+		grid-template-columns: 1fr 1fr;
+		column-gap: var(--space-lg);
+	}
+`
+
+const CadenceRow = styled.div.withConfig({
+	displayName: 'CompanyDetailCadenceRow',
+})`
+	${ruledLedgerRow}
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--space-sm);
+	padding: var(--space-xs) 0;
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-medium-size);
+	color: var(--color-on-surface-variant);
+
+	&:first-child,
+	@media (min-width: 640px) {
+		&:nth-child(2) {
+			border-top: none;
+		}
+	}
+`
+
+const CadenceLabel = styled.dt.withConfig({
+	displayName: 'CompanyDetailCadenceLabel',
+})`
+	${stenciledTitle}
+	margin: 0;
+	font-size: var(--typescale-label-small-size);
+	opacity: 0.75;
 `
 
 const ContactList = styled.ul.withConfig({
