@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+
 import {
 	DateTime,
 	Effect,
@@ -9,13 +11,79 @@ import {
 	ServiceMap,
 	Stream,
 } from 'effect'
-import { LanguageModel } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
 import type { ResolvedPolicy } from '../domain/types'
 import { resolvePolicy, type SystemDefaults } from './policy'
-import { ResearchEventSink } from './ports'
+import {
+	AgentLanguageModel,
+	ExtractLanguageModel,
+	ResearchEventSink,
+	WriterLanguageModel,
+} from './ports'
 import { type FreeformSchema, schemaRegistry } from './schemas/index'
+import { researchToolkit } from './tools'
+
+const sha256Hex = (input: string): string =>
+	createHash('sha256').update(input).digest('hex')
+
+/**
+ * Deterministic JSON serializer: sorts object keys and drops function values
+ * so two call-sites that pass equivalent hints hash identically regardless of
+ * property-declaration order. Plain `JSON.stringify` would preserve insertion
+ * order and produce spurious cache misses.
+ */
+const stableStringify = (value: unknown): string => {
+	const seen = new WeakSet<object>()
+	const walk = (v: unknown): unknown => {
+		if (v === null || typeof v !== 'object') return v
+		if (seen.has(v as object)) return '[circular]'
+		seen.add(v as object)
+		if (Array.isArray(v)) return v.map(walk)
+		return Object.fromEntries(
+			Object.entries(v as Record<string, unknown>)
+				.filter(([, val]) => typeof val !== 'function')
+				.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+				.map(([k, val]) => [k, walk(val)] as const),
+		)
+	}
+	return JSON.stringify(walk(value))
+}
+
+export const normalizeResearchQuery = (query: string): string =>
+	query.trim().replace(/\s+/g, ' ').toLowerCase()
+
+export const schemaVersionFor = (schemaName: string): number => {
+	const match = schemaName.match(/_v(\d+)$/)
+	return match ? Number(match[1]) : 1
+}
+
+/**
+ * Research-run cache TTL policy. Structured schemas are stable (the schema
+ * itself is the invalidation knob via `schemaVersion`); freeform briefs stay
+ * topical for only a short window.
+ */
+export const researchCacheTtlDaysFor = (
+	schemaName: string | null | undefined,
+): number => (!schemaName || schemaName === 'freeform' ? 7 : 30)
+
+export const computeResearchCacheKey = (args: {
+	readonly userId: string
+	readonly query: string
+	readonly schemaName: string
+	readonly schemaVersion: number
+	readonly subjects: ReadonlyArray<{ table: string; id: string }> | undefined
+	readonly hints: unknown
+}): string => {
+	const sortedSubjects = [...(args.subjects ?? [])]
+		.map(s => `${s.table}:${s.id}`)
+		.sort()
+		.join(',')
+	const hintsJson = stableStringify(args.hints ?? {})
+	return sha256Hex(
+		`${args.userId}|${normalizeResearchQuery(args.query)}|${args.schemaName}|${args.schemaVersion}|${sortedSubjects}|${hintsJson}`,
+	)
+}
 
 // ── Event types for SSE streaming ──
 
@@ -23,9 +91,13 @@ export type ResearchEventType =
 	| 'run.started'
 	| 'tool.called'
 	| 'tool.result'
+	| 'tool.retried'
+	| 'tool.fell_back'
+	| 'tool.cache_hit'
 	| 'run.succeeded'
 	| 'run.failed'
 	| 'run.cancelled'
+	| 'provider.circuit_open'
 
 export interface ResearchEvent {
 	readonly type: ResearchEventType
@@ -74,6 +146,7 @@ export interface CreateResearchInput {
 	readonly autoApprovePaidCents?: number | undefined
 	readonly idempotencyKey?: string | undefined
 	readonly confirm?: boolean | undefined
+	readonly forceFresh?: boolean | undefined
 }
 
 // ── ResearchService ──
@@ -83,7 +156,13 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 	{
 		make: Effect.gen(function* () {
 			const sql = yield* SqlClient.SqlClient
-			const llm = yield* LanguageModel.LanguageModel
+			const agentLlm = yield* AgentLanguageModel
+			const extractLlm = yield* ExtractLanguageModel
+			const writerLlm = yield* WriterLanguageModel
+			// Resolve the toolkit + handlers once at layer-build time so the
+			// forked research fiber does not carry `HandlersFor<Tools>` as a
+			// lingering context requirement.
+			const toolkit = yield* researchToolkit
 
 			// ── Startup sweeper: mark orphaned running rows as failed ──
 			// Runs left in 'running' status across a server restart can never
@@ -237,6 +316,23 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					const schemaName =
 						(run as { schemaName: string | null }).schemaName ?? 'freeform'
 
+					// ── Checkpoint state from any prior partial run ──
+					// `phase` + `research_text` + `findings` are persisted after each
+					// phase; on resume we skip already-completed phases.
+					const checkpointPhase = ((run as { phase?: number | null }).phase ??
+						0) as number
+					const cachedResearchText = (run as { research_text?: string | null })
+						.research_text
+					const existingFindings = run['findings'] as Record<
+						string,
+						unknown
+					> | null
+					const existingFindingsHasValue =
+						existingFindings !== null &&
+						typeof existingFindings === 'object' &&
+						Object.keys(existingFindings).length > 0 &&
+						!('error' in existingFindings)
+
 					// Snapshot subjects if anchored
 					const subjects = context?.subjects
 						? yield* snapshotSubjects(context.subjects)
@@ -278,75 +374,118 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						hintsContext,
 					].join('\n')
 
+					// Prior-run token tally carried across resumes
+					const priorTokensIn =
+						(run as { tokensIn?: number | null }).tokensIn ?? 0
+					const priorTokensOut =
+						(run as { tokensOut?: number | null }).tokensOut ?? 0
+
 					// ── Phase 1: LLM research pass ──
-					// With a real LLM this drives a tool-calling loop.
-					// With stub LLM, returns deterministic text without tool calls.
-					yield* publishEvent(researchId, 'tool.called', {
-						tool: 'llm.generateText',
-						phase: 1,
-					})
-
-					const researchResponse = yield* llm.generateText({
-						prompt: `${systemPrompt}\n\n${(run as { query: string }).query}`,
-					})
-
-					yield* Ref.update(toolLog, log => [
-						...log,
-						{
-							timestamp: DateTime.nowUnsafe().toString(),
-							type: 'call' as const,
+					// Skipped on resume if the checkpoint captured research_text.
+					let researchText: string
+					let tokensIn = priorTokensIn
+					let tokensOut = priorTokensOut
+					if (checkpointPhase >= 1 && cachedResearchText) {
+						researchText = cachedResearchText
+						yield* Effect.logInfo('research.phase1.resume').pipe(
+							Effect.annotateLogs({
+								research_id: researchId,
+								text_length: researchText.length,
+							}),
+						)
+					} else {
+						yield* publishEvent(researchId, 'tool.called', {
 							tool: 'llm.generateText',
-							input: { phase: 1, query: (run as { query: string }).query },
-						},
-						{
-							timestamp: DateTime.nowUnsafe().toString(),
-							type: 'result' as const,
+							phase: 1,
+						})
+						const researchResponse = yield* agentLlm.generateText({
+							prompt: `${systemPrompt}\n\n${(run as { query: string }).query}`,
+							toolkit,
+							toolChoice: 'auto',
+						})
+						researchText = researchResponse.text
+						tokensIn += researchResponse.usage.inputTokens.total ?? 0
+						tokensOut += researchResponse.usage.outputTokens.total ?? 0
+						yield* Ref.update(toolLog, log => [
+							...log,
+							{
+								timestamp: DateTime.nowUnsafe().toString(),
+								type: 'call' as const,
+								tool: 'llm.generateText',
+								input: {
+									phase: 1,
+									query: (run as { query: string }).query,
+								},
+							},
+							{
+								timestamp: DateTime.nowUnsafe().toString(),
+								type: 'result' as const,
+								tool: 'llm.generateText',
+								output: { textLength: researchText.length },
+							},
+						])
+						yield* publishEvent(researchId, 'tool.result', {
 							tool: 'llm.generateText',
-							output: { textLength: researchResponse.text.length },
-						},
-					])
-					yield* publishEvent(researchId, 'tool.result', {
-						tool: 'llm.generateText',
-						phase: 1,
-						textLength: researchResponse.text.length,
-					})
-
-					// Track token usage
-					const tokensIn = researchResponse.usage.inputTokens.total ?? 0
-					let tokensOut = researchResponse.usage.outputTokens.total ?? 0
+							phase: 1,
+							textLength: researchText.length,
+						})
+						yield* sql`
+							UPDATE research_runs
+							SET phase = 1,
+								research_text = ${researchText},
+								tokens_in = ${tokensIn},
+								tokens_out = ${tokensOut},
+								updated_at = now()
+							WHERE id = ${researchId}
+						`
+					}
 
 					// ── Phase 2: Structured output ──
-					yield* publishEvent(researchId, 'tool.called', {
-						tool: 'llm.generateObject',
-						phase: 2,
-						schema: schemaName,
-					})
-
-					// Cast schema to satisfy generateObject's Encoder constraint.
-					// Registry schemas are all Structs with DecodingServices=never,
-					// but Schema.Top erases that — the cast is safe.
-					const structuredResponse = yield* llm.generateObject({
-						schema: outputSchema as typeof FreeformSchema,
-						prompt: `Based on this research, produce structured findings:\n\n${researchResponse.text}`,
-					})
-
-					const findings = structuredResponse.value as unknown
-					tokensOut += structuredResponse.usage.outputTokens.total ?? 0
-
-					yield* Ref.update(toolLog, log => [
-						...log,
-						{
-							timestamp: DateTime.nowUnsafe().toString(),
-							type: 'result' as const,
+					// Skipped on resume if findings were already captured.
+					let findings: unknown
+					if (checkpointPhase >= 2 && existingFindingsHasValue) {
+						findings = existingFindings
+						yield* Effect.logInfo('research.phase2.resume').pipe(
+							Effect.annotateLogs({ research_id: researchId }),
+						)
+					} else {
+						yield* publishEvent(researchId, 'tool.called', {
 							tool: 'llm.generateObject',
-							output: { schema: schemaName },
-						},
-					])
-					yield* publishEvent(researchId, 'tool.result', {
-						tool: 'llm.generateObject',
-						phase: 2,
-						schema: schemaName,
-					})
+							phase: 2,
+							schema: schemaName,
+						})
+						// Cast schema to satisfy generateObject's Encoder constraint.
+						// Registry schemas are all Structs with DecodingServices=never,
+						// but Schema.Top erases that — the cast is safe.
+						const structuredResponse = yield* extractLlm.generateObject({
+							schema: outputSchema as typeof FreeformSchema,
+							prompt: `Based on this research, produce structured findings:\n\n${researchText}`,
+						})
+						findings = structuredResponse.value as unknown
+						tokensOut += structuredResponse.usage.outputTokens.total ?? 0
+						yield* Ref.update(toolLog, log => [
+							...log,
+							{
+								timestamp: DateTime.nowUnsafe().toString(),
+								type: 'result' as const,
+								tool: 'llm.generateObject',
+								output: { schema: schemaName },
+							},
+						])
+						yield* publishEvent(researchId, 'tool.result', {
+							tool: 'llm.generateObject',
+							phase: 2,
+							schema: schemaName,
+						})
+						yield* sql`
+							UPDATE research_runs
+							SET phase = 2,
+								findings = ${JSON.stringify(findings)},
+								tokens_out = ${tokensOut},
+								updated_at = now()
+							WHERE id = ${researchId}
+						`
+					}
 
 					// ── Phase 3: Brief generation ──
 					const briefLang = context?.hints?.language ?? 'en'
@@ -356,7 +495,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						language: briefLang,
 					})
 
-					const briefResponse = yield* llm.generateText({
+					const briefResponse = yield* writerLlm.generateText({
 						prompt: `Write a concise human-readable research brief in ${briefLang} based on these findings:\n\n${JSON.stringify(findings)}`,
 					})
 
@@ -379,6 +518,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					yield* sql`
 						UPDATE research_runs
 						SET status = 'succeeded',
+							phase = 3,
 							findings = ${JSON.stringify(findings)},
 							brief_md = ${briefMd},
 							tokens_in = ${tokensIn},
@@ -388,6 +528,30 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							updated_at = now()
 						WHERE id = ${researchId}
 					`
+
+					// ── Write to research_cache so identical requests can skip the fiber ──
+					const cacheKey = computeResearchCacheKey({
+						userId,
+						query: (run as { query: string }).query,
+						schemaName,
+						schemaVersion: schemaVersionFor(schemaName),
+						subjects: context?.subjects,
+						hints: context?.hints,
+					})
+					const ttlDays = researchCacheTtlDaysFor(schemaName)
+					yield* sql`
+						INSERT INTO research_cache (
+							key_hash, user_id, research_id, cached_at, expires_at
+						) VALUES (
+							${cacheKey}, ${userId}, ${researchId},
+							now(), now() + (${`${ttlDays} days`})::interval
+						)
+						ON CONFLICT (key_hash) DO UPDATE SET
+							research_id = EXCLUDED.research_id,
+							user_id     = EXCLUDED.user_id,
+							cached_at   = EXCLUDED.cached_at,
+							expires_at  = EXCLUDED.expires_at
+					`.pipe(Effect.ignore)
 
 					// Merge findings onto parent group row if this is a leaf
 					const parentId = (run as { parentId: string | null }).parentId
@@ -451,6 +615,100 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 								has_selector: !!input.context?.selector,
 							}),
 						)
+
+						// ── Outer research-run cache check ──
+						// Identical (user, query, schema, subjects, hints) within TTL
+						// returns immediately without forking a fiber. `forceFresh`
+						// overrides this and always executes.
+						const schemaNameForKey = input.schemaName ?? 'freeform'
+						const cacheKey = computeResearchCacheKey({
+							userId,
+							query: input.query,
+							schemaName: schemaNameForKey,
+							schemaVersion: schemaVersionFor(schemaNameForKey),
+							subjects: input.context?.subjects,
+							hints: input.context?.hints,
+						})
+						if (!input.forceFresh) {
+							const hits = yield* sql<{ research_id: string }>`
+								SELECT research_id
+								FROM research_cache
+								WHERE key_hash = ${cacheKey}
+									AND user_id = ${userId}
+									AND expires_at > now()
+								LIMIT 1
+							`
+							if (hits[0]) {
+								const cachedId = hits[0].research_id
+								const [cachedRun] = yield* sql<{
+									findings: unknown
+									brief_md: string | null
+									tokens_in: number
+									tokens_out: number
+								}>`
+									SELECT findings, brief_md, tokens_in, tokens_out
+									FROM research_runs
+									WHERE id = ${cachedId} AND status = 'succeeded'
+									LIMIT 1
+								`
+								if (cachedRun) {
+									const clonedRows = yield* sql<{ id: string }>`
+										INSERT INTO research_runs (
+											query, mode, schema_name, kind, status, context,
+											findings, brief_md,
+											tokens_in, tokens_out,
+											cost_cents, paid_cost_cents,
+											idempotency_key, created_by,
+											started_at, completed_at
+										) VALUES (
+											${input.query},
+											${input.mode ?? 'deep'},
+											${input.schemaName ?? null},
+											'cache_hit',
+											'succeeded',
+											${JSON.stringify(input.context ?? {})},
+											${JSON.stringify(cachedRun.findings)},
+											${cachedRun.brief_md},
+											${cachedRun.tokens_in},
+											${cachedRun.tokens_out},
+											0, 0,
+											${input.idempotencyKey ?? null},
+											${userId},
+											now(), now()
+										) RETURNING id
+									`
+									const cloned = clonedRows[0]
+									if (!cloned)
+										return { id: cachedId, status: 'succeeded' as const }
+									const clonedId = cloned.id
+									// Clone source attributions from the cached run
+									yield* sql`
+										INSERT INTO research_run_sources (research_id, source_id, local_ref, fetched_at, cost_cents)
+										SELECT ${clonedId}, source_id, local_ref, fetched_at, 0
+										FROM research_run_sources
+										WHERE research_id = ${cachedId}
+										ON CONFLICT DO NOTHING
+									`
+									if (input.context?.subjects) {
+										for (const s of input.context.subjects) {
+											yield* sql`
+												INSERT INTO research_links (research_id, subject_table, subject_id, link_kind)
+												VALUES (${clonedId}, ${s.table}, ${s.id}, 'input')
+												ON CONFLICT DO NOTHING
+											`
+										}
+									}
+									yield* Effect.logInfo('research.cache_hit').pipe(
+										Effect.annotateLogs({
+											user_id: userId,
+											research_id: clonedId,
+											source_research_id: cachedId,
+										}),
+									)
+									return { id: clonedId, status: 'succeeded' as const }
+								}
+							}
+						}
 
 						// Resolve policy
 						const policy = yield* resolvePolicy({

@@ -19,8 +19,11 @@ export type {
 } from './application/ports'
 // ── Application (ports) ────────────────────────────────────────────────────
 export {
+	AgentLanguageModel,
+	BlobStorage,
 	Budget,
 	DiscoverProvider,
+	ExtractLanguageModel,
 	ExtractProvider,
 	ProviderQuota,
 	RegistryRouter,
@@ -29,6 +32,7 @@ export {
 	ResearchRunContext,
 	ScrapeProvider,
 	SearchProvider,
+	WriterLanguageModel,
 } from './application/ports'
 export {
 	makeProviderQuotaLayer,
@@ -51,6 +55,7 @@ export {
 	ProspectScanV1Schema,
 	schemaRegistry,
 } from './application/schemas/index'
+export { researchToolkit, researchToolkitLayer } from './application/tools'
 // ── Domain ─────────────────────────────────────────────────────────────────
 export {
 	ApprovalRequired,

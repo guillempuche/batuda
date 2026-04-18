@@ -1,4 +1,5 @@
 import { type Effect, type Schema, ServiceMap } from 'effect'
+import type { LanguageModel } from 'effect/unstable/ai'
 
 import type { Country } from '../domain/country'
 import type { ProviderError } from '../domain/errors'
@@ -9,6 +10,42 @@ export class ResearchRunContext extends ServiceMap.Service<
 	ResearchRunContext,
 	{ readonly researchId: string }
 >()('research/ResearchRunContext') {}
+
+// ── Tier-specific LanguageModel services ──
+// Three distinct tags backed by the same LanguageModel.Service shape.
+// Phase 1 pins a different model/provider cascade to each phase of the fiber
+// (agent = reasoning + tool loop, extract = structured JSON, writer = brief).
+
+export class AgentLanguageModel extends ServiceMap.Service<
+	AgentLanguageModel,
+	LanguageModel.Service
+>()('research/AgentLanguageModel') {}
+
+export class ExtractLanguageModel extends ServiceMap.Service<
+	ExtractLanguageModel,
+	LanguageModel.Service
+>()('research/ExtractLanguageModel') {}
+
+export class WriterLanguageModel extends ServiceMap.Service<
+	WriterLanguageModel,
+	LanguageModel.Service
+>()('research/WriterLanguageModel') {}
+
+// ── BlobStorage port (research-local view of app storage) ──
+// Narrow put/get used by scrape caching. Server wires this to S3StorageProvider
+// so research stays independent of the server package.
+
+export class BlobStorage extends ServiceMap.Service<
+	BlobStorage,
+	{
+		readonly put: (
+			key: string,
+			bytes: Uint8Array,
+			contentType: string,
+		) => Effect.Effect<void>
+		readonly get: (key: string) => Effect.Effect<Uint8Array>
+	}
+>()('research/BlobStorage') {}
 
 import type {
 	BudgetSnapshot,
@@ -67,6 +104,8 @@ export interface ExtractInput {
 	readonly url: string
 	readonly schema: Schema.Top
 	readonly prompt?: string | undefined
+	readonly schemaName?: string | undefined
+	readonly schemaVersion?: number | undefined
 }
 
 export class ExtractProvider extends ServiceMap.Service<

@@ -44,6 +44,8 @@ import { providerListConfig } from './_config'
 import { withFallback } from './_fallback'
 import { disabledError, notYetImplementedError } from './_shared'
 import { makeBraveSearch } from './brave/search'
+import { makeCachedExtract } from './cached-extract'
+import { makeCachedScrape } from './cached-scrape'
 import { makeCachedSearch } from './cached-search'
 import { StubDiscoverProviderInstance } from './stub/discover'
 import { StubExtractProviderInstance } from './stub/extract'
@@ -218,6 +220,10 @@ const searchLayer = Layer.effect(
 
 const cachedSearchLayer = makeCachedSearch().pipe(Layer.provide(searchLayer))
 
+const cachedScrapeLayer = makeCachedScrape()
+
+const cachedExtractLayer = makeCachedExtract()
+
 const scrapeLayer = Layer.effect(
 	ScrapeProvider,
 	Effect.gen(function* () {
@@ -376,8 +382,8 @@ const reportLayer = Layer.effect(
 
 export const makeResearchProvidersLive = Layer.mergeAll(
 	cachedSearchLayer,
-	scrapeLayer,
-	extractLayer,
+	cachedScrapeLayer.pipe(Layer.provide(scrapeLayer)),
+	cachedExtractLayer.pipe(Layer.provide(extractLayer)),
 	discoverLayer,
 	registryLayer,
 	reportLayer,
