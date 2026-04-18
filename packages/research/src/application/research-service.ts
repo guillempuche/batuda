@@ -1,11 +1,13 @@
 import { createHash } from 'node:crypto'
 
 import {
+	Config,
 	DateTime,
 	Effect,
 	Fiber,
 	HashMap,
 	Layer,
+	PartitionedSemaphore,
 	PubSub,
 	Ref,
 	ServiceMap,
@@ -164,27 +166,52 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 			// lingering context requirement.
 			const toolkit = yield* researchToolkit
 
-			// ── Startup sweeper: mark orphaned running rows as failed ──
-			// Runs left in 'running' status across a server restart can never
-			// complete because their in-memory fiber is gone. Reclaim them.
 			const ORPHAN_AGE_SECONDS = 900
-			const swept = yield* sql`
-				UPDATE research_runs
-				SET status = 'failed',
-					findings = jsonb_set(findings, '{error}', '"server restarted mid-run"'),
-					completed_at = now(),
-					updated_at = now()
-				WHERE status = 'running'
-				  AND started_at < now() - interval '1 second' * ${ORPHAN_AGE_SECONDS}
-				RETURNING id
-			`
-			if (swept.length > 0) {
+
+			// Reclaim runs that cannot progress after a server restart:
+			// 'running' rows whose fiber vanished mid-execution, and 'queued'
+			// rows whose in-memory permit-wait slot vanished.
+			const sweepOrphanRuns = (maxAgeSeconds: number) =>
+				Effect.gen(function* () {
+					// COALESCE guards NULL findings: jsonb_set(NULL, …) returns
+					// NULL, which would silently drop the error field on rows
+					// that never wrote findings (newly-queued rows especially).
+					const running = yield* sql<{ id: string }>`
+						UPDATE research_runs
+						SET status = 'failed',
+							findings = jsonb_set(COALESCE(findings, '{}'::jsonb), '{error}', '"server restarted mid-run"'),
+							completed_at = now(),
+							updated_at = now()
+						WHERE status = 'running'
+						  AND started_at < now() - interval '1 second' * ${maxAgeSeconds}
+						RETURNING id
+					`
+					// Queued rows have no started_at — the fiber never reached
+					// the status-to-running flip. Fall back to created_at.
+					const queued = yield* sql<{ id: string }>`
+						UPDATE research_runs
+						SET status = 'failed',
+							findings = jsonb_set(COALESCE(findings, '{}'::jsonb), '{error}', '"server restarted before fiber started"'),
+							completed_at = now(),
+							updated_at = now()
+						WHERE status = 'queued'
+						  AND created_at < now() - interval '1 second' * ${maxAgeSeconds}
+						RETURNING id
+					`
+					return { running, queued }
+				}).pipe(sql.withTransaction)
+
+			// ── Startup sweep ──
+			const swept = yield* sweepOrphanRuns(ORPHAN_AGE_SECONDS)
+			if (swept.running.length > 0 || swept.queued.length > 0) {
 				yield* Effect.logWarning(
 					'research.sweepOrphans: marked orphaned runs as failed',
 				).pipe(
 					Effect.annotateLogs({
-						count: swept.length,
-						ids: swept.map(r => (r as { readonly id: string }).id),
+						running_count: swept.running.length,
+						queued_count: swept.queued.length,
+						running_ids: swept.running.map(r => r.id),
+						queued_ids: swept.queued.map(r => r.id),
 					}),
 				)
 			}
@@ -196,6 +223,17 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 			const activeFibers = yield* Ref.make(
 				HashMap.empty<string, Fiber.Fiber<void, unknown>>(),
 			)
+
+			// Fiber concurrency gate. Shared permit pool, waiters queued per
+			// userId — releases round-robin across partitions so one tenant's
+			// burst cannot starve the rest. Capacity is fixed at service
+			// construction; changing it requires a restart.
+			const maxConcurrentFibersTotal = yield* Config.int(
+				'RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL',
+			)
+			const fiberSem = yield* PartitionedSemaphore.make<string>({
+				permits: maxConcurrentFibersTotal,
+			})
 
 			// ── Event sink (observability: webhooks, metrics) ──
 			const eventSink = yield* ResearchEventSink
@@ -581,7 +619,16 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					),
 					Effect.ensuring(
 						Effect.gen(function* () {
-							// Clean up pubsub and fiber refs
+							// Without this shutdown, Stream.fromPubSub keeps the
+							// subscriber channel open past the terminal event — the
+							// stream only ends when the HTTP socket drops. Shut
+							// down before removing the map entry so the interrupt
+							// signal reaches waiting subscribers.
+							const pubsubMap = yield* Ref.get(activePubSubs)
+							const maybePubSub = HashMap.get(pubsubMap, researchId)
+							if (maybePubSub._tag === 'Some') {
+								yield* PubSub.shutdown(maybePubSub.value)
+							}
 							yield* Ref.update(activePubSubs, m =>
 								HashMap.remove(m, researchId),
 							)
@@ -760,9 +807,20 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							HashMap.set(m, researchId, pubsub),
 						)
 
-						// Fork the fiber
+						// withPermit is wrapped inside the fork, not around it, so
+						// create() returns immediately and the permit wait plus its
+						// interrupt handler live on the forked fiber. Cancellation
+						// while queued then releases the slot cleanly without
+						// touching the caller's flow.
 						const fiber = yield* Effect.forkDetach(
-							runFiber(researchId, userId, policy, systemDefaults.hardCeiling),
+							fiberSem.withPermit(userId)(
+								runFiber(
+									researchId,
+									userId,
+									policy,
+									systemDefaults.hardCeiling,
+								),
+							),
 						)
 						yield* Ref.update(activeFibers, m =>
 							HashMap.set(m, researchId, fiber),
@@ -968,17 +1026,8 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						RETURNING *
 					`,
 
-				/** Mark orphaned running rows as failed (startup sweeper). */
-				sweepOrphans: (maxAgeSeconds: number) =>
-					sql`
-						UPDATE research_runs
-						SET status = 'failed',
-							findings = jsonb_set(findings, '{error}', '"server restarted mid-run"'),
-							completed_at = now(),
-							updated_at = now()
-						WHERE status = 'running'
-						  AND started_at < now() - interval '1 second' * ${maxAgeSeconds}
-					`,
+				/** Mark orphaned running + queued rows as failed. */
+				sweepOrphans: (maxAgeSeconds: number) => sweepOrphanRuns(maxAgeSeconds),
 			}
 		}),
 	},
