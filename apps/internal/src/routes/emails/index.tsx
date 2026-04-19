@@ -5,7 +5,19 @@ import {
 	useAtomValue,
 } from '@effect/atom-react'
 import { useLingui } from '@lingui/react/macro'
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import {
+	type ColumnDef,
+	type ColumnSizingState,
+	flexRender,
+	getCoreRowModel,
+	getSortedRowModel,
+	type SortingState,
+	type Table as TanstackTable,
+	useReactTable,
+	type VisibilityState,
+} from '@tanstack/react-table'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import {
@@ -18,21 +30,31 @@ import {
 	CheckCheck,
 	ChevronLeft,
 	ChevronRight,
+	Columns,
 	Eye,
 	EyeOff,
 	Inbox as InboxIcon,
 	Mail,
 	Pencil,
+	PencilLine,
 	Search,
 	X,
 } from 'lucide-react'
-import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import {
+	useCallback,
+	useContext,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react'
 import styled, { css } from 'styled-components'
 
 import {
 	PriButton,
 	PriCheckbox,
 	PriInput,
+	PriPopover,
 	PriSelect,
 	usePriToast,
 } from '@engranatge/ui/pri'
@@ -49,6 +71,7 @@ import {
 	updateThreadStatusAtom,
 } from '#/atoms/emails-atoms'
 import { companiesListAtom } from '#/atoms/pipeline-atoms'
+import { PriTable } from '#/components/primitives/pri-table'
 import { EmptyState } from '#/components/shared/empty-state'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { SkeletonRows } from '#/components/shared/skeleton-row'
@@ -57,7 +80,6 @@ import { dehydrateAtom } from '#/lib/atom-hydration'
 import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import {
-	agedPaperRow,
 	brushedMetalPlate,
 	rulerUnderRule,
 	stenciledTitle,
@@ -84,6 +106,7 @@ type ThreadRow = {
 	readonly lastMessageDirection: Direction | null
 	readonly lastInboundClassification: InboundClassification | null
 	readonly isUnread: boolean
+	readonly hasDraft: boolean
 	readonly updatedAt: string
 	readonly inbox: ThreadInbox | null
 }
@@ -226,7 +249,7 @@ function EmailsIndexPage() {
 	const { t } = useLingui()
 	const search = Route.useSearch()
 	const navigate = useNavigate({ from: Route.fullPath })
-	const { openCompose } = useComposeEmail()
+	const { openCompose, drafts } = useComposeEmail()
 	const wire = useMemo(() => toWireSearch(search), [search])
 
 	// Atom identity is keyed by the canonical wire-shape key, not by the
@@ -262,19 +285,28 @@ function EmailsIndexPage() {
 		() => (AsyncResult.isSuccess(result) ? narrowEnvelope(result.value) : null),
 		[result],
 	)
+	const threadIdsWithDraft = useMemo<ReadonlySet<string>>(() => {
+		const set = new Set<string>()
+		for (const d of drafts) {
+			if (d.threadId !== undefined && d.threadId !== '') set.add(d.threadId)
+		}
+		return set
+	}, [drafts])
 	const threads = useMemo<ReadonlyArray<ThreadRow>>(() => {
 		const rows = envelope !== null ? narrowThreads(envelope.items) : []
-		if (overlays.size === 0) return rows
+		if (overlays.size === 0 && threadIdsWithDraft.size === 0) return rows
 		return rows.map(row => {
 			const patch = overlays.get(row.id)
-			if (patch === undefined) return row
+			const hasDraft = threadIdsWithDraft.has(row.id)
+			if (patch === undefined && !hasDraft) return row
 			return {
 				...row,
-				...(patch.status !== undefined && { status: patch.status }),
-				...(patch.isUnread !== undefined && { isUnread: patch.isUnread }),
+				...(patch?.status !== undefined && { status: patch.status }),
+				...(patch?.isUnread !== undefined && { isUnread: patch.isUnread }),
+				...(hasDraft && { hasDraft: true }),
 			}
 		})
-	}, [envelope, overlays])
+	}, [envelope, overlays, threadIdsWithDraft])
 	const total = envelope?.total ?? 0
 	const isLoading = AsyncResult.isInitial(result)
 	const isFailure = AsyncResult.isFailure(result)
@@ -728,190 +760,20 @@ function EmailsIndexPage() {
 						: {})}
 				/>
 			) : (
-				<ThreadsTable role='table' aria-label={t`Email threads`}>
-					<ThreadsHead role='row'>
-						<HeadCellCheckbox role='columnheader'>
-							<PriCheckbox.Root
-								checked={allSelected}
-								onCheckedChange={checked => {
-									if (checked) selectAll()
-									else clearSelection()
-								}}
-								aria-label={t`Select all threads on this page`}
-							>
-								<PriCheckbox.Indicator>
-									<Check size={12} aria-hidden />
-								</PriCheckbox.Indicator>
-							</PriCheckbox.Root>
-						</HeadCellCheckbox>
-						<HeadCell role='columnheader'>{t`Subject`}</HeadCell>
-						<HeadCell role='columnheader'>{t`Company`}</HeadCell>
-						<HeadCellCount role='columnheader'>{t`Msgs`}</HeadCellCount>
-						<HeadCell role='columnheader'>{t`Status`}</HeadCell>
-						<HeadCellDir role='columnheader' aria-label={t`Last direction`}>
-							{/* dir-only column, no visible text to avoid clutter */}
-							<span aria-hidden>⇅</span>
-						</HeadCellDir>
-						<HeadCell role='columnheader'>{t`Updated`}</HeadCell>
-					</ThreadsHead>
-
-					{threads.map(thread => {
-						const company =
-							thread.companyId !== null
-								? (companiesById.get(thread.companyId) ?? null)
-								: null
-						const checked = selected.has(thread.id)
-						const suspicious =
-							thread.lastInboundClassification === 'spam' ||
-							thread.lastInboundClassification === 'blocked'
-						return (
-							<ThreadRowEl
-								key={thread.id}
-								role='row'
-								data-testid={`thread-row-${thread.id}`}
-								$unread={thread.isUnread}
-								$muted={suspicious}
-								$selected={checked}
-							>
-								<CellCheckbox role='cell'>
-									<PriCheckbox.Root
-										checked={checked}
-										onCheckedChange={() => toggleSelect(thread.id)}
-										aria-label={t`Select thread ${thread.subject ?? '(no subject)'}`}
-									>
-										<PriCheckbox.Indicator>
-											<Check size={12} aria-hidden />
-										</PriCheckbox.Indicator>
-									</PriCheckbox.Root>
-								</CellCheckbox>
-								<CellSubject role='cell'>
-									{thread.isUnread && <UnreadDot aria-hidden />}
-									<SubjectLinkWrap $unread={thread.isUnread}>
-										<Link
-											to='/emails/$threadId'
-											params={{ threadId: thread.id }}
-										>
-											{thread.subject && thread.subject !== '' ? (
-												thread.subject
-											) : (
-												<NoSubject>{t`(no subject)`}</NoSubject>
-											)}
-										</Link>
-									</SubjectLinkWrap>
-									{suspicious && (
-										<SuspiciousTag>
-											<AlertTriangle size={12} aria-hidden />
-											<span>
-												{thread.lastInboundClassification === 'spam'
-													? t`Spam`
-													: t`Blocked`}
-											</span>
-										</SuspiciousTag>
-									)}
-								</CellSubject>
-								<CellCompany role='cell'>
-									{company !== null ? (
-										<CompanyLinkWrap>
-											<Link
-												to='/companies/$slug'
-												params={{ slug: company.slug }}
-											>
-												{company.name}
-											</Link>
-										</CompanyLinkWrap>
-									) : (
-										<Muted>—</Muted>
-									)}
-								</CellCompany>
-								<CellCount role='cell'>{thread.messageCount}</CellCount>
-								<CellStatus role='cell'>
-									<StatusPill $status={thread.status}>
-										{thread.status === 'open'
-											? t`Open`
-											: thread.status === 'closed'
-												? t`Closed`
-												: t`Archived`}
-									</StatusPill>
-								</CellStatus>
-								<CellDir role='cell'>
-									{thread.lastMessageDirection === 'outbound' ? (
-										<ArrowUpRight
-											size={16}
-											aria-label={t`Last message outbound`}
-										/>
-									) : thread.lastMessageDirection === 'inbound' ? (
-										<ArrowDownLeft
-											size={16}
-											aria-label={t`Last message inbound`}
-										/>
-									) : (
-										<Muted>—</Muted>
-									)}
-								</CellDir>
-								<CellDate role='cell'>
-									<RelativeDate
-										value={thread.lastMessageAt ?? thread.updatedAt}
-									/>
-									<RowActions role='group' aria-label={t`Row actions`}>
-										{thread.isUnread ? (
-											<IconAction
-												type='button'
-												onClick={() => {
-													void applyRead([thread.id], true)
-												}}
-												aria-label={t`Mark read`}
-											>
-												<Eye size={14} aria-hidden />
-											</IconAction>
-										) : (
-											<IconAction
-												type='button'
-												onClick={() => {
-													void applyRead([thread.id], false)
-												}}
-												aria-label={t`Mark unread`}
-											>
-												<EyeOff size={14} aria-hidden />
-											</IconAction>
-										)}
-										{thread.status === 'open' ? (
-											<IconAction
-												type='button'
-												onClick={() => {
-													void applyStatus([thread.id], 'closed')
-												}}
-												aria-label={t`Close thread`}
-											>
-												<CheckCheck size={14} aria-hidden />
-											</IconAction>
-										) : (
-											<IconAction
-												type='button'
-												onClick={() => {
-													void applyStatus([thread.id], 'open')
-												}}
-												aria-label={t`Reopen thread`}
-											>
-												<ArchiveRestore size={14} aria-hidden />
-											</IconAction>
-										)}
-										{thread.status !== 'archived' ? (
-											<IconAction
-												type='button'
-												onClick={() => {
-													void applyStatus([thread.id], 'archived')
-												}}
-												aria-label={t`Archive thread`}
-											>
-												<Archive size={14} aria-hidden />
-											</IconAction>
-										) : null}
-									</RowActions>
-								</CellDate>
-							</ThreadRowEl>
-						)
-					})}
-				</ThreadsTable>
+				<>
+					{drafts.length > 0 && <DraftsResumeStrip drafts={drafts} />}
+					<ThreadsGrid
+						threads={threads}
+						companiesById={companiesById}
+						selected={selected}
+						allSelected={allSelected}
+						toggleSelect={toggleSelect}
+						selectAll={selectAll}
+						clearSelection={clearSelection}
+						applyStatus={applyStatus}
+						applyRead={applyRead}
+					/>
+				</>
 			)}
 
 			{total > EMAILS_PAGE_SIZE && (
@@ -941,6 +803,560 @@ function EmailsIndexPage() {
 				</Pagination>
 			)}
 		</Page>
+	)
+}
+
+// ── ThreadsGrid: TanStack Table + Virtual + PriTable ──────────────
+
+type ThreadsGridProps = {
+	readonly threads: ReadonlyArray<ThreadRow>
+	readonly companiesById: Map<string, CompanyLookup>
+	readonly selected: ReadonlySet<string>
+	readonly allSelected: boolean
+	readonly toggleSelect: (id: string) => void
+	readonly selectAll: () => void
+	readonly clearSelection: () => void
+	readonly applyStatus: (
+		ids: ReadonlyArray<string>,
+		status: ThreadStatus,
+	) => Promise<void>
+	readonly applyRead: (
+		ids: ReadonlyArray<string>,
+		read: boolean,
+	) => Promise<void>
+}
+
+const COLUMN_SIZING_KEY = 'forja.emails.columnSizing'
+const COLUMN_VISIBILITY_KEY = 'forja.emails.columnVisibility'
+
+function readLocal<T>(key: string, fallback: T): T {
+	if (typeof window === 'undefined') return fallback
+	try {
+		const raw = window.localStorage.getItem(key)
+		if (raw === null) return fallback
+		const parsed: unknown = JSON.parse(raw)
+		if (parsed === null || typeof parsed !== 'object') return fallback
+		return parsed as T
+	} catch {
+		return fallback
+	}
+}
+
+function writeLocal(key: string, value: unknown): void {
+	if (typeof window === 'undefined') return
+	try {
+		window.localStorage.setItem(key, JSON.stringify(value))
+	} catch {
+		// ignore quota / private-mode failures
+	}
+}
+
+function ThreadsGrid({
+	threads,
+	companiesById,
+	selected,
+	allSelected,
+	toggleSelect,
+	selectAll,
+	clearSelection,
+	applyStatus,
+	applyRead,
+}: ThreadsGridProps) {
+	const { t } = useLingui()
+	const navigate = useNavigate({ from: '/emails/' })
+
+	const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() =>
+		readLocal<ColumnSizingState>(COLUMN_SIZING_KEY, {}),
+	)
+	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
+		() => readLocal<VisibilityState>(COLUMN_VISIBILITY_KEY, {}),
+	)
+	const [sorting, setSorting] = useState<SortingState>([])
+
+	useEffect(() => {
+		writeLocal(COLUMN_SIZING_KEY, columnSizing)
+	}, [columnSizing])
+	useEffect(() => {
+		writeLocal(COLUMN_VISIBILITY_KEY, columnVisibility)
+	}, [columnVisibility])
+
+	const rowSelection = useMemo<Record<string, boolean>>(() => {
+		const obj: Record<string, boolean> = {}
+		for (const id of selected) obj[id] = true
+		return obj
+	}, [selected])
+
+	const columns = useMemo<ColumnDef<ThreadRow>[]>(
+		() => [
+			{
+				id: 'select',
+				size: 44,
+				enableResizing: false,
+				enableHiding: false,
+				enableSorting: false,
+				header: () => (
+					<PriCheckbox.Root
+						checked={allSelected}
+						onCheckedChange={checked => {
+							if (checked) selectAll()
+							else clearSelection()
+						}}
+						aria-label={t`Select all threads on this page`}
+					>
+						<PriCheckbox.Indicator>
+							<Check size={12} aria-hidden />
+						</PriCheckbox.Indicator>
+					</PriCheckbox.Root>
+				),
+				cell: ({ row }) => (
+					<PriCheckbox.Root
+						checked={selected.has(row.original.id)}
+						onCheckedChange={() => toggleSelect(row.original.id)}
+						aria-label={t`Select thread ${row.original.subject ?? '(no subject)'}`}
+					>
+						<PriCheckbox.Indicator>
+							<Check size={12} aria-hidden />
+						</PriCheckbox.Indicator>
+					</PriCheckbox.Root>
+				),
+			},
+			{
+				id: 'status',
+				header: '',
+				size: 36,
+				enableResizing: false,
+				enableHiding: false,
+				enableSorting: false,
+				cell: ({ row }) => <StatusCell thread={row.original} />,
+			},
+			{
+				id: 'who',
+				header: () => t`Who`,
+				size: 260,
+				accessorFn: r => resolveCompany(r, companiesById)?.name ?? '',
+				cell: ({ row }) => (
+					<WhoCell
+						thread={row.original}
+						company={resolveCompany(row.original, companiesById)}
+					/>
+				),
+			},
+			{
+				id: 'what',
+				header: () => t`What`,
+				size: 420,
+				accessorFn: r => r.subject ?? '',
+				cell: ({ row }) => <WhatCell thread={row.original} />,
+			},
+			{
+				id: 'when',
+				header: () => t`When`,
+				size: 120,
+				accessorFn: r => r.lastMessageAt ?? r.updatedAt,
+				cell: ({ row }) => (
+					<RelativeDate
+						value={row.original.lastMessageAt ?? row.original.updatedAt}
+					/>
+				),
+			},
+			{
+				id: 'actions',
+				header: '',
+				size: 140,
+				enableResizing: false,
+				enableHiding: false,
+				enableSorting: false,
+				cell: ({ row }) => (
+					<RowActionsCell
+						thread={row.original}
+						applyStatus={applyStatus}
+						applyRead={applyRead}
+					/>
+				),
+			},
+		],
+		[
+			t,
+			companiesById,
+			selected,
+			allSelected,
+			toggleSelect,
+			selectAll,
+			clearSelection,
+			applyStatus,
+			applyRead,
+		],
+	)
+
+	const table = useReactTable({
+		data: threads as ThreadRow[],
+		columns,
+		state: { columnSizing, columnVisibility, sorting, rowSelection },
+		getRowId: r => r.id,
+		enableRowSelection: true,
+		enableColumnResizing: true,
+		columnResizeMode: 'onChange',
+		onColumnSizingChange: setColumnSizing,
+		onColumnVisibilityChange: setColumnVisibility,
+		onSortingChange: setSorting,
+		getCoreRowModel: getCoreRowModel(),
+		getSortedRowModel: getSortedRowModel(),
+		defaultColumn: { minSize: 48, maxSize: 800 },
+	})
+
+	const scrollRef = useRef<HTMLDivElement>(null)
+	const rows = table.getRowModel().rows
+	const virtualizer = useVirtualizer({
+		count: rows.length,
+		getScrollElement: () => scrollRef.current,
+		estimateSize: () => 64,
+		overscan: 8,
+	})
+	const virtualRows = virtualizer.getVirtualItems()
+
+	return (
+		<GridShell>
+			<GridToolbar>
+				<ColumnVisibilityMenu table={table} />
+			</GridToolbar>
+			<GridScroll ref={scrollRef}>
+				<PriTable.Root>
+					<PriTable.Head>
+						{table.getHeaderGroups().map(group => (
+							<PriTable.Row key={group.id}>
+								{group.headers.map(header => (
+									<PriTable.ColumnHeader
+										key={header.id}
+										style={{ width: header.getSize() }}
+										onClick={
+											header.column.getCanSort()
+												? header.column.getToggleSortingHandler()
+												: undefined
+										}
+									>
+										{header.isPlaceholder
+											? null
+											: flexRender(
+													header.column.columnDef.header,
+													header.getContext(),
+												)}
+										{header.column.getIsSorted() === 'asc' && ' ↑'}
+										{header.column.getIsSorted() === 'desc' && ' ↓'}
+										{header.column.getCanResize() && (
+											<PriTable.Resizer
+												onMouseDown={header.getResizeHandler()}
+												onTouchStart={header.getResizeHandler()}
+												$isResizing={header.column.getIsResizing()}
+											/>
+										)}
+									</PriTable.ColumnHeader>
+								))}
+							</PriTable.Row>
+						))}
+					</PriTable.Head>
+					<PriTable.Body
+						style={{
+							height: virtualizer.getTotalSize(),
+							position: 'relative',
+						}}
+					>
+						{virtualRows.map(vi => {
+							const row = rows[vi.index]
+							if (row === undefined) return null
+							const thread = row.original
+							return (
+								<PriTable.Row
+									key={row.id}
+									data-testid={`thread-row-${thread.id}`}
+									data-unread={thread.isUnread ? 'true' : 'false'}
+									data-draft={thread.hasDraft ? 'true' : 'false'}
+									data-selected={selected.has(thread.id) ? 'true' : 'false'}
+									style={{
+										position: 'absolute',
+										top: 0,
+										left: 0,
+										right: 0,
+										transform: `translateY(${vi.start}px)`,
+									}}
+									onClick={() => {
+										void navigate({
+											to: '/emails/$threadId',
+											params: { threadId: thread.id },
+										})
+									}}
+								>
+									{row.getVisibleCells().map(cell => (
+										<PriTable.Cell
+											key={cell.id}
+											style={{ width: cell.column.getSize() }}
+											onClick={
+												cell.column.id === 'select' ||
+												cell.column.id === 'actions'
+													? e => e.stopPropagation()
+													: undefined
+											}
+										>
+											{flexRender(
+												cell.column.columnDef.cell,
+												cell.getContext(),
+											)}
+										</PriTable.Cell>
+									))}
+								</PriTable.Row>
+							)
+						})}
+					</PriTable.Body>
+				</PriTable.Root>
+			</GridScroll>
+		</GridShell>
+	)
+}
+
+function resolveCompany(
+	thread: ThreadRow,
+	companiesById: Map<string, CompanyLookup>,
+): CompanyLookup | null {
+	if (thread.companyId === null) return null
+	return companiesById.get(thread.companyId) ?? null
+}
+
+function StatusCell({ thread }: { thread: ThreadRow }) {
+	if (thread.hasDraft) {
+		return <PencilLine size={14} aria-label='Has draft' />
+	}
+	if (thread.isUnread) {
+		return <UnreadDot aria-label='Unread' />
+	}
+	if (thread.status === 'closed') {
+		return <Check size={14} aria-label='Closed' />
+	}
+	if (thread.status === 'archived') {
+		return <Archive size={14} aria-label='Archived' />
+	}
+	return null
+}
+
+function WhoCell({
+	thread,
+	company,
+}: {
+	thread: ThreadRow
+	company: CompanyLookup | null
+}) {
+	const { t } = useLingui()
+	const senderLabel =
+		thread.inbox?.displayName ?? thread.inbox?.email ?? t`Unknown`
+	return (
+		<WhoStack>
+			<WhoLine1>
+				<WhoName>{senderLabel}</WhoName>
+				{thread.lastMessageDirection === 'outbound' ? (
+					<ArrowUpRight size={12} aria-label={t`Outbound`} />
+				) : thread.lastMessageDirection === 'inbound' ? (
+					<ArrowDownLeft size={12} aria-label={t`Inbound`} />
+				) : null}
+			</WhoLine1>
+			<WhoLine2>{company?.name ?? '—'}</WhoLine2>
+		</WhoStack>
+	)
+}
+
+function WhatCell({ thread }: { thread: ThreadRow }) {
+	const { t } = useLingui()
+	const suspicious =
+		thread.lastInboundClassification === 'spam' ||
+		thread.lastInboundClassification === 'blocked'
+	return (
+		<WhatStack>
+			<WhatLine1 $unread={thread.isUnread}>
+				{thread.subject && thread.subject !== '' ? (
+					<WhatSubject>{thread.subject}</WhatSubject>
+				) : (
+					<NoSubject>{t`(no subject)`}</NoSubject>
+				)}
+				{suspicious && (
+					<SuspiciousTag>
+						<AlertTriangle size={10} aria-hidden />
+						<span>
+							{thread.lastInboundClassification === 'spam'
+								? t`Spam`
+								: t`Blocked`}
+						</span>
+					</SuspiciousTag>
+				)}
+			</WhatLine1>
+			<WhatLine2>
+				{thread.messageCount === 1 ? t`1 msg` : t`${thread.messageCount} msgs`}
+			</WhatLine2>
+		</WhatStack>
+	)
+}
+
+function RowActionsCell({
+	thread,
+	applyStatus,
+	applyRead,
+}: {
+	thread: ThreadRow
+	applyStatus: (
+		ids: ReadonlyArray<string>,
+		status: ThreadStatus,
+	) => Promise<void>
+	applyRead: (ids: ReadonlyArray<string>, read: boolean) => Promise<void>
+}) {
+	const { t } = useLingui()
+	return (
+		<RowActionsRow>
+			{thread.isUnread ? (
+				<IconAction
+					type='button'
+					onClick={() => {
+						void applyRead([thread.id], true)
+					}}
+					aria-label={t`Mark read`}
+				>
+					<Eye size={14} aria-hidden />
+				</IconAction>
+			) : (
+				<IconAction
+					type='button'
+					onClick={() => {
+						void applyRead([thread.id], false)
+					}}
+					aria-label={t`Mark unread`}
+				>
+					<EyeOff size={14} aria-hidden />
+				</IconAction>
+			)}
+			{thread.status === 'open' ? (
+				<IconAction
+					type='button'
+					onClick={() => {
+						void applyStatus([thread.id], 'closed')
+					}}
+					aria-label={t`Close thread`}
+				>
+					<CheckCheck size={14} aria-hidden />
+				</IconAction>
+			) : (
+				<IconAction
+					type='button'
+					onClick={() => {
+						void applyStatus([thread.id], 'open')
+					}}
+					aria-label={t`Reopen thread`}
+				>
+					<ArchiveRestore size={14} aria-hidden />
+				</IconAction>
+			)}
+			{thread.status !== 'archived' && (
+				<IconAction
+					type='button'
+					onClick={() => {
+						void applyStatus([thread.id], 'archived')
+					}}
+					aria-label={t`Archive thread`}
+				>
+					<Archive size={14} aria-hidden />
+				</IconAction>
+			)}
+		</RowActionsRow>
+	)
+}
+
+function ColumnVisibilityMenu({ table }: { table: TanstackTable<ThreadRow> }) {
+	const { t } = useLingui()
+	const labelFor = (id: string): string => {
+		if (id === 'who') return t`Who`
+		if (id === 'what') return t`What`
+		if (id === 'when') return t`When`
+		return id
+	}
+	return (
+		<PriPopover.Root>
+			<PriPopover.Trigger
+				render={props => (
+					<PriButton type='button' $variant='outlined' {...props}>
+						<Columns size={14} aria-hidden />
+						<span>{t`Columns`}</span>
+					</PriButton>
+				)}
+			/>
+			<PriPopover.Portal>
+				<PriPopover.Positioner>
+					<PriPopover.Popup>
+						<MenuList>
+							{table
+								.getAllLeafColumns()
+								.filter(col => col.getCanHide())
+								.map(col => (
+									<MenuRow key={col.id}>
+										<PriCheckbox.Root
+											checked={col.getIsVisible()}
+											onCheckedChange={() => col.toggleVisibility()}
+										>
+											<PriCheckbox.Indicator>
+												<Check size={12} aria-hidden />
+											</PriCheckbox.Indicator>
+										</PriCheckbox.Root>
+										<MenuLabel>{labelFor(col.id)}</MenuLabel>
+									</MenuRow>
+								))}
+							<MenuDivider />
+							<PriButton
+								type='button'
+								$variant='text'
+								onClick={() => table.resetColumnVisibility()}
+							>
+								{t`Reset`}
+							</PriButton>
+						</MenuList>
+					</PriPopover.Popup>
+				</PriPopover.Positioner>
+			</PriPopover.Portal>
+		</PriPopover.Root>
+	)
+}
+
+// ── DraftsResumeStrip: pinned chip row above the grid ─────────────
+
+type StripDraft = {
+	readonly id: string
+	readonly subject: string
+}
+
+function DraftsResumeStrip({ drafts }: { drafts: ReadonlyArray<StripDraft> }) {
+	const { t } = useLingui()
+	const [collapsed, setCollapsed] = useState<boolean>(() =>
+		readLocal<boolean>('forja.emails.draftsStripCollapsed', false),
+	)
+	useEffect(() => {
+		writeLocal('forja.emails.draftsStripCollapsed', collapsed)
+	}, [collapsed])
+	return (
+		<StripPlate>
+			<StripLabel>
+				{drafts.length === 1
+					? t`Resume drafting (1)`
+					: t`Resume drafting (${drafts.length})`}
+			</StripLabel>
+			{!collapsed && (
+				<ChipRow>
+					{drafts.slice(0, 8).map(d => (
+						<DraftChip key={d.id} type='button'>
+							{d.subject !== '' ? d.subject : t`Untitled`}
+						</DraftChip>
+					))}
+				</ChipRow>
+			)}
+			<PriButton
+				type='button'
+				$variant='text'
+				onClick={() => setCollapsed(c => !c)}
+			>
+				{collapsed ? t`Expand` : t`Collapse`}
+			</PriButton>
+		</StripPlate>
 	)
 }
 
@@ -1038,6 +1454,7 @@ function narrowThreads(rows: ReadonlyArray<unknown>): ReadonlyArray<ThreadRow> {
 					? classification
 					: null,
 			isUnread: r['isUnread'] === true,
+			hasDraft: false,
 			updatedAt:
 				typeof r['updatedAt'] === 'string'
 					? r['updatedAt']
@@ -1264,230 +1681,6 @@ const BulkLabel = styled.span.withConfig({
 	margin-right: auto;
 `
 
-const ThreadsTable = styled.div.withConfig({
-	displayName: 'EmailsIndexTable',
-})`
-	display: flex;
-	flex-direction: column;
-	gap: 0;
-	border: 1px solid var(--color-ledger-line);
-	border-radius: var(--shape-2xs);
-	overflow: hidden;
-	background: var(--color-paper-aged);
-`
-
-const gridTemplate = css`
-	display: grid;
-	grid-template-columns:
-		2.5rem
-		minmax(0, 1.6fr)
-		minmax(0, 1fr)
-		3rem
-		6rem
-		2rem
-		minmax(0, 1fr);
-	align-items: center;
-	gap: var(--space-sm);
-	padding: var(--space-sm) var(--space-md);
-
-	@media (max-width: 767px) {
-		grid-template-columns: 1fr;
-		gap: var(--space-2xs);
-	}
-`
-
-const ThreadsHead = styled.div.withConfig({
-	displayName: 'EmailsIndexTableHead',
-})`
-	${gridTemplate}
-	background: linear-gradient(
-		145deg,
-		var(--color-metal-light) 0%,
-		var(--color-metal) 55%,
-		var(--color-metal-dark) 100%
-	);
-	color: var(--color-on-surface);
-	font-family: var(--font-display);
-	font-size: var(--typescale-label-small-size);
-	letter-spacing: 0.08em;
-	text-transform: uppercase;
-	text-shadow: var(--text-shadow-emboss);
-	position: sticky;
-	top: 0;
-	z-index: 2;
-	border-bottom: 1px solid rgba(0, 0, 0, 0.25);
-
-	@media (max-width: 767px) {
-		display: none;
-	}
-`
-
-const HeadCell = styled.div.withConfig({ displayName: 'EmailsIndexHeadCell' })``
-const HeadCellCheckbox = styled.div.withConfig({
-	displayName: 'EmailsIndexHeadCellCheckbox',
-})`
-	display: flex;
-	align-items: center;
-	justify-content: center;
-`
-const HeadCellCount = styled.div.withConfig({
-	displayName: 'EmailsIndexHeadCellCount',
-})`
-	text-align: right;
-`
-const HeadCellDir = styled.div.withConfig({
-	displayName: 'EmailsIndexHeadCellDir',
-})`
-	text-align: center;
-`
-
-const ThreadRowEl = styled.div.withConfig({
-	displayName: 'EmailsIndexTableRow',
-	shouldForwardProp: prop =>
-		prop !== '$unread' && prop !== '$muted' && prop !== '$selected',
-})<{
-	$unread: boolean
-	$muted: boolean
-	$selected: boolean
-}>`
-	${gridTemplate}
-	${agedPaperRow}
-	border-bottom: 1px solid var(--color-ledger-line);
-	opacity: ${p => (p.$muted ? 0.7 : 1)};
-
-	${p =>
-		p.$selected &&
-		css`
-			background-color: color-mix(
-				in oklab,
-				var(--color-primary) 12%,
-				transparent
-			);
-		`}
-
-	&:last-child {
-		border-bottom: none;
-	}
-
-	&:hover {
-		background-color: color-mix(
-			in oklab,
-			var(--color-primary) 4%,
-			var(--color-paper-aged)
-		);
-	}
-
-	@media (max-width: 767px) {
-		padding: var(--space-sm);
-		grid-template-areas:
-			'check subject'
-			'check meta'
-			'. actions';
-		grid-template-columns: 2.5rem 1fr;
-		row-gap: var(--space-2xs);
-	}
-`
-
-const CellCheckbox = styled.div.withConfig({
-	displayName: 'EmailsIndexCellCheckbox',
-})`
-	display: flex;
-	align-items: center;
-	justify-content: center;
-
-	@media (max-width: 767px) {
-		grid-area: check;
-	}
-`
-
-const CellSubject = styled.div.withConfig({
-	displayName: 'EmailsIndexCellSubject',
-})`
-	display: flex;
-	align-items: center;
-	gap: var(--space-2xs);
-	min-width: 0;
-
-	@media (max-width: 767px) {
-		grid-area: subject;
-	}
-`
-
-const CellCompany = styled.div.withConfig({
-	displayName: 'EmailsIndexCellCompany',
-})`
-	min-width: 0;
-
-	@media (max-width: 767px) {
-		grid-area: meta;
-		font-size: var(--typescale-label-small-size);
-	}
-`
-
-const CellCount = styled.div.withConfig({
-	displayName: 'EmailsIndexCellCount',
-})`
-	text-align: right;
-	font-family: var(--font-display);
-	font-weight: var(--font-weight-bold);
-	color: var(--color-on-surface-variant);
-
-	@media (max-width: 767px) {
-		display: none;
-	}
-`
-
-const CellStatus = styled.div.withConfig({
-	displayName: 'EmailsIndexCellStatus',
-})`
-	@media (max-width: 767px) {
-		grid-area: meta;
-		justify-self: start;
-	}
-`
-
-const CellDir = styled.div.withConfig({ displayName: 'EmailsIndexCellDir' })`
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	color: var(--color-on-surface-variant);
-
-	@media (max-width: 767px) {
-		display: none;
-	}
-`
-
-const CellDate = styled.div.withConfig({ displayName: 'EmailsIndexCellDate' })`
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: var(--space-sm);
-	min-width: 0;
-
-	@media (max-width: 767px) {
-		grid-area: actions;
-		justify-content: flex-end;
-	}
-`
-
-const RowActions = styled.div.withConfig({
-	displayName: 'EmailsIndexRowActions',
-})`
-	display: flex;
-	gap: var(--space-2xs);
-	opacity: 0;
-	transition: opacity 160ms ease;
-
-	${ThreadRowEl}:hover &,
-	${ThreadRowEl}:focus-within & {
-		opacity: 1;
-	}
-
-	@media (max-width: 767px) {
-		opacity: 1;
-	}
-`
-
 const IconAction = styled.button.withConfig({
 	displayName: 'EmailsIndexIconAction',
 })`
@@ -1518,58 +1711,6 @@ const IconAction = styled.button.withConfig({
 		outline: none;
 		box-shadow: var(--glow-active);
 	}
-`
-
-const SubjectLinkWrap = styled.div.withConfig({
-	displayName: 'EmailsIndexSubjectLinkWrap',
-	shouldForwardProp: prop => prop !== '$unread',
-})<{ $unread: boolean }>`
-	min-width: 0;
-
-	> a {
-		color: var(--color-on-surface);
-		text-decoration: none;
-		font-family: var(--font-body);
-		font-size: var(--typescale-body-large-size);
-		font-weight: ${p =>
-			p.$unread ? 'var(--font-weight-bold)' : 'var(--font-weight-medium)'};
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		display: block;
-	}
-
-	> a:hover {
-		color: var(--color-primary);
-	}
-`
-
-const CompanyLinkWrap = styled.div.withConfig({
-	displayName: 'EmailsIndexCompanyLinkWrap',
-})`
-	min-width: 0;
-
-	> a {
-		color: var(--color-on-surface);
-		text-decoration: none;
-		font-family: var(--font-body);
-		font-size: var(--typescale-body-medium-size);
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		display: block;
-	}
-
-	> a:hover {
-		color: var(--color-primary);
-		text-decoration: underline;
-	}
-`
-
-const Muted = styled.span.withConfig({ displayName: 'EmailsIndexMuted' })`
-	color: var(--color-on-surface-variant);
-	font-style: italic;
-	opacity: 0.7;
 `
 
 const NoSubject = styled.span.withConfig({
@@ -1607,40 +1748,6 @@ const SuspiciousTag = styled.span.withConfig({
 	font-weight: var(--font-weight-bold);
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
-`
-
-const StatusPill = styled.span.withConfig({
-	displayName: 'EmailsIndexStatusPill',
-	shouldForwardProp: prop => prop !== '$status',
-})<{ $status: ThreadStatus }>`
-	display: inline-flex;
-	align-items: center;
-	padding: 2px var(--space-2xs);
-	border-radius: var(--shape-2xs);
-	font-family: var(--font-display);
-	font-size: var(--typescale-label-small-size);
-	font-weight: var(--font-weight-bold);
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-	${p =>
-		p.$status === 'open'
-			? css`
-					background: color-mix(in oklab, var(--color-primary) 16%, transparent);
-					color: color-mix(in oklab, var(--color-primary) 80%, black);
-					border: 1px solid
-						color-mix(in oklab, var(--color-primary) 45%, transparent);
-				`
-			: p.$status === 'closed'
-				? css`
-						background: color-mix(in oklab, var(--color-outline) 24%, transparent);
-						color: var(--color-on-surface-variant);
-						border: 1px solid var(--color-outline);
-					`
-				: css`
-						background: transparent;
-						color: var(--color-on-surface-variant);
-						border: 1px dashed var(--color-outline);
-					`}
 `
 
 const Pagination = styled.div.withConfig({
@@ -1681,4 +1788,181 @@ const PageIndicator = styled.span.withConfig({
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
 	color: var(--color-on-surface-variant);
+`
+
+// ── ThreadsGrid styles ────────────────────────────────────────────
+
+const GridShell = styled.div.withConfig({ displayName: 'EmailsGridShell' })`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-xs);
+`
+
+const GridToolbar = styled.div.withConfig({
+	displayName: 'EmailsGridToolbar',
+})`
+	display: flex;
+	justify-content: flex-end;
+	gap: var(--space-xs);
+`
+
+const GridScroll = styled.div.withConfig({ displayName: 'EmailsGridScroll' })`
+	position: relative;
+	max-height: calc(100vh - 22rem);
+	overflow-y: auto;
+	border: 1px solid var(--color-outline-variant);
+	border-radius: var(--shape-2xs);
+	background: var(--color-surface);
+`
+
+const WhoStack = styled.div.withConfig({ displayName: 'EmailsWhoStack' })`
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+`
+
+const WhoLine1 = styled.div.withConfig({ displayName: 'EmailsWhoLine1' })`
+	display: flex;
+	align-items: center;
+	gap: var(--space-2xs);
+	color: var(--color-on-surface);
+	overflow: hidden;
+	white-space: nowrap;
+`
+
+const WhoName = styled.span.withConfig({ displayName: 'EmailsWhoName' })`
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+`
+
+const WhoLine2 = styled.div.withConfig({ displayName: 'EmailsWhoLine2' })`
+	font-size: var(--typescale-label-medium-size);
+	color: var(--color-on-surface-variant);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+`
+
+const WhatStack = styled.div.withConfig({ displayName: 'EmailsWhatStack' })`
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+`
+
+const WhatLine1 = styled.div.withConfig({
+	displayName: 'EmailsWhatLine1',
+	shouldForwardProp: prop => !prop.startsWith('$'),
+})<{ $unread: boolean }>`
+	display: flex;
+	align-items: center;
+	gap: var(--space-2xs);
+	color: var(--color-on-surface);
+	overflow: hidden;
+	font-weight: ${p =>
+		p.$unread ? 'var(--font-weight-bold)' : 'var(--font-weight-regular)'};
+`
+
+const WhatSubject = styled.span.withConfig({
+	displayName: 'EmailsWhatSubject',
+})`
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	min-width: 0;
+`
+
+const WhatLine2 = styled.div.withConfig({ displayName: 'EmailsWhatLine2' })`
+	font-size: var(--typescale-label-medium-size);
+	color: var(--color-on-surface-variant);
+`
+
+const RowActionsRow = styled.div.withConfig({
+	displayName: 'EmailsRowActionsRow',
+})`
+	display: flex;
+	gap: var(--space-2xs);
+	justify-content: flex-end;
+`
+
+const MenuList = styled.div.withConfig({ displayName: 'EmailsMenuList' })`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2xs);
+	min-width: 12rem;
+`
+
+const MenuRow = styled.label.withConfig({ displayName: 'EmailsMenuRow' })`
+	display: flex;
+	align-items: center;
+	gap: var(--space-2xs);
+	padding: var(--space-2xs);
+	cursor: pointer;
+
+	&:hover {
+		background: color-mix(in oklab, var(--color-primary) 8%, transparent);
+	}
+`
+
+const MenuLabel = styled.span.withConfig({ displayName: 'EmailsMenuLabel' })`
+	font-family: var(--font-body);
+	color: var(--color-on-surface);
+`
+
+const MenuDivider = styled.hr.withConfig({ displayName: 'EmailsMenuDivider' })`
+	border: none;
+	border-top: 1px solid var(--color-outline-variant);
+	margin: var(--space-2xs) 0;
+`
+
+// ── DraftsResumeStrip styles ──────────────────────────────────────
+
+const StripPlate = styled.div.withConfig({ displayName: 'EmailsStripPlate' })`
+	${brushedMetalPlate}
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-sm);
+	padding: var(--space-sm) var(--space-md);
+	border-radius: var(--shape-2xs);
+`
+
+const StripLabel = styled.span.withConfig({
+	displayName: 'EmailsStripLabel',
+})`
+	font-family: var(--font-display);
+	font-size: var(--typescale-label-medium-size);
+	font-weight: var(--font-weight-bold);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--color-on-surface);
+	text-shadow: var(--text-shadow-emboss);
+`
+
+const ChipRow = styled.div.withConfig({ displayName: 'EmailsChipRow' })`
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-2xs);
+	flex: 1 1 auto;
+`
+
+const DraftChip = styled.button.withConfig({ displayName: 'EmailsDraftChip' })`
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2xs);
+	padding: var(--space-2xs) var(--space-sm);
+	background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+	color: var(--color-on-surface);
+	border: 1px dashed var(--color-primary);
+	border-radius: var(--shape-2xs);
+	font-family: var(--font-body);
+	font-size: var(--typescale-label-medium-size);
+	cursor: pointer;
+	transition: background 160ms ease;
+
+	&:hover {
+		background: color-mix(in oklab, var(--color-primary) 20%, transparent);
+	}
 `
