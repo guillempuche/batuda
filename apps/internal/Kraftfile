@@ -1,5 +1,5 @@
 spec: v0.6
-name: engranatge-internal
+name: batuda-internal
 runtime: node:latest
 labels:
   cloud.unikraft.v1.instances/scale_to_zero.policy: "on"

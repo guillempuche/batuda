@@ -23,7 +23,7 @@ RUN --mount=type=cache,target=/root/.pnpm-store \
     CI=true pnpm install --frozen-lockfile
 
 RUN DO_NOT_TRACK=1 TURBO_TELEMETRY_DISABLED=1 \
-    pnpm turbo run build --filter=@engranatge/internal
+    pnpm turbo run build --filter=@batuda/internal
 
 # Stage 2 — runtime (production-only, no devDependencies or source)
 FROM node:24-alpine
@@ -31,7 +31,7 @@ FROM node:24-alpine
 ENV NODE_OPTIONS=--no-network-family-autoselection
 ENV NODE_ENV=production
 ENV PORT=3000
-ENV SERVER_URL=https://api.engranatge.com
+ENV SERVER_URL=https://api.batuda.co
 
 # Run as non-root for security
 RUN addgroup -g 1001 -S app && adduser -u 1001 -S app -G app

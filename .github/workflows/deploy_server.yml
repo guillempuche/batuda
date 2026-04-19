@@ -68,12 +68,12 @@ jobs:
         env:
           KRAFTCLOUD_TOKEN: ${{ secrets.KRAFTCLOUD_TOKEN }}
         run: |
-          if kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} service get engranatge-server >/dev/null 2>&1; then
+          if kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} service get batuda-server >/dev/null 2>&1; then
             echo "exists=true" >> $GITHUB_OUTPUT
-            echo "Service engranatge-server already exists — will perform rolling update"
+            echo "Service batuda-server already exists — will perform rolling update"
           else
             echo "exists=false" >> $GITHUB_OUTPUT
-            echo "Service engranatge-server does not exist — will create it"
+            echo "Service batuda-server does not exist — will create it"
           fi
 
       - name: Deploy to KraftCloud
@@ -100,7 +100,7 @@ jobs:
             if [ "${{ steps.service-check.outputs.exists }}" = "true" ]; then
               kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
                 --timeout 5m \
-                --service engranatge-server \
+                --service batuda-server \
                 --rollout remove_sequential \
                 --rollout-wait 30s \
                 -M 1024 \
@@ -135,8 +135,8 @@ jobs:
             else
               kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
                 --timeout 5m \
-                --name engranatge-server \
-                -d api.engranatge.com \
+                --name batuda-server \
+                -d api.batuda.co \
                 -p 443:3000 \
                 -M 1024 \
                 -e NODE_ENV=production \
@@ -174,5 +174,5 @@ jobs:
           KRAFTCLOUD_TOKEN: ${{ secrets.KRAFTCLOUD_TOKEN }}
         run: |
           sleep 5
-          kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} instance list | grep engranatge-server || true
-          curl --retry 5 --retry-delay 5 --retry-all-errors -sf https://api.engranatge.com/health && echo "Health check passed" || echo "::warning::Health check failed"
+          kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} instance list | grep batuda-server || true
+          curl --retry 5 --retry-delay 5 --retry-all-errors -sf https://api.batuda.co/health && echo "Health check passed" || echo "::warning::Health check failed"

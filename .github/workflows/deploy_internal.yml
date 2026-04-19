@@ -67,12 +67,12 @@ jobs:
         env:
           KRAFTCLOUD_TOKEN: ${{ secrets.KRAFTCLOUD_TOKEN }}
         run: |
-          if kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} service get engranatge-internal >/dev/null 2>&1; then
+          if kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} service get batuda-internal >/dev/null 2>&1; then
             echo "exists=true" >> $GITHUB_OUTPUT
-            echo "Service engranatge-internal already exists — will perform rolling update"
+            echo "Service batuda-internal already exists — will perform rolling update"
           else
             echo "exists=false" >> $GITHUB_OUTPUT
-            echo "Service engranatge-internal does not exist — will create it"
+            echo "Service batuda-internal does not exist — will create it"
           fi
 
       - name: Deploy to KraftCloud
@@ -93,7 +93,7 @@ jobs:
             if [ "${{ steps.service-check.outputs.exists }}" = "true" ]; then
               kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
                 --timeout 5m \
-                --service engranatge-internal \
+                --service batuda-internal \
                 --rollout remove_sequential \
                 --rollout-wait 30s \
                 -M 1024 \
@@ -101,8 +101,8 @@ jobs:
             else
               kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
                 --timeout 5m \
-                --name engranatge-internal \
-                -d forja.engranatge.com \
+                --name batuda-internal \
+                -d batuda.co \
                 -p 443:3000 \
                 -M 1024 \
                 .
@@ -113,5 +113,5 @@ jobs:
           KRAFTCLOUD_TOKEN: ${{ secrets.KRAFTCLOUD_TOKEN }}
         run: |
           sleep 5
-          kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} service get engranatge-internal || true
-          curl -sSf https://forja.engranatge.com -o /dev/null && echo "Site is accessible" || echo "::warning::Site not accessible"
+          kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} service get batuda-internal || true
+          curl -sSf https://batuda.co -o /dev/null && echo "Site is accessible" || echo "::warning::Site not accessible"
