@@ -37,7 +37,7 @@ pnpm install
 
 Workspace layout:
 
-- `apps/*` — `server`, `internal` (Forja CRM), `marketing`, `cli`
+- `apps/*` — `server`, `internal` (Forja CRM), `cli`
 - `packages/*` — `domain`, `controllers`, `auth`, `ui`, etc.
 
 ## 2. Configure environment files
@@ -112,7 +112,7 @@ Verifies the database is reachable, env vars are set, and Docker services are up
 
 ## 8. Start the dev servers
 
-Open three terminals at the repo root:
+Open two terminals at the repo root:
 
 ```bash
 # terminal 1 — API + MCP + Better Auth
@@ -120,9 +120,6 @@ pnpm dev:server
 
 # terminal 2 — Forja CRM (the internal app)
 pnpm dev:internal
-
-# terminal 3 — public marketing site
-pnpm dev:marketing
 ```
 
 Dev URLs use portless `*.localhost` hostnames (no `/etc/hosts` edit needed on modern macOS/Linux):
@@ -130,7 +127,8 @@ Dev URLs use portless `*.localhost` hostnames (no `/etc/hosts` edit needed on mo
 - API: [https://api.engranatge.localhost](https://api.engranatge.localhost)
 - API docs (Scalar): [https://api.engranatge.localhost/docs](https://api.engranatge.localhost/docs)
 - Forja: [https://forja.engranatge.localhost](https://forja.engranatge.localhost)
-- Marketing: [https://engranatge.localhost](https://engranatge.localhost)
+
+The public marketing site lives in a separate repo (`engranatge-marketing`). Run its own `pnpm dev` if you need the full loop against a local CRM.
 
 Log in at `/sign-in` with the admin credentials you set in Step 5.
 
@@ -155,7 +153,7 @@ The interactive TUI (`pnpm cli:tui`) shows a coloured `LOCAL` / `CLOUD` badge in
 
 **Port 5433 already in use.** Another Postgres is bound to the default port. Either stop the other instance or change `POSTGRES_PORT` in `.env` and re-run `pnpm cli services up`.
 
-**TLS cert errors on `*.engranatge.localhost`.** Dev servers use self-signed certs. Accept the cert once per hostname in your browser (API + Forja + marketing = three prompts).
+**TLS cert errors on `*.engranatge.localhost`.** Dev servers use self-signed certs. Accept the cert once per hostname in your browser (API + Forja = two prompts).
 
 **`pnpm cli auth bootstrap` says `UsersAlreadyExist`.** Someone already bootstrapped. If you don't know the credentials, run `pnpm cli auth reset-password --email <their-email>` to overwrite the password instead.
 

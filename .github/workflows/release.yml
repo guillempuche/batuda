@@ -10,7 +10,7 @@ on:
         options:
           - server
           - internal
-          - marketing
+          - ui
           - all
       dry_run:
         description: "Dry run (preview without creating release)"
@@ -62,8 +62,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Release Marketing
-        if: inputs.app == 'marketing' || inputs.app == 'all'
-        run: pnpm release:marketing --ci ${{ inputs.dry_run && '--dry-run' || '' }}
+      - name: Release UI
+        if: inputs.app == 'ui' || inputs.app == 'all'
+        run: pnpm release:ui --ci ${{ inputs.dry_run && '--dry-run' || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

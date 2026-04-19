@@ -54,14 +54,10 @@
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│  apps/marketing  (Engranatge — engranatge.com)                   │
-│  TanStack Start — Unikraft, Node.js SSR                          │
-│                                                                  │
-│  /  (homepage)  /:lang/:slug  (prospect pages)                  │
-│                                                                  │
-│  Calls apps/server HTTP API for page content                    │
-│  SEO: hreflang, og tags, SSR                                    │
-│  Languages: ca | es | en                                        │
+│  Public marketing site (separate `engranatge-marketing` repo)    │
+│  TanStack Start — deployed independently                         │
+│  Fetches page content from apps/server at GET /pages/{slug}     │
+│  CORS-allowed origin only — no other runtime coupling            │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
@@ -147,12 +143,12 @@ Shared HttpApi spec (route groups, tagged HTTP errors, middleware tag). Consumed
 
 ### `packages/ui`
 
-Shared between internal and marketing apps. Contains:
+Shared design system for Forja and for the separate public marketing site (consumed as a published npm package there). Contains:
 
 - CSS design tokens (`tokens.css`) — MD3 typography, color, spacing, shape, elevation
 - Tiptap custom block extensions (hero, cta, valueProps, painPoints, socialProof)
 
-Both apps import tokens via `@import '@engranatge/ui/tokens.css'` and use the shared block extensions for content consistency.
+Consumers import tokens via `@import '@engranatge/ui/tokens.css'` and use the shared block extensions for content consistency.
 
 ### `apps/cli`
 
@@ -185,23 +181,12 @@ TanStack Start SSR app deployed to Unikraft (Node.js). Responsibilities:
 
 - Pipeline and company management UI
 - styled-components for co-located CSS with MD3 design tokens
-- Rich text editing via Tiptap (documents, proposals)
+- Rich text editing via Tiptap (public prospect pages; planned for research docs)
+- Email composition via React Email v6 (`@react-email/editor`) — wraps Tiptap internally but the Forja email module never imports `@tiptap/*` directly; see `packages/email` and `docs/backend.md` § Email service
 - Interactive map view via react-map-gl + MapLibre (company clustering)
 - Page management (create, edit, publish prospect pages)
 - Mobile-first, no backend logic
 - Calls `apps/server` HTTP API for all data
-
-### `apps/marketing`
-
-Engranatge — public marketing site at `engranatge.com`.
-TanStack Start SSR app deployed to Unikraft (Node.js). Responsibilities:
-
-- Marketing homepage for Engranatge brand
-- Public prospect pages at `/:lang/:slug` (ca/es/en)
-- Renders Tiptap JSON block content from `pages` table
-- SSR for SEO: hreflang, og tags, canonical URLs
-- View tracking (fire-and-forget POST on page load)
-- No backend logic — calls `apps/server` HTTP API
 
 ---
 
@@ -217,7 +202,6 @@ Engranatge has three bounded contexts. Each owns its own domain errors and types
 │    packages/controllers ──┐                                      │
 │                           ├──► apps/server (services, routes)    │
 │                           └──► apps/internal (typed API client)  │
-│                                apps/marketing (typed API client) │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
@@ -334,9 +318,9 @@ Agent researches company (get_company, Firecrawl/Exa)
 
 ```
 Browser requests engranatge.com/ca/{slug}
-  → apps/marketing SSR calls GET api.engranatge.com/pages/{slug}?lang=ca
+  → Public site (engranatge-marketing repo) SSR calls GET api.engranatge.com/pages/{slug}?lang=ca
   → Server returns published page content (Tiptap JSON + meta)
-  → apps/marketing renders blocks to HTML, emits SEO tags
+  → Public site renders blocks to HTML, emits SEO tags
   → Client-side fires POST /pages/{slug}/view (fire-and-forget)
   → Server increments view_count
 ```
@@ -408,15 +392,11 @@ kraft build                     # builds unikernel image
 kraft deploy                    # deploys to Unikraft Cloud → forja.engranatge.com
 ```
 
-### Marketing (Unikraft)
+### Public marketing site
 
-```bash
-pnpm --filter marketing build  # produces .output/server/index.mjs
-kraft build                     # builds unikernel image
-kraft deploy                    # deploys to Unikraft Cloud → engranatge.com
-```
+Deployed from the separate `engranatge-marketing` repo to KraftCloud (service `engranatge-marketing` → `engranatge.com`). No coupling to this repo except the server's CORS allow-list (`ALLOWED_ORIGINS` must include `https://engranatge.com`).
 
-All three apps run on Unikraft — stateless Node.js SSR. Scales to zero when idle.
+Both Forja apps run on Unikraft — stateless Node.js SSR. Scales to zero when idle.
 
 ### Database (NeonDB)
 

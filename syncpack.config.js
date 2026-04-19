@@ -11,7 +11,7 @@ export default {
 			packages: [
 				'@engranatge/server',
 				'@engranatge/internal',
-				'@engranatge/marketing',
+				'@engranatge/ui',
 			],
 			dependencyTypes: ['local'],
 			isIgnored: true,

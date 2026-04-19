@@ -3,7 +3,7 @@
 TanStack Start SSR app for the internal Forja sales tool. Deployed to Unikraft (Node.js). Mobile-first.
 For system context see [architecture.md](architecture.md).
 
-Deployed at `forja.engranatge.com`. For the public marketing site, see [marketing.md](marketing.md).
+Deployed at `forja.engranatge.com`. The public marketing site lives in a separate repo (`engranatge-marketing`).
 
 ---
 
@@ -49,7 +49,7 @@ Deployed to Unikraft (Node.js SSR) via `Dockerfile` + `Kraftfile`. Build output 
 
 ## Token system
 
-**Note:** Tokens are defined in `packages/ui/src/tokens.css` and imported by both `apps/internal` and `apps/marketing`. The values below document the full token set.
+**Note:** Tokens are defined in `packages/ui/src/tokens.css` and imported by `apps/internal` via the workspace link; the separate marketing repo consumes the same tokens via the published `@engranatge/ui` npm package. The values below document the full token set.
 
 All spacing, typography, and color values come from CSS custom properties defined in
 `packages/ui/src/tokens.css`. Tailwind's `@theme` bridges these tokens to utility classes. Never hardcode values — use Tailwind utilities or `var(--token)` in styled-components.
@@ -474,7 +474,7 @@ import { AnimateNumber, Typewriter, Carousel, Ticker, ScrambleText } from 'motio
   {pipelineCount}
 </AnimateNumber>
 
-// Typewriter for marketing hero
+// Typewriter for animated headlines
 <Typewriter speed="normal" play>
   Organitza el teu pipeline comercial
 </Typewriter>

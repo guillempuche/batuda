@@ -1,6 +1,6 @@
 {
 	"name": "@engranatge/ui",
-	"version": "0.0.1",
+	"version": "2026.4.19",
 	"type": "module",
 	"types": "./src/index.ts",
 	"main": "./src/index.ts",
@@ -42,5 +42,29 @@
 		"tsdown": "^0.21.7",
 		"typescript": "^5.9.3"
 	},
-	"private": true
+	"private": false,
+	"files": [
+		"dist"
+	],
+	"publishConfig": {
+		"access": "public",
+		"main": "./dist/index.mjs",
+		"types": "./dist/index.d.mts",
+		"exports": {
+			".": {
+				"types": "./dist/index.d.mts",
+				"import": "./dist/index.mjs"
+			},
+			"./blocks": {
+				"types": "./dist/blocks/index.d.mts",
+				"import": "./dist/blocks/index.mjs"
+			},
+			"./pri": {
+				"types": "./dist/pri/index.d.mts",
+				"import": "./dist/pri/index.mjs"
+			},
+			"./tokens.css": "./dist/tokens.css",
+			"./tailwind.css": "./dist/tailwind.css"
+		}
+	}
 }

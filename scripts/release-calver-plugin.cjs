@@ -25,16 +25,17 @@ class CalVerPlugin extends Plugin {
 		const todayPrefix = `${year}.${month}.${day}`
 
 		if (latestVersion) {
-			const parts = latestVersion.split('.')
-			if (parts.length === 4) {
-				const tagDate = `${parts[0]}.${parts[1]}.${parts[2]}`
-				if (tagDate === todayPrefix) {
-					return `${todayPrefix}.${parseInt(parts[3], 10) + 1}`
-				}
+			// Accept "YYYY.M.D" or "YYYY.M.D-N". Same-day bumps use the -N
+			// prerelease suffix so the base remains valid 3-segment SemVer,
+			// which is what pnpm's workspace resolver requires.
+			const match = latestVersion.match(/^(\d+\.\d+\.\d+)(?:-(\d+))?$/)
+			if (match && match[1] === todayPrefix) {
+				const n = match[2] === undefined ? 1 : parseInt(match[2], 10) + 1
+				return `${todayPrefix}-${n}`
 			}
 		}
 
-		return `${todayPrefix}.0`
+		return todayPrefix
 	}
 }
 

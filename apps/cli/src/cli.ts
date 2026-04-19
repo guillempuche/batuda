@@ -53,9 +53,6 @@ const seedCommand = Command.make(
 				yield* Console.log(
 					'  Forja web:    pnpm dev:internal → https://forja.engranatge.localhost',
 				)
-				yield* Console.log(
-					'  Marketing:    pnpm dev:marketing → https://engranatge.localhost',
-				)
 				yield* Console.log('')
 				yield* Console.log(
 					'  API docs (Scalar): https://api.engranatge.localhost/docs',

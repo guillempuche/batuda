@@ -19,7 +19,7 @@ Never install Node or pnpm globally or via other package managers for this proje
 
 Use **`agent-browser`** (already installed) to test and debug the local web app.
 
-Dev URLs (via portless): **Forja (internal CRM) `https://forja.engranatge.localhost`**, Marketing `https://engranatge.localhost`, API server `https://api.engranatge.localhost`. Most debugging is against Forja.
+Dev URLs (via portless): **Forja (internal CRM) `https://forja.engranatge.localhost`** and API server `https://api.engranatge.localhost`. Most debugging is against Forja.
 
 ### Dev login
 
@@ -254,4 +254,4 @@ RESEARCH_API_KEY_SEARCH_2=fc_...           # slot 1 key
 | ---------- | --------------------------------------------------------------------------------- |
 | `/crm`     | CRM data operations — MCP tools, companies, interactions, documents, tasks, pages |
 | `/commits` | Git commit messages following project conventions                                 |
-| `/debug`   | Diagnose server, internal, and marketing apps — health checks, logs, Docker, auth |
+| `/debug`   | Diagnose server and internal apps — health checks, logs, Docker, auth             |

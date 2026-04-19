@@ -1,9 +1,0 @@
-spec: v0.6
-name: engranatge-marketing
-runtime: node:latest
-labels:
-  # Public site — always running. Cold starts (200ms+) and 504s on wake
-  # are unacceptable for first-time visitors from search/social.
-  cloud.unikraft.v1.instances/scale_to_zero.policy: "off"
-rootfs: ./Dockerfile
-cmd: ["/usr/bin/node", "/app/.output/server/index.mjs"]

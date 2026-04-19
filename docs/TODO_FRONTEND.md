@@ -1,25 +1,20 @@
 # TODO — Frontend
 
-Ordered implementation checklist for `apps/internal` (Forja) and `apps/marketing` (Engranatge).
-See [frontend.md](frontend.md) for internal app patterns. See [marketing.md](marketing.md) for public site.
-See [architecture.md](architecture.md) for data flow.
+Ordered implementation checklist for `apps/internal` (Forja). The public marketing site is handled by the separate `engranatge-marketing` repo.
+
+See [frontend.md](frontend.md) for internal app patterns. See [architecture.md](architecture.md) for data flow.
 
 ## Design system direction
 
-Two apps, one system.
+Forja (internal CRM) — *the workbench*. Data-dense, keyboard-first, compact rows, command palette. Desktop-first productivity idiom (closer to Linear/Attio/Height than to stock MD3).
 
-- **Marketing (Engranatge)** — *the workshop*. Theatrical workshop metaphor (machine buttons, blueprints, pegboards, brushed metal). Storytelling for prospects. Bespoke scene components stay inside `apps/marketing/`.
-- **Forja (internal CRM)** — *the workbench*. Data-dense, keyboard-first, compact rows, command palette. No theater. Desktop-first productivity idiom (closer to Linear/Attio/Height than to stock MD3).
-
-**Shared layer (`packages/ui`)**:
+**Shared layer (`packages/ui`)** — consumed by Forja locally via workspace link, and published to npm for the separate marketing site:
 
 - Tokens (`tokens.css`) — colors, typography, spacing, shape, elevation, motion.
-- **`Pri*` primitives** — `PriButton`, `PriInput`, `PriSelect`, `PriDialog`, `PriMenu`, `PriTooltip`, `PriTabs`, `PriCheckbox`, `PriRadio`, `PriSwitch`, `PriToast`, `PriCombobox`, `PriPopover`. Headless Base UI wrapped with styled-components. The `Pri` prefix (short for "Primitive") marks them as shared, low-level building blocks — both marketing forms and Forja forms use the same `<PriInput>`.
-- Tiptap block schemas (`blocks/`).
+- **`Pri*` primitives** — `PriButton`, `PriInput`, `PriSelect`, `PriDialog`, `PriMenu`, `PriTooltip`, `PriTabs`, `PriCheckbox`, `PriRadio`, `PriSwitch`, `PriToast`, `PriCombobox`, `PriPopover`. Headless Base UI wrapped with styled-components. The `Pri` prefix (short for "Primitive") marks them as shared, low-level building blocks.
+- Tiptap block schemas (`blocks/`) — used by Forja prospect-page editing; rendered by the marketing site.
 
-**Not shared**: workshop-specific aesthetic tokens (`--texture-brushed-metal`, `--elevation-workshop-*`) and scene components (`MachineButton`, `BlueprintSheet`, `ConveyorBelt`) stay in `apps/marketing/`. Forja gets its own CRM patterns (`DataTable`, `CommandPalette`, `Sidebar`, `KanbanBoard`, `Timeline`).
-
-**MD3 stance**: we keep MD3's *structural* concepts that marketing already uses — color roles, typescale, shape, spacing — but reject MD3's stock components (mobile-first, too airy for a data-dense CRM). Marketing diverges via bespoke scene components; Forja diverges via a desktop-dense, keyboard-first idiom. We do **not** import MD3 concepts the codebase isn't already using (state layers, density scales) — if Forja needs them later, we add them with evidence, not speculation.
+**MD3 stance**: we keep MD3's *structural* concepts — color roles, typescale, shape, spacing — but reject MD3's stock components (mobile-first, too airy for a data-dense CRM). Forja diverges via a desktop-dense, keyboard-first idiom. We do **not** import MD3 concepts the codebase isn't already using (state layers, density scales) — if Forja needs them later, we add them with evidence, not speculation.
 
 ---
 
@@ -57,7 +52,7 @@ Two apps, one system.
 
 - [ ] Create `packages/ui/package.json` — `@engranatge/ui`, deps: `@tiptap/core`, `@tiptap/pm`, `@base-ui/react`, `styled-components`, peerDeps: `tailwindcss`, `react`, `react-dom`
 - [ ] Create `packages/ui/tsconfig.json` extending `../../tsconfig.base.json`
-- [ ] Create `packages/ui/src/tokens.css` — MD3 CSS custom properties (shared by both apps)
+- [ ] Create `packages/ui/src/tokens.css` — MD3 CSS custom properties
 - [ ] Create `packages/ui/src/tailwind.css` — `@import "tailwindcss"` + `@import "./tokens.css"` + `@theme` with breakpoints only (see frontend.md)
 - [ ] Create Tiptap block extensions in `packages/ui/src/blocks/`:
   - [ ] `hero.ts` — heading, subheading, CTA
@@ -85,7 +80,6 @@ Two apps, one system.
   - [ ] Elevation tokens (0–3)
   - [ ] Breakpoint tokens (--bp-sm, --bp-md, --bp-lg, --bp-xl)
   - [ ] Page layout tokens (--page-gutter, --page-max-width, --card-radius)
-- [ ] Keep marketing-only aesthetic tokens **out** of shared `tokens.css` — `--texture-brushed-metal`, `--elevation-workshop-*` live in `apps/marketing/src/styles.css`
 - [ ] Create `src/styles/global.css`
   - [ ] Import tokens.css
   - [ ] CSS reset (box-sizing, margin 0, font-family)
@@ -131,7 +125,7 @@ Each component: styled-components co-located in `.tsx`, all values from CSS cust
 
 ## Phase 5 — Pri* primitives (Base UI + styled-components, shared in packages/ui)
 
-Primitives live in `packages/ui/src/pri/` and are consumed by **both** Forja and Marketing via the `@engranatge/ui/pri` subpath export. The `Pri` prefix (short for "Primitive") marks them as shared, low-level building blocks — one canonical `<PriInput>` for the whole monorepo.
+Primitives live in `packages/ui/src/pri/` and are consumed by Forja via the `@engranatge/ui/pri` subpath export (and by the external marketing site via the published npm package). The `Pri` prefix (short for "Primitive") marks them as shared, low-level building blocks — one canonical `<PriInput>` for every consumer.
 
 Naming: always `Pri` + PascalCase component name (`PriButton`, not `PrimitiveButton` or `UiButton`). Filenames: kebab-case (`pri-button.tsx`). Compound primitives mirror Base UI's namespace exactly (e.g. `PriSelect.Root`, `PriSelect.Trigger`, `PriSelect.Popup`).
 
@@ -141,37 +135,37 @@ Each primitive:
 - All values from CSS custom property tokens (no hex, no hardcoded px)
 - Variants via `$`-prefixed transient props (`$variant`, `$size`)
 - No business logic, no data fetching, no i18n — pure visual primitive
-- **Neutral defaults only**: structural tokens (shape, focus ring, spacing, typescale, transitions). No theme-specific gradients, textures, or accent colors. Consumers compose styled overrides on top to apply their own visual language (e.g. marketing's metal-skin wrappers).
+- **Neutral defaults only**: structural tokens (shape, focus ring, spacing, typescale, transitions). No theme-specific gradients, textures, or accent colors. Consumers compose styled overrides on top to apply their own visual language.
 
 ### Lazy-extraction rule
 
-A primitive is created **only** when at least one real consumer exists in `apps/marketing` or `apps/internal`. No speculative primitives — if Forja later needs a primitive that doesn't exist yet, we extract it then with a real consumer driving the API.
+A primitive is created **only** when at least one real consumer exists. No speculative primitives — if Forja later needs a primitive that doesn't exist yet, we extract it then with a real consumer driving the API.
 
 This avoids the trap of building 14 primitives up-front, half of which would never be used or would need rework once a real consumer appears.
 
 ### Status
 
-| Primitive        | Status    | First consumer                                             |
-| ---------------- | --------- | ---------------------------------------------------------- |
-| `PriSelect`      | extracted | `apps/marketing/src/components/layout/language-select.tsx` |
-| `PriButton`      | stub      | Forja `FormField`, marketing CTAs (if refactored)          |
-| `PriInput`       | stub      | Forja forms                                                |
-| `PriDialog`      | stub      | Forja quick-edit modals                                    |
-| `PriMenu`        | stub      | Forja row action menus                                     |
-| `PriTooltip`     | stub      | Forja keyboard-shortcut hints                              |
-| `PriPopover`     | stub      | Forja filter popovers                                      |
-| `PriTabs`        | stub      | Forja company detail tabs                                  |
-| `PriCheckbox`    | stub      | Forja task completion                                      |
-| `PriCombobox`    | stub      | Forja contact autocomplete                                 |
-| `PriRadio`       | stub      | Forja form options                                         |
-| `PriSwitch`      | stub      | Forja settings toggles                                     |
-| `PriToast`       | stub      | Forja success/error notifications                          |
-| `PriAlertDialog` | stub      | Forja destructive confirmations                            |
+| Primitive        | Status    | First consumer                                   |
+| ---------------- | --------- | ------------------------------------------------ |
+| `PriSelect`      | extracted | Marketing site language selector (external repo) |
+| `PriButton`      | stub      | Forja `FormField`                                |
+| `PriInput`       | stub      | Forja forms                                      |
+| `PriDialog`      | stub      | Forja quick-edit modals                          |
+| `PriMenu`        | stub      | Forja row action menus                           |
+| `PriTooltip`     | stub      | Forja keyboard-shortcut hints                    |
+| `PriPopover`     | stub      | Forja filter popovers                            |
+| `PriTabs`        | stub      | Forja company detail tabs                        |
+| `PriCheckbox`    | stub      | Forja task completion                            |
+| `PriCombobox`    | stub      | Forja contact autocomplete                       |
+| `PriRadio`       | stub      | Forja form options                               |
+| `PriSwitch`      | stub      | Forja settings toggles                           |
+| `PriToast`       | stub      | Forja success/error notifications                |
+| `PriAlertDialog` | stub      | Forja destructive confirmations                  |
 
 ### Consumption
 
-- Marketing's theatrical components (`MachineButton`, `BlueprintSheet`, `ConveyorBelt`) stay bespoke — they're not primitives, they're scene components
-- Forja imports everything from `@engranatge/ui/pri` — no local primitives
+- Forja imports everything from `@engranatge/ui/pri` via the workspace link — no local primitives.
+- The marketing repo consumes the same primitives via the published `@engranatge/ui` npm package.
 
 ## Phase 5c — State management (effect-atom + SSR)
 
@@ -402,433 +396,3 @@ DESKTOP:
 - [ ] Point `forja.engranatge.com` to deployed instance
 - [ ] Set `SERVER_URL` env var to `https://api.engranatge.com`
 - [ ] Verify production deploy works end-to-end
-
----
-
-# apps/marketing (Engranatge)
-
-See [marketing.md](marketing.md) for architecture, [brand-proposal.md](brand-proposal.md) for visual identity.
-
-Workshop metaphor: the site IS a mechanical workshop. Each page is a room, the blog is a logbook, case studies are blueprints. All static marketing pages live as route components with hardcoded content — no CMS, no Tiptap (except prospect pages). Marketing copy is Catalan-first.
-
-```
-apps/marketing/src/
-├── routes/
-│   ├── __root.tsx                    # workbench shell — pegboard + blueprint + bench
-│   ├── index.tsx                     # homepage — workshop entrance
-│   ├── projects/
-│   │   ├── index.tsx                 # case study list — blueprint wall
-│   │   └── $slug.tsx                 # single case study — blueprint
-│   ├── blog/
-│   │   ├── index.tsx                 # blog index — logbook shelf
-│   │   └── $slug.tsx                 # blog post — logbook entry
-│   ├── about.tsx                     # about — workshop tour
-│   ├── pricing.tsx                   # pricing — parts catalog
-│   └── $lang/
-│       └── $slug.tsx                 # prospect pages (Tiptap-driven)
-├── components/
-│   ├── layout/
-│   │   ├── workshop-nav.tsx          # top nav strip with CTA
-│   │   ├── workshop-footer.tsx       # footer (mobile only, hidden on desktop)
-│   │   ├── workshop-desktop.tsx      # desktop layout: pegboard bg + icon columns + blueprint
-│   │   ├── blueprint-sheet.tsx       # content sheet with pushpins + stencil title
-│   │   ├── pegboard-icon.tsx         # tool icon with hook (Lucide icons)
-│   │   ├── bench-edge.tsx            # bottom strip with indicator lights (desktop)
-│   │   ├── drawer-tabs.tsx           # fixed bottom tab bar (mobile)
-│   │   └── section.tsx              # reusable page section wrapper
-│   ├── workshop/
-│   │   ├── conveyor-belt.tsx         # animated problem→solution flow
-│   │   ├── control-panel.tsx         # CTA styled as machine interface
-│   │   ├── blueprint-card.tsx        # case study card — technical drawing
-│   │   ├── logbook-card.tsx          # blog card — journal page style
-│   │   ├── before-after.tsx          # manual vs automated comparison
-│   │   ├── parts-row.tsx             # pricing line item — catalog style
-│   │   ├── indicator-light.tsx       # status dot (green/amber/red)
-│   │   └── gear-mascot.tsx           # gear emoji mascot with expressions
-│   └── blocks/                       # Tiptap renderers (prospect pages only)
-│       ├── block-renderer.tsx        # type → component dispatch
-│       ├── hero-block.tsx
-│       ├── cta-block.tsx
-│       ├── value-props-block.tsx
-│       ├── pain-points-block.tsx
-│       ├── social-proof-block.tsx
-│       └── rich-text-block.tsx
-├── data/
-│   ├── navigation.ts                 # nav items array
-│   └── copy.ts                       # shared marketing copy strings
-├── lib/
-│   └── api.ts                        # typed fetch for prospect page API
-└── styles.css                        # @import tokens + base reset + viewport lock
-```
-
----
-
-## Phase 12 — Project scaffold
-
-- [ ] Scaffold with TanStack CLI:
-  ```bash
-  npx @tanstack/cli create marketing \
-    --toolchain biome \
-    --no-examples \
-    --no-git \
-    --no-install \
-    --package-manager pnpm \
-    --framework React \
-    --target-dir apps/marketing
-  ```
-- [ ] Post-scaffold cleanup — remove Cloudflare, devtools, demo files:
-  - [ ] Remove from `package.json`: `@cloudflare/vite-plugin`, `wrangler` (if scaffolded)
-  - [ ] Remove from `package.json`: `@tanstack/react-devtools`, `@tanstack/devtools-vite`, `@tanstack/react-router-devtools`, `lucide-react`
-  - [ ] Remove from `package.json`: `@tailwindcss/typography` (if scaffolded — keep `tailwindcss` and `@tailwindcss/vite`)
-  - [ ] Keep in `vite.config.ts`: `tailwindcss()` plugin. Remove `cloudflare()`, `devtools()` + their imports
-  - [ ] Delete demo files: `src/components/Header.tsx`, `src/components/Footer.tsx`, `src/components/ThemeToggle.tsx`, `src/routes/about.tsx`
-  - [ ] Delete `wrangler.jsonc` if created
-  - [ ] Replace `src/styles.css` demo content — `@import '@engranatge/ui/tailwind.css'` + app-level reset
-- [ ] Adapt for monorepo:
-  - [ ] `package.json`: set name to `@engranatge/marketing`
-  - [ ] `package.json`: add `@engranatge/ui: "workspace:*"`
-  - [ ] `package.json`: add `styled-components`, `motion`, `motion-plus`
-  - [ ] `package.json`: add `@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/pm` (for prospect pages)
-  - [ ] `tsconfig.json`: add `"extends": "../../tsconfig.base.json"`
-- [ ] Create `Dockerfile` and `Kraftfile` for Unikraft deployment
-- [ ] Run `pnpm install` from root, verify `pnpm dev:marketing` starts
-
-## Phase 13 — Layout shell (workbench)
-
-Fixed-viewport workbench layout. Desktop: pegboard wall with tools on hooks, blueprint sheet pinned with pushpins, bench edge strip. Mobile: normal scroll with drawer tab bar.
-
-- [x] `src/routes/__root.tsx`:
-  - [x] `<html lang="ca">` default
-  - [x] Load `styles.css` (viewport lock for desktop)
-  - [x] Shell wrapper: flex column, `height: 100dvh` on desktop
-  - [x] Desktop: `<WorkshopNav />` + `<WorkshopDesktop>{children}</WorkshopDesktop>` + `<BenchEdge />`
-  - [x] Mobile: `<WorkshopFooter />` + `<DrawerTabs />` (footer hidden on desktop, tabs hidden on desktop)
-- [x] `src/components/layout/workshop-nav.tsx`:
-  - [x] Logo: "Engranatge" wordmark (DM Sans bold) + gear icon
-  - [x] Links: Eines, Pressupost
-  - [x] "Parlem" CTA button (desktop only, terracotta primary)
-  - [x] Mobile: hamburger → slide-in panel
-- [x] `src/components/layout/workshop-desktop.tsx`:
-  - [x] Pegboard background: `radial-gradient` dot pattern on `surface-dim`
-  - [x] Left icon column: Inici, Eines, Preus, Parla (Lucide icons on hooks)
-  - [x] Center: `<BlueprintSheet>` wrapping page content
-  - [x] Right icon column: Per què?, Projectes, Diari, Nosaltres, Paperera (disabled)
-- [x] `src/components/layout/blueprint-sheet.tsx`:
-  - [x] CSS pushpins at 4 corners (terracotta circles with shadow)
-  - [x] Stencil title derived from route (`INICI · ESQUEMA`, `EINES · CATÀLEG`, etc.)
-  - [x] Scrollable content area (desktop only)
-  - [x] Sheet styling: `surface-bright` bg, border, shadow (desktop only)
-- [x] `src/components/layout/pegboard-icon.tsx`:
-  - [x] Hook (CSS inverted-U), icon circle (48px), label
-  - [x] Active route highlighting with `primary-container` bg
-  - [x] Disabled state at 30% opacity
-- [x] `src/components/layout/bench-edge.tsx`:
-  - [x] Dark strip with indicator lights + copyright (desktop only)
-- [x] `src/components/layout/drawer-tabs.tsx`:
-  - [x] Fixed bottom tab bar (mobile only) with Lucide icons
-  - [x] Drawer pull indicator, active tab highlighting, safe area padding
-- [x] `src/components/layout/workshop-footer.tsx`:
-  - [x] Hidden on desktop (BenchEdge replaces it)
-  - [x] Bottom padding for drawer tabs on mobile
-- [x] `src/components/layout/section.tsx`:
-  - [x] Reusable section wrapper with heading + optional subheading
-  - [ ] Props: `title`, `subtitle`, `background` (surface level token), `children`
-  - [ ] Padding: `var(--space-12)` vertical, responsive
-  - [ ] Heading: `typescale-headline-large`
-
-## Phase 14 — Workshop components
-
-Shared visual components that implement the workshop metaphor. Pure presentational — no data fetching.
-
-### ConveyorBelt
-
-The homepage hero animation. Shows a business problem entering one side and a solution exiting the other.
-
-- [ ] `src/components/workshop/conveyor-belt.tsx`:
-  - [ ] Horizontal track with CSS dashed border (conveyor belt line)
-  - [ ] Items slide left→right via CSS `@keyframes translateX`
-  - [ ] Left side: problem label (e.g. "4h factures manuals")
-  - [ ] Right side: solution label (e.g. "10 min automatitzat")
-  - [ ] Items are small cards with `var(--color-surface-container-low)` bg
-  - [ ] Belt track: `var(--color-outline-variant)` dashed border
-  - [ ] `prefers-reduced-motion: reduce` → no animation, show static before/after
-  - [ ] Mobile: vertical flow (top→bottom) instead of horizontal
-
-### ControlPanel
-
-CTA section styled as a machine control panel. Used at the bottom of pages.
-
-- [ ] `src/components/workshop/control-panel.tsx`:
-  - [ ] Props: `heading`, `body`, `actions: { label, href, variant }[]`
-  - [ ] Background: `var(--color-surface-container-high)` with `var(--color-outline)` border
-  - [ ] Top bar: row of 3 IndicatorLight dots (decorative — red, amber, green)
-  - [ ] Heading: `typescale-headline-small`
-  - [ ] Body: `typescale-body-large`
-  - [ ] Action buttons row: primary (filled) + secondary (outlined)
-  - [ ] Primary button: `var(--color-primary)` bg
-  - [ ] Secondary button: `var(--color-outline)` border, `var(--color-primary)` text
-
-### BlueprintCard
-
-Case study teaser card. Technical drawing aesthetic.
-
-- [ ] `src/components/workshop/blueprint-card.tsx`:
-  - [ ] Props: `title`, `client` (anonymized), `industry`, `result`, `slug`
-  - [ ] Background: `var(--color-surface-container-lowest)` — light, paper-like
-  - [ ] Border: `1px dashed var(--color-outline)` — technical drawing style
-  - [ ] Title: `typescale-title-medium`, monospace or decorative font
-  - [ ] Client/industry: `typescale-label-medium`, `var(--color-on-surface-variant)`
-  - [ ] Result highlight: `var(--color-secondary)` text, bold metric
-  - [ ] Link → `/projects/${slug}`
-
-### LogbookCard
-
-Blog post teaser. Handwritten journal page feel.
-
-- [ ] `src/components/workshop/logbook-card.tsx`:
-  - [ ] Props: `title`, `date`, `excerpt`, `slug`
-  - [ ] Background: `var(--color-surface-container-lowest)`
-  - [ ] Left border: `3px solid var(--color-primary-container)` — page binding
-  - [ ] Date: `typescale-label-small`, `var(--color-on-surface-variant)`, decorative font
-  - [ ] Title: `typescale-title-medium`
-  - [ ] Excerpt: `typescale-body-medium`, 3-line clamp
-  - [ ] Link → `/blog/${slug}`
-
-### BeforeAfter
-
-Manual vs automated comparison. Two-column layout.
-
-- [ ] `src/components/workshop/before-after.tsx`:
-  - [ ] Props: `items: { manual: string, automated: string }[]`
-  - [ ] Two columns: "Sense Engranatge" (without) vs "Amb Engranatge" (with)
-  - [ ] Left column: `var(--color-surface-dim)` bg, strikethrough text style
-  - [ ] Right column: `var(--color-secondary-container)` bg, bold metrics
-  - [ ] Mobile: stacked rows, each row shows both states
-
-### Small utility components
-
-- [ ] `src/components/workshop/indicator-light.tsx`:
-  - [ ] Props: `color: 'green' | 'amber' | 'red'`
-  - [ ] 8px circle, `border-radius: var(--shape-full)`
-  - [ ] Green: `var(--color-secondary)`, Amber: `#C4851C`, Red: `var(--color-error)`
-  - [ ] Subtle `box-shadow` glow in same color at 30% opacity
-
-- [ ] `src/components/workshop/parts-row.tsx`:
-  - [ ] Props: `name`, `description`, `price`, `unit`
-  - [ ] Table-row style: name left, price right, description below in smaller text
-  - [ ] Border bottom: `var(--color-outline-variant)`
-  - [ ] Price: `typescale-title-medium`, `var(--color-on-surface)`
-  - [ ] Unit: `typescale-label-small`, `var(--color-on-surface-variant)`
-
-- [ ] `src/components/workshop/gear-mascot.tsx`:
-  - [ ] Props: `expression: 'default' | 'building' | 'celebrating' | 'sleeping' | 'thinking'`
-  - [ ] Inline SVG — gear cog with eyes + accessories per expression
-  - [ ] `building`: hard hat, `celebrating`: confetti, `sleeping`: closed eyes + zzz, `thinking`: wrench
-  - [ ] Default size: 64px, scalable via `width` prop
-  - [ ] Placeholder: simple CSS circle with emoji until SVGs are designed
-
-## Phase 15 — Static data
-
-Marketing content lives as typed constants. No CMS. Changes require a deploy.
-
-- [ ] `src/data/navigation.ts`:
-  - [ ] Type: `NavItem = { label, href, description }`
-  - [ ] Items: Projectes, Diari, Taller, Pressupost
-
-- [ ] `src/data/copy.ts`:
-  - [ ] Hero headline: "Les màquines fan la feina. Tu fas el negoci."
-  - [ ] Hero subheadline: "Construïm eines que treballen mentre tu dorms."
-  - [ ] Section headings, CTA labels, footer text
-  - [ ] All strings in Catalan, plain object export
-
-## Phase 16 — Homepage (workshop entrance)
-
-`/` — the main landing page. Short, scannable. Business owners don't scroll long pages.
-
-- [ ] `src/routes/index.tsx`:
-  - [ ] No data fetching — pure static render
-
-### Hero section
-
-- [ ] Full-width, `var(--color-surface)` bg
-- [ ] Headline: `typescale-display-large`, copy from `data/copy.ts`
-- [ ] Subheadline: `typescale-headline-small`, `var(--color-on-surface-variant)`
-- [ ] ConveyorBelt animation below headline
-- [ ] CTA button: "Parlem" (Let's talk) → `/pricing`
-- [ ] GearMascot in `default` expression, positioned beside CTA (desktop) or below (mobile)
-
-### BeforeAfter section
-
-- [ ] Section heading: "Abans i després" (Before and after)
-- [ ] 3-4 concrete comparisons:
-  - "4h copiant factures a mà" → "10 min, automàtic"
-  - "Seguiment de clients en un Excel" → "Recordatoris intel·ligents"
-  - "Comandes per WhatsApp, comptades a mà" → "Sistema de comandes amb estoc en temps real"
-- [ ] BeforeAfter component
-
-### Social proof (when available)
-
-- [ ] Section heading: "Qui ja ho fa servir" (Who already uses it)
-- [ ] Placeholder: empty for now, conditionally rendered
-- [ ] When content exists: client name (anonymized), industry, one-line quote, key result metric
-
-### Bottom CTA
-
-- [ ] ControlPanel component
-- [ ] Heading: "Parlem del teu negoci" (Let's talk about your business)
-- [ ] Body: one sentence about free consultation
-- [ ] Actions: primary "Demana pressupost" → `/pricing`, secondary "Escriu-nos" → email
-
-## Phase 18 — Case studies (/projects)
-
-Content is hardcoded — no database. Each case study is a route component.
-
-### Blueprint wall — `/projects`
-
-- [ ] `src/routes/projects/index.tsx`:
-  - [ ] Page heading: "Projectes" (Blueprints)
-  - [ ] BlueprintCard grid from hardcoded list
-  - [ ] Grid: 1 col mobile, 2 col desktop
-  - [ ] Empty state with GearMascot `thinking` if no projects yet
-
-### Individual blueprint — `/projects/$slug`
-
-- [ ] `src/routes/projects/$slug.tsx`:
-  - [ ] Loader: match slug to hardcoded case study, 404 if not found
-  - [ ] Header: project title + client industry + date
-  - [ ] Section "El problema" (The problem): what was manual/broken
-  - [ ] Section "La solució" (The solution): what we built, with BeforeAfter
-  - [ ] Section "Resultats" (Results): key metrics in large type
-  - [ ] Technical details: tools used, integration points (for credibility)
-  - [ ] Blueprint aesthetic: dashed borders, monospace labels, grid-line background via CSS
-  - [ ] Bottom ControlPanel CTA
-
-## Phase 19 — Blog (/blog)
-
-Workshop logbook. Content is hardcoded in route components until volume justifies a CMS.
-
-### Logbook shelf — `/blog`
-
-- [ ] `src/routes/blog/index.tsx`:
-  - [ ] Page heading: "Diari de taller" (Workshop logbook)
-  - [ ] LogbookCard list from hardcoded entries
-  - [ ] Layout: single column, max-width `var(--bp-md)` centered
-  - [ ] Most recent first
-  - [ ] GearMascot `building` in sidebar decoration (desktop)
-
-### Logbook entry — `/blog/$slug`
-
-- [ ] `src/routes/blog/$slug.tsx`:
-  - [ ] Loader: match slug to hardcoded post, 404 if not found
-  - [ ] Article layout: max-width `var(--bp-md)`, centered
-  - [ ] Date in decorative font, `var(--color-on-surface-variant)`
-  - [ ] Title: `typescale-headline-large`
-  - [ ] Body: `typescale-body-large`, generous line-height (1.7)
-  - [ ] Code blocks: `JetBrains Mono`, `var(--color-surface-container)` bg
-  - [ ] Images: full-width within content column
-  - [ ] Bottom: link back to `/blog` + ControlPanel CTA
-
-## Phase 20 — About (/about)
-
-Workshop tour. Who works here, what tools we use, why we do this.
-
-- [ ] `src/routes/about.tsx`:
-  - [ ] Hero: "El taller" heading + one-paragraph mission statement
-  - [ ] GearMascot `celebrating` beside mission text
-  - [ ] Section "Per què existim" (Why we exist): the SMB gap — enterprise software too expensive, their tech cousin set up WordPress in 2016
-  - [ ] Section "Com treballem" (How we work): direct, honest, anti-consultant approach
-  - [ ] Section "Les eines del taller" (Workshop tools): tech stack in plain language — not to impress, to show we use serious tools
-  - [ ] Section "On som" (Where we are): Catalan, local, "som del barri" energy
-  - [ ] Bottom ControlPanel CTA
-
-## Phase 21 — Pricing (/pricing)
-
-Parts catalog. Clean, honest, no-nonsense. Also doubles as a contact/quote form.
-
-- [ ] `src/routes/pricing.tsx`:
-  - [ ] Hero: "Pressupost" heading + "Sense lletra petita" (No fine print) subheading
-  - [ ] PartsRow list for each service (from `data/services.ts` — loop, not hardcoded)
-  - [ ] Annual support contract row (optional add-on, per service)
-  - [ ] Clear "Què inclou" (What's included) and "Què no inclou" (What's not included) per service
-  - [ ] Contact section: email, phone, WhatsApp link
-  - [ ] Optional: simple contact form (name, business, what they need) — POST to server API
-  - [ ] GearMascot `thinking` beside the form
-  - [ ] Tone: "Digue'ns què necessites i et direm què costa." (Tell us what you need, we'll tell you what it costs.)
-
-## Phase 22 — Prospect pages (/:lang/:slug)
-
-Dynamic pages powered by Tiptap JSON from the server. These are the only pages that fetch data.
-
-- [ ] `src/routes/$lang/$slug.tsx`:
-  - [ ] Server function: `GET ${SERVER_URL}/pages/${slug}?lang=${lang}`
-  - [ ] Validate `lang` param: `ca | es | en`, 404 on invalid
-  - [ ] Handle 404 for unpublished or missing pages
-  - [ ] Set `<html lang>` to match route param
-  - [ ] Render page content through BlockRenderer
-  - [ ] SEO tags: `<title>`, og:title, og:description, og:image, og:locale
-  - [ ] `<link rel="alternate" hreflang="...">` for all available translations
-  - [ ] `<link rel="canonical">` pointing to current lang URL
-  - [ ] Fire `POST /pages/${slug}/view` on client load (fire-and-forget, no await)
-
-### Tiptap block renderers
-
-- [ ] `src/components/blocks/BlockRenderer.tsx`:
-  - [ ] `BLOCK_MAP: Record<string, ComponentType>` — maps block type string to React component
-  - [ ] Iterates `content` array from Tiptap JSON, renders matching component or falls through to RichTextBlock
-  - [ ] Unknown block types: log warning, render nothing
-
-- [ ] `src/components/blocks/HeroBlock.tsx`:
-  - [ ] Props from Tiptap attrs: `heading`, `subheading`, `ctaLabel`, `ctaHref`
-  - [ ] Full-width, `typescale-display-large` heading
-  - [ ] CTA button with primary color
-
-- [ ] `src/components/blocks/CtaBlock.tsx`:
-  - [ ] Props: `heading`, `body`, `buttons: { label, href, type }[]`
-  - [ ] Renders as ControlPanel component
-  - [ ] Button types: `calendar` (Cal.com link), `whatsapp`, `email`, `link`
-
-- [ ] `src/components/blocks/ValuePropsBlock.tsx`:
-  - [ ] Props: `items: { title, description, icon }[]`
-  - [ ] Grid: 1 col mobile, 2 col tablet, 3 col desktop
-  - [ ] Card per item with icon, title, description
-
-- [ ] `src/components/blocks/PainPointsBlock.tsx`:
-  - [ ] Props: `items: { problem, cost }[]`
-  - [ ] Styled as a problem list — each item shows the pain and its business cost
-  - [ ] Left accent border in `var(--color-error-container)`
-
-- [ ] `src/components/blocks/SocialProofBlock.tsx`:
-  - [ ] Props: `items: { quote, source, role }[]`
-  - [ ] Testimonial cards with quote marks, source name, role
-
-- [ ] `src/components/blocks/RichTextBlock.tsx`:
-  - [ ] Catch-all for standard Tiptap nodes (paragraphs, headings, lists, links, images, code)
-  - [ ] Uses `generateHTML()` from `@tiptap/html` with StarterKit extensions
-  - [ ] Styled via global CSS targeting `.rich-text` wrapper class
-  - [ ] Typography: body text `typescale-body-large`, headings from MD3 scale
-
-## Phase 23 — SEO and meta
-
-- [ ] `src/lib/seo.ts`:
-  - [ ] Helper: `buildMeta({ title, description, image, url, lang })` → returns TanStack Start meta array
-  - [ ] Default og:image: Engranatge social card (static PNG in `public/`)
-  - [ ] Default description: one-line company pitch in Catalan
-- [ ] Per-page meta tags:
-  - [ ] Homepage: title "Engranatge — Les màquines fan la feina", full meta
-  - [ ] Service pages: title "Eines — Engranatge" / "Automatitzacions — Engranatge"
-  - [ ] Blog: title from post data
-  - [ ] Prospect pages: title + og from server page `meta` field
-- [ ] `public/robots.txt`: allow all, sitemap reference
-- [ ] `public/sitemap.xml`: static pages only (prospect pages are dynamic, not indexed)
-
-## Phase 24 — Unikraft deployment
-
-- [ ] Run `pnpm --filter marketing build` and verify `.output/server/index.mjs` generated
-- [ ] Test locally: `node apps/marketing/.output/server/index.mjs` on port 3001
-- [ ] Run `kraft build` with `apps/marketing/Kraftfile` and verify image builds
-- [ ] Run `kraft run` locally and verify SSR responds
-- [ ] Deploy to Unikraft Cloud with `kraft deploy`
-- [ ] Point `engranatge.com` to deployed instance
-- [ ] Set `SERVER_URL` env var to `https://api.engranatge.com`
-- [ ] Verify static pages render: `/`, `/tools`, `/about`, `/pricing`
-- [ ] Verify prospect page renders at `engranatge.com/ca/test-slug` (needs server running)

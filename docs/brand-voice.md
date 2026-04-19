@@ -24,7 +24,7 @@ The copy is written in the **first person**. The speaker is the workshop itself,
 
 **Resolving the register at draft time.** This document does not hard-code which register Engranatge uses today. The drafter picks by:
 
-1. **Reading context first.** Check the existing i18n files (`apps/marketing/src/i18n/*.ts`), any recent hero or CTA copy, and the About page if one exists. If everything already says *construeixo / construyo / I build*, continue in singular. If everything says *construïm / construimos / we build*, continue in plural. Match what is already live.
+1. **Reading context first.** Check the existing marketing copy, any recent hero or CTA copy, and the About page if one exists. If everything already says *construeixo / construyo / I build*, continue in singular. If everything says *construïm / construimos / we build*, continue in plural. Match what is already live.
 2. **Asking the developer when context is silent or contradictory.** If there is no existing copy, or the files mix singular and plural, ask a single targeted question before drafting: *"Should this copy speak as a solo workshop (I) or as a team (we)?"*
 3. **Never guessing silently.** Picking the wrong register is a cascading error that touches every sentence on the page. Do not invent one.
 
@@ -60,7 +60,7 @@ Low-return moments where you should not spend the budget:
 
 - Paragraph bodies. Keep them plain.
 - CTA buttons. "Parlem" is sharper than "Entra al taller".
-- Footer taglines. Already covered by `footer.tagline` in the i18n files.
+- Footer taglines.
 
 When in doubt, cut the metaphor. The brand is strong enough that the reader does not need to be reminded every paragraph.
 
@@ -201,7 +201,7 @@ Empathy is highest at ToFu because the reader does not know you yet. Specificity
 
 ## Native language voice — per-locale rules
 
-Engranatge ships copy in three languages: Catalan, Castilian, and English. Catalan is the source voice (the `Locale` type lives in `apps/marketing/src/i18n/ca.ts`), Castilian is the widest-reach market, and English is the outreach and future-international surface.
+Engranatge ships copy in three languages: Catalan, Castilian, and English. Catalan is the source voice, Castilian is the widest-reach market, and English is the outreach and future-international surface.
 
 **The rule that beats all other rules:** do not translate. Write each language from scratch as a local copywriter would. If a sentence reads like a translation, throw it out.
 
@@ -398,13 +398,13 @@ Some rules apply to all three languages equally and must hold regardless of nati
 - **Question marks are fine.** A question is often a better hook than a statement.
 - **Numbers in prices use the locale's thousands separator.** Catalan/Castilian: *2.000 €*. English: *€2,000*. Never mix.
 
-## Adding a new i18n key
+## Adding a new i18n entry
 
-When adding a new i18n key, the order is non-negotiable:
+When adding a new translated string, the order is non-negotiable:
 
-1. Add to `ca.ts` first (the source of the `Locale` type).
-2. Add to `es.ts` second.
-3. Add to `en.ts` third.
+1. Write Catalan first (the source voice).
+2. Write Castilian second.
+3. Write English third.
 
 Each language is written natively from the same brief, not translated from the previous one. If the Catalan line has a wordplay that does not exist in Castilian, the Castilian line says something different with the same intent. Forcing a translation is how consultant voice creeps in.
 

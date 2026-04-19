@@ -26,7 +26,6 @@ Engranatge gives agencies like yours everything you need to fill that gap:
 - **AI integrations** — let AI handle tasks that require judgment but not creativity: categorizing emails, drafting invoices, summarizing feedback.
 - **Built-in CRM (Forja)** — track prospects, log interactions (visits, calls, emails, LinkedIn, Instagram), and manage your pipeline.
 - **AI-agent ready** — expose all data to AI agents via MCP (Claude, ChatGPT) and connect to n8n/Zapier via webhooks.
-- **Multilingual prospect pages** — generate AI-powered pages for prospects with i18n support (ca/es/en).
 
 ## Tech stack
 
@@ -37,7 +36,6 @@ Engranatge gives agencies like yours everything you need to fill that gap:
 | Shared schema   | `packages/domain` — Effect Schema                   |
 | CLI             | `apps/cli` — Effect CLI + @clack/prompts TUI        |
 | Backend         | `apps/server` — Effect HTTP + MCP server            |
-| Marketing site  | `apps/marketing` — TanStack Start                   |
 | CRM frontend    | `apps/internal` — TanStack Start (Forja)            |
 | Shared UI       | `packages/ui` — MD3 design tokens + BaseUI + Tiptap |
 | Database        | Postgres (NeonDB)                                   |
@@ -56,10 +54,9 @@ pnpm cli services up        # start Postgres + MinIO via Docker
 pnpm cli db migrate         # create CRM + auth tables
 pnpm cli auth bootstrap     # create first admin (interactive)
 pnpm cli doctor             # verify everything is healthy
-# in 3 terminals:
+# in 2 terminals:
 pnpm dev:server             # API + MCP server
 pnpm dev:internal           # CRM (Forja)
-pnpm dev:marketing          # marketing site
 ```
 
 First time? See the [detailed walkthrough](docs/getting-started.md) for explanations of each step, env var guidance, and troubleshooting.
@@ -79,7 +76,6 @@ pnpm cli:tui           # interactive TUI menu
 # Development
 pnpm dev:server        # start API + MCP server
 pnpm dev:internal      # start CRM app (Forja)
-pnpm dev:marketing     # start marketing site
 
 # Build & lint
 pnpm build             # build all packages
@@ -93,7 +89,6 @@ pnpm check             # lint + format (CI mode)
 - [Architecture](docs/architecture.md) — system design, data flow, deployment
 - [Backend](docs/backend.md) — Effect patterns, routes, MCP tools
 - [Frontend](docs/frontend.md) — design tokens, MD3, BaseUI, components
-- [Marketing](docs/marketing.md) — public site, prospect pages, i18n
 - [AI agents](AGENTS.md) — how AI agents interact with this system
 
 ## Contributing

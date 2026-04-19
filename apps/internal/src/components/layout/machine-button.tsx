@@ -15,10 +15,9 @@ type IconComponent = ComponentType<{
  * shadow-board regardless of breakpoint. Active state pulses an amber
  * focus ring on the housing and brightens the cap.
  *
- * Mirrors the visual language of `apps/marketing`'s MachineButton but
- * leans on Forja's `--color-status-*` palette rather than marketing's
- * baked gradients — the caller passes a solid token and the radial
- * highlight/shadow sandwich is computed here.
+ * The cap color is driven by `--color-status-*` tokens — the caller
+ * passes a solid token and the radial highlight/shadow sandwich is
+ * computed here.
  */
 
 export type MachineButtonSize = 'compact' | 'full'

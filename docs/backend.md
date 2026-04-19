@@ -627,7 +627,7 @@ Key files:
 
 ### Cross-origin policy
 
-Forja (web) lives on `:3000`, marketing on `:3001`, this API on `:3010` — every request is cross-origin. CORS is wired as a global `HttpRouter.middleware` in `src/main.ts` via `HttpMiddleware.cors({ allowedOrigins, credentials: true, ... })`, with `allowedOrigins` read from `ALLOWED_ORIGINS` env (comma-separated) and falling back to `http://localhost:3000,http://localhost:3001` in dev. The same env var is fed to Better-Auth as `trustedOrigins` in `src/lib/auth.ts` so both layers agree on what's legitimate. `credentials: true` is required for the browser to attach the `forja.session_token` cookie on fetch calls that use `credentials: 'include'`.
+Forja (web) lives on `:3000`, this API on `:3010`, and the separate marketing site on `:3001` — every request is cross-origin. CORS is wired as a global `HttpRouter.middleware` in `src/main.ts` via `HttpMiddleware.cors({ allowedOrigins, credentials: true, ... })`, with `allowedOrigins` read from `ALLOWED_ORIGINS` env (comma-separated) and falling back to `http://localhost:3000,http://localhost:3001` in dev. The same env var is fed to Better-Auth as `trustedOrigins` in `src/lib/auth.ts` so both layers agree on what's legitimate. `credentials: true` is required for the browser to attach the `forja.session_token` cookie on fetch calls that use `credentials: 'include'`.
 
 ### Invite-only signup
 
@@ -644,69 +644,123 @@ Sign-in is unaffected: `POST /auth/sign-in/email` still works for any existing u
 
 ---
 
-## Email service (AgentMail)
+## Email service (AgentMail + React Email v6)
 
-Outbound email (outreach, follow-ups) and inbound reply handling via [AgentMail](https://agentmail.to). The deeper code samples below still reference the old Resend SDK shape and need a targeted refresh — see `apps/server/src/services/email.ts`, `apps/server/src/services/agentmail-provider.ts` and `apps/server/src/services/email-provider.ts` for the actual current implementation (Tag + Layer pattern with vendor swap at the boundary).
+Outbound email (outreach, follow-ups, replies) and inbound handling via [AgentMail](https://agentmail.to). Authoring on both ends — humans in Forja's compose form, AI agents via MCP — converges on a single typed block tree, rendered through shared primitives in `packages/email`. AgentMail carries the final MIME; Forja owns the authoring surface and the rendering pipeline.
 
-### Sending
+### Package layout — `packages/email`
 
-```typescript
-// src/services/email.ts
-import { Resend } from "resend"
-import { Effect, Layer, Context } from "effect"
+Shared Node+browser library, consumed by `apps/server` (render at send time), `apps/internal` (compose + footer editors), and `packages/controllers` (HTTP schema).
 
-export class EmailService extends ServiceMap.Service<EmailService>()(
-  "EmailService",
-  {
-    make: Effect.gen(function* () {
-      const apiKey = yield* Config.string("RESEND_API_KEY")
-      const fromAddress = yield* Config.string("EMAIL_FROM")
-      const resend = new Resend(apiKey)
+- `schema.ts` — Effect `Schema` for `EmailBlock` and `EmailBlocks` (the block tree).
+- `render.ts` — `renderBlocks(blocks, { preview, attachments })` → `{ html, text, resolvedAttachments }`. HTML via React Email's `render()`; plain text via `toPlainText()` with `>` prefixing on quoted subtrees.
+- `sanitize.ts` — `sanitizeHtmlToBlocks` (parse5 server / DOMParser client) and `sanitizeTextToBlocks` for reply-quoting.
+- `theme.ts` — `brandTheme = extendTheme('basic', …)` with MD3 palette mirrored from `packages/ui/src/tokens.css`. Fonts: Barlow Condensed (display), Barlow (body).
+- `components/` — `EmailBody`, `SignOff`, `AgentEmail` (block-tree renderer).
+- `editor/` — `EmailEditor` (shared `@react-email/editor` wrapper, `mode: 'compose' | 'footer'`) and `image-upload.ts` (staging integration).
 
-    return {
-      send: (to: string, subject: string, html: string, metadata: { companyId: string; contactId?: string }) =>
-        Effect.gen(function* () {
-          const result = yield* Effect.tryPromise({
-            try: () => resend.emails.send({ from: fromAddress, to, subject, html }),
-            catch: (e) => new EmailError({ cause: e })
-          })
-          // Auto-log as interaction
-          const interactionService = yield* InteractionService
-          yield* interactionService.create({
-            company_id: metadata.companyId,
-            contact_id: metadata.contactId,
-            channel: "email",
-            direction: "outbound",
-            type: "email",
-            summary: subject,
-            outcome: "sent",
-          })
-          return result
-        }),
+### Block schema
+
+```ts
+type EmailBlock =
+  | { type: 'paragraph'; spans: ReadonlyArray<Span> }
+  | { type: 'heading'; level: 1 | 2 | 3; spans: ReadonlyArray<Span> }
+  | { type: 'list'; ordered: boolean; items: ReadonlyArray<ReadonlyArray<Span>> }
+  | { type: 'quote'; children: ReadonlyArray<EmailBlock> }     // recursive
+  | { type: 'divider' }
+  | {
+      type: 'image'
+      source:
+        | { kind: 'staging'; stagingId: string }  // human upload in flight
+        | { kind: 'cid';     cid: string       }  // already-linked (e.g. inherited from parent)
+        | { kind: 'url';     href: string      }  // agents only, for assets we control
+      alt: string
+      width?: number
+      height?: number
     }
-  }),
-  },
-) {
-  static readonly layer = Layer.effect(this, this.make)
-}
 ```
 
-### Inbound replies (webhook)
+At render time, `staging` resolves to a `cid` via `email_attachment_staging` + the outbound MIME part. `cid` blocks emit `<img src="cid:…">` as-is (so re-attached parent inline images resolve). `url` blocks emit a plain `<img src>`.
 
-Resend forwards inbound emails to `POST /webhooks/email/inbound`. The handler:
+### Draft body shadow (`email_draft_bodies`)
 
-1. Parses the Resend webhook payload (verifies signature with `RESEND_WEBHOOK_SECRET`)
-2. Matches reply to a company/contact by `from` address
-3. Auto-creates an interaction with `channel: "email"`, `direction: "inbound"`
-4. Fires `interaction.logged` webhook event
+AgentMail's draft API accepts only `{to, cc, bcc, subject, text, html, attachments, in_reply_to, send_at, client_id, labels}` — no metadata / JSON field. So a pure AgentMail round-trip would lose the block tree on every reload. The service keeps a local shadow keyed by provider `draft_id`:
+
+```sql
+CREATE TABLE email_draft_bodies (
+  draft_id   TEXT PRIMARY KEY,
+  inbox_id   UUID NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE,
+  body_json  JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+)
+```
+
+Writes happen on every draft upsert; reads `LEFT JOIN` so the editor re-hydrates losslessly. `draft_id` is `TEXT` because upstream providers own its shape (AgentMail string, local filename stem). The provider still owns `html`/`text`/`attachments` — the shadow only carries the authoring tree.
+
+### Attachment staging (`email_attachment_staging`)
+
+StorageProvider-backed (R2 / S3 / MinIO / local filesystem — same contract used by recordings and research-blob-storage). Bytes land at `email/staging/<inboxId>/<stagingId>`; preview URLs are short-lived signed URLs served to the WYSIWYG canvas.
+
+```sql
+CREATE TABLE email_attachment_staging (
+  staging_id    TEXT PRIMARY KEY,
+  inbox_id      UUID NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE,
+  draft_id      TEXT,
+  storage_key   TEXT NOT NULL,
+  filename      TEXT NOT NULL,
+  content_type  TEXT NOT NULL,
+  size_bytes    BIGINT NOT NULL,
+  is_inline     BOOLEAN NOT NULL DEFAULT false,
+  cid           TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at    TIMESTAMPTZ NOT NULL
+)
+```
+
+**Compression is email-domain-only.** Other `StorageProvider` consumers (`recordings.ts`, `research-blob-storage.ts`) store bytes verbatim — lossy compression would destroy fidelity. Email staging runs `compressEmailImage` (in `apps/server/src/services/email-asset-compression.ts`, `sharp`-backed) for images: max dimension 1600 px, JPEG q82 (photos) or PNG palette (graphics), HEIC/AVIF → JPEG for universal client rendering. PDFs, zips, docs — passed through byte-identical.
+
+**Five cleanup triggers:**
+
+1. User removes a chip from the compose tray → immediate `DELETE /v1/email/attachments/staging/:id`.
+2. User deletes an inline image block in the editor → same DELETE fires once the ProseMirror node is gone.
+3. Draft deleted → server sweeps every staging row referenced by `bodyJson` + the provider attachment list.
+4. Send succeeds → `markSentAndCleanup` deletes the rows and storage keys for every materialized attachment.
+5. Background TTL sweep (hourly cron) → deletes rows past `expires_at` whose draft no longer references them.
+
+Because the backend is durable, a server restart no longer loses in-progress drafts.
+
+### Reply flow
+
+Client helper `apps/internal/src/components/emails/parent-to-quote-block.ts` takes the parent message `{ html, text, fromName, fromEmail, receivedAt, locale }` and returns `[<empty paragraph>, <attribution>, <quote>]`:
+
+- Empty paragraph first so the editor cursor lands there (top-posting UX).
+- Attribution paragraph — Lingui-localized `On <date>, <sender> wrote:` / `El <date>, <qui> va escriure:`.
+- Quote wraps `sanitizeHtmlToBlocks(html, { client: true })` (native `DOMParser`) or `sanitizeTextToBlocks(text)` as fallback.
+
+The sanitizer is **allowlist-mapping, not strip-in-place**: HTML is parsed, walked, and re-emitted as a typed `EmailBlock[]`. Anything not on the allowlist simply never appears in the output. This is a stronger guarantee than sanitize-html-style blocklists and avoids their transitive-dep footprint. Server-side uses [`parse5`](https://github.com/inikulin/parse5) — zero runtime deps, WHATWG-compliant, the same parser `jsdom` wraps. Client-side uses native `DOMParser`. See `feedback_minimal_dep_libraries.md`.
+
+Inbound parent inline images (`<img src="cid:…">`) map to `{ type: 'image', source: { kind: 'cid', cid } }` so on reply-send the server re-attaches the parent's inline parts (fetched via `EmailProvider.streamAttachment`) with the same `Content-ID`. Those bytes **do not** flow through `email_attachment_staging` — they're re-forwarded straight from the provider. Non-inline parent attachments are not carried forward (matches Gmail / Apple Mail behavior).
+
+Threading headers (`In-Reply-To`, `References`) are emitted by AgentMail when the server calls its reply endpoint with the parent's `thread_id` + `message_id`. No server-side header construction.
+
+### Footer CRUD
+
+`inbox_footers.body_json JSONB` (replacing the prior `html` + `text_fallback` columns). Authored in `FooterManageDialog` via the same `EmailEditor` used for compose, just with `mode="footer"` — narrower palette (no H1, no divider, no lists; paragraphs + inline formatting + `image` blocks for logo-in-signature). No structured author/city/brand fields; the user composes the signature freely. At send time, footer blocks are appended to the user's block tree before `renderBlocks` runs — a single render step yields consistent footer placement in both `html` and `text`.
+
+### AgentMail inline-image semantics
+
+`SendAttachmentInput` carries an explicit `disposition: 'inline' | 'attachment'`. Without it, AgentMail's MIME builder defaults to `attachment` and `<img src="cid:…">` in the body fails to resolve against the part. The server sets `disposition: 'inline'` whenever the staging row has `is_inline = true`; inbound parent inline parts are re-emitted the same way on reply.
 
 ### Env vars
 
 ```
-RESEND_API_KEY=re_...
-RESEND_WEBHOOK_SECRET=whsec_...
-EMAIL_FROM=forja@guillempuche.com
+EMAIL_PROVIDER=agentmail          # or `local` for the filesystem catcher in dev
+AGENTMAIL_API_KEY=am_...
+AGENTMAIL_WEBHOOK_SECRET=whsec_...
+EMAIL_FROM=forja@engranatge.com
 ```
+
+The `EMAIL_PROVIDER` gate is required — there's no auto/NODE_ENV fallback (see `feedback_explicit_env_vars.md`).
 
 ---
 
@@ -935,7 +989,7 @@ That's it — `OpenAiLanguageModel.model(name)` + `OpenAiClient.layer({ apiKey, 
 
 ## Pages API
 
-The pages API serves both public (marketing site) and internal (management) use cases:
+The pages API serves two use cases: public reads from the separate marketing site, and internal management by Forja admins:
 
 ### Public routes (no auth)
 

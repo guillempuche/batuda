@@ -182,7 +182,7 @@ Tokens: `--font-display` and `--font-body` in `@engranatge/ui/tokens.css`. Loade
 
 ### Mascot / Character
 
-**GearMascot** — emoji-based gear character with switchable expressions (`default`, `happy`, `working`, etc.). Lives in the hero section. Simple colored circle with an emoji face — approachable, not over-designed. Component: `apps/marketing/src/components/workshop/gear-mascot.tsx`.
+**GearMascot** — emoji-based gear character with switchable expressions (`default`, `happy`, `working`, etc.). Lives in the hero section. Simple colored circle with an emoji face — approachable, not over-designed.
 
 ---
 
@@ -244,7 +244,7 @@ You're walking around the shop floor, clipboard in hand.
 
 ## Workshop Visual Language
 
-The specific aesthetic vocabulary shared across Engranatge apps. Defined in `@engranatge/ui/tokens.css` so both marketing and Forja (future internal tool) use the same visual language.
+The specific aesthetic vocabulary shared across Engranatge surfaces. Defined in `@engranatge/ui/tokens.css` — consumed locally by Forja and published to npm for the separate marketing site, so both draw from the same visual language.
 
 ### Surfaces
 

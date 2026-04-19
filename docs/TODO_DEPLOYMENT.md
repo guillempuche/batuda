@@ -2,15 +2,15 @@
 
 Remaining work to bring `apps/internal` (Forja CRM) and `apps/server` (API) live on KraftCloud.
 
-The marketing site (`apps/marketing` → `engranatge.com`) is being deployed first;
-this doc captures the rest so it isn't lost. See `.github/workflows/deploy_*.yml` for
-the workflow definitions and `.env.example.github` for the secrets/vars reference.
+The public marketing site at `engranatge.com` is deployed from the separate
+`engranatge-marketing` repo. See `.github/workflows/deploy_*.yml` for the workflow
+definitions in this repo and `.env.example.github` for the secrets/vars reference.
 
 ---
 
 ## Background
 
-All three apps share the same deploy pattern:
+The two CRM apps in this repo share the same deploy pattern (the marketing repo follows the same pattern):
 
 1. Cloudflare DNS record (CNAME → `fra.unikraft.app`, **DNS only** — gray cloud)
 2. GitHub Actions workflow (`deploy_<app>.yml`) triggered by tag push or `workflow_dispatch`
@@ -122,4 +122,4 @@ Reference: `.env.example.github`. All values land in the `production` environmen
 - [ ] Add a `Verify deployment` step to the internal workflow (mirror the one in `deploy_server.yml`)
 - [ ] Decide on alerting: KraftCloud email vs Better Stack vs OpenTelemetry exporter
 - [ ] Document the rollback procedure (`kraft cloud instance stop <previous>` + redeploy previous tag)
-- [ ] Once all 3 services exist, audit `kraft cloud --metro fra image list` and prune old image versions
+- [ ] Once both services exist, audit `kraft cloud --metro fra image list` and prune old image versions

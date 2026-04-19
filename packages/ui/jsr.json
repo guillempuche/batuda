@@ -1,0 +1,9 @@
+{
+	"name": "@engranatge/ui",
+	"version": "2026.4.19",
+	"exports": {
+		".": "./src/index.ts",
+		"./blocks": "./src/blocks/index.ts",
+		"./pri": "./src/pri/index.ts"
+	}
+}

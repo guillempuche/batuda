@@ -7,32 +7,32 @@ const {
 module.exports = {
 	extends: './.release-it.base.json',
 	git: {
-		commitsPath: 'apps/marketing',
-		commitMessage: 'cicd(release): marketing v${version}',
-		tagAnnotation: 'Marketing Release v${version}',
-		tagMatch: 'marketing-v[0-9]*.[0-9]*.[0-9]*',
-		tagName: 'marketing-v${version}',
+		commitsPath: 'packages/ui',
+		commitMessage: 'cicd(release): ui v${version}',
+		tagAnnotation: 'UI Release v${version}',
+		tagMatch: 'ui-v[0-9]*.[0-9]*.[0-9]*',
+		tagName: 'ui-v${version}',
 	},
 	github: {
-		releaseName: 'Marketing v${version}',
+		releaseName: 'UI v${version}',
 	},
 	hooks: {
-		'after:release': "echo '✅ Released marketing v${version}'",
+		'after:release': "echo '✅ Released ui v${version}'",
 	},
 	npm: false,
 	plugins: {
 		'./scripts/release-calver-plugin.cjs': {},
 		'@release-it/bumper': {
-			in: 'apps/marketing/package.json',
-			out: 'apps/marketing/package.json',
+			in: 'packages/ui/package.json',
+			out: ['packages/ui/package.json', 'packages/ui/jsr.json'],
 		},
 		'@release-it/conventional-changelog': {
 			gitRawCommitsOpts: {
-				path: getCommitPathsArray('apps/marketing'),
+				path: getCommitPathsArray('packages/ui'),
 			},
 			header: changelogHeader,
 			ignoreRecommendedBump: true,
-			infile: 'apps/marketing/CHANGELOG.md',
+			infile: 'packages/ui/CHANGELOG.md',
 			preset: changelogPreset,
 			writerOpts: {
 				headerPartial: '## {{date}} ({{currentTag}})\n',
