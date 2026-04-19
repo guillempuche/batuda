@@ -1,22 +1,21 @@
 ---
 name: debug-apps
-description: This skill should be used when the user asks to "debug", "diagnose", "check health", "run doctor", or says "app not working", "server down", "login broken", "blank page", "white screen", "500 error", "CORS error", "auth issue", "can't connect", "database error", "migration failed", "services not running", "certificate error", or asks to check if the Engranatge apps (server, internal/Forja, marketing) are healthy locally.
+description: This skill should be used when the user asks to "debug", "diagnose", "check health", "run doctor", or says "app not working", "server down", "login broken", "blank page", "white screen", "500 error", "CORS error", "auth issue", "can't connect", "database error", "migration failed", "services not running", "certificate error", or asks to check if the server or Forja internal app is healthy locally.
 ---
 
 # Debug Local Apps
 
-Diagnose server, internal (Forja), and marketing apps. Run against one, two, or all three based on what the user asks.
+Diagnose server and internal (Forja) apps. Run against one or both based on what the user asks.
 
 ## Identify targets
 
-| Keyword                          | App(s) to debug               |
-| -------------------------------- | ----------------------------- |
-| `server`, `api`, `backend`       | server                        |
-| `internal`, `forja`, `crm`       | internal                      |
-| `marketing`, `web`, `site`       | marketing                     |
-| `auth`, `login`, `session`       | server + internal             |
-| `email`, `inbox`                 | server                        |
-| `all`, `everything`, unspecified | server + internal + marketing |
+| Keyword                          | App(s) to debug   |
+| -------------------------------- | ----------------- |
+| `server`, `api`, `backend`       | server            |
+| `internal`, `forja`, `crm`       | internal          |
+| `auth`, `login`, `session`       | server + internal |
+| `email`, `inbox`                 | server            |
+| `all`, `everything`, unspecified | server + internal |
 
 ## Pre-flight checks
 
@@ -24,7 +23,7 @@ Run these checks for each target app. Report results before deeper debugging.
 
 ### Portless proxy
 
-All dev URLs route through portless (`*.engranatge.localhost`). If all three apps fail with connection errors, check the proxy first before investigating individual apps.
+All dev URLs route through portless (`*.engranatge.localhost`). If both apps fail with connection errors, check the proxy first before investigating individual apps.
 
 ### Server (`api.engranatge.localhost`)
 
@@ -52,15 +51,6 @@ lsof -i :3000 -sTCP:LISTEN 2>/dev/null | head -5
 ```
 
 Verify `apps/internal/.env` contains `VITE_SERVER_URL=https://api.engranatge.localhost`. Without it, client-side API calls fall back to `http://localhost:3010` which breaks under portless.
-
-### Marketing (`engranatge.localhost`)
-
-```bash
-curl -sk https://engranatge.localhost/ 2>/dev/null | head -20 && echo "OK" || echo "DOWN"
-# If DOWN:
-lsof -i :3001 -sTCP:LISTEN 2>/dev/null | head -5
-# Start: pnpm dev:marketing
-```
 
 ## Common issues
 

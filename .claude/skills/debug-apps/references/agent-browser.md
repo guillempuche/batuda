@@ -32,7 +32,6 @@ agent-browser get url                                         # should be / (pip
 agent-browser open https://forja.engranatge.localhost              # pipeline dashboard
 agent-browser open https://forja.engranatge.localhost/companies    # company list
 agent-browser open https://forja.engranatge.localhost/tasks        # tasks view
-agent-browser open https://engranatge.localhost/                    # marketing site
 agent-browser back                                                 # go back
 agent-browser reload                                               # reload page
 ```

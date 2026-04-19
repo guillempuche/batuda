@@ -9,7 +9,6 @@ json=$(cat)
 file_path=$(echo "$json" | jq -r '.tool_input.file_path // empty')
 
 case "$file_path" in
-	*apps/marketing/src/*.tsx | *apps/marketing/src/*.ts) app=marketing ;;
 	*apps/internal/src/*.tsx | *apps/internal/src/*.ts) app=internal ;;
 	*) exit 0 ;;
 esac
