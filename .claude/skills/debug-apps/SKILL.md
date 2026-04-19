@@ -25,10 +25,10 @@ Run these checks for each target app. Report results before deeper debugging.
 
 All dev URLs route through portless (`*.engranatge.localhost`). If both apps fail with connection errors, check the proxy first before investigating individual apps.
 
-### Server (`api.engranatge.localhost`)
+### Server (`api.batuda.localhost`)
 
 ```bash
-curl -sk https://api.engranatge.localhost/health 2>/dev/null && echo "OK" || echo "DOWN"
+curl -sk https://api.batuda.localhost/health 2>/dev/null && echo "OK" || echo "DOWN"
 # If DOWN:
 lsof -i :3010 -sTCP:LISTEN 2>/dev/null | head -5
 # Start: pnpm dev:server
@@ -41,16 +41,16 @@ Check the persistent log file at `apps/server/server.log` (survives `node --watc
 - `cors allowed origins:` — verify CORS config
 - `Listening on` — last boot, which port
 
-### Internal / Forja (`forja.engranatge.localhost`)
+### Internal / Forja (`batuda.localhost`)
 
 ```bash
-curl -sk https://forja.engranatge.localhost/ 2>/dev/null | head -20 && echo "OK" || echo "DOWN"
+curl -sk https://batuda.localhost/ 2>/dev/null | head -20 && echo "OK" || echo "DOWN"
 # If DOWN:
 lsof -i :3000 -sTCP:LISTEN 2>/dev/null | head -5
 # Start: pnpm dev:internal
 ```
 
-Verify `apps/internal/.env` contains `VITE_SERVER_URL=https://api.engranatge.localhost`. Without it, client-side API calls fall back to `http://localhost:3010` which breaks under portless.
+Verify `apps/internal/.env` contains `VITE_SERVER_URL=https://api.batuda.localhost`. Without it, client-side API calls fall back to `http://localhost:3010` which breaks under portless.
 
 ## Common issues
 
@@ -63,7 +63,7 @@ After pre-flight, check these in order. Stop when the cause is found.
 - `RESEARCH_PROVIDER_LLM` set (no auto-default; use `stub`)
 - All `RESEARCH_DEFAULT_*` and `RESEARCH_MAX_*` budget/concurrency vars set
 - `ALLOWED_ORIGINS` matches portless URLs (`https://*.engranatge.localhost`)
-- `BETTER_AUTH_BASE_URL=https://api.engranatge.localhost`
+- `BETTER_AUTH_BASE_URL=https://api.batuda.localhost`
 - `EMAIL_PROVIDER` set explicitly (use `local-inbox` for dev)
 - Run `pnpm cli doctor` for a full automated environment health check
 
@@ -95,8 +95,8 @@ pnpm cli db reset     # truncate + migrate + seed (nuclear option)
 
 Auth spans server + internal. Both must be running.
 
-1. Verify CORS preflight: `curl -sk -X OPTIONS -H "Origin: https://forja.engranatge.localhost" -H "Access-Control-Request-Method: POST" https://api.engranatge.localhost/auth/sign-in/email -D - -o /dev/null 2>&1 | grep -i 'access-control'`
-2. Verify session endpoint: `curl -sk https://api.engranatge.localhost/auth/get-session`
+1. Verify CORS preflight: `curl -sk -X OPTIONS -H "Origin: https://batuda.localhost" -H "Access-Control-Request-Method: POST" https://api.batuda.localhost/auth/sign-in/email -D - -o /dev/null 2>&1 | grep -i 'access-control'`
+2. Verify session endpoint: `curl -sk https://api.batuda.localhost/auth/get-session`
 3. Check `apps/server/server.log` for `http.url="/auth/sign-in/email"` and its status
 4. Verify seed user exists: `pnpm cli seed --preset minimal` (idempotent)
 
@@ -137,7 +137,7 @@ For the full command reference (login flow, navigation, interaction, network ins
 Quick login test:
 
 ```bash
-agent-browser open https://forja.engranatge.localhost/login
+agent-browser open https://batuda.localhost/login
 agent-browser fill "input[name='email']" "dev@forja.cat"
 agent-browser fill "input[name='password']" "forja-dev-2026"
 agent-browser click "button[type='submit']"

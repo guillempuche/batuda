@@ -25,8 +25,8 @@ If the user passed an argument (e.g. `/release server`, `/release ui`, `/release
 
 Otherwise, use `AskUserQuestion`:
 
-- **Server** — API at api.engranatge.com (`server-v*` tag → auto-deploys)
-- **Internal** — Forja CRM at forja.engranatge.com (`internal-v*` tag → auto-deploys)
+- **Server** — API at api.batuda.co (`server-v*` tag → auto-deploys)
+- **Internal** — Forja CRM at batuda.co (`internal-v*` tag → auto-deploys)
 - **UI** — `@engranatge/ui` shared package (`ui-v*` tag → auto-publishes to npm + JSR)
 - **All** — Server first, then Internal, then UI
 
@@ -111,14 +111,14 @@ Only verify targets that were actually released:
 **Server:**
 
 ```bash
-curl -s https://api.engranatge.com/health
+curl -s https://api.batuda.co/health
 kraft cloud --metro fra instance list | grep engranatge-server
 ```
 
 **Internal:**
 
 ```bash
-curl -sI https://forja.engranatge.com | head -5
+curl -sI https://batuda.co | head -5
 kraft cloud --metro fra service get engranatge-internal
 ```
 

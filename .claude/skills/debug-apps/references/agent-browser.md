@@ -16,7 +16,7 @@ If login fails, re-run `pnpm cli seed --preset minimal` — the seed is idempote
 Ensure seed data exists before attempting login.
 
 ```bash
-agent-browser open https://forja.engranatge.localhost/login
+agent-browser open https://batuda.localhost/login
 agent-browser snapshot                                        # see the login form
 agent-browser fill "input[name='email']" "dev@forja.cat"
 agent-browser fill "input[name='password']" "forja-dev-2026"
@@ -29,9 +29,9 @@ agent-browser get url                                         # should be / (pip
 ## Navigate
 
 ```bash
-agent-browser open https://forja.engranatge.localhost              # pipeline dashboard
-agent-browser open https://forja.engranatge.localhost/companies    # company list
-agent-browser open https://forja.engranatge.localhost/tasks        # tasks view
+agent-browser open https://batuda.localhost              # pipeline dashboard
+agent-browser open https://batuda.localhost/companies    # company list
+agent-browser open https://batuda.localhost/tasks        # tasks view
 agent-browser back                                                 # go back
 agent-browser reload                                               # reload page
 ```
@@ -85,7 +85,7 @@ Quick mobile login → navigate → drill-in, all via testids:
 
 ```bash
 agent-browser set device "iPhone 16 Pro"
-agent-browser open https://forja.engranatge.localhost/
+agent-browser open https://batuda.localhost/
 agent-browser find testid "login-email" fill "dev@forja.cat"
 agent-browser find testid "login-password" fill "forja-dev-2026"
 agent-browser find testid "login-submit" click
