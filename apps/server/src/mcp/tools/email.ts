@@ -1,24 +1,30 @@
 import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 
-import { EmailService } from '../../services/email'
-import type { SendAttachmentInput } from '../../services/email-provider'
+import { EmailBlocks } from '@engranatge/email/schema'
 
-const mapAttachments = (
+import { EmailService } from '../../services/email'
+import {
+	EmailAttachmentStaging,
+	type StagingRef,
+} from '../../services/email-attachment-staging'
+
+// Convert MCP snake_case refs to the service's camelCase StagingRef.
+// `inline: false` is the default; unspecified inline means tray-style
+// attachment (a PDF, zip…), not an in-body image.
+const toStagingRefs = (
 	list:
 		| readonly {
-				readonly filename: string
-				readonly content_type: string
-				readonly content_base64: string
-				readonly content_id?: string | undefined
+				readonly staging_id: string
+				readonly inline?: boolean | undefined
+				readonly cid?: string | undefined
 		  }[]
 		| undefined,
-): readonly SendAttachmentInput[] =>
-	(list ?? []).map(a => ({
-		filename: a.filename,
-		contentType: a.content_type,
-		contentBase64: a.content_base64,
-		...(a.content_id !== undefined && { contentId: a.content_id }),
+): readonly StagingRef[] =>
+	(list ?? []).map(r => ({
+		stagingId: r.staging_id,
+		inline: r.inline ?? false,
+		...(r.cid !== undefined && { cid: r.cid }),
 	}))
 
 // ── Shared result schemas ────────────────────────────────────────
@@ -43,21 +49,21 @@ const ThreadStatus = Schema.Literals(['open', 'closed', 'archived'])
 const InboxPurpose = Schema.Literals(['human', 'agent', 'shared'])
 const Recipients = Schema.Union([Schema.String, Schema.Array(Schema.String)])
 
-// MCP attachments are inline base64 (no multipart staging hop — MCP tools
-// are a direct call so the AI already has the bytes). The HTTP composer
-// uses stagingIds instead; both routes hit the same provider interface.
-const InlineAttachment = Schema.Struct({
-	filename: Schema.String,
-	content_type: Schema.String,
-	content_base64: Schema.String,
-	content_id: Schema.optional(Schema.String),
+// MCP attachments reference staged uploads — agents call
+// `stage_email_attachment` first to upload bytes, then pass the
+// returned staging_id here. `inline: true` selects Content-Disposition
+// inline at MIME time and lets the body reference the image via `cid`.
+const AttachmentRef = Schema.Struct({
+	staging_id: Schema.String,
+	inline: Schema.optional(Schema.Boolean),
+	cid: Schema.optional(Schema.String),
 })
 
 // ── Compose tools ────────────────────────────────────────────────
 
 const SendEmail = Tool.make('send_email', {
 	description:
-		'Send a new email from a specific inbox. Accepts a single recipient or array for To/Cc/Bcc. Attachments are inline base64 (filename + content_type + content_base64 + optional content_id for cid-referenced inline images). Creates a thread link and logs an outbound interaction. Returns {_tag:"sent"} on success or {_tag:"suppressed"} if a recipient is suppressed. Set skip_footer=true to omit the inbox default footer.',
+		'Send a new email from a specific inbox. The body is a structured block tree (paragraph / heading / list / quote / divider / image) — not raw html/text. Attachments reference staging_ids returned by stage_email_attachment; set inline=true for cid-referenced inline images. Returns {_tag:"sent"} on success or {_tag:"suppressed"} if a recipient is suppressed. Set skip_footer=true to omit the inbox default footer.',
 	parameters: Schema.Struct({
 		inbox_id: Schema.String,
 		to: Recipients,
@@ -65,11 +71,11 @@ const SendEmail = Tool.make('send_email', {
 		bcc: Schema.optional(Schema.Array(Schema.String)),
 		reply_to: Schema.optional(Schema.String),
 		subject: Schema.String,
-		text: Schema.optional(Schema.String),
-		html: Schema.optional(Schema.String),
+		body_json: EmailBlocks,
+		preview: Schema.optional(Schema.String),
 		company_id: Schema.String,
 		contact_id: Schema.optional(Schema.String),
-		attachments: Schema.optional(Schema.Array(InlineAttachment)),
+		attachments: Schema.optional(Schema.Array(AttachmentRef)),
 		skip_footer: Schema.optional(Schema.Boolean),
 	}),
 	success: SendEmailResult,
@@ -80,19 +86,50 @@ const SendEmail = Tool.make('send_email', {
 
 const ReplyEmail = Tool.make('reply_email', {
 	description:
-		'Reply to the latest message in an existing email thread. Optional Cc/Bcc extend the thread. Attachments are inline base64 (filename + content_type + content_base64). Returns {_tag:"sent"} on success or {_tag:"suppressed"} if the recipient is suppressed. Set skip_footer=true to omit the inbox default footer.',
+		'Reply to the latest message in an existing email thread. Body is a structured block tree — if you want the parent quoted, emit a `quote` block wrapping sanitized parent blocks (you can read the parent via get_email_thread). Optional Cc/Bcc extend the thread. Attachments reference staging_ids from stage_email_attachment. Returns {_tag:"sent"} or {_tag:"suppressed"}. Set skip_footer=true to omit the inbox default footer.',
 	parameters: Schema.Struct({
 		thread_id: Schema.String,
-		text: Schema.optional(Schema.String),
-		html: Schema.optional(Schema.String),
+		body_json: EmailBlocks,
+		preview: Schema.optional(Schema.String),
 		cc: Schema.optional(Schema.Array(Schema.String)),
 		bcc: Schema.optional(Schema.Array(Schema.String)),
-		attachments: Schema.optional(Schema.Array(InlineAttachment)),
+		attachments: Schema.optional(Schema.Array(AttachmentRef)),
 		skip_footer: Schema.optional(Schema.Boolean),
 	}),
 	success: SendEmailResult,
 })
 	.annotate(Tool.Title, 'Reply Email')
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, true)
+
+// ── Attachment staging ──────────────────────────────────────────
+// Bytes-in, staging_id-out. Human compose uses a multipart HTTP endpoint;
+// MCP tools get this tool instead. Same backend, same object store, same
+// sweep/cleanup rules — just a different transport.
+
+const StageEmailAttachmentResult = Schema.Struct({
+	staging_id: Schema.String,
+	filename: Schema.String,
+	content_type: Schema.String,
+	size: Schema.Number,
+	is_inline: Schema.Boolean,
+	preview_url: Schema.optional(Schema.String),
+})
+
+const StageEmailAttachment = Tool.make('stage_email_attachment', {
+	description:
+		'Upload attachment bytes so they can be referenced by send_email / reply_email / footer tools. Returns a staging_id the other tools reference. Image uploads go through automatic email compression (max 1600px, JPEG/PNG normalization); other content types are stored verbatim. Set inline=true for in-body images (will be emitted as <img src="cid:..."> with Content-Disposition: inline); false (default) for tray-style attachments like PDFs. Optional draft_id ties the staging to a specific draft so cleanup runs when the draft is deleted.',
+	parameters: Schema.Struct({
+		inbox_id: Schema.String,
+		filename: Schema.String,
+		content_type: Schema.String,
+		content_base64: Schema.String,
+		inline: Schema.optional(Schema.Boolean),
+		draft_id: Schema.optional(Schema.String),
+	}),
+	success: StageEmailAttachmentResult,
+})
+	.annotate(Tool.Title, 'Stage Email Attachment')
 	.annotate(Tool.Destructive, false)
 	.annotate(Tool.OpenWorld, true)
 
@@ -265,15 +302,14 @@ const SyncEmailInboxes = Tool.make('sync_email_inboxes', {
 
 const CreateEmailDraft = Tool.make('create_email_draft', {
 	description:
-		'Create a draft email that a human can review in Forja before sending. The draft is stored on the provider (AgentMail) and shows up in the compose dock. Optionally set company_id/contact_id/mode to link to CRM context.',
+		'Create a draft email that a human can review in Forja before sending. The draft is stored on the provider (AgentMail) plus a local body_json shadow that preserves the typed block tree for lossless editor re-hydration. Optionally set company_id/contact_id/mode to link to CRM context.',
 	parameters: Schema.Struct({
 		inbox_id: Schema.String,
 		to: Schema.optional(Recipients),
 		cc: Schema.optional(Schema.Array(Schema.String)),
 		bcc: Schema.optional(Schema.Array(Schema.String)),
 		subject: Schema.optional(Schema.String),
-		text: Schema.optional(Schema.String),
-		html: Schema.optional(Schema.String),
+		body_json: Schema.optional(EmailBlocks),
 		in_reply_to: Schema.optional(Schema.String),
 		company_id: Schema.optional(Schema.String),
 		contact_id: Schema.optional(Schema.String),
@@ -288,7 +324,7 @@ const CreateEmailDraft = Tool.make('create_email_draft', {
 
 const UpdateEmailDraft = Tool.make('update_email_draft', {
 	description:
-		'Update fields on an existing draft. Pass only the fields you want to change.',
+		'Update fields on an existing draft. Pass only the fields you want to change. body_json replaces the typed block tree stored in the shadow table.',
 	parameters: Schema.Struct({
 		inbox_id: Schema.String,
 		draft_id: Schema.String,
@@ -296,8 +332,7 @@ const UpdateEmailDraft = Tool.make('update_email_draft', {
 		cc: Schema.optional(Schema.Array(Schema.String)),
 		bcc: Schema.optional(Schema.Array(Schema.String)),
 		subject: Schema.optional(Schema.String),
-		text: Schema.optional(Schema.String),
-		html: Schema.optional(Schema.String),
+		body_json: Schema.optional(EmailBlocks),
 	}),
 	success: Schema.Unknown,
 })
@@ -348,12 +383,11 @@ const ListInboxFooters = Tool.make('list_inbox_footers', {
 
 const CreateInboxFooter = Tool.make('create_inbox_footer', {
 	description:
-		'Create an HTML footer for an inbox. If is_default is true, this becomes the footer automatically appended to outbound emails. Only one default per inbox is allowed.',
+		'Create a structured block-tree footer for an inbox. The body is the same EmailBlocks shape used by send_email/reply_email (paragraph / image / list). If is_default is true, this becomes the footer automatically appended to outbound emails. Only one default per inbox is allowed.',
 	parameters: Schema.Struct({
 		inbox_id: Schema.String,
 		name: Schema.String,
-		html: Schema.String,
-		text_fallback: Schema.optional(Schema.String),
+		body_json: EmailBlocks,
 		is_default: Schema.optional(Schema.Boolean),
 	}),
 	success: Schema.Unknown,
@@ -364,12 +398,11 @@ const CreateInboxFooter = Tool.make('create_inbox_footer', {
 
 const UpdateInboxFooter = Tool.make('update_inbox_footer', {
 	description:
-		'Update an existing inbox footer. Flipping is_default=true atomically clears the previous default for the same inbox.',
+		'Update an existing inbox footer. Pass body_json to replace the block tree. Flipping is_default=true atomically clears the previous default for the same inbox.',
 	parameters: Schema.Struct({
 		id: Schema.String,
 		name: Schema.optional(Schema.String),
-		html: Schema.optional(Schema.String),
-		text_fallback: Schema.optional(Schema.String),
+		body_json: Schema.optional(EmailBlocks),
 		is_default: Schema.optional(Schema.Boolean),
 	}),
 	success: Schema.Unknown,
@@ -393,6 +426,7 @@ const DeleteInboxFooter = Tool.make('delete_inbox_footer', {
 export const EmailTools = Toolkit.make(
 	SendEmail,
 	ReplyEmail,
+	StageEmailAttachment,
 	ListEmailThreads,
 	GetEmailThread,
 	UpdateThreadStatus,
@@ -416,18 +450,15 @@ export const EmailTools = Toolkit.make(
 export const EmailHandlersLive = EmailTools.toLayer(
 	Effect.gen(function* () {
 		const svc = yield* EmailService
+		const staging = yield* EmailAttachmentStaging
 		return {
-			send_email: params => {
-				const attachments = mapAttachments(params.attachments)
-				return svc
+			send_email: params =>
+				svc
 					.send(
 						params.inbox_id,
 						typeof params.to === 'string' ? params.to : [...params.to],
 						params.subject,
-						{
-							...(params.text !== undefined && { text: params.text }),
-							...(params.html !== undefined && { html: params.html }),
-						},
+						params.body_json,
 						params.company_id,
 						params.contact_id,
 						{
@@ -436,7 +467,10 @@ export const EmailHandlersLive = EmailTools.toLayer(
 							...(params.reply_to !== undefined && {
 								replyTo: params.reply_to,
 							}),
-							...(attachments.length > 0 && { attachments }),
+							...(params.preview !== undefined && { preview: params.preview }),
+							...(params.attachments !== undefined && {
+								attachmentRefs: toStagingRefs(params.attachments),
+							}),
 							...(params.skip_footer !== undefined && {
 								skipFooter: params.skip_footer,
 							}),
@@ -457,26 +491,20 @@ export const EmailHandlersLive = EmailTools.toLayer(
 							}),
 						),
 						Effect.orDie,
-					)
-			},
-			reply_email: params => {
-				const attachments = mapAttachments(params.attachments)
-				return svc
-					.reply(
-						params.thread_id,
-						{
-							...(params.text !== undefined && { text: params.text }),
-							...(params.html !== undefined && { html: params.html }),
-						},
-						{
-							...(params.cc !== undefined && { cc: [...params.cc] }),
-							...(params.bcc !== undefined && { bcc: [...params.bcc] }),
-							...(attachments.length > 0 && { attachments }),
-							...(params.skip_footer !== undefined && {
-								skipFooter: params.skip_footer,
-							}),
-						},
-					)
+					),
+			reply_email: params =>
+				svc
+					.reply(params.thread_id, params.body_json, {
+						...(params.cc !== undefined && { cc: [...params.cc] }),
+						...(params.bcc !== undefined && { bcc: [...params.bcc] }),
+						...(params.preview !== undefined && { preview: params.preview }),
+						...(params.attachments !== undefined && {
+							attachmentRefs: toStagingRefs(params.attachments),
+						}),
+						...(params.skip_footer !== undefined && {
+							skipFooter: params.skip_footer,
+						}),
+					})
 					.pipe(
 						Effect.map(r => ({
 							_tag: 'sent' as const,
@@ -492,8 +520,29 @@ export const EmailHandlersLive = EmailTools.toLayer(
 							}),
 						),
 						Effect.orDie,
-					)
-			},
+					),
+			stage_email_attachment: params =>
+				Effect.gen(function* () {
+					const bytes = Buffer.from(params.content_base64, 'base64')
+					const result = yield* staging.stage({
+						inboxId: params.inbox_id,
+						bytes,
+						filename: params.filename,
+						contentType: params.content_type,
+						isInline: params.inline ?? false,
+						...(params.draft_id !== undefined && { draftId: params.draft_id }),
+					})
+					return {
+						staging_id: result.stagingId,
+						filename: result.filename,
+						content_type: result.contentType,
+						size: result.size,
+						is_inline: result.isInline,
+						...(result.previewUrl !== undefined && {
+							preview_url: result.previewUrl,
+						}),
+					}
+				}).pipe(Effect.orDie),
 			list_email_threads: params =>
 				svc
 					.listThreads({
@@ -611,8 +660,9 @@ export const EmailHandlersLive = EmailTools.toLayer(
 							...(params.subject !== undefined && {
 								subject: params.subject,
 							}),
-							...(params.text !== undefined && { text: params.text }),
-							...(params.html !== undefined && { html: params.html }),
+							...(params.body_json !== undefined && {
+								bodyJson: params.body_json,
+							}),
 							...(params.in_reply_to !== undefined && {
 								inReplyTo: params.in_reply_to,
 							}),
@@ -642,8 +692,9 @@ export const EmailHandlersLive = EmailTools.toLayer(
 						...(params.subject !== undefined && {
 							subject: params.subject,
 						}),
-						...(params.text !== undefined && { text: params.text }),
-						...(params.html !== undefined && { html: params.html }),
+						...(params.body_json !== undefined && {
+							bodyJson: params.body_json,
+						}),
 					})
 					.pipe(Effect.orDie),
 			send_email_draft: params =>
@@ -671,10 +722,7 @@ export const EmailHandlersLive = EmailTools.toLayer(
 					.createFooter({
 						inboxId: params.inbox_id,
 						name: params.name,
-						html: params.html,
-						...(params.text_fallback !== undefined && {
-							textFallback: params.text_fallback,
-						}),
+						bodyJson: params.body_json,
 						...(params.is_default !== undefined && {
 							isDefault: params.is_default,
 						}),
@@ -684,9 +732,8 @@ export const EmailHandlersLive = EmailTools.toLayer(
 				svc
 					.updateFooter(params.id, {
 						...(params.name !== undefined && { name: params.name }),
-						...(params.html !== undefined && { html: params.html }),
-						...(params.text_fallback !== undefined && {
-							textFallback: params.text_fallback,
+						...(params.body_json !== undefined && {
+							bodyJson: params.body_json,
 						}),
 						...(params.is_default !== undefined && {
 							isDefault: params.is_default,

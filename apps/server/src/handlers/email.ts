@@ -5,41 +5,47 @@ import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import { BadRequest, ForjaApi } from '@engranatge/controllers'
 
 import { EmailService } from '../services/email'
-import { EmailAttachmentStaging } from '../services/email-attachment-staging'
-import type { SendAttachmentInput } from '../services/email-provider'
+import {
+	EmailAttachmentStaging,
+	type StagingRef,
+} from '../services/email-attachment-staging'
 
 export const EmailLive = HttpApiBuilder.group(ForjaApi, 'email', handlers =>
 	Effect.gen(function* () {
 		const svc = yield* EmailService
 		const staging = yield* EmailAttachmentStaging
 
-		// Resolve an array of { stagingId } refs into the provider-agnostic
-		// SendAttachmentInput shape that the service accepts.
-		const resolveAttachments = (
-			refs: ReadonlyArray<{ readonly stagingId: string }> | undefined,
-		): Effect.Effect<readonly SendAttachmentInput[], BadRequest> =>
-			refs && refs.length > 0
-				? staging.resolve(refs.map(r => r.stagingId))
-				: Effect.succeed([])
+		// Convert the on-wire ref shape to the staging service's StagingRef.
+		// Defaults `inline: false` when caller omits it — same policy the
+		// compose tray uses for non-image attachments.
+		const toStagingRefs = (
+			refs:
+				| ReadonlyArray<{
+						readonly stagingId: string
+						readonly inline?: boolean | undefined
+						readonly cid?: string | undefined
+				  }>
+				| undefined,
+		): readonly StagingRef[] =>
+			refs
+				? refs.map(r => ({
+						stagingId: r.stagingId,
+						inline: r.inline ?? false,
+						...(r.cid !== undefined && { cid: r.cid }),
+					}))
+				: []
+
 		return (
 			handlers
 				.handle('send', _ =>
-					Effect.gen(function* () {
-						const attachments = yield* resolveAttachments(_.payload.attachments)
-						return yield* svc.send(
+					svc
+						.send(
 							_.payload.inboxId,
 							typeof _.payload.to === 'string'
 								? _.payload.to
 								: [..._.payload.to],
 							_.payload.subject,
-							{
-								...(_.payload.text !== undefined && {
-									text: _.payload.text,
-								}),
-								...(_.payload.html !== undefined && {
-									html: _.payload.html,
-								}),
-							},
+							_.payload.bodyJson,
 							_.payload.companyId,
 							_.payload.contactId,
 							{
@@ -50,47 +56,46 @@ export const EmailLive = HttpApiBuilder.group(ForjaApi, 'email', handlers =>
 								...(_.payload.replyTo !== undefined && {
 									replyTo: _.payload.replyTo,
 								}),
-								...(attachments.length > 0 && { attachments }),
+								...(_.payload.preview !== undefined && {
+									preview: _.payload.preview,
+								}),
+								...(_.payload.attachments !== undefined && {
+									attachmentRefs: toStagingRefs(_.payload.attachments),
+								}),
 								...(_.payload.skipFooter !== undefined && {
 									skipFooter: _.payload.skipFooter,
 								}),
 							},
 						)
-					}).pipe(
-						Effect.catchTag('EmailSendError', e => Effect.die(e)),
-						Effect.catchTag('SqlError', e => Effect.die(e)),
-					),
+						.pipe(
+							Effect.catchTag('EmailSendError', e => Effect.die(e)),
+							Effect.catchTag('EmailError', e => Effect.die(e)),
+							Effect.catchTag('SqlError', e => Effect.die(e)),
+						),
 				)
 				.handle('reply', _ =>
-					Effect.gen(function* () {
-						const attachments = yield* resolveAttachments(_.payload.attachments)
-						return yield* svc.reply(
-							_.payload.threadId,
-							{
-								...(_.payload.text !== undefined && {
-									text: _.payload.text,
-								}),
-								...(_.payload.html !== undefined && {
-									html: _.payload.html,
-								}),
-							},
-							{
-								...(_.payload.cc !== undefined && { cc: [..._.payload.cc] }),
-								...(_.payload.bcc !== undefined && {
-									bcc: [..._.payload.bcc],
-								}),
-								...(attachments.length > 0 && { attachments }),
-								...(_.payload.skipFooter !== undefined && {
-									skipFooter: _.payload.skipFooter,
-								}),
-							},
-						)
-					}).pipe(
-						Effect.catchTag('EmailSendError', e => Effect.die(e)),
-						Effect.catchTag('NotFound', e => Effect.die(e)),
-						Effect.catchTag('EmailError', e => Effect.die(e)),
-						Effect.catchTag('SqlError', e => Effect.die(e)),
-					),
+					svc
+						.reply(_.payload.threadId, _.payload.bodyJson, {
+							...(_.payload.cc !== undefined && { cc: [..._.payload.cc] }),
+							...(_.payload.bcc !== undefined && {
+								bcc: [..._.payload.bcc],
+							}),
+							...(_.payload.preview !== undefined && {
+								preview: _.payload.preview,
+							}),
+							...(_.payload.attachments !== undefined && {
+								attachmentRefs: toStagingRefs(_.payload.attachments),
+							}),
+							...(_.payload.skipFooter !== undefined && {
+								skipFooter: _.payload.skipFooter,
+							}),
+						})
+						.pipe(
+							Effect.catchTag('EmailSendError', e => Effect.die(e)),
+							Effect.catchTag('NotFound', e => Effect.die(e)),
+							Effect.catchTag('EmailError', e => Effect.die(e)),
+							Effect.catchTag('SqlError', e => Effect.die(e)),
+						),
 				)
 				.handle('listThreads', _ =>
 					svc.listThreads({
@@ -225,8 +230,9 @@ export const EmailLive = HttpApiBuilder.group(ForjaApi, 'email', handlers =>
 								...(_.payload.subject !== undefined && {
 									subject: _.payload.subject,
 								}),
-								...(_.payload.text !== undefined && { text: _.payload.text }),
-								...(_.payload.html !== undefined && { html: _.payload.html }),
+								...(_.payload.bodyJson !== undefined && {
+									bodyJson: _.payload.bodyJson,
+								}),
 								...(_.payload.inReplyTo !== undefined && {
 									inReplyTo: _.payload.inReplyTo,
 								}),
@@ -266,8 +272,9 @@ export const EmailLive = HttpApiBuilder.group(ForjaApi, 'email', handlers =>
 							...(_.payload.subject !== undefined && {
 								subject: _.payload.subject,
 							}),
-							...(_.payload.text !== undefined && { text: _.payload.text }),
-							...(_.payload.html !== undefined && { html: _.payload.html }),
+							...(_.payload.bodyJson !== undefined && {
+								bodyJson: _.payload.bodyJson,
+							}),
 						})
 						.pipe(Effect.orDie),
 				)
@@ -292,10 +299,7 @@ export const EmailLive = HttpApiBuilder.group(ForjaApi, 'email', handlers =>
 						.createFooter({
 							inboxId: _.params.inboxId,
 							name: _.payload.name,
-							html: _.payload.html,
-							...(_.payload.textFallback !== undefined && {
-								textFallback: _.payload.textFallback,
-							}),
+							bodyJson: _.payload.bodyJson,
 							...(_.payload.isDefault !== undefined && {
 								isDefault: _.payload.isDefault,
 							}),
@@ -312,9 +316,8 @@ export const EmailLive = HttpApiBuilder.group(ForjaApi, 'email', handlers =>
 					svc
 						.updateFooter(_.params.id, {
 							...(_.payload.name !== undefined && { name: _.payload.name }),
-							...(_.payload.html !== undefined && { html: _.payload.html }),
-							...(_.payload.textFallback !== undefined && {
-								textFallback: _.payload.textFallback,
+							...(_.payload.bodyJson !== undefined && {
+								bodyJson: _.payload.bodyJson,
 							}),
 							...(_.payload.isDefault !== undefined && {
 								isDefault: _.payload.isDefault,
@@ -326,12 +329,20 @@ export const EmailLive = HttpApiBuilder.group(ForjaApi, 'email', handlers =>
 						),
 				)
 				.handle('deleteFooter', _ => svc.deleteFooter(_.params.id))
+				.handle('discardStagedAttachment', _ =>
+					staging
+						.discard(_.query.inboxId, _.params.stagingId)
+						.pipe(Effect.catchTag('BadRequest', e => Effect.fail(e))),
+				)
 				.handleRaw(
 					'stageAttachment',
 					Effect.fnUntraced(function* ({ request }) {
 						let bytes: Uint8Array | undefined
 						let filename: string | undefined
 						let contentType: string | undefined
+						let inboxId: string | undefined
+						let inline = false
+						let draftId: string | undefined
 
 						yield* request.multipartStream.pipe(
 							Stream.runForEach(part =>
@@ -340,6 +351,23 @@ export const EmailLive = HttpApiBuilder.group(ForjaApi, 'email', handlers =>
 										bytes = yield* part.contentEffect
 										filename = part.name ?? 'attachment'
 										contentType = part.contentType
+										return
+									}
+									if (Multipart.isField(part)) {
+										const value = part.value
+										if (part.key === 'inboxId' && typeof value === 'string') {
+											inboxId = value
+										} else if (
+											part.key === 'inline' &&
+											typeof value === 'string'
+										) {
+											inline = value === 'true'
+										} else if (
+											part.key === 'draftId' &&
+											typeof value === 'string'
+										) {
+											draftId = value
+										}
 									}
 								}),
 							),
@@ -355,12 +383,24 @@ export const EmailLive = HttpApiBuilder.group(ForjaApi, 'email', handlers =>
 								{ status: 400 },
 							)
 						}
+						if (!inboxId) {
+							return HttpServerResponse.jsonUnsafe(
+								{
+									_tag: 'BadRequest',
+									message: 'Missing inboxId field in multipart upload',
+								},
+								{ status: 400 },
+							)
+						}
 
 						const result = yield* staging
 							.stage({
+								inboxId,
 								bytes,
 								filename: filename ?? 'attachment',
 								contentType,
+								isInline: inline,
+								...(draftId !== undefined && { draftId }),
 							})
 							.pipe(
 								Effect.catchTag('BadRequest', err =>

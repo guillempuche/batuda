@@ -148,11 +148,16 @@ const mapMessage = (m: {
 
 // Convert our provider-agnostic SendAttachmentInput into AgentMail's
 // `SendAttachment` shape (base64 string via `content`).
+//
+// An `<img src="cid:…">` in the rendered body won't resolve unless the
+// matching MIME part is `Content-Disposition: inline`. The caller picks
+// the disposition; we just forward it as AgentMail's `contentDisposition`.
 const toAgentMailAttachment = (a: SendAttachmentInput) => ({
 	filename: a.filename,
 	contentType: a.contentType,
 	content: a.contentBase64,
 	...(a.contentId !== undefined && { contentId: a.contentId }),
+	...(a.disposition !== undefined && { contentDisposition: a.disposition }),
 })
 
 const mapInbox = (i: {

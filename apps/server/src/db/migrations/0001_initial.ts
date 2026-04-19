@@ -239,16 +239,51 @@ export default Effect.gen(function* () {
 		)
 	`
 
+	// Footer bodies are typed block trees; html/text are derived on send.
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS inbox_footers (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 			inbox_id UUID NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE,
 			name TEXT NOT NULL,
-			html TEXT NOT NULL,
-			text_fallback TEXT NOT NULL DEFAULT '',
+			body_json JSONB NOT NULL,
 			is_default BOOLEAN NOT NULL DEFAULT false,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+		)
+	`
+
+	// Draft body shadow — AgentMail's draft API exposes html/text only, so
+	// the editor-authored block tree lives here keyed by the provider's
+	// draft_id. Local provider doesn't need this (stores bodyJson inline
+	// in its on-disk JSON); the row is AgentMail-only in practice but the
+	// table is provider-agnostic.
+	yield* sql`
+		CREATE TABLE IF NOT EXISTS email_draft_bodies (
+			draft_id TEXT PRIMARY KEY,
+			inbox_id UUID NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE,
+			body_json JSONB NOT NULL,
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+		)
+	`
+
+	// Staged attachments — tracks each upload so we can sweep on draft
+	// delete / send / TTL. Durable storage key lives in storage_key; the
+	// bytes themselves are in StorageProvider under that key. cid is
+	// populated at send time so reply-open can re-link inline images.
+	yield* sql`
+		CREATE TABLE IF NOT EXISTS email_attachment_staging (
+			staging_id TEXT PRIMARY KEY,
+			inbox_id UUID NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE,
+			draft_id TEXT,
+			storage_key TEXT NOT NULL,
+			filename TEXT NOT NULL,
+			content_type TEXT NOT NULL,
+			size_bytes BIGINT NOT NULL,
+			is_inline BOOLEAN NOT NULL DEFAULT false,
+			cid TEXT,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			expires_at TIMESTAMPTZ NOT NULL,
+			sent_at TIMESTAMPTZ
 		)
 	`
 
@@ -579,6 +614,14 @@ export default Effect.gen(function* () {
 		// inbox_footers
 		sql`CREATE INDEX IF NOT EXISTS idx_inbox_footers_inbox_id ON inbox_footers(inbox_id)`,
 		sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_inbox_footers_single_default ON inbox_footers(inbox_id) WHERE is_default = true`,
+
+		// email_draft_bodies
+		sql`CREATE INDEX IF NOT EXISTS idx_email_draft_bodies_inbox ON email_draft_bodies(inbox_id)`,
+
+		// email_attachment_staging — hot paths are per-inbox recency, draft cleanup, and TTL sweep.
+		sql`CREATE INDEX IF NOT EXISTS idx_email_attachment_staging_inbox ON email_attachment_staging(inbox_id, created_at DESC)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_email_attachment_staging_draft ON email_attachment_staging(draft_id) WHERE draft_id IS NOT NULL`,
+		sql`CREATE INDEX IF NOT EXISTS idx_email_attachment_staging_expires ON email_attachment_staging(expires_at) WHERE sent_at IS NULL`,
 
 		// call_recordings — partial index on the common "active" path.
 		sql`CREATE INDEX IF NOT EXISTS idx_call_recordings_active ON call_recordings(deleted_at) WHERE deleted_at IS NULL`,

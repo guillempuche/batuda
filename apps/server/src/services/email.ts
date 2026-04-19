@@ -4,7 +4,14 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import { EmailError, EmailSuppressed, NotFound } from '@engranatge/controllers'
 import type { InboundClassification } from '@engranatge/domain'
+import {
+	renderBlocks,
+	type StagedAttachmentRef,
+} from '@engranatge/email/render'
+import type { EmailBlocks } from '@engranatge/email/schema'
 
+import type { ResolvedStaging, StagingRef } from './email-attachment-staging.js'
+import { EmailAttachmentStaging } from './email-attachment-staging.js'
 import type {
 	CreateDraftParams,
 	SendAttachmentInput,
@@ -78,28 +85,32 @@ const parseClientId = (
 	return result
 }
 
-const injectFooter = (
-	body: { text?: string; html?: string },
-	footer: { html: string; textFallback: string },
-): { text?: string; html?: string } => {
-	let html = body.html
-	if (html !== undefined) {
-		const closingBody = html.lastIndexOf('</body>')
-		if (closingBody !== -1) {
-			html = `${html.slice(0, closingBody)}<div>${footer.html}</div>${html.slice(closingBody)}`
-		} else {
-			html = `${html}<div>${footer.html}</div>`
-		}
-	}
-	let text = body.text
-	if (text !== undefined && footer.textFallback) {
-		text = `${text}\n\n${footer.textFallback}`
-	}
-	return {
-		...(text !== undefined && { text }),
-		...(html !== undefined && { html }),
-	}
-}
+// Convert staging refs for the renderer (keeps stagingId → cid lookup
+// without exposing bytes). Every inline staging carries a cid by the
+// time `resolve` returns, so a missing cid here is a programmer error.
+const toStagedRefs = (
+	staged: readonly ResolvedStaging[],
+): readonly StagedAttachmentRef[] =>
+	staged
+		.filter(s => s.inline)
+		.map(s => ({
+			stagingId: s.stagingId,
+			cid: s.cid ?? s.stagingId,
+			filename: s.filename,
+			contentType: s.contentType,
+			inline: s.inline,
+		}))
+
+const toSendAttachments = (
+	staged: readonly ResolvedStaging[],
+): readonly SendAttachmentInput[] =>
+	staged.map(s => ({
+		filename: s.filename,
+		contentType: s.contentType,
+		contentBase64: s.contentBase64,
+		disposition: s.inline ? 'inline' : 'attachment',
+		...(s.inline && s.cid ? { contentId: s.cid } : {}),
+	}))
 
 export class EmailService extends ServiceMap.Service<EmailService>()(
 	'EmailService',
@@ -110,6 +121,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 			const webhooks = yield* WebhookService
 			const timeline = yield* TimelineActivityService
 			const participantMatcher = yield* ParticipantMatcher
+			const staging = yield* EmailAttachmentStaging
 			const providerName = yield* Config.schema(
 				Schema.Literals(['local-inbox', 'agentmail']),
 				'EMAIL_PROVIDER',
@@ -167,14 +179,14 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					Effect.orDie,
 				)
 
-			type FooterRow = { html: string; textFallback: string }
+			type FooterRow = { bodyJson: EmailBlocks }
 			const resolveDefaultFooter = (localInboxId: string) =>
 				sql<FooterRow>`
-					SELECT html, text_fallback FROM inbox_footers
+					SELECT body_json FROM inbox_footers
 					WHERE inbox_id = ${localInboxId} AND is_default = true
 					LIMIT 1
 				`.pipe(
-					Effect.map(rows => rows[0] ?? null),
+					Effect.map(rows => rows[0]?.bodyJson ?? null),
 					Effect.orDie,
 				)
 
@@ -304,21 +316,22 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					inboxId: string,
 					to: string | string[],
 					subject: string,
-					body: { text?: string; html?: string },
+					bodyJson: EmailBlocks,
 					companyId: string,
 					contactId?: string,
 					extras?: {
 						cc?: string[] | undefined
 						bcc?: string[] | undefined
 						replyTo?: string | undefined
-						attachments?: readonly SendAttachmentInput[] | undefined
+						preview?: string | undefined
+						attachmentRefs?: readonly StagingRef[] | undefined
 						skipFooter?: boolean | undefined
 					},
 				) =>
 					Effect.gen(function* () {
 						const cc = extras?.cc ?? []
 						const bcc = extras?.bcc ?? []
-						const attachments = extras?.attachments ?? []
+						const attachmentRefs = extras?.attachmentRefs ?? []
 
 						const inbox = yield* resolveInbox(inboxId)
 						const providerInboxId = inbox?.providerInboxId ?? inboxId
@@ -329,24 +342,41 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							yield* assertContactNotSuppressed(contactId, to)
 						}
 
-						let finalBody = body
+						const staged = yield* staging.resolve(inboxId, attachmentRefs)
+						let blocks: EmailBlocks = bodyJson
 						if (!extras?.skipFooter && localInboxId) {
-							const footer = yield* resolveDefaultFooter(localInboxId)
-							if (footer) finalBody = injectFooter(body, footer)
+							const footerBlocks = yield* resolveDefaultFooter(localInboxId)
+							if (footerBlocks) blocks = [...bodyJson, ...footerBlocks]
 						}
+						const rendered = yield* Effect.tryPromise({
+							try: () =>
+								renderBlocks(blocks, {
+									...(extras?.preview !== undefined && {
+										preview: extras.preview,
+									}),
+									attachments: toStagedRefs(staged),
+								}),
+							catch: err =>
+								new EmailError({
+									message: `renderBlocks: ${err instanceof Error ? err.message : String(err)}`,
+								}),
+						})
+						const sendAttachments = toSendAttachments(staged)
 
 						const result = yield* provider
 							.send(providerInboxId, {
 								to,
 								subject,
-								...(finalBody.text !== undefined && { text: finalBody.text }),
-								...(finalBody.html !== undefined && { html: finalBody.html }),
+								text: rendered.text,
+								html: rendered.html,
 								...(cc.length > 0 && { cc }),
 								...(bcc.length > 0 && { bcc }),
 								...(extras?.replyTo !== undefined && {
 									replyTo: extras.replyTo,
 								}),
-								...(attachments.length > 0 && { attachments }),
+								...(sendAttachments.length > 0 && {
+									attachments: sendAttachments,
+								}),
 							})
 							.pipe(
 								Effect.catchTag('EmailSendError', err =>
@@ -387,6 +417,12 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							isNewThread: true,
 						})
 
+						if (staged.length > 0) {
+							yield* staging
+								.markSentAndCleanup(staged.map(s => s.stagingId))
+								.pipe(Effect.ignore)
+						}
+
 						yield* Effect.logInfo('Email sent').pipe(
 							Effect.annotateLogs({
 								event: 'email.sent',
@@ -400,18 +436,19 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 
 				reply: (
 					providerThreadId: string,
-					body: { text?: string; html?: string },
+					bodyJson: EmailBlocks,
 					extras?: {
 						cc?: string[] | undefined
 						bcc?: string[] | undefined
-						attachments?: readonly SendAttachmentInput[] | undefined
+						preview?: string | undefined
+						attachmentRefs?: readonly StagingRef[] | undefined
 						skipFooter?: boolean | undefined
 					},
 				) =>
 					Effect.gen(function* () {
 						const cc = extras?.cc ?? []
 						const bcc = extras?.bcc ?? []
-						const attachments = extras?.attachments ?? []
+						const attachmentRefs = extras?.attachmentRefs ?? []
 						const links = yield* sql`
 							SELECT * FROM email_thread_links
 							WHERE provider_thread_id = ${providerThreadId}
@@ -453,19 +490,39 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							link.inboxId ?? (yield* resolveLocalInboxId(link.providerInboxId))
 						const inboxEmail = yield* resolveInboxEmail(link.providerInboxId)
 
-						let finalBody = body
+						const staged = yield* staging.resolve(
+							link.providerInboxId,
+							attachmentRefs,
+						)
+						let blocks: EmailBlocks = bodyJson
 						if (!extras?.skipFooter && localInboxId) {
-							const footer = yield* resolveDefaultFooter(localInboxId)
-							if (footer) finalBody = injectFooter(body, footer)
+							const footerBlocks = yield* resolveDefaultFooter(localInboxId)
+							if (footerBlocks) blocks = [...bodyJson, ...footerBlocks]
 						}
+						const rendered = yield* Effect.tryPromise({
+							try: () =>
+								renderBlocks(blocks, {
+									...(extras?.preview !== undefined && {
+										preview: extras.preview,
+									}),
+									attachments: toStagedRefs(staged),
+								}),
+							catch: err =>
+								new EmailError({
+									message: `renderBlocks: ${err instanceof Error ? err.message : String(err)}`,
+								}),
+						})
+						const sendAttachments = toSendAttachments(staged)
 
 						const result = yield* provider
 							.reply(link.providerInboxId, lastMessage.messageId, {
-								...(finalBody.text !== undefined && { text: finalBody.text }),
-								...(finalBody.html !== undefined && { html: finalBody.html }),
+								text: rendered.text,
+								html: rendered.html,
 								...(cc.length > 0 && { cc }),
 								...(bcc.length > 0 && { bcc }),
-								...(attachments.length > 0 && { attachments }),
+								...(sendAttachments.length > 0 && {
+									attachments: sendAttachments,
+								}),
 							})
 							.pipe(
 								Effect.catchTag('EmailSendError', err =>
@@ -506,6 +563,12 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							bcc,
 							isNewThread: false,
 						})
+
+						if (staged.length > 0) {
+							yield* staging
+								.markSentAndCleanup(staged.map(s => s.stagingId))
+								.pipe(Effect.ignore)
+						}
 
 						yield* Effect.logInfo('Email reply sent').pipe(
 							Effect.annotateLogs({
@@ -1427,10 +1490,21 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					}).pipe(Effect.orDie),
 
 				// ── Drafts ──────────────────────────────────────────────────
+				// Drafts carry a bodyJson (block tree) alongside the provider's
+				// html/text. The provider only has a string body; the shadow
+				// table `email_draft_bodies` keeps the editor-authored tree so
+				// re-opens are lossless.
 
 				createDraft: (
 					inboxId: string,
-					params: CreateDraftParams,
+					params: {
+						to?: string | string[] | undefined
+						cc?: string | string[] | undefined
+						bcc?: string | string[] | undefined
+						subject?: string | undefined
+						bodyJson?: EmailBlocks | undefined
+						inReplyTo?: string | undefined
+					},
 					context?: {
 						companyId?: string
 						contactId?: string
@@ -1442,27 +1516,119 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						const inbox = yield* resolveInbox(inboxId)
 						const providerInboxId = inbox?.providerInboxId ?? inboxId
 						const clientId = context ? encodeClientId(context) : undefined
-						return yield* provider.createDraft(providerInboxId, {
-							...params,
+
+						const rendered = params.bodyJson
+							? yield* Effect.tryPromise({
+									try: () => renderBlocks(params.bodyJson!),
+									catch: err =>
+										new EmailError({
+											message: `renderBlocks: ${err instanceof Error ? err.message : String(err)}`,
+										}),
+								})
+							: null
+
+						const providerParams: CreateDraftParams = {
+							...(params.to !== undefined && { to: params.to }),
+							...(params.cc !== undefined && { cc: params.cc }),
+							...(params.bcc !== undefined && { bcc: params.bcc }),
+							...(params.subject !== undefined && { subject: params.subject }),
+							...(params.inReplyTo !== undefined && {
+								inReplyTo: params.inReplyTo,
+							}),
+							...(rendered !== null && {
+								text: rendered.text,
+								html: rendered.html,
+							}),
 							...(clientId !== undefined && { clientId }),
-						})
+						}
+
+						const draft = yield* provider.createDraft(
+							providerInboxId,
+							providerParams,
+						)
+
+						if (params.bodyJson && inbox?.id) {
+							yield* sql`
+								INSERT INTO email_draft_bodies ${sql.insert({
+									draftId: draft.draftId,
+									inboxId: inbox.id,
+									bodyJson: JSON.stringify(params.bodyJson),
+								})}
+								ON CONFLICT (draft_id) DO UPDATE
+								SET body_json = EXCLUDED.body_json,
+								    updated_at = now()
+							`.pipe(Effect.ignore)
+						}
+
+						return { ...draft, bodyJson: params.bodyJson ?? null }
 					}),
 
 				updateDraft: (
 					inboxId: string,
 					draftId: string,
-					params: UpdateDraftParams,
+					params: {
+						to?: string | string[] | undefined
+						cc?: string | string[] | undefined
+						bcc?: string | string[] | undefined
+						subject?: string | undefined
+						bodyJson?: EmailBlocks | undefined
+					},
 				) =>
 					Effect.gen(function* () {
 						const inbox = yield* resolveInbox(inboxId)
 						const providerInboxId = inbox?.providerInboxId ?? inboxId
-						return yield* provider.updateDraft(providerInboxId, draftId, params)
+
+						const rendered = params.bodyJson
+							? yield* Effect.tryPromise({
+									try: () => renderBlocks(params.bodyJson!),
+									catch: err =>
+										new EmailError({
+											message: `renderBlocks: ${err instanceof Error ? err.message : String(err)}`,
+										}),
+								})
+							: null
+
+						const providerParams: UpdateDraftParams = {
+							...(params.to !== undefined && { to: params.to }),
+							...(params.cc !== undefined && { cc: params.cc }),
+							...(params.bcc !== undefined && { bcc: params.bcc }),
+							...(params.subject !== undefined && { subject: params.subject }),
+							...(rendered !== null && {
+								text: rendered.text,
+								html: rendered.html,
+							}),
+						}
+
+						const draft = yield* provider.updateDraft(
+							providerInboxId,
+							draftId,
+							providerParams,
+						)
+
+						if (params.bodyJson && inbox?.id) {
+							yield* sql`
+								INSERT INTO email_draft_bodies ${sql.insert({
+									draftId,
+									inboxId: inbox.id,
+									bodyJson: JSON.stringify(params.bodyJson),
+								})}
+								ON CONFLICT (draft_id) DO UPDATE
+								SET body_json = EXCLUDED.body_json,
+								    updated_at = now()
+							`.pipe(Effect.ignore)
+						}
+
+						return { ...draft, bodyJson: params.bodyJson ?? null }
 					}),
 
 				deleteDraft: (inboxId: string, draftId: string) =>
 					Effect.gen(function* () {
 						const inbox = yield* resolveInbox(inboxId)
 						const providerInboxId = inbox?.providerInboxId ?? inboxId
+						yield* staging.sweepForDraft(draftId).pipe(Effect.ignore)
+						yield* sql`
+							DELETE FROM email_draft_bodies WHERE draft_id = ${draftId}
+						`.pipe(Effect.ignore)
 						yield* provider.deleteDraft(providerInboxId, draftId)
 					}),
 
@@ -1470,7 +1636,14 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					Effect.gen(function* () {
 						const inbox = yield* resolveInbox(inboxId)
 						const providerInboxId = inbox?.providerInboxId ?? inboxId
-						return yield* provider.getDraft(providerInboxId, draftId)
+						const draft = yield* provider.getDraft(providerInboxId, draftId)
+						const rows = yield* sql<{ bodyJson: EmailBlocks }>`
+							SELECT body_json FROM email_draft_bodies
+							WHERE draft_id = ${draftId}
+							LIMIT 1
+						`.pipe(Effect.orDie)
+						const bodyJson = rows[0]?.bodyJson ?? null
+						return { ...draft, bodyJson }
 					}),
 
 				listDrafts: (inboxId?: string) =>
@@ -1573,8 +1746,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 				createFooter: (input: {
 					inboxId: string
 					name: string
-					html: string
-					textFallback?: string
+					bodyJson: EmailBlocks
 					isDefault?: boolean
 				}) =>
 					Effect.gen(function* () {
@@ -1589,8 +1761,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							INSERT INTO inbox_footers ${sql.insert({
 								inboxId: input.inboxId,
 								name: input.name,
-								html: input.html,
-								textFallback: input.textFallback ?? '',
+								bodyJson: JSON.stringify(input.bodyJson),
 								isDefault: input.isDefault ?? false,
 							})}
 							RETURNING *
@@ -1602,8 +1773,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					id: string,
 					patch: {
 						name?: string
-						html?: string
-						textFallback?: string
+						bodyJson?: EmailBlocks
 						isDefault?: boolean
 					},
 				) =>
@@ -1624,9 +1794,8 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						}
 						const sets: Array<Statement.Fragment> = []
 						if (patch.name !== undefined) sets.push(sql`name = ${patch.name}`)
-						if (patch.html !== undefined) sets.push(sql`html = ${patch.html}`)
-						if (patch.textFallback !== undefined)
-							sets.push(sql`text_fallback = ${patch.textFallback}`)
+						if (patch.bodyJson !== undefined)
+							sets.push(sql`body_json = ${JSON.stringify(patch.bodyJson)}`)
 						if (patch.isDefault !== undefined)
 							sets.push(sql`is_default = ${patch.isDefault}`)
 						if (sets.length === 0) {

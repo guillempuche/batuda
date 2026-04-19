@@ -144,11 +144,11 @@ const ServicesLive = Layer.mergeAll(
 	PipelineService.layer,
 	PageService.layer,
 	EmailService.layer,
-	EmailAttachmentStaging.layer,
 	RecordingService.layer,
 	ResearchService.layer,
 	Geocoder.layer.pipe(Layer.provide(FetchHttpClient.layer)),
 ).pipe(
+	Layer.provideMerge(EmailAttachmentStaging.layer),
 	Layer.provideMerge(ResearchEventSinkLive),
 	Layer.provideMerge(ParticipantMatcher.layer),
 	Layer.provideMerge(TimelineActivityService.layer),

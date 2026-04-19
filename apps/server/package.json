@@ -20,6 +20,7 @@
 		"@engranatge/auth": "workspace:*",
 		"@engranatge/controllers": "workspace:*",
 		"@engranatge/domain": "workspace:*",
+		"@engranatge/email": "workspace:*",
 		"@engranatge/research": "workspace:*",
 		"@engranatge/ui": "workspace:*",
 		"agentmail": "^0.4.18",
@@ -27,6 +28,7 @@
 		"effect": "4.0.0-beta.43",
 		"kysely": "^0.28.15",
 		"pg": "^8.20.0",
+		"sharp": "^0.34.2",
 		"svix": "^1.62.0"
 	},
 	"devDependencies": {

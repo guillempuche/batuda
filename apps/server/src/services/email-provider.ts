@@ -7,11 +7,17 @@ import type { EmailError, EmailSendError } from '@engranatge/controllers'
 // Outbound attachments — providers accept base64-encoded content. The
 // service layer (staging resolver) always gives us bytes; we never pass
 // URLs through so the provider contract stays one-shaped.
+//
+// `disposition` is explicit so the provider MIME builder can set
+// `Content-Disposition: inline` on cid-referenced images — without it
+// AgentMail defaults to `attachment`, and the `<img src="cid:…">` in
+// the body wouldn't resolve against the MIME part.
 export interface SendAttachmentInput {
 	readonly filename: string
 	readonly contentType: string
 	readonly contentBase64: string
 	readonly contentId?: string | undefined
+	readonly disposition?: 'inline' | 'attachment' | undefined
 }
 
 export interface SendParams {
