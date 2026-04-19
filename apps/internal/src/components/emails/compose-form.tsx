@@ -5,6 +5,8 @@ import { AlertTriangle, Plus, Send, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 
+import { EmailEditor } from '@engranatge/email/editor'
+import type { EmailBlocks } from '@engranatge/email/schema'
 import { PriButton, PriInput, PriSelect } from '@engranatge/ui/pri'
 
 import { contactsAtomFor } from '#/atoms/company-atoms'
@@ -18,7 +20,6 @@ import {
 	updateDraftAtom,
 } from '#/atoms/emails-atoms'
 import { AttachmentPicker } from '#/components/emails/attachment-picker'
-import { EmailComposer } from '#/components/emails/email-composer'
 import { type Draft, useComposeEmail } from '#/context/compose-email-context'
 import type { StagedAttachment } from '#/lib/email-attachments'
 
@@ -37,8 +38,8 @@ type DraftForm = {
 	cc: string
 	bcc: string
 	subject: string
-	body: string
-	bodyHtml: string
+	bodyJson: EmailBlocks
+	bodyText: string
 	attachments: ReadonlyArray<StagedAttachment>
 }
 
@@ -89,8 +90,8 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 		cc: '',
 		bcc: '',
 		subject: draft.subject,
-		body: '',
-		bodyHtml: '',
+		bodyJson: draft.bodyJson ?? [],
+		bodyText: '',
 		attachments: [],
 	}))
 
@@ -169,8 +170,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 					if (list.length > 0) payload['bcc'] = list
 				}
 				if (patch.subject !== undefined) payload['subject'] = patch.subject
-				if (patch.body !== undefined) payload['text'] = patch.body
-				if (patch.bodyHtml !== undefined) payload['html'] = patch.bodyHtml
+				if (patch.bodyJson !== undefined) payload['bodyJson'] = patch.bodyJson
 
 				void updateDraft({
 					params: { draftId: serverId },
@@ -212,7 +212,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 
 	const canSend = useMemo(() => {
 		if (sendState === 'sending') return false
-		if (form.body.trim() === '') return false
+		if (form.bodyText.trim() === '') return false
 		if (suppressed.length > 0) return false
 		if (serverIdRef.current === null) return false
 		if (draft.mode === 'reply') {
@@ -221,7 +221,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 		if (effectiveInboxId === null) return false
 		if (form.to.trim() === '') return false
 		return true
-	}, [sendState, form.body, form.to, suppressed, effectiveInboxId, draft])
+	}, [sendState, form.bodyText, form.to, suppressed, effectiveInboxId, draft])
 
 	const handleSend = useCallback(async () => {
 		const serverId = serverIdRef.current
@@ -387,10 +387,12 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 
 			<BodyField>
 				<BodyLabel>{t`Message`}</BodyLabel>
-				<EmailComposer
-					initialHtml={form.bodyHtml}
-					onChange={(html, text) => {
-						patchForm({ body: text, bodyHtml: html })
+				<EmailEditor
+					mode='compose'
+					inboxId={effectiveInboxId ?? ''}
+					initialJson={form.bodyJson}
+					onChange={({ json, text }) => {
+						patchForm({ bodyJson: json, bodyText: text })
 					}}
 					placeholder={t`Write your message…`}
 				/>

@@ -8,6 +8,8 @@ import {
 	useState,
 } from 'react'
 
+import type { EmailBlocks } from '@engranatge/email/schema'
+
 export type DraftMode = 'new' | 'reply'
 export type DraftWindowState = 'open' | 'minimized' | 'fullscreen'
 
@@ -23,6 +25,7 @@ export type Draft = {
 	readonly contactId?: string
 	readonly subject: string
 	readonly to: string
+	readonly bodyJson?: EmailBlocks
 }
 
 export type OpenComposeInput = {
@@ -35,8 +38,7 @@ export type OpenComposeInput = {
 	readonly cc?: string
 	readonly bcc?: string
 	readonly subject?: string
-	readonly body?: string
-	readonly bodyHtml?: string
+	readonly bodyJson?: EmailBlocks
 }
 
 export type ComposeEmailContextValue = {
@@ -127,6 +129,7 @@ export function ComposeEmailProvider({
 			...(input.threadId !== undefined && { threadId: input.threadId }),
 			...(input.companyId !== undefined && { companyId: input.companyId }),
 			...(input.contactId !== undefined && { contactId: input.contactId }),
+			...(input.bodyJson !== undefined && { bodyJson: input.bodyJson }),
 		}
 		setDrafts(prev => [draft, ...prev])
 		return id

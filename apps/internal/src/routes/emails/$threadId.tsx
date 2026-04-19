@@ -30,6 +30,7 @@ import {
 	updateThreadStatusAtom,
 } from '#/atoms/emails-atoms'
 import { companiesListAtom } from '#/atoms/pipeline-atoms'
+import { parentToQuoteBlock } from '#/components/emails/parent-to-quote-block'
 import { EmptyState } from '#/components/shared/empty-state'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { SkeletonRows } from '#/components/shared/skeleton-row'
@@ -149,7 +150,7 @@ export const Route = createFileRoute('/emails/$threadId')({
 })
 
 function ThreadDetailPage() {
-	const { t } = useLingui()
+	const { t, i18n } = useLingui()
 	const { threadId } = Route.useParams()
 	const atom = useMemo(() => threadAtomFor(threadId), [threadId])
 	const result = useAtomValue(atom)
@@ -232,6 +233,22 @@ function ThreadDetailPage() {
 						].filter(addr => addr.toLowerCase() !== selfEmail)
 					: []
 			const subject = prefixSubject(detail.subject ?? '', 'Re: ')
+			const quoteSeed = seed
+			const attribution = {
+				withDate: t`On {date}, {who} wrote:`,
+				withoutDate: t`{who} wrote:`,
+				fallbackSender: t`someone`,
+			}
+			const bodyJson = quoteSeed
+				? parentToQuoteBlock({
+						...(quoteSeed.html !== null && { html: quoteSeed.html }),
+						...(quoteSeed.text !== null && { text: quoteSeed.text }),
+						fromEmail: quoteSeed.from,
+						receivedAt: new Date(quoteSeed.timestamp),
+						locale: i18n.locale,
+						attribution,
+					})
+				: undefined
 			openCompose({
 				mode: 'reply',
 				threadId,
@@ -240,9 +257,10 @@ function ThreadDetailPage() {
 				to: toList.join(', '),
 				...(ccList.length > 0 && { cc: ccList.join(', ') }),
 				subject,
+				...(bodyJson !== undefined && { bodyJson }),
 			})
 		},
-		[detail, threadId, openCompose],
+		[detail, threadId, openCompose, i18n.locale, t],
 	)
 
 	if (AsyncResult.isInitial(result) && detail === null) {

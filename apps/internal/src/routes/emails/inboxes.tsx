@@ -17,6 +17,8 @@ import {
 import { useCallback, useMemo, useState } from 'react'
 import styled, { css } from 'styled-components'
 
+import { EmailEditor } from '@engranatge/email/editor'
+import type { EmailBlocks } from '@engranatge/email/schema'
 import {
 	PriButton,
 	PriDialog,
@@ -35,7 +37,6 @@ import {
 	updateFooterAtom,
 	updateInboxAtom,
 } from '#/atoms/emails-atoms'
-import { EmailComposer } from '#/components/emails/email-composer'
 import { EmptyState } from '#/components/shared/empty-state'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { SkeletonRows } from '#/components/shared/skeleton-row'
@@ -657,8 +658,7 @@ function InboxFormDialog({
 type FooterRow = {
 	readonly id: string
 	readonly name: string
-	readonly html: string
-	readonly textFallback: string
+	readonly bodyJson: EmailBlocks
 	readonly isDefault: boolean
 }
 
@@ -693,23 +693,23 @@ function FooterManageDialog({
 
 	const [editing, setEditing] = useState<FooterEditing>({ kind: 'none' })
 	const [name, setName] = useState('')
-	const [html, setHtml] = useState('')
-	const [textFallback, setTextFallback] = useState('')
+	const [bodyJson, setBodyJson] = useState<EmailBlocks>([])
+	const [bodyText, setBodyText] = useState('')
 	const [isDefault, setIsDefault] = useState(false)
 	const [submitting, setSubmitting] = useState(false)
 
 	const startCreate = useCallback(() => {
 		setName('')
-		setHtml('')
-		setTextFallback('')
+		setBodyJson([])
+		setBodyText('')
 		setIsDefault(false)
 		setEditing({ kind: 'create' })
 	}, [])
 
 	const startEdit = useCallback((footer: FooterRow) => {
 		setName(footer.name)
-		setHtml(footer.html)
-		setTextFallback(footer.textFallback)
+		setBodyJson(footer.bodyJson)
+		setBodyText('')
 		setIsDefault(footer.isDefault)
 		setEditing({ kind: 'edit', footer })
 	}, [])
@@ -719,15 +719,14 @@ function FooterManageDialog({
 	}, [])
 
 	const handleSave = useCallback(async () => {
-		if (name.trim() === '' || html.trim() === '') return
+		if (name.trim() === '' || bodyText.trim() === '') return
 		setSubmitting(true)
 		if (editing.kind === 'create') {
 			const exit = await createFooter({
 				params: { inboxId: row.id },
 				payload: {
 					name,
-					html,
-					...(textFallback !== '' && { textFallback }),
+					bodyJson,
 					...(isDefault && { isDefault: true }),
 				},
 			} as never)
@@ -744,8 +743,7 @@ function FooterManageDialog({
 				params: { id: editing.footer.id },
 				payload: {
 					name,
-					html,
-					textFallback,
+					bodyJson,
 					isDefault,
 				},
 			} as never)
@@ -764,8 +762,8 @@ function FooterManageDialog({
 	}, [
 		editing,
 		name,
-		html,
-		textFallback,
+		bodyJson,
+		bodyText,
 		isDefault,
 		row.id,
 		createFooter,
@@ -916,11 +914,13 @@ function FooterManageDialog({
 							<Field>
 								<Label>{t`Content`}</Label>
 								<FooterEditorWrap>
-									<EmailComposer
-										initialHtml={html}
-										onChange={(h, text) => {
-											setHtml(h)
-											setTextFallback(text)
+									<EmailEditor
+										mode='footer'
+										inboxId={row.id}
+										initialJson={bodyJson}
+										onChange={({ json, text }) => {
+											setBodyJson(json)
+											setBodyText(text)
 										}}
 										placeholder={t`Write footer…`}
 									/>
@@ -948,7 +948,7 @@ function FooterManageDialog({
 									type='submit'
 									$variant='filled'
 									disabled={
-										submitting || name.trim() === '' || html.trim() === ''
+										submitting || name.trim() === '' || bodyText.trim() === ''
 									}
 								>
 									{submitting
@@ -973,12 +973,13 @@ function narrowFooterRows(raw: unknown): ReadonlyArray<FooterRow> {
 		if (!entry || typeof entry !== 'object') continue
 		const r = entry as Record<string, unknown>
 		if (typeof r['id'] !== 'string') continue
+		const bodyJson = Array.isArray(r['bodyJson'])
+			? (r['bodyJson'] as EmailBlocks)
+			: []
 		out.push({
 			id: r['id'],
 			name: typeof r['name'] === 'string' ? r['name'] : '',
-			html: typeof r['html'] === 'string' ? r['html'] : '',
-			textFallback:
-				typeof r['textFallback'] === 'string' ? r['textFallback'] : '',
+			bodyJson,
 			isDefault: r['isDefault'] === true,
 		})
 	}
