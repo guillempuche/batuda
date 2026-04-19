@@ -1,6 +1,6 @@
 import { Console, Effect } from 'effect'
 
-import { resetPassword } from '@engranatge/auth'
+import { resetPassword } from '@batuda/auth'
 
 import { acquireAuthAdapter } from '../lib/auth-adapter'
 import { confirmCloud } from '../lib/confirm-cloud'

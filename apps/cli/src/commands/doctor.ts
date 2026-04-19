@@ -212,7 +212,7 @@ const localChecks: Check[] = [
 	storageCheck,
 	urlCheck(
 		'Server',
-		'https://api.engranatge.localhost/health',
+		'https://api.batuda.localhost/health',
 		'not running → run `pnpm dev:server`',
 	),
 ]

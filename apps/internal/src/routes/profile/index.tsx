@@ -4,7 +4,7 @@ import { LogOut, Mail, UserCircle2 } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import styled from 'styled-components'
 
-import { PriButton } from '@engranatge/ui/pri'
+import { PriButton } from '@batuda/ui/pri'
 
 import { LanguageSelect } from '#/components/profile/language-select'
 import { getServerCookieHeader } from '#/lib/server-cookie'
@@ -81,7 +81,7 @@ function ProfilePage() {
 					<Trans>Profile</Trans>
 				</Heading>
 				<Subtitle>
-					<Trans>Your Forja workbench identity.</Trans>
+					<Trans>Your Batuda workbench identity.</Trans>
 				</Subtitle>
 			</Intro>
 

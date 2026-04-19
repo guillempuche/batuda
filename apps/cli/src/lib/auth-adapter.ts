@@ -4,7 +4,7 @@ import {
 	acquirePgPool,
 	type MagicLinkCallback,
 	makeBetterAuthAdapter,
-} from '@engranatge/auth'
+} from '@batuda/auth'
 
 export const acquireAuthAdapter = (opts?: {
 	readonly baseURL?: string

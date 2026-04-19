@@ -4,14 +4,14 @@ import * as HttpClient from 'effect/unstable/http/HttpClient'
 import * as HttpClientRequest from 'effect/unstable/http/HttpClientRequest'
 import * as HttpApiClient from 'effect/unstable/httpapi/HttpApiClient'
 
-import { ForjaApi } from '@engranatge/controllers'
+import { BatudaApi } from '@batuda/controllers'
 
-const BASE_URL = process.env['SERVER_URL'] ?? 'https://api.engranatge.localhost'
+const BASE_URL = process.env['SERVER_URL'] ?? 'https://api.batuda.localhost'
 
 /**
- * Server-side Forja API client used by route loaders during SSR.
+ * Server-side Batuda API client used by route loaders during SSR.
  *
- * Builds a typed `HttpApiClient.make(ForjaApi, ...)` instance that
+ * Builds a typed `HttpApiClient.make(BatudaApi, ...)` instance that
  * forwards the provided cookie header on every request via
  * `transformClient` (`HttpApiClient.ts:378`). Called once per SSR
  * request with the incoming cookie string — different visitor, different
@@ -21,8 +21,8 @@ const BASE_URL = process.env['SERVER_URL'] ?? 'https://api.engranatge.localhost'
  * service is process-global; cookies are request-scoped. `transformClient`
  * is the supported hook for per-client request shaping.
  */
-export const makeForjaApiServer = (cookieHeader: string | undefined) =>
-	HttpApiClient.make(ForjaApi, {
+export const makeBatudaApiServer = (cookieHeader: string | undefined) =>
+	HttpApiClient.make(BatudaApi, {
 		baseUrl: BASE_URL,
 		transformClient: httpClient =>
 			cookieHeader

@@ -2,10 +2,10 @@ import { Effect } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { ForjaApi } from '@engranatge/controllers'
+import { BatudaApi } from '@batuda/controllers'
 
 export const ProductsLive = HttpApiBuilder.group(
-	ForjaApi,
+	BatudaApi,
 	'products',
 	handlers =>
 		Effect.gen(function* () {

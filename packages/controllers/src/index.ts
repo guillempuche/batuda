@@ -1,6 +1,6 @@
 // Shared HttpApi spec — imported by both the server (as handler targets)
 // and the frontend (as a typed Atom client via AtomHttpApi.Service).
-export { ForjaApi } from './api'
+export { BatudaApi } from './api'
 // Tagged errors used in endpoint error unions. Handlers and clients both
 // pattern-match on these via `_tag`.
 export {
@@ -24,7 +24,7 @@ export {
 export { SessionContext, SessionMiddleware } from './middleware/session'
 // Route groups exported individually so consumers that need a subset
 // (e.g., MCP tools that only wire health + auth) don't have to import
-// the whole ForjaApi.
+// the whole BatudaApi.
 export { AgentMailWebhookGroup } from './routes/agentmail-webhook'
 export { AuthGroup } from './routes/auth'
 export { CompaniesGroup } from './routes/companies'

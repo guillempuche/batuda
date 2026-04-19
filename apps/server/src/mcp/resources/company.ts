@@ -6,8 +6,8 @@ import { CompanyService } from '../../services/companies'
 
 const slugParam = McpSchema.param('slug', Schema.String)
 
-export const CompanyResource = McpServer.resource`forja://company/${slugParam}`(
-	{
+export const CompanyResource =
+	McpServer.resource`batuda://company/${slugParam}`({
 		name: 'Company Profile',
 		description:
 			'Full company profile with contacts and recent interactions, compressed for LLM context.',
@@ -27,5 +27,4 @@ export const CompanyResource = McpServer.resource`forja://company/${slugParam}`(
 			const data = yield* service.getWithRelations(slug)
 			return JSON.stringify(data, null, 2)
 		}),
-	},
-)
+	})

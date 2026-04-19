@@ -45,7 +45,7 @@
                     └─────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│  apps/internal  (Forja — forja.engranatge.com)                 │
+│  apps/internal  (Forja — batuda.co)                 │
 │  TanStack Start — Unikraft, Node.js SSR                          │
 │                                                                  │
 │  Pipeline  /companies  /companies/$slug  /tasks                 │
@@ -163,7 +163,7 @@ Connects to Postgres via `@effect/sql-pg` using `DATABASE_URL` from `apps/cli/.e
 
 ### `apps/server`
 
-Effect v4 HTTP server deployed at `api.engranatge.com`. Responsibilities:
+Effect v4 HTTP server deployed at `api.batuda.co`. Responsibilities:
 
 - REST API (consumed by both frontend apps)
 - MCP server — stdio for Claude Code, HTTP/SSE for remote AI
@@ -176,7 +176,7 @@ Effect v4 HTTP server deployed at `api.engranatge.com`. Responsibilities:
 
 ### `apps/internal`
 
-Forja — internal sales prospecting tool at `forja.engranatge.com`.
+Forja — internal sales prospecting tool at `batuda.co`.
 TanStack Start SSR app deployed to Unikraft (Node.js). Responsibilities:
 
 - Pipeline and company management UI
@@ -318,7 +318,7 @@ Agent researches company (get_company, Firecrawl/Exa)
 
 ```
 Browser requests engranatge.com/ca/{slug}
-  → Public site (engranatge-marketing repo) SSR calls GET api.engranatge.com/pages/{slug}?lang=ca
+  → Public site (engranatge-marketing repo) SSR calls GET api.batuda.co/pages/{slug}?lang=ca
   → Server returns published page content (Tiptap JSON + meta)
   → Public site renders blocks to HTML, emits SEO tags
   → Client-side fires POST /pages/{slug}/view (fire-and-forget)
@@ -389,7 +389,7 @@ The server is stateless — all state in NeonDB. Scales to zero when idle.
 ```bash
 pnpm --filter internal build   # produces .output/server/index.mjs
 kraft build                     # builds unikernel image
-kraft deploy                    # deploys to Unikraft Cloud → forja.engranatge.com
+kraft deploy                    # deploys to Unikraft Cloud → batuda.co
 ```
 
 ### Public marketing site

@@ -8,7 +8,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { Config, Effect, Layer, Redacted } from 'effect'
 
-import { StorageError } from '@engranatge/controllers'
+import { StorageError } from '@batuda/controllers'
 
 import {
 	type HeadResult,

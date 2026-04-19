@@ -1,4 +1,4 @@
-import { ForjaApiAtom } from '#/lib/forja-api-atom'
+import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 
 /**
  * Canonical shape for the `/emails` search params. Mirrors the envelope
@@ -36,7 +36,7 @@ function makeListAtom(search: EmailsSearch) {
 	}
 	if (search.limit !== undefined) query['limit'] = search.limit
 	if (search.offset !== undefined) query['offset'] = search.offset
-	return ForjaApiAtom.query('email', 'listThreads', { query })
+	return BatudaApiAtom.query('email', 'listThreads', { query })
 }
 
 export function emailsSearchAtom(search: EmailsSearch) {
@@ -67,7 +67,7 @@ export function canonicalKey(search: EmailsSearch): string {
 	return JSON.stringify(Object.fromEntries(entries))
 }
 
-export const inboxesListAtom = ForjaApiAtom.query('email', 'listInboxes', {
+export const inboxesListAtom = BatudaApiAtom.query('email', 'listInboxes', {
 	query: {},
 })
 
@@ -78,7 +78,7 @@ export const inboxesListAtom = ForjaApiAtom.query('email', 'listInboxes', {
  */
 const threadCache = new Map<string, ReturnType<typeof makeThreadAtom>>()
 function makeThreadAtom(threadId: string) {
-	return ForjaApiAtom.query('email', 'getThread', {
+	return BatudaApiAtom.query('email', 'getThread', {
 		params: { threadId },
 	})
 }
@@ -92,43 +92,43 @@ export function threadAtomFor(threadId: string) {
 
 // Module-scoped mutation atoms — a single writable setter instance is
 // shared across every component that fires the same mutation.
-export const sendEmailAtom = ForjaApiAtom.mutation('email', 'send')
-export const replyEmailAtom = ForjaApiAtom.mutation('email', 'reply')
+export const sendEmailAtom = BatudaApiAtom.mutation('email', 'send')
+export const replyEmailAtom = BatudaApiAtom.mutation('email', 'reply')
 
-export const updateThreadStatusAtom = ForjaApiAtom.mutation(
+export const updateThreadStatusAtom = BatudaApiAtom.mutation(
 	'email',
 	'updateThreadStatus',
 )
-export const markThreadReadAtom = ForjaApiAtom.mutation(
+export const markThreadReadAtom = BatudaApiAtom.mutation(
 	'email',
 	'markThreadRead',
 )
-export const markThreadUnreadAtom = ForjaApiAtom.mutation(
+export const markThreadUnreadAtom = BatudaApiAtom.mutation(
 	'email',
 	'markThreadUnread',
 )
 
-export const createInboxAtom = ForjaApiAtom.mutation('email', 'createInbox')
-export const updateInboxAtom = ForjaApiAtom.mutation('email', 'updateInbox')
-export const syncInboxesAtom = ForjaApiAtom.mutation('email', 'syncInboxes')
+export const createInboxAtom = BatudaApiAtom.mutation('email', 'createInbox')
+export const updateInboxAtom = BatudaApiAtom.mutation('email', 'updateInbox')
+export const syncInboxesAtom = BatudaApiAtom.mutation('email', 'syncInboxes')
 
 // ── Drafts ──
-export const createDraftAtom = ForjaApiAtom.mutation('email', 'createDraft')
-export const updateDraftAtom = ForjaApiAtom.mutation('email', 'updateDraft')
-export const deleteDraftAtom = ForjaApiAtom.mutation('email', 'deleteDraft')
-export const sendDraftAtom = ForjaApiAtom.mutation('email', 'sendDraft')
-export const listDraftsAtom = ForjaApiAtom.query('email', 'listDrafts', {
+export const createDraftAtom = BatudaApiAtom.mutation('email', 'createDraft')
+export const updateDraftAtom = BatudaApiAtom.mutation('email', 'updateDraft')
+export const deleteDraftAtom = BatudaApiAtom.mutation('email', 'deleteDraft')
+export const sendDraftAtom = BatudaApiAtom.mutation('email', 'sendDraft')
+export const listDraftsAtom = BatudaApiAtom.query('email', 'listDrafts', {
 	query: {},
 })
 
 // ── Footers ──
-export const createFooterAtom = ForjaApiAtom.mutation('email', 'createFooter')
-export const updateFooterAtom = ForjaApiAtom.mutation('email', 'updateFooter')
-export const deleteFooterAtom = ForjaApiAtom.mutation('email', 'deleteFooter')
+export const createFooterAtom = BatudaApiAtom.mutation('email', 'createFooter')
+export const updateFooterAtom = BatudaApiAtom.mutation('email', 'updateFooter')
+export const deleteFooterAtom = BatudaApiAtom.mutation('email', 'deleteFooter')
 
 const footerCache = new Map<string, ReturnType<typeof makeFooterAtom>>()
 function makeFooterAtom(inboxId: string) {
-	return ForjaApiAtom.query('email', 'listFooters', {
+	return BatudaApiAtom.query('email', 'listFooters', {
 		params: { inboxId },
 	})
 }

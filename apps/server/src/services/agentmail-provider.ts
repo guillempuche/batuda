@@ -5,7 +5,7 @@ import {
 	EmailError,
 	EmailSendError,
 	type EmailSendErrorKind,
-} from '@engranatge/controllers'
+} from '@batuda/controllers'
 
 const classifyAgentMailError = (message: string): EmailSendErrorKind => {
 	const m = message.toLowerCase()
@@ -407,7 +407,7 @@ export const AgentMailProviderLive = Layer.effect(
 
 		// Fetches a signed download URL from AgentMail, then pipes the body
 		// through our response. We proxy (rather than redirecting the
-		// browser) so session cookies stay on the Forja origin.
+		// browser) so session cookies stay on the Batuda origin.
 		const streamAttachment = (
 			inboxId: string,
 			messageId: string,
@@ -498,7 +498,7 @@ export const AgentMailProviderLive = Layer.effect(
 					try: () =>
 						client.inboxes.messages.send(sender.inboxId, {
 							to: params.email,
-							subject: 'Sign in to Engranatge',
+							subject: 'Sign in to Batuda',
 							text: `Click the link below to sign in:\n\n${params.url}\n\nThis link will expire shortly.`,
 							html: `<p>Click the link below to sign in:</p><p><a href="${params.url}">${params.url}</a></p><p>This link will expire shortly.</p>`,
 						}),

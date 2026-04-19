@@ -5,7 +5,7 @@ import { SqlClient } from 'effect/unstable/sql'
 const docIdParam = McpSchema.param('id', Schema.String)
 
 export const DocumentResource =
-	McpServer.resource`forja://document/${docIdParam}`({
+	McpServer.resource`batuda://document/${docIdParam}`({
 		name: 'Document',
 		description: 'Full document content by ID (markdown or other).',
 		mimeType: 'application/json',

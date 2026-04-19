@@ -5,7 +5,7 @@ import {
 	type MagicLinkCallback,
 	type MagicLinkCallbackInput,
 	type Role,
-} from '@engranatge/auth'
+} from '@batuda/auth'
 
 import { acquireAuthAdapter } from '../lib/auth-adapter'
 import { confirmCloud } from '../lib/confirm-cloud'
@@ -39,7 +39,7 @@ export const authInvite = (input: AuthInviteInput) =>
 		const target = getTarget()
 
 		const baseURL = yield* Config.string('BETTER_AUTH_BASE_URL').pipe(
-			Config.withDefault('https://api.engranatge.localhost'),
+			Config.withDefault('https://api.batuda.localhost'),
 		)
 
 		let captured: MagicLinkCallbackInput | null = null

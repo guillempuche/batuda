@@ -1,7 +1,7 @@
 {
-	"name": "@engranatge/controllers",
+	"name": "@batuda/controllers",
 	"version": "0.0.1",
-	"description": "Engranatge — shared HttpApi spec (server handlers + frontend typed client)",
+	"description": "Batuda — shared HttpApi spec (server handlers + frontend typed client)",
 	"type": "module",
 	"types": "./src/index.ts",
 	"main": "./src/index.ts",
@@ -16,9 +16,9 @@
 		"check-types": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@engranatge/domain": "workspace:*",
-		"@engranatge/email": "workspace:*",
-		"@engranatge/ui": "workspace:*",
+		"@batuda/domain": "workspace:*",
+		"@batuda/email": "workspace:*",
+		"@batuda/ui": "workspace:*",
 		"effect": "4.0.0-beta.43"
 	},
 	"devDependencies": {

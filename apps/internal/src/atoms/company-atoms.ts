@@ -1,4 +1,4 @@
-import { ForjaApiAtom } from '#/lib/forja-api-atom'
+import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 
 /**
  * Id/slug-keyed atom factories for the Company Detail page.
@@ -34,29 +34,29 @@ const companyTasksCache = new Map<
 const timelineCache = new Map<string, ReturnType<typeof makeTimelineAtom>>()
 
 function makeCompanyAtom(slug: string) {
-	return ForjaApiAtom.query('companies', 'get', { params: { slug } })
+	return BatudaApiAtom.query('companies', 'get', { params: { slug } })
 }
 
 function makeContactsAtom(companyId: string) {
-	return ForjaApiAtom.query('contacts', 'list', {
+	return BatudaApiAtom.query('contacts', 'list', {
 		query: { companyId },
 	})
 }
 
 function makeInteractionsAtom(companyId: string) {
-	return ForjaApiAtom.query('interactions', 'list', {
+	return BatudaApiAtom.query('interactions', 'list', {
 		query: { companyId, limit: 20 },
 	})
 }
 
 function makeCompanyTasksAtom(companyId: string) {
-	return ForjaApiAtom.query('tasks', 'list', {
+	return BatudaApiAtom.query('tasks', 'list', {
 		query: { companyId },
 	})
 }
 
 function makeTimelineAtom(companyId: string) {
-	return ForjaApiAtom.query('timeline', 'list', {
+	return BatudaApiAtom.query('timeline', 'list', {
 		query: { companyId, limit: 50 },
 	})
 }

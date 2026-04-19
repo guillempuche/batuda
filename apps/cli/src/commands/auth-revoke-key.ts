@@ -1,6 +1,6 @@
 import { Console, Effect } from 'effect'
 
-import { revokeApiKey } from '@engranatge/auth'
+import { revokeApiKey } from '@batuda/auth'
 
 import { acquireAuthAdapter } from '../lib/auth-adapter'
 import { confirmCloud } from '../lib/confirm-cloud'

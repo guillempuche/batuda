@@ -1,7 +1,7 @@
 import { css } from 'styled-components'
 
 /**
- * Reusable CSS fragments for the Forja workshop visual language.
+ * Reusable CSS fragments for the Batuda workshop visual language.
  *
  * Each helper is a `styled-components` `css` template so callers can
  * interpolate it inside their own styled-component bodies without

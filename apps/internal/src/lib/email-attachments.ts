@@ -13,7 +13,7 @@ export type StagedAttachment = {
 }
 
 const SERVER_URL =
-	import.meta.env['VITE_SERVER_URL'] ?? 'https://api.engranatge.localhost'
+	import.meta.env['VITE_SERVER_URL'] ?? 'https://api.batuda.localhost'
 
 export async function uploadAttachment(
 	file: File,

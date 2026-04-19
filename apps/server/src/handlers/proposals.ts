@@ -3,7 +3,7 @@ import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { ForjaApi } from '@engranatge/controllers'
+import { BatudaApi } from '@batuda/controllers'
 
 import {
 	ProposalEvent,
@@ -19,7 +19,7 @@ const statusToEventKind = (status: string): ProposalEventKind | null => {
 }
 
 export const ProposalsLive = HttpApiBuilder.group(
-	ForjaApi,
+	BatudaApi,
 	'proposals',
 	handlers =>
 		Effect.gen(function* () {

@@ -32,7 +32,7 @@ const ServicesLive = Layer.mergeAll(
 const ServerLayer = McpToolsLive.pipe(
 	Layer.provide(
 		McpServer.layerStdio({
-			name: 'forja',
+			name: 'batuda',
 			version: '1.0.0',
 		}),
 	),
@@ -43,7 +43,7 @@ const ServerLayer = McpToolsLive.pipe(
 	Layer.provide(
 		Layer.succeed(CurrentUser, {
 			userId: 'local',
-			email: 'local@forja',
+			email: 'local@batuda',
 			name: 'Local Dev',
 			isAgent: false,
 		}),

@@ -1,6 +1,6 @@
 import { type Effect, ServiceMap } from 'effect'
 
-import type { StorageError } from '@engranatge/controllers'
+import type { StorageError } from '@batuda/controllers'
 
 // ── Provider-agnostic interfaces ──
 

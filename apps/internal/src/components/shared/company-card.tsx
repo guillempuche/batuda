@@ -3,7 +3,7 @@ import { Link } from '@tanstack/react-router'
 import { motion } from 'motion/react'
 import styled from 'styled-components'
 
-import { PriContextMenu } from '@engranatge/ui/pri'
+import { PriContextMenu } from '@batuda/ui/pri'
 
 import { agedPaperSurface } from '#/lib/workshop-mixins'
 import { PriorityDot } from './priority-dot'

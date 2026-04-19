@@ -20,7 +20,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import styled, { css } from 'styled-components'
 
-import { PriButton } from '@engranatge/ui/pri'
+import { PriButton } from '@batuda/ui/pri'
 
 import {
 	emailsSearchAtom,
@@ -116,13 +116,13 @@ type CompanyLookup = {
 }
 
 async function loadThreadOnServer(threadId: string): Promise<unknown> {
-	const [{ Effect }, { makeForjaApiServer }, cookie] = await Promise.all([
+	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
 		import('effect'),
-		import('#/lib/forja-api-server'),
+		import('#/lib/batuda-api-server'),
 		getServerCookieHeader(),
 	])
 	const program = Effect.gen(function* () {
-		const client = yield* makeForjaApiServer(cookie ?? undefined)
+		const client = yield* makeBatudaApiServer(cookie ?? undefined)
 		return yield* client.email.getThread({ params: { threadId } })
 	})
 	return Effect.runPromise(program)

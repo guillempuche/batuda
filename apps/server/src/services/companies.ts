@@ -2,7 +2,7 @@ import { Effect, Layer, ServiceMap } from 'effect'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { NotFound } from '@engranatge/controllers'
+import { NotFound } from '@batuda/controllers'
 
 export interface CompanyFilters {
 	readonly status?: string | undefined

@@ -19,7 +19,7 @@ import {
 import { TaskItem } from '#/components/shared/task-item'
 import { useQuickCapture } from '#/context/quick-capture-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
-import { ForjaApiAtom } from '#/lib/forja-api-atom'
+import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import { rulerUnderRule, stenciledTitle } from '#/lib/workshop-mixins'
 
@@ -63,13 +63,13 @@ type PipelineData = {
  * session on to the API server.
  */
 async function loadPipelineDataOnServer(): Promise<PipelineData> {
-	const [{ Effect }, { makeForjaApiServer }, cookie] = await Promise.all([
+	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
 		import('effect'),
-		import('#/lib/forja-api-server'),
+		import('#/lib/batuda-api-server'),
 		getServerCookieHeader(),
 	])
 	const program = Effect.gen(function* () {
-		const client = yield* makeForjaApiServer(cookie ?? undefined)
+		const client = yield* makeBatudaApiServer(cookie ?? undefined)
 		const [companies, openTasks] = yield* Effect.all(
 			[
 				client.companies.list({ query: { limit: 500 } }),
@@ -86,7 +86,7 @@ export const Route = createFileRoute('/')({
 	loader: async () => {
 		if (!import.meta.env.SSR) {
 			// Client-side navigation: let the atoms refetch directly via
-			// `ForjaApiAtom` using the browser's session cookie. Returning
+			// `BatudaApiAtom` using the browser's session cookie. Returning
 			// an empty dehydration leaves the registry alone and the
 			// component renders the loading state.
 			return { dehydrated: [] as const }
@@ -118,7 +118,7 @@ export const Route = createFileRoute('/')({
  * atom identity out here guarantees the same instance is used by every
  * render of the dashboard. `useAtomSet` wraps it into a writable setter.
  */
-const completeTaskAtom = ForjaApiAtom.mutation('tasks', 'complete')
+const completeTaskAtom = BatudaApiAtom.mutation('tasks', 'complete')
 
 /**
  * Pipeline dashboard — answers three questions in under three seconds:

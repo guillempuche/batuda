@@ -4,7 +4,7 @@ import path from 'node:path'
 import { DateTime, Effect, Layer, ServiceMap } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { BadRequest } from '@engranatge/controllers'
+import { BadRequest } from '@batuda/controllers'
 
 import {
 	compressEmailImage,

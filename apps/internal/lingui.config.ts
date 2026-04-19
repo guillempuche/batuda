@@ -1,7 +1,7 @@
 import { defineConfig } from '@lingui/cli'
 
 /**
- * Forja serves English and Catalan. The UI runtime (`src/i18n.ts`)
+ * Batuda serves English and Catalan. The UI runtime (`src/i18n.ts`)
  * activates `en` at module init and keeps serving English until the
  * `ca` catalog is populated and a language selector is wired up —
  * extraction is ahead of rendering so translators can start working

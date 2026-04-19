@@ -1,4 +1,4 @@
-/* Ordered list of locales Forja serves. Used by the language selector and
+/* Ordered list of locales Batuda serves. Used by the language selector and
  * anywhere code needs to branch on a validated code. Catalog files live at
  * `src/locales/{en,ca}/messages.po` and are resolved through `./lingui`. */
 export const langCodes = ['en', 'ca'] as const

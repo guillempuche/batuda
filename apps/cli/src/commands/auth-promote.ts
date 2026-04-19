@@ -1,6 +1,6 @@
 import { Console, Effect } from 'effect'
 
-import { promoteUser, type Role } from '@engranatge/auth'
+import { promoteUser, type Role } from '@batuda/auth'
 
 import { acquireAuthAdapter } from '../lib/auth-adapter'
 import { confirmCloud } from '../lib/confirm-cloud'

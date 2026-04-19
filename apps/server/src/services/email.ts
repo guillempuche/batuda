@@ -2,13 +2,10 @@ import { Config, Effect, Layer, Schema, ServiceMap } from 'effect'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { EmailError, EmailSuppressed, NotFound } from '@engranatge/controllers'
-import type { InboundClassification } from '@engranatge/domain'
-import {
-	renderBlocks,
-	type StagedAttachmentRef,
-} from '@engranatge/email/render'
-import type { EmailBlocks } from '@engranatge/email/schema'
+import { EmailError, EmailSuppressed, NotFound } from '@batuda/controllers'
+import type { InboundClassification } from '@batuda/domain'
+import { renderBlocks, type StagedAttachmentRef } from '@batuda/email/render'
+import type { EmailBlocks } from '@batuda/email/schema'
 
 import type { ResolvedStaging, StagingRef } from './email-attachment-staging.js'
 import { EmailAttachmentStaging } from './email-attachment-staging.js'
@@ -43,7 +40,7 @@ const encodeClientId = (ctx: {
 	mode?: string
 	threadLinkId?: string
 }): string => {
-	const parts = ['forja:draft']
+	const parts = ['batuda:draft']
 	if (ctx.companyId) parts.push(`companyId=${ctx.companyId}`)
 	if (ctx.contactId) parts.push(`contactId=${ctx.contactId}`)
 	if (ctx.mode) parts.push(`mode=${ctx.mode}`)
@@ -70,7 +67,7 @@ const parseClientId = (
 		mode: null,
 		threadLinkId: null,
 	}
-	if (!clientId?.startsWith('forja:draft')) return empty
+	if (!clientId?.startsWith('batuda:draft')) return empty
 	const result = { ...empty }
 	for (const part of clientId.split(';')) {
 		const eq = part.indexOf('=')
@@ -1292,9 +1289,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					Effect.gen(function* () {
 						// Client-side classification tag so the provider can
 						// reverse-look up our purpose without reading our DB.
-						const clientId = `forja:${input.purpose}:${
-							input.ownerUserId ?? 'shared'
-						}`
+						const clientId = `batuda::${input.ownerUserId ?? 'shared'}`
 						const created = yield* provider.createInbox({
 							...(input.username !== undefined && {
 								username: input.username,

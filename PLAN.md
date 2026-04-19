@@ -2,7 +2,7 @@
 
 Full scaffold for a B2B prospecting CRM + automation platform.
 Brand: **Engranatge** (`engranatge.com`)
-Domains: `engranatge.com` (marketing) · `forja.engranatge.com` (internal) · `api.engranatge.com` (server)
+Domains: `engranatge.com` (marketing) · `batuda.co` (internal) · `api.batuda.co` (server)
 
 ---
 
@@ -70,7 +70,7 @@ batuda/
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   │
-│   ├── internal/                 # Forja — internal sales tool (forja.engranatge.com)
+│   ├── internal/                 # Forja — internal sales tool (batuda.co)
 │   │   ├── src/
 │   │   │   ├── router.tsx              # createRouter + routeTree.gen
 │   │   │   ├── routes/
@@ -1395,11 +1395,11 @@ WORKDIR /app
 COPY --from=build /repo/apps/internal/.output /app/.output
 ENV NODE_ENV=production
 ENV PORT=3000
-ENV SERVER_URL=https://api.engranatge.com
+ENV SERVER_URL=https://api.batuda.co
 CMD ["node", ".output/server/index.mjs"]
 ```
 
-Note: The Dockerfile builds domain+ui+internal via Turborepo. The `SERVER_URL` points to `api.engranatge.com`.
+Note: The Dockerfile builds domain+ui+internal via Turborepo. The `SERVER_URL` points to `api.batuda.co`.
 
 **`apps/internal/Kraftfile`**:
 
@@ -1671,7 +1671,7 @@ WORKDIR /app
 COPY --from=build /repo/apps/marketing/.output /app/.output
 ENV NODE_ENV=production
 ENV PORT=3000
-ENV SERVER_URL=https://api.engranatge.com
+ENV SERVER_URL=https://api.batuda.co
 CMD ["node", ".output/server/index.mjs"]
 ```
 
@@ -1788,7 +1788,7 @@ pnpm --filter server dev:mcp
 2. **TanStack Start deployment** — Unikraft (Node.js SSR) via Dockerfile + Kraftfile
 3. **Unikraft Node 24 base image** — check `catalog.unikraft.org` for availability of node:24
 4. **NeonDB project** — create project at neon.tech, copy connection string to `.env`
-5. **DNS setup** — `engranatge.com`, `forja.engranatge.com`, `api.engranatge.com` pointing to respective Unikraft instances
+5. **DNS setup** — `engranatge.com`, `batuda.co`, `api.batuda.co` pointing to respective Unikraft instances
 6. **Tiptap block extensions** — verify custom node API in Tiptap v3 for structured block content
 
 ---

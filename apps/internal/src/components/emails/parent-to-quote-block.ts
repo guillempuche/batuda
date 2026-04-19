@@ -1,8 +1,8 @@
 import {
 	sanitizeHtmlToBlocks,
 	sanitizeTextToBlocks,
-} from '@engranatge/email/sanitize'
-import type { EmailBlock, EmailBlocks } from '@engranatge/email/schema'
+} from '@batuda/email/sanitize'
+import type { EmailBlock, EmailBlocks } from '@batuda/email/schema'
 
 // Caller supplies the translated attribution templates so Lingui stays
 // at the component boundary. {date} and {who} are literal placeholders.

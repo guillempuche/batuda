@@ -28,7 +28,7 @@ import {
 } from './tiptap-adapter'
 
 // ────────────────────────────────────────────────────────────────────
-// Public contract — consumed by Forja compose-form and FooterManageDialog.
+// Public contract — consumed by Batuda compose-form and FooterManageDialog.
 //
 // The editor wrapper composes three things:
 //   1. @react-email/editor's Tiptap-backed canvas (brand-themed via CSS vars)

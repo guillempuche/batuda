@@ -17,7 +17,7 @@ import { TasksGroup } from './routes/tasks'
 import { TimelineGroup } from './routes/timeline'
 import { WebhooksGroup } from './routes/webhooks'
 
-export const ForjaApi = HttpApi.make('ForjaApi')
+export const BatudaApi = HttpApi.make('BatudaApi')
 	.annotateMerge(
 		OpenApi.annotations({
 			title: 'Engranatge API',
@@ -43,4 +43,4 @@ export const ForjaApi = HttpApi.make('ForjaApi')
 	.add(ResearchGroup)
 	.add(TimelineGroup)
 
-export type ForjaApi = typeof ForjaApi
+export type BatudaApi = typeof BatudaApi

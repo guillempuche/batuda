@@ -8,7 +8,7 @@ import { messages as enMessages } from '../locales/en/messages.po'
 import type { LangCode } from './index'
 
 /* Both catalogs are imported eagerly at module init. The bundles are
- * small (Forja has at most a few hundred short strings) and eager
+ * small (Batuda has at most a few hundred short strings) and eager
  * imports keep SSR synchronous — no dynamic-import roundtrip on first
  * render, no locale-swap jank mid-hydration. */
 const catalogs: Record<LangCode, Messages> = {
@@ -16,7 +16,7 @@ const catalogs: Record<LangCode, Messages> = {
 	ca: caMessages,
 }
 
-/* Build a request-scoped `I18n` instance for one locale. Forja now
+/* Build a request-scoped `I18n` instance for one locale. Batuda now
  * supports per-user locale, so a shared `i18n.activate(...)` singleton
  * is unsafe under concurrent SSR requests — `setupI18n` hands back an
  * isolated instance each time. */
@@ -53,8 +53,8 @@ const headInstances: Record<LangCode, I18n> = {
 	ca: makeI18n('ca'),
 }
 
-const titleMsg = msg`Forja — Engranatge CRM`
-const descriptionMsg = msg`Forja — Engranatge's internal sales CRM.`
+const titleMsg = msg`Batuda`
+const descriptionMsg = msg`Batuda — a multi-tenant CRM for small agencies.`
 
 export const translatedHead: Record<
 	LangCode,

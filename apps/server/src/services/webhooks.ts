@@ -44,8 +44,11 @@ export class WebhookService extends ServiceMap.Service<WebhookService>()(
 											method: 'POST',
 											headers: {
 												'Content-Type': 'application/json',
-												'X-Forja-Event': event,
-												'X-Forja-Signature': hmacSign(endpoint.secret, payload),
+												'X-Batuda-Event': event,
+												'X-Batuda-Signature': hmacSign(
+													endpoint.secret,
+													payload,
+												),
 											},
 											body: JSON.stringify({
 												event,

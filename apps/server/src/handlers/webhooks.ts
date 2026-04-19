@@ -1,12 +1,12 @@
 import { Effect } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
-import { ForjaApi } from '@engranatge/controllers'
+import { BatudaApi } from '@batuda/controllers'
 
 import { WebhookService } from '../services/webhooks'
 
 export const WebhooksLive = HttpApiBuilder.group(
-	ForjaApi,
+	BatudaApi,
 	'webhooks',
 	handlers =>
 		Effect.gen(function* () {

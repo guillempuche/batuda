@@ -2,7 +2,7 @@ import { Effect, Stream } from 'effect'
 import { HttpServerResponse, Multipart } from 'effect/unstable/http'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
-import { BadRequest, ForjaApi } from '@engranatge/controllers'
+import { BadRequest, BatudaApi } from '@batuda/controllers'
 
 import { EmailService } from '../services/email'
 import {
@@ -10,7 +10,7 @@ import {
 	type StagingRef,
 } from '../services/email-attachment-staging'
 
-export const EmailLive = HttpApiBuilder.group(ForjaApi, 'email', handlers =>
+export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 	Effect.gen(function* () {
 		const svc = yield* EmailService
 		const staging = yield* EmailAttachmentStaging

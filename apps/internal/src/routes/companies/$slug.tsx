@@ -33,7 +33,7 @@ import {
 	PriSelect,
 	PriTabs,
 	usePriToast,
-} from '@engranatge/ui/pri'
+} from '@batuda/ui/pri'
 
 import {
 	companyAtomFor,
@@ -63,7 +63,7 @@ import { ScrewDot } from '#/components/shared/workshop-decorations'
 import { useComposeEmail } from '#/context/compose-email-context'
 import { useQuickCapture } from '#/context/quick-capture-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
-import { ForjaApiAtom } from '#/lib/forja-api-atom'
+import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import { useTabSearchParam } from '#/lib/tab-search'
@@ -161,13 +161,13 @@ type DetailPayload = {
  * the server.
  */
 async function loadDetailOnServer(slug: string): Promise<DetailPayload> {
-	const [{ Effect }, { makeForjaApiServer }, cookie] = await Promise.all([
+	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
 		import('effect'),
-		import('#/lib/forja-api-server'),
+		import('#/lib/batuda-api-server'),
 		getServerCookieHeader(),
 	])
 	const program = Effect.gen(function* () {
-		const client = yield* makeForjaApiServer(cookie ?? undefined)
+		const client = yield* makeBatudaApiServer(cookie ?? undefined)
 		const company = yield* client.companies.get({ params: { slug } })
 		const companyId = extractCompanyId(company)
 		if (companyId === null) {
@@ -220,7 +220,7 @@ export const Route = createFileRoute('/companies/$slug')({
 	loader: async ({ params: { slug } }) => {
 		if (!import.meta.env.SSR) {
 			// Client-side navigation: let the atoms refetch directly via
-			// `ForjaApiAtom`. First render flashes the loading state while
+			// `BatudaApiAtom`. First render flashes the loading state while
 			// the request is in flight — that's acceptable for parameterized
 			// routes per the plan (Phase 5b.4.e option 1).
 			return { dehydrated: [] as const, slug }
@@ -365,7 +365,7 @@ function DetailBody({
 
 	const toast = usePriToast()
 	const updateCompany = useAtomSet(
-		ForjaApiAtom.mutation('companies', 'update'),
+		BatudaApiAtom.mutation('companies', 'update'),
 		{ mode: 'promiseExit' },
 	)
 	const saveField = useCallback(
@@ -383,7 +383,7 @@ function DetailBody({
 				description: t`The workshop rejected the change. Try again.`,
 				type: 'error',
 			})
-			console.error('[forja] companies.update failed', exit.cause)
+			console.error('[batuda] companies.update failed', exit.cause)
 			throw new Error('update-failed')
 		},
 		[updateCompany, company.id, refreshCompany, toast, t],
@@ -951,7 +951,7 @@ function DetailBody({
 											>
 												<MailPlus size={14} aria-hidden />
 												<span>
-													<Trans>Email via Forja</Trans>
+													<Trans>Email via Batuda</Trans>
 												</span>
 											</ContactLinkButton>
 											{contact.phone && (

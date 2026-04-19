@@ -1,7 +1,7 @@
 import { MotionConfig } from 'motion/react'
 
 /**
- * Thin wrapper that sets Forja's global motion defaults:
+ * Thin wrapper that sets Batuda's global motion defaults:
  *   - spring physics for every `animate`/`layout`/`variants` transition
  *     unless overridden at the call site;
  *   - `reducedMotion='user'` so the whole app respects the OS preference
@@ -10,7 +10,11 @@ import { MotionConfig } from 'motion/react'
  * Mounted at the outermost level in `__root.tsx` alongside `<LayoutGroup>`
  * so both apply to every descendant `motion` component.
  */
-export function ForjaMotionConfig({ children }: { children: React.ReactNode }) {
+export function BatudaMotionConfig({
+	children,
+}: {
+	children: React.ReactNode
+}) {
 	return (
 		<MotionConfig
 			reducedMotion='user'

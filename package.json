@@ -1,5 +1,5 @@
 {
-	"name": "engranatge",
+	"name": "batuda",
 	"type": "module",
 	"engines": {
 		"node": ">=24",
@@ -7,11 +7,11 @@
 	},
 	"scripts": {
 		"______ Development ______": "",
-		"cli": "pnpm --filter @engranatge/cli dev",
-		"cli:tui": "pnpm --filter @engranatge/cli dev:tui",
-		"dev": "turbo dev --filter=@engranatge/server --filter=@engranatge/internal",
-		"dev:server": "pnpm --filter @engranatge/server dev",
-		"dev:internal": "pnpm --filter @engranatge/internal dev",
+		"cli": "pnpm --filter @batuda/cli dev",
+		"cli:tui": "pnpm --filter @batuda/cli dev:tui",
+		"dev": "turbo dev --filter=@batuda/server --filter=@batuda/internal",
+		"dev:server": "pnpm --filter @batuda/server dev",
+		"dev:internal": "pnpm --filter @batuda/internal dev",
 		"______ Build ______": "",
 		"build": "turbo build",
 		"check-types": "turbo check-types",
@@ -26,7 +26,7 @@
 		"______ Database ______": "",
 		"db:up": "docker compose -f docker/docker-compose.yml up -d",
 		"db:down": "docker compose -f docker/docker-compose.yml down",
-		"db:migrate": "pnpm --filter @engranatge/server run migrate",
+		"db:migrate": "pnpm --filter @batuda/server run migrate",
 		"______ Release ______": "",
 		"release:server": "release-it --config .release-it.server.cjs",
 		"release:internal": "release-it --config .release-it.internal.cjs",

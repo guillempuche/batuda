@@ -1,6 +1,6 @@
 import { Console, Effect } from 'effect'
 
-import { listUsers } from '@engranatge/auth'
+import { listUsers } from '@batuda/auth'
 
 import { acquireAuthAdapter } from '../lib/auth-adapter'
 import { printTable } from '../lib/table'

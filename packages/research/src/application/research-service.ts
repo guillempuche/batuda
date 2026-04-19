@@ -404,7 +404,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						? `\n\nHints: language=${context.hints.language ?? 'en'}, recency=${context.hints.recency_days ?? 'any'}, location=${context.hints.location ?? 'any'}`
 						: ''
 					const systemPrompt = [
-						'You are a research agent for Forja CRM.',
+						'You are a research agent for Batuda CRM.',
 						'Given a query, produce a thorough research brief with findings, sources, and citations.',
 						'Never fabricate sources. Every claim must be verifiable.',
 						`Output schema: ${schemaName}`,

@@ -34,7 +34,7 @@ export class Geocoder extends ServiceMap.Service<Geocoder>()('Geocoder', {
 						headers: {
 							// Nominatim ToS: every caller must identify itself with
 							// a real contact address so abuse can be reported.
-							'User-Agent': 'Forja/1.0 (developer@xiroi.cat)',
+							'User-Agent': 'Batuda/1.0 (developer@xiroi.cat)',
 							Accept: 'application/json',
 						},
 					})

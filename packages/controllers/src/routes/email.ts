@@ -5,7 +5,7 @@ import {
 	HttpApiSchema,
 } from 'effect/unstable/httpapi'
 
-import { EmailBlocks } from '@engranatge/email/schema'
+import { EmailBlocks } from '@batuda/email/schema'
 
 import { BadRequest, EmailSuppressed, NotFound } from '../errors'
 import { SessionMiddleware } from '../middleware/session'

@@ -4,7 +4,7 @@ import { admin, bearer, magicLink, openAPI } from 'better-auth/plugins'
 import { Effect, Layer, Redacted, ServiceMap } from 'effect'
 import pg from 'pg'
 
-import { buildBetterAuthConfig } from '@engranatge/auth'
+import { buildBetterAuthConfig } from '@batuda/auth'
 
 import { EmailProvider } from '../services/email-provider'
 import { EmailProviderLive } from '../services/email-provider-live'

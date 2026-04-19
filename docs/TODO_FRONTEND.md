@@ -393,6 +393,6 @@ DESKTOP:
 - [ ] Run `kraft build` with `apps/internal/Kraftfile` and verify image builds
 - [ ] Run `kraft run` locally and verify SSR responds
 - [ ] Deploy to Unikraft Cloud with `kraft deploy`
-- [ ] Point `forja.engranatge.com` to deployed instance
-- [ ] Set `SERVER_URL` env var to `https://api.engranatge.com`
+- [ ] Point `batuda.co` to deployed instance
+- [ ] Set `SERVER_URL` env var to `https://api.batuda.co`
 - [ ] Verify production deploy works end-to-end

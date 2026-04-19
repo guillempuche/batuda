@@ -22,7 +22,7 @@ The two CRM apps in this repo share the same deploy pattern (the marketing repo 
 
 ---
 
-## Phase 1 — Forja (`apps/internal` → `forja.engranatge.com`)
+## Phase 1 — Forja (`apps/internal` → `batuda.co`)
 
 No runtime secrets needed; the workflow only reads `KRAFTCLOUD_TOKEN`.
 
@@ -30,15 +30,15 @@ No runtime secrets needed; the workflow only reads `KRAFTCLOUD_TOKEN`.
 
 - [x] Cloudflare → engranatge.com → DNS → add CNAME `forja` → `fra.unikraft.app` (DNS only, gray cloud)
 - [x] Wait ~5 min for propagation
-- [x] Confirm: `dig +short forja.engranatge.com` returns a `fra.unikraft.app` CNAME chain
+- [x] Confirm: `dig +short batuda.co` returns a `fra.unikraft.app` CNAME chain
 
 ### Deploy
 
 - [ ] Trigger workflow: `gh workflow run deploy_internal.yml -R guillempuche/engranatge`
 - [ ] Watch run: `gh run watch -R guillempuche/engranatge`
-- [ ] Confirm cert issued: `kraft cloud --metro fra certificate list | grep forja.engranatge.com`
+- [ ] Confirm cert issued: `kraft cloud --metro fra certificate list | grep batuda.co`
 - [ ] Confirm instance running: `kraft cloud --metro fra instance list | grep engranatge-internal`
-- [ ] Smoke test: `curl -sI https://forja.engranatge.com | head -5`
+- [ ] Smoke test: `curl -sI https://batuda.co | head -5`
 
 ### Optional follow-ups
 
@@ -48,7 +48,7 @@ No runtime secrets needed; the workflow only reads `KRAFTCLOUD_TOKEN`.
 
 ---
 
-## Phase 2 — Server (`apps/server` → `api.engranatge.com`)
+## Phase 2 — Server (`apps/server` → `api.batuda.co`)
 
 The server depends on external infrastructure (NeonDB, Cloudflare R2, AgentMail) and
 references several GitHub secrets/variables that **do not exist yet** in the
@@ -68,7 +68,7 @@ references several GitHub secrets/variables that **do not exist yet** in the
 - [ ] **AgentMail**
   - [ ] Provision tenant + inbox
   - [ ] Capture `EMAIL_API_KEY`
-  - [ ] Configure webhook endpoint `https://api.engranatge.com/webhooks/email` and capture `EMAIL_WEBHOOK_SECRET`
+  - [ ] Configure webhook endpoint `https://api.batuda.co/webhooks/email` and capture `EMAIL_WEBHOOK_SECRET`
 - [ ] **Better Auth secret**
   - [ ] Generate: `node -e "console.log(crypto.randomBytes(32).toString('hex'))"`
 
@@ -87,8 +87,8 @@ Reference: `.env.example.github`. All values land in the `production` environmen
 
 #### Variables (`gh variable set <NAME> --env production -R guillempuche/engranatge --body "<value>"`)
 
-- [ ] `BETTER_AUTH_BASE_URL` = `https://api.engranatge.com`
-- [ ] `ALLOWED_ORIGINS` = `https://forja.engranatge.com,https://engranatge.com`
+- [ ] `BETTER_AUTH_BASE_URL` = `https://api.batuda.co`
+- [ ] `ALLOWED_ORIGINS` = `https://batuda.co,https://engranatge.com`
 - [ ] `STORAGE_ENDPOINT` = `https://<account>.r2.cloudflarestorage.com`
 - [ ] `STORAGE_REGION` = `auto`
 - [ ] `STORAGE_BUCKET` = `engranatge-recordings`
@@ -97,15 +97,15 @@ Reference: `.env.example.github`. All values land in the `production` environmen
 ### DNS
 
 - [x] Cloudflare → engranatge.com → DNS → add CNAME `api` → `fra.unikraft.app` (DNS only)
-- [x] Wait ~5 min, confirm `dig +short api.engranatge.com`
+- [x] Wait ~5 min, confirm `dig +short api.batuda.co`
 
 ### Deploy
 
 - [ ] Trigger workflow: `gh workflow run deploy_server.yml -R guillempuche/engranatge`
 - [ ] Watch run: `gh run watch -R guillempuche/engranatge`
-- [ ] Confirm cert: `kraft cloud --metro fra certificate list | grep api.engranatge.com`
+- [ ] Confirm cert: `kraft cloud --metro fra certificate list | grep api.batuda.co`
 - [ ] Confirm instance: `kraft cloud --metro fra instance list | grep engranatge-server`
-- [ ] Smoke test: `curl -sf https://api.engranatge.com/health`
+- [ ] Smoke test: `curl -sf https://api.batuda.co/health`
 - [ ] Tail logs once if smoke fails: `kraft cloud --metro fra instance logs <instance-name>`
 
 ### Post-deploy verification

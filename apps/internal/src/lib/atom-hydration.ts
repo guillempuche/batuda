@@ -3,7 +3,7 @@
  *
  * TanStack Start serializes loader return values with Seroval so they can
  * be embedded in the SSR HTML and picked up by the hydrated client. Atom
- * instances (the objects produced by `ForjaApiAtom.query(...)`) are NOT
+ * instances (the objects produced by `BatudaApiAtom.query(...)`) are NOT
  * serializable — they hold Effect runtime references, schemas, and
  * closures that Seroval can't encode. Returning an atom from a loader
  * makes the streamed reply throw inside TanStack's `<AwaitInner>` and

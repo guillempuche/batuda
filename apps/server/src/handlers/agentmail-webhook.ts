@@ -3,7 +3,7 @@ import { HttpServerResponse } from 'effect/unstable/http'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import { Webhook } from 'svix'
 
-import { ForjaApi } from '@engranatge/controllers'
+import { BatudaApi } from '@batuda/controllers'
 
 import { EmailService } from '../services/email'
 
@@ -78,7 +78,7 @@ type WebhookPayload =
 	| { event_type: string }
 
 export const AgentMailWebhookLive = HttpApiBuilder.group(
-	ForjaApi,
+	BatudaApi,
 	'agentmailWebhook',
 	handlers =>
 		Effect.gen(function* () {

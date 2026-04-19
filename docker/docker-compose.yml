@@ -1,15 +1,15 @@
-name: engranatge
+name: batuda
 
 services:
   db:
-    container_name: engranatge-db
+    container_name: batuda-db
     image: postgres:17-alpine
     ports:
       - "5433:5432"
     environment:
-      POSTGRES_DB: engranatge
-      POSTGRES_USER: engranatge
-      POSTGRES_PASSWORD: engranatge
+      POSTGRES_DB: batuda
+      POSTGRES_USER: batuda
+      POSTGRES_PASSWORD: batuda
     volumes:
       - pgdata:/var/lib/postgresql/data
 
@@ -17,37 +17,37 @@ services:
   # Mirrors Cloudflare R2 in prod; the same S3 SDK code path works for both
   # via STORAGE_ENDPOINT (http://localhost:9000 in dev, R2 endpoint in prod).
   storage:
-    container_name: engranatge-storage
+    container_name: batuda-storage
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     ports:
       - "9000:9000" # S3 API
       - "9001:9001" # Web console (http://localhost:9001)
     environment:
-      MINIO_ROOT_USER: engranatge
-      MINIO_ROOT_PASSWORD: engranatge-secret
+      MINIO_ROOT_USER: batuda
+      MINIO_ROOT_PASSWORD: batuda-secret
     volumes:
       - storage-data:/data
 
   # One-shot sidecar that creates the bucket on first boot. Idempotent —
   # safe to re-run; exits 0 once the bucket exists.
   storage-init:
-    container_name: engranatge-storage-init
+    container_name: batuda-storage-init
     image: minio/mc:latest
     depends_on:
       - storage
     restart: "no"
     entrypoint: >
       /bin/sh -c "
-      until mc alias set local http://storage:9000 engranatge engranatge-secret > /dev/null 2>&1; do
+      until mc alias set local http://storage:9000 batuda batuda-secret > /dev/null 2>&1; do
         echo 'waiting for storage...'; sleep 1;
       done;
-      mc mb --ignore-existing local/engranatge-recordings;
+      mc mb --ignore-existing local/batuda-recordings;
       echo 'bucket ready';
       "
 
 volumes:
   pgdata:
-    name: engranatge-pgdata
+    name: batuda-pgdata
   storage-data:
-    name: engranatge-storage-data
+    name: batuda-storage-data

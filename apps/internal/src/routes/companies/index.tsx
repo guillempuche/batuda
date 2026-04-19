@@ -8,7 +8,7 @@ import { LayoutGroup, motion } from 'motion/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
-import { PriButton, PriInput } from '@engranatge/ui/pri'
+import { PriButton, PriInput } from '@batuda/ui/pri'
 
 import {
 	type CompaniesSearch,
@@ -77,13 +77,13 @@ const validateSearch = validateSearchWith({
 async function loadCompaniesOnServer(
 	search: CompaniesSearch,
 ): Promise<{ companies: ReadonlyArray<unknown> }> {
-	const [{ Effect }, { makeForjaApiServer }, cookie] = await Promise.all([
+	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
 		import('effect'),
-		import('#/lib/forja-api-server'),
+		import('#/lib/batuda-api-server'),
 		getServerCookieHeader(),
 	])
 	const program = Effect.gen(function* () {
-		const client = yield* makeForjaApiServer(cookie ?? undefined)
+		const client = yield* makeBatudaApiServer(cookie ?? undefined)
 		return yield* client.companies.list({ query: search })
 	})
 	const companies = await Effect.runPromise(program)
@@ -95,7 +95,7 @@ export const Route = createFileRoute('/companies/')({
 	loaderDeps: ({ search }) => ({ search }),
 	loader: async ({ deps: { search } }) => {
 		if (!import.meta.env.SSR) {
-			// Client-side navigation: let the atom refetch via `ForjaApiAtom`
+			// Client-side navigation: let the atom refetch via `BatudaApiAtom`
 			// using the browser session cookie. Empty dehydration leaves the
 			// registry alone and the component renders the loading state.
 			return { dehydrated: [] as const }

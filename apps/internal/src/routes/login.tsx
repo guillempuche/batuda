@@ -4,7 +4,7 @@ import { Schema } from 'effect'
 import { useCallback, useState } from 'react'
 import styled from 'styled-components'
 
-import { PriButton, PriInput } from '@engranatge/ui/pri'
+import { PriButton, PriInput } from '@batuda/ui/pri'
 
 import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
@@ -27,7 +27,7 @@ function isSafeReturnTo(value: string): boolean {
  * Completely standalone — `__root.tsx` detects the `/login` path and
  * skips the authenticated AppShell, so this route renders on a bare
  * body. The form POSTs to Better-Auth's `/auth/sign-in/email` endpoint
- * on the API server; on success, the server sets the `forja.*` session
+ * on the API server; on success, the server sets the `batuda.*` session
  * cookie (cross-origin, `credentials: 'include'` from the fetch here
  * and `access-control-allow-credentials` from our CORS middleware),
  * and we client-navigate to `/`.
@@ -128,9 +128,9 @@ function LoginPage() {
 	return (
 		<Page>
 			<Card>
-				<Brand>Forja</Brand>
+				<Brand>Batuda</Brand>
 				<Subtitle>
-					<Trans>Engranatge internal CRM</Trans>
+					<Trans>Sign in to continue</Trans>
 				</Subtitle>
 				<Form onSubmit={handleSubmit} data-testid='login-form'>
 					<Field>
@@ -181,7 +181,7 @@ function LoginPage() {
 				</Form>
 				<Hint>
 					<Trans>
-						Forja is invite-only. Request access from the Engranatge team.
+						Batuda is invite-only. Request access from the Engranatge team.
 					</Trans>
 				</Hint>
 			</Card>

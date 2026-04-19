@@ -50,9 +50,8 @@ const tui = Effect.gen(function* () {
 		target === 'cloud'
 			? pc.bgRed(pc.white(' CLOUD '))
 			: pc.bgGreen(pc.black(' LOCAL '))
-	p.intro(`${pc.bgCyan(pc.black(' Engranatge CLI '))} ${targetBadge}`)
+	p.intro(`${pc.bgCyan(pc.black(' Batuda CLI '))} ${targetBadge}`)
 
-	// biome-ignore lint/correctness/noConstantCondition: TUI main loop
 	mainLoop: while (true) {
 		const command = yield* Effect.promise(() =>
 			p.select({
@@ -374,7 +373,7 @@ const tui = Effect.gen(function* () {
 							p.text({
 								message: 'Admin email:',
 								validate: v =>
-									v && v.includes('@') ? undefined : 'Must be an email address',
+									v?.includes('@') ? undefined : 'Must be an email address',
 							}),
 						)
 						if (p.isCancel(email)) {
@@ -383,7 +382,7 @@ const tui = Effect.gen(function* () {
 						const name = yield* Effect.promise(() =>
 							p.text({
 								message: 'Admin name:',
-								validate: v => (v && v.trim() ? undefined : 'Required'),
+								validate: v => (v?.trim() ? undefined : 'Required'),
 							}),
 						)
 						if (p.isCancel(name)) {
@@ -407,7 +406,7 @@ const tui = Effect.gen(function* () {
 							p.text({
 								message: 'Invitee email:',
 								validate: v =>
-									v && v.includes('@') ? undefined : 'Must be an email address',
+									v?.includes('@') ? undefined : 'Must be an email address',
 							}),
 						)
 						if (p.isCancel(email)) {
@@ -416,7 +415,7 @@ const tui = Effect.gen(function* () {
 						const name = yield* Effect.promise(() =>
 							p.text({
 								message: 'Invitee name:',
-								validate: v => (v && v.trim() ? undefined : 'Required'),
+								validate: v => (v?.trim() ? undefined : 'Required'),
 							}),
 						)
 						if (p.isCancel(name)) {
@@ -462,9 +461,7 @@ const tui = Effect.gen(function* () {
 								p.text({
 									message: 'Email:',
 									validate: v =>
-										v && v.includes('@')
-											? undefined
-											: 'Must be an email address',
+										v?.includes('@') ? undefined : 'Must be an email address',
 								}),
 							)
 							if (p.isCancel(input)) {
@@ -480,7 +477,7 @@ const tui = Effect.gen(function* () {
 							p.text({
 								message: 'Owner email:',
 								validate: v =>
-									v && v.includes('@') ? undefined : 'Must be an email address',
+									v?.includes('@') ? undefined : 'Must be an email address',
 							}),
 						)
 						if (p.isCancel(email)) {
@@ -490,7 +487,7 @@ const tui = Effect.gen(function* () {
 							p.text({
 								message: 'Key name:',
 								initialValue: 'local-dev',
-								validate: v => (v && v.trim() ? undefined : 'Required'),
+								validate: v => (v?.trim() ? undefined : 'Required'),
 							}),
 						)
 						if (p.isCancel(name)) {
@@ -499,8 +496,8 @@ const tui = Effect.gen(function* () {
 						const prefix = yield* Effect.promise(() =>
 							p.text({
 								message: 'Key prefix:',
-								initialValue: 'forja_',
-								validate: v => (v && v.trim() ? undefined : 'Required'),
+								initialValue: 'batuda_',
+								validate: v => (v?.trim() ? undefined : 'Required'),
 							}),
 						)
 						if (p.isCancel(prefix)) {
@@ -521,7 +518,7 @@ const tui = Effect.gen(function* () {
 							p.text({
 								message: 'Email:',
 								validate: v =>
-									v && v.includes('@') ? undefined : 'Must be an email address',
+									v?.includes('@') ? undefined : 'Must be an email address',
 							}),
 						)
 						if (p.isCancel(email)) {
@@ -547,7 +544,7 @@ const tui = Effect.gen(function* () {
 						const keyId = yield* Effect.promise(() =>
 							p.text({
 								message: 'Key id:',
-								validate: v => (v && v.trim() ? undefined : 'Required'),
+								validate: v => (v?.trim() ? undefined : 'Required'),
 							}),
 						)
 						if (p.isCancel(keyId)) {
@@ -561,7 +558,7 @@ const tui = Effect.gen(function* () {
 							p.text({
 								message: 'Email:',
 								validate: v =>
-									v && v.includes('@') ? undefined : 'Must be an email address',
+									v?.includes('@') ? undefined : 'Must be an email address',
 							}),
 						)
 						if (p.isCancel(email)) {
@@ -600,9 +597,7 @@ const tui = Effect.gen(function* () {
 								p.text({
 									message: 'Email:',
 									validate: v =>
-										v && v.includes('@')
-											? undefined
-											: 'Must be an email address',
+										v?.includes('@') ? undefined : 'Must be an email address',
 								}),
 							)
 							if (p.isCancel(input)) {

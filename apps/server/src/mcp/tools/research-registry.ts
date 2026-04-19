@@ -6,7 +6,7 @@ import {
 	ProviderQuota,
 	RegistryRouter,
 	ReportRouter,
-} from '@engranatge/research'
+} from '@batuda/research'
 
 // ── lookup_registry ──
 // One tool, two backends. depth='basic' → free registry (libreBORME).

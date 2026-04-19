@@ -5,7 +5,7 @@ import { Plus } from 'lucide-react'
 import { motion } from 'motion/react'
 import styled from 'styled-components'
 
-import { PriButton } from '@engranatge/ui/pri'
+import { PriButton } from '@batuda/ui/pri'
 
 import { ScrewDot } from '#/components/shared/workshop-decorations'
 import { useQuickCapture } from '#/context/quick-capture-context'
@@ -27,7 +27,7 @@ export function TopBar() {
 	const { open } = useQuickCapture()
 	const { i18n } = useLinguiCore()
 	const descriptor = deriveTitleDescriptor(pathname)
-	const title = descriptor ? i18n._(descriptor) : 'Forja'
+	const title = descriptor ? i18n._(descriptor) : 'Batuda'
 
 	return (
 		<Bar>

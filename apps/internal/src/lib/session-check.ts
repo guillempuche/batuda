@@ -7,11 +7,11 @@
  *   - On SSR, the caller forwards the incoming request's `cookie`
  *     header via `getRequestHeader('cookie')`.
  *   - On the client, the caller passes `undefined` and the browser's
- *     fetch automatically attaches the `forja.*` session cookie because
+ *     fetch automatically attaches the `batuda.*` session cookie because
  *     we pass `credentials: 'include'` (requires CORS + credentials on
  *     the API, which `apps/server/src/main.ts` configures).
  *
- * We don't use `ForjaApiAtom` / `HttpApiClient` here because the auth
+ * We don't use `BatudaApiAtom` / `HttpApiClient` here because the auth
  * routes are untyped passthroughs and this runs before any atoms are
  * instantiated — a plain fetch keeps the gate free of Effect runtime.
  */

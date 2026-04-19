@@ -1,7 +1,7 @@
 import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 
-import { EmailBlocks } from '@engranatge/email/schema'
+import { EmailBlocks } from '@batuda/email/schema'
 
 import { EmailService } from '../../services/email'
 import {
@@ -302,7 +302,7 @@ const SyncEmailInboxes = Tool.make('sync_email_inboxes', {
 
 const CreateEmailDraft = Tool.make('create_email_draft', {
 	description:
-		'Create a draft email that a human can review in Forja before sending. The draft is stored on the provider (AgentMail) plus a local body_json shadow that preserves the typed block tree for lossless editor re-hydration. Optionally set company_id/contact_id/mode to link to CRM context.',
+		'Create a draft email that a human can review in Batuda before sending. The draft is stored on the provider (AgentMail) plus a local body_json shadow that preserves the typed block tree for lossless editor re-hydration. Optionally set company_id/contact_id/mode to link to CRM context.',
 	parameters: Schema.Struct({
 		inbox_id: Schema.String,
 		to: Schema.optional(Recipients),

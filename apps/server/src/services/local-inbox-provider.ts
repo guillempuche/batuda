@@ -13,7 +13,7 @@ import { Readable } from 'node:stream'
 
 import { Effect, Layer } from 'effect'
 
-import { EmailError, EmailSendError } from '@engranatge/controllers'
+import { EmailError, EmailSendError } from '@batuda/controllers'
 
 import {
 	type CreateDraftParams,
@@ -51,7 +51,7 @@ const DEV_INBOX_CREATED_AT = new Date('2024-01-01T00:00:00Z')
 // Anchor relative to this file (apps/server/src/services/) so the inbox dir
 // always lives at apps/server/.dev-inbox regardless of where the process was
 // started from (root, apps/server, ...). Using process.cwd() doubled the path
-// when running via `pnpm --filter @engranatge/server dev`.
+// when running via `pnpm --filter @batuda/server dev`.
 const INBOX_DIR = resolve(import.meta.dirname, '..', '..', '.dev-inbox')
 const DRAFTS_DIR = resolve(INBOX_DIR, 'drafts')
 const ATTACHMENTS_DIR = resolve(INBOX_DIR, 'attachments')
@@ -718,7 +718,7 @@ export const LocalInboxProviderLive = Layer.effect(
 		): Effect.Effect<void, EmailSendError> =>
 			Effect.gen(function* () {
 				const sentAt = new Date()
-				const subject = `Sign in to Engranatge`
+				const subject = `Sign in to Batuda`
 				const bodyText = `Click the link below to sign in:\n\n${params.url}\n\nThis link will expire shortly.\n\nToken: ${params.token}`
 				const rec: MessageRecord = {
 					sentAt: sentAt.toISOString(),

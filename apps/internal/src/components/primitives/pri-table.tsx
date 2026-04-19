@@ -1,7 +1,7 @@
 import styled from 'styled-components'
 
 /**
- * Forja-internal table primitive. Compound export: `PriTable = { Root, Head,
+ * Batuda-internal table primitive. Compound export: `PriTable = { Root, Head,
  * Body, Row, ColumnHeader, Cell, Resizer }`. Semantic `<table>` subtree with
  * `display: block`/`flex` overrides so TanStack Virtual rows can live inside
  * `<tbody>` as absolutely-positioned `<tr>`s. Explicit ARIA roles are set so

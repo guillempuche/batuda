@@ -3,7 +3,7 @@ import { msg } from '@lingui/core/macro'
 import { useLingui } from '@lingui/react'
 import styled from 'styled-components'
 
-import { PriTooltip } from '@engranatge/ui/pri'
+import { PriTooltip } from '@batuda/ui/pri'
 
 import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
 

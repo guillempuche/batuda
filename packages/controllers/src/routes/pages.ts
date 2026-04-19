@@ -5,7 +5,7 @@ import {
 	HttpApiSchema,
 } from 'effect/unstable/httpapi'
 
-import { TiptapDocument } from '@engranatge/ui/blocks'
+import { TiptapDocument } from '@batuda/ui/blocks'
 
 import { NotFound } from '../errors'
 import { SessionMiddleware } from '../middleware/session'

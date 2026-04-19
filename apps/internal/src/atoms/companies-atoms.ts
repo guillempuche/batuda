@@ -1,4 +1,4 @@
-import { ForjaApiAtom } from '#/lib/forja-api-atom'
+import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 
 /**
  * Shape of the validated `/companies` search params. Mirrors the query
@@ -16,7 +16,7 @@ export type CompaniesSearch = {
 }
 
 /**
- * Cache of `ForjaApiAtom.query('companies', 'list', ...)` atoms keyed by
+ * Cache of `BatudaApiAtom.query('companies', 'list', ...)` atoms keyed by
  * a stable stringification of the search. Both the route loader (SSR)
  * and the component (client) go through this factory so they get the
  * *same* atom identity for the *same* search, which lets
@@ -30,7 +30,7 @@ export type CompaniesSearch = {
 const cache = new Map<string, ReturnType<typeof makeCompaniesSearchAtom>>()
 
 function makeCompaniesSearchAtom(search: CompaniesSearch) {
-	return ForjaApiAtom.query('companies', 'list', { query: search })
+	return BatudaApiAtom.query('companies', 'list', { query: search })
 }
 
 /**

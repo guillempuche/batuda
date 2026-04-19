@@ -1,4 +1,4 @@
-import { ForjaApiAtom } from '#/lib/forja-api-atom'
+import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 
 /**
  * Shared atom instances for Pipeline + Tasks pages.
@@ -21,7 +21,7 @@ import { ForjaApiAtom } from '#/lib/forja-api-atom'
  * The dashboard aggregates this list client-side for every metric
  * (status counts, overdue next-action, stale-pipeline, top priorities).
  */
-export const companiesListAtom = ForjaApiAtom.query('companies', 'list', {
+export const companiesListAtom = BatudaApiAtom.query('companies', 'list', {
 	query: { limit: 500 },
 })
 
@@ -35,6 +35,6 @@ export const companiesListAtom = ForjaApiAtom.query('companies', 'list', {
  * `packages/controllers/src/routes/tasks.ts`). Passing a boolean would
  * fail the schema.
  */
-export const openTasksAtom = ForjaApiAtom.query('tasks', 'list', {
+export const openTasksAtom = BatudaApiAtom.query('tasks', 'list', {
 	query: { completed: 'false' },
 })

@@ -7,13 +7,13 @@ import {
 	SessionContext,
 	SessionMiddleware,
 	Unauthorized,
-} from '@engranatge/controllers'
+} from '@batuda/controllers'
 
 import { Auth } from '../lib/auth'
 
 /**
  * Implementing Layer for the `SessionMiddleware` Tag declared in
- * `@engranatge/controllers`. Lives here (not in the shared package)
+ * `@batuda/controllers`. Lives here (not in the shared package)
  * because it depends on Better-Auth and Node HTTP — pulling those into
  * `packages/controllers` would make the spec package browser-hostile and
  * defeat the point of sharing the same HttpApi with the frontend client.

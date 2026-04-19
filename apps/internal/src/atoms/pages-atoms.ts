@@ -1,4 +1,4 @@
-import { ForjaApiAtom } from '#/lib/forja-api-atom'
+import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 
 export type PagesSearch = {
 	readonly companyId?: string
@@ -10,11 +10,11 @@ const listCache = new Map<string, ReturnType<typeof makeListAtom>>()
 const detailCache = new Map<string, ReturnType<typeof makeDetailAtom>>()
 
 function makeListAtom(search: PagesSearch) {
-	return ForjaApiAtom.query('pages', 'list', { query: search })
+	return BatudaApiAtom.query('pages', 'list', { query: search })
 }
 
 function makeDetailAtom(id: string) {
-	return ForjaApiAtom.query('pages', 'get', { params: { id } })
+	return BatudaApiAtom.query('pages', 'get', { params: { id } })
 }
 
 export function pagesSearchAtom(search: PagesSearch) {

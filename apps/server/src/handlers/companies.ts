@@ -1,13 +1,13 @@
 import { DateTime, Effect } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
-import { ForjaApi, NotFound } from '@engranatge/controllers'
+import { BatudaApi, NotFound } from '@batuda/controllers'
 
 import { CompanyService } from '../services/companies'
 import { Geocoder } from '../services/geocoder'
 
 export const CompaniesLive = HttpApiBuilder.group(
-	ForjaApi,
+	BatudaApi,
 	'companies',
 	handlers =>
 		Effect.gen(function* () {

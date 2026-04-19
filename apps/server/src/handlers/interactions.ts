@@ -3,7 +3,7 @@ import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { ForjaApi } from '@engranatge/controllers'
+import { BatudaApi } from '@batuda/controllers'
 
 import {
 	InteractionLogged,
@@ -11,7 +11,7 @@ import {
 } from '../services/timeline-activity'
 
 export const InteractionsLive = HttpApiBuilder.group(
-	ForjaApi,
+	BatudaApi,
 	'interactions',
 	handlers =>
 		Effect.gen(function* () {

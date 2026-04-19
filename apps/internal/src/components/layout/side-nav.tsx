@@ -9,18 +9,18 @@ import { NavLink } from './nav-link'
 
 /**
  * Desktop sidebar — a narrow pegboard column matching marketing's
- * `WorkshopDesktop`. A compact stamped-metal "Forja" plate sits at the
+ * `WorkshopDesktop`. A compact stamped-metal "Batuda" plate sits at the
  * top (styled after the marketing `LogoPlateAnchor`), followed by a
  * scrollable rack of MachineButton knobs shared with the mobile
- * BottomNav so Forja reads as one shadow-board across breakpoints.
+ * BottomNav so the app reads as one shadow-board across breakpoints.
  */
 export function SideNav() {
 	const { i18n, t } = useLingui()
 	return (
 		<Aside>
-			<LogoPlate to='/' aria-label={t`Forja home`}>
+			<LogoPlate to='/' aria-label={t`Batuda home`}>
 				<Cog size={12} aria-hidden />
-				<span>Forja</span>
+				<span>Batuda</span>
 			</LogoPlate>
 			<NavList>
 				{navItems.map(item => {

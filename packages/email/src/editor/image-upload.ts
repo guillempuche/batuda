@@ -1,4 +1,4 @@
-// Hooks the editor's Image Upload API into Forja's staged-attachment
+// Hooks the editor's Image Upload API into Batuda's staged-attachment
 // pipeline. Exposed as a small uploader object — paste/drop/slash
 // callbacks in the editor wrapper call `upload(file)`, which:
 //   1. POSTs the file to /v1/email/attachments/staging

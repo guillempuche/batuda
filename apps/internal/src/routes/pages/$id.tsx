@@ -14,15 +14,15 @@ import { ArrowLeft, Eye, Globe, Save } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
-import type { TiptapDocument } from '@engranatge/ui/blocks'
-import { allBlockExtensions } from '@engranatge/ui/blocks'
-import { PriButton, PriTabs, usePriToast } from '@engranatge/ui/pri'
+import type { TiptapDocument } from '@batuda/ui/blocks'
+import { allBlockExtensions } from '@batuda/ui/blocks'
+import { PriButton, PriTabs, usePriToast } from '@batuda/ui/pri'
 
 import { pageAtomFor } from '#/atoms/pages-atoms'
 import { EmptyState } from '#/components/shared/empty-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { dehydrateAtom } from '#/lib/atom-hydration'
-import { ForjaApiAtom } from '#/lib/forja-api-atom'
+import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import { useTabSearchParam } from '#/lib/tab-search'
@@ -47,13 +47,13 @@ type PageDetail = {
 }
 
 async function loadPageOnServer(id: string): Promise<unknown> {
-	const [{ Effect }, { makeForjaApiServer }, cookie] = await Promise.all([
+	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
 		import('effect'),
-		import('#/lib/forja-api-server'),
+		import('#/lib/batuda-api-server'),
 		getServerCookieHeader(),
 	])
 	const program = Effect.gen(function* () {
-		const client = yield* makeForjaApiServer(cookie ?? undefined)
+		const client = yield* makeBatudaApiServer(cookie ?? undefined)
 		return yield* client.pages.get({ params: { id } })
 	})
 	return Effect.runPromise(program)
@@ -138,10 +138,10 @@ function EditorBody({ page }: { page: PageDetail }) {
 		useMemo(() => pageAtomFor(page.id), [page.id]),
 	)
 
-	const updatePage = useAtomSet(ForjaApiAtom.mutation('pages', 'update'), {
+	const updatePage = useAtomSet(BatudaApiAtom.mutation('pages', 'update'), {
 		mode: 'promiseExit',
 	})
-	const publishPage = useAtomSet(ForjaApiAtom.mutation('pages', 'publish'), {
+	const publishPage = useAtomSet(BatudaApiAtom.mutation('pages', 'publish'), {
 		mode: 'promiseExit',
 	})
 
@@ -176,7 +176,7 @@ function EditorBody({ page }: { page: PageDetail }) {
 				description: t`Could not save the page. Please try again.`,
 				type: 'error',
 			})
-			console.error('[forja] pages.update failed', exit.cause)
+			console.error('[batuda] pages.update failed', exit.cause)
 		}
 		setSaving(false)
 	}, [editor, page.id, title, updatePage, toastManager, t, refreshPage])
@@ -199,7 +199,7 @@ function EditorBody({ page }: { page: PageDetail }) {
 				description: t`Could not publish the page. Please try again.`,
 				type: 'error',
 			})
-			console.error('[forja] pages.publish failed', exit.cause)
+			console.error('[batuda] pages.publish failed', exit.cause)
 		}
 		setPublishing(false)
 	}, [page.id, publishPage, toastManager, t, refreshPage])

@@ -26,7 +26,7 @@ export interface BuildBetterAuthConfigInput<
  */
 
 // Strip the first hostname label (the API subdomain) to get a parent cookie
-// domain. e.g. api.engranatge.com → engranatge.com.
+// domain. e.g. api.batuda.co → batuda.co.
 const cookieDomainFromBaseURL = (
 	baseURL: string | undefined,
 ): string | undefined => {
@@ -75,7 +75,7 @@ export const buildBetterAuthConfig = <Plugins extends BetterAuthPlugin[]>(
 			max: 100,
 		},
 		advanced: {
-			cookiePrefix: 'forja',
+			cookiePrefix: 'batuda',
 			useSecureCookies: input.env.useSecureCookies,
 			crossSubDomainCookies: {
 				enabled: true,

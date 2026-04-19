@@ -53,6 +53,6 @@ const McpAuthMiddleware = HttpRouter.middleware(
 
 export const McpHttpLive = Layer.mergeAll(McpToolsLive, McpAuthMiddleware).pipe(
 	Layer.provide(
-		McpServer.layerHttp({ name: 'forja', version: '1.0.0', path: '/mcp' }),
+		McpServer.layerHttp({ name: 'batuda', version: '1.0.0', path: '/mcp' }),
 	),
 )

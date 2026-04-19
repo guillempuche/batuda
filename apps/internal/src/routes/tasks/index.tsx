@@ -7,7 +7,7 @@ import type { ReactNode } from 'react'
 import { useCallback, useMemo } from 'react'
 import styled from 'styled-components'
 
-import { PriCollapsible } from '@engranatge/ui/pri'
+import { PriCollapsible } from '@batuda/ui/pri'
 
 import { companiesListAtom, openTasksAtom } from '#/atoms/pipeline-atoms'
 import { EmptyState } from '#/components/shared/empty-state'
@@ -16,7 +16,7 @@ import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { TaskItem, type TaskItemData } from '#/components/shared/task-item'
 import { useQuickCapture } from '#/context/quick-capture-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
-import { ForjaApiAtom } from '#/lib/forja-api-atom'
+import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import {
 	brushedMetalPlate,
@@ -48,13 +48,13 @@ async function loadTasksOnServer(): Promise<{
 	tasks: ReadonlyArray<unknown>
 	companies: ReadonlyArray<unknown>
 }> {
-	const [{ Effect }, { makeForjaApiServer }, cookie] = await Promise.all([
+	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
 		import('effect'),
-		import('#/lib/forja-api-server'),
+		import('#/lib/batuda-api-server'),
 		getServerCookieHeader(),
 	])
 	const program = Effect.gen(function* () {
-		const client = yield* makeForjaApiServer(cookie ?? undefined)
+		const client = yield* makeBatudaApiServer(cookie ?? undefined)
 		const [tasks, companies] = yield* Effect.all(
 			[
 				client.tasks.list({ query: { completed: 'false' } }),
@@ -88,7 +88,7 @@ export const Route = createFileRoute('/tasks/')({
 	component: TasksPage,
 })
 
-const completeTaskAtom = ForjaApiAtom.mutation('tasks', 'complete')
+const completeTaskAtom = BatudaApiAtom.mutation('tasks', 'complete')
 
 function TasksPage() {
 	const { t } = useLingui()

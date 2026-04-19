@@ -1,6 +1,6 @@
 import { Console, Effect } from 'effect'
 
-import { bootstrapFirstAdmin } from '@engranatge/auth'
+import { bootstrapFirstAdmin } from '@batuda/auth'
 
 import { acquireAuthAdapter } from '../lib/auth-adapter'
 import { confirmCloud } from '../lib/confirm-cloud'
@@ -36,7 +36,7 @@ export const authBootstrap = (input: AuthBootstrapInput) =>
 		yield* Console.log('')
 		yield* Console.log('Sign in:')
 		yield* Console.log(
-			'  curl -X POST https://api.engranatge.localhost/auth/sign-in/email \\',
+			'  curl -X POST https://api.batuda.localhost/auth/sign-in/email \\',
 		)
 		yield* Console.log("    -H 'content-type: application/json' \\")
 		yield* Console.log(

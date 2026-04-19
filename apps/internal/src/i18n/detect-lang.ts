@@ -21,7 +21,7 @@ export function writeStoredLang(lang: LangCode): void {
 	}
 }
 
-/* Walk the browser's preferred languages and pick the first Forja serves.
+/* Walk the browser's preferred languages and pick the first Batuda serves.
  * Catalan (any region) → 'ca'; anything English-ish → 'en'. Returns null
  * if nothing matches so callers can apply their own fallback. */
 export function detectBrowserLang(): LangCode | null {

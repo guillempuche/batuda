@@ -8,7 +8,7 @@ import {
 	ProviderQuota,
 	ScrapeProvider,
 	SearchProvider,
-} from '@engranatge/research'
+} from '@batuda/research'
 
 // ── web_search ──
 

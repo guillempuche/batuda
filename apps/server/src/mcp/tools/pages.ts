@@ -1,7 +1,7 @@
 import { Effect, Schema } from 'effect'
 import { McpSchema, McpServer, Tool, Toolkit } from 'effect/unstable/ai'
 
-import { BlockNode, TiptapDocument } from '@engranatge/ui/blocks'
+import { BlockNode, TiptapDocument } from '@batuda/ui/blocks'
 
 import { PageService } from '../../services/pages'
 

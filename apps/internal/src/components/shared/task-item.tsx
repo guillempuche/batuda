@@ -3,7 +3,7 @@ import { Check, Plus } from 'lucide-react'
 import { motion } from 'motion/react'
 import styled from 'styled-components'
 
-import { PriCheckbox } from '@engranatge/ui/pri'
+import { PriCheckbox } from '@batuda/ui/pri'
 
 import {
 	agedPaperRow,

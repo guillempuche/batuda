@@ -1,7 +1,7 @@
 {
-	"name": "@engranatge/email",
+	"name": "@batuda/email",
 	"version": "0.0.1",
-	"description": "Engranatge — email block schema, brand theme, server-side renderer, sanitizer, and WYSIWYG editor wrapper",
+	"description": "Batuda — email block schema, brand theme, server-side renderer, sanitizer, and WYSIWYG editor wrapper",
 	"type": "module",
 	"types": "./src/index.ts",
 	"main": "./src/index.ts",

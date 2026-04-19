@@ -180,9 +180,9 @@ describe('renderBlocks', () => {
 		)
 
 		it.todo(
-			// GIVEN a link span "Engranatge" href="https://engranatge.com"
+			// GIVEN a link span "Taller" href="https://taller.cat"
 			// WHEN rendered as plain text
-			// THEN the format is "Engranatge (https://engranatge.com)" to preserve the URL
+			// THEN the format is "Taller (https://taller.cat)" to preserve the URL
 			'should include link URLs inline in plain text output',
 		)
 	})

@@ -19,7 +19,7 @@ Never install Node or pnpm globally or via other package managers for this proje
 
 Use **`agent-browser`** (already installed) to test and debug the local web app.
 
-Dev URLs (via portless): **Forja (internal CRM) `https://forja.engranatge.localhost`** and API server `https://api.engranatge.localhost`. Most debugging is against Forja.
+Dev URLs (via portless): **Forja (internal CRM) `https://batuda.localhost`** and API server `https://api.batuda.localhost`. Most debugging is against Forja.
 
 ### Dev login
 
@@ -30,14 +30,14 @@ A test user is created by `pnpm cli seed` (any preset). Use it to log in when de
 
 Exported from `apps/cli/src/commands/seed.ts` as `TEST_USER`. If login fails, re-run `pnpm cli seed --preset minimal` — the seed is idempotent and will (re)create the user via Better-Auth's `signUpEmail`.
 
-Better-Auth lives on the API server at `api.engranatge.localhost/auth/*`. The Forja browser sends cookies cross-origin via `credentials: 'include'`; on SSR, loaders forward the incoming `cookie` header server-to-server. Both flows require the API server (`pnpm dev:server`) to be running.
+Better-Auth lives on the API server at `api.batuda.localhost/auth/*`. The Forja browser sends cookies cross-origin via `credentials: 'include'`; on SSR, loaders forward the incoming `cookie` header server-to-server. Both flows require the API server (`pnpm dev:server`) to be running.
 
 ### Open & navigate
 
 ```bash
-agent-browser open https://forja.engranatge.localhost              # open pipeline dashboard
-agent-browser open https://forja.engranatge.localhost/companies    # company list
-agent-browser open https://forja.engranatge.localhost/tasks        # tasks view
+agent-browser open https://batuda.localhost              # open pipeline dashboard
+agent-browser open https://batuda.localhost/companies    # company list
+agent-browser open https://batuda.localhost/tasks        # tasks view
 agent-browser back                                    # go back
 agent-browser reload                                  # reload page
 ```
@@ -118,10 +118,10 @@ The server exposes auto-generated OpenAPI docs from the Effect HttpApi spec and 
 
 | URL                                                              | What                                        |
 | ---------------------------------------------------------------- | ------------------------------------------- |
-| `https://api.engranatge.localhost/docs`                          | Scalar interactive docs (all CRM endpoints) |
-| `https://api.engranatge.localhost/openapi.json`                  | Raw OpenAPI 3.1 spec (machine-readable)     |
-| `https://api.engranatge.localhost/auth/reference`                | Better Auth Scalar docs (auth endpoints)    |
-| `https://api.engranatge.localhost/auth/open-api/generate-schema` | Better Auth raw OpenAPI spec                |
+| `https://api.batuda.localhost/docs`                          | Scalar interactive docs (all CRM endpoints) |
+| `https://api.batuda.localhost/openapi.json`                  | Raw OpenAPI 3.1 spec (machine-readable)     |
+| `https://api.batuda.localhost/auth/reference`                | Better Auth Scalar docs (auth endpoints)    |
+| `https://api.batuda.localhost/auth/open-api/generate-schema` | Better Auth raw OpenAPI spec                |
 
 The CRM spec is generated from `packages/controllers/src/api.ts` (`ForjaApi`). Adding a new route group or endpoint automatically appears in `/docs` and `/openapi.json`.
 

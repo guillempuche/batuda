@@ -3,9 +3,9 @@ import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { ForjaApi } from '@engranatge/controllers'
+import { BatudaApi } from '@batuda/controllers'
 
-export const TasksLive = HttpApiBuilder.group(ForjaApi, 'tasks', handlers =>
+export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
 		return handlers

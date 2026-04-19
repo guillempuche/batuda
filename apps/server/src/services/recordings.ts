@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { Effect, Layer, ServiceMap } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { BadRequest, Conflict, NotFound } from '@engranatge/controllers'
+import { BadRequest, Conflict, NotFound } from '@batuda/controllers'
 
 import { StorageProvider } from './storage-provider.js'
 import {

@@ -32,7 +32,7 @@ const seedCommand = Command.make(
 			Flag.withDefault('full' as const),
 		),
 		auth: Flag.boolean('auth').pipe(
-			Flag.withDescription('Create test auth user (dev@forja.cat)'),
+			Flag.withDescription('Create test auth user (dev@batuda.co)'),
 			Flag.withDefault(false),
 		),
 	},
@@ -48,33 +48,33 @@ const seedCommand = Command.make(
 				yield* Console.log('')
 				yield* Console.log('─── Access hints ───────────────────────────────')
 				yield* Console.log(
-					'  API server:   pnpm dev:server   → https://api.engranatge.localhost',
+					'  API server:   pnpm dev:server   → https://api.batuda.localhost',
 				)
 				yield* Console.log(
-					'  Forja web:    pnpm dev:internal → https://forja.engranatge.localhost',
-				)
-				yield* Console.log('')
-				yield* Console.log(
-					'  API docs (Scalar): https://api.engranatge.localhost/docs',
-				)
-				yield* Console.log(
-					'  OpenAPI spec:      https://api.engranatge.localhost/openapi.json',
-				)
-				yield* Console.log(
-					'  Auth docs:         https://api.engranatge.localhost/auth/reference',
-				)
-				yield* Console.log(
-					'  Auth OpenAPI:      https://api.engranatge.localhost/auth/open-api/generate-schema',
+					'  Batuda web:    pnpm dev:internal → https://batuda.localhost',
 				)
 				yield* Console.log('')
 				yield* Console.log(
-					'  Health check:    curl https://api.engranatge.localhost/health',
+					'  API docs (Scalar): https://api.batuda.localhost/docs',
 				)
 				yield* Console.log(
-					'  List companies:  curl https://api.engranatge.localhost/v1/companies',
+					'  OpenAPI spec:      https://api.batuda.localhost/openapi.json',
 				)
 				yield* Console.log(
-					'  Docker DB:       docker exec -it engranatge-postgres psql -U engranatge',
+					'  Auth docs:         https://api.batuda.localhost/auth/reference',
+				)
+				yield* Console.log(
+					'  Auth OpenAPI:      https://api.batuda.localhost/auth/open-api/generate-schema',
+				)
+				yield* Console.log('')
+				yield* Console.log(
+					'  Health check:    curl https://api.batuda.localhost/health',
+				)
+				yield* Console.log(
+					'  List companies:  curl https://api.batuda.localhost/v1/companies',
+				)
+				yield* Console.log(
+					'  Docker DB:       docker exec -it batuda-db psql -U batuda',
 				)
 				yield* Console.log('────────────────────────────────────────────────')
 			}),
@@ -182,7 +182,7 @@ const authCreateKeyCommand = Command.make(
 	{
 		email: Flag.string('email').pipe(
 			Flag.withDescription('User email that will own the key'),
-			Flag.withDefault('dev@forja.cat'),
+			Flag.withDefault('dev@batuda.co'),
 		),
 		name: Flag.string('name').pipe(
 			Flag.withDescription('Key name (used for listing/revoking later)'),
@@ -190,7 +190,7 @@ const authCreateKeyCommand = Command.make(
 		),
 		prefix: Flag.string('prefix').pipe(
 			Flag.withDescription('Plaintext prefix shown on every generated key'),
-			Flag.withDefault('forja_'),
+			Flag.withDefault('batuda_'),
 		),
 		expiresIn: Flag.integer('expires-in').pipe(
 			Flag.withDescription('Expiration in seconds (omit for no expiry)'),
@@ -399,8 +399,8 @@ const servicesCommand = Command.make('services').pipe(
 
 // ── Root ───────────────────────────────────────────────────
 
-const engranatge = Command.make('engranatge').pipe(
-	Command.withDescription('Engranatge CLI'),
+const batuda = Command.make('batuda').pipe(
+	Command.withDescription('Batuda CLI'),
 	Command.withSubcommands([
 		setupCommand,
 		doctorCommand,
@@ -442,7 +442,7 @@ const formatError = (e: unknown): string => {
 	return String(e)
 }
 
-const program = Command.run(engranatge, { version: '0.0.1' }).pipe(
+const program = Command.run(batuda, { version: '0.0.1' }).pipe(
 	Effect.provide(NodeServices.layer),
 	Effect.tapError(e => {
 		const hint = recoveryHint(e)

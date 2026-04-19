@@ -1,5 +1,5 @@
 {
-	"name": "@engranatge/cli",
+	"name": "@batuda/cli",
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
@@ -10,12 +10,12 @@
 	},
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.1026.0",
+		"@batuda/auth": "workspace:*",
+		"@batuda/domain": "workspace:*",
 		"@better-auth/api-key": "^1.5.6",
 		"@clack/prompts": "^1.2.0",
 		"@effect/platform-node": "4.0.0-beta.43",
 		"@effect/sql-pg": "4.0.0-beta.43",
-		"@engranatge/auth": "workspace:*",
-		"@engranatge/domain": "workspace:*",
 		"better-auth": "^1.5.6",
 		"dotenv": "^16.4.7",
 		"effect": "4.0.0-beta.43",

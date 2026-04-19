@@ -11,12 +11,12 @@ import {
 import leafletCss from 'leaflet/dist/leaflet.css?url'
 import { LayoutGroup } from 'motion/react'
 
-import { PriToast } from '@engranatge/ui/pri'
+import { PriToast } from '@batuda/ui/pri'
 
 import { ComposeDock } from '#/components/emails/compose-dock'
 import { QuickCaptureDialog } from '#/components/interactions/quick-capture-dialog'
 import { AppShell } from '#/components/layout/app-shell'
-import { ForjaMotionConfig } from '#/components/layout/motion-config'
+import { BatudaMotionConfig } from '#/components/layout/motion-config'
 import { ComposeEmailProvider } from '#/context/compose-email-context'
 import { QuickCaptureProvider } from '#/context/quick-capture-context'
 import { readLangCookieFromHeader } from '#/i18n/cookie'
@@ -150,7 +150,7 @@ function RootComponent() {
 			<LangProvider initialLang={lang}>
 				<RegistryProvider>
 					<HydrationBoundary state={dehydrated}>
-						<ForjaMotionConfig>
+						<BatudaMotionConfig>
 							<LayoutGroup>
 								<PriToast.Provider>
 									{isAuthChrome ? (
@@ -169,7 +169,7 @@ function RootComponent() {
 									<PriToast.Viewport />
 								</PriToast.Provider>
 							</LayoutGroup>
-						</ForjaMotionConfig>
+						</BatudaMotionConfig>
 					</HydrationBoundary>
 				</RegistryProvider>
 			</LangProvider>

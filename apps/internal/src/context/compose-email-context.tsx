@@ -8,7 +8,7 @@ import {
 	useState,
 } from 'react'
 
-import type { EmailBlocks } from '@engranatge/email/schema'
+import type { EmailBlocks } from '@batuda/email/schema'
 
 export type DraftMode = 'new' | 'reply'
 export type DraftWindowState = 'open' | 'minimized' | 'fullscreen'
@@ -58,7 +58,7 @@ export type ComposeEmailContextValue = {
 const ComposeEmailContext = createContext<ComposeEmailContextValue | null>(null)
 
 const SERVER_URL =
-	import.meta.env['VITE_SERVER_URL'] ?? 'https://api.engranatge.localhost'
+	import.meta.env['VITE_SERVER_URL'] ?? 'https://api.batuda.localhost'
 
 export function ComposeEmailProvider({
 	children,
@@ -267,7 +267,7 @@ function parseClientId(clientId: string | undefined): {
 	mode: string | null
 } {
 	const empty = { companyId: null, contactId: null, mode: null }
-	if (!clientId?.startsWith('forja:draft')) return empty
+	if (!clientId?.startsWith('batuda:draft')) return empty
 	const result: {
 		companyId: string | null
 		contactId: string | null

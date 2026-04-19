@@ -1,6 +1,6 @@
 import { Console, Effect } from 'effect'
 
-import { createApiKey } from '@engranatge/auth'
+import { createApiKey } from '@batuda/auth'
 
 import { acquireAuthAdapter } from '../lib/auth-adapter'
 import { confirmCloud } from '../lib/confirm-cloud'
@@ -50,7 +50,7 @@ export const authCreateKey = (input: AuthCreateKeyInput) =>
 		yield* Console.log('Sign up a new user with it:')
 		yield* Console.log('')
 		yield* Console.log(
-			'  curl -X POST https://api.engranatge.localhost/auth/admin/create-user \\',
+			'  curl -X POST https://api.batuda.localhost/auth/admin/create-user \\',
 		)
 		yield* Console.log("    -H 'content-type: application/json' \\")
 		yield* Console.log(`    -H 'x-api-key: ${created.key}' \\`)

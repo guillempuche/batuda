@@ -3,7 +3,7 @@ import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { ForjaApi, NotFound } from '@engranatge/controllers'
+import { BatudaApi, NotFound } from '@batuda/controllers'
 
 import {
 	DocumentCreated,
@@ -11,7 +11,7 @@ import {
 } from '../services/timeline-activity'
 
 export const DocumentsLive = HttpApiBuilder.group(
-	ForjaApi,
+	BatudaApi,
 	'documents',
 	handlers =>
 		Effect.gen(function* () {

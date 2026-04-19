@@ -10,7 +10,7 @@ import {
 } from 'react'
 import styled from 'styled-components'
 
-import { PriInput, PriSelect } from '@engranatge/ui/pri'
+import { PriInput, PriSelect } from '@batuda/ui/pri'
 
 import {
 	agedPaperSurface,

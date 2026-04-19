@@ -6,7 +6,7 @@ import { Effect, Layer } from 'effect'
 import { HttpServerRequest, HttpServerResponse } from 'effect/unstable/http'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
-import { ForjaApi } from '@engranatge/controllers'
+import { BatudaApi } from '@batuda/controllers'
 
 import { Auth } from '../lib/auth'
 import { EnvVars } from '../lib/env'
@@ -16,7 +16,7 @@ const proxyToAuth = Effect.gen(function* () {
 	const env = yield* EnvVars
 	const req = yield* HttpServerRequest.HttpServerRequest
 	const incomingMessage = NodeHttpServerRequest.toIncomingMessage(req)
-	const base = env.BETTER_AUTH_BASE_URL || `https://api.engranatge.com`
+	const base = env.BETTER_AUTH_BASE_URL || `https://api.batuda.co`
 
 	const headers = fromNodeHeaders(incomingMessage.headers)
 	const url = new URL(req.url, base)
@@ -35,7 +35,7 @@ const proxyToAuth = Effect.gen(function* () {
 })
 
 export const AuthHandlerLive = HttpApiBuilder.group(
-	ForjaApi,
+	BatudaApi,
 	'auth',
 	handlers =>
 		Effect.succeed(

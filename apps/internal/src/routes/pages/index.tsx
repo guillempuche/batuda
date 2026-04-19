@@ -46,13 +46,13 @@ const validateSearch = validateSearchWith({
 async function loadPagesOnServer(
 	search: PagesSearch,
 ): Promise<{ pages: ReadonlyArray<unknown> }> {
-	const [{ Effect }, { makeForjaApiServer }, cookie] = await Promise.all([
+	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
 		import('effect'),
-		import('#/lib/forja-api-server'),
+		import('#/lib/batuda-api-server'),
 		getServerCookieHeader(),
 	])
 	const program = Effect.gen(function* () {
-		const client = yield* makeForjaApiServer(cookie ?? undefined)
+		const client = yield* makeBatudaApiServer(cookie ?? undefined)
 		return yield* client.pages.list({ query: search })
 	})
 	const pages = await Effect.runPromise(program)

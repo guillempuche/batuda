@@ -1,7 +1,7 @@
 import { Effect } from 'effect'
 import sharp from 'sharp'
 
-import { BadRequest } from '@engranatge/controllers'
+import { BadRequest } from '@batuda/controllers'
 
 // Email-domain image compression. Runs server-side in the staging POST
 // handler before the StorageProvider.put call — bytes reach storage

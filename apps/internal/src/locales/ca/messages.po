@@ -196,6 +196,22 @@ msgstr "Torna als correus"
 msgid "Back to inbox"
 msgstr "Torna a la safata"
 
+#: src/i18n/lingui.tsx:56
+msgid "Batuda"
+msgstr "Batuda"
+
+#: src/i18n/lingui.tsx:57
+msgid "Batuda — a multi-tenant CRM for small agencies."
+msgstr "Batuda — un CRM multi-inquilí per a petites agències."
+
+#: src/components/layout/side-nav.tsx:21
+msgid "Batuda home"
+msgstr "Inici de Batuda"
+
+#: src/routes/login.tsx:183
+msgid "Batuda is invite-only. Request access from the Engranatge team."
+msgstr "Batuda és només amb invitació. Demana accés a l'equip d'Engranatge."
+
 #: src/components/emails/compose-form.tsx:358
 msgid "Bcc"
 msgstr "Bcc"
@@ -585,17 +601,17 @@ msgstr "Durada (min)"
 msgid "e.g. Company signature"
 msgstr "p. ex. Signatura de l'empresa"
 
-#: src/routes/emails/inboxes.tsx:534
-msgid "e.g. engranatge.com"
-msgstr "p. ex. engranatge.com"
-
 #: src/routes/emails/inboxes.tsx:524
 msgid "e.g. hola"
 msgstr "p. ex. hola"
 
 #: src/routes/emails/inboxes.tsx:550
-msgid "e.g. Hola — Engranatge"
-msgstr "p. ex. Hola — Engranatge"
+msgid "e.g. Hola — Taller"
+msgstr "p. ex. Hola — Taller"
+
+#: src/routes/emails/inboxes.tsx:534
+msgid "e.g. taller.cat"
+msgstr "p. ex. taller.cat"
 
 #: src/routes/emails/inboxes.tsx:868
 msgid "Edit"
@@ -631,8 +647,8 @@ msgid "Email drafts"
 msgstr "Esborranys de correu"
 
 #: src/routes/companies/$slug.tsx:954
-msgid "Email via Forja"
-msgstr "Correu via Forja"
+msgid "Email via Batuda"
+msgstr "Correu via Batuda"
 
 #: src/components/layout/nav-items.ts:52
 #: src/routes/companies/$slug.tsx:780
@@ -643,10 +659,6 @@ msgstr "Correus"
 #: src/routes/companies/$slug.tsx:1119
 msgid "Emails, calls, documents, and proposals will appear here as they happen."
 msgstr "Els emails, trucades, documents i propostes apareixeran aquí a mesura que passin."
-
-#: src/routes/login.tsx:133
-msgid "Engranatge internal CRM"
-msgstr "CRM intern d'Engranatge"
 
 #: src/components/shared/channel-icon.tsx:68
 msgid "Event"
@@ -693,22 +705,6 @@ msgstr "El proveïdor l'ha marcat com a brossa. El cos es mostra només per revi
 #: src/routes/emails/inboxes.tsx:825
 msgid "Footers — {0}"
 msgstr "Peus de pàgina — {0}"
-
-#: src/i18n/lingui.tsx:56
-msgid "Forja — Engranatge CRM"
-msgstr "Forja — CRM d'Engranatge"
-
-#: src/i18n/lingui.tsx:57
-msgid "Forja — Engranatge's internal sales CRM."
-msgstr "Forja — el CRM intern de vendes d'Engranatge."
-
-#: src/components/layout/side-nav.tsx:21
-msgid "Forja home"
-msgstr "Pàgina principal de Forja"
-
-#: src/routes/login.tsx:183
-msgid "Forja is invite-only. Request access from the Engranatge team."
-msgstr "Forja és només amb invitació. Demana accés a l'equip d'Engranatge."
 
 #: src/routes/emails/$threadId.tsx:534
 msgid "From"
@@ -1474,6 +1470,10 @@ msgstr "Mostrant {firstRow}–{lastRow} de {total}"
 msgid "Sign in"
 msgstr "Inicia sessió"
 
+#: src/routes/login.tsx:133
+msgid "Sign in to continue"
+msgstr "Inicia sessió per continuar"
+
 #: src/routes/profile/index.tsx:127
 msgid "Sign out"
 msgstr "Tanca sessió"
@@ -1757,5 +1757,5 @@ msgid "Write your message…"
 msgstr "Escriu el teu missatge…"
 
 #: src/routes/profile/index.tsx:84
-msgid "Your Forja workbench identity."
-msgstr "La teva identitat al banc de treball de Forja."
+msgid "Your Batuda workbench identity."
+msgstr "La teva identitat al banc de Batuda."

@@ -2,7 +2,7 @@ import { Trans } from '@lingui/react/macro'
 import { Check, ChevronsUpDown, Globe } from 'lucide-react'
 import styled from 'styled-components'
 
-import { PriSelect } from '@engranatge/ui/pri'
+import { PriSelect } from '@batuda/ui/pri'
 
 import { type LangCode, langCodes } from '#/i18n/index'
 import { useLang, useSetLang } from '#/i18n/lang-provider'

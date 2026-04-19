@@ -5,7 +5,7 @@ import { SqlClient } from 'effect/unstable/sql'
 const companyIdParam = McpSchema.param('companyId', Schema.String)
 
 export const TimelineResource =
-	McpServer.resource`forja://timeline/${companyIdParam}`({
+	McpServer.resource`batuda://timeline/${companyIdParam}`({
 		name: 'Company Timeline',
 		description:
 			'Chronological activity for a company: emails, calls, meetings, documents, proposals, research runs. Latest 100 events.',

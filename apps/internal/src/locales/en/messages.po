@@ -196,6 +196,22 @@ msgstr "Back to emails"
 msgid "Back to inbox"
 msgstr "Back to inbox"
 
+#: src/i18n/lingui.tsx:56
+msgid "Batuda"
+msgstr "Batuda"
+
+#: src/i18n/lingui.tsx:57
+msgid "Batuda — a multi-tenant CRM for small agencies."
+msgstr "Batuda — a multi-tenant CRM for small agencies."
+
+#: src/components/layout/side-nav.tsx:21
+msgid "Batuda home"
+msgstr "Batuda home"
+
+#: src/routes/login.tsx:183
+msgid "Batuda is invite-only. Request access from the Engranatge team."
+msgstr "Batuda is invite-only. Request access from the Engranatge team."
+
 #: src/components/emails/compose-form.tsx:358
 msgid "Bcc"
 msgstr "Bcc"
@@ -585,17 +601,17 @@ msgstr "Duration (min)"
 msgid "e.g. Company signature"
 msgstr "e.g. Company signature"
 
-#: src/routes/emails/inboxes.tsx:534
-msgid "e.g. engranatge.com"
-msgstr "e.g. engranatge.com"
-
 #: src/routes/emails/inboxes.tsx:524
 msgid "e.g. hola"
 msgstr "e.g. hola"
 
 #: src/routes/emails/inboxes.tsx:550
-msgid "e.g. Hola — Engranatge"
-msgstr "e.g. Hola — Engranatge"
+msgid "e.g. Hola — Taller"
+msgstr "e.g. Hola — Taller"
+
+#: src/routes/emails/inboxes.tsx:534
+msgid "e.g. taller.cat"
+msgstr "e.g. taller.cat"
 
 #: src/routes/emails/inboxes.tsx:868
 msgid "Edit"
@@ -631,8 +647,8 @@ msgid "Email drafts"
 msgstr "Email drafts"
 
 #: src/routes/companies/$slug.tsx:954
-msgid "Email via Forja"
-msgstr "Email via Forja"
+msgid "Email via Batuda"
+msgstr "Email via Batuda"
 
 #: src/components/layout/nav-items.ts:52
 #: src/routes/companies/$slug.tsx:780
@@ -643,10 +659,6 @@ msgstr "Emails"
 #: src/routes/companies/$slug.tsx:1119
 msgid "Emails, calls, documents, and proposals will appear here as they happen."
 msgstr "Emails, calls, documents, and proposals will appear here as they happen."
-
-#: src/routes/login.tsx:133
-msgid "Engranatge internal CRM"
-msgstr "Engranatge internal CRM"
 
 #: src/components/shared/channel-icon.tsx:68
 msgid "Event"
@@ -693,22 +705,6 @@ msgstr "Flagged as spam by the provider. The body is shown for review only."
 #: src/routes/emails/inboxes.tsx:825
 msgid "Footers — {0}"
 msgstr "Footers — {0}"
-
-#: src/i18n/lingui.tsx:56
-msgid "Forja — Engranatge CRM"
-msgstr "Forja — Engranatge CRM"
-
-#: src/i18n/lingui.tsx:57
-msgid "Forja — Engranatge's internal sales CRM."
-msgstr "Forja — Engranatge's internal sales CRM."
-
-#: src/components/layout/side-nav.tsx:21
-msgid "Forja home"
-msgstr "Forja home"
-
-#: src/routes/login.tsx:183
-msgid "Forja is invite-only. Request access from the Engranatge team."
-msgstr "Forja is invite-only. Request access from the Engranatge team."
 
 #: src/routes/emails/$threadId.tsx:534
 msgid "From"
@@ -1474,6 +1470,10 @@ msgstr "Showing {firstRow}–{lastRow} of {total}"
 msgid "Sign in"
 msgstr "Sign in"
 
+#: src/routes/login.tsx:133
+msgid "Sign in to continue"
+msgstr "Sign in to continue"
+
 #: src/routes/profile/index.tsx:127
 msgid "Sign out"
 msgstr "Sign out"
@@ -1757,5 +1757,5 @@ msgid "Write your message…"
 msgstr "Write your message…"
 
 #: src/routes/profile/index.tsx:84
-msgid "Your Forja workbench identity."
-msgstr "Your Forja workbench identity."
+msgid "Your Batuda workbench identity."
+msgstr "Your Batuda workbench identity."

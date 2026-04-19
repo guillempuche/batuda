@@ -3,10 +3,10 @@ import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { ForjaApi } from '@engranatge/controllers'
+import { BatudaApi } from '@batuda/controllers'
 
 export const TimelineLive = HttpApiBuilder.group(
-	ForjaApi,
+	BatudaApi,
 	'timeline',
 	handlers =>
 		Effect.gen(function* () {

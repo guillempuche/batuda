@@ -4,7 +4,7 @@ import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import viteReact from '@vitejs/plugin-react-swc'
 import { defineConfig } from 'vite'
 
-/* Forja uses `@vitejs/plugin-react-swc` so two SWC transforms can run at
+/* Batuda uses `@vitejs/plugin-react-swc` so two SWC transforms can run at
  * compile time:
  * - `@lingui/swc-plugin` turns `<Trans>…</Trans>` (from `@lingui/react/macro`)
  *   into the runtime form with auto-generated message IDs.

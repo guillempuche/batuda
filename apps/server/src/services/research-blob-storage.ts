@@ -2,7 +2,7 @@
  * Adapts the server-side `StorageProvider` (S3/R2/MinIO) to the
  * research-local `BlobStorage` port.
  *
- * Keeps the `@engranatge/research` package free of any server imports —
+ * Keeps the `@batuda/research` package free of any server imports —
  * it only depends on its own `BlobStorage` port — while letting the
  * research runtime use the same object store the rest of the app uses
  * (scrape markdown cache, recordings, etc.).
@@ -14,7 +14,7 @@
 
 import { Effect, Layer } from 'effect'
 
-import { BlobStorage } from '@engranatge/research'
+import { BlobStorage } from '@batuda/research'
 
 import { StorageProvider } from './storage-provider'
 

@@ -16,14 +16,14 @@ import {
 	PriNumberField,
 	PriToggleGroup,
 	usePriToast,
-} from '@engranatge/ui/pri'
+} from '@batuda/ui/pri'
 
 import {
 	ChannelIcon,
 	type InteractionChannel,
 } from '#/components/shared/channel-icon'
 import { useQuickCapture } from '#/context/quick-capture-context'
-import { ForjaApiAtom } from '#/lib/forja-api-atom'
+import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import {
 	brushedMetalPlate,
 	rulerUnderRule,
@@ -51,7 +51,7 @@ const CHANNELS: ReadonlyArray<InteractionChannel> = [
  *
  * Rendered once by `<QuickCaptureProvider>` (so there is a single
  * instance in the tree). Reads open-state from context and submits via
- * `ForjaApiAtom.mutation('interactions', 'create')` — the server handler
+ * `BatudaApiAtom.mutation('interactions', 'create')` — the server handler
  * writes the interaction AND updates `company.lastContactedAt` +
  * `nextAction`/`nextActionAt` in the same transaction.
  */
@@ -62,7 +62,7 @@ export function QuickCaptureDialog() {
 	const toastManager = usePriToast()
 
 	const createInteraction = useAtomSet(
-		ForjaApiAtom.mutation('interactions', 'create'),
+		BatudaApiAtom.mutation('interactions', 'create'),
 		{ mode: 'promiseExit' },
 	)
 
@@ -85,7 +85,7 @@ export function QuickCaptureDialog() {
 
 	const companiesAtom = useMemo(
 		() =>
-			ForjaApiAtom.query('companies', 'list', {
+			BatudaApiAtom.query('companies', 'list', {
 				query: { limit: 500 },
 			}),
 		[],
@@ -161,7 +161,7 @@ export function QuickCaptureDialog() {
 		const defect = exit.cause
 		setErrorMessage(t`Could not log the interaction. Please try again.`)
 		// biome-ignore lint/suspicious/noConsole: error logging for dev
-		console.error('[forja] interactions.create failed', defect)
+		console.error('[batuda] interactions.create failed', defect)
 		setSubmitting(false)
 	}
 

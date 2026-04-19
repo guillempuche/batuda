@@ -1,7 +1,7 @@
 {
-	"name": "@engranatge/research",
+	"name": "@batuda/research",
 	"version": "0.0.1",
-	"description": "Engranatge — research bounded context (provider ports, agent loop, budget, schemas)",
+	"description": "Batuda — research bounded context (provider ports, agent loop, budget, schemas)",
 	"type": "module",
 	"types": "./src/index.ts",
 	"main": "./src/index.ts",

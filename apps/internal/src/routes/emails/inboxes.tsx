@@ -17,15 +17,15 @@ import {
 import { useCallback, useMemo, useState } from 'react'
 import styled, { css } from 'styled-components'
 
-import { EmailEditor } from '@engranatge/email/editor'
-import type { EmailBlocks } from '@engranatge/email/schema'
+import { EmailEditor } from '@batuda/email/editor'
+import type { EmailBlocks } from '@batuda/email/schema'
 import {
 	PriButton,
 	PriDialog,
 	PriInput,
 	PriSelect,
 	usePriToast,
-} from '@engranatge/ui/pri'
+} from '@batuda/ui/pri'
 
 import {
 	createFooterAtom,
@@ -65,13 +65,13 @@ type InboxRow = {
 }
 
 async function loadInboxesOnServer(): Promise<ReadonlyArray<unknown>> {
-	const [{ Effect }, { makeForjaApiServer }, cookie] = await Promise.all([
+	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
 		import('effect'),
-		import('#/lib/forja-api-server'),
+		import('#/lib/batuda-api-server'),
 		getServerCookieHeader(),
 	])
 	const program = Effect.gen(function* () {
-		const client = yield* makeForjaApiServer(cookie ?? undefined)
+		const client = yield* makeBatudaApiServer(cookie ?? undefined)
 		return yield* client.email.listInboxes({ query: {} })
 	})
 	return Effect.runPromise(program)
@@ -531,7 +531,7 @@ function InboxFormDialog({
 										type='text'
 										value={domain}
 										onChange={e => setDomain(e.target.value)}
-										placeholder={t`e.g. engranatge.com`}
+										placeholder={t`e.g. taller.cat`}
 									/>
 								</Field>
 								<PreviewLine aria-live='polite'>
@@ -547,7 +547,7 @@ function InboxFormDialog({
 								type='text'
 								value={displayName}
 								onChange={e => setDisplayName(e.target.value)}
-								placeholder={t`e.g. Hola — Engranatge`}
+								placeholder={t`e.g. Hola — Taller`}
 							/>
 						</Field>
 

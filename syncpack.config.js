@@ -8,17 +8,13 @@ export default {
 		},
 		{
 			label: 'App versions (independently released)',
-			packages: [
-				'@engranatge/server',
-				'@engranatge/internal',
-				'@engranatge/ui',
-			],
+			packages: ['@batuda/server', '@batuda/internal', '@batuda/ui'],
 			dependencyTypes: ['local'],
 			isIgnored: true,
 		},
 		{
-			label: 'Engranatge',
-			dependencies: ['@engranatge/*'],
+			label: 'Batuda',
+			dependencies: ['@batuda/*'],
 			policy: 'sameRange',
 		},
 		{

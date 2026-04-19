@@ -1,11 +1,11 @@
 import { Effect } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
-import { ForjaApi } from '@engranatge/controllers'
+import { BatudaApi } from '@batuda/controllers'
 
 import { PageService } from '../services/pages'
 
-export const PagesLive = HttpApiBuilder.group(ForjaApi, 'pages', handlers =>
+export const PagesLive = HttpApiBuilder.group(BatudaApi, 'pages', handlers =>
 	Effect.gen(function* () {
 		const svc = yield* PageService
 		return handlers

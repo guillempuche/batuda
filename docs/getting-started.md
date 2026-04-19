@@ -124,9 +124,9 @@ pnpm dev:internal
 
 Dev URLs use portless `*.localhost` hostnames (no `/etc/hosts` edit needed on modern macOS/Linux):
 
-- API: [https://api.engranatge.localhost](https://api.engranatge.localhost)
-- API docs (Scalar): [https://api.engranatge.localhost/docs](https://api.engranatge.localhost/docs)
-- Forja: [https://forja.engranatge.localhost](https://forja.engranatge.localhost)
+- API: [https://api.batuda.localhost](https://api.batuda.localhost)
+- API docs (Scalar): [https://api.batuda.localhost/docs](https://api.batuda.localhost/docs)
+- Forja: [https://batuda.localhost](https://batuda.localhost)
 
 The public marketing site lives in a separate repo (`engranatge-marketing`). Run its own `pnpm dev` if you need the full loop against a local CRM.
 

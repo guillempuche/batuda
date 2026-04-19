@@ -11,7 +11,7 @@ type IconComponent = ComponentType<{
  * Workshop knob — a brushed-metal housing with a colored dome pushcap
  * stamped on top and a stenciled label below. Both the desktop SideNav
  * (`size='full'`) and the mobile BottomNav (`size='compact'`) render
- * through this component so Forja's navigation reads as one continuous
+ * through this component so Batuda's navigation reads as one continuous
  * shadow-board regardless of breakpoint. Active state pulses an amber
  * focus ring on the housing and brightens the cap.
  *

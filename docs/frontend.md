@@ -3,7 +3,7 @@
 TanStack Start SSR app for the internal Forja sales tool. Deployed to Unikraft (Node.js). Mobile-first.
 For system context see [architecture.md](architecture.md).
 
-Deployed at `forja.engranatge.com`. The public marketing site lives in a separate repo (`engranatge-marketing`).
+Deployed at `batuda.co`. The public marketing site lives in a separate repo (`engranatge-marketing`).
 
 ---
 

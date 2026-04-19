@@ -76,7 +76,7 @@ export class StorageError extends Schema.TaggedErrorClass<StorageError>()(
 
 // ── Research HTTP errors (route-level, status-mapped) ──
 // Domain-level research errors (ProviderError, BudgetExceeded, etc.) live
-// in @engranatge/research. These are the HTTP-facing subset used in route
+// in @batuda/research. These are the HTTP-facing subset used in route
 // definitions for 409 responses.
 
 /** Pre-run estimate exceeds available budget. Returned as 409. */

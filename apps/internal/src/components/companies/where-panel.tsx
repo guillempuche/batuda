@@ -4,10 +4,10 @@ import { Crosshair, ExternalLink, MapPin } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import styled from 'styled-components'
 
-import { PriButton, usePriToast } from '@engranatge/ui/pri'
+import { PriButton, usePriToast } from '@batuda/ui/pri'
 
 import { companyAtomFor } from '#/atoms/company-atoms'
-import { ForjaApiAtom } from '#/lib/forja-api-atom'
+import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import {
 	agedPaperSurface,
 	brushedMetalPlate,
@@ -44,7 +44,7 @@ export function WherePanel({
 	const { t } = useLingui()
 	const toast = usePriToast()
 	const refresh = useAtomRefresh(companyAtomFor(company.slug))
-	const geocode = useAtomSet(ForjaApiAtom.mutation('companies', 'geocode'), {
+	const geocode = useAtomSet(BatudaApiAtom.mutation('companies', 'geocode'), {
 		mode: 'promiseExit',
 	})
 

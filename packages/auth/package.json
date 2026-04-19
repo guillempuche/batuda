@@ -1,7 +1,7 @@
 {
-	"name": "@engranatge/auth",
+	"name": "@batuda/auth",
 	"version": "0.0.1",
-	"description": "Engranatge — auth bounded context (Better-Auth config builder + CLI-side use cases)",
+	"description": "Batuda — auth bounded context (Better-Auth config builder + CLI-side use cases)",
 	"type": "module",
 	"types": "./src/index.ts",
 	"main": "./src/index.ts",

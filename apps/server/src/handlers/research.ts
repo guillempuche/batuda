@@ -1,17 +1,17 @@
 import { Effect, Stream } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
-import { ForjaApi, NotFound, SessionContext } from '@engranatge/controllers'
+import { BatudaApi, NotFound, SessionContext } from '@batuda/controllers'
 import {
 	type CreateResearchInput,
 	ResearchService,
 	type SystemDefaults,
-} from '@engranatge/research'
+} from '@batuda/research'
 
 import { EnvVars } from '../lib/env'
 
 export const ResearchLive = HttpApiBuilder.group(
-	ForjaApi,
+	BatudaApi,
 	'research',
 	handlers =>
 		Effect.gen(function* () {

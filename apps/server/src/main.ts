@@ -10,14 +10,14 @@ import {
 import { HttpApiBuilder, HttpApiScalar, OpenApi } from 'effect/unstable/httpapi'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { ForjaApi } from '@engranatge/controllers'
+import { BatudaApi } from '@batuda/controllers'
 import {
 	makeResearchLlmLive,
 	makeResearchProvidersLive,
 	ResearchEventSink,
 	ResearchService,
 	researchToolkitLayer,
-} from '@engranatge/research'
+} from '@batuda/research'
 
 import { PgLive } from './db/client'
 import { AgentMailWebhookLive } from './handlers/agentmail-webhook'
@@ -60,7 +60,7 @@ import {
 } from './services/timeline-activity'
 import { WebhookService } from './services/webhooks'
 
-const ApiLive = HttpApiBuilder.layer(ForjaApi).pipe(
+const ApiLive = HttpApiBuilder.layer(BatudaApi).pipe(
 	Layer.provide([
 		HealthLive,
 		AuthHandlerLive,
@@ -176,7 +176,7 @@ const ServerLive = Layer.unwrap(
 // Better Auth also serves its own Scalar docs at /auth/reference
 // and raw schema at /auth/open-api/generate-schema.
 
-const DocsLive = HttpApiScalar.layerCdn(ForjaApi, {
+const DocsLive = HttpApiScalar.layerCdn(BatudaApi, {
 	path: '/docs',
 	scalar: { theme: 'kepler', layout: 'modern' },
 })
@@ -184,7 +184,7 @@ const DocsLive = HttpApiScalar.layerCdn(ForjaApi, {
 const OpenApiJsonLive = HttpRouter.add(
 	'GET',
 	'/openapi.json',
-	HttpServerResponse.json(OpenApi.fromApi(ForjaApi)),
+	HttpServerResponse.json(OpenApi.fromApi(BatudaApi)),
 )
 
 const AppLive = Layer.mergeAll(

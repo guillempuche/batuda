@@ -2,8 +2,8 @@ import { Effect, Layer, Schema, ServiceMap } from 'effect'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient, type SqlError } from 'effect/unstable/sql'
 
-import { NotFound } from '@engranatge/controllers'
-import { TiptapDocument } from '@engranatge/ui/blocks'
+import { NotFound } from '@batuda/controllers'
+import { TiptapDocument } from '@batuda/ui/blocks'
 
 import { CompanyService } from './companies'
 import { buildPageSlug } from './page-slug'

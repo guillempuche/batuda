@@ -1,7 +1,7 @@
 import { Effect, Schema } from 'effect'
 import { McpServer } from 'effect/unstable/ai'
 
-import { schemaRegistry } from '@engranatge/research'
+import { schemaRegistry } from '@batuda/research'
 
 import { LangParam, langDirective } from './_lang'
 
@@ -19,7 +19,7 @@ export const ResearchDesignerPrompt = McpServer.prompt({
 
 			return `${langDirective(lang)}
 
-You are helping design a research query for the Forja CRM research engine.
+You are helping design a research query for the Batuda CRM research engine.
 
 **Topic:** ${topic}
 

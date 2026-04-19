@@ -2,7 +2,7 @@ import { Effect, Stream } from 'effect'
 import { HttpServerResponse, Multipart } from 'effect/unstable/http'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
-import { BadRequest, ForjaApi } from '@engranatge/controllers'
+import { BadRequest, BatudaApi } from '@batuda/controllers'
 
 import { RecordingService } from '../services/recordings'
 
@@ -29,7 +29,7 @@ const emptyUpload = (): UploadFields => ({
 })
 
 export const RecordingsLive = HttpApiBuilder.group(
-	ForjaApi,
+	BatudaApi,
 	'recordings',
 	handlers =>
 		Effect.gen(function* () {

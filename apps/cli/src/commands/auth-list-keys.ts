@@ -1,6 +1,6 @@
 import { Console, Effect } from 'effect'
 
-import { listApiKeys } from '@engranatge/auth'
+import { listApiKeys } from '@batuda/auth'
 
 import { acquireAuthAdapter } from '../lib/auth-adapter'
 import { printTable } from '../lib/table'

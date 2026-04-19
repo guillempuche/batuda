@@ -1,12 +1,12 @@
 import { Effect, Schema } from 'effect'
 import { McpSchema, McpServer } from 'effect/unstable/ai'
 
-import { ResearchService } from '@engranatge/research'
+import { ResearchService } from '@batuda/research'
 
 const idParam = McpSchema.param('id', Schema.String)
 
-export const ResearchResource = McpServer.resource`forja://research/${idParam}`(
-	{
+export const ResearchResource =
+	McpServer.resource`batuda://research/${idParam}`({
 		name: 'Research Run',
 		description:
 			'Full research run with findings, brief, sources, and tool log.',
@@ -17,5 +17,4 @@ export const ResearchResource = McpServer.resource`forja://research/${idParam}`(
 			const run = yield* svc.get(id)
 			return JSON.stringify(run, null, 2)
 		}),
-	},
-)
+	})

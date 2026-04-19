@@ -259,7 +259,7 @@ describe('EmailAttachmentStaging', () => {
 		)
 	})
 
-	describe('isolation from other Forja storage consumers', () => {
+	describe('isolation from other Batuda storage consumers', () => {
 		it.todo(
 			// GIVEN a stage() that calls storage.put under key "email/staging/…"
 			// AND recordings.ts uses "recordings/…" and research-blob-storage.ts uses "research/…"

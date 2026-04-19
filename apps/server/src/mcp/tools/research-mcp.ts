@@ -1,7 +1,7 @@
 import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 
-import { ResearchService, type SystemDefaults } from '@engranatge/research'
+import { ResearchService, type SystemDefaults } from '@batuda/research'
 
 import { EnvVars } from '../../lib/env'
 

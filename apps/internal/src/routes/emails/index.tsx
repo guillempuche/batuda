@@ -57,7 +57,7 @@ import {
 	PriPopover,
 	PriSelect,
 	usePriToast,
-} from '@engranatge/ui/pri'
+} from '@batuda/ui/pri'
 
 import {
 	canonicalKey,
@@ -180,9 +180,9 @@ async function loadThreadsOnServer(wire: EmailsSearch): Promise<{
 	envelope: ListEnvelope
 	inboxes: ReadonlyArray<unknown>
 }> {
-	const [{ Effect }, { makeForjaApiServer }, cookie] = await Promise.all([
+	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
 		import('effect'),
-		import('#/lib/forja-api-server'),
+		import('#/lib/batuda-api-server'),
 		getServerCookieHeader(),
 	])
 	const queryForServer: Record<string, string | number> = {}
@@ -194,7 +194,7 @@ async function loadThreadsOnServer(wire: EmailsSearch): Promise<{
 	if (wire.limit !== undefined) queryForServer['limit'] = wire.limit
 	if (wire.offset !== undefined) queryForServer['offset'] = wire.offset
 	const program = Effect.gen(function* () {
-		const client = yield* makeForjaApiServer(cookie ?? undefined)
+		const client = yield* makeBatudaApiServer(cookie ?? undefined)
 		const [envelope, inboxes] = yield* Effect.all(
 			[
 				client.email.listThreads({ query: queryForServer }),
@@ -826,8 +826,8 @@ type ThreadsGridProps = {
 	) => Promise<void>
 }
 
-const COLUMN_SIZING_KEY = 'forja.emails.columnSizing'
-const COLUMN_VISIBILITY_KEY = 'forja.emails.columnVisibility'
+const COLUMN_SIZING_KEY = 'batuda.emails.columnSizing'
+const COLUMN_VISIBILITY_KEY = 'batuda.emails.columnVisibility'
 
 function readLocal<T>(key: string, fallback: T): T {
 	if (typeof window === 'undefined') return fallback
@@ -1328,10 +1328,10 @@ type StripDraft = {
 function DraftsResumeStrip({ drafts }: { drafts: ReadonlyArray<StripDraft> }) {
 	const { t } = useLingui()
 	const [collapsed, setCollapsed] = useState<boolean>(() =>
-		readLocal<boolean>('forja.emails.draftsStripCollapsed', false),
+		readLocal<boolean>('batuda.emails.draftsStripCollapsed', false),
 	)
 	useEffect(() => {
-		writeLocal('forja.emails.draftsStripCollapsed', collapsed)
+		writeLocal('batuda.emails.draftsStripCollapsed', collapsed)
 	}, [collapsed])
 	return (
 		<StripPlate>

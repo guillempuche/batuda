@@ -470,7 +470,7 @@ Trigger to revive: when the Forja UI's call-recording playback flow needs in-app
 - [ ] Run `kraft build` locally and verify image builds
 - [ ] Run `kraft run` locally and verify HTTP server responds
 - [ ] Deploy to Unikraft Cloud and verify
-- [ ] Point `api.engranatge.com` to deployed instance
+- [ ] Point `api.batuda.co` to deployed instance
 
 ## Phase 10 — Seed data
 
@@ -494,6 +494,6 @@ Trigger to revive: when the Forja UI's call-recording playback flow needs in-app
 - [ ] Create inboxes:
   - `client.inboxes.create({ username: "guillem", domain: "engranatge.com" })` → `guillem@engranatge.com` (personal)
   - `client.inboxes.create({ username: "info", domain: "engranatge.com" })` → `info@engranatge.com` (system/CRM)
-- [ ] Create AgentMail webhook: `client.webhooks.create({ url: "https://api.engranatge.com/webhooks/agentmail/inbound", eventTypes: ["message.received"] })`
+- [ ] Create AgentMail webhook: `client.webhooks.create({ url: "https://api.batuda.co/webhooks/agentmail/inbound", eventTypes: ["message.received"] })`
 - [ ] Store `EMAIL_API_KEY` in production env (and `EMAIL_WEBHOOK_SECRET` for AgentMail webhook signature verification)
 - [ ] Test end-to-end: send email via MCP → verify delivered + thread link created

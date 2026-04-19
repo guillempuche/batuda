@@ -5,9 +5,9 @@ import { AlertTriangle, Plus, Send, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 
-import { EmailEditor } from '@engranatge/email/editor'
-import type { EmailBlocks } from '@engranatge/email/schema'
-import { PriButton, PriInput, PriSelect } from '@engranatge/ui/pri'
+import { EmailEditor } from '@batuda/email/editor'
+import type { EmailBlocks } from '@batuda/email/schema'
+import { PriButton, PriInput, PriSelect } from '@batuda/ui/pri'
 
 import { contactsAtomFor } from '#/atoms/company-atoms'
 import {

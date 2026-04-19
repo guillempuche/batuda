@@ -11,7 +11,7 @@ import { Config, Effect, Redacted } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 import pg from 'pg'
 
-import { buildBetterAuthConfig } from '@engranatge/auth'
+import { buildBetterAuthConfig } from '@batuda/auth'
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -102,27 +102,27 @@ const messageSlugFromId = (providerMessageId: string): string =>
 
 const SEED_MESSAGE_BODIES: Record<string, { from: string; body: string }> = {
 	calpep01: {
-		from: 'dev@forja.cat',
-		body: 'Hola Pep,\n\nT’envio la proposta per la web i el sistema de reserves. Avisa’m quan tinguis un moment per revisar-la.\n\nSalutacions,\nForja',
+		from: 'admin@taller.cat',
+		body: 'Hola Pep,\n\nT’envio la proposta per la web i el sistema de reserves. Avisa’m quan tinguis un moment per revisar-la.\n\nSalutacions,\nTaller',
 	},
 	calpep02: {
 		from: 'pep@calpepfonda.cat',
 		body: 'Hola,\n\nGràcies per la proposta. Ens reunim dijous per parlar-ne?',
 	},
 	ferrosmarta01: {
-		from: 'dev@forja.cat',
+		from: 'admin@taller.cat',
 		body: 'Hola Marta,\n\nAquesta és una primera aproximació per l’automatització de processos comercials. Adjunto un esborrany d’agenda.',
 	},
 	ferrosjordi01: {
-		from: 'dev@forja.cat',
+		from: 'admin@taller.cat',
 		body: 'Hola Jordi,\n\nSeguim amb la demo de facturació. Et va bé dimarts a les 10?',
 	},
 	coastal01: {
-		from: 'dev@forja.cat',
+		from: 'admin@taller.cat',
 		body: 'Hi Tom,\n\nHere is a quick write-up on our delivery-note digitisation pilot. Happy to jump on a call.',
 	},
 	hostal01: {
-		from: 'dev@forja.cat',
+		from: 'admin@taller.cat',
 		body: 'Hola Arnau,\n\nProposta inicial per al sistema de reserves de l’Hostal. Repassem-la quan puguis.',
 	},
 	hostal02: {
@@ -130,15 +130,15 @@ const SEED_MESSAGE_BODIES: Record<string, { from: string; body: string }> = {
 		body: 'Hola,\n\nMolt bé, ens encaixa. Podries enviar un pressupost detallat?',
 	},
 	brightlane01: {
-		from: 'dev@forja.cat',
+		from: 'admin@taller.cat',
 		body: 'Hi Sarah,\n\nFollowing up on the ecommerce roadmap — let me know if Tuesday works for the review call.',
 	},
 	dismartinez01: {
-		from: 'dev@forja.cat',
+		from: 'admin@taller.cat',
 		body: 'Hola Carlos,\n\nPrimera presa de contacte sobre automatització logística. Quedo pendent de la teva resposta.',
 	},
 	parkstone01: {
-		from: 'dev@forja.cat',
+		from: 'admin@taller.cat',
 		body: 'Hi,\n\nSharing our website redesign offer as discussed. Full scope inside.',
 	},
 	nocompany01: {
@@ -146,7 +146,7 @@ const SEED_MESSAGE_BODIES: Record<string, { from: string; body: string }> = {
 		body: 'Hola,\n\nTinc interes en els vostres serveis. Podem parlar aquesta setmana?',
 	},
 	tancaments01: {
-		from: 'dev@forja.cat',
+		from: 'admin@taller.cat',
 		body: 'Hola Ramon,\n\nAdjunto la proposta d’automatització per a Tancaments Garraf.',
 	},
 	tancaments02: {
@@ -154,7 +154,7 @@ const SEED_MESSAGE_BODIES: Record<string, { from: string; body: string }> = {
 		body: 'Hola,\n\nGràcies. Tenim alguns dubtes sobre el calendari — te’ls envio aviat.',
 	},
 	tancaments03: {
-		from: 'dev@forja.cat',
+		from: 'admin@taller.cat',
 		body: 'Hola Ramon,\n\nRespostes als teus dubtes sobre el calendari, punt per punt.',
 	},
 	spamreject01: {
@@ -213,7 +213,9 @@ const writeDevInboxFiles = (
 			const slug = messageSlugFromId(msg.providerMessageId)
 			const meta = SEED_MESSAGE_BODIES[slug] ?? {
 				from:
-					msg.direction === 'outbound' ? 'dev@forja.cat' : 'sender@example.com',
+					msg.direction === 'outbound'
+						? 'admin@taller.cat'
+						: 'sender@example.com',
 				body: 'Seeded dev message.',
 			}
 			const recipients = JSON.parse(msg.recipients) as {
@@ -258,9 +260,9 @@ const writeDevInboxFiles = (
 // ── Test user ─────────────────────────────────────────────
 
 export const TEST_USER = {
-	email: 'dev@forja.cat',
-	password: 'forja-dev-2026',
-	name: 'Forja Dev',
+	email: 'admin@taller.cat',
+	password: 'batuda-dev-2026',
+	name: 'Taller Dev',
 }
 
 // ── Seed data ─────────────────────────────────────────────
@@ -2253,8 +2255,8 @@ export const seed = (preset: Preset) =>
 			// inbox for AI workflows. Operators add/remove more via the inbox
 			// management UI.
 			yield* Effect.logInfo('Seeding email inboxes...')
-			const humanInboxId = 'guillem@engranatge.com'
-			const agentInboxId = 'hola@engranatge.com'
+			const humanInboxId = 'admin@taller.cat'
+			const agentInboxId = 'hola@taller.cat'
 
 			const inboxRows = [
 				{
@@ -2266,18 +2268,18 @@ export const seed = (preset: Preset) =>
 					ownerUserId: null,
 					isDefault: true,
 					active: true,
-					clientId: 'forja:human',
+					clientId: 'batuda:human',
 				},
 				{
 					provider: 'agentmail',
 					providerInboxId: agentInboxId,
 					email: agentInboxId,
-					displayName: 'Forja team (shared with AI)',
+					displayName: 'Taller team (shared with AI)',
 					purpose: 'shared',
 					ownerUserId: null,
 					isDefault: false,
 					active: true,
-					clientId: 'forja:shared',
+					clientId: 'batuda:shared',
 				},
 			]
 			yield* sql`INSERT INTO inboxes ${sql.insert(normalizeRows(inboxRows))}`
@@ -2446,7 +2448,7 @@ export const seed = (preset: Preset) =>
 					companyId: companyMap.get('cal-pep-fonda')!,
 					contactId: contactMap.get('Pep Casals'),
 					recipients: JSON.stringify({
-						to: ['dev@forja.cat'],
+						to: ['admin@taller.cat'],
 						cc: [],
 						bcc: [],
 					}),
@@ -2541,7 +2543,7 @@ export const seed = (preset: Preset) =>
 					companyId: companyMap.get('hostal-pirineu')!,
 					contactId: contactMap.get('Arnau Ribas'),
 					recipients: JSON.stringify({
-						to: ['dev@forja.cat'],
+						to: ['admin@taller.cat'],
 						cc: [],
 						bcc: [],
 					}),
@@ -2615,7 +2617,7 @@ export const seed = (preset: Preset) =>
 					companyId: null,
 					contactId: null,
 					recipients: JSON.stringify({
-						to: ['dev@forja.cat'],
+						to: ['admin@taller.cat'],
 						cc: [],
 						bcc: [],
 					}),
@@ -2650,7 +2652,7 @@ export const seed = (preset: Preset) =>
 					companyId: companyMap.get('tancaments-garraf')!,
 					contactId: contactMap.get('Ramon Vila'),
 					recipients: JSON.stringify({
-						to: ['dev@forja.cat'],
+						to: ['admin@taller.cat'],
 						cc: [],
 						bcc: [],
 					}),
@@ -2685,7 +2687,7 @@ export const seed = (preset: Preset) =>
 					companyId: null,
 					contactId: null,
 					recipients: JSON.stringify({
-						to: ['info@engranatge.com'],
+						to: ['info@taller.cat'],
 						cc: [],
 						bcc: [],
 					}),
@@ -2703,7 +2705,7 @@ export const seed = (preset: Preset) =>
 					companyId: null,
 					contactId: null,
 					recipients: JSON.stringify({
-						to: ['info@engranatge.com'],
+						to: ['info@taller.cat'],
 						cc: [],
 						bcc: [],
 					}),

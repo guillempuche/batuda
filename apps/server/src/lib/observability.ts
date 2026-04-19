@@ -62,7 +62,7 @@ export const OtlpObservability = Layer.unwrap(
 		return Otlp.layerJson({
 			baseUrl,
 			resource: {
-				serviceName: 'forja-server',
+				serviceName: 'batuda-server',
 				serviceVersion: buildMeta.version,
 				attributes: {
 					'deployment.environment': environment,

@@ -8,16 +8,16 @@ import {
 } from 'react'
 import styled from 'styled-components'
 
-import { PriScrollArea } from '@engranatge/ui/pri'
+import { PriScrollArea } from '@batuda/ui/pri'
 
 /**
- * Forja blueprint sheet — aged technical-drawing paper with cross-hatch +
+ * Batuda blueprint sheet — aged technical-drawing paper with cross-hatch +
  * grid, tape strips at the top corners, and sticky rulers along the top
  * and left edges. The inner PriScrollArea viewport is the scroll owner
  * (body is locked at ≥768px) so sticky rulers + the metal rail scrollbar
  * stay visible while content scrolls underneath.
  *
- * Unlike marketing's sheet, Forja drops the folded-corner effect — tape +
+ * Unlike marketing's sheet, Batuda drops the folded-corner effect — tape +
  * rulers + cross-hatch + vignette are enough to carry the metaphor and
  * stay readable across long CRM content.
  *

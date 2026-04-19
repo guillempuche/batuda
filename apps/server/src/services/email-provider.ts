@@ -1,6 +1,6 @@
 import { type Effect, ServiceMap } from 'effect'
 
-import type { EmailError, EmailSendError } from '@engranatge/controllers'
+import type { EmailError, EmailSendError } from '@batuda/controllers'
 
 // ── Provider-agnostic interfaces ──
 

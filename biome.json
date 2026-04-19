@@ -69,11 +69,11 @@
 								":URL:",
 								":PACKAGE_WITH_PROTOCOL:",
 								":PACKAGE:",
-								"!@engranatge/*",
-								"!@engranatge/**"
+								"!@batuda/*",
+								"!@batuda/**"
 							],
 							":BLANK_LINE:",
-							["@engranatge/*", "@engranatge/**"],
+							["@batuda/*", "@batuda/**"],
 							":BLANK_LINE:",
 							[":ALIAS:", ":PATH:"]
 						]
