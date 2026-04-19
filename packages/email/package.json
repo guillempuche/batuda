@@ -1,0 +1,62 @@
+{
+	"name": "@engranatge/email",
+	"version": "0.0.1",
+	"description": "Engranatge — email block schema, brand theme, server-side renderer, sanitizer, and WYSIWYG editor wrapper",
+	"type": "module",
+	"types": "./src/index.ts",
+	"main": "./src/index.ts",
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"import": "./src/index.ts"
+		},
+		"./schema": {
+			"types": "./src/schema.ts",
+			"import": "./src/schema.ts"
+		},
+		"./render": {
+			"types": "./src/render.ts",
+			"import": "./src/render.ts"
+		},
+		"./sanitize": {
+			"types": "./src/sanitize.ts",
+			"import": "./src/sanitize.ts"
+		},
+		"./theme": {
+			"types": "./src/theme.ts",
+			"import": "./src/theme.ts"
+		},
+		"./components": {
+			"types": "./src/components/index.ts",
+			"import": "./src/components/index.ts"
+		},
+		"./editor": {
+			"types": "./src/editor/index.ts",
+			"import": "./src/editor/index.ts"
+		}
+	},
+	"scripts": {
+		"build": "tsdown",
+		"check-types": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"@react-email/components": "^1.0.12",
+		"@react-email/editor": "^1.1.0",
+		"@react-email/render": "^2.0.7",
+		"effect": "4.0.0-beta.43",
+		"parse5": "^8.0.0"
+	},
+	"peerDependencies": {
+		"react": "^19",
+		"react-dom": "^19"
+	},
+	"devDependencies": {
+		"@types/react": "19.2.14",
+		"tsdown": "^0.21.7",
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.4"
+	},
+	"private": true
+}
