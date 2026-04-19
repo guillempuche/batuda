@@ -5,6 +5,8 @@ import {
 	HttpApiSchema,
 } from 'effect/unstable/httpapi'
 
+import { EmailBlocks } from '@engranatge/email/schema'
+
 import { BadRequest, EmailSuppressed, NotFound } from '../errors'
 import { SessionMiddleware } from '../middleware/session'
 
@@ -13,13 +15,15 @@ const Recipients = Schema.Union([Schema.String, Schema.Array(Schema.String)])
 const ThreadStatus = Schema.Literals(['open', 'closed', 'archived'])
 const InboxPurpose = Schema.Literals(['human', 'agent', 'shared'])
 
-// Outbound attachment reference — the browser uploads bytes via the
-// staging endpoint first, then sends the thread with an array of
-// stagingIds. Keeps the send payload JSON-clean and sidesteps multipart
-// from the send path. Provider-agnostic: the server materializes the
-// base64 bytes and hands them to whichever provider is active.
+// Outbound attachment reference. The client uploads bytes via the
+// staging endpoint first, then the send payload just names stagingIds.
+// `inline` selects the Content-Disposition at MIME time; `cid` may be
+// set by callers that want a stable Content-ID (agents rewriting a
+// forwarded asset) — otherwise the server mints one.
 const SendAttachmentRef = Schema.Struct({
 	stagingId: Schema.String,
+	inline: Schema.optional(Schema.Boolean),
+	cid: Schema.optional(Schema.String),
 })
 
 export const EmailGroup = HttpApiGroup.make('email')
@@ -32,8 +36,8 @@ export const EmailGroup = HttpApiGroup.make('email')
 				bcc: Schema.optional(Schema.Array(Schema.String)),
 				replyTo: Schema.optional(Schema.String),
 				subject: Schema.String,
-				text: Schema.optional(Schema.String),
-				html: Schema.optional(Schema.String),
+				bodyJson: EmailBlocks,
+				preview: Schema.optional(Schema.String),
 				companyId: Schema.String,
 				contactId: Schema.optional(Schema.String),
 				attachments: Schema.optional(Schema.Array(SendAttachmentRef)),
@@ -53,8 +57,8 @@ export const EmailGroup = HttpApiGroup.make('email')
 		HttpApiEndpoint.post('reply', '/email/reply', {
 			payload: Schema.Struct({
 				threadId: Schema.String,
-				text: Schema.optional(Schema.String),
-				html: Schema.optional(Schema.String),
+				bodyJson: EmailBlocks,
+				preview: Schema.optional(Schema.String),
 				cc: Schema.optional(Schema.Array(Schema.String)),
 				bcc: Schema.optional(Schema.Array(Schema.String)),
 				attachments: Schema.optional(Schema.Array(SendAttachmentRef)),
@@ -182,9 +186,10 @@ export const EmailGroup = HttpApiGroup.make('email')
 		}),
 	)
 	.add(
-		// Multipart upload — the body is parsed by the raw handler, so the
-		// declared payload is Unknown. Expected parts: one File part keyed
-		// `file` (the attachment bytes + filename + contentType).
+		// Multipart upload — body parsed by the raw handler, so the declared
+		// payload is Unknown. Expected parts: `file` (bytes + filename +
+		// contentType), `inboxId`, optional `inline` flag (`"true"`/`"false"`),
+		// optional `draftId` for immediate attachment.
 		HttpApiEndpoint.post('stageAttachment', '/email/attachments/staging', {
 			payload: Schema.Unknown,
 			success: Schema.Struct({
@@ -192,14 +197,31 @@ export const EmailGroup = HttpApiGroup.make('email')
 				filename: Schema.String,
 				contentType: Schema.String,
 				size: Schema.Number,
+				isInline: Schema.Boolean,
+				previewUrl: Schema.optional(Schema.String),
 			}),
 			error: BadRequest.pipe(HttpApiSchema.status(400)),
 		}),
 	)
 	.add(
-		// Raw passthrough — the handler pipes the provider's attachment
-		// bytes straight into the HTTP response, so the declared success
-		// shape is Unknown (the real content-type is set at write time).
+		HttpApiEndpoint.delete(
+			'discardStagedAttachment',
+			'/email/attachments/staging/:stagingId',
+			{
+				params: { stagingId: Schema.String },
+				query: { inboxId: Schema.String },
+				success: Schema.Void,
+				error: Schema.Union([
+					NotFound.pipe(HttpApiSchema.status(404)),
+					BadRequest.pipe(HttpApiSchema.status(400)),
+				]),
+			},
+		),
+	)
+	.add(
+		// Raw passthrough — pipes the provider's attachment bytes into the
+		// HTTP response, so the declared success shape is Unknown (the real
+		// content-type is set at write time).
 		HttpApiEndpoint.get(
 			'downloadAttachment',
 			'/email/messages/:messageId/attachments/:attachmentId/download',
@@ -222,8 +244,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 				cc: Schema.optional(Schema.Array(Schema.String)),
 				bcc: Schema.optional(Schema.Array(Schema.String)),
 				subject: Schema.optional(Schema.String),
-				text: Schema.optional(Schema.String),
-				html: Schema.optional(Schema.String),
+				bodyJson: Schema.optional(EmailBlocks),
 				inReplyTo: Schema.optional(Schema.String),
 				companyId: Schema.optional(Schema.String),
 				contactId: Schema.optional(Schema.String),
@@ -257,8 +278,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 				cc: Schema.optional(Schema.Array(Schema.String)),
 				bcc: Schema.optional(Schema.Array(Schema.String)),
 				subject: Schema.optional(Schema.String),
-				text: Schema.optional(Schema.String),
-				html: Schema.optional(Schema.String),
+				bodyJson: Schema.optional(EmailBlocks),
 			}),
 			success: Schema.Unknown,
 		}),
@@ -298,8 +318,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 			params: { inboxId: Schema.String },
 			payload: Schema.Struct({
 				name: Schema.String,
-				html: Schema.String,
-				textFallback: Schema.optional(Schema.String),
+				bodyJson: EmailBlocks,
 				isDefault: Schema.optional(Schema.Boolean),
 			}),
 			success: Schema.Unknown,
@@ -317,8 +336,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 			params: { id: Schema.String },
 			payload: Schema.Struct({
 				name: Schema.optional(Schema.String),
-				html: Schema.optional(Schema.String),
-				textFallback: Schema.optional(Schema.String),
+				bodyJson: Schema.optional(EmailBlocks),
 				isDefault: Schema.optional(Schema.Boolean),
 			}),
 			success: Schema.Unknown,
