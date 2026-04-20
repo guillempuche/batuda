@@ -27,7 +27,7 @@ Otherwise, use `AskUserQuestion`:
 
 - **Server** — API at api.batuda.co (`server-v*` tag → auto-deploys)
 - **Internal** — Batuda web at batuda.co (`internal-v*` tag → auto-deploys; tag prefix kept while the app folder is `apps/internal/`)
-- **UI** — `@batuda/ui` shared package (`ui-v*` tag → auto-publishes to npm + JSR)
+- **UI** — `@batuda/ui` shared package (`ui-v*` tag → auto-publishes to npm)
 - **All** — Server first, then Internal, then UI
 
 ## Step 3: Check Commits Exist
@@ -81,7 +81,7 @@ GITHUB_TOKEN=$(gh auth token) pnpm release:internal --ci
 GITHUB_TOKEN=$(gh auth token) pnpm release:ui --ci
 ```
 
-**Note:** Deploy triggers automatically on tag push via GitHub workflows. For `ui`, the `ui-v*` tag triggers `publish-ui.yml` which builds `packages/ui/dist`, publishes to npm, then publishes to JSR via OIDC.
+**Note:** Deploy triggers automatically on tag push via GitHub workflows. For `ui`, the `ui-v*` tag triggers `publish-ui.yml` which builds `packages/ui/dist` and publishes to npm. JSR is not used — it does not allow non-JS/TS files and the UI package ships `tokens.css` / `tailwind.css`.
 
 ## Step 6: Watch Deployment
 
@@ -126,7 +126,6 @@ kraft cloud --metro fra service get batuda-web
 
 ```bash
 npm view @batuda/ui version     # latest on npm
-npx jsr show @batuda/ui         # latest on JSR
 ```
 
 ## Config Reference
@@ -135,7 +134,7 @@ npx jsr show @batuda/ui         # latest on JSR
 .release-it.base.json              # Shared: git, github, npm, changelog
 .release-it.server.cjs             # Server: extends base, tag server-v*
 .release-it.internal.cjs           # Internal: extends base, tag internal-v*
-.release-it.ui.cjs                 # UI: extends base, tag ui-v*, bumps jsr.json too
+.release-it.ui.cjs                 # UI: extends base, tag ui-v*
 scripts/release-calver-plugin.cjs  # CalVer version computation
 scripts/release-utils.cjs          # Workspace dependency path resolver
 ```
