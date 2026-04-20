@@ -1,4 +1,4 @@
-name: Deploy Internal
+name: Deploy Web
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: deploy-internal
+  group: deploy-web
   cancel-in-progress: false
 
 env:
@@ -67,12 +67,12 @@ jobs:
         env:
           KRAFTCLOUD_TOKEN: ${{ secrets.KRAFTCLOUD_TOKEN }}
         run: |
-          if kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} service get batuda-internal >/dev/null 2>&1; then
+          if kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} service get batuda-web >/dev/null 2>&1; then
             echo "exists=true" >> $GITHUB_OUTPUT
-            echo "Service batuda-internal already exists — will perform rolling update"
+            echo "Service batuda-web already exists — will perform rolling update"
           else
             echo "exists=false" >> $GITHUB_OUTPUT
-            echo "Service batuda-internal does not exist — will create it"
+            echo "Service batuda-web does not exist — will create it"
           fi
 
       - name: Deploy to KraftCloud
@@ -93,7 +93,7 @@ jobs:
             if [ "${{ steps.service-check.outputs.exists }}" = "true" ]; then
               kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
                 --timeout 5m \
-                --service batuda-internal \
+                --service batuda-web \
                 --rollout remove_sequential \
                 --rollout-wait 30s \
                 -M 1024 \
@@ -101,7 +101,7 @@ jobs:
             else
               kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
                 --timeout 5m \
-                --name batuda-internal \
+                --name batuda-web \
                 -d batuda.co \
                 -p 443:3000 \
                 -M 1024 \
@@ -113,5 +113,5 @@ jobs:
           KRAFTCLOUD_TOKEN: ${{ secrets.KRAFTCLOUD_TOKEN }}
         run: |
           sleep 5
-          kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} service get batuda-internal || true
+          kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} service get batuda-web || true
           curl -sSf https://batuda.co -o /dev/null && echo "Site is accessible" || echo "::warning::Site not accessible"

@@ -13,7 +13,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
-  # MinIO — S3-compatible storage for local dev (call recordings, etc.).
+  # MinIO — S3-compatible storage for local dev (recordings, email attachments, etc.).
   # Mirrors Cloudflare R2 in prod; the same S3 SDK code path works for both
   # via STORAGE_ENDPOINT (http://localhost:9000 in dev, R2 endpoint in prod).
   storage:
@@ -42,7 +42,7 @@ services:
       until mc alias set local http://storage:9000 batuda batuda-secret > /dev/null 2>&1; do
         echo 'waiting for storage...'; sleep 1;
       done;
-      mc mb --ignore-existing local/batuda-recordings;
+      mc mb --ignore-existing local/batuda-assets;
       echo 'bucket ready';
       "
 
