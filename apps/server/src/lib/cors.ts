@@ -2,51 +2,21 @@ import { Config, Effect, Layer } from 'effect'
 import { HttpMiddleware, HttpRouter } from 'effect/unstable/http'
 
 /**
- * URL-based origin matching (never regex) to avoid ReDoS and escaping bugs.
- * Wildcards only match the `https://*.suffix` form — the origin is parsed
- * with the `URL` constructor, then the hostname is compared via suffix check.
+ * Exact URL origin matching — no regex, no wildcards. ALLOWED_ORIGINS is a
+ * comma-separated list of full origins (`https://host` or `https://host:port`)
+ * and each candidate origin must match one of them literally. Listing every
+ * allowed origin explicitly avoids accidental overmatch from wildcard patterns.
  */
-export const matchOrigin = (origin: string, pattern: string): boolean => {
-	if (!pattern.includes('*')) return origin === pattern
-
-	// Parse origin with URL constructor — rejects malformed values
-	let parsed: URL
-	try {
-		parsed = new URL(origin)
-	} catch {
-		return false
-	}
-
-	// Parse pattern by replacing * with a placeholder so it's a valid URL
-	let patternParsed: URL
-	try {
-		patternParsed = new URL(pattern.replace('*', '_wildcard_'))
-	} catch {
-		return false
-	}
-
-	// Protocol must match exactly (https vs http)
-	if (parsed.protocol !== patternParsed.protocol) return false
-
-	// Port must match ('' = default port for the protocol)
-	if (parsed.port !== patternParsed.port) return false
-
-	// Hostname suffix check: "_wildcard_.engranatge.localhost" → ".engranatge.localhost"
-	const suffix = patternParsed.hostname.replace('_wildcard_', '')
-	if (!suffix.startsWith('.')) return false
-	if (!parsed.hostname.endsWith(suffix)) return false
-
-	// Must have at least one character before the suffix (bare domain != wildcard match)
-	const prefix = parsed.hostname.slice(0, -suffix.length)
-	return prefix.length > 0
-}
+export const matchOrigin = (origin: string, pattern: string): boolean =>
+	origin === pattern
 
 export const CorsLive = Layer.unwrap(
 	Effect.gen(function* () {
 		// Required — no fallback. Crashes on boot if unset so production never
-		// silently runs with wrong origins. Comma-separated, supports wildcards
-		// (e.g. `https://*.engranatge.localhost`). Must agree with Better-Auth
-		// `trustedOrigins` in lib/auth.ts.
+		// silently runs with wrong origins. Comma-separated list of exact
+		// cross-origin callers (e.g. `https://batuda.localhost`). The API does
+		// not list its own host — same-origin requests skip CORS. Must agree
+		// with Better-Auth `trustedOrigins` in lib/auth.ts.
 		const allowedOrigins = yield* Config.string('ALLOWED_ORIGINS').pipe(
 			Config.map(s => s.split(',').map(o => o.trim())),
 		)
