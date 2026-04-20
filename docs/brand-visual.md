@@ -1,18 +1,22 @@
-# Engranatge: Visual Brand
+# Batuda: Visual Brand
 
-The visual identity, central metaphor, layout vocabulary, and design rationale for the Engranatge brand. Paired with `docs/brand-voice.md` (copy voice rules, forbidden words, tone ladders, per-language native-voice rules for Catalan/Castilian/English). Together the two documents are the canonical brand.
+The visual identity, central metaphor, layout vocabulary, and design rationale for Batuda and its tenants. Paired with `docs/brand-voice.md` (copy voice rules, forbidden words, tone ladders, per-language native-voice rules for Catalan/Castilian/English). Together the two documents are the canonical brand.
+
+> **Scope note.** Batuda is the multi-tenant SaaS CRM. This document captures the visual language shared by the Batuda product UI *and* by tenant marketing sites served through it. The first tenant is **Engranatge** (the author's own agency at `engranatge.com`), whose site is used as the worked example below. Seeds use a fictitious tenant *Taller* (`taller.cat`). *"Forja"* may still appear as a workshop-metaphor word (forge), but is not a product name.
 
 What PostHog taught us: the best marketing sites have a **central metaphor** that unifies everything. PostHog's entire site IS a retro PC operating system — every page is an app, the nav is a file browser, the blog is a spreadsheet. That metaphor makes every design decision coherent.
 
-Engranatge needs its own.
+Batuda and its tenants need one too.
 
 ---
 
 ## The Name
 
-**Engranatge** = "gear mechanism" in Catalan. Gears that mesh together, a machine that runs by itself once set in motion.
+**Batuda** = in Catalan, a sudden blow or stroke (the sound of a hammer on the anvil) — the decisive move that starts the work. In the workshop metaphor, it's the stroke that sets a machine running.
 
-This is already a perfect metaphor. We just need to commit to it visually.
+*Engranatge* (the first tenant) = "gear mechanism" in Catalan: gears that mesh together, a machine that runs by itself once set in motion. The two words pair naturally — Batuda is the strike that engages the gears.
+
+Both are already perfect metaphors. The design just needs to commit to them visually.
 
 ---
 
@@ -20,7 +24,7 @@ This is already a perfect metaphor. We just need to commit to it visually.
 
 The site IS a **taller mecànic** (mechanical workshop) where business processes get built, tuned, and set running.
 
-| PostHog                                  | Engranatge                                  |
+| PostHog                                  | Batuda / tenant sites                       |
 | ---------------------------------------- | ------------------------------------------- |
 | Site = retro OS desktop                  | Site = workshop / factory floor             |
 | Pages = apps (spreadsheet, file manager) | Pages = machines, workbenches, blueprints   |
@@ -178,7 +182,7 @@ Borders and dividers. WCAG requires 3:1 for non-text UI components.
 | Display | **Barlow Condensed** | Narrow, industrial, reads like stamped metal labels |
 | Body    | **Barlow**           | Same family, warm and readable at body sizes        |
 
-Tokens: `--font-display` and `--font-body` in `@engranatge/ui/tokens.css`. Loaded via Google Fonts in `__root.tsx`.
+Tokens: `--font-display` and `--font-body` in `@batuda/ui/tokens.css`. Loaded via Google Fonts in `__root.tsx`.
 
 ### Mascot / Character
 
@@ -224,7 +228,7 @@ Buttons are **stamped metal plates**, not flat web buttons:
 
 You're walking around the shop floor, clipboard in hand.
 
-- **Metal binder clip** as the sticky header. Brushed chrome gradient with fine horizontal lines, engraved "ENGRANATGE" brand. Wider binder clip (64px) protruding above. Screw/rivet dots on edges. No hamburger menu.
+- **Metal binder clip** as the sticky header. Brushed chrome gradient with fine horizontal lines, engraved tenant brand ("ENGRANATGE" on the first tenant's site, "BATUDA" on the tool surface). Wider binder clip (64px) protruding above. Screw/rivet dots on edges. No hamburger menu.
 - **Paper surface** for content. Cream background with faint grid lines (body-level CSS). Normal scroll — you're flipping through the work order.
 - **Tool belt** as the fixed bottom bar. Dark leather/canvas texture (#3E2723), stitching dividers between tools. 4 tabs scroll to funnel sections. Active tab in terracotta tint.
 - **Label plate footer** — metal gradient (matching the clip header) with stamped brand, copyright, email. No multi-column grid. Sharp, minimal.
@@ -244,7 +248,7 @@ You're walking around the shop floor, clipboard in hand.
 
 ## Workshop Visual Language
 
-The specific aesthetic vocabulary shared across Engranatge surfaces. Defined in `@engranatge/ui/tokens.css` — consumed locally by Forja and published to npm for the separate marketing site, so both draw from the same visual language.
+The specific aesthetic vocabulary shared across Batuda surfaces and tenant marketing sites. Defined in `@batuda/ui/tokens.css` — consumed locally by the Batuda web app and published to npm for tenant marketing sites (e.g. Engranatge's), so both draw from the same visual language.
 
 ### Surfaces
 
@@ -289,12 +293,12 @@ Quick orientation for designers working in `brand-visual.md` without opening the
 
 ## Site Structure
 
-Single-page sales funnel at `/`. No multi-page navigation — all content on one scrollable page. Shadow board tools and tool belt tabs use TanStack Router hash navigation (`Link` with `hash` prop + `defaultHashScrollIntoView: { behavior: 'smooth' }`).
+Single-page sales funnel at `/` for each tenant marketing site. No multi-page navigation — all content on one scrollable page. Shadow board tools and tool belt tabs use TanStack Router hash navigation (`Link` with `hash` prop + `defaultHashScrollIntoView: { behavior: 'smooth' }`).
 
 ```
-engranatge.com/
+<tenant-domain>/              (e.g. engranatge.com/ or taller.cat/)
   /                    — Single-page funnel (hook → problem → solution → proof → pricing → CTA)
-  /:lang/:slug         — Prospect-specific pages (CMS, Tiptap blocks)
+  /:lang/:slug         — Prospect-specific pages (CMS, Tiptap blocks, served by api.batuda.co)
 ```
 
 ---
@@ -323,5 +327,5 @@ engranatge.com/
 - **Page length**: PostHog pages are very long. Local SMBs won't scroll that much. Keep it tight.
 - **Technical depth**: PostHog shows SQL queries and API docs. We show results and savings.
 - **Self-referential humor**: PostHog jokes about SaaS conventions. Our audience doesn't know SaaS conventions. Our humor should be about the frustrations of running a small business.
-- **English-first**: We're Catalan-first, multilingual second.
-- **Feature comparison tables**: We don't have direct competitors. We compare "with Engranatge" vs "without Engranatge" (manual vs automated).
+- **English-first**: Tenants like Engranatge are Catalan-first, multilingual second.
+- **Feature comparison tables**: The tenant's readers don't have direct competitors to compare. Compare "with the workshop" vs "without the workshop" (manual vs automated).

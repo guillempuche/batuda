@@ -1,8 +1,9 @@
-# Forja — Build Plan
+# Batuda — Build Plan
 
-Full scaffold for a B2B prospecting CRM + automation platform.
-Brand: **Engranatge** (`engranatge.com`)
-Domains: `engranatge.com` (marketing) · `batuda.co` (internal) · `api.batuda.co` (server)
+Full scaffold for a multi-tenant SaaS CRM + automation platform.
+Product: **Batuda** (`batuda.co`)
+First tenant: **Engranatge** (`engranatge.com`)
+Domains: `batuda.co` (web app) · `api.batuda.co` (server) · tenant marketing sites (e.g. `engranatge.com`)
 
 ---
 
@@ -70,7 +71,7 @@ batuda/
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   │
-│   ├── internal/                 # Forja — internal sales tool (batuda.co)
+│   ├── internal/                 # Batuda web app — multi-tenant SaaS CRM (batuda.co)
 │   │   ├── src/
 │   │   │   ├── router.tsx              # createRouter + routeTree.gen
 │   │   │   ├── routes/
@@ -98,14 +99,14 @@ batuda/
 │   │   │   ├── lib/
 │   │   │   │   └── api.ts              # Typed client → server
 │   │   │   └── styles/
-│   │   │       └── global.css          # imports @engranatge/ui tokens
+│   │   │       └── global.css          # imports @batuda/ui tokens
 │   │   ├── vite.config.ts              # Vite + tanstackStart()
 │   │   ├── Dockerfile                  # Two-stage Node 24 build
 │   │   ├── Kraftfile                   # Unikraft deploy config
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   │
-│   └── marketing/                # Engranatge — public site (engranatge.com)
+│   └── marketing/                # Tenant marketing site (e.g. Engranatge — engranatge.com)
 │       ├── src/
 │       │   ├── router.tsx              # createRouter + routeTree.gen
 │       │   ├── routes/
@@ -126,7 +127,7 @@ batuda/
 │       │   ├── lib/
 │       │   │   └── api.ts              # Typed client → server
 │       │   └── styles/
-│       │       └── global.css          # imports @engranatge/ui tokens
+│       │       └── global.css          # imports @batuda/ui tokens
 │       ├── vite.config.ts
 │       ├── Dockerfile
 │       ├── Kraftfile
@@ -206,7 +207,7 @@ packages:
 
 ```json
 {
-  "name": "forja",
+  "name": "batuda",
   "private": true,
   "type": "module",
   "engines": {
@@ -448,8 +449,8 @@ export default {
       dependencies: ['typescript'],
     },
     {
-      label: 'Forja',
-      dependencies: ['@engranatge/*'],
+      label: 'Batuda',
+      dependencies: ['@batuda/*'],
       policy: 'sameRange',
     },
     {
@@ -595,7 +596,7 @@ dist/
 
 ```
 # NeonDB
-DATABASE_URL=postgres://user:pass@ep-xxx.us-east-2.aws.neon.tech/forja?sslmode=require
+DATABASE_URL=postgres://user:pass@ep-xxx.us-east-2.aws.neon.tech/batuda?sslmode=require
 
 # API key for MCP remote (Claude.ai, ChatGPT)
 MCP_SECRET=change-me
@@ -612,7 +613,7 @@ PORT=3000
 
 ```nix
 {
-  description = "Forja — B2B prospecting platform";
+  description = "Batuda — multi-tenant SaaS CRM platform";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -633,7 +634,7 @@ PORT=3000
           ];
 
           shellHook = ''
-            echo "Forja dev environment"
+            echo "Batuda dev environment"
             echo "Node: $(node --version)"
             echo "pnpm: $(pnpm --version)"
           '';
@@ -659,7 +660,7 @@ Run `direnv allow` after cloning. The environment activates automatically on `cd
 
 ```json
 {
-  "name": "@engranatge/domain",
+  "name": "@batuda/domain",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -1033,7 +1034,7 @@ export * from './schema/index'
 
 ```json
 {
-  "name": "@engranatge/server",
+  "name": "@batuda/server",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -1044,7 +1045,7 @@ export * from './schema/index'
     "start": "node dist/main.js"
   },
   "dependencies": {
-    "@engranatge/domain": "workspace:*",
+    "@batuda/domain": "workspace:*",
     "effect": "^3.21.0",
     "@effect/platform": "^0.96.0",
     "@effect/platform-node": "^0.106.0",
@@ -1148,10 +1149,10 @@ Each tool returns the minimum data needed — never dumps full table.
 
 ### MCP Resources to implement
 
-| Resource         | URI                      | Returns                             |
-| ---------------- | ------------------------ | ----------------------------------- |
-| Company profile  | `forja://company/{slug}` | full profile compressed for context |
-| Pipeline summary | `forja://pipeline`       | pipeline overview                   |
+| Resource         | URI                       | Returns                             |
+| ---------------- | ------------------------- | ----------------------------------- |
+| Company profile  | `batuda://company/{slug}` | full profile compressed for context |
+| Pipeline summary | `batuda://pipeline`       | pipeline overview                   |
 
 ### `apps/server/src/routes/`
 
@@ -1177,7 +1178,7 @@ Based on the iapacte/iapacte production pattern (`infrastructure/kraftcloud/`):
 ```yaml
 spec: v0.6
 
-name: forja-server
+name: batuda-server
 
 runtime: node:latest
 
@@ -1219,8 +1220,8 @@ COPY ./packages ./packages
 RUN --mount=type=cache,target=/root/.pnpm-store \
     CI=true pnpm install --frozen-lockfile
 
-RUN pnpm --filter @engranatge/domain build && \
-    pnpm --filter @engranatge/server build
+RUN pnpm --filter @batuda/domain build && \
+    pnpm --filter @batuda/server build
 
 # Stage 2 — runtime
 FROM node:24-alpine
@@ -1244,7 +1245,7 @@ Key points from iapacte reference:
 
 ---
 
-## Phase 5 — apps/internal (Forja)
+## Phase 5 — apps/internal (Batuda web app)
 
 ### Step 1 — Scaffold with TanStack CLI
 
@@ -1289,21 +1290,21 @@ Replace `src/styles.css` content — remove Tailwind `@import "tailwindcss"` and
 
 ```json
 {
-  "name": "@engranatge/internal",
+  "name": "@batuda/web",
   "private": true,
   "type": "module",
   "imports": {
     "#/*": "./src/*"
   },
-  "description": "Forja — internal sales prospecting tool",
+  "description": "Batuda web app — multi-tenant SaaS CRM UI",
   "scripts": {
     "dev": "vite dev --port 3000",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
-    "@engranatge/domain": "workspace:*",
-    "@engranatge/ui": "workspace:*",
+    "@batuda/domain": "workspace:*",
+    "@batuda/ui": "workspace:*",
     "@tanstack/react-router": "latest",
     "@tanstack/react-start": "latest",
     "@tanstack/router-plugin": "^1.132.0",
@@ -1387,7 +1388,7 @@ RUN sed -i 's/"prepare": "lefthook install"/"prepare": ""/' package.json
 COPY ./apps ./apps
 COPY ./packages ./packages
 RUN --mount=type=cache,target=/root/.pnpm-store CI=true pnpm install --frozen-lockfile
-RUN DO_NOT_TRACK=1 TURBO_TELEMETRY_DISABLED=1 pnpm turbo run build --filter=@engranatge/internal
+RUN DO_NOT_TRACK=1 TURBO_TELEMETRY_DISABLED=1 pnpm turbo run build --filter=@batuda/web
 
 FROM node:24-alpine
 ENV NODE_OPTIONS=--no-network-family-autoselection
@@ -1405,7 +1406,7 @@ Note: The Dockerfile builds domain+ui+internal via Turborepo. The `SERVER_URL` p
 
 ```yaml
 spec: v0.6
-name: forja-internal
+name: batuda-web
 runtime: node:latest
 labels:
   cloud.unikraft.v1.instances/scale_to_zero.policy: "on"
@@ -1487,7 +1488,7 @@ Shared design tokens and Tiptap block extensions used by both `apps/internal` an
 
 ```json
 {
-  "name": "@engranatge/ui",
+  "name": "@batuda/ui",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -1526,7 +1527,7 @@ Both apps import tokens via:
 
 ```css
 /* apps/internal/src/styles/global.css or apps/marketing/src/styles/global.css */
-@import '@engranatge/ui/tokens.css';
+@import '@batuda/ui/tokens.css';
 ```
 
 ### `packages/ui/src/blocks/`
@@ -1545,9 +1546,9 @@ Standard rich text (paragraphs, headings, lists) is handled by Tiptap's built-in
 
 ---
 
-## Phase 5c — apps/marketing (Engranatge)
+## Phase 5c — apps/marketing (first tenant — Engranatge)
 
-Public-facing website at `engranatge.com`. Serves both the Engranatge marketing homepage and AI-generated prospect sales pages.
+Public-facing website at `engranatge.com`. Serves both the Engranatge tenant's marketing homepage and AI-generated prospect sales pages. (Additional tenants run the same template from their own repos.)
 
 ### Scaffold
 
@@ -1568,10 +1569,10 @@ Same post-scaffold cleanup as `apps/internal` (remove Tailwind, Cloudflare, devt
 
 ```json
 {
-  "name": "@engranatge/marketing",
+  "name": "engranatge-marketing",
   "private": true,
   "type": "module",
-  "description": "Engranatge — public marketing site + prospect pages",
+  "description": "Engranatge tenant — public marketing site + prospect pages",
   "imports": {
     "#/*": "./src/*"
   },
@@ -1581,8 +1582,8 @@ Same post-scaffold cleanup as `apps/internal` (remove Tailwind, Cloudflare, devt
     "preview": "vite preview"
   },
   "dependencies": {
-    "@engranatge/domain": "workspace:*",
-    "@engranatge/ui": "workspace:*",
+    "@batuda/domain": "workspace:*",
+    "@batuda/ui": "workspace:*",
     "@tanstack/react-router": "latest",
     "@tanstack/react-start": "latest",
     "@tanstack/router-plugin": "^1.132.0",
@@ -1607,7 +1608,7 @@ Same post-scaffold cleanup as `apps/internal` (remove Tailwind, Cloudflare, devt
 ### Route structure
 
 ```
-/                   Marketing homepage (Engranatge)
+/                   Tenant marketing homepage (Engranatge)
 /:lang              Language landing (ca/es/en)
 /:lang/:slug        Prospect page — fetches from GET /pages/:slug?lang=:lang
 ```
@@ -1663,7 +1664,7 @@ RUN sed -i 's/"prepare": "lefthook install"/"prepare": ""/' package.json
 COPY ./apps ./apps
 COPY ./packages ./packages
 RUN --mount=type=cache,target=/root/.pnpm-store CI=true pnpm install --frozen-lockfile
-RUN DO_NOT_TRACK=1 TURBO_TELEMETRY_DISABLED=1 pnpm turbo run build --filter=@engranatge/marketing
+RUN DO_NOT_TRACK=1 TURBO_TELEMETRY_DISABLED=1 pnpm turbo run build --filter=engranatge-marketing
 
 FROM node:24-alpine
 ENV NODE_OPTIONS=--no-network-family-autoselection
@@ -1698,13 +1699,13 @@ cmd: ["/usr/bin/node", "/app/.output/server/index.mjs"]
 ```json
 {
   "mcpServers": {
-    "forja": {
+    "batuda": {
       "command": "pnpm",
       "args": ["--filter", "server", "dev:mcp"],
       "env": {
         "DATABASE_URL": "${DATABASE_URL}"
       },
-      "description": "Forja — companies, contacts, interactions, documents, pages, pipeline"
+      "description": "Batuda — companies, contacts, interactions, documents, pages, pipeline"
     }
   }
 }
@@ -1717,7 +1718,7 @@ cmd: ["/usr/bin/node", "/app/.output/server/index.mjs"]
 ### `/.claude/CLAUDE.md`
 
 ```markdown
-# Forja — AI Agent Instructions
+# Batuda — AI Agent Instructions
 
 ## Source of truth
 
@@ -1777,7 +1778,7 @@ pnpm dev:marketing
 
 # 7. Test MCP locally
 pnpm --filter server dev:mcp
-# Then in Claude Code: /mcp to verify forja tools appear
+# Then in Claude Code: /mcp to verify batuda tools appear
 ```
 
 ---
@@ -1788,7 +1789,7 @@ pnpm --filter server dev:mcp
 2. **TanStack Start deployment** — Unikraft (Node.js SSR) via Dockerfile + Kraftfile
 3. **Unikraft Node 24 base image** — check `catalog.unikraft.org` for availability of node:24
 4. **NeonDB project** — create project at neon.tech, copy connection string to `.env`
-5. **DNS setup** — `engranatge.com`, `batuda.co`, `api.batuda.co` pointing to respective Unikraft instances
+5. **DNS setup** — `batuda.co`, `api.batuda.co`, and each tenant's marketing domain (e.g. `engranatge.com`) pointing to respective Unikraft instances
 6. **Tiptap block extensions** — verify custom node API in Tiptap v3 for structured block content
 
 ---

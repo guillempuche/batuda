@@ -69,7 +69,7 @@ apps/server/src/
 │   └── migrate.ts            # CRM + Better Auth migrations
 ├── main.ts                   # HTTP server entry point (REST API + MCP HTTP)
 ├── mcp-stdio.ts              # MCP stdio entry point (Claude Code local)
-├── api.ts                    # ForjaApi — HttpApi groups composition
+├── api.ts                    # BatudaApi — HttpApi groups composition
 ├── errors.ts                 # Domain error schemas (Unauthorized, NotFound, etc.)
 ├── routes/                   # HttpApiGroup definitions
 │   ├── auth.ts               # /auth/* wildcard (Better Auth proxy)
@@ -105,10 +105,10 @@ apps/server/src/
 │   │   ├── research-sink.ts # propose_update, attach_finding, propose_paid_action
 │   │   └── research-mcp.ts  # start_research, get_research, research_sync
 │   ├── resources/
-│   │   ├── company.ts        # forja://company/{slug} (parameterized)
-│   │   ├── pipeline.ts       # forja://pipeline (static)
-│   │   ├── document.ts       # forja://document/{id} (parameterized)
-│   │   └── research.ts       # forja://research/{id} (parameterized)
+│   │   ├── company.ts        # batuda://company/{slug} (parameterized)
+│   │   ├── pipeline.ts       # batuda://pipeline (static)
+│   │   ├── document.ts       # batuda://document/{id} (parameterized)
+│   │   └── research.ts       # batuda://research/{id} (parameterized)
 │   └── prompts/
 │       ├── _lang.ts           # LangParam + langDirective helper (ca/es/en)
 │       ├── _completions.ts    # Shared auto-completion (company slugs)
@@ -143,7 +143,7 @@ moduleResolution: bundler   → write imports WITHOUT .js extensions
                               import { foo } from '../foo.js'     ✗
 
 verbatimModuleSyntax: true  → type-only imports MUST use `import type`
-                              import type { Company } from '@engranatge/domain'
+                              import type { Company } from '@batuda/domain'
 
 noUncheckedIndexedAccess    → arr[0] is T | undefined, not T
                               always null-check array/object access
@@ -229,9 +229,9 @@ export default Effect.gen(function* () {
 
 ```typescript
 // apps/server/src/main.ts
-import { makeResearchLlmLive, makeResearchProvidersLive, ResearchService } from '@engranatge/research'
+import { makeResearchLlmLive, makeResearchProvidersLive, ResearchService } from '@batuda/research'
 
-const ApiLive = HttpApiBuilder.layer(ForjaApi).pipe(
+const ApiLive = HttpApiBuilder.layer(BatudaApi).pipe(
   Layer.provide([HealthLive, AuthHandlerLive, CompaniesLive, ResearchLive, ...]),
 )
 
@@ -333,7 +333,7 @@ export const CompaniesApi = HttpApiGroup.make("companies").add(
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 
 export const CompaniesApiLive = HttpApiBuilder.group(
-  ForjaApi,
+  BatudaApi,
   "companies",
   (handlers) =>
     handlers
@@ -398,7 +398,7 @@ The MCP server uses `effect/unstable/ai` — tools, resources, prompts, and elic
 ```
 McpToolsLive (src/mcp/server.ts)
 ├── Toolkits: companies, contacts, interactions, tasks, documents, pages, pipeline
-├── Resources: forja://company/{slug}, forja://pipeline, forja://document/{id}
+├── Resources: batuda://company/{slug}, batuda://pipeline, batuda://document/{id}
 └── Prompts: company-research, daily-briefing, proposal-draft, interaction-follow-up
     │
     ├── stdio transport (mcp-stdio.ts) — local Claude Code
@@ -465,7 +465,7 @@ import { McpSchema, McpServer } from 'effect/unstable/ai'
 
 const slugParam = McpSchema.param('slug', Schema.String)
 
-export const CompanyResource = McpServer.resource`forja://company/${slugParam}`({
+export const CompanyResource = McpServer.resource`batuda://company/${slugParam}`({
   name: 'Company Profile',
   description: 'Full company profile with contacts and recent interactions.',
   mimeType: 'application/json',
@@ -547,7 +547,7 @@ export class CurrentUser extends Context.Tag('CurrentUser')<CurrentUser, {
 ```typescript
 // src/mcp-stdio.ts
 const ServerLayer = McpToolsLive.pipe(
-  Layer.provide(McpServer.layerStdio({ name: 'forja', version: '1.0.0' })),
+  Layer.provide(McpServer.layerStdio({ name: 'batuda', version: '1.0.0' })),
   Layer.provide(ServicesLive),
   Layer.provide(PgLive),
   Layer.provide(NodeStdio.layer),
@@ -561,7 +561,7 @@ Layer.launch(ServerLayer).pipe(NodeRuntime.runMain)
 ```typescript
 // src/mcp/http.ts
 export const McpHttpLive = McpToolsLive.pipe(
-  Layer.provide(McpServer.layerHttp({ name: 'forja', version: '1.0.0', path: '/mcp' })),
+  Layer.provide(McpServer.layerHttp({ name: 'batuda', version: '1.0.0', path: '/mcp' })),
 )
 
 // In main.ts — merged with REST API on the same HttpRouter:
@@ -598,15 +598,15 @@ export const McpToolsLive = Layer.mergeAll(
 
 ```bash
 # MCP Inspector (interactive web UI)
-npx @modelcontextprotocol/inspector -- pnpm --filter @engranatge/server dev:mcp
+npx @modelcontextprotocol/inspector -- pnpm --filter @batuda/server dev:mcp
 
 # JSON-RPC pipe (smoke test)
-echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{"elicitation":{}},"clientInfo":{"name":"test","version":"0.1"}}}' | pnpm --filter @engranatge/server dev:mcp
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{"elicitation":{}},"clientInfo":{"name":"test","version":"0.1"}}}' | pnpm --filter @batuda/server dev:mcp
 
 # HTTP endpoint
 curl -X POST http://localhost:3010/mcp -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{...}}'
 
-# Claude Code — .mcp.json already configures the forja stdio server
+# Claude Code — .mcp.json already configures the batuda stdio server
 ```
 
 ---
@@ -617,7 +617,7 @@ Better Auth v1.5.6 handles all authentication. See [architecture.md](architectur
 
 Key files:
 
-- `src/lib/auth.ts` — Better Auth instance as `ServiceMap.Service`, with plugins: `openAPI`, `bearer`, `admin`, `apiKey`, `magicLink` (links are dispatched through `EmailProvider.sendMagicLink` — locally they land in `apps/server/.dev-inbox/` as `*sign-in-to-engranatge*.md` files; in cloud they go through AgentMail)
+- `src/lib/auth.ts` — Better Auth instance as `ServiceMap.Service`, with plugins: `openAPI`, `bearer`, `admin`, `apiKey`, `magicLink` (links are dispatched through `EmailProvider.sendMagicLink` — locally they land in `apps/server/.dev-inbox/` as `*sign-in-to-batuda*.md` files; in cloud they go through AgentMail)
 - `src/lib/env.ts` — Centralized environment variables (DATABASE_URL, BETTER_AUTH_SECRET, etc.)
 - `src/middleware/session.ts` — `SessionMiddleware` validates sessions via `auth.api.getSession()`, provides `SessionContext`
 - `src/routes/auth.ts` — Wildcard `/auth/*` GET/POST routes
@@ -627,7 +627,7 @@ Key files:
 
 ### Cross-origin policy
 
-Forja (web) lives on `:3000`, this API on `:3010`, and the separate marketing site on `:3001` — every request is cross-origin. CORS is wired as a global `HttpRouter.middleware` in `src/main.ts` via `HttpMiddleware.cors({ allowedOrigins, credentials: true, ... })`, with `allowedOrigins` read from `ALLOWED_ORIGINS` env (comma-separated) and falling back to `http://localhost:3000,http://localhost:3001` in dev. The same env var is fed to Better-Auth as `trustedOrigins` in `src/lib/auth.ts` so both layers agree on what's legitimate. `credentials: true` is required for the browser to attach the `forja.session_token` cookie on fetch calls that use `credentials: 'include'`.
+The Batuda web app lives on `:3000`, this API on `:3010`, and the tenant marketing site on `:3001` — every request is cross-origin. CORS is wired as a global `HttpRouter.middleware` in `src/main.ts` via `HttpMiddleware.cors({ allowedOrigins, credentials: true, ... })`, with `allowedOrigins` read from `ALLOWED_ORIGINS` env (comma-separated) and falling back to `http://localhost:3000,http://localhost:3001` in dev. The same env var is fed to Better-Auth as `trustedOrigins` in `src/lib/auth.ts` so both layers agree on what's legitimate. `credentials: true` is required for the browser to attach the `batuda.session_token` cookie on fetch calls that use `credentials: 'include'`.
 
 ### Invite-only signup
 
@@ -638,7 +638,7 @@ New users are created server-side via the admin plugin's `auth.api.createUser` e
 1. **From an authenticated admin session** — a logged-in user with `role: 'admin'` calls `POST /auth/admin/create-user` from any client. This is how a future "invite teammate" UI will work.
 2. **From a trusted server caller using an API key** — a script or MCP tool provisions an API key via `auth.api.createApiKey(...)`, then calls `auth.api.createUser({ body, headers: { 'x-api-key': <key> } })`. Because the `apiKey` plugin is configured with `enableSessionForAPIKeys: true`, an API key presented on a request opens a session carrying the owner's role — so the key must belong to a user with `role: 'admin'` for `createUser` to pass the admin plugin's access check.
 
-**Reference implementation**: `apps/cli/src/commands/seed.ts` uses direct `auth.api.createUser` inside the seed (the CLI has the DB directly, no HTTP) to provision the dev user `dev@forja.cat`. This is the template to copy when writing the production invite flow — same `createUser` call, different caller context (HTTP with API key instead of in-process DB).
+**Reference implementation**: `apps/cli/src/commands/seed.ts` uses direct `auth.api.createUser` inside the seed (the CLI has the DB directly, no HTTP) to provision the dev user `admin@taller.cat`. This is the template to copy when writing the production invite flow — same `createUser` call, different caller context (HTTP with API key instead of in-process DB).
 
 Sign-in is unaffected: `POST /auth/sign-in/email` still works for any existing user with `emailAndPassword` credentials. Only the `sign-up/email` path is closed.
 
@@ -646,7 +646,7 @@ Sign-in is unaffected: `POST /auth/sign-in/email` still works for any existing u
 
 ## Email service (AgentMail + React Email v6)
 
-Outbound email (outreach, follow-ups, replies) and inbound handling via [AgentMail](https://agentmail.to). Authoring on both ends — humans in Forja's compose form, AI agents via MCP — converges on a single typed block tree, rendered through shared primitives in `packages/email`. AgentMail carries the final MIME; Forja owns the authoring surface and the rendering pipeline.
+Outbound email (outreach, follow-ups, replies) and inbound handling via [AgentMail](https://agentmail.to). Authoring on both ends — humans in the web app's compose form, AI agents via MCP — converges on a single typed block tree, rendered through shared primitives in `packages/email`. AgentMail carries the final MIME; Batuda owns the authoring surface and the rendering pipeline.
 
 ### Package layout — `packages/email`
 
@@ -757,7 +757,7 @@ Threading headers (`In-Reply-To`, `References`) are emitted by AgentMail when th
 EMAIL_PROVIDER=agentmail          # or `local` for the filesystem catcher in dev
 AGENTMAIL_API_KEY=am_...
 AGENTMAIL_WEBHOOK_SECRET=whsec_...
-EMAIL_FROM=forja@engranatge.com
+EMAIL_FROM=hello@taller.cat          # tenant's own verified sending domain
 ```
 
 The `EMAIL_PROVIDER` gate is required — there's no auto/NODE_ENV fallback (see `feedback_explicit_env_vars.md`).
@@ -786,8 +786,8 @@ const fireWebhooks = (event: string, payload: unknown) =>
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-Forja-Event": event,
-            "X-Forja-Signature": hmacSign(endpoint['secret'] as string, payload)
+            "X-Batuda-Event": event,
+            "X-Batuda-Signature": hmacSign(endpoint['secret'] as string, payload)
           },
           body: JSON.stringify({ event, payload, timestamp: new Date().toISOString() })
         })
@@ -937,7 +937,7 @@ Style: 2-space indent, 100-char line width, single quotes, ES5 trailing commas, 
 ## Adding a new route
 
 1. Create `src/routes/<entity>.ts` with `HttpApiGroup`
-2. Add group to `ForjaApi` in `src/main.ts`
+2. Add group to `BatudaApi` in `src/main.ts`
 3. Add handler implementation
 4. Add Effect Schema in `packages/domain/src/schema/<entity>.ts`
 
@@ -953,7 +953,7 @@ Style: 2-space indent, 100-char line width, single quotes, ES5 trailing commas, 
 
 1. Define in `src/mcp/resources/<name>.ts`
 2. Static: `McpServer.resource({ uri, name, description, mimeType, audience, content })`
-3. Parameterized: `McpServer.resource\`forja://entity/${McpSchema.param('id', Schema.String)}\`({...})`
+3. Parameterized: `McpServer.resource\`batuda://entity/${McpSchema.param('id', Schema.String)}\`({...})`
 4. Add `completion` for parameterized resources
 5. Add to `McpToolsLive` in `src/mcp/server.ts`
 
@@ -989,7 +989,7 @@ That's it — `OpenAiLanguageModel.model(name)` + `OpenAiClient.layer({ apiKey, 
 
 ## Pages API
 
-The pages API serves two use cases: public reads from the separate marketing site, and internal management by Forja admins:
+The pages API serves two use cases: public reads from tenant marketing sites, and internal management by Batuda admins:
 
 ### Public routes (no auth)
 

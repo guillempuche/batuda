@@ -1,14 +1,14 @@
-# Engranatge
+# Batuda
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**Open-source automation platform for agencies serving local businesses.**
+**Open-source, multi-tenant SaaS CRM for small agencies serving local businesses.**
 
-Build and sell automations and AI workflows to restaurants, clinics, shops, and service businesses — with a built-in CRM to manage your sales pipeline.
+A workbench for independent agencies to manage prospects, log interactions, publish multilingual pages, and expose their pipeline to AI agents — all under one tenant-isolated instance.
 
 ## Contents
 
-- [Why Engranatge](#why-engranatge)
+- [Why Batuda](#why-batuda)
 - [Tech stack](#tech-stack)
 - [Quick start](#quick-start) · [Detailed walkthrough →](docs/getting-started.md)
 - [Scripts](#scripts)
@@ -16,16 +16,18 @@ Build and sell automations and AI workflows to restaurants, clinics, shops, and 
 - [Contributing](#contributing)
 - [License](#license)
 
-## Why Engranatge
+## Why Batuda
 
-Most local businesses run on manual work a machine could handle: copying spreadsheets, sending follow-up emails by hand, checking inventory by walking to the back room. Enterprise software is too expensive and too complex for them.
+Most agencies serving local businesses juggle prospect tracking in spreadsheets, send follow-ups by hand, and have no shared view of their pipeline. Enterprise CRMs are priced for sales teams of 50, not for one-to-five-person shops.
 
-Engranatge gives agencies like yours everything you need to fill that gap:
+Batuda gives small agencies everything they need without the sprawl:
 
-- **Automations** — connect the tools your clients already use. When X happens, do Y.
-- **AI integrations** — let AI handle tasks that require judgment but not creativity: categorizing emails, drafting invoices, summarizing feedback.
-- **Built-in CRM (Forja)** — track prospects, log interactions (visits, calls, emails, LinkedIn, Instagram), and manage your pipeline.
-- **AI-agent ready** — expose all data to AI agents via MCP (Claude, ChatGPT) and connect to n8n/Zapier via webhooks.
+- **Multi-tenant by default** — every agency gets an isolated workspace, users, pages, and pipeline.
+- **Pipeline + interactions** — track prospects, log visits, calls, emails, LinkedIn, Instagram. Next steps surface automatically.
+- **Page publishing** — Tiptap-based page builder with hero/CTA/value blocks, multilingual, tenant-scoped.
+- **AI-agent ready** — expose pipeline + documents to AI agents via MCP (Claude, ChatGPT) and connect to n8n/Zapier via webhooks.
+
+The first tenant is [**Engranatge**](https://engranatge.com) — a one-person automation agency in Catalonia (and the author of this tool). Examples and seed data use a fictitious tenant **Taller** at `taller.cat` so contributors can explore the product without touching real data.
 
 ## Tech stack
 
@@ -36,7 +38,7 @@ Engranatge gives agencies like yours everything you need to fill that gap:
 | Shared schema   | `packages/domain` — Effect Schema                   |
 | CLI             | `apps/cli` — Effect CLI + @clack/prompts TUI        |
 | Backend         | `apps/server` — Effect HTTP + MCP server            |
-| CRM frontend    | `apps/internal` — TanStack Start (Forja)            |
+| Web app         | `apps/internal` — TanStack Start                    |
 | Shared UI       | `packages/ui` — MD3 design tokens + BaseUI + Tiptap |
 | Database        | Postgres (NeonDB)                                   |
 | Deploy          | Unikraft via kraft CLI                              |
@@ -56,7 +58,7 @@ pnpm cli auth bootstrap     # create first admin (interactive)
 pnpm cli doctor             # verify everything is healthy
 # in 2 terminals:
 pnpm dev:server             # API + MCP server
-pnpm dev:internal           # CRM (Forja)
+pnpm dev:internal           # Batuda web app
 ```
 
 First time? See the [detailed walkthrough](docs/getting-started.md) for explanations of each step, env var guidance, and troubleshooting.
@@ -67,7 +69,7 @@ First time? See the [detailed walkthrough](docs/getting-started.md) for explanat
 # CLI
 pnpm cli setup         # copy .env files from examples
 pnpm cli doctor        # check environment health
-pnpm cli seed          # insert sample data
+pnpm cli seed          # insert sample data (Taller fictitious tenant)
 pnpm cli db migrate    # run database migrations
 pnpm cli db reset      # truncate + migrate + seed
 pnpm cli services up   # start Docker services
@@ -75,7 +77,7 @@ pnpm cli:tui           # interactive TUI menu
 
 # Development
 pnpm dev:server        # start API + MCP server
-pnpm dev:internal      # start CRM app (Forja)
+pnpm dev:internal      # start Batuda web app
 
 # Build & lint
 pnpm build             # build all packages

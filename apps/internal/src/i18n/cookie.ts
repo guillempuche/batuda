@@ -1,6 +1,6 @@
 import { isLangCode, type LangCode } from './index'
 
-const COOKIE_NAME = 'engranatge.lang'
+const COOKIE_NAME = 'batuda.lang'
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365
 
 /* Mirrors the localStorage choice into a cookie so the next SSR render
@@ -13,7 +13,7 @@ export function writeLangCookie(lang: LangCode): void {
 	document.cookie = `${COOKIE_NAME}=${lang}; Path=/; Max-Age=${ONE_YEAR_SECONDS}; SameSite=Lax`
 }
 
-/* Parse `engranatge.lang=<code>` out of a raw `Cookie:` header. Returns
+/* Parse `batuda.lang=<code>` out of a raw `Cookie:` header. Returns
  * null when absent or unparseable so callers can fall back to the
  * default. */
 export function readLangCookieFromHeader(

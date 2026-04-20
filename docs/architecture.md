@@ -45,7 +45,7 @@
                     └─────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│  apps/internal  (Forja — batuda.co)                 │
+│  apps/internal  (Batuda web app — batuda.co)                    │
 │  TanStack Start — Unikraft, Node.js SSR                          │
 │                                                                  │
 │  Pipeline  /companies  /companies/$slug  /tasks                 │
@@ -54,7 +54,8 @@
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│  Public marketing site (separate `engranatge-marketing` repo)    │
+│  Tenant marketing sites (each tenant runs its own public site)   │
+│  e.g. Engranatge tenant → engranatge.com (separate repo)         │
 │  TanStack Start — deployed independently                         │
 │  Fetches page content from apps/server at GET /pages/{slug}     │
 │  CORS-allowed origin only — no other runtime coupling            │
@@ -143,12 +144,12 @@ Shared HttpApi spec (route groups, tagged HTTP errors, middleware tag). Consumed
 
 ### `packages/ui`
 
-Shared design system for Forja and for the separate public marketing site (consumed as a published npm package there). Contains:
+Shared design system for the Batuda web app and for tenant public marketing sites (consumed as a published npm package there). Contains:
 
 - CSS design tokens (`tokens.css`) — MD3 typography, color, spacing, shape, elevation
 - Tiptap custom block extensions (hero, cta, valueProps, painPoints, socialProof)
 
-Consumers import tokens via `@import '@engranatge/ui/tokens.css'` and use the shared block extensions for content consistency.
+Consumers import tokens via `@import '@batuda/ui/tokens.css'` and use the shared block extensions for content consistency.
 
 ### `apps/cli`
 
@@ -176,13 +177,13 @@ Effect v4 HTTP server deployed at `api.batuda.co`. Responsibilities:
 
 ### `apps/internal`
 
-Forja — internal sales prospecting tool at `batuda.co`.
+Batuda web app — the multi-tenant SaaS CRM UI at `batuda.co`.
 TanStack Start SSR app deployed to Unikraft (Node.js). Responsibilities:
 
 - Pipeline and company management UI
 - styled-components for co-located CSS with MD3 design tokens
 - Rich text editing via Tiptap (public prospect pages; planned for research docs)
-- Email composition via React Email v6 (`@react-email/editor`) — wraps Tiptap internally but the Forja email module never imports `@tiptap/*` directly; see `packages/email` and `docs/backend.md` § Email service
+- Email composition via React Email v6 (`@react-email/editor`) — wraps Tiptap internally but the web app's email module never imports `@tiptap/*` directly; see `packages/email` and `docs/backend.md` § Email service
 - Interactive map view via react-map-gl + MapLibre (company clustering)
 - Page management (create, edit, publish prospect pages)
 - Mobile-first, no backend logic
@@ -192,7 +193,7 @@ TanStack Start SSR app deployed to Unikraft (Node.js). Responsibilities:
 
 ## Bounded contexts
 
-Engranatge has three bounded contexts. Each owns its own domain errors and types; dependencies only flow from consumers (apps) into the packages, never sideways.
+Batuda has three bounded contexts. Each owns its own domain errors and types; dependencies only flow from consumers (apps) into the packages, never sideways.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -310,17 +311,17 @@ Agent researches company (get_company, Firecrawl/Exa)
   → Server creates pages row with status: "draft"
   → Agent reviews, then calls publish_page(id)
   → Server sets status: "published", published_at: now
-  → Page accessible at engranatge.com/ca/{slug}
+  → Page accessible at <tenant-domain>/ca/{slug} (e.g. engranatge.com/ca/{slug})
   → Agent creates translations: create_page({ slug, lang: "es", content: {...} })
 ```
 
 ### Prospect visits a page
 
 ```
-Browser requests engranatge.com/ca/{slug}
-  → Public site (engranatge-marketing repo) SSR calls GET api.batuda.co/pages/{slug}?lang=ca
+Browser requests <tenant-domain>/ca/{slug} (e.g. engranatge.com/ca/{slug})
+  → Tenant marketing site SSR calls GET api.batuda.co/pages/{slug}?lang=ca
   → Server returns published page content (Tiptap JSON + meta)
-  → Public site renders blocks to HTML, emits SEO tags
+  → Tenant site renders blocks to HTML, emits SEO tags
   → Client-side fires POST /pages/{slug}/view (fire-and-forget)
   → Server increments view_count
 ```
@@ -392,11 +393,11 @@ kraft build                     # builds unikernel image
 kraft deploy                    # deploys to Unikraft Cloud → batuda.co
 ```
 
-### Public marketing site
+### Tenant marketing sites
 
-Deployed from the separate `engranatge-marketing` repo to KraftCloud (service `engranatge-marketing` → `engranatge.com`). No coupling to this repo except the server's CORS allow-list (`ALLOWED_ORIGINS` must include `https://engranatge.com`).
+Each tenant deploys its own public site from its own repo. The first tenant is Engranatge: its marketing repo (`engranatge-marketing`) deploys to KraftCloud (service `engranatge-marketing` → `engranatge.com`). No coupling to this repo except the server's CORS allow-list (`ALLOWED_ORIGINS` includes the tool origin `https://batuda.co` and each tenant origin, e.g. `https://engranatge.com`).
 
-Both Forja apps run on Unikraft — stateless Node.js SSR. Scales to zero when idle.
+Both Batuda apps (server + web) run on Unikraft — stateless Node.js SSR. Scales to zero when idle.
 
 ### Database (NeonDB)
 

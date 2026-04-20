@@ -19,18 +19,18 @@ Never install Node or pnpm globally or via other package managers for this proje
 
 Use **`agent-browser`** (already installed) to test and debug the local web app.
 
-Dev URLs (via portless): **Forja (internal CRM) `https://batuda.localhost`** and API server `https://api.batuda.localhost`. Most debugging is against Forja.
+Dev URLs (via portless): **Batuda web app `https://batuda.localhost`** and API server `https://api.batuda.localhost`. Most debugging is against the web app.
 
 ### Dev login
 
 A test user is created by `pnpm cli seed` (any preset). Use it to log in when debugging authenticated screens:
 
-- **Email:** `dev@forja.cat`
-- **Password:** `forja-dev-2026`
+- **Email:** `admin@taller.cat`
+- **Password:** `batuda-dev-2026`
 
 Exported from `apps/cli/src/commands/seed.ts` as `TEST_USER`. If login fails, re-run `pnpm cli seed --preset minimal` — the seed is idempotent and will (re)create the user via Better-Auth's `signUpEmail`.
 
-Better-Auth lives on the API server at `api.batuda.localhost/auth/*`. The Forja browser sends cookies cross-origin via `credentials: 'include'`; on SSR, loaders forward the incoming `cookie` header server-to-server. Both flows require the API server (`pnpm dev:server`) to be running.
+Better-Auth lives on the API server at `api.batuda.localhost/auth/*`. The web browser sends cookies cross-origin via `credentials: 'include'`; on SSR, loaders forward the incoming `cookie` header server-to-server. Both flows require the API server (`pnpm dev:server`) to be running.
 
 ### Open & navigate
 
@@ -116,14 +116,14 @@ agent-browser set offline off
 
 The server exposes auto-generated OpenAPI docs from the Effect HttpApi spec and Better Auth:
 
-| URL                                                              | What                                        |
-| ---------------------------------------------------------------- | ------------------------------------------- |
+| URL                                                          | What                                        |
+| ------------------------------------------------------------ | ------------------------------------------- |
 | `https://api.batuda.localhost/docs`                          | Scalar interactive docs (all CRM endpoints) |
 | `https://api.batuda.localhost/openapi.json`                  | Raw OpenAPI 3.1 spec (machine-readable)     |
 | `https://api.batuda.localhost/auth/reference`                | Better Auth Scalar docs (auth endpoints)    |
 | `https://api.batuda.localhost/auth/open-api/generate-schema` | Better Auth raw OpenAPI spec                |
 
-The CRM spec is generated from `packages/controllers/src/api.ts` (`ForjaApi`). Adding a new route group or endpoint automatically appears in `/docs` and `/openapi.json`.
+The CRM spec is generated from `packages/controllers/src/api.ts` (`BatudaApi`). Adding a new route group or endpoint automatically appears in `/docs` and `/openapi.json`.
 
 ---
 
@@ -136,7 +136,7 @@ Key libraries are vendored as git subtrees under `docs/repos/` so agents can rea
 | `docs/repos/effect`          | Effect v4 (`effect` package, unstable modules)                                             | Any Effect / Schema / ServiceMap / HttpApi / SQL / AI question — read `packages/effect/src/*.ts` directly         |
 | `docs/repos/tanstack-router` | TanStack Router + Start + Nitro plugin                                                     | File routes, rewrites, i18n, SSR, `createServerFn`, loader types                                                  |
 | `docs/repos/better-auth`     | Better Auth                                                                                | Session handling, cookies, sign-in flows, adapter contracts                                                       |
-| `docs/repos/base-ui`         | Base UI                                                                                    | Unstyled primitive internals behind `@engranatge/ui/pri` wrappers                                                 |
+| `docs/repos/base-ui`         | Base UI                                                                                    | Unstyled primitive internals behind `@batuda/ui/pri` wrappers                                                     |
 | `docs/repos/tiptap`          | Tiptap v3 monorepo (`@tiptap/core`, `/html`, `/react`, `/static-renderer`, all extensions) | Node/Mark API, `generateHTML`/`generateJSON`, schema checks, extension authoring — relevant for the pages feature |
 | `docs/repos/motion`          | Motion (framer-motion successor)                                                           | Animation primitives                                                                                              |
 | `docs/repos/motion-plus`     | Motion Plus                                                                                | Commercial Motion features                                                                                        |

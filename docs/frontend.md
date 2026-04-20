@@ -1,9 +1,9 @@
 # Frontend
 
-TanStack Start SSR app for the internal Forja sales tool. Deployed to Unikraft (Node.js). Mobile-first.
+TanStack Start SSR app for the Batuda web app — the multi-tenant SaaS CRM. Deployed to Unikraft (Node.js). Mobile-first.
 For system context see [architecture.md](architecture.md).
 
-Deployed at `batuda.co`. The public marketing site lives in a separate repo (`engranatge-marketing`).
+Deployed at `batuda.co`. Tenant marketing sites live in their own repos (e.g. the Engranatge tenant uses `engranatge-marketing`).
 
 ---
 
@@ -49,7 +49,7 @@ Deployed to Unikraft (Node.js SSR) via `Dockerfile` + `Kraftfile`. Build output 
 
 ## Token system
 
-**Note:** Tokens are defined in `packages/ui/src/tokens.css` and imported by `apps/internal` via the workspace link; the separate marketing repo consumes the same tokens via the published `@engranatge/ui` npm package. The values below document the full token set.
+**Note:** Tokens are defined in `packages/ui/src/tokens.css` and imported by `apps/internal` via the workspace link; tenant marketing repos consume the same tokens via the published `@batuda/ui` npm package. The values below document the full token set.
 
 All spacing, typography, and color values come from CSS custom properties defined in
 `packages/ui/src/tokens.css`. Tailwind's `@theme` bridges these tokens to utility classes. Never hardcode values — use Tailwind utilities or `var(--token)` in styled-components.
@@ -159,7 +159,7 @@ Each app imports this file as its CSS entry point:
 
 ```css
 /* apps/internal/src/styles.css */
-@import '@engranatge/ui/tailwind.css';
+@import '@batuda/ui/tailwind.css';
 ```
 
 ### Using tokens with Tailwind
@@ -489,7 +489,7 @@ import { AnimateNumber, Typewriter, Carousel, Ticker, ScrambleText } from 'motio
 
 // Scramble text on hover
 <ScrambleText active={isHovered} duration={0.8}>
-  Engranatge
+  Batuda
 </ScrambleText>
 ```
 
@@ -720,8 +720,8 @@ const fetchCompanies = createServerFn({ method: "GET" })
 
 ```typescript
 // src/lib/api.ts
-// Derived from @engranatge/controllers — see TODO_FRONTEND Phase 6
-// HttpApiClient.make(EngranatgeApi) gives a fully typed client
+// Derived from @batuda/controllers — see TODO_FRONTEND Phase 6
+// HttpApiClient.make(BatudaApi) gives a fully typed client
 // Used only inside server functions
 ```
 

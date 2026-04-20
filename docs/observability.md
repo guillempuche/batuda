@@ -191,9 +191,9 @@ Follow Prometheus conventions:
 
 **Examples:**
 
-- `forja_interactions_total`
-- `forja_api_request_duration_seconds`
-- `forja_webhook_delivery_total`
+- `batuda_interactions_total`
+- `batuda_api_request_duration_seconds`
+- `batuda_webhook_delivery_total`
 
 ### Implementation Options
 
@@ -242,7 +242,7 @@ const apiLatency = Metric.histogram("api_request_duration_seconds", {
 
 // Prometheus export
 import { PrometheusMetrics } from "effect/unstable/observability"
-const formatted = yield* PrometheusMetrics.format({ prefix: "forja" })
+const formatted = yield* PrometheusMetrics.format({ prefix: "batuda" })
 ```
 
 ## Pillar 3: Distributed Tracing
@@ -302,7 +302,7 @@ When you need it, Effect v4 has built-in OTLP export (see Implementation Details
 - **Jaeger/Zipkin** — open source trace visualization
 - **Grafana Tempo** — integrates with Loki and Prometheus
 
-## What to Track: Forja-Specific
+## What to Track: Batuda-Specific
 
 ### Critical Paths to Instrument
 
@@ -369,7 +369,7 @@ Track latency for user-facing operations:
 
 Follow Google's **Four Golden Signals** from the [Site Reliability Engineering](https://sre.google/sre-book/monitoring-distributed-systems/) book. These are the minimum signals you need to know if a system is healthy:
 
-| Signal         | Question                 | Forja Example                                     |
+| Signal         | Question                 | Batuda Example                                    |
 | -------------- | ------------------------ | ------------------------------------------------- |
 | **Traffic**    | Are requests flowing?    | Request rate by route, MCP tool call count        |
 | **Errors**     | Is anything failing?     | HTTP 4xx/5xx rate, webhook/email errors           |
@@ -538,7 +538,7 @@ export const buildMeta = {
 export const OtlpObservability = Otlp.layer({
   baseUrl: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
   resource: {
-    serviceName: 'forja-server',
+    serviceName: 'batuda-server',
     serviceVersion: buildMeta.version,
     attributes: {
       'deployment.environment': environment,

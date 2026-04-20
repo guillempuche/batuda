@@ -20,10 +20,10 @@ import { WebhooksGroup } from './routes/webhooks'
 export const BatudaApi = HttpApi.make('BatudaApi')
 	.annotateMerge(
 		OpenApi.annotations({
-			title: 'Engranatge API',
+			title: 'Batuda API',
 			version: '0.1.0',
 			description:
-				'CRM and sales pipeline API for Engranatge. Covers companies, contacts, interactions, tasks, documents, proposals, products, email, and recordings.',
+				'CRM and sales pipeline API for Batuda. Covers companies, contacts, interactions, tasks, documents, proposals, products, email, and recordings.',
 		}),
 	)
 	.add(HealthGroup)

@@ -44,7 +44,7 @@ import {
 // dev. The inboxId is stable so cached references survive a server restart.
 
 const DEV_INBOX_ID = 'inbox_dev_local'
-const DEV_INBOX_EMAIL = 'dev@engranatge.local'
+const DEV_INBOX_EMAIL = 'dev@batuda.local'
 const DEV_INBOX_DISPLAY_NAME = 'Local dev inbox'
 const DEV_INBOX_CREATED_AT = new Date('2024-01-01T00:00:00Z')
 

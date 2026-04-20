@@ -1,20 +1,20 @@
 # TODO — Frontend
 
-Ordered implementation checklist for `apps/internal` (Forja). The public marketing site is handled by the separate `engranatge-marketing` repo.
+Ordered implementation checklist for `apps/internal` (the Batuda web app). Each tenant's public marketing site lives in its own repo (for example, the Engranatge tenant uses `engranatge-marketing`).
 
-See [frontend.md](frontend.md) for internal app patterns. See [architecture.md](architecture.md) for data flow.
+See [frontend.md](frontend.md) for web app patterns. See [architecture.md](architecture.md) for data flow.
 
 ## Design system direction
 
-Forja (internal CRM) — *the workbench*. Data-dense, keyboard-first, compact rows, command palette. Desktop-first productivity idiom (closer to Linear/Attio/Height than to stock MD3).
+Batuda web app — *the workbench*. Data-dense, keyboard-first, compact rows, command palette. Desktop-first productivity idiom (closer to Linear/Attio/Height than to stock MD3).
 
-**Shared layer (`packages/ui`)** — consumed by Forja locally via workspace link, and published to npm for the separate marketing site:
+**Shared layer (`packages/ui`)** — consumed by the Batuda web app locally via workspace link, and published to npm for tenant marketing sites:
 
 - Tokens (`tokens.css`) — colors, typography, spacing, shape, elevation, motion.
 - **`Pri*` primitives** — `PriButton`, `PriInput`, `PriSelect`, `PriDialog`, `PriMenu`, `PriTooltip`, `PriTabs`, `PriCheckbox`, `PriRadio`, `PriSwitch`, `PriToast`, `PriCombobox`, `PriPopover`. Headless Base UI wrapped with styled-components. The `Pri` prefix (short for "Primitive") marks them as shared, low-level building blocks.
-- Tiptap block schemas (`blocks/`) — used by Forja prospect-page editing; rendered by the marketing site.
+- Tiptap block schemas (`blocks/`) — used by the Batuda web app for prospect-page editing; rendered by tenant marketing sites (e.g. the Engranatge tenant's `engranatge-marketing` repo).
 
-**MD3 stance**: we keep MD3's *structural* concepts — color roles, typescale, shape, spacing — but reject MD3's stock components (mobile-first, too airy for a data-dense CRM). Forja diverges via a desktop-dense, keyboard-first idiom. We do **not** import MD3 concepts the codebase isn't already using (state layers, density scales) — if Forja needs them later, we add them with evidence, not speculation.
+**MD3 stance**: we keep MD3's *structural* concepts — color roles, typescale, shape, spacing — but reject MD3's stock components (mobile-first, too airy for a data-dense CRM). Batuda diverges via a desktop-dense, keyboard-first idiom. We do **not** import MD3 concepts the codebase isn't already using (state layers, density scales) — if Batuda needs them later, we add them with evidence, not speculation.
 
 ---
 
@@ -38,9 +38,9 @@ Forja (internal CRM) — *the workbench*. Data-dense, keyboard-first, compact ro
   - [ ] Keep in `vite.config.ts`: `tailwindcss()` plugin. Remove `cloudflare()`, `devtools()` + their imports
   - [ ] Delete demo files: `src/components/Header.tsx`, `src/components/Footer.tsx`, `src/components/ThemeToggle.tsx`, `src/routes/about.tsx`
   - [ ] Delete `wrangler.jsonc` if created
-  - [ ] Replace `src/styles.css` demo content — `@import '@engranatge/ui/tailwind.css'` + app-level reset
+  - [ ] Replace `src/styles.css` demo content — `@import '@batuda/ui/tailwind.css'` + app-level reset
 - [ ] Adapt for monorepo:
-  - [ ] `package.json`: set name to `@engranatge/internal`, add `@engranatge/domain: "workspace:*"`, `@engranatge/controllers: "workspace:*"`, `@engranatge/ui: "workspace:*"`
+  - [ ] `package.json`: set name to `@batuda/web`, add `@batuda/domain: "workspace:*"`, `@batuda/controllers: "workspace:*"`, `@batuda/ui: "workspace:*"`
   - [ ] `package.json`: add `styled-components`, `@base-ui/react`, `motion`, `motion-plus`, `@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/pm`, `react-map-gl`, `maplibre-gl`, `supercluster`, `effect`, `@chenglou/pretext`
   - [ ] `package.json`: add devDep `@types/supercluster`
   - [ ] `tsconfig.json`: add `"extends": "../../tsconfig.base.json"`
@@ -50,7 +50,7 @@ Forja (internal CRM) — *the workbench*. Data-dense, keyboard-first, compact ro
 
 ## Phase 1b — packages/ui
 
-- [ ] Create `packages/ui/package.json` — `@engranatge/ui`, deps: `@tiptap/core`, `@tiptap/pm`, `@base-ui/react`, `styled-components`, peerDeps: `tailwindcss`, `react`, `react-dom`
+- [ ] Create `packages/ui/package.json` — `@batuda/ui`, deps: `@tiptap/core`, `@tiptap/pm`, `@base-ui/react`, `styled-components`, peerDeps: `tailwindcss`, `react`, `react-dom`
 - [ ] Create `packages/ui/tsconfig.json` extending `../../tsconfig.base.json`
 - [ ] Create `packages/ui/src/tokens.css` — MD3 CSS custom properties
 - [ ] Create `packages/ui/src/tailwind.css` — `@import "tailwindcss"` + `@import "./tokens.css"` + `@theme` with breakpoints only (see frontend.md)
@@ -64,7 +64,7 @@ Forja (internal CRM) — *the workbench*. Data-dense, keyboard-first, compact ro
 - [ ] Create `packages/ui/src/pri/` — shared `Pri*` primitive components (see Phase 5)
   - [ ] `index.ts` — re-exports all primitives
 - [ ] Add subpath export `"./pri"` to `packages/ui/package.json` exports map
-- [ ] Create `packages/ui/src/index.ts` — re-exports blocks (primitives live under `@engranatge/ui/pri` subpath)
+- [ ] Create `packages/ui/src/index.ts` — re-exports blocks (primitives live under `@batuda/ui/pri` subpath)
 
 ## Phase 2 — Design tokens
 
@@ -125,7 +125,7 @@ Each component: styled-components co-located in `.tsx`, all values from CSS cust
 
 ## Phase 5 — Pri* primitives (Base UI + styled-components, shared in packages/ui)
 
-Primitives live in `packages/ui/src/pri/` and are consumed by Forja via the `@engranatge/ui/pri` subpath export (and by the external marketing site via the published npm package). The `Pri` prefix (short for "Primitive") marks them as shared, low-level building blocks — one canonical `<PriInput>` for every consumer.
+Primitives live in `packages/ui/src/pri/` and are consumed by the Batuda web app via the `@batuda/ui/pri` subpath export (and by tenant marketing sites via the published npm package). The `Pri` prefix (short for "Primitive") marks them as shared, low-level building blocks — one canonical `<PriInput>` for every consumer.
 
 Naming: always `Pri` + PascalCase component name (`PriButton`, not `PrimitiveButton` or `UiButton`). Filenames: kebab-case (`pri-button.tsx`). Compound primitives mirror Base UI's namespace exactly (e.g. `PriSelect.Root`, `PriSelect.Trigger`, `PriSelect.Popup`).
 
@@ -139,33 +139,33 @@ Each primitive:
 
 ### Lazy-extraction rule
 
-A primitive is created **only** when at least one real consumer exists. No speculative primitives — if Forja later needs a primitive that doesn't exist yet, we extract it then with a real consumer driving the API.
+A primitive is created **only** when at least one real consumer exists. No speculative primitives — if the Batuda web app later needs a primitive that doesn't exist yet, we extract it then with a real consumer driving the API.
 
 This avoids the trap of building 14 primitives up-front, half of which would never be used or would need rework once a real consumer appears.
 
 ### Status
 
-| Primitive        | Status    | First consumer                                   |
-| ---------------- | --------- | ------------------------------------------------ |
-| `PriSelect`      | extracted | Marketing site language selector (external repo) |
-| `PriButton`      | stub      | Forja `FormField`                                |
-| `PriInput`       | stub      | Forja forms                                      |
-| `PriDialog`      | stub      | Forja quick-edit modals                          |
-| `PriMenu`        | stub      | Forja row action menus                           |
-| `PriTooltip`     | stub      | Forja keyboard-shortcut hints                    |
-| `PriPopover`     | stub      | Forja filter popovers                            |
-| `PriTabs`        | stub      | Forja company detail tabs                        |
-| `PriCheckbox`    | stub      | Forja task completion                            |
-| `PriCombobox`    | stub      | Forja contact autocomplete                       |
-| `PriRadio`       | stub      | Forja form options                               |
-| `PriSwitch`      | stub      | Forja settings toggles                           |
-| `PriToast`       | stub      | Forja success/error notifications                |
-| `PriAlertDialog` | stub      | Forja destructive confirmations                  |
+| Primitive        | Status    | First consumer                                          |
+| ---------------- | --------- | ------------------------------------------------------- |
+| `PriSelect`      | extracted | Tenant marketing site language selector (external repo) |
+| `PriButton`      | stub      | Web app `FormField`                                     |
+| `PriInput`       | stub      | Web app forms                                           |
+| `PriDialog`      | stub      | Web app quick-edit modals                               |
+| `PriMenu`        | stub      | Web app row action menus                                |
+| `PriTooltip`     | stub      | Web app keyboard-shortcut hints                         |
+| `PriPopover`     | stub      | Web app filter popovers                                 |
+| `PriTabs`        | stub      | Web app company detail tabs                             |
+| `PriCheckbox`    | stub      | Web app task completion                                 |
+| `PriCombobox`    | stub      | Web app contact autocomplete                            |
+| `PriRadio`       | stub      | Web app form options                                    |
+| `PriSwitch`      | stub      | Web app settings toggles                                |
+| `PriToast`       | stub      | Web app success/error notifications                     |
+| `PriAlertDialog` | stub      | Web app destructive confirmations                       |
 
 ### Consumption
 
-- Forja imports everything from `@engranatge/ui/pri` via the workspace link — no local primitives.
-- The marketing repo consumes the same primitives via the published `@engranatge/ui` npm package.
+- The Batuda web app imports everything from `@batuda/ui/pri` via the workspace link — no local primitives.
+- Each tenant marketing repo consumes the same primitives via the published `@batuda/ui` npm package.
 
 ## Phase 5c — State management (effect-atom + SSR)
 
@@ -210,27 +210,27 @@ const dehydrated = Hydration.dehydrate(registry, { encodeInitialAs: "promise" })
 
 ## Phase 6 — API client (derived from shared controllers)
 
-Client is derived from `@engranatge/controllers` — same `EngranatgeApi` spec the server implements.
+Client is derived from `@batuda/controllers` — same `BatudaApi` spec the server implements.
 No manual endpoint definitions; schemas, types, and error handling are shared.
 
-- [ ] Add dep: `@engranatge/controllers: "workspace:*"`
-- [ ] Create `src/lib/api.ts` — derive typed client from `EngranatgeApi`:
+- [ ] Add dep: `@batuda/controllers: "workspace:*"`
+- [ ] Create `src/lib/api.ts` — derive typed client from `BatudaApi`:
   ```ts
   import { HttpApiClient } from '@effect/platform'
-  import { EngranatgeApi } from '@engranatge/controllers'
+  import { BatudaApi } from '@batuda/controllers'
 
   // Typed client — all endpoints, request/response schemas, and errors derived from spec
-  const client = HttpApiClient.make(EngranatgeApi, {
+  const client = HttpApiClient.make(BatudaApi, {
     baseUrl: import.meta.env.SERVER_URL
   })
   ```
 - [ ] Create `AtomHttpApi.Tag` integration for effect-atom (query/mutation atoms from spec):
   ```ts
   import { AtomHttpApi } from '@effect-atom/atom-react'
-  import { EngranatgeApi } from '@engranatge/controllers'
+  import { BatudaApi } from '@batuda/controllers'
 
   class ApiClient extends AtomHttpApi.Tag<ApiClient>()('ApiClient', {
-    api: EngranatgeApi,
+    api: BatudaApi,
     httpClient: FetchHttpClient.layer,
     baseUrl: import.meta.env.SERVER_URL
   }) {}

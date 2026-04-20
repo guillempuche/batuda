@@ -1,15 +1,17 @@
-# Engranatge — brand voice
+# Batuda — brand voice
 
-Copy voice rules for all Engranatge customer-facing surfaces. This document covers the speaker (first-person singular vs plural), the tone flavour, forbidden vocabulary, the workshop metaphor budget, mission framing, sentence-level rules, tone ladders per funnel stage, and per-locale native voice for Catalan, Castilian, and English. Any piece of copy must pass these before shipping.
+Copy voice rules for all Batuda customer-facing surfaces. This document covers the speaker (first-person singular vs plural), the tone flavour, forbidden vocabulary, the workshop metaphor budget, mission framing, sentence-level rules, tone ladders per funnel stage, and per-locale native voice for Catalan, Castilian, and English. Any piece of copy must pass these before shipping.
+
+> **Note on brand scope.** Batuda is the product — the multi-tenant SaaS CRM. *Engranatge* is the author's own agency, and the first tenant of Batuda (so the voice and case studies below are drawn from Engranatge's workshop practice). Seeds and examples use a fictitious tenant *Taller* (at `taller.cat`). *"Forja"* may still appear as a workshop-metaphor word (forge / workshop) but is no longer a product name.
 
 Companion documents:
 
-- **`docs/services.md`** covers what Engranatge sells and the proof inventory.
+- **`docs/services.md`** covers what Engranatge (the first tenant) sells and the proof inventory that seeds Batuda's copy library.
 - **`docs/brand-visual.md`** covers the visual brand (colours, typography, layout, and the workshop metaphor applied to UI).
 
 ## Core voice positioning
 
-Engranatge is a **Mediterranean mechanical workshop**. It is not a consultancy. The central metaphor is *taller mecànic*, a workshop where small machines get built, tuned, and set running to take low-value work off the owner's plate. The mission is always framed the same way:
+Batuda is a **Mediterranean mechanical workshop**. It is not a consultancy. The central metaphor is *taller mecànic*, a workshop where small machines get built, tuned, and set running to take low-value work off the owner's plate. The mission is always framed the same way:
 
 > Machines do low-value work. Humans do high-value work.
 
@@ -22,7 +24,7 @@ The copy is written in the **first person**. The speaker is the workshop itself,
 - **Solo workshop → "I" (*jo* / *yo*).** Singular first person. The reader is being spoken to by one craftsman, not a faceless company. Honest, direct, and rare enough in B2B to be memorable.
 - **Team workshop → "we" (*nosaltres* / *nosotros*).** Plural first person. Still never *"we are a company that…"*. The voice is a small team, not a corporate entity.
 
-**Resolving the register at draft time.** This document does not hard-code which register Engranatge uses today. The drafter picks by:
+**Resolving the register at draft time.** This document does not hard-code which register Batuda uses today. The drafter picks by:
 
 1. **Reading context first.** Check the existing marketing copy, any recent hero or CTA copy, and the About page if one exists. If everything already says *construeixo / construyo / I build*, continue in singular. If everything says *construïm / construimos / we build*, continue in plural. Match what is already live.
 2. **Asking the developer when context is silent or contradictory.** If there is no existing copy, or the files mix singular and plural, ask a single targeted question before drafting: *"Should this copy speak as a solo workshop (I) or as a team (we)?"*
@@ -30,14 +32,14 @@ The copy is written in the **first person**. The speaker is the workshop itself,
 
 Never use third-person corporate voice regardless of which register is chosen:
 
-- ❌ *"Engranatge builds small machines."*
+- ❌ *"Batuda builds small machines."*
 - ❌ *"Our team connects your tools."*
 - ✅ *"I build small machines."* (solo)
 - ✅ *"We build small machines."* (team)
 
 ## Tone — funny, personal, approachable, authentic
 
-The voice has a specific flavour, and that flavour comes from a specific place. The Engranatge creator is from **Girona**, on the Mediterranean coast of Catalonia. That roots the voice in four moves.
+The voice has a specific flavour, and that flavour comes from a specific place. The Batuda creator is from **Girona**, on the Mediterranean coast of Catalonia. That roots the voice in four moves.
 
 - **Funny.** Dry, observational, owner-to-owner. A wink rather than a joke. The humour comes from naming the absurdity of Sunday-night invoicing. When in doubt, understate.
 - **Personal.** Name specific moments: 22:30 on a Sunday after closing the shop, the family lunch that got missed, the 340 € typo the gestoria found. Specificity is how copy becomes personal.
@@ -133,7 +135,7 @@ Tech names are acceptable only in:
 
 ## Concrete before / after rewrites
 
-Each of these is a realistic consultancy-voice sentence and its Engranatge-voice rewrite. Use them as calibration.
+Each of these is a realistic consultancy-voice sentence and its Batuda-voice rewrite. Use them as calibration.
 
 ### Hero line
 
@@ -201,7 +203,7 @@ Empathy is highest at ToFu because the reader does not know you yet. Specificity
 
 ## Native language voice — per-locale rules
 
-Engranatge ships copy in three languages: Catalan, Castilian, and English. Catalan is the source voice, Castilian is the widest-reach market, and English is the outreach and future-international surface.
+Batuda ships copy in three languages: Catalan, Castilian, and English. Catalan is the source voice, Castilian is the widest-reach market, and English is the outreach and future-international surface.
 
 **The rule that beats all other rules:** do not translate. Write each language from scratch as a local copywriter would. If a sentence reads like a translation, throw it out.
 
@@ -209,7 +211,7 @@ Engranatge ships copy in three languages: Catalan, Castilian, and English. Catal
 
 #### Register
 
-Use **tu**, not *vostè*, and not *vosaltres*. Engranatge talks to one owner, not to a company. The tone is respectful but close, the tone you would use with a shop owner you have known for two months rather than someone you just met at a conference.
+Use **tu**, not *vostè*, and not *vosaltres*. Batuda talks to one owner, not to a company. The tone is respectful but close, the tone you would use with a shop owner you have known for two months rather than someone you just met at a conference.
 
 - ✅ *"Explica'm el teu cas."* (tu + *em*, solo speaker)
 - ❌ *"Expliqui'm el seu cas."* (vostè + *seu*, too formal, sounds like a bank)
@@ -270,7 +272,7 @@ Em-dash (—) is rare in Catalan copy. Aim for one per page at most. Never use t
 
 #### Register
 
-Use **tú**, not *usted*. Same reasoning as Catalan: Engranatge is a workshop, not a bank. The one exception is if the specific surface is a formal proposal document, which is not in scope today, so keep the tú default.
+Use **tú**, not *usted*. Same reasoning as Catalan: Batuda is a workshop, not a bank. The one exception is if the specific surface is a formal proposal document, which is not in scope today, so keep the tú default.
 
 - ✅ *"Cuéntame tu caso."* (tú + *me*, solo speaker)
 - ❌ *"Cuénteme su caso."* (usted + *su*, too distant)
@@ -381,7 +383,7 @@ The voice to avoid is the generic Silicon Valley B2B SaaS voice. It shows up in 
 
 #### Rhythm and feel
 
-English Engranatge copy should feel **dry, concrete, and slightly understated**. The closest reference voices are Basecamp's marketing site, Pieter Levels' landing pages, and early 37signals. Not HubSpot. Not Salesforce.
+English Batuda copy should feel **dry, concrete, and slightly understated**. The closest reference voices are Basecamp's marketing site, Pieter Levels' landing pages, and early 37signals. Not HubSpot. Not Salesforce.
 
 - ✅ *"I build small machines. Each one does one job, every night, forever."*
 - ❌ *"Empowering businesses to leverage AI solutions for transformative operational excellence."*

@@ -1,6 +1,6 @@
 # Getting started
 
-A linear walkthrough for a fresh clone of Engranatge. Every command here assumes you are at the repo root.
+A linear walkthrough for a fresh clone of Batuda. Every command here assumes you are at the repo root.
 
 ## Contents
 
@@ -30,14 +30,14 @@ If you use [Nix](https://nixos.org), `nix develop` drops you into a shell with N
 ## 1. Clone + install
 
 ```bash
-git clone https://github.com/<org>/engranatge.git
-cd engranatge
+git clone https://github.com/<org>/batuda.git
+cd batuda
 pnpm install
 ```
 
 Workspace layout:
 
-- `apps/*` — `server`, `internal` (Forja CRM), `cli`
+- `apps/*` — `server`, `internal` (the Batuda web app), `cli`
 - `packages/*` — `domain`, `controllers`, `auth`, `ui`, etc.
 
 ## 2. Configure environment files
@@ -60,7 +60,7 @@ If you later add a new env key upstream, rerun `pnpm cli setup --update` to appe
 pnpm cli services up
 ```
 
-Starts Postgres and MinIO in Docker. Verify with `docker ps` — you should see two `engranatge-*` containers in `healthy` state.
+Starts Postgres and MinIO in Docker. Verify with `docker ps` — you should see two `batuda-*` containers in `healthy` state.
 
 Stop with `pnpm cli services down`; inspect with `pnpm cli services status`.
 
@@ -70,7 +70,7 @@ Stop with `pnpm cli services down`; inspect with `pnpm cli services status`.
 pnpm cli db migrate
 ```
 
-Runs every CRM migration plus Better Auth's built-in migrations. After this, `docker exec -it engranatge-postgres psql -U engranatge -c '\dt'` should list:
+Runs every CRM migration plus Better Auth's built-in migrations. After this, `docker exec -it batuda-postgres psql -U batuda -c '\dt'` should list:
 
 - **Auth tables**: `user`, `session`, `account`, `verification`, `apiKey`
 - **CRM tables**: `company`, `contact`, `interaction`, `task`, `document`, `proposal`, `page`, …
@@ -118,7 +118,7 @@ Open two terminals at the repo root:
 # terminal 1 — API + MCP + Better Auth
 pnpm dev:server
 
-# terminal 2 — Forja CRM (the internal app)
+# terminal 2 — Batuda web app (the internal app)
 pnpm dev:internal
 ```
 
@@ -126,9 +126,9 @@ Dev URLs use portless `*.localhost` hostnames (no `/etc/hosts` edit needed on mo
 
 - API: [https://api.batuda.localhost](https://api.batuda.localhost)
 - API docs (Scalar): [https://api.batuda.localhost/docs](https://api.batuda.localhost/docs)
-- Forja: [https://batuda.localhost](https://batuda.localhost)
+- Batuda web app: [https://batuda.localhost](https://batuda.localhost)
 
-The public marketing site lives in a separate repo (`engranatge-marketing`). Run its own `pnpm dev` if you need the full loop against a local CRM.
+Each tenant runs its own public marketing site from a separate repo (e.g. the Engranatge tenant uses `engranatge-marketing`). Run the tenant's own `pnpm dev` if you need the full loop against a local CRM.
 
 Log in at `/sign-in` with the admin credentials you set in Step 5.
 
@@ -153,7 +153,7 @@ The interactive TUI (`pnpm cli:tui`) shows a coloured `LOCAL` / `CLOUD` badge in
 
 **Port 5433 already in use.** Another Postgres is bound to the default port. Either stop the other instance or change `POSTGRES_PORT` in `.env` and re-run `pnpm cli services up`.
 
-**TLS cert errors on `*.engranatge.localhost`.** Dev servers use self-signed certs. Accept the cert once per hostname in your browser (API + Forja = two prompts).
+**TLS cert errors on `*.batuda.localhost`.** Dev servers use self-signed certs. Accept the cert once per hostname in your browser (API + web app = two prompts).
 
 **`pnpm cli auth bootstrap` says `UsersAlreadyExist`.** Someone already bootstrapped. If you don't know the credentials, run `pnpm cli auth reset-password --email <their-email>` to overwrite the password instead.
 

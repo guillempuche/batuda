@@ -1,16 +1,17 @@
 # TODO — Deployment
 
-Remaining work to bring `apps/internal` (Forja CRM) and `apps/server` (API) live on KraftCloud.
+Remaining work to bring `apps/internal` (the Batuda web app) and `apps/server` (API) live on KraftCloud.
 
-The public marketing site at `engranatge.com` is deployed from the separate
-`engranatge-marketing` repo. See `.github/workflows/deploy_*.yml` for the workflow
-definitions in this repo and `.env.example.github` for the secrets/vars reference.
+Each tenant's public marketing site is deployed from its own repo (e.g. the first
+tenant's site at `engranatge.com` ships from `engranatge-marketing`). See
+`.github/workflows/deploy_*.yml` for the workflow definitions in this repo and
+`.env.example.github` for the secrets/vars reference.
 
 ---
 
 ## Background
 
-The two CRM apps in this repo share the same deploy pattern (the marketing repo follows the same pattern):
+The two Batuda apps in this repo share the same deploy pattern (each tenant marketing repo follows the same pattern):
 
 1. Cloudflare DNS record (CNAME → `fra.unikraft.app`, **DNS only** — gray cloud)
 2. GitHub Actions workflow (`deploy_<app>.yml`) triggered by tag push or `workflow_dispatch`
@@ -22,29 +23,29 @@ The two CRM apps in this repo share the same deploy pattern (the marketing repo 
 
 ---
 
-## Phase 1 — Forja (`apps/internal` → `batuda.co`)
+## Phase 1 — Batuda web app (`apps/internal` → `batuda.co`)
 
 No runtime secrets needed; the workflow only reads `KRAFTCLOUD_TOKEN`.
 
 ### DNS
 
-- [x] Cloudflare → engranatge.com → DNS → add CNAME `forja` → `fra.unikraft.app` (DNS only, gray cloud)
+- [x] Cloudflare → batuda.co → DNS → add CNAME `@` → `fra.unikraft.app` (DNS only, gray cloud)
 - [x] Wait ~5 min for propagation
 - [x] Confirm: `dig +short batuda.co` returns a `fra.unikraft.app` CNAME chain
 
 ### Deploy
 
-- [ ] Trigger workflow: `gh workflow run deploy_internal.yml -R guillempuche/engranatge`
-- [ ] Watch run: `gh run watch -R guillempuche/engranatge`
+- [ ] Trigger workflow: `gh workflow run deploy_internal.yml -R guillempuche/batuda`
+- [ ] Watch run: `gh run watch -R guillempuche/batuda`
 - [ ] Confirm cert issued: `kraft cloud --metro fra certificate list | grep batuda.co`
-- [ ] Confirm instance running: `kraft cloud --metro fra instance list | grep engranatge-internal`
+- [ ] Confirm instance running: `kraft cloud --metro fra instance list | grep batuda-web`
 - [ ] Smoke test: `curl -sI https://batuda.co | head -5`
 
 ### Optional follow-ups
 
 - [ ] Bump `release:internal` once verified, set up CalVer tag flow
 - [ ] Add a basic `/health` route to internal so the workflow's verify step has a real signal
-- [ ] Document Forja login flow once Better Auth is wired through the server
+- [ ] Document the web app login flow once Better Auth is wired through the server
 
 ---
 
@@ -57,12 +58,12 @@ references several GitHub secrets/variables that **do not exist yet** in the
 ### Provision external services
 
 - [ ] **NeonDB**
-  - [ ] Create project `engranatge` in EU (Frankfurt) region
+  - [ ] Create project `batuda` in EU (Frankfurt) region
   - [ ] Create pooled connection role
-  - [ ] Run `pnpm --filter @engranatge/domain db:migrate` against the new database
+  - [ ] Run `pnpm --filter @batuda/domain db:migrate` against the new database
   - [ ] Capture pooled `postgres://…?sslmode=require` URL
 - [ ] **Cloudflare R2**
-  - [ ] Create bucket `engranatge-recordings`
+  - [ ] Create bucket `batuda-assets`
   - [ ] Create API token (Object Read/Write, scoped to that bucket)
   - [ ] Capture access key ID, secret, S3-compatible endpoint URL
 - [ ] **AgentMail**
@@ -76,7 +77,7 @@ references several GitHub secrets/variables that **do not exist yet** in the
 
 Reference: `.env.example.github`. All values land in the `production` environment, not the repo.
 
-#### Secrets (`gh secret set <NAME> --env production -R guillempuche/engranatge`)
+#### Secrets (`gh secret set <NAME> --env production -R guillempuche/batuda`)
 
 - [ ] `DATABASE_URL` — NeonDB pooled connection string
 - [ ] `BETTER_AUTH_SECRET` — generated above
@@ -85,35 +86,35 @@ Reference: `.env.example.github`. All values land in the `production` environmen
 - [ ] `EMAIL_API_KEY` — AgentMail API key
 - [ ] `EMAIL_WEBHOOK_SECRET` — AgentMail webhook secret
 
-#### Variables (`gh variable set <NAME> --env production -R guillempuche/engranatge --body "<value>"`)
+#### Variables (`gh variable set <NAME> --env production -R guillempuche/batuda --body "<value>"`)
 
 - [ ] `BETTER_AUTH_BASE_URL` = `https://api.batuda.co`
-- [ ] `ALLOWED_ORIGINS` = `https://batuda.co,https://engranatge.com`
+- [ ] `ALLOWED_ORIGINS` = `https://batuda.co,https://engranatge.com` (add each tenant's marketing origin)
 - [ ] `STORAGE_ENDPOINT` = `https://<account>.r2.cloudflarestorage.com`
 - [ ] `STORAGE_REGION` = `auto`
-- [ ] `STORAGE_BUCKET` = `engranatge-recordings`
+- [ ] `STORAGE_BUCKET` = `batuda-assets`
 - [ ] `EMAIL_PROVIDER` = `agentmail`
 
 ### DNS
 
-- [x] Cloudflare → engranatge.com → DNS → add CNAME `api` → `fra.unikraft.app` (DNS only)
+- [x] Cloudflare → batuda.co → DNS → add CNAME `api` → `fra.unikraft.app` (DNS only)
 - [x] Wait ~5 min, confirm `dig +short api.batuda.co`
 
 ### Deploy
 
-- [ ] Trigger workflow: `gh workflow run deploy_server.yml -R guillempuche/engranatge`
-- [ ] Watch run: `gh run watch -R guillempuche/engranatge`
+- [ ] Trigger workflow: `gh workflow run deploy_server.yml -R guillempuche/batuda`
+- [ ] Watch run: `gh run watch -R guillempuche/batuda`
 - [ ] Confirm cert: `kraft cloud --metro fra certificate list | grep api.batuda.co`
-- [ ] Confirm instance: `kraft cloud --metro fra instance list | grep engranatge-server`
+- [ ] Confirm instance: `kraft cloud --metro fra instance list | grep batuda-server`
 - [ ] Smoke test: `curl -sf https://api.batuda.co/health`
 - [ ] Tail logs once if smoke fails: `kraft cloud --metro fra instance logs <instance-name>`
 
 ### Post-deploy verification
 
-- [ ] Hit a real endpoint that touches the database (e.g. company search) from Forja
+- [ ] Hit a real endpoint that touches the database (e.g. company search) from the Batuda web app
 - [ ] Trigger an outbound email through AgentMail and confirm it leaves
 - [ ] Upload a test recording to R2 via the server, verify it lands in the bucket
-- [ ] Confirm cookies set by Better Auth resolve under `.engranatge.com`
+- [ ] Confirm cookies set by Better Auth resolve under `.batuda.co`
 
 ---
 

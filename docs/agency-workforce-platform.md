@@ -1,6 +1,6 @@
 # Agency Workforce Platform — future scope
 
-Deferred design note. Captures what Engranatge would need to evolve from
+Deferred design note. Captures what Batuda would need to evolve from
 "solo-founder CRM with an AI sidekick" into a platform that runs a small
 agency where AI employees and human employees share the same queue.
 
@@ -220,7 +220,7 @@ Every screen has two modes:
 The workshop view is where you supervise agents: in-flight tasks, queue
 depth, pending reviews, budget burn.
 
-## 7. Integration with today's Engranatge
+## 7. Integration with today's Batuda
 
 Mapping from existing entities to the platform model:
 
@@ -290,7 +290,7 @@ doesn't match a small agency with AI workers.
 
 Newer category: platforms that model a collection of AI agents as a
 company (org chart, goals, budgets, governance). Closer to what
-Engranatge would become than classic PSA tools — but all of them assume
+Batuda would become than classic PSA tools — but all of them assume
 *agents-only*, not mixed human/agent teams.
 
 - **[Paperclip](https://paperclip.ing)** ([paperclipai/paperclip](https://github.com/paperclipai/paperclip))
@@ -303,7 +303,7 @@ Engranatge would become than classic PSA tools — but all of them assume
   **Steal:** goal-ancestry injection (every task carries why it matters),
   heartbeat scheduler, per-agent budget hard-stop semantics, ticket +
   tool-call tracing shape. **Skip:** "autonomous company" framing —
-  Engranatge's user is a founder doing real work, not a board
+  Batuda's user is a founder doing real work, not a board
   approving a CEO-agent.
 - **[MeisnerDan/mission-control](https://github.com/MeisnerDan/mission-control)**
   — "Command center for solo entrepreneurs who delegate work to AI
@@ -346,14 +346,14 @@ Common pattern across this category: they all reinvent ticketing,
 org-charts, and budgets because there's no "agent-native" PM tool.
 Common gap: none of them have a real notion of a *client* or
 *engagement*, so billing and client-visibility are out of scope. That
-gap is precisely where Engranatge's CRM spine would be the
+gap is precisely where Batuda's CRM spine would be the
 differentiator.
 
 ### 8.5 Modern CRMs — inspiration for the CRM spine
 
-Engranatge already has a CRM spine (companies, contacts, interactions,
+Batuda already has a CRM spine (companies, contacts, interactions,
 tasks). These are the CRMs whose UX, data model, and agent-readiness we
-should steal from — not replace Engranatge with. Proprietary ones are
+should steal from — not replace Batuda with. Proprietary ones are
 here for design inspiration only.
 
 #### Agent-native / AI-native (proprietary — study, don't copy)
@@ -366,11 +366,11 @@ here for design inspiration only.
   **Steal:** MCP-first surface area (every CRM action reachable to an
   agent without a custom tool), natural-language search over entities,
   enrichment pipelines as first-class. **Skip:** the "generic CRM for
-  any team" positioning — Engranatge is opinionated for solo/agency.
+  any team" positioning — Batuda is opinionated for solo/agency.
 - **[Folk](https://folk.app)** — CRM for founders and agencies,
   relationship-first rather than deal-first. LinkedIn/email sync,
   multi-channel inbox, lightweight "groups" instead of heavy pipelines.
-  **Steal:** contact-first UX (Engranatge today is more company-first),
+  **Steal:** contact-first UX (Batuda today is more company-first),
   message sync across channels, smart fields auto-filled from
   interactions. **Skip:** closed source, SaaS-only.
 - **[Reevo](https://reevo.ai)** — AI-native CRM that auto-structures
@@ -390,12 +390,12 @@ here for design inspiration only.
   data-model patterns (custom fields/objects), kanban/table view
   composition, Figma kit, Storybook-per-component. **Skip:** huge
   codebase; retrofitting it would be harder than incremental extension
-  of Engranatge's typed CRM.
+  of Batuda's typed CRM.
 - **[Atomic CRM](https://github.com/marmelab/atomic-crm)** (MIT,
   React + shadcn/ui + Supabase) — 15k LOC, marketed as a *template* to
   build your own CRM. First-class **MCP server**, Agents.md + Claude.md,
   kanban pipeline, inbound email, SSO. Closest in spirit to what
-  Engranatge already is. **Steal:** MCP server layout, Agents.md
+  Batuda already is. **Steal:** MCP server layout, Agents.md
   conventions, "small codebase as a feature" stance, inbound-email
   ingest. **Skip:** Supabase lock-in (we have our own Effect stack).
 - **[EspoCRM](https://github.com/espocrm/espocrm)** (AGPL-3.0, PHP) —
@@ -427,7 +427,7 @@ When reading any of the above for inspiration, focus on:
    structured data. Folk, Reevo, Attio all solve this differently.
 4. **Pipeline vs. relationship framing** — founder-CRMs (Folk,
    Monica) emphasize relationships; sales-CRMs (Twenty, Salesforce)
-   emphasize deals. Engranatge is closer to the former.
+   emphasize deals. Batuda is closer to the former.
 5. **Extension surface** — custom fields, workflows, webhooks. Twenty
    and EspoCRM are the references.
 
@@ -452,7 +452,7 @@ product surface if we ever decide to build.
 - Gantt charts. Small agencies don't need them; linear scheduling +
   calendar view is enough.
 - Chat. Threads live in email; slack is not a surface we own.
-- Mobile-native app. Forja is mobile-first web; that's the mobile story.
+- Mobile-native app. The Batuda web app is mobile-first; that's the mobile story.
 - Offline mode. Cloud-first is fine for this audience.
 - Fine-grained permissions beyond Better-Auth + autonomy policy.
 

@@ -1,10 +1,10 @@
 /*
- * Forja — app-local design tokens
+ * Batuda — app-local design tokens
  *
- * Imported after @engranatge/ui/tailwind.css so shared tokens (palette,
+ * Imported after @batuda/ui/tailwind.css so shared tokens (palette,
  * typography, spacing, shape, elevation) are available in the same cascade.
  * Only domain-specific extensions belong here — if a token could plausibly
- * be reused by marketing, promote it to packages/ui/src/tokens.css instead.
+ * be reused by the marketing site, promote it to packages/ui/src/tokens.css instead.
  */
 
 :root {

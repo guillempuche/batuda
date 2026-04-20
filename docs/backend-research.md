@@ -1,6 +1,6 @@
 # Backend Research
 
-Generic, cross-topic research feature for Forja. An LLM-driven agent loop that consumes the external web (and structured data APIs) via pluggable capability providers, produces verifiable findings with inline citations, and never mutates domain rows directly.
+Generic, cross-topic research feature for the Batuda web app. An LLM-driven agent loop that consumes the external web (and structured data APIs) via pluggable capability providers, produces verifiable findings with inline citations, and never mutates domain rows directly.
 
 For system context see [architecture.md](architecture.md). For backend structure see [backend.md](backend.md).
 
@@ -57,12 +57,12 @@ The LLM sees capability tools (`web_read`, not `firecrawl_scrape`). Providers ar
 - **Links as source of truth**: every claim carries inline citations pointing at sources with content hashes and archived copies. A user can always answer "where did this come from?" and "is it still true?"
 - **Cost-aware**: tiered tools; per-run and per-day budget enforcement at the runtime level, not just in prompts. Default = €20/month cap, €5/run paid budget, auto-approved within budget.
 - **Safety rails**: research never mutates domain rows directly. It proposes updates that humans accept.
-- **Frontend-friendly**: users interact via the Forja UI; the server runs the agent loop, the browser streams tool calls via SSE.
+- **Frontend-friendly**: users interact via the Batuda web app; the server runs the agent loop, the browser streams tool calls via SSE.
 - **MCP parity**: Claude Desktop users reach the same capabilities via MCP tools + prompts.
 
 ### Non-goals (v1)
 
-- **No internal corpus**: no pgvector, no embeddings over Forja's own data, no RAG on interactions/documents/emails. Research is about pulling from the outside. `crm_lookup` stays because it's a relational lookup, not corpus search.
+- **No internal corpus**: no pgvector, no embeddings over Batuda's own data, no RAG on interactions/documents/emails. Research is about pulling from the outside. `crm_lookup` stays because it's a relational lookup, not corpus search.
 - **No multi-agent orchestration**: one LLM loop with a broad toolkit. No coordinator/sub-agent split.
 - **No agentic framework**: no LangChain, Mastra, LangGraph. Effect's `LanguageModel` + `Toolkit` + `Stream` is the whole loop.
 - **No scheduled watchers** (v1).
@@ -107,7 +107,7 @@ POST /research
 { "query": "Catalan agroecology cooperatives complaining about spreadsheets in 2025" }
 ```
 
-No subjects, no selector. The LLM runs `web_search` → `web_read` → `crm_lookup` (to dedupe against Forja) → produces a list of new prospects. Findings live standalone; user imports matches.
+No subjects, no selector. The LLM runs `web_search` → `web_read` → `crm_lookup` (to dedupe against Batuda) → produces a list of new prospects. Findings live standalone; user imports matches.
 
 ### 3.2 Subject-anchored
 
@@ -763,7 +763,7 @@ When a run starts, the current version of every subject row is captured into `co
 
 | Action                                                | Gate                                                   |
 | ----------------------------------------------------- | ------------------------------------------------------ |
-| Write to Forja domain rows                            | Always human via "Apply"                               |
+| Write to Batuda domain rows                           | Always human via "Apply"                               |
 | Call tier-3 paid tool above `auto_approve_paid_cents` | `propose_paid_action` → human approve                  |
 | Provider quota exhausted                              | `QuotaExhausted` → LLM tries alternative provider/tool |
 | Fan-out over `paid_monthly_cap_cents`                 | Hard block, no override                                |
@@ -1131,7 +1131,7 @@ GET    /research/preferences                  current user
 PUT    /research/policy                        { budget_cents, paid_budget_cents, auto_approve_paid_cents, paid_monthly_cap_cents }
 ```
 
-All routes live in `apps/server/src/handlers/research.ts` and are declared in `@engranatge/controllers` as an HttpApiGroup, following the existing pattern.
+All routes live in `apps/server/src/handlers/research.ts` and are declared in `@batuda/controllers` as an HttpApiGroup, following the existing pattern.
 
 ---
 
@@ -1157,7 +1157,7 @@ get_research({ id }) → { status, findings, cost }
 
 ### 15.2 Prompts
 
-Keep the existing `CompanyResearchPrompt` (`apps/server/src/mcp/prompts/company-research.ts:9`) — it's for Claude Desktop users who do their own synthesis over Forja data. `/research` is for Forja UI users who want one-click agent loops. They coexist.
+Keep the existing `CompanyResearchPrompt` (`apps/server/src/mcp/prompts/company-research.ts:9`) — it's for Claude Desktop users who do their own synthesis over Batuda data. `/research` is for Batuda web app users who want one-click agent loops. They coexist.
 
 Add:
 
@@ -1165,7 +1165,7 @@ Add:
 
 ### 15.3 Resources
 
-- `forja://research/{id}` — returns the research run as an MCP resource (findings + brief + sources).
+- `batuda://research/{id}` — returns the research run as an MCP resource (findings + brief + sources).
 
 ---
 
@@ -1173,7 +1173,7 @@ Add:
 
 ### 16.1 Scenario 1 — subject-anchored enrichment
 
-**State before.** One company in Forja, mostly empty:
+**State before.** One company in Batuda, mostly empty:
 
 ```
 id       01J9T0QH6A...
@@ -1235,7 +1235,7 @@ Idempotency-Key: 01J9Z-submit-abc
 POST /research
 
 {
-  "query": "Find Catalan agroecology cooperatives that publicly mention struggling with CRMs or spreadsheets in the last 6 months. For each, check if we already have them in Forja.",
+  "query": "Find Catalan agroecology cooperatives that publicly mention struggling with CRMs or spreadsheets in the last 6 months. For each, check if we already have them in Batuda.",
   "mode": "deep",
   "context": { "hints": { "language": "ca", "recency_days": 180 } },
   "schema_name": "prospect_scan_v1"
@@ -1455,7 +1455,7 @@ Everything ships together as v1.
 - HTTP: `POST /research`, `GET /research/:id`, `GET /research/:id/events` (SSE live), `POST /research/:id/cancel`, paid-action approval, proposed-update apply/reject.
 - In-memory PubSub for live SSE; `tool_log` jsonb for post-run audit.
 - MCP tools: `start_research`, `get_research`, `research_sync`.
-- UI: `/forja/research` create page, detail page with findings + brief + sources + proposals panel, by-subject tab on company detail, spending policy in settings, paid action approval UI.
+- UI: `/research` page in the Batuda web app (create + detail with findings + brief + sources + proposals panel), by-subject tab on company detail, spending policy in settings, paid action approval UI.
 - Observability (§20).
 - More country registries (UK Companies House, FR Pappers).
 
@@ -1626,7 +1626,7 @@ Named so the v1 shape doesn't preclude them.
   "first_fetched_at": "2026-04-09T14:32:10Z",
   "last_fetched_at": "2026-04-09T14:32:10Z",
   "content_hash": "sha256:…",
-  "content_ref": "s3://forja-sources/registry/librebor/F08234567.json",
+  "content_ref": "s3://batuda-sources/registry/librebor/F08234567.json",
   "language": "es"
 }
 ```

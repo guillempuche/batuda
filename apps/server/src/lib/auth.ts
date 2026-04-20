@@ -19,7 +19,7 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 			connectionString: Redacted.value(env.DATABASE_URL),
 		})
 
-		// The shared builder is the single source of truth for Engranatge's
+		// The shared builder is the single source of truth for Batuda's
 		// Better-Auth config. CLI commands use the same builder with a
 		// narrower plugin list (no magicLink) so that API keys and sessions
 		// created out-of-band validate against the running server here.

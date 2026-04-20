@@ -5,9 +5,9 @@ import { describe, it } from 'vitest'
 describe('SignOff', () => {
 	describe('rendering', () => {
 		it.todo(
-			// GIVEN <SignOff author="Alice" brand="Engranatge" city="Barcelona" />
+			// GIVEN <SignOff author="Alice" brand="Taller" city="Barcelona" />
 			// WHEN rendered
-			// THEN the text content reads "Alice · Engranatge · Barcelona" (joined by middot · space)
+			// THEN the text content reads "Alice · Taller · Barcelona" (joined by middot · space)
 			'should join all three fields with a middot separator',
 		)
 
@@ -70,7 +70,7 @@ describe('SignOff', () => {
 		)
 
 		it.todo(
-			// GIVEN brand containing a middot already ("Engra·natge")
+			// GIVEN brand containing a middot already ("Tal·ler")
 			// WHEN rendered
 			// THEN the join separator still appears; the inner middot is preserved as part of the brand text
 			'should preserve middot characters inside field values',

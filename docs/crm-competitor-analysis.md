@@ -1,8 +1,8 @@
-# CRM competitor analysis — landscape for Engranatge
+# CRM competitor analysis — landscape for Batuda
 
 Deep-read of the CRM products and open-source codebases referenced in
 [`agency-workforce-platform.md`](./agency-workforce-platform.md) §8.5, compared
-surface-by-surface against Engranatge's current architecture
+surface-by-surface against Batuda's current architecture
 (`packages/domain`, `packages/controllers`, `apps/server/src/services`,
 `apps/server/src/mcp`).
 
@@ -16,13 +16,13 @@ where we're accidentally lagging and should reconsider.
 
 1. [Executive summary](#1-executive-summary)
 2. [Methodology and scope](#2-methodology-and-scope)
-3. [Engranatge architecture baseline](#3-engranatge-architecture-baseline)
+3. [Batuda architecture baseline](#3-batuda-architecture-baseline)
 4. [Agent-native SaaS profiles](#4-agent-native-saas-profiles)
 5. [Modern open-source profiles](#5-modern-open-source-profiles)
 6. [Legacy / reference open-source profiles](#6-legacy--reference-open-source-profiles)
 7. [Cross-cutting analysis](#7-cross-cutting-analysis)
 8. [Surface-by-surface comparison](#8-surface-by-surface-comparison)
-9. [Patterns worth porting into Engranatge](#9-patterns-worth-porting-into-engranatge)
+9. [Patterns worth porting into Batuda](#9-patterns-worth-porting-into-batuda)
 10. [Patterns to explicitly reject](#10-patterns-to-explicitly-reject)
 11. [Design decisions validated and questioned](#11-design-decisions-validated-and-questioned)
 12. [Open research gaps](#12-open-research-gaps)
@@ -32,7 +32,7 @@ where we're accidentally lagging and should reconsider.
 
 ## 1. Executive summary
 
-Engranatge is a **relationship-first, MCP-first, single-tenant TypeScript/Effect
+Batuda is a **relationship-first, MCP-first, single-tenant TypeScript/Effect
 CRM** with a workshop register. The competitive landscape splits into three
 bands:
 
@@ -64,7 +64,7 @@ object soup, workflow-block AI, visual workflow builders, GraphQL-first APIs,
 AI credits pricing, hardcoded pipeline stages, apps marketplaces, AGPL
 licensing).
 
-The single most actionable finding: **Engranatge's MCP surface is competitive
+The single most actionable finding: **Batuda's MCP surface is competitive
 today** — typed intent-level tools, 5 guided prompts, 4 slug-completion
 resources, and discriminated-union results are all best-in-class. The gaps are
 (a) OAuth 2.1 discovery for external clients (Claude Desktop, ChatGPT) and
@@ -76,7 +76,7 @@ resources, and discriminated-union results are all best-in-class. The gaps are
 
 **In scope.** Every CRM named in
 [`agency-workforce-platform.md`](./agency-workforce-platform.md) §8.5
-(proprietary and open-source), with enough depth to compare each to Engranatge's
+(proprietary and open-source), with enough depth to compare each to Batuda's
 existing codebase along four surfaces: *domain*, *controllers*, *services*,
 *MCP*.
 
@@ -96,9 +96,9 @@ execution, Monaco launch).
 
 ---
 
-## 3. Engranatge architecture baseline
+## 3. Batuda architecture baseline
 
-For comparison to work, a terse map of what Engranatge is today. File
+For comparison to work, a terse map of what Batuda is today. File
 references are clickable into the repo.
 
 ### 3.1 Domain — `packages/domain`
@@ -182,7 +182,7 @@ via the DI container. Two pluggable adapter interfaces:
   The thick service
   [`email.ts`](../apps/server/src/services/email.ts) orchestrates suppression
   checks, footer injection, thread linking, inbound classification, and draft
-  `clientId` encoding (`forja:draft;companyId=X;contactId=Y;…`).
+  `clientId` encoding (`batuda:draft;companyId=X;contactId=Y;…`).
   Attachments staged separately in
   [`email-attachment-staging.ts`](../apps/server/src/services/email-attachment-staging.ts).
 - **Storage** — [`storage-provider.ts`](../apps/server/src/services/storage-provider.ts)
@@ -231,9 +231,9 @@ suite
 [`research-sink.ts`](../apps/server/src/mcp/tools/research-sink.ts)).
 
 **Resources** ([`resources/`](../apps/server/src/mcp/resources/)):
-[`company.ts`](../apps/server/src/mcp/resources/company.ts) (`forja://company/{slug}`,
+[`company.ts`](../apps/server/src/mcp/resources/company.ts) (`batuda://company/{slug}`,
 slug completion via ILIKE),
-[`pipeline.ts`](../apps/server/src/mcp/resources/pipeline.ts) (`forja://pipeline`),
+[`pipeline.ts`](../apps/server/src/mcp/resources/pipeline.ts) (`batuda://pipeline`),
 [`document.ts`](../apps/server/src/mcp/resources/document.ts),
 [`research.ts`](../apps/server/src/mcp/resources/research.ts).
 
@@ -500,7 +500,7 @@ emphasis.
 
 **Differentiator.** **Code-executing agent over a semi-structured world
 model**. While everyone else ships NL chat over structured rows, Lightfield's
-agent writes code against raw history. Closest in spirit to what Engranatge
+agent writes code against raw history. Closest in spirit to what Batuda
 could become with Effect-powered composable actions.
 
 **Patterns to steal.**
@@ -509,7 +509,7 @@ could become with Effect-powered composable actions.
   historically from the raw interaction log. Tiptap JSON + Effect pipelines
   map naturally onto "raw first, structured-on-demand".
 - Code-executing agent over interaction history — Lightfield's Python path
-  validates the primitive; Engranatge's research runtime could host the same
+  validates the primitive; Batuda's research runtime could host the same
   shape.
 
 ---
@@ -817,7 +817,7 @@ uploaded to Supabase Storage.
 - **Aggregate views** (`contacts_summary`, `companies_summary`, `activity_log`)
   to pre-join for list/search endpoints.
 - **MCP auth via OAuth 2.1 + RFC 9728 + transparent RLS.** 450 LOC MCP server
-  because RLS does the heavy lifting. For Engranatge, keep MCP tools narrowly
+  because RLS does the heavy lifting. For Batuda, keep MCP tools narrowly
   scoped, push auth into the data layer, let MCP inherit. Borrow the
   `WWW-Authenticate` + `/.well-known/oauth-protected-resource` dance for
   Claude/ChatGPT auto-discovery.
@@ -825,7 +825,7 @@ uploaded to Supabase Storage.
 **Not to copy.**
 
 - **Arbitrary-SQL MCP tools** (`query` / `mutate`). The safety surface is an
-  AST parser + RLS. Engranatge's typed per-verb tools are safer, more
+  AST parser + RLS. Batuda's typed per-verb tools are safer, more
   discoverable, and don't require the model to first `get_schema`.
 - **Deep Supabase lock-in.** Auth, storage, edge functions, RLS intertwined;
   Edge Functions run Deno (different runtime than the app).
@@ -1015,15 +1015,15 @@ table, including type dictionaries — every workspace owns its own taxonomy.
 
 ### 7.2 Where the field disagrees
 
-| Dimension                 | Camp A                                        | Camp B                                                                    |
-| ------------------------- | --------------------------------------------- | ------------------------------------------------------------------------- |
-| **Data model philosophy** | Schema-less / world model (Lightfield)        | Typed / schema-first (Attio, Twenty, Engranatge)                          |
-| **Pipeline framing**      | Relationship-first (Folk, Monica, Engranatge) | Deal-first (Reevo, Aurasell, Monaco, Twenty)                              |
-| **Pipeline primitive**    | List-with-list-attrs (Attio)                  | Status field on entity (Engranatge, Atomic CRM) / Deal row (Twenty, Folk) |
-| **MCP shape**             | Tiny + generic + RLS (Atomic CRM)             | Typed per-verb (Attio, Engranatge)                                        |
-| **Multi-channel inbox**   | Email + LinkedIn + WhatsApp peers (Folk)      | Email + calls primarily (most)                                            |
-| **Build vs rent**         | Software (most)                               | Managed outcome (Monaco)                                                  |
-| **Extension surface**     | Visual workflow builder (Twenty, Attio)       | Code-defined + webhooks (Engranatge, Folk, Lightfield)                    |
+| Dimension                 | Camp A                                    | Camp B                                                                |
+| ------------------------- | ----------------------------------------- | --------------------------------------------------------------------- |
+| **Data model philosophy** | Schema-less / world model (Lightfield)    | Typed / schema-first (Attio, Twenty, Batuda)                          |
+| **Pipeline framing**      | Relationship-first (Folk, Monica, Batuda) | Deal-first (Reevo, Aurasell, Monaco, Twenty)                          |
+| **Pipeline primitive**    | List-with-list-attrs (Attio)              | Status field on entity (Batuda, Atomic CRM) / Deal row (Twenty, Folk) |
+| **MCP shape**             | Tiny + generic + RLS (Atomic CRM)         | Typed per-verb (Attio, Batuda)                                        |
+| **Multi-channel inbox**   | Email + LinkedIn + WhatsApp peers (Folk)  | Email + calls primarily (most)                                        |
+| **Build vs rent**         | Software (most)                           | Managed outcome (Monaco)                                              |
+| **Extension surface**     | Visual workflow builder (Twenty, Attio)   | Code-defined + webhooks (Batuda, Folk, Lightfield)                    |
 
 ### 7.3 Hype vs substance
 
@@ -1049,7 +1049,7 @@ both ways.
 
 | CRM                           | Core entities                                                                                                    | Schema shape                                                    | Pipeline stance                      |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------ |
-| **Engranatge**                | Company, Contact, Interaction, Proposal, Task, Document, Page, CallRecording, EmailMessage, Product, ResearchRun | Static Effect `Model.Class` + branded IDs + `metadata: Unknown` | Company-centric (`status` field)     |
+| **Batuda**                    | Company, Contact, Interaction, Proposal, Task, Document, Page, CallRecording, EmailMessage, Product, ResearchRun | Static Effect `Model.Class` + branded IDs + `metadata: Unknown` | Company-centric (`status` field)     |
 | **Attio**                     | Objects + Records + Lists, 17 attribute types                                                                    | Dynamic via `list-attribute-definitions`; bitemporal values     | Lists-with-list-scoped-attrs         |
 | **Twenty**                    | 28 standard objects + custom                                                                                     | Dynamic metadata → real Postgres tables per workspace schema    | Opportunity as first-class object    |
 | **Atomic CRM**                | companies, contacts, deals, tasks, notes, tags, sales                                                            | Declarative SQL → auto-diff migrations                          | Stages hardcoded in source           |
@@ -1063,7 +1063,7 @@ both ways.
 | **NocoBase / NocoDB**         | Generic collections                                                                                              | Generic engine                                                  | Per-instance                         |
 | **Monica**                    | Contact + typed `relationships`, `life_events`, `gifts`, `contact_reminders`                                     | Typed graph edges with reverse names                            | Not a pipeline — a timeline          |
 
-**Engranatge's distinctive domain moves.**
+**Batuda's distinctive domain moves.**
 
 - [`ResearchRun`](https://github.com/twentyhq/twenty) with cost/quota tracking
   and hierarchical `parent_id` — no OSS CRM has this as a first-class entity.
@@ -1073,7 +1073,7 @@ both ways.
   `Interaction`, transcript status pre-declared before provider exists.
 - `metadata: Unknown` as forward-compat on every aggregate.
 
-**Engranatge's gaps vs the field.**
+**Batuda's gaps vs the field.**
 
 - No polymorphic activity log (Twenty's `TimelineActivity`).
 - No typed Contact↔Contact or Company↔Company edges (Monica's relationship
@@ -1087,7 +1087,7 @@ both ways.
 
 | CRM                             | Primary API                                                                                                      | Secondary                                                                                                          | Extension surface                                   |
 | ------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------- |
-| **Engranatge**                  | HttpApi (`effect/unstable/httpapi`), 16 route groups, session middleware                                         | —                                                                                                                  | `WebhookService` fires on events; AgentMail webhook |
+| **Batuda**                      | HttpApi (`effect/unstable/httpapi`), 16 route groups, session middleware                                         | —                                                                                                                  | `WebhookService` fires on events; AgentMail webhook |
 | **Attio**                       | REST + published OpenAPI                                                                                         | [App SDK](https://docs.attio.com/sdk/guides/creating-an-app) (TS + React in-app)                                   | Webhooks V2 with server-side filter DSL             |
 | **Twenty**                      | [GraphQL (Apollo 4)](https://github.com/twentyhq/twenty/tree/main/packages/twenty-server/src/engine/api/graphql) | [REST + OpenAPI](https://github.com/twentyhq/twenty/tree/main/packages/twenty-server/src/engine/api/rest) co-equal | API keys with role binding; Zapier app              |
 | **Atomic CRM**                  | PostgREST via Supabase                                                                                           | —                                                                                                                  | Edge functions (Deno), RLS for auth                 |
@@ -1096,14 +1096,14 @@ both ways.
 | **Reevo / Aurasell / Monaco**   | Proprietary                                                                                                      | —                                                                                                                  | Limited / none                                      |
 | **EspoCRM / SuiteCRM / OroCRM** | REST + SOAP (legacy)                                                                                             | RBAC-gated                                                                                                         | Workflow engines                                    |
 
-**Engranatge's distinctive controller moves.**
+**Batuda's distinctive controller moves.**
 
 - OpenAPI-first at [`api.ts`](../packages/controllers/src/api.ts), matching
   Attio and Folk's stance.
 - Typed `NotFound` with `HttpApiSchema.status(404)` — type-safe error mapping.
 - Session middleware as a single layer, applied uniformly.
 
-**Engranatge's gaps.**
+**Batuda's gaps.**
 
 - **No webhook filter DSL.** Today
   [`WebhookService`](../apps/server/src/services/webhooks.ts) fires on all
@@ -1120,7 +1120,7 @@ both ways.
 
 | CRM            | Email ingest                                                                                                                                       | Driver abstraction                                                             | Enrichment                                                         |
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| **Engranatge** | AgentMail webhook → `email_messages` + `email_thread_links`; company/contact matched by recipient; suppression check for bounced; footer injection | `EmailProvider` interface (Send/Reply/Draft/Thread); `StorageProvider` (S3/R2) | Geocoder (Nominatim, 1 req/s); ResearchRun integrated + cost-gated |
+| **Batuda**     | AgentMail webhook → `email_messages` + `email_thread_links`; company/contact matched by recipient; suppression check for bounced; footer injection | `EmailProvider` interface (Send/Reply/Draft/Thread); `StorageProvider` (S3/R2) | Geocoder (Nominatim, 1 req/s); ResearchRun integrated + cost-gated |
 | **Attio**      | Implicit via sync; `last_email_interaction` as read-only column                                                                                    | Single proprietary pipeline                                                    | Research Agent as workflow block; AI attributes compute-on-read    |
 | **Twenty**     | `messaging/drivers/` — gmail, imap, microsoft, smtp + `match-participant` module                                                                   | Per-channel polymorphic `MessageChannel`                                       | Apollo / Mailchimp / Stripe / Fireflies in `twenty-apps/community` |
 | **Atomic CRM** | Postmark webhook with forwarded-mode regex + direct-CC mode; company lookup by `website OR name OR domain`; attachments to Supabase Storage        | One provider (Postmark)                                                        | None native                                                        |
@@ -1128,7 +1128,7 @@ both ways.
 | **Lightfield** | Email + meeting transcripts + built-in call recorder (no Fathom)                                                                                   | Single opinionated pipeline                                                    | Agent-driven backfill                                              |
 | **Reevo**      | Email + calls + bundled domain purchase + inbox warming                                                                                            | Vertically integrated                                                          | Sales-infra bundled                                                |
 
-**Engranatge's distinctive service moves.**
+**Batuda's distinctive service moves.**
 
 - Two clean adapter interfaces with pluggable providers — same shape as
   Twenty's drivers, one provider per category today.
@@ -1136,14 +1136,14 @@ both ways.
   matches Atomic CRM's Postmark flow.
 - Draft `clientId` encoding
   ([`email.ts`](../apps/server/src/services/email.ts)) —
-  `forja:draft;companyId=X;contactId=Y;…` lets agents stage drafts without
+  `batuda:draft;companyId=X;contactId=Y;…` lets agents stage drafts without
   persisting, then send atomically. Not observed in any of the compared
   CRMs.
 
-**Engranatge's gaps.**
+**Batuda's gaps.**
 
 - **Single-provider today.** When a customer wants "sync my Gmail to
-  Engranatge," there's no pluggable path. Twenty's `drivers/` pattern is the
+  Batuda," there's no pluggable path. Twenty's `drivers/` pattern is the
   textbook answer; our `EmailProvider` interface is the right primitive, we
   just haven't implemented the other drivers.
 - **No LinkedIn / WhatsApp capture.** Folk's folkX extension is the defining
@@ -1155,15 +1155,15 @@ both ways.
 
 ### 8.4 MCP surface
 
-| CRM                           | Auth                                                                                          | Tools                                                                                                                                                                                                                                               | Resources                                                                                                                    | Prompts                                                                                              |
-| ----------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| **Engranatge**                | Better-auth session via [`McpAuthMiddleware`](../apps/server/src/mcp/http.ts)                 | ~30 typed tools across 10 toolkits; [discriminated-union results](../apps/server/src/mcp/tools/email.ts)                                                                                                                                            | 4 (`forja://company/{slug}`, `forja://pipeline`, `forja://document/{id}`, `forja://research/{id}`) with slug auto-completion | 5 guided (daily-briefing, company-research, proposal-draft, interaction-followup, research-designer) |
-| **Attio**                     | [OAuth 2.1](https://attio.com/mcp) (one-click Claude/ChatGPT install)                         | ~30 agent-tailored tools — split by intent (`upsert-record`, `update-list-entry-by-id`, `semantic-search-notes` vs `search-notes-by-metadata`); schema discovery via `list-attribute-definitions`; reads auto-approved, writes require confirmation | Via tools; no separate resources channel                                                                                     | User-authored custom prompts (Daily brief, Deal brief, QBR prep), shareable                          |
-| **Twenty**                    | API key **or** user JWT; `McpAuthGuard` + `WorkspaceAuthGuard`                                | **4 meta-tools**: `get-tool-catalog`, `learn-tools`, `load-skill`, `execute-tool` — agent self-loads only what it needs                                                                                                                             | Declared in capabilities                                                                                                     | Declared in capabilities                                                                             |
-| **Atomic CRM**                | OAuth 2.1 via **RFC 9728** protected-resource metadata; JWT injected into SQL session for RLS | **5 generic tools**: `get_schema`, `query`, `mutate`, `display_task_list`, `complete_task`; safety via pgsql-ast-parser + RLS                                                                                                                       | 1: `task-list-ui` (HTML widget with deep-links)                                                                              | —                                                                                                    |
-| **Folk**                      | None first-party; community MCPs wrap REST                                                    | ~10–15 in community wrappers                                                                                                                                                                                                                        | —                                                                                                                            | —                                                                                                    |
-| **Lightfield**                | First-party MCP declared; tool list not public                                                | —                                                                                                                                                                                                                                                   | —                                                                                                                            | —                                                                                                    |
-| **Reevo / Aurasell / Monaco** | No MCP                                                                                        | —                                                                                                                                                                                                                                                   | —                                                                                                                            | —                                                                                                    |
+| CRM                           | Auth                                                                                          | Tools                                                                                                                                                                                                                                               | Resources                                                                                                                        | Prompts                                                                                              |
+| ----------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **Batuda**                    | Better-auth session via [`McpAuthMiddleware`](../apps/server/src/mcp/http.ts)                 | ~30 typed tools across 10 toolkits; [discriminated-union results](../apps/server/src/mcp/tools/email.ts)                                                                                                                                            | 4 (`batuda://company/{slug}`, `batuda://pipeline`, `batuda://document/{id}`, `batuda://research/{id}`) with slug auto-completion | 5 guided (daily-briefing, company-research, proposal-draft, interaction-followup, research-designer) |
+| **Attio**                     | [OAuth 2.1](https://attio.com/mcp) (one-click Claude/ChatGPT install)                         | ~30 agent-tailored tools — split by intent (`upsert-record`, `update-list-entry-by-id`, `semantic-search-notes` vs `search-notes-by-metadata`); schema discovery via `list-attribute-definitions`; reads auto-approved, writes require confirmation | Via tools; no separate resources channel                                                                                         | User-authored custom prompts (Daily brief, Deal brief, QBR prep), shareable                          |
+| **Twenty**                    | API key **or** user JWT; `McpAuthGuard` + `WorkspaceAuthGuard`                                | **4 meta-tools**: `get-tool-catalog`, `learn-tools`, `load-skill`, `execute-tool` — agent self-loads only what it needs                                                                                                                             | Declared in capabilities                                                                                                         | Declared in capabilities                                                                             |
+| **Atomic CRM**                | OAuth 2.1 via **RFC 9728** protected-resource metadata; JWT injected into SQL session for RLS | **5 generic tools**: `get_schema`, `query`, `mutate`, `display_task_list`, `complete_task`; safety via pgsql-ast-parser + RLS                                                                                                                       | 1: `task-list-ui` (HTML widget with deep-links)                                                                                  | —                                                                                                    |
+| **Folk**                      | None first-party; community MCPs wrap REST                                                    | ~10–15 in community wrappers                                                                                                                                                                                                                        | —                                                                                                                                | —                                                                                                    |
+| **Lightfield**                | First-party MCP declared; tool list not public                                                | —                                                                                                                                                                                                                                                   | —                                                                                                                                | —                                                                                                    |
+| **Reevo / Aurasell / Monaco** | No MCP                                                                                        | —                                                                                                                                                                                                                                                   | —                                                                                                                                | —                                                                                                    |
 
 **Three archetypes of MCP design.**
 
@@ -1171,10 +1171,10 @@ both ways.
    is substrate. Agent must call `get_schema` first.
 2. **Meta-tool expanding** (Twenty). Four stable tools; others discovered/loaded
    on demand. Keeps context small when the catalog is huge.
-3. **Typed + intent-level** (Attio, Engranatge). One tool per verb, agent-shaped
+3. **Typed + intent-level** (Attio, Batuda). One tool per verb, agent-shaped
    naming, schema-discovery as a dedicated tool.
 
-**Engranatge sits closest to Attio's shape**, with three unique extras:
+**Batuda sits closest to Attio's shape**, with three unique extras:
 
 - **5 guided prompts** — nobody else ships these; they're all user-authored
   in Attio.
@@ -1184,13 +1184,13 @@ both ways.
   pattern-matchable by agents without string parsing. Strictly better than
   any observed OSS.
 
-**Engranatge's gaps.**
+**Batuda's gaps.**
 
 - **No `describe_schema` / `list_attribute_definitions` tool.** Fine for 30
   tools; won't scale if we add page templates or custom fields.
 - **No OAuth-2.1 protected-resource metadata.** Claude Desktop and ChatGPT
   Apps want the `WWW-Authenticate: Bearer resource_metadata=…` dance for
-  one-click install. Our session-cookie auth works for Forja but not for
+  one-click install. Our session-cookie auth works for the Batuda web app but not for
   external connectors.
 - **No meta-tool pattern.** Not blocking today; worth holding in mind past 50
   tools.
@@ -1200,7 +1200,7 @@ both ways.
 
 ---
 
-## 9. Patterns worth porting into Engranatge
+## 9. Patterns worth porting into Batuda
 
 Each pattern maps to specific files in our repo and a priority.
 
@@ -1212,7 +1212,7 @@ Each pattern maps to specific files in our repo and a priority.
    *Target*: extend [`http.ts`](../apps/server/src/mcp/http.ts); add
    `/.well-known/oauth-protected-resource` endpoint; handle Bearer token
    exchange alongside existing session auth.
-   *Why*: unlocks external agent clients without breaking Forja's cookie auth.
+   *Why*: unlocks external agent clients without breaking the Batuda web app's cookie auth.
 
 2. **Denormalised Interaction attributes** — `lastEmailInteractionAt`,
    `lastCallAt`, `nextCalendarEventAt` on `companies` and `contacts`, updated
@@ -1231,7 +1231,7 @@ Each pattern maps to specific files in our repo and a priority.
    documents, research as one audit/feed log.
    *Source*: [Twenty `TimelineActivity`](https://github.com/twentyhq/twenty/blob/main/packages/twenty-server/src/modules/timeline/standard-objects/timeline-activity.workspace-entity.ts).
    *Target*: new `packages/domain/src/schema/timeline-activity.ts`; migration;
-   new MCP resource `forja://timeline/{companyId}` in
+   new MCP resource `batuda://timeline/{companyId}` in
    [`resources/`](../apps/server/src/mcp/resources/).
    *Why*: reduces feed-code duplication; matches Effect event-sourcing
    instincts.
@@ -1364,7 +1364,7 @@ Each pattern maps to specific files in our repo and a priority.
   (owner, shared-with, rules).
 
 Resolved elsewhere: session-cookie MCP auth is folded into pattern #1
-(§9.1) — cookies stay for Forja, OAuth 2.1 gets bolted on for external
+(§9.1) — cookies stay for the Batuda web app, OAuth 2.1 gets bolted on for external
 clients. `MessageParticipant` and `ResearchRun` fold are moved into §11.3.
 
 ### 11.3 Decided (implementation scheduled)
@@ -1523,7 +1523,7 @@ Five patterns ship together in one cycle:
 **Monica** — [github.com/monicahq/monica](https://github.com/monicahq/monica) ·
 [database/migrations](https://github.com/monicahq/monica/tree/master/database/migrations).
 
-### 13.4 Engranatge code references (internal)
+### 13.4 Batuda code references (internal)
 
 Domain: [`packages/domain/src/schema/`](../packages/domain/src/schema/) —
 [`companies.ts`](../packages/domain/src/schema/companies.ts) ·

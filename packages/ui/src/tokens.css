@@ -1,5 +1,5 @@
 /* ============================================================
-   Engranatge Design Tokens
+   Batuda Design Tokens
    Colors · Typography · Spacing · Shape · Elevation · Workshop
 
    Canonical breakpoints (must match @theme in tailwind.css):
@@ -10,13 +10,13 @@
    values are used in styled-components @media rules.
 
    Scope rules:
-     All tokens below are shared by every consumer (marketing,
-     Forja internal, and future apps). The workshop visual
-     language — metal surfaces, elevation, embossing, brushed
-     textures — is the canonical brand system per
-     docs/brand-visual.md §Workshop Visual Language.
-     Domain-specific tokens (pipeline status, CRM accents) belong
-     in app-local files (e.g. apps/internal/src/forja-tokens.css).
+     All tokens below are shared by every consumer (the Batuda
+     web app and future apps). The workshop visual language —
+     metal surfaces, elevation, embossing, brushed textures —
+     is the canonical brand system per docs/brand-visual.md
+     §Workshop Visual Language. Domain-specific tokens (pipeline
+     status, CRM accents) belong in app-local files (e.g.
+     apps/internal/src/batuda-tokens.css).
    ============================================================ */
 
 :root {

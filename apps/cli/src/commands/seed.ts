@@ -1869,7 +1869,7 @@ export const seed = (preset: Preset) =>
 					companyId: companyMap.get('ferros-baix-llobregat'),
 					slug: 'intro-ferros-bl',
 					lang: 'en',
-					title: 'Introduction — Engranatge for Ferros BL',
+					title: 'Introduction — Taller for Ferros BL',
 					status: 'published',
 					template: 'intro',
 					content: JSON.stringify({
@@ -1918,7 +1918,7 @@ export const seed = (preset: Preset) =>
 						],
 					}),
 					meta: JSON.stringify({
-						ogTitle: 'Engranatge for Ferros BL',
+						ogTitle: 'Taller for Ferros BL',
 						ogDescription:
 							'Custom automation proposal for Ferros Baix Llobregat.',
 					}),
@@ -1930,7 +1930,7 @@ export const seed = (preset: Preset) =>
 					companyId: null,
 					slug: 'about',
 					lang: 'en',
-					title: 'About Engranatge',
+					title: 'About Taller',
 					status: 'published',
 					template: 'custom',
 					content: JSON.stringify({
@@ -1952,7 +1952,7 @@ export const seed = (preset: Preset) =>
 										content: [
 											{
 												type: 'text',
-												text: 'Engranatge is a one-person digital workshop based in Catalonia. I help small and mid-size businesses automate their operations, get found online, and stop losing clients to manual processes.',
+												text: 'Taller is a one-person digital workshop based in Catalonia. I help small and mid-size businesses automate their operations, get found online, and stop losing clients to manual processes.',
 											},
 										],
 									},
@@ -1961,7 +1961,7 @@ export const seed = (preset: Preset) =>
 						],
 					}),
 					meta: JSON.stringify({
-						ogTitle: 'About Engranatge',
+						ogTitle: 'About Taller',
 						ogDescription: 'One-person digital workshop for small businesses.',
 					}),
 					publishedAt: new Date('2026-01-15'),
@@ -1971,7 +1971,7 @@ export const seed = (preset: Preset) =>
 					companyId: null,
 					slug: 'about',
 					lang: 'ca',
-					title: 'Sobre Engranatge',
+					title: 'Sobre Taller',
 					status: 'published',
 					template: 'custom',
 					content: JSON.stringify({
@@ -1994,7 +1994,7 @@ export const seed = (preset: Preset) =>
 										content: [
 											{
 												type: 'text',
-												text: 'Engranatge és un taller digital unipersonal amb seu a Catalunya. Ajudo petites i mitjanes empreses a automatitzar les seves operacions, a ser trobades online i a deixar de perdre clients per processos manuals.',
+												text: 'Taller és un taller digital unipersonal amb seu a Catalunya. Ajudo petites i mitjanes empreses a automatitzar les seves operacions, a ser trobades online i a deixar de perdre clients per processos manuals.',
 											},
 										],
 									},
@@ -2003,7 +2003,7 @@ export const seed = (preset: Preset) =>
 						],
 					}),
 					meta: JSON.stringify({
-						ogTitle: 'Sobre Engranatge',
+						ogTitle: 'Sobre Taller',
 						ogDescription: 'Taller digital unipersonal per a petits negocis.',
 					}),
 					publishedAt: new Date('2026-01-15'),
@@ -2013,7 +2013,7 @@ export const seed = (preset: Preset) =>
 					companyId: null,
 					slug: 'about',
 					lang: 'es',
-					title: 'Sobre Engranatge',
+					title: 'Sobre Taller',
 					status: 'published',
 					template: 'custom',
 					content: JSON.stringify({
@@ -2037,7 +2037,7 @@ export const seed = (preset: Preset) =>
 										content: [
 											{
 												type: 'text',
-												text: 'Engranatge es un taller digital unipersonal con sede en Cataluña. Ayudo a pequeñas y medianas empresas a automatizar sus operaciones, a ser encontradas online y a dejar de perder clientes por procesos manuales.',
+												text: 'Taller es un taller digital unipersonal con sede en Cataluña. Ayudo a pequeñas y medianas empresas a automatizar sus operaciones, a ser encontradas online y a dejar de perder clientes por procesos manuales.',
 											},
 										],
 									},
@@ -2046,7 +2046,7 @@ export const seed = (preset: Preset) =>
 						],
 					}),
 					meta: JSON.stringify({
-						ogTitle: 'Sobre Engranatge',
+						ogTitle: 'Sobre Taller',
 						ogDescription: 'Taller digital unipersonal para pequeños negocios.',
 					}),
 					publishedAt: new Date('2026-01-15'),

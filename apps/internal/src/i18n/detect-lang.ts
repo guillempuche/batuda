@@ -1,6 +1,6 @@
 import { defaultLang, isLangCode, type LangCode } from './index'
 
-const STORAGE_KEY = 'engranatge.lang'
+const STORAGE_KEY = 'batuda.lang'
 
 export function readStoredLang(): LangCode | null {
 	if (typeof window === 'undefined') return null

@@ -1,5 +1,5 @@
-@import "@engranatge/ui/tailwind.css";
-@import "./forja-tokens.css";
+@import "@batuda/ui/tailwind.css";
+@import "./batuda-tokens.css";
 
 :root {
 	/* Layout dimensions — consumers that need clearance above the mobile
@@ -27,7 +27,7 @@ body {
 	-moz-osx-font-smoothing: grayscale;
 
 	/* Pegboard workshop body — warm tan + perforated radial-dot grid.
-	 * The brand doc's workshop metaphor starts here: every Forja chrome
+	 * The brand doc's workshop metaphor starts here: every Batuda chrome
 	 * element sits on top of this as if bolted to the board. */
 	background-color: var(--color-pegboard);
 	background-image:

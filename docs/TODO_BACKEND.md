@@ -27,9 +27,9 @@ Docker Compose files for local development services. Each service gets its own d
       image: postgres:17-alpine
       ports: ["5432:5432"]
       environment:
-        POSTGRES_DB: engranatge
-        POSTGRES_USER: engranatge
-        POSTGRES_PASSWORD: engranatge
+        POSTGRES_DB: batuda
+        POSTGRES_USER: batuda
+        POSTGRES_PASSWORD: batuda
       volumes:
         - postgres-data:/var/lib/postgresql/data
   volumes:
@@ -37,14 +37,14 @@ Docker Compose files for local development services. Each service gets its own d
   ```
 - [x] Add root script: `"db:up": "docker compose -f docker/docker-compose.yml up -d"`
 - [x] Add root script: `"db:down": "docker compose -f docker/docker-compose.yml down"`
-- [x] Add `DATABASE_URL=postgresql://engranatge:engranatge@localhost:5432/engranatge` to `.env.example`
+- [x] Add `DATABASE_URL=postgresql://batuda:batuda@localhost:5432/batuda` to `.env.example`
 - [x] Run `pnpm db:up` and verify Postgres accessible
 
 ## Phase 2 — packages/domain
 
 Effect Schema types. No runtime DB connection — just definitions.
 
-- [x] Create `packages/domain/package.json` — `@engranatge/domain`
+- [x] Create `packages/domain/package.json` — `@batuda/domain`
   - [x] deps: `effect`
   - [x] devDeps: `tsdown`, `typescript`
 - [x] Create `packages/domain/tsconfig.json` extending `../../tsconfig.base.json`, lib ESNext only (no DOM)
@@ -88,24 +88,24 @@ Pattern: Xiroi `@xiroi/library-controllers`.
   - [ ] `src/pipeline.ts` — `PipelineResponse`, `ApiGroupPipeline`
   - [x] ~~`src/emails.ts` — `EmailSendRequest` (includes `inboxId`), `EmailReplyRequest`, `EmailThreadListQuery` (filterable by `inboxId`, `companyId`), `EmailThreadResponse`, `EmailThreadDetailResponse`, `InboxResponse`, `ApiGroupEmails`~~ — co-located in `apps/server/src/routes/email.ts`
   - [x] ~~`src/email-webhooks.ts` — `AgentMailInboundPayload`, `ApiGroupEmailWebhooks` (no API key middleware — webhook auth only)~~ — co-located in `apps/server/src/routes/agentmail-webhook.ts`
-- [x] Create `src/api.ts` — combined `EngranatgeApi` spec:
+- [x] Create `src/api.ts` — combined `BatudaApi` spec:
   ```ts
-  export const EngranatgeApi = HttpApi.make('EngranatgeApi')
+  export const BatudaApi = HttpApi.make('BatudaApi')
     .add(ApiGroupCompanies)
     .add(ApiGroupContacts)
     .add(ApiGroupInteractions)
     .add(ApiGroupEmails)
     // ... all groups
     .middleware(ApiKeyMiddleware)
-    .annotate(OpenApi.Title, 'Engranatge API')
+    .annotate(OpenApi.Title, 'Batuda API')
   ```
-- [x] Create `src/index.ts` — re-exports all groups, schemas, errors, middleware, and `EngranatgeApi`
+- [x] Create `src/index.ts` — re-exports all groups, schemas, errors, middleware, and `BatudaApi`
 - [ ] Write schema validation tests for each request/response type (vitest)
 
 ## Phase 3 — apps/server setup
 
 - [x] Create `apps/server/package.json`
-  - [x] deps: `@engranatge/domain`, `@engranatge/controllers`, `effect`, `@effect/platform-node`, `@effect/sql-pg`, `agentmail`
+  - [x] deps: `@batuda/domain`, `@batuda/controllers`, `effect`, `@effect/platform-node`, `@effect/sql-pg`, `agentmail`
   - [x] devDeps: `typescript`
 - [x] Create `apps/server/tsconfig.json` extending `../../tsconfig.base.json`, lib ESNext only (no DOM)
 - [x] Install Effect v4 dependencies — verify package names/versions on npm
@@ -133,9 +133,9 @@ Pattern: Xiroi `@xiroi/library-controllers`.
   }).pipe(Layer.provide(PgLive))
   ```
 - [x] Create `src/db/migrations/` directory for Effect SQL migration files
-- [x] Create initial migration `src/db/migrations/0001_initial.ts` — all tables from `@engranatge/domain`
+- [x] Create initial migration `src/db/migrations/0001_initial.ts` — all tables from `@batuda/domain`
 - [x] Create `src/db/migrate.ts` — CLI entry point that runs `MigratorLive`
-- [x] Add root script: `"db:migrate": "pnpm --filter @engranatge/server run migrate"`
+- [x] Add root script: `"db:migrate": "pnpm --filter @batuda/server run migrate"`
 - [x] Implement `src/main.ts` skeleton — Effect HTTP server using `PgLive` + `MigratorLive` from `./db/` (runs migrations on startup)
 - [x] Run `pnpm db:up` then `pnpm db:migrate` — verify tables created in local Postgres
 - [x] Verify server starts with `pnpm db:up && pnpm dev:server`
@@ -153,26 +153,26 @@ Pattern: Xiroi `@xiroi/library-controllers`.
 
 ## Phase 5 — Live API handlers
 
-Specs (schemas, endpoints, groups) live in `@engranatge/controllers`.
+Specs (schemas, endpoints, groups) live in `@batuda/controllers`.
 Server provides live implementations via `HttpApiBuilder.group()`.
 
 For each entity:
 
-1. Import the group from `@engranatge/controllers`
+1. Import the group from `@batuda/controllers`
 2. Implement service (business logic + Effect SQL queries)
 3. Implement live handler with `HttpApiBuilder.group(ApiSpec, 'GroupName', handlers => ...)`
 4. Register in `ApiLive` layer
 
 ```
 src/api/
-  specs/api.ts        — imports groups from @engranatge/controllers + server-only groups (health)
+  specs/api.ts        — imports groups from @batuda/controllers + server-only groups (health)
   live/api.ts          — ApiLive = HttpApiBuilder.api(ApiSpec).pipe(Layer.provide(...))
   live/companies.ts    — CompaniesLive = HttpApiBuilder.group(ApiSpec, 'Companies', ...)
   live/contacts.ts     — ContactsLive
   ...
 ```
 
-- [x] Create `src/api/specs/api.ts` — imports `EngranatgeApi` groups + adds server-only groups (health)
+- [x] Create `src/api/specs/api.ts` — imports `BatudaApi` groups + adds server-only groups (health)
 - [x] Create `src/api/live/api.ts` — `ApiLive` composing all handler layers
 - [x] `live/companies.ts` — handle listCompanies, getCompany, createCompany, updateCompany
 - [x] `live/contacts.ts` — handle listContacts, createContact, updateContact, deleteContact
@@ -265,11 +265,11 @@ Voice calls captured by the salesperson on their phone (speakerphone + Voice Mem
 ### Local dev — MinIO
 
 - [x] Add `storage` (MinIO) and `storage-init` (mc bucket creator) services to `docker/docker-compose.yml` — same compose project as `db`, so `pnpm cli services up` brings both
-- [x] Bucket `engranatge-recordings` auto-created on first boot via the `storage-init` sidecar
+- [x] Bucket `batuda-assets` auto-created on first boot via the `storage-init` sidecar
 - [x] Add `STORAGE_*` env vars to `.env.example` pointing at `http://localhost:9000`
 - [x] Add `storageCheck` to `apps/cli/src/commands/doctor.ts` (HTTP GET `:9000/minio/health/live`)
 - [x] Smoke-test: `pnpm cli services up && pnpm cli doctor` should show `Storage (MinIO): listening on :9000`
-- [ ] Smoke-test: open `http://localhost:9001` in a browser, log in with `engranatge` / `engranatge-secret`, verify the bucket exists
+- [ ] Smoke-test: open `http://localhost:9001` in a browser, log in with `batuda` / `batuda-secret`, verify the bucket exists
 
 ### Schema — `packages/domain`
 
@@ -336,7 +336,7 @@ Mirror `EmailService` shape (`ServiceMap.Service` with `make: Effect.gen` return
   4. Return `{ recordingId, interactionId }`
 - [x] Method `listForCompany(companyId, limit?, offset?)` — JOIN `call_recordings` with `interactions`, scope by `company_id`, exclude `deleted_at IS NOT NULL`, ORDER BY `interactions.date DESC`
 - [x] Method `getById(recordingId)` — full row, exclude soft-deleted
-- [x] Method `getPlaybackUrl(recordingId)` — `storage.signedUrl(key, 600)` for the Forja UI's `<audio>` element
+- [x] Method `getPlaybackUrl(recordingId)` — `storage.signedUrl(key, 600)` for the Batuda web app's `<audio>` element
 - [x] Method `softDelete(recordingId)` — UPDATE `deleted_at = now()` first, then best-effort `storage.delete(key)` so the audio is gone immediately (GDPR right to erasure). Storage delete failure logs and continues — the row is already soft-deleted; an orphaned object will be caught by a future cleanup cron. Reverse order would risk losing the storage_key reference if the DB write failed mid-flight.
 - [x] Static `.layer` field
 
@@ -350,7 +350,7 @@ The upload endpoint takes binary audio. Use `handlers.handleRaw` (same pattern a
   - `GET /recordings/:id` — full recording row (no transcript yet)
   - `GET /recordings/:id/playback` — returns `{ url, expiresAt }` signed URL
   - `DELETE /recordings/:id` — soft-delete + audio purge
-- [x] `handlers/recordings.ts` — `RecordingsLive` (`HttpApiBuilder.group(ForjaApi, 'recordings', ...)`)
+- [x] `handlers/recordings.ts` — `RecordingsLive` (`HttpApiBuilder.group(BatudaApi, 'recordings', ...)`)
   - `handleRaw('upload', ...)` — walk `request.multipartStream` via `Stream.runForEach`, accumulate Field strings + the `audio` File `contentEffect` bytes into a `UploadFields` object, call `RecordingService.ingest`. Inline error mapping to JSON responses (400/404/409) since `handleRaw` bypasses the route's error schema.
   - Other handlers are typed `handle(...)` calls into the service. `SqlError` / `StorageError` flow via `Effect.catchTag(..., e => Effect.die(e))`, matching `handlers/email.ts`
 
@@ -379,13 +379,13 @@ Audio binary is not feasible through MCP — agents only read recording metadata
 ### Manual end-to-end validation
 
 - [ ] **Local dev:** `pnpm cli services up` (brings up `db` + `storage` + `storage-init`); `pnpm cli doctor` should show all green
-- [ ] **Production:** create R2 bucket `engranatge-recordings` in the Cloudflare dashboard before first deploy (the S3 client does **not** auto-create the bucket — it assumes it exists); generate API token, set `STORAGE_*` to the R2 endpoint + credentials in the prod env
+- [ ] **Production:** create R2 bucket `batuda-assets` in the Cloudflare dashboard before first deploy (the S3 client does **not** auto-create the bucket — it assumes it exists); generate API token, set `STORAGE_*` to the R2 endpoint + credentials in the prod env
 - [ ] **No-interactionId path:** `curl -X POST -F "audio=@sample.m4a" -F "companyId=<uuid>" http://localhost:3010/v1/recordings` → returns `{ recordingId, interactionId }` where `interactionId` is freshly created
 - [ ] **With-interactionId path:** seed an `interactions` row first (`channel='call'`, no recording attached), then `curl -X POST -F "audio=@sample.m4a" -F "interactionId=<existing-id>" http://localhost:3010/v1/recordings` → returns `{ recordingId, interactionId }` with `interactionId` matching the input
 - [ ] **Bad input (neither id):** `curl -X POST -F "audio=@sample.m4a" http://localhost:3010/v1/recordings` → 400
 - [ ] **Conflict (interaction wrong channel):** seed an interaction with `channel='email'`, attempt upload with that interactionId → 409
 - [ ] **Conflict (recording already attached):** upload twice with the same interactionId → second call → 409
-- [ ] Verify the audio actually landed in MinIO: `http://localhost:9001` → bucket `engranatge-recordings` → object exists at `recordings/<companyId>/<uuid>.m4a`
+- [ ] Verify the audio actually landed in MinIO: `http://localhost:9001` → bucket `batuda-assets` → object exists at `recordings/<companyId>/<uuid>.m4a`
 - [ ] `psql` → `SELECT * FROM call_recordings` → row exists with `transcript_status IS NULL`
 - [ ] Verify `companies.last_contacted_at` updated
 - [ ] Verify webhook fan-out fires `recording.uploaded`
@@ -395,7 +395,7 @@ Audio binary is not feasible through MCP — agents only read recording metadata
 
 ### Deferred to a later phase
 
-Transcription was originally bundled in Phase 6c but has been split out so the storage path can ship and be exercised by the Forja UI first. The schema is forward-compatible — every item below is one provider Layer + one service method away, no migration needed.
+Transcription was originally bundled in Phase 6c but has been split out so the storage path can ship and be exercised by the Batuda web app first. The schema is forward-compatible — every item below is one provider Layer + one service method away, no migration needed.
 
 - **`TranscriptionProvider` Tag** — `services/transcription-provider.ts`. `transcribe(params) => Effect<TranscriptResult, TranscriptionError>`. Pluggable so we can pick ElevenLabs Scribe v2 (default candidate, ≤5% WER on Catalan/Spanish, voice-based diarization, ~$0.50/hr) or swap to Groq Whisper / WhisperX without touching the service.
 - **`ElevenLabsProviderLive`** — `services/elevenlabs-provider.ts`. POSTs `multipart/form-data` to `https://api.elevenlabs.io/v1/speech-to-text` with `model_id=scribe_v2`, `diarize=true`, `num_speakers=2`, `timestamps_granularity=word` (omit `language_code` so auto-detect handles ca/es code-switching). File name is the only place "elevenlabs" appears — env vars stay vendor-neutral.
@@ -409,7 +409,7 @@ Transcription was originally bundled in Phase 6c but has been split out so the s
 - **Webhook events** — `recording.transcribed`, `recording.failed`. Wire `interaction.logged` to fire after enrichment, not on initial pending insert.
 - **LLM summary enrichment prompt** for `summarize_call` — first pass uses a generic Catalan/Spanish sales prompt; iterating is a separate task.
 
-Trigger to revive: when the Forja UI's call-recording playback flow needs in-app transcript display, or when a sales workflow is bottlenecked on manual call summarization.
+Trigger to revive: when the Batuda web app's call-recording playback flow needs in-app transcript display, or when a sales workflow is bottlenecked on manual call summarization.
 
 ### Out of scope (intentional)
 
@@ -452,14 +452,14 @@ Trigger to revive: when the Forja UI's call-recording playback flow needs in-app
 - [x] Implement tool: `reply_email` — reply to a thread
 - [x] Implement tool: `list_email_threads` — subject + participants + date + message count, no bodies; filterable by inbox/company (limit default 10)
 - [x] Implement tool: `get_email_thread` — full thread with messages as `extractedText` (reply-stripped plain text, not HTML)
-- [x] Implement resource: `forja://company/{slug}`
-- [x] Implement resource: `forja://pipeline`
+- [x] Implement resource: `batuda://company/{slug}`
+- [x] Implement resource: `batuda://pipeline`
 
 ## Phase 8 — MCP transports
 
 - [x] Implement `src/mcp-stdio.ts` — stdio transport for Claude Code
 - [x] Write `.mcp.json` pointing to `mcp-stdio.ts`
-- [x] Test: open Claude Code, run `/mcp`, verify forja tools listed
+- [x] Test: open Claude Code, run `/mcp`, verify batuda tools listed
 - [x] Implement HTTP/SSE transport on `/mcp` route — Bearer token from `MCP_SECRET`
 - [ ] Test remote MCP with a tunneled URL (Cloudflare Tunnel or ngrok)
 

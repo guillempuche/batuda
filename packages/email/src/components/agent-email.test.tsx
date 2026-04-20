@@ -182,9 +182,9 @@ describe('AgentEmail', () => {
 
 	describe('signOff', () => {
 		it.todo(
-			// GIVEN signOff={{ author: 'Alice', brand: 'Engranatge', city: 'Barcelona' }}
+			// GIVEN signOff={{ author: 'Alice', brand: 'Taller', city: 'Barcelona' }}
 			// WHEN rendered
-			// THEN the sign-off Text reads "ALICE · ENGRANATGE · BARCELONA" (uppercase, bullet-separated)
+			// THEN the sign-off Text reads "ALICE · TALLER · BARCELONA" (uppercase, bullet-separated)
 			'should render sign-off with all three fields separated by a middot',
 		)
 
