@@ -18,6 +18,6 @@ content=$(echo "$json" | jq -r '.tool_input.new_string // .tool_input.content //
 
 if echo "$content" | grep -qE '(<Trans[[:space:]>/]|useLingui\(|msg`|@lingui/(core|react)/macro)'; then
 	cat <<EOF
-{"systemMessage": "Lingui macro touched in apps/$app. Before ending the turn: run \`pnpm -F @engranatge/$app i18n:extract\`, translate new msgids in non-en messages.po, then \`pnpm -F @engranatge/$app i18n:check\` to confirm no missing translations."}
+{"systemMessage": "Lingui macro touched in apps/$app. Before ending the turn: run \`pnpm -F @batuda/$app i18n:extract\`, translate new msgids in non-en messages.po, then \`pnpm -F @batuda/$app i18n:check\` to confirm no missing translations."}
 EOF
 fi

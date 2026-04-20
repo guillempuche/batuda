@@ -182,11 +182,11 @@ cicd(deploy): add workspace package build chain to server Dockerfile
 ```
 
 ```
-ai(skills): update commit message conventions for forja
+ai(skills): update commit message conventions for batuda
 ```
 
 ```
-ai(mcp): add forja CRM server
+ai(mcp): add batuda CRM server
 ```
 
 ```

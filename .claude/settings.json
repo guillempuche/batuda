@@ -3,8 +3,8 @@
 	"model": "claude-opus-4-7",
 	"permissions": {
 		"allow": [
-			"Bash(curl -s* https://*engranatge.localhost/*)",
-			"Bash(curl -s* http://*engranatge.localhost/*)",
+			"Bash(curl -s* https://*batuda.localhost/*)",
+			"Bash(curl -s* http://*batuda.localhost/*)",
 			"Bash(curl -s* http://localhost:3001/*)",
 			"Bash(pnpm --filter * check-types)",
 			"Bash(pnpm --filter * build)",

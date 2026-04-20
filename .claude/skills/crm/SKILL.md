@@ -5,7 +5,7 @@ description: This skill should be used when the user asks to "add a company", "u
 
 # CRM Operations
 
-Forja CRM operations guide. Use MCP tools for all data access — never write raw SQL, read `.env` files, or call the HTTP API directly.
+Batuda CRM operations guide. Use MCP tools for all data access — never write raw SQL, read `.env` files, or call the HTTP API directly.
 
 The MCP server is registered in `.mcp.json`. Run `/mcp` in Claude Code to verify tools are loaded.
 

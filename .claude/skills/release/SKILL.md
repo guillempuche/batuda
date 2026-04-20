@@ -1,12 +1,12 @@
 ---
 name: release
-description: This skill should be used when the user asks to "release", "deploy", "ship", "create a new version", "release server", "release internal", "release ui", "release all", or mentions CalVer versioning. Handles interactive release workflow for Engranatge targets (server, internal, ui, or all) with independent CalVer versioning, GitHub tag-based deploys/publishes, and post-release verification.
+description: This skill should be used when the user asks to "release", "deploy", "ship", "create a new version", "release server", "release internal", "release ui", "release all", or mentions CalVer versioning. Handles interactive release workflow for Batuda targets (server, internal, ui, or all) with independent CalVer versioning, GitHub tag-based deploys/publishes, and post-release verification.
 allowed-tools: Bash(git:*) Bash(pnpm:*) Bash(gh:*) Bash(kraft:*) Bash(curl:*) Bash(npm:*) Read AskUserQuestion
 ---
 
 # Release Workflow
 
-Interactive release for this monorepo (Forja CRM server + internal app + shared UI package). CalVer format: `yyyy.m.d.patch` (e.g., `2026.4.6.0`). Independent versioning per target. The public marketing site lives in the separate `engranatge-marketing` repo.
+Interactive release for this monorepo (Batuda server + web app + shared UI package). CalVer format: `yyyy.m.d.patch` (e.g., `2026.4.6.0`). Independent versioning per target. The public marketing site lives in the separate `engranatge-marketing` repo (the first tenant's site, not the Batuda tool).
 
 ## Step 1: Pre-flight Checks
 
@@ -26,8 +26,8 @@ If the user passed an argument (e.g. `/release server`, `/release ui`, `/release
 Otherwise, use `AskUserQuestion`:
 
 - **Server** — API at api.batuda.co (`server-v*` tag → auto-deploys)
-- **Internal** — Forja CRM at batuda.co (`internal-v*` tag → auto-deploys)
-- **UI** — `@engranatge/ui` shared package (`ui-v*` tag → auto-publishes to npm + JSR)
+- **Internal** — Batuda web at batuda.co (`internal-v*` tag → auto-deploys; tag prefix kept while the app folder is `apps/internal/`)
+- **UI** — `@batuda/ui` shared package (`ui-v*` tag → auto-publishes to npm + JSR)
 - **All** — Server first, then Internal, then UI
 
 ## Step 3: Check Commits Exist
@@ -95,7 +95,7 @@ gh run watch
 
 # Internal
 sleep 5
-gh run list --workflow=deploy_internal.yml --limit 1
+gh run list --workflow=deploy_web.yml --limit 1
 gh run watch
 
 # UI
@@ -112,21 +112,21 @@ Only verify targets that were actually released:
 
 ```bash
 curl -s https://api.batuda.co/health
-kraft cloud --metro fra instance list | grep engranatge-server
+kraft cloud --metro fra instance list | grep batuda-server
 ```
 
 **Internal:**
 
 ```bash
 curl -sI https://batuda.co | head -5
-kraft cloud --metro fra service get engranatge-internal
+kraft cloud --metro fra service get batuda-web
 ```
 
 **UI:**
 
 ```bash
-npm view @engranatge/ui version     # latest on npm
-npx jsr show @engranatge/ui         # latest on JSR
+npm view @batuda/ui version     # latest on npm
+npx jsr show @batuda/ui         # latest on JSR
 ```
 
 ## Config Reference

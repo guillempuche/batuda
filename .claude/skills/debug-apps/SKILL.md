@@ -1,21 +1,21 @@
 ---
 name: debug-apps
-description: This skill should be used when the user asks to "debug", "diagnose", "check health", "run doctor", or says "app not working", "server down", "login broken", "blank page", "white screen", "500 error", "CORS error", "auth issue", "can't connect", "database error", "migration failed", "services not running", "certificate error", or asks to check if the server or Forja internal app is healthy locally.
+description: This skill should be used when the user asks to "debug", "diagnose", "check health", "run doctor", or says "app not working", "server down", "login broken", "blank page", "white screen", "500 error", "CORS error", "auth issue", "can't connect", "database error", "migration failed", "services not running", "certificate error", or asks to check if the Batuda server or web app is healthy locally.
 ---
 
 # Debug Local Apps
 
-Diagnose server and internal (Forja) apps. Run against one or both based on what the user asks.
+Diagnose the Batuda server (API) and web (internal CRM) apps. Run against one or both based on what the user asks.
 
 ## Identify targets
 
-| Keyword                          | App(s) to debug   |
-| -------------------------------- | ----------------- |
-| `server`, `api`, `backend`       | server            |
-| `internal`, `forja`, `crm`       | internal          |
-| `auth`, `login`, `session`       | server + internal |
-| `email`, `inbox`                 | server            |
-| `all`, `everything`, unspecified | server + internal |
+| Keyword                          | App(s) to debug |
+| -------------------------------- | --------------- |
+| `server`, `api`, `backend`       | server          |
+| `web`, `internal`, `crm`         | web             |
+| `auth`, `login`, `session`       | server + web    |
+| `email`, `inbox`                 | server          |
+| `all`, `everything`, unspecified | server + web    |
 
 ## Pre-flight checks
 
@@ -23,7 +23,7 @@ Run these checks for each target app. Report results before deeper debugging.
 
 ### Portless proxy
 
-All dev URLs route through portless (`*.engranatge.localhost`). If both apps fail with connection errors, check the proxy first before investigating individual apps.
+All dev URLs route through portless (web at `batuda.localhost`, API at `api.batuda.localhost`). If both apps fail with connection errors, check the proxy first before investigating individual apps.
 
 ### Server (`api.batuda.localhost`)
 
@@ -41,7 +41,7 @@ Check the persistent log file at `apps/server/server.log` (survives `node --watc
 - `cors allowed origins:` — verify CORS config
 - `Listening on` — last boot, which port
 
-### Internal / Forja (`batuda.localhost`)
+### Web / Internal (`batuda.localhost`)
 
 ```bash
 curl -sk https://batuda.localhost/ 2>/dev/null | head -20 && echo "OK" || echo "DOWN"
@@ -62,7 +62,7 @@ After pre-flight, check these in order. Stop when the cause is found.
 - All `RESEARCH_PROVIDER_*` vars set (server crashes without them; use `stub` for local dev)
 - `RESEARCH_PROVIDER_LLM` set (no auto-default; use `stub`)
 - All `RESEARCH_DEFAULT_*` and `RESEARCH_MAX_*` budget/concurrency vars set
-- `ALLOWED_ORIGINS` matches portless URLs (`https://*.engranatge.localhost`)
+- `ALLOWED_ORIGINS=https://batuda.localhost` — only the web origin (the API is same-origin to itself, so it does not appear in its own allowlist). No wildcards, every new cross-origin caller has to be listed explicitly
 - `BETTER_AUTH_BASE_URL=https://api.batuda.localhost`
 - `EMAIL_PROVIDER` set explicitly (use `local-inbox` for dev)
 - Run `pnpm cli doctor` for a full automated environment health check
@@ -138,8 +138,8 @@ Quick login test:
 
 ```bash
 agent-browser open https://batuda.localhost/login
-agent-browser fill "input[name='email']" "dev@forja.cat"
-agent-browser fill "input[name='password']" "forja-dev-2026"
+agent-browser fill "input[name='email']" "admin@taller.cat"
+agent-browser fill "input[name='password']" "batuda-dev-2026"
 agent-browser click "button[type='submit']"
 agent-browser wait 3000
 agent-browser snapshot

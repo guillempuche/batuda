@@ -6,8 +6,8 @@ Playwright-based CLI for testing apps as a real user. Already installed in this 
 
 Created by `pnpm cli seed` (any preset). Defined in `apps/cli/src/commands/seed.ts`:
 
-- **Email:** `dev@forja.cat`
-- **Password:** `forja-dev-2026`
+- **Email:** `admin@taller.cat`
+- **Password:** `batuda-dev-2026`
 
 If login fails, re-run `pnpm cli seed --preset minimal` — the seed is idempotent and will (re)create the user via Better-Auth's `signUpEmail`.
 
@@ -18,8 +18,8 @@ Ensure seed data exists before attempting login.
 ```bash
 agent-browser open https://batuda.localhost/login
 agent-browser snapshot                                        # see the login form
-agent-browser fill "input[name='email']" "dev@forja.cat"
-agent-browser fill "input[name='password']" "forja-dev-2026"
+agent-browser fill "input[name='email']" "admin@taller.cat"
+agent-browser fill "input[name='password']" "batuda-dev-2026"
 agent-browser click "button[type='submit']"
 agent-browser wait 3000
 agent-browser snapshot                                        # should show dashboard
@@ -70,9 +70,9 @@ agent-browser find placeholder "Search companies" fill "restaurant"
 agent-browser find testid "pipeline-card" click
 ```
 
-### Stable `data-testid` hooks in Forja
+### Stable `data-testid` hooks in Batuda
 
-Prefer `find testid` over text — immune to i18n (en/ca) and layout churn. Conventions Forja uses consistently:
+Prefer `find testid` over text — immune to i18n (en/ca) and layout churn. Conventions Batuda uses consistently:
 
 - **Nav:** `nav-<slug>` (mobile bottom) and `nav-desktop-<slug>` (sidebar) — kept distinct so testids resolve to the currently visible element.
 - **Tabs:** `tab-<value>` auto-emitted by `PriTabs.Tab` from its `value` prop.
@@ -86,8 +86,8 @@ Quick mobile login → navigate → drill-in, all via testids:
 ```bash
 agent-browser set device "iPhone 16 Pro"
 agent-browser open https://batuda.localhost/
-agent-browser find testid "login-email" fill "dev@forja.cat"
-agent-browser find testid "login-password" fill "forja-dev-2026"
+agent-browser find testid "login-email" fill "admin@taller.cat"
+agent-browser find testid "login-password" fill "batuda-dev-2026"
 agent-browser find testid "login-submit" click
 agent-browser wait 2500
 agent-browser find testid "nav-companies" click
