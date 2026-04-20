@@ -71,10 +71,10 @@ After pre-flight, check these in order. Stop when the cause is found.
 
 Local dev depends on two Docker containers defined in `docker/docker-compose.yml`:
 
-| Service     | Container            | Port(s)                               |
-| ----------- | -------------------- | ------------------------------------- |
-| Postgres 17 | `engranatge-db`      | `5433:5432`                           |
-| MinIO (S3)  | `engranatge-storage` | `9000` (S3 API), `9001` (web console) |
+| Service     | Container        | Port(s)                               |
+| ----------- | ---------------- | ------------------------------------- |
+| Postgres 17 | `batuda-db`      | `5433:5432`                           |
+| MinIO (S3)  | `batuda-storage` | `9000` (S3 API), `9001` (web console) |
 
 ```bash
 pnpm cli services status   # check Docker containers
@@ -82,7 +82,7 @@ pnpm cli services up       # start Postgres + MinIO
 pnpm cli services down     # stop all
 ```
 
-MinIO web console available at `http://localhost:9001` (user: `engranatge`, pass: `engranatge-secret`). A one-shot `storage-init` sidecar creates the `engranatge-recordings` bucket on first boot.
+MinIO web console available at `http://localhost:9001` (user: `batuda`, pass: `batuda-secret`). A one-shot `storage-init` sidecar creates the `batuda-assets` bucket on first boot.
 
 ### Database
 
