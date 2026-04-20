@@ -24,7 +24,7 @@ module.exports = {
 		'./scripts/release-calver-plugin.cjs': {},
 		'@release-it/bumper': {
 			in: 'packages/ui/package.json',
-			out: ['packages/ui/package.json', 'packages/ui/jsr.json'],
+			out: ['packages/ui/package.json'],
 		},
 		'@release-it/conventional-changelog': {
 			gitRawCommitsOpts: {

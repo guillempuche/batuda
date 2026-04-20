@@ -6,11 +6,10 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   publish:
-    name: Publish @batuda/ui to npm + JSR
+    name: Publish @batuda/ui to npm
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -39,7 +38,3 @@ jobs:
         run: pnpm publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish to JSR
-        working-directory: packages/ui
-        run: pnpm dlx jsr publish

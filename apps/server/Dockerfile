@@ -21,8 +21,8 @@ COPY ./packages ./packages
 RUN --mount=type=cache,target=/root/.pnpm-store \
     CI=true pnpm install --frozen-lockfile
 
-RUN pnpm --filter @engranatge/domain build && \
-    pnpm --filter @engranatge/server build
+RUN pnpm --filter @batuda/domain build && \
+    pnpm --filter @batuda/server build
 
 # Stage 2 — runtime (production-only, no devDependencies or source)
 FROM node:24-alpine
