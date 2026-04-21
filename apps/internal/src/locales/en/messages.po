@@ -87,6 +87,10 @@ msgstr "1 thread"
 msgid "1 thread selected"
 msgstr "1 thread selected"
 
+#: src/routes/calendar/index.tsx:316
+msgid "Accept"
+msgstr "Accept"
+
 #: src/routes/emails/inboxes.tsx:264
 msgid "Actions"
 msgstr "Actions"
@@ -231,7 +235,7 @@ msgstr "Blocked"
 msgid "Blocked by the provider. The body is shown for review only."
 msgstr "Blocked by the provider. The body is shown for review only."
 
-#: src/routes/calendar/index.tsx:170
+#: src/routes/calendar/index.tsx:193
 msgid "Book a meeting from a company page or forward an invitation to your inbox to see it here."
 msgstr "Book a meeting from a company page or forward an invitation to your inbox to see it here."
 
@@ -256,7 +260,7 @@ msgid "Cadence"
 msgstr "Cadence"
 
 #: src/components/layout/nav-items.ts:74
-#: src/routes/calendar/index.tsx:155
+#: src/routes/calendar/index.tsx:178
 msgid "Calendar"
 msgstr "Calendar"
 
@@ -337,7 +341,7 @@ msgid "Client"
 msgstr "Client"
 
 #: src/components/interactions/quick-capture-dialog.tsx:188
-#: src/routes/calendar/index.tsx:287
+#: src/routes/calendar/index.tsx:354
 #: src/routes/emails/$threadId.tsx:333
 #: src/routes/emails/inboxes.tsx:507
 #: src/routes/emails/inboxes.tsx:828
@@ -527,7 +531,7 @@ msgstr "Create a prospect landing page to share with this company."
 msgid "Create failed"
 msgstr "Create failed"
 
-#: src/routes/calendar/index.tsx:274
+#: src/routes/calendar/index.tsx:341
 msgid "Create follow-up task"
 msgstr "Create follow-up task"
 
@@ -570,6 +574,10 @@ msgstr "Dead"
 #: src/routes/companies/$slug.tsx:931
 msgid "Decision maker"
 msgstr "Decision maker"
+
+#: src/routes/calendar/index.tsx:332
+msgid "Decline"
+msgstr "Decline"
 
 #: src/routes/emails/inboxes.tsx:261
 #: src/routes/emails/inboxes.tsx:850
@@ -849,7 +857,7 @@ msgstr "Instagram"
 msgid "Interaction logged"
 msgstr "Interaction logged"
 
-#: src/routes/calendar/index.tsx:260
+#: src/routes/calendar/index.tsx:293
 msgid "Join video call"
 msgstr "Join video call"
 
@@ -892,7 +900,7 @@ msgstr "Later"
 msgid "LinkedIn"
 msgstr "LinkedIn"
 
-#: src/routes/calendar/index.tsx:166
+#: src/routes/calendar/index.tsx:189
 msgid "Loading calendar…"
 msgstr "Loading calendar…"
 
@@ -920,7 +928,7 @@ msgstr "Located on the map"
 msgid "Locating…"
 msgstr "Locating…"
 
-#: src/routes/calendar/index.tsx:255
+#: src/routes/calendar/index.tsx:284
 #: src/routes/companies/$slug.tsx:851
 msgid "Location"
 msgstr "Location"
@@ -1020,7 +1028,7 @@ msgstr "Meeting"
 msgid "Meeting booked"
 msgstr "Meeting booked"
 
-#: src/routes/calendar/index.tsx:158
+#: src/routes/calendar/index.tsx:181
 msgid "Meetings from bookings, email invitations, and internal blocks."
 msgstr "Meetings from bookings, email invitations, and internal blocks."
 
@@ -1093,7 +1101,7 @@ msgstr "Next: {0}"
 msgid "No activity yet"
 msgstr "No activity yet"
 
-#: src/routes/calendar/index.tsx:169
+#: src/routes/calendar/index.tsx:192
 msgid "No calendar events yet"
 msgstr "No calendar events yet"
 
@@ -1156,7 +1164,7 @@ msgstr "No high-priority companies without a scheduled follow-up"
 msgid "No inboxes yet"
 msgstr "No inboxes yet"
 
-#: src/routes/calendar/index.tsx:265
+#: src/routes/calendar/index.tsx:298
 msgid "no location"
 msgstr "no location"
 
@@ -1227,7 +1235,7 @@ msgstr "On {date}, {who} wrote:"
 msgid "Open"
 msgstr "Open"
 
-#: src/routes/calendar/index.tsx:283
+#: src/routes/calendar/index.tsx:350
 msgid "Open company"
 msgstr "Open company"
 
@@ -1332,7 +1340,7 @@ msgstr "Pain points"
 msgid "Password"
 msgstr "Password"
 
-#: src/routes/calendar/index.tsx:224
+#: src/routes/calendar/index.tsx:253
 #: src/routes/tasks/index.tsx:332
 #: src/routes/tasks/index.tsx:674
 msgid "Personal"
@@ -1343,7 +1351,7 @@ msgstr "Personal"
 msgid "Pipeline"
 msgstr "Pipeline"
 
-#: src/routes/calendar/index.tsx:174
+#: src/routes/calendar/index.tsx:197
 msgid "Preparing calendar view…"
 msgstr "Preparing calendar view…"
 
@@ -1481,6 +1489,10 @@ msgstr "Research"
 #: src/routes/emails/index.tsx:1311
 msgid "Reset"
 msgstr "Reset"
+
+#: src/routes/calendar/index.tsx:307
+msgid "Respond to the organizer"
+msgstr "Respond to the organizer"
 
 #: src/components/shared/status-badge.tsx:30
 #: src/routes/companies/$slug.tsx:396
@@ -1641,7 +1653,7 @@ msgstr "Snoozed"
 msgid "someone"
 msgstr "someone"
 
-#: src/routes/calendar/index.tsx:243
+#: src/routes/calendar/index.tsx:272
 #: src/routes/companies/$slug.tsx:861
 #: src/routes/tasks/index.tsx:692
 msgid "Source"
@@ -1655,7 +1667,7 @@ msgstr "Spam"
 msgid "Stamped into the workshop ledger."
 msgstr "Stamped into the workshop ledger."
 
-#: src/routes/calendar/index.tsx:249
+#: src/routes/calendar/index.tsx:278
 #: src/routes/pages/index.tsx:146
 #: src/routes/tasks/index.tsx:680
 msgid "Status"
@@ -1707,6 +1719,10 @@ msgstr "Tasks"
 #: src/routes/pages/$id.tsx:294
 msgid "Template"
 msgstr "Template"
+
+#: src/routes/calendar/index.tsx:324
+msgid "Tentative"
+msgstr "Tentative"
 
 #: src/routes/tasks/index.tsx:783
 msgid "The 20 most recently edited open tasks. Click one to reopen it."
@@ -1877,7 +1893,7 @@ msgstr "What needs to happen?"
 msgid "WhatsApp"
 msgstr "WhatsApp"
 
-#: src/routes/calendar/index.tsx:230
+#: src/routes/calendar/index.tsx:259
 #: src/routes/emails/index.tsx:953
 #: src/routes/emails/index.tsx:1272
 msgid "When"

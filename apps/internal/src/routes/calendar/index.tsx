@@ -3,7 +3,7 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute } from '@tanstack/react-router'
 import { DateTime } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
-import { CalendarPlus } from 'lucide-react'
+import { CalendarPlus, Check, CircleHelp, X } from 'lucide-react'
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
@@ -12,6 +12,7 @@ import { PriButton, PriDialog } from '@batuda/ui/pri'
 import {
 	calendarEventsAtom,
 	calendarEventTypesAtom,
+	rsvpEventAtom,
 } from '#/atoms/calendar-atoms'
 import { companiesListAtom } from '#/atoms/pipeline-atoms'
 import { createTaskAtom } from '#/atoms/tasks-atoms'
@@ -110,6 +111,9 @@ function CalendarPage() {
 	const eventsResult = useAtomValue(calendarEventsAtom)
 	const companiesResult = useAtomValue(companiesListAtom)
 	const createTask = useAtomSet(createTaskAtom)
+	const rsvpResult = useAtomValue(rsvpEventAtom)
+	const rsvpEvent = useAtomSet(rsvpEventAtom)
+	const rsvpPending = AsyncResult.isWaiting(rsvpResult)
 
 	const events = useMemo<ReadonlyArray<CalendarEventRow>>(() => {
 		if (!AsyncResult.isSuccess(eventsResult)) return []
@@ -146,6 +150,22 @@ function CalendarPage() {
 			setSelectedEventId(null)
 		},
 		[createTask],
+	)
+
+	// Respond to an email-sourced or booking invitation in-place. The
+	// server delegates to `CalendarService.respondToRsvp`, which is the
+	// same entry point the MCP tool uses — so accept/decline behave
+	// identically regardless of who triggered them. We don't close the
+	// drawer so the user can read the confirmation toast (future); for
+	// now the buttons disable while the mutation is in flight.
+	const handleRsvp = useCallback(
+		(eventId: string, rsvp: 'accepted' | 'declined' | 'tentative') => {
+			rsvpEvent({
+				params: { id: eventId },
+				payload: { rsvp },
+			})
+		},
+		[rsvpEvent],
 	)
 
 	const loading = AsyncResult.isWaiting(eventsResult)
@@ -194,6 +214,8 @@ function CalendarPage() {
 					}
 					onClose={() => setSelectedEventId(null)}
 					onCreateFollowUp={() => handleCreateFollowUp(selectedEvent)}
+					onRsvp={rsvp => handleRsvp(selectedEvent.id, rsvp)}
+					rsvpPending={rsvpPending}
 				/>
 			) : null}
 		</Page>
@@ -207,11 +229,15 @@ function EventDetailDialog({
 	company,
 	onClose,
 	onCreateFollowUp,
+	onRsvp,
+	rsvpPending,
 }: {
 	event: CalendarEventRow
 	company: CompanyLookup | null
 	onClose: () => void
 	onCreateFollowUp: () => void
+	onRsvp: (rsvp: 'accepted' | 'declined' | 'tentative') => void
+	rsvpPending: boolean
 }) {
 	const { t } = useLingui()
 	const start = new Date(event.startAt)
@@ -274,6 +300,40 @@ function EventDetailDialog({
 							</DetailValue>
 						</DetailField>
 					</DetailMeta>
+
+					{event.source !== 'internal' && event.status !== 'cancelled' ? (
+						<RsvpRow>
+							<RsvpHint>
+								<Trans>Respond to the organizer</Trans>
+							</RsvpHint>
+							<RsvpButtons>
+								<PriButton
+									$variant='text'
+									disabled={rsvpPending}
+									onClick={() => onRsvp('accepted')}
+								>
+									<Check size={12} aria-hidden />
+									<Trans>Accept</Trans>
+								</PriButton>
+								<PriButton
+									$variant='text'
+									disabled={rsvpPending}
+									onClick={() => onRsvp('tentative')}
+								>
+									<CircleHelp size={12} aria-hidden />
+									<Trans>Tentative</Trans>
+								</PriButton>
+								<PriButton
+									$variant='text'
+									disabled={rsvpPending}
+									onClick={() => onRsvp('declined')}
+								>
+									<X size={12} aria-hidden />
+									<Trans>Decline</Trans>
+								</PriButton>
+							</RsvpButtons>
+						</RsvpRow>
+					) : null}
 
 					<ActionRow>
 						<PriButton onClick={onCreateFollowUp}>
@@ -428,4 +488,26 @@ const ActionRow = styled.div.withConfig({ displayName: 'CalendarActionRow' })`
 	flex-wrap: wrap;
 	gap: var(--space-2xs);
 	margin-top: var(--space-md);
+`
+
+const RsvpRow = styled.div.withConfig({ displayName: 'CalendarRsvpRow' })`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2xs);
+	margin-top: var(--space-md);
+	padding: var(--space-sm);
+	border-top: 1px dashed var(--color-border-subtle);
+`
+
+const RsvpHint = styled.span.withConfig({ displayName: 'CalendarRsvpHint' })`
+	font-size: var(--font-size-xs);
+	color: var(--color-ink-muted);
+`
+
+const RsvpButtons = styled.div.withConfig({
+	displayName: 'CalendarRsvpButtons',
+})`
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-2xs);
 `

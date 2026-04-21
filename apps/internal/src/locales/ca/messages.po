@@ -87,6 +87,10 @@ msgstr "1 fil"
 msgid "1 thread selected"
 msgstr "1 fil seleccionat"
 
+#: src/routes/calendar/index.tsx:316
+msgid "Accept"
+msgstr "Accepta"
+
 #: src/routes/emails/inboxes.tsx:264
 msgid "Actions"
 msgstr "Accions"
@@ -231,7 +235,7 @@ msgstr "Bloquejat"
 msgid "Blocked by the provider. The body is shown for review only."
 msgstr "Bloquejat pel proveïdor. El cos es mostra només per revisar-lo."
 
-#: src/routes/calendar/index.tsx:170
+#: src/routes/calendar/index.tsx:193
 msgid "Book a meeting from a company page or forward an invitation to your inbox to see it here."
 msgstr "Reserva una reunió des d'una pàgina d'empresa o reenvia una invitació a la teva safata per veure-la aquí."
 
@@ -256,7 +260,7 @@ msgid "Cadence"
 msgstr "Cadència"
 
 #: src/components/layout/nav-items.ts:74
-#: src/routes/calendar/index.tsx:155
+#: src/routes/calendar/index.tsx:178
 msgid "Calendar"
 msgstr "Calendari"
 
@@ -337,7 +341,7 @@ msgid "Client"
 msgstr "Client"
 
 #: src/components/interactions/quick-capture-dialog.tsx:188
-#: src/routes/calendar/index.tsx:287
+#: src/routes/calendar/index.tsx:354
 #: src/routes/emails/$threadId.tsx:333
 #: src/routes/emails/inboxes.tsx:507
 #: src/routes/emails/inboxes.tsx:828
@@ -527,7 +531,7 @@ msgstr "Crea una pàgina d'aterratge per a un prospecte per compartir amb aquest
 msgid "Create failed"
 msgstr "Error en crear"
 
-#: src/routes/calendar/index.tsx:274
+#: src/routes/calendar/index.tsx:341
 msgid "Create follow-up task"
 msgstr "Crea una tasca de seguiment"
 
@@ -570,6 +574,10 @@ msgstr "Descartat"
 #: src/routes/companies/$slug.tsx:931
 msgid "Decision maker"
 msgstr "Responsable de decisió"
+
+#: src/routes/calendar/index.tsx:332
+msgid "Decline"
+msgstr "Rebutja"
 
 #: src/routes/emails/inboxes.tsx:261
 #: src/routes/emails/inboxes.tsx:850
@@ -849,7 +857,7 @@ msgstr "Instagram"
 msgid "Interaction logged"
 msgstr "Interacció registrada"
 
-#: src/routes/calendar/index.tsx:260
+#: src/routes/calendar/index.tsx:293
 msgid "Join video call"
 msgstr "Uneix-te a la videotrucada"
 
@@ -892,7 +900,7 @@ msgstr "Més tard"
 msgid "LinkedIn"
 msgstr "LinkedIn"
 
-#: src/routes/calendar/index.tsx:166
+#: src/routes/calendar/index.tsx:189
 msgid "Loading calendar…"
 msgstr "S'està carregant el calendari…"
 
@@ -920,7 +928,7 @@ msgstr "Localitzada al mapa"
 msgid "Locating…"
 msgstr "Localitzant…"
 
-#: src/routes/calendar/index.tsx:255
+#: src/routes/calendar/index.tsx:284
 #: src/routes/companies/$slug.tsx:851
 msgid "Location"
 msgstr "Ubicació"
@@ -1020,7 +1028,7 @@ msgstr "Reunió"
 msgid "Meeting booked"
 msgstr "Reunió programada"
 
-#: src/routes/calendar/index.tsx:158
+#: src/routes/calendar/index.tsx:181
 msgid "Meetings from bookings, email invitations, and internal blocks."
 msgstr "Reunions des de reserves, invitacions per correu i blocs interns."
 
@@ -1093,7 +1101,7 @@ msgstr "Següent: {0}"
 msgid "No activity yet"
 msgstr "Encara no hi ha activitat"
 
-#: src/routes/calendar/index.tsx:169
+#: src/routes/calendar/index.tsx:192
 msgid "No calendar events yet"
 msgstr "Encara no hi ha esdeveniments al calendari"
 
@@ -1156,7 +1164,7 @@ msgstr "Cap empresa d'alta prioritat sense seguiment programat"
 msgid "No inboxes yet"
 msgstr "Encara no hi ha safates"
 
-#: src/routes/calendar/index.tsx:265
+#: src/routes/calendar/index.tsx:298
 msgid "no location"
 msgstr "sense ubicació"
 
@@ -1227,7 +1235,7 @@ msgstr "El {date}, {who} va escriure:"
 msgid "Open"
 msgstr "Obert"
 
-#: src/routes/calendar/index.tsx:283
+#: src/routes/calendar/index.tsx:350
 msgid "Open company"
 msgstr "Obre l'empresa"
 
@@ -1332,7 +1340,7 @@ msgstr "Punts febles"
 msgid "Password"
 msgstr "Contrasenya"
 
-#: src/routes/calendar/index.tsx:224
+#: src/routes/calendar/index.tsx:253
 #: src/routes/tasks/index.tsx:332
 #: src/routes/tasks/index.tsx:674
 msgid "Personal"
@@ -1343,7 +1351,7 @@ msgstr "Personal"
 msgid "Pipeline"
 msgstr "Pipeline"
 
-#: src/routes/calendar/index.tsx:174
+#: src/routes/calendar/index.tsx:197
 msgid "Preparing calendar view…"
 msgstr "S'està preparant la vista del calendari…"
 
@@ -1481,6 +1489,10 @@ msgstr "Recerca"
 #: src/routes/emails/index.tsx:1311
 msgid "Reset"
 msgstr "Restableix"
+
+#: src/routes/calendar/index.tsx:307
+msgid "Respond to the organizer"
+msgstr "Respon a l'organitzador"
 
 #: src/components/shared/status-badge.tsx:30
 #: src/routes/companies/$slug.tsx:396
@@ -1641,7 +1653,7 @@ msgstr "Posposades"
 msgid "someone"
 msgstr "algú"
 
-#: src/routes/calendar/index.tsx:243
+#: src/routes/calendar/index.tsx:272
 #: src/routes/companies/$slug.tsx:861
 #: src/routes/tasks/index.tsx:692
 msgid "Source"
@@ -1655,7 +1667,7 @@ msgstr "Brossa"
 msgid "Stamped into the workshop ledger."
 msgstr "Segellat al llibre del taller."
 
-#: src/routes/calendar/index.tsx:249
+#: src/routes/calendar/index.tsx:278
 #: src/routes/pages/index.tsx:146
 #: src/routes/tasks/index.tsx:680
 msgid "Status"
@@ -1707,6 +1719,10 @@ msgstr "Tasques"
 #: src/routes/pages/$id.tsx:294
 msgid "Template"
 msgstr "Plantilla"
+
+#: src/routes/calendar/index.tsx:324
+msgid "Tentative"
+msgstr "Provisional"
 
 #: src/routes/tasks/index.tsx:783
 msgid "The 20 most recently edited open tasks. Click one to reopen it."
@@ -1877,7 +1893,7 @@ msgstr "Què cal fer?"
 msgid "WhatsApp"
 msgstr "WhatsApp"
 
-#: src/routes/calendar/index.tsx:230
+#: src/routes/calendar/index.tsx:259
 #: src/routes/emails/index.tsx:953
 #: src/routes/emails/index.tsx:1272
 msgid "When"

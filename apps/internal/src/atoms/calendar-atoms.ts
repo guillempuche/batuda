@@ -35,6 +35,15 @@ export const createInternalEventAtom = BatudaApiAtom.mutation(
 	'createInternalEvent',
 )
 
+/**
+ * RSVP for an email-sourced calendar event. Accepts `{ rsvp, comment? }`
+ * via payload and `{ id }` via path params. The server hands the work
+ * to `CalendarService.respondToRsvp`, which builds a METHOD=REPLY ICS
+ * for email-sourced rows or calls `BookingProvider.respondToRsvp` for
+ * bookings. The drawer buttons are the first UI caller.
+ */
+export const rsvpEventAtom = BatudaApiAtom.mutation('calendar', 'rsvpEvent')
+
 const eventDetailCache = new Map<
 	string,
 	ReturnType<typeof makeEventDetailAtom>
