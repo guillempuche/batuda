@@ -81,7 +81,7 @@ GITHUB_TOKEN=$(gh auth token) pnpm release:internal --ci
 GITHUB_TOKEN=$(gh auth token) pnpm release:ui --ci
 ```
 
-**Note:** Deploy triggers automatically on tag push via GitHub workflows. For `ui`, the `ui-v*` tag triggers `publish-ui.yml` which builds `packages/ui/dist` and publishes to npm. JSR is not used — it does not allow non-JS/TS files and the UI package ships `tokens.css` / `tailwind.css`.
+**Note:** Deploy triggers automatically on tag push via GitHub workflows. For `ui`, the `ui-v*` tag triggers `publish-ui.yml` which builds `packages/ui/dist` and publishes to npm with provenance via npm **Trusted Publishing (OIDC)** — no `NPM_TOKEN` secret. The trusted publisher is configured at https://www.npmjs.com/package/@batuda/ui/access (repo: `guillempuche/batuda`, workflow: `publish-ui.yml`). Same-day patches land as `YYYY.M.D-N` (a semver prerelease), so the workflow passes `--tag latest` to keep them as the default install target. JSR is not used — it does not allow non-JS/TS files and the UI package ships `tokens.css` / `tailwind.css`.
 
 ## Step 6: Watch Deployment
 
