@@ -10,6 +10,7 @@ import {
 import { HttpApiBuilder, HttpApiScalar, OpenApi } from 'effect/unstable/httpapi'
 import { SqlClient } from 'effect/unstable/sql'
 
+import { BookingProviderLive, IcsParserLive } from '@batuda/calendar'
 import { BatudaApi } from '@batuda/controllers'
 import {
 	makeResearchLlmLive,
@@ -22,6 +23,7 @@ import {
 import { PgLive } from './db/client'
 import { AgentMailWebhookLive } from './handlers/agentmail-webhook'
 import { AuthHandlerLive } from './handlers/auth'
+import { CalendarLive } from './handlers/calendar'
 import { CompaniesLive } from './handlers/companies'
 import { ContactsLive } from './handlers/contacts'
 import { DocumentsLive } from './handlers/documents'
@@ -78,6 +80,7 @@ const ApiLive = HttpApiBuilder.layer(BatudaApi).pipe(
 		RecordingsLive,
 		ResearchLive,
 		TimelineLive,
+		CalendarLive,
 	]),
 )
 
@@ -197,6 +200,8 @@ const AppLive = Layer.mergeAll(
 
 const program = HttpRouter.serve(AppLive).pipe(
 	Layer.provide(ServicesLive),
+	Layer.provide(BookingProviderLive),
+	Layer.provide(IcsParserLive),
 	Layer.provide(EmailProviderLive),
 	Layer.provide(researchToolkitLayer),
 	Layer.provide(makeResearchProvidersLive),

@@ -89,20 +89,6 @@ export default Effect.gen(function* () {
 		)
 	`
 	yield* sql`
-		CREATE TABLE IF NOT EXISTS tasks (
-			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-			contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
-			type TEXT NOT NULL,
-			title TEXT NOT NULL,
-			notes TEXT,
-			due_at TIMESTAMPTZ,
-			completed_at TIMESTAMPTZ,
-			metadata JSONB,
-			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-		)
-	`
-	yield* sql`
 		CREATE TABLE IF NOT EXISTS products (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 			slug TEXT NOT NULL UNIQUE,
@@ -216,6 +202,131 @@ export default Effect.gen(function* () {
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		)
 	`
+
+	// ── Calendar ─────────────────────────────────────────────────────
+	// Event types are vendor-neutral: `provider` names the backend, and
+	// `provider_event_type_id` is always TEXT (cal.com yields numeric ids,
+	// Google/Microsoft yield strings — storing both as TEXT keeps the
+	// column shape stable across provider swaps).
+	yield* sql`
+		CREATE TABLE IF NOT EXISTS calendar_event_types (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			slug TEXT NOT NULL UNIQUE,
+			provider TEXT NOT NULL CHECK (provider IN ('calcom','google','microsoft','internal')),
+			provider_event_type_id TEXT,
+			title TEXT NOT NULL,
+			duration_minutes INTEGER NOT NULL,
+			location_kind TEXT NOT NULL CHECK (location_kind IN ('video','phone','address','link','none')),
+			default_location_value TEXT,
+			active BOOLEAN NOT NULL DEFAULT true,
+			synced_at TIMESTAMPTZ,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			UNIQUE (provider, provider_event_type_id)
+		)
+	`
+	// `source` = why it's in our DB; `provider` = which backend owns
+	// the upstream row. Splitting them lets the booking backend swap
+	// without rewriting `source='booking'` rows. `ical_uid` is always
+	// present (generated locally for source='internal') so future
+	// CalDAV export stays a no-op.
+	yield* sql`
+		CREATE TABLE IF NOT EXISTS calendar_events (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			source TEXT NOT NULL CHECK (source IN ('booking','email','internal')),
+			provider TEXT NOT NULL CHECK (provider IN ('calcom','google','microsoft','email','internal')),
+			provider_booking_id TEXT,
+			ical_uid TEXT NOT NULL UNIQUE,
+			ical_sequence INTEGER NOT NULL DEFAULT 0,
+			event_type_id UUID REFERENCES calendar_event_types(id) ON DELETE SET NULL,
+			start_at TIMESTAMPTZ NOT NULL,
+			end_at TIMESTAMPTZ NOT NULL,
+			status TEXT NOT NULL CHECK (status IN ('confirmed','tentative','cancelled')),
+			title TEXT NOT NULL,
+			location_type TEXT NOT NULL CHECK (location_type IN ('video','phone','address','link','none')),
+			location_value TEXT,
+			video_call_url TEXT,
+			organizer_email TEXT NOT NULL,
+			company_id UUID REFERENCES companies(id) ON DELETE SET NULL,
+			contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
+			interaction_id UUID REFERENCES interactions(id) ON DELETE SET NULL,
+			metadata JSONB,
+			raw_ics BYTEA,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			CONSTRAINT calendar_events_provider_booking_consistent CHECK (
+				(source = 'booking' AND provider_booking_id IS NOT NULL)
+				OR (source IN ('email','internal') AND provider_booking_id IS NULL)
+			)
+		)
+	`
+	// `contact_id` mirrors email→contact resolution; `company_id`
+	// mirrors contact_id's company for fast joins.
+	yield* sql`
+		CREATE TABLE IF NOT EXISTS calendar_event_attendees (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			event_id UUID NOT NULL REFERENCES calendar_events(id) ON DELETE CASCADE,
+			email TEXT NOT NULL,
+			name TEXT,
+			contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
+			company_id UUID REFERENCES companies(id) ON DELETE SET NULL,
+			rsvp TEXT NOT NULL DEFAULT 'needs-action' CHECK (rsvp IN ('needs-action','accepted','declined','tentative')),
+			is_organizer BOOLEAN NOT NULL DEFAULT false,
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			UNIQUE (event_id, email)
+		)
+	`
+
+	// ── Tasks ────────────────────────────────────────────────────────
+	// `company_id` is nullable: internal work (e.g., "prep onsite day")
+	// has no company. `assignee_id` and `actor_id` are Better-Auth user
+	// ids (TEXT cuid2); no FK to `user` because the auth stack runs its
+	// own migrations. `completed_at` must co-exist with status='done'.
+	yield* sql`
+		CREATE TABLE IF NOT EXISTS tasks (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+			contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
+			type TEXT NOT NULL,
+			title TEXT NOT NULL,
+			notes TEXT,
+			status TEXT NOT NULL DEFAULT 'open'
+				CHECK (status IN ('open','in_progress','blocked','in_review','done','cancelled')),
+			source TEXT NOT NULL DEFAULT 'user'
+				CHECK (source IN ('user','agent','webhook','email','booking')),
+			priority TEXT NOT NULL DEFAULT 'normal'
+				CHECK (priority IN ('low','normal','high')),
+			assignee_id TEXT,
+			actor_id TEXT,
+			due_at TIMESTAMPTZ,
+			snoozed_until TIMESTAMPTZ,
+			completed_at TIMESTAMPTZ,
+			linked_interaction_id UUID REFERENCES interactions(id) ON DELETE SET NULL,
+			linked_calendar_event_id UUID REFERENCES calendar_events(id) ON DELETE SET NULL,
+			linked_thread_link_id UUID REFERENCES email_thread_links(id) ON DELETE SET NULL,
+			linked_proposal_id UUID REFERENCES proposals(id) ON DELETE SET NULL,
+			metadata JSONB,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			CONSTRAINT tasks_completed_at_matches_status CHECK (
+				(status = 'done' AND completed_at IS NOT NULL)
+				OR (status <> 'done' AND completed_at IS NULL)
+			)
+		)
+	`
+	// Append-only audit trail. `change` holds a field-level diff as
+	// { field: [oldValue, newValue] }. Cascading delete mirrors tasks.
+	yield* sql`
+		CREATE TABLE IF NOT EXISTS task_events (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+			at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			actor_id TEXT,
+			actor_kind TEXT NOT NULL CHECK (actor_kind IN ('user','agent')),
+			change JSONB NOT NULL
+		)
+	`
+
 	// Default shape for recipients reflects the { to, cc, bcc } schema.
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS email_messages (
@@ -652,5 +763,24 @@ export default Effect.gen(function* () {
 		sql`CREATE INDEX IF NOT EXISTS llm_cache_tier_expires_idx ON llm_cache(tier, expires_at)`,
 		sql`CREATE INDEX IF NOT EXISTS research_cache_user_expires_idx ON research_cache(user_id, expires_at)`,
 		sql`CREATE INDEX IF NOT EXISTS extraction_cache_content_schema_idx ON extraction_cache(content_hash, schema_name)`,
+
+		// calendar_events — hot queries are the month grid (by start_at) and
+		// the "meetings with X" join (company/contact × start_at).
+		sql`CREATE INDEX IF NOT EXISTS calendar_events_start_idx ON calendar_events(start_at)`,
+		sql`CREATE INDEX IF NOT EXISTS calendar_events_company_idx ON calendar_events(company_id, start_at) WHERE company_id IS NOT NULL`,
+		sql`CREATE INDEX IF NOT EXISTS calendar_events_contact_idx ON calendar_events(contact_id, start_at) WHERE contact_id IS NOT NULL`,
+		sql`CREATE UNIQUE INDEX IF NOT EXISTS calendar_events_provider_booking_idx ON calendar_events(provider, provider_booking_id) WHERE provider_booking_id IS NOT NULL`,
+
+		// calendar_event_attendees — fast "upcoming meetings with contact" lookup.
+		sql`CREATE INDEX IF NOT EXISTS calendar_event_attendees_contact_idx ON calendar_event_attendees(contact_id) WHERE contact_id IS NOT NULL`,
+		sql`CREATE INDEX IF NOT EXISTS calendar_event_attendees_event_idx ON calendar_event_attendees(event_id)`,
+
+		// tasks — queue-style views (by assignee+status) and overdue scan.
+		sql`CREATE INDEX IF NOT EXISTS tasks_assignee_status_idx ON tasks(assignee_id, status) WHERE assignee_id IS NOT NULL`,
+		sql`CREATE INDEX IF NOT EXISTS tasks_due_at_open_idx ON tasks(due_at) WHERE status = 'open' AND due_at IS NOT NULL`,
+		sql`CREATE INDEX IF NOT EXISTS tasks_company_idx ON tasks(company_id) WHERE company_id IS NOT NULL`,
+
+		// task_events — most recent changes per task drive the undo drawer.
+		sql`CREATE INDEX IF NOT EXISTS task_events_task_id_idx ON task_events(task_id, at DESC)`,
 	])
 })

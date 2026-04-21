@@ -15,6 +15,7 @@
 		"@aws-sdk/client-s3": "^3.1026.0",
 		"@aws-sdk/s3-request-presigner": "^3.1026.0",
 		"@batuda/auth": "workspace:*",
+		"@batuda/calendar": "workspace:*",
 		"@batuda/controllers": "workspace:*",
 		"@batuda/domain": "workspace:*",
 		"@batuda/email": "workspace:*",
