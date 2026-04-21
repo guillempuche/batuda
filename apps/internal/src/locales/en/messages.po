@@ -103,6 +103,10 @@ msgstr "Active client"
 msgid "Active companies"
 msgstr "Active companies"
 
+#: src/routes/tasks/index.tsx:632
+msgid "Add"
+msgstr "Add"
+
 #: src/components/shared/editable-field.tsx:322
 msgid "Add {label}"
 msgstr "Add {label}"
@@ -156,7 +160,6 @@ msgid "All statuses"
 msgstr "All statuses"
 
 #: src/routes/index.tsx:299
-#: src/routes/tasks/index.tsx:232
 msgid "All under control"
 msgstr "All under control"
 
@@ -186,6 +189,10 @@ msgstr "Attach"
 #: src/routes/emails/$threadId.tsx:611
 msgid "attachment"
 msgstr "attachment"
+
+#: src/routes/tasks/index.tsx:722
+msgid "Audit log"
+msgstr "Audit log"
 
 #: src/routes/emails/inboxes.tsx:213
 msgid "Back to emails"
@@ -256,6 +263,7 @@ msgstr "Call phone"
 #: src/components/interactions/quick-capture-dialog.tsx:400
 #: src/routes/emails/inboxes.tsx:639
 #: src/routes/emails/inboxes.tsx:945
+#: src/routes/tasks/index.tsx:717
 msgid "Cancel"
 msgstr "Cancel"
 
@@ -298,6 +306,7 @@ msgstr "Check that your session is valid or try again."
 msgid "Check the session or try again."
 msgstr "Check the session or try again."
 
+#: src/components/shared/task-item.tsx:292
 #: src/routes/emails/index.tsx:724
 msgid "Clear"
 msgstr "Clear"
@@ -384,6 +393,10 @@ msgstr "complained"
 #: src/routes/emails/$threadId.tsx:643
 msgid "Complained"
 msgstr "Complained"
+
+#: src/routes/tasks/index.tsx:710
+msgid "Complete"
+msgstr "Complete"
 
 #: src/routes/companies/$slug.tsx:1042
 msgid "Completed"
@@ -523,6 +536,10 @@ msgstr "Create one or run sync to pull mailboxes from the provider."
 msgid "Created"
 msgstr "Created"
 
+#: src/components/shared/task-item.tsx:336
+msgid "Created by agent"
+msgstr "Created by agent"
+
 #: src/routes/companies/$slug.tsx:877
 msgid "Current tools"
 msgstr "Current tools"
@@ -589,9 +606,22 @@ msgstr "Documents"
 msgid "Domain"
 msgstr "Domain"
 
+#: src/routes/tasks/index.tsx:505
+msgid "Done 7d"
+msgstr "Done 7d"
+
 #: src/routes/pages/index.tsx:126
 msgid "Draft"
 msgstr "Draft"
+
+#: src/components/shared/task-item.tsx:272
+#: src/routes/tasks/index.tsx:698
+msgid "Due"
+msgstr "Due"
+
+#: src/components/shared/task-item.tsx:284
+msgid "Due date"
+msgstr "Due date"
 
 #: src/components/interactions/quick-capture-dialog.tsx:374
 msgid "Duration (min)"
@@ -621,6 +651,10 @@ msgstr "Edit"
 msgid "Edit {label}"
 msgstr "Edit {label}"
 
+#: src/components/shared/task-item.tsx:261
+msgid "Edit due date"
+msgstr "Edit due date"
+
 #: src/routes/emails/inboxes.tsx:503
 msgid "Edit inbox"
 msgstr "Edit inbox"
@@ -629,6 +663,10 @@ msgstr "Edit inbox"
 #: src/routes/emails/inboxes.tsx:348
 msgid "Edit inbox {0}"
 msgstr "Edit inbox {0}"
+
+#: src/components/shared/task-item.tsx:216
+msgid "Edit task title"
+msgstr "Edit task title"
 
 #: src/routes/pages/$id.tsx:264
 msgid "Editor"
@@ -710,6 +748,18 @@ msgstr "Footers — {0}"
 msgid "From"
 msgstr "From"
 
+#: src/components/shared/task-item.tsx:340
+msgid "From booking"
+msgstr "From booking"
+
+#: src/components/shared/task-item.tsx:338
+msgid "From email"
+msgstr "From email"
+
+#: src/components/shared/task-item.tsx:341
+msgid "From webhook"
+msgstr "From webhook"
+
 #: src/components/emails/compose-window.tsx:69
 msgid "Full screen"
 msgstr "Full screen"
@@ -723,6 +773,7 @@ msgid "High"
 msgstr "High"
 
 #: src/components/shared/priority-dot.tsx:47
+#: src/components/shared/task-item.tsx:309
 #: src/routes/index.tsx:458
 msgid "High priority"
 msgstr "High priority"
@@ -815,7 +866,7 @@ msgstr "Last email"
 msgid "Last meet"
 msgstr "Last meet"
 
-#: src/routes/tasks/index.tsx:326
+#: src/routes/tasks/index.tsx:481
 msgid "Later"
 msgstr "Later"
 
@@ -856,7 +907,7 @@ msgstr "Location"
 msgid "Log"
 msgstr "Log"
 
-#: src/components/shared/task-item.tsx:76
+#: src/components/shared/task-item.tsx:121
 msgid "Log an interaction for this task"
 msgstr "Log an interaction for this task"
 
@@ -875,6 +926,7 @@ msgid "Low"
 msgstr "Low"
 
 #: src/components/shared/priority-dot.tsx:49
+#: src/components/shared/task-item.tsx:311
 msgid "Low priority"
 msgstr "Low priority"
 
@@ -892,12 +944,12 @@ msgid "Map provider mailboxes to purpose, owner, and defaults."
 msgstr "Map provider mailboxes to purpose, owner, and defaults."
 
 #. placeholder {0}: task.title
-#: src/components/shared/task-item.tsx:58
+#: src/components/shared/task-item.tsx:80
 msgid "Mark \"{0}\" as complete"
 msgstr "Mark \"{0}\" as complete"
 
 #. placeholder {0}: task.title
-#: src/components/shared/task-item.tsx:57
+#: src/components/shared/task-item.tsx:79
 msgid "Mark \"{0}\" as pending"
 msgstr "Mark \"{0}\" as pending"
 
@@ -1014,6 +1066,10 @@ msgstr "Next: {0}"
 msgid "No activity yet"
 msgstr "No activity yet"
 
+#: src/routes/tasks/index.tsx:726
+msgid "No changes recorded yet."
+msgstr "No changes recorded yet."
+
 #: src/routes/companies/index.tsx:318
 msgid "No companies match the filters"
 msgstr "No companies match the filters"
@@ -1035,7 +1091,9 @@ msgstr "No contacts yet"
 msgid "No coordinates yet. Locate this company to plot it on the map."
 msgstr "No coordinates yet. Locate this company to plot it on the map."
 
-#: src/components/shared/task-item.tsx:70
+#: src/components/shared/task-item.tsx:104
+#: src/components/shared/task-item.tsx:264
+#: src/routes/tasks/index.tsx:703
 msgid "no date"
 msgstr "no date"
 
@@ -1047,7 +1105,7 @@ msgstr "No documents yet"
 msgid "no due date"
 msgstr "no due date"
 
-#: src/routes/tasks/index.tsx:344
+#: src/routes/tasks/index.tsx:489
 msgid "No due date"
 msgstr "No due date"
 
@@ -1079,10 +1137,6 @@ msgstr "No overdue tasks, no pending follow-ups, no neglected companies."
 #: src/routes/pages/index.tsx:136
 msgid "No pages yet"
 msgstr "No pages yet"
-
-#: src/routes/tasks/index.tsx:233
-msgid "No pending tasks. Time to celebrate or prospect new leads."
-msgstr "No pending tasks. Time to celebrate or prospect new leads."
 
 #: src/routes/companies/$slug.tsx:903
 msgid "No products linked yet"
@@ -1116,9 +1170,17 @@ msgstr "No upcoming due dates"
 msgid "none scheduled"
 msgstr "none scheduled"
 
+#: src/components/shared/task-item.tsx:312
+msgid "Normal priority"
+msgstr "Normal priority"
+
 #: src/components/interactions/quick-capture-dialog.tsx:425
 msgid "Note"
 msgstr "Note"
+
+#: src/routes/tasks/index.tsx:789
+msgid "Nothing changed yet."
+msgstr "Nothing changed yet."
 
 #: src/routes/emails/$threadId.tsx:238
 msgid "On {date}, {who} wrote:"
@@ -1126,7 +1188,7 @@ msgstr "On {date}, {who} wrote:"
 
 #: src/routes/emails/$threadId.tsx:312
 #: src/routes/emails/index.tsx:589
-#: src/routes/tasks/index.tsx:253
+#: src/routes/tasks/index.tsx:443
 msgid "Open"
 msgstr "Open"
 
@@ -1146,6 +1208,10 @@ msgstr "Open Instagram"
 #: src/routes/companies/$slug.tsx:689
 msgid "Open LinkedIn"
 msgstr "Open LinkedIn"
+
+#: src/components/shared/task-item.tsx:112
+msgid "Open task details"
+msgstr "Open task details"
 
 #: src/routes/index.tsx:269
 msgid "Open tasks"
@@ -1183,8 +1249,8 @@ msgid "Outcome: {0}"
 msgstr "Outcome: {0}"
 
 #: src/routes/index.tsx:270
-#: src/routes/tasks/index.tsx:255
-#: src/routes/tasks/index.tsx:264
+#: src/routes/tasks/index.tsx:445
+#: src/routes/tasks/index.tsx:465
 msgid "Overdue"
 msgstr "Overdue"
 
@@ -1227,6 +1293,11 @@ msgstr "Pain points"
 msgid "Password"
 msgstr "Password"
 
+#: src/routes/tasks/index.tsx:332
+#: src/routes/tasks/index.tsx:674
+msgid "Personal"
+msgstr "Personal"
+
 #: src/components/layout/nav-items.ts:37
 #: src/routes/index.tsx:260
 msgid "Pipeline"
@@ -1246,6 +1317,7 @@ msgid "Primary navigation"
 msgstr "Primary navigation"
 
 #: src/routes/companies/$slug.tsx:866
+#: src/routes/tasks/index.tsx:686
 msgid "Priority"
 msgstr "Priority"
 
@@ -1310,9 +1382,22 @@ msgstr "Purpose"
 msgid "Queued"
 msgstr "Queued"
 
+#: src/routes/tasks/index.tsx:628
+msgid "Quick add task"
+msgstr "Quick add task"
+
+#: src/routes/tasks/index.tsx:523
+msgid "Quick add: \"Call Acme tomorrow #high\""
+msgstr "Quick add: \"Call Acme tomorrow #high\""
+
 #: src/routes/emails/index.tsx:502
 msgid "Read state update failed"
 msgstr "Read state update failed"
+
+#: src/routes/tasks/index.tsx:515
+#: src/routes/tasks/index.tsx:780
+msgid "Recent changes"
+msgstr "Recent changes"
 
 #: src/routes/companies/$slug.tsx:846
 msgid "Region"
@@ -1329,6 +1414,7 @@ msgstr "Remove {chip}"
 
 #: src/routes/emails/$threadId.tsx:344
 #: src/routes/emails/index.tsx:698
+#: src/routes/tasks/index.tsx:710
 msgid "Reopen"
 msgstr "Reopen"
 
@@ -1499,11 +1585,20 @@ msgstr "Size"
 msgid "Slug"
 msgstr "Slug"
 
+#: src/routes/tasks/index.tsx:714
+msgid "Snooze 1d"
+msgstr "Snooze 1d"
+
+#: src/routes/tasks/index.tsx:497
+msgid "Snoozed"
+msgstr "Snoozed"
+
 #: src/routes/emails/$threadId.tsx:240
 msgid "someone"
 msgstr "someone"
 
 #: src/routes/companies/$slug.tsx:861
+#: src/routes/tasks/index.tsx:692
 msgid "Source"
 msgstr "Source"
 
@@ -1516,6 +1611,7 @@ msgid "Stamped into the workshop ledger."
 msgstr "Stamped into the workshop ledger."
 
 #: src/routes/pages/index.tsx:146
+#: src/routes/tasks/index.tsx:680
 msgid "Status"
 msgstr "Status"
 
@@ -1552,16 +1648,23 @@ msgstr "System"
 msgid "Tags"
 msgstr "Tags"
 
+#: src/components/shared/task-item.tsx:206
+msgid "Task title"
+msgstr "Task title"
+
 #: src/components/layout/nav-items.ts:66
 #: src/routes/companies/$slug.tsx:783
-#: src/routes/tasks/index.tsx:224
-#: src/routes/tasks/index.tsx:246
+#: src/routes/tasks/index.tsx:436
 msgid "Tasks"
 msgstr "Tasks"
 
 #: src/routes/pages/$id.tsx:294
 msgid "Template"
 msgstr "Template"
+
+#: src/routes/tasks/index.tsx:783
+msgid "The 20 most recently edited open tasks. Click one to reopen it."
+msgstr "The 20 most recently edited open tasks. Click one to reopen it."
 
 #: src/components/companies/where-panel.tsx:73
 msgid "The geocoder did not return a match. Try editing the location field."
@@ -1583,8 +1686,7 @@ msgstr "The thread exists but the provider returned no messages."
 msgid "The thread may have been archived upstream or the link is stale."
 msgstr "The thread may have been archived upstream or the link is stale."
 
-#: src/routes/tasks/index.tsx:227
-#: src/routes/tasks/index.tsx:249
+#: src/routes/tasks/index.tsx:439
 msgid "The workshop ledger — tear off one strip at a time."
 msgstr "The workshop ledger — tear off one strip at a time."
 
@@ -1597,7 +1699,7 @@ msgid "They replied — keep the thread warm"
 msgstr "They replied — keep the thread warm"
 
 #: src/routes/index.tsx:416
-#: src/routes/tasks/index.tsx:307
+#: src/routes/tasks/index.tsx:473
 msgid "This week"
 msgstr "This week"
 
@@ -1627,7 +1729,7 @@ msgid "To"
 msgstr "To"
 
 #: src/routes/index.tsx:376
-#: src/routes/tasks/index.tsx:286
+#: src/routes/tasks/index.tsx:457
 msgid "Today"
 msgstr "Today"
 
@@ -1644,13 +1746,13 @@ msgstr "Type"
 msgid "Type and press Enter"
 msgstr "Type and press Enter"
 
+#: src/routes/tasks/index.tsx:802
+msgid "unknown"
+msgstr "unknown"
+
 #: src/routes/emails/index.tsx:1148
 msgid "Unknown"
 msgstr "Unknown"
-
-#: src/routes/tasks/index.tsx:203
-msgid "Unknown company"
-msgstr "Unknown company"
 
 #: src/routes/profile/index.tsx:74
 msgid "Unknown user"

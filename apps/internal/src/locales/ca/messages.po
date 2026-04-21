@@ -103,6 +103,10 @@ msgstr "Client actiu"
 msgid "Active companies"
 msgstr "Empreses actives"
 
+#: src/routes/tasks/index.tsx:632
+msgid "Add"
+msgstr "Afegeix"
+
 #: src/components/shared/editable-field.tsx:322
 msgid "Add {label}"
 msgstr "Afegeix {label}"
@@ -156,7 +160,6 @@ msgid "All statuses"
 msgstr "Tots els estats"
 
 #: src/routes/index.tsx:299
-#: src/routes/tasks/index.tsx:232
 msgid "All under control"
 msgstr "Tot sota control"
 
@@ -186,6 +189,10 @@ msgstr "Adjunta"
 #: src/routes/emails/$threadId.tsx:611
 msgid "attachment"
 msgstr "adjunt"
+
+#: src/routes/tasks/index.tsx:722
+msgid "Audit log"
+msgstr "Registre d'auditoria"
 
 #: src/routes/emails/inboxes.tsx:213
 msgid "Back to emails"
@@ -256,6 +263,7 @@ msgstr "Truca al telèfon"
 #: src/components/interactions/quick-capture-dialog.tsx:400
 #: src/routes/emails/inboxes.tsx:639
 #: src/routes/emails/inboxes.tsx:945
+#: src/routes/tasks/index.tsx:717
 msgid "Cancel"
 msgstr "Cancel·la"
 
@@ -298,6 +306,7 @@ msgstr "Comprova que la teva sessió sigui vàlida o torna-ho a provar."
 msgid "Check the session or try again."
 msgstr "Comprova la sessió o torna-ho a provar."
 
+#: src/components/shared/task-item.tsx:292
 #: src/routes/emails/index.tsx:724
 msgid "Clear"
 msgstr "Neteja"
@@ -384,6 +393,10 @@ msgstr "marcat com a brossa"
 #: src/routes/emails/$threadId.tsx:643
 msgid "Complained"
 msgstr "Marcat com a brossa"
+
+#: src/routes/tasks/index.tsx:710
+msgid "Complete"
+msgstr "Completa"
 
 #: src/routes/companies/$slug.tsx:1042
 msgid "Completed"
@@ -523,6 +536,10 @@ msgstr "Crea'n una o sincronitza per portar les bústies del proveïdor."
 msgid "Created"
 msgstr "Creada"
 
+#: src/components/shared/task-item.tsx:336
+msgid "Created by agent"
+msgstr "Creada per agent"
+
 #: src/routes/companies/$slug.tsx:877
 msgid "Current tools"
 msgstr "Eines actuals"
@@ -589,9 +606,22 @@ msgstr "Documents"
 msgid "Domain"
 msgstr "Domini"
 
+#: src/routes/tasks/index.tsx:505
+msgid "Done 7d"
+msgstr "Fetes 7d"
+
 #: src/routes/pages/index.tsx:126
 msgid "Draft"
 msgstr "Esborrany"
+
+#: src/components/shared/task-item.tsx:272
+#: src/routes/tasks/index.tsx:698
+msgid "Due"
+msgstr "Venciment"
+
+#: src/components/shared/task-item.tsx:284
+msgid "Due date"
+msgstr "Data de venciment"
 
 #: src/components/interactions/quick-capture-dialog.tsx:374
 msgid "Duration (min)"
@@ -621,6 +651,10 @@ msgstr "Edita"
 msgid "Edit {label}"
 msgstr "Edita {label}"
 
+#: src/components/shared/task-item.tsx:261
+msgid "Edit due date"
+msgstr "Edita la data de venciment"
+
 #: src/routes/emails/inboxes.tsx:503
 msgid "Edit inbox"
 msgstr "Edita la safata"
@@ -629,6 +663,10 @@ msgstr "Edita la safata"
 #: src/routes/emails/inboxes.tsx:348
 msgid "Edit inbox {0}"
 msgstr "Edita la safata {0}"
+
+#: src/components/shared/task-item.tsx:216
+msgid "Edit task title"
+msgstr "Edita el títol de la tasca"
 
 #: src/routes/pages/$id.tsx:264
 msgid "Editor"
@@ -710,6 +748,18 @@ msgstr "Peus de pàgina — {0}"
 msgid "From"
 msgstr "De"
 
+#: src/components/shared/task-item.tsx:340
+msgid "From booking"
+msgstr "De la reserva"
+
+#: src/components/shared/task-item.tsx:338
+msgid "From email"
+msgstr "Del correu"
+
+#: src/components/shared/task-item.tsx:341
+msgid "From webhook"
+msgstr "Del webhook"
+
 #: src/components/emails/compose-window.tsx:69
 msgid "Full screen"
 msgstr "Pantalla completa"
@@ -723,6 +773,7 @@ msgid "High"
 msgstr "Alta"
 
 #: src/components/shared/priority-dot.tsx:47
+#: src/components/shared/task-item.tsx:309
 #: src/routes/index.tsx:458
 msgid "High priority"
 msgstr "Prioritat alta"
@@ -815,7 +866,7 @@ msgstr "Últim email"
 msgid "Last meet"
 msgstr "Última visita"
 
-#: src/routes/tasks/index.tsx:326
+#: src/routes/tasks/index.tsx:481
 msgid "Later"
 msgstr "Més tard"
 
@@ -856,7 +907,7 @@ msgstr "Ubicació"
 msgid "Log"
 msgstr "Registra"
 
-#: src/components/shared/task-item.tsx:76
+#: src/components/shared/task-item.tsx:121
 msgid "Log an interaction for this task"
 msgstr "Registra una interacció per a aquesta tasca"
 
@@ -875,6 +926,7 @@ msgid "Low"
 msgstr "Baixa"
 
 #: src/components/shared/priority-dot.tsx:49
+#: src/components/shared/task-item.tsx:311
 msgid "Low priority"
 msgstr "Prioritat baixa"
 
@@ -892,12 +944,12 @@ msgid "Map provider mailboxes to purpose, owner, and defaults."
 msgstr "Associa les bústies del proveïdor a propòsit, propietari i valors per defecte."
 
 #. placeholder {0}: task.title
-#: src/components/shared/task-item.tsx:58
+#: src/components/shared/task-item.tsx:80
 msgid "Mark \"{0}\" as complete"
 msgstr "Marca «{0}» com a completada"
 
 #. placeholder {0}: task.title
-#: src/components/shared/task-item.tsx:57
+#: src/components/shared/task-item.tsx:79
 msgid "Mark \"{0}\" as pending"
 msgstr "Marca «{0}» com a pendent"
 
@@ -1014,6 +1066,10 @@ msgstr "Següent: {0}"
 msgid "No activity yet"
 msgstr "Encara no hi ha activitat"
 
+#: src/routes/tasks/index.tsx:726
+msgid "No changes recorded yet."
+msgstr "Encara no hi ha canvis enregistrats."
+
 #: src/routes/companies/index.tsx:318
 msgid "No companies match the filters"
 msgstr "Cap empresa coincideix amb els filtres"
@@ -1035,7 +1091,9 @@ msgstr "Encara no hi ha contactes"
 msgid "No coordinates yet. Locate this company to plot it on the map."
 msgstr "Encara sense coordenades. Localitza aquesta empresa per situar-la al mapa."
 
-#: src/components/shared/task-item.tsx:70
+#: src/components/shared/task-item.tsx:104
+#: src/components/shared/task-item.tsx:264
+#: src/routes/tasks/index.tsx:703
 msgid "no date"
 msgstr "sense data"
 
@@ -1047,7 +1105,7 @@ msgstr "Encara no hi ha documents"
 msgid "no due date"
 msgstr "sense data de venciment"
 
-#: src/routes/tasks/index.tsx:344
+#: src/routes/tasks/index.tsx:489
 msgid "No due date"
 msgstr "Sense data de venciment"
 
@@ -1079,10 +1137,6 @@ msgstr "Sense tasques endarrerides, sense seguiments pendents, sense empreses ob
 #: src/routes/pages/index.tsx:136
 msgid "No pages yet"
 msgstr "Encara no hi ha pàgines"
-
-#: src/routes/tasks/index.tsx:233
-msgid "No pending tasks. Time to celebrate or prospect new leads."
-msgstr "Sense tasques pendents. És hora de celebrar-ho o de buscar nous prospectes."
 
 #: src/routes/companies/$slug.tsx:903
 msgid "No products linked yet"
@@ -1116,9 +1170,17 @@ msgstr "Sense venciments propers"
 msgid "none scheduled"
 msgstr "cap planificat"
 
+#: src/components/shared/task-item.tsx:312
+msgid "Normal priority"
+msgstr "Prioritat normal"
+
 #: src/components/interactions/quick-capture-dialog.tsx:425
 msgid "Note"
 msgstr "Nota"
+
+#: src/routes/tasks/index.tsx:789
+msgid "Nothing changed yet."
+msgstr "Encara no ha canviat res."
 
 #: src/routes/emails/$threadId.tsx:238
 msgid "On {date}, {who} wrote:"
@@ -1126,7 +1188,7 @@ msgstr "El {date}, {who} va escriure:"
 
 #: src/routes/emails/$threadId.tsx:312
 #: src/routes/emails/index.tsx:589
-#: src/routes/tasks/index.tsx:253
+#: src/routes/tasks/index.tsx:443
 msgid "Open"
 msgstr "Obert"
 
@@ -1146,6 +1208,10 @@ msgstr "Obre Instagram"
 #: src/routes/companies/$slug.tsx:689
 msgid "Open LinkedIn"
 msgstr "Obre LinkedIn"
+
+#: src/components/shared/task-item.tsx:112
+msgid "Open task details"
+msgstr "Obre els detalls de la tasca"
 
 #: src/routes/index.tsx:269
 msgid "Open tasks"
@@ -1183,8 +1249,8 @@ msgid "Outcome: {0}"
 msgstr "Resultat: {0}"
 
 #: src/routes/index.tsx:270
-#: src/routes/tasks/index.tsx:255
-#: src/routes/tasks/index.tsx:264
+#: src/routes/tasks/index.tsx:445
+#: src/routes/tasks/index.tsx:465
 msgid "Overdue"
 msgstr "Endarrerit"
 
@@ -1227,6 +1293,11 @@ msgstr "Punts febles"
 msgid "Password"
 msgstr "Contrasenya"
 
+#: src/routes/tasks/index.tsx:332
+#: src/routes/tasks/index.tsx:674
+msgid "Personal"
+msgstr "Personal"
+
 #: src/components/layout/nav-items.ts:37
 #: src/routes/index.tsx:260
 msgid "Pipeline"
@@ -1246,6 +1317,7 @@ msgid "Primary navigation"
 msgstr "Navegació principal"
 
 #: src/routes/companies/$slug.tsx:866
+#: src/routes/tasks/index.tsx:686
 msgid "Priority"
 msgstr "Prioritat"
 
@@ -1310,9 +1382,22 @@ msgstr "Propòsit"
 msgid "Queued"
 msgstr "En cua"
 
+#: src/routes/tasks/index.tsx:628
+msgid "Quick add task"
+msgstr "Afegeix tasca ràpidament"
+
+#: src/routes/tasks/index.tsx:523
+msgid "Quick add: \"Call Acme tomorrow #high\""
+msgstr "Afegeix ràpid: «Truca a Acme demà #high»"
+
 #: src/routes/emails/index.tsx:502
 msgid "Read state update failed"
 msgstr "Ha fallat l'actualització de l'estat de lectura"
+
+#: src/routes/tasks/index.tsx:515
+#: src/routes/tasks/index.tsx:780
+msgid "Recent changes"
+msgstr "Canvis recents"
 
 #: src/routes/companies/$slug.tsx:846
 msgid "Region"
@@ -1329,6 +1414,7 @@ msgstr "Elimina {chip}"
 
 #: src/routes/emails/$threadId.tsx:344
 #: src/routes/emails/index.tsx:698
+#: src/routes/tasks/index.tsx:710
 msgid "Reopen"
 msgstr "Reobre"
 
@@ -1499,11 +1585,20 @@ msgstr "Mida"
 msgid "Slug"
 msgstr "Slug"
 
+#: src/routes/tasks/index.tsx:714
+msgid "Snooze 1d"
+msgstr "Posposa 1d"
+
+#: src/routes/tasks/index.tsx:497
+msgid "Snoozed"
+msgstr "Posposades"
+
 #: src/routes/emails/$threadId.tsx:240
 msgid "someone"
 msgstr "algú"
 
 #: src/routes/companies/$slug.tsx:861
+#: src/routes/tasks/index.tsx:692
 msgid "Source"
 msgstr "Origen"
 
@@ -1516,6 +1611,7 @@ msgid "Stamped into the workshop ledger."
 msgstr "Segellat al llibre del taller."
 
 #: src/routes/pages/index.tsx:146
+#: src/routes/tasks/index.tsx:680
 msgid "Status"
 msgstr "Estat"
 
@@ -1552,16 +1648,23 @@ msgstr "Sistema"
 msgid "Tags"
 msgstr "Etiquetes"
 
+#: src/components/shared/task-item.tsx:206
+msgid "Task title"
+msgstr "Títol de la tasca"
+
 #: src/components/layout/nav-items.ts:66
 #: src/routes/companies/$slug.tsx:783
-#: src/routes/tasks/index.tsx:224
-#: src/routes/tasks/index.tsx:246
+#: src/routes/tasks/index.tsx:436
 msgid "Tasks"
 msgstr "Tasques"
 
 #: src/routes/pages/$id.tsx:294
 msgid "Template"
 msgstr "Plantilla"
+
+#: src/routes/tasks/index.tsx:783
+msgid "The 20 most recently edited open tasks. Click one to reopen it."
+msgstr "Les 20 tasques obertes editades més recentment. Fes-hi clic per reobrir-ne una."
 
 #: src/components/companies/where-panel.tsx:73
 msgid "The geocoder did not return a match. Try editing the location field."
@@ -1583,8 +1686,7 @@ msgstr "El fil existeix però el proveïdor no ha retornat cap missatge."
 msgid "The thread may have been archived upstream or the link is stale."
 msgstr "Potser el fil s'ha arxivat al proveïdor o l'enllaç és obsolet."
 
-#: src/routes/tasks/index.tsx:227
-#: src/routes/tasks/index.tsx:249
+#: src/routes/tasks/index.tsx:439
 msgid "The workshop ledger — tear off one strip at a time."
 msgstr "El llibre del taller — arrenca-n'hi una tira cada vegada."
 
@@ -1597,7 +1699,7 @@ msgid "They replied — keep the thread warm"
 msgstr "Ha respost — manté el fil calent"
 
 #: src/routes/index.tsx:416
-#: src/routes/tasks/index.tsx:307
+#: src/routes/tasks/index.tsx:473
 msgid "This week"
 msgstr "Aquesta setmana"
 
@@ -1627,7 +1729,7 @@ msgid "To"
 msgstr "Per a"
 
 #: src/routes/index.tsx:376
-#: src/routes/tasks/index.tsx:286
+#: src/routes/tasks/index.tsx:457
 msgid "Today"
 msgstr "Avui"
 
@@ -1644,13 +1746,13 @@ msgstr "Tipus"
 msgid "Type and press Enter"
 msgstr "Escriu i prem Retorn"
 
+#: src/routes/tasks/index.tsx:802
+msgid "unknown"
+msgstr "desconegut"
+
 #: src/routes/emails/index.tsx:1148
 msgid "Unknown"
 msgstr "Desconegut"
-
-#: src/routes/tasks/index.tsx:203
-msgid "Unknown company"
-msgstr "Empresa desconeguda"
 
 #: src/routes/profile/index.tsx:74
 msgid "Unknown user"
