@@ -1,0 +1,30 @@
+{
+	"name": "@batuda/calendar",
+	"version": "0.0.1",
+	"description": "Batuda — calendar bounded context (BookingProvider + IcsParser ports, stub + cal.com adapters)",
+	"type": "module",
+	"types": "./src/index.ts",
+	"main": "./src/index.ts",
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"import": "./src/index.ts"
+		}
+	},
+	"scripts": {
+		"build": "tsdown",
+		"check-types": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"effect": "4.0.0-beta.43"
+	},
+	"devDependencies": {
+		"@types/node": "^22.15.0",
+		"tsdown": "^0.21.7",
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.4"
+	},
+	"private": true
+}
