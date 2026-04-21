@@ -4,6 +4,9 @@ import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CalendarService } from '../../services/calendar'
+import { dispatchForwardInvitation } from '../../services/calendar-forward-dispatch'
+import { dispatchRsvpReply } from '../../services/calendar-rsvp-dispatch'
+import { EmailService } from '../../services/email'
 
 // Agents identify the attendee at the protocol boundary (no session
 // ambient state to reach into) — the primary user's email rides with
@@ -213,6 +216,10 @@ export const CalendarHandlersLive = CalendarTools.toLayer(
 	Effect.gen(function* () {
 		const svc = yield* CalendarService
 		const sql = yield* SqlClient.SqlClient
+		// Pulled so the dispatcher closures below can re-inject it via
+		// `provideService`; the toolkit contract requires each handler's
+		// returned Effect to have R=never.
+		const emailSvc = yield* EmailService
 		return {
 			find_availability: params =>
 				svc
@@ -255,15 +262,42 @@ export const CalendarHandlersLive = CalendarTools.toLayer(
 					})
 					.pipe(Effect.orDie),
 			respond_to_invitation: params =>
-				svc
-					.respondToRsvp({
-						calendarEventId: params.calendar_event_id,
-						attendeeEmail: params.attendee_email,
-						rsvp: params.rsvp,
-						comment: params.comment ?? null,
-						actorUserId: params.actor_user_id ?? null,
-					})
-					.pipe(Effect.orDie),
+				dispatchRsvpReply({
+					calendarEventId: params.calendar_event_id,
+					attendeeEmail: params.attendee_email,
+					rsvp: params.rsvp,
+					comment: params.comment ?? null,
+					actorUserId: params.actor_user_id ?? null,
+				}).pipe(
+					Effect.map(r => ({
+						_tag: 'replied' as const,
+						updated: r.updated,
+						rsvp: r.rsvp,
+					})),
+					Effect.catchTag('CannotRsvpForSomeoneElse', e =>
+						Effect.succeed({
+							_tag: 'forbidden' as const,
+							reason: 'cannot_rsvp_for_someone_else',
+							attendeeEmail: e.attendeeEmail,
+						}),
+					),
+					Effect.catchTag('InvalidRsvpTarget', e =>
+						Effect.succeed({
+							_tag: 'invalid_target' as const,
+							reason: e.reason,
+						}),
+					),
+					Effect.catchTag('CalendarEventNotFound', e =>
+						Effect.succeed({
+							_tag: 'not_found' as const,
+							calendarEventId: e.calendarEventId,
+						}),
+					),
+					Effect.provideService(CalendarService, svc),
+					Effect.provideService(EmailService, emailSvc),
+					Effect.provideService(SqlClient.SqlClient, sql),
+					Effect.orDie,
+				),
 			rsvp_pending_invitations: params =>
 				svc
 					.listPendingInvitations({
@@ -272,18 +306,39 @@ export const CalendarHandlersLive = CalendarTools.toLayer(
 					})
 					.pipe(Effect.orDie),
 			forward_invitation: params =>
-				svc
-					.forwardInvitation({
-						calendarEventId: params.calendar_event_id,
-						toEmail: params.to_email,
-						note: params.note ?? null,
-					})
-					.pipe(
-						Effect.map(r => ({
-							ics_base64: Buffer.from(r.ics).toString('base64'),
-						})),
-						Effect.orDie,
+				dispatchForwardInvitation({
+					calendarEventId: params.calendar_event_id,
+					toEmail: params.to_email,
+					note: params.note ?? null,
+				}).pipe(
+					Effect.map(r => ({
+						ics_base64: Buffer.from(r.ics).toString('base64'),
+						messageId: 'messageId' in r ? r.messageId : null,
+						threadId: 'threadId' in r ? r.threadId : null,
+					})),
+					Effect.catchTag('CalendarEventNotFound', e =>
+						Effect.succeed({
+							ics_base64: '',
+							messageId: null,
+							threadId: null,
+							error: 'not_found' as const,
+							calendarEventId: e.calendarEventId,
+						}),
 					),
+					Effect.catchTag('InvalidRsvpTarget', e =>
+						Effect.succeed({
+							ics_base64: '',
+							messageId: null,
+							threadId: null,
+							error: 'invalid_target' as const,
+							reason: e.reason,
+						}),
+					),
+					Effect.provideService(CalendarService, svc),
+					Effect.provideService(EmailService, emailSvc),
+					Effect.provideService(SqlClient.SqlClient, sql),
+					Effect.orDie,
+				),
 			list_upcoming_meetings: params =>
 				Effect.gen(function* () {
 					const conditions: Array<Statement.Fragment> = [

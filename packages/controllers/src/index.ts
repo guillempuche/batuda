@@ -7,6 +7,7 @@ export {
 	EmailSendError,
 	EmailSendErrorKind,
 	EmailSuppressed,
+	Forbidden,
 	InsufficientBudget,
 	NotFound,
 	StorageError,

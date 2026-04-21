@@ -366,6 +366,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						replyTo?: string | undefined
 						preview?: string | undefined
 						attachmentRefs?: readonly StagingRef[] | undefined
+						rawAttachments?: readonly SendAttachmentInput[] | undefined
 						skipFooter?: boolean | undefined
 					},
 				) =>
@@ -373,6 +374,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						const cc = extras?.cc ?? []
 						const bcc = extras?.bcc ?? []
 						const attachmentRefs = extras?.attachmentRefs ?? []
+						const rawAttachments = extras?.rawAttachments ?? []
 
 						const inbox = yield* resolveInbox(inboxId)
 						const providerInboxId = inbox?.providerInboxId ?? inboxId
@@ -402,7 +404,10 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 									message: `renderBlocks: ${err instanceof Error ? err.message : String(err)}`,
 								}),
 						})
-						const sendAttachments = toSendAttachments(staged)
+						const sendAttachments = [
+							...toSendAttachments(staged),
+							...rawAttachments,
+						]
 
 						const result = yield* provider
 							.send(providerInboxId, {
@@ -483,6 +488,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						bcc?: string[] | undefined
 						preview?: string | undefined
 						attachmentRefs?: readonly StagingRef[] | undefined
+						rawAttachments?: readonly SendAttachmentInput[] | undefined
 						skipFooter?: boolean | undefined
 					},
 				) =>
@@ -490,6 +496,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						const cc = extras?.cc ?? []
 						const bcc = extras?.bcc ?? []
 						const attachmentRefs = extras?.attachmentRefs ?? []
+						const rawAttachments = extras?.rawAttachments ?? []
 						const links = yield* sql`
 							SELECT * FROM email_thread_links
 							WHERE provider_thread_id = ${providerThreadId}
@@ -553,7 +560,10 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 									message: `renderBlocks: ${err instanceof Error ? err.message : String(err)}`,
 								}),
 						})
-						const sendAttachments = toSendAttachments(staged)
+						const sendAttachments = [
+							...toSendAttachments(staged),
+							...rawAttachments,
+						]
 
 						const result = yield* provider
 							.reply(link.providerInboxId, lastMessage.messageId, {

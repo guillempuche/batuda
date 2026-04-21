@@ -8,11 +8,12 @@ import {
 	BadRequest,
 	BatudaApi,
 	Conflict,
+	Forbidden,
 	NotFound,
 	SessionContext,
 } from '@batuda/controllers'
 
-import { CalendarService } from '../services/calendar.js'
+import { dispatchRsvpReply } from '../services/calendar-rsvp-dispatch.js'
 
 type EventTypeRow = {
 	readonly id: string
@@ -45,7 +46,6 @@ export const CalendarLive = HttpApiBuilder.group(
 		Effect.gen(function* () {
 			const sql = yield* SqlClient.SqlClient
 			const provider = yield* BookingProvider
-			const calendar = yield* CalendarService
 			return handlers
 				.handle('listEventTypes', _ =>
 					Effect.gen(function* () {
@@ -157,23 +157,14 @@ export const CalendarLive = HttpApiBuilder.group(
 				)
 				.handle('rsvpEvent', _ =>
 					Effect.gen(function* () {
-						// Delegates to CalendarService.respondToRsvp, which builds a
-						// METHOD=REPLY ICS for email-sourced events (caller composes
-						// with EmailService.reply) or routes to BookingProvider for
-						// source='booking'. The route itself never invents replies —
-						// keeps the ICS/REPLY logic in one place so the MCP tool and
-						// Batuda drawer share the same code path.
 						const { userId, email: attendeeEmail } = yield* SessionContext
-						const result = yield* calendar.respondToRsvp({
+						const result = yield* dispatchRsvpReply({
 							calendarEventId: _.params.id,
 							attendeeEmail,
 							rsvp: _.payload.rsvp,
 							comment: _.payload.comment ?? null,
 							actorUserId: userId,
 						})
-						// Only surface structural fields to the client — raw REPLY
-						// bytes are an implementation detail of the email-reply path
-						// (out of scope for the HTTP response shape).
 						return {
 							updated: result.updated,
 							rsvp: result.rsvp,
@@ -190,8 +181,17 @@ export const CalendarLive = HttpApiBuilder.group(
 						Effect.catchTag('InvalidRsvpTarget', e =>
 							Effect.fail(new Conflict({ message: e.reason })),
 						),
+						Effect.catchTag('CannotRsvpForSomeoneElse', () =>
+							Effect.fail(
+								new Forbidden({
+									message: 'cannot_rsvp_for_someone_else',
+								}),
+							),
+						),
 						Effect.catch(e =>
-							e._tag === 'NotFound' || e._tag === 'Conflict'
+							e._tag === 'NotFound' ||
+							e._tag === 'Conflict' ||
+							e._tag === 'Forbidden'
 								? Effect.fail(e)
 								: Effect.die(e),
 						),

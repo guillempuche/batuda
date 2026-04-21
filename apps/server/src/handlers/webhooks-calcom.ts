@@ -7,8 +7,8 @@ import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import { BatudaApi } from '@batuda/controllers'
 
 import {
-	type CalcomWebhookEnvelope,
 	CalendarService,
+	decodeCalcomWebhookEnvelope,
 } from '../services/calendar'
 
 // Case-insensitive hex compare in constant time. Cal.com's docs don't
@@ -56,7 +56,12 @@ export const CalcomWebhookLive = HttpApiBuilder.group(
 					const rawBody = yield* Effect.orDie(request.text)
 					const headers = request.headers
 					const signature = headers['x-cal-signature-256']
-					if (!signature) {
+					// Split "missing" from "empty" on purpose: a caller that
+					// forgot the header made a shape error (→400), one that
+					// sent it with no value is signing wrong (→401). Using a
+					// single `!signature` check collapses both into 400 and
+					// hides auth failures as shape bugs.
+					if (signature === undefined) {
 						return HttpServerResponse.jsonUnsafe(
 							{ error: 'missing_signature_header' },
 							{ status: 400 },
@@ -79,9 +84,9 @@ export const CalcomWebhookLive = HttpApiBuilder.group(
 						)
 					}
 
-					let envelope: CalcomWebhookEnvelope
+					let parsed: unknown
 					try {
-						envelope = JSON.parse(rawBody) as CalcomWebhookEnvelope
+						parsed = JSON.parse(rawBody)
 					} catch {
 						return HttpServerResponse.jsonUnsafe(
 							{ error: 'invalid_json' },
@@ -89,13 +94,38 @@ export const CalcomWebhookLive = HttpApiBuilder.group(
 						)
 					}
 
-					if (!envelope?.triggerEvent) {
+					// Shape-validate with the same Schema the service reads so a
+					// rogue payload (e.g., cal.com ships a new field type we
+					// don't expect) fails at the boundary rather than crashing
+					// inside `handleCalcomWebhook`. Unknown optional fields in
+					// payload decode lenient by default — we only reject on
+					// required fields or wrong scalar types.
+					const decoded = yield* decodeCalcomWebhookEnvelope(parsed).pipe(
+						Effect.map(e => ({ _tag: 'ok' as const, envelope: e })),
+						Effect.catch(err =>
+							Effect.succeed({
+								_tag: 'error' as const,
+								message: String(err),
+							}),
+						),
+					)
+					if (decoded._tag === 'error') {
+						yield* Effect.logWarning(
+							'calcom webhook failed schema decode',
+						).pipe(
+							Effect.annotateLogs({
+								event: 'calcom.webhook_invalid_envelope',
+								reason: decoded.message,
+							}),
+						)
 						return HttpServerResponse.jsonUnsafe(
-							{ error: 'missing_trigger_event' },
+							{ error: 'invalid_envelope', detail: decoded.message },
 							{ status: 400 },
 						)
 					}
-					if (!envelope.payload?.iCalUID) {
+					const envelope = decoded.envelope
+
+					if (!envelope.payload.iCalUID) {
 						return HttpServerResponse.jsonUnsafe(
 							{ error: 'missing_ical_uid' },
 							{ status: 400 },

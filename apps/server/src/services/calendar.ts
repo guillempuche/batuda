@@ -1,4 +1,4 @@
-import { Data, Effect, Layer, ServiceMap } from 'effect'
+import { Data, Effect, Layer, Schema, ServiceMap } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import {
@@ -56,32 +56,48 @@ export class CannotRsvpForSomeoneElse extends Data.TaggedClass(
 
 // ── Cal.com webhook envelope ───────────────────────────────────────
 // Shape per cal.com v2 webhook docs. Unknown fields on `payload` are
-// kept loose so new triggers don't 4xx us — the handler logs & noops.
+// kept loose (Schema.Unknown everywhere optional) so new triggers don't
+// 4xx us — the handler logs & noops. Only the fields we branch on are
+// strongly typed.
 
-export interface CalcomWebhookEnvelope {
-	readonly triggerEvent: string
-	readonly createdAt: string
-	readonly payload: CalcomWebhookPayload
-}
+const CalcomAttendeeSchema = Schema.Struct({
+	email: Schema.String,
+	name: Schema.optional(Schema.String),
+})
 
-export interface CalcomWebhookPayload {
-	readonly iCalUID?: string
-	readonly iCalSequence?: number
-	readonly bookingId?: number
-	readonly uid?: string
-	readonly eventTypeId?: number
-	readonly title?: string
-	readonly startTime?: string
-	readonly endTime?: string
-	readonly organizer?: { readonly email?: string; readonly name?: string }
-	readonly attendees?: ReadonlyArray<{
-		readonly email: string
-		readonly name?: string
-	}>
-	readonly location?: string
-	readonly metadata?: Record<string, unknown>
-	readonly rescheduleStartTime?: string
-}
+export const CalcomWebhookPayloadSchema = Schema.Struct({
+	iCalUID: Schema.optional(Schema.String),
+	iCalSequence: Schema.optional(Schema.Number),
+	bookingId: Schema.optional(Schema.Number),
+	uid: Schema.optional(Schema.String),
+	eventTypeId: Schema.optional(Schema.Number),
+	title: Schema.optional(Schema.String),
+	startTime: Schema.optional(Schema.String),
+	endTime: Schema.optional(Schema.String),
+	organizer: Schema.optional(
+		Schema.Struct({
+			email: Schema.optional(Schema.String),
+			name: Schema.optional(Schema.String),
+		}),
+	),
+	attendees: Schema.optional(Schema.Array(CalcomAttendeeSchema)),
+	location: Schema.optional(Schema.String),
+	metadata: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+	rescheduleStartTime: Schema.optional(Schema.String),
+})
+
+export const CalcomWebhookEnvelopeSchema = Schema.Struct({
+	triggerEvent: Schema.String,
+	createdAt: Schema.String,
+	payload: CalcomWebhookPayloadSchema,
+})
+
+export type CalcomWebhookPayload = typeof CalcomWebhookPayloadSchema.Type
+export type CalcomWebhookEnvelope = typeof CalcomWebhookEnvelopeSchema.Type
+
+export const decodeCalcomWebhookEnvelope = Schema.decodeUnknownEffect(
+	CalcomWebhookEnvelopeSchema,
+)
 
 // ── Internal shapes ────────────────────────────────────────────────
 
@@ -141,9 +157,8 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 			const timeline = yield* TimelineActivityService
 			const participantMatcher = yield* ParticipantMatcher
 
-			// Hot-path cache for slot queries. Mirrors the cache pattern from
-			// PR #1's `handlers/calendar.ts` but lives here so MCP tools benefit
-			// from the same fan-out protection.
+			// Hot-path cache for slot queries so repeated callers within the
+			// TTL don't fan out parallel provider calls for the same window.
 			const slotCache = new Map<
 				string,
 				{ readonly expiresAt: number; readonly slots: ReadonlyArray<Slot> }
@@ -186,9 +201,8 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 				`.pipe(Effect.map(rows => rows[0] ?? null))
 
 			// ── Attendee resolution ─────────────────────────────────────
-			// Reuses ParticipantMatcher with `createPolicy='contact-only'` —
-			// the calendar ingest path never invents companies, only contacts
-			// under known company domains (per plan §2 / §11).
+			// `createPolicy='contact-only'` so calendar ingest never invents
+			// companies — only contacts under known company domains.
 			const resolveAttendee = (attendee: {
 				readonly email: string
 				readonly name: string | null
@@ -1004,6 +1018,26 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 					}
 					const rsvp: 'accepted' | 'declined' | 'tentative' = args.rsvp
 
+					// Refuse RSVPs from emails that aren't on the stored attendee
+					// list — without this, a caller could forge a reply for any
+					// email it picks. Tagged distinctly so callers can map to 403.
+					const attendeeMatch = yield* sql<{ exists: boolean }>`
+						SELECT EXISTS (
+							SELECT 1 FROM calendar_event_attendees
+							WHERE event_id = ${existing.id}
+								AND lower(email) = ${attendeeEmail}
+						) AS exists
+					`
+					if (!attendeeMatch[0]?.exists) {
+						return yield* Effect.fail(
+							new CannotRsvpForSomeoneElse({
+								calendarEventId: args.calendarEventId,
+								attendeeEmail,
+								requestedBy: args.actorUserId ?? 'unknown',
+							}),
+						)
+					}
+
 					let replyBytes: Uint8Array | null = null
 					if (existing.source === 'email' && existing.rawIcs) {
 						replyBytes = yield* parser
@@ -1184,16 +1218,31 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 							.toISOString()
 							.replace(/[-:]/g, '')
 							.replace(/\.\d{3}/, '')
+					// RFC 5545 §3.3.11: TEXT values must escape `\`, `;`, `,`,
+					// and newlines. Titles with commas ("Sync w/ Marta, Joan")
+					// would otherwise break the property at the first comma.
+					const escapeIcsText = (s: string) =>
+						s
+							.replace(/\\/g, '\\\\')
+							.replace(/;/g, '\\;')
+							.replace(/,/g, '\\,')
+							.replace(/\r\n|\r|\n/g, '\\n')
+					// RFC 5545 §3.8.7.2: every VEVENT MUST carry a DTSTAMP
+					// (creation time of the ICS in UTC). Without it strict
+					// parsers (Outlook, Exchange) reject the envelope.
+					const dtStamp = formatIcsDate(new Date())
 					const ics = [
 						'BEGIN:VCALENDAR',
 						'VERSION:2.0',
+						'PRODID:-//Batuda//Calendar//EN',
 						'METHOD:REQUEST',
 						'BEGIN:VEVENT',
 						`UID:${existing.icalUid}`,
 						`SEQUENCE:${existing.icalSequence}`,
+						`DTSTAMP:${dtStamp}`,
 						`DTSTART:${formatIcsDate(existing.startAt)}`,
 						`DTEND:${formatIcsDate(existing.endAt)}`,
-						`SUMMARY:${existing.title}`,
+						`SUMMARY:${escapeIcsText(existing.title)}`,
 						`ORGANIZER:MAILTO:${existing.organizerEmail}`,
 						`ATTENDEE;PARTSTAT=NEEDS-ACTION:MAILTO:${args.toEmail.toLowerCase()}`,
 						'END:VEVENT',

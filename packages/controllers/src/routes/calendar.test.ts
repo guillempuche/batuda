@@ -108,19 +108,22 @@ describe('RsvpEventInput', () => {
 		expect(exit._tag).toBe('Failure')
 	})
 
-	it('should accept each of the four rsvp literals', () => {
-		// GIVEN the full CalendarAttendeeRsvp union
+	it('should accept each of the three rsvp action literals', () => {
+		// GIVEN the three valid RSVP actions
 		// WHEN each is decoded independently
-		// THEN all four succeed (protects against accidental enum drift)
-		for (const rsvp of [
-			'needs-action',
-			'accepted',
-			'declined',
-			'tentative',
-		] as const) {
+		// THEN all three succeed (protects against accidental enum drift)
+		for (const rsvp of ['accepted', 'declined', 'tentative'] as const) {
 			const out = decode(RsvpEventInput, { rsvp })
 			expect(out.rsvp).toBe(rsvp)
 		}
+	})
+
+	it('should reject needs-action as an RSVP (it is an initial state, not an action)', () => {
+		// GIVEN rsvp='needs-action'
+		// WHEN decode runs
+		// THEN it fails — a caller cannot respond with "I have not responded"
+		const exit = decodeExit(RsvpEventInput, { rsvp: 'needs-action' })
+		expect(exit._tag).toBe('Failure')
 	})
 
 	it('should reject unknown rsvp literals', () => {

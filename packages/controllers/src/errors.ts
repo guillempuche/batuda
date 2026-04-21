@@ -19,6 +19,11 @@ export class Conflict extends Schema.TaggedErrorClass<Conflict>()('Conflict', {
 	message: Schema.String,
 }) {}
 
+export class Forbidden extends Schema.TaggedErrorClass<Forbidden>()(
+	'Forbidden',
+	{ message: Schema.String },
+) {}
+
 export const EmailSendErrorKind = Schema.Literals([
 	'suppressed',
 	'invalid_recipient',

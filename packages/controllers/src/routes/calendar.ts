@@ -5,9 +5,9 @@ import {
 	HttpApiSchema,
 } from 'effect/unstable/httpapi'
 
-import { CalendarAttendeeRsvp, CalendarLocationType } from '@batuda/calendar'
+import { CalendarLocationType } from '@batuda/calendar'
 
-import { BadRequest, Conflict, NotFound } from '../errors'
+import { BadRequest, Conflict, Forbidden, NotFound } from '../errors'
 import { SessionMiddleware } from '../middleware/session'
 
 // ── Input schemas ──
@@ -27,9 +27,11 @@ export const CreateInternalEventInput = Schema.Struct({
 
 // RSVP on an email-sourced event generates a METHOD=REPLY ICS and sends
 // it back to the organizer via the existing email-reply path. `comment`
-// becomes a free-text note appended to the reply body.
+// becomes a free-text note appended to the reply body. Only the three
+// action literals — `needs-action` is the initial state, not something
+// a caller can send.
 export const RsvpEventInput = Schema.Struct({
-	rsvp: CalendarAttendeeRsvp,
+	rsvp: Schema.Literals(['accepted', 'declined', 'tentative']),
 	comment: Schema.optional(Schema.String),
 })
 
@@ -86,6 +88,7 @@ export const CalendarGroup = HttpApiGroup.make('calendar')
 			error: Schema.Union([
 				NotFound.pipe(HttpApiSchema.status(404)),
 				Conflict.pipe(HttpApiSchema.status(409)),
+				Forbidden.pipe(HttpApiSchema.status(403)),
 				BadRequest.pipe(HttpApiSchema.status(400)),
 			]),
 		}),
