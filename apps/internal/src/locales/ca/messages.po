@@ -231,6 +231,10 @@ msgstr "Bloquejat"
 msgid "Blocked by the provider. The body is shown for review only."
 msgstr "Bloquejat pel proveïdor. El cos es mostra només per revisar-lo."
 
+#: src/routes/calendar/index.tsx:170
+msgid "Book a meeting from a company page or forward an invitation to your inbox to see it here."
+msgstr "Reserva una reunió des d'una pàgina d'empresa o reenvia una invitació a la teva safata per veure-la aquí."
+
 #: src/components/emails/compose-form.tsx:422
 msgid "bounced"
 msgstr "rebotat"
@@ -250,6 +254,11 @@ msgstr "Accions massives de fils"
 #: src/routes/companies/$slug.tsx:798
 msgid "Cadence"
 msgstr "Cadència"
+
+#: src/components/layout/nav-items.ts:74
+#: src/routes/calendar/index.tsx:155
+msgid "Calendar"
+msgstr "Calendari"
 
 #: src/components/interactions/quick-capture-dialog.tsx:422
 #: src/components/shared/channel-icon.tsx:62
@@ -328,6 +337,7 @@ msgid "Client"
 msgstr "Client"
 
 #: src/components/interactions/quick-capture-dialog.tsx:188
+#: src/routes/calendar/index.tsx:287
 #: src/routes/emails/$threadId.tsx:333
 #: src/routes/emails/inboxes.tsx:507
 #: src/routes/emails/inboxes.tsx:828
@@ -371,7 +381,7 @@ msgstr "Columnes"
 msgid "Comma-separated"
 msgstr "Separats per comes"
 
-#: src/components/layout/nav-items.ts:45
+#: src/components/layout/nav-items.ts:46
 #: src/routes/companies/index.tsx:248
 msgid "Companies"
 msgstr "Empreses"
@@ -516,6 +526,10 @@ msgstr "Crea una pàgina d'aterratge per a un prospecte per compartir amb aquest
 #: src/routes/emails/inboxes.tsx:735
 msgid "Create failed"
 msgstr "Error en crear"
+
+#: src/routes/calendar/index.tsx:274
+msgid "Create follow-up task"
+msgstr "Crea una tasca de seguiment"
 
 #: src/routes/emails/inboxes.tsx:893
 msgid "Create footer"
@@ -688,7 +702,7 @@ msgstr "Esborranys de correu"
 msgid "Email via Batuda"
 msgstr "Correu via Batuda"
 
-#: src/components/layout/nav-items.ts:52
+#: src/components/layout/nav-items.ts:53
 #: src/routes/companies/$slug.tsx:780
 #: src/routes/emails/index.tsx:536
 msgid "Emails"
@@ -835,6 +849,10 @@ msgstr "Instagram"
 msgid "Interaction logged"
 msgstr "Interacció registrada"
 
+#: src/routes/calendar/index.tsx:260
+msgid "Join video call"
+msgstr "Uneix-te a la videotrucada"
+
 #: src/routes/pages/index.tsx:145
 msgid "Lang"
 msgstr "Idioma"
@@ -874,6 +892,10 @@ msgstr "Més tard"
 msgid "LinkedIn"
 msgstr "LinkedIn"
 
+#: src/routes/calendar/index.tsx:166
+msgid "Loading calendar…"
+msgstr "S'està carregant el calendari…"
+
 #: src/routes/companies/index.tsx:308
 msgid "Loading companies…"
 msgstr "Carregant empreses…"
@@ -898,6 +920,7 @@ msgstr "Localitzada al mapa"
 msgid "Locating…"
 msgstr "Localitzant…"
 
+#: src/routes/calendar/index.tsx:255
 #: src/routes/companies/$slug.tsx:851
 msgid "Location"
 msgstr "Ubicació"
@@ -997,6 +1020,10 @@ msgstr "Reunió"
 msgid "Meeting booked"
 msgstr "Reunió programada"
 
+#: src/routes/calendar/index.tsx:158
+msgid "Meetings from bookings, email invitations, and internal blocks."
+msgstr "Reunions des de reserves, invitacions per correu i blocs interns."
+
 #: src/components/emails/compose-form.tsx:389
 msgid "Message"
 msgstr "Missatge"
@@ -1066,6 +1093,10 @@ msgstr "Següent: {0}"
 msgid "No activity yet"
 msgstr "Encara no hi ha activitat"
 
+#: src/routes/calendar/index.tsx:169
+msgid "No calendar events yet"
+msgstr "Encara no hi ha esdeveniments al calendari"
+
 #: src/routes/tasks/index.tsx:726
 msgid "No changes recorded yet."
 msgstr "Encara no hi ha canvis enregistrats."
@@ -1124,6 +1155,10 @@ msgstr "Cap empresa d'alta prioritat sense seguiment programat"
 #: src/routes/emails/inboxes.tsx:246
 msgid "No inboxes yet"
 msgstr "Encara no hi ha safates"
+
+#: src/routes/calendar/index.tsx:265
+msgid "no location"
+msgstr "sense ubicació"
 
 #: src/routes/emails/$threadId.tsx:423
 msgid "No messages in this thread"
@@ -1191,6 +1226,10 @@ msgstr "El {date}, {who} va escriure:"
 #: src/routes/tasks/index.tsx:443
 msgid "Open"
 msgstr "Obert"
+
+#: src/routes/calendar/index.tsx:283
+msgid "Open company"
+msgstr "Obre l'empresa"
 
 #: src/components/companies/where-panel.tsx:99
 #: src/routes/companies/$slug.tsx:709
@@ -1278,7 +1317,7 @@ msgstr "Pàgina desada"
 msgid "Page title"
 msgstr "Títol de la pàgina"
 
-#: src/components/layout/nav-items.ts:59
+#: src/components/layout/nav-items.ts:60
 #: src/routes/companies/$slug.tsx:786
 #: src/routes/pages/$id.tsx:214
 #: src/routes/pages/index.tsx:105
@@ -1293,15 +1332,20 @@ msgstr "Punts febles"
 msgid "Password"
 msgstr "Contrasenya"
 
+#: src/routes/calendar/index.tsx:224
 #: src/routes/tasks/index.tsx:332
 #: src/routes/tasks/index.tsx:674
 msgid "Personal"
 msgstr "Personal"
 
-#: src/components/layout/nav-items.ts:37
+#: src/components/layout/nav-items.ts:38
 #: src/routes/index.tsx:260
 msgid "Pipeline"
 msgstr "Pipeline"
+
+#: src/routes/calendar/index.tsx:174
+msgid "Preparing calendar view…"
+msgstr "S'està preparant la vista del calendari…"
 
 #: src/routes/pages/$id.tsx:232
 #: src/routes/pages/index.tsx:178
@@ -1325,7 +1369,7 @@ msgstr "Prioritat"
 msgid "Products fit"
 msgstr "Encaix de productes"
 
-#: src/components/layout/nav-items.ts:73
+#: src/components/layout/nav-items.ts:81
 #: src/routes/companies/$slug.tsx:768
 #: src/routes/companies/$slug.tsx:971
 #: src/routes/profile/index.tsx:81
@@ -1597,6 +1641,7 @@ msgstr "Posposades"
 msgid "someone"
 msgstr "algú"
 
+#: src/routes/calendar/index.tsx:243
 #: src/routes/companies/$slug.tsx:861
 #: src/routes/tasks/index.tsx:692
 msgid "Source"
@@ -1610,6 +1655,7 @@ msgstr "Brossa"
 msgid "Stamped into the workshop ledger."
 msgstr "Segellat al llibre del taller."
 
+#: src/routes/calendar/index.tsx:249
 #: src/routes/pages/index.tsx:146
 #: src/routes/tasks/index.tsx:680
 msgid "Status"
@@ -1652,7 +1698,7 @@ msgstr "Etiquetes"
 msgid "Task title"
 msgstr "Títol de la tasca"
 
-#: src/components/layout/nav-items.ts:66
+#: src/components/layout/nav-items.ts:67
 #: src/routes/companies/$slug.tsx:783
 #: src/routes/tasks/index.tsx:436
 msgid "Tasks"
@@ -1831,6 +1877,7 @@ msgstr "Què cal fer?"
 msgid "WhatsApp"
 msgstr "WhatsApp"
 
+#: src/routes/calendar/index.tsx:230
 #: src/routes/emails/index.tsx:953
 #: src/routes/emails/index.tsx:1272
 msgid "When"

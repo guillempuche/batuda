@@ -231,6 +231,10 @@ msgstr "Blocked"
 msgid "Blocked by the provider. The body is shown for review only."
 msgstr "Blocked by the provider. The body is shown for review only."
 
+#: src/routes/calendar/index.tsx:170
+msgid "Book a meeting from a company page or forward an invitation to your inbox to see it here."
+msgstr "Book a meeting from a company page or forward an invitation to your inbox to see it here."
+
 #: src/components/emails/compose-form.tsx:422
 msgid "bounced"
 msgstr "bounced"
@@ -250,6 +254,11 @@ msgstr "Bulk thread actions"
 #: src/routes/companies/$slug.tsx:798
 msgid "Cadence"
 msgstr "Cadence"
+
+#: src/components/layout/nav-items.ts:74
+#: src/routes/calendar/index.tsx:155
+msgid "Calendar"
+msgstr "Calendar"
 
 #: src/components/interactions/quick-capture-dialog.tsx:422
 #: src/components/shared/channel-icon.tsx:62
@@ -328,6 +337,7 @@ msgid "Client"
 msgstr "Client"
 
 #: src/components/interactions/quick-capture-dialog.tsx:188
+#: src/routes/calendar/index.tsx:287
 #: src/routes/emails/$threadId.tsx:333
 #: src/routes/emails/inboxes.tsx:507
 #: src/routes/emails/inboxes.tsx:828
@@ -371,7 +381,7 @@ msgstr "Columns"
 msgid "Comma-separated"
 msgstr "Comma-separated"
 
-#: src/components/layout/nav-items.ts:45
+#: src/components/layout/nav-items.ts:46
 #: src/routes/companies/index.tsx:248
 msgid "Companies"
 msgstr "Companies"
@@ -516,6 +526,10 @@ msgstr "Create a prospect landing page to share with this company."
 #: src/routes/emails/inboxes.tsx:735
 msgid "Create failed"
 msgstr "Create failed"
+
+#: src/routes/calendar/index.tsx:274
+msgid "Create follow-up task"
+msgstr "Create follow-up task"
 
 #: src/routes/emails/inboxes.tsx:893
 msgid "Create footer"
@@ -688,7 +702,7 @@ msgstr "Email drafts"
 msgid "Email via Batuda"
 msgstr "Email via Batuda"
 
-#: src/components/layout/nav-items.ts:52
+#: src/components/layout/nav-items.ts:53
 #: src/routes/companies/$slug.tsx:780
 #: src/routes/emails/index.tsx:536
 msgid "Emails"
@@ -835,6 +849,10 @@ msgstr "Instagram"
 msgid "Interaction logged"
 msgstr "Interaction logged"
 
+#: src/routes/calendar/index.tsx:260
+msgid "Join video call"
+msgstr "Join video call"
+
 #: src/routes/pages/index.tsx:145
 msgid "Lang"
 msgstr "Lang"
@@ -874,6 +892,10 @@ msgstr "Later"
 msgid "LinkedIn"
 msgstr "LinkedIn"
 
+#: src/routes/calendar/index.tsx:166
+msgid "Loading calendar…"
+msgstr "Loading calendar…"
+
 #: src/routes/companies/index.tsx:308
 msgid "Loading companies…"
 msgstr "Loading companies…"
@@ -898,6 +920,7 @@ msgstr "Located on the map"
 msgid "Locating…"
 msgstr "Locating…"
 
+#: src/routes/calendar/index.tsx:255
 #: src/routes/companies/$slug.tsx:851
 msgid "Location"
 msgstr "Location"
@@ -997,6 +1020,10 @@ msgstr "Meeting"
 msgid "Meeting booked"
 msgstr "Meeting booked"
 
+#: src/routes/calendar/index.tsx:158
+msgid "Meetings from bookings, email invitations, and internal blocks."
+msgstr "Meetings from bookings, email invitations, and internal blocks."
+
 #: src/components/emails/compose-form.tsx:389
 msgid "Message"
 msgstr "Message"
@@ -1066,6 +1093,10 @@ msgstr "Next: {0}"
 msgid "No activity yet"
 msgstr "No activity yet"
 
+#: src/routes/calendar/index.tsx:169
+msgid "No calendar events yet"
+msgstr "No calendar events yet"
+
 #: src/routes/tasks/index.tsx:726
 msgid "No changes recorded yet."
 msgstr "No changes recorded yet."
@@ -1124,6 +1155,10 @@ msgstr "No high-priority companies without a scheduled follow-up"
 #: src/routes/emails/inboxes.tsx:246
 msgid "No inboxes yet"
 msgstr "No inboxes yet"
+
+#: src/routes/calendar/index.tsx:265
+msgid "no location"
+msgstr "no location"
 
 #: src/routes/emails/$threadId.tsx:423
 msgid "No messages in this thread"
@@ -1191,6 +1226,10 @@ msgstr "On {date}, {who} wrote:"
 #: src/routes/tasks/index.tsx:443
 msgid "Open"
 msgstr "Open"
+
+#: src/routes/calendar/index.tsx:283
+msgid "Open company"
+msgstr "Open company"
 
 #: src/components/companies/where-panel.tsx:99
 #: src/routes/companies/$slug.tsx:709
@@ -1278,7 +1317,7 @@ msgstr "Page saved"
 msgid "Page title"
 msgstr "Page title"
 
-#: src/components/layout/nav-items.ts:59
+#: src/components/layout/nav-items.ts:60
 #: src/routes/companies/$slug.tsx:786
 #: src/routes/pages/$id.tsx:214
 #: src/routes/pages/index.tsx:105
@@ -1293,15 +1332,20 @@ msgstr "Pain points"
 msgid "Password"
 msgstr "Password"
 
+#: src/routes/calendar/index.tsx:224
 #: src/routes/tasks/index.tsx:332
 #: src/routes/tasks/index.tsx:674
 msgid "Personal"
 msgstr "Personal"
 
-#: src/components/layout/nav-items.ts:37
+#: src/components/layout/nav-items.ts:38
 #: src/routes/index.tsx:260
 msgid "Pipeline"
 msgstr "Pipeline"
+
+#: src/routes/calendar/index.tsx:174
+msgid "Preparing calendar view…"
+msgstr "Preparing calendar view…"
 
 #: src/routes/pages/$id.tsx:232
 #: src/routes/pages/index.tsx:178
@@ -1325,7 +1369,7 @@ msgstr "Priority"
 msgid "Products fit"
 msgstr "Products fit"
 
-#: src/components/layout/nav-items.ts:73
+#: src/components/layout/nav-items.ts:81
 #: src/routes/companies/$slug.tsx:768
 #: src/routes/companies/$slug.tsx:971
 #: src/routes/profile/index.tsx:81
@@ -1597,6 +1641,7 @@ msgstr "Snoozed"
 msgid "someone"
 msgstr "someone"
 
+#: src/routes/calendar/index.tsx:243
 #: src/routes/companies/$slug.tsx:861
 #: src/routes/tasks/index.tsx:692
 msgid "Source"
@@ -1610,6 +1655,7 @@ msgstr "Spam"
 msgid "Stamped into the workshop ledger."
 msgstr "Stamped into the workshop ledger."
 
+#: src/routes/calendar/index.tsx:249
 #: src/routes/pages/index.tsx:146
 #: src/routes/tasks/index.tsx:680
 msgid "Status"
@@ -1652,7 +1698,7 @@ msgstr "Tags"
 msgid "Task title"
 msgstr "Task title"
 
-#: src/components/layout/nav-items.ts:66
+#: src/components/layout/nav-items.ts:67
 #: src/routes/companies/$slug.tsx:783
 #: src/routes/tasks/index.tsx:436
 msgid "Tasks"
@@ -1831,6 +1877,7 @@ msgstr "What needs to happen?"
 msgid "WhatsApp"
 msgstr "WhatsApp"
 
+#: src/routes/calendar/index.tsx:230
 #: src/routes/emails/index.tsx:953
 #: src/routes/emails/index.tsx:1272
 msgid "When"

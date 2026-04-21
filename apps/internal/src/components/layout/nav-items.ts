@@ -2,6 +2,7 @@ import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import {
 	Building2,
+	Calendar,
 	CheckSquare,
 	FileText,
 	Gauge,
@@ -68,6 +69,13 @@ export const navItems: ReadonlyArray<NavItem> = [
 		icon: CheckSquare,
 		color: 'var(--color-status-responded)',
 		testId: 'tasks',
+	},
+	{
+		label: msg`Calendar`,
+		path: '/calendar',
+		icon: Calendar,
+		color: 'var(--color-status-meeting)',
+		testId: 'calendar',
 	},
 	{
 		label: msg`Profile`,

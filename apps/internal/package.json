@@ -21,6 +21,14 @@
 		"@effect/atom-react": "4.0.0-beta.43",
 		"@lingui/core": "6.0.0-next.3",
 		"@lingui/react": "6.0.0-next.3",
+		"@schedule-x/calendar": "^4.5.0",
+		"@schedule-x/current-time": "^4.5.0",
+		"@schedule-x/drag-and-drop": "^3.7.3",
+		"@schedule-x/event-modal": "^4.5.0",
+		"@schedule-x/events-service": "^4.5.0",
+		"@schedule-x/react": "^4.1.0",
+		"@schedule-x/resize": "^3.7.3",
+		"@schedule-x/theme-default": "^4.5.0",
 		"@tanstack/react-router": "1.168.10",
 		"@tanstack/react-start": "1.167.16",
 		"@tanstack/react-table": "^8.21.3",
@@ -40,7 +48,8 @@
 		"react-dom": "19.2.4",
 		"react-leaflet": "^5.0.0",
 		"scheduler": "^0.27.0",
-		"styled-components": "6.3.12"
+		"styled-components": "6.3.12",
+		"temporal-polyfill": "^0.3.0"
 	},
 	"devDependencies": {
 		"@lingui/cli": "6.0.0-next.3",

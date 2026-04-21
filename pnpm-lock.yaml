@@ -126,6 +126,30 @@ importers:
       '@lingui/react':
         specifier: 6.0.0-next.3
         version: 6.0.0-next.3(react@19.2.4)
+      '@schedule-x/calendar':
+        specifier: ^4.5.0
+        version: 4.5.0(@preact/signals@2.9.0(preact@10.29.1))(preact@10.29.1)(temporal-polyfill@0.3.0)
+      '@schedule-x/current-time':
+        specifier: ^4.5.0
+        version: 4.5.0
+      '@schedule-x/drag-and-drop':
+        specifier: ^3.7.3
+        version: 3.7.3
+      '@schedule-x/event-modal':
+        specifier: ^4.5.0
+        version: 4.5.0(@preact/signals@2.9.0(preact@10.29.1))(preact@10.29.1)
+      '@schedule-x/events-service':
+        specifier: ^4.5.0
+        version: 4.5.0
+      '@schedule-x/react':
+        specifier: ^4.1.0
+        version: 4.1.0(@schedule-x/calendar@4.5.0(@preact/signals@2.9.0(preact@10.29.1))(preact@10.29.1)(temporal-polyfill@0.3.0))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@schedule-x/resize':
+        specifier: ^3.7.3
+        version: 3.7.3
+      '@schedule-x/theme-default':
+        specifier: ^4.5.0
+        version: 4.5.0
       '@tanstack/react-router':
         specifier: 1.168.10
         version: 1.168.10(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -186,6 +210,9 @@ importers:
       styled-components:
         specifier: 6.3.12
         version: 6.3.12(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      temporal-polyfill:
+        specifier: ^0.3.0
+        version: 0.3.0
     devDependencies:
       '@lingui/cli':
         specifier: 6.0.0-next.3
@@ -2167,6 +2194,14 @@ packages:
     resolution: {integrity: sha512-oeQJs1aa8Ghke8JIK9yuq/+KjMiaYeDZ38jx7MhkXncXlUKjqQ3wEm2X3qCKyjo+ZZofZj+WsEEiqkTtRuE2xQ==}
     engines: {node: ^20.9.0 || >=22.0.0, npm: '>=10.8.2'}
 
+  '@preact/signals-core@1.14.1':
+    resolution: {integrity: sha512-vxPpfXqrwUe9lpjqfYNjAF/0RF/eFGeLgdJzdmIIZjpOnTmGmAB4BjWone562mJGMRP4frU6iZ6ei3PDsu52Ng==}
+
+  '@preact/signals@2.9.0':
+    resolution: {integrity: sha512-hYrY0KyUqkDgOl1qba/JGn6y81pXnurn21PMaxfcMwdncdZ3M/oVdmpTvEnsGjh48dIwDVc7bjWHqIsngSjYug==}
+    peerDependencies:
+      preact: '>= 10.25.0 || >=11.0.0-0'
+
   '@quansync/fs@1.0.0':
     resolution: {integrity: sha512-4TJ3DFtlf1L5LDMaM6CanJ/0lckGNtJcMjQ1NAV6zDmA0tEHKZtxNKin8EgPaVX1YzljbxckyT2tJrpQKAtngQ==}
 
@@ -2715,6 +2750,41 @@ packages:
 
   '@rolldown/pluginutils@1.0.0-rc.7':
     resolution: {integrity: sha512-qujRfC8sFVInYSPPMLQByRh7zhwkGFS4+tyMQ83srV1qrxL4g8E2tyxVVyxd0+8QeBM1mIk9KbWxkegRr76XzA==}
+
+  '@schedule-x/calendar@4.5.0':
+    resolution: {integrity: sha512-KEDtvder+nOLuHv0yWKvNBbJBsvxfBdbL/p1ZwX86sjC63Mp6u3zZt73a6V1a+8DbFSnBQpa+cReIUO3zjf7/A==}
+    peerDependencies:
+      '@preact/signals': ^2.0.2
+      preact: ^10.19.2
+      temporal-polyfill: 0.3.0
+
+  '@schedule-x/current-time@4.5.0':
+    resolution: {integrity: sha512-IRHGQVHn9gqia91v+oyXbAO6Y0mCI9NrYI/zG9XRKSuUg4PBwxDWyGyPVdM2RPac4Asn8UkbM34Ul3bYxqCJrg==}
+
+  '@schedule-x/drag-and-drop@3.7.3':
+    resolution: {integrity: sha512-nHwZKzdIKWNTdT5BEXy4vLlHOmOH3C3M744QUIU0EOXPAFZQR1bBTviGs2NhmvaLiGstnVx2/TZtdhocy60hgg==}
+
+  '@schedule-x/event-modal@4.5.0':
+    resolution: {integrity: sha512-tZLrUbbOU3BzQmgNQiMG9qNHBae51mtTpP60rMZZtJ0RVrXfjC+Qcp4uBWFtdaO7KCudMwUVqrJaamwg2TDYVQ==}
+    peerDependencies:
+      '@preact/signals': ^2.0.2
+      preact: ^10.19.2
+
+  '@schedule-x/events-service@4.5.0':
+    resolution: {integrity: sha512-7xqptu5RLbUYSO+2U7oo3Q5XtwVEH0ZQ6/Lcc7UJkpynqHEfpaplt59E0PMUKXcCTKI78BZmJCca3wZYcpuYkw==}
+
+  '@schedule-x/react@4.1.0':
+    resolution: {integrity: sha512-l2hn1kdTModk4Lbt+nEr/VAcuNMA+w+hAAtgz8VLOj5UeieM7PWoK+cDapzPHCjUKisCSPd8QZfAX966Ma82kQ==}
+    peerDependencies:
+      '@schedule-x/calendar': ^3.1.0 || ^4.0.0
+      react: ^16.7.0 || ^17 || ^18 || ^19
+      react-dom: ^16.7.0 || ^17 || ^18 || ^19
+
+  '@schedule-x/resize@3.7.3':
+    resolution: {integrity: sha512-rdzsBx6Dw7d7jwYb8IQzphTwxAofegn1caVaWEdv9WTj8RkLzDILgpM2Oe6KHtpgjMcUWs6aKBaPirJh0T9VZg==}
+
+  '@schedule-x/theme-default@4.5.0':
+    resolution: {integrity: sha512-T+OvouoRUPKpR2weZlt/7EvUEjMRmmQeZVfWMnKykoSWuZ2w+ypBncplXuf6mstio+ty2Mx3X/rThr1iJB7XXw==}
 
   '@selderee/plugin-htmlparser2@0.11.0':
     resolution: {integrity: sha512-P33hHGdldxGabLFjPPpaTxVolMrzrcegejx+0GxjrIb9Zv48D8yAIA/QTDR2dFl7Uz7urX8aX6+5bCZslr+gWQ==}
@@ -5281,6 +5351,9 @@ packages:
   postgres-range@1.1.4:
     resolution: {integrity: sha512-i/hbxIE9803Alj/6ytL7UHQxRvZkI9O4Sy+J3HGc4F4oo/2eQAjTSNJ0bfxyse3bH0nuVesCk+3IRLaMtG3H6w==}
 
+  preact@10.29.1:
+    resolution: {integrity: sha512-gQCLc/vWroE8lIpleXtdJhTFDogTdZG9AjMUpVkDf2iTCNwYNWA+u16dL41TqUDJO4gm2IgrcMv3uTpjd4Pwmg==}
+
   prettier@3.8.1:
     resolution: {integrity: sha512-UOnG6LftzbdaHZcKoPFtOcCKztrQ57WkHDeRD9t/PTQtmT0NHSeWWepj6pS0z/N7+08BHFDQVUrfmfMRcZwbMg==}
     engines: {node: '>=14'}
@@ -5823,6 +5896,12 @@ packages:
   tapable@2.3.2:
     resolution: {integrity: sha512-1MOpMXuhGzGL5TTCZFItxCc0AARf1EZFQkGqMm7ERKj8+Hgr5oLvJOVFcC+lRmR8hCe2S3jC4T5D7Vg/d7/fhA==}
     engines: {node: '>=6'}
+
+  temporal-polyfill@0.3.0:
+    resolution: {integrity: sha512-qNsTkX9K8hi+FHDfHmf22e/OGuXmfBm9RqNismxBrnSmZVJKegQ+HYYXT+R7Ha8F/YSm2Y34vmzD4cxMu2u95g==}
+
+  temporal-spec@0.3.0:
+    resolution: {integrity: sha512-n+noVpIqz4hYgFSMOSiINNOUOMFtV5cZQNCmmszA6GiVFVRt3G7AqVyhXjhCSmowvQn+NsGn+jMDMKJYHd3bSQ==}
 
   tiny-invariant@1.3.3:
     resolution: {integrity: sha512-+FbBPE1o9QAYvviau/qC5SE3caw21q3xkvWKBtja5vgqOWIHHJ3ioaq1VPfn/Szqctz2bU/oYeKd9/z5BL+PVg==}
@@ -7928,6 +8007,13 @@ snapshots:
 
   '@phun-ky/typeof@2.0.3': {}
 
+  '@preact/signals-core@1.14.1': {}
+
+  '@preact/signals@2.9.0(preact@10.29.1)':
+    dependencies:
+      '@preact/signals-core': 1.14.1
+      preact: 10.29.1
+
   '@quansync/fs@1.0.0':
     dependencies:
       quansync: 1.0.0
@@ -8392,6 +8478,33 @@ snapshots:
   '@rolldown/pluginutils@1.0.0-rc.12': {}
 
   '@rolldown/pluginutils@1.0.0-rc.7': {}
+
+  '@schedule-x/calendar@4.5.0(@preact/signals@2.9.0(preact@10.29.1))(preact@10.29.1)(temporal-polyfill@0.3.0)':
+    dependencies:
+      '@preact/signals': 2.9.0(preact@10.29.1)
+      preact: 10.29.1
+      temporal-polyfill: 0.3.0
+
+  '@schedule-x/current-time@4.5.0': {}
+
+  '@schedule-x/drag-and-drop@3.7.3': {}
+
+  '@schedule-x/event-modal@4.5.0(@preact/signals@2.9.0(preact@10.29.1))(preact@10.29.1)':
+    dependencies:
+      '@preact/signals': 2.9.0(preact@10.29.1)
+      preact: 10.29.1
+
+  '@schedule-x/events-service@4.5.0': {}
+
+  '@schedule-x/react@4.1.0(@schedule-x/calendar@4.5.0(@preact/signals@2.9.0(preact@10.29.1))(preact@10.29.1)(temporal-polyfill@0.3.0))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+    dependencies:
+      '@schedule-x/calendar': 4.5.0(@preact/signals@2.9.0(preact@10.29.1))(preact@10.29.1)(temporal-polyfill@0.3.0)
+      react: 19.2.4
+      react-dom: 19.2.4(react@19.2.4)
+
+  '@schedule-x/resize@3.7.3': {}
+
+  '@schedule-x/theme-default@4.5.0': {}
 
   '@selderee/plugin-htmlparser2@0.11.0':
     dependencies:
@@ -11117,6 +11230,8 @@ snapshots:
 
   postgres-range@1.1.4: {}
 
+  preact@10.29.1: {}
+
   prettier@3.8.1: {}
 
   pretty-format@29.7.0:
@@ -11752,6 +11867,12 @@ snapshots:
   tailwindcss@4.2.2: {}
 
   tapable@2.3.2: {}
+
+  temporal-polyfill@0.3.0:
+    dependencies:
+      temporal-spec: 0.3.0
+
+  temporal-spec@0.3.0: {}
 
   tiny-invariant@1.3.3: {}
 

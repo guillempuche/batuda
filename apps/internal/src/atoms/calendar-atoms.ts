@@ -1,0 +1,53 @@
+import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+
+/**
+ * Calendar atom registry (§6 of the calendar plan).
+ *
+ * Events are fetched once for a wide window on first paint (current
+ * month ± a fortnight on each side). Schedule-X owns the visible-range
+ * navigation in-memory; we refetch when the user jumps more than a
+ * month forward/backward via a `calendarRangeAtom` held on the page,
+ * not by re-keying the module-level atom (that would refetch on every
+ * view switch).
+ */
+export const calendarEventTypesAtom = BatudaApiAtom.query(
+	'calendar',
+	'listEventTypes',
+	{ query: { active: 'true' } },
+)
+
+/**
+ * Upcoming + recent events. `from` and `to` are absent on purpose — the
+ * server returns a sensible default window (next 60d + past 30d) so
+ * first paint always has context. A dedicated page-level atom re-runs
+ * the query with explicit range when the user navigates outside it.
+ */
+export const calendarEventsAtom = BatudaApiAtom.query(
+	'calendar',
+	'listEvents',
+	{
+		query: { limit: 500 },
+	},
+)
+
+export const createInternalEventAtom = BatudaApiAtom.mutation(
+	'calendar',
+	'createInternalEvent',
+)
+
+const eventDetailCache = new Map<
+	string,
+	ReturnType<typeof makeEventDetailAtom>
+>()
+function makeEventDetailAtom(eventId: string) {
+	return BatudaApiAtom.query('calendar', 'getEvent', {
+		params: { id: eventId },
+	})
+}
+export function calendarEventDetailAtomFor(eventId: string) {
+	const existing = eventDetailCache.get(eventId)
+	if (existing !== undefined) return existing
+	const atom = makeEventDetailAtom(eventId)
+	eventDetailCache.set(eventId, atom)
+	return atom
+}
