@@ -1,6 +1,6 @@
 {
 	"name": "@batuda/ui",
-	"version": "2026.4.21-1",
+	"version": "2026.4.21-2",
 	"type": "module",
 	"types": "./src/index.ts",
 	"main": "./src/index.ts",
