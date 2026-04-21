@@ -39,6 +39,17 @@ export {
 } from './domain/errors'
 // ── Infrastructure ─────────────────────────────────────────────────────────
 export {
+	buildCreateBookingBody,
+	CALCOM_API_VERSION,
+	CALCOM_DEFAULT_BASE_URL,
+	CALCOM_DEFAULT_TIMEZONE,
+	type CalcomApiVersionKey,
+	CalcomBookingProviderLayer,
+	flattenSlots,
+	makeCalcomBookingProvider,
+	stringifyId,
+} from './infrastructure/calcom-live'
+export {
 	BookingProviderLive,
 	IcsParserLive,
 } from './infrastructure/live'

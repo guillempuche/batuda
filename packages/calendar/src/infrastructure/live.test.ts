@@ -1,11 +1,16 @@
-import { Cause, ConfigProvider, Effect } from 'effect'
+import { Cause, ConfigProvider, Effect, Layer } from 'effect'
+import { FetchHttpClient } from 'effect/unstable/http'
 import { describe, expect, it } from 'vitest'
 
 import { BookingProvider } from '../application/ports/booking-provider'
 import { BookingProviderLive } from './live'
 
 // Build a one-shot program that materializes the live layer under a specific
-// env snapshot and hands back the booking provider for inspection.
+// env snapshot and hands back the booking provider for inspection. Every
+// branch of `BookingProviderLive` needs `HttpClient` upstream (the calcom
+// adapter actually uses it; the stub ignores the extra dependency), so we
+// always provide `FetchHttpClient.layer` — env snapshot alone decides which
+// branch builds.
 const withEnv = <A, E>(
 	env: Record<string, string>,
 	program: (provider: BookingProvider['Service']) => Effect.Effect<A, E>,
@@ -15,7 +20,9 @@ const withEnv = <A, E>(
 			const provider = yield* BookingProvider
 			return yield* program(provider)
 		}).pipe(
-			Effect.provide(BookingProviderLive),
+			Effect.provide(
+				BookingProviderLive.pipe(Layer.provide(FetchHttpClient.layer)),
+			),
 			Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env }))),
 		) as Effect.Effect<A, E, never>,
 	)
@@ -34,11 +41,12 @@ describe('BookingProviderLive env dispatch', () => {
 		}
 	})
 
-	it('should wire a fail-fast stand-in when CALENDAR_PROVIDER=calcom (adapter not yet live)', async () => {
-		// GIVEN CALENDAR_PROVIDER=calcom and no CalcomLive adapter wired in PR #1
-		// WHEN a caller invokes listEventTypes
-		// THEN the call fails with BookingFailed{reason='calcom_adapter_not_yet_wired'}
-		// AND `recoverable=false` so retries don't mask the wiring gap
+	it('should require CALENDAR_API_KEY when CALENDAR_PROVIDER=calcom', async () => {
+		// GIVEN CALENDAR_PROVIDER=calcom but no CALENDAR_API_KEY in the env
+		// WHEN the layer attempts to build the live cal.com adapter
+		// THEN the boot fails with ConfigError — no silent fallback to a
+		// placeholder or an unauthenticated client (memory
+		// `feedback_explicit_env_vars`)
 		const exit = await withEnv({ CALENDAR_PROVIDER: 'calcom' }, p =>
 			p.listEventTypes(),
 		)
@@ -46,12 +54,8 @@ describe('BookingProviderLive env dispatch', () => {
 		if (exit._tag === 'Failure') {
 			const failReason = exit.cause.reasons.find(Cause.isFailReason)
 			expect(failReason).toBeDefined()
-			const failure = failReason?.error
-			expect(failure?._tag).toBe('BookingFailed')
-			if (failure?._tag === 'BookingFailed') {
-				expect(failure.reason).toBe('calcom_adapter_not_yet_wired')
-				expect(failure.recoverable).toBe(false)
-			}
+			const failure = failReason?.error as { _tag?: string } | undefined
+			expect(failure?._tag).toBe('ConfigError')
 		}
 	})
 
