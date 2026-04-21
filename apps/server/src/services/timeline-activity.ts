@@ -76,6 +76,78 @@ export class SystemEvent extends Data.TaggedClass('SystemEvent')<{
 	readonly occurredAt: Date
 }> {}
 
+export class MeetingScheduled extends Data.TaggedClass('MeetingScheduled')<{
+	readonly calendarEventId: string
+	readonly companyId: string | null
+	readonly contactId: string | null
+	readonly source: 'booking' | 'email' | 'internal'
+	readonly title: string
+	readonly startAt: Date
+	readonly endAt: Date
+	readonly actorUserId: string | null
+	readonly occurredAt: Date
+}> {}
+
+export class MeetingRescheduled extends Data.TaggedClass('MeetingRescheduled')<{
+	readonly calendarEventId: string
+	readonly companyId: string | null
+	readonly contactId: string | null
+	readonly previousStartAt: Date
+	readonly startAt: Date
+	readonly endAt: Date
+	readonly actorUserId: string | null
+	readonly occurredAt: Date
+}> {}
+
+export class MeetingCancelled extends Data.TaggedClass('MeetingCancelled')<{
+	readonly calendarEventId: string
+	readonly companyId: string | null
+	readonly contactId: string | null
+	readonly cancelledStartAt: Date
+	readonly actorUserId: string | null
+	readonly occurredAt: Date
+}> {}
+
+export class MeetingRsvp extends Data.TaggedClass('MeetingRsvp')<{
+	readonly calendarEventId: string
+	readonly attendeeEmail: string
+	readonly rsvp: 'accepted' | 'declined' | 'tentative'
+	readonly companyId: string | null
+	readonly contactId: string | null
+	readonly actorUserId: string | null
+	readonly occurredAt: Date
+}> {}
+
+export class TaskCreated extends Data.TaggedClass('TaskCreated')<{
+	readonly taskId: string
+	readonly companyId: string | null
+	readonly contactId: string | null
+	readonly title: string
+	readonly taskType: string
+	readonly actorUserId: string | null
+	readonly actorKind: 'user' | 'agent'
+	readonly occurredAt: Date
+}> {}
+
+export class TaskUpdated extends Data.TaggedClass('TaskUpdated')<{
+	readonly taskId: string
+	readonly companyId: string | null
+	readonly contactId: string | null
+	readonly change: Record<string, readonly [unknown, unknown]>
+	readonly actorUserId: string | null
+	readonly actorKind: 'user' | 'agent'
+	readonly occurredAt: Date
+}> {}
+
+export class TaskCompleted extends Data.TaggedClass('TaskCompleted')<{
+	readonly taskId: string
+	readonly companyId: string | null
+	readonly contactId: string | null
+	readonly actorUserId: string | null
+	readonly actorKind: 'user' | 'agent'
+	readonly occurredAt: Date
+}> {}
+
 export type TimelineEvent =
 	| EmailSent
 	| EmailReceived
@@ -84,10 +156,22 @@ export type TimelineEvent =
 	| ProposalEvent
 	| ResearchRunCompleted
 	| SystemEvent
+	| MeetingScheduled
+	| MeetingRescheduled
+	| MeetingCancelled
+	| MeetingRsvp
+	| TaskCreated
+	| TaskUpdated
+	| TaskCompleted
 
 export type DenormColumn = 'last_email_at' | 'last_call_at' | 'last_meeting_at'
 
-export const denormColumnFor = (event: TimelineEvent): DenormColumn | null => {
+const isPast = (at: Date, now: Date) => at.getTime() <= now.getTime()
+
+export const denormColumnFor = (
+	event: TimelineEvent,
+	now: Date = new Date(),
+): DenormColumn | null => {
 	switch (event._tag) {
 		case 'EmailSent':
 		case 'EmailReceived':
@@ -98,13 +182,29 @@ export const denormColumnFor = (event: TimelineEvent): DenormColumn | null => {
 			if (event.channel === 'visit' || event.channel === 'event')
 				return 'last_meeting_at'
 			return null
+		case 'MeetingScheduled':
+		case 'MeetingRescheduled':
+			return isPast(event.startAt, now) ? 'last_meeting_at' : null
 		case 'DocumentCreated':
 		case 'ProposalEvent':
 		case 'ResearchRunCompleted':
 		case 'SystemEvent':
+		case 'MeetingCancelled':
+		case 'MeetingRsvp':
+		case 'TaskCreated':
+		case 'TaskUpdated':
+		case 'TaskCompleted':
 			return null
 	}
 }
+
+// Meetings that may shift `next_calendar_event_at` must recompute from
+// calendar_events, not GREATEST — rescheduling earlier or cancelling the only
+// upcoming event can DECREASE the value.
+export const needsNextMeetingRecompute = (event: TimelineEvent): boolean =>
+	event._tag === 'MeetingScheduled' ||
+	event._tag === 'MeetingRescheduled' ||
+	event._tag === 'MeetingCancelled'
 
 type TimelineKind =
 	| 'email_sent'
@@ -116,6 +216,13 @@ type TimelineKind =
 	| 'proposal_responded'
 	| 'research_run'
 	| 'system_event'
+	| 'meeting_scheduled'
+	| 'meeting_rescheduled'
+	| 'meeting_cancelled'
+	| 'meeting_rsvp'
+	| 'task_created'
+	| 'task_updated'
+	| 'task_completed'
 
 type TimelineEntityType =
 	| 'email_message'
@@ -125,6 +232,8 @@ type TimelineEntityType =
 	| 'proposal'
 	| 'research_run'
 	| 'system'
+	| 'calendar_event'
+	| 'task'
 
 type TimelineDirection = 'inbound' | 'outbound'
 
@@ -254,6 +363,122 @@ const rowBase = (event: TimelineEvent): TimelineRowBase => {
 				summary: event.summary,
 				payload: event.payload,
 			}
+		case 'MeetingScheduled':
+			return {
+				kind: 'meeting_scheduled',
+				entityType: 'calendar_event',
+				companyId: event.companyId,
+				contactId: event.contactId,
+				channel: 'calendar',
+				direction: null,
+				actorUserId: event.actorUserId,
+				occurredAt: event.occurredAt,
+				summary: event.title,
+				payload: {
+					source: event.source,
+					startAt: event.startAt,
+					endAt: event.endAt,
+				},
+			}
+		case 'MeetingRescheduled':
+			return {
+				kind: 'meeting_rescheduled',
+				entityType: 'calendar_event',
+				companyId: event.companyId,
+				contactId: event.contactId,
+				channel: 'calendar',
+				direction: null,
+				actorUserId: event.actorUserId,
+				occurredAt: event.occurredAt,
+				summary: null,
+				payload: {
+					previousStartAt: event.previousStartAt,
+					startAt: event.startAt,
+					endAt: event.endAt,
+				},
+			}
+		case 'MeetingCancelled':
+			return {
+				kind: 'meeting_cancelled',
+				entityType: 'calendar_event',
+				companyId: event.companyId,
+				contactId: event.contactId,
+				channel: 'calendar',
+				direction: null,
+				actorUserId: event.actorUserId,
+				occurredAt: event.occurredAt,
+				summary: null,
+				payload: {
+					cancelledStartAt: event.cancelledStartAt,
+				},
+			}
+		case 'MeetingRsvp':
+			return {
+				kind: 'meeting_rsvp',
+				entityType: 'calendar_event',
+				companyId: event.companyId,
+				contactId: event.contactId,
+				channel: 'calendar',
+				direction: null,
+				actorUserId: event.actorUserId,
+				occurredAt: event.occurredAt,
+				summary: null,
+				payload: {
+					attendeeEmail: event.attendeeEmail,
+					rsvp: event.rsvp,
+				},
+			}
+		case 'TaskCreated':
+			return {
+				kind: 'task_created',
+				entityType: 'task',
+				companyId: event.companyId,
+				contactId: event.contactId,
+				channel: null,
+				direction: null,
+				actorUserId: event.actorUserId,
+				occurredAt: event.occurredAt,
+				summary: event.title,
+				payload: {
+					taskType: event.taskType,
+					actorKind: event.actorKind,
+				},
+			}
+		case 'TaskUpdated': {
+			const statusChange = event.change['status']
+			const transitionsToDone =
+				Array.isArray(statusChange) && statusChange[1] === 'done'
+			return {
+				kind: transitionsToDone ? 'task_completed' : 'task_updated',
+				entityType: 'task',
+				companyId: event.companyId,
+				contactId: event.contactId,
+				channel: null,
+				direction: null,
+				actorUserId: event.actorUserId,
+				occurredAt: event.occurredAt,
+				summary: null,
+				payload: {
+					change: event.change,
+					actorKind: event.actorKind,
+				},
+			}
+		}
+		case 'TaskCompleted':
+			return {
+				kind: 'task_completed',
+				entityType: 'task',
+				companyId: event.companyId,
+				contactId: event.contactId,
+				channel: null,
+				direction: null,
+				actorUserId: event.actorUserId,
+				occurredAt: event.occurredAt,
+				summary: null,
+				payload: {
+					actorKind: event.actorKind,
+				},
+			}
 	}
 }
 
@@ -335,6 +560,13 @@ export const mapEventToInteraction = (
 		case 'ProposalEvent':
 		case 'ResearchRunCompleted':
 		case 'SystemEvent':
+		case 'MeetingScheduled':
+		case 'MeetingRescheduled':
+		case 'MeetingCancelled':
+		case 'MeetingRsvp':
+		case 'TaskCreated':
+		case 'TaskUpdated':
+		case 'TaskCompleted':
 			return null
 	}
 }
@@ -364,6 +596,15 @@ const entityIdFor = (
 			return event.researchRunId
 		case 'SystemEvent':
 			return event.entityId
+		case 'MeetingScheduled':
+		case 'MeetingRescheduled':
+		case 'MeetingCancelled':
+		case 'MeetingRsvp':
+			return event.calendarEventId
+		case 'TaskCreated':
+		case 'TaskUpdated':
+		case 'TaskCompleted':
+			return event.taskId
 	}
 }
 
@@ -434,6 +675,28 @@ export class TimelineActivityService extends ServiceMap.Service<TimelineActivity
 							WHERE id = ${contactId}`
 				}
 			}
+
+			const recomputeCompanyNextMeeting = (companyId: string) => sql`
+				UPDATE companies SET
+					next_calendar_event_at = (
+						SELECT MIN(start_at) FROM calendar_events
+						WHERE company_id = ${companyId}
+							AND status = 'confirmed'
+							AND start_at > now()
+					),
+					updated_at = now()
+				WHERE id = ${companyId}`
+
+			const recomputeContactNextMeeting = (contactId: string) => sql`
+				UPDATE contacts SET
+					next_calendar_event_at = (
+						SELECT MIN(start_at) FROM calendar_events
+						WHERE contact_id = ${contactId}
+							AND status = 'confirmed'
+							AND start_at > now()
+					),
+					updated_at = now()
+				WHERE id = ${contactId}`
 
 			return {
 				record: (
@@ -509,11 +772,28 @@ export class TimelineActivityService extends ServiceMap.Service<TimelineActivity
 								}
 
 								const column = denormColumnFor(event)
+								// For meetings, the column bump uses the meeting's `startAt`
+								// (time the meeting happened), not `occurredAt` (when we
+								// recorded the activity).
+								const bumpAt =
+									event._tag === 'MeetingScheduled' ||
+									event._tag === 'MeetingRescheduled'
+										? event.startAt
+										: event.occurredAt
 								if (column && base.companyId) {
-									yield* bumpCompany(column, base.companyId, event.occurredAt)
+									yield* bumpCompany(column, base.companyId, bumpAt)
 								}
 								if (column && base.contactId) {
-									yield* bumpContact(column, base.contactId, event.occurredAt)
+									yield* bumpContact(column, base.contactId, bumpAt)
+								}
+
+								if (needsNextMeetingRecompute(event)) {
+									if (base.companyId) {
+										yield* recomputeCompanyNextMeeting(base.companyId)
+									}
+									if (base.contactId) {
+										yield* recomputeContactNextMeeting(base.contactId)
+									}
 								}
 
 								return {
