@@ -5,10 +5,6 @@ All notable changes to this project will be documented in this file.
 
 ## 2026-04-21 (ui-v2026.4.21-2)
 
-## 2026-04-21 (ui-v2026.4.21-1)
-
-## 2026-04-21 (ui-v2026.4.21)
-
 ### Features
 
 * add data-testid hooks across Forja for agent-browser ([5cf0c12](https://github.com/guillempuche/batuda/commit/5cf0c12f1a192185a381398507d724867a8617e0))
@@ -30,6 +26,7 @@ All notable changes to this project will be documented in this file.
 ### CI/CD
 
 * drop jsr publishing and rename server dockerfile filters ([5b29816](https://github.com/guillempuche/batuda/commit/5b29816c1e8808a23ebeda33ed26e719da9ceb7f))
+* publish @batuda/ui via npm trusted publishing (oidc) ([f57e7fe](https://github.com/guillempuche/batuda/commit/f57e7fef32ab28290df40f1afa0fa0ec52f83128))
 
 ### Chores
 
@@ -37,5 +34,3 @@ All notable changes to this project will be documented in this file.
 * extract marketing app and publish @engranatge/ui ([56116a0](https://github.com/guillempuche/batuda/commit/56116a0d58e08c9d5a17cf33bd99b6fa9a286b39))
 * finish batuda rename in docs seeds tests and i18n ([d59f344](https://github.com/guillempuche/batuda/commit/d59f344fb83b4519bdd78652934afbba624be284))
 * rename tool to batuda and isolate engranatge as tenant ([f090b60](https://github.com/guillempuche/batuda/commit/f090b6085e25ef2becb4d188ca9a6199bc6474ae))
-
-# Changelog
