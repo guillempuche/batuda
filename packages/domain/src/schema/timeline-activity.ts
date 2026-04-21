@@ -15,6 +15,13 @@ export const TimelineKind = Schema.Literals([
 	'proposal_responded',
 	'research_run',
 	'system_event',
+	'meeting_scheduled',
+	'meeting_rescheduled',
+	'meeting_cancelled',
+	'meeting_rsvp',
+	'task_created',
+	'task_updated',
+	'task_completed',
 ])
 export type TimelineKind = typeof TimelineKind.Type
 
@@ -26,6 +33,8 @@ export const TimelineEntityType = Schema.Literals([
 	'proposal',
 	'research_run',
 	'system',
+	'calendar_event',
+	'task',
 ])
 export type TimelineEntityType = typeof TimelineEntityType.Type
 

@@ -16,14 +16,18 @@
 	},
 	"scripts": {
 		"build": "tsdown",
-		"check-types": "tsc --noEmit"
+		"check-types": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
 	},
 	"dependencies": {
 		"effect": "4.0.0-beta.43"
 	},
 	"devDependencies": {
+		"@types/node": "^22.15.0",
 		"tsdown": "^0.21.7",
-		"typescript": "^5.9.3"
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.4"
 	},
 	"private": true
 }

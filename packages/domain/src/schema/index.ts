@@ -24,7 +24,14 @@ export {
 export { Page, PageId } from './pages'
 export { Product, ProductId } from './products'
 export { Proposal, ProposalId } from './proposals'
-export { Task, TaskId } from './tasks'
+export { TaskActorKind, TaskEvent, TaskEventId } from './task-events'
+export {
+	Task,
+	TaskId,
+	TaskPriority,
+	TaskSource,
+	TaskStatus,
+} from './tasks'
 export {
 	TimelineActivity,
 	TimelineActivityId,
