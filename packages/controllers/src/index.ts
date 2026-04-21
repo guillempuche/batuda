@@ -16,6 +16,7 @@ export {
 export { SessionContext, SessionMiddleware } from './middleware/session'
 export { AgentMailWebhookGroup } from './routes/agentmail-webhook'
 export { AuthGroup } from './routes/auth'
+export { CalcomWebhookGroup } from './routes/calcom-webhook'
 export { CalendarGroup } from './routes/calendar'
 export { CompaniesGroup } from './routes/companies'
 export { ContactsGroup } from './routes/contacts'
