@@ -204,7 +204,7 @@ const AppLive = Layer.mergeAll(
 
 const program = HttpRouter.serve(AppLive).pipe(
 	Layer.provide(ServicesLive),
-	Layer.provide(BookingProviderLive),
+	Layer.provide(BookingProviderLive.pipe(Layer.provide(FetchHttpClient.layer))),
 	Layer.provide(IcsParserLive),
 	Layer.provide(EmailProviderLive),
 	Layer.provide(researchToolkitLayer),
