@@ -99,11 +99,20 @@ jobs:
                 -M 1024 \
                 .
             else
-              kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
-                --timeout 5m \
+              # First-time: create an explicitly-named service, then attach
+              # the instance to it. Using `deploy --name` alone lets UKC
+              # auto-name the service (e.g., "dawn-frog-jxfak9qt"), which
+              # breaks the next deploy's `service get batuda-web` lookup
+              # and forces a delete+recreate. Creating the service first
+              # makes the name the stable identifier for rolling updates.
+              kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} service create \
                 --name batuda-web \
                 -d batuda.co \
-                -p 443:3000 \
+                443:3000/tls+http \
+                80:443/http+redirect
+              kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
+                --timeout 5m \
+                --service batuda-web \
                 -M 1024 \
                 .
             fi
