@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Prepare files for KraftCloud
         run: |
@@ -37,7 +37,7 @@ jobs:
 
       - name: Cache KraftCloud CLI
         id: kraft-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: kraft.deb
           key: kraft-cli-${{ steps.kraft-version.outputs.version }}
@@ -76,7 +76,7 @@ jobs:
           fi
 
       - name: Deploy to KraftCloud
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         env:
           KRAFTCLOUD_TOKEN: ${{ secrets.KRAFTCLOUD_TOKEN }}
         with:
