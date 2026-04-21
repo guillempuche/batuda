@@ -1,0 +1,20 @@
+BEGIN:VCALENDAR
+PRODID:-//Google Inc//Google Calendar 70.9054//EN
+VERSION:2.0
+METHOD:REQUEST
+BEGIN:VEVENT
+UID:abc123xyz@google.com
+SEQUENCE:0
+DTSTAMP:20260505T090000Z
+DTSTART:20260505T120000Z
+DTEND:20260505T123000Z
+SUMMARY:Onboarding call
+LOCATION:https://meet.google.com/abc-defg-hij
+X-GOOGLE-CONFERENCE:https://meet.google.com/abc-defg-hij
+DESCRIPTION:-::~:~::~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~
+ :~:~:~:~:~:~::-\nJoin with Google Meet: https://meet.google.com/abc-defg-hij
+ORGANIZER;CN=Eve Owner:MAILTO:eve@xiroi.cat
+ATTENDEE;CN=Eve Owner;PARTSTAT=ACCEPTED;ROLE=CHAIR:MAILTO:eve@xiroi.cat
+ATTENDEE;CN=Frank Client;PARTSTAT=NEEDS-ACTION;ROLE=REQ-PARTICIPANT:MAILTO:frank@client.example
+END:VEVENT
+END:VCALENDAR

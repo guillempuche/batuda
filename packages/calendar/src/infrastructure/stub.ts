@@ -232,11 +232,14 @@ export const StubBookingProviderLayer = Layer.effect(
 	makeStubBookingProvider,
 )
 
-// ── Stub IcsParser ─────────────────────────────────────────────────────────
+// ── IcsParser — RFC 5545 subset ────────────────────────────────────────────
 //
-// Enough shape to let upstream callers drive the calendar service in tests
-// without pulling in `ical.js`. Real fixtures (Zoom/Teams/Meet) land in the
-// live adapter under PR #6.
+// Zero-dep parser sized for the shapes we actually receive from Zoom / Teams /
+// Meet / Outlook / Google Calendar invites. RRULE expansion is intentionally
+// left to downstream (master-instance upsert only); anything beyond that —
+// VTIMEZONE definitions, VTODO, floating-time conversion — degrades into a
+// `metadata.*` breadcrumb rather than a hard failure so one odd sender
+// doesn't block the inbound-email path.
 
 const decode = (bytes: Uint8Array): string => {
 	try {
@@ -245,6 +248,12 @@ const decode = (bytes: Uint8Array): string => {
 		return ''
 	}
 }
+
+// RFC 5545 §3.1: a CRLF followed by whitespace is a soft line break used to
+// keep long values under the 75-octet limit. Unfold before matching so LOCATION
+// and DESCRIPTION lines (which routinely wrap) survive our regex-based parse.
+const unfoldLines = (text: string): string =>
+	text.replace(/\r\n[\t ]/g, '').replace(/\n[\t ]/g, '')
 
 const parseMethod = (text: string): ParsedIcs['method'] => {
 	const match = text.match(/^METHOD:([A-Z]+)\s*$/m)
@@ -273,16 +282,102 @@ const parsePartstatToRsvp = (partstat: string): CalendarAttendeeRsvp => {
 	}
 }
 
-const parseIcsDate = (value: string): Date | null => {
+const parseIcsDate = (
+	value: string,
+): { date: Date; floating: boolean } | null => {
 	// Accepts both floating-time `YYYYMMDDTHHmmss` and UTC `YYYYMMDDTHHmmssZ`.
 	const match = value.match(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z)?/)
 	if (!match) return null
 	const [, y, mo, d, h, mi, s] = match
-	// Fabricate ISO 8601 so the native Date parser handles UTC vs floating.
-	const iso = `${y}-${mo}-${d}T${h}:${mi}:${s}${match[7] === 'Z' ? 'Z' : 'Z'}`
+	const iso = `${y}-${mo}-${d}T${h}:${mi}:${s}Z`
 	const parsed = new Date(iso)
-	return Number.isNaN(parsed.getTime()) ? null : parsed
+	if (Number.isNaN(parsed.getTime())) return null
+	return { date: parsed, floating: match[7] !== 'Z' }
 }
+
+// RFC 5545 §3.3.6: `PnDTnHnMnS` where any segment is optional. Used when a
+// VEVENT carries DURATION instead of DTEND.
+const parseDurationToMs = (value: string): number | null => {
+	const m = value.match(/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/)
+	if (!m) return null
+	const d = m[1] ? Number(m[1]) : 0
+	const h = m[2] ? Number(m[2]) : 0
+	const mi = m[3] ? Number(m[3]) : 0
+	const s = m[4] ? Number(m[4]) : 0
+	return (d * 86400 + h * 3600 + mi * 60 + s) * 1000
+}
+
+// Vendor URL extraction. First-match-wins order is Meet → Teams → Zoom; any
+// losers ride along in `metadata.additional_video_urls` so we can revisit if
+// forwarded threads contain multiple conferencing footers.
+const MEET_URL_RE = /https:\/\/meet\.google\.com\/[a-z]+-[a-z]+-[a-z]+/i
+const TEAMS_URL_RE =
+	/https:\/\/teams\.microsoft\.com\/l\/meetup-join\/[^\s"<]+/i
+const ZOOM_URL_RE = /https:\/\/[a-z0-9-]+\.zoom\.us\/j\/\d+(?:\?[^\s"<]*)?/i
+
+const extractMeetingUrl = (args: {
+	readonly location: string | null
+	readonly description: string | null
+	readonly xGoogleConference: string | null
+}): {
+	url: string | null
+	vendor: 'meet' | 'teams' | 'zoom' | null
+	additional: ReadonlyArray<string>
+} => {
+	const sources: string[] = []
+	if (args.xGoogleConference) sources.push(args.xGoogleConference)
+	if (args.location) sources.push(args.location)
+	if (args.description) sources.push(args.description)
+	const joined = sources.join('\n')
+	const meet = joined.match(MEET_URL_RE)?.[0] ?? null
+	const teams = joined.match(TEAMS_URL_RE)?.[0] ?? null
+	const zoom = joined.match(ZOOM_URL_RE)?.[0] ?? null
+	if (meet) {
+		const additional: string[] = []
+		if (teams) additional.push(teams)
+		if (zoom) additional.push(zoom)
+		return { url: meet, vendor: 'meet', additional }
+	}
+	if (teams) {
+		const additional: string[] = []
+		if (zoom) additional.push(zoom)
+		return { url: teams, vendor: 'teams', additional }
+	}
+	if (zoom) return { url: zoom, vendor: 'zoom', additional: [] }
+	return { url: null, vendor: null, additional: [] }
+}
+
+// LOCATION fallback classifier. Only hit when `extractMeetingUrl` came up empty —
+// otherwise the event is already `location_type='video'`.
+const classifyLocation = (
+	location: string | null,
+): {
+	type: 'address' | 'phone' | 'none'
+	value: string | null
+} => {
+	if (!location) return { type: 'none', value: null }
+	const trimmed = location.trim()
+	if (!trimmed) return { type: 'none', value: null }
+	if (/^tel:/i.test(trimmed)) {
+		return { type: 'phone', value: trimmed.replace(/^tel:/i, '').trim() }
+	}
+	// E.164-ish: starts with + or digit, has 6+ digits, only phone-safe chars.
+	if (/^\+?\d[\d\s\-()]{5,}$/.test(trimmed)) {
+		return { type: 'phone', value: trimmed }
+	}
+	return { type: 'address', value: trimmed }
+}
+
+// ICS TEXT values escape commas, semicolons, and backslashes; newlines ride
+// in as the two-character sequence "\n". Unescape before storing so the
+// value matches what the sender typed.
+const unescapeIcsText = (value: string): string =>
+	value
+		.replace(/\\n/g, '\n')
+		.replace(/\\N/g, '\n')
+		.replace(/\\,/g, ',')
+		.replace(/\\;/g, ';')
+		.replace(/\\\\/g, '\\')
 
 const parseVEvent = (block: string): ParsedVEvent | null => {
 	const lineOf = (name: string): string | null => {
@@ -293,13 +388,39 @@ const parseVEvent = (block: string): ParsedVEvent | null => {
 	const uid = lineOf('UID')
 	const dtStartRaw = block.match(/^DTSTART(?:;[^:\r\n]*)?:(\S+)/m)?.[1]
 	const dtEndRaw = block.match(/^DTEND(?:;[^:\r\n]*)?:(\S+)/m)?.[1]
-	if (!uid || !dtStartRaw || !dtEndRaw) return null
-	const startAt = parseIcsDate(dtStartRaw)
-	const endAt = parseIcsDate(dtEndRaw)
-	if (!startAt || !endAt) return null
+	if (!uid || !dtStartRaw) return null
+
+	const startParsed = parseIcsDate(dtStartRaw)
+	if (!startParsed) return null
+	const startAt = startParsed.date
+
+	let endAt: Date | null = null
+	if (dtEndRaw) {
+		const endParsed = parseIcsDate(dtEndRaw)
+		if (endParsed) endAt = endParsed.date
+	}
+	// DTEND missing → fall back to DURATION (RFC 5545 allows either, not both).
+	if (!endAt) {
+		const durationRaw = lineOf('DURATION')
+		if (durationRaw) {
+			const ms = parseDurationToMs(durationRaw)
+			if (ms !== null) endAt = new Date(startAt.getTime() + ms)
+		}
+	}
+	// Refusing to guess when both are missing keeps malformed invites from
+	// silently landing as zero-length events in the grid.
+	if (!endAt) return null
+
 	const sequenceRaw = lineOf('SEQUENCE')
 	const icalSequence = sequenceRaw ? Number.parseInt(sequenceRaw, 10) : 0
-	const title = lineOf('SUMMARY') ?? ''
+	const titleRaw = lineOf('SUMMARY') ?? ''
+	const title = unescapeIcsText(titleRaw)
+	const descriptionRaw = lineOf('DESCRIPTION')
+	const description = descriptionRaw ? unescapeIcsText(descriptionRaw) : null
+	const locationRaw = lineOf('LOCATION')
+	const location = locationRaw ? unescapeIcsText(locationRaw) : null
+	const xGoogleConference = lineOf('X-GOOGLE-CONFERENCE')
+
 	const organizerRaw = block.match(/^ORGANIZER(?:;[^:]*)?:(?:MAILTO:)?(\S+)/im)
 	const organizerEmail = organizerRaw?.[1]?.trim().toLowerCase() ?? ''
 
@@ -320,6 +441,33 @@ const parseVEvent = (block: string): ParsedVEvent | null => {
 		m = attendeeRe.exec(block)
 	}
 
+	const video = extractMeetingUrl({
+		location,
+		description,
+		xGoogleConference,
+	})
+	const metadata: Record<string, unknown> = {}
+	if (startParsed.floating) metadata['timezone'] = 'floating_assumed_utc'
+	if (video.additional.length > 0) {
+		metadata['additional_video_urls'] = video.additional
+	}
+	if (description) metadata['description'] = description
+	if (video.vendor) metadata['video_vendor'] = video.vendor
+
+	let locationType: ParsedVEvent['locationType']
+	let locationValue: string | null
+	if (video.url) {
+		locationType = 'video'
+		// Keep the human-readable LOCATION when provided (Teams uses "Microsoft
+		// Teams Meeting" as LOCATION and buries the URL in DESCRIPTION); fall
+		// back to the URL itself when LOCATION was empty.
+		locationValue = location ?? video.url
+	} else {
+		const classified = classifyLocation(location)
+		locationType = classified.type
+		locationValue = classified.value
+	}
+
 	return {
 		icalUid: uid,
 		icalSequence,
@@ -329,10 +477,10 @@ const parseVEvent = (block: string): ParsedVEvent | null => {
 		status: 'confirmed',
 		organizerEmail,
 		attendees,
-		locationType: 'none',
-		locationValue: null,
-		videoCallUrl: null,
-		metadata: {},
+		locationType,
+		locationValue,
+		videoCallUrl: video.url,
+		metadata,
 	}
 }
 
@@ -340,10 +488,11 @@ export const makeStubIcsParser = Effect.succeed(
 	IcsParser.of({
 		parse: (raw: Uint8Array) =>
 			Effect.gen(function* () {
-				const text = decode(raw)
-				if (!text.includes('BEGIN:VCALENDAR')) {
+				const decoded = decode(raw)
+				if (!decoded.includes('BEGIN:VCALENDAR')) {
 					return yield* new InvalidIcs({ reason: 'not-a-vcalendar' })
 				}
+				const text = unfoldLines(decoded)
 				const method = parseMethod(text)
 				const vEventBlocks = Array.from(
 					text.matchAll(/BEGIN:VEVENT([\s\S]*?)END:VEVENT/g),
