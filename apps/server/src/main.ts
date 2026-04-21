@@ -38,6 +38,7 @@ import { ResearchLive } from './handlers/research'
 import { TasksLive } from './handlers/tasks'
 import { TimelineLive } from './handlers/timeline'
 import { WebhooksLive } from './handlers/webhooks'
+import { CalcomWebhookLive } from './handlers/webhooks-calcom'
 import { Auth } from './lib/auth'
 import { CorsLive } from './lib/cors'
 import { EnvVars } from './lib/env'
@@ -45,6 +46,7 @@ import { LoggerLive } from './lib/logger'
 import { OtlpObservability } from './lib/observability'
 import { McpHttpLive } from './mcp/http'
 import { SessionMiddlewareLive } from './middleware/session'
+import { CalendarService } from './services/calendar'
 import { CompanyService } from './services/companies'
 import { EmailService } from './services/email'
 import { EmailAttachmentStaging } from './services/email-attachment-staging'
@@ -81,6 +83,7 @@ const ApiLive = HttpApiBuilder.layer(BatudaApi).pipe(
 		ResearchLive,
 		TimelineLive,
 		CalendarLive,
+		CalcomWebhookLive,
 	]),
 )
 
@@ -149,6 +152,7 @@ const ServicesLive = Layer.mergeAll(
 	EmailService.layer,
 	RecordingService.layer,
 	ResearchService.layer,
+	CalendarService.layer,
 	Geocoder.layer.pipe(Layer.provide(FetchHttpClient.layer)),
 ).pipe(
 	Layer.provideMerge(EmailAttachmentStaging.layer),

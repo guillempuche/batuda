@@ -11,6 +11,7 @@ import { DocumentResource } from './resources/document'
 import { PipelineResource } from './resources/pipeline'
 import { ResearchResource } from './resources/research'
 import { TimelineResource } from './resources/timeline'
+import { CalendarHandlersLive, CalendarTools } from './tools/calendar'
 import { CompanyHandlersLive, CompanyTools } from './tools/companies'
 import { ContactHandlersLive, ContactTools } from './tools/contacts'
 import { DocumentHandlersLive, DocumentTools } from './tools/documents'
@@ -35,6 +36,7 @@ export const McpToolsLive = Layer.mergeAll(
 	McpServer.toolkit(RecordingTools),
 	McpServer.toolkit(ResearchMcpTools),
 	McpServer.toolkit(TimelineTools),
+	McpServer.toolkit(CalendarTools),
 	CompanyResource,
 	PipelineResource,
 	DocumentResource,
@@ -57,4 +59,5 @@ export const McpToolsLive = Layer.mergeAll(
 	Layer.provide(RecordingHandlersLive),
 	Layer.provide(ResearchMcpHandlersLive),
 	Layer.provide(TimelineHandlersLive),
+	Layer.provide(CalendarHandlersLive),
 )
