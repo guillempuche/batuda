@@ -7,10 +7,12 @@ import type { InboundClassification } from '@batuda/domain'
 import { renderBlocks, type StagedAttachmentRef } from '@batuda/email/render'
 import type { EmailBlocks } from '@batuda/email/schema'
 
+import { CalendarService } from './calendar.js'
 import type { ResolvedStaging, StagingRef } from './email-attachment-staging.js'
 import { EmailAttachmentStaging } from './email-attachment-staging.js'
 import type {
 	CreateDraftParams,
+	ProviderAttachmentMeta,
 	SendAttachmentInput,
 	UpdateDraftParams,
 } from './email-provider.js'
@@ -119,10 +121,52 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 			const timeline = yield* TimelineActivityService
 			const participantMatcher = yield* ParticipantMatcher
 			const staging = yield* EmailAttachmentStaging
+			const calendar = yield* CalendarService
 			const providerName = yield* Config.schema(
 				Schema.Literals(['local-inbox', 'agentmail']),
 				'EMAIL_PROVIDER',
 			)
+
+			// Collect a Web ReadableStream into a single Uint8Array.
+			// Used to hand calendar.ingestIcs the raw .ics bytes we get
+			// from provider.streamAttachment without touching the disk.
+			const readStreamToBytes = (
+				stream: ReadableStream<Uint8Array>,
+			): Effect.Effect<Uint8Array> =>
+				Effect.promise(async () => {
+					const reader = stream.getReader()
+					const chunks: Uint8Array[] = []
+					let total = 0
+					for (;;) {
+						const { done, value } = await reader.read()
+						if (done) break
+						if (value) {
+							chunks.push(value)
+							total += value.byteLength
+						}
+					}
+					const out = new Uint8Array(total)
+					let offset = 0
+					for (const chunk of chunks) {
+						out.set(chunk, offset)
+						offset += chunk.byteLength
+					}
+					return out
+				})
+
+			const ICS_CONTENT_TYPES = new Set([
+				'text/calendar',
+				'application/ics',
+				'text/x-vcalendar',
+			])
+			const normalizedContentType = (ct: string | undefined): string =>
+				(ct ?? '').split(';')[0]?.trim().toLowerCase() ?? ''
+			const looksLikeIcs = (
+				ct: string | undefined,
+				filename: string | undefined,
+			) =>
+				ICS_CONTENT_TYPES.has(normalizedContentType(ct)) ||
+				!!filename?.toLowerCase().endsWith('.ics')
 
 			const assertContactNotSuppressed = (
 				contactId: string,
@@ -597,6 +641,10 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 									Effect.succeed({
 										to: [] as string[],
 										cc: undefined as string[] | undefined,
+										text: undefined as string | undefined,
+										attachments: undefined as
+											| readonly ProviderAttachmentMeta[]
+											| undefined,
 									}),
 								),
 							)
@@ -652,6 +700,12 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 
 						const inboxEmail = yield* resolveInboxEmail(payload.providerInboxId)
 
+						// Captured from inside the insert tx so the ICS ingest
+						// can link calendar_events rows back to the originating
+						// email. Stays null on dup-webhook (ON CONFLICT DO NOTHING)
+						// so we still ingest the ICS but skip sourceEmailMessageId.
+						let insertedEmailMessageId: string | null = null
+
 						yield* sql.withTransaction(
 							Effect.gen(function* () {
 								if (existingLinks.length === 0) {
@@ -698,6 +752,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								// Dup webhook: message already recorded. Skip participants
 								// + timeline so we don't double-bump cadence columns.
 								if (!emailMessage) return
+								insertedEmailMessageId = emailMessage.id
 
 								const participants = buildParticipants(
 									emailMessage.id,
@@ -738,6 +793,89 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								)
 							}),
 						)
+
+						// Calendar invites (Zoom / Teams / Meet / Outlook /
+						// Google) arrive as text/calendar attachments or as
+						// inline multipart bodies. We walk both: one inbound
+						// message can carry multiple VEVENTs (e.g. forwarded
+						// thread), and each iCalUID is upserted independently.
+						// One malformed ICS must not poison the whole webhook,
+						// so each ingest is wrapped in catchAllCause with a
+						// structured log.
+						const ingestRawIcs = (rawIcs: Uint8Array, origin: string) =>
+							calendar
+								.ingestIcs({
+									rawIcs,
+									sourceEmailMessageId: insertedEmailMessageId,
+								})
+								.pipe(
+									Effect.tap(result =>
+										Effect.logInfo('Calendar ICS ingested').pipe(
+											Effect.annotateLogs({
+												event: 'calendar.ics_ingested',
+												origin,
+												created: result.created,
+												updated: result.updated,
+												cancelled: result.cancelled,
+												rsvpUpdated: result.rsvpUpdated,
+											}),
+										),
+									),
+									Effect.catchCause(cause =>
+										Effect.logWarning('Calendar ICS ingest failed').pipe(
+											Effect.annotateLogs({
+												event: 'calendar.ics_ingest_failed',
+												origin,
+												cause: String(cause),
+											}),
+										),
+									),
+								)
+
+						const attachments = providerMessage.attachments ?? []
+						for (const att of attachments) {
+							if (!looksLikeIcs(att.contentType, att.filename)) continue
+							yield* provider
+								.streamAttachment(
+									payload.providerInboxId,
+									payload.providerMessageId,
+									att.attachmentId,
+								)
+								.pipe(
+									Effect.flatMap(({ stream }) => readStreamToBytes(stream)),
+									Effect.flatMap(bytes =>
+										ingestRawIcs(bytes, `attachment:${att.attachmentId}`),
+									),
+									Effect.catchCause(cause =>
+										Effect.logWarning('Calendar attachment fetch failed').pipe(
+											Effect.annotateLogs({
+												event: 'calendar.ics_attachment_failed',
+												attachmentId: att.attachmentId,
+												cause: String(cause),
+											}),
+										),
+									),
+								)
+						}
+
+						// Some senders paste the ICS body inline (no attachment
+						// part) — detect by BEGIN:VCALENDAR anywhere in the
+						// plain-text body and parse that slice.
+						const textBody = providerMessage.text
+						if (textBody) {
+							const beginIdx = textBody.indexOf('BEGIN:VCALENDAR')
+							const endIdx = textBody.lastIndexOf('END:VCALENDAR')
+							if (beginIdx !== -1 && endIdx !== -1 && endIdx > beginIdx) {
+								const slice = textBody.slice(
+									beginIdx,
+									endIdx + 'END:VCALENDAR'.length,
+								)
+								yield* ingestRawIcs(
+									new TextEncoder().encode(slice),
+									'inline-body',
+								)
+							}
+						}
 
 						yield* webhooks.fire('email.received', {
 							threadId: payload.providerThreadId,

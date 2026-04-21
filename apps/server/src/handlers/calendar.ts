@@ -7,9 +7,12 @@ import { BookingProvider } from '@batuda/calendar'
 import {
 	BadRequest,
 	BatudaApi,
+	Conflict,
 	NotFound,
 	SessionContext,
 } from '@batuda/controllers'
+
+import { CalendarService } from '../services/calendar.js'
 
 type EventTypeRow = {
 	readonly id: string
@@ -42,6 +45,7 @@ export const CalendarLive = HttpApiBuilder.group(
 		Effect.gen(function* () {
 			const sql = yield* SqlClient.SqlClient
 			const provider = yield* BookingProvider
+			const calendar = yield* CalendarService
 			return handlers
 				.handle('listEventTypes', _ =>
 					Effect.gen(function* () {
@@ -153,31 +157,43 @@ export const CalendarLive = HttpApiBuilder.group(
 				)
 				.handle('rsvpEvent', _ =>
 					Effect.gen(function* () {
-						// Minimal scaffold: update the primary attendee's RSVP column.
-						// The full flow (build REPLY ICS for source='email', call
-						// provider.respondToRsvp for source='booking') lands with the
-						// CalendarService in a later PR.
-						const { email: attendeeEmail } = yield* SessionContext
-						const exists = yield* sql<EventRow>`
-							SELECT * FROM calendar_events WHERE id = ${_.params.id} LIMIT 1
-						`
-						if (exists.length === 0)
-							return yield* new NotFound({
-								entity: 'calendar_event',
-								id: _.params.id,
-							})
-						const rows = yield* sql`
-							UPDATE calendar_event_attendees SET
-								rsvp = ${_.payload.rsvp},
-								updated_at = now()
-							WHERE event_id = ${_.params.id}
-								AND lower(email) = lower(${attendeeEmail})
-							RETURNING *
-						`
-						return { updated: rows.length, rsvp: _.payload.rsvp }
+						// Delegates to CalendarService.respondToRsvp, which builds a
+						// METHOD=REPLY ICS for email-sourced events (caller composes
+						// with EmailService.reply) or routes to BookingProvider for
+						// source='booking'. The route itself never invents replies —
+						// keeps the ICS/REPLY logic in one place so the MCP tool and
+						// Batuda drawer share the same code path.
+						const { userId, email: attendeeEmail } = yield* SessionContext
+						const result = yield* calendar.respondToRsvp({
+							calendarEventId: _.params.id,
+							attendeeEmail,
+							rsvp: _.payload.rsvp,
+							comment: _.payload.comment ?? null,
+							actorUserId: userId,
+						})
+						// Only surface structural fields to the client — raw REPLY
+						// bytes are an implementation detail of the email-reply path
+						// (out of scope for the HTTP response shape).
+						return {
+							updated: result.updated,
+							rsvp: result.rsvp,
+						}
 					}).pipe(
+						Effect.catchTag('CalendarEventNotFound', e =>
+							Effect.fail(
+								new NotFound({
+									entity: 'calendar_event',
+									id: e.calendarEventId,
+								}),
+							),
+						),
+						Effect.catchTag('InvalidRsvpTarget', e =>
+							Effect.fail(new Conflict({ message: e.reason })),
+						),
 						Effect.catch(e =>
-							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+							e._tag === 'NotFound' || e._tag === 'Conflict'
+								? Effect.fail(e)
+								: Effect.die(e),
 						),
 					),
 				)

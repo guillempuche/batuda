@@ -612,6 +612,7 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 							parsed,
 							vevent,
 							rawIcs: args.rawIcs,
+							sourceEmailMessageId: args.sourceEmailMessageId,
 							results,
 						})
 					}
@@ -622,6 +623,7 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 				readonly parsed: ParsedIcs
 				readonly vevent: ParsedIcs['events'][number]
 				readonly rawIcs: Uint8Array
+				readonly sourceEmailMessageId: string | null
 				readonly results: {
 					created: number
 					updated: number
@@ -693,7 +695,9 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 								interactionId: null,
 								metadata: JSON.stringify({
 									...vevent.metadata,
-									sourceEmailMessageId: args.rawIcs ? undefined : undefined,
+									...(args.sourceEmailMessageId
+										? { sourceEmailMessageId: args.sourceEmailMessageId }
+										: {}),
 								}),
 								rawIcs,
 							})}

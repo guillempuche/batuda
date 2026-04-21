@@ -152,9 +152,13 @@ const ServicesLive = Layer.mergeAll(
 	EmailService.layer,
 	RecordingService.layer,
 	ResearchService.layer,
-	CalendarService.layer,
 	Geocoder.layer.pipe(Layer.provide(FetchHttpClient.layer)),
 ).pipe(
+	// CalendarService sits below EmailService because EmailService's
+	// inbound-webhook path delegates text/calendar parts to it. Keep
+	// merged with provideMerge so handlers that also want a direct
+	// CalendarService still see it in the merged service map.
+	Layer.provideMerge(CalendarService.layer),
 	Layer.provideMerge(EmailAttachmentStaging.layer),
 	Layer.provideMerge(ResearchEventSinkLive),
 	Layer.provideMerge(ParticipantMatcher.layer),
