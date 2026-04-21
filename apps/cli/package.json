@@ -11,6 +11,7 @@
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.1026.0",
 		"@batuda/auth": "workspace:*",
+		"@batuda/calendar": "workspace:*",
 		"@batuda/domain": "workspace:*",
 		"@better-auth/api-key": "^1.5.6",
 		"@clack/prompts": "^1.2.0",

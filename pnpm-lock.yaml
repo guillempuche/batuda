@@ -47,6 +47,9 @@ importers:
       '@batuda/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@batuda/calendar':
+        specifier: workspace:*
+        version: link:../../packages/calendar
       '@batuda/domain':
         specifier: workspace:*
         version: link:../../packages/domain

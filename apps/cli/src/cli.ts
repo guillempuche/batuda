@@ -11,6 +11,11 @@ import { authPromote } from './commands/auth-promote'
 import { authResetPassword } from './commands/auth-reset-password'
 import { authRevokeKey } from './commands/auth-revoke-key'
 import { authSessions } from './commands/auth-sessions'
+import { calendarSeed } from './commands/calendar/seed'
+import {
+	calendarSimulateWebhook,
+	SIMULATE_TRIGGERS,
+} from './commands/calendar/simulate-webhook'
 import { dbMigrate, dbReset } from './commands/db'
 import { doctor } from './commands/doctor'
 import { seed, seedAuth } from './commands/seed'
@@ -397,6 +402,54 @@ const servicesCommand = Command.make('services').pipe(
 	]),
 )
 
+// ── Calendar ───────────────────────────────────────────────
+
+const calendarSeedCommand = Command.make('seed', {}, () =>
+	withDb(calendarSeed),
+).pipe(
+	Command.withDescription(
+		'Seed default calendar_event_types (idempotent; respects CALENDAR_PROVIDER)',
+	),
+)
+
+const calendarSimulateWebhookCommand = Command.make(
+	'simulate-webhook',
+	{
+		trigger: Flag.choice('trigger', SIMULATE_TRIGGERS).pipe(
+			Flag.withDescription('Cal.com webhook trigger to simulate'),
+			Flag.withDefault('BOOKING_CREATED' as const),
+		),
+		url: Flag.string('url').pipe(
+			Flag.withDescription('Target webhook URL'),
+			Flag.withDefault('http://localhost:3010/webhooks/calcom'),
+		),
+		icalUid: Flag.string('ical-uid').pipe(
+			Flag.withDescription(
+				'Override the iCalUID (handy to chain CREATED → CANCELLED on the same row)',
+			),
+			Flag.optional,
+		),
+	},
+	({ trigger, url, icalUid }) =>
+		calendarSimulateWebhook({
+			trigger,
+			url,
+			icalUid: Option.getOrUndefined(icalUid) ?? null,
+		}),
+).pipe(
+	Command.withDescription(
+		'Post a signed cal.com webhook envelope to the local server (no cal.com account needed)',
+	),
+)
+
+const calendarCommand = Command.make('calendar').pipe(
+	Command.withDescription('Calendar: seed event types, simulate webhooks'),
+	Command.withSubcommands([
+		calendarSeedCommand,
+		calendarSimulateWebhookCommand,
+	]),
+)
+
 // ── Root ───────────────────────────────────────────────────
 
 const batuda = Command.make('batuda').pipe(
@@ -408,6 +461,7 @@ const batuda = Command.make('batuda').pipe(
 		dbCommand,
 		authCommand,
 		servicesCommand,
+		calendarCommand,
 	]),
 )
 
