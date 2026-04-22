@@ -12,6 +12,7 @@
 		"dev": "turbo dev --filter=@batuda/server --filter=@batuda/internal",
 		"dev:server": "pnpm --filter @batuda/server dev",
 		"dev:internal": "pnpm --filter @batuda/internal dev",
+		"dev:otel": "otel-tui",
 		"______ Build ______": "",
 		"build": "turbo build",
 		"check-types": "turbo check-types",

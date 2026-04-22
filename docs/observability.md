@@ -515,6 +515,28 @@ span.attribute('contact.email', contact.email)
 span.attribute('document.content', content)
 ```
 
+## Local development with otel-tui
+
+The Nix flake provides [`otel-tui`](https://github.com/ymtdzzz/otel-tui) — a terminal OpenTelemetry receiver + viewer. It listens on the standard OTLP ports (`:4317` gRPC, `:4318` HTTP/JSON) and renders traces, logs, and metrics inline, so you can inspect them without running Jaeger/Grafana/Honeycomb locally.
+
+**Daily workflow:**
+
+```bash
+# Terminal 1 — start the viewer (empty until traffic arrives)
+pnpm dev:otel
+
+# Terminal 2 — start the server; it will POST OTLP/JSON to localhost:4318
+pnpm dev:server
+```
+
+Effect's `Otlp.layerJson` appends `/v1/traces`, `/v1/logs`, and `/v1/metrics` to the base URL — the same convention otel-tui and every vendor (Honeycomb, Grafana, Tempo) expect. Swapping environments is a pure env-var change:
+
+| Environment      | `OTEL_EXPORTER_OTLP_ENDPOINT`               | `OTEL_EXPORTER_OTLP_HEADERS` |
+| ---------------- | ------------------------------------------- | ---------------------------- |
+| Local (otel-tui) | `http://localhost:4318`                     | *(empty)*                    |
+| Honeycomb        | `https://api.honeycomb.io`                  | `x-honeycomb-team=KEY`       |
+| Grafana Cloud    | `https://otlp-gateway-....grafana.net/otlp` | `Authorization=Basic ...`    |
+
 ## Implementation Details
 
 ### Server: Effect v4 Built-in OTLP
