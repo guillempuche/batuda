@@ -21,7 +21,6 @@ import {
 } from '@batuda/research'
 
 import { PgLive } from './db/client'
-import { AgentMailWebhookLive } from './handlers/agentmail-webhook'
 import { AuthHandlerLive } from './handlers/auth'
 import { CalendarLive } from './handlers/calendar'
 import { CompaniesLive } from './handlers/companies'
@@ -45,13 +44,16 @@ import { EnvVars } from './lib/env'
 import { LoggerLive } from './lib/logger'
 import { OtlpObservability } from './lib/observability'
 import { McpHttpLive } from './mcp/http'
+import { OrgMiddlewareLive } from './middleware/org'
 import { SessionMiddlewareLive } from './middleware/session'
 import { CalendarService } from './services/calendar'
 import { CompanyService } from './services/companies'
+import { CredentialCrypto } from './services/credential-crypto'
 import { EmailService } from './services/email'
 import { EmailAttachmentStaging } from './services/email-attachment-staging'
 import { EmailProviderLive } from './services/email-provider-live'
 import { Geocoder } from './services/geocoder'
+import { MailTransport } from './services/mail-transport'
 import { PageService } from './services/pages'
 import { ParticipantMatcher } from './services/participant-matcher'
 import { PipelineService } from './services/pipeline'
@@ -78,7 +80,6 @@ const ApiLive = HttpApiBuilder.layer(BatudaApi).pipe(
 		PagesLive,
 		WebhooksLive,
 		EmailLive,
-		AgentMailWebhookLive,
 		RecordingsLive,
 		ResearchLive,
 		TimelineLive,
@@ -164,6 +165,8 @@ const ServicesLive = Layer.mergeAll(
 	Layer.provideMerge(ParticipantMatcher.layer),
 	Layer.provideMerge(TimelineActivityService.layer),
 	Layer.provideMerge(WebhookService.layer),
+	Layer.provideMerge(CredentialCrypto.layer),
+	Layer.provideMerge(MailTransport.layer),
 )
 
 const ServerLive = Layer.unwrap(
@@ -216,6 +219,7 @@ const program = HttpRouter.serve(AppLive).pipe(
 	Layer.provide(makeResearchLlmLive),
 	Layer.provide(ResearchBlobStorageLive),
 	Layer.provide(S3StorageProviderLive),
+	Layer.provide(OrgMiddlewareLive),
 	Layer.provide(SessionMiddlewareLive),
 	Layer.provide(Auth.layer),
 	Layer.provide(EnvVars.layer),

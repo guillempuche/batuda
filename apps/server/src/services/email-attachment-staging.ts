@@ -4,7 +4,7 @@ import path from 'node:path'
 import { DateTime, Effect, Layer, ServiceMap } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { BadRequest } from '@batuda/controllers'
+import { BadRequest, CurrentOrg } from '@batuda/controllers'
 
 import {
 	compressEmailImage,
@@ -95,8 +95,9 @@ export class EmailAttachmentStaging extends ServiceMap.Service<EmailAttachmentSt
 			// ── stage ──
 			const stage = (
 				input: StageInput,
-			): Effect.Effect<StagedAttachmentPublic, BadRequest> =>
+			): Effect.Effect<StagedAttachmentPublic, BadRequest, CurrentOrg> =>
 				Effect.gen(function* () {
+					const currentOrg = yield* CurrentOrg
 					if (input.bytes.byteLength === 0) {
 						return yield* new BadRequest({
 							message: 'Cannot stage empty attachment',
@@ -148,11 +149,11 @@ export class EmailAttachmentStaging extends ServiceMap.Service<EmailAttachmentSt
 
 					const insertResult = yield* sql`
 						INSERT INTO email_attachment_staging (
-							staging_id, inbox_id, draft_id, storage_key,
+							staging_id, organization_id, inbox_id, draft_id, storage_key,
 							filename, content_type, size_bytes, is_inline,
 							expires_at
 						) VALUES (
-							${stagingId}, ${input.inboxId}, ${input.draftId ?? null}, ${storageKey},
+							${stagingId}, ${currentOrg.id}, ${input.inboxId}, ${input.draftId ?? null}, ${storageKey},
 							${safeFilename}, ${compressed.contentType}, ${compressed.bytes.byteLength}, ${input.isInline},
 							${DateTime.toDate(expiresAt)}
 						)

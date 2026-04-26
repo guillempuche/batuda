@@ -68,7 +68,8 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 							},
 						)
 						.pipe(
-							Effect.catchTag('EmailSendError', e => Effect.die(e)),
+							// Surface the inbox-state failures as the route's declared
+							// 409s; collapse internal errors to die().
 							Effect.catchTag('EmailError', e => Effect.die(e)),
 							Effect.catchTag('SqlError', e => Effect.die(e)),
 						),
@@ -91,8 +92,6 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 							}),
 						})
 						.pipe(
-							Effect.catchTag('EmailSendError', e => Effect.die(e)),
-							Effect.catchTag('NotFound', e => Effect.die(e)),
 							Effect.catchTag('EmailError', e => Effect.die(e)),
 							Effect.catchTag('SqlError', e => Effect.die(e)),
 						),
@@ -163,15 +162,12 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 						}),
 					}),
 				)
+				.handle('listProviderPresets', () => svc.listProviderPresets())
+				.handle('inboxStatus', () => svc.inboxStatus())
 				.handle('createInbox', _ =>
 					svc
 						.createInbox({
-							...(_.payload.username !== undefined && {
-								username: _.payload.username,
-							}),
-							...(_.payload.domain !== undefined && {
-								domain: _.payload.domain,
-							}),
+							email: _.payload.email,
 							...(_.payload.displayName !== undefined && {
 								displayName: _.payload.displayName,
 							}),
@@ -179,14 +175,22 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 							...(_.payload.ownerUserId !== undefined && {
 								ownerUserId: _.payload.ownerUserId,
 							}),
+							...(_.payload.isPrivate !== undefined && {
+								isPrivate: _.payload.isPrivate,
+							}),
 							...(_.payload.isDefault !== undefined && {
 								isDefault: _.payload.isDefault,
 							}),
+							imapHost: _.payload.imapHost,
+							imapPort: _.payload.imapPort,
+							imapSecurity: _.payload.imapSecurity,
+							smtpHost: _.payload.smtpHost,
+							smtpPort: _.payload.smtpPort,
+							smtpSecurity: _.payload.smtpSecurity,
+							username: _.payload.username,
+							password: _.payload.password,
 						})
-						.pipe(
-							Effect.catchTag('EmailError', e => Effect.die(e)),
-							Effect.catchTag('SqlError', e => Effect.die(e)),
-						),
+						.pipe(Effect.catchTag('SqlError', e => Effect.die(e))),
 				)
 				.handle('updateInbox', _ =>
 					svc
@@ -200,19 +204,59 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 							...(_.payload.ownerUserId !== undefined && {
 								ownerUserId: _.payload.ownerUserId,
 							}),
+							...(_.payload.isPrivate !== undefined && {
+								isPrivate: _.payload.isPrivate,
+							}),
 							...(_.payload.isDefault !== undefined && {
 								isDefault: _.payload.isDefault,
 							}),
 							...(_.payload.active !== undefined && {
 								active: _.payload.active,
 							}),
+							...(_.payload.imapHost !== undefined && {
+								imapHost: _.payload.imapHost,
+							}),
+							...(_.payload.imapPort !== undefined && {
+								imapPort: _.payload.imapPort,
+							}),
+							...(_.payload.imapSecurity !== undefined && {
+								imapSecurity: _.payload.imapSecurity,
+							}),
+							...(_.payload.smtpHost !== undefined && {
+								smtpHost: _.payload.smtpHost,
+							}),
+							...(_.payload.smtpPort !== undefined && {
+								smtpPort: _.payload.smtpPort,
+							}),
+							...(_.payload.smtpSecurity !== undefined && {
+								smtpSecurity: _.payload.smtpSecurity,
+							}),
+							...(_.payload.username !== undefined && {
+								username: _.payload.username,
+							}),
+							...(_.payload.password !== undefined && {
+								password: _.payload.password,
+							}),
 						})
-						.pipe(
-							Effect.catchTag('NotFound', e => Effect.die(e)),
-							Effect.catchTag('SqlError', e => Effect.die(e)),
-						),
+						.pipe(Effect.catchTag('SqlError', e => Effect.die(e))),
 				)
-				.handle('syncInboxes', () => svc.syncInboxes())
+				.handle('deleteInbox', _ =>
+					svc.deleteInbox(_.params.id).pipe(
+						Effect.map(() => undefined as void),
+						Effect.catchTag('NotFound', e => Effect.die(e)),
+						Effect.catchTag('SqlError', e => Effect.die(e)),
+					),
+				)
+				.handle('testInbox', _ =>
+					svc
+						.testInbox(_.params.id)
+						.pipe(Effect.catchTag('SqlError', e => Effect.die(e))),
+				)
+				.handle('setPrimaryInbox', _ =>
+					svc
+						.setPrimaryInbox(_.params.id)
+						.pipe(Effect.catchTag('SqlError', e => Effect.die(e))),
+				)
 				// ── Drafts ──
 				.handle('createDraft', _ =>
 					svc
@@ -283,11 +327,15 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 				)
 				.handle('sendDraft', _ =>
 					svc.sendDraft(_.payload.inboxId, _.params.draftId).pipe(
-						Effect.catchTag('EmailError', e =>
-							Effect.fail(new BadRequest({ message: e.message })),
-						),
-						Effect.catchTag('EmailSendError', e => Effect.die(e)),
-						Effect.catchTag('SqlError', e => Effect.die(e)),
+						Effect.catchTags({
+							EmailError: e =>
+								Effect.fail(new BadRequest({ message: e.message })),
+							EmailSendError: e => Effect.die(e),
+							NotFound: e => Effect.die(e),
+							InboxInactive: e => Effect.die(e),
+							GrantUnavailable: e => Effect.die(e),
+							SqlError: e => Effect.die(e),
+						}),
 					),
 				)
 				// ── Footers ──
@@ -429,23 +477,22 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 						const piped = yield* svc
 							.streamAttachment(params.messageId, params.attachmentId)
 							.pipe(
-								Effect.catchTag('NotFound', err =>
-									Effect.succeed(
-										HttpServerResponse.jsonUnsafe(
-											{ _tag: 'NotFound', entity: err.entity, id: err.id },
-											{ status: 404 },
+								Effect.catchTags({
+									NotFound: err =>
+										Effect.succeed(
+											HttpServerResponse.jsonUnsafe(
+												{ _tag: 'NotFound', entity: err.entity, id: err.id },
+												{ status: 404 },
+											),
 										),
-									),
-								),
-								Effect.catchTag('EmailError', err =>
-									Effect.succeed(
-										HttpServerResponse.jsonUnsafe(
-											{ _tag: 'EmailError', message: err.message },
-											{ status: 502 },
+									EmailError: err =>
+										Effect.succeed(
+											HttpServerResponse.jsonUnsafe(
+												{ _tag: 'EmailError', message: err.message },
+												{ status: 502 },
+											),
 										),
-									),
-								),
-								Effect.catchTag('SqlError', e => Effect.die(e)),
+								}),
 							)
 						// If `piped` is already an HTTP response (one of the catch arms)
 						// hand it back unchanged. Otherwise wrap the provider stream.

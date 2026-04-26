@@ -35,19 +35,21 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 		)
 		const STORAGE_BUCKET = yield* Config.string('STORAGE_BUCKET')
 
-		const EMAIL_API_KEY = yield* Config.redacted('EMAIL_API_KEY')
-		// Required, no default: webhook signature verification is not
-		// opt-in. Missing secret would force a silent "skip verification"
-		// branch — boot fails instead.
-		const EMAIL_WEBHOOK_SECRET = yield* Config.redacted('EMAIL_WEBHOOK_SECRET')
-		// No default — the developer must explicitly choose `local-inbox`
-		// (dev catcher) or `agentmail` (real send). Forcing the choice
-		// prevents local config from silently leaking into prod and vice
-		// versa. The .env.example suggests `local-inbox` for local dev.
+		// Local-inbox is the only provider during the BYO-mailbox migration;
+		// real outbound SMTP / inbound IMAP transport ships in the mail-worker
+		// slice. Kept as a literal schema so the variable shape is stable when
+		// new transports are added.
 		const EMAIL_PROVIDER = yield* Config.schema(
-			Schema.Literals(['local-inbox', 'agentmail']),
+			Schema.Literals(['local-inbox']),
 			'EMAIL_PROVIDER',
 		)
+		// AES-256-GCM master key for encrypting per-inbox IMAP/SMTP
+		// credentials at rest. Base64-encoded 32 bytes. Per-inbox subkeys
+		// are derived via HKDF-SHA256 with the inbox id as `info`, so a
+		// row-level leak doesn't compromise other rows without this key.
+		// Required, no default — boot fails rather than ship plaintext.
+		// Generate with: node -e "console.log(crypto.randomBytes(32).toString('base64'))"
+		const EMAIL_CREDENTIAL_KEY = yield* Config.redacted('EMAIL_CREDENTIAL_KEY')
 
 		// No default — the developer must explicitly opt into a geocoding
 		// provider. Nominatim is the only option today; the variable is
@@ -99,9 +101,8 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 			STORAGE_ACCESS_KEY_ID,
 			STORAGE_SECRET_ACCESS_KEY,
 			STORAGE_BUCKET,
-			EMAIL_API_KEY,
-			EMAIL_WEBHOOK_SECRET,
 			EMAIL_PROVIDER,
+			EMAIL_CREDENTIAL_KEY,
 			GEOCODER_PROVIDER,
 			RESEARCH_DEFAULT_BUDGET_CENTS,
 			RESEARCH_DEFAULT_PAID_BUDGET_CENTS,

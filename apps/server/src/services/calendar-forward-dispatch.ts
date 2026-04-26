@@ -1,6 +1,7 @@
 import { Effect } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
+import { CurrentOrg } from '@batuda/controllers'
 import type { EmailBlocks } from '@batuda/email/schema'
 
 import { CalendarService } from './calendar.js'
@@ -19,6 +20,7 @@ export const dispatchForwardInvitation = (args: {
 		const calendar = yield* CalendarService
 		const email = yield* EmailService
 		const sql = yield* SqlClient.SqlClient
+		const currentOrg = yield* CurrentOrg
 
 		const { ics } = yield* calendar.forwardInvitation(args)
 
@@ -68,13 +70,16 @@ export const dispatchForwardInvitation = (args: {
 				SELECT inbox_id AS "inboxId"
 				FROM email_messages
 				WHERE id = ${sourceEmailMessageId}
+				  AND organization_id = ${currentOrg.id}
 				LIMIT 1
 			`
 			inboxId = messageRows[0]?.inboxId ?? null
 		}
 		if (!inboxId) {
 			const fallbackRows = yield* sql<{ id: string }>`
-				SELECT id FROM email_inboxes
+				SELECT id FROM inboxes
+				WHERE organization_id = ${currentOrg.id}
+				  AND active = true
 				ORDER BY created_at ASC
 				LIMIT 1
 			`
@@ -98,7 +103,8 @@ export const dispatchForwardInvitation = (args: {
 		const contactRows = yield* sql<{ id: string; companyId: string | null }>`
 			SELECT id, company_id AS "companyId"
 			FROM contacts
-			WHERE lower(email) = ${args.toEmail.toLowerCase()}
+			WHERE organization_id = ${currentOrg.id}
+			  AND lower(email) = ${args.toEmail.toLowerCase()}
 			ORDER BY created_at ASC
 			LIMIT 1
 		`

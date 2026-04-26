@@ -14,7 +14,8 @@ import { BadRequest } from '@batuda/controllers'
 //   - SVG → pass through (no raster resize); caller may sanitize.
 //   - GIF → pass through (sharp-resize kills animation).
 //   - everything else → caller skips calling this; stored verbatim.
-// Hard 25 MB ceiling matches the AgentMail per-message limit.
+// Hard 25 MB ceiling matches the typical per-message limit on commodity
+// SMTP transports (Gmail/M365/Fastmail all enforce 25 MB or less).
 
 export const MAX_BYTES = 25 * 1024 * 1024
 const DEFAULT_MAX_DIMENSION = 1600

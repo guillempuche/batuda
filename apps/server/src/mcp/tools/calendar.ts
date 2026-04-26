@@ -3,10 +3,18 @@ import { Tool, Toolkit } from 'effect/unstable/ai'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
+import { CurrentOrg, SessionContext } from '@batuda/controllers'
+
 import { CalendarService } from '../../services/calendar'
 import { dispatchForwardInvitation } from '../../services/calendar-forward-dispatch'
 import { dispatchRsvpReply } from '../../services/calendar-rsvp-dispatch'
 import { EmailService } from '../../services/email'
+
+// Per-request services the dispatcher tools depend on. The MCP HTTP middleware
+// (apps/server/src/mcp/http.ts) provides both alongside CurrentUser, so
+// declaring them here lets the toolkit's static check see them as
+// satisfied requirements rather than free `R` channels.
+const REQUEST_DEPENDENCIES = [SessionContext, CurrentOrg]
 
 // Agents identify the attendee at the protocol boundary (no session
 // ambient state to reach into) — the primary user's email rides with
@@ -96,6 +104,7 @@ const RespondToInvitation = Tool.make('respond_to_invitation', {
 		actor_user_id: Schema.optional(Schema.NullOr(Schema.String)),
 	}),
 	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Respond to Invitation')
 	.annotate(Tool.Destructive, false)
@@ -126,6 +135,7 @@ const ForwardInvitation = Tool.make('forward_invitation', {
 	success: Schema.Struct({
 		ics_base64: Schema.String,
 	}),
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Forward Invitation')
 	.annotate(Tool.Destructive, false)

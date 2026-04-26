@@ -169,29 +169,59 @@ export default Effect.gen(function* () {
 
 	// ── Email stack ──────────────────────────────────────────────────
 	// inboxes must be created before email_thread_links (FK dependency).
+	// One inbox = one IMAP+SMTP mailbox (Infomaniak / Fastmail / M365 /
+	// generic IMAP). Credentials are AES-256-GCM ciphertext at rest;
+	// folder_state holds per-folder UIDVALIDITY + lastUid checkpoints
+	// the mail-worker uses to resume IMAP sync without duplicates.
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS inboxes (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			provider TEXT NOT NULL,
-			provider_inbox_id TEXT NOT NULL,
+			organization_id TEXT NOT NULL,
 			email TEXT NOT NULL,
 			display_name TEXT,
-			purpose TEXT NOT NULL CHECK (purpose IN ('human','agent','shared')),
+			purpose TEXT NOT NULL,
 			owner_user_id TEXT,
 			is_default BOOLEAN NOT NULL DEFAULT false,
+			is_private BOOLEAN NOT NULL DEFAULT false,
 			active BOOLEAN NOT NULL DEFAULT true,
-			client_id TEXT,
+
+			imap_host TEXT NOT NULL,
+			imap_port INTEGER NOT NULL,
+			imap_security TEXT NOT NULL CHECK (imap_security IN ('tls','starttls','plain')),
+
+			smtp_host TEXT NOT NULL,
+			smtp_port INTEGER NOT NULL,
+			smtp_security TEXT NOT NULL CHECK (smtp_security IN ('tls','starttls','plain')),
+
+			username TEXT NOT NULL,
+			password_ciphertext BYTEA NOT NULL,
+			password_nonce BYTEA NOT NULL,
+			password_tag BYTEA NOT NULL,
+
+			grant_status TEXT NOT NULL DEFAULT 'connected'
+				CHECK (grant_status IN ('connected','auth_failed','connect_failed','disabled')),
+			grant_last_error TEXT,
+			grant_last_seen_at TIMESTAMPTZ,
+
+			folder_state JSONB NOT NULL DEFAULT '{}'::jsonb,
+
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-			UNIQUE (provider, provider_inbox_id)
+
+			CONSTRAINT inboxes_purpose_owner_chk CHECK (
+				(purpose = 'human'  AND owner_user_id IS NOT NULL) OR
+				(purpose = 'agent'  AND owner_user_id IS NOT NULL) OR
+				(purpose = 'shared' AND owner_user_id IS NULL AND is_private = false)
+			)
 		)
 	`
+	// external_thread_id is the RFC 5322 Message-ID of the thread root —
+	// stable across providers, replaces the old per-vendor thread id.
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS email_thread_links (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			provider TEXT NOT NULL,
-			provider_thread_id TEXT NOT NULL UNIQUE,
-			provider_inbox_id TEXT NOT NULL,
+			organization_id TEXT NOT NULL,
+			external_thread_id TEXT NOT NULL,
 			inbox_id UUID REFERENCES inboxes(id) ON DELETE SET NULL,
 			company_id UUID REFERENCES companies(id) ON DELETE SET NULL,
 			contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
@@ -199,7 +229,8 @@ export default Effect.gen(function* () {
 			status TEXT NOT NULL DEFAULT 'open',
 			last_read_at TIMESTAMPTZ,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			UNIQUE (organization_id, external_thread_id)
 		)
 	`
 
@@ -327,19 +358,40 @@ export default Effect.gen(function* () {
 		)
 	`
 
-	// Default shape for recipients reflects the { to, cc, bcc } schema.
+	// One row per RFC 822 message. message_id is the RFC 5322 Message-ID
+	// (stable across providers); imap_uid + imap_uidvalidity locate the
+	// message inside the user's mailbox so the worker can resume sync.
+	// raw_rfc822_ref points at the full bytes in object storage; parsed
+	// text/html bodies live inline for fast list/thread reads.
+	// Default recipients shape is { to, cc, bcc } — JSONB snapshot for
+	// compose UI; queryable index lives in message_participants.
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS email_messages (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			provider TEXT NOT NULL,
-			provider_message_id TEXT NOT NULL UNIQUE,
-			provider_thread_id TEXT NOT NULL,
-			provider_inbox_id TEXT NOT NULL,
+			organization_id TEXT NOT NULL,
+			inbox_id UUID REFERENCES inboxes(id) ON DELETE SET NULL,
+
+			message_id TEXT NOT NULL,
+			in_reply_to TEXT,
+			"references" TEXT[],
+
 			direction TEXT NOT NULL,
+			folder TEXT NOT NULL,
+			imap_uid INTEGER,
+			imap_uidvalidity INTEGER,
+
+			raw_rfc822_ref TEXT NOT NULL,
+			subject TEXT,
+			received_at TIMESTAMPTZ,
+			text_preview TEXT,
+			text_body TEXT,
+			html_body TEXT,
+
 			company_id UUID REFERENCES companies(id) ON DELETE SET NULL,
 			contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
 			recipients JSONB NOT NULL DEFAULT '{"to":[],"cc":[],"bcc":[]}'::jsonb,
-			status TEXT NOT NULL,
+
+			status TEXT NOT NULL CHECK (status IN ('normal','spam','blocked','bounced')),
 			status_reason TEXT,
 			bounce_type TEXT,
 			bounce_sub_type TEXT,
@@ -354,6 +406,7 @@ export default Effect.gen(function* () {
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS inbox_footers (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			organization_id TEXT NOT NULL,
 			inbox_id UUID NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE,
 			name TEXT NOT NULL,
 			body_json JSONB NOT NULL,
@@ -363,14 +416,13 @@ export default Effect.gen(function* () {
 		)
 	`
 
-	// Draft body shadow — AgentMail's draft API exposes html/text only, so
-	// the editor-authored block tree lives here keyed by the provider's
-	// draft_id. Local provider doesn't need this (stores bodyJson inline
-	// in its on-disk JSON); the row is AgentMail-only in practice but the
-	// table is provider-agnostic.
+	// Raw editor-authored body persisted between draft saves — keyed by
+	// draft_id so the editor can reload the exact block tree it last
+	// posted. Sender derives html/text from this on send.
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS email_draft_bodies (
 			draft_id TEXT PRIMARY KEY,
+			organization_id TEXT NOT NULL,
 			inbox_id UUID NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE,
 			body_json JSONB NOT NULL,
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -384,6 +436,7 @@ export default Effect.gen(function* () {
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS email_attachment_staging (
 			staging_id TEXT PRIMARY KEY,
+			organization_id TEXT NOT NULL,
 			inbox_id UUID NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE,
 			draft_id TEXT,
 			storage_key TEXT NOT NULL,
@@ -401,6 +454,8 @@ export default Effect.gen(function* () {
 	// ── Activity event log ───────────────────────────────────────────
 	// Polymorphic timeline of every notable event (emails, calls, documents,
 	// proposals, research runs, system events).
+	// actor_user_id is TEXT because Better Auth user ids are cuid2 strings,
+	// not UUIDs (an earlier draft of this schema modelled them as UUID).
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS timeline_activity (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -411,7 +466,7 @@ export default Effect.gen(function* () {
 			contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
 			channel TEXT,
 			direction TEXT,
-			actor_user_id UUID,
+			actor_user_id TEXT,
 			occurred_at TIMESTAMPTZ NOT NULL,
 			summary TEXT,
 			payload JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -470,13 +525,14 @@ export default Effect.gen(function* () {
 		WHERE addr.value IS NOT NULL AND addr.value <> ''
 		ON CONFLICT DO NOTHING
 	`
-	// Outbound 'from' can be recovered via the sending inbox.
+	// Outbound 'from' can be recovered via the sending inbox. Inbound 'from'
+	// is populated by the mail-worker at ingest time from parsed headers.
 	yield* sql`
 		INSERT INTO message_participants (email_message_id, email_address, role)
 		SELECT m.id, lower(i.email), 'from'
 		FROM email_messages m
-		JOIN inboxes i ON i.provider_inbox_id = m.provider_inbox_id
-		WHERE m.direction = 'outbound'
+		JOIN inboxes i ON i.id = m.inbox_id
+		WHERE m.direction = 'outbound' AND m.inbox_id IS NOT NULL
 		ON CONFLICT DO NOTHING
 	`
 	// Link each participant to an existing contact row when the email matches.
@@ -700,27 +756,48 @@ export default Effect.gen(function* () {
 
 	// ── Indexes ──────────────────────────────────────────────────────
 	yield* Effect.all([
-		// email_thread_links
+		// email_thread_links — org_updated index drives the inbox-list view.
 		sql`CREATE INDEX IF NOT EXISTS idx_email_thread_links_company_id ON email_thread_links(company_id)`,
-		sql`CREATE INDEX IF NOT EXISTS idx_email_thread_links_provider_inbox_id ON email_thread_links(provider_inbox_id)`,
 		sql`CREATE INDEX IF NOT EXISTS idx_email_thread_links_inbox_id ON email_thread_links(inbox_id)`,
 		sql`CREATE INDEX IF NOT EXISTS idx_email_thread_links_subject_lower ON email_thread_links(lower(subject))`,
-		sql`CREATE INDEX IF NOT EXISTS idx_email_thread_links_status_updated ON email_thread_links(provider_inbox_id, status, updated_at DESC)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_email_thread_links_org_updated ON email_thread_links(organization_id, updated_at DESC)`,
 
-		// email_messages
-		sql`CREATE INDEX IF NOT EXISTS idx_email_messages_provider_thread_id ON email_messages(provider_thread_id)`,
+		// email_messages — imap_dedupe + msgid keep duplicate fetches no-ops;
+		// references GIN powers the threading lookup.
 		sql`CREATE INDEX IF NOT EXISTS idx_email_messages_contact_id ON email_messages(contact_id) WHERE contact_id IS NOT NULL`,
 		sql`CREATE INDEX IF NOT EXISTS idx_email_messages_status ON email_messages(status)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_email_messages_org_status ON email_messages(organization_id, status_updated_at DESC)`,
+		sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_email_messages_imap_dedupe ON email_messages(inbox_id, imap_uidvalidity, imap_uid) WHERE imap_uid IS NOT NULL`,
+		sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_email_messages_msgid ON email_messages(organization_id, message_id)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_email_messages_references ON email_messages USING GIN ("references")`,
+		sql`CREATE INDEX IF NOT EXISTS idx_email_messages_inbox_received ON email_messages(inbox_id, received_at DESC)`,
 		sql`
 			CREATE INDEX IF NOT EXISTS idx_email_messages_inbound_active
 			ON email_messages(created_at DESC)
 			WHERE direction = 'inbound' AND (inbound_classification IS NULL OR inbound_classification = 'normal')
 		`,
 
-		// inboxes
+		// inboxes — defaults are scoped per (org, owner, purpose) for owned
+		// boxes and per (org, purpose) for shared boxes; worker scans by
+		// grant_status so an isolated index pays for itself.
+		sql`CREATE INDEX IF NOT EXISTS idx_inboxes_org ON inboxes(organization_id)`,
 		sql`CREATE INDEX IF NOT EXISTS idx_inboxes_purpose ON inboxes(purpose) WHERE active = true`,
-		sql`CREATE INDEX IF NOT EXISTS idx_inboxes_owner_user_id ON inboxes(owner_user_id) WHERE owner_user_id IS NOT NULL`,
-		sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_inboxes_single_default ON inboxes((1)) WHERE is_default = true`,
+		sql`
+			CREATE INDEX IF NOT EXISTS idx_inboxes_org_owner_active
+			ON inboxes(organization_id, owner_user_id)
+			WHERE owner_user_id IS NOT NULL AND active = true
+		`,
+		sql`
+			CREATE UNIQUE INDEX IF NOT EXISTS idx_inboxes_default_per_owner
+			ON inboxes(organization_id, owner_user_id, purpose)
+			WHERE is_default = true AND owner_user_id IS NOT NULL
+		`,
+		sql`
+			CREATE UNIQUE INDEX IF NOT EXISTS idx_inboxes_default_shared
+			ON inboxes(organization_id, purpose)
+			WHERE is_default = true AND owner_user_id IS NULL
+		`,
+		sql`CREATE INDEX IF NOT EXISTS idx_inboxes_grant_status ON inboxes(grant_status) WHERE active = true`,
 
 		// inbox_footers
 		sql`CREATE INDEX IF NOT EXISTS idx_inbox_footers_inbox_id ON inbox_footers(inbox_id)`,
@@ -783,4 +860,115 @@ export default Effect.gen(function* () {
 		// task_events — most recent changes per task drive the undo drawer.
 		sql`CREATE INDEX IF NOT EXISTS task_events_task_id_idx ON task_events(task_id, at DESC)`,
 	])
+
+	// ── Multi-tenant roles ──────────────────────────────────────────
+	// app_user: HTTP + MCP request path. RLS policies (added per-table by
+	// later slices) gate visibility on current_setting('app.current_org_id').
+	// app_service: mail worker + cron jobs. BYPASSRLS so background workers
+	// can resolve the org explicitly from the row they're processing
+	// instead of carrying a session-scoped GUC.
+	// NOLOGIN on both: connections still authenticate as the DATABASE_URL
+	// owner; the app SETs ROLE to one of these inside the request boundary.
+	yield* sql`
+		DO $$
+		BEGIN
+			IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app_user') THEN
+				CREATE ROLE app_user NOLOGIN;
+			END IF;
+			IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app_service') THEN
+				CREATE ROLE app_service NOLOGIN BYPASSRLS;
+			END IF;
+		END
+		$$;
+	`
+
+	// ── Better Auth additions ───────────────────────────────────────
+	// member.primary_inbox_id is the member's default From identity in
+	// this org; ON DELETE SET NULL so deleting the inbox demotes the
+	// member back to "no primary" rather than cascading them out.
+	// migrate.ts runs Better Auth before this CRM migration so `member`
+	// already exists by the time we ALTER it.
+	yield* sql`
+		ALTER TABLE "member"
+			ADD COLUMN IF NOT EXISTS primary_inbox_id UUID
+	`
+	yield* sql`
+		DO $$
+		BEGIN
+			IF NOT EXISTS (
+				SELECT 1 FROM pg_constraint WHERE conname = 'member_primary_inbox_id_fkey'
+			) THEN
+				ALTER TABLE "member"
+					ADD CONSTRAINT member_primary_inbox_id_fkey
+					FOREIGN KEY (primary_inbox_id) REFERENCES inboxes(id) ON DELETE SET NULL;
+			END IF;
+		END
+		$$;
+	`
+	yield* sql`
+		CREATE INDEX IF NOT EXISTS idx_member_primary_inbox
+			ON "member"(primary_inbox_id) WHERE primary_inbox_id IS NOT NULL
+	`
+
+	// ── Row-level security ──────────────────────────────────────────
+	// Every email-stack table is RLS-gated on
+	// current_setting('app.current_org_id'). app_user has the GUC set
+	// per request inside withTransaction; app_service has BYPASSRLS and
+	// resolves the org explicitly from each row it processes.
+	// message_participants is scoped transitively through email_messages.
+	yield* sql`ALTER TABLE inboxes ENABLE ROW LEVEL SECURITY`
+	yield* sql`ALTER TABLE email_thread_links ENABLE ROW LEVEL SECURITY`
+	yield* sql`ALTER TABLE email_messages ENABLE ROW LEVEL SECURITY`
+	yield* sql`ALTER TABLE email_draft_bodies ENABLE ROW LEVEL SECURITY`
+	yield* sql`ALTER TABLE inbox_footers ENABLE ROW LEVEL SECURITY`
+	yield* sql`ALTER TABLE email_attachment_staging ENABLE ROW LEVEL SECURITY`
+	yield* sql`ALTER TABLE message_participants ENABLE ROW LEVEL SECURITY`
+
+	yield* sql`
+		CREATE POLICY org_isolation_inboxes ON inboxes
+			USING (organization_id = current_setting('app.current_org_id', true))
+	`
+	yield* sql`
+		CREATE POLICY org_isolation_email_thread_links ON email_thread_links
+			USING (organization_id = current_setting('app.current_org_id', true))
+	`
+	yield* sql`
+		CREATE POLICY org_isolation_email_messages ON email_messages
+			USING (organization_id = current_setting('app.current_org_id', true))
+	`
+	yield* sql`
+		CREATE POLICY org_isolation_email_draft_bodies ON email_draft_bodies
+			USING (organization_id = current_setting('app.current_org_id', true))
+	`
+	yield* sql`
+		CREATE POLICY org_isolation_inbox_footers ON inbox_footers
+			USING (organization_id = current_setting('app.current_org_id', true))
+	`
+	yield* sql`
+		CREATE POLICY org_isolation_email_attachment_staging ON email_attachment_staging
+			USING (organization_id = current_setting('app.current_org_id', true))
+	`
+	yield* sql`
+		CREATE POLICY org_isolation_message_participants ON message_participants
+			USING (
+				EXISTS (
+					SELECT 1 FROM email_messages m
+					WHERE m.id = message_participants.email_message_id
+						AND m.organization_id = current_setting('app.current_org_id', true)
+				)
+			)
+	`
+
+	// app_user needs DML privileges; RLS still gates row visibility.
+	// app_service gets the same grants because BYPASSRLS only opts out
+	// of policy checks, not the underlying GRANT.
+	yield* sql`
+		GRANT USAGE ON SCHEMA public TO app_user, app_service
+	`
+	yield* sql`
+		GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_user, app_service
+	`
+	yield* sql`
+		GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_user, app_service
+	`
 })

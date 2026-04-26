@@ -1,6 +1,7 @@
 import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 
+import { CurrentOrg, SessionContext } from '@batuda/controllers'
 import { EmailBlocks } from '@batuda/email/schema'
 
 import { EmailService } from '../../services/email'
@@ -8,6 +9,12 @@ import {
 	EmailAttachmentStaging,
 	type StagingRef,
 } from '../../services/email-attachment-staging'
+
+// Per-request services every email tool depends on. The MCP HTTP middleware
+// (apps/server/src/mcp/http.ts) provides both alongside CurrentUser, so
+// declaring them here lets the toolkit's static check see them as
+// satisfied requirements rather than free `R` channels.
+const REQUEST_DEPENDENCIES = [SessionContext, CurrentOrg]
 
 // Convert MCP snake_case refs to the service's camelCase StagingRef.
 // `inline: false` is the default; unspecified inline means tray-style
@@ -63,9 +70,9 @@ const AttachmentRef = Schema.Struct({
 
 const SendEmail = Tool.make('send_email', {
 	description:
-		'Send a new email from a specific inbox. The body is a structured block tree (paragraph / heading / list / quote / divider / image) — not raw html/text. Attachments reference staging_ids returned by stage_email_attachment; set inline=true for cid-referenced inline images. Returns {_tag:"sent"} on success or {_tag:"suppressed"} if a recipient is suppressed. Set skip_footer=true to omit the inbox default footer.',
+		'Send a new email. The body is a structured block tree (paragraph / heading / list / quote / divider / image) — not raw html/text. Omit inbox_id to use the calling member’s primary inbox in the active org. Attachments reference staging_ids returned by stage_email_attachment; set inline=true for cid-referenced inline images. Returns {_tag:"sent"} on success or {_tag:"suppressed"} if a recipient is suppressed. Set skip_footer=true to omit the inbox default footer.',
 	parameters: Schema.Struct({
-		inbox_id: Schema.String,
+		inbox_id: Schema.optional(Schema.String),
 		to: Recipients,
 		cc: Schema.optional(Schema.Array(Schema.String)),
 		bcc: Schema.optional(Schema.Array(Schema.String)),
@@ -79,6 +86,7 @@ const SendEmail = Tool.make('send_email', {
 		skip_footer: Schema.optional(Schema.Boolean),
 	}),
 	success: SendEmailResult,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Send Email')
 	.annotate(Tool.Destructive, false)
@@ -97,6 +105,7 @@ const ReplyEmail = Tool.make('reply_email', {
 		skip_footer: Schema.optional(Schema.Boolean),
 	}),
 	success: SendEmailResult,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Reply Email')
 	.annotate(Tool.Destructive, false)
@@ -128,6 +137,7 @@ const StageEmailAttachment = Tool.make('stage_email_attachment', {
 		draft_id: Schema.optional(Schema.String),
 	}),
 	success: StageEmailAttachmentResult,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Stage Email Attachment')
 	.annotate(Tool.Destructive, false)
@@ -153,6 +163,7 @@ const ListEmailThreads = Tool.make('list_email_threads', {
 		limit: Schema.Number,
 		offset: Schema.Number,
 	}),
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Email Threads')
 	.annotate(Tool.Readonly, true)
@@ -166,6 +177,7 @@ const GetEmailThread = Tool.make('get_email_thread', {
 		thread_id: Schema.String,
 	}),
 	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Get Email Thread')
 	.annotate(Tool.Readonly, true)
@@ -186,6 +198,7 @@ const UpdateThreadStatus = Tool.make('update_email_thread_status', {
 		status: ThreadStatus,
 		updatedAt: Schema.String,
 	}),
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Update Email Thread Status')
 	.annotate(Tool.Destructive, false)
@@ -196,6 +209,7 @@ const MarkThreadRead = Tool.make('mark_email_thread_read', {
 		'Mark a thread as read (stamps last_read_at = now()). Subsequent listings will show is_unread=false unless new inbound messages arrive.',
 	parameters: Schema.Struct({ thread_id: Schema.String }),
 	success: Schema.Void,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Mark Email Thread Read')
 	.annotate(Tool.Destructive, false)
@@ -206,6 +220,7 @@ const MarkThreadUnread = Tool.make('mark_email_thread_unread', {
 		'Mark a thread as unread (clears last_read_at). Useful when an agent wants to resurface a thread for human attention.',
 	parameters: Schema.Struct({ thread_id: Schema.String }),
 	success: Schema.Void,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Mark Email Thread Unread')
 	.annotate(Tool.Destructive, false)
@@ -223,6 +238,7 @@ const ListEmailMessages = Tool.make('list_email_messages', {
 		limit: Schema.optional(Schema.Number),
 	}),
 	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Email Messages')
 	.annotate(Tool.Readonly, true)
@@ -230,38 +246,84 @@ const ListEmailMessages = Tool.make('list_email_messages', {
 	.annotate(Tool.OpenWorld, false)
 
 // ── Inbox management ─────────────────────────────────────────────
-// Inboxes are our local CRM metadata over the provider's inbox set
-// (AgentMail, LocalInbox, future Gmail/IMAP). `purpose` drives which
-// composer the inbox appears in: human inboxes belong to a team
-// member, agent inboxes are AI-only, shared ones surface in both.
+// Inboxes are owned by an (organization, user) pair. Each row stores its
+// own IMAP/SMTP transport configuration plus encrypted credentials —
+// Batuda is a generic mail client (Infomaniak, Fastmail, M365 IMAP, …),
+// not a hosted mailbox. `purpose` drives composer visibility: human
+// inboxes belong to a team member, agent inboxes are AI-only, shared
+// inboxes surface in both.
+
+const ImapSecurity = Schema.Literals(['tls', 'starttls', 'plain'])
+const SmtpSecurity = Schema.Literals(['tls', 'starttls', 'plain'])
 
 const ListEmailInboxes = Tool.make('list_email_inboxes', {
 	description:
-		'List local inbox rows (our CRM metadata — not the raw provider view). Each row carries purpose (human/agent/shared), ownerUserId, isDefault, active flag, and the stable providerInboxId. Filter by purpose, active flag, or owner.',
+		'List inbox rows visible to the calling member in the active organization. Each row carries purpose (human/agent/shared), ownerUserId, isDefault, active flag, IMAP/SMTP transport hosts, and grant_status. Filter by purpose, active flag, or owner. Private inboxes belonging to other members are hidden automatically.',
 	parameters: Schema.Struct({
 		purpose: Schema.optional(InboxPurpose),
 		active: Schema.optional(Schema.Boolean),
 		owner_user_id: Schema.optional(Schema.String),
 	}),
 	success: Schema.Array(Schema.Unknown),
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Email Inboxes')
 	.annotate(Tool.Readonly, true)
 	.annotate(Tool.Destructive, false)
 	.annotate(Tool.OpenWorld, false)
 
+const ListEmailProviderPresets = Tool.make('list_email_provider_presets', {
+	description:
+		'List the built-in mailbox presets (Infomaniak, Fastmail, Gmail Workspace, Microsoft 365, Proton Bridge, Generic IMAP). Each entry pre-fills IMAP and SMTP host/port/security so create_email_inbox callers only need to add credentials. Static — safe to cache.',
+	parameters: Schema.Struct({}),
+	success: Schema.Array(Schema.Unknown),
+})
+	.annotate(Tool.Title, 'List Email Provider Presets')
+	.annotate(Tool.Readonly, true)
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
+
+const GetEmailInboxStatus = Tool.make('get_email_inbox_status', {
+	description:
+		'Return the calling member’s primary inbox in the active organization, if any. Use before send_email/create_email_draft to confirm the user has a default inbox set; if hasDefault=false the UI should prompt them to connect a mailbox first.',
+	parameters: Schema.Struct({}),
+	success: Schema.Struct({
+		hasDefault: Schema.Boolean,
+		primary: Schema.NullOr(
+			Schema.Struct({
+				inboxId: Schema.String,
+				email: Schema.String,
+			}),
+		),
+	}),
+	dependencies: REQUEST_DEPENDENCIES,
+})
+	.annotate(Tool.Title, 'Get Email Inbox Status')
+	.annotate(Tool.Readonly, true)
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
+
 const CreateEmailInbox = Tool.make('create_email_inbox', {
 	description:
-		'Create a new inbox via the provider and mirror it locally with CRM metadata. Returns the created inbox row. `purpose` drives composer visibility: human = team member, agent = AI-only, shared = both. Setting isDefault atomically clears the previous default in the same purpose bucket.',
+		'Connect a new mailbox to the calling member. Requires full IMAP + SMTP transport details (use list_email_provider_presets to pre-fill these for known providers) and a password / app-password — Batuda is a generic IMAP/SMTP client, not a hosted mail provider. Credentials are encrypted at rest. `purpose=human` defaults ownership to the caller; `purpose=shared` clears any owner_user_id and rejects is_private=true. Setting is_default atomically clears the previous default in the same (owner, purpose) bucket.',
 	parameters: Schema.Struct({
+		email: Schema.String,
+		password: Schema.String,
 		username: Schema.optional(Schema.String),
-		domain: Schema.optional(Schema.String),
 		display_name: Schema.optional(Schema.String),
 		purpose: InboxPurpose,
 		owner_user_id: Schema.optional(Schema.String),
 		is_default: Schema.optional(Schema.Boolean),
+		is_private: Schema.optional(Schema.Boolean),
+		imap_host: Schema.String,
+		imap_port: Schema.Number,
+		imap_security: ImapSecurity,
+		smtp_host: Schema.String,
+		smtp_port: Schema.Number,
+		smtp_security: SmtpSecurity,
 	}),
 	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Create Email Inbox')
 	.annotate(Tool.Destructive, false)
@@ -269,40 +331,75 @@ const CreateEmailInbox = Tool.make('create_email_inbox', {
 
 const UpdateEmailInbox = Tool.make('update_email_inbox', {
 	description:
-		'Update CRM metadata on a local inbox row (displayName, purpose, ownerUserId, isDefault, active). Does not rename the provider address. Flipping `active=false` hides the inbox from composers without deleting historical thread links.',
+		'Update fields on an existing inbox in the active organization — display name, purpose, ownership, default flag, privacy, transport configuration, or credentials. Pass only the fields to change; password (if provided) is re-encrypted with a per-row HKDF subkey. Flipping `active=false` hides the inbox from composers and stops the IMAP worker, but preserves historical thread links.',
 	parameters: Schema.Struct({
 		id: Schema.String,
 		display_name: Schema.optional(Schema.NullOr(Schema.String)),
 		purpose: Schema.optional(InboxPurpose),
 		owner_user_id: Schema.optional(Schema.NullOr(Schema.String)),
 		is_default: Schema.optional(Schema.Boolean),
+		is_private: Schema.optional(Schema.Boolean),
 		active: Schema.optional(Schema.Boolean),
+		imap_host: Schema.optional(Schema.String),
+		imap_port: Schema.optional(Schema.Number),
+		imap_security: Schema.optional(ImapSecurity),
+		smtp_host: Schema.optional(Schema.String),
+		smtp_port: Schema.optional(Schema.Number),
+		smtp_security: Schema.optional(SmtpSecurity),
+		username: Schema.optional(Schema.String),
+		password: Schema.optional(Schema.String),
 	}),
 	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Update Email Inbox')
 	.annotate(Tool.Destructive, false)
 	.annotate(Tool.OpenWorld, false)
 
-const SyncEmailInboxes = Tool.make('sync_email_inboxes', {
+const TestEmailInbox = Tool.make('test_email_inbox', {
 	description:
-		'Reconcile the local inbox table with the provider. Inserts rows for provider inboxes missing locally (defaulting to purpose=shared) and marks rows whose provider id has disappeared as active=false. Returns counts of added and retired rows.',
-	parameters: Schema.Struct({}),
-	success: Schema.Struct({
-		added: Schema.Number,
-		retired: Schema.Number,
-		total: Schema.Number,
+		'Refresh the connection heartbeat for an inbox. The mail-transport slice will perform a real IMAP LOGIN + SMTP EHLO probe; until then this only stamps grant_last_seen_at so the UI can confirm the inbox row still resolves in this org. Returns the updated inbox row.',
+	parameters: Schema.Struct({
+		id: Schema.String,
 	}),
+	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
 })
-	.annotate(Tool.Title, 'Sync Email Inboxes')
+	.annotate(Tool.Title, 'Test Email Inbox')
 	.annotate(Tool.Destructive, false)
 	.annotate(Tool.OpenWorld, true)
+
+const DeleteEmailInbox = Tool.make('delete_email_inbox', {
+	description:
+		'Soft-delete an inbox: sets active=false and is_default=false so the IMAP worker stops syncing it and composers stop offering it, while preserving historical messages and thread links. The row is not removed; use update_email_inbox with active=true to restore.',
+	parameters: Schema.Struct({
+		id: Schema.String,
+	}),
+	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
+})
+	.annotate(Tool.Title, 'Delete Email Inbox')
+	.annotate(Tool.Destructive, true)
+	.annotate(Tool.OpenWorld, false)
+
+const SetPrimaryEmailInbox = Tool.make('set_primary_email_inbox', {
+	description:
+		'Promote one of the calling member’s human inboxes to is_default=true (their primary From identity in the active organization). Clears the previous primary in the same (owner, purpose) bucket. Rejects shared inboxes, inactive inboxes, and inboxes owned by another member.',
+	parameters: Schema.Struct({
+		id: Schema.String,
+	}),
+	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
+})
+	.annotate(Tool.Title, 'Set Primary Email Inbox')
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
 
 // ── Draft tools ─────────────────────────────────────────────────
 
 const CreateEmailDraft = Tool.make('create_email_draft', {
 	description:
-		'Create a draft email that a human can review in Batuda before sending. The draft is stored on the provider (AgentMail) plus a local body_json shadow that preserves the typed block tree for lossless editor re-hydration. Optionally set company_id/contact_id/mode to link to CRM context.',
+		'Create a draft email that a human can review in Batuda before sending. Stored locally with a body_json shadow that preserves the typed block tree for lossless editor re-hydration. Optionally set company_id/contact_id/mode to link to CRM context.',
 	parameters: Schema.Struct({
 		inbox_id: Schema.String,
 		to: Schema.optional(Recipients),
@@ -317,6 +414,7 @@ const CreateEmailDraft = Tool.make('create_email_draft', {
 		thread_link_id: Schema.optional(Schema.String),
 	}),
 	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Create Email Draft')
 	.annotate(Tool.Destructive, false)
@@ -335,6 +433,7 @@ const UpdateEmailDraft = Tool.make('update_email_draft', {
 		body_json: Schema.optional(EmailBlocks),
 	}),
 	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Update Email Draft')
 	.annotate(Tool.Destructive, false)
@@ -348,6 +447,7 @@ const SendEmailDraft = Tool.make('send_email_draft', {
 		draft_id: Schema.String,
 	}),
 	success: SendEmailResult,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Send Email Draft')
 	.annotate(Tool.Destructive, false)
@@ -360,6 +460,7 @@ const ListEmailDrafts = Tool.make('list_email_drafts', {
 		inbox_id: Schema.optional(Schema.String),
 	}),
 	success: Schema.Array(Schema.Unknown),
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Email Drafts')
 	.annotate(Tool.Readonly, true)
@@ -375,6 +476,7 @@ const ListInboxFooters = Tool.make('list_inbox_footers', {
 		inbox_id: Schema.String,
 	}),
 	success: Schema.Array(Schema.Unknown),
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Inbox Footers')
 	.annotate(Tool.Readonly, true)
@@ -391,6 +493,7 @@ const CreateInboxFooter = Tool.make('create_inbox_footer', {
 		is_default: Schema.optional(Schema.Boolean),
 	}),
 	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Create Inbox Footer')
 	.annotate(Tool.Destructive, false)
@@ -406,6 +509,7 @@ const UpdateInboxFooter = Tool.make('update_inbox_footer', {
 		is_default: Schema.optional(Schema.Boolean),
 	}),
 	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Update Inbox Footer')
 	.annotate(Tool.Destructive, false)
@@ -418,6 +522,7 @@ const DeleteInboxFooter = Tool.make('delete_inbox_footer', {
 		id: Schema.String,
 	}),
 	success: Schema.Void,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Delete Inbox Footer')
 	.annotate(Tool.Destructive, true)
@@ -434,9 +539,13 @@ export const EmailTools = Toolkit.make(
 	MarkThreadUnread,
 	ListEmailMessages,
 	ListEmailInboxes,
+	ListEmailProviderPresets,
+	GetEmailInboxStatus,
 	CreateEmailInbox,
 	UpdateEmailInbox,
-	SyncEmailInboxes,
+	TestEmailInbox,
+	DeleteEmailInbox,
+	SetPrimaryEmailInbox,
 	CreateEmailDraft,
 	UpdateEmailDraft,
 	SendEmailDraft,
@@ -602,24 +711,32 @@ export const EmailHandlersLive = EmailTools.toLayer(
 						ownerUserId: params.owner_user_id,
 					}),
 				}),
+			list_email_provider_presets: () => svc.listProviderPresets(),
+			get_email_inbox_status: () => svc.inboxStatus(),
 			create_email_inbox: params =>
 				svc
 					.createInbox({
-						...(params.username !== undefined && {
-							username: params.username,
-						}),
-						...(params.domain !== undefined && {
-							domain: params.domain,
-						}),
+						email: params.email,
+						password: params.password,
+						username: params.username ?? params.email,
+						purpose: params.purpose,
+						imapHost: params.imap_host,
+						imapPort: params.imap_port,
+						imapSecurity: params.imap_security,
+						smtpHost: params.smtp_host,
+						smtpPort: params.smtp_port,
+						smtpSecurity: params.smtp_security,
 						...(params.display_name !== undefined && {
 							displayName: params.display_name,
 						}),
-						purpose: params.purpose,
 						...(params.owner_user_id !== undefined && {
 							ownerUserId: params.owner_user_id,
 						}),
 						...(params.is_default !== undefined && {
 							isDefault: params.is_default,
+						}),
+						...(params.is_private !== undefined && {
+							isPrivate: params.is_private,
 						}),
 					})
 					.pipe(Effect.orDie),
@@ -638,15 +755,53 @@ export const EmailHandlersLive = EmailTools.toLayer(
 						...(params.is_default !== undefined && {
 							isDefault: params.is_default,
 						}),
+						...(params.is_private !== undefined && {
+							isPrivate: params.is_private,
+						}),
 						...(params.active !== undefined && {
 							active: params.active,
+						}),
+						...(params.imap_host !== undefined && {
+							imapHost: params.imap_host,
+						}),
+						...(params.imap_port !== undefined && {
+							imapPort: params.imap_port,
+						}),
+						...(params.imap_security !== undefined && {
+							imapSecurity: params.imap_security,
+						}),
+						...(params.smtp_host !== undefined && {
+							smtpHost: params.smtp_host,
+						}),
+						...(params.smtp_port !== undefined && {
+							smtpPort: params.smtp_port,
+						}),
+						...(params.smtp_security !== undefined && {
+							smtpSecurity: params.smtp_security,
+						}),
+						...(params.username !== undefined && {
+							username: params.username,
+						}),
+						...(params.password !== undefined && {
+							password: params.password,
 						}),
 					})
 					.pipe(
 						Effect.catchTag('NotFound', e => Effect.die(e)),
 						Effect.orDie,
 					),
-			sync_email_inboxes: () => svc.syncInboxes(),
+			test_email_inbox: params =>
+				svc.testInbox(params.id).pipe(
+					Effect.catchTag('NotFound', e => Effect.die(e)),
+					Effect.orDie,
+				),
+			delete_email_inbox: params =>
+				svc.deleteInbox(params.id).pipe(
+					Effect.catchTag('NotFound', e => Effect.die(e)),
+					Effect.orDie,
+				),
+			set_primary_email_inbox: params =>
+				svc.setPrimaryInbox(params.id).pipe(Effect.orDie),
 			create_email_draft: params =>
 				svc
 					.createDraft(

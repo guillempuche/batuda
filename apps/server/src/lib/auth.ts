@@ -1,6 +1,12 @@
 import { apiKey } from '@better-auth/api-key'
 import { betterAuth } from 'better-auth'
-import { admin, bearer, magicLink, openAPI } from 'better-auth/plugins'
+import {
+	admin,
+	bearer,
+	magicLink,
+	openAPI,
+	organization,
+} from 'better-auth/plugins'
 import { Effect, Layer, Redacted, ServiceMap } from 'effect'
 import pg from 'pg'
 
@@ -40,6 +46,26 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 					openAPI(),
 					bearer(),
 					admin(),
+					// Multi-tenant scoping. Every Batuda user belongs to one or more
+					// orgs; `session.activeOrganizationId` drives which org a request
+					// reads/writes. Tables that own org-scoped data carry an
+					// `organization_id` column populated from `CurrentOrg`.
+					// `member.primary_inbox_id` is the member's default From identity
+					// in this org; the column + FK + ON DELETE SET NULL are added by
+					// the migration since `additionalFields` does not generate FKs.
+					organization({
+						schema: {
+							member: {
+								additionalFields: {
+									primaryInboxId: {
+										type: 'string' as const,
+										required: false,
+										fieldName: 'primary_inbox_id' as const,
+									},
+								},
+							},
+						},
+					}),
 					apiKey({ enableSessionForAPIKeys: true }),
 					magicLink({
 						sendMagicLink: data =>

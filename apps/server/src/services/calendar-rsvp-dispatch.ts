@@ -1,6 +1,7 @@
 import { Effect } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
+import { CurrentOrg } from '@batuda/controllers'
 import type { EmailBlocks } from '@batuda/email/schema'
 
 import { CalendarService } from './calendar.js'
@@ -21,6 +22,7 @@ export const dispatchRsvpReply = (args: {
 		const calendar = yield* CalendarService
 		const email = yield* EmailService
 		const sql = yield* SqlClient.SqlClient
+		const currentOrg = yield* CurrentOrg
 
 		const result = yield* calendar.respondToRsvp(args)
 
@@ -62,19 +64,30 @@ export const dispatchRsvpReply = (args: {
 			)
 			return result
 		}
-		const messageRows = yield* sql<{ providerThreadId: string }>`
-			SELECT provider_thread_id
-			FROM email_messages
-			WHERE id = ${sourceEmailMessageId}
+		// Hop from the source message row to its local thread link via
+		// the Message-ID / References pair the IMAP worker stored. The
+		// service-side `email.reply` takes the local link UUID, not the
+		// RFC thread id.
+		const linkRows = yield* sql<{ id: string }>`
+			SELECT etl.id
+			FROM email_messages em
+			JOIN email_thread_links etl
+			  ON etl.organization_id = em.organization_id
+			 AND (
+			   etl.external_thread_id = em.message_id
+			   OR etl.external_thread_id = ANY(em."references")
+			 )
+			WHERE em.id = ${sourceEmailMessageId}
+			  AND em.organization_id = ${currentOrg.id}
 			LIMIT 1
 		`
-		const providerThreadId = messageRows[0]?.providerThreadId
-		if (!providerThreadId) {
+		const threadLinkId = linkRows[0]?.id
+		if (!threadLinkId) {
 			yield* Effect.logWarning(
-				'RSVP reply bytes produced but email message row missing',
+				'RSVP reply bytes produced but thread link row missing',
 			).pipe(
 				Effect.annotateLogs({
-					event: 'calendar.rsvp_reply_missing_message',
+					event: 'calendar.rsvp_reply_missing_thread_link',
 					calendarEventId: args.calendarEventId,
 					sourceEmailMessageId,
 				}),
@@ -97,7 +110,7 @@ export const dispatchRsvpReply = (args: {
 		}))
 
 		yield* email
-			.reply(providerThreadId, body, {
+			.reply(threadLinkId, body, {
 				skipFooter: true,
 				rawAttachments: [
 					{
@@ -114,7 +127,7 @@ export const dispatchRsvpReply = (args: {
 						Effect.annotateLogs({
 							event: 'calendar.rsvp_reply_send_failed',
 							calendarEventId: args.calendarEventId,
-							providerThreadId,
+							threadLinkId,
 							cause: String(cause),
 						}),
 					),
