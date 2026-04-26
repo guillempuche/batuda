@@ -113,7 +113,6 @@ type ThreadRow = {
 
 type InboxOption = {
 	readonly id: string
-	readonly providerInboxId: string
 	readonly email: string
 	readonly displayName: string | null
 	readonly purpose: 'human' | 'agent' | 'shared'
@@ -635,10 +634,7 @@ function EmailsIndexPage() {
 											<PriSelect.ItemText>{t`All inboxes`}</PriSelect.ItemText>
 										</PriSelect.Item>
 										{inboxOptions.map(inbox => (
-											<PriSelect.Item
-												key={inbox.id}
-												value={inbox.providerInboxId}
-											>
+											<PriSelect.Item key={inbox.id} value={inbox.id}>
 												<PriSelect.ItemIndicator>
 													<Check size={12} aria-hidden />
 												</PriSelect.ItemIndicator>
@@ -1488,7 +1484,6 @@ function narrowInboxes(
 		if (!row || typeof row !== 'object') continue
 		const r = row as Record<string, unknown>
 		if (typeof r['id'] !== 'string') continue
-		if (typeof r['providerInboxId'] !== 'string') continue
 		if (typeof r['email'] !== 'string') continue
 		const purpose = r['purpose']
 		if (purpose !== 'human' && purpose !== 'agent' && purpose !== 'shared') {
@@ -1496,7 +1491,6 @@ function narrowInboxes(
 		}
 		out.push({
 			id: r['id'],
-			providerInboxId: r['providerInboxId'],
 			email: r['email'],
 			displayName:
 				typeof r['displayName'] === 'string' ? r['displayName'] : null,

@@ -9,6 +9,7 @@ import {
 	Inbox as InboxIcon,
 	Pencil,
 	Plus,
+	RefreshCw,
 	Star,
 	Trash2,
 	X,
@@ -30,8 +31,13 @@ import {
 	createFooterAtom,
 	createInboxAtom,
 	deleteFooterAtom,
+	deleteInboxAtom,
 	footersAtomFor,
 	inboxesListAtom,
+	inboxStatusAtom,
+	providerPresetsAtom,
+	setPrimaryInboxAtom,
+	testInboxAtom,
 	updateFooterAtom,
 	updateInboxAtom,
 } from '#/atoms/emails-atoms'
@@ -48,18 +54,41 @@ import {
 } from '#/lib/workshop-mixins'
 
 type InboxPurpose = 'human' | 'agent' | 'shared'
+type TransportSecurity = 'tls' | 'starttls' | 'plain'
+type GrantStatus = 'connected' | 'auth_failed' | 'connect_failed' | 'disabled'
 
 type InboxRow = {
 	readonly id: string
-	readonly providerInboxId: string
 	readonly email: string
 	readonly displayName: string | null
 	readonly purpose: InboxPurpose
 	readonly ownerUserId: string | null
 	readonly isDefault: boolean
+	readonly isPrivate: boolean
 	readonly active: boolean
+	readonly imapHost: string
+	readonly imapPort: number
+	readonly imapSecurity: TransportSecurity
+	readonly smtpHost: string
+	readonly smtpPort: number
+	readonly smtpSecurity: TransportSecurity
+	readonly username: string
+	readonly grantStatus: GrantStatus
+	readonly grantLastError: string | null
+	readonly grantLastSeenAt: string | null
 	readonly createdAt: string | null
 	readonly updatedAt: string | null
+}
+
+type ProviderPreset = {
+	readonly name: string
+	readonly imapHost: string
+	readonly imapPort: number
+	readonly imapSecurity: TransportSecurity
+	readonly smtpHost: string
+	readonly smtpPort: number
+	readonly smtpSecurity: TransportSecurity
+	readonly helpUrl: string
 }
 
 async function loadInboxesOnServer(): Promise<ReadonlyArray<unknown>> {
@@ -104,9 +133,16 @@ function InboxesPage() {
 	const toastManager = usePriToast()
 	const inboxesResult = useAtomValue(inboxesListAtom)
 	const refreshInboxes = useAtomRefresh(inboxesListAtom)
+	const inboxStatusResult = useAtomValue(inboxStatusAtom)
+	const refreshInboxStatus = useAtomRefresh(inboxStatusAtom)
 
 	const createInbox = useAtomSet(createInboxAtom, { mode: 'promiseExit' })
 	const updateInbox = useAtomSet(updateInboxAtom, { mode: 'promiseExit' })
+	const deleteInbox = useAtomSet(deleteInboxAtom, { mode: 'promiseExit' })
+	const testInbox = useAtomSet(testInboxAtom, { mode: 'promiseExit' })
+	const setPrimaryInbox = useAtomSet(setPrimaryInboxAtom, {
+		mode: 'promiseExit',
+	})
 
 	const [dialog, setDialog] = useState<DialogMode>({ kind: 'closed' })
 
@@ -119,6 +155,29 @@ function InboxesPage() {
 	)
 	const isLoading = AsyncResult.isInitial(inboxesResult)
 	const isFailure = AsyncResult.isFailure(inboxesResult)
+
+	// hasDefault is the only signal we need from inboxStatus to drive the
+	// banner; the picker walks the inbox list itself.
+	const hasPrimary = useMemo(
+		() =>
+			AsyncResult.isSuccess(inboxStatusResult) &&
+			isInboxStatus(inboxStatusResult.value) &&
+			inboxStatusResult.value.hasDefault,
+		[inboxStatusResult],
+	)
+
+	const primarySuggestions = useMemo(
+		() =>
+			rows.filter(
+				row =>
+					row.active &&
+					row.purpose === 'human' &&
+					row.ownerUserId !== null &&
+					row.ownerUserId !== '',
+			),
+		[rows],
+	)
+	const showPrimaryBanner = !hasPrimary && primarySuggestions.length > 0
 
 	const openCreate = useCallback(() => {
 		setDialog({ kind: 'create' })
@@ -148,8 +207,9 @@ function InboxesPage() {
 				return
 			}
 			refreshInboxes()
+			refreshInboxStatus()
 		},
-		[updateInbox, refreshInboxes, toastManager, t],
+		[updateInbox, refreshInboxes, refreshInboxStatus, toastManager, t],
 	)
 
 	const setDefault = useCallback(
@@ -172,6 +232,70 @@ function InboxesPage() {
 		[updateInbox, refreshInboxes, toastManager, t],
 	)
 
+	const handleTest = useCallback(
+		async (row: InboxRow) => {
+			const exit = await testInbox({ params: { id: row.id } })
+			if (exit._tag !== 'Success') {
+				toastManager.add({
+					title: t`Test failed`,
+					description: t`Could not reach ${row.email}.`,
+					type: 'error',
+				})
+				return
+			}
+			toastManager.add({
+				title: t`Connection tested`,
+				description: t`Refreshing inbox status…`,
+				type: 'success',
+			})
+			refreshInboxes()
+		},
+		[testInbox, refreshInboxes, toastManager, t],
+	)
+
+	const handleDelete = useCallback(
+		async (row: InboxRow) => {
+			const ok = window.confirm(
+				t`Delete inbox ${row.email}? Stored messages stay; the connection stops.`,
+			)
+			if (!ok) return
+			const exit = await deleteInbox({ params: { id: row.id } })
+			if (exit._tag !== 'Success') {
+				toastManager.add({
+					title: t`Delete failed`,
+					type: 'error',
+				})
+				return
+			}
+			refreshInboxes()
+			refreshInboxStatus()
+			toastManager.add({
+				title: t`Inbox removed`,
+				type: 'success',
+			})
+		},
+		[deleteInbox, refreshInboxes, refreshInboxStatus, toastManager, t],
+	)
+
+	const handleSetPrimary = useCallback(
+		async (id: string) => {
+			const exit = await setPrimaryInbox({ params: { id } })
+			if (exit._tag !== 'Success') {
+				toastManager.add({
+					title: t`Could not set primary inbox`,
+					type: 'error',
+				})
+				return
+			}
+			refreshInboxStatus()
+			toastManager.add({
+				title: t`Primary inbox set`,
+				type: 'success',
+			})
+		},
+		[setPrimaryInbox, refreshInboxStatus, toastManager, t],
+	)
+
 	return (
 		<Page>
 			<Intro>
@@ -183,15 +307,74 @@ function InboxesPage() {
 						</Link>
 					</BackLink>
 					<Title>{t`Inbox management`}</Title>
-					<Subtitle>{t`Map provider mailboxes to purpose, owner, and defaults.`}</Subtitle>
+					<Subtitle>{t`Connect IMAP/SMTP mailboxes and choose your primary sender.`}</Subtitle>
 				</IntroText>
 				<IntroActions>
 					<PriButton type='button' $variant='filled' onClick={openCreate}>
 						<Plus size={14} aria-hidden />
-						<span>{t`Create inbox`}</span>
+						<span>{t`Connect mailbox`}</span>
 					</PriButton>
 				</IntroActions>
 			</Intro>
+
+			{showPrimaryBanner && (
+				<PrimaryBanner role='status'>
+					<PrimaryBannerText>
+						<strong>{t`No primary inbox set.`}</strong>{' '}
+						<span>{t`Pick one to use as your default sender.`}</span>
+					</PrimaryBannerText>
+					<PrimaryBannerActions>
+						{primarySuggestions.length === 1 ? (
+							<PriButton
+								type='button'
+								$variant='filled'
+								onClick={() => {
+									const only = primarySuggestions[0]
+									if (only !== undefined) {
+										void handleSetPrimary(only.id)
+									}
+								}}
+							>
+								{t`Use ${primarySuggestions[0]?.email ?? ''} as primary`}
+							</PriButton>
+						) : (
+							<PriSelect.Root
+								value=''
+								onValueChange={value => {
+									if (value !== null && value !== '') {
+										void handleSetPrimary(value)
+									}
+								}}
+							>
+								<PriSelect.Trigger aria-label={t`Choose primary inbox`}>
+									<PriSelect.Value placeholder={t`Choose primary inbox`} />
+									<PriSelect.Icon>
+										<ChevronLeft
+											size={14}
+											aria-hidden
+											style={{ transform: 'rotate(-90deg)' }}
+										/>
+									</PriSelect.Icon>
+								</PriSelect.Trigger>
+								<PriSelect.Portal>
+									<PriSelect.Positioner>
+										<PriSelect.Popup>
+											{primarySuggestions.map(row => (
+												<PriSelect.Item key={row.id} value={row.id}>
+													<PriSelect.ItemIndicator>
+														<Check size={12} aria-hidden />
+													</PriSelect.ItemIndicator>
+													<PriSelect.ItemText>{row.email}</PriSelect.ItemText>
+												</PriSelect.Item>
+											))}
+										</PriSelect.Popup>
+									</PriSelect.Positioner>
+								</PriSelect.Portal>
+							</PriSelect.Root>
+						)}
+					</PrimaryBannerActions>
+				</PrimaryBanner>
+			)}
 
 			{isLoading ? (
 				<SkeletonRows count={5} height='3rem' />
@@ -208,7 +391,7 @@ function InboxesPage() {
 					action={
 						<PriButton type='button' $variant='filled' onClick={openCreate}>
 							<Plus size={14} aria-hidden />
-							<span>{t`Create inbox`}</span>
+							<span>{t`Connect mailbox`}</span>
 						</PriButton>
 					}
 				/>
@@ -216,8 +399,8 @@ function InboxesPage() {
 				<InboxesTable role='table' aria-label={t`Local inboxes`}>
 					<TableHead role='row'>
 						<HeadCell role='columnheader'>{t`Email`}</HeadCell>
+						<HeadCell role='columnheader'>{t`Status`}</HeadCell>
 						<HeadCell role='columnheader'>{t`Purpose`}</HeadCell>
-						<HeadCell role='columnheader'>{t`Owner`}</HeadCell>
 						<HeadCell role='columnheader'>{t`Default`}</HeadCell>
 						<HeadCell role='columnheader'>{t`Active`}</HeadCell>
 						<HeadCell role='columnheader'>{t`Created`}</HeadCell>
@@ -229,10 +412,36 @@ function InboxesPage() {
 						<TableRow key={row.id} role='row' $inactive={!row.active}>
 							<CellEmail role='cell'>
 								<EmailAddress>{row.email}</EmailAddress>
-								{row.displayName !== null && row.displayName !== '' && (
-									<DisplayName>{row.displayName}</DisplayName>
-								)}
+								<EmailMeta>
+									{row.displayName !== null && row.displayName !== '' ? (
+										<DisplayName>{row.displayName}</DisplayName>
+									) : null}
+									{row.imapHost !== '' && (
+										<HostName title={`IMAP ${row.imapHost}:${row.imapPort}`}>
+											{row.imapHost}
+										</HostName>
+									)}
+									{row.isPrivate && (
+										<PrivacyTag aria-label={t`Private inbox`}>
+											{t`Private`}
+										</PrivacyTag>
+									)}
+								</EmailMeta>
 							</CellEmail>
+							<CellStatus role='cell'>
+								<StatusBadge
+									$status={row.grantStatus}
+									title={row.grantLastError ?? ''}
+								>
+									{row.grantStatus === 'connected'
+										? t`Connected`
+										: row.grantStatus === 'auth_failed'
+											? t`Auth failed`
+											: row.grantStatus === 'connect_failed'
+												? t`Connect failed`
+												: t`Disabled`}
+								</StatusBadge>
+							</CellStatus>
 							<CellPurpose role='cell'>
 								<PurposeBadge $purpose={row.purpose}>
 									{row.purpose === 'human'
@@ -242,15 +451,6 @@ function InboxesPage() {
 											: t`Shared`}
 								</PurposeBadge>
 							</CellPurpose>
-							<CellOwner role='cell'>
-								{row.ownerUserId !== null && row.ownerUserId !== '' ? (
-									<OwnerId title={row.ownerUserId}>
-										{row.ownerUserId.slice(0, 8)}…
-									</OwnerId>
-								) : (
-									<Muted>—</Muted>
-								)}
-							</CellOwner>
 							<CellDefault role='cell'>
 								<IconToggle
 									type='button'
@@ -297,6 +497,15 @@ function InboxesPage() {
 							<CellActions role='cell'>
 								<IconAction
 									type='button'
+									onClick={() => {
+										void handleTest(row)
+									}}
+									aria-label={t`Test connection for ${row.email}`}
+								>
+									<RefreshCw size={14} aria-hidden />
+								</IconAction>
+								<IconAction
+									type='button'
 									onClick={() => openFooters(row)}
 									aria-label={t`Manage footers for ${row.email}`}
 								>
@@ -308,6 +517,15 @@ function InboxesPage() {
 									aria-label={t`Edit inbox ${row.email}`}
 								>
 									<Pencil size={14} aria-hidden />
+								</IconAction>
+								<IconAction
+									type='button'
+									onClick={() => {
+										void handleDelete(row)
+									}}
+									aria-label={t`Delete inbox ${row.email}`}
+								>
+									<Trash2 size={14} aria-hidden />
 								</IconAction>
 							</CellActions>
 						</TableRow>
@@ -324,13 +542,14 @@ function InboxesPage() {
 						if (exit._tag !== 'Success') {
 							return {
 								ok: false,
-								error: t`Could not create the inbox.`,
+								error: t`Could not create the inbox. Check transport or credentials.`,
 							}
 						}
 						refreshInboxes()
+						refreshInboxStatus()
 						toastManager.add({
-							title: t`Inbox created`,
-							description: t`The new inbox is ready.`,
+							title: t`Inbox connected`,
+							description: t`The mailbox is ready.`,
 							type: 'success',
 						})
 						return { ok: true }
@@ -344,6 +563,7 @@ function InboxesPage() {
 							return { ok: false, error: t`Could not save the inbox.` }
 						}
 						refreshInboxes()
+						refreshInboxStatus()
 						toastManager.add({
 							title: t`Inbox updated`,
 							type: 'success',
@@ -360,11 +580,54 @@ function InboxesPage() {
 	)
 }
 
+function isInboxStatus(value: unknown): value is {
+	hasDefault: boolean
+	primary: { inboxId: string; email: string } | null
+} {
+	if (!value || typeof value !== 'object') return false
+	const r = value as Record<string, unknown>
+	return typeof r['hasDefault'] === 'boolean'
+}
+
 // ── Dialog ───────────────────────────────────────────────────────
 
 type MutationResult =
 	| { readonly ok: true }
 	| { readonly ok: false; readonly error: string }
+
+type CreatePayload = {
+	readonly email: string
+	readonly displayName?: string
+	readonly purpose: InboxPurpose
+	readonly ownerUserId?: string
+	readonly isDefault?: boolean
+	readonly isPrivate?: boolean
+	readonly imapHost: string
+	readonly imapPort: number
+	readonly imapSecurity: TransportSecurity
+	readonly smtpHost: string
+	readonly smtpPort: number
+	readonly smtpSecurity: TransportSecurity
+	readonly username: string
+	readonly password: string
+}
+
+type UpdatePayload = {
+	readonly displayName?: string | null
+	readonly purpose?: InboxPurpose
+	readonly ownerUserId?: string | null
+	readonly isDefault?: boolean
+	readonly isPrivate?: boolean
+	readonly active?: boolean
+	readonly imapHost?: string
+	readonly imapPort?: number
+	readonly imapSecurity?: TransportSecurity
+	readonly smtpHost?: string
+	readonly smtpPort?: number
+	readonly smtpSecurity?: TransportSecurity
+	readonly username?: string
+	readonly password?: string
+}
 
 function InboxFormDialog({
 	mode,
@@ -374,47 +637,84 @@ function InboxFormDialog({
 }: {
 	readonly mode: DialogMode
 	readonly onClose: () => void
-	readonly onCreate: (input: {
-		readonly username?: string
-		readonly domain?: string
-		readonly displayName?: string
-		readonly purpose: InboxPurpose
-		readonly ownerUserId?: string
-		readonly isDefault?: boolean
-	}) => Promise<MutationResult>
+	readonly onCreate: (input: CreatePayload) => Promise<MutationResult>
 	readonly onUpdate: (
 		id: string,
-		patch: {
-			readonly displayName?: string | null
-			readonly purpose?: InboxPurpose
-			readonly ownerUserId?: string | null
-			readonly isDefault?: boolean
-			readonly active?: boolean
-		},
+		patch: UpdatePayload,
 	) => Promise<MutationResult>
 }) {
 	const { t } = useLingui()
 	const editing = mode.kind === 'edit' ? mode.row : null
 
-	const [username, setUsername] = useState('')
-	const [domain, setDomain] = useState('')
+	const presetsResult = useAtomValue(providerPresetsAtom)
+	const presets = useMemo<ReadonlyArray<ProviderPreset>>(
+		() =>
+			AsyncResult.isSuccess(presetsResult)
+				? narrowPresets(presetsResult.value)
+				: [],
+		[presetsResult],
+	)
+
+	// Preset name selected in the dropdown — '' means none / custom.
+	const [presetName, setPresetName] = useState<string>('')
+	const [email, setEmail] = useState(editing?.email ?? '')
 	const [displayName, setDisplayName] = useState(editing?.displayName ?? '')
 	const [purpose, setPurpose] = useState<InboxPurpose>(
 		editing?.purpose ?? 'human',
 	)
 	const [ownerUserId, setOwnerUserId] = useState(editing?.ownerUserId ?? '')
 	const [isDefault, setIsDefault] = useState(editing?.isDefault ?? false)
+	const [isPrivate, setIsPrivate] = useState(editing?.isPrivate ?? false)
+
+	const [imapHost, setImapHost] = useState(editing?.imapHost ?? '')
+	const [imapPort, setImapPort] = useState<number>(editing?.imapPort ?? 993)
+	const [imapSecurity, setImapSecurity] = useState<TransportSecurity>(
+		editing?.imapSecurity ?? 'tls',
+	)
+	const [smtpHost, setSmtpHost] = useState(editing?.smtpHost ?? '')
+	const [smtpPort, setSmtpPort] = useState<number>(editing?.smtpPort ?? 465)
+	const [smtpSecurity, setSmtpSecurity] = useState<TransportSecurity>(
+		editing?.smtpSecurity ?? 'tls',
+	)
+	const [username, setUsername] = useState(editing?.username ?? '')
+	const [password, setPassword] = useState('')
+	// In edit mode the password field is empty and only sent when the
+	// user types a new one, so existing credentials aren't blanked.
+	const [changeCredentials, setChangeCredentials] = useState(false)
+
 	const [submitting, setSubmitting] = useState(false)
 	const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-	const previewEmail =
-		username !== '' && domain !== ''
-			? `${username}@${domain}`
-			: username !== ''
-				? `${username}@…`
-				: t`(provider assigns)`
+	const applyPreset = useCallback(
+		(name: string) => {
+			setPresetName(name)
+			const preset = presets.find(p => p.name === name)
+			if (preset === undefined) return
+			setImapHost(preset.imapHost)
+			setImapPort(preset.imapPort)
+			setImapSecurity(preset.imapSecurity)
+			setSmtpHost(preset.smtpHost)
+			setSmtpPort(preset.smtpPort)
+			setSmtpSecurity(preset.smtpSecurity)
+		},
+		[presets],
+	)
 
-	const canSubmit = !submitting && (editing !== null || purpose !== undefined)
+	const usernameForSubmit = username !== '' ? username : email
+
+	// Create requires email + transport + credentials. Edit lets the user
+	// patch any subset; we always send the full transport so the server's
+	// re-probe runs against current state, but only send the password when
+	// the user opted into changing it.
+	const canSubmit =
+		!submitting &&
+		(editing !== null
+			? email !== ''
+			: email !== '' &&
+				imapHost !== '' &&
+				smtpHost !== '' &&
+				password !== '' &&
+				usernameForSubmit !== '')
 
 	const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
 		event.preventDefault()
@@ -430,14 +730,31 @@ function InboxFormDialog({
 						ownerUserId:
 							purpose === 'human' && ownerUserId !== '' ? ownerUserId : null,
 						isDefault,
+						isPrivate,
+						imapHost,
+						imapPort,
+						imapSecurity,
+						smtpHost,
+						smtpPort,
+						smtpSecurity,
+						username: usernameForSubmit,
+						...(changeCredentials && password !== '' && { password }),
 					})
 				: await onCreate({
-						...(username !== '' && { username }),
-						...(domain !== '' && { domain }),
+						email,
 						...(displayName !== '' && { displayName }),
 						purpose,
 						...(purpose === 'human' && ownerUserId !== '' && { ownerUserId }),
 						...(isDefault && { isDefault: true }),
+						...(isPrivate && { isPrivate: true }),
+						imapHost,
+						imapPort,
+						imapSecurity,
+						smtpHost,
+						smtpPort,
+						smtpSecurity,
+						username: usernameForSubmit,
+						password,
 					})
 
 		if (result.ok) {
@@ -460,7 +777,7 @@ function InboxFormDialog({
 				<PriDialog.Popup>
 					<DialogHeader>
 						<PriDialog.Title>
-							{editing !== null ? t`Edit inbox` : t`Create inbox`}
+							{editing !== null ? t`Edit inbox` : t`Connect mailbox`}
 						</PriDialog.Title>
 						<PriDialog.Close
 							render={props => (
@@ -472,33 +789,56 @@ function InboxFormDialog({
 					</DialogHeader>
 
 					<Form onSubmit={handleSubmit}>
-						{editing === null && (
-							<>
-								<Field>
-									<Label htmlFor='ix-username'>{t`Username`}</Label>
-									<PriInput
-										id='ix-username'
-										type='text'
-										value={username}
-										onChange={e => setUsername(e.target.value)}
-										placeholder={t`e.g. hola`}
-									/>
-								</Field>
-								<Field>
-									<Label htmlFor='ix-domain'>{t`Domain`}</Label>
-									<PriInput
-										id='ix-domain'
-										type='text'
-										value={domain}
-										onChange={e => setDomain(e.target.value)}
-										placeholder={t`e.g. taller.cat`}
-									/>
-								</Field>
-								<PreviewLine aria-live='polite'>
-									{t`Address:`} <strong>{previewEmail}</strong>
-								</PreviewLine>
-							</>
+						{editing === null && presets.length > 0 && (
+							<Field>
+								<Label>{t`Provider preset`}</Label>
+								<PriSelect.Root
+									value={presetName}
+									onValueChange={value => {
+										if (value !== null) applyPreset(value)
+									}}
+								>
+									<PriSelect.Trigger aria-label={t`Provider preset`}>
+										<PriSelect.Value placeholder={t`Pick a provider`} />
+										<PriSelect.Icon>
+											<ChevronLeft
+												size={14}
+												aria-hidden
+												style={{ transform: 'rotate(-90deg)' }}
+											/>
+										</PriSelect.Icon>
+									</PriSelect.Trigger>
+									<PriSelect.Portal>
+										<PriSelect.Positioner>
+											<PriSelect.Popup>
+												{presets.map(p => (
+													<PriSelect.Item key={p.name} value={p.name}>
+														<PriSelect.ItemIndicator>
+															<Check size={12} aria-hidden />
+														</PriSelect.ItemIndicator>
+														<PriSelect.ItemText>{p.name}</PriSelect.ItemText>
+													</PriSelect.Item>
+												))}
+											</PriSelect.Popup>
+										</PriSelect.Positioner>
+									</PriSelect.Portal>
+								</PriSelect.Root>
+								<Hint>{t`Selecting a preset fills IMAP and SMTP defaults — you can still edit them.`}</Hint>
+							</Field>
 						)}
+
+						<Field>
+							<Label htmlFor='ix-email'>{t`Email address`}</Label>
+							<PriInput
+								id='ix-email'
+								type='email'
+								value={email}
+								onChange={e => setEmail(e.target.value)}
+								placeholder={t`you@example.com`}
+								required
+								disabled={editing !== null}
+							/>
+						</Field>
 
 						<Field>
 							<Label htmlFor='ix-display'>{t`Display name`}</Label>
@@ -507,9 +847,110 @@ function InboxFormDialog({
 								type='text'
 								value={displayName}
 								onChange={e => setDisplayName(e.target.value)}
-								placeholder={t`e.g. Hola — Taller`}
+								placeholder={t`e.g. Sales — Acme`}
 							/>
 						</Field>
+
+						<TransportGrid>
+							<Field>
+								<Label htmlFor='ix-imap-host'>{t`IMAP host`}</Label>
+								<PriInput
+									id='ix-imap-host'
+									type='text'
+									value={imapHost}
+									onChange={e => setImapHost(e.target.value)}
+									placeholder='imap.example.com'
+								/>
+							</Field>
+							<Field>
+								<Label htmlFor='ix-imap-port'>{t`IMAP port`}</Label>
+								<PriInput
+									id='ix-imap-port'
+									type='number'
+									value={imapPort}
+									onChange={e => setImapPort(parseInt(e.target.value, 10) || 0)}
+								/>
+							</Field>
+							<Field>
+								<Label>{t`IMAP security`}</Label>
+								<SecuritySelect
+									value={imapSecurity}
+									onChange={setImapSecurity}
+									ariaLabel={t`IMAP security`}
+								/>
+							</Field>
+
+							<Field>
+								<Label htmlFor='ix-smtp-host'>{t`SMTP host`}</Label>
+								<PriInput
+									id='ix-smtp-host'
+									type='text'
+									value={smtpHost}
+									onChange={e => setSmtpHost(e.target.value)}
+									placeholder='smtp.example.com'
+								/>
+							</Field>
+							<Field>
+								<Label htmlFor='ix-smtp-port'>{t`SMTP port`}</Label>
+								<PriInput
+									id='ix-smtp-port'
+									type='number'
+									value={smtpPort}
+									onChange={e => setSmtpPort(parseInt(e.target.value, 10) || 0)}
+								/>
+							</Field>
+							<Field>
+								<Label>{t`SMTP security`}</Label>
+								<SecuritySelect
+									value={smtpSecurity}
+									onChange={setSmtpSecurity}
+									ariaLabel={t`SMTP security`}
+								/>
+							</Field>
+						</TransportGrid>
+
+						<Field>
+							<Label htmlFor='ix-username'>{t`Username`}</Label>
+							<PriInput
+								id='ix-username'
+								type='text'
+								value={username}
+								onChange={e => setUsername(e.target.value)}
+								placeholder={t`Defaults to the email address.`}
+							/>
+						</Field>
+
+						{editing !== null && (
+							<CheckboxRow>
+								<input
+									id='ix-changecreds'
+									type='checkbox'
+									checked={changeCredentials}
+									onChange={e => setChangeCredentials(e.target.checked)}
+								/>
+								<label htmlFor='ix-changecreds'>
+									{t`Change password (re-probes the connection)`}
+								</label>
+							</CheckboxRow>
+						)}
+
+						{(editing === null || changeCredentials) && (
+							<Field>
+								<Label htmlFor='ix-password'>
+									{editing !== null
+										? t`New password or app-password`
+										: t`Password or app-password`}
+								</Label>
+								<PriInput
+									id='ix-password'
+									type='password'
+									value={password}
+									onChange={e => setPassword(e.target.value)}
+									placeholder={t`Stored encrypted with AES-256-GCM.`}
+									autoComplete='new-password'
+								/>
+							</Field>
+						)}
 
 						<Field>
 							<Label>{t`Purpose`}</Label>
@@ -570,7 +1011,7 @@ function InboxFormDialog({
 									type='text'
 									value={ownerUserId}
 									onChange={e => setOwnerUserId(e.target.value)}
-									placeholder={t`UUID (optional)`}
+									placeholder={t`Defaults to you when omitted.`}
 								/>
 							</Field>
 						)}
@@ -584,6 +1025,20 @@ function InboxFormDialog({
 							/>
 							<label htmlFor='ix-default'>{t`Use as default for this purpose`}</label>
 						</CheckboxRow>
+
+						{purpose !== 'shared' && (
+							<CheckboxRow>
+								<input
+									id='ix-private'
+									type='checkbox'
+									checked={isPrivate}
+									onChange={e => setIsPrivate(e.target.checked)}
+								/>
+								<label htmlFor='ix-private'>
+									{t`Private — hide threads from other members`}
+								</label>
+							</CheckboxRow>
+						)}
 
 						{errorMessage !== null && (
 							<ErrorText role='alert'>{errorMessage}</ErrorText>
@@ -600,10 +1055,10 @@ function InboxFormDialog({
 							</PriButton>
 							<PriButton type='submit' $variant='filled' disabled={!canSubmit}>
 								{submitting
-									? t`Saving…`
+									? t`Testing connection…`
 									: editing !== null
 										? t`Save`
-										: t`Create`}
+										: t`Test & connect`}
 							</PriButton>
 						</Footer>
 					</Form>
@@ -611,6 +1066,98 @@ function InboxFormDialog({
 			</PriDialog.Portal>
 		</PriDialog.Root>
 	)
+}
+
+function SecuritySelect({
+	value,
+	onChange,
+	ariaLabel,
+}: {
+	readonly value: TransportSecurity
+	readonly onChange: (next: TransportSecurity) => void
+	readonly ariaLabel: string
+}) {
+	const { t } = useLingui()
+	return (
+		<PriSelect.Root
+			value={value}
+			onValueChange={next => {
+				if (next === 'tls' || next === 'starttls' || next === 'plain') {
+					onChange(next)
+				}
+			}}
+		>
+			<PriSelect.Trigger aria-label={ariaLabel}>
+				<PriSelect.Value />
+				<PriSelect.Icon>
+					<ChevronLeft
+						size={14}
+						aria-hidden
+						style={{ transform: 'rotate(-90deg)' }}
+					/>
+				</PriSelect.Icon>
+			</PriSelect.Trigger>
+			<PriSelect.Portal>
+				<PriSelect.Positioner>
+					<PriSelect.Popup>
+						<PriSelect.Item value='tls'>
+							<PriSelect.ItemIndicator>
+								<Check size={12} aria-hidden />
+							</PriSelect.ItemIndicator>
+							<PriSelect.ItemText>{t`TLS`}</PriSelect.ItemText>
+						</PriSelect.Item>
+						<PriSelect.Item value='starttls'>
+							<PriSelect.ItemIndicator>
+								<Check size={12} aria-hidden />
+							</PriSelect.ItemIndicator>
+							<PriSelect.ItemText>{t`STARTTLS`}</PriSelect.ItemText>
+						</PriSelect.Item>
+						<PriSelect.Item value='plain'>
+							<PriSelect.ItemIndicator>
+								<Check size={12} aria-hidden />
+							</PriSelect.ItemIndicator>
+							<PriSelect.ItemText>{t`Plain`}</PriSelect.ItemText>
+						</PriSelect.Item>
+					</PriSelect.Popup>
+				</PriSelect.Positioner>
+			</PriSelect.Portal>
+		</PriSelect.Root>
+	)
+}
+
+function narrowPresets(raw: unknown): ReadonlyArray<ProviderPreset> {
+	if (!Array.isArray(raw)) return []
+	const out: Array<ProviderPreset> = []
+	for (const entry of raw) {
+		if (!entry || typeof entry !== 'object') continue
+		const r = entry as Record<string, unknown>
+		const sec = (s: unknown): TransportSecurity | null =>
+			s === 'tls' || s === 'starttls' || s === 'plain' ? s : null
+		const imapSec = sec(r['imapSecurity'])
+		const smtpSec = sec(r['smtpSecurity'])
+		if (
+			typeof r['name'] !== 'string' ||
+			typeof r['imapHost'] !== 'string' ||
+			typeof r['imapPort'] !== 'number' ||
+			imapSec === null ||
+			typeof r['smtpHost'] !== 'string' ||
+			typeof r['smtpPort'] !== 'number' ||
+			smtpSec === null
+		) {
+			continue
+		}
+		out.push({
+			name: r['name'],
+			imapHost: r['imapHost'],
+			imapPort: r['imapPort'],
+			imapSecurity: imapSec,
+			smtpHost: r['smtpHost'],
+			smtpPort: r['smtpPort'],
+			smtpSecurity: smtpSec,
+			helpUrl: typeof r['helpUrl'] === 'string' ? r['helpUrl'] : '',
+		})
+	}
+	return out
 }
 
 // ── Footer management dialog ────────────────────────────────────
@@ -951,11 +1498,22 @@ function narrowFooterRows(raw: unknown): ReadonlyArray<FooterRow> {
 function narrowInboxRows(rows: unknown): ReadonlyArray<InboxRow> {
 	if (!Array.isArray(rows)) return []
 	const out: Array<InboxRow> = []
+	const sec = (v: unknown): TransportSecurity =>
+		v === 'starttls' ? 'starttls' : v === 'plain' ? 'plain' : 'tls'
+	const status = (v: unknown): GrantStatus =>
+		v === 'auth_failed'
+			? 'auth_failed'
+			: v === 'connect_failed'
+				? 'connect_failed'
+				: v === 'disabled'
+					? 'disabled'
+					: 'connected'
+	const isoString = (v: unknown): string | null =>
+		typeof v === 'string' ? v : v instanceof Date ? v.toISOString() : null
 	for (const row of rows) {
 		if (!row || typeof row !== 'object') continue
 		const r = row as Record<string, unknown>
 		if (typeof r['id'] !== 'string') continue
-		if (typeof r['providerInboxId'] !== 'string') continue
 		if (typeof r['email'] !== 'string') continue
 		const purpose = r['purpose']
 		if (purpose !== 'human' && purpose !== 'agent' && purpose !== 'shared') {
@@ -963,7 +1521,6 @@ function narrowInboxRows(rows: unknown): ReadonlyArray<InboxRow> {
 		}
 		out.push({
 			id: r['id'],
-			providerInboxId: r['providerInboxId'],
 			email: r['email'],
 			displayName:
 				typeof r['displayName'] === 'string' ? r['displayName'] : null,
@@ -971,9 +1528,21 @@ function narrowInboxRows(rows: unknown): ReadonlyArray<InboxRow> {
 			ownerUserId:
 				typeof r['ownerUserId'] === 'string' ? r['ownerUserId'] : null,
 			isDefault: r['isDefault'] === true,
+			isPrivate: r['isPrivate'] === true,
 			active: r['active'] !== false,
-			createdAt: typeof r['createdAt'] === 'string' ? r['createdAt'] : null,
-			updatedAt: typeof r['updatedAt'] === 'string' ? r['updatedAt'] : null,
+			imapHost: typeof r['imapHost'] === 'string' ? r['imapHost'] : '',
+			imapPort: typeof r['imapPort'] === 'number' ? r['imapPort'] : 993,
+			imapSecurity: sec(r['imapSecurity']),
+			smtpHost: typeof r['smtpHost'] === 'string' ? r['smtpHost'] : '',
+			smtpPort: typeof r['smtpPort'] === 'number' ? r['smtpPort'] : 465,
+			smtpSecurity: sec(r['smtpSecurity']),
+			username: typeof r['username'] === 'string' ? r['username'] : '',
+			grantStatus: status(r['grantStatus']),
+			grantLastError:
+				typeof r['grantLastError'] === 'string' ? r['grantLastError'] : null,
+			grantLastSeenAt: isoString(r['grantLastSeenAt']),
+			createdAt: isoString(r['createdAt']),
+			updatedAt: isoString(r['updatedAt']),
 		})
 	}
 	return out
@@ -1065,12 +1634,12 @@ const gridTemplate = css`
 	display: grid;
 	grid-template-columns:
 		minmax(0, 2fr)
-		6rem
 		8rem
+		6rem
 		4rem
 		4rem
 		minmax(0, 1fr)
-		5rem;
+		8rem;
 	align-items: center;
 	gap: var(--space-sm);
 	padding: var(--space-sm) var(--space-md);
@@ -1148,14 +1717,139 @@ const CellPurpose = styled.div.withConfig({
 	displayName: 'InboxesCellPurpose',
 })``
 
-const CellOwner = styled.div.withConfig({ displayName: 'InboxesCellOwner' })`
+const CellStatus = styled.div.withConfig({ displayName: 'InboxesCellStatus' })``
+
+const EmailMeta = styled.div.withConfig({ displayName: 'InboxesEmailMeta' })`
+	display: flex;
+	align-items: center;
+	gap: var(--space-2xs);
+	flex-wrap: wrap;
 	min-width: 0;
 `
 
-const OwnerId = styled.span.withConfig({ displayName: 'InboxesOwnerId' })`
+const HostName = styled.span.withConfig({ displayName: 'InboxesHostName' })`
 	font-family: var(--font-mono, monospace);
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+`
+
+const PrivacyTag = styled.span.withConfig({ displayName: 'InboxesPrivacyTag' })`
+	display: inline-flex;
+	padding: 1px var(--space-2xs);
+	border-radius: var(--shape-2xs);
+	font-family: var(--font-display);
+	font-size: var(--typescale-label-small-size);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	background: color-mix(in oklab, #6366f1 10%, transparent);
+	color: color-mix(in oklab, #4338ca 80%, black);
+	border: 1px solid color-mix(in oklab, #6366f1 35%, transparent);
+`
+
+const StatusBadge = styled.span.withConfig({
+	displayName: 'InboxesStatusBadge',
+	shouldForwardProp: prop => prop !== '$status',
+})<{ $status: GrantStatus }>`
+	display: inline-flex;
+	align-items: center;
+	padding: 2px var(--space-2xs);
+	border-radius: var(--shape-2xs);
+	font-family: var(--font-display);
+	font-size: var(--typescale-label-small-size);
+	font-weight: var(--font-weight-bold);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	cursor: ${p => (p.$status !== 'connected' ? 'help' : 'default')};
+	${p =>
+		p.$status === 'connected'
+			? css`
+					background: color-mix(in oklab, #16a34a 14%, transparent);
+					color: color-mix(in oklab, #166534 80%, black);
+					border: 1px solid color-mix(in oklab, #16a34a 40%, transparent);
+				`
+			: p.$status === 'auth_failed'
+				? css`
+						background: color-mix(in oklab, var(--color-error) 14%, transparent);
+						color: color-mix(in oklab, var(--color-error) 80%, black);
+						border: 1px solid
+							color-mix(in oklab, var(--color-error) 45%, transparent);
+					`
+				: p.$status === 'connect_failed'
+					? css`
+							background: color-mix(in oklab, #f59e0b 18%, transparent);
+							color: color-mix(in oklab, #b45309 80%, black);
+							border: 1px solid color-mix(in oklab, #f59e0b 45%, transparent);
+						`
+					: css`
+							background: transparent;
+							color: var(--color-on-surface-variant);
+							border: 1px dashed var(--color-outline);
+						`}
+`
+
+const PrimaryBanner = styled.div.withConfig({
+	displayName: 'InboxesPrimaryBanner',
+})`
+	${agedPaperRow}
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-md);
+	padding: var(--space-sm) var(--space-md);
+	border: 1px solid var(--color-ledger-line);
+	border-left: 3px solid var(--color-primary);
+	border-radius: var(--shape-2xs);
+
+	@media (max-width: 767px) {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+`
+
+const PrimaryBannerText = styled.p.withConfig({
+	displayName: 'InboxesPrimaryBannerText',
+})`
+	margin: 0;
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-medium-size);
+
+	strong {
+		font-family: var(--font-display);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		font-size: var(--typescale-label-small-size);
+		margin-right: var(--space-2xs);
+	}
+`
+
+const PrimaryBannerActions = styled.div.withConfig({
+	displayName: 'InboxesPrimaryBannerActions',
+})`
+	display: flex;
+	gap: var(--space-xs);
+`
+
+const TransportGrid = styled.div.withConfig({
+	displayName: 'InboxFormTransportGrid',
+})`
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: var(--space-sm);
+
+	@media (max-width: 640px) {
+		grid-template-columns: 1fr;
+	}
+`
+
+const Hint = styled.p.withConfig({ displayName: 'InboxFormHint' })`
+	margin: 0;
+	font-family: var(--font-body);
+	font-size: var(--typescale-label-small-size);
+	color: var(--color-on-surface-variant);
+	font-style: italic;
 `
 
 const CellDefault = styled.div.withConfig({
@@ -1323,20 +2017,6 @@ const Field = styled.div.withConfig({ displayName: 'InboxFormField' })`
 const Label = styled.label.withConfig({ displayName: 'InboxFormLabel' })`
 	${stenciledTitle}
 	font-size: var(--typescale-label-small-size);
-`
-
-const PreviewLine = styled.p.withConfig({
-	displayName: 'InboxFormPreview',
-})`
-	margin: 0;
-	font-family: var(--font-body);
-	font-size: var(--typescale-label-medium-size);
-	color: var(--color-on-surface-variant);
-
-	strong {
-		font-family: var(--font-mono, monospace);
-		color: var(--color-on-surface);
-	}
 `
 
 const CheckboxRow = styled.div.withConfig({

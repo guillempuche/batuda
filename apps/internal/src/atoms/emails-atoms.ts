@@ -110,6 +110,19 @@ export const markThreadUnreadAtom = BatudaApiAtom.mutation(
 
 export const createInboxAtom = BatudaApiAtom.mutation('email', 'createInbox')
 export const updateInboxAtom = BatudaApiAtom.mutation('email', 'updateInbox')
+export const deleteInboxAtom = BatudaApiAtom.mutation('email', 'deleteInbox')
+export const testInboxAtom = BatudaApiAtom.mutation('email', 'testInbox')
+export const setPrimaryInboxAtom = BatudaApiAtom.mutation(
+	'email',
+	'setPrimaryInbox',
+)
+
+export const inboxStatusAtom = BatudaApiAtom.query('email', 'inboxStatus', {})
+export const providerPresetsAtom = BatudaApiAtom.query(
+	'email',
+	'listProviderPresets',
+	{},
+)
 
 // ── Drafts ──
 export const createDraftAtom = BatudaApiAtom.mutation('email', 'createDraft')
