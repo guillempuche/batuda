@@ -9,7 +9,6 @@ import {
 	Inbox as InboxIcon,
 	Pencil,
 	Plus,
-	RefreshCw,
 	Star,
 	Trash2,
 	X,
@@ -33,7 +32,6 @@ import {
 	deleteFooterAtom,
 	footersAtomFor,
 	inboxesListAtom,
-	syncInboxesAtom,
 	updateFooterAtom,
 	updateInboxAtom,
 } from '#/atoms/emails-atoms'
@@ -109,10 +107,8 @@ function InboxesPage() {
 
 	const createInbox = useAtomSet(createInboxAtom, { mode: 'promiseExit' })
 	const updateInbox = useAtomSet(updateInboxAtom, { mode: 'promiseExit' })
-	const syncInboxes = useAtomSet(syncInboxesAtom, { mode: 'promiseExit' })
 
 	const [dialog, setDialog] = useState<DialogMode>({ kind: 'closed' })
-	const [syncing, setSyncing] = useState(false)
 
 	const rows = useMemo<ReadonlyArray<InboxRow>>(
 		() =>
@@ -136,33 +132,6 @@ function InboxesPage() {
 	const closeDialog = useCallback(() => {
 		setDialog({ kind: 'closed' })
 	}, [])
-
-	const handleSync = useCallback(async () => {
-		setSyncing(true)
-		const exit = await syncInboxes({ payload: {} } as never)
-		setSyncing(false)
-		if (exit._tag !== 'Success') {
-			toastManager.add({
-				title: t`Sync failed`,
-				description: t`Could not reach the email provider. Check logs.`,
-				type: 'error',
-			})
-			return
-		}
-		const result = exit.value as {
-			added?: number
-			retired?: number
-			total?: number
-		} | null
-		const added = result?.added ?? 0
-		const retired = result?.retired ?? 0
-		toastManager.add({
-			title: t`Inboxes synced`,
-			description: t`Added ${added}, retired ${retired}.`,
-			type: 'success',
-		})
-		refreshInboxes()
-	}, [syncInboxes, refreshInboxes, toastManager, t])
 
 	const toggleActive = useCallback(
 		async (row: InboxRow) => {
@@ -217,15 +186,6 @@ function InboxesPage() {
 					<Subtitle>{t`Map provider mailboxes to purpose, owner, and defaults.`}</Subtitle>
 				</IntroText>
 				<IntroActions>
-					<PriButton
-						type='button'
-						$variant='outlined'
-						onClick={handleSync}
-						disabled={syncing}
-					>
-						<RefreshCw size={14} aria-hidden />
-						<span>{syncing ? t`Syncing…` : t`Sync now`}</span>
-					</PriButton>
 					<PriButton type='button' $variant='filled' onClick={openCreate}>
 						<Plus size={14} aria-hidden />
 						<span>{t`Create inbox`}</span>
@@ -244,7 +204,7 @@ function InboxesPage() {
 				<EmptyState
 					icon={InboxIcon}
 					title={t`No inboxes yet`}
-					description={t`Create one or run sync to pull mailboxes from the provider.`}
+					description={t`Connect your IMAP/SMTP mailbox to start sending and receiving email.`}
 					action={
 						<PriButton type='button' $variant='filled' onClick={openCreate}>
 							<Plus size={14} aria-hidden />

@@ -34,7 +34,7 @@ msgstr "— Select a company —"
 msgid "(no subject)"
 msgstr "(no subject)"
 
-#: src/routes/emails/inboxes.tsx:455
+#: src/routes/emails/inboxes.tsx:415
 msgid "(provider assigns)"
 msgstr "(provider assigns)"
 
@@ -91,11 +91,11 @@ msgstr "1 thread selected"
 msgid "Accept"
 msgstr "Accept"
 
-#: src/routes/emails/inboxes.tsx:264
+#: src/routes/emails/inboxes.tsx:224
 msgid "Actions"
 msgstr "Actions"
 
-#: src/routes/emails/inboxes.tsx:262
+#: src/routes/emails/inboxes.tsx:222
 msgid "Active"
 msgstr "Active"
 
@@ -136,16 +136,12 @@ msgstr "Add task"
 msgid "Add the first decision-maker to keep track of who to reach."
 msgstr "Add the first decision-maker to keep track of who to reach."
 
-#: src/routes/emails/inboxes.tsx:161
-msgid "Added {added}, retired {retired}."
-msgstr "Added {added}, retired {retired}."
-
-#: src/routes/emails/inboxes.tsx:538
+#: src/routes/emails/inboxes.tsx:498
 msgid "Address:"
 msgstr "Address:"
 
-#: src/routes/emails/inboxes.tsx:281
-#: src/routes/emails/inboxes.tsx:591
+#: src/routes/emails/inboxes.tsx:241
+#: src/routes/emails/inboxes.tsx:551
 msgid "Agent"
 msgstr "Agent"
 
@@ -198,7 +194,7 @@ msgstr "attachment"
 msgid "Audit log"
 msgstr "Audit log"
 
-#: src/routes/emails/inboxes.tsx:213
+#: src/routes/emails/inboxes.tsx:182
 msgid "Back to emails"
 msgstr "Back to emails"
 
@@ -274,8 +270,8 @@ msgid "Call phone"
 msgstr "Call phone"
 
 #: src/components/interactions/quick-capture-dialog.tsx:400
-#: src/routes/emails/inboxes.tsx:639
-#: src/routes/emails/inboxes.tsx:945
+#: src/routes/emails/inboxes.tsx:599
+#: src/routes/emails/inboxes.tsx:905
 #: src/routes/tasks/index.tsx:717
 msgid "Cancel"
 msgstr "Cancel"
@@ -315,7 +311,7 @@ msgstr "Check that the session is valid or try again."
 msgid "Check that your session is valid or try again."
 msgstr "Check that your session is valid or try again."
 
-#: src/routes/emails/inboxes.tsx:241
+#: src/routes/emails/inboxes.tsx:201
 msgid "Check the session or try again."
 msgstr "Check the session or try again."
 
@@ -343,8 +339,8 @@ msgstr "Client"
 #: src/components/interactions/quick-capture-dialog.tsx:188
 #: src/routes/calendar/index.tsx:354
 #: src/routes/emails/$threadId.tsx:333
-#: src/routes/emails/inboxes.tsx:507
-#: src/routes/emails/inboxes.tsx:828
+#: src/routes/emails/inboxes.tsx:467
+#: src/routes/emails/inboxes.tsx:788
 #: src/routes/emails/index.tsx:687
 msgid "Close"
 msgstr "Close"
@@ -425,6 +421,10 @@ msgstr "Compose"
 msgid "Conclusion or commitment (optional)"
 msgstr "Conclusion or commitment (optional)"
 
+#: src/routes/emails/inboxes.tsx:207
+msgid "Connect your IMAP/SMTP mailbox to start sending and receiving email."
+msgstr "Connect your IMAP/SMTP mailbox to start sending and receiving email."
+
 #: src/components/shared/status-badge.tsx:29
 #: src/routes/companies/$slug.tsx:395
 msgid "Contacted"
@@ -434,7 +434,7 @@ msgstr "Contacted"
 msgid "Contacts"
 msgstr "Contacts"
 
-#: src/routes/emails/inboxes.tsx:915
+#: src/routes/emails/inboxes.tsx:875
 msgid "Content"
 msgstr "Content"
 
@@ -446,7 +446,7 @@ msgstr "Coordinates saved from the geocoder."
 msgid "Copy slug"
 msgstr "Copy slug"
 
-#: src/routes/emails/inboxes.tsx:367
+#: src/routes/emails/inboxes.tsx:327
 msgid "Could not create the inbox."
 msgstr "Could not create the inbox."
 
@@ -454,7 +454,7 @@ msgstr "Could not create the inbox."
 msgid "Could not load companies"
 msgstr "Could not load companies"
 
-#: src/routes/emails/inboxes.tsx:240
+#: src/routes/emails/inboxes.tsx:200
 msgid "Could not load inboxes"
 msgstr "Could not load inboxes"
 
@@ -482,15 +482,11 @@ msgstr "Could not log the interaction. Please try again."
 msgid "Could not publish the page. Please try again."
 msgstr "Could not publish the page. Please try again."
 
-#: src/routes/emails/inboxes.tsx:147
-msgid "Could not reach the email provider. Check logs."
-msgstr "Could not reach the email provider. Check logs."
-
 #: src/routes/companies/$slug.tsx:382
 msgid "Could not save"
 msgstr "Could not save"
 
-#: src/routes/emails/inboxes.tsx:384
+#: src/routes/emails/inboxes.tsx:344
 msgid "Could not save the inbox."
 msgstr "Could not save the inbox."
 
@@ -498,7 +494,7 @@ msgstr "Could not save the inbox."
 msgid "Could not save the page. Please try again."
 msgstr "Could not save the page. Please try again."
 
-#: src/routes/emails/inboxes.tsx:196
+#: src/routes/emails/inboxes.tsx:165
 msgid "Could not set the default inbox."
 msgstr "Could not set the default inbox."
 
@@ -506,16 +502,16 @@ msgstr "Could not set the default inbox."
 msgid "Could not sign in. Check your email and password."
 msgstr "Could not sign in. Check your email and password."
 
-#: src/routes/emails/inboxes.tsx:176
+#: src/routes/emails/inboxes.tsx:145
 msgid "Could not toggle the inbox state."
 msgstr "Could not toggle the inbox state."
 
-#: src/routes/emails/inboxes.tsx:646
-#: src/routes/emails/inboxes.tsx:957
+#: src/routes/emails/inboxes.tsx:606
+#: src/routes/emails/inboxes.tsx:917
 msgid "Create"
 msgstr "Create"
 
-#: src/routes/emails/inboxes.tsx:841
+#: src/routes/emails/inboxes.tsx:801
 msgid "Create a footer to append to outgoing emails from this inbox."
 msgstr "Create a footer to append to outgoing emails from this inbox."
 
@@ -527,7 +523,7 @@ msgstr "Create a prospect landing page from a company detail view or via the MCP
 msgid "Create a prospect landing page to share with this company."
 msgstr "Create a prospect landing page to share with this company."
 
-#: src/routes/emails/inboxes.tsx:735
+#: src/routes/emails/inboxes.tsx:695
 msgid "Create failed"
 msgstr "Create failed"
 
@@ -535,22 +531,18 @@ msgstr "Create failed"
 msgid "Create follow-up task"
 msgstr "Create follow-up task"
 
-#: src/routes/emails/inboxes.tsx:893
+#: src/routes/emails/inboxes.tsx:853
 msgid "Create footer"
 msgstr "Create footer"
 
-#: src/routes/emails/inboxes.tsx:231
-#: src/routes/emails/inboxes.tsx:251
-#: src/routes/emails/inboxes.tsx:503
+#: src/routes/emails/inboxes.tsx:191
+#: src/routes/emails/inboxes.tsx:211
+#: src/routes/emails/inboxes.tsx:463
 msgid "Create inbox"
 msgstr "Create inbox"
 
-#: src/routes/emails/inboxes.tsx:247
-msgid "Create one or run sync to pull mailboxes from the provider."
-msgstr "Create one or run sync to pull mailboxes from the provider."
-
 #: src/routes/emails/$threadId.tsx:467
-#: src/routes/emails/inboxes.tsx:263
+#: src/routes/emails/inboxes.tsx:223
 msgid "Created"
 msgstr "Created"
 
@@ -579,24 +571,24 @@ msgstr "Decision maker"
 msgid "Decline"
 msgstr "Decline"
 
-#: src/routes/emails/inboxes.tsx:261
-#: src/routes/emails/inboxes.tsx:850
+#: src/routes/emails/inboxes.tsx:221
+#: src/routes/emails/inboxes.tsx:810
 msgid "Default"
 msgstr "Default"
 
-#: src/routes/emails/inboxes.tsx:302
+#: src/routes/emails/inboxes.tsx:262
 msgid "Default inbox"
 msgstr "Default inbox"
 
-#: src/routes/emails/inboxes.tsx:877
+#: src/routes/emails/inboxes.tsx:837
 msgid "Delete"
 msgstr "Delete"
 
-#: src/routes/emails/inboxes.tsx:785
+#: src/routes/emails/inboxes.tsx:745
 msgid "Delete failed"
 msgstr "Delete failed"
 
-#: src/routes/emails/inboxes.tsx:778
+#: src/routes/emails/inboxes.tsx:738
 msgid "Delete this footer? This cannot be undone."
 msgstr "Delete this footer? This cannot be undone."
 
@@ -612,7 +604,7 @@ msgstr "Direction"
 msgid "Discard"
 msgstr "Discard"
 
-#: src/routes/emails/inboxes.tsx:544
+#: src/routes/emails/inboxes.tsx:504
 msgid "Display name"
 msgstr "Display name"
 
@@ -624,7 +616,7 @@ msgstr "Document"
 msgid "Documents"
 msgstr "Documents"
 
-#: src/routes/emails/inboxes.tsx:528
+#: src/routes/emails/inboxes.tsx:488
 msgid "Domain"
 msgstr "Domain"
 
@@ -649,23 +641,23 @@ msgstr "Due date"
 msgid "Duration (min)"
 msgstr "Duration (min)"
 
-#: src/routes/emails/inboxes.tsx:911
+#: src/routes/emails/inboxes.tsx:871
 msgid "e.g. Company signature"
 msgstr "e.g. Company signature"
 
-#: src/routes/emails/inboxes.tsx:524
+#: src/routes/emails/inboxes.tsx:484
 msgid "e.g. hola"
 msgstr "e.g. hola"
 
-#: src/routes/emails/inboxes.tsx:550
+#: src/routes/emails/inboxes.tsx:510
 msgid "e.g. Hola — Taller"
 msgstr "e.g. Hola — Taller"
 
-#: src/routes/emails/inboxes.tsx:534
+#: src/routes/emails/inboxes.tsx:494
 msgid "e.g. taller.cat"
 msgstr "e.g. taller.cat"
 
-#: src/routes/emails/inboxes.tsx:868
+#: src/routes/emails/inboxes.tsx:828
 msgid "Edit"
 msgstr "Edit"
 
@@ -677,12 +669,12 @@ msgstr "Edit {label}"
 msgid "Edit due date"
 msgstr "Edit due date"
 
-#: src/routes/emails/inboxes.tsx:503
+#: src/routes/emails/inboxes.tsx:463
 msgid "Edit inbox"
 msgstr "Edit inbox"
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx:348
+#: src/routes/emails/inboxes.tsx:308
 msgid "Edit inbox {0}"
 msgstr "Edit inbox {0}"
 
@@ -697,7 +689,7 @@ msgstr "Editor"
 #: src/components/interactions/quick-capture-dialog.tsx:424
 #: src/components/shared/channel-icon.tsx:63
 #: src/routes/companies/$slug.tsx:742
-#: src/routes/emails/inboxes.tsx:258
+#: src/routes/emails/inboxes.tsx:218
 #: src/routes/login.tsx:138
 msgid "Email"
 msgstr "Email"
@@ -762,7 +754,7 @@ msgid "Flagged as spam by the provider. The body is shown for review only."
 msgstr "Flagged as spam by the provider. The body is shown for review only."
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx:825
+#: src/routes/emails/inboxes.tsx:785
 msgid "Footers — {0}"
 msgstr "Footers — {0}"
 
@@ -800,8 +792,8 @@ msgstr "High"
 msgid "High priority"
 msgstr "High priority"
 
-#: src/routes/emails/inboxes.tsx:279
-#: src/routes/emails/inboxes.tsx:585
+#: src/routes/emails/inboxes.tsx:239
+#: src/routes/emails/inboxes.tsx:545
 msgid "Human"
 msgstr "Human"
 
@@ -829,21 +821,17 @@ msgstr "Inbound message from {0}"
 msgid "Inbox"
 msgstr "Inbox"
 
-#: src/routes/emails/inboxes.tsx:372
+#: src/routes/emails/inboxes.tsx:332
 msgid "Inbox created"
 msgstr "Inbox created"
 
-#: src/routes/emails/inboxes.tsx:216
+#: src/routes/emails/inboxes.tsx:185
 msgid "Inbox management"
 msgstr "Inbox management"
 
-#: src/routes/emails/inboxes.tsx:388
+#: src/routes/emails/inboxes.tsx:348
 msgid "Inbox updated"
 msgstr "Inbox updated"
-
-#: src/routes/emails/inboxes.tsx:160
-msgid "Inboxes synced"
-msgstr "Inboxes synced"
 
 #: src/routes/companies/$slug.tsx:841
 msgid "Industry"
@@ -912,7 +900,7 @@ msgstr "Loading companies…"
 msgid "Loading…"
 msgstr "Loading…"
 
-#: src/routes/emails/inboxes.tsx:256
+#: src/routes/emails/inboxes.tsx:216
 msgid "Local inboxes"
 msgstr "Local inboxes"
 
@@ -962,7 +950,7 @@ msgid "Low priority"
 msgstr "Low priority"
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx:341
+#: src/routes/emails/inboxes.tsx:301
 msgid "Manage footers for {0}"
 msgstr "Manage footers for {0}"
 
@@ -970,7 +958,7 @@ msgstr "Manage footers for {0}"
 msgid "Manage inboxes"
 msgstr "Manage inboxes"
 
-#: src/routes/emails/inboxes.tsx:217
+#: src/routes/emails/inboxes.tsx:186
 msgid "Map provider mailboxes to purpose, owner, and defaults."
 msgstr "Map provider mailboxes to purpose, owner, and defaults."
 
@@ -984,11 +972,11 @@ msgstr "Mark \"{0}\" as complete"
 msgid "Mark \"{0}\" as pending"
 msgstr "Mark \"{0}\" as pending"
 
-#: src/routes/emails/inboxes.tsx:320
+#: src/routes/emails/inboxes.tsx:280
 msgid "Mark active"
 msgstr "Mark active"
 
-#: src/routes/emails/inboxes.tsx:302
+#: src/routes/emails/inboxes.tsx:262
 msgid "Mark as default"
 msgstr "Mark as default"
 
@@ -996,7 +984,7 @@ msgstr "Mark as default"
 msgid "Mark contacted"
 msgstr "Mark contacted"
 
-#: src/routes/emails/inboxes.tsx:320
+#: src/routes/emails/inboxes.tsx:280
 msgid "Mark inactive"
 msgstr "Mark inactive"
 
@@ -1056,7 +1044,7 @@ msgstr "msg"
 msgid "msgs"
 msgstr "msgs"
 
-#: src/routes/emails/inboxes.tsx:905
+#: src/routes/emails/inboxes.tsx:865
 msgid "Name"
 msgstr "Name"
 
@@ -1152,7 +1140,7 @@ msgstr "No due date"
 msgid "No email threads yet"
 msgstr "No email threads yet"
 
-#: src/routes/emails/inboxes.tsx:840
+#: src/routes/emails/inboxes.tsx:800
 msgid "No footers"
 msgstr "No footers"
 
@@ -1160,7 +1148,7 @@ msgstr "No footers"
 msgid "No high-priority companies without a scheduled follow-up"
 msgstr "No high-priority companies without a scheduled follow-up"
 
-#: src/routes/emails/inboxes.tsx:246
+#: src/routes/emails/inboxes.tsx:206
 msgid "No inboxes yet"
 msgstr "No inboxes yet"
 
@@ -1301,11 +1289,11 @@ msgstr "Outcome: {0}"
 msgid "Overdue"
 msgstr "Overdue"
 
-#: src/routes/emails/inboxes.tsx:260
+#: src/routes/emails/inboxes.tsx:220
 msgid "Owner"
 msgstr "Owner"
 
-#: src/routes/emails/inboxes.tsx:607
+#: src/routes/emails/inboxes.tsx:567
 msgid "Owner user ID"
 msgstr "Owner user ID"
 
@@ -1424,9 +1412,9 @@ msgstr "Published"
 msgid "Publishing…"
 msgstr "Publishing…"
 
-#: src/routes/emails/inboxes.tsx:259
-#: src/routes/emails/inboxes.tsx:555
-#: src/routes/emails/inboxes.tsx:568
+#: src/routes/emails/inboxes.tsx:219
+#: src/routes/emails/inboxes.tsx:515
+#: src/routes/emails/inboxes.tsx:528
 msgid "Purpose"
 msgstr "Purpose"
 
@@ -1508,8 +1496,8 @@ msgstr "Resume drafting ({0})"
 msgid "Resume drafting (1)"
 msgstr "Resume drafting (1)"
 
-#: src/routes/emails/inboxes.tsx:645
-#: src/routes/emails/inboxes.tsx:958
+#: src/routes/emails/inboxes.tsx:605
+#: src/routes/emails/inboxes.tsx:918
 #: src/routes/pages/$id.tsx:245
 msgid "Save"
 msgstr "Save"
@@ -1519,8 +1507,8 @@ msgid "Save failed"
 msgstr "Save failed"
 
 #: src/components/emails/compose-form.tsx:464
-#: src/routes/emails/inboxes.tsx:643
-#: src/routes/emails/inboxes.tsx:955
+#: src/routes/emails/inboxes.tsx:603
+#: src/routes/emails/inboxes.tsx:915
 #: src/routes/pages/$id.tsx:245
 msgid "Saving…"
 msgstr "Saving…"
@@ -1574,7 +1562,7 @@ msgstr "Sending…"
 msgid "Sent"
 msgstr "Sent"
 
-#: src/routes/emails/inboxes.tsx:860
+#: src/routes/emails/inboxes.tsx:820
 msgid "Set as default"
 msgstr "Set as default"
 
@@ -1582,8 +1570,8 @@ msgstr "Set as default"
 msgid "Settings"
 msgstr "Settings"
 
-#: src/routes/emails/inboxes.tsx:282
-#: src/routes/emails/inboxes.tsx:597
+#: src/routes/emails/inboxes.tsx:242
+#: src/routes/emails/inboxes.tsx:557
 msgid "Shared"
 msgstr "Shared"
 
@@ -1686,18 +1674,6 @@ msgstr "Subject"
 msgid "Summary"
 msgstr "Summary"
 
-#: src/routes/emails/inboxes.tsx:146
-msgid "Sync failed"
-msgstr "Sync failed"
-
-#: src/routes/emails/inboxes.tsx:227
-msgid "Sync now"
-msgstr "Sync now"
-
-#: src/routes/emails/inboxes.tsx:227
-msgid "Syncing…"
-msgstr "Syncing…"
-
 #: src/components/shared/channel-icon.tsx:72
 msgid "System"
 msgstr "System"
@@ -1732,7 +1708,7 @@ msgstr "The 20 most recently edited open tasks. Click one to reopen it."
 msgid "The geocoder did not return a match. Try editing the location field."
 msgstr "The geocoder did not return a match. Try editing the location field."
 
-#: src/routes/emails/inboxes.tsx:373
+#: src/routes/emails/inboxes.tsx:333
 msgid "The new inbox is ready."
 msgstr "The new inbox is ready."
 
@@ -1828,10 +1804,10 @@ msgstr "Unlinked"
 msgid "Untitled"
 msgstr "Untitled"
 
-#: src/routes/emails/inboxes.tsx:175
-#: src/routes/emails/inboxes.tsx:195
-#: src/routes/emails/inboxes.tsx:752
-#: src/routes/emails/inboxes.tsx:804
+#: src/routes/emails/inboxes.tsx:144
+#: src/routes/emails/inboxes.tsx:164
+#: src/routes/emails/inboxes.tsx:712
+#: src/routes/emails/inboxes.tsx:764
 msgid "Update failed"
 msgstr "Update failed"
 
@@ -1843,19 +1819,19 @@ msgstr "Upload failed"
 msgid "Uploading…"
 msgstr "Uploading…"
 
-#: src/routes/emails/inboxes.tsx:936
+#: src/routes/emails/inboxes.tsx:896
 msgid "Use as default footer"
 msgstr "Use as default footer"
 
-#: src/routes/emails/inboxes.tsx:625
+#: src/routes/emails/inboxes.tsx:585
 msgid "Use as default for this purpose"
 msgstr "Use as default for this purpose"
 
-#: src/routes/emails/inboxes.tsx:518
+#: src/routes/emails/inboxes.tsx:478
 msgid "Username"
 msgstr "Username"
 
-#: src/routes/emails/inboxes.tsx:613
+#: src/routes/emails/inboxes.tsx:573
 msgid "UUID (optional)"
 msgstr "UUID (optional)"
 
@@ -1913,7 +1889,7 @@ msgstr "Who"
 msgid "Workshop floor — live counters on the bench."
 msgstr "Workshop floor — live counters on the bench."
 
-#: src/routes/emails/inboxes.tsx:925
+#: src/routes/emails/inboxes.tsx:885
 msgid "Write footer…"
 msgstr "Write footer…"
 

@@ -110,7 +110,6 @@ export const markThreadUnreadAtom = BatudaApiAtom.mutation(
 
 export const createInboxAtom = BatudaApiAtom.mutation('email', 'createInbox')
 export const updateInboxAtom = BatudaApiAtom.mutation('email', 'updateInbox')
-export const syncInboxesAtom = BatudaApiAtom.mutation('email', 'syncInboxes')
 
 // ── Drafts ──
 export const createDraftAtom = BatudaApiAtom.mutation('email', 'createDraft')
