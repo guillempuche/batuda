@@ -1,6 +1,5 @@
 import { HttpApi, OpenApi } from 'effect/unstable/httpapi'
 
-import { AgentMailWebhookGroup } from './routes/agentmail-webhook'
 import { AuthGroup } from './routes/auth'
 import { CalcomWebhookGroup } from './routes/calcom-webhook'
 import { CalendarGroup } from './routes/calendar'
@@ -40,7 +39,6 @@ export const BatudaApi = HttpApi.make('BatudaApi')
 	.add(PagesGroup)
 	.add(WebhooksGroup)
 	.add(EmailGroup)
-	.add(AgentMailWebhookGroup)
 	.add(RecordingsGroup)
 	.add(ResearchGroup)
 	.add(TimelineGroup)

@@ -6,6 +6,7 @@ import {
 	bearer,
 	magicLink as magicLinkPlugin,
 	openAPI,
+	organization,
 } from 'better-auth/plugins'
 import { Effect } from 'effect'
 import type pg from 'pg'
@@ -166,6 +167,9 @@ export const makeBetterAuthAdapter = (
 				openAPI(),
 				bearer(),
 				admin(),
+				// CLI mirrors the server's plugin set so adapter-issued sessions
+				// and API keys carry the same plugin shape as runtime requests.
+				organization(),
 				apiKeyPlugin({ enableSessionForAPIKeys: true }),
 				magicLinkPlugin({
 					sendMagicLink: data =>

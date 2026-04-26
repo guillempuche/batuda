@@ -7,7 +7,17 @@ import {
 
 import { EmailBlocks } from '@batuda/email/schema'
 
-import { BadRequest, EmailSuppressed, NotFound } from '../errors'
+import {
+	BadRequest,
+	EmailSuppressed,
+	GrantAuthFailed,
+	GrantConnectFailed,
+	GrantUnavailable,
+	InboxInactive,
+	NoDefaultInbox,
+	NotFound,
+} from '../errors'
+import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 
 const Recipients = Schema.Union([Schema.String, Schema.Array(Schema.String)])
@@ -26,11 +36,23 @@ const SendAttachmentRef = Schema.Struct({
 	cid: Schema.optional(Schema.String),
 })
 
+// Inbox-lifecycle errors share a common 409 envelope on send/reply paths so
+// the client gets a consistent shape when an inbox can't actually transmit.
+const InboxOpFailures = [
+	NoDefaultInbox.pipe(HttpApiSchema.status(409)),
+	InboxInactive.pipe(HttpApiSchema.status(409)),
+	GrantAuthFailed.pipe(HttpApiSchema.status(409)),
+	GrantConnectFailed.pipe(HttpApiSchema.status(409)),
+	GrantUnavailable.pipe(HttpApiSchema.status(409)),
+] as const
+
 export const EmailGroup = HttpApiGroup.make('email')
 	.add(
 		HttpApiEndpoint.post('send', '/email/send', {
 			payload: Schema.Struct({
-				inboxId: Schema.String,
+				// Optional — server falls back to the calling member's primary
+				// human inbox when omitted (NoDefaultInbox if none is set).
+				inboxId: Schema.optional(Schema.String),
 				to: Recipients,
 				cc: Schema.optional(Schema.Array(Schema.String)),
 				bcc: Schema.optional(Schema.Array(Schema.String)),
@@ -50,6 +72,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 			error: Schema.Union([
 				EmailSuppressed.pipe(HttpApiSchema.status(409)),
 				BadRequest.pipe(HttpApiSchema.status(400)),
+				...InboxOpFailures,
 			]),
 		}),
 	)
@@ -71,6 +94,8 @@ export const EmailGroup = HttpApiGroup.make('email')
 			error: Schema.Union([
 				EmailSuppressed.pipe(HttpApiSchema.status(409)),
 				BadRequest.pipe(HttpApiSchema.status(400)),
+				NotFound.pipe(HttpApiSchema.status(404)),
+				...InboxOpFailures,
 			]),
 		}),
 	)
@@ -151,16 +176,38 @@ export const EmailGroup = HttpApiGroup.make('email')
 		}),
 	)
 	.add(
+		// Static preset list for the connect-mailbox UI. Returns provider-
+		// neutral entries (Infomaniak, Fastmail, Gmail Workspace, Microsoft
+		// 365, Proton Bridge, Generic) so the UI can pre-fill the IMAP/SMTP
+		// host/port/security fields.
+		HttpApiEndpoint.get('listProviderPresets', '/email/providers/presets', {
+			success: Schema.Array(Schema.Unknown),
+		}),
+	)
+	.add(
+		// Probe-then-insert. The transport is generic IMAP+SMTP — caller
+		// supplies host/port/security/username/password. Server runs an
+		// LOGIN/EHLO probe; on auth/connect failure it still inserts the
+		// row (with grant_status set) so the user can fix it from settings.
 		HttpApiEndpoint.post('createInbox', '/email/inboxes', {
 			payload: Schema.Struct({
-				username: Schema.optional(Schema.String),
-				domain: Schema.optional(Schema.String),
+				email: Schema.String,
 				displayName: Schema.optional(Schema.String),
 				purpose: InboxPurpose,
 				ownerUserId: Schema.optional(Schema.String),
+				isPrivate: Schema.optional(Schema.Boolean),
 				isDefault: Schema.optional(Schema.Boolean),
+				imapHost: Schema.String,
+				imapPort: Schema.Number,
+				imapSecurity: Schema.Literals(['tls', 'starttls', 'plain']),
+				smtpHost: Schema.String,
+				smtpPort: Schema.Number,
+				smtpSecurity: Schema.Literals(['tls', 'starttls', 'plain']),
+				username: Schema.String,
+				password: Schema.String,
 			}),
 			success: Schema.Unknown,
+			error: BadRequest.pipe(HttpApiSchema.status(400)),
 		}),
 	)
 	.add(
@@ -170,18 +217,68 @@ export const EmailGroup = HttpApiGroup.make('email')
 				displayName: Schema.optional(Schema.NullOr(Schema.String)),
 				purpose: Schema.optional(InboxPurpose),
 				ownerUserId: Schema.optional(Schema.NullOr(Schema.String)),
+				isPrivate: Schema.optional(Schema.Boolean),
 				isDefault: Schema.optional(Schema.Boolean),
 				active: Schema.optional(Schema.Boolean),
+				// Credential / transport patch: any subset triggers a re-probe.
+				imapHost: Schema.optional(Schema.String),
+				imapPort: Schema.optional(Schema.Number),
+				imapSecurity: Schema.optional(
+					Schema.Literals(['tls', 'starttls', 'plain']),
+				),
+				smtpHost: Schema.optional(Schema.String),
+				smtpPort: Schema.optional(Schema.Number),
+				smtpSecurity: Schema.optional(
+					Schema.Literals(['tls', 'starttls', 'plain']),
+				),
+				username: Schema.optional(Schema.String),
+				password: Schema.optional(Schema.String),
 			}),
 			success: Schema.Unknown,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(
-		HttpApiEndpoint.post('syncInboxes', '/email/inboxes/sync', {
+		HttpApiEndpoint.delete('deleteInbox', '/email/inboxes/:id', {
+			params: { id: Schema.String },
+			success: Schema.Void,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
+		}),
+	)
+	.add(
+		// Re-probe credentials. Updates grant_status / grant_last_error /
+		// grant_last_seen_at and returns the refreshed row.
+		HttpApiEndpoint.post('testInbox', '/email/inboxes/:id/test', {
+			params: { id: Schema.String },
+			success: Schema.Unknown,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
+		}),
+	)
+	.add(
+		// Set the calling member's primary_inbox_id. Validates ownership
+		// (same org + same user) so the call cannot point at someone else's
+		// inbox.
+		HttpApiEndpoint.post('setPrimaryInbox', '/email/inboxes/:id/primary', {
+			params: { id: Schema.String },
+			success: Schema.Unknown,
+			error: Schema.Union([
+				NotFound.pipe(HttpApiSchema.status(404)),
+				BadRequest.pipe(HttpApiSchema.status(400)),
+			]),
+		}),
+	)
+	.add(
+		// Cheap "do I have a primary?" probe used to drive the settings
+		// banner without paying for the full inbox list.
+		HttpApiEndpoint.get('inboxStatus', '/email/inbox-status', {
 			success: Schema.Struct({
-				added: Schema.Number,
-				retired: Schema.Number,
-				total: Schema.Number,
+				hasDefault: Schema.Boolean,
+				primary: Schema.NullOr(
+					Schema.Struct({
+						inboxId: Schema.String,
+						email: Schema.String,
+					}),
+				),
 			}),
 		}),
 	)
@@ -350,4 +447,5 @@ export const EmailGroup = HttpApiGroup.make('email')
 		}),
 	)
 	.middleware(SessionMiddleware)
+	.middleware(OrgMiddleware)
 	.prefix('/v1')
