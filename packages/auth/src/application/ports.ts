@@ -1,15 +1,19 @@
 import type { Effect } from 'effect'
 
 import type {
+	AlreadyMember,
 	ApiKeyNotFound,
 	AuthConfigError,
 	MagicLinkFailed,
+	OrgSlugTaken,
 	UserAlreadyExists,
 	UserNotFound,
 } from '../domain/errors'
 import type {
 	ApiKeyRecord,
 	AuthUser,
+	Organization,
+	OrgMembershipRole,
 	Role,
 	SessionRecord,
 } from '../domain/types'
@@ -89,4 +93,35 @@ export interface SessionRepository {
 // directly.
 export interface MagicLinkSender {
 	readonly send: (email: string) => Effect.Effect<void, MagicLinkFailed>
+}
+
+export interface NewOrganizationInput {
+	readonly name: string
+	readonly slug: string
+	readonly creatorUserId: string
+	readonly creatorRole: OrgMembershipRole
+}
+
+export interface OrganizationRepository {
+	readonly findBySlug: (
+		slug: string,
+	) => Effect.Effect<Organization | null, AuthConfigError>
+	readonly create: (
+		input: NewOrganizationInput,
+	) => Effect.Effect<Organization, OrgSlugTaken | AuthConfigError>
+}
+
+export interface AddMemberInput {
+	readonly userId: string
+	readonly organizationId: string
+	readonly role: OrgMembershipRole
+}
+
+export interface MemberRepository {
+	readonly add: (
+		input: AddMemberInput,
+		// `slug` is only carried so `AlreadyMember` can surface a useful
+		// message; nothing about the underlying write needs it.
+		context: { readonly slug: string; readonly email: string },
+	) => Effect.Effect<void, AlreadyMember | AuthConfigError>
 }

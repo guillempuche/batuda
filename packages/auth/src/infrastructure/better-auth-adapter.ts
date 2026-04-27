@@ -12,25 +12,32 @@ import { Effect } from 'effect'
 import type pg from 'pg'
 
 import type {
+	AddMemberInput,
 	ApiKeyRepository,
 	CreateApiKeyInput,
 	CreatedApiKey,
 	MagicLinkSender,
+	MemberRepository,
+	NewOrganizationInput,
 	NewUserInput,
 	NewUserWithPasswordInput,
+	OrganizationRepository,
 	SessionRepository,
 	UserRepository,
 } from '../application/ports'
 import {
+	AlreadyMember,
 	ApiKeyNotFound,
 	AuthConfigError,
 	MagicLinkFailed,
+	OrgSlugTaken,
 	UserAlreadyExists,
 	UserNotFound,
 } from '../domain/errors'
 import type {
 	ApiKeyRecord,
 	AuthUser,
+	Organization,
 	Role,
 	SessionRecord,
 } from '../domain/types'
@@ -75,6 +82,20 @@ interface SessionRow {
 	ipAddress: string | null
 	userAgent: string | null
 }
+
+interface OrganizationRow {
+	id: string
+	name: string
+	slug: string
+	createdAt: Date
+}
+
+const toOrganization = (row: OrganizationRow): Organization => ({
+	id: row.id,
+	name: row.name,
+	slug: row.slug,
+	createdAt: row.createdAt,
+})
 
 const toUser = (row: UserRow): AuthUser => ({
 	id: row.id,
@@ -138,10 +159,11 @@ export interface BetterAuthAdapterInput {
 }
 
 /**
- * Build the adapter-backed repositories (users / keys / sessions / magicLink)
- * on top of a CLI-flavored `betterAuth()` instance. The instance carries the
- * same plugin set as the server so API keys and sessions created here
- * validate against the running server at runtime.
+ * Build the adapter-backed repositories (users / keys / sessions /
+ * organizations / members / magicLink) on top of a CLI-flavored
+ * `betterAuth()` instance. The instance carries the same plugin set as the
+ * server so API keys and sessions created here validate against the
+ * running server at runtime.
  */
 export const makeBetterAuthAdapter = (
 	input: BetterAuthAdapterInput,
@@ -149,6 +171,8 @@ export const makeBetterAuthAdapter = (
 	readonly users: UserRepository
 	readonly keys: ApiKeyRepository
 	readonly sessions: SessionRepository
+	readonly organizations: OrganizationRepository
+	readonly members: MemberRepository
 	readonly magicLink: MagicLinkSender
 } => {
 	// The plugin is always wired so `instance.api.signInMagicLink` is part of
@@ -480,6 +504,83 @@ export const makeBetterAuthAdapter = (
 			}).pipe(Effect.map(r => r.rows.map(toSession))),
 	}
 
+	const organizations: OrganizationRepository = {
+		findBySlug: slug =>
+			Effect.tryPromise({
+				try: () =>
+					pool.query<OrganizationRow>(
+						'SELECT id, name, slug, "createdAt" FROM "organization" WHERE slug = $1 LIMIT 1',
+						[slug],
+					),
+				catch: queryError,
+			}).pipe(Effect.map(r => (r.rows[0] ? toOrganization(r.rows[0]) : null))),
+
+		create: (createInput: NewOrganizationInput) =>
+			Effect.tryPromise({
+				try: () =>
+					instance.api.createOrganization({
+						body: {
+							name: createInput.name,
+							slug: createInput.slug,
+							// Better Auth requires either an authenticated session or
+							// `userId` on the body to attach the creator as the first
+							// member; CLI runs without a session so we always pass it.
+							userId: createInput.creatorUserId,
+						},
+					}),
+				catch: cause => {
+					const message = cause instanceof Error ? cause.message : String(cause)
+					if (/ORGANIZATION_ALREADY_EXISTS|already exists/i.test(message)) {
+						return new OrgSlugTaken({ slug: createInput.slug })
+					}
+					return new AuthConfigError({ message })
+				},
+			}).pipe(
+				Effect.flatMap(result => {
+					if (!result?.id) {
+						return Effect.fail(
+							new AuthConfigError({
+								message: `createOrganization returned no id for slug=${createInput.slug}`,
+							}),
+						)
+					}
+					return Effect.succeed({
+						id: result.id,
+						name: result.name,
+						slug: result.slug,
+						createdAt:
+							result.createdAt instanceof Date
+								? result.createdAt
+								: new Date(result.createdAt),
+					} satisfies Organization)
+				}),
+			),
+	}
+
+	const members: MemberRepository = {
+		add: (addInput: AddMemberInput, context) =>
+			Effect.tryPromise({
+				try: () =>
+					instance.api.addMember({
+						body: {
+							userId: addInput.userId,
+							organizationId: addInput.organizationId,
+							role: addInput.role,
+						},
+					}),
+				catch: cause => {
+					const message = cause instanceof Error ? cause.message : String(cause)
+					if (/USER_IS_ALREADY_A_MEMBER|already a member/i.test(message)) {
+						return new AlreadyMember({
+							email: context.email,
+							slug: context.slug,
+						})
+					}
+					return new AuthConfigError({ message })
+				},
+			}).pipe(Effect.asVoid),
+	}
+
 	const magicLink: MagicLinkSender = {
 		send: email =>
 			input.magicLinkSender === undefined
@@ -503,5 +604,5 @@ export const makeBetterAuthAdapter = (
 					}).pipe(Effect.asVoid),
 	}
 
-	return { users, keys, sessions, magicLink }
+	return { users, keys, sessions, organizations, members, magicLink }
 }

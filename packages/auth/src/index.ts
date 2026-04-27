@@ -8,18 +8,27 @@ export {
 	bootstrapFirstAdmin,
 } from './application/bootstrap-first-admin'
 export { createApiKey } from './application/create-api-key'
+export {
+	type InviteAdminInput,
+	type InviteAdminResult,
+	inviteAdmin,
+} from './application/invite-admin'
 export { type InviteUserInput, inviteUser } from './application/invite-user'
 export { listApiKeys } from './application/list-api-keys'
 export { listSessions } from './application/list-sessions'
 export { listUsers } from './application/list-users'
 // ── Application (use cases + ports) ────────────────────────────────────────
 export type {
+	AddMemberInput,
 	ApiKeyRepository,
 	CreateApiKeyInput,
 	CreatedApiKey,
 	MagicLinkSender,
+	MemberRepository,
+	NewOrganizationInput,
 	NewUserInput,
 	NewUserWithPasswordInput,
+	OrganizationRepository,
 	SessionRepository,
 	UserRepository,
 } from './application/ports'
@@ -28,9 +37,11 @@ export { resetPassword } from './application/reset-password'
 export { revokeApiKey } from './application/revoke-api-key'
 // ── Domain ─────────────────────────────────────────────────────────────────
 export {
+	AlreadyMember,
 	ApiKeyNotFound,
 	AuthConfigError,
 	MagicLinkFailed,
+	OrgSlugTaken,
 	UserAlreadyExists,
 	UserNotFound,
 	UsersAlreadyExist,
@@ -38,10 +49,15 @@ export {
 export type {
 	ApiKeyRecord,
 	AuthUser,
+	Organization,
+	OrgMembershipRole,
 	Role,
 	SessionRecord,
 } from './domain/types'
-export { Role as RoleSchema } from './domain/types'
+export {
+	OrgMembershipRole as OrgMembershipRoleSchema,
+	Role as RoleSchema,
+} from './domain/types'
 export {
 	type BetterAuthAdapterInput,
 	type MagicLinkCallback,

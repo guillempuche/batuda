@@ -36,3 +36,20 @@ export class AuthConfigError extends Schema.TaggedErrorClass<AuthConfigError>()(
 	'AuthConfigError',
 	{ message: Schema.String },
 ) {}
+
+// `inviteAdmin` refuses to claim an org slug that's already in use unless the
+// caller opts in via `--allow-existing-org`. Without the gate, CLI mistakes
+// could attach a new admin to someone else's org.
+export class OrgSlugTaken extends Schema.TaggedErrorClass<OrgSlugTaken>()(
+	'OrgSlugTaken',
+	{ slug: Schema.String },
+) {}
+
+// Surfaced when an admin invite hits an existing `(userId, organizationId)`
+// row — handles both the slug-reuse case and the rare race where the user
+// landed in the org via a parallel path (e.g. server `/auth` flow) between
+// our find and write.
+export class AlreadyMember extends Schema.TaggedErrorClass<AlreadyMember>()(
+	'AlreadyMember',
+	{ email: Schema.String, slug: Schema.String },
+) {}
