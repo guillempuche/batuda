@@ -160,7 +160,8 @@ first, typed errors. All `/v1/*` routes pass through
   [`products.ts`](../packages/controllers/src/routes/products.ts).
 - Content: [`pages.ts`](../packages/controllers/src/routes/pages.ts).
 - Comms: [`email.ts`](../packages/controllers/src/routes/email.ts),
-  [`agentmail-webhook.ts`](../packages/controllers/src/routes/agentmail-webhook.ts),
+  [`calendar.ts`](../packages/controllers/src/routes/calendar.ts),
+  [`calcom-webhook.ts`](../packages/controllers/src/routes/calcom-webhook.ts),
   [`recordings.ts`](../packages/controllers/src/routes/recordings.ts),
   [`research.ts`](../packages/controllers/src/routes/research.ts),
   [`webhooks.ts`](../packages/controllers/src/routes/webhooks.ts).
@@ -172,17 +173,17 @@ first, typed errors. All `/v1/*` routes pass through
 Effect `ServiceMap.Service<T>` layered instantiation with `SqlClient` injected
 via the DI container. Two pluggable adapter interfaces:
 
-- **Email** — [`email-provider.ts`](../apps/server/src/services/email-provider.ts)
-  / live impl
-  [`agentmail-provider.ts`](../apps/server/src/services/agentmail-provider.ts)
-  (Send, Reply, CreateDraft, UpdateDraft, DeleteDraft, GetThread, ListThreads,
-  UpdateInboxSettings), driven by
-  [AgentMail](https://agentmail.to/). Wire-up in
-  [`email-provider-live.ts`](../apps/server/src/services/email-provider-live.ts).
+- **Email** — [`mail-transport.ts`](../apps/server/src/services/mail-transport.ts)
+  is the per-inbox IMAP+SMTP port (`imapflow` + `nodemailer` + `mailparser`).
+  Credentials decrypt through
+  [`credential-crypto.ts`](../apps/server/src/services/credential-crypto.ts)
+  (AES-256-GCM, HKDF subkey per inbox).
   The thick service
-  [`email.ts`](../apps/server/src/services/email.ts) orchestrates suppression
-  checks, footer injection, thread linking, inbound classification, and draft
-  `clientId` encoding (`batuda:draft;companyId=X;contactId=Y;…`).
+  [`email.ts`](../apps/server/src/services/email.ts) orchestrates inbox CRUD,
+  probe + grant_status updates, footer injection, thread linking, and draft
+  staging. Inbound IDLE + persistence runs in [`apps/mail-worker`](../apps/mail-worker/);
+  the worker writes as `app_service` (BYPASSRLS) and resolves
+  `organization_id` from the inbox row.
   Attachments staged separately in
   [`email-attachment-staging.ts`](../apps/server/src/services/email-attachment-staging.ts).
 - **Storage** — [`storage-provider.ts`](../apps/server/src/services/storage-provider.ts)
@@ -1085,16 +1086,16 @@ both ways.
 
 ### 8.2 Controllers layer
 
-| CRM                             | Primary API                                                                                                      | Secondary                                                                                                          | Extension surface                                   |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------- |
-| **Batuda**                      | HttpApi (`effect/unstable/httpapi`), 16 route groups, session middleware                                         | —                                                                                                                  | `WebhookService` fires on events; AgentMail webhook |
-| **Attio**                       | REST + published OpenAPI                                                                                         | [App SDK](https://docs.attio.com/sdk/guides/creating-an-app) (TS + React in-app)                                   | Webhooks V2 with server-side filter DSL             |
-| **Twenty**                      | [GraphQL (Apollo 4)](https://github.com/twentyhq/twenty/tree/main/packages/twenty-server/src/engine/api/graphql) | [REST + OpenAPI](https://github.com/twentyhq/twenty/tree/main/packages/twenty-server/src/engine/api/rest) co-equal | API keys with role binding; Zapier app              |
-| **Atomic CRM**                  | PostgREST via Supabase                                                                                           | —                                                                                                                  | Edge functions (Deno), RLS for auth                 |
-| **Folk**                        | REST + OpenAPI + webhooks                                                                                        | —                                                                                                                  | Community MCPs wrap the API                         |
-| **Lightfield**                  | REST (beta) + TS/Python SDKs                                                                                     | MCP                                                                                                                | Webhooks trigger autonomous agent behaviours        |
-| **Reevo / Aurasell / Monaco**   | Proprietary                                                                                                      | —                                                                                                                  | Limited / none                                      |
-| **EspoCRM / SuiteCRM / OroCRM** | REST + SOAP (legacy)                                                                                             | RBAC-gated                                                                                                         | Workflow engines                                    |
+| CRM                             | Primary API                                                                                                      | Secondary                                                                                                          | Extension surface                            |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------- |
+| **Batuda**                      | HttpApi (`effect/unstable/httpapi`), 16 route groups, session middleware                                         | —                                                                                                                  | `WebhookService` fires on events             |
+| **Attio**                       | REST + published OpenAPI                                                                                         | [App SDK](https://docs.attio.com/sdk/guides/creating-an-app) (TS + React in-app)                                   | Webhooks V2 with server-side filter DSL      |
+| **Twenty**                      | [GraphQL (Apollo 4)](https://github.com/twentyhq/twenty/tree/main/packages/twenty-server/src/engine/api/graphql) | [REST + OpenAPI](https://github.com/twentyhq/twenty/tree/main/packages/twenty-server/src/engine/api/rest) co-equal | API keys with role binding; Zapier app       |
+| **Atomic CRM**                  | PostgREST via Supabase                                                                                           | —                                                                                                                  | Edge functions (Deno), RLS for auth          |
+| **Folk**                        | REST + OpenAPI + webhooks                                                                                        | —                                                                                                                  | Community MCPs wrap the API                  |
+| **Lightfield**                  | REST (beta) + TS/Python SDKs                                                                                     | MCP                                                                                                                | Webhooks trigger autonomous agent behaviours |
+| **Reevo / Aurasell / Monaco**   | Proprietary                                                                                                      | —                                                                                                                  | Limited / none                               |
+| **EspoCRM / SuiteCRM / OroCRM** | REST + SOAP (legacy)                                                                                             | RBAC-gated                                                                                                         | Workflow engines                             |
 
 **Batuda's distinctive controller moves.**
 
@@ -1118,22 +1119,25 @@ both ways.
 
 ### 8.3 Services layer
 
-| CRM            | Email ingest                                                                                                                                       | Driver abstraction                                                             | Enrichment                                                         |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| **Batuda**     | AgentMail webhook → `email_messages` + `email_thread_links`; company/contact matched by recipient; suppression check for bounced; footer injection | `EmailProvider` interface (Send/Reply/Draft/Thread); `StorageProvider` (S3/R2) | Geocoder (Nominatim, 1 req/s); ResearchRun integrated + cost-gated |
-| **Attio**      | Implicit via sync; `last_email_interaction` as read-only column                                                                                    | Single proprietary pipeline                                                    | Research Agent as workflow block; AI attributes compute-on-read    |
-| **Twenty**     | `messaging/drivers/` — gmail, imap, microsoft, smtp + `match-participant` module                                                                   | Per-channel polymorphic `MessageChannel`                                       | Apollo / Mailchimp / Stripe / Fireflies in `twenty-apps/community` |
-| **Atomic CRM** | Postmark webhook with forwarded-mode regex + direct-CC mode; company lookup by `website OR name OR domain`; attachments to Supabase Storage        | One provider (Postmark)                                                        | None native                                                        |
-| **Folk**       | Gmail/Outlook + Google Calendar + **WhatsApp** + **LinkedIn via folkX extension**                                                                  | Multi-channel peers, including browser extension                               | Web research via Research Assistant                                |
-| **Lightfield** | Email + meeting transcripts + built-in call recorder (no Fathom)                                                                                   | Single opinionated pipeline                                                    | Agent-driven backfill                                              |
-| **Reevo**      | Email + calls + bundled domain purchase + inbox warming                                                                                            | Vertically integrated                                                          | Sales-infra bundled                                                |
+| CRM            | Email ingest                                                                                                                                                                  | Driver abstraction                                                                                                  | Enrichment                                                         |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| **Batuda**     | `apps/mail-worker` IMAP IDLE per inbox → `email_messages` + `email_thread_links`; company/contact matched by recipient; DSN parser flips `status='bounced'`; footer injection | Generic IMAP+SMTP transport per `inboxes` row (BYO mailbox); `StorageProvider` (S3/R2) for raw RFC822 + attachments | Geocoder (Nominatim, 1 req/s); ResearchRun integrated + cost-gated |
+| **Attio**      | Implicit via sync; `last_email_interaction` as read-only column                                                                                                               | Single proprietary pipeline                                                                                         | Research Agent as workflow block; AI attributes compute-on-read    |
+| **Twenty**     | `messaging/drivers/` — gmail, imap, microsoft, smtp + `match-participant` module                                                                                              | Per-channel polymorphic `MessageChannel`                                                                            | Apollo / Mailchimp / Stripe / Fireflies in `twenty-apps/community` |
+| **Atomic CRM** | Postmark webhook with forwarded-mode regex + direct-CC mode; company lookup by `website OR name OR domain`; attachments to Supabase Storage                                   | One provider (Postmark)                                                                                             | None native                                                        |
+| **Folk**       | Gmail/Outlook + Google Calendar + **WhatsApp** + **LinkedIn via folkX extension**                                                                                             | Multi-channel peers, including browser extension                                                                    | Web research via Research Assistant                                |
+| **Lightfield** | Email + meeting transcripts + built-in call recorder (no Fathom)                                                                                                              | Single opinionated pipeline                                                                                         | Agent-driven backfill                                              |
+| **Reevo**      | Email + calls + bundled domain purchase + inbox warming                                                                                                                       | Vertically integrated                                                                                               | Sales-infra bundled                                                |
 
 **Batuda's distinctive service moves.**
 
-- Two clean adapter interfaces with pluggable providers — same shape as
-  Twenty's drivers, one provider per category today.
-- Webhook-driven inbound (AgentMail pushes) — simpler than Twenty's polling,
-  matches Atomic CRM's Postmark flow.
+- BYO-mailbox model — each `(organization_id, owner_user_id)` connects its
+  own IMAP/SMTP credentials (Infomaniak, Fastmail, M365, Proton Bridge,
+  Gmail Workspace, etc.). No Batuda-hosted mail, no DNS work, no vendor
+  lock-in. Closer to Apple Mail / Thunderbird than to a SaaS email bus.
+- IDLE-driven inbound (long-lived IMAP IDLE in `apps/mail-worker`) — push
+  semantics without webhooks; faster than Twenty's polling, no provider
+  webhook surface to authenticate.
 - Draft `clientId` encoding
   ([`email.ts`](../apps/server/src/services/email.ts)) —
   `batuda:draft;companyId=X;contactId=Y;…` lets agents stage drafts without
@@ -1142,10 +1146,10 @@ both ways.
 
 **Batuda's gaps.**
 
-- **Single-provider today.** When a customer wants "sync my Gmail to
-  Batuda," there's no pluggable path. Twenty's `drivers/` pattern is the
-  textbook answer; our `EmailProvider` interface is the right primitive, we
-  just haven't implemented the other drivers.
+- **No native OAuth path yet.** Gmail / M365 users can connect via app
+  password (Workspace) or IMAP basic auth (M365), but native OAuth XOAUTH2
+  is deferred to v1.1 (designed in plan Appendix A). Until then the
+  preset list documents the per-provider gotchas.
 - **No LinkedIn / WhatsApp capture.** Folk's folkX extension is the defining
   UX for a solo/agency operator.
 - **No `match-participant` as explicit service.** Atomic CRM's `addNoteToContact`
@@ -1342,12 +1346,15 @@ Each pattern maps to specific files in our repo and a priority.
   all converge here.
 - **MCP as a primary agent surface** — Attio, Twenty, Atomic CRM, Lightfield
   all ship first-party.
-- **Pluggable provider interface for email/storage** — Twenty's explicit
-  drivers, our `EmailProvider` / `StorageProvider`.
+- **Generic IMAP/SMTP transport for email; pluggable provider for storage**
+  — bring-your-own mailbox (Infomaniak / Fastmail / M365 / Proton Bridge /
+  Gmail Workspace) with a single transport, plus `StorageProvider` (S3/R2)
+  for raw RFC822 + attachments.
 - **Typed MCP tool results** — nobody does this as well as our `SendEmailResult`
   discriminated union.
-- **Single-tenant per deployment** — avoids Twenty's schema-per-workspace
-  complexity for our scale.
+- **Multi-tenant single deployment with RLS** — `app.current_org_id`
+  GUC + Postgres RLS isolates orgs without Twenty's schema-per-workspace
+  complexity.
 - **HttpApi / OpenAPI-first** — aligns with Attio, Folk.
 - **Company as primary entity** — contrasts with SFDC-shape CRMs; aligns with
   Folk and the agency register.
@@ -1549,9 +1556,8 @@ Services: [`apps/server/src/services/`](../apps/server/src/services/) —
 [`companies.ts`](../apps/server/src/services/companies.ts) ·
 [`pipeline.ts`](../apps/server/src/services/pipeline.ts) ·
 [`email.ts`](../apps/server/src/services/email.ts) ·
-[`email-provider.ts`](../apps/server/src/services/email-provider.ts) ·
-[`email-provider-live.ts`](../apps/server/src/services/email-provider-live.ts) ·
-[`agentmail-provider.ts`](../apps/server/src/services/agentmail-provider.ts) ·
+[`mail-transport.ts`](../apps/server/src/services/mail-transport.ts) ·
+[`credential-crypto.ts`](../apps/server/src/services/credential-crypto.ts) ·
 [`email-attachment-staging.ts`](../apps/server/src/services/email-attachment-staging.ts) ·
 [`storage-provider.ts`](../apps/server/src/services/storage-provider.ts) ·
 [`s3-storage-provider.ts`](../apps/server/src/services/s3-storage-provider.ts) ·

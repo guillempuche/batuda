@@ -62,11 +62,16 @@
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│  Email (AgentMail)                                               │
+│  Email (generic IMAP/SMTP — bring your own mailbox)              │
 │  ┌──────────────────────────────────────────────────────────┐   │
-│  │  Outbound: apps/server → AgentMail API → recipient       │   │
-│  │  Inbound:  reply → AgentMail webhook → POST /webhooks/.. │   │
-│  │  Both auto-logged as interactions                         │   │
+│  │  Outbound: apps/server → SMTP (nodemailer) → recipient   │   │
+│  │            then APPEND to user's Sent folder via IMAP    │   │
+│  │  Inbound:  apps/mail-worker holds IMAP IDLE per inbox    │   │
+│  │            persists raw RFC822 to R2 + parsed bodies     │   │
+│  │            DSN bounces (RFC 3464) flip status='bounced'  │   │
+│  │  Credentials: AES-256-GCM on inboxes row (HKDF subkey)   │   │
+│  │  Providers: Infomaniak / Fastmail / M365 / Proton Bridge │   │
+│  │             / Gmail Workspace / Generic IMAP             │   │
 │  └──────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
 
@@ -169,8 +174,8 @@ Effect v4 HTTP server deployed at `api.batuda.co`. Responsibilities:
 - REST API (consumed by both frontend apps)
 - MCP server — stdio for Claude Code, HTTP/SSE for remote AI
 - Page content API — public routes for prospect pages, internal routes for CRUD
-- Outbound email via AgentMail (outreach, follow-ups) — auto-logged as interactions
-- Inbound email reply handling via AgentMail webhooks — auto-logged as interactions
+- Outbound email via per-org IMAP/SMTP credentials (`nodemailer` SMTP + IMAP `APPEND` to Sent) — auto-logged as interactions
+- Inbound email handled by `apps/mail-worker` (IMAP IDLE per inbox), not by `apps/server`
 - Object storage for call recording audio (S3-compatible: MinIO local, R2 prod) — linked to call interactions (existing or auto-created on upload)
 - Webhook fan-out (fire-and-forget POST to registered endpoints)
 - API key authentication for external integrations
@@ -241,7 +246,7 @@ Batuda has three bounded contexts. Each owns its own domain errors and types; de
 
 **Why a shared `buildBetterAuthConfig`.** The CLI and server both instantiate `betterAuth(...)` — the CLI because it mints users/keys out-of-band, the server because it serves `/auth/*`. If the plugin list or field set drifts between the two, the apiKey plugin's verification path breaks at runtime (keys minted in one process fail to validate in the other). Keeping the builder in one place makes that drift impossible.
 
-**Why the CLI omits `magicLink()`.** The magic-link sender depends on the server's `EmailProvider` service (local inbox catcher in dev, AgentMail in prod). The CLI doesn't run that service, so it injects its own `MagicLinkSender` port implementation when it needs to issue a link (see `pnpm cli auth invite`). The builder takes `plugins` as a parameter precisely so each caller supplies the plugin list it can back.
+**Why the CLI omits `magicLink()`.** The magic-link sender depends on the server's `EmailProvider` service (local inbox catcher in dev, real SMTP via the requesting org's primary inbox in prod). The CLI doesn't run that service, so it injects its own `MagicLinkSender` port implementation when it needs to issue a link (see `pnpm cli auth invite`). The builder takes `plugins` as a parameter precisely so each caller supplies the plugin list it can back.
 
 **Why research is a separate bounded context.** Research has its own domain model (providers, budgets, quotas, schemas), its own error hierarchy (`ProviderError`, `BudgetExceeded`, `QuotaExhausted`), and its own infrastructure concerns (external API keys, LLM inference, cost tracking). It reads CRM data (companies, contacts) but never writes directly — proposed changes go through the `propose_update` tool, reviewed by the outer AI or user before applying. This separation means research provider implementations, pricing models, and LLM providers can evolve independently of the CRM schema.
 
@@ -338,7 +343,9 @@ Company status updated to "client" via MCP or web
 
 ## Authentication (Better Auth)
 
-All auth is handled by [Better Auth](https://www.better-auth.com/) v1.5.6 with plugins: `openAPI`, `bearer`, `admin`, `apiKey`.
+All auth is handled by [Better Auth](https://www.better-auth.com/) v1.5.6 with plugins: `openAPI`, `bearer`, `admin`, `apiKey`, `organization`, `magicLink`.
+
+**Multi-org scoping.** Every request resolves an `activeOrganizationId` from the session (or env var, for MCP stdio in dev). Middleware loads the matching `organization` row into a `CurrentOrg` ServiceMap service, then opens a transactional connection that runs `SET LOCAL app.current_org_id = $orgId` before any tenant-scoped reads/writes. Two Postgres roles enforce isolation: `app_user` (RLS enforced — HTTP + MCP path) and `app_service` (BYPASSRLS — mail worker + cron jobs that resolve org ownership explicitly per row).
 
 **Two user types:**
 
@@ -444,11 +451,37 @@ provider_usage      — consumption counter per provider per billing period
 
 ```
 user                — auth users (team members + AI agents, with isAgent field)
-session             — active sessions
-account             �� auth provider accounts
+session             — active sessions; activeOrganizationId picks per-request tenant
+account             — auth provider accounts
 verification        — email verification tokens
 api_key             — hashed API keys (referenceId, configId, quotas, rate limits)
+organization        — tenant root; users belong via member rows
+member              — (organization_id, user_id) plus primary_inbox_id additionalField
+invitation          — pending invites by email
 ```
+
+### Email tables (per-org, RLS-enforced)
+
+```
+inboxes              — one row per IMAP+SMTP mailbox; carries credentials
+                       (password_ciphertext/nonce/tag, AES-256-GCM, HKDF
+                       subkey from EMAIL_CREDENTIAL_KEY + inbox.id),
+                       grant_status, folder_state JSONB per IMAP folder.
+                       Owned by (organization_id, owner_user_id);
+                       purpose ∈ {human, agent, shared}
+email_thread_links   — (organization_id, external_thread_id) where
+                       external_thread_id is the thread root's RFC Message-ID
+email_messages       — every fetched/sent message; raw_rfc822_ref points at
+                       R2 object; status ∈ {normal, spam, blocked, bounced}
+                       with bounce_type/bounce_sub_type populated by the
+                       worker's DSN parser
+inbox_footers        — per-inbox signature blocks
+email_draft_bodies   — sidecar storage for in-progress draft authoring trees
+email_attachment_staging — attachment uploads pending send
+message_participants — flat index of From/To/Cc/Bcc per message
+```
+
+All email tables enable RLS with policy `organization_id = current_setting('app.current_org_id')`. `message_participants` uses a subquery policy via its joined `email_messages` row.
 
 Relations: see `PLAN.md` § Entity relationships summary.
 
