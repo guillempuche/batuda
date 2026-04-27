@@ -23,14 +23,26 @@ Dev URLs (via portless): **Batuda web app `https://batuda.localhost`** and API s
 
 ### Dev login
 
-A test user is created by `pnpm cli seed` (any preset). Use it to log in when debugging authenticated screens:
+`pnpm cli seed` (any preset) creates the persona set below. Sign in as Alice for the default dev workflow:
 
-- **Email:** `admin@taller.cat`
-- **Password:** `batuda-dev-2026`
+| Email                   | Password          | Platform role | Memberships                         |
+| ----------------------- | ----------------- | ------------- | ----------------------------------- |
+| `admin@taller.cat`      | `batuda-dev-2026` | admin         | Taller (owner), Restaurant (member) |
+| `colleague@taller.cat`  | `batuda-dev-2026` | user          | Taller (member)                     |
+| `admin@restaurant.demo` | `batuda-dev-2026` | admin         | Restaurant (owner)                  |
 
-Exported from `apps/cli/src/commands/seed.ts` as `TEST_USER`. If login fails, re-run `pnpm cli seed --preset minimal` — the seed is idempotent and will (re)create the user via Better-Auth's `signUpEmail`.
+Switch to Bob to verify cross-org isolation; switch to Carol to test the per-user privacy predicate on shared inboxes. The personas are exported from `apps/cli/src/commands/seed.ts` as `DEMO_ORGS`, `DEMO_USERS`, `DEMO_MEMBERSHIPS` (with `TEST_USER` aliased to Alice for backward compatibility). If sign-in fails, re-run `pnpm cli db reset && pnpm cli seed` — the seed is idempotent and (re)creates the personas via Better Auth's admin API.
 
-Better-Auth lives on the API server at `api.batuda.localhost/auth/*`. The web browser sends cookies cross-origin via `credentials: 'include'`; on SSR, loaders forward the incoming `cookie` header server-to-server. Both flows require the API server (`pnpm dev:server`) to be running.
+Multi-org users (Alice) without an `activeOrganizationId` hit 403. The session-create hook auto-picks for single-org users; for Alice, set the active org explicitly:
+
+```bash
+curl -X POST https://api.batuda.localhost/auth/organization/set-active \
+  -H 'content-type: application/json' \
+  --cookie-jar cookies.txt --cookie cookies.txt \
+  -d '{"organizationSlug":"taller"}'
+```
+
+Better Auth lives on the API server at `api.batuda.localhost/auth/*`. The web browser sends cookies cross-origin via `credentials: 'include'`; on SSR, loaders forward the incoming `cookie` header server-to-server. Both flows require the API server (`pnpm dev:server`) to be running.
 
 ### Open & navigate
 
@@ -162,6 +174,33 @@ pnpm cli:tui              # interactive TUI (same commands)
 ```
 
 The CLI connects to Postgres via `DATABASE_URL` in `apps/cli/.env`. Commands that don't need the DB (`setup`, `services`) work without it.
+
+### Bootstrap a fresh deployment
+
+For a brand-new database with zero users, the auth namespace exposes two complementary subcommands:
+
+```bash
+# First admin + their owning organization, in one go. Refuses if any user
+# row already exists.
+pnpm cli auth bootstrap-org \
+  --email alice@example.com --name "Alice" --password "<secret>" \
+  --org-name "Acme" --org-slug acme
+
+# Subsequent invites: create-or-find the org, create-or-find the user,
+# attach as admin, send a magic link. Local mode prints the captured URL;
+# cloud mode prints a curl recipe pointing at the running server.
+pnpm cli auth invite-admin \
+  --email bob@restaurant.demo --name "Bob" \
+  --org-name "Restaurant Demo" --org-slug restaurant
+
+# Reuse an existing org instead of erroring out (e.g. adding a second
+# admin to an org that already exists):
+pnpm cli auth invite-admin \
+  --email carol@taller.cat --name "Carol" \
+  --org-name "Taller Demo" --org-slug taller --allow-existing-org
+```
+
+`bootstrap-org` is the zero-state path; `invite-admin` covers everything after.
 
 ---
 
