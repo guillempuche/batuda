@@ -67,6 +67,37 @@ export const buildBetterAuthConfig = <Plugins extends BetterAuthPlugin[]>(
 			expiresIn: 60 * 60 * 24 * 30, // 30 days
 			updateAge: 60 * 60 * 24 * 7, // renew weekly
 		},
+		databaseHooks: {
+			session: {
+				create: {
+					// Auto-pick activeOrganizationId for users with exactly one
+					// membership so the common case skips the org picker. With
+					// zero or many memberships we leave it unset — multi-org users
+					// must select via /auth/organization/set-active so the active
+					// scope is always intentional, never silently inherited.
+					before: async (session, ctx) => {
+						if (session['activeOrganizationId']) return { data: session }
+						const adapter = ctx?.context.adapter
+						if (!adapter) return { data: session }
+						const memberships = await adapter.findMany<{
+							organizationId: string
+						}>({
+							model: 'member',
+							where: [{ field: 'userId', value: session.userId }],
+							limit: 2,
+						})
+						const [only, ...rest] = memberships
+						if (!only || rest.length > 0) return { data: session }
+						return {
+							data: {
+								...session,
+								activeOrganizationId: only.organizationId,
+							},
+						}
+					},
+				},
+			},
+		},
 		plugins: input.plugins,
 		rateLimit: {
 			enabled: true,
