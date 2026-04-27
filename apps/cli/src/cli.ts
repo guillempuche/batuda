@@ -4,7 +4,9 @@ import { Command, Flag, Prompt } from 'effect/unstable/cli'
 
 import { authCreateKey } from './commands/auth'
 import { authBootstrap } from './commands/auth-bootstrap'
+import { authBootstrapOrg } from './commands/auth-bootstrap-org'
 import { authInvite } from './commands/auth-invite'
+import { authInviteAdmin } from './commands/auth-invite-admin'
 import { authListKeys } from './commands/auth-list-keys'
 import { authListUsers } from './commands/auth-list-users'
 import { authPromote } from './commands/auth-promote'
@@ -266,6 +268,84 @@ const authInviteCommand = Command.make(
 	),
 )
 
+const authBootstrapOrgCommand = Command.make(
+	'bootstrap-org',
+	{
+		email: Flag.string('email').pipe(
+			Flag.withDescription('Admin email address'),
+			Flag.withFallbackPrompt(Prompt.text({ message: 'Admin email:' })),
+		),
+		name: Flag.string('name').pipe(
+			Flag.withDescription('Admin display name'),
+			Flag.withFallbackPrompt(Prompt.text({ message: 'Admin name:' })),
+		),
+		password: Flag.redacted('password').pipe(
+			Flag.withDescription('Admin password (prompted if omitted)'),
+			Flag.withFallbackPrompt(Prompt.hidden({ message: 'Admin password:' })),
+		),
+		orgName: Flag.string('org-name').pipe(
+			Flag.withDescription('Organization display name'),
+			Flag.withFallbackPrompt(Prompt.text({ message: 'Organization name:' })),
+		),
+		orgSlug: Flag.string('org-slug').pipe(
+			Flag.withDescription('Organization URL slug (lowercase, kebab-case)'),
+			Flag.withFallbackPrompt(Prompt.text({ message: 'Organization slug:' })),
+		),
+	},
+	({ email, name, password, orgName, orgSlug }) =>
+		authBootstrapOrg({
+			email,
+			name,
+			password: Redacted.value(password),
+			orgName,
+			orgSlug,
+		}),
+).pipe(
+	Command.withDescription(
+		'Create the first admin and their organization (refuses if any user exists)',
+	),
+)
+
+const authInviteAdminCommand = Command.make(
+	'invite-admin',
+	{
+		email: Flag.string('email').pipe(
+			Flag.withDescription('Email address of the admin to invite'),
+			Flag.withFallbackPrompt(Prompt.text({ message: 'Admin email:' })),
+		),
+		name: Flag.string('name').pipe(
+			Flag.withDescription('Display name'),
+			Flag.withFallbackPrompt(Prompt.text({ message: 'Admin name:' })),
+		),
+		orgName: Flag.string('org-name').pipe(
+			Flag.withDescription('Organization display name'),
+			Flag.withFallbackPrompt(Prompt.text({ message: 'Organization name:' })),
+		),
+		orgSlug: Flag.string('org-slug').pipe(
+			Flag.withDescription('Organization URL slug (lowercase, kebab-case)'),
+			Flag.withFallbackPrompt(Prompt.text({ message: 'Organization slug:' })),
+		),
+		allowExistingOrg: Flag.boolean('allow-existing-org').pipe(
+			Flag.withDescription(
+				'Reuse an existing org with this slug; otherwise the command aborts',
+			),
+			Flag.withDefault(false),
+		),
+	},
+	({ email, name, orgName, orgSlug, allowExistingOrg }) =>
+		authInviteAdmin({
+			email,
+			name,
+			orgName,
+			orgSlug,
+			allowExistingOrg,
+		}),
+).pipe(
+	Command.withDescription(
+		'Create-or-find org, create-or-find user, attach as admin, send magic link',
+	),
+)
+
 const authListUsersCommand = Command.make(
 	'list-users',
 	{},
@@ -359,7 +439,9 @@ const authCommand = Command.make('auth').pipe(
 	Command.withDescription('Better Auth utilities'),
 	Command.withSubcommands([
 		authBootstrapCommand,
+		authBootstrapOrgCommand,
 		authInviteCommand,
+		authInviteAdminCommand,
 		authListUsersCommand,
 		authListKeysCommand,
 		authCreateKeyCommand,
