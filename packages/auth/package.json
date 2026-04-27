@@ -13,7 +13,9 @@
 	},
 	"scripts": {
 		"build": "tsdown",
-		"check-types": "tsc --noEmit"
+		"check-types": "tsc --noEmit",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest"
 	},
 	"dependencies": {
 		"@better-auth/api-key": "^1.5.6",
@@ -26,7 +28,8 @@
 		"@types/node": "^22.15.0",
 		"@types/pg": "^8.20.0",
 		"tsdown": "^0.21.7",
-		"typescript": "^5.9.3"
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.4"
 	},
 	"private": true
 }
