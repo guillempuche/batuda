@@ -119,12 +119,6 @@ export interface ProviderMessage extends ProviderMessageItem {
 	readonly attachments?: readonly ProviderAttachmentMeta[] | undefined
 }
 
-export interface MagicLinkParams {
-	readonly email: string
-	readonly url: string
-	readonly token: string
-}
-
 // ── Draft interfaces ──
 
 export interface CreateDraftParams {
@@ -216,9 +210,6 @@ export class EmailProvider extends ServiceMap.Service<
 			add: string[],
 			remove: string[],
 		) => Effect.Effect<void, EmailError>
-		readonly sendMagicLink: (
-			params: MagicLinkParams,
-		) => Effect.Effect<void, EmailSendError>
 		readonly createDraft: (
 			inboxId: string,
 			params: CreateDraftParams,

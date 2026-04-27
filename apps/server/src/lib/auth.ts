@@ -12,14 +12,14 @@ import pg from 'pg'
 
 import { buildBetterAuthConfig } from '@batuda/auth'
 
-import { EmailProvider } from '../services/email-provider'
-import { EmailProviderLive } from '../services/email-provider-live'
+import { TransactionalEmailProvider } from '../services/transactional-email-provider'
+import { TransactionalEmailProviderLive } from '../services/transactional-email-provider-live'
 import { EnvVars } from './env'
 
 export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 	make: Effect.gen(function* () {
 		const env = yield* EnvVars
-		const emailProvider = yield* EmailProvider
+		const transactional = yield* TransactionalEmailProvider
 
 		const pool = new pg.Pool({
 			connectionString: Redacted.value(env.DATABASE_URL),
@@ -70,7 +70,7 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 					magicLink({
 						sendMagicLink: data =>
 							Effect.runPromise(
-								emailProvider.sendMagicLink({
+								transactional.sendMagicLink({
 									email: data.email,
 									url: data.url,
 									token: data.token,
@@ -86,6 +86,6 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 }) {
 	static readonly layer = Layer.effect(this, this.make).pipe(
 		Layer.provide(EnvVars.layer),
-		Layer.provide(EmailProviderLive),
+		Layer.provide(TransactionalEmailProviderLive),
 	)
 }

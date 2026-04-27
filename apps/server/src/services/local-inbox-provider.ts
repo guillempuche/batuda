@@ -20,7 +20,6 @@ import {
 	type CreateInboxParams,
 	EmailProvider,
 	type ListParams,
-	type MagicLinkParams,
 	type ProviderAttachmentMeta,
 	type ProviderAttachmentStream,
 	type ProviderDraft,
@@ -710,35 +709,6 @@ export const LocalInboxProviderLive = Layer.effect(
 				)
 			})
 
-		// Magic-link writer — the `pnpm cli auth invite` command polls
-		// apps/server/.dev-inbox/ looking for files with the `magic-link`
-		// label, so keep the label stable.
-		const sendMagicLink = (
-			params: MagicLinkParams,
-		): Effect.Effect<void, EmailSendError> =>
-			Effect.gen(function* () {
-				const sentAt = new Date()
-				const subject = `Sign in to Batuda`
-				const bodyText = `Click the link below to sign in:\n\n${params.url}\n\nThis link will expire shortly.\n\nToken: ${params.token}`
-				const rec: MessageRecord = {
-					sentAt: sentAt.toISOString(),
-					messageId: `msg_local_${randomUUID()}`,
-					threadId: `thr_local_${randomUUID()}`,
-					from: DEV_INBOX_EMAIL,
-					to: [params.email],
-					cc: [],
-					bcc: [],
-					replyTo: null,
-					subject,
-					text: bodyText,
-					html: null,
-					labels: ['magic-link'],
-					bodyText,
-					attachments: [],
-				}
-				yield* writeRecord(rec, sentAt)
-			})
-
 		// ── Drafts ──
 
 		const ensureDraftsDir = Effect.tryPromise({
@@ -1005,7 +975,6 @@ export const LocalInboxProviderLive = Layer.effect(
 			createInbox,
 			streamAttachment,
 			updateLabels,
-			sendMagicLink,
 			createDraft,
 			updateDraft,
 			deleteDraft,
