@@ -23,13 +23,22 @@ export interface ParsedBounce {
 const isDsn = (mail: ParsedMail): boolean => {
 	const ct = mail.headers.get('content-type')
 	if (!ct) return false
-	const value = typeof ct === 'string' ? ct : (ct as { value?: string }).value
-	if (!value) return false
-	const lower = value.toLowerCase()
-	return (
-		lower.includes('multipart/report') &&
-		lower.includes('report-type=delivery-status')
-	)
+	if (typeof ct === 'string') {
+		const lower = ct.toLowerCase()
+		return (
+			lower.includes('multipart/report') &&
+			lower.includes('report-type=delivery-status')
+		)
+	}
+	// mailparser parses Content-Type into { value, params } — the report-type
+	// parameter is not part of `value`, so we must read it from `params`.
+	const parsed = ct as {
+		value?: string
+		params?: Record<string, string | undefined>
+	}
+	const value = parsed.value?.toLowerCase() ?? ''
+	const reportType = parsed.params?.['report-type']?.toLowerCase()
+	return value === 'multipart/report' && reportType === 'delivery-status'
 }
 
 const parseDeliveryStatus = (
@@ -87,23 +96,24 @@ const extractOriginalMessageId = (body: string): string | null => {
 export const parseBounce = (mail: ParsedMail): ParsedBounce | null => {
 	if (!isDsn(mail)) return null
 
-	let recipients: string[] = []
-	let statusCode: string | null = null
-	let diagnostic: string | null = null
-	let originalMessageId: string | null = null
+	// simpleParser flattens the message/delivery-status part into `mail.text`
+	// alongside the human-readable text/plain explanation. Scanning the
+	// concatenated text still works because the parser only matches lines
+	// that look like RFC 3464 headers (`Final-Recipient:`, `Status:`, etc.).
+	const {
+		recipients,
+		status: statusCode,
+		diagnostic,
+	} = parseDeliveryStatus(mail.text ?? '')
 
+	let originalMessageId: string | null = null
 	for (const att of mail.attachments ?? []) {
 		const ct = (att.contentType ?? '').toLowerCase()
-		const body = att.content?.toString('utf8') ?? ''
-		if (ct.startsWith('message/delivery-status')) {
-			const parsed = parseDeliveryStatus(body)
-			recipients = parsed.recipients
-			statusCode = parsed.status
-			diagnostic = parsed.diagnostic
-		} else if (
+		if (
 			ct.startsWith('message/rfc822') ||
 			ct.startsWith('text/rfc822-headers')
 		) {
+			const body = att.content?.toString('utf8') ?? ''
 			originalMessageId = extractOriginalMessageId(body) ?? originalMessageId
 		}
 	}
