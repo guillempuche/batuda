@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { apiKey } from '@better-auth/api-key'
 import { betterAuth } from 'better-auth'
-import { admin, bearer, openAPI } from 'better-auth/plugins'
+import { admin, bearer, openAPI, organization } from 'better-auth/plugins'
 import { Config, Effect, Redacted } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 import pg from 'pg'
@@ -55,13 +55,55 @@ const silentWav = (durationSec = 0.1, sampleRate = 8000): Buffer => {
 export const PRESETS = ['minimal', 'full'] as const
 export type Preset = (typeof PRESETS)[number]
 
-// ── Test user ─────────────────────────────────────────────
+// ── Demo personas ─────────────────────────────────────────
+//
+// Two orgs, three users, four memberships. Alice has dual membership so the
+// dev tour (and tests) can exercise the multi-org-user code path without
+// minting another account. Restaurant intentionally stays empty in v1 —
+// its purpose is to be the "other org" reference; a future preset can
+// populate it.
 
-export const TEST_USER = {
+export const DEMO_ORGS = [
+	{ slug: 'taller', name: 'Taller Demo' },
+	{ slug: 'restaurant', name: 'Restaurant Demo' },
+] as const
+
+const PRIMARY_DEMO_USER = {
 	email: 'admin@taller.cat',
 	password: 'batuda-dev-2026',
-	name: 'Taller Dev',
-}
+	name: 'Alice Admin',
+	role: 'admin',
+} as const
+
+export const DEMO_USERS = [
+	PRIMARY_DEMO_USER,
+	{
+		email: 'colleague@taller.cat',
+		password: 'batuda-dev-2026',
+		name: 'Carol Colleague',
+		role: 'user',
+	},
+	{
+		email: 'admin@restaurant.demo',
+		password: 'batuda-dev-2026',
+		name: 'Bob Owner',
+		role: 'admin',
+	},
+] as const
+
+export const DEMO_MEMBERSHIPS = [
+	{ email: 'admin@taller.cat', orgSlug: 'taller', role: 'owner' },
+	{ email: 'colleague@taller.cat', orgSlug: 'taller', role: 'member' },
+	{ email: 'admin@restaurant.demo', orgSlug: 'restaurant', role: 'owner' },
+	// Multi-org user: Alice is owner of taller and a regular member of
+	// restaurant. The dev tour and the org-isolation tests rely on this.
+	{ email: 'admin@taller.cat', orgSlug: 'restaurant', role: 'member' },
+] as const
+
+// Backward-compat shim — every existing seed reference (e.g. CRM rows that
+// stamp the seed user as creator) keeps pointing at the same email and
+// password so an existing dev login still works after this refactor.
+export const TEST_USER = PRIMARY_DEMO_USER
 
 // ── Seed data ─────────────────────────────────────────────
 
@@ -899,8 +941,8 @@ export const seedReset = Effect.gen(function* () {
 
 // ── Seed auth ─────────────────────────────────────────────
 
-export const seedAuth = Effect.gen(function* () {
-	yield* Effect.logInfo('Seeding auth user...')
+export const seedIdentities = Effect.gen(function* () {
+	yield* Effect.logInfo('Seeding orgs, users, memberships...')
 	const dbUrl = yield* Config.redacted('DATABASE_URL')
 	const secret = yield* Config.string('BETTER_AUTH_SECRET')
 	const baseURL = yield* Config.string('BETTER_AUTH_BASE_URL').pipe(
@@ -909,9 +951,10 @@ export const seedAuth = Effect.gen(function* () {
 
 	const pool = new pg.Pool({ connectionString: Redacted.value(dbUrl) })
 	// Uses the shared `buildBetterAuthConfig` — same plugins/config as the
-	// server, so API keys / users created here validate against the running
-	// /auth/* routes. `disableSignUp: true` closes the public signup endpoint;
-	// the admin plugin's `auth.api.createUser` below is the bypass.
+	// server, so API keys, sessions, and orgs created here validate against
+	// the running /auth/* routes. `disableSignUp: true` closes the public
+	// signup endpoint; the admin plugin's `auth.api.createUser` is the
+	// bypass for users, and the organization plugin handles orgs/members.
 	const auth = betterAuth(
 		buildBetterAuthConfig({
 			env: {
@@ -925,39 +968,117 @@ export const seedAuth = Effect.gen(function* () {
 				openAPI(),
 				bearer(),
 				admin(),
+				organization(),
 				apiKey({ enableSessionForAPIKeys: true }),
 			],
 		}),
 	)
 
-	yield* Effect.promise(() =>
-		auth.api.createUser({
-			body: {
-				email: TEST_USER.email,
-				password: TEST_USER.password,
-				name: TEST_USER.name,
-				role: 'admin',
-			},
-		}),
-	).pipe(
-		Effect.tap(() => Effect.logInfo(`Created auth user: ${TEST_USER.email}`)),
-		Effect.catchCause(() =>
-			Effect.logInfo(`Auth user already exists: ${TEST_USER.email}`),
-		),
-	)
+	// 1. Users — must come first because Better Auth's createOrganization
+	// requires `body.userId` (no HTTP session here) to attach the creator
+	// as the first member atomically.
+	const userIdsByEmail = new Map<string, string>()
+	for (const u of DEMO_USERS) {
+		yield* Effect.promise(() =>
+			auth.api.createUser({
+				body: {
+					email: u.email,
+					password: u.password,
+					name: u.name,
+					role: u.role,
+				},
+			}),
+		).pipe(
+			Effect.tap(() => Effect.logInfo(`  user: ${u.email}`)),
+			Effect.catchCause(() =>
+				Effect.logInfo(`  user already exists: ${u.email}`),
+			),
+		)
+		const found = yield* Effect.tryPromise({
+			try: () =>
+				pool.query<{ id: string }>(
+					'SELECT id FROM "user" WHERE email = $1 LIMIT 1',
+					[u.email],
+				),
+			catch: cause => new Error(String(cause)),
+		})
+		const row = found.rows[0]
+		if (row) userIdsByEmail.set(u.email, row.id)
+	}
+
+	// 2. Orgs — pass `userId` of the first declared owner so Better Auth
+	// can create the owner membership atomically. Subsequent memberships
+	// are added in step 3.
+	const orgIdsBySlug = new Map<string, string>()
+	for (const o of DEMO_ORGS) {
+		const firstOwner = DEMO_MEMBERSHIPS.find(
+			m => m.orgSlug === o.slug && m.role === 'owner',
+		)
+		const ownerUserId = firstOwner
+			? userIdsByEmail.get(firstOwner.email)
+			: undefined
+		if (!ownerUserId) {
+			yield* Effect.logInfo(`  org skipped (no owner resolved): ${o.slug}`)
+			continue
+		}
+		yield* Effect.promise(() =>
+			auth.api.createOrganization({
+				body: { name: o.name, slug: o.slug, userId: ownerUserId },
+			}),
+		).pipe(
+			Effect.tap(() => Effect.logInfo(`  org: ${o.slug}`)),
+			Effect.catchCause(() =>
+				Effect.logInfo(`  org already exists: ${o.slug}`),
+			),
+		)
+		const found = yield* Effect.tryPromise({
+			try: () =>
+				pool.query<{ id: string }>(
+					'SELECT id FROM "organization" WHERE slug = $1 LIMIT 1',
+					[o.slug],
+				),
+			catch: cause => new Error(String(cause)),
+		})
+		const row = found.rows[0]
+		if (row) orgIdsBySlug.set(o.slug, row.id)
+	}
+
+	// 3. Memberships — skip the role='owner' rows, they're already
+	// attached as a side-effect of createOrganization above.
+	for (const m of DEMO_MEMBERSHIPS) {
+		if (m.role === 'owner') continue
+		const userId = userIdsByEmail.get(m.email)
+		const orgId = orgIdsBySlug.get(m.orgSlug)
+		if (!userId || !orgId) continue
+		yield* Effect.promise(() =>
+			auth.api.addMember({
+				body: { userId, organizationId: orgId, role: m.role },
+			}),
+		).pipe(
+			Effect.tap(() =>
+				Effect.logInfo(`  member: ${m.email} → ${m.orgSlug} (${m.role})`),
+			),
+			Effect.catchCause(() =>
+				Effect.logInfo(`  member already exists: ${m.email} → ${m.orgSlug}`),
+			),
+		)
+	}
 
 	yield* Effect.logInfo('')
-	yield* Effect.logInfo('┌─── Auth credentials ───────────────────────┐')
-	yield* Effect.logInfo(`│  Email:    ${TEST_USER.email.padEnd(31)}│`)
-	yield* Effect.logInfo(`│  Password: ${TEST_USER.password.padEnd(31)}│`)
-	yield* Effect.logInfo(`│  Name:     ${TEST_USER.name.padEnd(31)}│`)
-	yield* Effect.logInfo('│  Role:     admin                           │')
-	yield* Effect.logInfo('└────────────────────────────────────────────┘')
-	yield* Effect.logInfo('')
-	yield* Effect.logInfo('Sign in:')
 	yield* Effect.logInfo(
-		`  curl -X POST http://localhost:3010/auth/sign-in/email \\`,
+		'┌─── Personas ───────────────────────────────────────┐',
 	)
+	for (const m of DEMO_MEMBERSHIPS) {
+		const u = DEMO_USERS.find(x => x.email === m.email)
+		const label = `${u?.name ?? m.email} → ${m.orgSlug} (${m.role})`
+		yield* Effect.logInfo(`│  ${label.padEnd(50)}│`)
+	}
+	yield* Effect.logInfo(
+		'└────────────────────────────────────────────────────┘',
+	)
+	yield* Effect.logInfo('')
+	yield* Effect.logInfo('Primary dev login (Alice → Taller):')
+	yield* Effect.logInfo(`  curl -X POST ${baseURL}/auth/sign-in/email \\`)
 	yield* Effect.logInfo(`    -H 'content-type: application/json' \\`)
 	yield* Effect.logInfo(
 		`    -d '{"email":"${TEST_USER.email}","password":"${TEST_USER.password}"}'`,
@@ -965,6 +1086,10 @@ export const seedAuth = Effect.gen(function* () {
 
 	yield* Effect.promise(() => pool.end())
 })
+
+// Backward-compat alias so existing `pnpm cli seed --auth` keeps working.
+// Drop after callers move to `seedIdentities`.
+export const seedAuth = seedIdentities
 
 // ── Seed effect ───────────────────────────────────────────
 
