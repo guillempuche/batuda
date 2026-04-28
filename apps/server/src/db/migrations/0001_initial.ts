@@ -887,10 +887,15 @@ export default Effect.gen(function* () {
 	// this org; ON DELETE SET NULL so deleting the inbox demotes the
 	// member back to "no primary" rather than cascading them out.
 	// migrate.ts runs Better Auth before this CRM migration so `member`
-	// already exists by the time we ALTER it.
+	// already exists by the time we ALTER it. Better Auth's
+	// additionalFields declares `primaryInboxId` as `string`, which lands
+	// as TEXT — but the FK target inboxes.id is UUID, so we drop the
+	// stale TEXT column and re-add it with the right type before
+	// installing the FK. Pre-prod: no rows to migrate.
+	yield* sql`ALTER TABLE "member" DROP COLUMN IF EXISTS primary_inbox_id`
 	yield* sql`
 		ALTER TABLE "member"
-			ADD COLUMN IF NOT EXISTS primary_inbox_id UUID
+			ADD COLUMN primary_inbox_id UUID
 	`
 	yield* sql`
 		DO $$

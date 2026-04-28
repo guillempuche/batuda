@@ -9,6 +9,10 @@ dist/
 # Turbo
 .turbo/
 
+# Playwright test artefacts
+apps/*/test-results/
+apps/*/playwright-report/
+
 # Environment
 .env
 .env.local
