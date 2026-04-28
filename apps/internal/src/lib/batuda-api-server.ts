@@ -6,7 +6,8 @@ import * as HttpApiClient from 'effect/unstable/httpapi/HttpApiClient'
 
 import { BatudaApi } from '@batuda/controllers'
 
-const BASE_URL = process.env['SERVER_URL'] ?? 'https://api.batuda.localhost'
+const BASE_URL =
+	import.meta.env['VITE_SERVER_URL'] ?? 'https://api.batuda.localhost'
 
 /**
  * Server-side Batuda API client used by route loaders during SSR.

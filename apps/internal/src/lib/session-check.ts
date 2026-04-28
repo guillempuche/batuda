@@ -61,11 +61,7 @@ export async function fetchSession(
 			name: typeof u.name === 'string' ? u.name : u.email,
 		}
 	} catch (err) {
-		if (
-			typeof process !== 'undefined' &&
-			process.versions?.node &&
-			err instanceof TypeError
-		) {
+		if (typeof window === 'undefined' && err instanceof TypeError) {
 			console.error(
 				'[session-check] SSR fetch failed — if TLS, run: portless trust',
 			)
