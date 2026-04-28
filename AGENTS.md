@@ -152,6 +152,7 @@ Key libraries are vendored as git subtrees under `docs/repos/` so agents can rea
 | `docs/repos/tiptap`          | Tiptap v3 monorepo (`@tiptap/core`, `/html`, `/react`, `/static-renderer`, all extensions) | Node/Mark API, `generateHTML`/`generateJSON`, schema checks, extension authoring — relevant for the pages feature |
 | `docs/repos/motion`          | Motion (framer-motion successor)                                                           | Animation primitives                                                                                              |
 | `docs/repos/motion-plus`     | Motion Plus                                                                                | Commercial Motion features                                                                                        |
+| `docs/repos/playwright`      | Playwright (`@playwright/test`)                                                            | E2E test API, fixtures, locator semantics, config options — referenced by `apps/internal/tests/e2e/`              |
 
 To add a new reference: `git subtree add --prefix=docs/repos/<name> <git-url> <branch> --squash`. To update an existing one: `git subtree pull --prefix=docs/repos/<name> <git-url> <branch> --squash`.
 
