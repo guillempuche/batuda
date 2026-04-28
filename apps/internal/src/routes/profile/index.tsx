@@ -1,7 +1,7 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { LogOut, Mail, UserCircle2 } from 'lucide-react'
-import { useCallback, useState } from 'react'
+import { useActionState } from 'react'
 import styled from 'styled-components'
 
 import { PriButton } from '@batuda/ui/pri'
@@ -43,33 +43,46 @@ export const Route = createFileRoute('/profile/')({
 	component: ProfilePage,
 })
 
+interface SignOutState {
+	readonly error: string | null
+}
+
+const INITIAL_STATE: SignOutState = { error: null }
+
 function ProfilePage() {
 	const { t } = useLingui()
 	const { user } = Route.useLoaderData() as { user: SessionUser | null }
 	const navigate = useNavigate()
-	const [signingOut, setSigningOut] = useState(false)
-	const [error, setError] = useState<string | null>(null)
 
-	const handleSignOut = useCallback(async () => {
-		setSigningOut(true)
-		setError(null)
-		try {
-			const res = await fetch(`${SERVER_URL}/auth/sign-out`, {
-				method: 'POST',
-				credentials: 'include',
-				headers: { 'content-type': 'application/json' },
-			})
-			if (!res.ok) {
-				setError(t`Sign-out failed. Please try again.`)
-				return
+	// React 19 form action mirrors login.tsx — React queues the submit
+	// even before hydration completes, so a click during the hydration
+	// gap is dispatched safely instead of falling through to a native
+	// form submit.
+	const [state, formAction, isPending] = useActionState<SignOutState, FormData>(
+		async () => {
+			try {
+				const res = await fetch(`${SERVER_URL}/auth/sign-out`, {
+					method: 'POST',
+					credentials: 'include',
+					headers: { 'content-type': 'application/json' },
+					// Better Auth's sign-out parses the body as JSON; send an
+					// empty object rather than no body so the parser doesn't
+					// throw SyntaxError on an empty string.
+					body: '{}',
+				})
+				if (!res.ok) {
+					return { error: t`Sign-out failed. Please try again.` }
+				}
+				await navigate({ to: '/login' })
+				return { error: null }
+			} catch {
+				return {
+					error: t`No connection to the server. Try again in a few seconds.`,
+				}
 			}
-			await navigate({ to: '/login' })
-		} catch {
-			setError(t`No connection to the server. Try again in a few seconds.`)
-		} finally {
-			setSigningOut(false)
-		}
-	}, [navigate, t])
+		},
+		INITIAL_STATE,
+	)
 
 	const displayName = user?.name ?? user?.email ?? t`Unknown user`
 	const initial = displayName.charAt(0).toUpperCase() || 'U'
@@ -113,20 +126,19 @@ function ProfilePage() {
 				<LanguageSelect />
 			</LanguageRow>
 
-			{error ? <ErrorText role='alert'>{error}</ErrorText> : null}
+			{state.error ? <ErrorText role='alert'>{state.error}</ErrorText> : null}
 
-			<Actions>
+			<SignOutForm action={formAction}>
 				<PriButton
-					type='button'
+					type='submit'
 					$variant='filled'
 					data-testid='profile-signout'
-					disabled={signingOut}
-					onClick={handleSignOut}
+					disabled={isPending}
 				>
 					<LogOut size={16} />
-					<span>{signingOut ? t`Signing out…` : t`Sign out`}</span>
+					<span>{isPending ? t`Signing out…` : t`Sign out`}</span>
 				</PriButton>
-			</Actions>
+			</SignOutForm>
 		</Page>
 	)
 }
@@ -237,7 +249,9 @@ const IdText = styled.span.withConfig({ displayName: 'ProfileIdText' })`
 	text-overflow: ellipsis;
 `
 
-const Actions = styled.div.withConfig({ displayName: 'ProfileActions' })`
+const SignOutForm = styled.form.withConfig({
+	displayName: 'ProfileSignOutForm',
+})`
 	display: flex;
 	gap: var(--space-sm);
 `
