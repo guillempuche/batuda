@@ -1,7 +1,7 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { Schema } from 'effect'
-import { useCallback, useState } from 'react'
+import { useActionState } from 'react'
 import styled from 'styled-components'
 
 import { PriButton, PriInput } from '@batuda/ui/pri'
@@ -74,55 +74,63 @@ export const Route = createFileRoute('/login')({
 	component: LoginPage,
 })
 
+interface FormState {
+	readonly error: string | null
+}
+
+const INITIAL_STATE: FormState = { error: null }
+
 function LoginPage() {
 	const { t } = useLingui()
 	const navigate = useNavigate()
 	const search = Route.useSearch()
-	const [email, setEmail] = useState('')
-	const [password, setPassword] = useState('')
-	const [submitting, setSubmitting] = useState(false)
-	const [error, setError] = useState<string | null>(null)
 
-	const handleSubmit = useCallback(
-		async (event: React.FormEvent<HTMLFormElement>) => {
-			event.preventDefault()
-			setSubmitting(true)
-			setError(null)
+	// React 19 form action. Inputs stay uncontrolled (read from FormData)
+	// and the action is queued by React even before hydration completes,
+	// so a click that lands during the hydration gap is dispatched safely
+	// to this handler instead of falling through to a native form submit
+	// (which would otherwise put the password in the URL on a GET form
+	// or full-page-reload on a POST). `useActionState` also threads the
+	// `pending` flag and the latest error into render without manual
+	// `useState`.
+	const [state, formAction, isPending] = useActionState<FormState, FormData>(
+		async (_previous, formData) => {
+			const email = String(formData.get('email') ?? '')
+			const password = String(formData.get('password') ?? '')
 			try {
-				const res = await fetch(`${SERVER_URL}/auth/sign-in/email`, {
+				const response = await fetch(`${SERVER_URL}/auth/sign-in/email`, {
 					method: 'POST',
 					credentials: 'include',
 					headers: { 'content-type': 'application/json' },
 					body: JSON.stringify({ email, password }),
 				})
-				if (!res.ok) {
-					const body = (await res.json().catch(() => null)) as {
+				if (!response.ok) {
+					const body = (await response.json().catch(() => null)) as {
 						message?: string
 					} | null
-					setError(
-						body?.message ??
+					return {
+						error:
+							body?.message ??
 							t`Could not sign in. Check your email and password.`,
-					)
-					return
+					}
 				}
-				// Success — cookie is set on the response. Navigate back to
-				// the page the user originally tried to reach, or to the
-				// dashboard as a fallback. We use `href` so the full URL
-				// (pathname + search + hash) round-trips cleanly; the root's
-				// `beforeLoad` will re-check the session and let us through.
+				// Success — cookie is on the response. Navigate to the
+				// originally requested URL (or `/`); the root's beforeLoad
+				// re-checks the session and lets us through.
 				const target =
 					search.returnTo && isSafeReturnTo(search.returnTo)
 						? search.returnTo
 						: '/'
 				await navigate({ href: target })
-			} catch (err) {
-				console.error('[Login] sign-in failed:', err)
-				setError(t`No connection to the server. Try again in a few seconds.`)
-			} finally {
-				setSubmitting(false)
+				return { error: null }
+			} catch (cause) {
+				console.error('[Login] sign-in failed:', cause)
+				return {
+					error: t`No connection to the server. Try again in a few seconds.`,
+				}
 			}
 		},
-		[email, password, navigate],
+		INITIAL_STATE,
 	)
 
 	return (
@@ -132,7 +140,7 @@ function LoginPage() {
 				<Subtitle>
 					<Trans>Sign in to continue</Trans>
 				</Subtitle>
-				<Form onSubmit={handleSubmit} data-testid='login-form'>
+				<Form action={formAction} data-testid='login-form'>
 					<Field>
 						<Label htmlFor='email'>
 							<Trans>Email</Trans>
@@ -143,9 +151,7 @@ function LoginPage() {
 							type='email'
 							autoComplete='email'
 							required
-							value={email}
-							onChange={e => setEmail(e.currentTarget.value)}
-							disabled={submitting}
+							disabled={isPending}
 							data-testid='login-email'
 						/>
 					</Field>
@@ -159,24 +165,22 @@ function LoginPage() {
 							type='password'
 							autoComplete='current-password'
 							required
-							value={password}
-							onChange={e => setPassword(e.currentTarget.value)}
-							disabled={submitting}
+							disabled={isPending}
 							data-testid='login-password'
 						/>
 					</Field>
-					{error ? (
+					{state.error ? (
 						<ErrorText role='alert' data-testid='login-error'>
-							{error}
+							{state.error}
 						</ErrorText>
 					) : null}
 					<SubmitButton
 						type='submit'
-						disabled={submitting}
+						disabled={isPending}
 						$variant='filled'
 						data-testid='login-submit'
 					>
-						{submitting ? t`Signing in…` : t`Sign in`}
+						{isPending ? t`Signing in…` : t`Sign in`}
 					</SubmitButton>
 				</Form>
 				<Hint>

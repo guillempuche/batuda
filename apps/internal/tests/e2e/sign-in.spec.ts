@@ -4,6 +4,10 @@ import { expect, test } from '@playwright/test'
 // apps/internal/src/routes/login.tsx (login-form, login-email,
 // login-password, login-submit, login-error). Personas come from
 // `pnpm cli db reset`'s DEMO_USERS seed (alice@taller.cat).
+//
+// The form uses React 19's `<form action={fn}>` pattern, so React queues
+// the submit even before hydration — no `requestSubmit()` workaround or
+// `networkidle` wait needed; a plain click is enough.
 
 test.describe('sign-in', () => {
 	test.describe('with seeded credentials', () => {
@@ -18,10 +22,11 @@ test.describe('sign-in', () => {
 			await page.getByTestId('login-password').fill('batuda-dev-2026')
 			await page.getByTestId('login-submit').click()
 
-			// THEN the router client-navigates to / (login.tsx — handleSubmit
-			// awaits navigate({ href: target }), where target='/' when no
-			// returnTo is set), and the login form leaves the DOM (proves the
-			// redirect actually happened, not just that the URL bar updated)
+			// THEN the action navigates to / (login.tsx — useActionState
+			// resolves with no error and calls navigate({ href: target })
+			// where target='/' when no returnTo is set), and the login
+			// form leaves the DOM (proves the redirect actually happened,
+			// not just that the URL bar updated)
 			await page.waitForURL(/\/$/)
 			await expect(page).toHaveURL(/\/$/)
 			await expect(page.getByTestId('login-form')).toHaveCount(0)
@@ -41,7 +46,7 @@ test.describe('sign-in', () => {
 			await page.getByTestId('login-submit').click()
 
 			// THEN login-error is visible (Better Auth's 401 maps to the
-			// error-text role in login.tsx) and the URL stays on /login —
+			// alert role in login.tsx) and the URL stays on /login —
 			// no redirect happens on auth failure
 			await expect(page.getByTestId('login-error')).toBeVisible()
 			await expect(page).toHaveURL(/\/login/)

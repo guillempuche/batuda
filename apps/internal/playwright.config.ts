@@ -16,9 +16,10 @@ import { defineConfig, devices } from '@playwright/test'
 // the next flow's testids land — don't pre-write specs for selectors that
 // don't exist yet.
 
-// Portless dev URL exposes the internal app on :1355. Override with
-// E2E_BASE_URL when running against a different host (CI, staging).
-const BASE_URL = process.env['E2E_BASE_URL'] ?? 'https://batuda.localhost:1355'
+// Default targets the portless dev URL on :443 (its documented default).
+// Override with E2E_BASE_URL when running against a non-default port,
+// staging, or CI.
+const BASE_URL = process.env['E2E_BASE_URL'] ?? 'https://batuda.localhost'
 
 export default defineConfig({
 	testDir: './tests/e2e',
