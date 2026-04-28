@@ -235,6 +235,9 @@ importers:
       '@types/leaflet':
         specifier: ^1.9.20
         version: 1.9.21
+      '@types/node':
+        specifier: ^22.15.0
+        version: 22.19.15
       '@types/react':
         specifier: 19.2.14
         version: 19.2.14
