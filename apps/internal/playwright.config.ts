@@ -12,14 +12,16 @@ import { defineConfig, devices } from '@playwright/test'
 //   4. `pnpm exec playwright install chromium` (one-time per machine)
 //
 // The suite intentionally targets only flows whose components carry
-// `data-testid` attributes today (login + compose). Add another spec when
-// the next flow's testids land — don't pre-write specs for selectors that
-// don't exist yet.
+// `data-testid` attributes today (login + compose). Add another test
+// when the next flow's testids land — don't pre-write tests for
+// selectors that don't exist yet.
 
 // Default targets the portless dev URL on :443 (its documented default).
 // Override with E2E_BASE_URL when running against a non-default port,
 // staging, or CI.
 const BASE_URL = process.env['E2E_BASE_URL'] ?? 'https://batuda.localhost'
+
+const STORAGE_STATE = 'tests/e2e/.auth/alice.json'
 
 export default defineConfig({
 	testDir: './tests/e2e',
@@ -39,9 +41,34 @@ export default defineConfig({
 		screenshot: 'only-on-failure',
 	},
 	projects: [
+		// 1. Run the auth.setup test first — it signs in once and writes
+		// storageState to a fixture file. Without this, every authenticated
+		// test would call POST /auth/sign-in/email and trip Better Auth's
+		// per-endpoint rate limit.
 		{
-			name: 'chromium',
+			name: 'setup',
+			testMatch: /.*\.setup\.ts/,
 			use: { ...devices['Desktop Chrome'] },
+		},
+		// 2. Tests for the sign-in flow itself need a fresh,
+		// unauthenticated context. They run independently of the setup
+		// project.
+		{
+			name: 'unauth',
+			testMatch: /sign-in\.test\.ts/,
+			use: { ...devices['Desktop Chrome'] },
+		},
+		// 3. Everything else gets Alice's cookie injected via
+		// storageState, so we don't pay the sign-in cost per test.
+		{
+			name: 'authed',
+			testMatch: /.*\.test\.ts/,
+			testIgnore: /sign-in\.test\.ts/,
+			use: {
+				...devices['Desktop Chrome'],
+				storageState: STORAGE_STATE,
+			},
+			dependencies: ['setup'],
 		},
 	],
 })
