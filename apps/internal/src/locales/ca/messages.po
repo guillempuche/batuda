@@ -916,7 +916,7 @@ msgstr "Idioma"
 
 #: src/components/profile/language-select.tsx:34
 #: src/routes/pages/$id.tsx:288
-#: src/routes/profile/index.tsx:111
+#: src/routes/profile/index.tsx:124
 msgid "Language"
 msgstr "Idioma"
 
@@ -1167,7 +1167,7 @@ msgid "No companies yet"
 msgstr "Encara no hi ha empreses"
 
 #: src/routes/login.tsx:129
-#: src/routes/profile/index.tsx:68
+#: src/routes/profile/index.tsx:80
 msgid "No connection to the server. Try again in a few seconds."
 msgstr "Sense connexió al servidor. Torna-ho a provar d'aquí a uns segons."
 
@@ -1461,7 +1461,7 @@ msgstr "Encaix de productes"
 #: src/components/layout/nav-items.ts:81
 #: src/routes/companies/$slug.tsx:768
 #: src/routes/companies/$slug.tsx:971
-#: src/routes/profile/index.tsx:81
+#: src/routes/profile/index.tsx:94
 msgid "Profile"
 msgstr "Perfil"
 
@@ -1709,11 +1709,11 @@ msgstr "Inicia sessió"
 msgid "Sign in to continue"
 msgstr "Inicia sessió per continuar"
 
-#: src/routes/profile/index.tsx:127
+#: src/routes/profile/index.tsx:139
 msgid "Sign out"
 msgstr "Tanca sessió"
 
-#: src/routes/profile/index.tsx:63
+#: src/routes/profile/index.tsx:74
 msgid "Sign-out failed. Please try again."
 msgstr "No s'ha pogut tancar la sessió. Torna-ho a provar."
 
@@ -1721,7 +1721,7 @@ msgstr "No s'ha pogut tancar la sessió. Torna-ho a provar."
 msgid "Signing in…"
 msgstr "Iniciant sessió…"
 
-#: src/routes/profile/index.tsx:127
+#: src/routes/profile/index.tsx:139
 msgid "Signing out…"
 msgstr "Tancant sessió…"
 
@@ -1940,7 +1940,7 @@ msgstr "desconegut"
 msgid "Unknown"
 msgstr "Desconegut"
 
-#: src/routes/profile/index.tsx:74
+#: src/routes/profile/index.tsx:87
 msgid "Unknown user"
 msgstr "Usuari desconegut"
 
@@ -2050,6 +2050,6 @@ msgstr "Escriu el teu missatge…"
 msgid "you@example.com"
 msgstr "tu@exemple.com"
 
-#: src/routes/profile/index.tsx:84
+#: src/routes/profile/index.tsx:97
 msgid "Your Batuda workbench identity."
 msgstr "La teva identitat al banc de Batuda."

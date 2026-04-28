@@ -916,7 +916,7 @@ msgstr "Lang"
 
 #: src/components/profile/language-select.tsx:34
 #: src/routes/pages/$id.tsx:288
-#: src/routes/profile/index.tsx:111
+#: src/routes/profile/index.tsx:124
 msgid "Language"
 msgstr "Language"
 
@@ -1167,7 +1167,7 @@ msgid "No companies yet"
 msgstr "No companies yet"
 
 #: src/routes/login.tsx:129
-#: src/routes/profile/index.tsx:68
+#: src/routes/profile/index.tsx:80
 msgid "No connection to the server. Try again in a few seconds."
 msgstr "No connection to the server. Try again in a few seconds."
 
@@ -1461,7 +1461,7 @@ msgstr "Products fit"
 #: src/components/layout/nav-items.ts:81
 #: src/routes/companies/$slug.tsx:768
 #: src/routes/companies/$slug.tsx:971
-#: src/routes/profile/index.tsx:81
+#: src/routes/profile/index.tsx:94
 msgid "Profile"
 msgstr "Profile"
 
@@ -1709,11 +1709,11 @@ msgstr "Sign in"
 msgid "Sign in to continue"
 msgstr "Sign in to continue"
 
-#: src/routes/profile/index.tsx:127
+#: src/routes/profile/index.tsx:139
 msgid "Sign out"
 msgstr "Sign out"
 
-#: src/routes/profile/index.tsx:63
+#: src/routes/profile/index.tsx:74
 msgid "Sign-out failed. Please try again."
 msgstr "Sign-out failed. Please try again."
 
@@ -1721,7 +1721,7 @@ msgstr "Sign-out failed. Please try again."
 msgid "Signing in…"
 msgstr "Signing in…"
 
-#: src/routes/profile/index.tsx:127
+#: src/routes/profile/index.tsx:139
 msgid "Signing out…"
 msgstr "Signing out…"
 
@@ -1940,7 +1940,7 @@ msgstr "unknown"
 msgid "Unknown"
 msgstr "Unknown"
 
-#: src/routes/profile/index.tsx:74
+#: src/routes/profile/index.tsx:87
 msgid "Unknown user"
 msgstr "Unknown user"
 
@@ -2050,6 +2050,6 @@ msgstr "Write your message…"
 msgid "you@example.com"
 msgstr "you@example.com"
 
-#: src/routes/profile/index.tsx:84
+#: src/routes/profile/index.tsx:97
 msgid "Your Batuda workbench identity."
 msgstr "Your Batuda workbench identity."
