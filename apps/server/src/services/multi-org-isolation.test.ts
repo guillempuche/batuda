@@ -1027,4 +1027,144 @@ describe('multi-org isolation', () => {
 			expect(row.rows[0]?.activeOrganizationId).toBeNull()
 		})
 	})
+
+	describe('grant hardening', () => {
+		// Even though Better Auth's API filters by user/org at the
+		// application layer, the request-path role (app_user) shouldn't
+		// have raw INSERT/UPDATE/DELETE on auth tables. SELECT is fine
+		// — Better Auth runs its own queries on the connection's owner
+		// role outside our middleware. These tests document and pin the
+		// posture that locks the request path to read-only for identity
+		// state.
+
+		describe('when role=app_user', () => {
+			it('should be allowed to SELECT from "user" (read-only access for session lookups)', async () => {
+				// GIVEN role=app_user
+				// WHEN a SELECT runs against "user"
+				// THEN it should succeed
+				await withSuper(async client => {
+					await client.query(`SET LOCAL ROLE app_user`)
+					const r = await client.query('SELECT id FROM "user" LIMIT 1')
+					expect(r.rowCount).toBeGreaterThanOrEqual(0)
+				})
+			})
+
+			it('should be denied INSERT into "user"', async () => {
+				// GIVEN role=app_user
+				// WHEN an INSERT into "user" runs
+				// THEN PostgreSQL should reject with permission denied
+				// [migrations/0001_initial.ts — REVOKE INSERT/UPDATE/DELETE on Better Auth tables FROM app_user]
+				await withSuper(async client => {
+					await client.query(`SET LOCAL ROLE app_user`)
+					await expect(
+						client.query(
+							`INSERT INTO "user" (id, email, name, "emailVerified", "createdAt", "updatedAt")
+							 VALUES ('attacker', 'evil@x', 'Evil', true, now(), now())`,
+						),
+					).rejects.toThrow(/permission denied|not allowed/i)
+				})
+			})
+
+			it('should be denied UPDATE on "session"', async () => {
+				// GIVEN role=app_user
+				// WHEN an UPDATE on "session" runs
+				// THEN PostgreSQL should reject with permission denied
+				await withSuper(async client => {
+					await client.query(`SET LOCAL ROLE app_user`)
+					await expect(
+						client.query(`UPDATE "session" SET "userId" = 'forged'`),
+					).rejects.toThrow(/permission denied|not allowed/i)
+				})
+			})
+
+			it('should be denied DELETE on "member"', async () => {
+				// GIVEN role=app_user
+				// WHEN a DELETE on "member" runs
+				// THEN PostgreSQL should reject with permission denied
+				await withSuper(async client => {
+					await client.query(`SET LOCAL ROLE app_user`)
+					await expect(
+						client.query(`DELETE FROM "member"`),
+					).rejects.toThrow(/permission denied|not allowed/i)
+				})
+			})
+		})
+
+		describe('when PUBLIC tries to read schema objects', () => {
+			it('should have no grants on the public schema', async () => {
+				// GIVEN the migration ran REVOKE ALL ON SCHEMA public FROM PUBLIC
+				// WHEN inspecting role_table_grants
+				// THEN no rows should appear for grantee=PUBLIC on schema=public
+				const result = await ctx.pool.query<{ count: string }>(
+					`SELECT count(*)::text AS count
+					 FROM information_schema.role_table_grants
+					 WHERE grantee = 'PUBLIC' AND table_schema = 'public'`,
+				)
+				expect(result.rows[0]?.count).toBe('0')
+			})
+		})
+
+		describe('when default privileges are inspected', () => {
+			it('should grant DML on future tables to app_user and app_service automatically', async () => {
+				// GIVEN ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT … TO app_user, app_service
+				// WHEN a fresh table is created in public
+				// THEN both roles should already have DML on it without an explicit GRANT
+				// [migrations/0001_initial.ts — ALTER DEFAULT PRIVILEGES block]
+				await withSuper(async client => {
+					await client.query(
+						`CREATE TABLE _grant_probe (id INT PRIMARY KEY, payload TEXT)`,
+					)
+					try {
+						const grants = await client.query<{ grantee: string; privilege: string }>(
+							`SELECT grantee, privilege_type AS privilege
+							 FROM information_schema.role_table_grants
+							 WHERE table_schema = 'public' AND table_name = '_grant_probe'
+							 ORDER BY grantee, privilege_type`,
+						)
+						const userGrants = grants.rows
+							.filter(r => r.grantee === 'app_user')
+							.map(r => r.privilege)
+							.sort()
+						const serviceGrants = grants.rows
+							.filter(r => r.grantee === 'app_service')
+							.map(r => r.privilege)
+							.sort()
+						expect(userGrants).toEqual([
+							'DELETE',
+							'INSERT',
+							'SELECT',
+							'UPDATE',
+						])
+						expect(serviceGrants).toEqual([
+							'DELETE',
+							'INSERT',
+							'SELECT',
+							'UPDATE',
+						])
+					} finally {
+						await client.query(`DROP TABLE _grant_probe`)
+					}
+				})
+			})
+		})
+
+		describe('when OrgMiddleware sets app.current_user_id', () => {
+			it("should be visible to handler queries via current_setting('app.current_user_id')", async () => {
+				// GIVEN role=app_user with the user-id GUC set
+				// WHEN current_setting('app.current_user_id', true) is read
+				// THEN it should return the value the middleware set
+				// [middleware/org.ts — set_config('app.current_user_id', sessionUserId, true)]
+				await withSuper(async client => {
+					await client.query(`SET LOCAL ROLE app_user`)
+					await client.query(
+						`SELECT set_config('app.current_user_id', '${ctx.aliceId}', true)`,
+					)
+					const r = await client.query<{ uid: string }>(
+						"SELECT current_setting('app.current_user_id', true) AS uid",
+					)
+					expect(r.rows[0]?.uid).toBe(ctx.aliceId)
+				})
+			})
+		})
+	})
 })
