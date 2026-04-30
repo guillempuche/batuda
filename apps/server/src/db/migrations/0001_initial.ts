@@ -486,15 +486,31 @@ export default Effect.gen(function* () {
 		)
 	`
 
-	// Raw editor-authored body persisted between draft saves — keyed by
-	// draft_id so the editor can reload the exact block tree it last
-	// posted. Sender derives html/text from this on send.
+	// Drafts are owned by Postgres (not the provider filesystem) so they
+	// survive server restarts and can be queried by other org members in
+	// the same workspace. body_json is the editor's block tree; html/text
+	// are derived on send. Recipient lists land as TEXT[] so partial
+	// recipient sets (drafts in flight) are queryable without JSON parsing.
+	// `mode` distinguishes new from reply drafts; `thread_link_id` and
+	// `in_reply_to` carry the threading context for replies. `client_id`
+	// is the editor session id, opaque to the server, used for optimistic
+	// reconciliation between two tabs editing the same draft.
 	yield* sql`
-		CREATE TABLE IF NOT EXISTS email_draft_bodies (
+		CREATE TABLE IF NOT EXISTS email_drafts (
 			draft_id TEXT PRIMARY KEY,
 			organization_id TEXT NOT NULL,
 			inbox_id UUID NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE,
-			body_json JSONB NOT NULL,
+			mode TEXT NOT NULL DEFAULT 'new'
+				CHECK (mode IN ('new', 'reply')),
+			to_addresses TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+			cc_addresses TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+			bcc_addresses TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+			subject TEXT,
+			in_reply_to TEXT,
+			thread_link_id UUID REFERENCES email_thread_links(id) ON DELETE SET NULL,
+			client_id TEXT,
+			body_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		)
 	`
@@ -867,8 +883,9 @@ export default Effect.gen(function* () {
 		sql`CREATE INDEX IF NOT EXISTS idx_inbox_footers_inbox_id ON inbox_footers(inbox_id)`,
 		sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_inbox_footers_single_default ON inbox_footers(inbox_id) WHERE is_default = true`,
 
-		// email_draft_bodies
-		sql`CREATE INDEX IF NOT EXISTS idx_email_draft_bodies_inbox ON email_draft_bodies(inbox_id)`,
+		// email_drafts
+		sql`CREATE INDEX IF NOT EXISTS idx_email_drafts_inbox ON email_drafts(inbox_id)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_email_drafts_org_updated ON email_drafts(organization_id, updated_at DESC)`,
 
 		// email_attachment_staging — hot paths are per-inbox recency, draft cleanup, and TTL sweep.
 		sql`CREATE INDEX IF NOT EXISTS idx_email_attachment_staging_inbox ON email_attachment_staging(inbox_id, created_at DESC)`,
@@ -980,8 +997,8 @@ export default Effect.gen(function* () {
 		sql`ALTER TABLE email_thread_links FORCE ROW LEVEL SECURITY`,
 		sql`ALTER TABLE email_messages ENABLE ROW LEVEL SECURITY`,
 		sql`ALTER TABLE email_messages FORCE ROW LEVEL SECURITY`,
-		sql`ALTER TABLE email_draft_bodies ENABLE ROW LEVEL SECURITY`,
-		sql`ALTER TABLE email_draft_bodies FORCE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE email_drafts ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE email_drafts FORCE ROW LEVEL SECURITY`,
 		sql`ALTER TABLE inbox_footers ENABLE ROW LEVEL SECURITY`,
 		sql`ALTER TABLE inbox_footers FORCE ROW LEVEL SECURITY`,
 		sql`ALTER TABLE email_attachment_staging ENABLE ROW LEVEL SECURITY`,
@@ -1055,7 +1072,7 @@ export default Effect.gen(function* () {
 				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
 		`,
 		sql`
-			CREATE POLICY org_isolation_email_draft_bodies ON email_draft_bodies
+			CREATE POLICY org_isolation_email_drafts ON email_drafts
 				TO app_user
 				USING (organization_id = current_setting('app.current_org_id', true))
 				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
