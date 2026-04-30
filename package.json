@@ -26,6 +26,7 @@
 		"______ Check ______": "",
 		"check": "biome check . && dprint check",
 		"check-deps": "syncpack lint",
+		"check-ports": "portless list",
 		"______ Database ______": "",
 		"db:up": "docker compose -f docker/docker-compose.yml up -d",
 		"db:down": "docker compose -f docker/docker-compose.yml down",
