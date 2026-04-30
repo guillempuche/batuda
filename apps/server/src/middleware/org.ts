@@ -33,11 +33,16 @@ interface OrgRow {
  *   3. Reject with `Forbidden` if the session has no `activeOrganizationId`.
  *   4. Look up the organization row by id — slug + name are read alongside
  *      so route handlers can build org-scoped URLs without a second query.
- *   5. Provide `CurrentOrg` to downstream handlers.
- *
- * The per-request `SET LOCAL app.current_org_id` GUC wrapper is *not*
- * wired here — it lands with the slice that introduces the first RLS
- * policy, so we don't pay for nested transactions before they're useful.
+ *   5. Open a transaction and `SET LOCAL ROLE app_user` + `SELECT
+ *      set_config('app.current_org_id', <id>, true)` so RLS policies engage
+ *      for the rest of the handler. Effect's SqlClient cleanly nests handler-
+ *      side `withTransaction` calls as savepoints (per
+ *      `docs/repos/effect/packages/effect/src/unstable/sql/SqlClient.ts:205-209`),
+ *      and `SET LOCAL` releases on COMMIT/ROLLBACK alongside the per-tx
+ *      Scope close (line 244), so the GUC scope follows the request scope
+ *      exactly. Pattern mirrors the mail-worker's per-batch wrapper at
+ *      `apps/mail-worker/src/ingest.ts:49-74`.
+ *   6. Provide `CurrentOrg` to downstream handlers.
  */
 export const OrgMiddlewareLive = Layer.effect(
 	OrgMiddleware,
@@ -94,11 +99,24 @@ export const OrgMiddlewareLive = Layer.effect(
 					})
 				}
 
-				return yield* Effect.provideService(effect, CurrentOrg, {
-					id: row.id,
-					name: row.name,
-					slug: row.slug,
-				})
+				// Run the rest of the request inside a transaction so SET LOCAL
+				// ROLE + the GUC live for exactly the request's scope and
+				// release on COMMIT/ROLLBACK. SqlError surfaces as a die so the
+				// middleware's declared error union stays { Unauthorized |
+				// Forbidden }.
+				return yield* sql
+					.withTransaction(
+						Effect.gen(function* () {
+							yield* sql`SET LOCAL ROLE app_user`
+							yield* sql`SELECT set_config('app.current_org_id', ${row.id}, true)`
+							return yield* Effect.provideService(effect, CurrentOrg, {
+								id: row.id,
+								name: row.name,
+								slug: row.slug,
+							})
+						}),
+					)
+					.pipe(Effect.orDie)
 			})
 	}),
 ).pipe(Layer.provide(Auth.layer))

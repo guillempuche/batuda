@@ -2,9 +2,11 @@ import { PgClient } from '@effect/sql-pg'
 import { Config } from 'effect'
 
 // Mirrors apps/server/src/db/client.ts so SELECTs come back camelCased
-// and parameter objects can be written camelCase too. The worker
-// connects as `app_service` (BYPASSRLS); RLS scoping is achieved with
-// per-transaction `SET LOCAL app.current_org_id`.
+// and parameter objects can be written camelCase too. The pool itself
+// connects as the DATABASE_URL owner; ingest pins each transaction to
+// `app_service` (BYPASSRLS) via `SET LOCAL ROLE` and sets
+// `app.current_org_id` for audit-trail consistency. See
+// apps/mail-worker/src/ingest.ts.
 export const PgLive = PgClient.layerConfig({
 	url: Config.redacted('DATABASE_URL'),
 	transformResultNames: Config.succeed((s: string) =>

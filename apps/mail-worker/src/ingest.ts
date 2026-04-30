@@ -48,6 +48,13 @@ export const ingestRawMessage = (args: {
 
 		yield* sql.withTransaction(
 			Effect.gen(function* () {
+				// Worker connects as the DATABASE_URL owner (superuser); the
+				// explicit SET LOCAL ROLE pins the per-tx identity to
+				// app_service (BYPASSRLS by design — the worker resolves the
+				// org explicitly per row instead of relying on the request
+				// path's RLS policies). Pairs with set_config('app.current_org_id'),
+				// which still fires for audit-trail consistency.
+				yield* sql`SET LOCAL ROLE app_service`
 				yield* sql`SELECT set_config('app.current_org_id', ${args.organizationId}, true)`
 
 				// Bounce check first: a DSN both updates the original message

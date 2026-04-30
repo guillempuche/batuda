@@ -92,26 +92,36 @@ const McpAuthMiddleware = HttpRouter.middleware(
 					)
 				}
 
-				return yield* httpEffect.pipe(
-					Effect.provideService(CurrentUser, {
-						userId: result.user.id,
-						email: result.user.email,
-						name: result.user.name ?? 'Unknown',
-						isAgent: result.user.isAgent === true,
-					}),
-					// SessionContext mirrors CurrentUser using the controllers-package
-					// tag so service-layer code that consumes SessionContext (e.g.
-					// EmailService) works identically across HTTP and MCP transports.
-					Effect.provideService(SessionContext, {
-						userId: result.user.id,
-						email: result.user.email,
-						name: result.user.name ?? undefined,
-						isAgent: result.user.isAgent === true,
-					}),
-					Effect.provideService(CurrentOrg, {
-						id: org.id,
-						name: org.name,
-						slug: org.slug,
+				// Same per-request transaction wrapper as OrgMiddlewareLive: SET
+				// LOCAL ROLE app_user + the GUC live for exactly the request's
+				// scope so the MCP tool sees RLS-scoped reads.
+				return yield* sql.withTransaction(
+					Effect.gen(function* () {
+						yield* sql`SET LOCAL ROLE app_user`
+						yield* sql`SELECT set_config('app.current_org_id', ${org.id}, true)`
+						return yield* httpEffect.pipe(
+							Effect.provideService(CurrentUser, {
+								userId: result.user.id,
+								email: result.user.email,
+								name: result.user.name ?? 'Unknown',
+								isAgent: result.user.isAgent === true,
+							}),
+							// SessionContext mirrors CurrentUser using the controllers-
+							// package tag so service-layer code that consumes
+							// SessionContext (e.g. EmailService) works identically across
+							// HTTP and MCP transports.
+							Effect.provideService(SessionContext, {
+								userId: result.user.id,
+								email: result.user.email,
+								name: result.user.name ?? undefined,
+								isAgent: result.user.isAgent === true,
+							}),
+							Effect.provideService(CurrentOrg, {
+								id: org.id,
+								name: org.name,
+								slug: org.slug,
+							}),
+						)
 					}),
 				)
 			})
