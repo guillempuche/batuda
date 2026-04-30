@@ -1064,32 +1064,25 @@ export const seedIdentities = Effect.gen(function* () {
 		)
 	}
 
+	const emailWidth = Math.max(...DEMO_USERS.map(u => u.email.length))
+	const pwWidth = Math.max(...DEMO_USERS.map(u => u.password.length))
+	const nameWidth = Math.max(...DEMO_USERS.map(u => u.name.length))
+
 	yield* Effect.logInfo('')
-	yield* Effect.logInfo(
-		'┌─── Personas ───────────────────────────────────────┐',
-	)
-	for (const m of DEMO_MEMBERSHIPS) {
-		const u = DEMO_USERS.find(x => x.email === m.email)
-		const label = `${u?.name ?? m.email} → ${m.orgSlug} (${m.role})`
-		yield* Effect.logInfo(`│  ${label.padEnd(50)}│`)
+	yield* Effect.logInfo('─── Demo users (sign in with any of these) ───')
+	for (const u of DEMO_USERS) {
+		const memberships = DEMO_MEMBERSHIPS.filter(m => m.email === u.email)
+			.map(m => `${m.orgSlug} (${m.role})`)
+			.join(', ')
+		yield* Effect.logInfo(
+			`  ${u.email.padEnd(emailWidth)}  ${u.password.padEnd(pwWidth)}  ${u.name.padEnd(nameWidth)}  → ${memberships}`,
+		)
 	}
-	yield* Effect.logInfo(
-		'└────────────────────────────────────────────────────┘',
-	)
 	yield* Effect.logInfo('')
-	yield* Effect.logInfo('Primary dev login (Alice → Taller):')
-	yield* Effect.logInfo(`  curl -X POST ${baseURL}/auth/sign-in/email \\`)
-	yield* Effect.logInfo(`    -H 'content-type: application/json' \\`)
-	yield* Effect.logInfo(
-		`    -d '{"email":"${TEST_USER.email}","password":"${TEST_USER.password}"}'`,
-	)
+	yield* Effect.logInfo(`Sign-in URL: ${baseURL}/auth/sign-in/email`)
 
 	yield* Effect.promise(() => pool.end())
 })
-
-// Backward-compat alias so existing `pnpm cli seed --auth` keeps working.
-// Drop after callers move to `seedIdentities`.
-export const seedAuth = seedIdentities
 
 // ── Seed effect ───────────────────────────────────────────
 

@@ -20,7 +20,7 @@ import {
 } from './commands/calendar/simulate-webhook'
 import { dbMigrate, dbReset } from './commands/db'
 import { doctor } from './commands/doctor'
-import { seed, seedAuth } from './commands/seed'
+import { seed, seedIdentities } from './commands/seed'
 import { servicesDown, servicesStatus, servicesUp } from './commands/services'
 import { appendEnvKeys, resetEnvFile, setup } from './commands/setup'
 import { withDb } from './db'
@@ -38,16 +38,12 @@ const seedCommand = Command.make(
 			),
 			Flag.withDefault('full' as const),
 		),
-		auth: Flag.boolean('auth').pipe(
-			Flag.withDescription('Create test auth user (dev@batuda.co)'),
-			Flag.withDefault(false),
-		),
 	},
-	({ preset, auth }) =>
+	({ preset }) =>
 		withDb(
 			Effect.gen(function* () {
 				const counts = yield* seed(preset)
-				if (auth) yield* seedAuth
+				yield* seedIdentities
 				yield* Console.log('')
 				yield* Console.log(
 					`Seeded (${preset}): ${counts.products} products, ${counts.companies} companies, ${counts.contacts} contacts, ${counts.interactions} interactions, ${counts.tasks} tasks, ${counts.documents} documents, ${counts.proposals} proposals, ${counts.pages} pages, ${counts.callRecordings} call recordings`,
@@ -111,15 +107,23 @@ const setupCommand = Command.make(
 			yield* Effect.logInfo('Setting up project...')
 			const results = yield* setup
 			for (const result of results) {
+				if (result.status === 'skipped') {
+					yield* Console.log(`  skip ${result.target} (no ${result.example})`)
+					continue
+				}
+				if (reset && result.status !== 'created') {
+					yield* resetEnvFile(result.example, result.target)
+					yield* Console.log(
+						`  ${result.target} replaced from ${result.example}`,
+					)
+					continue
+				}
 				switch (result.status) {
 					case 'created':
 						yield* Console.log(`  created ${result.target}`)
 						break
 					case 'up-to-date':
 						yield* Console.log(`  ${result.target} up to date`)
-						break
-					case 'skipped':
-						yield* Console.log(`  skip ${result.target} (no ${result.example})`)
 						break
 					case 'stale': {
 						yield* Console.log(
@@ -128,10 +132,7 @@ const setupCommand = Command.make(
 						for (const e of result.missing) {
 							yield* Console.log(`    ${e.key}`)
 						}
-						if (reset) {
-							yield* resetEnvFile(result.example, result.target)
-							yield* Console.log(`  → replaced from ${result.example}`)
-						} else if (update) {
+						if (update) {
 							yield* appendEnvKeys(result.target, result.missing)
 							yield* Console.log(`  → appended ${result.missing.length} key(s)`)
 						} else {
