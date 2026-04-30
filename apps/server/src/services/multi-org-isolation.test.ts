@@ -677,6 +677,76 @@ describe('multi-org isolation', () => {
 		})
 	})
 
+	describe('GUC setter — request-path safety net', () => {
+		// These tests document the contract OrgMiddleware enforces at
+		// runtime: app_user with the GUC set sees its own rows; app_user
+		// without the GUC sees zero rows AND can't insert. The middleware
+		// itself is exercised via `pnpm cli db reset` + actual HTTP requests
+		// — these unit-style assertions just pin the database side of the
+		// contract so a future RLS / role change is caught here.
+
+		describe('when role=app_user and app.current_org_id is unset', () => {
+			it('should return 0 rows from companies (fail-closed)', async () => {
+				// GIVEN one company seeded in each org
+				// AND the role flipped to app_user with no app.current_org_id
+				// WHEN a SELECT against companies fires
+				// THEN no rows should be returned, since '' ≠ any organization_id
+				// [middleware/org.ts — wrapper sets the GUC; this test asserts what happens without it]
+				await withSuper(async client => {
+					await client.query(
+						`INSERT INTO companies (organization_id, slug, name) VALUES ($1, 'sn-t', 'SN T'), ($2, 'sn-r', 'SN R')`,
+						[ctx.tallerOrgId, ctx.restaurantOrgId],
+					)
+					await client.query(`SET LOCAL ROLE app_user`)
+					const visible = await client.query(
+						"SELECT slug FROM companies WHERE slug LIKE 'sn-%'",
+					)
+					expect(visible.rows.length).toBe(0)
+				})
+			})
+
+			it('should reject an INSERT with a hard-coded org_id', async () => {
+				// GIVEN role=app_user and no app.current_org_id
+				// WHEN an INSERT runs with a real, valid organization_id in the row
+				// THEN RLS WITH CHECK should reject the row, since organization_id ≠ '' (the GUC value)
+				// [migrations/0001_initial.ts — org_isolation_companies WITH CHECK clause]
+				await withSuper(async client => {
+					await client.query(`SET LOCAL ROLE app_user`)
+					await expect(
+						client.query(
+							`INSERT INTO companies (organization_id, slug, name) VALUES ($1, 'leaktest', 'Leak')`,
+							[ctx.tallerOrgId],
+						),
+					).rejects.toThrow(/policy|row-level/i)
+				})
+			})
+		})
+
+		describe('when role=app_user and app.current_org_id is set to taller', () => {
+			it('should expose only taller rows', async () => {
+				// GIVEN one company seeded in each org
+				// WHEN the request flow runs (tx + SET LOCAL ROLE app_user + set_config)
+				// THEN the SELECT should return exactly the taller row
+				// [middleware/org.ts — same withTransaction shape used at runtime]
+				await withSuper(async client => {
+					await client.query(
+						`INSERT INTO companies (organization_id, slug, name) VALUES ($1, 'sn-go-t', 'Go T'), ($2, 'sn-go-r', 'Go R')`,
+						[ctx.tallerOrgId, ctx.restaurantOrgId],
+					)
+					await client.query(`SET LOCAL ROLE app_user`)
+					await client.query(
+						`SELECT set_config('app.current_org_id', '${ctx.tallerOrgId}', true)`,
+					)
+					const visible = await client.query<{ slug: string }>(
+						"SELECT slug FROM companies WHERE slug LIKE 'sn-go-%'",
+					)
+					expect(visible.rows.length).toBe(1)
+					expect(visible.rows[0]?.slug).toBe('sn-go-t')
+				})
+			})
+		})
+	})
+
 	describe('inviteAdmin orchestration', () => {
 		// Better Auth's createUser/createOrganization/addMember each open
 		// their own transaction, so per-test ROLLBACK does not undo their
