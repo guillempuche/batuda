@@ -1,5 +1,5 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: seed data */
-import { randomUUID } from 'node:crypto'
+import { createCipheriv, hkdfSync, randomBytes, randomUUID } from 'node:crypto'
 
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { apiKey } from '@better-auth/api-key'
@@ -1516,6 +1516,65 @@ export const seed = (preset: Preset) =>
 			yield* Effect.logInfo(
 				'  (skipped — auth user not found, run seed auth first)',
 			)
+		}
+
+		// Inbox — one connected human inbox per taller-org member who
+		// signs in. e2e tests + manual compose flows expect at least one
+		// inbox to be reachable; without this the compose form's "select
+		// inbox" picker is empty and Send is disabled. Credentials are
+		// AES-256-GCM via the same scheme apps/server uses (HKDF-SHA256
+		// per-inbox subkey, see apps/server/src/services/credential-crypto.ts).
+		// Only seeded for the taller org so multi-org-isolation tests can
+		// still assert "no inbox visible" for restaurant.
+		if (testUser) {
+			const masterKey = Buffer.from(
+				yield* Config.string('EMAIL_CREDENTIAL_KEY'),
+				'base64',
+			)
+			if (masterKey.length === 32) {
+				const inboxId = randomUUID()
+				const subkey = Buffer.from(
+					hkdfSync('sha256', masterKey, Buffer.alloc(0), Buffer.from(inboxId, 'utf8'), 32),
+				)
+				const nonce = randomBytes(12)
+				const cipher = createCipheriv('aes-256-gcm', subkey, nonce)
+				const ciphertext = Buffer.concat([
+					cipher.update('demo-imap-password', 'utf8'),
+					cipher.final(),
+				])
+				const tag = cipher.getAuthTag()
+				yield* sql`
+					INSERT INTO inboxes ${sql.insert({
+						id: inboxId,
+						organizationId: tallerOrgId,
+						email: TEST_USER.email,
+						displayName: TEST_USER.name,
+						purpose: 'human',
+						ownerUserId: testUser.id,
+						isDefault: true,
+						isPrivate: false,
+						active: true,
+						imapHost: 'imap.demo.invalid',
+						imapPort: 993,
+						imapSecurity: 'tls',
+						smtpHost: 'smtp.demo.invalid',
+						smtpPort: 465,
+						smtpSecurity: 'tls',
+						username: TEST_USER.email,
+						passwordCiphertext: ciphertext,
+						passwordNonce: nonce,
+						passwordTag: tag,
+						grantStatus: 'connected',
+					})}
+				`
+				yield* Effect.logInfo(
+					`  inbox: ${TEST_USER.email} (taller, owner ${testUser.id})`,
+				)
+			} else {
+				yield* Effect.logInfo(
+					'  (skipped inbox — EMAIL_CREDENTIAL_KEY must decode to 32 bytes)',
+				)
+			}
 		}
 
 		// Full preset extras
