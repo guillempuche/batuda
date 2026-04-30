@@ -1083,9 +1083,9 @@ describe('multi-org isolation', () => {
 				// THEN PostgreSQL should reject with permission denied
 				await withSuper(async client => {
 					await client.query(`SET LOCAL ROLE app_user`)
-					await expect(
-						client.query(`DELETE FROM "member"`),
-					).rejects.toThrow(/permission denied|not allowed/i)
+					await expect(client.query(`DELETE FROM "member"`)).rejects.toThrow(
+						/permission denied|not allowed/i,
+					)
 				})
 			})
 		})
@@ -1115,7 +1115,10 @@ describe('multi-org isolation', () => {
 						`CREATE TABLE _grant_probe (id INT PRIMARY KEY, payload TEXT)`,
 					)
 					try {
-						const grants = await client.query<{ grantee: string; privilege: string }>(
+						const grants = await client.query<{
+							grantee: string
+							privilege: string
+						}>(
 							`SELECT grantee, privilege_type AS privilege
 							 FROM information_schema.role_table_grants
 							 WHERE table_schema = 'public' AND table_name = '_grant_probe'
@@ -1129,12 +1132,7 @@ describe('multi-org isolation', () => {
 							.filter(r => r.grantee === 'app_service')
 							.map(r => r.privilege)
 							.sort()
-						expect(userGrants).toEqual([
-							'DELETE',
-							'INSERT',
-							'SELECT',
-							'UPDATE',
-						])
+						expect(userGrants).toEqual(['DELETE', 'INSERT', 'SELECT', 'UPDATE'])
 						expect(serviceGrants).toEqual([
 							'DELETE',
 							'INSERT',
