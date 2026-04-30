@@ -1228,16 +1228,50 @@ export default Effect.gen(function* () {
 		`,
 	])
 
-	// app_user needs DML privileges; RLS still gates row visibility.
-	// app_service gets the same grants because BYPASSRLS only opts out
-	// of policy checks, not the underlying GRANT.
+	// ── Grants ──────────────────────────────────────────────────────
+	// Defense-in-depth on top of RLS:
+	//   1. REVOKE PUBLIC's default access to schema/objects so a forgotten
+	//      future table doesn't end up world-readable.
+	//   2. GRANT SCHEMA USAGE to app_user/app_service so they can resolve
+	//      object names.
+	//   3. GRANT full DML on every existing table to app_service (BYPASSRLS
+	//      worker/cron path) — RLS doesn't gate it anyway.
+	//   4. GRANT full DML on every existing app-data table to app_user — RLS
+	//      then gates row visibility per-org.
+	//   5. GRANT SELECT only on Better Auth tables to app_user. Better Auth's
+	//      own API endpoints (/auth/*) are routed by Better Auth's HTTP
+	//      integration outside our OrgMiddleware, so they run as the
+	//      DATABASE_URL owner (not app_user) and keep full DML. Locking the
+	//      request-path role to read-only on auth tables means even a SQL
+	//      injection in a CRM handler can't mint sessions or hijack users.
+	//   6. ALTER DEFAULT PRIVILEGES so a future migration that adds a table
+	//      auto-grants it to both roles without re-issuing GRANT statements.
+	yield* sql`REVOKE ALL ON SCHEMA public FROM PUBLIC`
+	yield* sql`REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC`
+	yield* sql`REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM PUBLIC`
+
+	yield* sql`GRANT USAGE ON SCHEMA public TO app_user, app_service`
+	yield* sql`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_service`
+	yield* sql`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_user, app_service`
+
+	// app_user gets DML on every existing table EXCEPT the Better Auth
+	// auth-management tables. We then revoke writes on those auth tables
+	// so even with the broad GRANT below the request-path role can only
+	// read identity state.
+	yield* sql`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_user`
+	yield* sql`REVOKE INSERT, UPDATE, DELETE ON "user", "session", "account", "verification", "organization", "member", "invitation" FROM app_user`
+
+	// Default privileges so future tables (in any later migration) inherit
+	// the same posture without manual GRANTs. New tables created in
+	// `public` will be readable+writable by app_service and app_user;
+	// administrators can still REVOKE on individual auth-style tables
+	// after creation if needed.
 	yield* sql`
-		GRANT USAGE ON SCHEMA public TO app_user, app_service
+		ALTER DEFAULT PRIVILEGES IN SCHEMA public
+			GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_user, app_service
 	`
 	yield* sql`
-		GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_user, app_service
-	`
-	yield* sql`
-		GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_user, app_service
+		ALTER DEFAULT PRIVILEGES IN SCHEMA public
+			GRANT USAGE, SELECT ON SEQUENCES TO app_user, app_service
 	`
 })
