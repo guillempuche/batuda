@@ -100,15 +100,19 @@ export const OrgMiddlewareLive = Layer.effect(
 				}
 
 				// Run the rest of the request inside a transaction so SET LOCAL
-				// ROLE + the GUC live for exactly the request's scope and
-				// release on COMMIT/ROLLBACK. SqlError surfaces as a die so the
-				// middleware's declared error union stays { Unauthorized |
-				// Forbidden }.
+				// ROLE + the two GUCs (org id + user id) live for exactly the
+				// request's scope and release on COMMIT/ROLLBACK. SqlError
+				// surfaces as a die so the middleware's declared error union
+				// stays { Unauthorized | Forbidden }. `app.current_user_id`
+				// is set alongside `app.current_org_id` so future per-user
+				// RLS policies (e.g. on `member` to scope membership reads
+				// by self) don't need a second middleware change.
 				return yield* sql
 					.withTransaction(
 						Effect.gen(function* () {
 							yield* sql`SET LOCAL ROLE app_user`
 							yield* sql`SELECT set_config('app.current_org_id', ${row.id}, true)`
+							yield* sql`SELECT set_config('app.current_user_id', ${result.user.id}, true)`
 							return yield* Effect.provideService(effect, CurrentOrg, {
 								id: row.id,
 								name: row.name,

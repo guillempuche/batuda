@@ -93,12 +93,13 @@ const McpAuthMiddleware = HttpRouter.middleware(
 				}
 
 				// Same per-request transaction wrapper as OrgMiddlewareLive: SET
-				// LOCAL ROLE app_user + the GUC live for exactly the request's
-				// scope so the MCP tool sees RLS-scoped reads.
+				// LOCAL ROLE app_user + the two GUCs live for exactly the
+				// request's scope so the MCP tool sees RLS-scoped reads.
 				return yield* sql.withTransaction(
 					Effect.gen(function* () {
 						yield* sql`SET LOCAL ROLE app_user`
 						yield* sql`SELECT set_config('app.current_org_id', ${org.id}, true)`
+						yield* sql`SELECT set_config('app.current_user_id', ${result.user.id}, true)`
 						return yield* httpEffect.pipe(
 							Effect.provideService(CurrentUser, {
 								userId: result.user.id,
