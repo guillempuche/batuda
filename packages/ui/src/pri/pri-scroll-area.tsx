@@ -6,11 +6,24 @@ import styled from 'styled-components'
  * looks like a slider running down a rail. Wrap any scrollable region:
  *
  *   <PriScrollArea.Root>
- *     <PriScrollArea.Viewport>{children}</PriScrollArea.Viewport>
+ *     <PriScrollArea.Viewport>
+ *       <PriScrollArea.Content>{children}</PriScrollArea.Content>
+ *     </PriScrollArea.Viewport>
  *     <PriScrollArea.Scrollbar orientation="vertical">
  *       <PriScrollArea.Thumb />
  *     </PriScrollArea.Scrollbar>
  *   </PriScrollArea.Root>
+ *
+ * `Content` installs the ResizeObserver that recomputes thumb size when
+ * children resize (lazy images, i18n string swaps, dynamic sections).
+ * Skipping it leaves the thumb stale.
+ *
+ * Gotcha for vertical-only scroll: `Content` ships with inline
+ * `min-width: fit-content` so horizontal overflow is measurable. If your
+ * children have no width cap (e.g. responsive marketing sections), this
+ * blows the layout out to intrinsic width. Override with
+ * `<PriScrollArea.Content style={{ minWidth: 0 }}>` when you don't need
+ * horizontal-overflow detection.
  */
 const PriRoot = styled(ScrollArea.Root).withConfig({
 	displayName: 'PriScrollAreaRoot',
