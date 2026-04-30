@@ -1,14 +1,60 @@
 import { Effect } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
+// Single-initial-migration policy: this file is the only schema source of
+// truth. Every CREATE TABLE here is the table's final shape — no
+// ADD COLUMN / ALTER COLUMN / DROP COLUMN patches stacked on top, no
+// data backfills. `pnpm cli db reset` drops the database and re-runs this
+// from scratch; the seed (`apps/cli/src/commands/seed.ts`) populates the
+// rows the dev/test environment needs.
+//
+// Better Auth runs its own migration *before* this one (see
+// `apps/server/src/db/migrate.ts`), so the auth-managed tables — `user`,
+// `session`, `account`, `verification`, `organization`, `member`,
+// `invitation` — already exist when we get here. The only adjustment we
+// make to those is `member.primary_inbox_id` at the bottom of this file:
+// Better Auth's `additionalFields` lands it as TEXT, but the FK target
+// `inboxes.id` is UUID, so we drop+readd that column with the right type.
+
 export default Effect.gen(function* () {
 	const sql = yield* SqlClient.SqlClient
 
+	// ── Multi-tenant roles ───────────────────────────────────────────
+	// `app_user` is what HTTP and MCP request handlers run as. RLS gates
+	// row visibility on `current_setting('app.current_org_id', true)`,
+	// which the per-request middleware sets at the top of every
+	// transaction.
+	// `app_service` is what the mail-worker and cron jobs run as.
+	// BYPASSRLS lets background workers resolve the org explicitly from
+	// each row instead of carrying a session-scoped GUC across batches.
+	// NOLOGIN on both: the database connection still authenticates as
+	// the DATABASE_URL owner; the app issues `SET ROLE` inside the
+	// request boundary so the boundary is auditable.
+	yield* sql`
+		DO $$
+		BEGIN
+			IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app_user') THEN
+				CREATE ROLE app_user NOLOGIN;
+			END IF;
+			IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app_service') THEN
+				CREATE ROLE app_service NOLOGIN BYPASSRLS;
+			END IF;
+		END
+		$$;
+	`
+
 	// ── CRM core ─────────────────────────────────────────────────────
+	// `organization_id` is required on every row that holds user data.
+	// `slug` is unique per org so two orgs can each have a company called
+	// `acme`. Cadence columns (last_*_at, next_calendar_event_at) are
+	// denormalised so "who haven't I emailed in 30 days?" is a single
+	// table scan; they're maintained by handlers and the worker, not by
+	// triggers (the project favours explicit writes over hidden state).
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS companies (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			slug TEXT NOT NULL UNIQUE,
+			organization_id TEXT NOT NULL,
+			slug TEXT NOT NULL,
 			name TEXT NOT NULL,
 			status TEXT NOT NULL DEFAULT 'prospect',
 			industry TEXT,
@@ -30,6 +76,10 @@ export default Effect.gen(function* () {
 			next_action TEXT,
 			next_action_at TIMESTAMPTZ,
 			last_contacted_at TIMESTAMPTZ,
+			last_email_at TIMESTAMPTZ,
+			last_call_at TIMESTAMPTZ,
+			last_meeting_at TIMESTAMPTZ,
+			next_calendar_event_at TIMESTAMPTZ,
 			latitude NUMERIC(9,6),
 			longitude NUMERIC(9,6),
 			geocoded_at TIMESTAMPTZ,
@@ -39,6 +89,7 @@ export default Effect.gen(function* () {
 			deleted_at TIMESTAMPTZ,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			UNIQUE (organization_id, slug),
 			CONSTRAINT companies_latlng_chk CHECK (
 				(latitude IS NULL AND longitude IS NULL)
 				OR (latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180)
@@ -48,6 +99,7 @@ export default Effect.gen(function* () {
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS contacts (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			organization_id TEXT NOT NULL,
 			company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
 			name TEXT NOT NULL,
 			role TEXT,
@@ -61,6 +113,10 @@ export default Effect.gen(function* () {
 			email_status_reason TEXT,
 			email_status_updated_at TIMESTAMPTZ,
 			email_soft_bounce_count INTEGER NOT NULL DEFAULT 0,
+			last_email_at TIMESTAMPTZ,
+			last_call_at TIMESTAMPTZ,
+			last_meeting_at TIMESTAMPTZ,
+			next_calendar_event_at TIMESTAMPTZ,
 			notes TEXT,
 			metadata JSONB,
 			version INT NOT NULL DEFAULT 0,
@@ -72,6 +128,7 @@ export default Effect.gen(function* () {
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS interactions (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			organization_id TEXT NOT NULL,
 			company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
 			contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
 			date TIMESTAMPTZ NOT NULL,
@@ -91,7 +148,8 @@ export default Effect.gen(function* () {
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS products (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			slug TEXT NOT NULL UNIQUE,
+			organization_id TEXT NOT NULL,
+			slug TEXT NOT NULL,
 			name TEXT NOT NULL,
 			type TEXT NOT NULL,
 			status TEXT NOT NULL DEFAULT 'active',
@@ -101,12 +159,14 @@ export default Effect.gen(function* () {
 			target_industries TEXT[],
 			metadata JSONB,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			UNIQUE (organization_id, slug)
 		)
 	`
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS proposals (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			organization_id TEXT NOT NULL,
 			company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
 			contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
 			status TEXT NOT NULL DEFAULT 'draft',
@@ -126,6 +186,7 @@ export default Effect.gen(function* () {
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS documents (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			organization_id TEXT NOT NULL,
 			company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
 			interaction_id UUID REFERENCES interactions(id) ON DELETE SET NULL,
 			type TEXT NOT NULL,
@@ -138,6 +199,7 @@ export default Effect.gen(function* () {
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS pages (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			organization_id TEXT NOT NULL,
 			company_id UUID REFERENCES companies(id) ON DELETE SET NULL,
 			slug TEXT NOT NULL,
 			lang TEXT NOT NULL,
@@ -151,12 +213,13 @@ export default Effect.gen(function* () {
 			view_count INTEGER NOT NULL DEFAULT 0,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-			UNIQUE (slug, lang)
+			UNIQUE (organization_id, slug, lang)
 		)
 	`
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS webhook_endpoints (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			organization_id TEXT NOT NULL,
 			name TEXT NOT NULL,
 			url TEXT NOT NULL,
 			events TEXT[] NOT NULL,
@@ -238,11 +301,12 @@ export default Effect.gen(function* () {
 	// Event types are vendor-neutral: `provider` names the backend, and
 	// `provider_event_type_id` is always TEXT (cal.com yields numeric ids,
 	// Google/Microsoft yield strings — storing both as TEXT keeps the
-	// column shape stable across provider swaps).
+	// column shape stable across provider swaps). Slug is unique per org.
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS calendar_event_types (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			slug TEXT NOT NULL UNIQUE,
+			organization_id TEXT NOT NULL,
+			slug TEXT NOT NULL,
 			provider TEXT NOT NULL CHECK (provider IN ('calcom','google','microsoft','internal')),
 			provider_event_type_id TEXT,
 			title TEXT NOT NULL,
@@ -253,21 +317,23 @@ export default Effect.gen(function* () {
 			synced_at TIMESTAMPTZ,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-			UNIQUE (provider, provider_event_type_id)
+			UNIQUE (organization_id, slug),
+			UNIQUE (organization_id, provider, provider_event_type_id)
 		)
 	`
 	// `source` = why it's in our DB; `provider` = which backend owns
 	// the upstream row. Splitting them lets the booking backend swap
-	// without rewriting `source='booking'` rows. `ical_uid` is always
-	// present (generated locally for source='internal') so future
-	// CalDAV export stays a no-op.
+	// without rewriting `source='booking'` rows. `ical_uid` is per-org
+	// unique; iCal UIDs are RFC-globally-unique in theory, but two orgs
+	// importing the same external feed should each get their own row.
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS calendar_events (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			organization_id TEXT NOT NULL,
 			source TEXT NOT NULL CHECK (source IN ('booking','email','internal')),
 			provider TEXT NOT NULL CHECK (provider IN ('calcom','google','microsoft','email','internal')),
 			provider_booking_id TEXT,
-			ical_uid TEXT NOT NULL UNIQUE,
+			ical_uid TEXT NOT NULL,
 			ical_sequence INTEGER NOT NULL DEFAULT 0,
 			event_type_id UUID REFERENCES calendar_event_types(id) ON DELETE SET NULL,
 			start_at TIMESTAMPTZ NOT NULL,
@@ -285,6 +351,7 @@ export default Effect.gen(function* () {
 			raw_ics BYTEA,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			UNIQUE (organization_id, ical_uid),
 			CONSTRAINT calendar_events_provider_booking_consistent CHECK (
 				(source = 'booking' AND provider_booking_id IS NOT NULL)
 				OR (source IN ('email','internal') AND provider_booking_id IS NULL)
@@ -296,6 +363,7 @@ export default Effect.gen(function* () {
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS calendar_event_attendees (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			organization_id TEXT NOT NULL,
 			event_id UUID NOT NULL REFERENCES calendar_events(id) ON DELETE CASCADE,
 			email TEXT NOT NULL,
 			name TEXT,
@@ -316,6 +384,7 @@ export default Effect.gen(function* () {
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS tasks (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			organization_id TEXT NOT NULL,
 			company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
 			contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
 			type TEXT NOT NULL,
@@ -350,6 +419,7 @@ export default Effect.gen(function* () {
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS task_events (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			organization_id TEXT NOT NULL,
 			task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
 			at TIMESTAMPTZ NOT NULL DEFAULT now(),
 			actor_id TEXT,
@@ -455,10 +525,11 @@ export default Effect.gen(function* () {
 	// Polymorphic timeline of every notable event (emails, calls, documents,
 	// proposals, research runs, system events).
 	// actor_user_id is TEXT because Better Auth user ids are cuid2 strings,
-	// not UUIDs (an earlier draft of this schema modelled them as UUID).
+	// not UUIDs.
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS timeline_activity (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			organization_id TEXT NOT NULL,
 			kind TEXT NOT NULL,
 			entity_type TEXT NOT NULL,
 			entity_id UUID NOT NULL,
@@ -476,6 +547,8 @@ export default Effect.gen(function* () {
 
 	// One row per (email_message × email_address × role) so every CC'd
 	// participant is addressable, even when no contact exists yet.
+	// Org isolation is transitive through email_messages — see the RLS
+	// policy at the bottom of this file.
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS message_participants (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -488,64 +561,11 @@ export default Effect.gen(function* () {
 		)
 	`
 
-	// Denormalised cadence columns so "who haven't I emailed in 30 days?"
-	// is a single-table scan.
-	yield* sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS last_email_at TIMESTAMPTZ`
-	yield* sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS last_call_at TIMESTAMPTZ`
-	yield* sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS last_meeting_at TIMESTAMPTZ`
-	yield* sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS next_calendar_event_at TIMESTAMPTZ`
-	yield* sql`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS last_email_at TIMESTAMPTZ`
-	yield* sql`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS last_call_at TIMESTAMPTZ`
-	yield* sql`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS last_meeting_at TIMESTAMPTZ`
-	yield* sql`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS next_calendar_event_at TIMESTAMPTZ`
-
-	// Backfill cadence columns from existing interactions (pre-prod, safe).
-	// recordings.ts writes channel='call' while the docs say 'phone' — include both.
-	yield* sql`
-		UPDATE companies c SET
-			last_email_at   = (SELECT MAX(date) FROM interactions WHERE company_id = c.id AND channel = 'email'),
-			last_call_at    = (SELECT MAX(date) FROM interactions WHERE company_id = c.id AND channel IN ('phone', 'call')),
-			last_meeting_at = (SELECT MAX(date) FROM interactions WHERE company_id = c.id AND channel IN ('visit', 'event'))
-	`
-	yield* sql`
-		UPDATE contacts co SET
-			last_email_at   = (SELECT MAX(date) FROM interactions WHERE contact_id = co.id AND channel = 'email'),
-			last_call_at    = (SELECT MAX(date) FROM interactions WHERE contact_id = co.id AND channel IN ('phone', 'call')),
-			last_meeting_at = (SELECT MAX(date) FROM interactions WHERE contact_id = co.id AND channel IN ('visit', 'event'))
-	`
-
-	// Backfill message_participants from existing email_messages.recipients.
-	// Current shape: { to: [string], cc: [string], bcc: [string] } of email strings.
-	yield* sql`
-		INSERT INTO message_participants (email_message_id, email_address, role)
-		SELECT m.id, lower(addr.value), roles.role_name
-		FROM email_messages m
-		CROSS JOIN LATERAL (VALUES ('to'), ('cc'), ('bcc')) AS roles(role_name)
-		CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(m.recipients->roles.role_name, '[]'::jsonb)) AS addr(value)
-		WHERE addr.value IS NOT NULL AND addr.value <> ''
-		ON CONFLICT DO NOTHING
-	`
-	// Outbound 'from' can be recovered via the sending inbox. Inbound 'from'
-	// is populated by the mail-worker at ingest time from parsed headers.
-	yield* sql`
-		INSERT INTO message_participants (email_message_id, email_address, role)
-		SELECT m.id, lower(i.email), 'from'
-		FROM email_messages m
-		JOIN inboxes i ON i.id = m.inbox_id
-		WHERE m.direction = 'outbound' AND m.inbox_id IS NOT NULL
-		ON CONFLICT DO NOTHING
-	`
-	// Link each participant to an existing contact row when the email matches.
-	yield* sql`
-		UPDATE message_participants mp SET contact_id = c.id
-		FROM contacts c
-		WHERE lower(c.email) = mp.email_address AND mp.contact_id IS NULL
-	`
-
 	// ── Call recordings ──────────────────────────────────────────────
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS call_recordings (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			organization_id TEXT NOT NULL,
 			interaction_id UUID NOT NULL UNIQUE REFERENCES interactions(id) ON DELETE CASCADE,
 			storage_key TEXT NOT NULL,
 			mime_type TEXT NOT NULL,
@@ -569,21 +589,28 @@ export default Effect.gen(function* () {
 	`
 
 	// ── Research: runs, sources, m2m, links, paid spend, policy, quotas ──
+	// research_runs: idempotency_key is per-org so two orgs can run the
+	// same query independently. research_text/phase/schema_version are
+	// checkpoint columns the engine fills in mid-run.
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS research_runs (
 			id                      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+			organization_id         text NOT NULL,
 			parent_id               uuid REFERENCES research_runs(id) ON DELETE CASCADE,
 			kind                    text NOT NULL CHECK (kind IN ('leaf','group','followup','cache_hit')) DEFAULT 'leaf',
 
 			query                   text NOT NULL,
 			mode                    text NOT NULL DEFAULT 'deep',
 			schema_name             text,
+			schema_version          int,
+			phase                   smallint NOT NULL DEFAULT 0,
 
 			status                  text NOT NULL CHECK (status IN ('queued','running','succeeded','failed','cancelled','deleted')),
 			context                 jsonb NOT NULL DEFAULT '{}'::jsonb,
 
 			findings                jsonb NOT NULL DEFAULT '{}'::jsonb,
 			brief_md                text,
+			research_text           text,
 
 			budget_cents            int NOT NULL DEFAULT 0,
 			paid_budget_cents       int NOT NULL DEFAULT 0,
@@ -595,16 +622,22 @@ export default Effect.gen(function* () {
 			tokens_out              int NOT NULL DEFAULT 0,
 			paid_policy             jsonb NOT NULL DEFAULT '{}'::jsonb,
 
-			idempotency_key         text UNIQUE,
+			idempotency_key         text,
 			created_by              text NOT NULL,
 			created_at              timestamptz NOT NULL DEFAULT now(),
 			started_at              timestamptz,
 			completed_at            timestamptz,
 			updated_at              timestamptz NOT NULL DEFAULT now(),
 
-			tool_log                jsonb NOT NULL DEFAULT '[]'::jsonb
+			tool_log                jsonb NOT NULL DEFAULT '[]'::jsonb,
+
+			UNIQUE (organization_id, idempotency_key)
 		)
 	`
+	// sources stays GLOBAL: it's a content-addressable cache keyed by
+	// url_hash. Two orgs researching the same domain share the same row;
+	// org isolation is enforced through research_run_sources (which IS
+	// org-scoped via research_id).
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS sources (
 			id                text PRIMARY KEY,
@@ -625,32 +658,37 @@ export default Effect.gen(function* () {
 	`
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS research_run_sources (
-			research_id  uuid NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,
-			source_id    text NOT NULL REFERENCES sources(id),
-			local_ref    text NOT NULL,
-			fetched_at   timestamptz NOT NULL DEFAULT now(),
-			cost_cents   int NOT NULL DEFAULT 0,
+			organization_id  text NOT NULL,
+			research_id      uuid NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,
+			source_id        text NOT NULL REFERENCES sources(id),
+			local_ref        text NOT NULL,
+			fetched_at       timestamptz NOT NULL DEFAULT now(),
+			cost_cents       int NOT NULL DEFAULT 0,
 			PRIMARY KEY (research_id, source_id)
 		)
 	`
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS research_links (
-			research_id    uuid NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,
-			subject_table  text NOT NULL CHECK (subject_table IN ('companies','contacts')),
-			subject_id     uuid NOT NULL,
-			link_kind      text NOT NULL CHECK (link_kind IN ('input','finding')),
-			created_at     timestamptz NOT NULL DEFAULT now(),
+			organization_id  text NOT NULL,
+			research_id      uuid NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,
+			subject_table    text NOT NULL CHECK (subject_table IN ('companies','contacts')),
+			subject_id       uuid NOT NULL,
+			link_kind        text NOT NULL CHECK (link_kind IN ('input','finding')),
+			created_at       timestamptz NOT NULL DEFAULT now(),
 			PRIMARY KEY (research_id, subject_table, subject_id)
 		)
 	`
+	// research_paid_spend: idempotency_key is per-org so paid calls in
+	// one org never collide with another. (Pre-rewrite this was global.)
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS research_paid_spend (
 			id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+			organization_id  text NOT NULL,
 			research_id      uuid NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,
 			user_id          text NOT NULL,
 			provider         text NOT NULL,
 			tool             text NOT NULL,
-			idempotency_key  text NOT NULL UNIQUE,
+			idempotency_key  text NOT NULL,
 			amount_cents     int NOT NULL,
 			quota_units      int,
 			quota_unit       text,
@@ -660,9 +698,14 @@ export default Effect.gen(function* () {
 			source_id        text REFERENCES sources(id),
 			auto_approved    boolean NOT NULL,
 			approved_by      text,
-			at               timestamptz NOT NULL DEFAULT now()
+			at               timestamptz NOT NULL DEFAULT now(),
+			UNIQUE (organization_id, idempotency_key)
 		)
 	`
+	// user_research_policy / provider_quotas / provider_usage stay
+	// per-user (no organization_id). They're user-level configuration
+	// that travels with the user across orgs — Alice's OpenAI quota is
+	// Alice's regardless of which org she's working in today.
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS user_research_policy (
 			user_id                    text PRIMARY KEY,
@@ -700,11 +743,9 @@ export default Effect.gen(function* () {
 		)
 	`
 
-	// ── Research checkpoint columns + cache tables ─────────────────
-	yield* sql`ALTER TABLE research_runs ADD COLUMN IF NOT EXISTS research_text text`
-	yield* sql`ALTER TABLE research_runs ADD COLUMN IF NOT EXISTS phase smallint NOT NULL DEFAULT 0`
-	yield* sql`ALTER TABLE research_runs ADD COLUMN IF NOT EXISTS schema_version int`
-
+	// ── Caches (global de-dup, no org scoping) ──────────────────────
+	// Keyed by content/query hash; the same URL fetched by two orgs
+	// shares the cache row. The org-scoped data is in research_runs.
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS search_cache (
 			key_hash    text PRIMARY KEY,
@@ -756,6 +797,29 @@ export default Effect.gen(function* () {
 
 	// ── Indexes ──────────────────────────────────────────────────────
 	yield* Effect.all([
+		// Per-org indices on CRM tables — org_id leads in every read.
+		sql`CREATE INDEX IF NOT EXISTS idx_companies_org ON companies(organization_id)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_contacts_org ON contacts(organization_id)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_contacts_company ON contacts(company_id)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_interactions_org ON interactions(organization_id)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_interactions_company ON interactions(company_id)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_products_org ON products(organization_id)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_proposals_org ON proposals(organization_id)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_documents_org ON documents(organization_id)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_pages_org ON pages(organization_id)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_webhook_endpoints_org ON webhook_endpoints(organization_id)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_calendar_event_types_org ON calendar_event_types(organization_id)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_calendar_events_org ON calendar_events(organization_id)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_calendar_event_attendees_org ON calendar_event_attendees(organization_id)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_tasks_org ON tasks(organization_id)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_task_events_org ON task_events(organization_id)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_timeline_activity_org ON timeline_activity(organization_id)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_call_recordings_org ON call_recordings(organization_id)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_research_runs_org ON research_runs(organization_id)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_research_run_sources_org ON research_run_sources(organization_id)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_research_links_org ON research_links(organization_id)`,
+		sql`CREATE INDEX IF NOT EXISTS idx_research_paid_spend_org ON research_paid_spend(organization_id)`,
+
 		// email_thread_links — org_updated index drives the inbox-list view.
 		sql`CREATE INDEX IF NOT EXISTS idx_email_thread_links_company_id ON email_thread_links(company_id)`,
 		sql`CREATE INDEX IF NOT EXISTS idx_email_thread_links_inbox_id ON email_thread_links(inbox_id)`,
@@ -846,7 +910,7 @@ export default Effect.gen(function* () {
 		sql`CREATE INDEX IF NOT EXISTS calendar_events_start_idx ON calendar_events(start_at)`,
 		sql`CREATE INDEX IF NOT EXISTS calendar_events_company_idx ON calendar_events(company_id, start_at) WHERE company_id IS NOT NULL`,
 		sql`CREATE INDEX IF NOT EXISTS calendar_events_contact_idx ON calendar_events(contact_id, start_at) WHERE contact_id IS NOT NULL`,
-		sql`CREATE UNIQUE INDEX IF NOT EXISTS calendar_events_provider_booking_idx ON calendar_events(provider, provider_booking_id) WHERE provider_booking_id IS NOT NULL`,
+		sql`CREATE UNIQUE INDEX IF NOT EXISTS calendar_events_provider_booking_idx ON calendar_events(organization_id, provider, provider_booking_id) WHERE provider_booking_id IS NOT NULL`,
 
 		// calendar_event_attendees — fast "upcoming meetings with contact" lookup.
 		sql`CREATE INDEX IF NOT EXISTS calendar_event_attendees_contact_idx ON calendar_event_attendees(contact_id) WHERE contact_id IS NOT NULL`,
@@ -861,37 +925,16 @@ export default Effect.gen(function* () {
 		sql`CREATE INDEX IF NOT EXISTS task_events_task_id_idx ON task_events(task_id, at DESC)`,
 	])
 
-	// ── Multi-tenant roles ──────────────────────────────────────────
-	// app_user: HTTP + MCP request path. RLS policies (added per-table by
-	// later slices) gate visibility on current_setting('app.current_org_id').
-	// app_service: mail worker + cron jobs. BYPASSRLS so background workers
-	// can resolve the org explicitly from the row they're processing
-	// instead of carrying a session-scoped GUC.
-	// NOLOGIN on both: connections still authenticate as the DATABASE_URL
-	// owner; the app SETs ROLE to one of these inside the request boundary.
-	yield* sql`
-		DO $$
-		BEGIN
-			IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app_user') THEN
-				CREATE ROLE app_user NOLOGIN;
-			END IF;
-			IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app_service') THEN
-				CREATE ROLE app_service NOLOGIN BYPASSRLS;
-			END IF;
-		END
-		$$;
-	`
-
 	// ── Better Auth additions ───────────────────────────────────────
 	// member.primary_inbox_id is the member's default From identity in
 	// this org; ON DELETE SET NULL so deleting the inbox demotes the
 	// member back to "no primary" rather than cascading them out.
 	// migrate.ts runs Better Auth before this CRM migration so `member`
-	// already exists by the time we ALTER it. Better Auth's
+	// already exists by the time we reach this block. Better Auth's
 	// additionalFields declares `primaryInboxId` as `string`, which lands
 	// as TEXT — but the FK target inboxes.id is UUID, so we drop the
 	// stale TEXT column and re-add it with the right type before
-	// installing the FK. Pre-prod: no rows to migrate.
+	// installing the FK.
 	yield* sql`ALTER TABLE "member" DROP COLUMN IF EXISTS primary_inbox_id`
 	yield* sql`
 		ALTER TABLE "member"
@@ -916,53 +959,257 @@ export default Effect.gen(function* () {
 	`
 
 	// ── Row-level security ──────────────────────────────────────────
-	// Every email-stack table is RLS-gated on
-	// current_setting('app.current_org_id'). app_user has the GUC set
-	// per request inside withTransaction; app_service has BYPASSRLS and
-	// resolves the org explicitly from each row it processes.
-	// message_participants is scoped transitively through email_messages.
-	yield* sql`ALTER TABLE inboxes ENABLE ROW LEVEL SECURITY`
-	yield* sql`ALTER TABLE email_thread_links ENABLE ROW LEVEL SECURITY`
-	yield* sql`ALTER TABLE email_messages ENABLE ROW LEVEL SECURITY`
-	yield* sql`ALTER TABLE email_draft_bodies ENABLE ROW LEVEL SECURITY`
-	yield* sql`ALTER TABLE inbox_footers ENABLE ROW LEVEL SECURITY`
-	yield* sql`ALTER TABLE email_attachment_staging ENABLE ROW LEVEL SECURITY`
-	yield* sql`ALTER TABLE message_participants ENABLE ROW LEVEL SECURITY`
+	// Every org-scoped table has RLS gated on
+	// current_setting('app.current_org_id', true). The web request path
+	// sets this GUC inside withTransaction; the worker uses app_service
+	// (BYPASSRLS) and resolves the org explicitly per row.
+	//
+	// FORCE ROW LEVEL SECURITY makes the policy apply to the table owner
+	// too, not just non-owners — without FORCE, the role that owns the
+	// table (typically the DATABASE_URL connection role) bypasses the
+	// policy. TO app_user scopes the policy so app_service still gets to
+	// bypass cleanly via its BYPASSRLS attribute.
+	//
+	// message_participants is scoped transitively through email_messages
+	// (no organization_id column of its own).
+	yield* Effect.all([
+		// Email stack
+		sql`ALTER TABLE inboxes ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE inboxes FORCE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE email_thread_links ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE email_thread_links FORCE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE email_messages ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE email_messages FORCE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE email_draft_bodies ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE email_draft_bodies FORCE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE inbox_footers ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE inbox_footers FORCE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE email_attachment_staging ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE email_attachment_staging FORCE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE message_participants ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE message_participants FORCE ROW LEVEL SECURITY`,
 
-	yield* sql`
-		CREATE POLICY org_isolation_inboxes ON inboxes
-			USING (organization_id = current_setting('app.current_org_id', true))
-	`
-	yield* sql`
-		CREATE POLICY org_isolation_email_thread_links ON email_thread_links
-			USING (organization_id = current_setting('app.current_org_id', true))
-	`
-	yield* sql`
-		CREATE POLICY org_isolation_email_messages ON email_messages
-			USING (organization_id = current_setting('app.current_org_id', true))
-	`
-	yield* sql`
-		CREATE POLICY org_isolation_email_draft_bodies ON email_draft_bodies
-			USING (organization_id = current_setting('app.current_org_id', true))
-	`
-	yield* sql`
-		CREATE POLICY org_isolation_inbox_footers ON inbox_footers
-			USING (organization_id = current_setting('app.current_org_id', true))
-	`
-	yield* sql`
-		CREATE POLICY org_isolation_email_attachment_staging ON email_attachment_staging
-			USING (organization_id = current_setting('app.current_org_id', true))
-	`
-	yield* sql`
-		CREATE POLICY org_isolation_message_participants ON message_participants
-			USING (
-				EXISTS (
-					SELECT 1 FROM email_messages m
-					WHERE m.id = message_participants.email_message_id
-						AND m.organization_id = current_setting('app.current_org_id', true)
+		// CRM core
+		sql`ALTER TABLE companies ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE companies FORCE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE contacts ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE contacts FORCE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE interactions ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE interactions FORCE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE products ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE products FORCE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE proposals ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE proposals FORCE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE documents ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE documents FORCE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE pages ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE pages FORCE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE webhook_endpoints ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE webhook_endpoints FORCE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE calendar_event_types ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE calendar_event_types FORCE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE calendar_events ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE calendar_events FORCE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE calendar_event_attendees ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE calendar_event_attendees FORCE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE tasks ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE tasks FORCE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE task_events ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE task_events FORCE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE timeline_activity ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE timeline_activity FORCE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE call_recordings ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE call_recordings FORCE ROW LEVEL SECURITY`,
+
+		// Research
+		sql`ALTER TABLE research_runs ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE research_runs FORCE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE research_run_sources ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE research_run_sources FORCE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE research_links ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE research_links FORCE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE research_paid_spend ENABLE ROW LEVEL SECURITY`,
+		sql`ALTER TABLE research_paid_spend FORCE ROW LEVEL SECURITY`,
+	])
+
+	// Policies — single shape applied uniformly: org_id matches the GUC.
+	// USING gates reads/updates/deletes; WITH CHECK gates inserts/updates
+	// so a row can never be written into a different org than the GUC.
+	yield* Effect.all([
+		sql`
+			CREATE POLICY org_isolation_inboxes ON inboxes
+				TO app_user
+				USING (organization_id = current_setting('app.current_org_id', true))
+				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
+		`,
+		sql`
+			CREATE POLICY org_isolation_email_thread_links ON email_thread_links
+				TO app_user
+				USING (organization_id = current_setting('app.current_org_id', true))
+				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
+		`,
+		sql`
+			CREATE POLICY org_isolation_email_messages ON email_messages
+				TO app_user
+				USING (organization_id = current_setting('app.current_org_id', true))
+				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
+		`,
+		sql`
+			CREATE POLICY org_isolation_email_draft_bodies ON email_draft_bodies
+				TO app_user
+				USING (organization_id = current_setting('app.current_org_id', true))
+				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
+		`,
+		sql`
+			CREATE POLICY org_isolation_inbox_footers ON inbox_footers
+				TO app_user
+				USING (organization_id = current_setting('app.current_org_id', true))
+				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
+		`,
+		sql`
+			CREATE POLICY org_isolation_email_attachment_staging ON email_attachment_staging
+				TO app_user
+				USING (organization_id = current_setting('app.current_org_id', true))
+				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
+		`,
+		// message_participants — transitive through email_messages.
+		sql`
+			CREATE POLICY org_isolation_message_participants ON message_participants
+				TO app_user
+				USING (
+					EXISTS (
+						SELECT 1 FROM email_messages m
+						WHERE m.id = message_participants.email_message_id
+							AND m.organization_id = current_setting('app.current_org_id', true)
+					)
 				)
-			)
-	`
+				WITH CHECK (
+					EXISTS (
+						SELECT 1 FROM email_messages m
+						WHERE m.id = message_participants.email_message_id
+							AND m.organization_id = current_setting('app.current_org_id', true)
+					)
+				)
+		`,
+
+		// CRM core — uniform shape.
+		sql`
+			CREATE POLICY org_isolation_companies ON companies
+				TO app_user
+				USING (organization_id = current_setting('app.current_org_id', true))
+				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
+		`,
+		sql`
+			CREATE POLICY org_isolation_contacts ON contacts
+				TO app_user
+				USING (organization_id = current_setting('app.current_org_id', true))
+				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
+		`,
+		sql`
+			CREATE POLICY org_isolation_interactions ON interactions
+				TO app_user
+				USING (organization_id = current_setting('app.current_org_id', true))
+				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
+		`,
+		sql`
+			CREATE POLICY org_isolation_products ON products
+				TO app_user
+				USING (organization_id = current_setting('app.current_org_id', true))
+				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
+		`,
+		sql`
+			CREATE POLICY org_isolation_proposals ON proposals
+				TO app_user
+				USING (organization_id = current_setting('app.current_org_id', true))
+				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
+		`,
+		sql`
+			CREATE POLICY org_isolation_documents ON documents
+				TO app_user
+				USING (organization_id = current_setting('app.current_org_id', true))
+				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
+		`,
+		sql`
+			CREATE POLICY org_isolation_pages ON pages
+				TO app_user
+				USING (organization_id = current_setting('app.current_org_id', true))
+				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
+		`,
+		sql`
+			CREATE POLICY org_isolation_webhook_endpoints ON webhook_endpoints
+				TO app_user
+				USING (organization_id = current_setting('app.current_org_id', true))
+				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
+		`,
+		sql`
+			CREATE POLICY org_isolation_calendar_event_types ON calendar_event_types
+				TO app_user
+				USING (organization_id = current_setting('app.current_org_id', true))
+				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
+		`,
+		sql`
+			CREATE POLICY org_isolation_calendar_events ON calendar_events
+				TO app_user
+				USING (organization_id = current_setting('app.current_org_id', true))
+				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
+		`,
+		sql`
+			CREATE POLICY org_isolation_calendar_event_attendees ON calendar_event_attendees
+				TO app_user
+				USING (organization_id = current_setting('app.current_org_id', true))
+				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
+		`,
+		sql`
+			CREATE POLICY org_isolation_tasks ON tasks
+				TO app_user
+				USING (organization_id = current_setting('app.current_org_id', true))
+				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
+		`,
+		sql`
+			CREATE POLICY org_isolation_task_events ON task_events
+				TO app_user
+				USING (organization_id = current_setting('app.current_org_id', true))
+				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
+		`,
+		sql`
+			CREATE POLICY org_isolation_timeline_activity ON timeline_activity
+				TO app_user
+				USING (organization_id = current_setting('app.current_org_id', true))
+				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
+		`,
+		sql`
+			CREATE POLICY org_isolation_call_recordings ON call_recordings
+				TO app_user
+				USING (organization_id = current_setting('app.current_org_id', true))
+				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
+		`,
+
+		// Research
+		sql`
+			CREATE POLICY org_isolation_research_runs ON research_runs
+				TO app_user
+				USING (organization_id = current_setting('app.current_org_id', true))
+				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
+		`,
+		sql`
+			CREATE POLICY org_isolation_research_run_sources ON research_run_sources
+				TO app_user
+				USING (organization_id = current_setting('app.current_org_id', true))
+				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
+		`,
+		sql`
+			CREATE POLICY org_isolation_research_links ON research_links
+				TO app_user
+				USING (organization_id = current_setting('app.current_org_id', true))
+				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
+		`,
+		sql`
+			CREATE POLICY org_isolation_research_paid_spend ON research_paid_spend
+				TO app_user
+				USING (organization_id = current_setting('app.current_org_id', true))
+				WITH CHECK (organization_id = current_setting('app.current_org_id', true))
+		`,
+	])
 
 	// app_user needs DML privileges; RLS still gates row visibility.
 	// app_service gets the same grants because BYPASSRLS only opts out

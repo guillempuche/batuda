@@ -15,11 +15,13 @@ export const dbReset = Effect.gen(function* () {
 	yield* Effect.logInfo('Running migrations...')
 	yield* dbMigrate
 
-	yield* Effect.logInfo('Seeding (full)...')
-	yield* seed('full')
-
+	// Identities first so the CRM seed can stamp organization_id on every
+	// row from the resolved org id (default: the taller demo org).
 	yield* Effect.logInfo('Seeding identities...')
 	yield* seedIdentities
+
+	yield* Effect.logInfo('Seeding (full)...')
+	yield* seed('full')
 
 	yield* Effect.logInfo('Database reset complete.')
 })

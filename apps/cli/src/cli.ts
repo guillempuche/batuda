@@ -42,8 +42,8 @@ const seedCommand = Command.make(
 	({ preset }) =>
 		withDb(
 			Effect.gen(function* () {
-				const counts = yield* seed(preset)
 				yield* seedIdentities
+				const counts = yield* seed(preset)
 				yield* Console.log('')
 				yield* Console.log(
 					`Seeded (${preset}): ${counts.products} products, ${counts.companies} companies, ${counts.contacts} contacts, ${counts.interactions} interactions, ${counts.tasks} tasks, ${counts.documents} documents, ${counts.proposals} proposals, ${counts.pages} pages, ${counts.callRecordings} call recordings`,

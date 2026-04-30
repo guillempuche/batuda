@@ -1093,6 +1093,25 @@ export const seed = (preset: Preset) =>
 		// Always truncate before seeding so the command is idempotent.
 		yield* seedReset
 
+		// Every CRM row in this seed lives under the taller org. Restaurant
+		// stays empty by design (the multi-org-isolation tests provision
+		// rows there on demand). Resolved from the database so the seed
+		// works whether or not seedIdentities just ran.
+		const tallerOrgRows = yield* sql<{ id: string }>`
+			SELECT id FROM "organization" WHERE slug = 'taller' LIMIT 1
+		`
+		const tallerOrgId = tallerOrgRows[0]?.id
+		if (!tallerOrgId) {
+			return yield* Effect.die(
+				new Error(
+					'CRM seed requires the taller demo org. Run `seedIdentities` first (or `pnpm cli db reset` which orders identities before CRM data).',
+				),
+			)
+		}
+		// Helper: stamp organization_id on every row before sql.insert.
+		const stamp = <T extends Record<string, unknown>>(rows: ReadonlyArray<T>) =>
+			rows.map(r => ({ ...r, organizationId: tallerOrgId }))
+
 		const companies =
 			preset === 'minimal'
 				? COMPANIES.filter(c => MINIMAL_COMPANY_SLUGS.has(c.slug))
@@ -1110,7 +1129,7 @@ export const seed = (preset: Preset) =>
 		const insertedProducts = yield* sql<{
 			id: string
 			slug: string
-		}>`INSERT INTO products ${sql.insert(normalizeRows(products))} RETURNING id, slug`
+		}>`INSERT INTO products ${sql.insert(normalizeRows(stamp(products)))} RETURNING id, slug`
 		for (const p of insertedProducts) {
 			yield* Effect.logInfo(`  product: ${p.slug} (${p.id})`)
 		}
@@ -1121,7 +1140,7 @@ export const seed = (preset: Preset) =>
 			id: string
 			slug: string
 			status: string
-		}>`INSERT INTO companies ${sql.insert(normalizeRows(companies))} RETURNING id, slug, status`
+		}>`INSERT INTO companies ${sql.insert(normalizeRows(stamp(companies)))} RETURNING id, slug, status`
 
 		const companyMap = new Map(insertedCompanies.map(c => [c.slug, c.id]))
 		for (const c of insertedCompanies) {
@@ -1135,7 +1154,7 @@ export const seed = (preset: Preset) =>
 		const insertedContacts = yield* sql<{
 			id: string
 			name: string
-		}>`INSERT INTO contacts ${sql.insert(normalizeRows(data.contacts))} RETURNING id, name`
+		}>`INSERT INTO contacts ${sql.insert(normalizeRows(stamp(data.contacts)))} RETURNING id, name`
 
 		const contactMap = new Map(insertedContacts.map(c => [c.name, c.id]))
 		for (const c of insertedContacts) {
@@ -1149,7 +1168,7 @@ export const seed = (preset: Preset) =>
 			id: string
 			channel: string
 			type: string
-		}>`INSERT INTO interactions ${sql.insert(normalizeRows(dataWithContacts.interactions))} RETURNING id, channel, type`
+		}>`INSERT INTO interactions ${sql.insert(normalizeRows(stamp(dataWithContacts.interactions)))} RETURNING id, channel, type`
 		for (const i of insertedInteractions.slice(0, 3)) {
 			yield* Effect.logInfo(`  interaction: ${i.channel}/${i.type} (${i.id})`)
 		}
@@ -1163,10 +1182,11 @@ export const seed = (preset: Preset) =>
 		// the CLI bundle.
 		yield* sql`
 			INSERT INTO timeline_activity (
-				kind, entity_type, entity_id, company_id, contact_id,
+				organization_id, kind, entity_type, entity_id, company_id, contact_id,
 				channel, direction, occurred_at, summary, payload
 			)
 			SELECT
+				${tallerOrgId},
 				CASE WHEN channel IN ('phone','call') THEN 'call_logged'
 				     ELSE 'system_event' END,
 				'interaction', id, company_id, contact_id,
@@ -1197,7 +1217,7 @@ export const seed = (preset: Preset) =>
 		const insertedTasks = yield* sql<{
 			id: string
 			title: string
-		}>`INSERT INTO tasks ${sql.insert(normalizeRows(dataWithContacts.tasks))} RETURNING id, title`
+		}>`INSERT INTO tasks ${sql.insert(normalizeRows(stamp(dataWithContacts.tasks)))} RETURNING id, title`
 		for (const t of insertedTasks.slice(0, 3)) {
 			yield* Effect.logInfo(`  task: ${t.title} (${t.id})`)
 		}
@@ -1258,12 +1278,12 @@ export const seed = (preset: Preset) =>
 		for (const et of calendarEventTypeSeeds) {
 			yield* sql`
 				INSERT INTO calendar_event_types (
-					slug, provider, provider_event_type_id, title,
+					organization_id, slug, provider, provider_event_type_id, title,
 					duration_minutes, location_kind, default_location_value, active
 				) VALUES (
-					${et.slug}, ${et.provider}, NULL, ${et.title},
+					${tallerOrgId}, ${et.slug}, ${et.provider}, NULL, ${et.title},
 					${et.durationMinutes}, ${et.locationKind}, NULL, true
-				) ON CONFLICT (slug) DO UPDATE SET
+				) ON CONFLICT (organization_id, slug) DO UPDATE SET
 					title = EXCLUDED.title,
 					duration_minutes = EXCLUDED.duration_minutes,
 					location_kind = EXCLUDED.location_kind,
@@ -1271,10 +1291,14 @@ export const seed = (preset: Preset) =>
 			`
 		}
 		const [discoveryType] = yield* sql<{ id: string }>`
-			SELECT id FROM calendar_event_types WHERE slug = 'discovery' LIMIT 1
+			SELECT id FROM calendar_event_types
+			WHERE organization_id = ${tallerOrgId} AND slug = 'discovery'
+			LIMIT 1
 		`
 		const [internalType] = yield* sql<{ id: string }>`
-			SELECT id FROM calendar_event_types WHERE slug = 'internal-block' LIMIT 1
+			SELECT id FROM calendar_event_types
+			WHERE organization_id = ${tallerOrgId} AND slug = 'internal-block'
+			LIMIT 1
 		`
 		const calDay = 24 * 60 * 60 * 1000
 		const now = Date.now()
@@ -1422,7 +1446,7 @@ export const seed = (preset: Preset) =>
 			source: string
 			title: string
 		}>`
-			INSERT INTO calendar_events ${sql.insert(normalizeRows(calendarEventSeeds))}
+			INSERT INTO calendar_events ${sql.insert(normalizeRows(stamp(calendarEventSeeds)))}
 			RETURNING id, source, title
 		`
 		// Attendees for the four non-internal events. One organizer +
@@ -1454,7 +1478,7 @@ export const seed = (preset: Preset) =>
 			])
 		if (attendeeRows.length > 0) {
 			yield* sql`
-				INSERT INTO calendar_event_attendees ${sql.insert(normalizeRows(attendeeRows))}
+				INSERT INTO calendar_event_attendees ${sql.insert(normalizeRows(stamp(attendeeRows)))}
 			`
 		}
 		// A handful of task_events so the undo drawer in /tasks has
@@ -1466,7 +1490,7 @@ export const seed = (preset: Preset) =>
 			change: { kind: 'created', snapshot: { title: t.title } },
 		}))
 		if (taskEventRows.length > 0) {
-			yield* sql`INSERT INTO task_events ${sql.insert(normalizeRows(taskEventRows))}`
+			yield* sql`INSERT INTO task_events ${sql.insert(normalizeRows(stamp(taskEventRows)))}`
 		}
 		yield* Effect.logInfo(
 			`  ${insertedCalendarEvents.length} events, ${attendeeRows.length} attendees, ${taskEventRows.length} task events`,
@@ -1499,239 +1523,243 @@ export const seed = (preset: Preset) =>
 			// 6. Documents
 			yield* Effect.logInfo('Seeding documents...')
 			yield* sql`INSERT INTO documents ${sql.insert(
-				normalizeRows([
-					{
-						companyId: companyMap.get('cal-pep-fonda')!,
-						interactionId: insertedInteractions[0]?.id,
-						type: 'prenote',
-						title: 'Visit prep — Cal Pep',
-						content:
-							'## Goal\nSee the restaurant, understand current booking flow.\n\n## Questions\n- How many covers per service?\n- Do they take reservations via WhatsApp or phone?\n- Do they have a website?',
-					},
-					{
-						companyId: companyMap.get('cal-pep-fonda')!,
-						interactionId: insertedInteractions[0]?.id,
-						type: 'postnote',
-						title: 'Visit summary — Cal Pep',
-						content:
-							"## Summary\n60 covers, 2 services/day. Phone-only reservations — they lose ~15% of walk-ups who won't wait.\n\n## Decision\nWants website + booking. Budget approved up to 1500 EUR.",
-					},
-					{
-						companyId: companyMap.get('ferros-baix-llobregat')!,
-						interactionId: null,
-						type: 'research',
-						title: 'Company analysis — Ferros BL',
-						content:
-							'## Company\n40 employees, 2 warehouses in Cornellà. Revenue ~3M EUR/year.\n\n## Pain points detected\n- Manual invoicing: 2 days/month\n- Transcription errors: ~5% of invoices\n- No real-time stock control',
-					},
-					{
-						companyId: companyMap.get('hostal-pirineu')!,
-						interactionId: insertedInteractions[5]?.id,
-						type: 'visit_notes',
-						title: 'Visit notes — Hostal Pirineu',
-						content:
-							'## Context\n12 rooms, high season June–September + ski December–March.\n\n## Commissions\nBooking: 15–18%. They want to drop below 5% with a direct channel.\n\n## Requirements\n- Availability calendar\n- Upfront payment (Stripe/Redsys)\n- Multi-language: ca, es, fr',
-					},
-					{
-						companyId: companyMap.get('tancaments-garraf')!,
-						interactionId: null,
-						type: 'call_notes',
-						title: 'Demo debrief — Tancaments Garraf',
-						content:
-							'## Attendees\nRamon Vila (owner), Oriol Camps (project manager)\n\n## Key points\n- Currently tracking 12 concurrent projects in shared Google Sheets\n- Lost a client last month due to a missed deadline nobody saw in the spreadsheet\n- Want a dashboard with alerts per project phase\n\n## Objections\n- Worried about migration effort from existing sheets\n- Need offline access for site visits',
-					},
-					{
-						companyId: companyMap.get('distribuciones-martinez')!,
-						interactionId: null,
-						type: 'general',
-						title: 'Competitor landscape — logistics in Alzira',
-						content:
-							'## Notes\nNo direct competitor offering digital delivery notes in this area.\nClosest: a Valencia-based firm doing fleet GPS, but not document digitisation.\n\n## Opportunity\nFirst-mover advantage if we land Distribuciones Martínez as a reference client.',
-					},
-				]),
+				normalizeRows(
+					stamp([
+						{
+							companyId: companyMap.get('cal-pep-fonda')!,
+							interactionId: insertedInteractions[0]?.id,
+							type: 'prenote',
+							title: 'Visit prep — Cal Pep',
+							content:
+								'## Goal\nSee the restaurant, understand current booking flow.\n\n## Questions\n- How many covers per service?\n- Do they take reservations via WhatsApp or phone?\n- Do they have a website?',
+						},
+						{
+							companyId: companyMap.get('cal-pep-fonda')!,
+							interactionId: insertedInteractions[0]?.id,
+							type: 'postnote',
+							title: 'Visit summary — Cal Pep',
+							content:
+								"## Summary\n60 covers, 2 services/day. Phone-only reservations — they lose ~15% of walk-ups who won't wait.\n\n## Decision\nWants website + booking. Budget approved up to 1500 EUR.",
+						},
+						{
+							companyId: companyMap.get('ferros-baix-llobregat')!,
+							interactionId: null,
+							type: 'research',
+							title: 'Company analysis — Ferros BL',
+							content:
+								'## Company\n40 employees, 2 warehouses in Cornellà. Revenue ~3M EUR/year.\n\n## Pain points detected\n- Manual invoicing: 2 days/month\n- Transcription errors: ~5% of invoices\n- No real-time stock control',
+						},
+						{
+							companyId: companyMap.get('hostal-pirineu')!,
+							interactionId: insertedInteractions[5]?.id,
+							type: 'visit_notes',
+							title: 'Visit notes — Hostal Pirineu',
+							content:
+								'## Context\n12 rooms, high season June–September + ski December–March.\n\n## Commissions\nBooking: 15–18%. They want to drop below 5% with a direct channel.\n\n## Requirements\n- Availability calendar\n- Upfront payment (Stripe/Redsys)\n- Multi-language: ca, es, fr',
+						},
+						{
+							companyId: companyMap.get('tancaments-garraf')!,
+							interactionId: null,
+							type: 'call_notes',
+							title: 'Demo debrief — Tancaments Garraf',
+							content:
+								'## Attendees\nRamon Vila (owner), Oriol Camps (project manager)\n\n## Key points\n- Currently tracking 12 concurrent projects in shared Google Sheets\n- Lost a client last month due to a missed deadline nobody saw in the spreadsheet\n- Want a dashboard with alerts per project phase\n\n## Objections\n- Worried about migration effort from existing sheets\n- Need offline access for site visits',
+						},
+						{
+							companyId: companyMap.get('distribuciones-martinez')!,
+							interactionId: null,
+							type: 'general',
+							title: 'Competitor landscape — logistics in Alzira',
+							content:
+								'## Notes\nNo direct competitor offering digital delivery notes in this area.\nClosest: a Valencia-based firm doing fleet GPS, but not document digitisation.\n\n## Opportunity\nFirst-mover advantage if we land Distribuciones Martínez as a reference client.',
+						},
+					]),
+				),
 			)}`
 
 			// 7. Proposals
 			yield* Effect.logInfo('Seeding proposals...')
 			const productMap = new Map(insertedProducts.map(p => [p.slug, p.id]))
 			yield* sql`INSERT INTO proposals ${sql.insert(
-				normalizeRows([
-					{
-						companyId: companyMap.get('cal-pep-fonda')!,
-						contactId: contactMap.get('Pep Casals'),
-						status: 'accepted',
-						title: 'Web + Booking — Cal Pep Fonda',
-						lineItems: JSON.stringify([
-							{
-								product_id: productMap.get('web-starter'),
-								qty: 1,
-								price: '990.00',
-								notes: 'Responsive website with local SEO',
-							},
-							{
-								product_id: productMap.get('gestio-reserves'),
-								qty: 12,
-								price: '49.00',
-								notes: '12 months booking management',
-							},
-						]),
-						totalValue: '1578.00',
-						sentAt: new Date('2026-02-22'),
-						respondedAt: new Date('2026-02-25'),
-						notes: 'Accepted by phone. Project start March 1st.',
-					},
-					{
-						companyId: companyMap.get('ferros-baix-llobregat')!,
-						contactId: contactMap.get('Jordi Puig'),
-						status: 'draft',
-						title: 'Invoicing automation — Ferros BL',
-						lineItems: JSON.stringify([
-							{
-								product_id: productMap.get('automatitzacions'),
-								qty: 1,
-								price: '1500.00',
-								notes: 'Initial setup + Contaplus integration',
-							},
-						]),
-						totalValue: '1500.00',
-						sentAt: null,
-						respondedAt: null,
-						notes: 'Pending on-site meeting to finalise details.',
-					},
-					{
-						companyId: companyMap.get('hostal-pirineu')!,
-						contactId: contactMap.get('Arnau Ribas'),
-						status: 'sent',
-						title: 'Direct booking system — Hostal del Pirineu',
-						lineItems: JSON.stringify([
-							{
-								product_id: productMap.get('web-starter'),
-								qty: 1,
-								price: '990.00',
-								notes: 'Multi-language site (ca/es/fr)',
-							},
-							{
-								product_id: productMap.get('gestio-reserves'),
-								qty: 12,
-								price: '49.00',
-								notes: 'Booking engine, 12 months',
-							},
-						]),
-						totalValue: '1578.00',
-						sentAt: new Date('2026-04-06'),
-						expiresAt: new Date('2026-05-06'),
-						notes: 'Sent after the on-site visit. Waiting for reply.',
-					},
-					{
-						companyId: companyMap.get('bright-lane-boutique')!,
-						contactId: contactMap.get('Sarah Mitchell'),
-						status: 'viewed',
-						title: 'Ecommerce setup — Bright Lane Boutique',
-						lineItems: JSON.stringify([
-							{
-								product_id: productMap.get('ecommerce-local'),
-								qty: 1,
-								price: '2500.00',
-								notes: 'Online store with Instagram Shop integration',
-							},
-							{
-								product_id: productMap.get('web-starter'),
-								qty: 1,
-								price: '990.00',
-								notes: 'Landing page + SEO',
-							},
-							{
-								product_id: productMap.get('social-media-pack'),
-								qty: 3,
-								price: '300.00',
-								notes: '3 months social media management',
-							},
-						]),
-						totalValue: '4390.00',
-						sentAt: new Date('2026-04-01'),
-						expiresAt: new Date('2026-04-30'),
-						notes: 'Sarah opened the proposal link on April 3rd.',
-					},
-					{
-						companyId: companyMap.get('tancaments-garraf')!,
-						contactId: contactMap.get('Ramon Vila'),
-						status: 'negotiating',
-						title: 'Project management automation — Tancaments Garraf',
-						lineItems: JSON.stringify([
-							{
-								product_id: productMap.get('automatitzacions'),
-								qty: 1,
-								price: '1500.00',
-								notes: 'Google Sheets to dashboard migration',
-							},
-							{
-								product_id: productMap.get('web-starter'),
-								qty: 1,
-								price: '990.00',
-								notes: 'Corporate website refresh',
-							},
-							{
-								product_id: productMap.get('consultoria-custom'),
-								qty: 1,
-								price: '800.00',
-								notes: 'Discovery + custom workflow mapping',
-							},
-							{
-								product_id: productMap.get('consultoria-custom'),
-								qty: 1,
-								price: '600.00',
-								notes: 'Staff training (2 sessions)',
-							},
-							{
-								product_id: productMap.get('gestio-reserves'),
-								qty: 6,
-								price: '49.00',
-								notes: '6 months appointment scheduling pilot',
-							},
-						]),
-						totalValue: '4184.00',
-						sentAt: new Date('2026-04-08'),
-						expiresAt: new Date('2026-05-08'),
-						notes: 'Ramon wants to reduce scope. Negotiating line items.',
-					},
-					{
-						companyId: companyMap.get('park-stone-design')!,
-						contactId: null,
-						status: 'rejected',
-						title: 'Website redesign — Park & Stone Design',
-						lineItems: JSON.stringify([
-							{
-								product_id: productMap.get('web-starter'),
-								qty: 1,
-								price: '990.00',
-								notes: 'Portfolio website',
-							},
-						]),
-						totalValue: '990.00',
-						sentAt: new Date('2026-02-18'),
-						respondedAt: new Date('2026-02-20'),
-						notes: 'Already had a web provider. Polite decline.',
-					},
-					{
-						companyId: companyMap.get('coastal-freight')!,
-						contactId: contactMap.get('Tom Parker'),
-						status: 'expired',
-						title: 'Delivery note digitisation — Coastal Freight',
-						lineItems: JSON.stringify([
-							{
-								product_id: productMap.get('automatitzacions'),
-								qty: 1,
-								price: '1500.00',
-								notes: 'Paper to digital workflow',
-							},
-						]),
-						totalValue: '1500.00',
-						currency: 'USD',
-						sentAt: new Date('2026-02-01'),
-						expiresAt: new Date('2026-03-01'),
-						notes: 'Tom never responded. Proposal expired.',
-					},
-				]),
+				normalizeRows(
+					stamp([
+						{
+							companyId: companyMap.get('cal-pep-fonda')!,
+							contactId: contactMap.get('Pep Casals'),
+							status: 'accepted',
+							title: 'Web + Booking — Cal Pep Fonda',
+							lineItems: JSON.stringify([
+								{
+									product_id: productMap.get('web-starter'),
+									qty: 1,
+									price: '990.00',
+									notes: 'Responsive website with local SEO',
+								},
+								{
+									product_id: productMap.get('gestio-reserves'),
+									qty: 12,
+									price: '49.00',
+									notes: '12 months booking management',
+								},
+							]),
+							totalValue: '1578.00',
+							sentAt: new Date('2026-02-22'),
+							respondedAt: new Date('2026-02-25'),
+							notes: 'Accepted by phone. Project start March 1st.',
+						},
+						{
+							companyId: companyMap.get('ferros-baix-llobregat')!,
+							contactId: contactMap.get('Jordi Puig'),
+							status: 'draft',
+							title: 'Invoicing automation — Ferros BL',
+							lineItems: JSON.stringify([
+								{
+									product_id: productMap.get('automatitzacions'),
+									qty: 1,
+									price: '1500.00',
+									notes: 'Initial setup + Contaplus integration',
+								},
+							]),
+							totalValue: '1500.00',
+							sentAt: null,
+							respondedAt: null,
+							notes: 'Pending on-site meeting to finalise details.',
+						},
+						{
+							companyId: companyMap.get('hostal-pirineu')!,
+							contactId: contactMap.get('Arnau Ribas'),
+							status: 'sent',
+							title: 'Direct booking system — Hostal del Pirineu',
+							lineItems: JSON.stringify([
+								{
+									product_id: productMap.get('web-starter'),
+									qty: 1,
+									price: '990.00',
+									notes: 'Multi-language site (ca/es/fr)',
+								},
+								{
+									product_id: productMap.get('gestio-reserves'),
+									qty: 12,
+									price: '49.00',
+									notes: 'Booking engine, 12 months',
+								},
+							]),
+							totalValue: '1578.00',
+							sentAt: new Date('2026-04-06'),
+							expiresAt: new Date('2026-05-06'),
+							notes: 'Sent after the on-site visit. Waiting for reply.',
+						},
+						{
+							companyId: companyMap.get('bright-lane-boutique')!,
+							contactId: contactMap.get('Sarah Mitchell'),
+							status: 'viewed',
+							title: 'Ecommerce setup — Bright Lane Boutique',
+							lineItems: JSON.stringify([
+								{
+									product_id: productMap.get('ecommerce-local'),
+									qty: 1,
+									price: '2500.00',
+									notes: 'Online store with Instagram Shop integration',
+								},
+								{
+									product_id: productMap.get('web-starter'),
+									qty: 1,
+									price: '990.00',
+									notes: 'Landing page + SEO',
+								},
+								{
+									product_id: productMap.get('social-media-pack'),
+									qty: 3,
+									price: '300.00',
+									notes: '3 months social media management',
+								},
+							]),
+							totalValue: '4390.00',
+							sentAt: new Date('2026-04-01'),
+							expiresAt: new Date('2026-04-30'),
+							notes: 'Sarah opened the proposal link on April 3rd.',
+						},
+						{
+							companyId: companyMap.get('tancaments-garraf')!,
+							contactId: contactMap.get('Ramon Vila'),
+							status: 'negotiating',
+							title: 'Project management automation — Tancaments Garraf',
+							lineItems: JSON.stringify([
+								{
+									product_id: productMap.get('automatitzacions'),
+									qty: 1,
+									price: '1500.00',
+									notes: 'Google Sheets to dashboard migration',
+								},
+								{
+									product_id: productMap.get('web-starter'),
+									qty: 1,
+									price: '990.00',
+									notes: 'Corporate website refresh',
+								},
+								{
+									product_id: productMap.get('consultoria-custom'),
+									qty: 1,
+									price: '800.00',
+									notes: 'Discovery + custom workflow mapping',
+								},
+								{
+									product_id: productMap.get('consultoria-custom'),
+									qty: 1,
+									price: '600.00',
+									notes: 'Staff training (2 sessions)',
+								},
+								{
+									product_id: productMap.get('gestio-reserves'),
+									qty: 6,
+									price: '49.00',
+									notes: '6 months appointment scheduling pilot',
+								},
+							]),
+							totalValue: '4184.00',
+							sentAt: new Date('2026-04-08'),
+							expiresAt: new Date('2026-05-08'),
+							notes: 'Ramon wants to reduce scope. Negotiating line items.',
+						},
+						{
+							companyId: companyMap.get('park-stone-design')!,
+							contactId: null,
+							status: 'rejected',
+							title: 'Website redesign — Park & Stone Design',
+							lineItems: JSON.stringify([
+								{
+									product_id: productMap.get('web-starter'),
+									qty: 1,
+									price: '990.00',
+									notes: 'Portfolio website',
+								},
+							]),
+							totalValue: '990.00',
+							sentAt: new Date('2026-02-18'),
+							respondedAt: new Date('2026-02-20'),
+							notes: 'Already had a web provider. Polite decline.',
+						},
+						{
+							companyId: companyMap.get('coastal-freight')!,
+							contactId: contactMap.get('Tom Parker'),
+							status: 'expired',
+							title: 'Delivery note digitisation — Coastal Freight',
+							lineItems: JSON.stringify([
+								{
+									product_id: productMap.get('automatitzacions'),
+									qty: 1,
+									price: '1500.00',
+									notes: 'Paper to digital workflow',
+								},
+							]),
+							totalValue: '1500.00',
+							currency: 'USD',
+							sentAt: new Date('2026-02-01'),
+							expiresAt: new Date('2026-03-01'),
+							notes: 'Tom never responded. Proposal expired.',
+						},
+					]),
+				),
 			)}`
 
 			// 8. Pages
@@ -2448,7 +2476,7 @@ export const seed = (preset: Preset) =>
 					viewCount: 0,
 				},
 			]
-			yield* sql`INSERT INTO pages ${sql.insert(normalizeRows(pageRows))}`
+			yield* sql`INSERT INTO pages ${sql.insert(normalizeRows(stamp(pageRows)))}`
 
 			// 10. Research runs + sources
 			yield* Effect.logInfo('Seeding research runs & sources...')
@@ -2558,68 +2586,72 @@ export const seed = (preset: Preset) =>
 			const insertedRuns = yield* sql<{
 				id: string
 				status: string
-			}>`INSERT INTO research_runs ${sql.insert(normalizeRows(researchRunRows))} RETURNING id, status`
+			}>`INSERT INTO research_runs ${sql.insert(normalizeRows(stamp(researchRunRows)))} RETURNING id, status`
 			yield* Effect.logInfo(`  ${insertedRuns.length} research runs`)
 
 			// Group run with children
 			const groupRun = yield* sql<{
 				id: string
-			}>`INSERT INTO research_runs ${sql.insert([
-				{
-					kind: 'group',
-					query: 'Full market scan: small businesses in Catalonia',
-					mode: 'deep',
-					status: 'succeeded',
-					context: JSON.stringify({ scope: 'catalonia' }),
-					findings: JSON.stringify({ childCount: 2 }),
-					briefMd:
-						'## Market scan\nGrouped 2 sub-queries covering restaurants and retail in Catalonia.',
-					budgetCents: 100,
-					costCents: 47,
-					tokensIn: 16900,
-					tokensOut: 4000,
-					createdBy: testUser?.id ?? 'seed',
-					startedAt: new Date('2026-02-05T09:00:00Z'),
-					completedAt: new Date('2026-02-05T09:05:00Z'),
-				},
-			])} RETURNING id`
-			yield* sql`INSERT INTO research_runs ${sql.insert(
-				normalizeRows([
+			}>`INSERT INTO research_runs ${sql.insert(
+				stamp([
 					{
-						parentId: groupRun[0]!.id,
-						kind: 'leaf',
-						query: 'restaurants Catalonia without websites',
+						kind: 'group',
+						query: 'Full market scan: small businesses in Catalonia',
 						mode: 'deep',
 						status: 'succeeded',
-						findings: JSON.stringify({ count: 45 }),
+						context: JSON.stringify({ scope: 'catalonia' }),
+						findings: JSON.stringify({ childCount: 2 }),
 						briefMd:
-							'Found 45 restaurants in Catalonia without a website or with outdated sites.',
-						budgetCents: 50,
-						costCents: 25,
-						tokensIn: 9000,
-						tokensOut: 2200,
+							'## Market scan\nGrouped 2 sub-queries covering restaurants and retail in Catalonia.',
+						budgetCents: 100,
+						costCents: 47,
+						tokensIn: 16900,
+						tokensOut: 4000,
 						createdBy: testUser?.id ?? 'seed',
-						startedAt: new Date('2026-02-05T09:00:30Z'),
-						completedAt: new Date('2026-02-05T09:03:00Z'),
-					},
-					{
-						parentId: groupRun[0]!.id,
-						kind: 'followup',
-						query: 'retail shops Barcelona Instagram-only',
-						mode: 'deep',
-						status: 'succeeded',
-						findings: JSON.stringify({ count: 18 }),
-						briefMd:
-							'Found 18 retail shops in Barcelona selling only via Instagram DM.',
-						budgetCents: 50,
-						costCents: 22,
-						tokensIn: 7900,
-						tokensOut: 1800,
-						createdBy: testUser?.id ?? 'seed',
-						startedAt: new Date('2026-02-05T09:03:00Z'),
+						startedAt: new Date('2026-02-05T09:00:00Z'),
 						completedAt: new Date('2026-02-05T09:05:00Z'),
 					},
 				]),
+			)} RETURNING id`
+			yield* sql`INSERT INTO research_runs ${sql.insert(
+				normalizeRows(
+					stamp([
+						{
+							parentId: groupRun[0]!.id,
+							kind: 'leaf',
+							query: 'restaurants Catalonia without websites',
+							mode: 'deep',
+							status: 'succeeded',
+							findings: JSON.stringify({ count: 45 }),
+							briefMd:
+								'Found 45 restaurants in Catalonia without a website or with outdated sites.',
+							budgetCents: 50,
+							costCents: 25,
+							tokensIn: 9000,
+							tokensOut: 2200,
+							createdBy: testUser?.id ?? 'seed',
+							startedAt: new Date('2026-02-05T09:00:30Z'),
+							completedAt: new Date('2026-02-05T09:03:00Z'),
+						},
+						{
+							parentId: groupRun[0]!.id,
+							kind: 'followup',
+							query: 'retail shops Barcelona Instagram-only',
+							mode: 'deep',
+							status: 'succeeded',
+							findings: JSON.stringify({ count: 18 }),
+							briefMd:
+								'Found 18 retail shops in Barcelona selling only via Instagram DM.',
+							budgetCents: 50,
+							costCents: 22,
+							tokensIn: 7900,
+							tokensOut: 1800,
+							createdBy: testUser?.id ?? 'seed',
+							startedAt: new Date('2026-02-05T09:03:00Z'),
+							completedAt: new Date('2026-02-05T09:05:00Z'),
+						},
+					]),
+				),
 			)}`
 			yield* Effect.logInfo('  + 1 group with 2 children')
 
@@ -2962,7 +2994,7 @@ export const seed = (preset: Preset) =>
 
 			if (recordingRows.length > 0) {
 				yield* sql`INSERT INTO call_recordings ${sql.insert(
-					normalizeRows(recordingRows),
+					normalizeRows(stamp(recordingRows)),
 				)}`
 				yield* Effect.logInfo(
 					`  ${recordingRows.length} recordings (${uploadedCount} uploaded, ${recordingRows.length - uploadedCount} missing/deleted)`,
