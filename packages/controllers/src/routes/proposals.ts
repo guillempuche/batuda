@@ -1,6 +1,7 @@
 import { Schema } from 'effect'
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi'
 
+import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 
 const CreateProposalInput = Schema.Struct({
@@ -47,4 +48,5 @@ export const ProposalsGroup = HttpApiGroup.make('proposals')
 		}),
 	)
 	.middleware(SessionMiddleware)
+	.middleware(OrgMiddleware)
 	.prefix('/v1')

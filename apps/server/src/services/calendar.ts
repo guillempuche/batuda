@@ -14,6 +14,7 @@ import {
 	type Slot,
 	UnsupportedRsvp,
 } from '@batuda/calendar'
+import { CurrentOrg } from '@batuda/controllers'
 
 import {
 	Ambiguous,
@@ -260,10 +261,12 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 				}>,
 			) =>
 				Effect.gen(function* () {
+					const currentOrg = yield* CurrentOrg
 					for (const attendee of attendees) {
 						const resolved = yield* resolveAttendee(attendee)
 						yield* sql`
 							INSERT INTO calendar_event_attendees ${sql.insert({
+								organizationId: currentOrg.id,
 								eventId,
 								email: attendee.email.toLowerCase(),
 								name: attendee.name,
@@ -291,7 +294,7 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 			): Effect.Effect<
 				{ companyId: string | null; contactId: string | null },
 				never,
-				never
+				CurrentOrg
 			> =>
 				Effect.gen(function* () {
 					for (const attendee of attendees) {
@@ -326,28 +329,31 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 				readonly contactId: string | null
 				readonly metadata: Record<string, unknown> | null
 			}) =>
-				sql<CalendarEventRow>`
-					INSERT INTO calendar_events ${sql.insert({
-						source: 'booking',
-						provider: args.provider,
-						providerBookingId: args.providerBookingId,
-						icalUid: args.icalUid,
-						icalSequence: args.icalSequence,
-						eventTypeId: args.eventTypeId,
-						startAt: args.startAt,
-						endAt: args.endAt,
-						status: args.status,
-						title: args.title,
-						locationType: args.locationType,
-						locationValue: args.locationValue,
-						videoCallUrl: args.videoCallUrl,
-						organizerEmail: args.organizerEmail,
-						companyId: args.companyId,
-						contactId: args.contactId,
-						interactionId: null,
-						metadata: args.metadata ? JSON.stringify(args.metadata) : null,
-						rawIcs: null,
-					})}
+				Effect.gen(function* () {
+					const currentOrg = yield* CurrentOrg
+					return yield* sql<CalendarEventRow>`
+						INSERT INTO calendar_events ${sql.insert({
+							organizationId: currentOrg.id,
+							source: 'booking',
+							provider: args.provider,
+							providerBookingId: args.providerBookingId,
+							icalUid: args.icalUid,
+							icalSequence: args.icalSequence,
+							eventTypeId: args.eventTypeId,
+							startAt: args.startAt,
+							endAt: args.endAt,
+							status: args.status,
+							title: args.title,
+							locationType: args.locationType,
+							locationValue: args.locationValue,
+							videoCallUrl: args.videoCallUrl,
+							organizerEmail: args.organizerEmail,
+							companyId: args.companyId,
+							contactId: args.contactId,
+							interactionId: null,
+							metadata: args.metadata ? JSON.stringify(args.metadata) : null,
+							rawIcs: null,
+						})}
 					ON CONFLICT (ical_uid) DO UPDATE SET
 						ical_sequence = EXCLUDED.ical_sequence,
 						provider_booking_id = EXCLUDED.provider_booking_id,
@@ -360,14 +366,15 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 						location_type = EXCLUDED.location_type,
 						location_value = EXCLUDED.location_value,
 						video_call_url = EXCLUDED.video_call_url,
-						organizer_email = EXCLUDED.organizer_email,
-						company_id = EXCLUDED.company_id,
-						contact_id = EXCLUDED.contact_id,
-						metadata = EXCLUDED.metadata,
-						updated_at = now()
-					WHERE calendar_events.ical_sequence <= EXCLUDED.ical_sequence
-					RETURNING *
-				`.pipe(Effect.map(rows => rows[0] ?? null))
+							organizer_email = EXCLUDED.organizer_email,
+							company_id = EXCLUDED.company_id,
+							contact_id = EXCLUDED.contact_id,
+							metadata = EXCLUDED.metadata,
+							updated_at = now()
+						WHERE calendar_events.ical_sequence <= EXCLUDED.ical_sequence
+						RETURNING *
+					`.pipe(Effect.map(rows => rows[0] ?? null))
+				})
 
 			const markCancelled = (icalUid: string, icalSequence: number) =>
 				sql<CalendarEventRow>`
@@ -587,6 +594,7 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 				sql.withTransaction(
 					Effect.gen(function* () {
 						if (!payload.iCalUID) return
+						const currentOrg = yield* CurrentOrg
 						const existing = yield* findByIcalUid(payload.iCalUID)
 						if (!existing || !existing.companyId) return
 						const dueAt = new Date(
@@ -594,6 +602,7 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 						)
 						yield* sql`
 							INSERT INTO tasks ${sql.insert({
+								organizationId: currentOrg.id,
 								companyId: existing.companyId,
 								contactId: existing.contactId,
 								type: 'followup',
@@ -647,6 +656,7 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 			}) =>
 				sql.withTransaction(
 					Effect.gen(function* () {
+						const currentOrg = yield* CurrentOrg
 						const { parsed, vevent, rawIcs, results } = args
 						if (parsed.method === 'REPLY') {
 							const row = yield* findByIcalUid(vevent.icalUid)
@@ -690,6 +700,7 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 
 						const inserted = yield* sql<CalendarEventRow>`
 							INSERT INTO calendar_events ${sql.insert({
+								organizationId: currentOrg.id,
 								source: 'email',
 								provider: 'email',
 								providerBookingId: null,
@@ -1135,11 +1146,13 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 				readonly metadata: Record<string, unknown> | null
 			}) =>
 				Effect.gen(function* () {
+					const currentOrg = yield* CurrentOrg
 					const icalUid = `internal-${crypto.randomUUID()}@calendar.batuda`
 					return yield* sql.withTransaction(
 						Effect.gen(function* () {
 							const rows = yield* sql<CalendarEventRow>`
 								INSERT INTO calendar_events ${sql.insert({
+									organizationId: currentOrg.id,
 									source: 'internal',
 									provider: 'internal',
 									providerBookingId: null,

@@ -3,6 +3,8 @@ import { createHmac } from 'node:crypto'
 import { Effect, Layer, ServiceMap } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
+import { CurrentOrg } from '@batuda/controllers'
+
 const hmacSign = (secret: string | null, payload: unknown): string => {
 	if (!secret) return ''
 	return createHmac('sha256', secret)
@@ -17,10 +19,16 @@ export class WebhookService extends ServiceMap.Service<WebhookService>()(
 			const sql = yield* SqlClient.SqlClient
 
 			return {
+				// `fire` is called from services that already have CurrentOrg
+				// in scope, so we resolve it inside the effect and only fan
+				// out to endpoints belonging to that org.
 				fire: (event: string, payload: unknown) =>
 					Effect.gen(function* () {
+						const currentOrg = yield* CurrentOrg
 						const endpoints = yield* sql`
-							SELECT * FROM webhook_endpoints WHERE is_active = true
+							SELECT * FROM webhook_endpoints
+							WHERE is_active = true
+							  AND organization_id = ${currentOrg.id}
 						`
 
 						const matching = endpoints.filter((ep: any) =>
@@ -74,16 +82,39 @@ export class WebhookService extends ServiceMap.Service<WebhookService>()(
 						)
 					}).pipe(Effect.forkDetach),
 
-				list: () => sql`SELECT * FROM webhook_endpoints`,
+				list: () =>
+					Effect.gen(function* () {
+						const currentOrg = yield* CurrentOrg
+						return yield* sql`
+							SELECT * FROM webhook_endpoints
+							WHERE organization_id = ${currentOrg.id}
+						`
+					}),
 
 				create: (data: Record<string, unknown>) =>
-					sql`INSERT INTO webhook_endpoints ${sql.insert(data)} RETURNING *`,
+					Effect.gen(function* () {
+						const currentOrg = yield* CurrentOrg
+						return yield* sql`INSERT INTO webhook_endpoints ${sql.insert({ ...data, organizationId: currentOrg.id })} RETURNING *`
+					}),
 
 				update: (id: string, data: Record<string, unknown>) =>
-					sql`UPDATE webhook_endpoints SET ${sql.update(data, ['id'])} WHERE id = ${id} RETURNING *`,
+					Effect.gen(function* () {
+						const currentOrg = yield* CurrentOrg
+						return yield* sql`
+							UPDATE webhook_endpoints SET ${sql.update(data, ['id'])}
+							WHERE id = ${id} AND organization_id = ${currentOrg.id}
+							RETURNING *
+						`
+					}),
 
 				remove: (id: string) =>
-					sql`DELETE FROM webhook_endpoints WHERE id = ${id}`,
+					Effect.gen(function* () {
+						const currentOrg = yield* CurrentOrg
+						return yield* sql`
+							DELETE FROM webhook_endpoints
+							WHERE id = ${id} AND organization_id = ${currentOrg.id}
+						`
+					}),
 			}
 		}),
 	},

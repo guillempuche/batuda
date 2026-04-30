@@ -6,6 +6,7 @@ import {
 } from 'effect/unstable/httpapi'
 
 import { ConfirmRequired, InsufficientBudget, NotFound } from '../errors'
+import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 
 // ── Input schemas ──
@@ -203,4 +204,5 @@ export const ResearchGroup = HttpApiGroup.make('research')
 		}),
 	)
 	.middleware(SessionMiddleware)
+	.middleware(OrgMiddleware)
 	.prefix('/v1')

@@ -8,6 +8,7 @@ import {
 import { TaskPriority, TaskSource, TaskStatus } from '@batuda/domain'
 
 import { BadRequest, Conflict, NotFound } from '../errors'
+import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 
 // ── Input schemas ──
@@ -174,4 +175,5 @@ export const TasksGroup = HttpApiGroup.make('tasks')
 		}),
 	)
 	.middleware(SessionMiddleware)
+	.middleware(OrgMiddleware)
 	.prefix('/v1')

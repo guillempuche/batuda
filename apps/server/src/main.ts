@@ -11,7 +11,7 @@ import { HttpApiBuilder, HttpApiScalar, OpenApi } from 'effect/unstable/httpapi'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { BookingProviderLive, IcsParserLive } from '@batuda/calendar'
-import { BatudaApi } from '@batuda/controllers'
+import { BatudaApi, CurrentOrg } from '@batuda/controllers'
 import {
 	makeResearchLlmLive,
 	makeResearchProvidersLive,
@@ -101,6 +101,11 @@ const TIMELINE_STATUS_FOR_EVENT: Record<
 	'research.cancelled': 'cancelled',
 }
 
+// ResearchEventSink runs out-of-band of an HTTP request — research runs
+// are kicked off by users but progress events fire later, sometimes from
+// background fibres. Recover the active org from the research_run row and
+// provide CurrentOrg manually so org-scoped fan-out (webhooks, timeline)
+// can reach the right tables.
 const ResearchEventSinkLive = Layer.effect(
 	ResearchEventSink,
 	Effect.gen(function* () {
@@ -110,20 +115,34 @@ const ResearchEventSinkLive = Layer.effect(
 		return ResearchEventSink.of({
 			fire: (event, payload) =>
 				Effect.gen(function* () {
-					yield* webhooks.fire(event, payload)
-					const status = TIMELINE_STATUS_FOR_EVENT[event] ?? null
-					if (!status) return
 					const researchId = (payload as { researchId?: string }).researchId
-					if (!researchId) return
+					if (!researchId) {
+						yield* Effect.logWarning(
+							'ResearchEventSink.fire called without researchId in payload',
+						)
+						return
+					}
 					const rows = yield* sql<{
+						organizationId: string
 						query: string
 						briefMd: string | null
 					}>`
-						SELECT query, brief_md FROM research_runs
+						SELECT organization_id, query, brief_md
+						FROM research_runs
 						WHERE id = ${researchId} LIMIT 1
 					`
 					const [run] = rows
 					if (!run) return
+					const orgScope: { id: string; name: string; slug: string } = {
+						id: run.organizationId,
+						name: '',
+						slug: '',
+					}
+					yield* webhooks
+						.fire(event, payload)
+						.pipe(Effect.provideService(CurrentOrg, orgScope))
+					const status = TIMELINE_STATUS_FOR_EVENT[event] ?? null
+					if (!status) return
 					const linkRows = yield* sql<{ subjectId: string }>`
 						SELECT subject_id FROM research_links
 						WHERE research_id = ${researchId}
@@ -132,15 +151,17 @@ const ResearchEventSinkLive = Layer.effect(
 						LIMIT 1
 					`
 					const companyId = linkRows[0]?.subjectId ?? null
-					yield* timeline.record(
-						new ResearchRunCompleted({
-							researchRunId: researchId,
-							companyId,
-							summary: run.briefMd ?? run.query,
-							status,
-							occurredAt: new Date(),
-						}),
-					)
+					yield* timeline
+						.record(
+							new ResearchRunCompleted({
+								researchRunId: researchId,
+								companyId,
+								summary: run.briefMd ?? run.query,
+								status,
+								occurredAt: new Date(),
+							}),
+						)
+						.pipe(Effect.provideService(CurrentOrg, orgScope))
 				}).pipe(Effect.orDie),
 		})
 	}),

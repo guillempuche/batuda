@@ -8,6 +8,7 @@ import {
 import { TiptapDocument } from '@batuda/ui/blocks'
 
 import { NotFound } from '../errors'
+import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 
 const CreatePageInput = Schema.Struct({
@@ -68,6 +69,7 @@ export const PagesGroup = HttpApiGroup.make('pages')
 		}),
 	)
 	.middleware(SessionMiddleware)
+	.middleware(OrgMiddleware)
 	// Public endpoints AFTER (no auth)
 	.add(
 		HttpApiEndpoint.get('getPublic', '/pages/:slug', {

@@ -1,6 +1,8 @@
 import { Data, Effect, Layer, ServiceMap } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
+import { CurrentOrg } from '@batuda/controllers'
+
 export class MatchedContact extends Data.TaggedClass('MatchedContact')<{
 	readonly contactId: string
 	readonly companyId: string
@@ -54,8 +56,11 @@ export class ParticipantMatcher extends ServiceMap.Service<ParticipantMatcher>()
 			const sql = yield* SqlClient.SqlClient
 
 			return {
-				match: (args: MatchArgs): Effect.Effect<ParticipantMatch> =>
+				match: (
+					args: MatchArgs,
+				): Effect.Effect<ParticipantMatch, never, CurrentOrg> =>
 					Effect.gen(function* () {
+						const currentOrg = yield* CurrentOrg
 						const email = args.email.trim().toLowerCase()
 
 						const contacts = yield* sql<{
@@ -64,6 +69,7 @@ export class ParticipantMatcher extends ServiceMap.Service<ParticipantMatcher>()
 						}>`
 							SELECT id, company_id FROM contacts
 							WHERE lower(email) = ${email}
+							  AND organization_id = ${currentOrg.id}
 							ORDER BY updated_at DESC
 						`
 						const [firstContact, secondContact] = contacts
@@ -87,8 +93,11 @@ export class ParticipantMatcher extends ServiceMap.Service<ParticipantMatcher>()
 
 						const companies = yield* sql<{ id: string }>`
 							SELECT id FROM companies
-							WHERE lower(email) LIKE ${`%@${domain}`}
-								OR lower(website) LIKE ${`%${domain}%`}
+							WHERE organization_id = ${currentOrg.id}
+								AND (
+									lower(email) LIKE ${`%@${domain}`}
+									OR lower(website) LIKE ${`%${domain}%`}
+								)
 							ORDER BY updated_at DESC
 							LIMIT 1
 						`
@@ -102,6 +111,7 @@ export class ParticipantMatcher extends ServiceMap.Service<ParticipantMatcher>()
 
 						const inserted = yield* sql<{ id: string }>`
 							INSERT INTO contacts ${sql.insert({
+								organizationId: currentOrg.id,
 								companyId,
 								email,
 								name: args.displayName ?? email,

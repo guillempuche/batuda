@@ -2,10 +2,14 @@ import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
+import { CurrentOrg } from '@batuda/controllers'
+
 import {
 	DocumentCreated,
 	TimelineActivityService,
 } from '../../services/timeline-activity'
+
+const REQUEST_DEPENDENCIES = [CurrentOrg]
 
 const GetDocuments = Tool.make('get_documents', {
 	description:
@@ -15,6 +19,7 @@ const GetDocuments = Tool.make('get_documents', {
 		type: Schema.optional(Schema.String),
 	}),
 	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Documents')
 	.annotate(Tool.Readonly, true)
@@ -27,6 +32,7 @@ const GetDocument = Tool.make('get_document', {
 		id: Schema.String,
 	}),
 	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Get Document')
 	.annotate(Tool.Readonly, true)
@@ -44,6 +50,7 @@ const CreateDocument = Tool.make('create_document', {
 		content: Schema.String,
 	}),
 	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Create Document')
 	.annotate(Tool.Destructive, false)
@@ -57,6 +64,7 @@ const UpdateDocument = Tool.make('update_document', {
 		content: Schema.optional(Schema.String),
 	}),
 	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Update Document')
 	.annotate(Tool.Destructive, false)

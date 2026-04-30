@@ -8,6 +8,7 @@ import {
 import { CalendarLocationType } from '@batuda/calendar'
 
 import { BadRequest, Conflict, Forbidden, NotFound } from '../errors'
+import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 
 // ── Input schemas ──
@@ -105,4 +106,5 @@ export const CalendarGroup = HttpApiGroup.make('calendar')
 		}),
 	)
 	.middleware(SessionMiddleware)
+	.middleware(OrgMiddleware)
 	.prefix('/v1')

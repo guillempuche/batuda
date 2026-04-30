@@ -2,10 +2,14 @@ import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
+import { CurrentOrg } from '@batuda/controllers'
+
 import {
 	InteractionLogged,
 	TimelineActivityService,
 } from '../../services/timeline-activity'
+
+const REQUEST_DEPENDENCIES = [CurrentOrg]
 
 const LogInteraction = Tool.make('log_interaction', {
 	description:
@@ -24,6 +28,7 @@ const LogInteraction = Tool.make('log_interaction', {
 		duration_min: Schema.optional(Schema.Number),
 	}),
 	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Log Interaction')
 	.annotate(Tool.Destructive, false)
@@ -39,6 +44,7 @@ const ListInteractions = Tool.make('list_interactions', {
 		limit: Schema.optional(Schema.Number),
 	}),
 	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Interactions')
 	.annotate(Tool.Readonly, true)

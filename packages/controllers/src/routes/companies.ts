@@ -6,6 +6,7 @@ import {
 } from 'effect/unstable/httpapi'
 
 import { NotFound } from '../errors'
+import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 
 const CreateCompanyInput = Schema.Struct({
@@ -108,4 +109,5 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 		}),
 	)
 	.middleware(SessionMiddleware)
+	.middleware(OrgMiddleware)
 	.prefix('/v1')

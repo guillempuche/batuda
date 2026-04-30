@@ -1,8 +1,12 @@
 import { DateTime, Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 
+import { CurrentOrg } from '@batuda/controllers'
+
 import { CompanyService } from '../../services/companies'
 import { Geocoder } from '../../services/geocoder'
+
+const REQUEST_DEPENDENCIES = [CurrentOrg]
 
 const SearchCompanies = Tool.make('search_companies', {
 	description:
@@ -17,6 +21,7 @@ const SearchCompanies = Tool.make('search_companies', {
 		limit: Schema.optional(Schema.Number),
 	}),
 	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Search Companies')
 	.annotate(Tool.Readonly, true)
@@ -30,6 +35,7 @@ const GetCompany = Tool.make('get_company', {
 		id_or_slug: Schema.String,
 	}),
 	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Get Company')
 	.annotate(Tool.Readonly, true)
@@ -68,6 +74,7 @@ const CreateCompany = Tool.make('create_company', {
 		metadata: Schema.optional(Schema.Unknown),
 	}),
 	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Create Company')
 	.annotate(Tool.Destructive, false)
@@ -105,6 +112,7 @@ const UpdateCompany = Tool.make('update_company', {
 		metadata: Schema.optional(Schema.Unknown),
 	}),
 	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Update Company')
 	.annotate(Tool.Destructive, false)
@@ -118,6 +126,7 @@ const GeocodeCompany = Tool.make('geocode_company', {
 		id: Schema.String,
 	}),
 	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Geocode Company')
 	.annotate(Tool.Destructive, false)

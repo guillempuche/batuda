@@ -1,6 +1,8 @@
 import { Data, Effect, Layer, ServiceMap } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
+import { CurrentOrg } from '@batuda/controllers'
+
 export class EmailSent extends Data.TaggedClass('EmailSent')<{
 	readonly emailMessageId: string
 	readonly companyId: string
@@ -701,10 +703,11 @@ export class TimelineActivityService extends ServiceMap.Service<TimelineActivity
 			return {
 				record: (
 					event: TimelineEvent,
-				): Effect.Effect<RecordResult, never, never> =>
+				): Effect.Effect<RecordResult, never, CurrentOrg> =>
 					sql
 						.withTransaction(
 							Effect.gen(function* () {
+								const currentOrg = yield* CurrentOrg
 								let resolvedInteractionId: string | null = null
 
 								if (event._tag === 'InteractionLogged') {
@@ -716,6 +719,7 @@ export class TimelineActivityService extends ServiceMap.Service<TimelineActivity
 											const inserted = yield* sql<{ id: string }>`
 												INSERT INTO interactions ${sql.insert({
 													...interactionRow,
+													organizationId: currentOrg.id,
 													metadata: interactionRow.metadata,
 												})} RETURNING id`
 											const [created] = inserted
@@ -733,7 +737,10 @@ export class TimelineActivityService extends ServiceMap.Service<TimelineActivity
 									const interactionRow = mapEventToInteraction(event)
 									if (interactionRow) {
 										const inserted = yield* sql<{ id: string }>`
-											INSERT INTO interactions ${sql.insert(interactionRow)} RETURNING id`
+											INSERT INTO interactions ${sql.insert({
+												...interactionRow,
+												organizationId: currentOrg.id,
+											})} RETURNING id`
 										const [created] = inserted
 										if (!created) {
 											return yield* Effect.die(
@@ -750,6 +757,7 @@ export class TimelineActivityService extends ServiceMap.Service<TimelineActivity
 								const entityId = entityIdFor(event, resolvedInteractionId)
 								const activityRows = yield* sql<{ id: string }>`
 									INSERT INTO timeline_activity ${sql.insert({
+										organizationId: currentOrg.id,
 										kind: base.kind,
 										entityType: base.entityType,
 										entityId,

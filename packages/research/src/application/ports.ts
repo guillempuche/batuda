@@ -174,10 +174,17 @@ export class ReportRouter extends ServiceMap.Service<
 
 // ── Research event sink (observability — fires webhooks, metrics, etc.) ──
 
+// Implementations may require request-scoped tags (e.g. CurrentOrg, when the
+// sink fans out webhooks scoped to the active org). The R channel stays open
+// so callers thread their context — the research-service runs sinks under
+// the same fiber that holds the request's tags.
 export class ResearchEventSink extends ServiceMap.Service<
 	ResearchEventSink,
 	{
-		readonly fire: (event: string, payload: unknown) => Effect.Effect<void>
+		readonly fire: (
+			event: string,
+			payload: unknown,
+		) => Effect.Effect<void, never, never>
 	}
 >()('research/ResearchEventSink') {}
 

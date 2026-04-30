@@ -1,11 +1,16 @@
 import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 
+import { CurrentOrg } from '@batuda/controllers'
+
 import { CompanyService } from '../../services/companies'
 
 // ── crm_lookup ──
 // With `id`: get a single row. With `query`: search by name/fields.
 // Replaces separate search_companies + get_company + search_contacts + get_contact.
+// CurrentOrg is declared as a dependency so the MCP runtime threads the
+// active-org tag through every CRM lookup — same pattern the email tools
+// use at apps/server/src/mcp/tools/email.ts:17.
 
 const CrmLookup = Tool.make('crm_lookup', {
 	description:
@@ -16,6 +21,7 @@ const CrmLookup = Tool.make('crm_lookup', {
 		id: Schema.optional(Schema.String),
 	}),
 	success: Schema.Unknown,
+	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'CRM Lookup')
 	.annotate(Tool.Readonly, true)

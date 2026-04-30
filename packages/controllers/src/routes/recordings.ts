@@ -6,6 +6,7 @@ import {
 } from 'effect/unstable/httpapi'
 
 import { BadRequest, Conflict, NotFound } from '../errors'
+import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 
 const RecordingMetadata = Schema.Struct({
@@ -76,6 +77,7 @@ export const RecordingsGroup = HttpApiGroup.make('recordings')
 		}),
 	)
 	.middleware(SessionMiddleware)
+	.middleware(OrgMiddleware)
 	.prefix('/v1')
 
 // Re-export for handler reference (matches the existing routes pattern)

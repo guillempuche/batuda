@@ -39,6 +39,7 @@ const FindAvailability = Tool.make('find_availability', {
 		to: Schema.String,
 	}),
 	success: Schema.Array(Schema.Unknown),
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Find Availability')
 	.annotate(Tool.Readonly, true)
@@ -60,6 +61,7 @@ const ScheduleMeeting = Tool.make('schedule_meeting', {
 		metadata: Schema.optional(Schema.NullOr(Schema.Unknown)),
 	}),
 	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Schedule Meeting')
 	.annotate(Tool.Destructive, false)
@@ -73,6 +75,7 @@ const RescheduleMeeting = Tool.make('reschedule_meeting', {
 		new_start_at: Schema.String,
 	}),
 	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Reschedule Meeting')
 	.annotate(Tool.Destructive, false)
@@ -86,6 +89,7 @@ const CancelMeeting = Tool.make('cancel_meeting', {
 		reason: Schema.optional(Schema.NullOr(Schema.String)),
 	}),
 	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Cancel Meeting')
 	.annotate(Tool.Destructive, true)
@@ -118,6 +122,7 @@ const RsvpPendingInvitations = Tool.make('rsvp_pending_invitations', {
 		limit: Schema.optional(Schema.Number),
 	}),
 	success: Schema.Array(Schema.Unknown),
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Pending Invitations')
 	.annotate(Tool.Readonly, true)
@@ -153,6 +158,7 @@ const ListUpcoming = Tool.make('list_upcoming_meetings', {
 		limit: Schema.optional(Schema.Number),
 	}),
 	success: Schema.Array(Schema.Unknown),
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Upcoming Meetings')
 	.annotate(Tool.Readonly, true)
@@ -166,6 +172,7 @@ const ListEventTypes = Tool.make('list_event_types', {
 		active: Schema.optional(Schema.Boolean),
 	}),
 	success: Schema.Array(Schema.Unknown),
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Event Types')
 	.annotate(Tool.Readonly, true)
@@ -191,6 +198,7 @@ const CreateInternalBlock = Tool.make('create_internal_block', {
 		metadata: Schema.optional(Schema.NullOr(Schema.Unknown)),
 	}),
 	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Create Internal Block')
 	.annotate(Tool.Destructive, false)

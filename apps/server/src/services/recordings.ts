@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { Effect, Layer, ServiceMap } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { BadRequest, Conflict, NotFound } from '@batuda/controllers'
+import { BadRequest, Conflict, CurrentOrg, NotFound } from '@batuda/controllers'
 
 import { StorageProvider } from './storage-provider.js'
 import {
@@ -166,8 +166,10 @@ export class RecordingService extends ServiceMap.Service<RecordingService>()(
 							const ext = extForMimeType(params.mimeType)
 							const storageKey = `recordings/${companyId}/${randomUUID()}.${ext}`
 
+							const currentOrg = yield* CurrentOrg
 							const recordingInsert = yield* sql<{ id: string }>`
 								INSERT INTO call_recordings ${sql.insert({
+									organizationId: currentOrg.id,
 									interactionId,
 									storageKey,
 									mimeType: params.mimeType,

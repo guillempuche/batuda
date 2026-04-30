@@ -1,6 +1,7 @@
 import { Effect, Schema } from 'effect'
 import { McpSchema, McpServer, Tool, Toolkit } from 'effect/unstable/ai'
 
+import { CurrentOrg } from '@batuda/controllers'
 import { BlockNode, TiptapDocument } from '@batuda/ui/blocks'
 
 import { PageService } from '../../services/pages'
@@ -17,6 +18,7 @@ const CreatePage = Tool.make('create_page', {
 		content: TiptapDocument,
 	}),
 	success: Schema.Unknown,
+	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Create Page')
 	.annotate(Tool.Destructive, false)

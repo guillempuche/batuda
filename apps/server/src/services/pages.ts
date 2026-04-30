@@ -2,7 +2,7 @@ import { Effect, Layer, Schema, ServiceMap } from 'effect'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient, type SqlError } from 'effect/unstable/sql'
 
-import { NotFound } from '@batuda/controllers'
+import { CurrentOrg, NotFound } from '@batuda/controllers'
 import { TiptapDocument } from '@batuda/ui/blocks'
 
 import { CompanyService } from './companies'
@@ -44,14 +44,18 @@ export class PageService extends ServiceMap.Service<PageService>()(
 			const sql = yield* SqlClient.SqlClient
 			const companies = yield* CompanyService
 
-			const insertPage = (data: Record<string, unknown>) =>
-				sql`INSERT INTO pages ${sql.insert(data)} RETURNING *`
+			const insertPage = (data: Record<string, unknown>, orgId: string) =>
+				sql`INSERT INTO pages ${sql.insert({ ...data, organizationId: orgId })} RETURNING *`
 
 			const create = (data: CreatePageData) =>
 				Effect.gen(function* () {
+					const currentOrg = yield* CurrentOrg
 					const { slug, companyId, ...rest } = data
 					if (slug) {
-						return yield* insertPage({ ...rest, companyId, slug })
+						return yield* insertPage(
+							{ ...rest, companyId, slug },
+							currentOrg.id,
+						)
 					}
 					if (!companyId) {
 						return yield* new SlugRequired({
@@ -64,11 +68,10 @@ export class PageService extends ServiceMap.Service<PageService>()(
 					const maxAttempts = 3
 					for (let attempt = 1; attempt <= maxAttempts; attempt++) {
 						const candidate = buildPageSlug(companySlug)
-						const result = yield* insertPage({
-							...rest,
-							companyId,
-							slug: candidate,
-						}).pipe(
+						const result = yield* insertPage(
+							{ ...rest, companyId, slug: candidate },
+							currentOrg.id,
+						).pipe(
 							Effect.catch((err: SqlError.SqlError) =>
 								err.reason._tag === 'ConstraintError' && attempt < maxAttempts
 									? Effect.succeed(null)
