@@ -1534,7 +1534,13 @@ export const seed = (preset: Preset) =>
 			if (masterKey.length === 32) {
 				const inboxId = randomUUID()
 				const subkey = Buffer.from(
-					hkdfSync('sha256', masterKey, Buffer.alloc(0), Buffer.from(inboxId, 'utf8'), 32),
+					hkdfSync(
+						'sha256',
+						masterKey,
+						Buffer.alloc(0),
+						Buffer.from(inboxId, 'utf8'),
+						32,
+					),
 				)
 				const nonce = randomBytes(12)
 				const cipher = createCipheriv('aes-256-gcm', subkey, nonce)

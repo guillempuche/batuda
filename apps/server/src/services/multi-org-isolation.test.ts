@@ -87,7 +87,7 @@ const TABLES_TO_TRUNCATE = [
 	'email_thread_links',
 	'email_attachment_staging',
 	'inbox_footers',
-	'email_draft_bodies',
+	'email_drafts',
 	'inboxes',
 	'"member"',
 	'"invitation"',
@@ -599,6 +599,86 @@ describe('multi-org isolation', () => {
 					"SELECT slug FROM companies WHERE slug LIKE 'fc-%'",
 				)
 				expect(visible.rows.length).toBe(0)
+			})
+		})
+	})
+
+	describe('email_drafts org isolation', () => {
+		// DraftStore writes to email_drafts; the table is RLS-scoped on
+		// app.current_org_id with FORCE + WITH CHECK. These tests pin the
+		// db side of the contract: an INSERT can't smuggle a different
+		// org's id, and SELECTs strip cross-org rows.
+
+		const insertDraft = async (
+			client: pg.PoolClient,
+			orgId: string,
+			inboxId: string,
+			draftId: string,
+		) =>
+			client.query(
+				`INSERT INTO email_drafts (draft_id, organization_id, inbox_id, mode, body_json)
+				 VALUES ($1, $2, $3, 'new', '{}'::jsonb)`,
+				[draftId, orgId, inboxId],
+			)
+
+		const seedTwoInboxes = async (client: pg.PoolClient) => {
+			const ins = await client.query<{ id: string }>(
+				`INSERT INTO inboxes (organization_id, owner_user_id, email, purpose, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
+				 VALUES ($1,$2,'a@a','human','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x'),
+				        ($3,$4,'b@b','human','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x')
+				 RETURNING id`,
+				[ctx.tallerOrgId, ctx.aliceId, ctx.restaurantOrgId, ctx.bobId],
+			)
+			return [ins.rows[0]!.id, ins.rows[1]!.id] as const
+		}
+
+		describe('when role=app_user and current_org_id is taller', () => {
+			it('should expose only taller drafts', async () => {
+				// GIVEN one draft per org
+				// WHEN a SELECT runs as app_user with current_org_id=taller
+				// THEN only the taller draft should be visible
+				// [migrations/0001_initial.ts — org_isolation_email_drafts policy]
+				await withSuper(async client => {
+					const [tallerInboxId, restaurantInboxId] = await seedTwoInboxes(client)
+					await insertDraft(client, ctx.tallerOrgId, tallerInboxId, 'd-t')
+					await insertDraft(
+						client,
+						ctx.restaurantOrgId,
+						restaurantInboxId,
+						'd-r',
+					)
+					await client.query(`SET LOCAL ROLE app_user`)
+					await client.query(
+						`SET LOCAL app.current_org_id = '${ctx.tallerOrgId}'`,
+					)
+					const visible = await client.query<{ draft_id: string }>(
+						'SELECT draft_id FROM email_drafts',
+					)
+					expect(visible.rows.length).toBe(1)
+					expect(visible.rows[0]?.draft_id).toBe('d-t')
+				})
+			})
+		})
+
+		describe('when role=app_user with a hard-coded foreign org_id', () => {
+			it('should reject the INSERT via WITH CHECK', async () => {
+				// GIVEN role=app_user with current_org_id=taller
+				// WHEN an INSERT runs with organization_id=restaurant
+				// THEN RLS WITH CHECK should reject it
+				await withSuper(async client => {
+					const [, restaurantInboxId] = await seedTwoInboxes(client)
+					await client.query(`SET LOCAL ROLE app_user`)
+					await client.query(
+						`SET LOCAL app.current_org_id = '${ctx.tallerOrgId}'`,
+					)
+					await expect(
+						client.query(
+							`INSERT INTO email_drafts (draft_id, organization_id, inbox_id, mode, body_json)
+							 VALUES ('d-leak', $1, $2, 'new', '{}'::jsonb)`,
+							[ctx.restaurantOrgId, restaurantInboxId],
+						),
+					).rejects.toThrow(/policy|row-level/i)
+				})
 			})
 		})
 	})
