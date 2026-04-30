@@ -450,6 +450,159 @@ describe('multi-org isolation', () => {
 		})
 	})
 
+	describe('CRM-core RLS coverage', () => {
+		// Each table is asserted with the same shape: insert one row in
+		// each org via the table-owner connection, flip to app_user with
+		// current_org_id = taller, count visible rows, expect exactly one
+		// (the taller row). Proves the org_isolation_<t> policy fires
+		// uniformly across the CRM surface.
+
+		const insertCompany = async (
+			client: pg.PoolClient,
+			orgId: string,
+			slug: string,
+		) =>
+			client.query(
+				`INSERT INTO companies (organization_id, slug, name) VALUES ($1, $2, $3) RETURNING id`,
+				[orgId, slug, slug],
+			)
+
+		it('should expose only the taller company when GUC is set to taller', async () => {
+			// GIVEN one company in each org
+			// WHEN a query runs as app_user with current_org_id=taller
+			// THEN only the taller company is visible
+			// [migrations/0001_initial.ts — org_isolation_companies policy]
+			await withSuper(async client => {
+				await insertCompany(client, ctx.tallerOrgId, 'acme-t')
+				await insertCompany(client, ctx.restaurantOrgId, 'acme-r')
+				await client.query(`SET LOCAL ROLE app_user`)
+				await client.query(
+					`SET LOCAL app.current_org_id = '${ctx.tallerOrgId}'`,
+				)
+				const visible = await client.query<{ slug: string }>(
+					'SELECT slug FROM companies',
+				)
+				expect(visible.rows.length).toBe(1)
+				expect(visible.rows[0]?.slug).toBe('acme-t')
+			})
+		})
+
+		it('should allow the same company slug across two orgs (org-scoped UNIQUE)', async () => {
+			// GIVEN companies.slug used to be globally UNIQUE — after the
+			// rewrite it's UNIQUE(organization_id, slug)
+			// WHEN both orgs each insert a company called "acme"
+			// THEN both inserts succeed
+			await withSuper(async client => {
+				await client.query(
+					`INSERT INTO companies (organization_id, slug, name) VALUES ($1, 'acme', 'Acme T')`,
+					[ctx.tallerOrgId],
+				)
+				await client.query(
+					`INSERT INTO companies (organization_id, slug, name) VALUES ($1, 'acme', 'Acme R')`,
+					[ctx.restaurantOrgId],
+				)
+				const all = await client.query(
+					`SELECT count(*)::int AS n FROM companies WHERE slug = 'acme'`,
+				)
+				expect((all.rows[0] as { n: number }).n).toBe(2)
+			})
+		})
+
+		it('should reject an INSERT into companies with no resolvable org when GUC is unset (RLS WITH CHECK)', async () => {
+			// GIVEN no app.current_org_id set
+			// WHEN INSERT runs as app_user with a hard-coded organization_id
+			// THEN RLS WITH CHECK rejects it because the org doesn't match the GUC
+			await withSuper(async client => {
+				await client.query(`SET LOCAL ROLE app_user`)
+				await expect(
+					client.query(
+						`INSERT INTO companies (organization_id, slug, name) VALUES ($1, 'leak', 'Leak')`,
+						[ctx.tallerOrgId],
+					),
+				).rejects.toThrow(/policy|row-level/i)
+			})
+		})
+
+		it('should expose only org A contacts when the GUC is set to org A', async () => {
+			// GIVEN one contact per org tied to a same-org company
+			// WHEN a SELECT runs as app_user with current_org_id=taller
+			// THEN only the taller contact is visible
+			await withSuper(async client => {
+				const t = await insertCompany(client, ctx.tallerOrgId, 'co-t')
+				const r = await insertCompany(client, ctx.restaurantOrgId, 'co-r')
+				await client.query(
+					`INSERT INTO contacts (organization_id, company_id, name) VALUES ($1, $2, 'Alice T'), ($3, $4, 'Bob R')`,
+					[
+						ctx.tallerOrgId,
+						(t.rows[0] as { id: string }).id,
+						ctx.restaurantOrgId,
+						(r.rows[0] as { id: string }).id,
+					],
+				)
+				await client.query(`SET LOCAL ROLE app_user`)
+				await client.query(
+					`SET LOCAL app.current_org_id = '${ctx.tallerOrgId}'`,
+				)
+				const visible = await client.query<{ name: string }>(
+					'SELECT name FROM contacts',
+				)
+				expect(visible.rows.length).toBe(1)
+				expect(visible.rows[0]?.name).toBe('Alice T')
+			})
+		})
+
+		it('should expose only the taller task when the GUC is set to taller', async () => {
+			// GIVEN one task per org
+			// WHEN a query runs as app_user with current_org_id=taller
+			// THEN only the taller task is visible
+			await withSuper(async client => {
+				await client.query(
+					`INSERT INTO tasks (organization_id, type, title) VALUES ($1, 'followup', 'taller task'), ($2, 'followup', 'restaurant task')`,
+					[ctx.tallerOrgId, ctx.restaurantOrgId],
+				)
+				await client.query(`SET LOCAL ROLE app_user`)
+				await client.query(
+					`SET LOCAL app.current_org_id = '${ctx.tallerOrgId}'`,
+				)
+				const visible = await client.query<{ title: string }>(
+					'SELECT title FROM tasks',
+				)
+				expect(visible.rows.length).toBe(1)
+				expect(visible.rows[0]?.title).toBe('taller task')
+			})
+		})
+
+		it('should expose rows from both orgs when the role is app_service (BYPASSRLS — intentional worker path)', async () => {
+			// GIVEN one company per org
+			// WHEN a query runs as app_service (BYPASSRLS) with no GUC
+			// THEN both rows are visible — the worker/cron path
+			await withSuper(async client => {
+				await insertCompany(client, ctx.tallerOrgId, 's-t')
+				await insertCompany(client, ctx.restaurantOrgId, 's-r')
+				await client.query(`SET LOCAL ROLE app_service`)
+				const all = await client.query<{ slug: string }>(
+					"SELECT slug FROM companies WHERE slug LIKE 's-%'",
+				)
+				expect(all.rows.length).toBe(2)
+			})
+		})
+
+		it('should return 0 rows when GUC is unset (fail-closed)', async () => {
+			// GIVEN one company in each org
+			// WHEN a SELECT runs as app_user with no app.current_org_id
+			// THEN no rows are visible because '' ≠ any org id (fail-closed)
+			await withSuper(async client => {
+				await insertCompany(client, ctx.tallerOrgId, 'fc-t')
+				await insertCompany(client, ctx.restaurantOrgId, 'fc-r')
+				await client.query(`SET LOCAL ROLE app_user`)
+				const visible = await client.query(
+					"SELECT slug FROM companies WHERE slug LIKE 'fc-%'",
+				)
+				expect(visible.rows.length).toBe(0)
+			})
+		})
+	})
+
 	describe('DB-level invariants', () => {
 		it("CHECK rejects purpose='shared' + is_private=true on insert", async () => {
 			// GIVEN an attempt to create a shared inbox marked private (nonsensical)
