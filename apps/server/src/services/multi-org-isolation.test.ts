@@ -639,7 +639,8 @@ describe('multi-org isolation', () => {
 				// THEN only the taller draft should be visible
 				// [migrations/0001_initial.ts — org_isolation_email_drafts policy]
 				await withSuper(async client => {
-					const [tallerInboxId, restaurantInboxId] = await seedTwoInboxes(client)
+					const [tallerInboxId, restaurantInboxId] =
+						await seedTwoInboxes(client)
 					await insertDraft(client, ctx.tallerOrgId, tallerInboxId, 'd-t')
 					await insertDraft(
 						client,
