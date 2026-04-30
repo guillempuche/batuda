@@ -51,6 +51,7 @@ import { CompanyService } from './services/companies'
 import { CredentialCrypto } from './services/credential-crypto'
 import { EmailService } from './services/email'
 import { EmailAttachmentStaging } from './services/email-attachment-staging'
+import { DraftStore } from './services/email-draft-store'
 import { EmailProviderLive } from './services/email-provider-live'
 import { Geocoder } from './services/geocoder'
 import { MailTransport } from './services/mail-transport'
@@ -182,6 +183,7 @@ const ServicesLive = Layer.mergeAll(
 	// CalendarService still see it in the merged service map.
 	Layer.provideMerge(CalendarService.layer),
 	Layer.provideMerge(EmailAttachmentStaging.layer),
+	Layer.provideMerge(DraftStore.layer),
 	Layer.provideMerge(ResearchEventSinkLive),
 	Layer.provideMerge(ParticipantMatcher.layer),
 	Layer.provideMerge(TimelineActivityService.layer),

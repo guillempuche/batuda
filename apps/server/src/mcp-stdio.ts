@@ -10,6 +10,7 @@ import { McpToolsLive } from './mcp/server'
 import { CompanyService } from './services/companies'
 import { CredentialCrypto } from './services/credential-crypto'
 import { EmailService } from './services/email'
+import { DraftStore } from './services/email-draft-store'
 import { LocalInboxProviderLive } from './services/local-inbox-provider'
 import { MailTransport } from './services/mail-transport'
 import { PageService } from './services/pages'
@@ -32,6 +33,7 @@ const ServicesLive = Layer.mergeAll(
 	Layer.provideMerge(WebhookService.layer),
 	Layer.provideMerge(CredentialCrypto.layer),
 	Layer.provideMerge(MailTransport.layer),
+	Layer.provideMerge(DraftStore.layer),
 )
 
 // MCP stdio is a local-dev convenience surface (Cursor / Claude Desktop on

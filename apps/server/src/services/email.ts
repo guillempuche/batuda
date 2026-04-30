@@ -22,11 +22,8 @@ import { CalendarService } from './calendar.js'
 import { CredentialCrypto } from './credential-crypto.js'
 import type { ResolvedStaging, StagingRef } from './email-attachment-staging.js'
 import { EmailAttachmentStaging } from './email-attachment-staging.js'
-import type {
-	CreateDraftParams,
-	SendAttachmentInput,
-	UpdateDraftParams,
-} from './email-provider.js'
+import { DraftStore } from './email-draft-store.js'
+import type { SendAttachmentInput } from './email-provider.js'
 import { EmailProvider } from './email-provider.js'
 import type {
 	DecryptedCreds,
@@ -153,6 +150,38 @@ const toRecipientArray = (
 	return Array.isArray(value) ? value : [value as string]
 }
 
+// DraftStore.DraftRow → the shape EmailService callers (HTTP routes + MCP
+// tools) used to receive from the old EmailProvider draft surface. Keeps
+// the wire format stable so the route handlers and atoms don't need to
+// change in this slice.
+const draftRowToProviderShape = (row: {
+	readonly draftId: string
+	readonly inboxId: string
+	readonly clientId: string | null
+	readonly toAddresses: ReadonlyArray<string>
+	readonly ccAddresses: ReadonlyArray<string>
+	readonly bccAddresses: ReadonlyArray<string>
+	readonly subject: string | null
+	readonly inReplyTo: string | null
+	readonly bodyJson: unknown
+	readonly createdAt: Date
+	readonly updatedAt: Date
+}) => ({
+	draftId: row.draftId,
+	inboxId: row.inboxId,
+	clientId: row.clientId ?? undefined,
+	to: row.toAddresses as string[],
+	cc: row.ccAddresses as string[],
+	bcc: row.bccAddresses as string[],
+	subject: row.subject ?? undefined,
+	text: undefined as string | undefined,
+	html: undefined as string | undefined,
+	inReplyTo: row.inReplyTo ?? undefined,
+	bodyJson: row.bodyJson,
+	createdAt: row.createdAt,
+	updatedAt: row.updatedAt,
+})
+
 // Vendor-neutral mailbox presets surfaced to the connect-mailbox UI. Adding a
 // new entry requires no code beyond appending to this list — fields are the
 // same shape as the createInbox payload.
@@ -252,6 +281,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 			const sql = yield* SqlClient.SqlClient
 			const timeline = yield* TimelineActivityService
 			const staging = yield* EmailAttachmentStaging
+			const drafts = yield* DraftStore
 			const calendar = yield* CalendarService
 			const crypto = yield* CredentialCrypto
 			const transport = yield* MailTransport
@@ -1783,10 +1813,10 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					}),
 
 				// ── Drafts ──────────────────────────────────────────────────
-				// Drafts carry a bodyJson (block tree) alongside the provider's
-				// html/text. The provider only has a string body; the shadow
-				// table `email_draft_bodies` keeps the editor-authored tree so
-				// re-opens are lossless.
+				// Drafts live in Postgres via DraftStore. The editor block tree
+				// is the source of truth; html/text render on send.
+				// Threading metadata (mode, threadLinkId, inReplyTo) is real
+				// columns now — no clientId-string stuffing.
 
 				createDraft: (
 					inboxId: string,
@@ -1806,55 +1836,23 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					},
 				) =>
 					Effect.gen(function* () {
-						const currentOrg = yield* CurrentOrg
 						const inbox = yield* resolveInbox(inboxId)
 						if (!inbox) {
 							return yield* new NotFound({ entity: 'Inbox', id: inboxId })
 						}
-						const clientId = context ? encodeClientId(context) : undefined
-
-						const rendered = params.bodyJson
-							? yield* Effect.tryPromise({
-									try: () => renderBlocks(params.bodyJson!),
-									catch: err =>
-										new EmailError({
-											message: `renderBlocks: ${err instanceof Error ? err.message : String(err)}`,
-										}),
-								})
-							: null
-
-						const providerParams: CreateDraftParams = {
-							...(params.to !== undefined && { to: params.to }),
-							...(params.cc !== undefined && { cc: params.cc }),
-							...(params.bcc !== undefined && { bcc: params.bcc }),
-							...(params.subject !== undefined && { subject: params.subject }),
-							...(params.inReplyTo !== undefined && {
-								inReplyTo: params.inReplyTo,
-							}),
-							...(rendered !== null && {
-								text: rendered.text,
-								html: rendered.html,
-							}),
-							...(clientId !== undefined && { clientId }),
-						}
-
-						const draft = yield* provider.createDraft(inbox.id, providerParams)
-
-						if (params.bodyJson) {
-							yield* sql`
-								INSERT INTO email_draft_bodies ${sql.insert({
-									draftId: draft.draftId,
-									organizationId: currentOrg.id,
-									inboxId: inbox.id,
-									bodyJson: JSON.stringify(params.bodyJson),
-								})}
-								ON CONFLICT (draft_id) DO UPDATE
-								SET body_json = EXCLUDED.body_json,
-								    updated_at = now()
-							`.pipe(Effect.ignore)
-						}
-
-						return { ...draft, bodyJson: params.bodyJson ?? null }
+						const draft = yield* drafts.create({
+							inboxId: inbox.id,
+							mode: context?.mode === 'reply' ? 'reply' : 'new',
+							to: toRecipientArray(params.to) ?? [],
+							cc: toRecipientArray(params.cc) ?? [],
+							bcc: toRecipientArray(params.bcc) ?? [],
+							subject: params.subject ?? null,
+							inReplyTo: params.inReplyTo ?? null,
+							threadLinkId: context?.threadLinkId ?? null,
+							clientId: context ? encodeClientId(context) : null,
+							bodyJson: params.bodyJson ?? {},
+						})
+						return draftRowToProviderShape(draft)
 					}),
 
 				updateDraft: (
@@ -1869,120 +1867,53 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					},
 				) =>
 					Effect.gen(function* () {
-						const currentOrg = yield* CurrentOrg
 						const inbox = yield* resolveInbox(inboxId)
 						if (!inbox) {
 							return yield* new NotFound({ entity: 'Inbox', id: inboxId })
 						}
-
-						const rendered = params.bodyJson
-							? yield* Effect.tryPromise({
-									try: () => renderBlocks(params.bodyJson!),
-									catch: err =>
-										new EmailError({
-											message: `renderBlocks: ${err instanceof Error ? err.message : String(err)}`,
-										}),
-								})
-							: null
-
-						const providerParams: UpdateDraftParams = {
-							...(params.to !== undefined && { to: params.to }),
-							...(params.cc !== undefined && { cc: params.cc }),
-							...(params.bcc !== undefined && { bcc: params.bcc }),
-							...(params.subject !== undefined && { subject: params.subject }),
-							...(rendered !== null && {
-								text: rendered.text,
-								html: rendered.html,
+						const updated = yield* drafts.update(draftId, {
+							...(params.to !== undefined && {
+								to: toRecipientArray(params.to) ?? [],
 							}),
-						}
-
-						const draft = yield* provider.updateDraft(
-							inbox.id,
-							draftId,
-							providerParams,
-						)
-
-						if (params.bodyJson) {
-							yield* sql`
-								INSERT INTO email_draft_bodies ${sql.insert({
-									draftId,
-									organizationId: currentOrg.id,
-									inboxId: inbox.id,
-									bodyJson: JSON.stringify(params.bodyJson),
-								})}
-								ON CONFLICT (draft_id) DO UPDATE
-								SET body_json = EXCLUDED.body_json,
-								    updated_at = now()
-							`.pipe(Effect.ignore)
-						}
-
-						return { ...draft, bodyJson: params.bodyJson ?? null }
+							...(params.cc !== undefined && {
+								cc: toRecipientArray(params.cc) ?? [],
+							}),
+							...(params.bcc !== undefined && {
+								bcc: toRecipientArray(params.bcc) ?? [],
+							}),
+							...(params.subject !== undefined && { subject: params.subject }),
+							...(params.bodyJson !== undefined && {
+								bodyJson: params.bodyJson,
+							}),
+						})
+						return draftRowToProviderShape(updated)
 					}),
 
 				deleteDraft: (inboxId: string, draftId: string) =>
 					Effect.gen(function* () {
-						const currentOrg = yield* CurrentOrg
 						const inbox = yield* resolveInbox(inboxId)
 						if (!inbox) {
 							return yield* new NotFound({ entity: 'Inbox', id: inboxId })
 						}
 						yield* staging.sweepForDraft(draftId).pipe(Effect.ignore)
-						yield* sql`
-							DELETE FROM email_draft_bodies
-							WHERE draft_id = ${draftId}
-							  AND organization_id = ${currentOrg.id}
-						`.pipe(Effect.ignore)
-						yield* provider.deleteDraft(inbox.id, draftId)
+						yield* drafts.remove(draftId)
 					}),
 
 				getDraft: (inboxId: string, draftId: string) =>
 					Effect.gen(function* () {
-						const currentOrg = yield* CurrentOrg
 						const inbox = yield* resolveInbox(inboxId)
 						if (!inbox) {
 							return yield* new NotFound({ entity: 'Inbox', id: inboxId })
 						}
-						const draft = yield* provider.getDraft(inbox.id, draftId)
-						const rows = yield* sql<{ bodyJson: EmailBlocks }>`
-							SELECT body_json FROM email_draft_bodies
-							WHERE draft_id = ${draftId}
-							  AND organization_id = ${currentOrg.id}
-							LIMIT 1
-						`.pipe(Effect.orDie)
-						const bodyJson = rows[0]?.bodyJson ?? null
-						return { ...draft, bodyJson }
+						const draft = yield* drafts.get(draftId)
+						return draftRowToProviderShape(draft)
 					}),
 
 				listDrafts: (inboxId?: string) =>
 					Effect.gen(function* () {
-						const currentOrg = yield* CurrentOrg
-						if (inboxId) {
-							const inbox = yield* resolveInbox(inboxId)
-							if (!inbox) {
-								return yield* new NotFound({ entity: 'Inbox', id: inboxId })
-							}
-							return yield* provider.listDrafts(inbox.id)
-						}
-						const inboxes = yield* sql<{ id: string }>`
-							SELECT id FROM inboxes
-							WHERE organization_id = ${currentOrg.id}
-							  AND active = true
-						`.pipe(Effect.orDie)
-						const results = yield* Effect.all(
-							inboxes.map(i =>
-								provider
-									.listDrafts(i.id)
-									.pipe(
-										Effect.catch(() =>
-											Effect.succeed(
-												[] as import('./email-provider.js').ProviderDraftItem[],
-											),
-										),
-									),
-							),
-						)
-						return results
-							.flat()
+						const list = yield* drafts.list(inboxId)
+						return list
+							.map(draftRowToProviderShape)
 							.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
 					}),
 
@@ -1995,35 +1926,112 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						}
 						yield* assertInboxUsable(inbox)
 
-						const draft = yield* provider.getDraft(inbox.id, draftId)
-						const ctx = parseClientId(draft.clientId)
+						const draft = yield* drafts.get(draftId)
+						const ctx = parseClientId(draft.clientId ?? undefined)
 
 						if (ctx.contactId) {
-							yield* assertContactNotSuppressed(ctx.contactId, draft.to ?? [])
+							yield* assertContactNotSuppressed(
+								ctx.contactId,
+								draft.toAddresses as string[],
+							)
 						}
 
-						// Reply path needs the parent thread's external_thread_id so
-						// the new message lands inside that thread instead of opening
-						// a fresh one.
+						// Reply path needs the parent thread's external_thread_id +
+						// references chain so the new message lands inside that
+						// thread instead of opening a fresh one. Prefer the column
+						// on the draft row; fall back to the parsed clientId for
+						// rows created before the schema change.
+						const threadLinkId = draft.threadLinkId ?? ctx.threadLinkId
 						let existingThreadLink: {
 							id: string
 							externalThreadId: string
 						} | null = null
-						if (ctx.mode === 'reply' && ctx.threadLinkId) {
+						if (draft.mode === 'reply' && threadLinkId) {
 							const linkRows = yield* sql<{
 								id: string
 								externalThreadId: string
 							}>`
 								SELECT id, external_thread_id
 								FROM email_thread_links
-								WHERE id = ${ctx.threadLinkId}
+								WHERE id = ${threadLinkId}
 								  AND organization_id = ${currentOrg.id}
 								LIMIT 1
 							`.pipe(Effect.orDie)
 							existingThreadLink = linkRows[0] ?? null
 						}
 
-						const result = yield* provider.sendDraft(inbox.id, draftId)
+						// Resolve staged attachments for this draft + render the
+						// editor block tree to text/html. Footer is appended
+						// unconditionally — DraftStore doesn't expose a skipFooter
+						// flag yet, so drafts always get the inbox's default footer.
+						const refRows = yield* sql<{
+							stagingId: string
+							isInline: boolean
+							cid: string | null
+							filename: string
+						}>`
+							SELECT staging_id, is_inline, cid, filename
+							FROM email_attachment_staging
+							WHERE draft_id = ${draftId}
+							  AND sent_at IS NULL
+						`.pipe(Effect.orDie)
+						const stagedRefs: StagingRef[] = refRows.map(r => ({
+							stagingId: r.stagingId,
+							inline: r.isInline,
+							...(r.cid !== null && { cid: r.cid }),
+							filename: r.filename,
+						}))
+						const staged = yield* staging.resolve(inbox.id, stagedRefs)
+						const footerBlocks = yield* resolveDefaultFooter(inbox.id)
+						const blocks: EmailBlocks = footerBlocks
+							? [
+									...(Array.isArray(draft.bodyJson)
+										? (draft.bodyJson as EmailBlocks)
+										: []),
+									...footerBlocks,
+								]
+							: Array.isArray(draft.bodyJson)
+								? (draft.bodyJson as EmailBlocks)
+								: []
+						const rendered = yield* Effect.tryPromise({
+							try: () =>
+								renderBlocks(blocks, {
+									attachments: toStagedRefs(staged),
+								}),
+							catch: err =>
+								new EmailError({
+									message: `renderBlocks: ${err instanceof Error ? err.message : String(err)}`,
+								}),
+						})
+
+						const outbound: OutboundMessage = {
+							from: inbox.email,
+							to: draft.toAddresses as string[],
+							subject: draft.subject ?? '',
+							text: rendered.text,
+							html: rendered.html,
+							...(draft.ccAddresses.length > 0 && {
+								cc: draft.ccAddresses as string[],
+							}),
+							...(draft.bccAddresses.length > 0 && {
+								bcc: draft.bccAddresses as string[],
+							}),
+							...(existingThreadLink && {
+								inReplyTo: existingThreadLink.externalThreadId,
+								references: [existingThreadLink.externalThreadId],
+							}),
+							...(staged.length > 0 && {
+								attachments: toOutboundAttachments(toSendAttachments(staged)),
+							}),
+						}
+
+						const dispatched = yield* dispatchOutbound(inbox, outbound)
+						const result = {
+							messageId: dispatched.messageId,
+							threadId: existingThreadLink
+								? existingThreadLink.externalThreadId
+								: dispatched.messageId,
+						}
 
 						yield* recordOutbound({
 							result,
@@ -2031,15 +2039,20 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							companyId: ctx.companyId,
 							contactId: ctx.contactId,
 							subject: draft.subject ?? null,
-							to: draft.to ?? [],
-							cc: draft.cc ?? [],
-							bcc: draft.bcc ?? [],
+							to: draft.toAddresses as string[],
+							cc: draft.ccAddresses as string[],
+							bcc: draft.bccAddresses as string[],
 							existingThreadLink,
-							// Drafts still flow through the LocalInboxProvider; once
-							// drafts move to transport.send the placeholder turns into
-							// the real R2 key like send/reply already do.
-							rawRfc822Ref: `local:${result.messageId}`,
+							rawRfc822Ref: dispatched.rawRef,
 						})
+
+						if (staged.length > 0) {
+							yield* staging
+								.markSentAndCleanup(staged.map(s => s.stagingId))
+								.pipe(Effect.ignore)
+						}
+
+						yield* drafts.remove(draftId)
 
 						yield* Effect.logInfo('Draft sent').pipe(
 							Effect.annotateLogs({

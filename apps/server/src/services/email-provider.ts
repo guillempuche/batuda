@@ -210,30 +210,9 @@ export class EmailProvider extends ServiceMap.Service<
 			add: string[],
 			remove: string[],
 		) => Effect.Effect<void, EmailError>
-		readonly createDraft: (
-			inboxId: string,
-			params: CreateDraftParams,
-		) => Effect.Effect<ProviderDraft, EmailError>
-		readonly updateDraft: (
-			inboxId: string,
-			draftId: string,
-			params: UpdateDraftParams,
-		) => Effect.Effect<ProviderDraft, EmailError>
-		readonly deleteDraft: (
-			inboxId: string,
-			draftId: string,
-		) => Effect.Effect<void, EmailError>
-		readonly sendDraft: (
-			inboxId: string,
-			draftId: string,
-		) => Effect.Effect<SendResult, EmailSendError>
-		readonly listDrafts: (
-			inboxId: string,
-			params?: ListParams,
-		) => Effect.Effect<ProviderDraftItem[], EmailError>
-		readonly getDraft: (
-			inboxId: string,
-			draftId: string,
-		) => Effect.Effect<ProviderDraft, EmailError>
+		// Drafts moved to DraftStore (Postgres-backed) so the provider tag
+		// no longer carries createDraft/updateDraft/getDraft/listDrafts/
+		// deleteDraft/sendDraft. EmailService.sendDraft now goes through
+		// MailTransport directly.
 	}
 >()('EmailProvider') {}

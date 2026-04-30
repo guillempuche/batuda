@@ -330,10 +330,10 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 						Effect.catchTags({
 							EmailError: e =>
 								Effect.fail(new BadRequest({ message: e.message })),
-							EmailSendError: e => Effect.die(e),
 							NotFound: e => Effect.die(e),
 							InboxInactive: e => Effect.die(e),
 							GrantUnavailable: e => Effect.die(e),
+							BadRequest: e => Effect.die(e),
 							SqlError: e => Effect.die(e),
 						}),
 					),

@@ -1,13 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { createReadStream } from 'node:fs'
-import {
-	mkdir,
-	readdir,
-	readFile,
-	stat,
-	unlink,
-	writeFile,
-} from 'node:fs/promises'
+import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { Readable } from 'node:stream'
 
@@ -16,14 +9,11 @@ import { Effect, Layer } from 'effect'
 import { EmailError, EmailSendError } from '@batuda/controllers'
 
 import {
-	type CreateDraftParams,
 	type CreateInboxParams,
 	EmailProvider,
 	type ListParams,
 	type ProviderAttachmentMeta,
 	type ProviderAttachmentStream,
-	type ProviderDraft,
-	type ProviderDraftItem,
 	type ProviderInbox,
 	type ProviderMessage,
 	type ProviderMessageItem,
@@ -33,7 +23,6 @@ import {
 	type SendAttachmentInput,
 	type SendParams,
 	type SendResult,
-	type UpdateDraftParams,
 } from './email-provider.js'
 
 // ── Synthetic dev inbox identity ──
@@ -52,7 +41,6 @@ const DEV_INBOX_CREATED_AT = new Date('2024-01-01T00:00:00Z')
 // started from (root, apps/server, ...). Using process.cwd() doubled the path
 // when running via `pnpm --filter @batuda/server dev`.
 const INBOX_DIR = resolve(import.meta.dirname, '..', '..', '.dev-inbox')
-const DRAFTS_DIR = resolve(INBOX_DIR, 'drafts')
 const ATTACHMENTS_DIR = resolve(INBOX_DIR, 'attachments')
 
 // ── Filename + slug helpers ──
@@ -709,261 +697,6 @@ export const LocalInboxProviderLive = Layer.effect(
 				)
 			})
 
-		// ── Drafts ──
-
-		const ensureDraftsDir = Effect.tryPromise({
-			try: () => mkdir(DRAFTS_DIR, { recursive: true }),
-			catch: e =>
-				new EmailError({
-					message: `local-inbox: cannot create ${DRAFTS_DIR}: ${e instanceof Error ? e.message : String(e)}`,
-				}),
-		})
-
-		const draftFilename = (draftId: string) => `${draftId}.md`
-		const draftPath = (draftId: string) =>
-			resolve(DRAFTS_DIR, draftFilename(draftId))
-
-		const writeDraftFile = (draft: ProviderDraft) =>
-			Effect.gen(function* () {
-				yield* ensureDraftsDir
-				const to = draft.to ?? []
-				const cc = draft.cc ?? []
-				const bcc = draft.bcc ?? []
-				const fm = [
-					`draftId: ${draft.draftId}`,
-					`inboxId: ${draft.inboxId}`,
-					`to: ${formatList(to)}`,
-					`cc: ${formatList(cc)}`,
-					`bcc: ${formatList(bcc)}`,
-					`subject: ${draft.subject ?? ''}`,
-					`text: ${draft.text === undefined ? 'null' : draft.text}`,
-					`html: ${draft.html === undefined ? 'null' : draft.html}`,
-					...(draft.clientId ? [`clientId: ${draft.clientId}`] : []),
-					...(draft.inReplyTo ? [`inReplyTo: ${draft.inReplyTo}`] : []),
-					`updatedAt: ${draft.updatedAt.toISOString()}`,
-					`createdAt: ${draft.createdAt.toISOString()}`,
-				].join('\n')
-				const body = draft.text ?? draft.html ?? ''
-				const content = `---\n${fm}\n---\n\n${body}\n`
-				yield* Effect.tryPromise({
-					try: () => writeFile(draftPath(draft.draftId), content, 'utf8'),
-					catch: e =>
-						new EmailError({
-							message: `local-inbox: cannot write draft: ${e instanceof Error ? e.message : String(e)}`,
-						}),
-				})
-			})
-
-		const readDraftFile = (draftId: string) =>
-			Effect.tryPromise({
-				try: async () => {
-					const raw = await readFile(draftPath(draftId), 'utf8')
-					const match = FRONTMATTER_RE.exec(raw)
-					if (!match) throw new Error('missing frontmatter')
-					const fmText = match[1] ?? ''
-					const body = (match[2] ?? '').trimStart()
-					const fields: Record<string, string | string[]> = {}
-					const lines = fmText.split('\n')
-					let currentList: { key: string; items: string[] } | null = null
-					for (const line of lines) {
-						if (line.startsWith('  - ') && currentList) {
-							currentList.items.push(line.slice(4).trim())
-							continue
-						}
-						if (currentList) {
-							fields[currentList.key] = currentList.items
-							currentList = null
-						}
-						const colon = line.indexOf(':')
-						if (colon === -1) continue
-						const key = line.slice(0, colon).trim()
-						const value = line.slice(colon + 1).trim()
-						if (value === '') {
-							currentList = { key, items: [] }
-						} else if (value === '[]') {
-							fields[key] = []
-						} else {
-							fields[key] = value
-						}
-					}
-					if (currentList) fields[currentList.key] = currentList.items
-					const str = (k: string) => {
-						const v = fields[k]
-						return typeof v === 'string' && v !== 'null' ? v : undefined
-					}
-					const list = (k: string) => {
-						const v = fields[k]
-						return Array.isArray(v) && v.length > 0 ? v : undefined
-					}
-					return {
-						draftId: str('draftId') ?? draftId,
-						inboxId: str('inboxId') ?? DEV_INBOX_ID,
-						clientId: str('clientId'),
-						to: list('to'),
-						cc: list('cc'),
-						bcc: list('bcc'),
-						subject: str('subject'),
-						preview: body.slice(0, 140) || undefined,
-						text: str('text') ?? (body || undefined),
-						html: str('html'),
-						inReplyTo: str('inReplyTo'),
-						updatedAt: new Date(str('updatedAt') ?? Date.now()),
-						createdAt: new Date(str('createdAt') ?? Date.now()),
-					} satisfies ProviderDraft
-				},
-				catch: e =>
-					new EmailError({
-						message: `local-inbox: cannot read draft ${draftId}: ${e instanceof Error ? e.message : String(e)}`,
-					}),
-			})
-
-		const coerceList = (
-			v: string | string[] | undefined,
-		): string[] | undefined => {
-			if (v === undefined) return undefined
-			return Array.isArray(v) ? v : [v]
-		}
-
-		const createDraft = (
-			_inboxId: string,
-			params: CreateDraftParams,
-		): Effect.Effect<ProviderDraft, EmailError> =>
-			Effect.gen(function* () {
-				const now = new Date()
-				const draft: ProviderDraft = {
-					draftId: `draft_local_${randomUUID()}`,
-					inboxId: DEV_INBOX_ID,
-					clientId: params.clientId,
-					to: coerceList(params.to),
-					cc: coerceList(params.cc),
-					bcc: coerceList(params.bcc),
-					subject: params.subject,
-					text: params.text,
-					html: params.html,
-					inReplyTo: params.inReplyTo,
-					updatedAt: now,
-					createdAt: now,
-				}
-				yield* writeDraftFile(draft)
-				yield* Effect.logInfo(`local-inbox: created draft ${draft.draftId}`)
-				return draft
-			})
-
-		const updateDraft = (
-			_inboxId: string,
-			draftId: string,
-			params: UpdateDraftParams,
-		): Effect.Effect<ProviderDraft, EmailError> =>
-			Effect.gen(function* () {
-				const existing = yield* readDraftFile(draftId)
-				const updated: ProviderDraft = {
-					...existing,
-					to: params.to !== undefined ? coerceList(params.to) : existing.to,
-					cc: params.cc !== undefined ? coerceList(params.cc) : existing.cc,
-					bcc: params.bcc !== undefined ? coerceList(params.bcc) : existing.bcc,
-					subject: params.subject ?? existing.subject,
-					text: params.text ?? existing.text,
-					html: params.html ?? existing.html,
-					updatedAt: new Date(),
-				}
-				yield* writeDraftFile(updated)
-				return updated
-			})
-
-		const deleteDraft = (
-			_inboxId: string,
-			draftId: string,
-		): Effect.Effect<void, EmailError> =>
-			Effect.tryPromise({
-				try: () => unlink(draftPath(draftId)),
-				catch: e =>
-					new EmailError({
-						message: `local-inbox: cannot delete draft ${draftId}: ${e instanceof Error ? e.message : String(e)}`,
-					}),
-			}).pipe(Effect.asVoid)
-
-		const sendDraft = (
-			_inboxId: string,
-			draftId: string,
-		): Effect.Effect<SendResult, EmailSendError> =>
-			Effect.gen(function* () {
-				const draft = yield* readDraftFile(draftId).pipe(
-					Effect.mapError(
-						e =>
-							new EmailSendError({
-								message: e.message,
-								kind: 'unknown',
-								recipient: null,
-							}),
-					),
-				)
-				const sentAt = new Date()
-				const messageId = `msg_local_${randomUUID()}`
-				const threadId = `thr_local_${randomUUID()}`
-				const rec: MessageRecord = {
-					sentAt: sentAt.toISOString(),
-					messageId,
-					threadId,
-					from: DEV_INBOX_EMAIL,
-					to: draft.to ?? [],
-					cc: draft.cc ?? [],
-					bcc: draft.bcc ?? [],
-					replyTo: null,
-					subject: draft.subject ?? '(no subject)',
-					text: draft.text ?? null,
-					html: draft.html ?? null,
-					labels: [],
-					bodyText: draft.text ?? draft.html ?? '',
-					attachments: [],
-				}
-				yield* writeRecord(rec, sentAt)
-				yield* Effect.tryPromise({
-					try: () => unlink(draftPath(draftId)),
-					catch: () =>
-						new EmailSendError({
-							message: `local-inbox: cannot delete sent draft ${draftId}`,
-							kind: 'unknown',
-							recipient: null,
-						}),
-				})
-				yield* Effect.logInfo(
-					`local-inbox: sent draft ${draftId} as ${messageId}`,
-				)
-				return { messageId, threadId }
-			})
-
-		const listDrafts = (
-			_inboxId: string,
-			_params?: ListParams,
-		): Effect.Effect<ProviderDraftItem[], EmailError> =>
-			Effect.gen(function* () {
-				yield* ensureDraftsDir
-				const entries = yield* Effect.tryPromise({
-					try: () => readdir(DRAFTS_DIR),
-					catch: e =>
-						new EmailError({
-							message: `local-inbox: cannot read drafts dir: ${e instanceof Error ? e.message : String(e)}`,
-						}),
-				})
-				const mdFiles = entries.filter(n => n.endsWith('.md'))
-				const drafts: ProviderDraftItem[] = []
-				for (const f of mdFiles) {
-					const id = f.replace(/\.md$/, '')
-					const d = yield* readDraftFile(id).pipe(
-						Effect.catch(() => Effect.succeed(null as ProviderDraft | null)),
-					)
-					if (d) drafts.push(d)
-				}
-				return drafts.sort(
-					(a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
-				)
-			})
-
-		const getDraft = (
-			_inboxId: string,
-			draftId: string,
-		): Effect.Effect<ProviderDraft, EmailError> => readDraftFile(draftId)
-
 		return {
 			send,
 			reply,
@@ -975,12 +708,6 @@ export const LocalInboxProviderLive = Layer.effect(
 			createInbox,
 			streamAttachment,
 			updateLabels,
-			createDraft,
-			updateDraft,
-			deleteDraft,
-			sendDraft,
-			listDrafts,
-			getDraft,
 		} as const
 	}),
 )
