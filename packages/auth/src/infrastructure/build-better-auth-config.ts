@@ -104,6 +104,17 @@ export const buildBetterAuthConfig = <Plugins extends BetterAuthPlugin[]>(
 			storage: 'memory' as const,
 			window: 60,
 			max: 100,
+			// Better Auth's default for `/sign-in/*` is 3 attempts per 10s.
+			// That's tight enough to lock out a typical user retrying a
+			// forgotten password three times — and tight enough to fail the
+			// e2e suite, which stacks setup + unauth + cross-org sign-ins
+			// inside the window. Loosen to 20 per 60s: still strong brute-
+			// force protection (a serial attacker takes ~5h to try 100
+			// passwords against a single account) without false positives
+			// for human users or the test suite.
+			customRules: {
+				'/sign-in/email': { window: 60, max: 20 },
+			},
 		},
 		advanced: {
 			cookiePrefix: 'batuda',
