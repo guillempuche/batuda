@@ -31,7 +31,9 @@ test.describe('quick capture', () => {
 			await page.goto('/', { waitUntil: 'networkidle' })
 
 			// WHEN she opens the QuickCapture dialog from the TopBar
-			await page.getByRole('button', { name: 'Log' }).click()
+			// (testid disambiguates from per-task "Log an interaction"
+			// buttons that share the accessible name "Log")
+			await page.getByTestId('topbar-log-trigger').click()
 
 			// THEN the dialog is visible
 			await expect(page.getByTestId('quick-capture')).toBeVisible()
