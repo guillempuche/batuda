@@ -936,7 +936,13 @@ const getPresetData = (
 export const seedReset = Effect.gen(function* () {
 	const sql = yield* SqlClient.SqlClient
 	yield* Effect.logInfo('Truncating CRM tables...')
-	yield* sql`TRUNCATE companies, products, pages, research_runs, sources, user_research_policy, provider_quotas, provider_usage, inboxes, email_thread_links, email_messages, call_recordings CASCADE`
+	// `inboxes` is wiped via DELETE rather than TRUNCATE CASCADE because
+	// `member.primary_inbox_id` is a FK to inboxes. TRUNCATE CASCADE
+	// ignores `ON DELETE SET NULL` and would unconditionally truncate the
+	// `member` table too — wiping every membership the identity seed just
+	// created. DELETE honours the SET NULL action and leaves members intact.
+	yield* sql`DELETE FROM inboxes`
+	yield* sql`TRUNCATE companies, products, pages, research_runs, sources, user_research_policy, provider_quotas, provider_usage, email_thread_links, email_messages, call_recordings CASCADE`
 })
 
 // ── Seed auth ─────────────────────────────────────────────
@@ -950,6 +956,45 @@ export const seedIdentities = Effect.gen(function* () {
 	)
 
 	const pool = new pg.Pool({ connectionString: Redacted.value(dbUrl) })
+
+	// Refuse to seed when CRM rows reference org ids that don't exist in
+	// `organization`. Symptom of a partial reset (e.g. running
+	// `pnpm cli seed` after the auth tables got truncated separately):
+	// auth.api.createOrganization mints fresh ids, leaving every old CRM
+	// row pointing at a dead org. RLS then silently hides those rows from
+	// the dashboard — the demo looks empty for no obvious reason. This
+	// gate catches it at the source instead of letting a broken seed land.
+	const orphanCheck = yield* Effect.tryPromise({
+		try: () =>
+			pool.query<{ table: string; orphan_count: string }>(`
+				SELECT 'companies' AS table, count(*)::text AS orphan_count
+				FROM companies c
+				WHERE NOT EXISTS (
+					SELECT 1 FROM organization o WHERE o.id = c.organization_id
+				)
+				UNION ALL
+				SELECT 'contacts', count(*)::text
+				FROM contacts c
+				WHERE NOT EXISTS (
+					SELECT 1 FROM organization o WHERE o.id = c.organization_id
+				)
+			`),
+		catch: cause => new Error(String(cause)),
+	})
+	const orphanRows = orphanCheck.rows.filter(r => Number(r.orphan_count) > 0)
+	if (orphanRows.length > 0) {
+		yield* Effect.promise(() => pool.end())
+		const summary = orphanRows
+			.map(r => `${r.table}=${r.orphan_count}`)
+			.join(', ')
+		return yield* Effect.die(
+			new Error(
+				`CRM data references organization ids that no longer exist (${summary}). ` +
+					'This usually means the auth tables were reset without re-seeding ' +
+					'the CRM rows. Run `pnpm cli db reset` for a clean slate.',
+			),
+		)
+	}
 	// Uses the shared `buildBetterAuthConfig` — same plugins/config as the
 	// server, so API keys, sessions, and orgs created here validate against
 	// the running /auth/* routes. `disableSignUp: true` closes the public
