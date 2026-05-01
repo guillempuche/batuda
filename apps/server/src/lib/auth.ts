@@ -137,8 +137,13 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 									headers: request?.headers ?? new Headers(),
 								})
 							} catch (cause) {
-								const msg = cause instanceof Error ? cause.message : ''
-								if (!msg.toLowerCase().includes('already exists')) {
+								// Match by code, not message — locale shifts would
+								// silently break a substring predicate.
+								const code = (cause as { body?: { code?: string } })?.body?.code
+								if (
+									code !== 'USER_ALREADY_EXISTS' &&
+									code !== 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL'
+								) {
 									throw cause
 								}
 							}
