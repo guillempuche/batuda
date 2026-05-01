@@ -31,18 +31,28 @@ const buildMagicLinkBody = (
 	html: `<p>Click the link below to sign in:</p><p><a href="${params.url}">${params.url}</a></p><p>This link will expire shortly.</p>`,
 })
 
-// Plain-text body comes first so spam filters that score the text/html
-// pair can read both halves cleanly. The accept link is presented in
-// both — invitees on plaintext clients still get a working URL.
+// Inviter/org names are user-editable; inviteUrl is config-driven.
+// Escape for fields that mail clients parse as markup (html, subject).
+const escapeHtml = (value: string): string =>
+	value
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#39;')
+
 const buildInvitationBody = (
 	params: InvitationParams,
 	from: string,
 ): ResendBody => {
 	const expiry = params.expiresAt.toISOString()
+	const inviter = escapeHtml(params.inviterName)
+	const org = escapeHtml(params.organizationName)
+	const url = escapeHtml(params.inviteUrl)
 	return {
 		from,
+		subject: `${inviter} invited you to ${org} on Batuda`,
 		to: [params.email],
-		subject: `${params.inviterName} invited you to ${params.organizationName} on Batuda`,
 		text: [
 			`${params.inviterName} invited you to join ${params.organizationName} on Batuda.`,
 			'',
@@ -53,9 +63,9 @@ const buildInvitationBody = (
 			`This invitation expires on ${expiry}.`,
 		].join('\n'),
 		html: [
-			`<p>${params.inviterName} invited you to join <strong>${params.organizationName}</strong> on Batuda.</p>`,
+			`<p>${inviter} invited you to join <strong>${org}</strong> on Batuda.</p>`,
 			'<p>Click the link below to accept. The link signs you in automatically — no password needed.</p>',
-			`<p><a href="${params.inviteUrl}">${params.inviteUrl}</a></p>`,
+			`<p><a href="${url}">${url}</a></p>`,
 			`<p style="color:#666">This invitation expires on ${expiry}.</p>`,
 		].join(''),
 	}

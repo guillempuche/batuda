@@ -210,6 +210,52 @@ describe('TransactionalEmailProvider — Resend (unit, stubbed fetch)', () => {
 			})
 		})
 
+		describe('when the inviter or org name contains HTML control chars', () => {
+			it('should escape HTML in subject + html body but leave text body raw', async () => {
+				// GIVEN an inviter and org whose names contain HTML — the
+				// inviter's profile name and the org's display name are
+				// both user-editable, and email clients (Gmail/Outlook web)
+				// render basic tags in HTML bodies.
+				const captured: { url?: string; init?: RequestInit } = {}
+				const stub: typeof fetch = async (input, init) => {
+					captured.url = input.toString()
+					if (init) captured.init = init
+					return new Response('{}', { status: 200 })
+				}
+
+				// WHEN we send an invitation
+				const exit = await runWith(
+					stub,
+					Effect.gen(function* () {
+						const provider = yield* TransactionalEmailProvider
+						yield* provider.sendInvitation({
+							email: 'invitee@example.com',
+							inviterName: 'Mallory <img src=x onerror=alert(1)>',
+							organizationName: '</p><a href="https://evil">click</a>',
+							inviteUrl: 'https://example.com/accept-invitation/inv-1',
+							expiresAt: new Date('2026-06-01T00:00:00Z'),
+						})
+					}),
+				)
+				expect(exit._tag).toBe('Success')
+				const body = JSON.parse(String(captured.init?.body))
+
+				// THEN the html field must NOT carry raw `<img onerror=` or
+				// the malicious anchor. Escaped entities are fine.
+				expect(body.html).not.toContain('<img src=x onerror=')
+				expect(body.html).not.toContain('<a href="https://evil">click</a>')
+				expect(body.html).toContain('&lt;img src=x onerror=')
+
+				// AND the subject must also be escaped — Gmail's preview pane
+				// echoes raw subjects in some flows.
+				expect(body.subject).not.toContain('<img src=x onerror=alert(1)>')
+
+				// AND the text body keeps the raw values: text/plain is
+				// never parsed, so the recipient sees what was entered.
+				expect(body.text).toContain('Mallory <img src=x onerror=alert(1)>')
+			})
+		})
+
 		describe('when Resend returns 422 (invalid recipient)', () => {
 			it('should fail with kind=invalid_recipient carrying the recipient', async () => {
 				// GIVEN Resend returns a 4xx
