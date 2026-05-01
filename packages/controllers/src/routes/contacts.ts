@@ -59,6 +59,19 @@ export const ContactsGroup = HttpApiGroup.make('contacts')
 			success: Schema.Void,
 		}),
 	)
+	.add(
+		// Clears a bounced/complained suppression so the contact can receive
+		// mail again. Restricted to the suppression fields — clients can't
+		// flip arbitrary email_status values via this route.
+		HttpApiEndpoint.post(
+			'clearSuppression',
+			'/contacts/:id/email-suppression/clear',
+			{
+				params: { id: Schema.String },
+				success: Schema.Unknown,
+			},
+		),
+	)
 	.middleware(SessionMiddleware)
 	.middleware(OrgMiddleware)
 	.prefix('/v1')

@@ -59,5 +59,26 @@ export const ContactsLive = HttpApiBuilder.group(
 						)
 					}).pipe(Effect.orDie),
 				)
+				.handle('clearSuppression', _ =>
+					Effect.gen(function* () {
+						const rows = yield* sql`
+							UPDATE contacts
+							SET email_status = 'unknown',
+							    email_status_reason = NULL,
+							    email_status_updated_at = now(),
+							    email_soft_bounce_count = 0,
+							    updated_at = now()
+							WHERE id = ${_.params.id}
+							RETURNING *
+						`
+						yield* Effect.logInfo('Contact suppression cleared').pipe(
+							Effect.annotateLogs({
+								event: 'contact.suppression_cleared',
+								contactId: _.params.id,
+							}),
+						)
+						return rows[0]
+					}).pipe(Effect.orDie),
+				)
 		}),
 )
