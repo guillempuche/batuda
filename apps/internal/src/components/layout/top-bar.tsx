@@ -11,6 +11,7 @@ import { ScrewDot } from '#/components/shared/workshop-decorations'
 import { useQuickCapture } from '#/context/quick-capture-context'
 import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
 import { navItems } from './nav-items'
+import { OrgSwitcher } from './org-switcher'
 
 /**
  * Sheet-metal label strip across the top of the content column. Renders
@@ -35,8 +36,14 @@ export function TopBar() {
 			<ScrewDot $position='top-right' aria-hidden />
 			<Title>{title}</Title>
 			<Actions>
+				<OrgSwitcher />
 				<motion.div whileTap={{ scale: 0.96 }}>
-					<PriButton type='button' $variant='filled' onClick={() => open()}>
+					<PriButton
+						type='button'
+						$variant='filled'
+						data-testid='topbar-log-trigger'
+						onClick={() => open()}
+					>
 						<Plus size={18} />
 						<span>
 							<Trans>Log</Trans>

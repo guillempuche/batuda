@@ -103,6 +103,10 @@ msgstr "Client actiu"
 msgid "Active companies"
 msgstr "Empreses actives"
 
+#: src/components/layout/org-switcher.tsx:78
+msgid "Active organization"
+msgstr "Organització activa"
+
 #: src/routes/tasks/index.tsx:632
 msgid "Add"
 msgstr "Afegeix"
@@ -198,6 +202,10 @@ msgstr "Torna als correus"
 #: src/routes/emails/$threadId.tsx:308
 msgid "Back to inbox"
 msgstr "Torna a la safata"
+
+#: src/routes/settings/organization/members.tsx:83
+msgid "Back to organization"
+msgstr "Tornar a l'organització"
 
 #: src/i18n/lingui.tsx:56
 msgid "Batuda"
@@ -514,6 +522,10 @@ msgstr "No s'ha pogut publicar la pàgina. Torna-ho a provar."
 msgid "Could not reach {0}."
 msgstr "No s'ha pogut arribar a {0}."
 
+#: src/routes/settings/organization/members.tsx:67
+msgid "Could not remove {email}. Please try again."
+msgstr "No s'ha pogut eliminar {email}. Torna-ho a provar."
+
 #: src/routes/companies/$slug.tsx:382
 msgid "Could not save"
 msgstr "No s'ha pogut desar"
@@ -537,6 +549,10 @@ msgstr "No s'ha pogut establir la safata per defecte."
 #: src/routes/login.tsx:114
 msgid "Could not sign in. Check your email and password."
 msgstr "No s'ha pogut iniciar sessió. Comprova el correu i la contrasenya."
+
+#: src/components/layout/org-switcher.tsx:52
+msgid "Could not switch organization. Please try again."
+msgstr "No s'ha pogut canviar d'organització. Torna-ho a provar."
 
 #: src/routes/emails/inboxes.tsx:204
 msgid "Could not toggle the inbox state."
@@ -958,6 +974,8 @@ msgid "Loading companies…"
 msgstr "Carregant empreses…"
 
 #: src/components/shared/loading-spinner.tsx:23
+#: src/routes/settings/organization/index.tsx:48
+#: src/routes/settings/organization/members.tsx:105
 msgid "Loading…"
 msgstr "Carregant…"
 
@@ -983,7 +1001,7 @@ msgid "Location"
 msgstr "Ubicació"
 
 #: src/components/interactions/quick-capture-dialog.tsx:408
-#: src/components/layout/top-bar.tsx:42
+#: src/components/layout/top-bar.tsx:49
 msgid "Log"
 msgstr "Registra"
 
@@ -1018,6 +1036,10 @@ msgstr "Gestiona els peus de pàgina de {0}"
 #: src/routes/emails/index.tsx:548
 msgid "Manage inboxes"
 msgstr "Gestiona les safates"
+
+#: src/routes/settings/organization/index.tsx:79
+msgid "Manage members"
+msgstr "Gestiona els membres"
 
 #. placeholder {0}: task.title
 #: src/components/shared/task-item.tsx:80
@@ -1076,6 +1098,11 @@ msgstr "Reunió programada"
 #: src/routes/calendar/index.tsx:181
 msgid "Meetings from bookings, email invitations, and internal blocks."
 msgstr "Reunions des de reserves, invitacions per correu i blocs interns."
+
+#: src/routes/settings/organization/index.tsx:84
+#: src/routes/settings/organization/members.tsx:93
+msgid "Members"
+msgstr "Membres"
 
 #: src/components/emails/compose-form.tsx:389
 msgid "Message"
@@ -1146,6 +1173,14 @@ msgstr "Pròxim esdeveniment"
 msgid "Next: {0}"
 msgstr "Següent: {0}"
 
+#: src/components/layout/org-switcher.tsx:69
+msgid "No active organization"
+msgstr "Sense organització activa"
+
+#: src/routes/settings/organization/index.tsx:54
+msgid "No active organization. Pick one from the switcher in the top bar."
+msgstr "Sense organització activa. Tria'n una al selector de la barra superior."
+
 #: src/routes/companies/$slug.tsx:1118
 msgid "No activity yet"
 msgstr "Encara no hi ha activitat"
@@ -1166,8 +1201,10 @@ msgstr "Cap empresa coincideix amb els filtres"
 msgid "No companies yet"
 msgstr "Encara no hi ha empreses"
 
+#: src/components/layout/org-switcher.tsx:63
 #: src/routes/login.tsx:129
 #: src/routes/profile/index.tsx:80
+#: src/routes/settings/organization/members.tsx:73
 msgid "No connection to the server. Try again in a few seconds."
 msgstr "Sense connexió al servidor. Torna-ho a provar d'aquí a uns segons."
 
@@ -1216,6 +1253,10 @@ msgstr "Encara no hi ha safates"
 #: src/routes/calendar/index.tsx:298
 msgid "no location"
 msgstr "sense ubicació"
+
+#: src/routes/settings/organization/members.tsx:111
+msgid "No members yet."
+msgstr "Encara no hi ha membres."
 
 #: src/routes/emails/$threadId.tsx:423
 msgid "No messages in this thread"
@@ -1325,6 +1366,15 @@ msgstr "Obre el lloc web"
 msgid "Opened"
 msgstr "Obert"
 
+#: src/routes/settings/organization/index.tsx:38
+#: src/routes/settings/organization/members.tsx:87
+msgid "Organization"
+msgstr "Organització"
+
+#: src/components/layout/org-switcher.tsx:108
+msgid "Organizations"
+msgstr "Organitzacions"
+
 #: src/components/shared/channel-icon.tsx:73
 msgid "Other"
 msgstr "Altres"
@@ -1392,6 +1442,10 @@ msgstr "Contrasenya"
 #: src/routes/emails/inboxes.tsx:942
 msgid "Password or app-password"
 msgstr "Contrasenya o contrasenya d'aplicació"
+
+#: src/routes/settings/organization/members.tsx:96
+msgid "People with access to this workspace."
+msgstr "Persones amb accés a aquest espai de treball."
 
 #: src/routes/calendar/index.tsx:253
 #: src/routes/tasks/index.tsx:332
@@ -1545,6 +1599,10 @@ msgstr "Actualitzant l'estat de la bústia…"
 msgid "Region"
 msgstr "Regió"
 
+#: src/routes/settings/organization/members.tsx:153
+msgid "Remove"
+msgstr "Elimina"
+
 #. placeholder {0}: att.filename
 #: src/components/emails/attachment-picker.tsx:135
 msgid "Remove {0}"
@@ -1553,6 +1611,14 @@ msgstr "Elimina {0}"
 #: src/components/shared/editable-field.tsx:300
 msgid "Remove {chip}"
 msgstr "Elimina {chip}"
+
+#: src/routes/settings/organization/members.tsx:58
+msgid "Remove {email} from this organization?"
+msgstr "Vols eliminar {email} d'aquesta organització?"
+
+#: src/routes/settings/organization/members.tsx:153
+msgid "Removing…"
+msgstr "Eliminant…"
 
 #: src/routes/emails/$threadId.tsx:344
 #: src/routes/emails/index.tsx:694
@@ -1629,6 +1695,10 @@ msgstr "Cerca empreses"
 #: src/routes/emails/index.tsx:575
 msgid "Search threads"
 msgstr "Cerca fils"
+
+#: src/routes/settings/organization/index.tsx:88
+msgid "See who can access this workspace."
+msgstr "Veure qui té accés a aquest espai de treball."
 
 #: src/routes/emails/index.tsx:900
 msgid "Select all threads on this page"
@@ -1731,6 +1801,7 @@ msgstr "Mida"
 
 #: src/routes/pages/$id.tsx:282
 #: src/routes/pages/index.tsx:144
+#: src/routes/settings/organization/index.tsx:69
 msgid "Slug"
 msgstr "Slug"
 
@@ -1800,6 +1871,10 @@ msgstr "Assumpte"
 #: src/components/interactions/quick-capture-dialog.tsx:320
 msgid "Summary"
 msgstr "Resum"
+
+#: src/components/layout/org-switcher.tsx:93
+msgid "Switch organization"
+msgstr "Canvia d'organització"
 
 #: src/components/shared/channel-icon.tsx:72
 msgid "System"
@@ -1875,6 +1950,10 @@ msgstr "El llibre del taller — arrenca-n'hi una tira cada vegada."
 #: src/routes/companies/$slug.tsx:383
 msgid "The workshop rejected the change. Try again."
 msgstr "El taller ha rebutjat el canvi. Torna-ho a provar."
+
+#: src/routes/settings/organization/index.tsx:41
+msgid "The workspace your CRM data lives in."
+msgstr "L'espai de treball on viuen les dades del CRM."
 
 #: src/components/shared/status-badge.tsx:41
 msgid "They replied — keep the thread warm"
