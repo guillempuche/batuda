@@ -1,6 +1,6 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Building2, Users } from 'lucide-react'
+import { Building2, UserPlus, Users } from 'lucide-react'
 import styled from 'styled-components'
 
 import { authClient } from '#/lib/auth-client'
@@ -29,7 +29,10 @@ export const Route = createFileRoute('/settings/organization/')({
 function OrganizationSettingsPage() {
 	const { t } = useLingui()
 	const active = authClient.useActiveOrganization()
+	const activeMember = authClient.useActiveMember()
 	const org = active.data
+	const myRole = activeMember.data?.role ?? null
+	const canInvite = myRole === 'owner' || myRole === 'admin'
 
 	return (
 		<Page>
@@ -88,6 +91,24 @@ function OrganizationSettingsPage() {
 							<Trans>See who can access this workspace.</Trans>
 						</NavRowDescription>
 					</NavRow>
+
+					{canInvite ? (
+						<NavRow
+							to='/settings/organization/invite'
+							data-testid='settings-org-invite-link'
+							aria-label={t`Invite a new member`}
+						>
+							<NavRowLabel>
+								<UserPlus size={18} aria-hidden />
+								<NavRowTitle>
+									<Trans>Invite</Trans>
+								</NavRowTitle>
+							</NavRowLabel>
+							<NavRowDescription>
+								<Trans>Send a one-click sign-in link to a teammate.</Trans>
+							</NavRowDescription>
+						</NavRow>
+					) : null}
 				</>
 			)}
 		</Page>

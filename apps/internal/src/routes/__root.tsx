@@ -61,7 +61,16 @@ export const Route = createRootRoute({
 		}
 		const lang: LangCode = readLangCookieFromHeader(cookieHeader) ?? defaultLang
 
-		if (location.pathname !== '/login') {
+		// `/accept-invitation/<id>` is whitelisted alongside `/login`: the
+		// route renders its own auth-aware UI (magic-link redirect lands the
+		// user already authed; a stale-link visitor sees a "sign in to
+		// continue" CTA). Without this carve-out, the gate would force a
+		// /login redirect that bounces back via `returnTo`, which is
+		// jankier than letting the page render its own message.
+		const isPublicPath =
+			location.pathname === '/login' ||
+			location.pathname.startsWith('/accept-invitation/')
+		if (!isPublicPath) {
 			const user = await fetchSession(cookieHeader ?? undefined)
 			if (!user) {
 				throw redirect({
@@ -139,11 +148,14 @@ function RootComponent() {
 		return data?.dehydrated ?? []
 	})
 
-	// The login page renders standalone — no sidebar, no top bar, no
-	// Quick Capture dialog (there's no authenticated user yet, so the
-	// dialog would have nothing to do). Everything else runs inside the
-	// full authenticated shell.
-	const isAuthChrome = location.pathname === '/login'
+	// The login + accept-invitation pages render standalone — no sidebar,
+	// no top bar, no Quick Capture dialog. They're either pre-auth (login)
+	// or auth-transition (the accept page may run before the active org
+	// has been picked, so the AppShell's org-aware chrome would render
+	// empty). Everything else runs inside the full authenticated shell.
+	const isAuthChrome =
+		location.pathname === '/login' ||
+		location.pathname.startsWith('/accept-invitation/')
 
 	return (
 		<RootDocument lang={lang}>

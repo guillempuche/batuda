@@ -87,6 +87,10 @@ msgstr "1 fil seleccionat"
 msgid "Accept"
 msgstr "Accepta"
 
+#: src/routes/accept-invitation.$id.tsx:135
+msgid "Accepting the invitation…"
+msgstr "Acceptant la invitació…"
+
 #: src/routes/emails/inboxes.tsx:407
 msgid "Actions"
 msgstr "Accions"
@@ -135,6 +139,10 @@ msgstr "Afegeix tasca"
 #: src/routes/companies/$slug.tsx:920
 msgid "Add the first decision-maker to keep track of who to reach."
 msgstr "Afegeix el primer responsable de decisió per saber a qui adreçar-te."
+
+#: src/routes/settings/organization/invite.tsx:165
+msgid "Admin"
+msgstr "Admin"
 
 #: src/routes/emails/inboxes.tsx:450
 #: src/routes/emails/inboxes.tsx:992
@@ -203,6 +211,7 @@ msgstr "Torna als correus"
 msgid "Back to inbox"
 msgstr "Torna a la safata"
 
+#: src/routes/settings/organization/invite.tsx:84
 #: src/routes/settings/organization/members.tsx:83
 msgid "Back to organization"
 msgstr "Tornar a l'organització"
@@ -538,6 +547,10 @@ msgstr "No s'ha pogut desar la safata."
 msgid "Could not save the page. Please try again."
 msgstr "No s'ha pogut desar la pàgina. Torna-ho a provar."
 
+#: src/routes/settings/organization/invite.tsx:69
+msgid "Could not send the invitation. Please try again."
+msgstr "No s'''ha pogut enviar la invitació. Torna-ho a provar."
+
 #: src/routes/emails/inboxes.tsx:285
 msgid "Could not set primary inbox"
 msgstr "No s'ha pogut establir la bústia principal"
@@ -747,6 +760,7 @@ msgstr "Editor"
 #: src/routes/companies/$slug.tsx:742
 #: src/routes/emails/inboxes.tsx:401
 #: src/routes/login.tsx:146
+#: src/routes/settings/organization/invite.tsx:133
 msgid "Email"
 msgstr "Correu"
 
@@ -771,6 +785,10 @@ msgstr "Correus"
 #: src/routes/companies/$slug.tsx:1119
 msgid "Emails, calls, documents, and proposals will appear here as they happen."
 msgstr "Els emails, trucades, documents i propostes apareixeran aquí a mesura que passin."
+
+#: src/routes/settings/organization/invite.tsx:53
+msgid "Enter an email address."
+msgstr "Introdueix una adreça electrònica."
 
 #: src/components/shared/channel-icon.tsx:68
 msgid "Event"
@@ -837,6 +855,10 @@ msgstr "Del webhook"
 #: src/components/emails/compose-window.tsx:69
 msgid "Full screen"
 msgstr "Pantalla completa"
+
+#: src/routes/accept-invitation.$id.tsx:152
+msgid "Heading to the dashboard…"
+msgstr "Anant al tauler…"
 
 #: src/routes/emails/$threadId.tsx:556
 msgid "Hide Cc"
@@ -922,6 +944,26 @@ msgstr "Instagram"
 msgid "Interaction logged"
 msgstr "Interacció registrada"
 
+#: src/routes/settings/organization/invite.tsx:116
+msgid "Invitation sent to {sent}."
+msgstr "Invitació enviada a {sent}."
+
+#: src/routes/settings/organization/index.tsx:104
+msgid "Invite"
+msgstr "Convida"
+
+#: src/routes/settings/organization/invite.tsx:93
+msgid "Invite a member"
+msgstr "Convida un membre"
+
+#: src/routes/settings/organization/index.tsx:99
+msgid "Invite a new member"
+msgstr "Convida un nou membre"
+
+#: src/routes/accept-invitation.$id.tsx:122
+msgid "Join the workspace"
+msgstr "Uneix-te a l'''espai de treball"
+
 #: src/routes/calendar/index.tsx:293
 msgid "Join video call"
 msgstr "Uneix-te a la videotrucada"
@@ -974,7 +1016,7 @@ msgid "Loading companies…"
 msgstr "Carregant empreses…"
 
 #: src/components/shared/loading-spinner.tsx:23
-#: src/routes/settings/organization/index.tsx:48
+#: src/routes/settings/organization/index.tsx:51
 #: src/routes/settings/organization/members.tsx:105
 msgid "Loading…"
 msgstr "Carregant…"
@@ -1037,7 +1079,7 @@ msgstr "Gestiona els peus de pàgina de {0}"
 msgid "Manage inboxes"
 msgstr "Gestiona les safates"
 
-#: src/routes/settings/organization/index.tsx:79
+#: src/routes/settings/organization/index.tsx:82
 msgid "Manage members"
 msgstr "Gestiona els membres"
 
@@ -1099,7 +1141,11 @@ msgstr "Reunió programada"
 msgid "Meetings from bookings, email invitations, and internal blocks."
 msgstr "Reunions des de reserves, invitacions per correu i blocs interns."
 
-#: src/routes/settings/organization/index.tsx:84
+#: src/routes/settings/organization/invite.tsx:164
+msgid "Member"
+msgstr "Membre"
+
+#: src/routes/settings/organization/index.tsx:87
 #: src/routes/settings/organization/members.tsx:93
 msgid "Members"
 msgstr "Membres"
@@ -1177,7 +1223,7 @@ msgstr "Següent: {0}"
 msgid "No active organization"
 msgstr "Sense organització activa"
 
-#: src/routes/settings/organization/index.tsx:54
+#: src/routes/settings/organization/index.tsx:57
 msgid "No active organization. Pick one from the switcher in the top bar."
 msgstr "Sense organització activa. Tria'n una al selector de la barra superior."
 
@@ -1202,8 +1248,10 @@ msgid "No companies yet"
 msgstr "Encara no hi ha empreses"
 
 #: src/components/layout/org-switcher.tsx:63
+#: src/routes/accept-invitation.$id.tsx:80
 #: src/routes/login.tsx:129
 #: src/routes/profile/index.tsx:80
+#: src/routes/settings/organization/invite.tsx:76
 #: src/routes/settings/organization/members.tsx:73
 msgid "No connection to the server. Try again in a few seconds."
 msgstr "Sense connexió al servidor. Torna-ho a provar d'aquí a uns segons."
@@ -1323,6 +1371,14 @@ msgstr "Encara no ha canviat res."
 msgid "On {date}, {who} wrote:"
 msgstr "El {date}, {who} va escriure:"
 
+#: src/routes/accept-invitation.$id.tsx:125
+msgid "One click to accept the invitation."
+msgstr "Un clic per acceptar la invitació."
+
+#: src/routes/settings/organization/invite.tsx:106
+msgid "Only owners and admins can invite new members."
+msgstr "Només els propietaris i administradors poden convidar nous membres."
+
 #: src/routes/emails/$threadId.tsx:312
 #: src/routes/emails/index.tsx:588
 #: src/routes/tasks/index.tsx:443
@@ -1332,6 +1388,10 @@ msgstr "Obert"
 #: src/routes/calendar/index.tsx:350
 msgid "Open company"
 msgstr "Obre l'empresa"
+
+#: src/routes/accept-invitation.$id.tsx:163
+msgid "Open dashboard"
+msgstr "Obre el tauler"
 
 #: src/components/companies/where-panel.tsx:99
 #: src/routes/companies/$slug.tsx:709
@@ -1366,7 +1426,8 @@ msgstr "Obre el lloc web"
 msgid "Opened"
 msgstr "Obert"
 
-#: src/routes/settings/organization/index.tsx:38
+#: src/routes/settings/organization/index.tsx:41
+#: src/routes/settings/organization/invite.tsx:87
 #: src/routes/settings/organization/members.tsx:87
 msgid "Organization"
 msgstr "Organització"
@@ -1664,6 +1725,10 @@ msgstr "Reprèn esborranys ({0})"
 msgid "Resume drafting (1)"
 msgstr "Reprèn l'esborrany (1)"
 
+#: src/routes/settings/organization/invite.tsx:152
+msgid "Role"
+msgstr "Rol"
+
 #: src/routes/emails/inboxes.tsx:1060
 #: src/routes/emails/inboxes.tsx:1465
 #: src/routes/pages/$id.tsx:245
@@ -1696,7 +1761,7 @@ msgstr "Cerca empreses"
 msgid "Search threads"
 msgstr "Cerca fils"
 
-#: src/routes/settings/organization/index.tsx:88
+#: src/routes/settings/organization/index.tsx:91
 msgid "See who can access this workspace."
 msgstr "Veure qui té accés a aquest espai de treball."
 
@@ -1721,6 +1786,14 @@ msgstr "Triar un preestablit omple els paràmetres IMAP i SMTP — encara els po
 msgid "Send"
 msgstr "Envia"
 
+#: src/routes/settings/organization/invite.tsx:96
+msgid "Send a one-click invitation. The recipient signs in via the link in the email — no password to share."
+msgstr "Envia una invitació d'''un clic. El destinatari inicia sessió mitjançant l'''enllaç del correu — sense contrasenya per compartir."
+
+#: src/routes/settings/organization/index.tsx:108
+msgid "Send a one-click sign-in link to a teammate."
+msgstr "Envia un enllaç d'''inici de sessió d'''un clic a un company."
+
 #: src/components/emails/compose-form.tsx:416
 msgid "Send blocked: these recipients cannot receive email"
 msgstr "Enviament bloquejat: aquests destinataris no poden rebre correu"
@@ -1729,7 +1802,12 @@ msgstr "Enviament bloquejat: aquests destinataris no poden rebre correu"
 msgid "Send email"
 msgstr "Envia correu"
 
+#: src/routes/settings/organization/invite.tsx:176
+msgid "Send invitation"
+msgstr "Envia invitació"
+
 #: src/components/emails/compose-form.tsx:451
+#: src/routes/settings/organization/invite.tsx:176
 msgid "Sending…"
 msgstr "Enviant…"
 
@@ -1771,9 +1849,14 @@ msgstr "Mostra esdeveniments del sistema"
 msgid "Showing {firstRow}–{lastRow} of {total}"
 msgstr "Mostrant {firstRow}–{lastRow} de {total}"
 
+#: src/routes/accept-invitation.$id.tsx:111
 #: src/routes/login.tsx:183
 msgid "Sign in"
 msgstr "Inicia sessió"
+
+#: src/routes/accept-invitation.$id.tsx:93
+msgid "Sign in to accept this invitation"
+msgstr "Inicia sessió per acceptar aquesta invitació"
 
 #: src/routes/login.tsx:141
 msgid "Sign in to continue"
@@ -1801,7 +1884,7 @@ msgstr "Mida"
 
 #: src/routes/pages/$id.tsx:282
 #: src/routes/pages/index.tsx:144
-#: src/routes/settings/organization/index.tsx:69
+#: src/routes/settings/organization/index.tsx:72
 msgid "Slug"
 msgstr "Slug"
 
@@ -1927,6 +2010,18 @@ msgstr "Les 20 tasques obertes editades més recentment. Fes-hi clic per reobrir
 msgid "The geocoder did not return a match. Try editing the location field."
 msgstr "El geocodificador no ha trobat cap coincidència. Prova d'editar el camp d'ubicació."
 
+#: src/routes/accept-invitation.$id.tsx:96
+msgid "The invitation link signs you in automatically. If you're seeing this page, the link may have expired — sign in again to continue."
+msgstr "L'''enllaç de la invitació inicia sessió automàticament. Si veus aquesta pàgina, l'''enllaç pot haver caducat — inicia sessió de nou per continuar."
+
+#: src/routes/accept-invitation.$id.tsx:178
+msgid "The invitation may have expired or already been used."
+msgstr "La invitació pot haver caducat o ja s'''ha utilitzat."
+
+#: src/routes/settings/organization/invite.tsx:184
+msgid "The invitee gets a 48-hour link. They can accept it once."
+msgstr "El convidat rep un enllaç de 48 hores. Pot acceptar-lo una sola vegada."
+
 #: src/routes/emails/inboxes.tsx:552
 msgid "The mailbox is ready."
 msgstr "La bústia està a punt."
@@ -1951,13 +2046,21 @@ msgstr "El llibre del taller — arrenca-n'hi una tira cada vegada."
 msgid "The workshop rejected the change. Try again."
 msgstr "El taller ha rebutjat el canvi. Torna-ho a provar."
 
-#: src/routes/settings/organization/index.tsx:41
+#: src/routes/settings/organization/index.tsx:44
 msgid "The workspace your CRM data lives in."
 msgstr "L'espai de treball on viuen les dades del CRM."
 
 #: src/components/shared/status-badge.tsx:41
 msgid "They replied — keep the thread warm"
 msgstr "Ha respost — manté el fil calent"
+
+#: src/routes/accept-invitation.$id.tsx:175
+msgid "This invitation can't be accepted"
+msgstr "Aquesta invitació no es pot acceptar"
+
+#: src/routes/accept-invitation.$id.tsx:65
+msgid "This invitation is no longer valid."
+msgstr "Aquesta invitació ja no és vàlida."
 
 #: src/routes/index.tsx:416
 #: src/routes/tasks/index.tsx:473
@@ -2063,6 +2166,10 @@ msgstr "Usa com a per defecte per a aquest propòsit"
 msgid "Username"
 msgstr "Nom d'usuari"
 
+#: src/routes/settings/organization/invite.tsx:124
+msgid "View members"
+msgstr "Veure membres"
+
 #: src/components/shared/timeline-entry.tsx:75
 msgid "View thread"
 msgstr "Veure el fil"
@@ -2124,6 +2231,14 @@ msgstr "Escriu el peu de pàgina…"
 #: src/components/emails/compose-form.tsx:397
 msgid "Write your message…"
 msgstr "Escriu el teu missatge…"
+
+#: src/routes/accept-invitation.$id.tsx:148
+msgid "You're now a member of {orgName}."
+msgstr "Ja ets membre de {orgName}."
+
+#: src/routes/accept-invitation.$id.tsx:149
+msgid "You're now a member."
+msgstr "Ja ets membre."
 
 #: src/routes/emails/inboxes.tsx:837
 msgid "you@example.com"

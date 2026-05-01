@@ -87,6 +87,10 @@ msgstr "1 thread selected"
 msgid "Accept"
 msgstr "Accept"
 
+#: src/routes/accept-invitation.$id.tsx:135
+msgid "Accepting the invitation…"
+msgstr "Accepting the invitation…"
+
 #: src/routes/emails/inboxes.tsx:407
 msgid "Actions"
 msgstr "Actions"
@@ -135,6 +139,10 @@ msgstr "Add task"
 #: src/routes/companies/$slug.tsx:920
 msgid "Add the first decision-maker to keep track of who to reach."
 msgstr "Add the first decision-maker to keep track of who to reach."
+
+#: src/routes/settings/organization/invite.tsx:165
+msgid "Admin"
+msgstr "Admin"
 
 #: src/routes/emails/inboxes.tsx:450
 #: src/routes/emails/inboxes.tsx:992
@@ -203,6 +211,7 @@ msgstr "Back to emails"
 msgid "Back to inbox"
 msgstr "Back to inbox"
 
+#: src/routes/settings/organization/invite.tsx:84
 #: src/routes/settings/organization/members.tsx:83
 msgid "Back to organization"
 msgstr "Back to organization"
@@ -538,6 +547,10 @@ msgstr "Could not save the inbox."
 msgid "Could not save the page. Please try again."
 msgstr "Could not save the page. Please try again."
 
+#: src/routes/settings/organization/invite.tsx:69
+msgid "Could not send the invitation. Please try again."
+msgstr "Could not send the invitation. Please try again."
+
 #: src/routes/emails/inboxes.tsx:285
 msgid "Could not set primary inbox"
 msgstr "Could not set primary inbox"
@@ -747,6 +760,7 @@ msgstr "Editor"
 #: src/routes/companies/$slug.tsx:742
 #: src/routes/emails/inboxes.tsx:401
 #: src/routes/login.tsx:146
+#: src/routes/settings/organization/invite.tsx:133
 msgid "Email"
 msgstr "Email"
 
@@ -771,6 +785,10 @@ msgstr "Emails"
 #: src/routes/companies/$slug.tsx:1119
 msgid "Emails, calls, documents, and proposals will appear here as they happen."
 msgstr "Emails, calls, documents, and proposals will appear here as they happen."
+
+#: src/routes/settings/organization/invite.tsx:53
+msgid "Enter an email address."
+msgstr "Enter an email address."
 
 #: src/components/shared/channel-icon.tsx:68
 msgid "Event"
@@ -837,6 +855,10 @@ msgstr "From webhook"
 #: src/components/emails/compose-window.tsx:69
 msgid "Full screen"
 msgstr "Full screen"
+
+#: src/routes/accept-invitation.$id.tsx:152
+msgid "Heading to the dashboard…"
+msgstr "Heading to the dashboard…"
 
 #: src/routes/emails/$threadId.tsx:556
 msgid "Hide Cc"
@@ -922,6 +944,26 @@ msgstr "Instagram"
 msgid "Interaction logged"
 msgstr "Interaction logged"
 
+#: src/routes/settings/organization/invite.tsx:116
+msgid "Invitation sent to {sent}."
+msgstr "Invitation sent to {sent}."
+
+#: src/routes/settings/organization/index.tsx:104
+msgid "Invite"
+msgstr "Invite"
+
+#: src/routes/settings/organization/invite.tsx:93
+msgid "Invite a member"
+msgstr "Invite a member"
+
+#: src/routes/settings/organization/index.tsx:99
+msgid "Invite a new member"
+msgstr "Invite a new member"
+
+#: src/routes/accept-invitation.$id.tsx:122
+msgid "Join the workspace"
+msgstr "Join the workspace"
+
 #: src/routes/calendar/index.tsx:293
 msgid "Join video call"
 msgstr "Join video call"
@@ -974,7 +1016,7 @@ msgid "Loading companies…"
 msgstr "Loading companies…"
 
 #: src/components/shared/loading-spinner.tsx:23
-#: src/routes/settings/organization/index.tsx:48
+#: src/routes/settings/organization/index.tsx:51
 #: src/routes/settings/organization/members.tsx:105
 msgid "Loading…"
 msgstr "Loading…"
@@ -1037,7 +1079,7 @@ msgstr "Manage footers for {0}"
 msgid "Manage inboxes"
 msgstr "Manage inboxes"
 
-#: src/routes/settings/organization/index.tsx:79
+#: src/routes/settings/organization/index.tsx:82
 msgid "Manage members"
 msgstr "Manage members"
 
@@ -1099,7 +1141,11 @@ msgstr "Meeting booked"
 msgid "Meetings from bookings, email invitations, and internal blocks."
 msgstr "Meetings from bookings, email invitations, and internal blocks."
 
-#: src/routes/settings/organization/index.tsx:84
+#: src/routes/settings/organization/invite.tsx:164
+msgid "Member"
+msgstr "Member"
+
+#: src/routes/settings/organization/index.tsx:87
 #: src/routes/settings/organization/members.tsx:93
 msgid "Members"
 msgstr "Members"
@@ -1177,7 +1223,7 @@ msgstr "Next: {0}"
 msgid "No active organization"
 msgstr "No active organization"
 
-#: src/routes/settings/organization/index.tsx:54
+#: src/routes/settings/organization/index.tsx:57
 msgid "No active organization. Pick one from the switcher in the top bar."
 msgstr "No active organization. Pick one from the switcher in the top bar."
 
@@ -1202,8 +1248,10 @@ msgid "No companies yet"
 msgstr "No companies yet"
 
 #: src/components/layout/org-switcher.tsx:63
+#: src/routes/accept-invitation.$id.tsx:80
 #: src/routes/login.tsx:129
 #: src/routes/profile/index.tsx:80
+#: src/routes/settings/organization/invite.tsx:76
 #: src/routes/settings/organization/members.tsx:73
 msgid "No connection to the server. Try again in a few seconds."
 msgstr "No connection to the server. Try again in a few seconds."
@@ -1323,6 +1371,14 @@ msgstr "Nothing changed yet."
 msgid "On {date}, {who} wrote:"
 msgstr "On {date}, {who} wrote:"
 
+#: src/routes/accept-invitation.$id.tsx:125
+msgid "One click to accept the invitation."
+msgstr "One click to accept the invitation."
+
+#: src/routes/settings/organization/invite.tsx:106
+msgid "Only owners and admins can invite new members."
+msgstr "Only owners and admins can invite new members."
+
 #: src/routes/emails/$threadId.tsx:312
 #: src/routes/emails/index.tsx:588
 #: src/routes/tasks/index.tsx:443
@@ -1332,6 +1388,10 @@ msgstr "Open"
 #: src/routes/calendar/index.tsx:350
 msgid "Open company"
 msgstr "Open company"
+
+#: src/routes/accept-invitation.$id.tsx:163
+msgid "Open dashboard"
+msgstr "Open dashboard"
 
 #: src/components/companies/where-panel.tsx:99
 #: src/routes/companies/$slug.tsx:709
@@ -1366,7 +1426,8 @@ msgstr "Open website"
 msgid "Opened"
 msgstr "Opened"
 
-#: src/routes/settings/organization/index.tsx:38
+#: src/routes/settings/organization/index.tsx:41
+#: src/routes/settings/organization/invite.tsx:87
 #: src/routes/settings/organization/members.tsx:87
 msgid "Organization"
 msgstr "Organization"
@@ -1664,6 +1725,10 @@ msgstr "Resume drafting ({0})"
 msgid "Resume drafting (1)"
 msgstr "Resume drafting (1)"
 
+#: src/routes/settings/organization/invite.tsx:152
+msgid "Role"
+msgstr "Role"
+
 #: src/routes/emails/inboxes.tsx:1060
 #: src/routes/emails/inboxes.tsx:1465
 #: src/routes/pages/$id.tsx:245
@@ -1696,7 +1761,7 @@ msgstr "Search companies"
 msgid "Search threads"
 msgstr "Search threads"
 
-#: src/routes/settings/organization/index.tsx:88
+#: src/routes/settings/organization/index.tsx:91
 msgid "See who can access this workspace."
 msgstr "See who can access this workspace."
 
@@ -1721,6 +1786,14 @@ msgstr "Selecting a preset fills IMAP and SMTP defaults — you can still edit t
 msgid "Send"
 msgstr "Send"
 
+#: src/routes/settings/organization/invite.tsx:96
+msgid "Send a one-click invitation. The recipient signs in via the link in the email — no password to share."
+msgstr "Send a one-click invitation. The recipient signs in via the link in the email — no password to share."
+
+#: src/routes/settings/organization/index.tsx:108
+msgid "Send a one-click sign-in link to a teammate."
+msgstr "Send a one-click sign-in link to a teammate."
+
 #: src/components/emails/compose-form.tsx:416
 msgid "Send blocked: these recipients cannot receive email"
 msgstr "Send blocked: these recipients cannot receive email"
@@ -1729,7 +1802,12 @@ msgstr "Send blocked: these recipients cannot receive email"
 msgid "Send email"
 msgstr "Send email"
 
+#: src/routes/settings/organization/invite.tsx:176
+msgid "Send invitation"
+msgstr "Send invitation"
+
 #: src/components/emails/compose-form.tsx:451
+#: src/routes/settings/organization/invite.tsx:176
 msgid "Sending…"
 msgstr "Sending…"
 
@@ -1771,9 +1849,14 @@ msgstr "Show system events"
 msgid "Showing {firstRow}–{lastRow} of {total}"
 msgstr "Showing {firstRow}–{lastRow} of {total}"
 
+#: src/routes/accept-invitation.$id.tsx:111
 #: src/routes/login.tsx:183
 msgid "Sign in"
 msgstr "Sign in"
+
+#: src/routes/accept-invitation.$id.tsx:93
+msgid "Sign in to accept this invitation"
+msgstr "Sign in to accept this invitation"
 
 #: src/routes/login.tsx:141
 msgid "Sign in to continue"
@@ -1801,7 +1884,7 @@ msgstr "Size"
 
 #: src/routes/pages/$id.tsx:282
 #: src/routes/pages/index.tsx:144
-#: src/routes/settings/organization/index.tsx:69
+#: src/routes/settings/organization/index.tsx:72
 msgid "Slug"
 msgstr "Slug"
 
@@ -1927,6 +2010,18 @@ msgstr "The 20 most recently edited open tasks. Click one to reopen it."
 msgid "The geocoder did not return a match. Try editing the location field."
 msgstr "The geocoder did not return a match. Try editing the location field."
 
+#: src/routes/accept-invitation.$id.tsx:96
+msgid "The invitation link signs you in automatically. If you're seeing this page, the link may have expired — sign in again to continue."
+msgstr "The invitation link signs you in automatically. If you're seeing this page, the link may have expired — sign in again to continue."
+
+#: src/routes/accept-invitation.$id.tsx:178
+msgid "The invitation may have expired or already been used."
+msgstr "The invitation may have expired or already been used."
+
+#: src/routes/settings/organization/invite.tsx:184
+msgid "The invitee gets a 48-hour link. They can accept it once."
+msgstr "The invitee gets a 48-hour link. They can accept it once."
+
 #: src/routes/emails/inboxes.tsx:552
 msgid "The mailbox is ready."
 msgstr "The mailbox is ready."
@@ -1951,13 +2046,21 @@ msgstr "The workshop ledger — tear off one strip at a time."
 msgid "The workshop rejected the change. Try again."
 msgstr "The workshop rejected the change. Try again."
 
-#: src/routes/settings/organization/index.tsx:41
+#: src/routes/settings/organization/index.tsx:44
 msgid "The workspace your CRM data lives in."
 msgstr "The workspace your CRM data lives in."
 
 #: src/components/shared/status-badge.tsx:41
 msgid "They replied — keep the thread warm"
 msgstr "They replied — keep the thread warm"
+
+#: src/routes/accept-invitation.$id.tsx:175
+msgid "This invitation can't be accepted"
+msgstr "This invitation can't be accepted"
+
+#: src/routes/accept-invitation.$id.tsx:65
+msgid "This invitation is no longer valid."
+msgstr "This invitation is no longer valid."
 
 #: src/routes/index.tsx:416
 #: src/routes/tasks/index.tsx:473
@@ -2063,6 +2166,10 @@ msgstr "Use as default for this purpose"
 msgid "Username"
 msgstr "Username"
 
+#: src/routes/settings/organization/invite.tsx:124
+msgid "View members"
+msgstr "View members"
+
 #: src/components/shared/timeline-entry.tsx:75
 msgid "View thread"
 msgstr "View thread"
@@ -2124,6 +2231,14 @@ msgstr "Write footer…"
 #: src/components/emails/compose-form.tsx:397
 msgid "Write your message…"
 msgstr "Write your message…"
+
+#: src/routes/accept-invitation.$id.tsx:148
+msgid "You're now a member of {orgName}."
+msgstr "You're now a member of {orgName}."
+
+#: src/routes/accept-invitation.$id.tsx:149
+msgid "You're now a member."
+msgstr "You're now a member."
 
 #: src/routes/emails/inboxes.tsx:837
 msgid "you@example.com"

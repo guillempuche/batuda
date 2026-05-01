@@ -21,8 +21,10 @@ import { Route as PagesIdRouteImport } from './routes/pages/$id'
 import { Route as EmailsInboxesRouteImport } from './routes/emails/inboxes'
 import { Route as EmailsThreadIdRouteImport } from './routes/emails/$threadId'
 import { Route as CompaniesSlugRouteImport } from './routes/companies/$slug'
+import { Route as AcceptInvitationIdRouteImport } from './routes/accept-invitation.$id'
 import { Route as SettingsOrganizationIndexRouteImport } from './routes/settings/organization/index'
 import { Route as SettingsOrganizationMembersRouteImport } from './routes/settings/organization/members'
+import { Route as SettingsOrganizationInviteRouteImport } from './routes/settings/organization/invite'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -84,6 +86,11 @@ const CompaniesSlugRoute = CompaniesSlugRouteImport.update({
   path: '/companies/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AcceptInvitationIdRoute = AcceptInvitationIdRouteImport.update({
+  id: '/accept-invitation/$id',
+  path: '/accept-invitation/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsOrganizationIndexRoute =
   SettingsOrganizationIndexRouteImport.update({
     id: '/settings/organization/',
@@ -96,10 +103,17 @@ const SettingsOrganizationMembersRoute =
     path: '/settings/organization/members',
     getParentRoute: () => rootRouteImport,
   } as any)
+const SettingsOrganizationInviteRoute =
+  SettingsOrganizationInviteRouteImport.update({
+    id: '/settings/organization/invite',
+    path: '/settings/organization/invite',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/accept-invitation/$id': typeof AcceptInvitationIdRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/emails/$threadId': typeof EmailsThreadIdRoute
   '/emails/inboxes': typeof EmailsInboxesRoute
@@ -110,12 +124,14 @@ export interface FileRoutesByFullPath {
   '/pages/': typeof PagesIndexRoute
   '/profile/': typeof ProfileIndexRoute
   '/tasks/': typeof TasksIndexRoute
+  '/settings/organization/invite': typeof SettingsOrganizationInviteRoute
   '/settings/organization/members': typeof SettingsOrganizationMembersRoute
   '/settings/organization/': typeof SettingsOrganizationIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/accept-invitation/$id': typeof AcceptInvitationIdRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/emails/$threadId': typeof EmailsThreadIdRoute
   '/emails/inboxes': typeof EmailsInboxesRoute
@@ -126,6 +142,7 @@ export interface FileRoutesByTo {
   '/pages': typeof PagesIndexRoute
   '/profile': typeof ProfileIndexRoute
   '/tasks': typeof TasksIndexRoute
+  '/settings/organization/invite': typeof SettingsOrganizationInviteRoute
   '/settings/organization/members': typeof SettingsOrganizationMembersRoute
   '/settings/organization': typeof SettingsOrganizationIndexRoute
 }
@@ -133,6 +150,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/accept-invitation/$id': typeof AcceptInvitationIdRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/emails/$threadId': typeof EmailsThreadIdRoute
   '/emails/inboxes': typeof EmailsInboxesRoute
@@ -143,6 +161,7 @@ export interface FileRoutesById {
   '/pages/': typeof PagesIndexRoute
   '/profile/': typeof ProfileIndexRoute
   '/tasks/': typeof TasksIndexRoute
+  '/settings/organization/invite': typeof SettingsOrganizationInviteRoute
   '/settings/organization/members': typeof SettingsOrganizationMembersRoute
   '/settings/organization/': typeof SettingsOrganizationIndexRoute
 }
@@ -151,6 +170,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/accept-invitation/$id'
     | '/companies/$slug'
     | '/emails/$threadId'
     | '/emails/inboxes'
@@ -161,12 +181,14 @@ export interface FileRouteTypes {
     | '/pages/'
     | '/profile/'
     | '/tasks/'
+    | '/settings/organization/invite'
     | '/settings/organization/members'
     | '/settings/organization/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
+    | '/accept-invitation/$id'
     | '/companies/$slug'
     | '/emails/$threadId'
     | '/emails/inboxes'
@@ -177,12 +199,14 @@ export interface FileRouteTypes {
     | '/pages'
     | '/profile'
     | '/tasks'
+    | '/settings/organization/invite'
     | '/settings/organization/members'
     | '/settings/organization'
   id:
     | '__root__'
     | '/'
     | '/login'
+    | '/accept-invitation/$id'
     | '/companies/$slug'
     | '/emails/$threadId'
     | '/emails/inboxes'
@@ -193,6 +217,7 @@ export interface FileRouteTypes {
     | '/pages/'
     | '/profile/'
     | '/tasks/'
+    | '/settings/organization/invite'
     | '/settings/organization/members'
     | '/settings/organization/'
   fileRoutesById: FileRoutesById
@@ -200,6 +225,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
+  AcceptInvitationIdRoute: typeof AcceptInvitationIdRoute
   CompaniesSlugRoute: typeof CompaniesSlugRoute
   EmailsThreadIdRoute: typeof EmailsThreadIdRoute
   EmailsInboxesRoute: typeof EmailsInboxesRoute
@@ -210,6 +236,7 @@ export interface RootRouteChildren {
   PagesIndexRoute: typeof PagesIndexRoute
   ProfileIndexRoute: typeof ProfileIndexRoute
   TasksIndexRoute: typeof TasksIndexRoute
+  SettingsOrganizationInviteRoute: typeof SettingsOrganizationInviteRoute
   SettingsOrganizationMembersRoute: typeof SettingsOrganizationMembersRoute
   SettingsOrganizationIndexRoute: typeof SettingsOrganizationIndexRoute
 }
@@ -300,6 +327,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CompaniesSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/accept-invitation/$id': {
+      id: '/accept-invitation/$id'
+      path: '/accept-invitation/$id'
+      fullPath: '/accept-invitation/$id'
+      preLoaderRoute: typeof AcceptInvitationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/organization/': {
       id: '/settings/organization/'
       path: '/settings/organization'
@@ -314,12 +348,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsOrganizationMembersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/organization/invite': {
+      id: '/settings/organization/invite'
+      path: '/settings/organization/invite'
+      fullPath: '/settings/organization/invite'
+      preLoaderRoute: typeof SettingsOrganizationInviteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
+  AcceptInvitationIdRoute: AcceptInvitationIdRoute,
   CompaniesSlugRoute: CompaniesSlugRoute,
   EmailsThreadIdRoute: EmailsThreadIdRoute,
   EmailsInboxesRoute: EmailsInboxesRoute,
@@ -330,6 +372,7 @@ const rootRouteChildren: RootRouteChildren = {
   PagesIndexRoute: PagesIndexRoute,
   ProfileIndexRoute: ProfileIndexRoute,
   TasksIndexRoute: TasksIndexRoute,
+  SettingsOrganizationInviteRoute: SettingsOrganizationInviteRoute,
   SettingsOrganizationMembersRoute: SettingsOrganizationMembersRoute,
   SettingsOrganizationIndexRoute: SettingsOrganizationIndexRoute,
 }
