@@ -10,6 +10,7 @@ import {
 import { Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import {
+	AlertTriangle,
 	Briefcase,
 	Camera,
 	Check,
@@ -123,6 +124,8 @@ type ContactRow = {
 	readonly email: string | null
 	readonly phone: string | null
 	readonly linkedin: string | null
+	readonly emailStatus: 'unknown' | 'valid' | 'bounced' | 'complained'
+	readonly emailStatusReason: string | null
 }
 
 type TimelineRow = {
@@ -362,6 +365,7 @@ function DetailBody({
 
 	const refreshInteractions = useAtomRefresh(interactionsAtom)
 	const refreshTimeline = useAtomRefresh(timelineAtom)
+	const refreshContacts = useAtomRefresh(contactsAtom)
 
 	const toast = usePriToast()
 	const updateCompany = useAtomSet(
@@ -524,6 +528,29 @@ function DetailBody({
 			})
 		},
 		[openCompose, company.id],
+	)
+
+	const clearSuppression = useAtomSet(
+		BatudaApiAtom.mutation('contacts', 'clearSuppression'),
+		{ mode: 'promiseExit' },
+	)
+	const handleClearSuppression = useCallback(
+		async (contactId: string) => {
+			const exit = await clearSuppression({
+				params: { id: contactId },
+			} as never)
+			if (exit._tag === 'Success') {
+				refreshContacts()
+				return
+			}
+			toast.add({
+				title: t`Could not clear suppression`,
+				description: t`The change didn't go through. Try again.`,
+				type: 'error',
+			})
+			console.error('[batuda] contacts.clearSuppression failed', exit.cause)
+		},
+		[clearSuppression, refreshContacts, toast, t],
 	)
 
 	// Both the interactions feed and the company row become stale after
@@ -931,11 +958,56 @@ function DetailBody({
 														<Trans>Decision maker</Trans>
 													</DecisionBadge>
 												)}
+												{(contact.emailStatus === 'bounced' ||
+													contact.emailStatus === 'complained') && (
+													<SuppressionBadge
+														data-testid={`contact-suppression-badge-${contact.id}`}
+														$kind={contact.emailStatus}
+													>
+														<AlertTriangle size={10} aria-hidden />
+														<span>
+															{contact.emailStatus === 'bounced'
+																? t`Bounced`
+																: t`Complained`}
+														</span>
+													</SuppressionBadge>
+												)}
 											</ContactName>
 											{contact.role && (
 												<ContactRole>{contact.role}</ContactRole>
 											)}
 										</ContactHeader>
+										{(contact.emailStatus === 'bounced' ||
+											contact.emailStatus === 'complained') && (
+											<SuppressionBanner
+												role='alert'
+												data-testid={`contact-suppression-banner-${contact.id}`}
+												$kind={contact.emailStatus}
+											>
+												<AlertTriangle size={14} aria-hidden />
+												<SuppressionText>
+													<strong>
+														{contact.emailStatus === 'bounced'
+															? t`Email is dead-letter`
+															: t`Recipient marked as spam`}
+													</strong>
+													{contact.emailStatusReason ? (
+														<SuppressionReason>
+															{contact.emailStatusReason}
+														</SuppressionReason>
+													) : null}
+												</SuppressionText>
+												<SuppressionAction
+													type='button'
+													data-testid={`contact-suppression-clear-${contact.id}`}
+													onClick={() => {
+														void handleClearSuppression(contact.id)
+													}}
+												>
+													<Trans>Clear</Trans>
+												</SuppressionAction>
+											</SuppressionBanner>
+										)}
 										<ContactLinks>
 											{contact.email && (
 												<ContactLink href={`mailto:${contact.email}`}>
@@ -1216,6 +1288,12 @@ function narrowContacts(
 		const r = row as Record<string, unknown>
 		if (typeof r['id'] !== 'string') continue
 		if (typeof r['name'] !== 'string') continue
+		const emailStatus =
+			r['emailStatus'] === 'valid' ||
+			r['emailStatus'] === 'bounced' ||
+			r['emailStatus'] === 'complained'
+				? r['emailStatus']
+				: 'unknown'
 		out.push({
 			id: r['id'],
 			name: r['name'],
@@ -1224,6 +1302,11 @@ function narrowContacts(
 			email: typeof r['email'] === 'string' ? r['email'] : null,
 			phone: typeof r['phone'] === 'string' ? r['phone'] : null,
 			linkedin: typeof r['linkedin'] === 'string' ? r['linkedin'] : null,
+			emailStatus,
+			emailStatusReason:
+				typeof r['emailStatusReason'] === 'string'
+					? r['emailStatusReason']
+					: null,
 		})
 	}
 	return out
@@ -1676,6 +1759,76 @@ const DecisionBadge = styled.span.withConfig({
 	border-left: 3px solid var(--color-secondary);
 	font-size: var(--typescale-label-small-size);
 	transform: rotate(-0.5deg);
+`
+
+const SuppressionBadge = styled.span.withConfig({
+	displayName: 'CompanyDetailSuppressionBadge',
+	shouldForwardProp: prop => prop !== '$kind',
+})<{ $kind: 'bounced' | 'complained' }>`
+	${stenciledTitle}
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-3xs);
+	padding: var(--space-3xs) var(--space-2xs);
+	border-radius: var(--shape-3xs);
+	background: color-mix(in srgb, var(--color-error) 14%, transparent);
+	color: var(--color-error);
+	border: 1px dashed
+		color-mix(in srgb, var(--color-error) 40%, transparent);
+	font-size: var(--typescale-label-small-size);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+`
+
+const SuppressionBanner = styled.div.withConfig({
+	displayName: 'CompanyDetailSuppressionBanner',
+	shouldForwardProp: prop => prop !== '$kind',
+})<{ $kind: 'bounced' | 'complained' }>`
+	display: flex;
+	align-items: center;
+	gap: var(--space-2xs);
+	margin: var(--space-2xs) 0;
+	padding: var(--space-2xs) var(--space-sm);
+	border-left: 3px solid var(--color-error);
+	background: color-mix(in srgb, var(--color-error) 6%, transparent);
+	color: var(--color-error);
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+`
+
+const SuppressionText = styled.span.withConfig({
+	displayName: 'CompanyDetailSuppressionText',
+})`
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3xs);
+`
+
+const SuppressionReason = styled.span.withConfig({
+	displayName: 'CompanyDetailSuppressionReason',
+})`
+	font-style: italic;
+	font-size: var(--typescale-body-small-size);
+	color: color-mix(in srgb, var(--color-error) 80%, var(--color-on-surface));
+`
+
+const SuppressionAction = styled.button.withConfig({
+	displayName: 'CompanyDetailSuppressionAction',
+})`
+	${stenciledTitle}
+	background: transparent;
+	border: 1px dashed currentColor;
+	color: var(--color-error);
+	padding: var(--space-3xs) var(--space-2xs);
+	font-size: var(--typescale-label-small-size);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	cursor: pointer;
+
+	&:hover {
+		background: color-mix(in srgb, var(--color-error) 10%, transparent);
+	}
 `
 
 const ContactRole = styled.span.withConfig({
