@@ -54,6 +54,13 @@ function MembersPage() {
 	const myRole = activeMember.data?.role ?? null
 	const canRemove = myRole === 'owner' || myRole === 'admin'
 
+	// Inline so Lingui's macro extractor sees each `t` call.
+	const ROLE_LABELS: Record<string, string> = {
+		owner: t`Owner`,
+		admin: t`Admin`,
+		member: t`Member`,
+	}
+
 	const handleRemove = async (memberId: string, email: string) => {
 		const confirmed = window.confirm(t`Remove ${email} from this organization?`)
 		if (!confirmed) return
@@ -137,7 +144,7 @@ function MembersPage() {
 									$role={member.role}
 								>
 									<UserCircle2 size={12} aria-hidden />
-									<span>{roleLabel(member.role, t)}</span>
+									<span>{ROLE_LABELS[member.role] ?? member.role}</span>
 								</RoleBadge>
 								{canRemove ? (
 									<PriButton
@@ -160,16 +167,6 @@ function MembersPage() {
 			)}
 		</Page>
 	)
-}
-
-function roleLabel(
-	role: string,
-	t: (strings: TemplateStringsArray, ...args: unknown[]) => string,
-): string {
-	if (role === 'owner') return t`Owner`
-	if (role === 'admin') return t`Admin`
-	if (role === 'member') return t`Member`
-	return role
 }
 
 const Page = styled.div.withConfig({ displayName: 'MembersPage' })`
