@@ -54,6 +54,7 @@ import { EmailAttachmentStaging } from './services/email-attachment-staging'
 import { DraftStore } from './services/email-draft-store'
 import { EmailProviderLive } from './services/email-provider-live'
 import { Geocoder } from './services/geocoder'
+import { InboxHealthProbe } from './services/inbox-health-probe'
 import { MailTransport } from './services/mail-transport'
 import { PageService } from './services/pages'
 import { ParticipantMatcher } from './services/participant-matcher'
@@ -176,6 +177,10 @@ const ServicesLive = Layer.mergeAll(
 	RecordingService.layer,
 	ResearchService.layer,
 	Geocoder.layer.pipe(Layer.provide(FetchHttpClient.layer)),
+	// daemonLayer outputs `never` so a downstream `provideMerge` would
+	// skip building it (nothing requires it). Listing it inside `mergeAll`
+	// forces the build, which fires the side-effect that forks the probe.
+	InboxHealthProbe.daemonLayer.pipe(Layer.provide(InboxHealthProbe.layer)),
 ).pipe(
 	// CalendarService sits below EmailService because EmailService's
 	// inbound-webhook path delegates text/calendar parts to it. Keep
