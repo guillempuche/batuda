@@ -27,7 +27,13 @@ import {
 
 type Status = 'pending' | 'accepting' | 'accepted' | 'error' | 'unauthenticated'
 
+export interface AcceptSearch {
+	readonly error?: string
+}
+
 export const Route = createFileRoute('/accept-invitation/$id')({
+	validateSearch: (search: Record<string, unknown>): AcceptSearch =>
+		typeof search['error'] === 'string' ? { error: search['error'] } : {},
 	component: AcceptInvitationPage,
 })
 
@@ -35,12 +41,24 @@ function AcceptInvitationPage() {
 	const { t } = useLingui()
 	const navigate = useNavigate()
 	const { id } = Route.useParams()
+	const search = Route.useSearch()
 	const session = authClient.useSession()
 	const [status, setStatus] = useState<Status>('pending')
 	const [error, setError] = useState<string | null>(null)
 	const [orgName, setOrgName] = useState<string | null>(null)
 
 	useEffect(() => {
+		// Stop before acceptInvitation runs against a possibly wrong-user session.
+		if (search.error) {
+			setStatus('error')
+			setError(
+				search.error === 'invalid_token'
+					? t`This invitation link is no longer valid. It may have already been used.`
+					: t`The invitation link could not be verified (${search.error}).`,
+			)
+			return
+		}
+
 		// Wait for session to load before deciding.
 		if (session.isPending) return
 
@@ -79,7 +97,7 @@ function AcceptInvitationPage() {
 				setError(t`No connection to the server. Try again in a few seconds.`)
 			}
 		})()
-	}, [session.isPending, session.data, id, status, t])
+	}, [search.error, session.isPending, session.data, id, status, t])
 
 	if (status === 'unauthenticated') {
 		// Defer the redirect to a click so the user understands they need to
