@@ -38,10 +38,23 @@ const checkMigrations = Effect.gen(function* () {
 	Effect.catchCause(() => Effect.void),
 )
 
+const printServiceUrls = Console.log(
+	[
+		'',
+		'Service URLs:',
+		'  Postgres:        postgresql://batuda:batuda@localhost:5433/batuda',
+		'  MinIO console:   http://localhost:9001  (batuda / batuda-secret)',
+		'  mailpit web UI:  http://localhost:8025',
+	].join('\n'),
+)
+
 export const servicesUp = compose('up', '-d').pipe(
 	Effect.andThen(checkMigrations),
+	Effect.andThen(printServiceUrls),
 )
 
 export const servicesDown = compose('down')
 
-export const servicesStatus = compose('ps')
+export const servicesStatus = compose('ps').pipe(
+	Effect.andThen(printServiceUrls),
+)

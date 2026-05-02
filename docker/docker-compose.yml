@@ -46,6 +46,20 @@ services:
       echo 'bucket ready';
       "
 
+  # Local SMTP+IMAP catcher for dev. Real outbound goes here so the seeded
+  # inbox can round-trip without ever leaving the laptop. mailpit's HTTP
+  # API (:8025) is what the e2e specs poll to assert delivery.
+  mailpit:
+    container_name: batuda-mailpit
+    image: axllent/mailpit:v1.20
+    ports:
+      - "1025:1025" # SMTP
+      - "1143:1143" # IMAP
+      - "8025:8025" # Web UI + HTTP API
+    environment:
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+
 volumes:
   pgdata:
     name: batuda-pgdata
