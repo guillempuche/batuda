@@ -23,6 +23,7 @@ import { Route as EmailsThreadIdRouteImport } from './routes/emails/$threadId'
 import { Route as CompaniesSlugRouteImport } from './routes/companies/$slug'
 import { Route as AcceptInvitationIdRouteImport } from './routes/accept-invitation.$id'
 import { Route as SettingsOrganizationIndexRouteImport } from './routes/settings/organization/index'
+import { Route as SettingsOrganizationSpendRouteImport } from './routes/settings/organization/spend'
 import { Route as SettingsOrganizationMembersRouteImport } from './routes/settings/organization/members'
 import { Route as SettingsOrganizationInviteRouteImport } from './routes/settings/organization/invite'
 
@@ -97,6 +98,12 @@ const SettingsOrganizationIndexRoute =
     path: '/settings/organization/',
     getParentRoute: () => rootRouteImport,
   } as any)
+const SettingsOrganizationSpendRoute =
+  SettingsOrganizationSpendRouteImport.update({
+    id: '/settings/organization/spend',
+    path: '/settings/organization/spend',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const SettingsOrganizationMembersRoute =
   SettingsOrganizationMembersRouteImport.update({
     id: '/settings/organization/members',
@@ -126,6 +133,7 @@ export interface FileRoutesByFullPath {
   '/tasks/': typeof TasksIndexRoute
   '/settings/organization/invite': typeof SettingsOrganizationInviteRoute
   '/settings/organization/members': typeof SettingsOrganizationMembersRoute
+  '/settings/organization/spend': typeof SettingsOrganizationSpendRoute
   '/settings/organization/': typeof SettingsOrganizationIndexRoute
 }
 export interface FileRoutesByTo {
@@ -144,6 +152,7 @@ export interface FileRoutesByTo {
   '/tasks': typeof TasksIndexRoute
   '/settings/organization/invite': typeof SettingsOrganizationInviteRoute
   '/settings/organization/members': typeof SettingsOrganizationMembersRoute
+  '/settings/organization/spend': typeof SettingsOrganizationSpendRoute
   '/settings/organization': typeof SettingsOrganizationIndexRoute
 }
 export interface FileRoutesById {
@@ -163,6 +172,7 @@ export interface FileRoutesById {
   '/tasks/': typeof TasksIndexRoute
   '/settings/organization/invite': typeof SettingsOrganizationInviteRoute
   '/settings/organization/members': typeof SettingsOrganizationMembersRoute
+  '/settings/organization/spend': typeof SettingsOrganizationSpendRoute
   '/settings/organization/': typeof SettingsOrganizationIndexRoute
 }
 export interface FileRouteTypes {
@@ -183,6 +193,7 @@ export interface FileRouteTypes {
     | '/tasks/'
     | '/settings/organization/invite'
     | '/settings/organization/members'
+    | '/settings/organization/spend'
     | '/settings/organization/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -201,6 +212,7 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/settings/organization/invite'
     | '/settings/organization/members'
+    | '/settings/organization/spend'
     | '/settings/organization'
   id:
     | '__root__'
@@ -219,6 +231,7 @@ export interface FileRouteTypes {
     | '/tasks/'
     | '/settings/organization/invite'
     | '/settings/organization/members'
+    | '/settings/organization/spend'
     | '/settings/organization/'
   fileRoutesById: FileRoutesById
 }
@@ -238,6 +251,7 @@ export interface RootRouteChildren {
   TasksIndexRoute: typeof TasksIndexRoute
   SettingsOrganizationInviteRoute: typeof SettingsOrganizationInviteRoute
   SettingsOrganizationMembersRoute: typeof SettingsOrganizationMembersRoute
+  SettingsOrganizationSpendRoute: typeof SettingsOrganizationSpendRoute
   SettingsOrganizationIndexRoute: typeof SettingsOrganizationIndexRoute
 }
 
@@ -341,6 +355,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsOrganizationIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/organization/spend': {
+      id: '/settings/organization/spend'
+      path: '/settings/organization/spend'
+      fullPath: '/settings/organization/spend'
+      preLoaderRoute: typeof SettingsOrganizationSpendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/organization/members': {
       id: '/settings/organization/members'
       path: '/settings/organization/members'
@@ -374,6 +395,7 @@ const rootRouteChildren: RootRouteChildren = {
   TasksIndexRoute: TasksIndexRoute,
   SettingsOrganizationInviteRoute: SettingsOrganizationInviteRoute,
   SettingsOrganizationMembersRoute: SettingsOrganizationMembersRoute,
+  SettingsOrganizationSpendRoute: SettingsOrganizationSpendRoute,
   SettingsOrganizationIndexRoute: SettingsOrganizationIndexRoute,
 }
 export const routeTree = rootRouteImport

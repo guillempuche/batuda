@@ -1,6 +1,6 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Building2, UserPlus, Users } from 'lucide-react'
+import { Building2, UserPlus, Users, Wallet } from 'lucide-react'
 import styled from 'styled-components'
 
 import { authClient } from '#/lib/auth-client'
@@ -106,6 +106,24 @@ function OrganizationSettingsPage() {
 							</NavRowLabel>
 							<NavRowDescription>
 								<Trans>Send a one-click sign-in link to a teammate.</Trans>
+							</NavRowDescription>
+						</NavRow>
+					) : null}
+
+					{canInvite ? (
+						<NavRow
+							to='/settings/organization/spend'
+							data-testid='settings-org-spend-link'
+							aria-label={t`Open the org spend dashboard`}
+						>
+							<NavRowLabel>
+								<Wallet size={18} aria-hidden />
+								<NavRowTitle>
+									<Trans>Spend</Trans>
+								</NavRowTitle>
+							</NavRowLabel>
+							<NavRowDescription>
+								<Trans>Paid research API calls billed to this org.</Trans>
 							</NavRowDescription>
 						</NavRow>
 					) : null}

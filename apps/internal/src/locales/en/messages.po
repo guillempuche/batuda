@@ -40,9 +40,14 @@ msgstr "(no subject)"
 
 #. placeholder {0}: ev.attendeeCount
 #: src/components/companies/calendar-tab.tsx:66
-#: src/components/companies/upcoming-meetings-card.tsx:102
+#: src/components/companies/upcoming-meetings-card.tsx:99
 msgid "{0} attendees"
 msgstr "{0} attendees"
+
+#. placeholder {0}: b.calls
+#: src/routes/settings/organization/spend.tsx:190
+msgid "{0} calls"
+msgstr "{0} calls"
 
 #. placeholder {0}: companies.length
 #: src/routes/companies/index.tsx:242
@@ -78,9 +83,13 @@ msgid "{who} wrote:"
 msgstr "{who} wrote:"
 
 #: src/components/companies/calendar-tab.tsx:64
-#: src/components/companies/upcoming-meetings-card.tsx:100
+#: src/components/companies/upcoming-meetings-card.tsx:97
 msgid "1 attendee"
 msgstr "1 attendee"
+
+#: src/routes/settings/organization/spend.tsx:188
+msgid "1 call"
+msgstr "1 call"
 
 #: src/routes/companies/index.tsx:241
 msgid "1 company"
@@ -105,6 +114,11 @@ msgstr "Accept"
 #: src/routes/accept-invitation.$id.tsx:152
 msgid "Accepting the invitation…"
 msgstr "Accepting the invitation…"
+
+#. placeholder {0}: provider.length
+#: src/routes/settings/organization/spend.tsx:162
+msgid "across {0} providers"
+msgstr "across {0} providers"
 
 #: src/routes/emails/inboxes.tsx:407
 msgid "Actions"
@@ -179,6 +193,10 @@ msgstr "All inboxes"
 msgid "All statuses"
 msgstr "All statuses"
 
+#: src/routes/settings/organization/spend.tsx:154
+msgid "All time"
+msgstr "All time"
+
 #: src/routes/index.tsx:299
 msgid "All under control"
 msgstr "All under control"
@@ -229,6 +247,7 @@ msgstr "Back to inbox"
 
 #: src/routes/settings/organization/invite.tsx:86
 #: src/routes/settings/organization/members.tsx:90
+#: src/routes/settings/organization/spend.tsx:109
 msgid "Back to organization"
 msgstr "Back to organization"
 
@@ -285,6 +304,18 @@ msgstr "Brief summary (optional)"
 msgid "Bulk thread actions"
 msgstr "Bulk thread actions"
 
+#: src/routes/settings/organization/spend.tsx:168
+msgid "By provider"
+msgstr "By provider"
+
+#: src/routes/settings/organization/spend.tsx:209
+msgid "By tool"
+msgstr "By tool"
+
+#: src/routes/settings/organization/spend.tsx:202
+msgid "By user"
+msgstr "By user"
+
 #: src/routes/companies/$slug.tsx:862
 msgid "Cadence"
 msgstr "Cadence"
@@ -303,6 +334,10 @@ msgstr "Call"
 #: src/routes/companies/$slug.tsx:736
 msgid "Call phone"
 msgstr "Call phone"
+
+#: src/routes/settings/organization/spend.tsx:236
+msgid "Calls"
+msgstr "Calls"
 
 #: src/components/interactions/quick-capture-dialog.tsx:400
 #: src/components/research/research-dialog.tsx:188
@@ -1014,6 +1049,10 @@ msgstr "Join the workspace"
 msgid "Join video call"
 msgstr "Join video call"
 
+#: src/routes/settings/organization/spend.tsx:230
+msgid "Key"
+msgstr "Key"
+
 #: src/routes/pages/index.tsx:145
 msgid "Lang"
 msgstr "Lang"
@@ -1023,6 +1062,10 @@ msgstr "Lang"
 #: src/routes/profile/index.tsx:124
 msgid "Language"
 msgstr "Language"
+
+#: src/routes/settings/organization/spend.tsx:144
+msgid "Last 30 days"
+msgstr "Last 30 days"
 
 #: src/routes/emails/$threadId.tsx:473
 msgid "Last activity"
@@ -1375,6 +1418,10 @@ msgstr "No overdue tasks, no pending follow-ups, no neglected companies."
 msgid "No pages yet"
 msgstr "No pages yet"
 
+#: src/routes/settings/organization/spend.tsx:172
+msgid "No paid calls in this range."
+msgstr "No paid calls in this range."
+
 #: src/routes/emails/inboxes.tsx:323
 msgid "No primary inbox set."
 msgstr "No primary inbox set."
@@ -1436,6 +1483,10 @@ msgstr "Note"
 msgid "Nothing changed yet."
 msgstr "Nothing changed yet."
 
+#: src/routes/settings/organization/spend.tsx:221
+msgid "Nothing to show in this range."
+msgstr "Nothing to show in this range."
+
 #: src/routes/emails/$threadId.tsx:238
 msgid "On {date}, {who} wrote:"
 msgstr "On {date}, {who} wrote:"
@@ -1462,7 +1513,7 @@ msgstr "Open company"
 msgid "Open dashboard"
 msgstr "Open dashboard"
 
-#: src/components/companies/upcoming-meetings-card.tsx:111
+#: src/components/companies/upcoming-meetings-card.tsx:108
 msgid "Open in Cal.com"
 msgstr "Open in Cal.com"
 
@@ -1495,6 +1546,10 @@ msgstr "Open task details"
 #: src/routes/index.tsx:269
 msgid "Open tasks"
 msgstr "Open tasks"
+
+#: src/routes/settings/organization/index.tsx:117
+msgid "Open the org spend dashboard"
+msgstr "Open the org spend dashboard"
 
 #: src/routes/companies/$slug.tsx:720
 msgid "Open website"
@@ -1577,6 +1632,14 @@ msgstr "Page title"
 #: src/routes/pages/index.tsx:105
 msgid "Pages"
 msgstr "Pages"
+
+#: src/routes/settings/organization/index.tsx:126
+msgid "Paid research API calls billed to this org."
+msgstr "Paid research API calls billed to this org."
+
+#: src/routes/settings/organization/spend.tsx:119
+msgid "Paid research API calls billed to this organization."
+msgstr "Paid research API calls billed to this organization."
 
 #: src/routes/companies/$slug.tsx:946
 msgid "Pain points"
@@ -2043,6 +2106,13 @@ msgstr "Source"
 msgid "Spam"
 msgstr "Spam"
 
+#: src/routes/settings/organization/index.tsx:122
+#: src/routes/settings/organization/spend.tsx:94
+#: src/routes/settings/organization/spend.tsx:116
+#: src/routes/settings/organization/spend.tsx:233
+msgid "Spend"
+msgstr "Spend"
+
 #: src/components/interactions/quick-capture-dialog.tsx:155
 msgid "Stamped into the workshop ledger."
 msgstr "Stamped into the workshop ledger."
@@ -2207,6 +2277,10 @@ msgstr "This invitation is no longer valid."
 msgid "This invitation link is no longer valid. It may have already been used."
 msgstr "This invitation link is no longer valid. It may have already been used."
 
+#: src/routes/settings/organization/spend.tsx:134
+msgid "This month"
+msgstr "This month"
+
 #: src/routes/index.tsx:416
 #: src/routes/tasks/index.tsx:473
 msgid "This week"
@@ -2223,6 +2297,10 @@ msgstr "Thread metadata"
 #: src/routes/emails/$threadId.tsx:278
 msgid "Thread not found"
 msgstr "Thread not found"
+
+#: src/routes/settings/organization/spend.tsx:125
+msgid "Time range"
+msgstr "Time range"
 
 #: src/routes/companies/$slug.tsx:1259
 msgid "Timeline"
@@ -2260,7 +2338,7 @@ msgid "Type and press Enter"
 msgstr "Type and press Enter"
 
 #: src/components/companies/calendar-tab.tsx:60
-#: src/components/companies/upcoming-meetings-card.tsx:96
+#: src/components/companies/upcoming-meetings-card.tsx:93
 #: src/routes/tasks/index.tsx:802
 msgid "unknown"
 msgstr "unknown"
@@ -2388,6 +2466,10 @@ msgstr "Write footer…"
 #: src/components/emails/compose-form.tsx:397
 msgid "Write your message…"
 msgstr "Write your message…"
+
+#: src/routes/settings/organization/spend.tsx:97
+msgid "You don't have permission to see this page."
+msgstr "You don't have permission to see this page."
 
 #: src/routes/accept-invitation.$id.tsx:165
 msgid "You're now a member of {orgName}."

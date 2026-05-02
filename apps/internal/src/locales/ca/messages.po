@@ -40,9 +40,14 @@ msgstr "(sense assumpte)"
 
 #. placeholder {0}: ev.attendeeCount
 #: src/components/companies/calendar-tab.tsx:66
-#: src/components/companies/upcoming-meetings-card.tsx:102
+#: src/components/companies/upcoming-meetings-card.tsx:99
 msgid "{0} attendees"
 msgstr "{0} assistents"
+
+#. placeholder {0}: b.calls
+#: src/routes/settings/organization/spend.tsx:190
+msgid "{0} calls"
+msgstr "{0} crides"
 
 #. placeholder {0}: companies.length
 #: src/routes/companies/index.tsx:242
@@ -78,9 +83,13 @@ msgid "{who} wrote:"
 msgstr "{who} va escriure:"
 
 #: src/components/companies/calendar-tab.tsx:64
-#: src/components/companies/upcoming-meetings-card.tsx:100
+#: src/components/companies/upcoming-meetings-card.tsx:97
 msgid "1 attendee"
 msgstr "1 assistent"
+
+#: src/routes/settings/organization/spend.tsx:188
+msgid "1 call"
+msgstr "1 crida"
 
 #: src/routes/companies/index.tsx:241
 msgid "1 company"
@@ -105,6 +114,11 @@ msgstr "Accepta"
 #: src/routes/accept-invitation.$id.tsx:152
 msgid "Accepting the invitation…"
 msgstr "Acceptant la invitació…"
+
+#. placeholder {0}: provider.length
+#: src/routes/settings/organization/spend.tsx:162
+msgid "across {0} providers"
+msgstr "en {0} proveïdors"
 
 #: src/routes/emails/inboxes.tsx:407
 msgid "Actions"
@@ -179,6 +193,10 @@ msgstr "Totes les safates"
 msgid "All statuses"
 msgstr "Tots els estats"
 
+#: src/routes/settings/organization/spend.tsx:154
+msgid "All time"
+msgstr "Tot el temps"
+
 #: src/routes/index.tsx:299
 msgid "All under control"
 msgstr "Tot sota control"
@@ -229,6 +247,7 @@ msgstr "Torna a la safata"
 
 #: src/routes/settings/organization/invite.tsx:86
 #: src/routes/settings/organization/members.tsx:90
+#: src/routes/settings/organization/spend.tsx:109
 msgid "Back to organization"
 msgstr "Tornar a l'organització"
 
@@ -285,6 +304,18 @@ msgstr "Resum breu (opcional)"
 msgid "Bulk thread actions"
 msgstr "Accions massives de fils"
 
+#: src/routes/settings/organization/spend.tsx:168
+msgid "By provider"
+msgstr "Per proveïdor"
+
+#: src/routes/settings/organization/spend.tsx:209
+msgid "By tool"
+msgstr "Per eina"
+
+#: src/routes/settings/organization/spend.tsx:202
+msgid "By user"
+msgstr "Per usuari"
+
 #: src/routes/companies/$slug.tsx:862
 msgid "Cadence"
 msgstr "Cadència"
@@ -303,6 +334,10 @@ msgstr "Trucada"
 #: src/routes/companies/$slug.tsx:736
 msgid "Call phone"
 msgstr "Truca al telèfon"
+
+#: src/routes/settings/organization/spend.tsx:236
+msgid "Calls"
+msgstr "Crides"
 
 #: src/components/interactions/quick-capture-dialog.tsx:400
 #: src/components/research/research-dialog.tsx:188
@@ -1014,6 +1049,10 @@ msgstr "Uneix-te a l'''espai de treball"
 msgid "Join video call"
 msgstr "Uneix-te a la videotrucada"
 
+#: src/routes/settings/organization/spend.tsx:230
+msgid "Key"
+msgstr "Clau"
+
 #: src/routes/pages/index.tsx:145
 msgid "Lang"
 msgstr "Idioma"
@@ -1023,6 +1062,10 @@ msgstr "Idioma"
 #: src/routes/profile/index.tsx:124
 msgid "Language"
 msgstr "Idioma"
+
+#: src/routes/settings/organization/spend.tsx:144
+msgid "Last 30 days"
+msgstr "Últims 30 dies"
 
 #: src/routes/emails/$threadId.tsx:473
 msgid "Last activity"
@@ -1375,6 +1418,10 @@ msgstr "Sense tasques endarrerides, sense seguiments pendents, sense empreses ob
 msgid "No pages yet"
 msgstr "Encara no hi ha pàgines"
 
+#: src/routes/settings/organization/spend.tsx:172
+msgid "No paid calls in this range."
+msgstr "No hi ha crides de pagament en aquest interval."
+
 #: src/routes/emails/inboxes.tsx:323
 msgid "No primary inbox set."
 msgstr "No hi ha cap bústia principal."
@@ -1436,6 +1483,10 @@ msgstr "Nota"
 msgid "Nothing changed yet."
 msgstr "Encara no ha canviat res."
 
+#: src/routes/settings/organization/spend.tsx:221
+msgid "Nothing to show in this range."
+msgstr "Res a mostrar en aquest interval."
+
 #: src/routes/emails/$threadId.tsx:238
 msgid "On {date}, {who} wrote:"
 msgstr "El {date}, {who} va escriure:"
@@ -1462,7 +1513,7 @@ msgstr "Obre l'empresa"
 msgid "Open dashboard"
 msgstr "Obre el tauler"
 
-#: src/components/companies/upcoming-meetings-card.tsx:111
+#: src/components/companies/upcoming-meetings-card.tsx:108
 msgid "Open in Cal.com"
 msgstr "Obre a Cal.com"
 
@@ -1495,6 +1546,10 @@ msgstr "Obre els detalls de la tasca"
 #: src/routes/index.tsx:269
 msgid "Open tasks"
 msgstr "Tasques obertes"
+
+#: src/routes/settings/organization/index.tsx:117
+msgid "Open the org spend dashboard"
+msgstr "Obre el panell de despesa de l'organització"
 
 #: src/routes/companies/$slug.tsx:720
 msgid "Open website"
@@ -1577,6 +1632,14 @@ msgstr "Títol de la pàgina"
 #: src/routes/pages/index.tsx:105
 msgid "Pages"
 msgstr "Pàgines"
+
+#: src/routes/settings/organization/index.tsx:126
+msgid "Paid research API calls billed to this org."
+msgstr "Crides d'API de recerca pagades carregades a aquesta organització."
+
+#: src/routes/settings/organization/spend.tsx:119
+msgid "Paid research API calls billed to this organization."
+msgstr "Crides d'API de recerca pagades carregades a aquesta organització."
 
 #: src/routes/companies/$slug.tsx:946
 msgid "Pain points"
@@ -2043,6 +2106,13 @@ msgstr "Origen"
 msgid "Spam"
 msgstr "Brossa"
 
+#: src/routes/settings/organization/index.tsx:122
+#: src/routes/settings/organization/spend.tsx:94
+#: src/routes/settings/organization/spend.tsx:116
+#: src/routes/settings/organization/spend.tsx:233
+msgid "Spend"
+msgstr "Despesa"
+
 #: src/components/interactions/quick-capture-dialog.tsx:155
 msgid "Stamped into the workshop ledger."
 msgstr "Segellat al llibre del taller."
@@ -2207,6 +2277,10 @@ msgstr "Aquesta invitació ja no és vàlida."
 msgid "This invitation link is no longer valid. It may have already been used."
 msgstr "Aquest enllaç de la invitació ja no és vàlid. Pot haver-se utilitzat."
 
+#: src/routes/settings/organization/spend.tsx:134
+msgid "This month"
+msgstr "Aquest mes"
+
 #: src/routes/index.tsx:416
 #: src/routes/tasks/index.tsx:473
 msgid "This week"
@@ -2223,6 +2297,10 @@ msgstr "Metadades del fil"
 #: src/routes/emails/$threadId.tsx:278
 msgid "Thread not found"
 msgstr "Fil no trobat"
+
+#: src/routes/settings/organization/spend.tsx:125
+msgid "Time range"
+msgstr "Interval de temps"
 
 #: src/routes/companies/$slug.tsx:1259
 msgid "Timeline"
@@ -2260,7 +2338,7 @@ msgid "Type and press Enter"
 msgstr "Escriu i prem Retorn"
 
 #: src/components/companies/calendar-tab.tsx:60
-#: src/components/companies/upcoming-meetings-card.tsx:96
+#: src/components/companies/upcoming-meetings-card.tsx:93
 #: src/routes/tasks/index.tsx:802
 msgid "unknown"
 msgstr "desconegut"
@@ -2388,6 +2466,10 @@ msgstr "Escriu el peu de pàgina…"
 #: src/components/emails/compose-form.tsx:397
 msgid "Write your message…"
 msgstr "Escriu el teu missatge…"
+
+#: src/routes/settings/organization/spend.tsx:97
+msgid "You don't have permission to see this page."
+msgstr "No tens permís per veure aquesta pàgina."
 
 #: src/routes/accept-invitation.$id.tsx:165
 msgid "You're now a member of {orgName}."
