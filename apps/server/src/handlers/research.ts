@@ -242,5 +242,23 @@ export const ResearchLive = HttpApiBuilder.group(
 						Effect.orDie,
 					),
 				)
+				.handle('spend', _ =>
+					svc
+						.spend({
+							range: narrowRange(_.query.range),
+							groupBy: narrowGroupBy(_.query.groupBy),
+						})
+						.pipe(Effect.orDie),
+				)
 		}),
 )
+
+function narrowRange(value: string | undefined): 'month' | '30d' | 'all' {
+	return value === 'month' || value === '30d' ? value : 'all'
+}
+
+function narrowGroupBy(
+	value: string | undefined,
+): 'provider' | 'user' | 'tool' {
+	return value === 'user' || value === 'tool' ? value : 'provider'
+}

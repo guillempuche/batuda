@@ -944,6 +944,45 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						ORDER BY r.created_at DESC
 					`,
 
+				// Aggregates research_paid_spend rows for the current org.
+				// `range` clamps the time window (defaults to "all"); `groupBy`
+				// chooses which dimension to bucket by. The org_isolation_*
+				// policy on research_paid_spend already filters cross-org rows
+				// because OrgMiddleware sets app.current_org_id at the edge,
+				// so the WHERE clause only needs the time bound.
+				spend: (filters: {
+					range?: 'month' | '30d' | 'all'
+					groupBy?: 'provider' | 'user' | 'tool'
+				}) =>
+					Effect.gen(function* () {
+						const groupBy = filters.groupBy ?? 'provider'
+						const range = filters.range ?? 'all'
+
+						const sinceFragment =
+							range === 'month'
+								? sql`AND at >= date_trunc('month', now())`
+								: range === '30d'
+									? sql`AND at >= now() - interval '30 days'`
+									: sql``
+
+						const keyFragment =
+							groupBy === 'user'
+								? sql`user_id`
+								: groupBy === 'tool'
+									? sql`tool`
+									: sql`provider`
+
+						return yield* sql`
+							SELECT ${keyFragment} AS key,
+								SUM(amount_cents)::int AS amount_cents,
+								COUNT(*)::int AS calls
+							FROM research_paid_spend
+							WHERE 1=1 ${sinceFragment}
+							GROUP BY ${keyFragment}
+							ORDER BY amount_cents DESC
+						`
+					}),
+
 				/** Subscribe to SSE events for a run. Returns a Stream. */
 				subscribe: (researchId: string) =>
 					Effect.gen(function* () {

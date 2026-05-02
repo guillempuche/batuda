@@ -203,6 +203,15 @@ export const ResearchGroup = HttpApiGroup.make('research')
 			success: Schema.Unknown,
 		}),
 	)
+	.add(
+		HttpApiEndpoint.get('spend', '/research/spend', {
+			query: {
+				range: Schema.optional(Schema.String),
+				groupBy: Schema.optional(Schema.String),
+			},
+			success: Schema.Array(Schema.Unknown),
+		}),
+	)
 	.middleware(SessionMiddleware)
 	.middleware(OrgMiddleware)
 	.prefix('/v1')
