@@ -2,26 +2,36 @@
 	"name": "@batuda/ui",
 	"version": "2026.4.21-2",
 	"type": "module",
-	"types": "./src/index.ts",
-	"main": "./src/index.ts",
+	"types": "./dist/index.d.mts",
+	"main": "./dist/index.mjs",
 	"exports": {
 		".": {
-			"types": "./src/index.ts",
-			"import": "./src/index.ts"
+			"types": "./dist/index.d.mts",
+			"import": "./dist/index.mjs",
+			"development": "./src/index.ts"
 		},
 		"./blocks": {
-			"types": "./src/blocks/index.ts",
-			"import": "./src/blocks/index.ts"
+			"types": "./dist/blocks/index.d.mts",
+			"import": "./dist/blocks/index.mjs",
+			"development": "./src/blocks/index.ts"
 		},
 		"./pri": {
-			"types": "./src/pri/index.ts",
-			"import": "./src/pri/index.ts"
+			"types": "./dist/pri/index.d.mts",
+			"import": "./dist/pri/index.mjs",
+			"development": "./src/pri/index.ts"
 		},
-		"./tokens.css": "./src/tokens.css",
-		"./tailwind.css": "./src/tailwind.css"
+		"./tokens.css": {
+			"development": "./src/tokens.css",
+			"default": "./dist/tokens.css"
+		},
+		"./tailwind.css": {
+			"development": "./src/tailwind.css",
+			"default": "./dist/tailwind.css"
+		}
 	},
 	"scripts": {
 		"build": "tsdown",
+		"dev": "tsdown --watch",
 		"check-types": "tsc --noEmit"
 	},
 	"dependencies": {
@@ -47,24 +57,6 @@
 		"dist"
 	],
 	"publishConfig": {
-		"access": "public",
-		"main": "./dist/index.mjs",
-		"types": "./dist/index.d.mts",
-		"exports": {
-			".": {
-				"types": "./dist/index.d.mts",
-				"import": "./dist/index.mjs"
-			},
-			"./blocks": {
-				"types": "./dist/blocks/index.d.mts",
-				"import": "./dist/blocks/index.mjs"
-			},
-			"./pri": {
-				"types": "./dist/pri/index.d.mts",
-				"import": "./dist/pri/index.mjs"
-			},
-			"./tokens.css": "./dist/tokens.css",
-			"./tailwind.css": "./dist/tailwind.css"
-		}
+		"access": "public"
 	}
 }
