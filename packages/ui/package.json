@@ -6,19 +6,19 @@
 	"main": "./dist/index.mjs",
 	"exports": {
 		".": {
+			"development": "./src/index.ts",
 			"types": "./dist/index.d.mts",
-			"import": "./dist/index.mjs",
-			"development": "./src/index.ts"
+			"import": "./dist/index.mjs"
 		},
 		"./blocks": {
+			"development": "./src/blocks/index.ts",
 			"types": "./dist/blocks/index.d.mts",
-			"import": "./dist/blocks/index.mjs",
-			"development": "./src/blocks/index.ts"
+			"import": "./dist/blocks/index.mjs"
 		},
 		"./pri": {
+			"development": "./src/pri/index.ts",
 			"types": "./dist/pri/index.d.mts",
-			"import": "./dist/pri/index.mjs",
-			"development": "./src/pri/index.ts"
+			"import": "./dist/pri/index.mjs"
 		},
 		"./tokens.css": {
 			"development": "./src/tokens.css",

@@ -54,6 +54,18 @@ export default {
 		'peerDependencies',
 		'resolutions',
 	],
+	sortExports: [
+		'development',
+		'production',
+		'types',
+		'browser',
+		'module',
+		'node-addons',
+		'node',
+		'import',
+		'require',
+		'default',
+	],
 	sortFirst: [
 		'name',
 		'version',
