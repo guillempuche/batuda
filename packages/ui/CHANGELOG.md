@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-05-02 (ui-v2026.5.2-1)
+
+### Bug Fixes
+
+* **ui:** add repository field for npm provenance verification ([16cc522](https://github.com/guillempuche/batuda/commit/16cc52290af0b7cd3877cdab5c25b882661c0dd3))
+
 ## 2026-05-02 (ui-v2026.5.2)
 
 ### Bug Fixes
