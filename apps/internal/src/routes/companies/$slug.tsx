@@ -45,7 +45,11 @@ import {
 } from '#/atoms/company-atoms'
 import { emailsSearchAtom } from '#/atoms/emails-atoms'
 import { pagesSearchAtom } from '#/atoms/pages-atoms'
+import { researchListAtom } from '#/atoms/research-atoms'
 import { WherePanel } from '#/components/companies/where-panel'
+import { ResearchDialog } from '#/components/research/research-dialog'
+import { RunDetail } from '#/components/research/run-detail'
+import { type ResearchRunRow, RunList } from '#/components/research/run-list'
 import {
 	EditableChips,
 	EditableField,
@@ -206,6 +210,7 @@ const COMPANY_TABS = [
 	'contacts',
 	'emails',
 	'tasks',
+	'research',
 	'pages',
 	'documents',
 ] as const
@@ -356,12 +361,23 @@ function DetailBody({
 		() => emailsSearchAtom({ companyId: company.id, limit: 100 }),
 		[company.id],
 	)
+	const companyResearchAtom = useMemo(
+		() =>
+			researchListAtom({
+				subjectTable: 'companies',
+				subjectId: company.id,
+				limit: 50,
+			}),
+		[company.id],
+	)
 
 	const contactsResult = useAtomValue(contactsAtom)
 	const timelineResult = useAtomValue(timelineAtom)
 	const tasksResult = useAtomValue(tasksAtom)
 	const pagesResult = useAtomValue(companyPagesAtom)
 	const emailsResult = useAtomValue(companyEmailsAtom)
+	const researchResult = useAtomValue(companyResearchAtom)
+	const refreshResearch = useAtomRefresh(companyResearchAtom)
 
 	const refreshInteractions = useAtomRefresh(interactionsAtom)
 	const refreshTimeline = useAtomRefresh(timelineAtom)
@@ -434,6 +450,17 @@ function DetailBody({
 			AsyncResult.isSuccess(tasksResult) ? narrowTasks(tasksResult.value) : [],
 		[tasksResult],
 	)
+	const researchRuns = useMemo<ReadonlyArray<ResearchRunRow>>(
+		() =>
+			AsyncResult.isSuccess(researchResult)
+				? narrowResearch(researchResult.value)
+				: [],
+		[researchResult],
+	)
+	const [selectedResearchId, setSelectedResearchId] = useState<string | null>(
+		null,
+	)
+	const [researchDialogOpen, setResearchDialogOpen] = useState(false)
 	type PageEntry = {
 		readonly id: string
 		readonly title: string
@@ -809,6 +836,9 @@ function DetailBody({
 					<PriTabs.Tab value='tasks'>
 						<Trans>Tasks</Trans> ({openTaskCount})
 					</PriTabs.Tab>
+					<PriTabs.Tab value='research' data-testid='research-tab'>
+						<Trans>Research</Trans>
+					</PriTabs.Tab>
 					<PriTabs.Tab value='pages'>
 						<Trans>Pages</Trans> ({companyPages.length})
 					</PriTabs.Tab>
@@ -1126,6 +1156,38 @@ function DetailBody({
 					</PanelWrap>
 				</PriTabs.Panel>
 
+				<PriTabs.Panel value='research'>
+					<PanelWrap>
+						<ResearchPanelLayout>
+							<ResearchPanelHeader>
+								<PriButton
+									type='button'
+									$variant='filled'
+									data-testid='research-run-new'
+									onClick={() => {
+										setResearchDialogOpen(true)
+									}}
+								>
+									<Plus size={14} aria-hidden />
+									<span>
+										<Trans>Run new research</Trans>
+									</span>
+								</PriButton>
+							</ResearchPanelHeader>
+							<ResearchPanelBody>
+								<RunList
+									runs={researchRuns}
+									selectedId={selectedResearchId}
+									onSelect={setSelectedResearchId}
+								/>
+								{selectedResearchId !== null ? (
+									<RunDetail researchId={selectedResearchId} />
+								) : null}
+							</ResearchPanelBody>
+						</ResearchPanelLayout>
+					</PanelWrap>
+				</PriTabs.Panel>
+
 				<PriTabs.Panel value='pages'>
 					<PanelWrap>
 						{companyPages.length === 0 ? (
@@ -1166,6 +1228,16 @@ function DetailBody({
 					</PanelWrap>
 				</PriTabs.Panel>
 			</PriTabs.Root>
+
+			<ResearchDialog
+				open={researchDialogOpen}
+				onOpenChange={setResearchDialogOpen}
+				companyId={company.id}
+				onCreated={newId => {
+					setSelectedResearchId(newId)
+					refreshResearch()
+				}}
+			/>
 
 			<TimelineSection>
 				<PriCollapsible.Root defaultOpen>
@@ -1382,6 +1454,31 @@ function narrowTasks(rows: ReadonlyArray<unknown>): ReadonlyArray<TaskEntry> {
 	return out
 }
 
+function narrowResearch(
+	rows: ReadonlyArray<unknown>,
+): ReadonlyArray<ResearchRunRow> {
+	const out: Array<ResearchRunRow> = []
+	for (const row of rows) {
+		if (!row || typeof row !== 'object') continue
+		const r = row as Record<string, unknown>
+		if (typeof r['id'] !== 'string') continue
+		if (typeof r['query'] !== 'string') continue
+		if (typeof r['status'] !== 'string') continue
+		const createdAt = r['createdAt']
+		if (typeof createdAt !== 'string') continue
+		out.push({
+			id: r['id'],
+			query: r['query'],
+			schemaName: typeof r['schemaName'] === 'string' ? r['schemaName'] : null,
+			kind: typeof r['kind'] === 'string' ? r['kind'] : 'leaf',
+			status: r['status'],
+			costCents: typeof r['costCents'] === 'number' ? r['costCents'] : 0,
+			createdAt,
+		})
+	}
+	return out
+}
+
 // ── Styles ────────────────────────────────────────────────────────
 
 const Page = styled.div.withConfig({ displayName: 'CompanyDetailPage' })`
@@ -1576,6 +1673,33 @@ const PanelWrap = styled.div.withConfig({
 	displayName: 'CompanyDetailPanelWrap',
 })`
 	padding: var(--space-md) 0;
+`
+
+const ResearchPanelLayout = styled.div.withConfig({
+	displayName: 'CompanyDetailResearchPanelLayout',
+})`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-md);
+`
+
+const ResearchPanelHeader = styled.div.withConfig({
+	displayName: 'CompanyDetailResearchPanelHeader',
+})`
+	display: flex;
+	justify-content: flex-end;
+`
+
+const ResearchPanelBody = styled.div.withConfig({
+	displayName: 'CompanyDetailResearchPanelBody',
+})`
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--space-md);
+
+	@media (min-width: 1024px) {
+		grid-template-columns: minmax(18rem, 1fr) minmax(0, 2fr);
+	}
 `
 
 const ProfileGrid = styled.div.withConfig({
