@@ -574,6 +574,17 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 						)
 						const target = row ?? existing
 						if (!target) return
+
+						// Lock the calendar_events row for the rest of the tx so
+						// concurrent webhook retries serialise — without this, two
+						// retries can both pass the "task exists?" check below and
+						// both INSERT, leaving duplicates.
+						yield* sql`
+							SELECT 1 FROM calendar_events
+							WHERE id = ${target.id}
+							FOR UPDATE
+						`
+
 						yield* timeline.record(
 							new MeetingCancelled({
 								calendarEventId: target.id,
@@ -584,6 +595,43 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 								occurredAt: new Date(),
 							}),
 						)
+
+						// Skip the auto-task for organizer-only meetings (no company
+						// link) — mirrors handleMeetingEnded's guard so we don't
+						// orphan tasks with company_id=NULL.
+						if (!target.companyId) return
+
+						const existingTask = yield* sql`
+							SELECT id FROM tasks
+							WHERE linked_calendar_event_id = ${target.id}
+								AND type = 'followup'
+								AND source = 'booking'
+							LIMIT 1
+						`
+						if (existingTask.length > 0) return
+
+						const currentOrg = yield* CurrentOrg
+						const dueAt = new Date(
+							target.startAt.getTime() + 24 * 60 * 60 * 1000,
+						)
+						const attendeeName =
+							payload.attendees?.[0]?.name ??
+							payload.attendees?.[0]?.email ??
+							'attendee'
+						yield* sql`
+							INSERT INTO tasks ${sql.insert({
+								organizationId: currentOrg.id,
+								companyId: target.companyId,
+								contactId: target.contactId,
+								type: 'followup',
+								title: `Follow up about cancelled meeting with ${attendeeName}`,
+								source: 'booking',
+								priority: 'normal',
+								status: 'open',
+								linkedCalendarEventId: target.id,
+								dueAt,
+							})}
+						`
 					}),
 				)
 
