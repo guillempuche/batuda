@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-05-02 (ui-v2026.5.2)
+
+### Bug Fixes
+
+* order @batuda/ui exports so development condition wins ([652a66b](https://github.com/guillempuche/batuda/commit/652a66bf63c95c67af18477d88efc5bb4ff97c44))
+
+### Documentation
+
+* **ui:** clarify PriScrollArea.Content usage and gotchas ([0173be2](https://github.com/guillempuche/batuda/commit/0173be23170fec3d7032e3e64d9b49457a62640a))
+* **ui:** consolidate changelog to reflect the published 2026.4.21-2 tag ([d2787a7](https://github.com/guillempuche/batuda/commit/d2787a7828d3e7a40c7154bfd4b500e6da6882ba))
+
+### Chores
+
+* route @batuda/ui imports through dist by default ([30311b4](https://github.com/guillempuche/batuda/commit/30311b43ea1c75d39a0b928c426eaad729735b64))
+
 ## 2026-04-21 (ui-v2026.4.21-2)
 
 ### Features
