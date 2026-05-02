@@ -30,6 +30,37 @@ export const calendarEventsAtom = BatudaApiAtom.query(
 	},
 )
 
+const eventsByCompanyCache = new Map<
+	string,
+	ReturnType<typeof makeEventsByCompanyAtom>
+>()
+
+function makeEventsByCompanyAtom(args: {
+	companyId: string
+	from?: string
+	limit: number
+}) {
+	const query: Record<string, string | number> = {
+		companyId: args.companyId,
+		limit: args.limit,
+	}
+	if (args.from !== undefined) query['from'] = args.from
+	return BatudaApiAtom.query('calendar', 'listEvents', { query })
+}
+
+export function calendarEventsByCompanyAtom(args: {
+	companyId: string
+	from?: string
+	limit: number
+}) {
+	const key = `${args.companyId}|${args.from ?? ''}|${args.limit}`
+	const existing = eventsByCompanyCache.get(key)
+	if (existing !== undefined) return existing
+	const atom = makeEventsByCompanyAtom(args)
+	eventsByCompanyCache.set(key, atom)
+	return atom
+}
+
 export const createInternalEventAtom = BatudaApiAtom.mutation(
 	'calendar',
 	'createInternalEvent',

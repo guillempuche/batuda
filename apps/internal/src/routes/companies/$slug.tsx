@@ -46,6 +46,8 @@ import {
 import { emailsSearchAtom } from '#/atoms/emails-atoms'
 import { pagesSearchAtom } from '#/atoms/pages-atoms'
 import { researchListAtom } from '#/atoms/research-atoms'
+import { CalendarTab } from '#/components/companies/calendar-tab'
+import { UpcomingMeetingsCard } from '#/components/companies/upcoming-meetings-card'
 import { WherePanel } from '#/components/companies/where-panel'
 import { ResearchDialog } from '#/components/research/research-dialog'
 import { RunDetail } from '#/components/research/run-detail'
@@ -210,6 +212,7 @@ const COMPANY_TABS = [
 	'contacts',
 	'emails',
 	'tasks',
+	'calendar',
 	'research',
 	'pages',
 	'documents',
@@ -836,6 +839,9 @@ function DetailBody({
 					<PriTabs.Tab value='tasks'>
 						<Trans>Tasks</Trans> ({openTaskCount})
 					</PriTabs.Tab>
+					<PriTabs.Tab value='calendar' data-testid='company-calendar-tab'>
+						<Trans>Calendar</Trans>
+					</PriTabs.Tab>
 					<PriTabs.Tab value='research' data-testid='research-tab'>
 						<Trans>Research</Trans>
 					</PriTabs.Tab>
@@ -850,6 +856,7 @@ function DetailBody({
 
 				<PriTabs.Panel value='profile'>
 					<PanelWrap>
+						<UpcomingMeetingsCard companyId={company.id} />
 						<CadenceBlock>
 							<CadenceTitle>
 								<Trans>Cadence</Trans>
@@ -1156,6 +1163,12 @@ function DetailBody({
 					</PanelWrap>
 				</PriTabs.Panel>
 
+				<PriTabs.Panel value='calendar'>
+					<PanelWrap>
+						<CalendarTab companyId={company.id} />
+					</PanelWrap>
+				</PriTabs.Panel>
+
 				<PriTabs.Panel value='research'>
 					<PanelWrap>
 						<ResearchPanelLayout>
@@ -1399,6 +1412,10 @@ function timelineKindToChannel(kind: string, fallback: string | null): string {
 			return 'proposal'
 		case 'research_run':
 			return 'research'
+		case 'meeting_scheduled':
+		case 'meeting_completed':
+		case 'meeting_cancelled':
+			return 'event'
 		case 'system_event':
 			return 'system'
 		default:
