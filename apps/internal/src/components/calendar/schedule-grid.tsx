@@ -72,7 +72,7 @@ export default function ScheduleGrid({ events, onEventClick }: Props) {
 				createViewMonthGrid(),
 			],
 			defaultView: pickDefaultView(),
-			locale: i18n.locale,
+			locale: scheduleXLocale(i18n.locale),
 			events: calendarEvents,
 			calendars: CALENDAR_PALETTE,
 			callbacks: {
@@ -145,6 +145,19 @@ function pickDefaultView(): string {
 	if (window.matchMedia('(min-width: 1200px)').matches) return 'week'
 	if (window.matchMedia('(min-width: 768px)').matches) return 'week-agenda'
 	return 'month-agenda'
+}
+
+function scheduleXLocale(linguiLocale: string): string {
+	switch (linguiLocale) {
+		case 'en':
+			return 'en-US'
+		case 'ca':
+			return 'ca-ES'
+		case 'es':
+			return 'es-ES'
+		default:
+			return linguiLocale.includes('-') ? linguiLocale : 'en-US'
+	}
 }
 
 function toScheduleXEvent(event: ScheduleGridEvent): {
