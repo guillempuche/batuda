@@ -56,6 +56,7 @@ import { EmailProviderLive } from './services/email-provider-live'
 import { Geocoder } from './services/geocoder'
 import { InboxHealthProbe } from './services/inbox-health-probe'
 import { MailTransport } from './services/mail-transport'
+import { OrgResolution } from './services/org-resolution'
 import { PageService } from './services/pages'
 import { ParticipantMatcher } from './services/participant-matcher'
 import { PipelineService } from './services/pipeline'
@@ -195,6 +196,7 @@ const ServicesLive = Layer.mergeAll(
 	Layer.provideMerge(WebhookService.layer),
 	Layer.provideMerge(CredentialCrypto.layer),
 	Layer.provideMerge(MailTransport.layer),
+	Layer.provideMerge(OrgResolution.layer),
 )
 
 const ServerLive = Layer.unwrap(

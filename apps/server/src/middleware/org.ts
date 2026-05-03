@@ -20,6 +20,39 @@ interface OrgRow {
 }
 
 /**
+ * Run an effect with `CurrentOrg` provided AND the matching
+ * `app.current_org_id` GUC set on the connection. Both values must match —
+ * RLS would catch drift but the cost of debugging "row level security
+ * denied" is high, so they're stitched together here.
+ *
+ * For HTTP routes the same dance lives inline inside `OrgMiddlewareLive`
+ * (closed over its own `sql` binding); this exported helper exists so
+ * non-HTTP entry points (webhook handlers, MCP tools, future cron jobs)
+ * can reuse the contract without re-deriving it.
+ */
+export const provideOrg =
+	(org: {
+		readonly id: string
+		readonly name: string
+		readonly slug: string
+	}) =>
+	<A, E, R>(effect: Effect.Effect<A, E, R | CurrentOrg>) =>
+		Effect.gen(function* () {
+			const sql = yield* SqlClient.SqlClient
+			return yield* sql.withTransaction(
+				Effect.gen(function* () {
+					yield* sql`SET LOCAL ROLE app_user`
+					yield* sql`SELECT set_config('app.current_org_id', ${org.id}, true)`
+					return yield* Effect.provideService(effect, CurrentOrg, org)
+				}),
+			)
+		}) as Effect.Effect<
+			A,
+			E | import('effect/unstable/sql').SqlError.SqlError,
+			Exclude<R, CurrentOrg> | SqlClient.SqlClient
+		>
+
+/**
  * Implementing Layer for the `OrgMiddleware` Tag declared in
  * `@batuda/controllers`. Lives here (not in the shared package) because it
  * depends on Better-Auth, Node HTTP, and the Postgres client — pulling
