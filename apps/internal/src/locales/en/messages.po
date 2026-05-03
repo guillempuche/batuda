@@ -45,7 +45,7 @@ msgid "{0} attendees"
 msgstr "{0} attendees"
 
 #. placeholder {0}: b.calls
-#: src/routes/settings/organization/spend.tsx:190
+#: src/routes/settings/organization/spend.tsx:191
 msgid "{0} calls"
 msgstr "{0} calls"
 
@@ -87,7 +87,7 @@ msgstr "{who} wrote:"
 msgid "1 attendee"
 msgstr "1 attendee"
 
-#: src/routes/settings/organization/spend.tsx:188
+#: src/routes/settings/organization/spend.tsx:189
 msgid "1 call"
 msgstr "1 call"
 
@@ -116,7 +116,7 @@ msgid "Accepting the invitation…"
 msgstr "Accepting the invitation…"
 
 #. placeholder {0}: provider.length
-#: src/routes/settings/organization/spend.tsx:162
+#: src/routes/settings/organization/spend.tsx:161
 msgid "across {0} providers"
 msgstr "across {0} providers"
 
@@ -193,7 +193,7 @@ msgstr "All inboxes"
 msgid "All statuses"
 msgstr "All statuses"
 
-#: src/routes/settings/organization/spend.tsx:154
+#: src/routes/settings/organization/spend.tsx:153
 msgid "All time"
 msgstr "All time"
 
@@ -247,7 +247,7 @@ msgstr "Back to inbox"
 
 #: src/routes/settings/organization/invite.tsx:86
 #: src/routes/settings/organization/members.tsx:90
-#: src/routes/settings/organization/spend.tsx:109
+#: src/routes/settings/organization/spend.tsx:110
 msgid "Back to organization"
 msgstr "Back to organization"
 
@@ -304,15 +304,15 @@ msgstr "Brief summary (optional)"
 msgid "Bulk thread actions"
 msgstr "Bulk thread actions"
 
-#: src/routes/settings/organization/spend.tsx:168
+#: src/routes/settings/organization/spend.tsx:167
 msgid "By provider"
 msgstr "By provider"
 
-#: src/routes/settings/organization/spend.tsx:209
+#: src/routes/settings/organization/spend.tsx:210
 msgid "By tool"
 msgstr "By tool"
 
-#: src/routes/settings/organization/spend.tsx:202
+#: src/routes/settings/organization/spend.tsx:203
 msgid "By user"
 msgstr "By user"
 
@@ -335,7 +335,7 @@ msgstr "Call"
 msgid "Call phone"
 msgstr "Call phone"
 
-#: src/routes/settings/organization/spend.tsx:236
+#: src/routes/settings/organization/spend.tsx:241
 msgid "Calls"
 msgstr "Calls"
 
@@ -1049,7 +1049,7 @@ msgstr "Join the workspace"
 msgid "Join video call"
 msgstr "Join video call"
 
-#: src/routes/settings/organization/spend.tsx:230
+#: src/routes/settings/organization/spend.tsx:235
 msgid "Key"
 msgstr "Key"
 
@@ -1063,7 +1063,7 @@ msgstr "Lang"
 msgid "Language"
 msgstr "Language"
 
-#: src/routes/settings/organization/spend.tsx:144
+#: src/routes/settings/organization/spend.tsx:143
 msgid "Last 30 days"
 msgstr "Last 30 days"
 
@@ -1418,7 +1418,7 @@ msgstr "No overdue tasks, no pending follow-ups, no neglected companies."
 msgid "No pages yet"
 msgstr "No pages yet"
 
-#: src/routes/settings/organization/spend.tsx:172
+#: src/routes/settings/organization/spend.tsx:171
 msgid "No paid calls in this range."
 msgstr "No paid calls in this range."
 
@@ -1483,7 +1483,7 @@ msgstr "Note"
 msgid "Nothing changed yet."
 msgstr "Nothing changed yet."
 
-#: src/routes/settings/organization/spend.tsx:221
+#: src/routes/settings/organization/spend.tsx:226
 msgid "Nothing to show in this range."
 msgstr "Nothing to show in this range."
 
@@ -1637,7 +1637,7 @@ msgstr "Pages"
 msgid "Paid research API calls billed to this org."
 msgstr "Paid research API calls billed to this org."
 
-#: src/routes/settings/organization/spend.tsx:119
+#: src/routes/settings/organization/spend.tsx:120
 msgid "Paid research API calls billed to this organization."
 msgstr "Paid research API calls billed to this organization."
 
@@ -2107,9 +2107,9 @@ msgid "Spam"
 msgstr "Spam"
 
 #: src/routes/settings/organization/index.tsx:122
-#: src/routes/settings/organization/spend.tsx:94
-#: src/routes/settings/organization/spend.tsx:116
-#: src/routes/settings/organization/spend.tsx:233
+#: src/routes/settings/organization/spend.tsx:95
+#: src/routes/settings/organization/spend.tsx:117
+#: src/routes/settings/organization/spend.tsx:238
 msgid "Spend"
 msgstr "Spend"
 
@@ -2277,7 +2277,7 @@ msgstr "This invitation is no longer valid."
 msgid "This invitation link is no longer valid. It may have already been used."
 msgstr "This invitation link is no longer valid. It may have already been used."
 
-#: src/routes/settings/organization/spend.tsx:134
+#: src/routes/settings/organization/spend.tsx:133
 msgid "This month"
 msgstr "This month"
 
@@ -2298,7 +2298,7 @@ msgstr "Thread metadata"
 msgid "Thread not found"
 msgstr "Thread not found"
 
-#: src/routes/settings/organization/spend.tsx:125
+#: src/routes/settings/organization/spend.tsx:124
 msgid "Time range"
 msgstr "Time range"
 
@@ -2467,7 +2467,7 @@ msgstr "Write footer…"
 msgid "Write your message…"
 msgstr "Write your message…"
 
-#: src/routes/settings/organization/spend.tsx:97
+#: src/routes/settings/organization/spend.tsx:98
 msgid "You don't have permission to see this page."
 msgstr "You don't have permission to see this page."
 

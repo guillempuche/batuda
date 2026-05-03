@@ -45,7 +45,7 @@ msgid "{0} attendees"
 msgstr "{0} assistents"
 
 #. placeholder {0}: b.calls
-#: src/routes/settings/organization/spend.tsx:190
+#: src/routes/settings/organization/spend.tsx:191
 msgid "{0} calls"
 msgstr "{0} crides"
 
@@ -87,7 +87,7 @@ msgstr "{who} va escriure:"
 msgid "1 attendee"
 msgstr "1 assistent"
 
-#: src/routes/settings/organization/spend.tsx:188
+#: src/routes/settings/organization/spend.tsx:189
 msgid "1 call"
 msgstr "1 crida"
 
@@ -116,7 +116,7 @@ msgid "Accepting the invitation…"
 msgstr "Acceptant la invitació…"
 
 #. placeholder {0}: provider.length
-#: src/routes/settings/organization/spend.tsx:162
+#: src/routes/settings/organization/spend.tsx:161
 msgid "across {0} providers"
 msgstr "en {0} proveïdors"
 
@@ -193,7 +193,7 @@ msgstr "Totes les safates"
 msgid "All statuses"
 msgstr "Tots els estats"
 
-#: src/routes/settings/organization/spend.tsx:154
+#: src/routes/settings/organization/spend.tsx:153
 msgid "All time"
 msgstr "Tot el temps"
 
@@ -247,7 +247,7 @@ msgstr "Torna a la safata"
 
 #: src/routes/settings/organization/invite.tsx:86
 #: src/routes/settings/organization/members.tsx:90
-#: src/routes/settings/organization/spend.tsx:109
+#: src/routes/settings/organization/spend.tsx:110
 msgid "Back to organization"
 msgstr "Tornar a l'organització"
 
@@ -304,15 +304,15 @@ msgstr "Resum breu (opcional)"
 msgid "Bulk thread actions"
 msgstr "Accions massives de fils"
 
-#: src/routes/settings/organization/spend.tsx:168
+#: src/routes/settings/organization/spend.tsx:167
 msgid "By provider"
 msgstr "Per proveïdor"
 
-#: src/routes/settings/organization/spend.tsx:209
+#: src/routes/settings/organization/spend.tsx:210
 msgid "By tool"
 msgstr "Per eina"
 
-#: src/routes/settings/organization/spend.tsx:202
+#: src/routes/settings/organization/spend.tsx:203
 msgid "By user"
 msgstr "Per usuari"
 
@@ -335,7 +335,7 @@ msgstr "Trucada"
 msgid "Call phone"
 msgstr "Truca al telèfon"
 
-#: src/routes/settings/organization/spend.tsx:236
+#: src/routes/settings/organization/spend.tsx:241
 msgid "Calls"
 msgstr "Crides"
 
@@ -1049,7 +1049,7 @@ msgstr "Uneix-te a l'''espai de treball"
 msgid "Join video call"
 msgstr "Uneix-te a la videotrucada"
 
-#: src/routes/settings/organization/spend.tsx:230
+#: src/routes/settings/organization/spend.tsx:235
 msgid "Key"
 msgstr "Clau"
 
@@ -1063,7 +1063,7 @@ msgstr "Idioma"
 msgid "Language"
 msgstr "Idioma"
 
-#: src/routes/settings/organization/spend.tsx:144
+#: src/routes/settings/organization/spend.tsx:143
 msgid "Last 30 days"
 msgstr "Últims 30 dies"
 
@@ -1418,7 +1418,7 @@ msgstr "Sense tasques endarrerides, sense seguiments pendents, sense empreses ob
 msgid "No pages yet"
 msgstr "Encara no hi ha pàgines"
 
-#: src/routes/settings/organization/spend.tsx:172
+#: src/routes/settings/organization/spend.tsx:171
 msgid "No paid calls in this range."
 msgstr "No hi ha crides de pagament en aquest interval."
 
@@ -1483,7 +1483,7 @@ msgstr "Nota"
 msgid "Nothing changed yet."
 msgstr "Encara no ha canviat res."
 
-#: src/routes/settings/organization/spend.tsx:221
+#: src/routes/settings/organization/spend.tsx:226
 msgid "Nothing to show in this range."
 msgstr "Res a mostrar en aquest interval."
 
@@ -1637,7 +1637,7 @@ msgstr "Pàgines"
 msgid "Paid research API calls billed to this org."
 msgstr "Crides d'API de recerca pagades carregades a aquesta organització."
 
-#: src/routes/settings/organization/spend.tsx:119
+#: src/routes/settings/organization/spend.tsx:120
 msgid "Paid research API calls billed to this organization."
 msgstr "Crides d'API de recerca pagades carregades a aquesta organització."
 
@@ -2107,9 +2107,9 @@ msgid "Spam"
 msgstr "Brossa"
 
 #: src/routes/settings/organization/index.tsx:122
-#: src/routes/settings/organization/spend.tsx:94
-#: src/routes/settings/organization/spend.tsx:116
-#: src/routes/settings/organization/spend.tsx:233
+#: src/routes/settings/organization/spend.tsx:95
+#: src/routes/settings/organization/spend.tsx:117
+#: src/routes/settings/organization/spend.tsx:238
 msgid "Spend"
 msgstr "Despesa"
 
@@ -2277,7 +2277,7 @@ msgstr "Aquesta invitació ja no és vàlida."
 msgid "This invitation link is no longer valid. It may have already been used."
 msgstr "Aquest enllaç de la invitació ja no és vàlid. Pot haver-se utilitzat."
 
-#: src/routes/settings/organization/spend.tsx:134
+#: src/routes/settings/organization/spend.tsx:133
 msgid "This month"
 msgstr "Aquest mes"
 
@@ -2298,7 +2298,7 @@ msgstr "Metadades del fil"
 msgid "Thread not found"
 msgstr "Fil no trobat"
 
-#: src/routes/settings/organization/spend.tsx:125
+#: src/routes/settings/organization/spend.tsx:124
 msgid "Time range"
 msgstr "Interval de temps"
 
@@ -2467,7 +2467,7 @@ msgstr "Escriu el peu de pàgina…"
 msgid "Write your message…"
 msgstr "Escriu el teu missatge…"
 
-#: src/routes/settings/organization/spend.tsx:97
+#: src/routes/settings/organization/spend.tsx:98
 msgid "You don't have permission to see this page."
 msgstr "No tens permís per veure aquesta pàgina."
 

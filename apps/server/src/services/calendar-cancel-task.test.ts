@@ -47,6 +47,11 @@ describe('ingestCalcomCancel — SQL contract', () => {
 	})
 
 	afterAll(async () => {
+		// Drop the fixture company (cascades to any leftover calendar_events)
+		await pool.query(
+			`DELETE FROM companies WHERE slug = 'cancel-task-fixture' AND organization_id = $1`,
+			[orgId],
+		)
 		await pool.end()
 	})
 
@@ -178,21 +183,32 @@ describe('ingestCalcomCancel — SQL contract', () => {
 		await pool.query(`DELETE FROM calendar_events WHERE id = $1`, [eventId])
 	}
 
+	// `multi-org-isolation.test.ts` truncates `companies` between runs,
+	// so we can't rely on the seed. Insert a fixture company on demand
+	// (idempotent — slug is unique-per-org so the test re-uses an
+	// existing fixture row across `it`s).
+	const FIXTURE_COMPANY_SLUG = 'cancel-task-fixture'
+
 	const seedCompany = async (): Promise<{
 		companyId: string
 		contactId: string | null
 	}> => {
-		const r = await pool.query<{ id: string }>(
-			`SELECT id FROM companies WHERE organization_id=$1 LIMIT 1`,
-			[orgId],
+		const existing = await pool.query<{ id: string }>(
+			`SELECT id FROM companies WHERE slug=$1 AND organization_id=$2 LIMIT 1`,
+			[FIXTURE_COMPANY_SLUG, orgId],
 		)
-		const companyId = r.rows[0]?.id
-		if (!companyId) throw new Error('no seeded company found')
-		const c = await pool.query<{ id: string }>(
-			`SELECT id FROM contacts WHERE company_id=$1 LIMIT 1`,
-			[companyId],
-		)
-		return { companyId, contactId: c.rows[0]?.id ?? null }
+		let companyId = existing.rows[0]?.id
+		if (!companyId) {
+			const inserted = await pool.query<{ id: string }>(
+				`INSERT INTO companies (organization_id, slug, name, status, source)
+				 VALUES ($1, $2, 'Cancel-task fixture', 'prospect', 'manual')
+				 RETURNING id`,
+				[orgId, FIXTURE_COMPANY_SLUG],
+			)
+			companyId = inserted.rows[0]?.id
+			if (!companyId) throw new Error('failed to insert fixture company')
+		}
+		return { companyId, contactId: null }
 	}
 
 	describe('when the cancelled event has a company link', () => {
