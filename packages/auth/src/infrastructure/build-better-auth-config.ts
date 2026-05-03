@@ -26,7 +26,10 @@ export interface BuildBetterAuthConfigInput<
  */
 
 // Strip the first hostname label (the API subdomain) to get a parent cookie
-// domain. e.g. api.batuda.co → batuda.co.
+// domain. e.g. api.batuda.co → batuda.co. Returns undefined for hostnames
+// with fewer than 3 labels (single-label `localhost`, two-label `batuda.co`),
+// where there is no meaningful parent — Better Auth then omits the Domain
+// attribute and the cookie stays host-only.
 const cookieDomainFromBaseURL = (
 	baseURL: string | undefined,
 ): string | undefined => {
@@ -34,7 +37,7 @@ const cookieDomainFromBaseURL = (
 	try {
 		const { hostname } = new URL(baseURL)
 		const labels = hostname.split('.')
-		return labels.length >= 3 ? labels.slice(1).join('.') : undefined // Bare host like "localhost" has no parent domain.
+		return labels.length >= 3 ? labels.slice(1).join('.') : undefined
 	} catch {
 		return undefined
 	}
