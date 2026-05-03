@@ -1038,15 +1038,22 @@ function DetailBody({
 														</SuppressionReason>
 													) : null}
 												</SuppressionText>
-												<SuppressionAction
-													type='button'
-													data-testid={`contact-suppression-clear-${contact.id}`}
-													onClick={() => {
-														void handleClearSuppression(contact.id)
+												{/* Form action survives the React 19 hydration race
+												    that drops onClick handlers on freshly hot-built
+												    dev bundles — clicks on the Clear button were
+												    landing before the listener attached. */}
+												<form
+													action={async () => {
+														await handleClearSuppression(contact.id)
 													}}
 												>
-													<Trans>Clear</Trans>
-												</SuppressionAction>
+													<SuppressionAction
+														type='submit'
+														data-testid={`contact-suppression-clear-${contact.id}`}
+													>
+														<Trans>Clear</Trans>
+													</SuppressionAction>
+												</form>
 											</SuppressionBanner>
 										)}
 										<ContactLinks>
