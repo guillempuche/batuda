@@ -5,7 +5,11 @@ import styled from 'styled-components'
 
 import { researchDetailAtom } from '#/atoms/research-atoms'
 import { MarkdownView } from '#/components/markdown/markdown-view'
+import { CompanyEnrichmentView } from '#/components/research/findings/company-enrichment-view'
+import { CompetitorScanView } from '#/components/research/findings/competitor-scan-view'
+import { ContactDiscoveryView } from '#/components/research/findings/contact-discovery-view'
 import { FreeformView } from '#/components/research/findings/freeform-view'
+import { ProspectScanView } from '#/components/research/findings/prospect-scan-view'
 import {
 	brushedMetalPlate,
 	rulerUnderRule,
@@ -105,32 +109,54 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 				<SectionTitle>
 					<Trans>Findings</Trans>
 				</SectionTitle>
-				{run.schemaName === 'freeform' ? (
-					<FreeformView findings={run.findings as never} />
-				) : (
-					<GenericFindings value={run.findings} />
-				)}
+				<FindingsView schemaName={run.schemaName} findings={run.findings} />
 			</Section>
 		</Panel>
 	)
 }
 
-function GenericFindings({ value }: { readonly value: unknown }) {
-	if (value === null || value === undefined) {
+function FindingsView({
+	schemaName,
+	findings,
+}: {
+	readonly schemaName: string | null
+	readonly findings: unknown
+}) {
+	if (findings === null || findings === undefined) {
 		return (
 			<EmptyHint>
 				<Trans>No structured findings.</Trans>
 			</EmptyHint>
 		)
 	}
-	if (typeof value === 'object' && Object.keys(value).length === 0) {
+	if (
+		typeof findings === 'object' &&
+		!Array.isArray(findings) &&
+		Object.keys(findings as object).length === 0
+	) {
 		return (
 			<EmptyHint>
 				<Trans>No structured findings.</Trans>
 			</EmptyHint>
 		)
 	}
-	return <Pre>{JSON.stringify(value, null, 2)}</Pre>
+	switch (schemaName) {
+		case 'company-enrichment-v1':
+			return <CompanyEnrichmentView findings={findings as never} />
+		case 'competitor-scan-v1':
+			return <CompetitorScanView findings={findings as never} />
+		case 'contact-discovery-v1':
+			return <ContactDiscoveryView findings={findings as never} />
+		case 'prospect-scan-v1':
+			return <ProspectScanView findings={findings as never} />
+		case 'freeform':
+		case null:
+			return <FreeformView findings={findings as never} />
+		default:
+			// Unknown schema — render JSON so AI agents that ship a new schema
+			// don't disappear from the UI silently.
+			return <Pre>{JSON.stringify(findings, null, 2)}</Pre>
+	}
 }
 
 function narrowRun(raw: unknown): ResearchRunDetail | null {
