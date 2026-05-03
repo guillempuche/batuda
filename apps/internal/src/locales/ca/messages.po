@@ -152,7 +152,7 @@ msgstr "Afegeix {label}"
 msgid "Add a location on the Profile tab, then locate this company."
 msgstr "Afegeix una ubicació a la pestanya de perfil i després localitza aquesta empresa."
 
-#: src/components/emails/attachment-picker.tsx:107
+#: src/components/emails/attachment-picker.tsx:120
 msgid "Add attachment"
 msgstr "Afegeix adjunt"
 
@@ -227,7 +227,7 @@ msgstr "Arxivat"
 msgid "Archived — not pursuing"
 msgstr "Arxivat — no el continuo"
 
-#: src/components/emails/attachment-picker.tsx:110
+#: src/components/emails/attachment-picker.tsx:123
 msgid "Attach"
 msgstr "Adjunta"
 
@@ -355,7 +355,7 @@ msgstr "Crides"
 msgid "Cancel"
 msgstr "Cancel·la"
 
-#: src/components/emails/attachment-picker.tsx:159
+#: src/components/emails/attachment-picker.tsx:172
 msgid "Cancel upload"
 msgstr "Cancel·la la pujada"
 
@@ -774,7 +774,7 @@ msgstr "Direcció"
 msgid "Disabled"
 msgstr "Desactivada"
 
-#: src/components/emails/compose-form.tsx:462
+#: src/components/emails/compose-form.tsx:464
 msgid "Discard"
 msgstr "Descarta"
 
@@ -1893,7 +1893,7 @@ msgid "Remove"
 msgstr "Elimina"
 
 #. placeholder {0}: att.filename
-#: src/components/emails/attachment-picker.tsx:135
+#: src/components/emails/attachment-picker.tsx:148
 msgid "Remove {0}"
 msgstr "Elimina {0}"
 
@@ -1985,7 +1985,7 @@ msgstr "Desa"
 msgid "Save failed"
 msgstr "Ha fallat el desament"
 
-#: src/components/emails/compose-form.tsx:464
+#: src/components/emails/compose-form.tsx:466
 #: src/routes/emails/inboxes.tsx:1462
 #: src/routes/pages/$id.tsx:245
 msgid "Saving…"
@@ -2028,7 +2028,7 @@ msgstr "Selecciona el fil {0}"
 msgid "Selecting a preset fills IMAP and SMTP defaults — you can still edit them."
 msgstr "Triar un preestablit omple els paràmetres IMAP i SMTP — encara els pots editar."
 
-#: src/components/emails/compose-form.tsx:451
+#: src/components/emails/compose-form.tsx:453
 msgid "Send"
 msgstr "Envia"
 
@@ -2052,7 +2052,7 @@ msgstr "Envia correu"
 msgid "Send invitation"
 msgstr "Envia invitació"
 
-#: src/components/emails/compose-form.tsx:451
+#: src/components/emails/compose-form.tsx:453
 #: src/routes/settings/organization/invite.tsx:179
 msgid "Sending…"
 msgstr "Enviant…"
@@ -2449,11 +2449,11 @@ msgstr "Reunions properes"
 msgid "Update failed"
 msgstr "Ha fallat l'actualització"
 
-#: src/components/emails/attachment-picker.tsx:153
+#: src/components/emails/attachment-picker.tsx:166
 msgid "Upload failed"
 msgstr "Ha fallat la pujada"
 
-#: src/components/emails/attachment-picker.tsx:152
+#: src/components/emails/attachment-picker.tsx:165
 msgid "Uploading…"
 msgstr "Pujant…"
 

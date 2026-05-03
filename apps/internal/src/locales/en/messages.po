@@ -152,7 +152,7 @@ msgstr "Add {label}"
 msgid "Add a location on the Profile tab, then locate this company."
 msgstr "Add a location on the Profile tab, then locate this company."
 
-#: src/components/emails/attachment-picker.tsx:107
+#: src/components/emails/attachment-picker.tsx:120
 msgid "Add attachment"
 msgstr "Add attachment"
 
@@ -227,7 +227,7 @@ msgstr "Archived"
 msgid "Archived — not pursuing"
 msgstr "Archived — not pursuing"
 
-#: src/components/emails/attachment-picker.tsx:110
+#: src/components/emails/attachment-picker.tsx:123
 msgid "Attach"
 msgstr "Attach"
 
@@ -355,7 +355,7 @@ msgstr "Calls"
 msgid "Cancel"
 msgstr "Cancel"
 
-#: src/components/emails/attachment-picker.tsx:159
+#: src/components/emails/attachment-picker.tsx:172
 msgid "Cancel upload"
 msgstr "Cancel upload"
 
@@ -774,7 +774,7 @@ msgstr "Direction"
 msgid "Disabled"
 msgstr "Disabled"
 
-#: src/components/emails/compose-form.tsx:462
+#: src/components/emails/compose-form.tsx:464
 msgid "Discard"
 msgstr "Discard"
 
@@ -1893,7 +1893,7 @@ msgid "Remove"
 msgstr "Remove"
 
 #. placeholder {0}: att.filename
-#: src/components/emails/attachment-picker.tsx:135
+#: src/components/emails/attachment-picker.tsx:148
 msgid "Remove {0}"
 msgstr "Remove {0}"
 
@@ -1985,7 +1985,7 @@ msgstr "Save"
 msgid "Save failed"
 msgstr "Save failed"
 
-#: src/components/emails/compose-form.tsx:464
+#: src/components/emails/compose-form.tsx:466
 #: src/routes/emails/inboxes.tsx:1462
 #: src/routes/pages/$id.tsx:245
 msgid "Saving…"
@@ -2028,7 +2028,7 @@ msgstr "Select thread {0}"
 msgid "Selecting a preset fills IMAP and SMTP defaults — you can still edit them."
 msgstr "Selecting a preset fills IMAP and SMTP defaults — you can still edit them."
 
-#: src/components/emails/compose-form.tsx:451
+#: src/components/emails/compose-form.tsx:453
 msgid "Send"
 msgstr "Send"
 
@@ -2052,7 +2052,7 @@ msgstr "Send email"
 msgid "Send invitation"
 msgstr "Send invitation"
 
-#: src/components/emails/compose-form.tsx:451
+#: src/components/emails/compose-form.tsx:453
 #: src/routes/settings/organization/invite.tsx:179
 msgid "Sending…"
 msgstr "Sending…"
@@ -2449,11 +2449,11 @@ msgstr "Upcoming meetings"
 msgid "Update failed"
 msgstr "Update failed"
 
-#: src/components/emails/attachment-picker.tsx:153
+#: src/components/emails/attachment-picker.tsx:166
 msgid "Upload failed"
 msgstr "Upload failed"
 
-#: src/components/emails/attachment-picker.tsx:152
+#: src/components/emails/attachment-picker.tsx:165
 msgid "Uploading…"
 msgstr "Uploading…"
 
