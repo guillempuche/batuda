@@ -32,7 +32,7 @@ msgstr "— Select a company —"
 msgid "(no schema)"
 msgstr "(no schema)"
 
-#: src/routes/companies/$slug.tsx:1124
+#: src/routes/companies/$slug.tsx:1131
 #: src/routes/emails/$threadId.tsx:321
 #: src/routes/emails/index.tsx:1184
 msgid "(no subject)"
@@ -404,7 +404,7 @@ msgid "Choose primary inbox"
 msgstr "Choose primary inbox"
 
 #: src/components/shared/task-item.tsx:292
-#: src/routes/companies/$slug.tsx:1048
+#: src/routes/companies/$slug.tsx:1054
 #: src/routes/emails/index.tsx:733
 msgid "Clear"
 msgstr "Clear"
@@ -504,11 +504,11 @@ msgstr "Complained"
 msgid "Complete"
 msgstr "Complete"
 
-#: src/routes/companies/$slug.tsx:1155
+#: src/routes/companies/$slug.tsx:1162
 msgid "Completed"
 msgstr "Completed"
 
-#: src/routes/companies/$slug.tsx:1106
+#: src/routes/companies/$slug.tsx:1113
 #: src/routes/emails/index.tsx:571
 msgid "Compose"
 msgstr "Compose"
@@ -674,7 +674,7 @@ msgstr "Create a footer to append to outgoing emails from this inbox."
 msgid "Create a prospect landing page from a company detail view or via the MCP tools."
 msgstr "Create a prospect landing page from a company detail view or via the MCP tools."
 
-#: src/routes/companies/$slug.tsx:1227
+#: src/routes/companies/$slug.tsx:1234
 msgid "Create a prospect landing page to share with this company."
 msgstr "Create a prospect landing page to share with this company."
 
@@ -871,7 +871,7 @@ msgstr "Email drafts"
 msgid "Email is dead-letter"
 msgstr "Email is dead-letter"
 
-#: src/routes/companies/$slug.tsx:1067
+#: src/routes/companies/$slug.tsx:1074
 msgid "Email via Batuda"
 msgstr "Email via Batuda"
 
@@ -881,7 +881,7 @@ msgstr "Email via Batuda"
 msgid "Emails"
 msgstr "Emails"
 
-#: src/routes/companies/$slug.tsx:1293
+#: src/routes/companies/$slug.tsx:1300
 msgid "Emails, calls, documents, and proposals will appear here as they happen."
 msgstr "Emails, calls, documents, and proposals will appear here as they happen."
 
@@ -1295,7 +1295,7 @@ msgstr "Message"
 msgid "Messages"
 msgstr "Messages"
 
-#: src/routes/companies/$slug.tsx:1113
+#: src/routes/companies/$slug.tsx:1120
 msgid "Messages sent or received with this company will appear here."
 msgstr "Messages sent or received with this company will appear here."
 
@@ -1303,11 +1303,11 @@ msgstr "Messages sent or received with this company will appear here."
 msgid "Minimize"
 msgstr "Minimize"
 
-#: src/routes/companies/$slug.tsx:1133
+#: src/routes/companies/$slug.tsx:1140
 msgid "msg"
 msgstr "msg"
 
-#: src/routes/companies/$slug.tsx:1133
+#: src/routes/companies/$slug.tsx:1140
 msgid "msgs"
 msgstr "msgs"
 
@@ -1364,7 +1364,7 @@ msgstr "No active organization"
 msgid "No active organization. Pick one from the switcher in the top bar."
 msgstr "No active organization. Pick one from the switcher in the top bar."
 
-#: src/routes/companies/$slug.tsx:1292
+#: src/routes/companies/$slug.tsx:1299
 msgid "No activity yet"
 msgstr "No activity yet"
 
@@ -1411,11 +1411,11 @@ msgstr "No coordinates yet. Locate this company to plot it on the map."
 msgid "no date"
 msgstr "no date"
 
-#: src/routes/companies/$slug.tsx:1255
+#: src/routes/companies/$slug.tsx:1262
 msgid "No documents yet"
 msgstr "No documents yet"
 
-#: src/routes/companies/$slug.tsx:1159
+#: src/routes/companies/$slug.tsx:1166
 msgid "no due date"
 msgstr "no due date"
 
@@ -1423,7 +1423,7 @@ msgstr "no due date"
 msgid "No due date"
 msgstr "No due date"
 
-#: src/routes/companies/$slug.tsx:1112
+#: src/routes/companies/$slug.tsx:1119
 msgid "No email threads yet"
 msgstr "No email threads yet"
 
@@ -1455,7 +1455,7 @@ msgstr "No messages in this thread"
 msgid "No overdue tasks, no pending follow-ups, no neglected companies."
 msgstr "No overdue tasks, no pending follow-ups, no neglected companies."
 
-#: src/routes/companies/$slug.tsx:1226
+#: src/routes/companies/$slug.tsx:1233
 #: src/routes/pages/index.tsx:136
 msgid "No pages yet"
 msgstr "No pages yet"
@@ -1485,7 +1485,7 @@ msgstr "No structured findings."
 msgid "No tags yet"
 msgstr "No tags yet"
 
-#: src/routes/companies/$slug.tsx:1147
+#: src/routes/companies/$slug.tsx:1154
 msgid "No tasks for this company"
 msgstr "No tasks for this company"
 
@@ -1785,7 +1785,7 @@ msgstr "Products fit"
 
 #: src/components/layout/nav-items.ts:81
 #: src/routes/companies/$slug.tsx:829
-#: src/routes/companies/$slug.tsx:1084
+#: src/routes/companies/$slug.tsx:1091
 #: src/routes/profile/index.tsx:90
 msgid "Profile"
 msgstr "Profile"
@@ -1800,7 +1800,7 @@ msgstr "Proposal"
 msgid "Proposal in review"
 msgstr "Proposal in review"
 
-#: src/routes/companies/$slug.tsx:1256
+#: src/routes/companies/$slug.tsx:1263
 msgid "Proposals, meeting notes and attachments will show up here."
 msgstr "Proposals, meeting notes and attachments will show up here."
 
@@ -1967,7 +1967,7 @@ msgid "Run in progress — events stream as they arrive."
 msgstr "Run in progress — events stream as they arrive."
 
 #: src/components/research/research-dialog.tsx:105
-#: src/routes/companies/$slug.tsx:1202
+#: src/routes/companies/$slug.tsx:1209
 msgid "Run new research"
 msgstr "Run new research"
 
@@ -2087,7 +2087,7 @@ msgstr "Show less"
 msgid "Show more"
 msgstr "Show more"
 
-#: src/routes/companies/$slug.tsx:1287
+#: src/routes/companies/$slug.tsx:1294
 msgid "Show system events"
 msgstr "Show system events"
 
@@ -2375,7 +2375,7 @@ msgstr "Thread not found"
 msgid "Time range"
 msgstr "Time range"
 
-#: src/routes/companies/$slug.tsx:1276
+#: src/routes/companies/$slug.tsx:1283
 msgid "Timeline"
 msgstr "Timeline"
 
