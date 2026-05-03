@@ -62,6 +62,13 @@ const fillBody = async (
 test.describe('compose with attachment', () => {
 	test.beforeEach(async ({ page }) => {
 		await clearMailpit()
+		// See send-email.test.ts beforeEach for the rationale: the
+		// dev-stack inbox-health probe trips the seeded mailpit inbox
+		// to `connect_failed` on its 15-min cadence, so we re-assert
+		// `connected` per test to avoid GrantUnavailable on sendDraft.
+		psql(
+			`UPDATE inboxes SET grant_status='connected' WHERE email='admin@taller.cat'`,
+		)
 		await page.goto('/', { waitUntil: 'commit' })
 		await setActiveOrgBySlug(page, 'taller')
 	})

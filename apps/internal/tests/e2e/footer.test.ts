@@ -79,6 +79,12 @@ test.describe('compose with footer', () => {
 
 	test.beforeEach(async ({ page }) => {
 		await clearMailpit()
+		// See send-email.test.ts for the rationale: re-assert
+		// `connected` so the inbox-health probe doesn't trip
+		// GrantUnavailable on sendDraft.
+		psql(
+			`UPDATE inboxes SET grant_status='connected' WHERE email='admin@taller.cat'`,
+		)
 		await page.goto('/', { waitUntil: 'commit' })
 		await setActiveOrgBySlug(page, 'taller')
 	})

@@ -50,6 +50,17 @@ test.describe('compose and send via mailpit', () => {
 	test.beforeEach(async ({ page }) => {
 		// GIVEN mailpit is empty for this spec and Alice's session is on Taller
 		await clearMailpit()
+		// AND the seeded inbox's grant_status is reset to `connected` —
+		// the dev-stack inbox-health probe (services/inbox-health-probe.ts)
+		// runs on a 15-min cadence and trips mailpit's plain-auth IMAP
+		// probe to `connect_failed`, which would block sendDraft with
+		// GrantUnavailable. Tests seed the inbox with a known
+		// reachable mailpit and don't exercise the probe path, so a
+		// straight UPDATE keeps the send pipeline asserting only what
+		// it owns.
+		psql(
+			`UPDATE inboxes SET grant_status='connected' WHERE email='admin@taller.cat'`,
+		)
 		await page.goto('/', { waitUntil: 'commit' })
 		await setActiveOrgBySlug(page, 'taller')
 	})
