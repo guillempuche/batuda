@@ -1,5 +1,4 @@
 import { useLingui } from '@lingui/react/macro'
-import { useNavigate, useRouter } from '@tanstack/react-router'
 import { Building2, Check, ChevronsUpDown } from 'lucide-react'
 import { useState } from 'react'
 import styled from 'styled-components'
@@ -24,8 +23,6 @@ import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
  */
 export function OrgSwitcher() {
 	const { t } = useLingui()
-	const router = useRouter()
-	const navigate = useNavigate()
 	const [open, setOpen] = useState(false)
 	const [pending, setPending] = useState(false)
 	const [error, setError] = useState<string | null>(null)
@@ -53,12 +50,14 @@ export function OrgSwitcher() {
 				return
 			}
 			setOpen(false)
-			// Drop every loader's cache so the next render re-fetches under
-			// the new active-org cookie. Navigate to / so deep org-scoped
-			// pages don't 404 if the new org doesn't have the equivalent
-			// row (e.g. /companies/<slug> only valid in the previous org).
-			await router.invalidate()
-			await navigate({ to: '/' })
+			// Hard-navigate to / so the SSR runs again with the new
+			// active-org cookie and the AtomHttpApi registry rebuilds from
+			// scratch. A soft router.invalidate() would only rerun the
+			// loader; the dashboard's dehydrated atoms would still hold
+			// the previous org's companies/tasks until the user reloaded
+			// — the chrome label would update but the data wouldn't, which
+			// is the multi-org data leak we want closed.
+			window.location.assign('/')
 		} catch {
 			setError(t`No connection to the server. Try again in a few seconds.`)
 		} finally {

@@ -1192,6 +1192,47 @@ export const seed = (preset: Preset) =>
 			yield* Effect.logInfo(`  company: ${c.slug} [${c.status}] (${c.id})`)
 		}
 
+		// 2b. One Restaurant-org company so the multi-org switcher e2e can
+		// prove that data re-scopes after setActive (a label-only flip
+		// could pass without the queries refetching). Slug is unique
+		// across orgs by design — a Taller-only slug must not be visible
+		// when Restaurant is active and vice versa.
+		const restaurantOrgRows = yield* sql<{ id: string }>`
+			SELECT id FROM "organization" WHERE slug = 'restaurant' LIMIT 1
+		`
+		const restaurantOrgId = restaurantOrgRows[0]?.id
+		if (restaurantOrgId) {
+			yield* sql`INSERT INTO companies ${sql.insert([
+				normalizeRows([
+					{
+						organizationId: restaurantOrgId,
+						slug: 'marisqueria-del-port',
+						name: 'Marisqueria del Port',
+						status: 'client',
+						industry: 'restauració',
+						sizeRange: '6-10',
+						region: 'cat',
+						location: 'Sitges',
+						source: 'referral',
+						priority: 1,
+						website: 'https://marisqueriadelport.cat',
+						email: 'reserves@marisqueriadelport.cat',
+						phone: null,
+						productsFit: ['gestio-reserves'],
+						tags: ['gastro', 'garraf'],
+						painPoints: null,
+						currentTools: null,
+						nextAction: null,
+						latitude: null,
+						longitude: null,
+						geocodedAt: null,
+						geocodeSource: null,
+					},
+				])[0]!,
+			])}`
+			yield* Effect.logInfo('  company: marisqueria-del-port (restaurant)')
+		}
+
 		// 3. Contacts
 		yield* Effect.logInfo('Seeding contacts...')
 		// Pass empty contactMap for initial contact build — contactIds not needed yet
