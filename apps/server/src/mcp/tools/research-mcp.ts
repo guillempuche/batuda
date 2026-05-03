@@ -1,5 +1,6 @@
 import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
+import { SqlClient } from 'effect/unstable/sql'
 
 import { ResearchService, type SystemDefaults } from '@batuda/research'
 
@@ -68,6 +69,7 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 	Effect.gen(function* () {
 		const svc = yield* ResearchService
 		const env = yield* EnvVars
+		const sql = yield* SqlClient.SqlClient
 
 		const systemDefaults: SystemDefaults = {
 			budgetCents: env.RESEARCH_DEFAULT_BUDGET_CENTS,
@@ -77,13 +79,32 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 			hardCeiling: env.RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS,
 		}
 
+		// MCP middleware (apps/server/src/mcp/http.ts:101) sets
+		// app.current_org_id before the toolkit handlers run. Read it via
+		// current_setting so the handler doesn't take CurrentOrg as a
+		// requirement (Toolkit.toLayer wants R=never on each handler).
+		const readOrgId = Effect.gen(function* () {
+			const rows = yield* sql<{ orgId: string | null }>`
+				SELECT current_setting('app.current_org_id', true) AS "orgId"
+			`
+			const orgId = rows[0]?.orgId
+			if (!orgId) {
+				return yield* Effect.die(
+					'app.current_org_id not set — MCP middleware must run before research tools',
+				)
+			}
+			return orgId
+		})
+
 		return {
 			start_research: params =>
 				Effect.gen(function* () {
 					// MCP calls use a system user for now
 					const userId = 'mcp-system'
+					const orgId = yield* readOrgId
 					const result = yield* svc.create(
 						userId,
+						orgId,
 						{
 							query: params.query,
 							context: params.context as any,
@@ -103,8 +124,10 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 			research_sync: params =>
 				Effect.gen(function* () {
 					const userId = 'mcp-system'
+					const orgId = yield* readOrgId
 					const { id } = yield* svc.create(
 						userId,
+						orgId,
 						{
 							query: params.query,
 							context: params.context as any,

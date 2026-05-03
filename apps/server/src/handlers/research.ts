@@ -1,7 +1,12 @@
 import { Effect, Stream } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
-import { BatudaApi, NotFound, SessionContext } from '@batuda/controllers'
+import {
+	BatudaApi,
+	CurrentOrg,
+	NotFound,
+	SessionContext,
+} from '@batuda/controllers'
 import {
 	type CreateResearchInput,
 	ResearchService,
@@ -30,6 +35,7 @@ export const ResearchLive = HttpApiBuilder.group(
 				.handle('create', _ =>
 					Effect.gen(function* () {
 						const { userId } = yield* SessionContext
+						const currentOrg = yield* CurrentOrg
 						const input: CreateResearchInput = {
 							query: _.payload.query,
 							mode: _.payload.mode,
@@ -40,7 +46,12 @@ export const ResearchLive = HttpApiBuilder.group(
 							autoApprovePaidCents: _.payload.auto_approve_paid_cents,
 							confirm: _.payload.confirm,
 						}
-						return yield* svc.create(userId, input, systemDefaults)
+						return yield* svc.create(
+							userId,
+							currentOrg.id,
+							input,
+							systemDefaults,
+						)
 					}).pipe(Effect.orDie),
 				)
 				.handle('list', _ =>

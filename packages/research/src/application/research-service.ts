@@ -648,6 +648,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 				/** Create a research run, fork the fiber, return the run id. */
 				create: (
 					userId: string,
+					organizationId: string,
 					input: CreateResearchInput,
 					systemDefaults: SystemDefaults,
 				) =>
@@ -655,6 +656,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						yield* Effect.logInfo('research.create').pipe(
 							Effect.annotateLogs({
 								user_id: userId,
+								organization_id: organizationId,
 								query_length: input.query.length,
 								schema: input.schemaName ?? 'freeform',
 								mode: input.mode ?? 'deep',
@@ -701,6 +703,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 								if (cachedRun) {
 									const clonedRows = yield* sql<{ id: string }>`
 										INSERT INTO research_runs (
+											organization_id,
 											query, mode, schema_name, kind, status, context,
 											findings, brief_md,
 											tokens_in, tokens_out,
@@ -708,6 +711,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 											idempotency_key, created_by,
 											started_at, completed_at
 										) VALUES (
+											${organizationId},
 											${input.query},
 											${input.mode ?? 'deep'},
 											${input.schemaName ?? null},
@@ -772,10 +776,12 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						// Insert the run row
 						const [row] = yield* sql`
 							INSERT INTO research_runs (
+								organization_id,
 								query, mode, schema_name, status, context,
 								budget_cents, paid_budget_cents,
 								paid_policy, idempotency_key, created_by
 							) VALUES (
+								${organizationId},
 								${input.query},
 								${input.mode ?? 'deep'},
 								${input.schemaName ?? null},
