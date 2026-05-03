@@ -115,15 +115,20 @@ export const buildBetterAuthConfig = <Plugins extends BetterAuthPlugin[]>(
 			enabled: true,
 			storage: 'memory' as const,
 			window: 60,
-			max: 100,
 			// `strict` keeps Better Auth's defaults — production policy.
-			// `loose` widens `/sign-in/email` so the e2e suite (and
-			// developers stacking sign-ins during a debugging session)
-			// stop tripping the brute-force gate. Set explicitly via
-			// `BETTER_AUTH_RATE_LIMIT=loose` in dev only.
+			// `loose` raises the global cap and widens the per-route
+			// quotas the e2e suite hits hardest (`/sign-in/email`,
+			// `/get-session`, `/organization/set-active`). Each authed
+			// page render fires `/get-session` from SSR, so a worker
+			// running the full suite easily exceeds 100/min on that
+			// route alone. Set explicitly via `BETTER_AUTH_RATE_LIMIT=loose`
+			// in dev only.
+			max: input.env.rateLimit === 'loose' ? 1000 : 100,
 			...(input.env.rateLimit === 'loose' && {
 				customRules: {
 					'/sign-in/email': { window: 60, max: 200 },
+					'/get-session': { window: 60, max: 1000 },
+					'/organization/set-active': { window: 60, max: 500 },
 				},
 			}),
 		},
