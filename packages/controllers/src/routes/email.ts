@@ -123,6 +123,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 			params: { threadId: Schema.String },
 			payload: Schema.Struct({ status: ThreadStatus }),
 			success: Schema.Unknown,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(
@@ -145,6 +146,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 		HttpApiEndpoint.get('getThread', '/email/threads/:threadId', {
 			params: { threadId: Schema.String },
 			success: Schema.Unknown,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(
@@ -163,6 +165,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 		HttpApiEndpoint.get('getMessage', '/email/messages/:messageId', {
 			params: { messageId: Schema.String },
 			success: Schema.Unknown,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(

@@ -114,14 +114,22 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 					}),
 				)
 				.handle('getThread', _ =>
-					svc.getThread(_.params.threadId).pipe(Effect.orDie),
+					svc
+						.getThread(_.params.threadId)
+						.pipe(
+							Effect.catch(e =>
+								e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+							),
+						),
 				)
 				.handle('updateThreadStatus', _ =>
-					svc.updateThreadStatus(_.params.threadId, _.payload.status).pipe(
-						Effect.catchTag('NotFound', e => Effect.die(e)),
-						Effect.catchTag('SqlError', e => Effect.die(e)),
-						Effect.orDie,
-					),
+					svc
+						.updateThreadStatus(_.params.threadId, _.payload.status)
+						.pipe(
+							Effect.catch(e =>
+								e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+							),
+						),
 				)
 				.handle('markThreadRead', _ => svc.markThreadRead(_.params.threadId))
 				.handle('markThreadUnread', _ =>
@@ -147,7 +155,13 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 					}),
 				)
 				.handle('getMessage', _ =>
-					svc.getMessage(_.params.messageId).pipe(Effect.orDie),
+					svc
+						.getMessage(_.params.messageId)
+						.pipe(
+							Effect.catch(e =>
+								e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+							),
+						),
 				)
 				.handle('listInboxes', _ =>
 					svc.listLocalInboxes({
