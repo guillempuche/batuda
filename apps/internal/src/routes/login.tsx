@@ -6,6 +6,7 @@ import styled from 'styled-components'
 
 import { PriButton, PriInput } from '@batuda/ui/pri'
 
+import { apiBaseUrl } from '#/lib/api-base'
 import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import { fetchSession } from '#/lib/session-check'
@@ -37,11 +38,6 @@ function isSafeReturnTo(value: string): boolean {
  * no "Create account" link. New users are provisioned via the admin
  * plugin by an existing admin or an API-key-authenticated caller.
  */
-
-const SERVER_URL =
-	(typeof import.meta !== 'undefined' &&
-		import.meta.env?.['VITE_SERVER_URL']) ||
-	'http://localhost:3010'
 
 // Hoisted to module scope so TanStack infers the search type correctly;
 // inline it and the `search` param in `beforeLoad` widens to `{}`.
@@ -98,7 +94,7 @@ function LoginPage() {
 			const email = String(formData.get('email') ?? '')
 			const password = String(formData.get('password') ?? '')
 			try {
-				const response = await fetch(`${SERVER_URL}/auth/sign-in/email`, {
+				const response = await fetch(`${apiBaseUrl()}/auth/sign-in/email`, {
 					method: 'POST',
 					credentials: 'include',
 					headers: { 'content-type': 'application/json' },

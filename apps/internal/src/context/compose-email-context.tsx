@@ -10,6 +10,8 @@ import {
 
 import type { EmailBlocks } from '@batuda/email/schema'
 
+import { apiBaseUrl } from '#/lib/api-base'
+
 export type DraftMode = 'new' | 'reply'
 export type DraftWindowState = 'open' | 'minimized' | 'fullscreen'
 
@@ -57,9 +59,6 @@ export type ComposeEmailContextValue = {
 
 const ComposeEmailContext = createContext<ComposeEmailContextValue | null>(null)
 
-const SERVER_URL =
-	import.meta.env['VITE_SERVER_URL'] ?? 'https://api.batuda.localhost'
-
 export function ComposeEmailProvider({
 	children,
 }: {
@@ -71,7 +70,7 @@ export function ComposeEmailProvider({
 	useEffect(() => {
 		if (recoveredRef.current) return
 		recoveredRef.current = true
-		fetch(`${SERVER_URL}/v1/email/drafts`, { credentials: 'include' })
+		fetch(`${apiBaseUrl()}/v1/email/drafts`, { credentials: 'include' })
 			.then(res => (res.ok ? res.json() : []))
 			.then((serverDrafts: unknown) => {
 				if (!Array.isArray(serverDrafts)) return

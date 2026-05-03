@@ -25,6 +25,17 @@ const BatudaHttpClientLive = FetchHttpClient.layer.pipe(
  *
  * See `docs/repos/effect/packages/effect/src/unstable/reactivity/AtomHttpApi.ts:145`
  * for the constructor signature.
+ *
+ * `baseUrl` points at the absolute API host (`api.batuda.localhost` in
+ * dev, `api.batuda.co` in prod). The browser fetches `/v1/*` cross-
+ * origin and Better Auth's session cookie travels via
+ * `credentials: 'include'` because the parent-domain cookie is
+ * accepted under real TLDs in prod and host-only on the API subdomain
+ * in dev (the Vite `/auth/*` proxy lives only for the auth surface, so
+ * Set-Cookie arrives on `batuda.localhost` for the gate path; the API
+ * still recognises the cookie when the browser posts it back to
+ * `api.batuda.localhost` because Better Auth validates by name, not
+ * by which host minted it).
  */
 export class BatudaApiAtom extends AtomHttpApi.Service<BatudaApiAtom>()(
 	'BatudaApi',

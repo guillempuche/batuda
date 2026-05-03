@@ -6,8 +6,7 @@ import * as HttpApiClient from 'effect/unstable/httpapi/HttpApiClient'
 
 import { BatudaApi } from '@batuda/controllers'
 
-const BASE_URL =
-	import.meta.env['VITE_SERVER_URL'] ?? 'https://api.batuda.localhost'
+import { apiBaseUrl } from './api-base'
 
 /**
  * Server-side Batuda API client used by route loaders during SSR.
@@ -24,7 +23,7 @@ const BASE_URL =
  */
 export const makeBatudaApiServer = (cookieHeader: string | undefined) =>
 	HttpApiClient.make(BatudaApi, {
-		baseUrl: BASE_URL,
+		baseUrl: apiBaseUrl(),
 		transformClient: httpClient =>
 			cookieHeader
 				? HttpClient.mapRequest(

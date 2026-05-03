@@ -7,6 +7,7 @@ import styled from 'styled-components'
 import { PriButton } from '@batuda/ui/pri'
 
 import { LanguageSelect } from '#/components/profile/language-select'
+import { apiBaseUrl } from '#/lib/api-base'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import { fetchSession, type SessionUser } from '#/lib/session-check'
 import {
@@ -25,11 +26,6 @@ import {
  * stay on `/profile` once the cookie is gone, so the redirect is both
  * correctness and UX.
  */
-
-const SERVER_URL =
-	(typeof import.meta !== 'undefined' &&
-		import.meta.env?.['VITE_SERVER_URL']) ||
-	''
 
 export const Route = createFileRoute('/profile/')({
 	loader: async () => {
@@ -61,7 +57,7 @@ function ProfilePage() {
 	const [state, formAction, isPending] = useActionState<SignOutState, FormData>(
 		async () => {
 			try {
-				const res = await fetch(`${SERVER_URL}/auth/sign-out`, {
+				const res = await fetch(`${apiBaseUrl()}/auth/sign-out`, {
 					method: 'POST',
 					credentials: 'include',
 					headers: { 'content-type': 'application/json' },

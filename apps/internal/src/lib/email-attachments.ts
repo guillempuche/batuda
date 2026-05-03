@@ -1,3 +1,5 @@
+import { apiBaseUrl } from './api-base'
+
 /**
  * Staging upload for email attachments. The compose form uploads each
  * selected file individually and receives a `stagingId` back; when the
@@ -12,16 +14,13 @@ export type StagedAttachment = {
 	readonly size: number
 }
 
-const SERVER_URL =
-	import.meta.env['VITE_SERVER_URL'] ?? 'https://api.batuda.localhost'
-
 export async function uploadAttachment(
 	file: File,
 	options?: { readonly signal?: AbortSignal },
 ): Promise<StagedAttachment> {
 	const body = new FormData()
 	body.append('file', file, file.name)
-	const response = await fetch(`${SERVER_URL}/v1/email/attachments/staging`, {
+	const response = await fetch(`${apiBaseUrl()}/v1/email/attachments/staging`, {
 		method: 'POST',
 		credentials: 'include',
 		body,
@@ -47,7 +46,7 @@ export function downloadUrlFor(
 	messageId: string,
 	attachmentId: string,
 ): string {
-	return `${SERVER_URL}/v1/email/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}/download`
+	return `${apiBaseUrl()}/v1/email/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}/download`
 }
 
 export function formatBytes(bytes: number): string {

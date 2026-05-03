@@ -1,25 +1,34 @@
+import { apiBaseUrl } from './api-base'
+
 /**
  * Session gate used by the root route's `beforeLoad`.
  *
- * Calls Better-Auth's `/auth/get-session` endpoint against the API
- * server and returns a boolean. It is intentionally lightweight:
- *
- *   - On SSR, the caller forwards the incoming request's `cookie`
- *     header via `getRequestHeader('cookie')`.
- *   - On the client, the caller passes `undefined` and the browser's
- *     fetch automatically attaches the `batuda.*` session cookie because
- *     we pass `credentials: 'include'` (requires CORS + credentials on
- *     the API, which `apps/server/src/main.ts` configures).
+ * Calls Better-Auth's `/auth/get-session` and returns the user (or
+ * `null`). Base URL resolution lives in `api-base.ts`; on SSR the
+ * caller forwards the incoming request's `Cookie` header via
+ * `getServerCookieHeader()`. We narrow that header to the `batuda.*`
+ * cookie family before forwarding so unrelated browser cookies
+ * (third-party scripts, dev tooling, sibling apps) never leave the
+ * SSR runtime.
  *
  * We don't use `BatudaApiAtom` / `HttpApiClient` here because the auth
  * routes are untyped passthroughs and this runs before any atoms are
  * instantiated — a plain fetch keeps the gate free of Effect runtime.
  */
 
-const SERVER_URL =
-	(typeof import.meta !== 'undefined' &&
-		import.meta.env?.['VITE_SERVER_URL']) ||
-	''
+const AUTH_COOKIE_PATTERN = /^(?:__Secure-|__Host-)?batuda[._-]/
+
+function filterAuthCookies(header: string): string {
+	return header
+		.split(';')
+		.map(s => s.trim())
+		.filter(c => {
+			const eq = c.indexOf('=')
+			const name = eq === -1 ? c : c.slice(0, eq)
+			return AUTH_COOKIE_PATTERN.test(name)
+		})
+		.join('; ')
+}
 
 export type SessionUser = {
 	readonly id: string
@@ -39,11 +48,15 @@ export type SessionUser = {
 export async function fetchSession(
 	cookieHeader: string | undefined,
 ): Promise<SessionUser | null> {
-	if (!SERVER_URL) return null // VITE_SERVER_URL must be set
+	const base = apiBaseUrl()
+	if (typeof window === 'undefined' && !base) return null
 	try {
 		const headers: Record<string, string> = { accept: 'application/json' }
-		if (cookieHeader) headers['cookie'] = cookieHeader
-		const res = await fetch(`${SERVER_URL}/auth/get-session`, {
+		if (cookieHeader) {
+			const filtered = filterAuthCookies(cookieHeader)
+			if (filtered) headers['cookie'] = filtered
+		}
+		const res = await fetch(`${base}/auth/get-session`, {
 			method: 'GET',
 			headers,
 			credentials: 'include',
@@ -62,9 +75,7 @@ export async function fetchSession(
 		}
 	} catch (err) {
 		if (typeof window === 'undefined' && err instanceof TypeError) {
-			console.error(
-				'[session-check] SSR fetch failed — if TLS, run: portless trust',
-			)
+			console.error('[session-check] SSR fetch failed:', err.message)
 		}
 		return null
 	}
