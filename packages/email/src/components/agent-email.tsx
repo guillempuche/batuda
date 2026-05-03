@@ -1,3 +1,5 @@
+/** @jsxRuntime automatic */
+/** @jsxImportSource react */
 import { Heading, Hr, Img, Link, Text } from '@react-email/components'
 import type { CSSProperties, ReactNode } from 'react'
 import { Fragment } from 'react'

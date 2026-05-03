@@ -1,3 +1,5 @@
+/** @jsxRuntime automatic */
+/** @jsxImportSource react */
 import { Text } from '@react-email/components'
 
 import { brandTheme } from '../theme'
