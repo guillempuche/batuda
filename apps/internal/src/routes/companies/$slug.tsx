@@ -789,15 +789,19 @@ function DetailBody({
 							<Trans>Log interaction</Trans>
 						</PriButton>
 					</motion.div>
-					<PriButton
-						type='button'
-						$variant='outlined'
-						onClick={handleComposeEmail}
-						data-testid='action-compose-email'
-					>
-						<MailPlus size={16} aria-hidden />
-						<Trans>Email</Trans>
-					</PriButton>
+					{/* form action so compose opens reliably even during the
+					 * route subtree's hydration window — see
+					 * routes/emails/index.tsx for the same rationale. */}
+					<form action={handleComposeEmail}>
+						<PriButton
+							type='submit'
+							$variant='outlined'
+							data-testid='action-compose-email'
+						>
+							<MailPlus size={16} aria-hidden />
+							<Trans>Email</Trans>
+						</PriButton>
+					</form>
 					<PriButton
 						type='button'
 						$variant='outlined'

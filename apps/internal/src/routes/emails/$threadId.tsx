@@ -366,26 +366,29 @@ function ThreadDetailPage() {
 						<EyeOff size={14} aria-hidden />
 						<span>{t`Mark unread`}</span>
 					</PriButton>
-					<PriButton
-						type='button'
-						$variant='filled'
-						onClick={() => {
+					{/* See routes/emails/index.tsx for the form-action rationale —
+					 * Reply triggers compose, which the route's onClick path
+					 * could miss while the subtree is still hydrating. */}
+					<form
+						action={() => {
 							handleReply(false)
 						}}
 					>
-						<Reply size={14} aria-hidden />
-						<span>{t`Reply`}</span>
-					</PriButton>
-					<PriButton
-						type='button'
-						$variant='outlined'
-						onClick={() => {
+						<PriButton type='submit' $variant='filled'>
+							<Reply size={14} aria-hidden />
+							<span>{t`Reply`}</span>
+						</PriButton>
+					</form>
+					<form
+						action={() => {
 							handleReply(true)
 						}}
 					>
-						<Reply size={14} aria-hidden />
-						<span>{t`Reply all`}</span>
-					</PriButton>
+						<PriButton type='submit' $variant='outlined'>
+							<Reply size={14} aria-hidden />
+							<span>{t`Reply all`}</span>
+						</PriButton>
+					</form>
 				</Actions>
 			</HeaderPlate>
 

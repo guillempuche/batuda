@@ -547,17 +547,30 @@ function EmailsIndexPage() {
 						<InboxIcon size={14} aria-hidden />
 						<span>{t`Manage inboxes`}</span>
 					</PriButton>
-					<PriButton
-						type='button'
-						$variant='filled'
-						data-testid='emails-compose'
-						onClick={() => {
+					{/*
+					 * `<form action>` instead of a plain onClick so React 19
+					 * queues the submit through TanStack Start's selective
+					 * hydration. A bare onClick can land before the route
+					 * subtree's listeners attach during streaming SSR
+					 * hydration; the form-action path is the same one
+					 * `routes/login.tsx` uses, and Playwright's `.click()`
+					 * dispatches a real submit that React will replay
+					 * post-hydration.
+					 */}
+					<form
+						action={() => {
 							openCompose({ mode: 'new' })
 						}}
 					>
-						<Pencil size={14} aria-hidden />
-						<span>{t`Compose`}</span>
-					</PriButton>
+						<PriButton
+							type='submit'
+							$variant='filled'
+							data-testid='emails-compose'
+						>
+							<Pencil size={14} aria-hidden />
+							<span>{t`Compose`}</span>
+						</PriButton>
+					</form>
 				</IntroActions>
 			</Intro>
 
