@@ -24,17 +24,21 @@ import {
 
 /**
  * Renders a `company-enrichment-v1` research finding. Surfaces the
- * enrichment object (industry, size_range, pain_points, etc.) as a
+ * enrichment object (industry, sizeRange, painPoints, etc.) as a
  * typed field table, then competitor + contact arrays as their own
  * sections, finally the cross-cutting common sections.
+ *
+ * The schema stores keys as snake_case in the JSONB column, but the
+ * Pg client recursively camelizes JSONB on read, so the wire shape is
+ * camelCase end-to-end (see ./shared.tsx).
  */
 
 type EnrichmentBlock = {
 	readonly industry?: string
-	readonly size_range?: string
-	readonly pain_points?: string
-	readonly current_tools?: string
-	readonly products_fit?: ReadonlyArray<string>
+	readonly sizeRange?: string
+	readonly painPoints?: string
+	readonly currentTools?: string
+	readonly productsFit?: ReadonlyArray<string>
 	readonly tags?: ReadonlyArray<string>
 	readonly location?: string
 	readonly region?: string
@@ -70,12 +74,12 @@ const ENRICHMENT_FIELDS: ReadonlyArray<{
 	readonly label: ReactNode
 }> = [
 	{ key: 'industry', label: <Trans>Industry</Trans> },
-	{ key: 'size_range', label: <Trans>Size</Trans> },
+	{ key: 'sizeRange', label: <Trans>Size</Trans> },
 	{ key: 'region', label: <Trans>Region</Trans> },
 	{ key: 'location', label: <Trans>Location</Trans> },
 	{ key: 'address', label: <Trans>Address</Trans> },
-	{ key: 'pain_points', label: <Trans>Pain points</Trans> },
-	{ key: 'current_tools', label: <Trans>Current tools</Trans> },
+	{ key: 'painPoints', label: <Trans>Pain points</Trans> },
+	{ key: 'currentTools', label: <Trans>Current tools</Trans> },
 ]
 
 export function CompanyEnrichmentView({
@@ -107,14 +111,14 @@ export function CompanyEnrichmentView({
 								</FieldRow>
 							)
 						})}
-						{e.products_fit !== undefined && e.products_fit.length > 0 ? (
+						{e.productsFit !== undefined && e.productsFit.length > 0 ? (
 							<FieldRow>
 								<FieldKey>
 									<Trans>Products fit</Trans>
 								</FieldKey>
 								<FieldValue>
 									<TagList>
-										{e.products_fit.map(p => (
+										{e.productsFit.map(p => (
 											<Tag key={p}>{p}</Tag>
 										))}
 									</TagList>

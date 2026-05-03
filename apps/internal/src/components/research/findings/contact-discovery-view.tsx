@@ -32,7 +32,7 @@ type ContactEntry = {
 	readonly email?: string
 	readonly phone?: string
 	readonly linkedin?: string
-	readonly is_decision_maker?: boolean
+	readonly isDecisionMaker?: boolean
 	readonly notes?: string
 	readonly citations?: ReadonlyArray<Citation>
 }
@@ -61,7 +61,7 @@ export function ContactDiscoveryView({
 								<RowHead>
 									<Pill>{c.name}</Pill>
 									{c.role !== undefined ? <Reason>{c.role}</Reason> : null}
-									{c.is_decision_maker === true ? (
+									{c.isDecisionMaker === true ? (
 										<DecisionMakerBadge>
 											<Trans>Decision maker</Trans>
 										</DecisionMakerBadge>

@@ -9,18 +9,25 @@ import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
  * competitor-scan, contact-discovery, prospect-scan) each render their
  * own typed entities above these common sections; the freeform view
  * uses them too. Citation rendering is identical across schemas — they
- * all share the `{source_id, quote?, confidence?}` shape.
+ * all share the `{sourceId, quote?, confidence?}` shape.
+ *
+ * Findings are stored as JSONB with snake_case keys (the LLM agent
+ * fills in the schema verbatim). The Pg client's transformResultNames
+ * walks JSONB recursively (transformJson defaults to true), so by the
+ * time the wire response leaves the server every key is camelCase —
+ * including nested keys inside `findings`. The frontend types here
+ * mirror that wire shape.
  */
 
 export type Citation = {
-	readonly source_id: string
+	readonly sourceId: string
 	readonly quote?: string
 	readonly confidence?: number
 }
 
 export type ProposedUpdate = {
-	readonly subject_table: string
-	readonly subject_id?: string
+	readonly subjectTable: string
+	readonly subjectId?: string
 	readonly fields?: Readonly<Record<string, unknown>>
 	readonly reason?: string
 	readonly citations?: ReadonlyArray<Citation>
@@ -29,20 +36,20 @@ export type ProposedUpdate = {
 export type PendingPaidAction = {
 	readonly tool: string
 	readonly args?: Readonly<Record<string, unknown>>
-	readonly estimated_cents?: number
+	readonly estimatedCents?: number
 	readonly reason?: string
 }
 
 export type DiscoveredExisting = {
-	readonly subject_table: string
-	readonly subject_id: string
+	readonly subjectTable: string
+	readonly subjectId: string
 	readonly name: string
 }
 
 export type CommonFindings = {
-	readonly proposed_updates?: ReadonlyArray<ProposedUpdate>
-	readonly pending_paid_actions?: ReadonlyArray<PendingPaidAction>
-	readonly discovered_existing?: ReadonlyArray<DiscoveredExisting>
+	readonly proposedUpdates?: ReadonlyArray<ProposedUpdate>
+	readonly pendingPaidActions?: ReadonlyArray<PendingPaidAction>
+	readonly discoveredExisting?: ReadonlyArray<DiscoveredExisting>
 }
 
 export function stableKey(parts: ReadonlyArray<string>): string {
@@ -58,8 +65,8 @@ export function CitationList({
 	return (
 		<CitationsUl>
 			{citations.map(c => (
-				<CitationLi key={stableKey(['cit', c.source_id, c.quote ?? ''])}>
-					<CitationKey>{c.source_id}</CitationKey>
+				<CitationLi key={stableKey(['cit', c.sourceId, c.quote ?? ''])}>
+					<CitationKey>{c.sourceId}</CitationKey>
 					{c.quote !== undefined ? (
 						<CitationQuote>“{c.quote}”</CitationQuote>
 					) : null}
@@ -89,17 +96,17 @@ export function ProposedUpdatesSection({
 				{updates.map(u => {
 					const key = stableKey([
 						'pu',
-						u.subject_table,
-						u.subject_id ?? '',
+						u.subjectTable,
+						u.subjectId ?? '',
 						u.reason ?? '',
 						u.fields ? JSON.stringify(u.fields) : '',
 					])
 					return (
 						<ListItem key={key}>
 							<RowHead>
-								<Pill>{u.subject_table}</Pill>
-								{u.subject_id !== undefined ? (
-									<SubjectId>{u.subject_id}</SubjectId>
+								<Pill>{u.subjectTable}</Pill>
+								{u.subjectId !== undefined ? (
+									<SubjectId>{u.subjectId}</SubjectId>
 								) : null}
 							</RowHead>
 							{u.fields !== undefined ? (
@@ -147,8 +154,8 @@ export function PendingPaidActionsSection({
 						<ListItem key={key}>
 							<RowHead>
 								<Pill>{a.tool}</Pill>
-								{a.estimated_cents !== undefined ? (
-									<Cost>{`€${(a.estimated_cents / 100).toFixed(2)}`}</Cost>
+								{a.estimatedCents !== undefined ? (
+									<Cost>{`€${(a.estimatedCents / 100).toFixed(2)}`}</Cost>
 								) : null}
 							</RowHead>
 							{a.reason !== undefined ? <Reason>{a.reason}</Reason> : null}
@@ -173,10 +180,10 @@ export function DiscoveredExistingSection({
 			</SectionTitle>
 			<DiscoveredList>
 				{matches.map(m => (
-					<DiscoveredRow key={stableKey([m.subject_table, m.subject_id])}>
-						<Pill>{m.subject_table}</Pill>
+					<DiscoveredRow key={stableKey([m.subjectTable, m.subjectId])}>
+						<Pill>{m.subjectTable}</Pill>
 						<DiscoveredName>{m.name}</DiscoveredName>
-						<SubjectId>{m.subject_id}</SubjectId>
+						<SubjectId>{m.subjectId}</SubjectId>
 					</DiscoveredRow>
 				))}
 			</DiscoveredList>
@@ -189,9 +196,9 @@ export function CommonSections({
 }: {
 	readonly findings: CommonFindings | null | undefined
 }) {
-	const proposed = findings?.proposed_updates ?? []
-	const paid = findings?.pending_paid_actions ?? []
-	const existing = findings?.discovered_existing ?? []
+	const proposed = findings?.proposedUpdates ?? []
+	const paid = findings?.pendingPaidActions ?? []
+	const existing = findings?.discoveredExisting ?? []
 	if (proposed.length === 0 && paid.length === 0 && existing.length === 0) {
 		return null
 	}

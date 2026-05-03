@@ -21,9 +21,9 @@ export function FreeformView({
 }: {
 	readonly findings: CommonFindings | null | undefined
 }) {
-	const proposed = findings?.proposed_updates ?? []
-	const paid = findings?.pending_paid_actions ?? []
-	const existing = findings?.discovered_existing ?? []
+	const proposed = findings?.proposedUpdates ?? []
+	const paid = findings?.pendingPaidActions ?? []
+	const existing = findings?.discoveredExisting ?? []
 
 	if (proposed.length === 0 && paid.length === 0 && existing.length === 0) {
 		return (

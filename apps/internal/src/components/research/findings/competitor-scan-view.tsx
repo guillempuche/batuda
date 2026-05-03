@@ -24,7 +24,8 @@ import {
 /**
  * Renders a `competitor-scan-v1` research finding. Each competitor has
  * description + strengths + weaknesses + overlap; the optional
- * market_summary provides a top-level summary card.
+ * marketSummary provides a top-level summary card. JSONB keys land as
+ * camelCase on the wire (see ./shared.tsx).
  */
 
 type CompetitorEntry = {
@@ -38,15 +39,15 @@ type CompetitorEntry = {
 }
 
 type MarketSummary = {
-	readonly total_competitors_found: number
-	readonly market_maturity?: string
-	readonly key_differentiators?: ReadonlyArray<string>
+	readonly totalCompetitorsFound: number
+	readonly marketMaturity?: string
+	readonly keyDifferentiators?: ReadonlyArray<string>
 	readonly citations?: ReadonlyArray<Citation>
 }
 
 type CompetitorScanFindings = CommonFindings & {
 	readonly competitors?: ReadonlyArray<CompetitorEntry>
-	readonly market_summary?: MarketSummary
+	readonly marketSummary?: MarketSummary
 }
 
 export function CompetitorScanView({
@@ -55,7 +56,7 @@ export function CompetitorScanView({
 	readonly findings: CompetitorScanFindings | null | undefined
 }) {
 	const competitors = findings?.competitors ?? []
-	const summary = findings?.market_summary
+	const summary = findings?.marketSummary
 
 	return (
 		<Sections>
@@ -69,25 +70,25 @@ export function CompetitorScanView({
 							<FieldKey>
 								<Trans>Total competitors</Trans>
 							</FieldKey>
-							<FieldValue>{summary.total_competitors_found}</FieldValue>
+							<FieldValue>{summary.totalCompetitorsFound}</FieldValue>
 						</FieldRow>
-						{summary.market_maturity !== undefined ? (
+						{summary.marketMaturity !== undefined ? (
 							<FieldRow>
 								<FieldKey>
 									<Trans>Maturity</Trans>
 								</FieldKey>
-								<FieldValue>{summary.market_maturity}</FieldValue>
+								<FieldValue>{summary.marketMaturity}</FieldValue>
 							</FieldRow>
 						) : null}
-						{summary.key_differentiators !== undefined &&
-						summary.key_differentiators.length > 0 ? (
+						{summary.keyDifferentiators !== undefined &&
+						summary.keyDifferentiators.length > 0 ? (
 							<FieldRow>
 								<FieldKey>
 									<Trans>Key differentiators</Trans>
 								</FieldKey>
 								<FieldValue>
 									<TagList>
-										{summary.key_differentiators.map(d => (
+										{summary.keyDifferentiators.map(d => (
 											<Tag key={d}>{d}</Tag>
 										))}
 									</TagList>
