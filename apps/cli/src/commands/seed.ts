@@ -5,6 +5,7 @@ import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { apiKey } from '@better-auth/api-key'
 import { betterAuth } from 'better-auth'
 import { admin, bearer, openAPI, organization } from 'better-auth/plugins'
+import { adminAc, defaultAc } from 'better-auth/plugins/admin/access'
 import { Config, Effect, Redacted } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 import pg from 'pg'
@@ -89,6 +90,27 @@ export const DEMO_USERS = [
 		name: 'Bob Owner',
 		role: 'admin',
 	},
+	// Member-everywhere admin. Models the "company-wide admin who happens
+	// to belong to every org" persona — the cross-org reach is expressed
+	// via memberships, not a Better Auth role.
+	{
+		email: 'boss@batuda.dev',
+		password: 'batuda-dev-2026',
+		name: 'Bea Boss',
+		role: 'admin',
+	},
+	// Role-based superadmin. `app_service` is a Batuda-specific admin
+	// role recognised by the Better Auth admin plugin (see
+	// apps/server/src/lib/auth.ts adminRoles config). Has zero
+	// memberships by design — the e2e test pins what behaviour the UI
+	// should give such a user when the membership-scoped switcher
+	// returns nothing.
+	{
+		email: 'superadmin@batuda.dev',
+		password: 'batuda-dev-2026',
+		name: 'Sam Superadmin',
+		role: 'app_service',
+	},
 ] as const
 
 export const DEMO_MEMBERSHIPS = [
@@ -98,6 +120,10 @@ export const DEMO_MEMBERSHIPS = [
 	// Multi-org user: Alice is owner of taller and a regular member of
 	// restaurant. The dev tour and the org-isolation tests rely on this.
 	{ email: 'admin@taller.cat', orgSlug: 'restaurant', role: 'member' },
+	// Boss is admin in every demo org — the membership-based equivalent
+	// of a superadmin.
+	{ email: 'boss@batuda.dev', orgSlug: 'taller', role: 'admin' },
+	{ email: 'boss@batuda.dev', orgSlug: 'restaurant', role: 'admin' },
 ] as const
 
 // Backward-compat shim — every existing seed reference (e.g. CRM rows that
@@ -1012,7 +1038,17 @@ export const seedIdentities = Effect.gen(function* () {
 			plugins: [
 				openAPI(),
 				bearer(),
-				admin(),
+				// Mirror apps/server/src/lib/auth.ts adminRoles + roles so the
+				// seed's createUser accepts role: 'app_service' for the
+				// superadmin persona.
+				admin({
+					adminRoles: ['admin', 'app_service'],
+					roles: {
+						admin: adminAc,
+						user: defaultAc.newRole({ user: [], session: [] }),
+						app_service: adminAc,
+					},
+				}),
 				organization(),
 				apiKey({ enableSessionForAPIKeys: true }),
 			],
@@ -1024,19 +1060,25 @@ export const seedIdentities = Effect.gen(function* () {
 	// as the first member atomically.
 	const userIdsByEmail = new Map<string, string>()
 	for (const u of DEMO_USERS) {
-		yield* Effect.promise(() =>
+		yield* Effect.tryPromise(() =>
 			auth.api.createUser({
 				body: {
 					email: u.email,
 					password: u.password,
 					name: u.name,
-					role: u.role,
+					// `app_service` is allowed at runtime via the admin
+					// plugin's adminRoles, but Better Auth's static role
+					// type doesn't widen with adminRoles config; cast here
+					// keeps the narrow type for the common admin/user case.
+					role: u.role as 'admin' | 'user',
 				},
 			}),
 		).pipe(
 			Effect.tap(() => Effect.logInfo(`  user: ${u.email}`)),
-			Effect.catchCause(() =>
-				Effect.logInfo(`  user already exists: ${u.email}`),
+			Effect.catchCause(cause =>
+				Effect.logInfo(
+					`  user create failed (will keep going): ${u.email} — ${String(cause)}`,
+				),
 			),
 		)
 		const found = yield* Effect.tryPromise({

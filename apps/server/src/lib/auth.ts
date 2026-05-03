@@ -7,6 +7,7 @@ import {
 	openAPI,
 	organization,
 } from 'better-auth/plugins'
+import { adminAc, defaultAc } from 'better-auth/plugins/admin/access'
 import { Effect, Layer, Redacted, ServiceMap } from 'effect'
 import pg from 'pg'
 
@@ -75,7 +76,21 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 				plugins: [
 					openAPI(),
 					bearer(),
-					admin(),
+					// `app_service` is the Batuda role for cross-org
+					// superadmins (no membership rows; admin endpoints
+					// recognise the role). It mirrors the default `admin`
+					// permissions for now — narrowing the surface (e.g.
+					// read-only admin endpoints, no impersonate) is a
+					// follow-up. `admin` must stay listed because seed
+					// users + invitations create it explicitly.
+					admin({
+						adminRoles: ['admin', 'app_service'],
+						roles: {
+							admin: adminAc,
+							user: defaultAc.newRole({ user: [], session: [] }),
+							app_service: adminAc,
+						},
+					}),
 					// Multi-tenant scoping. Every Batuda user belongs to one or more
 					// orgs; `session.activeOrganizationId` drives which org a request
 					// reads/writes. Tables that own org-scoped data carry an

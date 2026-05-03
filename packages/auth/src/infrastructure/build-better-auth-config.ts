@@ -111,12 +111,13 @@ export const buildBetterAuthConfig = <Plugins extends BetterAuthPlugin[]>(
 			// That's tight enough to lock out a typical user retrying a
 			// forgotten password three times — and tight enough to fail the
 			// e2e suite, which stacks setup + unauth + cross-org sign-ins
-			// inside the window. Loosen to 20 per 60s: still strong brute-
-			// force protection (a serial attacker takes ~5h to try 100
+			// inside the window. Loosen to 50 per 60s: still strong brute-
+			// force protection (a serial attacker takes ~2h to try 100
 			// passwords against a single account) without false positives
-			// for human users or the test suite.
+			// for human users or the test suite (slice 1 + slice 3 alone
+			// stack ~12 sign-ins in roughly a minute).
 			customRules: {
-				'/sign-in/email': { window: 60, max: 20 },
+				'/sign-in/email': { window: 60, max: 50 },
 			},
 		},
 		advanced: {
