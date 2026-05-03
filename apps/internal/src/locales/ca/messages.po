@@ -271,7 +271,7 @@ msgstr "Batuda — un CRM multi-inquilí per a petites agències."
 msgid "Batuda home"
 msgstr "Inici de Batuda"
 
-#: src/routes/login.tsx:187
+#: src/routes/login.tsx:183
 msgid "Batuda is invite-only. Request access from the Engranatge team."
 msgstr "Batuda és només amb invitació. Demana accés a l'equip d'Engranatge."
 
@@ -646,7 +646,7 @@ msgstr "No s'ha pogut establir la bústia principal"
 msgid "Could not set the default inbox."
 msgstr "No s'ha pogut establir la safata per defecte."
 
-#: src/routes/login.tsx:114
+#: src/routes/login.tsx:110
 msgid "Could not sign in. Check your email and password."
 msgstr "No s'ha pogut iniciar sessió. Comprova el correu i la contrasenya."
 
@@ -849,12 +849,12 @@ msgid "Editor"
 msgstr "Editor"
 
 #: src/components/interactions/quick-capture-dialog.tsx:424
-#: src/components/research/findings/company-enrichment-view.tsx:185
+#: src/components/research/findings/company-enrichment-view.tsx:183
 #: src/components/research/findings/contact-discovery-view.tsx:74
 #: src/components/shared/channel-icon.tsx:63
 #: src/routes/companies/$slug.tsx:799
 #: src/routes/emails/inboxes.tsx:401
-#: src/routes/login.tsx:146
+#: src/routes/login.tsx:142
 #: src/routes/settings/organization/invite.tsx:136
 msgid "Email"
 msgstr "Correu"
@@ -1091,7 +1091,7 @@ msgstr "Idioma"
 
 #: src/components/profile/language-select.tsx:34
 #: src/routes/pages/$id.tsx:288
-#: src/routes/profile/index.tsx:124
+#: src/routes/profile/index.tsx:120
 msgid "Language"
 msgstr "Idioma"
 
@@ -1390,8 +1390,8 @@ msgstr "Encara no hi ha empreses"
 
 #: src/components/layout/org-switcher.tsx:63
 #: src/routes/accept-invitation.$id.tsx:97
-#: src/routes/login.tsx:129
-#: src/routes/profile/index.tsx:80
+#: src/routes/login.tsx:125
+#: src/routes/profile/index.tsx:76
 #: src/routes/settings/organization/invite.tsx:76
 #: src/routes/settings/organization/members.tsx:80
 msgid "No connection to the server. Try again in a few seconds."
@@ -1476,8 +1476,8 @@ msgstr "Encara sense productes vinculats"
 msgid "No research runs yet for this company."
 msgstr "Encara no hi ha cerques per a aquesta empresa."
 
-#: src/components/research/run-detail.tsx:131
-#: src/components/research/run-detail.tsx:142
+#: src/components/research/run-detail.tsx:128
+#: src/components/research/run-detail.tsx:139
 msgid "No structured findings."
 msgstr "No hi ha troballes estructurades."
 
@@ -1696,7 +1696,7 @@ msgstr "Indicadors de dolor"
 msgid "Pain points"
 msgstr "Punts febles"
 
-#: src/routes/login.tsx:160
+#: src/routes/login.tsx:156
 msgid "Password"
 msgstr "Contrasenya"
 
@@ -1718,7 +1718,7 @@ msgstr "Persones amb accés a aquest espai de treball."
 msgid "Personal"
 msgstr "Personal"
 
-#: src/components/research/findings/company-enrichment-view.tsx:195
+#: src/components/research/findings/company-enrichment-view.tsx:193
 #: src/components/research/findings/contact-discovery-view.tsx:84
 msgid "Phone"
 msgstr "Telèfon"
@@ -1786,7 +1786,7 @@ msgstr "Encaix de productes"
 #: src/components/layout/nav-items.ts:81
 #: src/routes/companies/$slug.tsx:825
 #: src/routes/companies/$slug.tsx:1080
-#: src/routes/profile/index.tsx:94
+#: src/routes/profile/index.tsx:90
 msgid "Profile"
 msgstr "Perfil"
 
@@ -2096,7 +2096,7 @@ msgid "Showing {firstRow}–{lastRow} of {total}"
 msgstr "Mostrant {firstRow}–{lastRow} de {total}"
 
 #: src/routes/accept-invitation.$id.tsx:128
-#: src/routes/login.tsx:183
+#: src/routes/login.tsx:179
 msgid "Sign in"
 msgstr "Inicia sessió"
 
@@ -2104,23 +2104,23 @@ msgstr "Inicia sessió"
 msgid "Sign in to accept this invitation"
 msgstr "Inicia sessió per acceptar aquesta invitació"
 
-#: src/routes/login.tsx:141
+#: src/routes/login.tsx:137
 msgid "Sign in to continue"
 msgstr "Inicia sessió per continuar"
 
-#: src/routes/profile/index.tsx:139
+#: src/routes/profile/index.tsx:135
 msgid "Sign out"
 msgstr "Tanca sessió"
 
-#: src/routes/profile/index.tsx:74
+#: src/routes/profile/index.tsx:70
 msgid "Sign-out failed. Please try again."
 msgstr "No s'ha pogut tancar la sessió. Torna-ho a provar."
 
-#: src/routes/login.tsx:183
+#: src/routes/login.tsx:179
 msgid "Signing in…"
 msgstr "Iniciant sessió…"
 
-#: src/routes/profile/index.tsx:139
+#: src/routes/profile/index.tsx:135
 msgid "Signing out…"
 msgstr "Tancant sessió…"
 
@@ -2424,7 +2424,7 @@ msgstr "desconegut"
 msgid "Unknown"
 msgstr "Desconegut"
 
-#: src/routes/profile/index.tsx:87
+#: src/routes/profile/index.tsx:83
 msgid "Unknown user"
 msgstr "Usuari desconegut"
 
@@ -2564,6 +2564,6 @@ msgstr "Ja ets membre."
 msgid "you@example.com"
 msgstr "tu@exemple.com"
 
-#: src/routes/profile/index.tsx:97
+#: src/routes/profile/index.tsx:93
 msgid "Your Batuda workbench identity."
 msgstr "La teva identitat al banc de Batuda."
