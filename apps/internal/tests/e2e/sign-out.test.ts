@@ -8,18 +8,38 @@ import { expect, test } from '@playwright/test'
 //   apps/internal/src/routes/login.tsx (login-form for the post-redirect
 //     assertion)
 //
-// The first test runs in the `authed` project and inherits Alice's
-// storageState. Sign-out invalidates that session row server-side, so
-// every subsequent test in this file uses a fresh empty storageState
-// and signs Alice back in via the form before exercising its scenario.
-// Keeps tests independent without leaking dead-session cookies.
+// Every test in this file signs Alice in via the form, signs her
+// out, and then asserts. Self-contained so a sign-out never leaks a
+// dead session into the persisted storageState that other test files
+// rely on (auth.setup writes Alice's cookies once; if we sign her out
+// using THAT cookie, the row is gone server-side and every subsequent
+// authed test in any file fails with 401).
+
+test.use({ storageState: { cookies: [], origins: [] } })
+
+async function signIn(page: import('@playwright/test').Page) {
+	await page.goto('/login')
+	await page.getByTestId('login-email').fill('admin@taller.cat')
+	await page.getByTestId('login-password').fill('batuda-dev-2026')
+	await page.getByTestId('login-submit').click()
+	await page.waitForURL(/\/$/)
+}
+
+async function signInAndOut(page: import('@playwright/test').Page) {
+	await signIn(page)
+	await page.goto('/profile')
+	await expect(page.getByTestId('profile-card')).toBeVisible()
+	await page.getByTestId('profile-signout').click()
+	await page.waitForURL(/\/login/)
+}
 
 test.describe('sign-out', () => {
 	test.describe('when an authenticated user submits the form', () => {
 		test('should tear down the session and land on /login', async ({
 			page,
 		}) => {
-			// GIVEN Alice is on the profile page (cookie injected by setup)
+			// GIVEN Alice signs in fresh (own cookie, not the persisted one)
+			await signIn(page)
 			await page.goto('/profile')
 			await expect(page.getByTestId('profile-card')).toBeVisible()
 
@@ -39,23 +59,6 @@ test.describe('sign-out', () => {
 	})
 
 	test.describe('after sign-out', () => {
-		// Skip storageState: each test signs Alice in via the form, signs
-		// her out, and then asserts. Self-contained so a sign-out in one
-		// test never leaks a dead session into the next.
-		test.use({ storageState: { cookies: [], origins: [] } })
-
-		async function signInAndOut(page: import('@playwright/test').Page) {
-			await page.goto('/login')
-			await page.getByTestId('login-email').fill('admin@taller.cat')
-			await page.getByTestId('login-password').fill('batuda-dev-2026')
-			await page.getByTestId('login-submit').click()
-			await page.waitForURL(/\/$/)
-			await page.goto('/profile')
-			await expect(page.getByTestId('profile-card')).toBeVisible()
-			await page.getByTestId('profile-signout').click()
-			await page.waitForURL(/\/login/)
-		}
-
 		// Note on the browser back button: pressing Back after sign-out
 		// can show a bfcache (back-forward cache) snapshot of the authed
 		// page before the route guard re-runs. The security property the

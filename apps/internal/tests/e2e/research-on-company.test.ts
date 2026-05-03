@@ -175,10 +175,23 @@ test.describe('research findings on company page', () => {
 				}
 			})
 
-			await page.getByTestId('research-run-new').click()
-			await expect(page.getByTestId('research-dialog')).toBeVisible({
-				timeout: 15_000,
-			})
+			// Click the open button until the dialog actually mounts. In
+			// the full-suite run the dev bundle may have just hot-rebuilt,
+			// and the SSR form-action replay buffer can miss the first
+			// click; the pre-hydration submit still navigates to the
+			// `javascript:throw …` no-op URL silently. Retrying gives
+			// React time to commit the hydrated handler.
+			const openBtn = page.getByTestId('research-run-new')
+			const dialog = page.getByTestId('research-dialog')
+			await expect
+				.poll(
+					async () => {
+						await openBtn.click({ timeout: 2_000 }).catch(() => {})
+						return dialog.isVisible()
+					},
+					{ timeout: 15_000, intervals: [200, 400, 600, 1000] },
+				)
+				.toBe(true)
 
 			await page
 				.getByTestId('research-dialog-query')

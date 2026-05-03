@@ -127,10 +127,15 @@ test.describe('org switcher', () => {
 		test('should persist the new active org across a hard reload', async ({
 			page,
 		}) => {
-			// GIVEN Alice has just switched to Restaurant
+			// GIVEN Alice has just switched to Restaurant. The earlier
+			// cases in this file already cover the dropdown-driven flow;
+			// here we only need durability across reload, so set the
+			// active org through the helper (POST /auth/organization/set-active)
+			// to dodge the React 19 hydration race that flakes the
+			// dropdown click when the file reaches its third test.
 			await page.goto('/', { waitUntil: 'networkidle' })
-			await page.getByTestId('org-switcher').click()
-			await page.getByTestId('org-switcher-option-restaurant').click()
+			await setActiveOrgBySlug(page, 'restaurant')
+			await page.reload({ waitUntil: 'networkidle' })
 			await expect(page.getByTestId('active-org-name')).toContainText(
 				'Restaurant Demo',
 				{ timeout: 10_000 },
