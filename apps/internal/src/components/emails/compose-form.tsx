@@ -438,6 +438,8 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 				onChange={next => {
 					patchForm({ attachments: next })
 				}}
+				inboxId={effectiveInboxId}
+				{...(serverIdRef.current !== null && { draftId: serverIdRef.current })}
 			/>
 
 			<Footer>

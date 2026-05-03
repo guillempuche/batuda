@@ -16,15 +16,23 @@ export type StagedAttachment = {
 
 export async function uploadAttachment(
 	file: File,
-	options?: { readonly signal?: AbortSignal },
+	options: {
+		readonly inboxId: string
+		readonly draftId?: string
+		readonly inline?: boolean
+		readonly signal?: AbortSignal
+	},
 ): Promise<StagedAttachment> {
 	const body = new FormData()
 	body.append('file', file, file.name)
+	body.append('inboxId', options.inboxId)
+	if (options.draftId !== undefined) body.append('draftId', options.draftId)
+	if (options.inline === true) body.append('inline', 'true')
 	const response = await fetch(`${apiBaseUrl()}/v1/email/attachments/staging`, {
 		method: 'POST',
 		credentials: 'include',
 		body,
-		...(options?.signal !== undefined && { signal: options.signal }),
+		...(options.signal !== undefined && { signal: options.signal }),
 	})
 	if (!response.ok) {
 		const message = await extractError(response)
