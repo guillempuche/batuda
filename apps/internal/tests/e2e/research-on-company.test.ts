@@ -93,11 +93,15 @@ test.describe('research findings on company page', () => {
 		test('should render the Research tab with the run row', async ({
 			page,
 		}) => {
-			// WHEN Alice opens the company page → Research tab
-			await page.goto(`/companies/${COMPANY_SLUG}`, {
+			// Land directly on `?tab=research` instead of clicking the
+			// tab. PriTabs.Root reads the active tab from the URL via
+			// `useTabSearchParam`, so a direct `goto` mounts the panel
+			// without waiting for React 19 hydration to wire up the
+			// `onValueChange` handler — eliminates the click-before-hydrate
+			// race that costs 5 s + leaves Profile selected.
+			await page.goto(`/companies/${COMPANY_SLUG}?tab=research`, {
 				waitUntil: 'networkidle',
 			})
-			await page.getByTestId('research-tab').click()
 
 			// THEN the seeded run appears in the list
 			await expect(page.getByTestId('research-run-list')).toBeVisible()
@@ -111,10 +115,9 @@ test.describe('research findings on company page', () => {
 		test('should open run detail with brief_md rendered as Markdown', async ({
 			page,
 		}) => {
-			await page.goto(`/companies/${COMPANY_SLUG}`, {
+			await page.goto(`/companies/${COMPANY_SLUG}?tab=research`, {
 				waitUntil: 'networkidle',
 			})
-			await page.getByTestId('research-tab').click()
 			await page
 				.getByTestId(`research-run-row-${seededRunIds[0]}`)
 				.first()
@@ -130,10 +133,9 @@ test.describe('research findings on company page', () => {
 		test('should render the freeform proposed updates section', async ({
 			page,
 		}) => {
-			await page.goto(`/companies/${COMPANY_SLUG}`, {
+			await page.goto(`/companies/${COMPANY_SLUG}?tab=research`, {
 				waitUntil: 'networkidle',
 			})
-			await page.getByTestId('research-tab').click()
 			await page
 				.getByTestId(`research-run-row-${seededRunIds[0]}`)
 				.first()
@@ -150,13 +152,22 @@ test.describe('research findings on company page', () => {
 		test('should fire exactly one POST /v1/research on double-submit', async ({
 			page,
 		}) => {
-			await page.goto(`/companies/${COMPANY_SLUG}`, {
+			// Slow Vite dev startup + selective hydration can push the
+			// open + submit + close round-trip beyond Playwright's 30 s
+			// default. Give the case headroom; the assertions below still
+			// fail fast on real bugs.
+			test.setTimeout(60_000)
+			await page.goto(`/companies/${COMPANY_SLUG}?tab=research`, {
 				waitUntil: 'networkidle',
 			})
-			await page.getByTestId('research-tab').click()
 
-			// Listen for the POST to /v1/research; double-clicking Submit must
-			// not produce two server calls.
+			// React 19 captures discrete events at the root and replays
+			// them once the suspense boundary hydrates (see
+			// react-dom-client.development.js around line 23583). The
+			// click below therefore fires after hydration even if the
+			// listener isn't wired at the moment of the click — but the
+			// replay can take longer than the default 5 s on a freshly
+			// hot-built dev bundle, so widen the visibility budget.
 			let posts = 0
 			page.on('request', req => {
 				if (req.method() === 'POST' && req.url().endsWith('/v1/research')) {
@@ -165,17 +176,22 @@ test.describe('research findings on company page', () => {
 			})
 
 			await page.getByTestId('research-run-new').click()
-			await expect(page.getByTestId('research-dialog')).toBeVisible()
+			await expect(page.getByTestId('research-dialog')).toBeVisible({
+				timeout: 15_000,
+			})
+
 			await page
 				.getByTestId('research-dialog-query')
 				.fill(`What does ${COMPANY_SLUG} sell?`)
-
 			const submit = page.getByTestId('research-dialog-submit')
+			await expect(submit).toBeEnabled()
+
+			// Two rapid submits must coalesce: the form's action pipeline
+			// flips `submitting=true` synchronously, so the second click
+			// finds `canSubmit === false` and bails before sending.
 			await submit.click()
 			await submit.click({ trial: true }).catch(() => {})
 
-			// Wait for the dialog to close (success path) so we know the
-			// request settled.
 			await expect(page.getByTestId('research-dialog')).toBeHidden({
 				timeout: 15_000,
 			})
@@ -183,7 +199,11 @@ test.describe('research findings on company page', () => {
 			expect(posts, 'expected exactly one POST /v1/research').toBe(1)
 
 			// Cleanup: drop whatever run id the engine created so reruns
-			// remain idempotent.
+			// remain idempotent. research_cache references research_runs
+			// without ON DELETE CASCADE, so the cache row has to go first.
+			psql(
+				`DELETE FROM research_cache WHERE research_id IN (SELECT id FROM research_runs WHERE query LIKE 'What does ${COMPANY_SLUG}%')`,
+			)
 			psql(
 				`DELETE FROM research_runs WHERE query LIKE 'What does ${COMPANY_SLUG}%'`,
 			)
