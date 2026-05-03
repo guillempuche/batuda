@@ -114,13 +114,17 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 					}),
 				)
 				.handle('getThread', _ =>
-					svc
-						.getThread(_.params.threadId)
-						.pipe(
-							Effect.catch(e =>
-								e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+					svc.getThread(_.params.threadId).pipe(
+						Effect.catchTag('NotFound', e =>
+							Effect.succeed(
+								HttpServerResponse.jsonUnsafe(
+									{ _tag: 'NotFound', entity: e.entity, id: e.id },
+									{ status: 404 },
+								),
 							),
 						),
+						Effect.orDie,
+					),
 				)
 				.handle('updateThreadStatus', _ =>
 					svc

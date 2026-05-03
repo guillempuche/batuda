@@ -18,6 +18,13 @@ import {
 import { renderBlocks, type StagedAttachmentRef } from '@batuda/email/render'
 import type { EmailBlocks } from '@batuda/email/schema'
 
+// Standard 8-4-4-4-12 hex UUID. Used to guard service entry points that
+// take a `threadId` / `companyId` / `messageId` — placeholder strings
+// from the frontend (e.g. compose-form's `__unused__`) would otherwise
+// propagate to postgres and surface as 500 instead of NotFound.
+const UUID_PATTERN =
+	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 import { CalendarService } from './calendar.js'
 import { CredentialCrypto } from './credential-crypto.js'
 import type { ResolvedStaging, StagingRef } from './email-attachment-staging.js'
@@ -154,6 +161,28 @@ const toRecipientArray = (
 // tools) used to receive from the old EmailProvider draft surface. Keeps
 // the wire format stable so the route handlers and atoms don't need to
 // change in this slice.
+//
+// Only enumerable, non-undefined fields are emitted. The route declares
+// `success: Schema.Unknown`, which decodes via `Schema.Json` whose
+// `isJson` recursively rejects any value containing `undefined` —
+// including object properties whose value is `undefined`. JSON.stringify
+// would drop those fields silently, but the schema runs first and
+// returns 500 before the stringify step. Date instances pass `isJson`
+// (no enumerable keys → vacuously true) and JSON.stringify converts
+// them to ISO strings on the wire, so they don't need special handling.
+type DraftProviderShape = {
+	readonly draftId: string
+	readonly inboxId: string
+	readonly to: ReadonlyArray<string>
+	readonly cc: ReadonlyArray<string>
+	readonly bcc: ReadonlyArray<string>
+	readonly bodyJson: unknown
+	readonly createdAt: Date
+	readonly updatedAt: Date
+	readonly clientId?: string
+	readonly subject?: string
+	readonly inReplyTo?: string
+}
 const draftRowToProviderShape = (row: {
 	readonly draftId: string
 	readonly inboxId: string
@@ -166,20 +195,18 @@ const draftRowToProviderShape = (row: {
 	readonly bodyJson: unknown
 	readonly createdAt: Date
 	readonly updatedAt: Date
-}) => ({
+}): DraftProviderShape => ({
 	draftId: row.draftId,
 	inboxId: row.inboxId,
-	clientId: row.clientId ?? undefined,
-	to: row.toAddresses as string[],
-	cc: row.ccAddresses as string[],
-	bcc: row.bccAddresses as string[],
-	subject: row.subject ?? undefined,
-	text: undefined as string | undefined,
-	html: undefined as string | undefined,
-	inReplyTo: row.inReplyTo ?? undefined,
+	to: row.toAddresses,
+	cc: row.ccAddresses,
+	bcc: row.bccAddresses,
 	bodyJson: row.bodyJson,
 	createdAt: row.createdAt,
 	updatedAt: row.updatedAt,
+	...(row.clientId !== null && { clientId: row.clientId }),
+	...(row.subject !== null && { subject: row.subject }),
+	...(row.inReplyTo !== null && { inReplyTo: row.inReplyTo }),
 })
 
 // Vendor-neutral mailbox presets surfaced to the connect-mailbox UI. Adding a
@@ -941,6 +968,17 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 
 				getThread: (threadId: string) =>
 					Effect.gen(function* () {
+						// Front-end placeholders ('__unused__' from compose-form,
+						// stale URLs, typos) reach here as raw strings. Guard up
+						// front so postgres' UUID parser never throws — that
+						// surfaces as Effect.die → 500, masking what is really
+						// a NotFound at the resource level.
+						if (!UUID_PATTERN.test(threadId)) {
+							return yield* new NotFound({
+								entity: 'EmailThread',
+								id: threadId,
+							})
+						}
 						const currentOrg = yield* CurrentOrg
 						const session = yield* SessionContext
 
