@@ -169,7 +169,7 @@ msgstr "Afegeix tasca"
 msgid "Add the first decision-maker to keep track of who to reach."
 msgstr "Afegeix el primer responsable de decisió per saber a qui adreçar-te."
 
-#: src/components/research/findings/company-enrichment-view.tsx:76
+#: src/components/research/findings/company-enrichment-view.tsx:80
 msgid "Address"
 msgstr "Adreça"
 
@@ -205,7 +205,7 @@ msgstr "Tot el temps"
 msgid "All under control"
 msgstr "Tot sota control"
 
-#: src/components/research/findings/shared.tsx:172
+#: src/components/research/findings/shared.tsx:179
 msgid "Already in CRM"
 msgstr "Ja al CRM"
 
@@ -348,7 +348,7 @@ msgid "Calls"
 msgstr "Crides"
 
 #: src/components/interactions/quick-capture-dialog.tsx:400
-#: src/components/research/research-dialog.tsx:188
+#: src/components/research/research-dialog.tsx:193
 #: src/routes/emails/inboxes.tsx:1054
 #: src/routes/emails/inboxes.tsx:1452
 #: src/routes/tasks/index.tsx:717
@@ -426,7 +426,7 @@ msgid "Client"
 msgstr "Client"
 
 #: src/components/interactions/quick-capture-dialog.tsx:188
-#: src/components/research/research-dialog.tsx:107
+#: src/components/research/research-dialog.tsx:112
 #: src/routes/calendar/index.tsx:354
 #: src/routes/emails/$threadId.tsx:333
 #: src/routes/emails/inboxes.tsx:784
@@ -486,8 +486,8 @@ msgstr "Empreses"
 msgid "Company"
 msgstr "Empresa"
 
-#: src/components/research/findings/company-enrichment-view.tsx:146
-#: src/components/research/findings/competitor-scan-view.tsx:105
+#: src/components/research/findings/company-enrichment-view.tsx:150
+#: src/components/research/findings/competitor-scan-view.tsx:106
 msgid "Competitors"
 msgstr "Competidors"
 
@@ -548,7 +548,7 @@ msgstr "Connexió provada"
 msgid "Contacted"
 msgstr "Contactat"
 
-#: src/components/research/findings/company-enrichment-view.tsx:170
+#: src/components/research/findings/company-enrichment-view.tsx:174
 #: src/routes/companies/$slug.tsx:838
 msgid "Contacts"
 msgstr "Contactes"
@@ -650,7 +650,7 @@ msgstr "No s'ha pogut establir la safata per defecte."
 msgid "Could not sign in. Check your email and password."
 msgstr "No s'ha pogut iniciar sessió. Comprova el correu i la contrasenya."
 
-#: src/components/research/research-dialog.tsx:72
+#: src/components/research/research-dialog.tsx:79
 msgid "Could not start the research run. Please try again."
 msgstr "No s'ha pogut iniciar la cerca. Torna-ho a provar."
 
@@ -674,7 +674,7 @@ msgstr "Crea un peu de pàgina per afegir als correus sortints d'aquesta bústia
 msgid "Create a prospect landing page from a company detail view or via the MCP tools."
 msgstr "Crea una pàgina d'aterratge per a un prospecte des del detall d'una empresa o amb les eines MCP."
 
-#: src/routes/companies/$slug.tsx:1214
+#: src/routes/companies/$slug.tsx:1227
 msgid "Create a prospect landing page to share with this company."
 msgstr "Crea una pàgina d'aterratge per a un prospecte per compartir amb aquesta empresa."
 
@@ -699,7 +699,7 @@ msgstr "Creada"
 msgid "Created by agent"
 msgstr "Creada per agent"
 
-#: src/components/research/findings/company-enrichment-view.tsx:78
+#: src/components/research/findings/company-enrichment-view.tsx:82
 #: src/routes/companies/$slug.tsx:945
 msgid "Current tools"
 msgstr "Eines actuals"
@@ -849,7 +849,7 @@ msgid "Editor"
 msgstr "Editor"
 
 #: src/components/interactions/quick-capture-dialog.tsx:424
-#: src/components/research/findings/company-enrichment-view.tsx:183
+#: src/components/research/findings/company-enrichment-view.tsx:187
 #: src/components/research/findings/contact-discovery-view.tsx:74
 #: src/components/shared/channel-icon.tsx:63
 #: src/routes/companies/$slug.tsx:802
@@ -881,11 +881,11 @@ msgstr "Correu via Batuda"
 msgid "Emails"
 msgstr "Correus"
 
-#: src/routes/companies/$slug.tsx:1280
+#: src/routes/companies/$slug.tsx:1293
 msgid "Emails, calls, documents, and proposals will appear here as they happen."
 msgstr "Els emails, trucades, documents i propostes apareixeran aquí a mesura que passin."
 
-#: src/components/research/findings/company-enrichment-view.tsx:95
+#: src/components/research/findings/company-enrichment-view.tsx:99
 msgid "Enrichment"
 msgstr "Enriquiment"
 
@@ -1039,7 +1039,7 @@ msgstr "Bústia eliminada"
 msgid "Inbox updated"
 msgstr "Safata actualitzada"
 
-#: src/components/research/findings/company-enrichment-view.tsx:72
+#: src/components/research/findings/company-enrichment-view.tsx:76
 #: src/components/research/findings/prospect-scan-view.tsx:75
 #: src/routes/companies/$slug.tsx:909
 msgid "Industry"
@@ -1081,7 +1081,7 @@ msgstr "Uneix-te a la videotrucada"
 msgid "Key"
 msgstr "Clau"
 
-#: src/components/research/findings/competitor-scan-view.tsx:86
+#: src/components/research/findings/competitor-scan-view.tsx:87
 msgid "Key differentiators"
 msgstr "Diferenciadors clau"
 
@@ -1164,7 +1164,7 @@ msgstr "Localitzada al mapa"
 msgid "Locating…"
 msgstr "Localitzant…"
 
-#: src/components/research/findings/company-enrichment-view.tsx:75
+#: src/components/research/findings/company-enrichment-view.tsx:79
 #: src/routes/calendar/index.tsx:284
 #: src/routes/companies/$slug.tsx:919
 msgid "Location"
@@ -1247,11 +1247,11 @@ msgstr "Marca com a llegit"
 msgid "Mark unread"
 msgstr "Marca com a no llegit"
 
-#: src/components/research/findings/competitor-scan-view.tsx:65
+#: src/components/research/findings/competitor-scan-view.tsx:66
 msgid "Market summary"
 msgstr "Resum de mercat"
 
-#: src/components/research/findings/competitor-scan-view.tsx:77
+#: src/components/research/findings/competitor-scan-view.tsx:78
 msgid "Maturity"
 msgstr "Maduresa"
 
@@ -1364,7 +1364,7 @@ msgstr "Sense organització activa"
 msgid "No active organization. Pick one from the switcher in the top bar."
 msgstr "Sense organització activa. Tria'n una al selector de la barra superior."
 
-#: src/routes/companies/$slug.tsx:1279
+#: src/routes/companies/$slug.tsx:1292
 msgid "No activity yet"
 msgstr "Encara no hi ha activitat"
 
@@ -1411,7 +1411,7 @@ msgstr "Encara sense coordenades. Localitza aquesta empresa per situar-la al map
 msgid "no date"
 msgstr "sense data"
 
-#: src/routes/companies/$slug.tsx:1242
+#: src/routes/companies/$slug.tsx:1255
 msgid "No documents yet"
 msgstr "Encara no hi ha documents"
 
@@ -1455,7 +1455,7 @@ msgstr "No hi ha missatges en aquest fil"
 msgid "No overdue tasks, no pending follow-ups, no neglected companies."
 msgstr "Sense tasques endarrerides, sense seguiments pendents, sense empreses oblidades."
 
-#: src/routes/companies/$slug.tsx:1213
+#: src/routes/companies/$slug.tsx:1226
 #: src/routes/pages/index.tsx:136
 msgid "No pages yet"
 msgstr "Encara no hi ha pàgines"
@@ -1634,7 +1634,7 @@ msgstr "Resultat"
 msgid "Outcome: {0}"
 msgstr "Resultat: {0}"
 
-#: src/components/research/research-dialog.tsx:137
+#: src/components/research/research-dialog.tsx:142
 msgid "Output schema"
 msgstr "Esquema de sortida"
 
@@ -1644,7 +1644,7 @@ msgstr "Esquema de sortida"
 msgid "Overdue"
 msgstr "Endarrerit"
 
-#: src/components/research/findings/competitor-scan-view.tsx:125
+#: src/components/research/findings/competitor-scan-view.tsx:126
 msgid "Overlap"
 msgstr "Solapament"
 
@@ -1691,7 +1691,7 @@ msgstr "Crides d'API de recerca pagades carregades a aquesta organització."
 msgid "Pain indicators"
 msgstr "Indicadors de dolor"
 
-#: src/components/research/findings/company-enrichment-view.tsx:77
+#: src/components/research/findings/company-enrichment-view.tsx:81
 #: src/routes/companies/$slug.tsx:950
 msgid "Pain points"
 msgstr "Punts febles"
@@ -1704,7 +1704,7 @@ msgstr "Contrasenya"
 msgid "Password or app-password"
 msgstr "Contrasenya o contrasenya d'aplicació"
 
-#: src/components/research/findings/shared.tsx:136
+#: src/components/research/findings/shared.tsx:143
 msgid "Pending paid actions"
 msgstr "Accions de pagament pendents"
 
@@ -1718,7 +1718,7 @@ msgstr "Persones amb accés a aquest espai de treball."
 msgid "Personal"
 msgstr "Personal"
 
-#: src/components/research/findings/company-enrichment-view.tsx:193
+#: src/components/research/findings/company-enrichment-view.tsx:197
 #: src/components/research/findings/contact-discovery-view.tsx:84
 msgid "Phone"
 msgstr "Telèfon"
@@ -1778,7 +1778,7 @@ msgstr "Privada — amaga els fils a la resta de membres"
 msgid "Private inbox"
 msgstr "Bústia privada"
 
-#: src/components/research/findings/company-enrichment-view.tsx:113
+#: src/components/research/findings/company-enrichment-view.tsx:117
 #: src/routes/companies/$slug.tsx:968
 msgid "Products fit"
 msgstr "Encaix de productes"
@@ -1800,11 +1800,11 @@ msgstr "Proposta"
 msgid "Proposal in review"
 msgstr "Proposta en revisió"
 
-#: src/routes/companies/$slug.tsx:1243
+#: src/routes/companies/$slug.tsx:1256
 msgid "Proposals, meeting notes and attachments will show up here."
 msgstr "Les propostes, notes de reunió i adjunts apareixeran aquí."
 
-#: src/components/research/findings/shared.tsx:86
+#: src/components/research/findings/shared.tsx:93
 msgid "Proposed updates"
 msgstr "Actualitzacions proposades"
 
@@ -1849,7 +1849,7 @@ msgstr "Publicant…"
 msgid "Purpose"
 msgstr "Propòsit"
 
-#: src/components/research/research-dialog.tsx:120
+#: src/components/research/research-dialog.tsx:125
 msgid "Question"
 msgstr "Pregunta"
 
@@ -1882,7 +1882,7 @@ msgstr "El destinatari ha marcat el missatge com a brossa"
 msgid "Refreshing inbox status…"
 msgstr "Actualitzant l'estat de la bústia…"
 
-#: src/components/research/findings/company-enrichment-view.tsx:74
+#: src/components/research/findings/company-enrichment-view.tsx:78
 #: src/components/research/findings/prospect-scan-view.tsx:83
 #: src/routes/companies/$slug.tsx:914
 msgid "Region"
@@ -1966,8 +1966,8 @@ msgstr "Execució fallida"
 msgid "Run in progress — events stream as they arrive."
 msgstr "Execució en curs — els esdeveniments arriben en temps real."
 
-#: src/components/research/research-dialog.tsx:100
-#: src/routes/companies/$slug.tsx:1190
+#: src/components/research/research-dialog.tsx:105
+#: src/routes/companies/$slug.tsx:1202
 msgid "Run new research"
 msgstr "Inicia una cerca"
 
@@ -2087,7 +2087,7 @@ msgstr "Mostra menys"
 msgid "Show more"
 msgstr "Mostra més"
 
-#: src/routes/companies/$slug.tsx:1274
+#: src/routes/companies/$slug.tsx:1287
 msgid "Show system events"
 msgstr "Mostra esdeveniments del sistema"
 
@@ -2124,7 +2124,7 @@ msgstr "Iniciant sessió…"
 msgid "Signing out…"
 msgstr "Tancant sessió…"
 
-#: src/components/research/findings/company-enrichment-view.tsx:73
+#: src/components/research/findings/company-enrichment-view.tsx:77
 #: src/routes/companies/$slug.tsx:924
 msgid "Size"
 msgstr "Mida"
@@ -2181,11 +2181,11 @@ msgstr "Despesa"
 msgid "Stamped into the workshop ledger."
 msgstr "Segellat al llibre del taller."
 
-#: src/components/research/research-dialog.tsx:178
+#: src/components/research/research-dialog.tsx:183
 msgid "Start"
 msgstr "Inicia"
 
-#: src/components/research/research-dialog.tsx:178
+#: src/components/research/research-dialog.tsx:183
 msgid "Starting…"
 msgstr "Iniciant…"
 
@@ -2208,7 +2208,7 @@ msgstr "Ha fallat l'actualització d'estat"
 msgid "Stored encrypted with AES-256-GCM."
 msgstr "Es desa xifrada amb AES-256-GCM."
 
-#: src/components/research/findings/competitor-scan-view.tsx:133
+#: src/components/research/findings/competitor-scan-view.tsx:134
 msgid "Strengths"
 msgstr "Punts forts"
 
@@ -2229,7 +2229,7 @@ msgstr "Canvia d'organització"
 msgid "System"
 msgstr "Sistema"
 
-#: src/components/research/findings/company-enrichment-view.tsx:127
+#: src/components/research/findings/company-enrichment-view.tsx:131
 #: src/routes/companies/$slug.tsx:962
 msgid "Tags"
 msgstr "Etiquetes"
@@ -2375,7 +2375,7 @@ msgstr "Fil no trobat"
 msgid "Time range"
 msgstr "Interval de temps"
 
-#: src/routes/companies/$slug.tsx:1263
+#: src/routes/companies/$slug.tsx:1276
 msgid "Timeline"
 msgstr "Cronologia"
 
@@ -2397,7 +2397,7 @@ msgstr "Per a"
 msgid "Today"
 msgstr "Avui"
 
-#: src/components/research/findings/competitor-scan-view.tsx:70
+#: src/components/research/findings/competitor-scan-view.tsx:71
 msgid "Total competitors"
 msgstr "Total competidors"
 
@@ -2491,7 +2491,7 @@ msgstr "Visites"
 msgid "Visit"
 msgstr "Visita"
 
-#: src/components/research/findings/competitor-scan-view.tsx:147
+#: src/components/research/findings/competitor-scan-view.tsx:148
 msgid "Weaknesses"
 msgstr "Punts febles"
 
@@ -2500,7 +2500,7 @@ msgstr "Punts febles"
 msgid "What"
 msgstr "Què"
 
-#: src/components/research/research-dialog.tsx:127
+#: src/components/research/research-dialog.tsx:132
 msgid "What do you want to find out about this company?"
 msgstr "Què vols saber d'aquesta empresa?"
 

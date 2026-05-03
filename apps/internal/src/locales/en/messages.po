@@ -169,7 +169,7 @@ msgstr "Add task"
 msgid "Add the first decision-maker to keep track of who to reach."
 msgstr "Add the first decision-maker to keep track of who to reach."
 
-#: src/components/research/findings/company-enrichment-view.tsx:76
+#: src/components/research/findings/company-enrichment-view.tsx:80
 msgid "Address"
 msgstr "Address"
 
@@ -205,7 +205,7 @@ msgstr "All time"
 msgid "All under control"
 msgstr "All under control"
 
-#: src/components/research/findings/shared.tsx:172
+#: src/components/research/findings/shared.tsx:179
 msgid "Already in CRM"
 msgstr "Already in CRM"
 
@@ -348,7 +348,7 @@ msgid "Calls"
 msgstr "Calls"
 
 #: src/components/interactions/quick-capture-dialog.tsx:400
-#: src/components/research/research-dialog.tsx:188
+#: src/components/research/research-dialog.tsx:193
 #: src/routes/emails/inboxes.tsx:1054
 #: src/routes/emails/inboxes.tsx:1452
 #: src/routes/tasks/index.tsx:717
@@ -426,7 +426,7 @@ msgid "Client"
 msgstr "Client"
 
 #: src/components/interactions/quick-capture-dialog.tsx:188
-#: src/components/research/research-dialog.tsx:107
+#: src/components/research/research-dialog.tsx:112
 #: src/routes/calendar/index.tsx:354
 #: src/routes/emails/$threadId.tsx:333
 #: src/routes/emails/inboxes.tsx:784
@@ -486,8 +486,8 @@ msgstr "Companies"
 msgid "Company"
 msgstr "Company"
 
-#: src/components/research/findings/company-enrichment-view.tsx:146
-#: src/components/research/findings/competitor-scan-view.tsx:105
+#: src/components/research/findings/company-enrichment-view.tsx:150
+#: src/components/research/findings/competitor-scan-view.tsx:106
 msgid "Competitors"
 msgstr "Competitors"
 
@@ -548,7 +548,7 @@ msgstr "Connection tested"
 msgid "Contacted"
 msgstr "Contacted"
 
-#: src/components/research/findings/company-enrichment-view.tsx:170
+#: src/components/research/findings/company-enrichment-view.tsx:174
 #: src/routes/companies/$slug.tsx:838
 msgid "Contacts"
 msgstr "Contacts"
@@ -650,7 +650,7 @@ msgstr "Could not set the default inbox."
 msgid "Could not sign in. Check your email and password."
 msgstr "Could not sign in. Check your email and password."
 
-#: src/components/research/research-dialog.tsx:72
+#: src/components/research/research-dialog.tsx:79
 msgid "Could not start the research run. Please try again."
 msgstr "Could not start the research run. Please try again."
 
@@ -674,7 +674,7 @@ msgstr "Create a footer to append to outgoing emails from this inbox."
 msgid "Create a prospect landing page from a company detail view or via the MCP tools."
 msgstr "Create a prospect landing page from a company detail view or via the MCP tools."
 
-#: src/routes/companies/$slug.tsx:1214
+#: src/routes/companies/$slug.tsx:1227
 msgid "Create a prospect landing page to share with this company."
 msgstr "Create a prospect landing page to share with this company."
 
@@ -699,7 +699,7 @@ msgstr "Created"
 msgid "Created by agent"
 msgstr "Created by agent"
 
-#: src/components/research/findings/company-enrichment-view.tsx:78
+#: src/components/research/findings/company-enrichment-view.tsx:82
 #: src/routes/companies/$slug.tsx:945
 msgid "Current tools"
 msgstr "Current tools"
@@ -849,7 +849,7 @@ msgid "Editor"
 msgstr "Editor"
 
 #: src/components/interactions/quick-capture-dialog.tsx:424
-#: src/components/research/findings/company-enrichment-view.tsx:183
+#: src/components/research/findings/company-enrichment-view.tsx:187
 #: src/components/research/findings/contact-discovery-view.tsx:74
 #: src/components/shared/channel-icon.tsx:63
 #: src/routes/companies/$slug.tsx:802
@@ -881,11 +881,11 @@ msgstr "Email via Batuda"
 msgid "Emails"
 msgstr "Emails"
 
-#: src/routes/companies/$slug.tsx:1280
+#: src/routes/companies/$slug.tsx:1293
 msgid "Emails, calls, documents, and proposals will appear here as they happen."
 msgstr "Emails, calls, documents, and proposals will appear here as they happen."
 
-#: src/components/research/findings/company-enrichment-view.tsx:95
+#: src/components/research/findings/company-enrichment-view.tsx:99
 msgid "Enrichment"
 msgstr "Enrichment"
 
@@ -1039,7 +1039,7 @@ msgstr "Inbox removed"
 msgid "Inbox updated"
 msgstr "Inbox updated"
 
-#: src/components/research/findings/company-enrichment-view.tsx:72
+#: src/components/research/findings/company-enrichment-view.tsx:76
 #: src/components/research/findings/prospect-scan-view.tsx:75
 #: src/routes/companies/$slug.tsx:909
 msgid "Industry"
@@ -1081,7 +1081,7 @@ msgstr "Join video call"
 msgid "Key"
 msgstr "Key"
 
-#: src/components/research/findings/competitor-scan-view.tsx:86
+#: src/components/research/findings/competitor-scan-view.tsx:87
 msgid "Key differentiators"
 msgstr "Key differentiators"
 
@@ -1164,7 +1164,7 @@ msgstr "Located on the map"
 msgid "Locating…"
 msgstr "Locating…"
 
-#: src/components/research/findings/company-enrichment-view.tsx:75
+#: src/components/research/findings/company-enrichment-view.tsx:79
 #: src/routes/calendar/index.tsx:284
 #: src/routes/companies/$slug.tsx:919
 msgid "Location"
@@ -1247,11 +1247,11 @@ msgstr "Mark read"
 msgid "Mark unread"
 msgstr "Mark unread"
 
-#: src/components/research/findings/competitor-scan-view.tsx:65
+#: src/components/research/findings/competitor-scan-view.tsx:66
 msgid "Market summary"
 msgstr "Market summary"
 
-#: src/components/research/findings/competitor-scan-view.tsx:77
+#: src/components/research/findings/competitor-scan-view.tsx:78
 msgid "Maturity"
 msgstr "Maturity"
 
@@ -1364,7 +1364,7 @@ msgstr "No active organization"
 msgid "No active organization. Pick one from the switcher in the top bar."
 msgstr "No active organization. Pick one from the switcher in the top bar."
 
-#: src/routes/companies/$slug.tsx:1279
+#: src/routes/companies/$slug.tsx:1292
 msgid "No activity yet"
 msgstr "No activity yet"
 
@@ -1411,7 +1411,7 @@ msgstr "No coordinates yet. Locate this company to plot it on the map."
 msgid "no date"
 msgstr "no date"
 
-#: src/routes/companies/$slug.tsx:1242
+#: src/routes/companies/$slug.tsx:1255
 msgid "No documents yet"
 msgstr "No documents yet"
 
@@ -1455,7 +1455,7 @@ msgstr "No messages in this thread"
 msgid "No overdue tasks, no pending follow-ups, no neglected companies."
 msgstr "No overdue tasks, no pending follow-ups, no neglected companies."
 
-#: src/routes/companies/$slug.tsx:1213
+#: src/routes/companies/$slug.tsx:1226
 #: src/routes/pages/index.tsx:136
 msgid "No pages yet"
 msgstr "No pages yet"
@@ -1634,7 +1634,7 @@ msgstr "Outcome"
 msgid "Outcome: {0}"
 msgstr "Outcome: {0}"
 
-#: src/components/research/research-dialog.tsx:137
+#: src/components/research/research-dialog.tsx:142
 msgid "Output schema"
 msgstr "Output schema"
 
@@ -1644,7 +1644,7 @@ msgstr "Output schema"
 msgid "Overdue"
 msgstr "Overdue"
 
-#: src/components/research/findings/competitor-scan-view.tsx:125
+#: src/components/research/findings/competitor-scan-view.tsx:126
 msgid "Overlap"
 msgstr "Overlap"
 
@@ -1691,7 +1691,7 @@ msgstr "Paid research API calls billed to this organization."
 msgid "Pain indicators"
 msgstr "Pain indicators"
 
-#: src/components/research/findings/company-enrichment-view.tsx:77
+#: src/components/research/findings/company-enrichment-view.tsx:81
 #: src/routes/companies/$slug.tsx:950
 msgid "Pain points"
 msgstr "Pain points"
@@ -1704,7 +1704,7 @@ msgstr "Password"
 msgid "Password or app-password"
 msgstr "Password or app-password"
 
-#: src/components/research/findings/shared.tsx:136
+#: src/components/research/findings/shared.tsx:143
 msgid "Pending paid actions"
 msgstr "Pending paid actions"
 
@@ -1718,7 +1718,7 @@ msgstr "People with access to this workspace."
 msgid "Personal"
 msgstr "Personal"
 
-#: src/components/research/findings/company-enrichment-view.tsx:193
+#: src/components/research/findings/company-enrichment-view.tsx:197
 #: src/components/research/findings/contact-discovery-view.tsx:84
 msgid "Phone"
 msgstr "Phone"
@@ -1778,7 +1778,7 @@ msgstr "Private — hide threads from other members"
 msgid "Private inbox"
 msgstr "Private inbox"
 
-#: src/components/research/findings/company-enrichment-view.tsx:113
+#: src/components/research/findings/company-enrichment-view.tsx:117
 #: src/routes/companies/$slug.tsx:968
 msgid "Products fit"
 msgstr "Products fit"
@@ -1800,11 +1800,11 @@ msgstr "Proposal"
 msgid "Proposal in review"
 msgstr "Proposal in review"
 
-#: src/routes/companies/$slug.tsx:1243
+#: src/routes/companies/$slug.tsx:1256
 msgid "Proposals, meeting notes and attachments will show up here."
 msgstr "Proposals, meeting notes and attachments will show up here."
 
-#: src/components/research/findings/shared.tsx:86
+#: src/components/research/findings/shared.tsx:93
 msgid "Proposed updates"
 msgstr "Proposed updates"
 
@@ -1849,7 +1849,7 @@ msgstr "Publishing…"
 msgid "Purpose"
 msgstr "Purpose"
 
-#: src/components/research/research-dialog.tsx:120
+#: src/components/research/research-dialog.tsx:125
 msgid "Question"
 msgstr "Question"
 
@@ -1882,7 +1882,7 @@ msgstr "Recipient marked as spam"
 msgid "Refreshing inbox status…"
 msgstr "Refreshing inbox status…"
 
-#: src/components/research/findings/company-enrichment-view.tsx:74
+#: src/components/research/findings/company-enrichment-view.tsx:78
 #: src/components/research/findings/prospect-scan-view.tsx:83
 #: src/routes/companies/$slug.tsx:914
 msgid "Region"
@@ -1966,8 +1966,8 @@ msgstr "Run failed"
 msgid "Run in progress — events stream as they arrive."
 msgstr "Run in progress — events stream as they arrive."
 
-#: src/components/research/research-dialog.tsx:100
-#: src/routes/companies/$slug.tsx:1190
+#: src/components/research/research-dialog.tsx:105
+#: src/routes/companies/$slug.tsx:1202
 msgid "Run new research"
 msgstr "Run new research"
 
@@ -2087,7 +2087,7 @@ msgstr "Show less"
 msgid "Show more"
 msgstr "Show more"
 
-#: src/routes/companies/$slug.tsx:1274
+#: src/routes/companies/$slug.tsx:1287
 msgid "Show system events"
 msgstr "Show system events"
 
@@ -2124,7 +2124,7 @@ msgstr "Signing in…"
 msgid "Signing out…"
 msgstr "Signing out…"
 
-#: src/components/research/findings/company-enrichment-view.tsx:73
+#: src/components/research/findings/company-enrichment-view.tsx:77
 #: src/routes/companies/$slug.tsx:924
 msgid "Size"
 msgstr "Size"
@@ -2181,11 +2181,11 @@ msgstr "Spend"
 msgid "Stamped into the workshop ledger."
 msgstr "Stamped into the workshop ledger."
 
-#: src/components/research/research-dialog.tsx:178
+#: src/components/research/research-dialog.tsx:183
 msgid "Start"
 msgstr "Start"
 
-#: src/components/research/research-dialog.tsx:178
+#: src/components/research/research-dialog.tsx:183
 msgid "Starting…"
 msgstr "Starting…"
 
@@ -2208,7 +2208,7 @@ msgstr "Status update failed"
 msgid "Stored encrypted with AES-256-GCM."
 msgstr "Stored encrypted with AES-256-GCM."
 
-#: src/components/research/findings/competitor-scan-view.tsx:133
+#: src/components/research/findings/competitor-scan-view.tsx:134
 msgid "Strengths"
 msgstr "Strengths"
 
@@ -2229,7 +2229,7 @@ msgstr "Switch organization"
 msgid "System"
 msgstr "System"
 
-#: src/components/research/findings/company-enrichment-view.tsx:127
+#: src/components/research/findings/company-enrichment-view.tsx:131
 #: src/routes/companies/$slug.tsx:962
 msgid "Tags"
 msgstr "Tags"
@@ -2375,7 +2375,7 @@ msgstr "Thread not found"
 msgid "Time range"
 msgstr "Time range"
 
-#: src/routes/companies/$slug.tsx:1263
+#: src/routes/companies/$slug.tsx:1276
 msgid "Timeline"
 msgstr "Timeline"
 
@@ -2397,7 +2397,7 @@ msgstr "To"
 msgid "Today"
 msgstr "Today"
 
-#: src/components/research/findings/competitor-scan-view.tsx:70
+#: src/components/research/findings/competitor-scan-view.tsx:71
 msgid "Total competitors"
 msgstr "Total competitors"
 
@@ -2491,7 +2491,7 @@ msgstr "Views"
 msgid "Visit"
 msgstr "Visit"
 
-#: src/components/research/findings/competitor-scan-view.tsx:147
+#: src/components/research/findings/competitor-scan-view.tsx:148
 msgid "Weaknesses"
 msgstr "Weaknesses"
 
@@ -2500,7 +2500,7 @@ msgstr "Weaknesses"
 msgid "What"
 msgstr "What"
 
-#: src/components/research/research-dialog.tsx:127
+#: src/components/research/research-dialog.tsx:132
 msgid "What do you want to find out about this company?"
 msgstr "What do you want to find out about this company?"
 
