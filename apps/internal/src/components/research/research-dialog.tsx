@@ -1,7 +1,7 @@
 import { useAtomSet } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { X } from 'lucide-react'
-import { type FormEvent, useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import styled from 'styled-components'
 
 import { PriButton, PriDialog, PriInput, PriSelect } from '@batuda/ui/pri'
@@ -47,42 +47,47 @@ export function ResearchDialog({
 
 	const canSubmit = query.trim().length > 0 && !submitting
 
-	const handleSubmit = useCallback(
-		async (event: FormEvent<HTMLFormElement>) => {
-			event.preventDefault()
-			if (!canSubmit) return
-			setSubmitting(true)
-			setErrorMessage(null)
+	// React 19 form action: queued through hydration so the button click
+	// can't race the listener registration. Using onSubmit on its own
+	// would let the browser's default submit fire on a pre-hydration
+	// click, which navigates the page and closes the dialog mid-test.
+	const handleAction = useCallback(async () => {
+		if (!canSubmit) return
+		setSubmitting(true)
+		setErrorMessage(null)
 
-			const exit = await createResearch({
-				payload: {
-					query: query.trim(),
-					schema_name: schema,
-					subject: { table: 'companies', id: companyId },
+		// `context.subjects` is the schema-correct path; the dialog used
+		// to send a top-level `subject` which fails validation server-side
+		// and leaves the dialog stuck open.
+		const exit = await createResearch({
+			payload: {
+				query: query.trim(),
+				schema_name: schema,
+				context: {
+					subjects: [{ table: 'companies', id: companyId }],
 				},
-			} as never)
+			},
+		} as never)
 
-			if (exit._tag === 'Success') {
-				const value = exit.value as Record<string, unknown> | null
-				const newId = typeof value?.['id'] === 'string' ? value['id'] : null
-				if (newId !== null && onCreated) onCreated(newId)
-				onOpenChange(false)
-				return
-			}
-			setErrorMessage(t`Could not start the research run. Please try again.`)
-			setSubmitting(false)
-		},
-		[
-			canSubmit,
-			createResearch,
-			query,
-			schema,
-			companyId,
-			onCreated,
-			onOpenChange,
-			t,
-		],
-	)
+		if (exit._tag === 'Success') {
+			const value = exit.value as Record<string, unknown> | null
+			const newId = typeof value?.['id'] === 'string' ? value['id'] : null
+			if (newId !== null && onCreated) onCreated(newId)
+			onOpenChange(false)
+			return
+		}
+		setErrorMessage(t`Could not start the research run. Please try again.`)
+		setSubmitting(false)
+	}, [
+		canSubmit,
+		createResearch,
+		query,
+		schema,
+		companyId,
+		onCreated,
+		onOpenChange,
+		t,
+	])
 
 	return (
 		<PriDialog.Root
@@ -114,7 +119,7 @@ export function ResearchDialog({
 						/>
 					</Header>
 
-					<Form onSubmit={handleSubmit} data-testid='research-dialog-form'>
+					<Form action={handleAction} data-testid='research-dialog-form'>
 						<Field>
 							<Label htmlFor='research-query'>
 								<Trans>Question</Trans>
