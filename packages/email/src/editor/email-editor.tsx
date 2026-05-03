@@ -135,13 +135,29 @@ export const EmailEditor = (props: EmailEditorProps) => {
 	)
 	const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-	const flush = useCallback(
+	// Two-phase change pipeline:
+	//   1. Synchronous onChange fires `{ json, text, html: '' }` on every
+	//      doc transition so consumers (canSend gates, draft auto-save)
+	//      see typing immediately. The previous 300ms debounce around
+	//      everything caused the consumer's body text to stay '' for
+	//      the lifetime of the form whenever any upstream React identity
+	//      flipped during the debounce window — the cleanup ran every
+	//      render and reset the timer before it could ever fire.
+	//   2. Debounced async pass calls `@react-email/render` and re-fires
+	//      onChange with the final html. Slow but only the html consumer
+	//      needs to wait for it; canSend just needs `text`.
+	const flushSync = useCallback(
 		(next: TiptapDoc) => {
 			const blocks = enforceModePalette(tiptapToEmailBlocks(next), mode)
-			// renderBlocks is async (react-email's render is async), but the
-			// editor onChange cycle needs a synchronous snapshot. We fire the
-			// async render and call onChange when it resolves — the consumer
-			// debounce in compose-form already expects eventual consistency.
+			const text = blocksToPlainText(blocks)
+			onChange({ json: blocks, html: '', text })
+		},
+		[mode, onChange],
+	)
+
+	const flushHtml = useCallback(
+		(next: TiptapDoc) => {
+			const blocks = enforceModePalette(tiptapToEmailBlocks(next), mode)
 			render(
 				createElement(AgentEmail, {
 					blocks,
@@ -149,21 +165,35 @@ export const EmailEditor = (props: EmailEditorProps) => {
 					signOff,
 				}),
 				{ pretty: false },
-			).then(html => {
-				const text = blocksToPlainText(blocks)
-				onChange({ json: blocks, html, text })
-			})
+			).then(
+				html => {
+					const text = blocksToPlainText(blocks)
+					onChange({ json: blocks, html, text })
+				},
+				err => {
+					// react-email's render rejects on unsupported markup or
+					// internal errors; without a catch the promise's
+					// rejection silently swallowed the onChange call. The
+					// sync pass above already gave the consumer a usable
+					// `text` snapshot, so we just log and bail.
+					console.error('[EmailEditor] render failed:', err)
+				},
+			)
 		},
 		[mode, onChange, signOff],
 	)
 
 	useEffect(() => {
+		flushSync(doc)
+	}, [doc, flushSync])
+
+	useEffect(() => {
 		if (debounceRef.current) clearTimeout(debounceRef.current)
-		debounceRef.current = setTimeout(() => flush(doc), debounceMs)
+		debounceRef.current = setTimeout(() => flushHtml(doc), debounceMs)
 		return () => {
 			if (debounceRef.current) clearTimeout(debounceRef.current)
 		}
-	}, [doc, debounceMs, flush])
+	}, [doc, debounceMs, flushHtml])
 
 	return (
 		<EmailEditorBridge

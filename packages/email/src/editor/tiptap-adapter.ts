@@ -123,12 +123,34 @@ const linkNode = (span: LinkSpan): TiptapNode => {
 // Tiptap doc → EmailBlocks
 // ────────────────────────────────────────────────────────────────────
 
+// `@react-email/editor` wraps the user-editable content inside its
+// own layout nodes (`globalContent` for theme styles, `container` for
+// the editable surface, etc.) — those don't correspond to email
+// blocks themselves but their descendants do. Walk through them
+// recursively instead of stopping at the top level, otherwise the
+// adapter returns an empty `EmailBlocks` for every doc the editor
+// produces and the consumer's `bodyText` stays '' forever.
+const WRAPPER_NODE_TYPES = new Set([
+	'container',
+	'columns',
+	'column',
+	'globalContent',
+	'section',
+])
+
 export const tiptapToEmailBlocks = (doc: TiptapDoc): EmailBlocks => {
 	const blocks: EmailBlock[] = []
-	for (const node of doc.content ?? []) {
-		const block = nodeToBlock(node)
-		if (block) blocks.push(block)
+	const visit = (nodes: ReadonlyArray<TiptapNode>): void => {
+		for (const node of nodes) {
+			if (WRAPPER_NODE_TYPES.has(node.type)) {
+				visit(node.content ?? [])
+				continue
+			}
+			const block = nodeToBlock(node)
+			if (block) blocks.push(block)
+		}
 	}
+	visit(doc.content ?? [])
 	return blocks
 }
 

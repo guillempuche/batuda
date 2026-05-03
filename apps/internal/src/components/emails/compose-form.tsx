@@ -97,22 +97,44 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 
 	const effectiveInboxId = form.inboxId ?? defaultInboxId
 
+	// `serverId` is mirrored from the ref into state so `canSend`'s
+	// useMemo re-runs when createDraft resolves -- refs aren't dep-
+	// tracked. The ref stays as the synchronous source of truth for
+	// debouncedSave + handleSend, which run inside callbacks that
+	// don't need React to re-render to read it.
+	const [serverId, setServerId] = useState<string | null>(draft.serverId)
 	const serverIdRef = useRef<string | null>(draft.serverId)
 	const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 	const mountedRef = useRef(true)
-	useEffect(
-		() => () => {
+	// Sentinel against StrictMode's double useEffect invocation. The
+	// createDraftAtom is module-scoped (one mutation atom shared by
+	// every ComposeForm), so a second call before the first resolves
+	// fires a parallel POST whose Promise<Exit> can race with the
+	// first -- both .then handlers subscribe to the same atom-state
+	// transition via AtomRegistry.getResult. Server logs corroborate
+	// with paired 200 + 499 (InterruptError) entries. Setting this
+	// flag inside the effect body ensures only one POST goes out.
+	const draftCreationStartedRef = useRef(false)
+	// Reset on every effect run + tear down on cleanup. The previous
+	// "() => () => false" shape only flipped to false in cleanup and
+	// never re-asserted true on the StrictMode re-run, leaving the
+	// createDraft `.then` handler convinced the form had unmounted
+	// and skipping the setServerId call.
+	useEffect(() => {
+		mountedRef.current = true
+		return () => {
 			mountedRef.current = false
-		},
-		[],
-	)
+		}
+	}, [])
 
 	// Create server draft on mount if none exists
 	useEffect(() => {
+		if (draftCreationStartedRef.current) return
 		if (serverIdRef.current !== null) return
 		const inboxId = effectiveInboxId
 		if (inboxId === null) return
 
+		draftCreationStartedRef.current = true
 		updateMeta(draft.id, { saving: true })
 
 		const params: Record<string, unknown> = { inboxId }
@@ -127,11 +149,14 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 			if (!mountedRef.current) return
 			if (exit._tag === 'Success') {
 				const result = exit.value as Record<string, unknown> | null
-				const serverId =
+				const id =
 					typeof result?.['draftId'] === 'string' ? result['draftId'] : null
-				serverIdRef.current = serverId
-				updateMeta(draft.id, { serverId, saving: false })
+				serverIdRef.current = id
+				setServerId(id)
+				updateMeta(draft.id, { serverId: id, saving: false })
 			} else {
+				// Reset the sentinel so a later inboxId change can retry.
+				draftCreationStartedRef.current = false
 				updateMeta(draft.id, { saving: false })
 			}
 		})
@@ -203,6 +228,19 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 		[draft.id, debouncedSave, updateMeta],
 	)
 
+	// Stable callback for the body editor. Inline `onChange={...}` would
+	// give EmailEditor a fresh reference every render -- and the editor
+	// keys its 300ms onChange debounce on the callback identity, so the
+	// timer would clear and reset on every parent render and never
+	// actually fire `onChange`. The compose form's `bodyText` then stays
+	// pinned at '' and `canSend` blocks Send forever.
+	const handleBodyChange = useCallback(
+		(payload: { json: EmailBlocks; text: string }) => {
+			patchForm({ bodyJson: payload.json, bodyText: payload.text })
+		},
+		[patchForm],
+	)
+
 	const [ccBccOpen, setCcBccOpen] = useState(false)
 	const [sendState, setSendState] = useState<SendState>('idle')
 	const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -214,14 +252,22 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 		if (sendState === 'sending') return false
 		if (form.bodyText.trim() === '') return false
 		if (suppressed.length > 0) return false
-		if (serverIdRef.current === null) return false
+		if (serverId === null) return false
 		if (draft.mode === 'reply') {
 			return draft.threadId !== undefined
 		}
 		if (effectiveInboxId === null) return false
 		if (form.to.trim() === '') return false
 		return true
-	}, [sendState, form.bodyText, form.to, suppressed, effectiveInboxId, draft])
+	}, [
+		sendState,
+		form.bodyText,
+		form.to,
+		suppressed,
+		effectiveInboxId,
+		draft,
+		serverId,
+	])
 
 	const handleSend = useCallback(async () => {
 		const serverId = serverIdRef.current
@@ -391,9 +437,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 					mode='compose'
 					inboxId={effectiveInboxId ?? ''}
 					initialJson={form.bodyJson}
-					onChange={({ json, text }) => {
-						patchForm({ bodyJson: json, bodyText: text })
-					}}
+					onChange={handleBodyChange}
 					placeholder={t`Write your message…`}
 				/>
 			</BodyField>
