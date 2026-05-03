@@ -136,7 +136,7 @@ msgstr "Active client"
 msgid "Active companies"
 msgstr "Active companies"
 
-#: src/components/layout/org-switcher.tsx:78
+#: src/components/layout/org-switcher.tsx:77
 msgid "Active organization"
 msgstr "Active organization"
 
@@ -654,7 +654,7 @@ msgstr "Could not sign in. Check your email and password."
 msgid "Could not start the research run. Please try again."
 msgstr "Could not start the research run. Please try again."
 
-#: src/components/layout/org-switcher.tsx:52
+#: src/components/layout/org-switcher.tsx:49
 msgid "Could not switch organization. Please try again."
 msgstr "Could not switch organization. Please try again."
 
@@ -1356,7 +1356,7 @@ msgstr "Next event"
 msgid "Next: {0}"
 msgstr "Next: {0}"
 
-#: src/components/layout/org-switcher.tsx:69
+#: src/components/layout/org-switcher.tsx:68
 msgid "No active organization"
 msgstr "No active organization"
 
@@ -1388,7 +1388,7 @@ msgstr "No companies match the filters"
 msgid "No companies yet"
 msgstr "No companies yet"
 
-#: src/components/layout/org-switcher.tsx:63
+#: src/components/layout/org-switcher.tsx:62
 #: src/routes/accept-invitation.$id.tsx:97
 #: src/routes/login.tsx:125
 #: src/routes/profile/index.tsx:76
@@ -1607,7 +1607,7 @@ msgstr "Opened"
 msgid "Organization"
 msgstr "Organization"
 
-#: src/components/layout/org-switcher.tsx:108
+#: src/components/layout/org-switcher.tsx:107
 msgid "Organizations"
 msgstr "Organizations"
 
@@ -2221,7 +2221,7 @@ msgstr "Subject"
 msgid "Summary"
 msgstr "Summary"
 
-#: src/components/layout/org-switcher.tsx:93
+#: src/components/layout/org-switcher.tsx:92
 msgid "Switch organization"
 msgstr "Switch organization"
 

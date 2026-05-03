@@ -136,7 +136,7 @@ msgstr "Client actiu"
 msgid "Active companies"
 msgstr "Empreses actives"
 
-#: src/components/layout/org-switcher.tsx:78
+#: src/components/layout/org-switcher.tsx:77
 msgid "Active organization"
 msgstr "Organització activa"
 
@@ -654,7 +654,7 @@ msgstr "No s'ha pogut iniciar sessió. Comprova el correu i la contrasenya."
 msgid "Could not start the research run. Please try again."
 msgstr "No s'ha pogut iniciar la cerca. Torna-ho a provar."
 
-#: src/components/layout/org-switcher.tsx:52
+#: src/components/layout/org-switcher.tsx:49
 msgid "Could not switch organization. Please try again."
 msgstr "No s'ha pogut canviar d'organització. Torna-ho a provar."
 
@@ -1356,7 +1356,7 @@ msgstr "Pròxim esdeveniment"
 msgid "Next: {0}"
 msgstr "Següent: {0}"
 
-#: src/components/layout/org-switcher.tsx:69
+#: src/components/layout/org-switcher.tsx:68
 msgid "No active organization"
 msgstr "Sense organització activa"
 
@@ -1388,7 +1388,7 @@ msgstr "Cap empresa coincideix amb els filtres"
 msgid "No companies yet"
 msgstr "Encara no hi ha empreses"
 
-#: src/components/layout/org-switcher.tsx:63
+#: src/components/layout/org-switcher.tsx:62
 #: src/routes/accept-invitation.$id.tsx:97
 #: src/routes/login.tsx:125
 #: src/routes/profile/index.tsx:76
@@ -1607,7 +1607,7 @@ msgstr "Obert"
 msgid "Organization"
 msgstr "Organització"
 
-#: src/components/layout/org-switcher.tsx:108
+#: src/components/layout/org-switcher.tsx:107
 msgid "Organizations"
 msgstr "Organitzacions"
 
@@ -2221,7 +2221,7 @@ msgstr "Assumpte"
 msgid "Summary"
 msgstr "Resum"
 
-#: src/components/layout/org-switcher.tsx:93
+#: src/components/layout/org-switcher.tsx:92
 msgid "Switch organization"
 msgstr "Canvia d'organització"
 
