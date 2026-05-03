@@ -168,7 +168,9 @@ export const ResearchLive = HttpApiBuilder.group(
 				)
 				.handle('attach', _ =>
 					Effect.gen(function* () {
+						const currentOrg = yield* CurrentOrg
 						yield* svc.attach(
+							currentOrg.id,
 							_.params.id,
 							_.payload.subject_table,
 							_.payload.subject_id,

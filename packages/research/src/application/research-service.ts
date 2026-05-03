@@ -732,10 +732,13 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 									if (!cloned)
 										return { id: cachedId, status: 'succeeded' as const }
 									const clonedId = cloned.id
-									// Clone source attributions from the cached run
+									// Clone source attributions from the cached run.
+									// research_run_sources / research_links are RLS-checked
+									// against `current_setting('app.current_org_id')`, so the
+									// org id has to be in the row, not just on the parent run.
 									yield* sql`
-										INSERT INTO research_run_sources (research_id, source_id, local_ref, fetched_at, cost_cents)
-										SELECT ${clonedId}, source_id, local_ref, fetched_at, 0
+										INSERT INTO research_run_sources (organization_id, research_id, source_id, local_ref, fetched_at, cost_cents)
+										SELECT ${organizationId}, ${clonedId}, source_id, local_ref, fetched_at, 0
 										FROM research_run_sources
 										WHERE research_id = ${cachedId}
 										ON CONFLICT DO NOTHING
@@ -743,8 +746,8 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 									if (input.context?.subjects) {
 										for (const s of input.context.subjects) {
 											yield* sql`
-												INSERT INTO research_links (research_id, subject_table, subject_id, link_kind)
-												VALUES (${clonedId}, ${s.table}, ${s.id}, 'input')
+												INSERT INTO research_links (organization_id, research_id, subject_table, subject_id, link_kind)
+												VALUES (${organizationId}, ${clonedId}, ${s.table}, ${s.id}, 'input')
 												ON CONFLICT DO NOTHING
 											`
 										}
@@ -796,12 +799,13 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						`
 						const researchId = (row as { id: string }).id
 
-						// Link input subjects
+						// Link input subjects. research_links is RLS-checked against
+						// the per-row organization_id, so the column has to be set.
 						if (input.context?.subjects) {
 							for (const s of input.context.subjects) {
 								yield* sql`
-									INSERT INTO research_links (research_id, subject_table, subject_id, link_kind)
-									VALUES (${researchId}, ${s.table}, ${s.id}, 'input')
+									INSERT INTO research_links (organization_id, research_id, subject_table, subject_id, link_kind)
+									VALUES (${organizationId}, ${researchId}, ${s.table}, ${s.id}, 'input')
 									ON CONFLICT DO NOTHING
 								`
 							}
@@ -1026,10 +1030,15 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					`,
 
 				/** Post-hoc attach a subject to a run. */
-				attach: (researchId: string, subjectTable: string, subjectId: string) =>
+				attach: (
+					organizationId: string,
+					researchId: string,
+					subjectTable: string,
+					subjectId: string,
+				) =>
 					sql`
-						INSERT INTO research_links (research_id, subject_table, subject_id, link_kind)
-						VALUES (${researchId}, ${subjectTable}, ${subjectId}, 'finding')
+						INSERT INTO research_links (organization_id, research_id, subject_table, subject_id, link_kind)
+						VALUES (${organizationId}, ${researchId}, ${subjectTable}, ${subjectId}, 'finding')
 						ON CONFLICT DO NOTHING
 					`,
 
