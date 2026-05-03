@@ -8,6 +8,15 @@ export interface AuthEnv {
 	readonly baseURL: string | undefined
 	readonly useSecureCookies: boolean
 	readonly trustedOrigins: ReadonlyArray<string>
+	/**
+	 * `strict` (default) keeps Better Auth's tight 3-attempts-per-10s
+	 * default on `/sign-in/*` so a forgotten-password retry can't be
+	 * brute-forced. `loose` widens it to 200/60s for local dev + e2e
+	 * runs that stack many sign-ins in a single window. Production
+	 * MUST stay on `strict` — flip via `BETTER_AUTH_RATE_LIMIT=loose`
+	 * in dev only.
+	 */
+	readonly rateLimit?: 'strict' | 'loose'
 }
 
 export interface BuildBetterAuthConfigInput<
@@ -107,18 +116,16 @@ export const buildBetterAuthConfig = <Plugins extends BetterAuthPlugin[]>(
 			storage: 'memory' as const,
 			window: 60,
 			max: 100,
-			// Better Auth's default for `/sign-in/*` is 3 attempts per 10s.
-			// That's tight enough to lock out a typical user retrying a
-			// forgotten password three times — and tight enough to fail the
-			// e2e suite, which stacks setup + unauth + cross-org sign-ins
-			// inside the window. Loosen to 50 per 60s: still strong brute-
-			// force protection (a serial attacker takes ~2h to try 100
-			// passwords against a single account) without false positives
-			// for human users or the test suite (slice 1 + slice 3 alone
-			// stack ~12 sign-ins in roughly a minute).
-			customRules: {
-				'/sign-in/email': { window: 60, max: 50 },
-			},
+			// `strict` keeps Better Auth's defaults — production policy.
+			// `loose` widens `/sign-in/email` so the e2e suite (and
+			// developers stacking sign-ins during a debugging session)
+			// stop tripping the brute-force gate. Set explicitly via
+			// `BETTER_AUTH_RATE_LIMIT=loose` in dev only.
+			...(input.env.rateLimit === 'loose' && {
+				customRules: {
+					'/sign-in/email': { window: 60, max: 200 },
+				},
+			}),
 		},
 		advanced: {
 			cookiePrefix: 'batuda',

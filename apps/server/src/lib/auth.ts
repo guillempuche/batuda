@@ -71,6 +71,7 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 					baseURL: env.BETTER_AUTH_BASE_URL,
 					useSecureCookies: !env.BETTER_AUTH_INSECURE_COOKIES,
 					trustedOrigins: env.ALLOWED_ORIGINS,
+					rateLimit: env.BETTER_AUTH_RATE_LIMIT,
 				},
 				pool,
 				plugins: [

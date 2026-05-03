@@ -18,6 +18,14 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 		const BETTER_AUTH_INSECURE_COOKIES = yield* Config.boolean(
 			'BETTER_AUTH_INSECURE_COOKIES',
 		).pipe(Config.withDefault(false))
+		// Defaults to `strict` (Better Auth's tight per-endpoint defaults).
+		// Set to `loose` in dev so the e2e suite, which stacks ~20 sign-ins
+		// in a single 60s window, doesn't trip the brute-force gate. Must
+		// stay strict in prod.
+		const BETTER_AUTH_RATE_LIMIT = yield* Config.schema(
+			Schema.Literals(['strict', 'loose']),
+			'BETTER_AUTH_RATE_LIMIT',
+		).pipe(Config.withDefault('strict' as const))
 		const ALLOWED_ORIGINS = yield* Config.string('ALLOWED_ORIGINS').pipe(
 			Config.withDefault(''),
 			Config.map(s => (s ? s.split(',').map(o => o.trim()) : [])),
@@ -95,6 +103,7 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 			BETTER_AUTH_SECRET,
 			BETTER_AUTH_BASE_URL,
 			BETTER_AUTH_INSECURE_COOKIES,
+			BETTER_AUTH_RATE_LIMIT,
 			ALLOWED_ORIGINS,
 			STORAGE_ENDPOINT,
 			STORAGE_REGION,
