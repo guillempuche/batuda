@@ -1,15 +1,17 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
-import { Config, Effect, Option, Redacted } from 'effect'
+import { Config, Effect, Exit, Option, Redacted } from 'effect'
 import { HttpServerResponse } from 'effect/unstable/http'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
 import { BatudaApi } from '@batuda/controllers'
 
+import { provideOrg } from '../middleware/org'
 import {
 	CalendarService,
 	decodeCalcomWebhookEnvelope,
 } from '../services/calendar'
+import { OrgResolution } from '../services/org-resolution'
 
 // Case-insensitive hex compare in constant time. Cal.com's docs don't
 // promise a casing; `x-cal-signature-256` is the lowercase header name
@@ -30,6 +32,7 @@ export const CalcomWebhookLive = HttpApiBuilder.group(
 	handlers =>
 		Effect.gen(function* () {
 			const svc = yield* CalendarService
+			const orgRes = yield* OrgResolution
 			// Optional at boot so the server still starts when cal.com is not
 			// configured yet; individual webhook requests fail with 503 until
 			// the secret lands. This matches the rest of the stack's
@@ -132,7 +135,36 @@ export const CalcomWebhookLive = HttpApiBuilder.group(
 						)
 					}
 
-					yield* svc.handleCalcomWebhook(envelope).pipe(Effect.orDie)
+					// Resolve the org from the payload BEFORE dispatching: every
+					// SQL write inside `handleCalcomWebhook` (timeline.record,
+					// task INSERTs, calendar_events upserts) yields CurrentOrg
+					// and runs inside provideOrg's RLS-scoped tx.
+					const orgScopeExit = yield* orgRes
+						.resolveOrgForCalcomWebhook(envelope.payload)
+						.pipe(Effect.exit)
+
+					if (Exit.isFailure(orgScopeExit)) {
+						yield* Effect.logWarning('calcom webhook for unknown org').pipe(
+							Effect.annotateLogs({
+								event: 'calcom.webhook.unknown_org',
+								icalUid: envelope.payload.iCalUID,
+								organizerEmail: envelope.payload.organizer?.email ?? null,
+								trigger: envelope.triggerEvent,
+							}),
+						)
+						return HttpServerResponse.jsonUnsafe(
+							{
+								error: 'unknown_org',
+								icalUid: envelope.payload.iCalUID,
+								organizerEmail: envelope.payload.organizer?.email ?? null,
+							},
+							{ status: 422 },
+						)
+					}
+
+					yield* svc
+						.handleCalcomWebhook(envelope)
+						.pipe(provideOrg(orgScopeExit.value), Effect.orDie)
 					return HttpServerResponse.jsonUnsafe({ ok: true })
 				}),
 			)
