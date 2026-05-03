@@ -75,12 +75,15 @@ test.describe('org spend dashboard', () => {
 		}
 	})
 
-	test.beforeEach(async ({ page }) => {
-		await page.goto('/', { waitUntil: 'commit' })
-		await setActiveOrgBySlug(page, 'taller')
-	})
-
 	test.describe('when the active user is an owner', () => {
+		// Storage state from auth.setup.ts is Alice's; the activeOrg flip
+		// must run BEFORE each test so the dashboard renders against
+		// taller's seeded paid_spend rows.
+		test.beforeEach(async ({ page }) => {
+			await page.goto('/', { waitUntil: 'commit' })
+			await setActiveOrgBySlug(page, 'taller')
+		})
+
 		test('should render the Spend nav row on the org settings landing', async ({
 			page,
 		}) => {
@@ -144,6 +147,11 @@ test.describe('org spend dashboard', () => {
 	})
 
 	test.describe('when the active user is a regular member', () => {
+		// Drop Alice's storageState for this case so the explicit Carol
+		// sign-in below isn't bounced by the already-authed redirect in
+		// __root.tsx → /login.
+		test.use({ storageState: { cookies: [], origins: [] } })
+
 		test('should hide the Spend nav row on the org settings landing', async ({
 			page,
 		}) => {
