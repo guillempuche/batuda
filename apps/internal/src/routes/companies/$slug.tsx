@@ -1177,19 +1177,32 @@ function DetailBody({
 					<PanelWrap>
 						<ResearchPanelLayout>
 							<ResearchPanelHeader>
-								<PriButton
-									type='button'
-									$variant='filled'
-									data-testid='research-run-new'
-									onClick={() => {
+								{/* React 19 form actions are pre-hydration safe: SSR
+								    injects an `addEventListener("submit", …)` script
+								    that buffers submits into `document.$$reactFormReplay`,
+								    and React replays them once the action handler is
+								    wired (see node_modules/react-dom/cjs/
+								    react-dom-server.browser.development.js:9926-9945
+								    + react-dom-client at the corresponding replay
+								    site). A bare onClick has no equivalent buffer
+								    outside of suspense boundaries, so e2e clicks land
+								    on the unhydrated button and the dialog never opens. */}
+								<form
+									action={() => {
 										setResearchDialogOpen(true)
 									}}
 								>
-									<Plus size={14} aria-hidden />
-									<span>
-										<Trans>Run new research</Trans>
-									</span>
-								</PriButton>
+									<PriButton
+										type='submit'
+										$variant='filled'
+										data-testid='research-run-new'
+									>
+										<Plus size={14} aria-hidden />
+										<span>
+											<Trans>Run new research</Trans>
+										</span>
+									</PriButton>
+								</form>
 							</ResearchPanelHeader>
 							<ResearchPanelBody>
 								<RunList
