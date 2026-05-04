@@ -21,7 +21,7 @@
 		"dotenv": "^16.4.7",
 		"effect": "4.0.0-beta.43",
 		"kysely": "^0.28.15",
-		"nodemailer": "^8.0.6",
+		"nodemailer": "^8.0.7",
 		"pg": "^8.20.0",
 		"picocolors": "^1.1.1"
 	},

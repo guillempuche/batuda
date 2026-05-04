@@ -23,7 +23,9 @@
 	"devDependencies": {
 		"@types/mailparser": "^3.4.6",
 		"@types/node": "^22.15.0",
+		"@types/nodemailer": "^8.0.0",
 		"@types/pg": "^8.20.0",
+		"nodemailer": "^8.0.7",
 		"tsdown": "^0.21.7",
 		"tsx": "^4.20.3",
 		"typescript": "^5.9.3",
