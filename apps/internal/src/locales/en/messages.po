@@ -156,7 +156,7 @@ msgstr "Add a location on the Profile tab, then locate this company."
 msgid "Add attachment"
 msgstr "Add attachment"
 
-#: src/components/emails/compose-form.tsx:387
+#: src/components/emails/compose-form.tsx:424
 msgid "Add Cc / Bcc"
 msgstr "Add Cc / Bcc"
 
@@ -275,7 +275,7 @@ msgstr "Batuda home"
 msgid "Batuda is invite-only. Request access from the Engranatge team."
 msgstr "Batuda is invite-only. Request access from the Engranatge team."
 
-#: src/components/emails/compose-form.tsx:404
+#: src/components/emails/compose-form.tsx:441
 msgid "Bcc"
 msgstr "Bcc"
 
@@ -291,7 +291,7 @@ msgstr "Blocked by the provider. The body is shown for review only."
 msgid "Book a meeting from a company page or forward an invitation to your inbox to see it here."
 msgstr "Book a meeting from a company page or forward an invitation to your inbox to see it here."
 
-#: src/components/emails/compose-form.tsx:466
+#: src/components/emails/compose-form.tsx:503
 msgid "bounced"
 msgstr "bounced"
 
@@ -359,7 +359,7 @@ msgstr "Cancel"
 msgid "Cancel upload"
 msgstr "Cancel upload"
 
-#: src/components/emails/compose-form.tsx:392
+#: src/components/emails/compose-form.tsx:429
 #: src/routes/emails/$threadId.tsx:564
 msgid "Cc"
 msgstr "Cc"
@@ -466,8 +466,8 @@ msgstr "Collapse"
 msgid "Columns"
 msgstr "Columns"
 
-#: src/components/emails/compose-form.tsx:397
-#: src/components/emails/compose-form.tsx:409
+#: src/components/emails/compose-form.tsx:434
+#: src/components/emails/compose-form.tsx:446
 msgid "Comma-separated"
 msgstr "Comma-separated"
 
@@ -491,7 +491,7 @@ msgstr "Company"
 msgid "Competitors"
 msgstr "Competitors"
 
-#: src/components/emails/compose-form.tsx:466
+#: src/components/emails/compose-form.tsx:503
 msgid "complained"
 msgstr "complained"
 
@@ -774,7 +774,7 @@ msgstr "Direction"
 msgid "Disabled"
 msgstr "Disabled"
 
-#: src/components/emails/compose-form.tsx:508
+#: src/components/emails/compose-form.tsx:545
 msgid "Discard"
 msgstr "Discard"
 
@@ -1017,7 +1017,7 @@ msgstr "Inbound and outbound emails will pin to this board once a thread exists.
 msgid "Inbound message from {0}"
 msgstr "Inbound message from {0}"
 
-#: src/components/emails/compose-form.tsx:333
+#: src/components/emails/compose-form.tsx:370
 #: src/routes/emails/$threadId.tsx:411
 #: src/routes/emails/$threadId.tsx:451
 msgid "Inbox"
@@ -1287,7 +1287,7 @@ msgstr "Member"
 msgid "Members"
 msgstr "Members"
 
-#: src/components/emails/compose-form.tsx:435
+#: src/components/emails/compose-form.tsx:472
 msgid "Message"
 msgstr "Message"
 
@@ -1315,7 +1315,7 @@ msgstr "msgs"
 msgid "Name"
 msgstr "Name"
 
-#: src/components/emails/compose-form.tsx:371
+#: src/components/emails/compose-form.tsx:408
 msgid "name@example.com, another@example.com"
 msgstr "name@example.com, another@example.com"
 
@@ -1985,7 +1985,7 @@ msgstr "Save"
 msgid "Save failed"
 msgstr "Save failed"
 
-#: src/components/emails/compose-form.tsx:510
+#: src/components/emails/compose-form.tsx:547
 #: src/routes/emails/inboxes.tsx:1462
 #: src/routes/pages/$id.tsx:245
 msgid "Saving…"
@@ -2015,7 +2015,7 @@ msgstr "See who can access this workspace."
 msgid "Select all threads on this page"
 msgstr "Select all threads on this page"
 
-#: src/components/emails/compose-form.tsx:341
+#: src/components/emails/compose-form.tsx:378
 msgid "Select inbox…"
 msgstr "Select inbox…"
 
@@ -2028,7 +2028,7 @@ msgstr "Select thread {0}"
 msgid "Selecting a preset fills IMAP and SMTP defaults — you can still edit them."
 msgstr "Selecting a preset fills IMAP and SMTP defaults — you can still edit them."
 
-#: src/components/emails/compose-form.tsx:497
+#: src/components/emails/compose-form.tsx:534
 msgid "Send"
 msgstr "Send"
 
@@ -2040,7 +2040,7 @@ msgstr "Send a one-click invitation. The recipient signs in via the link in the 
 msgid "Send a one-click sign-in link to a teammate."
 msgstr "Send a one-click sign-in link to a teammate."
 
-#: src/components/emails/compose-form.tsx:460
+#: src/components/emails/compose-form.tsx:497
 msgid "Send blocked: these recipients cannot receive email"
 msgstr "Send blocked: these recipients cannot receive email"
 
@@ -2052,7 +2052,7 @@ msgstr "Send email"
 msgid "Send invitation"
 msgstr "Send invitation"
 
-#: src/components/emails/compose-form.tsx:497
+#: src/components/emails/compose-form.tsx:534
 #: src/routes/settings/organization/invite.tsx:179
 msgid "Sending…"
 msgstr "Sending…"
@@ -2212,7 +2212,7 @@ msgstr "Stored encrypted with AES-256-GCM."
 msgid "Strengths"
 msgstr "Strengths"
 
-#: src/components/emails/compose-form.tsx:420
+#: src/components/emails/compose-form.tsx:457
 #: src/components/interactions/quick-capture-dialog.tsx:306
 msgid "Subject"
 msgstr "Subject"
@@ -2387,7 +2387,7 @@ msgstr "Title"
 msgid "TLS"
 msgstr "TLS"
 
-#: src/components/emails/compose-form.tsx:365
+#: src/components/emails/compose-form.tsx:402
 #: src/routes/emails/$threadId.tsx:541
 msgid "To"
 msgstr "To"
@@ -2508,7 +2508,7 @@ msgstr "What do you want to find out about this company?"
 msgid "What happened?"
 msgstr "What happened?"
 
-#: src/components/emails/compose-form.tsx:426
+#: src/components/emails/compose-form.tsx:463
 msgid "What is this about?"
 msgstr "What is this about?"
 
@@ -2544,7 +2544,7 @@ msgstr "Workshop floor — live counters on the bench."
 msgid "Write footer…"
 msgstr "Write footer…"
 
-#: src/components/emails/compose-form.tsx:441
+#: src/components/emails/compose-form.tsx:478
 msgid "Write your message…"
 msgstr "Write your message…"
 

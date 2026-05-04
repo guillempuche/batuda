@@ -156,7 +156,7 @@ msgstr "Afegeix una ubicació a la pestanya de perfil i després localitza aques
 msgid "Add attachment"
 msgstr "Afegeix adjunt"
 
-#: src/components/emails/compose-form.tsx:387
+#: src/components/emails/compose-form.tsx:424
 msgid "Add Cc / Bcc"
 msgstr "Afegeix Cc / Bcc"
 
@@ -275,7 +275,7 @@ msgstr "Inici de Batuda"
 msgid "Batuda is invite-only. Request access from the Engranatge team."
 msgstr "Batuda és només amb invitació. Demana accés a l'equip d'Engranatge."
 
-#: src/components/emails/compose-form.tsx:404
+#: src/components/emails/compose-form.tsx:441
 msgid "Bcc"
 msgstr "Bcc"
 
@@ -291,7 +291,7 @@ msgstr "Bloquejat pel proveïdor. El cos es mostra només per revisar-lo."
 msgid "Book a meeting from a company page or forward an invitation to your inbox to see it here."
 msgstr "Reserva una reunió des d'una pàgina d'empresa o reenvia una invitació a la teva safata per veure-la aquí."
 
-#: src/components/emails/compose-form.tsx:466
+#: src/components/emails/compose-form.tsx:503
 msgid "bounced"
 msgstr "rebotat"
 
@@ -359,7 +359,7 @@ msgstr "Cancel·la"
 msgid "Cancel upload"
 msgstr "Cancel·la la pujada"
 
-#: src/components/emails/compose-form.tsx:392
+#: src/components/emails/compose-form.tsx:429
 #: src/routes/emails/$threadId.tsx:564
 msgid "Cc"
 msgstr "Cc"
@@ -466,8 +466,8 @@ msgstr "Plega"
 msgid "Columns"
 msgstr "Columnes"
 
-#: src/components/emails/compose-form.tsx:397
-#: src/components/emails/compose-form.tsx:409
+#: src/components/emails/compose-form.tsx:434
+#: src/components/emails/compose-form.tsx:446
 msgid "Comma-separated"
 msgstr "Separats per comes"
 
@@ -491,7 +491,7 @@ msgstr "Empresa"
 msgid "Competitors"
 msgstr "Competidors"
 
-#: src/components/emails/compose-form.tsx:466
+#: src/components/emails/compose-form.tsx:503
 msgid "complained"
 msgstr "marcat com a brossa"
 
@@ -774,7 +774,7 @@ msgstr "Direcció"
 msgid "Disabled"
 msgstr "Desactivada"
 
-#: src/components/emails/compose-form.tsx:508
+#: src/components/emails/compose-form.tsx:545
 msgid "Discard"
 msgstr "Descarta"
 
@@ -1017,7 +1017,7 @@ msgstr "Els correus entrants i sortints es fixaran en aquest tauler un cop exist
 msgid "Inbound message from {0}"
 msgstr "Missatge entrant de {0}"
 
-#: src/components/emails/compose-form.tsx:333
+#: src/components/emails/compose-form.tsx:370
 #: src/routes/emails/$threadId.tsx:411
 #: src/routes/emails/$threadId.tsx:451
 msgid "Inbox"
@@ -1287,7 +1287,7 @@ msgstr "Membre"
 msgid "Members"
 msgstr "Membres"
 
-#: src/components/emails/compose-form.tsx:435
+#: src/components/emails/compose-form.tsx:472
 msgid "Message"
 msgstr "Missatge"
 
@@ -1315,7 +1315,7 @@ msgstr "missatges"
 msgid "Name"
 msgstr "Nom"
 
-#: src/components/emails/compose-form.tsx:371
+#: src/components/emails/compose-form.tsx:408
 msgid "name@example.com, another@example.com"
 msgstr "nom@exemple.cat, altre@exemple.cat"
 
@@ -1985,7 +1985,7 @@ msgstr "Desa"
 msgid "Save failed"
 msgstr "Ha fallat el desament"
 
-#: src/components/emails/compose-form.tsx:510
+#: src/components/emails/compose-form.tsx:547
 #: src/routes/emails/inboxes.tsx:1462
 #: src/routes/pages/$id.tsx:245
 msgid "Saving…"
@@ -2015,7 +2015,7 @@ msgstr "Veure qui té accés a aquest espai de treball."
 msgid "Select all threads on this page"
 msgstr "Selecciona tots els fils d'aquesta pàgina"
 
-#: src/components/emails/compose-form.tsx:341
+#: src/components/emails/compose-form.tsx:378
 msgid "Select inbox…"
 msgstr "Tria una safata…"
 
@@ -2028,7 +2028,7 @@ msgstr "Selecciona el fil {0}"
 msgid "Selecting a preset fills IMAP and SMTP defaults — you can still edit them."
 msgstr "Triar un preestablit omple els paràmetres IMAP i SMTP — encara els pots editar."
 
-#: src/components/emails/compose-form.tsx:497
+#: src/components/emails/compose-form.tsx:534
 msgid "Send"
 msgstr "Envia"
 
@@ -2040,7 +2040,7 @@ msgstr "Envia una invitació d'''un clic. El destinatari inicia sessió mitjanç
 msgid "Send a one-click sign-in link to a teammate."
 msgstr "Envia un enllaç d'''inici de sessió d'''un clic a un company."
 
-#: src/components/emails/compose-form.tsx:460
+#: src/components/emails/compose-form.tsx:497
 msgid "Send blocked: these recipients cannot receive email"
 msgstr "Enviament bloquejat: aquests destinataris no poden rebre correu"
 
@@ -2052,7 +2052,7 @@ msgstr "Envia correu"
 msgid "Send invitation"
 msgstr "Envia invitació"
 
-#: src/components/emails/compose-form.tsx:497
+#: src/components/emails/compose-form.tsx:534
 #: src/routes/settings/organization/invite.tsx:179
 msgid "Sending…"
 msgstr "Enviant…"
@@ -2212,7 +2212,7 @@ msgstr "Es desa xifrada amb AES-256-GCM."
 msgid "Strengths"
 msgstr "Punts forts"
 
-#: src/components/emails/compose-form.tsx:420
+#: src/components/emails/compose-form.tsx:457
 #: src/components/interactions/quick-capture-dialog.tsx:306
 msgid "Subject"
 msgstr "Assumpte"
@@ -2387,7 +2387,7 @@ msgstr "Títol"
 msgid "TLS"
 msgstr "TLS"
 
-#: src/components/emails/compose-form.tsx:365
+#: src/components/emails/compose-form.tsx:402
 #: src/routes/emails/$threadId.tsx:541
 msgid "To"
 msgstr "Per a"
@@ -2508,7 +2508,7 @@ msgstr "Què vols saber d'aquesta empresa?"
 msgid "What happened?"
 msgstr "Què ha passat?"
 
-#: src/components/emails/compose-form.tsx:426
+#: src/components/emails/compose-form.tsx:463
 msgid "What is this about?"
 msgstr "De què tracta?"
 
@@ -2544,7 +2544,7 @@ msgstr "Planta del taller — comptadors en viu al banc."
 msgid "Write footer…"
 msgstr "Escriu el peu de pàgina…"
 
-#: src/components/emails/compose-form.tsx:441
+#: src/components/emails/compose-form.tsx:478
 msgid "Write your message…"
 msgstr "Escriu el teu missatge…"
 
