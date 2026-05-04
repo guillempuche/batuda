@@ -17,6 +17,20 @@ export const rawMessageKey = (args: {
 }): string =>
 	`messages/${args.organizationId}/${args.inboxId}/${args.uidValidity}/${args.uid}.eml`
 
+// Per-attachment object key. Sibling of the raw RFC822 under the same
+// message prefix, so a download is one GET (the read path never reaches
+// for the parser). Index is the parsed-multipart position; the .bin
+// suffix is opaque on the wire — the response Content-Type comes from
+// the attachments JSONB metadata.
+export const attachmentKey = (args: {
+	readonly organizationId: string
+	readonly inboxId: string
+	readonly uidValidity: number
+	readonly uid: number
+	readonly index: number
+}): string =>
+	`messages/${args.organizationId}/${args.inboxId}/${args.uidValidity}/${args.uid}/attachment-${args.index}.bin`
+
 export class RawMessageStorage extends ServiceMap.Service<RawMessageStorage>()(
 	'RawMessageStorage',
 	{
@@ -48,6 +62,22 @@ export class RawMessageStorage extends ServiceMap.Service<RawMessageStorage>()(
 						catch: err =>
 							new Error(
 								`storage.putRaw failed for ${key}: ${err instanceof Error ? err.message : String(err)}`,
+							),
+					}),
+				putAttachment: (key: string, body: Uint8Array, contentType: string) =>
+					Effect.tryPromise({
+						try: () =>
+							client.send(
+								new PutObjectCommand({
+									Bucket: bucket,
+									Key: key,
+									Body: Buffer.from(body),
+									ContentType: contentType,
+								}),
+							),
+						catch: err =>
+							new Error(
+								`storage.putAttachment failed for ${key}: ${err instanceof Error ? err.message : String(err)}`,
 							),
 					}),
 			} as const

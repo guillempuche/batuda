@@ -435,6 +435,11 @@ export default Effect.gen(function* () {
 	// text/html bodies live inline for fast list/thread reads.
 	// Default recipients shape is { to, cc, bcc } — JSONB snapshot for
 	// compose UI; queryable index lives in message_participants.
+	// attachments JSONB is a metadata-only array; each entry's storageKey
+	// points at a sibling object next to raw_rfc822_ref so downloads are
+	// a single GET, not a parse-on-demand. deleted_at flips to now() when
+	// IMAP EXPUNGE removes the message — the row stays so thread history
+	// survives a remote delete; reads do not filter on it.
 	yield* sql`
 		CREATE TABLE IF NOT EXISTS email_messages (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -456,6 +461,7 @@ export default Effect.gen(function* () {
 			text_preview TEXT,
 			text_body TEXT,
 			html_body TEXT,
+			attachments JSONB NOT NULL DEFAULT '[]'::jsonb,
 
 			company_id UUID REFERENCES companies(id) ON DELETE SET NULL,
 			contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
@@ -467,6 +473,7 @@ export default Effect.gen(function* () {
 			bounce_sub_type TEXT,
 			inbound_classification TEXT CHECK (inbound_classification IN ('normal','spam','blocked')),
 			status_updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			deleted_at TIMESTAMPTZ,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		)

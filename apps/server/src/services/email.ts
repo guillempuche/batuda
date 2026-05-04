@@ -209,6 +209,32 @@ const draftRowToProviderShape = (row: {
 	...(row.inReplyTo !== null && { inReplyTo: row.inReplyTo }),
 })
 
+// Strip server-internal fields from the attachments JSONB before a row
+// crosses the API boundary. The DB column carries `storageKey` (where the
+// bytes live in object storage) — that's a worker-implementation detail
+// the client must not see. The wire shape matches AttachmentMeta in
+// apps/internal/src/routes/emails/$threadId.tsx: attachmentId is the
+// JSONB array index as a string so the download URL resolves back via
+// EmailService.streamAttachment.
+const projectAttachmentsForWire = <T extends Record<string, unknown>>(
+	row: T,
+): T => {
+	const raw = row['attachments']
+	if (!Array.isArray(raw)) return row
+	const projected = raw.map(a => {
+		const r = a as Record<string, unknown>
+		return {
+			attachmentId: String(r['index'] ?? ''),
+			filename: r['filename'],
+			size: r['sizeBytes'],
+			contentType: r['contentType'],
+			cid: r['cid'],
+			isInline: r['isInline'],
+		}
+	})
+	return { ...row, attachments: projected }
+}
+
 // Vendor-neutral mailbox presets surfaced to the connect-mailbox UI. Adding a
 // new entry requires no code beyond appending to this list — fields are the
 // same shape as the createInbox payload.
@@ -1056,6 +1082,15 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							textBody: string | null
 							htmlBody: string | null
 							recipients: { to?: string[]; cc?: string[]; bcc?: string[] }
+							attachments: ReadonlyArray<{
+								index: number
+								filename: string
+								contentType: string
+								sizeBytes: number
+								cid: string | null
+								isInline: boolean
+								storageKey: string
+							}>
 							status: 'normal' | 'spam' | 'blocked' | 'bounced'
 							statusReason: string | null
 							bounceType: string | null
@@ -1066,6 +1101,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							SELECT id, message_id, in_reply_to, "references",
 							       direction, folder, subject, received_at,
 							       text_preview, text_body, html_body, recipients,
+							       attachments,
 							       status, status_reason, bounce_type, bounce_sub_type,
 							       inbound_classification, status_updated_at
 							FROM email_messages
@@ -1077,6 +1113,12 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							ORDER BY received_at ASC NULLS LAST, status_updated_at ASC
 						`.pipe(Effect.orDie)
 
+						const messagesOut = messages.map(m =>
+							projectAttachmentsForWire(
+								m as unknown as Record<string, unknown>,
+							),
+						)
+
 						return {
 							id: link.id,
 							externalThreadId: link.externalThreadId,
@@ -1087,7 +1129,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							updatedAt: link.updatedAt,
 							companyId: link.companyId,
 							contactId: link.contactId,
-							messages,
+							messages: messagesOut,
 							inbox:
 								link.inboxEmail && link.inboxPurpose
 									? {
@@ -1320,13 +1362,14 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						if (filters?.status)
 							conditions.push(sql`status = ${filters.status}`)
 
-						return yield* sql`
+						const rows = yield* sql`
 							SELECT * FROM email_messages
 							WHERE ${sql.and(conditions)}
 							ORDER BY status_updated_at DESC
 							LIMIT ${filters?.limit ?? 50}
 							OFFSET ${filters?.offset ?? 0}
 						`
+						return rows.map(r => projectAttachmentsForWire(r))
 					}).pipe(Effect.orDie),
 
 				// `messageId` may be either the local UUID PK or the RFC Message-ID;
@@ -1348,7 +1391,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								id: messageId,
 							})
 						}
-						return rows[0]
+						return projectAttachmentsForWire(rows[0] as Record<string, unknown>)
 					}),
 
 				// ── Inbox CRUD ────────────────────────────────────────────────
@@ -1819,18 +1862,31 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						return refreshed!
 					}),
 
-				// Provider-agnostic inbound attachment byte stream. The caller
-				// (the REST download endpoint) pipes `stream` into the HTTP
-				// response so the provider's storage is never exposed to the
-				// browser directly.
+				// Inbound attachment byte stream. For messages whose attachments
+				// JSONB is populated (mail-worker-ingested rows), the bytes
+				// already live in object storage at a sibling key — one GET
+				// suffices, no parse-on-demand. For legacy / outbound rows
+				// without the JSONB, fall back to the provider abstraction.
 				streamAttachment: (messageId: string, attachmentId: string) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						const rows = yield* sql<{
 							inboxId: string | null
 							messageIdRfc: string
+							attachments: ReadonlyArray<{
+								index: number
+								filename: string
+								contentType: string
+								sizeBytes: number
+								cid: string | null
+								isInline: boolean
+								storageKey: string
+							}>
 						}>`
-							SELECT inbox_id, message_id AS message_id_rfc
+							SELECT
+								inbox_id,
+								message_id AS message_id_rfc,
+								attachments
 							FROM email_messages
 							WHERE organization_id = ${currentOrg.id}
 							  AND (id::text = ${messageId} OR message_id = ${messageId})
@@ -1843,6 +1899,41 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								id: messageId,
 							})
 						}
+
+						// Prefer the JSONB path when the row has metadata: parse the
+						// `attachmentId` URL segment as the array index. Anything
+						// else (provider attachment ids, cid lookups) falls through
+						// to the provider so legacy paths still work.
+						const idx = Number.parseInt(attachmentId, 10)
+						const meta = row.attachments?.[idx]
+						if (
+							row.attachments &&
+							row.attachments.length > 0 &&
+							Number.isFinite(idx) &&
+							meta !== undefined
+						) {
+							const bytes = yield* storage.get(meta.storageKey).pipe(
+								Effect.mapError(
+									err =>
+										new EmailError({
+											message: `attachment fetch failed: ${err.message}`,
+										}),
+								),
+							)
+							const stream = new ReadableStream<Uint8Array>({
+								start(controller) {
+									controller.enqueue(bytes)
+									controller.close()
+								},
+							})
+							return {
+								stream,
+								contentType: meta.contentType,
+								filename: meta.filename,
+								size: meta.sizeBytes,
+							}
+						}
+
 						return yield* provider.streamAttachment(
 							row.inboxId,
 							row.messageIdRfc,

@@ -5,14 +5,21 @@ import { SqlClient } from 'effect/unstable/sql'
 import { simpleParser } from 'mailparser'
 
 import { applyBounce, parseBounce } from './bounces.js'
-import { fromParsedMail, persistInboundMessage } from './persist.js'
-import { RawMessageStorage, rawMessageKey } from './storage.js'
+import {
+	type AttachmentMetadata,
+	fromParsedMail,
+	persistInboundMessage,
+} from './persist.js'
+import { attachmentKey, RawMessageStorage, rawMessageKey } from './storage.js'
 
 // One transactional ingest step per fetched UID. Wraps:
 //  1. mailparser.simpleParser → ParsedMail
 //  2. DSN check → applyBounce when present (still continues to step 4)
 //  3. R2 PUT of the raw RFC822 (idempotent on the deterministic key)
-//  4. INSERT email_messages + participants + thread link
+//  4. R2 PUT of each parsed attachment as its own object so the read
+//     path is a single GET, not a parse-on-demand.
+//  5. INSERT email_messages + participants + thread link, carrying
+//     `attachments` JSONB metadata that points at the keys from step 4.
 //
 // SET LOCAL app.current_org_id pins the GUC for the surrounding TX so
 // any future SELECT from app_user code paths keeps to a single org.
@@ -43,6 +50,36 @@ export const ingestRawMessage = (args: {
 		yield* storage
 			.putRaw(key, args.raw)
 			.pipe(Effect.mapError(err => new Error(String(err))))
+
+		// Upload each parsed attachment as its own object before the SQL
+		// INSERT. If a put fails the gen short-circuits, the message is
+		// not inserted, and the next worker tick re-runs the same UID
+		// (idempotent on the deterministic key + the partial unique
+		// dedupe index). Result: never persist a row whose attachments
+		// JSONB references missing bytes.
+		const attachmentsMeta: AttachmentMetadata[] = []
+		for (let i = 0; i < mail.attachments.length; i++) {
+			const a = mail.attachments[i]!
+			const aKey = attachmentKey({
+				organizationId: args.organizationId,
+				inboxId: args.inboxId,
+				uidValidity: args.imapUidvalidity,
+				uid: args.imapUid,
+				index: i,
+			})
+			yield* storage
+				.putAttachment(aKey, a.content, a.contentType)
+				.pipe(Effect.mapError(err => new Error(String(err))))
+			attachmentsMeta.push({
+				index: i,
+				filename: a.filename ?? `attachment-${i}`,
+				contentType: a.contentType,
+				sizeBytes: a.size,
+				cid: a.cid ?? null,
+				isInline: a.contentDisposition === 'inline',
+				storageKey: aKey,
+			})
+		}
 
 		const parsed = fromParsedMail(mail)
 
@@ -76,6 +113,7 @@ export const ingestRawMessage = (args: {
 					imapUidvalidity: args.imapUidvalidity,
 					rawRfc822Ref: key,
 					parsed,
+					attachments: attachmentsMeta,
 				})
 			}),
 		)

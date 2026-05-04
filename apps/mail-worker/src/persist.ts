@@ -65,6 +65,19 @@ export const fromParsedMail = (mail: ParsedMail): ParsedInbound => {
 	}
 }
 
+// Per-attachment metadata persisted as a JSONB array on email_messages.
+// `storageKey` points at the bytes uploaded by `RawMessageStorage.putAttachment`
+// — the download path is a single GET, no parse-on-request.
+export interface AttachmentMetadata {
+	readonly index: number
+	readonly filename: string
+	readonly contentType: string
+	readonly sizeBytes: number
+	readonly cid: string | null
+	readonly isInline: boolean
+	readonly storageKey: string
+}
+
 // Insert a parsed inbound message + its participants + (re)link to a
 // thread. Caller is responsible for `SET LOCAL app.current_org_id`
 // inside the surrounding transaction; the worker connects as
@@ -78,6 +91,7 @@ export const persistInboundMessage = (args: {
 	readonly imapUidvalidity: number
 	readonly rawRfc822Ref: string
 	readonly parsed: ParsedInbound
+	readonly attachments: ReadonlyArray<AttachmentMetadata>
 }) =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
@@ -107,7 +121,7 @@ export const persistInboundMessage = (args: {
 				organization_id, inbox_id, folder, imap_uid, imap_uidvalidity,
 				message_id, in_reply_to, "references",
 				subject, received_at, text_body, html_body, text_preview,
-				raw_rfc822_ref, recipients, status, status_updated_at,
+				raw_rfc822_ref, recipients, attachments, status, status_updated_at,
 				direction
 			)
 			VALUES (
@@ -123,6 +137,7 @@ export const persistInboundMessage = (args: {
 					cc: args.parsed.ccAddresses,
 					bcc: args.parsed.bccAddresses,
 				})}::jsonb,
+				${JSON.stringify(args.attachments)}::jsonb,
 				'normal', now(),
 				'inbound'
 			)
