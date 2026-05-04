@@ -15,6 +15,11 @@
 			"types": "./dist/blocks/index.d.mts",
 			"import": "./dist/blocks/index.mjs"
 		},
+		"./layout": {
+			"development": "./src/layout/index.ts",
+			"types": "./dist/layout/index.d.mts",
+			"import": "./dist/layout/index.mjs"
+		},
 		"./pri": {
 			"development": "./src/pri/index.ts",
 			"types": "./dist/pri/index.d.mts",
