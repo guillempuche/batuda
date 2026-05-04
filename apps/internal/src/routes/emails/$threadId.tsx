@@ -374,7 +374,11 @@ function ThreadDetailPage() {
 							handleReply(false)
 						}}
 					>
-						<PriButton type='submit' $variant='filled'>
+						<PriButton
+							type='submit'
+							$variant='filled'
+							data-testid='thread-reply'
+						>
 							<Reply size={14} aria-hidden />
 							<span>{t`Reply`}</span>
 						</PriButton>
@@ -384,7 +388,11 @@ function ThreadDetailPage() {
 							handleReply(true)
 						}}
 					>
-						<PriButton type='submit' $variant='outlined'>
+						<PriButton
+							type='submit'
+							$variant='outlined'
+							data-testid='thread-reply-all'
+						>
 							<Reply size={14} aria-hidden />
 							<span>{t`Reply all`}</span>
 						</PriButton>
@@ -518,6 +526,8 @@ function MessageItem({ msg }: { readonly msg: ThreadMessage }) {
 		<MessageCard
 			$direction={msg.direction}
 			$muted={suspicious}
+			data-testid='thread-message-card'
+			data-direction={msg.direction}
 			aria-label={
 				msg.direction === 'inbound'
 					? t`Inbound message from ${msg.from}`
@@ -545,6 +555,7 @@ function MessageItem({ msg }: { readonly msg: ThreadMessage }) {
 						<>
 							<CcToggle
 								type='button'
+								data-testid='thread-cc-toggle'
 								onClick={() => {
 									setCcOpen(v => !v)
 								}}
@@ -604,6 +615,8 @@ function MessageItem({ msg }: { readonly msg: ThreadMessage }) {
 					{msg.attachments.map(att => (
 						<AttachmentChip
 							key={att.attachmentId}
+							data-testid='attachment-chip'
+							data-attachment-id={att.attachmentId}
 							href={downloadUrlFor(msg.messageId, att.attachmentId)}
 							target='_blank'
 							rel='noreferrer'

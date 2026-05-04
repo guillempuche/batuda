@@ -631,7 +631,10 @@ function EmailsIndexPage() {
 								)
 							}
 						>
-							<PriSelect.Trigger aria-label={t`Filter by inbox`}>
+							<PriSelect.Trigger
+								data-testid='inbox-filter-trigger'
+								aria-label={t`Filter by inbox`}
+							>
 								<PriSelect.Value placeholder={t`All inboxes`} />
 								<PriSelect.Icon>
 									<ChevronRight size={14} aria-hidden />
@@ -640,14 +643,23 @@ function EmailsIndexPage() {
 							<PriSelect.Portal>
 								<PriSelect.Positioner>
 									<PriSelect.Popup>
-										<PriSelect.Item value='__all__'>
+										<PriSelect.Item
+											value='__all__'
+											data-testid='inbox-filter-option'
+											data-inbox-email='__all__'
+										>
 											<PriSelect.ItemIndicator>
 												<Check size={12} aria-hidden />
 											</PriSelect.ItemIndicator>
 											<PriSelect.ItemText>{t`All inboxes`}</PriSelect.ItemText>
 										</PriSelect.Item>
 										{inboxOptions.map(inbox => (
-											<PriSelect.Item key={inbox.id} value={inbox.id}>
+											<PriSelect.Item
+												key={inbox.id}
+												value={inbox.id}
+												data-testid='inbox-filter-option'
+												data-inbox-email={inbox.email}
+											>
 												<PriSelect.ItemIndicator>
 													<Check size={12} aria-hidden />
 												</PriSelect.ItemIndicator>
