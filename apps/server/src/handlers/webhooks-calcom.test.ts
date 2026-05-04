@@ -45,7 +45,9 @@ const fetchTallerId = Effect.gen(function* () {
 	`
 	const id = rows[0]?.id
 	if (!id) {
-		throw new Error("taller org missing — run 'pnpm cli db reset' first")
+		throw new Error(
+			"taller org missing — run 'pnpm cli db reset && pnpm cli seed' first",
+		)
 	}
 	return { taller: id }
 })

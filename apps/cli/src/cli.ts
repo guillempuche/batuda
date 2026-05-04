@@ -84,7 +84,7 @@ const seedCommand = Command.make(
 		),
 ).pipe(
 	Command.withDescription(
-		'Insert sample data (use `db reset` for clean slate)',
+		'Insert sample data (chain `pnpm cli db reset && pnpm cli seed` for a clean slate)',
 	),
 )
 
@@ -175,7 +175,9 @@ const dbMigrateCommand = Command.make('migrate', {}, () => dbMigrate).pipe(
 )
 
 const dbResetCommand = Command.make('reset', {}, () => withDb(dbReset)).pipe(
-	Command.withDescription('Truncate all tables, re-migrate, and re-seed'),
+	Command.withDescription(
+		'Drop the public schema and re-run migrations (no seed; chain `seed` for sample data)',
+	),
 )
 
 const dbCommand = Command.make('db').pipe(
@@ -579,20 +581,26 @@ const formatError = (e: unknown): string => {
 	return String(e)
 }
 
+// Shared by tapError (typed failures) and tapDefect (Effect.die /
+// unhandled exceptions). Without the latter, a `disableErrorReporting`
+// runtime swallows defects entirely and the user sees an empty exit 1.
+const reportError = (e: unknown) => {
+	const hint = recoveryHint(e)
+	if (hint) {
+		const tag =
+			e && typeof e === 'object' && '_tag' in e
+				? String((e as { _tag: unknown })._tag)
+				: undefined
+		const short = tag ?? (e instanceof Error ? e.message : String(e))
+		return Console.error(`${short}\n\n  Hint: ${hint}`)
+	}
+	return Console.error(formatError(e))
+}
+
 const program = Command.run(batuda, { version: '0.0.1' }).pipe(
 	Effect.provide(NodeServices.layer),
-	Effect.tapError(e => {
-		const hint = recoveryHint(e)
-		if (hint) {
-			const tag =
-				e && typeof e === 'object' && '_tag' in e
-					? String((e as { _tag: unknown })._tag)
-					: undefined
-			const short = tag ?? (e instanceof Error ? e.message : String(e))
-			return Console.error(`${short}\n\n  Hint: ${hint}`)
-		}
-		return Console.error(formatError(e))
-	}),
+	Effect.tapError(reportError),
+	Effect.tapDefect(reportError),
 )
 NodeRuntime.runMain(program as unknown as Effect.Effect<void, unknown, never>, {
 	disableErrorReporting: true,

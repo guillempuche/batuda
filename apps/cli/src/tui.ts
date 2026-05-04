@@ -221,7 +221,7 @@ const tui = Effect.gen(function* () {
 							{
 								value: 'reset' as const,
 								label: 'Reset',
-								hint: 'Truncate + migrate + seed',
+								hint: 'Drop schema + migrate (run Seed afterwards for data)',
 							},
 						],
 					}),

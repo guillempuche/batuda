@@ -40,7 +40,7 @@ describe('ingestCalcomCancel — SQL contract', () => {
 		const id = orgs.rows[0]?.id
 		if (!id) {
 			throw new Error(
-				`taller org missing — run 'pnpm cli db reset' before this test`,
+				`taller org missing — run 'pnpm cli db reset && pnpm cli seed' before this test`,
 			)
 		}
 		orgId = id

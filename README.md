@@ -71,7 +71,7 @@ pnpm cli setup         # copy .env files from examples
 pnpm cli doctor        # check environment health
 pnpm cli seed          # insert sample data (Taller fictitious tenant)
 pnpm cli db migrate    # run database migrations
-pnpm cli db reset      # truncate + migrate + seed
+pnpm cli db reset      # drop schema + re-migrate (chain `pnpm cli seed` for sample data)
 pnpm cli services up   # start Docker services
 pnpm cli:tui           # interactive TUI menu
 

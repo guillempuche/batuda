@@ -42,7 +42,9 @@ describe('research_runs INSERT — RLS contract', () => {
 		)
 		const oid = orgs.rows[0]?.id
 		if (!oid) {
-			throw new Error("taller org missing — run 'pnpm cli db reset' first")
+			throw new Error(
+				"taller org missing — run 'pnpm cli db reset && pnpm cli seed' first",
+			)
 		}
 		orgId = oid
 
@@ -53,7 +55,7 @@ describe('research_runs INSERT — RLS contract', () => {
 		const uid = users.rows[0]?.id
 		if (!uid) {
 			throw new Error(
-				"admin@taller.cat missing — run 'pnpm cli db reset' first",
+				"admin@taller.cat missing — run 'pnpm cli db reset && pnpm cli seed' first",
 			)
 		}
 		userId = uid

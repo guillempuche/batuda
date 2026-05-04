@@ -5,8 +5,8 @@ import { SqlClient } from 'effect/unstable/sql'
 // truth. Every CREATE TABLE here is the table's final shape — no
 // ADD COLUMN / ALTER COLUMN / DROP COLUMN patches stacked on top, no
 // data backfills. `pnpm cli db reset` drops the database and re-runs this
-// from scratch; the seed (`apps/cli/src/commands/seed.ts`) populates the
-// rows the dev/test environment needs.
+// from scratch; `pnpm cli seed` (`apps/cli/src/commands/seed.ts`) populates
+// the rows the dev/test environment needs.
 //
 // Better Auth runs its own migration *before* this one (see
 // `apps/server/src/db/migrate.ts`), so the auth-managed tables — `user`,

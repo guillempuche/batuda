@@ -2,7 +2,6 @@ import { Effect } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { execIn, ROOT } from '../shell'
-import { seed, seedIdentities } from './seed'
 
 export const dbMigrate = execIn(ROOT, 'pnpm', 'db:migrate')
 
@@ -15,13 +14,7 @@ export const dbReset = Effect.gen(function* () {
 	yield* Effect.logInfo('Running migrations...')
 	yield* dbMigrate
 
-	// Identities first so the CRM seed can stamp organization_id on every
-	// row from the resolved org id (default: the taller demo org).
-	yield* Effect.logInfo('Seeding identities...')
-	yield* seedIdentities
-
-	yield* Effect.logInfo('Seeding (full)...')
-	yield* seed('full')
-
-	yield* Effect.logInfo('Database reset complete.')
+	yield* Effect.logInfo(
+		'Database reset complete. Run `pnpm cli seed` to insert sample data.',
+	)
 })

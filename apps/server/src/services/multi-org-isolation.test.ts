@@ -762,7 +762,7 @@ describe('multi-org isolation', () => {
 		// These tests document the contract OrgMiddleware enforces at
 		// runtime: app_user with the GUC set sees its own rows; app_user
 		// without the GUC sees zero rows AND can't insert. The middleware
-		// itself is exercised via `pnpm cli db reset` + actual HTTP requests
+		// itself is exercised via `pnpm cli db reset && pnpm cli seed` + actual HTTP requests
 		// — these unit-style assertions just pin the database side of the
 		// contract so a future RLS / role change is caught here.
 

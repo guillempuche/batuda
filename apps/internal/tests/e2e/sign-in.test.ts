@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 // Sign-in golden path. Selectors are verified against
 // apps/internal/src/routes/login.tsx (login-form, login-email,
 // login-password, login-submit, login-error). Personas come from
-// `pnpm cli db reset`'s DEMO_USERS seed (alice@taller.cat).
+// `pnpm cli seed`'s DEMO_USERS (alice@taller.cat).
 //
 // The form uses React 19's `<form action={fn}>` pattern, so React queues
 // the submit even before hydration — no `requestSubmit()` workaround or

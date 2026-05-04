@@ -7,9 +7,10 @@ import { defineConfig, devices } from '@playwright/test'
 //
 // Prerequisites for `pnpm test:e2e`:
 //   1. `pnpm cli services up`    — Postgres + MinIO containers
-//   2. `pnpm cli db reset`        — fresh migrations + DEMO_* personas
-//   3. `pnpm dev`                 — server + internal stack on batuda.localhost
-//   4. `pnpm exec playwright install chromium` (one-time per machine)
+//   2. `pnpm cli db reset`        — fresh migrations
+//   3. `pnpm cli seed`            — DEMO_* personas + sample CRM
+//   4. `pnpm dev`                 — server + internal stack on batuda.localhost
+//   5. `pnpm exec playwright install chromium` (one-time per machine)
 //
 // The suite intentionally targets only flows whose components carry
 // `data-testid` attributes today (login + compose). Add another test
@@ -28,7 +29,7 @@ export default defineConfig({
 	timeout: 30_000,
 	expect: { timeout: 5_000 },
 	// Sequential — the dev stack is shared state; per-test isolation comes
-	// from `pnpm cli db reset` between manual runs, not from parallelism.
+	// from `pnpm cli db reset && pnpm cli seed` between manual runs, not from parallelism.
 	fullyParallel: false,
 	workers: 1,
 	retries: 0,

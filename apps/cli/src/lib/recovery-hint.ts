@@ -34,13 +34,13 @@ export const recoveryHint = (e: unknown): string | undefined => {
 
 	// Constraint violations (unique, not-null, check, FK)
 	if (code === '23505') {
-		return 'Unique constraint violated — duplicate data. Run: pnpm cli db reset'
+		return 'Unique constraint violated — duplicate data. Run: pnpm cli db reset && pnpm cli seed'
 	}
 	if (code === '23502') {
 		return 'NOT NULL constraint violated — a required column received null'
 	}
 	if (t === 'ConstraintError') {
-		return 'Constraint violated. Run: pnpm cli db reset'
+		return 'Constraint violated. Run: pnpm cli db reset && pnpm cli seed'
 	}
 
 	// Connection refused — DB not running

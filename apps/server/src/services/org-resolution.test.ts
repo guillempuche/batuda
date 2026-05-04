@@ -19,7 +19,7 @@ import { OrgResolution, type UnknownOrg } from './org-resolution.js'
 //
 // Requires: `pnpm cli services up` so Postgres is reachable on
 // $DATABASE_URL, and the seeded `taller` + `restaurant` orgs from
-// `pnpm cli db reset` so the JOIN to `organization` finds rows.
+// `pnpm cli db reset && pnpm cli seed` so the JOIN to `organization` finds rows.
 
 const TALLER = 'taller'
 const RESTAURANT = 'restaurant'
@@ -130,7 +130,7 @@ const fetchOrgIds = Effect.gen(function* () {
 	const restaurantId = rows.find(r => r.slug === RESTAURANT)?.id
 	if (!tallerId || !restaurantId) {
 		throw new Error(
-			`taller / restaurant orgs missing — run 'pnpm cli db reset' before this test`,
+			`taller / restaurant orgs missing — run 'pnpm cli db reset && pnpm cli seed' before this test`,
 		)
 	}
 	return { taller: tallerId, restaurant: restaurantId }

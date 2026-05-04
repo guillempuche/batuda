@@ -1013,11 +1013,11 @@ export const seedIdentities = Effect.gen(function* () {
 		const summary = orphanRows
 			.map(r => `${r.table}=${r.orphan_count}`)
 			.join(', ')
-		return yield* Effect.die(
+		return yield* Effect.fail(
 			new Error(
 				`CRM data references organization ids that no longer exist (${summary}). ` +
 					'This usually means the auth tables were reset without re-seeding ' +
-					'the CRM rows. Run `pnpm cli db reset` for a clean slate.',
+					'the CRM rows. Run `pnpm cli db reset && pnpm cli seed` for a clean slate.',
 			),
 		)
 	}
@@ -1189,9 +1189,9 @@ export const seed = (preset: Preset) =>
 		`
 		const tallerOrgId = tallerOrgRows[0]?.id
 		if (!tallerOrgId) {
-			return yield* Effect.die(
+			return yield* Effect.fail(
 				new Error(
-					'CRM seed requires the taller demo org. Run `seedIdentities` first (or `pnpm cli db reset` which orders identities before CRM data).',
+					'CRM seed requires the taller demo org. Run `pnpm cli seed` (which seeds identities before CRM data) or `pnpm cli db reset && pnpm cli seed` for a clean slate.',
 				),
 			)
 		}
