@@ -61,12 +61,36 @@ export interface SentResult {
 // 5xx auth family as auth_failed; anything that didn't get past the
 // socket as connect_failed; the rest as connect_failed too (caller can
 // differentiate via `detail`).
+//
+// `detail` aggregates every nodemailer field we've seen carry useful
+// information so the persisted error string (and the test error
+// context) reads `code=ECONNECTION command=CONN response=… message=…`
+// instead of the empty-string detail nodemailer hands back when only
+// the `responseCode` is meaningful.
+const formatSmtpDetail = (err: unknown): string | null => {
+	if (typeof err !== 'object' || err === null) return null
+	const e = err as {
+		code?: string
+		responseCode?: number
+		command?: string
+		response?: string
+		message?: string
+	}
+	const parts: Array<string> = []
+	if (e.code) parts.push(`code=${e.code}`)
+	if (e.responseCode !== undefined) parts.push(`responseCode=${e.responseCode}`)
+	if (e.command) parts.push(`command=${e.command}`)
+	if (e.response) parts.push(`response=${e.response}`)
+	if (e.message) parts.push(`message=${e.message}`)
+	return parts.length === 0 ? null : parts.join(' ')
+}
+
 const classifySmtpError = (
 	err: unknown,
 	inboxId: string,
 ): GrantAuthFailed | GrantConnectFailed => {
-	const e = err as { code?: string; responseCode?: number; message?: string }
-	const detail = e?.message ?? null
+	const e = err as { code?: string; responseCode?: number }
+	const detail = formatSmtpDetail(err)
 	if (e?.code === 'EAUTH' || e?.responseCode === 535) {
 		return new GrantAuthFailed({ inboxId, detail })
 	}
@@ -80,9 +104,8 @@ const classifyImapError = (
 	const e = err as {
 		authenticationFailed?: boolean
 		code?: string
-		message?: string
 	}
-	const detail = e?.message ?? null
+	const detail = formatSmtpDetail(err)
 	if (e?.authenticationFailed === true || e?.code === 'AUTHENTICATIONFAILED') {
 		return new GrantAuthFailed({ inboxId, detail })
 	}
