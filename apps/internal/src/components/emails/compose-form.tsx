@@ -173,8 +173,17 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 		updateMeta,
 	])
 
+	// `pendingPatchRef` accumulates every patch issued since the last
+	// timer fire. The previous version captured only the latest patch in
+	// the closure and discarded earlier keys when a new patchForm call
+	// reset the timer — a Send click that landed before the timer fired
+	// would push only the most recent field, leaving `to`/`subject`/body
+	// out of the saved draft and the server rejecting with EENVELOPE
+	// "No recipients defined".
+	const pendingPatchRef = useRef<Partial<DraftForm>>({})
 	const debouncedSave = useCallback(
 		(patch: Partial<DraftForm>) => {
+			pendingPatchRef.current = { ...pendingPatchRef.current, ...patch }
 			if (saveTimerRef.current !== null) {
 				clearTimeout(saveTimerRef.current)
 			}
@@ -183,19 +192,21 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 				const inboxId = effectiveInboxId
 				if (serverId === null || inboxId === null) return
 
+				const merged = pendingPatchRef.current
+				pendingPatchRef.current = {}
 				updateMeta(draft.id, { saving: true })
 				const payload: Record<string, unknown> = { inboxId }
-				if (patch.to !== undefined) payload['to'] = patch.to
-				if (patch.cc !== undefined) {
-					const list = splitAddresses(patch.cc)
+				if (merged.to !== undefined) payload['to'] = merged.to
+				if (merged.cc !== undefined) {
+					const list = splitAddresses(merged.cc)
 					if (list.length > 0) payload['cc'] = list
 				}
-				if (patch.bcc !== undefined) {
-					const list = splitAddresses(patch.bcc)
+				if (merged.bcc !== undefined) {
+					const list = splitAddresses(merged.bcc)
 					if (list.length > 0) payload['bcc'] = list
 				}
-				if (patch.subject !== undefined) payload['subject'] = patch.subject
-				if (patch.bodyJson !== undefined) payload['bodyJson'] = patch.bodyJson
+				if (merged.subject !== undefined) payload['subject'] = merged.subject
+				if (merged.bodyJson !== undefined) payload['bodyJson'] = merged.bodyJson
 
 				void updateDraft({
 					params: { draftId: serverId },
@@ -273,10 +284,30 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 		const serverId = serverIdRef.current
 		if (serverId === null || effectiveInboxId === null) return
 
+		// Cancel any pending debounced save and flush the current form
+		// state synchronously. Without this, a click on Send that lands
+		// before the SAVE_DEBOUNCE_MS timer fires sends a draft whose
+		// toAddresses / subject / cc / bcc / bodyJson on the server are
+		// still empty — the server then rejects with EENVELOPE "No
+		// recipients defined".
 		if (saveTimerRef.current !== null) {
 			clearTimeout(saveTimerRef.current)
 			saveTimerRef.current = null
 		}
+		const flushPayload: Record<string, unknown> = {
+			inboxId: effectiveInboxId,
+			to: form.to,
+			subject: form.subject,
+			bodyJson: form.bodyJson,
+		}
+		const ccList = splitAddresses(form.cc)
+		if (ccList.length > 0) flushPayload['cc'] = ccList
+		const bccList = splitAddresses(form.bcc)
+		if (bccList.length > 0) flushPayload['bcc'] = bccList
+		await updateDraft({
+			params: { draftId: serverId },
+			payload: flushPayload,
+		} as never)
 
 		setSendState('sending')
 		setErrorMessage(null)
@@ -299,7 +330,13 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 		}
 	}, [
 		effectiveInboxId,
+		form.to,
+		form.cc,
+		form.bcc,
+		form.subject,
+		form.bodyJson,
 		sendDraft,
+		updateDraft,
 		refreshList,
 		refreshThread,
 		close,
