@@ -82,9 +82,16 @@ test.describe('compose with attachment', () => {
 			const filename = `${testId}.pdf`
 
 			// GIVEN compose is open and the form is fillable
-			await page.goto('/emails')
+			// Wait for hydration before clicking the open button. `goto`'s
+			// default `load` event fires before TanStack Start finishes
+			// streaming + hydrating, so the click can land on the not-yet-
+			// wired form action and the SSR replay buffer occasionally
+			// misses it on hot-rebuilt dev bundles.
+			await page.goto('/emails', { waitUntil: 'networkidle' })
 			await page.getByTestId('emails-compose').click()
-			await expect(page.getByTestId('compose-form')).toBeVisible()
+			await expect(page.getByTestId('compose-form')).toBeVisible({
+				timeout: 15_000,
+			})
 			await page.getByTestId('compose-to').fill(recipient)
 			await page.getByTestId('compose-subject').fill(`Subj ${testId}`)
 			await fillBody(page, `Body ${testId}`)
@@ -117,16 +124,23 @@ test.describe('compose with attachment', () => {
 			expect(att?.Size).toBeGreaterThan(0)
 		})
 
-		test('should mark email_attachment_staging.sent_at on success', async ({
+		test('should purge email_attachment_staging on success', async ({
 			page,
 		}) => {
 			const testId = `e2e-att-sent-${Date.now()}`
 			const recipient = `${testId}@catcher.local`
 			const filename = `${testId}.pdf`
 
-			await page.goto('/emails')
+			// Wait for hydration before clicking the open button. `goto`'s
+			// default `load` event fires before TanStack Start finishes
+			// streaming + hydrating, so the click can land on the not-yet-
+			// wired form action and the SSR replay buffer occasionally
+			// misses it on hot-rebuilt dev bundles.
+			await page.goto('/emails', { waitUntil: 'networkidle' })
 			await page.getByTestId('emails-compose').click()
-			await expect(page.getByTestId('compose-form')).toBeVisible()
+			await expect(page.getByTestId('compose-form')).toBeVisible({
+				timeout: 15_000,
+			})
 			await page.getByTestId('compose-to').fill(recipient)
 			await page.getByTestId('compose-subject').fill(`Subj ${testId}`)
 			await fillBody(page, `Body ${testId}`)
@@ -144,16 +158,16 @@ test.describe('compose with attachment', () => {
 			await page.getByTestId('compose-send').click()
 
 			// Wait for the send to land in mailpit before reading the staging
-			// row — the sent_at column is set by the server's send path, not
-			// by the client.
+			// row — the post-send purge runs after the SMTP ack.
 			await waitForMessage(`to:${recipient}`)
 
-			// THEN the staging row's sent_at is populated (not NULL).
-			const sentAt = psql(
-				`SELECT sent_at FROM email_attachment_staging WHERE filename='${filename}'`,
+			// THEN the staging row is gone — markSentAndCleanup deletes it
+			// immediately after the provider acks (see
+			// apps/server/src/services/email-attachment-staging.ts).
+			const remaining = psql(
+				`SELECT staging_id FROM email_attachment_staging WHERE filename='${filename}'`,
 			)
-			expect(sentAt).not.toBe('')
-			expect(sentAt.toLowerCase()).not.toBe('null')
+			expect(remaining).toBe('')
 		})
 	})
 })

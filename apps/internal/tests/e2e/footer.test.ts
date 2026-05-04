@@ -66,9 +66,18 @@ test.describe('compose with footer', () => {
 			},
 		]).replace(/'/g, "''")
 
+		// Drop any leftover footer for this inbox so a previous run that
+		// died before afterAll doesn't trip the
+		// `idx_inbox_footers_single_default` unique constraint.
+		psql(`DELETE FROM inbox_footers WHERE inbox_id='${inboxId}'`)
+
+		// `psql -tA -c "INSERT ... RETURNING id"` emits the id followed by
+		// the INSERT command tag on its own line ("INSERT 0 1"), and the
+		// caller's `.trim()` doesn't strip the inner newline. Read the
+		// first line so the captured footerId is a clean UUID.
 		footerId = psql(
 			`INSERT INTO inbox_footers (organization_id, inbox_id, name, body_json, is_default) VALUES ('${orgId}', '${inboxId}', 'e2e-footer', '${bodyJson}'::jsonb, true) RETURNING id`,
-		)
+		).split('\n')[0]!
 	})
 
 	test.afterAll(() => {
