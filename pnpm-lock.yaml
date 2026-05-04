@@ -77,6 +77,9 @@ importers:
       kysely:
         specifier: ^0.28.15
         version: 0.28.15
+      nodemailer:
+        specifier: ^8.0.6
+        version: 8.0.6
       pg:
         specifier: ^8.20.0
         version: 8.20.0
@@ -87,6 +90,9 @@ importers:
       '@types/node':
         specifier: ^22.15.0
         version: 22.19.15
+      '@types/nodemailer':
+        specifier: ^8.0.0
+        version: 8.0.0
       '@types/pg':
         specifier: ^8.20.0
         version: 8.20.0

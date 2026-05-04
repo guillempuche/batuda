@@ -12,6 +12,38 @@ import pg from 'pg'
 
 import { buildBetterAuthConfig } from '@batuda/auth'
 
+import { injectViaSmtp } from '../lib/smtp-inject'
+
+// 1×1 transparent PNG (67 bytes) — used by attachment demo messages so
+// the chip render path has real bytes flowing through MinIO.
+const ONE_PIXEL_PNG = Buffer.from(
+	'89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c62000100000500010d0a2db40000000049454e44ae426082',
+	'hex',
+)
+
+// Minimal valid PDF (~290 bytes). Empty single-page A4 document.
+// Used as the M8 quote.pdf attachment so the chip download produces
+// bytes a PDF viewer will at least open without erroring.
+const TINY_PDF = Buffer.from(
+	[
+		'%PDF-1.4',
+		'1 0 obj <</Type/Catalog/Pages 2 0 R>> endobj',
+		'2 0 obj <</Type/Pages/Kids[3 0 R]/Count 1>> endobj',
+		'3 0 obj <</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]>> endobj',
+		'xref',
+		'0 4',
+		'0000000000 65535 f ',
+		'0000000009 00000 n ',
+		'0000000054 00000 n ',
+		'0000000104 00000 n ',
+		'trailer <</Size 4/Root 1 0 R>>',
+		'startxref',
+		'160',
+		'%%EOF',
+	].join('\n'),
+	'utf8',
+)
+
 // ── Helpers ──────────────────────────────────────────────
 
 /** Ensure all objects in a batch have the same keys (required by sql.insert). */
@@ -1646,70 +1678,358 @@ export const seed = (preset: Preset) =>
 			)
 		}
 
-		// Inbox — one connected human inbox per taller-org member who
-		// signs in. e2e tests + manual compose flows expect at least one
-		// inbox to be reachable; without this the compose form's "select
-		// inbox" picker is empty and Send is disabled. Credentials are
-		// AES-256-GCM via the same scheme apps/server uses (HKDF-SHA256
-		// per-inbox subkey, see apps/server/src/services/credential-crypto.ts).
-		// Only seeded for the taller org so multi-org-isolation tests can
-		// still assert "no inbox visible" for restaurant.
-		if (testUser) {
-			const masterKey = Buffer.from(
-				yield* Config.string('EMAIL_CREDENTIAL_KEY'),
-				'base64',
+		// Inboxes — one human + one agent per demo org. The dev compose
+		// stack runs Mailpit at localhost:1025 (SMTP) / 1143 (IMAP); each
+		// inbox is wired to it with security='plain'. Credentials are
+		// AES-256-GCM via the HKDF-SHA256 per-inbox-subkey scheme
+		// (apps/server/src/services/credential-crypto.ts) — the same one
+		// the worker decrypts with at runtime.
+		const masterKeyB64 = yield* Config.string('EMAIL_CREDENTIAL_KEY')
+		const masterKey = Buffer.from(masterKeyB64, 'base64')
+		if (masterKey.length !== 32) {
+			return yield* Effect.fail(
+				new Error(
+					'EMAIL_CREDENTIAL_KEY must be a base64 string decoding to 32 bytes. Run `pnpm cli setup` or check apps/cli/.env.',
+				),
 			)
-			if (masterKey.length === 32) {
-				const inboxId = randomUUID()
-				const subkey = Buffer.from(
-					hkdfSync(
-						'sha256',
-						masterKey,
-						Buffer.alloc(0),
-						Buffer.from(inboxId, 'utf8'),
-						32,
-					),
-				)
-				const nonce = randomBytes(12)
-				const cipher = createCipheriv('aes-256-gcm', subkey, nonce)
-				const ciphertext = Buffer.concat([
-					cipher.update('demo-imap-password', 'utf8'),
-					cipher.final(),
-				])
-				const tag = cipher.getAuthTag()
-				yield* sql`
-					INSERT INTO inboxes ${sql.insert({
-						id: inboxId,
-						organizationId: tallerOrgId,
-						email: TEST_USER.email,
-						displayName: TEST_USER.name,
-						purpose: 'human',
-						ownerUserId: testUser.id,
-						isDefault: true,
-						isPrivate: false,
-						active: true,
-						imapHost: 'localhost',
-						imapPort: 1143,
-						imapSecurity: 'plain',
-						smtpHost: 'localhost',
-						smtpPort: 1025,
-						smtpSecurity: 'plain',
-						username: TEST_USER.email,
-						passwordCiphertext: ciphertext,
-						passwordNonce: nonce,
-						passwordTag: tag,
-						grantStatus: 'connected',
-					})}
-				`
-				yield* Effect.logInfo(
-					`  inbox: ${TEST_USER.email} (taller, owner ${testUser.id})`,
-				)
-			} else {
-				yield* Effect.logInfo(
-					'  (skipped inbox — EMAIL_CREDENTIAL_KEY must decode to 32 bytes)',
-				)
-			}
 		}
+
+		const restaurantOrgRow = yield* sql<{
+			id: string
+		}>`SELECT id FROM "organization" WHERE slug = 'restaurant' LIMIT 1`
+		const restaurantOrgIdForInbox = restaurantOrgRow[0]?.id ?? null
+
+		interface InboxSpec {
+			readonly email: string
+			readonly displayName: string
+			readonly ownerEmail: string
+			readonly orgId: string
+			readonly purpose: 'human' | 'agent'
+			readonly isDefault: boolean
+			readonly footerText: string
+		}
+
+		const inboxSpecs: InboxSpec[] = [
+			{
+				email: 'admin@taller.cat',
+				displayName: 'Alice Admin',
+				ownerEmail: 'admin@taller.cat',
+				orgId: tallerOrgId,
+				purpose: 'human',
+				isDefault: true,
+				footerText: '— Alice Admin\nTaller Demo · taller.cat',
+			},
+			{
+				email: 'agent@taller.cat',
+				displayName: 'Alice Agent',
+				ownerEmail: 'admin@taller.cat',
+				orgId: tallerOrgId,
+				purpose: 'agent',
+				isDefault: false,
+				footerText: "Automated response from Alice's agent.",
+			},
+		]
+		if (restaurantOrgIdForInbox) {
+			inboxSpecs.push(
+				{
+					email: 'admin@restaurant.demo',
+					displayName: 'Bob Owner',
+					ownerEmail: 'admin@restaurant.demo',
+					orgId: restaurantOrgIdForInbox,
+					purpose: 'human',
+					isDefault: true,
+					footerText: '— Bob Owner\nRestaurant Demo',
+				},
+				{
+					email: 'agent@restaurant.demo',
+					displayName: 'Bob Agent',
+					ownerEmail: 'admin@restaurant.demo',
+					orgId: restaurantOrgIdForInbox,
+					purpose: 'agent',
+					isDefault: false,
+					footerText: "Automated response from Bob's agent.",
+				},
+			)
+		}
+
+		const ownerEmails = [...new Set(inboxSpecs.map(s => s.ownerEmail))]
+		const ownerRows = yield* sql<{
+			id: string
+			email: string
+		}>`SELECT id, email FROM "user" WHERE email = ANY(${ownerEmails as string[]})`
+		const userIdByEmail = new Map(ownerRows.map(r => [r.email, r.id]))
+
+		interface SeededInbox {
+			readonly id: string
+			readonly email: string
+			readonly orgId: string
+		}
+		const seededInboxes: SeededInbox[] = []
+
+		for (const spec of inboxSpecs) {
+			const ownerId = userIdByEmail.get(spec.ownerEmail)
+			if (!ownerId) {
+				yield* Effect.logInfo(
+					`  (skipped inbox ${spec.email} — owner not found, run seed auth first)`,
+				)
+				continue
+			}
+			const inboxId = randomUUID()
+			const subkey = Buffer.from(
+				hkdfSync(
+					'sha256',
+					masterKey,
+					Buffer.alloc(0),
+					Buffer.from(inboxId, 'utf8'),
+					32,
+				),
+			)
+			const nonce = randomBytes(12)
+			const cipher = createCipheriv('aes-256-gcm', subkey, nonce)
+			const ciphertext = Buffer.concat([
+				cipher.update('demo-imap-password', 'utf8'),
+				cipher.final(),
+			])
+			const tag = cipher.getAuthTag()
+			yield* sql`
+				INSERT INTO inboxes ${sql.insert({
+					id: inboxId,
+					organizationId: spec.orgId,
+					email: spec.email,
+					displayName: spec.displayName,
+					purpose: spec.purpose,
+					ownerUserId: ownerId,
+					isDefault: spec.isDefault,
+					isPrivate: false,
+					active: true,
+					imapHost: 'localhost',
+					imapPort: 1143,
+					imapSecurity: 'plain',
+					smtpHost: 'localhost',
+					smtpPort: 1025,
+					smtpSecurity: 'plain',
+					username: spec.email,
+					passwordCiphertext: ciphertext,
+					passwordNonce: nonce,
+					passwordTag: tag,
+					grantStatus: 'connected',
+				})}
+			`
+			yield* sql`
+				INSERT INTO inbox_footers ${sql.insert({
+					organizationId: spec.orgId,
+					inboxId,
+					name: 'default',
+					bodyJson: JSON.stringify([
+						{
+							type: 'paragraph',
+							spans: [{ kind: 'text', value: spec.footerText }],
+						},
+					]),
+					isDefault: true,
+				})}
+			`
+			yield* Effect.logInfo(
+				`  inbox: ${spec.email} (${spec.purpose}, owner ${ownerId})`,
+			)
+			seededInboxes.push({
+				id: inboxId,
+				email: spec.email,
+				orgId: spec.orgId,
+			})
+		}
+
+		// Demo messages — SMTP into Mailpit so the running mail-worker
+		// ingests them through the real persist path (raw RFC822 + per-
+		// attachment objects in MinIO + email_messages JSONB). Subjects
+		// and senders are stable across runs; UUIDs/UIDs come from the
+		// runtime, not the seed. If `pnpm dev` isn't up yet, the messages
+		// sit in Mailpit's IMAP store until the worker boots.
+		const tallerHuman = seededInboxes.find(i => i.email === 'admin@taller.cat')
+		const tallerAgent = seededInboxes.find(i => i.email === 'agent@taller.cat')
+		const restaurantHuman = seededInboxes.find(
+			i => i.email === 'admin@restaurant.demo',
+		)
+		const restaurantAgent = seededInboxes.find(
+			i => i.email === 'agent@restaurant.demo',
+		)
+
+		if (tallerHuman) {
+			// M1 — single inbound, plain text
+			const m1 = yield* injectViaSmtp({
+				to: 'admin@taller.cat',
+				from: 'pep@calpepfonda.cat',
+				subject: 'Quote for the booking module',
+				text: 'Hola Alice,\n\nM’agradaria saber el preu del mòdul de reserves.\n\nGràcies,\nPep',
+			})
+			// M2 — Pep replies, threads with M1 via In-Reply-To + References
+			yield* injectViaSmtp({
+				to: 'admin@taller.cat',
+				from: 'pep@calpepfonda.cat',
+				subject: 'Re: Quote for the booking module',
+				text: 'Una pregunta més: també suporta cancel·lacions automàtiques?\n\nPep',
+				inReplyTo: m1.messageId,
+				references: [m1.messageId],
+			})
+			// M3 — rich HTML body (bold + list + link), with a Cc on the
+			// wire so the thread-render Cc-toggle path has data to reveal.
+			yield* injectViaSmtp({
+				to: 'admin@taller.cat',
+				cc: 'marta@ferrosbl.com',
+				from: 'kickoff@ferrosbl.com',
+				subject: 'Project kickoff materials',
+				text: 'Hi Alice,\n\nQuick recap of kickoff items:\n- Stakeholder list\n- Booking flow walkthrough\n\nAgenda link: https://taller.cat/kickoff',
+				html:
+					'<p>Hi Alice,</p>' +
+					'<p>Quick recap of <strong>kickoff items</strong>:</p>' +
+					'<ul><li>Stakeholder list</li><li>Booking flow walkthrough</li></ul>' +
+					'<p><a href="https://taller.cat/kickoff">Agenda link</a></p>',
+			})
+			// M8 — multi-attachment vendor quote. quote.pdf carries real
+			// PDF bytes so a chip-click download opens cleanly in any
+			// viewer; logo.png reuses the 1×1 PNG.
+			yield* injectViaSmtp({
+				to: 'admin@taller.cat',
+				from: 'vendor@example.com',
+				subject: 'Vendor quote — final',
+				text: 'See attached.',
+				attachments: [
+					{
+						filename: 'quote.pdf',
+						contentType: 'application/pdf',
+						content: TINY_PDF,
+					},
+					{
+						filename: 'logo.png',
+						contentType: 'image/png',
+						content: ONE_PIXEL_PNG,
+					},
+				],
+			})
+
+			// M9 — Alice's outbound reply on the booking-module thread.
+			// The mail-worker only writes direction='inbound' today, so
+			// SMTP-then-IMAP-FETCH would mark this 'inbound' too.
+			// Direct INSERT keeps direction/folder honest. Pre-create the
+			// thread_link so M9 joins M1+M2 immediately; the worker's
+			// later ingest of M1 hits ON CONFLICT and just refreshes
+			// updated_at on the same link.
+			yield* sql`
+				INSERT INTO email_thread_links ${sql.insert({
+					organizationId: tallerHuman.orgId,
+					inboxId: tallerHuman.id,
+					externalThreadId: m1.messageId,
+					subject: 'Quote for the booking module',
+				})}
+				ON CONFLICT (organization_id, external_thread_id) DO NOTHING
+			`
+			yield* sql`
+				INSERT INTO email_messages ${sql.insert({
+					organizationId: tallerHuman.orgId,
+					inboxId: tallerHuman.id,
+					messageId: `<m9-${randomUUID()}@taller.cat>`,
+					inReplyTo: m1.messageId,
+					references: [m1.messageId],
+					direction: 'outbound',
+					folder: 'Sent',
+					rawRfc822Ref: `messages/${tallerHuman.orgId}/${tallerHuman.id}/seed/m9.eml`,
+					subject: 'Re: Quote for the booking module',
+					textBody:
+						'Hi Pep,\n\nAttached is the quote for the booking module. Let me know what you think.\n\nAlice',
+					textPreview: 'Hi Pep, Attached is the quote for the booking module.',
+					recipients: JSON.stringify({
+						to: ['pep@calpepfonda.cat'],
+						cc: [],
+						bcc: [],
+					}),
+					status: 'normal',
+				})}
+			`
+			yield* Effect.logInfo('  message: M9 outbound (Sent folder, taller)')
+
+			// M12 — standalone spam-classified inbound. The worker does
+			// not classify on ingest; INSERT directly so the demo shows
+			// inbound_classification='spam' as a live UI state. The
+			// thread root is M12 itself (no parent) so external_thread_id
+			// equals message_id — same shape resolveThreadId would write.
+			const m12MsgId = `<m12-${randomUUID()}@scam.example>`
+			yield* sql`
+				INSERT INTO email_thread_links ${sql.insert({
+					organizationId: tallerHuman.orgId,
+					inboxId: tallerHuman.id,
+					externalThreadId: m12MsgId,
+					subject: 'URGENT: wire transfer needed',
+				})}
+				ON CONFLICT (organization_id, external_thread_id) DO NOTHING
+			`
+			yield* sql`
+				INSERT INTO email_messages ${sql.insert({
+					organizationId: tallerHuman.orgId,
+					inboxId: tallerHuman.id,
+					messageId: m12MsgId,
+					direction: 'inbound',
+					folder: 'INBOX',
+					rawRfc822Ref: `messages/${tallerHuman.orgId}/${tallerHuman.id}/seed/m12.eml`,
+					subject: 'URGENT: wire transfer needed',
+					textBody:
+						'Dear customer, please wire €5000 to the account below within 24 hours.',
+					textPreview: 'Dear customer, please wire €5000…',
+					recipients: JSON.stringify({
+						to: ['admin@taller.cat'],
+						cc: [],
+						bcc: [],
+					}),
+					status: 'normal',
+					inboundClassification: 'spam',
+				})}
+			`
+			yield* Effect.logInfo('  message: M12 inbound (spam classification)')
+		}
+		if (tallerAgent) {
+			// M4 — single attachment on the agent inbox; exercises the
+			// inbox-filter dropdown and the inbound-attachment download path
+			yield* injectViaSmtp({
+				to: 'agent@taller.cat',
+				from: 'photos@hostalpirineu.com',
+				subject: 'Visit photos attached',
+				text: "Hi, photos from yesterday's visit attached.",
+				attachments: [
+					{
+						filename: 'photo.png',
+						contentType: 'image/png',
+						content: ONE_PIXEL_PNG,
+					},
+				],
+			})
+		}
+		if (restaurantHuman) {
+			const m5 = yield* injectViaSmtp({
+				to: 'admin@restaurant.demo',
+				from: 'noreply@batuda.dev',
+				subject: 'Welcome to Batuda',
+				text: 'Welcome Bob! Reply when ready and we’ll set up your first inbox.',
+			})
+			yield* injectViaSmtp({
+				to: 'admin@restaurant.demo',
+				from: 'noreply@batuda.dev',
+				subject: 'Re: Welcome to Batuda',
+				text: 'Quick follow-up — let me know if anything is unclear.',
+				inReplyTo: m5.messageId,
+				references: [m5.messageId],
+			})
+		}
+		if (restaurantAgent) {
+			yield* injectViaSmtp({
+				to: 'agent@restaurant.demo',
+				from: 'support@example.com',
+				subject: 'Out of office',
+				text: 'Out today, back Monday.',
+			})
+		}
+
+		yield* Effect.logInfo(
+			'Demo emails injected into Mailpit. Run `pnpm dev` — the mail-worker will ingest them within ~5 s.',
+		)
 
 		// Full preset extras
 		if (preset === 'full') {

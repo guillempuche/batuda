@@ -20,6 +20,7 @@ import {
 } from './commands/calendar/simulate-webhook'
 import { dbMigrate, dbReset } from './commands/db'
 import { doctor } from './commands/doctor'
+import { emailInject } from './commands/email'
 import { seed, seedIdentities } from './commands/seed'
 import { servicesDown, servicesStatus, servicesUp } from './commands/services'
 import { appendEnvKeys, resetEnvFile, setup } from './commands/setup'
@@ -535,6 +536,61 @@ const calendarCommand = Command.make('calendar').pipe(
 	]),
 )
 
+// ── Email ──────────────────────────────────────────────────
+
+const emailInjectCommand = Command.make(
+	'inject',
+	{
+		to: Flag.string('to').pipe(
+			Flag.withDescription('Recipient address (must match a seeded inbox)'),
+		),
+		from: Flag.string('from').pipe(
+			Flag.withDescription('Sender address (any value works locally)'),
+		),
+		subject: Flag.string('subject').pipe(Flag.withDescription('Subject line')),
+		text: Flag.string('text').pipe(
+			Flag.withDescription('Plain-text body'),
+			Flag.optional,
+		),
+		html: Flag.string('html').pipe(
+			Flag.withDescription('HTML body (sets Content-Type: text/html)'),
+			Flag.optional,
+		),
+		inReplyTo: Flag.string('in-reply-to').pipe(
+			Flag.withDescription('Message-Id this reply targets (chains threading)'),
+			Flag.optional,
+		),
+		host: Flag.string('smtp-host').pipe(
+			Flag.withDescription('Mailpit SMTP host'),
+			Flag.withDefault('localhost'),
+		),
+		port: Flag.integer('smtp-port').pipe(
+			Flag.withDescription('Mailpit SMTP port'),
+			Flag.withDefault(1025),
+		),
+	},
+	({ to, from, subject, text, html, inReplyTo, host, port }) =>
+		emailInject({
+			to,
+			from,
+			subject,
+			text: Option.getOrUndefined(text),
+			html: Option.getOrUndefined(html),
+			inReplyTo: Option.getOrUndefined(inReplyTo),
+			host,
+			port,
+		}),
+).pipe(
+	Command.withDescription(
+		'SMTP a canned message into Mailpit so the mail-worker can ingest it via IMAP',
+	),
+)
+
+const emailCommand = Command.make('email').pipe(
+	Command.withDescription('Email: inject canned messages into Mailpit'),
+	Command.withSubcommands([emailInjectCommand]),
+)
+
 // ── Root ───────────────────────────────────────────────────
 
 const batuda = Command.make('batuda').pipe(
@@ -547,6 +603,7 @@ const batuda = Command.make('batuda').pipe(
 		authCommand,
 		servicesCommand,
 		calendarCommand,
+		emailCommand,
 	]),
 )
 

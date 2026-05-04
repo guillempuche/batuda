@@ -173,6 +173,43 @@ const storageCheck: Check = {
 	),
 }
 
+const emailCredentialKeyCheck: Check = {
+	name: 'EMAIL_CREDENTIAL_KEY',
+	run: Effect.sync(() => {
+		const value = process.env['EMAIL_CREDENTIAL_KEY'] ?? ''
+		if (!value) {
+			return fail('not set → required for inbox seed; run `pnpm cli setup`')
+		}
+		const decoded = Buffer.from(value, 'base64')
+		if (decoded.length !== 32) {
+			return fail(
+				`base64 must decode to 32 bytes (got ${decoded.length}) → regenerate with \`node -e "console.log(crypto.randomBytes(32).toString('base64'))"\``,
+			)
+		}
+		return ok('32 bytes')
+	}),
+}
+
+const mailpitCheck: Check = {
+	name: 'Mailpit',
+	run: Effect.tryPromise({
+		try: () =>
+			fetch('http://localhost:8025/api/v1/info', {
+				signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
+			}),
+		catch: () => null,
+	}).pipe(
+		Effect.map(res =>
+			res?.ok
+				? ok('listening on :8025 (SMTP :1025, IMAP :1143)')
+				: warn('stopped → run `pnpm cli services up`'),
+		),
+		Effect.catch(() =>
+			Effect.succeed(warn('stopped → run `pnpm cli services up`')),
+		),
+	),
+}
+
 const cloudDbHostCheck: Check = {
 	name: 'Cloud DB host',
 	run: Effect.sync(() => {
@@ -205,11 +242,13 @@ const cloudAuthUrlCheck: Check = {
 const localChecks: Check[] = [
 	fileCheck('.env', '.env file'),
 	fileCheck('apps/cli/.env', 'apps/cli/.env file'),
+	emailCredentialKeyCheck,
 	dockerCheck,
 	composeCheck,
 	dbConnectionCheck,
 	migrationCheck,
 	storageCheck,
+	mailpitCheck,
 	urlCheck(
 		'Server',
 		'https://api.batuda.localhost/health',
