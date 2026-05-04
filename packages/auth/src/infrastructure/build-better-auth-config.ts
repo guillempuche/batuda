@@ -34,18 +34,35 @@ export interface BuildBetterAuthConfigInput<
  * concrete plugin tuple and `additionalFields`.
  */
 
-// Strip the first hostname label (the API subdomain) to get a parent cookie
-// domain. e.g. api.batuda.co → batuda.co. Returns undefined for hostnames
-// with fewer than 3 labels (single-label `localhost`, two-label `batuda.co`),
-// where there is no meaningful parent — Better Auth then omits the Domain
-// attribute and the cookie stays host-only.
-const cookieDomainFromBaseURL = (
+// Derive a parent cookie domain from the API base URL so the session
+// cookie spans both the API host and its sibling app host.
+//
+//   prod      api.batuda.co                 → batuda.co
+//   prod-deep api.eu-west.batuda.co         → eu-west.batuda.co  (strip first label)
+//   dev       api.batuda.localhost          → batuda.localhost
+//   worktree  feature-x.api.batuda.localhost → batuda.localhost  (collapse to apex)
+//
+// Production keeps the existing "strip first label" rule so an
+// intentional multi-tier hostname (`api.eu-west.example.com`) still
+// resolves to its meaningful parent. .localhost hostnames collapse to
+// the last two labels because dev workflows put the worktree branch as
+// the leftmost label and need both `<branch>.batuda.localhost` and
+// `<branch>.api.batuda.localhost` to share the cookie.
+//
+// Returns undefined for hostnames with fewer than 2 labels, so Better
+// Auth omits the Domain attribute and the cookie stays host-only.
+export const cookieDomainFromBaseURL = (
 	baseURL: string | undefined,
 ): string | undefined => {
 	if (!baseURL) return undefined
 	try {
 		const { hostname } = new URL(baseURL)
 		const labels = hostname.split('.')
+		if (labels.length < 2) return undefined
+		const isLocalhost = labels[labels.length - 1] === 'localhost'
+		if (isLocalhost) {
+			return labels.slice(-2).join('.')
+		}
 		return labels.length >= 3 ? labels.slice(1).join('.') : undefined
 	} catch {
 		return undefined
