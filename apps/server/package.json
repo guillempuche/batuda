@@ -3,7 +3,7 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
-		"dev": "portless api.batuda node --watch --env-file=../../.env --import tsx src/main.ts",
+		"dev": "portless run --name api.batuda node --watch --env-file=../../.env --import tsx src/main.ts",
 		"dev:mcp": "node --env-file=../../.env --import tsx src/mcp-stdio.ts",
 		"build": "tsdown src/main.ts src/mcp-stdio.ts src/db/migrate.ts",
 		"check-types": "tsc --noEmit",
