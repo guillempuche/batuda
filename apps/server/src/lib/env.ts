@@ -1,4 +1,32 @@
-import { Config, Effect, Layer, Schema, ServiceMap } from 'effect'
+import {
+	Config,
+	ConfigProvider,
+	Effect,
+	Layer,
+	Schema,
+	ServiceMap,
+} from 'effect'
+
+/**
+ * Returns the first ALLOWED_ORIGINS pattern that uses a wildcard
+ * subdomain whose suffix is NOT under `.localhost`, or `null` if every
+ * pattern is safe. Production origins must be listed explicitly so a
+ * misconfigured deploy can't grant CORS + Better-Auth trust to every
+ * subdomain of an externally-resolvable apex.
+ */
+export function findUnsafeWildcardOrigin(
+	patterns: ReadonlyArray<string>,
+): string | null {
+	for (const pattern of patterns) {
+		const wildcardAt = pattern.indexOf('://*.')
+		if (wildcardAt === -1) continue
+		const suffix = pattern.slice(wildcardAt + '://*.'.length)
+		if (suffix === 'localhost') continue
+		if (suffix.endsWith('.localhost')) continue
+		return pattern
+	}
+	return null
+}
 
 export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 	make: Effect.gen(function* () {
@@ -26,9 +54,32 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 			Schema.Literals(['strict', 'loose']),
 			'BETTER_AUTH_RATE_LIMIT',
 		).pipe(Config.withDefault('strict' as const))
+		// Comma-separated list of trusted origins (e.g.
+		// `https://batuda.localhost`). Each entry is either a literal
+		// origin matched exactly or a wildcard-subdomain pattern
+		// `https://*.host`. Wildcards are accepted only when the suffix
+		// ends in `.localhost` — production hosts (`*.example.com`) are
+		// rejected at boot to avoid shipping a broad subdomain-trust hole.
+		// Same array is reused as Better-Auth `trustedOrigins`.
 		const ALLOWED_ORIGINS = yield* Config.string('ALLOWED_ORIGINS').pipe(
 			Config.withDefault(''),
 			Config.map(s => (s ? s.split(',').map(o => o.trim()) : [])),
+			Config.mapOrFail(patterns => {
+				const offending = findUnsafeWildcardOrigin(patterns)
+				if (offending !== null) {
+					return Effect.fail(
+						new Config.ConfigError(
+							new ConfigProvider.SourceError({
+								message:
+									`ALLOWED_ORIGINS rejects wildcard pattern "${offending}": ` +
+									'wildcard subdomains are only allowed under .localhost. ' +
+									'List each production origin explicitly.',
+							}),
+						),
+					)
+				}
+				return Effect.succeed(patterns)
+			}),
 		)
 
 		// S3-compatible object storage. Same code path serves MinIO (local
