@@ -4,7 +4,7 @@
 	"description": "Batuda — internal CRM app",
 	"type": "module",
 	"scripts": {
-		"dev": "portless batuda vite dev",
+		"dev": "portless run --name batuda vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
 		"check-types": "pnpm routes:generate && tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
