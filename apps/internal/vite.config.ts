@@ -20,10 +20,33 @@ import { defineConfig } from 'vite'
 // on a `localhost`-suffixed host, which RFC 6761-aware browsers refuse —
 // the SSR-on-reload path then sees no cookie and bounces to /login.
 // Production keeps the cross-origin setup (real TLD, browsers always
-// accept the parent domain). Override with INTERNAL_API_URL when the
-// API runs on a non-default portless subdomain locally.
+// accept the parent domain).
+//
+// Resolution order:
+//   1. `INTERNAL_API_URL` — explicit override.
+//   2. Derived from `PORTLESS_URL` (set by `portless run`) when the
+//      Vite dev server is itself on `*.batuda.localhost`. This makes
+//      a worktree at `feature-x.batuda.localhost` proxy to its
+//      matching API at `feature-x.api.batuda.localhost` with no per-
+//      worktree env file.
+//   3. Default `https://api.batuda.localhost` for the main checkout.
+const portlessUrl = process.env['PORTLESS_URL']
+const derivedApiTarget = (() => {
+	if (!portlessUrl) return null
+	const marker = 'batuda.localhost'
+	try {
+		const url = new URL(portlessUrl)
+		if (!url.host.endsWith(marker)) return null
+		const apiHost = url.host.replace(marker, `api.${marker}`)
+		return `${url.protocol}//${apiHost}`
+	} catch {
+		return null
+	}
+})()
 const apiTarget =
-	process.env['INTERNAL_API_URL'] ?? 'https://api.batuda.localhost'
+	process.env['INTERNAL_API_URL'] ??
+	derivedApiTarget ??
+	'https://api.batuda.localhost'
 
 // Proxy scope is the closed enumeration of API paths the frontend talks
 // to: Better Auth (`/auth/*`), the typed REST API (`/v1/*`), and the
