@@ -28,6 +28,7 @@ import { motion } from 'motion/react'
 import { useCallback, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
+import { Sidebar, Stack, Switcher } from '@batuda/ui'
 import {
 	PriButton,
 	PriCollapsible,
@@ -46,17 +47,17 @@ import {
 import { emailsSearchAtom } from '#/atoms/emails-atoms'
 import { pagesSearchAtom } from '#/atoms/pages-atoms'
 import { researchListAtom } from '#/atoms/research-atoms'
+import { AboutSection } from '#/components/companies/about-section'
+import { CadenceCard } from '#/components/companies/cadence-card'
 import { CalendarTab } from '#/components/companies/calendar-tab'
+import { NextActionCard } from '#/components/companies/next-action-card'
+import { OpenTasksCard } from '#/components/companies/open-tasks-card'
+import { ResearchSummaryCard } from '#/components/companies/research-summary-card'
 import { UpcomingMeetingsCard } from '#/components/companies/upcoming-meetings-card'
 import { WherePanel } from '#/components/companies/where-panel'
 import { ResearchDialog } from '#/components/research/research-dialog'
 import { RunDetail } from '#/components/research/run-detail'
 import { type ResearchRunRow, RunList } from '#/components/research/run-list'
-import {
-	EditableChips,
-	EditableField,
-	EditableSelect,
-} from '#/components/shared/editable-field'
 import { EmptyState } from '#/components/shared/empty-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { PriorityDot } from '#/components/shared/priority-dot'
@@ -535,6 +536,19 @@ function DetailBody({
 		[tasks],
 	)
 
+	const openTasks = useMemo(
+		() =>
+			tasks
+				.filter(task => task.completedAt === null)
+				.slice()
+				.sort((a, b) => {
+					const da = a.dueAt ? Date.parse(a.dueAt) : Number.POSITIVE_INFINITY
+					const db = b.dueAt ? Date.parse(b.dueAt) : Number.POSITIVE_INFINITY
+					return da - db
+				}),
+		[tasks],
+	)
+
 	const [showSystemEvents, setShowSystemEvents] = useState(false)
 	const visibleTimeline = useMemo(
 		() =>
@@ -826,7 +840,7 @@ function DetailBody({
 			<PriTabs.Root value={tab} onValueChange={v => setTab(v as CompanyTab)}>
 				<PriTabs.List>
 					<PriTabs.Tab value='profile'>
-						<Trans>Profile</Trans>
+						<Trans>Overview</Trans>
 					</PriTabs.Tab>
 					<PriTabs.Tab value='where'>
 						<Trans>Where</Trans>
@@ -860,117 +874,90 @@ function DetailBody({
 
 				<PriTabs.Panel value='profile'>
 					<PanelWrap>
-						<UpcomingMeetingsCard companyId={company.id} />
-						<CadenceBlock>
-							<CadenceTitle>
-								<Trans>Cadence</Trans>
-							</CadenceTitle>
-							<CadenceGrid>
-								<CadenceRow>
-									<CadenceLabel>
-										<Trans>Last email</Trans>
-									</CadenceLabel>
-									<RelativeDate
-										value={company.lastEmailAt}
-										fallback={t`never`}
+						<Stack $gap='lg'>
+							<Switcher $threshold='48rem' $gap='md'>
+								<NextActionCard
+									value={company.nextAction}
+									onSave={next => saveField('nextAction', next)}
+								/>
+								<CadenceCard
+									lastEmailAt={company.lastEmailAt}
+									lastCallAt={company.lastCallAt}
+									lastMeetingAt={company.lastMeetingAt}
+									nextCalendarEventAt={company.nextCalendarEventAt}
+									onLogInteraction={handleLogInteraction}
+								/>
+								<UpcomingMeetingsCard companyId={company.id} />
+							</Switcher>
+							<Sidebar
+								$side='right'
+								$sideWidth='22rem'
+								$contentMin='50%'
+								$gap='md'
+							>
+								<Stack $gap='md'>
+									<OpenTasksCard tasks={openTasks} />
+									<OverviewTimeline data-testid='company-overview-timeline'>
+										<PriCollapsible.Root defaultOpen>
+											<TimelineTrigger>
+												<ChevronRight size={14} aria-hidden />
+												<Trans>Timeline</Trans>
+											</TimelineTrigger>
+											<PriCollapsible.Panel>
+												<TimelinePanelInner>
+													<TimelineToolbar>
+														<SystemEventsToggle>
+															<input
+																type='checkbox'
+																checked={showSystemEvents}
+																onChange={e =>
+																	setShowSystemEvents(e.target.checked)
+																}
+															/>
+															<Trans>Show system events</Trans>
+														</SystemEventsToggle>
+													</TimelineToolbar>
+													{visibleTimeline.length === 0 ? (
+														<EmptyState
+															title={t`No activity yet`}
+															description={t`Emails, calls, documents, and proposals will appear here as they happen.`}
+														/>
+													) : (
+														<TimelineList>
+															{visibleTimeline.map(row => {
+																const entry: TimelineEntryData = {
+																	id: row.id,
+																	channel: row.channel,
+																	subject: null,
+																	summary: row.summary,
+																	outcome: null,
+																	nextAction: null,
+																	date: row.date,
+																	threadId: null,
+																}
+																return (
+																	<TimelineEntry key={row.id} entry={entry} />
+																)
+															})}
+														</TimelineList>
+													)}
+												</TimelinePanelInner>
+											</PriCollapsible.Panel>
+										</PriCollapsible.Root>
+									</OverviewTimeline>
+								</Stack>
+								<Stack $gap='md'>
+									<ResearchSummaryCard
+										runs={researchRuns}
+										onRunNew={() => setResearchDialogOpen(true)}
 									/>
-								</CadenceRow>
-								<CadenceRow>
-									<CadenceLabel>
-										<Trans>Last call</Trans>
-									</CadenceLabel>
-									<RelativeDate
-										value={company.lastCallAt}
-										fallback={t`never`}
+									<AboutSection
+										company={company}
+										onSave={(field, next) => saveField(field, next)}
 									/>
-								</CadenceRow>
-								<CadenceRow>
-									<CadenceLabel>
-										<Trans>Last meet</Trans>
-									</CadenceLabel>
-									<RelativeDate
-										value={company.lastMeetingAt}
-										fallback={t`never`}
-									/>
-								</CadenceRow>
-								<CadenceRow>
-									<CadenceLabel>
-										<Trans>Next event</Trans>
-									</CadenceLabel>
-									<RelativeDate
-										value={company.nextCalendarEventAt}
-										fallback={t`none scheduled`}
-									/>
-								</CadenceRow>
-							</CadenceGrid>
-						</CadenceBlock>
-						<ProfileGrid>
-							<EditableField
-								label={t`Industry`}
-								value={company.industry}
-								onSave={next => saveField('industry', next)}
-							/>
-							<EditableField
-								label={t`Region`}
-								value={company.region}
-								onSave={next => saveField('region', next)}
-							/>
-							<EditableField
-								label={t`Location`}
-								value={company.location}
-								onSave={next => saveField('location', next)}
-							/>
-							<EditableField
-								label={t`Size`}
-								value={company.sizeRange}
-								onSave={next => saveField('sizeRange', next)}
-							/>
-							<EditableField
-								label={t`Source`}
-								value={company.source}
-								onSave={next => saveField('source', next)}
-							/>
-							<EditableSelect
-								label={t`Priority`}
-								value={
-									company.priority === null ? null : String(company.priority)
-								}
-								options={priorityOptions}
-								onSave={next =>
-									saveField('priority', next === null ? null : Number(next))
-								}
-								placeholder={t`— not set —`}
-							/>
-							<EditableField
-								label={t`Current tools`}
-								value={company.currentTools}
-								onSave={next => saveField('currentTools', next)}
-							/>
-							<EditableField
-								label={t`Pain points`}
-								value={company.painPoints}
-								onSave={next => saveField('painPoints', next)}
-								multiline
-							/>
-							<EditableField
-								label={t`Next action`}
-								value={company.nextAction}
-								onSave={next => saveField('nextAction', next)}
-								multiline
-							/>
-							<EditableChips
-								label={t`Tags`}
-								values={company.tags}
-								onSave={next => saveField('tags', next)}
-								emptyHint={t`No tags yet`}
-							/>
-							<EditableChips
-								label={t`Products fit`}
-								values={company.productsFit}
-								onSave={next => saveField('productsFit', next)}
-								emptyHint={t`No products linked yet`}
-							/>
-						</ProfileGrid>
+								</Stack>
+							</Sidebar>
+						</Stack>
 					</PanelWrap>
 				</PriTabs.Panel>
 
@@ -1275,51 +1262,6 @@ function DetailBody({
 					refreshResearch()
 				}}
 			/>
-
-			<TimelineSection>
-				<PriCollapsible.Root defaultOpen>
-					<PriCollapsible.Trigger>
-						<ChevronRight size={14} aria-hidden />
-						<Trans>Timeline</Trans>
-					</PriCollapsible.Trigger>
-					<PriCollapsible.Panel>
-						<TimelinePanelInner>
-							<TimelineToolbar>
-								<SystemEventsToggle>
-									<input
-										type='checkbox'
-										checked={showSystemEvents}
-										onChange={e => setShowSystemEvents(e.target.checked)}
-									/>
-									<Trans>Show system events</Trans>
-								</SystemEventsToggle>
-							</TimelineToolbar>
-							{visibleTimeline.length === 0 ? (
-								<EmptyState
-									title={t`No activity yet`}
-									description={t`Emails, calls, documents, and proposals will appear here as they happen.`}
-								/>
-							) : (
-								<TimelineList>
-									{visibleTimeline.map(row => {
-										const entry: TimelineEntryData = {
-											id: row.id,
-											channel: row.channel,
-											subject: null,
-											summary: row.summary,
-											outcome: null,
-											nextAction: null,
-											date: row.date,
-											threadId: null,
-										}
-										return <TimelineEntry key={row.id} entry={entry} />
-									})}
-								</TimelineList>
-							)}
-						</TimelinePanelInner>
-					</PriCollapsible.Panel>
-				</PriCollapsible.Root>
-			</TimelineSection>
 		</Page>
 	)
 }
@@ -1743,113 +1685,6 @@ const ResearchPanelBody = styled.div.withConfig({
 	}
 `
 
-const ProfileGrid = styled.div.withConfig({
-	displayName: 'CompanyDetailProfileGrid',
-})`
-	display: grid;
-	grid-template-columns: 1fr;
-	gap: var(--space-md);
-
-	@media (min-width: 768px) {
-		grid-template-columns: 1fr 1fr;
-	}
-`
-
-const CadenceBlock = styled.section.withConfig({
-	displayName: 'CompanyDetailCadenceBlock',
-})`
-	${agedPaperSurface}
-	position: relative;
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-sm);
-	margin-bottom: var(--space-lg);
-	padding: var(--space-md) var(--space-md) var(--space-xs);
-
-	/* Screw dot top-left — stamped log-plate feel */
-	&::before {
-		content: '';
-		position: absolute;
-		top: 6px;
-		left: 6px;
-		width: 5px;
-		height: 5px;
-		border-radius: 50%;
-		background: radial-gradient(
-			circle at 35% 35%,
-			var(--color-metal-dark),
-			var(--color-metal-deep)
-		);
-	}
-
-	&::after {
-		content: '';
-		position: absolute;
-		top: 6px;
-		right: 6px;
-		width: 5px;
-		height: 5px;
-		border-radius: 50%;
-		background: radial-gradient(
-			circle at 35% 35%,
-			var(--color-metal-dark),
-			var(--color-metal-deep)
-		);
-	}
-`
-
-const CadenceTitle = styled.h3.withConfig({
-	displayName: 'CompanyDetailCadenceTitle',
-})`
-	${stenciledTitle}
-	margin: 0;
-	font-size: var(--typescale-label-medium-size);
-	opacity: 0.85;
-`
-
-const CadenceGrid = styled.dl.withConfig({
-	displayName: 'CompanyDetailCadenceGrid',
-})`
-	display: grid;
-	grid-template-columns: 1fr;
-	margin: 0;
-
-	@media (min-width: 640px) {
-		grid-template-columns: 1fr 1fr;
-		column-gap: var(--space-lg);
-	}
-`
-
-const CadenceRow = styled.div.withConfig({
-	displayName: 'CompanyDetailCadenceRow',
-})`
-	${ruledLedgerRow}
-	display: flex;
-	align-items: baseline;
-	justify-content: space-between;
-	gap: var(--space-sm);
-	padding: var(--space-xs) 0;
-	font-family: var(--font-body);
-	font-size: var(--typescale-body-medium-size);
-	color: var(--color-on-surface-variant);
-
-	&:first-child,
-	@media (min-width: 640px) {
-		&:nth-child(2) {
-			border-top: none;
-		}
-	}
-`
-
-const CadenceLabel = styled.dt.withConfig({
-	displayName: 'CompanyDetailCadenceLabel',
-})`
-	${stenciledTitle}
-	margin: 0;
-	font-size: var(--typescale-label-small-size);
-	opacity: 0.75;
-`
-
 const ContactList = styled.ul.withConfig({
 	displayName: 'CompanyDetailContactList',
 })`
@@ -2193,12 +2028,25 @@ const TaskMeta = styled.span.withConfig({
 	flex-shrink: 0;
 `
 
-const TimelineSection = styled.section.withConfig({
-	displayName: 'CompanyDetailTimelineSection',
+const OverviewTimeline = styled.section.withConfig({
+	displayName: 'CompanyDetailOverviewTimeline',
 })`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
+`
+
+const TimelineTrigger = styled(PriCollapsible.Trigger).withConfig({
+	displayName: 'CompanyDetailTimelineTrigger',
+})`
+	& > svg {
+		transition: transform 200ms ease;
+	}
+
+	&[data-open] > svg,
+	&[aria-expanded='true'] > svg {
+		transform: rotate(90deg);
+	}
 `
 
 const TimelinePanelInner = styled.div.withConfig({
