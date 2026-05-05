@@ -134,8 +134,35 @@ If ALL changed files match `ai` patterns → use `ai` type. If mixed with non-AI
 2. **Body**: Past tense, capital start, period at end
 3. **No attribution**: Never include "Co-Authored-By", "Generated with", or any AI/author attribution
 4. **AI-only changes**: When changes are exclusively AI-related (see AI Scope), always use `ai` type
-5. **No mechanical cleanup**: Don't mention consequences obvious from the primary change (removed unused imports, unwrapped single-child fragments, updated indentation). Focus on intent
+5. **No mechanical cleanup or implementation narration**: Don't mention consequences obvious from the primary change (removed unused imports, unwrapped single-child fragments, updated indentation), and don't describe how the diff achieves the change ("added a helper that maps X to Y" when the diff is the helper). Focus on intent / why, not mechanism
 6. **No tautology**: The subject must not repeat the type as a verb. The type already conveys the action — e.g., `fix: fix the login` → `fix: resolve login failure`, `refactor: refactor auth` → `refactor: simplify auth flow`
+
+## Body sizing
+
+**One bullet per topic, not per file.** Files are an implementation detail; the diff already lists them. A topic is a distinct concern a reader needs to understand: a behavior change, a follow-up worth flagging, a side effect that lives outside the diff. A 10-file rename across one package is one topic; a one-file PR that fixes a bug *and* changes a wire-shape *and* defers a TODO is three.
+
+The diff shows what changed; the message answers *why*. When in doubt, fewer bullets. Each bullet earns its place by carrying information the diff doesn't.
+
+| Topics in the change                                    | Body                                                                          |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Zero (subject already conveys intent fully)             | None — subject is enough                                                      |
+| One                                                     | 0–1 bullet, ≤ 2 sentences                                                     |
+| Two or three (split into separate commits if practical) | 2–3 bullets                                                                   |
+| More                                                    | First reconsider whether this should be multiple commits; if not, 3–5 bullets |
+
+**Skip a bullet that:**
+
+- Restates the subject in different words.
+- Lists files — `git log --stat` shows them.
+- Narrates implementation steps the diff already shows.
+- Recaps the investigation. The investigation belongs in the PR description, not the commit body.
+- Reports test counts or "all green" results unless the change itself is a test infra fix.
+
+**Keep a bullet that:**
+
+- Explains *why* when it isn't obvious from the diff (non-local invariant, regression cause, external constraint).
+- Flags a side effect a future reader might miss (wire-shape change, env var added, perf trade-off).
+- Notes follow-up work intentionally deferred.
 
 ## Validation Checklist
 
@@ -151,6 +178,16 @@ Run this checklist on every message **before** returning the preview:
 
 ```
 feat(server): add health check endpoint
+```
+
+```
+fix(web): handle empty pipeline state without throwing
+```
+
+```
+test(server): make email-attachment-download self-sufficient
+
+- Previous version resolved admin@taller.cat from the seed; multi-org-isolation truncates inboxes between runs and pre-push then failed in beforeAll. Synthetic fixture ids survive the truncate and clean up after themselves.
 ```
 
 ```
