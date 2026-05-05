@@ -177,7 +177,7 @@ const dbMigrateCommand = Command.make('migrate', {}, () => dbMigrate).pipe(
 
 const dbResetCommand = Command.make('reset', {}, () => withDb(dbReset)).pipe(
 	Command.withDescription(
-		'Drop the public schema and re-run migrations (no seed; chain `seed` for sample data)',
+		'Drop the public schema, re-run migrations, and clear Mailpit (no seed; chain `seed` for sample data)',
 	),
 )
 
