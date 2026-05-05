@@ -820,24 +820,10 @@ function DetailBody({
 							<Trans>Email</Trans>
 						</PriButton>
 					</form>
-					<PriButton
-						type='button'
-						$variant='outlined'
-						disabled
-						data-testid='action-add-task'
-					>
-						<Plus size={16} aria-hidden />
-						<Trans>Add task</Trans>
-					</PriButton>
-					<PriButton
-						type='button'
-						$variant='outlined'
-						disabled
-						data-testid='action-new-proposal'
-					>
-						<Plus size={16} aria-hidden />
-						<Trans>New proposal</Trans>
-					</PriButton>
+					{/* "Add task" and "New proposal" are gated on flows that
+					 * don't exist yet (no task-create endpoint, no
+					 * proposal-create endpoint). Showing them disabled reads
+					 * as broken; they'll surface when their flows land. */}
 				</PrimaryActions>
 			</Header>
 
@@ -1359,6 +1345,13 @@ const Header = styled(motion.header).withConfig({
 	gap: var(--space-md);
 	padding: var(--space-lg) var(--space-lg) var(--space-md);
 	box-shadow: var(--elevation-workshop-md);
+	/* Stay pinned at the top of the BlueprintSheet PriScrollArea so the
+	 * identity, status, and primary actions stay reachable while the
+	 * user scrolls the dashboard body. The z-index sits above the tab
+	 * indicator (z=1) but below toasts (z=20). */
+	position: sticky;
+	top: 0;
+	z-index: 5;
 `
 
 const IdentityRow = styled.div.withConfig({
