@@ -22,21 +22,37 @@ const PriList = styled(Tabs.List).withConfig({
 })`
 	position: relative;
 	display: flex;
+	flex-wrap: nowrap;
 	gap: 2px;
 	padding: 0 var(--space-sm);
 	border-bottom: 2px solid rgba(0, 0, 0, 0.18);
 	background: transparent;
+	overflow-x: auto;
+	overflow-y: hidden;
+	scrollbar-width: thin;
+	scroll-snap-type: x proximity;
+
+	&::-webkit-scrollbar {
+		height: 4px;
+	}
+	&::-webkit-scrollbar-thumb {
+		background: color-mix(in oklab, var(--color-on-surface) 25%, transparent);
+		border-radius: 4px;
+	}
 `
 
 const PriTab = styled(Tabs.Tab).withConfig({
 	displayName: 'PriTabsTab',
 })`
 	position: relative;
+	flex-shrink: 0;
+	scroll-snap-align: start;
 	background: #e7dec4;
 	border: none;
 	padding: var(--space-sm) var(--space-lg) var(--space-xs);
 	margin-bottom: -2px;
 	min-height: 2.5rem;
+	white-space: nowrap;
 	clip-path: polygon(
 		12px 0,
 		calc(100% - 12px) 0,
