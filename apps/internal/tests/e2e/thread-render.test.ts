@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test'
 
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
-// Thread-render path. The seed SMTPs M1 + M2 (Pep × Alice) so this
+// Thread-render path. The seed direct-INSERTs M1 + M2 (Pep × Alice) so this
 // spec opens the resulting thread and verifies that:
 //   1. Both message cards render with the right `data-direction`.
 //   2. Cards appear in chronological order (M1 received_at < M2).

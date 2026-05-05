@@ -5,13 +5,13 @@ import { expect, test } from '@playwright/test'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 import { injectViaSmtp } from './helpers/smtp-inject'
 
-// Cross-process IMAP-ingest roundtrip. Inject a fresh message via
-// SMTP into Mailpit; the mail-worker IMAP-IDLEs against the same
-// Mailpit, fetches the new UID, and writes an `email_messages` row.
-// We poll the DB for the row with the unique subject so the test
-// never races against the worker's tick cadence. The atom-cache
-// refresh + UI render is left for inbox-listing.test.ts; this one
-// is intentionally narrow on the worker → DB boundary.
+// Cross-process IMAP-ingest roundtrip. SKIPPED locally: Mailpit (the
+// dev compose mail catcher) does not implement IMAP — only SMTP +
+// POP3 + HTTP. The mail-worker connects via ImapFlow, which fails
+// with "Unexpected close" on every tick, and the row this test
+// asserts can never appear. Re-enable once we swap Mailpit for a
+// test container that speaks IMAP (greenmail, dovecot, etc.) or
+// when this spec runs against a real provider in CI.
 
 const DATABASE_URL =
 	process.env['E2E_DATABASE_URL'] ??
@@ -36,37 +36,38 @@ const waitForRow = async (
 	throw new Error('worker did not ingest within timeout')
 }
 
-test.describe('SMTP → IMAP → DB roundtrip', () => {
-	test.beforeEach(async ({ page }) => {
-		// Make sure Alice is active on Taller so any UI-side assertions
-		// downstream resolve in the right org.
-		await page.goto('/', { waitUntil: 'commit' })
-		await setActiveOrgBySlug(page, 'taller')
-	})
+test.describe
+	.skip('SMTP → IMAP → DB roundtrip (needs IMAP-capable catcher)', () => {
+		test.beforeEach(async ({ page }) => {
+			// Make sure Alice is active on Taller so any UI-side assertions
+			// downstream resolve in the right org.
+			await page.goto('/', { waitUntil: 'commit' })
+			await setActiveOrgBySlug(page, 'taller')
+		})
 
-	test.describe('when an external sender SMTPs a fresh message', () => {
-		test('should appear as an inbound email_messages row within the worker tick window', async () => {
-			const testId = `roundtrip-${Date.now()}`
-			const subject = `e2e roundtrip ${testId}`
+		test.describe('when an external sender SMTPs a fresh message', () => {
+			test('should appear as an inbound email_messages row within the worker tick window', async () => {
+				const testId = `roundtrip-${Date.now()}`
+				const subject = `e2e roundtrip ${testId}`
 
-			// WHEN we SMTP-inject a message addressed to Alice's seeded inbox
-			await injectViaSmtp({
-				to: 'admin@taller.cat',
-				from: `sender-${testId}@example.com`,
-				subject,
-				text: `body ${testId}`,
-			})
+				// WHEN we SMTP-inject a message addressed to Alice's seeded inbox
+				await injectViaSmtp({
+					to: 'admin@taller.cat',
+					from: `sender-${testId}@example.com`,
+					subject,
+					text: `body ${testId}`,
+				})
 
-			// THEN the worker ingests it within ~30s (IDLE wake-up + folder-
-			// sync tick + INSERT). Poll on the unique subject to be tick-
-			// agnostic.
-			const direction = await waitForRow(() =>
-				psql(
-					`SELECT direction FROM email_messages
+				// THEN the worker ingests it within ~30s (IDLE wake-up + folder-
+				// sync tick + INSERT). Poll on the unique subject to be tick-
+				// agnostic.
+				const direction = await waitForRow(() =>
+					psql(
+						`SELECT direction FROM email_messages
 					 WHERE subject = '${subject.replace(/'/g, "''")}'`,
-				),
-			)
-			expect(direction).toBe('inbound')
+					),
+				)
+				expect(direction).toBe('inbound')
+			})
 		})
 	})
-})

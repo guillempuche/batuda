@@ -5,9 +5,10 @@ import { expect, test } from '@playwright/test'
 import { clearMailpit, getRawMessage, waitForMessage } from './helpers/mailpit'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
-// Reply path. The seed SMTPs M1+M2 (Pep × Alice) into Mailpit; the
-// mail-worker ingests them on its next IDLE cycle so the threads list
-// renders before the test runs. The reply submit goes through the same
+// Reply path. The seed direct-INSERTs M1+M2 (Pep × Alice) so the
+// thread renders the moment `pnpm cli seed` finishes — no IMAP
+// dependency (Mailpit doesn't speak IMAP). The reply submit goes
+// through the same
 // compose form the rest of the suite drives, so we lean on its
 // existing testids and assert on the wire bytes Mailpit captures —
 // the SMTP socket is the single authoritative source for "did the

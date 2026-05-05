@@ -4,13 +4,13 @@ import { expect, test } from '@playwright/test'
 
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
-// Inbound-attachment download path. The seed SMTPs M4 ("Visit photos
-// attached") into Mailpit on the agent inbox; the mail-worker
-// extracts the attachment, uploads it to MinIO, and writes the
-// metadata into `email_messages.attachments` JSONB. This spec opens
-// the resulting thread and exercises the chip click → server hands
-// the bytes back through `StorageProvider.get`. M8 ("Vendor quote —
-// final") is the multi-attachment variant.
+// Inbound-attachment download path. The seed direct-INSERTs M4
+// ("Visit photos attached") on the agent inbox and uploads the bytes
+// to MinIO at `messages/<org>/<inbox>/seed/<slug>/attachment-0.bin`,
+// with `email_messages.attachments` JSONB pointing at the key. This
+// spec opens the resulting thread and exercises the chip click →
+// server hands the bytes back through `StorageProvider.get`. M8
+// ("Vendor quote — final") is the multi-attachment variant.
 //
 // Selectors verified against:
 //   apps/internal/src/routes/emails/$threadId.tsx

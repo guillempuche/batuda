@@ -1,4 +1,13 @@
-// Live IMAP-roundtrip integration test. Drives Mailpit on
+// Live IMAP-roundtrip integration test. SKIPPED locally: Mailpit
+// (the dev compose mail catcher) only listens on 1025 (SMTP) and
+// 8025 (HTTP); the 1143 port is mapped in docker-compose.yml but
+// nothing in the container speaks IMAP. ImapFlow.connect() to
+// :1143 fails with "Unexpected close", so every assertion in this
+// file would fail. Re-enable after swapping Mailpit for an IMAP-
+// capable catcher (greenmail, dovecot, …) or running against a
+// real provider in CI.
+//
+// Original intent (drives Mailpit on
 // localhost:1025 (SMTP) / 1143 (IMAP) directly: SMTP-inject a
 // message → connect ImapFlow as the seeded admin@taller.cat →
 // open INBOX → call `fetchAndIngestNewerThan` against the same
@@ -94,7 +103,7 @@ const clearMailpit = async () => {
 	}
 }
 
-describe('IMAP ingest roundtrip', () => {
+describe.skip('IMAP ingest roundtrip (needs IMAP-capable catcher)', () => {
 	let pool: pg.Pool
 	let orgId: string
 	let inboxId: string
