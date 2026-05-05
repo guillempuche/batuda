@@ -1555,6 +1555,12 @@ const PrimaryActions = styled.div.withConfig({
 const PanelWrap = styled.div.withConfig({
 	displayName: 'CompanyDetailPanelWrap',
 })`
+	/* Establish a query container so panels (Contacts, Files) reflow on
+	 * their own width via @container queries instead of viewport @media
+	 * queries — the company-detail page lives inside a Sidebar primitive
+	 * that already constrains horizontal space, so panel content needs
+	 * to react to that, not to the viewport. */
+	container-type: inline-size;
 	padding: var(--space-md) 0;
 `
 
@@ -1584,6 +1590,15 @@ const ContactList = styled.ul.withConfig({
 	list-style: none;
 	padding: 0;
 	margin: 0;
+
+	/* When the People panel has room for two contact cards side by side,
+	 * lay them out as a 2-up grid. Threshold is the panel's own width
+	 * (set by the PanelWrap container) so the page reflows the right
+	 * way regardless of viewport breakpoints. */
+	@container (min-width: 48rem) {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+	}
 `
 
 const ContactCard = styled.li.withConfig({
@@ -1847,6 +1862,13 @@ const PagesList = styled.ul.withConfig({
 	list-style: none;
 	padding: 0;
 	margin: 0;
+
+	/* Match the People panel's container-query reflow so wide tabs
+	 * stop wasting horizontal space when there are several pages. */
+	@container (min-width: 48rem) {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+	}
 `
 
 const PageRow = styled.li.withConfig({ displayName: 'CompanyDetailPageRow' })`
