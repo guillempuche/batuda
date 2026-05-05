@@ -131,23 +131,43 @@ async function loadThreadOnServer(threadId: string): Promise<unknown> {
 export const Route = createFileRoute('/emails/$threadId')({
 	loader: async ({ params: { threadId } }) => {
 		if (!import.meta.env.SSR) {
-			return { dehydrated: [] as const, threadId }
+			return {
+				dehydrated: [] as const,
+				threadId,
+				subject: null as string | null,
+			}
 		}
 		try {
 			const raw = await loadThreadOnServer(threadId)
+			const subject = extractThreadSubject(raw)
 			return {
 				dehydrated: [
 					dehydrateAtom(threadAtomFor(threadId), AsyncResult.success(raw)),
 				] as const,
 				threadId,
+				subject,
 			}
 		} catch (error) {
 			console.warn('[ThreadDetailLoader] falling back to client fetch:', error)
-			return { dehydrated: [] as const, threadId }
+			return {
+				dehydrated: [] as const,
+				threadId,
+				subject: null as string | null,
+			}
 		}
+	},
+	head: ({ loaderData }) => {
+		const subject = loaderData?.subject?.trim() || 'Email thread'
+		return { meta: [{ title: `${subject} — Batuda` }] }
 	},
 	component: ThreadDetailPage,
 })
+
+function extractThreadSubject(raw: unknown): string | null {
+	if (!raw || typeof raw !== 'object') return null
+	const subject = (raw as Record<string, unknown>)['subject']
+	return typeof subject === 'string' ? subject : null
+}
 
 function ThreadDetailPage() {
 	const { t, i18n } = useLingui()

@@ -19,6 +19,7 @@ import { allBlockExtensions } from '@batuda/ui/blocks'
 import { PriButton, PriTabs, usePriToast } from '@batuda/ui/pri'
 
 import { pageAtomFor } from '#/atoms/pages-atoms'
+import { useSetDocumentTitle } from '#/components/layout/top-bar-title'
 import { EmptyState } from '#/components/shared/empty-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { dehydrateAtom } from '#/lib/atom-hydration'
@@ -73,24 +74,36 @@ export const Route = createFileRoute('/pages/$id')({
 	search: { middlewares: [stripSearchParams({ tab: 'editor' })] },
 	loader: async ({ params: { id } }) => {
 		if (!import.meta.env.SSR) {
-			return { dehydrated: [] as const, id }
+			return { dehydrated: [] as const, id, title: null as string | null }
 		}
 		try {
 			const page = await loadPageOnServer(id)
+			const title = extractPageTitle(page)
 			return {
 				dehydrated: [
 					dehydrateAtom(pageAtomFor(id), AsyncResult.success(page)),
 				] as const,
 				id,
+				title,
 			}
 		} catch (error) {
 			if (isNotFoundError(error)) throw notFound()
 			console.warn('[PageEditorLoader] falling back:', error)
-			return { dehydrated: [] as const, id }
+			return { dehydrated: [] as const, id, title: null as string | null }
 		}
+	},
+	head: ({ loaderData }) => {
+		const title = loaderData?.title ?? 'Page'
+		return { meta: [{ title: `${title} — Batuda` }] }
 	},
 	component: PageEditorPage,
 })
+
+function extractPageTitle(raw: unknown): string | null {
+	if (!raw || typeof raw !== 'object') return null
+	const title = (raw as Record<string, unknown>)['title']
+	return typeof title === 'string' && title.length > 0 ? title : null
+}
 
 function isNotFoundError(error: unknown): boolean {
 	if (!error || typeof error !== 'object') return false
@@ -134,6 +147,16 @@ function EditorBody({ page }: { page: PageDetail }) {
 	const { t } = useLingui()
 	const toastManager = usePriToast()
 	const [tab, setTab] = useTabSearchParam<PageTab>(PAGE_TABS, 'editor')
+
+	// Mirror the page title (and active tab when not the default) into
+	// the top bar + browser tab, replacing the static "Pages" label.
+	const tabLabel: Record<PageTab, string> = {
+		editor: t`Editor`,
+		meta: t`Meta`,
+	}
+	useSetDocumentTitle(
+		tab === 'editor' ? page.title : `${page.title} · ${tabLabel[tab]}`,
+	)
 	const refreshPage = useAtomRefresh(
 		useMemo(() => pageAtomFor(page.id), [page.id]),
 	)

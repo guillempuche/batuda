@@ -4,6 +4,7 @@ import { BlueprintSheet } from './blueprint-sheet'
 import { BottomNav } from './bottom-nav'
 import { SideNav } from './side-nav'
 import { TopBar } from './top-bar'
+import { TopBarTitleProvider } from './top-bar-title'
 
 /**
  * Responsive workshop shell. The body is locked at ≥768px (see styles.css)
@@ -17,14 +18,16 @@ import { TopBar } from './top-bar'
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
 	return (
-		<Shell>
-			<SideNav />
-			<Main>
-				<TopBar />
-				<BlueprintSheet>{children}</BlueprintSheet>
-			</Main>
-			<BottomNav />
-		</Shell>
+		<TopBarTitleProvider>
+			<Shell>
+				<SideNav />
+				<Main>
+					<TopBar />
+					<BlueprintSheet>{children}</BlueprintSheet>
+				</Main>
+				<BottomNav />
+			</Shell>
+		</TopBarTitleProvider>
 	)
 }
 

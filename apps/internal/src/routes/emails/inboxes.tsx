@@ -119,6 +119,7 @@ export const Route = createFileRoute('/emails/inboxes')({
 			return { dehydrated: [] as const }
 		}
 	},
+	head: () => ({ meta: [{ title: 'Inboxes — Batuda' }] }),
 	component: InboxesPage,
 })
 

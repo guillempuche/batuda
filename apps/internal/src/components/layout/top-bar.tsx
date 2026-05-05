@@ -15,13 +15,17 @@ import { OrgSwitcher } from './org-switcher'
 
 /**
  * Sheet-metal label strip across the top of the content column. Renders
- * the current page title in stenciled display-font with an embossed
+ * the current section name in stenciled display-font with an embossed
  * shadow, plus a stamped-metal "Log" CTA that opens the QuickCapture
  * dialog. The current user lives on the sidebar/bottom-nav Profile
- * entry — this bar intentionally stays focused on page title + Log.
+ * entry — this bar intentionally stays focused on section title + Log.
  *
- * Page title is derived from the longest-prefix match in `navItems` so
- * sub-routes (e.g. `/companies/$slug`) still read as their parent area.
+ * The title is the longest-prefix match in `navItems` (e.g. "Companies"
+ * for both /companies and /companies/$slug). Deep page strings —
+ * company name, thread subject, active tab — go to `document.title`
+ * via `useSetDocumentTitle`, not here; the in-page header is where
+ * those surface visually. On phones the heading hides under 480 px to
+ * avoid duplicating the bottom-rail nav selection.
  */
 export function TopBar() {
 	const pathname = useRouterState({ select: state => state.location.pathname })
@@ -58,7 +62,6 @@ export function TopBar() {
 function deriveTitleDescriptor(pathname: string) {
 	const exact = navItems.find(item => item.path === pathname)
 	if (exact) return exact.label
-
 	const matches = navItems.filter(
 		item => item.path !== '/' && pathname.startsWith(item.path),
 	)
@@ -98,10 +101,9 @@ const Title = styled.h1.withConfig({ displayName: 'TopBarTitle' })`
 	text-overflow: ellipsis;
 	white-space: nowrap;
 
-	/* On phones the heading duplicates the sidebar nav (which moves to
-	 * the bottom-rail icons at the same breakpoint) and competes with
-	 * the org chip + Log button for space. Hide it under 480 px so the
-	 * row reads as: org · Log. */
+	/* On phones the section heading duplicates the bottom-rail nav
+	 * selection and competes with the org chip + Log button for space.
+	 * Hide it under 480 px so the row reads as: org · Log. */
 	@media (max-width: 479px) {
 		display: none;
 	}

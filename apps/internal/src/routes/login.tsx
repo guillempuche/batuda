@@ -67,6 +67,7 @@ export const Route = createFileRoute('/login')({
 			throw redirect({ href: target })
 		}
 	},
+	head: () => ({ meta: [{ title: 'Sign in — Batuda' }] }),
 	component: LoginPage,
 })
 

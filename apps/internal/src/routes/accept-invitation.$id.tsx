@@ -34,6 +34,7 @@ export interface AcceptSearch {
 export const Route = createFileRoute('/accept-invitation/$id')({
 	validateSearch: (search: Record<string, unknown>): AcceptSearch =>
 		typeof search['error'] === 'string' ? { error: search['error'] } : {},
+	head: () => ({ meta: [{ title: 'Accept invitation — Batuda' }] }),
 	component: AcceptInvitationPage,
 })
 

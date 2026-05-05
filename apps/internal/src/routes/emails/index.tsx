@@ -227,6 +227,7 @@ export const Route = createFileRoute('/emails/')({
 			return { dehydrated: [] as const }
 		}
 	},
+	head: () => ({ meta: [{ title: 'Emails — Batuda' }] }),
 	component: EmailsIndexPage,
 })
 

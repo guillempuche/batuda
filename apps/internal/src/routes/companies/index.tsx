@@ -115,6 +115,7 @@ export const Route = createFileRoute('/companies/')({
 			return { dehydrated: [] as const }
 		}
 	},
+	head: () => ({ meta: [{ title: 'Companies — Batuda' }] }),
 	component: CompaniesListPage,
 })
 

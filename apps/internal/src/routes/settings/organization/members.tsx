@@ -36,6 +36,7 @@ interface MemberRow {
 }
 
 export const Route = createFileRoute('/settings/organization/members')({
+	head: () => ({ meta: [{ title: 'Members — Batuda' }] }),
 	component: MembersPage,
 })
 

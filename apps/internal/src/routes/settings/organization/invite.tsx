@@ -30,6 +30,7 @@ import {
 type Role = 'member' | 'admin'
 
 export const Route = createFileRoute('/settings/organization/invite')({
+	head: () => ({ meta: [{ title: 'Invite member — Batuda' }] }),
 	component: InvitePage,
 })
 

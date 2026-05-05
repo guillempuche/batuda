@@ -103,6 +103,7 @@ export const Route = createFileRoute('/calendar/')({
 			return { dehydrated: [] as const }
 		}
 	},
+	head: () => ({ meta: [{ title: 'Calendar — Batuda' }] }),
 	component: CalendarPage,
 })
 

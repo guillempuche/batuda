@@ -36,6 +36,7 @@ export const Route = createFileRoute('/profile/')({
 		const user = await fetchSession(cookieHeader)
 		return { user }
 	},
+	head: () => ({ meta: [{ title: 'Profile — Batuda' }] }),
 	component: ProfilePage,
 })
 
