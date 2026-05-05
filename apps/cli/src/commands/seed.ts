@@ -1715,6 +1715,7 @@ export const seed = (preset: Preset) =>
 
 				interface InboxSpec {
 					readonly email: string
+					readonly id: string
 					readonly displayName: string
 					readonly ownerEmail: string
 					readonly orgId: string
@@ -1723,8 +1724,19 @@ export const seed = (preset: Preset) =>
 					readonly footerText: string
 				}
 
+				// Stable demo-inbox UUIDs so URLs that include `?inboxId=…`
+				// survive a re-seed. Pattern: synthetic 0…1 prefix, last
+				// nibble identifies which inbox (1=taller-human, …). Pure
+				// dev-fixture; production inboxes go through `createInbox`
+				// which mints fresh UUIDs.
+				const TALLER_HUMAN_INBOX_ID = '11111111-1111-4111-8111-111111111111'
+				const TALLER_AGENT_INBOX_ID = '22222222-2222-4222-8222-222222222222'
+				const RESTAURANT_HUMAN_INBOX_ID = '33333333-3333-4333-8333-333333333333'
+				const RESTAURANT_AGENT_INBOX_ID = '44444444-4444-4444-8444-444444444444'
+
 				const inboxSpecs: InboxSpec[] = [
 					{
+						id: TALLER_HUMAN_INBOX_ID,
 						email: 'admin@taller.cat',
 						displayName: 'Alice Admin',
 						ownerEmail: 'admin@taller.cat',
@@ -1734,6 +1746,7 @@ export const seed = (preset: Preset) =>
 						footerText: '— Alice Admin\nTaller Demo · taller.cat',
 					},
 					{
+						id: TALLER_AGENT_INBOX_ID,
 						email: 'agent@taller.cat',
 						displayName: 'Alice Agent',
 						ownerEmail: 'admin@taller.cat',
@@ -1746,6 +1759,7 @@ export const seed = (preset: Preset) =>
 				if (restaurantOrgIdForInbox) {
 					inboxSpecs.push(
 						{
+							id: RESTAURANT_HUMAN_INBOX_ID,
 							email: 'admin@restaurant.demo',
 							displayName: 'Bob Owner',
 							ownerEmail: 'admin@restaurant.demo',
@@ -1755,6 +1769,7 @@ export const seed = (preset: Preset) =>
 							footerText: '— Bob Owner\nRestaurant Demo',
 						},
 						{
+							id: RESTAURANT_AGENT_INBOX_ID,
 							email: 'agent@restaurant.demo',
 							displayName: 'Bob Agent',
 							ownerEmail: 'admin@restaurant.demo',
@@ -1788,7 +1803,7 @@ export const seed = (preset: Preset) =>
 						)
 						continue
 					}
-					const inboxId = randomUUID()
+					const inboxId = spec.id
 					const subkey = Buffer.from(
 						hkdfSync(
 							'sha256',
