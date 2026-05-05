@@ -1069,6 +1069,11 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							})
 						}
 
+						// JOIN message_participants so the wire response can carry
+						// `from` per message — the table stores sender as a
+						// participant row with role='from' rather than a column on
+						// email_messages. Without the JOIN the UI's `From` field
+						// renders empty for every card.
 						const messages = yield* sql<{
 							id: string
 							messageId: string
@@ -1082,6 +1087,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							textBody: string | null
 							htmlBody: string | null
 							recipients: { to?: string[]; cc?: string[]; bcc?: string[] }
+							fromAddress: string | null
 							attachments: ReadonlyArray<{
 								index: number
 								filename: string
@@ -1098,26 +1104,79 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							inboundClassification: 'normal' | 'spam' | 'blocked' | null
 							statusUpdatedAt: Date
 						}>`
-							SELECT id, message_id, in_reply_to, "references",
-							       direction, folder, subject, received_at,
-							       text_preview, text_body, html_body, recipients,
-							       attachments,
-							       status, status_reason, bounce_type, bounce_sub_type,
-							       inbound_classification, status_updated_at
-							FROM email_messages
-							WHERE organization_id = ${currentOrg.id}
+							SELECT em.id, em.message_id, em.in_reply_to, em."references",
+							       em.direction, em.folder, em.subject, em.received_at,
+							       em.text_preview, em.text_body, em.html_body, em.recipients,
+							       em.attachments,
+							       em.status, em.status_reason, em.bounce_type, em.bounce_sub_type,
+							       em.inbound_classification, em.status_updated_at,
+							       (
+							         SELECT mp.email_address
+							         FROM message_participants mp
+							         WHERE mp.email_message_id = em.id
+							           AND mp.role = 'from'
+							         LIMIT 1
+							       ) AS from_address
+							FROM email_messages em
+							WHERE em.organization_id = ${currentOrg.id}
 							  AND (
-							    message_id = ${link.externalThreadId}
-							    OR ${link.externalThreadId} = ANY("references")
+							    em.message_id = ${link.externalThreadId}
+							    OR ${link.externalThreadId} = ANY(em."references")
 							  )
-							ORDER BY received_at ASC NULLS LAST, status_updated_at ASC
+							ORDER BY em.received_at ASC NULLS LAST, em.status_updated_at ASC
 						`.pipe(Effect.orDie)
 
-						const messagesOut = messages.map(m =>
-							projectAttachmentsForWire(
-								m as unknown as Record<string, unknown>,
-							),
-						)
+						// Flatten to the UI's expected shape (keys it actually
+						// reads in apps/internal/src/routes/emails/$threadId.tsx
+						// `narrowMessages`): top-level `from`/`to`/`cc`, `text`/
+						// `html`/`preview`, `timestamp`, and a `deliverability`
+						// sub-object. We rebuild from scratch (instead of
+						// spreading the SQL row) because Effect's HTTP
+						// serializer flags repeat-visited references as
+						// cycles — having both `recipients.to` and `to`
+						// pointing at the same array trips it.
+						const messagesOut = messages.map(m => {
+							const fromAddress = m.fromAddress ?? ''
+							return {
+								id: m.id,
+								messageId: m.messageId,
+								inReplyTo: m.inReplyTo,
+								references: m.references ?? [],
+								direction: m.direction,
+								folder: m.folder,
+								subject: m.subject,
+								from: fromAddress,
+								to: [...(m.recipients?.to ?? [])],
+								cc: [...(m.recipients?.cc ?? [])],
+								bcc: [...(m.recipients?.bcc ?? [])],
+								text: m.textBody,
+								html: m.htmlBody,
+								preview: m.textPreview,
+								timestamp:
+									m.receivedAt instanceof Date
+										? m.receivedAt.toISOString()
+										: m.receivedAt,
+								attachments: m.attachments.map(a => ({
+									attachmentId: String(a.index),
+									filename: a.filename,
+									size: a.sizeBytes,
+									contentType: a.contentType,
+									cid: a.cid,
+									isInline: a.isInline,
+								})),
+								inboundClassification: m.inboundClassification,
+								deliverability: {
+									status: m.status,
+									statusReason: m.statusReason,
+									bounceType: m.bounceType,
+									bounceSubType: m.bounceSubType,
+									statusUpdatedAt:
+										m.statusUpdatedAt instanceof Date
+											? m.statusUpdatedAt.toISOString()
+											: m.statusUpdatedAt,
+								},
+							}
+						})
 
 						return {
 							id: link.id,
