@@ -98,6 +98,14 @@ const Title = styled.h1.withConfig({ displayName: 'TopBarTitle' })`
 	text-overflow: ellipsis;
 	white-space: nowrap;
 
+	/* On phones the heading duplicates the sidebar nav (which moves to
+	 * the bottom-rail icons at the same breakpoint) and competes with
+	 * the org chip + Log button for space. Hide it under 480 px so the
+	 * row reads as: org · Log. */
+	@media (max-width: 479px) {
+		display: none;
+	}
+
 	@media (min-width: 768px) {
 		font-size: var(--typescale-title-large-size);
 		line-height: var(--typescale-title-large-line);
