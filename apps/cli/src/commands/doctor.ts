@@ -201,11 +201,54 @@ const mailpitCheck: Check = {
 	}).pipe(
 		Effect.map(res =>
 			res?.ok
-				? ok('listening on :8025 (SMTP :1025, IMAP :1143)')
+				? ok(
+						'listening on :8025 (SMTP :1025; no IMAP — seed uses direct INSERT)',
+					)
 				: warn('stopped → run `pnpm cli services up`'),
 		),
 		Effect.catch(() =>
 			Effect.succeed(warn('stopped → run `pnpm cli services up`')),
+		),
+	),
+}
+
+// Process check for the mail-worker. The worker is a long-running
+// Node process supervised by `turbo dev` (not Docker), so no port
+// to probe. Both server and mail-worker dev scripts share argv
+// (`node --watch --import tsx src/main.ts`); the only distinguisher
+// is cwd. Pipe pgrep through lsof to keep just the apps/mail-worker
+// children. Cloud-tier doctor skips this; in prod the worker runs
+// under its own deploy.
+const MAIL_WORKER_PROCESS_CHECK = `
+for pid in $(pgrep -f 'tsx src/main.ts' 2>/dev/null); do
+  cwd=$(lsof -p "$pid" 2>/dev/null | awk '$4=="cwd"{print $NF; exit}')
+  case "$cwd" in *apps/mail-worker*) echo "$pid $cwd";; esac
+done
+`
+
+const mailWorkerCheck: Check = {
+	name: 'mail-worker',
+	run: execSilent('sh', '-c', MAIL_WORKER_PROCESS_CHECK).pipe(
+		Effect.map(out => {
+			const lines = out
+				.split('\n')
+				.map(l => l.trim())
+				.filter(Boolean)
+			if (lines.length === 0) {
+				return warn(
+					'not running → start `pnpm dev` (or `pnpm dev:mail-worker`)',
+				)
+			}
+			const pids = lines.map(l => l.split(/\s+/, 1)[0]).join(',')
+			if (lines.length === 1) return ok(`running (PID ${pids})`)
+			return warn(
+				`${lines.length} instances running (PIDs ${pids}) — competing on inbox claims; kill duplicates with \`kill ${pids.replace(/,/g, ' ')}\``,
+			)
+		}),
+		Effect.catch(() =>
+			Effect.succeed(
+				warn('process scan failed; cannot determine mail-worker status'),
+			),
 		),
 	),
 }
@@ -254,6 +297,7 @@ const localChecks: Check[] = [
 		'https://api.batuda.localhost/health',
 		'not running → run `pnpm dev:server`',
 	),
+	mailWorkerCheck,
 ]
 
 const cloudChecks: Check[] = [

@@ -1,8 +1,10 @@
 /**
- * Inject a canned RFC822 message into the local Mailpit so the
- * mail-worker's IDLE picks it up via IMAP and produces real
- * `email_messages` rows. Exists for ad-hoc dev pokes and as the
- * building block the seed reuses to populate demo inboxes.
+ * Inject a canned RFC822 message into the local Mailpit. Useful for
+ * eyeballing a wire-format payload in Mailpit's web UI (or for the
+ * outbound-assertion side of e2e specs). Mailpit does not speak
+ * IMAP, so the mail-worker cannot fetch what's injected here — DB
+ * ingest never happens locally. The seed populates demo
+ * `email_messages` rows directly via SQL instead.
  */
 
 import { Console, Effect } from 'effect'
@@ -35,6 +37,6 @@ export const emailInject = (args: InjectArgs) =>
 		)
 		yield* Console.log(`injected message-id=${result.messageId}`)
 		yield* Console.log(
-			'Run `pnpm dev` (or check `pnpm cli services status`) and the mail-worker will ingest within ~5s.',
+			'Visible at http://localhost:8025 — outbound only; not ingested into the DB (Mailpit has no IMAP).',
 		)
 	})

@@ -582,7 +582,7 @@ const emailInjectCommand = Command.make(
 		}),
 ).pipe(
 	Command.withDescription(
-		'SMTP a canned message into Mailpit so the mail-worker can ingest it via IMAP',
+		'SMTP a canned message into Mailpit (visible in the Mailpit UI; outbound assertions only — Mailpit has no IMAP, so no DB ingest happens)',
 	),
 )
 
