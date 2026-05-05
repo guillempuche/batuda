@@ -55,6 +55,7 @@ import { OpenTasksCard } from '#/components/companies/open-tasks-card'
 import { ResearchSummaryCard } from '#/components/companies/research-summary-card'
 import { UpcomingMeetingsCard } from '#/components/companies/upcoming-meetings-card'
 import { WherePanel } from '#/components/companies/where-panel'
+import { useSetDocumentTitle } from '#/components/layout/top-bar-title'
 import { ResearchDialog } from '#/components/research/research-dialog'
 import type { ResearchRunRow } from '#/components/research/run-list'
 import { EmptyState } from '#/components/shared/empty-state'
@@ -205,6 +206,12 @@ function extractCompanyId(raw: unknown): string | null {
 	return typeof id === 'string' ? id : null
 }
 
+function extractCompanyName(raw: unknown): string | null {
+	if (!raw || typeof raw !== 'object') return null
+	const name = (raw as Record<string, unknown>)['name']
+	return typeof name === 'string' ? name : null
+}
+
 const COMPANY_TABS = ['overview', 'conversations', 'people', 'files'] as const
 type CompanyTab = (typeof COMPANY_TABS)[number]
 
@@ -223,11 +230,12 @@ export const Route = createFileRoute('/companies/$slug')({
 			// `BatudaApiAtom`. First render flashes the loading state while
 			// the request is in flight — that's acceptable for parameterized
 			// routes per the plan (Phase 5b.4.e option 1).
-			return { dehydrated: [] as const, slug }
+			return { dehydrated: [] as const, slug, name: null as string | null }
 		}
 		try {
 			const payload = await loadDetailOnServer(slug)
 			const companyId = extractCompanyId(payload.company)
+			const name = extractCompanyName(payload.company)
 			// Can't hydrate the relation atoms without a companyId. Fall back
 			// to hydrating only the company atom; the relations will fetch
 			// client-side after hydration.
@@ -240,6 +248,7 @@ export const Route = createFileRoute('/companies/$slug')({
 						),
 					] as const,
 					slug,
+					name,
 				}
 			}
 			return {
@@ -262,6 +271,7 @@ export const Route = createFileRoute('/companies/$slug')({
 					),
 				] as const,
 				slug,
+				name,
 			}
 		} catch (error) {
 			// 404 from the server → propagate as a TanStack Router notFound.
@@ -271,8 +281,17 @@ export const Route = createFileRoute('/companies/$slug')({
 				throw notFound()
 			}
 			console.warn('[CompanyDetailLoader] falling back:', error)
-			return { dehydrated: [] as const, slug }
+			return { dehydrated: [] as const, slug, name: null as string | null }
 		}
+	},
+	// `head()` runs on the server with the loader's return value, so the
+	// initial HTML response carries the right `<title>` for SSR + crawlers.
+	// The component layer (useSetDocumentTitle) overrides afterwards when
+	// the user toggles tabs, since `head()` doesn't react to search-param
+	// changes within the same matched route.
+	head: ({ loaderData, params }) => {
+		const title = loaderData?.name ?? params.slug
+		return { meta: [{ title: `${title} — Batuda` }] }
 	},
 	component: CompanyDetailPage,
 })
@@ -337,6 +356,21 @@ function DetailBody({
 	const { open: openQuickCapture } = useQuickCapture()
 	const { openCompose } = useComposeEmail()
 	const [tab, setTab] = useTabSearchParam<CompanyTab>(COMPANY_TABS, 'overview')
+
+	// Push the company name into the top bar + browser tab title so the
+	// duplicated "Companies" page heading goes away on the detail page;
+	// the sidebar already conveys the active section. Suffix the active
+	// non-default tab so a deep-linked /companies/$slug?tab=conversations
+	// reads as "Marisqueria · Conversations" in browser history.
+	const tabLabel: Record<CompanyTab, string> = {
+		overview: t`Overview`,
+		conversations: t`Conversations`,
+		people: t`People`,
+		files: t`Files`,
+	}
+	const topBarTitle =
+		tab === 'overview' ? company.name : `${company.name} · ${tabLabel[tab]}`
+	useSetDocumentTitle(topBarTitle)
 
 	const contactsAtom = useMemo(() => contactsAtomFor(company.id), [company.id])
 	const interactionsAtom = useMemo(
@@ -1345,13 +1379,6 @@ const Header = styled(motion.header).withConfig({
 	gap: var(--space-md);
 	padding: var(--space-lg) var(--space-lg) var(--space-md);
 	box-shadow: var(--elevation-workshop-md);
-	/* Stay pinned at the top of the BlueprintSheet PriScrollArea so the
-	 * identity, status, and primary actions stay reachable while the
-	 * user scrolls the dashboard body. The z-index sits above the tab
-	 * indicator (z=1) but below toasts (z=20). */
-	position: sticky;
-	top: 0;
-	z-index: 5;
 `
 
 const IdentityRow = styled.div.withConfig({

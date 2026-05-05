@@ -25,6 +25,7 @@ type SpendBucket = {
 const EMPTY: ReadonlyArray<SpendBucket> = []
 
 export const Route = createFileRoute('/settings/organization/spend')({
+	head: () => ({ meta: [{ title: 'Spend — Batuda' }] }),
 	component: SpendPage,
 })
 

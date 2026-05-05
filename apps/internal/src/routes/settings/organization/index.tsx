@@ -23,6 +23,7 @@ import {
  */
 
 export const Route = createFileRoute('/settings/organization/')({
+	head: () => ({ meta: [{ title: 'Organization — Batuda' }] }),
 	component: OrganizationSettingsPage,
 })
 
