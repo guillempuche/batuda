@@ -38,8 +38,10 @@ type WherePanelCompany = {
 
 export function WherePanel({
 	company,
+	compact = false,
 }: {
 	readonly company: WherePanelCompany
+	readonly compact?: boolean
 }) {
 	const { t } = useLingui()
 	const toast = usePriToast()
@@ -101,7 +103,7 @@ export function WherePanel({
 				) : null}
 			</Header>
 			{hasCoords ? (
-				<MapFrame>
+				<MapFrame $compact={compact}>
 					<LeafletMap
 						latitude={company.latitude as number}
 						longitude={company.longitude as number}
@@ -272,10 +274,12 @@ const ExternalLinkButton = styled.button`
 	}
 `
 
-const MapFrame = styled.div`
+const MapFrame = styled.div.withConfig({
+	shouldForwardProp: prop => prop !== '$compact',
+})<{ $compact: boolean }>`
 	${brushedMetalPlate};
 	width: 100%;
-	height: 320px;
+	height: ${p => (p.$compact ? '180px' : '320px')};
 	border-radius: var(--radius-md);
 
 	& > div,
