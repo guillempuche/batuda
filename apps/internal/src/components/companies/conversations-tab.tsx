@@ -1,5 +1,6 @@
 import { useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
+import { Link } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { Mail } from 'lucide-react'
 import { useMemo, useState } from 'react'
@@ -150,6 +151,33 @@ export function ConversationsTab({
 		[merged, enabled],
 	)
 
+	// Lingui's `t` is a tagged-template macro: it's transformed at the
+	// call site, so passing `t` into a helper would compile to no-ops
+	// and render empty strings. Build the label/title maps here, in JSX
+	// scope, then read them by kind.
+	const KIND_LABEL: Record<ConvKind, string> = {
+		interaction: t`Interaction`,
+		email: t`Email`,
+		calendar: t`Calendar`,
+		task: t`Task`,
+	}
+	const NO_SUMMARY = t`(no summary)`
+	const NO_SUBJECT = t`(no subject)`
+	const FALLBACK_DATE = t`unknown`
+
+	const titleFor = (item: UnifiedRow): string => {
+		switch (item.kind) {
+			case 'interaction':
+				return item.row.summary ?? NO_SUMMARY
+			case 'email':
+				return item.row.subject?.trim() || NO_SUBJECT
+			case 'calendar':
+				return item.row.title
+			case 'task':
+				return item.row.title
+		}
+	}
+
 	return (
 		<Wrap data-testid='company-conversations-tab'>
 			<Toolbar>
@@ -163,7 +191,7 @@ export function ConversationsTab({
 							aria-pressed={enabled.has(kind)}
 							data-testid={`company-conversations-chip-${kind}`}
 						>
-							{kindLabel(kind, t)}
+							{KIND_LABEL[kind]}
 						</Chip>
 					))}
 				</Chips>
@@ -185,28 +213,40 @@ export function ConversationsTab({
 				</Empty>
 			) : (
 				<List>
-					{visible.map(item => (
-						<Row key={`${item.kind}-${rowId(item)}`} data-kind={item.kind}>
-							<RowMain>
-								<RowKind>{kindLabel(item.kind, t)}</RowKind>
-								<RowTitle>{rowTitle(item, t)}</RowTitle>
-								{rowSubtitle(item) ? (
-									<RowSubtitle>{rowSubtitle(item)}</RowSubtitle>
-								) : null}
-							</RowMain>
-							<RowMeta>
-								<RelativeDate value={item.date} fallback={t`unknown`} />
-							</RowMeta>
-						</Row>
-					))}
+					{visible.map(item => {
+						const subtitle = rowSubtitle(item)
+						const body = (
+							<>
+								<RowMain>
+									<RowKind>{KIND_LABEL[item.kind]}</RowKind>
+									<RowTitle>{titleFor(item)}</RowTitle>
+									{subtitle ? <RowSubtitle>{subtitle}</RowSubtitle> : null}
+								</RowMain>
+								<RowMeta>
+									<RelativeDate value={item.date} fallback={FALLBACK_DATE} />
+								</RowMeta>
+							</>
+						)
+						const key = `${item.kind}-${item.row.id}`
+						return (
+							<Row key={key} data-kind={item.kind}>
+								{item.kind === 'email' ? (
+									<Link
+										to='/emails/$threadId'
+										params={{ threadId: item.row.id }}
+									>
+										{body}
+									</Link>
+								) : (
+									body
+								)}
+							</Row>
+						)
+					})}
 				</List>
 			)}
 		</Wrap>
 	)
-}
-
-function rowId(item: UnifiedRow): string {
-	return item.row.id
 }
 
 function narrowCalendar(
@@ -227,38 +267,6 @@ function narrowCalendar(
 		})
 	}
 	return out
-}
-
-function kindLabel(
-	kind: ConvKind,
-	t: (s: TemplateStringsArray) => string,
-): string {
-	switch (kind) {
-		case 'interaction':
-			return t`Interaction`
-		case 'email':
-			return t`Email`
-		case 'calendar':
-			return t`Calendar`
-		case 'task':
-			return t`Task`
-	}
-}
-
-function rowTitle(
-	item: UnifiedRow,
-	t: (s: TemplateStringsArray) => string,
-): string {
-	switch (item.kind) {
-		case 'interaction':
-			return item.row.summary ?? t`(no summary)`
-		case 'email':
-			return item.row.subject?.trim() || t`(no subject)`
-		case 'calendar':
-			return item.row.title
-		case 'task':
-			return item.row.title
-	}
 }
 
 function rowSubtitle(item: UnifiedRow): string | null {
@@ -346,6 +354,29 @@ const Row = styled.li`
 
 	&:first-child {
 		border-top: none;
+	}
+
+	/* Email rows wrap their body in a TanStack Link so the row is
+	 * tappable. Stretch the link to fill the row and reset the default
+	 * underline styling. */
+	& > a {
+		display: flex;
+		flex: 1 1 auto;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-sm);
+		color: inherit;
+		text-decoration: none;
+	}
+
+	& > a:hover {
+		color: var(--color-primary);
+	}
+
+	& > a:focus-visible {
+		outline: none;
+		box-shadow: var(--glow-active);
+		border-radius: var(--shape-2xs);
 	}
 `
 
