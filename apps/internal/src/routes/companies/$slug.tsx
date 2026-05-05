@@ -49,15 +49,14 @@ import { pagesSearchAtom } from '#/atoms/pages-atoms'
 import { researchListAtom } from '#/atoms/research-atoms'
 import { AboutSection } from '#/components/companies/about-section'
 import { CadenceCard } from '#/components/companies/cadence-card'
-import { CalendarTab } from '#/components/companies/calendar-tab'
+import { ConversationsTab } from '#/components/companies/conversations-tab'
 import { NextActionCard } from '#/components/companies/next-action-card'
 import { OpenTasksCard } from '#/components/companies/open-tasks-card'
 import { ResearchSummaryCard } from '#/components/companies/research-summary-card'
 import { UpcomingMeetingsCard } from '#/components/companies/upcoming-meetings-card'
 import { WherePanel } from '#/components/companies/where-panel'
 import { ResearchDialog } from '#/components/research/research-dialog'
-import { RunDetail } from '#/components/research/run-detail'
-import { type ResearchRunRow, RunList } from '#/components/research/run-list'
+import type { ResearchRunRow } from '#/components/research/run-list'
 import { EmptyState } from '#/components/shared/empty-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { PriorityDot } from '#/components/shared/priority-dot'
@@ -79,7 +78,6 @@ import {
 	agedPaperSurface,
 	brushedMetalBezel,
 	brushedMetalPlate,
-	ruledLedgerRow,
 	stenciledTitle,
 } from '#/lib/workshop-mixins'
 
@@ -207,17 +205,7 @@ function extractCompanyId(raw: unknown): string | null {
 	return typeof id === 'string' ? id : null
 }
 
-const COMPANY_TABS = [
-	'profile',
-	'where',
-	'contacts',
-	'emails',
-	'tasks',
-	'calendar',
-	'research',
-	'pages',
-	'documents',
-] as const
+const COMPANY_TABS = ['overview', 'conversations', 'people', 'files'] as const
 type CompanyTab = (typeof COMPANY_TABS)[number]
 
 const validateSearch = validateSearchWith({
@@ -227,8 +215,8 @@ const validateSearch = validateSearchWith({
 export const Route = createFileRoute('/companies/$slug')({
 	validateSearch,
 	// Strip the default tab from the URL so `useTabSearchParam` can write
-	// `tab: next` unconditionally without leaving `?tab=profile` behind.
-	search: { middlewares: [stripSearchParams({ tab: 'profile' })] },
+	// `tab: next` unconditionally without leaving `?tab=overview` behind.
+	search: { middlewares: [stripSearchParams({ tab: 'overview' })] },
 	loader: async ({ params: { slug } }) => {
 		if (!import.meta.env.SSR) {
 			// Client-side navigation: let the atoms refetch directly via
@@ -348,7 +336,7 @@ function DetailBody({
 	const { t } = useLingui()
 	const { open: openQuickCapture } = useQuickCapture()
 	const { openCompose } = useComposeEmail()
-	const [tab, setTab] = useTabSearchParam<CompanyTab>(COMPANY_TABS, 'profile')
+	const [tab, setTab] = useTabSearchParam<CompanyTab>(COMPANY_TABS, 'overview')
 
 	const contactsAtom = useMemo(() => contactsAtomFor(company.id), [company.id])
 	const interactionsAtom = useMemo(
@@ -461,9 +449,6 @@ function DetailBody({
 				: [],
 		[researchResult],
 	)
-	const [selectedResearchId, setSelectedResearchId] = useState<string | null>(
-		null,
-	)
 	const [researchDialogOpen, setResearchDialogOpen] = useState(false)
 	type PageEntry = {
 		readonly id: string
@@ -531,10 +516,29 @@ function DetailBody({
 		return out
 	}, [emailsResult])
 
-	const openTaskCount = useMemo(
-		() => tasks.filter(task => task.completedAt === null).length,
-		[tasks],
+	// Real-world interactions (email/call/meeting/note/etc.) drawn from
+	// the polymorphic timeline. System events (research runs, automated
+	// task creation) are excluded — they're noise in the conversations
+	// view and stay reachable via the Overview Timeline toggle.
+	const conversationInteractions = useMemo(
+		() =>
+			timelineEntries
+				.filter(entry => entry.kind !== 'system_event')
+				.map(entry => ({
+					id: entry.id,
+					channel: entry.channel,
+					summary: entry.summary,
+					occurredAt: entry.date,
+				})),
+		[timelineEntries],
 	)
+
+	// Sum of every kind feeding the Conversations tab so the badge tells
+	// the user "this many things to look at" at a glance. Calendar
+	// events live inside ConversationsTab itself so they're not counted
+	// here — the badge is a lower bound.
+	const conversationsCount =
+		conversationInteractions.length + companyThreads.length + tasks.length
 
 	const openTasks = useMemo(
 		() =>
@@ -839,40 +843,25 @@ function DetailBody({
 
 			<PriTabs.Root value={tab} onValueChange={v => setTab(v as CompanyTab)}>
 				<PriTabs.List>
-					<PriTabs.Tab value='profile'>
+					<PriTabs.Tab value='overview'>
 						<Trans>Overview</Trans>
 					</PriTabs.Tab>
-					<PriTabs.Tab value='where'>
-						<Trans>Where</Trans>
-						{company.latitude !== null && company.longitude !== null ? (
-							<MapPin size={12} aria-hidden />
-						) : null}
+					<PriTabs.Tab
+						value='conversations'
+						data-testid='company-conversations-tab'
+					>
+						<Trans>Conversations</Trans> ({conversationsCount})
 					</PriTabs.Tab>
-					<PriTabs.Tab value='contacts'>
-						<Trans>Contacts</Trans> ({contacts.length})
+					<PriTabs.Tab value='people'>
+						<Trans>People</Trans> ({contacts.length})
 					</PriTabs.Tab>
-					<PriTabs.Tab value='emails'>
-						<Trans>Emails</Trans> ({companyThreads.length})
-					</PriTabs.Tab>
-					<PriTabs.Tab value='tasks'>
-						<Trans>Tasks</Trans> ({openTaskCount})
-					</PriTabs.Tab>
-					<PriTabs.Tab value='calendar' data-testid='company-calendar-tab'>
-						<Trans>Calendar</Trans>
-					</PriTabs.Tab>
-					<PriTabs.Tab value='research' data-testid='research-tab'>
-						<Trans>Research</Trans>
-					</PriTabs.Tab>
-					<PriTabs.Tab value='pages'>
-						<Trans>Pages</Trans> ({companyPages.length})
-					</PriTabs.Tab>
-					<PriTabs.Tab value='documents'>
-						<Trans>Documents</Trans>
+					<PriTabs.Tab value='files'>
+						<Trans>Files</Trans> ({companyPages.length})
 					</PriTabs.Tab>
 					<PriTabs.Indicator />
 				</PriTabs.List>
 
-				<PriTabs.Panel value='profile'>
+				<PriTabs.Panel value='overview'>
 					<PanelWrap>
 						<Stack $gap='lg'>
 							<Switcher $threshold='48rem' $gap='md'>
@@ -951,6 +940,7 @@ function DetailBody({
 										runs={researchRuns}
 										onRunNew={() => setResearchDialogOpen(true)}
 									/>
+									<WherePanel company={company} compact />
 									<AboutSection
 										company={company}
 										onSave={(field, next) => saveField(field, next)}
@@ -961,13 +951,7 @@ function DetailBody({
 					</PanelWrap>
 				</PriTabs.Panel>
 
-				<PriTabs.Panel value='where'>
-					<PanelWrap>
-						<WherePanel company={company} />
-					</PanelWrap>
-				</PriTabs.Panel>
-
-				<PriTabs.Panel value='contacts'>
+				<PriTabs.Panel value='people'>
 					<PanelWrap>
 						{contacts.length === 0 ? (
 							<EmptyState
@@ -1088,167 +1072,64 @@ function DetailBody({
 					</PanelWrap>
 				</PriTabs.Panel>
 
-				<PriTabs.Panel value='emails'>
+				<PriTabs.Panel value='conversations'>
 					<PanelWrap>
-						<EmailsPanelToolbar>
-							<PriButton
-								type='button'
-								$variant='outlined'
-								onClick={handleComposeEmail}
-							>
-								<MailPlus size={14} aria-hidden />
-								<Trans>Compose</Trans>
-							</PriButton>
-						</EmailsPanelToolbar>
-						{companyThreads.length === 0 ? (
-							<EmptyState
-								icon={Mail}
-								title={t`No email threads yet`}
-								description={t`Messages sent or received with this company will appear here.`}
-							/>
-						) : (
-							<ThreadList>
-								{companyThreads.map(thread => (
-									<ThreadRow key={thread.id}>
-										<ThreadTitle>
-											<Link
-												to='/emails/$threadId'
-												params={{ threadId: thread.id }}
-											>
-												{thread.subject?.trim() || t`(no subject)`}
-											</Link>
-										</ThreadTitle>
-										<ThreadMeta>
-											<ThreadStatusBadge $status={thread.status}>
-												{thread.status}
-											</ThreadStatusBadge>
-											<span>
-												{thread.messageCount}{' '}
-												{thread.messageCount === 1 ? t`msg` : t`msgs`}
-											</span>
-											<RelativeDate value={thread.updatedAt} />
-										</ThreadMeta>
-									</ThreadRow>
-								))}
-							</ThreadList>
-						)}
-					</PanelWrap>
-				</PriTabs.Panel>
-
-				<PriTabs.Panel value='tasks'>
-					<PanelWrap>
-						{tasks.length === 0 ? (
-							<EmptyState title={t`No tasks for this company`} />
-						) : (
-							<TaskList>
-								{tasks.map(task => (
-									<TaskRow key={task.id} $completed={task.completedAt !== null}>
-										<TaskTitle>{task.title}</TaskTitle>
-										<TaskMeta>
-											{task.completedAt !== null ? (
-												<Trans>Completed</Trans>
-											) : (
-												<RelativeDate
-													value={task.dueAt}
-													fallback={t`no due date`}
-												/>
-											)}
-										</TaskMeta>
-									</TaskRow>
-								))}
-							</TaskList>
-						)}
-					</PanelWrap>
-				</PriTabs.Panel>
-
-				<PriTabs.Panel value='calendar'>
-					<PanelWrap>
-						<CalendarTab companyId={company.id} />
-					</PanelWrap>
-				</PriTabs.Panel>
-
-				<PriTabs.Panel value='research'>
-					<PanelWrap>
-						<ResearchPanelLayout>
-							<ResearchPanelHeader>
-								{/* React 19 form actions are pre-hydration safe: SSR
-								    injects an `addEventListener("submit", …)` script
-								    that buffers submits into `document.$$reactFormReplay`,
-								    and React replays them once the action handler is
-								    wired (see node_modules/react-dom/cjs/
-								    react-dom-server.browser.development.js:9926-9945
-								    + react-dom-client at the corresponding replay
-								    site). A bare onClick has no equivalent buffer
-								    outside of suspense boundaries, so e2e clicks land
-								    on the unhydrated button and the dialog never opens. */}
-								<form
-									action={() => {
-										setResearchDialogOpen(true)
-									}}
-								>
-									<PriButton
-										type='submit'
-										$variant='filled'
-										data-testid='research-run-new'
-									>
-										<Plus size={14} aria-hidden />
-										<span>
-											<Trans>Run new research</Trans>
-										</span>
-									</PriButton>
-								</form>
-							</ResearchPanelHeader>
-							<ResearchPanelBody>
-								<RunList
-									runs={researchRuns}
-									selectedId={selectedResearchId}
-									onSelect={setSelectedResearchId}
-								/>
-								{selectedResearchId !== null ? (
-									<RunDetail researchId={selectedResearchId} />
-								) : null}
-							</ResearchPanelBody>
-						</ResearchPanelLayout>
-					</PanelWrap>
-				</PriTabs.Panel>
-
-				<PriTabs.Panel value='pages'>
-					<PanelWrap>
-						{companyPages.length === 0 ? (
-							<EmptyState
-								icon={FileText}
-								title={t`No pages yet`}
-								description={t`Create a prospect landing page to share with this company.`}
-							/>
-						) : (
-							<PagesList>
-								{companyPages.map(pg => (
-									<PageRow key={pg.id}>
-										<PageRowTitle>
-											<Link to='/pages/$id' params={{ id: pg.id }}>
-												{pg.title}
-											</Link>
-										</PageRowTitle>
-										<PageRowMeta>
-											<PageLangBadge>{pg.lang}</PageLangBadge>
-											<PageStatusBadge $published={pg.status === 'published'}>
-												{pg.status}
-											</PageStatusBadge>
-										</PageRowMeta>
-									</PageRow>
-								))}
-							</PagesList>
-						)}
-					</PanelWrap>
-				</PriTabs.Panel>
-
-				<PriTabs.Panel value='documents'>
-					<PanelWrap>
-						<EmptyState
-							icon={FileText}
-							title={t`No documents yet`}
-							description={t`Proposals, meeting notes and attachments will show up here.`}
+						<ConversationsTab
+							companyId={company.id}
+							interactions={conversationInteractions}
+							threads={companyThreads}
+							tasks={tasks}
+							onCompose={handleComposeEmail}
 						/>
+					</PanelWrap>
+				</PriTabs.Panel>
+
+				<PriTabs.Panel value='files'>
+					<PanelWrap>
+						<Stack $gap='lg'>
+							<FilesGroup>
+								<FilesGroupTitle>
+									<Trans>Pages</Trans>
+								</FilesGroupTitle>
+								{companyPages.length === 0 ? (
+									<EmptyState
+										icon={FileText}
+										title={t`No pages yet`}
+										description={t`Create a prospect landing page to share with this company.`}
+									/>
+								) : (
+									<PagesList>
+										{companyPages.map(pg => (
+											<PageRow key={pg.id}>
+												<PageRowTitle>
+													<Link to='/pages/$id' params={{ id: pg.id }}>
+														{pg.title}
+													</Link>
+												</PageRowTitle>
+												<PageRowMeta>
+													<PageLangBadge>{pg.lang}</PageLangBadge>
+													<PageStatusBadge
+														$published={pg.status === 'published'}
+													>
+														{pg.status}
+													</PageStatusBadge>
+												</PageRowMeta>
+											</PageRow>
+										))}
+									</PagesList>
+								)}
+							</FilesGroup>
+							<FilesGroup>
+								<FilesGroupTitle>
+									<Trans>Documents</Trans>
+								</FilesGroupTitle>
+								<EmptyState
+									icon={FileText}
+									title={t`No documents yet`}
+									description={t`Proposals, meeting notes and attachments will show up here.`}
+								/>
+							</FilesGroup>
+						</Stack>
 					</PanelWrap>
 				</PriTabs.Panel>
 			</PriTabs.Root>
@@ -1257,8 +1138,7 @@ function DetailBody({
 				open={researchDialogOpen}
 				onOpenChange={setResearchDialogOpen}
 				companyId={company.id}
-				onCreated={newId => {
-					setSelectedResearchId(newId)
+				onCreated={() => {
 					refreshResearch()
 				}}
 			/>
@@ -1658,31 +1538,21 @@ const PanelWrap = styled.div.withConfig({
 	padding: var(--space-md) 0;
 `
 
-const ResearchPanelLayout = styled.div.withConfig({
-	displayName: 'CompanyDetailResearchPanelLayout',
+const FilesGroup = styled.section.withConfig({
+	displayName: 'CompanyDetailFilesGroup',
 })`
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-md);
+	gap: var(--space-sm);
 `
 
-const ResearchPanelHeader = styled.div.withConfig({
-	displayName: 'CompanyDetailResearchPanelHeader',
+const FilesGroupTitle = styled.h3.withConfig({
+	displayName: 'CompanyDetailFilesGroupTitle',
 })`
-	display: flex;
-	justify-content: flex-end;
-`
-
-const ResearchPanelBody = styled.div.withConfig({
-	displayName: 'CompanyDetailResearchPanelBody',
-})`
-	display: grid;
-	grid-template-columns: 1fr;
-	gap: var(--space-md);
-
-	@media (min-width: 1024px) {
-		grid-template-columns: minmax(18rem, 1fr) minmax(0, 2fr);
-	}
+	${stenciledTitle}
+	margin: 0;
+	font-size: var(--typescale-title-medium-size);
+	line-height: var(--typescale-title-medium-line);
 `
 
 const ContactList = styled.ul.withConfig({
@@ -1885,147 +1755,6 @@ const ContactLinkButton = styled.button.withConfig({
 	&:hover {
 		border-bottom-style: solid;
 	}
-`
-
-const EmailsPanelToolbar = styled.div.withConfig({
-	displayName: 'CompanyDetailEmailsPanelToolbar',
-})`
-	display: flex;
-	justify-content: flex-end;
-	margin-bottom: var(--space-sm);
-`
-
-const ThreadList = styled.ul.withConfig({
-	displayName: 'CompanyDetailThreadList',
-})`
-	display: flex;
-	flex-direction: column;
-	gap: 0;
-	list-style: none;
-	padding: 0;
-	margin: 0;
-`
-
-const ThreadRow = styled.li.withConfig({
-	displayName: 'CompanyDetailThreadRow',
-})`
-	${ruledLedgerRow}
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: var(--space-sm);
-	padding: var(--space-sm) var(--space-md);
-	background-color: var(--color-paper-aged);
-
-	&:first-child {
-		border-top: 1px solid var(--color-ledger-line);
-	}
-`
-
-const ThreadTitle = styled.span.withConfig({
-	displayName: 'CompanyDetailThreadTitle',
-})`
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-
-	& a {
-		color: var(--color-primary);
-		font-weight: var(--font-weight-medium);
-		text-decoration: none;
-	}
-
-	& a:hover {
-		text-decoration: underline;
-	}
-`
-
-const ThreadMeta = styled.div.withConfig({
-	displayName: 'CompanyDetailThreadMeta',
-})`
-	display: flex;
-	align-items: center;
-	gap: var(--space-sm);
-	font-family: var(--font-display);
-	font-size: var(--typescale-label-small-size);
-	font-weight: var(--font-weight-bold);
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-	color: var(--color-on-surface-variant);
-	flex-shrink: 0;
-`
-
-const ThreadStatusBadge = styled.span.withConfig({
-	displayName: 'CompanyDetailThreadStatusBadge',
-	shouldForwardProp: prop => prop !== '$status',
-})<{ $status: 'open' | 'closed' | 'archived' }>`
-	padding: var(--space-3xs) var(--space-xs);
-	border-radius: 4px;
-	background: ${p =>
-		p.$status === 'open'
-			? 'color-mix(in oklab, var(--color-status-client) 20%, transparent)'
-			: p.$status === 'closed'
-				? 'color-mix(in oklab, var(--color-status-prospect) 20%, transparent)'
-				: 'color-mix(in oklab, var(--color-on-surface) 12%, transparent)'};
-	color: ${p =>
-		p.$status === 'open'
-			? 'var(--color-status-client)'
-			: 'var(--color-on-surface-variant)'};
-`
-
-const TaskList = styled.ul.withConfig({
-	displayName: 'CompanyDetailTaskList',
-})`
-	display: flex;
-	flex-direction: column;
-	gap: 0;
-	list-style: none;
-	padding: 0;
-	margin: 0;
-`
-
-const TaskRow = styled.li.withConfig({
-	displayName: 'CompanyDetailTaskRow',
-	shouldForwardProp: prop => prop !== '$completed',
-})<{ $completed: boolean }>`
-	${ruledLedgerRow}
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: var(--space-sm);
-	padding: var(--space-sm) var(--space-md);
-	background-color: var(--color-paper-aged);
-	opacity: ${p => (p.$completed ? 0.55 : 1)};
-
-	&:first-child {
-		border-top: 1px solid var(--color-ledger-line);
-	}
-`
-
-const TaskTitle = styled.span.withConfig({
-	displayName: 'CompanyDetailTaskTitle',
-})`
-	font-family: var(--font-body);
-	font-size: var(--typescale-body-medium-size);
-	line-height: var(--typescale-body-medium-line);
-	color: var(--color-on-surface);
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	min-width: 0;
-`
-
-const TaskMeta = styled.span.withConfig({
-	displayName: 'CompanyDetailTaskMeta',
-})`
-	font-family: var(--font-display);
-	font-size: var(--typescale-label-small-size);
-	font-weight: var(--font-weight-bold);
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-	color: var(--color-on-surface-variant);
-	flex-shrink: 0;
 `
 
 const OverviewTimeline = styled.section.withConfig({
