@@ -183,10 +183,17 @@ const ActiveLabel = styled.span.withConfig({
 	line-height: var(--typescale-label-medium-line);
 	letter-spacing: 0.04em;
 	text-transform: uppercase;
-	max-width: 12rem;
+	/* Cap the chip at 14ch on phones / narrow tablets where it competes
+	 * with the page heading and Log button for the row, then relax on
+	 * wider viewports where there's room for the full org name. */
+	max-width: 14ch;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+
+	@media (min-width: 768px) {
+		max-width: 18rem;
+	}
 `
 
 const MenuList = styled.ul.withConfig({
