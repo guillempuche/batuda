@@ -58,11 +58,11 @@ test.describe('contact suppression banner', () => {
 		page,
 	}) => {
 		// WHEN the user opens the bounced contact's company page → Contacts.
-		// Land on `?tab=contacts` directly so PriTabs.Root reads the active
+		// Land on `?tab=people` directly so PriTabs.Root reads the active
 		// tab from the URL via `useTabSearchParam` and the panel mounts at
 		// SSR — clicking the tab requires React 19 hydration to wire the
 		// onValueChange listener and races the assertion in dev builds.
-		await page.goto(`/companies/${COMPANY_SLUG}?tab=contacts`, {
+		await page.goto(`/companies/${COMPANY_SLUG}?tab=people`, {
 			waitUntil: 'networkidle',
 		})
 
@@ -81,7 +81,7 @@ test.describe('contact suppression banner', () => {
 		page,
 	}) => {
 		// GIVEN the page is open and the banner is visible
-		await page.goto(`/companies/${COMPANY_SLUG}?tab=contacts`, {
+		await page.goto(`/companies/${COMPANY_SLUG}?tab=people`, {
 			waitUntil: 'networkidle',
 		})
 		const banner = page.getByTestId(/^contact-suppression-banner-/).first()
