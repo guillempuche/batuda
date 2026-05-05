@@ -13,16 +13,12 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/routes/emails/$threadId.tsx:415
-#: src/routes/emails/$threadId.tsx:425
-#: src/routes/emails/$threadId.tsx:470
-#: src/routes/pages/index.tsx:170
+#: src/routes/emails/$threadId.tsx:435
+#: src/routes/emails/$threadId.tsx:445
+#: src/routes/emails/$threadId.tsx:490
+#: src/routes/pages/index.tsx:171
 msgid "—"
 msgstr "—"
-
-#: src/routes/companies/$slug.tsx:942
-msgid "— not set —"
-msgstr "— not set —"
 
 #: src/components/interactions/quick-capture-dialog.tsx:219
 msgid "— Select a company —"
@@ -32,11 +28,15 @@ msgstr "— Select a company —"
 msgid "(no schema)"
 msgstr "(no schema)"
 
-#: src/routes/companies/$slug.tsx:1131
-#: src/routes/emails/$threadId.tsx:321
-#: src/routes/emails/index.tsx:1224
+#: src/components/companies/conversations-tab.tsx:165
+#: src/routes/emails/$threadId.tsx:341
+#: src/routes/emails/index.tsx:1225
 msgid "(no subject)"
 msgstr "(no subject)"
+
+#: src/components/companies/conversations-tab.tsx:164
+msgid "(no summary)"
+msgstr "(no summary)"
 
 #. placeholder {0}: ev.attendeeCount
 #: src/components/companies/calendar-tab.tsx:66
@@ -45,86 +45,94 @@ msgid "{0} attendees"
 msgstr "{0} attendees"
 
 #. placeholder {0}: b.calls
-#: src/routes/settings/organization/spend.tsx:191
+#: src/routes/settings/organization/spend.tsx:192
 msgid "{0} calls"
 msgstr "{0} calls"
 
 #. placeholder {0}: companies.length
-#: src/routes/companies/index.tsx:242
+#: src/routes/companies/index.tsx:243
 msgid "{0} companies"
 msgstr "{0} companies"
 
 #. placeholder {0}: companies.length
-#: src/routes/companies/index.tsx:239
+#: src/routes/companies/index.tsx:240
 msgid "{0} companies with filters applied"
 msgstr "{0} companies with filters applied"
 
 #. placeholder {0}: thread.messageCount
-#: src/routes/emails/index.tsx:1238
+#: src/routes/emails/index.tsx:1239
 msgid "{0} msgs"
 msgstr "{0} msgs"
 
 #. placeholder {0}: failedIds.length
-#: src/routes/emails/index.tsx:493
-#: src/routes/emails/index.tsx:525
+#: src/routes/emails/index.tsx:494
+#: src/routes/emails/index.tsx:526
 msgid "{0} thread could not be updated."
 msgstr "{0} thread could not be updated."
 
-#: src/routes/emails/index.tsx:720
+#: src/routes/emails/index.tsx:721
 msgid "{selectedCount} threads selected"
 msgstr "{selectedCount} threads selected"
 
-#: src/routes/emails/index.tsx:559
+#: src/routes/emails/index.tsx:560
 msgid "{total} threads"
 msgstr "{total} threads"
 
-#: src/routes/emails/$threadId.tsx:239
+#: src/routes/emails/$threadId.tsx:259
 msgid "{who} wrote:"
 msgstr "{who} wrote:"
+
+#: src/components/companies/open-tasks-card.tsx:59
+msgid "+{remaining} more"
+msgstr "+{remaining} more"
 
 #: src/components/companies/calendar-tab.tsx:64
 #: src/components/companies/upcoming-meetings-card.tsx:97
 msgid "1 attendee"
 msgstr "1 attendee"
 
-#: src/routes/settings/organization/spend.tsx:189
+#: src/routes/settings/organization/spend.tsx:190
 msgid "1 call"
 msgstr "1 call"
 
-#: src/routes/companies/index.tsx:241
+#: src/routes/companies/index.tsx:242
 msgid "1 company"
 msgstr "1 company"
 
-#: src/routes/emails/index.tsx:1238
+#: src/routes/emails/index.tsx:1239
 msgid "1 msg"
 msgstr "1 msg"
 
-#: src/routes/emails/index.tsx:559
+#: src/routes/emails/index.tsx:560
 msgid "1 thread"
 msgstr "1 thread"
 
-#: src/routes/emails/index.tsx:719
+#: src/routes/emails/index.tsx:720
 msgid "1 thread selected"
 msgstr "1 thread selected"
 
-#: src/routes/calendar/index.tsx:316
+#: src/components/companies/about-section.tsx:51
+msgid "About"
+msgstr "About"
+
+#: src/routes/calendar/index.tsx:317
 msgid "Accept"
 msgstr "Accept"
 
-#: src/routes/accept-invitation.$id.tsx:152
+#: src/routes/accept-invitation.$id.tsx:153
 msgid "Accepting the invitation…"
 msgstr "Accepting the invitation…"
 
 #. placeholder {0}: provider.length
-#: src/routes/settings/organization/spend.tsx:161
+#: src/routes/settings/organization/spend.tsx:162
 msgid "across {0} providers"
 msgstr "across {0} providers"
 
-#: src/routes/emails/inboxes.tsx:407
+#: src/routes/emails/inboxes.tsx:408
 msgid "Actions"
 msgstr "Actions"
 
-#: src/routes/emails/inboxes.tsx:405
+#: src/routes/emails/inboxes.tsx:406
 msgid "Active"
 msgstr "Active"
 
@@ -132,7 +140,7 @@ msgstr "Active"
 msgid "Active client"
 msgstr "Active client"
 
-#: src/routes/index.tsx:268
+#: src/routes/index.tsx:269
 msgid "Active companies"
 msgstr "Active companies"
 
@@ -140,7 +148,7 @@ msgstr "Active companies"
 msgid "Active organization"
 msgstr "Active organization"
 
-#: src/routes/tasks/index.tsx:632
+#: src/routes/tasks/index.tsx:633
 msgid "Add"
 msgstr "Add"
 
@@ -148,7 +156,7 @@ msgstr "Add"
 msgid "Add {label}"
 msgstr "Add {label}"
 
-#: src/components/companies/where-panel.tsx:126
+#: src/components/companies/where-panel.tsx:128
 msgid "Add a location on the Profile tab, then locate this company."
 msgstr "Add a location on the Profile tab, then locate this company."
 
@@ -161,11 +169,10 @@ msgid "Add Cc / Bcc"
 msgstr "Add Cc / Bcc"
 
 #: src/components/shared/company-card.tsx:113
-#: src/routes/companies/$slug.tsx:812
 msgid "Add task"
 msgstr "Add task"
 
-#: src/routes/companies/$slug.tsx:988
+#: src/routes/companies/$slug.tsx:979
 msgid "Add the first decision-maker to keep track of who to reach."
 msgstr "Add the first decision-maker to keep track of who to reach."
 
@@ -173,35 +180,35 @@ msgstr "Add the first decision-maker to keep track of who to reach."
 msgid "Address"
 msgstr "Address"
 
-#: src/routes/settings/organization/invite.tsx:168
-#: src/routes/settings/organization/members.tsx:60
+#: src/routes/settings/organization/invite.tsx:169
+#: src/routes/settings/organization/members.tsx:61
 msgid "Admin"
 msgstr "Admin"
 
-#: src/routes/emails/inboxes.tsx:450
-#: src/routes/emails/inboxes.tsx:992
+#: src/routes/emails/inboxes.tsx:451
+#: src/routes/emails/inboxes.tsx:993
 msgid "Agent"
 msgstr "Agent"
 
-#: src/routes/companies/index.tsx:276
-#: src/routes/emails/index.tsx:622
+#: src/routes/companies/index.tsx:277
+#: src/routes/emails/index.tsx:623
 msgid "All"
 msgstr "All"
 
-#: src/routes/emails/index.tsx:661
-#: src/routes/emails/index.tsx:677
+#: src/routes/emails/index.tsx:662
+#: src/routes/emails/index.tsx:678
 msgid "All inboxes"
 msgstr "All inboxes"
 
-#: src/routes/pages/index.tsx:125
+#: src/routes/pages/index.tsx:126
 msgid "All statuses"
 msgstr "All statuses"
 
-#: src/routes/settings/organization/spend.tsx:153
+#: src/routes/settings/organization/spend.tsx:154
 msgid "All time"
 msgstr "All time"
 
-#: src/routes/index.tsx:299
+#: src/routes/index.tsx:300
 msgid "All under control"
 msgstr "All under control"
 
@@ -209,17 +216,17 @@ msgstr "All under control"
 msgid "Already in CRM"
 msgstr "Already in CRM"
 
-#: src/routes/emails/$threadId.tsx:356
-#: src/routes/emails/index.tsx:753
+#: src/routes/emails/$threadId.tsx:376
+#: src/routes/emails/index.tsx:754
 msgid "Archive"
 msgstr "Archive"
 
-#: src/routes/emails/index.tsx:1307
+#: src/routes/emails/index.tsx:1308
 msgid "Archive thread"
 msgstr "Archive thread"
 
-#: src/routes/emails/$threadId.tsx:315
-#: src/routes/emails/index.tsx:627
+#: src/routes/emails/$threadId.tsx:335
+#: src/routes/emails/index.tsx:628
 msgid "Archived"
 msgstr "Archived"
 
@@ -231,31 +238,31 @@ msgstr "Archived — not pursuing"
 msgid "Attach"
 msgstr "Attach"
 
-#: src/routes/emails/$threadId.tsx:624
-#: src/routes/emails/$threadId.tsx:627
+#: src/routes/emails/$threadId.tsx:644
+#: src/routes/emails/$threadId.tsx:647
 msgid "attachment"
 msgstr "attachment"
 
-#: src/routes/tasks/index.tsx:722
+#: src/routes/tasks/index.tsx:723
 msgid "Audit log"
 msgstr "Audit log"
 
-#: src/routes/emails/inboxes.tsx:439
+#: src/routes/emails/inboxes.tsx:440
 msgid "Auth failed"
 msgstr "Auth failed"
 
-#: src/routes/emails/inboxes.tsx:306
+#: src/routes/emails/inboxes.tsx:307
 msgid "Back to emails"
 msgstr "Back to emails"
 
-#: src/routes/emails/$threadId.tsx:283
-#: src/routes/emails/$threadId.tsx:308
+#: src/routes/emails/$threadId.tsx:303
+#: src/routes/emails/$threadId.tsx:328
 msgid "Back to inbox"
 msgstr "Back to inbox"
 
-#: src/routes/settings/organization/invite.tsx:86
-#: src/routes/settings/organization/members.tsx:90
-#: src/routes/settings/organization/spend.tsx:110
+#: src/routes/settings/organization/invite.tsx:87
+#: src/routes/settings/organization/members.tsx:91
+#: src/routes/settings/organization/spend.tsx:111
 msgid "Back to organization"
 msgstr "Back to organization"
 
@@ -271,7 +278,7 @@ msgstr "Batuda — a multi-tenant CRM for small agencies."
 msgid "Batuda home"
 msgstr "Batuda home"
 
-#: src/routes/login.tsx:183
+#: src/routes/login.tsx:184
 msgid "Batuda is invite-only. Request access from the Engranatge team."
 msgstr "Batuda is invite-only. Request access from the Engranatge team."
 
@@ -279,15 +286,15 @@ msgstr "Batuda is invite-only. Request access from the Engranatge team."
 msgid "Bcc"
 msgstr "Bcc"
 
-#: src/routes/emails/index.tsx:1232
+#: src/routes/emails/index.tsx:1233
 msgid "Blocked"
 msgstr "Blocked"
 
-#: src/routes/emails/$threadId.tsx:598
+#: src/routes/emails/$threadId.tsx:618
 msgid "Blocked by the provider. The body is shown for review only."
 msgstr "Blocked by the provider. The body is shown for review only."
 
-#: src/routes/calendar/index.tsx:193
+#: src/routes/calendar/index.tsx:194
 msgid "Book a meeting from a company page or forward an invitation to your inbox to see it here."
 msgstr "Book a meeting from a company page or forward an invitation to your inbox to see it here."
 
@@ -295,8 +302,8 @@ msgstr "Book a meeting from a company page or forward an invitation to your inbo
 msgid "bounced"
 msgstr "bounced"
 
-#: src/routes/companies/$slug.tsx:1011
-#: src/routes/emails/$threadId.tsx:657
+#: src/routes/companies/$slug.tsx:1002
+#: src/routes/emails/$threadId.tsx:677
 msgid "Bounced"
 msgstr "Bounced"
 
@@ -308,29 +315,30 @@ msgstr "Brief"
 msgid "Brief summary (optional)"
 msgstr "Brief summary (optional)"
 
-#: src/routes/emails/index.tsx:716
+#: src/routes/emails/index.tsx:717
 msgid "Bulk thread actions"
 msgstr "Bulk thread actions"
 
-#: src/routes/settings/organization/spend.tsx:167
+#: src/routes/settings/organization/spend.tsx:168
 msgid "By provider"
 msgstr "By provider"
 
-#: src/routes/settings/organization/spend.tsx:210
+#: src/routes/settings/organization/spend.tsx:211
 msgid "By tool"
 msgstr "By tool"
 
-#: src/routes/settings/organization/spend.tsx:203
+#: src/routes/settings/organization/spend.tsx:204
 msgid "By user"
 msgstr "By user"
 
-#: src/routes/companies/$slug.tsx:866
+#: src/components/companies/cadence-card.tsx:51
+#: src/components/companies/cadence-card.tsx:78
 msgid "Cadence"
 msgstr "Cadence"
 
+#: src/components/companies/conversations-tab.tsx:161
 #: src/components/layout/nav-items.ts:74
-#: src/routes/calendar/index.tsx:178
-#: src/routes/companies/$slug.tsx:847
+#: src/routes/calendar/index.tsx:179
 msgid "Calendar"
 msgstr "Calendar"
 
@@ -339,19 +347,19 @@ msgstr "Calendar"
 msgid "Call"
 msgstr "Call"
 
-#: src/routes/companies/$slug.tsx:736
+#: src/routes/companies/$slug.tsx:788
 msgid "Call phone"
 msgstr "Call phone"
 
-#: src/routes/settings/organization/spend.tsx:241
+#: src/routes/settings/organization/spend.tsx:242
 msgid "Calls"
 msgstr "Calls"
 
 #: src/components/interactions/quick-capture-dialog.tsx:400
 #: src/components/research/research-dialog.tsx:193
-#: src/routes/emails/inboxes.tsx:1054
-#: src/routes/emails/inboxes.tsx:1452
-#: src/routes/tasks/index.tsx:717
+#: src/routes/emails/inboxes.tsx:1055
+#: src/routes/emails/inboxes.tsx:1453
+#: src/routes/tasks/index.tsx:718
 msgid "Cancel"
 msgstr "Cancel"
 
@@ -360,23 +368,23 @@ msgid "Cancel upload"
 msgstr "Cancel upload"
 
 #: src/components/emails/compose-form.tsx:429
-#: src/routes/emails/$threadId.tsx:575
+#: src/routes/emails/$threadId.tsx:595
 msgid "Cc"
 msgstr "Cc"
 
-#: src/routes/emails/inboxes.tsx:932
+#: src/routes/emails/inboxes.tsx:933
 msgid "Change password (re-probes the connection)"
 msgstr "Change password (re-probes the connection)"
 
-#: src/routes/companies/$slug.tsx:639
+#: src/routes/companies/$slug.tsx:691
 msgid "Change priority"
 msgstr "Change priority"
 
-#: src/routes/companies/$slug.tsx:681
+#: src/routes/companies/$slug.tsx:733
 msgid "Change status"
 msgstr "Change status"
 
-#: src/routes/pages/$id.tsx:169
+#: src/routes/pages/$id.tsx:192
 msgid "Changes have been saved."
 msgstr "Changes have been saved."
 
@@ -384,54 +392,54 @@ msgstr "Changes have been saved."
 msgid "Channel"
 msgstr "Channel"
 
-#: src/routes/companies/$slug.tsx:325
-#: src/routes/emails/index.tsx:783
-#: src/routes/pages/$id.tsx:124
+#: src/routes/companies/$slug.tsx:333
+#: src/routes/emails/index.tsx:784
+#: src/routes/pages/$id.tsx:137
 msgid "Check that the session is valid or try again."
 msgstr "Check that the session is valid or try again."
 
-#: src/routes/companies/index.tsx:312
+#: src/routes/companies/index.tsx:313
 msgid "Check that your session is valid or try again."
 msgstr "Check that your session is valid or try again."
 
-#: src/routes/emails/inboxes.tsx:384
+#: src/routes/emails/inboxes.tsx:385
 msgid "Check the session or try again."
 msgstr "Check the session or try again."
 
-#: src/routes/emails/inboxes.tsx:349
 #: src/routes/emails/inboxes.tsx:350
+#: src/routes/emails/inboxes.tsx:351
 msgid "Choose primary inbox"
 msgstr "Choose primary inbox"
 
 #: src/components/shared/task-item.tsx:292
-#: src/routes/companies/$slug.tsx:1054
-#: src/routes/emails/index.tsx:768
+#: src/routes/companies/$slug.tsx:1045
+#: src/routes/emails/index.tsx:769
 msgid "Clear"
 msgstr "Clear"
 
-#: src/routes/companies/index.tsx:302
-#: src/routes/companies/index.tsx:331
-#: src/routes/emails/index.tsx:710
-#: src/routes/emails/index.tsx:805
+#: src/routes/companies/index.tsx:303
+#: src/routes/companies/index.tsx:332
+#: src/routes/emails/index.tsx:711
+#: src/routes/emails/index.tsx:806
 msgid "Clear filters"
 msgstr "Clear filters"
 
-#: src/routes/emails/$threadId.tsx:669
+#: src/routes/emails/$threadId.tsx:689
 msgid "Clicked"
 msgstr "Clicked"
 
 #: src/components/shared/status-badge.tsx:33
-#: src/routes/companies/$slug.tsx:422
+#: src/routes/companies/$slug.tsx:445
 msgid "Client"
 msgstr "Client"
 
 #: src/components/interactions/quick-capture-dialog.tsx:188
 #: src/components/research/research-dialog.tsx:112
-#: src/routes/calendar/index.tsx:354
-#: src/routes/emails/$threadId.tsx:333
-#: src/routes/emails/inboxes.tsx:784
-#: src/routes/emails/inboxes.tsx:1335
-#: src/routes/emails/index.tsx:731
+#: src/routes/calendar/index.tsx:355
+#: src/routes/emails/$threadId.tsx:353
+#: src/routes/emails/inboxes.tsx:785
+#: src/routes/emails/inboxes.tsx:1336
+#: src/routes/emails/index.tsx:732
 msgid "Close"
 msgstr "Close"
 
@@ -439,14 +447,14 @@ msgstr "Close"
 msgid "Close draft"
 msgstr "Close draft"
 
-#: src/routes/emails/index.tsx:1286
+#: src/routes/emails/index.tsx:1287
 msgid "Close thread"
 msgstr "Close thread"
 
 #: src/components/shared/status-badge.tsx:34
-#: src/routes/companies/$slug.tsx:423
-#: src/routes/emails/$threadId.tsx:314
-#: src/routes/emails/index.tsx:626
+#: src/routes/companies/$slug.tsx:446
+#: src/routes/emails/$threadId.tsx:334
+#: src/routes/emails/index.tsx:627
 msgid "Closed"
 msgstr "Closed"
 
@@ -458,11 +466,11 @@ msgstr "Closed — won or lost"
 msgid "Cold lead — no contact yet"
 msgstr "Cold lead — no contact yet"
 
-#: src/routes/emails/index.tsx:1406
+#: src/routes/emails/index.tsx:1407
 msgid "Collapse"
 msgstr "Collapse"
 
-#: src/routes/emails/index.tsx:1330
+#: src/routes/emails/index.tsx:1331
 msgid "Columns"
 msgstr "Columns"
 
@@ -472,17 +480,17 @@ msgid "Comma-separated"
 msgstr "Comma-separated"
 
 #: src/components/layout/nav-items.ts:46
-#: src/routes/companies/index.tsx:248
+#: src/routes/companies/index.tsx:249
 msgid "Companies"
 msgstr "Companies"
 
 #: src/components/interactions/quick-capture-dialog.tsx:200
 #: src/components/interactions/quick-capture-dialog.tsx:209
-#: src/routes/emails/$threadId.tsx:407
-#: src/routes/emails/$threadId.tsx:447
-#: src/routes/index.tsx:314
-#: src/routes/index.tsx:391
-#: src/routes/index.tsx:431
+#: src/routes/emails/$threadId.tsx:427
+#: src/routes/emails/$threadId.tsx:467
+#: src/routes/index.tsx:315
+#: src/routes/index.tsx:392
+#: src/routes/index.tsx:432
 msgid "Company"
 msgstr "Company"
 
@@ -495,21 +503,17 @@ msgstr "Competitors"
 msgid "complained"
 msgstr "complained"
 
-#: src/routes/companies/$slug.tsx:1012
-#: src/routes/emails/$threadId.tsx:659
+#: src/routes/companies/$slug.tsx:1003
+#: src/routes/emails/$threadId.tsx:679
 msgid "Complained"
 msgstr "Complained"
 
-#: src/routes/tasks/index.tsx:710
+#: src/routes/tasks/index.tsx:711
 msgid "Complete"
 msgstr "Complete"
 
-#: src/routes/companies/$slug.tsx:1162
-msgid "Completed"
-msgstr "Completed"
-
-#: src/routes/companies/$slug.tsx:1113
-#: src/routes/emails/index.tsx:594
+#: src/components/companies/conversations-tab.tsx:206
+#: src/routes/emails/index.tsx:595
 msgid "Compose"
 msgstr "Compose"
 
@@ -517,39 +521,38 @@ msgstr "Compose"
 msgid "Conclusion or commitment (optional)"
 msgstr "Conclusion or commitment (optional)"
 
-#: src/routes/emails/inboxes.tsx:441
+#: src/routes/emails/inboxes.tsx:442
 msgid "Connect failed"
 msgstr "Connect failed"
 
-#: src/routes/emails/inboxes.tsx:310
+#: src/routes/emails/inboxes.tsx:311
 msgid "Connect IMAP/SMTP mailboxes and choose your primary sender."
 msgstr "Connect IMAP/SMTP mailboxes and choose your primary sender."
 
-#: src/routes/emails/inboxes.tsx:315
-#: src/routes/emails/inboxes.tsx:394
-#: src/routes/emails/inboxes.tsx:780
+#: src/routes/emails/inboxes.tsx:316
+#: src/routes/emails/inboxes.tsx:395
+#: src/routes/emails/inboxes.tsx:781
 msgid "Connect mailbox"
 msgstr "Connect mailbox"
 
-#: src/routes/emails/inboxes.tsx:390
+#: src/routes/emails/inboxes.tsx:391
 msgid "Connect your IMAP/SMTP mailbox to start sending and receiving email."
 msgstr "Connect your IMAP/SMTP mailbox to start sending and receiving email."
 
-#: src/routes/emails/inboxes.tsx:437
+#: src/routes/emails/inboxes.tsx:438
 msgid "Connected"
 msgstr "Connected"
 
-#: src/routes/emails/inboxes.tsx:247
+#: src/routes/emails/inboxes.tsx:248
 msgid "Connection tested"
 msgstr "Connection tested"
 
 #: src/components/shared/status-badge.tsx:29
-#: src/routes/companies/$slug.tsx:418
+#: src/routes/companies/$slug.tsx:441
 msgid "Contacted"
 msgstr "Contacted"
 
 #: src/components/research/findings/company-enrichment-view.tsx:174
-#: src/routes/companies/$slug.tsx:838
 msgid "Contacts"
 msgstr "Contacts"
 
@@ -557,11 +560,16 @@ msgstr "Contacts"
 msgid "Contacts found"
 msgstr "Contacts found"
 
-#: src/routes/emails/inboxes.tsx:1422
+#: src/routes/emails/inboxes.tsx:1423
 msgid "Content"
 msgstr "Content"
 
-#: src/components/companies/where-panel.tsx:66
+#: src/routes/companies/$slug.tsx:367
+#: src/routes/companies/$slug.tsx:873
+msgid "Conversations"
+msgstr "Conversations"
+
+#: src/components/companies/where-panel.tsx:68
 msgid "Coordinates saved from the geocoder."
 msgstr "Coordinates saved from the geocoder."
 
@@ -569,27 +577,27 @@ msgstr "Coordinates saved from the geocoder."
 msgid "Copy slug"
 msgstr "Copy slug"
 
-#: src/routes/companies/$slug.tsx:577
+#: src/routes/companies/$slug.tsx:629
 msgid "Could not clear suppression"
 msgstr "Could not clear suppression"
 
-#: src/routes/emails/inboxes.tsx:545
+#: src/routes/emails/inboxes.tsx:546
 msgid "Could not create the inbox. Check transport or credentials."
 msgstr "Could not create the inbox. Check transport or credentials."
 
-#: src/routes/companies/index.tsx:311
+#: src/routes/companies/index.tsx:312
 msgid "Could not load companies"
 msgstr "Could not load companies"
 
-#: src/routes/emails/inboxes.tsx:383
+#: src/routes/emails/inboxes.tsx:384
 msgid "Could not load inboxes"
 msgstr "Could not load inboxes"
 
-#: src/routes/companies/$slug.tsx:324
+#: src/routes/companies/$slug.tsx:332
 msgid "Could not load this company"
 msgstr "Could not load this company"
 
-#: src/routes/pages/$id.tsx:123
+#: src/routes/pages/$id.tsx:136
 msgid "Could not load this page"
 msgstr "Could not load this page"
 
@@ -597,11 +605,11 @@ msgstr "Could not load this page"
 msgid "Could not load this run."
 msgstr "Could not load this run."
 
-#: src/routes/emails/index.tsx:782
+#: src/routes/emails/index.tsx:783
 msgid "Could not load threads"
 msgstr "Could not load threads"
 
-#: src/components/companies/where-panel.tsx:72
+#: src/components/companies/where-panel.tsx:74
 msgid "Could not locate"
 msgstr "Could not locate"
 
@@ -609,44 +617,44 @@ msgstr "Could not locate"
 msgid "Could not log the interaction. Please try again."
 msgstr "Could not log the interaction. Please try again."
 
-#: src/routes/pages/$id.tsx:199
+#: src/routes/pages/$id.tsx:222
 msgid "Could not publish the page. Please try again."
 msgstr "Could not publish the page. Please try again."
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx:241
+#: src/routes/emails/inboxes.tsx:242
 msgid "Could not reach {0}."
 msgstr "Could not reach {0}."
 
-#: src/routes/settings/organization/members.tsx:74
+#: src/routes/settings/organization/members.tsx:75
 msgid "Could not remove {email}. Please try again."
 msgstr "Could not remove {email}. Please try again."
 
-#: src/routes/companies/$slug.tsx:405
+#: src/routes/companies/$slug.tsx:428
 msgid "Could not save"
 msgstr "Could not save"
 
-#: src/routes/emails/inboxes.tsx:563
+#: src/routes/emails/inboxes.tsx:564
 msgid "Could not save the inbox."
 msgstr "Could not save the inbox."
 
-#: src/routes/pages/$id.tsx:176
+#: src/routes/pages/$id.tsx:199
 msgid "Could not save the page. Please try again."
 msgstr "Could not save the page. Please try again."
 
-#: src/routes/settings/organization/invite.tsx:69
+#: src/routes/settings/organization/invite.tsx:70
 msgid "Could not send the invitation. Please try again."
 msgstr "Could not send the invitation. Please try again."
 
-#: src/routes/emails/inboxes.tsx:285
+#: src/routes/emails/inboxes.tsx:286
 msgid "Could not set primary inbox"
 msgstr "Could not set primary inbox"
 
-#: src/routes/emails/inboxes.tsx:225
+#: src/routes/emails/inboxes.tsx:226
 msgid "Could not set the default inbox."
 msgstr "Could not set the default inbox."
 
-#: src/routes/login.tsx:110
+#: src/routes/login.tsx:111
 msgid "Could not sign in. Check your email and password."
 msgstr "Could not sign in. Check your email and password."
 
@@ -658,40 +666,40 @@ msgstr "Could not start the research run. Please try again."
 msgid "Could not switch organization. Please try again."
 msgstr "Could not switch organization. Please try again."
 
-#: src/routes/emails/inboxes.tsx:204
+#: src/routes/emails/inboxes.tsx:205
 msgid "Could not toggle the inbox state."
 msgstr "Could not toggle the inbox state."
 
-#: src/routes/emails/inboxes.tsx:1464
+#: src/routes/emails/inboxes.tsx:1465
 msgid "Create"
 msgstr "Create"
 
-#: src/routes/emails/inboxes.tsx:1348
+#: src/routes/emails/inboxes.tsx:1349
 msgid "Create a footer to append to outgoing emails from this inbox."
 msgstr "Create a footer to append to outgoing emails from this inbox."
 
-#: src/routes/pages/index.tsx:137
+#: src/routes/pages/index.tsx:138
 msgid "Create a prospect landing page from a company detail view or via the MCP tools."
 msgstr "Create a prospect landing page from a company detail view or via the MCP tools."
 
-#: src/routes/companies/$slug.tsx:1234
+#: src/routes/companies/$slug.tsx:1118
 msgid "Create a prospect landing page to share with this company."
 msgstr "Create a prospect landing page to share with this company."
 
-#: src/routes/emails/inboxes.tsx:1242
+#: src/routes/emails/inboxes.tsx:1243
 msgid "Create failed"
 msgstr "Create failed"
 
-#: src/routes/calendar/index.tsx:341
+#: src/routes/calendar/index.tsx:342
 msgid "Create follow-up task"
 msgstr "Create follow-up task"
 
-#: src/routes/emails/inboxes.tsx:1400
+#: src/routes/emails/inboxes.tsx:1401
 msgid "Create footer"
 msgstr "Create footer"
 
-#: src/routes/emails/$threadId.tsx:478
-#: src/routes/emails/inboxes.tsx:406
+#: src/routes/emails/$threadId.tsx:498
+#: src/routes/emails/inboxes.tsx:407
 msgid "Created"
 msgstr "Created"
 
@@ -699,8 +707,8 @@ msgstr "Created"
 msgid "Created by agent"
 msgstr "Created by agent"
 
+#: src/components/companies/about-section.tsx:100
 #: src/components/research/findings/company-enrichment-view.tsx:82
-#: src/routes/companies/$slug.tsx:945
 msgid "Current tools"
 msgstr "Current tools"
 
@@ -709,60 +717,60 @@ msgid "Date"
 msgstr "Date"
 
 #: src/components/shared/status-badge.tsx:35
-#: src/routes/companies/$slug.tsx:424
+#: src/routes/companies/$slug.tsx:447
 msgid "Dead"
 msgstr "Dead"
 
 #: src/components/research/findings/contact-discovery-view.tsx:66
-#: src/routes/companies/$slug.tsx:999
+#: src/routes/companies/$slug.tsx:990
 msgid "Decision maker"
 msgstr "Decision maker"
 
-#: src/routes/calendar/index.tsx:332
+#: src/routes/calendar/index.tsx:333
 msgid "Decline"
 msgstr "Decline"
 
-#: src/routes/emails/inboxes.tsx:404
-#: src/routes/emails/inboxes.tsx:1357
+#: src/routes/emails/inboxes.tsx:405
+#: src/routes/emails/inboxes.tsx:1358
 msgid "Default"
 msgstr "Default"
 
-#: src/routes/emails/inboxes.tsx:462
+#: src/routes/emails/inboxes.tsx:463
 msgid "Default inbox"
 msgstr "Default inbox"
 
-#: src/routes/emails/inboxes.tsx:919
+#: src/routes/emails/inboxes.tsx:920
 msgid "Defaults to the email address."
 msgstr "Defaults to the email address."
 
-#: src/routes/emails/inboxes.tsx:1014
+#: src/routes/emails/inboxes.tsx:1015
 msgid "Defaults to you when omitted."
 msgstr "Defaults to you when omitted."
 
-#: src/routes/emails/inboxes.tsx:1384
+#: src/routes/emails/inboxes.tsx:1385
 msgid "Delete"
 msgstr "Delete"
 
-#: src/routes/emails/inboxes.tsx:265
-#: src/routes/emails/inboxes.tsx:1292
+#: src/routes/emails/inboxes.tsx:266
+#: src/routes/emails/inboxes.tsx:1293
 msgid "Delete failed"
 msgstr "Delete failed"
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx:526
+#: src/routes/emails/inboxes.tsx:527
 msgid "Delete inbox {0}"
 msgstr "Delete inbox {0}"
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx:259
+#: src/routes/emails/inboxes.tsx:260
 msgid "Delete inbox {0}? Stored messages stay; the connection stops."
 msgstr "Delete inbox {0}? Stored messages stay; the connection stops."
 
-#: src/routes/emails/inboxes.tsx:1285
+#: src/routes/emails/inboxes.tsx:1286
 msgid "Delete this footer? This cannot be undone."
 msgstr "Delete this footer? This cannot be undone."
 
-#: src/routes/emails/$threadId.tsx:655
+#: src/routes/emails/$threadId.tsx:675
 msgid "Delivered"
 msgstr "Delivered"
 
@@ -770,7 +778,7 @@ msgstr "Delivered"
 msgid "Direction"
 msgstr "Direction"
 
-#: src/routes/emails/inboxes.tsx:442
+#: src/routes/emails/inboxes.tsx:443
 msgid "Disabled"
 msgstr "Disabled"
 
@@ -778,7 +786,11 @@ msgstr "Disabled"
 msgid "Discard"
 msgstr "Discard"
 
-#: src/routes/emails/inboxes.tsx:844
+#: src/components/companies/about-section.tsx:90
+msgid "Discovery"
+msgstr "Discovery"
+
+#: src/routes/emails/inboxes.tsx:845
 msgid "Display name"
 msgstr "Display name"
 
@@ -786,20 +798,20 @@ msgstr "Display name"
 msgid "Document"
 msgstr "Document"
 
-#: src/routes/companies/$slug.tsx:856
+#: src/routes/companies/$slug.tsx:1144
 msgid "Documents"
 msgstr "Documents"
 
-#: src/routes/tasks/index.tsx:505
+#: src/routes/tasks/index.tsx:506
 msgid "Done 7d"
 msgstr "Done 7d"
 
-#: src/routes/pages/index.tsx:126
+#: src/routes/pages/index.tsx:127
 msgid "Draft"
 msgstr "Draft"
 
 #: src/components/shared/task-item.tsx:272
-#: src/routes/tasks/index.tsx:698
+#: src/routes/tasks/index.tsx:699
 msgid "Due"
 msgstr "Due"
 
@@ -811,15 +823,15 @@ msgstr "Due date"
 msgid "Duration (min)"
 msgstr "Duration (min)"
 
-#: src/routes/emails/inboxes.tsx:1418
+#: src/routes/emails/inboxes.tsx:1419
 msgid "e.g. Company signature"
 msgstr "e.g. Company signature"
 
-#: src/routes/emails/inboxes.tsx:850
+#: src/routes/emails/inboxes.tsx:851
 msgid "e.g. Sales — Acme"
 msgstr "e.g. Sales — Acme"
 
-#: src/routes/emails/inboxes.tsx:1375
+#: src/routes/emails/inboxes.tsx:1376
 msgid "Edit"
 msgstr "Edit"
 
@@ -831,12 +843,12 @@ msgstr "Edit {label}"
 msgid "Edit due date"
 msgstr "Edit due date"
 
-#: src/routes/emails/inboxes.tsx:780
+#: src/routes/emails/inboxes.tsx:781
 msgid "Edit inbox"
 msgstr "Edit inbox"
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx:517
+#: src/routes/emails/inboxes.tsx:518
 msgid "Edit inbox {0}"
 msgstr "Edit inbox {0}"
 
@@ -844,22 +856,24 @@ msgstr "Edit inbox {0}"
 msgid "Edit task title"
 msgstr "Edit task title"
 
-#: src/routes/pages/$id.tsx:264
+#: src/routes/pages/$id.tsx:154
+#: src/routes/pages/$id.tsx:287
 msgid "Editor"
 msgstr "Editor"
 
+#: src/components/companies/conversations-tab.tsx:160
 #: src/components/interactions/quick-capture-dialog.tsx:424
 #: src/components/research/findings/company-enrichment-view.tsx:187
 #: src/components/research/findings/contact-discovery-view.tsx:74
 #: src/components/shared/channel-icon.tsx:63
-#: src/routes/companies/$slug.tsx:802
-#: src/routes/emails/inboxes.tsx:401
-#: src/routes/login.tsx:142
-#: src/routes/settings/organization/invite.tsx:136
+#: src/routes/companies/$slug.tsx:854
+#: src/routes/emails/inboxes.tsx:402
+#: src/routes/login.tsx:143
+#: src/routes/settings/organization/invite.tsx:137
 msgid "Email"
 msgstr "Email"
 
-#: src/routes/emails/inboxes.tsx:831
+#: src/routes/emails/inboxes.tsx:832
 msgid "Email address"
 msgstr "Email address"
 
@@ -867,21 +881,20 @@ msgstr "Email address"
 msgid "Email drafts"
 msgstr "Email drafts"
 
-#: src/routes/companies/$slug.tsx:1032
+#: src/routes/companies/$slug.tsx:1023
 msgid "Email is dead-letter"
 msgstr "Email is dead-letter"
 
-#: src/routes/companies/$slug.tsx:1074
+#: src/routes/companies/$slug.tsx:1065
 msgid "Email via Batuda"
 msgstr "Email via Batuda"
 
 #: src/components/layout/nav-items.ts:53
-#: src/routes/companies/$slug.tsx:841
-#: src/routes/emails/index.tsx:558
+#: src/routes/emails/index.tsx:559
 msgid "Emails"
 msgstr "Emails"
 
-#: src/routes/companies/$slug.tsx:1300
+#: src/routes/companies/$slug.tsx:932
 msgid "Emails, calls, documents, and proposals will appear here as they happen."
 msgstr "Emails, calls, documents, and proposals will appear here as they happen."
 
@@ -889,7 +902,7 @@ msgstr "Emails, calls, documents, and proposals will appear here as they happen.
 msgid "Enrichment"
 msgstr "Enrichment"
 
-#: src/routes/settings/organization/invite.tsx:53
+#: src/routes/settings/organization/invite.tsx:54
 msgid "Enter an email address."
 msgstr "Enter an email address."
 
@@ -901,28 +914,37 @@ msgstr "Event"
 msgid "Exit full screen"
 msgstr "Exit full screen"
 
-#: src/routes/emails/index.tsx:1406
+#: src/routes/emails/index.tsx:1407
 msgid "Expand"
 msgstr "Expand"
 
-#: src/routes/emails/$threadId.tsx:661
+#: src/routes/emails/$threadId.tsx:681
 msgid "Failed"
 msgstr "Failed"
 
-#: src/routes/emails/index.tsx:659
+#: src/routes/companies/$slug.tsx:369
+#: src/routes/companies/$slug.tsx:879
+msgid "Files"
+msgstr "Files"
+
+#: src/routes/emails/index.tsx:660
 msgid "Filter by inbox"
 msgstr "Filter by inbox"
 
-#: src/routes/companies/index.tsx:270
-#: src/routes/emails/index.tsx:616
+#: src/routes/companies/index.tsx:271
+#: src/routes/emails/index.tsx:617
 msgid "Filter by status"
 msgstr "Filter by status"
 
-#: src/routes/companies/index.tsx:254
+#: src/routes/companies/index.tsx:255
 msgid "Filter companies"
 msgstr "Filter companies"
 
-#: src/routes/emails/index.tsx:600
+#: src/components/companies/conversations-tab.tsx:184
+msgid "Filter conversations"
+msgstr "Filter conversations"
+
+#: src/routes/emails/index.tsx:601
 msgid "Filter emails"
 msgstr "Filter emails"
 
@@ -934,16 +956,16 @@ msgstr "Findings"
 msgid "First outreach sent"
 msgstr "First outreach sent"
 
-#: src/routes/emails/$threadId.tsx:597
+#: src/routes/emails/$threadId.tsx:617
 msgid "Flagged as spam by the provider. The body is shown for review only."
 msgstr "Flagged as spam by the provider. The body is shown for review only."
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx:1332
+#: src/routes/emails/inboxes.tsx:1333
 msgid "Footers — {0}"
 msgstr "Footers — {0}"
 
-#: src/routes/emails/$threadId.tsx:547
+#: src/routes/emails/$threadId.tsx:567
 msgid "From"
 msgstr "From"
 
@@ -963,85 +985,85 @@ msgstr "From webhook"
 msgid "Full screen"
 msgstr "Full screen"
 
-#: src/routes/accept-invitation.$id.tsx:169
+#: src/routes/accept-invitation.$id.tsx:170
 msgid "Heading to the dashboard…"
 msgstr "Heading to the dashboard…"
 
-#: src/routes/emails/$threadId.tsx:570
+#: src/routes/emails/$threadId.tsx:590
 msgid "Hide Cc"
 msgstr "Hide Cc"
 
-#: src/routes/companies/$slug.tsx:430
+#: src/routes/companies/$slug.tsx:453
 msgid "High"
 msgstr "High"
 
 #: src/components/shared/priority-dot.tsx:47
 #: src/components/shared/task-item.tsx:309
-#: src/routes/index.tsx:458
+#: src/routes/index.tsx:459
 msgid "High priority"
 msgstr "High priority"
 
-#: src/routes/emails/inboxes.tsx:448
-#: src/routes/emails/inboxes.tsx:986
+#: src/routes/emails/inboxes.tsx:449
+#: src/routes/emails/inboxes.tsx:987
 msgid "Human"
 msgstr "Human"
 
-#: src/routes/emails/inboxes.tsx:856
+#: src/routes/emails/inboxes.tsx:857
 msgid "IMAP host"
 msgstr "IMAP host"
 
-#: src/routes/emails/inboxes.tsx:866
+#: src/routes/emails/inboxes.tsx:867
 msgid "IMAP port"
 msgstr "IMAP port"
 
-#: src/routes/emails/inboxes.tsx:875
-#: src/routes/emails/inboxes.tsx:879
+#: src/routes/emails/inboxes.tsx:876
+#: src/routes/emails/inboxes.tsx:880
 msgid "IMAP security"
 msgstr "IMAP security"
 
-#: src/routes/companies/index.tsx:251
+#: src/routes/companies/index.tsx:252
 msgid "In pipeline"
 msgstr "In pipeline"
 
 #: src/components/interactions/quick-capture-dialog.tsx:271
-#: src/routes/emails/index.tsx:1205
+#: src/routes/emails/index.tsx:1206
 msgid "Inbound"
 msgstr "Inbound"
 
-#: src/routes/emails/index.tsx:794
+#: src/routes/emails/index.tsx:795
 msgid "Inbound and outbound emails will pin to this board once a thread exists."
 msgstr "Inbound and outbound emails will pin to this board once a thread exists."
 
 #. placeholder {0}: msg.from
-#: src/routes/emails/$threadId.tsx:533
+#: src/routes/emails/$threadId.tsx:553
 msgid "Inbound message from {0}"
 msgstr "Inbound message from {0}"
 
 #: src/components/emails/compose-form.tsx:370
-#: src/routes/emails/$threadId.tsx:419
-#: src/routes/emails/$threadId.tsx:459
+#: src/routes/emails/$threadId.tsx:439
+#: src/routes/emails/$threadId.tsx:479
 msgid "Inbox"
 msgstr "Inbox"
 
-#: src/routes/emails/inboxes.tsx:551
+#: src/routes/emails/inboxes.tsx:552
 msgid "Inbox connected"
 msgstr "Inbox connected"
 
-#: src/routes/emails/inboxes.tsx:309
+#: src/routes/emails/inboxes.tsx:310
 msgid "Inbox management"
 msgstr "Inbox management"
 
-#: src/routes/emails/inboxes.tsx:273
+#: src/routes/emails/inboxes.tsx:274
 msgid "Inbox removed"
 msgstr "Inbox removed"
 
-#: src/routes/emails/inboxes.tsx:568
+#: src/routes/emails/inboxes.tsx:569
 msgid "Inbox updated"
 msgstr "Inbox updated"
 
+#: src/components/companies/about-section.tsx:62
 #: src/components/research/findings/company-enrichment-view.tsx:76
 #: src/components/research/findings/prospect-scan-view.tsx:75
-#: src/routes/companies/$slug.tsx:909
 msgid "Industry"
 msgstr "Industry"
 
@@ -1049,35 +1071,39 @@ msgstr "Industry"
 msgid "Instagram"
 msgstr "Instagram"
 
+#: src/components/companies/conversations-tab.tsx:159
+msgid "Interaction"
+msgstr "Interaction"
+
 #: src/components/interactions/quick-capture-dialog.tsx:154
 msgid "Interaction logged"
 msgstr "Interaction logged"
 
-#: src/routes/settings/organization/invite.tsx:119
+#: src/routes/settings/organization/invite.tsx:120
 msgid "Invitation sent to {sent}."
 msgstr "Invitation sent to {sent}."
 
-#: src/routes/settings/organization/index.tsx:104
+#: src/routes/settings/organization/index.tsx:105
 msgid "Invite"
 msgstr "Invite"
 
-#: src/routes/settings/organization/invite.tsx:96
+#: src/routes/settings/organization/invite.tsx:97
 msgid "Invite a member"
 msgstr "Invite a member"
 
-#: src/routes/settings/organization/index.tsx:99
+#: src/routes/settings/organization/index.tsx:100
 msgid "Invite a new member"
 msgstr "Invite a new member"
 
-#: src/routes/accept-invitation.$id.tsx:139
+#: src/routes/accept-invitation.$id.tsx:140
 msgid "Join the workspace"
 msgstr "Join the workspace"
 
-#: src/routes/calendar/index.tsx:293
+#: src/routes/calendar/index.tsx:294
 msgid "Join video call"
 msgstr "Join video call"
 
-#: src/routes/settings/organization/spend.tsx:235
+#: src/routes/settings/organization/spend.tsx:236
 msgid "Key"
 msgstr "Key"
 
@@ -1085,42 +1111,42 @@ msgstr "Key"
 msgid "Key differentiators"
 msgstr "Key differentiators"
 
-#: src/routes/pages/index.tsx:145
+#: src/routes/pages/index.tsx:146
 msgid "Lang"
 msgstr "Lang"
 
 #: src/components/profile/language-select.tsx:34
-#: src/routes/pages/$id.tsx:288
-#: src/routes/profile/index.tsx:120
+#: src/routes/pages/$id.tsx:311
+#: src/routes/profile/index.tsx:121
 msgid "Language"
 msgstr "Language"
 
-#: src/routes/settings/organization/spend.tsx:143
+#: src/routes/settings/organization/spend.tsx:144
 msgid "Last 30 days"
 msgstr "Last 30 days"
 
-#: src/routes/emails/$threadId.tsx:484
+#: src/routes/emails/$threadId.tsx:504
 msgid "Last activity"
 msgstr "Last activity"
 
-#: src/routes/companies/$slug.tsx:880
+#: src/components/companies/cadence-card.tsx:90
 msgid "Last call"
 msgstr "Last call"
 
 #: src/components/shared/company-card.tsx:95
-#: src/routes/companies/$slug.tsx:774
+#: src/routes/companies/$slug.tsx:826
 msgid "Last contact"
 msgstr "Last contact"
 
-#: src/routes/companies/$slug.tsx:871
+#: src/components/companies/cadence-card.tsx:84
 msgid "Last email"
 msgstr "Last email"
 
-#: src/routes/companies/$slug.tsx:889
+#: src/components/companies/cadence-card.tsx:96
 msgid "Last meet"
 msgstr "Last meet"
 
-#: src/routes/tasks/index.tsx:481
+#: src/routes/tasks/index.tsx:482
 msgid "Later"
 msgstr "Later"
 
@@ -1129,11 +1155,11 @@ msgstr "Later"
 msgid "LinkedIn"
 msgstr "LinkedIn"
 
-#: src/routes/calendar/index.tsx:189
+#: src/routes/calendar/index.tsx:190
 msgid "Loading calendar…"
 msgstr "Loading calendar…"
 
-#: src/routes/companies/index.tsx:308
+#: src/routes/companies/index.tsx:309
 msgid "Loading companies…"
 msgstr "Loading companies…"
 
@@ -1143,35 +1169,35 @@ msgstr "Loading run…"
 
 #: src/components/companies/upcoming-meetings-card.tsx:57
 #: src/components/shared/loading-spinner.tsx:23
-#: src/routes/settings/organization/index.tsx:51
-#: src/routes/settings/organization/members.tsx:112
+#: src/routes/settings/organization/index.tsx:52
+#: src/routes/settings/organization/members.tsx:113
 msgid "Loading…"
 msgstr "Loading…"
 
-#: src/routes/emails/inboxes.tsx:399
+#: src/routes/emails/inboxes.tsx:400
 msgid "Local inboxes"
 msgstr "Local inboxes"
 
-#: src/components/companies/where-panel.tsx:143
+#: src/components/companies/where-panel.tsx:145
 msgid "Locate this company"
 msgstr "Locate this company"
 
-#: src/components/companies/where-panel.tsx:65
+#: src/components/companies/where-panel.tsx:67
 msgid "Located on the map"
 msgstr "Located on the map"
 
-#: src/components/companies/where-panel.tsx:141
+#: src/components/companies/where-panel.tsx:143
 msgid "Locating…"
 msgstr "Locating…"
 
+#: src/components/companies/about-section.tsx:72
 #: src/components/research/findings/company-enrichment-view.tsx:79
-#: src/routes/calendar/index.tsx:284
-#: src/routes/companies/$slug.tsx:919
+#: src/routes/calendar/index.tsx:285
 msgid "Location"
 msgstr "Location"
 
 #: src/components/interactions/quick-capture-dialog.tsx:408
-#: src/components/layout/top-bar.tsx:49
+#: src/components/layout/top-bar.tsx:53
 msgid "Log"
 msgstr "Log"
 
@@ -1179,9 +1205,13 @@ msgstr "Log"
 msgid "Log an interaction for this task"
 msgstr "Log an interaction for this task"
 
+#: src/components/companies/cadence-card.tsx:65
+msgid "Log first interaction"
+msgstr "Log first interaction"
+
 #: src/components/interactions/quick-capture-dialog.tsx:182
 #: src/components/shared/company-card.tsx:108
-#: src/routes/companies/$slug.tsx:789
+#: src/routes/companies/$slug.tsx:841
 msgid "Log interaction"
 msgstr "Log interaction"
 
@@ -1189,7 +1219,7 @@ msgstr "Log interaction"
 msgid "Logging…"
 msgstr "Logging…"
 
-#: src/routes/companies/$slug.tsx:432
+#: src/routes/companies/$slug.tsx:455
 msgid "Low"
 msgstr "Low"
 
@@ -1199,15 +1229,15 @@ msgid "Low priority"
 msgstr "Low priority"
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx:510
+#: src/routes/emails/inboxes.tsx:511
 msgid "Manage footers for {0}"
 msgstr "Manage footers for {0}"
 
-#: src/routes/emails/index.tsx:571
+#: src/routes/emails/index.tsx:572
 msgid "Manage inboxes"
 msgstr "Manage inboxes"
 
-#: src/routes/settings/organization/index.tsx:82
+#: src/routes/settings/organization/index.tsx:83
 msgid "Manage members"
 msgstr "Manage members"
 
@@ -1221,11 +1251,11 @@ msgstr "Mark \"{0}\" as complete"
 msgid "Mark \"{0}\" as pending"
 msgstr "Mark \"{0}\" as pending"
 
-#: src/routes/emails/inboxes.tsx:480
+#: src/routes/emails/inboxes.tsx:481
 msgid "Mark active"
 msgstr "Mark active"
 
-#: src/routes/emails/inboxes.tsx:462
+#: src/routes/emails/inboxes.tsx:463
 msgid "Mark as default"
 msgstr "Mark as default"
 
@@ -1233,17 +1263,17 @@ msgstr "Mark as default"
 msgid "Mark contacted"
 msgstr "Mark contacted"
 
-#: src/routes/emails/inboxes.tsx:480
+#: src/routes/emails/inboxes.tsx:481
 msgid "Mark inactive"
 msgstr "Mark inactive"
 
-#: src/routes/emails/index.tsx:764
-#: src/routes/emails/index.tsx:1265
+#: src/routes/emails/index.tsx:765
+#: src/routes/emails/index.tsx:1266
 msgid "Mark read"
 msgstr "Mark read"
 
-#: src/routes/emails/$threadId.tsx:367
-#: src/routes/emails/index.tsx:1275
+#: src/routes/emails/$threadId.tsx:387
+#: src/routes/emails/index.tsx:1276
 msgid "Mark unread"
 msgstr "Mark unread"
 
@@ -1255,7 +1285,7 @@ msgstr "Market summary"
 msgid "Maturity"
 msgstr "Maturity"
 
-#: src/routes/companies/$slug.tsx:431
+#: src/routes/companies/$slug.tsx:454
 msgid "Medium"
 msgstr "Medium"
 
@@ -1265,7 +1295,7 @@ msgstr "Medium priority"
 
 #: src/components/interactions/quick-capture-dialog.tsx:423
 #: src/components/shared/status-badge.tsx:31
-#: src/routes/companies/$slug.tsx:420
+#: src/routes/companies/$slug.tsx:443
 msgid "Meeting"
 msgstr "Meeting"
 
@@ -1273,17 +1303,17 @@ msgstr "Meeting"
 msgid "Meeting booked"
 msgstr "Meeting booked"
 
-#: src/routes/calendar/index.tsx:181
+#: src/routes/calendar/index.tsx:182
 msgid "Meetings from bookings, email invitations, and internal blocks."
 msgstr "Meetings from bookings, email invitations, and internal blocks."
 
-#: src/routes/settings/organization/invite.tsx:167
-#: src/routes/settings/organization/members.tsx:61
+#: src/routes/settings/organization/invite.tsx:168
+#: src/routes/settings/organization/members.tsx:62
 msgid "Member"
 msgstr "Member"
 
-#: src/routes/settings/organization/index.tsx:87
-#: src/routes/settings/organization/members.tsx:100
+#: src/routes/settings/organization/index.tsx:88
+#: src/routes/settings/organization/members.tsx:101
 msgid "Members"
 msgstr "Members"
 
@@ -1291,27 +1321,19 @@ msgstr "Members"
 msgid "Message"
 msgstr "Message"
 
-#: src/routes/emails/$threadId.tsx:474
+#: src/routes/emails/$threadId.tsx:494
 msgid "Messages"
 msgstr "Messages"
 
-#: src/routes/companies/$slug.tsx:1120
-msgid "Messages sent or received with this company will appear here."
-msgstr "Messages sent or received with this company will appear here."
+#: src/routes/pages/$id.tsx:155
+msgid "Meta"
+msgstr "Meta"
 
 #: src/components/emails/compose-window.tsx:62
 msgid "Minimize"
 msgstr "Minimize"
 
-#: src/routes/companies/$slug.tsx:1140
-msgid "msg"
-msgstr "msg"
-
-#: src/routes/companies/$slug.tsx:1140
-msgid "msgs"
-msgstr "msgs"
-
-#: src/routes/emails/inboxes.tsx:1412
+#: src/routes/emails/inboxes.tsx:1413
 msgid "Name"
 msgstr "Name"
 
@@ -1319,35 +1341,32 @@ msgstr "Name"
 msgid "name@example.com, another@example.com"
 msgstr "name@example.com, another@example.com"
 
-#: src/routes/index.tsx:288
+#: src/routes/index.tsx:289
 msgid "Needs attention"
 msgstr "Needs attention"
 
-#: src/routes/companies/$slug.tsx:776
-#: src/routes/companies/$slug.tsx:875
-#: src/routes/companies/$slug.tsx:884
-#: src/routes/companies/$slug.tsx:893
+#: src/components/companies/cadence-card.tsx:86
+#: src/components/companies/cadence-card.tsx:92
+#: src/components/companies/cadence-card.tsx:98
+#: src/routes/companies/$slug.tsx:828
 msgid "never"
 msgstr "never"
 
-#: src/routes/emails/inboxes.tsx:941
+#: src/routes/emails/inboxes.tsx:942
 msgid "New password or app-password"
 msgstr "New password or app-password"
 
-#: src/routes/companies/$slug.tsx:821
-msgid "New proposal"
-msgstr "New proposal"
-
-#: src/routes/emails/index.tsx:848
+#: src/routes/emails/index.tsx:849
 msgid "Next"
 msgstr "Next"
 
+#: src/components/companies/next-action-card.tsx:31
+#: src/components/companies/next-action-card.tsx:36
 #: src/components/interactions/quick-capture-dialog.tsx:348
-#: src/routes/companies/$slug.tsx:956
 msgid "Next action"
 msgstr "Next action"
 
-#: src/routes/companies/$slug.tsx:898
+#: src/components/companies/cadence-card.tsx:102
 msgid "Next event"
 msgstr "Next event"
 
@@ -1360,15 +1379,15 @@ msgstr "Next: {0}"
 msgid "No active organization"
 msgstr "No active organization"
 
-#: src/routes/emails/index.tsx:777
+#: src/routes/emails/index.tsx:778
 msgid "No active organization on this session"
 msgstr "No active organization on this session"
 
-#: src/routes/settings/organization/index.tsx:57
+#: src/routes/settings/organization/index.tsx:58
 msgid "No active organization. Pick one from the switcher in the top bar."
 msgstr "No active organization. Pick one from the switcher in the top bar."
 
-#: src/routes/companies/$slug.tsx:1299
+#: src/routes/companies/$slug.tsx:931
 msgid "No activity yet"
 msgstr "No activity yet"
 
@@ -1376,103 +1395,111 @@ msgstr "No activity yet"
 msgid "No calendar events for this company yet."
 msgstr "No calendar events for this company yet."
 
-#: src/routes/calendar/index.tsx:192
+#: src/routes/calendar/index.tsx:193
 msgid "No calendar events yet"
 msgstr "No calendar events yet"
 
-#: src/routes/tasks/index.tsx:726
+#: src/routes/tasks/index.tsx:727
 msgid "No changes recorded yet."
 msgstr "No changes recorded yet."
 
-#: src/routes/companies/index.tsx:318
+#: src/routes/companies/index.tsx:319
 msgid "No companies match the filters"
 msgstr "No companies match the filters"
 
-#: src/routes/companies/index.tsx:319
+#: src/routes/companies/index.tsx:320
 msgid "No companies yet"
 msgstr "No companies yet"
 
 #: src/components/layout/org-switcher.tsx:62
-#: src/routes/accept-invitation.$id.tsx:97
-#: src/routes/login.tsx:125
-#: src/routes/profile/index.tsx:76
-#: src/routes/settings/organization/invite.tsx:76
-#: src/routes/settings/organization/members.tsx:80
+#: src/routes/accept-invitation.$id.tsx:98
+#: src/routes/login.tsx:126
+#: src/routes/profile/index.tsx:77
+#: src/routes/settings/organization/invite.tsx:77
+#: src/routes/settings/organization/members.tsx:81
 msgid "No connection to the server. Try again in a few seconds."
 msgstr "No connection to the server. Try again in a few seconds."
 
-#: src/routes/companies/$slug.tsx:987
+#: src/components/companies/cadence-card.tsx:56
+msgid "No contact yet."
+msgstr "No contact yet."
+
+#: src/routes/companies/$slug.tsx:978
 msgid "No contacts yet"
 msgstr "No contacts yet"
 
-#: src/components/companies/where-panel.tsx:118
+#: src/components/companies/conversations-tab.tsx:212
+msgid "No conversations yet."
+msgstr "No conversations yet."
+
+#: src/components/companies/where-panel.tsx:120
 msgid "No coordinates yet. Locate this company to plot it on the map."
 msgstr "No coordinates yet. Locate this company to plot it on the map."
 
 #: src/components/shared/task-item.tsx:104
 #: src/components/shared/task-item.tsx:264
-#: src/routes/tasks/index.tsx:703
+#: src/routes/tasks/index.tsx:704
 msgid "no date"
 msgstr "no date"
 
-#: src/routes/companies/$slug.tsx:1262
+#: src/routes/companies/$slug.tsx:1148
 msgid "No documents yet"
 msgstr "No documents yet"
 
-#: src/routes/companies/$slug.tsx:1166
+#: src/components/companies/open-tasks-card.tsx:53
 msgid "no due date"
 msgstr "no due date"
 
-#: src/routes/tasks/index.tsx:489
+#: src/routes/tasks/index.tsx:490
 msgid "No due date"
 msgstr "No due date"
 
-#: src/routes/companies/$slug.tsx:1119
-msgid "No email threads yet"
-msgstr "No email threads yet"
-
-#: src/routes/emails/inboxes.tsx:1347
+#: src/routes/emails/inboxes.tsx:1348
 msgid "No footers"
 msgstr "No footers"
 
-#: src/routes/index.tsx:461
+#: src/routes/index.tsx:462
 msgid "No high-priority companies without a scheduled follow-up"
 msgstr "No high-priority companies without a scheduled follow-up"
 
-#: src/routes/emails/inboxes.tsx:389
+#: src/routes/emails/inboxes.tsx:390
 msgid "No inboxes yet"
 msgstr "No inboxes yet"
 
-#: src/routes/calendar/index.tsx:298
+#: src/routes/calendar/index.tsx:299
 msgid "no location"
 msgstr "no location"
 
-#: src/routes/settings/organization/members.tsx:118
+#: src/routes/settings/organization/members.tsx:119
 msgid "No members yet."
 msgstr "No members yet."
 
-#: src/routes/emails/$threadId.tsx:434
+#: src/routes/emails/$threadId.tsx:454
 msgid "No messages in this thread"
 msgstr "No messages in this thread"
 
-#: src/routes/index.tsx:300
+#: src/components/companies/open-tasks-card.tsx:45
+msgid "No open tasks."
+msgstr "No open tasks."
+
+#: src/routes/index.tsx:301
 msgid "No overdue tasks, no pending follow-ups, no neglected companies."
 msgstr "No overdue tasks, no pending follow-ups, no neglected companies."
 
-#: src/routes/companies/$slug.tsx:1233
-#: src/routes/pages/index.tsx:136
+#: src/routes/companies/$slug.tsx:1117
+#: src/routes/pages/index.tsx:137
 msgid "No pages yet"
 msgstr "No pages yet"
 
-#: src/routes/settings/organization/spend.tsx:171
+#: src/routes/settings/organization/spend.tsx:172
 msgid "No paid calls in this range."
 msgstr "No paid calls in this range."
 
-#: src/routes/emails/inboxes.tsx:323
+#: src/routes/emails/inboxes.tsx:324
 msgid "No primary inbox set."
 msgstr "No primary inbox set."
 
-#: src/routes/companies/$slug.tsx:971
+#: src/components/companies/about-section.tsx:121
 msgid "No products linked yet"
 msgstr "No products linked yet"
 
@@ -1480,32 +1507,32 @@ msgstr "No products linked yet"
 msgid "No research runs yet for this company."
 msgstr "No research runs yet for this company."
 
+#: src/components/companies/research-summary-card.tsx:61
+msgid "No research yet."
+msgstr "No research yet."
+
 #: src/components/research/run-detail.tsx:128
 #: src/components/research/run-detail.tsx:139
 msgid "No structured findings."
 msgstr "No structured findings."
 
-#: src/routes/companies/$slug.tsx:965
+#: src/components/companies/about-section.tsx:115
 msgid "No tags yet"
 msgstr "No tags yet"
 
-#: src/routes/companies/$slug.tsx:1154
-msgid "No tasks for this company"
-msgstr "No tasks for this company"
-
-#: src/routes/index.tsx:378
+#: src/routes/index.tsx:379
 msgid "No tasks for today"
 msgstr "No tasks for today"
 
-#: src/routes/emails/index.tsx:789
+#: src/routes/emails/index.tsx:790
 msgid "No threads match the filters"
 msgstr "No threads match the filters"
 
-#: src/routes/emails/index.tsx:789
+#: src/routes/emails/index.tsx:790
 msgid "No threads yet"
 msgstr "No threads yet"
 
-#: src/routes/index.tsx:418
+#: src/routes/index.tsx:419
 msgid "No upcoming due dates"
 msgstr "No upcoming due dates"
 
@@ -1513,7 +1540,7 @@ msgstr "No upcoming due dates"
 msgid "No upcoming meetings."
 msgstr "No upcoming meetings."
 
-#: src/routes/companies/$slug.tsx:902
+#: src/components/companies/cadence-card.tsx:106
 msgid "none scheduled"
 msgstr "none scheduled"
 
@@ -1525,37 +1552,37 @@ msgstr "Normal priority"
 msgid "Note"
 msgstr "Note"
 
-#: src/routes/tasks/index.tsx:789
+#: src/routes/tasks/index.tsx:790
 msgid "Nothing changed yet."
 msgstr "Nothing changed yet."
 
-#: src/routes/settings/organization/spend.tsx:226
+#: src/routes/settings/organization/spend.tsx:227
 msgid "Nothing to show in this range."
 msgstr "Nothing to show in this range."
 
-#: src/routes/emails/$threadId.tsx:238
+#: src/routes/emails/$threadId.tsx:258
 msgid "On {date}, {who} wrote:"
 msgstr "On {date}, {who} wrote:"
 
-#: src/routes/accept-invitation.$id.tsx:142
+#: src/routes/accept-invitation.$id.tsx:143
 msgid "One click to accept the invitation."
 msgstr "One click to accept the invitation."
 
-#: src/routes/settings/organization/invite.tsx:109
+#: src/routes/settings/organization/invite.tsx:110
 msgid "Only owners and admins can invite new members."
 msgstr "Only owners and admins can invite new members."
 
-#: src/routes/emails/$threadId.tsx:312
-#: src/routes/emails/index.tsx:624
-#: src/routes/tasks/index.tsx:443
+#: src/routes/emails/$threadId.tsx:332
+#: src/routes/emails/index.tsx:625
+#: src/routes/tasks/index.tsx:444
 msgid "Open"
 msgstr "Open"
 
-#: src/routes/calendar/index.tsx:350
+#: src/routes/calendar/index.tsx:351
 msgid "Open company"
 msgstr "Open company"
 
-#: src/routes/accept-invitation.$id.tsx:180
+#: src/routes/accept-invitation.$id.tsx:181
 msgid "Open dashboard"
 msgstr "Open dashboard"
 
@@ -1563,8 +1590,8 @@ msgstr "Open dashboard"
 msgid "Open in Cal.com"
 msgstr "Open in Cal.com"
 
-#: src/components/companies/where-panel.tsx:99
-#: src/routes/companies/$slug.tsx:766
+#: src/components/companies/where-panel.tsx:101
+#: src/routes/companies/$slug.tsx:818
 msgid "Open in Google Maps"
 msgstr "Open in Google Maps"
 
@@ -1572,11 +1599,11 @@ msgstr "Open in Google Maps"
 msgid "Open in new tab"
 msgstr "Open in new tab"
 
-#: src/routes/companies/$slug.tsx:756
+#: src/routes/companies/$slug.tsx:808
 msgid "Open Instagram"
 msgstr "Open Instagram"
 
-#: src/routes/companies/$slug.tsx:746
+#: src/routes/companies/$slug.tsx:798
 msgid "Open LinkedIn"
 msgstr "Open LinkedIn"
 
@@ -1589,25 +1616,26 @@ msgstr "Open research run {0}"
 msgid "Open task details"
 msgstr "Open task details"
 
-#: src/routes/index.tsx:269
+#: src/components/companies/open-tasks-card.tsx:39
+#: src/routes/index.tsx:270
 msgid "Open tasks"
 msgstr "Open tasks"
 
-#: src/routes/settings/organization/index.tsx:117
+#: src/routes/settings/organization/index.tsx:118
 msgid "Open the org spend dashboard"
 msgstr "Open the org spend dashboard"
 
-#: src/routes/companies/$slug.tsx:720
+#: src/routes/companies/$slug.tsx:772
 msgid "Open website"
 msgstr "Open website"
 
-#: src/routes/emails/$threadId.tsx:667
+#: src/routes/emails/$threadId.tsx:687
 msgid "Opened"
 msgstr "Opened"
 
-#: src/routes/settings/organization/index.tsx:41
-#: src/routes/settings/organization/invite.tsx:90
-#: src/routes/settings/organization/members.tsx:94
+#: src/routes/settings/organization/index.tsx:42
+#: src/routes/settings/organization/invite.tsx:91
+#: src/routes/settings/organization/members.tsx:95
 msgid "Organization"
 msgstr "Organization"
 
@@ -1620,12 +1648,12 @@ msgid "Other"
 msgstr "Other"
 
 #: src/components/interactions/quick-capture-dialog.tsx:268
-#: src/routes/emails/index.tsx:1203
+#: src/routes/emails/index.tsx:1204
 msgid "Outbound"
 msgstr "Outbound"
 
 #. placeholder {0}: msg.to.join(', ')
-#: src/routes/emails/$threadId.tsx:534
+#: src/routes/emails/$threadId.tsx:554
 msgid "Outbound message to {0}"
 msgstr "Outbound message to {0}"
 
@@ -1642,9 +1670,9 @@ msgstr "Outcome: {0}"
 msgid "Output schema"
 msgstr "Output schema"
 
-#: src/routes/index.tsx:270
-#: src/routes/tasks/index.tsx:445
-#: src/routes/tasks/index.tsx:465
+#: src/routes/index.tsx:271
+#: src/routes/tasks/index.tsx:446
+#: src/routes/tasks/index.tsx:466
 msgid "Overdue"
 msgstr "Overdue"
 
@@ -1652,42 +1680,47 @@ msgstr "Overdue"
 msgid "Overlap"
 msgstr "Overlap"
 
-#: src/routes/settings/organization/members.tsx:59
+#: src/routes/companies/$slug.tsx:366
+#: src/routes/companies/$slug.tsx:867
+msgid "Overview"
+msgstr "Overview"
+
+#: src/routes/settings/organization/members.tsx:60
 msgid "Owner"
 msgstr "Owner"
 
-#: src/routes/emails/inboxes.tsx:1008
+#: src/routes/emails/inboxes.tsx:1009
 msgid "Owner user ID"
 msgstr "Owner user ID"
 
-#: src/routes/emails/index.tsx:841
+#: src/routes/emails/index.tsx:842
 msgid "Page {page} of {totalPages}"
 msgstr "Page {page} of {totalPages}"
 
-#: src/routes/pages/$id.tsx:191
+#: src/routes/pages/$id.tsx:214
 msgid "Page published"
 msgstr "Page published"
 
-#: src/routes/pages/$id.tsx:168
+#: src/routes/pages/$id.tsx:191
 msgid "Page saved"
 msgstr "Page saved"
 
-#: src/routes/pages/$id.tsx:220
+#: src/routes/pages/$id.tsx:243
 msgid "Page title"
 msgstr "Page title"
 
 #: src/components/layout/nav-items.ts:60
-#: src/routes/companies/$slug.tsx:853
-#: src/routes/pages/$id.tsx:214
-#: src/routes/pages/index.tsx:105
+#: src/routes/companies/$slug.tsx:1112
+#: src/routes/pages/$id.tsx:237
+#: src/routes/pages/index.tsx:106
 msgid "Pages"
 msgstr "Pages"
 
-#: src/routes/settings/organization/index.tsx:126
+#: src/routes/settings/organization/index.tsx:127
 msgid "Paid research API calls billed to this org."
 msgstr "Paid research API calls billed to this org."
 
-#: src/routes/settings/organization/spend.tsx:120
+#: src/routes/settings/organization/spend.tsx:121
 msgid "Paid research API calls billed to this organization."
 msgstr "Paid research API calls billed to this organization."
 
@@ -1695,16 +1728,16 @@ msgstr "Paid research API calls billed to this organization."
 msgid "Pain indicators"
 msgstr "Pain indicators"
 
+#: src/components/companies/about-section.tsx:94
 #: src/components/research/findings/company-enrichment-view.tsx:81
-#: src/routes/companies/$slug.tsx:950
 msgid "Pain points"
 msgstr "Pain points"
 
-#: src/routes/login.tsx:156
+#: src/routes/login.tsx:157
 msgid "Password"
 msgstr "Password"
 
-#: src/routes/emails/inboxes.tsx:942
+#: src/routes/emails/inboxes.tsx:943
 msgid "Password or app-password"
 msgstr "Password or app-password"
 
@@ -1712,13 +1745,18 @@ msgstr "Password or app-password"
 msgid "Pending paid actions"
 msgstr "Pending paid actions"
 
-#: src/routes/settings/organization/members.tsx:103
+#: src/routes/companies/$slug.tsx:368
+#: src/routes/companies/$slug.tsx:876
+msgid "People"
+msgstr "People"
+
+#: src/routes/settings/organization/members.tsx:104
 msgid "People with access to this workspace."
 msgstr "People with access to this workspace."
 
-#: src/routes/calendar/index.tsx:253
-#: src/routes/tasks/index.tsx:332
-#: src/routes/tasks/index.tsx:674
+#: src/routes/calendar/index.tsx:254
+#: src/routes/tasks/index.tsx:333
+#: src/routes/tasks/index.tsx:675
 msgid "Personal"
 msgstr "Personal"
 
@@ -1727,41 +1765,41 @@ msgstr "Personal"
 msgid "Phone"
 msgstr "Phone"
 
-#: src/routes/emails/inboxes.tsx:802
+#: src/routes/emails/inboxes.tsx:803
 msgid "Pick a provider"
 msgstr "Pick a provider"
 
-#: src/routes/emails/index.tsx:778
+#: src/routes/emails/index.tsx:779
 msgid "Pick an organization from the switcher in the header, or sign out and back in. After a recent dev DB reset, existing sessions can point at organization ids that the reset removed."
 msgstr "Pick an organization from the switcher in the header, or sign out and back in. After a recent dev DB reset, existing sessions can point at organization ids that the reset removed."
 
-#: src/routes/emails/inboxes.tsx:324
+#: src/routes/emails/inboxes.tsx:325
 msgid "Pick one to use as your default sender."
 msgstr "Pick one to use as your default sender."
 
 #: src/components/layout/nav-items.ts:38
-#: src/routes/index.tsx:260
+#: src/routes/index.tsx:261
 msgid "Pipeline"
 msgstr "Pipeline"
 
-#: src/routes/emails/inboxes.tsx:1119
+#: src/routes/emails/inboxes.tsx:1120
 msgid "Plain"
 msgstr "Plain"
 
-#: src/routes/calendar/index.tsx:197
+#: src/routes/calendar/index.tsx:198
 msgid "Preparing calendar view…"
 msgstr "Preparing calendar view…"
 
-#: src/routes/pages/$id.tsx:232
-#: src/routes/pages/index.tsx:178
+#: src/routes/pages/$id.tsx:255
+#: src/routes/pages/index.tsx:179
 msgid "Preview"
 msgstr "Preview"
 
-#: src/routes/emails/index.tsx:839
+#: src/routes/emails/index.tsx:840
 msgid "Previous"
 msgstr "Previous"
 
-#: src/routes/emails/inboxes.tsx:292
+#: src/routes/emails/inboxes.tsx:293
 msgid "Primary inbox set"
 msgstr "Primary inbox set"
 
@@ -1769,38 +1807,36 @@ msgstr "Primary inbox set"
 msgid "Primary navigation"
 msgstr "Primary navigation"
 
-#: src/routes/companies/$slug.tsx:934
-#: src/routes/tasks/index.tsx:686
+#: src/routes/tasks/index.tsx:687
 msgid "Priority"
 msgstr "Priority"
 
-#: src/routes/emails/inboxes.tsx:426
+#: src/routes/emails/inboxes.tsx:427
 msgid "Private"
 msgstr "Private"
 
-#: src/routes/emails/inboxes.tsx:1038
+#: src/routes/emails/inboxes.tsx:1039
 msgid "Private — hide threads from other members"
 msgstr "Private — hide threads from other members"
 
-#: src/routes/emails/inboxes.tsx:425
+#: src/routes/emails/inboxes.tsx:426
 msgid "Private inbox"
 msgstr "Private inbox"
 
+#: src/components/companies/about-section.tsx:118
 #: src/components/research/findings/company-enrichment-view.tsx:117
-#: src/routes/companies/$slug.tsx:968
 msgid "Products fit"
 msgstr "Products fit"
 
 #: src/components/layout/nav-items.ts:81
-#: src/routes/companies/$slug.tsx:829
-#: src/routes/companies/$slug.tsx:1091
-#: src/routes/profile/index.tsx:90
+#: src/routes/companies/$slug.tsx:1082
+#: src/routes/profile/index.tsx:91
 msgid "Profile"
 msgstr "Profile"
 
 #: src/components/shared/channel-icon.tsx:70
 #: src/components/shared/status-badge.tsx:32
-#: src/routes/companies/$slug.tsx:421
+#: src/routes/companies/$slug.tsx:444
 msgid "Proposal"
 msgstr "Proposal"
 
@@ -1808,7 +1844,7 @@ msgstr "Proposal"
 msgid "Proposal in review"
 msgstr "Proposal in review"
 
-#: src/routes/companies/$slug.tsx:1263
+#: src/routes/companies/$slug.tsx:1149
 msgid "Proposals, meeting notes and attachments will show up here."
 msgstr "Proposals, meeting notes and attachments will show up here."
 
@@ -1817,7 +1853,7 @@ msgid "Proposed updates"
 msgstr "Proposed updates"
 
 #: src/components/shared/status-badge.tsx:28
-#: src/routes/companies/$slug.tsx:417
+#: src/routes/companies/$slug.tsx:440
 msgid "Prospect"
 msgstr "Prospect"
 
@@ -1825,35 +1861,35 @@ msgstr "Prospect"
 msgid "Prospects"
 msgstr "Prospects"
 
-#: src/routes/emails/inboxes.tsx:794
-#: src/routes/emails/inboxes.tsx:801
+#: src/routes/emails/inboxes.tsx:795
+#: src/routes/emails/inboxes.tsx:802
 msgid "Provider preset"
 msgstr "Provider preset"
 
-#: src/routes/pages/$id.tsx:307
+#: src/routes/pages/$id.tsx:330
 msgid "Public URL"
 msgstr "Public URL"
 
-#: src/routes/pages/$id.tsx:255
+#: src/routes/pages/$id.tsx:278
 msgid "Publish"
 msgstr "Publish"
 
-#: src/routes/pages/$id.tsx:198
+#: src/routes/pages/$id.tsx:221
 msgid "Publish failed"
 msgstr "Publish failed"
 
-#: src/routes/pages/index.tsx:127
-#: src/routes/pages/index.tsx:148
+#: src/routes/pages/index.tsx:128
+#: src/routes/pages/index.tsx:149
 msgid "Published"
 msgstr "Published"
 
-#: src/routes/pages/$id.tsx:255
+#: src/routes/pages/$id.tsx:278
 msgid "Publishing…"
 msgstr "Publishing…"
 
-#: src/routes/emails/inboxes.tsx:403
-#: src/routes/emails/inboxes.tsx:956
-#: src/routes/emails/inboxes.tsx:969
+#: src/routes/emails/inboxes.tsx:404
+#: src/routes/emails/inboxes.tsx:957
+#: src/routes/emails/inboxes.tsx:970
 msgid "Purpose"
 msgstr "Purpose"
 
@@ -1861,42 +1897,42 @@ msgstr "Purpose"
 msgid "Question"
 msgstr "Question"
 
-#: src/routes/emails/$threadId.tsx:665
+#: src/routes/emails/$threadId.tsx:685
 msgid "Queued"
 msgstr "Queued"
 
-#: src/routes/tasks/index.tsx:628
+#: src/routes/tasks/index.tsx:629
 msgid "Quick add task"
 msgstr "Quick add task"
 
-#: src/routes/tasks/index.tsx:523
+#: src/routes/tasks/index.tsx:524
 msgid "Quick add: \"Call Acme tomorrow #high\""
 msgstr "Quick add: \"Call Acme tomorrow #high\""
 
-#: src/routes/emails/index.tsx:524
+#: src/routes/emails/index.tsx:525
 msgid "Read state update failed"
 msgstr "Read state update failed"
 
-#: src/routes/tasks/index.tsx:515
-#: src/routes/tasks/index.tsx:780
+#: src/routes/tasks/index.tsx:516
+#: src/routes/tasks/index.tsx:781
 msgid "Recent changes"
 msgstr "Recent changes"
 
-#: src/routes/companies/$slug.tsx:1033
+#: src/routes/companies/$slug.tsx:1024
 msgid "Recipient marked as spam"
 msgstr "Recipient marked as spam"
 
-#: src/routes/emails/inboxes.tsx:248
+#: src/routes/emails/inboxes.tsx:249
 msgid "Refreshing inbox status…"
 msgstr "Refreshing inbox status…"
 
+#: src/components/companies/about-section.tsx:67
 #: src/components/research/findings/company-enrichment-view.tsx:78
 #: src/components/research/findings/prospect-scan-view.tsx:83
-#: src/routes/companies/$slug.tsx:914
 msgid "Region"
 msgstr "Region"
 
-#: src/routes/settings/organization/members.tsx:160
+#: src/routes/settings/organization/members.tsx:161
 msgid "Remove"
 msgstr "Remove"
 
@@ -1909,60 +1945,60 @@ msgstr "Remove {0}"
 msgid "Remove {chip}"
 msgstr "Remove {chip}"
 
-#: src/routes/settings/organization/members.tsx:65
+#: src/routes/settings/organization/members.tsx:66
 msgid "Remove {email} from this organization?"
 msgstr "Remove {email} from this organization?"
 
-#: src/routes/settings/organization/members.tsx:160
+#: src/routes/settings/organization/members.tsx:161
 msgid "Removing…"
 msgstr "Removing…"
 
-#: src/routes/emails/$threadId.tsx:344
-#: src/routes/emails/index.tsx:742
-#: src/routes/tasks/index.tsx:710
+#: src/routes/emails/$threadId.tsx:364
+#: src/routes/emails/index.tsx:743
+#: src/routes/tasks/index.tsx:711
 msgid "Reopen"
 msgstr "Reopen"
 
-#: src/routes/emails/index.tsx:1296
+#: src/routes/emails/index.tsx:1297
 msgid "Reopen thread"
 msgstr "Reopen thread"
 
-#: src/routes/emails/$threadId.tsx:383
+#: src/routes/emails/$threadId.tsx:403
 msgid "Reply"
 msgstr "Reply"
 
-#: src/routes/emails/$threadId.tsx:397
+#: src/routes/emails/$threadId.tsx:417
 msgid "Reply all"
 msgstr "Reply all"
 
+#: src/components/companies/research-summary-card.tsx:40
 #: src/components/shared/channel-icon.tsx:71
-#: src/routes/companies/$slug.tsx:850
 msgid "Research"
 msgstr "Research"
 
-#: src/routes/emails/index.tsx:1360
+#: src/routes/emails/index.tsx:1361
 msgid "Reset"
 msgstr "Reset"
 
-#: src/routes/calendar/index.tsx:307
+#: src/routes/calendar/index.tsx:308
 msgid "Respond to the organizer"
 msgstr "Respond to the organizer"
 
 #: src/components/shared/status-badge.tsx:30
-#: src/routes/companies/$slug.tsx:419
+#: src/routes/companies/$slug.tsx:442
 msgid "Responded"
 msgstr "Responded"
 
 #. placeholder {0}: drafts.length
-#: src/routes/emails/index.tsx:1390
+#: src/routes/emails/index.tsx:1391
 msgid "Resume drafting ({0})"
 msgstr "Resume drafting ({0})"
 
-#: src/routes/emails/index.tsx:1389
+#: src/routes/emails/index.tsx:1390
 msgid "Resume drafting (1)"
 msgstr "Resume drafting (1)"
 
-#: src/routes/settings/organization/invite.tsx:155
+#: src/routes/settings/organization/invite.tsx:156
 msgid "Role"
 msgstr "Role"
 
@@ -1974,8 +2010,11 @@ msgstr "Run failed"
 msgid "Run in progress — events stream as they arrive."
 msgstr "Run in progress — events stream as they arrive."
 
+#: src/components/companies/research-summary-card.tsx:54
+msgid "Run new"
+msgstr "Run new"
+
 #: src/components/research/research-dialog.tsx:105
-#: src/routes/companies/$slug.tsx:1209
 msgid "Run new research"
 msgstr "Run new research"
 
@@ -1983,43 +2022,47 @@ msgstr "Run new research"
 msgid "Run shape unrecognised."
 msgstr "Run shape unrecognised."
 
-#: src/routes/emails/inboxes.tsx:1060
-#: src/routes/emails/inboxes.tsx:1465
-#: src/routes/pages/$id.tsx:245
+#: src/components/companies/about-section.tsx:58
+msgid "Sales context"
+msgstr "Sales context"
+
+#: src/routes/emails/inboxes.tsx:1061
+#: src/routes/emails/inboxes.tsx:1466
+#: src/routes/pages/$id.tsx:268
 msgid "Save"
 msgstr "Save"
 
-#: src/routes/pages/$id.tsx:175
+#: src/routes/pages/$id.tsx:198
 msgid "Save failed"
 msgstr "Save failed"
 
 #: src/components/emails/compose-form.tsx:547
-#: src/routes/emails/inboxes.tsx:1462
-#: src/routes/pages/$id.tsx:245
+#: src/routes/emails/inboxes.tsx:1463
+#: src/routes/pages/$id.tsx:268
 msgid "Saving…"
 msgstr "Saving…"
 
-#: src/routes/companies/index.tsx:261
+#: src/routes/companies/index.tsx:262
 msgid "Search by name, industry, or location…"
 msgstr "Search by name, industry, or location…"
 
-#: src/routes/emails/index.tsx:608
+#: src/routes/emails/index.tsx:609
 msgid "Search by subject…"
 msgstr "Search by subject…"
 
-#: src/routes/companies/index.tsx:264
+#: src/routes/companies/index.tsx:265
 msgid "Search companies"
 msgstr "Search companies"
 
-#: src/routes/emails/index.tsx:611
+#: src/routes/emails/index.tsx:612
 msgid "Search threads"
 msgstr "Search threads"
 
-#: src/routes/settings/organization/index.tsx:91
+#: src/routes/settings/organization/index.tsx:92
 msgid "See who can access this workspace."
 msgstr "See who can access this workspace."
 
-#: src/routes/emails/index.tsx:953
+#: src/routes/emails/index.tsx:954
 msgid "Select all threads on this page"
 msgstr "Select all threads on this page"
 
@@ -2028,11 +2071,11 @@ msgid "Select inbox…"
 msgstr "Select inbox…"
 
 #. placeholder {0}: row.original.subject ?? '(no subject)'
-#: src/routes/emails/index.tsx:964
+#: src/routes/emails/index.tsx:965
 msgid "Select thread {0}"
 msgstr "Select thread {0}"
 
-#: src/routes/emails/inboxes.tsx:826
+#: src/routes/emails/inboxes.tsx:827
 msgid "Selecting a preset fills IMAP and SMTP defaults — you can still edit them."
 msgstr "Selecting a preset fills IMAP and SMTP defaults — you can still edit them."
 
@@ -2040,11 +2083,11 @@ msgstr "Selecting a preset fills IMAP and SMTP defaults — you can still edit t
 msgid "Send"
 msgstr "Send"
 
-#: src/routes/settings/organization/invite.tsx:99
+#: src/routes/settings/organization/invite.tsx:100
 msgid "Send a one-click invitation. The recipient signs in via the link in the email — no password to share."
 msgstr "Send a one-click invitation. The recipient signs in via the link in the email — no password to share."
 
-#: src/routes/settings/organization/index.tsx:108
+#: src/routes/settings/organization/index.tsx:109
 msgid "Send a one-click sign-in link to a teammate."
 msgstr "Send a one-click sign-in link to a teammate."
 
@@ -2052,38 +2095,38 @@ msgstr "Send a one-click sign-in link to a teammate."
 msgid "Send blocked: these recipients cannot receive email"
 msgstr "Send blocked: these recipients cannot receive email"
 
-#: src/routes/companies/$slug.tsx:728
+#: src/routes/companies/$slug.tsx:780
 msgid "Send email"
 msgstr "Send email"
 
-#: src/routes/settings/organization/invite.tsx:179
+#: src/routes/settings/organization/invite.tsx:180
 msgid "Send invitation"
 msgstr "Send invitation"
 
 #: src/components/emails/compose-form.tsx:534
-#: src/routes/settings/organization/invite.tsx:179
+#: src/routes/settings/organization/invite.tsx:180
 msgid "Sending…"
 msgstr "Sending…"
 
-#: src/routes/emails/$threadId.tsx:663
+#: src/routes/emails/$threadId.tsx:683
 msgid "Sent"
 msgstr "Sent"
 
-#: src/routes/emails/inboxes.tsx:1367
+#: src/routes/emails/inboxes.tsx:1368
 msgid "Set as default"
 msgstr "Set as default"
 
-#: src/routes/pages/$id.tsx:267
+#: src/routes/pages/$id.tsx:290
 msgid "Settings"
 msgstr "Settings"
 
-#: src/routes/emails/inboxes.tsx:451
-#: src/routes/emails/inboxes.tsx:998
+#: src/routes/emails/inboxes.tsx:452
+#: src/routes/emails/inboxes.tsx:999
 msgid "Shared"
 msgstr "Shared"
 
 #. placeholder {0}: msg.cc.length
-#: src/routes/emails/$threadId.tsx:570
+#: src/routes/emails/$threadId.tsx:590
 msgid "Show Cc ({0})"
 msgstr "Show Cc ({0})"
 
@@ -2095,93 +2138,93 @@ msgstr "Show less"
 msgid "Show more"
 msgstr "Show more"
 
-#: src/routes/companies/$slug.tsx:1294
+#: src/routes/companies/$slug.tsx:926
 msgid "Show system events"
 msgstr "Show system events"
 
-#: src/routes/emails/index.tsx:830
+#: src/routes/emails/index.tsx:831
 msgid "Showing {firstRow}–{lastRow} of {total}"
 msgstr "Showing {firstRow}–{lastRow} of {total}"
 
-#: src/routes/accept-invitation.$id.tsx:128
-#: src/routes/login.tsx:179
+#: src/routes/accept-invitation.$id.tsx:129
+#: src/routes/login.tsx:180
 msgid "Sign in"
 msgstr "Sign in"
 
-#: src/routes/accept-invitation.$id.tsx:110
+#: src/routes/accept-invitation.$id.tsx:111
 msgid "Sign in to accept this invitation"
 msgstr "Sign in to accept this invitation"
 
-#: src/routes/login.tsx:137
+#: src/routes/login.tsx:138
 msgid "Sign in to continue"
 msgstr "Sign in to continue"
 
-#: src/routes/profile/index.tsx:135
+#: src/routes/profile/index.tsx:136
 msgid "Sign out"
 msgstr "Sign out"
 
-#: src/routes/profile/index.tsx:70
+#: src/routes/profile/index.tsx:71
 msgid "Sign-out failed. Please try again."
 msgstr "Sign-out failed. Please try again."
 
-#: src/routes/login.tsx:179
+#: src/routes/login.tsx:180
 msgid "Signing in…"
 msgstr "Signing in…"
 
-#: src/routes/profile/index.tsx:135
+#: src/routes/profile/index.tsx:136
 msgid "Signing out…"
 msgstr "Signing out…"
 
+#: src/components/companies/about-section.tsx:77
 #: src/components/research/findings/company-enrichment-view.tsx:77
-#: src/routes/companies/$slug.tsx:924
 msgid "Size"
 msgstr "Size"
 
-#: src/routes/pages/$id.tsx:282
-#: src/routes/pages/index.tsx:144
-#: src/routes/settings/organization/index.tsx:72
+#: src/routes/pages/$id.tsx:305
+#: src/routes/pages/index.tsx:145
+#: src/routes/settings/organization/index.tsx:73
 msgid "Slug"
 msgstr "Slug"
 
-#: src/routes/emails/inboxes.tsx:884
+#: src/routes/emails/inboxes.tsx:885
 msgid "SMTP host"
 msgstr "SMTP host"
 
-#: src/routes/emails/inboxes.tsx:894
+#: src/routes/emails/inboxes.tsx:895
 msgid "SMTP port"
 msgstr "SMTP port"
 
-#: src/routes/emails/inboxes.tsx:903
-#: src/routes/emails/inboxes.tsx:907
+#: src/routes/emails/inboxes.tsx:904
+#: src/routes/emails/inboxes.tsx:908
 msgid "SMTP security"
 msgstr "SMTP security"
 
-#: src/routes/tasks/index.tsx:714
+#: src/routes/tasks/index.tsx:715
 msgid "Snooze 1d"
 msgstr "Snooze 1d"
 
-#: src/routes/tasks/index.tsx:497
+#: src/routes/tasks/index.tsx:498
 msgid "Snoozed"
 msgstr "Snoozed"
 
-#: src/routes/emails/$threadId.tsx:240
+#: src/routes/emails/$threadId.tsx:260
 msgid "someone"
 msgstr "someone"
 
-#: src/routes/calendar/index.tsx:272
-#: src/routes/companies/$slug.tsx:929
-#: src/routes/tasks/index.tsx:692
+#: src/components/companies/about-section.tsx:82
+#: src/routes/calendar/index.tsx:273
+#: src/routes/tasks/index.tsx:693
 msgid "Source"
 msgstr "Source"
 
-#: src/routes/emails/index.tsx:1231
+#: src/routes/emails/index.tsx:1232
 msgid "Spam"
 msgstr "Spam"
 
-#: src/routes/settings/organization/index.tsx:122
-#: src/routes/settings/organization/spend.tsx:95
-#: src/routes/settings/organization/spend.tsx:117
-#: src/routes/settings/organization/spend.tsx:238
+#: src/routes/settings/organization/index.tsx:123
+#: src/routes/settings/organization/spend.tsx:96
+#: src/routes/settings/organization/spend.tsx:118
+#: src/routes/settings/organization/spend.tsx:239
 msgid "Spend"
 msgstr "Spend"
 
@@ -2197,22 +2240,22 @@ msgstr "Start"
 msgid "Starting…"
 msgstr "Starting…"
 
-#: src/routes/emails/inboxes.tsx:1113
+#: src/routes/emails/inboxes.tsx:1114
 msgid "STARTTLS"
 msgstr "STARTTLS"
 
-#: src/routes/calendar/index.tsx:278
-#: src/routes/emails/inboxes.tsx:402
-#: src/routes/pages/index.tsx:146
-#: src/routes/tasks/index.tsx:680
+#: src/routes/calendar/index.tsx:279
+#: src/routes/emails/inboxes.tsx:403
+#: src/routes/pages/index.tsx:147
+#: src/routes/tasks/index.tsx:681
 msgid "Status"
 msgstr "Status"
 
-#: src/routes/emails/index.tsx:492
+#: src/routes/emails/index.tsx:493
 msgid "Status update failed"
 msgstr "Status update failed"
 
-#: src/routes/emails/inboxes.tsx:949
+#: src/routes/emails/inboxes.tsx:950
 msgid "Stored encrypted with AES-256-GCM."
 msgstr "Stored encrypted with AES-256-GCM."
 
@@ -2237,18 +2280,25 @@ msgstr "Switch organization"
 msgid "System"
 msgstr "System"
 
+#: src/components/companies/about-section.tsx:112
 #: src/components/research/findings/company-enrichment-view.tsx:131
-#: src/routes/companies/$slug.tsx:962
 msgid "Tags"
 msgstr "Tags"
+
+#: src/components/companies/about-section.tsx:108
+msgid "Tags & fit"
+msgstr "Tags & fit"
+
+#: src/components/companies/conversations-tab.tsx:162
+msgid "Task"
+msgstr "Task"
 
 #: src/components/shared/task-item.tsx:206
 msgid "Task title"
 msgstr "Task title"
 
 #: src/components/layout/nav-items.ts:67
-#: src/routes/companies/$slug.tsx:844
-#: src/routes/tasks/index.tsx:436
+#: src/routes/tasks/index.tsx:437
 msgid "Tasks"
 msgstr "Tasks"
 
@@ -2256,65 +2306,65 @@ msgstr "Tasks"
 msgid "Tax ID"
 msgstr "Tax ID"
 
-#: src/routes/pages/$id.tsx:294
+#: src/routes/pages/$id.tsx:317
 msgid "Template"
 msgstr "Template"
 
-#: src/routes/calendar/index.tsx:324
+#: src/routes/calendar/index.tsx:325
 msgid "Tentative"
 msgstr "Tentative"
 
-#: src/routes/emails/inboxes.tsx:1061
+#: src/routes/emails/inboxes.tsx:1062
 msgid "Test & connect"
 msgstr "Test & connect"
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx:503
+#: src/routes/emails/inboxes.tsx:504
 msgid "Test connection for {0}"
 msgstr "Test connection for {0}"
 
-#: src/routes/emails/inboxes.tsx:240
+#: src/routes/emails/inboxes.tsx:241
 msgid "Test failed"
 msgstr "Test failed"
 
-#: src/routes/emails/inboxes.tsx:1058
+#: src/routes/emails/inboxes.tsx:1059
 msgid "Testing connection…"
 msgstr "Testing connection…"
 
-#: src/routes/tasks/index.tsx:783
+#: src/routes/tasks/index.tsx:784
 msgid "The 20 most recently edited open tasks. Click one to reopen it."
 msgstr "The 20 most recently edited open tasks. Click one to reopen it."
 
-#: src/routes/companies/$slug.tsx:578
+#: src/routes/companies/$slug.tsx:630
 msgid "The change didn't go through. Try again."
 msgstr "The change didn't go through. Try again."
 
-#: src/components/companies/where-panel.tsx:73
+#: src/components/companies/where-panel.tsx:75
 msgid "The geocoder did not return a match. Try editing the location field."
 msgstr "The geocoder did not return a match. Try editing the location field."
 
 #. placeholder {0}: search.error
-#: src/routes/accept-invitation.$id.tsx:57
+#: src/routes/accept-invitation.$id.tsx:58
 msgid "The invitation link could not be verified ({0})."
 msgstr "The invitation link could not be verified ({0})."
 
-#: src/routes/accept-invitation.$id.tsx:113
+#: src/routes/accept-invitation.$id.tsx:114
 msgid "The invitation link signs you in automatically. If you're seeing this page, the link may have expired — sign in again to continue."
 msgstr "The invitation link signs you in automatically. If you're seeing this page, the link may have expired — sign in again to continue."
 
-#: src/routes/accept-invitation.$id.tsx:196
+#: src/routes/accept-invitation.$id.tsx:197
 msgid "The invitation may have expired or already been used."
 msgstr "The invitation may have expired or already been used."
 
-#: src/routes/settings/organization/invite.tsx:187
+#: src/routes/settings/organization/invite.tsx:188
 msgid "The invitee gets a 48-hour link. They can accept it once."
 msgstr "The invitee gets a 48-hour link. They can accept it once."
 
-#: src/routes/emails/inboxes.tsx:552
+#: src/routes/emails/inboxes.tsx:553
 msgid "The mailbox is ready."
 msgstr "The mailbox is ready."
 
-#: src/routes/pages/$id.tsx:192
+#: src/routes/pages/$id.tsx:215
 msgid "The page is now live."
 msgstr "The page is now live."
 
@@ -2322,23 +2372,23 @@ msgstr "The page is now live."
 msgid "The run finished without proposed updates or paid actions."
 msgstr "The run finished without proposed updates or paid actions."
 
-#: src/routes/emails/$threadId.tsx:435
+#: src/routes/emails/$threadId.tsx:455
 msgid "The thread exists but the provider returned no messages."
 msgstr "The thread exists but the provider returned no messages."
 
-#: src/routes/emails/$threadId.tsx:279
+#: src/routes/emails/$threadId.tsx:299
 msgid "The thread may have been archived upstream or the link is stale."
 msgstr "The thread may have been archived upstream or the link is stale."
 
-#: src/routes/tasks/index.tsx:439
+#: src/routes/tasks/index.tsx:440
 msgid "The workshop ledger — tear off one strip at a time."
 msgstr "The workshop ledger — tear off one strip at a time."
 
-#: src/routes/companies/$slug.tsx:406
+#: src/routes/companies/$slug.tsx:429
 msgid "The workshop rejected the change. Try again."
 msgstr "The workshop rejected the change. Try again."
 
-#: src/routes/settings/organization/index.tsx:44
+#: src/routes/settings/organization/index.tsx:45
 msgid "The workspace your CRM data lives in."
 msgstr "The workspace your CRM data lives in."
 
@@ -2346,62 +2396,62 @@ msgstr "The workspace your CRM data lives in."
 msgid "They replied — keep the thread warm"
 msgstr "They replied — keep the thread warm"
 
-#: src/routes/accept-invitation.$id.tsx:192
+#: src/routes/accept-invitation.$id.tsx:193
 msgid "This invitation can't be accepted"
 msgstr "This invitation can't be accepted"
 
-#: src/routes/accept-invitation.$id.tsx:82
+#: src/routes/accept-invitation.$id.tsx:83
 msgid "This invitation is no longer valid."
 msgstr "This invitation is no longer valid."
 
-#: src/routes/accept-invitation.$id.tsx:56
+#: src/routes/accept-invitation.$id.tsx:57
 msgid "This invitation link is no longer valid. It may have already been used."
 msgstr "This invitation link is no longer valid. It may have already been used."
 
-#: src/routes/settings/organization/spend.tsx:133
+#: src/routes/settings/organization/spend.tsx:134
 msgid "This month"
 msgstr "This month"
 
-#: src/routes/index.tsx:416
-#: src/routes/tasks/index.tsx:473
+#: src/routes/index.tsx:417
+#: src/routes/tasks/index.tsx:474
 msgid "This week"
 msgstr "This week"
 
-#: src/routes/emails/$threadId.tsx:323
+#: src/routes/emails/$threadId.tsx:343
 msgid "Thread actions"
 msgstr "Thread actions"
 
-#: src/routes/emails/$threadId.tsx:445
+#: src/routes/emails/$threadId.tsx:465
 msgid "Thread metadata"
 msgstr "Thread metadata"
 
-#: src/routes/emails/$threadId.tsx:278
+#: src/routes/emails/$threadId.tsx:298
 msgid "Thread not found"
 msgstr "Thread not found"
 
-#: src/routes/settings/organization/spend.tsx:124
+#: src/routes/settings/organization/spend.tsx:125
 msgid "Time range"
 msgstr "Time range"
 
-#: src/routes/companies/$slug.tsx:1283
+#: src/routes/companies/$slug.tsx:913
 msgid "Timeline"
 msgstr "Timeline"
 
-#: src/routes/pages/index.tsx:143
+#: src/routes/pages/index.tsx:144
 msgid "Title"
 msgstr "Title"
 
-#: src/routes/emails/inboxes.tsx:1107
+#: src/routes/emails/inboxes.tsx:1108
 msgid "TLS"
 msgstr "TLS"
 
 #: src/components/emails/compose-form.tsx:402
-#: src/routes/emails/$threadId.tsx:551
+#: src/routes/emails/$threadId.tsx:571
 msgid "To"
 msgstr "To"
 
-#: src/routes/index.tsx:376
-#: src/routes/tasks/index.tsx:457
+#: src/routes/index.tsx:377
+#: src/routes/tasks/index.tsx:458
 msgid "Today"
 msgstr "Today"
 
@@ -2409,8 +2459,8 @@ msgstr "Today"
 msgid "Total competitors"
 msgstr "Total competitors"
 
-#: src/routes/companies/index.tsx:323
-#: src/routes/emails/index.tsx:793
+#: src/routes/companies/index.tsx:324
+#: src/routes/emails/index.tsx:794
 msgid "Try different criteria or clear the filters."
 msgstr "Try different criteria or clear the filters."
 
@@ -2423,24 +2473,26 @@ msgid "Type and press Enter"
 msgstr "Type and press Enter"
 
 #: src/components/companies/calendar-tab.tsx:60
+#: src/components/companies/conversations-tab.tsx:166
+#: src/components/companies/research-summary-card.tsx:69
 #: src/components/companies/upcoming-meetings-card.tsx:93
-#: src/routes/tasks/index.tsx:802
+#: src/routes/tasks/index.tsx:803
 msgid "unknown"
 msgstr "unknown"
 
-#: src/routes/emails/index.tsx:1197
+#: src/routes/emails/index.tsx:1198
 msgid "Unknown"
 msgstr "Unknown"
 
-#: src/routes/profile/index.tsx:83
+#: src/routes/profile/index.tsx:84
 msgid "Unknown user"
 msgstr "Unknown user"
 
-#: src/routes/emails/$threadId.tsx:455
+#: src/routes/emails/$threadId.tsx:475
 msgid "Unlinked"
 msgstr "Unlinked"
 
-#: src/routes/emails/index.tsx:1396
+#: src/routes/emails/index.tsx:1397
 msgid "Untitled"
 msgstr "Untitled"
 
@@ -2450,10 +2502,10 @@ msgstr "Untitled"
 msgid "Upcoming meetings"
 msgstr "Upcoming meetings"
 
-#: src/routes/emails/inboxes.tsx:203
-#: src/routes/emails/inboxes.tsx:224
-#: src/routes/emails/inboxes.tsx:1259
-#: src/routes/emails/inboxes.tsx:1311
+#: src/routes/emails/inboxes.tsx:204
+#: src/routes/emails/inboxes.tsx:225
+#: src/routes/emails/inboxes.tsx:1260
+#: src/routes/emails/inboxes.tsx:1312
 msgid "Update failed"
 msgstr "Update failed"
 
@@ -2466,23 +2518,23 @@ msgid "Uploading…"
 msgstr "Uploading…"
 
 #. placeholder {0}: primarySuggestions[0]?.email ?? ''
-#: src/routes/emails/inboxes.tsx:338
+#: src/routes/emails/inboxes.tsx:339
 msgid "Use {0} as primary"
 msgstr "Use {0} as primary"
 
-#: src/routes/emails/inboxes.tsx:1443
+#: src/routes/emails/inboxes.tsx:1444
 msgid "Use as default footer"
 msgstr "Use as default footer"
 
-#: src/routes/emails/inboxes.tsx:1026
+#: src/routes/emails/inboxes.tsx:1027
 msgid "Use as default for this purpose"
 msgstr "Use as default for this purpose"
 
-#: src/routes/emails/inboxes.tsx:913
+#: src/routes/emails/inboxes.tsx:914
 msgid "Username"
 msgstr "Username"
 
-#: src/routes/settings/organization/invite.tsx:127
+#: src/routes/settings/organization/invite.tsx:128
 msgid "View members"
 msgstr "View members"
 
@@ -2490,8 +2542,8 @@ msgstr "View members"
 msgid "View thread"
 msgstr "View thread"
 
-#: src/routes/pages/$id.tsx:300
-#: src/routes/pages/index.tsx:147
+#: src/routes/pages/$id.tsx:323
+#: src/routes/pages/index.tsx:148
 msgid "Views"
 msgstr "Views"
 
@@ -2503,8 +2555,8 @@ msgstr "Visit"
 msgid "Weaknesses"
 msgstr "Weaknesses"
 
-#: src/routes/emails/index.tsx:995
-#: src/routes/emails/index.tsx:1320
+#: src/routes/emails/index.tsx:996
+#: src/routes/emails/index.tsx:1321
 msgid "What"
 msgstr "What"
 
@@ -2528,27 +2580,26 @@ msgstr "What needs to happen?"
 msgid "WhatsApp"
 msgstr "WhatsApp"
 
-#: src/routes/calendar/index.tsx:259
-#: src/routes/emails/index.tsx:1002
-#: src/routes/emails/index.tsx:1321
+#: src/routes/calendar/index.tsx:260
+#: src/routes/emails/index.tsx:1003
+#: src/routes/emails/index.tsx:1322
 msgid "When"
 msgstr "When"
 
-#: src/components/companies/where-panel.tsx:88
-#: src/routes/companies/$slug.tsx:832
+#: src/components/companies/where-panel.tsx:90
 msgid "Where"
 msgstr "Where"
 
-#: src/routes/emails/index.tsx:983
-#: src/routes/emails/index.tsx:1319
+#: src/routes/emails/index.tsx:984
+#: src/routes/emails/index.tsx:1320
 msgid "Who"
 msgstr "Who"
 
-#: src/routes/index.tsx:263
+#: src/routes/index.tsx:264
 msgid "Workshop floor — live counters on the bench."
 msgstr "Workshop floor — live counters on the bench."
 
-#: src/routes/emails/inboxes.tsx:1432
+#: src/routes/emails/inboxes.tsx:1433
 msgid "Write footer…"
 msgstr "Write footer…"
 
@@ -2556,22 +2607,22 @@ msgstr "Write footer…"
 msgid "Write your message…"
 msgstr "Write your message…"
 
-#: src/routes/settings/organization/spend.tsx:98
+#: src/routes/settings/organization/spend.tsx:99
 msgid "You don't have permission to see this page."
 msgstr "You don't have permission to see this page."
 
-#: src/routes/accept-invitation.$id.tsx:165
+#: src/routes/accept-invitation.$id.tsx:166
 msgid "You're now a member of {orgName}."
 msgstr "You're now a member of {orgName}."
 
-#: src/routes/accept-invitation.$id.tsx:166
+#: src/routes/accept-invitation.$id.tsx:167
 msgid "You're now a member."
 msgstr "You're now a member."
 
-#: src/routes/emails/inboxes.tsx:837
+#: src/routes/emails/inboxes.tsx:838
 msgid "you@example.com"
 msgstr "you@example.com"
 
-#: src/routes/profile/index.tsx:93
+#: src/routes/profile/index.tsx:94
 msgid "Your Batuda workbench identity."
 msgstr "Your Batuda workbench identity."
