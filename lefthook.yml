@@ -38,5 +38,12 @@ pre-commit:
 pre-push:
   commands:
     test:
+      # `--concurrency=1` because @batuda/server and @batuda/mail-worker
+      # both run live-DB integration tests against localhost:5433. Server's
+      # `multi-org-isolation.test.ts` TRUNCATEs `email_messages`/
+      # `email_thread_links` in beforeAll; mail-worker's
+      # `threading.test.ts` inserts into the same tables and races the
+      # truncate when both packages run in parallel. Serialise until we
+      # ship per-package DB isolation.
       run: |
-        pnpm turbo test
+        pnpm turbo test --concurrency=1
