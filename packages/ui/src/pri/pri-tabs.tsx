@@ -31,6 +31,18 @@ const PriList = styled(Tabs.List).withConfig({
 	overflow-y: hidden;
 	scrollbar-width: thin;
 	scroll-snap-type: x proximity;
+	/* Fade the leading + trailing pixels so it's visible that the tab
+	 * strip can scroll horizontally when there isn't room for every tab.
+	 * mask-image works on the rendered element (including the children),
+	 * so scroll-snapped tabs stay fully readable in the centre while the
+	 * edges hint "more here". */
+	mask-image: linear-gradient(
+		to right,
+		transparent 0,
+		black 1.25rem,
+		black calc(100% - 1.25rem),
+		transparent 100%
+	);
 
 	&::-webkit-scrollbar {
 		height: 4px;
