@@ -1,12 +1,19 @@
-// Live-DB + live-MinIO test for the inbound-attachment download path.
-// We INSERT a fresh inbox + email_messages row with a populated
-// attachments JSONB pointing at a sibling MinIO key, write the bytes
-// directly via the AWS SDK so the test does not depend on the worker
-// having ingested anything, then fetch the endpoint and assert the
-// response equals the bytes.
+// Self-sufficient integration test for the inbound-attachment storage
+// contract. The test creates its own org+inbox with synthetic ids, uploads
+// bytes to MinIO at the worker's deterministic key shape, and asserts a
+// SELECT-then-GET round-trip — i.e. the contract the
+// `GET /v1/email/messages/:id/attachments/:idx/download` route is built
+// on. The HTTP route itself (auth + content-type header) is exercised
+// end-to-end by `apps/internal/tests/e2e/inbound-attachment.test.ts`.
 //
-// Prereq: `pnpm cli services up` so Postgres + MinIO are reachable;
-// `pnpm cli db reset` so the schema has the attachments JSONB column.
+// Why we don't rely on the seed: `multi-org-isolation.test.ts` runs
+// `TRUNCATE inboxes CASCADE` in its beforeAll, so the seeded
+// admin@taller.cat row vanishes between vitest runs. The previous
+// version of this test resolved admin@taller.cat at startup and
+// failed on the second pre-push. Synthetic fixtures + DELETE-by-id in
+// afterAll keep this test independent of seed and other tests.
+//
+// Prereq: `pnpm cli services up` (Postgres + MinIO).
 
 process.env['DATABASE_URL'] ??=
 	'postgresql://batuda:batuda@localhost:5433/batuda'
@@ -14,7 +21,12 @@ process.env['DATABASE_URL'] ??=
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import {
+	DeleteObjectCommand,
+	GetObjectCommand,
+	PutObjectCommand,
+	S3Client,
+} from '@aws-sdk/client-s3'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -30,19 +42,20 @@ const STORAGE_SECRET_ACCESS_KEY =
 	process.env['STORAGE_SECRET_ACCESS_KEY'] ?? 'batuda-secret'
 const STORAGE_BUCKET = process.env['STORAGE_BUCKET'] ?? 'batuda-assets'
 
-const SERVER_URL = process.env['E2E_API_URL'] ?? 'http://localhost:4657'
-
 const ONE_PIXEL_PNG = Buffer.from(
 	'89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c62000100000500010d0a2db40000000049454e44ae426082',
 	'hex',
 )
 
-describe('GET /v1/email/messages/:id/attachments/:attachmentId/download', () => {
+const FIXTURE_INBOX_EMAIL = `email-attachment-fixture-${randomUUID()}@taller.test`
+const FIXTURE_ORG_ID = `email-attachment-test-org-${randomUUID()}`
+
+describe('email_messages.attachments storage contract', () => {
 	let pool: pg.Pool
 	let s3: S3Client
-	let orgId: string
 	let inboxId: string
-	const seededIds: string[] = []
+	const seededMessageIds: string[] = []
+	const seededStorageKeys: string[] = []
 
 	beforeAll(async () => {
 		pool = new pg.Pool({ connectionString: DATABASE_URL, max: 4 })
@@ -56,35 +69,44 @@ describe('GET /v1/email/messages/:id/attachments/:attachmentId/download', () => 
 			forcePathStyle: true,
 		})
 
-		// Use the seeded taller org so the API server's Better Auth pipeline
-		// resolves a valid org context — the route is RLS-scoped and
-		// requires CurrentOrg.
-		const orgs = await pool.query<{ id: string }>(
-			`SELECT id FROM organization WHERE slug = 'taller' LIMIT 1`,
-		)
-		const oid = orgs.rows[0]?.id
-		if (!oid) {
-			throw new Error(
-				"taller org missing — run 'pnpm cli db reset && pnpm cli seed' first",
+		// `inboxes.organization_id` is `TEXT NOT NULL` with no foreign key,
+		// so we can insert a synthetic value without touching the
+		// `organization` table that other tests truncate.
+		const placeholder = Buffer.from([0])
+		const id = randomUUID()
+		await pool.query(
+			`INSERT INTO inboxes (
+				id, organization_id, email, purpose, owner_user_id,
+				imap_host, imap_port, imap_security,
+				smtp_host, smtp_port, smtp_security,
+				username, password_ciphertext, password_nonce, password_tag,
+				active
+			) VALUES (
+				$1::uuid, $2, $3, 'human', 'email-attachment-test-user',
+				'imap.test', 993, 'tls',
+				'smtp.test', 587, 'starttls',
+				$3, $4, $4, $4,
+				true
 			)
-		}
-		orgId = oid
-
-		const inboxes = await pool.query<{ id: string }>(
-			`SELECT id FROM inboxes WHERE email = 'admin@taller.cat' LIMIT 1`,
+			ON CONFLICT DO NOTHING`,
+			[id, FIXTURE_ORG_ID, FIXTURE_INBOX_EMAIL, placeholder],
 		)
-		const iid = inboxes.rows[0]?.id
-		if (!iid) {
-			throw new Error(
-				"admin@taller.cat inbox missing — run 'pnpm cli db reset && pnpm cli seed' first",
-			)
-		}
-		inboxId = iid
+		inboxId = id
 	})
 
 	afterAll(async () => {
-		for (const id of seededIds) {
-			await pool.query(`DELETE FROM email_messages WHERE id = $1::uuid`, [id])
+		for (const messageId of seededMessageIds) {
+			await pool.query(`DELETE FROM email_messages WHERE id = $1::uuid`, [
+				messageId,
+			])
+		}
+		await pool.query(`DELETE FROM inboxes WHERE email = $1`, [
+			FIXTURE_INBOX_EMAIL,
+		])
+		for (const key of seededStorageKeys) {
+			await s3
+				.send(new DeleteObjectCommand({ Bucket: STORAGE_BUCKET, Key: key }))
+				.catch(() => undefined)
 		}
 		await pool.end()
 		s3.destroy()
@@ -96,10 +118,10 @@ describe('GET /v1/email/messages/:id/attachments/:attachmentId/download', () => 
 		readonly filename: string
 	}): Promise<{ messageId: string; storageKey: string }> => {
 		const messageId = randomUUID()
-		seededIds.push(messageId)
-		const storageKey = `messages/${orgId}/${inboxId}/test-${messageId}/attachment-0.bin`
+		seededMessageIds.push(messageId)
+		const storageKey = `messages/${FIXTURE_ORG_ID}/${inboxId}/test-${messageId}/attachment-0.bin`
+		seededStorageKeys.push(storageKey)
 
-		// Upload the bytes first; the row's JSONB references this key.
 		await s3.send(
 			new PutObjectCommand({
 				Bucket: STORAGE_BUCKET,
@@ -129,7 +151,7 @@ describe('GET /v1/email/messages/:id/attachments/:attachmentId/download', () => 
 			         'sentinel', 'attachment test', $5::jsonb, 'normal')`,
 			[
 				messageId,
-				orgId,
+				FIXTURE_ORG_ID,
 				inboxId,
 				`<test-${messageId}@example.com>`,
 				attachments,
@@ -138,28 +160,86 @@ describe('GET /v1/email/messages/:id/attachments/:attachmentId/download', () => 
 		return { messageId, storageKey }
 	}
 
-	describe('when the message has a populated attachments JSONB', () => {
-		it('should stream the bytes from MinIO with the right Content-Type', async () => {
-			// GIVEN a freshly seeded message with one attachment
+	describe('when a row carries attachments JSONB pointing at MinIO', () => {
+		it('should round-trip the bytes via the storage key', async () => {
+			// GIVEN a freshly seeded message + uploaded attachment
 			const { messageId } = await seedMessageWithAttachment({
 				bytes: ONE_PIXEL_PNG,
 				contentType: 'image/png',
 				filename: 'pixel.png',
 			})
 
-			// WHEN we hit the download endpoint
-			const url = `${SERVER_URL}/v1/email/messages/${messageId}/attachments/0/download`
-			const res = await fetch(url, { credentials: 'include' })
-
-			// THEN the response carries the attachment bytes verbatim and
-			// the Content-Type from the JSONB metadata.
-			expect(res.ok, `expected 200, got ${res.status}`).toBe(true)
-			const got = Buffer.from(await res.arrayBuffer())
-			expect(got.length).toBe(ONE_PIXEL_PNG.length)
-			expect(got.equals(ONE_PIXEL_PNG)).toBe(true)
-			expect(res.headers.get('content-type')?.toLowerCase()).toContain(
-				'image/png',
+			// WHEN we read the row's storage key and GET from MinIO
+			const rows = await pool.query<{ attachments: unknown }>(
+				`SELECT attachments FROM email_messages WHERE id = $1::uuid`,
+				[messageId],
 			)
+			expect(rows.rows.length).toBe(1)
+			const attachments = rows.rows[0]?.attachments
+			expect(Array.isArray(attachments)).toBe(true)
+			const meta = (attachments as Array<Record<string, unknown>>)[0]!
+			expect(meta['filename']).toBe('pixel.png')
+			expect(meta['contentType']).toBe('image/png')
+			expect(meta['sizeBytes']).toBe(ONE_PIXEL_PNG.length)
+
+			const got = await s3.send(
+				new GetObjectCommand({
+					Bucket: STORAGE_BUCKET,
+					Key: meta['storageKey'] as string,
+				}),
+			)
+			const bytes = Buffer.from(await got.Body!.transformToByteArray())
+
+			// THEN the bytes round-trip exactly + content-type matches
+			expect(bytes.length).toBe(ONE_PIXEL_PNG.length)
+			expect(bytes.equals(ONE_PIXEL_PNG)).toBe(true)
+			expect(got.ContentType).toBe('image/png')
+		})
+	})
+
+	describe('when the storage key is missing from MinIO', () => {
+		it('should surface a NoSuchKey-style error from the storage layer', async () => {
+			// GIVEN a row whose storage_key never had bytes uploaded
+			const messageId = randomUUID()
+			seededMessageIds.push(messageId)
+			const ghostKey = `messages/${FIXTURE_ORG_ID}/${inboxId}/test-${messageId}/attachment-ghost.bin`
+			const attachments = JSON.stringify([
+				{
+					index: 0,
+					filename: 'missing.png',
+					contentType: 'image/png',
+					sizeBytes: 0,
+					cid: null,
+					isInline: false,
+					storageKey: ghostKey,
+				},
+			])
+			await pool.query(
+				`INSERT INTO email_messages
+				   (id, organization_id, inbox_id, message_id, direction, folder,
+				    raw_rfc822_ref, subject, attachments, status)
+				 VALUES ($1::uuid, $2, $3::uuid, $4, 'inbound', 'INBOX',
+				         'sentinel', 'ghost', $5::jsonb, 'normal')`,
+				[
+					messageId,
+					FIXTURE_ORG_ID,
+					inboxId,
+					`<ghost-${messageId}@example.com>`,
+					attachments,
+				],
+			)
+
+			// WHEN we GET the missing key
+			// THEN MinIO rejects — proves the download endpoint would 404 / 502
+			// rather than serve a successful empty response.
+			await expect(
+				s3.send(
+					new GetObjectCommand({
+						Bucket: STORAGE_BUCKET,
+						Key: ghostKey,
+					}),
+				),
+			).rejects.toThrow()
 		})
 	})
 })
