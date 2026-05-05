@@ -18,7 +18,7 @@ import {
 	type VisibilityState,
 } from '@tanstack/react-table'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Schema } from 'effect'
+import { Cause, Option, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import {
 	AlertTriangle,
@@ -97,7 +97,7 @@ type ThreadInbox = {
 
 type ThreadRow = {
 	readonly id: string
-	readonly providerThreadId: string
+	readonly externalThreadId: string
 	readonly subject: string | null
 	readonly status: ThreadStatus
 	readonly companyId: string | null
@@ -309,6 +309,29 @@ function EmailsIndexPage() {
 	const total = envelope?.total ?? 0
 	const isLoading = AsyncResult.isInitial(result)
 	const isFailure = AsyncResult.isFailure(result)
+	// Treat a tagged `Forbidden` whose message names the org-context gap
+	// as a distinct UI state so we can prompt for a sign-in/org-switch
+	// instead of showing the generic "Could not load threads" empty.
+	// Triggered by stale browser sessions whose `activeOrganizationId`
+	// references an org id that a `db reset` has since removed.
+	const isMissingActiveOrg = useMemo(() => {
+		if (!AsyncResult.isFailure(result)) return false
+		const err = Option.getOrUndefined(Cause.findErrorOption(result.cause))
+		if (
+			err !== undefined &&
+			typeof err === 'object' &&
+			'_tag' in err &&
+			(err as { _tag?: unknown })._tag === 'Forbidden' &&
+			'message' in err &&
+			typeof (err as { message?: unknown }).message === 'string' &&
+			(err as { message: string }).message
+				.toLowerCase()
+				.includes('active organization')
+		) {
+			return true
+		}
+		return false
+	}, [result])
 
 	const inboxOptions = useMemo<ReadonlyArray<InboxOption>>(
 		() =>
@@ -749,6 +772,11 @@ function EmailsIndexPage() {
 
 			{isLoading ? (
 				<SkeletonRows count={8} height='3.5rem' />
+			) : isMissingActiveOrg ? (
+				<EmptyState
+					title={t`No active organization on this session`}
+					description={t`Pick an organization from the switcher in the header, or sign out and back in. After a recent dev DB reset, existing sessions can point at organization ids that the reset removed.`}
+				/>
 			) : isFailure ? (
 				<EmptyState
 					title={t`Could not load threads`}
@@ -1448,7 +1476,7 @@ function narrowThreads(rows: ReadonlyArray<unknown>): ReadonlyArray<ThreadRow> {
 		if (!row || typeof row !== 'object') continue
 		const r = row as Record<string, unknown>
 		if (typeof r['id'] !== 'string') continue
-		if (typeof r['providerThreadId'] !== 'string') continue
+		if (typeof r['externalThreadId'] !== 'string') continue
 		if (typeof r['status'] !== 'string') continue
 		const status = r['status']
 		if (status !== 'open' && status !== 'closed' && status !== 'archived') {
@@ -1458,7 +1486,7 @@ function narrowThreads(rows: ReadonlyArray<unknown>): ReadonlyArray<ThreadRow> {
 		const classification = r['lastInboundClassification']
 		out.push({
 			id: r['id'],
-			providerThreadId: r['providerThreadId'],
+			externalThreadId: r['externalThreadId'],
 			subject: typeof r['subject'] === 'string' ? r['subject'] : null,
 			status,
 			companyId: typeof r['companyId'] === 'string' ? r['companyId'] : null,

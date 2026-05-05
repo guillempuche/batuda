@@ -99,7 +99,7 @@ type ThreadMessage = {
 
 type ThreadDetail = {
 	readonly id: string
-	readonly providerThreadId: string
+	readonly externalThreadId: string
 	readonly subject: string | null
 	readonly status: ThreadStatus
 	readonly companyId: string | null
@@ -689,8 +689,8 @@ function narrowDetail(raw: unknown): ThreadDetail | null {
 	const messages = narrowMessages(r['messages'])
 	return {
 		id: r['id'],
-		providerThreadId:
-			typeof r['providerThreadId'] === 'string' ? r['providerThreadId'] : '',
+		externalThreadId:
+			typeof r['externalThreadId'] === 'string' ? r['externalThreadId'] : '',
 		subject: typeof r['subject'] === 'string' ? r['subject'] : null,
 		status:
 			r['status'] === 'open' ||

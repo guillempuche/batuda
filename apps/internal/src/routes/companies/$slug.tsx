@@ -492,7 +492,7 @@ function DetailBody({
 
 	type CompanyThreadRow = {
 		readonly id: string
-		readonly providerThreadId: string
+		readonly externalThreadId: string
 		readonly subject: string | null
 		readonly status: 'open' | 'closed' | 'archived'
 		readonly updatedAt: string
@@ -509,14 +509,14 @@ function DetailBody({
 			if (!row || typeof row !== 'object') continue
 			const r = row as Record<string, unknown>
 			if (typeof r['id'] !== 'string') continue
-			if (typeof r['providerThreadId'] !== 'string') continue
+			if (typeof r['externalThreadId'] !== 'string') continue
 			const status = r['status']
 			if (status !== 'open' && status !== 'closed' && status !== 'archived') {
 				continue
 			}
 			out.push({
 				id: r['id'],
-				providerThreadId: r['providerThreadId'],
+				externalThreadId: r['externalThreadId'],
 				subject: typeof r['subject'] === 'string' ? r['subject'] : null,
 				status,
 				updatedAt:

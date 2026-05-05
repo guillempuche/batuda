@@ -34,7 +34,7 @@ msgstr "(no schema)"
 
 #: src/routes/companies/$slug.tsx:1131
 #: src/routes/emails/$threadId.tsx:321
-#: src/routes/emails/index.tsx:1196
+#: src/routes/emails/index.tsx:1224
 msgid "(no subject)"
 msgstr "(no subject)"
 
@@ -60,21 +60,21 @@ msgid "{0} companies with filters applied"
 msgstr "{0} companies with filters applied"
 
 #. placeholder {0}: thread.messageCount
-#: src/routes/emails/index.tsx:1210
+#: src/routes/emails/index.tsx:1238
 msgid "{0} msgs"
 msgstr "{0} msgs"
 
 #. placeholder {0}: failedIds.length
-#: src/routes/emails/index.tsx:470
-#: src/routes/emails/index.tsx:502
+#: src/routes/emails/index.tsx:493
+#: src/routes/emails/index.tsx:525
 msgid "{0} thread could not be updated."
 msgstr "{0} thread could not be updated."
 
-#: src/routes/emails/index.tsx:697
+#: src/routes/emails/index.tsx:720
 msgid "{selectedCount} threads selected"
 msgstr "{selectedCount} threads selected"
 
-#: src/routes/emails/index.tsx:536
+#: src/routes/emails/index.tsx:559
 msgid "{total} threads"
 msgstr "{total} threads"
 
@@ -95,15 +95,15 @@ msgstr "1 call"
 msgid "1 company"
 msgstr "1 company"
 
-#: src/routes/emails/index.tsx:1210
+#: src/routes/emails/index.tsx:1238
 msgid "1 msg"
 msgstr "1 msg"
 
-#: src/routes/emails/index.tsx:536
+#: src/routes/emails/index.tsx:559
 msgid "1 thread"
 msgstr "1 thread"
 
-#: src/routes/emails/index.tsx:696
+#: src/routes/emails/index.tsx:719
 msgid "1 thread selected"
 msgstr "1 thread selected"
 
@@ -184,12 +184,12 @@ msgid "Agent"
 msgstr "Agent"
 
 #: src/routes/companies/index.tsx:276
-#: src/routes/emails/index.tsx:599
+#: src/routes/emails/index.tsx:622
 msgid "All"
 msgstr "All"
 
-#: src/routes/emails/index.tsx:638
-#: src/routes/emails/index.tsx:654
+#: src/routes/emails/index.tsx:661
+#: src/routes/emails/index.tsx:677
 msgid "All inboxes"
 msgstr "All inboxes"
 
@@ -210,16 +210,16 @@ msgid "Already in CRM"
 msgstr "Already in CRM"
 
 #: src/routes/emails/$threadId.tsx:356
-#: src/routes/emails/index.tsx:730
+#: src/routes/emails/index.tsx:753
 msgid "Archive"
 msgstr "Archive"
 
-#: src/routes/emails/index.tsx:1279
+#: src/routes/emails/index.tsx:1307
 msgid "Archive thread"
 msgstr "Archive thread"
 
 #: src/routes/emails/$threadId.tsx:315
-#: src/routes/emails/index.tsx:604
+#: src/routes/emails/index.tsx:627
 msgid "Archived"
 msgstr "Archived"
 
@@ -279,7 +279,7 @@ msgstr "Batuda is invite-only. Request access from the Engranatge team."
 msgid "Bcc"
 msgstr "Bcc"
 
-#: src/routes/emails/index.tsx:1204
+#: src/routes/emails/index.tsx:1232
 msgid "Blocked"
 msgstr "Blocked"
 
@@ -308,7 +308,7 @@ msgstr "Brief"
 msgid "Brief summary (optional)"
 msgstr "Brief summary (optional)"
 
-#: src/routes/emails/index.tsx:693
+#: src/routes/emails/index.tsx:716
 msgid "Bulk thread actions"
 msgstr "Bulk thread actions"
 
@@ -385,7 +385,7 @@ msgid "Channel"
 msgstr "Channel"
 
 #: src/routes/companies/$slug.tsx:325
-#: src/routes/emails/index.tsx:755
+#: src/routes/emails/index.tsx:783
 #: src/routes/pages/$id.tsx:124
 msgid "Check that the session is valid or try again."
 msgstr "Check that the session is valid or try again."
@@ -405,14 +405,14 @@ msgstr "Choose primary inbox"
 
 #: src/components/shared/task-item.tsx:292
 #: src/routes/companies/$slug.tsx:1054
-#: src/routes/emails/index.tsx:745
+#: src/routes/emails/index.tsx:768
 msgid "Clear"
 msgstr "Clear"
 
 #: src/routes/companies/index.tsx:302
 #: src/routes/companies/index.tsx:331
-#: src/routes/emails/index.tsx:687
-#: src/routes/emails/index.tsx:777
+#: src/routes/emails/index.tsx:710
+#: src/routes/emails/index.tsx:805
 msgid "Clear filters"
 msgstr "Clear filters"
 
@@ -431,7 +431,7 @@ msgstr "Client"
 #: src/routes/emails/$threadId.tsx:333
 #: src/routes/emails/inboxes.tsx:784
 #: src/routes/emails/inboxes.tsx:1335
-#: src/routes/emails/index.tsx:708
+#: src/routes/emails/index.tsx:731
 msgid "Close"
 msgstr "Close"
 
@@ -439,14 +439,14 @@ msgstr "Close"
 msgid "Close draft"
 msgstr "Close draft"
 
-#: src/routes/emails/index.tsx:1258
+#: src/routes/emails/index.tsx:1286
 msgid "Close thread"
 msgstr "Close thread"
 
 #: src/components/shared/status-badge.tsx:34
 #: src/routes/companies/$slug.tsx:423
 #: src/routes/emails/$threadId.tsx:314
-#: src/routes/emails/index.tsx:603
+#: src/routes/emails/index.tsx:626
 msgid "Closed"
 msgstr "Closed"
 
@@ -458,11 +458,11 @@ msgstr "Closed — won or lost"
 msgid "Cold lead — no contact yet"
 msgstr "Cold lead — no contact yet"
 
-#: src/routes/emails/index.tsx:1378
+#: src/routes/emails/index.tsx:1406
 msgid "Collapse"
 msgstr "Collapse"
 
-#: src/routes/emails/index.tsx:1302
+#: src/routes/emails/index.tsx:1330
 msgid "Columns"
 msgstr "Columns"
 
@@ -509,7 +509,7 @@ msgid "Completed"
 msgstr "Completed"
 
 #: src/routes/companies/$slug.tsx:1113
-#: src/routes/emails/index.tsx:571
+#: src/routes/emails/index.tsx:594
 msgid "Compose"
 msgstr "Compose"
 
@@ -597,7 +597,7 @@ msgstr "Could not load this page"
 msgid "Could not load this run."
 msgstr "Could not load this run."
 
-#: src/routes/emails/index.tsx:754
+#: src/routes/emails/index.tsx:782
 msgid "Could not load threads"
 msgstr "Could not load threads"
 
@@ -877,7 +877,7 @@ msgstr "Email via Batuda"
 
 #: src/components/layout/nav-items.ts:53
 #: src/routes/companies/$slug.tsx:841
-#: src/routes/emails/index.tsx:535
+#: src/routes/emails/index.tsx:558
 msgid "Emails"
 msgstr "Emails"
 
@@ -901,7 +901,7 @@ msgstr "Event"
 msgid "Exit full screen"
 msgstr "Exit full screen"
 
-#: src/routes/emails/index.tsx:1378
+#: src/routes/emails/index.tsx:1406
 msgid "Expand"
 msgstr "Expand"
 
@@ -909,12 +909,12 @@ msgstr "Expand"
 msgid "Failed"
 msgstr "Failed"
 
-#: src/routes/emails/index.tsx:636
+#: src/routes/emails/index.tsx:659
 msgid "Filter by inbox"
 msgstr "Filter by inbox"
 
 #: src/routes/companies/index.tsx:270
-#: src/routes/emails/index.tsx:593
+#: src/routes/emails/index.tsx:616
 msgid "Filter by status"
 msgstr "Filter by status"
 
@@ -922,7 +922,7 @@ msgstr "Filter by status"
 msgid "Filter companies"
 msgstr "Filter companies"
 
-#: src/routes/emails/index.tsx:577
+#: src/routes/emails/index.tsx:600
 msgid "Filter emails"
 msgstr "Filter emails"
 
@@ -1004,11 +1004,11 @@ msgid "In pipeline"
 msgstr "In pipeline"
 
 #: src/components/interactions/quick-capture-dialog.tsx:271
-#: src/routes/emails/index.tsx:1177
+#: src/routes/emails/index.tsx:1205
 msgid "Inbound"
 msgstr "Inbound"
 
-#: src/routes/emails/index.tsx:766
+#: src/routes/emails/index.tsx:794
 msgid "Inbound and outbound emails will pin to this board once a thread exists."
 msgstr "Inbound and outbound emails will pin to this board once a thread exists."
 
@@ -1203,7 +1203,7 @@ msgstr "Low priority"
 msgid "Manage footers for {0}"
 msgstr "Manage footers for {0}"
 
-#: src/routes/emails/index.tsx:548
+#: src/routes/emails/index.tsx:571
 msgid "Manage inboxes"
 msgstr "Manage inboxes"
 
@@ -1237,13 +1237,13 @@ msgstr "Mark contacted"
 msgid "Mark inactive"
 msgstr "Mark inactive"
 
-#: src/routes/emails/index.tsx:741
-#: src/routes/emails/index.tsx:1237
+#: src/routes/emails/index.tsx:764
+#: src/routes/emails/index.tsx:1265
 msgid "Mark read"
 msgstr "Mark read"
 
 #: src/routes/emails/$threadId.tsx:367
-#: src/routes/emails/index.tsx:1247
+#: src/routes/emails/index.tsx:1275
 msgid "Mark unread"
 msgstr "Mark unread"
 
@@ -1338,7 +1338,7 @@ msgstr "New password or app-password"
 msgid "New proposal"
 msgstr "New proposal"
 
-#: src/routes/emails/index.tsx:820
+#: src/routes/emails/index.tsx:848
 msgid "Next"
 msgstr "Next"
 
@@ -1359,6 +1359,10 @@ msgstr "Next: {0}"
 #: src/components/layout/org-switcher.tsx:68
 msgid "No active organization"
 msgstr "No active organization"
+
+#: src/routes/emails/index.tsx:777
+msgid "No active organization on this session"
+msgstr "No active organization on this session"
 
 #: src/routes/settings/organization/index.tsx:57
 msgid "No active organization. Pick one from the switcher in the top bar."
@@ -1493,11 +1497,11 @@ msgstr "No tasks for this company"
 msgid "No tasks for today"
 msgstr "No tasks for today"
 
-#: src/routes/emails/index.tsx:761
+#: src/routes/emails/index.tsx:789
 msgid "No threads match the filters"
 msgstr "No threads match the filters"
 
-#: src/routes/emails/index.tsx:761
+#: src/routes/emails/index.tsx:789
 msgid "No threads yet"
 msgstr "No threads yet"
 
@@ -1542,7 +1546,7 @@ msgid "Only owners and admins can invite new members."
 msgstr "Only owners and admins can invite new members."
 
 #: src/routes/emails/$threadId.tsx:312
-#: src/routes/emails/index.tsx:601
+#: src/routes/emails/index.tsx:624
 #: src/routes/tasks/index.tsx:443
 msgid "Open"
 msgstr "Open"
@@ -1616,7 +1620,7 @@ msgid "Other"
 msgstr "Other"
 
 #: src/components/interactions/quick-capture-dialog.tsx:268
-#: src/routes/emails/index.tsx:1175
+#: src/routes/emails/index.tsx:1203
 msgid "Outbound"
 msgstr "Outbound"
 
@@ -1656,7 +1660,7 @@ msgstr "Owner"
 msgid "Owner user ID"
 msgstr "Owner user ID"
 
-#: src/routes/emails/index.tsx:813
+#: src/routes/emails/index.tsx:841
 msgid "Page {page} of {totalPages}"
 msgstr "Page {page} of {totalPages}"
 
@@ -1727,6 +1731,10 @@ msgstr "Phone"
 msgid "Pick a provider"
 msgstr "Pick a provider"
 
+#: src/routes/emails/index.tsx:778
+msgid "Pick an organization from the switcher in the header, or sign out and back in. After a recent dev DB reset, existing sessions can point at organization ids that the reset removed."
+msgstr "Pick an organization from the switcher in the header, or sign out and back in. After a recent dev DB reset, existing sessions can point at organization ids that the reset removed."
+
 #: src/routes/emails/inboxes.tsx:324
 msgid "Pick one to use as your default sender."
 msgstr "Pick one to use as your default sender."
@@ -1749,7 +1757,7 @@ msgstr "Preparing calendar view…"
 msgid "Preview"
 msgstr "Preview"
 
-#: src/routes/emails/index.tsx:811
+#: src/routes/emails/index.tsx:839
 msgid "Previous"
 msgstr "Previous"
 
@@ -1865,7 +1873,7 @@ msgstr "Quick add task"
 msgid "Quick add: \"Call Acme tomorrow #high\""
 msgstr "Quick add: \"Call Acme tomorrow #high\""
 
-#: src/routes/emails/index.tsx:501
+#: src/routes/emails/index.tsx:524
 msgid "Read state update failed"
 msgstr "Read state update failed"
 
@@ -1910,12 +1918,12 @@ msgid "Removing…"
 msgstr "Removing…"
 
 #: src/routes/emails/$threadId.tsx:344
-#: src/routes/emails/index.tsx:719
+#: src/routes/emails/index.tsx:742
 #: src/routes/tasks/index.tsx:710
 msgid "Reopen"
 msgstr "Reopen"
 
-#: src/routes/emails/index.tsx:1268
+#: src/routes/emails/index.tsx:1296
 msgid "Reopen thread"
 msgstr "Reopen thread"
 
@@ -1932,7 +1940,7 @@ msgstr "Reply all"
 msgid "Research"
 msgstr "Research"
 
-#: src/routes/emails/index.tsx:1332
+#: src/routes/emails/index.tsx:1360
 msgid "Reset"
 msgstr "Reset"
 
@@ -1946,11 +1954,11 @@ msgid "Responded"
 msgstr "Responded"
 
 #. placeholder {0}: drafts.length
-#: src/routes/emails/index.tsx:1362
+#: src/routes/emails/index.tsx:1390
 msgid "Resume drafting ({0})"
 msgstr "Resume drafting ({0})"
 
-#: src/routes/emails/index.tsx:1361
+#: src/routes/emails/index.tsx:1389
 msgid "Resume drafting (1)"
 msgstr "Resume drafting (1)"
 
@@ -1995,7 +2003,7 @@ msgstr "Saving…"
 msgid "Search by name, industry, or location…"
 msgstr "Search by name, industry, or location…"
 
-#: src/routes/emails/index.tsx:585
+#: src/routes/emails/index.tsx:608
 msgid "Search by subject…"
 msgstr "Search by subject…"
 
@@ -2003,7 +2011,7 @@ msgstr "Search by subject…"
 msgid "Search companies"
 msgstr "Search companies"
 
-#: src/routes/emails/index.tsx:588
+#: src/routes/emails/index.tsx:611
 msgid "Search threads"
 msgstr "Search threads"
 
@@ -2011,7 +2019,7 @@ msgstr "Search threads"
 msgid "See who can access this workspace."
 msgstr "See who can access this workspace."
 
-#: src/routes/emails/index.tsx:925
+#: src/routes/emails/index.tsx:953
 msgid "Select all threads on this page"
 msgstr "Select all threads on this page"
 
@@ -2020,7 +2028,7 @@ msgid "Select inbox…"
 msgstr "Select inbox…"
 
 #. placeholder {0}: row.original.subject ?? '(no subject)'
-#: src/routes/emails/index.tsx:936
+#: src/routes/emails/index.tsx:964
 msgid "Select thread {0}"
 msgstr "Select thread {0}"
 
@@ -2091,7 +2099,7 @@ msgstr "Show more"
 msgid "Show system events"
 msgstr "Show system events"
 
-#: src/routes/emails/index.tsx:802
+#: src/routes/emails/index.tsx:830
 msgid "Showing {firstRow}–{lastRow} of {total}"
 msgstr "Showing {firstRow}–{lastRow} of {total}"
 
@@ -2166,7 +2174,7 @@ msgstr "someone"
 msgid "Source"
 msgstr "Source"
 
-#: src/routes/emails/index.tsx:1203
+#: src/routes/emails/index.tsx:1231
 msgid "Spam"
 msgstr "Spam"
 
@@ -2200,7 +2208,7 @@ msgstr "STARTTLS"
 msgid "Status"
 msgstr "Status"
 
-#: src/routes/emails/index.tsx:469
+#: src/routes/emails/index.tsx:492
 msgid "Status update failed"
 msgstr "Status update failed"
 
@@ -2402,7 +2410,7 @@ msgid "Total competitors"
 msgstr "Total competitors"
 
 #: src/routes/companies/index.tsx:323
-#: src/routes/emails/index.tsx:765
+#: src/routes/emails/index.tsx:793
 msgid "Try different criteria or clear the filters."
 msgstr "Try different criteria or clear the filters."
 
@@ -2420,7 +2428,7 @@ msgstr "Type and press Enter"
 msgid "unknown"
 msgstr "unknown"
 
-#: src/routes/emails/index.tsx:1169
+#: src/routes/emails/index.tsx:1197
 msgid "Unknown"
 msgstr "Unknown"
 
@@ -2432,7 +2440,7 @@ msgstr "Unknown user"
 msgid "Unlinked"
 msgstr "Unlinked"
 
-#: src/routes/emails/index.tsx:1368
+#: src/routes/emails/index.tsx:1396
 msgid "Untitled"
 msgstr "Untitled"
 
@@ -2495,8 +2503,8 @@ msgstr "Visit"
 msgid "Weaknesses"
 msgstr "Weaknesses"
 
-#: src/routes/emails/index.tsx:967
-#: src/routes/emails/index.tsx:1292
+#: src/routes/emails/index.tsx:995
+#: src/routes/emails/index.tsx:1320
 msgid "What"
 msgstr "What"
 
@@ -2521,8 +2529,8 @@ msgid "WhatsApp"
 msgstr "WhatsApp"
 
 #: src/routes/calendar/index.tsx:259
-#: src/routes/emails/index.tsx:974
-#: src/routes/emails/index.tsx:1293
+#: src/routes/emails/index.tsx:1002
+#: src/routes/emails/index.tsx:1321
 msgid "When"
 msgstr "When"
 
@@ -2531,8 +2539,8 @@ msgstr "When"
 msgid "Where"
 msgstr "Where"
 
-#: src/routes/emails/index.tsx:955
-#: src/routes/emails/index.tsx:1291
+#: src/routes/emails/index.tsx:983
+#: src/routes/emails/index.tsx:1319
 msgid "Who"
 msgstr "Who"
 

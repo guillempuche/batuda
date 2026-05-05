@@ -34,7 +34,7 @@ msgstr "(sense esquema)"
 
 #: src/routes/companies/$slug.tsx:1131
 #: src/routes/emails/$threadId.tsx:321
-#: src/routes/emails/index.tsx:1196
+#: src/routes/emails/index.tsx:1224
 msgid "(no subject)"
 msgstr "(sense assumpte)"
 
@@ -60,21 +60,21 @@ msgid "{0} companies with filters applied"
 msgstr "{0} empreses amb filtres aplicats"
 
 #. placeholder {0}: thread.messageCount
-#: src/routes/emails/index.tsx:1210
+#: src/routes/emails/index.tsx:1238
 msgid "{0} msgs"
 msgstr "{0} missatges"
 
 #. placeholder {0}: failedIds.length
-#: src/routes/emails/index.tsx:470
-#: src/routes/emails/index.tsx:502
+#: src/routes/emails/index.tsx:493
+#: src/routes/emails/index.tsx:525
 msgid "{0} thread could not be updated."
 msgstr "No s'han pogut actualitzar {0} fils."
 
-#: src/routes/emails/index.tsx:697
+#: src/routes/emails/index.tsx:720
 msgid "{selectedCount} threads selected"
 msgstr "{selectedCount} fils seleccionats"
 
-#: src/routes/emails/index.tsx:536
+#: src/routes/emails/index.tsx:559
 msgid "{total} threads"
 msgstr "{total} fils"
 
@@ -95,15 +95,15 @@ msgstr "1 crida"
 msgid "1 company"
 msgstr "1 empresa"
 
-#: src/routes/emails/index.tsx:1210
+#: src/routes/emails/index.tsx:1238
 msgid "1 msg"
 msgstr "1 missatge"
 
-#: src/routes/emails/index.tsx:536
+#: src/routes/emails/index.tsx:559
 msgid "1 thread"
 msgstr "1 fil"
 
-#: src/routes/emails/index.tsx:696
+#: src/routes/emails/index.tsx:719
 msgid "1 thread selected"
 msgstr "1 fil seleccionat"
 
@@ -184,12 +184,12 @@ msgid "Agent"
 msgstr "Agent"
 
 #: src/routes/companies/index.tsx:276
-#: src/routes/emails/index.tsx:599
+#: src/routes/emails/index.tsx:622
 msgid "All"
 msgstr "Tots"
 
-#: src/routes/emails/index.tsx:638
-#: src/routes/emails/index.tsx:654
+#: src/routes/emails/index.tsx:661
+#: src/routes/emails/index.tsx:677
 msgid "All inboxes"
 msgstr "Totes les safates"
 
@@ -210,16 +210,16 @@ msgid "Already in CRM"
 msgstr "Ja al CRM"
 
 #: src/routes/emails/$threadId.tsx:356
-#: src/routes/emails/index.tsx:730
+#: src/routes/emails/index.tsx:753
 msgid "Archive"
 msgstr "Arxiva"
 
-#: src/routes/emails/index.tsx:1279
+#: src/routes/emails/index.tsx:1307
 msgid "Archive thread"
 msgstr "Arxiva el fil"
 
 #: src/routes/emails/$threadId.tsx:315
-#: src/routes/emails/index.tsx:604
+#: src/routes/emails/index.tsx:627
 msgid "Archived"
 msgstr "Arxivat"
 
@@ -279,7 +279,7 @@ msgstr "Batuda és només amb invitació. Demana accés a l'equip d'Engranatge."
 msgid "Bcc"
 msgstr "Bcc"
 
-#: src/routes/emails/index.tsx:1204
+#: src/routes/emails/index.tsx:1232
 msgid "Blocked"
 msgstr "Bloquejat"
 
@@ -308,7 +308,7 @@ msgstr "Resum"
 msgid "Brief summary (optional)"
 msgstr "Resum breu (opcional)"
 
-#: src/routes/emails/index.tsx:693
+#: src/routes/emails/index.tsx:716
 msgid "Bulk thread actions"
 msgstr "Accions massives de fils"
 
@@ -385,7 +385,7 @@ msgid "Channel"
 msgstr "Canal"
 
 #: src/routes/companies/$slug.tsx:325
-#: src/routes/emails/index.tsx:755
+#: src/routes/emails/index.tsx:783
 #: src/routes/pages/$id.tsx:124
 msgid "Check that the session is valid or try again."
 msgstr "Comprova que la sessió sigui vàlida o torna-ho a provar."
@@ -405,14 +405,14 @@ msgstr "Tria la bústia principal"
 
 #: src/components/shared/task-item.tsx:292
 #: src/routes/companies/$slug.tsx:1054
-#: src/routes/emails/index.tsx:745
+#: src/routes/emails/index.tsx:768
 msgid "Clear"
 msgstr "Neteja"
 
 #: src/routes/companies/index.tsx:302
 #: src/routes/companies/index.tsx:331
-#: src/routes/emails/index.tsx:687
-#: src/routes/emails/index.tsx:777
+#: src/routes/emails/index.tsx:710
+#: src/routes/emails/index.tsx:805
 msgid "Clear filters"
 msgstr "Neteja els filtres"
 
@@ -431,7 +431,7 @@ msgstr "Client"
 #: src/routes/emails/$threadId.tsx:333
 #: src/routes/emails/inboxes.tsx:784
 #: src/routes/emails/inboxes.tsx:1335
-#: src/routes/emails/index.tsx:708
+#: src/routes/emails/index.tsx:731
 msgid "Close"
 msgstr "Tanca"
 
@@ -439,14 +439,14 @@ msgstr "Tanca"
 msgid "Close draft"
 msgstr "Tanca l'esborrany"
 
-#: src/routes/emails/index.tsx:1258
+#: src/routes/emails/index.tsx:1286
 msgid "Close thread"
 msgstr "Tanca el fil"
 
 #: src/components/shared/status-badge.tsx:34
 #: src/routes/companies/$slug.tsx:423
 #: src/routes/emails/$threadId.tsx:314
-#: src/routes/emails/index.tsx:603
+#: src/routes/emails/index.tsx:626
 msgid "Closed"
 msgstr "Tancat"
 
@@ -458,11 +458,11 @@ msgstr "Tancat — guanyat o perdut"
 msgid "Cold lead — no contact yet"
 msgstr "Pista freda — encara sense contacte"
 
-#: src/routes/emails/index.tsx:1378
+#: src/routes/emails/index.tsx:1406
 msgid "Collapse"
 msgstr "Plega"
 
-#: src/routes/emails/index.tsx:1302
+#: src/routes/emails/index.tsx:1330
 msgid "Columns"
 msgstr "Columnes"
 
@@ -509,7 +509,7 @@ msgid "Completed"
 msgstr "Completada"
 
 #: src/routes/companies/$slug.tsx:1113
-#: src/routes/emails/index.tsx:571
+#: src/routes/emails/index.tsx:594
 msgid "Compose"
 msgstr "Redacta"
 
@@ -597,7 +597,7 @@ msgstr "No s'ha pogut carregar aquesta pàgina"
 msgid "Could not load this run."
 msgstr "No s'ha pogut carregar aquesta execució."
 
-#: src/routes/emails/index.tsx:754
+#: src/routes/emails/index.tsx:782
 msgid "Could not load threads"
 msgstr "No s'han pogut carregar els fils"
 
@@ -877,7 +877,7 @@ msgstr "Correu via Batuda"
 
 #: src/components/layout/nav-items.ts:53
 #: src/routes/companies/$slug.tsx:841
-#: src/routes/emails/index.tsx:535
+#: src/routes/emails/index.tsx:558
 msgid "Emails"
 msgstr "Correus"
 
@@ -901,7 +901,7 @@ msgstr "Esdeveniment"
 msgid "Exit full screen"
 msgstr "Surt de pantalla completa"
 
-#: src/routes/emails/index.tsx:1378
+#: src/routes/emails/index.tsx:1406
 msgid "Expand"
 msgstr "Desplega"
 
@@ -909,12 +909,12 @@ msgstr "Desplega"
 msgid "Failed"
 msgstr "Fallit"
 
-#: src/routes/emails/index.tsx:636
+#: src/routes/emails/index.tsx:659
 msgid "Filter by inbox"
 msgstr "Filtra per safata"
 
 #: src/routes/companies/index.tsx:270
-#: src/routes/emails/index.tsx:593
+#: src/routes/emails/index.tsx:616
 msgid "Filter by status"
 msgstr "Filtra per estat"
 
@@ -922,7 +922,7 @@ msgstr "Filtra per estat"
 msgid "Filter companies"
 msgstr "Filtra empreses"
 
-#: src/routes/emails/index.tsx:577
+#: src/routes/emails/index.tsx:600
 msgid "Filter emails"
 msgstr "Filtra correus"
 
@@ -1004,11 +1004,11 @@ msgid "In pipeline"
 msgstr "Al pipeline"
 
 #: src/components/interactions/quick-capture-dialog.tsx:271
-#: src/routes/emails/index.tsx:1177
+#: src/routes/emails/index.tsx:1205
 msgid "Inbound"
 msgstr "Entrant"
 
-#: src/routes/emails/index.tsx:766
+#: src/routes/emails/index.tsx:794
 msgid "Inbound and outbound emails will pin to this board once a thread exists."
 msgstr "Els correus entrants i sortints es fixaran en aquest tauler un cop existeixi un fil."
 
@@ -1203,7 +1203,7 @@ msgstr "Prioritat baixa"
 msgid "Manage footers for {0}"
 msgstr "Gestiona els peus de pàgina de {0}"
 
-#: src/routes/emails/index.tsx:548
+#: src/routes/emails/index.tsx:571
 msgid "Manage inboxes"
 msgstr "Gestiona les safates"
 
@@ -1237,13 +1237,13 @@ msgstr "Marca com a contactat"
 msgid "Mark inactive"
 msgstr "Marca com a inactiva"
 
-#: src/routes/emails/index.tsx:741
-#: src/routes/emails/index.tsx:1237
+#: src/routes/emails/index.tsx:764
+#: src/routes/emails/index.tsx:1265
 msgid "Mark read"
 msgstr "Marca com a llegit"
 
 #: src/routes/emails/$threadId.tsx:367
-#: src/routes/emails/index.tsx:1247
+#: src/routes/emails/index.tsx:1275
 msgid "Mark unread"
 msgstr "Marca com a no llegit"
 
@@ -1338,7 +1338,7 @@ msgstr "Contrasenya nova o d'aplicació"
 msgid "New proposal"
 msgstr "Nova proposta"
 
-#: src/routes/emails/index.tsx:820
+#: src/routes/emails/index.tsx:848
 msgid "Next"
 msgstr "Següent"
 
@@ -1359,6 +1359,10 @@ msgstr "Següent: {0}"
 #: src/components/layout/org-switcher.tsx:68
 msgid "No active organization"
 msgstr "Sense organització activa"
+
+#: src/routes/emails/index.tsx:777
+msgid "No active organization on this session"
+msgstr "Cap organització activa en aquesta sessió"
 
 #: src/routes/settings/organization/index.tsx:57
 msgid "No active organization. Pick one from the switcher in the top bar."
@@ -1493,11 +1497,11 @@ msgstr "Cap tasca per a aquesta empresa"
 msgid "No tasks for today"
 msgstr "Cap tasca per a avui"
 
-#: src/routes/emails/index.tsx:761
+#: src/routes/emails/index.tsx:789
 msgid "No threads match the filters"
 msgstr "Cap fil coincideix amb els filtres"
 
-#: src/routes/emails/index.tsx:761
+#: src/routes/emails/index.tsx:789
 msgid "No threads yet"
 msgstr "Encara no hi ha fils"
 
@@ -1542,7 +1546,7 @@ msgid "Only owners and admins can invite new members."
 msgstr "Només els propietaris i administradors poden convidar nous membres."
 
 #: src/routes/emails/$threadId.tsx:312
-#: src/routes/emails/index.tsx:601
+#: src/routes/emails/index.tsx:624
 #: src/routes/tasks/index.tsx:443
 msgid "Open"
 msgstr "Obert"
@@ -1616,7 +1620,7 @@ msgid "Other"
 msgstr "Altres"
 
 #: src/components/interactions/quick-capture-dialog.tsx:268
-#: src/routes/emails/index.tsx:1175
+#: src/routes/emails/index.tsx:1203
 msgid "Outbound"
 msgstr "Sortint"
 
@@ -1656,7 +1660,7 @@ msgstr "Propietari"
 msgid "Owner user ID"
 msgstr "ID d'usuari propietari"
 
-#: src/routes/emails/index.tsx:813
+#: src/routes/emails/index.tsx:841
 msgid "Page {page} of {totalPages}"
 msgstr "Pàgina {page} de {totalPages}"
 
@@ -1727,6 +1731,10 @@ msgstr "Telèfon"
 msgid "Pick a provider"
 msgstr "Tria un proveïdor"
 
+#: src/routes/emails/index.tsx:778
+msgid "Pick an organization from the switcher in the header, or sign out and back in. After a recent dev DB reset, existing sessions can point at organization ids that the reset removed."
+msgstr "Tria una organització al selector de la barra superior, o tanca la sessió i torna a entrar. Després d'un reset recent de la base de dades de dev, les sessions existents poden apuntar a identificadors d'organització que el reset ha esborrat."
+
 #: src/routes/emails/inboxes.tsx:324
 msgid "Pick one to use as your default sender."
 msgstr "Tria'n una com a remitent per defecte."
@@ -1749,7 +1757,7 @@ msgstr "S'està preparant la vista del calendari…"
 msgid "Preview"
 msgstr "Vista prèvia"
 
-#: src/routes/emails/index.tsx:811
+#: src/routes/emails/index.tsx:839
 msgid "Previous"
 msgstr "Anterior"
 
@@ -1865,7 +1873,7 @@ msgstr "Afegeix tasca ràpidament"
 msgid "Quick add: \"Call Acme tomorrow #high\""
 msgstr "Afegeix ràpid: «Truca a Acme demà #high»"
 
-#: src/routes/emails/index.tsx:501
+#: src/routes/emails/index.tsx:524
 msgid "Read state update failed"
 msgstr "Ha fallat l'actualització de l'estat de lectura"
 
@@ -1910,12 +1918,12 @@ msgid "Removing…"
 msgstr "Eliminant…"
 
 #: src/routes/emails/$threadId.tsx:344
-#: src/routes/emails/index.tsx:719
+#: src/routes/emails/index.tsx:742
 #: src/routes/tasks/index.tsx:710
 msgid "Reopen"
 msgstr "Reobre"
 
-#: src/routes/emails/index.tsx:1268
+#: src/routes/emails/index.tsx:1296
 msgid "Reopen thread"
 msgstr "Reobre el fil"
 
@@ -1932,7 +1940,7 @@ msgstr "Respon a tots"
 msgid "Research"
 msgstr "Recerca"
 
-#: src/routes/emails/index.tsx:1332
+#: src/routes/emails/index.tsx:1360
 msgid "Reset"
 msgstr "Restableix"
 
@@ -1946,11 +1954,11 @@ msgid "Responded"
 msgstr "Respost"
 
 #. placeholder {0}: drafts.length
-#: src/routes/emails/index.tsx:1362
+#: src/routes/emails/index.tsx:1390
 msgid "Resume drafting ({0})"
 msgstr "Reprèn esborranys ({0})"
 
-#: src/routes/emails/index.tsx:1361
+#: src/routes/emails/index.tsx:1389
 msgid "Resume drafting (1)"
 msgstr "Reprèn l'esborrany (1)"
 
@@ -1995,7 +2003,7 @@ msgstr "Desant…"
 msgid "Search by name, industry, or location…"
 msgstr "Cerca per nom, sector o ubicació…"
 
-#: src/routes/emails/index.tsx:585
+#: src/routes/emails/index.tsx:608
 msgid "Search by subject…"
 msgstr "Cerca per assumpte…"
 
@@ -2003,7 +2011,7 @@ msgstr "Cerca per assumpte…"
 msgid "Search companies"
 msgstr "Cerca empreses"
 
-#: src/routes/emails/index.tsx:588
+#: src/routes/emails/index.tsx:611
 msgid "Search threads"
 msgstr "Cerca fils"
 
@@ -2011,7 +2019,7 @@ msgstr "Cerca fils"
 msgid "See who can access this workspace."
 msgstr "Veure qui té accés a aquest espai de treball."
 
-#: src/routes/emails/index.tsx:925
+#: src/routes/emails/index.tsx:953
 msgid "Select all threads on this page"
 msgstr "Selecciona tots els fils d'aquesta pàgina"
 
@@ -2020,7 +2028,7 @@ msgid "Select inbox…"
 msgstr "Tria una safata…"
 
 #. placeholder {0}: row.original.subject ?? '(no subject)'
-#: src/routes/emails/index.tsx:936
+#: src/routes/emails/index.tsx:964
 msgid "Select thread {0}"
 msgstr "Selecciona el fil {0}"
 
@@ -2091,7 +2099,7 @@ msgstr "Mostra més"
 msgid "Show system events"
 msgstr "Mostra esdeveniments del sistema"
 
-#: src/routes/emails/index.tsx:802
+#: src/routes/emails/index.tsx:830
 msgid "Showing {firstRow}–{lastRow} of {total}"
 msgstr "Mostrant {firstRow}–{lastRow} de {total}"
 
@@ -2166,7 +2174,7 @@ msgstr "algú"
 msgid "Source"
 msgstr "Origen"
 
-#: src/routes/emails/index.tsx:1203
+#: src/routes/emails/index.tsx:1231
 msgid "Spam"
 msgstr "Brossa"
 
@@ -2200,7 +2208,7 @@ msgstr "STARTTLS"
 msgid "Status"
 msgstr "Estat"
 
-#: src/routes/emails/index.tsx:469
+#: src/routes/emails/index.tsx:492
 msgid "Status update failed"
 msgstr "Ha fallat l'actualització d'estat"
 
@@ -2402,7 +2410,7 @@ msgid "Total competitors"
 msgstr "Total competidors"
 
 #: src/routes/companies/index.tsx:323
-#: src/routes/emails/index.tsx:765
+#: src/routes/emails/index.tsx:793
 msgid "Try different criteria or clear the filters."
 msgstr "Prova amb criteris diferents o neteja els filtres."
 
@@ -2420,7 +2428,7 @@ msgstr "Escriu i prem Retorn"
 msgid "unknown"
 msgstr "desconegut"
 
-#: src/routes/emails/index.tsx:1169
+#: src/routes/emails/index.tsx:1197
 msgid "Unknown"
 msgstr "Desconegut"
 
@@ -2432,7 +2440,7 @@ msgstr "Usuari desconegut"
 msgid "Unlinked"
 msgstr "Sense enllaçar"
 
-#: src/routes/emails/index.tsx:1368
+#: src/routes/emails/index.tsx:1396
 msgid "Untitled"
 msgstr "Sense títol"
 
@@ -2495,8 +2503,8 @@ msgstr "Visita"
 msgid "Weaknesses"
 msgstr "Punts febles"
 
-#: src/routes/emails/index.tsx:967
-#: src/routes/emails/index.tsx:1292
+#: src/routes/emails/index.tsx:995
+#: src/routes/emails/index.tsx:1320
 msgid "What"
 msgstr "Què"
 
@@ -2521,8 +2529,8 @@ msgid "WhatsApp"
 msgstr "WhatsApp"
 
 #: src/routes/calendar/index.tsx:259
-#: src/routes/emails/index.tsx:974
-#: src/routes/emails/index.tsx:1293
+#: src/routes/emails/index.tsx:1002
+#: src/routes/emails/index.tsx:1321
 msgid "When"
 msgstr "Quan"
 
@@ -2531,8 +2539,8 @@ msgstr "Quan"
 msgid "Where"
 msgstr "On"
 
-#: src/routes/emails/index.tsx:955
-#: src/routes/emails/index.tsx:1291
+#: src/routes/emails/index.tsx:983
+#: src/routes/emails/index.tsx:1319
 msgid "Who"
 msgstr "Qui"
 

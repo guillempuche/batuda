@@ -3776,6 +3776,16 @@ export const seed = (preset: Preset) =>
 				}
 
 				yield* Effect.logInfo('Seed complete!')
+				yield* Effect.logInfo('')
+				yield* Effect.logInfo(
+					'⚠ If you were already signed in to https://batuda.localhost, sign out and back in.',
+				)
+				yield* Effect.logInfo(
+					'  The reset replaced every auth row, so existing sessions point at organization ids that no longer exist',
+				)
+				yield* Effect.logInfo(
+					'  and /emails will render "No active organization on this session" until the cookie refreshes.',
+				)
 				return counts
 			}),
 		)
