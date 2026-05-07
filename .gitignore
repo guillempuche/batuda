@@ -20,6 +20,9 @@ apps/*/playwright-report/
 .env.cloud
 apps/*/.env.cloud
 
+# Local secrets — never commit (TLS keys, dev tokens, etc.)
+secrets/
+
 # Cloud CLI audit log (appended by confirm-cloud on every --env cloud write)
 cloud-audit.log
 
