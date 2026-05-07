@@ -12,6 +12,7 @@ export { PriPreviewCard } from './pri-preview-card'
 export { PriScrollArea } from './pri-scroll-area'
 export { PriSelect } from './pri-select'
 export { PriTabs } from './pri-tabs'
+export { PriTextarea } from './pri-textarea'
 export {
 	createPriToastManager,
 	PriToast,
