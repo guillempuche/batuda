@@ -56,9 +56,11 @@ export const ResearchLive = HttpApiBuilder.group(
 				)
 				.handle('list', _ =>
 					Effect.gen(function* () {
-						const { userId } = yield* SessionContext
+						// Org-scope is enforced by RLS — `created_by` stays
+						// opt-in so a per-company query returns every
+						// teammate's run, not just the caller's.
 						return yield* svc.list({
-							createdBy: _.query.created_by ?? userId,
+							createdBy: _.query.created_by,
 							status: _.query.status,
 							subjectTable: _.query.subject_table,
 							subjectId: _.query.subject_id,
