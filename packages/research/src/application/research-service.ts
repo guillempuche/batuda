@@ -176,6 +176,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					// COALESCE guards NULL findings: jsonb_set(NULL, …) returns
 					// NULL, which would silently drop the error field on rows
 					// that never wrote findings (newly-queued rows especially).
+					// `seed:%` rows are dev fixtures, not orphans.
 					const running = yield* sql<{ id: string }>`
 						UPDATE research_runs
 						SET status = 'failed',
@@ -184,6 +185,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							updated_at = now()
 						WHERE status = 'running'
 						  AND started_at < now() - interval '1 second' * ${maxAgeSeconds}
+						  AND (idempotency_key IS NULL OR idempotency_key NOT LIKE 'seed:%')
 						RETURNING id
 					`
 					// Queued rows have no started_at — the fiber never reached
@@ -196,6 +198,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							updated_at = now()
 						WHERE status = 'queued'
 						  AND created_at < now() - interval '1 second' * ${maxAgeSeconds}
+						  AND (idempotency_key IS NULL OR idempotency_key NOT LIKE 'seed:%')
 						RETURNING id
 					`
 					return { running, queued }
