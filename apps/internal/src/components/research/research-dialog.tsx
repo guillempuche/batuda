@@ -1,23 +1,58 @@
+import { Radio } from '@base-ui/react/radio'
+import { RadioGroup } from '@base-ui/react/radio-group'
 import { useAtomSet } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import styled from 'styled-components'
 
-import { PriButton, PriDialog, PriInput, PriSelect } from '@batuda/ui/pri'
+import type { SchemaName } from '@batuda/research'
+import { PriButton, PriDialog, PriTextarea } from '@batuda/ui/pri'
 
 import { createResearchAtom } from '#/atoms/research-atoms'
-import { stenciledTitle } from '#/lib/workshop-mixins'
+import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
 
-const SCHEMA_OPTIONS = [
-	'freeform',
-	'company-enrichment-v1',
-	'competitor-scan-v1',
-	'contact-discovery-v1',
-	'prospect-scan-v1',
-] as const
+// Type-only import; adding a schema server-side forces an option here.
+type SchemaOption = SchemaName
 
-type SchemaOption = (typeof SCHEMA_OPTIONS)[number]
+type SchemaCard = {
+	readonly value: SchemaOption
+	readonly label: string
+	readonly description: string
+}
+
+const SCHEMA_CARDS: ReadonlyArray<SchemaCard> = [
+	{
+		value: 'freeform',
+		label: 'Freeform',
+		description:
+			'Open-ended brief. Pick when the question does not fit a fixed shape — history, market trend, an opinion piece. No structured output.',
+	},
+	{
+		value: 'company_enrichment_v1',
+		label: 'Company enrichment',
+		description:
+			'Fill industry, size, location, contacts, competitors and proposed CRM updates for this company. Pick when you want every field on the company card answered.',
+	},
+	{
+		value: 'competitor_scan_v1',
+		label: 'Competitor scan',
+		description:
+			'Map direct competitors with strengths, weaknesses, and a market-maturity summary. Pick when you need to know who you are up against.',
+	},
+	{
+		value: 'contact_discovery_v1',
+		label: 'Contact discovery',
+		description:
+			'Find decision-makers and operational contacts at this company. Pick when you need names, emails, phones and roles to reach out.',
+	},
+	{
+		value: 'prospect_scan_v1',
+		label: 'Prospect scan',
+		description:
+			'Find similar companies elsewhere with the same pain. Pick when you have closed a deal and want lookalikes.',
+	},
+]
 
 export function ResearchDialog({
 	open,
@@ -47,18 +82,12 @@ export function ResearchDialog({
 
 	const canSubmit = query.trim().length > 0 && !submitting
 
-	// React 19 form action: queued through hydration so the button click
-	// can't race the listener registration. Using onSubmit on its own
-	// would let the browser's default submit fire on a pre-hydration
-	// click, which navigates the page and closes the dialog mid-test.
+	// React 19 form action — queues through hydration so a pre-hydration click can't navigate.
 	const handleAction = useCallback(async () => {
 		if (!canSubmit) return
 		setSubmitting(true)
 		setErrorMessage(null)
 
-		// `context.subjects` is the schema-correct path; the dialog used
-		// to send a top-level `subject` which fails validation server-side
-		// and leaves the dialog stuck open.
 		const exit = await createResearch({
 			payload: {
 				query: query.trim(),
@@ -124,11 +153,11 @@ export function ResearchDialog({
 							<Label htmlFor='research-query'>
 								<Trans>Question</Trans>
 							</Label>
-							<PriInput
+							<PriTextarea
 								id='research-query'
 								data-testid='research-dialog-query'
-								type='text'
 								value={query}
+								rows={3}
 								placeholder={t`What do you want to find out about this company?`}
 								onChange={event => {
 									setQuery(event.target.value)
@@ -138,35 +167,35 @@ export function ResearchDialog({
 						</Field>
 
 						<Field>
-							<Label htmlFor='research-schema'>
-								<Trans>Output schema</Trans>
+							<Label as='div'>
+								<Trans>What kind of research?</Trans>
 							</Label>
-							<PriSelect.Root
+							<SchemaGrid
 								value={schema}
-								onValueChange={(value: string | null) => {
-									if (value === null) return
-									setSchema(value as SchemaOption)
+								onValueChange={value => {
+									if (typeof value === 'string') {
+										setSchema(value as SchemaOption)
+									}
 								}}
+								data-testid='research-dialog-schema'
 							>
-								<PriSelect.Trigger
-									id='research-schema'
-									data-testid='research-dialog-schema'
-								>
-									<PriSelect.Value />
-									<PriSelect.Icon />
-								</PriSelect.Trigger>
-								<PriSelect.Portal>
-									<PriSelect.Positioner>
-										<PriSelect.Popup>
-											{SCHEMA_OPTIONS.map(option => (
-												<PriSelect.Item key={option} value={option}>
-													<PriSelect.ItemText>{option}</PriSelect.ItemText>
-												</PriSelect.Item>
-											))}
-										</PriSelect.Popup>
-									</PriSelect.Positioner>
-								</PriSelect.Portal>
-							</PriSelect.Root>
+								{SCHEMA_CARDS.map(card => (
+									<SchemaCardLabel
+										key={card.value}
+										data-testid={`research-dialog-schema-${card.value}`}
+									>
+										<SchemaCardHead>
+											<SchemaRadioRoot value={card.value}>
+												<SchemaRadioIndicator />
+											</SchemaRadioRoot>
+											<SchemaCardTitle>{card.label}</SchemaCardTitle>
+										</SchemaCardHead>
+										<SchemaCardDescription>
+											{card.description}
+										</SchemaCardDescription>
+									</SchemaCardLabel>
+								))}
+							</SchemaGrid>
 						</Field>
 
 						{errorMessage !== null ? (
@@ -267,4 +296,101 @@ const Footer = styled.div`
 	display: flex;
 	gap: var(--space-sm);
 	justify-content: flex-end;
+`
+
+const SchemaGrid = styled(RadioGroup)`
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--space-2xs);
+
+	@media (min-width: 32rem) {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+`
+
+// `<label>` so a click anywhere on the card toggles the embedded
+// Radio.Root. Column layout — the radio shares a row with the title
+// (head), the description sits below across the full card width.
+// Cards stretch to row height via grid `align-items: stretch`.
+const SchemaCardLabel = styled.label`
+	${brushedMetalPlate}
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2xs);
+	padding: var(--space-sm);
+	border-radius: var(--shape-2xs);
+	border: 1px solid color-mix(in oklab, var(--color-on-surface) 14%, transparent);
+	cursor: pointer;
+	transition: border-color 140ms ease, box-shadow 140ms ease;
+
+	&:hover {
+		border-color: color-mix(in oklab, var(--color-primary) 60%, transparent);
+	}
+
+	&:has([data-checked]) {
+		border-color: var(--color-primary);
+		box-shadow: var(--glow-active);
+	}
+
+	&:focus-within {
+		box-shadow: var(--glow-active);
+	}
+`
+
+const SchemaCardHead = styled.div`
+	display: flex;
+	align-items: center;
+	gap: var(--space-xs);
+`
+
+const SchemaRadioRoot = styled(Radio.Root)`
+	flex: 0 0 auto;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.1rem;
+	height: 1.1rem;
+	border-radius: 50%;
+	border: 1px solid color-mix(in oklab, var(--color-on-surface) 32%, transparent);
+	background: var(--color-surface);
+	cursor: pointer;
+	padding: 0;
+
+	&[data-checked] {
+		border-color: var(--color-primary);
+	}
+
+	&:focus-visible {
+		outline: none;
+	}
+`
+
+const SchemaRadioIndicator = styled(Radio.Indicator)`
+	display: block;
+	width: 0.55rem;
+	height: 0.55rem;
+	border-radius: 50%;
+	background: var(--color-primary);
+	transform: scale(0);
+	transition: transform 140ms ease;
+
+	&[data-checked] {
+		transform: scale(1);
+	}
+`
+
+const SchemaCardTitle = styled.span`
+	${stenciledTitle}
+	font-size: var(--typescale-label-large-size);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	line-height: 1;
+`
+
+const SchemaCardDescription = styled.span`
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	line-height: var(--typescale-body-small-line);
+	color: var(--color-on-surface);
 `

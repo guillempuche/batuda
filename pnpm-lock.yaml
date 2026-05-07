@@ -120,6 +120,9 @@ importers:
       '@batuda/email':
         specifier: workspace:*
         version: link:../../packages/email
+      '@batuda/research':
+        specifier: workspace:*
+        version: link:../../packages/research
       '@batuda/ui':
         specifier: workspace:*
         version: link:../../packages/ui

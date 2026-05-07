@@ -1,4 +1,5 @@
 import { Trans, useLingui } from '@lingui/react/macro'
+import { Link } from '@tanstack/react-router'
 import { Microscope, Plus } from 'lucide-react'
 import styled from 'styled-components'
 
@@ -12,16 +13,6 @@ import {
 	stenciledTitle,
 } from '#/lib/workshop-mixins'
 
-/**
- * Research summary card — shows the most recent research run for this
- * company plus a primary "Run new research" CTA. The full list of runs
- * stays accessible via the Conversations tab and direct
- * `/research/:id` deep-links; this card is the at-a-glance entry.
- *
- * Renders inside a `<form>` so the React-19 form-action replay buffer
- * keeps the button tappable before the dialog state is wired up — same
- * rationale as the existing Research-tab button.
- */
 export function ResearchSummaryCard({
 	runs,
 	onRunNew,
@@ -39,36 +30,37 @@ export function ResearchSummaryCard({
 					<Microscope size={14} aria-hidden />
 					<Trans>Research</Trans>
 				</Heading>
-				<form
-					action={() => {
-						onRunNew()
-					}}
+				<PriButton
+					type='button'
+					$variant='outlined'
+					onClick={onRunNew}
+					data-testid='company-research-summary-run-new'
 				>
-					<PriButton
-						type='submit'
-						$variant='outlined'
-						data-testid='company-research-summary-run-new'
-					>
-						<Plus size={14} aria-hidden />
-						<span>
-							<Trans>Run new</Trans>
-						</span>
-					</PriButton>
-				</form>
+					<Plus size={14} aria-hidden />
+					<span>
+						<Trans>Run new</Trans>
+					</span>
+				</PriButton>
 			</Header>
 			{latest === null ? (
 				<Empty>
 					<Trans>No research yet.</Trans>
 				</Empty>
 			) : (
-				<LatestRow>
-					<Query title={latest.query}>{latest.query}</Query>
-					<Meta>
-						<Status>{latest.status}</Status>
-						<Dot>·</Dot>
-						<RelativeDate value={latest.createdAt} fallback={t`unknown`} />
-					</Meta>
-				</LatestRow>
+				<Link
+					to='/research/$id'
+					params={{ id: latest.id }}
+					data-testid={`company-research-summary-row-${latest.id}`}
+				>
+					<LatestRow>
+						<Query title={latest.query}>{latest.query}</Query>
+						<Meta>
+							<Status>{latest.status}</Status>
+							<Dot>·</Dot>
+							<RelativeDate value={latest.createdAt} fallback={t`unknown`} />
+						</Meta>
+					</LatestRow>
+				</Link>
 			)}
 		</Card>
 	)
@@ -105,6 +97,18 @@ const LatestRow = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-3xs);
+	color: inherit;
+	text-decoration: none;
+	border-radius: var(--shape-3xs);
+
+	a:hover & {
+		text-decoration: underline;
+	}
+
+	a:focus-visible & {
+		outline: none;
+		box-shadow: var(--glow-active);
+	}
 `
 
 const Query = styled.span`

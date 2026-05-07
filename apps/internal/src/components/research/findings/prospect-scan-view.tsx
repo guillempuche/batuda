@@ -22,7 +22,7 @@ import {
 } from './shared'
 
 /**
- * Renders a `prospect-scan-v1` research finding. Each prospect carries
+ * Renders a `prospect_scan_v1` research finding. Each prospect carries
  * a `whyRelevant` rationale + optional industry/region/taxId +
  * pain-indicator tags + citations.
  */

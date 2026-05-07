@@ -23,7 +23,7 @@ import {
 } from './shared'
 
 /**
- * Renders a `company-enrichment-v1` research finding. Surfaces the
+ * Renders a `company_enrichment_v1` research finding. Surfaces the
  * enrichment object (industry, sizeRange, painPoints, etc.) as a
  * typed field table, then competitor + contact arrays as their own
  * sections, finally the cross-cutting common sections.

@@ -251,6 +251,10 @@ msgstr "Audit log"
 msgid "Auth failed"
 msgstr "Auth failed"
 
+#: src/routes/research/$id.tsx:24
+msgid "Back to companies"
+msgstr "Back to companies"
+
 #: src/routes/emails/inboxes.tsx:307
 msgid "Back to emails"
 msgstr "Back to emails"
@@ -307,7 +311,7 @@ msgstr "bounced"
 msgid "Bounced"
 msgstr "Bounced"
 
-#: src/components/research/run-detail.tsx:102
+#: src/components/research/run-detail.tsx:115
 msgid "Brief"
 msgstr "Brief"
 
@@ -356,7 +360,7 @@ msgid "Calls"
 msgstr "Calls"
 
 #: src/components/interactions/quick-capture-dialog.tsx:400
-#: src/components/research/research-dialog.tsx:193
+#: src/components/research/research-dialog.tsx:222
 #: src/routes/emails/inboxes.tsx:1055
 #: src/routes/emails/inboxes.tsx:1453
 #: src/routes/tasks/index.tsx:718
@@ -434,7 +438,7 @@ msgid "Client"
 msgstr "Client"
 
 #: src/components/interactions/quick-capture-dialog.tsx:188
-#: src/components/research/research-dialog.tsx:112
+#: src/components/research/research-dialog.tsx:141
 #: src/routes/calendar/index.tsx:355
 #: src/routes/emails/$threadId.tsx:353
 #: src/routes/emails/inboxes.tsx:785
@@ -601,7 +605,7 @@ msgstr "Could not load this company"
 msgid "Could not load this page"
 msgstr "Could not load this page"
 
-#: src/components/research/run-detail.tsx:46
+#: src/components/research/run-detail.tsx:59
 msgid "Could not load this run."
 msgstr "Could not load this run."
 
@@ -658,7 +662,7 @@ msgstr "Could not set the default inbox."
 msgid "Could not sign in. Check your email and password."
 msgstr "Could not sign in. Check your email and password."
 
-#: src/components/research/research-dialog.tsx:79
+#: src/components/research/research-dialog.tsx:108
 msgid "Could not start the research run. Please try again."
 msgstr "Could not start the research run. Please try again."
 
@@ -948,7 +952,7 @@ msgstr "Filter conversations"
 msgid "Filter emails"
 msgstr "Filter emails"
 
-#: src/components/research/run-detail.tsx:110
+#: src/components/research/run-detail.tsx:123
 msgid "Findings"
 msgstr "Findings"
 
@@ -1163,7 +1167,7 @@ msgstr "Loading calendar…"
 msgid "Loading companies…"
 msgstr "Loading companies…"
 
-#: src/components/research/run-detail.tsx:36
+#: src/components/research/run-detail.tsx:49
 msgid "Loading run…"
 msgstr "Loading run…"
 
@@ -1507,12 +1511,12 @@ msgstr "No products linked yet"
 msgid "No research runs yet for this company."
 msgstr "No research runs yet for this company."
 
-#: src/components/companies/research-summary-card.tsx:61
+#: src/components/companies/research-summary-card.tsx:47
 msgid "No research yet."
 msgstr "No research yet."
 
-#: src/components/research/run-detail.tsx:128
-#: src/components/research/run-detail.tsx:139
+#: src/components/research/run-detail.tsx:141
+#: src/components/research/run-detail.tsx:152
 msgid "No structured findings."
 msgstr "No structured findings."
 
@@ -1665,10 +1669,6 @@ msgstr "Outcome"
 #: src/components/shared/timeline-entry.tsx:61
 msgid "Outcome: {0}"
 msgstr "Outcome: {0}"
-
-#: src/components/research/research-dialog.tsx:142
-msgid "Output schema"
-msgstr "Output schema"
 
 #: src/routes/index.tsx:271
 #: src/routes/tasks/index.tsx:446
@@ -1893,7 +1893,7 @@ msgstr "Publishing…"
 msgid "Purpose"
 msgstr "Purpose"
 
-#: src/components/research/research-dialog.tsx:125
+#: src/components/research/research-dialog.tsx:154
 msgid "Question"
 msgstr "Question"
 
@@ -1971,10 +1971,14 @@ msgstr "Reply"
 msgid "Reply all"
 msgstr "Reply all"
 
-#: src/components/companies/research-summary-card.tsx:40
+#: src/components/companies/research-summary-card.tsx:31
 #: src/components/shared/channel-icon.tsx:71
 msgid "Research"
 msgstr "Research"
+
+#: src/routes/research/$id.tsx:18
+msgid "Research run"
+msgstr "Research run"
 
 #: src/routes/emails/index.tsx:1361
 msgid "Reset"
@@ -2002,23 +2006,23 @@ msgstr "Resume drafting (1)"
 msgid "Role"
 msgstr "Role"
 
-#: src/components/research/run-detail.tsx:91
+#: src/components/research/run-detail.tsx:104
 msgid "Run failed"
 msgstr "Run failed"
 
-#: src/components/research/run-detail.tsx:84
+#: src/components/research/run-detail.tsx:97
 msgid "Run in progress — events stream as they arrive."
 msgstr "Run in progress — events stream as they arrive."
 
-#: src/components/companies/research-summary-card.tsx:54
+#: src/components/companies/research-summary-card.tsx:41
 msgid "Run new"
 msgstr "Run new"
 
-#: src/components/research/research-dialog.tsx:105
+#: src/components/research/research-dialog.tsx:134
 msgid "Run new research"
 msgstr "Run new research"
 
-#: src/components/research/run-detail.tsx:57
+#: src/components/research/run-detail.tsx:70
 msgid "Run shape unrecognised."
 msgstr "Run shape unrecognised."
 
@@ -2232,11 +2236,11 @@ msgstr "Spend"
 msgid "Stamped into the workshop ledger."
 msgstr "Stamped into the workshop ledger."
 
-#: src/components/research/research-dialog.tsx:183
+#: src/components/research/research-dialog.tsx:212
 msgid "Start"
 msgstr "Start"
 
-#: src/components/research/research-dialog.tsx:183
+#: src/components/research/research-dialog.tsx:212
 msgid "Starting…"
 msgstr "Starting…"
 
@@ -2474,7 +2478,7 @@ msgstr "Type and press Enter"
 
 #: src/components/companies/calendar-tab.tsx:60
 #: src/components/companies/conversations-tab.tsx:166
-#: src/components/companies/research-summary-card.tsx:69
+#: src/components/companies/research-summary-card.tsx:60
 #: src/components/companies/upcoming-meetings-card.tsx:93
 #: src/routes/tasks/index.tsx:803
 msgid "unknown"
@@ -2560,7 +2564,7 @@ msgstr "Weaknesses"
 msgid "What"
 msgstr "What"
 
-#: src/components/research/research-dialog.tsx:132
+#: src/components/research/research-dialog.tsx:161
 msgid "What do you want to find out about this company?"
 msgstr "What do you want to find out about this company?"
 
@@ -2571,6 +2575,10 @@ msgstr "What happened?"
 #: src/components/emails/compose-form.tsx:463
 msgid "What is this about?"
 msgstr "What is this about?"
+
+#: src/components/research/research-dialog.tsx:171
+msgid "What kind of research?"
+msgstr "What kind of research?"
 
 #: src/components/interactions/quick-capture-dialog.tsx:355
 msgid "What needs to happen?"

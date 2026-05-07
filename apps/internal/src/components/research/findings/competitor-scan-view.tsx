@@ -22,7 +22,7 @@ import {
 } from './shared'
 
 /**
- * Renders a `competitor-scan-v1` research finding. Each competitor has
+ * Renders a `competitor_scan_v1` research finding. Each competitor has
  * description + strengths + weaknesses + overlap; the optional
  * marketSummary provides a top-level summary card. JSONB keys land as
  * camelCase on the wire (see ./shared.tsx).

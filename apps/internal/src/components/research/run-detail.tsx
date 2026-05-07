@@ -1,7 +1,10 @@
 import { useAtomValue } from '@effect/atom-react'
 import { Trans } from '@lingui/react/macro'
 import { AsyncResult } from 'effect/unstable/reactivity'
+import type { ComponentType } from 'react'
 import styled from 'styled-components'
+
+import type { SchemaName } from '@batuda/research'
 
 import { researchDetailAtom } from '#/atoms/research-atoms'
 import { MarkdownView } from '#/components/markdown/markdown-view'
@@ -15,6 +18,16 @@ import {
 	rulerUnderRule,
 	stenciledTitle,
 } from '#/lib/workshop-mixins'
+
+// `Record<SchemaName, …>` keeps the dispatch table exhaustive against the schema registry.
+type FindingsViewProps = { readonly findings: never }
+const FINDINGS_VIEWS: Record<SchemaName, ComponentType<FindingsViewProps>> = {
+	freeform: FreeformView,
+	company_enrichment_v1: CompanyEnrichmentView,
+	competitor_scan_v1: CompetitorScanView,
+	contact_discovery_v1: ContactDiscoveryView,
+	prospect_scan_v1: ProspectScanView,
+}
 
 type ResearchRunDetail = {
 	readonly id: string
@@ -140,23 +153,14 @@ function FindingsView({
 			</EmptyHint>
 		)
 	}
-	switch (schemaName) {
-		case 'company-enrichment-v1':
-			return <CompanyEnrichmentView findings={findings as never} />
-		case 'competitor-scan-v1':
-			return <CompetitorScanView findings={findings as never} />
-		case 'contact-discovery-v1':
-			return <ContactDiscoveryView findings={findings as never} />
-		case 'prospect-scan-v1':
-			return <ProspectScanView findings={findings as never} />
-		case 'freeform':
-		case null:
-			return <FreeformView findings={findings as never} />
-		default:
-			// Unknown schema — render JSON so AI agents that ship a new schema
-			// don't disappear from the UI silently.
-			return <Pre>{JSON.stringify(findings, null, 2)}</Pre>
+	// `null` predates the schemaName column; treat as freeform.
+	const key = (schemaName ?? 'freeform') as SchemaName
+	const View = FINDINGS_VIEWS[key]
+	if (View) {
+		return <View findings={findings as never} />
 	}
+	// Unknown schema (newer than this bundle) — render JSON so data isn't dropped.
+	return <Pre>{JSON.stringify(findings, null, 2)}</Pre>
 }
 
 function narrowRun(raw: unknown): ResearchRunDetail | null {

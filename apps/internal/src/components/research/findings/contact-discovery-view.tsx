@@ -21,7 +21,7 @@ import {
 } from './shared'
 
 /**
- * Renders a `contact-discovery-v1` research finding. Each contact
+ * Renders a `contact_discovery_v1` research finding. Each contact
  * carries role + email + phone + linkedin + an optional decision-maker
  * flag + free-form notes.
  */

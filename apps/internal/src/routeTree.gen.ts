@@ -17,6 +17,7 @@ import { Route as PagesIndexRouteImport } from './routes/pages/index'
 import { Route as EmailsIndexRouteImport } from './routes/emails/index'
 import { Route as CompaniesIndexRouteImport } from './routes/companies/index'
 import { Route as CalendarIndexRouteImport } from './routes/calendar/index'
+import { Route as ResearchIdRouteImport } from './routes/research/$id'
 import { Route as PagesIdRouteImport } from './routes/pages/$id'
 import { Route as EmailsInboxesRouteImport } from './routes/emails/inboxes'
 import { Route as EmailsThreadIdRouteImport } from './routes/emails/$threadId'
@@ -65,6 +66,11 @@ const CompaniesIndexRoute = CompaniesIndexRouteImport.update({
 const CalendarIndexRoute = CalendarIndexRouteImport.update({
   id: '/calendar/',
   path: '/calendar/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResearchIdRoute = ResearchIdRouteImport.update({
+  id: '/research/$id',
+  path: '/research/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PagesIdRoute = PagesIdRouteImport.update({
@@ -125,6 +131,7 @@ export interface FileRoutesByFullPath {
   '/emails/$threadId': typeof EmailsThreadIdRoute
   '/emails/inboxes': typeof EmailsInboxesRoute
   '/pages/$id': typeof PagesIdRoute
+  '/research/$id': typeof ResearchIdRoute
   '/calendar/': typeof CalendarIndexRoute
   '/companies/': typeof CompaniesIndexRoute
   '/emails/': typeof EmailsIndexRoute
@@ -144,6 +151,7 @@ export interface FileRoutesByTo {
   '/emails/$threadId': typeof EmailsThreadIdRoute
   '/emails/inboxes': typeof EmailsInboxesRoute
   '/pages/$id': typeof PagesIdRoute
+  '/research/$id': typeof ResearchIdRoute
   '/calendar': typeof CalendarIndexRoute
   '/companies': typeof CompaniesIndexRoute
   '/emails': typeof EmailsIndexRoute
@@ -164,6 +172,7 @@ export interface FileRoutesById {
   '/emails/$threadId': typeof EmailsThreadIdRoute
   '/emails/inboxes': typeof EmailsInboxesRoute
   '/pages/$id': typeof PagesIdRoute
+  '/research/$id': typeof ResearchIdRoute
   '/calendar/': typeof CalendarIndexRoute
   '/companies/': typeof CompaniesIndexRoute
   '/emails/': typeof EmailsIndexRoute
@@ -185,6 +194,7 @@ export interface FileRouteTypes {
     | '/emails/$threadId'
     | '/emails/inboxes'
     | '/pages/$id'
+    | '/research/$id'
     | '/calendar/'
     | '/companies/'
     | '/emails/'
@@ -204,6 +214,7 @@ export interface FileRouteTypes {
     | '/emails/$threadId'
     | '/emails/inboxes'
     | '/pages/$id'
+    | '/research/$id'
     | '/calendar'
     | '/companies'
     | '/emails'
@@ -223,6 +234,7 @@ export interface FileRouteTypes {
     | '/emails/$threadId'
     | '/emails/inboxes'
     | '/pages/$id'
+    | '/research/$id'
     | '/calendar/'
     | '/companies/'
     | '/emails/'
@@ -243,6 +255,7 @@ export interface RootRouteChildren {
   EmailsThreadIdRoute: typeof EmailsThreadIdRoute
   EmailsInboxesRoute: typeof EmailsInboxesRoute
   PagesIdRoute: typeof PagesIdRoute
+  ResearchIdRoute: typeof ResearchIdRoute
   CalendarIndexRoute: typeof CalendarIndexRoute
   CompaniesIndexRoute: typeof CompaniesIndexRoute
   EmailsIndexRoute: typeof EmailsIndexRoute
@@ -311,6 +324,13 @@ declare module '@tanstack/react-router' {
       path: '/calendar'
       fullPath: '/calendar/'
       preLoaderRoute: typeof CalendarIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/research/$id': {
+      id: '/research/$id'
+      path: '/research/$id'
+      fullPath: '/research/$id'
+      preLoaderRoute: typeof ResearchIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pages/$id': {
@@ -387,6 +407,7 @@ const rootRouteChildren: RootRouteChildren = {
   EmailsThreadIdRoute: EmailsThreadIdRoute,
   EmailsInboxesRoute: EmailsInboxesRoute,
   PagesIdRoute: PagesIdRoute,
+  ResearchIdRoute: ResearchIdRoute,
   CalendarIndexRoute: CalendarIndexRoute,
   CompaniesIndexRoute: CompaniesIndexRoute,
   EmailsIndexRoute: EmailsIndexRoute,
