@@ -360,7 +360,7 @@ msgid "Calls"
 msgstr "Crides"
 
 #: src/components/interactions/quick-capture-dialog.tsx:400
-#: src/components/research/research-dialog.tsx:222
+#: src/components/research/research-dialog.tsx:221
 #: src/routes/emails/inboxes.tsx:1055
 #: src/routes/emails/inboxes.tsx:1453
 #: src/routes/tasks/index.tsx:718
@@ -438,7 +438,7 @@ msgid "Client"
 msgstr "Client"
 
 #: src/components/interactions/quick-capture-dialog.tsx:188
-#: src/components/research/research-dialog.tsx:141
+#: src/components/research/research-dialog.tsx:140
 #: src/routes/calendar/index.tsx:355
 #: src/routes/emails/$threadId.tsx:353
 #: src/routes/emails/inboxes.tsx:785
@@ -498,6 +498,14 @@ msgstr "Empreses"
 msgid "Company"
 msgstr "Empresa"
 
+#: src/components/research/research-dialog.tsx:36
+msgid "Company enrichment"
+msgstr "Enriquiment d'empresa"
+
+#: src/components/research/research-dialog.tsx:41
+msgid "Competitor scan"
+msgstr "Anàlisi de competidors"
+
 #: src/components/research/findings/company-enrichment-view.tsx:150
 #: src/components/research/findings/competitor-scan-view.tsx:106
 msgid "Competitors"
@@ -550,6 +558,10 @@ msgstr "Connectada"
 #: src/routes/emails/inboxes.tsx:248
 msgid "Connection tested"
 msgstr "Connexió provada"
+
+#: src/components/research/research-dialog.tsx:46
+msgid "Contact discovery"
+msgstr "Descoberta de contactes"
 
 #: src/components/shared/status-badge.tsx:29
 #: src/routes/companies/$slug.tsx:441
@@ -662,7 +674,7 @@ msgstr "No s'ha pogut establir la safata per defecte."
 msgid "Could not sign in. Check your email and password."
 msgstr "No s'ha pogut iniciar sessió. Comprova el correu i la contrasenya."
 
-#: src/components/research/research-dialog.tsx:108
+#: src/components/research/research-dialog.tsx:107
 msgid "Could not start the research run. Please try again."
 msgstr "No s'ha pogut iniciar la cerca. Torna-ho a provar."
 
@@ -931,6 +943,10 @@ msgstr "Fallit"
 msgid "Files"
 msgstr "Arxius"
 
+#: src/components/research/research-dialog.tsx:37
+msgid "Fill industry, size, location, contacts, competitors and proposed CRM updates for this company. Pick when you want every field on the company card answered."
+msgstr "Omple sector, mida, ubicació, contactes, competidors i actualitzacions de CRM proposades per a aquesta empresa. Tria-ho quan vulguis omplir tots els camps de la fitxa."
+
 #: src/routes/emails/index.tsx:660
 msgid "Filter by inbox"
 msgstr "Filtra per safata"
@@ -952,6 +968,14 @@ msgstr "Filtra les converses"
 msgid "Filter emails"
 msgstr "Filtra correus"
 
+#: src/components/research/research-dialog.tsx:47
+msgid "Find decision-makers and operational contacts at this company. Pick when you need names, emails, phones and roles to reach out."
+msgstr "Troba decisors i contactes operatius d'aquesta empresa. Tria-ho quan necessitis noms, correus, telèfons i rols per contactar-los."
+
+#: src/components/research/research-dialog.tsx:52
+msgid "Find similar companies elsewhere with the same pain. Pick when you have closed a deal and want lookalikes."
+msgstr "Troba empreses similars amb el mateix problema. Tria-ho quan hagis tancat un acord i en vulguis trobar de semblants."
+
 #: src/components/research/run-detail.tsx:123
 msgid "Findings"
 msgstr "Troballes"
@@ -968,6 +992,10 @@ msgstr "El proveïdor l'ha marcat com a brossa. El cos es mostra només per revi
 #: src/routes/emails/inboxes.tsx:1333
 msgid "Footers — {0}"
 msgstr "Peus de pàgina — {0}"
+
+#: src/components/research/research-dialog.tsx:31
+msgid "Freeform"
+msgstr "Lliure"
 
 #: src/routes/emails/$threadId.tsx:567
 msgid "From"
@@ -1244,6 +1272,10 @@ msgstr "Gestiona les safates"
 #: src/routes/settings/organization/index.tsx:83
 msgid "Manage members"
 msgstr "Gestiona els membres"
+
+#: src/components/research/research-dialog.tsx:42
+msgid "Map direct competitors with strengths, weaknesses, and a market-maturity summary. Pick when you need to know who you are up against."
+msgstr "Mapeja competidors directes amb fortaleses, debilitats i un resum de maduresa de mercat. Tria-ho quan necessitis saber contra qui competeixes."
 
 #. placeholder {0}: task.title
 #: src/components/shared/task-item.tsx:80
@@ -1633,6 +1665,10 @@ msgstr "Obre el panell de despesa de l'organització"
 msgid "Open website"
 msgstr "Obre el lloc web"
 
+#: src/components/research/research-dialog.tsx:32
+msgid "Open-ended brief. Pick when the question does not fit a fixed shape — history, market trend, an opinion piece. No structured output."
+msgstr "Resum lliure. Tria-ho quan la pregunta no encaixa en una forma fixa — història, tendència de mercat, opinió. Sense sortida estructurada."
+
 #: src/routes/emails/$threadId.tsx:687
 msgid "Opened"
 msgstr "Obert"
@@ -1857,6 +1893,10 @@ msgstr "Actualitzacions proposades"
 msgid "Prospect"
 msgstr "Prospecte"
 
+#: src/components/research/research-dialog.tsx:51
+msgid "Prospect scan"
+msgstr "Escàner de prospectes"
+
 #: src/components/research/findings/prospect-scan-view.tsx:57
 msgid "Prospects"
 msgstr "Prospectes"
@@ -1893,7 +1933,7 @@ msgstr "Publicant…"
 msgid "Purpose"
 msgstr "Propòsit"
 
-#: src/components/research/research-dialog.tsx:154
+#: src/components/research/research-dialog.tsx:153
 msgid "Question"
 msgstr "Pregunta"
 
@@ -2018,7 +2058,7 @@ msgstr "Execució en curs — els esdeveniments arriben en temps real."
 msgid "Run new"
 msgstr "Executa una nova"
 
-#: src/components/research/research-dialog.tsx:134
+#: src/components/research/research-dialog.tsx:133
 msgid "Run new research"
 msgstr "Inicia una cerca"
 
@@ -2236,11 +2276,11 @@ msgstr "Despesa"
 msgid "Stamped into the workshop ledger."
 msgstr "Segellat al llibre del taller."
 
-#: src/components/research/research-dialog.tsx:212
+#: src/components/research/research-dialog.tsx:211
 msgid "Start"
 msgstr "Inicia"
 
-#: src/components/research/research-dialog.tsx:212
+#: src/components/research/research-dialog.tsx:211
 msgid "Starting…"
 msgstr "Iniciant…"
 
@@ -2564,7 +2604,7 @@ msgstr "Punts febles"
 msgid "What"
 msgstr "Què"
 
-#: src/components/research/research-dialog.tsx:161
+#: src/components/research/research-dialog.tsx:160
 msgid "What do you want to find out about this company?"
 msgstr "Què vols saber d'aquesta empresa?"
 
@@ -2576,7 +2616,7 @@ msgstr "Què ha passat?"
 msgid "What is this about?"
 msgstr "De què tracta?"
 
-#: src/components/research/research-dialog.tsx:171
+#: src/components/research/research-dialog.tsx:170
 msgid "What kind of research?"
 msgstr "Quin tipus de recerca?"
 

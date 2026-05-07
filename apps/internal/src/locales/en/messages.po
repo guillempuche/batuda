@@ -360,7 +360,7 @@ msgid "Calls"
 msgstr "Calls"
 
 #: src/components/interactions/quick-capture-dialog.tsx:400
-#: src/components/research/research-dialog.tsx:222
+#: src/components/research/research-dialog.tsx:221
 #: src/routes/emails/inboxes.tsx:1055
 #: src/routes/emails/inboxes.tsx:1453
 #: src/routes/tasks/index.tsx:718
@@ -438,7 +438,7 @@ msgid "Client"
 msgstr "Client"
 
 #: src/components/interactions/quick-capture-dialog.tsx:188
-#: src/components/research/research-dialog.tsx:141
+#: src/components/research/research-dialog.tsx:140
 #: src/routes/calendar/index.tsx:355
 #: src/routes/emails/$threadId.tsx:353
 #: src/routes/emails/inboxes.tsx:785
@@ -498,6 +498,14 @@ msgstr "Companies"
 msgid "Company"
 msgstr "Company"
 
+#: src/components/research/research-dialog.tsx:36
+msgid "Company enrichment"
+msgstr "Company enrichment"
+
+#: src/components/research/research-dialog.tsx:41
+msgid "Competitor scan"
+msgstr "Competitor scan"
+
 #: src/components/research/findings/company-enrichment-view.tsx:150
 #: src/components/research/findings/competitor-scan-view.tsx:106
 msgid "Competitors"
@@ -550,6 +558,10 @@ msgstr "Connected"
 #: src/routes/emails/inboxes.tsx:248
 msgid "Connection tested"
 msgstr "Connection tested"
+
+#: src/components/research/research-dialog.tsx:46
+msgid "Contact discovery"
+msgstr "Contact discovery"
 
 #: src/components/shared/status-badge.tsx:29
 #: src/routes/companies/$slug.tsx:441
@@ -662,7 +674,7 @@ msgstr "Could not set the default inbox."
 msgid "Could not sign in. Check your email and password."
 msgstr "Could not sign in. Check your email and password."
 
-#: src/components/research/research-dialog.tsx:108
+#: src/components/research/research-dialog.tsx:107
 msgid "Could not start the research run. Please try again."
 msgstr "Could not start the research run. Please try again."
 
@@ -931,6 +943,10 @@ msgstr "Failed"
 msgid "Files"
 msgstr "Files"
 
+#: src/components/research/research-dialog.tsx:37
+msgid "Fill industry, size, location, contacts, competitors and proposed CRM updates for this company. Pick when you want every field on the company card answered."
+msgstr "Fill industry, size, location, contacts, competitors and proposed CRM updates for this company. Pick when you want every field on the company card answered."
+
 #: src/routes/emails/index.tsx:660
 msgid "Filter by inbox"
 msgstr "Filter by inbox"
@@ -952,6 +968,14 @@ msgstr "Filter conversations"
 msgid "Filter emails"
 msgstr "Filter emails"
 
+#: src/components/research/research-dialog.tsx:47
+msgid "Find decision-makers and operational contacts at this company. Pick when you need names, emails, phones and roles to reach out."
+msgstr "Find decision-makers and operational contacts at this company. Pick when you need names, emails, phones and roles to reach out."
+
+#: src/components/research/research-dialog.tsx:52
+msgid "Find similar companies elsewhere with the same pain. Pick when you have closed a deal and want lookalikes."
+msgstr "Find similar companies elsewhere with the same pain. Pick when you have closed a deal and want lookalikes."
+
 #: src/components/research/run-detail.tsx:123
 msgid "Findings"
 msgstr "Findings"
@@ -968,6 +992,10 @@ msgstr "Flagged as spam by the provider. The body is shown for review only."
 #: src/routes/emails/inboxes.tsx:1333
 msgid "Footers — {0}"
 msgstr "Footers — {0}"
+
+#: src/components/research/research-dialog.tsx:31
+msgid "Freeform"
+msgstr "Freeform"
 
 #: src/routes/emails/$threadId.tsx:567
 msgid "From"
@@ -1244,6 +1272,10 @@ msgstr "Manage inboxes"
 #: src/routes/settings/organization/index.tsx:83
 msgid "Manage members"
 msgstr "Manage members"
+
+#: src/components/research/research-dialog.tsx:42
+msgid "Map direct competitors with strengths, weaknesses, and a market-maturity summary. Pick when you need to know who you are up against."
+msgstr "Map direct competitors with strengths, weaknesses, and a market-maturity summary. Pick when you need to know who you are up against."
 
 #. placeholder {0}: task.title
 #: src/components/shared/task-item.tsx:80
@@ -1633,6 +1665,10 @@ msgstr "Open the org spend dashboard"
 msgid "Open website"
 msgstr "Open website"
 
+#: src/components/research/research-dialog.tsx:32
+msgid "Open-ended brief. Pick when the question does not fit a fixed shape — history, market trend, an opinion piece. No structured output."
+msgstr "Open-ended brief. Pick when the question does not fit a fixed shape — history, market trend, an opinion piece. No structured output."
+
 #: src/routes/emails/$threadId.tsx:687
 msgid "Opened"
 msgstr "Opened"
@@ -1857,6 +1893,10 @@ msgstr "Proposed updates"
 msgid "Prospect"
 msgstr "Prospect"
 
+#: src/components/research/research-dialog.tsx:51
+msgid "Prospect scan"
+msgstr "Prospect scan"
+
 #: src/components/research/findings/prospect-scan-view.tsx:57
 msgid "Prospects"
 msgstr "Prospects"
@@ -1893,7 +1933,7 @@ msgstr "Publishing…"
 msgid "Purpose"
 msgstr "Purpose"
 
-#: src/components/research/research-dialog.tsx:154
+#: src/components/research/research-dialog.tsx:153
 msgid "Question"
 msgstr "Question"
 
@@ -2018,7 +2058,7 @@ msgstr "Run in progress — events stream as they arrive."
 msgid "Run new"
 msgstr "Run new"
 
-#: src/components/research/research-dialog.tsx:134
+#: src/components/research/research-dialog.tsx:133
 msgid "Run new research"
 msgstr "Run new research"
 
@@ -2236,11 +2276,11 @@ msgstr "Spend"
 msgid "Stamped into the workshop ledger."
 msgstr "Stamped into the workshop ledger."
 
-#: src/components/research/research-dialog.tsx:212
+#: src/components/research/research-dialog.tsx:211
 msgid "Start"
 msgstr "Start"
 
-#: src/components/research/research-dialog.tsx:212
+#: src/components/research/research-dialog.tsx:211
 msgid "Starting…"
 msgstr "Starting…"
 
@@ -2564,7 +2604,7 @@ msgstr "Weaknesses"
 msgid "What"
 msgstr "What"
 
-#: src/components/research/research-dialog.tsx:161
+#: src/components/research/research-dialog.tsx:160
 msgid "What do you want to find out about this company?"
 msgstr "What do you want to find out about this company?"
 
@@ -2576,7 +2616,7 @@ msgstr "What happened?"
 msgid "What is this about?"
 msgstr "What is this about?"
 
-#: src/components/research/research-dialog.tsx:171
+#: src/components/research/research-dialog.tsx:170
 msgid "What kind of research?"
 msgstr "What kind of research?"
 

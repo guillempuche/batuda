@@ -1,6 +1,8 @@
 import { Radio } from '@base-ui/react/radio'
 import { RadioGroup } from '@base-ui/react/radio-group'
 import { useAtomSet } from '@effect/atom-react'
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
@@ -15,42 +17,39 @@ import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
 // Type-only import; adding a schema server-side forces an option here.
 type SchemaOption = SchemaName
 
+// `msg` so the labels + descriptions extract into the catalog;
+// `i18n._(card.label)` resolves them at render.
 type SchemaCard = {
 	readonly value: SchemaOption
-	readonly label: string
-	readonly description: string
+	readonly label: MessageDescriptor
+	readonly description: MessageDescriptor
 }
 
 const SCHEMA_CARDS: ReadonlyArray<SchemaCard> = [
 	{
 		value: 'freeform',
-		label: 'Freeform',
-		description:
-			'Open-ended brief. Pick when the question does not fit a fixed shape — history, market trend, an opinion piece. No structured output.',
+		label: msg`Freeform`,
+		description: msg`Open-ended brief. Pick when the question does not fit a fixed shape — history, market trend, an opinion piece. No structured output.`,
 	},
 	{
 		value: 'company_enrichment_v1',
-		label: 'Company enrichment',
-		description:
-			'Fill industry, size, location, contacts, competitors and proposed CRM updates for this company. Pick when you want every field on the company card answered.',
+		label: msg`Company enrichment`,
+		description: msg`Fill industry, size, location, contacts, competitors and proposed CRM updates for this company. Pick when you want every field on the company card answered.`,
 	},
 	{
 		value: 'competitor_scan_v1',
-		label: 'Competitor scan',
-		description:
-			'Map direct competitors with strengths, weaknesses, and a market-maturity summary. Pick when you need to know who you are up against.',
+		label: msg`Competitor scan`,
+		description: msg`Map direct competitors with strengths, weaknesses, and a market-maturity summary. Pick when you need to know who you are up against.`,
 	},
 	{
 		value: 'contact_discovery_v1',
-		label: 'Contact discovery',
-		description:
-			'Find decision-makers and operational contacts at this company. Pick when you need names, emails, phones and roles to reach out.',
+		label: msg`Contact discovery`,
+		description: msg`Find decision-makers and operational contacts at this company. Pick when you need names, emails, phones and roles to reach out.`,
 	},
 	{
 		value: 'prospect_scan_v1',
-		label: 'Prospect scan',
-		description:
-			'Find similar companies elsewhere with the same pain. Pick when you have closed a deal and want lookalikes.',
+		label: msg`Prospect scan`,
+		description: msg`Find similar companies elsewhere with the same pain. Pick when you have closed a deal and want lookalikes.`,
 	},
 ]
 
@@ -65,7 +64,7 @@ export function ResearchDialog({
 	readonly companyId: string
 	readonly onCreated?: (researchId: string) => void
 }) {
-	const { t } = useLingui()
+	const { i18n, t } = useLingui()
 	const createResearch = useAtomSet(createResearchAtom, { mode: 'promiseExit' })
 	const [query, setQuery] = useState('')
 	const [schema, setSchema] = useState<SchemaOption>('freeform')
@@ -188,10 +187,10 @@ export function ResearchDialog({
 											<SchemaRadioRoot value={card.value}>
 												<SchemaRadioIndicator />
 											</SchemaRadioRoot>
-											<SchemaCardTitle>{card.label}</SchemaCardTitle>
+											<SchemaCardTitle>{i18n._(card.label)}</SchemaCardTitle>
 										</SchemaCardHead>
 										<SchemaCardDescription>
-											{card.description}
+											{i18n._(card.description)}
 										</SchemaCardDescription>
 									</SchemaCardLabel>
 								))}
