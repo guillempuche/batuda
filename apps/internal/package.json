@@ -1,6 +1,6 @@
 {
 	"name": "@batuda/internal",
-	"version": "2026.5.7",
+	"version": "2026.5.10",
 	"description": "Batuda — internal CRM app",
 	"type": "module",
 	"scripts": {

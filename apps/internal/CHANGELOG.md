@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-05-10 (internal-v2026.5.10)
+
+### Features
+
+* **internal:** build production SSR via Nitro ([97fec25](https://github.com/guillempuche/batuda/commit/97fec25b4789346220811cb280f2a203bfd2941c))
+
+### Chores
+
+* **internal:** refresh lingui po line references ([31f385a](https://github.com/guillempuche/batuda/commit/31f385aee079f3d78222e6c3f1e1a4710167e2e4))
+
 ## 2026-05-07 (internal-v2026.5.7)
 
 ### Features
