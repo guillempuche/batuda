@@ -60,12 +60,12 @@ No runtime secrets needed; the workflow only reads `KRAFTCLOUD_TOKEN`.
 
 ### Cloudflare SSL/TLS (do AFTER first successful deploy so LE cert exists)
 
-- [ ] SSL/TLS → Overview → set encryption mode to **Full (Strict)**
-- [ ] SSL/TLS → Edge Certificates → **Always Use HTTPS** = on
-- [ ] SSL/TLS → Edge Certificates → **Minimum TLS Version** = 1.2
-- [ ] SSL/TLS → Edge Certificates → **TLS 1.3** = on
-- [ ] Verify via Cloudflare edge: `curl -I https://batuda.co` (expect HTTP/2 200, no 525)
-- [ ] Verify SSL Labs grade A on `batuda.co`
+- [x] SSL/TLS → Overview → set encryption mode to **Full (Strict)** — set in dashboard
+- [x] SSL/TLS → Edge Certificates → **Always Use HTTPS** = on — verified `curl -sI http://batuda.co` returns `301 → https://batuda.co/`
+- [x] SSL/TLS → Edge Certificates → **Minimum TLS Version** = 1.2 — set in dashboard
+- [x] SSL/TLS → Edge Certificates → **TLS 1.3** = on — verified `openssl s_client -tls1_3` succeeds with `TLS_AES_256_GCM_SHA384`
+- [ ] Verify via Cloudflare edge: `curl -I https://batuda.co` (expect HTTP/2 200, no 525) — currently returns 404 (no origin deployed)
+- [ ] Verify SSL Labs grade A on `batuda.co` — gated on origin deploy
 
 ### (Deferred) Hardening — restrict origin to Cloudflare-only traffic
 
@@ -236,8 +236,8 @@ The `-e` flag block is duplicated across the **update branch** and **first-creat
 
 ### DNS
 
-- [ ] Cloudflare → batuda.co → DNS → add CNAME `api` → `fra.unikraft.app` (**proxied**, orange cloud) — record does **not** exist yet (verified `dig +short api.batuda.co` returns nothing)
-- [ ] Wait ~5 min, confirm `dig +short api.batuda.co` returns Cloudflare proxy IPs
+- [x] Cloudflare → batuda.co → DNS → add CNAME `api` → `fra.unikraft.app` (**proxied**, orange cloud) — record id `0b18987335bda3e69926b3ace118c8c7`
+- [x] Wait ~5 min, confirm `dig +short api.batuda.co` returns Cloudflare proxy IPs — verified `104.21.87.42`, `172.67.140.144`
 
 ### Deploy
 
