@@ -156,7 +156,7 @@ msgstr "Afegeix"
 msgid "Add {label}"
 msgstr "Afegeix {label}"
 
-#: src/components/companies/where-panel.tsx:128
+#: src/components/companies/where-panel-client.client.tsx:121
 msgid "Add a location on the Profile tab, then locate this company."
 msgstr "Afegeix una ubicació a la pestanya de perfil i després localitza aquesta empresa."
 
@@ -585,7 +585,7 @@ msgstr "Contingut"
 msgid "Conversations"
 msgstr "Converses"
 
-#: src/components/companies/where-panel.tsx:68
+#: src/components/companies/where-panel-client.client.tsx:61
 msgid "Coordinates saved from the geocoder."
 msgstr "Coordenades desades del geocodificador."
 
@@ -625,7 +625,7 @@ msgstr "No s'ha pogut carregar aquesta execució."
 msgid "Could not load threads"
 msgstr "No s'han pogut carregar els fils"
 
-#: src/components/companies/where-panel.tsx:74
+#: src/components/companies/where-panel-client.client.tsx:67
 msgid "Could not locate"
 msgstr "No s'ha pogut localitzar"
 
@@ -1210,15 +1210,15 @@ msgstr "Carregant…"
 msgid "Local inboxes"
 msgstr "Safates locals"
 
-#: src/components/companies/where-panel.tsx:145
+#: src/components/companies/where-panel-client.client.tsx:138
 msgid "Locate this company"
 msgstr "Localitza aquesta empresa"
 
-#: src/components/companies/where-panel.tsx:67
+#: src/components/companies/where-panel-client.client.tsx:60
 msgid "Located on the map"
 msgstr "Localitzada al mapa"
 
-#: src/components/companies/where-panel.tsx:143
+#: src/components/companies/where-panel-client.client.tsx:136
 msgid "Locating…"
 msgstr "Localitzant…"
 
@@ -1468,7 +1468,7 @@ msgstr "Encara no hi ha contactes"
 msgid "No conversations yet."
 msgstr "Encara cap conversa."
 
-#: src/components/companies/where-panel.tsx:120
+#: src/components/companies/where-panel-client.client.tsx:113
 msgid "No coordinates yet. Locate this company to plot it on the map."
 msgstr "Encara sense coordenades. Localitza aquesta empresa per situar-la al mapa."
 
@@ -1626,7 +1626,7 @@ msgstr "Obre el tauler"
 msgid "Open in Cal.com"
 msgstr "Obre a Cal.com"
 
-#: src/components/companies/where-panel.tsx:101
+#: src/components/companies/where-panel-client.client.tsx:94
 #: src/routes/companies/$slug.tsx:818
 msgid "Open in Google Maps"
 msgstr "Obre a Google Maps"
@@ -2383,7 +2383,7 @@ msgstr "Les 20 tasques obertes editades més recentment. Fes-hi clic per reobrir
 msgid "The change didn't go through. Try again."
 msgstr "El canvi no s'ha completat. Torna-ho a provar."
 
-#: src/components/companies/where-panel.tsx:75
+#: src/components/companies/where-panel-client.client.tsx:68
 msgid "The geocoder did not return a match. Try editing the location field."
 msgstr "El geocodificador no ha trobat cap coincidència. Prova d'editar el camp d'ubicació."
 
@@ -2634,7 +2634,7 @@ msgstr "WhatsApp"
 msgid "When"
 msgstr "Quan"
 
-#: src/components/companies/where-panel.tsx:90
+#: src/components/companies/where-panel-client.client.tsx:83
 msgid "Where"
 msgstr "On"
 

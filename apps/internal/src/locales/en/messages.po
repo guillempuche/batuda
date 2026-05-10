@@ -156,7 +156,7 @@ msgstr "Add"
 msgid "Add {label}"
 msgstr "Add {label}"
 
-#: src/components/companies/where-panel.tsx:128
+#: src/components/companies/where-panel-client.client.tsx:121
 msgid "Add a location on the Profile tab, then locate this company."
 msgstr "Add a location on the Profile tab, then locate this company."
 
@@ -585,7 +585,7 @@ msgstr "Content"
 msgid "Conversations"
 msgstr "Conversations"
 
-#: src/components/companies/where-panel.tsx:68
+#: src/components/companies/where-panel-client.client.tsx:61
 msgid "Coordinates saved from the geocoder."
 msgstr "Coordinates saved from the geocoder."
 
@@ -625,7 +625,7 @@ msgstr "Could not load this run."
 msgid "Could not load threads"
 msgstr "Could not load threads"
 
-#: src/components/companies/where-panel.tsx:74
+#: src/components/companies/where-panel-client.client.tsx:67
 msgid "Could not locate"
 msgstr "Could not locate"
 
@@ -1210,15 +1210,15 @@ msgstr "Loading…"
 msgid "Local inboxes"
 msgstr "Local inboxes"
 
-#: src/components/companies/where-panel.tsx:145
+#: src/components/companies/where-panel-client.client.tsx:138
 msgid "Locate this company"
 msgstr "Locate this company"
 
-#: src/components/companies/where-panel.tsx:67
+#: src/components/companies/where-panel-client.client.tsx:60
 msgid "Located on the map"
 msgstr "Located on the map"
 
-#: src/components/companies/where-panel.tsx:143
+#: src/components/companies/where-panel-client.client.tsx:136
 msgid "Locating…"
 msgstr "Locating…"
 
@@ -1468,7 +1468,7 @@ msgstr "No contacts yet"
 msgid "No conversations yet."
 msgstr "No conversations yet."
 
-#: src/components/companies/where-panel.tsx:120
+#: src/components/companies/where-panel-client.client.tsx:113
 msgid "No coordinates yet. Locate this company to plot it on the map."
 msgstr "No coordinates yet. Locate this company to plot it on the map."
 
@@ -1626,7 +1626,7 @@ msgstr "Open dashboard"
 msgid "Open in Cal.com"
 msgstr "Open in Cal.com"
 
-#: src/components/companies/where-panel.tsx:101
+#: src/components/companies/where-panel-client.client.tsx:94
 #: src/routes/companies/$slug.tsx:818
 msgid "Open in Google Maps"
 msgstr "Open in Google Maps"
@@ -2383,7 +2383,7 @@ msgstr "The 20 most recently edited open tasks. Click one to reopen it."
 msgid "The change didn't go through. Try again."
 msgstr "The change didn't go through. Try again."
 
-#: src/components/companies/where-panel.tsx:75
+#: src/components/companies/where-panel-client.client.tsx:68
 msgid "The geocoder did not return a match. Try editing the location field."
 msgstr "The geocoder did not return a match. Try editing the location field."
 
@@ -2634,7 +2634,7 @@ msgstr "WhatsApp"
 msgid "When"
 msgstr "When"
 
-#: src/components/companies/where-panel.tsx:90
+#: src/components/companies/where-panel-client.client.tsx:83
 msgid "Where"
 msgstr "Where"
 
