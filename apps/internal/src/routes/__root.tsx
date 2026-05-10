@@ -8,7 +8,6 @@ import {
 	useLocation,
 	useMatches,
 } from '@tanstack/react-router'
-import leafletCss from 'leaflet/dist/leaflet.css?url'
 import { LayoutGroup } from 'motion/react'
 
 import { PriToast } from '@batuda/ui/pri'
@@ -115,7 +114,6 @@ export const Route = createRootRoute({
 					href: '/apple-touch-icon.png',
 				},
 				{ rel: 'stylesheet', href: appCss },
-				{ rel: 'stylesheet', href: leafletCss },
 				{ rel: 'preconnect', href: 'https://fonts.googleapis.com' },
 				{
 					rel: 'preconnect',

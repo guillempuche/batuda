@@ -1,8 +1,14 @@
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
 import { lingui } from '@lingui/vite-plugin'
 import tailwindcss from '@tailwindcss/vite'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import viteReact from '@vitejs/plugin-react-swc'
+import { nitro } from 'nitro/vite'
 import { defineConfig } from 'vite'
+
+const here = dirname(fileURLToPath(import.meta.url))
 
 /* Batuda uses `@vitejs/plugin-react-swc` so two SWC transforms can run at
  * compile time:
@@ -78,6 +84,46 @@ const devProxy = {
 const config = defineConfig({
 	resolve: {
 		tsconfigPaths: true,
+		// The CJS shim does `require("react")` and creates a duplicate
+		// React via Node's CJS cache; SSR's hooks dispatcher lives on
+		// the ESM React, so any external-store hook call throws
+		// "Invalid hook call". React 19 has `useSyncExternalStore`
+		// natively, but aliasing straight to bare `'react'` breaks
+		// dev SSR because the alias keeps React in-graph (bypassing
+		// externalization) and `react/index.js` is CJS, which Vite's
+		// dev module-runner can't execute. The local ESM shims
+		// re-export from `react` so both dev and build land on a
+		// single instance.
+		alias: [
+			{
+				find: /^use-sync-external-store\/shim\/with-selector$/,
+				replacement: resolve(
+					here,
+					'src/lib/use-sync-external-store-shim-with-selector.ts',
+				),
+			},
+			{
+				find: /^use-sync-external-store\/shim$/,
+				replacement: resolve(here, 'src/lib/use-sync-external-store-shim.ts'),
+			},
+			{
+				find: /^use-sync-external-store\/shim\/index$/,
+				replacement: resolve(here, 'src/lib/use-sync-external-store-shim.ts'),
+			},
+			{
+				find: /^use-sync-external-store\/shim\/index\.js$/,
+				replacement: resolve(here, 'src/lib/use-sync-external-store-shim.ts'),
+			},
+		],
+		dedupe: ['react', 'react-dom', '@base-ui/react', '@base-ui/utils'],
+		// Drop the default 'node' condition so tslib (and any other
+		// dual-pkg dep that styled-components pulls in) resolves to its
+		// ESM build. With 'node' first, Vite/Nitro picks the CJS entry
+		// and the interop wrapper exposes `__extends` only via a
+		// `.default` property — Nitro's prebuild then emits
+		// `const { __extends } = tslib.default` which throws at SSR
+		// time because tslib's ESM has named exports, not a default.
+		conditions: ['module', 'import', 'default'],
 	},
 	server: {
 		proxy: devProxy,
@@ -86,10 +132,22 @@ const config = defineConfig({
 		proxy: devProxy,
 	},
 	ssr: {
-		noExternal: ['styled-components'],
+		// Bundle through Vite for SSR so the React-using deps go through
+		// the same dedupe + conditions as the rest of the SSR graph;
+		// otherwise Vite externalizes them and Node's resolver picks a
+		// different React/tslib instance and SSR throws on hook calls
+		// or `__extends` is undefined.
+		noExternal: [
+			'styled-components',
+			'@batuda/ui',
+			'@base-ui/react',
+			'@base-ui/utils',
+		],
+		resolve: { conditions: ['module', 'import', 'default'] },
 	},
 	plugins: [
 		tanstackStart(),
+		nitro(),
 		viteReact({
 			plugins: [
 				['@lingui/swc-plugin', {}],
