@@ -90,22 +90,22 @@ mTLS support — verify with KraftCloud first.
 ## Phase 2 — Server (`apps/server` → `api.batuda.co`)
 
 > **PR shape — Slice 1 (env hygiene), 3 commits in one PR**, must merge **before** the production deploy.
-> Audit found 2 stale vars (`EMAIL_API_KEY`, `EMAIL_WEBHOOK_SECRET`) that the workflow still passes despite zero code readers (AgentMail leftovers), and **5 + 8 vars the code requires with no defaults** that neither the workflow nor `.env.example.github` declares — server boot crashes today on a fresh prod deploy. The PR fixes both.
+> Audit found 2 stale vars (`EMAIL_API_KEY`, `EMAIL_WEBHOOK_SECRET`) that the workflow still passes despite zero code readers (AgentMail leftovers), and **8 + 8 vars the code requires with no defaults** that neither the workflow nor `.env.example.github` declares — server boot crashes today on a fresh prod deploy. The PR fixes both. (Original audit said 5 + 8; the missing var was `CALENDAR_PROVIDER`, the boot selector for `BookingProviderLive` in `packages/calendar/src/infrastructure/live.ts`.)
 
 Commits in PR #1:
 
-- [ ] `ci(server): drop stale AgentMail env vars from deploy workflow`
-  - Strip `-e EMAIL_API_KEY=…` from update + first-create branches
-  - Strip `-e EMAIL_WEBHOOK_SECRET=…` from update + first-create branches
-- [ ] `ci(server): wire transactional-email + calendar + research-budget vars`
-  - Add `-e EMAIL_CREDENTIAL_KEY`, `-e EMAIL_API_KEY_TRANSACTIONAL`, `-e EMAIL_FROM_TRANSACTIONAL`, `-e CALENDAR_API_KEY`, `-e CALENDAR_WEBHOOK_SECRET`, `-e GEOCODER_PROVIDER`, `-e EMAIL_PROVIDER_TRANSACTIONAL` to both branches
-  - Add the 8 `-e RESEARCH_DEFAULT_*` / `RESEARCH_MAX_*` / `RESEARCH_CONFIRM_*` to both branches
-- [ ] `docs: align .env.example.github with code env reads`
-  - Strip `EMAIL_API_KEY` and `EMAIL_WEBHOOK_SECRET` lines (and AgentMail commentary)
-  - Replace `EMAIL_PROVIDER=agentmail` with `EMAIL_PROVIDER=local-inbox`
-  - Add the 5 newly-required entries with comments naming their consumer
-  - Add the 8 research-budget entries (some already present — verify)
-  - Add commented-out optional examples: `MIN_LOG_LEVEL`, `CALENDAR_BASE_URL`, `BATUDA_ACTIVE_ORG_*`, `PORTLESS_URL`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`
+- [x] `cicd(deploy): drop stale AgentMail env vars from server deploy`
+  - Stripped `-e EMAIL_API_KEY=…` from update + first-create branches
+  - Stripped `-e EMAIL_WEBHOOK_SECRET=…` from update + first-create branches
+- [x] `cicd(deploy): wire transactional, calendar, and research-budget vars`
+  - Added `-e EMAIL_CREDENTIAL_KEY`, `-e EMAIL_API_KEY_TRANSACTIONAL`, `-e EMAIL_FROM_TRANSACTIONAL`, `-e EMAIL_PROVIDER_TRANSACTIONAL`, `-e CALENDAR_PROVIDER`, `-e CALENDAR_API_KEY`, `-e CALENDAR_WEBHOOK_SECRET`, `-e GEOCODER_PROVIDER` to both branches (8 vars — original audit missed `CALENDAR_PROVIDER`, also required at boot)
+  - Added the 8 `-e RESEARCH_DEFAULT_*` / `RESEARCH_MAX_*` / `RESEARCH_CONFIRM_*` to both branches
+- [x] `docs: align .env.example.github with code env reads`
+  - Stripped `EMAIL_API_KEY` and `EMAIL_WEBHOOK_SECRET` lines (and AgentMail commentary)
+  - `EMAIL_PROVIDER` was already `local-inbox`, no rename needed
+  - Added the 5 newly-required entries with comments naming their consumer (EMAIL_CREDENTIAL_KEY, EMAIL_API_KEY_TRANSACTIONAL, CALENDAR_PROVIDER, CALENDAR_API_KEY, CALENDAR_WEBHOOK_SECRET)
+  - Verified all 8 research-budget entries already present
+  - Added commented-out optional examples: `MIN_LOG_LEVEL`, `CALENDAR_BASE_URL`, `BATUDA_ACTIVE_ORG_*`, `PORTLESS_URL`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`
 
 Already applied to `deploy_server.yml` (kraft timing knobs, separate from Slice 1):
 
@@ -150,9 +150,9 @@ Already applied to `deploy_server.yml` (kraft timing knobs, separate from Slice 
   - [ ] Capture key → `RESEARCH_API_KEY_LLM`
   - [ ] Decide model → `RESEARCH_MODEL_LLM` (suggested: `Qwen/Qwen3-32B`)
 
-- [ ] **Self-generate locally** — random hex secrets
-  - [ ] `node -e "console.log(crypto.randomBytes(32).toString('hex'))"` → `BETTER_AUTH_SECRET`
-  - [ ] `node -e "console.log(crypto.randomBytes(32).toString('hex'))"` → `EMAIL_CREDENTIAL_KEY` (HKDF master for inbox credential AES-256-GCM; **rotation breaks every encrypted inbox row** — save in a password manager before pasting to GH)
+- [ ] **Self-generate locally** — random secrets
+  - [ ] `node -e "console.log(crypto.randomBytes(32).toString('hex'))"` → `BETTER_AUTH_SECRET` (hex)
+  - [ ] `node -e "console.log(crypto.randomBytes(32).toString('base64'))"` → `EMAIL_CREDENTIAL_KEY` (**base64**, not hex — `apps/server/src/services/credential-crypto.ts` decodes with `Buffer.from(..., 'base64')` and dies if the result is not exactly 32 bytes; HKDF master for inbox credential AES-256-GCM; **rotation breaks every encrypted inbox row** — save in a password manager before pasting to GH; must match the mail-worker value in Phase 3)
 
 ### Configure GitHub `production` environment
 
@@ -173,7 +173,7 @@ To add:
 
 - [ ] `DATABASE_URL` — pooled NeonDB URL
 - [ ] `BETTER_AUTH_SECRET` — generated hex
-- [ ] `EMAIL_CREDENTIAL_KEY` — generated hex (must match the value mail-worker will use in Phase 3)
+- [ ] `EMAIL_CREDENTIAL_KEY` — generated base64 (must match the value mail-worker will use in Phase 3)
 - [ ] `STORAGE_ACCESS_KEY_ID` — R2
 - [ ] `STORAGE_SECRET_ACCESS_KEY` — R2
 - [ ] `EMAIL_API_KEY_TRANSACTIONAL` — Resend (required because `EMAIL_PROVIDER_TRANSACTIONAL=resend`)
@@ -197,6 +197,7 @@ Quoted values to avoid shell quirks. To set:
 - [ ] `EMAIL_PROVIDER` = `"local-inbox"` (the BYO IMAP/SMTP per-inbox path; only literal accepted by `Schema.Literals` today — naming follow-up tracked separately)
 - [ ] `EMAIL_PROVIDER_TRANSACTIONAL` = `"resend"`
 - [ ] `EMAIL_FROM_TRANSACTIONAL` = `"Batuda <noreply@batuda.co>"`
+- [ ] `CALENDAR_PROVIDER` = `"calcom"` (boot selector in `packages/calendar/src/infrastructure/live.ts`)
 - [ ] `GEOCODER_PROVIDER` = `"nominatim"`
 - [ ] `RESEARCH_PROVIDER_SEARCH` = `"brave"`
 - [ ] `RESEARCH_PROVIDER_SCRAPE` = `"firecrawl"`
