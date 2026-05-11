@@ -121,8 +121,6 @@ jobs:
                 -e STORAGE_ACCESS_KEY_ID="${{ secrets.STORAGE_ACCESS_KEY_ID }}" \
                 -e STORAGE_SECRET_ACCESS_KEY="${{ secrets.STORAGE_SECRET_ACCESS_KEY }}" \
                 -e STORAGE_BUCKET="${{ vars.STORAGE_BUCKET }}" \
-                -e EMAIL_API_KEY="${{ secrets.EMAIL_API_KEY }}" \
-                -e EMAIL_WEBHOOK_SECRET="${{ secrets.EMAIL_WEBHOOK_SECRET }}" \
                 -e EMAIL_PROVIDER="${{ vars.EMAIL_PROVIDER }}" \
                 -e RESEARCH_PROVIDER_SEARCH="${{ vars.RESEARCH_PROVIDER_SEARCH }}" \
                 -e RESEARCH_PROVIDER_SCRAPE="${{ vars.RESEARCH_PROVIDER_SCRAPE }}" \
@@ -164,8 +162,6 @@ jobs:
                 -e STORAGE_ACCESS_KEY_ID="${{ secrets.STORAGE_ACCESS_KEY_ID }}" \
                 -e STORAGE_SECRET_ACCESS_KEY="${{ secrets.STORAGE_SECRET_ACCESS_KEY }}" \
                 -e STORAGE_BUCKET="${{ vars.STORAGE_BUCKET }}" \
-                -e EMAIL_API_KEY="${{ secrets.EMAIL_API_KEY }}" \
-                -e EMAIL_WEBHOOK_SECRET="${{ secrets.EMAIL_WEBHOOK_SECRET }}" \
                 -e EMAIL_PROVIDER="${{ vars.EMAIL_PROVIDER }}" \
                 -e RESEARCH_PROVIDER_SEARCH="${{ vars.RESEARCH_PROVIDER_SEARCH }}" \
                 -e RESEARCH_PROVIDER_SCRAPE="${{ vars.RESEARCH_PROVIDER_SCRAPE }}" \
