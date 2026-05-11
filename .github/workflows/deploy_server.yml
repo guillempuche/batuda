@@ -122,6 +122,14 @@ jobs:
                 -e STORAGE_SECRET_ACCESS_KEY="${{ secrets.STORAGE_SECRET_ACCESS_KEY }}" \
                 -e STORAGE_BUCKET="${{ vars.STORAGE_BUCKET }}" \
                 -e EMAIL_PROVIDER="${{ vars.EMAIL_PROVIDER }}" \
+                -e EMAIL_CREDENTIAL_KEY="${{ secrets.EMAIL_CREDENTIAL_KEY }}" \
+                -e EMAIL_PROVIDER_TRANSACTIONAL="${{ vars.EMAIL_PROVIDER_TRANSACTIONAL }}" \
+                -e EMAIL_API_KEY_TRANSACTIONAL="${{ secrets.EMAIL_API_KEY_TRANSACTIONAL }}" \
+                -e EMAIL_FROM_TRANSACTIONAL="${{ vars.EMAIL_FROM_TRANSACTIONAL }}" \
+                -e CALENDAR_PROVIDER="${{ vars.CALENDAR_PROVIDER }}" \
+                -e CALENDAR_API_KEY="${{ secrets.CALENDAR_API_KEY }}" \
+                -e CALENDAR_WEBHOOK_SECRET="${{ secrets.CALENDAR_WEBHOOK_SECRET }}" \
+                -e GEOCODER_PROVIDER="${{ vars.GEOCODER_PROVIDER }}" \
                 -e RESEARCH_PROVIDER_SEARCH="${{ vars.RESEARCH_PROVIDER_SEARCH }}" \
                 -e RESEARCH_PROVIDER_SCRAPE="${{ vars.RESEARCH_PROVIDER_SCRAPE }}" \
                 -e RESEARCH_PROVIDER_EXTRACT="${{ vars.RESEARCH_PROVIDER_EXTRACT }}" \
@@ -135,6 +143,14 @@ jobs:
                 -e RESEARCH_API_KEY_DISCOVER="${{ secrets.RESEARCH_API_KEY_DISCOVER }}" \
                 -e RESEARCH_API_KEY_LLM="${{ secrets.RESEARCH_API_KEY_LLM }}" \
                 -e RESEARCH_MODEL_LLM="${{ vars.RESEARCH_MODEL_LLM }}" \
+                -e RESEARCH_DEFAULT_BUDGET_CENTS="${{ vars.RESEARCH_DEFAULT_BUDGET_CENTS }}" \
+                -e RESEARCH_DEFAULT_PAID_BUDGET_CENTS="${{ vars.RESEARCH_DEFAULT_PAID_BUDGET_CENTS }}" \
+                -e RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS="${{ vars.RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS }}" \
+                -e RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS="${{ vars.RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS }}" \
+                -e RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS="${{ vars.RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS }}" \
+                -e RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL="${{ vars.RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL }}" \
+                -e RESEARCH_MAX_CONCURRENCY_FANOUT="${{ vars.RESEARCH_MAX_CONCURRENCY_FANOUT }}" \
+                -e RESEARCH_CONFIRM_THRESHOLD_FANOUT="${{ vars.RESEARCH_CONFIRM_THRESHOLD_FANOUT }}" \
                 .
             else
               # First-time: create an explicitly-named service, then attach
@@ -163,6 +179,14 @@ jobs:
                 -e STORAGE_SECRET_ACCESS_KEY="${{ secrets.STORAGE_SECRET_ACCESS_KEY }}" \
                 -e STORAGE_BUCKET="${{ vars.STORAGE_BUCKET }}" \
                 -e EMAIL_PROVIDER="${{ vars.EMAIL_PROVIDER }}" \
+                -e EMAIL_CREDENTIAL_KEY="${{ secrets.EMAIL_CREDENTIAL_KEY }}" \
+                -e EMAIL_PROVIDER_TRANSACTIONAL="${{ vars.EMAIL_PROVIDER_TRANSACTIONAL }}" \
+                -e EMAIL_API_KEY_TRANSACTIONAL="${{ secrets.EMAIL_API_KEY_TRANSACTIONAL }}" \
+                -e EMAIL_FROM_TRANSACTIONAL="${{ vars.EMAIL_FROM_TRANSACTIONAL }}" \
+                -e CALENDAR_PROVIDER="${{ vars.CALENDAR_PROVIDER }}" \
+                -e CALENDAR_API_KEY="${{ secrets.CALENDAR_API_KEY }}" \
+                -e CALENDAR_WEBHOOK_SECRET="${{ secrets.CALENDAR_WEBHOOK_SECRET }}" \
+                -e GEOCODER_PROVIDER="${{ vars.GEOCODER_PROVIDER }}" \
                 -e RESEARCH_PROVIDER_SEARCH="${{ vars.RESEARCH_PROVIDER_SEARCH }}" \
                 -e RESEARCH_PROVIDER_SCRAPE="${{ vars.RESEARCH_PROVIDER_SCRAPE }}" \
                 -e RESEARCH_PROVIDER_EXTRACT="${{ vars.RESEARCH_PROVIDER_EXTRACT }}" \
@@ -176,6 +200,14 @@ jobs:
                 -e RESEARCH_API_KEY_DISCOVER="${{ secrets.RESEARCH_API_KEY_DISCOVER }}" \
                 -e RESEARCH_API_KEY_LLM="${{ secrets.RESEARCH_API_KEY_LLM }}" \
                 -e RESEARCH_MODEL_LLM="${{ vars.RESEARCH_MODEL_LLM }}" \
+                -e RESEARCH_DEFAULT_BUDGET_CENTS="${{ vars.RESEARCH_DEFAULT_BUDGET_CENTS }}" \
+                -e RESEARCH_DEFAULT_PAID_BUDGET_CENTS="${{ vars.RESEARCH_DEFAULT_PAID_BUDGET_CENTS }}" \
+                -e RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS="${{ vars.RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS }}" \
+                -e RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS="${{ vars.RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS }}" \
+                -e RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS="${{ vars.RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS }}" \
+                -e RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL="${{ vars.RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL }}" \
+                -e RESEARCH_MAX_CONCURRENCY_FANOUT="${{ vars.RESEARCH_MAX_CONCURRENCY_FANOUT }}" \
+                -e RESEARCH_CONFIRM_THRESHOLD_FANOUT="${{ vars.RESEARCH_CONFIRM_THRESHOLD_FANOUT }}" \
                 .
             fi
 
