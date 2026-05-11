@@ -5,8 +5,11 @@
 			"url": "https://mcp.cloudflare.com/mcp"
 		},
 		"neon": {
-			"type": "http",
-			"url": "https://mcp.neon.tech/mcp"
+			"command": "sh",
+			"args": [
+				"-c",
+				"exec npx -y @neondatabase/mcp-server-neon start \"$NEON_API_KEY\""
+			]
 		}
 	}
 }
