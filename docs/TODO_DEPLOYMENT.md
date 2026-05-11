@@ -52,11 +52,11 @@ No runtime secrets needed; the workflow only reads `KRAFTCLOUD_TOKEN`.
 
 ### Deploy
 
-- [ ] Trigger workflow: `gh workflow run deploy_web.yml -R guillempuche/batuda`
-- [ ] Watch run: `gh run watch -R guillempuche/batuda`
-- [ ] Confirm LE cert issued: `kraft cloud --metro fra certificate list | grep batuda.co`
-- [ ] Confirm instance running: `kraft cloud --metro fra instance list | grep batuda-web`
-- [ ] Smoke test via Cloudflare edge: `curl -sI https://batuda.co | head -5`
+- [x] Trigger workflow: `gh workflow run deploy_web.yml -R guillempuche/batuda`
+- [x] Watch run: `gh run watch -R guillempuche/batuda`
+- [x] Confirm LE cert issued: `kraft cloud --metro fra certificate list | grep batuda.co` — `batuda.co-5nna3`, valid
+- [x] Confirm instance running: `kraft cloud --metro fra instance list | grep batuda-web` — `batuda-web-om2b1`, running
+- [x] Smoke test via Cloudflare edge: `curl -sI https://batuda.co | head -5` — HTTP/2 307 → `/login?returnTo=%2F` (Better Auth gating, no 525)
 
 ### Cloudflare SSL/TLS (do AFTER first successful deploy so LE cert exists)
 
@@ -64,7 +64,7 @@ No runtime secrets needed; the workflow only reads `KRAFTCLOUD_TOKEN`.
 - [x] SSL/TLS → Edge Certificates → **Always Use HTTPS** = on — verified `curl -sI http://batuda.co` returns `301 → https://batuda.co/`
 - [x] SSL/TLS → Edge Certificates → **Minimum TLS Version** = 1.2 — set in dashboard
 - [x] SSL/TLS → Edge Certificates → **TLS 1.3** = on — verified `openssl s_client -tls1_3` succeeds with `TLS_AES_256_GCM_SHA384`
-- [ ] Verify via Cloudflare edge: `curl -I https://batuda.co` (expect HTTP/2 200, no 525) — currently returns 404 (no origin deployed)
+- [x] Verify via Cloudflare edge: `curl -I https://batuda.co` (expect no 525) — returns HTTP/2 307 to `/login` (auth-gated, not 200 because every route requires session; goal of "TLS handshake succeeds end-to-end through CF edge" is met)
 - [ ] Verify SSL Labs grade A on `batuda.co` — gated on origin deploy
 
 ### (Deferred) Hardening — restrict origin to Cloudflare-only traffic
@@ -92,17 +92,24 @@ mTLS support — verify with KraftCloud first.
 > **PR shape — Slice 1 (env hygiene), 3 commits in one PR**, must merge **before** the production deploy.
 > Audit found 2 stale vars (`EMAIL_API_KEY`, `EMAIL_WEBHOOK_SECRET`) that the workflow still passes despite zero code readers (AgentMail leftovers), and **5 + 8 vars the code requires with no defaults** that neither the workflow nor `.env.example.github` declares — server boot crashes today on a fresh prod deploy. The PR fixes both.
 
-Commits:
+Commits in PR #1:
 
 - [ ] `ci(server): drop stale AgentMail env vars from deploy workflow`
+  - Strip `-e EMAIL_API_KEY=…` from update + first-create branches
+  - Strip `-e EMAIL_WEBHOOK_SECRET=…` from update + first-create branches
 - [ ] `ci(server): wire transactional-email + calendar + research-budget vars`
+  - Add `-e EMAIL_CREDENTIAL_KEY`, `-e EMAIL_API_KEY_TRANSACTIONAL`, `-e EMAIL_FROM_TRANSACTIONAL`, `-e CALENDAR_API_KEY`, `-e CALENDAR_WEBHOOK_SECRET`, `-e GEOCODER_PROVIDER`, `-e EMAIL_PROVIDER_TRANSACTIONAL` to both branches
+  - Add the 8 `-e RESEARCH_DEFAULT_*` / `RESEARCH_MAX_*` / `RESEARCH_CONFIRM_*` to both branches
 - [ ] `docs: align .env.example.github with code env reads`
+  - Strip `EMAIL_API_KEY` and `EMAIL_WEBHOOK_SECRET` lines (and AgentMail commentary)
+  - Replace `EMAIL_PROVIDER=agentmail` with `EMAIL_PROVIDER=local-inbox`
+  - Add the 5 newly-required entries with comments naming their consumer
+  - Add the 8 research-budget entries (some already present — verify)
+  - Add commented-out optional examples: `MIN_LOG_LEVEL`, `CALENDAR_BASE_URL`, `BATUDA_ACTIVE_ORG_*`, `PORTLESS_URL`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`
 
-Already applied to `deploy_server.yml` (separate from Slice 1, no checkbox needed):
+Already applied to `deploy_server.yml` (kraft timing knobs, separate from Slice 1):
 
-- [x] Pin `KRAFT_VERSION: v0.12.10`
-- [x] Set `--timeout 10s` on both update + first-create branches
-- [x] Set `--rollout-wait 5s` on update branch
+- [x] `KRAFT_VERSION: v0.12.10` pinned + `--timeout 10s` on both branches + `--rollout-wait 5s` on update branch
 
 ### Provision external services
 
@@ -153,14 +160,14 @@ Reference: `.env.example.github`. All values land in the `production` environmen
 
 #### Secrets to delete (stale, AgentMail leftovers, zero code readers)
 
-- [ ] `gh secret delete EMAIL_API_KEY        --env production -R guillempuche/batuda`
-- [ ] `gh secret delete EMAIL_WEBHOOK_SECRET --env production -R guillempuche/batuda`
+- [x] `gh secret delete EMAIL_API_KEY` — already absent in `production` env (verified via `gh secret list`)
+- [x] `gh secret delete EMAIL_WEBHOOK_SECRET` — already absent in `production` env
 
 #### Secrets to set (`gh secret set <NAME> --env production -R guillempuche/batuda`)
 
-Already present (verify they exist):
+Already present:
 
-- [ ] `KRAFTCLOUD_TOKEN`
+- [x] `KRAFTCLOUD_TOKEN` — verified via `gh secret list --env production`
 
 To add:
 
@@ -169,8 +176,8 @@ To add:
 - [ ] `EMAIL_CREDENTIAL_KEY` — generated hex (must match the value mail-worker will use in Phase 3)
 - [ ] `STORAGE_ACCESS_KEY_ID` — R2
 - [ ] `STORAGE_SECRET_ACCESS_KEY` — R2
-- [ ] `EMAIL_API_KEY_TRANSACTIONAL` — Resend
-- [ ] `CALENDAR_API_KEY` — Cal.com
+- [ ] `EMAIL_API_KEY_TRANSACTIONAL` — Resend (required because `EMAIL_PROVIDER_TRANSACTIONAL=resend`)
+- [ ] `CALENDAR_API_KEY` — Cal.com (required when Calendar layer mounts at boot)
 - [ ] `CALENDAR_WEBHOOK_SECRET` — Cal.com webhook
 - [ ] `RESEARCH_API_KEY_SEARCH` — Brave
 - [ ] `RESEARCH_API_KEY_SCRAPE` — Firecrawl
@@ -207,32 +214,6 @@ Quoted values to avoid shell quirks. To set:
 - [ ] `RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL` = `"3"`
 - [ ] `RESEARCH_MAX_CONCURRENCY_FANOUT` = `"3"`
 - [ ] `RESEARCH_CONFIRM_THRESHOLD_FANOUT` = `"10"`
-
-### Update `deploy_server.yml` workflow (Slice 1, PR #1)
-
-The `-e` flag block is duplicated across the **update branch** and **first-create branch** of the deploy step. Every change must land in **both** copies.
-
-- [ ] Strip `-e EMAIL_API_KEY=…` from update branch
-- [ ] Strip `-e EMAIL_API_KEY=…` from first-create branch
-- [ ] Strip `-e EMAIL_WEBHOOK_SECRET=…` from update branch
-- [ ] Strip `-e EMAIL_WEBHOOK_SECRET=…` from first-create branch
-- [ ] Add `-e EMAIL_CREDENTIAL_KEY=…` to both branches
-- [ ] Add `-e EMAIL_API_KEY_TRANSACTIONAL=…` to both branches
-- [ ] Add `-e EMAIL_FROM_TRANSACTIONAL=…` to both branches
-- [ ] Add `-e CALENDAR_API_KEY=…` to both branches
-- [ ] Add `-e CALENDAR_WEBHOOK_SECRET=…` to both branches
-- [ ] Add `-e GEOCODER_PROVIDER=…` to both branches
-- [ ] Add `-e EMAIL_PROVIDER_TRANSACTIONAL=…` to both branches
-- [ ] Add the 8 `-e RESEARCH_DEFAULT_*` / `RESEARCH_MAX_*` / `RESEARCH_CONFIRM_*` to both branches
-
-### Update `.env.example.github` (Slice 1, PR #1)
-
-- [ ] Strip `EMAIL_API_KEY` and `EMAIL_WEBHOOK_SECRET` lines
-- [ ] Strip the AgentMail commentary on those lines
-- [ ] Replace `EMAIL_PROVIDER=agentmail` with `EMAIL_PROVIDER=local-inbox`
-- [ ] Add the 5 newly-required entries with comments naming their consumer
-- [ ] Add the 8 research budget entries (some already there — verify)
-- [ ] Add commented-out optional examples: `MIN_LOG_LEVEL`, `CALENDAR_BASE_URL`, `BATUDA_ACTIVE_ORG_*`, `PORTLESS_URL`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`
 
 ### DNS
 
