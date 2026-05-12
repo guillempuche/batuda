@@ -2,13 +2,16 @@ packages:
   - 'apps/*'
   - 'packages/*'
 
-# `injectWorkspacePackages` leaves peerless workspace deps as unresolved symlinks under `pnpm deploy`.
-forceLegacyDeploy: true
-
 # Flat node_modules. pnpm's default `.pnpm/<peer-deps-hash>/` paths exceed
 # Unikraft's libukcpio buffer (~256 chars) and crash the unikernel at boot
 # with `Failed to extract CPIO to /: -2`.
 nodeLinker: hoisted
+
+# Required for `pnpm deploy` to work. Legacy mode would re-resolve transitive
+# deps without honouring the workspace lockfile (drifted `@effect/platform-
+# node-shared` beta.43 → beta.65 on its own). Non-legacy deploy generates a
+# dedicated lockfile from the workspace one — versions stay pinned.
+injectWorkspacePackages: true
 
 # Trusted install scripts; install fails on any unlisted dep with build scripts.
 allowBuilds:
