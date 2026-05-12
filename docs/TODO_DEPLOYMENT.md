@@ -171,50 +171,51 @@ Already present:
 
 To add:
 
-- [ ] `DATABASE_URL` — pooled NeonDB URL
-- [ ] `BETTER_AUTH_SECRET` — generated hex
-- [ ] `EMAIL_CREDENTIAL_KEY` — generated base64 (must match the value mail-worker will use in Phase 3)
-- [ ] `STORAGE_ACCESS_KEY_ID` — R2
-- [ ] `STORAGE_SECRET_ACCESS_KEY` — R2
-- [ ] `EMAIL_API_KEY_TRANSACTIONAL` — Resend (required because `EMAIL_PROVIDER_TRANSACTIONAL=resend`)
-- [ ] `CALENDAR_API_KEY` — Cal.com (required when Calendar layer mounts at boot)
-- [ ] `CALENDAR_WEBHOOK_SECRET` — Cal.com webhook
-- [ ] `RESEARCH_API_KEY_SEARCH` — Brave
-- [ ] `RESEARCH_API_KEY_SCRAPE` — Firecrawl
-- [ ] `RESEARCH_API_KEY_EXTRACT` — Firecrawl
-- [ ] `RESEARCH_API_KEY_DISCOVER` — Firecrawl
-- [ ] `RESEARCH_API_KEY_LLM` — Nebius (or chosen LLM)
+- [x] `DATABASE_URL` — pooled NeonDB URL (set via `gh secret set` 2026-05-11)
+- [x] `BETTER_AUTH_SECRET` — generated hex (set via dashboard 2026-05-11)
+- [x] `EMAIL_CREDENTIAL_KEY` — generated base64 (set via dashboard 2026-05-11; must match the value mail-worker will use in Phase 3)
+- [x] `STORAGE_ACCESS_KEY_ID` — R2 Account API token (Object Read & Write, scoped to `batuda-assets`; set 2026-05-12)
+- [x] `STORAGE_SECRET_ACCESS_KEY` — R2 Account API token (set 2026-05-12)
+- [x] `EMAIL_API_KEY_TRANSACTIONAL` — Resend (set via dashboard 2026-05-11)
+- [x] `CALENDAR_API_KEY` — Cal.com (set via dashboard 2026-05-11)
+- [x] `CALENDAR_WEBHOOK_SECRET` — Cal.com webhook HMAC key (set via dashboard 2026-05-11; same value on cal.com webhook config)
+- [x] `RESEARCH_API_KEY_SEARCH` — Brave (set via dashboard 2026-05-11)
+- [x] `RESEARCH_API_KEY_SCRAPE` — Firecrawl (set via dashboard 2026-05-11)
+- [x] `RESEARCH_API_KEY_EXTRACT` — Firecrawl (set via dashboard 2026-05-11)
+- [x] `RESEARCH_API_KEY_DISCOVER` — Firecrawl (set via dashboard 2026-05-11)
+- [x] `RESEARCH_API_KEY_LLM` — Nebius (set via dashboard 2026-05-12)
+- [x] `RESEARCH_API_KEY_REGISTRY_ES` — Librebor (set 2026-05-12; bonus — Librebor adapter is unimplemented today (`packages/research/src/infrastructure/providers-live.ts:160`), workflow does not pass the var yet, key sits unused until the adapter ships)
 
 #### Variables (`gh variable set <NAME> --env production -R guillempuche/batuda --body "<value>"`)
 
-Quoted values to avoid shell quirks. To set:
+Quoted values to avoid shell quirks. All 26 set 2026-05-11/12 (verified via `gh variable list --env production`):
 
-- [ ] `BETTER_AUTH_BASE_URL` = `"https://api.batuda.co"`
-- [ ] `ALLOWED_ORIGINS` = `"https://batuda.co,https://engranatge.com"` (add each tenant's marketing origin)
-- [ ] `STORAGE_ENDPOINT` = `"https://<account>.r2.cloudflarestorage.com"`
-- [ ] `STORAGE_REGION` = `"auto"`
-- [ ] `STORAGE_BUCKET` = `"batuda-assets"`
-- [ ] `EMAIL_PROVIDER` = `"local-inbox"` (the BYO IMAP/SMTP per-inbox path; only literal accepted by `Schema.Literals` today — naming follow-up tracked separately)
-- [ ] `EMAIL_PROVIDER_TRANSACTIONAL` = `"resend"`
-- [ ] `EMAIL_FROM_TRANSACTIONAL` = `"Batuda <noreply@batuda.co>"`
-- [ ] `CALENDAR_PROVIDER` = `"calcom"` (boot selector in `packages/calendar/src/infrastructure/live.ts`)
-- [ ] `GEOCODER_PROVIDER` = `"nominatim"`
-- [ ] `RESEARCH_PROVIDER_SEARCH` = `"brave"`
-- [ ] `RESEARCH_PROVIDER_SCRAPE` = `"firecrawl"`
-- [ ] `RESEARCH_PROVIDER_EXTRACT` = `"firecrawl"`
-- [ ] `RESEARCH_PROVIDER_DISCOVER` = `"firecrawl"`
-- [ ] `RESEARCH_PROVIDER_REGISTRY_ES` = `"librebor"`
-- [ ] `RESEARCH_PROVIDER_REPORT_ES` = `"none"`
-- [ ] `RESEARCH_PROVIDER_LLM` = `"nebius"`
-- [ ] `RESEARCH_MODEL_LLM` = `"Qwen/Qwen3-32B"`
-- [ ] `RESEARCH_DEFAULT_BUDGET_CENTS` = `"100"`
-- [ ] `RESEARCH_DEFAULT_PAID_BUDGET_CENTS` = `"500"`
-- [ ] `RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS` = `"200"`
-- [ ] `RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS` = `"2000"`
-- [ ] `RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS` = `"10000"`
-- [ ] `RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL` = `"3"`
-- [ ] `RESEARCH_MAX_CONCURRENCY_FANOUT` = `"3"`
-- [ ] `RESEARCH_CONFIRM_THRESHOLD_FANOUT` = `"10"`
+- [x] `BETTER_AUTH_BASE_URL` = `"https://api.batuda.co"`
+- [x] `ALLOWED_ORIGINS` = `"https://batuda.co,https://engranatge.com"` (add each tenant's marketing origin)
+- [x] `STORAGE_ENDPOINT` = `"https://<account-id>.eu.r2.cloudflarestorage.com"` (EU jurisdiction bucket → `.eu.` infix is mandatory; account-id is the hex string visible in the R2 bucket's "S3 API" field)
+- [x] `STORAGE_REGION` = `"auto"` (R2 ignores the AWS region; `auto` is the canonical value, `us-east-1`/empty also alias)
+- [x] `STORAGE_BUCKET` = `"batuda-assets"`
+- [x] `EMAIL_PROVIDER` = `"local-inbox"` (the BYO IMAP/SMTP per-inbox path; only literal accepted by `Schema.Literals` today — naming follow-up tracked separately)
+- [x] `EMAIL_PROVIDER_TRANSACTIONAL` = `"resend"`
+- [x] `EMAIL_FROM_TRANSACTIONAL` = `"Batuda <noreply@batuda.co>"`
+- [x] `CALENDAR_PROVIDER` = `"calcom"` (boot selector in `packages/calendar/src/infrastructure/live.ts`)
+- [x] `GEOCODER_PROVIDER` = `"nominatim"`
+- [x] `RESEARCH_PROVIDER_SEARCH` = `"brave"`
+- [x] `RESEARCH_PROVIDER_SCRAPE` = `"firecrawl"`
+- [x] `RESEARCH_PROVIDER_EXTRACT` = `"firecrawl"`
+- [x] `RESEARCH_PROVIDER_DISCOVER` = `"firecrawl"`
+- [x] `RESEARCH_PROVIDER_REGISTRY_ES` = `"librebor"`
+- [x] `RESEARCH_PROVIDER_REPORT_ES` = `"none"`
+- [x] `RESEARCH_PROVIDER_LLM` = `"nebius"`
+- [x] `RESEARCH_MODEL_LLM` = `"Qwen/Qwen3-32B"`
+- [x] `RESEARCH_DEFAULT_BUDGET_CENTS` = `"100"`
+- [x] `RESEARCH_DEFAULT_PAID_BUDGET_CENTS` = `"500"`
+- [x] `RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS` = `"200"`
+- [x] `RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS` = `"2000"`
+- [x] `RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS` = `"10000"`
+- [x] `RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL` = `"3"`
+- [x] `RESEARCH_MAX_CONCURRENCY_FANOUT` = `"3"`
+- [x] `RESEARCH_CONFIRM_THRESHOLD_FANOUT` = `"10"`
 
 ### DNS
 
