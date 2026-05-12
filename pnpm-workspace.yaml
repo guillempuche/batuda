@@ -7,11 +7,25 @@ packages:
 # with `Failed to extract CPIO to /: -2`.
 nodeLinker: hoisted
 
-# Required for `pnpm deploy` to work. Legacy mode would re-resolve transitive
-# deps without honouring the workspace lockfile (drifted `@effect/platform-
-# node-shared` beta.43 → beta.65 on its own). Non-legacy deploy generates a
-# dedicated lockfile from the workspace one — versions stay pinned.
-injectWorkspacePackages: true
+# `pnpm deploy` re-resolves transitive deps in legacy mode without honouring
+# the workspace lockfile, so peer-dep transitives drift to the latest matching
+# semver. The override below pins the @effect family at exact versions across
+# the deploy boundary. `injectWorkspacePackages` would also fix this but
+# breaks apps/internal's build (peerless workspace deps stay as unresolved
+# symlinks under injection).
+forceLegacyDeploy: true
+
+# Pin @effect/* transitives so pnpm legacy deploy can't drift them across
+# the workspace → /deploy boundary (`@effect/platform-node-shared` resolved
+# beta.43 → beta.65 on its own, then crashed Node at `effect/dist/Context.js`
+# because the older API name no longer exists in beta.43).
+overrides:
+  '@effect/platform-node-shared': 4.0.0-beta.43
+  '@effect/platform-node': 4.0.0-beta.43
+  '@effect/platform': 4.0.0-beta.43
+  '@effect/sql-pg': 4.0.0-beta.43
+  '@effect/sql': 4.0.0-beta.43
+  effect: 4.0.0-beta.43
 
 # Trusted install scripts; install fails on any unlisted dep with build scripts.
 allowBuilds:
