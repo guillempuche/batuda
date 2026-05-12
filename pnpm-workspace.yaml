@@ -2,8 +2,8 @@ packages:
   - 'apps/*'
   - 'packages/*'
 
-# Required for `pnpm deploy` to materialise workspace deps into the output tree.
-injectWorkspacePackages: true
+# `injectWorkspacePackages` leaves peerless workspace deps as unresolved symlinks under `pnpm deploy`.
+forceLegacyDeploy: true
 
 # Trusted install scripts; install fails on any unlisted dep with build scripts.
 allowBuilds:
