@@ -5,6 +5,11 @@ packages:
 # `injectWorkspacePackages` leaves peerless workspace deps as unresolved symlinks under `pnpm deploy`.
 forceLegacyDeploy: true
 
+# Flat node_modules. pnpm's default `.pnpm/<peer-deps-hash>/` paths exceed
+# Unikraft's libukcpio buffer (~256 chars) and crash the unikernel at boot
+# with `Failed to extract CPIO to /: -2`.
+nodeLinker: hoisted
+
 # Trusted install scripts; install fails on any unlisted dep with build scripts.
 allowBuilds:
   '@swc/core': true
