@@ -1,3 +1,15 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+
+# Required for `pnpm deploy` to materialise workspace deps into the output tree.
+injectWorkspacePackages: true
+
+# Trusted install scripts; install fails on any unlisted dep with build scripts.
+allowBuilds:
+  '@swc/core': true
+  dprint: true
+  esbuild: true
+  lefthook: true
+  msgpackr-extract: true
+  sharp: true
