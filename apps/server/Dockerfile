@@ -7,7 +7,7 @@ ENV NODE_OPTIONS=--no-network-family-autoselection
 WORKDIR /repo
 
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@11.1.1 --activate
 
 # Copy workspace manifests first for layer caching
 COPY ./package.json ./pnpm-lock.yaml ./pnpm-workspace.yaml ./tsconfig.base.json ./
