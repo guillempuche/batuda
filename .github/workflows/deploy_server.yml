@@ -92,10 +92,12 @@ jobs:
           #     timeout note below); 30s tripped HTTP 400 and aborted the
           #     rollout. Node + DB pool warm-up fits in 5s on the cold
           #     unikernel path because connection-pool init is lazy.
-          #   -M 1024: 512 MiB caused CPIO extraction to run out of space
-          #     on the marketing unikernel; matching 1024 here for the
-          #     server's larger runtime footprint (DB driver, R2 SDK,
-          #     IMAP/SMTP client).
+          #   -M 2048: pnpm v11 hoisted-mode `pnpm deploy --prod` under legacy
+          #     deploy doesn't prune to apps/server's runtime deps — /deploy
+          #     ends up with the workspace's full install tree (~303 MB).
+          #     1024 ran out of initrd RAM extracting the CPIO. 2048 fits.
+          #     Slimming the image is tracked as a follow-up; bumping memory
+          #     unblocks the first prod boot today.
           #   --timeout 10s is mandatory: kraft's default per-RPC timeout
           #     is 60s, but UKC's API caps it at 10000ms and rejects
           #     anything higher with HTTP 400 ("Timeout value must be in
@@ -109,7 +111,7 @@ jobs:
                 --service batuda-server \
                 --rollout remove_sequential \
                 --rollout-wait 5s \
-                -M 1024 \
+                -M 2048 \
                 -e NODE_ENV=production \
                 -e PORT=3000 \
                 -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
@@ -166,7 +168,7 @@ jobs:
               kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
                 --timeout 10s \
                 --service batuda-server \
-                -M 1024 \
+                -M 2048 \
                 -e NODE_ENV=production \
                 -e PORT=3000 \
                 -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
