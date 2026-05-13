@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-05-13 (internal-v2026.5.13)
+
+### CI/CD
+
+* **deploy:** bake VITE_SERVER_URL into apps/internal build ([d24b414](https://github.com/guillempuche/batuda/commit/d24b414c0aea2fd7028595e4b2c07dea3d983db9))
+
+### Chores
+
+* hoist pnpm node_modules to fit Unikraft CPIO path limit ([456e0ce](https://github.com/guillempuche/batuda/commit/456e0ceba6f1f59913f6bf45adaef379e223068b))
+* upgrade pnpm to v11.1.1 with v11 defaults ([5f5d076](https://github.com/guillempuche/batuda/commit/5f5d076242db75cfde38d798c79b426d402fb226))
+
 ## 2026-05-10 (internal-v2026.5.10)
 
 ### Features
