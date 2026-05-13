@@ -114,6 +114,9 @@ jobs:
                 -M 2048 \
                 -e NODE_ENV=production \
                 -e PORT=3000 \
+                -e SERVICE_VERSION="${{ steps.meta.outputs.version }}" \
+                -e GIT_SHA="${{ github.sha }}" \
+                -e REGION="${{ env.KRAFTCLOUD_METRO }}" \
                 -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
                 -e BETTER_AUTH_SECRET="${{ secrets.BETTER_AUTH_SECRET }}" \
                 -e BETTER_AUTH_BASE_URL="${{ vars.BETTER_AUTH_BASE_URL }}" \
@@ -171,6 +174,9 @@ jobs:
                 -M 2048 \
                 -e NODE_ENV=production \
                 -e PORT=3000 \
+                -e SERVICE_VERSION="${{ steps.meta.outputs.version }}" \
+                -e GIT_SHA="${{ github.sha }}" \
+                -e REGION="${{ env.KRAFTCLOUD_METRO }}" \
                 -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
                 -e BETTER_AUTH_SECRET="${{ secrets.BETTER_AUTH_SECRET }}" \
                 -e BETTER_AUTH_BASE_URL="${{ vars.BETTER_AUTH_BASE_URL }}" \
