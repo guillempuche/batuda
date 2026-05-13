@@ -33,5 +33,16 @@
 		"tsx": "^4.20.3",
 		"typescript": "^5.9.3"
 	},
-	"private": true
+	"private": true,
+	"dependenciesMeta": {
+		"@batuda/auth": {
+			"injected": true
+		},
+		"@batuda/calendar": {
+			"injected": true
+		},
+		"@batuda/domain": {
+			"injected": true
+		}
+	}
 }

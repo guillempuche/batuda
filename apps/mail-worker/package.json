@@ -31,5 +31,13 @@
 		"typescript": "^5.9.3",
 		"vitest": "^4.1.4"
 	},
-	"private": true
+	"private": true,
+	"dependenciesMeta": {
+		"@batuda/controllers": {
+			"injected": true
+		},
+		"@batuda/server": {
+			"injected": true
+		}
+	}
 }

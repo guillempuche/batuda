@@ -78,6 +78,17 @@
 		"vitest": "^4.1.4"
 	},
 	"private": true,
+	"dependenciesMeta": {
+		"@batuda/controllers": {
+			"injected": true
+		},
+		"@batuda/domain": {
+			"injected": true
+		},
+		"@batuda/research": {
+			"injected": true
+		}
+	},
 	"imports": {
 		"#/*": "./src/*"
 	}

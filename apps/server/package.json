@@ -44,5 +44,22 @@
 		"typescript": "^5.9.3",
 		"vitest": "^4.1.4"
 	},
-	"private": true
+	"private": true,
+	"dependenciesMeta": {
+		"@batuda/auth": {
+			"injected": true
+		},
+		"@batuda/calendar": {
+			"injected": true
+		},
+		"@batuda/controllers": {
+			"injected": true
+		},
+		"@batuda/domain": {
+			"injected": true
+		},
+		"@batuda/research": {
+			"injected": true
+		}
+	}
 }
