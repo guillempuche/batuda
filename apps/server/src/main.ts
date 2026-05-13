@@ -239,6 +239,24 @@ const AppLive = Layer.mergeAll(
 	OpenApiJsonLive,
 )
 
+// `CurrentOrg` is request-scoped: real call sites override it via
+// OrgMiddleware (HTTP), McpAuthMiddleware (MCP tools), `provideOrg`
+// (cal.com webhook), or the inline `Effect.provideService` calls in
+// ResearchEventSinkLive. Non-org-scoped endpoints (/docs, /openapi.json,
+// MCP transport plumbing) and a few service method signatures still
+// surface `CurrentOrg` in the program's R, so we satisfy the type
+// statically here with a layer that dies loudly if anyone reads the tag
+// outside a request scope — surfacing the leak as a Defect rather than
+// silently masking it with a cast.
+const CurrentOrgFallbackLive = Layer.effect(
+	CurrentOrg,
+	Effect.die(
+		new Error(
+			'CurrentOrg accessed outside a request scope — reach it via OrgMiddleware, McpAuthMiddleware, provideOrg, or an explicit Effect.provideService(CurrentOrg, …).',
+		),
+	),
+)
+
 const program = HttpRouter.serve(AppLive).pipe(
 	Layer.provide(ServicesLive),
 	Layer.provide(BookingProviderLive),
@@ -251,6 +269,7 @@ const program = HttpRouter.serve(AppLive).pipe(
 	Layer.provide(S3StorageProviderLive),
 	Layer.provide(OrgMiddlewareLive),
 	Layer.provide(SessionMiddlewareLive),
+	Layer.provide(CurrentOrgFallbackLive),
 	Layer.provide(Auth.layer),
 	// Provided once at the bottom of the stack so every layer above (booking,
 	// brave search, calcom, geocoder, inbox-health-probe, …) can pick up
@@ -264,4 +283,4 @@ const program = HttpRouter.serve(AppLive).pipe(
 	Layer.launch,
 )
 
-NodeRuntime.runMain(program as unknown as Effect.Effect<void, unknown, never>)
+NodeRuntime.runMain(program)
