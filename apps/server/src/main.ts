@@ -177,7 +177,7 @@ const ServicesLive = Layer.mergeAll(
 	EmailService.layer,
 	RecordingService.layer,
 	ResearchService.layer,
-	Geocoder.layer.pipe(Layer.provide(FetchHttpClient.layer)),
+	Geocoder.layer,
 	// daemonLayer outputs `never` so a downstream `provideMerge` would
 	// skip building it (nothing requires it). Listing it inside `mergeAll`
 	// forces the build, which fires the side-effect that forks the probe.
@@ -241,7 +241,7 @@ const AppLive = Layer.mergeAll(
 
 const program = HttpRouter.serve(AppLive).pipe(
 	Layer.provide(ServicesLive),
-	Layer.provide(BookingProviderLive.pipe(Layer.provide(FetchHttpClient.layer))),
+	Layer.provide(BookingProviderLive),
 	Layer.provide(IcsParserLive),
 	Layer.provide(EmailProviderLive),
 	Layer.provide(researchToolkitLayer),
@@ -252,6 +252,10 @@ const program = HttpRouter.serve(AppLive).pipe(
 	Layer.provide(OrgMiddlewareLive),
 	Layer.provide(SessionMiddlewareLive),
 	Layer.provide(Auth.layer),
+	// Provided once at the bottom of the stack so every layer above (booking,
+	// brave search, calcom, geocoder, inbox-health-probe, …) can pick up
+	// `HttpClient.HttpClient` from a single shared fetch.
+	Layer.provide(FetchHttpClient.layer),
 	Layer.provide(EnvVars.layer),
 	Layer.provide(PgLive),
 	Layer.provideMerge(ServerLive),
