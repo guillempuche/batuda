@@ -22,6 +22,12 @@ COPY ./packages ./packages
 RUN --mount=type=cache,target=/root/.pnpm-store \
     CI=true pnpm install --frozen-lockfile
 
+# Baked into the Vite client+SSR bundles via `import.meta.env.VITE_SERVER_URL`
+# (see apps/internal/src/lib/api-base.ts). Vite replaces this statically at
+# build time, so setting it at runtime would be too late — without it the SSR
+# session check resolves an empty base URL and every request lands on /login.
+ENV VITE_SERVER_URL=https://api.batuda.co
+
 RUN DO_NOT_TRACK=1 TURBO_TELEMETRY_DISABLED=1 \
     pnpm turbo run build --filter=@batuda/internal
 
@@ -31,7 +37,6 @@ FROM node:24-alpine
 ENV NODE_OPTIONS=--no-network-family-autoselection
 ENV NODE_ENV=production
 ENV PORT=3000
-ENV SERVER_URL=https://api.batuda.co
 
 # Run as non-root for security
 RUN addgroup -g 1001 -S app && adduser -u 1001 -S app -G app
