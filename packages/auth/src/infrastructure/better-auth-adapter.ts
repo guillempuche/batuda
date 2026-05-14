@@ -339,6 +339,30 @@ export const makeBetterAuthAdapter = (
 				),
 			),
 
+		setName: (email: string, name: string) =>
+			Effect.tryPromise({
+				try: () =>
+					pool.query<{ id: string }>(
+						'SELECT id FROM "user" WHERE email = $1 LIMIT 1',
+						[email],
+					),
+				catch: queryError,
+			}).pipe(
+				Effect.flatMap(
+					(lookup): Effect.Effect<void, UserNotFound | AuthConfigError> =>
+						lookup.rows[0]
+							? Effect.tryPromise({
+									try: () =>
+										pool.query(
+											'UPDATE "user" SET name = $1, "updatedAt" = now() WHERE id = $2',
+											[name, lookup.rows[0]!.id],
+										),
+									catch: queryError,
+								}).pipe(Effect.asVoid)
+							: Effect.fail(new UserNotFound({ email })),
+				),
+			),
+
 		setPassword: (email: string, password: string) =>
 			Effect.tryPromise({
 				try: () =>

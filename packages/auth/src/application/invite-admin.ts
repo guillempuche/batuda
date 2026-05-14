@@ -5,6 +5,7 @@ import type {
 	AuthConfigError,
 	MagicLinkFailed,
 	UserAlreadyExists,
+	UserNotFound,
 } from '../domain/errors'
 import { OrgSlugTaken } from '../domain/errors'
 import type { AuthUser } from '../domain/types'
@@ -57,6 +58,7 @@ export const inviteAdmin = (
 	| OrgSlugTaken
 	| AlreadyMember
 	| UserAlreadyExists
+	| UserNotFound
 	| MagicLinkFailed
 	| AuthConfigError
 > =>
@@ -69,13 +71,24 @@ export const inviteAdmin = (
 		// Reuse an existing user when the email matches; the orchestration
 		// stays idempotent so re-running with the same inputs is safe.
 		const existingUser = yield* users.findByEmail(input.email)
+		// Backfill the name when the existing row has none — typical for users
+		// minted by a magic-link sign-in (Better Auth doesn't require name on
+		// that flow). Don't overwrite a non-empty name; the user may have set
+		// it via the profile UI and we'd silently clobber their choice.
+		const inputName = input.name.trim()
+		if (existingUser && existingUser.name.trim() === '' && inputName !== '') {
+			yield* users.setName(input.email, input.name)
+		}
 		const user =
-			existingUser ??
-			(yield* users.createPasswordless({
-				email: input.email,
-				name: input.name,
-				role: 'admin', // Platform-level role; org membership role is separate.
-			}))
+			existingUser !== null
+				? existingUser.name.trim() === '' && inputName !== ''
+					? { ...existingUser, name: input.name }
+					: existingUser
+				: yield* users.createPasswordless({
+						email: input.email,
+						name: input.name,
+						role: 'admin', // Platform-level role; org membership role is separate.
+					})
 
 		// New org → creator becomes 'owner' atomically via Better Auth's
 		// creatorRole. Existing org → join explicitly as 'admin'. The

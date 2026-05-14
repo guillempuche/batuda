@@ -64,6 +64,10 @@ export interface UserRepository {
 		email: string,
 		role: Role,
 	) => Effect.Effect<void, UserNotFound | AuthConfigError>
+	readonly setName: (
+		email: string,
+		name: string,
+	) => Effect.Effect<void, UserNotFound | AuthConfigError>
 	readonly setPassword: (
 		email: string,
 		password: string,
