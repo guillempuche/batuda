@@ -33,9 +33,11 @@ const appendAudit = (line: string): void => {
 /**
  * Gate for destructive operations when `--env cloud`. No-op on local.
  *
- * Re-prompts the user to re-type the DB hostname verbatim. On mismatch or
- * cancel, fails with `CloudRefused` and appends a REFUSED line to
- * `cloud-audit.log`. On success, appends an OK line and resolves.
+ * Shows the parsed DB hostname and asks for a `y/N` confirm (default no).
+ * Cancelling or answering no fails with `CloudRefused` and appends a
+ * REFUSED line to `cloud-audit.log`. Confirming appends an OK line and
+ * resolves. The default-no posture is what keeps a stray Enter from
+ * running a prod op.
  */
 export const confirmCloud = (command: string) =>
 	Effect.gen(function* () {
@@ -45,24 +47,25 @@ export const confirmCloud = (command: string) =>
 		const ts = new Date().toISOString()
 		const user = process.env['USER'] ?? 'unknown'
 
-		const typed = yield* Effect.promise(() =>
-			p.text({
-				message: `⚠  CLOUD \`${command}\` against ${expectedHost}. Re-type the hostname to confirm:`,
+		const answer = yield* Effect.promise(() =>
+			p.confirm({
+				message: `⚠  Run \`${command}\` against ${expectedHost}?`,
+				initialValue: false,
 			}),
 		)
 
-		const isCancelled = p.isCancel(typed)
-		const typedStr = isCancelled ? '<cancelled>' : typed.trim()
+		const isCancelled = p.isCancel(answer)
+		const confirmed = !isCancelled && answer === true
 
-		if (isCancelled || typedStr !== expectedHost) {
+		if (!confirmed) {
 			appendAudit(
-				`${ts}\t${command}\tREFUSED\thost=${expectedHost}\ttyped=${typedStr}\tuser=${user}`,
+				`${ts}\t${command}\tREFUSED\thost=${expectedHost}\tanswer=${isCancelled ? '<cancelled>' : 'no'}\tuser=${user}`,
 			)
 			return yield* Effect.fail(
 				new CloudRefused({
 					reason: isCancelled
 						? 'Cancelled by user.'
-						: `Expected "${expectedHost}", got "${typedStr}".`,
+						: `Declined the y/N confirm for host "${expectedHost}".`,
 				}),
 			)
 		}
