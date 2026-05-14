@@ -120,10 +120,14 @@ const fetchGhVariables = (): void => {
 		)
 			continue
 		const { name, value } = entry as { name: string; value: string }
-		if (process.env[name] === undefined) {
-			process.env[name] = value
-			merged++
-		}
+		// Always override in cloud mode: gh is authoritative for non-secret
+		// variables. The local `.env` baseline often carries dev defaults
+		// (e.g. `BETTER_AUTH_BASE_URL=https://api.batuda.localhost`); without
+		// this override the CLI would silently use the dev value against
+		// prod credentials. `.env.cloud` still wins because it loads after
+		// this function returns (see `loadEnv`).
+		process.env[name] = value
+		merged++
 	}
 	if (merged > 0) {
 		// Count-only — never log names or values, even on success.
@@ -136,16 +140,19 @@ const fetchGhVariables = (): void => {
 /**
  * Parse `--env local|cloud` from argv (default `local`), strip the flag so
  * Effect CLI never sees it, and load `.env` files via dotenv in precedence
- * order (later files override earlier ones):
+ * order (later wins):
  *
- *   1. `<repo>/.env`                      (baseline)
- *   2. `<repo>/apps/cli/.env`             (per-app overrides)
- *   3. `<repo>/.env.cloud`                (cloud only — secrets only)
- *   4. `<repo>/apps/cli/.env.cloud`       (cloud only)
+ *   1. `<repo>/.env`                      (local-dev baseline)
+ *   2. `<repo>/apps/cli/.env`             (per-app baseline)
+ *   3. gh `variable list` (cloud only)    (authoritative cloud variables)
+ *   4. `<repo>/.env.cloud`                (cloud only — secrets + overrides)
+ *   5. `<repo>/apps/cli/.env.cloud`       (cloud only)
  *
- * In cloud mode, after the files load, non-secret GH Actions variables are
- * fetched via `gh variable list` and merged for keys still missing. See
- * `fetchGhVariables` for the leak-safety contract.
+ * Why gh fetch runs *between* the baselines and `.env.cloud`: the baseline
+ * usually carries dev defaults like `BETTER_AUTH_BASE_URL=…localhost`, and
+ * cloud mode must not inherit those. `.env.cloud` is reserved for secrets
+ * (which gh can't expose) and rare local overrides — putting it last keeps
+ * the user's explicit overrides authoritative.
  *
  * Must run before `NodeRuntime.runMain` / any Effect Config resolution so
  * process.env is populated before the layer stack is built.
@@ -155,20 +162,23 @@ export const loadEnv = (): EnvTarget => {
 	const target = stripEnvFlag(argv)
 	stripPnpmSeparator(argv)
 
-	const files = [
-		resolve(ROOT, '.env'),
-		resolve(ROOT, 'apps/cli/.env'),
-		...(target === 'cloud'
-			? [resolve(ROOT, '.env.cloud'), resolve(ROOT, 'apps/cli/.env.cloud')]
-			: []),
+	const baselineFiles = [resolve(ROOT, '.env'), resolve(ROOT, 'apps/cli/.env')]
+	const cloudOverrideFiles = [
+		resolve(ROOT, '.env.cloud'),
+		resolve(ROOT, 'apps/cli/.env.cloud'),
 	]
-	for (const file of files) {
+
+	const loadFile = (file: string): void => {
 		if (existsSync(file)) {
 			dotenvConfig({ path: file, override: true, quiet: true })
 		}
 	}
 
-	if (target === 'cloud') fetchGhVariables()
+	for (const file of baselineFiles) loadFile(file)
+	if (target === 'cloud') {
+		fetchGhVariables()
+		for (const file of cloudOverrideFiles) loadFile(file)
+	}
 
 	resolvedTarget = target
 	return target
