@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url'
+
 import { NodeRuntime, NodeServices } from '@effect/platform-node'
 import { Console, Effect, Option, Redacted } from 'effect'
 import { Command, Flag, Prompt } from 'effect/unstable/cli'
@@ -84,6 +86,7 @@ const seedCommand = Command.make(
 			}),
 		),
 ).pipe(
+	Command.withShortDescription('Insert sample data'),
 	Command.withDescription(
 		'Insert sample data (chain `pnpm cli db reset && pnpm cli seed` for a clean slate)',
 	),
@@ -147,7 +150,10 @@ const setupCommand = Command.make(
 			}
 			yield* Effect.logInfo('Setup complete.')
 		}),
-).pipe(Command.withDescription('Set up local environment (copy .env files)'))
+).pipe(
+	Command.withShortDescription('Copy .env templates into place'),
+	Command.withDescription('Set up local environment (copy .env files)'),
+)
 
 // ── Doctor ─────────────────────────────────────────────────
 
@@ -176,6 +182,7 @@ const dbMigrateCommand = Command.make('migrate', {}, () => dbMigrate).pipe(
 )
 
 const dbResetCommand = Command.make('reset', {}, () => withDb(dbReset)).pipe(
+	Command.withShortDescription('Drop schema + re-run migrations'),
 	Command.withDescription(
 		'Drop the public schema, re-run migrations, and clear Mailpit (no seed; chain `seed` for sample data)',
 	),
@@ -216,6 +223,7 @@ const authCreateKeyCommand = Command.make(
 			expiresIn: Option.getOrUndefined(expiresIn),
 		}),
 ).pipe(
+	Command.withShortDescription('Create an API key for a user'),
 	Command.withDescription(
 		'Create a Better Auth API key for a user (local dev signup bypass)',
 	),
@@ -244,6 +252,7 @@ const authBootstrapCommand = Command.make(
 			password: Redacted.value(password),
 		}),
 ).pipe(
+	Command.withShortDescription('Create the first admin user'),
 	Command.withDescription(
 		'Create the first admin user (refuses if any user already exists)',
 	),
@@ -267,6 +276,7 @@ const authInviteCommand = Command.make(
 	},
 	({ email, name, role }) => authInvite({ email, name, role }),
 ).pipe(
+	Command.withShortDescription('Create a passwordless user + magic link'),
 	Command.withDescription(
 		'Create a passwordless user and issue a magic link (local prints the URL)',
 	),
@@ -305,6 +315,7 @@ const authBootstrapOrgCommand = Command.make(
 			orgSlug,
 		}),
 ).pipe(
+	Command.withShortDescription('Create the first admin and their org'),
 	Command.withDescription(
 		'Create the first admin and their organization (refuses if any user exists)',
 	),
@@ -345,6 +356,7 @@ const authInviteAdminCommand = Command.make(
 			allowExistingOrg,
 		}),
 ).pipe(
+	Command.withShortDescription('Create an org and its first admin'),
 	Command.withDescription(
 		'Create-or-find org, create-or-find user, attach as admin, send magic link',
 	),
@@ -365,7 +377,10 @@ const authListKeysCommand = Command.make(
 		),
 	},
 	({ email }) => authListKeys({ email: Option.getOrUndefined(email) }),
-).pipe(Command.withDescription('List API keys (all, or filtered by --email)'))
+).pipe(
+	Command.withShortDescription('List API keys'),
+	Command.withDescription('List API keys (all, or filtered by --email)'),
+)
 
 const authPromoteCommand = Command.make(
 	'promote',
@@ -380,7 +395,10 @@ const authPromoteCommand = Command.make(
 		),
 	},
 	({ email, role }) => authPromote({ email, role }),
-).pipe(Command.withDescription("Change a user's role (admin|user)"))
+).pipe(
+	Command.withShortDescription("Set a user's platform role"),
+	Command.withDescription("Change a user's role (admin|user)"),
+)
 
 const authDemoteCommand = Command.make(
 	'demote',
@@ -392,6 +410,7 @@ const authDemoteCommand = Command.make(
 	},
 	({ email }) => authPromote({ email, role: 'user' }),
 ).pipe(
+	Command.withShortDescription("Demote a user to 'user' role"),
 	Command.withDescription(
 		"Set a user's role to 'user' (alias for promote --role user)",
 	),
@@ -406,7 +425,10 @@ const authRevokeKeyCommand = Command.make(
 		),
 	},
 	({ keyId }) => authRevokeKey({ keyId }),
-).pipe(Command.withDescription('Disable an API key (enabled=false)'))
+).pipe(
+	Command.withShortDescription('Disable an API key'),
+	Command.withDescription('Disable an API key (enabled=false)'),
+)
 
 const authResetPasswordCommand = Command.make(
 	'reset-password',
@@ -423,6 +445,7 @@ const authResetPasswordCommand = Command.make(
 	({ email, password }) =>
 		authResetPassword({ email, password: Redacted.value(password) }),
 ).pipe(
+	Command.withShortDescription("Overwrite a user's password"),
 	Command.withDescription("Overwrite a user's credential in the account table"),
 )
 
@@ -436,6 +459,7 @@ const authSessionsCommand = Command.make(
 	},
 	({ email }) => authSessions({ email: Option.getOrUndefined(email) }),
 ).pipe(
+	Command.withShortDescription('List active sessions'),
 	Command.withDescription('List active sessions (all, or filtered by --email)'),
 )
 
@@ -493,6 +517,7 @@ const servicesCommand = Command.make('services').pipe(
 const calendarSeedCommand = Command.make('seed', {}, () =>
 	withDb(calendarSeed),
 ).pipe(
+	Command.withShortDescription('Seed default event types'),
 	Command.withDescription(
 		'Seed default calendar_event_types (idempotent; respects CALENDAR_PROVIDER)',
 	),
@@ -523,12 +548,14 @@ const calendarSimulateWebhookCommand = Command.make(
 			icalUid: Option.getOrUndefined(icalUid) ?? null,
 		}),
 ).pipe(
+	Command.withShortDescription('Replay a signed cal.com webhook'),
 	Command.withDescription(
 		'Post a signed cal.com webhook envelope to the local server (no cal.com account needed)',
 	),
 )
 
 const calendarCommand = Command.make('calendar').pipe(
+	Command.withShortDescription('Seed event types, replay webhooks'),
 	Command.withDescription('Calendar: seed event types, simulate webhooks'),
 	Command.withSubcommands([
 		calendarSeedCommand,
@@ -581,6 +608,7 @@ const emailInjectCommand = Command.make(
 			port,
 		}),
 ).pipe(
+	Command.withShortDescription('SMTP a canned message into Mailpit'),
 	Command.withDescription(
 		'SMTP a canned message into Mailpit (visible in the Mailpit UI; outbound assertions only — Mailpit has no IMAP, so no DB ingest happens)',
 	),
@@ -593,7 +621,12 @@ const emailCommand = Command.make('email').pipe(
 
 // ── Root ───────────────────────────────────────────────────
 
-const batuda = Command.make('batuda').pipe(
+// Exported so the TUI walker (`apps/cli/src/tui.ts`) can introspect the
+// command tree and run leaves in-process via `Command.runWith`. Keeping the
+// definition here (rather than in a separate `cli-tree.ts`) avoids splitting
+// the file just to share one const; the `isMain` guard below makes import
+// safe by deferring `runMain` until cli.ts is the entry script.
+export const batuda = Command.make('batuda').pipe(
 	Command.withDescription('Batuda CLI'),
 	Command.withSubcommands([
 		setupCommand,
@@ -609,11 +642,14 @@ const batuda = Command.make('batuda').pipe(
 
 // ── Run ────────────────────────────────────────────────────
 
-// Parse `--env local|cloud` (default local), strip the flag + pnpm's `--`
-// separator, and populate process.env via dotenv BEFORE Effect Config
-// resolves any variable. Every subsequent `Config.redacted('DATABASE_URL')`
-// / `Config.string(...)` read hits a fully-loaded process.env.
-loadEnv()
+// Standard ESM "is this file the entry point?" check. Equivalent to
+// `require.main === module` in CJS. tsx, the dev runner, sets
+// `process.argv[1]` to the absolute path of the entry .ts file; the bundled
+// `dist/cli.mjs` keeps the same shape. Importing `batuda` from tui.ts
+// therefore evaluates this module without ever running `runMain`.
+const isMain =
+	typeof import.meta?.url === 'string' &&
+	process.argv[1] === fileURLToPath(import.meta.url)
 
 // Format tagged errors as `Tag(field=…)`. `Schema.TaggedErrorClass` instances
 // extend the native `Error`, so schema fields that collide with built-ins
@@ -654,11 +690,20 @@ const reportError = (e: unknown) => {
 	return Console.error(formatError(e))
 }
 
-const program = Command.run(batuda, { version: '0.0.1' }).pipe(
-	Effect.provide(NodeServices.layer),
-	Effect.tapError(reportError),
-	Effect.tapDefect(reportError),
-)
-NodeRuntime.runMain(program as unknown as Effect.Effect<void, unknown, never>, {
-	disableErrorReporting: true,
-})
+if (isMain) {
+	// Parse `--env local|cloud` (default local), strip the flag + pnpm's `--`
+	// separator, and populate process.env via dotenv BEFORE Effect Config
+	// resolves any variable. Every subsequent `Config.redacted('DATABASE_URL')`
+	// / `Config.string(...)` read hits a fully-loaded process.env.
+	loadEnv()
+
+	const program = Command.run(batuda, { version: '0.0.1' }).pipe(
+		Effect.provide(NodeServices.layer),
+		Effect.tapError(reportError),
+		Effect.tapDefect(reportError),
+	)
+	NodeRuntime.runMain(
+		program as unknown as Effect.Effect<void, unknown, never>,
+		{ disableErrorReporting: true },
+	)
+}

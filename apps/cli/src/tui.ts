@@ -1,34 +1,68 @@
+import { fileURLToPath } from 'node:url'
+
 import * as p from '@clack/prompts'
 import { NodeRuntime, NodeServices } from '@effect/platform-node'
 import { Cause, Effect } from 'effect'
+import { Command } from 'effect/unstable/cli'
 import pc from 'picocolors'
 
-import { authCreateKey } from './commands/auth'
-import { authBootstrap } from './commands/auth-bootstrap'
-import { authInvite } from './commands/auth-invite'
-import { authListKeys } from './commands/auth-list-keys'
-import { authListUsers } from './commands/auth-list-users'
-import { authPromote } from './commands/auth-promote'
-import { authResetPassword } from './commands/auth-reset-password'
-import { authRevokeKey } from './commands/auth-revoke-key'
-import { authSessions } from './commands/auth-sessions'
-import { dbMigrate, dbReset } from './commands/db'
-import { doctor } from './commands/doctor'
-import { seed } from './commands/seed'
-import { servicesDown, servicesStatus, servicesUp } from './commands/services'
-import { appendEnvKeys, resetEnvFile, setup } from './commands/setup'
-import { withDb } from './db'
+import { batuda } from './cli'
 import { getTarget, loadEnv } from './lib/load-env'
 import { recoveryHint } from './lib/recovery-hint'
 
 // Populate process.env + resolve --env before any Effect Config reads.
 loadEnv()
 
-// ── Error recovery ────────────────────────────────────────
+// `runWith` takes argv explicitly (vs. `run` which reads process.argv), so the
+// menu can synthesise argv from a navigation path. Leaf `Flag.withFallbackPrompt`
+// still drives prompts, so new flags in cli.ts show up here for free.
+const runCommand = Command.runWith(batuda, { version: '0.0.1' })
+
+// ── Tree introspection ─────────────────────────────────────
+
+// `Command.withSubcommands` accepts `SubcommandGroup` entries so help output
+// can label sections; for menu navigation we just want the flat children.
+const childrenOf = (
+	cmd: Command.Command.Any,
+): ReadonlyArray<Command.Command.Any> =>
+	cmd.subcommands.flatMap(group => [...group.commands])
+
+const isLeaf = (cmd: Command.Command.Any): boolean =>
+	childrenOf(cmd).length === 0
+
+// `invite-admin` → `Invite admin`. A per-command label override would
+// reintroduce the maintenance burden auto-discovery removes; the name is
+// already the CLI's source of truth.
+const humanize = (name: string): string => {
+	const lowered = name.replaceAll('-', ' ')
+	return lowered.charAt(0).toUpperCase() + lowered.slice(1)
+}
+
+const descriptionOf = (cmd: Command.Command.Any): string | undefined =>
+	cmd.shortDescription ?? cmd.description ?? undefined
+
+// Walk back to a command by name path. Used by "← Back" so we don't have to
+// maintain a parent pointer alongside the navigation state. Returns the
+// deepest valid ancestor if a segment is missing — defensive only; callers
+// pass paths built from prior valid navigation.
+const resolvePath = (
+	root: Command.Command.Any,
+	path: ReadonlyArray<string>,
+): Command.Command.Any => {
+	let cmd: Command.Command.Any = root
+	for (const segment of path) {
+		const next = childrenOf(cmd).find(c => c.name === segment)
+		if (!next) return cmd
+		cmd = next
+	}
+	return cmd
+}
+
+// ── Error recovery ─────────────────────────────────────────
 
 const withRecovery = <A, E, R>(
 	effect: Effect.Effect<A, E, R>,
-): Effect.Effect<void, E, R> =>
+): Effect.Effect<void, never, R> =>
 	effect.pipe(
 		Effect.catchCause((cause: Cause.Cause<E>) => {
 			const error = Cause.squash(cause)
@@ -44,6 +78,31 @@ const withRecovery = <A, E, R>(
 
 // ── TUI ────────────────────────────────────────────────────
 
+// Sentinel option values. Prefixed with `__` so they never collide with a
+// real subcommand name.
+const BACK = '__back'
+const EXIT = '__exit'
+
+type MenuOption = { value: string; label: string; hint?: string }
+
+// Returns a mutable array because clack's `p.select` typing rejects readonly.
+const buildMenuOptions = (
+	children: ReadonlyArray<Command.Command.Any>,
+	isTop: boolean,
+): Array<MenuOption> => {
+	const items: Array<MenuOption> = children.map(child => {
+		const hint = descriptionOf(child)
+		return hint
+			? { value: child.name, label: humanize(child.name), hint }
+			: { value: child.name, label: humanize(child.name) }
+	})
+	if (!isTop) {
+		items.push({ value: BACK, label: '← Back', hint: 'Up one level' })
+	}
+	items.push({ value: EXIT, label: 'Exit', hint: 'Quit the CLI' })
+	return items
+}
+
 const tui = Effect.gen(function* () {
 	const target = getTarget()
 	const targetBadge =
@@ -53,578 +112,71 @@ const tui = Effect.gen(function* () {
 	p.intro(`${pc.bgCyan(pc.black(' Batuda CLI '))} ${targetBadge}`)
 
 	mainLoop: while (true) {
-		const command = yield* Effect.promise(() =>
-			p.select({
-				message: 'What do you want to do?',
-				options: [
-					{
-						value: 'setup' as const,
-						label: 'Setup',
-						hint: 'Configure local environment (.env, etc.)',
-					},
-					{
-						value: 'doctor' as const,
-						label: 'Doctor',
-						hint: 'Check environment health',
-					},
-					{
-						value: 'seed' as const,
-						label: 'Seed',
-						hint: 'Populate database with sample data',
-					},
-					{
-						value: 'db' as const,
-						label: 'DB',
-						hint: 'Database management',
-					},
-					{
-						value: 'services' as const,
-						label: 'Services',
-						hint: 'Manage local Docker services',
-					},
-					{
-						value: 'auth' as const,
-						label: 'Auth',
-						hint: 'Better Auth users, keys, and sessions',
-					},
-					{
-						value: 'exit' as const,
-						label: 'Exit',
-						hint: 'Quit the CLI',
-					},
-				],
-			}),
-		)
+		let path: ReadonlyArray<string> = []
+		let cmd: Command.Command.Any = batuda
 
-		if (p.isCancel(command) || command === 'exit') {
-			p.outro(pc.green('Bye!'))
-			return
+		while (true) {
+			if (isLeaf(cmd)) {
+				yield* withRecovery(runCommand([...path]))
+				p.log.message(pc.dim('───'))
+				continue mainLoop
+			}
+
+			const children = childrenOf(cmd)
+			const isTop = path.length === 0
+			const options = buildMenuOptions(children, isTop)
+
+			const selection = yield* Effect.promise(() =>
+				p.select({
+					message: isTop ? 'What do you want to do?' : `${path.join(' › ')} →`,
+					options,
+				}),
+			)
+
+			// Ctrl-C / Esc at top exits the TUI; deeper, it rewinds to the
+			// top menu so the user can't get trapped in a sub-tree.
+			if (p.isCancel(selection)) {
+				if (isTop) {
+					p.outro(pc.green('Bye!'))
+					return
+				}
+				continue mainLoop
+			}
+			if (selection === EXIT) {
+				p.outro(pc.green('Bye!'))
+				return
+			}
+			if (selection === BACK) {
+				path = path.slice(0, -1)
+				cmd = resolvePath(batuda, path)
+				continue
+			}
+
+			const next = children.find(c => c.name === selection)
+			if (!next) continue
+			path = [...path, selection]
+			cmd = next
 		}
-
-		switch (command) {
-			case 'setup': {
-				const s = p.spinner()
-				s.start('Configuring environment...')
-				const results = yield* setup
-				s.stop('Environment configured!')
-
-				for (const result of results) {
-					switch (result.status) {
-						case 'created':
-							p.log.success(`created ${result.target}`)
-							break
-						case 'up-to-date':
-							p.log.success(`${result.target} up to date`)
-							break
-						case 'skipped':
-							p.log.warn(`skip ${result.target} (no ${result.example})`)
-							break
-						case 'stale': {
-							const lines = result.missing.map(
-								e => `${pc.cyan(e.key)}=${e.line.slice(e.key.length + 1)}`,
-							)
-							p.note(lines.join('\n'), `Missing in ${result.target}`)
-
-							const action = yield* Effect.promise(() =>
-								p.select({
-									message: `${result.target} has ${result.missing.length} missing key(s)`,
-									options: [
-										{
-											value: 'append' as const,
-											label: 'Append missing keys',
-										},
-										{
-											value: 'reset' as const,
-											label: 'Replace entire file from .env.example',
-										},
-										{ value: 'skip' as const, label: 'Skip' },
-									],
-								}),
-							)
-
-							if (p.isCancel(action) || action === 'skip') break
-							if (action === 'append') {
-								yield* appendEnvKeys(result.target, result.missing)
-								p.log.success(
-									`Appended ${result.missing.length} key(s) to ${result.target}`,
-								)
-							} else {
-								yield* resetEnvFile(result.example, result.target)
-								p.log.success(
-									`Replaced ${result.target} from ${result.example}`,
-								)
-							}
-							break
-						}
-					}
-				}
-				break
-			}
-
-			case 'doctor': {
-				const s = p.spinner()
-				s.start('Checking...')
-				const results = yield* doctor
-				s.stop('Diagnosis complete!')
-				const lines = results.map(r => {
-					const icon =
-						r.status === 'ok'
-							? pc.green('\u2713')
-							: r.status === 'warn'
-								? pc.yellow('!')
-								: pc.red('\u2717')
-					return `${icon} ${r.name}: ${r.detail}`
-				})
-				p.note(lines.join('\n'), 'Status')
-				break
-			}
-
-			case 'seed': {
-				yield* withRecovery(
-					withDb(
-						Effect.gen(function* () {
-							const s = p.spinner()
-							s.start('Inserting data...')
-							const counts = yield* seed('full')
-							s.stop('Seed complete!')
-
-							p.note(
-								[
-									`${pc.cyan(String(counts.products))} products`,
-									`${pc.cyan(String(counts.companies))} companies`,
-									`${pc.cyan(String(counts.contacts))} contacts`,
-									`${pc.cyan(String(counts.interactions))} interactions`,
-									`${pc.cyan(String(counts.tasks))} tasks`,
-									`${pc.cyan(String(counts.documents))} documents`,
-									`${pc.cyan(String(counts.proposals))} proposals`,
-									`${pc.cyan(String(counts.pages))} pages`,
-									`${pc.cyan(String(counts.callRecordings))} call recordings`,
-								].join('\n'),
-								'Summary',
-							)
-						}),
-					),
-				)
-				break
-			}
-
-			case 'db': {
-				const action = yield* Effect.promise(() =>
-					p.select({
-						message: 'Action?',
-						options: [
-							{
-								value: 'migrate' as const,
-								label: 'Migrate',
-								hint: 'Run database migrations',
-							},
-							{
-								value: 'reset' as const,
-								label: 'Reset',
-								hint: 'Drop schema + migrate (run Seed afterwards for data)',
-							},
-						],
-					}),
-				)
-
-				if (p.isCancel(action)) {
-					continue mainLoop
-				}
-
-				switch (action) {
-					case 'migrate': {
-						yield* withRecovery(
-							Effect.gen(function* () {
-								const s = p.spinner()
-								s.start('Running migrations...')
-								yield* dbMigrate
-								s.stop('Migrations complete!')
-							}),
-						)
-						break
-					}
-					case 'reset': {
-						const confirm = yield* Effect.promise(() =>
-							p.confirm({
-								message: 'Are you sure? All data will be lost.',
-								initialValue: false,
-							}),
-						)
-						if (p.isCancel(confirm) || !confirm) {
-							continue mainLoop
-						}
-						yield* withRecovery(
-							Effect.gen(function* () {
-								const s = p.spinner()
-								s.start('Resetting database...')
-								yield* withDb(dbReset)
-								s.stop('Database reset!')
-							}),
-						)
-						break
-					}
-				}
-				break
-			}
-
-			case 'services': {
-				const action = yield* Effect.promise(() =>
-					p.select({
-						message: 'Action?',
-						options: [
-							{
-								value: 'up' as const,
-								label: 'Up',
-								hint: 'Start services',
-							},
-							{
-								value: 'down' as const,
-								label: 'Down',
-								hint: 'Stop services',
-							},
-							{
-								value: 'status' as const,
-								label: 'Status',
-								hint: 'Show services status',
-							},
-						],
-					}),
-				)
-
-				if (p.isCancel(action)) {
-					continue mainLoop
-				}
-
-				switch (action) {
-					case 'up':
-						yield* withRecovery(servicesUp)
-						break
-					case 'down':
-						yield* withRecovery(servicesDown)
-						break
-					case 'status':
-						yield* withRecovery(servicesStatus)
-						break
-				}
-				break
-			}
-
-			case 'auth': {
-				const action = yield* Effect.promise(() =>
-					p.select({
-						message: 'Action?',
-						options: [
-							{
-								value: 'bootstrap' as const,
-								label: 'Bootstrap',
-								hint: 'Create the first admin user',
-							},
-							{
-								value: 'invite' as const,
-								label: 'Invite',
-								hint: 'Passwordless user + magic link',
-							},
-							{
-								value: 'list-users' as const,
-								label: 'List users',
-								hint: 'Dump the user table',
-							},
-							{
-								value: 'list-keys' as const,
-								label: 'List API keys',
-								hint: 'Every API key (all or by email)',
-							},
-							{
-								value: 'create-key' as const,
-								label: 'Create API key',
-								hint: 'Mint a new key for a user',
-							},
-							{
-								value: 'promote' as const,
-								label: 'Promote / Demote',
-								hint: "Change a user's role",
-							},
-							{
-								value: 'revoke-key' as const,
-								label: 'Revoke API key',
-								hint: 'Disable an API key',
-							},
-							{
-								value: 'reset-password' as const,
-								label: 'Reset password',
-								hint: "Overwrite a user's credential",
-							},
-							{
-								value: 'sessions' as const,
-								label: 'Sessions',
-								hint: 'Active sessions (all or by email)',
-							},
-						],
-					}),
-				)
-
-				if (p.isCancel(action)) {
-					continue mainLoop
-				}
-
-				switch (action) {
-					case 'bootstrap': {
-						const email = yield* Effect.promise(() =>
-							p.text({
-								message: 'Admin email:',
-								validate: v =>
-									v?.includes('@') ? undefined : 'Must be an email address',
-							}),
-						)
-						if (p.isCancel(email)) {
-							continue mainLoop
-						}
-						const name = yield* Effect.promise(() =>
-							p.text({
-								message: 'Admin name:',
-								validate: v => (v?.trim() ? undefined : 'Required'),
-							}),
-						)
-						if (p.isCancel(name)) {
-							continue mainLoop
-						}
-						const password = yield* Effect.promise(() =>
-							p.password({
-								message: 'Admin password:',
-								validate: v =>
-									v && v.length >= 8 ? undefined : 'At least 8 characters',
-							}),
-						)
-						if (p.isCancel(password)) {
-							continue mainLoop
-						}
-						yield* withRecovery(authBootstrap({ email, name, password }))
-						break
-					}
-					case 'invite': {
-						const email = yield* Effect.promise(() =>
-							p.text({
-								message: 'Invitee email:',
-								validate: v =>
-									v?.includes('@') ? undefined : 'Must be an email address',
-							}),
-						)
-						if (p.isCancel(email)) {
-							continue mainLoop
-						}
-						const name = yield* Effect.promise(() =>
-							p.text({
-								message: 'Invitee name:',
-								validate: v => (v?.trim() ? undefined : 'Required'),
-							}),
-						)
-						if (p.isCancel(name)) {
-							continue mainLoop
-						}
-						const role = yield* Effect.promise(() =>
-							p.select({
-								message: 'Role?',
-								options: [
-									{ value: 'user' as const, label: 'User' },
-									{ value: 'admin' as const, label: 'Admin' },
-								],
-								initialValue: 'user' as const,
-							}),
-						)
-						if (p.isCancel(role)) {
-							continue mainLoop
-						}
-						yield* withRecovery(authInvite({ email, name, role }))
-						break
-					}
-					case 'list-users': {
-						yield* withRecovery(authListUsers)
-						break
-					}
-					case 'list-keys': {
-						const scope = yield* Effect.promise(() =>
-							p.select({
-								message: 'Scope?',
-								options: [
-									{ value: 'all' as const, label: 'All keys' },
-									{ value: 'by-email' as const, label: 'Filter by email' },
-								],
-								initialValue: 'all' as const,
-							}),
-						)
-						if (p.isCancel(scope)) {
-							continue mainLoop
-						}
-						let email: string | undefined
-						if (scope === 'by-email') {
-							const input = yield* Effect.promise(() =>
-								p.text({
-									message: 'Email:',
-									validate: v =>
-										v?.includes('@') ? undefined : 'Must be an email address',
-								}),
-							)
-							if (p.isCancel(input)) {
-								continue mainLoop
-							}
-							email = input
-						}
-						yield* withRecovery(authListKeys({ email }))
-						break
-					}
-					case 'create-key': {
-						const email = yield* Effect.promise(() =>
-							p.text({
-								message: 'Owner email:',
-								validate: v =>
-									v?.includes('@') ? undefined : 'Must be an email address',
-							}),
-						)
-						if (p.isCancel(email)) {
-							continue mainLoop
-						}
-						const name = yield* Effect.promise(() =>
-							p.text({
-								message: 'Key name:',
-								initialValue: 'local-dev',
-								validate: v => (v?.trim() ? undefined : 'Required'),
-							}),
-						)
-						if (p.isCancel(name)) {
-							continue mainLoop
-						}
-						const prefix = yield* Effect.promise(() =>
-							p.text({
-								message: 'Key prefix:',
-								initialValue: 'batuda_',
-								validate: v => (v?.trim() ? undefined : 'Required'),
-							}),
-						)
-						if (p.isCancel(prefix)) {
-							continue mainLoop
-						}
-						yield* withRecovery(
-							authCreateKey({
-								email,
-								name,
-								prefix,
-								expiresIn: undefined,
-							}),
-						)
-						break
-					}
-					case 'promote': {
-						const email = yield* Effect.promise(() =>
-							p.text({
-								message: 'Email:',
-								validate: v =>
-									v?.includes('@') ? undefined : 'Must be an email address',
-							}),
-						)
-						if (p.isCancel(email)) {
-							continue mainLoop
-						}
-						const role = yield* Effect.promise(() =>
-							p.select({
-								message: 'New role?',
-								options: [
-									{ value: 'admin' as const, label: 'Admin' },
-									{ value: 'user' as const, label: 'User' },
-								],
-								initialValue: 'admin' as const,
-							}),
-						)
-						if (p.isCancel(role)) {
-							continue mainLoop
-						}
-						yield* withRecovery(authPromote({ email, role }))
-						break
-					}
-					case 'revoke-key': {
-						const keyId = yield* Effect.promise(() =>
-							p.text({
-								message: 'Key id:',
-								validate: v => (v?.trim() ? undefined : 'Required'),
-							}),
-						)
-						if (p.isCancel(keyId)) {
-							continue mainLoop
-						}
-						yield* withRecovery(authRevokeKey({ keyId }))
-						break
-					}
-					case 'reset-password': {
-						const email = yield* Effect.promise(() =>
-							p.text({
-								message: 'Email:',
-								validate: v =>
-									v?.includes('@') ? undefined : 'Must be an email address',
-							}),
-						)
-						if (p.isCancel(email)) {
-							continue mainLoop
-						}
-						const password = yield* Effect.promise(() =>
-							p.password({
-								message: 'New password:',
-								validate: v =>
-									v && v.length >= 8 ? undefined : 'At least 8 characters',
-							}),
-						)
-						if (p.isCancel(password)) {
-							continue mainLoop
-						}
-						yield* withRecovery(authResetPassword({ email, password }))
-						break
-					}
-					case 'sessions': {
-						const scope = yield* Effect.promise(() =>
-							p.select({
-								message: 'Scope?',
-								options: [
-									{ value: 'all' as const, label: 'All sessions' },
-									{ value: 'by-email' as const, label: 'Filter by email' },
-								],
-								initialValue: 'all' as const,
-							}),
-						)
-						if (p.isCancel(scope)) {
-							continue mainLoop
-						}
-						let email: string | undefined
-						if (scope === 'by-email') {
-							const input = yield* Effect.promise(() =>
-								p.text({
-									message: 'Email:',
-									validate: v =>
-										v?.includes('@') ? undefined : 'Must be an email address',
-								}),
-							)
-							if (p.isCancel(input)) {
-								continue mainLoop
-							}
-							email = input
-						}
-						yield* withRecovery(authSessions({ email }))
-						break
-					}
-				}
-				break
-			}
-		}
-
-		p.log.message(pc.dim('───'))
 	}
 })
 
 // ── Run ────────────────────────────────────────────────────
 
-const program = tui.pipe(
-	Effect.provide(NodeServices.layer),
-	Effect.tapError(e =>
-		Effect.sync(() => p.cancel(e instanceof Error ? e.message : String(e))),
-	),
-)
-NodeRuntime.runMain(program as unknown as Effect.Effect<void, unknown, never>, {
-	disableErrorReporting: true,
-})
+// `tui`'s error channel is `never` after `withRecovery` swallows leaf
+// failures and `Effect.promise` (used for the menu prompt) declares no
+// failure. No tapError needed — runtime defects still surface via
+// `NodeRuntime.runMain`'s defect handler.
+const program = tui.pipe(Effect.provide(NodeServices.layer))
+
+// Match the cli.ts `isMain` guard so importing this module (unlikely but
+// possible) doesn't auto-launch.
+const isMain =
+	typeof import.meta?.url === 'string' &&
+	process.argv[1] === fileURLToPath(import.meta.url)
+
+if (isMain) {
+	NodeRuntime.runMain(
+		program as unknown as Effect.Effect<void, unknown, never>,
+		{ disableErrorReporting: true },
+	)
+}
