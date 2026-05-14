@@ -11,7 +11,7 @@ const WORKSPACE_DIRS = ['apps', 'packages'] as const
 /**
  * Return repo-relative paths to every `.env.example` (exact name) located at
  * the repo root or one level deep inside `apps/` and `packages/`. Variants
- * like `.env.cloud.example` or `.env.example.github` are intentionally
+ * like `.env.example.cloud` or `.env.example.github` are intentionally
  * ignored so the sync surface stays narrow.
  */
 const findEnvExamples = (): string[] => {
