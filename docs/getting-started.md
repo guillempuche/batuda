@@ -139,13 +139,11 @@ Log in at `/sign-in` with the admin credentials you set in Step 5.
 Every CLI command accepts `--env local|cloud` (default `local`).
 
 - `--env local` loads `.env` + `apps/cli/.env` + `.env.local` + `apps/cli/.env.local`. This is always safe.
-- `--env cloud` loads the equivalents with `.cloud` suffix. **Destructive operations** (`db migrate`, `db reset`, `auth bootstrap`, `auth invite`, `auth create-key`, `auth promote`, `auth demote`, `auth revoke-key`, `auth reset-password`) are gated behind a re-prompt: the CLI asks you to type the DB hostname verbatim before it proceeds. Mistyping aborts and appends a `REFUSED` line to `cloud-audit.log` at the repo root. Successful runs append an `OK` line.
+- `--env cloud` loads the same baseline plus `.env.cloud` and `apps/cli/.env.cloud` (gitignored — they hold prod secrets). Non-secret GitHub Actions Variables are fetched on startup via `gh variable list --env production`, so `.env.cloud` only needs to carry secrets (which GitHub never exposes via the API). Commands that mutate state — DB writes, seeds, resets, auth user / key / session writes (e.g. `db reset`, `auth bootstrap`, `auth invite-admin`) — are gated behind a `y/N` confirm (default no) that shows the parsed DB hostname. Decline / Ctrl-C aborts and appends a `REFUSED` line to `cloud-audit.log`; confirming appends an `OK` line. Pure inspections (e.g. `doctor`, `auth list-*`, `auth sessions`) skip the gate; whether any given command calls `confirmCloud` is settled in `apps/cli/src/commands/*.ts`, so `pnpm cli <group> --help` plus a quick read of the command file is the authoritative reference.
 
-Read-only commands (`doctor`, `auth list-users`, `auth list-keys`, `auth sessions`) skip the gate.
+The interactive TUI (`pnpm cli:tui`) shows a coloured `LOCAL` / `CLOUD` badge in its header so you always know which database is at risk. Its menu is auto-generated from the CLI command tree, so every new `pnpm cli` subcommand appears in the TUI (and in `pnpm cli --help`) with no extra wiring.
 
-The interactive TUI (`pnpm cli:tui`) shows a coloured `LOCAL` / `CLOUD` badge in its header so you always know which database is at risk.
-
-`.env.cloud` files are gitignored — only the committer of a cloud env file should have it on disk.
+Cloud env requires `gh` authenticated locally (`gh auth status`). If `gh` is missing or unauthed the CLI prints a one-line install hint and falls back to whatever is in `.env.cloud`; any still-missing var will fail loudly at its specific Config read site.
 
 ## Troubleshooting
 
