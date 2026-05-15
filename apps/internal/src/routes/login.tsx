@@ -1,12 +1,14 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { Schema } from 'effect'
-import { useActionState } from 'react'
+import { useActionState, useEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 
 import { PriButton, PriInput } from '@batuda/ui/pri'
 
+import { PriPasswordInput } from '#/components/primitives/pri-password-input'
 import { apiBaseUrl } from '#/lib/api-base'
+import { normalizeEmail } from '#/lib/forms'
 import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import { fetchSession } from '#/lib/session-check'
@@ -22,28 +24,69 @@ function isSafeReturnTo(value: string): boolean {
 	return value.startsWith('/') && !value.startsWith('//')
 }
 
+const safeReturnTo = (value: string | undefined): string =>
+	value && isSafeReturnTo(value) ? value : '/'
+
+// Cross-tab sign-in coordination channel: when the magic-link verify
+// endpoint lands the user in a fresh tab, we broadcast so the original
+// `/login` tab can navigate off the stale "Check your inbox" panel.
+const AUTH_CHANNEL = 'batuda-auth'
+
 /**
- * Login page.
- *
- * Completely standalone — `__root.tsx` detects the `/login` path and
- * skips the authenticated AppShell, so this route renders on a bare
- * body. The form POSTs to Better-Auth's `/auth/sign-in/email` endpoint
- * on the API server; on success, the server sets the `batuda.*` session
- * cookie (cross-origin, `credentials: 'include'` from the fetch here
- * and `access-control-allow-credentials` from our CORS middleware),
- * and we client-navigate to `/`.
- *
- * Public sign-up is disabled on the server — see
- * `docs/backend.md#invite-only-signup` — so this page deliberately has
- * no "Create account" link. New users are provisioned via the admin
- * plugin by an existing admin or an API-key-authenticated caller.
+ * Standalone route: `__root.tsx` skips the authenticated AppShell for
+ * `/login` so this renders on a bare body. No "Create account" link
+ * because public sign-up is disabled server-side (see
+ * docs/backend.md#invite-only-signup).
  */
 
 // Hoisted to module scope so TanStack infers the search type correctly;
 // inline it and the `search` param in `beforeLoad` widens to `{}`.
 const validateSearch = validateSearchWith({
 	returnTo: Schema.NonEmptyString,
+	magic_link_error: Schema.NonEmptyString,
 })
+
+const MAGIC_LINK_EXPIRY_MINUTES = 5
+const RESEND_COOLDOWN_SECONDS = 30
+
+interface ProviderDeepLink {
+	readonly host: string
+	readonly label: string
+	readonly url: string
+}
+
+const PROVIDER_DEEP_LINKS: ReadonlyArray<ProviderDeepLink> = [
+	{ host: 'gmail.com', label: 'Gmail', url: 'https://mail.google.com' },
+	{ host: 'googlemail.com', label: 'Gmail', url: 'https://mail.google.com' },
+	{
+		host: 'outlook.com',
+		label: 'Outlook',
+		url: 'https://outlook.live.com/mail',
+	},
+	{
+		host: 'hotmail.com',
+		label: 'Outlook',
+		url: 'https://outlook.live.com/mail',
+	},
+	{
+		host: 'icloud.com',
+		label: 'iCloud Mail',
+		url: 'https://www.icloud.com/mail',
+	},
+	{ host: 'proton.me', label: 'Proton Mail', url: 'https://mail.proton.me' },
+	{
+		host: 'protonmail.com',
+		label: 'Proton Mail',
+		url: 'https://mail.proton.me',
+	},
+	{ host: 'fastmail.com', label: 'Fastmail', url: 'https://app.fastmail.com' },
+]
+
+const providerDeepLinkFor = (email: string): ProviderDeepLink | null => {
+	const host = email.split('@')[1]?.toLowerCase()
+	if (!host) return null
+	return PROVIDER_DEEP_LINKS.find(entry => entry.host === host) ?? null
+}
 
 export const Route = createFileRoute('/login')({
 	validateSearch,
@@ -60,11 +103,7 @@ export const Route = createFileRoute('/login')({
 		}
 		const user = await fetchSession(cookieHeader)
 		if (user) {
-			const target =
-				search.returnTo && isSafeReturnTo(search.returnTo)
-					? search.returnTo
-					: '/'
-			throw redirect({ href: target })
+			throw redirect({ href: safeReturnTo(search.returnTo) })
 		}
 	},
 	head: () => ({ meta: [{ title: 'Sign in — Batuda' }] }),
@@ -77,22 +116,29 @@ interface FormState {
 
 const INITIAL_STATE: FormState = { error: null }
 
+type MagicLinkStatus =
+	| { readonly kind: 'idle' }
+	| { readonly kind: 'sending' }
+	| { readonly kind: 'sent'; readonly email: string }
+	| { readonly kind: 'error'; readonly message: string }
+
 function LoginPage() {
 	const { t } = useLingui()
 	const navigate = useNavigate()
 	const search = Route.useSearch()
+	const emailFieldRef = useRef<HTMLInputElement | null>(null)
+	const inboxHeadingRef = useRef<HTMLHeadingElement | null>(null)
+	const [magicLinkStatus, setMagicLinkStatus] = useState<MagicLinkStatus>({
+		kind: 'idle',
+	})
+	const [resendCountdown, setResendCountdown] = useState(0)
 
-	// React 19 form action. Inputs stay uncontrolled (read from FormData)
-	// and the action is queued by React even before hydration completes,
-	// so a click that lands during the hydration gap is dispatched safely
-	// to this handler instead of falling through to a native form submit
-	// (which would otherwise put the password in the URL on a GET form
-	// or full-page-reload on a POST). `useActionState` also threads the
-	// `pending` flag and the latest error into render without manual
-	// `useState`.
+	// React 19 form action: queued even during the pre-hydration gap, so an
+	// early click cannot fall through to a native submit and leak the
+	// password into the URL.
 	const [state, formAction, isPending] = useActionState<FormState, FormData>(
 		async (_previous, formData) => {
-			const email = String(formData.get('email') ?? '')
+			const email = normalizeEmail(String(formData.get('email') ?? ''))
 			const password = String(formData.get('password') ?? '')
 			try {
 				const response = await fetch(`${apiBaseUrl()}/auth/sign-in/email`, {
@@ -103,22 +149,15 @@ function LoginPage() {
 				})
 				if (!response.ok) {
 					const body = (await response.json().catch(() => null)) as {
+						code?: string
 						message?: string
 					} | null
-					return {
-						error:
-							body?.message ??
-							t`Could not sign in. Check your email and password.`,
-					}
+					return { error: passwordErrorMessage(body, response.status, t) }
 				}
 				// Success — cookie is on the response. Navigate to the
 				// originally requested URL (or `/`); the root's beforeLoad
 				// re-checks the session and lets us through.
-				const target =
-					search.returnTo && isSafeReturnTo(search.returnTo)
-						? search.returnTo
-						: '/'
-				await navigate({ href: target })
+				await navigate({ href: safeReturnTo(search.returnTo) })
 				return { error: null }
 			} catch (cause) {
 				console.error('[Login] sign-in failed:', cause)
@@ -130,6 +169,134 @@ function LoginPage() {
 		INITIAL_STATE,
 	)
 
+	// Verify-time errors land back here via the magic-link plugin's
+	// errorCallbackURL (auth.ts wires `/login?magic_link_error=<code>`).
+	const verifyError = useMemo(
+		() => magicLinkVerifyErrorMessage(search.magic_link_error, t),
+		[search.magic_link_error, t],
+	)
+
+	// Resend cooldown ticker — stops the user from mashing the button into
+	// a 429 from Better-Auth's per-route rate limit.
+	useEffect(() => {
+		if (resendCountdown <= 0) return
+		const id = setTimeout(() => {
+			setResendCountdown(value => Math.max(0, value - 1))
+		}, 1_000)
+		return () => {
+			clearTimeout(id)
+		}
+	}, [resendCountdown])
+
+	// When the magic-link verify endpoint lands the user in a fresh tab,
+	// the original /login tab is left on the stale inbox panel. Listen for
+	// the sibling navigation event so we follow them off the page.
+	useEffect(() => {
+		if (typeof BroadcastChannel === 'undefined') return
+		const channel = new BroadcastChannel(AUTH_CHANNEL)
+		channel.onmessage = event => {
+			if (event.data?.kind === 'signed-in') {
+				void navigate({ href: safeReturnTo(search.returnTo) })
+			}
+		}
+		return () => {
+			channel.close()
+		}
+	}, [navigate, search.returnTo])
+
+	// Focus management on swap: when the form is replaced by the inbox
+	// panel, focus follows the heading so screen readers re-anchor.
+	useEffect(() => {
+		if (magicLinkStatus.kind === 'sent' && inboxHeadingRef.current) {
+			inboxHeadingRef.current.focus()
+		}
+	}, [magicLinkStatus.kind])
+
+	const sendMagicLink = async (email: string) => {
+		setMagicLinkStatus({ kind: 'sending' })
+		try {
+			const callbackURL = absoluteUrl(safeReturnTo(search.returnTo))
+			// Better-Auth substitutes the literal `${ERROR_CODE}` server-side,
+			// so build via URL with a placeholder and swap it in to avoid the
+			// `$`/`{`/`}` getting percent-encoded.
+			const errorCallbackURL = absoluteUrl('/login', {
+				magic_link_error: '__CODE__',
+			}).replace('__CODE__', '${ERROR_CODE}')
+			const response = await fetch(`${apiBaseUrl()}/auth/sign-in/magic-link`, {
+				method: 'POST',
+				credentials: 'include',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ email, callbackURL, errorCallbackURL }),
+			})
+			if (!response.ok) {
+				const body = (await response.json().catch(() => null)) as {
+					code?: string
+					message?: string
+				} | null
+				setMagicLinkStatus({
+					kind: 'error',
+					message: magicLinkErrorMessage(body, response.status, t),
+				})
+				return
+			}
+			setMagicLinkStatus({ kind: 'sent', email })
+			setResendCountdown(RESEND_COOLDOWN_SECONDS)
+		} catch (cause) {
+			console.error('[Login] magic-link request failed:', cause)
+			setMagicLinkStatus({
+				kind: 'error',
+				message: t`No connection to the server. Try again in a few seconds.`,
+			})
+		}
+	}
+
+	const requestMagicLink = () => {
+		const email = normalizeEmail(emailFieldRef.current?.value ?? '')
+		if (!isLikelyEmail(email)) {
+			setMagicLinkStatus({
+				kind: 'error',
+				message: t`Enter a valid email above first.`,
+			})
+			return
+		}
+		void sendMagicLink(email)
+	}
+
+	const resendMagicLink = () => {
+		if (magicLinkStatus.kind !== 'sent') return
+		if (resendCountdown > 0) return
+		void sendMagicLink(magicLinkStatus.email)
+	}
+
+	const changeEmail = () => {
+		setMagicLinkStatus({ kind: 'idle' })
+		setResendCountdown(0)
+		requestAnimationFrame(() => {
+			if (emailFieldRef.current) {
+				emailFieldRef.current.value = ''
+				emailFieldRef.current.focus()
+			}
+		})
+	}
+
+	const usePasswordInstead = () => {
+		setMagicLinkStatus({ kind: 'idle' })
+		setResendCountdown(0)
+	}
+
+	if (magicLinkStatus.kind === 'sent') {
+		return (
+			<InboxView
+				email={magicLinkStatus.email}
+				resendCountdown={resendCountdown}
+				onResend={resendMagicLink}
+				onChangeEmail={changeEmail}
+				onUsePassword={usePasswordInstead}
+				headingRef={inboxHeadingRef}
+			/>
+		)
+	}
+
 	return (
 		<Page>
 			<Card>
@@ -137,6 +304,11 @@ function LoginPage() {
 				<Subtitle>
 					<Trans>Sign in to continue</Trans>
 				</Subtitle>
+				{verifyError ? (
+					<ErrorText role='alert' data-testid='login-magic-link-error'>
+						{verifyError}
+					</ErrorText>
+				) : null}
 				<Form action={formAction} data-testid='login-form'>
 					<Field>
 						<Label htmlFor='email'>
@@ -148,7 +320,8 @@ function LoginPage() {
 							type='email'
 							autoComplete='email'
 							required
-							disabled={isPending}
+							ref={emailFieldRef}
+							disabled={isPending || magicLinkStatus.kind === 'sending'}
 							data-testid='login-email'
 						/>
 					</Field>
@@ -156,13 +329,12 @@ function LoginPage() {
 						<Label htmlFor='password'>
 							<Trans>Password</Trans>
 						</Label>
-						<PriInput
+						<PriPasswordInput
 							id='password'
 							name='password'
-							type='password'
 							autoComplete='current-password'
 							required
-							disabled={isPending}
+							disabled={isPending || magicLinkStatus.kind === 'sending'}
 							data-testid='login-password'
 						/>
 					</Field>
@@ -173,13 +345,30 @@ function LoginPage() {
 					) : null}
 					<SubmitButton
 						type='submit'
-						disabled={isPending}
+						disabled={isPending || magicLinkStatus.kind === 'sending'}
 						$variant='filled'
 						data-testid='login-submit'
 					>
 						{isPending ? t`Signing in…` : t`Sign in`}
 					</SubmitButton>
 				</Form>
+				<MagicLinkRow>
+					<MagicLinkTrigger
+						type='button'
+						onClick={requestMagicLink}
+						disabled={isPending || magicLinkStatus.kind === 'sending'}
+						data-testid='login-magic-link-trigger'
+					>
+						{magicLinkStatus.kind === 'sending'
+							? t`Sending…`
+							: t`Email me a sign-in link`}
+					</MagicLinkTrigger>
+				</MagicLinkRow>
+				{magicLinkStatus.kind === 'error' ? (
+					<ErrorText role='alert' data-testid='login-magic-link-error'>
+						{magicLinkStatus.message}
+					</ErrorText>
+				) : null}
 				<Hint>
 					<Trans>
 						Batuda is invite-only. Request access from the Engranatge team.
@@ -189,6 +378,174 @@ function LoginPage() {
 		</Page>
 	)
 }
+
+interface InboxViewProps {
+	readonly email: string
+	readonly resendCountdown: number
+	readonly onResend: () => void
+	readonly onChangeEmail: () => void
+	readonly onUsePassword: () => void
+	readonly headingRef: React.RefObject<HTMLHeadingElement | null>
+}
+
+function InboxView({
+	email,
+	resendCountdown,
+	onResend,
+	onChangeEmail,
+	onUsePassword,
+	headingRef,
+}: InboxViewProps) {
+	const { t } = useLingui()
+	const provider = providerDeepLinkFor(email)
+
+	return (
+		<Page>
+			<Card
+				role='status'
+				aria-live='polite'
+				data-testid='magic-link-sent-panel'
+			>
+				<Brand>Batuda</Brand>
+				<InboxHeading ref={headingRef} tabIndex={-1}>
+					<Trans>Check your inbox</Trans>
+				</InboxHeading>
+				<Subtitle>
+					<Trans>We sent a sign-in link to</Trans>{' '}
+					<strong data-testid='magic-link-sent-email'>{email}</strong>.
+				</Subtitle>
+				<Subtitle>
+					<Trans>
+						It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it?
+						Check spam.
+					</Trans>
+				</Subtitle>
+				<ButtonRow>
+					<PriButton
+						type='button'
+						$variant='filled'
+						onClick={onResend}
+						disabled={resendCountdown > 0}
+						data-testid='magic-link-resend'
+					>
+						{resendCountdown > 0 ? (
+							<>
+								<Trans>Resend in</Trans>{' '}
+								<span data-testid='magic-link-resend-countdown'>
+									{resendCountdown}s
+								</span>
+							</>
+						) : (
+							t`Resend link`
+						)}
+					</PriButton>
+					{provider ? (
+						<PriButton
+							type='button'
+							$variant='outlined'
+							onClick={() => {
+								window.open(provider.url, '_blank', 'noopener,noreferrer')
+							}}
+							data-testid='magic-link-open-provider'
+						>
+							<Trans>Open {provider.label}</Trans>
+						</PriButton>
+					) : null}
+				</ButtonRow>
+				<SecondaryRow>
+					<SecondaryLink
+						type='button'
+						onClick={onChangeEmail}
+						data-testid='magic-link-change-email'
+					>
+						<Trans>Use a different email</Trans>
+					</SecondaryLink>
+					<SecondaryLink
+						type='button'
+						onClick={onUsePassword}
+						data-testid='magic-link-use-password'
+					>
+						<Trans>Use password instead</Trans>
+					</SecondaryLink>
+				</SecondaryRow>
+			</Card>
+		</Page>
+	)
+}
+
+// --- helpers ----------------------------------------------------------------
+
+const isLikelyEmail = (value: string): boolean =>
+	value.length > 3 && value.includes('@') && !value.includes(' ')
+
+const absoluteUrl = (path: string, query?: Record<string, string>): string => {
+	const origin =
+		typeof window !== 'undefined' && window.location?.origin
+			? window.location.origin
+			: 'http://localhost'
+	const url = new URL(path, origin)
+	if (query) {
+		for (const [key, value] of Object.entries(query)) {
+			url.searchParams.set(key, value)
+		}
+	}
+	return url.toString()
+}
+
+type Tr = ReturnType<typeof useLingui>['t']
+
+const passwordErrorMessage = (
+	body: { code?: string; message?: string } | null,
+	status: number,
+	t: Tr,
+): string => {
+	if (status === 429) {
+		return t`Too many attempts. Try again in a minute.`
+	}
+	switch (body?.code) {
+		case 'INVALID_EMAIL_OR_PASSWORD':
+			return t`Email or password is incorrect.`
+		case 'EMAIL_NOT_VERIFIED':
+			return t`Your email isn't verified yet. Use the magic link instead.`
+		default:
+			return (
+				body?.message ?? t`Could not sign in. Check your email and password.`
+			)
+	}
+}
+
+const magicLinkErrorMessage = (
+	body: { code?: string; message?: string } | null,
+	status: number,
+	t: Tr,
+): string => {
+	if (status === 429) {
+		return t`Too many attempts. Try again in a minute.`
+	}
+	return (
+		body?.message ?? t`Could not send the link. Try again in a few seconds.`
+	)
+}
+
+const magicLinkVerifyErrorMessage = (
+	code: string | undefined,
+	t: Tr,
+): string | null => {
+	if (!code) return null
+	switch (code) {
+		case 'new_user_signup_disabled':
+			return t`We don't recognize that email. Ask an admin to invite you.`
+		case 'EXPIRED_TOKEN':
+			return t`That link expired. Request a fresh one below.`
+		case 'INVALID_TOKEN':
+		case 'ATTEMPTS_EXCEEDED':
+			return t`That link is no longer valid. Request a fresh one below.`
+		default:
+			return t`We couldn't sign you in via that link. Try again.`
+	}
+}
+
+// --- styled components ------------------------------------------------------
 
 const Page = styled.div.withConfig({ displayName: 'LoginPage' })`
 	min-height: 100dvh;
@@ -303,6 +660,93 @@ const SubmitButton = styled(PriButton).withConfig({
 	displayName: 'LoginSubmit',
 })`
 	margin-top: var(--space-xs);
+`
+
+const MagicLinkRow = styled.div.withConfig({
+	displayName: 'LoginMagicLinkRow',
+})`
+	display: flex;
+	justify-content: center;
+	margin-top: calc(var(--space-xs) * -1);
+`
+
+const MagicLinkTrigger = styled.button.withConfig({
+	displayName: 'LoginMagicLinkTrigger',
+})`
+	background: none;
+	border: none;
+	padding: var(--space-2xs) var(--space-xs);
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	color: var(--color-primary);
+	text-decoration: underline;
+	text-underline-offset: 3px;
+	cursor: pointer;
+
+	&:hover:not(:disabled) {
+		color: var(--color-on-surface);
+	}
+
+	&:focus-visible {
+		outline: 2px solid var(--color-primary);
+		outline-offset: 2px;
+		border-radius: var(--shape-2xs);
+	}
+
+	&:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+`
+
+const InboxHeading = styled.h2.withConfig({
+	displayName: 'LoginInboxHeading',
+})`
+	${stenciledTitle}
+	font-size: var(--typescale-headline-small-size);
+	margin: 0;
+	&:focus {
+		outline: none;
+	}
+`
+
+const ButtonRow = styled.div.withConfig({ displayName: 'LoginInboxButtonRow' })`
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-sm);
+	margin-top: var(--space-xs);
+`
+
+const SecondaryRow = styled.div.withConfig({
+	displayName: 'LoginInboxSecondaryRow',
+})`
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-md);
+	margin-top: var(--space-xs);
+`
+
+const SecondaryLink = styled.button.withConfig({
+	displayName: 'LoginInboxSecondaryLink',
+})`
+	background: none;
+	border: none;
+	padding: 0;
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	color: var(--color-primary);
+	text-decoration: underline;
+	cursor: pointer;
+
+	&:hover {
+		color: var(--color-on-surface);
+	}
+
+	&:focus-visible {
+		outline: 2px solid var(--color-primary);
+		outline-offset: 2px;
+		border-radius: var(--shape-2xs);
+	}
 `
 
 const Hint = styled.p.withConfig({ displayName: 'LoginHint' })`

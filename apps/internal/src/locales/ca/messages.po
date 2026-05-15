@@ -282,7 +282,7 @@ msgstr "Batuda — un CRM multi-inquilí per a petites agències."
 msgid "Batuda home"
 msgstr "Inici de Batuda"
 
-#: src/routes/login.tsx:184
+#: src/routes/login.tsx:366
 msgid "Batuda is invite-only. Request access from the Engranatge team."
 msgstr "Batuda és només amb invitació. Demana accés a l'equip d'Engranatge."
 
@@ -409,6 +409,10 @@ msgstr "Comprova que la teva sessió sigui vàlida o torna-ho a provar."
 #: src/routes/emails/inboxes.tsx:385
 msgid "Check the session or try again."
 msgstr "Comprova la sessió o torna-ho a provar."
+
+#: src/routes/login.tsx:404
+msgid "Check your inbox"
+msgstr "Mira la safata d'entrada"
 
 #: src/routes/emails/inboxes.tsx:350
 #: src/routes/emails/inboxes.tsx:351
@@ -670,10 +674,6 @@ msgstr "No s'ha pogut establir la bústia principal"
 msgid "Could not set the default inbox."
 msgstr "No s'ha pogut establir la safata per defecte."
 
-#: src/routes/login.tsx:111
-msgid "Could not sign in. Check your email and password."
-msgstr "No s'ha pogut iniciar sessió. Comprova el correu i la contrasenya."
-
 #: src/components/research/research-dialog.tsx:107
 msgid "Could not start the research run. Please try again."
 msgstr "No s'ha pogut iniciar la cerca. Torna-ho a provar."
@@ -884,7 +884,7 @@ msgstr "Editor"
 #: src/components/shared/channel-icon.tsx:63
 #: src/routes/companies/$slug.tsx:854
 #: src/routes/emails/inboxes.tsx:402
-#: src/routes/login.tsx:143
+#: src/routes/login.tsx:308
 #: src/routes/settings/organization/invite.tsx:137
 msgid "Email"
 msgstr "Correu"
@@ -900,6 +900,10 @@ msgstr "Esborranys de correu"
 #: src/routes/companies/$slug.tsx:1023
 msgid "Email is dead-letter"
 msgstr "El correu electrònic és no entregable"
+
+#: src/routes/login.tsx:357
+msgid "Email me a sign-in link"
+msgstr "Envia'm un enllaç per correu"
 
 #: src/routes/companies/$slug.tsx:1065
 msgid "Email via Batuda"
@@ -917,6 +921,10 @@ msgstr "Els emails, trucades, documents i propostes apareixeran aquí a mesura q
 #: src/components/research/findings/company-enrichment-view.tsx:99
 msgid "Enrichment"
 msgstr "Enriquiment"
+
+#: src/routes/login.tsx:251
+msgid "Enter a valid email above first."
+msgstr "Primer escriu un correu vàlid a sobre."
 
 #: src/routes/settings/organization/invite.tsx:54
 msgid "Enter an email address."
@@ -1025,6 +1033,10 @@ msgstr "Anant al tauler…"
 msgid "Hide Cc"
 msgstr "Amaga Cc"
 
+#: src/components/primitives/pri-password-input.tsx:95
+msgid "Hide password"
+msgstr "Amaga la contrasenya"
+
 #: src/routes/companies/$slug.tsx:453
 msgid "High"
 msgstr "Alta"
@@ -1126,6 +1138,10 @@ msgstr "Convida un membre"
 #: src/routes/settings/organization/index.tsx:100
 msgid "Invite a new member"
 msgstr "Convida un nou membre"
+
+#: src/routes/login.tsx:411
+msgid "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
+msgstr "Caduca en {MAGIC_LINK_EXPIRY_MINUTES} minuts. No el veus? Mira el correu brossa."
 
 #: src/routes/accept-invitation.$id.tsx:140
 msgid "Join the workspace"
@@ -1449,7 +1465,8 @@ msgstr "Encara no hi ha empreses"
 
 #: src/components/layout/org-switcher.tsx:62
 #: src/routes/accept-invitation.$id.tsx:98
-#: src/routes/login.tsx:126
+#: src/routes/login.tsx:155
+#: src/routes/login.tsx:241
 #: src/routes/profile/index.tsx:77
 #: src/routes/settings/organization/invite.tsx:77
 #: src/routes/settings/organization/members.tsx:81
@@ -1614,6 +1631,11 @@ msgstr "Només els propietaris i administradors poden convidar nous membres."
 msgid "Open"
 msgstr "Obert"
 
+#. placeholder {0}: provider.label
+#: src/routes/login.tsx:444
+msgid "Open {0}"
+msgstr "Obre {0}"
+
 #: src/routes/calendar/index.tsx:351
 msgid "Open company"
 msgstr "Obre l'empresa"
@@ -1769,7 +1791,7 @@ msgstr "Indicadors de dolor"
 msgid "Pain points"
 msgstr "Punts febles"
 
-#: src/routes/login.tsx:157
+#: src/routes/login.tsx:323
 msgid "Password"
 msgstr "Contrasenya"
 
@@ -2020,6 +2042,14 @@ msgstr "Recerca"
 msgid "Research run"
 msgstr "Recerca"
 
+#: src/routes/login.tsx:426
+msgid "Resend in"
+msgstr "Torna a enviar en"
+
+#: src/routes/login.tsx:432
+msgid "Resend link"
+msgstr "Torna a enviar l'enllaç"
+
 #: src/routes/emails/index.tsx:1361
 msgid "Reset"
 msgstr "Restableix"
@@ -2148,6 +2178,7 @@ msgid "Send invitation"
 msgstr "Envia invitació"
 
 #: src/components/emails/compose-form.tsx:534
+#: src/routes/login.tsx:356
 #: src/routes/settings/organization/invite.tsx:180
 msgid "Sending…"
 msgstr "Enviant…"
@@ -2182,6 +2213,10 @@ msgstr "Mostra menys"
 msgid "Show more"
 msgstr "Mostra més"
 
+#: src/components/primitives/pri-password-input.tsx:94
+msgid "Show password"
+msgstr "Mostra la contrasenya"
+
 #: src/routes/companies/$slug.tsx:926
 msgid "Show system events"
 msgstr "Mostra esdeveniments del sistema"
@@ -2191,7 +2226,7 @@ msgid "Showing {firstRow}–{lastRow} of {total}"
 msgstr "Mostrant {firstRow}–{lastRow} de {total}"
 
 #: src/routes/accept-invitation.$id.tsx:129
-#: src/routes/login.tsx:180
+#: src/routes/login.tsx:345
 msgid "Sign in"
 msgstr "Inicia sessió"
 
@@ -2199,7 +2234,7 @@ msgstr "Inicia sessió"
 msgid "Sign in to accept this invitation"
 msgstr "Inicia sessió per acceptar aquesta invitació"
 
-#: src/routes/login.tsx:138
+#: src/routes/login.tsx:298
 msgid "Sign in to continue"
 msgstr "Inicia sessió per continuar"
 
@@ -2211,7 +2246,7 @@ msgstr "Tanca sessió"
 msgid "Sign-out failed. Please try again."
 msgstr "No s'ha pogut tancar la sessió. Torna-ho a provar."
 
-#: src/routes/login.tsx:180
+#: src/routes/login.tsx:345
 msgid "Signing in…"
 msgstr "Iniciant sessió…"
 
@@ -2566,6 +2601,10 @@ msgstr "Pujant…"
 msgid "Use {0} as primary"
 msgstr "Fes servir {0} com a principal"
 
+#: src/routes/login.tsx:454
+msgid "Use a different email"
+msgstr "Fes servir un altre correu"
+
 #: src/routes/emails/inboxes.tsx:1444
 msgid "Use as default footer"
 msgstr "Utilitza com a peu de pàgina predeterminat"
@@ -2573,6 +2612,10 @@ msgstr "Utilitza com a peu de pàgina predeterminat"
 #: src/routes/emails/inboxes.tsx:1027
 msgid "Use as default for this purpose"
 msgstr "Usa com a per defecte per a aquest propòsit"
+
+#: src/routes/login.tsx:461
+msgid "Use password instead"
+msgstr "Fes servir contrasenya"
 
 #: src/routes/emails/inboxes.tsx:914
 msgid "Username"
@@ -2594,6 +2637,10 @@ msgstr "Visites"
 #: src/components/shared/channel-icon.tsx:64
 msgid "Visit"
 msgstr "Visita"
+
+#: src/routes/login.tsx:407
+msgid "We sent a sign-in link to"
+msgstr "S'ha enviat un enllaç d'inici de sessió a"
 
 #: src/components/research/findings/competitor-scan-view.tsx:148
 msgid "Weaknesses"

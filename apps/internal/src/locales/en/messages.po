@@ -282,7 +282,7 @@ msgstr "Batuda — a multi-tenant CRM for small agencies."
 msgid "Batuda home"
 msgstr "Batuda home"
 
-#: src/routes/login.tsx:184
+#: src/routes/login.tsx:366
 msgid "Batuda is invite-only. Request access from the Engranatge team."
 msgstr "Batuda is invite-only. Request access from the Engranatge team."
 
@@ -409,6 +409,10 @@ msgstr "Check that your session is valid or try again."
 #: src/routes/emails/inboxes.tsx:385
 msgid "Check the session or try again."
 msgstr "Check the session or try again."
+
+#: src/routes/login.tsx:404
+msgid "Check your inbox"
+msgstr "Check your inbox"
 
 #: src/routes/emails/inboxes.tsx:350
 #: src/routes/emails/inboxes.tsx:351
@@ -670,10 +674,6 @@ msgstr "Could not set primary inbox"
 msgid "Could not set the default inbox."
 msgstr "Could not set the default inbox."
 
-#: src/routes/login.tsx:111
-msgid "Could not sign in. Check your email and password."
-msgstr "Could not sign in. Check your email and password."
-
 #: src/components/research/research-dialog.tsx:107
 msgid "Could not start the research run. Please try again."
 msgstr "Could not start the research run. Please try again."
@@ -884,7 +884,7 @@ msgstr "Editor"
 #: src/components/shared/channel-icon.tsx:63
 #: src/routes/companies/$slug.tsx:854
 #: src/routes/emails/inboxes.tsx:402
-#: src/routes/login.tsx:143
+#: src/routes/login.tsx:308
 #: src/routes/settings/organization/invite.tsx:137
 msgid "Email"
 msgstr "Email"
@@ -900,6 +900,10 @@ msgstr "Email drafts"
 #: src/routes/companies/$slug.tsx:1023
 msgid "Email is dead-letter"
 msgstr "Email is dead-letter"
+
+#: src/routes/login.tsx:357
+msgid "Email me a sign-in link"
+msgstr "Email me a sign-in link"
 
 #: src/routes/companies/$slug.tsx:1065
 msgid "Email via Batuda"
@@ -917,6 +921,10 @@ msgstr "Emails, calls, documents, and proposals will appear here as they happen.
 #: src/components/research/findings/company-enrichment-view.tsx:99
 msgid "Enrichment"
 msgstr "Enrichment"
+
+#: src/routes/login.tsx:251
+msgid "Enter a valid email above first."
+msgstr "Enter a valid email above first."
 
 #: src/routes/settings/organization/invite.tsx:54
 msgid "Enter an email address."
@@ -1025,6 +1033,10 @@ msgstr "Heading to the dashboard…"
 msgid "Hide Cc"
 msgstr "Hide Cc"
 
+#: src/components/primitives/pri-password-input.tsx:95
+msgid "Hide password"
+msgstr "Hide password"
+
 #: src/routes/companies/$slug.tsx:453
 msgid "High"
 msgstr "High"
@@ -1126,6 +1138,10 @@ msgstr "Invite a member"
 #: src/routes/settings/organization/index.tsx:100
 msgid "Invite a new member"
 msgstr "Invite a new member"
+
+#: src/routes/login.tsx:411
+msgid "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
+msgstr "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
 
 #: src/routes/accept-invitation.$id.tsx:140
 msgid "Join the workspace"
@@ -1449,7 +1465,8 @@ msgstr "No companies yet"
 
 #: src/components/layout/org-switcher.tsx:62
 #: src/routes/accept-invitation.$id.tsx:98
-#: src/routes/login.tsx:126
+#: src/routes/login.tsx:155
+#: src/routes/login.tsx:241
 #: src/routes/profile/index.tsx:77
 #: src/routes/settings/organization/invite.tsx:77
 #: src/routes/settings/organization/members.tsx:81
@@ -1614,6 +1631,11 @@ msgstr "Only owners and admins can invite new members."
 msgid "Open"
 msgstr "Open"
 
+#. placeholder {0}: provider.label
+#: src/routes/login.tsx:444
+msgid "Open {0}"
+msgstr "Open {0}"
+
 #: src/routes/calendar/index.tsx:351
 msgid "Open company"
 msgstr "Open company"
@@ -1769,7 +1791,7 @@ msgstr "Pain indicators"
 msgid "Pain points"
 msgstr "Pain points"
 
-#: src/routes/login.tsx:157
+#: src/routes/login.tsx:323
 msgid "Password"
 msgstr "Password"
 
@@ -2020,6 +2042,14 @@ msgstr "Research"
 msgid "Research run"
 msgstr "Research run"
 
+#: src/routes/login.tsx:426
+msgid "Resend in"
+msgstr "Resend in"
+
+#: src/routes/login.tsx:432
+msgid "Resend link"
+msgstr "Resend link"
+
 #: src/routes/emails/index.tsx:1361
 msgid "Reset"
 msgstr "Reset"
@@ -2148,6 +2178,7 @@ msgid "Send invitation"
 msgstr "Send invitation"
 
 #: src/components/emails/compose-form.tsx:534
+#: src/routes/login.tsx:356
 #: src/routes/settings/organization/invite.tsx:180
 msgid "Sending…"
 msgstr "Sending…"
@@ -2182,6 +2213,10 @@ msgstr "Show less"
 msgid "Show more"
 msgstr "Show more"
 
+#: src/components/primitives/pri-password-input.tsx:94
+msgid "Show password"
+msgstr "Show password"
+
 #: src/routes/companies/$slug.tsx:926
 msgid "Show system events"
 msgstr "Show system events"
@@ -2191,7 +2226,7 @@ msgid "Showing {firstRow}–{lastRow} of {total}"
 msgstr "Showing {firstRow}–{lastRow} of {total}"
 
 #: src/routes/accept-invitation.$id.tsx:129
-#: src/routes/login.tsx:180
+#: src/routes/login.tsx:345
 msgid "Sign in"
 msgstr "Sign in"
 
@@ -2199,7 +2234,7 @@ msgstr "Sign in"
 msgid "Sign in to accept this invitation"
 msgstr "Sign in to accept this invitation"
 
-#: src/routes/login.tsx:138
+#: src/routes/login.tsx:298
 msgid "Sign in to continue"
 msgstr "Sign in to continue"
 
@@ -2211,7 +2246,7 @@ msgstr "Sign out"
 msgid "Sign-out failed. Please try again."
 msgstr "Sign-out failed. Please try again."
 
-#: src/routes/login.tsx:180
+#: src/routes/login.tsx:345
 msgid "Signing in…"
 msgstr "Signing in…"
 
@@ -2566,6 +2601,10 @@ msgstr "Uploading…"
 msgid "Use {0} as primary"
 msgstr "Use {0} as primary"
 
+#: src/routes/login.tsx:454
+msgid "Use a different email"
+msgstr "Use a different email"
+
 #: src/routes/emails/inboxes.tsx:1444
 msgid "Use as default footer"
 msgstr "Use as default footer"
@@ -2573,6 +2612,10 @@ msgstr "Use as default footer"
 #: src/routes/emails/inboxes.tsx:1027
 msgid "Use as default for this purpose"
 msgstr "Use as default for this purpose"
+
+#: src/routes/login.tsx:461
+msgid "Use password instead"
+msgstr "Use password instead"
 
 #: src/routes/emails/inboxes.tsx:914
 msgid "Username"
@@ -2594,6 +2637,10 @@ msgstr "Views"
 #: src/components/shared/channel-icon.tsx:64
 msgid "Visit"
 msgstr "Visit"
+
+#: src/routes/login.tsx:407
+msgid "We sent a sign-in link to"
+msgstr "We sent a sign-in link to"
 
 #: src/components/research/findings/competitor-scan-view.tsx:148
 msgid "Weaknesses"
