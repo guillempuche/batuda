@@ -13,31 +13,29 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { buildBetterAuthConfig } from '@batuda/auth'
 
 // Requires `pnpm cli services up` (Postgres on $DATABASE_URL) with
-// migrations applied. Each describe owns its own betterAuth instance
-// and TRUNCATEs the auth tables so timestamped emails stay hermetic.
+// migrations applied. Every email this test mints starts with the
+// auth-it- prefix so afterAll can scope DELETEs to its own rows —
+// TRUNCATE would wipe the seeded taller/restaurant orgs that sibling
+// test files depend on.
 
 const DATABASE_URL =
 	process.env['DATABASE_URL'] ??
 	'postgresql://batuda:batuda@localhost:5433/batuda'
 const BETTER_AUTH_SECRET = process.env['BETTER_AUTH_SECRET'] ?? 'test-secret'
 
-const AUTH_TABLES_TO_TRUNCATE = [
-	'"verification"',
-	'"session"',
-	'"account"',
-	'"member"',
-	'"invitation"',
-	'"organization"',
-	'"user"',
-] as const
-
-const truncateAuthTables = async (pool: pg.Pool): Promise<void> => {
-	await pool.query(`TRUNCATE ${AUTH_TABLES_TO_TRUNCATE.join(', ')} CASCADE`)
-}
+const TEST_EMAIL_PREFIX = 'auth-it-'
 
 const sharedPool = new pg.Pool({ connectionString: DATABASE_URL })
 
 afterAll(async () => {
+	// Remove only the rows we wrote so the seed survives for sibling tests.
+	await sharedPool.query(
+		`DELETE FROM "account" WHERE "userId" IN (SELECT id FROM "user" WHERE email LIKE $1)`,
+		[`${TEST_EMAIL_PREFIX}%`],
+	)
+	await sharedPool.query(`DELETE FROM "user" WHERE email LIKE $1`, [
+		`${TEST_EMAIL_PREFIX}%`,
+	])
 	await sharedPool.end()
 })
 
@@ -86,8 +84,7 @@ describe('magic-link plugin existence pre-check on sendMagicLink', () => {
 			}),
 		)
 
-	beforeAll(async () => {
-		await truncateAuthTables(sharedPool)
+	beforeAll(() => {
 		capturedSends = []
 	})
 
@@ -96,7 +93,7 @@ describe('magic-link plugin existence pre-check on sendMagicLink', () => {
 			// [auth.ts:206 — unknown-email branch]
 			// GIVEN a fresh betterAuth instance and an email not in "user"
 			const auth = buildInstance()
-			const unregisteredEmail = `noone-${Date.now()}@example.invalid`
+			const unregisteredEmail = `${TEST_EMAIL_PREFIX}noone-${Date.now()}@example.invalid`
 
 			// WHEN /sign-in/magic-link is invoked
 			const response = await auth.api.signInMagicLink({
@@ -119,7 +116,7 @@ describe('magic-link plugin existence pre-check on sendMagicLink', () => {
 			// [auth.ts:206 — known-email branch]
 			// GIVEN a registered user
 			const auth = buildInstance()
-			const registeredEmail = `known-${Date.now()}@example.com`
+			const registeredEmail = `${TEST_EMAIL_PREFIX}known-${Date.now()}@example.com`
 			await auth.api.createUser({
 				body: {
 					email: registeredEmail,
@@ -244,8 +241,9 @@ describe('credential-row strip helper (matches sendInvitationEmail bug fold-in)'
 		)
 	}
 
-	beforeAll(async () => {
-		await truncateAuthTables(sharedPool)
+	beforeAll(() => {
+		// No truncate — afterAll at file scope cleans this test's own rows
+		// by `auth-it-` email prefix so the dev seed stays untouched.
 	})
 
 	describe('when the invite path just created the user', () => {
@@ -254,7 +252,7 @@ describe('credential-row strip helper (matches sendInvitationEmail bug fold-in)'
 			// GIVEN a freshly created invitee carrying the throwaway password
 			// that sendInvitationEmail mints at auth.ts:146.
 			const auth = buildInstance()
-			const inviteeEmail = `wascreated-${Date.now()}@example.com`
+			const inviteeEmail = `${TEST_EMAIL_PREFIX}wascreated-${Date.now()}@example.com`
 			await auth.api.createUser({
 				body: {
 					email: inviteeEmail,
@@ -283,7 +281,7 @@ describe('credential-row strip helper (matches sendInvitationEmail bug fold-in)'
 			// GIVEN an existing user with a real password (second-org invite
 			// path resolves to USER_ALREADY_EXISTS at auth.ts:156).
 			const auth = buildInstance()
-			const existingUserEmail = `existing-${Date.now()}@example.com`
+			const existingUserEmail = `${TEST_EMAIL_PREFIX}existing-${Date.now()}@example.com`
 			await auth.api.createUser({
 				body: {
 					email: existingUserEmail,
