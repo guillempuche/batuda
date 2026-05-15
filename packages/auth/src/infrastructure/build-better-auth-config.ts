@@ -144,6 +144,11 @@ export const buildBetterAuthConfig = <Plugins extends BetterAuthPlugin[]>(
 			...(input.env.rateLimit === 'loose' && {
 				customRules: {
 					'/sign-in/email': { window: 60, max: 200 },
+					// Magic-link plugin defaults to 5/60s on both routes — too
+					// tight for e2e suites exercising the passwordless /login.
+					// Production stays on the plugin default.
+					'/sign-in/magic-link': { window: 60, max: 200 },
+					'/magic-link/verify': { window: 60, max: 200 },
 					'/get-session': { window: 60, max: 1000 },
 					'/organization/set-active': { window: 60, max: 500 },
 				},

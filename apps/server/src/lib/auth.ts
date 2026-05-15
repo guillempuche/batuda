@@ -133,16 +133,11 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 									'Better Auth is not yet initialized; refusing to send invitation.',
 								)
 							}
-							// Pre-create the invitee — magic-link's verify endpoint
-							// refuses to create users when `disableSignUp: true` is
-							// set (per
-							// docs/repos/better-auth/.../magic-link/index.ts:399-418),
-							// so the admin createUser path is the only escape hatch
-							// that gives the magic link something to sign in to.
-							// `auth.api.createUser` throws USER_ALREADY_EXISTS_USE_
-							// ANOTHER_EMAIL if the row exists; treat that as success
-							// (existing user being invited to a second org is the
-							// happy path).
+							// Pre-create the invitee because magic-link verify refuses
+							// to create users while `disableSignUp` is on. Existing
+							// users (second-org invitations) fall through with
+							// wasCreated=false so we never strip a real password.
+							let wasCreated = false
 							try {
 								await authHandle.api.createUser({
 									body: {
@@ -152,6 +147,7 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 									},
 									headers: request?.headers ?? new Headers(),
 								})
+								wasCreated = true
 							} catch (cause) {
 								// Match by code, not message — locale shifts would
 								// silently break a substring predicate.
@@ -162,6 +158,18 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 								) {
 									throw cause
 								}
+							}
+							if (wasCreated) {
+								// Strip the throwaway credential row before the
+								// magic link is minted so no `/sign-in/email`
+								// window exists on the password we just stored.
+								// Magic-link verify reads the user row only.
+								await pool.query(
+									`DELETE FROM "account"
+									 WHERE "userId" = (SELECT id FROM "user" WHERE email = $1 LIMIT 1)
+									   AND "providerId" = 'credential'`,
+									[data.email],
+								)
 							}
 							// Mint a magic-link sign-in URL. The URL is delivered
 							// to *our* sendMagicLink callback below; we route it to
@@ -191,7 +199,23 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 					}),
 					apiKey({ enableSessionForAPIKeys: true }),
 					magicLink({
-						sendMagicLink: data => {
+						// Closes the silent-signup hole on /sign-in/magic-link.
+						// The invitation flow and CLI invite commands pre-create
+						// users so verify always has a row to sign in to.
+						disableSignUp: true,
+						sendMagicLink: async (data, ctx) => {
+							// Silently no-op for unknown emails so /sign-in/magic-link
+							// can't be used to spam strangers or enumerate membership.
+							// Invitations pre-create the invitee, so this is a no-op
+							// for that path.
+							if (ctx?.context.internalAdapter) {
+								const found = await ctx.context.internalAdapter.findUserByEmail(
+									data.email,
+								)
+								if (!found?.user) {
+									return
+								}
+							}
 							// Branch on metadata.kind so a magic-link minted from
 							// inside `sendInvitationEmail` ships the invitation
 							// template instead of the generic sign-in template.
@@ -204,7 +228,7 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 								  }
 								| undefined
 							if (meta?.kind === 'invitation') {
-								return Effect.runPromise(
+								await Effect.runPromise(
 									transactional.sendInvitation({
 										email: data.email,
 										inviterName: meta.inviterName ?? 'A teammate',
@@ -216,8 +240,9 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 											: new Date(Date.now() + 1000 * 60 * 60 * 48),
 									}),
 								)
+								return
 							}
-							return Effect.runPromise(
+							await Effect.runPromise(
 								transactional.sendMagicLink({
 									email: data.email,
 									url: data.url,
