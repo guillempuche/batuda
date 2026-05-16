@@ -69,6 +69,8 @@ export const Route = createRootRoute({
 		// jankier than letting the page render its own message.
 		const isPublicPath =
 			location.pathname === '/login' ||
+			location.pathname === '/forgot-password' ||
+			location.pathname === '/reset-password' ||
 			location.pathname.startsWith('/accept-invitation/')
 		if (!isPublicPath) {
 			const user = await fetchSession(cookieHeader ?? undefined)
@@ -154,6 +156,8 @@ function RootComponent() {
 	// empty). Everything else runs inside the full authenticated shell.
 	const isAuthChrome =
 		location.pathname === '/login' ||
+		location.pathname === '/forgot-password' ||
+		location.pathname === '/reset-password' ||
 		location.pathname.startsWith('/accept-invitation/')
 
 	// Tell any stale `/login` tab (left on the "Check your inbox" panel

@@ -270,6 +270,12 @@ msgstr "Back to inbox"
 msgid "Back to organization"
 msgstr "Back to organization"
 
+#: src/routes/forgot-password.tsx:82
+#: src/routes/forgot-password.tsx:134
+#: src/routes/reset-password.tsx:82
+msgid "Back to sign in"
+msgstr "Back to sign in"
+
 #: src/i18n/lingui.tsx:56
 msgid "Batuda"
 msgstr "Batuda"
@@ -282,7 +288,7 @@ msgstr "Batuda — a multi-tenant CRM for small agencies."
 msgid "Batuda home"
 msgstr "Batuda home"
 
-#: src/routes/login.tsx:392
+#: src/routes/login.tsx:404
 msgid "Batuda is invite-only. Request access from the Engranatge team."
 msgstr "Batuda is invite-only. Request access from the Engranatge team."
 
@@ -419,7 +425,8 @@ msgstr "Check that your session is valid or try again."
 msgid "Check the session or try again."
 msgstr "Check the session or try again."
 
-#: src/routes/login.tsx:430
+#: src/routes/forgot-password.tsx:65
+#: src/routes/login.tsx:442
 msgid "Check your inbox"
 msgstr "Check your inbox"
 
@@ -675,7 +682,8 @@ msgstr "Could not save the page. Please try again."
 msgid "Could not send the invitation. Please try again."
 msgstr "Could not send the invitation. Please try again."
 
-#: src/routes/login.tsx:132
+#: src/routes/forgot-password.tsx:119
+#: src/routes/login.tsx:137
 msgid "Could not send the link. Try again in a few seconds."
 msgstr "Could not send the link. Try again in a few seconds."
 
@@ -687,7 +695,7 @@ msgstr "Could not set primary inbox"
 msgid "Could not set the default inbox."
 msgstr "Could not set the default inbox."
 
-#: src/routes/login.tsx:131
+#: src/routes/login.tsx:136
 msgid "Could not sign in. Check your email and password."
 msgstr "Could not sign in. Check your email and password."
 
@@ -913,7 +921,8 @@ msgstr "Editor"
 #: src/components/shared/channel-icon.tsx:63
 #: src/routes/companies/$slug.tsx:854
 #: src/routes/emails/inboxes.tsx:402
-#: src/routes/login.tsx:334
+#: src/routes/forgot-password.tsx:105
+#: src/routes/login.tsx:339
 #: src/routes/settings/organization/invite.tsx:137
 msgid "Email"
 msgstr "Email"
@@ -930,11 +939,11 @@ msgstr "Email drafts"
 msgid "Email is dead-letter"
 msgstr "Email is dead-letter"
 
-#: src/routes/login.tsx:383
+#: src/routes/login.tsx:388
 msgid "Email me a sign-in link"
 msgstr "Email me a sign-in link"
 
-#: src/routes/login.tsx:129
+#: src/routes/login.tsx:134
 msgid "Email or password is incorrect."
 msgstr "Email or password is incorrect."
 
@@ -955,7 +964,7 @@ msgstr "Emails, calls, documents, and proposals will appear here as they happen.
 msgid "Enrichment"
 msgstr "Enrichment"
 
-#: src/routes/login.tsx:134
+#: src/routes/login.tsx:139
 msgid "Enter a valid email above first."
 msgstr "Enter a valid email above first."
 
@@ -1034,6 +1043,10 @@ msgstr "Flagged as spam by the provider. The body is shown for review only."
 msgid "Footers — {0}"
 msgstr "Footers — {0}"
 
+#: src/routes/login.tsx:395
+msgid "Forgot password?"
+msgstr "Forgot password?"
+
 #: src/components/research/research-dialog.tsx:31
 msgid "Freeform"
 msgstr "Freeform"
@@ -1057,6 +1070,10 @@ msgstr "From webhook"
 #: src/components/emails/compose-window.tsx:69
 msgid "Full screen"
 msgstr "Full screen"
+
+#: src/routes/reset-password.tsx:173
+msgid "Go to sign in"
+msgstr "Go to sign in"
 
 #: src/routes/accept-invitation.$id.tsx:170
 msgid "Heading to the dashboard…"
@@ -1092,6 +1109,10 @@ msgstr "I prefer passwordless"
 #: src/routes/profile/index.tsx:289
 msgid "I prefer passwordless — don't ask me again"
 msgstr "I prefer passwordless — don't ask me again"
+
+#: src/routes/forgot-password.tsx:68
+msgid "If <0>{submittedEmail}</0> is registered, a reset link is on its way. The link expires in 1 hour."
+msgstr "If <0>{submittedEmail}</0> is registered, a reset link is on its way. The link expires in 1 hour."
 
 #: src/routes/emails/inboxes.tsx:857
 msgid "IMAP host"
@@ -1180,7 +1201,7 @@ msgstr "Invite a member"
 msgid "Invite a new member"
 msgstr "Invite a new member"
 
-#: src/routes/login.tsx:437
+#: src/routes/login.tsx:449
 msgid "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
 msgstr "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
 
@@ -1447,6 +1468,7 @@ msgstr "never"
 
 #: src/routes/profile/index.tsx:229
 #: src/routes/profile/index.tsx:413
+#: src/routes/reset-password.tsx:193
 msgid "New password"
 msgstr "New password"
 
@@ -1511,7 +1533,7 @@ msgstr "No companies yet"
 
 #: src/components/layout/org-switcher.tsx:62
 #: src/routes/accept-invitation.$id.tsx:98
-#: src/routes/login.tsx:133
+#: src/routes/login.tsx:138
 #: src/routes/profile/index.tsx:77
 #: src/routes/settings/organization/invite.tsx:77
 #: src/routes/settings/organization/members.tsx:81
@@ -1646,6 +1668,10 @@ msgstr "none scheduled"
 msgid "Normal priority"
 msgstr "Normal priority"
 
+#: src/routes/forgot-password.tsx:74
+msgid "Not seeing it? Check your spam folder. If you're sure the email is right and it never arrives, an admin can help."
+msgstr "Not seeing it? Check your spam folder. If you're sure the email is right and it never arrives, an admin can help."
+
 #: src/components/interactions/quick-capture-dialog.tsx:425
 msgid "Note"
 msgstr "Note"
@@ -1677,7 +1703,7 @@ msgid "Open"
 msgstr "Open"
 
 #. placeholder {0}: provider.label
-#: src/routes/login.tsx:470
+#: src/routes/login.tsx:482
 msgid "Open {0}"
 msgstr "Open {0}"
 
@@ -1836,13 +1862,17 @@ msgstr "Pain indicators"
 msgid "Pain points"
 msgstr "Pain points"
 
-#: src/routes/login.tsx:349
+#: src/routes/login.tsx:354
 msgid "Password"
 msgstr "Password"
 
 #: src/routes/emails/inboxes.tsx:943
 msgid "Password or app-password"
 msgstr "Password or app-password"
+
+#: src/routes/reset-password.tsx:157
+msgid "Password updated"
+msgstr "Password updated"
 
 #: src/routes/profile/index.tsx:461
 msgid "Password updated."
@@ -1854,6 +1884,7 @@ msgstr "Passwordless sign-in only"
 
 #: src/routes/profile/index.tsx:255
 #: src/routes/profile/index.tsx:439
+#: src/routes/reset-password.tsx:221
 msgid "Passwords need at least {MIN_PASSWORD_LENGTH} characters."
 msgstr "Passwords need at least {MIN_PASSWORD_LENGTH} characters."
 
@@ -1884,6 +1915,10 @@ msgstr "Phone"
 #: src/routes/profile/index.tsx:390
 msgid "Pick a new password. Other signed-in devices will be signed out."
 msgstr "Pick a new password. Other signed-in devices will be signed out."
+
+#: src/routes/reset-password.tsx:188
+msgid "Pick a password you'll remember. Minimum 8 characters."
+msgstr "Pick a password you'll remember. Minimum 8 characters."
 
 #: src/routes/emails/inboxes.tsx:803
 msgid "Pick a provider"
@@ -2089,6 +2124,7 @@ msgstr "Reopen thread"
 
 #: src/routes/profile/index.tsx:242
 #: src/routes/profile/index.tsx:426
+#: src/routes/reset-password.tsx:207
 msgid "Repeat new password"
 msgstr "Repeat new password"
 
@@ -2100,6 +2136,11 @@ msgstr "Reply"
 msgid "Reply all"
 msgstr "Reply all"
 
+#: src/routes/reset-password.tsx:77
+#: src/routes/reset-password.tsx:140
+msgid "Request a new link"
+msgstr "Request a new link"
+
 #: src/components/companies/research-summary-card.tsx:31
 #: src/components/shared/channel-icon.tsx:71
 msgid "Research"
@@ -2109,17 +2150,25 @@ msgstr "Research"
 msgid "Research run"
 msgstr "Research run"
 
-#: src/routes/login.tsx:452
+#: src/routes/login.tsx:464
 msgid "Resend in"
 msgstr "Resend in"
 
-#: src/routes/login.tsx:458
+#: src/routes/login.tsx:470
 msgid "Resend link"
 msgstr "Resend link"
 
 #: src/routes/emails/index.tsx:1361
 msgid "Reset"
 msgstr "Reset"
+
+#: src/routes/reset-password.tsx:66
+msgid "Reset links expire after 1 hour and can only be used once. Ask for a new one and follow it within the hour."
+msgstr "Reset links expire after 1 hour and can only be used once. Ask for a new one and follow it within the hour."
+
+#: src/routes/forgot-password.tsx:95
+msgid "Reset your password"
+msgstr "Reset your password"
 
 #: src/routes/calendar/index.tsx:308
 msgid "Respond to the organizer"
@@ -2177,6 +2226,10 @@ msgstr "Save"
 msgid "Save failed"
 msgstr "Save failed"
 
+#: src/routes/reset-password.tsx:242
+msgid "Save new password"
+msgstr "Save new password"
+
 #: src/routes/profile/index.tsx:280
 msgid "Save password"
 msgstr "Save password"
@@ -2186,6 +2239,7 @@ msgstr "Save password"
 #: src/routes/pages/$id.tsx:268
 #: src/routes/profile/index.tsx:278
 #: src/routes/profile/index.tsx:472
+#: src/routes/reset-password.tsx:242
 msgid "Saving…"
 msgstr "Saving…"
 
@@ -2250,8 +2304,13 @@ msgstr "Send email"
 msgid "Send invitation"
 msgstr "Send invitation"
 
+#: src/routes/forgot-password.tsx:128
+msgid "Send reset link"
+msgstr "Send reset link"
+
 #: src/components/emails/compose-form.tsx:534
-#: src/routes/login.tsx:382
+#: src/routes/forgot-password.tsx:128
+#: src/routes/login.tsx:387
 #: src/routes/settings/organization/invite.tsx:180
 msgid "Sending…"
 msgstr "Sending…"
@@ -2259,6 +2318,10 @@ msgstr "Sending…"
 #: src/routes/emails/$threadId.tsx:683
 msgid "Sent"
 msgstr "Sent"
+
+#: src/routes/reset-password.tsx:185
+msgid "Set a new password"
+msgstr "Set a new password"
 
 #: src/routes/profile/index.tsx:218
 msgid "Set a password"
@@ -2311,7 +2374,7 @@ msgid "Showing {firstRow}–{lastRow} of {total}"
 msgstr "Showing {firstRow}–{lastRow} of {total}"
 
 #: src/routes/accept-invitation.$id.tsx:129
-#: src/routes/login.tsx:371
+#: src/routes/login.tsx:376
 msgid "Sign in"
 msgstr "Sign in"
 
@@ -2319,9 +2382,13 @@ msgstr "Sign in"
 msgid "Sign in to accept this invitation"
 msgstr "Sign in to accept this invitation"
 
-#: src/routes/login.tsx:324
+#: src/routes/login.tsx:329
 msgid "Sign in to continue"
 msgstr "Sign in to continue"
+
+#: src/routes/reset-password.tsx:160
+msgid "Sign in with your new password. Other devices will need to sign in again too."
+msgstr "Sign in with your new password. Other devices will need to sign in again too."
 
 #: src/routes/profile/index.tsx:138
 msgid "Sign out"
@@ -2331,7 +2398,7 @@ msgstr "Sign out"
 msgid "Sign-out failed. Please try again."
 msgstr "Sign-out failed. Please try again."
 
-#: src/routes/login.tsx:371
+#: src/routes/login.tsx:376
 msgid "Signing in…"
 msgstr "Signing in…"
 
@@ -2377,6 +2444,7 @@ msgstr "someone"
 
 #: src/routes/profile/index.tsx:267
 #: src/routes/profile/index.tsx:456
+#: src/routes/reset-password.tsx:233
 msgid "Something went wrong. Try again."
 msgstr "Something went wrong. Try again."
 
@@ -2500,11 +2568,11 @@ msgstr "Test failed"
 msgid "Testing connection…"
 msgstr "Testing connection…"
 
-#: src/routes/login.tsx:136
+#: src/routes/login.tsx:141
 msgid "That link expired. Request a fresh one below."
 msgstr "That link expired. Request a fresh one below."
 
-#: src/routes/login.tsx:137
+#: src/routes/login.tsx:142
 msgid "That link is no longer valid. Request a fresh one below."
 msgstr "That link is no longer valid. Request a fresh one below."
 
@@ -2557,6 +2625,10 @@ msgstr "The thread exists but the provider returned no messages."
 msgid "The thread may have been archived upstream or the link is stale."
 msgstr "The thread may have been archived upstream or the link is stale."
 
+#: src/routes/reset-password.tsx:130
+msgid "The token expired or was already used. Request a fresh link."
+msgstr "The token expired or was already used. Request a fresh link."
+
 #: src/routes/profile/index.tsx:446
 msgid "The two new password fields don't match."
 msgstr "The two new password fields don't match."
@@ -2564,6 +2636,10 @@ msgstr "The two new password fields don't match."
 #: src/routes/profile/index.tsx:262
 msgid "The two password fields don't match."
 msgstr "The two password fields don't match."
+
+#: src/routes/reset-password.tsx:228
+msgid "The two passwords don't match."
+msgstr "The two passwords don't match."
 
 #: src/routes/tasks/index.tsx:440
 msgid "The workshop ledger — tear off one strip at a time."
@@ -2592,6 +2668,11 @@ msgstr "This invitation is no longer valid."
 #: src/routes/accept-invitation.$id.tsx:57
 msgid "This invitation link is no longer valid. It may have already been used."
 msgstr "This invitation link is no longer valid. It may have already been used."
+
+#: src/routes/reset-password.tsx:63
+#: src/routes/reset-password.tsx:127
+msgid "This link is no longer valid"
+msgstr "This link is no longer valid"
 
 #: src/routes/settings/organization/spend.tsx:134
 msgid "This month"
@@ -2640,7 +2721,7 @@ msgstr "To"
 msgid "Today"
 msgstr "Today"
 
-#: src/routes/login.tsx:128
+#: src/routes/login.tsx:133
 msgid "Too many attempts. Try again in a minute."
 msgstr "Too many attempts. Try again in a minute."
 
@@ -2660,6 +2741,10 @@ msgstr "Type"
 #: src/components/shared/editable-field.tsx:320
 msgid "Type and press Enter"
 msgstr "Type and press Enter"
+
+#: src/routes/forgot-password.tsx:98
+msgid "Type the email you sign in with. We'll send a reset link."
+msgstr "Type the email you sign in with. We'll send a reset link."
 
 #: src/components/companies/calendar-tab.tsx:60
 #: src/components/companies/conversations-tab.tsx:166
@@ -2711,7 +2796,7 @@ msgstr "Uploading…"
 msgid "Use {0} as primary"
 msgstr "Use {0} as primary"
 
-#: src/routes/login.tsx:480
+#: src/routes/login.tsx:492
 msgid "Use a different email"
 msgstr "Use a different email"
 
@@ -2723,7 +2808,7 @@ msgstr "Use as default footer"
 msgid "Use as default for this purpose"
 msgstr "Use as default for this purpose"
 
-#: src/routes/login.tsx:487
+#: src/routes/login.tsx:499
 msgid "Use password instead"
 msgstr "Use password instead"
 
@@ -2748,15 +2833,15 @@ msgstr "Views"
 msgid "Visit"
 msgstr "Visit"
 
-#: src/routes/login.tsx:138
+#: src/routes/login.tsx:143
 msgid "We couldn't sign you in via that link. Try again."
 msgstr "We couldn't sign you in via that link. Try again."
 
-#: src/routes/login.tsx:135
+#: src/routes/login.tsx:140
 msgid "We don't recognize that email. Ask an admin to invite you."
 msgstr "We don't recognize that email. Ask an admin to invite you."
 
-#: src/routes/login.tsx:433
+#: src/routes/login.tsx:445
 msgid "We sent a sign-in link to"
 msgstr "We sent a sign-in link to"
 
@@ -2852,6 +2937,6 @@ msgstr "you@example.com"
 msgid "Your Batuda workbench identity."
 msgstr "Your Batuda workbench identity."
 
-#: src/routes/login.tsx:130
+#: src/routes/login.tsx:135
 msgid "Your email isn't verified yet. Use the magic link instead."
 msgstr "Your email isn't verified yet. Use the magic link instead."

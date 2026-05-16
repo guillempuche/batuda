@@ -1,6 +1,11 @@
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
+import {
+	createFileRoute,
+	Link,
+	redirect,
+	useNavigate,
+} from '@tanstack/react-router'
 import { Schema } from 'effect'
 import { useActionState, useEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
@@ -381,6 +386,13 @@ function LoginPage() {
 						{magicLinkStatus.kind === 'sending'
 							? t`Sending…`
 							: t`Email me a sign-in link`}
+					</MagicLinkTrigger>
+					<MagicLinkTrigger
+						as={Link}
+						to='/forgot-password'
+						data-testid='login-forgot-password'
+					>
+						<Trans>Forgot password?</Trans>
 					</MagicLinkTrigger>
 				</MagicLinkRow>
 				{magicLinkStatus.kind === 'error' ? (

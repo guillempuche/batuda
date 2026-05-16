@@ -56,7 +56,7 @@ export default defineConfig({
 		// project. Includes the magic-link sign-in variant.
 		{
 			name: 'unauth',
-			testMatch: /sign-in(?:-magic-link)?\.test\.ts/,
+			testMatch: /(?:sign-in(?:-magic-link)?|forgot-password)\.test\.ts/,
 			use: { ...devices['Desktop Chrome'] },
 		},
 		// 3. Everything else gets Alice's cookie injected via
@@ -64,7 +64,7 @@ export default defineConfig({
 		{
 			name: 'authed',
 			testMatch: /.*\.test\.ts/,
-			testIgnore: /sign-in(?:-magic-link)?\.test\.ts/,
+			testIgnore: /(?:sign-in(?:-magic-link)?|forgot-password)\.test\.ts/,
 			use: {
 				...devices['Desktop Chrome'],
 				storageState: STORAGE_STATE,
