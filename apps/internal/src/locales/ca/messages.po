@@ -380,8 +380,8 @@ msgstr "Cc"
 msgid "Change my mind — set a password anyway"
 msgstr "Canvio d'opinió — vull posar contrasenya"
 
-#: src/routes/profile/index.tsx:381
-#: src/routes/profile/index.tsx:468
+#: src/routes/profile/index.tsx:387
+#: src/routes/profile/index.tsx:474
 msgid "Change password"
 msgstr "Canvia la contrasenya"
 
@@ -744,11 +744,11 @@ msgstr "Creada"
 msgid "Created by agent"
 msgstr "Creada per agent"
 
-#: src/routes/profile/index.tsx:395
+#: src/routes/profile/index.tsx:401
 msgid "Current password"
 msgstr "Contrasenya actual"
 
-#: src/routes/profile/index.tsx:445
+#: src/routes/profile/index.tsx:451
 msgid "Current password is incorrect."
 msgstr "La contrasenya actual no és correcta."
 
@@ -1446,7 +1446,7 @@ msgid "never"
 msgstr "mai"
 
 #: src/routes/profile/index.tsx:229
-#: src/routes/profile/index.tsx:407
+#: src/routes/profile/index.tsx:413
 msgid "New password"
 msgstr "Contrasenya nova"
 
@@ -1844,7 +1844,7 @@ msgstr "Contrasenya"
 msgid "Password or app-password"
 msgstr "Contrasenya o contrasenya d'aplicació"
 
-#: src/routes/profile/index.tsx:455
+#: src/routes/profile/index.tsx:461
 msgid "Password updated."
 msgstr "Contrasenya actualitzada."
 
@@ -1853,7 +1853,7 @@ msgid "Passwordless sign-in only"
 msgstr "Només inici de sessió sense contrasenya"
 
 #: src/routes/profile/index.tsx:255
-#: src/routes/profile/index.tsx:433
+#: src/routes/profile/index.tsx:439
 msgid "Passwords need at least {MIN_PASSWORD_LENGTH} characters."
 msgstr "La contrasenya ha de tenir com a mínim {MIN_PASSWORD_LENGTH} caràcters."
 
@@ -1881,7 +1881,7 @@ msgstr "Personal"
 msgid "Phone"
 msgstr "Telèfon"
 
-#: src/routes/profile/index.tsx:384
+#: src/routes/profile/index.tsx:390
 msgid "Pick a new password. Other signed-in devices will be signed out."
 msgstr "Tria una contrasenya nova. Els altres dispositius es desconnectaran."
 
@@ -2088,7 +2088,7 @@ msgid "Reopen thread"
 msgstr "Reobre el fil"
 
 #: src/routes/profile/index.tsx:242
-#: src/routes/profile/index.tsx:420
+#: src/routes/profile/index.tsx:426
 msgid "Repeat new password"
 msgstr "Repeteix la contrasenya nova"
 
@@ -2185,7 +2185,7 @@ msgstr "Desa la contrasenya"
 #: src/routes/emails/inboxes.tsx:1463
 #: src/routes/pages/$id.tsx:268
 #: src/routes/profile/index.tsx:278
-#: src/routes/profile/index.tsx:466
+#: src/routes/profile/index.tsx:472
 msgid "Saving…"
 msgstr "Desant…"
 
@@ -2376,7 +2376,7 @@ msgid "someone"
 msgstr "algú"
 
 #: src/routes/profile/index.tsx:267
-#: src/routes/profile/index.tsx:450
+#: src/routes/profile/index.tsx:456
 msgid "Something went wrong. Try again."
 msgstr "Alguna cosa ha fallat. Prova-ho de nou."
 
@@ -2557,7 +2557,7 @@ msgstr "El fil existeix però el proveïdor no ha retornat cap missatge."
 msgid "The thread may have been archived upstream or the link is stale."
 msgstr "Potser el fil s'ha arxivat al proveïdor o l'enllaç és obsolet."
 
-#: src/routes/profile/index.tsx:440
+#: src/routes/profile/index.tsx:446
 msgid "The two new password fields don't match."
 msgstr "Les dues contrasenyes noves no coincideixen."
 
