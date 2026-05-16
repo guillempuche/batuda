@@ -39,9 +39,26 @@ Same `moduleResolution: bundler` as the server — no `.js` in imports, `import 
 `apps/internal/vite.config.ts` — Vite with TanStack Start:
 
 - `tanstackStart()` from `@tanstack/react-start/plugin/vite` — SSR framework
+- `nitro()` from `nitro/vite` — server framework underlying TanStack Start. Dev-only `/auth/*` and `/v1/*` HTTPS proxy rules live in `nitro({ routeRules })` (NOT Vite's `server.proxy`; Nitro's pre-middleware short-circuits document requests before Vite's proxy runs).
 - `tailwindcss()` from `@tailwindcss/vite` — Tailwind v4 Vite plugin
-- `viteReact()` — React JSX transform
-- `tsconfigPaths()` — resolve `#/*` path alias
+- `viteReact()` with `@swc/plugin-styled-components` (stable `componentId` for SSR ↔ CSR matching) and `@lingui/swc-plugin` (compiles macros)
+- `lingui()` plugin for catalog handling
+
+`@batuda/ui` workspace dual export — load-bearing for hydration:
+
+```jsonc
+// packages/ui/package.json (exports)
+"development": "./src/...",   // workspace consumers
+"import":      "./dist/..."   // npm consumers
+```
+
+`'development'` must appear in BOTH `resolve.conditions` and
+`ssr.resolve.conditions` so SSR and client load the same build. Otherwise
+`noExternal: ['@batuda/ui']` re-runs the SWC styled-components plugin on
+`dist/` for SSR (adding componentIds), while the client loads `dist/`
+as-is (no IDs). Mismatched classnames → React 19 bails hydration and
+`onClick` handlers silently never attach. See the comment block at
+`apps/internal/vite.config.ts:120-138`.
 
 Deployed to Unikraft (Node.js SSR) via `Dockerfile` + `Kraftfile`. Build output in `.output/server/index.mjs`.
 
@@ -184,137 +201,71 @@ const Card = styled.div`
 
 For Tailwind spacing in layout, use arbitrary values with token references: `gap-[var(--space-4)]`, `p-[var(--page-gutter)]`.
 
-### Color tokens — MD3 color scheme
+### Color tokens — Mediterranean industrial
 
-```css
-/* Light scheme (default) */
-:root {
-  /* Primary */
-  --color-primary:                #1a56db;
-  --color-on-primary:             #ffffff;
-  --color-primary-container:      #d6e4ff;
-  --color-on-primary-container:   #001551;
+Brand palette + WCAG rationale live in
+[`docs/brand-visual.md`](brand-visual.md); canonical values in
+`packages/ui/src/tokens.css`. The summary below is a pointer, not a duplicate.
 
-  /* Secondary */
-  --color-secondary:              #575e71;
-  --color-on-secondary:           #ffffff;
-  --color-secondary-container:    #dbe2f9;
-  --color-on-secondary-container: #141b2c;
+- **Primary** — terracotta (`--color-primary: #B05220`); `--color-on-primary` is white.
+- **Secondary** — olive green (`--color-secondary: #2E6B4F`); `--color-on-secondary` is white.
+- **Surface system** — warm cream, not cool grey. `--color-surface` is `#F5F0E8`; the full ramp goes through `--color-surface-dim/container-low/container/container-high/container-highest`.
+- **On-surface** — warm graphite `--color-on-surface: #2D2A24`, with `--color-on-surface-variant` for secondary text.
+- **Outline** — `--color-outline` for visible borders, `--color-outline-variant` for subtle dividers.
+- **No tertiary, no fixed accents.** Two-accent system by design (terracotta + olive).
+- **No dark mode** at this writing — light only.
 
-  /* Tertiary */
-  --color-tertiary:               #715573;
-  --color-on-tertiary:            #ffffff;
-  --color-tertiary-container:     #fcd7fb;
-  --color-on-tertiary-container:  #29132d;
+The workshop visual language layers a second palette on top — metal, paper,
+ledger lines — covered in the §Workshop tokens section below.
 
-  /* Error */
-  --color-error:                  #ba1a1a;
-  --color-on-error:               #ffffff;
-  --color-error-container:        #ffdad6;
-  --color-on-error-container:     #410002;
+### Fluid spacing scale — semantic names
 
-  /* Surface */
-  --color-surface:                #f8f9ff;
-  --color-on-surface:             #191c20;
-  --color-surface-variant:        #e1e2ec;
-  --color-on-surface-variant:     #44464f;
-  --color-surface-container-low:  #f2f3fa;
-  --color-surface-container:      #ececf4;
-  --color-surface-container-high: #e6e7ef;
+T-shirt names so the scale reads independently of pixel size. The earlier
+numeric `--space-1/2/4` convention is gone. Canonical values in
+`packages/ui/src/tokens.css`.
 
-  /* Background */
-  --color-background:             #f8f9ff;
-  --color-on-background:          #191c20;
-
-  /* Outline */
-  --color-outline:                #747680;
-  --color-outline-variant:        #c5c6d0;
-
-  /* Status colors — pipeline */
-  --color-status-prospect:        var(--color-surface-variant);
-  --color-status-contacted:       #e8f4fd;
-  --color-status-responded:       #fff3e0;
-  --color-status-meeting:         #e8f5e9;
-  --color-status-proposal:        #f3e5f5;
-  --color-status-client:          #e8f5e9;
-  --color-status-closed:          var(--color-surface-container);
-  --color-status-dead:            var(--color-surface-container);
-}
-
-/* Dark scheme */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-primary:                #adc6ff;
-    --color-on-primary:             #002e6e;
-    --color-primary-container:      #003fa0;
-    --color-on-primary-container:   #d6e4ff;
-
-    --color-secondary:              #bfc6dc;
-    --color-on-secondary:           #293041;
-    --color-secondary-container:    #3f4759;
-    --color-on-secondary-container: #dbe2f9;
-
-    --color-surface:                #111318;
-    --color-on-surface:             #e2e2e9;
-    --color-surface-variant:        #44464f;
-    --color-on-surface-variant:     #c5c6d0;
-    --color-surface-container-low:  #191c20;
-    --color-surface-container:      #1e2026;
-    --color-surface-container-high: #282a2f;
-
-    --color-background:             #111318;
-    --color-on-background:          #e2e2e9;
-
-    --color-outline:                #8f9099;
-    --color-outline-variant:        #44464f;
-  }
-}
-```
-
-### Fluid spacing scale
-
-```css
-/* packages/ui/src/tokens.css — continued */
-
-/* 8px base grid — fluid between 320px and 1280px viewports */
---space-1:   clamp(0.25rem, 0.4vw,  0.5rem);    /*  4–8px */
---space-2:   clamp(0.5rem,  0.75vw, 1rem);       /*  8–16px */
---space-3:   clamp(0.75rem, 1vw,    1.25rem);    /* 12–20px */
---space-4:   clamp(1rem,    1.5vw,  1.5rem);     /* 16–24px */
---space-5:   clamp(1.25rem, 1.75vw, 1.75rem);   /* 20–28px */
---space-6:   clamp(1.5rem,  2vw,    2rem);       /* 24–32px */
---space-8:   clamp(2rem,    2.5vw,  2.5rem);     /* 32–40px */
---space-10:  clamp(2.5rem,  3vw,    3rem);       /* 40–48px */
---space-12:  clamp(3rem,    4vw,    4rem);       /* 48–64px */
---space-16:  clamp(4rem,    5vw,    5rem);       /* 64–80px */
-
-/* Page layout */
---page-gutter:    clamp(1rem, 4vw, 2rem);
---page-max-width: 75rem;   /* 1200px */
---card-radius:    0.75rem;
---chip-radius:    999px;
-```
+`--space-3xs` · `--space-2xs` · `--space-xs` · `--space-sm` · `--space-md` ·
+`--space-lg` · `--space-xl` · `--space-2xl` · `--space-3xl` · `--space-4xl` ·
+`--space-5xl`. All `clamp()`-based, fluid between 320px and 1280px viewports.
 
 ### Shape tokens
 
-```css
---shape-none:        0;
---shape-extra-small: 0.25rem;
---shape-small:       0.5rem;
---shape-medium:      0.75rem;
---shape-large:       1rem;
---shape-extra-large: 1.75rem;
---shape-full:        999px;
-```
+T-shirt names. Canonical values in `packages/ui/src/tokens.css`.
 
-### Elevation (MD3 tonal surface elevation)
+`--shape-2xs` (0.25rem) · `--shape-xs` (0.5rem) · `--shape-sm` (0.75rem) ·
+`--shape-md` (1rem) · `--shape-lg` (1.75rem) · `--shape-full` (999px).
 
-```css
---elevation-0: none;
---elevation-1: 0 1px 2px 0 rgb(0 0 0 / 0.08);
---elevation-2: 0 1px 2px 0 rgb(0 0 0 / 0.08), 0 2px 6px 2px rgb(0 0 0 / 0.08);
---elevation-3: 0 4px 8px 3px rgb(0 0 0 / 0.12), 0 1px 3px 0 rgb(0 0 0 / 0.12);
-```
+### Workshop visual language
+
+The brand layers a workshop aesthetic on top of the base tokens —
+brushed-metal plates, aged-paper surfaces, masking-tape strips, stenciled
+labels. The system and rationale live in
+[`docs/brand-visual.md`](brand-visual.md) §Workshop Visual Language.
+
+Reusable CSS fragments are exposed as `styled-components` `css` mixins from
+`apps/internal/src/lib/workshop-mixins.ts`:
+
+| Mixin               | Used for                                                              |
+| ------------------- | --------------------------------------------------------------------- |
+| `agedPaperSurface`  | Card / dialog / empty-state surfaces — cream paper with fibre flecks. |
+| `agedPaperRow`      | List rows (tasks, timeline) — lighter paper variant.                  |
+| `ruledLedgerRow`    | Ledger-style list rows with thin bottom rule and 5n emphasis.         |
+| `brushedMetalPlate` | Plate-style cards — 145deg metal gradient + noise overlay.            |
+| `brushedMetalBezel` | Icon bezels — rounded metal frame for embedded icons.                 |
+| `stenciledTitle`    | Display-font uppercase titles with embossed text-shadow.              |
+| `rulerUnderRule`    | Dashed under-rule on page-intro headings.                             |
+| `maskingTapeCorner` | Decorative beige tape strip at the corner of a paper surface.         |
+
+Workshop tokens (metal palette, paper colours, elevation-workshop shadows,
+brushed-metal texture) live in `packages/ui/src/tokens.css` §Workshop. Use
+them via `var(--color-metal-*)`, `var(--color-paper-*)`, etc. — never
+hardcode metal greys.
+
+### Elevation tokens
+
+Two ramps — MD3 tonal (`--elevation-0/1/2/3`) for generic surfaces, and
+workshop-specific (`--elevation-workshop-sm/md/lg`) for the brushed-metal
+plates and bezels. Canonical values in `packages/ui/src/tokens.css`.
 
 ---
 
@@ -322,22 +273,58 @@ For Tailwind spacing in layout, use arbitrary values with token references: `gap
 
 ### Primitives — `Pri` prefix
 
-Primitive components wrapping BaseUI headless components use the `Pri` prefix. They live in `src/components/pri/` and combine Tailwind classes for static styles with styled-components for dynamic/stateful styles:
+The `Pri` prefix marks primitive components. Two locations:
 
-```
-PriButton, PriInput, PriSelect, PriDialog, PriTabs,
-PriCheckbox, PriMenu, PriTooltip, PriCollapsible
-```
+- **`packages/ui/src/pri/`** — library primitives shared across apps (and
+  published to npm as `@batuda/ui/pri` for tenant marketing sites). Each
+  wraps a BaseUI headless component with Batuda's workshop styling.
+- **`apps/internal/src/components/primitives/`** — app-local primitives
+  that compose library primitives or BaseUI directly, but stay too
+  internal to publish. Example: `PriPasswordInput` (eye-toggle wrapper
+  around `PriInput`).
+
+Library primitives at the time of writing: `PriAvatar`, `PriButton`,
+`PriCheckbox`, `PriCollapsible`, `PriContextMenu`, `PriDialog`, `PriField`,
+`PriInput`, `PriNumberField`, `PriPopover`, `PriPreviewCard`,
+`PriScrollArea`, `PriSelect`, `PriTabs`, `PriTextarea`, `PriToast`,
+`PriToggleGroup`, `PriToolbar`, `PriTooltip`.
+
+App-local primitives at the time of writing: `PriPasswordInput`, `PriTable`.
+
+#### `PriPasswordInput` — uncontrolled only
+
+Use this primitive as **uncontrolled**: omit `value=` / `onChange=` and
+read the typed value via `new FormData(event.currentTarget).get('fieldName')`
+in the submit handler (same pattern as `/login`).
+
+Controlled `value` + React `onChange` silently drops Playwright `fill()`
+updates because BaseUI's `FieldControl` owns `onChange` and exposes
+`onValueChange` instead; the eye-toggle wrapper compounds the mismatch.
+The caveat is specific to `PriPasswordInput` — `PriInput` used directly
+(e.g. the `/emails` search input) works fine when controlled.
 
 ### Composed — domain names
 
-Components that compose primitives or implement domain-specific UI use descriptive names without prefix:
+Components that compose primitives or implement domain-specific UI use
+descriptive names without a prefix. They live in
+`apps/internal/src/components/<domain>/` (e.g. `companies/company-card.tsx`,
+`profile/set-password-nudge.tsx`).
 
-```
-StatusBadge, PriorityDot, ChannelIcon, CompanyCard,
-TaskItem, EmptyState, LoadingSpinner, TiptapEditor,
-TiptapViewer, CompanyMap
-```
+### Lingui macros — every user-facing string
+
+Every visible string in `apps/internal` is wrapped in a Lingui macro:
+
+- **JSX text**: `<Trans>Sign in</Trans>` (`@lingui/react/macro`)
+- **Template strings inside hooks / handlers**: `` t`Saving…` `` from
+  `useLingui()` (`@lingui/react/macro`)
+- **Module-scope descriptors** (e.g. error-code → message tables):
+  `` msg`Email or password is incorrect.` `` (`@lingui/core/macro`), then
+  resolve in-component via `t(MESSAGES[code])`.
+
+Run `pnpm i18n:extract` (in `apps/internal/`) after each batch of changes;
+it updates the `.po` catalogs in `src/locales/{en,ca}/`. Catalan
+translations must be filled in before merge (i18n-check pre-commit hook
+will block on missing strings).
 
 ---
 
