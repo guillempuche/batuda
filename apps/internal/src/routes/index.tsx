@@ -7,6 +7,7 @@ import { useCallback, useMemo } from 'react'
 import styled from 'styled-components'
 
 import { companiesListAtom, openTasksAtom } from '#/atoms/pipeline-atoms'
+import { SetPasswordNudge } from '#/components/profile/set-password-nudge'
 import { CompanyCard } from '#/components/shared/company-card'
 import { EmptyState } from '#/components/shared/empty-state'
 import { KpiCounter } from '#/components/shared/kpi-counter'
@@ -264,6 +265,8 @@ function PipelinePage() {
 					<Trans>Workshop floor — live counters on the bench.</Trans>
 				</Subtitle>
 			</Intro>
+
+			<SetPasswordNudge />
 
 			<KpiRow>
 				<KpiCounter value={companies.length} label={t`Active companies`} />
