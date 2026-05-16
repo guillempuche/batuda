@@ -54,31 +54,30 @@ const apiTarget =
 	derivedApiTarget ??
 	'https://api.batuda.localhost'
 
-// Proxy scope is the closed enumeration of API paths the frontend talks
-// to: Better Auth (`/auth/*`), the typed REST API (`/v1/*`), and the
-// public docs surfaces (`/openapi.json`, `/docs`). Anything not in this
-// list stays inside the Vite dev server. `secure: false` skips TLS
-// validation for the upstream hop because portless ships self-signed
-// certs locally — it must never run in prod where Vite isn't in the
-// request path. The proxy origin (`batuda.localhost`) is the parent of
-// the API origin (`api.batuda.localhost`), so when Better Auth emits
-// `Set-Cookie ... Domain=batuda.localhost` the browser accepts it (the
-// `Domain` attribute is a domain-match for the request host). The
-// resulting cookie applies to BOTH `batuda.localhost` (so SSR
-// `getRequestHeader('cookie')` sees it on hard reload) AND every
-// subdomain (so cross-origin `/v1/*` fetches that bypass the proxy
-// still attach it). We deliberately do NOT set `cookieDomainRewrite`.
-const proxyOpts = {
-	target: apiTarget,
-	changeOrigin: true,
+// Same-origin proxy so Better Auth's `Set-Cookie ... Domain=batuda.localhost`
+// is a domain-match for the request host: the cookie applies to both
+// `batuda.localhost` (SSR `getRequestHeader('cookie')` on hard reload) AND
+// every subdomain (cross-origin `/v1/*` fetches that bypass the proxy still
+// attach it). No `cookieDomainRewrite` on purpose.
+//
+// Rules live on `nitro({ routeRules })`, NOT Vite's `server.proxy`: Nitro's
+// plugin registers a `vary: sec-fetch-dest` pre-middleware in `configureServer`
+// (nitro/dist/vite.mjs:288) that runs ahead of Vite's internal proxy and
+// short-circuits every document-like request into SSR. `routeRules.proxy`
+// instead runs inside Nitro's H3 router before its catch-all SSR handler.
+//
+// Closed list: Better Auth (`/auth/*`), typed REST (`/v1/*`), public docs
+// (`/openapi.json`, `/docs`). Everything else stays inside Nitro.
+const proxyTo = (suffix: string) => ({
+	to: `${apiTarget}${suffix}`,
 	secure: false,
-} as const
-
-const devProxy = {
-	'/auth': proxyOpts,
-	'/v1': proxyOpts,
-	'/openapi.json': proxyOpts,
-	'/docs': proxyOpts,
+})
+const nitroRouteRules = {
+	'/auth/**': { proxy: proxyTo('/auth/**') },
+	'/v1/**': { proxy: proxyTo('/v1/**') },
+	'/openapi.json': { proxy: proxyTo('/openapi.json') },
+	'/docs': { proxy: proxyTo('/docs') },
+	'/docs/**': { proxy: proxyTo('/docs/**') },
 } as const
 
 const config = defineConfig({
@@ -125,12 +124,6 @@ const config = defineConfig({
 		// time because tslib's ESM has named exports, not a default.
 		conditions: ['module', 'import', 'default'],
 	},
-	server: {
-		proxy: devProxy,
-	},
-	preview: {
-		proxy: devProxy,
-	},
 	ssr: {
 		// Bundle through Vite for SSR so the React-using deps go through
 		// the same dedupe + conditions as the rest of the SSR graph;
@@ -147,7 +140,7 @@ const config = defineConfig({
 	},
 	plugins: [
 		tanstackStart(),
-		nitro(),
+		nitro({ routeRules: nitroRouteRules }),
 		viteReact({
 			plugins: [
 				['@lingui/swc-plugin', {}],
