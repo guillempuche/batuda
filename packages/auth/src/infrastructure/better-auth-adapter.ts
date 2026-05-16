@@ -270,14 +270,15 @@ export const makeBetterAuthAdapter = (
 				),
 			),
 
-		createPasswordless: (input: NewUserInput) => {
-			const throwaway = `bootstrap-${Math.random().toString(36).slice(2)}-${Date.now()}`
-			return Effect.tryPromise({
+		createPasswordless: (input: NewUserInput) =>
+			// Better Auth's admin createUser gates credential creation on a
+			// truthy `password` field — omit it and no `account` row is
+			// written. See admin/routes.ts `if (ctx.body.password)`.
+			Effect.tryPromise({
 				try: () =>
 					instance.api.createUser({
 						body: {
 							email: input.email,
-							password: throwaway,
 							name: input.name,
 							role: input.role,
 						},
@@ -303,17 +304,9 @@ export const makeBetterAuthAdapter = (
 							}),
 						)
 					}
-					return Effect.tryPromise({
-						try: () =>
-							pool.query(
-								'DELETE FROM "account" WHERE "userId" = $1 AND "providerId" = $2',
-								[row.id, 'credential'],
-							),
-						catch: queryError,
-					}).pipe(Effect.map(() => toUser(row)))
+					return Effect.succeed(toUser(row))
 				}),
-			)
-		},
+			),
 
 		setRole: (email: string, role: Role) =>
 			Effect.tryPromise({

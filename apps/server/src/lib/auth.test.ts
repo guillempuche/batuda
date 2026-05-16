@@ -193,11 +193,10 @@ describe('buildBetterAuthConfig customRules — magic-link routes in loose mode'
 	})
 })
 
-describe('credential-row strip helper (matches sendInvitationEmail bug fold-in)', () => {
-	// The strip DELETE is closure-bound inside the org plugin's
-	// sendInvitationEmail callback (auth.ts:167) and reaching it through
-	// the public API needs an authed inviter session — end-to-end coverage
-	// lives in apps/internal/tests/e2e. Here we exercise the SQL itself.
+describe('admin createUser respects an omitted password', () => {
+	// Pins the Better Auth contract that callers (web invitation flow,
+	// CLI `users.createPasswordless`) lean on: no `password` => no
+	// `account` row, so invitees start passwordless.
 
 	const buildInstance = () =>
 		betterAuth(
@@ -232,70 +231,48 @@ describe('credential-row strip helper (matches sendInvitationEmail bug fold-in)'
 		return Number(result.rows[0]?.count ?? '0')
 	}
 
-	const stripCredentialRow = async (email: string): Promise<void> => {
-		await sharedPool.query(
-			`DELETE FROM "account"
-			 WHERE "userId" = (SELECT id FROM "user" WHERE email = $1 LIMIT 1)
-			   AND "providerId" = 'credential'`,
-			[email],
-		)
-	}
-
-	beforeAll(() => {
-		// No truncate — afterAll at file scope cleans this test's own rows
-		// by `auth-it-` email prefix so the dev seed stays untouched.
-	})
-
-	describe('when the invite path just created the user', () => {
-		it('should remove the throwaway credential row so the invitee starts passwordless', async () => {
-			// [auth.ts:167 — wasCreated=true branch]
-			// GIVEN a freshly created invitee carrying the throwaway password
-			// that sendInvitationEmail mints at auth.ts:146.
+	describe('when password is omitted', () => {
+		it('should create the user without a credential row', async () => {
+			// [better-auth/dist/plugins/admin/routes.mjs:170 — `if (ctx.body.password)` gate is false]
+			// GIVEN a fresh invitee email and an instance with the admin plugin
 			const auth = buildInstance()
-			const inviteeEmail = `${TEST_EMAIL_PREFIX}wascreated-${Date.now()}@example.com`
+			const inviteeEmail = `${TEST_EMAIL_PREFIX}nopwd-${Date.now()}@example.com`
+
+			// WHEN createUser is called with no password field
 			await auth.api.createUser({
 				body: {
 					email: inviteeEmail,
-					name: 'Was Created',
-					password: `invite-fake-id-${Date.now()}-pending`,
+					name: 'No Password',
 				},
 			})
-			expect(
-				await countCredentialRows(inviteeEmail),
-				'createUser must write a credential row for the strip to remove',
-			).toBe(1)
 
-			// WHEN the strip runs
-			await stripCredentialRow(inviteeEmail)
-
-			// THEN the credential row is gone but the user row survives —
-			// magic-link verify reads the user row only.
-			expect(await countCredentialRows(inviteeEmail)).toBe(0)
+			// THEN the user row is written but the credential row is skipped —
+			// magic-link verify reads `findUserByEmail` so the user can sign in.
 			expect(await countUserRows(inviteeEmail)).toBe(1)
+			expect(await countCredentialRows(inviteeEmail)).toBe(0)
 		})
 	})
 
-	describe('when the invite path encountered an existing user', () => {
-		it('should leave the existing credential row untouched (no data loss)', async () => {
-			// [auth.ts:162 — wasCreated=false branch]
-			// GIVEN an existing user with a real password (second-org invite
-			// path resolves to USER_ALREADY_EXISTS at auth.ts:156).
+	describe('when password is provided', () => {
+		it('should write a credential row alongside the user', async () => {
+			// [better-auth/dist/plugins/admin/routes.mjs:170 — `if (ctx.body.password)` gate is true]
+			// GIVEN an email and a real password (matches the second-org
+			// invite path: the user already has a password from a prior org).
 			const auth = buildInstance()
-			const existingUserEmail = `${TEST_EMAIL_PREFIX}existing-${Date.now()}@example.com`
+			const userEmail = `${TEST_EMAIL_PREFIX}haspwd-${Date.now()}@example.com`
+
+			// WHEN createUser is called with a password
 			await auth.api.createUser({
 				body: {
-					email: existingUserEmail,
-					name: 'Existing',
+					email: userEmail,
+					name: 'Has Password',
 					password: 'their-own-real-password-1234',
 				},
 			})
-			expect(await countCredentialRows(existingUserEmail)).toBe(1)
 
-			// WHEN the invite path skips the strip (no call here on purpose —
-			// production gates the DELETE on `wasCreated`).
-
-			// THEN the real password row is preserved.
-			expect(await countCredentialRows(existingUserEmail)).toBe(1)
+			// THEN both rows exist — confirms `password` is the only switch.
+			expect(await countUserRows(userEmail)).toBe(1)
+			expect(await countCredentialRows(userEmail)).toBe(1)
 		})
 	})
 })

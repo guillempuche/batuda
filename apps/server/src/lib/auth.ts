@@ -48,7 +48,8 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 							body: {
 								email: string
 								name: string
-								password: string
+								// Optional: omitting leaves the invitee passwordless.
+								password?: string
 							}
 							headers?: Headers
 						}) => Promise<unknown>
@@ -134,20 +135,19 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 								)
 							}
 							// Pre-create the invitee because magic-link verify refuses
-							// to create users while `disableSignUp` is on. Existing
-							// users (second-org invitations) fall through with
-							// wasCreated=false so we never strip a real password.
-							let wasCreated = false
+							// to create users while `disableSignUp` is on. Omitting
+							// `password` keeps invitees passwordless — admin createUser
+							// only writes a credential row when one is provided.
+							// Second-org invitations fall through the catch arm:
+							// `USER_ALREADY_EXISTS` is non-fatal here.
 							try {
 								await authHandle.api.createUser({
 									body: {
 										email: data.email,
 										name: data.email.split('@')[0] ?? data.email,
-										password: `invite-${data.id}-${Date.now()}-pending`,
 									},
 									headers: request?.headers ?? new Headers(),
 								})
-								wasCreated = true
 							} catch (cause) {
 								// Match by code, not message — locale shifts would
 								// silently break a substring predicate.
@@ -158,18 +158,6 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 								) {
 									throw cause
 								}
-							}
-							if (wasCreated) {
-								// Strip the throwaway credential row before the
-								// magic link is minted so no `/sign-in/email`
-								// window exists on the password we just stored.
-								// Magic-link verify reads the user row only.
-								await pool.query(
-									`DELETE FROM "account"
-									 WHERE "userId" = (SELECT id FROM "user" WHERE email = $1 LIMIT 1)
-									   AND "providerId" = 'credential'`,
-									[data.email],
-								)
 							}
 							// Mint a magic-link sign-in URL. The URL is delivered
 							// to *our* sendMagicLink callback below; we route it to
