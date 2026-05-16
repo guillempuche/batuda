@@ -380,8 +380,8 @@ msgstr "Cc"
 msgid "Change my mind — set a password anyway"
 msgstr "Change my mind — set a password anyway"
 
-#: src/routes/profile/index.tsx:381
-#: src/routes/profile/index.tsx:468
+#: src/routes/profile/index.tsx:387
+#: src/routes/profile/index.tsx:474
 msgid "Change password"
 msgstr "Change password"
 
@@ -744,11 +744,11 @@ msgstr "Created"
 msgid "Created by agent"
 msgstr "Created by agent"
 
-#: src/routes/profile/index.tsx:395
+#: src/routes/profile/index.tsx:401
 msgid "Current password"
 msgstr "Current password"
 
-#: src/routes/profile/index.tsx:445
+#: src/routes/profile/index.tsx:451
 msgid "Current password is incorrect."
 msgstr "Current password is incorrect."
 
@@ -1446,7 +1446,7 @@ msgid "never"
 msgstr "never"
 
 #: src/routes/profile/index.tsx:229
-#: src/routes/profile/index.tsx:407
+#: src/routes/profile/index.tsx:413
 msgid "New password"
 msgstr "New password"
 
@@ -1844,7 +1844,7 @@ msgstr "Password"
 msgid "Password or app-password"
 msgstr "Password or app-password"
 
-#: src/routes/profile/index.tsx:455
+#: src/routes/profile/index.tsx:461
 msgid "Password updated."
 msgstr "Password updated."
 
@@ -1853,7 +1853,7 @@ msgid "Passwordless sign-in only"
 msgstr "Passwordless sign-in only"
 
 #: src/routes/profile/index.tsx:255
-#: src/routes/profile/index.tsx:433
+#: src/routes/profile/index.tsx:439
 msgid "Passwords need at least {MIN_PASSWORD_LENGTH} characters."
 msgstr "Passwords need at least {MIN_PASSWORD_LENGTH} characters."
 
@@ -1881,7 +1881,7 @@ msgstr "Personal"
 msgid "Phone"
 msgstr "Phone"
 
-#: src/routes/profile/index.tsx:384
+#: src/routes/profile/index.tsx:390
 msgid "Pick a new password. Other signed-in devices will be signed out."
 msgstr "Pick a new password. Other signed-in devices will be signed out."
 
@@ -2088,7 +2088,7 @@ msgid "Reopen thread"
 msgstr "Reopen thread"
 
 #: src/routes/profile/index.tsx:242
-#: src/routes/profile/index.tsx:420
+#: src/routes/profile/index.tsx:426
 msgid "Repeat new password"
 msgstr "Repeat new password"
 
@@ -2185,7 +2185,7 @@ msgstr "Save password"
 #: src/routes/emails/inboxes.tsx:1463
 #: src/routes/pages/$id.tsx:268
 #: src/routes/profile/index.tsx:278
-#: src/routes/profile/index.tsx:466
+#: src/routes/profile/index.tsx:472
 msgid "Saving…"
 msgstr "Saving…"
 
@@ -2376,7 +2376,7 @@ msgid "someone"
 msgstr "someone"
 
 #: src/routes/profile/index.tsx:267
-#: src/routes/profile/index.tsx:450
+#: src/routes/profile/index.tsx:456
 msgid "Something went wrong. Try again."
 msgstr "Something went wrong. Try again."
 
@@ -2557,7 +2557,7 @@ msgstr "The thread exists but the provider returned no messages."
 msgid "The thread may have been archived upstream or the link is stale."
 msgstr "The thread may have been archived upstream or the link is stale."
 
-#: src/routes/profile/index.tsx:440
+#: src/routes/profile/index.tsx:446
 msgid "The two new password fields don't match."
 msgstr "The two new password fields don't match."
 
