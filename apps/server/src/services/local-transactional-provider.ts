@@ -9,6 +9,7 @@ import { EmailSendError } from '@batuda/controllers'
 import {
 	type InvitationParams,
 	type MagicLinkParams,
+	type ResetPasswordParams,
 	TransactionalEmailProvider,
 } from './transactional-email-provider.js'
 
@@ -131,6 +132,25 @@ export const LocalTransactionalProviderLive = Layer.effect(
 				label: 'magic-link',
 			})
 
+		const sendResetPassword = (params: ResetPasswordParams) => {
+			const expiry = params.expiresAt.toISOString()
+			const bodyText = [
+				'Someone (hopefully you) asked to reset your Batuda password.',
+				'',
+				'Click the link below to choose a new one:',
+				'',
+				params.url,
+				'',
+				`This link expires at ${expiry}. If you didn't request a reset, you can ignore this email.`,
+			].join('\n')
+			return writeMd({
+				to: params.email,
+				subject: 'Reset your Batuda password',
+				bodyText,
+				label: 'password-reset',
+			})
+		}
+
 		const sendInvitation = (params: InvitationParams) => {
 			const expiry = params.expiresAt.toISOString()
 			const subject = `${params.inviterName} invited you to ${params.organizationName} on Batuda`
@@ -151,6 +171,6 @@ export const LocalTransactionalProviderLive = Layer.effect(
 			})
 		}
 
-		return { sendMagicLink, sendInvitation } as const
+		return { sendMagicLink, sendInvitation, sendResetPassword } as const
 	}),
 )

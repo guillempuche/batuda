@@ -69,5 +69,6 @@ export {
 	type AuthEnv,
 	type BuildBetterAuthConfigInput,
 	buildBetterAuthConfig,
+	type SendResetPassword,
 } from './infrastructure/build-better-auth-config'
 export { acquirePgPool } from './infrastructure/pg-pool'

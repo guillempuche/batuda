@@ -5,6 +5,7 @@ import { EmailSendError } from '@batuda/controllers'
 import {
 	type InvitationParams,
 	type MagicLinkParams,
+	type ResetPasswordParams,
 	TransactionalEmailProvider,
 } from './transactional-email-provider.js'
 
@@ -71,8 +72,36 @@ const buildInvitationBody = (
 	}
 }
 
+const buildResetPasswordBody = (
+	params: ResetPasswordParams,
+	from: string,
+): ResendBody => {
+	const expiry = params.expiresAt.toISOString()
+	const url = escapeHtml(params.url)
+	return {
+		from,
+		to: [params.email],
+		subject: 'Reset your Batuda password',
+		text: [
+			'Someone (hopefully you) asked to reset your Batuda password.',
+			'',
+			'Click the link below to choose a new one:',
+			'',
+			params.url,
+			'',
+			`This link expires at ${expiry}. If you didn't request a reset, you can ignore this email.`,
+		].join('\n'),
+		html: [
+			'<p>Someone (hopefully you) asked to reset your Batuda password.</p>',
+			'<p>Click the link below to choose a new one:</p>',
+			`<p><a href="${url}">${url}</a></p>`,
+			`<p style="color:#666">This link expires at ${expiry}. If you didn't request a reset, you can ignore this email.</p>`,
+		].join(''),
+	}
+}
+
 // Sends via the Resend REST API. Raw `fetch` keeps this layer dependency-free
-// (no SDK transitives) — magic-link delivery is one POST, one JSON body.
+// (no SDK transitives) — every template is one POST, one JSON body.
 export const ResendTransactionalProviderLive = Layer.effect(
 	TransactionalEmailProvider,
 	Effect.gen(function* () {
@@ -127,6 +156,9 @@ export const ResendTransactionalProviderLive = Layer.effect(
 		const sendInvitation = (params: InvitationParams) =>
 			post(buildInvitationBody(params, from), params.email)
 
-		return { sendMagicLink, sendInvitation } as const
+		const sendResetPassword = (params: ResetPasswordParams) =>
+			post(buildResetPasswordBody(params, from), params.email)
+
+		return { sendMagicLink, sendInvitation, sendResetPassword } as const
 	}),
 )
