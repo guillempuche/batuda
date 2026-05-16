@@ -282,7 +282,7 @@ msgstr "Batuda — a multi-tenant CRM for small agencies."
 msgid "Batuda home"
 msgstr "Batuda home"
 
-#: src/routes/login.tsx:371
+#: src/routes/login.tsx:389
 msgid "Batuda is invite-only. Request access from the Engranatge team."
 msgstr "Batuda is invite-only. Request access from the Engranatge team."
 
@@ -410,7 +410,7 @@ msgstr "Check that your session is valid or try again."
 msgid "Check the session or try again."
 msgstr "Check the session or try again."
 
-#: src/routes/login.tsx:409
+#: src/routes/login.tsx:427
 msgid "Check your inbox"
 msgstr "Check your inbox"
 
@@ -666,6 +666,10 @@ msgstr "Could not save the page. Please try again."
 msgid "Could not send the invitation. Please try again."
 msgstr "Could not send the invitation. Please try again."
 
+#: src/routes/login.tsx:132
+msgid "Could not send the link. Try again in a few seconds."
+msgstr "Could not send the link. Try again in a few seconds."
+
 #: src/routes/emails/inboxes.tsx:286
 msgid "Could not set primary inbox"
 msgstr "Could not set primary inbox"
@@ -673,6 +677,10 @@ msgstr "Could not set primary inbox"
 #: src/routes/emails/inboxes.tsx:226
 msgid "Could not set the default inbox."
 msgstr "Could not set the default inbox."
+
+#: src/routes/login.tsx:131
+msgid "Could not sign in. Check your email and password."
+msgstr "Could not sign in. Check your email and password."
 
 #: src/components/research/research-dialog.tsx:107
 msgid "Could not start the research run. Please try again."
@@ -884,7 +892,7 @@ msgstr "Editor"
 #: src/components/shared/channel-icon.tsx:63
 #: src/routes/companies/$slug.tsx:854
 #: src/routes/emails/inboxes.tsx:402
-#: src/routes/login.tsx:313
+#: src/routes/login.tsx:331
 #: src/routes/settings/organization/invite.tsx:137
 msgid "Email"
 msgstr "Email"
@@ -901,9 +909,13 @@ msgstr "Email drafts"
 msgid "Email is dead-letter"
 msgstr "Email is dead-letter"
 
-#: src/routes/login.tsx:362
+#: src/routes/login.tsx:380
 msgid "Email me a sign-in link"
 msgstr "Email me a sign-in link"
+
+#: src/routes/login.tsx:129
+msgid "Email or password is incorrect."
+msgstr "Email or password is incorrect."
 
 #: src/routes/companies/$slug.tsx:1065
 msgid "Email via Batuda"
@@ -922,7 +934,7 @@ msgstr "Emails, calls, documents, and proposals will appear here as they happen.
 msgid "Enrichment"
 msgstr "Enrichment"
 
-#: src/routes/login.tsx:256
+#: src/routes/login.tsx:134
 msgid "Enter a valid email above first."
 msgstr "Enter a valid email above first."
 
@@ -1139,7 +1151,7 @@ msgstr "Invite a member"
 msgid "Invite a new member"
 msgstr "Invite a new member"
 
-#: src/routes/login.tsx:416
+#: src/routes/login.tsx:434
 msgid "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
 msgstr "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
 
@@ -1465,8 +1477,7 @@ msgstr "No companies yet"
 
 #: src/components/layout/org-switcher.tsx:62
 #: src/routes/accept-invitation.$id.tsx:98
-#: src/routes/login.tsx:167
-#: src/routes/login.tsx:246
+#: src/routes/login.tsx:133
 #: src/routes/profile/index.tsx:77
 #: src/routes/settings/organization/invite.tsx:77
 #: src/routes/settings/organization/members.tsx:81
@@ -1632,7 +1643,7 @@ msgid "Open"
 msgstr "Open"
 
 #. placeholder {0}: provider.label
-#: src/routes/login.tsx:449
+#: src/routes/login.tsx:467
 msgid "Open {0}"
 msgstr "Open {0}"
 
@@ -1791,7 +1802,7 @@ msgstr "Pain indicators"
 msgid "Pain points"
 msgstr "Pain points"
 
-#: src/routes/login.tsx:328
+#: src/routes/login.tsx:346
 msgid "Password"
 msgstr "Password"
 
@@ -2042,11 +2053,11 @@ msgstr "Research"
 msgid "Research run"
 msgstr "Research run"
 
-#: src/routes/login.tsx:431
+#: src/routes/login.tsx:449
 msgid "Resend in"
 msgstr "Resend in"
 
-#: src/routes/login.tsx:437
+#: src/routes/login.tsx:455
 msgid "Resend link"
 msgstr "Resend link"
 
@@ -2178,7 +2189,7 @@ msgid "Send invitation"
 msgstr "Send invitation"
 
 #: src/components/emails/compose-form.tsx:534
-#: src/routes/login.tsx:361
+#: src/routes/login.tsx:379
 #: src/routes/settings/organization/invite.tsx:180
 msgid "Sending…"
 msgstr "Sending…"
@@ -2226,7 +2237,7 @@ msgid "Showing {firstRow}–{lastRow} of {total}"
 msgstr "Showing {firstRow}–{lastRow} of {total}"
 
 #: src/routes/accept-invitation.$id.tsx:129
-#: src/routes/login.tsx:350
+#: src/routes/login.tsx:368
 msgid "Sign in"
 msgstr "Sign in"
 
@@ -2234,7 +2245,7 @@ msgstr "Sign in"
 msgid "Sign in to accept this invitation"
 msgstr "Sign in to accept this invitation"
 
-#: src/routes/login.tsx:303
+#: src/routes/login.tsx:321
 msgid "Sign in to continue"
 msgstr "Sign in to continue"
 
@@ -2246,7 +2257,7 @@ msgstr "Sign out"
 msgid "Sign-out failed. Please try again."
 msgstr "Sign-out failed. Please try again."
 
-#: src/routes/login.tsx:350
+#: src/routes/login.tsx:368
 msgid "Signing in…"
 msgstr "Signing in…"
 
@@ -2410,6 +2421,14 @@ msgstr "Test failed"
 msgid "Testing connection…"
 msgstr "Testing connection…"
 
+#: src/routes/login.tsx:136
+msgid "That link expired. Request a fresh one below."
+msgstr "That link expired. Request a fresh one below."
+
+#: src/routes/login.tsx:137
+msgid "That link is no longer valid. Request a fresh one below."
+msgstr "That link is no longer valid. Request a fresh one below."
+
 #: src/routes/tasks/index.tsx:784
 msgid "The 20 most recently edited open tasks. Click one to reopen it."
 msgstr "The 20 most recently edited open tasks. Click one to reopen it."
@@ -2534,6 +2553,10 @@ msgstr "To"
 msgid "Today"
 msgstr "Today"
 
+#: src/routes/login.tsx:128
+msgid "Too many attempts. Try again in a minute."
+msgstr "Too many attempts. Try again in a minute."
+
 #: src/components/research/findings/competitor-scan-view.tsx:71
 msgid "Total competitors"
 msgstr "Total competitors"
@@ -2601,7 +2624,7 @@ msgstr "Uploading…"
 msgid "Use {0} as primary"
 msgstr "Use {0} as primary"
 
-#: src/routes/login.tsx:459
+#: src/routes/login.tsx:477
 msgid "Use a different email"
 msgstr "Use a different email"
 
@@ -2613,7 +2636,7 @@ msgstr "Use as default footer"
 msgid "Use as default for this purpose"
 msgstr "Use as default for this purpose"
 
-#: src/routes/login.tsx:466
+#: src/routes/login.tsx:484
 msgid "Use password instead"
 msgstr "Use password instead"
 
@@ -2638,7 +2661,15 @@ msgstr "Views"
 msgid "Visit"
 msgstr "Visit"
 
-#: src/routes/login.tsx:412
+#: src/routes/login.tsx:138
+msgid "We couldn't sign you in via that link. Try again."
+msgstr "We couldn't sign you in via that link. Try again."
+
+#: src/routes/login.tsx:135
+msgid "We don't recognize that email. Ask an admin to invite you."
+msgstr "We don't recognize that email. Ask an admin to invite you."
+
+#: src/routes/login.tsx:430
 msgid "We sent a sign-in link to"
 msgstr "We sent a sign-in link to"
 
@@ -2721,3 +2752,7 @@ msgstr "you@example.com"
 #: src/routes/profile/index.tsx:94
 msgid "Your Batuda workbench identity."
 msgstr "Your Batuda workbench identity."
+
+#: src/routes/login.tsx:130
+msgid "Your email isn't verified yet. Use the magic link instead."
+msgstr "Your email isn't verified yet. Use the magic link instead."

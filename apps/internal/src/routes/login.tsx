@@ -1,3 +1,4 @@
+import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { Schema } from 'effect'
@@ -118,6 +119,25 @@ interface FormState {
 
 const INITIAL_STATE: FormState = { error: null }
 
+// Module-scope MessageDescriptors so `lingui extract` finds them
+// statically; `t(descriptor)` from `useLingui()` resolves them at render.
+// Defining them inside helpers that receive `t` as a parameter would
+// silently ship empty strings — the macro only recognises the imported
+// `msg` / `t` identifiers, not shadowed local bindings.
+const MESSAGES = {
+	rateLimit: msg`Too many attempts. Try again in a minute.`,
+	invalidCredentials: msg`Email or password is incorrect.`,
+	emailNotVerified: msg`Your email isn't verified yet. Use the magic link instead.`,
+	passwordFallback: msg`Could not sign in. Check your email and password.`,
+	magicLinkFallback: msg`Could not send the link. Try again in a few seconds.`,
+	network: msg`No connection to the server. Try again in a few seconds.`,
+	enterValidEmail: msg`Enter a valid email above first.`,
+	verifyNewUserDisabled: msg`We don't recognize that email. Ask an admin to invite you.`,
+	verifyExpired: msg`That link expired. Request a fresh one below.`,
+	verifyInvalid: msg`That link is no longer valid. Request a fresh one below.`,
+	verifyUnknown: msg`We couldn't sign you in via that link. Try again.`,
+} as const
+
 type MagicLinkStatus =
 	| { readonly kind: 'idle' }
 	| { readonly kind: 'sending' }
@@ -150,11 +170,15 @@ function LoginPage() {
 					body: JSON.stringify({ email, password }),
 				})
 				if (!response.ok) {
-					const body = (await response.json().catch(() => null)) as {
-						code?: string
-						message?: string
-					} | null
-					return { error: passwordErrorMessage(body, response.status, t) }
+					const body = (await response.json().catch(() => null)) as ErrorBody
+					const key = passwordErrorKey(body, response.status)
+					// Known codes have curated copy; unknowns defer to Better-Auth's
+					// already-localized `message` and only then to our generic string.
+					const error =
+						key === 'fallback'
+							? (body?.message ?? t(MESSAGES.passwordFallback))
+							: t(MESSAGES[key])
+					return { error }
 				}
 				// Success — cookie is on the response. Navigate to the
 				// originally requested URL (or `/`); the root's beforeLoad
@@ -163,9 +187,7 @@ function LoginPage() {
 				return { error: null }
 			} catch (cause) {
 				console.error('[Login] sign-in failed:', cause)
-				return {
-					error: t`No connection to the server. Try again in a few seconds.`,
-				}
+				return { error: t(MESSAGES.network) }
 			}
 		},
 		INITIAL_STATE,
@@ -173,10 +195,11 @@ function LoginPage() {
 
 	// Verify-time errors land back here via the magic-link plugin's
 	// errorCallbackURL, which appends `?error=<code>` to the URL we passed.
-	const verifyError = useMemo(
-		() => magicLinkVerifyErrorMessage(search.error, t),
-		[search.error, t],
-	)
+	const verifyError = useMemo(() => {
+		const key = magicLinkVerifyErrorKey(search.error)
+		if (!key) return null
+		return t(MESSAGES[key])
+	}, [search.error, t])
 
 	// Resend cooldown ticker — stops the user from mashing the button into
 	// a 429 from Better-Auth's per-route rate limit.
@@ -227,24 +250,22 @@ function LoginPage() {
 				body: JSON.stringify({ email, callbackURL, errorCallbackURL }),
 			})
 			if (!response.ok) {
-				const body = (await response.json().catch(() => null)) as {
-					code?: string
-					message?: string
-				} | null
-				setMagicLinkStatus({
-					kind: 'error',
-					message: magicLinkErrorMessage(body, response.status, t),
-				})
+				const body = (await response.json().catch(() => null)) as ErrorBody
+				const key = magicLinkErrorKey(response.status)
+				// 429 has curated copy; everything else prefers Better-Auth's
+				// already-localized `message` over our generic fallback.
+				const message =
+					key === 'rateLimit'
+						? t(MESSAGES.rateLimit)
+						: (body?.message ?? t(MESSAGES.magicLinkFallback))
+				setMagicLinkStatus({ kind: 'error', message })
 				return
 			}
 			setMagicLinkStatus({ kind: 'sent', email })
 			setResendCountdown(RESEND_COOLDOWN_SECONDS)
 		} catch (cause) {
 			console.error('[Login] magic-link request failed:', cause)
-			setMagicLinkStatus({
-				kind: 'error',
-				message: t`No connection to the server. Try again in a few seconds.`,
-			})
+			setMagicLinkStatus({ kind: 'error', message: t(MESSAGES.network) })
 		}
 	}
 
@@ -253,7 +274,7 @@ function LoginPage() {
 		if (!isLikelyEmail(email)) {
 			setMagicLinkStatus({
 				kind: 'error',
-				message: t`Enter a valid email above first.`,
+				message: t(MESSAGES.enterValidEmail),
 			})
 			return
 		}
@@ -473,6 +494,60 @@ function InboxView({
 
 // --- helpers ----------------------------------------------------------------
 
+// Shape of Better-Auth's error responses. The literal return-type unions on
+// the helpers below are load-bearing: they let the call-site narrow against
+// `MESSAGES` and let TS catch a missing key the moment one is added here.
+type ErrorBody = { code?: string; message?: string } | null
+
+// HTTP 429 short-circuits the body — Better-Auth's rate-limit response has
+// no `code`, so status has to be checked before `body.code`.
+const passwordErrorKey = (
+	body: ErrorBody,
+	status: number,
+): 'rateLimit' | 'invalidCredentials' | 'emailNotVerified' | 'fallback' => {
+	if (status === 429) return 'rateLimit'
+	switch (body?.code) {
+		case 'INVALID_EMAIL_OR_PASSWORD':
+			return 'invalidCredentials'
+		case 'EMAIL_NOT_VERIFIED':
+			return 'emailNotVerified'
+		default:
+			return 'fallback'
+	}
+}
+
+// Magic-link send has no body-level codes worth distinguishing — only
+// the 429 needs a custom message, everything else defers to the body.
+const magicLinkErrorKey = (
+	status: number,
+): 'rateLimit' | 'magicLinkFallback' =>
+	status === 429 ? 'rateLimit' : 'magicLinkFallback'
+
+// Codes arrive via `?error=` from the magic-link plugin's errorCallbackURL.
+// `new_user_signup_disabled` is lowercase because Better-Auth emits it from
+// the signup path, the others are SCREAMING_SNAKE from the verify path.
+const magicLinkVerifyErrorKey = (
+	code: string | undefined,
+):
+	| 'verifyNewUserDisabled'
+	| 'verifyExpired'
+	| 'verifyInvalid'
+	| 'verifyUnknown'
+	| null => {
+	if (!code) return null
+	switch (code) {
+		case 'new_user_signup_disabled':
+			return 'verifyNewUserDisabled'
+		case 'EXPIRED_TOKEN':
+			return 'verifyExpired'
+		case 'INVALID_TOKEN':
+		case 'ATTEMPTS_EXCEEDED':
+			return 'verifyInvalid'
+		default:
+			return 'verifyUnknown'
+	}
+}
+
 const isLikelyEmail = (value: string): boolean =>
 	value.length > 3 && value.includes('@') && !value.includes(' ')
 
@@ -488,59 +563,6 @@ const absoluteUrl = (path: string, query?: Record<string, string>): string => {
 		}
 	}
 	return url.toString()
-}
-
-type Tr = ReturnType<typeof useLingui>['t']
-
-const passwordErrorMessage = (
-	body: { code?: string; message?: string } | null,
-	status: number,
-	t: Tr,
-): string => {
-	if (status === 429) {
-		return t`Too many attempts. Try again in a minute.`
-	}
-	switch (body?.code) {
-		case 'INVALID_EMAIL_OR_PASSWORD':
-			return t`Email or password is incorrect.`
-		case 'EMAIL_NOT_VERIFIED':
-			return t`Your email isn't verified yet. Use the magic link instead.`
-		default:
-			return (
-				body?.message ?? t`Could not sign in. Check your email and password.`
-			)
-	}
-}
-
-const magicLinkErrorMessage = (
-	body: { code?: string; message?: string } | null,
-	status: number,
-	t: Tr,
-): string => {
-	if (status === 429) {
-		return t`Too many attempts. Try again in a minute.`
-	}
-	return (
-		body?.message ?? t`Could not send the link. Try again in a few seconds.`
-	)
-}
-
-const magicLinkVerifyErrorMessage = (
-	code: string | undefined,
-	t: Tr,
-): string | null => {
-	if (!code) return null
-	switch (code) {
-		case 'new_user_signup_disabled':
-			return t`We don't recognize that email. Ask an admin to invite you.`
-		case 'EXPIRED_TOKEN':
-			return t`That link expired. Request a fresh one below.`
-		case 'INVALID_TOKEN':
-		case 'ATTEMPTS_EXCEEDED':
-			return t`That link is no longer valid. Request a fresh one below.`
-		default:
-			return t`We couldn't sign you in via that link. Try again.`
-	}
 }
 
 // --- styled components ------------------------------------------------------

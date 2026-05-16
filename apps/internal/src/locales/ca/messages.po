@@ -282,7 +282,7 @@ msgstr "Batuda — un CRM multi-inquilí per a petites agències."
 msgid "Batuda home"
 msgstr "Inici de Batuda"
 
-#: src/routes/login.tsx:371
+#: src/routes/login.tsx:389
 msgid "Batuda is invite-only. Request access from the Engranatge team."
 msgstr "Batuda és només amb invitació. Demana accés a l'equip d'Engranatge."
 
@@ -410,7 +410,7 @@ msgstr "Comprova que la teva sessió sigui vàlida o torna-ho a provar."
 msgid "Check the session or try again."
 msgstr "Comprova la sessió o torna-ho a provar."
 
-#: src/routes/login.tsx:409
+#: src/routes/login.tsx:427
 msgid "Check your inbox"
 msgstr "Mira la safata d'entrada"
 
@@ -666,6 +666,10 @@ msgstr "No s'ha pogut desar la pàgina. Torna-ho a provar."
 msgid "Could not send the invitation. Please try again."
 msgstr "No s'''ha pogut enviar la invitació. Torna-ho a provar."
 
+#: src/routes/login.tsx:132
+msgid "Could not send the link. Try again in a few seconds."
+msgstr "No s'ha pogut enviar l'enllaç. Torna-ho a provar d'aquí uns segons."
+
 #: src/routes/emails/inboxes.tsx:286
 msgid "Could not set primary inbox"
 msgstr "No s'ha pogut establir la bústia principal"
@@ -673,6 +677,10 @@ msgstr "No s'ha pogut establir la bústia principal"
 #: src/routes/emails/inboxes.tsx:226
 msgid "Could not set the default inbox."
 msgstr "No s'ha pogut establir la safata per defecte."
+
+#: src/routes/login.tsx:131
+msgid "Could not sign in. Check your email and password."
+msgstr "No s'ha pogut iniciar sessió. Comprova el correu i la contrasenya."
 
 #: src/components/research/research-dialog.tsx:107
 msgid "Could not start the research run. Please try again."
@@ -884,7 +892,7 @@ msgstr "Editor"
 #: src/components/shared/channel-icon.tsx:63
 #: src/routes/companies/$slug.tsx:854
 #: src/routes/emails/inboxes.tsx:402
-#: src/routes/login.tsx:313
+#: src/routes/login.tsx:331
 #: src/routes/settings/organization/invite.tsx:137
 msgid "Email"
 msgstr "Correu"
@@ -901,9 +909,13 @@ msgstr "Esborranys de correu"
 msgid "Email is dead-letter"
 msgstr "El correu electrònic és no entregable"
 
-#: src/routes/login.tsx:362
+#: src/routes/login.tsx:380
 msgid "Email me a sign-in link"
 msgstr "Envia'm un enllaç per correu"
+
+#: src/routes/login.tsx:129
+msgid "Email or password is incorrect."
+msgstr "El correu o la contrasenya no són correctes."
 
 #: src/routes/companies/$slug.tsx:1065
 msgid "Email via Batuda"
@@ -922,7 +934,7 @@ msgstr "Els emails, trucades, documents i propostes apareixeran aquí a mesura q
 msgid "Enrichment"
 msgstr "Enriquiment"
 
-#: src/routes/login.tsx:256
+#: src/routes/login.tsx:134
 msgid "Enter a valid email above first."
 msgstr "Primer escriu un correu vàlid a sobre."
 
@@ -1139,7 +1151,7 @@ msgstr "Convida un membre"
 msgid "Invite a new member"
 msgstr "Convida un nou membre"
 
-#: src/routes/login.tsx:416
+#: src/routes/login.tsx:434
 msgid "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
 msgstr "Caduca en {MAGIC_LINK_EXPIRY_MINUTES} minuts. No el veus? Mira el correu brossa."
 
@@ -1465,8 +1477,7 @@ msgstr "Encara no hi ha empreses"
 
 #: src/components/layout/org-switcher.tsx:62
 #: src/routes/accept-invitation.$id.tsx:98
-#: src/routes/login.tsx:167
-#: src/routes/login.tsx:246
+#: src/routes/login.tsx:133
 #: src/routes/profile/index.tsx:77
 #: src/routes/settings/organization/invite.tsx:77
 #: src/routes/settings/organization/members.tsx:81
@@ -1632,7 +1643,7 @@ msgid "Open"
 msgstr "Obert"
 
 #. placeholder {0}: provider.label
-#: src/routes/login.tsx:449
+#: src/routes/login.tsx:467
 msgid "Open {0}"
 msgstr "Obre {0}"
 
@@ -1791,7 +1802,7 @@ msgstr "Indicadors de dolor"
 msgid "Pain points"
 msgstr "Punts febles"
 
-#: src/routes/login.tsx:328
+#: src/routes/login.tsx:346
 msgid "Password"
 msgstr "Contrasenya"
 
@@ -2042,11 +2053,11 @@ msgstr "Recerca"
 msgid "Research run"
 msgstr "Recerca"
 
-#: src/routes/login.tsx:431
+#: src/routes/login.tsx:449
 msgid "Resend in"
 msgstr "Torna a enviar en"
 
-#: src/routes/login.tsx:437
+#: src/routes/login.tsx:455
 msgid "Resend link"
 msgstr "Torna a enviar l'enllaç"
 
@@ -2178,7 +2189,7 @@ msgid "Send invitation"
 msgstr "Envia invitació"
 
 #: src/components/emails/compose-form.tsx:534
-#: src/routes/login.tsx:361
+#: src/routes/login.tsx:379
 #: src/routes/settings/organization/invite.tsx:180
 msgid "Sending…"
 msgstr "Enviant…"
@@ -2226,7 +2237,7 @@ msgid "Showing {firstRow}–{lastRow} of {total}"
 msgstr "Mostrant {firstRow}–{lastRow} de {total}"
 
 #: src/routes/accept-invitation.$id.tsx:129
-#: src/routes/login.tsx:350
+#: src/routes/login.tsx:368
 msgid "Sign in"
 msgstr "Inicia sessió"
 
@@ -2234,7 +2245,7 @@ msgstr "Inicia sessió"
 msgid "Sign in to accept this invitation"
 msgstr "Inicia sessió per acceptar aquesta invitació"
 
-#: src/routes/login.tsx:303
+#: src/routes/login.tsx:321
 msgid "Sign in to continue"
 msgstr "Inicia sessió per continuar"
 
@@ -2246,7 +2257,7 @@ msgstr "Tanca sessió"
 msgid "Sign-out failed. Please try again."
 msgstr "No s'ha pogut tancar la sessió. Torna-ho a provar."
 
-#: src/routes/login.tsx:350
+#: src/routes/login.tsx:368
 msgid "Signing in…"
 msgstr "Iniciant sessió…"
 
@@ -2410,6 +2421,14 @@ msgstr "Prova fallida"
 msgid "Testing connection…"
 msgstr "Provant la connexió…"
 
+#: src/routes/login.tsx:136
+msgid "That link expired. Request a fresh one below."
+msgstr "L'enllaç ha caducat. Demana'n un de nou a sota."
+
+#: src/routes/login.tsx:137
+msgid "That link is no longer valid. Request a fresh one below."
+msgstr "L'enllaç ja no és vàlid. Demana'n un de nou a sota."
+
 #: src/routes/tasks/index.tsx:784
 msgid "The 20 most recently edited open tasks. Click one to reopen it."
 msgstr "Les 20 tasques obertes editades més recentment. Fes-hi clic per reobrir-ne una."
@@ -2534,6 +2553,10 @@ msgstr "Per a"
 msgid "Today"
 msgstr "Avui"
 
+#: src/routes/login.tsx:128
+msgid "Too many attempts. Try again in a minute."
+msgstr "Massa intents. Torna-ho a provar d'aquí un minut."
+
 #: src/components/research/findings/competitor-scan-view.tsx:71
 msgid "Total competitors"
 msgstr "Total competidors"
@@ -2601,7 +2624,7 @@ msgstr "Pujant…"
 msgid "Use {0} as primary"
 msgstr "Fes servir {0} com a principal"
 
-#: src/routes/login.tsx:459
+#: src/routes/login.tsx:477
 msgid "Use a different email"
 msgstr "Fes servir un altre correu"
 
@@ -2613,7 +2636,7 @@ msgstr "Utilitza com a peu de pàgina predeterminat"
 msgid "Use as default for this purpose"
 msgstr "Usa com a per defecte per a aquest propòsit"
 
-#: src/routes/login.tsx:466
+#: src/routes/login.tsx:484
 msgid "Use password instead"
 msgstr "Fes servir contrasenya"
 
@@ -2638,7 +2661,15 @@ msgstr "Visites"
 msgid "Visit"
 msgstr "Visita"
 
-#: src/routes/login.tsx:412
+#: src/routes/login.tsx:138
+msgid "We couldn't sign you in via that link. Try again."
+msgstr "No s'ha pogut iniciar sessió amb aquest enllaç. Torna-ho a provar."
+
+#: src/routes/login.tsx:135
+msgid "We don't recognize that email. Ask an admin to invite you."
+msgstr "No reconeixem aquest correu. Demana a un administrador que t'inviti."
+
+#: src/routes/login.tsx:430
 msgid "We sent a sign-in link to"
 msgstr "S'ha enviat un enllaç d'inici de sessió a"
 
@@ -2721,3 +2752,7 @@ msgstr "tu@exemple.com"
 #: src/routes/profile/index.tsx:94
 msgid "Your Batuda workbench identity."
 msgstr "La teva identitat al banc de Batuda."
+
+#: src/routes/login.tsx:130
+msgid "Your email isn't verified yet. Use the magic link instead."
+msgstr "El correu encara no està verificat. Fes servir l'enllaç de sessió."
