@@ -9,7 +9,9 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TasksIndexRouteImport } from './routes/tasks/index'
 import { Route as ProfileIndexRouteImport } from './routes/profile/index'
@@ -28,9 +30,19 @@ import { Route as SettingsOrganizationSpendRouteImport } from './routes/settings
 import { Route as SettingsOrganizationMembersRouteImport } from './routes/settings/organization/members'
 import { Route as SettingsOrganizationInviteRouteImport } from './routes/settings/organization/invite'
 
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -125,7 +137,9 @@ const SettingsOrganizationInviteRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/accept-invitation/$id': typeof AcceptInvitationIdRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/emails/$threadId': typeof EmailsThreadIdRoute
@@ -145,7 +159,9 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/accept-invitation/$id': typeof AcceptInvitationIdRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/emails/$threadId': typeof EmailsThreadIdRoute
@@ -166,7 +182,9 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/accept-invitation/$id': typeof AcceptInvitationIdRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/emails/$threadId': typeof EmailsThreadIdRoute
@@ -188,7 +206,9 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/forgot-password'
     | '/login'
+    | '/reset-password'
     | '/accept-invitation/$id'
     | '/companies/$slug'
     | '/emails/$threadId'
@@ -208,7 +228,9 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/forgot-password'
     | '/login'
+    | '/reset-password'
     | '/accept-invitation/$id'
     | '/companies/$slug'
     | '/emails/$threadId'
@@ -228,7 +250,9 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/forgot-password'
     | '/login'
+    | '/reset-password'
     | '/accept-invitation/$id'
     | '/companies/$slug'
     | '/emails/$threadId'
@@ -249,7 +273,9 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   AcceptInvitationIdRoute: typeof AcceptInvitationIdRoute
   CompaniesSlugRoute: typeof CompaniesSlugRoute
   EmailsThreadIdRoute: typeof EmailsThreadIdRoute
@@ -270,11 +296,25 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -401,7 +441,9 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   AcceptInvitationIdRoute: AcceptInvitationIdRoute,
   CompaniesSlugRoute: CompaniesSlugRoute,
   EmailsThreadIdRoute: EmailsThreadIdRoute,
