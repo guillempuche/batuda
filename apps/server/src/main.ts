@@ -239,23 +239,26 @@ const AppLive = Layer.mergeAll(
 	OpenApiJsonLive,
 )
 
-// `CurrentOrg` is request-scoped: real call sites override it via
-// OrgMiddleware (HTTP), McpAuthMiddleware (MCP tools), `provideOrg`
-// (cal.com webhook), or the inline `Effect.provideService` calls in
-// ResearchEventSinkLive. Non-org-scoped endpoints (/docs, /openapi.json,
-// MCP transport plumbing) and a few service method signatures still
-// surface `CurrentOrg` in the program's R, so we satisfy the type
-// statically here with a layer that dies loudly if anyone reads the tag
-// outside a request scope — surfacing the leak as a Defect rather than
-// silently masking it with a cast.
-const CurrentOrgFallbackLive = Layer.effect(
-	CurrentOrg,
-	Effect.die(
-		new Error(
-			'CurrentOrg accessed outside a request scope — reach it via OrgMiddleware, McpAuthMiddleware, provideOrg, or an explicit Effect.provideService(CurrentOrg, …).',
-		),
-	),
-)
+// `CurrentOrg` is request-scoped — provided per request by OrgMiddleware
+// (HTTP), McpAuthMiddleware (MCP tools), `provideOrg` (cal.com webhook),
+// and inline `Effect.provideService` calls in ResearchEventSinkLive. It
+// surfaces in the program's R only because Tool.make declares
+// `dependencies: [CurrentOrg]` for typing.
+//
+// No root layer for it on purpose: `McpServer.toolkit(...)` snapshots the
+// service map at layer-build time (effect/src/unstable/ai/McpServer.ts:610)
+// and re-injects it per tool call via `Effect.provideContext`, where
+// `ServiceMap.merge` lets the snapshot OVERRIDE the request fiber. A
+// boot-time sentinel would clobber McpAuthMiddleware's real value and
+// return empty/foreign rows from every tool; leaving the tag absent at
+// boot keeps it out of the snapshot so the request value survives.
+//
+// The runMain cast type-erases the unsatisfied requirement. A
+// defect-throwing fallback would surface accidental out-of-scope reads
+// more loudly but crashes startup for the same snapshot reason. The
+// pattern stops being necessary when upstream defers `McpServer.toolkit`
+// capture to request time; `main.boot.test.ts:149-156` is the regression
+// guard (not in `pnpm test` today — run via `pnpm test:integration`).
 
 const program = HttpRouter.serve(AppLive).pipe(
 	Layer.provide(ServicesLive),
@@ -269,7 +272,6 @@ const program = HttpRouter.serve(AppLive).pipe(
 	Layer.provide(S3StorageProviderLive),
 	Layer.provide(OrgMiddlewareLive),
 	Layer.provide(SessionMiddlewareLive),
-	Layer.provide(CurrentOrgFallbackLive),
 	Layer.provide(Auth.layer),
 	// Provided once at the bottom of the stack so every layer above (booking,
 	// brave search, calcom, geocoder, inbox-health-probe, …) can pick up
@@ -283,4 +285,4 @@ const program = HttpRouter.serve(AppLive).pipe(
 	Layer.launch,
 )
 
-NodeRuntime.runMain(program)
+NodeRuntime.runMain(program as unknown as Effect.Effect<void, unknown, never>)
