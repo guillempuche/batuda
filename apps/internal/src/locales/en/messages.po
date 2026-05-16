@@ -282,7 +282,7 @@ msgstr "Batuda — a multi-tenant CRM for small agencies."
 msgid "Batuda home"
 msgstr "Batuda home"
 
-#: src/routes/login.tsx:366
+#: src/routes/login.tsx:371
 msgid "Batuda is invite-only. Request access from the Engranatge team."
 msgstr "Batuda is invite-only. Request access from the Engranatge team."
 
@@ -410,7 +410,7 @@ msgstr "Check that your session is valid or try again."
 msgid "Check the session or try again."
 msgstr "Check the session or try again."
 
-#: src/routes/login.tsx:404
+#: src/routes/login.tsx:409
 msgid "Check your inbox"
 msgstr "Check your inbox"
 
@@ -884,7 +884,7 @@ msgstr "Editor"
 #: src/components/shared/channel-icon.tsx:63
 #: src/routes/companies/$slug.tsx:854
 #: src/routes/emails/inboxes.tsx:402
-#: src/routes/login.tsx:308
+#: src/routes/login.tsx:313
 #: src/routes/settings/organization/invite.tsx:137
 msgid "Email"
 msgstr "Email"
@@ -901,7 +901,7 @@ msgstr "Email drafts"
 msgid "Email is dead-letter"
 msgstr "Email is dead-letter"
 
-#: src/routes/login.tsx:357
+#: src/routes/login.tsx:362
 msgid "Email me a sign-in link"
 msgstr "Email me a sign-in link"
 
@@ -922,7 +922,7 @@ msgstr "Emails, calls, documents, and proposals will appear here as they happen.
 msgid "Enrichment"
 msgstr "Enrichment"
 
-#: src/routes/login.tsx:251
+#: src/routes/login.tsx:256
 msgid "Enter a valid email above first."
 msgstr "Enter a valid email above first."
 
@@ -1033,7 +1033,7 @@ msgstr "Heading to the dashboard…"
 msgid "Hide Cc"
 msgstr "Hide Cc"
 
-#: src/components/primitives/pri-password-input.tsx:95
+#: src/components/primitives/pri-password-input.tsx:97
 msgid "Hide password"
 msgstr "Hide password"
 
@@ -1139,7 +1139,7 @@ msgstr "Invite a member"
 msgid "Invite a new member"
 msgstr "Invite a new member"
 
-#: src/routes/login.tsx:411
+#: src/routes/login.tsx:416
 msgid "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
 msgstr "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
 
@@ -1465,8 +1465,8 @@ msgstr "No companies yet"
 
 #: src/components/layout/org-switcher.tsx:62
 #: src/routes/accept-invitation.$id.tsx:98
-#: src/routes/login.tsx:155
-#: src/routes/login.tsx:241
+#: src/routes/login.tsx:167
+#: src/routes/login.tsx:246
 #: src/routes/profile/index.tsx:77
 #: src/routes/settings/organization/invite.tsx:77
 #: src/routes/settings/organization/members.tsx:81
@@ -1632,7 +1632,7 @@ msgid "Open"
 msgstr "Open"
 
 #. placeholder {0}: provider.label
-#: src/routes/login.tsx:444
+#: src/routes/login.tsx:449
 msgid "Open {0}"
 msgstr "Open {0}"
 
@@ -1791,7 +1791,7 @@ msgstr "Pain indicators"
 msgid "Pain points"
 msgstr "Pain points"
 
-#: src/routes/login.tsx:323
+#: src/routes/login.tsx:328
 msgid "Password"
 msgstr "Password"
 
@@ -2042,11 +2042,11 @@ msgstr "Research"
 msgid "Research run"
 msgstr "Research run"
 
-#: src/routes/login.tsx:426
+#: src/routes/login.tsx:431
 msgid "Resend in"
 msgstr "Resend in"
 
-#: src/routes/login.tsx:432
+#: src/routes/login.tsx:437
 msgid "Resend link"
 msgstr "Resend link"
 
@@ -2178,7 +2178,7 @@ msgid "Send invitation"
 msgstr "Send invitation"
 
 #: src/components/emails/compose-form.tsx:534
-#: src/routes/login.tsx:356
+#: src/routes/login.tsx:361
 #: src/routes/settings/organization/invite.tsx:180
 msgid "Sending…"
 msgstr "Sending…"
@@ -2213,7 +2213,7 @@ msgstr "Show less"
 msgid "Show more"
 msgstr "Show more"
 
-#: src/components/primitives/pri-password-input.tsx:94
+#: src/components/primitives/pri-password-input.tsx:96
 msgid "Show password"
 msgstr "Show password"
 
@@ -2226,7 +2226,7 @@ msgid "Showing {firstRow}–{lastRow} of {total}"
 msgstr "Showing {firstRow}–{lastRow} of {total}"
 
 #: src/routes/accept-invitation.$id.tsx:129
-#: src/routes/login.tsx:345
+#: src/routes/login.tsx:350
 msgid "Sign in"
 msgstr "Sign in"
 
@@ -2234,7 +2234,7 @@ msgstr "Sign in"
 msgid "Sign in to accept this invitation"
 msgstr "Sign in to accept this invitation"
 
-#: src/routes/login.tsx:298
+#: src/routes/login.tsx:303
 msgid "Sign in to continue"
 msgstr "Sign in to continue"
 
@@ -2246,7 +2246,7 @@ msgstr "Sign out"
 msgid "Sign-out failed. Please try again."
 msgstr "Sign-out failed. Please try again."
 
-#: src/routes/login.tsx:345
+#: src/routes/login.tsx:350
 msgid "Signing in…"
 msgstr "Signing in…"
 
@@ -2601,7 +2601,7 @@ msgstr "Uploading…"
 msgid "Use {0} as primary"
 msgstr "Use {0} as primary"
 
-#: src/routes/login.tsx:454
+#: src/routes/login.tsx:459
 msgid "Use a different email"
 msgstr "Use a different email"
 
@@ -2613,7 +2613,7 @@ msgstr "Use as default footer"
 msgid "Use as default for this purpose"
 msgstr "Use as default for this purpose"
 
-#: src/routes/login.tsx:461
+#: src/routes/login.tsx:466
 msgid "Use password instead"
 msgstr "Use password instead"
 
@@ -2638,7 +2638,7 @@ msgstr "Views"
 msgid "Visit"
 msgstr "Visit"
 
-#: src/routes/login.tsx:407
+#: src/routes/login.tsx:412
 msgid "We sent a sign-in link to"
 msgstr "We sent a sign-in link to"
 
