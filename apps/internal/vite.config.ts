@@ -122,7 +122,20 @@ const config = defineConfig({
 		// `.default` property — Nitro's prebuild then emits
 		// `const { __extends } = tslib.default` which throws at SSR
 		// time because tslib's ESM has named exports, not a default.
-		conditions: ['module', 'import', 'default'],
+		//
+		// `development` is first so workspace packages with a
+		// `"development"` export key (e.g. `@batuda/ui`) resolve to
+		// their TS source in dev, not the pre-built `dist/`. Without
+		// it Vite picks `import` → `dist/index.mjs`, which tsdown ships
+		// without `@swc/plugin-styled-components` componentIds; the SSR
+		// pipeline's `noExternal` still re-runs the SWC plugin and adds
+		// IDs, while the client loads dist as-is. The classnames then
+		// diverge (`pri-input__PriInput-sc-{hash}-0` vs `PriInput-{hash}`)
+		// and React 19 bails hydration on every affected subtree —
+		// magic-link button onClick stops attaching, sign-in form
+		// submits get dropped, etc. Symmetric source load + symmetric
+		// transform fixes the mismatch at the root.
+		conditions: ['development', 'module', 'import', 'default'],
 	},
 	ssr: {
 		// Bundle through Vite for SSR so the React-using deps go through
@@ -136,7 +149,7 @@ const config = defineConfig({
 			'@base-ui/react',
 			'@base-ui/utils',
 		],
-		resolve: { conditions: ['module', 'import', 'default'] },
+		resolve: { conditions: ['development', 'module', 'import', 'default'] },
 	},
 	plugins: [
 		tanstackStart(),
