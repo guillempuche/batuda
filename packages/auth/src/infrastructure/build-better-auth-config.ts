@@ -90,6 +90,13 @@ export const buildBetterAuthConfig = <Plugins extends BetterAuthPlugin[]>(
 					required: false,
 					defaultValue: false,
 				},
+				// User has chosen to stay passwordless; gates the "set a password"
+				// nudge so we stop asking. Toggled via `/auth/update-user`.
+				passwordOptOut: {
+					type: 'boolean' as const,
+					required: false,
+					defaultValue: false,
+				},
 			},
 		},
 		session: {

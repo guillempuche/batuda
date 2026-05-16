@@ -13,6 +13,7 @@ import pg from 'pg'
 
 import { buildBetterAuthConfig } from '@batuda/auth'
 
+import { setPasswordRoute } from '../plugins/set-password-route'
 import { TransactionalEmailProvider } from '../services/transactional-email-provider'
 import { TransactionalEmailProviderLive } from '../services/transactional-email-provider-live'
 import { EnvVars } from './env'
@@ -186,6 +187,7 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 						},
 					}),
 					apiKey({ enableSessionForAPIKeys: true }),
+					setPasswordRoute(),
 					magicLink({
 						// Closes the silent-signup hole on /sign-in/magic-link.
 						// The invitation flow and CLI invite commands pre-create
