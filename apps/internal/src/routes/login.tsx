@@ -43,7 +43,9 @@ const AUTH_CHANNEL = 'batuda-auth'
 // inline it and the `search` param in `beforeLoad` widens to `{}`.
 const validateSearch = validateSearchWith({
 	returnTo: Schema.NonEmptyString,
-	magic_link_error: Schema.NonEmptyString,
+	// Set by the magic-link plugin's `errorCallbackURL` redirect on verify
+	// failure — Better-Auth hard-codes the param name `error`, no template.
+	error: Schema.NonEmptyString,
 })
 
 const MAGIC_LINK_EXPIRY_MINUTES = 5
@@ -170,10 +172,10 @@ function LoginPage() {
 	)
 
 	// Verify-time errors land back here via the magic-link plugin's
-	// errorCallbackURL (auth.ts wires `/login?magic_link_error=<code>`).
+	// errorCallbackURL, which appends `?error=<code>` to the URL we passed.
 	const verifyError = useMemo(
-		() => magicLinkVerifyErrorMessage(search.magic_link_error, t),
-		[search.magic_link_error, t],
+		() => magicLinkVerifyErrorMessage(search.error, t),
+		[search.error, t],
 	)
 
 	// Resend cooldown ticker — stops the user from mashing the button into
@@ -216,12 +218,8 @@ function LoginPage() {
 		setMagicLinkStatus({ kind: 'sending' })
 		try {
 			const callbackURL = absoluteUrl(safeReturnTo(search.returnTo))
-			// Better-Auth substitutes the literal `${ERROR_CODE}` server-side,
-			// so build via URL with a placeholder and swap it in to avoid the
-			// `$`/`{`/`}` getting percent-encoded.
-			const errorCallbackURL = absoluteUrl('/login', {
-				magic_link_error: '__CODE__',
-			}).replace('__CODE__', '${ERROR_CODE}')
+			// Better-Auth appends `?error=<code>` here on verify failure.
+			const errorCallbackURL = absoluteUrl('/login')
 			const response = await fetch(`${apiBaseUrl()}/auth/sign-in/magic-link`, {
 				method: 'POST',
 				credentials: 'include',
