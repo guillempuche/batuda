@@ -30,10 +30,13 @@ pre-commit:
       # `i18n:check` in every workspace that defines it via pnpm's
       # `--if-present` filter — internal is the only web app here today, any
       # new web app tomorrow without editing this file.
+      #
+      # No `stage_fixed`: `i18n:check` is read-only (it verifies catalogs
+      # are in sync, never writes). Auto-amending .po would silently stage
+      # untranslated msgstr entries, which then ship as empty strings.
       glob: "apps/internal/**/*.{tsx,ts,po}"
       run: |
         pnpm -r --parallel --if-present run i18n:check
-      stage_fixed: true
 
 pre-push:
   commands:
