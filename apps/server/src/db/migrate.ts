@@ -26,6 +26,11 @@ const authMigrate = Effect.promise(async () => {
 					required: false,
 					defaultValue: false,
 				},
+				passwordOptOut: {
+					type: 'boolean',
+					required: false,
+					defaultValue: false,
+				},
 			},
 		},
 		// `organization()` here so Better Auth's CLI generates the
