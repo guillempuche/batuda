@@ -270,8 +270,8 @@ msgstr "Back to inbox"
 msgid "Back to organization"
 msgstr "Back to organization"
 
-#: src/routes/forgot-password.tsx:82
-#: src/routes/forgot-password.tsx:134
+#: src/routes/forgot-password.tsx:86
+#: src/routes/forgot-password.tsx:140
 #: src/routes/reset-password.tsx:82
 msgid "Back to sign in"
 msgstr "Back to sign in"
@@ -425,7 +425,7 @@ msgstr "Check that your session is valid or try again."
 msgid "Check the session or try again."
 msgstr "Check the session or try again."
 
-#: src/routes/forgot-password.tsx:65
+#: src/routes/forgot-password.tsx:69
 #: src/routes/login.tsx:442
 msgid "Check your inbox"
 msgstr "Check your inbox"
@@ -682,7 +682,7 @@ msgstr "Could not save the page. Please try again."
 msgid "Could not send the invitation. Please try again."
 msgstr "Could not send the invitation. Please try again."
 
-#: src/routes/forgot-password.tsx:119
+#: src/routes/forgot-password.tsx:123
 #: src/routes/login.tsx:137
 msgid "Could not send the link. Try again in a few seconds."
 msgstr "Could not send the link. Try again in a few seconds."
@@ -921,7 +921,7 @@ msgstr "Editor"
 #: src/components/shared/channel-icon.tsx:63
 #: src/routes/companies/$slug.tsx:854
 #: src/routes/emails/inboxes.tsx:402
-#: src/routes/forgot-password.tsx:105
+#: src/routes/forgot-password.tsx:109
 #: src/routes/login.tsx:339
 #: src/routes/settings/organization/invite.tsx:137
 msgid "Email"
@@ -1110,7 +1110,7 @@ msgstr "I prefer passwordless"
 msgid "I prefer passwordless — don't ask me again"
 msgstr "I prefer passwordless — don't ask me again"
 
-#: src/routes/forgot-password.tsx:68
+#: src/routes/forgot-password.tsx:72
 msgid "If <0>{submittedEmail}</0> is registered, a reset link is on its way. The link expires in 1 hour."
 msgstr "If <0>{submittedEmail}</0> is registered, a reset link is on its way. The link expires in 1 hour."
 
@@ -1668,7 +1668,7 @@ msgstr "none scheduled"
 msgid "Normal priority"
 msgstr "Normal priority"
 
-#: src/routes/forgot-password.tsx:74
+#: src/routes/forgot-password.tsx:78
 msgid "Not seeing it? Check your spam folder. If you're sure the email is right and it never arrives, an admin can help."
 msgstr "Not seeing it? Check your spam folder. If you're sure the email is right and it never arrives, an admin can help."
 
@@ -2166,7 +2166,7 @@ msgstr "Reset"
 msgid "Reset links expire after 1 hour and can only be used once. Ask for a new one and follow it within the hour."
 msgstr "Reset links expire after 1 hour and can only be used once. Ask for a new one and follow it within the hour."
 
-#: src/routes/forgot-password.tsx:95
+#: src/routes/forgot-password.tsx:99
 msgid "Reset your password"
 msgstr "Reset your password"
 
@@ -2304,12 +2304,12 @@ msgstr "Send email"
 msgid "Send invitation"
 msgstr "Send invitation"
 
-#: src/routes/forgot-password.tsx:128
+#: src/routes/forgot-password.tsx:134
 msgid "Send reset link"
 msgstr "Send reset link"
 
 #: src/components/emails/compose-form.tsx:534
-#: src/routes/forgot-password.tsx:128
+#: src/routes/forgot-password.tsx:134
 #: src/routes/login.tsx:387
 #: src/routes/settings/organization/invite.tsx:180
 msgid "Sending…"
@@ -2742,7 +2742,7 @@ msgstr "Type"
 msgid "Type and press Enter"
 msgstr "Type and press Enter"
 
-#: src/routes/forgot-password.tsx:98
+#: src/routes/forgot-password.tsx:102
 msgid "Type the email you sign in with. We'll send a reset link."
 msgstr "Type the email you sign in with. We'll send a reset link."
 
