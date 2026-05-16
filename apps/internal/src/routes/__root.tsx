@@ -9,6 +9,7 @@ import {
 	useMatches,
 } from '@tanstack/react-router'
 import { LayoutGroup } from 'motion/react'
+import { useEffect } from 'react'
 
 import { PriToast } from '@batuda/ui/pri'
 
@@ -154,6 +155,18 @@ function RootComponent() {
 	const isAuthChrome =
 		location.pathname === '/login' ||
 		location.pathname.startsWith('/accept-invitation/')
+
+	// Tell any stale `/login` tab (left on the "Check your inbox" panel
+	// after a cross-tab magic-link verify) to navigate off. Listener lives
+	// in login.tsx; firing on every authed-shell mount covers all sign-in
+	// paths uniformly.
+	useEffect(() => {
+		if (isAuthChrome) return
+		if (typeof BroadcastChannel === 'undefined') return
+		const channel = new BroadcastChannel('batuda-auth')
+		channel.postMessage({ kind: 'signed-in' })
+		channel.close()
+	}, [isAuthChrome])
 
 	return (
 		<RootDocument lang={lang}>

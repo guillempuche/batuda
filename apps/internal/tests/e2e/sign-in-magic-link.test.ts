@@ -135,10 +135,10 @@ test.describe('magic-link sign-in from /login', () => {
 			page,
 		}) => {
 			// GIVEN Better-Auth's verify endpoint redirected back here with
-			// ?magic_link_error=new_user_signup_disabled (unknown email tried
-			// to verify a captured token in a different tab / shared link)
+			// `?error=<code>` appended to the errorCallbackURL we passed.
+			// new_user_signup_disabled fires when an unknown email verifies.
 			// [apps/server/src/lib/auth.ts — disableSignUp: true on magicLink]
-			await page.goto('/login?magic_link_error=new_user_signup_disabled')
+			await page.goto('/login?error=new_user_signup_disabled')
 
 			// THEN the inline error panel renders alongside the form so the
 			// user knows why they bounced back
