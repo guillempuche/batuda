@@ -140,7 +140,7 @@ msgstr "Active"
 msgid "Active client"
 msgstr "Active client"
 
-#: src/routes/index.tsx:269
+#: src/routes/index.tsx:272
 msgid "Active companies"
 msgstr "Active companies"
 
@@ -208,7 +208,7 @@ msgstr "All statuses"
 msgid "All time"
 msgstr "All time"
 
-#: src/routes/index.tsx:300
+#: src/routes/index.tsx:303
 msgid "All under control"
 msgstr "All under control"
 
@@ -282,7 +282,7 @@ msgstr "Batuda — a multi-tenant CRM for small agencies."
 msgid "Batuda home"
 msgstr "Batuda home"
 
-#: src/routes/login.tsx:389
+#: src/routes/login.tsx:392
 msgid "Batuda is invite-only. Request access from the Engranatge team."
 msgstr "Batuda is invite-only. Request access from the Engranatge team."
 
@@ -376,6 +376,15 @@ msgstr "Cancel upload"
 msgid "Cc"
 msgstr "Cc"
 
+#: src/routes/profile/index.tsx:327
+msgid "Change my mind — set a password anyway"
+msgstr "Change my mind — set a password anyway"
+
+#: src/routes/profile/index.tsx:381
+#: src/routes/profile/index.tsx:468
+msgid "Change password"
+msgstr "Change password"
+
 #: src/routes/emails/inboxes.tsx:933
 msgid "Change password (re-probes the connection)"
 msgstr "Change password (re-probes the connection)"
@@ -410,7 +419,7 @@ msgstr "Check that your session is valid or try again."
 msgid "Check the session or try again."
 msgstr "Check the session or try again."
 
-#: src/routes/login.tsx:427
+#: src/routes/login.tsx:430
 msgid "Check your inbox"
 msgstr "Check your inbox"
 
@@ -496,9 +505,9 @@ msgstr "Companies"
 #: src/components/interactions/quick-capture-dialog.tsx:209
 #: src/routes/emails/$threadId.tsx:427
 #: src/routes/emails/$threadId.tsx:467
-#: src/routes/index.tsx:315
-#: src/routes/index.tsx:392
-#: src/routes/index.tsx:432
+#: src/routes/index.tsx:318
+#: src/routes/index.tsx:395
+#: src/routes/index.tsx:435
 msgid "Company"
 msgstr "Company"
 
@@ -694,6 +703,10 @@ msgstr "Could not switch organization. Please try again."
 msgid "Could not toggle the inbox state."
 msgstr "Could not toggle the inbox state."
 
+#: src/routes/profile/index.tsx:332
+msgid "Couldn't update your preference. Try again."
+msgstr "Couldn't update your preference. Try again."
+
 #: src/routes/emails/inboxes.tsx:1465
 msgid "Create"
 msgstr "Create"
@@ -730,6 +743,14 @@ msgstr "Created"
 #: src/components/shared/task-item.tsx:336
 msgid "Created by agent"
 msgstr "Created by agent"
+
+#: src/routes/profile/index.tsx:395
+msgid "Current password"
+msgstr "Current password"
+
+#: src/routes/profile/index.tsx:445
+msgid "Current password is incorrect."
+msgstr "Current password is incorrect."
 
 #: src/components/companies/about-section.tsx:100
 #: src/components/research/findings/company-enrichment-view.tsx:82
@@ -892,7 +913,7 @@ msgstr "Editor"
 #: src/components/shared/channel-icon.tsx:63
 #: src/routes/companies/$slug.tsx:854
 #: src/routes/emails/inboxes.tsx:402
-#: src/routes/login.tsx:331
+#: src/routes/login.tsx:334
 #: src/routes/settings/organization/invite.tsx:137
 msgid "Email"
 msgstr "Email"
@@ -909,7 +930,7 @@ msgstr "Email drafts"
 msgid "Email is dead-letter"
 msgstr "Email is dead-letter"
 
-#: src/routes/login.tsx:380
+#: src/routes/login.tsx:383
 msgid "Email me a sign-in link"
 msgstr "Email me a sign-in link"
 
@@ -1055,7 +1076,7 @@ msgstr "High"
 
 #: src/components/shared/priority-dot.tsx:47
 #: src/components/shared/task-item.tsx:309
-#: src/routes/index.tsx:459
+#: src/routes/index.tsx:462
 msgid "High priority"
 msgstr "High priority"
 
@@ -1063,6 +1084,14 @@ msgstr "High priority"
 #: src/routes/emails/inboxes.tsx:987
 msgid "Human"
 msgstr "Human"
+
+#: src/components/profile/set-password-nudge.tsx:114
+msgid "I prefer passwordless"
+msgstr "I prefer passwordless"
+
+#: src/routes/profile/index.tsx:289
+msgid "I prefer passwordless — don't ask me again"
+msgstr "I prefer passwordless — don't ask me again"
 
 #: src/routes/emails/inboxes.tsx:857
 msgid "IMAP host"
@@ -1151,7 +1180,7 @@ msgstr "Invite a member"
 msgid "Invite a new member"
 msgstr "Invite a new member"
 
-#: src/routes/login.tsx:434
+#: src/routes/login.tsx:437
 msgid "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
 msgstr "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
 
@@ -1177,7 +1206,7 @@ msgstr "Lang"
 
 #: src/components/profile/language-select.tsx:34
 #: src/routes/pages/$id.tsx:311
-#: src/routes/profile/index.tsx:121
+#: src/routes/profile/index.tsx:119
 msgid "Language"
 msgstr "Language"
 
@@ -1405,7 +1434,7 @@ msgstr "Name"
 msgid "name@example.com, another@example.com"
 msgstr "name@example.com, another@example.com"
 
-#: src/routes/index.tsx:289
+#: src/routes/index.tsx:292
 msgid "Needs attention"
 msgstr "Needs attention"
 
@@ -1415,6 +1444,11 @@ msgstr "Needs attention"
 #: src/routes/companies/$slug.tsx:828
 msgid "never"
 msgstr "never"
+
+#: src/routes/profile/index.tsx:229
+#: src/routes/profile/index.tsx:407
+msgid "New password"
+msgstr "New password"
 
 #: src/routes/emails/inboxes.tsx:942
 msgid "New password or app-password"
@@ -1522,7 +1556,7 @@ msgstr "No due date"
 msgid "No footers"
 msgstr "No footers"
 
-#: src/routes/index.tsx:462
+#: src/routes/index.tsx:465
 msgid "No high-priority companies without a scheduled follow-up"
 msgstr "No high-priority companies without a scheduled follow-up"
 
@@ -1546,7 +1580,7 @@ msgstr "No messages in this thread"
 msgid "No open tasks."
 msgstr "No open tasks."
 
-#: src/routes/index.tsx:301
+#: src/routes/index.tsx:304
 msgid "No overdue tasks, no pending follow-ups, no neglected companies."
 msgstr "No overdue tasks, no pending follow-ups, no neglected companies."
 
@@ -1584,7 +1618,7 @@ msgstr "No structured findings."
 msgid "No tags yet"
 msgstr "No tags yet"
 
-#: src/routes/index.tsx:379
+#: src/routes/index.tsx:382
 msgid "No tasks for today"
 msgstr "No tasks for today"
 
@@ -1596,7 +1630,7 @@ msgstr "No threads match the filters"
 msgid "No threads yet"
 msgstr "No threads yet"
 
-#: src/routes/index.tsx:419
+#: src/routes/index.tsx:422
 msgid "No upcoming due dates"
 msgstr "No upcoming due dates"
 
@@ -1643,7 +1677,7 @@ msgid "Open"
 msgstr "Open"
 
 #. placeholder {0}: provider.label
-#: src/routes/login.tsx:467
+#: src/routes/login.tsx:470
 msgid "Open {0}"
 msgstr "Open {0}"
 
@@ -1686,7 +1720,7 @@ msgid "Open task details"
 msgstr "Open task details"
 
 #: src/components/companies/open-tasks-card.tsx:39
-#: src/routes/index.tsx:270
+#: src/routes/index.tsx:273
 msgid "Open tasks"
 msgstr "Open tasks"
 
@@ -1739,7 +1773,7 @@ msgstr "Outcome"
 msgid "Outcome: {0}"
 msgstr "Outcome: {0}"
 
-#: src/routes/index.tsx:271
+#: src/routes/index.tsx:274
 #: src/routes/tasks/index.tsx:446
 #: src/routes/tasks/index.tsx:466
 msgid "Overdue"
@@ -1802,13 +1836,26 @@ msgstr "Pain indicators"
 msgid "Pain points"
 msgstr "Pain points"
 
-#: src/routes/login.tsx:346
+#: src/routes/login.tsx:349
 msgid "Password"
 msgstr "Password"
 
 #: src/routes/emails/inboxes.tsx:943
 msgid "Password or app-password"
 msgstr "Password or app-password"
+
+#: src/routes/profile/index.tsx:455
+msgid "Password updated."
+msgstr "Password updated."
+
+#: src/routes/profile/index.tsx:315
+msgid "Passwordless sign-in only"
+msgstr "Passwordless sign-in only"
+
+#: src/routes/profile/index.tsx:255
+#: src/routes/profile/index.tsx:433
+msgid "Passwords need at least {MIN_PASSWORD_LENGTH} characters."
+msgstr "Passwords need at least {MIN_PASSWORD_LENGTH} characters."
 
 #: src/components/research/findings/shared.tsx:143
 msgid "Pending paid actions"
@@ -1834,6 +1881,10 @@ msgstr "Personal"
 msgid "Phone"
 msgstr "Phone"
 
+#: src/routes/profile/index.tsx:384
+msgid "Pick a new password. Other signed-in devices will be signed out."
+msgstr "Pick a new password. Other signed-in devices will be signed out."
+
 #: src/routes/emails/inboxes.tsx:803
 msgid "Pick a provider"
 msgstr "Pick a provider"
@@ -1847,7 +1898,7 @@ msgid "Pick one to use as your default sender."
 msgstr "Pick one to use as your default sender."
 
 #: src/components/layout/nav-items.ts:38
-#: src/routes/index.tsx:261
+#: src/routes/index.tsx:262
 msgid "Pipeline"
 msgstr "Pipeline"
 
@@ -1899,7 +1950,7 @@ msgstr "Products fit"
 
 #: src/components/layout/nav-items.ts:81
 #: src/routes/companies/$slug.tsx:1082
-#: src/routes/profile/index.tsx:91
+#: src/routes/profile/index.tsx:89
 msgid "Profile"
 msgstr "Profile"
 
@@ -2036,6 +2087,11 @@ msgstr "Reopen"
 msgid "Reopen thread"
 msgstr "Reopen thread"
 
+#: src/routes/profile/index.tsx:242
+#: src/routes/profile/index.tsx:420
+msgid "Repeat new password"
+msgstr "Repeat new password"
+
 #: src/routes/emails/$threadId.tsx:403
 msgid "Reply"
 msgstr "Reply"
@@ -2053,11 +2109,11 @@ msgstr "Research"
 msgid "Research run"
 msgstr "Research run"
 
-#: src/routes/login.tsx:449
+#: src/routes/login.tsx:452
 msgid "Resend in"
 msgstr "Resend in"
 
-#: src/routes/login.tsx:455
+#: src/routes/login.tsx:458
 msgid "Resend link"
 msgstr "Resend link"
 
@@ -2121,9 +2177,15 @@ msgstr "Save"
 msgid "Save failed"
 msgstr "Save failed"
 
+#: src/routes/profile/index.tsx:280
+msgid "Save password"
+msgstr "Save password"
+
 #: src/components/emails/compose-form.tsx:547
 #: src/routes/emails/inboxes.tsx:1463
 #: src/routes/pages/$id.tsx:268
+#: src/routes/profile/index.tsx:278
+#: src/routes/profile/index.tsx:466
 msgid "Saving…"
 msgstr "Saving…"
 
@@ -2189,7 +2251,7 @@ msgid "Send invitation"
 msgstr "Send invitation"
 
 #: src/components/emails/compose-form.tsx:534
-#: src/routes/login.tsx:379
+#: src/routes/login.tsx:382
 #: src/routes/settings/organization/invite.tsx:180
 msgid "Sending…"
 msgstr "Sending…"
@@ -2198,9 +2260,21 @@ msgstr "Sending…"
 msgid "Sent"
 msgstr "Sent"
 
+#: src/routes/profile/index.tsx:218
+msgid "Set a password"
+msgstr "Set a password"
+
+#: src/components/profile/set-password-nudge.tsx:93
+msgid "Set a password so you don't have to check your email next time."
+msgstr "Set a password so you don't have to check your email next time."
+
 #: src/routes/emails/inboxes.tsx:1368
 msgid "Set as default"
 msgstr "Set as default"
+
+#: src/components/profile/set-password-nudge.tsx:106
+msgid "Set password"
+msgstr "Set password"
 
 #: src/routes/pages/$id.tsx:290
 msgid "Settings"
@@ -2237,7 +2311,7 @@ msgid "Showing {firstRow}–{lastRow} of {total}"
 msgstr "Showing {firstRow}–{lastRow} of {total}"
 
 #: src/routes/accept-invitation.$id.tsx:129
-#: src/routes/login.tsx:368
+#: src/routes/login.tsx:371
 msgid "Sign in"
 msgstr "Sign in"
 
@@ -2245,11 +2319,11 @@ msgstr "Sign in"
 msgid "Sign in to accept this invitation"
 msgstr "Sign in to accept this invitation"
 
-#: src/routes/login.tsx:321
+#: src/routes/login.tsx:324
 msgid "Sign in to continue"
 msgstr "Sign in to continue"
 
-#: src/routes/profile/index.tsx:136
+#: src/routes/profile/index.tsx:138
 msgid "Sign out"
 msgstr "Sign out"
 
@@ -2257,11 +2331,11 @@ msgstr "Sign out"
 msgid "Sign-out failed. Please try again."
 msgstr "Sign-out failed. Please try again."
 
-#: src/routes/login.tsx:368
+#: src/routes/login.tsx:371
 msgid "Signing in…"
 msgstr "Signing in…"
 
-#: src/routes/profile/index.tsx:136
+#: src/routes/profile/index.tsx:138
 msgid "Signing out…"
 msgstr "Signing out…"
 
@@ -2300,6 +2374,11 @@ msgstr "Snoozed"
 #: src/routes/emails/$threadId.tsx:260
 msgid "someone"
 msgstr "someone"
+
+#: src/routes/profile/index.tsx:267
+#: src/routes/profile/index.tsx:450
+msgid "Something went wrong. Try again."
+msgstr "Something went wrong. Try again."
 
 #: src/components/companies/about-section.tsx:82
 #: src/routes/calendar/index.tsx:273
@@ -2478,6 +2557,14 @@ msgstr "The thread exists but the provider returned no messages."
 msgid "The thread may have been archived upstream or the link is stale."
 msgstr "The thread may have been archived upstream or the link is stale."
 
+#: src/routes/profile/index.tsx:440
+msgid "The two new password fields don't match."
+msgstr "The two new password fields don't match."
+
+#: src/routes/profile/index.tsx:262
+msgid "The two password fields don't match."
+msgstr "The two password fields don't match."
+
 #: src/routes/tasks/index.tsx:440
 msgid "The workshop ledger — tear off one strip at a time."
 msgstr "The workshop ledger — tear off one strip at a time."
@@ -2510,7 +2597,7 @@ msgstr "This invitation link is no longer valid. It may have already been used."
 msgid "This month"
 msgstr "This month"
 
-#: src/routes/index.tsx:417
+#: src/routes/index.tsx:420
 #: src/routes/tasks/index.tsx:474
 msgid "This week"
 msgstr "This week"
@@ -2548,7 +2635,7 @@ msgstr "TLS"
 msgid "To"
 msgstr "To"
 
-#: src/routes/index.tsx:377
+#: src/routes/index.tsx:380
 #: src/routes/tasks/index.tsx:458
 msgid "Today"
 msgstr "Today"
@@ -2586,7 +2673,7 @@ msgstr "unknown"
 msgid "Unknown"
 msgstr "Unknown"
 
-#: src/routes/profile/index.tsx:84
+#: src/routes/profile/index.tsx:82
 msgid "Unknown user"
 msgstr "Unknown user"
 
@@ -2624,7 +2711,7 @@ msgstr "Uploading…"
 msgid "Use {0} as primary"
 msgstr "Use {0} as primary"
 
-#: src/routes/login.tsx:477
+#: src/routes/login.tsx:480
 msgid "Use a different email"
 msgstr "Use a different email"
 
@@ -2636,7 +2723,7 @@ msgstr "Use as default footer"
 msgid "Use as default for this purpose"
 msgstr "Use as default for this purpose"
 
-#: src/routes/login.tsx:484
+#: src/routes/login.tsx:487
 msgid "Use password instead"
 msgstr "Use password instead"
 
@@ -2669,7 +2756,7 @@ msgstr "We couldn't sign you in via that link. Try again."
 msgid "We don't recognize that email. Ask an admin to invite you."
 msgstr "We don't recognize that email. Ask an admin to invite you."
 
-#: src/routes/login.tsx:430
+#: src/routes/login.tsx:433
 msgid "We sent a sign-in link to"
 msgstr "We sent a sign-in link to"
 
@@ -2721,7 +2808,7 @@ msgstr "Where"
 msgid "Who"
 msgstr "Who"
 
-#: src/routes/index.tsx:264
+#: src/routes/index.tsx:265
 msgid "Workshop floor — live counters on the bench."
 msgstr "Workshop floor — live counters on the bench."
 
@@ -2733,9 +2820,21 @@ msgstr "Write footer…"
 msgid "Write your message…"
 msgstr "Write your message…"
 
+#: src/routes/profile/index.tsx:221
+msgid "You currently sign in from email links. Add a password to skip checking your email next time."
+msgstr "You currently sign in from email links. Add a password to skip checking your email next time."
+
 #: src/routes/settings/organization/spend.tsx:99
 msgid "You don't have permission to see this page."
 msgstr "You don't have permission to see this page."
+
+#: src/components/profile/set-password-nudge.tsx:90
+msgid "You got in from a link in your email."
+msgstr "You got in from a link in your email."
+
+#: src/routes/profile/index.tsx:318
+msgid "You sign in from email links. I won't bring it up again."
+msgstr "You sign in from email links. I won't bring it up again."
 
 #: src/routes/accept-invitation.$id.tsx:166
 msgid "You're now a member of {orgName}."
@@ -2749,7 +2848,7 @@ msgstr "You're now a member."
 msgid "you@example.com"
 msgstr "you@example.com"
 
-#: src/routes/profile/index.tsx:94
+#: src/routes/profile/index.tsx:92
 msgid "Your Batuda workbench identity."
 msgstr "Your Batuda workbench identity."
 
