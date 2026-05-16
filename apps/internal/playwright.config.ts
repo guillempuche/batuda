@@ -53,10 +53,10 @@ export default defineConfig({
 		},
 		// 2. Tests for the sign-in flow itself need a fresh,
 		// unauthenticated context. They run independently of the setup
-		// project.
+		// project. Includes the magic-link sign-in variant.
 		{
 			name: 'unauth',
-			testMatch: /sign-in\.test\.ts/,
+			testMatch: /sign-in(?:-magic-link)?\.test\.ts/,
 			use: { ...devices['Desktop Chrome'] },
 		},
 		// 3. Everything else gets Alice's cookie injected via
@@ -64,7 +64,7 @@ export default defineConfig({
 		{
 			name: 'authed',
 			testMatch: /.*\.test\.ts/,
-			testIgnore: /sign-in\.test\.ts/,
+			testIgnore: /sign-in(?:-magic-link)?\.test\.ts/,
 			use: {
 				...devices['Desktop Chrome'],
 				storageState: STORAGE_STATE,
