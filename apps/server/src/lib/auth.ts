@@ -76,6 +76,20 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 					rateLimit: env.BETTER_AUTH_RATE_LIMIT,
 				},
 				pool,
+				sendResetPassword: async data => {
+					// Mirror BA's default `resetPasswordTokenExpiresIn` (1h) and
+					// pass it through so the template can tell the recipient
+					// whether the link is still good.
+					const RESET_TOKEN_TTL_MS = 60 * 60 * 1000
+					const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS)
+					await Effect.runPromise(
+						transactional.sendResetPassword({
+							email: data.user.email,
+							url: data.url,
+							expiresAt,
+						}),
+					)
+				},
 				plugins: [
 					openAPI(),
 					bearer(),

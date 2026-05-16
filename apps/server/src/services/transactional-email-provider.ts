@@ -2,17 +2,28 @@ import { type Effect, ServiceMap } from 'effect'
 
 import type { EmailSendError } from '@batuda/controllers'
 
-// System-originated transactional email — magic links today, password
-// resets and invitation emails next. Kept separate from the BYO-mailbox
-// `EmailProvider` because the deployment shape, reliability requirements,
-// and operational tooling (DKIM/SPF on Batuda's domain vs the user's)
-// don't overlap. CRM mailbox outage = one user complaining; transactional
-// outage = nobody can log in.
+// System-originated transactional email — magic links, password resets,
+// and org invitations. Kept separate from the BYO-mailbox `EmailProvider`
+// because the deployment shape, reliability requirements, and operational
+// tooling (DKIM/SPF on Batuda's domain vs the user's) don't overlap. CRM
+// mailbox outage = one user complaining; transactional outage = nobody
+// can log in.
 
 export interface MagicLinkParams {
 	readonly email: string
 	readonly url: string
 	readonly token: string
+}
+
+// Reset-password URL bounces through BA's `/auth/reset-password/:token`
+// callback endpoint (origin-checked) which then redirects to the frontend
+// `/reset-password?token=...` page. `expiresAt` is BA's
+// `resetPasswordTokenExpiresIn` (default 1 hour) — the template surfaces
+// it so a returning user knows whether the link is still good.
+export interface ResetPasswordParams {
+	readonly email: string
+	readonly url: string
+	readonly expiresAt: Date
 }
 
 // Org invitation. `inviteUrl` is the magic-link URL minted by the BA
@@ -36,6 +47,9 @@ export class TransactionalEmailProvider extends ServiceMap.Service<
 		) => Effect.Effect<void, EmailSendError>
 		readonly sendInvitation: (
 			params: InvitationParams,
+		) => Effect.Effect<void, EmailSendError>
+		readonly sendResetPassword: (
+			params: ResetPasswordParams,
 		) => Effect.Effect<void, EmailSendError>
 	}
 >()('TransactionalEmailProvider') {}

@@ -103,6 +103,52 @@ describe('TransactionalEmailProvider — Local (integration)', () => {
 		})
 	})
 
+	describe('sendResetPassword', () => {
+		describe('when called with valid params', () => {
+			it('should write a .md file with labels: password-reset and the expiry inline', async () => {
+				// GIVEN the local transactional provider
+				// AND a recipient unique to this run
+				const recipient = `it-resetpwd-${Date.now()}@example.com`
+				const expiresAt = new Date('2026-06-01T12:00:00Z')
+
+				// WHEN we send a reset-password email
+				await program(
+					Effect.gen(function* () {
+						const provider = yield* TransactionalEmailProvider
+						yield* provider.sendResetPassword({
+							email: recipient,
+							url: 'https://api.batuda.localhost/auth/reset-password/tok-1?callbackURL=https://batuda.localhost/reset-password',
+							expiresAt,
+						})
+					}),
+				)
+
+				// THEN a .md file should appear in the dev-inbox dir
+				//   [local-transactional-provider.ts — sendResetPassword writeMd branch]
+				const inbox = join(__dirname, '..', '..', '.dev-inbox')
+				const files = await readdir(inbox)
+				const match = files.find(name =>
+					name.includes(recipient.split('@')[0]!),
+				)
+				expect(
+					match,
+					'expected a file matching the recipient slug',
+				).toBeTruthy()
+
+				// AND the frontmatter should carry labels: ['password-reset']
+				const body = await readFile(join(inbox, match!), 'utf8')
+				expect(body).toMatch(/labels:\s*\n\s+- password-reset/)
+
+				// AND the body should include the URL + ISO expiry so the recipient
+				// knows whether the link is still good.
+				expect(body).toContain('/auth/reset-password/tok-1')
+				expect(body).toContain(expiresAt.toISOString())
+
+				await rm(join(inbox, match!), { force: true })
+			})
+		})
+	})
+
 	describe('sendMagicLink (regression — must still work after sendInvitation lands)', () => {
 		describe('when called with valid params', () => {
 			it('should write a .md file with labels: magic-link', async () => {
@@ -320,6 +366,44 @@ describe('TransactionalEmailProvider — Resend (unit, stubbed fetch)', () => {
 				if (exit._tag !== 'Failure') return
 				const error = failureFrom(exit.cause)
 				expect(error?.kind).toBe('unknown')
+			})
+		})
+
+		describe('sendResetPassword via Resend', () => {
+			it('should POST the reset-password template with the URL inline + ISO expiry', async () => {
+				// GIVEN the stub captures the request shape
+				//   [resend-transactional-provider.ts — sendResetPassword branch]
+				const captured: { url?: string; init?: RequestInit } = {}
+				const stub: typeof fetch = async (input, init) => {
+					captured.url = input.toString()
+					if (init) captured.init = init
+					return new Response('{}', { status: 200 })
+				}
+				const expiresAt = new Date('2026-06-01T12:00:00Z')
+
+				// WHEN we send a reset-password email
+				const exit = await runWith(
+					stub,
+					Effect.gen(function* () {
+						const provider = yield* TransactionalEmailProvider
+						yield* provider.sendResetPassword({
+							email: 'pwd-reset@example.com',
+							url: 'https://api.batuda.localhost/auth/reset-password/tok-1?callbackURL=https://batuda.localhost/reset-password',
+							expiresAt,
+						})
+					}),
+				)
+				expect(exit._tag, 'exit should be Success').toBe('Success')
+
+				// THEN the body carries the URL + recipient + escaped HTML link
+				expect(captured.url).toBe('https://api.resend.com/emails')
+				const body = JSON.parse(String(captured.init?.body))
+				expect(body.to).toEqual(['pwd-reset@example.com'])
+				expect(body.subject).toContain('Reset')
+				expect(body.text).toContain('/auth/reset-password/tok-1')
+				expect(body.text).toContain(expiresAt.toISOString())
+				expect(body.html).toContain('href="')
+				expect(body.html).toContain(expiresAt.toISOString())
 			})
 		})
 

@@ -19,12 +19,29 @@ export interface AuthEnv {
 	readonly rateLimit?: 'strict' | 'loose'
 }
 
+/**
+ * BA invokes `sendResetPassword({ user, url, token }, ctx.request)`. The
+ * `/request-password-reset` route silently succeeds for unknown emails
+ * (see docs/repos/better-auth/.../api/routes/password.ts:101-119), so
+ * by the time this callback fires the user is guaranteed to exist.
+ * CLI callers omit it — there is no recovery-email surface in the CLI.
+ */
+export type SendResetPassword = (
+	data: {
+		readonly user: { readonly email: string }
+		readonly url: string
+		readonly token: string
+	},
+	request?: Request,
+) => Promise<void>
+
 export interface BuildBetterAuthConfigInput<
 	Plugins extends BetterAuthPlugin[],
 > {
 	readonly env: AuthEnv
 	readonly pool: pg.Pool
 	readonly plugins: Plugins
+	readonly sendResetPassword?: SendResetPassword
 }
 
 /**
@@ -82,7 +99,16 @@ export const buildBetterAuthConfig = <Plugins extends BetterAuthPlugin[]>(
 			dialect: new PostgresDialect({ pool: input.pool }),
 			type: 'postgres' as const,
 		},
-		emailAndPassword: { enabled: true, disableSignUp: true }, // Invite-only: new users created via admin plugin, not public sign-up.
+		// Invite-only: new users created via admin plugin, not public sign-up.
+		// `sendResetPassword` is wired by the server only; the CLI omits it
+		// because there is no recovery-email surface in CLI flows.
+		emailAndPassword: {
+			enabled: true,
+			disableSignUp: true,
+			...(input.sendResetPassword
+				? { sendResetPassword: input.sendResetPassword }
+				: {}),
+		},
 		user: {
 			additionalFields: {
 				isAgent: {
@@ -156,6 +182,10 @@ export const buildBetterAuthConfig = <Plugins extends BetterAuthPlugin[]>(
 					// Production stays on the plugin default.
 					'/sign-in/magic-link': { window: 60, max: 200 },
 					'/magic-link/verify': { window: 60, max: 200 },
+					// Reset-password default is the global 100/min; the forgot-password
+					// e2e fires several requests back-to-back across the suite. Loose
+					// mode widens just this route; production stays on the global cap.
+					'/request-password-reset': { window: 60, max: 200 },
 					'/get-session': { window: 60, max: 1000 },
 					'/organization/set-active': { window: 60, max: 500 },
 				},
