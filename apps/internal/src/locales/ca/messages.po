@@ -270,8 +270,8 @@ msgstr "Torna a la safata"
 msgid "Back to organization"
 msgstr "Tornar a l'organització"
 
-#: src/routes/forgot-password.tsx:82
-#: src/routes/forgot-password.tsx:134
+#: src/routes/forgot-password.tsx:86
+#: src/routes/forgot-password.tsx:140
 #: src/routes/reset-password.tsx:82
 msgid "Back to sign in"
 msgstr "Torna a iniciar sessió"
@@ -425,7 +425,7 @@ msgstr "Comprova que la teva sessió sigui vàlida o torna-ho a provar."
 msgid "Check the session or try again."
 msgstr "Comprova la sessió o torna-ho a provar."
 
-#: src/routes/forgot-password.tsx:65
+#: src/routes/forgot-password.tsx:69
 #: src/routes/login.tsx:442
 msgid "Check your inbox"
 msgstr "Mira la safata d'entrada"
@@ -682,7 +682,7 @@ msgstr "No s'ha pogut desar la pàgina. Torna-ho a provar."
 msgid "Could not send the invitation. Please try again."
 msgstr "No s'''ha pogut enviar la invitació. Torna-ho a provar."
 
-#: src/routes/forgot-password.tsx:119
+#: src/routes/forgot-password.tsx:123
 #: src/routes/login.tsx:137
 msgid "Could not send the link. Try again in a few seconds."
 msgstr "No s'ha pogut enviar l'enllaç. Torna-ho a provar d'aquí uns segons."
@@ -921,7 +921,7 @@ msgstr "Editor"
 #: src/components/shared/channel-icon.tsx:63
 #: src/routes/companies/$slug.tsx:854
 #: src/routes/emails/inboxes.tsx:402
-#: src/routes/forgot-password.tsx:105
+#: src/routes/forgot-password.tsx:109
 #: src/routes/login.tsx:339
 #: src/routes/settings/organization/invite.tsx:137
 msgid "Email"
@@ -1110,7 +1110,7 @@ msgstr "Prefereixo sense contrasenya"
 msgid "I prefer passwordless — don't ask me again"
 msgstr "Prefereixo sense contrasenya — no m'ho tornis a preguntar"
 
-#: src/routes/forgot-password.tsx:68
+#: src/routes/forgot-password.tsx:72
 msgid "If <0>{submittedEmail}</0> is registered, a reset link is on its way. The link expires in 1 hour."
 msgstr "Si <0>{submittedEmail}</0> està registrat, t'arribarà un enllaç per restablir la contrasenya. L'enllaç caduca en 1 hora."
 
@@ -1668,7 +1668,7 @@ msgstr "cap planificat"
 msgid "Normal priority"
 msgstr "Prioritat normal"
 
-#: src/routes/forgot-password.tsx:74
+#: src/routes/forgot-password.tsx:78
 msgid "Not seeing it? Check your spam folder. If you're sure the email is right and it never arrives, an admin can help."
 msgstr "No el veus? Mira la carpeta de correu brossa. Si estàs segur que el correu és correcte i no arriba mai, un administrador et pot ajudar."
 
@@ -2166,7 +2166,7 @@ msgstr "Restableix"
 msgid "Reset links expire after 1 hour and can only be used once. Ask for a new one and follow it within the hour."
 msgstr "Els enllaços per restablir caduquen en 1 hora i només es poden fer servir un cop. Demana'n un de nou i obre'l dins l'hora."
 
-#: src/routes/forgot-password.tsx:95
+#: src/routes/forgot-password.tsx:99
 msgid "Reset your password"
 msgstr "Restableix la contrasenya"
 
@@ -2304,12 +2304,12 @@ msgstr "Envia correu"
 msgid "Send invitation"
 msgstr "Envia invitació"
 
-#: src/routes/forgot-password.tsx:128
+#: src/routes/forgot-password.tsx:134
 msgid "Send reset link"
 msgstr "Envia l'enllaç"
 
 #: src/components/emails/compose-form.tsx:534
-#: src/routes/forgot-password.tsx:128
+#: src/routes/forgot-password.tsx:134
 #: src/routes/login.tsx:387
 #: src/routes/settings/organization/invite.tsx:180
 msgid "Sending…"
@@ -2742,7 +2742,7 @@ msgstr "Tipus"
 msgid "Type and press Enter"
 msgstr "Escriu i prem Retorn"
 
-#: src/routes/forgot-password.tsx:98
+#: src/routes/forgot-password.tsx:102
 msgid "Type the email you sign in with. We'll send a reset link."
 msgstr "Escriu el correu amb què inicies sessió. T'enviaré un enllaç per restablir-la."
 
