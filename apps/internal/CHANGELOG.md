@@ -3,6 +3,33 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-05-17 (internal-v2026.5.17)
+
+### Features
+
+* add magic-link sign-in and show-password toggle on /login ([590234c](https://github.com/guillempuche/batuda/commit/590234c3e53d171523f3af6435039223e8833a00))
+* **internal:** add /forgot-password and /reset-password routes ([d6c04b0](https://github.com/guillempuche/batuda/commit/d6c04b01e91db830d7ff25ff936e806fa7fe1c3b))
+* **internal:** add /profile password card and dashboard nudge ([3ef98f9](https://github.com/guillempuche/batuda/commit/3ef98f902f7db820f59ab91162b487b8f4b47acd))
+
+### Bug Fixes
+
+* **internal:** hoist login error messages to msg descriptors ([c17c551](https://github.com/guillempuche/batuda/commit/c17c551329e743514e8ef12c9a666971412aa9cd))
+* **internal:** resolve @batuda/ui to source via 'development' condition ([1f665dd](https://github.com/guillempuche/batuda/commit/1f665ddee5e0b72ce6a54ba551717ac33785c769))
+* **internal:** route dev API proxy through nitro routeRules ([3bf35e9](https://github.com/guillempuche/batuda/commit/3bf35e93d53330b99ab3cfdc65e0e08afc3b0c09))
+* **internal:** route sign-in-magic-link.test.ts to the unauth project ([522fac9](https://github.com/guillempuche/batuda/commit/522fac90c7132effdb14ff66ddfaf570458d3679))
+* **internal:** wire magic-link verify error + cross-tab sign-in correctly ([d767f93](https://github.com/guillempuche/batuda/commit/d767f93ea79f4f1476c567694a65c7d3154eaead))
+
+### Tests
+
+* **internal:** cover /profile password set, opt-out, and change ([9e0d7ef](https://github.com/guillempuche/batuda/commit/9e0d7ef4944a40c62c569ae064f411f09e2b3f74))
+* **internal:** cover forgot-password end-to-end ([5c2e32c](https://github.com/guillempuche/batuda/commit/5c2e32cda6d6a0890a7232934fe13f488d309a53))
+
+### Chores
+
+* **internal:** refresh Lingui catalogs after login.tsx line shifts ([b4a7a02](https://github.com/guillempuche/batuda/commit/b4a7a026fe2bbf6669ff997075bfc42d459f00c8))
+* **internal:** refresh Lingui line-number refs ([bb71cd5](https://github.com/guillempuche/batuda/commit/bb71cd593c655139a5b242b4849a5a97a8cdc698))
+* **internal:** refresh Lingui line-number refs after readability pass ([fb97823](https://github.com/guillempuche/batuda/commit/fb978230cab0d201323921e59ec55232e6792569))
+
 ## 2026-05-13 (internal-v2026.5.13-1)
 
 ## 2026-05-13 (internal-v2026.5.13)
