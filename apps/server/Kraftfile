@@ -5,9 +5,13 @@ name: batuda-server
 runtime: node:latest
 
 labels:
-  cloud.unikraft.v1.instances/scale_to_zero.policy: "on"
-  cloud.unikraft.v1.instances/scale_to_zero.stateful: "false"
-  cloud.unikraft.v1.instances/scale_to_zero.cooldown_time_ms: 30000
+  # Scale-to-zero is OFF: every API request from the frontend would
+  # otherwise pay a cold-start tax, and the platform's SIGKILL during
+  # in-flight requests left CF returning 504s (observed 2026-05-17 on
+  # the forgot-password flow). With one always-warm instance the user-
+  # facing latency stays sub-second. Revisit once we add proper
+  # ready/health gating and the cold-start path is verified short.
+  cloud.unikraft.v1.instances/scale_to_zero.policy: "off"
 
 rootfs: ./Dockerfile
 cmd: ["/usr/bin/node", "/app/dist/main.mjs"]
