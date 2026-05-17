@@ -2,8 +2,10 @@ spec: v0.6
 name: batuda-web
 runtime: node:latest
 labels:
-  cloud.unikraft.v1.instances/scale_to_zero.policy: "on"
-  cloud.unikraft.v1.instances/scale_to_zero.stateful: "false"
-  cloud.unikraft.v1.instances/scale_to_zero.cooldown_time_ms: 30000
+  # Scale-to-zero is OFF: matches apps/server/Kraftfile (see fix(server)
+  # commit 2026-05-17). Cold-start of the SSR bundle adds ~2s to first
+  # paint on every visit, jarring for the auth-gated routes visitors
+  # land on. Revisit when ready/health gating is in place.
+  cloud.unikraft.v1.instances/scale_to_zero.policy: "off"
 rootfs: ./Dockerfile
 cmd: ["/usr/bin/node", "/app/.output/server/index.mjs"]
