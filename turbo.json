@@ -37,7 +37,16 @@
 		},
 		"test:integration": {
 			"dependsOn": ["^build"],
-			"env": ["DATABASE_URL"],
+			"env": [
+				"DATABASE_URL",
+				"BETTER_AUTH_SECRET",
+				"EMAIL_CREDENTIAL_KEY",
+				"STORAGE_ENDPOINT",
+				"STORAGE_REGION",
+				"STORAGE_ACCESS_KEY_ID",
+				"STORAGE_SECRET_ACCESS_KEY",
+				"STORAGE_BUCKET"
+			],
 			"inputs": ["$TURBO_DEFAULT$", "src/**/*", "**/*.integration.test.*"],
 			"outputs": ["coverage/**/*"],
 			"cache": true
