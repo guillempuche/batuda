@@ -103,6 +103,13 @@ jobs:
           STORAGE_BUCKET: batuda-assets
         run: pnpm cli seed
 
+      # --concurrency=1 forces the workspaces' test:integration tasks to
+      # run one at a time. multi-org-isolation (server) TRUNCATEs the
+      # email tables in beforeAll; if mail-worker's threading runs in
+      # parallel, its INSERT loses the race to that TRUNCATE. Within each
+      # workspace, vitest's fileParallelism: false already serializes
+      # files. The proper fix (per-test transactions in multi-org) is
+      # tracked as a follow-up CI-perf slice.
       - name: Test (integration)
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
@@ -113,7 +120,7 @@ jobs:
           STORAGE_ACCESS_KEY_ID: batuda
           STORAGE_SECRET_ACCESS_KEY: batuda-secret
           STORAGE_BUCKET: batuda-assets
-        run: pnpm test:integration
+        run: pnpm exec turbo test:integration --concurrency=1
 
       # Cleanup runs even on test failure; only skipped if the branch was
       # never created (e.g. earlier step failed).
