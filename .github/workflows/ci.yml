@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   ci:
-    name: Lint, Build, Type Check
+    name: Lint, Build, Type Check, Test
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -43,3 +43,84 @@ jobs:
 
       - name: Type check
         run: pnpm check-types
+
+      # Fast unit suite first — no external services needed. Any test that
+      # touches Postgres lives under `*.integration.test.ts` and runs in
+      # the integration phase below against an ephemeral Neon branch.
+      - name: Test (unit)
+        run: pnpm test
+
+      # Spin up an ephemeral Neon branch for the integration phase.
+      # Outputs are job-scoped + secret-marked per Neon's docs, so
+      # migrations + seed + integration tests all live in this job.
+      # expires_at is a safety net: if the runner is killed before the
+      # delete step runs, Neon auto-cleans the branch after 6 h.
+      - name: Compute Neon branch expiry (6h)
+        id: neon-expiry
+        run: echo "iso=$(date -u -d '+6 hours' +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Create Neon branch
+        id: neon-branch
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: ci-${{ github.run_id }}-${{ github.run_attempt }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          expires_at: ${{ steps.neon-expiry.outputs.iso }}
+          # Our 0001 migration creates app_user + app_service alongside
+          # neondb_owner, so the action's "infer the role" path fails with
+          # "Multiple roles found". Pin neondb_owner — it owns the schema
+          # and integration tests SET LOCAL ROLE to switch into app_user.
+          role: neondb_owner
+
+      - name: Apply migrations to CI branch
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+        run: pnpm db:migrate
+
+      # Spin up MinIO (S3-compatible storage) via the same docker-compose
+      # file dev uses. `storage-init` is a one-shot mc container that
+      # waits for storage to be reachable and `mb --ignore-existing` the
+      # bucket; `--wait` blocks until both services are healthy or, in
+      # storage-init's case, have exited 0.
+      - name: Start MinIO via docker compose
+        run: docker compose -f docker/docker-compose.yml up -d --wait storage storage-init
+
+      # Seed fixtures (notably the `taller` / `restaurant` orgs) that
+      # several integration tests rely on. EMAIL_CREDENTIAL_KEY is base64
+      # of 32 zero bytes — fine for a branch that gets deleted at
+      # end-of-run. STORAGE_* points at the MinIO container started
+      # above; the seedDemoEmails stage PUTs raw RFC822 bytes there.
+      - name: Seed CI branch
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          BETTER_AUTH_SECRET: ci-only-not-prod-ci-only-not-prod-ci
+          EMAIL_CREDENTIAL_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          STORAGE_ENDPOINT: http://localhost:9000
+          STORAGE_REGION: us-east-1
+          STORAGE_ACCESS_KEY_ID: batuda
+          STORAGE_SECRET_ACCESS_KEY: batuda-secret
+          STORAGE_BUCKET: batuda-assets
+        run: pnpm cli seed
+
+      - name: Test (integration)
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          BETTER_AUTH_SECRET: ci-only-not-prod-ci-only-not-prod-ci
+          EMAIL_CREDENTIAL_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          STORAGE_ENDPOINT: http://localhost:9000
+          STORAGE_REGION: us-east-1
+          STORAGE_ACCESS_KEY_ID: batuda
+          STORAGE_SECRET_ACCESS_KEY: batuda-secret
+          STORAGE_BUCKET: batuda-assets
+        run: pnpm test:integration
+
+      # Cleanup runs even on test failure; only skipped if the branch was
+      # never created (e.g. earlier step failed).
+      - name: Delete Neon branch
+        if: always() && steps.neon-branch.outcome == 'success'
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch: ci-${{ github.run_id }}-${{ github.run_attempt }}
+          api_key: ${{ secrets.NEON_API_KEY }}
