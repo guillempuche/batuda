@@ -1,15 +1,17 @@
 import { defineConfig } from 'vitest/config'
 
-// Opt-in boot-test runner. The default `vitest run` excludes
-// `*.boot.test.ts` (slow, requires the dev services fixture and a built
-// dist/). `pnpm test:integration` flips it on by routing through this
-// config.
+// DB-integration runner — `*.integration.test.ts` files that need a real
+// Postgres ($DATABASE_URL) but no other services. CI applies migrations
+// against an ephemeral Neon branch and runs this config. Sequential file
+// execution because several suites TRUNCATE shared tables in beforeAll
+// (notably multi-org-isolation), which races with any parallel suite
+// that inserts into the same tables.
 export default defineConfig({
 	test: {
-		include: ['src/**/*.boot.test.ts'],
+		include: ['src/**/*.integration.test.ts'],
 		environment: 'node',
 		globals: false,
-		testTimeout: 60_000,
+		testTimeout: 30_000,
 		fileParallelism: false,
 	},
 })
