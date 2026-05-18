@@ -18,6 +18,7 @@
 		"build": "turbo build",
 		"check-types": "turbo check-types",
 		"test": "turbo test",
+		"test:integration": "turbo test:integration",
 		"______ Code Quality ______": "",
 		"lint": "pnpm lint-syncpack && pnpm lint-biome && pnpm lint-markdown",
 		"lint-biome": "biome check --write --no-errors-on-unmatched --max-diagnostics=none",
