@@ -3,7 +3,7 @@ name: batuda
 services:
   db:
     container_name: batuda-db
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     ports:
       - "5433:5432"
     environment:
@@ -11,7 +11,10 @@ services:
       POSTGRES_USER: batuda
       POSTGRES_PASSWORD: batuda
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # pg18+ moved the data dir up one level so a single mount can host
+      # multiple major versions (enables pg_upgrade --link); see
+      # github.com/docker-library/postgres/issues/37.
+      - pgdata:/var/lib/postgresql
 
   # MinIO — S3-compatible storage for local dev (recordings, email attachments, etc.).
   # Mirrors Cloudflare R2 in prod; the same S3 SDK code path works for both
