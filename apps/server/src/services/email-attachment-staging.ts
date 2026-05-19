@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 
-import { DateTime, Effect, Layer, ServiceMap } from 'effect'
+import { DateTime, Effect, Layer, Schedule, ServiceMap } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { BadRequest, CurrentOrg } from '@batuda/controllers'
@@ -436,6 +436,22 @@ export class EmailAttachmentStaging extends ServiceMap.Service<EmailAttachmentSt
 	},
 ) {
 	static readonly layer = Layer.effect(this, this.make)
+
+	// 5-min cadence stays well under the 1-hour TTL so a missed tick can't leak orphans past expiry.
+	static readonly sweepDaemonLayer = Layer.effectDiscard(
+		Effect.gen(function* () {
+			const staging = yield* EmailAttachmentStaging
+			yield* Effect.logInfo('email staging sweep: every 5 minutes')
+			yield* staging.sweepExpired().pipe(
+				Effect.tapError(error =>
+					Effect.logError('email staging sweep failed', error),
+				),
+				Effect.ignore,
+				Effect.repeat(Schedule.spaced('5 minutes')),
+				Effect.forkScoped,
+			)
+		}),
+	)
 }
 
 // ────────────────────────────────────────────────────────────────────
