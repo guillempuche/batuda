@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-import { Effect, Layer, ServiceMap } from 'effect'
+import { Data, Effect, Layer, Schedule, ServiceMap } from 'effect'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
@@ -40,6 +40,27 @@ import type {
 import { MailTransport } from './mail-transport.js'
 import { StorageProvider } from './storage-provider.js'
 import { EmailSent, TimelineActivityService } from './timeline-activity.js'
+
+// Typed tag so the handler can die deliberately and the staging sweep
+// claims the orphaned attachment objects instead of leaking on a 500.
+export class SmtpSendFailed extends Data.TaggedError('SmtpSendFailed')<{
+	readonly cause: unknown
+	readonly inboxId: string
+}> {}
+
+// 1 + 3 retries spaced 1s/2s/4s → ~7s worst case before surfacing.
+export const smtpRetrySchedule = Schedule.exponential('1 second', 2).pipe(
+	Schedule.bothLeft(Schedule.recurs(3)),
+)
+
+export const retrySmtpSend = <A, E>(
+	send: Effect.Effect<A, E>,
+	inboxId: string,
+): Effect.Effect<A, SmtpSendFailed> =>
+	send.pipe(
+		Effect.retry(smtpRetrySchedule),
+		Effect.mapError(cause => new SmtpSendFailed({ cause, inboxId })),
+	)
 
 // PgClient.transformResultNames in apps/server/src/db/client.ts converts
 // snake_case columns to camelCase on read, so every row type in this file
@@ -538,10 +559,17 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 			const dispatchOutbound = (
 				inbox: InboxRow,
 				message: OutboundMessage,
-			): Effect.Effect<{ messageId: string; rawRef: string }, never, never> =>
+			): Effect.Effect<
+				{ messageId: string; rawRef: string },
+				SmtpSendFailed,
+				never
+			> =>
 				Effect.gen(function* () {
 					const creds = yield* loadDecryptedCreds(inbox)
-					const sent = yield* transport.send(creds, message).pipe(Effect.orDie)
+					const sent = yield* retrySmtpSend(
+						transport.send(creds, message),
+						inbox.id,
+					)
 					const messageId = sent.messageId
 					const key = sentRawKey(inbox.organizationId, inbox.id, messageId)
 					yield* storage
