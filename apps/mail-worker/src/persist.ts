@@ -2,6 +2,9 @@ import { Effect } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 import type { ParsedMail } from 'mailparser'
 
+import { CurrentOrg } from '@batuda/domain'
+import { NoMatch, ParticipantMatcher } from '@batuda/email/participant-matcher'
+
 import { resolveThreadId } from './threading.js'
 
 // Parsed-mail subset the worker reads. Decouples persist from any
@@ -95,6 +98,7 @@ export const persistInboundMessage = (args: {
 }) =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
+		const matcher = yield* ParticipantMatcher
 
 		const externalThreadId = yield* resolveThreadId({
 			organizationId: args.organizationId,
@@ -103,12 +107,53 @@ export const persistInboundMessage = (args: {
 			references: args.parsed.references,
 		})
 
+		// Resolve sender → contact/company once, then carry the IDs onto
+		// both the thread link and the message row. `createPolicy: 'never'`
+		// keeps inbound passive: an unknown sender stays an orphan, never
+		// auto-creates a contact. The matcher only reads `currentOrg.id`
+		// (not name/slug), so a thin record is sufficient — providing the
+		// full org would mean a second round-trip we don't need.
+		const match = args.parsed.fromAddress
+			? yield* matcher
+					.match({
+						email: args.parsed.fromAddress,
+						createPolicy: 'never',
+					})
+					.pipe(
+						Effect.provideService(CurrentOrg, {
+							id: args.organizationId,
+							name: '',
+							slug: '',
+						}),
+					)
+			: new NoMatch({ email: '' })
+
+		// Ambiguous and NoMatch deliberately fall through to null on both
+		// IDs — we never pick a winner when the address resolves to more
+		// than one contact.
+		const companyId =
+			match._tag === 'MatchedContact' ||
+			match._tag === 'MatchedCompanyOnly' ||
+			match._tag === 'CreatedContact' ||
+			match._tag === 'CreatedBoth'
+				? match.companyId
+				: null
+		const contactId =
+			match._tag === 'MatchedContact' ||
+			match._tag === 'CreatedContact' ||
+			match._tag === 'CreatedBoth'
+				? match.contactId
+				: null
+
 		// Upsert thread link first so the message INSERT can reference its
 		// `external_thread_id` invariant. Idempotent under the unique
-		// `(organization_id, external_thread_id)` index.
+		// `(organization_id, external_thread_id)` index. The DO UPDATE
+		// clause deliberately leaves `company_id`/`contact_id` alone —
+		// the first message on a thread sets the link, later messages
+		// from a different sender don't re-home the whole thread.
 		yield* sql`
-			INSERT INTO email_thread_links (organization_id, inbox_id, external_thread_id, updated_at)
-			VALUES (${args.organizationId}, ${args.inboxId}, ${externalThreadId}, now())
+			INSERT INTO email_thread_links (organization_id, inbox_id, external_thread_id, company_id, contact_id, updated_at)
+			VALUES (${args.organizationId}, ${args.inboxId}, ${externalThreadId}, ${companyId}, ${contactId}, now())
 			ON CONFLICT (organization_id, external_thread_id)
 			DO UPDATE SET updated_at = now()
 		`
@@ -122,7 +167,7 @@ export const persistInboundMessage = (args: {
 				message_id, in_reply_to, "references",
 				subject, received_at, text_body, html_body, text_preview,
 				raw_rfc822_ref, recipients, attachments, status, status_updated_at,
-				direction
+				direction, company_id, contact_id
 			)
 			VALUES (
 				${args.organizationId}, ${args.inboxId}, ${args.folder},
@@ -139,7 +184,7 @@ export const persistInboundMessage = (args: {
 				})}::jsonb,
 				${JSON.stringify(args.attachments)}::jsonb,
 				'normal', now(),
-				'inbound'
+				'inbound', ${companyId}, ${contactId}
 			)
 			ON CONFLICT (inbox_id, imap_uidvalidity, imap_uid)
 			  WHERE imap_uid IS NOT NULL
@@ -151,25 +196,28 @@ export const persistInboundMessage = (args: {
 
 		// Participant rows — one per (message × address × role). This
 		// is the queryable index used for "all messages where contact
-		// X was on To/Cc". The IMAP worker fixes the pre-existing gap
-		// where role='from' was only written for outbound messages.
-		type Row = { messageId: string; address: string; role: string }
+		// X was on To/Cc". jsonb_to_recordset matches JSON keys to
+		// recordset columns by exact (case-sensitive) name, and
+		// Postgres folds unquoted column identifiers to lowercase, so
+		// the JSON keys must be lowercase snake_case to match
+		// `message_id`/`address`/`role`.
+		type Row = { message_id: string; address: string; role: string }
 		const rows: Row[] = []
 		if (args.parsed.fromAddress) {
 			rows.push({
-				messageId: messageDbId,
+				message_id: messageDbId,
 				address: args.parsed.fromAddress,
 				role: 'from',
 			})
 		}
 		for (const a of args.parsed.toAddresses) {
-			rows.push({ messageId: messageDbId, address: a, role: 'to' })
+			rows.push({ message_id: messageDbId, address: a, role: 'to' })
 		}
 		for (const a of args.parsed.ccAddresses) {
-			rows.push({ messageId: messageDbId, address: a, role: 'cc' })
+			rows.push({ message_id: messageDbId, address: a, role: 'cc' })
 		}
 		for (const a of args.parsed.bccAddresses) {
-			rows.push({ messageId: messageDbId, address: a, role: 'bcc' })
+			rows.push({ message_id: messageDbId, address: a, role: 'bcc' })
 		}
 		if (rows.length > 0) {
 			yield* sql`
