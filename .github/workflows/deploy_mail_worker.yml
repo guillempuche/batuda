@@ -1,0 +1,115 @@
+name: Deploy Mail-worker
+
+on:
+  push:
+    tags:
+      - "mail-worker-v*"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-mail-worker
+  cancel-in-progress: false
+
+env:
+  KRAFTCLOUD_METRO: fra
+  # Pinned to the same kraft CLI version as deploy_server.yml. Bump
+  # both together after a dry-run on one target.
+  KRAFT_VERSION: v0.12.10
+
+jobs:
+  deploy:
+    name: Deploy to KraftCloud
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Prepare files for KraftCloud
+        run: |
+          cp apps/mail-worker/Kraftfile Kraftfile
+          cp apps/mail-worker/Dockerfile Dockerfile
+
+      - name: Cache KraftCloud CLI
+        id: kraft-cache
+        uses: actions/cache@v5
+        with:
+          path: kraft.deb
+          key: kraft-cli-${{ env.KRAFT_VERSION }}
+
+      - name: Download KraftCloud CLI
+        if: steps.kraft-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -sSfL "https://github.com/unikraft/kraftkit/releases/download/${KRAFT_VERSION}/kraftkit_${KRAFT_VERSION#v}_linux_amd64.deb" -o kraft.deb
+
+      - name: Install KraftCloud CLI
+        run: |
+          sudo dpkg -i kraft.deb
+          which kraft
+
+      - name: Extract version from tag
+        id: meta
+        run: |
+          if [[ "$GITHUB_REF_NAME" == mail-worker-v* ]]; then
+            echo "version=${GITHUB_REF_NAME#mail-worker-v}" >> $GITHUB_OUTPUT
+          else
+            echo "version=$(node -p "require('./apps/mail-worker/package.json').version")" >> $GITHUB_OUTPUT
+          fi
+          echo "short_sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      # Background worker — no public HTTP endpoint, so no service. Use a
+      # stable instance name (`batuda-mail-worker`) mirroring the
+      # batuda-server / batuda-web naming so ops commands target a
+      # predictable identity. The IMAP IDLE connections drop on any
+      # restart and the worker's claim-and-reconnect loop re-establishes
+      # them, so a ~5s gap between delete + recreate is acceptable.
+      - name: Delete previous instance (idempotent)
+        env:
+          KRAFTCLOUD_TOKEN: ${{ secrets.KRAFTCLOUD_TOKEN }}
+        run: |
+          kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} instance remove batuda-mail-worker 2>&1 | grep -v "not found" || true
+
+      - name: Deploy to KraftCloud
+        uses: nick-fields/retry@v4
+        env:
+          KRAFTCLOUD_TOKEN: ${{ secrets.KRAFTCLOUD_TOKEN }}
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 30
+          timeout_minutes: 10
+          # -M 2048 mirrors server's footprint; mail-worker's deploy tree
+          # (aws-sdk + imapflow + mailparser + pg + effect) is comparable.
+          # --timeout 10s is mandatory: UKC caps per-RPC timeouts at
+          # 10000ms; kraft's 60s default is rejected with HTTP 400.
+          # --scale-to-zero off matches the Kraftfile label and keeps the
+          # IDLE-holding worker always-warm.
+          command: |
+            kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
+              --timeout 10s \
+              --name batuda-mail-worker \
+              -M 2048 \
+              --scale-to-zero off \
+              -e NODE_ENV=production \
+              -e SERVICE_VERSION="${{ steps.meta.outputs.version }}" \
+              -e GIT_SHA="${{ github.sha }}" \
+              -e REGION="${{ env.KRAFTCLOUD_METRO }}" \
+              -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+              -e EMAIL_CREDENTIAL_KEY="${{ secrets.EMAIL_CREDENTIAL_KEY }}" \
+              -e STORAGE_ENDPOINT="${{ vars.STORAGE_ENDPOINT }}" \
+              -e STORAGE_REGION="${{ vars.STORAGE_REGION }}" \
+              -e STORAGE_ACCESS_KEY_ID="${{ secrets.STORAGE_ACCESS_KEY_ID }}" \
+              -e STORAGE_SECRET_ACCESS_KEY="${{ secrets.STORAGE_SECRET_ACCESS_KEY }}" \
+              -e STORAGE_BUCKET="${{ vars.STORAGE_BUCKET }}" \
+              .
+
+      - name: Verify deployment
+        env:
+          KRAFTCLOUD_TOKEN: ${{ secrets.KRAFTCLOUD_TOKEN }}
+        run: |
+          sleep 5
+          kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} instance get batuda-mail-worker
+          # claimAvailableInboxes runs every 5 s, so an IDLE-established
+          # log line should appear within ~10 s if any inbox is provisioned.
+          kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} instance logs batuda-mail-worker --tail 100 || echo "::warning::No logs yet"
