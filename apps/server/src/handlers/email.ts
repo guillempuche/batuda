@@ -72,6 +72,7 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 							// 409s; collapse internal errors to die().
 							Effect.catchTag('EmailError', e => Effect.die(e)),
 							Effect.catchTag('SqlError', e => Effect.die(e)),
+							Effect.catchTag('SmtpSendFailed', e => Effect.die(e)),
 						),
 				)
 				.handle('reply', _ =>
@@ -94,6 +95,7 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 						.pipe(
 							Effect.catchTag('EmailError', e => Effect.die(e)),
 							Effect.catchTag('SqlError', e => Effect.die(e)),
+							Effect.catchTag('SmtpSendFailed', e => Effect.die(e)),
 						),
 				)
 				.handle('listThreads', _ =>
@@ -353,6 +355,7 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 							GrantUnavailable: e => Effect.die(e),
 							BadRequest: e => Effect.die(e),
 							SqlError: e => Effect.die(e),
+							SmtpSendFailed: e => Effect.die(e),
 						}),
 					),
 				)
