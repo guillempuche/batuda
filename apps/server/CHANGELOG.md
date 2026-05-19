@@ -3,6 +3,36 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-05-19 (server-v2026.5.20)
+
+### Features
+
+* **server:** add user-scoped RLS for 3 research tables ([bc3b193](https://github.com/guillempuche/batuda/commit/bc3b193a52581f9a74394221ed7b1da0c2724b44))
+* **server:** match email search against per-message FTS ([5677f0d](https://github.com/guillempuche/batuda/commit/5677f0d27cd41f754b961db0cdd345c52485adba))
+* **server:** retry SMTP sends and surface SmtpSendFailed ([4f59048](https://github.com/guillempuche/batuda/commit/4f590486a712afba9ba2ace7c0d9e0bd5e7056e6))
+* **server:** schedule the staged-attachment orphan sweep ([0d2da50](https://github.com/guillempuche/batuda/commit/0d2da50af09343c4456b23ba04e653021565f89f))
+
+### Bug Fixes
+
+* **server:** disable scale-to-zero so in-flight requests don't 504 ([72eb0f2](https://github.com/guillempuche/batuda/commit/72eb0f2aa935eda23ec26547e7ba6cb535b6eb8b))
+
+### Refactoring
+
+* **domain:** move CurrentOrg from @batuda/controllers ([73f3c35](https://github.com/guillempuche/batuda/commit/73f3c352ebfe488226c23b0f13b09cf69c7e42f6))
+* move ParticipantMatcher to @batuda/email ([0ef885c](https://github.com/guillempuche/batuda/commit/0ef885c0129b6151e7ea366e4d9c9c14ff3a2768))
+
+### Tests
+
+* **server:** cover email FTS across subject, body, recipients ([c525338](https://github.com/guillempuche/batuda/commit/c52533845474ad221db4e6470a7f57f970508979))
+* **server:** cover SMTP retry policy with TestClock ([df61ca7](https://github.com/guillempuche/batuda/commit/df61ca7c270b9c7ce29b3518a0a393d40071d10a))
+* **server:** cover user-scoped RLS isolation ([b4015dd](https://github.com/guillempuche/batuda/commit/b4015dd664569d309599d1d8f8a6d490187e8b4c))
+* split unit and integration suites across all workspaces ([3c5d7be](https://github.com/guillempuche/batuda/commit/3c5d7be3ee14cc99fad7d67ba7eca1e5aca414b0))
+
+### CI/CD
+
+* gate merges with two-phase pipeline (unit + integration against Neon + MinIO) ([fb0cadb](https://github.com/guillempuche/batuda/commit/fb0cadb8cdbf0d5c0830a0ae811d1e9bc5e37823))
+* **release:** ui v2026.5.17 ([9abce7a](https://github.com/guillempuche/batuda/commit/9abce7a9b09919066852f9506366b587ab79885c))
+
 ## 2026-05-17 (server-v2026.5.17)
 
 ### Features

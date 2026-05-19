@@ -1,6 +1,6 @@
 {
 	"name": "@batuda/server",
-	"version": "2026.5.17",
+	"version": "2026.5.20",
 	"type": "module",
 	"scripts": {
 		"dev": "portless run --name api.batuda node --watch --env-file=../../.env --import tsx src/main.ts",
