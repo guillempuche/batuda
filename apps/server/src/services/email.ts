@@ -1304,8 +1304,31 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						if (filters?.purpose)
 							conditions.push(sql`i.purpose = ${filters.purpose}`)
 						if (filters?.query) {
-							const pattern = `%${filters.query.toLowerCase()}%`
-							conditions.push(sql`lower(tl.subject) LIKE ${pattern}`)
+							const trimmedQuery = filters.query.trim()
+							if (trimmedQuery.length > 0) {
+								// FTS over each message's subject + preview + body; the
+								// separate participants subquery catches sender/recipient
+								// hits, which the tsvector deliberately omits (unbounded
+								// recipient sets would force a tsvector rebuild on every
+								// reply).
+								conditions.push(sql`(
+									EXISTS (
+										SELECT 1 FROM email_messages em
+										WHERE em.organization_id = tl.organization_id
+										  AND (em.message_id = tl.external_thread_id
+										       OR tl.external_thread_id = ANY(em."references"))
+										  AND em.search_vector @@ plainto_tsquery('simple', ${trimmedQuery})
+									)
+									OR EXISTS (
+										SELECT 1 FROM email_messages em2
+										JOIN message_participants mp ON mp.email_message_id = em2.id
+										WHERE em2.organization_id = tl.organization_id
+										  AND (em2.message_id = tl.external_thread_id
+										       OR tl.external_thread_id = ANY(em2."references"))
+										  AND mp.email_address ILIKE ${`%${trimmedQuery}%`}
+									)
+								)`)
+							}
 						}
 
 						const whereClause = sql`WHERE ${sql.and(conditions)}`
