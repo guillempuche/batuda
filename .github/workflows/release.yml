@@ -11,6 +11,7 @@ on:
           - server
           - internal
           - ui
+          - mail-worker
           - all
       dry_run:
         description: "Dry run (preview without creating release)"
@@ -65,5 +66,13 @@ jobs:
       - name: Release UI
         if: inputs.app == 'ui' || inputs.app == 'all'
         run: pnpm release:ui --ci ${{ inputs.dry_run && '--dry-run' || '' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Mail-worker runs last in `all` so a failing API-side release
+      # doesn't leave a half-promoted worker stack.
+      - name: Release Mail-worker
+        if: inputs.app == 'mail-worker' || inputs.app == 'all'
+        run: pnpm release:mail-worker --ci ${{ inputs.dry_run && '--dry-run' || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
