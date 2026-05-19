@@ -1,26 +1,12 @@
-import { Schema, ServiceMap } from 'effect'
+import { Schema } from 'effect'
 import { HttpApiMiddleware, HttpApiSchema } from 'effect/unstable/httpapi'
+
+import { CurrentOrg } from '@batuda/domain'
 
 import { Forbidden, Unauthorized } from '../errors'
 
-/**
- * The active organization for the current request, populated by the
- * `OrgMiddleware`. The implementing Layer lives in `apps/server` because
- * it depends on Better-Auth, Node HTTP, and the Postgres client — this
- * package only declares the Tag so route groups can reference it from
- * their `.middleware(...)` chain without pulling in server-only runtime.
- *
- * Shared across HTTP and MCP code paths: MCP middleware also provides
- * this same tag so service-layer helpers stay context-agnostic.
- */
-export class CurrentOrg extends ServiceMap.Service<
-	CurrentOrg,
-	{
-		readonly id: string
-		readonly name: string
-		readonly slug: string
-	}
->()('CurrentOrg') {}
+// Re-exported so HTTP routes can grab CurrentOrg from the same module as OrgMiddleware.
+export { CurrentOrg }
 
 export class OrgMiddleware extends HttpApiMiddleware.Service<
 	OrgMiddleware,
