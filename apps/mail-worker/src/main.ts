@@ -1,6 +1,8 @@
 import { NodeRuntime } from '@effect/platform-node'
 import { Effect, type Fiber, Layer, Ref, Schedule } from 'effect'
 
+import { ParticipantMatcher } from '@batuda/email/participant-matcher'
+
 import { type ClaimedInbox, claimAvailableInboxes } from './claim.js'
 import { PgLive } from './db.js'
 import { CredentialDecryptor } from './decrypt.js'
@@ -87,6 +89,7 @@ const program = Effect.gen(function* () {
 const Live = Layer.mergeAll(
 	CredentialDecryptor.layer,
 	RawMessageStorage.layer,
+	ParticipantMatcher.layer,
 	PgLive,
 ).pipe(Layer.provideMerge(WorkerEnvVars.layer))
 

@@ -31,6 +31,8 @@ import nodemailer from 'nodemailer'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { ParticipantMatcher } from '@batuda/email/participant-matcher'
+
 import { fetchAndIngestNewerThan, markExpunged } from './folder-sync'
 import { RawMessageStorage } from './storage'
 
@@ -186,6 +188,7 @@ describe.skip('IMAP ingest roundtrip (needs IMAP-capable catcher)', () => {
 					}).pipe(
 						Effect.provide(RawMessageStorage.layer),
 						Effect.provide(WorkerEnvVars.layer),
+						Effect.provide(ParticipantMatcher.layer),
 						Effect.provide(PgLive),
 					),
 				)
@@ -244,6 +247,7 @@ describe.skip('IMAP ingest roundtrip (needs IMAP-capable catcher)', () => {
 					}).pipe(
 						Effect.provide(RawMessageStorage.layer),
 						Effect.provide(WorkerEnvVars.layer),
+						Effect.provide(ParticipantMatcher.layer),
 						Effect.provide(PgLive),
 					),
 				)
@@ -260,6 +264,7 @@ describe.skip('IMAP ingest roundtrip (needs IMAP-capable catcher)', () => {
 					}).pipe(
 						Effect.provide(RawMessageStorage.layer),
 						Effect.provide(WorkerEnvVars.layer),
+						Effect.provide(ParticipantMatcher.layer),
 						Effect.provide(PgLive),
 					),
 				)
@@ -309,6 +314,7 @@ describe.skip('IMAP ingest roundtrip (needs IMAP-capable catcher)', () => {
 					}).pipe(
 						Effect.provide(RawMessageStorage.layer),
 						Effect.provide(WorkerEnvVars.layer),
+						Effect.provide(ParticipantMatcher.layer),
 						Effect.provide(PgLive),
 					),
 				)
