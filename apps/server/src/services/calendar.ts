@@ -15,7 +15,6 @@ import {
 	UnsupportedRsvp,
 } from '@batuda/calendar'
 import { CurrentOrg } from '@batuda/controllers'
-
 import {
 	Ambiguous,
 	CreatedContact,
@@ -23,7 +22,8 @@ import {
 	MatchedContact,
 	NoMatch,
 	ParticipantMatcher,
-} from './participant-matcher'
+} from '@batuda/email/participant-matcher'
+
 import {
 	MeetingCancelled,
 	MeetingRescheduled,

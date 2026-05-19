@@ -13,7 +13,8 @@
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.1026.0",
 		"@batuda/controllers": "workspace:*",
-		"@batuda/server": "workspace:*",
+		"@batuda/domain": "workspace:*",
+		"@batuda/email": "workspace:*",
 		"@effect/platform-node": "4.0.0-beta.43",
 		"@effect/sql-pg": "4.0.0-beta.43",
 		"effect": "4.0.0-beta.43",

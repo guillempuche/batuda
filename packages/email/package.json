@@ -33,6 +33,10 @@
 		"./editor": {
 			"types": "./src/editor/index.ts",
 			"import": "./src/editor/index.ts"
+		},
+		"./participant-matcher": {
+			"types": "./src/participant-matcher.ts",
+			"import": "./src/participant-matcher.ts"
 		}
 	},
 	"scripts": {
@@ -42,6 +46,7 @@
 		"test:watch": "vitest"
 	},
 	"dependencies": {
+		"@batuda/domain": "workspace:*",
 		"@react-email/components": "^1.0.12",
 		"@react-email/editor": "^1.1.0",
 		"@react-email/render": "^2.0.7",

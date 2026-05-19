@@ -303,9 +303,12 @@ importers:
       '@batuda/controllers':
         specifier: workspace:*
         version: link:../../packages/controllers
-      '@batuda/server':
+      '@batuda/domain':
         specifier: workspace:*
-        version: link:../server
+        version: link:../../packages/domain
+      '@batuda/email':
+        specifier: workspace:*
+        version: link:../../packages/email
       '@effect/platform-node':
         specifier: 4.0.0-beta.43
         version: 4.0.0-beta.43(effect@4.0.0-beta.43)(ioredis@5.10.1)
@@ -546,6 +549,9 @@ importers:
 
   packages/email:
     dependencies:
+      '@batuda/domain':
+        specifier: workspace:*
+        version: link:../domain
       '@react-email/components':
         specifier: ^1.0.12
         version: 1.0.12(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
