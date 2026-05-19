@@ -12,6 +12,7 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import { BookingProviderLive, IcsParserLive } from '@batuda/calendar'
 import { BatudaApi, CurrentOrg } from '@batuda/controllers'
+import { ParticipantMatcher } from '@batuda/email/participant-matcher'
 import {
 	makeResearchLlmLive,
 	makeResearchProvidersLive,
@@ -58,7 +59,6 @@ import { InboxHealthProbe } from './services/inbox-health-probe'
 import { MailTransport } from './services/mail-transport'
 import { OrgResolution } from './services/org-resolution'
 import { PageService } from './services/pages'
-import { ParticipantMatcher } from './services/participant-matcher'
 import { PipelineService } from './services/pipeline'
 import { RecordingService } from './services/recordings'
 import { ResearchBlobStorageLive } from './services/research-blob-storage'

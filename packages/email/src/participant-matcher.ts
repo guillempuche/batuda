@@ -1,7 +1,7 @@
 import { Data, Effect, Layer, ServiceMap } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { CurrentOrg } from '@batuda/controllers'
+import { CurrentOrg } from '@batuda/domain'
 
 export class MatchedContact extends Data.TaggedClass('MatchedContact')<{
 	readonly contactId: string

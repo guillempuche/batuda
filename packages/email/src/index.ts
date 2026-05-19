@@ -1,5 +1,6 @@
 export * from './components/index'
 export * from './editor/index'
+export * from './participant-matcher'
 export * from './render'
 export * from './sanitize'
 export * from './schema'
