@@ -182,6 +182,8 @@ const ServicesLive = Layer.mergeAll(
 	// skip building it (nothing requires it). Listing it inside `mergeAll`
 	// forces the build, which fires the side-effect that forks the probe.
 	InboxHealthProbe.daemonLayer.pipe(Layer.provide(InboxHealthProbe.layer)),
+	// Same `never`-output trick; EmailAttachmentStaging is supplied via the `provideMerge` below.
+	EmailAttachmentStaging.sweepDaemonLayer,
 ).pipe(
 	// CalendarService sits below EmailService because EmailService's
 	// inbound-webhook path delegates text/calendar parts to it. Keep
