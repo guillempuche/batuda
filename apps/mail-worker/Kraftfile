@@ -1,0 +1,16 @@
+spec: v0.6
+
+name: batuda-mail-worker
+
+runtime: node:latest
+
+labels:
+  # Scale-to-zero is OFF: mail-worker holds long-lived IMAP IDLE
+  # connections per inbox. A scale-to-zero suspend would drop those
+  # connections every idle window and lose IDLE notifications between
+  # wake-ups; the worker's claim/reconnect loop is built for crash
+  # recovery, not for re-establishing connections every few minutes.
+  cloud.unikraft.v1.instances/scale_to_zero.policy: "off"
+
+rootfs: ./Dockerfile
+cmd: ["/usr/bin/node", "/app/dist/main.mjs"]
