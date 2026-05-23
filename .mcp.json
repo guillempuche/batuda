@@ -10,10 +10,6 @@
 				"-c",
 				"exec npx -y @neondatabase/mcp-server-neon start \"$NEON_API_KEY\""
 			]
-		},
-		"vercel": {
-			"type": "http",
-			"url": "https://mcp.vercel.com"
 		}
 	}
 }

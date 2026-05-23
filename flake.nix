@@ -17,6 +17,11 @@
             pkgs.nodejs_24
             pkgs.pnpm
             pkgs.dprint
+            # Cloudflare Workers CLI. Used to deploy apps/internal (the
+            # batuda-web TanStack Start app) to Workers. Installed via nix
+            # so `wrangler login`, `wrangler deploy`, `wrangler dev` work
+            # without each contributor having to `pnpm exec wrangler …`.
+            pkgs.wrangler
             # Local OpenTelemetry receiver + TUI viewer.
             # Listens on :4317 (gRPC) and :4318 (OTLP/HTTP JSON).
             # Point OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
@@ -29,6 +34,7 @@
             echo "Forja dev environment"
             echo "Node:     $(node --version)"
             echo "pnpm:     $(pnpm --version)"
+            echo "wrangler: $(wrangler --version 2>/dev/null || echo 'available')"
             echo "otel-tui: $(otel-tui --version 2>/dev/null || echo 'available')"
           '';
         };

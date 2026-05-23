@@ -58,6 +58,7 @@
 		"temporal-polyfill": "^0.3.0"
 	},
 	"devDependencies": {
+		"@cloudflare/vite-plugin": "^1.37.2",
 		"@lingui/cli": "6.0.0-next.3",
 		"@lingui/swc-plugin": "6.0.0-next.2",
 		"@lingui/vite-plugin": "6.0.0-next.3",
@@ -75,10 +76,12 @@
 		"tailwindcss": ">=4",
 		"typescript": "^5.9.3",
 		"vite": "8.0.3",
-		"vitest": "^4.1.4"
+		"vitest": "^4.1.4",
+		"wrangler": "^4.93.0"
 	},
 	"private": true,
 	"imports": {
 		"#/*": "./src/*"
-	}
+	},
+	"packageManager": "pnpm@11.1.1"
 }

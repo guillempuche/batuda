@@ -46,7 +46,7 @@
 
 ┌─────────────────────────────────────────────────────────────────┐
 │  apps/internal  (Batuda web app — batuda.co)                    │
-│  TanStack Start — Unikraft, Node.js SSR                          │
+│  TanStack Start — Cloudflare Workers SSR                         │
 │                                                                  │
 │  Pipeline  /companies  /companies/$slug  /tasks                 │
 │                                                                  │
@@ -185,7 +185,7 @@ Effect v4 HTTP server deployed at `api.batuda.co`. Responsibilities:
 ### `apps/internal`
 
 Batuda web app — the multi-tenant SaaS CRM UI at `batuda.co`.
-TanStack Start SSR app deployed to Unikraft (Node.js). Responsibilities:
+TanStack Start SSR app deployed to Cloudflare Workers. Responsibilities:
 
 - Pipeline and company management UI
 - styled-components for co-located CSS with MD3 design tokens
@@ -394,19 +394,22 @@ kraft deploy         # deploys to Unikraft Cloud
 
 The server is stateless — all state in NeonDB. Scales to zero when idle.
 
-### Internal (Unikraft)
+### Internal (Cloudflare Workers)
 
 ```bash
-pnpm --filter internal build   # produces .output/server/index.mjs
-kraft build                     # builds unikernel image
-kraft deploy                    # deploys to Unikraft Cloud → batuda.co
+pnpm turbo run build --filter=@batuda/internal   # @cloudflare/vite-plugin → dist/
+cd apps/internal && wrangler deploy               # uploads Worker + assets
 ```
+
+The `src/worker.ts` entry SSRs the app and forwards `/auth/*`, `/v1/*`,
+`/openapi.json`, `/docs/*` to `api.batuda.co` (the API stays on Unikraft).
+The `batuda.co/*` Workers Route is bound out-of-band, not by the deploy.
 
 ### Tenant marketing sites
 
 Each tenant deploys its own public site from its own repo. The first tenant is Engranatge: its marketing repo (`engranatge-marketing`) deploys to KraftCloud (service `engranatge-marketing` → `engranatge.com`). No coupling to this repo except the server's CORS allow-list (`ALLOWED_ORIGINS` includes the tool origin `https://batuda.co` and each tenant origin, e.g. `https://engranatge.com`).
 
-Both Batuda apps (server + web) run on Unikraft — stateless Node.js SSR. Scales to zero when idle.
+The server runs on Unikraft (stateless Node.js, scales to zero when idle); the web app runs on Cloudflare Workers (SSR at the edge).
 
 ### Database (NeonDB)
 

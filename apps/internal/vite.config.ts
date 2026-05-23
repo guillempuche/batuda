@@ -1,11 +1,11 @@
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { cloudflare } from '@cloudflare/vite-plugin'
 import { lingui } from '@lingui/vite-plugin'
 import tailwindcss from '@tailwindcss/vite'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import viteReact from '@vitejs/plugin-react-swc'
-import { nitro } from 'nitro/vite'
 import { defineConfig } from 'vite'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -60,27 +60,29 @@ const apiTarget =
 // every subdomain (cross-origin `/v1/*` fetches that bypass the proxy still
 // attach it). No `cookieDomainRewrite` on purpose.
 //
-// Rules live on `nitro({ routeRules })`, NOT Vite's `server.proxy`: Nitro's
-// plugin registers a `vary: sec-fetch-dest` pre-middleware in `configureServer`
-// (nitro/dist/vite.mjs:288) that runs ahead of Vite's internal proxy and
-// short-circuits every document-like request into SSR. `routeRules.proxy`
-// instead runs inside Nitro's H3 router before its catch-all SSR handler.
-//
 // Closed list: Better Auth (`/auth/*`), typed REST (`/v1/*`), public docs
-// (`/openapi.json`, `/docs`). Everything else stays inside Nitro.
-const proxyTo = (suffix: string) => ({
-	to: `${apiTarget}${suffix}`,
+// (`/openapi.json`, `/docs`). Everything else stays inside the SSR app.
+//
+// Production (Cloudflare Workers): the same forwarding runs inside the
+// Worker entry (see `src/worker.ts`) because there is no nitro layer; CF
+// has no equivalent of nitro's `routeRules` proxy. The dev `server.proxy`
+// below mirrors the Worker's prod behavior so dev parity holds.
+const apiProxy = {
+	target: apiTarget,
+	changeOrigin: true,
 	secure: false,
-})
-const nitroRouteRules = {
-	'/auth/**': { proxy: proxyTo('/auth/**') },
-	'/v1/**': { proxy: proxyTo('/v1/**') },
-	'/openapi.json': { proxy: proxyTo('/openapi.json') },
-	'/docs': { proxy: proxyTo('/docs') },
-	'/docs/**': { proxy: proxyTo('/docs/**') },
-} as const
+}
+const devProxy = {
+	'/auth': apiProxy,
+	'/v1': apiProxy,
+	'/openapi.json': apiProxy,
+	'/docs': apiProxy,
+}
 
 const config = defineConfig({
+	server: {
+		proxy: devProxy,
+	},
 	resolve: {
 		tsconfigPaths: true,
 		// The CJS shim does `require("react")` and creates a duplicate
@@ -152,8 +154,9 @@ const config = defineConfig({
 		resolve: { conditions: ['development', 'module', 'import', 'default'] },
 	},
 	plugins: [
+		tailwindcss(),
+		cloudflare({ viteEnvironment: { name: 'ssr' } }),
 		tanstackStart(),
-		nitro({ routeRules: nitroRouteRules }),
 		viteReact({
 			plugins: [
 				['@lingui/swc-plugin', {}],
@@ -170,7 +173,6 @@ const config = defineConfig({
 			],
 		}),
 		lingui(),
-		tailwindcss(),
 	],
 })
 

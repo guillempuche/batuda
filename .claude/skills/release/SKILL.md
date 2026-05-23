@@ -130,7 +130,7 @@ kraft cloud --metro fra instance list | grep batuda-server
 
 ```bash
 curl -sI https://batuda.co | head -5
-kraft cloud --metro fra service get batuda-web
+cd apps/internal && pnpm exec wrangler deployments list
 ```
 
 **UI:**
