@@ -35,3 +35,4 @@ allowBuilds:
   lefthook: true
   msgpackr-extract: true
   sharp: true
+  workerd: true

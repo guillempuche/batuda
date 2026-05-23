@@ -1,6 +1,6 @@
 # Frontend
 
-TanStack Start SSR app for the Batuda web app — the multi-tenant SaaS CRM. Deployed to Unikraft (Node.js). Mobile-first.
+TanStack Start SSR app for the Batuda web app — the multi-tenant SaaS CRM. Deployed to Cloudflare Workers. Mobile-first.
 For system context see [architecture.md](architecture.md).
 
 Deployed at `batuda.co`. Tenant marketing sites live in their own repos (e.g. the Engranatge tenant uses `engranatge-marketing`).
@@ -60,7 +60,7 @@ as-is (no IDs). Mismatched classnames → React 19 bails hydration and
 `onClick` handlers silently never attach. See the comment block at
 `apps/internal/vite.config.ts:120-138`.
 
-Deployed to Unikraft (Node.js SSR) via `Dockerfile` + `Kraftfile`. Build output in `.output/server/index.mjs`.
+Deployed to Cloudflare Workers via `@cloudflare/vite-plugin` + `wrangler` (config in `apps/internal/wrangler.jsonc`, Worker entry in `src/worker.ts`). Build output in `dist/`.
 
 ---
 

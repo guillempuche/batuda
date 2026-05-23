@@ -1,0 +1,13 @@
+{
+	// pnpm's hoisted linker keeps wrangler at the workspace root, not under
+	// apps/internal/node_modules, so the schema path climbs two levels.
+	"$schema": "../../node_modules/wrangler/config-schema.json",
+	"name": "batuda-web",
+	// Account ID is an identifier, not a secret (it appears in every dashboard
+	// URL). Pinning it lets a CI token scoped to only Workers Scripts:Edit
+	// deploy without an account-listing read permission.
+	"account_id": "b4ffb72b6d377a7950e0d3a596d82d4b",
+	"compatibility_date": "2025-09-24",
+	"compatibility_flags": ["nodejs_compat"],
+	"main": "src/worker.ts"
+}

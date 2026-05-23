@@ -11,18 +11,14 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  KRAFTCLOUD_METRO: fra
-  # Pinned to a known-good kraft CLI version. UKC's API now caps the
-  # `--timeout` per-RPC value at 10000ms and rejects anything higher with
-  # HTTP 400 ("Timeout value must be in the range -1 to 10000"); kraft's
-  # default of 60s (60000ms) trips this on every deploy, so the
-  # invocation explicitly passes `--timeout 10s`. Bump this version
-  # deliberately after verifying the new release against a dry-run deploy.
-  KRAFT_VERSION: v0.12.10
+  # Baked into the Vite client + SSR bundles via `import.meta.env.VITE_SERVER_URL`
+  # and into the worker's API proxy targets. Build-time only.
+  VITE_SERVER_URL: https://api.batuda.co
+  INTERNAL_API_URL: https://api.batuda.co
 
 jobs:
   deploy:
-    name: Deploy to KraftCloud
+    name: Deploy to Cloudflare Workers
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production
@@ -31,136 +27,39 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Prepare files for KraftCloud
-        run: |
-          cp apps/internal/Kraftfile Kraftfile
-          cp apps/internal/Dockerfile Dockerfile
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v5
 
-      - name: Cache KraftCloud CLI
-        id: kraft-cache
-        uses: actions/cache@v5
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
         with:
-          path: kraft.deb
-          key: kraft-cli-${{ env.KRAFT_VERSION }}
+          node-version: "24"
+          cache: "pnpm"
 
-      - name: Download KraftCloud CLI
-        if: steps.kraft-cache.outputs.cache-hit != 'true'
-        run: |
-          curl -sSfL "https://github.com/unikraft/kraftkit/releases/download/${KRAFT_VERSION}/kraftkit_${KRAFT_VERSION#v}_linux_amd64.deb" -o kraft.deb
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: Install KraftCloud CLI
-        run: |
-          sudo dpkg -i kraft.deb
-          which kraft
+      # Turbo builds @batuda/ui, @batuda/email, @batuda/controllers (and the
+      # rest of the workspace dep graph via `dependsOn: ^build`) before the
+      # app itself, so `vite build` finds their `dist/` outputs. The
+      # @cloudflare/vite-plugin emits the Worker bundle + static assets under
+      # apps/internal/dist/ and an auto-generated dist/server/wrangler.json.
+      - name: Build
+        run: pnpm turbo run build --filter=@batuda/internal
 
-      - name: Extract version from tag
-        id: meta
-        run: |
-          if [[ "$GITHUB_REF_NAME" == internal-v* ]]; then
-            echo "version=${GITHUB_REF_NAME#internal-v}" >> $GITHUB_OUTPUT
-          else
-            echo "version=$(node -p "require('./apps/internal/package.json').version")" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Check if KraftCloud service exists
-        id: service-check
-        env:
-          KRAFTCLOUD_TOKEN: ${{ secrets.KRAFTCLOUD_TOKEN }}
-        run: |
-          if kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} service get batuda-web >/dev/null 2>&1; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-            echo "Service batuda-web already exists — will perform rolling update"
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-            echo "Service batuda-web does not exist — will create it"
-          fi
-
-      - name: Deploy to KraftCloud
-        uses: nick-fields/retry@v4
-        env:
-          KRAFTCLOUD_TOKEN: ${{ secrets.KRAFTCLOUD_TOKEN }}
+      # `wrangler deploy` reads apps/internal/wrangler.jsonc, uploads the
+      # Worker (src/worker.ts → SSR + /auth,/v1,/docs proxy to api.batuda.co)
+      # and the static client assets. The Workers Route for batuda.co is
+      # managed out-of-band (CF dashboard / API), so a deploy never touches
+      # the production domain binding.
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
         with:
-          max_attempts: 2
-          retry_wait_seconds: 60
-          timeout_minutes: 10
-          # Rollout strategy (zero-downtime for the web app):
-          #
-          #   --rollout remove_sequential
-          #     KraftCloud spins up the new instance first, waits for it to
-          #     boot and bind :3000, then removes the old one. The old
-          #     instance keeps serving traffic until the new one is ready,
-          #     so visitors never hit a 502/504.
-          #
-          #   --rollout-wait 5s
-          #     Grace period between "new instance created" and "old
-          #     instance removed". Capped by UKC's 10s per-RPC limit (see
-          #     timeout note below); 5s is well under the cap and Node's
-          #     cold-start fits in it.
-          #
-          #   -M 1024
-          #     Memory budget. 512 MiB caused CPIO extraction to fail with
-          #     "No space left on device" — the image rootfs plus the Node
-          #     runtime needs ~800 MiB working set.
-          #
-          #   --name is OMITTED on the --service branch so kraft can
-          #   auto-generate a unique instance name; this is what lets the
-          #   old and new instances coexist during the rollout window.
-          command: |
-            # `--timeout 10s` is mandatory: kraft's default per-RPC timeout
-            # is 60s (60000ms), but UKC's API caps it at 10000ms and
-            # rejects anything higher with HTTP 400 ("Timeout value must
-            # be in the range -1 to 10000"). 10s is the maximum allowed.
-            #
-            # `--rollout-wait` is mapped to the same UKC cap because kraft
-            # uses it as the timeout for the `/v1/instances/wait` poll
-            # while the new instance comes up; 30s tripped the same 400
-            # error and aborted the rollout, leaking instances. 5s is
-            # well under the cap and Node's cold-start fits in it.
-            if [ "${{ steps.service-check.outputs.exists }}" = "true" ]; then
-              kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
-                --timeout 10s \
-                --service batuda-web \
-                --rollout remove_sequential \
-                --rollout-wait 5s \
-                -M 1024 \
-                .
-            else
-              # First-time: create an explicitly-named service, then attach
-              # the instance to it. The service owns the domain + cert;
-              # instances churn across releases while the service name is
-              # the stable identifier the rolling-update path keys off.
-              # Using `kraft cloud deploy --name` alone lets UKC auto-name
-              # the service, which breaks the next deploy's service lookup.
-              #
-              # First-time service create: UKC auto-issues a Let's Encrypt
-              # cert for the `-d batuda.co` domain. Cloudflare SSL/TLS set
-              # to Full (Strict) accepts LE (publicly-trusted CA), same
-              # path Engranatge runs.
-              #
-              # NB. Cloudflare Origin Certs were attempted and rejected by
-              # UKC: CF Origin CA hardcodes the cert subject CN to
-              # "CloudFlare Origin Certificate" (a non-FQDN string), and
-              # `kraft cloud certificate create` returns
-              #   400: "The certificate CN must be a fully-qualified domain name".
-              # If we want edge-only origin TLS later, the path is
-              # Cloudflare Authenticated Origin Pulls on top of LE — not
-              # CF Origin Certs — pending verification of UKC mTLS support.
-              kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} service create \
-                --name batuda-web \
-                -d batuda.co \
-                443:3000/tls+http \
-                80:443/http+redirect
-              kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
-                --timeout 10s \
-                --service batuda-web \
-                -M 1024 \
-                .
-            fi
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: apps/internal
+          command: deploy
 
       - name: Verify deployment
-        env:
-          KRAFTCLOUD_TOKEN: ${{ secrets.KRAFTCLOUD_TOKEN }}
         run: |
           sleep 5
-          kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} service get batuda-web || true
           curl -sSf https://batuda.co -o /dev/null && echo "Site is accessible" || echo "::warning::Site not accessible"
