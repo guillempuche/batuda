@@ -187,7 +187,7 @@ fix(web): handle empty pipeline state without throwing
 ```
 test(server): make email-attachment-download self-sufficient
 
-- Previous version resolved admin@taller.cat from the seed; multi-org-isolation truncates inboxes between runs and pre-push then failed in beforeAll. Synthetic fixture ids survive the truncate and clean up after themselves.
+- Previous version resolved admin@taller.cat from the seed; multi-org-isolation truncated inboxes between runs and pre-push then failed in beforeAll. Synthetic fixture ids survived the truncate and cleaned up after themselves.
 ```
 
 ```
