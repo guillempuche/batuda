@@ -16,7 +16,8 @@
 			"Bash(agent-browser network *)",
 			"Bash(agent-browser screenshot *)",
 			"Bash(agent-browser console *)",
-			"Bash(agent-browser --help)"
+			"Bash(agent-browser --help)",
+			"Edit(.claude/skills/**)"
 		]
 	},
 	"model": "claude-opus-4-7",
