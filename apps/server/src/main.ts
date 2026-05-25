@@ -63,6 +63,7 @@ import { PipelineService } from './services/pipeline'
 import { RecordingService } from './services/recordings'
 import { ResearchBlobStorageLive } from './services/research-blob-storage'
 import { S3StorageProviderLive } from './services/s3-storage-provider'
+import { TaskService } from './services/tasks'
 import {
 	ResearchRunCompleted,
 	TimelineActivityService,
@@ -172,6 +173,7 @@ const ResearchEventSinkLive = Layer.effect(
 
 const ServicesLive = Layer.mergeAll(
 	CompanyService.layer,
+	TaskService.layer,
 	PipelineService.layer,
 	PageService.layer,
 	EmailService.layer,

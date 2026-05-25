@@ -19,11 +19,13 @@ import { PageService } from './services/pages'
 import { PipelineService } from './services/pipeline'
 import { RecordingService } from './services/recordings'
 import { S3StorageProviderLive } from './services/s3-storage-provider'
+import { TaskService } from './services/tasks'
 import { TimelineActivityService } from './services/timeline-activity'
 import { WebhookService } from './services/webhooks'
 
 const ServicesLive = Layer.mergeAll(
 	CompanyService.layer,
+	TaskService.layer,
 	PipelineService.layer,
 	PageService.layer,
 	EmailService.layer,

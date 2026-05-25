@@ -3,6 +3,10 @@ import { Tool, Toolkit } from 'effect/unstable/ai'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
+import { CurrentOrg } from '@batuda/controllers'
+
+import { TaskService } from '../../services/tasks'
+
 // ── Shared literals ──────────────────────────────────────────────
 // The shapes here mirror the CHECK constraints in 0001_initial.ts.
 // Keeping them as exported Schema.Literals rather than free-form
@@ -49,6 +53,7 @@ const CreateTask = Tool.make('create_task', {
 		metadata: Schema.optional(Schema.NullOr(Schema.Unknown)),
 	}),
 	success: Schema.Unknown,
+	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Create Task')
 	.annotate(Tool.Destructive, false)
@@ -211,6 +216,7 @@ const asDate = (v: string | null | undefined): Date | null | undefined =>
 export const TaskHandlersLive = TaskTools.toLayer(
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
+		const taskService = yield* TaskService
 
 		const buildFilters = (params: {
 			readonly company_id?: string | undefined
@@ -252,7 +258,7 @@ export const TaskHandlersLive = TaskTools.toLayer(
 		return {
 			create_task: params =>
 				Effect.gen(function* () {
-					const rows = yield* sql`INSERT INTO tasks ${sql.insert({
+					const rows = yield* taskService.create({
 						title: params.title,
 						type: params.type,
 						companyId: params.company_id ?? null,
@@ -270,7 +276,7 @@ export const TaskHandlersLive = TaskTools.toLayer(
 							params.metadata !== undefined && params.metadata !== null
 								? JSON.stringify(params.metadata)
 								: null,
-					})} RETURNING *`
+					})
 					return rows[0]
 				}).pipe(Effect.orDie),
 

@@ -11,6 +11,8 @@ import {
 	SessionContext,
 } from '@batuda/controllers'
 
+import { TaskService } from '../services/tasks'
+
 type TaskRow = {
 	readonly id: string
 	readonly status: string
@@ -36,6 +38,7 @@ const requireFresh = (row: TaskRow, ifMatch: string | undefined) => {
 export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
+		const taskService = yield* TaskService
 		return handlers
 			.handle('list', _ =>
 				Effect.gen(function* () {
@@ -94,28 +97,26 @@ export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 			.handle('create', _ =>
 				Effect.gen(function* () {
 					const { userId: actorId } = yield* SessionContext
-					const rows = yield* sql`
-						INSERT INTO tasks ${sql.insert({
-							company_id: _.payload.companyId ?? null,
-							contact_id: _.payload.contactId ?? null,
-							type: _.payload.type,
-							title: _.payload.title,
-							notes: _.payload.notes ?? null,
-							status: _.payload.status ?? 'open',
-							source: _.payload.source ?? 'user',
-							priority: _.payload.priority ?? 'normal',
-							assignee_id: _.payload.assigneeId ?? actorId,
-							actor_id: actorId,
-							due_at: _.payload.dueAt
-								? DateTime.toDateUtc(_.payload.dueAt)
-								: null,
-							linked_interaction_id: _.payload.linkedInteractionId ?? null,
-							linked_calendar_event_id: _.payload.linkedCalendarEventId ?? null,
-							linked_thread_link_id: _.payload.linkedThreadLinkId ?? null,
-							linked_proposal_id: _.payload.linkedProposalId ?? null,
-							metadata: _.payload.metadata ?? null,
-						})} RETURNING *
-					`
+					const rows = yield* taskService.create({
+						company_id: _.payload.companyId ?? null,
+						contact_id: _.payload.contactId ?? null,
+						type: _.payload.type,
+						title: _.payload.title,
+						notes: _.payload.notes ?? null,
+						status: _.payload.status ?? 'open',
+						source: _.payload.source ?? 'user',
+						priority: _.payload.priority ?? 'normal',
+						assignee_id: _.payload.assigneeId ?? actorId,
+						actor_id: actorId,
+						due_at: _.payload.dueAt
+							? DateTime.toDateUtc(_.payload.dueAt)
+							: null,
+						linked_interaction_id: _.payload.linkedInteractionId ?? null,
+						linked_calendar_event_id: _.payload.linkedCalendarEventId ?? null,
+						linked_thread_link_id: _.payload.linkedThreadLinkId ?? null,
+						linked_proposal_id: _.payload.linkedProposalId ?? null,
+						metadata: _.payload.metadata ?? null,
+					})
 					yield* Effect.logInfo('Task created').pipe(
 						Effect.annotateLogs({
 							event: 'task.created',
@@ -130,9 +131,9 @@ export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 					const current = yield* sql<TaskRow>`
 						SELECT * FROM tasks WHERE id = ${_.params.id} LIMIT 1
 					`
-					if (current.length === 0)
+					const row = current[0]
+					if (!row)
 						return yield* new NotFound({ entity: 'task', id: _.params.id })
-					const row = current[0]!
 					yield* requireFresh(row, _.headers['if-match'])
 
 					const updates: Record<string, unknown> = {}
@@ -223,9 +224,10 @@ export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 					const current = yield* sql<TaskRow>`
 						SELECT * FROM tasks WHERE id = ${_.params.id} LIMIT 1
 					`
-					if (current.length === 0)
+					const existing = current[0]
+					if (!existing)
 						return yield* new NotFound({ entity: 'task', id: _.params.id })
-					if (current[0]!.status === 'done')
+					if (existing.status === 'done')
 						return yield* new Conflict({ message: 'cannot_cancel_done_task' })
 					const rows = yield* sql`
 						UPDATE tasks SET
