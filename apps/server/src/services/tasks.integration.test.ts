@@ -11,6 +11,8 @@
 process.env['DATABASE_URL'] ??=
 	'postgresql://batuda:batuda@localhost:5433/batuda'
 
+import { randomUUID } from 'node:crypto'
+
 import { Effect, Layer } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 import pg from 'pg'
@@ -19,7 +21,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { CurrentOrg } from '@batuda/controllers'
 
 import { PgLive } from '../db/client'
-import { TaskService } from './tasks'
+import { type TaskFilters, type TaskPage, TaskService } from './tasks'
 
 const DATABASE_URL =
 	process.env['DATABASE_URL'] ??
@@ -66,7 +68,15 @@ afterAll(async () => {
 // and CurrentOrg = `currentOrg` — the role + GUC OrgMiddleware establishes
 // per request — so org_isolation engages exactly as in production. The
 // transaction commits on success; afterAll removes the fixture rows.
-const createWith = (gucOrg: string, currentOrg: string) => {
+const createWith = (
+	gucOrg: string,
+	currentOrg: string,
+	data: Record<string, unknown> = {
+		type: 'follow_up',
+		title: FIXTURE_TITLE,
+		status: 'open',
+	},
+) => {
 	const deps = Layer.mergeAll(
 		TaskService.layer,
 		Layer.succeed(CurrentOrg, {
@@ -83,11 +93,7 @@ const createWith = (gucOrg: string, currentOrg: string) => {
 			Effect.gen(function* () {
 				yield* sql`SET LOCAL ROLE app_user`
 				yield* sql`SELECT set_config('app.current_org_id', ${gucOrg}, true)`
-				return yield* tasks.create({
-					type: 'follow_up',
-					title: FIXTURE_TITLE,
-					status: 'open',
-				})
+				return yield* tasks.create(data)
 			}),
 		)
 	}).pipe(Effect.provide(deps), Effect.runPromise)
@@ -164,6 +170,91 @@ describe('TaskService.create', () => {
 			expect(tallerVisible.length).toBeGreaterThan(0)
 			expect(restaurantVisible).toHaveLength(0)
 			// [apps/server/src/db/migrations/0001_initial.ts — org_isolation_tasks USING]
+		})
+	})
+})
+
+const listWith = (org: string, filters: TaskFilters) => {
+	const deps = Layer.mergeAll(
+		TaskService.layer,
+		Layer.succeed(CurrentOrg, { id: org, name: 'fixture', slug: 'fixture' }),
+	).pipe(Layer.provideMerge(PgLive))
+	const page: TaskPage = { sort: 'due', limit: 100, offset: 0 }
+
+	return Effect.gen(function* () {
+		const sql = yield* SqlClient.SqlClient
+		const tasks = yield* TaskService
+		return yield* sql.withTransaction(
+			Effect.gen(function* () {
+				yield* sql`SET LOCAL ROLE app_user`
+				yield* sql`SELECT set_config('app.current_org_id', ${org}, true)`
+				return yield* tasks.list(filters, page)
+			}),
+		)
+	}).pipe(Effect.provide(deps), Effect.runPromise)
+}
+
+describe('TaskService.list', () => {
+	describe('when filtering by completed status', () => {
+		it('should treat completed=false as open work, excluding done AND cancelled', async () => {
+			// GIVEN one open, one done, and one cancelled task for a unique assignee
+			const assignee = `list-fixture-${randomUUID()}`
+			await createWith(tallerOrgId, tallerOrgId, {
+				type: 'follow_up',
+				title: FIXTURE_TITLE,
+				status: 'open',
+				assigneeId: assignee,
+			})
+			await createWith(tallerOrgId, tallerOrgId, {
+				type: 'follow_up',
+				title: FIXTURE_TITLE,
+				status: 'done',
+				completedAt: new Date(),
+				assigneeId: assignee,
+			})
+			await createWith(tallerOrgId, tallerOrgId, {
+				type: 'follow_up',
+				title: FIXTURE_TITLE,
+				status: 'cancelled',
+				assigneeId: assignee,
+			})
+
+			// WHEN listing that assignee's open work
+			const rows = (await listWith(tallerOrgId, {
+				assigneeId: assignee,
+				completed: false,
+			})) as ReadonlyArray<{ status: string }>
+
+			// THEN only the open task returns — a cancelled task is not "open work"
+			expect(rows.map(r => r.status)).toEqual(['open'])
+			// [apps/server/src/services/tasks.ts — completed=false → NOT IN ('done','cancelled')]
+		})
+
+		it('should map completed=true to status=done', async () => {
+			// GIVEN an open and a done task for a unique assignee
+			const assignee = `list-fixture-${randomUUID()}`
+			await createWith(tallerOrgId, tallerOrgId, {
+				type: 'follow_up',
+				title: FIXTURE_TITLE,
+				status: 'open',
+				assigneeId: assignee,
+			})
+			await createWith(tallerOrgId, tallerOrgId, {
+				type: 'follow_up',
+				title: FIXTURE_TITLE,
+				status: 'done',
+				completedAt: new Date(),
+				assigneeId: assignee,
+			})
+
+			// WHEN listing completed tasks for that assignee
+			const rows = (await listWith(tallerOrgId, {
+				assigneeId: assignee,
+				completed: true,
+			})) as ReadonlyArray<{ status: string }>
+
+			// THEN only the done task returns
+			expect(rows.map(r => r.status)).toEqual(['done'])
 		})
 	})
 })
