@@ -22,6 +22,7 @@ import { CurrentOrg } from '@batuda/controllers'
 
 import { PgLive } from '../db/client'
 import { type TaskFilters, type TaskPage, TaskService } from './tasks'
+import { TimelineActivityService } from './timeline-activity'
 
 const DATABASE_URL =
 	process.env['DATABASE_URL'] ??
@@ -59,7 +60,17 @@ beforeAll(async () => {
 }, 30_000)
 
 afterAll(async () => {
-	// Run as connection owner (no role switch) so RLS doesn't gate cleanup.
+	// Run as the connecting superuser (no role switch) so RLS doesn't gate
+	// cleanup. timeline_activity has no FK to tasks, so clear it and the
+	// task_events trail by the fixture title before the tasks themselves.
+	await pool.query(
+		`DELETE FROM timeline_activity WHERE entity_type = 'task' AND entity_id IN (SELECT id FROM tasks WHERE title = $1)`,
+		[FIXTURE_TITLE],
+	)
+	await pool.query(
+		`DELETE FROM task_events WHERE task_id IN (SELECT id FROM tasks WHERE title = $1)`,
+		[FIXTURE_TITLE],
+	)
 	await pool.query(`DELETE FROM tasks WHERE title = $1`, [FIXTURE_TITLE])
 	await pool.end()
 })
@@ -84,7 +95,12 @@ const createWith = (
 			name: 'fixture',
 			slug: 'fixture',
 		}),
-	).pipe(Layer.provideMerge(PgLive))
+	).pipe(
+		// TaskService now records onto the timeline, so it needs
+		// TimelineActivityService; both resolve their SqlClient from PgLive.
+		Layer.provideMerge(TimelineActivityService.layer),
+		Layer.provideMerge(PgLive),
+	)
 
 	return Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
@@ -178,7 +194,12 @@ const listWith = (org: string, filters: TaskFilters) => {
 	const deps = Layer.mergeAll(
 		TaskService.layer,
 		Layer.succeed(CurrentOrg, { id: org, name: 'fixture', slug: 'fixture' }),
-	).pipe(Layer.provideMerge(PgLive))
+	).pipe(
+		// TaskService now records onto the timeline, so it needs
+		// TimelineActivityService; both resolve their SqlClient from PgLive.
+		Layer.provideMerge(TimelineActivityService.layer),
+		Layer.provideMerge(PgLive),
+	)
 	const page: TaskPage = { sort: 'due', limit: 100, offset: 0 }
 
 	return Effect.gen(function* () {
@@ -269,7 +290,12 @@ const attempt = (
 	const deps = Layer.mergeAll(
 		TaskService.layer,
 		Layer.succeed(CurrentOrg, { id: org, name: 'fixture', slug: 'fixture' }),
-	).pipe(Layer.provideMerge(PgLive))
+	).pipe(
+		// TaskService now records onto the timeline, so it needs
+		// TimelineActivityService; both resolve their SqlClient from PgLive.
+		Layer.provideMerge(TimelineActivityService.layer),
+		Layer.provideMerge(PgLive),
+	)
 
 	return Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
@@ -332,7 +358,10 @@ describe('TaskService transitions', () => {
 				tallerOrgId,
 				Effect.gen(function* () {
 					const tasks = yield* TaskService
-					return yield* tasks.snooze(id, new Date(Date.now() - 60_000))
+					return yield* tasks.snooze(id, new Date(Date.now() - 60_000), {
+						id: null,
+						kind: 'user',
+					})
 				}),
 			)
 
@@ -404,6 +433,98 @@ describe('TaskService task_events', () => {
 			expect(events.rows[1]?.change).toEqual({ status: ['open', 'done'] })
 			expect(events.rows[1]?.actor_kind).toBe('agent')
 			// [apps/server/src/services/tasks.ts — recordEvent]
+		} finally {
+			client.release()
+		}
+	})
+})
+
+describe('TaskService timeline activity', () => {
+	it('should record task_created then task_completed on the company timeline', async () => {
+		// GIVEN a freshly created company-less task (create records TaskCreated)
+		const created = (await createWith(tallerOrgId, tallerOrgId, {
+			type: 'follow_up',
+			title: FIXTURE_TITLE,
+			status: 'open',
+		})) as ReadonlyArray<{ id: string }>
+		const taskId = created[0]?.id
+		if (!taskId) throw new Error('fixture task was not created')
+
+		// WHEN it is completed through the service
+		await attempt(
+			tallerOrgId,
+			Effect.gen(function* () {
+				const tasks = yield* TaskService
+				return yield* tasks.complete(taskId, { id: null, kind: 'agent' })
+			}),
+		)
+
+		// THEN both activities land on the timeline for the task, with a null
+		// company_id — company-less tasks still appear
+		// [apps/server/src/services/tasks.ts — timeline.record on create + complete]
+		const activities = await pool.query<{
+			kind: string
+			company_id: string | null
+		}>(
+			`SELECT kind, company_id FROM timeline_activity
+			 WHERE entity_type = 'task' AND entity_id = $1::uuid
+			 ORDER BY occurred_at ASC`,
+			[taskId],
+		)
+		expect(activities.rows.map(r => r.kind)).toEqual([
+			'task_created',
+			'task_completed',
+		])
+		expect(activities.rows[0]?.company_id).toBeNull()
+	})
+})
+
+describe('TaskService snooze/reschedule events', () => {
+	it('should append a field-diff event for snooze and for reschedule', async () => {
+		// GIVEN an open task
+		const id = await seedTask({ status: 'open' })
+
+		// WHEN it is snoozed to the future then rescheduled, as an agent
+		await attempt(
+			tallerOrgId,
+			Effect.gen(function* () {
+				const tasks = yield* TaskService
+				return yield* tasks.snooze(id, new Date(Date.now() + 3_600_000), {
+					id: null,
+					kind: 'agent',
+				})
+			}),
+		)
+		await attempt(
+			tallerOrgId,
+			Effect.gen(function* () {
+				const tasks = yield* TaskService
+				return yield* tasks.reschedule(id, new Date(Date.now() + 7_200_000), {
+					id: null,
+					kind: 'agent',
+				})
+			}),
+		)
+
+		// THEN both transitions appended events — previously snooze and
+		// reschedule wrote nothing to the undo trail
+		// [apps/server/src/services/tasks.ts — recordTaskUpdate on snooze/reschedule]
+		const client = await pool.connect()
+		try {
+			await client.query('BEGIN')
+			await client.query('SET LOCAL ROLE app_user')
+			await client.query(`SELECT set_config('app.current_org_id', $1, true)`, [
+				tallerOrgId,
+			])
+			const events = await client.query<{ change: Record<string, unknown> }>(
+				`SELECT change FROM task_events WHERE task_id = $1 ORDER BY at ASC`,
+				[id],
+			)
+			await client.query('ROLLBACK')
+
+			const keys = events.rows.flatMap(r => Object.keys(r.change))
+			expect(keys).toContain('snoozedUntil')
+			expect(keys).toContain('dueAt')
 		} finally {
 			client.release()
 		}

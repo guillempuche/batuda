@@ -4,6 +4,13 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import { BadRequest, Conflict, CurrentOrg, NotFound } from '@batuda/controllers'
 
+import {
+	TaskCompleted,
+	TaskCreated,
+	TaskUpdated,
+	TimelineActivityService,
+} from './timeline-activity'
+
 export interface TaskFilters {
 	readonly companyId?: string | undefined
 	readonly contactId?: string | undefined
@@ -38,6 +45,18 @@ export interface TaskActor {
 	readonly kind: 'user' | 'agent'
 }
 
+// Columns read back from a write to build the timeline event. Result names
+// are camelCase (PgClient transformResultNames), so this mirrors the row as
+// returned, not the snake_case columns.
+interface TaskRow {
+	readonly id: string
+	readonly organizationId: string
+	readonly companyId: string | null
+	readonly contactId: string | null
+	readonly title: string
+	readonly type: string
+}
+
 // Persistence shared by the HTTP `tasks` handler and the MCP task toolkit.
 // Writes funnel through here so the `organization_id` stamp lives in one
 // place: the column is NOT NULL with no DB default, and the org_isolation
@@ -49,6 +68,7 @@ export class TaskService extends ServiceMap.Service<TaskService>()(
 	{
 		make: Effect.gen(function* () {
 			const sql = yield* SqlClient.SqlClient
+			const timeline = yield* TimelineActivityService
 
 			const conditionsFor = (
 				orgId: string,
@@ -110,20 +130,58 @@ export class TaskService extends ServiceMap.Service<TaskService>()(
 					change: JSON.stringify(change),
 				})}`.pipe(Effect.orDie, Effect.asVoid)
 
+			// Both stores for a non-create transition: the task_events undo trail
+			// AND the company-timeline activity row. Kept together so a new
+			// transition can't write one and forget the other. `record` maps a
+			// `status → done` change to a task_completed activity; other diffs land
+			// as task_updated.
+			const recordTaskUpdate = (
+				orgId: string,
+				row: TaskRow,
+				actor: TaskActor,
+				change: Record<string, readonly [unknown, unknown]>,
+			) =>
+				Effect.gen(function* () {
+					yield* recordEvent(orgId, row.id, actor, change)
+					yield* timeline.record(
+						new TaskUpdated({
+							taskId: row.id,
+							companyId: row.companyId,
+							contactId: row.contactId,
+							change,
+							actorUserId: actor.id,
+							actorKind: actor.kind,
+							occurredAt: new Date(),
+						}),
+					)
+				})
+
 			return {
 				create: (data: Record<string, unknown>, actor: TaskActor) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
-						const rows = yield* sql<{
-							id: string
-						}>`INSERT INTO tasks ${sql.insert({ ...data, organizationId: currentOrg.id })} RETURNING *`.pipe(
-							Effect.orDie,
-						)
+						const rows =
+							yield* sql<TaskRow>`INSERT INTO tasks ${sql.insert({ ...data, organizationId: currentOrg.id })} RETURNING *`.pipe(
+								Effect.orDie,
+							)
 						const row = rows[0]
-						if (row)
+						if (row) {
 							yield* recordEvent(currentOrg.id, row.id, actor, {
 								kind: 'created',
 							})
+							yield* timeline.record(
+								new TaskCreated({
+									taskId: row.id,
+									companyId: row.companyId,
+									contactId: row.contactId,
+									title: row.title,
+									taskType: row.type,
+									actorUserId: actor.id,
+									actorKind: actor.kind,
+									occurredAt: new Date(),
+								}),
+							)
+						}
 						return rows
 					}),
 
@@ -153,7 +211,7 @@ export class TaskService extends ServiceMap.Service<TaskService>()(
 						`.pipe(Effect.orDie)
 						const prior = before[0]
 						if (!prior) return yield* new NotFound({ entity: 'task', id })
-						const rows = yield* sql<{ id: string }>`
+						const rows = yield* sql<TaskRow>`
 							UPDATE tasks SET
 								status = 'done',
 								completed_at = COALESCE(completed_at, now()),
@@ -166,6 +224,16 @@ export class TaskService extends ServiceMap.Service<TaskService>()(
 						yield* recordEvent(currentOrg.id, id, actor, {
 							status: [prior.status, 'done'],
 						})
+						yield* timeline.record(
+							new TaskCompleted({
+								taskId: id,
+								companyId: row.companyId,
+								contactId: row.contactId,
+								actorUserId: actor.id,
+								actorKind: actor.kind,
+								occurredAt: new Date(),
+							}),
+						)
 						return row
 					}),
 
@@ -179,7 +247,7 @@ export class TaskService extends ServiceMap.Service<TaskService>()(
 						`.pipe(Effect.orDie)
 						const prior = before[0]
 						if (!prior) return yield* new NotFound({ entity: 'task', id })
-						const rows = yield* sql<{ id: string }>`
+						const rows = yield* sql<TaskRow>`
 							UPDATE tasks SET
 								status = 'open',
 								completed_at = NULL,
@@ -189,7 +257,7 @@ export class TaskService extends ServiceMap.Service<TaskService>()(
 						`.pipe(Effect.orDie)
 						const row = rows[0]
 						if (!row) return yield* new NotFound({ entity: 'task', id })
-						yield* recordEvent(currentOrg.id, id, actor, {
+						yield* recordTaskUpdate(currentOrg.id, row, actor, {
 							status: [prior.status, 'open'],
 						})
 						return row
@@ -211,7 +279,7 @@ export class TaskService extends ServiceMap.Service<TaskService>()(
 							return yield* new Conflict({ message: 'cannot_cancel_done_task' })
 						// Clearing completed_at keeps the done ⇔ completed_at invariant:
 						// only status='done' may carry one (tasks_completed_at_matches_status).
-						const rows = yield* sql<{ id: string }>`
+						const rows = yield* sql<TaskRow>`
 							UPDATE tasks SET
 								status = 'cancelled',
 								completed_at = NULL,
@@ -221,39 +289,59 @@ export class TaskService extends ServiceMap.Service<TaskService>()(
 						`.pipe(Effect.orDie)
 						const row = rows[0]
 						if (!row) return yield* new NotFound({ entity: 'task', id })
-						yield* recordEvent(currentOrg.id, id, actor, {
+						yield* recordTaskUpdate(currentOrg.id, row, actor, {
 							status: [existing.status, 'cancelled'],
 						})
 						return row
 					}),
 
-				snooze: (id: string, until: Date) =>
+				snooze: (id: string, until: Date, actor: TaskActor) =>
 					Effect.gen(function* () {
 						// Reject past timers on both transports — a snooze into the past
 						// would resurface the task immediately.
 						if (until.getTime() <= Date.now())
 							return yield* new BadRequest({ message: 'until_must_be_future' })
 						const currentOrg = yield* CurrentOrg
-						const rows = yield* sql<{ id: string }>`
+						const before = yield* sql<{ snoozedUntil: string | null }>`
+							SELECT snoozed_until FROM tasks
+							WHERE id = ${id} AND organization_id = ${currentOrg.id}
+							LIMIT 1
+						`.pipe(Effect.orDie)
+						const prior = before[0]
+						if (!prior) return yield* new NotFound({ entity: 'task', id })
+						const rows = yield* sql<TaskRow>`
 							UPDATE tasks SET snoozed_until = ${until}, updated_at = now()
 							WHERE id = ${id} AND organization_id = ${currentOrg.id}
 							RETURNING *
 						`.pipe(Effect.orDie)
 						const row = rows[0]
 						if (!row) return yield* new NotFound({ entity: 'task', id })
+						yield* recordTaskUpdate(currentOrg.id, row, actor, {
+							snoozedUntil: [prior.snoozedUntil, until],
+						})
 						return row
 					}),
 
-				reschedule: (id: string, dueAt: Date | null) =>
+				reschedule: (id: string, dueAt: Date | null, actor: TaskActor) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
-						const rows = yield* sql<{ id: string }>`
+						const before = yield* sql<{ dueAt: string | null }>`
+							SELECT due_at FROM tasks
+							WHERE id = ${id} AND organization_id = ${currentOrg.id}
+							LIMIT 1
+						`.pipe(Effect.orDie)
+						const prior = before[0]
+						if (!prior) return yield* new NotFound({ entity: 'task', id })
+						const rows = yield* sql<TaskRow>`
 							UPDATE tasks SET due_at = ${dueAt}, updated_at = now()
 							WHERE id = ${id} AND organization_id = ${currentOrg.id}
 							RETURNING *
 						`.pipe(Effect.orDie)
 						const row = rows[0]
 						if (!row) return yield* new NotFound({ entity: 'task', id })
+						yield* recordTaskUpdate(currentOrg.id, row, actor, {
+							dueAt: [prior.dueAt, dueAt],
+						})
 						return row
 					}),
 			}

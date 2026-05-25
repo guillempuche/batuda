@@ -358,7 +358,7 @@ export const TaskHandlersLive = TaskTools.toLayer(
 				),
 
 			snooze_task: params =>
-				taskService.snooze(params.id, new Date(params.until)).pipe(
+				taskService.snooze(params.id, new Date(params.until), AGENT_ACTOR).pipe(
 					Effect.catchTag('NotFound', () => Effect.succeed(null)),
 					Effect.orDie,
 				),
@@ -368,6 +368,7 @@ export const TaskHandlersLive = TaskTools.toLayer(
 					.reschedule(
 						params.id,
 						params.due_at === null ? null : new Date(params.due_at),
+						AGENT_ACTOR,
 					)
 					.pipe(
 						Effect.catchTag('NotFound', () => Effect.succeed(null)),
