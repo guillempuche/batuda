@@ -1,6 +1,5 @@
 import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
-import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
@@ -63,7 +62,7 @@ const CreateTask = Tool.make('create_task', {
 
 const ListTasks = Tool.make('list_tasks', {
 	description:
-		'List tasks with filters. `completed` is a legacy convenience flag mapped to status=done. Prefer status/statuses/overdue_only/include_snoozed for richer queries. Results sort by due_at ASC NULLS LAST, then created_at ASC. Default limit 25.',
+		'List tasks with filters. `completed=true` maps to status=done; `completed=false` returns open work (excludes done AND cancelled). Prefer status/statuses/overdue_only/include_snoozed for richer queries. Results sort by due_at ASC NULLS LAST, then created_at ASC. Default limit 25.',
 	parameters: Schema.Struct({
 		company_id: Schema.optional(Schema.String),
 		contact_id: Schema.optional(Schema.String),
@@ -81,6 +80,7 @@ const ListTasks = Tool.make('list_tasks', {
 		offset: Schema.optional(Schema.Number),
 	}),
 	success: Schema.Array(Schema.Unknown),
+	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'List Tasks')
 	.annotate(Tool.Readonly, true)
@@ -101,6 +101,7 @@ const SearchTasks = Tool.make('search_tasks', {
 		limit: Schema.optional(Schema.Number),
 	}),
 	success: Schema.Array(Schema.Unknown),
+	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Search Tasks')
 	.annotate(Tool.Readonly, true)
@@ -205,10 +206,10 @@ export const TaskTools = Toolkit.make(
 )
 
 // ── Handlers ─────────────────────────────────────────────────────
-// Every read builds a Fragment[] to avoid string concatenation in the
-// SQL layer. Writes stay small on purpose — the DB CHECK constraints
-// enforce the status/completed_at invariant so the handler does not
-// need to rehash it.
+// Reads delegate to TaskService.list so filter semantics stay identical
+// to the HTTP transport. Writes stay small on purpose — the DB CHECK
+// constraints enforce the status/completed_at invariant so the handler
+// does not need to rehash it.
 
 const asDate = (v: string | null | undefined): Date | null | undefined =>
 	v === null ? null : v === undefined ? undefined : new Date(v)
@@ -217,43 +218,6 @@ export const TaskHandlersLive = TaskTools.toLayer(
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
 		const taskService = yield* TaskService
-
-		const buildFilters = (params: {
-			readonly company_id?: string | undefined
-			readonly contact_id?: string | undefined
-			readonly status?: string | undefined
-			readonly statuses?: ReadonlyArray<string> | undefined
-			readonly priority?: string | undefined
-			readonly source?: string | undefined
-			readonly assignee_id?: string | undefined
-			readonly due_before?: string | undefined
-			readonly due_after?: string | undefined
-			readonly overdue_only?: boolean | undefined
-			readonly include_snoozed?: boolean | undefined
-			readonly completed?: boolean | undefined
-		}): Array<Statement.Fragment> => {
-			const c: Array<Statement.Fragment> = []
-			if (params.company_id) c.push(sql`company_id = ${params.company_id}`)
-			if (params.contact_id) c.push(sql`contact_id = ${params.contact_id}`)
-			if (params.status) c.push(sql`status = ${params.status}`)
-			if (params.statuses && params.statuses.length > 0)
-				c.push(sql`status IN ${sql.in([...params.statuses])}`)
-			if (params.priority) c.push(sql`priority = ${params.priority}`)
-			if (params.source) c.push(sql`source = ${params.source}`)
-			if (params.assignee_id) c.push(sql`assignee_id = ${params.assignee_id}`)
-			if (params.due_before)
-				c.push(sql`due_at <= ${new Date(params.due_before)}`)
-			if (params.due_after) c.push(sql`due_at >= ${new Date(params.due_after)}`)
-			if (params.overdue_only === true)
-				c.push(sql`due_at < now() AND status = 'open'`)
-			// Default: hide currently-snoozed rows. Pass include_snoozed=true
-			// to see them (e.g., for the snoozed-tab in the inbox).
-			if (params.include_snoozed !== true)
-				c.push(sql`(snoozed_until IS NULL OR snoozed_until <= now())`)
-			if (params.completed === true) c.push(sql`status = 'done'`)
-			if (params.completed === false) c.push(sql`status <> 'done'`)
-			return c
-		}
 
 		return {
 			create_task: params =>
@@ -281,31 +245,45 @@ export const TaskHandlersLive = TaskTools.toLayer(
 				}).pipe(Effect.orDie),
 
 			list_tasks: params =>
-				Effect.gen(function* () {
-					const conditions = buildFilters(params)
-					const limit = params.limit ?? 25
-					const offset = params.offset ?? 0
-					return yield* sql`
-						SELECT * FROM tasks
-						${conditions.length > 0 ? sql`WHERE ${sql.and(conditions)}` : sql``}
-						ORDER BY due_at ASC NULLS LAST, created_at ASC
-						LIMIT ${limit} OFFSET ${offset}
-					`
-				}).pipe(Effect.orDie),
+				taskService
+					.list(
+						{
+							companyId: params.company_id,
+							contactId: params.contact_id,
+							assigneeId: params.assignee_id,
+							status: params.status,
+							statuses: params.statuses,
+							priority: params.priority,
+							source: params.source,
+							dueAfter: params.due_after,
+							dueBefore: params.due_before,
+							overdueOnly: params.overdue_only,
+							includeSnoozed: params.include_snoozed,
+							completed: params.completed,
+						},
+						{
+							sort: 'due',
+							limit: params.limit ?? 25,
+							offset: params.offset ?? 0,
+						},
+					)
+					.pipe(Effect.orDie),
 
 			search_tasks: params =>
-				Effect.gen(function* () {
-					const conditions = buildFilters(params)
-					const needle = `%${params.query.replace(/[\\%_]/g, m => '\\' + m)}%`
-					conditions.push(sql`(title ILIKE ${needle} OR notes ILIKE ${needle})`)
-					const limit = params.limit ?? 25
-					return yield* sql`
-						SELECT * FROM tasks
-						WHERE ${sql.and(conditions)}
-						ORDER BY due_at ASC NULLS LAST, created_at ASC
-						LIMIT ${limit}
-					`
-				}).pipe(Effect.orDie),
+				taskService
+					.list(
+						{
+							companyId: params.company_id,
+							assigneeId: params.assignee_id,
+							status: params.status,
+							source: params.source,
+							overdueOnly: params.overdue_only,
+							includeSnoozed: params.include_snoozed,
+							search: params.query,
+						},
+						{ sort: 'due', limit: params.limit ?? 25, offset: 0 },
+					)
+					.pipe(Effect.orDie),
 
 			update_task: params =>
 				Effect.gen(function* () {

@@ -1,6 +1,5 @@
 import { DateTime, Effect } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
-import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
 import {
@@ -42,42 +41,32 @@ export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 		return handlers
 			.handle('list', _ =>
 				Effect.gen(function* () {
-					const conditions: Array<Statement.Fragment> = []
-					if (_.query.companyId)
-						conditions.push(sql`company_id = ${_.query.companyId}`)
-					if (_.query.contactId)
-						conditions.push(sql`contact_id = ${_.query.contactId}`)
-					if (_.query.assigneeId)
-						conditions.push(sql`assignee_id = ${_.query.assigneeId}`)
-					if (_.query.status) conditions.push(sql`status = ${_.query.status}`)
-					if (_.query.priority)
-						conditions.push(sql`priority = ${_.query.priority}`)
-					if (_.query.source) conditions.push(sql`source = ${_.query.source}`)
-					if (_.query.dueFrom)
-						conditions.push(sql`due_at >= ${_.query.dueFrom}`)
-					if (_.query.dueTo) conditions.push(sql`due_at <= ${_.query.dueTo}`)
-					if (_.query.overdueOnly === 'true')
-						conditions.push(sql`due_at < now() AND status = 'open'`)
-					if (_.query.includeSnoozed !== 'true')
-						conditions.push(
-							sql`(snoozed_until IS NULL OR snoozed_until <= now())`,
-						)
-					if (_.query.search)
-						conditions.push(sql`title ILIKE ${`%${_.query.search}%`}`)
-					if (_.query.completed === 'true')
-						conditions.push(sql`status = 'done'`)
-					else if (_.query.completed === 'false')
-						conditions.push(sql`status NOT IN ('done', 'cancelled')`)
-
-					const limit = _.query.limit ?? 50
-					const offset = _.query.offset ?? 0
-
-					return yield* sql`
-						SELECT * FROM tasks
-						${conditions.length > 0 ? sql`WHERE ${sql.and(conditions)}` : sql``}
-						ORDER BY COALESCE(due_at, created_at) DESC
-						LIMIT ${limit} OFFSET ${offset}
-					`
+					return yield* taskService.list(
+						{
+							companyId: _.query.companyId,
+							contactId: _.query.contactId,
+							assigneeId: _.query.assigneeId,
+							status: _.query.status,
+							priority: _.query.priority,
+							source: _.query.source,
+							dueAfter: _.query.dueFrom,
+							dueBefore: _.query.dueTo,
+							overdueOnly: _.query.overdueOnly === 'true',
+							includeSnoozed: _.query.includeSnoozed === 'true',
+							completed:
+								_.query.completed === 'true'
+									? true
+									: _.query.completed === 'false'
+										? false
+										: undefined,
+							search: _.query.search,
+						},
+						{
+							sort: 'recent',
+							limit: _.query.limit ?? 50,
+							offset: _.query.offset ?? 0,
+						},
+					)
 				}).pipe(Effect.orDie),
 			)
 			.handle('get', _ =>
