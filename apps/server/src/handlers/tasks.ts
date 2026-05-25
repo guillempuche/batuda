@@ -14,17 +14,18 @@ import { TaskService } from '../services/tasks'
 type TaskRow = {
 	readonly id: string
 	readonly status: string
-	readonly updated_at: string
-	readonly completed_at: string | null
+	readonly updatedAt: string
+	readonly completedAt: string | null
 }
 
 // Optimistic-concurrency gate for PATCH /tasks/:id. Compare the row's
 // current `updated_at` ISO against the client's `If-Match` header; any
 // drift returns 409 so the UI can resurface the fresh row instead of
-// silently overwriting an agent's edit.
+// silently overwriting an agent's edit. Result columns arrive camelCase
+// (PgClient transformResultNames), so read `updatedAt`, not `updated_at`.
 const requireFresh = (row: TaskRow, ifMatch: string | undefined) => {
 	if (!ifMatch) return Effect.void
-	const current = new Date(row.updated_at).toISOString()
+	const current = new Date(row.updatedAt).toISOString()
 	if (current === ifMatch) return Effect.void
 	return Effect.fail(
 		new Conflict({
@@ -204,13 +205,24 @@ export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 				}),
 			)
 			.handle('snooze', _ =>
-				taskService.snooze(_.params.id, DateTime.toDateUtc(_.payload.until)),
+				Effect.gen(function* () {
+					const { userId, isAgent } = yield* SessionContext
+					return yield* taskService.snooze(
+						_.params.id,
+						DateTime.toDateUtc(_.payload.until),
+						{ id: userId, kind: isAgent ? 'agent' : 'user' },
+					)
+				}),
 			)
 			.handle('reschedule', _ =>
-				taskService.reschedule(
-					_.params.id,
-					_.payload.dueAt ? DateTime.toDateUtc(_.payload.dueAt) : null,
-				),
+				Effect.gen(function* () {
+					const { userId, isAgent } = yield* SessionContext
+					return yield* taskService.reschedule(
+						_.params.id,
+						_.payload.dueAt ? DateTime.toDateUtc(_.payload.dueAt) : null,
+						{ id: userId, kind: isAgent ? 'agent' : 'user' },
+					)
+				}),
 			)
 			.handle('bulkComplete', _ =>
 				Effect.gen(function* () {
