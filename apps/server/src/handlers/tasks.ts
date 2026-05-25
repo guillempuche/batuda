@@ -2,37 +2,9 @@ import { DateTime, Effect } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import { SqlClient } from 'effect/unstable/sql'
 
-import {
-	BatudaApi,
-	Conflict,
-	NotFound,
-	SessionContext,
-} from '@batuda/controllers'
+import { BatudaApi, NotFound, SessionContext } from '@batuda/controllers'
 
 import { TaskService } from '../services/tasks'
-
-type TaskRow = {
-	readonly id: string
-	readonly status: string
-	readonly updatedAt: string
-	readonly completedAt: string | null
-}
-
-// Optimistic-concurrency gate for PATCH /tasks/:id. Compare the row's
-// current `updated_at` ISO against the client's `If-Match` header; any
-// drift returns 409 so the UI can resurface the fresh row instead of
-// silently overwriting an agent's edit. Result columns arrive camelCase
-// (PgClient transformResultNames), so read `updatedAt`, not `updated_at`.
-const requireFresh = (row: TaskRow, ifMatch: string | undefined) => {
-	if (!ifMatch) return Effect.void
-	const current = new Date(row.updatedAt).toISOString()
-	if (current === ifMatch) return Effect.void
-	return Effect.fail(
-		new Conflict({
-			message: `stale_write — current updated_at ${current} !== If-Match ${ifMatch}`,
-		}),
-	)
-}
 
 export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 	Effect.gen(function* () {
@@ -69,20 +41,7 @@ export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 					)
 				}).pipe(Effect.orDie),
 			)
-			.handle('get', _ =>
-				Effect.gen(function* () {
-					const rows = yield* sql<TaskRow>`
-						SELECT * FROM tasks WHERE id = ${_.params.id} LIMIT 1
-					`
-					if (rows.length === 0)
-						return yield* new NotFound({ entity: 'task', id: _.params.id })
-					return rows[0]
-				}).pipe(
-					Effect.catch(e =>
-						e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
-					),
-				),
-			)
+			.handle('get', _ => taskService.get(_.params.id))
 			.handle('create', _ =>
 				Effect.gen(function* () {
 					const { userId: actorId, isAgent } = yield* SessionContext
@@ -122,60 +81,36 @@ export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 			)
 			.handle('update', _ =>
 				Effect.gen(function* () {
-					const current = yield* sql<TaskRow>`
-						SELECT * FROM tasks WHERE id = ${_.params.id} LIMIT 1
-					`
-					const row = current[0]
-					if (!row)
-						return yield* new NotFound({ entity: 'task', id: _.params.id })
-					yield* requireFresh(row, _.headers['if-match'])
-
-					const updates: Record<string, unknown> = {}
-					if (_.payload.title !== undefined) updates['title'] = _.payload.title
-					if (_.payload.notes !== undefined) updates['notes'] = _.payload.notes
-					if (_.payload.status !== undefined)
-						updates['status'] = _.payload.status
-					if (_.payload.priority !== undefined)
-						updates['priority'] = _.payload.priority
-					if (_.payload.assigneeId !== undefined)
-						updates['assignee_id'] = _.payload.assigneeId
-					if (_.payload.dueAt !== undefined)
-						updates['due_at'] = _.payload.dueAt
-							? DateTime.toDateUtc(_.payload.dueAt)
-							: null
-					if (_.payload.snoozedUntil !== undefined)
-						updates['snoozed_until'] = _.payload.snoozedUntil
-							? DateTime.toDateUtc(_.payload.snoozedUntil)
-							: null
-					if (_.payload.companyId !== undefined)
-						updates['company_id'] = _.payload.companyId
-					if (_.payload.contactId !== undefined)
-						updates['contact_id'] = _.payload.contactId
-					if (_.payload.metadata !== undefined)
-						updates['metadata'] = _.payload.metadata
-
-					// Keep the invariant: status='done' ⇔ completed_at IS NOT NULL.
-					// The DB CHECK would reject violations anyway, but updating
-					// `completed_at` here means clients don't have to know about it.
-					if (_.payload.status !== undefined) {
-						updates['completed_at'] =
-							_.payload.status === 'done' ? new Date() : null
-					}
-					updates['updated_at'] = new Date()
-					updates['actor_id'] = (yield* SessionContext).userId
-
-					const updated = yield* sql`
-						UPDATE tasks SET ${sql.update(updates)}
-						WHERE id = ${_.params.id} RETURNING *
-					`
-					return updated[0]
-				}).pipe(
-					Effect.catch(e =>
-						e._tag === 'NotFound' || e._tag === 'Conflict'
-							? Effect.fail(e)
-							: Effect.die(e),
-					),
-				),
+					const { userId, isAgent } = yield* SessionContext
+					return yield* taskService.update(
+						_.params.id,
+						{
+							title: _.payload.title,
+							notes: _.payload.notes,
+							status: _.payload.status,
+							priority: _.payload.priority,
+							assigneeId: _.payload.assigneeId,
+							// undefined leaves the column untouched; explicit null clears it.
+							dueAt:
+								_.payload.dueAt !== undefined
+									? _.payload.dueAt
+										? DateTime.toDateUtc(_.payload.dueAt)
+										: null
+									: undefined,
+							snoozedUntil:
+								_.payload.snoozedUntil !== undefined
+									? _.payload.snoozedUntil
+										? DateTime.toDateUtc(_.payload.snoozedUntil)
+										: null
+									: undefined,
+							companyId: _.payload.companyId,
+							contactId: _.payload.contactId,
+							metadata: _.payload.metadata,
+						},
+						{ id: userId, kind: isAgent ? 'agent' : 'user' },
+						_.headers['if-match'],
+					)
+				}),
 			)
 			.handle('complete', _ =>
 				Effect.gen(function* () {
@@ -224,24 +159,10 @@ export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 					)
 				}),
 			)
-			.handle('bulkComplete', _ =>
-				Effect.gen(function* () {
-					const rows = yield* sql`
-						UPDATE tasks SET
-							status = 'done',
-							completed_at = COALESCE(completed_at, now()),
-							updated_at = now()
-						WHERE id IN ${sql.in(_.payload.ids)} RETURNING id
-					`
-					return {
-						completed: rows.length,
-						ids: rows.map(r => (r as { id: string }).id),
-					}
-				}).pipe(Effect.orDie),
-			)
+			.handle('bulkComplete', _ => taskService.bulkComplete(_.payload.ids))
 			.handle('events', _ =>
 				Effect.gen(function* () {
-					const exists = yield* sql<TaskRow>`
+					const exists = yield* sql`
 						SELECT id FROM tasks WHERE id = ${_.params.id} LIMIT 1
 					`
 					if (exists.length === 0)

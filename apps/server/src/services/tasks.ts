@@ -45,6 +45,22 @@ export interface TaskActor {
 	readonly kind: 'user' | 'agent'
 }
 
+// Fields a PATCH can change. The caller decodes the wire payload into this
+// shape (dates already converted to Date); the service maps it to columns and
+// keeps the status ⇔ completed_at invariant.
+export interface TaskUpdateInput {
+	readonly title?: string | undefined
+	readonly notes?: string | null | undefined
+	readonly status?: string | undefined
+	readonly priority?: string | undefined
+	readonly assigneeId?: string | null | undefined
+	readonly dueAt?: Date | null | undefined
+	readonly snoozedUntil?: Date | null | undefined
+	readonly companyId?: string | null | undefined
+	readonly contactId?: string | null | undefined
+	readonly metadata?: unknown
+}
+
 // Columns read back from a write to build the timeline event. Result names
 // are camelCase (PgClient transformResultNames), so this mirrors the row as
 // returned, not the snake_case columns.
@@ -343,6 +359,97 @@ export class TaskService extends ServiceMap.Service<TaskService>()(
 							dueAt: [prior.dueAt, dueAt],
 						})
 						return row
+					}),
+
+				get: (id: string) =>
+					Effect.gen(function* () {
+						const currentOrg = yield* CurrentOrg
+						const rows = yield* sql`
+							SELECT * FROM tasks
+							WHERE id = ${id} AND organization_id = ${currentOrg.id}
+							LIMIT 1
+						`.pipe(Effect.orDie)
+						const row = rows[0]
+						if (!row) return yield* new NotFound({ entity: 'task', id })
+						return row
+					}),
+
+				// Partial field update. `ifMatch` is the HTTP If-Match optimistic-
+				// concurrency gate (the row's prior `updated_at` ISO); MCP callers
+				// omit it. Free-form edits don't write the task_events/timeline trail
+				// the discrete transitions do.
+				update: (
+					id: string,
+					input: TaskUpdateInput,
+					actor: TaskActor,
+					ifMatch?: string,
+				) =>
+					Effect.gen(function* () {
+						const currentOrg = yield* CurrentOrg
+						const current = yield* sql<{ updatedAt: string }>`
+							SELECT updated_at FROM tasks
+							WHERE id = ${id} AND organization_id = ${currentOrg.id}
+							LIMIT 1
+						`.pipe(Effect.orDie)
+						const prior = current[0]
+						if (!prior) return yield* new NotFound({ entity: 'task', id })
+						// Result columns are camelCase (transformResultNames), so the
+						// freshness check reads `updatedAt`, not `updated_at`.
+						if (ifMatch !== undefined) {
+							const fresh = new Date(prior.updatedAt).toISOString()
+							if (fresh !== ifMatch)
+								return yield* new Conflict({
+									message: `stale_write — current updated_at ${fresh} !== If-Match ${ifMatch}`,
+								})
+						}
+
+						const updates: Record<string, unknown> = {}
+						if (input.title !== undefined) updates['title'] = input.title
+						if (input.notes !== undefined) updates['notes'] = input.notes
+						if (input.status !== undefined) updates['status'] = input.status
+						if (input.priority !== undefined)
+							updates['priority'] = input.priority
+						if (input.assigneeId !== undefined)
+							updates['assignee_id'] = input.assigneeId
+						if (input.dueAt !== undefined) updates['due_at'] = input.dueAt
+						if (input.snoozedUntil !== undefined)
+							updates['snoozed_until'] = input.snoozedUntil
+						if (input.companyId !== undefined)
+							updates['company_id'] = input.companyId
+						if (input.contactId !== undefined)
+							updates['contact_id'] = input.contactId
+						if (input.metadata !== undefined)
+							updates['metadata'] = input.metadata
+						// Keep status='done' ⇔ completed_at IS NOT NULL so clients don't
+						// have to manage completed_at (the DB CHECK enforces it anyway).
+						if (input.status !== undefined)
+							updates['completed_at'] =
+								input.status === 'done' ? new Date() : null
+						updates['updated_at'] = new Date()
+						updates['actor_id'] = actor.id
+
+						const updated = yield* sql`
+							UPDATE tasks SET ${sql.update(updates)}
+							WHERE id = ${id} AND organization_id = ${currentOrg.id}
+							RETURNING *
+						`.pipe(Effect.orDie)
+						return updated[0]
+					}),
+
+				bulkComplete: (ids: ReadonlyArray<string>) =>
+					Effect.gen(function* () {
+						const currentOrg = yield* CurrentOrg
+						if (ids.length === 0) return { completed: 0, ids: [] as string[] }
+						const rows = yield* sql<{ id: string }>`
+							UPDATE tasks SET
+								status = 'done',
+								completed_at = COALESCE(completed_at, now()),
+								updated_at = now()
+							WHERE id IN ${sql.in([...ids])}
+								AND organization_id = ${currentOrg.id}
+							RETURNING id
+						`.pipe(Effect.orDie)
+						return { completed: rows.length, ids: rows.map(r => r.id) }
 					}),
 			}
 		}),
