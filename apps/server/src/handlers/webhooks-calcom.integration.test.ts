@@ -12,10 +12,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { CurrentOrg } from '@batuda/controllers'
 
 import { PgLive } from '../db/client.js'
-import { provideOrg } from '../middleware/org.js'
+import { enterOrgScope } from '../middleware/org.js'
 import { OrgResolution } from '../services/org-resolution.js'
 
-// Function-level integration test for the org-resolution + provideOrg
+// Function-level integration test for the org-resolution + enterOrgScope
 // pipeline that webhooks-calcom.ts wires up (lines ~140-170 of the
 // handler). The full HTTP path (signature verification, schema decode,
 // dispatch through CalendarService) is exercised by the running dev
@@ -24,7 +24,7 @@ import { OrgResolution } from '../services/org-resolution.js'
 //
 //   1. resolveOrgForCalcomWebhook(payload) returns the matching org for
 //      a known cal.com booking.
-//   2. provideOrg(org)(effect) makes CurrentOrg AND `app.current_org_id`
+//   2. enterOrgScope({ org })(effect) makes CurrentOrg AND `app.current_org_id`
 //      reach the inner effect — so any SQL the CalendarService runs
 //      passes RLS as `app_user`.
 //
@@ -118,7 +118,7 @@ const cleanupFixtureInbox = Effect.gen(function* () {
 	yield* sql`DELETE FROM inboxes WHERE email = ${FIXTURE_INBOX_EMAIL}`
 })
 
-describe('webhook org-resolution + provideOrg pipeline', () => {
+describe('webhook org-resolution + enterOrgScope pipeline', () => {
 	let orgIds: OrgIds
 	const seededEvents: string[] = []
 
@@ -150,12 +150,12 @@ describe('webhook org-resolution + provideOrg pipeline', () => {
 		it('should provide CurrentOrg AND set app.current_org_id for downstream SQL', async () => {
 			// GIVEN a calendar_events row with provider=calcom + source=booking in taller
 			// WHEN resolveOrgForCalcomWebhook(payload) returns taller AND
-			//      provideOrg(taller) wraps an inner effect that yields CurrentOrg
-			//      and reads current_setting('app.current_org_id')
+			//      enterOrgScope({ org }) wraps an inner effect that yields
+			//      CurrentOrg and reads current_setting('app.current_org_id')
 			// THEN the inner effect sees CurrentOrg.id === taller.id
 			//      AND current_setting === taller.id
 			// [webhooks-calcom.ts:135-174 — handler chain]
-			// [middleware/org.ts:64-90 — provideOrg]
+			// [middleware/org.ts — enterOrgScope]
 			const eventId = randomUUID()
 			const icalUid = `webhook-test-${eventId}`
 			seededEvents.push(eventId)
@@ -188,8 +188,9 @@ describe('webhook org-resolution + provideOrg pipeline', () => {
 						iCalUID: icalUid,
 					} as never)
 
-					// Then run the inner effect through provideOrg.
-					return yield* provideOrg(org)(inner)
+					// Then run the inner effect through enterOrgScope.
+					const sql = yield* SqlClient.SqlClient
+					return yield* enterOrgScope(sql, { org })(inner)
 				}).pipe(
 					Effect.provide(OrgResolution.layer),
 					Effect.provide(PgLive),
@@ -210,13 +211,13 @@ describe('webhook org-resolution + provideOrg pipeline', () => {
 		})
 	})
 
-	describe("when provideOrg's inner effect runs as app_user against an org-scoped table", () => {
+	describe("when enterOrgScope's inner effect runs as app_user against an org-scoped table", () => {
 		it('should pass the org_isolation RLS WITH CHECK clause', async () => {
-			// GIVEN provideOrg(taller) has set app.current_org_id and SET ROLE app_user
+			// GIVEN enterOrgScope({ org }) has set app.current_org_id and SET ROLE app_user
 			// WHEN the inner effect INSERTs a row that includes organization_id = taller.id
 			// THEN the org_isolation_calendar_events policy approves the write
 			//      AND the row is queryable from inside the same tx
-			// [middleware/org.ts:75-79 — SET LOCAL ROLE app_user]
+			// [middleware/org.ts — enterOrgScope: SET LOCAL ROLE app_user]
 			// [migrations/0001_initial.ts — org_isolation_calendar_events policy]
 			const eventId = randomUUID()
 			const icalUid = `rls-test-${eventId}`
@@ -258,7 +259,8 @@ describe('webhook org-resolution + provideOrg pipeline', () => {
 							organizer: { email: FIXTURE_INBOX_EMAIL },
 						} as never)
 						.pipe(Effect.orDie)
-					return yield* provideOrg(org)(inner)
+					const sql = yield* SqlClient.SqlClient
+					return yield* enterOrgScope(sql, { org })(inner)
 				}).pipe(
 					Effect.provide(OrgResolution.layer),
 					Effect.provide(PgLive),

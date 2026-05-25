@@ -3,10 +3,11 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import { Config, Effect, Exit, Option, Redacted } from 'effect'
 import { HttpServerResponse } from 'effect/unstable/http'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
+import { SqlClient } from 'effect/unstable/sql'
 
 import { BatudaApi } from '@batuda/controllers'
 
-import { provideOrg } from '../middleware/org'
+import { enterOrgScope } from '../middleware/org'
 import {
 	CalendarService,
 	decodeCalcomWebhookEnvelope,
@@ -33,6 +34,7 @@ export const CalcomWebhookLive = HttpApiBuilder.group(
 		Effect.gen(function* () {
 			const svc = yield* CalendarService
 			const orgRes = yield* OrgResolution
+			const sql = yield* SqlClient.SqlClient
 			// Optional at boot so the server still starts when cal.com is not
 			// configured yet; individual webhook requests fail with 503 until
 			// the secret lands. This matches the rest of the stack's
@@ -138,7 +140,7 @@ export const CalcomWebhookLive = HttpApiBuilder.group(
 					// Resolve the org from the payload BEFORE dispatching: every
 					// SQL write inside `handleCalcomWebhook` (timeline.record,
 					// task INSERTs, calendar_events upserts) yields CurrentOrg
-					// and runs inside provideOrg's RLS-scoped tx.
+					// and runs inside enterOrgScope's RLS-scoped tx.
 					const orgScopeExit = yield* orgRes
 						.resolveOrgForCalcomWebhook(envelope.payload)
 						.pipe(Effect.exit)
@@ -164,7 +166,7 @@ export const CalcomWebhookLive = HttpApiBuilder.group(
 
 					yield* svc
 						.handleCalcomWebhook(envelope)
-						.pipe(provideOrg(orgScopeExit.value), Effect.orDie)
+						.pipe(enterOrgScope(sql, { org: orgScopeExit.value }))
 					return HttpServerResponse.jsonUnsafe({ ok: true })
 				}),
 			)

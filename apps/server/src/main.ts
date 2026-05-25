@@ -244,7 +244,7 @@ const AppLive = Layer.mergeAll(
 )
 
 // `CurrentOrg` is request-scoped — provided per request by OrgMiddleware
-// (HTTP), McpAuthMiddleware (MCP tools), `provideOrg` (cal.com webhook),
+// (HTTP), McpAuthMiddleware (MCP tools), `enterOrgScope` (cal.com webhook),
 // and inline `Effect.provideService` calls in ResearchEventSinkLive. It
 // surfaces in the program's R only because Tool.make declares
 // `dependencies: [CurrentOrg]` for typing.
