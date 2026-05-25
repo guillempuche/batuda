@@ -1,5 +1,6 @@
 import { HttpApi, OpenApi } from 'effect/unstable/httpapi'
 
+import { ApiKeysGroup } from './routes/api-keys'
 import { AuthGroup } from './routes/auth'
 import { CalcomWebhookGroup } from './routes/calcom-webhook'
 import { CalendarGroup } from './routes/calendar'
@@ -29,6 +30,7 @@ export const BatudaApi = HttpApi.make('BatudaApi')
 	)
 	.add(HealthGroup)
 	.add(AuthGroup)
+	.add(ApiKeysGroup)
 	.add(CompaniesGroup)
 	.add(ContactsGroup)
 	.add(InteractionsGroup)

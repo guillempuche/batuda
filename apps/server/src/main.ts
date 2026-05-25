@@ -22,6 +22,7 @@ import {
 } from '@batuda/research'
 
 import { PgLive } from './db/client'
+import { ApiKeysLive } from './handlers/api-keys'
 import { AuthHandlerLive } from './handlers/auth'
 import { CalendarLive } from './handlers/calendar'
 import { CompaniesLive } from './handlers/companies'
@@ -47,6 +48,7 @@ import { OtlpObservability } from './lib/observability'
 import { McpHttpLive } from './mcp/http'
 import { OrgMiddlewareLive, resolveSystemOrg } from './middleware/org'
 import { SessionMiddlewareLive } from './middleware/session'
+import { ApiKeyService } from './services/api-keys'
 import { CalendarService } from './services/calendar'
 import { CompanyService } from './services/companies'
 import { CredentialCrypto } from './services/credential-crypto'
@@ -74,6 +76,7 @@ const ApiLive = HttpApiBuilder.layer(BatudaApi).pipe(
 	Layer.provide([
 		HealthLive,
 		AuthHandlerLive,
+		ApiKeysLive,
 		CompaniesLive,
 		ContactsLive,
 		InteractionsLive,
@@ -187,6 +190,7 @@ const ResearchEventSinkLive = Layer.effect(
 )
 
 const ServicesLive = Layer.mergeAll(
+	ApiKeyService.layer,
 	CompanyService.layer,
 	TaskService.layer,
 	PipelineService.layer,
