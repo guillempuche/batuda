@@ -1,6 +1,6 @@
 import { NodeHttpServerRequest } from '@effect/platform-node'
 import { fromNodeHeaders } from 'better-auth/node'
-import { Effect, Layer } from 'effect'
+import { Data, Effect, Layer } from 'effect'
 import { HttpServerRequest } from 'effect/unstable/http'
 import { SqlClient } from 'effect/unstable/sql'
 
@@ -60,6 +60,40 @@ export const enterOrgScope =
 				}),
 			)
 			.pipe(Effect.orDie) as Effect.Effect<A, never, Exclude<R, CurrentOrg>>
+
+// Raised when a system-actor scope can't resolve its org — e.g. the org was
+// deleted between a research run completing and its fan-out firing. A distinct
+// tag lets callers skip the work rather than crash.
+export class SystemOrgNotFound extends Data.TaggedError('SystemOrgNotFound')<{
+	readonly orgId: string
+}> {}
+
+/**
+ * Fail-closed org scope for system actors that run outside any request — the
+ * research event sink fires after the originating request has returned. Loads
+ * the real organization row by id (so `CurrentOrg` carries a true name/slug
+ * instead of empties), then enters app_user scope via `enterOrgScope`. A
+ * missing org fails with `SystemOrgNotFound` *before* the effect runs, so no
+ * partial scope (role/GUC) is ever applied.
+ *
+ * `userId` is the on-behalf-of user (e.g. the run's creator); omit it to set
+ * the org GUC alone.
+ */
+export const resolveSystemOrg =
+	(
+		sql: SqlClient.SqlClient,
+		orgId: string,
+		opts?: { readonly userId?: string | undefined },
+	) =>
+	<A, E, R>(effect: Effect.Effect<A, E, R>) =>
+		Effect.gen(function* () {
+			const rows = yield* sql<OrgRow>`
+				SELECT id, name, slug FROM "organization" WHERE id = ${orgId} LIMIT 1
+			`.pipe(Effect.orDie)
+			const org = rows[0]
+			if (!org) return yield* new SystemOrgNotFound({ orgId })
+			return yield* enterOrgScope(sql, { org, userId: opts?.userId })(effect)
+		})
 
 /**
  * Implementing Layer for the `OrgMiddleware` Tag declared in

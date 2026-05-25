@@ -12,7 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { CurrentOrg } from '@batuda/controllers'
 
 import { PgLive } from '../db/client.js'
-import { enterOrgScope } from './org.js'
+import { enterOrgScope, resolveSystemOrg } from './org.js'
 
 // enterOrgScope is the single combinator the HTTP org middleware, the MCP
 // auth middleware, and the cal.com webhook all route their tx-tail through.
@@ -205,6 +205,77 @@ describe('enterOrgScope', () => {
 
 			expect(asA).toBe(1)
 			expect(asB).toBe(0)
+		})
+	})
+})
+
+// resolveSystemOrg layers a real org load + fail-closed guard on top of
+// enterOrgScope, for system actors (the research event sink) that have an org
+// id but no request. The org isolation itself is enterOrgScope's job (covered
+// above); these cover what resolveSystemOrg adds.
+describe('resolveSystemOrg', () => {
+	describe('when the org exists', () => {
+		it('should load the real org and run as app_user with both GUCs', async () => {
+			// GIVEN an existing org id and an on-behalf-of user
+			// WHEN resolveSystemOrg(sql, orgId, { userId }) wraps the reader
+			// THEN CurrentOrg carries the real slug (not an empty string), the
+			//      role is app_user, and both GUCs are set
+			// [middleware/org.ts — resolveSystemOrg: load org then enterOrgScope]
+			const userId = `sys-${randomUUID()}`
+			const result = await Effect.runPromise(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* resolveSystemOrg(sql, ctx.org.id, { userId })(readScope)
+				}).pipe(Effect.provide(PgLive)) as Effect.Effect<
+					ScopeReading,
+					never,
+					never
+				>,
+			)
+			expect(result.role).toBe('app_user')
+			expect(result.orgGuc).toBe(ctx.org.id)
+			expect(result.userGuc).toBe(userId)
+			expect(result.currentOrgId).toBe(ctx.org.id)
+			expect(result.currentOrgSlug).toBe(ctx.org.slug)
+			expect(result.currentOrgSlug.length).toBeGreaterThan(0)
+		})
+	})
+
+	describe('when the org does not exist', () => {
+		it('should fail with SystemOrgNotFound without running the effect', async () => {
+			// GIVEN an org id with no organization row
+			// WHEN resolveSystemOrg wraps an effect that would flip a sentinel
+			// THEN it fails SystemOrgNotFound and the inner effect never ran, so
+			//      no partial role/GUC scope was applied
+			// [middleware/org.ts — resolveSystemOrg: missing org fails pre-scope]
+			let ran = false
+			// catchTag only fires for SystemOrgNotFound, so a 'fail-closed'
+			// outcome also asserts the error tag; any other failure propagates.
+			const outcome = await Effect.runPromise(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* resolveSystemOrg(
+						sql,
+						'org-does-not-exist',
+						{},
+					)(
+						Effect.sync(() => {
+							ran = true
+							return 'ran' as const
+						}),
+					).pipe(
+						Effect.catchTag('SystemOrgNotFound', () =>
+							Effect.succeed('fail-closed' as const),
+						),
+					)
+				}).pipe(Effect.provide(PgLive)) as Effect.Effect<
+					'ran' | 'fail-closed',
+					never,
+					never
+				>,
+			)
+			expect(ran).toBe(false)
+			expect(outcome).toBe('fail-closed')
 		})
 	})
 })
