@@ -11,7 +11,7 @@ import { HttpApiBuilder, HttpApiScalar, OpenApi } from 'effect/unstable/httpapi'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { BookingProviderLive, IcsParserLive } from '@batuda/calendar'
-import { BatudaApi, CurrentOrg } from '@batuda/controllers'
+import { BatudaApi } from '@batuda/controllers'
 import { ParticipantMatcher } from '@batuda/email/participant-matcher'
 import {
 	makeResearchLlmLive,
@@ -45,7 +45,7 @@ import { EnvVars } from './lib/env'
 import { LoggerLive } from './lib/logger'
 import { OtlpObservability } from './lib/observability'
 import { McpHttpLive } from './mcp/http'
-import { OrgMiddlewareLive } from './middleware/org'
+import { OrgMiddlewareLive, resolveSystemOrg } from './middleware/org'
 import { SessionMiddlewareLive } from './middleware/session'
 import { CalendarService } from './services/calendar'
 import { CompanyService } from './services/companies'
@@ -107,9 +107,10 @@ const TIMELINE_STATUS_FOR_EVENT: Record<
 
 // ResearchEventSink runs out-of-band of an HTTP request — research runs
 // are kicked off by users but progress events fire later, sometimes from
-// background fibres. Recover the active org from the research_run row and
-// provide CurrentOrg manually so org-scoped fan-out (webhooks, timeline)
-// can reach the right tables.
+// background fibres. Recover the org (and originating user) from the
+// research_run row and enter app_user scope via resolveSystemOrg, so the
+// org-scoped fan-out (webhooks, timeline) writes under RLS like a request
+// instead of relying on the owner connection's bypass.
 const ResearchEventSinkLive = Layer.effect(
 	ResearchEventSink,
 	Effect.gen(function* () {
@@ -128,44 +129,58 @@ const ResearchEventSinkLive = Layer.effect(
 					}
 					const rows = yield* sql<{
 						organizationId: string
+						createdBy: string | null
 						query: string
 						briefMd: string | null
 					}>`
-						SELECT organization_id, query, brief_md
+						SELECT organization_id, created_by, query, brief_md
 						FROM research_runs
 						WHERE id = ${researchId} LIMIT 1
 					`
 					const [run] = rows
 					if (!run) return
-					const orgScope: { id: string; name: string; slug: string } = {
-						id: run.organizationId,
-						name: '',
-						slug: '',
-					}
-					yield* webhooks
-						.fire(event, payload)
-						.pipe(Effect.provideService(CurrentOrg, orgScope))
 					const status = TIMELINE_STATUS_FOR_EVENT[event] ?? null
-					if (!status) return
-					const linkRows = yield* sql<{ subjectId: string }>`
-						SELECT subject_id FROM research_links
-						WHERE research_id = ${researchId}
-						  AND subject_table = 'companies'
-						  AND link_kind = 'input'
-						LIMIT 1
-					`
-					const companyId = linkRows[0]?.subjectId ?? null
-					yield* timeline
-						.record(
-							new ResearchRunCompleted({
-								researchRunId: researchId,
-								companyId,
-								summary: run.briefMd ?? run.query,
-								status,
-								occurredAt: new Date(),
-							}),
-						)
-						.pipe(Effect.provideService(CurrentOrg, orgScope))
+
+					// Fan out as the system actor: load the real org and enter
+					// app_user scope so the timeline write passes RLS like a
+					// request would, instead of leaning on the owner connection's
+					// bypass. webhooks.fire forks its own delivery, so it rides
+					// CurrentOrg (now a real name/slug) but escapes the per-tx GUC.
+					yield* resolveSystemOrg(sql, run.organizationId, {
+						userId: run.createdBy ?? undefined,
+					})(
+						Effect.gen(function* () {
+							yield* webhooks.fire(event, payload)
+							if (!status) return
+							const linkRows = yield* sql<{ subjectId: string }>`
+								SELECT subject_id FROM research_links
+								WHERE research_id = ${researchId}
+								  AND subject_table = 'companies'
+								  AND link_kind = 'input'
+								LIMIT 1
+							`
+							yield* timeline.record(
+								new ResearchRunCompleted({
+									researchRunId: researchId,
+									companyId: linkRows[0]?.subjectId ?? null,
+									summary: run.briefMd ?? run.query,
+									status,
+									occurredAt: new Date(),
+								}),
+							)
+						}),
+					).pipe(
+						// Org deleted between run completion and fan-out: skip
+						// rather than crash, mirroring the missing-run return above.
+						Effect.catchTag('SystemOrgNotFound', e =>
+							Effect.logWarning('research fan-out skipped: org not found').pipe(
+								Effect.annotateLogs({
+									event: 'research.fanout.unknown_org',
+									orgId: e.orgId,
+								}),
+							),
+						),
+					)
 				}).pipe(Effect.orDie),
 		})
 	}),
