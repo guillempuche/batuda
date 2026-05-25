@@ -3,7 +3,6 @@ import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import { SqlClient } from 'effect/unstable/sql'
 
 import {
-	BadRequest,
 	BatudaApi,
 	Conflict,
 	NotFound,
@@ -172,108 +171,16 @@ export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 					),
 				),
 			)
-			.handle('complete', _ =>
-				Effect.gen(function* () {
-					const rows = yield* sql<TaskRow>`
-						UPDATE tasks SET
-							status = 'done',
-							completed_at = COALESCE(completed_at, now()),
-							updated_at = now()
-						WHERE id = ${_.params.id} RETURNING *
-					`
-					if (rows.length === 0)
-						return yield* new NotFound({ entity: 'task', id: _.params.id })
-					return rows[0]
-				}).pipe(
-					Effect.catch(e =>
-						e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
-					),
-				),
-			)
-			.handle('reopen', _ =>
-				Effect.gen(function* () {
-					const rows = yield* sql<TaskRow>`
-						UPDATE tasks SET
-							status = 'open',
-							completed_at = NULL,
-							updated_at = now()
-						WHERE id = ${_.params.id} RETURNING *
-					`
-					if (rows.length === 0)
-						return yield* new NotFound({ entity: 'task', id: _.params.id })
-					return rows[0]
-				}).pipe(
-					Effect.catch(e =>
-						e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
-					),
-				),
-			)
-			.handle('cancel', _ =>
-				Effect.gen(function* () {
-					const current = yield* sql<TaskRow>`
-						SELECT * FROM tasks WHERE id = ${_.params.id} LIMIT 1
-					`
-					const existing = current[0]
-					if (!existing)
-						return yield* new NotFound({ entity: 'task', id: _.params.id })
-					if (existing.status === 'done')
-						return yield* new Conflict({ message: 'cannot_cancel_done_task' })
-					const rows = yield* sql`
-						UPDATE tasks SET
-							status = 'cancelled',
-							completed_at = NULL,
-							updated_at = now()
-						WHERE id = ${_.params.id} RETURNING *
-					`
-					return rows[0]
-				}).pipe(
-					Effect.catch(e =>
-						e._tag === 'NotFound' || e._tag === 'Conflict'
-							? Effect.fail(e)
-							: Effect.die(e),
-					),
-				),
-			)
+			.handle('complete', _ => taskService.complete(_.params.id))
+			.handle('reopen', _ => taskService.reopen(_.params.id))
+			.handle('cancel', _ => taskService.cancel(_.params.id))
 			.handle('snooze', _ =>
-				Effect.gen(function* () {
-					const until = DateTime.toDateUtc(_.payload.until)
-					if (until.getTime() <= Date.now())
-						return yield* new BadRequest({ message: 'until_must_be_future' })
-					const rows = yield* sql<TaskRow>`
-						UPDATE tasks SET
-							snoozed_until = ${until},
-							updated_at = now()
-						WHERE id = ${_.params.id} RETURNING *
-					`
-					if (rows.length === 0)
-						return yield* new NotFound({ entity: 'task', id: _.params.id })
-					return rows[0]
-				}).pipe(
-					Effect.catch(e =>
-						e._tag === 'NotFound' || e._tag === 'BadRequest'
-							? Effect.fail(e)
-							: Effect.die(e),
-					),
-				),
+				taskService.snooze(_.params.id, DateTime.toDateUtc(_.payload.until)),
 			)
 			.handle('reschedule', _ =>
-				Effect.gen(function* () {
-					const dueAt = _.payload.dueAt
-						? DateTime.toDateUtc(_.payload.dueAt)
-						: null
-					const rows = yield* sql<TaskRow>`
-						UPDATE tasks SET
-							due_at = ${dueAt},
-							updated_at = now()
-						WHERE id = ${_.params.id} RETURNING *
-					`
-					if (rows.length === 0)
-						return yield* new NotFound({ entity: 'task', id: _.params.id })
-					return rows[0]
-				}).pipe(
-					Effect.catch(e =>
-						e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
-					),
+				taskService.reschedule(
+					_.params.id,
+					_.payload.dueAt ? DateTime.toDateUtc(_.payload.dueAt) : null,
 				),
 			)
 			.handle('bulkComplete', _ =>

@@ -259,6 +259,108 @@ describe('TaskService.list', () => {
 	})
 })
 
+// Runs a TaskService method as app_user and reports the failure tag (or null
+// on success) — lets the transition guards assert their tagged errors without
+// unwrapping Effect causes.
+const attempt = (
+	org: string,
+	body: Effect.Effect<unknown, unknown, CurrentOrg | TaskService>,
+): Promise<{ failedWith: string | null }> => {
+	const deps = Layer.mergeAll(
+		TaskService.layer,
+		Layer.succeed(CurrentOrg, { id: org, name: 'fixture', slug: 'fixture' }),
+	).pipe(Layer.provideMerge(PgLive))
+
+	return Effect.gen(function* () {
+		const sql = yield* SqlClient.SqlClient
+		return yield* sql.withTransaction(
+			Effect.gen(function* () {
+				yield* sql`SET LOCAL ROLE app_user`
+				yield* sql`SELECT set_config('app.current_org_id', ${org}, true)`
+				return yield* body.pipe(
+					Effect.match({
+						onFailure: e => ({
+							failedWith: (e as { _tag?: string })._tag ?? 'error',
+						}),
+						onSuccess: () => ({ failedWith: null as string | null }),
+					}),
+				)
+			}),
+		)
+	}).pipe(Effect.provide(deps), Effect.runPromise)
+}
+
+const seedTask = async (data: Record<string, unknown>): Promise<string> => {
+	const rows = (await createWith(tallerOrgId, tallerOrgId, {
+		type: 'follow_up',
+		title: FIXTURE_TITLE,
+		...data,
+	})) as ReadonlyArray<{ id: string }>
+	const row = rows[0]
+	if (!row) throw new Error('fixture task was not created')
+	return row.id
+}
+
+describe('TaskService transitions', () => {
+	describe('cancel', () => {
+		it('should reject cancelling a task that is already done', async () => {
+			// GIVEN a done task
+			const id = await seedTask({ status: 'done', completedAt: new Date() })
+
+			// WHEN cancelling it
+			const result = await attempt(
+				tallerOrgId,
+				Effect.gen(function* () {
+					const tasks = yield* TaskService
+					return yield* tasks.cancel(id)
+				}),
+			)
+
+			// THEN it is rejected with Conflict (reopen it first to cancel)
+			expect(result.failedWith).toBe('Conflict')
+			// [apps/server/src/services/tasks.ts — cancel done-guard]
+		})
+	})
+
+	describe('snooze', () => {
+		it('should reject a snooze timer in the past', async () => {
+			// GIVEN an open task
+			const id = await seedTask({ status: 'open' })
+
+			// WHEN snoozing it to a past timestamp
+			const result = await attempt(
+				tallerOrgId,
+				Effect.gen(function* () {
+					const tasks = yield* TaskService
+					return yield* tasks.snooze(id, new Date(Date.now() - 60_000))
+				}),
+			)
+
+			// THEN it is rejected with BadRequest
+			expect(result.failedWith).toBe('BadRequest')
+			// [apps/server/src/services/tasks.ts — snooze future guard]
+		})
+	})
+
+	describe('complete', () => {
+		it('should report NotFound for a missing task id', async () => {
+			// GIVEN an id that does not exist
+			// WHEN completing it
+			const result = await attempt(
+				tallerOrgId,
+				Effect.gen(function* () {
+					const tasks = yield* TaskService
+					return yield* tasks.complete(randomUUID())
+				}),
+			)
+
+			// THEN it fails with NotFound
+			expect(result.failedWith).toBe('NotFound')
+			// [apps/server/src/services/tasks.ts — complete NotFound]
+		})
+	})
+})
+
 describe('tasks organization_id contract', () => {
 	const asAppUser = async <T>(
 		org: string,

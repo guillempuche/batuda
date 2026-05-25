@@ -2,7 +2,7 @@ import { Effect, Layer, ServiceMap } from 'effect'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { CurrentOrg } from '@batuda/controllers'
+import { BadRequest, Conflict, CurrentOrg, NotFound } from '@batuda/controllers'
 
 export interface TaskFilters {
 	readonly companyId?: string | undefined
@@ -106,6 +106,97 @@ export class TaskService extends ServiceMap.Service<TaskService>()(
 							ORDER BY ${order}
 							LIMIT ${page.limit} OFFSET ${page.offset}
 						`
+					}),
+
+				complete: (id: string) =>
+					Effect.gen(function* () {
+						const currentOrg = yield* CurrentOrg
+						const rows = yield* sql<{ id: string }>`
+							UPDATE tasks SET
+								status = 'done',
+								completed_at = COALESCE(completed_at, now()),
+								updated_at = now()
+							WHERE id = ${id} AND organization_id = ${currentOrg.id}
+							RETURNING *
+						`.pipe(Effect.orDie)
+						const row = rows[0]
+						if (!row) return yield* new NotFound({ entity: 'task', id })
+						return row
+					}),
+
+				reopen: (id: string) =>
+					Effect.gen(function* () {
+						const currentOrg = yield* CurrentOrg
+						const rows = yield* sql<{ id: string }>`
+							UPDATE tasks SET
+								status = 'open',
+								completed_at = NULL,
+								updated_at = now()
+							WHERE id = ${id} AND organization_id = ${currentOrg.id}
+							RETURNING *
+						`.pipe(Effect.orDie)
+						const row = rows[0]
+						if (!row) return yield* new NotFound({ entity: 'task', id })
+						return row
+					}),
+
+				cancel: (id: string) =>
+					Effect.gen(function* () {
+						const currentOrg = yield* CurrentOrg
+						const current = yield* sql<{ status: string }>`
+							SELECT status FROM tasks
+							WHERE id = ${id} AND organization_id = ${currentOrg.id}
+							LIMIT 1
+						`.pipe(Effect.orDie)
+						const existing = current[0]
+						if (!existing) return yield* new NotFound({ entity: 'task', id })
+						// A done task can't be cancelled — reopen it first. Enforced on
+						// both transports; the MCP tool previously no-op'd silently.
+						if (existing.status === 'done')
+							return yield* new Conflict({ message: 'cannot_cancel_done_task' })
+						// Clearing completed_at keeps the done ⇔ completed_at invariant:
+						// only status='done' may carry one (tasks_completed_at_matches_status).
+						const rows = yield* sql<{ id: string }>`
+							UPDATE tasks SET
+								status = 'cancelled',
+								completed_at = NULL,
+								updated_at = now()
+							WHERE id = ${id} AND organization_id = ${currentOrg.id}
+							RETURNING *
+						`.pipe(Effect.orDie)
+						const row = rows[0]
+						if (!row) return yield* new NotFound({ entity: 'task', id })
+						return row
+					}),
+
+				snooze: (id: string, until: Date) =>
+					Effect.gen(function* () {
+						// Reject past timers on both transports — a snooze into the past
+						// would resurface the task immediately.
+						if (until.getTime() <= Date.now())
+							return yield* new BadRequest({ message: 'until_must_be_future' })
+						const currentOrg = yield* CurrentOrg
+						const rows = yield* sql<{ id: string }>`
+							UPDATE tasks SET snoozed_until = ${until}, updated_at = now()
+							WHERE id = ${id} AND organization_id = ${currentOrg.id}
+							RETURNING *
+						`.pipe(Effect.orDie)
+						const row = rows[0]
+						if (!row) return yield* new NotFound({ entity: 'task', id })
+						return row
+					}),
+
+				reschedule: (id: string, dueAt: Date | null) =>
+					Effect.gen(function* () {
+						const currentOrg = yield* CurrentOrg
+						const rows = yield* sql<{ id: string }>`
+							UPDATE tasks SET due_at = ${dueAt}, updated_at = now()
+							WHERE id = ${id} AND organization_id = ${currentOrg.id}
+							RETURNING *
+						`.pipe(Effect.orDie)
+						const row = rows[0]
+						if (!row) return yield* new NotFound({ entity: 'task', id })
+						return row
 					}),
 			}
 		}),
