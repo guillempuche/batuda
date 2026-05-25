@@ -140,6 +140,7 @@ const CompleteTask = Tool.make('complete_task', {
 		'Mark a task as done (status=done, completed_at=now()). Idempotent — a second call on an already-done task is a no-op.',
 	parameters: Schema.Struct({ id: Schema.String }),
 	success: Schema.Unknown,
+	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Complete Task')
 	.annotate(Tool.Destructive, false)
@@ -151,6 +152,7 @@ const ReopenTask = Tool.make('reopen_task', {
 		'Re-open a done or cancelled task (status=open, completed_at=NULL). Idempotent — re-opening an already-open task leaves the row alone.',
 	parameters: Schema.Struct({ id: Schema.String }),
 	success: Schema.Unknown,
+	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Reopen Task')
 	.annotate(Tool.Destructive, false)
@@ -162,6 +164,7 @@ const CancelTask = Tool.make('cancel_task', {
 		'Cancel an open or in-progress task (status=cancelled). Rejects tasks whose status is already done. Use reopen_task first if you need to cancel a completed task.',
 	parameters: Schema.Struct({ id: Schema.String }),
 	success: Schema.Unknown,
+	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Cancel Task')
 	.annotate(Tool.Destructive, false)
@@ -169,12 +172,13 @@ const CancelTask = Tool.make('cancel_task', {
 
 const SnoozeTask = Tool.make('snooze_task', {
 	description:
-		'Hide a task from the active queue until `until` (ISO 8601 datetime). The row stays at status=open; list_tasks with include_snoozed=false filters it out while the timer is still in the future.',
+		'Hide a task from the active queue until `until` (ISO 8601 datetime). The row stays at status=open; list_tasks with include_snoozed=false filters it out while the timer is still in the future. `until` must be a future timestamp.',
 	parameters: Schema.Struct({
 		id: Schema.String,
 		until: Schema.String,
 	}),
 	success: Schema.Unknown,
+	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Snooze Task')
 	.annotate(Tool.Destructive, false)
@@ -188,6 +192,7 @@ const RescheduleTask = Tool.make('reschedule_task', {
 		due_at: Schema.NullOr(Schema.String),
 	}),
 	success: Schema.Unknown,
+	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Reschedule Task')
 	.annotate(Tool.Destructive, false)
@@ -328,68 +333,39 @@ export const TaskHandlersLive = TaskTools.toLayer(
 				}).pipe(Effect.orDie),
 
 			complete_task: ({ id }) =>
-				Effect.gen(function* () {
-					const rows = yield* sql`
-						UPDATE tasks SET
-							status = 'done',
-							completed_at = COALESCE(completed_at, now()),
-							updated_at = now()
-						WHERE id = ${id}
-						RETURNING *
-					`
-					return rows[0]
-				}).pipe(Effect.orDie),
+				taskService.complete(id).pipe(
+					Effect.catchTag('NotFound', () => Effect.succeed(null)),
+					Effect.orDie,
+				),
 
 			reopen_task: ({ id }) =>
-				Effect.gen(function* () {
-					const rows = yield* sql`
-						UPDATE tasks SET
-							status = 'open',
-							completed_at = NULL,
-							updated_at = now()
-						WHERE id = ${id}
-						RETURNING *
-					`
-					return rows[0]
-				}).pipe(Effect.orDie),
+				taskService.reopen(id).pipe(
+					Effect.catchTag('NotFound', () => Effect.succeed(null)),
+					Effect.orDie,
+				),
 
 			cancel_task: ({ id }) =>
-				Effect.gen(function* () {
-					const rows = yield* sql`
-						UPDATE tasks SET
-							status = 'cancelled',
-							updated_at = now()
-						WHERE id = ${id} AND status <> 'done'
-						RETURNING *
-					`
-					return rows[0]
-				}).pipe(Effect.orDie),
+				taskService.cancel(id).pipe(
+					Effect.catchTag('NotFound', () => Effect.succeed(null)),
+					Effect.orDie,
+				),
 
 			snooze_task: params =>
-				Effect.gen(function* () {
-					const until = new Date(params.until)
-					const rows = yield* sql`
-						UPDATE tasks SET
-							snoozed_until = ${until},
-							updated_at = now()
-						WHERE id = ${params.id}
-						RETURNING *
-					`
-					return rows[0]
-				}).pipe(Effect.orDie),
+				taskService.snooze(params.id, new Date(params.until)).pipe(
+					Effect.catchTag('NotFound', () => Effect.succeed(null)),
+					Effect.orDie,
+				),
 
 			reschedule_task: params =>
-				Effect.gen(function* () {
-					const due = params.due_at === null ? null : new Date(params.due_at)
-					const rows = yield* sql`
-						UPDATE tasks SET
-							due_at = ${due},
-							updated_at = now()
-						WHERE id = ${params.id}
-						RETURNING *
-					`
-					return rows[0]
-				}).pipe(Effect.orDie),
+				taskService
+					.reschedule(
+						params.id,
+						params.due_at === null ? null : new Date(params.due_at),
+					)
+					.pipe(
+						Effect.catchTag('NotFound', () => Effect.succeed(null)),
+						Effect.orDie,
+					),
 		}
 	}),
 )
