@@ -28,6 +28,35 @@ export function findUnsafeWildcardOrigin(
 	return null
 }
 
+/**
+ * Builds the absolute accept-invitation URL Better Auth redirects to after a
+ * magic-link verify. Takes the public origin explicitly so it can't drift
+ * with ALLOWED_ORIGINS ordering — reordering that list never retargets an
+ * invite link at the wrong product.
+ */
+export function buildInvitationCallbackURL(
+	publicUrl: string,
+	invitationId: string,
+): string {
+	return `${publicUrl.replace(/\/$/, '')}/accept-invitation/${invitationId}`
+}
+
+/**
+ * Returns an explanatory message if `publicUrl` is not one of
+ * `allowedOrigins`, else `null`. APP_PUBLIC_URL must be a trusted origin so
+ * the links the server mints can't point at a host it won't serve.
+ */
+export function findPublicUrlNotAllowed(
+	publicUrl: string,
+	allowedOrigins: ReadonlyArray<string>,
+): string | null {
+	if (allowedOrigins.includes(publicUrl)) return null
+	return (
+		`APP_PUBLIC_URL "${publicUrl}" is not one of ALLOWED_ORIGINS ` +
+		`[${allowedOrigins.join(', ')}]. List it there so the app trusts it.`
+	)
+}
+
 export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 	make: Effect.gen(function* () {
 		const DATABASE_URL = yield* Config.redacted('DATABASE_URL')
@@ -81,6 +110,24 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 				return Effect.succeed(patterns)
 			}),
 		)
+
+		// Canonical public origin for the links the server mints (invitation
+		// callback URLs). Required, no default — like BETTER_AUTH_BASE_URL — and
+		// validated to be one of ALLOWED_ORIGINS so an invite can't point at an
+		// origin the app doesn't trust. Decoupled from ALLOWED_ORIGINS ordering
+		// on purpose: reordering that list no longer moves invite links.
+		const APP_PUBLIC_URL = yield* Config.string('APP_PUBLIC_URL')
+		const publicUrlError = findPublicUrlNotAllowed(
+			APP_PUBLIC_URL,
+			ALLOWED_ORIGINS,
+		)
+		if (publicUrlError !== null) {
+			return yield* Effect.fail(
+				new Config.ConfigError(
+					new ConfigProvider.SourceError({ message: publicUrlError }),
+				),
+			)
+		}
 
 		// S3-compatible object storage. Same code path serves MinIO (local
 		// dev) and Cloudflare R2 (prod) — only the endpoint/credentials
@@ -156,6 +203,7 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 			BETTER_AUTH_INSECURE_COOKIES,
 			BETTER_AUTH_RATE_LIMIT,
 			ALLOWED_ORIGINS,
+			APP_PUBLIC_URL,
 			STORAGE_ENDPOINT,
 			STORAGE_REGION,
 			STORAGE_ACCESS_KEY_ID,

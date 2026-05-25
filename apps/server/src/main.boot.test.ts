@@ -24,8 +24,9 @@ const PORT = 34_040
 const env = {
 	NODE_ENV: 'production',
 	PORT: String(PORT),
-	// Local dev fixtures from `pnpm cli services up`.
-	DATABASE_URL: 'postgres://batuda:batuda-secret@localhost:5433/batuda',
+	// Local dev fixtures from `pnpm cli services up` (docker-compose sets
+	// POSTGRES_PASSWORD=batuda).
+	DATABASE_URL: 'postgres://batuda:batuda@localhost:5433/batuda',
 	STORAGE_ENDPOINT: 'http://localhost:9000',
 	STORAGE_REGION: 'auto',
 	STORAGE_ACCESS_KEY_ID: 'batuda',
@@ -34,7 +35,10 @@ const env = {
 	// Boot-time tags must be set; the actual auth flow isn't exercised.
 	BETTER_AUTH_SECRET: '00000000000000000000000000000000',
 	BETTER_AUTH_BASE_URL: `http://localhost:${PORT}`,
-	ALLOWED_ORIGINS: '',
+	// APP_PUBLIC_URL is required and validated ∈ ALLOWED_ORIGINS at boot, so
+	// these must be a consistent pair (was ALLOWED_ORIGINS='').
+	ALLOWED_ORIGINS: `http://localhost:${PORT}`,
+	APP_PUBLIC_URL: `http://localhost:${PORT}`,
 	EMAIL_CREDENTIAL_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
 	EMAIL_PROVIDER: 'local-inbox',
 	EMAIL_PROVIDER_TRANSACTIONAL: 'local',

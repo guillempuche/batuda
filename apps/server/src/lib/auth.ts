@@ -16,7 +16,7 @@ import { buildBetterAuthConfig } from '@batuda/auth'
 import { setPasswordRoute } from '../plugins/set-password-route'
 import { TransactionalEmailProvider } from '../services/transactional-email-provider'
 import { TransactionalEmailProviderLive } from '../services/transactional-email-provider-live'
-import { EnvVars } from './env'
+import { buildInvitationCallbackURL, EnvVars } from './env'
 
 export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 	make: Effect.gen(function* () {
@@ -134,15 +134,12 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 							// endpoint then redirects to that resolved URL — so a
 							// `/accept-invitation/...` relative path would land on
 							// `https://api.batuda.localhost/...` which the
-							// frontend can't serve. Use the first trusted origin
-							// (the public-facing app URL) as the prefix.
-							const frontendOrigin = env.ALLOWED_ORIGINS[0]
-							if (!frontendOrigin) {
-								throw new Error(
-									'No ALLOWED_ORIGINS configured; cannot build invitation callbackURL.',
-								)
-							}
-							const callbackURL = `${frontendOrigin.replace(/\/$/, '')}/accept-invitation/${data.id}`
+							// frontend can't serve. APP_PUBLIC_URL is the canonical
+							// app origin, validated ∈ ALLOWED_ORIGINS at boot.
+							const callbackURL = buildInvitationCallbackURL(
+								env.APP_PUBLIC_URL,
+								data.id,
+							)
 
 							if (!authHandle) {
 								throw new Error(
