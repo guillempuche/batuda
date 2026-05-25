@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { findUnsafeWildcardOrigin } from './env.js'
+import {
+	buildInvitationCallbackURL,
+	findPublicUrlNotAllowed,
+	findUnsafeWildcardOrigin,
+} from './env.js'
 
 // Locks in the safety guard that refuses to boot when ALLOWED_ORIGINS
 // includes a wildcard pattern whose suffix is *not* `.localhost`. Without
@@ -70,6 +74,77 @@ describe('findUnsafeWildcardOrigin', () => {
 			expect(
 				findUnsafeWildcardOrigin(['https://*.localhost.attacker.com']),
 			).toBe('https://*.localhost.attacker.com')
+		})
+	})
+})
+
+// The invitation callback URL is built from APP_PUBLIC_URL, not
+// ALLOWED_ORIGINS[0] — so reordering the trusted-origins list can't silently
+// retarget invite links. These lock the host the link points at.
+describe('buildInvitationCallbackURL', () => {
+	describe('with a public URL and an invitation id', () => {
+		it('should build an absolute accept-invitation URL', () => {
+			// GIVEN the canonical app origin and an invitation id
+			// WHEN the callback URL is built
+			// THEN it is <origin>/accept-invitation/<id>
+			// [lib/env.ts — buildInvitationCallbackURL]
+			expect(buildInvitationCallbackURL('https://batuda.co', 'inv-1')).toBe(
+				'https://batuda.co/accept-invitation/inv-1',
+			)
+		})
+
+		it('should trim a trailing slash on the origin', () => {
+			// GIVEN a public URL with a trailing slash
+			// WHEN the callback URL is built
+			// THEN the slash is collapsed so the path isn't doubled
+			// [lib/env.ts — replace(/\/$/, '')]
+			expect(buildInvitationCallbackURL('https://batuda.co/', 'inv-2')).toBe(
+				'https://batuda.co/accept-invitation/inv-2',
+			)
+		})
+
+		it('should target the given origin regardless of any origins order', () => {
+			// GIVEN the builder takes the origin directly (not ALLOWED_ORIGINS[0])
+			// WHEN called with a second-listed product origin
+			// THEN the link targets exactly that origin — reordering can't move it
+			// [lib/env.ts — origin is a parameter, not positional]
+			expect(buildInvitationCallbackURL('https://app.batuda.co', 'inv-3')).toBe(
+				'https://app.batuda.co/accept-invitation/inv-3',
+			)
+		})
+	})
+})
+
+// APP_PUBLIC_URL must be one of ALLOWED_ORIGINS or the server refuses to boot,
+// so an invite can't point at a host the app doesn't actually trust.
+describe('findPublicUrlNotAllowed', () => {
+	describe('when the public URL is one of the allowed origins', () => {
+		it('should return null', () => {
+			// GIVEN APP_PUBLIC_URL listed in ALLOWED_ORIGINS
+			// WHEN the validator runs
+			// THEN it passes (null)
+			// [lib/env.ts — includes() short-circuit]
+			expect(
+				findPublicUrlNotAllowed('https://batuda.co', [
+					'https://admin.batuda.co',
+					'https://batuda.co',
+				]),
+			).toBeNull()
+		})
+	})
+
+	describe('when the public URL is not an allowed origin', () => {
+		it('should return a message so boot fails', () => {
+			// GIVEN APP_PUBLIC_URL absent from ALLOWED_ORIGINS
+			// WHEN the validator runs
+			// THEN it returns a non-null message that EnvVars turns into a boot
+			//   ConfigError
+			// [lib/env.ts — non-membership branch]
+			const message = findPublicUrlNotAllowed('https://evil.example', [
+				'https://batuda.co',
+			])
+			expect(message).not.toBeNull()
+			expect(message).toContain('APP_PUBLIC_URL')
 		})
 	})
 })

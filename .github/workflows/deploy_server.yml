@@ -121,6 +121,7 @@ jobs:
                 -e BETTER_AUTH_SECRET="${{ secrets.BETTER_AUTH_SECRET }}" \
                 -e BETTER_AUTH_BASE_URL="${{ vars.BETTER_AUTH_BASE_URL }}" \
                 -e ALLOWED_ORIGINS="${{ vars.ALLOWED_ORIGINS }}" \
+                -e APP_PUBLIC_URL="${{ vars.APP_PUBLIC_URL }}" \
                 -e STORAGE_ENDPOINT="${{ vars.STORAGE_ENDPOINT }}" \
                 -e STORAGE_REGION="${{ vars.STORAGE_REGION }}" \
                 -e STORAGE_ACCESS_KEY_ID="${{ secrets.STORAGE_ACCESS_KEY_ID }}" \
@@ -181,6 +182,7 @@ jobs:
                 -e BETTER_AUTH_SECRET="${{ secrets.BETTER_AUTH_SECRET }}" \
                 -e BETTER_AUTH_BASE_URL="${{ vars.BETTER_AUTH_BASE_URL }}" \
                 -e ALLOWED_ORIGINS="${{ vars.ALLOWED_ORIGINS }}" \
+                -e APP_PUBLIC_URL="${{ vars.APP_PUBLIC_URL }}" \
                 -e STORAGE_ENDPOINT="${{ vars.STORAGE_ENDPOINT }}" \
                 -e STORAGE_REGION="${{ vars.STORAGE_REGION }}" \
                 -e STORAGE_ACCESS_KEY_ID="${{ secrets.STORAGE_ACCESS_KEY_ID }}" \
