@@ -6,6 +6,10 @@ import { CurrentOrg } from '@batuda/controllers'
 
 import { TaskService } from '../../services/tasks'
 
+// MCP writes are agent-driven; task_events records actor_kind='agent' with no
+// individual user id.
+const AGENT_ACTOR = { id: null, kind: 'agent' as const }
+
 // ── Shared literals ──────────────────────────────────────────────
 // The shapes here mirror the CHECK constraints in 0001_initial.ts.
 // Keeping them as exported Schema.Literals rather than free-form
@@ -227,25 +231,28 @@ export const TaskHandlersLive = TaskTools.toLayer(
 		return {
 			create_task: params =>
 				Effect.gen(function* () {
-					const rows = yield* taskService.create({
-						title: params.title,
-						type: params.type,
-						companyId: params.company_id ?? null,
-						contactId: params.contact_id ?? null,
-						notes: params.notes ?? null,
-						dueAt: asDate(params.due_at ?? null),
-						priority: params.priority ?? 'normal',
-						source: params.source ?? 'agent',
-						assigneeId: params.assignee_id ?? null,
-						linkedInteractionId: params.linked_interaction_id ?? null,
-						linkedCalendarEventId: params.linked_calendar_event_id ?? null,
-						linkedThreadLinkId: params.linked_thread_link_id ?? null,
-						linkedProposalId: params.linked_proposal_id ?? null,
-						metadata:
-							params.metadata !== undefined && params.metadata !== null
-								? JSON.stringify(params.metadata)
-								: null,
-					})
+					const rows = yield* taskService.create(
+						{
+							title: params.title,
+							type: params.type,
+							companyId: params.company_id ?? null,
+							contactId: params.contact_id ?? null,
+							notes: params.notes ?? null,
+							dueAt: asDate(params.due_at ?? null),
+							priority: params.priority ?? 'normal',
+							source: params.source ?? 'agent',
+							assigneeId: params.assignee_id ?? null,
+							linkedInteractionId: params.linked_interaction_id ?? null,
+							linkedCalendarEventId: params.linked_calendar_event_id ?? null,
+							linkedThreadLinkId: params.linked_thread_link_id ?? null,
+							linkedProposalId: params.linked_proposal_id ?? null,
+							metadata:
+								params.metadata !== undefined && params.metadata !== null
+									? JSON.stringify(params.metadata)
+									: null,
+						},
+						AGENT_ACTOR,
+					)
 					return rows[0]
 				}).pipe(Effect.orDie),
 
@@ -333,19 +340,19 @@ export const TaskHandlersLive = TaskTools.toLayer(
 				}).pipe(Effect.orDie),
 
 			complete_task: ({ id }) =>
-				taskService.complete(id).pipe(
+				taskService.complete(id, AGENT_ACTOR).pipe(
 					Effect.catchTag('NotFound', () => Effect.succeed(null)),
 					Effect.orDie,
 				),
 
 			reopen_task: ({ id }) =>
-				taskService.reopen(id).pipe(
+				taskService.reopen(id, AGENT_ACTOR).pipe(
 					Effect.catchTag('NotFound', () => Effect.succeed(null)),
 					Effect.orDie,
 				),
 
 			cancel_task: ({ id }) =>
-				taskService.cancel(id).pipe(
+				taskService.cancel(id, AGENT_ACTOR).pipe(
 					Effect.catchTag('NotFound', () => Effect.succeed(null)),
 					Effect.orDie,
 				),

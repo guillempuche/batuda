@@ -84,27 +84,32 @@ export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 			)
 			.handle('create', _ =>
 				Effect.gen(function* () {
-					const { userId: actorId } = yield* SessionContext
-					const rows = yield* taskService.create({
-						company_id: _.payload.companyId ?? null,
-						contact_id: _.payload.contactId ?? null,
-						type: _.payload.type,
-						title: _.payload.title,
-						notes: _.payload.notes ?? null,
-						status: _.payload.status ?? 'open',
-						source: _.payload.source ?? 'user',
-						priority: _.payload.priority ?? 'normal',
-						assignee_id: _.payload.assigneeId ?? actorId,
-						actor_id: actorId,
-						due_at: _.payload.dueAt
-							? DateTime.toDateUtc(_.payload.dueAt)
-							: null,
-						linked_interaction_id: _.payload.linkedInteractionId ?? null,
-						linked_calendar_event_id: _.payload.linkedCalendarEventId ?? null,
-						linked_thread_link_id: _.payload.linkedThreadLinkId ?? null,
-						linked_proposal_id: _.payload.linkedProposalId ?? null,
-						metadata: _.payload.metadata ?? null,
-					})
+					const { userId: actorId, isAgent } = yield* SessionContext
+					const rows = yield* taskService.create(
+						{
+							company_id: _.payload.companyId ?? null,
+							contact_id: _.payload.contactId ?? null,
+							type: _.payload.type,
+							title: _.payload.title,
+							notes: _.payload.notes ?? null,
+							status: _.payload.status ?? 'open',
+							source: _.payload.source ?? 'user',
+							priority: _.payload.priority ?? 'normal',
+							assignee_id: _.payload.assigneeId ?? actorId,
+							// The tasks column; the audit actor for task_events is the
+							// second argument below.
+							actor_id: actorId,
+							due_at: _.payload.dueAt
+								? DateTime.toDateUtc(_.payload.dueAt)
+								: null,
+							linked_interaction_id: _.payload.linkedInteractionId ?? null,
+							linked_calendar_event_id: _.payload.linkedCalendarEventId ?? null,
+							linked_thread_link_id: _.payload.linkedThreadLinkId ?? null,
+							linked_proposal_id: _.payload.linkedProposalId ?? null,
+							metadata: _.payload.metadata ?? null,
+						},
+						{ id: actorId, kind: isAgent ? 'agent' : 'user' },
+					)
 					yield* Effect.logInfo('Task created').pipe(
 						Effect.annotateLogs({
 							event: 'task.created',
@@ -171,9 +176,33 @@ export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 					),
 				),
 			)
-			.handle('complete', _ => taskService.complete(_.params.id))
-			.handle('reopen', _ => taskService.reopen(_.params.id))
-			.handle('cancel', _ => taskService.cancel(_.params.id))
+			.handle('complete', _ =>
+				Effect.gen(function* () {
+					const { userId, isAgent } = yield* SessionContext
+					return yield* taskService.complete(_.params.id, {
+						id: userId,
+						kind: isAgent ? 'agent' : 'user',
+					})
+				}),
+			)
+			.handle('reopen', _ =>
+				Effect.gen(function* () {
+					const { userId, isAgent } = yield* SessionContext
+					return yield* taskService.reopen(_.params.id, {
+						id: userId,
+						kind: isAgent ? 'agent' : 'user',
+					})
+				}),
+			)
+			.handle('cancel', _ =>
+				Effect.gen(function* () {
+					const { userId, isAgent } = yield* SessionContext
+					return yield* taskService.cancel(_.params.id, {
+						id: userId,
+						kind: isAgent ? 'agent' : 'user',
+					})
+				}),
+			)
 			.handle('snooze', _ =>
 				taskService.snooze(_.params.id, DateTime.toDateUtc(_.payload.until)),
 			)
