@@ -20,37 +20,46 @@ interface OrgRow {
 }
 
 /**
- * Run an effect with `CurrentOrg` provided AND the matching
- * `app.current_org_id` GUC set on the connection. Both values must match —
- * RLS would catch drift but the cost of debugging "row level security
- * denied" is high, so they're stitched together here.
+ * Enter the per-request org scope on the SQL connection, then run `effect`
+ * inside it. In one transaction: `SET LOCAL ROLE app_user`, set the
+ * `app.current_org_id` GUC (and `app.current_user_id` when a user is
+ * present), and provide `CurrentOrg`. The role + GUCs release on
+ * COMMIT/ROLLBACK with the transaction's scope, so they follow the request
+ * exactly. Effect's SqlClient nests handler-side `withTransaction` calls as
+ * savepoints, and `SET LOCAL` releases alongside the per-tx Scope, so the
+ * GUC scope tracks the request scope. SQL faults die as a defect, keeping
+ * callers' error unions free of `SqlError`.
  *
- * For HTTP routes the same dance lives inline inside `OrgMiddlewareLive`
- * (closed over its own `sql` binding); this exported helper exists so
- * non-HTTP entry points (webhook handlers, MCP tools, future cron jobs)
- * can reuse the contract without re-deriving it.
+ * The HTTP org middleware, the MCP auth middleware, and the cal.com webhook
+ * all route their tx-tail through here so the role + GUC contract can't
+ * drift between transports; each keeps its own session prologue and error
+ * rendering on top.
+ *
+ * `userId` is optional: the webhook acts for an org with no signed-in user,
+ * so the user GUC is left unset rather than written as an empty string — an
+ * empty string reads back as `''` (not NULL) and could match an empty-keyed
+ * row under a future user-scoped policy.
  */
-export const provideOrg =
-	(org: {
-		readonly id: string
-		readonly name: string
-		readonly slug: string
-	}) =>
-	<A, E, R>(effect: Effect.Effect<A, E, R | CurrentOrg>) =>
-		Effect.gen(function* () {
-			const sql = yield* SqlClient.SqlClient
-			return yield* sql.withTransaction(
+export const enterOrgScope =
+	(
+		// Passed in (not pulled from context) so the wrapped effect's R stays
+		// free of SqlClient — the HTTP middleware boundary only admits the
+		// services it provides. Every caller already holds a layer-level binding.
+		sql: SqlClient.SqlClient,
+		scope: { readonly org: OrgRow; readonly userId?: string | undefined },
+	) =>
+	<A, E, R>(effect: Effect.Effect<A, E, R>) =>
+		sql
+			.withTransaction(
 				Effect.gen(function* () {
 					yield* sql`SET LOCAL ROLE app_user`
-					yield* sql`SELECT set_config('app.current_org_id', ${org.id}, true)`
-					return yield* Effect.provideService(effect, CurrentOrg, org)
+					yield* sql`SELECT set_config('app.current_org_id', ${scope.org.id}, true)`
+					if (scope.userId !== undefined)
+						yield* sql`SELECT set_config('app.current_user_id', ${scope.userId}, true)`
+					return yield* Effect.provideService(effect, CurrentOrg, scope.org)
 				}),
 			)
-		}) as Effect.Effect<
-			A,
-			E | import('effect/unstable/sql').SqlError.SqlError,
-			Exclude<R, CurrentOrg> | SqlClient.SqlClient
-		>
+			.pipe(Effect.orDie) as Effect.Effect<A, never, Exclude<R, CurrentOrg>>
 
 /**
  * Implementing Layer for the `OrgMiddleware` Tag declared in
@@ -66,16 +75,8 @@ export const provideOrg =
  *   3. Reject with `Forbidden` if the session has no `activeOrganizationId`.
  *   4. Look up the organization row by id — slug + name are read alongside
  *      so route handlers can build org-scoped URLs without a second query.
- *   5. Open a transaction and `SET LOCAL ROLE app_user` + `SELECT
- *      set_config('app.current_org_id', <id>, true)` so RLS policies engage
- *      for the rest of the handler. Effect's SqlClient cleanly nests handler-
- *      side `withTransaction` calls as savepoints (per
- *      `docs/repos/effect/packages/effect/src/unstable/sql/SqlClient.ts:205-209`),
- *      and `SET LOCAL` releases on COMMIT/ROLLBACK alongside the per-tx
- *      Scope close (line 244), so the GUC scope follows the request scope
- *      exactly. Pattern mirrors the mail-worker's per-batch wrapper at
- *      `apps/mail-worker/src/ingest.ts:49-74`.
- *   6. Provide `CurrentOrg` to downstream handlers.
+ *   5. Hand off to `enterOrgScope` — role + both GUCs + `CurrentOrg` inside
+ *      one transaction; see its doc for the savepoint/scope mechanics.
  */
 export const OrgMiddlewareLive = Layer.effect(
 	OrgMiddleware,
@@ -132,28 +133,14 @@ export const OrgMiddlewareLive = Layer.effect(
 					})
 				}
 
-				// Run the rest of the request inside a transaction so SET LOCAL
-				// ROLE + the two GUCs (org id + user id) live for exactly the
-				// request's scope and release on COMMIT/ROLLBACK. SqlError
-				// surfaces as a die so the middleware's declared error union
-				// stays { Unauthorized | Forbidden }. `app.current_user_id`
-				// is set alongside `app.current_org_id` so future per-user
-				// RLS policies (e.g. on `member` to scope membership reads
-				// by self) don't need a second middleware change.
-				return yield* sql
-					.withTransaction(
-						Effect.gen(function* () {
-							yield* sql`SET LOCAL ROLE app_user`
-							yield* sql`SELECT set_config('app.current_org_id', ${row.id}, true)`
-							yield* sql`SELECT set_config('app.current_user_id', ${result.user.id}, true)`
-							return yield* Effect.provideService(effect, CurrentOrg, {
-								id: row.id,
-								name: row.name,
-								slug: row.slug,
-							})
-						}),
-					)
-					.pipe(Effect.orDie)
+				// Enter the org scope (role + both GUCs + CurrentOrg) for the
+				// rest of the request via the shared combinator, keeping the
+				// HTTP and MCP transports in lockstep. The user GUC backs
+				// future per-user RLS (e.g. scoping membership reads to self).
+				return yield* enterOrgScope(sql, {
+					org: row,
+					userId: result.user.id,
+				})(effect)
 			})
 	}),
 ).pipe(Layer.provide(Auth.layer))
