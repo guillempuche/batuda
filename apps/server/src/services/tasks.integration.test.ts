@@ -93,7 +93,7 @@ const createWith = (
 			Effect.gen(function* () {
 				yield* sql`SET LOCAL ROLE app_user`
 				yield* sql`SELECT set_config('app.current_org_id', ${gucOrg}, true)`
-				return yield* tasks.create(data)
+				return yield* tasks.create(data, { id: null, kind: 'user' })
 			}),
 		)
 	}).pipe(Effect.provide(deps), Effect.runPromise)
@@ -312,7 +312,7 @@ describe('TaskService transitions', () => {
 				tallerOrgId,
 				Effect.gen(function* () {
 					const tasks = yield* TaskService
-					return yield* tasks.cancel(id)
+					return yield* tasks.cancel(id, { id: null, kind: 'user' })
 				}),
 			)
 
@@ -350,7 +350,7 @@ describe('TaskService transitions', () => {
 				tallerOrgId,
 				Effect.gen(function* () {
 					const tasks = yield* TaskService
-					return yield* tasks.complete(randomUUID())
+					return yield* tasks.complete(randomUUID(), { id: null, kind: 'user' })
 				}),
 			)
 
@@ -358,6 +358,55 @@ describe('TaskService transitions', () => {
 			expect(result.failedWith).toBe('NotFound')
 			// [apps/server/src/services/tasks.ts — complete NotFound]
 		})
+	})
+})
+
+describe('TaskService task_events', () => {
+	it('should record a created event and a status-change event for a task', async () => {
+		// GIVEN a freshly created task (createWith records it as a 'user' actor)
+		const created = (await createWith(tallerOrgId, tallerOrgId, {
+			type: 'follow_up',
+			title: FIXTURE_TITLE,
+			status: 'open',
+		})) as ReadonlyArray<{ id: string }>
+		const taskId = created[0]?.id
+		if (!taskId) throw new Error('fixture task was not created')
+
+		// WHEN it is completed through the service as an agent
+		await attempt(
+			tallerOrgId,
+			Effect.gen(function* () {
+				const tasks = yield* TaskService
+				return yield* tasks.complete(taskId, { id: null, kind: 'agent' })
+			}),
+		)
+
+		// THEN both events are on the audit trail GET /tasks/:id/events reads
+		const client = await pool.connect()
+		try {
+			await client.query('BEGIN')
+			await client.query('SET LOCAL ROLE app_user')
+			await client.query(`SELECT set_config('app.current_org_id', $1, true)`, [
+				tallerOrgId,
+			])
+			const events = await client.query<{
+				change: unknown
+				actor_kind: string
+			}>(
+				`SELECT change, actor_kind FROM task_events WHERE task_id = $1 ORDER BY at ASC`,
+				[taskId],
+			)
+			await client.query('ROLLBACK')
+
+			expect(events.rows).toHaveLength(2)
+			expect(events.rows[0]?.change).toEqual({ kind: 'created' })
+			expect(events.rows[0]?.actor_kind).toBe('user')
+			expect(events.rows[1]?.change).toEqual({ status: ['open', 'done'] })
+			expect(events.rows[1]?.actor_kind).toBe('agent')
+			// [apps/server/src/services/tasks.ts — recordEvent]
+		} finally {
+			client.release()
+		}
 	})
 })
 
