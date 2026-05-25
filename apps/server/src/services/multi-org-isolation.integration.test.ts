@@ -603,6 +603,188 @@ describe('multi-org isolation', () => {
 		})
 	})
 
+	describe('Better Auth org-table RLS (0005)', () => {
+		// 0001_initial left member/invitation without RLS while granting
+		// app_user SELECT on them, so a predicate-less read on the request
+		// path leaked every org's membership. 0005 adds org-isolation policies
+		// (ENABLE, not FORCE) so app_user is filtered while Better Auth's owner
+		// pool — which runs sign-in, org-switch, and invite-accept — bypasses.
+
+		describe('member', () => {
+			describe('when role=app_user is scoped to one org', () => {
+				it('should expose only that org members', async () => {
+					// GIVEN the seed gives each org its own members
+					// WHEN a predicate-less SELECT runs as app_user scoped to taller
+					// THEN only taller's members are visible — the policy fires
+					//   regardless of the absent WHERE clause
+					// [migrations/0005_auth_table_rls.ts — org_isolation_member]
+					await withSuper(async client => {
+						const owned = await client.query<{ n: number }>(
+							`SELECT count(*)::int AS n FROM member WHERE "organizationId" = $1`,
+							[ctx.tallerOrgId],
+						)
+						const expected = (owned.rows[0] as { n: number }).n
+						await client.query(`SET LOCAL ROLE app_user`)
+						await client.query(
+							`SET LOCAL app.current_org_id = '${ctx.tallerOrgId}'`,
+						)
+						const visible = await client.query<{ organizationId: string }>(
+							`SELECT "organizationId" FROM member`,
+						)
+						expect(expected).toBeGreaterThan(0)
+						expect(visible.rows.length).toBe(expected)
+						expect(
+							visible.rows.every(r => r.organizationId === ctx.tallerOrgId),
+						).toBe(true)
+					})
+				})
+			})
+
+			describe('when role=app_user and current_org_id is unset', () => {
+				it('should see zero members (fail-closed)', async () => {
+					// GIVEN members exist for every org
+					// WHEN a SELECT runs as app_user with no app.current_org_id
+					// THEN the unset GUC reads NULL, "organizationId" = NULL is never
+					//   true, and no rows are visible
+					// [migrations/0005_auth_table_rls.ts — org_isolation_member USING]
+					await withSuper(async client => {
+						await client.query(`SET LOCAL ROLE app_user`)
+						const visible = await client.query(`SELECT id FROM member`)
+						expect(visible.rows.length).toBe(0)
+					})
+				})
+			})
+
+			describe('when reading through the Better Auth owner pool', () => {
+				it('should bypass RLS and read members across orgs', async () => {
+					// GIVEN RLS is ENABLED but not FORCED on member
+					// WHEN the table owner (Better Auth's pool role) reads member
+					// THEN it sees members from every org, so sign-in / org-switch /
+					//   membership lookups keep working
+					// [migrations/0005_auth_table_rls.ts — ENABLE without FORCE]
+					const orgs = await ctx.pool.query<{ organizationId: string }>(
+						`SELECT DISTINCT "organizationId" FROM member`,
+					)
+					const ids = orgs.rows.map(r => r.organizationId)
+					expect(ids).toContain(ctx.tallerOrgId)
+					expect(ids).toContain(ctx.restaurantOrgId)
+				})
+			})
+		})
+
+		describe('invitation', () => {
+			const insertInvite = (
+				client: pg.PoolClient,
+				id: string,
+				orgId: string,
+				inviterId: string,
+				email: string,
+			) =>
+				client.query(
+					`INSERT INTO invitation (id, "organizationId", email, status, "expiresAt", "inviterId")
+					 VALUES ($1, $2, $3, 'pending', now() + interval '7 days', $4)`,
+					[id, orgId, email, inviterId],
+				)
+
+			describe('when role=app_user is scoped to one org', () => {
+				it('should expose only invitations of the scoped org', async () => {
+					// GIVEN one pending invitation in each org
+					// WHEN a SELECT runs as app_user scoped to taller
+					// THEN only taller's invitation is visible
+					// [migrations/0005_auth_table_rls.ts — org_isolation_invitation]
+					await withSuper(async client => {
+						await insertInvite(
+							client,
+							'inv-t',
+							ctx.tallerOrgId,
+							ctx.aliceId,
+							'pat@taller.cat',
+						)
+						await insertInvite(
+							client,
+							'inv-r',
+							ctx.restaurantOrgId,
+							ctx.bobId,
+							'sam@restaurant.demo',
+						)
+						await client.query(`SET LOCAL ROLE app_user`)
+						await client.query(
+							`SET LOCAL app.current_org_id = '${ctx.tallerOrgId}'`,
+						)
+						const visible = await client.query<{
+							id: string
+							organizationId: string
+						}>(`SELECT id, "organizationId" FROM invitation`)
+						expect(visible.rows.length).toBe(1)
+						expect(visible.rows[0]?.id).toBe('inv-t')
+						expect(visible.rows[0]?.organizationId).toBe(ctx.tallerOrgId)
+					})
+				})
+			})
+
+			describe('when role=app_user and current_org_id is unset', () => {
+				it('should see zero invitations (fail-closed)', async () => {
+					// GIVEN a pending invitation in each org
+					// WHEN a SELECT runs as app_user with no app.current_org_id
+					// THEN no rows are visible (unset GUC → NULL → never matches)
+					// [migrations/0005_auth_table_rls.ts — org_isolation_invitation USING]
+					await withSuper(async client => {
+						await insertInvite(
+							client,
+							'inv-t',
+							ctx.tallerOrgId,
+							ctx.aliceId,
+							'pat@taller.cat',
+						)
+						await insertInvite(
+							client,
+							'inv-r',
+							ctx.restaurantOrgId,
+							ctx.bobId,
+							'sam@restaurant.demo',
+						)
+						await client.query(`SET LOCAL ROLE app_user`)
+						const visible = await client.query(`SELECT id FROM invitation`)
+						expect(visible.rows.length).toBe(0)
+					})
+				})
+			})
+
+			describe('when reading through the Better Auth owner pool', () => {
+				it('should bypass RLS and read invitations across orgs', async () => {
+					// GIVEN a pending invitation in each org and no GUC set
+					// WHEN the table owner reads invitation
+					// THEN it still sees both — proving the owner skips the policy
+					//   (a filtered owner would see 0 with no GUC), so invite-accept
+					//   resolves the row owner-side
+					// [migrations/0005_auth_table_rls.ts — ENABLE without FORCE]
+					await withSuper(async client => {
+						await insertInvite(
+							client,
+							'inv-t',
+							ctx.tallerOrgId,
+							ctx.aliceId,
+							'pat@taller.cat',
+						)
+						await insertInvite(
+							client,
+							'inv-r',
+							ctx.restaurantOrgId,
+							ctx.bobId,
+							'sam@restaurant.demo',
+						)
+						const visible = await client.query<{ organizationId: string }>(
+							`SELECT "organizationId" FROM invitation`,
+						)
+						const ids = visible.rows.map(r => r.organizationId)
+						expect(ids).toContain(ctx.tallerOrgId)
+						expect(ids).toContain(ctx.restaurantOrgId)
+					})
+				})
+			})
+		})
+	})
+
 	describe('email_drafts org isolation', () => {
 		// DraftStore writes to email_drafts; the table is RLS-scoped on
 		// app.current_org_id with FORCE + WITH CHECK. These tests pin the
@@ -1033,7 +1215,8 @@ describe('multi-org isolation', () => {
 		// application layer, the request-path role (app_user) shouldn't
 		// have raw INSERT/UPDATE/DELETE on auth tables. SELECT is fine
 		// — Better Auth runs its own queries on the connection's owner
-		// role outside our middleware. These tests document and pin the
+		// role outside our middleware. apikey is the exception — app_user has
+		// no grant on it at all (0005). These tests document and pin the
 		// posture that locks the request path to read-only for identity
 		// state.
 
@@ -1084,6 +1267,21 @@ describe('multi-org isolation', () => {
 				await withSuper(async client => {
 					await client.query(`SET LOCAL ROLE app_user`)
 					await expect(client.query(`DELETE FROM "member"`)).rejects.toThrow(
+						/permission denied|not allowed/i,
+					)
+				})
+			})
+
+			it('should be denied SELECT on apikey (keys live behind the Better Auth pool)', async () => {
+				// GIVEN role=app_user
+				// WHEN a SELECT on apikey runs
+				// THEN PostgreSQL should reject with permission denied — the
+				//   request path has no grant on apikey at all, so key material
+				//   is reachable only through Better Auth's owner pool
+				// [migrations/0005_auth_table_rls.ts — REVOKE ALL ON apikey FROM app_user]
+				await withSuper(async client => {
+					await client.query(`SET LOCAL ROLE app_user`)
+					await expect(client.query(`SELECT id FROM apikey`)).rejects.toThrow(
 						/permission denied|not allowed/i,
 					)
 				})
