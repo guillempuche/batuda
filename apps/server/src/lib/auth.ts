@@ -197,7 +197,9 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 							})
 						},
 					}),
-					apiKey({ enableSessionForAPIKeys: true }),
+					// enableMetadata: org-owned keys carry { organizationId } so the
+					// MCP path resolves the org from the key (BADREQUEST otherwise).
+					apiKey({ enableSessionForAPIKeys: true, enableMetadata: true }),
 					setPasswordRoute(),
 					magicLink({
 						// Closes the silent-signup hole on /sign-in/magic-link.
@@ -257,7 +259,10 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 		)
 		authHandle = instance as unknown as typeof authHandle
 
-		return { instance } as const
+		// `pool` connects as the DB owner (never SET ROLE app_user), so it is
+		// the only path that can read/write the `apikey` table — app_user has
+		// no grants on it (migrations/0005). API-key management uses it.
+		return { instance, pool } as const
 	}),
 }) {
 	static readonly layer = Layer.effect(this, this.make).pipe(
