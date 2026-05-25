@@ -1,0 +1,206 @@
+// Integration test for TaskService.create. Verifies the service stamps the
+// active org's id on insert — the regression guard for the bug where the
+// HTTP handler and MCP tool both omitted organization_id (TEXT NOT NULL,
+// no DB default), so every create failed the not-null / org_isolation RLS
+// WITH CHECK under role app_user. Also pins the RLS facets the stamp
+// relies on: cross-org writes are rejected and created rows stay isolated.
+//
+// Prereq: `pnpm cli services up` (Postgres on $DATABASE_URL) and seeded
+// `taller` + `restaurant` orgs (`pnpm cli db reset && pnpm cli seed`).
+
+process.env['DATABASE_URL'] ??=
+	'postgresql://batuda:batuda@localhost:5433/batuda'
+
+import { Effect, Layer } from 'effect'
+import { SqlClient } from 'effect/unstable/sql'
+import pg from 'pg'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+
+import { CurrentOrg } from '@batuda/controllers'
+
+import { PgLive } from '../db/client'
+import { TaskService } from './tasks'
+
+const DATABASE_URL =
+	process.env['DATABASE_URL'] ??
+	'postgresql://batuda:batuda@localhost:5433/batuda'
+
+const TALLER_SLUG = 'taller'
+const RESTAURANT_SLUG = 'restaurant'
+const FIXTURE_TITLE = 'taskservice-create-fixture'
+
+let pool: pg.Pool
+let tallerOrgId: string
+let restaurantOrgId: string
+
+const orgIdBySlug = async (slug: string): Promise<string> => {
+	const rows = await pool.query<{ id: string }>(
+		`SELECT id FROM organization WHERE slug = $1 LIMIT 1`,
+		[slug],
+	)
+	const id = rows.rows[0]?.id
+	if (!id) {
+		throw new Error(
+			`${slug} org missing — run 'pnpm cli db reset && pnpm cli seed' before this test`,
+		)
+	}
+	return id
+}
+
+beforeAll(async () => {
+	pool = new pg.Pool({ connectionString: DATABASE_URL, max: 4 })
+	// `SET LOCAL ROLE app_user` (below) needs the connecting user to be a
+	// member of app_user — idempotent on already-granted dev containers.
+	await pool.query('GRANT app_user TO CURRENT_USER')
+	tallerOrgId = await orgIdBySlug(TALLER_SLUG)
+	restaurantOrgId = await orgIdBySlug(RESTAURANT_SLUG)
+}, 30_000)
+
+afterAll(async () => {
+	// Run as connection owner (no role switch) so RLS doesn't gate cleanup.
+	await pool.query(`DELETE FROM tasks WHERE title = $1`, [FIXTURE_TITLE])
+	await pool.end()
+})
+
+// Runs TaskService.create as role app_user with app.current_org_id = `gucOrg`
+// and CurrentOrg = `currentOrg` — the role + GUC OrgMiddleware establishes
+// per request — so org_isolation engages exactly as in production. The
+// transaction commits on success; afterAll removes the fixture rows.
+const createWith = (gucOrg: string, currentOrg: string) => {
+	const deps = Layer.mergeAll(
+		TaskService.layer,
+		Layer.succeed(CurrentOrg, {
+			id: currentOrg,
+			name: 'fixture',
+			slug: 'fixture',
+		}),
+	).pipe(Layer.provideMerge(PgLive))
+
+	return Effect.gen(function* () {
+		const sql = yield* SqlClient.SqlClient
+		const tasks = yield* TaskService
+		return yield* sql.withTransaction(
+			Effect.gen(function* () {
+				yield* sql`SET LOCAL ROLE app_user`
+				yield* sql`SELECT set_config('app.current_org_id', ${gucOrg}, true)`
+				return yield* tasks.create({
+					type: 'follow_up',
+					title: FIXTURE_TITLE,
+					status: 'open',
+				})
+			}),
+		)
+	}).pipe(Effect.provide(deps), Effect.runPromise)
+}
+
+// Reads task ids carrying the fixture title visible under `org`'s GUC.
+const visibleTaskIds = async (org: string): Promise<ReadonlyArray<string>> => {
+	const client = await pool.connect()
+	try {
+		await client.query('BEGIN')
+		await client.query('SET LOCAL ROLE app_user')
+		await client.query(`SELECT set_config('app.current_org_id', $1, true)`, [
+			org,
+		])
+		const rows = await client.query<{ id: string }>(
+			`SELECT id FROM tasks WHERE title = $1`,
+			[FIXTURE_TITLE],
+		)
+		await client.query('ROLLBACK')
+		return rows.rows.map(r => r.id)
+	} finally {
+		client.release()
+	}
+}
+
+describe('TaskService.create', () => {
+	describe('when invoked as app_user with a matching active org', () => {
+		it('should stamp organization_id from CurrentOrg', async () => {
+			// GIVEN role=app_user pinned to the taller org
+			// WHEN a company-less task is created through the service
+			const rows = (await createWith(
+				tallerOrgId,
+				tallerOrgId,
+			)) as ReadonlyArray<{
+				id: string
+				organizationId: string
+				companyId: string | null
+				title: string
+			}>
+
+			// THEN the persisted row carries the active org id
+			expect(rows[0]?.organizationId).toBe(tallerOrgId)
+			// AND the company-less task persisted with a null company_id
+			expect(rows[0]?.companyId).toBeNull()
+			expect(rows[0]?.title).toBe(FIXTURE_TITLE)
+			// [apps/server/src/services/tasks.ts — sql.insert organizationId]
+		})
+	})
+
+	describe('when CurrentOrg disagrees with the active-org GUC', () => {
+		it('should be rejected by org_isolation (cannot forge a cross-org task)', async () => {
+			// GIVEN role=app_user pinned to taller but CurrentOrg = restaurant
+			// WHEN create stamps the restaurant org while the GUC says taller
+			const create = createWith(tallerOrgId, restaurantOrgId)
+
+			// THEN the WITH CHECK predicate rejects the insert
+			await expect(create).rejects.toThrow()
+			// AND no restaurant-org fixture row leaked into taller's space
+			expect(await visibleTaskIds(restaurantOrgId)).toHaveLength(0)
+			// [apps/server/src/db/migrations/0001_initial.ts — org_isolation_tasks WITH CHECK]
+		})
+	})
+
+	describe('when a created task is read under a different org', () => {
+		it('should be visible to its own org and hidden from another', async () => {
+			// GIVEN a task created under the taller org
+			await createWith(tallerOrgId, tallerOrgId)
+
+			// WHEN reading the fixture under each org's GUC
+			const tallerVisible = await visibleTaskIds(tallerOrgId)
+			const restaurantVisible = await visibleTaskIds(restaurantOrgId)
+
+			// THEN taller sees it and restaurant does not (org_isolation USING)
+			expect(tallerVisible.length).toBeGreaterThan(0)
+			expect(restaurantVisible).toHaveLength(0)
+			// [apps/server/src/db/migrations/0001_initial.ts — org_isolation_tasks USING]
+		})
+	})
+})
+
+describe('tasks organization_id contract', () => {
+	const asAppUser = async <T>(
+		org: string,
+		fn: (client: pg.PoolClient) => Promise<T>,
+	): Promise<T> => {
+		const client = await pool.connect()
+		try {
+			await client.query('BEGIN')
+			await client.query('SET LOCAL ROLE app_user')
+			await client.query(`SELECT set_config('app.current_org_id', $1, true)`, [
+				org,
+			])
+			const result = await fn(client)
+			await client.query('ROLLBACK')
+			return result
+		} finally {
+			client.release()
+		}
+	}
+
+	describe('when a task is inserted without organization_id', () => {
+		it('should be rejected under role app_user', () =>
+			asAppUser(tallerOrgId, async client => {
+				// GIVEN role=app_user pinned to the taller org
+				// WHEN inserting a task that omits organization_id (the pre-fix shape)
+				const insert = client.query(
+					`INSERT INTO tasks (type, title, status) VALUES ('follow_up', $1, 'open')`,
+					[FIXTURE_TITLE],
+				)
+
+				// THEN Postgres rejects it — not-null + org_isolation WITH CHECK
+				await expect(insert).rejects.toThrow()
+				// [apps/server/src/db/migrations/0001_initial.ts:387 — organization_id NOT NULL + WITH CHECK]
+			}))
+	})
+})
