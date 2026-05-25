@@ -327,6 +327,32 @@ const seedTask = async (data: Record<string, unknown>): Promise<string> => {
 	return row.id
 }
 
+// Runs a method under role app_user + the org GUC and returns its value
+// (failures die). Use `attempt` instead when asserting a tagged failure.
+const runScoped = <A>(
+	org: string,
+	body: Effect.Effect<A, unknown, CurrentOrg | TaskService>,
+): Promise<A> => {
+	const deps = Layer.mergeAll(
+		TaskService.layer,
+		Layer.succeed(CurrentOrg, { id: org, name: 'fixture', slug: 'fixture' }),
+	).pipe(
+		Layer.provideMerge(TimelineActivityService.layer),
+		Layer.provideMerge(PgLive),
+	)
+
+	return Effect.gen(function* () {
+		const sql = yield* SqlClient.SqlClient
+		return yield* sql.withTransaction(
+			Effect.gen(function* () {
+				yield* sql`SET LOCAL ROLE app_user`
+				yield* sql`SELECT set_config('app.current_org_id', ${org}, true)`
+				return yield* body
+			}),
+		)
+	}).pipe(Effect.provide(deps), Effect.orDie, Effect.runPromise)
+}
+
 describe('TaskService transitions', () => {
 	describe('cancel', () => {
 		it('should reject cancelling a task that is already done', async () => {
@@ -528,6 +554,121 @@ describe('TaskService snooze/reschedule events', () => {
 		} finally {
 			client.release()
 		}
+	})
+})
+
+describe('TaskService.get', () => {
+	it('should return the task for its own org', async () => {
+		// GIVEN a seeded task
+		const id = await seedTask({ status: 'open' })
+
+		// WHEN fetched through the service under that org
+		const row = (await runScoped(
+			tallerOrgId,
+			Effect.gen(function* () {
+				const tasks = yield* TaskService
+				return yield* tasks.get(id)
+			}),
+		)) as { id: string }
+
+		// THEN it returns the row
+		expect(row.id).toBe(id)
+		// [apps/server/src/services/tasks.ts — get]
+	})
+
+	it('should report NotFound for a missing id', async () => {
+		// GIVEN an id that does not exist
+		// WHEN fetched
+		const result = await attempt(
+			tallerOrgId,
+			Effect.gen(function* () {
+				const tasks = yield* TaskService
+				return yield* tasks.get(randomUUID())
+			}),
+		)
+
+		// THEN it fails with NotFound
+		expect(result.failedWith).toBe('NotFound')
+		// [apps/server/src/services/tasks.ts — get NotFound]
+	})
+})
+
+describe('TaskService.update', () => {
+	it('should apply a field change without an If-Match', async () => {
+		// GIVEN an open task
+		const id = await seedTask({ status: 'open' })
+
+		// WHEN its notes are updated through the service (title stays the
+		// fixture so afterAll still cleans it up)
+		await runScoped(
+			tallerOrgId,
+			Effect.gen(function* () {
+				const tasks = yield* TaskService
+				return yield* tasks.update(
+					id,
+					{ notes: 'consolidation-test-note' },
+					{ id: null, kind: 'user' },
+				)
+			}),
+		)
+
+		// THEN the committed row reflects the change
+		const after = await pool.query<{ notes: string | null }>(
+			`SELECT notes FROM tasks WHERE id = $1`,
+			[id],
+		)
+		expect(after.rows[0]?.notes).toBe('consolidation-test-note')
+		// [apps/server/src/services/tasks.ts — update]
+	})
+
+	it('should reject a stale If-Match with Conflict', async () => {
+		// GIVEN an open task
+		const id = await seedTask({ status: 'open' })
+
+		// WHEN updated with an If-Match that can't match the row's updated_at
+		const result = await attempt(
+			tallerOrgId,
+			Effect.gen(function* () {
+				const tasks = yield* TaskService
+				return yield* tasks.update(
+					id,
+					{ title: FIXTURE_TITLE },
+					{ id: null, kind: 'user' },
+					'1970-01-01T00:00:00.000Z',
+				)
+			}),
+		)
+
+		// THEN it fails Conflict — and the freshness check read `updatedAt`
+		// (camelCase) without throwing on a missing `updated_at` column
+		expect(result.failedWith).toBe('Conflict')
+		// [apps/server/src/services/tasks.ts — update If-Match gate]
+	})
+})
+
+describe('TaskService.bulkComplete', () => {
+	it('should complete the given tasks and report the count', async () => {
+		// GIVEN two open tasks
+		const a = await seedTask({ status: 'open' })
+		const b = await seedTask({ status: 'open' })
+
+		// WHEN bulk-completed through the service
+		const result = (await runScoped(
+			tallerOrgId,
+			Effect.gen(function* () {
+				const tasks = yield* TaskService
+				return yield* tasks.bulkComplete([a, b])
+			}),
+		)) as { completed: number; ids: ReadonlyArray<string> }
+
+		// THEN both are reported and persisted as done
+		expect(result.completed).toBe(2)
+		const statuses = await pool.query<{ status: string }>(
+			`SELECT status FROM tasks WHERE id = ANY($1)`,
+			[[a, b]],
+		)
+		expect(statuses.rows.map(r => r.status)).toEqual(['done', 'done'])
+		// [apps/server/src/services/tasks.ts — bulkComplete]
 	})
 })
 
