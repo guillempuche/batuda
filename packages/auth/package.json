@@ -18,8 +18,8 @@
 		"test:watch": "vitest"
 	},
 	"dependencies": {
-		"@better-auth/api-key": "^1.5.6",
-		"better-auth": "^1.5.6",
+		"@better-auth/api-key": "^1.6.11",
+		"better-auth": "^1.6.11",
 		"effect": "4.0.0-beta.43",
 		"kysely": "^0.28.15",
 		"pg": "^8.20.0"
