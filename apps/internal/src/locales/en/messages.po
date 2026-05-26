@@ -216,6 +216,15 @@ msgstr "All under control"
 msgid "Already in CRM"
 msgstr "Already in CRM"
 
+#: src/routes/settings/api-keys/index.tsx:395
+msgid "Any agent using \"{confirmLabel}\" will stop working. This can't be undone."
+msgstr "Any agent using \"{confirmLabel}\" will stop working. This can't be undone."
+
+#: src/routes/settings/api-keys/index.tsx:197
+#: src/routes/settings/profile/index.tsx:114
+msgid "API keys"
+msgstr "API keys"
+
 #: src/routes/emails/$threadId.tsx:376
 #: src/routes/emails/index.tsx:754
 msgid "Archive"
@@ -269,6 +278,10 @@ msgstr "Back to inbox"
 #: src/routes/settings/organization/spend.tsx:111
 msgid "Back to organization"
 msgstr "Back to organization"
+
+#: src/routes/settings/api-keys/index.tsx:187
+msgid "Back to settings"
+msgstr "Back to settings"
 
 #: src/routes/forgot-password.tsx:86
 #: src/routes/forgot-password.tsx:140
@@ -369,6 +382,7 @@ msgstr "Calls"
 #: src/components/research/research-dialog.tsx:221
 #: src/routes/emails/inboxes.tsx:1055
 #: src/routes/emails/inboxes.tsx:1453
+#: src/routes/settings/api-keys/index.tsx:410
 #: src/routes/tasks/index.tsx:718
 msgid "Cancel"
 msgstr "Cancel"
@@ -382,12 +396,12 @@ msgstr "Cancel upload"
 msgid "Cc"
 msgstr "Cc"
 
-#: src/routes/profile/index.tsx:327
+#: src/routes/settings/profile/index.tsx:350
 msgid "Change my mind — set a password anyway"
 msgstr "Change my mind — set a password anyway"
 
-#: src/routes/profile/index.tsx:387
-#: src/routes/profile/index.tsx:474
+#: src/routes/settings/profile/index.tsx:410
+#: src/routes/settings/profile/index.tsx:497
 msgid "Change password"
 msgstr "Change password"
 
@@ -609,9 +623,25 @@ msgstr "Conversations"
 msgid "Coordinates saved from the geocoder."
 msgstr "Coordinates saved from the geocoder."
 
+#: src/routes/settings/api-keys/index.tsx:358
+msgid "Copied"
+msgstr "Copied"
+
+#: src/routes/settings/api-keys/index.tsx:358
+msgid "Copy"
+msgstr "Copy"
+
+#: src/routes/settings/api-keys/index.tsx:171
+msgid "Copy failed"
+msgstr "Copy failed"
+
 #: src/components/shared/company-card.tsx:125
 msgid "Copy slug"
 msgstr "Copy slug"
+
+#: src/routes/settings/api-keys/index.tsx:337
+msgid "Copy your key now"
+msgstr "Copy your key now"
 
 #: src/routes/companies/$slug.tsx:629
 msgid "Could not clear suppression"
@@ -620,6 +650,14 @@ msgstr "Could not clear suppression"
 #: src/routes/emails/inboxes.tsx:546
 msgid "Could not create the inbox. Check transport or credentials."
 msgstr "Could not create the inbox. Check transport or credentials."
+
+#: src/routes/settings/api-keys/index.tsx:138
+msgid "Could not create the key. Please try again."
+msgstr "Could not create the key. Please try again."
+
+#: src/routes/settings/api-keys/index.tsx:159
+msgid "Could not delete the key. Please try again."
+msgstr "Could not delete the key. Please try again."
 
 #: src/routes/companies/index.tsx:312
 msgid "Could not load companies"
@@ -644,6 +682,10 @@ msgstr "Could not load this run."
 #: src/routes/emails/index.tsx:783
 msgid "Could not load threads"
 msgstr "Could not load threads"
+
+#: src/routes/settings/api-keys/index.tsx:270
+msgid "Could not load your keys. Refresh to try again."
+msgstr "Could not load your keys. Refresh to try again."
 
 #: src/components/companies/where-panel-client.client.tsx:67
 msgid "Could not locate"
@@ -711,7 +753,7 @@ msgstr "Could not switch organization. Please try again."
 msgid "Could not toggle the inbox state."
 msgstr "Could not toggle the inbox state."
 
-#: src/routes/profile/index.tsx:332
+#: src/routes/settings/profile/index.tsx:355
 msgid "Couldn't update your preference. Try again."
 msgstr "Couldn't update your preference. Try again."
 
@@ -722,6 +764,10 @@ msgstr "Create"
 #: src/routes/emails/inboxes.tsx:1349
 msgid "Create a footer to append to outgoing emails from this inbox."
 msgstr "Create a footer to append to outgoing emails from this inbox."
+
+#: src/routes/settings/api-keys/index.tsx:209
+msgid "Create a key"
+msgstr "Create a key"
 
 #: src/routes/pages/index.tsx:138
 msgid "Create a prospect landing page from a company detail view or via the MCP tools."
@@ -743,20 +789,33 @@ msgstr "Create follow-up task"
 msgid "Create footer"
 msgstr "Create footer"
 
+#: src/routes/settings/api-keys/index.tsx:254
+msgid "Create key"
+msgstr "Create key"
+
 #: src/routes/emails/$threadId.tsx:498
 #: src/routes/emails/inboxes.tsx:407
 msgid "Created"
 msgstr "Created"
 
+#. placeholder {0}: formatDate(row.createdAt)
+#: src/routes/settings/api-keys/index.tsx:292
+msgid "Created {0}"
+msgstr "Created {0}"
+
 #: src/components/shared/task-item.tsx:336
 msgid "Created by agent"
 msgstr "Created by agent"
 
-#: src/routes/profile/index.tsx:401
+#: src/routes/settings/api-keys/index.tsx:254
+msgid "Creating…"
+msgstr "Creating…"
+
+#: src/routes/settings/profile/index.tsx:424
 msgid "Current password"
 msgstr "Current password"
 
-#: src/routes/profile/index.tsx:451
+#: src/routes/settings/profile/index.tsx:474
 msgid "Current password is incorrect."
 msgstr "Current password is incorrect."
 
@@ -801,11 +860,13 @@ msgid "Defaults to you when omitted."
 msgstr "Defaults to you when omitted."
 
 #: src/routes/emails/inboxes.tsx:1385
+#: src/routes/settings/api-keys/index.tsx:318
 msgid "Delete"
 msgstr "Delete"
 
 #: src/routes/emails/inboxes.tsx:266
 #: src/routes/emails/inboxes.tsx:1293
+#: src/routes/settings/api-keys/index.tsx:158
 msgid "Delete failed"
 msgstr "Delete failed"
 
@@ -819,9 +880,22 @@ msgstr "Delete inbox {0}"
 msgid "Delete inbox {0}? Stored messages stay; the connection stops."
 msgstr "Delete inbox {0}? Stored messages stay; the connection stops."
 
+#: src/routes/settings/api-keys/index.tsx:425
+msgid "Delete key"
+msgstr "Delete key"
+
 #: src/routes/emails/inboxes.tsx:1286
 msgid "Delete this footer? This cannot be undone."
 msgstr "Delete this footer? This cannot be undone."
+
+#: src/routes/settings/api-keys/index.tsx:392
+msgid "Delete this key?"
+msgstr "Delete this key?"
+
+#: src/routes/settings/api-keys/index.tsx:318
+#: src/routes/settings/api-keys/index.tsx:425
+msgid "Deleting…"
+msgstr "Deleting…"
 
 #: src/routes/emails/$threadId.tsx:675
 msgid "Delivered"
@@ -832,6 +906,7 @@ msgid "Direction"
 msgstr "Direction"
 
 #: src/routes/emails/inboxes.tsx:443
+#: src/routes/settings/api-keys/index.tsx:303
 msgid "Disabled"
 msgstr "Disabled"
 
@@ -855,6 +930,10 @@ msgstr "Document"
 msgid "Documents"
 msgstr "Documents"
 
+#: src/routes/settings/api-keys/index.tsx:370
+msgid "Done"
+msgstr "Done"
+
 #: src/routes/tasks/index.tsx:506
 msgid "Done 7d"
 msgstr "Done 7d"
@@ -875,6 +954,10 @@ msgstr "Due date"
 #: src/components/interactions/quick-capture-dialog.tsx:374
 msgid "Duration (min)"
 msgstr "Duration (min)"
+
+#: src/routes/settings/api-keys/index.tsx:222
+msgid "e.g. Claude Desktop"
+msgstr "e.g. Claude Desktop"
 
 #: src/routes/emails/inboxes.tsx:1419
 msgid "e.g. Company signature"
@@ -984,6 +1067,19 @@ msgstr "Exit full screen"
 msgid "Expand"
 msgstr "Expand"
 
+#. placeholder {0}: formatDate(row.expiresAt)
+#: src/routes/settings/api-keys/index.tsx:296
+msgid "Expires {0}"
+msgstr "Expires {0}"
+
+#: src/routes/settings/api-keys/index.tsx:228
+msgid "Expires in (days)"
+msgstr "Expires in (days)"
+
+#: src/routes/settings/api-keys/index.tsx:118
+msgid "Expiry must be a number of days greater than zero."
+msgstr "Expiry must be a number of days greater than zero."
+
 #: src/routes/emails/$threadId.tsx:681
 msgid "Failed"
 msgstr "Failed"
@@ -1071,6 +1167,10 @@ msgstr "From webhook"
 msgid "Full screen"
 msgstr "Full screen"
 
+#: src/routes/settings/api-keys/index.tsx:111
+msgid "Give the key a name so you can recognize it later."
+msgstr "Give the key a name so you can recognize it later."
+
 #: src/routes/reset-password.tsx:173
 msgid "Go to sign in"
 msgstr "Go to sign in"
@@ -1106,7 +1206,7 @@ msgstr "Human"
 msgid "I prefer passwordless"
 msgstr "I prefer passwordless"
 
-#: src/routes/profile/index.tsx:289
+#: src/routes/settings/profile/index.tsx:312
 msgid "I prefer passwordless — don't ask me again"
 msgstr "I prefer passwordless — don't ask me again"
 
@@ -1217,9 +1317,17 @@ msgstr "Join video call"
 msgid "Key"
 msgstr "Key"
 
+#: src/routes/settings/api-keys/index.tsx:150
+msgid "Key deleted"
+msgstr "Key deleted"
+
 #: src/components/research/findings/competitor-scan-view.tsx:87
 msgid "Key differentiators"
 msgstr "Key differentiators"
+
+#: src/routes/settings/api-keys/index.tsx:200
+msgid "Keys let AI agents and MCP clients act on behalf of this organization."
+msgstr "Keys let AI agents and MCP clients act on behalf of this organization."
 
 #: src/routes/pages/index.tsx:146
 msgid "Lang"
@@ -1227,7 +1335,7 @@ msgstr "Lang"
 
 #: src/components/profile/language-select.tsx:34
 #: src/routes/pages/$id.tsx:311
-#: src/routes/profile/index.tsx:119
+#: src/routes/settings/profile/index.tsx:142
 msgid "Language"
 msgstr "Language"
 
@@ -1279,6 +1387,7 @@ msgstr "Loading run…"
 
 #: src/components/companies/upcoming-meetings-card.tsx:57
 #: src/components/shared/loading-spinner.tsx:23
+#: src/routes/settings/api-keys/index.tsx:266
 #: src/routes/settings/organization/index.tsx:52
 #: src/routes/settings/organization/members.tsx:113
 msgid "Loading…"
@@ -1448,6 +1557,7 @@ msgid "Minimize"
 msgstr "Minimize"
 
 #: src/routes/emails/inboxes.tsx:1413
+#: src/routes/settings/api-keys/index.tsx:215
 msgid "Name"
 msgstr "Name"
 
@@ -1466,9 +1576,17 @@ msgstr "Needs attention"
 msgid "never"
 msgstr "never"
 
-#: src/routes/profile/index.tsx:229
-#: src/routes/profile/index.tsx:413
+#: src/routes/settings/api-keys/index.tsx:236
+msgid "Never"
+msgstr "Never"
+
+#: src/routes/settings/api-keys/index.tsx:298
+msgid "Never expires"
+msgstr "Never expires"
+
 #: src/routes/reset-password.tsx:193
+#: src/routes/settings/profile/index.tsx:252
+#: src/routes/settings/profile/index.tsx:436
 msgid "New password"
 msgstr "New password"
 
@@ -1534,9 +1652,9 @@ msgstr "No companies yet"
 #: src/components/layout/org-switcher.tsx:62
 #: src/routes/accept-invitation.$id.tsx:98
 #: src/routes/login.tsx:138
-#: src/routes/profile/index.tsx:77
 #: src/routes/settings/organization/invite.tsx:77
 #: src/routes/settings/organization/members.tsx:81
+#: src/routes/settings/profile/index.tsx:82
 msgid "No connection to the server. Try again in a few seconds."
 msgstr "No connection to the server. Try again in a few seconds."
 
@@ -1585,6 +1703,10 @@ msgstr "No high-priority companies without a scheduled follow-up"
 #: src/routes/emails/inboxes.tsx:390
 msgid "No inboxes yet"
 msgstr "No inboxes yet"
+
+#: src/routes/settings/api-keys/index.tsx:274
+msgid "No keys yet. Create one above to connect an agent."
+msgstr "No keys yet. Create one above to connect an agent."
 
 #: src/routes/calendar/index.tsx:299
 msgid "no location"
@@ -1769,6 +1891,7 @@ msgstr "Opened"
 #: src/routes/settings/organization/index.tsx:42
 #: src/routes/settings/organization/invite.tsx:91
 #: src/routes/settings/organization/members.tsx:95
+#: src/routes/settings/profile/index.tsx:108
 msgid "Organization"
 msgstr "Organization"
 
@@ -1874,17 +1997,17 @@ msgstr "Password or app-password"
 msgid "Password updated"
 msgstr "Password updated"
 
-#: src/routes/profile/index.tsx:461
+#: src/routes/settings/profile/index.tsx:484
 msgid "Password updated."
 msgstr "Password updated."
 
-#: src/routes/profile/index.tsx:315
+#: src/routes/settings/profile/index.tsx:338
 msgid "Passwordless sign-in only"
 msgstr "Passwordless sign-in only"
 
-#: src/routes/profile/index.tsx:255
-#: src/routes/profile/index.tsx:439
 #: src/routes/reset-password.tsx:221
+#: src/routes/settings/profile/index.tsx:278
+#: src/routes/settings/profile/index.tsx:462
 msgid "Passwords need at least {MIN_PASSWORD_LENGTH} characters."
 msgstr "Passwords need at least {MIN_PASSWORD_LENGTH} characters."
 
@@ -1912,7 +2035,7 @@ msgstr "Personal"
 msgid "Phone"
 msgstr "Phone"
 
-#: src/routes/profile/index.tsx:390
+#: src/routes/settings/profile/index.tsx:413
 msgid "Pick a new password. Other signed-in devices will be signed out."
 msgstr "Pick a new password. Other signed-in devices will be signed out."
 
@@ -1983,9 +2106,8 @@ msgstr "Private inbox"
 msgid "Products fit"
 msgstr "Products fit"
 
-#: src/components/layout/nav-items.ts:81
 #: src/routes/companies/$slug.tsx:1082
-#: src/routes/profile/index.tsx:89
+#: src/routes/settings/profile/index.tsx:94
 msgid "Profile"
 msgstr "Profile"
 
@@ -2122,9 +2244,9 @@ msgstr "Reopen"
 msgid "Reopen thread"
 msgstr "Reopen thread"
 
-#: src/routes/profile/index.tsx:242
-#: src/routes/profile/index.tsx:426
 #: src/routes/reset-password.tsx:207
+#: src/routes/settings/profile/index.tsx:265
+#: src/routes/settings/profile/index.tsx:449
 msgid "Repeat new password"
 msgstr "Repeat new password"
 
@@ -2230,16 +2352,16 @@ msgstr "Save failed"
 msgid "Save new password"
 msgstr "Save new password"
 
-#: src/routes/profile/index.tsx:280
+#: src/routes/settings/profile/index.tsx:303
 msgid "Save password"
 msgstr "Save password"
 
 #: src/components/emails/compose-form.tsx:547
 #: src/routes/emails/inboxes.tsx:1463
 #: src/routes/pages/$id.tsx:268
-#: src/routes/profile/index.tsx:278
-#: src/routes/profile/index.tsx:472
 #: src/routes/reset-password.tsx:242
+#: src/routes/settings/profile/index.tsx:301
+#: src/routes/settings/profile/index.tsx:495
 msgid "Saving…"
 msgstr "Saving…"
 
@@ -2270,6 +2392,10 @@ msgstr "Select all threads on this page"
 #: src/components/emails/compose-form.tsx:378
 msgid "Select inbox…"
 msgstr "Select inbox…"
+
+#: src/routes/settings/api-keys/index.tsx:172
+msgid "Select the key and copy it manually."
+msgstr "Select the key and copy it manually."
 
 #. placeholder {0}: row.original.subject ?? '(no subject)'
 #: src/routes/emails/index.tsx:965
@@ -2323,7 +2449,7 @@ msgstr "Sent"
 msgid "Set a new password"
 msgstr "Set a new password"
 
-#: src/routes/profile/index.tsx:218
+#: src/routes/settings/profile/index.tsx:241
 msgid "Set a password"
 msgstr "Set a password"
 
@@ -2339,7 +2465,10 @@ msgstr "Set as default"
 msgid "Set password"
 msgstr "Set password"
 
+#: src/components/layout/nav-items.ts:81
 #: src/routes/pages/$id.tsx:290
+#: src/routes/settings/api-keys/index.tsx:190
+#: src/routes/settings/profile/index.tsx:101
 msgid "Settings"
 msgstr "Settings"
 
@@ -2390,11 +2519,11 @@ msgstr "Sign in to continue"
 msgid "Sign in with your new password. Other devices will need to sign in again too."
 msgstr "Sign in with your new password. Other devices will need to sign in again too."
 
-#: src/routes/profile/index.tsx:138
+#: src/routes/settings/profile/index.tsx:161
 msgid "Sign out"
 msgstr "Sign out"
 
-#: src/routes/profile/index.tsx:71
+#: src/routes/settings/profile/index.tsx:76
 msgid "Sign-out failed. Please try again."
 msgstr "Sign-out failed. Please try again."
 
@@ -2402,7 +2531,7 @@ msgstr "Sign-out failed. Please try again."
 msgid "Signing in…"
 msgstr "Signing in…"
 
-#: src/routes/profile/index.tsx:138
+#: src/routes/settings/profile/index.tsx:161
 msgid "Signing out…"
 msgstr "Signing out…"
 
@@ -2442,9 +2571,9 @@ msgstr "Snoozed"
 msgid "someone"
 msgstr "someone"
 
-#: src/routes/profile/index.tsx:267
-#: src/routes/profile/index.tsx:456
 #: src/routes/reset-password.tsx:233
+#: src/routes/settings/profile/index.tsx:290
+#: src/routes/settings/profile/index.tsx:479
 msgid "Something went wrong. Try again."
 msgstr "Something went wrong. Try again."
 
@@ -2580,6 +2709,10 @@ msgstr "That link is no longer valid. Request a fresh one below."
 msgid "The 20 most recently edited open tasks. Click one to reopen it."
 msgstr "The 20 most recently edited open tasks. Click one to reopen it."
 
+#: src/routes/settings/api-keys/index.tsx:151
+msgid "The API key can no longer be used."
+msgstr "The API key can no longer be used."
+
 #: src/routes/companies/$slug.tsx:630
 msgid "The change didn't go through. Try again."
 msgstr "The change didn't go through. Try again."
@@ -2629,11 +2762,11 @@ msgstr "The thread may have been archived upstream or the link is stale."
 msgid "The token expired or was already used. Request a fresh link."
 msgstr "The token expired or was already used. Request a fresh link."
 
-#: src/routes/profile/index.tsx:446
+#: src/routes/settings/profile/index.tsx:469
 msgid "The two new password fields don't match."
 msgstr "The two new password fields don't match."
 
-#: src/routes/profile/index.tsx:262
+#: src/routes/settings/profile/index.tsx:285
 msgid "The two password fields don't match."
 msgstr "The two password fields don't match."
 
@@ -2668,6 +2801,10 @@ msgstr "This invitation is no longer valid."
 #: src/routes/accept-invitation.$id.tsx:57
 msgid "This invitation link is no longer valid. It may have already been used."
 msgstr "This invitation link is no longer valid. It may have already been used."
+
+#: src/routes/settings/api-keys/index.tsx:340
+msgid "This is the only time the full key is shown. Store it somewhere safe — I can't show it again."
+msgstr "This is the only time the full key is shown. Store it somewhere safe — I can't show it again."
 
 #: src/routes/reset-password.tsx:63
 #: src/routes/reset-password.tsx:127
@@ -2758,7 +2895,7 @@ msgstr "unknown"
 msgid "Unknown"
 msgstr "Unknown"
 
-#: src/routes/profile/index.tsx:82
+#: src/routes/settings/profile/index.tsx:87
 msgid "Unknown user"
 msgstr "Unknown user"
 
@@ -2769,6 +2906,10 @@ msgstr "Unlinked"
 #: src/routes/emails/index.tsx:1397
 msgid "Untitled"
 msgstr "Untitled"
+
+#: src/routes/settings/api-keys/index.tsx:279
+msgid "Untitled key"
+msgstr "Untitled key"
 
 #: src/components/companies/upcoming-meetings-card.tsx:53
 #: src/components/companies/upcoming-meetings-card.tsx:69
@@ -2905,7 +3046,7 @@ msgstr "Write footer…"
 msgid "Write your message…"
 msgstr "Write your message…"
 
-#: src/routes/profile/index.tsx:221
+#: src/routes/settings/profile/index.tsx:244
 msgid "You currently sign in from email links. Add a password to skip checking your email next time."
 msgstr "You currently sign in from email links. Add a password to skip checking your email next time."
 
@@ -2917,7 +3058,7 @@ msgstr "You don't have permission to see this page."
 msgid "You got in from a link in your email."
 msgstr "You got in from a link in your email."
 
-#: src/routes/profile/index.tsx:318
+#: src/routes/settings/profile/index.tsx:341
 msgid "You sign in from email links. I won't bring it up again."
 msgstr "You sign in from email links. I won't bring it up again."
 
@@ -2933,10 +3074,14 @@ msgstr "You're now a member."
 msgid "you@example.com"
 msgstr "you@example.com"
 
-#: src/routes/profile/index.tsx:92
+#: src/routes/settings/profile/index.tsx:97
 msgid "Your Batuda workbench identity."
 msgstr "Your Batuda workbench identity."
 
 #: src/routes/login.tsx:135
 msgid "Your email isn't verified yet. Use the magic link instead."
 msgstr "Your email isn't verified yet. Use the magic link instead."
+
+#: src/routes/settings/api-keys/index.tsx:262
+msgid "Your keys"
+msgstr "Your keys"

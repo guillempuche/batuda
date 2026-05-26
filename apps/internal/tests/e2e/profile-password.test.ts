@@ -133,8 +133,8 @@ test.describe('setting a first password from /profile', () => {
 			//   [profile/index.tsx — `!hasPassword && !passwordOptOut` branch]
 			const bob = await bootPasswordlessInvitee(page, browser, 'pwd-set')
 
-			// WHEN Bob opens /profile
-			await bob.page.goto('/profile', { waitUntil: 'networkidle' })
+			// WHEN Bob opens the settings profile page
+			await bob.page.goto('/settings/profile', { waitUntil: 'networkidle' })
 
 			// THEN the set-password form should render — not the change-password
 			// form, and not the opted-out confirmed state.
@@ -194,7 +194,7 @@ test.describe('setting a first password from /profile', () => {
 			// GIVEN a passwordless invitee on /profile
 			//   [profile/index.tsx — `passwordless-only-toggle` button]
 			const bob = await bootPasswordlessInvitee(page, browser, 'pwd-optout')
-			await bob.page.goto('/profile', { waitUntil: 'networkidle' })
+			await bob.page.goto('/settings/profile', { waitUntil: 'networkidle' })
 			await expect(bob.page.getByTestId('set-password-form')).toBeVisible({
 				timeout: 10_000,
 			})
@@ -232,7 +232,7 @@ test.describe('setting a first password from /profile', () => {
 		}) => {
 			// GIVEN Alice, who already has a credential row from the seed
 			//   [profile/index.tsx — `hasPassword === true` branch]
-			await page.goto('/profile', { waitUntil: 'networkidle' })
+			await page.goto('/settings/profile', { waitUntil: 'networkidle' })
 
 			// THEN the change-password form should render, not the set form.
 			await expect(page.getByTestId('change-password-form')).toBeVisible({

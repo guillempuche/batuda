@@ -138,13 +138,13 @@ test.describe('session persistence', () => {
 	test.describe('when an already-authenticated user visits /login?returnTo=...', () => {
 		test('should honor returnTo on the bounce', async ({ page }) => {
 			// GIVEN Alice's cookie is present
-			// WHEN she navigates to /login?returnTo=/profile
-			await page.goto('/login?returnTo=%2Fprofile')
+			// WHEN she navigates to /login?returnTo=/settings/profile
+			await page.goto('/login?returnTo=%2Fsettings%2Fprofile')
 
-			// THEN the bounce sends her to /profile, not /
+			// THEN the bounce sends her to /settings/profile, not /
 			// [routes/login.tsx:67-71 — same branch, returnTo path]
-			await page.waitForURL(/\/profile/)
-			await expect(page).toHaveURL(/\/profile$/)
+			await page.waitForURL(/\/settings\/profile$/)
+			await expect(page).toHaveURL(/\/settings\/profile$/)
 			await expect(page.getByTestId('login-form')).toHaveCount(0)
 		})
 	})

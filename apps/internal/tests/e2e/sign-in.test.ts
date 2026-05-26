@@ -41,11 +41,11 @@ test.describe('sign-in', () => {
 
 	test.describe('with seeded credentials and a safe returnTo', () => {
 		test('should land Alice on the original deep route', async ({ page }) => {
-			// GIVEN /login?returnTo=/profile is open (the gate redirected
-			// here from a guarded route). /profile is chosen because it's
-			// user-scoped — no active-org dependency, so the assertion
-			// doesn't race the org-picker for multi-org Alice.
-			await page.goto('/login?returnTo=%2Fprofile')
+			// GIVEN /login?returnTo=/settings/profile is open (the gate
+			// redirected here from a guarded route). The profile page is
+			// chosen because it's user-scoped — no active-org dependency, so
+			// the assertion doesn't race the org-picker for multi-org Alice.
+			await page.goto('/login?returnTo=%2Fsettings%2Fprofile')
 			await expect(page.getByTestId('login-form')).toBeVisible()
 
 			// WHEN Alice submits valid creds
@@ -53,10 +53,9 @@ test.describe('sign-in', () => {
 			await page.getByTestId('login-password').fill('batuda-dev-2026')
 			await page.getByTestId('login-submit').click()
 
-			// THEN the URL becomes /profile, not /
-			// [routes/login.tsx:121-124 — isSafeReturnTo true branch]
-			await page.waitForURL(/\/profile/)
-			await expect(page).toHaveURL(/\/profile$/)
+			// THEN the URL becomes /settings/profile, not /
+			await page.waitForURL(/\/settings\/profile$/)
+			await expect(page).toHaveURL(/\/settings\/profile$/)
 			await expect(page.getByTestId('login-form')).toHaveCount(0)
 		})
 	})
