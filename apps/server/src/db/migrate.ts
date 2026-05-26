@@ -1,7 +1,8 @@
 import { apiKey } from '@better-auth/api-key'
+import { oauthProvider } from '@better-auth/oauth-provider'
 import { NodeRuntime } from '@effect/platform-node'
 import { getMigrations } from 'better-auth/db/migration'
-import { admin, bearer, openAPI, organization } from 'better-auth/plugins'
+import { admin, bearer, jwt, openAPI, organization } from 'better-auth/plugins'
 import { Effect } from 'effect'
 import { PostgresDialect } from 'kysely'
 import pg from 'pg'
@@ -55,6 +56,16 @@ const authMigrate = Effect.promise(async () => {
 				},
 			}),
 			apiKey(),
+			// Generates the OAuth provider tables (oauthClient, oauthAccessToken,
+			// oauthRefreshToken, oauthConsent) plus the jwt plugin's jwks table,
+			// backing the OAuth MCP path. loginPage/consentPage are runtime-only;
+			// the values don't affect schema generation. Keep in sync with
+			// src/lib/auth.ts.
+			jwt(),
+			oauthProvider({
+				loginPage: 'http://localhost/login',
+				consentPage: 'http://localhost/consent',
+			}),
 		],
 	})
 	await runMigrations()

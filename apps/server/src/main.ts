@@ -31,6 +31,7 @@ import { DocumentsLive } from './handlers/documents'
 import { EmailLive } from './handlers/email'
 import { HealthLive } from './handlers/health'
 import { InteractionsLive } from './handlers/interactions'
+import { McpOAuthLive } from './handlers/mcp-oauth'
 import { PagesLive } from './handlers/pages'
 import { ProductsLive } from './handlers/products'
 import { ProposalsLive } from './handlers/proposals'
@@ -45,6 +46,7 @@ import { CorsLive } from './lib/cors'
 import { EnvVars } from './lib/env'
 import { LoggerLive } from './lib/logger'
 import { OtlpObservability } from './lib/observability'
+import { WellKnownLive } from './lib/well-known'
 import { McpHttpLive } from './mcp/http'
 import { OrgMiddlewareLive, resolveSystemOrg } from './middleware/org'
 import { SessionMiddlewareLive } from './middleware/session'
@@ -59,6 +61,7 @@ import { EmailProviderLive } from './services/email-provider-live'
 import { Geocoder } from './services/geocoder'
 import { InboxHealthProbe } from './services/inbox-health-probe'
 import { MailTransport } from './services/mail-transport'
+import { McpOAuthService } from './services/mcp-oauth'
 import { OrgResolution } from './services/org-resolution'
 import { PageService } from './services/pages'
 import { PipelineService } from './services/pipeline'
@@ -77,6 +80,7 @@ const ApiLive = HttpApiBuilder.layer(BatudaApi).pipe(
 		HealthLive,
 		AuthHandlerLive,
 		ApiKeysLive,
+		McpOAuthLive,
 		CompaniesLive,
 		ContactsLive,
 		InteractionsLive,
@@ -191,6 +195,7 @@ const ResearchEventSinkLive = Layer.effect(
 
 const ServicesLive = Layer.mergeAll(
 	ApiKeyService.layer,
+	McpOAuthService.layer,
 	CompanyService.layer,
 	TaskService.layer,
 	PipelineService.layer,
@@ -260,6 +265,7 @@ const AppLive = Layer.mergeAll(
 	CorsLive,
 	DocsLive,
 	OpenApiJsonLive,
+	WellKnownLive,
 )
 
 // `CurrentOrg` is request-scoped — provided per request by OrgMiddleware

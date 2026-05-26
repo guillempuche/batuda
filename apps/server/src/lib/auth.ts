@@ -1,8 +1,10 @@
 import { apiKey } from '@better-auth/api-key'
+import { oauthProvider } from '@better-auth/oauth-provider'
 import { betterAuth } from 'better-auth'
 import {
 	admin,
 	bearer,
+	jwt,
 	magicLink,
 	openAPI,
 	organization,
@@ -200,6 +202,34 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 					// enableMetadata: org-owned keys carry { organizationId } so the
 					// MCP path resolves the org from the key (BADREQUEST otherwise).
 					apiKey({ enableSessionForAPIKeys: true, enableMetadata: true }),
+					// OAuth 2.1 Authorization Server for web chat MCP clients
+					// (ChatGPT, Claude.ai) that can't send the `x-api-key` header.
+					// `oauthProvider` issues JWT access tokens whose `aud` is the
+					// requested RFC 8707 resource; `validAudiences` allow-lists the
+					// `/mcp` resource so the resource server can verify a token was
+					// minted for it. Without it, a `resource=<host>/mcp` request is
+					// rejected and tokens fall back to opaque (unverifiable as a JWT).
+					// Serves authorize/token/register (open DCR — clients self-register)
+					// under /auth; discovery is re-served at the host root by main.ts;
+					// the /mcp Bearer branch verifies tokens with `verifyAccessToken`.
+					// `jwt()` is required — oauthProvider signs the tokens through it
+					// and exposes the JWKS the resource server verifies against.
+					// Pin the JWT issuer to the bare origin (not the default
+					// baseURL+basePath `…/auth`): the access-token `iss`, the AS
+					// metadata `issuer`, the resource server's verify issuer, and the
+					// protected-resource `authorization_servers` then all agree on the
+					// origin, and discovery is served at the host root (RFC 8414).
+					jwt({ jwt: { issuer: env.BETTER_AUTH_BASE_URL } }),
+					oauthProvider({
+						loginPage: `${env.APP_PUBLIC_URL}/login`,
+						consentPage: `${env.APP_PUBLIC_URL}/oauth/consent`,
+						requirePKCE: true,
+						allowDynamicClientRegistration: true,
+						validAudiences: [
+							env.BETTER_AUTH_BASE_URL,
+							`${env.BETTER_AUTH_BASE_URL}/mcp`,
+						],
+					}),
 					setPasswordRoute(),
 					magicLink({
 						// Closes the silent-signup hole on /sign-in/magic-link.
