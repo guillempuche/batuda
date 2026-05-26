@@ -158,4 +158,58 @@ describe('apps/server program boot', () => {
 		// THEN no fallback message should have fired during boot
 		expect(combined).not.toMatch(/CurrentOrg accessed outside a request scope/)
 	})
+
+	it('should serve OAuth protected-resource metadata at the host root', async () => {
+		// GIVEN the booted server with the oauthProvider + jwt plugins active
+		// WHEN an MCP client probes RFC 9728 discovery at the origin root
+		const res = await fetch(
+			`http://localhost:${PORT}/.well-known/oauth-protected-resource/mcp`,
+		)
+		const body = (await res.json()) as {
+			resource: string
+			authorization_servers: ReadonlyArray<string>
+			bearer_methods_supported: ReadonlyArray<string>
+		}
+		// THEN the resource is the /mcp endpoint and the lone AS is this origin
+		expect(res.status).toBe(200)
+		expect(body.resource).toBe(`http://localhost:${PORT}/mcp`)
+		expect(body.authorization_servers).toEqual([`http://localhost:${PORT}`])
+		expect(body.bearer_methods_supported).toEqual(['header'])
+	})
+
+	it('should serve OAuth authorization-server metadata with PKCE S256 + DCR', async () => {
+		// GIVEN the booted server
+		// WHEN a client fetches RFC 8414 AS metadata at the root
+		const res = await fetch(
+			`http://localhost:${PORT}/.well-known/oauth-authorization-server`,
+		)
+		const body = (await res.json()) as {
+			issuer: string
+			code_challenge_methods_supported: ReadonlyArray<string>
+			registration_endpoint: string
+		}
+		// THEN the issuer is the origin, PKCE S256 is advertised, and DCR is open
+		expect(res.status).toBe(200)
+		expect(body.issuer).toBe(`http://localhost:${PORT}`)
+		expect(body.code_challenge_methods_supported).toContain('S256')
+		expect(body.registration_endpoint).toContain('/auth/')
+	})
+
+	it('should answer an unauthenticated /mcp request with an OAuth challenge', async () => {
+		// GIVEN no Authorization, x-api-key, or cookie
+		// WHEN an MCP client POSTs to /mcp
+		const res = await fetch(`http://localhost:${PORT}/mcp`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize' }),
+		})
+		// THEN it is a 401 advertising the protected-resource metadata, with the
+		// JSON-RPC error body the MCP transport expects
+		expect(res.status).toBe(401)
+		expect(res.headers.get('www-authenticate')).toContain(
+			`resource_metadata="http://localhost:${PORT}/.well-known/oauth-protected-resource/mcp"`,
+		)
+		const body = (await res.json()) as { error?: { code?: number } }
+		expect(body.error?.code).toBe(-32001)
+	})
 })
