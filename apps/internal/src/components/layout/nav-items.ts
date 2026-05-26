@@ -7,7 +7,7 @@ import {
 	FileText,
 	Gauge,
 	Mail,
-	User,
+	Settings,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
 
@@ -78,10 +78,10 @@ export const navItems: ReadonlyArray<NavItem> = [
 		testId: 'calendar',
 	},
 	{
-		label: msg`Profile`,
-		path: '/profile',
-		icon: User,
+		label: msg`Settings`,
+		path: '/settings',
+		icon: Settings,
 		color: 'var(--color-status-prospect)',
-		testId: 'profile',
+		testId: 'settings',
 	},
 ]

@@ -1,12 +1,9 @@
 import { expect, test } from '@playwright/test'
 
 // Sign-out tears down the Better-Auth session and the root-route guard
-// then refuses to keep us on `/profile`. Selectors verified against:
-//   apps/internal/src/routes/profile/index.tsx (profile-card,
-//     profile-signout — submitted via React 19 form action so the click
-//     is queued through hydration)
-//   apps/internal/src/routes/login.tsx (login-form for the post-redirect
-//     assertion)
+// then refuses to keep us on the settings profile page. The profile page
+// is submitted via a React 19 form action so the click is queued through
+// hydration; login-form drives the post-redirect assertion.
 //
 // Every test in this file signs Alice in via the form, signs her
 // out, and then asserts. Self-contained so a sign-out never leaks a
@@ -27,7 +24,7 @@ async function signIn(page: import('@playwright/test').Page) {
 
 async function signInAndOut(page: import('@playwright/test').Page) {
 	await signIn(page)
-	await page.goto('/profile')
+	await page.goto('/settings/profile')
 	await expect(page.getByTestId('profile-card')).toBeVisible()
 	await page.getByTestId('profile-signout').click()
 	await page.waitForURL(/\/login/)
@@ -40,7 +37,7 @@ test.describe('sign-out', () => {
 		}) => {
 			// GIVEN Alice signs in fresh (own cookie, not the persisted one)
 			await signIn(page)
-			await page.goto('/profile')
+			await page.goto('/settings/profile')
 			await expect(page.getByTestId('profile-card')).toBeVisible()
 
 			// WHEN she submits the sign-out form
@@ -48,10 +45,9 @@ test.describe('sign-out', () => {
 
 			// THEN the route guard redirects to /login and the sign-in form
 			// re-renders — proves both that the cookie is gone (otherwise
-			// the guard would let us back onto /profile) and that the
+			// the guard would let us back onto the profile page) and that the
 			// navigation actually fired (the form is mounted only on the
 			// login route)
-			// [routes/profile/index.tsx — profile-signout submit]
 			await page.waitForURL(/\/login/)
 			await expect(page).toHaveURL(/\/login/)
 			await expect(page.getByTestId('login-form')).toBeVisible()

@@ -28,7 +28,7 @@ interface DismissEntry {
 /**
  * Reminds passwordless users they can bind a password without forcing it.
  * Three escape paths so the prompt never overstays its welcome:
- *   - "Set password" routes to /profile (where the form lives).
+ *   - "Set password" routes to /settings/profile (where the form lives).
  *   - "I prefer passwordless" persists a server-side opt-out — silences
  *     the nudge on every device.
  *   - "Maybe later" stores a local 24h dismissal — quieter, auto-expires.
@@ -62,7 +62,7 @@ export function SetPasswordNudge() {
 	if (dismissedLocally) return null
 
 	const handleSetPassword = async () => {
-		await navigate({ to: '/profile' })
+		await navigate({ to: '/settings/profile' })
 	}
 
 	const handleOptOut = async () => {

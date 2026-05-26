@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TasksIndexRouteImport } from './routes/tasks/index'
+import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as ProfileIndexRouteImport } from './routes/profile/index'
 import { Route as PagesIndexRouteImport } from './routes/pages/index'
 import { Route as EmailsIndexRouteImport } from './routes/emails/index'
@@ -25,7 +26,9 @@ import { Route as EmailsInboxesRouteImport } from './routes/emails/inboxes'
 import { Route as EmailsThreadIdRouteImport } from './routes/emails/$threadId'
 import { Route as CompaniesSlugRouteImport } from './routes/companies/$slug'
 import { Route as AcceptInvitationIdRouteImport } from './routes/accept-invitation.$id'
+import { Route as SettingsProfileIndexRouteImport } from './routes/settings/profile/index'
 import { Route as SettingsOrganizationIndexRouteImport } from './routes/settings/organization/index'
+import { Route as SettingsApiKeysIndexRouteImport } from './routes/settings/api-keys/index'
 import { Route as SettingsOrganizationSpendRouteImport } from './routes/settings/organization/spend'
 import { Route as SettingsOrganizationMembersRouteImport } from './routes/settings/organization/members'
 import { Route as SettingsOrganizationInviteRouteImport } from './routes/settings/organization/invite'
@@ -53,6 +56,11 @@ const IndexRoute = IndexRouteImport.update({
 const TasksIndexRoute = TasksIndexRouteImport.update({
   id: '/tasks/',
   path: '/tasks/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsIndexRoute = SettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfileIndexRoute = ProfileIndexRouteImport.update({
@@ -110,12 +118,22 @@ const AcceptInvitationIdRoute = AcceptInvitationIdRouteImport.update({
   path: '/accept-invitation/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsProfileIndexRoute = SettingsProfileIndexRouteImport.update({
+  id: '/settings/profile/',
+  path: '/settings/profile/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsOrganizationIndexRoute =
   SettingsOrganizationIndexRouteImport.update({
     id: '/settings/organization/',
     path: '/settings/organization/',
     getParentRoute: () => rootRouteImport,
   } as any)
+const SettingsApiKeysIndexRoute = SettingsApiKeysIndexRouteImport.update({
+  id: '/settings/api-keys/',
+  path: '/settings/api-keys/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsOrganizationSpendRoute =
   SettingsOrganizationSpendRouteImport.update({
     id: '/settings/organization/spend',
@@ -151,11 +169,14 @@ export interface FileRoutesByFullPath {
   '/emails/': typeof EmailsIndexRoute
   '/pages/': typeof PagesIndexRoute
   '/profile/': typeof ProfileIndexRoute
+  '/settings/': typeof SettingsIndexRoute
   '/tasks/': typeof TasksIndexRoute
   '/settings/organization/invite': typeof SettingsOrganizationInviteRoute
   '/settings/organization/members': typeof SettingsOrganizationMembersRoute
   '/settings/organization/spend': typeof SettingsOrganizationSpendRoute
+  '/settings/api-keys/': typeof SettingsApiKeysIndexRoute
   '/settings/organization/': typeof SettingsOrganizationIndexRoute
+  '/settings/profile/': typeof SettingsProfileIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -173,11 +194,14 @@ export interface FileRoutesByTo {
   '/emails': typeof EmailsIndexRoute
   '/pages': typeof PagesIndexRoute
   '/profile': typeof ProfileIndexRoute
+  '/settings': typeof SettingsIndexRoute
   '/tasks': typeof TasksIndexRoute
   '/settings/organization/invite': typeof SettingsOrganizationInviteRoute
   '/settings/organization/members': typeof SettingsOrganizationMembersRoute
   '/settings/organization/spend': typeof SettingsOrganizationSpendRoute
+  '/settings/api-keys': typeof SettingsApiKeysIndexRoute
   '/settings/organization': typeof SettingsOrganizationIndexRoute
+  '/settings/profile': typeof SettingsProfileIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -196,11 +220,14 @@ export interface FileRoutesById {
   '/emails/': typeof EmailsIndexRoute
   '/pages/': typeof PagesIndexRoute
   '/profile/': typeof ProfileIndexRoute
+  '/settings/': typeof SettingsIndexRoute
   '/tasks/': typeof TasksIndexRoute
   '/settings/organization/invite': typeof SettingsOrganizationInviteRoute
   '/settings/organization/members': typeof SettingsOrganizationMembersRoute
   '/settings/organization/spend': typeof SettingsOrganizationSpendRoute
+  '/settings/api-keys/': typeof SettingsApiKeysIndexRoute
   '/settings/organization/': typeof SettingsOrganizationIndexRoute
+  '/settings/profile/': typeof SettingsProfileIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -220,11 +247,14 @@ export interface FileRouteTypes {
     | '/emails/'
     | '/pages/'
     | '/profile/'
+    | '/settings/'
     | '/tasks/'
     | '/settings/organization/invite'
     | '/settings/organization/members'
     | '/settings/organization/spend'
+    | '/settings/api-keys/'
     | '/settings/organization/'
+    | '/settings/profile/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -242,11 +272,14 @@ export interface FileRouteTypes {
     | '/emails'
     | '/pages'
     | '/profile'
+    | '/settings'
     | '/tasks'
     | '/settings/organization/invite'
     | '/settings/organization/members'
     | '/settings/organization/spend'
+    | '/settings/api-keys'
     | '/settings/organization'
+    | '/settings/profile'
   id:
     | '__root__'
     | '/'
@@ -264,11 +297,14 @@ export interface FileRouteTypes {
     | '/emails/'
     | '/pages/'
     | '/profile/'
+    | '/settings/'
     | '/tasks/'
     | '/settings/organization/invite'
     | '/settings/organization/members'
     | '/settings/organization/spend'
+    | '/settings/api-keys/'
     | '/settings/organization/'
+    | '/settings/profile/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -287,11 +323,14 @@ export interface RootRouteChildren {
   EmailsIndexRoute: typeof EmailsIndexRoute
   PagesIndexRoute: typeof PagesIndexRoute
   ProfileIndexRoute: typeof ProfileIndexRoute
+  SettingsIndexRoute: typeof SettingsIndexRoute
   TasksIndexRoute: typeof TasksIndexRoute
   SettingsOrganizationInviteRoute: typeof SettingsOrganizationInviteRoute
   SettingsOrganizationMembersRoute: typeof SettingsOrganizationMembersRoute
   SettingsOrganizationSpendRoute: typeof SettingsOrganizationSpendRoute
+  SettingsApiKeysIndexRoute: typeof SettingsApiKeysIndexRoute
   SettingsOrganizationIndexRoute: typeof SettingsOrganizationIndexRoute
+  SettingsProfileIndexRoute: typeof SettingsProfileIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -329,6 +368,13 @@ declare module '@tanstack/react-router' {
       path: '/tasks'
       fullPath: '/tasks/'
       preLoaderRoute: typeof TasksIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/': {
+      id: '/settings/'
+      path: '/settings'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof SettingsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profile/': {
@@ -408,11 +454,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AcceptInvitationIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/profile/': {
+      id: '/settings/profile/'
+      path: '/settings/profile'
+      fullPath: '/settings/profile/'
+      preLoaderRoute: typeof SettingsProfileIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/organization/': {
       id: '/settings/organization/'
       path: '/settings/organization'
       fullPath: '/settings/organization/'
       preLoaderRoute: typeof SettingsOrganizationIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/api-keys/': {
+      id: '/settings/api-keys/'
+      path: '/settings/api-keys'
+      fullPath: '/settings/api-keys/'
+      preLoaderRoute: typeof SettingsApiKeysIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings/organization/spend': {
@@ -455,21 +515,15 @@ const rootRouteChildren: RootRouteChildren = {
   EmailsIndexRoute: EmailsIndexRoute,
   PagesIndexRoute: PagesIndexRoute,
   ProfileIndexRoute: ProfileIndexRoute,
+  SettingsIndexRoute: SettingsIndexRoute,
   TasksIndexRoute: TasksIndexRoute,
   SettingsOrganizationInviteRoute: SettingsOrganizationInviteRoute,
   SettingsOrganizationMembersRoute: SettingsOrganizationMembersRoute,
   SettingsOrganizationSpendRoute: SettingsOrganizationSpendRoute,
+  SettingsApiKeysIndexRoute: SettingsApiKeysIndexRoute,
   SettingsOrganizationIndexRoute: SettingsOrganizationIndexRoute,
+  SettingsProfileIndexRoute: SettingsProfileIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
