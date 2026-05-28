@@ -194,7 +194,7 @@ msgstr "Admin"
 msgid "Agent"
 msgstr "Agent"
 
-#: src/routes/settings/mcp/connections.tsx:113
+#: src/routes/settings/mcp/connections.tsx:114
 msgid "AI assistants you've connected over MCP. Choose which organization each one acts in."
 msgstr "Assistents d'IA que has connectat per MCP. Tria en quina organització actua cadascun."
 
@@ -296,7 +296,7 @@ msgid "Back to organization"
 msgstr "Tornar a l'organització"
 
 #: src/routes/settings/api-keys/index.tsx:187
-#: src/routes/settings/mcp/connections.tsx:100
+#: src/routes/settings/mcp/connections.tsx:101
 msgid "Back to settings"
 msgstr "Torna a la configuració"
 
@@ -465,7 +465,7 @@ msgstr "Comprova la sessió o torna-ho a provar."
 msgid "Check your inbox"
 msgstr "Mira la safata d'entrada"
 
-#: src/routes/settings/mcp/connections.tsx:175
+#: src/routes/settings/mcp/connections.tsx:181
 msgid "Choose organization"
 msgstr "Tria una organització"
 
@@ -620,7 +620,7 @@ msgid "Connected"
 msgstr "Connectada"
 
 #. placeholder {0}: formatDate(row.createdAt)
-#: src/routes/settings/mcp/connections.tsx:148
+#: src/routes/settings/mcp/connections.tsx:149
 msgid "Connected {0}"
 msgstr "Connectat {0}"
 
@@ -730,7 +730,7 @@ msgstr "No s'ha pogut carregar aquesta execució."
 msgid "Could not load threads"
 msgstr "No s'han pogut carregar els fils"
 
-#: src/routes/settings/mcp/connections.tsx:130
+#: src/routes/settings/mcp/connections.tsx:131
 msgid "Could not load your connections. Refresh to try again."
 msgstr "No s'han pogut carregar les connexions. Actualitza per tornar-ho a provar."
 
@@ -804,7 +804,7 @@ msgstr "No s'ha pogut canviar d'organització. Torna-ho a provar."
 msgid "Could not toggle the inbox state."
 msgstr "No s'ha pogut canviar l'estat de la safata."
 
-#: src/routes/settings/mcp/connections.tsx:89
+#: src/routes/settings/mcp/connections.tsx:90
 msgid "Could not update"
 msgstr "No s'ha pogut actualitzar"
 
@@ -1451,7 +1451,7 @@ msgstr "Carregant l'execució…"
 #: src/components/companies/upcoming-meetings-card.tsx:57
 #: src/components/shared/loading-spinner.tsx:23
 #: src/routes/settings/api-keys/index.tsx:266
-#: src/routes/settings/mcp/connections.tsx:126
+#: src/routes/settings/mcp/connections.tsx:127
 #: src/routes/settings/organization/index.tsx:52
 #: src/routes/settings/organization/members.tsx:113
 msgid "Loading…"
@@ -1572,7 +1572,7 @@ msgstr "Resum de mercat"
 msgid "Maturity"
 msgstr "Maduresa"
 
-#: src/routes/settings/mcp/connections.tsx:110
+#: src/routes/settings/mcp/connections.tsx:111
 msgid "MCP connections"
 msgstr "Connexions MCP"
 
@@ -1727,7 +1727,7 @@ msgstr "Encara no hi ha empreses"
 msgid "No connection to the server. Try again in a few seconds."
 msgstr "Sense connexió al servidor. Torna-ho a provar d'aquí a uns segons."
 
-#: src/routes/settings/mcp/connections.tsx:136
+#: src/routes/settings/mcp/connections.tsx:137
 msgid "No connections yet. Add this server in your AI assistant and authorize it, then it appears here."
 msgstr "Encara no hi ha connexions. Afegeix aquest servidor al teu assistent d'IA i autoritza'l; després apareixerà aquí."
 
@@ -1973,11 +1973,11 @@ msgid "Organization"
 msgstr "Organització"
 
 #. placeholder {0}: row.name ?? t`Unnamed client`
-#: src/routes/settings/mcp/connections.tsx:171
+#: src/routes/settings/mcp/connections.tsx:177
 msgid "Organization for {0}"
 msgstr "Organització per a {0}"
 
-#: src/routes/settings/mcp/connections.tsx:81
+#: src/routes/settings/mcp/connections.tsx:82
 msgid "Organization updated"
 msgstr "Organització actualitzada"
 
@@ -2492,6 +2492,15 @@ msgstr "Selecciona el fil {0}"
 msgid "Selecting a preset fills IMAP and SMTP defaults — you can still edit them."
 msgstr "Triar un preestablit omple els paràmetres IMAP i SMTP — encara els pots editar."
 
+#: src/routes/settings/mcp/connections.tsx:154
+msgid "Self-reported name"
+msgstr "Nom autodeclarat"
+
+#. placeholder {0}: row.redirectHost
+#: src/routes/settings/mcp/connections.tsx:153
+msgid "Self-reported name · sends you to {0}"
+msgstr "Nom autodeclarat · t'envia a {0}"
+
 #: src/components/emails/compose-form.tsx:534
 msgid "Send"
 msgstr "Envia"
@@ -2554,7 +2563,7 @@ msgstr "Posa contrasenya"
 #: src/components/layout/nav-items.ts:81
 #: src/routes/pages/$id.tsx:290
 #: src/routes/settings/api-keys/index.tsx:190
-#: src/routes/settings/mcp/connections.tsx:103
+#: src/routes/settings/mcp/connections.tsx:104
 #: src/routes/settings/profile/index.tsx:108
 msgid "Settings"
 msgstr "Configuració"
@@ -2885,7 +2894,7 @@ msgstr "L'espai de treball on viuen les dades del CRM."
 msgid "They replied — keep the thread warm"
 msgstr "Ha respost — manté el fil calent"
 
-#: src/routes/settings/mcp/connections.tsx:82
+#: src/routes/settings/mcp/connections.tsx:83
 msgid "This connection now acts in the chosen organization."
 msgstr "Aquesta connexió ara actua en l'organització triada."
 
@@ -3006,8 +3015,8 @@ msgstr "Usuari desconegut"
 msgid "Unlinked"
 msgstr "Sense enllaçar"
 
-#: src/routes/settings/mcp/connections.tsx:146
-#: src/routes/settings/mcp/connections.tsx:171
+#: src/routes/settings/mcp/connections.tsx:147
+#: src/routes/settings/mcp/connections.tsx:177
 msgid "Unnamed client"
 msgstr "Client sense nom"
 
@@ -3166,7 +3175,7 @@ msgstr "No tens permís per veure aquesta pàgina."
 msgid "You got in from a link in your email."
 msgstr "Has entrat des d'un enllaç al teu correu."
 
-#: src/routes/settings/mcp/connections.tsx:90
+#: src/routes/settings/mcp/connections.tsx:91
 msgid "You may not be a member of that organization. Try again."
 msgstr "Potser no ets membre d'aquesta organització. Torna-ho a provar."
 
@@ -3190,7 +3199,7 @@ msgstr "tu@exemple.com"
 msgid "Your Batuda workbench identity."
 msgstr "La teva identitat al banc de Batuda."
 
-#: src/routes/settings/mcp/connections.tsx:122
+#: src/routes/settings/mcp/connections.tsx:123
 msgid "Your connections"
 msgstr "Les teves connexions"
 

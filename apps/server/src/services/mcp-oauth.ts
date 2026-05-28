@@ -5,13 +5,17 @@ import { Forbidden } from '@batuda/controllers'
 
 import { Auth } from '../lib/auth'
 
-// A user's MCP OAuth connection: an OAuth client they've consented to, plus the
-// organization its access tokens currently act in (`null` = not yet chosen).
+// A user's MCP OAuth connection: an OAuth client they've consented to, the org
+// its access tokens currently act in (`null` = not yet chosen), and the host of
+// its first redirect URI. The host is provenance — the client `name` is
+// self-asserted at registration, but the redirect host is where it actually
+// sends the user, so the UI can show it rather than trust the name alone.
 export interface McpConnection {
 	readonly clientId: string
 	readonly name: string | null
 	readonly createdAt: string
 	readonly organizationId: string | null
+	readonly redirectHost: string | null
 }
 
 interface ConnectionRow {
@@ -19,6 +23,20 @@ interface ConnectionRow {
 	readonly name: string | null
 	readonly createdAt: string | Date
 	readonly organizationId: string | null
+	readonly redirectUris: unknown
+}
+
+// The host of a client's first registered redirect URI, or null if it has none
+// / they're unparseable. Surfaced on the connections page as provenance.
+const firstRedirectHost = (redirectUris: unknown): string | null => {
+	const uris = Array.isArray(redirectUris) ? redirectUris : []
+	const first = uris.find((u): u is string => typeof u === 'string')
+	if (first === undefined) return null
+	try {
+		return new URL(first).host
+	} catch {
+		return null
+	}
 }
 
 // Binds a `(user, OAuth client)` connection to the organization its MCP access
@@ -110,6 +128,7 @@ export class McpOAuthService extends ServiceMap.Service<McpOAuthService>()(
 							client.query<ConnectionRow>(
 								`SELECT c."clientId"        AS "clientId",
 								        oc.name             AS name,
+								        oc."redirectUris"   AS "redirectUris",
 								        c."createdAt"       AS "createdAt",
 								        sel.organization_id AS "organizationId"
 								 FROM "oauthConsent" c
@@ -126,6 +145,7 @@ export class McpOAuthService extends ServiceMap.Service<McpOAuthService>()(
 							name: row.name,
 							createdAt: new Date(row.createdAt).toISOString(),
 							organizationId: row.organizationId,
+							redirectHost: firstRedirectHost(row.redirectUris),
 						}))
 					}),
 			}

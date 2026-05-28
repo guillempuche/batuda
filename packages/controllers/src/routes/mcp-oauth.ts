@@ -24,6 +24,9 @@ export const McpConnectionView = Schema.Struct({
 	name: Schema.NullOr(Schema.String),
 	createdAt: Schema.String,
 	organizationId: Schema.NullOr(Schema.String),
+	// Host of the client's first redirect URI — provenance shown beside the
+	// self-asserted `name` (null if it registered none / they're unparseable).
+	redirectHost: Schema.NullOr(Schema.String),
 })
 
 // ── Route group ──

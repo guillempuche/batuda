@@ -28,6 +28,7 @@ type Connection = {
 	readonly name: string | null
 	readonly createdAt: string
 	readonly organizationId: string | null
+	readonly redirectHost: string | null
 }
 
 const connectionsAtom = BatudaApiAtom.query('mcpOAuth', 'listConnections', {})
@@ -147,6 +148,11 @@ function ConnectionsPage() {
 									<ConnMeta>
 										<Trans>Connected {formatDate(row.createdAt)}</Trans>
 									</ConnMeta>
+									<ConnMeta>
+										{row.redirectHost
+											? t`Self-reported name · sends you to ${row.redirectHost}`
+											: t`Self-reported name`}
+									</ConnMeta>
 								</ConnInfo>
 								<PriSelect.Root
 									items={orgOptions}
@@ -225,6 +231,8 @@ function narrowConnections(
 			name: typeof r['name'] === 'string' ? r['name'] : null,
 			organizationId:
 				typeof r['organizationId'] === 'string' ? r['organizationId'] : null,
+			redirectHost:
+				typeof r['redirectHost'] === 'string' ? r['redirectHost'] : null,
 		})
 	}
 	return out
