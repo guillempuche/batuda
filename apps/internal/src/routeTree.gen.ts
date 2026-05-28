@@ -22,6 +22,7 @@ import { Route as CompaniesIndexRouteImport } from './routes/companies/index'
 import { Route as CalendarIndexRouteImport } from './routes/calendar/index'
 import { Route as ResearchIdRouteImport } from './routes/research/$id'
 import { Route as PagesIdRouteImport } from './routes/pages/$id'
+import { Route as OauthConsentRouteImport } from './routes/oauth/consent'
 import { Route as EmailsInboxesRouteImport } from './routes/emails/inboxes'
 import { Route as EmailsThreadIdRouteImport } from './routes/emails/$threadId'
 import { Route as CompaniesSlugRouteImport } from './routes/companies/$slug'
@@ -32,6 +33,7 @@ import { Route as SettingsApiKeysIndexRouteImport } from './routes/settings/api-
 import { Route as SettingsOrganizationSpendRouteImport } from './routes/settings/organization/spend'
 import { Route as SettingsOrganizationMembersRouteImport } from './routes/settings/organization/members'
 import { Route as SettingsOrganizationInviteRouteImport } from './routes/settings/organization/invite'
+import { Route as SettingsMcpConnectionsRouteImport } from './routes/settings/mcp/connections'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -98,6 +100,11 @@ const PagesIdRoute = PagesIdRouteImport.update({
   path: '/pages/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OauthConsentRoute = OauthConsentRouteImport.update({
+  id: '/oauth/consent',
+  path: '/oauth/consent',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EmailsInboxesRoute = EmailsInboxesRouteImport.update({
   id: '/emails/inboxes',
   path: '/emails/inboxes',
@@ -152,6 +159,11 @@ const SettingsOrganizationInviteRoute =
     path: '/settings/organization/invite',
     getParentRoute: () => rootRouteImport,
   } as any)
+const SettingsMcpConnectionsRoute = SettingsMcpConnectionsRouteImport.update({
+  id: '/settings/mcp/connections',
+  path: '/settings/mcp/connections',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -162,6 +174,7 @@ export interface FileRoutesByFullPath {
   '/companies/$slug': typeof CompaniesSlugRoute
   '/emails/$threadId': typeof EmailsThreadIdRoute
   '/emails/inboxes': typeof EmailsInboxesRoute
+  '/oauth/consent': typeof OauthConsentRoute
   '/pages/$id': typeof PagesIdRoute
   '/research/$id': typeof ResearchIdRoute
   '/calendar/': typeof CalendarIndexRoute
@@ -171,6 +184,7 @@ export interface FileRoutesByFullPath {
   '/profile/': typeof ProfileIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/tasks/': typeof TasksIndexRoute
+  '/settings/mcp/connections': typeof SettingsMcpConnectionsRoute
   '/settings/organization/invite': typeof SettingsOrganizationInviteRoute
   '/settings/organization/members': typeof SettingsOrganizationMembersRoute
   '/settings/organization/spend': typeof SettingsOrganizationSpendRoute
@@ -187,6 +201,7 @@ export interface FileRoutesByTo {
   '/companies/$slug': typeof CompaniesSlugRoute
   '/emails/$threadId': typeof EmailsThreadIdRoute
   '/emails/inboxes': typeof EmailsInboxesRoute
+  '/oauth/consent': typeof OauthConsentRoute
   '/pages/$id': typeof PagesIdRoute
   '/research/$id': typeof ResearchIdRoute
   '/calendar': typeof CalendarIndexRoute
@@ -196,6 +211,7 @@ export interface FileRoutesByTo {
   '/profile': typeof ProfileIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/tasks': typeof TasksIndexRoute
+  '/settings/mcp/connections': typeof SettingsMcpConnectionsRoute
   '/settings/organization/invite': typeof SettingsOrganizationInviteRoute
   '/settings/organization/members': typeof SettingsOrganizationMembersRoute
   '/settings/organization/spend': typeof SettingsOrganizationSpendRoute
@@ -213,6 +229,7 @@ export interface FileRoutesById {
   '/companies/$slug': typeof CompaniesSlugRoute
   '/emails/$threadId': typeof EmailsThreadIdRoute
   '/emails/inboxes': typeof EmailsInboxesRoute
+  '/oauth/consent': typeof OauthConsentRoute
   '/pages/$id': typeof PagesIdRoute
   '/research/$id': typeof ResearchIdRoute
   '/calendar/': typeof CalendarIndexRoute
@@ -222,6 +239,7 @@ export interface FileRoutesById {
   '/profile/': typeof ProfileIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/tasks/': typeof TasksIndexRoute
+  '/settings/mcp/connections': typeof SettingsMcpConnectionsRoute
   '/settings/organization/invite': typeof SettingsOrganizationInviteRoute
   '/settings/organization/members': typeof SettingsOrganizationMembersRoute
   '/settings/organization/spend': typeof SettingsOrganizationSpendRoute
@@ -240,6 +258,7 @@ export interface FileRouteTypes {
     | '/companies/$slug'
     | '/emails/$threadId'
     | '/emails/inboxes'
+    | '/oauth/consent'
     | '/pages/$id'
     | '/research/$id'
     | '/calendar/'
@@ -249,6 +268,7 @@ export interface FileRouteTypes {
     | '/profile/'
     | '/settings/'
     | '/tasks/'
+    | '/settings/mcp/connections'
     | '/settings/organization/invite'
     | '/settings/organization/members'
     | '/settings/organization/spend'
@@ -265,6 +285,7 @@ export interface FileRouteTypes {
     | '/companies/$slug'
     | '/emails/$threadId'
     | '/emails/inboxes'
+    | '/oauth/consent'
     | '/pages/$id'
     | '/research/$id'
     | '/calendar'
@@ -274,6 +295,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/settings'
     | '/tasks'
+    | '/settings/mcp/connections'
     | '/settings/organization/invite'
     | '/settings/organization/members'
     | '/settings/organization/spend'
@@ -290,6 +312,7 @@ export interface FileRouteTypes {
     | '/companies/$slug'
     | '/emails/$threadId'
     | '/emails/inboxes'
+    | '/oauth/consent'
     | '/pages/$id'
     | '/research/$id'
     | '/calendar/'
@@ -299,6 +322,7 @@ export interface FileRouteTypes {
     | '/profile/'
     | '/settings/'
     | '/tasks/'
+    | '/settings/mcp/connections'
     | '/settings/organization/invite'
     | '/settings/organization/members'
     | '/settings/organization/spend'
@@ -316,6 +340,7 @@ export interface RootRouteChildren {
   CompaniesSlugRoute: typeof CompaniesSlugRoute
   EmailsThreadIdRoute: typeof EmailsThreadIdRoute
   EmailsInboxesRoute: typeof EmailsInboxesRoute
+  OauthConsentRoute: typeof OauthConsentRoute
   PagesIdRoute: typeof PagesIdRoute
   ResearchIdRoute: typeof ResearchIdRoute
   CalendarIndexRoute: typeof CalendarIndexRoute
@@ -325,6 +350,7 @@ export interface RootRouteChildren {
   ProfileIndexRoute: typeof ProfileIndexRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
   TasksIndexRoute: typeof TasksIndexRoute
+  SettingsMcpConnectionsRoute: typeof SettingsMcpConnectionsRoute
   SettingsOrganizationInviteRoute: typeof SettingsOrganizationInviteRoute
   SettingsOrganizationMembersRoute: typeof SettingsOrganizationMembersRoute
   SettingsOrganizationSpendRoute: typeof SettingsOrganizationSpendRoute
@@ -426,6 +452,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PagesIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/oauth/consent': {
+      id: '/oauth/consent'
+      path: '/oauth/consent'
+      fullPath: '/oauth/consent'
+      preLoaderRoute: typeof OauthConsentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/emails/inboxes': {
       id: '/emails/inboxes'
       path: '/emails/inboxes'
@@ -496,6 +529,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsOrganizationInviteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/mcp/connections': {
+      id: '/settings/mcp/connections'
+      path: '/settings/mcp/connections'
+      fullPath: '/settings/mcp/connections'
+      preLoaderRoute: typeof SettingsMcpConnectionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -508,6 +548,7 @@ const rootRouteChildren: RootRouteChildren = {
   CompaniesSlugRoute: CompaniesSlugRoute,
   EmailsThreadIdRoute: EmailsThreadIdRoute,
   EmailsInboxesRoute: EmailsInboxesRoute,
+  OauthConsentRoute: OauthConsentRoute,
   PagesIdRoute: PagesIdRoute,
   ResearchIdRoute: ResearchIdRoute,
   CalendarIndexRoute: CalendarIndexRoute,
@@ -517,6 +558,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProfileIndexRoute: ProfileIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
   TasksIndexRoute: TasksIndexRoute,
+  SettingsMcpConnectionsRoute: SettingsMcpConnectionsRoute,
   SettingsOrganizationInviteRoute: SettingsOrganizationInviteRoute,
   SettingsOrganizationMembersRoute: SettingsOrganizationMembersRoute,
   SettingsOrganizationSpendRoute: SettingsOrganizationSpendRoute,

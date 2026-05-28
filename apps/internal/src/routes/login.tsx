@@ -33,6 +33,19 @@ function isSafeReturnTo(value: string): boolean {
 const safeReturnTo = (value: string | undefined): string =>
 	value && isSafeReturnTo(value) ? value : '/'
 
+/**
+ * The connection request in the URL when an AI assistant (ChatGPT, Claude.ai)
+ * sent the user here to sign in — otherwise empty. Read straight from the URL
+ * because it's signed, and the router's parsed search would drop the parts the
+ * signature covers. The `sig` marker tells a real request from a hand-typed URL.
+ */
+function pendingOAuthQuery(): string {
+	if (typeof window === 'undefined') return ''
+	const raw = window.location.search.replace(/^\?/, '')
+	const params = new URLSearchParams(raw)
+	return params.has('client_id') && params.has('sig') ? raw : ''
+}
+
 // Cross-tab sign-in coordination channel: when the magic-link verify
 // endpoint lands the user in a fresh tab, we broadcast so the original
 // `/login` tab can navigate off the stale "Check your inbox" panel.
@@ -134,6 +147,7 @@ const MESSAGES = {
 	invalidCredentials: msg`Email or password is incorrect.`,
 	emailNotVerified: msg`Your email isn't verified yet. Use the magic link instead.`,
 	passwordFallback: msg`Could not sign in. Check your email and password.`,
+	oauthRestart: msg`That connection request expired. Start it again from your AI assistant.`,
 	magicLinkFallback: msg`Could not send the link. Try again in a few seconds.`,
 	network: msg`No connection to the server. Try again in a few seconds.`,
 	enterValidEmail: msg`Enter a valid email above first.`,
@@ -167,15 +181,27 @@ function LoginPage() {
 		async (_previous, formData) => {
 			const email = normalizeEmail(String(formData.get('email') ?? ''))
 			const password = String(formData.get('password') ?? '')
+			// If an AI assistant sent the user here to connect, send its request
+			// along with the sign-in so the server can carry on once they're in.
+			const oauthQuery = pendingOAuthQuery()
 			try {
 				const response = await fetch(`${apiBaseUrl()}/auth/sign-in/email`, {
 					method: 'POST',
 					credentials: 'include',
 					headers: { 'content-type': 'application/json' },
-					body: JSON.stringify({ email, password }),
+					body: JSON.stringify(
+						oauthQuery
+							? { email, password, oauth_query: oauthQuery }
+							: { email, password },
+					),
 				})
 				if (!response.ok) {
 					const body = (await response.json().catch(() => null)) as ErrorBody
+					// The credentials were fine; the connection request itself
+					// lapsed. Send them back to the assistant, not to "wrong password".
+					if (oauthQuery && isOAuthQueryError(body)) {
+						return { error: t(MESSAGES.oauthRestart) }
+					}
 					const key = passwordErrorKey(body, response.status)
 					// Known codes have curated copy; unknowns defer to Better-Auth's
 					// already-localized `message` and only then to our generic string.
@@ -184,6 +210,19 @@ function LoginPage() {
 							? (body?.message ?? t(MESSAGES.passwordFallback))
 							: t(MESSAGES[key])
 					return { error }
+				}
+				// The server replies with where to send the browser next — the
+				// consent screen, or back to the assistant. Go there, not into
+				// the app.
+				if (oauthQuery) {
+					const body = (await response.json().catch(() => null)) as {
+						url?: string
+					} | null
+					if (body?.url) {
+						window.location.assign(body.url)
+						return { error: null }
+					}
+					// No next URL came back — they're signed in, so just enter the app.
 				}
 				// Success — cookie is on the response. Navigate to the
 				// originally requested URL (or `/`); the root's beforeLoad
@@ -509,7 +548,13 @@ function InboxView({
 // Shape of Better-Auth's error responses. The literal return-type unions on
 // the helpers below are load-bearing: they let the call-site narrow against
 // `MESSAGES` and let TS catch a missing key the moment one is added here.
-type ErrorBody = { code?: string; message?: string } | null
+type ErrorBody = { code?: string; message?: string; error?: string } | null
+
+// A forwarded authorize query that's expired or tampered fails sign-in with
+// this code (not a credential error), so the user can be pointed back to their
+// assistant instead of being told their password is wrong.
+const isOAuthQueryError = (body: ErrorBody): boolean =>
+	body?.error === 'invalid_signature' || body?.code === 'invalid_signature'
 
 // HTTP 429 short-circuits the body — Better-Auth's rate-limit response has
 // no `code`, so status has to be checked before `body.code`.
