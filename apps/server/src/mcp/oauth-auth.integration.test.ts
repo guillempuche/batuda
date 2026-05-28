@@ -46,9 +46,10 @@ const env: Record<string, string> = {
 for (const [k, v] of Object.entries(env)) process.env[k] ??= v
 
 import { randomUUID } from 'node:crypto'
+import { createServer } from 'node:http'
 
 import type { PgClient } from '@effect/sql-pg'
-import { verifyJwsAccessToken } from 'better-auth/oauth2'
+import { verifyAccessToken, verifyJwsAccessToken } from 'better-auth/oauth2'
 import { type Config, Effect, Layer, ManagedRuntime } from 'effect'
 import { SqlClient, type SqlError } from 'effect/unstable/sql'
 import pg from 'pg'
@@ -338,6 +339,50 @@ afterAll(async () => {
 })
 
 describe('OAuth access token verification', () => {
+	describe('the wired verifyAccessToken over a real JWKS endpoint', () => {
+		// The other cases use the in-process verifyJwsAccessToken; the /mcp
+		// middleware instead calls verifyAccessToken with a jwksUrl it fetches
+		// over HTTP. Exercise that exact production call so a Better Auth change
+		// to the fetch/verify contract fails here rather than at runtime.
+		it('should verify a token fetched from an HTTP JWKS endpoint', async () => {
+			// GIVEN the AS's JWKS served over HTTP, as the resource server fetches it
+			const jwks = await runtime.runPromise(
+				Effect.gen(function* () {
+					const auth = yield* Auth
+					return yield* Effect.promise(() => auth.instance.api.getJwks())
+				}),
+			)
+			const server = createServer((_req, res) => {
+				res.setHeader('content-type', 'application/json')
+				res.end(JSON.stringify(jwks))
+			})
+			await new Promise<void>(resolve =>
+				server.listen(0, '127.0.0.1', () => resolve()),
+			)
+			try {
+				const address = server.address()
+				const port = address && typeof address === 'object' ? address.port : 0
+
+				// WHEN the wired call verifies a freshly minted token
+				const token = await mintToken({ sub: singleOrgUserId })
+				const payload = await verifyAccessToken(token, {
+					jwksUrl: `http://127.0.0.1:${port}/jwks`,
+					verifyOptions: {
+						audience: AUDIENCE,
+						issuer: BASE_URL,
+						algorithms: ['EdDSA'],
+					},
+				})
+
+				// THEN it returns the payload, with azp rewritten to client_id
+				expect(payload?.sub).toBe(singleOrgUserId)
+				expect(payload?.['client_id']).toBe(CLIENT_ID)
+			} finally {
+				await new Promise<void>(resolve => server.close(() => resolve()))
+			}
+		})
+	})
+
 	describe('a token minted for the /mcp resource', () => {
 		it('should verify and expose the subject + client id', async () => {
 			// GIVEN a token for the single-org user, audience-bound to /mcp
