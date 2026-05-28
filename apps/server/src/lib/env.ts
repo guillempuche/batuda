@@ -83,6 +83,15 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 			Schema.Literals(['strict', 'loose']),
 			'BETTER_AUTH_RATE_LIMIT',
 		).pipe(Config.withDefault('strict' as const))
+		// How long an OAuth access token (the credential a connected AI
+		// assistant calls /mcp with) stays valid, in seconds. Defaults short
+		// so production keeps the window a leaked or post-offboarding token
+		// works to a few minutes — the per-call org-membership check is the
+		// instant cut-off, this just caps the edges. Dev sets it long so local
+		// testing isn't constantly re-authorizing.
+		const OAUTH_ACCESS_TOKEN_TTL_SECONDS = yield* Config.int(
+			'OAUTH_ACCESS_TOKEN_TTL_SECONDS',
+		).pipe(Config.withDefault(900))
 		// Comma-separated list of trusted origins (e.g.
 		// `https://batuda.localhost`). Each entry is either a literal
 		// origin matched exactly or a wildcard-subdomain pattern
@@ -202,6 +211,7 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 			BETTER_AUTH_BASE_URL,
 			BETTER_AUTH_INSECURE_COOKIES,
 			BETTER_AUTH_RATE_LIMIT,
+			OAUTH_ACCESS_TOKEN_TTL_SECONDS,
 			ALLOWED_ORIGINS,
 			APP_PUBLIC_URL,
 			STORAGE_ENDPOINT,
