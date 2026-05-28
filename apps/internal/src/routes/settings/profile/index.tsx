@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-router'
 import {
 	Building2,
+	Cable,
 	KeyRound,
 	LogOut,
 	Mail,
@@ -119,6 +120,12 @@ function ProfilePage() {
 					<KeyRound size={16} aria-hidden />
 					<span>
 						<Trans>API keys</Trans>
+					</span>
+				</NavRow>
+				<NavRow to='/settings/mcp' data-testid='settings-nav-mcp-setup'>
+					<Cable size={16} aria-hidden />
+					<span>
+						<Trans>Connect AI tools</Trans>
 					</span>
 				</NavRow>
 				<NavRow

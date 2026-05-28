@@ -29,6 +29,7 @@ import { Route as CompaniesSlugRouteImport } from './routes/companies/$slug'
 import { Route as AcceptInvitationIdRouteImport } from './routes/accept-invitation.$id'
 import { Route as SettingsProfileIndexRouteImport } from './routes/settings/profile/index'
 import { Route as SettingsOrganizationIndexRouteImport } from './routes/settings/organization/index'
+import { Route as SettingsMcpIndexRouteImport } from './routes/settings/mcp/index'
 import { Route as SettingsApiKeysIndexRouteImport } from './routes/settings/api-keys/index'
 import { Route as SettingsOrganizationSpendRouteImport } from './routes/settings/organization/spend'
 import { Route as SettingsOrganizationMembersRouteImport } from './routes/settings/organization/members'
@@ -136,6 +137,11 @@ const SettingsOrganizationIndexRoute =
     path: '/settings/organization/',
     getParentRoute: () => rootRouteImport,
   } as any)
+const SettingsMcpIndexRoute = SettingsMcpIndexRouteImport.update({
+  id: '/settings/mcp/',
+  path: '/settings/mcp/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsApiKeysIndexRoute = SettingsApiKeysIndexRouteImport.update({
   id: '/settings/api-keys/',
   path: '/settings/api-keys/',
@@ -189,6 +195,7 @@ export interface FileRoutesByFullPath {
   '/settings/organization/members': typeof SettingsOrganizationMembersRoute
   '/settings/organization/spend': typeof SettingsOrganizationSpendRoute
   '/settings/api-keys/': typeof SettingsApiKeysIndexRoute
+  '/settings/mcp/': typeof SettingsMcpIndexRoute
   '/settings/organization/': typeof SettingsOrganizationIndexRoute
   '/settings/profile/': typeof SettingsProfileIndexRoute
 }
@@ -216,6 +223,7 @@ export interface FileRoutesByTo {
   '/settings/organization/members': typeof SettingsOrganizationMembersRoute
   '/settings/organization/spend': typeof SettingsOrganizationSpendRoute
   '/settings/api-keys': typeof SettingsApiKeysIndexRoute
+  '/settings/mcp': typeof SettingsMcpIndexRoute
   '/settings/organization': typeof SettingsOrganizationIndexRoute
   '/settings/profile': typeof SettingsProfileIndexRoute
 }
@@ -244,6 +252,7 @@ export interface FileRoutesById {
   '/settings/organization/members': typeof SettingsOrganizationMembersRoute
   '/settings/organization/spend': typeof SettingsOrganizationSpendRoute
   '/settings/api-keys/': typeof SettingsApiKeysIndexRoute
+  '/settings/mcp/': typeof SettingsMcpIndexRoute
   '/settings/organization/': typeof SettingsOrganizationIndexRoute
   '/settings/profile/': typeof SettingsProfileIndexRoute
 }
@@ -273,6 +282,7 @@ export interface FileRouteTypes {
     | '/settings/organization/members'
     | '/settings/organization/spend'
     | '/settings/api-keys/'
+    | '/settings/mcp/'
     | '/settings/organization/'
     | '/settings/profile/'
   fileRoutesByTo: FileRoutesByTo
@@ -300,6 +310,7 @@ export interface FileRouteTypes {
     | '/settings/organization/members'
     | '/settings/organization/spend'
     | '/settings/api-keys'
+    | '/settings/mcp'
     | '/settings/organization'
     | '/settings/profile'
   id:
@@ -327,6 +338,7 @@ export interface FileRouteTypes {
     | '/settings/organization/members'
     | '/settings/organization/spend'
     | '/settings/api-keys/'
+    | '/settings/mcp/'
     | '/settings/organization/'
     | '/settings/profile/'
   fileRoutesById: FileRoutesById
@@ -355,6 +367,7 @@ export interface RootRouteChildren {
   SettingsOrganizationMembersRoute: typeof SettingsOrganizationMembersRoute
   SettingsOrganizationSpendRoute: typeof SettingsOrganizationSpendRoute
   SettingsApiKeysIndexRoute: typeof SettingsApiKeysIndexRoute
+  SettingsMcpIndexRoute: typeof SettingsMcpIndexRoute
   SettingsOrganizationIndexRoute: typeof SettingsOrganizationIndexRoute
   SettingsProfileIndexRoute: typeof SettingsProfileIndexRoute
 }
@@ -501,6 +514,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsOrganizationIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/mcp/': {
+      id: '/settings/mcp/'
+      path: '/settings/mcp'
+      fullPath: '/settings/mcp/'
+      preLoaderRoute: typeof SettingsMcpIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/api-keys/': {
       id: '/settings/api-keys/'
       path: '/settings/api-keys'
@@ -563,6 +583,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsOrganizationMembersRoute: SettingsOrganizationMembersRoute,
   SettingsOrganizationSpendRoute: SettingsOrganizationSpendRoute,
   SettingsApiKeysIndexRoute: SettingsApiKeysIndexRoute,
+  SettingsMcpIndexRoute: SettingsMcpIndexRoute,
   SettingsOrganizationIndexRoute: SettingsOrganizationIndexRoute,
   SettingsProfileIndexRoute: SettingsProfileIndexRoute,
 }
