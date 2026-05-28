@@ -225,6 +225,9 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 						consentPage: `${env.APP_PUBLIC_URL}/oauth/consent`,
 						requirePKCE: true,
 						allowDynamicClientRegistration: true,
+						// Short in prod, long in dev (see env). Keeps a leaked or
+						// post-offboarding token usable only briefly.
+						accessTokenExpiresIn: env.OAUTH_ACCESS_TOKEN_TTL_SECONDS,
 						// Only `/mcp` is allow-listed — it's the sole resource server, so
 						// a token for any other audience has no verifier and shouldn't mint.
 						validAudiences: [`${env.BETTER_AUTH_BASE_URL}/mcp`],
