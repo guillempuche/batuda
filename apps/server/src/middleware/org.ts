@@ -61,6 +61,36 @@ export const enterOrgScope =
 			)
 			.pipe(Effect.orDie) as Effect.Effect<A, never, Exclude<R, CurrentOrg>>
 
+/**
+ * Enter a per-user scope for reads that span a user's orgs before any single
+ * org is chosen — their MCP connections, and the memberships the /mcp path
+ * scans to resolve which org a token acts in. In one transaction: `SET LOCAL
+ * ROLE app_mcp_resolver`, set the `app.current_user_id` GUC, run `effect`,
+ * commit. The resolver's RLS policies match that GUC, so the reads can't see
+ * another user's rows even if a `WHERE` is wrong.
+ *
+ * Use it to RETURN plain values (e.g. the resolved org id), then enter the org
+ * scope separately. Do NOT nest it inside `enterOrgScope`: SqlClient nests
+ * `withTransaction` as savepoints, so a nested `SET LOCAL ROLE` would not
+ * revert cleanly and the resolver role would bleed into the org-scoped work.
+ *
+ * `userId` is required — unlike `enterOrgScope`'s optional user GUC. An unset
+ * GUC reads back as `''`, which matches no rows and rejects inserts, so there
+ * is no system-actor path through here.
+ */
+export const enterUserScope =
+	(sql: SqlClient.SqlClient, userId: string) =>
+	<A, E, R>(effect: Effect.Effect<A, E, R>) =>
+		sql
+			.withTransaction(
+				Effect.gen(function* () {
+					yield* sql`SET LOCAL ROLE app_mcp_resolver`
+					yield* sql`SELECT set_config('app.current_user_id', ${userId}, true)`
+					return yield* effect
+				}),
+			)
+			.pipe(Effect.orDie) as Effect.Effect<A, never, R>
+
 // Raised when a system-actor scope can't resolve its org — e.g. the org was
 // deleted between a research run completing and its fan-out firing. A distinct
 // tag lets callers skip the work rather than crash.

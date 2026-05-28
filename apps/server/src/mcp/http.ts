@@ -14,7 +14,7 @@ import { SessionContext } from '@batuda/controllers'
 
 import { Auth } from '../lib/auth'
 import { EnvVars } from '../lib/env'
-import { enterOrgScope } from '../middleware/org'
+import { enterOrgScope, enterUserScope } from '../middleware/org'
 import { CurrentUser } from './current-user'
 import { McpToolsLive } from './server'
 
@@ -205,12 +205,29 @@ const McpAuthMiddleware = HttpRouter.middleware(
 								prmUrl,
 							)
 						}
-						// Every current membership — the owner role bypasses member RLS
-						// before scope, so this sees all of the user's orgs.
-						const memberships = yield* sql<{ organizationId: string }>`
-							SELECT "organizationId" FROM member WHERE "userId" = ${userId}
-						`.pipe(Effect.orDie)
-						const orgIds = memberships.map(m => m.organizationId)
+						// Read the caller's memberships (all their orgs) and their
+						// per-client selection under the resolver role: the user GUC's
+						// RLS confines both reads to this user even if a WHERE slips.
+						// enterUserScope returns plain values and commits before we
+						// enter org scope below — it must not nest inside enterScope.
+						const { orgIds, selectedOrgId } = yield* enterUserScope(
+							sql,
+							userId,
+						)(
+							Effect.gen(function* () {
+								const memberships = yield* sql<{ organizationId: string }>`
+									SELECT "organizationId" FROM member WHERE "userId" = ${userId}
+								`
+								const selection = yield* sql<{ organizationId: string }>`
+									SELECT organization_id FROM mcp_oauth_org
+									WHERE user_id = ${userId} AND client_id = ${clientId} LIMIT 1
+								`
+								return {
+									orgIds: memberships.map(m => m.organizationId),
+									selectedOrgId: selection[0]?.organizationId,
+								}
+							}),
+						)
 						if (orgIds.length === 0) {
 							return yield* jsonRpcError(
 								403,
@@ -222,11 +239,6 @@ const McpAuthMiddleware = HttpRouter.middleware(
 						// still a live membership: a stale row (user left the org) falls
 						// back to auto-pick so the token can't read an org the user no
 						// longer belongs to.
-						const selection = yield* sql<{ organizationId: string }>`
-							SELECT organization_id FROM mcp_oauth_org
-							WHERE user_id = ${userId} AND client_id = ${clientId} LIMIT 1
-						`.pipe(Effect.orDie)
-						const selectedOrgId = selection[0]?.organizationId
 						const orgId =
 							selectedOrgId && orgIds.includes(selectedOrgId)
 								? selectedOrgId
