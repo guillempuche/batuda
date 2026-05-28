@@ -194,7 +194,7 @@ msgstr "Admin"
 msgid "Agent"
 msgstr "Agent"
 
-#: src/routes/settings/mcp/connections.tsx:113
+#: src/routes/settings/mcp/connections.tsx:114
 msgid "AI assistants you've connected over MCP. Choose which organization each one acts in."
 msgstr "AI assistants you've connected over MCP. Choose which organization each one acts in."
 
@@ -296,7 +296,7 @@ msgid "Back to organization"
 msgstr "Back to organization"
 
 #: src/routes/settings/api-keys/index.tsx:187
-#: src/routes/settings/mcp/connections.tsx:100
+#: src/routes/settings/mcp/connections.tsx:101
 msgid "Back to settings"
 msgstr "Back to settings"
 
@@ -465,7 +465,7 @@ msgstr "Check the session or try again."
 msgid "Check your inbox"
 msgstr "Check your inbox"
 
-#: src/routes/settings/mcp/connections.tsx:175
+#: src/routes/settings/mcp/connections.tsx:181
 msgid "Choose organization"
 msgstr "Choose organization"
 
@@ -620,7 +620,7 @@ msgid "Connected"
 msgstr "Connected"
 
 #. placeholder {0}: formatDate(row.createdAt)
-#: src/routes/settings/mcp/connections.tsx:148
+#: src/routes/settings/mcp/connections.tsx:149
 msgid "Connected {0}"
 msgstr "Connected {0}"
 
@@ -730,7 +730,7 @@ msgstr "Could not load this run."
 msgid "Could not load threads"
 msgstr "Could not load threads"
 
-#: src/routes/settings/mcp/connections.tsx:130
+#: src/routes/settings/mcp/connections.tsx:131
 msgid "Could not load your connections. Refresh to try again."
 msgstr "Could not load your connections. Refresh to try again."
 
@@ -804,7 +804,7 @@ msgstr "Could not switch organization. Please try again."
 msgid "Could not toggle the inbox state."
 msgstr "Could not toggle the inbox state."
 
-#: src/routes/settings/mcp/connections.tsx:89
+#: src/routes/settings/mcp/connections.tsx:90
 msgid "Could not update"
 msgstr "Could not update"
 
@@ -1451,7 +1451,7 @@ msgstr "Loading run…"
 #: src/components/companies/upcoming-meetings-card.tsx:57
 #: src/components/shared/loading-spinner.tsx:23
 #: src/routes/settings/api-keys/index.tsx:266
-#: src/routes/settings/mcp/connections.tsx:126
+#: src/routes/settings/mcp/connections.tsx:127
 #: src/routes/settings/organization/index.tsx:52
 #: src/routes/settings/organization/members.tsx:113
 msgid "Loading…"
@@ -1572,7 +1572,7 @@ msgstr "Market summary"
 msgid "Maturity"
 msgstr "Maturity"
 
-#: src/routes/settings/mcp/connections.tsx:110
+#: src/routes/settings/mcp/connections.tsx:111
 msgid "MCP connections"
 msgstr "MCP connections"
 
@@ -1727,7 +1727,7 @@ msgstr "No companies yet"
 msgid "No connection to the server. Try again in a few seconds."
 msgstr "No connection to the server. Try again in a few seconds."
 
-#: src/routes/settings/mcp/connections.tsx:136
+#: src/routes/settings/mcp/connections.tsx:137
 msgid "No connections yet. Add this server in your AI assistant and authorize it, then it appears here."
 msgstr "No connections yet. Add this server in your AI assistant and authorize it, then it appears here."
 
@@ -1973,11 +1973,11 @@ msgid "Organization"
 msgstr "Organization"
 
 #. placeholder {0}: row.name ?? t`Unnamed client`
-#: src/routes/settings/mcp/connections.tsx:171
+#: src/routes/settings/mcp/connections.tsx:177
 msgid "Organization for {0}"
 msgstr "Organization for {0}"
 
-#: src/routes/settings/mcp/connections.tsx:81
+#: src/routes/settings/mcp/connections.tsx:82
 msgid "Organization updated"
 msgstr "Organization updated"
 
@@ -2492,6 +2492,15 @@ msgstr "Select thread {0}"
 msgid "Selecting a preset fills IMAP and SMTP defaults — you can still edit them."
 msgstr "Selecting a preset fills IMAP and SMTP defaults — you can still edit them."
 
+#: src/routes/settings/mcp/connections.tsx:154
+msgid "Self-reported name"
+msgstr "Self-reported name"
+
+#. placeholder {0}: row.redirectHost
+#: src/routes/settings/mcp/connections.tsx:153
+msgid "Self-reported name · sends you to {0}"
+msgstr "Self-reported name · sends you to {0}"
+
 #: src/components/emails/compose-form.tsx:534
 msgid "Send"
 msgstr "Send"
@@ -2554,7 +2563,7 @@ msgstr "Set password"
 #: src/components/layout/nav-items.ts:81
 #: src/routes/pages/$id.tsx:290
 #: src/routes/settings/api-keys/index.tsx:190
-#: src/routes/settings/mcp/connections.tsx:103
+#: src/routes/settings/mcp/connections.tsx:104
 #: src/routes/settings/profile/index.tsx:108
 msgid "Settings"
 msgstr "Settings"
@@ -2885,7 +2894,7 @@ msgstr "The workspace your CRM data lives in."
 msgid "They replied — keep the thread warm"
 msgstr "They replied — keep the thread warm"
 
-#: src/routes/settings/mcp/connections.tsx:82
+#: src/routes/settings/mcp/connections.tsx:83
 msgid "This connection now acts in the chosen organization."
 msgstr "This connection now acts in the chosen organization."
 
@@ -3006,8 +3015,8 @@ msgstr "Unknown user"
 msgid "Unlinked"
 msgstr "Unlinked"
 
-#: src/routes/settings/mcp/connections.tsx:146
-#: src/routes/settings/mcp/connections.tsx:171
+#: src/routes/settings/mcp/connections.tsx:147
+#: src/routes/settings/mcp/connections.tsx:177
 msgid "Unnamed client"
 msgstr "Unnamed client"
 
@@ -3166,7 +3175,7 @@ msgstr "You don't have permission to see this page."
 msgid "You got in from a link in your email."
 msgstr "You got in from a link in your email."
 
-#: src/routes/settings/mcp/connections.tsx:90
+#: src/routes/settings/mcp/connections.tsx:91
 msgid "You may not be a member of that organization. Try again."
 msgstr "You may not be a member of that organization. Try again."
 
@@ -3190,7 +3199,7 @@ msgstr "you@example.com"
 msgid "Your Batuda workbench identity."
 msgstr "Your Batuda workbench identity."
 
-#: src/routes/settings/mcp/connections.tsx:122
+#: src/routes/settings/mcp/connections.tsx:123
 msgid "Your connections"
 msgstr "Your connections"
 

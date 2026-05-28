@@ -58,6 +58,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { PgLive } from '../db/client'
 import { Auth } from '../lib/auth'
 import { enterOrgScope, enterUserScope } from '../middleware/org'
+import { gcAbandonedClients } from '../plugins/oauth-client-gc'
 import { McpOAuthService } from '../services/mcp-oauth'
 
 const DATABASE_URL = process.env['DATABASE_URL'] as string
@@ -752,6 +753,49 @@ describe('RLS backstop on the resolver role', () => {
 		} finally {
 			await client.query('ROLLBACK')
 			client.release()
+		}
+	})
+})
+
+describe('abandoned OAuth client GC', () => {
+	it('should delete only never-consented clients past the grace window', async () => {
+		const old = `gc-old-${randomUUID()}`
+		const recent = `gc-recent-${randomUUID()}`
+		const consented = `gc-consented-${randomUUID()}`
+		try {
+			// GIVEN an old + a recent never-consented client, and an old consented one
+			await pool.query(
+				`INSERT INTO "oauthClient" (id, "clientId", "redirectUris", name, "createdAt")
+				 VALUES ($1, $1, '[]'::jsonb, 'gc', '2000-01-01'),
+				        ($2, $2, '[]'::jsonb, 'gc', now()),
+				        ($3, $3, '[]'::jsonb, 'gc', '2000-01-01')`,
+				[old, recent, consented],
+			)
+			await pool.query(
+				`INSERT INTO "oauthConsent" (id, "clientId", "userId", scopes, "createdAt", "updatedAt")
+				 VALUES ($1, $2, $3, '["openid"]'::jsonb, now(), now())`,
+				[randomUUID(), consented, singleOrgUserId],
+			)
+			// WHEN the GC runs with a 7-day grace window
+			const deleted = await gcAbandonedClients(pool, 7)
+			// THEN only the old never-consented client is gone
+			const rows = await pool.query<{ clientId: string }>(
+				'SELECT "clientId" FROM "oauthClient" WHERE "clientId" = ANY($1)',
+				[[old, recent, consented]],
+			)
+			const ids = rows.rows.map(r => r.clientId)
+			expect(deleted).toBeGreaterThanOrEqual(1)
+			expect(ids).not.toContain(old)
+			expect(ids).toContain(recent)
+			expect(ids).toContain(consented)
+		} finally {
+			await pool.query(
+				'DELETE FROM "oauthConsent" WHERE "clientId" = ANY($1)',
+				[[old, recent, consented]],
+			)
+			await pool.query('DELETE FROM "oauthClient" WHERE "clientId" = ANY($1)', [
+				[old, recent, consented],
+			])
 		}
 	})
 })

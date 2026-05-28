@@ -92,6 +92,13 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 		const OAUTH_ACCESS_TOKEN_TTL_SECONDS = yield* Config.int(
 			'OAUTH_ACCESS_TOKEN_TTL_SECONDS',
 		).pipe(Config.withDefault(900))
+		// Anyone can register an OAuth client (open Dynamic Client Registration),
+		// so abandoned ones get garbage-collected after each registration: a
+		// client older than this many days with no consent is deleted. Short in
+		// prod; dev sets it long so a client registered while testing survives.
+		const OAUTH_CLIENT_GC_DAYS = yield* Config.int('OAUTH_CLIENT_GC_DAYS').pipe(
+			Config.withDefault(7),
+		)
 		// Comma-separated list of trusted origins (e.g.
 		// `https://batuda.localhost`). Each entry is either a literal
 		// origin matched exactly or a wildcard-subdomain pattern
@@ -212,6 +219,7 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 			BETTER_AUTH_INSECURE_COOKIES,
 			BETTER_AUTH_RATE_LIMIT,
 			OAUTH_ACCESS_TOKEN_TTL_SECONDS,
+			OAUTH_CLIENT_GC_DAYS,
 			ALLOWED_ORIGINS,
 			APP_PUBLIC_URL,
 			STORAGE_ENDPOINT,
