@@ -123,6 +123,10 @@ msgstr "Accepta"
 msgid "Accepting the invitation…"
 msgstr "Acceptant la invitació…"
 
+#: src/routes/oauth/consent.tsx:128
+msgid "Access"
+msgstr "Accés"
+
 #. placeholder {0}: provider.length
 #: src/routes/settings/organization/spend.tsx:162
 msgid "across {0} providers"
@@ -190,6 +194,10 @@ msgstr "Admin"
 msgid "Agent"
 msgstr "Agent"
 
+#: src/routes/settings/mcp/connections.tsx:113
+msgid "AI assistants you've connected over MCP. Choose which organization each one acts in."
+msgstr "Assistents d'IA que has connectat per MCP. Tria en quina organització actua cadascun."
+
 #: src/routes/companies/index.tsx:277
 #: src/routes/emails/index.tsx:623
 msgid "All"
@@ -212,16 +220,24 @@ msgstr "Tot el temps"
 msgid "All under control"
 msgstr "Tot sota control"
 
+#: src/routes/oauth/consent.tsx:163
+msgid "Allow"
+msgstr "Permet"
+
 #: src/components/research/findings/shared.tsx:179
 msgid "Already in CRM"
 msgstr "Ja al CRM"
+
+#: src/routes/oauth/consent.tsx:114
+msgid "An AI assistant wants to connect to your Batuda account over MCP and act on your behalf. Only approve assistants you trust."
+msgstr "Un assistent d'IA vol connectar-se al teu compte de Batuda per MCP i actuar en nom teu. Aprova només els assistents en qui confiïs."
 
 #: src/routes/settings/api-keys/index.tsx:395
 msgid "Any agent using \"{confirmLabel}\" will stop working. This can't be undone."
 msgstr "Qualsevol agent que faci servir \"{confirmLabel}\" deixarà de funcionar. Això no es pot desfer."
 
 #: src/routes/settings/api-keys/index.tsx:197
-#: src/routes/settings/profile/index.tsx:114
+#: src/routes/settings/profile/index.tsx:121
 msgid "API keys"
 msgstr "Claus d'API"
 
@@ -280,6 +296,7 @@ msgid "Back to organization"
 msgstr "Tornar a l'organització"
 
 #: src/routes/settings/api-keys/index.tsx:187
+#: src/routes/settings/mcp/connections.tsx:100
 msgid "Back to settings"
 msgstr "Torna a la configuració"
 
@@ -301,7 +318,7 @@ msgstr "Batuda — un CRM multi-inquilí per a petites agències."
 msgid "Batuda home"
 msgstr "Inici de Batuda"
 
-#: src/routes/login.tsx:404
+#: src/routes/login.tsx:443
 msgid "Batuda is invite-only. Request access from the Engranatge team."
 msgstr "Batuda és només amb invitació. Demana accés a l'equip d'Engranatge."
 
@@ -391,17 +408,21 @@ msgstr "Cancel·la"
 msgid "Cancel upload"
 msgstr "Cancel·la la pujada"
 
+#: src/routes/oauth/consent.tsx:152
+msgid "Cancelling…"
+msgstr "Cancel·lant…"
+
 #: src/components/emails/compose-form.tsx:429
 #: src/routes/emails/$threadId.tsx:595
 msgid "Cc"
 msgstr "Cc"
 
-#: src/routes/settings/profile/index.tsx:350
+#: src/routes/settings/profile/index.tsx:366
 msgid "Change my mind — set a password anyway"
 msgstr "Canvio d'opinió — vull posar contrasenya"
 
-#: src/routes/settings/profile/index.tsx:410
-#: src/routes/settings/profile/index.tsx:497
+#: src/routes/settings/profile/index.tsx:426
+#: src/routes/settings/profile/index.tsx:513
 msgid "Change password"
 msgstr "Canvia la contrasenya"
 
@@ -440,9 +461,13 @@ msgid "Check the session or try again."
 msgstr "Comprova la sessió o torna-ho a provar."
 
 #: src/routes/forgot-password.tsx:69
-#: src/routes/login.tsx:442
+#: src/routes/login.tsx:481
 msgid "Check your inbox"
 msgstr "Mira la safata d'entrada"
+
+#: src/routes/settings/mcp/connections.tsx:175
+msgid "Choose organization"
+msgstr "Tria una organització"
 
 #: src/routes/emails/inboxes.tsx:350
 #: src/routes/emails/inboxes.tsx:351
@@ -468,6 +493,7 @@ msgstr "Clicat"
 
 #: src/components/shared/status-badge.tsx:33
 #: src/routes/companies/$slug.tsx:445
+#: src/routes/oauth/consent.tsx:121
 msgid "Client"
 msgstr "Client"
 
@@ -581,6 +607,10 @@ msgstr "Connecta bústies IMAP/SMTP i tria el remitent principal."
 msgid "Connect mailbox"
 msgstr "Connecta una bústia"
 
+#: src/routes/oauth/consent.tsx:111
+msgid "Connect to Batuda?"
+msgstr "Connectar a Batuda?"
+
 #: src/routes/emails/inboxes.tsx:391
 msgid "Connect your IMAP/SMTP mailbox to start sending and receiving email."
 msgstr "Connecta la teva bústia IMAP/SMTP per començar a enviar i rebre correu."
@@ -589,9 +619,22 @@ msgstr "Connecta la teva bústia IMAP/SMTP per començar a enviar i rebre correu
 msgid "Connected"
 msgstr "Connectada"
 
+#. placeholder {0}: formatDate(row.createdAt)
+#: src/routes/settings/mcp/connections.tsx:148
+msgid "Connected {0}"
+msgstr "Connectat {0}"
+
+#: src/routes/oauth/consent.tsx:163
+msgid "Connecting…"
+msgstr "Connectant…"
+
 #: src/routes/emails/inboxes.tsx:248
 msgid "Connection tested"
 msgstr "Connexió provada"
+
+#: src/routes/settings/profile/index.tsx:130
+msgid "Connections"
+msgstr "Connexions"
 
 #: src/components/research/research-dialog.tsx:46
 msgid "Contact discovery"
@@ -647,6 +690,10 @@ msgstr "Copia la teva clau ara"
 msgid "Could not clear suppression"
 msgstr "No s'''ha pogut esborrar la supressió"
 
+#: src/routes/oauth/consent.tsx:68
+msgid "Could not complete the connection. Please try again."
+msgstr "No s'ha pogut completar la connexió. Torna-ho a provar."
+
 #: src/routes/emails/inboxes.tsx:546
 msgid "Could not create the inbox. Check transport or credentials."
 msgstr "No s'ha pogut crear la bústia. Revisa el transport o les credencials."
@@ -682,6 +729,10 @@ msgstr "No s'ha pogut carregar aquesta execució."
 #: src/routes/emails/index.tsx:783
 msgid "Could not load threads"
 msgstr "No s'han pogut carregar els fils"
+
+#: src/routes/settings/mcp/connections.tsx:130
+msgid "Could not load your connections. Refresh to try again."
+msgstr "No s'han pogut carregar les connexions. Actualitza per tornar-ho a provar."
 
 #: src/routes/settings/api-keys/index.tsx:270
 msgid "Could not load your keys. Refresh to try again."
@@ -725,7 +776,7 @@ msgid "Could not send the invitation. Please try again."
 msgstr "No s'''ha pogut enviar la invitació. Torna-ho a provar."
 
 #: src/routes/forgot-password.tsx:123
-#: src/routes/login.tsx:137
+#: src/routes/login.tsx:151
 msgid "Could not send the link. Try again in a few seconds."
 msgstr "No s'ha pogut enviar l'enllaç. Torna-ho a provar d'aquí uns segons."
 
@@ -737,7 +788,7 @@ msgstr "No s'ha pogut establir la bústia principal"
 msgid "Could not set the default inbox."
 msgstr "No s'ha pogut establir la safata per defecte."
 
-#: src/routes/login.tsx:136
+#: src/routes/login.tsx:149
 msgid "Could not sign in. Check your email and password."
 msgstr "No s'ha pogut iniciar sessió. Comprova el correu i la contrasenya."
 
@@ -753,7 +804,11 @@ msgstr "No s'ha pogut canviar d'organització. Torna-ho a provar."
 msgid "Could not toggle the inbox state."
 msgstr "No s'ha pogut canviar l'estat de la safata."
 
-#: src/routes/settings/profile/index.tsx:355
+#: src/routes/settings/mcp/connections.tsx:89
+msgid "Could not update"
+msgstr "No s'ha pogut actualitzar"
+
+#: src/routes/settings/profile/index.tsx:371
 msgid "Couldn't update your preference. Try again."
 msgstr "No he pogut desar la teva preferència. Prova-ho de nou."
 
@@ -811,11 +866,11 @@ msgstr "Creada per agent"
 msgid "Creating…"
 msgstr "Creant…"
 
-#: src/routes/settings/profile/index.tsx:424
+#: src/routes/settings/profile/index.tsx:440
 msgid "Current password"
 msgstr "Contrasenya actual"
 
-#: src/routes/settings/profile/index.tsx:474
+#: src/routes/settings/profile/index.tsx:490
 msgid "Current password is incorrect."
 msgstr "La contrasenya actual no és correcta."
 
@@ -900,6 +955,10 @@ msgstr "Eliminant…"
 #: src/routes/emails/$threadId.tsx:675
 msgid "Delivered"
 msgstr "Lliurat"
+
+#: src/routes/oauth/consent.tsx:152
+msgid "Deny"
+msgstr "Denega"
 
 #: src/components/interactions/quick-capture-dialog.tsx:256
 msgid "Direction"
@@ -1005,7 +1064,7 @@ msgstr "Editor"
 #: src/routes/companies/$slug.tsx:854
 #: src/routes/emails/inboxes.tsx:402
 #: src/routes/forgot-password.tsx:109
-#: src/routes/login.tsx:339
+#: src/routes/login.tsx:378
 #: src/routes/settings/organization/invite.tsx:137
 msgid "Email"
 msgstr "Correu"
@@ -1022,11 +1081,11 @@ msgstr "Esborranys de correu"
 msgid "Email is dead-letter"
 msgstr "El correu electrònic és no entregable"
 
-#: src/routes/login.tsx:388
+#: src/routes/login.tsx:427
 msgid "Email me a sign-in link"
 msgstr "Envia'm un enllaç per correu"
 
-#: src/routes/login.tsx:134
+#: src/routes/login.tsx:147
 msgid "Email or password is incorrect."
 msgstr "El correu o la contrasenya no són correctes."
 
@@ -1047,7 +1106,7 @@ msgstr "Els emails, trucades, documents i propostes apareixeran aquí a mesura q
 msgid "Enrichment"
 msgstr "Enriquiment"
 
-#: src/routes/login.tsx:139
+#: src/routes/login.tsx:153
 msgid "Enter a valid email above first."
 msgstr "Primer escriu un correu vàlid a sobre."
 
@@ -1139,7 +1198,7 @@ msgstr "El proveïdor l'ha marcat com a brossa. El cos es mostra només per revi
 msgid "Footers — {0}"
 msgstr "Peus de pàgina — {0}"
 
-#: src/routes/login.tsx:395
+#: src/routes/login.tsx:434
 msgid "Forgot password?"
 msgstr "Has oblidat la contrasenya?"
 
@@ -1170,6 +1229,10 @@ msgstr "Pantalla completa"
 #: src/routes/settings/api-keys/index.tsx:111
 msgid "Give the key a name so you can recognize it later."
 msgstr "Posa un nom a la clau perquè la puguis reconèixer més endavant."
+
+#: src/routes/oauth/consent.tsx:96
+msgid "Go to connections"
+msgstr "Ves a connexions"
 
 #: src/routes/reset-password.tsx:173
 msgid "Go to sign in"
@@ -1206,7 +1269,7 @@ msgstr "Humà"
 msgid "I prefer passwordless"
 msgstr "Prefereixo sense contrasenya"
 
-#: src/routes/settings/profile/index.tsx:312
+#: src/routes/settings/profile/index.tsx:328
 msgid "I prefer passwordless — don't ask me again"
 msgstr "Prefereixo sense contrasenya — no m'ho tornis a preguntar"
 
@@ -1301,7 +1364,7 @@ msgstr "Convida un membre"
 msgid "Invite a new member"
 msgstr "Convida un nou membre"
 
-#: src/routes/login.tsx:449
+#: src/routes/login.tsx:488
 msgid "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
 msgstr "Caduca en {MAGIC_LINK_EXPIRY_MINUTES} minuts. No el veus? Mira el correu brossa."
 
@@ -1335,7 +1398,7 @@ msgstr "Idioma"
 
 #: src/components/profile/language-select.tsx:34
 #: src/routes/pages/$id.tsx:311
-#: src/routes/settings/profile/index.tsx:142
+#: src/routes/settings/profile/index.tsx:158
 msgid "Language"
 msgstr "Idioma"
 
@@ -1388,6 +1451,7 @@ msgstr "Carregant l'execució…"
 #: src/components/companies/upcoming-meetings-card.tsx:57
 #: src/components/shared/loading-spinner.tsx:23
 #: src/routes/settings/api-keys/index.tsx:266
+#: src/routes/settings/mcp/connections.tsx:126
 #: src/routes/settings/organization/index.tsx:52
 #: src/routes/settings/organization/members.tsx:113
 msgid "Loading…"
@@ -1508,6 +1572,10 @@ msgstr "Resum de mercat"
 msgid "Maturity"
 msgstr "Maduresa"
 
+#: src/routes/settings/mcp/connections.tsx:110
+msgid "MCP connections"
+msgstr "Connexions MCP"
+
 #: src/routes/companies/$slug.tsx:454
 msgid "Medium"
 msgstr "Mitjana"
@@ -1585,8 +1653,8 @@ msgid "Never expires"
 msgstr "No caduca mai"
 
 #: src/routes/reset-password.tsx:193
-#: src/routes/settings/profile/index.tsx:252
-#: src/routes/settings/profile/index.tsx:436
+#: src/routes/settings/profile/index.tsx:268
+#: src/routes/settings/profile/index.tsx:452
 msgid "New password"
 msgstr "Contrasenya nova"
 
@@ -1651,12 +1719,17 @@ msgstr "Encara no hi ha empreses"
 
 #: src/components/layout/org-switcher.tsx:62
 #: src/routes/accept-invitation.$id.tsx:98
-#: src/routes/login.tsx:138
+#: src/routes/login.tsx:152
+#: src/routes/oauth/consent.tsx:71
 #: src/routes/settings/organization/invite.tsx:77
 #: src/routes/settings/organization/members.tsx:81
-#: src/routes/settings/profile/index.tsx:82
+#: src/routes/settings/profile/index.tsx:89
 msgid "No connection to the server. Try again in a few seconds."
 msgstr "Sense connexió al servidor. Torna-ho a provar d'aquí a uns segons."
+
+#: src/routes/settings/mcp/connections.tsx:136
+msgid "No connections yet. Add this server in your AI assistant and authorize it, then it appears here."
+msgstr "Encara no hi ha connexions. Afegeix aquest servidor al teu assistent d'IA i autoritza'l; després apareixerà aquí."
 
 #: src/components/companies/cadence-card.tsx:56
 msgid "No contact yet."
@@ -1802,6 +1875,10 @@ msgstr "Nota"
 msgid "Nothing changed yet."
 msgstr "Encara no ha canviat res."
 
+#: src/routes/oauth/consent.tsx:80
+msgid "Nothing to authorize"
+msgstr "Res a autoritzar"
+
 #: src/routes/settings/organization/spend.tsx:227
 msgid "Nothing to show in this range."
 msgstr "Res a mostrar en aquest interval."
@@ -1825,7 +1902,7 @@ msgid "Open"
 msgstr "Obert"
 
 #. placeholder {0}: provider.label
-#: src/routes/login.tsx:482
+#: src/routes/login.tsx:521
 msgid "Open {0}"
 msgstr "Obre {0}"
 
@@ -1891,9 +1968,18 @@ msgstr "Obert"
 #: src/routes/settings/organization/index.tsx:42
 #: src/routes/settings/organization/invite.tsx:91
 #: src/routes/settings/organization/members.tsx:95
-#: src/routes/settings/profile/index.tsx:108
+#: src/routes/settings/profile/index.tsx:115
 msgid "Organization"
 msgstr "Organització"
+
+#. placeholder {0}: row.name ?? t`Unnamed client`
+#: src/routes/settings/mcp/connections.tsx:171
+msgid "Organization for {0}"
+msgstr "Organització per a {0}"
+
+#: src/routes/settings/mcp/connections.tsx:81
+msgid "Organization updated"
+msgstr "Organització actualitzada"
 
 #: src/components/layout/org-switcher.tsx:107
 msgid "Organizations"
@@ -1985,7 +2071,7 @@ msgstr "Indicadors de dolor"
 msgid "Pain points"
 msgstr "Punts febles"
 
-#: src/routes/login.tsx:354
+#: src/routes/login.tsx:393
 msgid "Password"
 msgstr "Contrasenya"
 
@@ -1997,17 +2083,17 @@ msgstr "Contrasenya o contrasenya d'aplicació"
 msgid "Password updated"
 msgstr "Contrasenya actualitzada"
 
-#: src/routes/settings/profile/index.tsx:484
+#: src/routes/settings/profile/index.tsx:500
 msgid "Password updated."
 msgstr "Contrasenya actualitzada."
 
-#: src/routes/settings/profile/index.tsx:338
+#: src/routes/settings/profile/index.tsx:354
 msgid "Passwordless sign-in only"
 msgstr "Només inici de sessió sense contrasenya"
 
 #: src/routes/reset-password.tsx:221
-#: src/routes/settings/profile/index.tsx:278
-#: src/routes/settings/profile/index.tsx:462
+#: src/routes/settings/profile/index.tsx:294
+#: src/routes/settings/profile/index.tsx:478
 msgid "Passwords need at least {MIN_PASSWORD_LENGTH} characters."
 msgstr "La contrasenya ha de tenir com a mínim {MIN_PASSWORD_LENGTH} caràcters."
 
@@ -2035,7 +2121,7 @@ msgstr "Personal"
 msgid "Phone"
 msgstr "Telèfon"
 
-#: src/routes/settings/profile/index.tsx:413
+#: src/routes/settings/profile/index.tsx:429
 msgid "Pick a new password. Other signed-in devices will be signed out."
 msgstr "Tria una contrasenya nova. Els altres dispositius es desconnectaran."
 
@@ -2107,7 +2193,7 @@ msgid "Products fit"
 msgstr "Encaix de productes"
 
 #: src/routes/companies/$slug.tsx:1082
-#: src/routes/settings/profile/index.tsx:94
+#: src/routes/settings/profile/index.tsx:101
 msgid "Profile"
 msgstr "Perfil"
 
@@ -2245,8 +2331,8 @@ msgid "Reopen thread"
 msgstr "Reobre el fil"
 
 #: src/routes/reset-password.tsx:207
-#: src/routes/settings/profile/index.tsx:265
-#: src/routes/settings/profile/index.tsx:449
+#: src/routes/settings/profile/index.tsx:281
+#: src/routes/settings/profile/index.tsx:465
 msgid "Repeat new password"
 msgstr "Repeteix la contrasenya nova"
 
@@ -2272,11 +2358,11 @@ msgstr "Recerca"
 msgid "Research run"
 msgstr "Recerca"
 
-#: src/routes/login.tsx:464
+#: src/routes/login.tsx:503
 msgid "Resend in"
 msgstr "Torna a enviar en"
 
-#: src/routes/login.tsx:470
+#: src/routes/login.tsx:509
 msgid "Resend link"
 msgstr "Torna a enviar l'enllaç"
 
@@ -2352,7 +2438,7 @@ msgstr "Ha fallat el desament"
 msgid "Save new password"
 msgstr "Desa la nova contrasenya"
 
-#: src/routes/settings/profile/index.tsx:303
+#: src/routes/settings/profile/index.tsx:319
 msgid "Save password"
 msgstr "Desa la contrasenya"
 
@@ -2360,8 +2446,8 @@ msgstr "Desa la contrasenya"
 #: src/routes/emails/inboxes.tsx:1463
 #: src/routes/pages/$id.tsx:268
 #: src/routes/reset-password.tsx:242
-#: src/routes/settings/profile/index.tsx:301
-#: src/routes/settings/profile/index.tsx:495
+#: src/routes/settings/profile/index.tsx:317
+#: src/routes/settings/profile/index.tsx:511
 msgid "Saving…"
 msgstr "Desant…"
 
@@ -2436,7 +2522,7 @@ msgstr "Envia l'enllaç"
 
 #: src/components/emails/compose-form.tsx:534
 #: src/routes/forgot-password.tsx:134
-#: src/routes/login.tsx:387
+#: src/routes/login.tsx:426
 #: src/routes/settings/organization/invite.tsx:180
 msgid "Sending…"
 msgstr "Enviant…"
@@ -2449,7 +2535,7 @@ msgstr "Enviat"
 msgid "Set a new password"
 msgstr "Posa una contrasenya nova"
 
-#: src/routes/settings/profile/index.tsx:241
+#: src/routes/settings/profile/index.tsx:257
 msgid "Set a password"
 msgstr "Posa una contrasenya"
 
@@ -2468,7 +2554,8 @@ msgstr "Posa contrasenya"
 #: src/components/layout/nav-items.ts:81
 #: src/routes/pages/$id.tsx:290
 #: src/routes/settings/api-keys/index.tsx:190
-#: src/routes/settings/profile/index.tsx:101
+#: src/routes/settings/mcp/connections.tsx:103
+#: src/routes/settings/profile/index.tsx:108
 msgid "Settings"
 msgstr "Configuració"
 
@@ -2503,7 +2590,7 @@ msgid "Showing {firstRow}–{lastRow} of {total}"
 msgstr "Mostrant {firstRow}–{lastRow} de {total}"
 
 #: src/routes/accept-invitation.$id.tsx:129
-#: src/routes/login.tsx:376
+#: src/routes/login.tsx:415
 msgid "Sign in"
 msgstr "Inicia sessió"
 
@@ -2511,7 +2598,7 @@ msgstr "Inicia sessió"
 msgid "Sign in to accept this invitation"
 msgstr "Inicia sessió per acceptar aquesta invitació"
 
-#: src/routes/login.tsx:329
+#: src/routes/login.tsx:368
 msgid "Sign in to continue"
 msgstr "Inicia sessió per continuar"
 
@@ -2519,19 +2606,19 @@ msgstr "Inicia sessió per continuar"
 msgid "Sign in with your new password. Other devices will need to sign in again too."
 msgstr "Inicia sessió amb la contrasenya nova. Els altres dispositius també hauran de tornar a iniciar sessió."
 
-#: src/routes/settings/profile/index.tsx:161
+#: src/routes/settings/profile/index.tsx:177
 msgid "Sign out"
 msgstr "Tanca sessió"
 
-#: src/routes/settings/profile/index.tsx:76
+#: src/routes/settings/profile/index.tsx:83
 msgid "Sign-out failed. Please try again."
 msgstr "No s'ha pogut tancar la sessió. Torna-ho a provar."
 
-#: src/routes/login.tsx:376
+#: src/routes/login.tsx:415
 msgid "Signing in…"
 msgstr "Iniciant sessió…"
 
-#: src/routes/settings/profile/index.tsx:161
+#: src/routes/settings/profile/index.tsx:177
 msgid "Signing out…"
 msgstr "Tancant sessió…"
 
@@ -2571,9 +2658,13 @@ msgstr "Posposades"
 msgid "someone"
 msgstr "algú"
 
+#: src/routes/oauth/consent.tsx:56
+msgid "Something went wrong. Start the connection again from your assistant."
+msgstr "Alguna cosa ha anat malament. Torna a iniciar la connexió des del teu assistent."
+
 #: src/routes/reset-password.tsx:233
-#: src/routes/settings/profile/index.tsx:290
-#: src/routes/settings/profile/index.tsx:479
+#: src/routes/settings/profile/index.tsx:306
+#: src/routes/settings/profile/index.tsx:495
 msgid "Something went wrong. Try again."
 msgstr "Alguna cosa ha fallat. Prova-ho de nou."
 
@@ -2697,11 +2788,15 @@ msgstr "Prova fallida"
 msgid "Testing connection…"
 msgstr "Provant la connexió…"
 
-#: src/routes/login.tsx:141
+#: src/routes/login.tsx:150
+msgid "That connection request expired. Start it again from your AI assistant."
+msgstr "Aquesta sol·licitud de connexió ha caducat. Torna a iniciar-la des del teu assistent d'IA."
+
+#: src/routes/login.tsx:155
 msgid "That link expired. Request a fresh one below."
 msgstr "L'enllaç ha caducat. Demana'n un de nou a sota."
 
-#: src/routes/login.tsx:142
+#: src/routes/login.tsx:156
 msgid "That link is no longer valid. Request a fresh one below."
 msgstr "L'enllaç ja no és vàlid. Demana'n un de nou a sota."
 
@@ -2762,11 +2857,11 @@ msgstr "Potser el fil s'ha arxivat al proveïdor o l'enllaç és obsolet."
 msgid "The token expired or was already used. Request a fresh link."
 msgstr "El token ha caducat o ja s'ha fet servir. Demana un enllaç nou."
 
-#: src/routes/settings/profile/index.tsx:469
+#: src/routes/settings/profile/index.tsx:485
 msgid "The two new password fields don't match."
 msgstr "Les dues contrasenyes noves no coincideixen."
 
-#: src/routes/settings/profile/index.tsx:285
+#: src/routes/settings/profile/index.tsx:301
 msgid "The two password fields don't match."
 msgstr "Les dues contrasenyes no coincideixen."
 
@@ -2789,6 +2884,10 @@ msgstr "L'espai de treball on viuen les dades del CRM."
 #: src/components/shared/status-badge.tsx:41
 msgid "They replied — keep the thread warm"
 msgstr "Ha respost — manté el fil calent"
+
+#: src/routes/settings/mcp/connections.tsx:82
+msgid "This connection now acts in the chosen organization."
+msgstr "Aquesta connexió ara actua en l'organització triada."
 
 #: src/routes/accept-invitation.$id.tsx:193
 msgid "This invitation can't be accepted"
@@ -2814,6 +2913,10 @@ msgstr "Aquest enllaç ja no és vàlid"
 #: src/routes/settings/organization/spend.tsx:134
 msgid "This month"
 msgstr "Aquest mes"
+
+#: src/routes/oauth/consent.tsx:83
+msgid "This page opens when an AI assistant asks to connect. Start the connection from your assistant."
+msgstr "Aquesta pàgina s'obre quan un assistent d'IA demana connectar-se. Inicia la connexió des del teu assistent."
 
 #: src/routes/index.tsx:420
 #: src/routes/tasks/index.tsx:474
@@ -2858,7 +2961,7 @@ msgstr "Per a"
 msgid "Today"
 msgstr "Avui"
 
-#: src/routes/login.tsx:133
+#: src/routes/login.tsx:146
 msgid "Too many attempts. Try again in a minute."
 msgstr "Massa intents. Torna-ho a provar d'aquí un minut."
 
@@ -2895,13 +2998,18 @@ msgstr "desconegut"
 msgid "Unknown"
 msgstr "Desconegut"
 
-#: src/routes/settings/profile/index.tsx:87
+#: src/routes/settings/profile/index.tsx:94
 msgid "Unknown user"
 msgstr "Usuari desconegut"
 
 #: src/routes/emails/$threadId.tsx:475
 msgid "Unlinked"
 msgstr "Sense enllaçar"
+
+#: src/routes/settings/mcp/connections.tsx:146
+#: src/routes/settings/mcp/connections.tsx:171
+msgid "Unnamed client"
+msgstr "Client sense nom"
 
 #: src/routes/emails/index.tsx:1397
 msgid "Untitled"
@@ -2937,7 +3045,7 @@ msgstr "Pujant…"
 msgid "Use {0} as primary"
 msgstr "Fes servir {0} com a principal"
 
-#: src/routes/login.tsx:492
+#: src/routes/login.tsx:531
 msgid "Use a different email"
 msgstr "Fes servir un altre correu"
 
@@ -2949,7 +3057,7 @@ msgstr "Utilitza com a peu de pàgina predeterminat"
 msgid "Use as default for this purpose"
 msgstr "Usa com a per defecte per a aquest propòsit"
 
-#: src/routes/login.tsx:499
+#: src/routes/login.tsx:538
 msgid "Use password instead"
 msgstr "Fes servir contrasenya"
 
@@ -2974,15 +3082,15 @@ msgstr "Visites"
 msgid "Visit"
 msgstr "Visita"
 
-#: src/routes/login.tsx:143
+#: src/routes/login.tsx:157
 msgid "We couldn't sign you in via that link. Try again."
 msgstr "No s'ha pogut iniciar sessió amb aquest enllaç. Torna-ho a provar."
 
-#: src/routes/login.tsx:140
+#: src/routes/login.tsx:154
 msgid "We don't recognize that email. Ask an admin to invite you."
 msgstr "No reconeixem aquest correu. Demana a un administrador que t'inviti."
 
-#: src/routes/login.tsx:445
+#: src/routes/login.tsx:484
 msgid "We sent a sign-in link to"
 msgstr "S'ha enviat un enllaç d'inici de sessió a"
 
@@ -3046,7 +3154,7 @@ msgstr "Escriu el peu de pàgina…"
 msgid "Write your message…"
 msgstr "Escriu el teu missatge…"
 
-#: src/routes/settings/profile/index.tsx:244
+#: src/routes/settings/profile/index.tsx:260
 msgid "You currently sign in from email links. Add a password to skip checking your email next time."
 msgstr "Ara mateix entres des d'enllaços al correu. Afegeix una contrasenya per no haver de mirar el correu la pròxima vegada."
 
@@ -3058,7 +3166,11 @@ msgstr "No tens permís per veure aquesta pàgina."
 msgid "You got in from a link in your email."
 msgstr "Has entrat des d'un enllaç al teu correu."
 
-#: src/routes/settings/profile/index.tsx:341
+#: src/routes/settings/mcp/connections.tsx:90
+msgid "You may not be a member of that organization. Try again."
+msgstr "Potser no ets membre d'aquesta organització. Torna-ho a provar."
+
+#: src/routes/settings/profile/index.tsx:357
 msgid "You sign in from email links. I won't bring it up again."
 msgstr "Entres des d'enllaços al correu. No t'ho tornaré a esmentar."
 
@@ -3074,11 +3186,15 @@ msgstr "Ja ets membre."
 msgid "you@example.com"
 msgstr "tu@exemple.com"
 
-#: src/routes/settings/profile/index.tsx:97
+#: src/routes/settings/profile/index.tsx:104
 msgid "Your Batuda workbench identity."
 msgstr "La teva identitat al banc de Batuda."
 
-#: src/routes/login.tsx:135
+#: src/routes/settings/mcp/connections.tsx:122
+msgid "Your connections"
+msgstr "Les teves connexions"
+
+#: src/routes/login.tsx:148
 msgid "Your email isn't verified yet. Use the magic link instead."
 msgstr "El correu encara no està verificat. Fes servir l'enllaç de sessió."
 

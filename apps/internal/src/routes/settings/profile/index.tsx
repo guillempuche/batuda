@@ -5,7 +5,14 @@ import {
 	useNavigate,
 	useRouter,
 } from '@tanstack/react-router'
-import { Building2, KeyRound, LogOut, Mail, UserCircle2 } from 'lucide-react'
+import {
+	Building2,
+	KeyRound,
+	LogOut,
+	Mail,
+	Plug,
+	UserCircle2,
+} from 'lucide-react'
 import { useActionState, useRef, useState } from 'react'
 import styled from 'styled-components'
 
@@ -112,6 +119,15 @@ function ProfilePage() {
 					<KeyRound size={16} aria-hidden />
 					<span>
 						<Trans>API keys</Trans>
+					</span>
+				</NavRow>
+				<NavRow
+					to='/settings/mcp/connections'
+					data-testid='settings-nav-mcp-connections'
+				>
+					<Plug size={16} aria-hidden />
+					<span>
+						<Trans>Connections</Trans>
 					</span>
 				</NavRow>
 			</SettingsNav>

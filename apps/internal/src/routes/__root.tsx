@@ -158,7 +158,10 @@ function RootComponent() {
 		location.pathname === '/login' ||
 		location.pathname === '/forgot-password' ||
 		location.pathname === '/reset-password' ||
-		location.pathname.startsWith('/accept-invitation/')
+		location.pathname.startsWith('/accept-invitation/') ||
+		// The OAuth consent screen runs mid-flow (authed, but handing access to
+		// an MCP client) — render it focused, without the org-aware chrome.
+		location.pathname === '/oauth/consent'
 
 	// Tell any stale `/login` tab (left on the "Check your inbox" panel
 	// after a cross-tab magic-link verify) to navigate off. Listener lives
