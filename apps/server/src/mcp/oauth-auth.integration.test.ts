@@ -57,7 +57,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import { PgLive } from '../db/client'
 import { Auth } from '../lib/auth'
-import { enterOrgScope } from '../middleware/org'
+import { enterOrgScope, enterUserScope } from '../middleware/org'
 import { McpOAuthService } from '../services/mcp-oauth'
 
 const DATABASE_URL = process.env['DATABASE_URL'] as string
@@ -220,17 +220,28 @@ const resolveBearer = (token: string): Promise<BearerOutcome> =>
 				SELECT id FROM "user" WHERE id = ${userId} LIMIT 1
 			`.pipe(Effect.orDie)
 			if (!userRows[0]) return { kind: 'challenge' } satisfies BearerOutcome
-			const memberships = yield* sql<{ organizationId: string }>`
-				SELECT "organizationId" FROM member WHERE "userId" = ${userId}
-			`.pipe(Effect.orDie)
-			const orgIds = memberships.map(m => m.organizationId)
+			// Mirror the middleware: read memberships + selection under the
+			// resolver role so the suite exercises the same RLS-scoped path.
+			const { orgIds, selectedOrgId } = yield* enterUserScope(
+				sql,
+				userId,
+			)(
+				Effect.gen(function* () {
+					const memberships = yield* sql<{ organizationId: string }>`
+						SELECT "organizationId" FROM member WHERE "userId" = ${userId}
+					`
+					const selection = yield* sql<{ organizationId: string }>`
+						SELECT organization_id FROM mcp_oauth_org
+						WHERE user_id = ${userId} AND client_id = ${clientId} LIMIT 1
+					`
+					return {
+						orgIds: memberships.map(m => m.organizationId),
+						selectedOrgId: selection[0]?.organizationId,
+					}
+				}),
+			)
 			if (orgIds.length === 0)
 				return { kind: 'forbidden', code: -32002 } satisfies BearerOutcome
-			const selection = yield* sql<{ organizationId: string }>`
-				SELECT organization_id FROM mcp_oauth_org
-				WHERE user_id = ${userId} AND client_id = ${clientId} LIMIT 1
-			`.pipe(Effect.orDie)
-			const selectedOrgId = selection[0]?.organizationId
 			const orgId =
 				selectedOrgId && orgIds.includes(selectedOrgId)
 					? selectedOrgId
@@ -656,5 +667,91 @@ describe('McpOAuthService.listConnections', () => {
 			expect(connections).toHaveLength(1)
 			expect(connections[0]?.organizationId).toBeNull()
 		})
+	})
+})
+
+describe('RLS backstop on the resolver role', () => {
+	// The connections and /mcp reads run as app_mcp_resolver with the caller's id
+	// in app.current_user_id. These prove the policies isolate by user at the
+	// database — the guarantee behind the explicit WHERE in McpOAuthService and
+	// the /mcp resolution, should a future edit ever drop it.
+	//
+	// The `rls-a`/`rls-b` (users) + `rls-c` (client) rows are synthetic ids that
+	// the email/slug-keyed cleanup wouldn't catch; each case stays inside its own
+	// BEGIN…ROLLBACK so nothing persists past the test.
+
+	it("should hide another user's mcp_oauth_org rows even without a WHERE", async () => {
+		const client = await pool.connect()
+		try {
+			// GIVEN two users each hold a connection binding
+			await client.query('BEGIN')
+			await client.query(
+				`INSERT INTO mcp_oauth_org (user_id, client_id, organization_id)
+				 VALUES ('rls-a', 'rls-c', $1), ('rls-b', 'rls-c', $1)`,
+				[taller.id],
+			)
+			// WHEN the resolver reads as user A
+			await client.query('SET LOCAL ROLE app_mcp_resolver')
+			await client.query(
+				"SELECT set_config('app.current_user_id', 'rls-a', true)",
+			)
+			const all = await client.query<{ user_id: string }>(
+				'SELECT user_id FROM mcp_oauth_org',
+			)
+			const reachForB = await client.query(
+				"SELECT 1 FROM mcp_oauth_org WHERE user_id = 'rls-b'",
+			)
+			// THEN only A's row is visible, even reaching for B's directly
+			expect(all.rows.every(r => r.user_id === 'rls-a')).toBe(true)
+			expect(reachForB.rowCount).toBe(0)
+		} finally {
+			await client.query('ROLLBACK')
+			client.release()
+		}
+	})
+
+	it('should reject writing a row for another user', async () => {
+		const client = await pool.connect()
+		try {
+			await client.query('BEGIN')
+			// GIVEN the resolver scoped to user A
+			await client.query('SET LOCAL ROLE app_mcp_resolver')
+			await client.query(
+				"SELECT set_config('app.current_user_id', 'rls-a', true)",
+			)
+			// WHEN it inserts a row owned by user B, THEN the WITH CHECK rejects it
+			await expect(
+				client.query(
+					`INSERT INTO mcp_oauth_org (user_id, client_id, organization_id)
+					 VALUES ('rls-b', 'rls-c', $1)`,
+					[taller.id],
+				),
+			).rejects.toThrow(/row-level security/i)
+		} finally {
+			await client.query('ROLLBACK')
+			client.release()
+		}
+	})
+
+	it("should expose only the current user's memberships", async () => {
+		const client = await pool.connect()
+		try {
+			await client.query('BEGIN')
+			// GIVEN the seeded member table spans several users
+			// WHEN the resolver reads member as the single-org user
+			await client.query('SET LOCAL ROLE app_mcp_resolver')
+			await client.query("SELECT set_config('app.current_user_id', $1, true)", [
+				singleOrgUserId,
+			])
+			const rows = await client.query<{ userId: string }>(
+				'SELECT "userId" FROM member',
+			)
+			// THEN every visible membership is that user's own
+			expect(rows.rowCount).toBeGreaterThan(0)
+			expect(rows.rows.every(r => r.userId === singleOrgUserId)).toBe(true)
+		} finally {
+			await client.query('ROLLBACK')
+			client.release()
+		}
 	})
 })
