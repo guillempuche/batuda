@@ -164,6 +164,10 @@ const McpAuthMiddleware = HttpRouter.middleware(
 							verifyOptions: {
 								audience: `${env.BETTER_AUTH_BASE_URL}/mcp`,
 								issuer: env.BETTER_AUTH_BASE_URL,
+								// Pin the signature algorithm. The signing keys are EdDSA;
+								// without this pin, adding any other key type to the JWKS
+								// later would open the door to algorithm-substitution.
+								algorithms: ['EdDSA'],
 							},
 						}),
 					).pipe(

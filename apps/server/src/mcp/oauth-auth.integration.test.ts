@@ -188,7 +188,12 @@ const resolveBearer = (token: string): Promise<BearerOutcome> =>
 				try: () =>
 					verifyJwsAccessToken(token, {
 						jwksFetch: () => auth.instance.api.getJwks(),
-						verifyOptions: { audience: AUDIENCE, issuer: BASE_URL },
+						// Pinned to EdDSA to match the /mcp middleware verify exactly.
+						verifyOptions: {
+							audience: AUDIENCE,
+							issuer: BASE_URL,
+							algorithms: ['EdDSA'],
+						},
 					}),
 				catch: error => error,
 			}).pipe(
