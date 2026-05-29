@@ -1,11 +1,9 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { ArrowLeft, Check, Copy, Plug } from 'lucide-react'
-import { useState } from 'react'
+import { ArrowLeft, Plug } from 'lucide-react'
 import styled from 'styled-components'
 
-import { usePriToast } from '@batuda/ui/pri'
-
+import { PriCopyButton } from '#/components/primitives/pri-copy-button'
 import { apiBaseUrl } from '#/lib/api-base'
 import {
 	brushedMetalPlate,
@@ -14,11 +12,12 @@ import {
 } from '#/lib/workshop-mixins'
 
 /**
- * Help page for connecting an AI tool to this org over MCP. Two paths: dev
- * tools paste a config snippet with an API key; chat interfaces (ChatGPT,
- * Claude.ai) can't carry a key, so they add the server by URL and approve it
- * over OAuth. Every snippet embeds the live server URL, so it's correct for
- * whichever environment the page is served from.
+ * Help page for connecting an AI tool to this org over MCP. Chat interfaces
+ * (ChatGPT, Claude.ai) come first since most people reach for those — they
+ * can't carry a key, so they add the server by URL and approve it over OAuth.
+ * Coding tools come last: they paste a config snippet with an API key. Every
+ * snippet embeds the live server URL, so it's correct for whichever environment
+ * the page is served from.
  */
 
 export const Route = createFileRoute('/settings/mcp/')({
@@ -26,9 +25,9 @@ export const Route = createFileRoute('/settings/mcp/')({
 	component: McpSetupPage,
 })
 
-// The config snippet for each file-config tool, given the live MCP URL. Tool
-// names, file paths, and the snippets themselves are not translated (brands,
-// paths, code); only the surrounding guidance is.
+// The config snippet for each coding tool, given the live MCP URL. Tool names,
+// file paths, and the snippets themselves are not translated (brands, paths,
+// code); only the surrounding guidance is.
 type HeaderClient = {
 	readonly id: string
 	readonly label: string
@@ -101,35 +100,10 @@ const HEADER_CLIENTS: ReadonlyArray<HeaderClient> = [
 
 function McpSetupPage() {
 	const { t } = useLingui()
-	const toastManager = usePriToast()
-	const [copiedId, setCopiedId] = useState<string | null>(null)
-	const [copiedLabel, setCopiedLabel] = useState('')
 	const mcpUrl = `${apiBaseUrl()}/mcp`
-
-	const copy = async (id: string, text: string, label: string) => {
-		try {
-			await navigator.clipboard.writeText(text)
-			setCopiedId(id)
-			// Drives a polite live region so the copy is announced, not just shown.
-			setCopiedLabel(label)
-			setTimeout(
-				() => setCopiedId(current => (current === id ? null : current)),
-				1500,
-			)
-		} catch {
-			toastManager.add({
-				title: t`Couldn't copy`,
-				description: t`Select the text and copy it manually.`,
-				type: 'error',
-			})
-		}
-	}
 
 	return (
 		<Page>
-			<Announce role='status' aria-live='polite'>
-				{copiedId ? t`Copied ${copiedLabel}` : ''}
-			</Announce>
 			<BackLink to='/settings' aria-label={t`Back to settings`}>
 				<ArrowLeft size={14} aria-hidden />
 				<span>
@@ -144,73 +118,12 @@ function McpSetupPage() {
 				</Heading>
 				<Subtitle>
 					<Trans>
-						Give an AI assistant access to this organization's CRM. Dev tools
-						use an API key; chat interfaces connect over OAuth.
+						Give an AI assistant access to this organization's CRM. Chat apps
+						like ChatGPT and Claude.ai connect over OAuth; coding tools use an
+						API key.
 					</Trans>
 				</Subtitle>
 			</Intro>
-
-			<Section>
-				<SectionTitle>
-					<Trans>Dev tools (API key)</Trans>
-				</SectionTitle>
-				<SectionLead>
-					<Trans>
-						Create an API key, then paste the snippet for your tool — replacing{' '}
-						<Mono>YOUR_API_KEY</Mono> with it. The key acts in this
-						organization.
-					</Trans>{' '}
-					<Link to='/settings/api-keys'>
-						<Trans>Create an API key</Trans>
-					</Link>
-				</SectionLead>
-
-				{HEADER_CLIENTS.map(client => {
-					const snippet = client.snippet(mcpUrl)
-					return (
-						<ClientBlock key={client.id}>
-							<BlockHead>
-								<ClientName>{client.label}</ClientName>
-								<Where>{client.where}</Where>
-							</BlockHead>
-							<CodeWrap>
-								<Pre>
-									<code>{snippet}</code>
-								</Pre>
-								<CopyButton
-									type='button'
-									data-testid={`mcp-copy-${client.id}`}
-									aria-label={t`Copy the ${client.label} config`}
-									onClick={() => void copy(client.id, snippet, client.label)}
-								>
-									{copiedId === client.id ? (
-										<Check size={14} aria-hidden />
-									) : (
-										<Copy size={14} aria-hidden />
-									)}
-								</CopyButton>
-							</CodeWrap>
-							{client.id === 'gemini' ? (
-								<Note>
-									<Trans>
-										Use <Mono>httpUrl</Mono>, not <Mono>url</Mono> — plain{' '}
-										<Mono>url</Mono> selects the old SSE transport.
-									</Trans>
-								</Note>
-							) : null}
-							{client.id === 'claude-desktop' ? (
-								<Note>
-									<Trans>
-										Claude Desktop can't reach a remote server directly, so this
-										bridges through <Mono>mcp-remote</Mono> (needs Node
-										installed). Or add it as an OAuth connector instead.
-									</Trans>
-								</Note>
-							) : null}
-						</ClientBlock>
-					)
-				})}
-			</Section>
 
 			<Section>
 				<SectionTitle>
@@ -228,18 +141,7 @@ function McpSetupPage() {
 					<Pre>
 						<code>{mcpUrl}</code>
 					</Pre>
-					<CopyButton
-						type='button'
-						data-testid='mcp-copy-url'
-						aria-label={t`Copy the server URL`}
-						onClick={() => void copy('url', mcpUrl, t`server URL`)}
-					>
-						{copiedId === 'url' ? (
-							<Check size={14} aria-hidden />
-						) : (
-							<Copy size={14} aria-hidden />
-						)}
-					</CopyButton>
+					<CopyBtn text={mcpUrl} label={t`server URL`} testId='mcp-copy-url' />
 				</UrlRow>
 
 				<Steps>
@@ -267,6 +169,61 @@ function McpSetupPage() {
 					</Link>
 				</SectionLead>
 			</Section>
+
+			<Section>
+				<SectionTitle>
+					<Trans>Coding tools (API key)</Trans>
+				</SectionTitle>
+				<SectionLead>
+					<Trans>
+						Create an API key, then paste the snippet for your tool — replacing{' '}
+						<Mono>YOUR_API_KEY</Mono> with it. The key acts in this
+						organization.
+					</Trans>{' '}
+					<Link to='/settings/api-keys'>
+						<Trans>Create an API key</Trans>
+					</Link>
+				</SectionLead>
+
+				{HEADER_CLIENTS.map(client => {
+					const snippet = client.snippet(mcpUrl)
+					return (
+						<ClientBlock key={client.id}>
+							<BlockHead>
+								<ClientName>{client.label}</ClientName>
+								<Where>{client.where}</Where>
+							</BlockHead>
+							<CodeWrap>
+								<Pre>
+									<code>{snippet}</code>
+								</Pre>
+								<CopyBtn
+									text={snippet}
+									label={client.label}
+									testId={`mcp-copy-${client.id}`}
+								/>
+							</CodeWrap>
+							{client.id === 'gemini' ? (
+								<Note>
+									<Trans>
+										Use <Mono>httpUrl</Mono>, not <Mono>url</Mono> — plain{' '}
+										<Mono>url</Mono> selects the old SSE transport.
+									</Trans>
+								</Note>
+							) : null}
+							{client.id === 'claude-desktop' ? (
+								<Note>
+									<Trans>
+										Claude Desktop can't reach a remote server directly, so this
+										bridges through <Mono>mcp-remote</Mono> (needs Node
+										installed). Or add it as an OAuth connector instead.
+									</Trans>
+								</Note>
+							) : null}
+						</ClientBlock>
+					)
+				})}
+			</Section>
 		</Page>
 	)
 }
@@ -275,20 +232,6 @@ const Page = styled.div.withConfig({ displayName: 'McpSetupPage' })`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-lg);
-`
-
-// Off-screen but in the accessibility tree: a polite live region that announces
-// a successful copy, which is otherwise only the icon swapping to a check.
-const Announce = styled.span`
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	padding: 0;
-	margin: -1px;
-	overflow: hidden;
-	clip: rect(0, 0, 0, 0);
-	white-space: nowrap;
-	border: 0;
 `
 
 const BackLink = styled(Link).withConfig({ displayName: 'McpSetupBackLink' })`
@@ -422,37 +365,18 @@ const Pre = styled.pre.withConfig({ displayName: 'McpSetupPre' })`
 	white-space: pre;
 `
 
-const CopyButton = styled.button.withConfig({ displayName: 'McpSetupCopy' })`
+// The shared PriCopyButton positioned into the code block's corner.
+const CopyBtn = styled(PriCopyButton).withConfig({
+	displayName: 'McpSetupCopy',
+})`
 	position: absolute;
 	top: var(--space-2xs);
 	right: var(--space-2xs);
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
 	width: 1.75rem;
 	height: 1.75rem;
 	border-radius: var(--shape-3xs);
 	border: 1px solid var(--color-outline);
 	background: var(--color-surface);
-	color: var(--color-on-surface-variant);
-	cursor: pointer;
-
-	&:hover {
-		color: var(--color-primary);
-	}
-
-	&:focus-visible {
-		outline: none;
-		box-shadow: var(--glow-active);
-	}
-`
-
-const Note = styled.p.withConfig({ displayName: 'McpSetupNote' })`
-	font-family: var(--font-body);
-	font-size: var(--typescale-body-small-size);
-	font-style: italic;
-	color: var(--color-on-surface-variant);
-	margin: 0;
 `
 
 const UrlRow = styled.div.withConfig({ displayName: 'McpSetupUrlRow' })`
@@ -481,4 +405,12 @@ const Mono = styled.code.withConfig({ displayName: 'McpSetupMono' })`
 	padding: 0 var(--space-3xs);
 	border-radius: var(--shape-3xs);
 	background: color-mix(in oklab, var(--color-on-surface) 8%, transparent);
+`
+
+const Note = styled.p.withConfig({ displayName: 'McpSetupNote' })`
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	line-height: var(--typescale-body-small-line);
+	color: var(--color-on-surface-variant);
+	margin: 0;
 `

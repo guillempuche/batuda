@@ -357,6 +357,9 @@ function ApiKeysPage() {
 								<Copy size={14} aria-hidden />
 								<span>{copied ? t`Copied` : t`Copy`}</span>
 							</PriButton>
+							<SrOnly role='status' aria-live='polite'>
+								{copied ? t`Copied` : ''}
+							</SrOnly>
 						</SecretBox>
 						<RevealActions>
 							<PriDialog.Close
@@ -668,6 +671,18 @@ const SecretBox = styled.div.withConfig({ displayName: 'ApiKeysSecretBox' })`
 	align-items: stretch;
 	gap: var(--space-sm);
 	flex-wrap: wrap;
+`
+
+const SrOnly = styled.span.withConfig({ displayName: 'ApiKeysSrOnly' })`
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
 `
 
 const SecretValue = styled.code.withConfig({
