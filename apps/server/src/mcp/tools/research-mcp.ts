@@ -2,7 +2,11 @@ import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { ResearchService, type SystemDefaults } from '@batuda/research'
+import {
+	type CreateResearchInput,
+	ResearchService,
+	type SystemDefaults,
+} from '@batuda/research'
 
 import { EnvVars } from '../../lib/env'
 
@@ -107,7 +111,7 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 						orgId,
 						{
 							query: params.query,
-							context: params.context as any,
+							context: params.context as CreateResearchInput['context'],
 							schemaName: params.schema_name,
 						},
 						systemDefaults,
@@ -130,7 +134,7 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 						orgId,
 						{
 							query: params.query,
-							context: params.context as any,
+							context: params.context as CreateResearchInput['context'],
 							schemaName: params.schema_name,
 						},
 						systemDefaults,

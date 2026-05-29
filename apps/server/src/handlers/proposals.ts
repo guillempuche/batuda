@@ -37,11 +37,11 @@ export const ProposalsLive = HttpApiBuilder.group(
 				.handle('create', _ =>
 					Effect.gen(function* () {
 						const rows =
-							yield* sql`INSERT INTO proposals ${sql.insert(_.payload as any)} RETURNING *`
+							yield* sql`INSERT INTO proposals ${sql.insert(_.payload)} RETURNING *`
 						yield* Effect.logInfo('Proposal created').pipe(
 							Effect.annotateLogs({
 								event: 'proposal.created',
-								companyId: (_.payload as any).companyId,
+								companyId: _.payload.companyId,
 							}),
 						)
 						return rows[0]
@@ -62,7 +62,7 @@ export const ProposalsLive = HttpApiBuilder.group(
 						const before = existing[0]
 
 						const rows = yield* sql`
-							UPDATE proposals SET ${sql.update({ ...(_.payload as any), updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) }, ['id'])}
+							UPDATE proposals SET ${sql.update({ ..._.payload, updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })}
 							WHERE id = ${_.params.id} RETURNING *
 						`
 

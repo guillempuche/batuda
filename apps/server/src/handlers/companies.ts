@@ -37,12 +37,12 @@ export const CompaniesLive = HttpApiBuilder.group(
 					),
 				)
 				.handle('create', _ =>
-					svc.create(_.payload as any).pipe(
+					svc.create(_.payload).pipe(
 						Effect.tap(r =>
 							Effect.logInfo('Company created').pipe(
 								Effect.annotateLogs({
 									event: 'company.created',
-									slug: (r as any)[0]?.slug,
+									slug: r[0]?.['slug'],
 								}),
 							),
 						),
@@ -51,7 +51,7 @@ export const CompaniesLive = HttpApiBuilder.group(
 					),
 				)
 				.handle('update', _ =>
-					svc.update(_.params.id, _.payload as any).pipe(
+					svc.update(_.params.id, _.payload).pipe(
 						Effect.tap(() =>
 							Effect.logInfo('Company updated').pipe(
 								Effect.annotateLogs({
