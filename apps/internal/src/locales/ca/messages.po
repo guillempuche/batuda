@@ -86,11 +86,11 @@ msgstr "{who} va escriure:"
 msgid "+{remaining} more"
 msgstr "+{remaining} més"
 
-#: src/routes/settings/mcp/index.tsx:247
+#: src/routes/settings/mcp/index.tsx:149
 msgid "<0>ChatGPT:</0> Settings → Connectors → turn on Developer mode → add the URL above and choose OAuth. (Plus, Pro, Business, Enterprise, or Edu.)"
 msgstr "<0>ChatGPT:</0> Configuració → Connectors → activa el mode desenvolupador → afegeix l'URL de dalt i tria OAuth. (Plus, Pro, Business, Enterprise o Edu.)"
 
-#: src/routes/settings/mcp/index.tsx:254
+#: src/routes/settings/mcp/index.tsx:156
 msgid "<0>Claude.ai:</0> Settings → Connectors → Add custom connector → paste the URL above."
 msgstr "<0>Claude.ai:</0> Configuració → Connectors → Afegeix un connector personalitzat → enganxa l'URL de dalt."
 
@@ -197,7 +197,7 @@ msgstr "Adreça"
 msgid "Admin"
 msgstr "Admin"
 
-#: src/routes/settings/mcp/index.tsx:262
+#: src/routes/settings/mcp/index.tsx:164
 msgid "After approving, manage which org each one acts in here."
 msgstr "Després d'aprovar-lo, gestiona aquí en quina organització actua cadascun."
 
@@ -244,7 +244,7 @@ msgstr "Ja al CRM"
 msgid "An AI assistant wants to connect to your Batuda account over MCP and act on your behalf. Only approve assistants you trust."
 msgstr "Un assistent d'IA vol connectar-se al teu compte de Batuda per MCP i actuar en nom teu. Aprova només els assistents en qui confiïs."
 
-#: src/routes/settings/api-keys/index.tsx:395
+#: src/routes/settings/api-keys/index.tsx:398
 msgid "Any agent using \"{confirmLabel}\" will stop working. This can't be undone."
 msgstr "Qualsevol agent que faci servir \"{confirmLabel}\" deixarà de funcionar. Això no es pot desfer."
 
@@ -309,7 +309,7 @@ msgstr "Tornar a l'organització"
 
 #: src/routes/settings/api-keys/index.tsx:187
 #: src/routes/settings/mcp/connections.tsx:101
-#: src/routes/settings/mcp/index.tsx:133
+#: src/routes/settings/mcp/index.tsx:107
 msgid "Back to settings"
 msgstr "Torna a la configuració"
 
@@ -412,7 +412,7 @@ msgstr "Crides"
 #: src/components/research/research-dialog.tsx:221
 #: src/routes/emails/inboxes.tsx:1055
 #: src/routes/emails/inboxes.tsx:1453
-#: src/routes/settings/api-keys/index.tsx:410
+#: src/routes/settings/api-keys/index.tsx:413
 #: src/routes/tasks/index.tsx:718
 msgid "Cancel"
 msgstr "Cancel·la"
@@ -459,11 +459,11 @@ msgstr "S'han desat els canvis."
 msgid "Channel"
 msgstr "Canal"
 
-#: src/routes/settings/mcp/index.tsx:217
+#: src/routes/settings/mcp/index.tsx:130
 msgid "Chat interfaces (OAuth)"
 msgstr "Interfícies de xat (OAuth)"
 
-#: src/routes/settings/mcp/index.tsx:220
+#: src/routes/settings/mcp/index.tsx:133
 msgid "ChatGPT and Claude.ai can't send a key, so they connect over OAuth. Add this server by URL, approve it, and it appears under your connections."
 msgstr "ChatGPT i Claude.ai no poden enviar una clau, així que es connecten amb OAuth. Afegeix aquest servidor per URL, aprova'l i apareixerà a les teves connexions."
 
@@ -495,7 +495,7 @@ msgstr "Tria una organització"
 msgid "Choose primary inbox"
 msgstr "Tria la bústia principal"
 
-#: src/routes/settings/mcp/index.tsx:203
+#: src/routes/settings/mcp/index.tsx:216
 msgid "Claude Desktop can't reach a remote server directly, so this bridges through <0>mcp-remote</0> (needs Node installed). Or add it as an OAuth connector instead."
 msgstr "Claude Desktop no es pot connectar directament a un servidor remot, així que això fa de pont amb <0>mcp-remote</0> (cal tenir Node instal·lat). O afegeix-lo com a connector OAuth."
 
@@ -550,6 +550,10 @@ msgstr "Tancat"
 #: src/components/shared/status-badge.tsx:45
 msgid "Closed — won or lost"
 msgstr "Tancat — guanyat o perdut"
+
+#: src/routes/settings/mcp/index.tsx:175
+msgid "Coding tools (API key)"
+msgstr "Eines de programació (clau API)"
 
 #: src/components/shared/status-badge.tsx:39
 msgid "Cold lead — no contact yet"
@@ -622,7 +626,7 @@ msgstr "Conclusió o compromís (opcional)"
 msgid "Connect AI tools"
 msgstr "Connecta eines d'IA"
 
-#: src/routes/settings/mcp/index.tsx:143
+#: src/routes/settings/mcp/index.tsx:117
 msgid "Connect AI tools over MCP"
 msgstr "Connecta eines d'IA amb MCP"
 
@@ -700,16 +704,21 @@ msgid "Coordinates saved from the geocoder."
 msgstr "Coordenades desades del geocodificador."
 
 #: src/routes/settings/api-keys/index.tsx:358
+#: src/routes/settings/api-keys/index.tsx:361
 msgid "Copied"
 msgstr "Copiada"
 
-#: src/routes/settings/mcp/index.tsx:131
-msgid "Copied {copiedLabel}"
-msgstr "Copiat {copiedLabel}"
+#: src/components/primitives/pri-copy-button.tsx:55
+msgid "Copied {label}"
+msgstr "S'ha copiat {label}"
 
 #: src/routes/settings/api-keys/index.tsx:358
 msgid "Copy"
 msgstr "Copia"
+
+#: src/components/primitives/pri-copy-button.tsx:44
+msgid "Copy {label}"
+msgstr "Copia {label}"
 
 #: src/routes/settings/api-keys/index.tsx:171
 msgid "Copy failed"
@@ -718,15 +727,6 @@ msgstr "No s'ha pogut copiar"
 #: src/components/shared/company-card.tsx:125
 msgid "Copy slug"
 msgstr "Copia el slug"
-
-#. placeholder {0}: client.label
-#: src/routes/settings/mcp/index.tsx:183
-msgid "Copy the {0} config"
-msgstr "Copia la configuració de {0}"
-
-#: src/routes/settings/mcp/index.tsx:234
-msgid "Copy the server URL"
-msgstr "Copia l'URL del servidor"
 
 #: src/routes/settings/api-keys/index.tsx:337
 msgid "Copy your key now"
@@ -854,7 +854,7 @@ msgstr "No s'ha pogut canviar l'estat de la safata."
 msgid "Could not update"
 msgstr "No s'ha pogut actualitzar"
 
-#: src/routes/settings/mcp/index.tsx:121
+#: src/components/primitives/pri-copy-button.tsx:31
 msgid "Couldn't copy"
 msgstr "No s'ha pogut copiar"
 
@@ -882,11 +882,11 @@ msgstr "Crea una pàgina d'aterratge per a un prospecte des del detall d'una emp
 msgid "Create a prospect landing page to share with this company."
 msgstr "Crea una pàgina d'aterratge per a un prospecte per compartir amb aquesta empresa."
 
-#: src/routes/settings/mcp/index.tsx:164
+#: src/routes/settings/mcp/index.tsx:184
 msgid "Create an API key"
 msgstr "Crea una clau d'API"
 
-#: src/routes/settings/mcp/index.tsx:158
+#: src/routes/settings/mcp/index.tsx:178
 msgid "Create an API key, then paste the snippet for your tool — replacing <0>YOUR_API_KEY</0> with it. The key acts in this organization."
 msgstr "Crea una clau d'API i enganxa el fragment de la teva eina — substituint <0>YOUR_API_KEY</0> per la clau. La clau actua en aquesta organització."
 
@@ -993,7 +993,7 @@ msgstr "Suprimeix la bústia {0}"
 msgid "Delete inbox {0}? Stored messages stay; the connection stops."
 msgstr "Suprimir la bústia {0}? Els missatges desats es mantenen; la connexió s'atura."
 
-#: src/routes/settings/api-keys/index.tsx:425
+#: src/routes/settings/api-keys/index.tsx:428
 msgid "Delete key"
 msgstr "Elimina la clau"
 
@@ -1001,12 +1001,12 @@ msgstr "Elimina la clau"
 msgid "Delete this footer? This cannot be undone."
 msgstr "Eliminar aquest peu de pàgina? Aquesta acció no es pot desfer."
 
-#: src/routes/settings/api-keys/index.tsx:392
+#: src/routes/settings/api-keys/index.tsx:395
 msgid "Delete this key?"
 msgstr "Vols eliminar aquesta clau?"
 
 #: src/routes/settings/api-keys/index.tsx:318
-#: src/routes/settings/api-keys/index.tsx:425
+#: src/routes/settings/api-keys/index.tsx:428
 msgid "Deleting…"
 msgstr "Eliminant…"
 
@@ -1017,10 +1017,6 @@ msgstr "Lliurat"
 #: src/routes/oauth/consent.tsx:152
 msgid "Deny"
 msgstr "Denega"
-
-#: src/routes/settings/mcp/index.tsx:155
-msgid "Dev tools (API key)"
-msgstr "Eines de desenvolupament (clau d'API)"
 
 #: src/components/interactions/quick-capture-dialog.tsx:256
 msgid "Direction"
@@ -1051,7 +1047,7 @@ msgstr "Document"
 msgid "Documents"
 msgstr "Documents"
 
-#: src/routes/settings/api-keys/index.tsx:370
+#: src/routes/settings/api-keys/index.tsx:373
 msgid "Done"
 msgstr "Fet"
 
@@ -1288,9 +1284,9 @@ msgstr "Del webhook"
 msgid "Full screen"
 msgstr "Pantalla completa"
 
-#: src/routes/settings/mcp/index.tsx:146
-msgid "Give an AI assistant access to this organization's CRM. Dev tools use an API key; chat interfaces connect over OAuth."
-msgstr "Dona accés al CRM d'aquesta organització a un assistent d'IA. Les eines de desenvolupament usen una clau d'API; les interfícies de xat es connecten amb OAuth."
+#: src/routes/settings/mcp/index.tsx:120
+msgid "Give an AI assistant access to this organization's CRM. Chat apps like ChatGPT and Claude.ai connect over OAuth; coding tools use an API key."
+msgstr "Dona a un assistent d'IA accés al CRM d'aquesta organització. Les aplicacions de xat com ChatGPT i Claude.ai es connecten amb OAuth; les eines de programació fan servir una clau API."
 
 #: src/routes/settings/api-keys/index.tsx:111
 msgid "Give the key a name so you can recognize it later."
@@ -2549,7 +2545,7 @@ msgstr "Tria una safata…"
 msgid "Select the key and copy it manually."
 msgstr "Selecciona la clau i copia-la manualment."
 
-#: src/routes/settings/mcp/index.tsx:122
+#: src/components/primitives/pri-copy-button.tsx:32
 msgid "Select the text and copy it manually."
 msgstr "Selecciona el text i copia'l manualment."
 
@@ -2610,7 +2606,7 @@ msgstr "Enviant…"
 msgid "Sent"
 msgstr "Enviat"
 
-#: src/routes/settings/mcp/index.tsx:235
+#: src/routes/settings/mcp/index.tsx:144
 msgid "server URL"
 msgstr "l'URL del servidor"
 
@@ -2638,7 +2634,7 @@ msgstr "Posa contrasenya"
 #: src/routes/pages/$id.tsx:290
 #: src/routes/settings/api-keys/index.tsx:190
 #: src/routes/settings/mcp/connections.tsx:104
-#: src/routes/settings/mcp/index.tsx:136
+#: src/routes/settings/mcp/index.tsx:110
 #: src/routes/settings/profile/index.tsx:109
 msgid "Settings"
 msgstr "Configuració"
@@ -3129,7 +3125,7 @@ msgstr "Pujant…"
 msgid "Use {0} as primary"
 msgstr "Fes servir {0} com a principal"
 
-#: src/routes/settings/mcp/index.tsx:195
+#: src/routes/settings/mcp/index.tsx:208
 msgid "Use <0>httpUrl</0>, not <1>url</1> — plain <2>url</2> selects the old SSE transport."
 msgstr "Usa <0>httpUrl</0>, no <1>url</1> — <2>url</2> sol selecciona el transport SSE antic."
 
@@ -3279,7 +3275,7 @@ msgid "Your Batuda workbench identity."
 msgstr "La teva identitat al banc de Batuda."
 
 #: src/routes/settings/mcp/connections.tsx:123
-#: src/routes/settings/mcp/index.tsx:266
+#: src/routes/settings/mcp/index.tsx:168
 msgid "Your connections"
 msgstr "Les teves connexions"
 
