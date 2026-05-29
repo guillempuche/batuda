@@ -90,13 +90,13 @@ const Live = Layer.mergeAll(
 	CredentialDecryptor.layer,
 	RawMessageStorage.layer,
 	ParticipantMatcher.layer,
-	PgLive,
-).pipe(Layer.provideMerge(WorkerEnvVars.layer))
-
-NodeRuntime.runMain(
-	Effect.scoped(program).pipe(Effect.provide(Live)) as unknown as Effect.Effect<
-		void,
-		unknown,
-		never
-	>,
+).pipe(
+	// ParticipantMatcher reads contacts/companies via SqlClient, so PgLive must
+	// be PROVIDED to the merged layers — `mergeAll` alongside it leaves that
+	// requirement unsatisfied. provideMerge also re-exposes SqlClient for the
+	// inbox claim/session queries run by `program`.
+	Layer.provideMerge(PgLive),
+	Layer.provideMerge(WorkerEnvVars.layer),
 )
+
+NodeRuntime.runMain(Effect.scoped(program).pipe(Effect.provide(Live)))
