@@ -3,6 +3,50 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-05-29 (server-v2026.5.29)
+
+### Features
+
+* add org-owned API keys for AI/MCP sessions ([97bfc1b](https://github.com/guillempuche/batuda/commit/97bfc1bd6020ba35d28f1f5ce198991ce07bc544))
+* attribute MCP API keys to their creating member ([1476a6d](https://github.com/guillempuche/batuda/commit/1476a6d7eb6dca9b2a241cf8d3dbad27a0268fe2))
+* authenticate MCP sessions via OAuth 2.1 ([06ff241](https://github.com/guillempuche/batuda/commit/06ff2419052254b1c9c5be6491d2789180a84351))
+* clean up abandoned OAuth clients and show connection provenance ([9c7e9fe](https://github.com/guillempuche/batuda/commit/9c7e9fe4e21fd87149c9f9ee50e9978de642c7b8))
+* **server:** authenticate MCP sessions with org API keys ([91788a1](https://github.com/guillempuche/batuda/commit/91788a12a01c2285adc43da78f091a09480175b2))
+* **server:** back the MCP OAuth tables with row-level security ([faf2b67](https://github.com/guillempuche/batuda/commit/faf2b6759e213d4b3c12cbfba5dbc92902b30869))
+* **server:** make OAuth access-token lifetime configurable ([9ba9752](https://github.com/guillempuche/batuda/commit/9ba9752bd4eced6f9ece266dbd663c48b8bbdeef))
+* **server:** rate-limit org API keys and return 429 when exceeded ([d89d2c0](https://github.com/guillempuche/batuda/commit/d89d2c0945dc4c7708725bdb4237a6a3e85d8dae))
+* **server:** record task lifecycle events ([5d53d67](https://github.com/guillempuche/batuda/commit/5d53d673bddf49b823c26f56f0a23fd65e8868fc))
+* **server:** record task transitions on the company timeline ([f9e2cfe](https://github.com/guillempuche/batuda/commit/f9e2cfe8e162e799f58b8ec34de2951dd80b6a35))
+* **server:** RLS backstop on Better Auth org tables ([a06a96e](https://github.com/guillempuche/batuda/commit/a06a96e16ff4c24c9108552775e373ad3e98c36b))
+
+### Bug Fixes
+
+* **server:** pin MCP token verification to EdDSA ([820cffa](https://github.com/guillempuche/batuda/commit/820cffac072fa17aae451919236921e8dceb3a32))
+* **server:** reconcile MCP task transitions with TaskService ([da4f661](https://github.com/guillempuche/batuda/commit/da4f661a809a166169f905aae1b4d803babb062c))
+* **server:** stamp organization_id on task creation ([695e30f](https://github.com/guillempuche/batuda/commit/695e30ff53d88c4dabfcb140732a68cd2dd4a230))
+* **server:** target invite links at an explicit APP_PUBLIC_URL ([4aee4f3](https://github.com/guillempuche/batuda/commit/4aee4f34bbbc19fd5bf805e2730a2e20245e3fd7))
+* **server:** unify task list filtering through TaskService ([0118b9e](https://github.com/guillempuche/batuda/commit/0118b9ecaaf1e97ae9452dadf38acee5416efa12))
+
+### Refactoring
+
+* **server:** centralize storage config and clarify daemon layers ([b359e6e](https://github.com/guillempuche/batuda/commit/b359e6e0f90ee4ab45f7bd43e22ced00c34a8cb9))
+* **server:** drop as-any casts in handlers and MCP tools ([39a67fa](https://github.com/guillempuche/batuda/commit/39a67fa395338f98899a8919b81b4674c3717a5b))
+* **server:** move task get/update/bulkComplete onto TaskService ([c472a3a](https://github.com/guillempuche/batuda/commit/c472a3ac610015cef2bdbb55051ee0d3458b13a1))
+* **server:** move task transitions onto TaskService ([7d00219](https://github.com/guillempuche/batuda/commit/7d00219038cf85f7acf5e246e099bfb204e57d87))
+* **server:** replace raw new Date() with DateTime/now() ([291426c](https://github.com/guillempuche/batuda/commit/291426c5fd675e13de606aaa6cf7a630c222297a))
+* **server:** require every env var, remove Config defaults ([3b82a90](https://github.com/guillempuche/batuda/commit/3b82a906e42e609a7c1b6284f1d44413b71d63e0))
+* **server:** scope research fan-out as a system actor ([fe49680](https://github.com/guillempuche/batuda/commit/fe49680404b21c7c59752f19c30fa6ccacd7feb3))
+* **server:** unify org-scope entry behind enterOrgScope ([523e4e4](https://github.com/guillempuche/batuda/commit/523e4e44a3ed99ea9b12f00973df25b08bd58461))
+
+### Tests
+
+* **server:** verify MCP tokens over the real JWKS endpoint ([cf4fa0a](https://github.com/guillempuche/batuda/commit/cf4fa0aea96c4cfd399b626ec81ed3f587928ee3))
+
+### Chores
+
+* pin better-auth packages to exact versions ([ef1ac5a](https://github.com/guillempuche/batuda/commit/ef1ac5adfe65a712923fba27a3d3ffe53e4c12a2))
+* upgrade better-auth to 1.6.11 and add oauth-provider ([63ea900](https://github.com/guillempuche/batuda/commit/63ea900065d77d8fcb8731f8ca1e075e5065f580))
+
 ## 2026-05-19 (server-v2026.5.20)
 
 ### Features
