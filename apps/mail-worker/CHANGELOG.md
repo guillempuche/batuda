@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-05-29 (mail-worker-v2026.5.29-2)
+
+### Bug Fixes
+
+* **mail-worker:** provide SqlClient to ParticipantMatcher ([03457fd](https://github.com/guillempuche/batuda/commit/03457fdc070f44fdb61bca16596f4cfb6fbc9d48))
+
 ## 2026-05-29 (mail-worker-v2026.5.29-1)
 
 ### Bug Fixes
