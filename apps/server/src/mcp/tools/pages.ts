@@ -80,61 +80,22 @@ const GetPage = Tool.make('get_page', {
 	.annotate(Tool.Destructive, false)
 	.annotate(Tool.OpenWorld, false)
 
-const InsertBlock = Tool.make('insert_block', {
+const EditPageBlock = Tool.make('edit_page_block', {
 	description:
-		'Insert a block at a specific position in a page document. Defaults to appending at the end.',
+		'Edit a page block tree by position. action=insert puts block at position (appends if omitted); update merges attrs into the block at position; move relocates a block from->to; remove deletes the block at position.',
 	parameters: Schema.Struct({
 		page_id: Schema.String,
+		action: Schema.Literals(['insert', 'update', 'move', 'remove']),
 		position: Schema.optional(Schema.Number),
-		block: BlockNode,
+		block: Schema.optional(BlockNode),
+		attrs: Schema.optional(Schema.Unknown),
+		from: Schema.optional(Schema.Number),
+		to: Schema.optional(Schema.Number),
 	}),
 	success: Schema.Unknown,
 })
-	.annotate(Tool.Title, 'Insert Block')
+	.annotate(Tool.Title, 'Edit Page Block')
 	.annotate(Tool.Destructive, false)
-	.annotate(Tool.Idempotent, false)
-	.annotate(Tool.OpenWorld, false)
-
-const UpdateBlock = Tool.make('update_block', {
-	description:
-		'Update the attrs of a block at a specific position. Only the provided attrs fields are merged — omitted fields keep their current value.',
-	parameters: Schema.Struct({
-		page_id: Schema.String,
-		position: Schema.Number,
-		attrs: Schema.Unknown,
-	}),
-	success: Schema.Unknown,
-})
-	.annotate(Tool.Title, 'Update Block')
-	.annotate(Tool.Destructive, false)
-	.annotate(Tool.Idempotent, true)
-	.annotate(Tool.OpenWorld, false)
-
-const MoveBlock = Tool.make('move_block', {
-	description: 'Move a block from one position to another within the document.',
-	parameters: Schema.Struct({
-		page_id: Schema.String,
-		from: Schema.Number,
-		to: Schema.Number,
-	}),
-	success: Schema.Unknown,
-})
-	.annotate(Tool.Title, 'Move Block')
-	.annotate(Tool.Destructive, false)
-	.annotate(Tool.Idempotent, true)
-	.annotate(Tool.OpenWorld, false)
-
-const RemoveBlock = Tool.make('remove_block', {
-	description: 'Remove a block at a specific position from the document.',
-	parameters: Schema.Struct({
-		page_id: Schema.String,
-		position: Schema.Number,
-	}),
-	success: Schema.Unknown,
-})
-	.annotate(Tool.Title, 'Remove Block')
-	.annotate(Tool.Destructive, false)
-	.annotate(Tool.Idempotent, false)
 	.annotate(Tool.OpenWorld, false)
 
 export const PageTools = Toolkit.make(
@@ -143,10 +104,7 @@ export const PageTools = Toolkit.make(
 	PublishPage,
 	ListPages,
 	GetPage,
-	InsertBlock,
-	UpdateBlock,
-	MoveBlock,
-	RemoveBlock,
+	EditPageBlock,
 )
 
 export const PageHandlersLive = PageTools.toLayer(
@@ -206,57 +164,47 @@ export const PageHandlersLive = PageTools.toLayer(
 					}
 					return yield* service.getById(id_or_slug)
 				}).pipe(Effect.orDie),
-			insert_block: ({ page_id, position, block }) =>
+			edit_page_block: params =>
 				service
-					.mutateContent(page_id, doc => {
+					.mutateContent(params.page_id, doc => {
 						const content = [...doc.content]
-						const idx = position ?? content.length
-						content.splice(idx, 0, block)
-						return { ...doc, content }
-					})
-					.pipe(
-						Effect.map(r => r[0]),
-						Effect.orDie,
-					),
-			update_block: ({ page_id, position, attrs }) =>
-				service
-					.mutateContent(page_id, doc => {
-						const content = [...doc.content]
-						const existing = content[position]
-						if (!existing || !('attrs' in existing)) return doc
-						content[position] = {
-							...existing,
-							attrs: {
-								...existing.attrs,
-								...(attrs as Record<string, unknown>),
-							},
-						} as typeof existing
-						return { ...doc, content }
-					})
-					.pipe(
-						Effect.map(r => r[0]),
-						Effect.orDie,
-					),
-			move_block: ({ page_id, from, to }) =>
-				service
-					.mutateContent(page_id, doc => {
-						const content = [...doc.content]
-						if (from < 0 || from >= content.length) return doc
-						const [block] = content.splice(from, 1)
-						content.splice(to, 0, block!)
-						return { ...doc, content }
-					})
-					.pipe(
-						Effect.map(r => r[0]),
-						Effect.orDie,
-					),
-			remove_block: ({ page_id, position }) =>
-				service
-					.mutateContent(page_id, doc => {
-						const content = [...doc.content]
-						if (position < 0 || position >= content.length) return doc
-						content.splice(position, 1)
-						return { ...doc, content }
+						// Each action treats its missing/out-of-bounds params as a no-op
+						// (returns the document unchanged) rather than failing.
+						switch (params.action) {
+							case 'insert': {
+								const idx = params.position ?? content.length
+								if (params.block) content.splice(idx, 0, params.block)
+								return { ...doc, content }
+							}
+							case 'update': {
+								if (params.position === undefined) return doc
+								const existing = content[params.position]
+								if (!existing || !('attrs' in existing)) return doc
+								content[params.position] = {
+									...existing,
+									attrs: {
+										...existing.attrs,
+										...(params.attrs as Record<string, unknown>),
+									},
+								} as typeof existing
+								return { ...doc, content }
+							}
+							case 'move': {
+								if (params.from === undefined || params.to === undefined)
+									return doc
+								if (params.from < 0 || params.from >= content.length) return doc
+								const [block] = content.splice(params.from, 1)
+								if (block) content.splice(params.to, 0, block)
+								return { ...doc, content }
+							}
+							case 'remove': {
+								if (params.position === undefined) return doc
+								if (params.position < 0 || params.position >= content.length)
+									return doc
+								content.splice(params.position, 1)
+								return { ...doc, content }
+							}
+						}
 					})
 					.pipe(
 						Effect.map(r => r[0]),
