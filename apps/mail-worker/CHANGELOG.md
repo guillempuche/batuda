@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-05-29 (mail-worker-v2026.5.29-1)
+
+### Bug Fixes
+
+* **mail-worker:** bundle [@batuda](https://github.com/batuda) workspace deps so the worker boots ([dbbb79e](https://github.com/guillempuche/batuda/commit/dbbb79ed884ee78c102da879297c83fc70ae337a))
+
 ## 2026-05-29 (mail-worker-v2026.5.29)
 
 ### Features
