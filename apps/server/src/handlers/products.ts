@@ -19,7 +19,7 @@ export const ProductsLive = HttpApiBuilder.group(
 				.handle('create', _ =>
 					Effect.gen(function* () {
 						const rows =
-							yield* sql`INSERT INTO products ${sql.insert(_.payload as any)} RETURNING *`
+							yield* sql`INSERT INTO products ${sql.insert(_.payload)} RETURNING *`
 						yield* Effect.logInfo('Product created').pipe(
 							Effect.annotateLogs({ event: 'product.created' }),
 						)
@@ -29,7 +29,7 @@ export const ProductsLive = HttpApiBuilder.group(
 				.handle('update', _ =>
 					Effect.gen(function* () {
 						const rows = yield* sql`
-							UPDATE products SET ${sql.update({ ...(_.payload as any), updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) }, ['id'])}
+							UPDATE products SET ${sql.update({ ..._.payload, updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })}
 							WHERE id = ${_.params.id} RETURNING *
 						`
 						yield* Effect.logInfo('Product updated').pipe(

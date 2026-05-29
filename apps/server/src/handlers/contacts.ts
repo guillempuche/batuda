@@ -23,11 +23,11 @@ export const ContactsLive = HttpApiBuilder.group(
 				.handle('create', _ =>
 					Effect.gen(function* () {
 						const rows =
-							yield* sql`INSERT INTO contacts ${sql.insert(_.payload as any)} RETURNING *`
+							yield* sql`INSERT INTO contacts ${sql.insert(_.payload)} RETURNING *`
 						yield* Effect.logInfo('Contact created').pipe(
 							Effect.annotateLogs({
 								event: 'contact.created',
-								companyId: (_.payload as any).companyId,
+								companyId: _.payload.companyId,
 							}),
 						)
 						return rows[0]
@@ -36,7 +36,7 @@ export const ContactsLive = HttpApiBuilder.group(
 				.handle('update', _ =>
 					Effect.gen(function* () {
 						const rows = yield* sql`
-							UPDATE contacts SET ${sql.update({ ...(_.payload as any), updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) }, ['id'])}
+							UPDATE contacts SET ${sql.update({ ..._.payload, updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })}
 							WHERE id = ${_.params.id} RETURNING *
 						`
 						yield* Effect.logInfo('Contact updated').pipe(

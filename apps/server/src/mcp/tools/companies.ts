@@ -165,12 +165,12 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 				),
 			create_company: params =>
 				Effect.gen(function* () {
-					const rows = yield* service.create(params as any)
+					const rows = yield* service.create(params)
 					return rows[0]
 				}).pipe(Effect.orDie),
 			update_company: ({ id, ...fields }) =>
 				Effect.gen(function* () {
-					const rows = yield* service.update(id, fields as any)
+					const rows = yield* service.update(id, fields)
 					return rows[0]
 				}).pipe(Effect.orDie),
 			geocode_company: ({ id }) =>

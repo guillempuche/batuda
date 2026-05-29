@@ -19,7 +19,7 @@ export const WebhooksLive = HttpApiBuilder.group(
 				)
 				.handle('create', _ =>
 					Effect.gen(function* () {
-						const rows = yield* svc.create(_.payload as any)
+						const rows = yield* svc.create(_.payload)
 						yield* Effect.logInfo('Webhook endpoint created').pipe(
 							Effect.annotateLogs({ event: 'webhook.created' }),
 						)
@@ -28,7 +28,7 @@ export const WebhooksLive = HttpApiBuilder.group(
 				)
 				.handle('update', _ =>
 					Effect.gen(function* () {
-						const rows = yield* svc.update(_.params.id, _.payload as any)
+						const rows = yield* svc.update(_.params.id, _.payload)
 						return rows[0]
 					}).pipe(Effect.orDie),
 				)

@@ -87,7 +87,7 @@ export const DocumentsLive = HttpApiBuilder.group(
 				.handle('update', _ =>
 					Effect.gen(function* () {
 						const rows = yield* sql`
-							UPDATE documents SET ${sql.update({ ...(_.payload as any), updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) }, ['id'])}
+							UPDATE documents SET ${sql.update({ ..._.payload, updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })}
 							WHERE id = ${_.params.id} RETURNING *
 						`
 						yield* Effect.logInfo('Document updated').pipe(
