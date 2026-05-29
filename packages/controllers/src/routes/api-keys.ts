@@ -30,6 +30,13 @@ export const ApiKeyView = Schema.Struct({
 	expiresAt: Schema.NullOr(Schema.String),
 	createdAt: Schema.String,
 	enabled: Schema.Boolean,
+	createdBy: Schema.NullOr(
+		Schema.Struct({
+			id: Schema.String,
+			name: Schema.NullOr(Schema.String),
+			email: Schema.String,
+		}),
+	),
 })
 
 // Create response — the only place the plaintext `key` is ever returned.

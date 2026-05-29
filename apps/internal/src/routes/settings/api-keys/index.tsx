@@ -38,6 +38,10 @@ type ApiKeyRow = {
 	readonly expiresAt: string | null
 	readonly createdAt: string
 	readonly enabled: boolean
+	readonly createdBy: {
+		readonly name: string | null
+		readonly email: string
+	} | null
 }
 
 // The one-time create response — the only place the plaintext `key` exists.
@@ -278,6 +282,8 @@ function ApiKeysPage() {
 						{rows.map(row => {
 							const label = row.name ?? t`Untitled key`
 							const isDeleting = deletingId === row.id
+							const creatorName =
+								row.createdBy?.name ?? row.createdBy?.email ?? null
 							return (
 								<KeyRow key={row.id} data-testid='api-key-row'>
 									<KeyInfo>
@@ -291,6 +297,11 @@ function ApiKeysPage() {
 											<MetaItem>
 												<Trans>Created {formatDate(row.createdAt)}</Trans>
 											</MetaItem>
+											{creatorName ? (
+												<MetaItem data-testid='api-key-creator'>
+													<Trans>by {creatorName}</Trans>
+												</MetaItem>
+											) : null}
 											<MetaItem>
 												{row.expiresAt ? (
 													<Trans>Expires {formatDate(row.expiresAt)}</Trans>
@@ -452,9 +463,20 @@ function narrowKeys(rows: ReadonlyArray<unknown>): ReadonlyArray<ApiKeyRow> {
 			prefix: typeof r['prefix'] === 'string' ? r['prefix'] : null,
 			expiresAt: typeof r['expiresAt'] === 'string' ? r['expiresAt'] : null,
 			enabled: r['enabled'] !== false,
+			createdBy: narrowCreatedBy(r['createdBy']),
 		})
 	}
 	return out
+}
+
+function narrowCreatedBy(
+	value: unknown,
+): { readonly name: string | null; readonly email: string } | null {
+	if (!value || typeof value !== 'object') return null
+	const v = value as Record<string, unknown>
+	const email = typeof v['email'] === 'string' ? v['email'] : null
+	if (email === null) return null
+	return { name: typeof v['name'] === 'string' ? v['name'] : null, email }
 }
 
 function narrowCreated(value: unknown): CreatedApiKey | null {

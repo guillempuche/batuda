@@ -1,7 +1,7 @@
-// Pins how the /mcp middleware resolves an org API key: key → org's agent +
-// org (from the key's metadata) → scoped session, the org isolation that
-// yields, and the fail-closed rejections. The JSON-RPC envelope wiring is
-// covered by the boot test.
+// Pins how the /mcp middleware resolves an org API key: key → its org + the
+// creating member (from the key's metadata) → a session scoped to that member,
+// the org isolation that yields, and the fail-closed rejections. The JSON-RPC
+// envelope wiring is covered by the boot test.
 //
 // The full env must be set before the Auth layer builds.
 const env: Record<string, string> = {
@@ -67,6 +67,7 @@ let runtime: ManagedRuntime.ManagedRuntime<
 >
 let taller: Org
 let restaurant: Org
+let tallerMemberId: string
 
 const orgBySlug = async (slug: string): Promise<Org> => {
 	const result = await pool.query<Org>(
@@ -79,6 +80,17 @@ const orgBySlug = async (slug: string): Promise<Org> => {
 			`${slug} org missing — run 'pnpm cli db reset && pnpm cli seed'`,
 		)
 	return row
+}
+
+// A real member of the org — the key creator a real /mcp key would carry.
+const memberIdOf = async (orgId: string): Promise<string> => {
+	const r = await pool.query<{ userId: string }>(
+		'SELECT "userId" FROM member WHERE "organizationId" = $1 ORDER BY "userId" LIMIT 1',
+		[orgId],
+	)
+	const id = r.rows[0]?.userId
+	if (!id) throw new Error(`${orgId} has no members — run 'pnpm cli seed'`)
+	return id
 }
 
 // One marker company per org, so a scoped read can prove isolation.
@@ -102,6 +114,7 @@ beforeAll(async () => {
 	pool = new pg.Pool({ connectionString: DATABASE_URL, max: 4 })
 	taller = await orgBySlug('taller')
 	restaurant = await orgBySlug('restaurant')
+	tallerMemberId = await memberIdOf(taller.id)
 	await cleanup()
 	await seedCompany(taller.id)
 	await seedCompany(restaurant.id)
@@ -119,9 +132,9 @@ afterAll(async () => {
 	await pool.end()
 })
 
-// Mints a key (ApiKeyService), verifies it (the middleware's first step), then
-// — for a valid org key — resolves the org from metadata and runs `body`
-// inside enterOrgScope as the agent, exactly as the /mcp middleware would.
+// Verifies a key the way the /mcp middleware does as its first step, surfacing
+// what the result carries (validity, org, the key's agent owner, rate-limit
+// error). Creator resolution is exercised separately via `resolveCreator`.
 interface ResolveResult {
 	readonly valid: boolean
 	readonly orgId: string | null
@@ -155,14 +168,42 @@ const verify = (key: string) =>
 		}),
 	)
 
+// Mirrors the /mcp middleware's creator resolution: verify, read the creator id
+// from the key's metadata, and confirm a live membership in the org. Returns the
+// creator's user id, or null when the key has no creator or the creator is not
+// (or no longer) a member.
+const resolveCreator = (orgId: string, key: string) =>
+	runtime.runPromise(
+		Effect.gen(function* () {
+			const { instance } = yield* Auth
+			const verified = yield* Effect.promise(() =>
+				instance.api.verifyApiKey({ body: { key } }),
+			)
+			if (!verified.valid || !verified.key) return null
+			const createdByUserId = (
+				verified.key.metadata as { createdByUserId?: string } | null
+			)?.createdByUserId
+			if (!createdByUserId) return null
+			const sql = yield* SqlClient.SqlClient
+			const rows = yield* sql<{ id: string }>`
+				SELECT u.id FROM "user" u
+				JOIN member m ON m."userId" = u.id AND m."organizationId" = ${orgId}
+				WHERE u.id = ${createdByUserId} LIMIT 1
+			`
+			return rows[0]?.id ?? null
+		}),
+	)
+
 describe('MCP API-key auth resolution', () => {
 	describe('a valid org key', () => {
-		it('should resolve to its org + agent and scope reads to that org', async () => {
+		it('should attribute to the creating member and scope reads to its org', async () => {
 			// GIVEN a key minted for the taller org
 			const created = await runtime.runPromise(
 				Effect.gen(function* () {
 					const svc = yield* ApiKeyService
-					return yield* svc.create(taller.id, { name: 'mcp-key' })
+					return yield* svc.create(taller.id, tallerMemberId, {
+						name: 'mcp-key',
+					})
 				}),
 			)
 
@@ -177,8 +218,10 @@ describe('MCP API-key auth resolution', () => {
 				[`agent+${taller.id}@keys.batuda.internal`],
 			)
 			expect(resolved.referenceId).toBe(agent.rows[0]?.id)
+			// AND it attributes to the creating member, still a live member
+			expect(await resolveCreator(taller.id, created.key)).toBe(tallerMemberId)
 
-			// AND entering that scope as the agent reads only taller's marker
+			// AND entering that scope as the creating member reads only taller's marker
 			// company, never restaurant's (RLS isolation)
 			// Result columns are camelCase (PgClient transformResultNames).
 			const orgIds = await runtime.runPromise(
@@ -186,7 +229,7 @@ describe('MCP API-key auth resolution', () => {
 					const sql = yield* SqlClient.SqlClient
 					return yield* enterOrgScope(sql, {
 						org: taller,
-						userId: resolved.referenceId ?? '',
+						userId: tallerMemberId,
 					})(
 						Effect.gen(function* () {
 							const rows = yield* sql<{ organizationId: string }>`
@@ -209,7 +252,9 @@ describe('MCP API-key auth resolution', () => {
 			const created = await runtime.runPromise(
 				Effect.gen(function* () {
 					const svc = yield* ApiKeyService
-					return yield* svc.create(taller.id, { name: 'mcp-revoke' })
+					return yield* svc.create(taller.id, tallerMemberId, {
+						name: 'mcp-revoke',
+					})
 				}),
 			)
 			const id = created.id
@@ -233,7 +278,9 @@ describe('MCP API-key auth resolution', () => {
 			await runtime.runPromise(
 				Effect.gen(function* () {
 					const svc = yield* ApiKeyService
-					return yield* svc.create(taller.id, { name: 'mcp-rl-seed' })
+					return yield* svc.create(taller.id, tallerMemberId, {
+						name: 'mcp-rl-seed',
+					})
 				}),
 			)
 			const agentRow = await pool.query<{ id: string }>(
@@ -276,6 +323,62 @@ describe('MCP API-key auth resolution', () => {
 			expect(third.errorCode).toBe('RATE_LIMITED')
 			expect(typeof third.tryAgainIn).toBe('number')
 			expect(Math.ceil((third.tryAgainIn ?? 0) / 1000)).toBeGreaterThan(0)
+		})
+	})
+
+	describe('a key whose creator is no longer a member', () => {
+		it('should resolve no creator, so the middleware rejects it', async () => {
+			// GIVEN a taller key stamped with a creator id that has no taller
+			// membership (a member who has since left, or never belonged)
+			const exMemberId = randomUUID()
+			const created = await runtime.runPromise(
+				Effect.gen(function* () {
+					const svc = yield* ApiKeyService
+					return yield* svc.create(taller.id, exMemberId, {
+						name: 'mcp-ex-member',
+					})
+				}),
+			)
+			// WHEN resolving the creator against taller
+			// THEN no live membership → null (the middleware answers 403)
+			expect(await resolveCreator(taller.id, created.key)).toBeNull()
+		})
+	})
+
+	describe('a key with no creator in its metadata', () => {
+		it('should resolve no creator, so the middleware rejects it', async () => {
+			// GIVEN a key minted directly without a createdByUserId; there is no
+			// backward-compat fallback to the org agent
+			await runtime.runPromise(
+				Effect.gen(function* () {
+					const svc = yield* ApiKeyService
+					return yield* svc.create(taller.id, tallerMemberId, {
+						name: 'mcp-nocreator-seed',
+					})
+				}),
+			)
+			const agentRow = await pool.query<{ id: string }>(
+				'SELECT id FROM "user" WHERE lower(email) = lower($1)',
+				[`agent+${taller.id}@keys.batuda.internal`],
+			)
+			const key = await runtime.runPromise(
+				Effect.gen(function* () {
+					const { instance } = yield* Auth
+					const created = yield* Effect.promise(() =>
+						instance.api.createApiKey({
+							body: {
+								userId: agentRow.rows[0]?.id as string,
+								name: 'mcp-nocreator',
+								metadata: { organizationId: taller.id },
+							},
+						}),
+					)
+					return created.key
+				}),
+			)
+			// WHEN resolving the creator
+			// THEN none (no createdByUserId) → null (the middleware answers 403)
+			expect(await resolveCreator(taller.id, key)).toBeNull()
 		})
 	})
 })

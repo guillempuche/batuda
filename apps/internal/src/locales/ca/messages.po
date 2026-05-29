@@ -244,11 +244,11 @@ msgstr "Ja al CRM"
 msgid "An AI assistant wants to connect to your Batuda account over MCP and act on your behalf. Only approve assistants you trust."
 msgstr "Un assistent d'IA vol connectar-se al teu compte de Batuda per MCP i actuar en nom teu. Aprova només els assistents en qui confiïs."
 
-#: src/routes/settings/api-keys/index.tsx:398
+#: src/routes/settings/api-keys/index.tsx:409
 msgid "Any agent using \"{confirmLabel}\" will stop working. This can't be undone."
 msgstr "Qualsevol agent que faci servir \"{confirmLabel}\" deixarà de funcionar. Això no es pot desfer."
 
-#: src/routes/settings/api-keys/index.tsx:197
+#: src/routes/settings/api-keys/index.tsx:201
 #: src/routes/settings/profile/index.tsx:122
 msgid "API keys"
 msgstr "Claus d'API"
@@ -307,7 +307,7 @@ msgstr "Torna a la safata"
 msgid "Back to organization"
 msgstr "Tornar a l'organització"
 
-#: src/routes/settings/api-keys/index.tsx:187
+#: src/routes/settings/api-keys/index.tsx:191
 #: src/routes/settings/mcp/connections.tsx:101
 #: src/routes/settings/mcp/index.tsx:107
 msgid "Back to settings"
@@ -372,6 +372,10 @@ msgstr "Resum breu (opcional)"
 msgid "Bulk thread actions"
 msgstr "Accions massives de fils"
 
+#: src/routes/settings/api-keys/index.tsx:302
+msgid "by {creatorName}"
+msgstr "per {creatorName}"
+
 #: src/routes/settings/organization/spend.tsx:168
 msgid "By provider"
 msgstr "Per proveïdor"
@@ -412,7 +416,7 @@ msgstr "Crides"
 #: src/components/research/research-dialog.tsx:221
 #: src/routes/emails/inboxes.tsx:1055
 #: src/routes/emails/inboxes.tsx:1453
-#: src/routes/settings/api-keys/index.tsx:413
+#: src/routes/settings/api-keys/index.tsx:424
 #: src/routes/tasks/index.tsx:718
 msgid "Cancel"
 msgstr "Cancel·la"
@@ -703,8 +707,8 @@ msgstr "Converses"
 msgid "Coordinates saved from the geocoder."
 msgstr "Coordenades desades del geocodificador."
 
-#: src/routes/settings/api-keys/index.tsx:358
-#: src/routes/settings/api-keys/index.tsx:361
+#: src/routes/settings/api-keys/index.tsx:369
+#: src/routes/settings/api-keys/index.tsx:372
 msgid "Copied"
 msgstr "Copiada"
 
@@ -712,7 +716,7 @@ msgstr "Copiada"
 msgid "Copied {label}"
 msgstr "S'ha copiat {label}"
 
-#: src/routes/settings/api-keys/index.tsx:358
+#: src/routes/settings/api-keys/index.tsx:369
 msgid "Copy"
 msgstr "Copia"
 
@@ -720,7 +724,7 @@ msgstr "Copia"
 msgid "Copy {label}"
 msgstr "Copia {label}"
 
-#: src/routes/settings/api-keys/index.tsx:171
+#: src/routes/settings/api-keys/index.tsx:175
 msgid "Copy failed"
 msgstr "No s'ha pogut copiar"
 
@@ -728,7 +732,7 @@ msgstr "No s'ha pogut copiar"
 msgid "Copy slug"
 msgstr "Copia el slug"
 
-#: src/routes/settings/api-keys/index.tsx:337
+#: src/routes/settings/api-keys/index.tsx:348
 msgid "Copy your key now"
 msgstr "Copia la teva clau ara"
 
@@ -744,11 +748,11 @@ msgstr "No s'ha pogut completar la connexió. Torna-ho a provar."
 msgid "Could not create the inbox. Check transport or credentials."
 msgstr "No s'ha pogut crear la bústia. Revisa el transport o les credencials."
 
-#: src/routes/settings/api-keys/index.tsx:138
+#: src/routes/settings/api-keys/index.tsx:142
 msgid "Could not create the key. Please try again."
 msgstr "No s'ha pogut crear la clau. Torna-ho a provar."
 
-#: src/routes/settings/api-keys/index.tsx:159
+#: src/routes/settings/api-keys/index.tsx:163
 msgid "Could not delete the key. Please try again."
 msgstr "No s'ha pogut eliminar la clau. Torna-ho a provar."
 
@@ -780,7 +784,7 @@ msgstr "No s'han pogut carregar els fils"
 msgid "Could not load your connections. Refresh to try again."
 msgstr "No s'han pogut carregar les connexions. Actualitza per tornar-ho a provar."
 
-#: src/routes/settings/api-keys/index.tsx:270
+#: src/routes/settings/api-keys/index.tsx:274
 msgid "Could not load your keys. Refresh to try again."
 msgstr "No s'han pogut carregar les teves claus. Actualitza per tornar-ho a provar."
 
@@ -870,7 +874,7 @@ msgstr "Crea"
 msgid "Create a footer to append to outgoing emails from this inbox."
 msgstr "Crea un peu de pàgina per afegir als correus sortints d'aquesta bústia."
 
-#: src/routes/settings/api-keys/index.tsx:209
+#: src/routes/settings/api-keys/index.tsx:213
 msgid "Create a key"
 msgstr "Crea una clau"
 
@@ -902,7 +906,7 @@ msgstr "Crea una tasca de seguiment"
 msgid "Create footer"
 msgstr "Crea peu de pàgina"
 
-#: src/routes/settings/api-keys/index.tsx:254
+#: src/routes/settings/api-keys/index.tsx:258
 msgid "Create key"
 msgstr "Crea la clau"
 
@@ -912,7 +916,7 @@ msgid "Created"
 msgstr "Creada"
 
 #. placeholder {0}: formatDate(row.createdAt)
-#: src/routes/settings/api-keys/index.tsx:292
+#: src/routes/settings/api-keys/index.tsx:298
 msgid "Created {0}"
 msgstr "Creada el {0}"
 
@@ -920,7 +924,7 @@ msgstr "Creada el {0}"
 msgid "Created by agent"
 msgstr "Creada per agent"
 
-#: src/routes/settings/api-keys/index.tsx:254
+#: src/routes/settings/api-keys/index.tsx:258
 msgid "Creating…"
 msgstr "Creant…"
 
@@ -973,13 +977,13 @@ msgid "Defaults to you when omitted."
 msgstr "Per defecte ets tu si s'omet."
 
 #: src/routes/emails/inboxes.tsx:1385
-#: src/routes/settings/api-keys/index.tsx:318
+#: src/routes/settings/api-keys/index.tsx:329
 msgid "Delete"
 msgstr "Elimina"
 
 #: src/routes/emails/inboxes.tsx:266
 #: src/routes/emails/inboxes.tsx:1293
-#: src/routes/settings/api-keys/index.tsx:158
+#: src/routes/settings/api-keys/index.tsx:162
 msgid "Delete failed"
 msgstr "Error en eliminar"
 
@@ -993,7 +997,7 @@ msgstr "Suprimeix la bústia {0}"
 msgid "Delete inbox {0}? Stored messages stay; the connection stops."
 msgstr "Suprimir la bústia {0}? Els missatges desats es mantenen; la connexió s'atura."
 
-#: src/routes/settings/api-keys/index.tsx:428
+#: src/routes/settings/api-keys/index.tsx:439
 msgid "Delete key"
 msgstr "Elimina la clau"
 
@@ -1001,12 +1005,12 @@ msgstr "Elimina la clau"
 msgid "Delete this footer? This cannot be undone."
 msgstr "Eliminar aquest peu de pàgina? Aquesta acció no es pot desfer."
 
-#: src/routes/settings/api-keys/index.tsx:395
+#: src/routes/settings/api-keys/index.tsx:406
 msgid "Delete this key?"
 msgstr "Vols eliminar aquesta clau?"
 
-#: src/routes/settings/api-keys/index.tsx:318
-#: src/routes/settings/api-keys/index.tsx:428
+#: src/routes/settings/api-keys/index.tsx:329
+#: src/routes/settings/api-keys/index.tsx:439
 msgid "Deleting…"
 msgstr "Eliminant…"
 
@@ -1023,7 +1027,7 @@ msgid "Direction"
 msgstr "Direcció"
 
 #: src/routes/emails/inboxes.tsx:443
-#: src/routes/settings/api-keys/index.tsx:303
+#: src/routes/settings/api-keys/index.tsx:314
 msgid "Disabled"
 msgstr "Desactivada"
 
@@ -1047,7 +1051,7 @@ msgstr "Document"
 msgid "Documents"
 msgstr "Documents"
 
-#: src/routes/settings/api-keys/index.tsx:373
+#: src/routes/settings/api-keys/index.tsx:384
 msgid "Done"
 msgstr "Fet"
 
@@ -1072,7 +1076,7 @@ msgstr "Data de venciment"
 msgid "Duration (min)"
 msgstr "Durada (min)"
 
-#: src/routes/settings/api-keys/index.tsx:222
+#: src/routes/settings/api-keys/index.tsx:226
 msgid "e.g. Claude Desktop"
 msgstr "p. ex. Claude Desktop"
 
@@ -1185,15 +1189,15 @@ msgid "Expand"
 msgstr "Desplega"
 
 #. placeholder {0}: formatDate(row.expiresAt)
-#: src/routes/settings/api-keys/index.tsx:296
+#: src/routes/settings/api-keys/index.tsx:307
 msgid "Expires {0}"
 msgstr "Caduca el {0}"
 
-#: src/routes/settings/api-keys/index.tsx:228
+#: src/routes/settings/api-keys/index.tsx:232
 msgid "Expires in (days)"
 msgstr "Caduca d'aquí a (dies)"
 
-#: src/routes/settings/api-keys/index.tsx:118
+#: src/routes/settings/api-keys/index.tsx:122
 msgid "Expiry must be a number of days greater than zero."
 msgstr "La caducitat ha de ser un nombre de dies més gran que zero."
 
@@ -1288,7 +1292,7 @@ msgstr "Pantalla completa"
 msgid "Give an AI assistant access to this organization's CRM. Chat apps like ChatGPT and Claude.ai connect over OAuth; coding tools use an API key."
 msgstr "Dona a un assistent d'IA accés al CRM d'aquesta organització. Les aplicacions de xat com ChatGPT i Claude.ai es connecten amb OAuth; les eines de programació fan servir una clau API."
 
-#: src/routes/settings/api-keys/index.tsx:111
+#: src/routes/settings/api-keys/index.tsx:115
 msgid "Give the key a name so you can recognize it later."
 msgstr "Posa un nom a la clau perquè la puguis reconèixer més endavant."
 
@@ -1442,7 +1446,7 @@ msgstr "Uneix-te a la videotrucada"
 msgid "Key"
 msgstr "Clau"
 
-#: src/routes/settings/api-keys/index.tsx:150
+#: src/routes/settings/api-keys/index.tsx:154
 msgid "Key deleted"
 msgstr "Clau eliminada"
 
@@ -1450,7 +1454,7 @@ msgstr "Clau eliminada"
 msgid "Key differentiators"
 msgstr "Diferenciadors clau"
 
-#: src/routes/settings/api-keys/index.tsx:200
+#: src/routes/settings/api-keys/index.tsx:204
 msgid "Keys let AI agents and MCP clients act on behalf of this organization."
 msgstr "Les claus permeten que els agents d'IA i els clients MCP actuïn en nom d'aquesta organització."
 
@@ -1512,7 +1516,7 @@ msgstr "Carregant l'execució…"
 
 #: src/components/companies/upcoming-meetings-card.tsx:57
 #: src/components/shared/loading-spinner.tsx:23
-#: src/routes/settings/api-keys/index.tsx:266
+#: src/routes/settings/api-keys/index.tsx:270
 #: src/routes/settings/mcp/connections.tsx:127
 #: src/routes/settings/organization/index.tsx:52
 #: src/routes/settings/organization/members.tsx:113
@@ -1687,7 +1691,7 @@ msgid "Minimize"
 msgstr "Minimitza"
 
 #: src/routes/emails/inboxes.tsx:1413
-#: src/routes/settings/api-keys/index.tsx:215
+#: src/routes/settings/api-keys/index.tsx:219
 msgid "Name"
 msgstr "Nom"
 
@@ -1706,11 +1710,11 @@ msgstr "Necessita atenció"
 msgid "never"
 msgstr "mai"
 
-#: src/routes/settings/api-keys/index.tsx:236
+#: src/routes/settings/api-keys/index.tsx:240
 msgid "Never"
 msgstr "Mai"
 
-#: src/routes/settings/api-keys/index.tsx:298
+#: src/routes/settings/api-keys/index.tsx:309
 msgid "Never expires"
 msgstr "No caduca mai"
 
@@ -1839,7 +1843,7 @@ msgstr "Cap empresa d'alta prioritat sense seguiment programat"
 msgid "No inboxes yet"
 msgstr "Encara no hi ha safates"
 
-#: src/routes/settings/api-keys/index.tsx:274
+#: src/routes/settings/api-keys/index.tsx:278
 msgid "No keys yet. Create one above to connect an agent."
 msgstr "Encara no tens cap clau. Crea'n una a dalt per connectar un agent."
 
@@ -2541,7 +2545,7 @@ msgstr "Selecciona tots els fils d'aquesta pàgina"
 msgid "Select inbox…"
 msgstr "Tria una safata…"
 
-#: src/routes/settings/api-keys/index.tsx:172
+#: src/routes/settings/api-keys/index.tsx:176
 msgid "Select the key and copy it manually."
 msgstr "Selecciona la clau i copia-la manualment."
 
@@ -2632,7 +2636,7 @@ msgstr "Posa contrasenya"
 
 #: src/components/layout/nav-items.ts:81
 #: src/routes/pages/$id.tsx:290
-#: src/routes/settings/api-keys/index.tsx:190
+#: src/routes/settings/api-keys/index.tsx:194
 #: src/routes/settings/mcp/connections.tsx:104
 #: src/routes/settings/mcp/index.tsx:110
 #: src/routes/settings/profile/index.tsx:109
@@ -2884,7 +2888,7 @@ msgstr "L'enllaç ja no és vàlid. Demana'n un de nou a sota."
 msgid "The 20 most recently edited open tasks. Click one to reopen it."
 msgstr "Les 20 tasques obertes editades més recentment. Fes-hi clic per reobrir-ne una."
 
-#: src/routes/settings/api-keys/index.tsx:151
+#: src/routes/settings/api-keys/index.tsx:155
 msgid "The API key can no longer be used."
 msgstr "La clau d'API ja no es pot fer servir."
 
@@ -2981,7 +2985,7 @@ msgstr "Aquesta invitació ja no és vàlida."
 msgid "This invitation link is no longer valid. It may have already been used."
 msgstr "Aquest enllaç de la invitació ja no és vàlid. Pot haver-se utilitzat."
 
-#: src/routes/settings/api-keys/index.tsx:340
+#: src/routes/settings/api-keys/index.tsx:351
 msgid "This is the only time the full key is shown. Store it somewhere safe — I can't show it again."
 msgstr "Aquest és l'únic moment en què es mostra la clau sencera. Desa-la en un lloc segur — no te la puc tornar a mostrar."
 
@@ -3095,7 +3099,7 @@ msgstr "Client sense nom"
 msgid "Untitled"
 msgstr "Sense títol"
 
-#: src/routes/settings/api-keys/index.tsx:279
+#: src/routes/settings/api-keys/index.tsx:283
 msgid "Untitled key"
 msgstr "Clau sense títol"
 
@@ -3283,6 +3287,6 @@ msgstr "Les teves connexions"
 msgid "Your email isn't verified yet. Use the magic link instead."
 msgstr "El correu encara no està verificat. Fes servir l'enllaç de sessió."
 
-#: src/routes/settings/api-keys/index.tsx:262
+#: src/routes/settings/api-keys/index.tsx:266
 msgid "Your keys"
 msgstr "Les teves claus"

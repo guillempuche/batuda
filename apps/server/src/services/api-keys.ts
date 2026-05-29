@@ -17,6 +17,13 @@ export interface CreatedApiKey {
 	readonly createdAt: string
 }
 
+// Resolved creator of a key — the human whose session minted it.
+interface Creator {
+	readonly id: string
+	readonly name: string | null
+	readonly email: string
+}
+
 // List/get shape — never carries the secret, only the masked `start` prefix.
 export interface RedactedApiKey {
 	readonly id: string
@@ -26,6 +33,7 @@ export interface RedactedApiKey {
 	readonly expiresAt: string | null
 	readonly createdAt: string
 	readonly enabled: boolean
+	readonly createdBy: Creator | null
 }
 
 interface KeyRow {
@@ -36,12 +44,31 @@ interface KeyRow {
 	readonly expiresAt: string | Date | null
 	readonly createdAt: string | Date
 	readonly enabled: boolean
+	readonly metadata: string | null
 }
 
 const isoOrNull = (value: string | Date | null): string | null =>
 	value === null ? null : new Date(value).toISOString()
 
-const toRedacted = (row: KeyRow): RedactedApiKey => ({
+// Better Auth stores key metadata as a JSON string column; pull the creator id
+// back out, tolerating a double-encoded value.
+const parseCreatorId = (metadata: string | null): string | null => {
+	if (!metadata) return null
+	try {
+		let parsed: unknown = JSON.parse(metadata)
+		if (typeof parsed === 'string') parsed = JSON.parse(parsed)
+		return (
+			(parsed as { createdByUserId?: string } | null)?.createdByUserId ?? null
+		)
+	} catch {
+		return null
+	}
+}
+
+const toRedacted = (
+	row: KeyRow,
+	createdBy: Creator | null,
+): RedactedApiKey => ({
 	id: row.id,
 	name: row.name,
 	start: row.start,
@@ -49,9 +76,11 @@ const toRedacted = (row: KeyRow): RedactedApiKey => ({
 	expiresAt: isoOrNull(row.expiresAt),
 	createdAt: new Date(row.createdAt).toISOString(),
 	enabled: row.enabled,
+	createdBy,
 })
 
-const SELECT_COLS = 'id, name, start, prefix, "expiresAt", "createdAt", enabled'
+const SELECT_COLS =
+	'id, name, start, prefix, "expiresAt", "createdAt", enabled, metadata'
 
 // API keys are owned by a per-org agent user (`isAgent`) and carry the org in
 // their Better Auth `metadata`; the MCP transport reads that to scope the
@@ -113,9 +142,31 @@ export class ApiKeyService extends ServiceMap.Service<ApiKeyService>()(
 					return created
 				})
 
+			// Batch-resolve the human creators of a set of keys so a listing can
+			// label each key with who minted it — one query, not one per key.
+			const resolveCreators = (rows: ReadonlyArray<KeyRow>) =>
+				Effect.gen(function* () {
+					const ids = [
+						...new Set(
+							rows
+								.map(r => parseCreatorId(r.metadata))
+								.filter((id): id is string => id !== null),
+						),
+					]
+					if (ids.length === 0) return new Map<string, Creator>()
+					const users = yield* Effect.tryPromise(() =>
+						auth.pool.query<Creator>(
+							'SELECT id, name, email FROM "user" WHERE id = ANY($1)',
+							[ids],
+						),
+					).pipe(Effect.orDie)
+					return new Map(users.rows.map(u => [u.id, u] as const))
+				})
+
 			return {
 				create: (
 					orgId: string,
+					actorUserId: string,
 					input: {
 						readonly name: string
 						readonly expiresIn?: number | undefined
@@ -131,7 +182,10 @@ export class ApiKeyService extends ServiceMap.Service<ApiKeyService>()(
 								body: {
 									userId: agentId,
 									name: input.name,
-									metadata: { organizationId: orgId },
+									metadata: {
+										organizationId: orgId,
+										createdByUserId: actorUserId,
+									},
 									// Stamp the limit from config rather than inherit Better
 									// Auth's 10-req/day default, which a single MCP turn (many
 									// tool calls) would blow through.
@@ -173,7 +227,13 @@ export class ApiKeyService extends ServiceMap.Service<ApiKeyService>()(
 								[agentId],
 							),
 						).pipe(Effect.orDie)
-						return rows.rows.map(toRedacted)
+						const creators = yield* resolveCreators(rows.rows)
+						return rows.rows.map(row =>
+							toRedacted(
+								row,
+								creators.get(parseCreatorId(row.metadata) ?? '') ?? null,
+							),
+						)
 					}),
 
 				get: (
@@ -194,7 +254,11 @@ export class ApiKeyService extends ServiceMap.Service<ApiKeyService>()(
 						const row = rows.rows[0]
 						if (!row)
 							return yield* new NotFound({ entity: 'apiKey', id: keyId })
-						return toRedacted(row)
+						const creators = yield* resolveCreators([row])
+						return toRedacted(
+							row,
+							creators.get(parseCreatorId(row.metadata) ?? '') ?? null,
+						)
 					}),
 
 				delete: (orgId: string, keyId: string): Effect.Effect<void, NotFound> =>

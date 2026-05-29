@@ -103,9 +103,10 @@ const McpAuthMiddleware = HttpRouter.middleware(
 						enterOrgScope(sql, { org, userId: principal.userId }),
 					)
 
-				// ── API-key path (AI/MCP clients): the key resolves to its org's
-				// agent user (referenceId) and the org from metadata — no cookie
-				// session or activeOrganizationId is involved. Fail closed.
+				// ── API-key path (AI/MCP clients): the org and the creating member
+				// come from the key's metadata; the session acts as that member so
+				// actions attribute to them — no cookie or activeOrganizationId
+				// involved. Fail closed.
 				const apiKey = headers.get('x-api-key')
 				if (apiKey) {
 					const verified = yield* Effect.promise(() =>
@@ -135,34 +136,48 @@ const McpAuthMiddleware = HttpRouter.middleware(
 						}
 						return yield* jsonRpcError(401, -32001, 'Invalid API key')
 					}
-					const orgId = (
-						verified.key.metadata as { organizationId?: string } | null
-					)?.organizationId
+					const meta = verified.key.metadata as {
+						organizationId?: string
+						createdByUserId?: string
+					} | null
+					const orgId = meta?.organizationId
 					if (!orgId) {
 						return yield* jsonRpcError(401, -32001, 'API key is not org-scoped')
 					}
+					// Required, never silently org-attributed: a key with no creator
+					// in its metadata is rejected outright.
+					const createdByUserId = meta?.createdByUserId
+					if (!createdByUserId) {
+						return yield* jsonRpcError(
+							403,
+							-32003,
+							'API key has no creator; recreate it',
+						)
+					}
 					const org = yield* loadOrg(orgId)
-					const agentRows = yield* sql<{
+					// Resolve the creator and confirm they are still a live member of the
+					// org: the key stops working once they leave.
+					const creatorRows = yield* sql<{
 						id: string
 						email: string
 						name: string | null
 					}>`
-						SELECT id, email, name FROM "user"
-						WHERE id = ${verified.key.referenceId} LIMIT 1
+						SELECT u.id, u.email, u.name FROM "user" u
+						JOIN member m ON m."userId" = u.id AND m."organizationId" = ${orgId}
+						WHERE u.id = ${createdByUserId} LIMIT 1
 					`.pipe(Effect.orDie)
-					const agent = agentRows[0]
-					// Org or agent user deleted out from under the key → fail closed.
-					if (!org || !agent) {
+					const creator = creatorRows[0]
+					if (!org || !creator) {
 						return yield* jsonRpcError(
 							403,
 							-32003,
-							'API key organization or agent is no longer available',
+							'API key creator is no longer a member of its organization',
 						)
 					}
 					return yield* enterScope(org, {
-						userId: agent.id,
-						email: agent.email,
-						name: agent.name,
+						userId: creator.id,
+						email: creator.email,
+						name: creator.name,
 						isAgent: true,
 					})
 				}

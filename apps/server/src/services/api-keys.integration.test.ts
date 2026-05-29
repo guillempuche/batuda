@@ -54,6 +54,7 @@ let pool: pg.Pool
 let runtime: ManagedRuntime.ManagedRuntime<ApiKeyService, Config.ConfigError>
 let tallerOrgId: string
 let restaurantOrgId: string
+let tallerMemberId: string
 
 const orgIdBySlug = async (slug: string): Promise<string> => {
 	const r = await pool.query<{ id: string }>(
@@ -65,6 +66,17 @@ const orgIdBySlug = async (slug: string): Promise<string> => {
 		throw new Error(
 			`${slug} org missing — run 'pnpm cli db reset && pnpm cli seed'`,
 		)
+	return id
+}
+
+// A real member of the org, used as the key creator (stored in key metadata).
+const memberIdOf = async (orgId: string): Promise<string> => {
+	const r = await pool.query<{ userId: string }>(
+		'SELECT "userId" FROM member WHERE "organizationId" = $1 ORDER BY "userId" LIMIT 1',
+		[orgId],
+	)
+	const id = r.rows[0]?.userId
+	if (!id) throw new Error(`${orgId} has no members — run 'pnpm cli seed'`)
 	return id
 }
 
@@ -80,6 +92,7 @@ beforeAll(async () => {
 	pool = new pg.Pool({ connectionString: DATABASE_URL, max: 4 })
 	tallerOrgId = await orgIdBySlug('taller')
 	restaurantOrgId = await orgIdBySlug('restaurant')
+	tallerMemberId = await memberIdOf(tallerOrgId)
 	await cleanup()
 	runtime = ManagedRuntime.make(
 		Layer.provide(
@@ -95,11 +108,16 @@ afterAll(async () => {
 	await pool.end()
 })
 
-const create = (orgId: string, name: string, expiresIn?: number) =>
+const create = (
+	orgId: string,
+	name: string,
+	expiresIn?: number,
+	actorUserId = tallerMemberId,
+) =>
 	runtime.runPromise(
 		Effect.gen(function* () {
 			const svc = yield* ApiKeyService
-			return yield* svc.create(orgId, { name, expiresIn })
+			return yield* svc.create(orgId, actorUserId, { name, expiresIn })
 		}),
 	)
 
@@ -173,7 +191,10 @@ describe('ApiKeyService.create', () => {
 				typeof row?.metadata === 'string'
 					? (JSON.parse(row.metadata) as unknown)
 					: row?.metadata
-			expect(meta).toMatchObject({ organizationId: tallerOrgId })
+			expect(meta).toMatchObject({
+				organizationId: tallerOrgId,
+				createdByUserId: tallerMemberId,
+			})
 			expect(row?.rateLimitEnabled).toBe(true)
 			const agentR = await pool.query<{ id: string }>(
 				'SELECT id FROM "user" WHERE lower(email) = lower($1)',
@@ -218,6 +239,8 @@ describe('ApiKeyService.list', () => {
 		const found = tallerKeys.find(k => k.id === created.id)
 		expect(found).toBeDefined()
 		expect(found).not.toHaveProperty('key')
+		// list resolves the key's creator from its metadata
+		expect(found?.createdBy?.id).toBe(tallerMemberId)
 		expect(restaurantKeys.some(k => k.id === created.id)).toBe(false)
 	})
 
