@@ -121,7 +121,9 @@ export class InboxHealthProbe extends ServiceMap.Service<InboxHealthProbe>()(
 	static readonly layer = Layer.effect(this, this.make)
 
 	// Forks the recurring loop on boot. Separate from `layer` so tests can
-	// drive `tick` directly without paying for a daemon.
+	// drive `tick` directly without paying for a daemon. Outputs no service
+	// (`effectDiscard`), so it must be listed in `mergeAll` — a `provideMerge`
+	// would skip building it and the probe would never start.
 	static readonly daemonLayer = Layer.effectDiscard(
 		Effect.gen(function* () {
 			const probe = yield* InboxHealthProbe
