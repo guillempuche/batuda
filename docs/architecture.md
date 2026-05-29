@@ -345,9 +345,9 @@ Company status updated to "client" via MCP or web
 
 ## Authentication (Better Auth)
 
-All auth is handled by [Better Auth](https://www.better-auth.com/) v1.5.6 with plugins: `openAPI`, `bearer`, `admin`, `apiKey`, `organization`, `magicLink`.
+All auth is handled by [Better Auth](https://www.better-auth.com/) v1.6.11 with plugins: `openAPI`, `bearer`, `admin`, `apiKey`, `organization`, `magicLink`, `jwt`, and `oauthProvider` (the OAuth 2.1 authorization server for web-chat MCP clients).
 
-**Multi-org scoping.** Every request resolves an `activeOrganizationId` from the session (or env var, for MCP stdio in dev). Middleware loads the matching `organization` row into a `CurrentOrg` ServiceMap service, then opens a transactional connection that runs `SET LOCAL app.current_org_id = $orgId` before any tenant-scoped reads/writes. Two Postgres roles enforce isolation: `app_user` (RLS enforced — HTTP + MCP path) and `app_service` (BYPASSRLS — mail worker + cron jobs that resolve org ownership explicitly per row).
+**Multi-org scoping.** Every request resolves an `activeOrganizationId` from the session (or env var, for MCP stdio in dev). Middleware loads the matching `organization` row into a `CurrentOrg` ServiceMap service, then opens a transactional connection that runs `SET LOCAL app.current_org_id = $orgId` before any tenant-scoped reads/writes. Three Postgres roles enforce isolation: `app_user` (RLS enforced — HTTP + MCP path), `app_service` (BYPASSRLS — mail worker + cron jobs that resolve org ownership explicitly per row), and `app_mcp_resolver` (a NOLOGIN role the MCP OAuth path switches into to read a caller's own memberships and consents under user-scoped RLS).
 
 **Two user types:**
 
@@ -364,13 +364,21 @@ All auth is handled by [Better Auth](https://www.better-auth.com/) v1.5.6 with p
 | `/mcp` (HTTP transport)                                     | Protected — HTTP middleware validates Better Auth session, provides `CurrentUser` |
 | MCP stdio                                                   | Trusted local process — static `CurrentUser`                                      |
 
-**API key flow for AI agents and external services (n8n, Zapier):**
+**API key flow.** Two kinds of `x-api-key` keys exist:
 
-1. Admin creates agent user: `POST /auth/admin/create-user`
-2. Admin creates API key: `POST /auth/api-key/create`
-3. Agent/service sends `x-api-key: sk_...` header
-4. `@better-auth/api-key` plugin with `enableSessionForAPIKeys: true` mocks a session
-5. `SessionMiddleware` validates uniformly via `auth.api.getSession()`
+- **Org-scoped keys** (the `/mcp` path) — any org member self-serves them under
+  `/settings/api-keys`. Each key is owned by the org's agent user but stamps its
+  creating member in metadata. On a `/mcp` call the key resolves to its org plus
+  that member — re-checking a live `member` row, so the key stops working once the
+  creator leaves the org — and the session acts as the member, so actions
+  attribute to the person. Keys carry a per-key rate limit (`API_KEY_RATE_LIMIT_*`,
+  enabled in prod); a throttled key gets `429` + `Retry-After`.
+- **User-owned keys** (admin / external integrations like n8n, Zapier) — minted
+  out-of-band against a specific user (`pnpm cli auth create-key` or
+  `POST /auth/api-key/create`). They carry no org metadata and serve `/auth/admin/*`
+  and webhook callers, not `/mcp`.
+
+Both are validated by `@better-auth/api-key` (`enableSessionForAPIKeys: true`); `SessionMiddleware` validates `/v1/*` uniformly via `auth.api.getSession()`.
 
 **MCP auth on behalf of user:**
 
@@ -459,7 +467,9 @@ user                — auth users (team members + AI agents, with isAgent field
 session             — active sessions; activeOrganizationId picks per-request tenant
 account             — auth provider accounts
 verification        — email verification tokens
-api_key             — hashed API keys (referenceId, configId, quotas, rate limits)
+api_key             — hashed API keys (referenceId, configId, quotas, per-key
+                      rate limits; metadata carries organizationId + createdByUserId
+                      for org-scoped /mcp keys)
 organization        — tenant root; users belong via member rows
 member              — (organization_id, user_id) plus primary_inbox_id additionalField
 invitation          — pending invites by email
