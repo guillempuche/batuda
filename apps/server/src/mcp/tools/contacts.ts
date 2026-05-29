@@ -1,4 +1,4 @@
-import { Effect, Schema } from 'effect'
+import { DateTime, Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
@@ -77,7 +77,7 @@ export const ContactHandlersLive = ContactTools.toLayer(
 				Effect.gen(function* () {
 					const data: Record<string, unknown> = {
 						...fields,
-						updatedAt: new Date(),
+						updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 					}
 					const rows =
 						yield* sql`UPDATE contacts SET ${sql.update(data, ['id'])} WHERE id = ${id} RETURNING *`

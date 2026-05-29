@@ -1,7 +1,7 @@
 import { createServer } from 'node:http'
 
 import { NodeHttpServer, NodeRuntime } from '@effect/platform-node'
-import { Config, Effect, Layer } from 'effect'
+import { Config, DateTime, Effect, Layer } from 'effect'
 import {
 	FetchHttpClient,
 	HttpRouter,
@@ -172,7 +172,7 @@ const ResearchEventSinkLive = Layer.effect(
 									companyId: linkRows[0]?.subjectId ?? null,
 									summary: run.briefMd ?? run.query,
 									status,
-									occurredAt: new Date(),
+									occurredAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 								}),
 							)
 						}),

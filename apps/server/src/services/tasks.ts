@@ -1,4 +1,4 @@
-import { Effect, Layer, ServiceMap } from 'effect'
+import { DateTime, Effect, Layer, ServiceMap } from 'effect'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
@@ -167,7 +167,7 @@ export class TaskService extends ServiceMap.Service<TaskService>()(
 							change,
 							actorUserId: actor.id,
 							actorKind: actor.kind,
-							occurredAt: new Date(),
+							occurredAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 						}),
 					)
 				})
@@ -194,7 +194,7 @@ export class TaskService extends ServiceMap.Service<TaskService>()(
 									taskType: row.type,
 									actorUserId: actor.id,
 									actorKind: actor.kind,
-									occurredAt: new Date(),
+									occurredAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 								}),
 							)
 						}
@@ -247,7 +247,7 @@ export class TaskService extends ServiceMap.Service<TaskService>()(
 								contactId: row.contactId,
 								actorUserId: actor.id,
 								actorKind: actor.kind,
-								occurredAt: new Date(),
+								occurredAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 							}),
 						)
 						return row
@@ -424,8 +424,10 @@ export class TaskService extends ServiceMap.Service<TaskService>()(
 						// have to manage completed_at (the DB CHECK enforces it anyway).
 						if (input.status !== undefined)
 							updates['completed_at'] =
-								input.status === 'done' ? new Date() : null
-						updates['updated_at'] = new Date()
+								input.status === 'done'
+									? DateTime.toDateUtc(DateTime.nowUnsafe())
+									: null
+						updates['updated_at'] = DateTime.toDateUtc(DateTime.nowUnsafe())
 						updates['actor_id'] = actor.id
 
 						const updated = yield* sql`

@@ -1,4 +1,4 @@
-import { Effect, Stream } from 'effect'
+import { DateTime, Effect, Stream } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
 import {
@@ -109,7 +109,7 @@ export const ResearchLive = HttpApiBuilder.group(
 										researchId: _.params.id,
 										timestamp:
 											(run as { completedAt: string | null }).completedAt ??
-											new Date().toISOString(),
+											DateTime.formatIso(DateTime.nowUnsafe()),
 										data: {},
 									},
 								],

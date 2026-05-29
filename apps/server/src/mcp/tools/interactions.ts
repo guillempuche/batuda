@@ -1,4 +1,4 @@
-import { Effect, Schema } from 'effect'
+import { DateTime, Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
@@ -66,7 +66,7 @@ export const InteractionHandlersLive = InteractionTools.toLayer(
 		return {
 			log_interaction: params =>
 				Effect.gen(function* () {
-					const occurredAt = new Date()
+					const occurredAt = DateTime.toDateUtc(DateTime.nowUnsafe())
 					const nextActionAt = params.next_action_at
 						? new Date(params.next_action_at)
 						: null
@@ -100,7 +100,7 @@ export const InteractionHandlersLive = InteractionTools.toLayer(
 
 					if (params.next_action || nextActionAt) {
 						const companyUpdate: Record<string, unknown> = {
-							updatedAt: new Date(),
+							updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 						}
 						if (params.next_action)
 							companyUpdate['nextAction'] = params.next_action

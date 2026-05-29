@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-import { Data, Effect, Layer, Schedule, ServiceMap } from 'effect'
+import { Data, DateTime, Effect, Layer, Schedule, ServiceMap } from 'effect'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
@@ -646,7 +646,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								`
 							}
 
-							const sentAt = new Date()
+							const sentAt = DateTime.toDateUtc(DateTime.nowUnsafe())
 							const emailRows = yield* sql<{ id: string }>`
 								INSERT INTO email_messages ${sql.insert({
 									organizationId: currentOrg.id,
@@ -1680,7 +1680,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								passwordTag: encrypted.tag,
 								grantStatus: probe.status,
 								grantLastError: probe.detail,
-								grantLastSeenAt: new Date(),
+								grantLastSeenAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 								folderState: '{}',
 							})}
 							RETURNING ${selectInboxColumns}

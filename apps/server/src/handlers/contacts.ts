@@ -1,4 +1,4 @@
-import { Effect } from 'effect'
+import { DateTime, Effect } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
@@ -36,7 +36,7 @@ export const ContactsLive = HttpApiBuilder.group(
 				.handle('update', _ =>
 					Effect.gen(function* () {
 						const rows = yield* sql`
-							UPDATE contacts SET ${sql.update({ ...(_.payload as any), updatedAt: new Date() }, ['id'])}
+							UPDATE contacts SET ${sql.update({ ...(_.payload as any), updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) }, ['id'])}
 							WHERE id = ${_.params.id} RETURNING *
 						`
 						yield* Effect.logInfo('Contact updated').pipe(

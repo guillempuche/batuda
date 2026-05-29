@@ -1,4 +1,4 @@
-import { Effect, Schema } from 'effect'
+import { DateTime, Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
@@ -330,7 +330,7 @@ export const TaskHandlersLive = TaskTools.toLayer(
 							yield* sql`SELECT * FROM tasks WHERE id = ${params.id}`
 						return existing[0]
 					}
-					fields['updated_at'] = new Date()
+					fields['updated_at'] = DateTime.toDateUtc(DateTime.nowUnsafe())
 					const rows = yield* sql`
 						UPDATE tasks SET ${sql.update(fields)}
 						WHERE id = ${params.id}

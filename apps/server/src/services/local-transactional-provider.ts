@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
-import { Effect, Layer } from 'effect'
+import { DateTime, Effect, Layer } from 'effect'
 
 import { EmailSendError } from '@batuda/controllers'
 
@@ -97,7 +97,7 @@ export const LocalTransactionalProviderLive = Layer.effect(
 		}): Effect.Effect<void, EmailSendError> =>
 			Effect.gen(function* () {
 				yield* ensureInboxDir
-				const sentAt = new Date()
+				const sentAt = DateTime.toDateUtc(DateTime.nowUnsafe())
 				const messageId = `msg_local_${randomUUID()}`
 				const threadId = `thr_local_${randomUUID()}`
 				const stamp = filenameStamp(sentAt)
