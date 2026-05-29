@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-05-29 (server-v2026.5.29-1)
+
+### CI/CD
+
+* **deploy:** run server and mail-worker on base-compat runtime ([7ea3691](https://github.com/guillempuche/batuda/commit/7ea3691cfc63046714c2523551f6f6bc5a1a7466))
+
 ## 2026-05-29 (server-v2026.5.29)
 
 ### Features
