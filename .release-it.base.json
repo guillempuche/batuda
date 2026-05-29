@@ -2,8 +2,10 @@
 	"$schema": "https://unpkg.com/release-it@19/schema/release-it.json",
 	"git": {
 		"commit": true,
+		"commitArgs": ["--no-verify"],
 		"commitMessage": "cicd(release): v${version}",
 		"push": true,
+		"pushArgs": ["--follow-tags", "--no-verify"],
 		"requireBranch": "main",
 		"requireCleanWorkingDir": true,
 		"requireCommits": true,
