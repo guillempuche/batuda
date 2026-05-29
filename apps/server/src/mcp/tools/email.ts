@@ -397,11 +397,13 @@ const SetPrimaryEmailInbox = Tool.make('set_primary_email_inbox', {
 
 // ── Draft tools ─────────────────────────────────────────────────
 
-const CreateEmailDraft = Tool.make('create_email_draft', {
+const ManageEmailDraft = Tool.make('manage_email_draft', {
 	description:
-		'Create a draft email that a human can review in Batuda before sending. Stored locally with a body_json shadow that preserves the typed block tree for lossless editor re-hydration. Optionally set company_id/contact_id/mode to link to CRM context.',
+		'Manage an email draft a human can review before sending. action=create makes a new draft (optionally linked to CRM via company_id/contact_id/mode); update changes fields on an existing draft_id; send dispatches draft_id through the same thread-link/interaction/message pipeline as a direct send (returns {_tag:"sent"} or {_tag:"suppressed"}). body_json is the typed block tree preserved for lossless editor re-hydration.',
 	parameters: Schema.Struct({
+		action: Schema.Literals(['create', 'update', 'send']),
 		inbox_id: Schema.String,
+		draft_id: Schema.optional(Schema.String),
 		to: Schema.optional(Recipients),
 		cc: Schema.optional(Schema.Array(Schema.String)),
 		bcc: Schema.optional(Schema.Array(Schema.String)),
@@ -416,40 +418,7 @@ const CreateEmailDraft = Tool.make('create_email_draft', {
 	success: Schema.Unknown,
 	dependencies: REQUEST_DEPENDENCIES,
 })
-	.annotate(Tool.Title, 'Create Email Draft')
-	.annotate(Tool.Destructive, false)
-	.annotate(Tool.OpenWorld, true)
-
-const UpdateEmailDraft = Tool.make('update_email_draft', {
-	description:
-		'Update fields on an existing draft. Pass only the fields you want to change. body_json replaces the typed block tree stored in the shadow table.',
-	parameters: Schema.Struct({
-		inbox_id: Schema.String,
-		draft_id: Schema.String,
-		to: Schema.optional(Recipients),
-		cc: Schema.optional(Schema.Array(Schema.String)),
-		bcc: Schema.optional(Schema.Array(Schema.String)),
-		subject: Schema.optional(Schema.String),
-		body_json: Schema.optional(EmailBlocks),
-	}),
-	success: Schema.Unknown,
-	dependencies: REQUEST_DEPENDENCIES,
-})
-	.annotate(Tool.Title, 'Update Email Draft')
-	.annotate(Tool.Destructive, false)
-	.annotate(Tool.OpenWorld, false)
-
-const SendEmailDraft = Tool.make('send_email_draft', {
-	description:
-		'Send a previously created draft. This triggers the same thread-link/interaction/message recording pipeline as a direct send. Returns {_tag:"sent"} or {_tag:"suppressed"}.',
-	parameters: Schema.Struct({
-		inbox_id: Schema.String,
-		draft_id: Schema.String,
-	}),
-	success: SendEmailResult,
-	dependencies: REQUEST_DEPENDENCIES,
-})
-	.annotate(Tool.Title, 'Send Email Draft')
+	.annotate(Tool.Title, 'Manage Email Draft')
 	.annotate(Tool.Destructive, false)
 	.annotate(Tool.OpenWorld, true)
 
@@ -483,27 +452,13 @@ const ListInboxFooters = Tool.make('list_inbox_footers', {
 	.annotate(Tool.Destructive, false)
 	.annotate(Tool.OpenWorld, false)
 
-const CreateInboxFooter = Tool.make('create_inbox_footer', {
+const ManageInboxFooter = Tool.make('manage_inbox_footer', {
 	description:
-		'Create a structured block-tree footer for an inbox. The body is the same EmailBlocks shape used by send_email/reply_email (paragraph / image / list). If is_default is true, this becomes the footer automatically appended to outbound emails. Only one default per inbox is allowed.',
+		'Manage an inbox footer (the block tree appended to outbound emails). action=create adds a footer (body_json is the EmailBlocks shape used by send_email; is_default=true makes it the auto-appended default, one per inbox); update changes name/body_json/is_default on footer_id (is_default=true atomically clears the prior default); delete permanently removes footer_id.',
 	parameters: Schema.Struct({
-		inbox_id: Schema.String,
-		name: Schema.String,
-		body_json: EmailBlocks,
-		is_default: Schema.optional(Schema.Boolean),
-	}),
-	success: Schema.Unknown,
-	dependencies: REQUEST_DEPENDENCIES,
-})
-	.annotate(Tool.Title, 'Create Inbox Footer')
-	.annotate(Tool.Destructive, false)
-	.annotate(Tool.OpenWorld, false)
-
-const UpdateInboxFooter = Tool.make('update_inbox_footer', {
-	description:
-		'Update an existing inbox footer. Pass body_json to replace the block tree. Flipping is_default=true atomically clears the previous default for the same inbox.',
-	parameters: Schema.Struct({
-		id: Schema.String,
+		action: Schema.Literals(['create', 'update', 'delete']),
+		inbox_id: Schema.optional(Schema.String),
+		footer_id: Schema.optional(Schema.String),
 		name: Schema.optional(Schema.String),
 		body_json: Schema.optional(EmailBlocks),
 		is_default: Schema.optional(Schema.Boolean),
@@ -511,22 +466,13 @@ const UpdateInboxFooter = Tool.make('update_inbox_footer', {
 	success: Schema.Unknown,
 	dependencies: REQUEST_DEPENDENCIES,
 })
-	.annotate(Tool.Title, 'Update Inbox Footer')
-	.annotate(Tool.Destructive, false)
-	.annotate(Tool.OpenWorld, false)
-
-const DeleteInboxFooter = Tool.make('delete_inbox_footer', {
-	description:
-		'Permanently delete an inbox footer. If the deleted footer was the default, no footer will be appended to future outbound emails until another is set as default.',
-	parameters: Schema.Struct({
-		id: Schema.String,
-	}),
-	success: Schema.Void,
-	dependencies: REQUEST_DEPENDENCIES,
-})
-	.annotate(Tool.Title, 'Delete Inbox Footer')
+	.annotate(Tool.Title, 'Manage Inbox Footer')
 	.annotate(Tool.Destructive, true)
 	.annotate(Tool.OpenWorld, false)
+
+// Action-parameterized tools can't mark a field required per-action at the
+// schema level, so the merged handlers guard the conditional ones at runtime.
+const dieMissing = (message: string) => Effect.die(new Error(message))
 
 export const EmailTools = Toolkit.make(
 	SendEmail,
@@ -546,14 +492,10 @@ export const EmailTools = Toolkit.make(
 	TestEmailInbox,
 	DeleteEmailInbox,
 	SetPrimaryEmailInbox,
-	CreateEmailDraft,
-	UpdateEmailDraft,
-	SendEmailDraft,
+	ManageEmailDraft,
 	ListEmailDrafts,
 	ListInboxFooters,
-	CreateInboxFooter,
-	UpdateInboxFooter,
-	DeleteInboxFooter,
+	ManageInboxFooter,
 )
 
 export const EmailHandlersLive = EmailTools.toLayer(
@@ -802,103 +744,119 @@ export const EmailHandlersLive = EmailTools.toLayer(
 				),
 			set_primary_email_inbox: params =>
 				svc.setPrimaryInbox(params.id).pipe(Effect.orDie),
-			create_email_draft: params =>
-				svc
-					.createDraft(
-						params.inbox_id,
-						{
-							...(params.to !== undefined && {
-								to: typeof params.to === 'string' ? params.to : [...params.to],
-							}),
-							...(params.cc !== undefined && { cc: [...params.cc] }),
-							...(params.bcc !== undefined && { bcc: [...params.bcc] }),
-							...(params.subject !== undefined && {
-								subject: params.subject,
-							}),
-							...(params.body_json !== undefined && {
-								bodyJson: params.body_json,
-							}),
-							...(params.in_reply_to !== undefined && {
-								inReplyTo: params.in_reply_to,
-							}),
-						},
-						{
-							...(params.company_id !== undefined && {
-								companyId: params.company_id,
-							}),
-							...(params.contact_id !== undefined && {
-								contactId: params.contact_id,
-							}),
-							...(params.mode !== undefined && { mode: params.mode }),
-							...(params.thread_link_id !== undefined && {
-								threadLinkId: params.thread_link_id,
-							}),
-						},
-					)
-					.pipe(Effect.orDie),
-			update_email_draft: params =>
-				svc
-					.updateDraft(params.inbox_id, params.draft_id, {
-						...(params.to !== undefined && {
-							to: typeof params.to === 'string' ? params.to : [...params.to],
-						}),
-						...(params.cc !== undefined && { cc: [...params.cc] }),
-						...(params.bcc !== undefined && { bcc: [...params.bcc] }),
-						...(params.subject !== undefined && {
-							subject: params.subject,
-						}),
-						...(params.body_json !== undefined && {
-							bodyJson: params.body_json,
-						}),
-					})
-					.pipe(Effect.orDie),
-			send_email_draft: params =>
-				svc.sendDraft(params.inbox_id, params.draft_id).pipe(
-					Effect.map(r => ({
-						_tag: 'sent' as const,
-						messageId: r.messageId,
-						threadId: r.threadId,
-					})),
-					Effect.catchTag('EmailSuppressed', e =>
-						Effect.succeed({
-							_tag: 'suppressed' as const,
-							contactStatus: e.status,
-							recipient: e.recipient,
-							reason: e.reason,
-						}),
-					),
-					Effect.orDie,
-				),
+			manage_email_draft: params => {
+				// Shared body fields apply to both create and update; in_reply_to and
+				// the CRM-link object are create-only.
+				const fields = {
+					...(params.to !== undefined && {
+						to: typeof params.to === 'string' ? params.to : [...params.to],
+					}),
+					...(params.cc !== undefined && { cc: [...params.cc] }),
+					...(params.bcc !== undefined && { bcc: [...params.bcc] }),
+					...(params.subject !== undefined && { subject: params.subject }),
+					...(params.body_json !== undefined && {
+						bodyJson: params.body_json,
+					}),
+				}
+				switch (params.action) {
+					case 'create':
+						return svc
+							.createDraft(
+								params.inbox_id,
+								{
+									...fields,
+									...(params.in_reply_to !== undefined && {
+										inReplyTo: params.in_reply_to,
+									}),
+								},
+								{
+									...(params.company_id !== undefined && {
+										companyId: params.company_id,
+									}),
+									...(params.contact_id !== undefined && {
+										contactId: params.contact_id,
+									}),
+									...(params.mode !== undefined && { mode: params.mode }),
+									...(params.thread_link_id !== undefined && {
+										threadLinkId: params.thread_link_id,
+									}),
+								},
+							)
+							.pipe(Effect.orDie)
+					case 'update':
+						if (params.draft_id === undefined)
+							return dieMissing('draft_id is required to update a draft')
+						return svc
+							.updateDraft(params.inbox_id, params.draft_id, fields)
+							.pipe(Effect.orDie)
+					case 'send':
+						if (params.draft_id === undefined)
+							return dieMissing('draft_id is required to send a draft')
+						return svc.sendDraft(params.inbox_id, params.draft_id).pipe(
+							Effect.map(r => ({
+								_tag: 'sent' as const,
+								messageId: r.messageId,
+								threadId: r.threadId,
+							})),
+							Effect.catchTag('EmailSuppressed', e =>
+								Effect.succeed({
+									_tag: 'suppressed' as const,
+									contactStatus: e.status,
+									recipient: e.recipient,
+									reason: e.reason,
+								}),
+							),
+							Effect.orDie,
+						)
+				}
+			},
 			list_email_drafts: params =>
 				svc.listDrafts(params.inbox_id).pipe(Effect.orDie),
 			list_inbox_footers: params => svc.listFooters(params.inbox_id),
-			create_inbox_footer: params =>
-				svc
-					.createFooter({
-						inboxId: params.inbox_id,
-						name: params.name,
-						bodyJson: params.body_json,
-						...(params.is_default !== undefined && {
-							isDefault: params.is_default,
-						}),
-					})
-					.pipe(Effect.orDie),
-			update_inbox_footer: params =>
-				svc
-					.updateFooter(params.id, {
-						...(params.name !== undefined && { name: params.name }),
-						...(params.body_json !== undefined && {
-							bodyJson: params.body_json,
-						}),
-						...(params.is_default !== undefined && {
-							isDefault: params.is_default,
-						}),
-					})
-					.pipe(
-						Effect.catchTag('NotFound', e => Effect.die(e)),
-						Effect.orDie,
-					),
-			delete_inbox_footer: params => svc.deleteFooter(params.id),
+			manage_inbox_footer: params => {
+				switch (params.action) {
+					case 'create':
+						if (
+							params.inbox_id === undefined ||
+							params.name === undefined ||
+							params.body_json === undefined
+						)
+							return dieMissing(
+								'inbox_id, name and body_json are required to create a footer',
+							)
+						return svc
+							.createFooter({
+								inboxId: params.inbox_id,
+								name: params.name,
+								bodyJson: params.body_json,
+								...(params.is_default !== undefined && {
+									isDefault: params.is_default,
+								}),
+							})
+							.pipe(Effect.orDie)
+					case 'update':
+						if (params.footer_id === undefined)
+							return dieMissing('footer_id is required to update a footer')
+						return svc
+							.updateFooter(params.footer_id, {
+								...(params.name !== undefined && { name: params.name }),
+								...(params.body_json !== undefined && {
+									bodyJson: params.body_json,
+								}),
+								...(params.is_default !== undefined && {
+									isDefault: params.is_default,
+								}),
+							})
+							.pipe(
+								Effect.catchTag('NotFound', e => Effect.die(e)),
+								Effect.orDie,
+							)
+					case 'delete':
+						if (params.footer_id === undefined)
+							return dieMissing('footer_id is required to delete a footer')
+						return svc.deleteFooter(params.footer_id)
+				}
+			},
 		}
 	}),
 )
