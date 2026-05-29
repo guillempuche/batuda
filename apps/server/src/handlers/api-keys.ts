@@ -22,7 +22,7 @@ export const ApiKeysLive = HttpApiBuilder.group(
 					Effect.gen(function* () {
 						const org = yield* CurrentOrg
 						const { userId } = yield* SessionContext
-						const created = yield* apiKeyService.create(org.id, {
+						const created = yield* apiKeyService.create(org.id, userId, {
 							name: _.payload.name,
 							expiresIn:
 								_.payload.expiresInDays !== undefined

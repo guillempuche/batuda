@@ -244,11 +244,11 @@ msgstr "Already in CRM"
 msgid "An AI assistant wants to connect to your Batuda account over MCP and act on your behalf. Only approve assistants you trust."
 msgstr "An AI assistant wants to connect to your Batuda account over MCP and act on your behalf. Only approve assistants you trust."
 
-#: src/routes/settings/api-keys/index.tsx:398
+#: src/routes/settings/api-keys/index.tsx:409
 msgid "Any agent using \"{confirmLabel}\" will stop working. This can't be undone."
 msgstr "Any agent using \"{confirmLabel}\" will stop working. This can't be undone."
 
-#: src/routes/settings/api-keys/index.tsx:197
+#: src/routes/settings/api-keys/index.tsx:201
 #: src/routes/settings/profile/index.tsx:122
 msgid "API keys"
 msgstr "API keys"
@@ -307,7 +307,7 @@ msgstr "Back to inbox"
 msgid "Back to organization"
 msgstr "Back to organization"
 
-#: src/routes/settings/api-keys/index.tsx:187
+#: src/routes/settings/api-keys/index.tsx:191
 #: src/routes/settings/mcp/connections.tsx:101
 #: src/routes/settings/mcp/index.tsx:107
 msgid "Back to settings"
@@ -372,6 +372,10 @@ msgstr "Brief summary (optional)"
 msgid "Bulk thread actions"
 msgstr "Bulk thread actions"
 
+#: src/routes/settings/api-keys/index.tsx:302
+msgid "by {creatorName}"
+msgstr "by {creatorName}"
+
 #: src/routes/settings/organization/spend.tsx:168
 msgid "By provider"
 msgstr "By provider"
@@ -412,7 +416,7 @@ msgstr "Calls"
 #: src/components/research/research-dialog.tsx:221
 #: src/routes/emails/inboxes.tsx:1055
 #: src/routes/emails/inboxes.tsx:1453
-#: src/routes/settings/api-keys/index.tsx:413
+#: src/routes/settings/api-keys/index.tsx:424
 #: src/routes/tasks/index.tsx:718
 msgid "Cancel"
 msgstr "Cancel"
@@ -703,8 +707,8 @@ msgstr "Conversations"
 msgid "Coordinates saved from the geocoder."
 msgstr "Coordinates saved from the geocoder."
 
-#: src/routes/settings/api-keys/index.tsx:358
-#: src/routes/settings/api-keys/index.tsx:361
+#: src/routes/settings/api-keys/index.tsx:369
+#: src/routes/settings/api-keys/index.tsx:372
 msgid "Copied"
 msgstr "Copied"
 
@@ -712,7 +716,7 @@ msgstr "Copied"
 msgid "Copied {label}"
 msgstr "Copied {label}"
 
-#: src/routes/settings/api-keys/index.tsx:358
+#: src/routes/settings/api-keys/index.tsx:369
 msgid "Copy"
 msgstr "Copy"
 
@@ -720,7 +724,7 @@ msgstr "Copy"
 msgid "Copy {label}"
 msgstr "Copy {label}"
 
-#: src/routes/settings/api-keys/index.tsx:171
+#: src/routes/settings/api-keys/index.tsx:175
 msgid "Copy failed"
 msgstr "Copy failed"
 
@@ -728,7 +732,7 @@ msgstr "Copy failed"
 msgid "Copy slug"
 msgstr "Copy slug"
 
-#: src/routes/settings/api-keys/index.tsx:337
+#: src/routes/settings/api-keys/index.tsx:348
 msgid "Copy your key now"
 msgstr "Copy your key now"
 
@@ -744,11 +748,11 @@ msgstr "Could not complete the connection. Please try again."
 msgid "Could not create the inbox. Check transport or credentials."
 msgstr "Could not create the inbox. Check transport or credentials."
 
-#: src/routes/settings/api-keys/index.tsx:138
+#: src/routes/settings/api-keys/index.tsx:142
 msgid "Could not create the key. Please try again."
 msgstr "Could not create the key. Please try again."
 
-#: src/routes/settings/api-keys/index.tsx:159
+#: src/routes/settings/api-keys/index.tsx:163
 msgid "Could not delete the key. Please try again."
 msgstr "Could not delete the key. Please try again."
 
@@ -780,7 +784,7 @@ msgstr "Could not load threads"
 msgid "Could not load your connections. Refresh to try again."
 msgstr "Could not load your connections. Refresh to try again."
 
-#: src/routes/settings/api-keys/index.tsx:270
+#: src/routes/settings/api-keys/index.tsx:274
 msgid "Could not load your keys. Refresh to try again."
 msgstr "Could not load your keys. Refresh to try again."
 
@@ -870,7 +874,7 @@ msgstr "Create"
 msgid "Create a footer to append to outgoing emails from this inbox."
 msgstr "Create a footer to append to outgoing emails from this inbox."
 
-#: src/routes/settings/api-keys/index.tsx:209
+#: src/routes/settings/api-keys/index.tsx:213
 msgid "Create a key"
 msgstr "Create a key"
 
@@ -902,7 +906,7 @@ msgstr "Create follow-up task"
 msgid "Create footer"
 msgstr "Create footer"
 
-#: src/routes/settings/api-keys/index.tsx:254
+#: src/routes/settings/api-keys/index.tsx:258
 msgid "Create key"
 msgstr "Create key"
 
@@ -912,7 +916,7 @@ msgid "Created"
 msgstr "Created"
 
 #. placeholder {0}: formatDate(row.createdAt)
-#: src/routes/settings/api-keys/index.tsx:292
+#: src/routes/settings/api-keys/index.tsx:298
 msgid "Created {0}"
 msgstr "Created {0}"
 
@@ -920,7 +924,7 @@ msgstr "Created {0}"
 msgid "Created by agent"
 msgstr "Created by agent"
 
-#: src/routes/settings/api-keys/index.tsx:254
+#: src/routes/settings/api-keys/index.tsx:258
 msgid "Creating…"
 msgstr "Creating…"
 
@@ -973,13 +977,13 @@ msgid "Defaults to you when omitted."
 msgstr "Defaults to you when omitted."
 
 #: src/routes/emails/inboxes.tsx:1385
-#: src/routes/settings/api-keys/index.tsx:318
+#: src/routes/settings/api-keys/index.tsx:329
 msgid "Delete"
 msgstr "Delete"
 
 #: src/routes/emails/inboxes.tsx:266
 #: src/routes/emails/inboxes.tsx:1293
-#: src/routes/settings/api-keys/index.tsx:158
+#: src/routes/settings/api-keys/index.tsx:162
 msgid "Delete failed"
 msgstr "Delete failed"
 
@@ -993,7 +997,7 @@ msgstr "Delete inbox {0}"
 msgid "Delete inbox {0}? Stored messages stay; the connection stops."
 msgstr "Delete inbox {0}? Stored messages stay; the connection stops."
 
-#: src/routes/settings/api-keys/index.tsx:428
+#: src/routes/settings/api-keys/index.tsx:439
 msgid "Delete key"
 msgstr "Delete key"
 
@@ -1001,12 +1005,12 @@ msgstr "Delete key"
 msgid "Delete this footer? This cannot be undone."
 msgstr "Delete this footer? This cannot be undone."
 
-#: src/routes/settings/api-keys/index.tsx:395
+#: src/routes/settings/api-keys/index.tsx:406
 msgid "Delete this key?"
 msgstr "Delete this key?"
 
-#: src/routes/settings/api-keys/index.tsx:318
-#: src/routes/settings/api-keys/index.tsx:428
+#: src/routes/settings/api-keys/index.tsx:329
+#: src/routes/settings/api-keys/index.tsx:439
 msgid "Deleting…"
 msgstr "Deleting…"
 
@@ -1023,7 +1027,7 @@ msgid "Direction"
 msgstr "Direction"
 
 #: src/routes/emails/inboxes.tsx:443
-#: src/routes/settings/api-keys/index.tsx:303
+#: src/routes/settings/api-keys/index.tsx:314
 msgid "Disabled"
 msgstr "Disabled"
 
@@ -1047,7 +1051,7 @@ msgstr "Document"
 msgid "Documents"
 msgstr "Documents"
 
-#: src/routes/settings/api-keys/index.tsx:373
+#: src/routes/settings/api-keys/index.tsx:384
 msgid "Done"
 msgstr "Done"
 
@@ -1072,7 +1076,7 @@ msgstr "Due date"
 msgid "Duration (min)"
 msgstr "Duration (min)"
 
-#: src/routes/settings/api-keys/index.tsx:222
+#: src/routes/settings/api-keys/index.tsx:226
 msgid "e.g. Claude Desktop"
 msgstr "e.g. Claude Desktop"
 
@@ -1185,15 +1189,15 @@ msgid "Expand"
 msgstr "Expand"
 
 #. placeholder {0}: formatDate(row.expiresAt)
-#: src/routes/settings/api-keys/index.tsx:296
+#: src/routes/settings/api-keys/index.tsx:307
 msgid "Expires {0}"
 msgstr "Expires {0}"
 
-#: src/routes/settings/api-keys/index.tsx:228
+#: src/routes/settings/api-keys/index.tsx:232
 msgid "Expires in (days)"
 msgstr "Expires in (days)"
 
-#: src/routes/settings/api-keys/index.tsx:118
+#: src/routes/settings/api-keys/index.tsx:122
 msgid "Expiry must be a number of days greater than zero."
 msgstr "Expiry must be a number of days greater than zero."
 
@@ -1288,7 +1292,7 @@ msgstr "Full screen"
 msgid "Give an AI assistant access to this organization's CRM. Chat apps like ChatGPT and Claude.ai connect over OAuth; coding tools use an API key."
 msgstr "Give an AI assistant access to this organization's CRM. Chat apps like ChatGPT and Claude.ai connect over OAuth; coding tools use an API key."
 
-#: src/routes/settings/api-keys/index.tsx:111
+#: src/routes/settings/api-keys/index.tsx:115
 msgid "Give the key a name so you can recognize it later."
 msgstr "Give the key a name so you can recognize it later."
 
@@ -1442,7 +1446,7 @@ msgstr "Join video call"
 msgid "Key"
 msgstr "Key"
 
-#: src/routes/settings/api-keys/index.tsx:150
+#: src/routes/settings/api-keys/index.tsx:154
 msgid "Key deleted"
 msgstr "Key deleted"
 
@@ -1450,7 +1454,7 @@ msgstr "Key deleted"
 msgid "Key differentiators"
 msgstr "Key differentiators"
 
-#: src/routes/settings/api-keys/index.tsx:200
+#: src/routes/settings/api-keys/index.tsx:204
 msgid "Keys let AI agents and MCP clients act on behalf of this organization."
 msgstr "Keys let AI agents and MCP clients act on behalf of this organization."
 
@@ -1512,7 +1516,7 @@ msgstr "Loading run…"
 
 #: src/components/companies/upcoming-meetings-card.tsx:57
 #: src/components/shared/loading-spinner.tsx:23
-#: src/routes/settings/api-keys/index.tsx:266
+#: src/routes/settings/api-keys/index.tsx:270
 #: src/routes/settings/mcp/connections.tsx:127
 #: src/routes/settings/organization/index.tsx:52
 #: src/routes/settings/organization/members.tsx:113
@@ -1687,7 +1691,7 @@ msgid "Minimize"
 msgstr "Minimize"
 
 #: src/routes/emails/inboxes.tsx:1413
-#: src/routes/settings/api-keys/index.tsx:215
+#: src/routes/settings/api-keys/index.tsx:219
 msgid "Name"
 msgstr "Name"
 
@@ -1706,11 +1710,11 @@ msgstr "Needs attention"
 msgid "never"
 msgstr "never"
 
-#: src/routes/settings/api-keys/index.tsx:236
+#: src/routes/settings/api-keys/index.tsx:240
 msgid "Never"
 msgstr "Never"
 
-#: src/routes/settings/api-keys/index.tsx:298
+#: src/routes/settings/api-keys/index.tsx:309
 msgid "Never expires"
 msgstr "Never expires"
 
@@ -1839,7 +1843,7 @@ msgstr "No high-priority companies without a scheduled follow-up"
 msgid "No inboxes yet"
 msgstr "No inboxes yet"
 
-#: src/routes/settings/api-keys/index.tsx:274
+#: src/routes/settings/api-keys/index.tsx:278
 msgid "No keys yet. Create one above to connect an agent."
 msgstr "No keys yet. Create one above to connect an agent."
 
@@ -2541,7 +2545,7 @@ msgstr "Select all threads on this page"
 msgid "Select inbox…"
 msgstr "Select inbox…"
 
-#: src/routes/settings/api-keys/index.tsx:172
+#: src/routes/settings/api-keys/index.tsx:176
 msgid "Select the key and copy it manually."
 msgstr "Select the key and copy it manually."
 
@@ -2632,7 +2636,7 @@ msgstr "Set password"
 
 #: src/components/layout/nav-items.ts:81
 #: src/routes/pages/$id.tsx:290
-#: src/routes/settings/api-keys/index.tsx:190
+#: src/routes/settings/api-keys/index.tsx:194
 #: src/routes/settings/mcp/connections.tsx:104
 #: src/routes/settings/mcp/index.tsx:110
 #: src/routes/settings/profile/index.tsx:109
@@ -2884,7 +2888,7 @@ msgstr "That link is no longer valid. Request a fresh one below."
 msgid "The 20 most recently edited open tasks. Click one to reopen it."
 msgstr "The 20 most recently edited open tasks. Click one to reopen it."
 
-#: src/routes/settings/api-keys/index.tsx:151
+#: src/routes/settings/api-keys/index.tsx:155
 msgid "The API key can no longer be used."
 msgstr "The API key can no longer be used."
 
@@ -2981,7 +2985,7 @@ msgstr "This invitation is no longer valid."
 msgid "This invitation link is no longer valid. It may have already been used."
 msgstr "This invitation link is no longer valid. It may have already been used."
 
-#: src/routes/settings/api-keys/index.tsx:340
+#: src/routes/settings/api-keys/index.tsx:351
 msgid "This is the only time the full key is shown. Store it somewhere safe — I can't show it again."
 msgstr "This is the only time the full key is shown. Store it somewhere safe — I can't show it again."
 
@@ -3095,7 +3099,7 @@ msgstr "Unnamed client"
 msgid "Untitled"
 msgstr "Untitled"
 
-#: src/routes/settings/api-keys/index.tsx:279
+#: src/routes/settings/api-keys/index.tsx:283
 msgid "Untitled key"
 msgstr "Untitled key"
 
@@ -3283,6 +3287,6 @@ msgstr "Your connections"
 msgid "Your email isn't verified yet. Use the magic link instead."
 msgstr "Your email isn't verified yet. Use the magic link instead."
 
-#: src/routes/settings/api-keys/index.tsx:262
+#: src/routes/settings/api-keys/index.tsx:266
 msgid "Your keys"
 msgstr "Your keys"
