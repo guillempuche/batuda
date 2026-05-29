@@ -4,7 +4,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "node --watch --env-file=../../.env --import tsx src/main.ts",
-		"build": "tsdown src/main.ts",
+		"build": "tsdown",
 		"check-types": "tsc --noEmit",
 		"start": "node dist/main.mjs",
 		"test": "vitest run --passWithNoTests",
