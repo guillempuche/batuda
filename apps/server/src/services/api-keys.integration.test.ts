@@ -8,6 +8,7 @@ const env: Record<string, string> = {
 	BETTER_AUTH_BASE_URL: 'http://localhost:3010',
 	ALLOWED_ORIGINS: 'http://localhost:3010',
 	APP_PUBLIC_URL: 'http://localhost:3010',
+	API_KEY_RATE_LIMIT_ENABLED: 'true',
 	STORAGE_ENDPOINT: 'http://localhost:9000',
 	STORAGE_REGION: 'auto',
 	STORAGE_ACCESS_KEY_ID: 'batuda',
@@ -42,6 +43,7 @@ import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { Auth } from '../lib/auth'
+import { EnvVars } from '../lib/env'
 import { ApiKeyService } from './api-keys'
 
 const DATABASE_URL = process.env['DATABASE_URL'] as string
@@ -79,7 +81,12 @@ beforeAll(async () => {
 	tallerOrgId = await orgIdBySlug('taller')
 	restaurantOrgId = await orgIdBySlug('restaurant')
 	await cleanup()
-	runtime = ManagedRuntime.make(Layer.provide(ApiKeyService.layer, Auth.layer))
+	runtime = ManagedRuntime.make(
+		Layer.provide(
+			ApiKeyService.layer,
+			Layer.mergeAll(Auth.layer, EnvVars.layer),
+		),
+	)
 }, 60_000)
 
 afterAll(async () => {
@@ -152,13 +159,13 @@ const agentCount = async (orgId: string) => {
 
 describe('ApiKeyService.create', () => {
 	describe('for a member of the active org', () => {
-		it('should mint a one-time key stamped with the org and no rate limit', async () => {
+		it('should mint a one-time key stamped with the org, agent-owned, and rate-limited', async () => {
 			// GIVEN a create for the taller org
 			// WHEN the service mints a key
 			const created = await create(tallerOrgId, 'ci-create')
 
 			// THEN the plaintext key is returned once, and the row carries the org
-			// in metadata, is owned by the org's agent user, and has no rate limit
+			// in metadata, is owned by the org's agent user, and carries the limit
 			expect(created.key.length).toBeGreaterThan(0)
 			const row = await apikeyRow(created.id)
 			// Better Auth stores metadata as a JSON string column.
@@ -167,7 +174,7 @@ describe('ApiKeyService.create', () => {
 					? (JSON.parse(row.metadata) as unknown)
 					: row?.metadata
 			expect(meta).toMatchObject({ organizationId: tallerOrgId })
-			expect(row?.rateLimitEnabled).toBe(false)
+			expect(row?.rateLimitEnabled).toBe(true)
 			const agentR = await pool.query<{ id: string }>(
 				'SELECT id FROM "user" WHERE lower(email) = lower($1)',
 				[`agent+${tallerOrgId}@keys.batuda.internal`],

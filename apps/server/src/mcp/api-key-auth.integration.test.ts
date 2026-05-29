@@ -50,6 +50,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { PgLive } from '../db/client'
 import { Auth } from '../lib/auth'
+import { EnvVars } from '../lib/env'
 import { enterOrgScope } from '../middleware/org'
 import { ApiKeyService } from '../services/api-keys'
 
@@ -105,7 +106,10 @@ beforeAll(async () => {
 	await seedCompany(taller.id)
 	await seedCompany(restaurant.id)
 	runtime = ManagedRuntime.make(
-		Layer.provideMerge(ApiKeyService.layer, Layer.mergeAll(Auth.layer, PgLive)),
+		Layer.provideMerge(
+			ApiKeyService.layer,
+			Layer.mergeAll(Auth.layer, PgLive),
+		).pipe(Layer.provide(EnvVars.layer)),
 	)
 }, 60_000)
 
@@ -122,6 +126,8 @@ interface ResolveResult {
 	readonly valid: boolean
 	readonly orgId: string | null
 	readonly referenceId: string | null
+	readonly errorCode: string | null
+	readonly tryAgainIn: number | null
 }
 
 const verify = (key: string) =>
@@ -135,10 +141,16 @@ const verify = (key: string) =>
 				? ((verified.key?.metadata as { organizationId?: string } | null)
 						?.organizationId ?? null)
 				: null
+			const error = verified.error as {
+				code?: string
+				details?: { tryAgainIn?: number }
+			} | null
 			return {
 				valid: verified.valid,
 				orgId,
 				referenceId: verified.key?.referenceId ?? null,
+				errorCode: error?.code ?? null,
+				tryAgainIn: error?.details?.tryAgainIn ?? null,
 			} satisfies ResolveResult
 		}),
 	)
@@ -212,6 +224,58 @@ describe('MCP API-key auth resolution', () => {
 			// THEN neither verifies
 			expect(garbage.valid).toBe(false)
 			expect(revoked.valid).toBe(false)
+		})
+	})
+
+	describe('a rate-limited key', () => {
+		it('should fail closed with RATE_LIMITED and a retry hint once over its window', async () => {
+			// GIVEN taller's agent user (the owner every taller key references)
+			await runtime.runPromise(
+				Effect.gen(function* () {
+					const svc = yield* ApiKeyService
+					return yield* svc.create(taller.id, { name: 'mcp-rl-seed' })
+				}),
+			)
+			const agentRow = await pool.query<{ id: string }>(
+				'SELECT id FROM "user" WHERE lower(email) = lower($1)',
+				[`agent+${taller.id}@keys.batuda.internal`],
+			)
+			const agentId = agentRow.rows[0]?.id as string
+
+			// AND a key for it capped at 2 requests in a long window (minted
+			// directly so the cap is small regardless of the env defaults)
+			const limitedKey = await runtime.runPromise(
+				Effect.gen(function* () {
+					const { instance } = yield* Auth
+					const created = yield* Effect.promise(() =>
+						instance.api.createApiKey({
+							body: {
+								userId: agentId,
+								name: 'mcp-rl',
+								metadata: { organizationId: taller.id },
+								rateLimitEnabled: true,
+								rateLimitMax: 2,
+								rateLimitTimeWindow: 60_000,
+							},
+						}),
+					)
+					return created.key
+				}),
+			)
+
+			// WHEN it is verified three times inside the window
+			const first = await verify(limitedKey)
+			const second = await verify(limitedKey)
+			const third = await verify(limitedKey)
+
+			// THEN the first two pass and the third is throttled with the code +
+			// retry hint the /mcp branch maps to a 429 + Retry-After
+			expect(first.valid).toBe(true)
+			expect(second.valid).toBe(true)
+			expect(third.valid).toBe(false)
+			expect(third.errorCode).toBe('RATE_LIMITED')
+			expect(typeof third.tryAgainIn).toBe('number')
+			expect(Math.ceil((third.tryAgainIn ?? 0) / 1000)).toBeGreaterThan(0)
 		})
 	})
 })

@@ -63,7 +63,7 @@ export const CorsLive = Layer.unwrap(
 				// Required: browser only attaches the session cookie with
 				// credentials:'include' + a specific origin (not *).
 				credentials: true,
-				exposedHeaders: ['content-length', 'content-type'],
+				exposedHeaders: ['content-length', 'content-type', 'retry-after'],
 				maxAge: 86400, // 24 h — preflight cache; browsers cap at this anyway.
 			}),
 			{ global: true },
