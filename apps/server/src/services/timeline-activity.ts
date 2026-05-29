@@ -1,4 +1,4 @@
-import { Data, Effect, Layer, ServiceMap } from 'effect'
+import { Data, DateTime, Effect, Layer, ServiceMap } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
@@ -172,7 +172,7 @@ const isPast = (at: Date, now: Date) => at.getTime() <= now.getTime()
 
 export const denormColumnFor = (
 	event: TimelineEvent,
-	now: Date = new Date(),
+	now: Date = DateTime.toDateUtc(DateTime.nowUnsafe()),
 ): DenormColumn | null => {
 	switch (event._tag) {
 		case 'EmailSent':

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-import { Effect, Layer, ServiceMap } from 'effect'
+import { DateTime, Effect, Layer, ServiceMap } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg, NotFound } from '@batuda/controllers'
@@ -134,7 +134,9 @@ export class DraftStore extends ServiceMap.Service<DraftStore>()('DraftStore', {
 		const update = (draftId: string, input: UpdateDraftInput) =>
 			Effect.gen(function* () {
 				const currentOrg = yield* CurrentOrg
-				const patch: Record<string, unknown> = { updatedAt: new Date() }
+				const patch: Record<string, unknown> = {
+					updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
+				}
 				if (input.to !== undefined) patch['toAddresses'] = input.to
 				if (input.cc !== undefined) patch['ccAddresses'] = input.cc
 				if (input.bcc !== undefined) patch['bccAddresses'] = input.bcc

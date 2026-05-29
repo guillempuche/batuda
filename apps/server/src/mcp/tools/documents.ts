@@ -1,4 +1,4 @@
-import { Effect, Schema } from 'effect'
+import { DateTime, Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
@@ -121,7 +121,7 @@ export const DocumentHandlersLive = DocumentTools.toLayer(
 							contactId: null,
 							title: created.title ?? params.type,
 							actorUserId: null,
-							occurredAt: new Date(),
+							occurredAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 						}),
 					)
 					const full =
@@ -132,7 +132,7 @@ export const DocumentHandlersLive = DocumentTools.toLayer(
 				Effect.gen(function* () {
 					const data: Record<string, unknown> = {
 						...fields,
-						updatedAt: new Date(),
+						updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 					}
 					const rows =
 						yield* sql`UPDATE documents SET ${sql.update(data, ['id'])} WHERE id = ${id} RETURNING *`

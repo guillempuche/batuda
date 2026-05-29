@@ -51,7 +51,7 @@ export const InteractionsLive = HttpApiBuilder.group(
 
 						const occurredAt = payload.date
 							? DateTime.toDateUtc(payload.date)
-							: new Date()
+							: DateTime.toDateUtc(DateTime.nowUnsafe())
 						const nextActionAt = payload.nextActionAt
 							? new Date(payload.nextActionAt)
 							: null
@@ -85,7 +85,7 @@ export const InteractionsLive = HttpApiBuilder.group(
 
 						if (payload.nextAction || payload.nextActionAt) {
 							const companyUpdate: Record<string, unknown> = {
-								updatedAt: new Date(),
+								updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 							}
 							if (payload.nextAction)
 								companyUpdate['nextAction'] = payload.nextAction

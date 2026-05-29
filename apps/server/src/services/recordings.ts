@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-import { Effect, Layer, ServiceMap } from 'effect'
+import { DateTime, Effect, Layer, ServiceMap } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { BadRequest, Conflict, CurrentOrg, NotFound } from '@batuda/controllers'
@@ -135,7 +135,7 @@ export class RecordingService extends ServiceMap.Service<RecordingService>()(
 								contactId = params.contactId ?? null
 							}
 
-							const recordedAt = new Date()
+							const recordedAt = DateTime.toDateUtc(DateTime.nowUnsafe())
 							const activityResult = yield* timeline.record(
 								new InteractionLogged({
 									companyId,

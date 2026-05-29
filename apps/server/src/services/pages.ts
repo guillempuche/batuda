@@ -1,4 +1,4 @@
-import { Effect, Layer, Schema, ServiceMap } from 'effect'
+import { DateTime, Effect, Layer, Schema, ServiceMap } from 'effect'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient, type SqlError } from 'effect/unstable/sql'
 
@@ -146,7 +146,7 @@ export class PageService extends ServiceMap.Service<PageService>()(
 				create,
 
 				update: (id: string, data: Record<string, unknown>) =>
-					sql`UPDATE pages SET ${sql.update({ ...data, updatedAt: new Date() })} WHERE id = ${id} RETURNING *`,
+					sql`UPDATE pages SET ${sql.update({ ...data, updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })} WHERE id = ${id} RETURNING *`,
 
 				publish: (id: string) =>
 					sql`UPDATE pages SET status = 'published', published_at = now(), updated_at = now() WHERE id = ${id} RETURNING *`,

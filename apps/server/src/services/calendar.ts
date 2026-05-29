@@ -1,4 +1,4 @@
-import { Data, Effect, Layer, Schema, ServiceMap } from 'effect'
+import { Data, DateTime, Effect, Layer, Schema, ServiceMap } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import {
@@ -517,7 +517,7 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 									startAt,
 									endAt,
 									actorUserId: null,
-									occurredAt: new Date(),
+									occurredAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 								}),
 							)
 						}
@@ -557,7 +557,7 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 								startAt,
 								endAt,
 								actorUserId: null,
-								occurredAt: new Date(),
+								occurredAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 							}),
 						)
 					}),
@@ -592,7 +592,7 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 								contactId: target.contactId,
 								cancelledStartAt: target.startAt,
 								actorUserId: null,
-								occurredAt: new Date(),
+								occurredAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 							}),
 						)
 
@@ -731,7 +731,7 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 										companyId: row.companyId,
 										contactId: row.contactId,
 										actorUserId: null,
-										occurredAt: new Date(),
+										occurredAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 									}),
 								)
 							}
@@ -809,7 +809,7 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 									contactId: inserted.contactId,
 									cancelledStartAt: inserted.startAt,
 									actorUserId: null,
-									occurredAt: new Date(),
+									occurredAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 								}),
 							)
 							results.cancelled += 1
@@ -826,7 +826,7 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 									startAt: inserted.startAt,
 									endAt: inserted.endAt,
 									actorUserId: null,
-									occurredAt: new Date(),
+									occurredAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 								}),
 							)
 							results.updated += 1
@@ -841,7 +841,7 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 									startAt: inserted.startAt,
 									endAt: inserted.endAt,
 									actorUserId: null,
-									occurredAt: new Date(),
+									occurredAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 								}),
 							)
 							results.created += 1
@@ -934,7 +934,7 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 									startAt: args.startAt,
 									endAt,
 									actorUserId: null,
-									occurredAt: new Date(),
+									occurredAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 								}),
 							)
 							return row
@@ -988,7 +988,7 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 									startAt: args.newStartAt,
 									endAt: newEndAt,
 									actorUserId: null,
-									occurredAt: new Date(),
+									occurredAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 								}),
 							)
 							return { ...existing, startAt: args.newStartAt, endAt: newEndAt }
@@ -1030,7 +1030,7 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 									contactId: existing.contactId,
 									cancelledStartAt: existing.startAt,
 									actorUserId: null,
-									occurredAt: new Date(),
+									occurredAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 								}),
 							)
 							return { ...existing, status: 'cancelled' as const }
@@ -1149,7 +1149,7 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 									companyId: existing.companyId,
 									contactId: existing.contactId,
 									actorUserId: args.actorUserId,
-									occurredAt: new Date(),
+									occurredAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 								}),
 							)
 							return {
@@ -1241,7 +1241,7 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 									startAt: args.startAt,
 									endAt: args.endAt,
 									actorUserId: null,
-									occurredAt: new Date(),
+									occurredAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 								}),
 							)
 							return row
@@ -1291,7 +1291,9 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 					// RFC 5545 §3.8.7.2: every VEVENT MUST carry a DTSTAMP
 					// (creation time of the ICS in UTC). Without it strict
 					// parsers (Outlook, Exchange) reject the envelope.
-					const dtStamp = formatIcsDate(new Date())
+					const dtStamp = formatIcsDate(
+						DateTime.toDateUtc(DateTime.nowUnsafe()),
+					)
 					const ics = [
 						'BEGIN:VCALENDAR',
 						'VERSION:2.0',

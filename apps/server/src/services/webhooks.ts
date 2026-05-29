@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto'
 
-import { Effect, Layer, ServiceMap } from 'effect'
+import { DateTime, Effect, Layer, ServiceMap } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
@@ -61,7 +61,7 @@ export class WebhookService extends ServiceMap.Service<WebhookService>()(
 											body: JSON.stringify({
 												event,
 												payload,
-												timestamp: new Date().toISOString(),
+												timestamp: DateTime.formatIso(DateTime.nowUnsafe()),
 											}),
 										}),
 									catch: e =>

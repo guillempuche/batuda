@@ -4,7 +4,7 @@ import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { Readable } from 'node:stream'
 
-import { Effect, Layer } from 'effect'
+import { DateTime, Effect, Layer } from 'effect'
 
 import { EmailError, EmailSendError } from '@batuda/controllers'
 
@@ -173,7 +173,7 @@ const parseFrontmatter = (raw: string): MessageRecord => {
 		.filter((a): a is StoredAttachment => a !== null)
 
 	return {
-		sentAt: asString('sentAt', new Date().toISOString()),
+		sentAt: asString('sentAt', DateTime.formatIso(DateTime.nowUnsafe())),
 		messageId: asString('messageId'),
 		threadId: asString('threadId'),
 		from: asString('from', DEV_INBOX_EMAIL),
@@ -424,7 +424,7 @@ export const LocalInboxProviderLive = Layer.effect(
 			params: SendParams,
 		): Effect.Effect<SendResult, EmailSendError> =>
 			Effect.gen(function* () {
-				const sentAt = new Date()
+				const sentAt = DateTime.toDateUtc(DateTime.nowUnsafe())
 				const messageId = `msg_local_${randomUUID()}`
 				const threadId = `thr_local_${randomUUID()}`
 				const recipients = Array.isArray(params.to) ? params.to : [params.to]
@@ -482,7 +482,7 @@ export const LocalInboxProviderLive = Layer.effect(
 				const subject = original?.record.subject
 					? `Re: ${original.record.subject.replace(/^Re:\s*/i, '')}`
 					: 'Re: (local-inbox)'
-				const sentAt = new Date()
+				const sentAt = DateTime.toDateUtc(DateTime.nowUnsafe())
 				const newMessageId = `msg_local_${randomUUID()}`
 				const recipients = params.to
 					? Array.isArray(params.to)

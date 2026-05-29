@@ -1,4 +1,4 @@
-import { Effect, Layer, ServiceMap } from 'effect'
+import { DateTime, Effect, Layer, ServiceMap } from 'effect'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
@@ -91,7 +91,7 @@ export class CompanyService extends ServiceMap.Service<CompanyService>()(
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						return yield* sql`
-							UPDATE companies SET ${sql.update({ ...data, updatedAt: new Date() })}
+							UPDATE companies SET ${sql.update({ ...data, updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })}
 							WHERE id = ${id} AND organization_id = ${currentOrg.id}
 							RETURNING *
 						`

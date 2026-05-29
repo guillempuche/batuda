@@ -1,4 +1,4 @@
-import { Effect } from 'effect'
+import { DateTime, Effect } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
@@ -62,7 +62,7 @@ export const ProposalsLive = HttpApiBuilder.group(
 						const before = existing[0]
 
 						const rows = yield* sql`
-							UPDATE proposals SET ${sql.update({ ...(_.payload as any), updatedAt: new Date() }, ['id'])}
+							UPDATE proposals SET ${sql.update({ ...(_.payload as any), updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) }, ['id'])}
 							WHERE id = ${_.params.id} RETURNING *
 						`
 
@@ -76,7 +76,7 @@ export const ProposalsLive = HttpApiBuilder.group(
 									companyId: before.companyId,
 									contactId: before.contactId,
 									actorUserId: null,
-									occurredAt: new Date(),
+									occurredAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 								}),
 							)
 						}

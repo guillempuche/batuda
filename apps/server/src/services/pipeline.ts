@@ -17,7 +17,7 @@ export class PipelineService extends ServiceMap.Service<PipelineService>()(
 							t.company_id, c.name as company_name, c.slug as company_slug
 						FROM tasks t
 						INNER JOIN companies c ON t.company_id = c.id
-						WHERE t.completed_at IS NULL AND t.due_at < ${new Date()}
+						WHERE t.completed_at IS NULL AND t.due_at < now()
 						ORDER BY t.due_at
 						LIMIT ${limit}
 					`,
@@ -37,7 +37,7 @@ export class PipelineService extends ServiceMap.Service<PipelineService>()(
 						const overdueCompanies = yield* sql`
 							SELECT id, slug, name, next_action, next_action_at
 							FROM companies
-							WHERE next_action_at < ${new Date()}
+							WHERE next_action_at < now()
 								AND status NOT IN ('closed', 'dead')
 							ORDER BY next_action_at
 							LIMIT ${limit}
@@ -57,7 +57,7 @@ export class PipelineService extends ServiceMap.Service<PipelineService>()(
 							count: number
 						}>`
 							SELECT count(*)::int as count FROM tasks
-							WHERE completed_at IS NULL AND due_at < ${new Date()}
+							WHERE completed_at IS NULL AND due_at < now()
 						`
 
 						const companiesWithoutNextAction = yield* sql<{
