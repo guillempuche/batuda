@@ -6,10 +6,11 @@ import {
 	S3Client,
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
-import { Config, Effect, Layer, Redacted } from 'effect'
+import { Effect, Layer, Redacted } from 'effect'
 
 import { StorageError } from '@batuda/controllers'
 
+import { EnvVars } from '../lib/env.js'
 import {
 	type HeadResult,
 	type PutParams,
@@ -22,11 +23,12 @@ const errorMessage = (e: unknown): string =>
 export const S3StorageProviderLive = Layer.effect(
 	StorageProvider,
 	Effect.gen(function* () {
-		const endpoint = yield* Config.string('STORAGE_ENDPOINT')
-		const region = yield* Config.string('STORAGE_REGION')
-		const accessKeyId = yield* Config.string('STORAGE_ACCESS_KEY_ID')
-		const secretAccessKey = yield* Config.redacted('STORAGE_SECRET_ACCESS_KEY')
-		const bucket = yield* Config.string('STORAGE_BUCKET')
+		const env = yield* EnvVars
+		const endpoint = env.STORAGE_ENDPOINT
+		const region = env.STORAGE_REGION
+		const accessKeyId = env.STORAGE_ACCESS_KEY_ID
+		const secretAccessKey = env.STORAGE_SECRET_ACCESS_KEY
+		const bucket = env.STORAGE_BUCKET
 
 		// `forcePathStyle: true` keeps a single code path working for both
 		// MinIO (which only speaks path-style: `http://host/bucket/key`) and

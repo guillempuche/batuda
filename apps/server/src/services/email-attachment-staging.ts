@@ -438,6 +438,7 @@ export class EmailAttachmentStaging extends ServiceMap.Service<EmailAttachmentSt
 	static readonly layer = Layer.effect(this, this.make)
 
 	// 5-min cadence stays well under the 1-hour TTL so a missed tick can't leak orphans past expiry.
+	// Outputs no service (`effectDiscard`), so it must be listed in `mergeAll` — a `provideMerge` skips it.
 	static readonly sweepDaemonLayer = Layer.effectDiscard(
 		Effect.gen(function* () {
 			const staging = yield* EmailAttachmentStaging
