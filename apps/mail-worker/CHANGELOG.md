@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-05-29 (mail-worker-v2026.5.29)
+
+### Features
+
+* add org-owned API keys for AI/MCP sessions ([97bfc1b](https://github.com/guillempuche/batuda/commit/97bfc1bd6020ba35d28f1f5ce198991ce07bc544))
+* attribute MCP API keys to their creating member ([1476a6d](https://github.com/guillempuche/batuda/commit/1476a6d7eb6dca9b2a241cf8d3dbad27a0268fe2))
+* authenticate MCP sessions via OAuth 2.1 ([06ff241](https://github.com/guillempuche/batuda/commit/06ff2419052254b1c9c5be6491d2789180a84351))
+* clean up abandoned OAuth clients and show connection provenance ([9c7e9fe](https://github.com/guillempuche/batuda/commit/9c7e9fe4e21fd87149c9f9ee50e9978de642c7b8))
+
+### CI/CD
+
+* **deploy:** run server and mail-worker on base-compat runtime ([7ea3691](https://github.com/guillempuche/batuda/commit/7ea3691cfc63046714c2523551f6f6bc5a1a7466))
+
 ## 2026-05-19 (mail-worker-v2026.5.20)
 
 ### Features
