@@ -3,6 +3,7 @@ import { Effect, Layer, ServiceMap } from 'effect'
 import { NotFound } from '@batuda/controllers'
 
 import { Auth } from '../lib/auth'
+import { EnvVars } from '../lib/env'
 
 // Returned once on create — `key` is the plaintext the caller must store now
 // (Better Auth hashes it on write, so it is unrecoverable afterward).
@@ -63,6 +64,7 @@ export class ApiKeyService extends ServiceMap.Service<ApiKeyService>()(
 	{
 		make: Effect.gen(function* () {
 			const auth = yield* Auth
+			const env = yield* EnvVars
 
 			// One deterministic agent user per org. `.internal` is never a routable
 			// mailbox; the user is passwordless (no `password` → no account row) and
@@ -130,7 +132,17 @@ export class ApiKeyService extends ServiceMap.Service<ApiKeyService>()(
 									userId: agentId,
 									name: input.name,
 									metadata: { organizationId: orgId },
-									rateLimitEnabled: false,
+									// Stamp the limit from config rather than inherit Better
+									// Auth's 10-req/day default, which a single MCP turn (many
+									// tool calls) would blow through.
+									rateLimitEnabled: env.API_KEY_RATE_LIMIT_ENABLED,
+									...(env.API_KEY_RATE_LIMIT_ENABLED
+										? {
+												rateLimitMax: env.API_KEY_RATE_LIMIT_MAX,
+												rateLimitTimeWindow:
+													env.API_KEY_RATE_LIMIT_WINDOW_SECONDS * 1000,
+											}
+										: {}),
 									...(input.expiresIn !== undefined
 										? { expiresIn: input.expiresIn }
 										: {}),

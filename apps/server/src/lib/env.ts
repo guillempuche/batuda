@@ -99,6 +99,22 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 		const OAUTH_CLIENT_GC_DAYS = yield* Config.int('OAUTH_CLIENT_GC_DAYS').pipe(
 			Config.withDefault(7),
 		)
+		// Per-key rate limit for org-scoped API keys — the credential AI/MCP
+		// clients call /mcp with. Enabled in prod so a leaked or runaway key
+		// can't hammer the API unthrottled; dev sets ENABLED=false so local MCP
+		// testing (which fans out many tool calls per turn) never hits a false
+		// rejection. MAX requests per WINDOW_SECONDS, stamped on each key at
+		// creation. Defaults are generous (600/60s ≈ 10 req/s) — they bound
+		// abuse, not normal use; tune per environment.
+		const API_KEY_RATE_LIMIT_ENABLED = yield* Config.boolean(
+			'API_KEY_RATE_LIMIT_ENABLED',
+		).pipe(Config.withDefault(true))
+		const API_KEY_RATE_LIMIT_MAX = yield* Config.int(
+			'API_KEY_RATE_LIMIT_MAX',
+		).pipe(Config.withDefault(600))
+		const API_KEY_RATE_LIMIT_WINDOW_SECONDS = yield* Config.int(
+			'API_KEY_RATE_LIMIT_WINDOW_SECONDS',
+		).pipe(Config.withDefault(60))
 		// Comma-separated list of trusted origins (e.g.
 		// `https://batuda.localhost`). Each entry is either a literal
 		// origin matched exactly or a wildcard-subdomain pattern
@@ -220,6 +236,9 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 			BETTER_AUTH_RATE_LIMIT,
 			OAUTH_ACCESS_TOKEN_TTL_SECONDS,
 			OAUTH_CLIENT_GC_DAYS,
+			API_KEY_RATE_LIMIT_ENABLED,
+			API_KEY_RATE_LIMIT_MAX,
+			API_KEY_RATE_LIMIT_WINDOW_SECONDS,
 			ALLOWED_ORIGINS,
 			APP_PUBLIC_URL,
 			STORAGE_ENDPOINT,

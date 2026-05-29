@@ -18,10 +18,15 @@ import { enterOrgScope, enterUserScope } from '../middleware/org'
 import { CurrentUser } from './current-user'
 import { McpToolsLive } from './server'
 
-const jsonRpcError = (status: number, code: number, message: string) =>
+const jsonRpcError = (
+	status: number,
+	code: number,
+	message: string,
+	headers?: Record<string, string>,
+) =>
 	HttpServerResponse.json(
 		{ jsonrpc: '2.0', id: null, error: { code, message } },
-		{ status },
+		{ status, ...(headers ? { headers } : {}) },
 	)
 
 // 401 that advertises the OAuth Authorization Server per RFC 9728: keeps the
@@ -106,9 +111,28 @@ const McpAuthMiddleware = HttpRouter.middleware(
 					const verified = yield* Effect.promise(() =>
 						instance.api.verifyApiKey({ body: { key: apiKey } }),
 					)
-					// verifyApiKey returns valid:false for unknown/disabled/expired/
-					// rate-limited keys (it never throws for those).
 					if (!verified.valid || !verified.key) {
+						// A throttled key comes back with a distinct code (not a bad
+						// credential): answer 429 + Retry-After so the client backs off
+						// instead of treating it as an invalid credential.
+						const error = verified.error as {
+							code?: string
+							details?: { tryAgainIn?: number }
+						} | null
+						if (
+							error?.code === 'RATE_LIMITED' ||
+							error?.code === 'USAGE_EXCEEDED'
+						) {
+							const tryAgainIn = error.details?.tryAgainIn
+							return yield* jsonRpcError(
+								429,
+								-32001,
+								'API key rate limit exceeded',
+								typeof tryAgainIn === 'number'
+									? { 'retry-after': String(Math.ceil(tryAgainIn / 1000)) }
+									: undefined,
+							)
+						}
 						return yield* jsonRpcError(401, -32001, 'Invalid API key')
 					}
 					const orgId = (
