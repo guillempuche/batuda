@@ -38,9 +38,7 @@ export const OtlpObservability = Layer.unwrap(
 		const headersRaw = yield* Config.string('OTEL_EXPORTER_OTLP_HEADERS').pipe(
 			Config.withDefault(''),
 		)
-		const environment = yield* Config.string('NODE_ENV').pipe(
-			Config.withDefault('development'),
-		)
+		const environment = yield* Config.string('NODE_ENV')
 
 		if (!baseUrl) {
 			yield* Effect.logInfo(

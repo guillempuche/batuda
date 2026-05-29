@@ -1,7 +1,9 @@
-// PgLive reads DATABASE_URL via Config at layer-build time. Default to
-// the docker-compose service so the suite runs without a loaded .env.
+// PgLive reads DATABASE_URL and InboxHealthProbe reads
+// EMAIL_HEALTH_PROBE_INTERVAL_SEC via Config at layer-build time — both
+// required (no default). Set them so the suite runs without a loaded .env.
 process.env['DATABASE_URL'] ??=
 	'postgresql://batuda:batuda@localhost:5433/batuda'
+process.env['EMAIL_HEALTH_PROBE_INTERVAL_SEC'] ??= '900'
 
 import { Effect, Layer } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'

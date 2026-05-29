@@ -60,13 +60,9 @@ export function findPublicUrlNotAllowed(
 export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 	make: Effect.gen(function* () {
 		const DATABASE_URL = yield* Config.redacted('DATABASE_URL')
-		const PORT = yield* Config.int('PORT').pipe(Config.withDefault(3010))
-		const NODE_ENV = yield* Config.string('NODE_ENV').pipe(
-			Config.withDefault('development'),
-		)
-		const MIN_LOG_LEVEL = yield* Config.string('MIN_LOG_LEVEL').pipe(
-			Config.withDefault('Info'),
-		)
+		const PORT = yield* Config.int('PORT')
+		const NODE_ENV = yield* Config.string('NODE_ENV')
+		const MIN_LOG_LEVEL = yield* Config.string('MIN_LOG_LEVEL')
 
 		const BETTER_AUTH_SECRET = yield* Config.redacted('BETTER_AUTH_SECRET')
 		// Required (no default): cookie-domain derivation depends on this,
@@ -74,47 +70,41 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 		const BETTER_AUTH_BASE_URL = yield* Config.string('BETTER_AUTH_BASE_URL')
 		const BETTER_AUTH_INSECURE_COOKIES = yield* Config.boolean(
 			'BETTER_AUTH_INSECURE_COOKIES',
-		).pipe(Config.withDefault(false))
-		// Defaults to `strict` (Better Auth's tight per-endpoint defaults).
-		// Set to `loose` in dev so the e2e suite, which stacks ~20 sign-ins
-		// in a single 60s window, doesn't trip the brute-force gate. Must
-		// stay strict in prod.
+		)
+		// Required (no default). Prod: `strict` (Better Auth's tight per-endpoint
+		// gates). Dev: `loose` so the e2e suite, which stacks many sign-ins in a
+		// short window, doesn't trip the brute-force gate.
 		const BETTER_AUTH_RATE_LIMIT = yield* Config.schema(
 			Schema.Literals(['strict', 'loose']),
 			'BETTER_AUTH_RATE_LIMIT',
-		).pipe(Config.withDefault('strict' as const))
+		)
 		// How long an OAuth access token (the credential a connected AI
-		// assistant calls /mcp with) stays valid, in seconds. Defaults short
-		// so production keeps the window a leaked or post-offboarding token
-		// works to a few minutes — the per-call org-membership check is the
-		// instant cut-off, this just caps the edges. Dev sets it long so local
-		// testing isn't constantly re-authorizing.
+		// assistant calls /mcp with) stays valid, in seconds. Required. Prod
+		// keeps it short (a leaked/post-offboarding token works only a few
+		// minutes — the per-call org-membership check is the instant cut-off,
+		// this caps the edges); dev sets it long so local testing isn't
+		// constantly re-authorizing.
 		const OAUTH_ACCESS_TOKEN_TTL_SECONDS = yield* Config.int(
 			'OAUTH_ACCESS_TOKEN_TTL_SECONDS',
-		).pipe(Config.withDefault(900))
+		)
 		// Anyone can register an OAuth client (open Dynamic Client Registration),
 		// so abandoned ones get garbage-collected after each registration: a
-		// client older than this many days with no consent is deleted. Short in
-		// prod; dev sets it long so a client registered while testing survives.
-		const OAUTH_CLIENT_GC_DAYS = yield* Config.int('OAUTH_CLIENT_GC_DAYS').pipe(
-			Config.withDefault(7),
-		)
+		// client older than this many days with no consent is deleted. Required;
+		// prod short, dev long so a client registered while testing survives.
+		const OAUTH_CLIENT_GC_DAYS = yield* Config.int('OAUTH_CLIENT_GC_DAYS')
 		// Per-key rate limit for org-scoped API keys — the credential AI/MCP
-		// clients call /mcp with. Enabled in prod so a leaked or runaway key
-		// can't hammer the API unthrottled; dev sets ENABLED=false so local MCP
-		// testing (which fans out many tool calls per turn) never hits a false
-		// rejection. MAX requests per WINDOW_SECONDS, stamped on each key at
-		// creation. Defaults are generous (600/60s ≈ 10 req/s) — they bound
-		// abuse, not normal use; tune per environment.
+		// clients call /mcp with. Required (no default). Prod enables it so a
+		// leaked or runaway key can't hammer the API unthrottled; dev sets
+		// ENABLED=false so local MCP testing (which fans out many tool calls per
+		// turn) never hits a false rejection. MAX requests per WINDOW_SECONDS,
+		// stamped on each key at creation.
 		const API_KEY_RATE_LIMIT_ENABLED = yield* Config.boolean(
 			'API_KEY_RATE_LIMIT_ENABLED',
-		).pipe(Config.withDefault(true))
-		const API_KEY_RATE_LIMIT_MAX = yield* Config.int(
-			'API_KEY_RATE_LIMIT_MAX',
-		).pipe(Config.withDefault(600))
+		)
+		const API_KEY_RATE_LIMIT_MAX = yield* Config.int('API_KEY_RATE_LIMIT_MAX')
 		const API_KEY_RATE_LIMIT_WINDOW_SECONDS = yield* Config.int(
 			'API_KEY_RATE_LIMIT_WINDOW_SECONDS',
-		).pipe(Config.withDefault(60))
+		)
 		// Comma-separated list of trusted origins (e.g.
 		// `https://batuda.localhost`). Each entry is either a literal
 		// origin matched exactly or a wildcard-subdomain pattern
@@ -123,7 +113,6 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 		// rejected at boot to avoid shipping a broad subdomain-trust hole.
 		// Same array is reused as Better-Auth `trustedOrigins`.
 		const ALLOWED_ORIGINS = yield* Config.string('ALLOWED_ORIGINS').pipe(
-			Config.withDefault(''),
 			Config.map(s => (s ? s.split(',').map(o => o.trim()) : [])),
 			Config.mapOrFail(patterns => {
 				const offending = findUnsafeWildcardOrigin(patterns)
