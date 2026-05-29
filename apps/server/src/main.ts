@@ -229,7 +229,7 @@ const ServicesLive = Layer.mergeAll(
 
 const ServerLive = Layer.unwrap(
 	Effect.gen(function* () {
-		const port = yield* Config.int('PORT').pipe(Config.withDefault(3010))
+		const port = yield* Config.int('PORT')
 		const portlessUrl = yield* Config.string('PORTLESS_URL').pipe(
 			Config.withDefault(''),
 		)

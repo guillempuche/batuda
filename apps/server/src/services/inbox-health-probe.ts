@@ -34,9 +34,7 @@ export class InboxHealthProbe extends ServiceMap.Service<InboxHealthProbe>()(
 			const sql = yield* SqlClient.SqlClient
 			const transport = yield* MailTransport
 			const crypto = yield* CredentialCrypto
-			const intervalSec = yield* Config.int(
-				'EMAIL_HEALTH_PROBE_INTERVAL_SEC',
-			).pipe(Config.withDefault(900))
+			const intervalSec = yield* Config.int('EMAIL_HEALTH_PROBE_INTERVAL_SEC')
 
 			const probeOne = (inbox: ActiveInboxRow) =>
 				Effect.gen(function* () {

@@ -7,16 +7,12 @@ import { Config, Effect, Layer, Logger, References } from 'effect'
  * - Development: pretty console + logfmt file (server.log) + tracer
  * - Production:  JSON console + tracer
  *
- * Min log level read from MIN_LOG_LEVEL env var (default: Info).
+ * Min log level read from MIN_LOG_LEVEL env var.
  */
 export const LoggerLive = Layer.unwrap(
 	Effect.gen(function* () {
-		const env = yield* Config.string('NODE_ENV').pipe(
-			Config.withDefault('development'),
-		)
-		const level = yield* Config.logLevel('MIN_LOG_LEVEL').pipe(
-			Config.withDefault('Info'),
-		)
+		const env = yield* Config.string('NODE_ENV')
+		const level = yield* Config.logLevel('MIN_LOG_LEVEL')
 
 		const minLevel = Layer.succeed(References.MinimumLogLevel, level)
 
@@ -39,9 +35,7 @@ export const LoggerLive = Layer.unwrap(
  */
 export const McpLoggerLive = Layer.unwrap(
 	Effect.gen(function* () {
-		const level = yield* Config.logLevel('MIN_LOG_LEVEL').pipe(
-			Config.withDefault('Info'),
-		)
+		const level = yield* Config.logLevel('MIN_LOG_LEVEL')
 
 		return Logger.layer([
 			Logger.consolePretty({ stderr: true }),
