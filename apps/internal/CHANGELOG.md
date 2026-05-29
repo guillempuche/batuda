@@ -3,6 +3,39 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-05-29 (internal-v2026.5.29)
+
+### Features
+
+* add org-owned API keys for AI/MCP sessions ([97bfc1b](https://github.com/guillempuche/batuda/commit/97bfc1bd6020ba35d28f1f5ce198991ce07bc544))
+* attribute MCP API keys to their creating member ([1476a6d](https://github.com/guillempuche/batuda/commit/1476a6d7eb6dca9b2a241cf8d3dbad27a0268fe2))
+* authenticate MCP sessions via OAuth 2.1 ([06ff241](https://github.com/guillempuche/batuda/commit/06ff2419052254b1c9c5be6491d2789180a84351))
+* clean up abandoned OAuth clients and show connection provenance ([9c7e9fe](https://github.com/guillempuche/batuda/commit/9c7e9fe4e21fd87149c9f9ee50e9978de642c7b8))
+* **internal:** add accessible copy button and reorder MCP help page ([b4f5b6f](https://github.com/guillempuche/batuda/commit/b4f5b6f5320366731d162415ca9b59e57f58d853))
+* **internal:** add API key management under a settings hub ([a2be43c](https://github.com/guillempuche/batuda/commit/a2be43c21d4b40f75543aa93f654c71814934dbb))
+* **internal:** add MCP OAuth consent and connections UI ([4f18ca2](https://github.com/guillempuche/batuda/commit/4f18ca284347872a3cdda722efa603bf4bc0cb45))
+* **internal:** add MCP setup help page with copy-paste configs ([dac32e9](https://github.com/guillempuche/batuda/commit/dac32e9e7bde08cd98a040e2dac0cd1241bfbf40))
+* **internal:** deny framing app-wide to block clickjacking ([9658eff](https://github.com/guillempuche/batuda/commit/9658eff4d9a1e23bde017d88f0878a3a7b8fb905))
+
+### Bug Fixes
+
+* **internal:** disable scale-to-zero to drop the per-visit cold-start tax ([21af565](https://github.com/guillempuche/batuda/commit/21af5659dc9ade9d43084287a8002ea0834d0cba))
+
+### Refactoring
+
+* **domain:** move CurrentOrg from @batuda/controllers ([73f3c35](https://github.com/guillempuche/batuda/commit/73f3c352ebfe488226c23b0f13b09cf69c7e42f6))
+* move ParticipantMatcher to @batuda/email ([0ef885c](https://github.com/guillempuche/batuda/commit/0ef885c0129b6151e7ea366e4d9c9c14ff3a2768))
+
+### CI/CD
+
+* **deploy:** move batuda-web from kraftcloud to cloudflare workers ([00efd38](https://github.com/guillempuche/batuda/commit/00efd38912d040dc240d383690bb4b66b205bfea))
+* **release:** ui v2026.5.17 ([9abce7a](https://github.com/guillempuche/batuda/commit/9abce7a9b09919066852f9506366b587ab79885c))
+
+### Chores
+
+* pin better-auth packages to exact versions ([ef1ac5a](https://github.com/guillempuche/batuda/commit/ef1ac5adfe65a712923fba27a3d3ffe53e4c12a2))
+* upgrade better-auth to 1.6.11 and add oauth-provider ([63ea900](https://github.com/guillempuche/batuda/commit/63ea900065d77d8fcb8731f8ca1e075e5065f580))
+
 ## 2026-05-17 (internal-v2026.5.17)
 
 ### Features
