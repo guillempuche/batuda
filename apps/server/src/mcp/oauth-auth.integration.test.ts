@@ -269,6 +269,13 @@ const deleteFixtureRows = async () => {
 }
 
 const cleanup = async () => {
+	// The JWKS signing key is stored encrypted with BETTER_AUTH_SECRET. CI clones
+	// its database from a parent whose key was encrypted with a different secret,
+	// so this run can't decrypt it — and Better Auth reuses a still-valid key
+	// rather than regenerating one. Clear it so the first sign mints a fresh key
+	// with this run's secret. Safe: the suite is sequential (fileParallelism:false)
+	// and this is the only file that signs JWTs.
+	await pool.query('DELETE FROM jwks')
 	await pool.query('DELETE FROM companies WHERE slug = $1', [FIXTURE_SLUG])
 	await pool.query(
 		`DELETE FROM mcp_oauth_org WHERE user_id IN (SELECT id FROM "user" WHERE email LIKE $1)`,
