@@ -1,4 +1,14 @@
-import { Data, DateTime, Effect, Layer, Schema, ServiceMap } from 'effect'
+import {
+	Cache,
+	Data,
+	DateTime,
+	Duration,
+	Effect,
+	Layer,
+	Option,
+	Schema,
+	ServiceMap,
+} from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import {
@@ -158,12 +168,24 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 			const timeline = yield* TimelineActivityService
 			const participantMatcher = yield* ParticipantMatcher
 
-			// Hot-path cache for slot queries so repeated callers within the
-			// TTL don't fan out parallel provider calls for the same window.
-			const slotCache = new Map<
+			// Remembers the available times we just looked up so that people
+			// asking for the same dates at once get a quick answer, instead of
+			// each request going out to the calendar provider separately. We keep
+			// the 500 most recent answers and forget each one after a short while,
+			// so this memory can't grow forever.
+			const slotCache = yield* Cache.make<
 				string,
-				{ readonly expiresAt: number; readonly slots: ReadonlyArray<Slot> }
-			>()
+				ReadonlyArray<Slot>,
+				never,
+				never
+			>({
+				capacity: 500,
+				timeToLive: Duration.millis(AVAILABILITY_CACHE_TTL_MS),
+				// We always store answers ourselves; we never ask this cache to
+				// fetch one for us, so reaching here means something went wrong.
+				lookup: () =>
+					Effect.die('calendar slotCache lookup invoked — expected set-only'),
+			})
 
 			const cacheKey = (
 				providerEventTypeId: string,
@@ -1337,8 +1359,8 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 						args.from,
 						args.to,
 					)
-					const hit = slotCache.get(key)
-					if (hit && hit.expiresAt > Date.now()) return hit.slots
+					const hit = yield* Cache.getOption(slotCache, key)
+					if (Option.isSome(hit)) return hit.value
 					const slots = yield* provider
 						.findSlots({
 							providerEventTypeId: eventType.providerEventTypeId,
@@ -1350,10 +1372,7 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 								Effect.succeed<ReadonlyArray<Slot>>([]),
 							),
 						)
-					slotCache.set(key, {
-						slots,
-						expiresAt: Date.now() + AVAILABILITY_CACHE_TTL_MS,
-					})
+					yield* Cache.set(slotCache, key, slots)
 					return slots
 				})
 
