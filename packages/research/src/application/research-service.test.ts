@@ -1,3 +1,4 @@
+import { Cause } from 'effect'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -5,6 +6,7 @@ import {
 	normalizeResearchQuery,
 	researchCacheTtlDaysFor,
 	schemaVersionFor,
+	shouldMarkRunFailed,
 } from './research-service'
 
 describe('normalizeResearchQuery', () => {
@@ -174,6 +176,41 @@ describe('computeResearchCacheKey', () => {
 
 		// THEN switching the hint language misses the cache
 		expect(ca).not.toBe(es)
+	})
+})
+
+describe('shouldMarkRunFailed', () => {
+	describe('when the run ended with a typed failure', () => {
+		it('should mark the run failed', () => {
+			// GIVEN a Fail cause (an LLM or SQL error reaching the terminal handler)
+			// [research-service.ts — Effect.catchCause(cause => shouldMarkRunFailed(cause) ? …)]
+			const cause = Cause.fail(new Error('llm provider failed'))
+
+			// WHEN deciding whether to record the run as failed
+			// THEN it is recorded as failed
+			expect(shouldMarkRunFailed(cause)).toBe(true)
+		})
+	})
+
+	describe('when the run ended with a defect (an unexpected crash)', () => {
+		it('should mark the run failed', () => {
+			// GIVEN a Die cause (an unexpected throw, not a typed error)
+			const cause = Cause.die(new Error('boom'))
+
+			// THEN it is still recorded as failed
+			expect(shouldMarkRunFailed(cause)).toBe(true)
+		})
+	})
+
+	describe('when the run was interrupted (cancelled or shut down)', () => {
+		it('should not mark the run failed, so the cancellation status stands', () => {
+			// GIVEN a pure interrupt cause (cancel / graceful shutdown)
+			const cause = Cause.interrupt()
+
+			// WHEN deciding
+			// THEN the run is left alone — overwriting it with 'failed' would be wrong
+			expect(shouldMarkRunFailed(cause)).toBe(false)
+		})
 	})
 })
 

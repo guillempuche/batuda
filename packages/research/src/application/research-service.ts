@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 
 import {
+	Cause,
 	Config,
 	DateTime,
 	Effect,
@@ -25,6 +26,13 @@ import {
 } from './ports'
 import { type FreeformSchema, schemaRegistry } from './schemas/index'
 import { researchToolkit } from './tools'
+
+// A finished run is flipped to 'failed' for a real error or an unexpected
+// crash, but NOT when it was simply cancelled or shut down (a pure interrupt) —
+// that path sets its own status. So anything that isn't purely an interrupt
+// counts as a failure worth recording.
+export const shouldMarkRunFailed = (cause: Cause.Cause<unknown>): boolean =>
+	!Cause.hasInterruptsOnly(cause)
 
 const sha256Hex = (input: string): string =>
 	createHash('sha256').update(input).digest('hex')
@@ -260,12 +268,10 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						})
 					}
 					// Fire to external observability (webhooks, metrics)
-					yield* eventSink
-						.fire(`research.${type.replace('run.', '')}`, {
-							researchId,
-							...(typeof data === 'object' && data !== null ? data : { data }),
-						})
-						.pipe(Effect.catch(() => Effect.void))
+					yield* eventSink.fire(`research.${type.replace('run.', '')}`, {
+						researchId,
+						...(typeof data === 'object' && data !== null ? data : { data }),
+					})
 				})
 
 			const snapshotSubjects = (
@@ -605,21 +611,27 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						tokensOut,
 					})
 				}).pipe(
-					Effect.catch((error: unknown) =>
-						Effect.gen(function* () {
-							yield* sql`
-								UPDATE research_runs
-								SET status = 'failed',
-									findings = ${JSON.stringify({ error: String(error) })},
-									completed_at = now(),
-									updated_at = now()
-								WHERE id = ${researchId}
-							`
-							yield* publishEvent(researchId, 'run.failed', {
-								error: String(error),
+					Effect.catchCause(cause => {
+						if (shouldMarkRunFailed(cause)) {
+							return Effect.gen(function* () {
+								const detail = Cause.pretty(cause)
+								yield* sql`
+									UPDATE research_runs
+									SET status = 'failed',
+										findings = ${JSON.stringify({ error: detail })},
+										completed_at = now(),
+										updated_at = now()
+									WHERE id = ${researchId}
+								`
+								yield* publishEvent(researchId, 'run.failed', {
+									error: detail,
+								})
 							})
-						}),
-					),
+						}
+						// Pure interrupt (cancel/shutdown): propagate it; the cancel
+						// path sets the status itself, so don't overwrite it.
+						return Effect.interrupt
+					}),
 					Effect.ensuring(
 						Effect.gen(function* () {
 							// Without this shutdown, Stream.fromPubSub keeps the
