@@ -43,6 +43,7 @@ import { WebhooksLive } from './handlers/webhooks'
 import { CalcomWebhookLive } from './handlers/webhooks-calcom'
 import { Auth } from './lib/auth'
 import { CorsLive } from './lib/cors'
+import { installCrashGuards } from './lib/crash-guards'
 import { EnvVars } from './lib/env'
 import { LoggerLive } from './lib/logger'
 import { OtlpObservability } from './lib/observability'
@@ -313,5 +314,10 @@ const program = HttpRouter.serve(AppLive).pipe(
 	Layer.provide(OtlpObservability),
 	Layer.launch,
 )
+
+// Turn on the crash safety net before the server starts, so a rare low-level
+// error gets logged and the process auto-restarted instead of dying silently.
+// See crash-guards.ts.
+installCrashGuards()
 
 NodeRuntime.runMain(program as unknown as Effect.Effect<void, unknown, never>)
