@@ -4,6 +4,7 @@ import { Effect, type Fiber, Layer, Ref, Schedule } from 'effect'
 import { ParticipantMatcher } from '@batuda/email/participant-matcher'
 
 import { type ClaimedInbox, claimAvailableInboxes } from './claim.js'
+import { installCrashGuards } from './crash-guards.js'
 import { PgLive } from './db.js'
 import { CredentialDecryptor } from './decrypt.js'
 import { WorkerEnvVars } from './env.js'
@@ -98,5 +99,10 @@ const Live = Layer.mergeAll(
 	Layer.provideMerge(PgLive),
 	Layer.provideMerge(WorkerEnvVars.layer),
 )
+
+// Turn on the crash safety net before the worker starts: a rare low-level error
+// (e.g. a dropped email connection) must be logged and the worker auto-restarted,
+// not left silently dead — which would stop it watching every mailbox.
+installCrashGuards()
 
 NodeRuntime.runMain(Effect.scoped(program).pipe(Effect.provide(Live)))
