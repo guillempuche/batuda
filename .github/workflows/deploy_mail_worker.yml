@@ -85,12 +85,17 @@ jobs:
           # 10000ms; kraft's 60s default is rejected with HTTP 400.
           # --scale-to-zero off matches the Kraftfile label and keeps the
           # IDLE-holding worker always-warm.
+          # --restart on-failure: if the worker crashes (non-zero exit), the
+          # platform starts a fresh one instead of leaving it dead but still
+          # listed as "running" and processing no mail. A clean shutdown
+          # (exit 0) is left alone. Pairs with the crash-guards in main.ts.
           command: |
             kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
               --timeout 10s \
               --name batuda-mail-worker \
               -M 2048 \
               --scale-to-zero off \
+              --restart on-failure \
               -e NODE_ENV=production \
               -e SERVICE_VERSION="${{ steps.meta.outputs.version }}" \
               -e GIT_SHA="${{ github.sha }}" \
