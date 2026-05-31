@@ -1,7 +1,7 @@
 import { createServer } from 'node:http'
 
 import { NodeHttpServer, NodeRuntime } from '@effect/platform-node'
-import { Config, DateTime, Effect, Layer } from 'effect'
+import { Cause, Config, DateTime, Effect, Layer } from 'effect'
 import {
 	FetchHttpClient,
 	HttpRouter,
@@ -189,7 +189,22 @@ const ResearchEventSinkLive = Layer.effect(
 							),
 						),
 					)
-				}).pipe(Effect.orDie),
+				}).pipe(
+					// The event sink is fire-and-forget telemetry. A transient DB
+					// error here must NOT kill the research run, so log and move on;
+					// only a genuine cancellation/shutdown (a pure interrupt) is let
+					// through.
+					Effect.catchCause(cause =>
+						Cause.hasInterruptsOnly(cause)
+							? Effect.interrupt
+							: Effect.logWarning('research event-sink fan-out failed').pipe(
+									Effect.annotateLogs({
+										event: 'research.fanout.failed',
+										cause: Cause.pretty(cause),
+									}),
+								),
+					),
+				),
 		})
 	}),
 )
