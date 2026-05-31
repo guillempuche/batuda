@@ -1,4 +1,4 @@
-import { DateTime, Effect } from 'effect'
+import { Cache, DateTime, Duration, Effect, Option } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
@@ -26,16 +26,6 @@ type EventRow = {
 	readonly source: 'booking' | 'email' | 'internal'
 }
 
-// Hard-coded 60s availability cache per `(eventTypeId, from, to)`. A
-// request that arrives inside the window replays the prior slot list
-// so the Batuda booking picker doesn't fan out N parallel calls into
-// the provider when the user clicks around. The entry is invalidated
-// by a booking webhook fan-out; in between, the provider's own edge
-// staleness is already bounded.
-const slotCache = new Map<
-	string,
-	{ readonly expiresAt: number; readonly slots: ReadonlyArray<unknown> }
->()
 const cacheKey = (eventTypeId: string, from: string, to: string) =>
 	`${eventTypeId}|${from}|${to}`
 
@@ -46,6 +36,26 @@ export const CalendarLive = HttpApiBuilder.group(
 		Effect.gen(function* () {
 			const sql = yield* SqlClient.SqlClient
 			const provider = yield* BookingProvider
+
+			// Remembers the available times we just looked up so the booking
+			// picker stays fast while someone clicks around, instead of asking
+			// the calendar provider again and again. We keep the 500 most recent
+			// answers and forget each one after a minute, so this memory can't
+			// grow forever.
+			const slotCache = yield* Cache.make<
+				string,
+				ReadonlyArray<unknown>,
+				never,
+				never
+			>({
+				capacity: 500,
+				timeToLive: Duration.seconds(60),
+				// We always store answers ourselves; we never ask this cache to
+				// fetch one for us, so reaching here means something went wrong.
+				lookup: () =>
+					Effect.die('calendar slotCache lookup invoked — expected set-only'),
+			})
+
 			return handlers
 				.handle('listEventTypes', _ =>
 					Effect.gen(function* () {
@@ -213,8 +223,8 @@ export const CalendarLive = HttpApiBuilder.group(
 								message: 'unknown_event_type_or_not_synced',
 							})
 						const key = cacheKey(_.query.eventTypeId, _.query.from, _.query.to)
-						const cached = slotCache.get(key)
-						if (cached && cached.expiresAt > Date.now()) return cached.slots
+						const cached = yield* Cache.getOption(slotCache, key)
+						if (Option.isSome(cached)) return cached.value
 
 						const slots = yield* provider
 							.findSlots({
@@ -230,10 +240,7 @@ export const CalendarLive = HttpApiBuilder.group(
 									Effect.die('provider_failed'),
 								),
 							)
-						slotCache.set(key, {
-							slots,
-							expiresAt: Date.now() + 60_000,
-						})
+						yield* Cache.set(slotCache, key, slots)
 						return slots
 					}).pipe(
 						Effect.catch(e =>
