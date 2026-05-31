@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-05-31 (server-v2026.5.31)
+
+### Features
+
+* add process crash guards to server and mail-worker ([115fa85](https://github.com/guillempuche/batuda/commit/115fa85ed22d87e1410813c7bf588e8012ac59ad))
+
+### Bug Fixes
+
+* **server:** cap calendar slot caches to prevent unbounded growth ([0989b54](https://github.com/guillempuche/batuda/commit/0989b54d6cfc562ccd7b5f9b10e2abfe042eab80))
+* **server:** run webhook lookup before backgrounding delivery ([6686061](https://github.com/guillempuche/batuda/commit/668606174cd81f8332af0679c1391558ad667476))
+* stop event-sink failures from stranding research runs ([23bd88c](https://github.com/guillempuche/batuda/commit/23bd88c266104b6ff1ae6acc8584f6ff4d9fb59a))
+
+### Tests
+
+* **server:** clear stale JWKS so oauth-auth tests can mint tokens ([e86a662](https://github.com/guillempuche/batuda/commit/e86a662c31f9ad27ccce61844442127c1cb6a5a9))
+
 ## 2026-05-29 (server-v2026.5.29-1)
 
 ### CI/CD
