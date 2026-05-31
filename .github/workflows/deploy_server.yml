@@ -92,6 +92,10 @@ jobs:
           #     timeout note below); 30s tripped HTTP 400 and aborted the
           #     rollout. Node + DB pool warm-up fits in 5s on the cold
           #     unikernel path because connection-pool init is lazy.
+          #   --restart on-failure: if the process crashes (non-zero exit) the
+          #     platform starts a fresh instance, instead of leaving a dead-but-
+          #     "running" box that serves nothing. A clean shutdown (exit 0) is
+          #     left alone. Pairs with the process crash-guards in main.ts.
           #   -M 2048: pnpm v11 hoisted-mode `pnpm deploy --prod` under legacy
           #     deploy doesn't prune to apps/server's runtime deps — /deploy
           #     ends up with the workspace's full install tree (~303 MB).
@@ -108,6 +112,7 @@ jobs:
             if [ "${{ steps.service-check.outputs.exists }}" = "true" ]; then
               kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
                 --timeout 10s \
+                --restart on-failure \
                 --service batuda-server \
                 --rollout remove_sequential \
                 --rollout-wait 5s \
@@ -180,6 +185,7 @@ jobs:
                 80:443/http+redirect
               kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
                 --timeout 10s \
+                --restart on-failure \
                 --service batuda-server \
                 -M 2048 \
                 -e NODE_ENV=production \
