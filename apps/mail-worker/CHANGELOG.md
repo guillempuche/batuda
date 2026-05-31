@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-05-31 (mail-worker-v2026.5.31)
+
+### Features
+
+* add process crash guards to server and mail-worker ([115fa85](https://github.com/guillempuche/batuda/commit/115fa85ed22d87e1410813c7bf588e8012ac59ad))
+
+### Bug Fixes
+
+* **mail-worker:** handle imap client errors instead of crashing ([fda27f8](https://github.com/guillempuche/batuda/commit/fda27f80b8dd6f6b06b5c515b15d39e9f90c34cf))
+
 ## 2026-05-29 (mail-worker-v2026.5.29-2)
 
 ### Bug Fixes
