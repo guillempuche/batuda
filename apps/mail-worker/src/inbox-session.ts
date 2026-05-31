@@ -13,6 +13,23 @@ import {
 	recordFolderHead,
 } from './folder-sync.js'
 
+// When the email connection drops, the IMAP library reports it as an 'error'
+// event from outside our normal flow. With no listener, that crashes the whole
+// worker — taking down every mailbox it watches, not just this one. So we
+// listen and just record it; the worker's retry loop reconnects on its own.
+export const onImapClientError =
+	(inboxId: string) =>
+	(error: unknown): void => {
+		console.warn(
+			JSON.stringify({
+				level: 'WARN',
+				message: 'imap client error (will reconnect)',
+				inboxId,
+				error: error instanceof Error ? error.message : String(error),
+			}),
+		)
+	}
+
 // Folders we monitor per inbox. Most providers have INBOX + Sent;
 // Gmail's "All Mail" duplicates everything (covered by IMAP \All
 // special-use), so we skip it. Outbound rows we APPEND to "Sent" still
@@ -157,6 +174,8 @@ export const runInboxSession = (claimed: ClaimedInbox) =>
 			// so the connection breaks idle slightly before the server would.
 			maxIdleTime: env.EMAIL_WORKER_IDLE_TIMEOUT_SEC * 1000,
 		})
+
+		client.on('error', onImapClientError(claimed.id))
 
 		// EXPUNGE arrives over IDLE. The listener runs outside any Effect
 		// scope so we can't issue SQL from it directly — instead we
