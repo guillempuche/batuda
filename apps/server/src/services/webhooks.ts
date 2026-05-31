@@ -12,6 +12,20 @@ const hmacSign = (secret: string | null, payload: unknown): string => {
 		.digest('hex')
 }
 
+// Just the columns fire() reads; the query returns the whole row.
+export type WebhookEndpoint = {
+	readonly url: string
+	readonly secret: string | null
+	readonly events: ReadonlyArray<string>
+}
+
+// An endpoint is notified for an event only if it subscribed to that event.
+export const matchingEndpoints = (
+	endpoints: ReadonlyArray<WebhookEndpoint>,
+	event: string,
+): ReadonlyArray<WebhookEndpoint> =>
+	endpoints.filter(ep => ep.events.includes(event))
+
 export class WebhookService extends ServiceMap.Service<WebhookService>()(
 	'WebhookService',
 	{
@@ -25,15 +39,13 @@ export class WebhookService extends ServiceMap.Service<WebhookService>()(
 				fire: (event: string, payload: unknown) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
-						const endpoints = yield* sql`
+						const endpoints = yield* sql<WebhookEndpoint>`
 							SELECT * FROM webhook_endpoints
 							WHERE is_active = true
 							  AND organization_id = ${currentOrg.id}
 						`
 
-						const matching = endpoints.filter((ep: any) =>
-							ep.events.includes(event),
-						)
+						const matching = matchingEndpoints(endpoints, event)
 
 						yield* Effect.logInfo('Webhook fan-out').pipe(
 							Effect.annotateLogs({
@@ -43,9 +55,13 @@ export class WebhookService extends ServiceMap.Service<WebhookService>()(
 							}),
 						)
 
+						// Send the webhooks in the background, but only after the lookup
+						// above has finished. The lookup has to run as part of the original
+						// request so it reads from the right place; sending it to the
+						// background too could make it run too late and read the wrong data.
 						yield* Effect.forEach(
 							matching,
-							(endpoint: any) =>
+							endpoint =>
 								Effect.tryPromise({
 									try: () =>
 										fetch(endpoint.url, {
@@ -79,8 +95,8 @@ export class WebhookService extends ServiceMap.Service<WebhookService>()(
 									),
 								),
 							{ concurrency: 'unbounded' },
-						)
-					}).pipe(Effect.forkDetach),
+						).pipe(Effect.forkDetach)
+					}),
 
 				list: () =>
 					Effect.gen(function* () {
