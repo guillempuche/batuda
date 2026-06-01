@@ -141,8 +141,10 @@ const UpdateTask = Tool.make('update_task', {
 
 const CompleteTask = Tool.make('complete_task', {
 	description:
-		'Mark a task as done (status=done, completed_at=now()). Idempotent — a second call on an already-done task is a no-op.',
-	parameters: Schema.Struct({ id: Schema.String }),
+		'Mark a task as done (status=done, completed_at=now()). Idempotent — a second call on an already-done task is a no-op. Pass a single id or an array of ids to complete in one call; the array form goes through the bulk-complete service path.',
+	parameters: Schema.Struct({
+		id: Schema.Union([Schema.String, Schema.Array(Schema.String)]),
+	}),
 	success: Schema.Unknown,
 	dependencies: [CurrentOrg],
 })
@@ -202,10 +204,36 @@ const RescheduleTask = Tool.make('reschedule_task', {
 	.annotate(Tool.Destructive, false)
 	.annotate(Tool.OpenWorld, false)
 
+const GetTask = Tool.make('get_task', {
+	description:
+		'Get a single task by id. Returns the full row including audit timestamps and link slots; for the activity audit trail use get_task_events.',
+	parameters: Schema.Struct({ id: Schema.String }),
+	success: Schema.Unknown,
+	dependencies: [CurrentOrg],
+})
+	.annotate(Tool.Title, 'Get Task')
+	.annotate(Tool.Readonly, true)
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
+
+const GetTaskEvents = Tool.make('get_task_events', {
+	description:
+		'List audit events recorded for a task (created/updated/completed/cancelled/snoozed/rescheduled). Returns up to the 100 most recent events sorted by occurrence time descending.',
+	parameters: Schema.Struct({ id: Schema.String }),
+	success: Schema.Array(Schema.Unknown),
+	dependencies: [CurrentOrg],
+})
+	.annotate(Tool.Title, 'Get Task Events')
+	.annotate(Tool.Readonly, true)
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
+
 export const TaskTools = Toolkit.make(
 	CreateTask,
 	ListTasks,
 	SearchTasks,
+	GetTask,
+	GetTaskEvents,
 	UpdateTask,
 	CompleteTask,
 	ReopenTask,
@@ -339,11 +367,34 @@ export const TaskHandlersLive = TaskTools.toLayer(
 					return rows[0]
 				}).pipe(Effect.orDie),
 
-			complete_task: ({ id }) =>
-				taskService.complete(id, AGENT_ACTOR).pipe(
+			complete_task: ({ id }) => {
+				// Branch on typeof string (not Array.isArray) because the latter
+				// does not narrow the readonly-array side of the union under strict mode.
+				if (typeof id !== 'string') {
+					return taskService.bulkComplete(id).pipe(Effect.orDie)
+				}
+				return taskService.complete(id, AGENT_ACTOR).pipe(
+					Effect.catchTag('NotFound', () => Effect.succeed(null)),
+					Effect.orDie,
+				)
+			},
+
+			get_task: ({ id }) =>
+				taskService.get(id).pipe(
 					Effect.catchTag('NotFound', () => Effect.succeed(null)),
 					Effect.orDie,
 				),
+
+			get_task_events: ({ id }) =>
+				Effect.gen(function* () {
+					const exists =
+						yield* sql`SELECT id FROM tasks WHERE id = ${id} LIMIT 1`
+					if (exists.length === 0) return []
+					return yield* sql`
+						SELECT * FROM task_events WHERE task_id = ${id}
+						ORDER BY at DESC LIMIT 100
+					`
+				}).pipe(Effect.orDie),
 
 			reopen_task: ({ id }) =>
 				taskService.reopen(id, AGENT_ACTOR).pipe(

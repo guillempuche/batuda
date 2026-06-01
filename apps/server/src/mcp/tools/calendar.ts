@@ -179,6 +179,20 @@ const ListEventTypes = Tool.make('list_event_types', {
 	.annotate(Tool.Destructive, false)
 	.annotate(Tool.OpenWorld, false)
 
+const GetCalendarEvent = Tool.make('get_calendar_event', {
+	description:
+		'Get a single calendar event by id. Returns the full calendar_events row (start_at, end_at, attendees, status, source, ical_uid, etc.).',
+	parameters: Schema.Struct({
+		id: Schema.String,
+	}),
+	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
+})
+	.annotate(Tool.Title, 'Get Calendar Event')
+	.annotate(Tool.Readonly, true)
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
+
 // ── Internal work blocks ────────────────────────────────────────
 
 const CreateInternalBlock = Tool.make('create_internal_block', {
@@ -226,6 +240,7 @@ export const CalendarTools = Toolkit.make(
 	ForwardInvitation,
 	ListUpcoming,
 	ListEventTypes,
+	GetCalendarEvent,
 	CreateInternalBlock,
 	SyncEventTypes,
 )
@@ -386,6 +401,14 @@ export const CalendarHandlersLive = CalendarTools.toLayer(
 						${conditions.length > 0 ? sql`WHERE ${sql.and(conditions)}` : sql``}
 						ORDER BY slug
 					`
+				}).pipe(Effect.orDie),
+			get_calendar_event: ({ id }) =>
+				Effect.gen(function* () {
+					const rows =
+						yield* sql`SELECT * FROM calendar_events WHERE id = ${id} LIMIT 1`
+					if (rows.length === 0)
+						return yield* Effect.die(`Calendar event ${id} not found`)
+					return rows[0]
 				}).pipe(Effect.orDie),
 			create_internal_block: params =>
 				svc

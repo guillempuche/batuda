@@ -20,9 +20,10 @@ const ListCallRecordings = Tool.make('list_call_recordings', {
 
 const GetCallRecording = Tool.make('get_call_recording', {
 	description:
-		'Get a single call recording by id, joined with its parent interaction. Returns metadata only — no audio bytes, no transcript yet.',
+		'Get a single call recording by id, joined with its parent interaction. Set include_playback_url=true to also return a short-lived signed playback URL (expires in ~10 min) alongside metadata.',
 	parameters: Schema.Struct({
 		recording_id: Schema.String,
+		include_playback_url: Schema.optional(Schema.Boolean),
 	}),
 	success: Schema.Unknown,
 })
@@ -31,7 +32,26 @@ const GetCallRecording = Tool.make('get_call_recording', {
 	.annotate(Tool.Destructive, false)
 	.annotate(Tool.OpenWorld, false)
 
-export const RecordingTools = Toolkit.make(ListCallRecordings, GetCallRecording)
+const DeleteCallRecording = Tool.make('delete_call_recording', {
+	description:
+		'Soft-delete a call recording. Marks the row deleted_at=now() and best-effort deletes the stored audio object; an orphaned object is fine to leave for a future cleanup cron if the storage delete fails.',
+	parameters: Schema.Struct({
+		recording_id: Schema.String,
+	}),
+	success: Schema.Struct({
+		status: Schema.Literal('deleted'),
+	}),
+})
+	.annotate(Tool.Title, 'Delete Call Recording')
+	.annotate(Tool.Destructive, true)
+	.annotate(Tool.Idempotent, true)
+	.annotate(Tool.OpenWorld, false)
+
+export const RecordingTools = Toolkit.make(
+	ListCallRecordings,
+	GetCallRecording,
+	DeleteCallRecording,
+)
 
 export const RecordingHandlersLive = RecordingTools.toLayer(
 	Effect.gen(function* () {
@@ -45,8 +65,20 @@ export const RecordingHandlersLive = RecordingTools.toLayer(
 						params.offset ?? 0,
 					)
 					.pipe(Effect.orDie),
-			get_call_recording: ({ recording_id }) =>
-				svc.getById(recording_id).pipe(Effect.orDie),
+			get_call_recording: ({ recording_id, include_playback_url }) =>
+				Effect.gen(function* () {
+					const recording = yield* svc.getById(recording_id).pipe(Effect.orDie)
+					if (!include_playback_url) return recording
+					const playback = yield* svc
+						.getPlaybackUrl(recording_id)
+						.pipe(Effect.orDie)
+					return { ...(recording as Record<string, unknown>), playback }
+				}),
+			delete_call_recording: ({ recording_id }) =>
+				Effect.gen(function* () {
+					yield* svc.softDelete(recording_id)
+					return { status: 'deleted' as const }
+				}).pipe(Effect.orDie),
 		}
 	}),
 )

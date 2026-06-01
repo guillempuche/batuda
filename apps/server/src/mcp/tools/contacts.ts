@@ -37,7 +37,7 @@ const CreateContact = Tool.make('create_contact', {
 
 const UpdateContact = Tool.make('update_contact', {
 	description:
-		'Update one or more fields on an existing contact by UUID. Only include fields to change.',
+		'Update one or more fields on an existing contact by UUID. Only include fields to change. Set clear_email_suppression=true to reset email_status to "unknown" (use after a bounced/complained contact confirms their address is good again — this re-enables outbound mail to that address).',
 	parameters: Schema.Struct({
 		id: Schema.String,
 		name: Schema.optional(Schema.String),
@@ -46,6 +46,7 @@ const UpdateContact = Tool.make('update_contact', {
 		phone: Schema.optional(Schema.String),
 		linkedin: Schema.optional(Schema.String),
 		notes: Schema.optional(Schema.String),
+		clear_email_suppression: Schema.optional(Schema.Boolean),
 	}),
 	success: Schema.Unknown,
 })
@@ -54,10 +55,26 @@ const UpdateContact = Tool.make('update_contact', {
 	.annotate(Tool.Idempotent, true)
 	.annotate(Tool.OpenWorld, false)
 
+const DeleteContact = Tool.make('delete_contact', {
+	description:
+		'Permanently delete a contact by UUID. Cascade-detaches the contact from interactions / proposals / threads via ON DELETE SET NULL — those rows survive with contact_id=NULL.',
+	parameters: Schema.Struct({
+		id: Schema.String,
+	}),
+	success: Schema.Struct({
+		status: Schema.Literal('deleted'),
+	}),
+})
+	.annotate(Tool.Title, 'Delete Contact')
+	.annotate(Tool.Destructive, true)
+	.annotate(Tool.Idempotent, true)
+	.annotate(Tool.OpenWorld, false)
+
 export const ContactTools = Toolkit.make(
 	ListContacts,
 	CreateContact,
 	UpdateContact,
+	DeleteContact,
 )
 
 export const ContactHandlersLive = ContactTools.toLayer(
@@ -78,15 +95,28 @@ export const ContactHandlersLive = ContactTools.toLayer(
 					})} RETURNING *`
 					return rows[0]
 				}).pipe(Effect.orDie),
-			update_contact: ({ id, ...fields }) =>
+			update_contact: ({ id, clear_email_suppression, ...fields }) =>
 				Effect.gen(function* () {
 					const data: Record<string, unknown> = {
 						...fields,
 						updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 					}
+					if (clear_email_suppression) {
+						data['emailStatus'] = 'unknown'
+						data['emailStatusReason'] = null
+						data['emailStatusUpdatedAt'] = DateTime.toDateUtc(
+							DateTime.nowUnsafe(),
+						)
+						data['emailSoftBounceCount'] = 0
+					}
 					const rows =
 						yield* sql`UPDATE contacts SET ${sql.update(data, ['id'])} WHERE id = ${id} RETURNING *`
 					return rows[0]
+				}).pipe(Effect.orDie),
+			delete_contact: ({ id }) =>
+				Effect.gen(function* () {
+					yield* sql`DELETE FROM contacts WHERE id = ${id}`
+					return { status: 'deleted' as const }
 				}).pipe(Effect.orDie),
 		}
 	}),
