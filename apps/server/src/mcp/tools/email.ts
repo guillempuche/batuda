@@ -245,6 +245,40 @@ const ListEmailMessages = Tool.make('list_email_messages', {
 	.annotate(Tool.Destructive, false)
 	.annotate(Tool.OpenWorld, false)
 
+const GetEmailMessage = Tool.make('get_email_message', {
+	description:
+		'Get a single per-message deliverability record by id. Returns status, recipient, subject, error, timestamps — the full audit row for one outbound send.',
+	parameters: Schema.Struct({
+		message_id: Schema.String,
+	}),
+	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
+})
+	.annotate(Tool.Title, 'Get Email Message')
+	.annotate(Tool.Readonly, true)
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
+
+const DownloadEmailAttachment = Tool.make('download_email_attachment', {
+	description:
+		'Download an attachment from a received email message as base64. Returns { filename, content_type, base64, size }. The provider stream is collected into memory — use sparingly for large files (the HTTP transport stays canonical for big transfers).',
+	parameters: Schema.Struct({
+		message_id: Schema.String,
+		attachment_id: Schema.String,
+	}),
+	success: Schema.Struct({
+		filename: Schema.NullOr(Schema.String),
+		content_type: Schema.String,
+		base64: Schema.String,
+		size: Schema.optional(Schema.Number),
+	}),
+	dependencies: REQUEST_DEPENDENCIES,
+})
+	.annotate(Tool.Title, 'Download Email Attachment')
+	.annotate(Tool.Readonly, true)
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, true)
+
 // ── Inbox management ─────────────────────────────────────────────
 // Inboxes are owned by an (organization, user) pair. Each row stores its
 // own IMAP/SMTP transport configuration plus encrypted credentials —
@@ -399,9 +433,9 @@ const SetPrimaryEmailInbox = Tool.make('set_primary_email_inbox', {
 
 const ManageEmailDraft = Tool.make('manage_email_draft', {
 	description:
-		'Manage an email draft a human can review before sending. action=create makes a new draft (optionally linked to CRM via company_id/contact_id/mode); update changes fields on an existing draft_id; send dispatches draft_id through the same thread-link/interaction/message pipeline as a direct send (returns {_tag:"sent"} or {_tag:"suppressed"}). body_json is the typed block tree preserved for lossless editor re-hydration.',
+		'Manage an email draft a human can review before sending. action=create makes a new draft (optionally linked to CRM via company_id/contact_id/mode); update changes fields on an existing draft_id; send dispatches draft_id through the same thread-link/interaction/message pipeline as a direct send (returns {_tag:"sent"} or {_tag:"suppressed"}); delete permanently removes draft_id. body_json is the typed block tree preserved for lossless editor re-hydration.',
 	parameters: Schema.Struct({
-		action: Schema.Literals(['create', 'update', 'send']),
+		action: Schema.Literals(['create', 'update', 'send', 'delete']),
 		inbox_id: Schema.String,
 		draft_id: Schema.optional(Schema.String),
 		to: Schema.optional(Recipients),
@@ -436,6 +470,41 @@ const ListEmailDrafts = Tool.make('list_email_drafts', {
 	.annotate(Tool.Destructive, false)
 	.annotate(Tool.OpenWorld, false)
 
+const GetEmailDraft = Tool.make('get_email_draft', {
+	description:
+		'Get a single draft by id within an inbox. Returns full draft contents including body_json. Returns null if no matching draft exists in the inbox (or the draft belongs to a different inbox).',
+	parameters: Schema.Struct({
+		inbox_id: Schema.String,
+		draft_id: Schema.String,
+	}),
+	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
+})
+	.annotate(Tool.Title, 'Get Email Draft')
+	.annotate(Tool.Readonly, true)
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
+
+const DiscardStagedEmailAttachment = Tool.make(
+	'discard_staged_email_attachment',
+	{
+		description:
+			"Permanently discard a staged email attachment (drops the row from email_attachment_staging). staging_id must belong to the supplied inbox_id; mismatches are rejected so a tenant can't discard another tenant's staging row.",
+		parameters: Schema.Struct({
+			inbox_id: Schema.String,
+			staging_id: Schema.String,
+		}),
+		success: Schema.Struct({
+			status: Schema.Literal('discarded'),
+		}),
+		dependencies: REQUEST_DEPENDENCIES,
+	},
+)
+	.annotate(Tool.Title, 'Discard Staged Email Attachment')
+	.annotate(Tool.Destructive, true)
+	.annotate(Tool.Idempotent, true)
+	.annotate(Tool.OpenWorld, false)
+
 // ── Footer tools ────────────────────────────────────────────────
 
 const ListInboxFooters = Tool.make('list_inbox_footers', {
@@ -448,6 +517,20 @@ const ListInboxFooters = Tool.make('list_inbox_footers', {
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Inbox Footers')
+	.annotate(Tool.Readonly, true)
+	.annotate(Tool.Destructive, false)
+	.annotate(Tool.OpenWorld, false)
+
+const GetInboxFooter = Tool.make('get_inbox_footer', {
+	description:
+		'Get a single inbox footer by id. Returns name, body_json (block tree), is_default, and timestamps. Org-scope is enforced by RLS — a footer belonging to another org returns NotFound.',
+	parameters: Schema.Struct({
+		id: Schema.String,
+	}),
+	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
+})
+	.annotate(Tool.Title, 'Get Inbox Footer')
 	.annotate(Tool.Readonly, true)
 	.annotate(Tool.Destructive, false)
 	.annotate(Tool.OpenWorld, false)
@@ -478,12 +561,15 @@ export const EmailTools = Toolkit.make(
 	SendEmail,
 	ReplyEmail,
 	StageEmailAttachment,
+	DiscardStagedEmailAttachment,
+	DownloadEmailAttachment,
 	ListEmailThreads,
 	GetEmailThread,
 	UpdateThreadStatus,
 	MarkThreadRead,
 	MarkThreadUnread,
 	ListEmailMessages,
+	GetEmailMessage,
 	ListEmailInboxes,
 	ListEmailProviderPresets,
 	GetEmailInboxStatus,
@@ -494,7 +580,9 @@ export const EmailTools = Toolkit.make(
 	SetPrimaryEmailInbox,
 	ManageEmailDraft,
 	ListEmailDrafts,
+	GetEmailDraft,
 	ListInboxFooters,
+	GetInboxFooter,
 	ManageInboxFooter,
 )
 
@@ -645,6 +733,38 @@ export const EmailHandlersLive = EmailTools.toLayer(
 						...(params.limit !== undefined && { limit: params.limit }),
 					})
 					.pipe(Effect.orDie),
+			get_email_message: ({ message_id }) =>
+				svc.getMessage(message_id).pipe(Effect.orDie),
+			download_email_attachment: ({ message_id, attachment_id }) =>
+				Effect.gen(function* () {
+					const piped = yield* svc
+						.streamAttachment(message_id, attachment_id)
+						.pipe(Effect.orDie)
+					const chunks: Uint8Array[] = []
+					yield* Effect.tryPromise({
+						try: async () => {
+							const reader = piped.stream.getReader()
+							while (true) {
+								const { done, value } = await reader.read()
+								if (done) break
+								if (value) chunks.push(value)
+							}
+						},
+						catch: e => new Error(`attachment stream: ${String(e)}`),
+					}).pipe(Effect.orDie)
+					const base64 = Buffer.concat(chunks).toString('base64')
+					return {
+						filename: piped.filename ?? null,
+						content_type: piped.contentType,
+						base64,
+						...(piped.size !== undefined && { size: piped.size }),
+					}
+				}),
+			discard_staged_email_attachment: ({ inbox_id, staging_id }) =>
+				staging.discard(inbox_id, staging_id).pipe(
+					Effect.map(() => ({ status: 'discarded' as const })),
+					Effect.orDie,
+				),
 			list_email_inboxes: params =>
 				svc.listLocalInboxes({
 					...(params.purpose !== undefined && { purpose: params.purpose }),
@@ -808,11 +928,20 @@ export const EmailHandlersLive = EmailTools.toLayer(
 							),
 							Effect.orDie,
 						)
+					case 'delete':
+						if (params.draft_id === undefined)
+							return dieMissing('draft_id is required to delete a draft')
+						return svc
+							.deleteDraft(params.inbox_id, params.draft_id)
+							.pipe(Effect.orDie)
 				}
 			},
 			list_email_drafts: params =>
 				svc.listDrafts(params.inbox_id).pipe(Effect.orDie),
+			get_email_draft: ({ inbox_id, draft_id }) =>
+				svc.getDraft(inbox_id, draft_id).pipe(Effect.orDie),
 			list_inbox_footers: params => svc.listFooters(params.inbox_id),
+			get_inbox_footer: ({ id }) => svc.getFooter(id).pipe(Effect.orDie),
 			manage_inbox_footer: params => {
 				switch (params.action) {
 					case 'create':
