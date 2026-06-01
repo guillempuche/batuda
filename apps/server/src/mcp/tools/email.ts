@@ -202,6 +202,7 @@ const UpdateThreadStatus = Tool.make('update_email_thread_status', {
 })
 	.annotate(Tool.Title, 'Update Email Thread Status')
 	.annotate(Tool.Destructive, false)
+	.annotate(Tool.Idempotent, true)
 	.annotate(Tool.OpenWorld, false)
 
 const MarkThreadRead = Tool.make('mark_email_thread_read', {
@@ -213,6 +214,7 @@ const MarkThreadRead = Tool.make('mark_email_thread_read', {
 })
 	.annotate(Tool.Title, 'Mark Email Thread Read')
 	.annotate(Tool.Destructive, false)
+	.annotate(Tool.Idempotent, true)
 	.annotate(Tool.OpenWorld, false)
 
 const MarkThreadUnread = Tool.make('mark_email_thread_unread', {
@@ -224,6 +226,7 @@ const MarkThreadUnread = Tool.make('mark_email_thread_unread', {
 })
 	.annotate(Tool.Title, 'Mark Email Thread Unread')
 	.annotate(Tool.Destructive, false)
+	.annotate(Tool.Idempotent, true)
 	.annotate(Tool.OpenWorld, false)
 
 // ── Message audit ────────────────────────────────────────────────
@@ -388,6 +391,7 @@ const UpdateEmailInbox = Tool.make('update_email_inbox', {
 })
 	.annotate(Tool.Title, 'Update Email Inbox')
 	.annotate(Tool.Destructive, false)
+	.annotate(Tool.Idempotent, true)
 	.annotate(Tool.OpenWorld, false)
 
 const TestEmailInbox = Tool.make('test_email_inbox', {
@@ -401,6 +405,7 @@ const TestEmailInbox = Tool.make('test_email_inbox', {
 })
 	.annotate(Tool.Title, 'Test Email Inbox')
 	.annotate(Tool.Destructive, false)
+	.annotate(Tool.Idempotent, true)
 	.annotate(Tool.OpenWorld, true)
 
 const DeleteEmailInbox = Tool.make('delete_email_inbox', {
@@ -414,6 +419,7 @@ const DeleteEmailInbox = Tool.make('delete_email_inbox', {
 })
 	.annotate(Tool.Title, 'Delete Email Inbox')
 	.annotate(Tool.Destructive, true)
+	.annotate(Tool.Idempotent, true)
 	.annotate(Tool.OpenWorld, false)
 
 const SetPrimaryEmailInbox = Tool.make('set_primary_email_inbox', {
@@ -427,6 +433,7 @@ const SetPrimaryEmailInbox = Tool.make('set_primary_email_inbox', {
 })
 	.annotate(Tool.Title, 'Set Primary Email Inbox')
 	.annotate(Tool.Destructive, false)
+	.annotate(Tool.Idempotent, true)
 	.annotate(Tool.OpenWorld, false)
 
 // ── Draft tools ─────────────────────────────────────────────────
