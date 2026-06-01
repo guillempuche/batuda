@@ -2,7 +2,7 @@ import { DateTime, Effect } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { BatudaApi } from '@batuda/controllers'
+import { BatudaApi, CurrentOrg } from '@batuda/controllers'
 
 export const ProductsLive = HttpApiBuilder.group(
 	BatudaApi,
@@ -18,8 +18,11 @@ export const ProductsLive = HttpApiBuilder.group(
 				)
 				.handle('create', _ =>
 					Effect.gen(function* () {
-						const rows =
-							yield* sql`INSERT INTO products ${sql.insert(_.payload)} RETURNING *`
+						const currentOrg = yield* CurrentOrg
+						const rows = yield* sql`INSERT INTO products ${sql.insert({
+							..._.payload,
+							organizationId: currentOrg.id,
+						})} RETURNING *`
 						yield* Effect.logInfo('Product created').pipe(
 							Effect.annotateLogs({ event: 'product.created' }),
 						)
