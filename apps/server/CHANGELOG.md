@@ -3,6 +3,33 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-06-01 (server-v2026.6.1)
+
+### Features
+
+* **server:** add products MCP tools ([05bd36c](https://github.com/guillempuche/batuda/commit/05bd36c6c4c66de12d2d18b7f7f23827b414a8ad))
+* **server:** add proposals MCP tools ([74afd4d](https://github.com/guillempuche/batuda/commit/74afd4d25afaf462e175944404f030683f6622e4))
+* **server:** add research lifecycle MCP tools ([a99e7ce](https://github.com/guillempuche/batuda/commit/a99e7ce317a5099016a9b100b09c3c5bcc1f1fb7))
+* **server:** close per-resource MCP get-by-id, delete, and extension gaps ([26a6541](https://github.com/guillempuche/batuda/commit/26a6541ccd6bcf4a412ac5712de14a2bd6515716))
+
+### Bug Fixes
+
+* **server:** stamp organization_id on calendar createInternalEvent ([e357648](https://github.com/guillempuche/batuda/commit/e3576489de91003ccca98a96b67d2ad3053333b4))
+* **server:** stamp organization_id on contacts create ([6738873](https://github.com/guillempuche/batuda/commit/67388737422073c4c588c6cc1e832d40cb6edbfe))
+* **server:** stamp organization_id on documents create ([8046f24](https://github.com/guillempuche/batuda/commit/8046f24a1256e41aa0a548925a2384fe38710288))
+* **server:** stamp organization_id on products create ([3de3ae7](https://github.com/guillempuche/batuda/commit/3de3ae75ce3d99a09d1841438dab61616b46a7c1))
+* **server:** stamp organization_id on proposals create ([a6ff836](https://github.com/guillempuche/batuda/commit/a6ff83625a0750b001e88e9143ee4b55a31b2dd7))
+
+### Refactoring
+
+* **server:** annotate safe-retry MCP tools as idempotent ([bd0debf](https://github.com/guillempuche/batuda/commit/bd0debf7247d1ea4ee28f46375a9fda9128a50fb))
+* **server:** consolidate narrow MCP write tools into action tools ([462b256](https://github.com/guillempuche/batuda/commit/462b2564162623eb58a1ee6481314565610ea104))
+* **server:** declare CurrentOrg dependency on research-mcp tools ([db00ac4](https://github.com/guillempuche/batuda/commit/db00ac48a47e2e8ca14cdcc0f6749929dc838f30))
+
+### Tests
+
+* **server:** pin MCP tool annotation invariants ([34526cf](https://github.com/guillempuche/batuda/commit/34526cfeb562e1da32e70d6604c3c6f8fd97f0d6))
+
 ## 2026-05-31 (server-v2026.5.31)
 
 ### Features
