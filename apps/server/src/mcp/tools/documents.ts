@@ -99,8 +99,10 @@ export const DocumentHandlersLive = DocumentTools.toLayer(
 				}).pipe(Effect.orDie),
 			create_document: params =>
 				Effect.gen(function* () {
+					const currentOrg = yield* CurrentOrg
 					const rows = yield* sql<{ id: string; title: string | null }>`
 						INSERT INTO documents ${sql.insert({
+							organizationId: currentOrg.id,
 							companyId: params.company_id,
 							interactionId: params.interaction_id,
 							type: params.type,
