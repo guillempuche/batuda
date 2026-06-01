@@ -3,7 +3,7 @@ import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { BatudaApi } from '@batuda/controllers'
+import { BatudaApi, CurrentOrg } from '@batuda/controllers'
 
 import {
 	ProposalEvent,
@@ -36,8 +36,11 @@ export const ProposalsLive = HttpApiBuilder.group(
 				)
 				.handle('create', _ =>
 					Effect.gen(function* () {
-						const rows =
-							yield* sql`INSERT INTO proposals ${sql.insert(_.payload)} RETURNING *`
+						const currentOrg = yield* CurrentOrg
+						const rows = yield* sql`INSERT INTO proposals ${sql.insert({
+							..._.payload,
+							organizationId: currentOrg.id,
+						})} RETURNING *`
 						yield* Effect.logInfo('Proposal created').pipe(
 							Effect.annotateLogs({
 								event: 'proposal.created',
