@@ -225,13 +225,30 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 						loginPage: `${env.APP_PUBLIC_URL}/login`,
 						consentPage: `${env.APP_PUBLIC_URL}/oauth/consent`,
 						requirePKCE: true,
+						// Two flags, both needed for open DCR. The first enables the
+						// /register endpoint at all; without the second, the endpoint
+						// is session-gated and a fresh MCP client (Claude.ai, ChatGPT,
+						// Codex) — which has no session — gets a 401 on its very first
+						// call and never reaches sign-in. With both set, the endpoint
+						// rewrites confidential auth methods to "none" per RFC 7591
+						// §3.2.1 and the AS metadata advertises public_client_supported.
+						// Abandoned clients are bounded by oauthClientGc below.
 						allowDynamicClientRegistration: true,
+						allowUnauthenticatedClientRegistration: true,
 						// Short in prod, long in dev (see env). Keeps a leaked or
 						// post-offboarding token usable only briefly.
 						accessTokenExpiresIn: env.OAUTH_ACCESS_TOKEN_TTL_SECONDS,
 						// Only `/mcp` is allow-listed — it's the sole resource server, so
 						// a token for any other audience has no verifier and shouldn't mint.
 						validAudiences: [`${env.BETTER_AUTH_BASE_URL}/mcp`],
+						// Silence the "please ensure /.well-known/* exists" warnings —
+						// well-known.ts re-serves both documents at the host root with
+						// `oauthProviderAuthServerMetadata` / `oauthProviderOpenIdConfigMetadata`,
+						// which is where MCP clients (RFC 9728/8414) actually probe.
+						silenceWarnings: {
+							oauthAuthServerConfig: true,
+							openidConfig: true,
+						},
 					}),
 					setPasswordRoute(),
 					// Garbage-collects abandoned open-DCR clients after each
