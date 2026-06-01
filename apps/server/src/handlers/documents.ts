@@ -3,7 +3,7 @@ import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { BatudaApi, NotFound } from '@batuda/controllers'
+import { BatudaApi, CurrentOrg, NotFound } from '@batuda/controllers'
 
 import {
 	DocumentCreated,
@@ -46,6 +46,7 @@ export const DocumentsLive = HttpApiBuilder.group(
 				)
 				.handle('create', _ =>
 					Effect.gen(function* () {
+						const currentOrg = yield* CurrentOrg
 						const payload = _.payload as {
 							companyId: string
 							interactionId?: string
@@ -54,7 +55,10 @@ export const DocumentsLive = HttpApiBuilder.group(
 							content: string
 						}
 						const rows = yield* sql<{ id: string; title: string | null }>`
-							INSERT INTO documents ${sql.insert(payload)} RETURNING id, title
+							INSERT INTO documents ${sql.insert({
+								...payload,
+								organizationId: currentOrg.id,
+							})} RETURNING id, title
 						`
 						const created = rows[0]
 						if (!created) {
