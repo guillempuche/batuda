@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-06-01 (server-v2026.6.1-1)
+
+### Bug Fixes
+
+* **server:** open DCR to unauthenticated MCP clients ([295097d](https://github.com/guillempuche/batuda/commit/295097d3d84f0d9e4f910222a6ca79014ad284e1))
+
 ## 2026-06-01 (server-v2026.6.1)
 
 ### Features
