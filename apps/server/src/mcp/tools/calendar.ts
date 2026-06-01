@@ -79,6 +79,7 @@ const RescheduleMeeting = Tool.make('reschedule_meeting', {
 })
 	.annotate(Tool.Title, 'Reschedule Meeting')
 	.annotate(Tool.Destructive, false)
+	.annotate(Tool.Idempotent, true)
 	.annotate(Tool.OpenWorld, true)
 
 const CancelMeeting = Tool.make('cancel_meeting', {

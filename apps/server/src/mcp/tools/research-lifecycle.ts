@@ -42,7 +42,7 @@ const CancelResearch = Tool.make('cancel_research', {
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Cancel Research')
-	.annotate(Tool.Destructive, false)
+	.annotate(Tool.Destructive, true)
 	.annotate(Tool.Idempotent, true)
 	.annotate(Tool.OpenWorld, false)
 
