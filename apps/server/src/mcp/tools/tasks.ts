@@ -174,7 +174,7 @@ const CancelTask = Tool.make('cancel_task', {
 	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Cancel Task')
-	.annotate(Tool.Destructive, false)
+	.annotate(Tool.Destructive, true)
 	.annotate(Tool.Idempotent, true)
 	.annotate(Tool.OpenWorld, false)
 
