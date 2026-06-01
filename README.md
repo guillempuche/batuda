@@ -2,13 +2,16 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**Open-source, multi-tenant SaaS CRM for small agencies serving local businesses.**
+**An open-source CRM with a built-in research agent. Find people, email them, follow up, and remember the trail.**
 
-A workbench for independent agencies to manage prospects, log interactions, publish multilingual pages, and expose their pipeline to AI agents — all under one tenant-isolated instance.
+I built Batuda for the cases where a CRM that just *stores the row* isn't enough. I wanted the same tool to go look the row up — read a company's site, find the right contact, summarise the competitor — and hand me a structured result I could act on, on my own search + LLM keys, on a budget I set per user.
 
 ## Contents
 
-- [Why Batuda](#why-batuda)
+- [The motion, end-to-end](#the-motion-end-to-end)
+- [Who I built it for](#who-i-built-it-for)
+- [What's in it today](#whats-in-it-today)
+- [How Batuda compares](#how-batuda-compares)
 - [Tech stack](#tech-stack)
 - [Quick start](#quick-start) · [Detailed walkthrough →](docs/getting-started.md)
 - [Scripts](#scripts)
@@ -16,18 +19,58 @@ A workbench for independent agencies to manage prospects, log interactions, publ
 - [Contributing](#contributing)
 - [License](#license)
 
-## Why Batuda
+## The motion, end-to-end
 
-Most agencies serving local businesses juggle prospect tracking in spreadsheets, send follow-ups by hand, and have no shared view of their pipeline. Enterprise CRMs are priced for sales teams of 50, not for one-to-five-person shops.
+1. **Find.** Launch a research job against your own search and LLM providers. Pick a mode (`prospect_scan`, `company_enrichment`, `contact_discovery`, `competitor_scan`) or go freeform. Each run lands as a structured record on a company, with per-user budgets, monthly caps, and explicit approval over the auto-approve threshold. Caching at every layer (search, scrape, extract, LLM) so re-runs don't re-spend.
+2. **Contact.** Email from your own inbox. Any IMAP/SMTP provider — Infomaniak, Fastmail, M365, Gmail, anything. Outbound goes from your address. Inbound threads back onto the contact.
+3. **Follow up.** Tasks and meetings carry the next step. Cal.com webhooks pull meeting state straight onto the contact.
+4. **Remember.** An immutable interaction log captures every touch. Documents, proposals, and call notes hang off the same company. Multi-tenant Postgres, RLS-isolated workspaces, your data.
 
-Batuda gives small agencies everything they need without the sprawl:
+## Who I built it for
 
-- **Multi-tenant by default** — every agency gets an isolated workspace, users, pages, and pipeline.
-- **Pipeline + interactions** — track prospects, log visits, calls, emails, LinkedIn, Instagram. Next steps surface automatically.
-- **Page publishing** — Tiptap-based page builder with hero/CTA/value blocks, multilingual, tenant-scoped.
-- **AI-agent ready** — expose pipeline + documents to AI agents via MCP (Claude, ChatGPT) and connect to n8n/Zapier via webhooks.
+The same job — find someone, contact them, remember what happened — shows up in dozens of shapes. The ones I had in mind:
 
-The first tenant is [**Engranatge**](https://engranatge.com) — a one-person automation agency in Catalonia (and the author of this tool). Examples and seed data use a fictitious tenant **Taller** at `taller.cat` so contributors can explore the product without touching real data.
+- A two-person agency tracking 80 local restaurants through proposals and follow-ups.
+- A solo founder running a seed round across 120 angels and partners.
+- A freelance designer staying in touch with 30 past clients without a paid CRM seat.
+- A recruiter shortlisting candidates for a specific role.
+- A journalist tracking sources, calls, and quotes for a long-form piece.
+- A podcaster or author booking guests across a launch.
+- An academic mapping potential collaborators for a paper or grant.
+- A nonprofit development team tracking donors and funders.
+- A community or event organiser keeping speakers and sponsors in one place.
+- A consultant juggling 12 active proposals across past and future clients.
+- A job seeker tracking applications, recruiters, and follow-ups.
+- An open-source maintainer reaching out for sponsorships.
+
+One instance, many workspaces. Run it alone, run it for a team, or host several workspaces under one roof.
+
+## What's in it today
+
+- **Research as a first-class capability.** Pluggable `SearchProvider`, `ScrapeProvider`, `ExtractProvider`, `DiscoverProvider`, plus three language-model roles (`AgentLanguageModel`, `ExtractLanguageModel`, `WriterLanguageModel`). Brave wired today. Per-user policy in `user_research_policy`, clamped against a system hard ceiling. Hierarchical parent/child runs. Streaming SSE events you can watch live.
+- **Five typed result schemas** — `CompanyEnrichmentV1`, `CompetitorScanV1`, `ContactDiscoveryV1`, `ProspectScanV1`, `Freeform`. The agent returns a record, not prose.
+- **Email through your own inbox.** IMAP IDLE in a separate `mail-worker` process. Credentials AES-256-GCM-encrypted per inbox. Outbound via SMTP, footer injection, draft staging.
+- **Pipeline you can read at a glance.** Companies and contacts with status, priority, next action, last-contacted-at. Company-first, not deal-first.
+- **MCP-first agent surface.** First-party MCP server with OAuth 2.1, intent-level typed tools (`search_companies`, `log_interaction`, `create_research`, `send_email`, …), slug-completion resources, and guided prompts. Claude, ChatGPT, and n8n use the same surface you do.
+- **Multilingual page publishing** (Tiptap JSON blocks, `ca`/`es`/`en`) when you want a public landing for a workspace.
+- **MIT, multi-tenant, your Postgres.** RLS-isolated workspaces, Better Auth, app-user / app-service roles.
+
+## How Batuda compares
+
+| Project         | Web research                              | Open source | Provider choice     | Budget control            | First-party MCP    |
+| --------------- | ----------------------------------------- | ----------- | ------------------- | ------------------------- | ------------------ |
+| **Batuda**      | First-class service + 5 typed schemas     | **MIT**     | **Pluggable ports** | **Per-user policy + cap** | **Yes**            |
+| Attio           | Workflow block on a record                | Closed      | Their stack         | AI credits                | Yes                |
+| Folk            | "Research Assistant"                      | Closed      | Their stack         | Per-plan                  | Community wrappers |
+| Lightfield      | Code execution over interaction memory    | Closed      | Their stack         | Per-seat                  | Listed             |
+| Reevo           | Bundled prospect DB, light "research"     | Closed      | Their stack         | Seat + credits            | None mentioned     |
+| Twenty          | None as first-class (workflow `ai-agent`) | Custom OSS  | Vercel AI SDK       | None                      | Yes                |
+| Atomic CRM      | None                                      | MIT         | n/a                 | n/a                       | OAuth + RLS proxy  |
+| EspoCRM / Suite | None                                      | AGPL        | n/a                 | n/a                       | None               |
+
+The combination no one else ships in one tool: **MIT + your provider keys + per-user budget caps + typed research schemas + intent-level MCP**. Full surface-by-surface comparison: [`docs/crm-competitor-analysis.md`](docs/crm-competitor-analysis.md).
+
+> **Status.** Pre-1.0. Schema rewrites happen in a single `0001_initial.ts` migration; expect breaking changes between releases until I cut a stable version.
 
 ## Tech stack
 
@@ -87,11 +130,30 @@ pnpm check             # lint + format (CI mode)
 
 ## Documentation
 
-- [Getting started](docs/getting-started.md) — first-run setup, auth bootstrap, troubleshooting
-- [Architecture](docs/architecture.md) — system design, data flow, deployment
-- [Backend](docs/backend.md) — Effect patterns, routes, MCP tools
-- [Frontend](docs/frontend.md) — design tokens, MD3, BaseUI, components
-- [AI agents](AGENTS.md) — how AI agents interact with this system
+**Run it**
+
+- [Getting started](docs/getting-started.md) — first-run setup, auth bootstrap, troubleshooting.
+
+**Understand the architecture**
+
+- [Architecture](docs/architecture.md) — system design, data flow, deployment.
+- [Backend](docs/backend.md) — Effect patterns, routes, MCP tools.
+- [Backend — research](docs/backend-research.md) — the agent loop, pluggable capability providers, citations, budget policy. Start here for the research surface.
+- [Frontend](docs/frontend.md) — design tokens, MD3, BaseUI, components.
+
+**Strategic context**
+
+- [CRM competitor analysis](docs/crm-competitor-analysis.md) — surface-by-surface comparison against Attio, Folk, Twenty, Atomic CRM, EspoCRM, and more. Source for the table above.
+- [Agency workforce platform](docs/agency-workforce-platform.md) — deferred design note on what it would take to grow Batuda into a small-agency platform where AI and human workers share a queue.
+
+**Operate it**
+
+- [Observability](docs/observability.md) — logs, metrics, traces.
+- [Runbooks](docs/runbooks.md) — operational procedures (auth secret rotation, etc.).
+
+**Contribute**
+
+- [AGENTS.md](AGENTS.md) — rules and patterns for AI coding assistants working in this repo.
 
 ## Contributing
 
