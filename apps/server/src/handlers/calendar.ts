@@ -8,6 +8,7 @@ import {
 	BadRequest,
 	BatudaApi,
 	Conflict,
+	CurrentOrg,
 	Forbidden,
 	NotFound,
 	SessionContext,
@@ -127,6 +128,7 @@ export const CalendarLive = HttpApiBuilder.group(
 				.handle('createInternalEvent', _ =>
 					Effect.gen(function* () {
 						const { email: organizerEmail } = yield* SessionContext
+						const currentOrg = yield* CurrentOrg
 						const startAt = DateTime.toDateUtc(_.payload.startAt)
 						const endAt = DateTime.toDateUtc(_.payload.endAt)
 						if (endAt.getTime() <= startAt.getTime())
@@ -137,6 +139,7 @@ export const CalendarLive = HttpApiBuilder.group(
 						const icalUid = `internal-${crypto.randomUUID()}@calendar.batuda`
 						const rows = yield* sql`
 							INSERT INTO calendar_events ${sql.insert({
+								organization_id: currentOrg.id,
 								source: 'internal',
 								provider: 'internal',
 								provider_booking_id: null,
