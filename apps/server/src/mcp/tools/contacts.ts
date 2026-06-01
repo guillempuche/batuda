@@ -2,6 +2,8 @@ import { DateTime, Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
+import { CurrentOrg } from '@batuda/controllers'
+
 const ListContacts = Tool.make('list_contacts', {
 	description: 'List contacts for a company.',
 	parameters: Schema.Struct({
@@ -27,6 +29,7 @@ const CreateContact = Tool.make('create_contact', {
 		notes: Schema.optional(Schema.String),
 	}),
 	success: Schema.Unknown,
+	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Create Contact')
 	.annotate(Tool.Destructive, false)
@@ -67,7 +70,9 @@ export const ContactHandlersLive = ContactTools.toLayer(
 				),
 			create_contact: ({ company_id, ...fields }) =>
 				Effect.gen(function* () {
+					const currentOrg = yield* CurrentOrg
 					const rows = yield* sql`INSERT INTO contacts ${sql.insert({
+						organizationId: currentOrg.id,
 						companyId: company_id,
 						...fields,
 					})} RETURNING *`
