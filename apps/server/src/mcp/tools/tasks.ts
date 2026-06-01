@@ -137,6 +137,7 @@ const UpdateTask = Tool.make('update_task', {
 })
 	.annotate(Tool.Title, 'Update Task')
 	.annotate(Tool.Destructive, false)
+	.annotate(Tool.Idempotent, true)
 	.annotate(Tool.OpenWorld, false)
 
 const CompleteTask = Tool.make('complete_task', {
@@ -174,6 +175,7 @@ const CancelTask = Tool.make('cancel_task', {
 })
 	.annotate(Tool.Title, 'Cancel Task')
 	.annotate(Tool.Destructive, false)
+	.annotate(Tool.Idempotent, true)
 	.annotate(Tool.OpenWorld, false)
 
 const SnoozeTask = Tool.make('snooze_task', {
@@ -188,6 +190,7 @@ const SnoozeTask = Tool.make('snooze_task', {
 })
 	.annotate(Tool.Title, 'Snooze Task')
 	.annotate(Tool.Destructive, false)
+	.annotate(Tool.Idempotent, true)
 	.annotate(Tool.OpenWorld, false)
 
 const RescheduleTask = Tool.make('reschedule_task', {
@@ -202,6 +205,7 @@ const RescheduleTask = Tool.make('reschedule_task', {
 })
 	.annotate(Tool.Title, 'Reschedule Task')
 	.annotate(Tool.Destructive, false)
+	.annotate(Tool.Idempotent, true)
 	.annotate(Tool.OpenWorld, false)
 
 const GetTask = Tool.make('get_task', {
