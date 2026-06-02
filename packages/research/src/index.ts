@@ -53,6 +53,7 @@ export {
 	ContactDiscoveryV1Schema,
 	FreeformSchema,
 	ProspectScanV1Schema,
+	SchemaNameSchema,
 	schemaRegistry,
 } from './application/schemas/index'
 export { researchToolkit, researchToolkitLayer } from './application/tools'
