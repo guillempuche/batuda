@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-06-02 (server-v2026.6.2)
+
+### Bug Fixes
+
+* harden research MCP input validation and lifecycle guards ([03a952d](https://github.com/guillempuche/batuda/commit/03a952d20c60f61a3aae44ba50d93fd1a0541d65))
+
 ## 2026-06-01 (server-v2026.6.1-1)
 
 ### Bug Fixes
