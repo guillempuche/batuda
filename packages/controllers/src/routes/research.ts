@@ -115,6 +115,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 			params: { id: Schema.String },
 			payload: AttachInput,
 			success: Schema.Unknown,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	// DELETE /research/:id — soft-delete

@@ -2,6 +2,9 @@ import { Cause } from 'effect'
 import { describe, expect, it } from 'vitest'
 
 import {
+	attachOutcome,
+	cancelOutcome,
+	clampPagination,
 	computeResearchCacheKey,
 	normalizeResearchQuery,
 	researchCacheTtlDaysFor,
@@ -214,6 +217,114 @@ describe('shouldMarkRunFailed', () => {
 	})
 })
 
+describe('clampPagination', () => {
+	describe('when no limit or offset is given', () => {
+		it('should fall back to the default page size and a zero offset', () => {
+			// GIVEN no pagination filters
+			// WHEN clamping
+			const { limit, offset } = clampPagination(undefined, undefined)
+
+			// THEN the prior query defaults stand
+			expect(limit).toBe(20)
+			expect(offset).toBe(0)
+		})
+	})
+
+	describe('when the limit is below the floor', () => {
+		it('should raise a negative or zero limit to 1 so SQL never sees LIMIT < 1', () => {
+			// GIVEN limits Postgres would reject as `LIMIT -1` / `LIMIT 0`
+			// THEN they are floored at the minimum of 1
+			expect(clampPagination(-1, 0).limit).toBe(1)
+			expect(clampPagination(0, 0).limit).toBe(1)
+		})
+	})
+
+	describe('when the limit is above the ceiling', () => {
+		it('should cap an oversized limit at 100 so one call cannot pull the whole table', () => {
+			// GIVEN an absurdly large limit
+			// THEN it is capped at the page-size ceiling
+			expect(clampPagination(10_000_000, 0).limit).toBe(100)
+		})
+	})
+
+	describe('when the limit is within range', () => {
+		it('should pass a sensible page size through unchanged', () => {
+			// GIVEN a limit inside [1, 100]
+			// THEN it is preserved
+			expect(clampPagination(50, 0).limit).toBe(50)
+		})
+	})
+
+	describe('when the offset is negative', () => {
+		it('should floor it at 0, since a negative OFFSET is meaningless', () => {
+			// GIVEN a negative offset
+			// THEN it is floored to 0
+			expect(clampPagination(20, -5).offset).toBe(0)
+		})
+	})
+
+	describe('when the offset is a valid position', () => {
+		it('should pass it through unchanged', () => {
+			// GIVEN a non-negative offset
+			// THEN it is preserved
+			expect(clampPagination(20, 40).offset).toBe(40)
+		})
+	})
+})
+
+describe('cancelOutcome', () => {
+	describe('when a queued/running row flipped to cancelled', () => {
+		it('should report a real cancellation', () => {
+			// GIVEN the UPDATE … RETURNING matched a row
+			// THEN the run was genuinely cancelled
+			expect(cancelOutcome(true, true)).toBe('cancelled')
+		})
+	})
+
+	describe('when nothing flipped but the run exists', () => {
+		it('should report it as already in a terminal state', () => {
+			// GIVEN no row flipped, but the run is present (already finished)
+			// THEN cancelling is a no-op on a terminal run
+			expect(cancelOutcome(false, true)).toBe('already_terminal')
+		})
+	})
+
+	describe('when nothing flipped and the run is absent', () => {
+		it('should report not_found instead of a false success', () => {
+			// GIVEN no row flipped and no run with that id
+			// THEN the caller learns it does not exist (the F7 bug)
+			expect(cancelOutcome(false, false)).toBe('not_found')
+		})
+	})
+})
+
+describe('attachOutcome', () => {
+	describe('when the subject does not exist', () => {
+		it('should refuse at the subject, preventing an orphan link', () => {
+			// GIVEN no company/contact with that id (the F3 bug)
+			// THEN the attach is rejected before the run is even considered
+			expect(attachOutcome(false, false)).toBe('subject_not_found')
+			expect(attachOutcome(false, true)).toBe('subject_not_found')
+		})
+	})
+
+	describe('when the subject exists but the run does not', () => {
+		it('should report the run as not found', () => {
+			// GIVEN a real subject but no such run
+			// THEN the attach is rejected at the run
+			expect(attachOutcome(true, false)).toBe('run_not_found')
+		})
+	})
+
+	describe('when both the subject and run exist', () => {
+		it('should attach the link', () => {
+			// GIVEN both rows present
+			// THEN the link may be written
+			expect(attachOutcome(true, true)).toBe('attached')
+		})
+	})
+})
+
 // ── Fiber-level behaviors (integration) ──
 // These exercise runFiber against stub providers + real Postgres. They require
 // `pnpm cli services up`, the 0001 migration applied, and the three tier-LLM
@@ -231,5 +342,20 @@ describe('research fiber (integration)', () => {
 	)
 	it.todo(
 		'should short-circuit identical create() calls via research_cache (kind=cache_hit, cost_cents=0)',
+	)
+})
+
+// ── Lifecycle guards (integration) ──
+// Exercise the not-found / existence checks against real Postgres. Scaffolded
+// so the BDD intent stays visible — wire fixtures in the integration harness.
+describe('research lifecycle (integration)', () => {
+	it.todo(
+		'should report outcome=not_found when cancelling a run id with no queued/running row',
+	)
+	it.todo(
+		'should report outcome=already_terminal when cancelling a run that already finished',
+	)
+	it.todo(
+		'should refuse to attach a run to a company or contact that does not exist, writing no research_links row',
 	)
 })

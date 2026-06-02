@@ -4,6 +4,8 @@ import { Tool, Toolkit } from 'effect/unstable/ai'
 import { CurrentOrg, SessionContext } from '@batuda/controllers'
 import { ResearchService } from '@batuda/research'
 
+import { redactDbErrors, Uuid } from './_research-shared'
+
 const REQUEST_DEPENDENCIES = [SessionContext, CurrentOrg]
 
 const Decision = Schema.Literals(['approve', 'skip'])
@@ -17,7 +19,7 @@ const ListResearch = Tool.make('list_research', {
 		created_by: Schema.optional(Schema.String),
 		status: Schema.optional(Schema.String),
 		subject_table: Schema.optional(Schema.String),
-		subject_id: Schema.optional(Schema.String),
+		subject_id: Schema.optional(Uuid),
 		since: Schema.optional(Schema.String),
 		limit: Schema.optional(Schema.Number),
 		offset: Schema.optional(Schema.Number),
@@ -34,11 +36,12 @@ const CancelResearch = Tool.make('cancel_research', {
 	description:
 		'Interrupt a queued or running research run. Already-cancelled runs are left as-is.',
 	parameters: Schema.Struct({
-		id: Schema.String,
+		id: Uuid,
 	}),
-	success: Schema.Struct({
-		status: Schema.Literal('cancelled'),
-	}),
+	success: Schema.Union([
+		Schema.Struct({ status: Schema.Literal('cancelled') }),
+		Schema.Struct({ error: Schema.Literal('not_found') }),
+	]),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Cancel Research')
@@ -52,11 +55,14 @@ const AttachResearch = Tool.make('attach_research', {
 	parameters: Schema.Struct({
 		id: Schema.String,
 		subject_table: Schema.Literals(['companies', 'contacts']),
-		subject_id: Schema.String,
+		subject_id: Uuid,
 	}),
-	success: Schema.Struct({
-		status: Schema.Literal('attached'),
-	}),
+	success: Schema.Union([
+		Schema.Struct({ status: Schema.Literal('attached') }),
+		Schema.Struct({
+			error: Schema.Literals(['subject_not_found', 'run_not_found']),
+		}),
+	]),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Attach Research')
@@ -68,7 +74,7 @@ const DeleteResearch = Tool.make('delete_research', {
 	description:
 		'Soft-delete a research run (sets status=deleted; the row stays for audit but stops appearing in list_research). Requires user approval before execution.',
 	parameters: Schema.Struct({
-		id: Schema.String,
+		id: Uuid,
 	}),
 	success: Schema.Struct({
 		status: Schema.Literal('deleted'),
@@ -196,23 +202,31 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 						limit: filters.limit,
 						offset: filters.offset,
 					})
-					.pipe(Effect.orDie),
+					.pipe(redactDbErrors),
 			cancel_research: ({ id }) =>
 				Effect.gen(function* () {
-					yield* svc.cancel(id)
+					const res = yield* svc.cancel(id)
+					if (res.outcome === 'not_found')
+						return { error: 'not_found' as const }
 					return { status: 'cancelled' as const }
-				}).pipe(Effect.orDie),
+				}).pipe(redactDbErrors),
 			attach_research: ({ id, subject_table, subject_id }) =>
 				Effect.gen(function* () {
 					const currentOrg = yield* CurrentOrg
-					yield* svc.attach(currentOrg.id, id, subject_table, subject_id)
-					return { status: 'attached' as const }
-				}).pipe(Effect.orDie),
+					const res = yield* svc.attach(
+						currentOrg.id,
+						id,
+						subject_table,
+						subject_id,
+					)
+					if (res.outcome === 'attached') return { status: 'attached' as const }
+					return { error: res.outcome }
+				}).pipe(redactDbErrors),
 			delete_research: ({ id }) =>
 				Effect.gen(function* () {
 					yield* svc.softDelete(id)
 					return { status: 'deleted' as const }
-				}).pipe(Effect.orDie),
+				}).pipe(redactDbErrors),
 			resolve_research_paid_action: ({ decision }) =>
 				// Placeholder: returns the resolution shape but the follow-up
 				// run that performs the paid call is not yet wired, so no DB
@@ -230,7 +244,7 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 						proposed_updates?: unknown[]
 					} | null
 					return findings?.proposed_updates ?? []
-				}).pipe(Effect.orDie),
+				}).pipe(redactDbErrors),
 			resolve_research_proposed_update: ({ decision }) =>
 				// Placeholder: the OCC-protected CRM write that would land on
 				// apply is not yet wired, so this returns the resolution
@@ -255,7 +269,7 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 							paidMonthlyCapCents: params.paid_monthly_cap_cents,
 						})
 						.pipe(Effect.map(rows => rows[0]))
-				}).pipe(Effect.orDie),
+				}).pipe(redactDbErrors),
 			get_research_spend: ({ range, group_by }) =>
 				svc
 					.spend({
@@ -264,7 +278,7 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 						...(range !== undefined && { range }),
 						...(group_by !== undefined && { groupBy: group_by }),
 					})
-					.pipe(Effect.orDie),
+					.pipe(redactDbErrors),
 		}
 	}),
 )

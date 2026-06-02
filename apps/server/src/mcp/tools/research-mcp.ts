@@ -9,6 +9,12 @@ import {
 } from '@batuda/research'
 
 import { EnvVars } from '../../lib/env'
+import {
+	ResearchQuery,
+	redactDbErrors,
+	SchemaNameParam,
+	Uuid,
+} from './_research-shared'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg]
 
@@ -18,9 +24,9 @@ const StartResearch = Tool.make('start_research', {
 	description:
 		'Start a research run. Returns an ID immediately — use get_research to poll for results. Best for long-running research where you want to do other work while waiting.',
 	parameters: Schema.Struct({
-		query: Schema.String,
+		query: ResearchQuery,
 		context: Schema.optional(Schema.Unknown),
-		schema_name: Schema.optional(Schema.String),
+		schema_name: Schema.optional(SchemaNameParam),
 	}),
 	success: Schema.Struct({
 		id: Schema.String,
@@ -38,7 +44,7 @@ const GetResearch = Tool.make('get_research', {
 	description:
 		'Get the current state of a research run. Returns status, findings (if complete), cost, and sources.',
 	parameters: Schema.Struct({
-		id: Schema.String,
+		id: Uuid,
 	}),
 	success: Schema.Unknown,
 	dependencies: REQUEST_DEPENDENCIES,
@@ -54,9 +60,9 @@ const ResearchSync = Tool.make('research_sync', {
 	description:
 		'Run research to completion and return full findings inline. Blocks until done or timeout. Best for short research that fits in a single tool call.',
 	parameters: Schema.Struct({
-		query: Schema.String,
+		query: ResearchQuery,
 		context: Schema.optional(Schema.Unknown),
-		schema_name: Schema.optional(Schema.String),
+		schema_name: Schema.optional(SchemaNameParam),
 		max_wait_seconds: Schema.optional(Schema.Number),
 	}),
 	success: Schema.Unknown,
@@ -104,13 +110,13 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 						systemDefaults,
 					)
 					return result
-				}).pipe(Effect.orDie),
+				}).pipe(redactDbErrors),
 
 			get_research: params =>
 				Effect.gen(function* () {
 					const run = yield* svc.get(params.id)
 					return run ?? { error: 'not found' }
-				}).pipe(Effect.orDie),
+				}).pipe(redactDbErrors),
 
 			research_sync: params =>
 				Effect.gen(function* () {
@@ -145,7 +151,7 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 					}
 
 					return run ?? { error: 'not found' }
-				}).pipe(Effect.orDie),
+				}).pipe(redactDbErrors),
 		}
 	}),
 )

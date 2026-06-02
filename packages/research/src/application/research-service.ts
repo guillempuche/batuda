@@ -68,6 +68,43 @@ export const schemaVersionFor = (schemaName: string): number => {
 	return match ? Number(match[1]) : 1
 }
 
+// Clamp list pagination so out-of-range input can't reach SQL: a negative limit
+// makes Postgres reject `LIMIT -1`, an unbounded one would pull the whole table,
+// and a negative offset is meaningless. Defaults match the prior query.
+export const clampPagination = (
+	limit: number | undefined,
+	offset: number | undefined,
+): { readonly limit: number; readonly offset: number } => {
+	// `Schema.Number` also admits NaN/Infinity/floats, which would reach SQL as
+	// `LIMIT NaN` / `LIMIT 2.5`; coerce to a finite integer (or the default) first.
+	const toInt = (n: number | undefined, fallback: number): number =>
+		n !== undefined && Number.isFinite(n) ? Math.trunc(n) : fallback
+	return {
+		limit: Math.min(Math.max(toInt(limit, 20), 1), 100),
+		offset: Math.max(toInt(offset, 0), 0),
+	}
+}
+
+// Outcome of a cancel attempt, decided from whether a queued/running row
+// actually flipped to cancelled and whether the run exists at all.
+export const cancelOutcome = (
+	flipped: boolean,
+	exists: boolean,
+): 'cancelled' | 'already_terminal' | 'not_found' =>
+	flipped ? 'cancelled' : exists ? 'already_terminal' : 'not_found'
+
+// Outcome of an attach attempt: the subject must exist before the run, and both
+// before the link is written.
+export const attachOutcome = (
+	subjectExists: boolean,
+	runExists: boolean,
+): 'subject_not_found' | 'run_not_found' | 'attached' =>
+	!subjectExists
+		? 'subject_not_found'
+		: !runExists
+			? 'run_not_found'
+			: 'attached'
+
 /**
  * Research-run cache TTL policy. Structured schemas are stable (the schema
  * itself is the invalidation knob via `schemaVersion`); freeform briefs stay
@@ -944,6 +981,12 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							)`)
 						}
 
+						// Clamp pagination before it reaches SQL (see clampPagination).
+						const { limit, offset } = clampPagination(
+							filters.limit,
+							filters.offset,
+						)
+
 						return yield* sql`
 							SELECT r.id, r.kind, r.query, r.mode, r.schema_name,
 								r.status, r.cost_cents, r.paid_cost_cents,
@@ -951,8 +994,8 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							FROM research_runs r
 							WHERE ${sql.and(conditions)}
 							ORDER BY r.created_at DESC
-							LIMIT ${filters.limit ?? 20}
-							OFFSET ${filters.offset ?? 0}
+							LIMIT ${limit}
+							OFFSET ${offset}
 						`
 					}),
 
@@ -1028,12 +1071,28 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						if (maybeFiber._tag === 'Some') {
 							yield* Fiber.interrupt(maybeFiber.value)
 						}
-						yield* sql`
+						// RETURNING tells us whether a queued/running row actually
+						// flipped, so the caller can tell a real cancel apart from a
+						// no-op on a missing or already-finished run.
+						const [cancelled] = yield* sql<{ id: string }>`
 							UPDATE research_runs
 							SET status = 'cancelled', completed_at = now(), updated_at = now()
 							WHERE id = ${researchId} AND status IN ('queued', 'running')
+							RETURNING id
 						`
-						yield* publishEvent(researchId, 'run.cancelled', {})
+						const flipped = cancelled !== undefined
+						if (flipped) {
+							yield* publishEvent(researchId, 'run.cancelled', {})
+							return { outcome: cancelOutcome(true, true) }
+						}
+						// Nothing flipped: tell an already-finished run apart from one
+						// that doesn't exist at all.
+						const [existing] = yield* sql<{ id: string }>`
+							SELECT id FROM research_runs
+							WHERE id = ${researchId} AND status != 'deleted'
+							LIMIT 1
+						`
+						return { outcome: cancelOutcome(false, existing !== undefined) }
 					}),
 
 				/** Soft-delete a research run. */
@@ -1048,14 +1107,52 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 				attach: (
 					organizationId: string,
 					researchId: string,
-					subjectTable: string,
+					subjectTable: 'companies' | 'contacts',
 					subjectId: string,
 				) =>
-					sql`
-						INSERT INTO research_links (organization_id, research_id, subject_table, subject_id, link_kind)
-						VALUES (${organizationId}, ${researchId}, ${subjectTable}, ${subjectId}, 'finding')
-						ON CONFLICT DO NOTHING
-					`,
+					Effect.gen(function* () {
+						// Guard against orphan links: the subject row must exist and
+						// belong to this org before we record the link. Branch on the
+						// (enum-constrained) table so its name is always a literal,
+						// never interpolated into the statement.
+						const subjectLookup =
+							subjectTable === 'companies'
+								? sql<{ id: string }>`
+									SELECT id FROM companies
+									WHERE id = ${subjectId}
+									  AND organization_id = ${organizationId}
+									  AND deleted_at IS NULL
+									LIMIT 1
+								`
+								: sql<{ id: string }>`
+									SELECT id FROM contacts
+									WHERE id = ${subjectId}
+									  AND organization_id = ${organizationId}
+									  AND deleted_at IS NULL
+									LIMIT 1
+								`
+						const [subject] = yield* subjectLookup
+						// Skip the run lookup when the subject is already missing.
+						if (!subject) return { outcome: attachOutcome(false, false) }
+
+						// The run must exist under this org as well.
+						const [run] = yield* sql<{ id: string }>`
+							SELECT id FROM research_runs
+							WHERE id = ${researchId}
+							  AND organization_id = ${organizationId}
+							  AND status != 'deleted'
+							LIMIT 1
+						`
+						const outcome = attachOutcome(true, run !== undefined)
+						if (outcome === 'attached') {
+							yield* sql`
+								INSERT INTO research_links (organization_id, research_id, subject_table, subject_id, link_kind)
+								VALUES (${organizationId}, ${researchId}, ${subjectTable}, ${subjectId}, 'finding')
+								ON CONFLICT DO NOTHING
+							`
+						}
+						return { outcome }
+					}),
 
 				/** Get user's research policy. */
 				getPolicy: (userId: string) =>

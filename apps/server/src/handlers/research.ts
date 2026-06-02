@@ -164,21 +164,44 @@ export const ResearchLive = HttpApiBuilder.group(
 				)
 				.handle('cancel', _ =>
 					Effect.gen(function* () {
-						yield* svc.cancel(_.params.id)
+						const res = yield* svc.cancel(_.params.id)
+						if (res.outcome === 'not_found')
+							return yield* new NotFound({
+								entity: 'research',
+								id: _.params.id,
+							})
 						return { status: 'cancelled' }
-					}).pipe(Effect.orDie),
+					}).pipe(
+						Effect.catch(e =>
+							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+						),
+					),
 				)
 				.handle('attach', _ =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
-						yield* svc.attach(
+						const res = yield* svc.attach(
 							currentOrg.id,
 							_.params.id,
 							_.payload.subject_table,
 							_.payload.subject_id,
 						)
+						if (res.outcome === 'subject_not_found')
+							return yield* new NotFound({
+								entity: _.payload.subject_table,
+								id: _.payload.subject_id,
+							})
+						if (res.outcome === 'run_not_found')
+							return yield* new NotFound({
+								entity: 'research',
+								id: _.params.id,
+							})
 						return { status: 'attached' }
-					}).pipe(Effect.orDie),
+					}).pipe(
+						Effect.catch(e =>
+							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+						),
+					),
 				)
 				.handle('delete', _ =>
 					Effect.gen(function* () {
