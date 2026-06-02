@@ -1,5 +1,12 @@
 {
 	"mcpServers": {
+		"batuda": {
+			"type": "http",
+			"url": "https://api.batuda.co/mcp",
+			"headers": {
+				"x-api-key": "${BATUDA_API_KEY}"
+			}
+		},
 		"cloudflare-api": {
 			"type": "http",
 			"url": "https://mcp.cloudflare.com/mcp"
