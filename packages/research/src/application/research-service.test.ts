@@ -72,6 +72,7 @@ describe('computeResearchCacheKey', () => {
 			userId: 'u1',
 			query: 'Ports of Barcelona',
 			schemaName: 'company_brief',
+			templateFingerprint: '',
 			schemaVersion: 1,
 			subjects: [
 				{ table: 'companies', id: 'c2' },
@@ -83,6 +84,7 @@ describe('computeResearchCacheKey', () => {
 			userId: 'u1',
 			query: '  ports of BARCELONA',
 			schemaName: 'company_brief',
+			templateFingerprint: '',
 			schemaVersion: 1,
 			subjects: [
 				{ table: 'companies', id: 'c1' },
@@ -100,6 +102,7 @@ describe('computeResearchCacheKey', () => {
 		const same = {
 			query: 'q',
 			schemaName: 'company_brief',
+			templateFingerprint: '',
 			schemaVersion: 1,
 			subjects: undefined,
 			hints: undefined,
@@ -117,6 +120,7 @@ describe('computeResearchCacheKey', () => {
 			userId: 'u1',
 			query: 'q',
 			schemaName: 'company_brief',
+			templateFingerprint: '',
 			schemaVersion: 1,
 			subjects: undefined,
 			hints: undefined,
@@ -125,6 +129,7 @@ describe('computeResearchCacheKey', () => {
 			userId: 'u1',
 			query: 'q',
 			schemaName: 'company_brief',
+			templateFingerprint: '',
 			schemaVersion: 2,
 			subjects: undefined,
 			hints: undefined,
@@ -140,6 +145,7 @@ describe('computeResearchCacheKey', () => {
 			userId: 'u1',
 			query: 'q',
 			schemaName: 'company_brief',
+			templateFingerprint: '',
 			schemaVersion: 1,
 			subjects: undefined,
 			hints: { lang: 'ca', depth: 2, tone: 'formal' },
@@ -148,6 +154,7 @@ describe('computeResearchCacheKey', () => {
 			userId: 'u1',
 			query: 'q',
 			schemaName: 'company_brief',
+			templateFingerprint: '',
 			schemaVersion: 1,
 			subjects: undefined,
 			hints: { tone: 'formal', depth: 2, lang: 'ca' },
@@ -164,6 +171,7 @@ describe('computeResearchCacheKey', () => {
 			userId: 'u1',
 			query: 'q',
 			schemaName: 'company_brief',
+			templateFingerprint: '',
 			schemaVersion: 1,
 			subjects: undefined,
 			hints: { lang: 'ca' },
@@ -172,6 +180,7 @@ describe('computeResearchCacheKey', () => {
 			userId: 'u1',
 			query: 'q',
 			schemaName: 'company_brief',
+			templateFingerprint: '',
 			schemaVersion: 1,
 			subjects: undefined,
 			hints: { lang: 'es' },
@@ -179,6 +188,37 @@ describe('computeResearchCacheKey', () => {
 
 		// THEN switching the hint language misses the cache
 		expect(ca).not.toBe(es)
+	})
+
+	it('should change the key when the template fingerprint changes', () => {
+		// GIVEN the same request resolved against different template stacks
+		const base = {
+			userId: 'u1',
+			query: 'q',
+			schemaName: 'company_brief',
+			schemaVersion: 1,
+			subjects: undefined,
+			hints: undefined,
+		}
+		const withA = computeResearchCacheKey({
+			...base,
+			templateFingerprint: 'fpA',
+		})
+		const withB = computeResearchCacheKey({
+			...base,
+			templateFingerprint: 'fpB',
+		})
+		const none = computeResearchCacheKey({ ...base, templateFingerprint: '' })
+		const noneAgain = computeResearchCacheKey({
+			...base,
+			templateFingerprint: '',
+		})
+
+		// THEN an edited or swapped stack misses the prior cache, while an
+		// unchanged (or absent) instruction layer keeps the same key
+		expect(withA).not.toBe(withB)
+		expect(withA).not.toBe(none)
+		expect(none).toBe(noneAgain)
 	})
 })
 

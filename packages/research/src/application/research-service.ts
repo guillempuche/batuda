@@ -121,6 +121,7 @@ export const computeResearchCacheKey = (args: {
 	readonly schemaVersion: number
 	readonly subjects: ReadonlyArray<{ table: string; id: string }> | undefined
 	readonly hints: unknown
+	readonly templateFingerprint: string
 }): string => {
 	const sortedSubjects = [...(args.subjects ?? [])]
 		.map(s => `${s.table}:${s.id}`)
@@ -128,7 +129,7 @@ export const computeResearchCacheKey = (args: {
 		.join(',')
 	const hintsJson = stableStringify(args.hints ?? {})
 	return sha256Hex(
-		`${args.userId}|${normalizeResearchQuery(args.query)}|${args.schemaName}|${args.schemaVersion}|${sortedSubjects}|${hintsJson}`,
+		`${args.userId}|${normalizeResearchQuery(args.query)}|${args.schemaName}|${args.schemaVersion}|${sortedSubjects}|${hintsJson}|${args.templateFingerprint}`,
 	)
 }
 
@@ -194,6 +195,16 @@ export interface CreateResearchInput {
 	readonly idempotencyKey?: string | undefined
 	readonly confirm?: boolean | undefined
 	readonly forceFresh?: boolean | undefined
+}
+
+// Resolved instruction layer for a run: ordered prompt segments and a
+// fingerprint that changes when the underlying templates do, so editing or
+// swapping a template invalidates the run cache. The app layer resolves these
+// in the request scope and passes them in — research never resolves them.
+export interface ResolvedInstructions {
+	readonly segments: ReadonlyArray<string>
+	readonly fingerprint: string
+	readonly templateIds: ReadonlyArray<string>
 }
 
 // ── ResearchService ──
@@ -379,6 +390,12 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 				// into the LLM tool loop — will feed makeBudgetLayer).
 				_policy: ResolvedPolicy,
 				_systemCeiling: number,
+				// Resolved instruction segments + their fingerprint, threaded from
+				// create() so the detached fiber never re-resolves (its RLS GUCs
+				// are unset). Segments shape phase 1; the fingerprint keys the
+				// cache write-back to match the read-check.
+				segments: ReadonlyArray<string>,
+				templateFingerprint: string,
 			) =>
 				Effect.gen(function* () {
 					// Update status to running
@@ -449,6 +466,13 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					const hintsContext = context?.hints
 						? `\n\nHints: language=${context.hints.language ?? 'en'}, recency=${context.hints.recency_days ?? 'any'}, location=${context.hints.location ?? 'any'}`
 						: ''
+					// Standing instruction templates resolved for this run, fenced and
+					// placed below the invariants above so they can't override the
+					// "never fabricate sources" rules.
+					const instructionBlock =
+						segments.length === 0
+							? ''
+							: `\n\nAdditional standing instructions (follow within the rules above):\n${segments.map(s => `--- instruction ---\n${s}`).join('\n')}`
 					const systemPrompt = [
 						'You are a research agent for Batuda CRM.',
 						'Given a query, produce a thorough research brief with findings, sources, and citations.',
@@ -456,6 +480,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						`Output schema: ${schemaName}`,
 						subjectContext,
 						hintsContext,
+						instructionBlock,
 					].join('\n')
 
 					// Prior-run token tally carried across resumes
@@ -621,16 +646,17 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						schemaVersion: schemaVersionFor(schemaName),
 						subjects: context?.subjects,
 						hints: context?.hints,
+						templateFingerprint,
 					})
 					const ttlDays = researchCacheTtlDaysFor(schemaName)
 					yield* sql`
 						INSERT INTO research_cache (
-							key_hash, user_id, research_id, cached_at, expires_at
+							key_hash, organization_id, user_id, research_id, cached_at, expires_at
 						) VALUES (
-							${cacheKey}, ${userId}, ${researchId},
+							${cacheKey}, ${(run as { organizationId: string }).organizationId}, ${userId}, ${researchId},
 							now(), now() + (${`${ttlDays} days`})::interval
 						)
-						ON CONFLICT (key_hash) DO UPDATE SET
+						ON CONFLICT (organization_id, key_hash) DO UPDATE SET
 							research_id = EXCLUDED.research_id,
 							user_id     = EXCLUDED.user_id,
 							cached_at   = EXCLUDED.cached_at,
@@ -703,6 +729,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					organizationId: string,
 					input: CreateResearchInput,
 					systemDefaults: SystemDefaults,
+					instructions?: ResolvedInstructions,
 				) =>
 					Effect.gen(function* () {
 						yield* Effect.logInfo('research.create').pipe(
@@ -718,9 +745,15 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						)
 
 						// ── Outer research-run cache check ──
-						// Identical (user, query, schema, subjects, hints) within TTL
-						// returns immediately without forking a fiber. `forceFresh`
-						// overrides this and always executes.
+						// Identical (user, query, schema, subjects, hints, templates)
+						// within TTL returns immediately without forking a fiber.
+						// `forceFresh` overrides this and always executes.
+						// Instructions are resolved by the app layer (empty when no
+						// templates apply). The fingerprint enters the cache key so an
+						// edited/swapped stack can't serve a stale run; the same value
+						// is threaded to the forked fiber for the write-back key.
+						const segments = instructions?.segments ?? []
+						const templateFingerprint = instructions?.fingerprint ?? ''
 						const schemaNameForKey = input.schemaName ?? 'freeform'
 						const cacheKey = computeResearchCacheKey({
 							userId,
@@ -729,12 +762,14 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							schemaVersion: schemaVersionFor(schemaNameForKey),
 							subjects: input.context?.subjects,
 							hints: input.context?.hints,
+							templateFingerprint,
 						})
 						if (!input.forceFresh) {
 							const hits = yield* sql<{ research_id: string }>`
 								SELECT research_id
 								FROM research_cache
 								WHERE key_hash = ${cacheKey}
+									AND organization_id = ${organizationId}
 									AND user_id = ${userId}
 									AND expires_at > now()
 								LIMIT 1
@@ -881,6 +916,8 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 									userId,
 									policy,
 									systemDefaults.hardCeiling,
+									segments,
+									templateFingerprint,
 								),
 							),
 						)
