@@ -30,6 +30,7 @@ import { ContactsLive } from './handlers/contacts'
 import { DocumentsLive } from './handlers/documents'
 import { EmailLive } from './handlers/email'
 import { HealthLive } from './handlers/health'
+import { InstructionsLive } from './handlers/instructions'
 import { InteractionsLive } from './handlers/interactions'
 import { McpOAuthLive } from './handlers/mcp-oauth'
 import { PagesLive } from './handlers/pages'
@@ -61,6 +62,7 @@ import { DraftStore } from './services/email-draft-store'
 import { EmailProviderLive } from './services/email-provider-live'
 import { Geocoder } from './services/geocoder'
 import { InboxHealthProbe } from './services/inbox-health-probe'
+import { InstructionsService } from './services/instructions'
 import { MailTransport } from './services/mail-transport'
 import { McpOAuthService } from './services/mcp-oauth'
 import { OrgResolution } from './services/org-resolution'
@@ -94,6 +96,7 @@ const ApiLive = HttpApiBuilder.layer(BatudaApi).pipe(
 		EmailLive,
 		RecordingsLive,
 		ResearchLive,
+		InstructionsLive,
 		TimelineLive,
 		CalendarLive,
 		CalcomWebhookLive,
@@ -219,6 +222,7 @@ const ServicesLive = Layer.mergeAll(
 	EmailService.layer,
 	RecordingService.layer,
 	ResearchService.layer,
+	InstructionsService.layer,
 	Geocoder.layer,
 	// daemonLayer outputs `never` so a downstream `provideMerge` would
 	// skip building it (nothing requires it). Listing it inside `mergeAll`

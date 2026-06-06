@@ -16,6 +16,10 @@ import { CompanyHandlersLive, CompanyTools } from './tools/companies'
 import { ContactHandlersLive, ContactTools } from './tools/contacts'
 import { DocumentHandlersLive, DocumentTools } from './tools/documents'
 import { EmailHandlersLive, EmailTools } from './tools/email'
+import {
+	InstructionsMcpHandlersLive,
+	InstructionsMcpTools,
+} from './tools/instructions-mcp'
 import { InteractionHandlersLive, InteractionTools } from './tools/interactions'
 import { PageHandlersLive, PageTools } from './tools/pages'
 import { PipelineHandlersLive, PipelineTools } from './tools/pipeline'
@@ -44,6 +48,7 @@ export const McpToolsLive = Layer.mergeAll(
 	McpServer.toolkit(RecordingTools),
 	McpServer.toolkit(ResearchLifecycleTools),
 	McpServer.toolkit(ResearchMcpTools),
+	McpServer.toolkit(InstructionsMcpTools),
 	McpServer.toolkit(TimelineTools),
 	McpServer.toolkit(CalendarTools),
 	CompanyResource,
@@ -70,6 +75,7 @@ export const McpToolsLive = Layer.mergeAll(
 	Layer.provide(RecordingHandlersLive),
 	Layer.provide(ResearchLifecycleHandlersLive),
 	Layer.provide(ResearchMcpHandlersLive),
+	Layer.provide(InstructionsMcpHandlersLive),
 	Layer.provide(TimelineHandlersLive),
 	Layer.provide(CalendarHandlersLive),
 )
