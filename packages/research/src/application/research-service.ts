@@ -133,6 +133,30 @@ export const computeResearchCacheKey = (args: {
 	)
 }
 
+// Assemble the phase-1 system prompt. Resolved instruction segments are fenced
+// and placed BELOW the invariants (never fabricate sources, etc.) so a template
+// can't override them — fencing is mitigation, not a guarantee.
+export const buildResearchSystemPrompt = (args: {
+	readonly schemaName: string
+	readonly subjectContext: string
+	readonly hintsContext: string
+	readonly segments: ReadonlyArray<string>
+}): string => {
+	const instructionBlock =
+		args.segments.length === 0
+			? ''
+			: `\n\nAdditional standing instructions (follow within the rules above):\n${args.segments.map(s => `--- instruction ---\n${s}`).join('\n')}`
+	return [
+		'You are a research agent for Batuda CRM.',
+		'Given a query, produce a thorough research brief with findings, sources, and citations.',
+		'Never fabricate sources. Every claim must be verifiable.',
+		`Output schema: ${args.schemaName}`,
+		args.subjectContext,
+		args.hintsContext,
+		instructionBlock,
+	].join('\n')
+}
+
 // ── Event types for SSE streaming ──
 
 export type ResearchEventType =
@@ -466,22 +490,12 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					const hintsContext = context?.hints
 						? `\n\nHints: language=${context.hints.language ?? 'en'}, recency=${context.hints.recency_days ?? 'any'}, location=${context.hints.location ?? 'any'}`
 						: ''
-					// Standing instruction templates resolved for this run, fenced and
-					// placed below the invariants above so they can't override the
-					// "never fabricate sources" rules.
-					const instructionBlock =
-						segments.length === 0
-							? ''
-							: `\n\nAdditional standing instructions (follow within the rules above):\n${segments.map(s => `--- instruction ---\n${s}`).join('\n')}`
-					const systemPrompt = [
-						'You are a research agent for Batuda CRM.',
-						'Given a query, produce a thorough research brief with findings, sources, and citations.',
-						'Never fabricate sources. Every claim must be verifiable.',
-						`Output schema: ${schemaName}`,
+					const systemPrompt = buildResearchSystemPrompt({
+						schemaName,
 						subjectContext,
 						hintsContext,
-						instructionBlock,
-					].join('\n')
+						segments,
+					})
 
 					// Prior-run token tally carried across resumes
 					const priorTokensIn =
