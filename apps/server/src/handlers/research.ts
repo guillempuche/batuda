@@ -7,6 +7,7 @@ import {
 	NotFound,
 	SessionContext,
 } from '@batuda/controllers'
+import { resolveInstructions } from '@batuda/instructions'
 import {
 	type CreateResearchInput,
 	ResearchService,
@@ -46,11 +47,18 @@ export const ResearchLive = HttpApiBuilder.group(
 							autoApprovePaidCents: _.payload.auto_approve_paid_cents,
 							confirm: _.payload.confirm,
 						}
+						const instructions = yield* resolveInstructions({
+							organizationId: currentOrg.id,
+							userId,
+							agent: 'research',
+							overrideTemplateIds: _.payload.template_ids,
+						})
 						return yield* svc.create(
 							userId,
 							currentOrg.id,
 							input,
 							systemDefaults,
+							instructions,
 						)
 					}).pipe(Effect.orDie),
 				)
