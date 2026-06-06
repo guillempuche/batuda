@@ -42,6 +42,7 @@ const CreateResearchInput = Schema.Struct({
 	paid_budget_cents: Schema.optional(Schema.Number),
 	auto_approve_paid_cents: Schema.optional(Schema.Number),
 	confirm: Schema.optional(Schema.Boolean),
+	template_ids: Schema.optional(Schema.Array(Schema.String)),
 })
 
 const UpdatePolicyInput = Schema.Struct({
