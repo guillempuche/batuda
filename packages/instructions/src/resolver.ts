@@ -63,15 +63,19 @@ export interface ResolvedInstructions {
 	readonly source: StackSource
 }
 
+// SqlClient.transformResultNames camelCases result keys, so a snake_case column
+// like owner_user_id reads back as ownerUserId. The SELECTs keep the real
+// (snake) column names; the row types and property access use the camelCase
+// keys the client returns.
 interface StackRow {
 	readonly id: string
-	readonly owner_user_id: string | null
+	readonly ownerUserId: string | null
 }
 
 interface TemplateRow {
 	readonly id: string
 	readonly body: string
-	readonly updated_at: string
+	readonly updatedAt: string
 }
 
 const readStackTemplateIds = (
@@ -79,13 +83,13 @@ const readStackTemplateIds = (
 	stackId: string,
 ): Effect.Effect<ReadonlyArray<string>, SqlError.SqlError> =>
 	Effect.map(
-		sql<{ template_id: string }>`
+		sql<{ templateId: string }>`
 			SELECT template_id
 			FROM agent_default_stack_items
 			WHERE stack_id = ${stackId}
 			ORDER BY position ASC
 		`,
-		rows => rows.map(row => row.template_id),
+		rows => rows.map(row => row.templateId),
 	)
 
 // Resolve the effective instruction prompt for one agent run. Must run inside
@@ -114,8 +118,8 @@ export const resolveInstructions = (
 						AND agent = ${args.agent}
 						AND (owner_user_id = ${args.userId} OR owner_user_id IS NULL)
 				`
-		const userStack = stacks.find(s => s.owner_user_id === args.userId)
-		const orgStack = stacks.find(s => s.owner_user_id === null)
+		const userStack = stacks.find(s => s.ownerUserId === args.userId)
+		const orgStack = stacks.find(s => s.ownerUserId === null)
 
 		const source = pickStackSource({
 			hasOverride: override.length > 0,
@@ -156,7 +160,7 @@ export const resolveInstructions = (
 		return {
 			segments: assembleSegments(ordered),
 			fingerprint: fingerprintTemplates(
-				ordered.map(row => ({ id: row.id, updatedAt: row.updated_at })),
+				ordered.map(row => ({ id: row.id, updatedAt: row.updatedAt })),
 			),
 			templateIds: ordered.map(row => row.id),
 			source,
