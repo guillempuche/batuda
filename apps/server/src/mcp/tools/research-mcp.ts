@@ -1,7 +1,9 @@
 import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
+import { SqlClient } from 'effect/unstable/sql'
 
-import { CurrentOrg } from '@batuda/controllers'
+import { CurrentOrg, SessionContext } from '@batuda/controllers'
+import { resolveInstructions } from '@batuda/instructions'
 import {
 	type CreateResearchInput,
 	ResearchService,
@@ -16,7 +18,7 @@ import {
 	Uuid,
 } from './_research-shared'
 
-const REQUEST_DEPENDENCIES = [CurrentOrg]
+const REQUEST_DEPENDENCIES = [SessionContext, CurrentOrg]
 
 // ── start_research (async) ──
 
@@ -27,6 +29,7 @@ const StartResearch = Tool.make('start_research', {
 		query: ResearchQuery,
 		context: Schema.optional(Schema.Unknown),
 		schema_name: Schema.optional(SchemaNameParam),
+		template_ids: Schema.optional(Schema.Array(Uuid)),
 	}),
 	success: Schema.Struct({
 		id: Schema.String,
@@ -63,6 +66,7 @@ const ResearchSync = Tool.make('research_sync', {
 		query: ResearchQuery,
 		context: Schema.optional(Schema.Unknown),
 		schema_name: Schema.optional(SchemaNameParam),
+		template_ids: Schema.optional(Schema.Array(Uuid)),
 		max_wait_seconds: Schema.optional(Schema.Number),
 	}),
 	success: Schema.Unknown,
@@ -83,6 +87,7 @@ export const ResearchMcpTools = Toolkit.make(
 export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 	Effect.gen(function* () {
 		const svc = yield* ResearchService
+		const sql = yield* SqlClient.SqlClient
 		const env = yield* EnvVars
 
 		const systemDefaults: SystemDefaults = {
@@ -96,9 +101,17 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 		return {
 			start_research: params =>
 				Effect.gen(function* () {
-					// MCP calls use a system user for now
-					const userId = 'mcp-system'
+					// Run as the attributed user (the api key's owner), not a shared
+					// system actor — so the cache key, budget, and created_by all
+					// belong to the real person behind the key.
+					const userId = (yield* SessionContext).userId
 					const orgId = (yield* CurrentOrg).id
+					const instructions = yield* resolveInstructions({
+						organizationId: orgId,
+						userId,
+						agent: 'research',
+						overrideTemplateIds: params.template_ids,
+					}).pipe(Effect.provideService(SqlClient.SqlClient, sql))
 					const result = yield* svc.create(
 						userId,
 						orgId,
@@ -108,6 +121,7 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 							schemaName: params.schema_name,
 						},
 						systemDefaults,
+						instructions,
 					)
 					return result
 				}).pipe(redactDbErrors),
@@ -120,8 +134,14 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 
 			research_sync: params =>
 				Effect.gen(function* () {
-					const userId = 'mcp-system'
+					const userId = (yield* SessionContext).userId
 					const orgId = (yield* CurrentOrg).id
+					const instructions = yield* resolveInstructions({
+						organizationId: orgId,
+						userId,
+						agent: 'research',
+						overrideTemplateIds: params.template_ids,
+					}).pipe(Effect.provideService(SqlClient.SqlClient, sql))
 					const { id } = yield* svc.create(
 						userId,
 						orgId,
@@ -131,6 +151,7 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 							schemaName: params.schema_name,
 						},
 						systemDefaults,
+						instructions,
 					)
 
 					// Poll until the run reaches a terminal status or we exceed
