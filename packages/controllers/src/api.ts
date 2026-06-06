@@ -9,6 +9,7 @@ import { ContactsGroup } from './routes/contacts'
 import { DocumentsGroup } from './routes/documents'
 import { EmailGroup } from './routes/email'
 import { HealthGroup } from './routes/health'
+import { InstructionsGroup } from './routes/instructions'
 import { InteractionsGroup } from './routes/interactions'
 import { McpOAuthGroup } from './routes/mcp-oauth'
 import { PagesGroup } from './routes/pages'
@@ -45,6 +46,7 @@ export const BatudaApi = HttpApi.make('BatudaApi')
 	.add(EmailGroup)
 	.add(RecordingsGroup)
 	.add(ResearchGroup)
+	.add(InstructionsGroup)
 	.add(TimelineGroup)
 	.add(CalendarGroup)
 	.add(CalcomWebhookGroup)
