@@ -25,11 +25,16 @@ const ORG = `ri-org-${randomUUID()}`
 const U1 = `ri-u1-${randomUUID()}`
 const U2 = `ri-u2-${randomUUID()}`
 const U3 = `ri-u3-${randomUUID()}`
+const E1 = `ri-e1-${randomUUID()}`
+const E2 = `ri-e2-${randomUUID()}`
+const E4 = `ri-e4-${randomUUID()}`
 const ORG_OBJ = { id: ORG, name: 'ri', slug: 'ri' }
 
 let orgTemplate = ''
 let userTemplate = ''
 let u2Personal = ''
+let e1Template = ''
+let e2Template = ''
 
 const runRoot = <A>(
 	eff: Effect.Effect<A, unknown, SqlClient.SqlClient>,
@@ -94,7 +99,40 @@ beforeAll(async () => {
 					yield* sql`
 						INSERT INTO agent_default_stack_items (organization_id, stack_id, template_id, position)
 						VALUES (${ORG}, ${us[0]?.id ?? ''}, ${user}, 0)`
-					return { org, user, u2: u2[0]?.id ?? '' }
+					// E1 extends the org default with one personal addition (delta = [e1]).
+					const e1t = yield* sql<{ id: string }>`
+							INSERT INTO instruction_templates (organization_id, owner_user_id, name, body, created_by)
+							VALUES (${ORG}, ${E1}, 'E1', 'e1 body', ${E1}) RETURNING id`
+					const e1s = yield* sql<{ id: string }>`
+							INSERT INTO agent_default_stacks (organization_id, owner_user_id, agent, composition)
+							VALUES (${ORG}, ${E1}, 'research', 'extend') RETURNING id`
+					yield* sql`
+							INSERT INTO agent_default_stack_items (organization_id, stack_id, template_id, position)
+							VALUES (${ORG}, ${e1s[0]?.id ?? ''}, ${e1t[0]?.id ?? ''}, 0)`
+					// E2 extends but re-lists the org template ahead of its own (dedup case).
+					const e2t = yield* sql<{ id: string }>`
+							INSERT INTO instruction_templates (organization_id, owner_user_id, name, body, created_by)
+							VALUES (${ORG}, ${E2}, 'E2', 'e2 body', ${E2}) RETURNING id`
+					const e2s = yield* sql<{ id: string }>`
+							INSERT INTO agent_default_stacks (organization_id, owner_user_id, agent, composition)
+							VALUES (${ORG}, ${E2}, 'research', 'extend') RETURNING id`
+					yield* sql`
+							INSERT INTO agent_default_stack_items (organization_id, stack_id, template_id, position)
+							VALUES (${ORG}, ${e2s[0]?.id ?? ''}, ${org}, 0)`
+					yield* sql`
+							INSERT INTO agent_default_stack_items (organization_id, stack_id, template_id, position)
+							VALUES (${ORG}, ${e2s[0]?.id ?? ''}, ${e2t[0]?.id ?? ''}, 1)`
+					// E4 has an extend stack with no additions of its own (empty delta).
+					yield* sql`
+							INSERT INTO agent_default_stacks (organization_id, owner_user_id, agent, composition)
+							VALUES (${ORG}, ${E4}, 'research', 'extend')`
+					return {
+						org,
+						user,
+						u2: u2[0]?.id ?? '',
+						e1: e1t[0]?.id ?? '',
+						e2: e2t[0]?.id ?? '',
+					}
 				}),
 			)
 		}),
@@ -102,6 +140,8 @@ beforeAll(async () => {
 	orgTemplate = ids.org
 	userTemplate = ids.user
 	u2Personal = ids.u2
+	e1Template = ids.e1
+	e2Template = ids.e2
 }, 60_000)
 
 afterAll(async () => {
@@ -214,6 +254,69 @@ describe('resolveInstructions (live RLS)', () => {
 			// THEN the fingerprint changes (and the edited body resolves)
 			expect(after.fingerprint).not.toBe(before.fingerprint)
 			expect(after.segments).toEqual(['edited body'])
+		})
+	})
+
+	describe('when a user stack extends the org default', () => {
+		it('should resolve the org default first, then the user additions', async () => {
+			// GIVEN E1 has an extend stack that adds one personal template
+			const result = await resolveAs(E1)
+			// THEN the live org default leads and the addition follows
+			expect(result.source).toBe('user')
+			expect(result.templateIds).toEqual([orgTemplate, e1Template])
+			expect(result.segments).toEqual(['org body', 'e1 body'])
+		})
+
+		it('should keep the org template in its slot when the delta re-lists it', async () => {
+			// GIVEN E2's extend delta re-lists the org template ahead of its own
+			const result = await resolveAs(E2)
+			// THEN the org template keeps its lead slot and the duplicate is dropped
+			expect(result.source).toBe('user')
+			expect(result.templateIds).toEqual([orgTemplate, e2Template])
+			expect(result.segments).toEqual(['org body', 'e2 body'])
+		})
+
+		it('should resolve to the org default alone when the extend delta is empty', async () => {
+			// GIVEN E4 has an extend stack with no additions of its own
+			const result = await resolveAs(E4)
+			// THEN only the live org default resolves; the source stays the user stack
+			expect(result.source).toBe('user')
+			expect(result.templateIds).toEqual([orgTemplate])
+			expect(result.segments).toEqual(['org body'])
+		})
+
+		it('should be bypassed entirely by a per-run override', async () => {
+			// GIVEN E1 (an extend user) passes an explicit override
+			const result = await resolveAs(E1, [e1Template])
+			// THEN the override wins and the org default is not composed in
+			expect(result.source).toBe('override')
+			expect(result.templateIds).toEqual([e1Template])
+			expect(result.segments).toEqual(['e1 body'])
+		})
+
+		// Runs last: it edits the shared org template to prove the org base is live.
+		it('should track a live edit to the org default it extends', async () => {
+			// GIVEN E1's extend resolution layers on the org default
+			const before = await resolveAs(E1)
+			// WHEN the org default's template is edited
+			await runRoot(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					yield* sql.withTransaction(
+						Effect.gen(function* () {
+							yield* sql`SET LOCAL ROLE app_service`
+							yield* sql`
+								UPDATE instruction_templates
+								SET body = 'edited org body', updated_at = now() + interval '1 second'
+								WHERE id = ${orgTemplate}`
+						}),
+					)
+				}),
+			)
+			const after = await resolveAs(E1)
+			// THEN E1's fingerprint changes and the edited org body resolves in the org slot
+			expect(after.fingerprint).not.toBe(before.fingerprint)
+			expect(after.segments).toEqual(['edited org body', 'e1 body'])
 		})
 	})
 })

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
 	assembleSegments,
+	dedupeKeepFirst,
 	personalTemplatesInOrgStack,
 	pickStackSource,
 } from './resolver'
@@ -127,6 +128,45 @@ describe('personalTemplatesInOrgStack', () => {
 			// GIVEN an empty org stack [resolver.ts:46]
 			// THEN there is nothing to reject
 			expect(personalTemplatesInOrgStack([])).toEqual([])
+		})
+	})
+})
+
+describe('dedupeKeepFirst', () => {
+	describe('when an id repeats later in the list', () => {
+		it('should keep the first occurrence and preserve order', () => {
+			// GIVEN a list with a later duplicate [resolver.ts:dedupeKeepFirst]
+			// THEN the first position is kept and the duplicate dropped
+			expect(dedupeKeepFirst(['a', 'b', 'a', 'c'])).toEqual(['a', 'b', 'c'])
+		})
+	})
+
+	describe('when a user addition repeats an org template (the extend case)', () => {
+		it('should keep the template in its earlier org position', () => {
+			// GIVEN the org default ids followed by the user's additions, one of
+			// which is already in the org block [resolver.ts:dedupeKeepFirst]
+			const orgIds = ['org-1', 'org-2']
+			const userAdditions = ['org-2', 'mine']
+			// THEN org-2 keeps its org position and the user's duplicate is dropped
+			expect(dedupeKeepFirst([...orgIds, ...userAdditions])).toEqual([
+				'org-1',
+				'org-2',
+				'mine',
+			])
+		})
+	})
+
+	describe('when there are no duplicates', () => {
+		it('should return the ids unchanged', () => {
+			// GIVEN all-distinct ids [resolver.ts:dedupeKeepFirst]
+			expect(dedupeKeepFirst(['a', 'b', 'c'])).toEqual(['a', 'b', 'c'])
+		})
+	})
+
+	describe('when the list is empty', () => {
+		it('should return an empty list', () => {
+			// GIVEN no ids [resolver.ts:dedupeKeepFirst]
+			expect(dedupeKeepFirst([])).toEqual([])
 		})
 	})
 })
