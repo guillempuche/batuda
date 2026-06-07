@@ -76,14 +76,96 @@ export const Route = createFileRoute('/settings/organization/templates')({
 })
 
 function OrgTemplatesPage() {
-	const { t } = useLingui()
-	const toast = usePriToast()
 	const activeMember = authClient.useActiveMember()
 	const role = activeMember.data?.role ?? null
 	const isAdmin = role === 'owner' || role === 'admin'
 
 	const templatesResult = useAtomValue(instructionTemplatesAtom)
 	const refreshTemplates = useAtomRefresh(instructionTemplatesAtom)
+
+	// Org-owned templates are the ones with no personal owner.
+	const orgTemplates = useMemo<ReadonlyArray<TemplateShape>>(
+		() =>
+			AsyncResult.isSuccess(templatesResult)
+				? narrowTemplates(templatesResult.value).filter(
+						x => x.ownerUserId === null,
+					)
+				: [],
+		[templatesResult],
+	)
+
+	return (
+		<Page>
+			<BackLink to='/settings/organization'>
+				<ArrowLeft size={14} aria-hidden />
+				<span>
+					<Trans>Back to organization</Trans>
+				</span>
+			</BackLink>
+
+			<Intro>
+				<Heading>
+					<ScrollText size={20} aria-hidden />
+					<Trans>Org instruction templates</Trans>
+				</Heading>
+				<Subtitle>
+					<Trans>
+						Shared guidance every member's research agent can use, plus the
+						organization's default.
+					</Trans>
+				</Subtitle>
+			</Intro>
+
+			{isAdmin ? (
+				<OrgTemplateAdmin
+					orgTemplates={orgTemplates}
+					refreshTemplates={refreshTemplates}
+				/>
+			) : (
+				<Section>
+					<Hint role='note'>
+						<Trans>
+							Your organization's admins manage these templates. You can use any
+							of them in your own default or per run.
+						</Trans>
+					</Hint>
+					{orgTemplates.length > 0 ? (
+						<TemplateList>
+							{orgTemplates.map(row => (
+								<TemplateRowItem key={row.id} data-testid='org-template-row'>
+									<TemplateName>{row.name}</TemplateName>
+									<OwnerBadge>
+										<Trans>Org</Trans>
+									</OwnerBadge>
+								</TemplateRowItem>
+							))}
+						</TemplateList>
+					) : (
+						<Empty>
+							<Trans>No org templates yet.</Trans>
+						</Empty>
+					)}
+				</Section>
+			)}
+		</Page>
+	)
+}
+
+// The admin half of the org templates page: managing org templates, the org
+// default stack, the donation review queue, and preset import. It's mounted
+// only for owners/admins, so its donation, preset, and stack queries never
+// fire for a regular member — who can't act on that data anyway, since every
+// org write is admin-gated on the server.
+function OrgTemplateAdmin({
+	orgTemplates,
+	refreshTemplates,
+}: {
+	readonly orgTemplates: ReadonlyArray<TemplateShape>
+	readonly refreshTemplates: () => void
+}) {
+	const { t } = useLingui()
+	const toast = usePriToast()
+
 	const donationsResult = useAtomValue(instructionDonationsAtom)
 	const refreshDonations = useAtomRefresh(instructionDonationsAtom)
 	const presetsResult = useAtomValue(instructionPresetsAtom)
@@ -97,16 +179,6 @@ function OrgTemplatesPage() {
 	const rejectDonation = useAtomSet(rejectDonationAtom, { mode: 'promiseExit' })
 	const importPreset = useAtomSet(importPresetAtom, { mode: 'promiseExit' })
 
-	// Org-owned templates are the ones with no personal owner.
-	const orgTemplates = useMemo<ReadonlyArray<TemplateShape>>(
-		() =>
-			AsyncResult.isSuccess(templatesResult)
-				? narrowTemplates(templatesResult.value).filter(
-						x => x.ownerUserId === null,
-					)
-				: [],
-		[templatesResult],
-	)
 	const pendingDonations = useMemo(
 		() =>
 			AsyncResult.isSuccess(donationsResult)
@@ -268,236 +340,185 @@ function OrgTemplatesPage() {
 	}
 
 	return (
-		<Page>
-			<BackLink to='/settings/organization'>
-				<ArrowLeft size={14} aria-hidden />
-				<span>
-					<Trans>Back to organization</Trans>
-				</span>
-			</BackLink>
+		<>
+			<Section>
+				<SectionHead>
+					<SectionTitle>
+						<Trans>Org templates</Trans>
+					</SectionTitle>
+					<PriButton
+						type='button'
+						$variant='filled'
+						data-testid='org-templates-new'
+						onClick={openCreate}
+					>
+						<Plus size={16} aria-hidden />
+						<Trans>New org template</Trans>
+					</PriButton>
+				</SectionHead>
 
-			<Intro>
-				<Heading>
-					<ScrollText size={20} aria-hidden />
-					<Trans>Org instruction templates</Trans>
-				</Heading>
-				<Subtitle>
-					<Trans>
-						Shared guidance every member's research agent can use, plus the
-						organization's default.
-					</Trans>
-				</Subtitle>
-			</Intro>
-
-			{!isAdmin ? (
-				<Section>
-					<Hint role='note'>
+				{orgTemplates.length === 0 ? (
+					<Empty>
 						<Trans>
-							Your organization's admins manage these templates. You can use any
-							of them in your own default or per run.
+							No org templates yet. Create one, import a preset, or accept a
+							member's proposal.
 						</Trans>
-					</Hint>
-					{orgTemplates.length > 0 ? (
-						<TemplateList>
-							{orgTemplates.map(row => (
-								<TemplateRowItem key={row.id} data-testid='org-template-row'>
-									<TemplateName>{row.name}</TemplateName>
-									<OwnerBadge>
-										<Trans>Org</Trans>
-									</OwnerBadge>
-								</TemplateRowItem>
-							))}
-						</TemplateList>
-					) : (
-						<Empty>
-							<Trans>No org templates yet.</Trans>
-						</Empty>
-					)}
-				</Section>
-			) : (
-				<>
-					<Section>
-						<SectionHead>
-							<SectionTitle>
-								<Trans>Org templates</Trans>
-							</SectionTitle>
+					</Empty>
+				) : (
+					<TemplateList>
+						{orgTemplates.map(row => (
+							<TemplateRowItem key={row.id} data-testid='org-template-row'>
+								<TemplateName>{row.name}</TemplateName>
+								<OwnerBadge>
+									<Trans>Org</Trans>
+								</OwnerBadge>
+								<RowActions>
+									<InstructionIconButton
+										type='button'
+										aria-label={t`Edit ${row.name}`}
+										onClick={() => openEdit(row)}
+									>
+										<Pencil size={14} aria-hidden />
+									</InstructionIconButton>
+									<InstructionIconButton
+										type='button'
+										aria-label={t`Delete ${row.name}`}
+										onClick={() =>
+											setConfirmTarget({ id: row.id, name: row.name })
+										}
+									>
+										<Trash2 size={14} aria-hidden />
+									</InstructionIconButton>
+								</RowActions>
+							</TemplateRowItem>
+						))}
+					</TemplateList>
+				)}
+			</Section>
+
+			<Section data-testid='org-default-stack'>
+				<SectionTitle>
+					<Trans>Organization default</Trans>
+				</SectionTitle>
+				<Hint>
+					<Trans>
+						These templates run for every member who hasn't set their own — in
+						order. Only org templates can go here.
+					</Trans>
+				</Hint>
+				{stacksFailed ? (
+					<Notice role='alert'>
+						<Trans>Couldn't load the org default. Refresh to try again.</Trans>
+					</Notice>
+				) : orgTemplates.length === 0 ? (
+					<Empty>
+						<Trans>Add an org template first.</Trans>
+					</Empty>
+				) : (
+					<>
+						<StackPicker
+							options={stackOptions}
+							selectedIds={effectiveStack}
+							onChange={setStackIds}
+						/>
+						<Actions>
 							<PriButton
 								type='button'
 								$variant='filled'
-								data-testid='org-templates-new'
-								onClick={openCreate}
+								data-testid='org-default-save'
+								disabled={savingStack || effectiveStack.length === 0}
+								onClick={() => {
+									void saveStack()
+								}}
 							>
-								<Plus size={16} aria-hidden />
-								<Trans>New org template</Trans>
+								<Trans>Save the org default</Trans>
 							</PriButton>
-						</SectionHead>
+						</Actions>
+					</>
+				)}
+			</Section>
 
-						{orgTemplates.length === 0 ? (
-							<Empty>
-								<Trans>
-									No org templates yet. Create one, import a preset, or accept a
-									member's proposal.
-								</Trans>
-							</Empty>
-						) : (
-							<TemplateList>
-								{orgTemplates.map(row => (
-									<TemplateRowItem key={row.id} data-testid='org-template-row'>
-										<TemplateName>{row.name}</TemplateName>
-										<OwnerBadge>
-											<Trans>Org</Trans>
-										</OwnerBadge>
-										<RowActions>
-											<InstructionIconButton
-												type='button'
-												aria-label={t`Edit ${row.name}`}
-												onClick={() => openEdit(row)}
-											>
-												<Pencil size={14} aria-hidden />
-											</InstructionIconButton>
-											<InstructionIconButton
-												type='button'
-												aria-label={t`Delete ${row.name}`}
-												onClick={() =>
-													setConfirmTarget({ id: row.id, name: row.name })
-												}
-											>
-												<Trash2 size={14} aria-hidden />
-											</InstructionIconButton>
-										</RowActions>
-									</TemplateRowItem>
-								))}
-							</TemplateList>
-						)}
-					</Section>
+			<Section>
+				<SectionTitle>
+					<Trans>Member proposals</Trans>
+				</SectionTitle>
+				{pendingDonations.length === 0 ? (
+					<Empty>
+						<Trans>No proposals waiting for review.</Trans>
+					</Empty>
+				) : (
+					<ReviewList>
+						{pendingDonations.map(d => (
+							<ReviewItem key={d.id} data-testid='donation-row'>
+								<ReviewHead>
+									<TemplateName>{d.name}</TemplateName>
+									<ReviewActions>
+										<PriButton
+											type='button'
+											$variant='filled'
+											data-testid='donation-accept'
+											onClick={() => {
+												void accept(d.id, d.name)
+											}}
+										>
+											<Check size={14} aria-hidden />
+											<Trans>Add to org</Trans>
+										</PriButton>
+										<InstructionIconButton
+											type='button'
+											aria-label={t`Decline ${d.name}`}
+											onClick={() => {
+												void reject(d.id)
+											}}
+										>
+											<X size={14} aria-hidden />
+										</InstructionIconButton>
+									</ReviewActions>
+								</ReviewHead>
+								<BodyPreview>{preview(d.body)}</BodyPreview>
+							</ReviewItem>
+						))}
+					</ReviewList>
+				)}
+			</Section>
 
-					<Section data-testid='org-default-stack'>
-						<SectionTitle>
-							<Trans>Organization default</Trans>
-						</SectionTitle>
-						<Hint>
-							<Trans>
-								These templates run for every member who hasn't set their own —
-								in order. Only org templates can go here.
-							</Trans>
-						</Hint>
-						{stacksFailed ? (
-							<Notice role='alert'>
-								<Trans>
-									Couldn't load the org default. Refresh to try again.
-								</Trans>
-							</Notice>
-						) : orgTemplates.length === 0 ? (
-							<Empty>
-								<Trans>Add an org template first.</Trans>
-							</Empty>
-						) : (
-							<>
-								<StackPicker
-									options={stackOptions}
-									selectedIds={effectiveStack}
-									onChange={setStackIds}
-								/>
-								<Actions>
+			<Section>
+				<SectionTitle>
+					<Trans>Starter presets</Trans>
+				</SectionTitle>
+				<Hint>
+					<Trans>
+						Batuda-written templates you can drop into the org and edit.
+					</Trans>
+				</Hint>
+				{presets.length === 0 ? (
+					<Empty>
+						<Trans>No presets available.</Trans>
+					</Empty>
+				) : (
+					<ReviewList>
+						{presets.map(p => (
+							<ReviewItem key={p.id} data-testid='preset-row'>
+								<ReviewHead>
+									<TemplateName>{p.name}</TemplateName>
 									<PriButton
 										type='button'
-										$variant='filled'
-										data-testid='org-default-save'
-										disabled={savingStack || effectiveStack.length === 0}
+										$variant='outlined'
+										data-testid='preset-import'
 										onClick={() => {
-											void saveStack()
+											void importToOrg(p.id, p.name)
 										}}
 									>
-										<Trans>Save the org default</Trans>
+										<Download size={14} aria-hidden />
+										<Trans>Import to org</Trans>
 									</PriButton>
-								</Actions>
-							</>
-						)}
-					</Section>
-
-					<Section>
-						<SectionTitle>
-							<Trans>Member proposals</Trans>
-						</SectionTitle>
-						{pendingDonations.length === 0 ? (
-							<Empty>
-								<Trans>No proposals waiting for review.</Trans>
-							</Empty>
-						) : (
-							<ReviewList>
-								{pendingDonations.map(d => (
-									<ReviewItem key={d.id} data-testid='donation-row'>
-										<ReviewHead>
-											<TemplateName>{d.name}</TemplateName>
-											<ReviewActions>
-												<PriButton
-													type='button'
-													$variant='filled'
-													data-testid='donation-accept'
-													onClick={() => {
-														void accept(d.id, d.name)
-													}}
-												>
-													<Check size={14} aria-hidden />
-													<Trans>Add to org</Trans>
-												</PriButton>
-												<InstructionIconButton
-													type='button'
-													aria-label={t`Decline ${d.name}`}
-													onClick={() => {
-														void reject(d.id)
-													}}
-												>
-													<X size={14} aria-hidden />
-												</InstructionIconButton>
-											</ReviewActions>
-										</ReviewHead>
-										<BodyPreview>{preview(d.body)}</BodyPreview>
-									</ReviewItem>
-								))}
-							</ReviewList>
-						)}
-					</Section>
-
-					<Section>
-						<SectionTitle>
-							<Trans>Starter presets</Trans>
-						</SectionTitle>
-						<Hint>
-							<Trans>
-								Batuda-written templates you can drop into the org and edit.
-							</Trans>
-						</Hint>
-						{presets.length === 0 ? (
-							<Empty>
-								<Trans>No presets available.</Trans>
-							</Empty>
-						) : (
-							<ReviewList>
-								{presets.map(p => (
-									<ReviewItem key={p.id} data-testid='preset-row'>
-										<ReviewHead>
-											<TemplateName>{p.name}</TemplateName>
-											<PriButton
-												type='button'
-												$variant='outlined'
-												data-testid='preset-import'
-												onClick={() => {
-													void importToOrg(p.id, p.name)
-												}}
-											>
-												<Download size={14} aria-hidden />
-												<Trans>Import to org</Trans>
-											</PriButton>
-										</ReviewHead>
-										<BodyPreview>{preview(p.body)}</BodyPreview>
-									</ReviewItem>
-								))}
-							</ReviewList>
-						)}
-					</Section>
-				</>
-			)}
+								</ReviewHead>
+								<BodyPreview>{preview(p.body)}</BodyPreview>
+							</ReviewItem>
+						))}
+					</ReviewList>
+				)}
+			</Section>
 
 			<TemplateEditorDialog
 				open={dialogOpen}
@@ -550,7 +571,7 @@ function OrgTemplatesPage() {
 					</PriDialog.Popup>
 				</PriDialog.Portal>
 			</PriDialog.Root>
-		</Page>
+		</>
 	)
 }
 
