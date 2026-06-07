@@ -32,6 +32,9 @@ const TransferInput = Schema.Struct({ target_user_id: Schema.String })
 
 const SetStackInput = Schema.Struct({
 	template_ids: Schema.Array(Schema.String),
+	// Personal stacks only: 'extend' layers the templates on the live org
+	// default; absent/'replace' uses the stack alone. Ignored for org stacks.
+	composition: Schema.optional(Schema.Literals(['replace', 'extend'])),
 })
 
 const ImportPresetInput = Schema.Struct({ scope: Scope })

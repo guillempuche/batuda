@@ -21,6 +21,7 @@ import {
 	presetsForAgent,
 	proposeDonation,
 	rejectDonation,
+	type StackComposition,
 	type StackView,
 	setDefaultStack,
 	transferTemplateToUser,
@@ -256,6 +257,7 @@ export class InstructionsService extends ServiceMap.Service<InstructionsService>
 					userId: string,
 					agent: Agent,
 					templateIds: ReadonlyArray<string>,
+					composition: StackComposition,
 				): Effect.Effect<SetStackOutcome, never, SqlClient.SqlClient> =>
 					Effect.gen(function* () {
 						const result = yield* setDefaultStack({
@@ -263,6 +265,7 @@ export class InstructionsService extends ServiceMap.Service<InstructionsService>
 							ownerUserId: userId,
 							agent,
 							templateIds,
+							composition,
 						})
 						return result.ok
 							? { outcome: 'set' as const, stackId: result.stackId }
@@ -291,6 +294,8 @@ export class InstructionsService extends ServiceMap.Service<InstructionsService>
 							ownerUserId: null,
 							agent,
 							templateIds,
+							// The org default is always the base of any extend.
+							composition: 'replace',
 						})
 						return result.ok
 							? { outcome: 'set' as const, stackId: result.stackId }

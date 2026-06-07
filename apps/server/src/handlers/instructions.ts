@@ -93,6 +93,7 @@ export const InstructionsLive = HttpApiBuilder.group(
 							userId,
 							agent,
 							_.payload.template_ids,
+							_.payload.composition ?? 'replace',
 						)
 					}),
 				)

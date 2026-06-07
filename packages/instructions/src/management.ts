@@ -4,6 +4,7 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import type { Agent, InstructionTemplate } from './domain'
 import { classifyStackTemplates } from './management-logic'
+import type { StackComposition } from './resolver'
 
 // SQL-only management operations for instruction templates, default stacks, and
 // donations. They run as the request-scoped role, so RLS already limits what
@@ -176,6 +177,7 @@ export const deleteTemplate = (id: string): Eff<DeleteTemplateResult> =>
 export interface StackView {
 	readonly id: string
 	readonly templateIds: ReadonlyArray<string>
+	readonly composition: StackComposition
 }
 
 const loadStackItemIds = (
@@ -197,20 +199,29 @@ export const getDefaultStacks = (
 ): Eff<{ readonly org: StackView | null; readonly user: StackView | null }> =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
-		const stacks = yield* sql<{ id: string; ownerUserId: string | null }>`
-			SELECT id, owner_user_id FROM agent_default_stacks
+		const stacks = yield* sql<{
+			id: string
+			ownerUserId: string | null
+			composition: StackComposition
+		}>`
+			SELECT id, owner_user_id, composition FROM agent_default_stacks
 			WHERE organization_id = ${organizationId} AND agent = ${agent}
 				AND (owner_user_id = ${userId} OR owner_user_id IS NULL)
 		`
 		const orgRow = stacks.find(s => s.ownerUserId === null)
 		const userRow = stacks.find(s => s.ownerUserId === userId)
 		const org = orgRow
-			? { id: orgRow.id, templateIds: yield* loadStackItemIds(sql, orgRow.id) }
+			? {
+					id: orgRow.id,
+					templateIds: yield* loadStackItemIds(sql, orgRow.id),
+					composition: orgRow.composition,
+				}
 			: null
 		const user = userRow
 			? {
 					id: userRow.id,
 					templateIds: yield* loadStackItemIds(sql, userRow.id),
+					composition: userRow.composition,
 				}
 			: null
 		return { org, user }
@@ -222,6 +233,9 @@ export interface SetDefaultStackInput {
 	readonly ownerUserId: string | null
 	readonly agent: Agent
 	readonly templateIds: ReadonlyArray<string>
+	// 'extend' layers the items on the live org default; the org default is
+	// always the base, so it passes 'replace'.
+	readonly composition: StackComposition
 }
 
 export type SetDefaultStackResult =
@@ -279,11 +293,11 @@ export const setDefaultStack = (
 		if (existingRow) {
 			stackId = existingRow.id
 			yield* sql`DELETE FROM agent_default_stack_items WHERE stack_id = ${stackId}`
-			yield* sql`UPDATE agent_default_stacks SET updated_at = now() WHERE id = ${stackId}`
+			yield* sql`UPDATE agent_default_stacks SET composition = ${input.composition}, updated_at = now() WHERE id = ${stackId}`
 		} else {
 			const created = yield* sql<{ id: string }>`
-				INSERT INTO agent_default_stacks (organization_id, owner_user_id, agent)
-				VALUES (${input.organizationId}, ${input.ownerUserId}, ${input.agent})
+				INSERT INTO agent_default_stacks (organization_id, owner_user_id, agent, composition)
+				VALUES (${input.organizationId}, ${input.ownerUserId}, ${input.agent}, ${input.composition})
 				RETURNING id
 			`
 			const createdRow = created[0]
