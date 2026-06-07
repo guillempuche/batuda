@@ -10,6 +10,8 @@ import styled from 'styled-components'
 
 import { PriScrollArea } from '@batuda/ui/pri'
 
+import { useMediaQuery } from '#/lib/use-media-query'
+
 /**
  * Batuda blueprint sheet — aged technical-drawing paper with cross-hatch +
  * grid, tape strips at the top corners, and sticky rulers along the top
@@ -43,6 +45,10 @@ export function useBlueprintViewportRef(): ViewportRef {
 export function BlueprintSheet({ children }: { children: React.ReactNode }) {
 	const viewportRef = useRef<HTMLDivElement>(null)
 	const value = useMemo(() => viewportRef, [])
+	// Below 768px the page scrolls as a normal document (the body lock only
+	// applies at ≥768px), so the scroll area — which always owns its scroll — is
+	// mounted only on the locked-body layout. Phones get plain document scroll.
+	const isDesktopScroll = useMediaQuery('(min-width: 768px)', true)
 	const { scrollYProgress } = useScroll({ container: viewportRef })
 	// Parallel-rule effect: top ruler ticks drift horizontally as the user
 	// scrolls the sheet, so the drafting-table metaphor stays alive.
@@ -58,14 +64,20 @@ export function BlueprintSheet({ children }: { children: React.ReactNode }) {
 					<TopRuler style={{ backgroundPositionX: rulerShiftX }} />
 					<LeftRuler style={{ backgroundPositionY: rulerShiftY }} />
 					<Vignette />
-					<PriScrollArea.Root>
-						<PriScrollArea.Viewport ref={viewportRef}>
+					{isDesktopScroll ? (
+						<PriScrollArea.Root>
+							<PriScrollArea.Viewport ref={viewportRef}>
+								<Content>{children}</Content>
+							</PriScrollArea.Viewport>
+							<PriScrollArea.Scrollbar orientation='vertical'>
+								<PriScrollArea.Thumb />
+							</PriScrollArea.Scrollbar>
+						</PriScrollArea.Root>
+					) : (
+						<MobileViewport ref={viewportRef}>
 							<Content>{children}</Content>
-						</PriScrollArea.Viewport>
-						<PriScrollArea.Scrollbar orientation='vertical'>
-							<PriScrollArea.Thumb />
-						</PriScrollArea.Scrollbar>
-					</PriScrollArea.Root>
+						</MobileViewport>
+					)}
 				</Sheet>
 			</Wrapper>
 		</ViewportRefContext.Provider>
@@ -253,12 +265,18 @@ const Vignette = styled.div`
 	}
 `
 
+// Phones scroll the document, not an inner viewport. This wrapper holds no
+// scroll of its own (so the page scrolls naturally and a touch anywhere works),
+// and only exists to keep the ruler-parallax ref pointed at a mounted element.
+const MobileViewport = styled.div`
+	flex: 1;
+	min-width: 0;
+	min-height: 0;
+`
+
 const Content = styled.div`
 	padding: var(--space-lg) var(--space-md);
-	padding-bottom: calc(
-		var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px) +
-			var(--space-md)
-	);
+	padding-bottom: calc(var(--bottom-nav-space) + var(--space-md));
 	position: relative;
 	z-index: 2;
 

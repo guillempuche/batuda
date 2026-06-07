@@ -6,6 +6,13 @@
 	 * bottom nav, fixed widths for the desktop side nav, or sticky top-bar
 	 * offsets reference these tokens. */
 	--bottom-nav-height: 4.5rem;
+	/* Total space a fixed bottom nav occupies: the bar plus the iOS safe-area
+	 * inset. Single source for both the nav's height and the content padding
+	 * that keeps pages clear of it. */
+	--bottom-nav-space: calc(
+		var(--bottom-nav-height) +
+		env(safe-area-inset-bottom, 0px)
+	);
 	--side-nav-width: 8rem; /* 128px — narrow pegboard: knob + label below */
 	--top-bar-height: 3.5rem;
 }

@@ -54,7 +54,7 @@ const Bar = styled.nav.withConfig({ displayName: 'BottomNavBar' })`
 	justify-content: space-evenly;
 	padding: var(--space-xs) 0;
 	padding-bottom: calc(var(--space-xs) + env(safe-area-inset-bottom, 0px));
-	min-height: var(--bottom-nav-height);
+	min-height: var(--bottom-nav-space);
 
 	/* Glassy bar — tinted pegboard color with backdrop blur so the workshop
 	 * texture still bleeds through but text and icons remain legible. Matches
