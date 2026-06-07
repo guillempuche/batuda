@@ -40,6 +40,15 @@ pre-commit:
 
 pre-push:
   commands:
+    secrets:
+      # Scan for leaked secrets before publishing to the PUBLIC repo.
+      # GitHub push protection catches known token formats server-side;
+      # this adds local pre-push coverage, incl. bespoke patterns defined
+      # in .secretlintrc.json. .gitignore is respected by default;
+      # .secretlintignore excludes vendored docs/repos and the lockfile.
+      run: |
+        pnpm lint-secrets
+
     test:
       # `--concurrency=1` because @batuda/server and @batuda/mail-worker
       # both run live-DB integration tests against localhost:5433. Server's
