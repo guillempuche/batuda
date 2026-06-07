@@ -54,6 +54,7 @@ import {
 	narrowPresets,
 	narrowStackIds,
 	narrowTemplates,
+	outcomeOf,
 	type TemplateShape,
 } from '#/components/instructions/instruction-shapes'
 import {
@@ -161,10 +162,7 @@ function OrgTemplatesPage() {
 		const exit = await deleteTemplate({ params: { id: target.id } } as never)
 		setDeleting(false)
 		setConfirmTarget(null)
-		const outcome =
-			exit._tag === 'Success'
-				? (exit.value as { outcome?: string } | null)?.outcome
-				: null
+		const outcome = outcomeOf(exit)
 		if (outcome === 'in_use') {
 			toast.add({
 				title: t`Still in use`,
@@ -198,10 +196,7 @@ function OrgTemplatesPage() {
 			payload: { template_ids: ids },
 		} as never)
 		setSavingStack(false)
-		const outcome =
-			exit._tag === 'Success'
-				? (exit.value as { outcome?: string } | null)?.outcome
-				: null
+		const outcome = outcomeOf(exit)
 		if (outcome === 'set') {
 			toast.add({ title: t`Org default saved`, type: 'success' })
 			refreshStacks()
@@ -216,10 +211,7 @@ function OrgTemplatesPage() {
 
 	const accept = async (id: string, name: string) => {
 		const exit = await acceptDonation({ params: { id } } as never)
-		const outcome =
-			exit._tag === 'Success'
-				? (exit.value as { outcome?: string } | null)?.outcome
-				: null
+		const outcome = outcomeOf(exit)
 		if (outcome === 'accepted') {
 			toast.add({
 				title: t`Added to the org`,
@@ -240,10 +232,7 @@ function OrgTemplatesPage() {
 
 	const reject = async (id: string) => {
 		const exit = await rejectDonation({ params: { id } } as never)
-		const outcome =
-			exit._tag === 'Success'
-				? (exit.value as { outcome?: string } | null)?.outcome
-				: null
+		const outcome = outcomeOf(exit)
 		if (outcome === 'rejected') {
 			toast.add({ title: t`Proposal declined`, type: 'success' })
 		} else {
@@ -261,10 +250,7 @@ function OrgTemplatesPage() {
 			params: { presetId },
 			payload: { scope: 'org' },
 		} as never)
-		const outcome =
-			exit._tag === 'Success'
-				? (exit.value as { outcome?: string } | null)?.outcome
-				: null
+		const outcome = outcomeOf(exit)
 		if (outcome === 'imported') {
 			toast.add({
 				title: t`Added to the org`,

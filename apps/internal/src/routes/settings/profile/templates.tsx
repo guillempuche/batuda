@@ -39,6 +39,7 @@ import {
 import {
 	narrowStackIds,
 	narrowTemplates,
+	outcomeOf,
 	type TemplateShape,
 } from '#/components/instructions/instruction-shapes'
 import type { StackOption } from '#/components/instructions/stack-picker'
@@ -128,7 +129,7 @@ function TemplatesPage() {
 			})
 			return
 		}
-		const outcome = (exit.value as { outcome?: string } | null)?.outcome
+		const outcome = outcomeOf(exit)
 		// A template still referenced by a default stack is blocked server-side;
 		// surface why instead of letting the row silently reappear.
 		if (outcome === 'in_use') {
@@ -158,10 +159,7 @@ function TemplatesPage() {
 	// becomes an org-owned template everyone can use.
 	const donate = async (row: TemplateShape) => {
 		const exit = await donateTemplate({ params: { id: row.id } } as never)
-		const outcome =
-			exit._tag === 'Success'
-				? (exit.value as { outcome?: string } | null)?.outcome
-				: null
+		const outcome = outcomeOf(exit)
 		if (outcome === 'proposed') {
 			toast.add({
 				title: t`Sent to your admins`,

@@ -94,3 +94,19 @@ export function narrowPresets(value: unknown): ReadonlyArray<PresetShape> {
 	}
 	return out
 }
+
+// Pull the server's `{ outcome }` discriminant out of a mutation result.
+// promiseExit mutations resolve to a tagged Success/Failure result; only a
+// Success carries a value, and these endpoints return `Schema.Unknown` bodies
+// — so narrow the value rather than casting it to a made-up type. A failed
+// call, or a success without a recognisable outcome, both read as null.
+export function outcomeOf(exit: {
+	readonly _tag: string
+	readonly value?: unknown
+}): string | null {
+	if (exit._tag !== 'Success') return null
+	const value = exit.value
+	if (!value || typeof value !== 'object') return null
+	const outcome = (value as Record<string, unknown>)['outcome']
+	return typeof outcome === 'string' ? outcome : null
+}
