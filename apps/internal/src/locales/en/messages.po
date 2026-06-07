@@ -30,12 +30,12 @@ msgid "\"{0}\" is waiting for an admin to add it to the organization."
 msgstr "\"{0}\" is waiting for an admin to add it to the organization."
 
 #. placeholder {0}: confirmTarget?.name ?? ''
-#: src/routes/settings/organization/templates.tsx:546
+#: src/routes/settings/organization/templates.tsx:543
 msgid "\"{0}\" will be removed for everyone in the organization. This can't be undone."
 msgstr "\"{0}\" will be removed for everyone in the organization. This can't be undone."
 
 #. placeholder {0}: confirmTarget?.name ?? ''
-#: src/routes/settings/profile/templates.tsx:329
+#: src/routes/settings/profile/templates.tsx:326
 msgid "\"{0}\" will be removed for good. This can't be undone."
 msgstr "\"{0}\" will be removed for good. This can't be undone."
 
@@ -485,14 +485,13 @@ msgstr "Call phone"
 msgid "Calls"
 msgstr "Calls"
 
+#: src/components/instructions/template-delete-confirm.tsx:56
 #: src/components/instructions/template-editor-dialog.tsx:178
 #: src/components/interactions/quick-capture-dialog.tsx:400
 #: src/components/research/research-dialog.tsx:271
 #: src/routes/emails/inboxes.tsx:1055
 #: src/routes/emails/inboxes.tsx:1453
 #: src/routes/settings/api-keys/index.tsx:424
-#: src/routes/settings/organization/templates.tsx:566
-#: src/routes/settings/profile/templates.tsx:349
 #: src/routes/tasks/index.tsx:718
 msgid "Cancel"
 msgstr "Cancel"
@@ -1104,10 +1103,9 @@ msgstr "Defaults to the email address."
 msgid "Defaults to you when omitted."
 msgstr "Defaults to you when omitted."
 
+#: src/components/instructions/template-delete-confirm.tsx:51
 #: src/routes/emails/inboxes.tsx:1385
 #: src/routes/settings/api-keys/index.tsx:329
-#: src/routes/settings/organization/templates.tsx:561
-#: src/routes/settings/profile/templates.tsx:344
 msgid "Delete"
 msgstr "Delete"
 
@@ -1148,18 +1146,17 @@ msgstr "Delete this footer? This cannot be undone."
 msgid "Delete this key?"
 msgstr "Delete this key?"
 
-#: src/routes/settings/organization/templates.tsx:543
+#: src/routes/settings/organization/templates.tsx:541
 msgid "Delete this org template?"
 msgstr "Delete this org template?"
 
-#: src/routes/settings/profile/templates.tsx:326
+#: src/routes/settings/profile/templates.tsx:324
 msgid "Delete this template?"
 msgstr "Delete this template?"
 
+#: src/components/instructions/template-delete-confirm.tsx:51
 #: src/routes/settings/api-keys/index.tsx:329
 #: src/routes/settings/api-keys/index.tsx:439
-#: src/routes/settings/organization/templates.tsx:561
-#: src/routes/settings/profile/templates.tsx:344
 msgid "Deleting…"
 msgstr "Deleting…"
 
