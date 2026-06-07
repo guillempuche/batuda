@@ -6,7 +6,7 @@ import { ArrowLeft, Gift, Pencil, Plus, ScrollText, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import styled from 'styled-components'
 
-import { PriButton, PriDialog, usePriToast } from '@batuda/ui/pri'
+import { PriButton, usePriToast } from '@batuda/ui/pri'
 
 import {
 	defaultStacksAtom,
@@ -21,7 +21,6 @@ import {
 } from '#/components/instructions/instruction-chrome'
 import {
 	BackLink,
-	DialogActions,
 	Empty,
 	Heading,
 	Intro,
@@ -43,6 +42,7 @@ import {
 	type TemplateShape,
 } from '#/components/instructions/instruction-shapes'
 import type { StackOption } from '#/components/instructions/stack-picker'
+import { TemplateDeleteConfirm } from '#/components/instructions/template-delete-confirm'
 import {
 	type TemplateDraft,
 	TemplateEditorDialog,
@@ -313,47 +313,22 @@ function TemplatesPage() {
 				}}
 			/>
 
-			<PriDialog.Root
+			<TemplateDeleteConfirm
 				open={confirmTarget !== null}
-				onOpenChange={(nextOpen: boolean) => {
-					if (!nextOpen && !deleting) setConfirmTarget(null)
+				deleting={deleting}
+				onConfirm={() => {
+					void confirmDelete()
 				}}
-			>
-				<PriDialog.Portal>
-					<PriDialog.Backdrop />
-					<PriDialog.Popup data-testid='template-delete-confirm'>
-						<PriDialog.Title>
-							<Trans>Delete this template?</Trans>
-						</PriDialog.Title>
-						<PriDialog.Description>
-							<Trans>
-								"{confirmTarget?.name ?? ''}" will be removed for good. This
-								can't be undone.
-							</Trans>
-						</PriDialog.Description>
-						<DialogActions>
-							<PriButton
-								type='button'
-								$variant='filled'
-								data-testid='template-delete-confirm-button'
-								disabled={deleting}
-								onClick={() => {
-									void confirmDelete()
-								}}
-							>
-								{deleting ? <Trans>Deleting…</Trans> : <Trans>Delete</Trans>}
-							</PriButton>
-							<PriDialog.Close
-								render={props => (
-									<PriButton type='button' $variant='text' {...props}>
-										<Trans>Cancel</Trans>
-									</PriButton>
-								)}
-							/>
-						</DialogActions>
-					</PriDialog.Popup>
-				</PriDialog.Portal>
-			</PriDialog.Root>
+				onClose={() => setConfirmTarget(null)}
+				testId='template-delete-confirm'
+				title={<Trans>Delete this template?</Trans>}
+				description={
+					<Trans>
+						"{confirmTarget?.name ?? ''}" will be removed for good. This can't
+						be undone.
+					</Trans>
+				}
+			/>
 		</Page>
 	)
 }

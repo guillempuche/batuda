@@ -15,7 +15,7 @@ import {
 import { useMemo, useState } from 'react'
 import styled from 'styled-components'
 
-import { PriButton, PriDialog, usePriToast } from '@batuda/ui/pri'
+import { PriButton, usePriToast } from '@batuda/ui/pri'
 
 import {
 	acceptDonationAtom,
@@ -34,7 +34,6 @@ import {
 } from '#/components/instructions/instruction-chrome'
 import {
 	BackLink,
-	DialogActions,
 	Empty,
 	Heading,
 	Intro,
@@ -61,6 +60,7 @@ import {
 	type StackOption,
 	StackPicker,
 } from '#/components/instructions/stack-picker'
+import { TemplateDeleteConfirm } from '#/components/instructions/template-delete-confirm'
 import {
 	type TemplateDraft,
 	TemplateEditorDialog,
@@ -530,47 +530,22 @@ function OrgTemplateAdmin({
 				}}
 			/>
 
-			<PriDialog.Root
+			<TemplateDeleteConfirm
 				open={confirmTarget !== null}
-				onOpenChange={(nextOpen: boolean) => {
-					if (!nextOpen && !deleting) setConfirmTarget(null)
+				deleting={deleting}
+				onConfirm={() => {
+					void confirmDelete()
 				}}
-			>
-				<PriDialog.Portal>
-					<PriDialog.Backdrop />
-					<PriDialog.Popup data-testid='org-template-delete-confirm'>
-						<PriDialog.Title>
-							<Trans>Delete this org template?</Trans>
-						</PriDialog.Title>
-						<PriDialog.Description>
-							<Trans>
-								"{confirmTarget?.name ?? ''}" will be removed for everyone in
-								the organization. This can't be undone.
-							</Trans>
-						</PriDialog.Description>
-						<DialogActions>
-							<PriButton
-								type='button'
-								$variant='filled'
-								data-testid='org-template-delete-confirm-button'
-								disabled={deleting}
-								onClick={() => {
-									void confirmDelete()
-								}}
-							>
-								{deleting ? <Trans>Deleting…</Trans> : <Trans>Delete</Trans>}
-							</PriButton>
-							<PriDialog.Close
-								render={props => (
-									<PriButton type='button' $variant='text' {...props}>
-										<Trans>Cancel</Trans>
-									</PriButton>
-								)}
-							/>
-						</DialogActions>
-					</PriDialog.Popup>
-				</PriDialog.Portal>
-			</PriDialog.Root>
+				onClose={() => setConfirmTarget(null)}
+				testId='org-template-delete-confirm'
+				title={<Trans>Delete this org template?</Trans>}
+				description={
+					<Trans>
+						"{confirmTarget?.name ?? ''}" will be removed for everyone in the
+						organization. This can't be undone.
+					</Trans>
+				}
+			/>
 		</>
 	)
 }
