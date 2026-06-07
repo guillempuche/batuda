@@ -2,7 +2,7 @@ import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
-import { ArrowLeft, Pencil, Plus, ScrollText, Trash2 } from 'lucide-react'
+import { ArrowLeft, Gift, Pencil, Plus, ScrollText, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import styled from 'styled-components'
 
@@ -11,6 +11,7 @@ import { PriButton, PriDialog, usePriToast } from '@batuda/ui/pri'
 import {
 	defaultStacksAtom,
 	deleteTemplateAtom,
+	donateTemplateAtom,
 	instructionTemplatesAtom,
 } from '#/atoms/instruction-atoms'
 import { DefaultStackEditor } from '#/components/instructions/default-stack-editor'
@@ -18,6 +19,11 @@ import {
 	InstructionIconButton,
 	OwnerBadge,
 } from '#/components/instructions/instruction-chrome'
+import {
+	narrowStackIds,
+	narrowTemplates,
+	type TemplateShape,
+} from '#/components/instructions/instruction-shapes'
 import type { StackOption } from '#/components/instructions/stack-picker'
 import {
 	type TemplateDraft,
@@ -32,13 +38,6 @@ import {
 } from '#/lib/workshop-mixins'
 
 const AGENT = 'research'
-
-type TemplateRow = {
-	readonly id: string
-	readonly name: string
-	readonly body: string
-	readonly ownerUserId: string | null
-}
 
 export const Route = createFileRoute('/settings/profile/templates')({
 	head: () => ({ meta: [{ title: 'Instruction templates — Batuda' }] }),
@@ -57,10 +56,11 @@ function TemplatesPage() {
 	const stacksResult = useAtomValue(stacksAtom)
 	const refreshStacks = useAtomRefresh(stacksAtom)
 	const deleteTemplate = useAtomSet(deleteTemplateAtom, { mode: 'promiseExit' })
+	const donateTemplate = useAtomSet(donateTemplateAtom, { mode: 'promiseExit' })
 
 	const templatesFailed = AsyncResult.isFailure(templatesResult)
 	const stacksFailed = AsyncResult.isFailure(stacksResult)
-	const templates = useMemo<ReadonlyArray<TemplateRow>>(
+	const templates = useMemo<ReadonlyArray<TemplateShape>>(
 		() =>
 			AsyncResult.isSuccess(templatesResult)
 				? narrowTemplates(templatesResult.value)
@@ -96,7 +96,7 @@ function TemplatesPage() {
 		setEditing(null)
 		setDialogOpen(true)
 	}
-	const openEdit = (row: TemplateRow) => {
+	const openEdit = (row: TemplateShape) => {
 		setEditing({ id: row.id, name: row.name, body: row.body })
 		setDialogOpen(true)
 	}
@@ -140,6 +140,29 @@ function TemplatesPage() {
 		toast.add({ title: t`Template deleted`, type: 'success' })
 		refreshTemplates()
 		refreshStacks()
+	}
+
+	// Offer a personal template to the org; an admin reviews it before it
+	// becomes an org-owned template everyone can use.
+	const donate = async (row: TemplateShape) => {
+		const exit = await donateTemplate({ params: { id: row.id } } as never)
+		const outcome =
+			exit._tag === 'Success'
+				? (exit.value as { outcome?: string } | null)?.outcome
+				: null
+		if (outcome === 'proposed') {
+			toast.add({
+				title: t`Sent to your admins`,
+				description: t`"${row.name}" is waiting for an admin to add it to the organization.`,
+				type: 'success',
+			})
+			return
+		}
+		toast.add({
+			title: t`Couldn't send it`,
+			description: t`Please try again.`,
+			type: 'error',
+		})
 	}
 
 	return (
@@ -209,6 +232,15 @@ function TemplatesPage() {
 									</OwnerBadge>
 									{mine ? (
 										<RowActions>
+											<InstructionIconButton
+												type='button'
+												aria-label={t`Donate ${row.name} to your organization`}
+												onClick={() => {
+													void donate(row)
+												}}
+											>
+												<Gift size={14} aria-hidden />
+											</InstructionIconButton>
 											<InstructionIconButton
 												type='button'
 												aria-label={t`Edit ${row.name}`}
@@ -314,38 +346,6 @@ function TemplatesPage() {
 			</PriDialog.Root>
 		</Page>
 	)
-}
-
-function narrowTemplates(value: unknown): ReadonlyArray<TemplateRow> {
-	if (!Array.isArray(value)) return []
-	const out: Array<TemplateRow> = []
-	for (const row of value) {
-		if (!row || typeof row !== 'object') continue
-		const r = row as Record<string, unknown>
-		const id = typeof r['id'] === 'string' ? r['id'] : null
-		const name = typeof r['name'] === 'string' ? r['name'] : null
-		if (id === null || name === null) continue
-		out.push({
-			id,
-			name,
-			body: typeof r['body'] === 'string' ? r['body'] : '',
-			ownerUserId:
-				typeof r['ownerUserId'] === 'string' ? r['ownerUserId'] : null,
-		})
-	}
-	return out
-}
-
-function narrowStackIds(
-	value: unknown,
-	key: 'org' | 'user',
-): ReadonlyArray<string> | null {
-	if (!value || typeof value !== 'object') return null
-	const slot = (value as Record<string, unknown>)[key]
-	if (!slot || typeof slot !== 'object') return null
-	const ids = (slot as Record<string, unknown>)['templateIds']
-	if (!Array.isArray(ids)) return null
-	return ids.filter((x): x is string => typeof x === 'string')
 }
 
 const Page = styled.div`

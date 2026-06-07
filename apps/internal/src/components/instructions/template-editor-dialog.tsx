@@ -28,12 +28,15 @@ export function TemplateEditorDialog({
 	onOpenChange,
 	editing,
 	onSaved,
+	scope = 'personal',
 }: {
 	readonly open: boolean
 	readonly onOpenChange: (next: boolean) => void
-	// null = create a new personal template; set = edit an existing one.
+	// null = create a new template; set = edit an existing one.
 	readonly editing: TemplateDraft | null
 	readonly onSaved: () => void
+	// New templates are personal unless an admin creates an org-owned one.
+	readonly scope?: 'personal' | 'org'
 }) {
 	const { t } = useLingui()
 	const createTemplate = useAtomSet(createTemplateAtom, { mode: 'promiseExit' })
@@ -55,7 +58,7 @@ export function TemplateEditorDialog({
 		const exit =
 			editing === null
 				? await createTemplate({
-						payload: { name, body, scope: 'personal' },
+						payload: { name, body, scope },
 					} as never)
 				: await updateTemplate({
 						params: { id: editing.id },
@@ -78,10 +81,12 @@ export function TemplateEditorDialog({
 					<Header>
 						<PriDialog.Title>
 							<Heading>
-								{editing === null ? (
-									<Trans>New template</Trans>
-								) : (
+								{editing !== null ? (
 									<Trans>Edit template</Trans>
+								) : scope === 'org' ? (
+									<Trans>New org template</Trans>
+								) : (
+									<Trans>New template</Trans>
 								)}
 							</Heading>
 						</PriDialog.Title>
@@ -97,9 +102,16 @@ export function TemplateEditorDialog({
 					<PriDialog.Description
 						render={props => (
 							<Description {...props}>
-								<Trans>
-									Standing guidance your research agent follows on every run.
-								</Trans>
+								{scope === 'org' ? (
+									<Trans>
+										Shared with everyone in your organization — their research
+										agent follows it on every run.
+									</Trans>
+								) : (
+									<Trans>
+										Standing guidance your research agent follows on every run.
+									</Trans>
+								)}
 							</Description>
 						)}
 					/>
