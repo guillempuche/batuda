@@ -1,6 +1,6 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { ArrowLeft, Gift, Pencil, Plus, ScrollText, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
@@ -20,6 +20,23 @@ import {
 	OwnerBadge,
 } from '#/components/instructions/instruction-chrome'
 import {
+	BackLink,
+	DialogActions,
+	Empty,
+	Heading,
+	Intro,
+	Notice,
+	Page,
+	RowActions,
+	Section,
+	SectionHead,
+	SectionTitle,
+	Subtitle,
+	TemplateList,
+	TemplateName,
+	TemplateRowItem,
+} from '#/components/instructions/instruction-page-chrome'
+import {
 	narrowStackIds,
 	narrowTemplates,
 	type TemplateShape,
@@ -30,12 +47,7 @@ import {
 	TemplateEditorDialog,
 } from '#/components/instructions/template-editor-dialog'
 import { authClient } from '#/lib/auth-client'
-import {
-	brushedMetalPlate,
-	ruledLedgerRow,
-	rulerUnderRule,
-	stenciledTitle,
-} from '#/lib/workshop-mixins'
+import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
 
 const AGENT = 'research'
 
@@ -348,132 +360,6 @@ function TemplatesPage() {
 	)
 }
 
-const Page = styled.div`
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-lg);
-`
-
-const BackLink = styled(Link)`
-	display: inline-flex;
-	gap: var(--space-2xs);
-	font-family: var(--font-display);
-	font-size: var(--typescale-label-medium-size);
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-	color: var(--color-on-surface-variant);
-	text-decoration: none;
-
-	&:hover {
-		color: var(--color-on-surface);
-	}
-
-	&:focus-visible {
-		outline: none;
-		box-shadow: var(--glow-active);
-	}
-`
-
-const Intro = styled.div`
-	${rulerUnderRule}
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-2xs);
-	padding-bottom: var(--space-xs);
-`
-
-const Heading = styled.h2`
-	${stenciledTitle}
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-2xs);
-	font-size: var(--typescale-headline-large-size);
-	line-height: var(--typescale-headline-large-line);
-	margin: 0;
-`
-
-const Subtitle = styled.p`
-	font-family: var(--font-body);
-	font-size: var(--typescale-body-large-size);
-	font-style: italic;
-	color: var(--color-on-surface-variant);
-	margin: 0;
-	max-width: 46rem;
-`
-
-const Section = styled.section`
-	${brushedMetalPlate}
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-sm);
-	padding: var(--space-md);
-	border-radius: var(--shape-2xs);
-`
-
-const SectionHead = styled.div`
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: var(--space-sm);
-`
-
-const SectionTitle = styled.h3`
-	${stenciledTitle}
-	font-size: var(--typescale-title-medium-size);
-	line-height: var(--typescale-title-medium-line);
-	margin: 0;
-`
-
-const TemplateList = styled.ul`
-	list-style: none;
-	margin: 0;
-	padding: 0;
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-2xs);
-`
-
-const TemplateRowItem = styled.li`
-	${ruledLedgerRow}
-	display: flex;
-	align-items: center;
-	gap: var(--space-sm);
-	padding: var(--space-2xs) 0;
-`
-
-const TemplateName = styled.span`
-	flex: 1 1 auto;
-	font-family: var(--font-body);
-	font-size: var(--typescale-body-medium-size);
-	color: var(--color-on-surface);
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-`
-
-const RowActions = styled.div`
-	display: inline-flex;
-	gap: var(--space-2xs);
-`
-
-const Empty = styled.p`
-	font-family: var(--font-body);
-	font-size: var(--typescale-body-medium-size);
-	font-style: italic;
-	color: var(--color-on-surface-variant);
-	margin: 0;
-`
-
-const Notice = styled.p`
-	font-family: var(--font-body);
-	font-size: var(--typescale-body-small-size);
-	color: var(--color-error);
-	padding: var(--space-2xs) var(--space-sm);
-	border-left: 3px solid var(--color-error);
-	background: color-mix(in srgb, var(--color-error) 6%, transparent);
-	margin: 0;
-`
-
 const EmptyDefault = styled.section`
 	${brushedMetalPlate}
 	display: flex;
@@ -488,11 +374,4 @@ const EmptyDefaultTitle = styled.h3`
 	font-size: var(--typescale-title-medium-size);
 	line-height: var(--typescale-title-medium-line);
 	margin: 0;
-`
-
-const DialogActions = styled.div`
-	display: flex;
-	gap: var(--space-sm);
-	justify-content: flex-end;
-	margin-top: var(--space-md);
 `
