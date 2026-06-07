@@ -16,7 +16,12 @@ import { Effect } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { resolveInstructions } from '@batuda/instructions'
+import {
+	clearUserDefaultStack,
+	getDefaultStacks,
+	resolveInstructions,
+	setDefaultStack,
+} from '@batuda/instructions'
 
 import { PgLive } from '../db/client.js'
 import { enterOrgScope } from '../middleware/org.js'
@@ -317,6 +322,76 @@ describe('resolveInstructions (live RLS)', () => {
 			// THEN E1's fingerprint changes and the edited org body resolves in the org slot
 			expect(after.fingerprint).not.toBe(before.fingerprint)
 			expect(after.segments).toEqual(['edited org body', 'e1 body'])
+		})
+	})
+
+	describe('default-stack composition (set, then read it back)', () => {
+		const setStackFor = (
+			userId: string,
+			composition: 'replace' | 'extend',
+			templateIds: ReadonlyArray<string>,
+		) =>
+			runRoot(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* enterOrgScope(sql, { org: ORG_OBJ, userId })(
+						setDefaultStack({
+							organizationId: ORG,
+							ownerUserId: userId,
+							agent: 'research',
+							templateIds,
+							composition,
+						}),
+					)
+				}),
+			)
+		const readStacks = (userId: string) =>
+			runRoot(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* enterOrgScope(sql, { org: ORG_OBJ, userId })(
+						getDefaultStacks(ORG, userId, 'research'),
+					)
+				}),
+			)
+
+		it('should persist composition=extend and read it back with its items', async () => {
+			// GIVEN a fresh user saves an extend stack over the org template
+			const me = `ri-s1-${randomUUID()}`
+			const result = await setStackFor(me, 'extend', [orgTemplate])
+			expect(result.ok).toBe(true)
+			// THEN reading it back reports extend + the stored items
+			const stacks = await readStacks(me)
+			expect(stacks.user?.composition).toBe('extend')
+			expect(stacks.user?.templateIds).toEqual([orgTemplate])
+		})
+
+		it('should overwrite the composition when an existing stack is re-saved', async () => {
+			// GIVEN a user's stack is extend, then re-saved as replace
+			const me = `ri-s2-${randomUUID()}`
+			await setStackFor(me, 'extend', [orgTemplate])
+			await setStackFor(me, 'replace', [orgTemplate])
+			// THEN the upsert UPDATE wrote the new composition
+			const stacks = await readStacks(me)
+			expect(stacks.user?.composition).toBe('replace')
+		})
+
+		it('should leave no user stack after it is cleared', async () => {
+			// GIVEN a user with an extend stack
+			const me = `ri-s3-${randomUUID()}`
+			await setStackFor(me, 'extend', [orgTemplate])
+			// WHEN it is cleared
+			await runRoot(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* enterOrgScope(sql, { org: ORG_OBJ, userId: me })(
+						clearUserDefaultStack(ORG, me, 'research'),
+					)
+				}),
+			)
+			// THEN they inherit the org default again (no user stack)
+			const stacks = await readStacks(me)
+			expect(stacks.user).toBeNull()
 		})
 	})
 })
