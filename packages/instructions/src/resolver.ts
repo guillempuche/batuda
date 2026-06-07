@@ -35,6 +35,26 @@ export const assembleSegments = (
 ): ReadonlyArray<string> =>
 	templates.map(t => t.body.trim()).filter(body => body.length > 0)
 
+// A user's default stack either replaces the org default or extends it (the org
+// default, live, followed by the user's own additions).
+export type StackComposition = 'replace' | 'extend'
+
+// Keep the first occurrence of each id, preserving order. When an "extend" user
+// stack is appended after the org default, a template already in the org block
+// keeps its earlier position and the later duplicate is dropped.
+export const dedupeKeepFirst = (
+	ids: ReadonlyArray<string>,
+): ReadonlyArray<string> => {
+	const seen = new Set<string>()
+	const out: Array<string> = []
+	for (const id of ids) {
+		if (seen.has(id)) continue
+		seen.add(id)
+		out.push(id)
+	}
+	return out
+}
+
 // An org default stack (owner null) may reference only org-owned templates. A
 // personal template inside an org stack is hidden by RLS from other members and
 // would be silently dropped from their resolved prompt, so it must be rejected
@@ -70,6 +90,7 @@ export interface ResolvedInstructions {
 interface StackRow {
 	readonly id: string
 	readonly ownerUserId: string | null
+	readonly composition: StackComposition
 }
 
 interface TemplateRow {
@@ -112,7 +133,7 @@ export const resolveInstructions = (
 		const stacks = yield* override.length > 0
 			? Effect.succeed<ReadonlyArray<StackRow>>([])
 			: sql<StackRow>`
-					SELECT id, owner_user_id
+					SELECT id, owner_user_id, composition
 					FROM agent_default_stacks
 					WHERE organization_id = ${args.organizationId}
 						AND agent = ${args.agent}
@@ -129,11 +150,25 @@ export const resolveInstructions = (
 		const chosenStack =
 			source === 'user' ? userStack : source === 'org' ? orgStack : undefined
 
+		// An "extend" user stack resolves to the live org default followed by the
+		// user's own additions (deduped, with the org keeping its position).
+		// Every other case reads a single chosen stack, as before.
+		const isExtend = source === 'user' && userStack?.composition === 'extend'
 		const orderedIds = yield* source === 'override'
 			? Effect.succeed<ReadonlyArray<string>>(override)
-			: chosenStack
-				? readStackTemplateIds(sql, chosenStack.id)
-				: Effect.succeed<ReadonlyArray<string>>([])
+			: isExtend
+				? Effect.gen(function* () {
+						const orgIds = orgStack
+							? yield* readStackTemplateIds(sql, orgStack.id)
+							: []
+						const userIds = userStack
+							? yield* readStackTemplateIds(sql, userStack.id)
+							: []
+						return dedupeKeepFirst([...orgIds, ...userIds])
+					})
+				: chosenStack
+					? readStackTemplateIds(sql, chosenStack.id)
+					: Effect.succeed<ReadonlyArray<string>>([])
 
 		if (orderedIds.length === 0) {
 			return {
