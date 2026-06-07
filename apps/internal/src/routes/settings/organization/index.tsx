@@ -1,6 +1,6 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Building2, UserPlus, Users, Wallet } from 'lucide-react'
+import { Building2, ScrollText, UserPlus, Users, Wallet } from 'lucide-react'
 import styled from 'styled-components'
 
 import { authClient } from '#/lib/auth-client'
@@ -125,6 +125,24 @@ function OrganizationSettingsPage() {
 							</NavRowLabel>
 							<NavRowDescription>
 								<Trans>Paid research API calls billed to this org.</Trans>
+							</NavRowDescription>
+						</NavRow>
+					) : null}
+
+					{canInvite ? (
+						<NavRow
+							to='/settings/organization/templates'
+							data-testid='settings-org-templates-link'
+							aria-label={t`Manage org instruction templates`}
+						>
+							<NavRowLabel>
+								<ScrollText size={18} aria-hidden />
+								<NavRowTitle>
+									<Trans>Instruction templates</Trans>
+								</NavRowTitle>
+							</NavRowLabel>
+							<NavRowDescription>
+								<Trans>Shared guidance and the org research default.</Trans>
 							</NavRowDescription>
 						</NavRow>
 					) : null}
