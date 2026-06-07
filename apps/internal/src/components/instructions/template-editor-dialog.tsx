@@ -28,12 +28,15 @@ export function TemplateEditorDialog({
 	onOpenChange,
 	editing,
 	onSaved,
+	scope = 'personal',
 }: {
 	readonly open: boolean
 	readonly onOpenChange: (next: boolean) => void
-	// null = create a new personal template; set = edit an existing one.
+	// null = create a new template; set = edit an existing one.
 	readonly editing: TemplateDraft | null
 	readonly onSaved: () => void
+	// New templates are personal unless an admin creates an org-owned one.
+	readonly scope?: 'personal' | 'org'
 }) {
 	const { t } = useLingui()
 	const createTemplate = useAtomSet(createTemplateAtom, { mode: 'promiseExit' })
@@ -55,7 +58,7 @@ export function TemplateEditorDialog({
 		const exit =
 			editing === null
 				? await createTemplate({
-						payload: { name, body, scope: 'personal' },
+						payload: { name, body, scope },
 					} as never)
 				: await updateTemplate({
 						params: { id: editing.id },

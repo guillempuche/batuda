@@ -32,6 +32,7 @@ import { Route as SettingsOrganizationIndexRouteImport } from './routes/settings
 import { Route as SettingsMcpIndexRouteImport } from './routes/settings/mcp/index'
 import { Route as SettingsApiKeysIndexRouteImport } from './routes/settings/api-keys/index'
 import { Route as SettingsProfileTemplatesRouteImport } from './routes/settings/profile/templates'
+import { Route as SettingsOrganizationTemplatesRouteImport } from './routes/settings/organization/templates'
 import { Route as SettingsOrganizationSpendRouteImport } from './routes/settings/organization/spend'
 import { Route as SettingsOrganizationMembersRouteImport } from './routes/settings/organization/members'
 import { Route as SettingsOrganizationInviteRouteImport } from './routes/settings/organization/invite'
@@ -154,6 +155,12 @@ const SettingsProfileTemplatesRoute =
     path: '/settings/profile/templates',
     getParentRoute: () => rootRouteImport,
   } as any)
+const SettingsOrganizationTemplatesRoute =
+  SettingsOrganizationTemplatesRouteImport.update({
+    id: '/settings/organization/templates',
+    path: '/settings/organization/templates',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const SettingsOrganizationSpendRoute =
   SettingsOrganizationSpendRouteImport.update({
     id: '/settings/organization/spend',
@@ -201,6 +208,7 @@ export interface FileRoutesByFullPath {
   '/settings/organization/invite': typeof SettingsOrganizationInviteRoute
   '/settings/organization/members': typeof SettingsOrganizationMembersRoute
   '/settings/organization/spend': typeof SettingsOrganizationSpendRoute
+  '/settings/organization/templates': typeof SettingsOrganizationTemplatesRoute
   '/settings/profile/templates': typeof SettingsProfileTemplatesRoute
   '/settings/api-keys/': typeof SettingsApiKeysIndexRoute
   '/settings/mcp/': typeof SettingsMcpIndexRoute
@@ -230,6 +238,7 @@ export interface FileRoutesByTo {
   '/settings/organization/invite': typeof SettingsOrganizationInviteRoute
   '/settings/organization/members': typeof SettingsOrganizationMembersRoute
   '/settings/organization/spend': typeof SettingsOrganizationSpendRoute
+  '/settings/organization/templates': typeof SettingsOrganizationTemplatesRoute
   '/settings/profile/templates': typeof SettingsProfileTemplatesRoute
   '/settings/api-keys': typeof SettingsApiKeysIndexRoute
   '/settings/mcp': typeof SettingsMcpIndexRoute
@@ -260,6 +269,7 @@ export interface FileRoutesById {
   '/settings/organization/invite': typeof SettingsOrganizationInviteRoute
   '/settings/organization/members': typeof SettingsOrganizationMembersRoute
   '/settings/organization/spend': typeof SettingsOrganizationSpendRoute
+  '/settings/organization/templates': typeof SettingsOrganizationTemplatesRoute
   '/settings/profile/templates': typeof SettingsProfileTemplatesRoute
   '/settings/api-keys/': typeof SettingsApiKeysIndexRoute
   '/settings/mcp/': typeof SettingsMcpIndexRoute
@@ -291,6 +301,7 @@ export interface FileRouteTypes {
     | '/settings/organization/invite'
     | '/settings/organization/members'
     | '/settings/organization/spend'
+    | '/settings/organization/templates'
     | '/settings/profile/templates'
     | '/settings/api-keys/'
     | '/settings/mcp/'
@@ -320,6 +331,7 @@ export interface FileRouteTypes {
     | '/settings/organization/invite'
     | '/settings/organization/members'
     | '/settings/organization/spend'
+    | '/settings/organization/templates'
     | '/settings/profile/templates'
     | '/settings/api-keys'
     | '/settings/mcp'
@@ -349,6 +361,7 @@ export interface FileRouteTypes {
     | '/settings/organization/invite'
     | '/settings/organization/members'
     | '/settings/organization/spend'
+    | '/settings/organization/templates'
     | '/settings/profile/templates'
     | '/settings/api-keys/'
     | '/settings/mcp/'
@@ -379,6 +392,7 @@ export interface RootRouteChildren {
   SettingsOrganizationInviteRoute: typeof SettingsOrganizationInviteRoute
   SettingsOrganizationMembersRoute: typeof SettingsOrganizationMembersRoute
   SettingsOrganizationSpendRoute: typeof SettingsOrganizationSpendRoute
+  SettingsOrganizationTemplatesRoute: typeof SettingsOrganizationTemplatesRoute
   SettingsProfileTemplatesRoute: typeof SettingsProfileTemplatesRoute
   SettingsApiKeysIndexRoute: typeof SettingsApiKeysIndexRoute
   SettingsMcpIndexRoute: typeof SettingsMcpIndexRoute
@@ -549,6 +563,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsProfileTemplatesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/organization/templates': {
+      id: '/settings/organization/templates'
+      path: '/settings/organization/templates'
+      fullPath: '/settings/organization/templates'
+      preLoaderRoute: typeof SettingsOrganizationTemplatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/organization/spend': {
       id: '/settings/organization/spend'
       path: '/settings/organization/spend'
@@ -603,6 +624,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsOrganizationInviteRoute: SettingsOrganizationInviteRoute,
   SettingsOrganizationMembersRoute: SettingsOrganizationMembersRoute,
   SettingsOrganizationSpendRoute: SettingsOrganizationSpendRoute,
+  SettingsOrganizationTemplatesRoute: SettingsOrganizationTemplatesRoute,
   SettingsProfileTemplatesRoute: SettingsProfileTemplatesRoute,
   SettingsApiKeysIndexRoute: SettingsApiKeysIndexRoute,
   SettingsMcpIndexRoute: SettingsMcpIndexRoute,
