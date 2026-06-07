@@ -127,3 +127,17 @@ agent-browser network requests --filter "/api/"       # filter API calls
 agent-browser set offline on                          # test offline behavior
 agent-browser set offline off
 ```
+
+## Record a video (WebM)
+
+Native Playwright recording — no ffmpeg. The recorder runs in a fresh context but preserves cookies and localStorage, so logging in (or navigating to the target page) before `record start` keeps the session; with no URL it captures the current page.
+
+```bash
+agent-browser open https://batuda.localhost/companies   # set up state / log in first
+agent-browser record start /tmp/demo.webm               # defaults to current page if url omitted
+# ... perform the flow: click / fill / press / etc. ...
+agent-browser record stop                               # saves the .webm
+agent-browser record restart /tmp/demo2.webm [url]      # stop current, start a new one
+```
+
+Use a recording (over a screenshot) for flows, animations, and multi-step interactions. Keep it concise — set up state before `record start`, then perform only the steps that show the change. For embedding the file in a PR, see the `pr` skill → *Embedding media*.
