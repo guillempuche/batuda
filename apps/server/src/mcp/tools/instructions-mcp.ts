@@ -49,12 +49,13 @@ const ManagePreset = Tool.make('manage_instruction_preset', {
 
 const ManageDefaultStack = Tool.make('manage_instruction_default_stack', {
 	description:
-		'Get, set, or clear the default instruction stack for an agent. scope=org sets the org default (admin only); scope=personal sets your own; clear removes your own so you inherit the org default.',
+		'Get, set, or clear the default instruction stack for an agent. scope=org sets the org default (admin only); scope=personal sets your own; clear removes your own so you inherit the org default. composition=extend (personal scope) layers your templates on the live org default instead of replacing it.',
 	parameters: Schema.Struct({
 		action: Schema.Literals(['get', 'set', 'clear']),
 		agent: Schema.String,
 		scope: Schema.optional(Scope),
 		template_ids: Schema.optional(Schema.Array(Uuid)),
+		composition: Schema.optional(Schema.Literals(['replace', 'extend'])),
 	}),
 	success: Schema.Unknown,
 	dependencies: REQUEST_DEPENDENCIES,
@@ -155,6 +156,7 @@ export const InstructionsMcpHandlersLive = InstructionsMcpTools.toLayer(
 											userId,
 											agent,
 											params.template_ids,
+											params.composition ?? 'replace',
 										),
 							)
 					}

@@ -48,6 +48,7 @@ export { instructionPresets, presetById, presetsForAgent } from './presets'
 export type {
 	ResolvedInstructions,
 	ResolveInstructionsArgs,
+	StackComposition,
 	StackSource,
 } from './resolver'
 export {
