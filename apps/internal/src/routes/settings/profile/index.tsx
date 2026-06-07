@@ -12,6 +12,7 @@ import {
 	LogOut,
 	Mail,
 	Plug,
+	ScrollText,
 	UserCircle2,
 } from 'lucide-react'
 import { useActionState, useRef, useState } from 'react'
@@ -135,6 +136,15 @@ function ProfilePage() {
 					<Plug size={16} aria-hidden />
 					<span>
 						<Trans>Connections</Trans>
+					</span>
+				</NavRow>
+				<NavRow
+					to='/settings/profile/templates'
+					data-testid='settings-nav-templates'
+				>
+					<ScrollText size={16} aria-hidden />
+					<span>
+						<Trans>Instruction templates</Trans>
 					</span>
 				</NavRow>
 			</SettingsNav>
