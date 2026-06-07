@@ -1,17 +1,24 @@
 import { Radio } from '@base-ui/react/radio'
 import { RadioGroup } from '@base-ui/react/radio-group'
-import { useAtomSet } from '@effect/atom-react'
+import { useAtomSet, useAtomValue } from '@effect/atom-react'
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
+import { Link } from '@tanstack/react-router'
+import { AsyncResult } from 'effect/unstable/reactivity'
 import { X } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
 import type { SchemaName } from '@batuda/research'
 import { PriButton, PriDialog, PriTextarea } from '@batuda/ui/pri'
 
+import { instructionTemplatesAtom } from '#/atoms/instruction-atoms'
 import { createResearchAtom } from '#/atoms/research-atoms'
+import {
+	type StackOption,
+	StackPicker,
+} from '#/components/instructions/stack-picker'
 import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
 
 // Type-only import; adding a schema server-side forces an option here.
@@ -70,6 +77,15 @@ export function ResearchDialog({
 	const [schema, setSchema] = useState<SchemaOption>('freeform')
 	const [submitting, setSubmitting] = useState(false)
 	const [errorMessage, setErrorMessage] = useState<string | null>(null)
+	const [templateIds, setTemplateIds] = useState<ReadonlyArray<string>>([])
+	const templatesResult = useAtomValue(instructionTemplatesAtom)
+	const templateOptions = useMemo<ReadonlyArray<StackOption>>(
+		() =>
+			AsyncResult.isSuccess(templatesResult)
+				? narrowOptions(templatesResult.value)
+				: [],
+		[templatesResult],
+	)
 
 	useEffect(() => {
 		if (!open) return
@@ -77,6 +93,7 @@ export function ResearchDialog({
 		setSchema('freeform')
 		setSubmitting(false)
 		setErrorMessage(null)
+		setTemplateIds([])
 	}, [open])
 
 	const canSubmit = query.trim().length > 0 && !submitting
@@ -94,6 +111,7 @@ export function ResearchDialog({
 				context: {
 					subjects: [{ table: 'companies', id: companyId }],
 				},
+				...(templateIds.length > 0 ? { template_ids: templateIds } : {}),
 			},
 		} as never)
 
@@ -112,6 +130,7 @@ export function ResearchDialog({
 		query,
 		schema,
 		companyId,
+		templateIds,
 		onCreated,
 		onOpenChange,
 		t,
@@ -197,6 +216,37 @@ export function ResearchDialog({
 							</SchemaGrid>
 						</Field>
 
+						<Field>
+							<Label as='div'>
+								<Trans>Instructions for this run (optional)</Trans>
+							</Label>
+							{templateOptions.length > 0 ? (
+								<>
+									<HelpText>
+										<Trans>
+											Pick templates to use just for this run. Leave empty to
+											use your default.
+										</Trans>
+									</HelpText>
+									<StackPicker
+										options={templateOptions}
+										selectedIds={templateIds}
+										onChange={setTemplateIds}
+									/>
+								</>
+							) : (
+								<HelpText>
+									<Trans>
+										Set up reusable{' '}
+										<SetupLink to='/settings/profile/templates'>
+											instruction templates
+										</SetupLink>{' '}
+										to guide every run.
+									</Trans>
+								</HelpText>
+							)}
+						</Field>
+
 						{errorMessage !== null ? (
 							<ErrorBanner role='alert'>{errorMessage}</ErrorBanner>
 						) : null}
@@ -229,6 +279,43 @@ export function ResearchDialog({
 		</PriDialog.Root>
 	)
 }
+
+function narrowOptions(value: unknown): ReadonlyArray<StackOption> {
+	if (!Array.isArray(value)) return []
+	const out: Array<StackOption> = []
+	for (const row of value) {
+		if (!row || typeof row !== 'object') continue
+		const r = row as Record<string, unknown>
+		const id = typeof r['id'] === 'string' ? r['id'] : null
+		const name = typeof r['name'] === 'string' ? r['name'] : null
+		if (id === null || name === null) continue
+		out.push({
+			id,
+			name,
+			ownerUserId:
+				typeof r['ownerUserId'] === 'string' ? r['ownerUserId'] : null,
+		})
+	}
+	return out
+}
+
+const HelpText = styled.p`
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	color: var(--color-on-surface-variant);
+	margin: 0;
+`
+
+const SetupLink = styled(Link)`
+	color: var(--color-primary);
+	text-decoration: underline;
+
+	&:focus-visible {
+		outline: none;
+		box-shadow: var(--glow-active);
+		border-radius: var(--shape-2xs);
+	}
+`
 
 const Header = styled.div`
 	display: flex;
@@ -285,9 +372,9 @@ const Label = styled.label`
 const ErrorBanner = styled.div`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
-	color: var(--color-error, #c6664b);
+	color: var(--color-error);
 	padding: var(--space-2xs) var(--space-sm);
-	border: 1px solid var(--color-error, #c6664b);
+	border: 1px solid var(--color-error);
 	border-radius: var(--shape-2xs);
 `
 

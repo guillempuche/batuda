@@ -24,6 +24,11 @@ msgstr "—"
 msgid "— Select a company —"
 msgstr "— Select a company —"
 
+#. placeholder {0}: confirmTarget?.name ?? ''
+#: src/routes/settings/profile/templates.tsx:287
+msgid "\"{0}\" will be removed for good. This can't be undone."
+msgstr "\"{0}\" will be removed for good. This can't be undone."
+
 #: src/components/research/run-list.tsx:53
 msgid "(no schema)"
 msgstr "(no schema)"
@@ -69,6 +74,13 @@ msgstr "{0} msgs"
 #: src/routes/emails/index.tsx:526
 msgid "{0} thread could not be updated."
 msgstr "{0} thread could not be updated."
+
+#. placeholder {0}: o.name
+#. placeholder {1}: i + 1
+#. placeholder {2}: selected.length
+#: src/components/instructions/stack-picker.tsx:104
+msgid "{0}, position {1} of {2}"
+msgstr "{0}, position {1} of {2}"
 
 #: src/routes/emails/index.tsx:721
 msgid "{selectedCount} threads selected"
@@ -119,6 +131,10 @@ msgstr "1 thread"
 msgid "1 thread selected"
 msgstr "1 thread selected"
 
+#: src/components/instructions/template-editor-dialog.tsx:127
+msgid "A short label. Start it with a [tag] like [research] to group related templates if you like — the brackets are just part of the name."
+msgstr "A short label. Start it with a [tag] like [research] to group related templates if you like — the brackets are just part of the name."
+
 #: src/components/companies/about-section.tsx:51
 msgid "About"
 msgstr "About"
@@ -164,6 +180,11 @@ msgstr "Active organization"
 msgid "Add"
 msgstr "Add"
 
+#. placeholder {0}: o.name
+#: src/components/instructions/stack-picker.tsx:153
+msgid "Add {0}"
+msgstr "Add {0}"
+
 #: src/components/shared/editable-field.tsx:322
 msgid "Add {label}"
 msgstr "Add {label}"
@@ -171,6 +192,18 @@ msgstr "Add {label}"
 #: src/components/companies/where-panel-client.client.tsx:121
 msgid "Add a location on the Profile tab, then locate this company."
 msgstr "Add a location on the Profile tab, then locate this company."
+
+#: src/components/instructions/template-editor-dialog.tsx:50
+msgid "Add a name and instructions before saving."
+msgstr "Add a name and instructions before saving."
+
+#: src/components/instructions/stack-picker.tsx:147
+msgid "Add a template"
+msgstr "Add a template"
+
+#: src/components/instructions/default-stack-editor.tsx:90
+msgid "Add at least one template before saving a default."
+msgstr "Add at least one template before saving a default."
 
 #: src/components/emails/attachment-picker.tsx:120
 msgid "Add attachment"
@@ -249,7 +282,7 @@ msgid "Any agent using \"{confirmLabel}\" will stop working. This can't be undon
 msgstr "Any agent using \"{confirmLabel}\" will stop working. This can't be undone."
 
 #: src/routes/settings/api-keys/index.tsx:201
-#: src/routes/settings/profile/index.tsx:122
+#: src/routes/settings/profile/index.tsx:123
 msgid "API keys"
 msgstr "API keys"
 
@@ -287,6 +320,10 @@ msgstr "Audit log"
 #: src/routes/emails/inboxes.tsx:440
 msgid "Auth failed"
 msgstr "Auth failed"
+
+#: src/routes/settings/profile/templates.tsx:150
+msgid "Back to account"
+msgstr "Back to account"
 
 #: src/routes/research/$id.tsx:24
 msgid "Back to companies"
@@ -412,11 +449,13 @@ msgstr "Call phone"
 msgid "Calls"
 msgstr "Calls"
 
+#: src/components/instructions/template-editor-dialog.tsx:166
 #: src/components/interactions/quick-capture-dialog.tsx:400
-#: src/components/research/research-dialog.tsx:221
+#: src/components/research/research-dialog.tsx:271
 #: src/routes/emails/inboxes.tsx:1055
 #: src/routes/emails/inboxes.tsx:1453
 #: src/routes/settings/api-keys/index.tsx:424
+#: src/routes/settings/profile/templates.tsx:307
 #: src/routes/tasks/index.tsx:718
 msgid "Cancel"
 msgstr "Cancel"
@@ -434,12 +473,12 @@ msgstr "Cancelling…"
 msgid "Cc"
 msgstr "Cc"
 
-#: src/routes/settings/profile/index.tsx:373
+#: src/routes/settings/profile/index.tsx:383
 msgid "Change my mind — set a password anyway"
 msgstr "Change my mind — set a password anyway"
 
-#: src/routes/settings/profile/index.tsx:433
-#: src/routes/settings/profile/index.tsx:520
+#: src/routes/settings/profile/index.tsx:443
+#: src/routes/settings/profile/index.tsx:530
 msgid "Change password"
 msgstr "Change password"
 
@@ -526,8 +565,9 @@ msgstr "Clicked"
 msgid "Client"
 msgstr "Client"
 
+#: src/components/instructions/template-editor-dialog.tsx:90
 #: src/components/interactions/quick-capture-dialog.tsx:188
-#: src/components/research/research-dialog.tsx:140
+#: src/components/research/research-dialog.tsx:159
 #: src/routes/calendar/index.tsx:355
 #: src/routes/emails/$threadId.tsx:353
 #: src/routes/emails/inboxes.tsx:785
@@ -591,11 +631,11 @@ msgstr "Companies"
 msgid "Company"
 msgstr "Company"
 
-#: src/components/research/research-dialog.tsx:36
+#: src/components/research/research-dialog.tsx:43
 msgid "Company enrichment"
 msgstr "Company enrichment"
 
-#: src/components/research/research-dialog.tsx:41
+#: src/components/research/research-dialog.tsx:48
 msgid "Competitor scan"
 msgstr "Competitor scan"
 
@@ -626,7 +666,7 @@ msgstr "Compose"
 msgid "Conclusion or commitment (optional)"
 msgstr "Conclusion or commitment (optional)"
 
-#: src/routes/settings/profile/index.tsx:128
+#: src/routes/settings/profile/index.tsx:129
 msgid "Connect AI tools"
 msgstr "Connect AI tools"
 
@@ -673,11 +713,11 @@ msgstr "Connecting…"
 msgid "Connection tested"
 msgstr "Connection tested"
 
-#: src/routes/settings/profile/index.tsx:137
+#: src/routes/settings/profile/index.tsx:138
 msgid "Connections"
 msgstr "Connections"
 
-#: src/components/research/research-dialog.tsx:46
+#: src/components/research/research-dialog.tsx:53
 msgid "Contact discovery"
 msgstr "Contact discovery"
 
@@ -821,6 +861,10 @@ msgstr "Could not save the inbox."
 msgid "Could not save the page. Please try again."
 msgstr "Could not save the page. Please try again."
 
+#: src/components/instructions/template-editor-dialog.tsx:69
+msgid "Could not save the template. Please try again."
+msgstr "Could not save the template. Please try again."
+
 #: src/routes/settings/organization/invite.tsx:70
 msgid "Could not send the invitation. Please try again."
 msgstr "Could not send the invitation. Please try again."
@@ -842,7 +886,7 @@ msgstr "Could not set the default inbox."
 msgid "Could not sign in. Check your email and password."
 msgstr "Could not sign in. Check your email and password."
 
-#: src/components/research/research-dialog.tsx:107
+#: src/components/research/research-dialog.tsx:125
 msgid "Could not start the research run. Please try again."
 msgstr "Could not start the research run. Please try again."
 
@@ -862,7 +906,20 @@ msgstr "Could not update"
 msgid "Couldn't copy"
 msgstr "Couldn't copy"
 
-#: src/routes/settings/profile/index.tsx:378
+#: src/routes/settings/profile/templates.tsx:114
+#: src/routes/settings/profile/templates.tsx:134
+msgid "Couldn't delete the template. Please try again."
+msgstr "Couldn't delete the template. Please try again."
+
+#: src/routes/settings/profile/templates.tsx:239
+msgid "Couldn't load your default. Refresh to try again."
+msgstr "Couldn't load your default. Refresh to try again."
+
+#: src/routes/settings/profile/templates.tsx:185
+msgid "Couldn't load your templates. Refresh to try again."
+msgstr "Couldn't load your templates. Refresh to try again."
+
+#: src/routes/settings/profile/index.tsx:388
 msgid "Couldn't update your preference. Try again."
 msgstr "Couldn't update your preference. Try again."
 
@@ -885,6 +942,10 @@ msgstr "Create a prospect landing page from a company detail view or via the MCP
 #: src/routes/companies/$slug.tsx:1118
 msgid "Create a prospect landing page to share with this company."
 msgstr "Create a prospect landing page to share with this company."
+
+#: src/routes/settings/profile/templates.tsx:247
+msgid "Create a template above first, then pick which ones run by default."
+msgstr "Create a template above first, then pick which ones run by default."
 
 #: src/routes/settings/mcp/index.tsx:184
 msgid "Create an API key"
@@ -928,11 +989,11 @@ msgstr "Created by agent"
 msgid "Creating…"
 msgstr "Creating…"
 
-#: src/routes/settings/profile/index.tsx:447
+#: src/routes/settings/profile/index.tsx:457
 msgid "Current password"
 msgstr "Current password"
 
-#: src/routes/settings/profile/index.tsx:497
+#: src/routes/settings/profile/index.tsx:507
 msgid "Current password is incorrect."
 msgstr "Current password is incorrect."
 
@@ -978,12 +1039,20 @@ msgstr "Defaults to you when omitted."
 
 #: src/routes/emails/inboxes.tsx:1385
 #: src/routes/settings/api-keys/index.tsx:329
+#: src/routes/settings/profile/templates.tsx:302
 msgid "Delete"
 msgstr "Delete"
+
+#. placeholder {0}: row.name
+#: src/routes/settings/profile/templates.tsx:221
+msgid "Delete {0}"
+msgstr "Delete {0}"
 
 #: src/routes/emails/inboxes.tsx:266
 #: src/routes/emails/inboxes.tsx:1293
 #: src/routes/settings/api-keys/index.tsx:162
+#: src/routes/settings/profile/templates.tsx:113
+#: src/routes/settings/profile/templates.tsx:133
 msgid "Delete failed"
 msgstr "Delete failed"
 
@@ -1009,8 +1078,13 @@ msgstr "Delete this footer? This cannot be undone."
 msgid "Delete this key?"
 msgstr "Delete this key?"
 
+#: src/routes/settings/profile/templates.tsx:284
+msgid "Delete this template?"
+msgstr "Delete this template?"
+
 #: src/routes/settings/api-keys/index.tsx:329
 #: src/routes/settings/api-keys/index.tsx:439
+#: src/routes/settings/profile/templates.tsx:302
 msgid "Deleting…"
 msgstr "Deleting…"
 
@@ -1088,9 +1162,18 @@ msgstr "e.g. Company signature"
 msgid "e.g. Sales — Acme"
 msgstr "e.g. Sales — Acme"
 
+#: src/components/instructions/template-editor-dialog.tsx:122
+msgid "e.g. Spain hospitality sourcing"
+msgstr "e.g. Spain hospitality sourcing"
+
 #: src/routes/emails/inboxes.tsx:1376
 msgid "Edit"
 msgstr "Edit"
+
+#. placeholder {0}: row.name
+#: src/routes/settings/profile/templates.tsx:214
+msgid "Edit {0}"
+msgstr "Edit {0}"
 
 #: src/components/shared/editable-field.tsx:141
 msgid "Edit {label}"
@@ -1112,6 +1195,10 @@ msgstr "Edit inbox {0}"
 #: src/components/shared/task-item.tsx:216
 msgid "Edit task title"
 msgstr "Edit task title"
+
+#: src/components/instructions/template-editor-dialog.tsx:84
+msgid "Edit template"
+msgstr "Edit template"
 
 #: src/routes/pages/$id.tsx:154
 #: src/routes/pages/$id.tsx:287
@@ -1210,7 +1297,7 @@ msgstr "Failed"
 msgid "Files"
 msgstr "Files"
 
-#: src/components/research/research-dialog.tsx:37
+#: src/components/research/research-dialog.tsx:44
 msgid "Fill industry, size, location, contacts, competitors and proposed CRM updates for this company. Pick when you want every field on the company card answered."
 msgstr "Fill industry, size, location, contacts, competitors and proposed CRM updates for this company. Pick when you want every field on the company card answered."
 
@@ -1235,11 +1322,11 @@ msgstr "Filter conversations"
 msgid "Filter emails"
 msgstr "Filter emails"
 
-#: src/components/research/research-dialog.tsx:47
+#: src/components/research/research-dialog.tsx:54
 msgid "Find decision-makers and operational contacts at this company. Pick when you need names, emails, phones and roles to reach out."
 msgstr "Find decision-makers and operational contacts at this company. Pick when you need names, emails, phones and roles to reach out."
 
-#: src/components/research/research-dialog.tsx:52
+#: src/components/research/research-dialog.tsx:59
 msgid "Find similar companies elsewhere with the same pain. Pick when you have closed a deal and want lookalikes."
 msgstr "Find similar companies elsewhere with the same pain. Pick when you have closed a deal and want lookalikes."
 
@@ -1264,7 +1351,7 @@ msgstr "Footers — {0}"
 msgid "Forgot password?"
 msgstr "Forgot password?"
 
-#: src/components/research/research-dialog.tsx:31
+#: src/components/research/research-dialog.tsx:38
 msgid "Freeform"
 msgstr "Freeform"
 
@@ -1335,7 +1422,7 @@ msgstr "Human"
 msgid "I prefer passwordless"
 msgstr "I prefer passwordless"
 
-#: src/routes/settings/profile/index.tsx:335
+#: src/routes/settings/profile/index.tsx:345
 msgid "I prefer passwordless — don't ask me again"
 msgstr "I prefer passwordless — don't ask me again"
 
@@ -1406,6 +1493,19 @@ msgstr "Industry"
 msgid "Instagram"
 msgstr "Instagram"
 
+#: src/routes/settings/profile/index.tsx:147
+#: src/routes/settings/profile/templates.tsx:157
+msgid "Instruction templates"
+msgstr "Instruction templates"
+
+#: src/components/instructions/template-editor-dialog.tsx:137
+msgid "Instructions"
+msgstr "Instructions"
+
+#: src/components/research/research-dialog.tsx:221
+msgid "Instructions for this run (optional)"
+msgstr "Instructions for this run (optional)"
+
 #: src/components/companies/conversations-tab.tsx:159
 msgid "Interaction"
 msgstr "Interaction"
@@ -1464,7 +1564,7 @@ msgstr "Lang"
 
 #: src/components/profile/language-select.tsx:34
 #: src/routes/pages/$id.tsx:311
-#: src/routes/settings/profile/index.tsx:165
+#: src/routes/settings/profile/index.tsx:175
 msgid "Language"
 msgstr "Language"
 
@@ -1590,7 +1690,7 @@ msgstr "Manage inboxes"
 msgid "Manage members"
 msgstr "Manage members"
 
-#: src/components/research/research-dialog.tsx:42
+#: src/components/research/research-dialog.tsx:49
 msgid "Map direct competitors with strengths, weaknesses, and a market-maturity summary. Pick when you need to know who you are up against."
 msgstr "Map direct competitors with strengths, weaknesses, and a market-maturity summary. Pick when you need to know who you are up against."
 
@@ -1686,10 +1786,34 @@ msgstr "Messages"
 msgid "Meta"
 msgstr "Meta"
 
+#: src/components/instructions/stack-picker.tsx:108
+#: src/components/instructions/stack-picker.tsx:159
+#: src/routes/settings/profile/templates.tsx:207
+msgid "Mine"
+msgstr "Mine"
+
 #: src/components/emails/compose-window.tsx:62
 msgid "Minimize"
 msgstr "Minimize"
 
+#. placeholder {0}: o.name
+#: src/components/instructions/stack-picker.tsx:123
+msgid "Move {0} down"
+msgstr "Move {0} down"
+
+#. placeholder {0}: o.name
+#: src/components/instructions/stack-picker.tsx:112
+msgid "Move {0} up"
+msgstr "Move {0} up"
+
+#. placeholder {0}: moved?.name ?? ''
+#. placeholder {1}: target + 1
+#. placeholder {2}: next.length
+#: src/components/instructions/stack-picker.tsx:68
+msgid "Moved {0} to position {1} of {2}"
+msgstr "Moved {0} to position {1} of {2}"
+
+#: src/components/instructions/template-editor-dialog.tsx:115
 #: src/routes/emails/inboxes.tsx:1413
 #: src/routes/settings/api-keys/index.tsx:219
 msgid "Name"
@@ -1719,14 +1843,19 @@ msgid "Never expires"
 msgstr "Never expires"
 
 #: src/routes/reset-password.tsx:193
-#: src/routes/settings/profile/index.tsx:275
-#: src/routes/settings/profile/index.tsx:459
+#: src/routes/settings/profile/index.tsx:285
+#: src/routes/settings/profile/index.tsx:469
 msgid "New password"
 msgstr "New password"
 
 #: src/routes/emails/inboxes.tsx:942
 msgid "New password or app-password"
 msgstr "New password or app-password"
+
+#: src/components/instructions/template-editor-dialog.tsx:82
+#: src/routes/settings/profile/templates.tsx:179
+msgid "New template"
+msgstr "New template"
 
 #: src/routes/emails/index.tsx:849
 msgid "Next"
@@ -1789,7 +1918,7 @@ msgstr "No companies yet"
 #: src/routes/oauth/consent.tsx:71
 #: src/routes/settings/organization/invite.tsx:77
 #: src/routes/settings/organization/members.tsx:81
-#: src/routes/settings/profile/index.tsx:90
+#: src/routes/settings/profile/index.tsx:91
 msgid "No connection to the server. Try again in a few seconds."
 msgstr "No connection to the server. Try again in a few seconds."
 
@@ -1904,6 +2033,14 @@ msgstr "No tags yet"
 #: src/routes/index.tsx:382
 msgid "No tasks for today"
 msgstr "No tasks for today"
+
+#: src/components/instructions/stack-picker.tsx:94
+msgid "No templates added yet."
+msgstr "No templates added yet."
+
+#: src/routes/settings/profile/templates.tsx:189
+msgid "No templates yet. Create one to start shaping your runs."
+msgstr "No templates yet. Create one to start shaping your runs."
 
 #: src/routes/emails/index.tsx:790
 msgid "No threads match the filters"
@@ -2023,7 +2160,7 @@ msgstr "Open the org spend dashboard"
 msgid "Open website"
 msgstr "Open website"
 
-#: src/components/research/research-dialog.tsx:32
+#: src/components/research/research-dialog.tsx:39
 msgid "Open-ended brief. Pick when the question does not fit a fixed shape — history, market trend, an opinion piece. No structured output."
 msgstr "Open-ended brief. Pick when the question does not fit a fixed shape — history, market trend, an opinion piece. No structured output."
 
@@ -2031,10 +2168,16 @@ msgstr "Open-ended brief. Pick when the question does not fit a fixed shape — 
 msgid "Opened"
 msgstr "Opened"
 
+#: src/components/instructions/stack-picker.tsx:108
+#: src/components/instructions/stack-picker.tsx:159
+#: src/routes/settings/profile/templates.tsx:205
+msgid "Org"
+msgstr "Org"
+
 #: src/routes/settings/organization/index.tsx:42
 #: src/routes/settings/organization/invite.tsx:91
 #: src/routes/settings/organization/members.tsx:95
-#: src/routes/settings/profile/index.tsx:116
+#: src/routes/settings/profile/index.tsx:117
 msgid "Organization"
 msgstr "Organization"
 
@@ -2149,17 +2292,17 @@ msgstr "Password or app-password"
 msgid "Password updated"
 msgstr "Password updated"
 
-#: src/routes/settings/profile/index.tsx:507
+#: src/routes/settings/profile/index.tsx:517
 msgid "Password updated."
 msgstr "Password updated."
 
-#: src/routes/settings/profile/index.tsx:361
+#: src/routes/settings/profile/index.tsx:371
 msgid "Passwordless sign-in only"
 msgstr "Passwordless sign-in only"
 
 #: src/routes/reset-password.tsx:221
-#: src/routes/settings/profile/index.tsx:301
-#: src/routes/settings/profile/index.tsx:485
+#: src/routes/settings/profile/index.tsx:311
+#: src/routes/settings/profile/index.tsx:495
 msgid "Passwords need at least {MIN_PASSWORD_LENGTH} characters."
 msgstr "Passwords need at least {MIN_PASSWORD_LENGTH} characters."
 
@@ -2187,7 +2330,7 @@ msgstr "Personal"
 msgid "Phone"
 msgstr "Phone"
 
-#: src/routes/settings/profile/index.tsx:436
+#: src/routes/settings/profile/index.tsx:446
 msgid "Pick a new password. Other signed-in devices will be signed out."
 msgstr "Pick a new password. Other signed-in devices will be signed out."
 
@@ -2206,6 +2349,10 @@ msgstr "Pick an organization from the switcher in the header, or sign out and ba
 #: src/routes/emails/inboxes.tsx:325
 msgid "Pick one to use as your default sender."
 msgstr "Pick one to use as your default sender."
+
+#: src/components/research/research-dialog.tsx:226
+msgid "Pick templates to use just for this run. Leave empty to use your default."
+msgstr "Pick templates to use just for this run. Leave empty to use your default."
 
 #: src/components/layout/nav-items.ts:38
 #: src/routes/index.tsx:262
@@ -2259,7 +2406,7 @@ msgid "Products fit"
 msgstr "Products fit"
 
 #: src/routes/companies/$slug.tsx:1082
-#: src/routes/settings/profile/index.tsx:102
+#: src/routes/settings/profile/index.tsx:103
 msgid "Profile"
 msgstr "Profile"
 
@@ -2286,7 +2433,7 @@ msgstr "Proposed updates"
 msgid "Prospect"
 msgstr "Prospect"
 
-#: src/components/research/research-dialog.tsx:51
+#: src/components/research/research-dialog.tsx:58
 msgid "Prospect scan"
 msgstr "Prospect scan"
 
@@ -2326,7 +2473,7 @@ msgstr "Publishing…"
 msgid "Purpose"
 msgstr "Purpose"
 
-#: src/components/research/research-dialog.tsx:153
+#: src/components/research/research-dialog.tsx:172
 msgid "Question"
 msgstr "Question"
 
@@ -2369,8 +2516,15 @@ msgstr "Region"
 msgid "Remove"
 msgstr "Remove"
 
+#. placeholder {0}: target.name
+#: src/routes/settings/profile/templates.tsx:125
+msgid "Remove \"{0}\" from your default first, then delete it."
+msgstr "Remove \"{0}\" from your default first, then delete it."
+
 #. placeholder {0}: att.filename
+#. placeholder {0}: o.name
 #: src/components/emails/attachment-picker.tsx:148
+#: src/components/instructions/stack-picker.tsx:134
 msgid "Remove {0}"
 msgstr "Remove {0}"
 
@@ -2381,6 +2535,11 @@ msgstr "Remove {chip}"
 #: src/routes/settings/organization/members.tsx:66
 msgid "Remove {email} from this organization?"
 msgstr "Remove {email} from this organization?"
+
+#. placeholder {0}: removed?.name ?? ''
+#: src/components/instructions/stack-picker.tsx:83
+msgid "Removed {0}"
+msgstr "Removed {0}"
 
 #: src/routes/settings/organization/members.tsx:161
 msgid "Removing…"
@@ -2397,8 +2556,8 @@ msgid "Reopen thread"
 msgstr "Reopen thread"
 
 #: src/routes/reset-password.tsx:207
-#: src/routes/settings/profile/index.tsx:288
-#: src/routes/settings/profile/index.tsx:472
+#: src/routes/settings/profile/index.tsx:298
+#: src/routes/settings/profile/index.tsx:482
 msgid "Repeat new password"
 msgstr "Repeat new password"
 
@@ -2462,6 +2621,10 @@ msgstr "Resume drafting ({0})"
 msgid "Resume drafting (1)"
 msgstr "Resume drafting (1)"
 
+#: src/routes/settings/profile/templates.tsx:160
+msgid "Reusable, standing guidance your research agent follows — what you sell, who you target, tone, and which sources to trust."
+msgstr "Reusable, standing guidance your research agent follows — what you sell, who you target, tone, and which sources to trust."
+
 #: src/routes/settings/organization/invite.tsx:156
 msgid "Role"
 msgstr "Role"
@@ -2478,7 +2641,7 @@ msgstr "Run in progress — events stream as they arrive."
 msgid "Run new"
 msgstr "Run new"
 
-#: src/components/research/research-dialog.tsx:133
+#: src/components/research/research-dialog.tsx:152
 msgid "Run new research"
 msgstr "Run new research"
 
@@ -2490,11 +2653,16 @@ msgstr "Run shape unrecognised."
 msgid "Sales context"
 msgstr "Sales context"
 
+#: src/components/instructions/template-editor-dialog.tsx:161
 #: src/routes/emails/inboxes.tsx:1061
 #: src/routes/emails/inboxes.tsx:1466
 #: src/routes/pages/$id.tsx:268
 msgid "Save"
 msgstr "Save"
+
+#: src/components/instructions/default-stack-editor.tsx:103
+msgid "Save as my default"
+msgstr "Save as my default"
 
 #: src/routes/pages/$id.tsx:198
 msgid "Save failed"
@@ -2504,16 +2672,17 @@ msgstr "Save failed"
 msgid "Save new password"
 msgstr "Save new password"
 
-#: src/routes/settings/profile/index.tsx:326
+#: src/routes/settings/profile/index.tsx:336
 msgid "Save password"
 msgstr "Save password"
 
 #: src/components/emails/compose-form.tsx:547
+#: src/components/instructions/template-editor-dialog.tsx:161
 #: src/routes/emails/inboxes.tsx:1463
 #: src/routes/pages/$id.tsx:268
 #: src/routes/reset-password.tsx:242
-#: src/routes/settings/profile/index.tsx:324
-#: src/routes/settings/profile/index.tsx:518
+#: src/routes/settings/profile/index.tsx:334
+#: src/routes/settings/profile/index.tsx:528
 msgid "Saving…"
 msgstr "Saving…"
 
@@ -2618,7 +2787,7 @@ msgstr "server URL"
 msgid "Set a new password"
 msgstr "Set a new password"
 
-#: src/routes/settings/profile/index.tsx:264
+#: src/routes/settings/profile/index.tsx:274
 msgid "Set a password"
 msgstr "Set a password"
 
@@ -2634,12 +2803,16 @@ msgstr "Set as default"
 msgid "Set password"
 msgstr "Set password"
 
+#: src/components/research/research-dialog.tsx:239
+msgid "Set up reusable <0>instruction templates</0> to guide every run."
+msgstr "Set up reusable <0>instruction templates</0> to guide every run."
+
 #: src/components/layout/nav-items.ts:81
 #: src/routes/pages/$id.tsx:290
 #: src/routes/settings/api-keys/index.tsx:194
 #: src/routes/settings/mcp/connections.tsx:104
 #: src/routes/settings/mcp/index.tsx:110
-#: src/routes/settings/profile/index.tsx:109
+#: src/routes/settings/profile/index.tsx:110
 msgid "Settings"
 msgstr "Settings"
 
@@ -2690,11 +2863,11 @@ msgstr "Sign in to continue"
 msgid "Sign in with your new password. Other devices will need to sign in again too."
 msgstr "Sign in with your new password. Other devices will need to sign in again too."
 
-#: src/routes/settings/profile/index.tsx:184
+#: src/routes/settings/profile/index.tsx:194
 msgid "Sign out"
 msgstr "Sign out"
 
-#: src/routes/settings/profile/index.tsx:84
+#: src/routes/settings/profile/index.tsx:85
 msgid "Sign-out failed. Please try again."
 msgstr "Sign-out failed. Please try again."
 
@@ -2702,7 +2875,7 @@ msgstr "Sign-out failed. Please try again."
 msgid "Signing in…"
 msgstr "Signing in…"
 
-#: src/routes/settings/profile/index.tsx:184
+#: src/routes/settings/profile/index.tsx:194
 msgid "Signing out…"
 msgstr "Signing out…"
 
@@ -2747,8 +2920,8 @@ msgid "Something went wrong. Start the connection again from your assistant."
 msgstr "Something went wrong. Start the connection again from your assistant."
 
 #: src/routes/reset-password.tsx:233
-#: src/routes/settings/profile/index.tsx:313
-#: src/routes/settings/profile/index.tsx:502
+#: src/routes/settings/profile/index.tsx:323
+#: src/routes/settings/profile/index.tsx:512
 msgid "Something went wrong. Try again."
 msgstr "Something went wrong. Try again."
 
@@ -2773,11 +2946,19 @@ msgstr "Spend"
 msgid "Stamped into the workshop ledger."
 msgstr "Stamped into the workshop ledger."
 
-#: src/components/research/research-dialog.tsx:211
+#: src/components/instructions/template-editor-dialog.tsx:145
+msgid "Standing guidance the agent should follow on every run…"
+msgstr "Standing guidance the agent should follow on every run…"
+
+#: src/components/instructions/template-editor-dialog.tsx:100
+msgid "Standing guidance your research agent follows on every run."
+msgstr "Standing guidance your research agent follows on every run."
+
+#: src/components/research/research-dialog.tsx:261
 msgid "Start"
 msgstr "Start"
 
-#: src/components/research/research-dialog.tsx:211
+#: src/components/research/research-dialog.tsx:261
 msgid "Starting…"
 msgstr "Starting…"
 
@@ -2795,6 +2976,10 @@ msgstr "Status"
 #: src/routes/emails/index.tsx:493
 msgid "Status update failed"
 msgstr "Status update failed"
+
+#: src/routes/settings/profile/templates.tsx:124
+msgid "Still in use"
+msgstr "Still in use"
 
 #: src/routes/emails/inboxes.tsx:950
 msgid "Stored encrypted with AES-256-GCM."
@@ -2850,6 +3035,14 @@ msgstr "Tax ID"
 #: src/routes/pages/$id.tsx:317
 msgid "Template"
 msgstr "Template"
+
+#: src/routes/settings/profile/templates.tsx:140
+msgid "Template deleted"
+msgstr "Template deleted"
+
+#: src/routes/settings/profile/templates.tsx:170
+msgid "Templates"
+msgstr "Templates"
 
 #: src/routes/calendar/index.tsx:325
 msgid "Tentative"
@@ -2941,11 +3134,11 @@ msgstr "The thread may have been archived upstream or the link is stale."
 msgid "The token expired or was already used. Request a fresh link."
 msgstr "The token expired or was already used. Request a fresh link."
 
-#: src/routes/settings/profile/index.tsx:492
+#: src/routes/settings/profile/index.tsx:502
 msgid "The two new password fields don't match."
 msgstr "The two new password fields don't match."
 
-#: src/routes/settings/profile/index.tsx:308
+#: src/routes/settings/profile/index.tsx:318
 msgid "The two password fields don't match."
 msgstr "The two password fields don't match."
 
@@ -2964,6 +3157,14 @@ msgstr "The workshop rejected the change. Try again."
 #: src/routes/settings/organization/index.tsx:45
 msgid "The workspace your CRM data lives in."
 msgstr "The workspace your CRM data lives in."
+
+#: src/components/instructions/default-stack-editor.tsx:82
+msgid "These come from your organization. Saving keeps your own copy, so your runs stop following later changes to the org default."
+msgstr "These come from your organization. Saving keeps your own copy, so your runs stop following later changes to the org default."
+
+#: src/components/instructions/default-stack-editor.tsx:74
+msgid "These templates shape every research run, in order — unless you pick different ones for a single run."
+msgstr "These templates shape every research run, in order — unless you pick different ones for a single run."
 
 #: src/components/shared/status-badge.tsx:41
 msgid "They replied — keep the thread warm"
@@ -3082,7 +3283,7 @@ msgstr "unknown"
 msgid "Unknown"
 msgstr "Unknown"
 
-#: src/routes/settings/profile/index.tsx:95
+#: src/routes/settings/profile/index.tsx:96
 msgid "Unknown user"
 msgstr "Unknown user"
 
@@ -3149,9 +3350,17 @@ msgstr "Use as default for this purpose"
 msgid "Use password instead"
 msgstr "Use password instead"
 
+#: src/components/instructions/default-stack-editor.tsx:114
+msgid "Use the org default"
+msgstr "Use the org default"
+
 #: src/routes/emails/inboxes.tsx:914
 msgid "Username"
 msgstr "Username"
+
+#: src/components/instructions/default-stack-editor.tsx:67
+msgid "Using the org default"
+msgstr "Using the org default"
 
 #: src/routes/settings/organization/invite.tsx:128
 msgid "View members"
@@ -3191,7 +3400,7 @@ msgstr "Weaknesses"
 msgid "What"
 msgstr "What"
 
-#: src/components/research/research-dialog.tsx:160
+#: src/components/research/research-dialog.tsx:179
 msgid "What do you want to find out about this company?"
 msgstr "What do you want to find out about this company?"
 
@@ -3203,7 +3412,7 @@ msgstr "What happened?"
 msgid "What is this about?"
 msgstr "What is this about?"
 
-#: src/components/research/research-dialog.tsx:170
+#: src/components/research/research-dialog.tsx:189
 msgid "What kind of research?"
 msgstr "What kind of research?"
 
@@ -3242,7 +3451,7 @@ msgstr "Write footer…"
 msgid "Write your message…"
 msgstr "Write your message…"
 
-#: src/routes/settings/profile/index.tsx:267
+#: src/routes/settings/profile/index.tsx:277
 msgid "You currently sign in from email links. Add a password to skip checking your email next time."
 msgstr "You currently sign in from email links. Add a password to skip checking your email next time."
 
@@ -3258,7 +3467,7 @@ msgstr "You got in from a link in your email."
 msgid "You may not be a member of that organization. Try again."
 msgstr "You may not be a member of that organization. Try again."
 
-#: src/routes/settings/profile/index.tsx:364
+#: src/routes/settings/profile/index.tsx:374
 msgid "You sign in from email links. I won't bring it up again."
 msgstr "You sign in from email links. I won't bring it up again."
 
@@ -3274,7 +3483,7 @@ msgstr "You're now a member."
 msgid "you@example.com"
 msgstr "you@example.com"
 
-#: src/routes/settings/profile/index.tsx:105
+#: src/routes/settings/profile/index.tsx:106
 msgid "Your Batuda workbench identity."
 msgstr "Your Batuda workbench identity."
 
@@ -3290,3 +3499,12 @@ msgstr "Your email isn't verified yet. Use the magic link instead."
 #: src/routes/settings/api-keys/index.tsx:266
 msgid "Your keys"
 msgstr "Your keys"
+
+#: src/components/instructions/default-stack-editor.tsx:69
+msgid "Your own"
+msgstr "Your own"
+
+#: src/components/instructions/default-stack-editor.tsx:63
+#: src/routes/settings/profile/templates.tsx:244
+msgid "Your research default"
+msgstr "Your research default"
