@@ -273,6 +273,7 @@ function CompaniesListPage() {
 						type='button'
 						$active={search.status === undefined}
 						onClick={() => handleStatusFilter(undefined)}
+						data-testid='companies-status-all'
 					>
 						{t`All`}
 					</StatusFilterButton>
@@ -287,6 +288,7 @@ function CompaniesListPage() {
 								)
 							}
 							aria-pressed={search.status === status}
+							data-testid={`companies-status-${status}`}
 						>
 							<StatusBadge status={status} />
 						</StatusFilterButton>
@@ -298,6 +300,7 @@ function CompaniesListPage() {
 						type='button'
 						$variant='outlined'
 						onClick={handleClearFilters}
+						data-testid='companies-clear-filters'
 					>
 						<X size={14} aria-hidden />
 						<span>{t`Clear filters`}</span>
@@ -327,6 +330,7 @@ function CompaniesListPage() {
 										type='button'
 										$variant='outlined'
 										onClick={handleClearFilters}
+										data-testid='companies-clear-filters-empty'
 									>
 										<X size={14} aria-hidden />
 										<span>{t`Clear filters`}</span>

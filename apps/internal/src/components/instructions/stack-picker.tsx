@@ -109,6 +109,7 @@ export function StackPicker({
 								<InstructionIconButton
 									type='button'
 									data-action='up'
+									data-testid={`stack-up-${o.id}`}
 									aria-label={t`Move ${o.name} up`}
 									aria-disabled={atTop}
 									onClick={() => {
@@ -120,6 +121,7 @@ export function StackPicker({
 								<InstructionIconButton
 									type='button'
 									data-action='down'
+									data-testid={`stack-down-${o.id}`}
 									aria-label={t`Move ${o.name} down`}
 									aria-disabled={atBottom}
 									onClick={() => {
@@ -131,6 +133,7 @@ export function StackPicker({
 								<InstructionIconButton
 									type='button'
 									data-action='remove'
+									data-testid={`stack-remove-${o.id}`}
 									aria-label={t`Remove ${o.name}`}
 									onClick={() => remove(o.id)}
 								>
@@ -150,6 +153,7 @@ export function StackPicker({
 							<AddChip
 								key={o.id}
 								type='button'
+								data-testid={`stack-add-${o.id}`}
 								aria-label={t`Add ${o.name}`}
 								onClick={() => onChange([...selectedIds, o.id])}
 							>

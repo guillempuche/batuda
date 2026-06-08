@@ -311,7 +311,12 @@ function InboxesPage() {
 					<Subtitle>{t`Connect IMAP/SMTP mailboxes and choose your primary sender.`}</Subtitle>
 				</IntroText>
 				<IntroActions>
-					<PriButton type='button' $variant='filled' onClick={openCreate}>
+					<PriButton
+						type='button'
+						$variant='filled'
+						data-testid='inboxes-connect'
+						onClick={openCreate}
+					>
 						<Plus size={14} aria-hidden />
 						<span>{t`Connect mailbox`}</span>
 					</PriButton>
@@ -390,7 +395,12 @@ function InboxesPage() {
 					title={t`No inboxes yet`}
 					description={t`Connect your IMAP/SMTP mailbox to start sending and receiving email.`}
 					action={
-						<PriButton type='button' $variant='filled' onClick={openCreate}>
+						<PriButton
+							type='button'
+							$variant='filled'
+							data-testid='inboxes-empty-connect'
+							onClick={openCreate}
+						>
 							<Plus size={14} aria-hidden />
 							<span>{t`Connect mailbox`}</span>
 						</PriButton>

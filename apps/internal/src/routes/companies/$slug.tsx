@@ -689,6 +689,7 @@ function DetailBody({
 									<HeaderInlineButton
 										type='button'
 										aria-label={t`Change priority`}
+										data-testid='company-priority-trigger'
 									>
 										{company.priority === null ? (
 											<GhostPriorityDot aria-hidden />
@@ -731,6 +732,7 @@ function DetailBody({
 									<HeaderInlineButton
 										type='button'
 										aria-label={t`Change status`}
+										data-testid='company-status-trigger'
 									>
 										<StatusBadge
 											status={asCompanyStatus(company.status)}
@@ -747,7 +749,11 @@ function DetailBody({
 									<PriSelect.Popup>
 										<PriSelect.List>
 											{statusOptions.map(opt => (
-												<PriSelect.Item key={opt.value} value={opt.value}>
+												<PriSelect.Item
+													key={opt.value}
+													value={opt.value}
+													data-testid={`company-status-option-${opt.value}`}
+												>
 													<PriSelect.ItemIndicator>
 														<Check size={12} />
 													</PriSelect.ItemIndicator>
@@ -863,7 +869,7 @@ function DetailBody({
 
 			<PriTabs.Root value={tab} onValueChange={v => setTab(v as CompanyTab)}>
 				<PriTabs.List>
-					<PriTabs.Tab value='overview'>
+					<PriTabs.Tab value='overview' data-testid='company-overview-tab'>
 						<Trans>Overview</Trans>
 					</PriTabs.Tab>
 					<PriTabs.Tab
@@ -872,10 +878,10 @@ function DetailBody({
 					>
 						<Trans>Conversations</Trans> ({conversationsCount})
 					</PriTabs.Tab>
-					<PriTabs.Tab value='people'>
+					<PriTabs.Tab value='people' data-testid='company-people-tab'>
 						<Trans>People</Trans> ({contacts.length})
 					</PriTabs.Tab>
-					<PriTabs.Tab value='files'>
+					<PriTabs.Tab value='files' data-testid='company-files-tab'>
 						<Trans>Files</Trans> ({companyPages.length})
 					</PriTabs.Tab>
 					<PriTabs.Indicator />

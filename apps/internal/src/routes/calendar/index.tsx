@@ -173,7 +173,7 @@ function CalendarPage() {
 	const empty = !loading && events.length === 0
 
 	return (
-		<Page>
+		<Page data-testid='calendar-page'>
 			<Header>
 				<HeaderTitle>
 					<Trans>Calendar</Trans>
@@ -185,7 +185,7 @@ function CalendarPage() {
 				</HeaderSub>
 			</Header>
 
-			<GridFrame>
+			<GridFrame data-testid='calendar-grid'>
 				{loading && events.length === 0 ? (
 					<LoadingSpinner label={t`Loading calendar…`} />
 				) : empty ? (
@@ -248,7 +248,7 @@ function EventDetailDialog({
 		<PriDialog.Root open onOpenChange={open => !open && onClose()}>
 			<PriDialog.Portal>
 				<PriDialog.Backdrop />
-				<PriDialog.Popup>
+				<PriDialog.Popup data-testid={`calendar-event-dialog-${event.id}`}>
 					<PriDialog.Title>{event.title}</PriDialog.Title>
 					<PriDialog.Description>
 						{company !== null ? company.name : t`Personal`}
@@ -290,6 +290,7 @@ function EventDetailDialog({
 										href={event.videoCallUrl}
 										target='_blank'
 										rel='noreferrer'
+										data-testid='calendar-event-video-link'
 									>
 										<Trans>Join video call</Trans>
 									</VideoLink>
@@ -312,6 +313,7 @@ function EventDetailDialog({
 									$variant='text'
 									disabled={rsvpPending}
 									onClick={() => onRsvp('accepted')}
+									data-testid='calendar-rsvp-accept'
 								>
 									<Check size={12} aria-hidden />
 									<Trans>Accept</Trans>
@@ -320,6 +322,7 @@ function EventDetailDialog({
 									$variant='text'
 									disabled={rsvpPending}
 									onClick={() => onRsvp('tentative')}
+									data-testid='calendar-rsvp-tentative'
 								>
 									<CircleHelp size={12} aria-hidden />
 									<Trans>Tentative</Trans>
@@ -328,6 +331,7 @@ function EventDetailDialog({
 									$variant='text'
 									disabled={rsvpPending}
 									onClick={() => onRsvp('declined')}
+									data-testid='calendar-rsvp-decline'
 								>
 									<X size={12} aria-hidden />
 									<Trans>Decline</Trans>
@@ -337,7 +341,10 @@ function EventDetailDialog({
 					) : null}
 
 					<ActionRow>
-						<PriButton onClick={onCreateFollowUp}>
+						<PriButton
+							onClick={onCreateFollowUp}
+							data-testid='calendar-event-follow-up'
+						>
 							<CalendarPlus size={12} aria-hidden />
 							<Trans>Create follow-up task</Trans>
 						</PriButton>
@@ -347,11 +354,16 @@ function EventDetailDialog({
 								onClick={() => {
 									window.location.assign(`/companies/${company.slug}`)
 								}}
+								data-testid='calendar-event-open-company'
 							>
 								<Trans>Open company</Trans>
 							</PriButton>
 						) : null}
-						<PriButton $variant='text' onClick={onClose}>
+						<PriButton
+							$variant='text'
+							onClick={onClose}
+							data-testid='calendar-event-dialog-close'
+						>
 							<Trans>Close</Trans>
 						</PriButton>
 					</ActionRow>
