@@ -25,7 +25,7 @@ msgid "— Select a company —"
 msgstr "— Tria una empresa —"
 
 #. placeholder {0}: row.name
-#: src/routes/settings/profile/templates.tsx:166
+#: src/routes/settings/profile/templates.tsx:170
 msgid "\"{0}\" is waiting for an admin to add it to the organization."
 msgstr "«{0}» espera que un administrador l'afegeixi a l'organització."
 
@@ -35,7 +35,7 @@ msgid "\"{0}\" will be removed for everyone in the organization. This can't be u
 msgstr "S'eliminarà «{0}» per a tothom de l'organització. Això no es pot desfer."
 
 #. placeholder {0}: confirmTarget?.name ?? ''
-#: src/routes/settings/profile/templates.tsx:326
+#: src/routes/settings/profile/templates.tsx:331
 msgid "\"{0}\" will be removed for good. This can't be undone."
 msgstr "S'eliminarà «{0}» per sempre. Això no es pot desfer."
 
@@ -223,9 +223,13 @@ msgstr "Afegeix una plantilla"
 msgid "Add an org template first."
 msgstr "Afegeix primer una plantilla de l'organització."
 
-#: src/components/instructions/default-stack-editor.tsx:90
+#: src/components/instructions/default-stack-editor.tsx:168
 msgid "Add at least one template before saving a default."
 msgstr "Afegeix almenys una plantilla abans de desar un valor per defecte."
+
+#: src/components/instructions/default-stack-editor.tsx:166
+msgid "Add at least one template to layer on the org default."
+msgstr "Afegeix almenys una plantilla per posar-la sobre el valor per defecte de l'organització."
 
 #: src/components/emails/attachment-picker.tsx:120
 msgid "Add attachment"
@@ -246,6 +250,10 @@ msgstr "Afegeix el primer responsable de decisió per saber a qui adreçar-te."
 #: src/routes/settings/organization/templates.tsx:465
 msgid "Add to org"
 msgstr "Afegeix a l'organització"
+
+#: src/components/instructions/default-stack-editor.tsx:130
+msgid "Add to the org default"
+msgstr "Amplia el valor per defecte de l'organització"
 
 #: src/routes/settings/organization/templates.tsx:289
 #: src/routes/settings/organization/templates.tsx:328
@@ -352,7 +360,7 @@ msgstr "Registre d'auditoria"
 msgid "Auth failed"
 msgstr "Error d'autenticació"
 
-#: src/routes/settings/profile/templates.tsx:183
+#: src/routes/settings/profile/templates.tsx:187
 msgid "Back to account"
 msgstr "Torna al compte"
 
@@ -951,8 +959,8 @@ msgid "Couldn't decline it"
 msgstr "No s'ha pogut rebutjar"
 
 #: src/routes/settings/organization/templates.tsx:250
-#: src/routes/settings/profile/templates.tsx:127
-#: src/routes/settings/profile/templates.tsx:147
+#: src/routes/settings/profile/templates.tsx:131
+#: src/routes/settings/profile/templates.tsx:151
 msgid "Couldn't delete the template. Please try again."
 msgstr "No s'ha pogut eliminar la plantilla. Torna-ho a provar."
 
@@ -964,11 +972,11 @@ msgstr "No s'ha pogut importar"
 msgid "Couldn't load the org default. Refresh to try again."
 msgstr "No s'ha pogut carregar el valor per defecte de l'organització. Actualitza per tornar-ho a provar."
 
-#: src/routes/settings/profile/templates.tsx:281
+#: src/routes/settings/profile/templates.tsx:285
 msgid "Couldn't load your default. Refresh to try again."
 msgstr "No s'ha pogut carregar el teu valor per defecte. Actualitza per tornar-ho a provar."
 
-#: src/routes/settings/profile/templates.tsx:218
+#: src/routes/settings/profile/templates.tsx:222
 msgid "Couldn't load your templates. Refresh to try again."
 msgstr "No s'han pogut carregar les teves plantilles. Actualitza per tornar-ho a provar."
 
@@ -976,7 +984,7 @@ msgstr "No s'han pogut carregar les teves plantilles. Actualitza per tornar-ho a
 msgid "Couldn't save"
 msgstr "No s'ha pogut desar"
 
-#: src/routes/settings/profile/templates.tsx:172
+#: src/routes/settings/profile/templates.tsx:176
 msgid "Couldn't send it"
 msgstr "No s'ha pogut enviar"
 
@@ -1004,7 +1012,7 @@ msgstr "Crea una pàgina d'aterratge per a un prospecte des del detall d'una emp
 msgid "Create a prospect landing page to share with this company."
 msgstr "Crea una pàgina d'aterratge per a un prospecte per compartir amb aquesta empresa."
 
-#: src/routes/settings/profile/templates.tsx:289
+#: src/routes/settings/profile/templates.tsx:293
 msgid "Create a template above first, then pick which ones run by default."
 msgstr "Crea primer una plantilla a dalt i després tria quines s'executen per defecte."
 
@@ -1111,7 +1119,7 @@ msgstr "Elimina"
 
 #. placeholder {0}: row.name
 #: src/routes/settings/organization/templates.tsx:385
-#: src/routes/settings/profile/templates.tsx:263
+#: src/routes/settings/profile/templates.tsx:267
 msgid "Delete {0}"
 msgstr "Elimina {0}"
 
@@ -1119,8 +1127,8 @@ msgstr "Elimina {0}"
 #: src/routes/emails/inboxes.tsx:1293
 #: src/routes/settings/api-keys/index.tsx:162
 #: src/routes/settings/organization/templates.tsx:249
-#: src/routes/settings/profile/templates.tsx:126
-#: src/routes/settings/profile/templates.tsx:146
+#: src/routes/settings/profile/templates.tsx:130
+#: src/routes/settings/profile/templates.tsx:150
 msgid "Delete failed"
 msgstr "Error en eliminar"
 
@@ -1150,7 +1158,7 @@ msgstr "Vols eliminar aquesta clau?"
 msgid "Delete this org template?"
 msgstr "Vols eliminar aquesta plantilla de l'organització?"
 
-#: src/routes/settings/profile/templates.tsx:324
+#: src/routes/settings/profile/templates.tsx:329
 msgid "Delete this template?"
 msgstr "Vols eliminar aquesta plantilla?"
 
@@ -1198,7 +1206,7 @@ msgid "Documents"
 msgstr "Documents"
 
 #. placeholder {0}: row.name
-#: src/routes/settings/profile/templates.tsx:247
+#: src/routes/settings/profile/templates.tsx:251
 msgid "Donate {0} to your organization"
 msgstr "Dona {0} a la teva organització"
 
@@ -1249,7 +1257,7 @@ msgstr "Edita"
 
 #. placeholder {0}: row.name
 #: src/routes/settings/organization/templates.tsx:378
-#: src/routes/settings/profile/templates.tsx:256
+#: src/routes/settings/profile/templates.tsx:260
 msgid "Edit {0}"
 msgstr "Edita {0}"
 
@@ -1366,6 +1374,10 @@ msgstr "Caduca d'aquí a (dies)"
 msgid "Expiry must be a number of days greater than zero."
 msgstr "La caducitat ha de ser un nombre de dies més gran que zero."
 
+#: src/components/instructions/default-stack-editor.tsx:98
+msgid "Extending the org default"
+msgstr "S'amplia el valor per defecte de l'organització"
+
 #: src/routes/emails/$threadId.tsx:681
 msgid "Failed"
 msgstr "Fallit"
@@ -1449,6 +1461,10 @@ msgstr "Del correu"
 msgid "From webhook"
 msgstr "Del webhook"
 
+#: src/components/instructions/default-stack-editor.tsx:137
+msgid "From your organization, applied first"
+msgstr "De la teva organització, s'aplica primer"
+
 #: src/components/emails/compose-window.tsx:69
 msgid "Full screen"
 msgstr "Pantalla completa"
@@ -1490,6 +1506,10 @@ msgstr "Alta"
 #: src/routes/index.tsx:462
 msgid "High priority"
 msgstr "Prioritat alta"
+
+#: src/components/instructions/default-stack-editor.tsx:111
+msgid "How your default uses the org default"
+msgstr "Com es relaciona el teu valor per defecte amb el de l'organització"
 
 #: src/routes/emails/inboxes.tsx:449
 #: src/routes/emails/inboxes.tsx:987
@@ -1577,7 +1597,7 @@ msgstr "Instagram"
 
 #: src/routes/settings/organization/index.tsx:141
 #: src/routes/settings/profile/index.tsx:147
-#: src/routes/settings/profile/templates.tsx:190
+#: src/routes/settings/profile/templates.tsx:194
 msgid "Instruction templates"
 msgstr "Plantilles d'instruccions"
 
@@ -1879,7 +1899,7 @@ msgstr "Meta"
 
 #: src/components/instructions/stack-picker.tsx:108
 #: src/components/instructions/stack-picker.tsx:159
-#: src/routes/settings/profile/templates.tsx:240
+#: src/routes/settings/profile/templates.tsx:244
 msgid "Mine"
 msgstr "Meva"
 
@@ -1949,7 +1969,7 @@ msgid "New password or app-password"
 msgstr "Contrasenya nova o d'aplicació"
 
 #: src/components/instructions/template-editor-dialog.tsx:89
-#: src/routes/settings/profile/templates.tsx:212
+#: src/routes/settings/profile/templates.tsx:216
 msgid "New template"
 msgstr "Nova plantilla"
 
@@ -2150,7 +2170,7 @@ msgstr "Cap tasca per a avui"
 msgid "No templates added yet."
 msgstr "Encara no has afegit cap plantilla."
 
-#: src/routes/settings/profile/templates.tsx:222
+#: src/routes/settings/profile/templates.tsx:226
 msgid "No templates yet. Create one to start shaping your runs."
 msgstr "Encara no hi ha plantilles. Crea'n una per començar a guiar les teves recerques."
 
@@ -2284,7 +2304,7 @@ msgstr "Obert"
 #: src/components/instructions/stack-picker.tsx:159
 #: src/routes/settings/organization/templates.tsx:138
 #: src/routes/settings/organization/templates.tsx:373
-#: src/routes/settings/profile/templates.tsx:238
+#: src/routes/settings/profile/templates.tsx:242
 msgid "Org"
 msgstr "Org"
 
@@ -2497,7 +2517,7 @@ msgstr "Sense xifrar"
 #: src/routes/settings/organization/templates.tsx:299
 #: src/routes/settings/organization/templates.tsx:313
 #: src/routes/settings/organization/templates.tsx:337
-#: src/routes/settings/profile/templates.tsx:173
+#: src/routes/settings/profile/templates.tsx:177
 msgid "Please try again."
 msgstr "Torna-ho a provar."
 
@@ -2664,7 +2684,7 @@ msgid "Remove \"{0}\" from the org default first, then delete it."
 msgstr "Treu «{0}» del valor per defecte de l'organització primer i després elimina-la."
 
 #. placeholder {0}: target.name
-#: src/routes/settings/profile/templates.tsx:138
+#: src/routes/settings/profile/templates.tsx:142
 msgid "Remove \"{0}\" from your default first, then delete it."
 msgstr "Treu «{0}» del teu valor per defecte primer i després elimina-la."
 
@@ -2707,6 +2727,10 @@ msgstr "Reobre el fil"
 #: src/routes/settings/profile/index.tsx:482
 msgid "Repeat new password"
 msgstr "Repeteix la contrasenya nova"
+
+#: src/components/instructions/default-stack-editor.tsx:120
+msgid "Replace the org default"
+msgstr "Substitueix el valor per defecte de l'organització"
 
 #: src/routes/emails/$threadId.tsx:403
 msgid "Reply"
@@ -2768,7 +2792,7 @@ msgstr "Reprèn esborranys ({0})"
 msgid "Resume drafting (1)"
 msgstr "Reprèn l'esborrany (1)"
 
-#: src/routes/settings/profile/templates.tsx:193
+#: src/routes/settings/profile/templates.tsx:197
 msgid "Reusable, standing guidance your research agent follows — what you sell, who you target, tone, and which sources to trust."
 msgstr "Orientació reutilitzable i permanent que segueix el teu agent de recerca: què vens, a qui t'adreces, el to i en quines fonts confiar."
 
@@ -2807,13 +2831,17 @@ msgstr "Context comercial"
 msgid "Save"
 msgstr "Desa"
 
-#: src/components/instructions/default-stack-editor.tsx:103
+#: src/components/instructions/default-stack-editor.tsx:186
 msgid "Save as my default"
 msgstr "Desa com el meu valor per defecte"
 
 #: src/routes/pages/$id.tsx:198
 msgid "Save failed"
 msgstr "Ha fallat el desament"
+
+#: src/components/instructions/default-stack-editor.tsx:184
+msgid "Save my additions"
+msgstr "Desa les meves aportacions"
 
 #: src/routes/reset-password.tsx:242
 msgid "Save new password"
@@ -2930,7 +2958,7 @@ msgstr "Enviant…"
 msgid "Sent"
 msgstr "Enviat"
 
-#: src/routes/settings/profile/templates.tsx:165
+#: src/routes/settings/profile/templates.tsx:169
 msgid "Sent to your admins"
 msgstr "Enviada als administradors"
 
@@ -3149,7 +3177,7 @@ msgid "Status update failed"
 msgstr "Ha fallat l'actualització d'estat"
 
 #: src/routes/settings/organization/templates.tsx:240
-#: src/routes/settings/profile/templates.tsx:137
+#: src/routes/settings/profile/templates.tsx:141
 msgid "Still in use"
 msgstr "Encara s'utilitza"
 
@@ -3209,11 +3237,11 @@ msgid "Template"
 msgstr "Plantilla"
 
 #: src/routes/settings/organization/templates.tsx:256
-#: src/routes/settings/profile/templates.tsx:153
+#: src/routes/settings/profile/templates.tsx:157
 msgid "Template deleted"
 msgstr "Plantilla eliminada"
 
-#: src/routes/settings/profile/templates.tsx:203
+#: src/routes/settings/profile/templates.tsx:207
 msgid "Templates"
 msgstr "Plantilles"
 
@@ -3331,7 +3359,7 @@ msgstr "El taller ha rebutjat el canvi. Torna-ho a provar."
 msgid "The workspace your CRM data lives in."
 msgstr "L'espai de treball on viuen les dades del CRM."
 
-#: src/components/instructions/default-stack-editor.tsx:82
+#: src/components/instructions/default-stack-editor.tsx:157
 msgid "These come from your organization. Saving keeps your own copy, so your runs stop following later changes to the org default."
 msgstr "Aquestes vénen de la teva organització. Si les deses, en guardes una còpia pròpia i les teves recerques deixen de seguir els canvis posteriors del valor per defecte de l'organització."
 
@@ -3339,7 +3367,7 @@ msgstr "Aquestes vénen de la teva organització. Si les deses, en guardes una c
 msgid "These templates run for every member who hasn't set their own — in order. Only org templates can go here."
 msgstr "Aquestes plantilles s'apliquen, en ordre, a cada membre que no n'hagi triat de pròpies. Aquí només hi poden anar plantilles de l'organització."
 
-#: src/components/instructions/default-stack-editor.tsx:74
+#: src/components/instructions/default-stack-editor.tsx:105
 msgid "These templates shape every research run, in order — unless you pick different ones for a single run."
 msgstr "Aquestes plantilles configuren cada recerca, en ordre, llevat que en triïs d'altres per a una recerca concreta."
 
@@ -3527,7 +3555,7 @@ msgstr "Usa com a per defecte per a aquest propòsit"
 msgid "Use password instead"
 msgstr "Fes servir contrasenya"
 
-#: src/components/instructions/default-stack-editor.tsx:114
+#: src/components/instructions/default-stack-editor.tsx:198
 msgid "Use the org default"
 msgstr "Utilitza el valor per defecte de l'organització"
 
@@ -3535,7 +3563,7 @@ msgstr "Utilitza el valor per defecte de l'organització"
 msgid "Username"
 msgstr "Nom d'usuari"
 
-#: src/components/instructions/default-stack-editor.tsx:67
+#: src/components/instructions/default-stack-editor.tsx:96
 msgid "Using the org default"
 msgstr "S'utilitza el valor per defecte de l'organització"
 
@@ -3677,15 +3705,19 @@ msgstr "El correu encara no està verificat. Fes servir l'enllaç de sessió."
 msgid "Your keys"
 msgstr "Les teves claus"
 
+#: src/components/instructions/default-stack-editor.tsx:147
+msgid "Your organization has no default yet."
+msgstr "La teva organització encara no té cap valor per defecte."
+
 #: src/routes/settings/organization/templates.tsx:127
 msgid "Your organization's admins manage these templates. You can use any of them in your own default or per run."
 msgstr "Els administradors de la teva organització gestionen aquestes plantilles. En pots fer servir qualsevol al teu valor per defecte o en cada recerca."
 
-#: src/components/instructions/default-stack-editor.tsx:69
+#: src/components/instructions/default-stack-editor.tsx:100
 msgid "Your own"
 msgstr "Pròpia"
 
-#: src/components/instructions/default-stack-editor.tsx:63
-#: src/routes/settings/profile/templates.tsx:286
+#: src/components/instructions/default-stack-editor.tsx:92
+#: src/routes/settings/profile/templates.tsx:290
 msgid "Your research default"
 msgstr "La teva recerca per defecte"

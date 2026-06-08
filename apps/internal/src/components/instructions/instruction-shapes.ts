@@ -60,6 +60,23 @@ export function narrowStackIds(
 	return ids.filter((x): x is string => typeof x === 'string')
 }
 
+export type StackComposition = 'replace' | 'extend'
+
+// The user's stored composition — 'extend' layers their picks on the live org
+// default; 'replace' uses their picks alone. null when they have no own stack
+// (they inherit the org default).
+export function narrowStackComposition(
+	value: unknown,
+): StackComposition | null {
+	if (!value || typeof value !== 'object') return null
+	const slot = (value as Record<string, unknown>)['user']
+	if (!slot || typeof slot !== 'object') return null
+	const composition = (slot as Record<string, unknown>)['composition']
+	return composition === 'replace' || composition === 'extend'
+		? composition
+		: null
+}
+
 export function narrowDonations(value: unknown): ReadonlyArray<DonationShape> {
 	if (!Array.isArray(value)) return []
 	const out: Array<DonationShape> = []

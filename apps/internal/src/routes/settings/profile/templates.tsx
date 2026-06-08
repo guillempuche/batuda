@@ -36,6 +36,7 @@ import {
 	TemplateRowItem,
 } from '#/components/instructions/instruction-page-chrome'
 import {
+	narrowStackComposition,
 	narrowStackIds,
 	narrowTemplates,
 	outcomeOf,
@@ -85,6 +86,9 @@ function TemplatesPage() {
 		: null
 	const orgStackIds = AsyncResult.isSuccess(stacksResult)
 		? narrowStackIds(stacksResult.value, 'org')
+		: null
+	const userComposition = AsyncResult.isSuccess(stacksResult)
+		? narrowStackComposition(stacksResult.value)
 		: null
 
 	const options = useMemo<ReadonlyArray<StackOption>>(
@@ -298,6 +302,7 @@ function TemplatesPage() {
 					options={options}
 					userStackIds={userStackIds}
 					orgStackIds={orgStackIds}
+					userComposition={userComposition}
 					onSaved={() => {
 						refreshStacks()
 					}}

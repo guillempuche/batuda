@@ -25,7 +25,7 @@ msgid "— Select a company —"
 msgstr "— Select a company —"
 
 #. placeholder {0}: row.name
-#: src/routes/settings/profile/templates.tsx:166
+#: src/routes/settings/profile/templates.tsx:170
 msgid "\"{0}\" is waiting for an admin to add it to the organization."
 msgstr "\"{0}\" is waiting for an admin to add it to the organization."
 
@@ -35,7 +35,7 @@ msgid "\"{0}\" will be removed for everyone in the organization. This can't be u
 msgstr "\"{0}\" will be removed for everyone in the organization. This can't be undone."
 
 #. placeholder {0}: confirmTarget?.name ?? ''
-#: src/routes/settings/profile/templates.tsx:326
+#: src/routes/settings/profile/templates.tsx:331
 msgid "\"{0}\" will be removed for good. This can't be undone."
 msgstr "\"{0}\" will be removed for good. This can't be undone."
 
@@ -223,9 +223,13 @@ msgstr "Add a template"
 msgid "Add an org template first."
 msgstr "Add an org template first."
 
-#: src/components/instructions/default-stack-editor.tsx:90
+#: src/components/instructions/default-stack-editor.tsx:168
 msgid "Add at least one template before saving a default."
 msgstr "Add at least one template before saving a default."
+
+#: src/components/instructions/default-stack-editor.tsx:166
+msgid "Add at least one template to layer on the org default."
+msgstr "Add at least one template to layer on the org default."
 
 #: src/components/emails/attachment-picker.tsx:120
 msgid "Add attachment"
@@ -246,6 +250,10 @@ msgstr "Add the first decision-maker to keep track of who to reach."
 #: src/routes/settings/organization/templates.tsx:465
 msgid "Add to org"
 msgstr "Add to org"
+
+#: src/components/instructions/default-stack-editor.tsx:130
+msgid "Add to the org default"
+msgstr "Add to the org default"
 
 #: src/routes/settings/organization/templates.tsx:289
 #: src/routes/settings/organization/templates.tsx:328
@@ -352,7 +360,7 @@ msgstr "Audit log"
 msgid "Auth failed"
 msgstr "Auth failed"
 
-#: src/routes/settings/profile/templates.tsx:183
+#: src/routes/settings/profile/templates.tsx:187
 msgid "Back to account"
 msgstr "Back to account"
 
@@ -951,8 +959,8 @@ msgid "Couldn't decline it"
 msgstr "Couldn't decline it"
 
 #: src/routes/settings/organization/templates.tsx:250
-#: src/routes/settings/profile/templates.tsx:127
-#: src/routes/settings/profile/templates.tsx:147
+#: src/routes/settings/profile/templates.tsx:131
+#: src/routes/settings/profile/templates.tsx:151
 msgid "Couldn't delete the template. Please try again."
 msgstr "Couldn't delete the template. Please try again."
 
@@ -964,11 +972,11 @@ msgstr "Couldn't import it"
 msgid "Couldn't load the org default. Refresh to try again."
 msgstr "Couldn't load the org default. Refresh to try again."
 
-#: src/routes/settings/profile/templates.tsx:281
+#: src/routes/settings/profile/templates.tsx:285
 msgid "Couldn't load your default. Refresh to try again."
 msgstr "Couldn't load your default. Refresh to try again."
 
-#: src/routes/settings/profile/templates.tsx:218
+#: src/routes/settings/profile/templates.tsx:222
 msgid "Couldn't load your templates. Refresh to try again."
 msgstr "Couldn't load your templates. Refresh to try again."
 
@@ -976,7 +984,7 @@ msgstr "Couldn't load your templates. Refresh to try again."
 msgid "Couldn't save"
 msgstr "Couldn't save"
 
-#: src/routes/settings/profile/templates.tsx:172
+#: src/routes/settings/profile/templates.tsx:176
 msgid "Couldn't send it"
 msgstr "Couldn't send it"
 
@@ -1004,7 +1012,7 @@ msgstr "Create a prospect landing page from a company detail view or via the MCP
 msgid "Create a prospect landing page to share with this company."
 msgstr "Create a prospect landing page to share with this company."
 
-#: src/routes/settings/profile/templates.tsx:289
+#: src/routes/settings/profile/templates.tsx:293
 msgid "Create a template above first, then pick which ones run by default."
 msgstr "Create a template above first, then pick which ones run by default."
 
@@ -1111,7 +1119,7 @@ msgstr "Delete"
 
 #. placeholder {0}: row.name
 #: src/routes/settings/organization/templates.tsx:385
-#: src/routes/settings/profile/templates.tsx:263
+#: src/routes/settings/profile/templates.tsx:267
 msgid "Delete {0}"
 msgstr "Delete {0}"
 
@@ -1119,8 +1127,8 @@ msgstr "Delete {0}"
 #: src/routes/emails/inboxes.tsx:1293
 #: src/routes/settings/api-keys/index.tsx:162
 #: src/routes/settings/organization/templates.tsx:249
-#: src/routes/settings/profile/templates.tsx:126
-#: src/routes/settings/profile/templates.tsx:146
+#: src/routes/settings/profile/templates.tsx:130
+#: src/routes/settings/profile/templates.tsx:150
 msgid "Delete failed"
 msgstr "Delete failed"
 
@@ -1150,7 +1158,7 @@ msgstr "Delete this key?"
 msgid "Delete this org template?"
 msgstr "Delete this org template?"
 
-#: src/routes/settings/profile/templates.tsx:324
+#: src/routes/settings/profile/templates.tsx:329
 msgid "Delete this template?"
 msgstr "Delete this template?"
 
@@ -1198,7 +1206,7 @@ msgid "Documents"
 msgstr "Documents"
 
 #. placeholder {0}: row.name
-#: src/routes/settings/profile/templates.tsx:247
+#: src/routes/settings/profile/templates.tsx:251
 msgid "Donate {0} to your organization"
 msgstr "Donate {0} to your organization"
 
@@ -1249,7 +1257,7 @@ msgstr "Edit"
 
 #. placeholder {0}: row.name
 #: src/routes/settings/organization/templates.tsx:378
-#: src/routes/settings/profile/templates.tsx:256
+#: src/routes/settings/profile/templates.tsx:260
 msgid "Edit {0}"
 msgstr "Edit {0}"
 
@@ -1366,6 +1374,10 @@ msgstr "Expires in (days)"
 msgid "Expiry must be a number of days greater than zero."
 msgstr "Expiry must be a number of days greater than zero."
 
+#: src/components/instructions/default-stack-editor.tsx:98
+msgid "Extending the org default"
+msgstr "Extending the org default"
+
 #: src/routes/emails/$threadId.tsx:681
 msgid "Failed"
 msgstr "Failed"
@@ -1449,6 +1461,10 @@ msgstr "From email"
 msgid "From webhook"
 msgstr "From webhook"
 
+#: src/components/instructions/default-stack-editor.tsx:137
+msgid "From your organization, applied first"
+msgstr "From your organization, applied first"
+
 #: src/components/emails/compose-window.tsx:69
 msgid "Full screen"
 msgstr "Full screen"
@@ -1490,6 +1506,10 @@ msgstr "High"
 #: src/routes/index.tsx:462
 msgid "High priority"
 msgstr "High priority"
+
+#: src/components/instructions/default-stack-editor.tsx:111
+msgid "How your default uses the org default"
+msgstr "How your default uses the org default"
 
 #: src/routes/emails/inboxes.tsx:449
 #: src/routes/emails/inboxes.tsx:987
@@ -1577,7 +1597,7 @@ msgstr "Instagram"
 
 #: src/routes/settings/organization/index.tsx:141
 #: src/routes/settings/profile/index.tsx:147
-#: src/routes/settings/profile/templates.tsx:190
+#: src/routes/settings/profile/templates.tsx:194
 msgid "Instruction templates"
 msgstr "Instruction templates"
 
@@ -1879,7 +1899,7 @@ msgstr "Meta"
 
 #: src/components/instructions/stack-picker.tsx:108
 #: src/components/instructions/stack-picker.tsx:159
-#: src/routes/settings/profile/templates.tsx:240
+#: src/routes/settings/profile/templates.tsx:244
 msgid "Mine"
 msgstr "Mine"
 
@@ -1949,7 +1969,7 @@ msgid "New password or app-password"
 msgstr "New password or app-password"
 
 #: src/components/instructions/template-editor-dialog.tsx:89
-#: src/routes/settings/profile/templates.tsx:212
+#: src/routes/settings/profile/templates.tsx:216
 msgid "New template"
 msgstr "New template"
 
@@ -2150,7 +2170,7 @@ msgstr "No tasks for today"
 msgid "No templates added yet."
 msgstr "No templates added yet."
 
-#: src/routes/settings/profile/templates.tsx:222
+#: src/routes/settings/profile/templates.tsx:226
 msgid "No templates yet. Create one to start shaping your runs."
 msgstr "No templates yet. Create one to start shaping your runs."
 
@@ -2284,7 +2304,7 @@ msgstr "Opened"
 #: src/components/instructions/stack-picker.tsx:159
 #: src/routes/settings/organization/templates.tsx:138
 #: src/routes/settings/organization/templates.tsx:373
-#: src/routes/settings/profile/templates.tsx:238
+#: src/routes/settings/profile/templates.tsx:242
 msgid "Org"
 msgstr "Org"
 
@@ -2497,7 +2517,7 @@ msgstr "Plain"
 #: src/routes/settings/organization/templates.tsx:299
 #: src/routes/settings/organization/templates.tsx:313
 #: src/routes/settings/organization/templates.tsx:337
-#: src/routes/settings/profile/templates.tsx:173
+#: src/routes/settings/profile/templates.tsx:177
 msgid "Please try again."
 msgstr "Please try again."
 
@@ -2664,7 +2684,7 @@ msgid "Remove \"{0}\" from the org default first, then delete it."
 msgstr "Remove \"{0}\" from the org default first, then delete it."
 
 #. placeholder {0}: target.name
-#: src/routes/settings/profile/templates.tsx:138
+#: src/routes/settings/profile/templates.tsx:142
 msgid "Remove \"{0}\" from your default first, then delete it."
 msgstr "Remove \"{0}\" from your default first, then delete it."
 
@@ -2707,6 +2727,10 @@ msgstr "Reopen thread"
 #: src/routes/settings/profile/index.tsx:482
 msgid "Repeat new password"
 msgstr "Repeat new password"
+
+#: src/components/instructions/default-stack-editor.tsx:120
+msgid "Replace the org default"
+msgstr "Replace the org default"
 
 #: src/routes/emails/$threadId.tsx:403
 msgid "Reply"
@@ -2768,7 +2792,7 @@ msgstr "Resume drafting ({0})"
 msgid "Resume drafting (1)"
 msgstr "Resume drafting (1)"
 
-#: src/routes/settings/profile/templates.tsx:193
+#: src/routes/settings/profile/templates.tsx:197
 msgid "Reusable, standing guidance your research agent follows — what you sell, who you target, tone, and which sources to trust."
 msgstr "Reusable, standing guidance your research agent follows — what you sell, who you target, tone, and which sources to trust."
 
@@ -2807,13 +2831,17 @@ msgstr "Sales context"
 msgid "Save"
 msgstr "Save"
 
-#: src/components/instructions/default-stack-editor.tsx:103
+#: src/components/instructions/default-stack-editor.tsx:186
 msgid "Save as my default"
 msgstr "Save as my default"
 
 #: src/routes/pages/$id.tsx:198
 msgid "Save failed"
 msgstr "Save failed"
+
+#: src/components/instructions/default-stack-editor.tsx:184
+msgid "Save my additions"
+msgstr "Save my additions"
 
 #: src/routes/reset-password.tsx:242
 msgid "Save new password"
@@ -2930,7 +2958,7 @@ msgstr "Sending…"
 msgid "Sent"
 msgstr "Sent"
 
-#: src/routes/settings/profile/templates.tsx:165
+#: src/routes/settings/profile/templates.tsx:169
 msgid "Sent to your admins"
 msgstr "Sent to your admins"
 
@@ -3149,7 +3177,7 @@ msgid "Status update failed"
 msgstr "Status update failed"
 
 #: src/routes/settings/organization/templates.tsx:240
-#: src/routes/settings/profile/templates.tsx:137
+#: src/routes/settings/profile/templates.tsx:141
 msgid "Still in use"
 msgstr "Still in use"
 
@@ -3209,11 +3237,11 @@ msgid "Template"
 msgstr "Template"
 
 #: src/routes/settings/organization/templates.tsx:256
-#: src/routes/settings/profile/templates.tsx:153
+#: src/routes/settings/profile/templates.tsx:157
 msgid "Template deleted"
 msgstr "Template deleted"
 
-#: src/routes/settings/profile/templates.tsx:203
+#: src/routes/settings/profile/templates.tsx:207
 msgid "Templates"
 msgstr "Templates"
 
@@ -3331,7 +3359,7 @@ msgstr "The workshop rejected the change. Try again."
 msgid "The workspace your CRM data lives in."
 msgstr "The workspace your CRM data lives in."
 
-#: src/components/instructions/default-stack-editor.tsx:82
+#: src/components/instructions/default-stack-editor.tsx:157
 msgid "These come from your organization. Saving keeps your own copy, so your runs stop following later changes to the org default."
 msgstr "These come from your organization. Saving keeps your own copy, so your runs stop following later changes to the org default."
 
@@ -3339,7 +3367,7 @@ msgstr "These come from your organization. Saving keeps your own copy, so your r
 msgid "These templates run for every member who hasn't set their own — in order. Only org templates can go here."
 msgstr "These templates run for every member who hasn't set their own — in order. Only org templates can go here."
 
-#: src/components/instructions/default-stack-editor.tsx:74
+#: src/components/instructions/default-stack-editor.tsx:105
 msgid "These templates shape every research run, in order — unless you pick different ones for a single run."
 msgstr "These templates shape every research run, in order — unless you pick different ones for a single run."
 
@@ -3527,7 +3555,7 @@ msgstr "Use as default for this purpose"
 msgid "Use password instead"
 msgstr "Use password instead"
 
-#: src/components/instructions/default-stack-editor.tsx:114
+#: src/components/instructions/default-stack-editor.tsx:198
 msgid "Use the org default"
 msgstr "Use the org default"
 
@@ -3535,7 +3563,7 @@ msgstr "Use the org default"
 msgid "Username"
 msgstr "Username"
 
-#: src/components/instructions/default-stack-editor.tsx:67
+#: src/components/instructions/default-stack-editor.tsx:96
 msgid "Using the org default"
 msgstr "Using the org default"
 
@@ -3677,15 +3705,19 @@ msgstr "Your email isn't verified yet. Use the magic link instead."
 msgid "Your keys"
 msgstr "Your keys"
 
+#: src/components/instructions/default-stack-editor.tsx:147
+msgid "Your organization has no default yet."
+msgstr "Your organization has no default yet."
+
 #: src/routes/settings/organization/templates.tsx:127
 msgid "Your organization's admins manage these templates. You can use any of them in your own default or per run."
 msgstr "Your organization's admins manage these templates. You can use any of them in your own default or per run."
 
-#: src/components/instructions/default-stack-editor.tsx:69
+#: src/components/instructions/default-stack-editor.tsx:100
 msgid "Your own"
 msgstr "Your own"
 
-#: src/components/instructions/default-stack-editor.tsx:63
-#: src/routes/settings/profile/templates.tsx:286
+#: src/components/instructions/default-stack-editor.tsx:92
+#: src/routes/settings/profile/templates.tsx:290
 msgid "Your research default"
 msgstr "Your research default"
