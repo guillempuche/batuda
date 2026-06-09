@@ -76,7 +76,7 @@ agent-browser open https://batuda.localhost/<route>
 agent-browser screenshot /tmp/pr-<feature>-mobile.png
 ```
 
-**Recording** (native WebM, no ffmpeg; preserves login state when started from the current page — see vercel-labs/agent-browser#116). Record at the viewport that matters for the flow; record both sizes only if the flow itself differs by size:
+**Recording** (native WebM — the uploader transcodes it to a compact MP4, so capture stays simple; preserves login state when started from the current page — see vercel-labs/agent-browser#116). Record at the viewport that matters, and keep it tight — set up state *before* `record start`, then perform only the steps that show the change; record both sizes only if the flow itself differs by size:
 
 ```bash
 agent-browser set device "iPhone 16 Pro"               # or: set viewport 1440 900
@@ -190,31 +190,18 @@ These are the things a human reviewer of *this* system must act on or verify and
 
 If a change touches none of these, say so briefly rather than leaving the reviewer guessing.
 
-### Embedding media (public repo)
+### Embedding media
 
-`guillempuche/batuda` is public, so raw URLs render inline. Keep the feature diff clean by hosting media on a dedicated, never-merged `pr-media` branch instead of committing it into the change. Do it from a throwaway worktree so the feature worktree is untouched:
+Media goes **with the PR** — never on a side branch. Two paths:
 
-```bash
-MEDIA=$(mktemp -d)
-# reuse the branch if it exists, otherwise create it orphaned
-git worktree add -B pr-media "$MEDIA" origin/pr-media 2>/dev/null \
-  || { git worktree add --detach "$MEDIA" && git -C "$MEDIA" switch --orphan pr-media; }
-mkdir -p "$MEDIA/<branch>"
-cp /tmp/pr-<feature>*.png /tmp/pr-<feature>.webm "$MEDIA/<branch>/"
-git -C "$MEDIA" add . && git -C "$MEDIA" commit -m "chore: pr media for <branch>"
-git -C "$MEDIA" push -u origin pr-media
-git worktree remove "$MEDIA"
-```
+**Automated (agent, no human) — the shared media bucket.** `scripts/gh-pr-media.sh <pr#> <file>…` syncs each capture to the team's public `github-media` bucket over S3 (provider-agnostic, via the `aws` CLI), keyed `<repo>/pr-<n>/<file>`, and prints the markdown — an image embed or a `<video>` tag — to drop into the body with `gh pr edit`. It compacts as it uploads — PNG/JPEG screenshots become WebP, WebM/MOV recordings a downscaled MP4 — so you hand it raw captures and the embed stays small (a UI shot drops ~8× vs PNG). Re-running for a PR **replaces** its media (new files uploaded, then stale objects under the PR's folder deleted), so updated screenshots/recordings don't pile up. This is what lets `/pr` run end-to-end on any teammate's laptop, with no stray branch and no manual drag.
 
-Then reference the raw URLs in the body:
+- One-time per-laptop config (gitignored `.env.pr-media`, copied from `.env.example.pr-media`, filled from the team vault): `GITHUB_MEDIA_S3_ENDPOINT` + `GITHUB_MEDIA_S3_ACCESS_KEY_ID` + `GITHUB_MEDIA_S3_SECRET_ACCESS_KEY` + `GITHUB_MEDIA_PUBLIC_BASE` (the bucket's public r2.dev/custom URL — public access is required, since GitHub fetches the media unauthenticated). Namespaced `GITHUB_MEDIA_S3_*` so they never collide with the backend `STORAGE_*` or a teammate's `AWS_*`; the script maps them to `AWS_*` for the one subprocess. The `aws`, `cwebp`, and `ffmpeg` CLIs come from the nix dev shell (`flake.nix`), so `nix develop` / direnv covers it. Bucket + script are shared; only the keys are per-person.
+- If a var is missing the script exits naming it; fall back to the manual path.
 
-```markdown
-![<caption>](https://raw.githubusercontent.com/guillempuche/batuda/pr-media/<branch>/pr-<feature>-desktop.png)
+**Manual (human) — GitHub user-attachments.** Drag the file into the PR description in the web UI; GitHub mints a `user-attachments` URL bound to the PR (a `.webm` becomes an inline player). Use this when no R2 token is set up — leave a `> _Drag the <thing> in here._` placeholder in the body so the spot is obvious.
 
-<video controls src="https://raw.githubusercontent.com/guillempuche/batuda/pr-media/<branch>/pr-<feature>.webm"></video>
-```
-
-Fallback: dragging files into the PR body via the GitHub web UI mints `user-attachments` URLs that render natively (a player for `.webm`) — use that if a browser surface is available and you'd rather not push media.
+**Never** create a `pr-media` (or any media) branch — it clutters the repo with a branch nobody asked for, and surprises like that erode trust even when they work.
 
 ## Step 8 — Review loop
 
