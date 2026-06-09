@@ -800,6 +800,7 @@ function EmailsIndexPage() {
 									<PriButton
 										type='button'
 										$variant='outlined'
+										data-testid='emails-empty-clear-filters'
 										onClick={handleClearFilters}
 									>
 										<X size={14} aria-hidden />
@@ -833,6 +834,7 @@ function EmailsIndexPage() {
 						<PriButton
 							type='button'
 							$variant='outlined'
+							data-testid='emails-page-prev'
 							disabled={page <= 1}
 							onClick={() => handlePage(page - 1)}
 						>
@@ -843,6 +845,7 @@ function EmailsIndexPage() {
 						<PriButton
 							type='button'
 							$variant='outlined'
+							data-testid='emails-page-next'
 							disabled={page >= totalPages}
 							onClick={() => handlePage(page + 1)}
 						>

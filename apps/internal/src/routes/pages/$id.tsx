@@ -232,12 +232,13 @@ function EditorBody({ page }: { page: PageDetail }) {
 	return (
 		<Page>
 			<Header>
-				<BackLink to='/pages'>
+				<BackLink to='/pages' data-testid='page-editor-back'>
 					<ArrowLeft size={16} aria-hidden />
 					<Trans>Pages</Trans>
 				</BackLink>
 				<HeaderMain>
 					<TitleInput
+						data-testid='page-editor-title-input'
 						value={title}
 						onChange={e => setTitle(e.target.value)}
 						placeholder={t`Page title`}
@@ -247,6 +248,7 @@ function EditorBody({ page }: { page: PageDetail }) {
 						<MetaTag>{page.status}</MetaTag>
 						{page.status === 'published' && (
 							<PreviewLink
+								data-testid='page-editor-preview'
 								href={publicUrl}
 								target='_blank'
 								rel='noopener noreferrer'
@@ -263,6 +265,7 @@ function EditorBody({ page }: { page: PageDetail }) {
 						$variant='outlined'
 						onClick={handleSave}
 						disabled={saving}
+						data-testid='page-editor-save'
 					>
 						<Save size={16} aria-hidden />
 						{saving ? t`Saving…` : t`Save`}
@@ -273,6 +276,7 @@ function EditorBody({ page }: { page: PageDetail }) {
 							$variant='filled'
 							onClick={handlePublish}
 							disabled={publishing}
+							data-testid='page-editor-publish'
 						>
 							<Eye size={16} aria-hidden />
 							{publishing ? t`Publishing…` : t`Publish`}
@@ -283,10 +287,10 @@ function EditorBody({ page }: { page: PageDetail }) {
 
 			<PriTabs.Root value={tab} onValueChange={v => setTab(v as PageTab)}>
 				<PriTabs.List>
-					<PriTabs.Tab value='editor'>
+					<PriTabs.Tab value='editor' data-testid='page-editor-tab-editor'>
 						<Trans>Editor</Trans>
 					</PriTabs.Tab>
-					<PriTabs.Tab value='meta'>
+					<PriTabs.Tab value='meta' data-testid='page-editor-tab-meta'>
 						<Trans>Settings</Trans>
 					</PriTabs.Tab>
 					<PriTabs.Indicator />

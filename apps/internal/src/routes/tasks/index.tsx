@@ -449,11 +449,12 @@ function TasksPage() {
 			</Intro>
 
 			<Layout>
-				<Rail>
+				<Rail data-testid='tasks-view-rail'>
 					<RailButton
 						$active={selectedView === 'today'}
 						type='button'
 						onClick={() => setSelectedView('today')}
+						data-testid='tasks-view-today'
 					>
 						<Trans>Today</Trans>
 						<Count>{buckets.today.length}</Count>
@@ -462,6 +463,7 @@ function TasksPage() {
 						$active={selectedView === 'overdue'}
 						type='button'
 						onClick={() => setSelectedView('overdue')}
+						data-testid='tasks-view-overdue'
 					>
 						<Trans>Overdue</Trans>
 						<Count>{buckets.overdue.length}</Count>
@@ -470,6 +472,7 @@ function TasksPage() {
 						$active={selectedView === 'this-week'}
 						type='button'
 						onClick={() => setSelectedView('this-week')}
+						data-testid='tasks-view-this-week'
 					>
 						<Trans>This week</Trans>
 						<Count>{buckets.thisWeek.length}</Count>
@@ -478,6 +481,7 @@ function TasksPage() {
 						$active={selectedView === 'later'}
 						type='button'
 						onClick={() => setSelectedView('later')}
+						data-testid='tasks-view-later'
 					>
 						<Trans>Later</Trans>
 						<Count>{buckets.later.length}</Count>
@@ -486,6 +490,7 @@ function TasksPage() {
 						$active={selectedView === 'no-due'}
 						type='button'
 						onClick={() => setSelectedView('no-due')}
+						data-testid='tasks-view-no-due'
 					>
 						<Trans>No due date</Trans>
 						<Count>{buckets.noDue.length}</Count>
@@ -494,6 +499,7 @@ function TasksPage() {
 						$active={selectedView === 'snoozed'}
 						type='button'
 						onClick={() => setSelectedView('snoozed')}
+						data-testid='tasks-view-snoozed'
 					>
 						<Trans>Snoozed</Trans>
 						<Count>{snoozedTasks.length}</Count>
@@ -502,6 +508,7 @@ function TasksPage() {
 						$active={selectedView === 'done'}
 						type='button'
 						onClick={() => setSelectedView('done')}
+						data-testid='tasks-view-done'
 					>
 						<Trans>Done 7d</Trans>
 						<Count>{doneTasks.length}</Count>
@@ -511,6 +518,7 @@ function TasksPage() {
 						$active={false}
 						type='button'
 						onClick={() => setUndoOpen(true)}
+						data-testid='tasks-recent-changes-open'
 					>
 						<History size={12} aria-hidden />
 						<Trans>Recent changes</Trans>
@@ -615,12 +623,14 @@ function QuickAddForm({
 
 	return (
 		<QuickAddRow
+			data-testid='tasks-quick-add-form'
 			onSubmit={e => {
 				e.preventDefault()
 				void submit()
 			}}
 		>
 			<QuickAddInput
+				data-testid='tasks-quick-add-input'
 				ref={inputRef}
 				value={value}
 				onChange={e => setValue(e.target.value)}
@@ -628,7 +638,11 @@ function QuickAddForm({
 				disabled={pending}
 				aria-label={t`Quick add task`}
 			/>
-			<QuickAddButton type='submit' disabled={pending || value.trim() === ''}>
+			<QuickAddButton
+				type='submit'
+				disabled={pending || value.trim() === ''}
+				data-testid='tasks-quick-add-submit'
+			>
 				<Plus size={14} aria-hidden />
 				<Trans>Add</Trans>
 			</QuickAddButton>
@@ -669,7 +683,7 @@ function DetailPane({
 		<PriDialog.Root open onOpenChange={open => !open && onClose()}>
 			<PriDialog.Portal>
 				<PriDialog.Backdrop />
-				<PriDialog.Popup>
+				<PriDialog.Popup data-testid='task-detail-dialog'>
 					<PriDialog.Title>{task.title}</PriDialog.Title>
 					<PriDialog.Description>
 						{company !== null ? company.name : t`Personal`}
@@ -707,14 +721,25 @@ function DetailPane({
 					</DetailMeta>
 
 					<ActionRow>
-						<PriButton onClick={() => onToggle(task.status !== 'done')}>
+						<PriButton
+							onClick={() => onToggle(task.status !== 'done')}
+							data-testid='task-detail-toggle'
+						>
 							{task.status === 'done' ? t`Reopen` : t`Complete`}
 						</PriButton>
-						<PriButton $variant='text' onClick={onSnooze}>
+						<PriButton
+							$variant='text'
+							onClick={onSnooze}
+							data-testid='task-detail-snooze'
+						>
 							<Clock size={12} aria-hidden />
 							<Trans>Snooze 1d</Trans>
 						</PriButton>
-						<PriButton $variant='text' onClick={onCancel}>
+						<PriButton
+							$variant='text'
+							onClick={onCancel}
+							data-testid='task-detail-cancel'
+						>
 							<Trans>Cancel</Trans>
 						</PriButton>
 					</ActionRow>
@@ -776,7 +801,7 @@ function UndoDialog({
 		<PriDialog.Root open={open} onOpenChange={onOpenChange}>
 			<PriDialog.Portal>
 				<PriDialog.Backdrop />
-				<PriDialog.Popup>
+				<PriDialog.Popup data-testid='tasks-recent-changes-dialog'>
 					<PriDialog.Title>
 						<Trans>Recent changes</Trans>
 					</PriDialog.Title>

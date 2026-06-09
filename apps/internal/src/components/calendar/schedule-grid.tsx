@@ -86,7 +86,7 @@ export default function ScheduleGrid({ events, onEventClick }: Props) {
 	)
 
 	return (
-		<Frame>
+		<Frame data-testid='calendar-schedule-grid'>
 			<ScheduleXCalendar calendarApp={calendarApp} />
 		</Frame>
 	)

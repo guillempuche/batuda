@@ -26,6 +26,19 @@ agent-browser snapshot                                        # should show dash
 agent-browser get url                                         # should be / (pipeline)
 ```
 
+### Set an active org — required before any org-scoped page
+
+Login does **not** guarantee an active organization. A freshly-seeded or multi-org user can land with **NO ACTIVE ORGANIZATION**, and every org-scoped page (companies, emails, templates, …) then renders "Couldn't load … Refresh to try again." instead of its content (the switcher itself reads "NO ACTIVE ORGANIZATION"). Pick one — this calls Better Auth `setActive` and reloads the page:
+
+```bash
+agent-browser find testid "org-switcher" click
+agent-browser snapshot | grep org-switcher-option   # the user's orgs, one row per membership
+agent-browser find testid "org-switcher-option-taller" click   # pick by <org-slug>
+agent-browser wait 3000                                        # setActive triggers a full reload
+```
+
+`active-org-name` shows the current selection. The menu renders one `org-switcher-option-<slug>` per membership, so the snapshot above is the list of slugs a given user can pick. Outside the browser, `pnpm cli data members` lists every email ↔ org-slug ↔ role and `pnpm cli data orgs` lists all org slugs — both read across every org, so you can look up the exact `<slug>` before switching.
+
 ## Navigate
 
 ```bash

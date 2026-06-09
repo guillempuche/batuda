@@ -173,6 +173,7 @@ function PagesListPage() {
 								<Td>
 									{page.status === 'published' && (
 										<PreviewLink
+											data-testid={`page-row-preview-${page.slug}`}
 											href={`https://engranatge.localhost/${page.lang}/${page.slug}`}
 											target='_blank'
 											rel='noopener noreferrer'

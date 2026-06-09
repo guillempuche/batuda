@@ -247,7 +247,7 @@ function PipelinePage() {
 
 	if (isLoading) {
 		return (
-			<Page>
+			<Page data-testid='pipeline-page'>
 				<LoadingSpinner />
 			</Page>
 		)
@@ -256,7 +256,7 @@ function PipelinePage() {
 	const overdueTasksCount = overdueTasks.length
 
 	return (
-		<Page>
+		<Page data-testid='pipeline-page'>
 			<Intro>
 				<Title>
 					<Trans>Pipeline</Trans>
@@ -276,7 +276,7 @@ function PipelinePage() {
 
 			<StatusStrip>
 				{STATUS_ORDER.map(status => (
-					<StatusChip key={status}>
+					<StatusChip key={status} data-testid={`pipeline-column-${status}`}>
 						<StatusBadge status={status} size='lg' />
 						<StatusCount>{statusCounts.get(status) ?? 0}</StatusCount>
 					</StatusChip>

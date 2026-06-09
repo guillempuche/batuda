@@ -99,6 +99,7 @@ Auth spans server + internal. Both must be running.
 2. Verify session endpoint: `curl -sk https://api.batuda.localhost/auth/get-session`
 3. Check `apps/server/server.log` for `http.url="/auth/sign-in/email"` and its status
 4. Verify seed user exists: `pnpm cli seed --preset minimal` (idempotent)
+5. **Active org:** logging in does not set an active organization. If org-scoped pages (companies, emails, templates…) render "Couldn't load … Refresh to try again." and the switcher shows "NO ACTIVE ORGANIZATION", select one: `agent-browser find testid "org-switcher" click` then `find testid "org-switcher-option-<slug>" click` (Better Auth `setActive` + reload). The available `<slug>`s are the `org-switcher-option-*` entries in the open switcher's snapshot — one per membership, or run `pnpm cli data members`.
 
 ### Local dev email
 
@@ -121,6 +122,7 @@ If no emails appear, verify `EMAIL_PROVIDER=local-inbox` in `.env` and check `ap
 | `pnpm cli setup`           | Copy `.env` files from examples            |
 | `pnpm cli seed`            | Truncate + insert seed data (idempotent)   |
 | `pnpm cli seed --preset X` | `minimal` or `full` preset (default: full) |
+| `pnpm cli data [entity]`   | List seeded mock data (overview or rows)   |
 | `pnpm cli db migrate`      | Run pending migrations                     |
 | `pnpm cli db reset`        | Truncate + migrate + seed (clean slate)    |
 | `pnpm cli services up`     | Start Docker Postgres + MinIO              |
@@ -141,6 +143,9 @@ agent-browser open https://batuda.localhost/login
 agent-browser fill "input[name='email']" "admin@taller.cat"
 agent-browser fill "input[name='password']" "batuda-dev-2026"
 agent-browser click "button[type='submit']"
+agent-browser wait 3000
+agent-browser find testid "org-switcher" click                # org-scoped pages error
+agent-browser find testid "org-switcher-option-taller" click  # without an active org
 agent-browser wait 3000
 agent-browser snapshot
 ```

@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url'
 
 import { NodeRuntime, NodeServices } from '@effect/platform-node'
 import { Console, Effect, Option, Redacted } from 'effect'
-import { Command, Flag, Prompt } from 'effect/unstable/cli'
+import { Argument, Command, Flag, Prompt } from 'effect/unstable/cli'
 
 import { authCreateKey } from './commands/auth'
 import { authBootstrap } from './commands/auth-bootstrap'
@@ -20,6 +20,7 @@ import {
 	calendarSimulateWebhook,
 	SIMULATE_TRIGGERS,
 } from './commands/calendar/simulate-webhook'
+import { dataInspect, ENTITY_NAMES } from './commands/data'
 import { dbMigrate, dbReset } from './commands/db'
 import { doctor } from './commands/doctor'
 import { emailInject } from './commands/email'
@@ -626,6 +627,26 @@ const emailCommand = Command.make('email').pipe(
 // definition here (rather than in a separate `cli-tree.ts`) avoids splitting
 // the file just to share one const; the `isMain` guard below makes import
 // safe by deferring `runMain` until cli.ts is the entry script.
+const dataCommand = Command.make(
+	'data',
+	{
+		entity: Argument.choice('entity', ENTITY_NAMES).pipe(
+			Argument.withDescription('Seeded entity to list; omit for an overview'),
+			Argument.optional,
+		),
+		json: Flag.boolean('json').pipe(
+			Flag.withDescription('Print JSON instead of a table'),
+			Flag.withDefault(false),
+		),
+	},
+	({ entity, json }) => withDb(dataInspect(entity, json)),
+).pipe(
+	Command.withShortDescription('List seeded mock data'),
+	Command.withDescription(
+		'Inspect seeded mock data: run bare for a row-count overview, or `data <entity>` (orgs, members, companies, templates, stacks, inboxes, tasks, pages) for the rows. Add --json to script the output.',
+	),
+)
+
 export const batuda = Command.make('batuda').pipe(
 	Command.withDescription('Batuda CLI'),
 	Command.withSubcommands([
@@ -633,6 +654,7 @@ export const batuda = Command.make('batuda').pipe(
 		doctorCommand,
 		seedCommand,
 		dbCommand,
+		dataCommand,
 		authCommand,
 		servicesCommand,
 		calendarCommand,

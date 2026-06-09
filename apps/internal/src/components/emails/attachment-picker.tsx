@@ -115,6 +115,7 @@ export function AttachmentPicker({
 		<Wrapper>
 			<PickerButton
 				type='button'
+				data-testid='compose-attach'
 				onClick={() => inputRef.current?.click()}
 				disabled={disabled}
 				aria-label={t`Add attachment`}
