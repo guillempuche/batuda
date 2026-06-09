@@ -22,6 +22,22 @@
             # so `wrangler login`, `wrangler deploy`, `wrangler dev` work
             # without each contributor having to `pnpm exec wrangler …`.
             pkgs.wrangler
+            # AWS CLI (v2). Used by scripts/gh-pr-media.sh to upload PR
+            # screenshots/recordings to the shared media bucket over S3
+            # (provider-agnostic — the bucket happens to live on R2). Installed
+            # via nix so `/pr` media upload works on every contributor's laptop
+            # with no manual install.
+            pkgs.awscli2
+            # ffmpeg — compresses /pr screen recordings before upload.
+            # agent-browser records full-resolution WebM with no quality knob,
+            # so a few desktop seconds is several MB; ffmpeg downscales, drops
+            # the frame rate, and transcodes to a compact MP4. Installed via nix
+            # so the /pr media flow is identical on every contributor's laptop.
+            pkgs.ffmpeg
+            # libwebp — provides `cwebp`, which the /pr uploader uses to convert
+            # PNG/JPEG screenshots to WebP (crisp UI text, ~8x smaller). Paired
+            # with ffmpeg so scripts/gh-pr-media.sh can compact every capture.
+            pkgs.libwebp
             # Local OpenTelemetry receiver + TUI viewer.
             # Listens on :4317 (gRPC) and :4318 (OTLP/HTTP JSON).
             # Point OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
@@ -35,6 +51,9 @@
             echo "Node:     $(node --version)"
             echo "pnpm:     $(pnpm --version)"
             echo "wrangler: $(wrangler --version 2>/dev/null || echo 'available')"
+            echo "aws:      $(aws --version 2>/dev/null || echo 'available')"
+            echo "ffmpeg:   $(ffmpeg -version 2>/dev/null | head -1 | cut -d' ' -f3)"
+            echo "cwebp:    $(cwebp -version 2>/dev/null | head -1)"
             echo "otel-tui: $(otel-tui --version 2>/dev/null || echo 'available')"
           '';
         };
