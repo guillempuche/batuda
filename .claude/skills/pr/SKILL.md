@@ -8,7 +8,7 @@ allowed-tools: Bash(git:*) Bash(gh:*) Bash(pnpm:*) Bash(agent-browser:*) Bash(cu
 
 Takes a finished change and turns it into a reviewed, mergeable pull request, following this repo's conventions. **By the time this runs the work is usually already committed on a local feature branch**, so the default path is review → verify → push → PR → review-loop → merge; the readability and commit steps (4–5) fire only when there are *new* changes to make (self-review fixes or review follow-ups). The uncommitted case is handled too.
 
-Work from a feature branch — ideally a worktree off `main` — and never commit on `main`. The steps are sequential gates; don't flip the PR out of draft until every gate is green.
+Work from a feature branch — ideally a worktree off `main` — and never commit on `main`. The steps are sequential gates; don't merge or hand off the PR until every one is green.
 
 ## Step 1 — Re-baseline on main
 
@@ -151,12 +151,13 @@ Push the branch, then **create or update** — never open a duplicate:
 git push -u origin <branch>
 gh pr view --json number,state,isDraft 2>/dev/null \
   && echo "PR exists → the push updated it; refresh the body if scope grew (Step 8)" \
-  || gh pr create --draft --base main --title "type(scope): subject" --body-file <file>
+  || gh pr create --base main --title "type(scope): subject" --body-file <file>   # add --draft only for nameable WIP
 ```
 
-- **Open as `--draft`.** Self-review (Step 3) is done, but CI hasn't run yet — flip to ready in Step 8 once checks are green, so a half-checked PR never pings the reviewer.
+- **Open ready for review by default.** A committed, self-reviewed, verified change is finished — reserve `--draft` for work you can *name* as unfinished (a partial slice, a known-broken intermediate, something opened early for direction). CI status shows on the PR either way; protect the reviewer by working CI to green and only merging or handing off when it passes (Step 8), not by parking finished work in draft.
+- **If you're unsure about anything in the PR, ask the user.** A judgment call you can't settle, a path you couldn't verify, an ambiguity in scope — raise it as a question rather than guessing or burying it in the body.
 - The title mirrors the lead commit's subject (same type/scope rules as `/commits`).
-- **Stacked PR:** if this branch depends on another unmerged branch, set `--base <dep-branch>` (not `main`) so the diff shows only this slice; re-target to `main` after the dependency merges.
+- **Stacked PR:** if this branch depends on another unmerged branch, set `--base <dep-branch>` (not `main`) so the diff shows only this slice; re-target to `main` after the dependency merges. **CI only runs on main-targeting PRs** (`ci.yml` is `pull_request: branches: [main]`), so a stacked PR gets *no checks* until it's retargeted — and a base change alone won't fire them, so push a fresh commit (empty or amended) to trigger the run.
 
 ### PR body — house style
 
@@ -213,7 +214,7 @@ Between opening and merging is where most of the work is — don't jump to merge
 gh pr checks <N> --watch        # wait for every check; triage any red
 ```
 
-A check that passes locally but fails in CI is usually env / strict-mode (Turbo env scoping, build-only paths). Fix it, push, and re-run the relevant gate (Step 2 or 6) on the fix. Once CI is green (and self-review is done), flip the draft to ready:
+A check that passes locally but fails in CI is usually env / strict-mode (Turbo env scoping, build-only paths). Fix it, push, and re-run the relevant gate (Step 2 or 6) on the fix. If you opened as draft (genuine WIP that's now complete), flip it to ready once CI is green:
 
 ```bash
 gh pr ready <N>
@@ -250,9 +251,11 @@ Default to **rebase** unless squashing serves a specific reason.
 gh pr merge <N> --rebase --delete-branch    # or --squash --delete-branch
 ```
 
+**Never `--delete-branch` a PR that another open PR is stacked on.** GitHub closes the child instead of auto-retargeting it, and a PR closed because its base branch was deleted can't be reopened or retargeted — you have to recreate it as a fresh PR. To land a stack: merge each parent **without** `--delete-branch`, retarget the child to `main` and rebase it onto main (dropping the merged parent's commits), then delete the orphaned branches once nothing targets them.
+
 If rebase hits conflicts: pause and surface to the user — rebase the branch locally, force-push, then retry rebase-merge. Never fall back to a merge-commit.
 
-`--delete-branch` removes the remote branch only. If the change was made in a worktree, clean it up afterward: `git worktree remove <path>` (or `ExitWorktree` if this session created it), then `git worktree prune`.
+`--delete-branch` removes the remote branch only — after the merge, also drop the local branch: `git checkout main && git pull && git branch -D <branch>`. If the change was made in a worktree, clean it up afterward: `git worktree remove <path>` (or `ExitWorktree` if this session created it), then `git worktree prune`.
 
 ## Conventions this skill encodes
 
@@ -264,5 +267,5 @@ If rebase hits conflicts: pause and surface to the user — rebase the branch lo
 - Tests ride with their logic in one commit.
 - Verification gates: `install` → `check-types` + `test` → `build`.
 - PR body in the house style with a Review guide; `## Verification` claims only what was actually run; first-person singular; no AI attribution.
-- Open as draft; watch CI to green; address review through the same gates; keep the PR body in sync.
+- Open ready by default (draft only for nameable WIP); watch CI to green; address review through the same gates; keep the PR body in sync.
 - Merge by rebase or squash (consult first), never a merge-commit.
