@@ -19,6 +19,7 @@ apps/*/playwright-report/
 .env.local
 .env.*.local
 .env.cloud
+.env.pr-media
 apps/*/.env.cloud
 
 # Local secrets — never commit (TLS keys, dev tokens, etc.)
