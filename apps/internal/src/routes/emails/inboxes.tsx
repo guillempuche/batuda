@@ -89,6 +89,8 @@ type ProviderPreset = {
 	readonly smtpPort: number
 	readonly smtpSecurity: TransportSecurity
 	readonly helpUrl: string
+	readonly appPasswordUrl: string
+	readonly passwordAuthSupported: boolean
 }
 
 async function loadInboxesOnServer(): Promise<ReadonlyArray<unknown>> {
@@ -153,6 +155,14 @@ function InboxesPage() {
 				? narrowInboxRows(inboxesResult.value)
 				: [],
 		[inboxesResult],
+	)
+	const presetsResult = useAtomValue(providerPresetsAtom)
+	const presets = useMemo<ReadonlyArray<ProviderPreset>>(
+		() =>
+			AsyncResult.isSuccess(presetsResult)
+				? narrowPresets(presetsResult.value)
+				: [],
+		[presetsResult],
 	)
 	const isLoading = AsyncResult.isInitial(inboxesResult)
 	const isFailure = AsyncResult.isFailure(inboxesResult)
@@ -452,6 +462,23 @@ function InboxesPage() {
 												? t`Connect failed`
 												: t`Disabled`}
 								</StatusBadge>
+								{row.grantStatus === 'auth_failed' && (
+									<AuthHint>
+										{t`2FA accounts need an app-specific password.`}
+										{authPasswordUrlFor(presets, row.imapHost) !== '' && (
+											<>
+												{' '}
+												<PresetLink
+													href={authPasswordUrlFor(presets, row.imapHost)}
+													target='_blank'
+													rel='noreferrer noopener'
+												>
+													{t`Create an app password →`}
+												</PresetLink>
+											</>
+										)}
+									</AuthHint>
+								)}
 							</CellStatus>
 							<CellPurpose role='cell'>
 								<PurposeBadge $purpose={row.purpose}>
@@ -711,6 +738,18 @@ function InboxFormDialog({
 		[presets],
 	)
 
+	// Derived from the chosen preset: powers the 2FA app-password hint and
+	// blocks submit for providers that no longer accept password sign-in.
+	const selectedPreset = useMemo(
+		() => presets.find(p => p.name === presetName) ?? null,
+		[presets, presetName],
+	)
+	const providerUnsupported =
+		selectedPreset !== null && !selectedPreset.passwordAuthSupported
+	const appPasswordUrl = selectedPreset?.appPasswordUrl ?? ''
+	const setupUrl =
+		appPasswordUrl !== '' ? appPasswordUrl : (selectedPreset?.helpUrl ?? '')
+
 	const usernameForSubmit = username !== '' ? username : email
 
 	// Create requires email + transport + credentials. Edit lets the user
@@ -719,6 +758,7 @@ function InboxFormDialog({
 	// the user opted into changing it.
 	const canSubmit =
 		!submitting &&
+		!providerUnsupported &&
 		(editing !== null
 			? email !== ''
 			: email !== '' &&
@@ -835,6 +875,30 @@ function InboxFormDialog({
 									</PriSelect.Portal>
 								</PriSelect.Root>
 								<Hint>{t`Selecting a preset fills IMAP and SMTP defaults — you can still edit them.`}</Hint>
+								{selectedPreset !== null &&
+									(providerUnsupported ? (
+										<Warning role='alert'>
+											{t`${selectedPreset.name} no longer allows password sign-in for mail apps, so it can't be connected here yet — it needs an OAuth sign-in. Pick another provider or use Generic IMAP.`}
+										</Warning>
+									) : (
+										<Hint>
+											{t`Has two-factor authentication enabled? Use a provider app-specific password below, not your normal login password.`}
+											{setupUrl !== '' && (
+												<>
+													{' '}
+													<PresetLink
+														href={setupUrl}
+														target='_blank'
+														rel='noreferrer noopener'
+													>
+														{appPasswordUrl !== ''
+															? t`Create an app password →`
+															: t`Setup guide →`}
+													</PresetLink>
+												</>
+											)}
+										</Hint>
+									))}
 							</Field>
 						)}
 
@@ -1136,6 +1200,18 @@ function SecuritySelect({
 	)
 }
 
+// App-password page for the provider matching an inbox's IMAP host, or '' when
+// the host isn't a known preset. Points an auth-failed inbox (usually a 2FA
+// account missing its app password) at the right place to create one.
+function authPasswordUrlFor(
+	presets: ReadonlyArray<ProviderPreset>,
+	imapHost: string,
+): string {
+	if (imapHost === '') return ''
+	const preset = presets.find(p => p.imapHost === imapHost)
+	return preset?.appPasswordUrl ?? ''
+}
+
 function narrowPresets(raw: unknown): ReadonlyArray<ProviderPreset> {
 	if (!Array.isArray(raw)) return []
 	const out: Array<ProviderPreset> = []
@@ -1166,6 +1242,9 @@ function narrowPresets(raw: unknown): ReadonlyArray<ProviderPreset> {
 			smtpPort: r['smtpPort'],
 			smtpSecurity: smtpSec,
 			helpUrl: typeof r['helpUrl'] === 'string' ? r['helpUrl'] : '',
+			appPasswordUrl:
+				typeof r['appPasswordUrl'] === 'string' ? r['appPasswordUrl'] : '',
+			passwordAuthSupported: r['passwordAuthSupported'] !== false,
 		})
 	}
 	return out
@@ -1861,6 +1940,26 @@ const Hint = styled.p.withConfig({ displayName: 'InboxFormHint' })`
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
 	font-style: italic;
+`
+
+const PresetLink = styled.a.withConfig({ displayName: 'InboxFormPresetLink' })`
+	color: var(--color-primary);
+	font-style: normal;
+	text-decoration: underline;
+`
+
+const Warning = styled.p.withConfig({ displayName: 'InboxFormWarning' })`
+	margin: 0;
+	font-family: var(--font-body);
+	font-size: var(--typescale-label-small-size);
+	color: var(--color-error);
+`
+
+const AuthHint = styled.p.withConfig({ displayName: 'InboxesAuthHint' })`
+	margin: var(--space-2xs) 0 0;
+	font-family: var(--font-body);
+	font-size: var(--typescale-label-small-size);
+	color: var(--color-on-surface-variant);
 `
 
 const CellDefault = styled.div.withConfig({
