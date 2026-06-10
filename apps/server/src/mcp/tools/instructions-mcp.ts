@@ -18,13 +18,14 @@ const Scope = Schema.Literals(['personal', 'org'])
 
 const ManageTemplate = Tool.make('manage_instruction_template', {
 	description:
-		'List, create, update, or delete instruction templates for the active org. scope=org targets an org-owned template (admin only); scope=personal targets your own. Editing an org template as a non-admin forks a personal copy.',
+		'List, create, update, delete, or transfer instruction templates for the active org. scope=org targets an org-owned template (admin only); scope=personal targets your own. Editing an org template as a non-admin forks a personal copy. transfer hands a personal template you own to another member (target_user_id).',
 	parameters: Schema.Struct({
-		action: Schema.Literals(['list', 'create', 'update', 'delete']),
+		action: Schema.Literals(['list', 'create', 'update', 'delete', 'transfer']),
 		id: Schema.optional(Uuid),
 		name: Schema.optional(Schema.String),
 		body: Schema.optional(Schema.String),
 		scope: Schema.optional(Scope),
+		target_user_id: Schema.optional(Schema.String),
 	}),
 	success: Schema.Unknown,
 	dependencies: REQUEST_DEPENDENCIES,
@@ -63,10 +64,28 @@ const ManageDefaultStack = Tool.make('manage_instruction_default_stack', {
 	.annotate(Tool.Title, 'Manage Instruction Default Stack')
 	.annotate(Tool.OpenWorld, false)
 
+const ManageDonation = Tool.make('manage_instruction_donation', {
+	description:
+		'Donate a personal instruction template to the org for shared use, or review pending donations. propose submits a personal template you own (template_id) for admin review; list returns donations (optionally filtered by status); accept (admin only) creates a fresh org template from the proposal; reject (admin only) closes it. Accepting reads only the snapshot taken when the donation was proposed, never the proposer’s still-personal template.',
+	parameters: Schema.Struct({
+		action: Schema.Literals(['propose', 'list', 'accept', 'reject']),
+		template_id: Schema.optional(Uuid),
+		id: Schema.optional(Uuid),
+		status: Schema.optional(
+			Schema.Literals(['pending', 'accepted', 'rejected']),
+		),
+	}),
+	success: Schema.Unknown,
+	dependencies: REQUEST_DEPENDENCIES,
+})
+	.annotate(Tool.Title, 'Manage Instruction Donations')
+	.annotate(Tool.OpenWorld, false)
+
 export const InstructionsMcpTools = Toolkit.make(
 	ManageTemplate,
 	ManagePreset,
 	ManageDefaultStack,
+	ManageDonation,
 )
 
 export const InstructionsMcpHandlersLive = InstructionsMcpTools.toLayer(
@@ -115,6 +134,17 @@ export const InstructionsMcpHandlersLive = InstructionsMcpTools.toLayer(
 							if (params.id === undefined)
 								return { error: 'id is required to delete' }
 							return yield* run(svc.remove(userId, params.id))
+						case 'transfer':
+							if (
+								params.id === undefined ||
+								params.target_user_id === undefined
+							)
+								return {
+									error: 'id and target_user_id are required to transfer',
+								}
+							return yield* run(
+								svc.transfer(org.id, userId, params.id, params.target_user_id),
+							)
 					}
 				}),
 
@@ -159,6 +189,28 @@ export const InstructionsMcpHandlersLive = InstructionsMcpTools.toLayer(
 											params.composition ?? 'replace',
 										),
 							)
+					}
+				}),
+
+			manage_instruction_donation: params =>
+				Effect.gen(function* () {
+					const org = yield* CurrentOrg
+					const { userId } = yield* SessionContext
+					switch (params.action) {
+						case 'list':
+							return yield* run(svc.listDonations(params.status))
+						case 'propose':
+							if (params.template_id === undefined)
+								return { error: 'template_id is required to propose' }
+							return yield* run(svc.propose(org.id, userId, params.template_id))
+						case 'accept':
+							if (params.id === undefined)
+								return { error: 'id is required to accept' }
+							return yield* run(svc.accept(userId, params.id))
+						case 'reject':
+							if (params.id === undefined)
+								return { error: 'id is required to reject' }
+							return yield* run(svc.reject(userId, params.id))
 					}
 				}),
 		}

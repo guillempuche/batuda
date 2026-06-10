@@ -11,6 +11,7 @@ import { CompanyTools } from './companies'
 import { ContactTools } from './contacts'
 import { DocumentTools } from './documents'
 import { EmailTools } from './email'
+import { InstructionsMcpTools } from './instructions-mcp'
 import { InteractionTools } from './interactions'
 import { PageTools } from './pages'
 import { PipelineTools } from './pipeline'
@@ -32,6 +33,7 @@ const TOOLKITS = {
 	ContactTools,
 	DocumentTools,
 	EmailTools,
+	InstructionsMcpTools,
 	InteractionTools,
 	PageTools,
 	PipelineTools,
