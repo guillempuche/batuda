@@ -131,7 +131,7 @@ export function TemplateEditorDialog({
 								name='name'
 								data-testid='template-editor-name'
 								defaultValue={editing?.name ?? ''}
-								placeholder={t`e.g. Spain hospitality sourcing`}
+								placeholder={t`e.g. [research] Spain hospitality sourcing`}
 								aria-describedby='template-name-hint'
 								required
 							/>
