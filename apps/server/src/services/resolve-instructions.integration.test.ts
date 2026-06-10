@@ -184,6 +184,7 @@ describe('resolveInstructions (live RLS)', () => {
 			expect(result.source).toBe('user')
 			expect(result.segments).toEqual(['user body'])
 			expect(result.templateIds).toEqual([userTemplate])
+			expect(result.templateNames).toEqual(['Mine'])
 		})
 	})
 
@@ -269,6 +270,7 @@ describe('resolveInstructions (live RLS)', () => {
 			// THEN the live org default leads and the addition follows
 			expect(result.source).toBe('user')
 			expect(result.templateIds).toEqual([orgTemplate, e1Template])
+			expect(result.templateNames).toEqual(['Org', 'E1'])
 			expect(result.segments).toEqual(['org body', 'e1 body'])
 		})
 
@@ -278,6 +280,7 @@ describe('resolveInstructions (live RLS)', () => {
 			// THEN the org template keeps its lead slot and the duplicate is dropped
 			expect(result.source).toBe('user')
 			expect(result.templateIds).toEqual([orgTemplate, e2Template])
+			expect(result.templateNames).toEqual(['Org', 'E2'])
 			expect(result.segments).toEqual(['org body', 'e2 body'])
 		})
 
@@ -296,6 +299,7 @@ describe('resolveInstructions (live RLS)', () => {
 			// THEN the override wins and the org default is not composed in
 			expect(result.source).toBe('override')
 			expect(result.templateIds).toEqual([e1Template])
+			expect(result.templateNames).toEqual(['E1'])
 			expect(result.segments).toEqual(['e1 body'])
 		})
 

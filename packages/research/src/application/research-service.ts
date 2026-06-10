@@ -229,6 +229,7 @@ export interface ResolvedInstructions {
 	readonly segments: ReadonlyArray<string>
 	readonly fingerprint: string
 	readonly templateIds: ReadonlyArray<string>
+	readonly templateNames: ReadonlyArray<string>
 }
 
 // ── ResearchService ──
@@ -768,6 +769,8 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						// is threaded to the forked fiber for the write-back key.
 						const segments = instructions?.segments ?? []
 						const templateFingerprint = instructions?.fingerprint ?? ''
+						const templateIds = instructions?.templateIds ?? []
+						const templateNames = instructions?.templateNames ?? []
 						const schemaNameForKey = input.schemaName ?? 'freeform'
 						const cacheKey = computeResearchCacheKey({
 							userId,
@@ -810,6 +813,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 											tokens_in, tokens_out,
 											cost_cents, paid_cost_cents,
 											idempotency_key, created_by,
+											template_ids, template_names, template_fingerprint,
 											started_at, completed_at
 										) VALUES (
 											${organizationId},
@@ -826,6 +830,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 											0, 0,
 											${input.idempotencyKey ?? null},
 											${userId},
+											${JSON.stringify(templateIds)}, ${JSON.stringify(templateNames)}, ${templateFingerprint},
 											now(), now()
 										) RETURNING id
 									`
@@ -883,7 +888,8 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 								organization_id,
 								query, mode, schema_name, status, context,
 								budget_cents, paid_budget_cents,
-								paid_policy, idempotency_key, created_by
+								paid_policy, idempotency_key, created_by,
+								template_ids, template_names, template_fingerprint
 							) VALUES (
 								${organizationId},
 								${input.query},
@@ -895,7 +901,10 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 								${policy.paidBudgetCents},
 								${JSON.stringify(policy)},
 								${input.idempotencyKey ?? null},
-								${userId}
+								${userId},
+								${JSON.stringify(templateIds)},
+								${JSON.stringify(templateNames)},
+								${templateFingerprint}
 							) RETURNING id
 						`
 						const researchId = (row as { id: string }).id
@@ -946,7 +955,9 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 				get: (researchId: string) =>
 					Effect.gen(function* () {
 						const [run] = yield* sql`
-							SELECT r.*,
+							-- A failed run keeps its error text inside findings; lift it out
+							-- so the detail view can show why the run failed.
+							SELECT r.*, r.findings->>'error' AS error_message,
 								COALESCE(
 									(SELECT json_agg(json_build_object(
 										'source_id', rs.source_id,

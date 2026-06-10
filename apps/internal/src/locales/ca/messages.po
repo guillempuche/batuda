@@ -434,7 +434,7 @@ msgstr "rebotat"
 msgid "Bounced"
 msgstr "Rebotat"
 
-#: src/components/research/run-detail.tsx:115
+#: src/components/research/run-detail.tsx:117
 msgid "Brief"
 msgstr "Resum"
 
@@ -849,7 +849,7 @@ msgstr "No s'ha pogut carregar aquesta empresa"
 msgid "Could not load this page"
 msgstr "No s'ha pogut carregar aquesta pàgina"
 
-#: src/components/research/run-detail.tsx:59
+#: src/components/research/run-detail.tsx:60
 msgid "Could not load this run."
 msgstr "No s'ha pogut carregar aquesta execució."
 
@@ -1233,6 +1233,10 @@ msgstr "Data de venciment"
 msgid "Duration (min)"
 msgstr "Durada (min)"
 
+#: src/components/instructions/template-editor-dialog.tsx:134
+msgid "e.g. [research] Spain hospitality sourcing"
+msgstr "p. ex. [research] Espanya prospecció d'hostaleria"
+
 #: src/routes/settings/api-keys/index.tsx:226
 msgid "e.g. Claude Desktop"
 msgstr "p. ex. Claude Desktop"
@@ -1244,10 +1248,6 @@ msgstr "p. ex. Signatura de l'empresa"
 #: src/routes/emails/inboxes.tsx:861
 msgid "e.g. Sales — Acme"
 msgstr "p. ex. Vendes — Acme"
-
-#: src/components/instructions/template-editor-dialog.tsx:134
-msgid "e.g. Spain hospitality sourcing"
-msgstr "p. ex. Prospecció d'hostaleria a Espanya"
 
 #: src/routes/emails/inboxes.tsx:1386
 msgid "Edit"
@@ -1418,7 +1418,7 @@ msgstr "Troba decisors i contactes operatius d'aquesta empresa. Tria-ho quan nec
 msgid "Find similar companies elsewhere with the same pain. Pick when you have closed a deal and want lookalikes."
 msgstr "Troba empreses similars amb el mateix problema. Tria-ho quan hagis tancat un acord i en vulguis trobar de semblants."
 
-#: src/components/research/run-detail.tsx:123
+#: src/components/research/run-detail.tsx:125
 msgid "Findings"
 msgstr "Troballes"
 
@@ -1711,7 +1711,7 @@ msgstr "S'està carregant el calendari…"
 msgid "Loading companies…"
 msgstr "Carregant empreses…"
 
-#: src/components/research/run-detail.tsx:49
+#: src/components/research/run-detail.tsx:50
 msgid "Loading run…"
 msgstr "Carregant l'execució…"
 
@@ -2133,8 +2133,8 @@ msgstr "Encara no hi ha recerques per a aquesta empresa."
 msgid "No research yet."
 msgstr "Encara sense recerca."
 
-#: src/components/research/run-detail.tsx:141
-#: src/components/research/run-detail.tsx:152
+#: src/components/research/run-detail.tsx:143
+#: src/components/research/run-detail.tsx:154
 msgid "No structured findings."
 msgstr "No hi ha troballes estructurades."
 
@@ -2774,11 +2774,11 @@ msgstr "Orientació reutilitzable i permanent que segueix el teu agent de recerc
 msgid "Role"
 msgstr "Rol"
 
-#: src/components/research/run-detail.tsx:104
+#: src/components/research/run-detail.tsx:106
 msgid "Run failed"
 msgstr "Execució fallida"
 
-#: src/components/research/run-detail.tsx:97
+#: src/components/research/run-detail.tsx:99
 msgid "Run in progress — events stream as they arrive."
 msgstr "Execució en curs — els esdeveniments arriben en temps real."
 
@@ -2790,7 +2790,7 @@ msgstr "Executa una nova"
 msgid "Run new research"
 msgstr "Inicia una recerca"
 
-#: src/components/research/run-detail.tsx:70
+#: src/components/research/run-detail.tsx:71
 msgid "Run shape unrecognised."
 msgstr "Format d'execució no reconegut."
 
@@ -2972,6 +2972,10 @@ msgstr "Configura <0>plantilles d'instruccions</0> reutilitzables per guiar cada
 #: src/routes/settings/profile/index.tsx:110
 msgid "Settings"
 msgstr "Configuració"
+
+#: src/components/research/run-detail.tsx:181
+msgid "Shaped by"
+msgstr "Modelat per"
 
 #: src/routes/emails/inboxes.tsx:462
 #: src/routes/emails/inboxes.tsx:1009

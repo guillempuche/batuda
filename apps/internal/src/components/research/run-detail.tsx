@@ -34,6 +34,7 @@ type ResearchRunDetail = {
 	readonly query: string
 	readonly schemaName: string | null
 	readonly status: string
+	readonly templateNames: readonly string[]
 	readonly briefMd: string | null
 	readonly findings: unknown
 	readonly errorMessage?: string | null
@@ -90,6 +91,7 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 						<SchemaText>{run.schemaName}</SchemaText>
 					) : null}
 				</HeaderMeta>
+				<ShapedBy templateNames={run.templateNames} />
 			</Header>
 
 			{isRunning ? (
@@ -163,6 +165,26 @@ function FindingsView({
 	return <Pre>{JSON.stringify(findings, null, 2)}</Pre>
 }
 
+// Show which standing instructions shaped this result, by name. The names are
+// frozen onto the run when it is created, so they display for any viewer — even
+// a teammate who can't read another member's personal template — and survive
+// the template being renamed or deleted.
+function ShapedBy({
+	templateNames,
+}: {
+	readonly templateNames: readonly string[]
+}) {
+	if (templateNames.length === 0) return null
+	return (
+		<Provenance data-testid='research-run-provenance'>
+			<ProvenanceLabel>
+				<Trans>Shaped by</Trans>
+			</ProvenanceLabel>
+			<span>{templateNames.join(' · ')}</span>
+		</Provenance>
+	)
+}
+
 function narrowRun(raw: unknown): ResearchRunDetail | null {
 	if (!raw || typeof raw !== 'object') return null
 	const r = raw as Record<string, unknown>
@@ -174,6 +196,9 @@ function narrowRun(raw: unknown): ResearchRunDetail | null {
 		query: r['query'],
 		schemaName: typeof r['schemaName'] === 'string' ? r['schemaName'] : null,
 		status: r['status'],
+		templateNames: Array.isArray(r['templateNames'])
+			? r['templateNames'].filter((x): x is string => typeof x === 'string')
+			: [],
 		briefMd: typeof r['briefMd'] === 'string' ? r['briefMd'] : null,
 		findings: r['findings'] ?? null,
 		errorMessage:
@@ -211,6 +236,21 @@ const HeaderMeta = styled.div`
 	align-items: baseline;
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface-variant);
+`
+
+const Provenance = styled.div`
+	display: inline-flex;
+	gap: var(--space-2xs);
+	align-items: baseline;
+	flex-wrap: wrap;
+	font-size: var(--typescale-body-small-size);
+	color: var(--color-on-surface-variant);
+`
+
+const ProvenanceLabel = styled.span`
+	font-family: var(--font-display);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
 `
 
 const StatusText = styled.span.withConfig({

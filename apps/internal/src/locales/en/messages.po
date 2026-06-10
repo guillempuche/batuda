@@ -434,7 +434,7 @@ msgstr "bounced"
 msgid "Bounced"
 msgstr "Bounced"
 
-#: src/components/research/run-detail.tsx:115
+#: src/components/research/run-detail.tsx:117
 msgid "Brief"
 msgstr "Brief"
 
@@ -849,7 +849,7 @@ msgstr "Could not load this company"
 msgid "Could not load this page"
 msgstr "Could not load this page"
 
-#: src/components/research/run-detail.tsx:59
+#: src/components/research/run-detail.tsx:60
 msgid "Could not load this run."
 msgstr "Could not load this run."
 
@@ -1233,6 +1233,10 @@ msgstr "Due date"
 msgid "Duration (min)"
 msgstr "Duration (min)"
 
+#: src/components/instructions/template-editor-dialog.tsx:134
+msgid "e.g. [research] Spain hospitality sourcing"
+msgstr "e.g. [research] Spain hospitality sourcing"
+
 #: src/routes/settings/api-keys/index.tsx:226
 msgid "e.g. Claude Desktop"
 msgstr "e.g. Claude Desktop"
@@ -1244,10 +1248,6 @@ msgstr "e.g. Company signature"
 #: src/routes/emails/inboxes.tsx:861
 msgid "e.g. Sales — Acme"
 msgstr "e.g. Sales — Acme"
-
-#: src/components/instructions/template-editor-dialog.tsx:134
-msgid "e.g. Spain hospitality sourcing"
-msgstr "e.g. Spain hospitality sourcing"
 
 #: src/routes/emails/inboxes.tsx:1386
 msgid "Edit"
@@ -1418,7 +1418,7 @@ msgstr "Find decision-makers and operational contacts at this company. Pick when
 msgid "Find similar companies elsewhere with the same pain. Pick when you have closed a deal and want lookalikes."
 msgstr "Find similar companies elsewhere with the same pain. Pick when you have closed a deal and want lookalikes."
 
-#: src/components/research/run-detail.tsx:123
+#: src/components/research/run-detail.tsx:125
 msgid "Findings"
 msgstr "Findings"
 
@@ -1711,7 +1711,7 @@ msgstr "Loading calendar…"
 msgid "Loading companies…"
 msgstr "Loading companies…"
 
-#: src/components/research/run-detail.tsx:49
+#: src/components/research/run-detail.tsx:50
 msgid "Loading run…"
 msgstr "Loading run…"
 
@@ -2133,8 +2133,8 @@ msgstr "No research runs yet for this company."
 msgid "No research yet."
 msgstr "No research yet."
 
-#: src/components/research/run-detail.tsx:141
-#: src/components/research/run-detail.tsx:152
+#: src/components/research/run-detail.tsx:143
+#: src/components/research/run-detail.tsx:154
 msgid "No structured findings."
 msgstr "No structured findings."
 
@@ -2774,11 +2774,11 @@ msgstr "Reusable, standing guidance your research agent follows — what you sel
 msgid "Role"
 msgstr "Role"
 
-#: src/components/research/run-detail.tsx:104
+#: src/components/research/run-detail.tsx:106
 msgid "Run failed"
 msgstr "Run failed"
 
-#: src/components/research/run-detail.tsx:97
+#: src/components/research/run-detail.tsx:99
 msgid "Run in progress — events stream as they arrive."
 msgstr "Run in progress — events stream as they arrive."
 
@@ -2790,7 +2790,7 @@ msgstr "Run new"
 msgid "Run new research"
 msgstr "Run new research"
 
-#: src/components/research/run-detail.tsx:70
+#: src/components/research/run-detail.tsx:71
 msgid "Run shape unrecognised."
 msgstr "Run shape unrecognised."
 
@@ -2972,6 +2972,10 @@ msgstr "Set up reusable <0>instruction templates</0> to guide every run."
 #: src/routes/settings/profile/index.tsx:110
 msgid "Settings"
 msgstr "Settings"
+
+#: src/components/research/run-detail.tsx:181
+msgid "Shaped by"
+msgstr "Shaped by"
 
 #: src/routes/emails/inboxes.tsx:462
 #: src/routes/emails/inboxes.tsx:1009
