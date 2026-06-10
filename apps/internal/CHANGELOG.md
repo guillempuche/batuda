@@ -3,6 +3,38 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-06-10 (internal-v2026.6.10)
+
+### Features
+
+* add instruction-template management API over HTTP and MCP ([08f1a50](https://github.com/guillempuche/batuda/commit/08f1a5059d8e93dbcaf4d3732ff381d3bd1348cc))
+* **instructions:** set and read stack composition via the API and MCP ([df1ae5e](https://github.com/guillempuche/batuda/commit/df1ae5e43e7bcfd43350e53d9a81dda43940c5e6))
+* **internal:** add AI instruction-templates UI ([c381949](https://github.com/guillempuche/batuda/commit/c38194932e5e7d89b737bfe27db4ff4cbab16611))
+* **internal:** add extend mode and drag-and-drop to the stack editor ([78e3169](https://github.com/guillempuche/batuda/commit/78e3169c8b4a0e053b2b310cb4c64133e4fd6173))
+* **internal:** add org instruction-templates admin page ([af231bb](https://github.com/guillempuche/batuda/commit/af231bb957200c45ae8db5750483a9bcd3e25cb9))
+* **internal:** show the [tag] convention in the name placeholder ([19b1b68](https://github.com/guillempuche/batuda/commit/19b1b689570698e371c3d7da4be8b5d0439a68fe))
+* org-isolate the research cache and thread instruction templates ([fa6c6ef](https://github.com/guillempuche/batuda/commit/fa6c6eff56db43aac6da49ad57967e75212e3d92))
+* record which instruction templates shaped each research run ([d86e9b8](https://github.com/guillempuche/batuda/commit/d86e9b89a3c040d41edbabbea5276aa4c79ff8f4))
+
+### Bug Fixes
+
+* harden research MCP input validation and lifecycle guards ([03a952d](https://github.com/guillempuche/batuda/commit/03a952d20c60f61a3aae44ba50d93fd1a0541d65))
+* **internal:** restore mobile scroll and bottom-nav clearance ([b9672fb](https://github.com/guillempuche/batuda/commit/b9672fbda8ade076cca80f580f027db728636bc3))
+* **internal:** stop authed hard-loads bouncing to /login in dev ([3048912](https://github.com/guillempuche/batuda/commit/30489129cfeedca80d25ceca56b07d4771fc7186))
+* stop event-sink failures from stranding research runs ([23bd88c](https://github.com/guillempuche/batuda/commit/23bd88c266104b6ff1ae6acc8584f6ff4d9fb59a))
+
+### Refactoring
+
+* extract the research system-prompt builder ([14e813a](https://github.com/guillempuche/batuda/commit/14e813aca146c704d16fcaf5c4979fa681acb17d))
+* **internal:** move org admin sections into an admin-only child ([ab2db78](https://github.com/guillempuche/batuda/commit/ab2db78542bc8a72630d763590243631ff08b24b))
+* **internal:** read mutation outcomes through one shared helper ([2f0446f](https://github.com/guillempuche/batuda/commit/2f0446fb4f9e5a68108e336d17f411ef8ff465e4))
+* **internal:** share the instruction-template page chrome ([16d678f](https://github.com/guillempuche/batuda/commit/16d678f36a2bf2f3c289322ce6cfd697f3b1e018))
+* **internal:** share the template delete-confirm dialog ([d4ab895](https://github.com/guillempuche/batuda/commit/d4ab895eecb4f15afc8da8c0f5dd6b8e1ec907b7))
+
+### Chores
+
+* **internal:** refresh i18n catalog source references ([b8df8ba](https://github.com/guillempuche/batuda/commit/b8df8baa672b778d8eb5d55cb4e0c735d908b918))
+
 ## 2026-05-29 (internal-v2026.5.29)
 
 ### Features
