@@ -80,6 +80,7 @@ export interface ResolvedInstructions {
 	readonly segments: ReadonlyArray<string>
 	readonly fingerprint: string
 	readonly templateIds: ReadonlyArray<string>
+	readonly templateNames: ReadonlyArray<string>
 	readonly source: StackSource
 }
 
@@ -95,6 +96,7 @@ interface StackRow {
 
 interface TemplateRow {
 	readonly id: string
+	readonly name: string
 	readonly body: string
 	readonly updatedAt: string
 }
@@ -175,6 +177,7 @@ export const resolveInstructions = (
 				segments: [],
 				fingerprint: fingerprintTemplates([]),
 				templateIds: [],
+				templateNames: [],
 				source,
 			}
 		}
@@ -183,7 +186,7 @@ export const resolveInstructions = (
 		// personal template named in a per-run override) — they never reach the
 		// prompt and never enter the fingerprint.
 		const rows = yield* sql<TemplateRow>`
-			SELECT id, body, EXTRACT(EPOCH FROM updated_at)::text AS updated_at
+			SELECT id, name, body, EXTRACT(EPOCH FROM updated_at)::text AS updated_at
 			FROM instruction_templates
 			WHERE id IN ${sql.in([...orderedIds])}
 		`
@@ -198,6 +201,7 @@ export const resolveInstructions = (
 				ordered.map(row => ({ id: row.id, updatedAt: row.updatedAt })),
 			),
 			templateIds: ordered.map(row => row.id),
+			templateNames: ordered.map(row => row.name),
 			source,
 		}
 	})

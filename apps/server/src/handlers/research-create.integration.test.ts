@@ -206,4 +206,85 @@ describe('research_runs INSERT — RLS contract', () => {
 			)
 		})
 	})
+
+	describe('when a run records instruction provenance', () => {
+		it('should persist the resolved template ids and fingerprint', async () => {
+			// GIVEN a resolved instruction set — two template ids and a fingerprint
+			// WHEN a research_runs row is inserted with template_ids + template_fingerprint
+			// THEN reading the row back returns the same ids and fingerprint
+			// [research-service.ts — template_ids/template_fingerprint on the run INSERTs]
+			const id = randomUUID()
+			seededIds.push(id)
+			const tplA = randomUUID()
+			const tplB = randomUUID()
+
+			const row = await withOrgScope(async client => {
+				const result = await client.query<{
+					template_ids: string[]
+					template_fingerprint: string
+				}>(
+					`INSERT INTO research_runs (
+						id, organization_id,
+						query, mode, schema_name, status, context,
+						budget_cents, paid_budget_cents,
+						paid_policy, idempotency_key, created_by,
+						template_ids, template_fingerprint
+					) VALUES (
+						$1::uuid, $2,
+						$3, 'deep', 'freeform', 'queued', '{}'::jsonb,
+						100, 500,
+						'{}'::jsonb, NULL, $4,
+						$5::jsonb, $6
+					)
+					RETURNING template_ids, template_fingerprint`,
+					[
+						id,
+						orgId,
+						`Provenance query ${id}`,
+						userId,
+						JSON.stringify([tplA, tplB]),
+						'fp-prov-123',
+					],
+				)
+				return result.rows[0]
+			})
+
+			expect(row?.template_ids).toEqual([tplA, tplB])
+			expect(row?.template_fingerprint).toBe('fp-prov-123')
+		})
+
+		it('should default to an empty set and fingerprint when no templates apply', async () => {
+			// GIVEN a run created without any instruction provenance (columns omitted)
+			// WHEN the row is inserted with only the base columns
+			// THEN template_ids defaults to [] and template_fingerprint to ''
+			// [0012_research_run_provenance — column defaults]
+			const id = randomUUID()
+			seededIds.push(id)
+
+			const row = await withOrgScope(async client => {
+				const result = await client.query<{
+					template_ids: unknown
+					template_fingerprint: string
+				}>(
+					`INSERT INTO research_runs (
+						id, organization_id,
+						query, mode, schema_name, status, context,
+						budget_cents, paid_budget_cents,
+						paid_policy, idempotency_key, created_by
+					) VALUES (
+						$1::uuid, $2,
+						$3, 'deep', 'freeform', 'queued', '{}'::jsonb,
+						100, 500,
+						'{}'::jsonb, NULL, $4
+					)
+					RETURNING template_ids, template_fingerprint`,
+					[id, orgId, `No-provenance query ${id}`, userId],
+				)
+				return result.rows[0]
+			})
+
+			expect(row?.template_ids).toEqual([])
+			expect(row?.template_fingerprint).toBe('')
+		})
+	})
 })
