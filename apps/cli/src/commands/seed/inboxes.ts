@@ -13,6 +13,11 @@ interface InboxSpec {
 	readonly purpose: 'human' | 'agent'
 	readonly isDefault: boolean
 	readonly footerText: string
+	readonly grantStatus:
+		| 'connected'
+		| 'auth_failed'
+		| 'connect_failed'
+		| 'disabled'
 }
 
 export type SeededInbox = {
@@ -26,6 +31,10 @@ const TALLER_HUMAN_INBOX_ID = '11111111-1111-4111-8111-111111111111'
 const TALLER_AGENT_INBOX_ID = '22222222-2222-4222-8222-222222222222'
 const RESTAURANT_HUMAN_INBOX_ID = '33333333-3333-4333-8333-333333333333'
 const RESTAURANT_AGENT_INBOX_ID = '44444444-4444-4444-8444-444444444444'
+// Unhealthy-grant demo inboxes so the inbox list renders every status tone.
+const TALLER_AUTH_FAILED_INBOX_ID = '55555555-5555-4555-8555-555555555555'
+const TALLER_CONNECT_FAILED_INBOX_ID = '66666666-6666-4666-8666-666666666666'
+const TALLER_DISABLED_INBOX_ID = '77777777-7777-4777-8777-777777777777'
 
 export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 	Effect.gen(function* () {
@@ -49,6 +58,7 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 				purpose: 'human',
 				isDefault: true,
 				footerText: '— Alice Admin\nTaller Demo · taller.cat',
+				grantStatus: 'connected',
 			},
 			{
 				id: TALLER_AGENT_INBOX_ID,
@@ -59,6 +69,41 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 				purpose: 'agent',
 				isDefault: false,
 				footerText: "Automated response from Alice's agent.",
+				grantStatus: 'connected',
+			},
+			// Unhealthy inboxes round out the four grant states the list styles.
+			{
+				id: TALLER_AUTH_FAILED_INBOX_ID,
+				email: 'alerts@taller.cat',
+				displayName: 'Taller Alerts (auth failed)',
+				ownerEmail: 'admin@taller.cat',
+				orgId: tallerOrgId,
+				purpose: 'human',
+				isDefault: false,
+				footerText: '— Taller Demo',
+				grantStatus: 'auth_failed',
+			},
+			{
+				id: TALLER_CONNECT_FAILED_INBOX_ID,
+				email: 'noreply@taller.cat',
+				displayName: 'Taller Noreply (connect failed)',
+				ownerEmail: 'admin@taller.cat',
+				orgId: tallerOrgId,
+				purpose: 'human',
+				isDefault: false,
+				footerText: '— Taller Demo',
+				grantStatus: 'connect_failed',
+			},
+			{
+				id: TALLER_DISABLED_INBOX_ID,
+				email: 'archive@taller.cat',
+				displayName: 'Taller Archive (disabled)',
+				ownerEmail: 'admin@taller.cat',
+				orgId: tallerOrgId,
+				purpose: 'human',
+				isDefault: false,
+				footerText: '— Taller Demo',
+				grantStatus: 'disabled',
 			},
 		]
 		if (restaurantOrgId !== null) {
@@ -72,6 +117,7 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 					purpose: 'human',
 					isDefault: true,
 					footerText: '— Bob Owner\nRestaurant Demo',
+					grantStatus: 'connected',
 				},
 				{
 					id: RESTAURANT_AGENT_INBOX_ID,
@@ -82,6 +128,7 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 					purpose: 'agent',
 					isDefault: false,
 					footerText: "Automated response from Bob's agent.",
+					grantStatus: 'connected',
 				},
 			)
 		}
@@ -141,7 +188,7 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 					passwordCiphertext: ciphertext,
 					passwordNonce: nonce,
 					passwordTag: tag,
-					grantStatus: 'connected',
+					grantStatus: spec.grantStatus,
 				})}
 			`
 			yield* sql`

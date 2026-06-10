@@ -384,7 +384,6 @@ export const COMPANIES = [
 		region: 'cat',
 		location: 'Manresa',
 		source: 'google_maps',
-		priority: 3,
 		metadata: { notes: 'Found via Maps but no contact info available yet.' },
 	},
 	{
@@ -815,6 +814,52 @@ export const getPresetData = (
 			dueAt: new Date('2026-05-01'),
 			metadata: { travelRequired: true, estimatedKm: 130 },
 		},
+		// Varied lifecycle/source/priority so the board's middle states, the
+		// agent/email/booking source chips, the priority rivets, and the snooze
+		// view all have something to render.
+		{
+			companyId: companyMap.get('cal-pep-fonda')!,
+			contactId: null,
+			type: 'other',
+			title: 'Draft a follow-up email for Cal Pep',
+			notes: 'Auto-suggested after the last visit.',
+			source: 'agent',
+			priority: 'high',
+			status: 'in_progress',
+			dueAt: new Date('2026-04-18'),
+		},
+		{
+			companyId: companyMap.get('ferros-baix-llobregat')!,
+			contactId: null,
+			type: 'email',
+			title: 'Awaiting budget sign-off before the proposal',
+			source: 'email',
+			status: 'blocked',
+			dueAt: new Date('2026-04-20'),
+		},
+		{
+			companyId: companyMap.get('hostal-pirineu')!,
+			contactId: null,
+			type: 'call',
+			title: 'Review the reservations demo recording',
+			source: 'booking',
+			priority: 'low',
+			status: 'in_review',
+		},
+		{
+			companyId: companyMap.get('park-stone-design')!,
+			contactId: null,
+			type: 'other',
+			title: 'Outreach cancelled — they kept their provider',
+			status: 'cancelled',
+		},
+		{
+			companyId: companyMap.get('cal-pep-fonda')!,
+			contactId: null,
+			type: 'followup',
+			title: 'Revisit the Cal Pep upsell',
+			snoozedUntil: new Date('2026-07-15'),
+		},
 	]
 
 	const withContactDefaults = <
@@ -831,8 +876,14 @@ export const getPresetData = (
 	})
 
 	// `normalizeRows` writes explicit NULL for missing keys, bypassing Postgres column defaults.
-	const withTaskDefaults = <T extends { status?: string }>(task: T) => ({
+	const withTaskDefaults = <
+		T extends { status?: string; source?: string; priority?: string },
+	>(
+		task: T,
+	) => ({
 		status: 'open' as const,
+		source: 'user' as const,
+		priority: 'normal' as const,
 		...task,
 	})
 
