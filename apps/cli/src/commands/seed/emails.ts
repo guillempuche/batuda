@@ -19,6 +19,9 @@ interface SeedMessageArgs {
 	readonly inbox: SeededInbox
 	readonly threadRootMessageId: string
 	readonly threadSubject: string
+	readonly threadStatus?: 'open' | 'closed' | 'archived'
+	readonly threadCompanyId?: string | null
+	readonly threadContactId?: string | null
 	readonly messageId: string
 	readonly fromAddress: string
 	readonly toAddresses: readonly string[]
@@ -30,7 +33,13 @@ interface SeedMessageArgs {
 	readonly references?: readonly string[]
 	readonly attachments?: readonly SeedAttachment[]
 	readonly receivedAt?: Date
-	readonly inboundClassification?: 'normal' | 'spam'
+	readonly inboundClassification?: 'normal' | 'spam' | 'blocked'
+	readonly status?: 'normal' | 'spam' | 'blocked' | 'bounced'
+	readonly statusReason?: string
+	readonly bounceType?: string
+	readonly bounceSubType?: string
+	readonly companyId?: string | null
+	readonly contactId?: string | null
 	readonly direction?: 'inbound' | 'outbound'
 	readonly folder?: string
 }
@@ -68,6 +77,9 @@ export const seedDemoEmails = (
 						inboxId: args.inbox.id,
 						externalThreadId: args.threadRootMessageId,
 						subject: args.threadSubject,
+						status: args.threadStatus ?? 'open',
+						companyId: args.threadCompanyId ?? null,
+						contactId: args.threadContactId ?? null,
 					})}
 					ON CONFLICT (organization_id, external_thread_id) DO NOTHING
 				`
@@ -136,7 +148,12 @@ export const seedDemoEmails = (
 						bcc: [],
 					}),
 					attachments: JSON.stringify(attachmentsMeta),
-					status: 'normal',
+					companyId: args.companyId ?? null,
+					contactId: args.contactId ?? null,
+					status: args.status ?? 'normal',
+					statusReason: args.statusReason ?? null,
+					bounceType: args.bounceType ?? null,
+					bounceSubType: args.bounceSubType ?? null,
 					inboundClassification: args.inboundClassification ?? null,
 				}
 				const insertedRows = yield* sql<{ id: string }>`
@@ -183,6 +200,28 @@ export const seedDemoEmails = (
 			i => i.email === 'agent@restaurant.demo',
 		)
 
+		// Resolve the seeded company + contact (by slug / email within the org)
+		// so at least one thread lands on the CRM timeline. Same lookup style as
+		// the inbox seed; ids stay null if the CRM seed was skipped.
+		const tallerOrgId = tallerHuman?.orgId
+		let calPepCompanyId: string | null = null
+		let pepContactId: string | null = null
+		if (tallerOrgId) {
+			const companyRows = yield* sql<{ id: string }>`
+				SELECT id FROM companies
+				WHERE organization_id = ${tallerOrgId} AND slug = 'cal-pep-fonda'
+				LIMIT 1
+			`
+			calPepCompanyId = companyRows[0]?.id ?? null
+			const contactRows = yield* sql<{ id: string }>`
+				SELECT id FROM contacts
+				WHERE organization_id = ${tallerOrgId}
+				  AND email = 'pep@calpepfonda.cat'
+				LIMIT 1
+			`
+			pepContactId = contactRows[0]?.id ?? null
+		}
+
 		if (tallerHuman) {
 			const m1Id = '<m1-quote@calpepfonda.cat>'
 			const m2Id = '<m2-quote-followup@calpepfonda.cat>'
@@ -190,17 +229,25 @@ export const seedDemoEmails = (
 			const m8Id = '<m8-vendor-quote@example.com>'
 			const m9Id = `<m9-${randomUUID()}@taller.cat>`
 			const m12Id = `<m12-${randomUUID()}@scam.example>`
+			const m13Id = `<m13-${randomUUID()}@promo.example>`
+			const m14Id = `<m14-${randomUUID()}@malware.example>`
 
 			yield* insertSeedMessage({
 				inbox: tallerHuman,
 				threadRootMessageId: m1Id,
 				threadSubject: 'Quote for the booking module',
+				// Pep is a seeded CRM contact at Cal Pep Fonda — linking the thread
+				// and its messages surfaces this email on the company/contact timeline.
+				threadCompanyId: calPepCompanyId,
+				threadContactId: pepContactId,
 				messageId: m1Id,
 				fromAddress: 'pep@calpepfonda.cat',
 				toAddresses: ['admin@taller.cat'],
 				subject: 'Quote for the booking module',
 				textBody:
 					'Hola Alice,\n\nM’agradaria saber el preu del mòdul de reserves.\n\nGràcies,\nPep',
+				companyId: calPepCompanyId,
+				contactId: pepContactId,
 				receivedAt: new Date('2026-04-30T09:00:00Z'),
 			})
 			yield* insertSeedMessage({
@@ -213,6 +260,8 @@ export const seedDemoEmails = (
 				subject: 'Re: Quote for the booking module',
 				textBody:
 					'Una pregunta més: també suporta cancel·lacions automàtiques?\n\nPep',
+				companyId: calPepCompanyId,
+				contactId: pepContactId,
 				inReplyTo: m1Id,
 				references: [m1Id],
 				receivedAt: new Date('2026-05-01T10:30:00Z'),
@@ -221,6 +270,7 @@ export const seedDemoEmails = (
 				inbox: tallerHuman,
 				threadRootMessageId: m3Id,
 				threadSubject: 'Project kickoff materials',
+				threadStatus: 'closed',
 				messageId: m3Id,
 				fromAddress: 'kickoff@ferrosbl.com',
 				toAddresses: ['admin@taller.cat'],
@@ -239,6 +289,7 @@ export const seedDemoEmails = (
 				inbox: tallerHuman,
 				threadRootMessageId: m8Id,
 				threadSubject: 'Vendor quote — final',
+				threadStatus: 'archived',
 				messageId: m8Id,
 				fromAddress: 'vendor@example.com',
 				toAddresses: ['admin@taller.cat'],
@@ -269,6 +320,14 @@ export const seedDemoEmails = (
 				subject: 'Re: Quote for the booking module',
 				textBody:
 					'Hi Pep,\n\nAttached is the quote for the booking module. Let me know what you think.\n\nAlice',
+				companyId: calPepCompanyId,
+				contactId: pepContactId,
+				// Outbound reply that bounced — exercises the deliverability badge
+				// with a hard-bounce reason on the same CRM-linked thread.
+				status: 'bounced',
+				statusReason: 'Recipient address rejected: user unknown',
+				bounceType: 'Permanent',
+				bounceSubType: 'General',
 				inReplyTo: m1Id,
 				references: [m1Id],
 				direction: 'outbound',
@@ -290,8 +349,80 @@ export const seedDemoEmails = (
 				receivedAt: new Date('2026-05-03T08:00:00Z'),
 			})
 
+			// Spam-quarantined message: hidden from the default inbox view, listed
+			// under the spam filter. status and classification both flag it.
+			yield* insertSeedMessage({
+				inbox: tallerHuman,
+				threadRootMessageId: m13Id,
+				threadSubject: 'You have won a prize!!!',
+				messageId: m13Id,
+				fromAddress: 'deals@promo.example',
+				toAddresses: ['admin@taller.cat'],
+				subject: 'You have won a prize!!!',
+				textBody: 'Click here to claim your free voucher before it expires.',
+				status: 'spam',
+				statusReason: 'Spam score above threshold',
+				inboundClassification: 'spam',
+				receivedAt: new Date('2026-05-03T09:30:00Z'),
+			})
+
+			// Blocked message: a hard-blocked sender (e.g. malware). Drives the
+			// blocked status badge and the blocked inbound-classification banner.
+			yield* insertSeedMessage({
+				inbox: tallerHuman,
+				threadRootMessageId: m14Id,
+				threadSubject: 'Invoice attached',
+				messageId: m14Id,
+				fromAddress: 'billing@malware.example',
+				toAddresses: ['admin@taller.cat'],
+				subject: 'Invoice attached',
+				textBody: 'Please review the attached invoice and confirm payment.',
+				status: 'blocked',
+				statusReason: 'Sender on org blocklist',
+				inboundClassification: 'blocked',
+				receivedAt: new Date('2026-05-03T10:15:00Z'),
+			})
+
+			// An in-flight reply draft on Pep's quote thread, so /emails shows a
+			// resumable draft. body_json is the EmailBlocks block tree (same shape
+			// as inbox footers); thread_link_id ties it back to the M1 thread.
+			const threadLinkRows = yield* sql<{ id: string }>`
+				SELECT id FROM email_thread_links
+				WHERE organization_id = ${tallerHuman.orgId}
+				  AND external_thread_id = ${m1Id}
+				LIMIT 1
+			`
+			const m1ThreadLinkId = threadLinkRows[0]?.id ?? null
+			yield* sql`
+				INSERT INTO email_drafts ${sql.insert({
+					draftId: `draft_seed-${randomUUID()}`,
+					organizationId: tallerHuman.orgId,
+					inboxId: tallerHuman.id,
+					mode: 'reply',
+					toAddresses: ['pep@calpepfonda.cat'],
+					ccAddresses: [],
+					bccAddresses: [],
+					subject: 'Re: Quote for the booking module',
+					inReplyTo: m1Id,
+					threadLinkId: m1ThreadLinkId,
+					clientId: null,
+					bodyJson: JSON.stringify([
+						{
+							type: 'paragraph',
+							spans: [
+								{
+									kind: 'text',
+									value:
+										'Hi Pep, thanks for the questions — drafting the cancellation details now.',
+								},
+							],
+						},
+					]),
+				})}
+			`
+
 			yield* Effect.logInfo(
-				'  taller human: M1+M2 (thread), M3 (rich+Cc), M8 (2 attachments), M9 (outbound), M12 (spam)',
+				'  taller human: M1+M2 (CRM-linked thread), M3 (closed), M8 (archived), M9 (bounced), M12 (spam-classified), M13 (spam), M14 (blocked), +1 reply draft',
 			)
 		}
 		if (tallerAgent) {

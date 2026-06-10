@@ -2516,6 +2516,169 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		startedAt: new Date('2026-05-05T15:00:00Z'),
 		completedAt: new Date('2026-05-05T15:00:28Z'),
 	},
+
+	// ── LOCAL-DEV: states the long-tail above never reaches ───────
+	// One run per otherwise-unreachable findings/lifecycle shape, so
+	// the matching UI section (pending paid actions, "Already in CRM",
+	// partial brief on a failed run, a cache hit with real cloned
+	// findings) renders against real data in local dev.
+
+	// A paid action the agent paused on before spending — drives the
+	// `pending_paid_actions` section (UI key: pendingPaidActions).
+	{
+		key: 'paid-gate',
+		companySlug: 'coastal-freight',
+		query: 'Coastal Freight — directors + share capital (awaiting paid lookup)',
+		mode: 'deep',
+		schemaName: 'company_enrichment_v1',
+		kind: 'leaf',
+		status: 'succeeded',
+		findings: {
+			enrichment: {
+				industry: 'transport',
+				size_range: '11-25',
+				pain_points:
+					'Free sources confirm the fleet but not the directors or share capital.',
+				current_tools: 'Paper + Sage 200 + WhatsApp.',
+				products_fit: ['automatitzacions'],
+				tags: ['logistics', 'maresme'],
+				region: 'cat',
+				location: 'Mataró',
+				citations: [{ source_id: 'src_exa_001', confidence: 0.8 }],
+			},
+			pending_paid_actions: [
+				{
+					tool: 'einforma.company_report',
+					args: { tax_id: 'B65xxxxxx', depth: 'full' },
+					estimated_cents: 150,
+					reason:
+						'Directors and share capital are only available behind the paid registry report; over the auto-approve cap, so it waits for a click.',
+				},
+				{
+					tool: 'firecrawl.scrape',
+					args: { url: 'https://coastalfreight.es/legal', render: true },
+					estimated_cents: 5,
+					reason:
+						'Legal page is JS-rendered; a rendered scrape would confirm the VAT id before paying for the full report.',
+				},
+			],
+		},
+		briefMd:
+			'## Coastal Freight — blocked on a paid lookup\nFree sources cover the fleet and routes, but directors + share capital sit behind the einforma report. The run paused at the paid gate: approve the report (≈€1.50) to finish enrichment.',
+		budgetCents: 100,
+		paidBudgetCents: 200,
+		costCents: 16,
+		tokensIn: 6100,
+		tokensOut: 1400,
+		startedAt: new Date('2026-05-20T08:00:00Z'),
+		completedAt: new Date('2026-05-20T08:01:24Z'),
+		attachSources: [{ sourceId: 'src_exa_001', costCents: 4 }],
+	},
+
+	// A peer scan that recognised companies already in the CRM — drives
+	// the "Already in CRM" section (UI key: discoveredExisting).
+	{
+		key: 'prospects-known',
+		companySlug: 'ferros-baix-llobregat',
+		query: 'Baix Llobregat metal fabricators — peer scan (dedup against CRM)',
+		mode: 'deep',
+		schemaName: 'prospect_scan_v1',
+		kind: 'leaf',
+		status: 'succeeded',
+		findings: {
+			prospects: [
+				{
+					name: 'Mecanitzats Sant Boi',
+					website: 'https://mecanitzatssantboi.cat',
+					industry: 'manufactura',
+					region: 'cat',
+					why_relevant:
+						'CNC shop in Sant Boi with manual invoicing; not yet contacted.',
+					pain_indicators: ['excel-invoicing', 'no-vendor'],
+					citations: [{ source_id: 'src_registry_001' }],
+				},
+			],
+			discovered_existing: [
+				{
+					subject_table: 'companies',
+					subject_id: '<ferros-id>',
+					name: 'Ferros Baix Llobregat',
+				},
+				{
+					subject_table: 'companies',
+					subject_id: '<electricitat-id>',
+					name: 'Electricitat del Vallès',
+				},
+			],
+		},
+		briefMd:
+			'## Baix Llobregat peers — deduped\nOne genuinely new prospect (Mecanitzats Sant Boi). The scan also re-surfaced two companies already in the CRM, listed under "Already in CRM" so they are not re-added.',
+		budgetCents: 50,
+		costCents: 21,
+		tokensIn: 8200,
+		tokensOut: 1900,
+		startedAt: new Date('2026-05-18T09:30:00Z'),
+		completedAt: new Date('2026-05-18T09:31:48Z'),
+		attachSources: [{ sourceId: 'src_registry_001', costCents: 0 }],
+	},
+
+	// Failed mid-run, but the partial brief from the work done before
+	// the error survives — the realistic "spent tokens, then errored".
+	{
+		key: 'enrichment-failed-partial',
+		companySlug: 'distribuciones-martinez',
+		query: 'Distribuciones Martínez — registry enrichment (interrupted)',
+		mode: 'deep',
+		schemaName: 'company_enrichment_v1',
+		kind: 'leaf',
+		status: 'failed',
+		findings: {
+			error: 'einforma report timed out after the web pass completed',
+		},
+		briefMd:
+			'## Distribuciones Martínez — partial (run failed)\nThe free web pass finished before the error: family-run distributor in Alzira, ~15 staff, phone + paper order intake. The paid registry step then timed out, so directors and VAT are still unconfirmed. Safe to retry once the provider recovers.',
+		budgetCents: 60,
+		paidBudgetCents: 200,
+		costCents: 17,
+		tokensIn: 6400,
+		tokensOut: 820,
+		startedAt: new Date('2026-05-22T10:00:00Z'),
+		completedAt: new Date('2026-05-22T10:01:36Z'),
+	},
+
+	// A cache hit that cloned real prior findings (not an empty
+	// freeform) — visually distinct from the cached-freeform run above.
+	{
+		key: 'competitors-cache-hit',
+		companySlug: 'consultoria-beta',
+		query: 'València boutique consulting — competitor scan (cached)',
+		mode: 'quick',
+		schemaName: 'competitor_scan_v1',
+		kind: 'cache_hit',
+		status: 'succeeded',
+		findings: {
+			competitors: RICH_COMPETITORS_VALENCIA,
+			market_summary: {
+				total_competitors_found: 12,
+				market_maturity: 'fragmented',
+				key_differentiators: [
+					'proposal turnaround time',
+					'methodology IP',
+					'digital intake',
+				],
+				citations: [],
+			},
+		},
+		briefMd:
+			'## València consultancies — competitive scan (cached)\nServed from a prior run within the TTL — same 12-firm landscape, zero spend. Clones the earlier competitor findings verbatim so the cached result is a full scan, not an empty brief.',
+		budgetCents: 0,
+		costCents: 0,
+		tokensIn: 0,
+		tokensOut: 0,
+		startedAt: new Date('2026-05-15T09:00:00Z'),
+		completedAt: new Date('2026-05-15T09:00:00Z'),
+		toolLog: TOOL_LOG_CACHE_HIT,
+	},
 ]
 
 export const seedResearchRuns = (
@@ -2911,6 +3074,31 @@ export const seedResearchRuns = (
 						idempotencyKey: 'seed:run:marisqueria-del-port-competitors',
 						createdBy: testUser?.id ?? 'seed',
 					},
+					// LOCAL-DEV: a failed run so the restaurant tenant can show
+					// the error block after an org switch (the two runs above
+					// only cover succeeded + queued).
+					{
+						organizationId: restaurantOrgId,
+						kind: 'leaf',
+						query: 'Marisqueria del Port — directors via paid registry lookup',
+						mode: 'deep',
+						schemaName: 'company_enrichment_v1',
+						status: 'failed',
+						context: JSON.stringify({}),
+						findings: JSON.stringify({
+							error: 'einforma quota exhausted for this period',
+						}),
+						briefMd: null,
+						budgetCents: 60,
+						costCents: 12,
+						tokensIn: 4200,
+						tokensOut: 480,
+						toolLog: JSON.stringify([]),
+						idempotencyKey: 'seed:run:marisqueria-del-port-registry-failed',
+						createdBy: testUser?.id ?? 'seed',
+						startedAt: new Date('2026-03-02T11:00:00Z'),
+						completedAt: new Date('2026-03-02T11:00:42Z'),
+					},
 				]
 				const restaurantRuns = yield* sql<{
 					id: string
@@ -2941,6 +3129,14 @@ export const seedProviderQuotas = (
 	Effect.gen(function* () {
 		if (!testUser) return
 		yield* Effect.logInfo('Seeding provider quotas & usage...')
+		// The quota check counts only the current month
+		// (date_trunc('month', now()) in provider-quota.ts), so the warn
+		// state is only reachable from a row anchored to *this* month.
+		// Computed at seed time so it stays current whenever the seed runs.
+		const now = new Date()
+		const currentPeriodStart = `${now.getUTCFullYear()}-${String(
+			now.getUTCMonth() + 1,
+		).padStart(2, '0')}-01`
 		yield* sql`INSERT INTO provider_quotas ${sql.insert(
 			normalizeRows([
 				{
@@ -3007,7 +3203,16 @@ export const seedProviderQuotas = (
 					periodStart: '2026-04-01',
 					unitsConsumed: 1,
 				},
+				// LOCAL-DEV: current-month firecrawl usage at 460/500 = 92%,
+				// past the 80% warn threshold, so the quota-warning state is
+				// reachable (the older periods top out at ~77% this month).
+				{
+					userId: testUser.id,
+					provider: 'firecrawl',
+					periodStart: currentPeriodStart,
+					unitsConsumed: 460,
+				},
 			]),
 		)}`
-		yield* Effect.logInfo('  3 quotas, 4 usage rows')
+		yield* Effect.logInfo('  3 quotas, 5 usage rows')
 	})

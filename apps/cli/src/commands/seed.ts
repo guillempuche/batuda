@@ -12,7 +12,9 @@ import {
 import { seedDocuments } from './seed/documents'
 import { seedDemoEmails } from './seed/emails'
 import { seedInboxes } from './seed/inboxes'
+import { linkRunProvenance, seedInstructions } from './seed/instructions'
 import { seedPages } from './seed/pages'
+import { seedPersonaActivity } from './seed/personas'
 import { seedProposals } from './seed/proposals'
 import { seedRecordings } from './seed/recordings'
 import {
@@ -83,6 +85,7 @@ export const seed = (preset: Preset) =>
 				const testUser = yield* seedResearchPolicy(ctx)
 				const seededInboxes = yield* seedInboxes(ctx)
 				yield* seedDemoEmails(sql, seededInboxes)
+				const instructionTemplateIds = yield* seedInstructions(ctx)
 
 				if (preset === 'full') {
 					yield* seedDocuments(ctx, companyMap, insertedInteractions)
@@ -91,10 +94,14 @@ export const seed = (preset: Preset) =>
 					yield* seedResearchRuns(ctx, testUser, companyMap)
 					yield* seedProviderQuotas(ctx, testUser)
 					yield* seedRecordings(ctx, companyMap)
+					yield* linkRunProvenance(ctx, instructionTemplateIds)
 				}
+
+				yield* seedPersonaActivity(ctx)
 
 				const counts = {
 					products: insertedProducts.length,
+					instructionTemplates: instructionTemplateIds.size,
 					companies: insertedCompanies.length,
 					contacts: insertedContacts.length,
 					interactions: insertedInteractions.length,

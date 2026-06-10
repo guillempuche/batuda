@@ -56,6 +56,20 @@ export const seedCalendar = (
 				durationMinutes: 60,
 				locationKind: 'none',
 			},
+			{
+				slug: 'phone-consult',
+				provider: 'calcom',
+				title: 'Phone consultation',
+				durationMinutes: 20,
+				locationKind: 'phone',
+			},
+			{
+				slug: 'webinar',
+				provider: 'calcom',
+				title: 'Group webinar',
+				durationMinutes: 45,
+				locationKind: 'link',
+			},
 		] as const
 		for (const et of calendarEventTypeSeeds) {
 			yield* sql`
