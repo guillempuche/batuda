@@ -136,8 +136,12 @@ export const forkTemplate = (
 		})
 	})
 
-// Hand a template to another member. RLS lets the owner target their own row and
-// only requires the new owner to stay in-org, so the app validates the target.
+// Hand a template to another member in the same org. A member can't make this
+// change directly: once the new owner is set, the per-user read policy hides the
+// row from the member, and the table refuses to write a row they can no longer
+// see. So the ownership change runs through a privileged database function that
+// re-checks ownership and target membership before reassigning. It returns the
+// updated row on success, or no row when the caller doesn't own the template.
 export const transferTemplateToUser = (
 	id: string,
 	targetUserId: string,
@@ -145,10 +149,8 @@ export const transferTemplateToUser = (
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
 		const rows = yield* sql<TemplateRow>`
-			UPDATE instruction_templates
-			SET owner_user_id = ${targetUserId}, updated_at = now()
-			WHERE id = ${id}
-			RETURNING id, organization_id, owner_user_id, name, body, source_preset_id, created_by, updated_at::text AS updated_at
+			SELECT id, organization_id, owner_user_id, name, body, source_preset_id, created_by, updated_at::text AS updated_at
+			FROM transfer_instruction_template(${id}, ${targetUserId})
 		`
 		const row = rows[0]
 		return row ? toTemplate(row) : undefined
