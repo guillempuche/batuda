@@ -3,6 +3,29 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-06-10 (server-v2026.6.10)
+
+### Features
+
+* add instruction-template management API over HTTP and MCP ([08f1a50](https://github.com/guillempuche/batuda/commit/08f1a5059d8e93dbcaf4d3732ff381d3bd1348cc))
+* expose instruction transfer and donation lifecycle over MCP ([e92ef2b](https://github.com/guillempuche/batuda/commit/e92ef2bb427c238d7e8784db889809e67fd9caab))
+* **instructions:** add instruction-templates library and resolver ([8dffdc5](https://github.com/guillempuche/batuda/commit/8dffdc5486944eea7684685410e11abc548b30cb))
+* **instructions:** add template management and donations schema ([3a48cb0](https://github.com/guillempuche/batuda/commit/3a48cb06dd08a260ca4fd57872342cfaaa4a6837))
+* **instructions:** let a user default stack extend the org default ([e7e10a0](https://github.com/guillempuche/batuda/commit/e7e10a043447c6616e85223c6a57238d77474b92))
+* **instructions:** set and read stack composition via the API and MCP ([df1ae5e](https://github.com/guillempuche/batuda/commit/df1ae5e43e7bcfd43350e53d9a81dda43940c5e6))
+* org-isolate the research cache and thread instruction templates ([fa6c6ef](https://github.com/guillempuche/batuda/commit/fa6c6eff56db43aac6da49ad57967e75212e3d92))
+* record which instruction templates shaped each research run ([d86e9b8](https://github.com/guillempuche/batuda/commit/d86e9b89a3c040d41edbabbea5276aa4c79ff8f4))
+* **server:** add instruction-templates schema and RLS ([fda5f92](https://github.com/guillempuche/batuda/commit/fda5f921568d2a3245d91a87bd96da5d5935db1c))
+* **server:** resolve research instructions and switch the MCP actor ([39a7c79](https://github.com/guillempuche/batuda/commit/39a7c7920d09b319ba97f22c4eba338cbd28b5ad))
+
+### Bug Fixes
+
+* **instructions:** read camelCase result keys in the resolver ([e946079](https://github.com/guillempuche/batuda/commit/e946079598bbe3d0742c8ee711f6e91bd9d6d804))
+
+### Refactoring
+
+* extract the research system-prompt builder ([14e813a](https://github.com/guillempuche/batuda/commit/14e813aca146c704d16fcaf5c4979fa681acb17d))
+
 ## 2026-06-02 (server-v2026.6.2)
 
 ### Bug Fixes
