@@ -311,7 +311,7 @@ const ListEmailInboxes = Tool.make('list_email_inboxes', {
 
 const ListEmailProviderPresets = Tool.make('list_email_provider_presets', {
 	description:
-		'List the built-in mailbox presets (Infomaniak, Fastmail, Gmail Workspace, Microsoft 365, Proton Bridge, Generic IMAP). Each entry pre-fills IMAP and SMTP host/port/security so create_email_inbox callers only need to add credentials. Static — safe to cache.',
+		'List the built-in mailbox presets (Infomaniak, Fastmail, iCloud Mail, Yahoo Mail, Gmail Workspace, Microsoft 365, Proton Bridge, Generic IMAP). Each entry pre-fills IMAP and SMTP host/port/security, plus appPasswordUrl (where the user generates an app-specific password for a 2FA account) and passwordAuthSupported (false for Gmail and Microsoft 365, which no longer allow password sign-in and need OAuth). create_email_inbox callers only need to add credentials. Static — safe to cache.',
 	parameters: Schema.Struct({}),
 	success: Schema.Array(Schema.Unknown),
 })
@@ -342,7 +342,7 @@ const GetEmailInboxStatus = Tool.make('get_email_inbox_status', {
 
 const CreateEmailInbox = Tool.make('create_email_inbox', {
 	description:
-		'Connect a new mailbox to the calling member. Requires full IMAP + SMTP transport details (use list_email_provider_presets to pre-fill these for known providers) and a password / app-password — Batuda is a generic IMAP/SMTP client, not a hosted mail provider. Credentials are encrypted at rest. `purpose=human` defaults ownership to the caller; `purpose=shared` clears any owner_user_id and rejects is_private=true. Setting is_default atomically clears the previous default in the same (owner, purpose) bucket.',
+		'Connect a new mailbox to the calling member. Requires full IMAP + SMTP transport details (use list_email_provider_presets to pre-fill these for known providers) and a password / app-password — Batuda is a generic IMAP/SMTP client, not a hosted mail provider. If the account has two-factor authentication enabled, its normal login password is rejected: the user must generate a provider app-specific password (see appPasswordUrl on the matching preset) and pass that instead. Gmail and Microsoft 365 no longer allow password sign-in at all (passwordAuthSupported=false) and will fail until an OAuth connector exists. Credentials are encrypted at rest. `purpose=human` defaults ownership to the caller; `purpose=shared` clears any owner_user_id and rejects is_private=true. Setting is_default atomically clears the previous default in the same (owner, purpose) bucket.',
 	parameters: Schema.Struct({
 		email: Schema.String,
 		password: Schema.String,
@@ -396,7 +396,7 @@ const UpdateEmailInbox = Tool.make('update_email_inbox', {
 
 const TestEmailInbox = Tool.make('test_email_inbox', {
 	description:
-		'Refresh the connection heartbeat for an inbox. The mail-transport slice will perform a real IMAP LOGIN + SMTP EHLO probe; until then this only stamps grant_last_seen_at so the UI can confirm the inbox row still resolves in this org. Returns the updated inbox row.',
+		'Re-probe a stored inbox: decrypts the saved credentials and runs a real IMAP LOGIN + SMTP check against the configured hosts, then updates grant_status / grant_last_error / grant_last_seen_at and returns the refreshed inbox row. Use after changing a password (for example switching to an app-specific password) to confirm the mailbox now connects.',
 	parameters: Schema.Struct({
 		id: Schema.String,
 	}),

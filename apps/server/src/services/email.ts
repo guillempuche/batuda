@@ -256,30 +256,16 @@ const projectAttachmentsForWire = <T extends Record<string, unknown>>(
 	return { ...row, attachments: projected }
 }
 
-// Vendor-neutral mailbox presets surfaced to the connect-mailbox UI. Adding a
-// new entry requires no code beyond appending to this list — fields are the
-// same shape as the createInbox payload.
+// Vendor-neutral mailbox presets for the connect-mailbox picker. The transport
+// fields mirror the createInbox payload; helpUrl, appPasswordUrl and
+// passwordAuthSupported are UI-only hints. Most providers accept an app-specific
+// password under two-factor authentication, and appPasswordUrl points to where
+// the user creates one. Gmail and Microsoft 365 are passwordAuthSupported=false:
+// they dropped password sign-in for mail clients and need an OAuth connection
+// the app does not offer yet, so the UI flags them when selected. Ordered by
+// rough global popularity (most common first), with Generic IMAP last as the
+// manual catch-all.
 const PROVIDER_PRESETS = [
-	{
-		name: 'Infomaniak',
-		imapHost: 'mail.infomaniak.com',
-		imapPort: 993,
-		imapSecurity: 'tls',
-		smtpHost: 'mail.infomaniak.com',
-		smtpPort: 465,
-		smtpSecurity: 'tls',
-		helpUrl: 'https://www.infomaniak.com/en/support/faq/2427',
-	},
-	{
-		name: 'Fastmail',
-		imapHost: 'imap.fastmail.com',
-		imapPort: 993,
-		imapSecurity: 'tls',
-		smtpHost: 'smtp.fastmail.com',
-		smtpPort: 465,
-		smtpSecurity: 'tls',
-		helpUrl: 'https://www.fastmail.help/hc/en-us/articles/1500000278342',
-	},
 	{
 		name: 'Gmail Workspace',
 		imapHost: 'imap.gmail.com',
@@ -289,6 +275,8 @@ const PROVIDER_PRESETS = [
 		smtpPort: 465,
 		smtpSecurity: 'tls',
 		helpUrl: 'https://support.google.com/mail/answer/7126229',
+		appPasswordUrl: '',
+		passwordAuthSupported: false,
 	},
 	{
 		name: 'Microsoft 365',
@@ -300,6 +288,32 @@ const PROVIDER_PRESETS = [
 		smtpSecurity: 'starttls',
 		helpUrl:
 			'https://support.microsoft.com/en-us/office/pop-imap-and-smtp-settings-8361e398-8af4-4e97-b147-6c6c4ac95353',
+		appPasswordUrl: '',
+		passwordAuthSupported: false,
+	},
+	{
+		name: 'iCloud Mail',
+		imapHost: 'imap.mail.me.com',
+		imapPort: 993,
+		imapSecurity: 'tls',
+		smtpHost: 'smtp.mail.me.com',
+		smtpPort: 587,
+		smtpSecurity: 'starttls',
+		helpUrl: '',
+		appPasswordUrl: 'https://support.apple.com/en-us/102654',
+		passwordAuthSupported: true,
+	},
+	{
+		name: 'Yahoo Mail',
+		imapHost: 'imap.mail.yahoo.com',
+		imapPort: 993,
+		imapSecurity: 'tls',
+		smtpHost: 'smtp.mail.yahoo.com',
+		smtpPort: 465,
+		smtpSecurity: 'tls',
+		helpUrl: '',
+		appPasswordUrl: 'https://help.yahoo.com/kb/SLN15241.html',
+		passwordAuthSupported: true,
 	},
 	{
 		name: 'Proton Bridge',
@@ -310,6 +324,34 @@ const PROVIDER_PRESETS = [
 		smtpPort: 1025,
 		smtpSecurity: 'starttls',
 		helpUrl: 'https://proton.me/support/protonmail-bridge-clients',
+		appPasswordUrl: '',
+		passwordAuthSupported: true,
+	},
+	{
+		name: 'Fastmail',
+		imapHost: 'imap.fastmail.com',
+		imapPort: 993,
+		imapSecurity: 'tls',
+		smtpHost: 'smtp.fastmail.com',
+		smtpPort: 465,
+		smtpSecurity: 'tls',
+		helpUrl: 'https://www.fastmail.help/hc/en-us/articles/1500000278342',
+		appPasswordUrl:
+			'https://www.fastmail.help/hc/en-us/articles/360058752854-App-passwords',
+		passwordAuthSupported: true,
+	},
+	{
+		name: 'Infomaniak',
+		imapHost: 'mail.infomaniak.com',
+		imapPort: 993,
+		imapSecurity: 'tls',
+		smtpHost: 'mail.infomaniak.com',
+		smtpPort: 465,
+		smtpSecurity: 'tls',
+		helpUrl: 'https://www.infomaniak.com/en/support/faq/2427',
+		appPasswordUrl:
+			'https://www.infomaniak.com/en/support/faq/2855/manage-application-passwords',
+		passwordAuthSupported: true,
 	},
 	{
 		name: 'Generic IMAP',
@@ -320,6 +362,8 @@ const PROVIDER_PRESETS = [
 		smtpPort: 587,
 		smtpSecurity: 'starttls',
 		helpUrl: '',
+		appPasswordUrl: '',
+		passwordAuthSupported: true,
 	},
 ] as const
 
@@ -412,6 +456,102 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						LIMIT 1
 					`.pipe(Effect.orDie)
 					return rows[0] ?? null
+				})
+
+			// Decrypt the stored credentials in-memory, run an IMAP LOGIN + SMTP
+			// verify against the configured hosts, and persist the outcome so the
+			// status badge reflects reality. Shared by testInbox (a manual
+			// re-test) and updateInbox (immediate feedback after a credential or
+			// transport change) so both report connect/auth failures identically.
+			const reprobeInbox = (id: string) =>
+				Effect.gen(function* () {
+					const currentOrg = yield* CurrentOrg
+
+					const credRows = yield* sql<{
+						imapHost: string
+						imapPort: number
+						imapSecurity: 'tls' | 'starttls' | 'plain'
+						smtpHost: string
+						smtpPort: number
+						smtpSecurity: 'tls' | 'starttls' | 'plain'
+						username: string
+						passwordCiphertext: Uint8Array
+						passwordNonce: Uint8Array
+						passwordTag: Uint8Array
+					}>`
+						SELECT
+							imap_host          AS "imapHost",
+							imap_port          AS "imapPort",
+							imap_security      AS "imapSecurity",
+							smtp_host          AS "smtpHost",
+							smtp_port          AS "smtpPort",
+							smtp_security      AS "smtpSecurity",
+							username,
+							password_ciphertext AS "passwordCiphertext",
+							password_nonce     AS "passwordNonce",
+							password_tag       AS "passwordTag"
+						FROM inboxes
+						WHERE id = ${id}
+						  AND organization_id = ${currentOrg.id}
+						LIMIT 1
+					`.pipe(Effect.orDie)
+					const cred = credRows[0]
+					if (!cred) {
+						return yield* new NotFound({ entity: 'Inbox', id })
+					}
+
+					const password = crypto.decryptPassword({
+						inboxId: id,
+						ciphertext: cred.passwordCiphertext,
+						nonce: cred.passwordNonce,
+						tag: cred.passwordTag,
+					})
+
+					const probe = yield* transport
+						.probe({
+							inboxId: id,
+							imapHost: cred.imapHost,
+							imapPort: cred.imapPort,
+							imapSecurity: cred.imapSecurity,
+							smtpHost: cred.smtpHost,
+							smtpPort: cred.smtpPort,
+							smtpSecurity: cred.smtpSecurity,
+							username: cred.username,
+							password,
+						})
+						.pipe(
+							Effect.match({
+								onSuccess: () =>
+									({
+										status: 'connected' as const,
+										detail: null as string | null,
+									}) as const,
+								onFailure: err =>
+									({
+										status:
+											err._tag === 'GrantAuthFailed'
+												? ('auth_failed' as const)
+												: ('connect_failed' as const),
+										detail: err.detail ?? null,
+									}) as const,
+							}),
+						)
+
+					const rows = yield* sql<InboxRow>`
+						UPDATE inboxes
+						SET
+							grant_status = ${probe.status},
+							grant_last_error = ${probe.detail},
+							grant_last_seen_at = now(),
+							updated_at = now()
+						WHERE id = ${id}
+						  AND organization_id = ${currentOrg.id}
+						RETURNING ${selectInboxColumns}
+					`
+					if (rows.length === 0) {
+						return yield* new NotFound({ entity: 'Inbox', id })
+					}
+					return rows[0]!
 				})
 
 			const resolveDefaultInboxForCurrentUser = () =>
@@ -1759,14 +1899,25 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							sets.push(sql`password_ciphertext = ${encrypted.ciphertext}`)
 							sets.push(sql`password_nonce = ${encrypted.nonce}`)
 							sets.push(sql`password_tag = ${encrypted.tag}`)
-							// Reset the grant state so the worker re-probes on next tick.
-							sets.push(sql`grant_status = 'connected'`)
-							sets.push(sql`grant_last_error = NULL`)
 						}
 
 						if (sets.length === 0) {
 							return existing
 						}
+
+						// A credential or transport change is re-probed after the
+						// write so the returned row reflects the real connection
+						// state — createInbox probes up-front, and an edit that only
+						// touches metadata (e.g. display name) skips the probe.
+						const credentialsChanged =
+							patch.password !== undefined ||
+							patch.username !== undefined ||
+							patch.imapHost !== undefined ||
+							patch.imapPort !== undefined ||
+							patch.imapSecurity !== undefined ||
+							patch.smtpHost !== undefined ||
+							patch.smtpPort !== undefined ||
+							patch.smtpSecurity !== undefined
 
 						// Promoting to default requires clearing the prior default
 						// in the same (owner, purpose) bucket, mirroring createInbox.
@@ -1802,6 +1953,9 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						if (rows.length === 0) {
 							return yield* new NotFound({ entity: 'Inbox', id })
 						}
+						if (credentialsChanged) {
+							return yield* reprobeInbox(id)
+						}
 						return rows[0]!
 					}),
 
@@ -1825,100 +1979,9 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						return rows[0]!
 					}),
 
-				// Re-probe stored credentials by decrypting in-memory and running
-				// IMAP LOGIN + SMTP verify against the configured hosts. The
-				// inbox row is updated with the probe outcome so the UI can
-				// refresh the status badge without reloading the entire list.
-				testInbox: (id: string) =>
-					Effect.gen(function* () {
-						const currentOrg = yield* CurrentOrg
-
-						const credRows = yield* sql<{
-							imapHost: string
-							imapPort: number
-							imapSecurity: 'tls' | 'starttls' | 'plain'
-							smtpHost: string
-							smtpPort: number
-							smtpSecurity: 'tls' | 'starttls' | 'plain'
-							username: string
-							passwordCiphertext: Uint8Array
-							passwordNonce: Uint8Array
-							passwordTag: Uint8Array
-						}>`
-							SELECT
-								imap_host          AS "imapHost",
-								imap_port          AS "imapPort",
-								imap_security      AS "imapSecurity",
-								smtp_host          AS "smtpHost",
-								smtp_port          AS "smtpPort",
-								smtp_security      AS "smtpSecurity",
-								username,
-								password_ciphertext AS "passwordCiphertext",
-								password_nonce     AS "passwordNonce",
-								password_tag       AS "passwordTag"
-							FROM inboxes
-							WHERE id = ${id}
-							  AND organization_id = ${currentOrg.id}
-							LIMIT 1
-						`.pipe(Effect.orDie)
-						const cred = credRows[0]
-						if (!cred) {
-							return yield* new NotFound({ entity: 'Inbox', id })
-						}
-
-						const password = crypto.decryptPassword({
-							inboxId: id,
-							ciphertext: cred.passwordCiphertext,
-							nonce: cred.passwordNonce,
-							tag: cred.passwordTag,
-						})
-
-						const probe = yield* transport
-							.probe({
-								inboxId: id,
-								imapHost: cred.imapHost,
-								imapPort: cred.imapPort,
-								imapSecurity: cred.imapSecurity,
-								smtpHost: cred.smtpHost,
-								smtpPort: cred.smtpPort,
-								smtpSecurity: cred.smtpSecurity,
-								username: cred.username,
-								password,
-							})
-							.pipe(
-								Effect.match({
-									onSuccess: () =>
-										({
-											status: 'connected' as const,
-											detail: null as string | null,
-										}) as const,
-									onFailure: err =>
-										({
-											status:
-												err._tag === 'GrantAuthFailed'
-													? ('auth_failed' as const)
-													: ('connect_failed' as const),
-											detail: err.detail ?? null,
-										}) as const,
-								}),
-							)
-
-						const rows = yield* sql<InboxRow>`
-							UPDATE inboxes
-							SET
-								grant_status = ${probe.status},
-								grant_last_error = ${probe.detail},
-								grant_last_seen_at = now(),
-								updated_at = now()
-							WHERE id = ${id}
-							  AND organization_id = ${currentOrg.id}
-							RETURNING ${selectInboxColumns}
-						`
-						if (rows.length === 0) {
-							return yield* new NotFound({ entity: 'Inbox', id })
-						}
-						return rows[0]!
-					}),
+				// Manual re-test of a stored mailbox — decrypt, probe, and write
+				// back the grant status. Shares reprobeInbox with updateInbox.
+				testInbox: (id: string) => reprobeInbox(id),
 
 				// Promotes a single inbox to `is_default=true` for the calling
 				// member. Validates ownership so a member cannot promote an

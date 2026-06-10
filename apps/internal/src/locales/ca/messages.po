@@ -87,6 +87,11 @@ msgstr "{0} empreses amb filtres aplicats"
 msgid "{0} msgs"
 msgstr "{0} missatges"
 
+#. placeholder {0}: selectedPreset.name
+#: src/routes/emails/inboxes.tsx:881
+msgid "{0} no longer allows password sign-in for mail apps, so it can't be connected here yet — it needs an OAuth sign-in. Pick another provider or use Generic IMAP."
+msgstr "{0} ja no permet iniciar la sessió amb contrasenya a les aplicacions de correu, així que de moment no es pot connectar aquí: necessita un inici de sessió OAuth. Tria un altre proveïdor o fes servir IMAP genèric."
+
 #. placeholder {0}: failedIds.length
 #: src/routes/emails/index.tsx:494
 #: src/routes/emails/index.tsx:526
@@ -142,6 +147,10 @@ msgstr "1 fil"
 msgid "1 thread selected"
 msgstr "1 fil seleccionat"
 
+#: src/routes/emails/inboxes.tsx:467
+msgid "2FA accounts need an app-specific password."
+msgstr "Els comptes amb verificació en dos passos necessiten una contrasenya d'aplicació."
+
 #: src/components/instructions/template-editor-dialog.tsx:139
 msgid "A short label. Start it with a [tag] like [research] to group related templates if you like — the brackets are just part of the name."
 msgstr "Una etiqueta curta. Si vols, comença-la amb un [tag] com ara [research] per agrupar plantilles relacionades; els claudàtors només formen part del nom."
@@ -167,11 +176,11 @@ msgstr "Accés"
 msgid "across {0} providers"
 msgstr "en {0} proveïdors"
 
-#: src/routes/emails/inboxes.tsx:418
+#: src/routes/emails/inboxes.tsx:428
 msgid "Actions"
 msgstr "Accions"
 
-#: src/routes/emails/inboxes.tsx:416
+#: src/routes/emails/inboxes.tsx:426
 msgid "Active"
 msgstr "Activa"
 
@@ -266,8 +275,8 @@ msgstr "Admin"
 msgid "After approving, manage which org each one acts in here."
 msgstr "Després d'aprovar-lo, gestiona aquí en quina organització actua cadascun."
 
-#: src/routes/emails/inboxes.tsx:461
-#: src/routes/emails/inboxes.tsx:1003
+#: src/routes/emails/inboxes.tsx:488
+#: src/routes/emails/inboxes.tsx:1067
 msgid "Agent"
 msgstr "Agent"
 
@@ -349,7 +358,7 @@ msgstr "adjunt"
 msgid "Audit log"
 msgstr "Registre d'auditoria"
 
-#: src/routes/emails/inboxes.tsx:450
+#: src/routes/emails/inboxes.tsx:460
 msgid "Auth failed"
 msgstr "Error d'autenticació"
 
@@ -361,7 +370,7 @@ msgstr "Torna al compte"
 msgid "Back to companies"
 msgstr "Tornar a empreses"
 
-#: src/routes/emails/inboxes.tsx:307
+#: src/routes/emails/inboxes.tsx:317
 msgid "Back to emails"
 msgstr "Torna als correus"
 
@@ -490,8 +499,8 @@ msgstr "Crides"
 #: src/components/instructions/template-editor-dialog.tsx:178
 #: src/components/interactions/quick-capture-dialog.tsx:400
 #: src/components/research/research-dialog.tsx:271
-#: src/routes/emails/inboxes.tsx:1065
-#: src/routes/emails/inboxes.tsx:1463
+#: src/routes/emails/inboxes.tsx:1129
+#: src/routes/emails/inboxes.tsx:1542
 #: src/routes/settings/api-keys/index.tsx:424
 #: src/routes/tasks/index.tsx:743
 msgid "Cancel"
@@ -519,7 +528,7 @@ msgstr "Canvio d'opinió — vull posar contrasenya"
 msgid "Change password"
 msgstr "Canvia la contrasenya"
 
-#: src/routes/emails/inboxes.tsx:943
+#: src/routes/emails/inboxes.tsx:1007
 msgid "Change password (re-probes the connection)"
 msgstr "Canvia la contrasenya (reprova la connexió)"
 
@@ -557,7 +566,7 @@ msgstr "Comprova que la sessió sigui vàlida o torna-ho a provar."
 msgid "Check that your session is valid or try again."
 msgstr "Comprova que la teva sessió sigui vàlida o torna-ho a provar."
 
-#: src/routes/emails/inboxes.tsx:390
+#: src/routes/emails/inboxes.tsx:400
 msgid "Check the session or try again."
 msgstr "Comprova la sessió o torna-ho a provar."
 
@@ -570,8 +579,8 @@ msgstr "Mira la safata d'entrada"
 msgid "Choose organization"
 msgstr "Tria una organització"
 
-#: src/routes/emails/inboxes.tsx:355
-#: src/routes/emails/inboxes.tsx:356
+#: src/routes/emails/inboxes.tsx:365
+#: src/routes/emails/inboxes.tsx:366
 msgid "Choose primary inbox"
 msgstr "Tria la bústia principal"
 
@@ -607,8 +616,8 @@ msgstr "Client"
 #: src/components/research/research-dialog.tsx:159
 #: src/routes/calendar/index.tsx:367
 #: src/routes/emails/$threadId.tsx:353
-#: src/routes/emails/inboxes.tsx:795
-#: src/routes/emails/inboxes.tsx:1346
+#: src/routes/emails/inboxes.tsx:835
+#: src/routes/emails/inboxes.tsx:1425
 #: src/routes/emails/index.tsx:732
 msgid "Close"
 msgstr "Tanca"
@@ -711,17 +720,17 @@ msgstr "Connecta eines d'IA"
 msgid "Connect AI tools over MCP"
 msgstr "Connecta eines d'IA amb MCP"
 
-#: src/routes/emails/inboxes.tsx:452
+#: src/routes/emails/inboxes.tsx:462
 msgid "Connect failed"
 msgstr "Connexió fallida"
 
-#: src/routes/emails/inboxes.tsx:311
+#: src/routes/emails/inboxes.tsx:321
 msgid "Connect IMAP/SMTP mailboxes and choose your primary sender."
 msgstr "Connecta bústies IMAP/SMTP i tria el remitent principal."
 
-#: src/routes/emails/inboxes.tsx:321
-#: src/routes/emails/inboxes.tsx:405
-#: src/routes/emails/inboxes.tsx:791
+#: src/routes/emails/inboxes.tsx:331
+#: src/routes/emails/inboxes.tsx:415
+#: src/routes/emails/inboxes.tsx:831
 msgid "Connect mailbox"
 msgstr "Connecta una bústia"
 
@@ -729,11 +738,11 @@ msgstr "Connecta una bústia"
 msgid "Connect to Batuda?"
 msgstr "Connectar a Batuda?"
 
-#: src/routes/emails/inboxes.tsx:396
+#: src/routes/emails/inboxes.tsx:406
 msgid "Connect your IMAP/SMTP mailbox to start sending and receiving email."
 msgstr "Connecta la teva bústia IMAP/SMTP per començar a enviar i rebre correu."
 
-#: src/routes/emails/inboxes.tsx:448
+#: src/routes/emails/inboxes.tsx:458
 msgid "Connected"
 msgstr "Connectada"
 
@@ -746,7 +755,7 @@ msgstr "Connectat {0}"
 msgid "Connecting…"
 msgstr "Connectant…"
 
-#: src/routes/emails/inboxes.tsx:248
+#: src/routes/emails/inboxes.tsx:258
 msgid "Connection tested"
 msgstr "Connexió provada"
 
@@ -771,7 +780,7 @@ msgstr "Contactes"
 msgid "Contacts found"
 msgstr "Contactes trobats"
 
-#: src/routes/emails/inboxes.tsx:1433
+#: src/routes/emails/inboxes.tsx:1512
 msgid "Content"
 msgstr "Contingut"
 
@@ -821,7 +830,7 @@ msgstr "No s'''ha pogut esborrar la supressió"
 msgid "Could not complete the connection. Please try again."
 msgstr "No s'ha pogut completar la connexió. Torna-ho a provar."
 
-#: src/routes/emails/inboxes.tsx:556
+#: src/routes/emails/inboxes.tsx:583
 msgid "Could not create the inbox. Check transport or credentials."
 msgstr "No s'ha pogut crear la bústia. Revisa el transport o les credencials."
 
@@ -837,7 +846,7 @@ msgstr "No s'ha pogut eliminar la clau. Torna-ho a provar."
 msgid "Could not load companies"
 msgstr "No s'han pogut carregar les empreses"
 
-#: src/routes/emails/inboxes.tsx:389
+#: src/routes/emails/inboxes.tsx:399
 msgid "Could not load inboxes"
 msgstr "No s'han pogut carregar les safates"
 
@@ -878,7 +887,7 @@ msgid "Could not publish the page. Please try again."
 msgstr "No s'ha pogut publicar la pàgina. Torna-ho a provar."
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx:242
+#: src/routes/emails/inboxes.tsx:252
 msgid "Could not reach {0}."
 msgstr "No s'ha pogut arribar a {0}."
 
@@ -890,7 +899,7 @@ msgstr "No s'ha pogut eliminar {email}. Torna-ho a provar."
 msgid "Could not save"
 msgstr "No s'ha pogut desar"
 
-#: src/routes/emails/inboxes.tsx:574
+#: src/routes/emails/inboxes.tsx:601
 msgid "Could not save the inbox."
 msgstr "No s'ha pogut desar la safata."
 
@@ -911,11 +920,11 @@ msgstr "No s'''ha pogut enviar la invitació. Torna-ho a provar."
 msgid "Could not send the link. Try again in a few seconds."
 msgstr "No s'ha pogut enviar l'enllaç. Torna-ho a provar d'aquí uns segons."
 
-#: src/routes/emails/inboxes.tsx:286
+#: src/routes/emails/inboxes.tsx:296
 msgid "Could not set primary inbox"
 msgstr "No s'ha pogut establir la bústia principal"
 
-#: src/routes/emails/inboxes.tsx:226
+#: src/routes/emails/inboxes.tsx:236
 msgid "Could not set the default inbox."
 msgstr "No s'ha pogut establir la safata per defecte."
 
@@ -931,7 +940,7 @@ msgstr "No s'ha pogut iniciar la recerca. Torna-ho a provar."
 msgid "Could not switch organization. Please try again."
 msgstr "No s'ha pogut canviar d'organització. Torna-ho a provar."
 
-#: src/routes/emails/inboxes.tsx:205
+#: src/routes/emails/inboxes.tsx:215
 msgid "Could not toggle the inbox state."
 msgstr "No s'ha pogut canviar l'estat de la safata."
 
@@ -985,11 +994,11 @@ msgstr "No s'ha pogut enviar"
 msgid "Couldn't update your preference. Try again."
 msgstr "No he pogut desar la teva preferència. Prova-ho de nou."
 
-#: src/routes/emails/inboxes.tsx:1475
+#: src/routes/emails/inboxes.tsx:1554
 msgid "Create"
 msgstr "Crea"
 
-#: src/routes/emails/inboxes.tsx:1359
+#: src/routes/emails/inboxes.tsx:1438
 msgid "Create a footer to append to outgoing emails from this inbox."
 msgstr "Crea un peu de pàgina per afegir als correus sortints d'aquesta bústia."
 
@@ -1017,7 +1026,12 @@ msgstr "Crea una clau d'API"
 msgid "Create an API key, then paste the snippet for your tool — replacing <0>YOUR_API_KEY</0> with it. The key acts in this organization."
 msgstr "Crea una clau d'API i enganxa el fragment de la teva eina — substituint <0>YOUR_API_KEY</0> per la clau. La clau actua en aquesta organització."
 
-#: src/routes/emails/inboxes.tsx:1253
+#: src/routes/emails/inboxes.tsx:476
+#: src/routes/emails/inboxes.tsx:895
+msgid "Create an app password →"
+msgstr "Crea una contrasenya d'aplicació →"
+
+#: src/routes/emails/inboxes.tsx:1332
 msgid "Create failed"
 msgstr "Error en crear"
 
@@ -1025,7 +1039,7 @@ msgstr "Error en crear"
 msgid "Create follow-up task"
 msgstr "Crea una tasca de seguiment"
 
-#: src/routes/emails/inboxes.tsx:1411
+#: src/routes/emails/inboxes.tsx:1490
 msgid "Create footer"
 msgstr "Crea peu de pàgina"
 
@@ -1034,7 +1048,7 @@ msgid "Create key"
 msgstr "Crea la clau"
 
 #: src/routes/emails/$threadId.tsx:498
-#: src/routes/emails/inboxes.tsx:417
+#: src/routes/emails/inboxes.tsx:427
 msgid "Created"
 msgstr "Creada"
 
@@ -1087,25 +1101,25 @@ msgstr "Rebutja"
 msgid "Decline {0}"
 msgstr "Rebutja {0}"
 
-#: src/routes/emails/inboxes.tsx:415
-#: src/routes/emails/inboxes.tsx:1368
+#: src/routes/emails/inboxes.tsx:425
+#: src/routes/emails/inboxes.tsx:1447
 msgid "Default"
 msgstr "Per defecte"
 
-#: src/routes/emails/inboxes.tsx:473
+#: src/routes/emails/inboxes.tsx:500
 msgid "Default inbox"
 msgstr "Safata per defecte"
 
-#: src/routes/emails/inboxes.tsx:930
+#: src/routes/emails/inboxes.tsx:994
 msgid "Defaults to the email address."
 msgstr "Per defecte, l'adreça electrònica."
 
-#: src/routes/emails/inboxes.tsx:1025
+#: src/routes/emails/inboxes.tsx:1089
 msgid "Defaults to you when omitted."
 msgstr "Per defecte ets tu si s'omet."
 
 #: src/components/instructions/template-delete-confirm.tsx:51
-#: src/routes/emails/inboxes.tsx:1395
+#: src/routes/emails/inboxes.tsx:1474
 #: src/routes/settings/api-keys/index.tsx:329
 msgid "Delete"
 msgstr "Elimina"
@@ -1116,8 +1130,8 @@ msgstr "Elimina"
 msgid "Delete {0}"
 msgstr "Elimina {0}"
 
-#: src/routes/emails/inboxes.tsx:266
-#: src/routes/emails/inboxes.tsx:1303
+#: src/routes/emails/inboxes.tsx:276
+#: src/routes/emails/inboxes.tsx:1382
 #: src/routes/settings/api-keys/index.tsx:162
 #: src/routes/settings/organization/templates.tsx:249
 #: src/routes/settings/profile/templates.tsx:130
@@ -1126,12 +1140,12 @@ msgid "Delete failed"
 msgstr "Error en eliminar"
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx:537
+#: src/routes/emails/inboxes.tsx:564
 msgid "Delete inbox {0}"
 msgstr "Suprimeix la bústia {0}"
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx:260
+#: src/routes/emails/inboxes.tsx:270
 msgid "Delete inbox {0}? Stored messages stay; the connection stops."
 msgstr "Suprimir la bústia {0}? Els missatges desats es mantenen; la connexió s'atura."
 
@@ -1139,7 +1153,7 @@ msgstr "Suprimir la bústia {0}? Els missatges desats es mantenen; la connexió 
 msgid "Delete key"
 msgstr "Elimina la clau"
 
-#: src/routes/emails/inboxes.tsx:1296
+#: src/routes/emails/inboxes.tsx:1375
 msgid "Delete this footer? This cannot be undone."
 msgstr "Eliminar aquest peu de pàgina? Aquesta acció no es pot desfer."
 
@@ -1173,7 +1187,7 @@ msgstr "Denega"
 msgid "Direction"
 msgstr "Direcció"
 
-#: src/routes/emails/inboxes.tsx:453
+#: src/routes/emails/inboxes.tsx:463
 #: src/routes/settings/api-keys/index.tsx:314
 msgid "Disabled"
 msgstr "Desactivada"
@@ -1186,7 +1200,7 @@ msgstr "Descarta"
 msgid "Discovery"
 msgstr "Descoberta"
 
-#: src/routes/emails/inboxes.tsx:855
+#: src/routes/emails/inboxes.tsx:919
 msgid "Display name"
 msgstr "Nom a mostrar"
 
@@ -1241,15 +1255,15 @@ msgstr "p. ex. [research] Espanya prospecció d'hostaleria"
 msgid "e.g. Claude Desktop"
 msgstr "p. ex. Claude Desktop"
 
-#: src/routes/emails/inboxes.tsx:1429
+#: src/routes/emails/inboxes.tsx:1508
 msgid "e.g. Company signature"
 msgstr "p. ex. Signatura de l'empresa"
 
-#: src/routes/emails/inboxes.tsx:861
+#: src/routes/emails/inboxes.tsx:925
 msgid "e.g. Sales — Acme"
 msgstr "p. ex. Vendes — Acme"
 
-#: src/routes/emails/inboxes.tsx:1386
+#: src/routes/emails/inboxes.tsx:1465
 msgid "Edit"
 msgstr "Edita"
 
@@ -1267,12 +1281,12 @@ msgstr "Edita {label}"
 msgid "Edit due date"
 msgstr "Edita la data de venciment"
 
-#: src/routes/emails/inboxes.tsx:791
+#: src/routes/emails/inboxes.tsx:831
 msgid "Edit inbox"
 msgstr "Edita la safata"
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx:528
+#: src/routes/emails/inboxes.tsx:555
 msgid "Edit inbox {0}"
 msgstr "Edita la safata {0}"
 
@@ -1295,14 +1309,14 @@ msgstr "Editor"
 #: src/components/research/findings/contact-discovery-view.tsx:74
 #: src/components/shared/channel-icon.tsx:63
 #: src/routes/companies/$slug.tsx:860
-#: src/routes/emails/inboxes.tsx:412
+#: src/routes/emails/inboxes.tsx:422
 #: src/routes/forgot-password.tsx:109
 #: src/routes/login.tsx:378
 #: src/routes/settings/organization/invite.tsx:137
 msgid "Email"
 msgstr "Correu"
 
-#: src/routes/emails/inboxes.tsx:842
+#: src/routes/emails/inboxes.tsx:906
 msgid "Email address"
 msgstr "Adreça electrònica"
 
@@ -1431,7 +1445,7 @@ msgid "Flagged as spam by the provider. The body is shown for review only."
 msgstr "El proveïdor l'ha marcat com a brossa. El cos es mostra només per revisar-lo."
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx:1343
+#: src/routes/emails/inboxes.tsx:1422
 msgid "Footers — {0}"
 msgstr "Peus de pàgina — {0}"
 
@@ -1483,6 +1497,10 @@ msgstr "Ves a connexions"
 msgid "Go to sign in"
 msgstr "Ves a iniciar sessió"
 
+#: src/routes/emails/inboxes.tsx:885
+msgid "Has two-factor authentication enabled? Use a provider app-specific password below, not your normal login password."
+msgstr "Tens la verificació en dos passos activada? Fes servir una contrasenya d'aplicació del proveïdor aquí sota, no la teva contrasenya d'inici de sessió habitual."
+
 #: src/routes/accept-invitation.$id.tsx:170
 msgid "Heading to the dashboard…"
 msgstr "Anant al tauler…"
@@ -1509,8 +1527,8 @@ msgstr "Prioritat alta"
 msgid "How your default uses the org default"
 msgstr "Com es relaciona el teu valor per defecte amb el de l'organització"
 
-#: src/routes/emails/inboxes.tsx:459
-#: src/routes/emails/inboxes.tsx:997
+#: src/routes/emails/inboxes.tsx:486
+#: src/routes/emails/inboxes.tsx:1061
 msgid "Human"
 msgstr "Humà"
 
@@ -1526,16 +1544,16 @@ msgstr "Prefereixo sense contrasenya — no m'ho tornis a preguntar"
 msgid "If <0>{submittedEmail}</0> is registered, a reset link is on its way. The link expires in 1 hour."
 msgstr "Si <0>{submittedEmail}</0> està registrat, t'arribarà un enllaç per restablir la contrasenya. L'enllaç caduca en 1 hora."
 
-#: src/routes/emails/inboxes.tsx:867
+#: src/routes/emails/inboxes.tsx:931
 msgid "IMAP host"
 msgstr "Servidor IMAP"
 
-#: src/routes/emails/inboxes.tsx:877
+#: src/routes/emails/inboxes.tsx:941
 msgid "IMAP port"
 msgstr "Port IMAP"
 
-#: src/routes/emails/inboxes.tsx:886
-#: src/routes/emails/inboxes.tsx:890
+#: src/routes/emails/inboxes.tsx:950
+#: src/routes/emails/inboxes.tsx:954
 msgid "IMAP security"
 msgstr "Seguretat IMAP"
 
@@ -1567,19 +1585,19 @@ msgstr "Missatge entrant de {0}"
 msgid "Inbox"
 msgstr "Safata"
 
-#: src/routes/emails/inboxes.tsx:562
+#: src/routes/emails/inboxes.tsx:589
 msgid "Inbox connected"
 msgstr "Bústia connectada"
 
-#: src/routes/emails/inboxes.tsx:310
+#: src/routes/emails/inboxes.tsx:320
 msgid "Inbox management"
 msgstr "Gestió de safates"
 
-#: src/routes/emails/inboxes.tsx:274
+#: src/routes/emails/inboxes.tsx:284
 msgid "Inbox removed"
 msgstr "Bústia eliminada"
 
-#: src/routes/emails/inboxes.tsx:579
+#: src/routes/emails/inboxes.tsx:606
 msgid "Inbox updated"
 msgstr "Safata actualitzada"
 
@@ -1724,7 +1742,7 @@ msgstr "Carregant l'execució…"
 msgid "Loading…"
 msgstr "Carregant…"
 
-#: src/routes/emails/inboxes.tsx:410
+#: src/routes/emails/inboxes.tsx:420
 msgid "Local inboxes"
 msgstr "Safates locals"
 
@@ -1779,7 +1797,7 @@ msgid "Low priority"
 msgstr "Prioritat baixa"
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx:521
+#: src/routes/emails/inboxes.tsx:548
 msgid "Manage footers for {0}"
 msgstr "Gestiona els peus de pàgina de {0}"
 
@@ -1809,11 +1827,11 @@ msgstr "Marca «{0}» com a completada"
 msgid "Mark \"{0}\" as pending"
 msgstr "Marca «{0}» com a pendent"
 
-#: src/routes/emails/inboxes.tsx:491
+#: src/routes/emails/inboxes.tsx:518
 msgid "Mark active"
 msgstr "Marca com a activa"
 
-#: src/routes/emails/inboxes.tsx:473
+#: src/routes/emails/inboxes.tsx:500
 msgid "Mark as default"
 msgstr "Marca com a per defecte"
 
@@ -1821,7 +1839,7 @@ msgstr "Marca com a per defecte"
 msgid "Mark contacted"
 msgstr "Marca com a contactat"
 
-#: src/routes/emails/inboxes.tsx:491
+#: src/routes/emails/inboxes.tsx:518
 msgid "Mark inactive"
 msgstr "Marca com a inactiva"
 
@@ -1905,7 +1923,7 @@ msgid "Minimize"
 msgstr "Minimitza"
 
 #: src/components/instructions/template-editor-dialog.tsx:127
-#: src/routes/emails/inboxes.tsx:1423
+#: src/routes/emails/inboxes.tsx:1502
 #: src/routes/settings/api-keys/index.tsx:219
 msgid "Name"
 msgstr "Nom"
@@ -1944,7 +1962,7 @@ msgstr "Nova plantilla d'organització"
 msgid "New password"
 msgstr "Contrasenya nova"
 
-#: src/routes/emails/inboxes.tsx:952
+#: src/routes/emails/inboxes.tsx:1016
 msgid "New password or app-password"
 msgstr "Contrasenya nova o d'aplicació"
 
@@ -2056,7 +2074,7 @@ msgstr "sense data de venciment"
 msgid "No due date"
 msgstr "Sense data de venciment"
 
-#: src/routes/emails/inboxes.tsx:1358
+#: src/routes/emails/inboxes.tsx:1437
 msgid "No footers"
 msgstr "Sense peus de pàgina"
 
@@ -2064,7 +2082,7 @@ msgstr "Sense peus de pàgina"
 msgid "No high-priority companies without a scheduled follow-up"
 msgstr "Cap empresa d'alta prioritat sense seguiment programat"
 
-#: src/routes/emails/inboxes.tsx:395
+#: src/routes/emails/inboxes.tsx:405
 msgid "No inboxes yet"
 msgstr "Encara no hi ha safates"
 
@@ -2113,7 +2131,7 @@ msgstr "No hi ha crides de pagament en aquest interval."
 msgid "No presets available."
 msgstr "No hi ha plantilles predefinides disponibles."
 
-#: src/routes/emails/inboxes.tsx:329
+#: src/routes/emails/inboxes.tsx:339
 msgid "No primary inbox set."
 msgstr "No hi ha cap bústia principal."
 
@@ -2365,7 +2383,7 @@ msgstr "Resum"
 msgid "Owner"
 msgstr "Propietari"
 
-#: src/routes/emails/inboxes.tsx:1019
+#: src/routes/emails/inboxes.tsx:1083
 msgid "Owner user ID"
 msgstr "ID d'usuari propietari"
 
@@ -2413,7 +2431,7 @@ msgstr "Punts febles"
 msgid "Password"
 msgstr "Contrasenya"
 
-#: src/routes/emails/inboxes.tsx:953
+#: src/routes/emails/inboxes.tsx:1017
 msgid "Password or app-password"
 msgstr "Contrasenya o contrasenya d'aplicació"
 
@@ -2467,7 +2485,7 @@ msgstr "Tria una contrasenya nova. Els altres dispositius es desconnectaran."
 msgid "Pick a password you'll remember. Minimum 8 characters."
 msgstr "Tria una contrasenya que recordis. Mínim 8 caràcters."
 
-#: src/routes/emails/inboxes.tsx:813
+#: src/routes/emails/inboxes.tsx:853
 msgid "Pick a provider"
 msgstr "Tria un proveïdor"
 
@@ -2475,7 +2493,7 @@ msgstr "Tria un proveïdor"
 msgid "Pick an organization from the switcher in the header, or sign out and back in. After a recent dev DB reset, existing sessions can point at organization ids that the reset removed."
 msgstr "Tria una organització al selector de la barra superior, o tanca la sessió i torna a entrar. Després d'un reset recent de la base de dades de dev, les sessions existents poden apuntar a identificadors d'organització que el reset ha esborrat."
 
-#: src/routes/emails/inboxes.tsx:330
+#: src/routes/emails/inboxes.tsx:340
 msgid "Pick one to use as your default sender."
 msgstr "Tria'n una com a remitent per defecte."
 
@@ -2488,7 +2506,7 @@ msgstr "Tria les plantilles per fer servir només en aquesta recerca. Deixa-ho b
 msgid "Pipeline"
 msgstr "Pipeline"
 
-#: src/routes/emails/inboxes.tsx:1130
+#: src/routes/emails/inboxes.tsx:1194
 msgid "Plain"
 msgstr "Sense xifrar"
 
@@ -2513,7 +2531,7 @@ msgstr "Vista prèvia"
 msgid "Previous"
 msgstr "Anterior"
 
-#: src/routes/emails/inboxes.tsx:293
+#: src/routes/emails/inboxes.tsx:303
 msgid "Primary inbox set"
 msgstr "Bústia principal establerta"
 
@@ -2525,15 +2543,15 @@ msgstr "Navegació principal"
 msgid "Priority"
 msgstr "Prioritat"
 
-#: src/routes/emails/inboxes.tsx:437
+#: src/routes/emails/inboxes.tsx:447
 msgid "Private"
 msgstr "Privada"
 
-#: src/routes/emails/inboxes.tsx:1049
+#: src/routes/emails/inboxes.tsx:1113
 msgid "Private — hide threads from other members"
 msgstr "Privada — amaga els fils a la resta de membres"
 
-#: src/routes/emails/inboxes.tsx:436
+#: src/routes/emails/inboxes.tsx:446
 msgid "Private inbox"
 msgstr "Bústia privada"
 
@@ -2582,8 +2600,8 @@ msgstr "Escàner de prospectes"
 msgid "Prospects"
 msgstr "Prospectes"
 
-#: src/routes/emails/inboxes.tsx:805
-#: src/routes/emails/inboxes.tsx:812
+#: src/routes/emails/inboxes.tsx:845
+#: src/routes/emails/inboxes.tsx:852
 msgid "Provider preset"
 msgstr "Preestablit del proveïdor"
 
@@ -2608,9 +2626,9 @@ msgstr "Publicada"
 msgid "Publishing…"
 msgstr "Publicant…"
 
-#: src/routes/emails/inboxes.tsx:414
-#: src/routes/emails/inboxes.tsx:967
-#: src/routes/emails/inboxes.tsx:980
+#: src/routes/emails/inboxes.tsx:424
+#: src/routes/emails/inboxes.tsx:1031
+#: src/routes/emails/inboxes.tsx:1044
 msgid "Purpose"
 msgstr "Propòsit"
 
@@ -2643,7 +2661,7 @@ msgstr "Canvis recents"
 msgid "Recipient marked as spam"
 msgstr "El destinatari ha marcat el missatge com a brossa"
 
-#: src/routes/emails/inboxes.tsx:249
+#: src/routes/emails/inboxes.tsx:259
 msgid "Refreshing inbox status…"
 msgstr "Actualitzant l'estat de la bústia…"
 
@@ -2799,8 +2817,8 @@ msgid "Sales context"
 msgstr "Context comercial"
 
 #: src/components/instructions/template-editor-dialog.tsx:173
-#: src/routes/emails/inboxes.tsx:1071
-#: src/routes/emails/inboxes.tsx:1476
+#: src/routes/emails/inboxes.tsx:1135
+#: src/routes/emails/inboxes.tsx:1555
 #: src/routes/pages/$id.tsx:271
 msgid "Save"
 msgstr "Desa"
@@ -2831,7 +2849,7 @@ msgstr "Desa el valor per defecte de l'organització"
 
 #: src/components/emails/compose-form.tsx:547
 #: src/components/instructions/template-editor-dialog.tsx:173
-#: src/routes/emails/inboxes.tsx:1473
+#: src/routes/emails/inboxes.tsx:1552
 #: src/routes/pages/$id.tsx:271
 #: src/routes/reset-password.tsx:242
 #: src/routes/settings/profile/index.tsx:334
@@ -2880,7 +2898,7 @@ msgstr "Selecciona el text i copia'l manualment."
 msgid "Select thread {0}"
 msgstr "Selecciona el fil {0}"
 
-#: src/routes/emails/inboxes.tsx:837
+#: src/routes/emails/inboxes.tsx:877
 msgid "Selecting a preset fills IMAP and SMTP defaults — you can still edit them."
 msgstr "Triar un preestablit omple els paràmetres IMAP i SMTP — encara els pots editar."
 
@@ -2952,7 +2970,7 @@ msgstr "Posa una contrasenya"
 msgid "Set a password so you don't have to check your email next time."
 msgstr "Posa una contrasenya per no haver de mirar el correu la pròxima vegada."
 
-#: src/routes/emails/inboxes.tsx:1378
+#: src/routes/emails/inboxes.tsx:1457
 msgid "Set as default"
 msgstr "Estableix com a predeterminat"
 
@@ -2973,12 +2991,16 @@ msgstr "Configura <0>plantilles d'instruccions</0> reutilitzables per guiar cada
 msgid "Settings"
 msgstr "Configuració"
 
+#: src/routes/emails/inboxes.tsx:896
+msgid "Setup guide →"
+msgstr "Guia de configuració →"
+
 #: src/components/research/run-detail.tsx:181
 msgid "Shaped by"
 msgstr "Modelat per"
 
-#: src/routes/emails/inboxes.tsx:462
-#: src/routes/emails/inboxes.tsx:1009
+#: src/routes/emails/inboxes.tsx:489
+#: src/routes/emails/inboxes.tsx:1073
 msgid "Shared"
 msgstr "Compartida"
 
@@ -3063,16 +3085,16 @@ msgstr "Mida"
 msgid "Slug"
 msgstr "Slug"
 
-#: src/routes/emails/inboxes.tsx:895
+#: src/routes/emails/inboxes.tsx:959
 msgid "SMTP host"
 msgstr "Servidor SMTP"
 
-#: src/routes/emails/inboxes.tsx:905
+#: src/routes/emails/inboxes.tsx:969
 msgid "SMTP port"
 msgstr "Port SMTP"
 
-#: src/routes/emails/inboxes.tsx:914
-#: src/routes/emails/inboxes.tsx:918
+#: src/routes/emails/inboxes.tsx:978
+#: src/routes/emails/inboxes.tsx:982
 msgid "SMTP security"
 msgstr "Seguretat SMTP"
 
@@ -3139,12 +3161,12 @@ msgstr "Plantilles predefinides per començar"
 msgid "Starting…"
 msgstr "Iniciant…"
 
-#: src/routes/emails/inboxes.tsx:1124
+#: src/routes/emails/inboxes.tsx:1188
 msgid "STARTTLS"
 msgstr "STARTTLS"
 
 #: src/routes/calendar/index.tsx:279
-#: src/routes/emails/inboxes.tsx:413
+#: src/routes/emails/inboxes.tsx:423
 #: src/routes/pages/index.tsx:147
 #: src/routes/tasks/index.tsx:695
 msgid "Status"
@@ -3159,7 +3181,7 @@ msgstr "Ha fallat l'actualització d'estat"
 msgid "Still in use"
 msgstr "Encara s'utilitza"
 
-#: src/routes/emails/inboxes.tsx:960
+#: src/routes/emails/inboxes.tsx:1024
 msgid "Stored encrypted with AES-256-GCM."
 msgstr "Es desa xifrada amb AES-256-GCM."
 
@@ -3227,20 +3249,20 @@ msgstr "Plantilles"
 msgid "Tentative"
 msgstr "Provisional"
 
-#: src/routes/emails/inboxes.tsx:1072
+#: src/routes/emails/inboxes.tsx:1136
 msgid "Test & connect"
 msgstr "Prova i connecta"
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx:514
+#: src/routes/emails/inboxes.tsx:541
 msgid "Test connection for {0}"
 msgstr "Prova la connexió de {0}"
 
-#: src/routes/emails/inboxes.tsx:241
+#: src/routes/emails/inboxes.tsx:251
 msgid "Test failed"
 msgstr "Prova fallida"
 
-#: src/routes/emails/inboxes.tsx:1069
+#: src/routes/emails/inboxes.tsx:1133
 msgid "Testing connection…"
 msgstr "Provant la connexió…"
 
@@ -3289,7 +3311,7 @@ msgstr "La invitació pot haver caducat o ja s'''ha utilitzat."
 msgid "The invitee gets a 48-hour link. They can accept it once."
 msgstr "El convidat rep un enllaç de 48 hores. Pot acceptar-lo una sola vegada."
 
-#: src/routes/emails/inboxes.tsx:563
+#: src/routes/emails/inboxes.tsx:590
 msgid "The mailbox is ready."
 msgstr "La bústia està a punt."
 
@@ -3415,7 +3437,7 @@ msgstr "Cronologia"
 msgid "Title"
 msgstr "Títol"
 
-#: src/routes/emails/inboxes.tsx:1118
+#: src/routes/emails/inboxes.tsx:1182
 msgid "TLS"
 msgstr "TLS"
 
@@ -3493,10 +3515,10 @@ msgstr "Clau sense títol"
 msgid "Upcoming meetings"
 msgstr "Reunions properes"
 
-#: src/routes/emails/inboxes.tsx:204
-#: src/routes/emails/inboxes.tsx:225
-#: src/routes/emails/inboxes.tsx:1270
-#: src/routes/emails/inboxes.tsx:1322
+#: src/routes/emails/inboxes.tsx:214
+#: src/routes/emails/inboxes.tsx:235
+#: src/routes/emails/inboxes.tsx:1349
+#: src/routes/emails/inboxes.tsx:1401
 msgid "Update failed"
 msgstr "Ha fallat l'actualització"
 
@@ -3509,7 +3531,7 @@ msgid "Uploading…"
 msgstr "Pujant…"
 
 #. placeholder {0}: primarySuggestions[0]?.email ?? ''
-#: src/routes/emails/inboxes.tsx:344
+#: src/routes/emails/inboxes.tsx:354
 msgid "Use {0} as primary"
 msgstr "Fes servir {0} com a principal"
 
@@ -3521,11 +3543,11 @@ msgstr "Usa <0>httpUrl</0>, no <1>url</1> — <2>url</2> sol selecciona el trans
 msgid "Use a different email"
 msgstr "Fes servir un altre correu"
 
-#: src/routes/emails/inboxes.tsx:1454
+#: src/routes/emails/inboxes.tsx:1533
 msgid "Use as default footer"
 msgstr "Utilitza com a peu de pàgina predeterminat"
 
-#: src/routes/emails/inboxes.tsx:1037
+#: src/routes/emails/inboxes.tsx:1101
 msgid "Use as default for this purpose"
 msgstr "Usa com a per defecte per a aquest propòsit"
 
@@ -3537,7 +3559,7 @@ msgstr "Fes servir contrasenya"
 msgid "Use the org default"
 msgstr "Utilitza el valor per defecte de l'organització"
 
-#: src/routes/emails/inboxes.tsx:924
+#: src/routes/emails/inboxes.tsx:988
 msgid "Username"
 msgstr "Nom d'usuari"
 
@@ -3626,7 +3648,7 @@ msgstr "Qui"
 msgid "Workshop floor — live counters on the bench."
 msgstr "Planta del taller — comptadors en viu al banc."
 
-#: src/routes/emails/inboxes.tsx:1443
+#: src/routes/emails/inboxes.tsx:1522
 msgid "Write footer…"
 msgstr "Escriu el peu de pàgina…"
 
@@ -3662,7 +3684,7 @@ msgstr "Ja ets membre de {orgName}."
 msgid "You're now a member."
 msgstr "Ja ets membre."
 
-#: src/routes/emails/inboxes.tsx:848
+#: src/routes/emails/inboxes.tsx:912
 msgid "you@example.com"
 msgstr "tu@exemple.com"
 
