@@ -194,7 +194,7 @@ export const makeBetterAuthAdapter = (
 				// CLI mirrors the server's plugin set so adapter-issued sessions
 				// and API keys carry the same plugin shape as runtime requests.
 				organization(),
-				apiKeyPlugin({ enableSessionForAPIKeys: true }),
+				apiKeyPlugin({ enableSessionForAPIKeys: false }),
 				magicLinkPlugin({
 					sendMagicLink: data =>
 						resolvedSender({

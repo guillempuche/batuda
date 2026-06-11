@@ -72,7 +72,7 @@ export const seedIdentities = Effect.gen(function* () {
 					},
 				}),
 				organization(),
-				apiKey({ enableSessionForAPIKeys: true }),
+				apiKey({ enableSessionForAPIKeys: false }),
 			],
 		}),
 	)
