@@ -53,6 +53,8 @@ Type-checks and unit tests are **not** enough — they have passed on changes th
 
 When the change touches the web UI (`apps/internal`, `packages/ui`), attach visual proof so the reviewer sees it without running the branch. Drive the app with `agent-browser` — full command reference in `.claude/skills/debug-apps/references/agent-browser.md`. First make sure the stack is up and seeded (`/debug-apps`; `pnpm cli seed --preset minimal`) and log in if the route is gated.
 
+**Default to capturing — screenshots are on by default for every UI PR; capture them without asking.** The only case where skipping is even on the table is a change whose visual result is self-evident from the diff alone — a token value, a one-word copy edit, a renamed label — something any human understands by reading the code. Even then, don't decide for the user: **`AskUserQuestion`** whether to capture or skip, and follow their answer. Never skip silently. "The stack is slow to start" is not a reason to skip; if it genuinely won't come up, surface that and ask rather than burying a note in the PR body.
+
 **Screenshot, recording, or both — pick by what changed:**
 
 - **Screenshot** — a *state*: new/changed layout, copy, color, a field, an empty / loading / error state. One still per distinct state. This is the default; prefer it when a single frame tells the story.
@@ -169,7 +171,7 @@ Match recent PRs (`gh pr view 67 --json body`, `gh pr view 64 --json body`). Inc
 - `## Changes` (or `## The fix` for a bug) — the substantive changes as bullets describing **intent**, not file lists. The diff already shows the files.
 - `## Impact` — the blast radius (see checklist below). The single most valuable section for this codebase, because the surfaces are decoupled and the diff doesn't reveal the ripple. Omit only if genuinely none apply.
 - `## Review guide` — how to review this fast: where to look first, the riskiest part and why, any decision I made that you might overrule, and anything I couldn't fully verify (e.g. Snyk unavailable). Mark generated or mechanical parts as skip-able. This is where the self-review (Step 3) surfaces what it couldn't resolve.
-- `## Screenshots` / `## Demo` — for UI PRs (embedding below).
+- `## Screenshots` / `## Demo` — **mandatory for UI PRs**: embed the media, or — only for a self-evident change the user approved skipping — one line `> Screenshots skipped (approved): <reason>`. Neither present = an incomplete PR; there is no silent third option. (Embedding below.)
 - `## Tests` — what's covered (unit / integration), when notable.
 - `## Verification` — only what you **actually ran** (verify-before-assert): the gates you executed (`check-types` / `test` / `build`) and the live-stack or UI check you actually performed. Never write "all tests pass" you didn't run — an unverified claim here is worse than saying nothing.
 - `## Deferred` — follow-ups intentionally not in this PR.
