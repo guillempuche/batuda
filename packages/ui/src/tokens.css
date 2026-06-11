@@ -23,7 +23,9 @@
 	/* ═══ Core — palette (Mediterranean) ═══════════════════════ */
 
 	/* --- Primary — Terracotta --- */
-	--color-primary: #b05220;
+	/* Clears WCAG AA 4.5:1 as text on every cream surface (the lightest dialog
+	   paper through the darkest container) and keeps ≥6:1 for white-on-primary. */
+	--color-primary: #95400f;
 	--color-on-primary: #ffffff;
 
 	/* --- Secondary — Olive Green --- */

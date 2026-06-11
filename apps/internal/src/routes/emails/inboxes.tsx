@@ -470,6 +470,7 @@ function InboxesPage() {
 												{' '}
 												<PresetLink
 													href={authPasswordUrlFor(presets, row.imapHost)}
+													aria-label={t`Create an app-specific password for ${row.email}, opens in a new tab`}
 													target='_blank'
 													rel='noreferrer noopener'
 												>
@@ -749,6 +750,12 @@ function InboxFormDialog({
 	const appPasswordUrl = selectedPreset?.appPasswordUrl ?? ''
 	const setupUrl =
 		appPasswordUrl !== '' ? appPasswordUrl : (selectedPreset?.helpUrl ?? '')
+	// Tie the active hint or warning to the provider select for screen readers.
+	const providerHintId = providerUnsupported
+		? 'ix-provider-warning'
+		: selectedPreset !== null
+			? 'ix-provider-2fa-hint'
+			: undefined
 
 	const usernameForSubmit = username !== '' ? username : email
 
@@ -849,7 +856,10 @@ function InboxFormDialog({
 										if (value !== null) applyPreset(value)
 									}}
 								>
-									<PriSelect.Trigger aria-label={t`Provider preset`}>
+									<PriSelect.Trigger
+										aria-label={t`Provider preset`}
+										aria-describedby={providerHintId}
+									>
 										<PriSelect.Value placeholder={t`Pick a provider`} />
 										<PriSelect.Icon>
 											<ChevronLeft
@@ -877,17 +887,22 @@ function InboxFormDialog({
 								<Hint>{t`Selecting a preset fills IMAP and SMTP defaults — you can still edit them.`}</Hint>
 								{selectedPreset !== null &&
 									(providerUnsupported ? (
-										<Warning role='alert'>
+										<Warning role='alert' id='ix-provider-warning'>
 											{t`${selectedPreset.name} no longer allows password sign-in for mail apps, so it can't be connected here yet — it needs an OAuth sign-in. Pick another provider or use Generic IMAP.`}
 										</Warning>
 									) : (
-										<Hint>
+										<Hint id='ix-provider-2fa-hint'>
 											{t`Has two-factor authentication enabled? Use a provider app-specific password below, not your normal login password.`}
 											{setupUrl !== '' && (
 												<>
 													{' '}
 													<PresetLink
 														href={setupUrl}
+														aria-label={
+															appPasswordUrl !== ''
+																? t`Create an app-specific password, opens in a new tab`
+																: t`Open the setup guide, opens in a new tab`
+														}
 														target='_blank'
 														rel='noreferrer noopener'
 													>
@@ -1128,7 +1143,14 @@ function InboxFormDialog({
 							>
 								{t`Cancel`}
 							</PriButton>
-							<PriButton type='submit' $variant='filled' disabled={!canSubmit}>
+							<PriButton
+								type='submit'
+								$variant='filled'
+								disabled={!canSubmit}
+								aria-describedby={
+									providerUnsupported ? 'ix-provider-warning' : undefined
+								}
+							>
 								{submitting
 									? t`Testing connection…`
 									: editing !== null
