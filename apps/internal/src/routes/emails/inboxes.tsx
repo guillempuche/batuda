@@ -1,6 +1,12 @@
-import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
+import {
+	useAtom,
+	useAtomRefresh,
+	useAtomSet,
+	useAtomValue,
+} from '@effect/atom-react'
 import { useLingui } from '@lingui/react/macro'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useLocation } from '@tanstack/react-router'
+import { Option, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import {
 	Check,
@@ -14,7 +20,7 @@ import {
 	Trash2,
 	X,
 } from 'lucide-react'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import styled, { css } from 'styled-components'
 
 import { EmailEditor } from '@batuda/email/editor'
@@ -41,10 +47,17 @@ import {
 	updateFooterAtom,
 	updateInboxAtom,
 } from '#/atoms/emails-atoms'
+import {
+	emptyInboxDraft,
+	type InboxDraft,
+	inboxDraftAtom,
+} from '#/atoms/inbox-draft-atoms'
 import { EmptyState } from '#/components/shared/empty-state'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { SkeletonRows } from '#/components/shared/skeleton-row'
 import { dehydrateAtom } from '#/lib/atom-hydration'
+import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
+import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import {
 	agedPaperRow,
@@ -106,7 +119,20 @@ async function loadInboxesOnServer(): Promise<ReadonlyArray<unknown>> {
 	return Effect.runPromise(program)
 }
 
+// Which dialog is open lives in the `?dlg=` URL param so dialogs are
+// deep-linkable and the back button closes them. This route owns exactly three
+// dialogs; a `?dlg=` value outside this set fails to decode and stays closed.
+// `dlg` is intentionally not a loaderDep — opening a dialog never refetches.
+const inboxDlgSchema = Schema.Union([
+	dlgNoId('create'),
+	dlgWithId('edit'),
+	dlgWithId('footers'),
+])
+type InboxDlg = Schema.Schema.Type<typeof inboxDlgSchema>
+const decodeInboxDlg = Schema.decodeUnknownOption(inboxDlgSchema)
+
 export const Route = createFileRoute('/emails/inboxes')({
+	validateSearch: validateSearchWith({ dlg: inboxDlgSchema }),
 	loader: async () => {
 		if (!import.meta.env.SSR) return { dehydrated: [] as const }
 		try {
@@ -125,11 +151,43 @@ export const Route = createFileRoute('/emails/inboxes')({
 	component: InboxesPage,
 })
 
-type DialogMode =
-	| { readonly kind: 'closed' }
-	| { readonly kind: 'create' }
-	| { readonly kind: 'edit'; readonly row: InboxRow }
-	| { readonly kind: 'footers'; readonly row: InboxRow }
+// Open pushes a history entry (so Back closes the dialog); close drops `dlg`
+// with replace (so Back doesn't reopen it).
+//
+// `dlg` is read from the live URL rather than this route's validated search:
+// a programmatic navigate that removes the last search param updates the URL
+// but leaves the route match's validated search stale (only a real back/forward
+// re-resolves it), so the dialog wouldn't close. The URL always reflects the
+// truth, so we decode it through the same schema here — keeping the scope gate
+// (an unknown `dlg` decodes to nothing) without casts.
+function useInboxDlg() {
+	const rawDlg = useLocation({ select: l => l.search?.dlg })
+	const dlg = useMemo(
+		() => Option.getOrUndefined(decodeInboxDlg(rawDlg)),
+		[rawDlg],
+	)
+	const navigate = Route.useNavigate()
+	const open = useCallback(
+		(next: InboxDlg) => {
+			void navigate({
+				to: '/emails/inboxes',
+				search: prev => ({ ...prev, dlg: next }),
+			})
+		},
+		[navigate],
+	)
+	const close = useCallback(() => {
+		if (dlg === undefined) return
+		// Drop the `dlg` key entirely (rather than blank it) so the param
+		// disappears from the address bar and the URL goes back to clean.
+		void navigate({
+			to: '/emails/inboxes',
+			search: ({ dlg: _, ...rest }) => rest,
+			replace: true,
+		})
+	}, [navigate, dlg])
+	return { dlg, open, close }
+}
 
 function InboxesPage() {
 	const { t } = useLingui()
@@ -147,7 +205,7 @@ function InboxesPage() {
 		mode: 'promiseExit',
 	})
 
-	const [dialog, setDialog] = useState<DialogMode>({ kind: 'closed' })
+	const { dlg, open, close } = useInboxDlg()
 
 	const rows = useMemo<ReadonlyArray<InboxRow>>(
 		() =>
@@ -166,6 +224,20 @@ function InboxesPage() {
 	)
 	const isLoading = AsyncResult.isInitial(inboxesResult)
 	const isFailure = AsyncResult.isFailure(inboxesResult)
+	const listSettled =
+		AsyncResult.isSuccess(inboxesResult) || AsyncResult.isFailure(inboxesResult)
+
+	// Edit/footers dialogs carry only the row id in the URL; resolve the row
+	// from the loaded list. A deep link to a row that no longer exists closes
+	// itself once the list has loaded.
+	const targetRow = useMemo(() => {
+		if (dlg === undefined || dlg.kind === 'create') return null
+		return rows.find(row => row.id === dlg.id) ?? null
+	}, [dlg, rows])
+	useEffect(() => {
+		if (dlg === undefined || dlg.kind === 'create') return
+		if (listSettled && targetRow === null) close()
+	}, [dlg, listSettled, targetRow, close])
 
 	// hasDefault is the only signal we need from inboxStatus to drive the
 	// banner; the picker walks the inbox list itself.
@@ -190,18 +262,15 @@ function InboxesPage() {
 	)
 	const showPrimaryBanner = !hasPrimary && primarySuggestions.length > 0
 
-	const openCreate = useCallback(() => {
-		setDialog({ kind: 'create' })
-	}, [])
-	const openEdit = useCallback((row: InboxRow) => {
-		setDialog({ kind: 'edit', row })
-	}, [])
-	const openFooters = useCallback((row: InboxRow) => {
-		setDialog({ kind: 'footers', row })
-	}, [])
-	const closeDialog = useCallback(() => {
-		setDialog({ kind: 'closed' })
-	}, [])
+	const openCreate = useCallback(() => open({ kind: 'create' }), [open])
+	const openEdit = useCallback(
+		(row: InboxRow) => open({ kind: 'edit', id: row.id }),
+		[open],
+	)
+	const openFooters = useCallback(
+		(row: InboxRow) => open({ kind: 'footers', id: row.id }),
+		[open],
+	)
 
 	const toggleActive = useCallback(
 		async (row: InboxRow) => {
@@ -571,50 +640,93 @@ function InboxesPage() {
 				</InboxesTable>
 			)}
 
-			{(dialog.kind === 'create' || dialog.kind === 'edit') && (
-				<InboxFormDialog
-					mode={dialog}
-					onClose={closeDialog}
-					onCreate={async input => {
-						const exit = await createInbox({ payload: input } as never)
-						if (exit._tag !== 'Success') {
-							return {
-								ok: false,
-								error: t`Could not create the inbox. Check transport or credentials.`,
+			{dlg !== undefined &&
+				(dlg.kind === 'create' ||
+					(dlg.kind === 'edit' && targetRow !== null)) && (
+					<InboxFormDialog
+						key={dlg.kind === 'edit' ? `edit:${dlg.id}` : 'create'}
+						editing={dlg.kind === 'edit' ? targetRow : null}
+						onClose={close}
+						onCreate={async input => {
+							const exit = await createInbox({ payload: input } as never)
+							if (exit._tag !== 'Success') {
+								return {
+									ok: false,
+									error: t`Could not create the inbox. Check transport or credentials.`,
+								}
 							}
-						}
-						refreshInboxes()
-						refreshInboxStatus()
-						toastManager.add({
-							title: t`Inbox connected`,
-							description: t`The mailbox is ready.`,
-							type: 'success',
-						})
-						return { ok: true }
-					}}
-					onUpdate={async (id, patch) => {
-						const exit = await updateInbox({
-							params: { id },
-							payload: patch,
-						})
-						if (exit._tag !== 'Success') {
-							return { ok: false, error: t`Could not save the inbox.` }
-						}
-						refreshInboxes()
-						refreshInboxStatus()
-						toastManager.add({
-							title: t`Inbox updated`,
-							type: 'success',
-						})
-						return { ok: true }
-					}}
+							refreshInboxes()
+							refreshInboxStatus()
+							toastManager.add({
+								title: t`Inbox connected`,
+								description: t`The mailbox is ready.`,
+								type: 'success',
+							})
+							return { ok: true }
+						}}
+						onUpdate={async (id, patch) => {
+							const exit = await updateInbox({
+								params: { id },
+								payload: patch,
+							})
+							if (exit._tag !== 'Success') {
+								return { ok: false, error: t`Could not save the inbox.` }
+							}
+							refreshInboxes()
+							refreshInboxStatus()
+							toastManager.add({
+								title: t`Inbox updated`,
+								type: 'success',
+							})
+							return { ok: true }
+						}}
+					/>
+				)}
+
+			{dlg?.kind === 'footers' && targetRow !== null && (
+				<FooterManageDialog
+					key={`footers:${targetRow.id}`}
+					row={targetRow}
+					onClose={close}
 				/>
 			)}
 
-			{dialog.kind === 'footers' && (
-				<FooterManageDialog row={dialog.row} onClose={closeDialog} />
-			)}
+			{dlg !== undefined &&
+				dlg.kind !== 'create' &&
+				targetRow === null &&
+				!listSettled && <DialogPending onClose={close} />}
 		</Page>
+	)
+}
+
+// Shown briefly when a deep link names a row (?dlg={kind:'edit',id}) before the
+// inbox list has loaded, so the dialog doesn't flash empty or closed.
+function DialogPending({ onClose }: { readonly onClose: () => void }) {
+	const { t } = useLingui()
+	return (
+		<PriDialog.Root
+			open
+			onOpenChange={(next: boolean) => {
+				if (!next) onClose()
+			}}
+		>
+			<PriDialog.Portal>
+				<PriDialog.Backdrop />
+				<PriDialog.Popup>
+					<DialogHeader>
+						<PriDialog.Title>{t`Loading…`}</PriDialog.Title>
+						<PriDialog.Close
+							render={props => (
+								<CloseButton type='button' aria-label={t`Close`} {...props}>
+									<X size={16} aria-hidden />
+								</CloseButton>
+							)}
+						/>
+					</DialogHeader>
+					<SkeletonRows count={3} height='2rem' />
+				</PriDialog.Popup>
+			</PriDialog.Portal>
+		</PriDialog.Root>
 	)
 }
 
@@ -667,13 +779,33 @@ type UpdatePayload = {
 	readonly password?: string
 }
 
+// Seed the edit form from a row. Password is intentionally omitted — it is
+// never read back, only set when the user opts to change it.
+function rowToDraft(row: InboxRow): InboxDraft {
+	return {
+		email: row.email,
+		displayName: row.displayName ?? '',
+		purpose: row.purpose,
+		ownerUserId: row.ownerUserId ?? '',
+		isDefault: row.isDefault,
+		isPrivate: row.isPrivate,
+		imapHost: row.imapHost,
+		imapPort: row.imapPort,
+		imapSecurity: row.imapSecurity,
+		smtpHost: row.smtpHost,
+		smtpPort: row.smtpPort,
+		smtpSecurity: row.smtpSecurity,
+		username: row.username,
+	}
+}
+
 function InboxFormDialog({
-	mode,
+	editing,
 	onClose,
 	onCreate,
 	onUpdate,
 }: {
-	readonly mode: DialogMode
+	readonly editing: InboxRow | null
 	readonly onClose: () => void
 	readonly onCreate: (input: CreatePayload) => Promise<MutationResult>
 	readonly onUpdate: (
@@ -682,7 +814,7 @@ function InboxFormDialog({
 	) => Promise<MutationResult>
 }) {
 	const { t } = useLingui()
-	const editing = mode.kind === 'edit' ? mode.row : null
+	const isCreate = editing === null
 
 	const presetsResult = useAtomValue(providerPresetsAtom)
 	const presets = useMemo<ReadonlyArray<ProviderPreset>>(
@@ -693,28 +825,25 @@ function InboxFormDialog({
 		[presetsResult],
 	)
 
+	// Create keeps its draft in a global atom so a half-filled form survives
+	// closing the dialog and navigating away; edit uses local state seeded from
+	// the row. Both share the InboxDraft shape, so the form binds to one `draft`
+	// regardless of mode. The password is never part of the draft.
+	const [createDraft, setCreateDraft] = useAtom(inboxDraftAtom)
+	const [editDraft, setEditDraft] = useState<InboxDraft>(() =>
+		editing !== null ? rowToDraft(editing) : emptyInboxDraft,
+	)
+	const draft = isCreate ? createDraft : editDraft
+	const patchDraft = useCallback(
+		(partial: Partial<InboxDraft>) => {
+			if (isCreate) setCreateDraft(prev => ({ ...prev, ...partial }))
+			else setEditDraft(prev => ({ ...prev, ...partial }))
+		},
+		[isCreate, setCreateDraft],
+	)
+
 	// Preset name selected in the dropdown — '' means none / custom.
 	const [presetName, setPresetName] = useState<string>('')
-	const [email, setEmail] = useState(editing?.email ?? '')
-	const [displayName, setDisplayName] = useState(editing?.displayName ?? '')
-	const [purpose, setPurpose] = useState<InboxPurpose>(
-		editing?.purpose ?? 'human',
-	)
-	const [ownerUserId, setOwnerUserId] = useState(editing?.ownerUserId ?? '')
-	const [isDefault, setIsDefault] = useState(editing?.isDefault ?? false)
-	const [isPrivate, setIsPrivate] = useState(editing?.isPrivate ?? false)
-
-	const [imapHost, setImapHost] = useState(editing?.imapHost ?? '')
-	const [imapPort, setImapPort] = useState<number>(editing?.imapPort ?? 993)
-	const [imapSecurity, setImapSecurity] = useState<TransportSecurity>(
-		editing?.imapSecurity ?? 'tls',
-	)
-	const [smtpHost, setSmtpHost] = useState(editing?.smtpHost ?? '')
-	const [smtpPort, setSmtpPort] = useState<number>(editing?.smtpPort ?? 465)
-	const [smtpSecurity, setSmtpSecurity] = useState<TransportSecurity>(
-		editing?.smtpSecurity ?? 'tls',
-	)
-	const [username, setUsername] = useState(editing?.username ?? '')
 	const [password, setPassword] = useState('')
 	// In edit mode the password field is empty and only sent when the
 	// user types a new one, so existing credentials aren't blanked.
@@ -728,14 +857,16 @@ function InboxFormDialog({
 			setPresetName(name)
 			const preset = presets.find(p => p.name === name)
 			if (preset === undefined) return
-			setImapHost(preset.imapHost)
-			setImapPort(preset.imapPort)
-			setImapSecurity(preset.imapSecurity)
-			setSmtpHost(preset.smtpHost)
-			setSmtpPort(preset.smtpPort)
-			setSmtpSecurity(preset.smtpSecurity)
+			patchDraft({
+				imapHost: preset.imapHost,
+				imapPort: preset.imapPort,
+				imapSecurity: preset.imapSecurity,
+				smtpHost: preset.smtpHost,
+				smtpPort: preset.smtpPort,
+				smtpSecurity: preset.smtpSecurity,
+			})
 		},
-		[presets],
+		[presets, patchDraft],
 	)
 
 	// Derived from the chosen preset: powers the 2FA app-password hint and
@@ -750,7 +881,7 @@ function InboxFormDialog({
 	const setupUrl =
 		appPasswordUrl !== '' ? appPasswordUrl : (selectedPreset?.helpUrl ?? '')
 
-	const usernameForSubmit = username !== '' ? username : email
+	const usernameForSubmit = draft.username !== '' ? draft.username : draft.email
 
 	// Create requires email + transport + credentials. Edit lets the user
 	// patch any subset; we always send the full transport so the server's
@@ -760,10 +891,10 @@ function InboxFormDialog({
 		!submitting &&
 		!providerUnsupported &&
 		(editing !== null
-			? email !== ''
-			: email !== '' &&
-				imapHost !== '' &&
-				smtpHost !== '' &&
+			? draft.email !== ''
+			: draft.email !== '' &&
+				draft.imapHost !== '' &&
+				draft.smtpHost !== '' &&
 				password !== '' &&
 				usernameForSubmit !== '')
 
@@ -776,39 +907,45 @@ function InboxFormDialog({
 		const result =
 			editing !== null
 				? await onUpdate(editing.id, {
-						displayName: displayName === '' ? null : displayName,
-						purpose,
+						displayName: draft.displayName === '' ? null : draft.displayName,
+						purpose: draft.purpose,
 						ownerUserId:
-							purpose === 'human' && ownerUserId !== '' ? ownerUserId : null,
-						isDefault,
-						isPrivate,
-						imapHost,
-						imapPort,
-						imapSecurity,
-						smtpHost,
-						smtpPort,
-						smtpSecurity,
+							draft.purpose === 'human' && draft.ownerUserId !== ''
+								? draft.ownerUserId
+								: null,
+						isDefault: draft.isDefault,
+						isPrivate: draft.isPrivate,
+						imapHost: draft.imapHost,
+						imapPort: draft.imapPort,
+						imapSecurity: draft.imapSecurity,
+						smtpHost: draft.smtpHost,
+						smtpPort: draft.smtpPort,
+						smtpSecurity: draft.smtpSecurity,
 						username: usernameForSubmit,
 						...(changeCredentials && password !== '' && { password }),
 					})
 				: await onCreate({
-						email,
-						...(displayName !== '' && { displayName }),
-						purpose,
-						...(purpose === 'human' && ownerUserId !== '' && { ownerUserId }),
-						...(isDefault && { isDefault: true }),
-						...(isPrivate && { isPrivate: true }),
-						imapHost,
-						imapPort,
-						imapSecurity,
-						smtpHost,
-						smtpPort,
-						smtpSecurity,
+						email: draft.email,
+						...(draft.displayName !== '' && { displayName: draft.displayName }),
+						purpose: draft.purpose,
+						...(draft.purpose === 'human' &&
+							draft.ownerUserId !== '' && { ownerUserId: draft.ownerUserId }),
+						...(draft.isDefault && { isDefault: true }),
+						...(draft.isPrivate && { isPrivate: true }),
+						imapHost: draft.imapHost,
+						imapPort: draft.imapPort,
+						imapSecurity: draft.imapSecurity,
+						smtpHost: draft.smtpHost,
+						smtpPort: draft.smtpPort,
+						smtpSecurity: draft.smtpSecurity,
 						username: usernameForSubmit,
 						password,
 					})
 
 		if (result.ok) {
+			// Clear the persisted create draft only after a successful connect;
+			// closing or navigating away keeps it.
+			if (isCreate) setCreateDraft(emptyInboxDraft)
 			onClose()
 			return
 		}
@@ -818,7 +955,7 @@ function InboxFormDialog({
 
 	return (
 		<PriDialog.Root
-			open={mode.kind !== 'closed'}
+			open
 			onOpenChange={(next: boolean) => {
 				if (!next) onClose()
 			}}
@@ -907,8 +1044,8 @@ function InboxFormDialog({
 							<PriInput
 								id='ix-email'
 								type='email'
-								value={email}
-								onChange={e => setEmail(e.target.value)}
+								value={draft.email}
+								onChange={e => patchDraft({ email: e.target.value })}
 								placeholder={t`you@example.com`}
 								required
 								disabled={editing !== null}
@@ -920,8 +1057,8 @@ function InboxFormDialog({
 							<PriInput
 								id='ix-display'
 								type='text'
-								value={displayName}
-								onChange={e => setDisplayName(e.target.value)}
+								value={draft.displayName}
+								onChange={e => patchDraft({ displayName: e.target.value })}
 								placeholder={t`e.g. Sales — Acme`}
 							/>
 						</Field>
@@ -932,8 +1069,8 @@ function InboxFormDialog({
 								<PriInput
 									id='ix-imap-host'
 									type='text'
-									value={imapHost}
-									onChange={e => setImapHost(e.target.value)}
+									value={draft.imapHost}
+									onChange={e => patchDraft({ imapHost: e.target.value })}
 									placeholder='imap.example.com'
 								/>
 							</Field>
@@ -942,15 +1079,17 @@ function InboxFormDialog({
 								<PriInput
 									id='ix-imap-port'
 									type='number'
-									value={imapPort}
-									onChange={e => setImapPort(parseInt(e.target.value, 10) || 0)}
+									value={draft.imapPort}
+									onChange={e =>
+										patchDraft({ imapPort: parseInt(e.target.value, 10) || 0 })
+									}
 								/>
 							</Field>
 							<Field>
 								<Label>{t`IMAP security`}</Label>
 								<SecuritySelect
-									value={imapSecurity}
-									onChange={setImapSecurity}
+									value={draft.imapSecurity}
+									onChange={next => patchDraft({ imapSecurity: next })}
 									ariaLabel={t`IMAP security`}
 								/>
 							</Field>
@@ -960,8 +1099,8 @@ function InboxFormDialog({
 								<PriInput
 									id='ix-smtp-host'
 									type='text'
-									value={smtpHost}
-									onChange={e => setSmtpHost(e.target.value)}
+									value={draft.smtpHost}
+									onChange={e => patchDraft({ smtpHost: e.target.value })}
 									placeholder='smtp.example.com'
 								/>
 							</Field>
@@ -970,15 +1109,17 @@ function InboxFormDialog({
 								<PriInput
 									id='ix-smtp-port'
 									type='number'
-									value={smtpPort}
-									onChange={e => setSmtpPort(parseInt(e.target.value, 10) || 0)}
+									value={draft.smtpPort}
+									onChange={e =>
+										patchDraft({ smtpPort: parseInt(e.target.value, 10) || 0 })
+									}
 								/>
 							</Field>
 							<Field>
 								<Label>{t`SMTP security`}</Label>
 								<SecuritySelect
-									value={smtpSecurity}
-									onChange={setSmtpSecurity}
+									value={draft.smtpSecurity}
+									onChange={next => patchDraft({ smtpSecurity: next })}
 									ariaLabel={t`SMTP security`}
 								/>
 							</Field>
@@ -989,8 +1130,8 @@ function InboxFormDialog({
 							<PriInput
 								id='ix-username'
 								type='text'
-								value={username}
-								onChange={e => setUsername(e.target.value)}
+								value={draft.username}
+								onChange={e => patchDraft({ username: e.target.value })}
 								placeholder={t`Defaults to the email address.`}
 							/>
 						</Field>
@@ -1030,14 +1171,14 @@ function InboxFormDialog({
 						<Field>
 							<Label>{t`Purpose`}</Label>
 							<PriSelect.Root
-								value={purpose}
+								value={draft.purpose}
 								onValueChange={value => {
 									if (
 										value === 'human' ||
 										value === 'agent' ||
 										value === 'shared'
 									) {
-										setPurpose(value)
+										patchDraft({ purpose: value })
 									}
 								}}
 							>
@@ -1078,14 +1219,14 @@ function InboxFormDialog({
 							</PriSelect.Root>
 						</Field>
 
-						{purpose === 'human' && (
+						{draft.purpose === 'human' && (
 							<Field>
 								<Label htmlFor='ix-owner'>{t`Owner user ID`}</Label>
 								<PriInput
 									id='ix-owner'
 									type='text'
-									value={ownerUserId}
-									onChange={e => setOwnerUserId(e.target.value)}
+									value={draft.ownerUserId}
+									onChange={e => patchDraft({ ownerUserId: e.target.value })}
 									placeholder={t`Defaults to you when omitted.`}
 								/>
 							</Field>
@@ -1095,19 +1236,19 @@ function InboxFormDialog({
 							<input
 								id='ix-default'
 								type='checkbox'
-								checked={isDefault}
-								onChange={e => setIsDefault(e.target.checked)}
+								checked={draft.isDefault}
+								onChange={e => patchDraft({ isDefault: e.target.checked })}
 							/>
 							<label htmlFor='ix-default'>{t`Use as default for this purpose`}</label>
 						</CheckboxRow>
 
-						{purpose !== 'shared' && (
+						{draft.purpose !== 'shared' && (
 							<CheckboxRow>
 								<input
 									id='ix-private'
 									type='checkbox'
-									checked={isPrivate}
-									onChange={e => setIsPrivate(e.target.checked)}
+									checked={draft.isPrivate}
+									onChange={e => patchDraft({ isPrivate: e.target.checked })}
 								/>
 								<label htmlFor='ix-private'>
 									{t`Private — hide threads from other members`}

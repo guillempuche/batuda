@@ -8,6 +8,15 @@ import {
 } from 'react'
 
 /**
+ * Boundary note: page-scoped dialogs (e.g. the inbox dialogs in
+ * routes/emails/inboxes.tsx) live in the `?dlg=` URL param so they are
+ * deep-linkable and the back button closes them. Quick Capture stays a
+ * React context instead: it is the one app-global dialog (opens from
+ * anywhere via Shift+I), and its imperative `onSubmitted` pre-fill callback
+ * below cannot be serialised into a URL.
+ */
+
+/**
  * Shape of the "pre-fill" payload callers pass when they want the Quick
  * Capture dialog to open with a company (and optionally a contact) already
  * selected. If `undefined` the dialog opens empty — the user picks the
