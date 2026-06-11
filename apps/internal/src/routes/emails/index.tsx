@@ -5,7 +5,7 @@ import {
 	useAtomValue,
 } from '@effect/atom-react'
 import { useLingui } from '@lingui/react/macro'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import {
 	type ColumnDef,
 	type ColumnSizingState,
@@ -37,6 +37,7 @@ import {
 	Mail,
 	Pencil,
 	PencilLine,
+	Plus,
 	Search,
 	X,
 } from 'lucide-react'
@@ -560,6 +561,25 @@ function EmailsIndexPage() {
 					<Subtitle>{total === 1 ? t`1 thread` : t`${total} threads`}</Subtitle>
 				</IntroText>
 				<IntroActions>
+					{/*
+					 * Cross-route dialog opener: a real <Link> (cmd/middle-clickable,
+					 * shareable) that lands on /emails/inboxes with the connect dialog
+					 * already open via the `?dlg=` param. Back returns here.
+					 */}
+					<PriButton
+						$variant='outlined'
+						data-testid='emails-connect-mailbox'
+						render={props => (
+							<Link
+								to='/emails/inboxes'
+								search={{ dlg: { kind: 'create' } }}
+								{...props}
+							/>
+						)}
+					>
+						<Plus size={14} aria-hidden />
+						<span>{t`Connect mailbox`}</span>
+					</PriButton>
 					<PriButton
 						type='button'
 						$variant='outlined'
