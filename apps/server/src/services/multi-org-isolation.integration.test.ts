@@ -117,7 +117,7 @@ const buildTestAuth = (pool: pg.Pool) =>
 				bearer(),
 				admin(),
 				organization(),
-				apiKey({ enableSessionForAPIKeys: true }),
+				apiKey({ enableSessionForAPIKeys: false }),
 				magicLink({ sendMagicLink: async () => {} }),
 			],
 		}),

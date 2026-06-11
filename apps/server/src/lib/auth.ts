@@ -202,7 +202,11 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 					}),
 					// enableMetadata: org-owned keys carry { organizationId } so the
 					// MCP path resolves the org from the key (BADREQUEST otherwise).
-					apiKey({ enableSessionForAPIKeys: true, enableMetadata: true }),
+					// enableSessionForAPIKeys is off on purpose: a key authenticates
+					// only the MCP path (checked there with verifyApiKey), never as a
+					// login session on the cookie-gated REST API — so a leaked key
+					// can't be replayed beyond /mcp.
+					apiKey({ enableSessionForAPIKeys: false, enableMetadata: true }),
 					// OAuth 2.1 Authorization Server for web chat MCP clients
 					// (ChatGPT, Claude.ai) that can't send the `x-api-key` header.
 					// `oauthProvider` issues JWT access tokens whose `aud` is the

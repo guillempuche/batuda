@@ -29,6 +29,11 @@ const sharedPool = new pg.Pool({ connectionString: DATABASE_URL })
 
 afterAll(async () => {
 	// Remove only the rows we wrote so the seed survives for sibling tests.
+	// API keys reference the user, so clear them before the user rows.
+	await sharedPool.query(
+		`DELETE FROM apikey WHERE "referenceId" IN (SELECT id FROM "user" WHERE email LIKE $1)`,
+		[`${TEST_EMAIL_PREFIX}%`],
+	)
 	await sharedPool.query(
 		`DELETE FROM "account" WHERE "userId" IN (SELECT id FROM "user" WHERE email LIKE $1)`,
 		[`${TEST_EMAIL_PREFIX}%`],
@@ -37,6 +42,70 @@ afterAll(async () => {
 		`${TEST_EMAIL_PREFIX}%`,
 	])
 	await sharedPool.end()
+})
+
+describe('API key session confinement', () => {
+	// Build the instance like the server (auth.ts): a key must never become a
+	// login session. Its only consumer is the MCP path, which checks it with
+	// verifyApiKey — so a leaked key can't be replayed against the cookie-gated
+	// REST API that reads getSession.
+	const buildInstance = () =>
+		betterAuth(
+			buildBetterAuthConfig({
+				env: {
+					secret: BETTER_AUTH_SECRET,
+					baseURL: 'http://localhost:3010',
+					useSecureCookies: false,
+					trustedOrigins: [],
+				},
+				pool: sharedPool,
+				plugins: [
+					openAPI(),
+					bearer(),
+					admin(),
+					organization(),
+					apiKey({ enableSessionForAPIKeys: false }),
+				],
+			}),
+		)
+
+	describe('when an x-api-key is presented to getSession', () => {
+		it('should not resolve a session, yet stay valid for verifyApiKey', async () => {
+			// GIVEN a user holding a valid API key
+			const auth = buildInstance()
+			const email = `${TEST_EMAIL_PREFIX}confine-${Date.now()}@example.com`
+			await auth.api.createUser({
+				body: {
+					email,
+					name: 'Key Confine',
+					password: 'temp-confine-password-1234',
+				},
+			})
+			const lookup = await sharedPool.query<{ id: string }>(
+				'SELECT id FROM "user" WHERE email = $1 LIMIT 1',
+				[email],
+			)
+			const userId = lookup.rows[0]!.id
+			const created = await auth.api.createApiKey({
+				body: { userId, name: 'confinement-probe' },
+			})
+
+			// WHEN getSession sees only that key in the x-api-key header
+			const session = await auth.api.getSession({
+				headers: new Headers({ 'x-api-key': created.key }),
+			})
+
+			// THEN no session is minted — the key cannot authenticate the
+			// session-gated REST API.
+			expect(session).toBeNull()
+
+			// AND the key still verifies on its intended MCP path.
+			const verified = await auth.api.verifyApiKey({
+				body: { key: created.key },
+			})
+			expect(verified.valid).toBe(true)
+		})
+	})
 })
 
 describe('magic-link plugin existence pre-check on sendMagicLink', () => {
@@ -63,7 +132,7 @@ describe('magic-link plugin existence pre-check on sendMagicLink', () => {
 					bearer(),
 					admin(),
 					organization(),
-					apiKey({ enableSessionForAPIKeys: true }),
+					apiKey({ enableSessionForAPIKeys: false }),
 					magicLink({
 						disableSignUp: true,
 						// Mirrors auth.ts:206 — silent no-op for unknown emails
