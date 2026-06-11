@@ -114,6 +114,44 @@ Magic-link emails (from invite flow) are tagged with `labels: magic-link` in fro
 
 If no emails appear, verify `EMAIL_PROVIDER=local-inbox` in `.env` and check `apps/server/server.log` for `"email provider: local-inbox"`.
 
+## Running a worktree dev stack
+
+To run the app from a git worktree (e.g. to verify a branch live) **alongside** the
+main checkout's stack, without conflict.
+
+**How it works:** portless auto-prefixes the git branch name, so you use the
+**same** dev names and portless namespaces them by worktree. From a worktree on
+branch `<branch>`, `--name batuda` serves at `<branch>.batuda.localhost` and
+`--name api.batuda` at `<branch>.api.batuda.localhost`. The web auto-derives its
+API origin from its own host, so the pair just works. portless injects `PORT`
+(overriding `.env`), so there is no port clash with the main stack. Docker
+Postgres/MinIO are shared (same data).
+
+Setup (run binaries directly — `pnpm` scripts fail in worktrees on the lefthook
+`prepare` hook: `core.hooksPath is set locally`):
+
+```bash
+# 1. Copy the .env from the main checkout — no edits needed. ALLOWED_ORIGINS
+#    ships a `*.batuda.localhost` wildcard that trusts the worktree origin, and
+#    the auth cookie domain collapses to `batuda.localhost` (shared), so login
+#    works as-is. (Older .env missing the wildcard: append `,https://*.batuda.localhost`.)
+#    Caveat: APP_PUBLIC_URL/BETTER_AUTH_BASE_URL stay at the main host, so
+#    invite/MCP-issuer links point at the main app — fine for normal testing.
+cp ../../.env ./.env
+
+# 2. Build @batuda/ui — the SERVER (node/tsx) resolves its `default`/dist export.
+#    (vite dev alone doesn't need this: the web uses the `development`/src export.)
+./node_modules/.bin/turbo run build --filter=@batuda/ui
+
+# 3. Start server (from apps/server) and web (from apps/internal), in background:
+../../node_modules/.bin/portless run --name api.batuda node --watch --env-file=../../.env --import tsx src/main.ts
+../../node_modules/.bin/portless run --name batuda vite dev
+```
+
+Verify: `curl -sk https://<branch>.api.batuda.localhost/health` and drive
+`agent-browser` against `https://<branch>.batuda.localhost`. The branch is
+`git branch --show-current`.
+
 ## CLI commands reference
 
 | Command                    | Purpose                                    |
