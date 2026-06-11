@@ -67,6 +67,9 @@ const PriPopup = styled(Select.Popup).withConfig({
 	displayName: 'PriSelectPopup',
 })`
 	position: relative;
+	/* Match the popup to at least the trigger width so options never look narrower than the selector. */
+	min-width: var(--anchor-width);
+	box-sizing: border-box;
 	background-color: var(--color-metal);
 	background-image:
 		var(--texture-brushed-metal),
