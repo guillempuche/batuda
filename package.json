@@ -43,7 +43,7 @@
 		"release:ui:dry": "release-it --config .release-it.ui.cjs --dry-run",
 		"release:mail-worker:dry": "release-it --config .release-it.mail-worker.cjs --dry-run",
 		"______ Setup ______": "",
-		"prepare": "lefthook install",
+		"prepare": "lefthook install --force",
 		"setup": "pnpm cli -- setup"
 	},
 	"devDependencies": {
