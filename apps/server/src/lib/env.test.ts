@@ -115,19 +115,35 @@ describe('buildInvitationCallbackURL', () => {
 	})
 })
 
-// APP_PUBLIC_URL must be one of ALLOWED_ORIGINS or the server refuses to boot,
-// so an invite can't point at a host the app doesn't actually trust.
+// APP_PUBLIC_URL must be trusted by ALLOWED_ORIGINS (literal or wildcard) or the
+// server refuses to boot, so an invite can't point at a host the app doesn't
+// actually trust. Wildcard matching lets a portless-derived worktree origin pass.
 describe('findPublicUrlNotAllowed', () => {
 	describe('when the public URL is one of the allowed origins', () => {
 		it('should return null', () => {
-			// GIVEN APP_PUBLIC_URL listed in ALLOWED_ORIGINS
+			// GIVEN APP_PUBLIC_URL listed literally in ALLOWED_ORIGINS
 			// WHEN the validator runs
 			// THEN it passes (null)
-			// [lib/env.ts — includes() short-circuit]
+			// [lib/env.ts — matchOrigin literal branch]
 			expect(
 				findPublicUrlNotAllowed('https://batuda.co', [
 					'https://admin.batuda.co',
 					'https://batuda.co',
+				]),
+			).toBeNull()
+		})
+	})
+
+	describe('when the public URL matches an allowed wildcard origin', () => {
+		it('should return null', () => {
+			// GIVEN a derived worktree origin and a `*.batuda.localhost` wildcard
+			// WHEN the validator runs
+			// THEN the wildcard accepts it (the literal isn't listed)
+			// [lib/env.ts — matchOrigin wildcard branch]
+			expect(
+				findPublicUrlNotAllowed('https://feature-x.batuda.localhost', [
+					'https://batuda.localhost',
+					'https://*.batuda.localhost',
 				]),
 			).toBeNull()
 		})
