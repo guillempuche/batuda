@@ -7,6 +7,9 @@ import {
 	ServiceMap,
 } from 'effect'
 
+import { matchOrigin } from './origin-match'
+import { deriveWorktreeOrigins } from './portless-origins'
+
 /**
  * Returns the first ALLOWED_ORIGINS pattern that uses a wildcard
  * subdomain whose suffix is NOT under `.localhost`, or `null` if every
@@ -42,15 +45,17 @@ export function buildInvitationCallbackURL(
 }
 
 /**
- * Returns an explanatory message if `publicUrl` is not one of
- * `allowedOrigins`, else `null`. APP_PUBLIC_URL must be a trusted origin so
- * the links the server mints can't point at a host it won't serve.
+ * Returns an explanatory message if `publicUrl` is not trusted by
+ * `allowedOrigins`, else `null`. APP_PUBLIC_URL must be a trusted origin so the
+ * links the server mints can't point at a host it won't serve. Matched with the
+ * same wildcard rules as CORS, so a derived worktree origin
+ * (`<branch>.batuda.localhost`) is accepted by the `*.batuda.localhost` wildcard.
  */
 export function findPublicUrlNotAllowed(
 	publicUrl: string,
 	allowedOrigins: ReadonlyArray<string>,
 ): string | null {
-	if (allowedOrigins.includes(publicUrl)) return null
+	if (allowedOrigins.some(p => matchOrigin(publicUrl, p))) return null
 	return (
 		`APP_PUBLIC_URL "${publicUrl}" is not one of ALLOWED_ORIGINS ` +
 		`[${allowedOrigins.join(', ')}]. List it there so the app trusts it.`
@@ -65,9 +70,23 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 		const MIN_LOG_LEVEL = yield* Config.string('MIN_LOG_LEVEL')
 
 		const BETTER_AUTH_SECRET = yield* Config.redacted('BETTER_AUTH_SECRET')
-		// Required (no default): cookie-domain derivation depends on this,
-		// so a missing value in prod would ship broken auth silently.
-		const BETTER_AUTH_BASE_URL = yield* Config.string('BETTER_AUTH_BASE_URL')
+
+		// In a dev worktree portless sets PORTLESS_URL to this worktree's own api
+		// host (`<branch>.api.batuda.localhost`); derive the matching origins so the
+		// server's canonical base and the links it mints use the worktree's host,
+		// not the main checkout's. Null off `*.batuda.localhost` (prod), where the
+		// explicit env values below win. Mirrors apps/internal/vite.config.ts.
+		const PORTLESS_URL = yield* Config.string('PORTLESS_URL').pipe(
+			Config.withDefault(''),
+		)
+		const worktreeOrigins = deriveWorktreeOrigins(PORTLESS_URL)
+
+		// Required (no default): cookie-domain derivation depends on this, so a
+		// missing value in prod would ship broken auth silently. In a worktree the
+		// portless-derived api origin overrides it.
+		const BETTER_AUTH_BASE_URL =
+			worktreeOrigins?.apiOrigin ??
+			(yield* Config.string('BETTER_AUTH_BASE_URL'))
 		const BETTER_AUTH_INSECURE_COOKIES = yield* Config.boolean(
 			'BETTER_AUTH_INSECURE_COOKIES',
 		)
@@ -137,7 +156,8 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 		// validated to be one of ALLOWED_ORIGINS so an invite can't point at an
 		// origin the app doesn't trust. Decoupled from ALLOWED_ORIGINS ordering
 		// on purpose: reordering that list no longer moves invite links.
-		const APP_PUBLIC_URL = yield* Config.string('APP_PUBLIC_URL')
+		const APP_PUBLIC_URL =
+			worktreeOrigins?.appOrigin ?? (yield* Config.string('APP_PUBLIC_URL'))
 		const publicUrlError = findPublicUrlNotAllowed(
 			APP_PUBLIC_URL,
 			ALLOWED_ORIGINS,
