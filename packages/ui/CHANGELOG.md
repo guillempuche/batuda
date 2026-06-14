@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-06-14 (ui-v2026.6.14-1)
+
+### Bug Fixes
+
+* **ui:** add exports to publishConfig for npm distribution ([3c5cedb](https://github.com/guillempuche/batuda/commit/3c5cedb2b3d1564b549acaac8b17b6f9d51d6e37))
+
 ## 2026-06-14 (ui-v2026.6.14)
 
 ### Features
