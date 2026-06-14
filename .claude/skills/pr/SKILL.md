@@ -44,6 +44,8 @@ gh pr view --json number,state,isDraft 2>/dev/null || echo "no PR yet"
 
 Type-checks and unit tests are **not** enough — they have passed on changes that produced wrong behavior at runtime. Run the changed path against the live local stack and confirm the user-visible behavior. If the stack is unhealthy, run `/debug-apps` first.
 
+**In a git worktree** (the recommended setup): provision its own stack with `pnpm cli worktree up` (not `services up`), then `pnpm dev`, and target the worktree's own host — `https://<branch>.batuda.localhost` (web) / `https://<branch>.api.batuda.localhost` (api), where `<branch>` = `git branch --show-current` — everywhere this step (and the screenshot commands below) say `batuda.localhost`. The server, login, and minted links all work at that host automatically. See `/worktrees`.
+
 - **CLI** — run the actual command (`pnpm cli seed`, `pnpm cli doctor`, …) and inspect output / DB state.
 - **Server** — hit the endpoint (curl or via the running app), check the response and `apps/server/server.log`.
 - **UI** — drive the page and confirm the rendered state (see below).
