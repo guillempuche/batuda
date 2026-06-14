@@ -21,6 +21,16 @@
 		]
 	},
 	"hooks": {
+		"SessionStart": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "$CLAUDE_PROJECT_DIR/.claude/hooks/worktree-up.sh"
+					}
+				]
+			}
+		],
 		"PreToolUse": [
 			{
 				"matcher": "Edit",
@@ -116,6 +126,16 @@
 					{
 						"type": "command",
 						"command": "cd /Users/guillem/programacio/codi/autonom/batuda && git diff --name-only HEAD 2>/dev/null | grep -qE '\\.(ts|tsx)$' && echo '{\"systemMessage\": \"TypeScript files changed. Run: pnpm check-types\"}' || true"
+					}
+				]
+			}
+		],
+		"WorktreeRemove": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "$CLAUDE_PROJECT_DIR/.claude/hooks/worktree-down.sh"
 					}
 				]
 			}
