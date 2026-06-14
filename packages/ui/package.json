@@ -62,7 +62,31 @@
 		"dist"
 	],
 	"publishConfig": {
-		"access": "public"
+		"access": "public",
+		"exports": {
+			".": {
+				"types": "./dist/index.d.mts",
+				"import": "./dist/index.mjs"
+			},
+			"./blocks": {
+				"types": "./dist/blocks/index.d.mts",
+				"import": "./dist/blocks/index.mjs"
+			},
+			"./layout": {
+				"types": "./dist/layout/index.d.mts",
+				"import": "./dist/layout/index.mjs"
+			},
+			"./pri": {
+				"types": "./dist/pri/index.d.mts",
+				"import": "./dist/pri/index.mjs"
+			},
+			"./tokens.css": {
+				"default": "./dist/tokens.css"
+			},
+			"./tailwind.css": {
+				"default": "./dist/tailwind.css"
+			}
+		}
 	},
 	"repository": {
 		"type": "git",
