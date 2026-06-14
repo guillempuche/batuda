@@ -117,9 +117,10 @@ If no emails appear, verify `EMAIL_PROVIDER=local-inbox` in `.env` and check `ap
 ## Running a worktree dev stack
 
 Each git worktree gets its own dev data inside the **one shared** Docker stack — its
-own Postgres database (`batuda_<branch>`) and MinIO bucket (`batuda-assets-<branch>`),
-**not** a stack per worktree. portless serves it at `<branch>.batuda.localhost` (web)
-and `<branch>.api.batuda.localhost` (server), namespaced by branch so there's no clash
+own Postgres database (`batuda_<slug>`) and MinIO bucket (`batuda-assets-<slug>`),
+**not** a stack per worktree. portless serves it at `<label>.batuda.localhost` (web)
+and `<label>.api.batuda.localhost` (server), where `<label>`/`<slug>` is the branch's
+last path segment (so `ui/foo` → `foo.batuda.localhost`), so there's no clash
 with the main checkout. See the `/worktrees` skill for the full model.
 
 ```bash
@@ -136,9 +137,10 @@ pnpm cli worktree down      # drop this worktree's DB + bucket
 pnpm cli worktree prune     # reap DBs/buckets of worktrees that no longer exist
 ```
 
-Verify: `curl -sk https://<branch>.api.batuda.localhost/health` and drive
-`agent-browser` against `https://<branch>.batuda.localhost` (`<branch>` =
-`git branch --show-current`). The server derives its own auth/app origins from
+Verify: `curl -sk https://<label>.api.batuda.localhost/health` and drive
+`agent-browser` against `https://<label>.batuda.localhost` (use the host
+`pnpm cli worktree doctor` prints — portless takes the branch's last path segment).
+The server derives its own auth/app origins from
 `PORTLESS_URL`, so login, API calls, and minted links (invitations, auth redirects)
 all target the worktree's host automatically — no per-worktree `.env` edits. If the
 server won't boot with an `APP_PUBLIC_URL … not one of ALLOWED_ORIGINS` error, the

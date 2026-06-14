@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
@@ -20,13 +21,39 @@ const PG_USER = 'batuda'
 // Compose names the default network `<project>_default`.
 const STORAGE_NETWORK = `${SHARED_PROJECT}_default`
 
-// Docker-safe slug (lowercase, [a-z0-9-]) derived from the worktree's branch.
-const slugify = (s: string) =>
-	s
+// portless routes each worktree by the branch's LAST path segment — `ui/foo` and a
+// plain `foo` both serve `foo.batuda.localhost` — lowercased to a DNS label, with a
+// short hash appended past 63 chars. We mirror that derivation exactly so the host
+// we print is the host portless serves, and we key this worktree's database +
+// bucket off the SAME label so the URL and the data behind it can't drift apart.
+const MAX_DNS_LABEL = 63
+// A bucket name caps at 63 chars and ours carries a `batuda-assets-` (14) prefix, so
+// the shared slug is bounded to 49 — also safe for the `batuda_` database prefix.
+const MAX_SLUG = 49
+
+const dnsLabel = (raw: string, max: number): string => {
+	const sane = raw
 		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/[^a-z0-9-]/g, '-')
+		.replace(/-{2,}/g, '-')
 		.replace(/^-+|-+$/g, '')
-		.slice(0, 24)
+	if (sane.length <= max) return sane
+	// Too long: keep a unique tail by appending a short hash. Trim by 7 to leave
+	// room for the 6-char hash plus the hyphen that joins it.
+	const hash = createHash('sha256').update(sane).digest('hex').slice(0, 6)
+	return `${sane.slice(0, max - 7).replace(/-+$/, '')}-${hash}`
+}
+
+const branchLabel = (branch: string) => branch.split('/').pop() ?? branch
+
+// The subdomain portless actually serves for this branch (capped at 63 as it does).
+const branchHost = (branch: string) =>
+	`${dnsLabel(branchLabel(branch), MAX_DNS_LABEL)}.batuda.localhost`
+
+// Names this worktree's database + bucket — the same label as the host, capped
+// tighter so both identifiers stay valid.
+const slugForBranch = (branch: string) =>
+	dnsLabel(branchLabel(branch), MAX_SLUG)
 
 // Postgres identifiers can't contain hyphens unquoted, so the database name uses
 // underscores; S3 bucket names can't contain underscores, so the bucket keeps
@@ -59,9 +86,7 @@ export const isLinkedWorktree = Effect.gen(function* () {
 
 const branchName = execSilent('git', 'rev-parse', '--abbrev-ref', 'HEAD')
 
-const slugForCurrentWorktree = branchName.pipe(
-	Effect.map(b => slugify(b.replace(/^worktree-/, ''))),
-)
+const slugForCurrentWorktree = branchName.pipe(Effect.map(slugForBranch))
 
 // Only the worktree's own database and bucket differ from main; the shared
 // endpoints (Postgres host/port, MinIO, Mailpit) are inherited as-is.
@@ -185,7 +210,7 @@ const mcCapture = (command: string) => execSilent(mcScript(command))
 const settle = <A, E, R>(self: Effect.Effect<A, E, R>) =>
 	self.pipe(Effect.retry(Schedule.spaced('2 seconds').pipe(Schedule.take(5))))
 
-// `git worktree list` includes the main checkout; slugifying every branch the
+// `git worktree list` includes the main checkout; deriving each branch's slug the
 // same way the up path does means a live worktree's data is never swept.
 const liveWorktreeSlugs = execSilent(
 	'git',
@@ -197,7 +222,7 @@ const liveWorktreeSlugs = execSilent(
 		const slugs = new Set<string>()
 		for (const line of out.split('\n')) {
 			const m = line.match(/^branch refs\/heads\/(.+)$/)
-			if (m?.[1]) slugs.add(slugify(m[1].replace(/^worktree-/, '')))
+			if (m?.[1]) slugs.add(slugForBranch(m[1]))
 		}
 		return slugs
 	}),
@@ -331,7 +356,7 @@ export const worktreeUp = Effect.gen(function* () {
 			`  Database:  ${dbName(slug)}  (postgresql://batuda:batuda@localhost:5433/${dbName(slug)})`,
 			`  Bucket:    ${bucketName(slug)}  (MinIO http://localhost:9001, batuda / batuda-secret)`,
 			'  Mailpit:   http://localhost:8025  (shared across worktrees)',
-			`  Run \`pnpm dev\` → portless serves https://${branch}.batuda.localhost`,
+			`  Run \`pnpm dev\` → portless serves https://${branchHost(branch)}`,
 			'',
 		].join('\n'),
 	)
@@ -393,14 +418,14 @@ export const worktreeLs = Effect.gen(function* () {
 		// linked worktree owns its `batuda_<slug>` / `batuda-assets-<slug>` pair.
 		const isMain = resolve(e.path) === resolve(main)
 		const branch = e.branch ?? '(detached)'
-		const slug = e.branch ? slugify(e.branch.replace(/^worktree-/, '')) : ''
+		const slug = e.branch ? slugForBranch(e.branch) : ''
 		const db = isMain ? 'batuda' : dbName(slug)
 		const bucket = isMain ? 'batuda-assets' : bucketName(slug)
 		const provisioned = dbs.has(db) && buckets.has(bucket)
 		const url = isMain
 			? 'https://batuda.localhost'
 			: e.branch
-				? `https://${e.branch}.batuda.localhost`
+				? `https://${branchHost(e.branch)}`
 				: '—'
 		return { branch, db, url, provisioned }
 	})
@@ -475,7 +500,7 @@ export const worktreeDoctor = Effect.gen(function* () {
 		checks.push({
 			ok: true,
 			name: 'url',
-			detail: `https://${branch}.batuda.localhost (run \`pnpm dev\`)`,
+			detail: `https://${branchHost(branch)} (run \`pnpm dev\`)`,
 		})
 	}
 

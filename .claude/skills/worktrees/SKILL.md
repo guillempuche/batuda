@@ -16,14 +16,17 @@ everything — **3 containers total, regardless of how many worktrees you have**
 is a *logical tenant* inside it:
 
 - its own Postgres **database** `batuda_<slug>` and MinIO **bucket** `batuda-assets-<slug>`,
-  where `<slug>` is the branch lowercased with a leading `worktree-` dropped, non-alphanumerics
-  → `-`, capped at 24 chars (the database swaps `-` → `_`) — so branch `worktree-feature-x` gives
-  `batuda_feature_x` / `batuda-assets-feature-x`, which is what `ls`/`doctor` print,
+  where `<slug>` is the branch's **last path segment** lowercased, non-alphanumerics → `-`
+  (the database swaps `-` → `_`; a very long name gets a short hash suffix) — so branch
+  `ui/feature-x` gives `batuda_feature_x` / `batuda-assets-feature-x`, which is what
+  `ls`/`doctor` print,
 - a generated `.env` pointing `DATABASE_URL` / `STORAGE_BUCKET` at them; everything else
   (shared endpoints, secrets) is inherited from the main checkout's `.env`.
 
-portless gives each worktree its own URLs by **raw** branch — web `https://<branch>.batuda.localhost`,
-server `https://<branch>.api.batuda.localhost` — so two worktrees' `pnpm dev` never collide.
+portless serves each worktree on that same last-path-segment label — web
+`https://<label>.batuda.localhost`, server `https://<label>.api.batuda.localhost`, so
+`ui/feature-x` → `feature-x.batuda.localhost` and two worktrees' `pnpm dev` never collide.
+**Use the URL `pnpm cli worktree ls`/`doctor` prints** — don't build it from the branch by hand.
 
 ## Where worktrees live
 
@@ -39,7 +42,7 @@ fires the auto-provision/teardown hooks below.
    `pnpm install && pnpm cli worktree up`, then skips once the worktree's database exists). Or
    run `pnpm cli worktree up` yourself: it ensures the shared stack is up, creates the DB +
    bucket, writes `.env`, and migrates + seeds (re-running re-seeds — see Caveats).
-3. **Run** — `pnpm dev` → portless serves `https://<branch>.batuda.localhost`.
+3. **Run** — `pnpm dev` → portless serves `https://<label>.batuda.localhost` (the branch's last path segment).
 4. **Inspect** — `pnpm cli worktree ls` (every worktree + its DB/URL/provisioned state),
    `pnpm cli worktree doctor` (deep health of the current one).
 5. **Tear down** — auto when **Claude** removes the worktree (the `WorktreeRemove` hook drops
