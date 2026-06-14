@@ -27,6 +27,13 @@ import { emailInject } from './commands/email'
 import { seed, seedIdentities } from './commands/seed'
 import { servicesDown, servicesStatus, servicesUp } from './commands/services'
 import { appendEnvKeys, resetEnvFile, setup } from './commands/setup'
+import {
+	worktreeDoctor,
+	worktreeDown,
+	worktreeLs,
+	worktreePrune,
+	worktreeUp,
+} from './commands/worktree'
 import { withDb } from './db'
 import { loadEnv } from './lib/load-env'
 import { recoveryHint } from './lib/recovery-hint'
@@ -489,27 +496,118 @@ const servicesUpCommand = Command.make('up', {}, () =>
 		yield* Effect.logInfo('Starting services...')
 		yield* servicesUp
 	}),
-).pipe(Command.withDescription('Start local Docker services'))
+).pipe(Command.withDescription('Start the shared Docker services'))
 
-const servicesDownCommand = Command.make('down', {}, () =>
-	Effect.gen(function* () {
-		yield* Effect.logInfo('Stopping services...')
-		yield* servicesDown
-	}),
-).pipe(Command.withDescription('Stop local Docker services'))
+const servicesDownCommand = Command.make(
+	'down',
+	{
+		force: Flag.boolean('force').pipe(
+			Flag.withDescription(
+				'Stop the shared stack even from inside a worktree (affects every worktree)',
+			),
+			Flag.withDefault(false),
+		),
+	},
+	({ force }) =>
+		Effect.gen(function* () {
+			yield* Effect.logInfo('Stopping services...')
+			yield* servicesDown(force)
+		}),
+).pipe(
+	Command.withDescription(
+		'Stop the shared Docker services (affects all worktrees)',
+	),
+)
 
 const servicesStatusCommand = Command.make(
 	'status',
 	{},
 	() => servicesStatus,
-).pipe(Command.withDescription('Show Docker services status'))
+).pipe(Command.withDescription('Show shared Docker services status'))
 
 const servicesCommand = Command.make('services').pipe(
-	Command.withDescription('Manage local Docker services'),
+	Command.withDescription(
+		'Manage the one shared Docker stack (Postgres, MinIO, Mailpit) all worktrees use',
+	),
 	Command.withSubcommands([
 		servicesUpCommand,
 		servicesDownCommand,
 		servicesStatusCommand,
+	]),
+)
+
+// ── Worktree ───────────────────────────────────────────────
+
+const worktreeUpCommand = Command.make('up', {}, () => worktreeUp).pipe(
+	Command.withShortDescription(
+		'Provision this worktree (database + bucket + seed)',
+	),
+	Command.withDescription(
+		'Provision this worktree inside the shared stack: create its own Postgres ' +
+			'database (batuda_<branch>) and MinIO bucket, write its .env, then migrate ' +
+			'and seed. Idempotent, and auto-runs on session start.',
+	),
+)
+
+const worktreeDownCommand = Command.make('down', {}, () => worktreeDown).pipe(
+	Command.withShortDescription('Drop this worktree’s database + bucket'),
+	Command.withDescription(
+		'Drop this worktree’s Postgres database and MinIO bucket from the shared ' +
+			'stack. The shared containers and every other worktree are left untouched.',
+	),
+)
+
+const worktreePruneCommand = Command.make(
+	'prune',
+	{},
+	() => worktreePrune,
+).pipe(
+	Command.withShortDescription('Remove orphaned worktree databases + buckets'),
+	Command.withDescription(
+		'Drop databases and buckets left behind by worktrees that no longer exist ' +
+			'(removed with `git worktree remove`, crashed sessions, non-interactive ' +
+			'runs). The main checkout and every live worktree are kept.',
+	),
+)
+
+const worktreeLsCommand = Command.make('ls', {}, () => worktreeLs).pipe(
+	Command.withShortDescription(
+		'List all worktrees + their database/bucket/URL',
+	),
+	Command.withDescription(
+		'Show every git worktree with its Postgres database, whether it is ' +
+			'provisioned (✓), and its portless URL — the at-a-glance map for ' +
+			'juggling parallel sessions.',
+	),
+)
+
+const worktreeDoctorCommand = Command.make(
+	'doctor',
+	{},
+	() => worktreeDoctor,
+).pipe(
+	Command.withShortDescription('Diagnose this worktree’s data layer'),
+	Command.withDescription(
+		'Check the current worktree’s health: shared stack reachable, its database ' +
+			'exists + migrated, its bucket exists, and the portless URL it serves.',
+	),
+)
+
+const worktreeCommand = Command.make('worktree').pipe(
+	Command.withShortDescription('Per-worktree dev data on the shared stack'),
+	Command.withDescription(
+		'Give each git worktree its own Postgres database + MinIO bucket inside the ' +
+			'one shared Docker stack — low-RAM isolation for parallel sessions. ' +
+			'Auto-provisioned on session start; `up` (re)provisions, `down` removes ' +
+			'this worktree, `prune` reaps orphans, `ls` maps them, `doctor` ' +
+			'diagnoses. Example: `pnpm cli worktree up`.',
+	),
+	Command.withSubcommands([
+		worktreeUpCommand,
+		worktreeDownCommand,
+		worktreePruneCommand,
+		worktreeLsCommand,
+		worktreeDoctorCommand,
 	]),
 )
 
@@ -657,6 +755,7 @@ export const batuda = Command.make('batuda').pipe(
 		dataCommand,
 		authCommand,
 		servicesCommand,
+		worktreeCommand,
 		calendarCommand,
 		emailCommand,
 	]),
