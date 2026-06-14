@@ -134,6 +134,20 @@ Log in at `/sign-in` with the admin credentials you set in Step 5.
 
 ---
 
+## (Optional) Parallel work in git worktrees
+
+Work on several branches at once without a second Docker stack: each git worktree is a *tenant* in the shared stack with its own database + bucket. The `/worktrees` skill has the full model; the short version:
+
+```bash
+git worktree add .claude/worktrees/<name> -b <branch>   # create
+pnpm cli worktree up                                     # its DB + bucket + .env, then migrate + seed
+pnpm dev                                                 # portless serves it on its own host
+pnpm cli worktree doctor                                 # prints that host + health
+pnpm cli worktree down                                   # drop its DB + bucket when done
+```
+
+portless serves the worktree at the branch's **last path segment** — `ui/foo` → `https://foo.batuda.localhost`. Use the URL `worktree doctor` prints rather than guessing it.
+
 ## Env targets: `--env local|cloud`
 
 Every CLI command accepts `--env local|cloud` (default `local`).
@@ -152,6 +166,8 @@ Cloud env requires `gh` authenticated locally (`gh auth status`). If `gh` is mis
 **Port 5433 already in use.** Another Postgres is bound to the default port. Either stop the other instance or change `POSTGRES_PORT` in `.env` and re-run `pnpm cli services up`.
 
 **TLS cert errors on `*.batuda.localhost`.** Dev servers use self-signed certs. Accept the cert once per hostname in your browser (API + web app = two prompts).
+
+**A worktree host won't load at all** (`ERR_CONNECTION_CLOSED`, no cert prompt). A long-running portless proxy can lack certs for worktree subdomains created after it started — restart the proxy so it re-mints them.
 
 **`pnpm cli auth bootstrap` says `UsersAlreadyExist`.** Someone already bootstrapped. If you don't know the credentials, run `pnpm cli auth reset-password --email <their-email>` to overwrite the password instead.
 
