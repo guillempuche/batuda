@@ -4,6 +4,9 @@ services:
   db:
     container_name: batuda-db
     image: postgres:18-alpine
+    # One shared Postgres backs every worktree (each gets its own database), so
+    # raise the ceiling for all those concurrent dev-server pools.
+    command: postgres -c max_connections=200
     ports:
       - "5433:5432"
     environment:

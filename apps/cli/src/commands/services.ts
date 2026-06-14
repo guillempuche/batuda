@@ -5,11 +5,12 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import { PgLive } from '../db'
 import { exec, ROOT } from '../shell'
+import { isLinkedWorktree } from './worktree'
 
 const COMPOSE_FILE = resolve(ROOT, 'docker/docker-compose.yml')
 
 const compose = (...args: string[]) =>
-	exec('docker', 'compose', '-f', COMPOSE_FILE, ...args).pipe(
+	exec('docker', 'compose', '-p', 'batuda', '-f', COMPOSE_FILE, ...args).pipe(
 		Effect.catch(() =>
 			Effect.fail(
 				new Error('Docker command failed. Is Docker/OrbStack running?'),
@@ -20,7 +21,7 @@ const compose = (...args: string[]) =>
 /**
  * After `docker compose up -d`, the DB container needs a moment to
  * accept connections. Retry up to 4 times (1 s apart) then give up
- * silently -- the user can always run `pnpm cli doctor` separately.
+ * silently — the user can always run `pnpm cli doctor` separately.
  */
 const checkMigrations = Effect.gen(function* () {
 	const sql = yield* SqlClient.SqlClient
@@ -53,7 +54,20 @@ export const servicesUp = compose('up', '-d').pipe(
 	Effect.andThen(printServiceUrls),
 )
 
-export const servicesDown = compose('down')
+// Stopping the one shared stack disrupts every worktree and the main checkout, so
+// refuse from inside a linked worktree unless explicitly forced — point at the
+// per-worktree teardown instead.
+export const servicesDown = (force: boolean) =>
+	Effect.gen(function* () {
+		if (!force && (yield* isLinkedWorktree)) {
+			return yield* Effect.fail(
+				new Error(
+					'`services down` stops the shared stack used by every worktree. Run it from the main checkout, use `pnpm cli worktree down` to remove just this worktree, or pass --force.',
+				),
+			)
+		}
+		yield* compose('down')
+	})
 
 export const servicesStatus = compose('ps').pipe(
 	Effect.andThen(printServiceUrls),
