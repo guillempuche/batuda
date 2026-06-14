@@ -140,23 +140,79 @@
 	--typescale-label-small-weight: 500;
 	--typescale-label-small-tracking: 0.031rem;
 
-	/* ═══ Core — spacing (fluid clamp, 3xs → 5xl) ══════════════ */
-	/*    8px base grid                                          */
+	/* ═══ Core — spacing (fluid Utopia clamp, geometric ladder) ═ */
+	/*    Base step 16→20px (sm/1×) across 320→1440px; each token  */
+	/*    a fixed multiple of the base, zoom-safe rem+vw.          */
 
-	--space-3xs: clamp(0.125rem, 0.2vw, 0.25rem); /*  2–4px  */
-	--space-2xs: clamp(0.25rem, 0.4vw, 0.5rem); /*  4–8px  */
-	--space-xs: clamp(0.5rem, 0.75vw, 1rem); /*  8–16px */
-	--space-sm: clamp(0.75rem, 1vw, 1.25rem); /* 12–20px */
-	--space-md: clamp(1rem, 1.5vw, 1.5rem); /* 16–24px */
-	--space-lg: clamp(1.25rem, 1.75vw, 1.75rem); /* 20–28px */
-	--space-xl: clamp(1.5rem, 2vw, 2rem); /* 24–32px */
-	--space-2xl: clamp(2rem, 2.5vw, 2.5rem); /* 32–40px */
-	--space-3xl: clamp(2.5rem, 3vw, 3rem); /* 40–48px */
-	--space-4xl: clamp(3rem, 4vw, 4rem); /* 48–64px */
-	--space-5xl: clamp(4rem, 5vw, 5rem); /* 64–80px */
+	--space-3xs: clamp(
+		0.25rem,
+		0.232rem +
+		0.089vw,
+		0.3125rem
+	); /*   4–5px   ·0.25× */
+	--space-2xs: clamp(
+		0.5rem,
+		0.464rem +
+		0.179vw,
+		0.625rem
+	); /*     8–10px  ·0.5×  */
+	--space-xs: clamp(
+		0.75rem,
+		0.696rem +
+		0.268vw,
+		0.9375rem
+	); /*   12–15px  ·0.75× */
+	--space-sm: clamp(
+		1rem,
+		0.929rem +
+		0.357vw,
+		1.25rem
+	); /*        16–20px  ·1×    */
+	--space-md: clamp(
+		1.5rem,
+		1.393rem +
+		0.536vw,
+		1.875rem
+	); /*     24–30px  ·1.5×  */
+	--space-lg: clamp(
+		2rem,
+		1.857rem +
+		0.714vw,
+		2.5rem
+	); /*         32–40px  ·2×    */
+	--space-xl: clamp(
+		2.5rem,
+		2.321rem +
+		0.893vw,
+		3.125rem
+	); /*     40–50px  ·2.5×  */
+	--space-2xl: clamp(
+		3rem,
+		2.786rem +
+		1.071vw,
+		3.75rem
+	); /*       48–60px  ·3×    */
+	--space-3xl: clamp(
+		4rem,
+		3.714rem +
+		1.429vw,
+		5rem
+	); /*          64–80px  ·4×    */
+	--space-4xl: clamp(
+		6rem,
+		5.571rem +
+		2.143vw,
+		7.5rem
+	); /*        96–120px ·6×    */
+	--space-5xl: clamp(
+		8rem,
+		7.429rem +
+		2.857vw,
+		10rem
+	); /*        128–160px ·8×    */
 
-	/* Page layout */
-	--page-gutter: clamp(1rem, 4vw, 2rem);
+	/* Page layout — gutter is the page edge-inset, NOT on the space ladder */
+	--page-gutter: clamp(1rem, 0.714rem + 1.429vw, 2rem); /* 16–32px */
 	--page-max-width: 75rem;
 
 	/* ═══ Core — shape (border radius) ═════════════════════════ */
