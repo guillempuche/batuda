@@ -62,8 +62,8 @@ After pre-flight, check these in order. Stop when the cause is found.
 - All `RESEARCH_PROVIDER_*` vars set (server crashes without them; use `stub` for local dev)
 - `RESEARCH_PROVIDER_LLM` set (no auto-default; use `stub`)
 - All `RESEARCH_DEFAULT_*` and `RESEARCH_MAX_*` budget/concurrency vars set
-- `ALLOWED_ORIGINS=https://batuda.localhost` — only the web origin (the API is same-origin to itself, so it does not appear in its own allowlist). No wildcards, every new cross-origin caller has to be listed explicitly
-- `BETTER_AUTH_BASE_URL=https://api.batuda.localhost`
+- `ALLOWED_ORIGINS` — the web origin(s): `https://batuda.localhost` plus the `https://*.batuda.localhost` wildcard that trusts each worktree's `<branch>.batuda.localhost`. Production origins must be listed explicitly (a wildcard whose suffix isn't `.localhost` is rejected at boot)
+- `BETTER_AUTH_BASE_URL=https://api.batuda.localhost` (in a worktree the server derives this + `APP_PUBLIC_URL` from `PORTLESS_URL`, so they point at the worktree's own host)
 - `EMAIL_PROVIDER` set explicitly (use `local-inbox` for dev)
 - Run `pnpm cli doctor` for a full automated environment health check
 
@@ -73,7 +73,7 @@ Local dev depends on two Docker containers defined in `docker/docker-compose.yml
 
 | Service     | Container        | Port(s)                               |
 | ----------- | ---------------- | ------------------------------------- |
-| Postgres 17 | `batuda-db`      | `5433:5432`                           |
+| Postgres 18 | `batuda-db`      | `5433:5432`                           |
 | MinIO (S3)  | `batuda-storage` | `9000` (S3 API), `9001` (web console) |
 
 ```bash
@@ -116,57 +116,54 @@ If no emails appear, verify `EMAIL_PROVIDER=local-inbox` in `.env` and check `ap
 
 ## Running a worktree dev stack
 
-To run the app from a git worktree (e.g. to verify a branch live) **alongside** the
-main checkout's stack, without conflict.
-
-**How it works:** portless auto-prefixes the git branch name, so you use the
-**same** dev names and portless namespaces them by worktree. From a worktree on
-branch `<branch>`, `--name batuda` serves at `<branch>.batuda.localhost` and
-`--name api.batuda` at `<branch>.api.batuda.localhost`. The web auto-derives its
-API origin from its own host, so the pair just works. portless injects `PORT`
-(overriding `.env`), so there is no port clash with the main stack. Docker
-Postgres/MinIO are shared (same data).
-
-Setup (run binaries directly — `pnpm` scripts fail in worktrees on the lefthook
-`prepare` hook: `core.hooksPath is set locally`):
+Each git worktree gets its own dev data inside the **one shared** Docker stack — its
+own Postgres database (`batuda_<branch>`) and MinIO bucket (`batuda-assets-<branch>`),
+**not** a stack per worktree. portless serves it at `<branch>.batuda.localhost` (web)
+and `<branch>.api.batuda.localhost` (server), namespaced by branch so there's no clash
+with the main checkout. See the `/worktrees` skill for the full model.
 
 ```bash
-# 1. Copy the .env from the main checkout — no edits needed. ALLOWED_ORIGINS
-#    ships a `*.batuda.localhost` wildcard that trusts the worktree origin, and
-#    the auth cookie domain collapses to `batuda.localhost` (shared), so login
-#    works as-is. (Older .env missing the wildcard: append `,https://*.batuda.localhost`.)
-#    Caveat: APP_PUBLIC_URL/BETTER_AUTH_BASE_URL stay at the main host, so
-#    invite/MCP-issuer links point at the main app — fine for normal testing.
-cp ../../.env ./.env
+# Provision this worktree: creates its DB + bucket, writes .env, migrates + seeds.
+# Auto-runs once on session start (skips once the DB exists); re-running re-seeds.
+pnpm cli worktree up
 
-# 2. Build @batuda/ui — the SERVER (node/tsx) resolves its `default`/dist export.
-#    (vite dev alone doesn't need this: the web uses the `development`/src export.)
-./node_modules/.bin/turbo run build --filter=@batuda/ui
+# Run the stack — portless injects PORT/PORTLESS_URL per service, no clash with main.
+pnpm dev
 
-# 3. Start server (from apps/server) and web (from apps/internal), in background:
-../../node_modules/.bin/portless run --name api.batuda node --watch --env-file=../../.env --import tsx src/main.ts
-../../node_modules/.bin/portless run --name batuda vite dev
+pnpm cli worktree ls        # every worktree + its DB + provisioned state + URL
+pnpm cli worktree doctor    # this worktree: stack, DB, migrations, bucket, URL
+pnpm cli worktree down      # drop this worktree's DB + bucket
+pnpm cli worktree prune     # reap DBs/buckets of worktrees that no longer exist
 ```
 
 Verify: `curl -sk https://<branch>.api.batuda.localhost/health` and drive
-`agent-browser` against `https://<branch>.batuda.localhost`. The branch is
-`git branch --show-current`.
+`agent-browser` against `https://<branch>.batuda.localhost` (`<branch>` =
+`git branch --show-current`). The server derives its own auth/app origins from
+`PORTLESS_URL`, so login, API calls, and minted links (invitations, auth redirects)
+all target the worktree's host automatically — no per-worktree `.env` edits. If the
+server won't boot with an `APP_PUBLIC_URL … not one of ALLOWED_ORIGINS` error, the
+main `.env` is missing the `https://*.batuda.localhost` wildcard — add it there.
 
 ## CLI commands reference
 
-| Command                    | Purpose                                    |
-| -------------------------- | ------------------------------------------ |
-| `pnpm cli doctor`          | Full environment health check              |
-| `pnpm cli setup`           | Copy `.env` files from examples            |
-| `pnpm cli seed`            | Truncate + insert seed data (idempotent)   |
-| `pnpm cli seed --preset X` | `minimal` or `full` preset (default: full) |
-| `pnpm cli data [entity]`   | List seeded mock data (overview or rows)   |
-| `pnpm cli db migrate`      | Run pending migrations                     |
-| `pnpm cli db reset`        | Truncate + migrate + seed (clean slate)    |
-| `pnpm cli services up`     | Start Docker Postgres + MinIO              |
-| `pnpm cli services down`   | Stop Docker services                       |
-| `pnpm cli services status` | Show Docker container status               |
-| `pnpm cli:tui`             | Interactive TUI (same commands)            |
+| Command                    | Purpose                                        |
+| -------------------------- | ---------------------------------------------- |
+| `pnpm cli doctor`          | Full environment health check                  |
+| `pnpm cli setup`           | Copy `.env` files from examples                |
+| `pnpm cli seed`            | Truncate + insert seed data (idempotent)       |
+| `pnpm cli seed --preset X` | `minimal` or `full` preset (default: full)     |
+| `pnpm cli data [entity]`   | List seeded mock data (overview or rows)       |
+| `pnpm cli db migrate`      | Run pending migrations                         |
+| `pnpm cli db reset`        | Truncate + migrate + seed (clean slate)        |
+| `pnpm cli services up`     | Start Docker Postgres + MinIO                  |
+| `pnpm cli services down`   | Stop Docker services                           |
+| `pnpm cli services status` | Show Docker container status                   |
+| `pnpm cli worktree up`     | Provision this worktree's DB + bucket (+ seed) |
+| `pnpm cli worktree ls`     | List all worktrees + DB / URL / provisioned    |
+| `pnpm cli worktree doctor` | Diagnose the current worktree's data layer     |
+| `pnpm cli worktree down`   | Drop this worktree's DB + bucket               |
+| `pnpm cli worktree prune`  | Reap orphaned worktree DBs + buckets           |
+| `pnpm cli:tui`             | Interactive TUI (same commands)                |
 
 ## Browser debugging
 
