@@ -33,10 +33,19 @@
 set -euo pipefail
 
 # Teammate-local config (gitignored), if present — values come from the vault.
+# It lives only in the main checkout, never in a linked worktree, so when run
+# from a worktree fall back to the main checkout's copy via the shared git dir.
 # set -a auto-exports everything the file defines, so the aws CLI below sees it.
-[ -f .env.pr-media ] && {
+env_file=""
+if [ -f .env.pr-media ]; then
+	env_file=.env.pr-media
+elif main_git="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" && [ -n "$main_git" ]; then
+	candidate="$(dirname "$main_git")/.env.pr-media"
+	[ -f "$candidate" ] && env_file="$candidate"
+fi
+[ -n "$env_file" ] && {
 	set -a
-	. ./.env.pr-media
+	. "$env_file"
 	set +a
 }
 
