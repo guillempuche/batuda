@@ -41,6 +41,14 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # The TanStack Start Vite plugin (run by Build) is the single source of
+      # truth for apps/internal/src/routeTree.gen.ts. If Build regenerated a
+      # different tree, the committed one is stale — fail so it gets committed.
+      - name: Verify route tree is up to date
+        run: |
+          git diff --exit-code -- apps/internal/src/routeTree.gen.ts \
+            || { echo "::error::routeTree.gen.ts is stale — run 'pnpm build' and commit the regenerated file."; exit 1; }
+
       - name: Type check
         run: pnpm check-types
 
