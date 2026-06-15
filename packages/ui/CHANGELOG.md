@@ -17,7 +17,7 @@ All notable changes to this project will be documented in this file.
 
 ### Bug Fixes
 
-* meet WCAG AA contrast and add ARIA to the mailbox connect form ([1326007](https://github.com/guillempuche/batuda/commit/1326007c3d3178d882dde6c4dd6d29d8b2896771)), closes [#b05220](https://github.com/guillempuche/batuda/issues/b05220) [#95400f](https://github.com/guillempuche/batuda/issues/95400f)
+* meet WCAG AA contrast and add ARIA to the mailbox connect form ([1326007](https://github.com/guillempuche/batuda/commit/1326007c3d3178d882dde6c4dd6d29d8b2896771))
 * **ui:** match select popup width to its trigger ([839ae9b](https://github.com/guillempuche/batuda/commit/839ae9b803cdb896ce5d2ad896e75dbabd0d66d5))
 
 ## 2026-05-17 (ui-v2026.5.17)
