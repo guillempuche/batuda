@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-06-15 (server-v2026.6.15-1)
+
+### CI/CD
+
+* **deploy:** keep lefthook disabled across prepare-script changes ([55433e7](https://github.com/guillempuche/batuda/commit/55433e7d207ba3d4f764b8499eef9c800bb9cc14))
+
 ## 2026-06-15 (server-v2026.6.15)
 
 ### Features
