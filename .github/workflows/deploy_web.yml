@@ -53,7 +53,7 @@ jobs:
       # managed out-of-band (CF dashboard / API), so a deploy never touches
       # the production domain binding.
       - name: Deploy
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: apps/internal
