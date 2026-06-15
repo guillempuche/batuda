@@ -136,6 +136,7 @@ If ALL changed files match `ai` patterns → use `ai` type. If mixed with non-AI
 4. **AI-only changes**: When changes are exclusively AI-related (see AI Scope), always use `ai` type
 5. **No mechanical cleanup or implementation narration**: Don't mention consequences obvious from the primary change (removed unused imports, unwrapped single-child fragments, updated indentation), and don't describe how the diff achieves the change ("added a helper that maps X to Y" when the diff is the helper). Focus on intent / why, not mechanism
 6. **No tautology**: The subject must not repeat the type as a verb. The type already conveys the action — e.g., `fix: fix the login` → `fix: resolve login failure`, `refactor: refactor auth` → `refactor: simplify auth flow`
+7. **No bare `#` tokens in the body**: The changelog generator reads `#<token>` as a GitHub issue reference and renders it as a "closes" link, so a hex color or fragment becomes a broken issue link in the release notes — write `b05220 → 95400f`, not `#b05220 → #95400f`
 
 ## Body sizing
 
