@@ -13,8 +13,9 @@ RUN corepack enable && corepack prepare pnpm@11.1.1 --activate
 COPY ./package.json ./pnpm-lock.yaml ./pnpm-workspace.yaml ./tsconfig.base.json ./
 COPY ./turbo.json ./
 
-# Disable lefthook in Docker build (no git available)
-RUN sed -i 's/"prepare": "lefthook install"/"prepare": ""/' package.json
+# Disable lefthook in the Docker build (no git here); match any prepare value so a
+# later prepare-script change can't silently slip past and break the build.
+RUN sed -i 's/"prepare": "[^"]*"/"prepare": ""/' package.json
 
 # Copy the full workspace so the turbo filter has the complete graph.
 # @batuda/mail-worker transitively depends on auth, calendar, controllers,
