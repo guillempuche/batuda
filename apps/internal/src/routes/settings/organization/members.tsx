@@ -143,11 +143,14 @@ function MembersPage() {
 			const result = await authClient.organization.inviteMember({
 				email: trimmed,
 				role: inviteRole,
+				// Let people re-invite someone who hasn't accepted yet: reuse
+				// the open invitation (the link already in their inbox keeps
+				// working) instead of erroring on the second try.
+				resend: true,
 			})
 			if (result.error) {
-				// BA returns INVITER_NOT_FOUND, USER_ALREADY_INVITED_TO_THIS_
-				// ORGANIZATION, USER_IS_ALREADY_A_MEMBER_OF_THIS_ORGANIZATION,
-				// etc. The message is human-readable enough to surface inline.
+				// Remaining errors (already a member, no inviter, etc.) come
+				// back with a human-readable message, so we show it as-is.
 				setInviteError(
 					result.error.message ??
 						t`Could not send the invitation. Please try again.`,
