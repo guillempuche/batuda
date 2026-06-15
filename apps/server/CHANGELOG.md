@@ -3,6 +3,30 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-06-15 (server-v2026.6.15)
+
+### Features
+
+* confine API keys to the MCP path ([f1110d6](https://github.com/guillempuche/batuda/commit/f1110d6aadfc423480d90f1cc4dda680b72d9d90))
+* **server:** derive a worktree's auth + app origins from PORTLESS_URL ([0d2845f](https://github.com/guillempuche/batuda/commit/0d2845f719ce07f888147e0980cfbcaff2ed1fe4))
+* support app-specific passwords for 2FA mailboxes ([cfb7237](https://github.com/guillempuche/batuda/commit/cfb7237d6b27d96d349246016f737b33cbc0aed9))
+* **ui:** adopt Utopia geometric ladder for fluid space tokens ([bdbfaa5](https://github.com/guillempuche/batuda/commit/bdbfaa5f76ef639896b47135e48f66109ab680b3))
+
+### Bug Fixes
+
+* meet WCAG AA contrast and add ARIA to the mailbox connect form ([1326007](https://github.com/guillempuche/batuda/commit/1326007c3d3178d882dde6c4dd6d29d8b2896771)), closes [#b05220](https://github.com/guillempuche/batuda/issues/b05220) [#95400f](https://github.com/guillempuche/batuda/issues/95400f)
+* **ui:** add exports to publishConfig for npm distribution ([3c5cedb](https://github.com/guillempuche/batuda/commit/3c5cedb2b3d1564b549acaac8b17b6f9d51d6e37))
+* **ui:** match select popup width to its trigger ([839ae9b](https://github.com/guillempuche/batuda/commit/839ae9b803cdb896ce5d2ad896e75dbabd0d66d5))
+
+### Documentation
+
+* **ui:** remove broken issue links from the v2026.6.14 changelog ([bfb0584](https://github.com/guillempuche/batuda/commit/bfb0584f06ffbf6f3e61cb15e8f6d4bd7ac7d16e))
+
+### CI/CD
+
+* **release:** ui v2026.6.14 ([ac6b83d](https://github.com/guillempuche/batuda/commit/ac6b83dd4f18e4b177adfef69a05f79d92bf5262))
+* **release:** ui v2026.6.14-1 ([7918100](https://github.com/guillempuche/batuda/commit/7918100c016129cf171d61d0e1587c39c2947f7b))
+
 ## 2026-06-10 (server-v2026.6.10)
 
 ### Features
