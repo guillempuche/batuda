@@ -84,6 +84,24 @@ describe('MCP tool annotation coverage', () => {
 						).toBe(true)
 					})
 
+					it('should expose an object-typed inputSchema', () => {
+						// GIVEN a tool registered in the toolkit
+						// WHEN generating its MCP inputSchema (the same call the
+						//      server makes when answering tools/list)
+						// THEN the JSON Schema root is type "object" — clients hide
+						//      every tool in the list when one breaks this rule, and
+						//      an empty Schema.Struct({}) produces a typeless root, so
+						//      no-arg tools must leave parameters off entirely
+						// [tools/${toolkitName} — inputSchema root-type invariant]
+						const inputSchema = Tool.getJsonSchema(tool) as {
+							type?: unknown
+						}
+						expect(
+							inputSchema.type,
+							`${toolName} inputSchema root must be type:"object"; drop empty Schema.Struct({}) (omit parameters instead)`,
+						).toBe('object')
+					})
+
 					if (READ_ONLY_NAME.test(toolName)) {
 						it('should declare Tool.Readonly = true', () => {
 							// GIVEN a tool whose name matches a read-only convention
