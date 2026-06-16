@@ -224,7 +224,6 @@ const CreateInternalBlock = Tool.make('create_internal_block', {
 const SyncEventTypes = Tool.make('sync_event_types', {
 	description:
 		'Pull the latest event-type list from the calendar provider (title, duration_minutes, locations) and update local rows by (provider, provider_event_type_id). Safe to call on every boot + on demand; title/duration changes show up without a redeploy.',
-	parameters: Schema.Struct({}),
 	success: Schema.Struct({ synced: Schema.Number }),
 })
 	.annotate(Tool.Title, 'Sync Event Types')

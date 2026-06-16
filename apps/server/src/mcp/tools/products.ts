@@ -9,7 +9,6 @@ const REQUEST_DEPENDENCIES = [CurrentOrg]
 const ListProducts = Tool.make('list_products', {
 	description:
 		'List products in the organization. Returns id, slug, name, type, status, default_price, price_type, target_industries, metadata, created_at.',
-	parameters: Schema.Struct({}),
 	success: Schema.Array(Schema.Unknown),
 	dependencies: REQUEST_DEPENDENCIES,
 })

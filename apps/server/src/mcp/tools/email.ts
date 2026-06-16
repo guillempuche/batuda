@@ -312,7 +312,6 @@ const ListEmailInboxes = Tool.make('list_email_inboxes', {
 const ListEmailProviderPresets = Tool.make('list_email_provider_presets', {
 	description:
 		'List the built-in mailbox presets (Infomaniak, Fastmail, iCloud Mail, Yahoo Mail, Gmail Workspace, Microsoft 365, Proton Bridge, Generic IMAP). Each entry pre-fills IMAP and SMTP host/port/security, plus appPasswordUrl (where the user generates an app-specific password for a 2FA account) and passwordAuthSupported (false for Gmail and Microsoft 365, which no longer allow password sign-in and need OAuth). create_email_inbox callers only need to add credentials. Static — safe to cache.',
-	parameters: Schema.Struct({}),
 	success: Schema.Array(Schema.Unknown),
 })
 	.annotate(Tool.Title, 'List Email Provider Presets')
@@ -323,7 +322,6 @@ const ListEmailProviderPresets = Tool.make('list_email_provider_presets', {
 const GetEmailInboxStatus = Tool.make('get_email_inbox_status', {
 	description:
 		'Return the calling member’s primary inbox in the active organization, if any. Use before send_email/create_email_draft to confirm the user has a default inbox set; if hasDefault=false the UI should prompt them to connect a mailbox first.',
-	parameters: Schema.Struct({}),
 	success: Schema.Struct({
 		hasDefault: Schema.Boolean,
 		primary: Schema.NullOr(
