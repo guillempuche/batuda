@@ -132,8 +132,14 @@ test.describe('compose and send via the mail catcher', () => {
 			// GIVEN Alice opens compose from Pep Casals' company so SuppressionGuard
 			// has a companyId to query against
 			await page.goto('/companies/cal-pep-fonda', { waitUntil: 'networkidle' })
+			// Wait for hydration so the click lands on the wired action, and give
+			// the compose dialog room to mount on a cold dev bundle (mirrors the
+			// attachment spec's rationale).
+			await expect(page.getByTestId('action-compose-email')).toBeEnabled()
 			await page.getByTestId('action-compose-email').click()
-			await expect(page.getByTestId('compose-form')).toBeVisible()
+			await expect(page.getByTestId('compose-form')).toBeVisible({
+				timeout: 15_000,
+			})
 
 			// WHEN Alice puts the suppressed contact in `to`
 			await page.getByTestId('compose-to').fill(SUPPRESSED_EMAIL)

@@ -4,19 +4,20 @@ import { expect, test } from '@playwright/test'
 
 import {
 	clearCatcher,
+	getMessage,
 	getRawMessage,
 	waitForMessage,
 } from './helpers/mail-catcher'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
-// Rich-compose path. The Tiptap editor inside the compose form is
-// driven through its bubble menu — selecting text exposes Bold,
-// Bullet List, and Link buttons. We trigger formatting via keyboard
-// shortcuts (Cmd+B / Cmd+Shift+8 / Cmd+K-style flow) because the
-// upstream `@react-email/editor` bubble menu DOM is not stable enough
-// for testid-style hooks. The wire-side assertion is what proves the
-// formatting survived: the raw RFC822 must contain `<strong>`, `<ul>`,
-// `<li>`, and an `<a href` tag.
+// Rich-compose path. The Tiptap editor's bubble-menu controls carry no
+// stable testids, so formatting is applied the way a user would: the
+// "- " Markdown rule starts a bullet list, and a double-click word
+// selection plus the stock Cmd+B keymap bolds a word. The proof is
+// wire-side: the decoded text/html part the recipient receives, where the
+// brand renderer emits inline-styled spans — a font-weight span for bold,
+// and <ul>/<li> whose rows wrap their text in <span> — not <strong> or
+// bare list tags.
 //
 // Selectors verified against:
 //   apps/internal/src/components/emails/compose-form.tsx
@@ -47,7 +48,7 @@ test.describe('compose with rich formatting', () => {
 	})
 
 	test.describe('when the user composes with bold + a bullet list', () => {
-		test('should send an HTML body that carries <strong>, <ul>, and <li> on the wire', async ({
+		test('should send an HTML body where bold and a bullet list survive on the wire', async ({
 			page,
 		}) => {
 			const testId = `rich-${Date.now()}`
@@ -62,24 +63,36 @@ test.describe('compose with rich formatting', () => {
 
 			const editor = editorOf(page)
 			await editor.click()
-			// Bold word via Cmd+B (Tiptap's stock keymap)
+			// Build the body: a first line, then a bullet list. The "- "
+			// Markdown input rule fires on typed text and is reliable headless.
+			await editor.pressSequentially('Hello world')
+			await page.keyboard.press('Enter')
+			await editor.pressSequentially('- one')
+			await page.keyboard.press('Enter')
+			await editor.pressSequentially('two')
+			// Bold "Hello" by selecting the word — double-click is a reliable
+			// browser primitive — then toggling Tiptap's stock Cmd+B. Toggling
+			// bold on an empty caret (stored marks) does not survive the typing
+			// that follows in headless Chromium.
+			await editor
+				.locator('p')
+				.filter({ hasText: 'Hello world' })
+				.first()
+				.dblclick({ position: { x: 8, y: 10 } })
 			await page.keyboard.press('Meta+b')
-			await editor.pressSequentially('Hello')
-			await page.keyboard.press('Meta+b')
-			await editor.pressSequentially(' world\n')
-			// Bullet list via the standard Tiptap Markdown shortcut
-			await editor.pressSequentially('- one\n')
-			await editor.pressSequentially('two\n')
 
 			await expect(page.getByTestId('compose-send')).toBeEnabled()
 			await page.getByTestId('compose-send').click()
 
-			// THEN the raw RFC822 carries the formatting on the html part
+			// THEN the decoded html part carries the formatting. The brand
+			// renderer emits inline-styled spans, not <strong> or bare <ul>:
+			// bold is a font-weight span, list rows wrap their text in <span>.
 			const summary = await waitForMessage(recipient)
-			const raw = getRawMessage(summary)
-			expect(raw).toMatch(/<strong>Hello<\/strong>/i)
-			expect(raw).toMatch(/<ul>/i)
-			expect(raw).toMatch(/<li>/i)
+			const html = (await getMessage(summary)).Html
+			expect(html).toMatch(/<span style="font-weight:\s*700">Hello<\/span>/i)
+			expect(html).toMatch(/<ul[^>]*>/i)
+			expect(html).toMatch(/<li[^>]*><span>one<\/span>/i)
+			expect(html).toMatch(/<li[^>]*><span>two<\/span>/i)
 		})
 	})
 
