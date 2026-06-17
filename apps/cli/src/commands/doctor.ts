@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { request } from 'node:https'
 import { resolve } from 'node:path'
 
-import { Effect } from 'effect'
+import { Config, Effect } from 'effect'
 import type { ChildProcessSpawner } from 'effect/unstable/process'
 import { SqlClient } from 'effect/unstable/sql'
 
@@ -190,22 +190,21 @@ const emailCredentialKeyCheck: Check = {
 	}),
 }
 
-const mailpitCheck: Check = {
-	name: 'Mailpit',
-	run: Effect.tryPromise({
-		try: () =>
-			fetch('http://localhost:8025/api/v1/info', {
-				signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
-			}),
-		catch: () => null,
+const mailCatcherCheck: Check = {
+	name: 'Mail catcher',
+	run: Effect.gen(function* () {
+		const url = yield* Config.string('MAIL_CATCHER_HTTP_URL')
+		const res = yield* Effect.tryPromise({
+			try: () =>
+				fetch(`${url}/api/service/readiness`, {
+					signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
+				}),
+			catch: () => null,
+		})
+		return res.ok
+			? ok('listening on :8025 REST (SMTP :1025, IMAP :1143)')
+			: warn('stopped → run `pnpm cli services up`')
 	}).pipe(
-		Effect.map(res =>
-			res?.ok
-				? ok(
-						'listening on :8025 (SMTP :1025; no IMAP — seed uses direct INSERT)',
-					)
-				: warn('stopped → run `pnpm cli services up`'),
-		),
 		Effect.catch(() =>
 			Effect.succeed(warn('stopped → run `pnpm cli services up`')),
 		),
@@ -291,7 +290,7 @@ const localChecks: Check[] = [
 	dbConnectionCheck,
 	migrationCheck,
 	storageCheck,
-	mailpitCheck,
+	mailCatcherCheck,
 	urlCheck(
 		'Server',
 		'https://api.batuda.localhost/health',

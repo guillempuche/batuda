@@ -1,6 +1,6 @@
 import { resolve } from 'node:path'
 
-import { Console, Effect, Layer, Schedule } from 'effect'
+import { Config, Console, Effect, Layer, Schedule } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { PgLive } from '../db'
@@ -39,18 +39,42 @@ const checkMigrations = Effect.gen(function* () {
 	Effect.catchCause(() => Effect.void),
 )
 
+/**
+ * GreenMail boots a JVM, so its listeners come up a few seconds after the
+ * container starts. Poll the REST readiness endpoint (which answers 503 until
+ * ready) up to 15 times, 1 s apart, so `services up` only returns once the
+ * catcher can accept mail; give up silently like checkMigrations.
+ */
+const checkMailCatcher = Effect.gen(function* () {
+	const url = yield* Config.string('MAIL_CATCHER_HTTP_URL')
+	const probe = Effect.gen(function* () {
+		const res = yield* Effect.tryPromise(() =>
+			fetch(`${url}/api/service/readiness`, {
+				signal: AbortSignal.timeout(2000),
+			}),
+		)
+		if (!res.ok) {
+			return yield* Effect.fail(new Error('mail catcher not ready'))
+		}
+	})
+	yield* probe.pipe(
+		Effect.retry(Schedule.spaced('1 second').pipe(Schedule.take(15))),
+	)
+}).pipe(Effect.catchCause(() => Effect.void))
+
 const printServiceUrls = Console.log(
 	[
 		'',
 		'Service URLs:',
 		'  Postgres:        postgresql://batuda:batuda@localhost:5433/batuda',
 		'  MinIO console:   http://localhost:9001  (batuda / batuda-secret)',
-		'  mailpit web UI:  http://localhost:8025',
+		'  Mail catcher:    http://localhost:8025  (GreenMail REST API)',
 	].join('\n'),
 )
 
 export const servicesUp = compose('up', '-d').pipe(
 	Effect.andThen(checkMigrations),
+	Effect.andThen(checkMailCatcher),
 	Effect.andThen(printServiceUrls),
 )
 

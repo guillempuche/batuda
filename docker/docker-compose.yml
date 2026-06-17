@@ -52,19 +52,21 @@ services:
       echo 'bucket ready';
       "
 
-  # Local SMTP+IMAP catcher for dev. Real outbound goes here so the seeded
-  # inbox can round-trip without ever leaving the laptop. mailpit's HTTP
-  # API (:8025) is what the e2e specs poll to assert delivery.
-  mailpit:
-    container_name: batuda-mailpit
-    image: axllent/mailpit:v1.20
+  # Local SMTP + IMAP catcher for dev. GreenMail speaks real IMAP, so the
+  # seeded inbox round-trips both ways — outbound send and inbound ingest — on
+  # the laptop; its REST API (host :8025) is what the e2e specs poll/purge.
+  # The image listens on GreenMail's default ports (mail +3000, REST 8080);
+  # the host mapping exposes them as 1025/1143/8025, which the seed expects.
+  # auth.disabled lets any login through and auto-creates a mailbox on delivery.
+  mail-catcher:
+    container_name: batuda-mail-catcher
+    image: greenmail/standalone:2.1.9
     ports:
-      - "1025:1025" # SMTP
-      - "1143:1143" # IMAP
-      - "8025:8025" # Web UI + HTTP API
+      - "1025:3025" # SMTP
+      - "1143:3143" # IMAP
+      - "8025:8080" # REST API
     environment:
-      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
-      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      GREENMAIL_OPTS: "-Dgreenmail.setup.test.all -Dgreenmail.hostname=0.0.0.0 -Dgreenmail.auth.disabled"
 
 volumes:
   pgdata:

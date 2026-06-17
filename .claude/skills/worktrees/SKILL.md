@@ -11,7 +11,7 @@ stack per worktree.
 
 ## The model
 
-One **shared** Docker stack (the `batuda` compose project: Postgres, MinIO, Mailpit) backs
+One **shared** Docker stack (the `batuda` compose project: Postgres, MinIO, GreenMail) backs
 everything — **3 containers total, regardless of how many worktrees you have**. A worktree
 is a *logical tenant* inside it:
 

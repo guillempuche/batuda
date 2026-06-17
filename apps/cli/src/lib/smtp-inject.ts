@@ -1,12 +1,12 @@
 import { Effect } from 'effect'
 import nodemailer from 'nodemailer'
 
-// Shared SMTP-into-Mailpit injector. The seed uses it to populate demo
-// inboxes via the real ingest path; the `email inject` CLI command uses
-// it for ad-hoc dev pokes; the e2e helper re-exports it for the
-// IMAP-roundtrip spec. One transport per call — connection cost is
-// negligible against Mailpit on localhost and removes any cross-process
-// state we'd otherwise have to manage.
+// Shared SMTP injector into the dev mail catcher. The seed uses it to populate
+// demo inboxes via the real ingest path; the `email inject` CLI command uses
+// it for ad-hoc dev pokes; the e2e helper re-exports it for the IMAP-roundtrip
+// spec. One transport per call — connection cost is negligible against the
+// catcher on localhost and removes any cross-process state we'd otherwise have
+// to manage.
 
 export interface InjectAttachment {
 	readonly filename: string
@@ -35,9 +35,10 @@ export interface InjectResult {
 const DEFAULT_SMTP_HOST = 'localhost'
 const DEFAULT_SMTP_PORT = 1025
 
-// Mailpit accepts unauthenticated relay on the dev port. `secure: false`
-// + `requireTLS: false` matches the inbox row's `smtpSecurity='plain'`
-// so the demo round-trip mirrors what the worker does at runtime.
+// The dev mail catcher accepts unauthenticated relay on the dev port.
+// `secure: false` + `requireTLS: false` matches the inbox row's
+// `smtpSecurity='plain'` so the demo round-trip mirrors what the worker does
+// at runtime.
 export const injectViaSmtp = (
 	msg: InjectedMessage,
 	options: {

@@ -89,7 +89,7 @@ const branchName = execSilent('git', 'rev-parse', '--abbrev-ref', 'HEAD')
 const slugForCurrentWorktree = branchName.pipe(Effect.map(slugForBranch))
 
 // Only the worktree's own database and bucket differ from main; the shared
-// endpoints (Postgres host/port, MinIO, Mailpit) are inherited as-is.
+// endpoints (Postgres host/port, MinIO, GreenMail) are inherited as-is.
 const envOverrides = (slug: string): Record<string, string> => ({
 	DATABASE_URL: `postgresql://batuda:batuda@localhost:5433/${dbName(slug)}`,
 	STORAGE_BUCKET: bucketName(slug),
@@ -355,7 +355,7 @@ export const worktreeUp = Effect.gen(function* () {
 			'✓ Worktree ready inside the shared stack',
 			`  Database:  ${dbName(slug)}  (postgresql://batuda:batuda@localhost:5433/${dbName(slug)})`,
 			`  Bucket:    ${bucketName(slug)}  (MinIO http://localhost:9001, batuda / batuda-secret)`,
-			'  Mailpit:   http://localhost:8025  (shared across worktrees)',
+			'  Mail catcher: http://localhost:8025  (GreenMail, shared across worktrees)',
 			`  Run \`pnpm dev\` → portless serves https://${branchHost(branch)}`,
 			'',
 		].join('\n'),
