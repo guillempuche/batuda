@@ -16,8 +16,11 @@ export interface CatcherMessage {
 }
 
 // Decoded view for the few assertions that need the parsed body/attachments.
+// `Html` is the decoded text/html part — assert formatting against this, not
+// the raw RFC822, whose quoted-printable soft-wraps split long style tags.
 interface ParsedMessage {
 	readonly Text: string
+	readonly Html: string
 	readonly Attachments: ReadonlyArray<{
 		readonly FileName: string
 		readonly ContentType: string
@@ -104,6 +107,7 @@ export async function getMessage(
 	const parsed = await simpleParser(message.mimeMessage)
 	return {
 		Text: parsed.text ?? '',
+		Html: parsed.html || '',
 		Attachments: parsed.attachments.map(a => ({
 			FileName: a.filename ?? '',
 			ContentType: a.contentType,
