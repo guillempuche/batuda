@@ -1,25 +1,16 @@
-// Live IMAP-roundtrip integration test. SKIPPED locally: Mailpit
-// (the dev compose mail catcher) only listens on 1025 (SMTP) and
-// 8025 (HTTP); the 1143 port is mapped in docker-compose.yml but
-// nothing in the container speaks IMAP. ImapFlow.connect() to
-// :1143 fails with "Unexpected close", so every assertion in this
-// file would fail. Re-enable after swapping Mailpit for an IMAP-
-// capable catcher (greenmail, dovecot, …) or running against a
-// real provider in CI.
+// Live IMAP-roundtrip integration test. Gated behind MAIL_CATCHER_LIVE: it
+// needs the running dev stack (GreenMail IMAP on :1143, Postgres, MinIO),
+// none of which exist in the unit-test CI job, so it stays inert there and
+// runs only when explicitly enabled:
+//   pnpm cli services up && pnpm cli db reset && pnpm cli seed
+//   MAIL_CATCHER_LIVE=1 pnpm --filter @batuda/mail-worker vitest run src/imap-roundtrip
 //
-// Original intent (drives Mailpit on
-// localhost:1025 (SMTP) / 1143 (IMAP) directly: SMTP-inject a
-// message → connect ImapFlow as the seeded admin@taller.cat →
-// open INBOX → call `fetchAndIngestNewerThan` against the same
-// SqlClient layer the worker uses → assert that an
-// `email_messages` row with the test subject lands. The IMAP +
-// SMTP connections are real wire interactions; the only thing
-// we mock is the `Effect.never` outer loop in
+// What it does: SMTP-inject a message → connect ImapFlow as the seeded
+// admin@taller.cat → open INBOX → call `fetchAndIngestNewerThan` against the
+// same SqlClient layer the worker uses → assert that an `email_messages` row
+// with the test subject lands. The IMAP + SMTP connections are real wire
+// interactions; the only thing we mock is the `Effect.never` outer loop in
 // `runInboxSession` so the test terminates.
-//
-// Prereq: `pnpm cli services up` (Mailpit + Postgres + MinIO);
-// `pnpm cli db reset && pnpm cli seed` so the admin@taller.cat
-// inbox + the taller org exist with a working password.
 
 process.env['DATABASE_URL'] ??=
 	'postgresql://batuda:batuda@localhost:5433/batuda'
@@ -96,257 +87,260 @@ const smtpInject = async (msg: {
 	}
 }
 
-const clearMailpit = async () => {
-	const res = await fetch('http://localhost:8025/api/v1/messages', {
-		method: 'DELETE',
+const clearCatcher = async () => {
+	const res = await fetch('http://localhost:8025/api/mail/purge', {
+		method: 'POST',
 	})
 	if (!res.ok) {
-		throw new Error(`mailpit clear failed: ${res.status}`)
+		throw new Error(`mail catcher purge failed: ${res.status}`)
 	}
 }
 
-describe.skip('IMAP ingest roundtrip (needs IMAP-capable catcher)', () => {
-	let pool: pg.Pool
-	let orgId: string
-	let inboxId: string
+describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
+	'IMAP ingest roundtrip (live; set MAIL_CATCHER_LIVE)',
+	() => {
+		let pool: pg.Pool
+		let orgId: string
+		let inboxId: string
 
-	beforeAll(async () => {
-		pool = new pg.Pool({ connectionString: DATABASE_URL, max: 4 })
-		const orgs = await pool.query<{ id: string }>(
-			`SELECT id FROM organization WHERE slug = 'taller' LIMIT 1`,
-		)
-		const oid = orgs.rows[0]?.id
-		if (!oid) {
-			throw new Error(
-				"taller org missing — run 'pnpm cli db reset && pnpm cli seed' first",
+		beforeAll(async () => {
+			pool = new pg.Pool({ connectionString: DATABASE_URL, max: 4 })
+			const orgs = await pool.query<{ id: string }>(
+				`SELECT id FROM organization WHERE slug = 'taller' LIMIT 1`,
 			)
-		}
-		orgId = oid
+			const oid = orgs.rows[0]?.id
+			if (!oid) {
+				throw new Error(
+					"taller org missing — run 'pnpm cli db reset && pnpm cli seed' first",
+				)
+			}
+			orgId = oid
 
-		const inboxes = await pool.query<{ id: string }>(
-			`SELECT id FROM inboxes WHERE email = 'admin@taller.cat' LIMIT 1`,
-		)
-		const iid = inboxes.rows[0]?.id
-		if (!iid) {
-			throw new Error(
-				"admin@taller.cat inbox missing — run 'pnpm cli db reset && pnpm cli seed' first",
+			const inboxes = await pool.query<{ id: string }>(
+				`SELECT id FROM inboxes WHERE email = 'admin@taller.cat' LIMIT 1`,
 			)
-		}
-		inboxId = iid
-	})
-
-	afterAll(async () => {
-		await pool.end()
-	})
-
-	const openImap = async () => {
-		const client = new ImapFlow({
-			host: 'localhost',
-			port: 1143,
-			secure: false,
-			auth: { user: 'admin@taller.cat', pass: 'demo-imap-password' },
-			logger: false,
+			const iid = inboxes.rows[0]?.id
+			if (!iid) {
+				throw new Error(
+					"admin@taller.cat inbox missing — run 'pnpm cli db reset && pnpm cli seed' first",
+				)
+			}
+			inboxId = iid
 		})
-		await client.connect()
-		return client
-	}
 
-	describe('when an SMTP-injected message arrives and the worker runs one fetch tick', () => {
-		it('should INSERT an inbound email_messages row keyed by the IMAP UID', async () => {
-			const subject = `roundtrip ${Date.now()}`
+		afterAll(async () => {
+			await pool.end()
+		})
 
-			// Clean Mailpit so the only fetched UID is ours.
-			await clearMailpit()
-			await pool.query(
-				`DELETE FROM email_messages WHERE subject = $1 AND organization_id = $2`,
-				[subject, orgId],
-			)
-
-			// GIVEN an SMTP-injected message addressed to the seeded inbox
-			await smtpInject({
-				to: 'admin@taller.cat',
-				from: 'roundtrip-sender@example.com',
-				subject,
-				text: 'hello from the roundtrip test',
+		const openImap = async () => {
+			const client = new ImapFlow({
+				host: 'localhost',
+				port: 1143,
+				secure: false,
+				auth: { user: 'admin@taller.cat', pass: 'demo-imap-password' },
+				logger: false,
 			})
+			await client.connect()
+			return client
+		}
 
-			// AND a fresh ImapFlow client connected to Mailpit
-			const client = await openImap()
-			try {
-				const opened = await client.mailboxOpen('INBOX')
-				const uidvalidity = Number(opened.uidValidity)
+		describe('when an SMTP-injected message arrives and the worker runs one fetch tick', () => {
+			it('should INSERT an inbound email_messages row keyed by the IMAP UID', async () => {
+				const subject = `roundtrip ${Date.now()}`
 
-				// WHEN we run one fetch tick from sinceUid=0 against our SqlClient
-				await runWith(
-					fetchAndIngestNewerThan({
-						client,
-						organizationId: orgId,
-						inboxId,
-						folder: 'INBOX',
-						uidvalidity,
-						sinceUid: 0,
-					}).pipe(
-						Effect.provide(RawMessageStorage.layer),
-						Effect.provide(WorkerEnvVars.layer),
-						Effect.provide(ParticipantMatcher.layer),
-						Effect.provide(PgLive),
-					),
+				// Clean the catcher so the only fetched UID is ours.
+				await clearCatcher()
+				await pool.query(
+					`DELETE FROM email_messages WHERE subject = $1 AND organization_id = $2`,
+					[subject, orgId],
 				)
 
-				// THEN an inbound email_messages row exists with our subject
-				const rows = await pool.query<{
-					id: string
-					direction: string
-					imap_uid: number
-					imap_uidvalidity: number
-				}>(
-					`SELECT id, direction, imap_uid, imap_uidvalidity
+				// GIVEN an SMTP-injected message addressed to the seeded inbox
+				await smtpInject({
+					to: 'admin@taller.cat',
+					from: 'roundtrip-sender@example.com',
+					subject,
+					text: 'hello from the roundtrip test',
+				})
+
+				// AND a fresh ImapFlow client connected to the catcher
+				const client = await openImap()
+				try {
+					const opened = await client.mailboxOpen('INBOX')
+					const uidvalidity = Number(opened.uidValidity)
+
+					// WHEN we run one fetch tick from sinceUid=0 against our SqlClient
+					await runWith(
+						fetchAndIngestNewerThan({
+							client,
+							organizationId: orgId,
+							inboxId,
+							folder: 'INBOX',
+							uidvalidity,
+							sinceUid: 0,
+						}).pipe(
+							Effect.provide(RawMessageStorage.layer),
+							Effect.provide(WorkerEnvVars.layer),
+							Effect.provide(ParticipantMatcher.layer),
+							Effect.provide(PgLive),
+						),
+					)
+
+					// THEN an inbound email_messages row exists with our subject
+					const rows = await pool.query<{
+						id: string
+						direction: string
+						imap_uid: number
+						imap_uidvalidity: number
+					}>(
+						`SELECT id, direction, imap_uid, imap_uidvalidity
 					 FROM email_messages
 					 WHERE subject = $1 AND organization_id = $2`,
+						[subject, orgId],
+					)
+					expect(rows.rows.length).toBe(1)
+					expect(rows.rows[0]!.direction).toBe('inbound')
+					expect(rows.rows[0]!.imap_uidvalidity).toBe(uidvalidity)
+					expect(rows.rows[0]!.imap_uid).toBeGreaterThan(0)
+				} finally {
+					await client.logout().catch(() => undefined)
+				}
+			})
+		})
+
+		describe('when the same fetch tick runs a second time', () => {
+			it('should not duplicate the row (idempotency on the partial unique index)', async () => {
+				const subject = `dedupe ${Date.now()}`
+				await clearCatcher()
+				await pool.query(
+					`DELETE FROM email_messages WHERE subject = $1 AND organization_id = $2`,
 					[subject, orgId],
 				)
-				expect(rows.rows.length).toBe(1)
-				expect(rows.rows[0]!.direction).toBe('inbound')
-				expect(rows.rows[0]!.imap_uidvalidity).toBe(uidvalidity)
-				expect(rows.rows[0]!.imap_uid).toBeGreaterThan(0)
-			} finally {
-				await client.logout().catch(() => undefined)
-			}
-		})
-	})
+				await smtpInject({
+					to: 'admin@taller.cat',
+					from: 'dedupe-sender@example.com',
+					subject,
+					text: 'dedupe test',
+				})
 
-	describe('when the same fetch tick runs a second time', () => {
-		it('should not duplicate the row (idempotency on the partial unique index)', async () => {
-			const subject = `dedupe ${Date.now()}`
-			await clearMailpit()
-			await pool.query(
-				`DELETE FROM email_messages WHERE subject = $1 AND organization_id = $2`,
-				[subject, orgId],
-			)
-			await smtpInject({
-				to: 'admin@taller.cat',
-				from: 'dedupe-sender@example.com',
-				subject,
-				text: 'dedupe test',
-			})
+				const client = await openImap()
+				try {
+					const opened = await client.mailboxOpen('INBOX')
+					const uidvalidity = Number(opened.uidValidity)
 
-			const client = await openImap()
-			try {
-				const opened = await client.mailboxOpen('INBOX')
-				const uidvalidity = Number(opened.uidValidity)
+					// First tick — INSERT.
+					await runWith(
+						fetchAndIngestNewerThan({
+							client,
+							organizationId: orgId,
+							inboxId,
+							folder: 'INBOX',
+							uidvalidity,
+							sinceUid: 0,
+						}).pipe(
+							Effect.provide(RawMessageStorage.layer),
+							Effect.provide(WorkerEnvVars.layer),
+							Effect.provide(ParticipantMatcher.layer),
+							Effect.provide(PgLive),
+						),
+					)
 
-				// First tick — INSERT.
-				await runWith(
-					fetchAndIngestNewerThan({
-						client,
-						organizationId: orgId,
-						inboxId,
-						folder: 'INBOX',
-						uidvalidity,
-						sinceUid: 0,
-					}).pipe(
-						Effect.provide(RawMessageStorage.layer),
-						Effect.provide(WorkerEnvVars.layer),
-						Effect.provide(ParticipantMatcher.layer),
-						Effect.provide(PgLive),
-					),
-				)
+					// Second tick — same UID, must DO NOTHING.
+					await runWith(
+						fetchAndIngestNewerThan({
+							client,
+							organizationId: orgId,
+							inboxId,
+							folder: 'INBOX',
+							uidvalidity,
+							sinceUid: 0,
+						}).pipe(
+							Effect.provide(RawMessageStorage.layer),
+							Effect.provide(WorkerEnvVars.layer),
+							Effect.provide(ParticipantMatcher.layer),
+							Effect.provide(PgLive),
+						),
+					)
 
-				// Second tick — same UID, must DO NOTHING.
-				await runWith(
-					fetchAndIngestNewerThan({
-						client,
-						organizationId: orgId,
-						inboxId,
-						folder: 'INBOX',
-						uidvalidity,
-						sinceUid: 0,
-					}).pipe(
-						Effect.provide(RawMessageStorage.layer),
-						Effect.provide(WorkerEnvVars.layer),
-						Effect.provide(ParticipantMatcher.layer),
-						Effect.provide(PgLive),
-					),
-				)
-
-				const rows = await pool.query<{ count: string }>(
-					`SELECT count(*)::text AS count
+					const rows = await pool.query<{ count: string }>(
+						`SELECT count(*)::text AS count
 					 FROM email_messages
 					 WHERE subject = $1 AND organization_id = $2`,
-					[subject, orgId],
-				)
-				expect(rows.rows[0]!.count).toBe('1')
-			} finally {
-				await client.logout().catch(() => undefined)
-			}
-		})
-	})
-
-	describe('when the message is EXPUNGEd from IMAP', () => {
-		it('should set deleted_at on the row when markExpunged runs', async () => {
-			const subject = `expunge ${Date.now()}`
-			await clearMailpit()
-			await pool.query(
-				`DELETE FROM email_messages WHERE subject = $1 AND organization_id = $2`,
-				[subject, orgId],
-			)
-			await smtpInject({
-				to: 'admin@taller.cat',
-				from: 'expunge-sender@example.com',
-				subject,
-				text: 'expunge test',
+						[subject, orgId],
+					)
+					expect(rows.rows[0]!.count).toBe('1')
+				} finally {
+					await client.logout().catch(() => undefined)
+				}
 			})
-
-			const client = await openImap()
-			try {
-				const opened = await client.mailboxOpen('INBOX')
-				const uidvalidity = Number(opened.uidValidity)
-
-				// First, ingest the message so a row exists to soft-delete.
-				await runWith(
-					fetchAndIngestNewerThan({
-						client,
-						organizationId: orgId,
-						inboxId,
-						folder: 'INBOX',
-						uidvalidity,
-						sinceUid: 0,
-					}).pipe(
-						Effect.provide(RawMessageStorage.layer),
-						Effect.provide(WorkerEnvVars.layer),
-						Effect.provide(ParticipantMatcher.layer),
-						Effect.provide(PgLive),
-					),
-				)
-
-				// Resolve the UID we just ingested.
-				const inserted = await pool.query<{ imap_uid: number }>(
-					`SELECT imap_uid FROM email_messages
-					 WHERE subject = $1 AND organization_id = $2`,
-					[subject, orgId],
-				)
-				const uid = inserted.rows[0]?.imap_uid
-				expect(uid, 'ingested row must have a UID').toBeGreaterThan(0)
-
-				// WHEN markExpunged fires for that UID
-				await runWith(
-					markExpunged({
-						inboxId,
-						imapUidvalidity: uidvalidity,
-						imapUid: uid!,
-					}).pipe(Effect.provide(PgLive)),
-				)
-
-				// THEN the row's deleted_at is non-NULL
-				const after = await pool.query<{ deleted_at: Date | null }>(
-					`SELECT deleted_at FROM email_messages
-					 WHERE subject = $1 AND organization_id = $2`,
-					[subject, orgId],
-				)
-				expect(after.rows[0]?.deleted_at).not.toBeNull()
-			} finally {
-				await client.logout().catch(() => undefined)
-			}
 		})
-	})
-})
+
+		describe('when the message is EXPUNGEd from IMAP', () => {
+			it('should set deleted_at on the row when markExpunged runs', async () => {
+				const subject = `expunge ${Date.now()}`
+				await clearCatcher()
+				await pool.query(
+					`DELETE FROM email_messages WHERE subject = $1 AND organization_id = $2`,
+					[subject, orgId],
+				)
+				await smtpInject({
+					to: 'admin@taller.cat',
+					from: 'expunge-sender@example.com',
+					subject,
+					text: 'expunge test',
+				})
+
+				const client = await openImap()
+				try {
+					const opened = await client.mailboxOpen('INBOX')
+					const uidvalidity = Number(opened.uidValidity)
+
+					// First, ingest the message so a row exists to soft-delete.
+					await runWith(
+						fetchAndIngestNewerThan({
+							client,
+							organizationId: orgId,
+							inboxId,
+							folder: 'INBOX',
+							uidvalidity,
+							sinceUid: 0,
+						}).pipe(
+							Effect.provide(RawMessageStorage.layer),
+							Effect.provide(WorkerEnvVars.layer),
+							Effect.provide(ParticipantMatcher.layer),
+							Effect.provide(PgLive),
+						),
+					)
+
+					// Resolve the UID we just ingested.
+					const inserted = await pool.query<{ imap_uid: number }>(
+						`SELECT imap_uid FROM email_messages
+					 WHERE subject = $1 AND organization_id = $2`,
+						[subject, orgId],
+					)
+					const uid = inserted.rows[0]?.imap_uid
+					expect(uid, 'ingested row must have a UID').toBeGreaterThan(0)
+
+					// WHEN markExpunged fires for that UID
+					await runWith(
+						markExpunged({
+							inboxId,
+							imapUidvalidity: uidvalidity,
+							imapUid: uid!,
+						}).pipe(Effect.provide(PgLive)),
+					)
+
+					// THEN the row's deleted_at is non-NULL
+					const after = await pool.query<{ deleted_at: Date | null }>(
+						`SELECT deleted_at FROM email_messages
+					 WHERE subject = $1 AND organization_id = $2`,
+						[subject, orgId],
+					)
+					expect(after.rows[0]?.deleted_at).not.toBeNull()
+				} finally {
+					await client.logout().catch(() => undefined)
+				}
+			})
+		})
+	},
+)

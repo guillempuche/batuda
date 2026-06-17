@@ -78,6 +78,7 @@ const syncOneFolderTick = (args: {
 	readonly folder: string
 	readonly backfillDays: number
 	readonly expungedQueue: Array<{ uid: number; uidValidity: number }>
+	readonly waitForChange: Effect.Effect<void>
 }) =>
 	Effect.gen(function* () {
 		const opened = yield* Effect.tryPromise({
@@ -95,7 +96,8 @@ const syncOneFolderTick = (args: {
 		// Drain any EXPUNGE events the listener accumulated. We do this
 		// before the new fetch so a delete + re-add (rare) can't race.
 		while (args.expungedQueue.length > 0) {
-			const e = args.expungedQueue.shift()!
+			const e = args.expungedQueue.shift()
+			if (e === undefined) break
 			yield* markExpunged({
 				inboxId: args.inbox.id,
 				imapUidvalidity: e.uidValidity,
@@ -136,14 +138,16 @@ const syncOneFolderTick = (args: {
 			})
 		}
 
-		// IDLE: resolves on EXISTS / EXPUNGE from server, on the
-		// constructor-set maxIdleTime, or when client.idle() is called
-		// again. Either way the outer loop will re-enter syncOneFolderTick
-		// and pick up the delta.
-		yield* Effect.tryPromise({
-			try: () => args.client.idle(),
-			catch: err => new Error(`idle failed on ${args.folder}: ${String(err)}`),
+		// Hold IMAP IDLE so the server can push `exists`/`expunge` mid-IDLE.
+		// imapflow surfaces those as events rather than resolving idle(), so we
+		// start it fire-and-forget — the promise settles when the next tick's
+		// mailboxOpen breaks IDLE — and park until an event wakes us, or the
+		// poll timeout elapses. The poll is the reliable re-sync floor; the
+		// event is a low-latency optimization where the server delivers it.
+		yield* Effect.sync(() => {
+			void args.client.idle().catch(() => {})
 		})
+		yield* args.waitForChange
 	})
 
 // One inbox = one IMAP connection per tracked folder. We keep things
@@ -183,11 +187,40 @@ export const runInboxSession = (claimed: ClaimedInbox) =>
 		// Bounded growth: even pathological providers won't expunge faster
 		// than we can drain on the round-robin (sub-second between ticks).
 		const expungedQueue: Array<{ uid: number; uidValidity: number }> = []
+
+		// New mail surfaces as an `exists` event and removals as `expunge`
+		// while imapflow auto-IDLEs the selected mailbox. Both wake the folder
+		// loop (parked in `waitForChange`) so it re-syncs promptly. The
+		// listeners run outside any Effect scope, so they poke a plain callback
+		// the parked Effect installs.
+		let onChange: (() => void) | null = null
+		const signalChange = () => onChange?.()
+		client.on('exists', signalChange)
 		client.on('expunge', (data: unknown) => {
 			const d = data as { uid?: number; uidValidity?: number }
 			if (typeof d?.uid === 'number' && typeof d?.uidValidity === 'number') {
 				expungedQueue.push({ uid: d.uid, uidValidity: d.uidValidity })
 			}
+			signalChange()
+		})
+
+		// Park until the server reports a change, or the poll interval elapses
+		// as a safety net for servers whose IDLE push is unreliable. Reuses
+		// EMAIL_WORKER_IDLE_TIMEOUT_SEC as the longest gap between re-syncs.
+		const waitForChange = Effect.callback<void>(resume => {
+			let settled = false
+			const done = () => {
+				if (settled) return
+				settled = true
+				onChange = null
+				resume(Effect.void)
+			}
+			onChange = done
+			const timer = setTimeout(done, env.EMAIL_WORKER_IDLE_TIMEOUT_SEC * 1000)
+			return Effect.sync(() => {
+				clearTimeout(timer)
+				if (onChange === done) onChange = null
+			})
 		})
 
 		const connectResult = yield* Effect.result(
@@ -212,18 +245,36 @@ export const runInboxSession = (claimed: ClaimedInbox) =>
 
 		yield* markHealthy(claimed.id)
 
-		// Round-robin every tracked folder. The idle inside each tick
-		// gives up to ~29 min of low-power waiting per folder before we
-		// rotate to the next.
+		// Per inbox we sync each tracked folder in a round-robin, parking on
+		// server change-events (or a poll timeout) between passes.
+		//
+		// Only sync folders the server actually exposes. Providers vary —
+		// the dev catcher (GreenMail) has just INBOX, Gmail names Sent
+		// "[Gmail]/Sent Mail" — so opening a hardcoded "Sent" would error
+		// every tick. INBOX is guaranteed by the IMAP spec; bail if even
+		// that is missing so the retry backoff handles it, not a hot loop.
+		const available = yield* Effect.tryPromise({
+			try: () => client.list(),
+			catch: err => new Error(`list mailboxes failed: ${String(err)}`),
+		})
+		const availablePaths = new Set(available.map(box => box.path))
+		const folders = TRACKED_FOLDERS.filter(f => availablePaths.has(f))
+		if (folders.length === 0) {
+			return yield* Effect.fail(
+				new Error(`no tracked folders available for inbox=${claimed.id}`),
+			)
+		}
+
 		yield* Effect.gen(function* () {
 			while (true) {
-				for (const folder of TRACKED_FOLDERS) {
+				for (const folder of folders) {
 					yield* syncOneFolderTick({
 						client,
 						inbox: claimed,
 						folder,
 						backfillDays: env.EMAIL_WORKER_BACKFILL_DAYS,
 						expungedQueue,
+						waitForChange,
 					}).pipe(
 						Effect.catchCause(cause =>
 							Effect.logWarning(
