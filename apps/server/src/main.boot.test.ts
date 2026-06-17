@@ -9,7 +9,7 @@
  * Not wired into the default `pnpm test`. Run it explicitly with
  * `pnpm --filter @batuda/server test:integration`. Requires the local
  * dev fixtures to be running (`pnpm cli services up` brings up Postgres
- * + MinIO + Mailpit).
+ * + MinIO + GreenMail).
  */
 
 import { type ChildProcess, spawn } from 'node:child_process'
