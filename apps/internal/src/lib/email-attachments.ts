@@ -54,7 +54,19 @@ export function downloadUrlFor(
 	messageId: string,
 	attachmentId: string,
 ): string {
-	return `${apiBaseUrl()}/v1/email/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}/download`
+	// This URL is baked into an <a href> during SSR, so it must be one the
+	// browser can reach with its session cookie. In dev that means relative:
+	// apiBaseUrl()'s dev-SSR value is the 127.0.0.1 loopback, which would ship
+	// in the HTML and 401 (the browser can't send the Secure cookie there); a
+	// relative path resolves against the page origin instead, whose /v1/* the
+	// Vite dev proxy forwards to the API. In prod apiBaseUrl() is the real API
+	// origin, so the link goes straight there cross-origin like every other
+	// call — no extra hop through the SSR Worker.
+	const base =
+		typeof import.meta !== 'undefined' && import.meta.env?.DEV
+			? ''
+			: apiBaseUrl()
+	return `${base}/v1/email/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}/download`
 }
 
 export function formatBytes(bytes: number): string {
