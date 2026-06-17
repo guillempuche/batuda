@@ -2,12 +2,16 @@ import { execSync } from 'node:child_process'
 
 import { expect, test } from '@playwright/test'
 
-import { clearMailpit, getMessage, waitForMessage } from './helpers/mailpit'
+import {
+	clearCatcher,
+	getMessage,
+	waitForMessage,
+} from './helpers/mail-catcher'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // Sends an email with a small PDF attachment via the compose UI and
-// asserts mailpit's parsed metadata carries the file. Slice 6.4
-// deferred this spec until the dev stack had a real SMTP catcher.
+// asserts the mail catcher's parsed metadata carries the file. The seeded
+// inbox points at the dev SMTP catcher, so the round-trip works.
 //
 // Selectors verified against:
 //   apps/internal/src/components/emails/compose-form.tsx (compose-{form,to,
@@ -61,11 +65,10 @@ const fillBody = async (
 
 test.describe('compose with attachment', () => {
 	test.beforeEach(async ({ page }) => {
-		await clearMailpit()
-		// See send-email.test.ts beforeEach for the rationale: the
-		// dev-stack inbox-health probe trips the seeded mailpit inbox
-		// to `connect_failed` on its 15-min cadence, so we re-assert
-		// `connected` per test to avoid GrantUnavailable on sendDraft.
+		await clearCatcher()
+		// See send-email.test.ts beforeEach for the rationale: force the
+		// seeded inbox `connected` so a cold-catcher probe tick can't trip
+		// GrantUnavailable on sendDraft.
 		psql(
 			`UPDATE inboxes SET grant_status='connected' WHERE email='admin@taller.cat'`,
 		)
@@ -74,7 +77,7 @@ test.describe('compose with attachment', () => {
 	})
 
 	test.describe('when the user attaches a small PDF', () => {
-		test("should include the attachment in mailpit's message metadata", async ({
+		test("should include the attachment in the catcher's message metadata", async ({
 			page,
 		}) => {
 			const testId = `e2e-attach-${Date.now()}`
@@ -115,11 +118,11 @@ test.describe('compose with attachment', () => {
 			})
 			await page.getByTestId('compose-send').click()
 
-			// THEN mailpit receives the message with the attachment metadata
-			const summary = await waitForMessage(`to:${recipient}`)
-			const detail = await getMessage(summary.ID)
+			// THEN the catcher receives the message with the attachment metadata
+			const summary = await waitForMessage(recipient)
+			const detail = await getMessage(summary)
 			const att = detail.Attachments.find(a => a.FileName === filename)
-			expect(att, 'attachment present on mailpit message').toBeDefined()
+			expect(att, 'attachment present on catcher message').toBeDefined()
 			expect(att?.ContentType).toBe('application/pdf')
 			expect(att?.Size).toBeGreaterThan(0)
 		})
@@ -157,9 +160,9 @@ test.describe('compose with attachment', () => {
 			})
 			await page.getByTestId('compose-send').click()
 
-			// Wait for the send to land in mailpit before reading the staging
-			// row — the post-send purge runs after the SMTP ack.
-			await waitForMessage(`to:${recipient}`)
+			// Wait for the send to land in the catcher before reading the
+			// staging row — the post-send purge runs after the SMTP ack.
+			await waitForMessage(recipient)
 
 			// THEN the staging row is gone — markSentAndCleanup deletes it
 			// immediately after the provider acks (see

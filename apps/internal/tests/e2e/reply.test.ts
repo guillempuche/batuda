@@ -2,17 +2,19 @@ import { execSync } from 'node:child_process'
 
 import { expect, test } from '@playwright/test'
 
-import { clearMailpit, getRawMessage, waitForMessage } from './helpers/mailpit'
+import {
+	clearCatcher,
+	getRawMessage,
+	waitForMessage,
+} from './helpers/mail-catcher'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
-// Reply path. The seed direct-INSERTs M1+M2 (Pep × Alice) so the
-// thread renders the moment `pnpm cli seed` finishes — no IMAP
-// dependency (Mailpit doesn't speak IMAP). The reply submit goes
-// through the same
-// compose form the rest of the suite drives, so we lean on its
-// existing testids and assert on the wire bytes Mailpit captures —
-// the SMTP socket is the single authoritative source for "did the
-// reply land with the right In-Reply-To/References".
+// Reply path. The seed direct-INSERTs M1+M2 (Pep × Alice) so the thread
+// renders the moment `pnpm cli seed` finishes — no inbound IMAP sync needed.
+// The reply submit goes through the same compose form the rest of the suite
+// drives, so we lean on its existing testids and assert on the wire bytes the
+// mail catcher captures — the SMTP socket is the single authoritative source
+// for "did the reply land with the right In-Reply-To/References".
 //
 // Selectors verified against:
 //   apps/internal/src/routes/emails/$threadId.tsx
@@ -44,11 +46,12 @@ const fillBody = async (
 
 test.describe('reply on a seeded thread', () => {
 	test.beforeEach(async ({ page }) => {
-		// GIVEN Mailpit is empty and Alice's session is active on Taller.
-		await clearMailpit()
-		// AND the seeded inbox is reachable (the inbox-health probe trips
-		// `connect_failed` on a 15-min cadence and would block sendDraft;
-		// reset to `connected` so the spec asserts the reply path itself).
+		// GIVEN the catcher is empty and Alice's session is active on Taller.
+		await clearCatcher()
+		// AND the seeded inbox's grant is forced `connected` — the inbox-health
+		// probe marks it connected against the reachable catcher, but its first
+		// tick can lose the race to a cold catcher; this keeps sendDraft (which
+		// blocks on GrantUnavailable) asserting the reply path itself.
 		psql(
 			`UPDATE inboxes SET grant_status='connected' WHERE email='admin@taller.cat'`,
 		)
@@ -79,12 +82,12 @@ test.describe('reply on a seeded thread', () => {
 			await expect(page.getByTestId('compose-send')).toBeEnabled()
 			await page.getByTestId('compose-send').click()
 
-			// THEN Mailpit captures the reply, and the raw RFC822 carries
+			// THEN the catcher captures the reply, and the raw RFC822 carries
 			// In-Reply-To + References pointing at the parent's Message-Id.
-			const summary = await waitForMessage('to:pep@calpepfonda.cat', {
+			const summary = await waitForMessage('pep@calpepfonda.cat', {
 				timeoutMs: 10_000,
 			})
-			const raw = await getRawMessage(summary.ID)
+			const raw = getRawMessage(summary)
 			expect(raw).toMatch(/in-reply-to:\s*<[^>]+>/i)
 			expect(raw).toMatch(/references:\s*<[^>]+>/i)
 		})
@@ -114,11 +117,11 @@ test.describe('reply on a seeded thread', () => {
 			await expect(page.getByTestId('compose-send')).toBeEnabled()
 			await page.getByTestId('compose-send').click()
 
-			// THEN Mailpit captures the reply with the same threading headers
-			const summary = await waitForMessage('to:pep@calpepfonda.cat', {
+			// THEN the catcher captures the reply with the same threading headers
+			const summary = await waitForMessage('pep@calpepfonda.cat', {
 				timeoutMs: 10_000,
 			})
-			const raw = await getRawMessage(summary.ID)
+			const raw = getRawMessage(summary)
 			expect(raw).toMatch(/in-reply-to:\s*<[^>]+>/i)
 		})
 	})

@@ -3,11 +3,11 @@ import { execSync } from 'node:child_process'
 import { expect, test } from '@playwright/test'
 
 import {
-	clearMailpit,
+	clearCatcher,
 	getMessage,
 	getRawMessage,
 	waitForMessage,
-} from './helpers/mailpit'
+} from './helpers/mail-catcher'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // Sends an email after configuring a default footer on the seeded inbox
@@ -15,9 +15,9 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 // this spec until a real catcher could observe what nodemailer wrote to
 // the SMTP socket.
 //
-// Reads the raw RFC822 from mailpit's HTTP API rather than the storage
-// object — both are fed by the same `transport.send(creds, message)`
-// call in apps/server/src/services/email.ts:491; mailpit captures the
+// Reads the raw RFC822 from the mail catcher's REST API rather than the
+// storage object — both are fed by the same `transport.send(creds, message)`
+// call in apps/server/src/services/email.ts; the catcher captures the
 // SMTP-receive side, storage captures the nodemailer-emit side. Equally
 // authoritative for the "did the footer make it on the wire" question.
 
@@ -87,10 +87,9 @@ test.describe('compose with footer', () => {
 	})
 
 	test.beforeEach(async ({ page }) => {
-		await clearMailpit()
-		// See send-email.test.ts for the rationale: re-assert
-		// `connected` so the inbox-health probe doesn't trip
-		// GrantUnavailable on sendDraft.
+		await clearCatcher()
+		// See send-email.test.ts for the rationale: force `connected` so a
+		// cold-catcher probe tick can't trip GrantUnavailable on sendDraft.
 		psql(
 			`UPDATE inboxes SET grant_status='connected' WHERE email='admin@taller.cat'`,
 		)
@@ -115,14 +114,14 @@ test.describe('compose with footer', () => {
 			await expect(page.getByTestId('compose-send')).toBeEnabled()
 			await page.getByTestId('compose-send').click()
 
-			// THEN mailpit's parsed text body and the raw wire bytes both
+			// THEN the catcher's parsed text body and the raw wire bytes both
 			// contain the footer marker — proves the server appended the
 			// footer before serializing.
-			const summary = await waitForMessage(`to:${recipient}`)
-			const detail = await getMessage(summary.ID)
+			const summary = await waitForMessage(recipient)
+			const detail = await getMessage(summary)
 			expect(detail.Text).toContain(footerMarker)
 
-			const raw = await getRawMessage(summary.ID)
+			const raw = getRawMessage(summary)
 			expect(raw).toContain(footerMarker)
 		})
 	})

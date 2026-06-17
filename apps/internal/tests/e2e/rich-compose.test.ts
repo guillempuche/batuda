@@ -2,7 +2,11 @@ import { execSync } from 'node:child_process'
 
 import { expect, test } from '@playwright/test'
 
-import { clearMailpit, getRawMessage, waitForMessage } from './helpers/mailpit'
+import {
+	clearCatcher,
+	getRawMessage,
+	waitForMessage,
+} from './helpers/mail-catcher'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // Rich-compose path. The Tiptap editor inside the compose form is
@@ -33,8 +37,8 @@ const editorOf = (page: import('@playwright/test').Page) =>
 
 test.describe('compose with rich formatting', () => {
 	test.beforeEach(async ({ page }) => {
-		// GIVEN Mailpit is empty and the seeded inbox is reachable.
-		await clearMailpit()
+		// GIVEN the catcher is empty and the seeded inbox is reachable.
+		await clearCatcher()
 		psql(
 			`UPDATE inboxes SET grant_status='connected' WHERE email='admin@taller.cat'`,
 		)
@@ -71,8 +75,8 @@ test.describe('compose with rich formatting', () => {
 			await page.getByTestId('compose-send').click()
 
 			// THEN the raw RFC822 carries the formatting on the html part
-			const summary = await waitForMessage(`to:${recipient}`)
-			const raw = await getRawMessage(summary.ID)
+			const summary = await waitForMessage(recipient)
+			const raw = getRawMessage(summary)
 			expect(raw).toMatch(/<strong>Hello<\/strong>/i)
 			expect(raw).toMatch(/<ul>/i)
 			expect(raw).toMatch(/<li>/i)
@@ -98,8 +102,8 @@ test.describe('compose with rich formatting', () => {
 
 			await page.getByTestId('compose-send').click()
 
-			const summary = await waitForMessage(`to:${recipient}`)
-			const raw = await getRawMessage(summary.ID)
+			const summary = await waitForMessage(recipient)
+			const raw = getRawMessage(summary)
 			// A text/plain part is the baseline for any nodemailer-emitted
 			// message; if this regresses, the rich path probably stopped
 			// producing the alt content too.
