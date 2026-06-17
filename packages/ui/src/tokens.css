@@ -124,6 +124,20 @@
 	--typescale-body-small-line: 1rem;
 	--typescale-body-small-tracking: 0.025rem;
 
+	/* Prose — long-form reading (marketing/content). Fluid sizes + generous
+	 * leading, distinct from the compact fixed Body scale used in dense UI. */
+	--typescale-prose-large-size: clamp(1rem, 0.96rem + 0.21vw, 1.125rem);
+	--typescale-prose-large-line: clamp(1.5rem, 1.44rem + 0.3vw, 1.75rem);
+	--typescale-prose-large-tracking: 0rem;
+
+	--typescale-prose-medium-size: clamp(0.9375rem, 0.9rem + 0.19vw, 1rem);
+	--typescale-prose-medium-line: clamp(1.4rem, 1.34rem + 0.28vw, 1.55rem);
+	--typescale-prose-medium-tracking: 0rem;
+
+	--typescale-prose-small-size: clamp(0.875rem, 0.85rem + 0.13vw, 0.9375rem);
+	--typescale-prose-small-line: clamp(1.3rem, 1.26rem + 0.2vw, 1.4rem);
+	--typescale-prose-small-tracking: 0rem;
+
 	/* Label */
 	--typescale-label-large-size: 0.875rem;
 	--typescale-label-large-line: 1.25rem;
