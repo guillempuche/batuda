@@ -246,14 +246,18 @@ export class MailTransport extends ServiceMap.Service<MailTransport>()(
 						try: async () => {
 							// Most providers expose a "Sent" mailbox; Gmail uses
 							// "[Gmail]/Sent Mail" — imapflow's special-use lookup
-							// resolves either via the SPECIAL-USE attribute.
+							// resolves either via the SPECIAL-USE attribute. Dev mail
+							// catchers (GreenMail) and providers without a Sent folder
+							// resolve neither; skip the APPEND (the message already went
+							// out over SMTP) instead of erroring.
 							const box =
 								(await imap
 									.getMailboxLock('Sent', { readOnly: false })
 									.catch(() => null)) ??
-								(await imap.getMailboxLock('[Gmail]/Sent Mail', {
-									readOnly: false,
-								}))
+								(await imap
+									.getMailboxLock('[Gmail]/Sent Mail', { readOnly: false })
+									.catch(() => null))
+							if (!box) return
 							try {
 								await imap.append('Sent', Buffer.from(raw), ['\\Seen'])
 							} finally {
