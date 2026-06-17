@@ -3,16 +3,15 @@ import { execSync } from 'node:child_process'
 import { expect, test } from '@playwright/test'
 
 import {
-	clearMailpit,
+	clearCatcher,
 	expectNoMessage,
 	waitForMessage,
-} from './helpers/mailpit'
+} from './helpers/mail-catcher'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
-// Sends a brand-new email via the compose UI and asserts it lands on
-// mailpit's HTTP API. Slice 3.7 deferred this spec until the dev stack
-// had a real SMTP/IMAP catcher; the seeded inbox now points at
-// localhost:1025/1143 with security='plain', so the round-trip works.
+// Sends a brand-new email via the compose UI and asserts it lands on the
+// mail catcher's REST API. The seeded inbox points at localhost:1025/1143
+// with security='plain', so the round-trip works.
 //
 // Selectors verified against:
 //   apps/internal/src/components/emails/compose-form.tsx (compose-{form,to,
@@ -46,18 +45,16 @@ const fillBody = async (
 	await editor.pressSequentially(text)
 }
 
-test.describe('compose and send via mailpit', () => {
+test.describe('compose and send via the mail catcher', () => {
 	test.beforeEach(async ({ page }) => {
-		// GIVEN mailpit is empty for this spec and Alice's session is on Taller
-		await clearMailpit()
-		// AND the seeded inbox's grant_status is reset to `connected` —
-		// the dev-stack inbox-health probe (services/inbox-health-probe.ts)
-		// runs on a 15-min cadence and trips mailpit's plain-auth IMAP
-		// probe to `connect_failed`, which would block sendDraft with
-		// GrantUnavailable. Tests seed the inbox with a known
-		// reachable mailpit and don't exercise the probe path, so a
-		// straight UPDATE keeps the send pipeline asserting only what
-		// it owns.
+		// GIVEN the catcher is empty for this spec and Alice's session is on Taller
+		await clearCatcher()
+		// AND the seeded inbox's grant_status is forced to `connected`. The
+		// inbox-health probe (services/inbox-health-probe.ts) marks the inbox
+		// connected against the reachable catcher, but it runs on a 15-min
+		// cadence and its first tick can lose the race to a cold-booting
+		// catcher; this UPDATE keeps the send pipeline (which blocks on
+		// GrantUnavailable) asserting only what it owns.
 		psql(
 			`UPDATE inboxes SET grant_status='connected' WHERE email='admin@taller.cat'`,
 		)
@@ -66,11 +63,11 @@ test.describe('compose and send via mailpit', () => {
 	})
 
 	test.describe('when an authenticated user sends a brand-new email', () => {
-		test("should write the message to mailpit's inbox (poll until present)", async ({
+		test("should write the message to the catcher's inbox (poll until present)", async ({
 			page,
 		}) => {
-			// Unique recipient + subject keeps mailpit search deterministic
-			// even if a previous run left stragglers (clearMailpit covers it,
+			// Unique recipient + subject keeps the catcher lookup deterministic
+			// even if a previous run left stragglers (clearCatcher covers it,
 			// but a fresh address belt-and-suspenders the assertion).
 			const testId = `e2e-${Date.now()}`
 			const recipient = `${testId}@catcher.local`
@@ -86,8 +83,8 @@ test.describe('compose and send via mailpit', () => {
 			await expect(page.getByTestId('compose-send')).toBeEnabled()
 			await page.getByTestId('compose-send').click()
 
-			// THEN mailpit receives the message within the polling window
-			const msg = await waitForMessage(`to:${recipient}`)
+			// THEN the mail catcher receives the message within the polling window
+			const msg = await waitForMessage(recipient)
 			expect(msg.Subject).toBe(subject)
 		})
 
@@ -105,9 +102,9 @@ test.describe('compose and send via mailpit', () => {
 			await fillBody(page, `Body ${testId}`)
 			await page.getByTestId('compose-send').click()
 
-			// Wait for mailpit to confirm the round-trip before checking the
+			// Wait for the catcher to confirm the round-trip before checking the
 			// UI — eliminates the "did the click do nothing?" failure mode.
-			await waitForMessage(`to:${recipient}`)
+			await waitForMessage(recipient)
 			await expect(page.getByTestId('compose-window')).toBeHidden({
 				timeout: 5_000,
 			})
@@ -129,7 +126,9 @@ test.describe('compose and send via mailpit', () => {
 			)
 		})
 
-		test('should disable Send and never reach mailpit', async ({ page }) => {
+		test('should disable Send and never reach the catcher', async ({
+			page,
+		}) => {
 			// GIVEN Alice opens compose from Pep Casals' company so SuppressionGuard
 			// has a companyId to query against
 			await page.goto('/companies/cal-pep-fonda', { waitUntil: 'networkidle' })
@@ -141,9 +140,9 @@ test.describe('compose and send via mailpit', () => {
 			await page.getByTestId('compose-subject').fill('blocked send')
 			await fillBody(page, 'should not arrive')
 
-			// THEN the Send button stays disabled, no message reaches mailpit
+			// THEN the Send button stays disabled, no message reaches the catcher
 			await expect(page.getByTestId('compose-send')).toBeDisabled()
-			await expectNoMessage(`to:${SUPPRESSED_EMAIL}`)
+			await expectNoMessage(SUPPRESSED_EMAIL)
 		})
 	})
 })

@@ -1,13 +1,16 @@
-// Tiny SMTP-into-Mailpit injector for e2e specs that need to drive the
-// inbound side of the mail-worker. Mirrors `apps/cli/src/lib/smtp-inject.ts`
-// — the CLI helper sits behind an Effect API the seed uses, while this
-// helper is a thin Promise wrapper specs can `await`. Both target the
-// same dev compose service (Mailpit on localhost:1025).
+// Tiny SMTP injector for e2e specs that need to drive the inbound side of the
+// mail-worker. Mirrors `apps/cli/src/lib/smtp-inject.ts` — the CLI helper sits
+// behind an Effect API the seed uses, while this helper is a thin Promise
+// wrapper specs can `await`. Both target the same dev mail catcher on
+// localhost:1025.
 
 import nodemailer from 'nodemailer'
 
-const MAILPIT_SMTP_HOST = process.env['MAILPIT_SMTP_HOST'] ?? 'localhost'
-const MAILPIT_SMTP_PORT = Number(process.env['MAILPIT_SMTP_PORT'] ?? '1025')
+const MAIL_CATCHER_SMTP_HOST =
+	process.env['MAIL_CATCHER_SMTP_HOST'] ?? 'localhost'
+const MAIL_CATCHER_SMTP_PORT = Number(
+	process.env['MAIL_CATCHER_SMTP_PORT'] ?? '1025',
+)
 
 export interface InjectAttachment {
 	readonly filename: string
@@ -31,8 +34,8 @@ export async function injectViaSmtp(
 	msg: InjectArgs,
 ): Promise<{ messageId: string }> {
 	const transport = nodemailer.createTransport({
-		host: MAILPIT_SMTP_HOST,
-		port: MAILPIT_SMTP_PORT,
+		host: MAIL_CATCHER_SMTP_HOST,
+		port: MAIL_CATCHER_SMTP_PORT,
 		secure: false,
 		requireTLS: false,
 		auth: undefined,
