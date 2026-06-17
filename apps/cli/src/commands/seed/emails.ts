@@ -7,7 +7,8 @@ import type { SqlClient } from 'effect/unstable/sql'
 import type { SeededInbox } from './inboxes'
 import { ONE_PIXEL_PNG, TINY_PDF } from './shared'
 
-// Direct INSERTs because Mailpit doesn't speak IMAP, so the worker can't ingest fixtures.
+// Direct INSERTs keep the seed fast and deterministic — no SMTP round-trip or
+// worker IMAP tick needed to materialize fixtures.
 
 interface SeedAttachment {
 	readonly filename: string
@@ -97,8 +98,7 @@ export const seedDemoEmails = (
 					storageKey: string
 				}> = []
 				if (args.attachments) {
-					for (let i = 0; i < args.attachments.length; i++) {
-						const a = args.attachments[i]!
+					for (const [i, a] of args.attachments.entries()) {
 						const storageKey = `messages/${args.inbox.orgId}/${args.inbox.id}/seed/${slug}/attachment-${i}.bin`
 						yield* Effect.tryPromise({
 							try: () =>

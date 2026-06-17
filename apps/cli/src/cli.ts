@@ -192,7 +192,7 @@ const dbMigrateCommand = Command.make('migrate', {}, () => dbMigrate).pipe(
 const dbResetCommand = Command.make('reset', {}, () => withDb(dbReset)).pipe(
 	Command.withShortDescription('Drop schema + re-run migrations'),
 	Command.withDescription(
-		'Drop the public schema, re-run migrations, and clear Mailpit (no seed; chain `seed` for sample data)',
+		'Drop the public schema, re-run migrations, and purge the mail catcher (no seed; chain `seed` for sample data)',
 	),
 )
 
@@ -527,7 +527,7 @@ const servicesStatusCommand = Command.make(
 
 const servicesCommand = Command.make('services').pipe(
 	Command.withDescription(
-		'Manage the one shared Docker stack (Postgres, MinIO, Mailpit) all worktrees use',
+		'Manage the one shared Docker stack (Postgres, MinIO, GreenMail) all worktrees use',
 	),
 	Command.withSubcommands([
 		servicesUpCommand,
@@ -687,11 +687,11 @@ const emailInjectCommand = Command.make(
 			Flag.optional,
 		),
 		host: Flag.string('smtp-host').pipe(
-			Flag.withDescription('Mailpit SMTP host'),
+			Flag.withDescription('Mail catcher SMTP host'),
 			Flag.withDefault('localhost'),
 		),
 		port: Flag.integer('smtp-port').pipe(
-			Flag.withDescription('Mailpit SMTP port'),
+			Flag.withDescription('Mail catcher SMTP port'),
 			Flag.withDefault(1025),
 		),
 	},
@@ -707,14 +707,16 @@ const emailInjectCommand = Command.make(
 			port,
 		}),
 ).pipe(
-	Command.withShortDescription('SMTP a canned message into Mailpit'),
+	Command.withShortDescription('SMTP a canned message into the mail catcher'),
 	Command.withDescription(
-		'SMTP a canned message into Mailpit (visible in the Mailpit UI; outbound assertions only — Mailpit has no IMAP, so no DB ingest happens)',
+		'SMTP a canned message into the mail catcher (visible via its REST API; if addressed to a seeded inbox with the worker running, it is also ingested over IMAP)',
 	),
 )
 
 const emailCommand = Command.make('email').pipe(
-	Command.withDescription('Email: inject canned messages into Mailpit'),
+	Command.withDescription(
+		'Email: inject canned messages into the mail catcher',
+	),
 	Command.withSubcommands([emailInjectCommand]),
 )
 
