@@ -13,3724 +13,3727 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/routes/emails/$threadId.tsx:435
-#: src/routes/emails/$threadId.tsx:445
-#: src/routes/emails/$threadId.tsx:490
-#: src/routes/pages/index.tsx:171
+#: src/routes/emails/$threadId.tsx
+#: src/routes/emails/$threadId.tsx
+#: src/routes/emails/$threadId.tsx
+#: src/routes/pages/index.tsx
 msgid "—"
 msgstr "—"
 
-#: src/components/interactions/quick-capture-dialog.tsx:219
+#: src/components/interactions/quick-capture-dialog.tsx
 msgid "— Select a company —"
 msgstr "— Tria una empresa —"
 
 #. placeholder {0}: row.name
-#: src/routes/settings/profile/templates.tsx:170
+#: src/routes/settings/profile/templates.tsx
 msgid "\"{0}\" is waiting for an admin to add it to the organization."
 msgstr "«{0}» espera que un administrador l'afegeixi a l'organització."
 
 #. placeholder {0}: confirmTarget?.name ?? ''
-#: src/routes/settings/organization/templates.tsx:543
+#: src/routes/settings/organization/templates.tsx
 msgid "\"{0}\" will be removed for everyone in the organization. This can't be undone."
 msgstr "S'eliminarà «{0}» per a tothom de l'organització. Això no es pot desfer."
 
 #. placeholder {0}: confirmTarget?.name ?? ''
-#: src/routes/settings/profile/templates.tsx:331
+#: src/routes/settings/profile/templates.tsx
 msgid "\"{0}\" will be removed for good. This can't be undone."
 msgstr "S'eliminarà «{0}» per sempre. Això no es pot desfer."
 
-#: src/routes/settings/organization/templates.tsx:329
+#: src/routes/settings/organization/templates.tsx
 msgid "\"{name}\" is now an org template you can edit."
 msgstr "«{name}» ja és una plantilla de l'organització que pots editar."
 
-#: src/routes/settings/organization/templates.tsx:290
+#: src/routes/settings/organization/templates.tsx
 msgid "\"{name}\" is now an org template."
 msgstr "«{name}» ja és una plantilla de l'organització."
 
-#: src/components/research/run-list.tsx:53
+#: src/components/research/run-list.tsx
 msgid "(no schema)"
 msgstr "(sense esquema)"
 
-#: src/components/companies/conversations-tab.tsx:165
-#: src/routes/emails/$threadId.tsx:341
-#: src/routes/emails/index.tsx:1228
+#: src/components/companies/conversations-tab.tsx
+#: src/routes/emails/$threadId.tsx
+#: src/routes/emails/index.tsx
 msgid "(no subject)"
 msgstr "(sense assumpte)"
 
-#: src/components/companies/conversations-tab.tsx:164
+#: src/components/companies/conversations-tab.tsx
 msgid "(no summary)"
 msgstr "(sense resum)"
 
 #. placeholder {0}: ev.attendeeCount
-#: src/components/companies/calendar-tab.tsx:66
-#: src/components/companies/upcoming-meetings-card.tsx:99
+#: src/components/companies/calendar-tab.tsx
+#: src/components/companies/upcoming-meetings-card.tsx
 msgid "{0} attendees"
 msgstr "{0} assistents"
 
 #. placeholder {0}: b.calls
-#: src/routes/settings/organization/spend.tsx:192
+#: src/routes/settings/organization/spend.tsx
 msgid "{0} calls"
 msgstr "{0} crides"
 
 #. placeholder {0}: companies.length
-#: src/routes/companies/index.tsx:243
+#: src/routes/companies/index.tsx
 msgid "{0} companies"
 msgstr "{0} empreses"
 
 #. placeholder {0}: companies.length
-#: src/routes/companies/index.tsx:240
+#: src/routes/companies/index.tsx
 msgid "{0} companies with filters applied"
 msgstr "{0} empreses amb filtres aplicats"
 
 #. placeholder {0}: thread.messageCount
-#: src/routes/emails/index.tsx:1242
+#: src/routes/emails/index.tsx
 msgid "{0} msgs"
 msgstr "{0} missatges"
 
 #. placeholder {0}: selectedPreset.name
-#: src/routes/emails/inboxes.tsx:891
+#: src/routes/emails/inboxes.tsx
 msgid "{0} no longer allows password sign-in for mail apps, so it can't be connected here yet — it needs an OAuth sign-in. Pick another provider or use Generic IMAP."
 msgstr "{0} ja no permet iniciar la sessió amb contrasenya a les aplicacions de correu, així que de moment no es pot connectar aquí: necessita un inici de sessió OAuth. Tria un altre proveïdor o fes servir IMAP genèric."
 
 #. placeholder {0}: failedIds.length
-#: src/routes/emails/index.tsx:494
-#: src/routes/emails/index.tsx:526
+#: src/routes/emails/index.tsx
+#: src/routes/emails/index.tsx
 msgid "{0} thread could not be updated."
 msgstr "No s'han pogut actualitzar {0} fils."
 
-#: src/routes/emails/index.tsx:721
+#: src/routes/emails/index.tsx
 msgid "{selectedCount} threads selected"
 msgstr "{selectedCount} fils seleccionats"
 
-#: src/routes/emails/index.tsx:560
+#: src/routes/emails/index.tsx
 msgid "{total} threads"
 msgstr "{total} fils"
 
-#: src/routes/emails/$threadId.tsx:259
+#: src/routes/emails/$threadId.tsx
 msgid "{who} wrote:"
 msgstr "{who} va escriure:"
 
-#: src/components/companies/open-tasks-card.tsx:59
+#: src/components/companies/open-tasks-card.tsx
 msgid "+{remaining} more"
 msgstr "+{remaining} més"
 
-#: src/routes/settings/mcp/index.tsx:149
+#: src/routes/settings/mcp/index.tsx
 msgid "<0>ChatGPT:</0> Settings → Connectors → turn on Developer mode → add the URL above and choose OAuth. (Plus, Pro, Business, Enterprise, or Edu.)"
 msgstr "<0>ChatGPT:</0> Configuració → Connectors → activa el mode desenvolupador → afegeix l'URL de dalt i tria OAuth. (Plus, Pro, Business, Enterprise o Edu.)"
 
-#: src/routes/settings/mcp/index.tsx:156
+#: src/routes/settings/mcp/index.tsx
 msgid "<0>Claude.ai:</0> Settings → Connectors → Add custom connector → paste the URL above."
 msgstr "<0>Claude.ai:</0> Configuració → Connectors → Afegeix un connector personalitzat → enganxa l'URL de dalt."
 
-#: src/components/companies/calendar-tab.tsx:64
-#: src/components/companies/upcoming-meetings-card.tsx:97
+#: src/components/companies/calendar-tab.tsx
+#: src/components/companies/upcoming-meetings-card.tsx
 msgid "1 attendee"
 msgstr "1 assistent"
 
-#: src/routes/settings/organization/spend.tsx:190
+#: src/routes/settings/organization/spend.tsx
 msgid "1 call"
 msgstr "1 crida"
 
-#: src/routes/companies/index.tsx:242
+#: src/routes/companies/index.tsx
 msgid "1 company"
 msgstr "1 empresa"
 
-#: src/routes/emails/index.tsx:1242
+#: src/routes/emails/index.tsx
 msgid "1 msg"
 msgstr "1 missatge"
 
-#: src/routes/emails/index.tsx:560
+#: src/routes/emails/index.tsx
 msgid "1 thread"
 msgstr "1 fil"
 
-#: src/routes/emails/index.tsx:720
+#: src/routes/emails/index.tsx
 msgid "1 thread selected"
 msgstr "1 fil seleccionat"
 
-#: src/routes/emails/inboxes.tsx:467
+#: src/routes/emails/inboxes.tsx
 msgid "2FA accounts need an app-specific password."
 msgstr "Els comptes amb verificació en dos passos necessiten una contrasenya d'aplicació."
 
-#: src/components/instructions/template-editor-dialog.tsx:139
+#: src/components/instructions/template-editor-dialog.tsx
 msgid "A short label. Start it with a [tag] like [research] to group related templates if you like — the brackets are just part of the name."
 msgstr "Una etiqueta curta. Si vols, comença-la amb un [tag] com ara [research] per agrupar plantilles relacionades; els claudàtors només formen part del nom."
 
-#: src/components/companies/about-section.tsx:51
+#: src/components/companies/about-section.tsx
 msgid "About"
 msgstr "Sobre l'empresa"
 
-#: src/routes/calendar/index.tsx:319
+#: src/routes/calendar/index.tsx
 msgid "Accept"
 msgstr "Accepta"
 
-#: src/routes/accept-invitation.$id.tsx:153
+#: src/routes/accept-invitation.$id.tsx
 msgid "Accepting the invitation…"
 msgstr "Acceptant la invitació…"
 
-#: src/routes/oauth/consent.tsx:128
+#: src/routes/oauth/consent.tsx
 msgid "Access"
 msgstr "Accés"
 
 #. placeholder {0}: provider.length
-#: src/routes/settings/organization/spend.tsx:162
+#: src/routes/settings/organization/spend.tsx
 msgid "across {0} providers"
 msgstr "en {0} proveïdors"
 
-#: src/routes/emails/inboxes.tsx:428
+#: src/routes/emails/inboxes.tsx
 msgid "Actions"
 msgstr "Accions"
 
-#: src/routes/emails/inboxes.tsx:426
+#: src/routes/emails/inboxes.tsx
 msgid "Active"
 msgstr "Activa"
 
-#: src/components/shared/status-badge.tsx:44
+#: src/components/shared/status-badge.tsx
 msgid "Active client"
 msgstr "Client actiu"
 
-#: src/routes/index.tsx:272
+#: src/routes/index.tsx
 msgid "Active companies"
 msgstr "Empreses actives"
 
-#: src/components/layout/org-switcher.tsx:77
+#: src/components/layout/org-switcher.tsx
 msgid "Active organization"
 msgstr "Organització activa"
 
-#: src/routes/tasks/index.tsx:647
+#: src/routes/tasks/index.tsx
 msgid "Add"
 msgstr "Afegeix"
 
 #. placeholder {0}: o.name
-#: src/components/instructions/stack-picker.tsx:134
+#: src/components/instructions/stack-picker.tsx
 msgid "Add {0}"
 msgstr "Afegeix {0}"
 
-#: src/components/shared/editable-field.tsx:322
+#: src/components/shared/editable-field.tsx
 msgid "Add {label}"
 msgstr "Afegeix {label}"
 
-#: src/components/companies/where-panel-client.client.tsx:121
+#: src/components/companies/where-panel-client.client.tsx
 msgid "Add a location on the Profile tab, then locate this company."
 msgstr "Afegeix una ubicació a la pestanya de perfil i després localitza aquesta empresa."
 
-#: src/components/instructions/template-editor-dialog.tsx:53
+#: src/components/instructions/template-editor-dialog.tsx
 msgid "Add a name and instructions before saving."
 msgstr "Posa un nom i les instruccions abans de desar."
 
-#: src/components/instructions/stack-picker.tsx:127
+#: src/components/instructions/stack-picker.tsx
 msgid "Add a template"
 msgstr "Afegeix una plantilla"
 
-#: src/routes/settings/organization/templates.tsx:415
+#: src/routes/settings/organization/templates.tsx
 msgid "Add an org template first."
 msgstr "Afegeix primer una plantilla de l'organització."
 
-#: src/components/instructions/default-stack-editor.tsx:175
+#: src/components/instructions/default-stack-editor.tsx
 msgid "Add at least one template before saving a default."
 msgstr "Afegeix almenys una plantilla abans de desar un valor per defecte."
 
-#: src/components/instructions/default-stack-editor.tsx:171
+#: src/components/instructions/default-stack-editor.tsx
 msgid "Add at least one template to layer on the org default."
 msgstr "Afegeix almenys una plantilla per posar-la sobre el valor per defecte de l'organització."
 
-#: src/components/emails/attachment-picker.tsx:121
+#: src/components/emails/attachment-picker.tsx
 msgid "Add attachment"
 msgstr "Afegeix adjunt"
 
-#: src/components/emails/compose-form.tsx:424
+#: src/components/emails/compose-form.tsx
 msgid "Add Cc / Bcc"
 msgstr "Afegeix Cc / Bcc"
 
-#: src/components/shared/company-card.tsx:113
+#: src/components/shared/company-card.tsx
 msgid "Add task"
 msgstr "Afegeix tasca"
 
-#: src/routes/companies/$slug.tsx:985
+#: src/routes/companies/$slug.tsx
 msgid "Add the first decision-maker to keep track of who to reach."
 msgstr "Afegeix el primer responsable de decisió per saber a qui adreçar-te."
 
-#: src/routes/settings/organization/templates.tsx:465
+#: src/routes/settings/organization/templates.tsx
 msgid "Add to org"
 msgstr "Afegeix a l'organització"
 
-#: src/components/instructions/default-stack-editor.tsx:135
+#: src/components/instructions/default-stack-editor.tsx
 msgid "Add to the org default"
 msgstr "Amplia el valor per defecte de l'organització"
 
-#: src/routes/settings/organization/templates.tsx:289
-#: src/routes/settings/organization/templates.tsx:328
+#: src/routes/settings/organization/templates.tsx
+#: src/routes/settings/organization/templates.tsx
 msgid "Added to the org"
 msgstr "Afegida a l'organització"
 
-#: src/components/research/findings/company-enrichment-view.tsx:80
+#: src/components/research/findings/company-enrichment-view.tsx
 msgid "Address"
 msgstr "Adreça"
 
-#: src/routes/settings/organization/invite.tsx:169
-#: src/routes/settings/organization/members.tsx:61
+#: src/routes/settings/organization/invite.tsx
+#: src/routes/settings/organization/members.tsx
 msgid "Admin"
 msgstr "Admin"
 
-#: src/routes/settings/mcp/index.tsx:164
+#: src/routes/settings/mcp/index.tsx
 msgid "After approving, manage which org each one acts in here."
 msgstr "Després d'aprovar-lo, gestiona aquí en quina organització actua cadascun."
 
-#: src/routes/emails/inboxes.tsx:489
-#: src/routes/emails/inboxes.tsx:1082
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
 msgid "Agent"
 msgstr "Agent"
 
-#: src/routes/settings/mcp/connections.tsx:114
+#: src/routes/settings/mcp/connections.tsx
 msgid "AI assistants you've connected over MCP. Choose which organization each one acts in."
 msgstr "Assistents d'IA que has connectat per MCP. Tria en quina organització actua cadascun."
 
-#: src/routes/companies/index.tsx:278
-#: src/routes/emails/index.tsx:623
+#: src/routes/companies/index.tsx
+#: src/routes/emails/index.tsx
 msgid "All"
 msgstr "Tots"
 
-#: src/routes/emails/index.tsx:662
-#: src/routes/emails/index.tsx:678
+#: src/routes/emails/index.tsx
+#: src/routes/emails/index.tsx
 msgid "All inboxes"
 msgstr "Totes les safates"
 
-#: src/routes/pages/index.tsx:126
+#: src/routes/pages/index.tsx
 msgid "All statuses"
 msgstr "Tots els estats"
 
-#: src/routes/settings/organization/spend.tsx:154
+#: src/routes/settings/organization/spend.tsx
 msgid "All time"
 msgstr "Tot el temps"
 
-#: src/routes/index.tsx:303
+#: src/routes/index.tsx
 msgid "All under control"
 msgstr "Tot sota control"
 
-#: src/routes/oauth/consent.tsx:163
+#: src/routes/oauth/consent.tsx
 msgid "Allow"
 msgstr "Permet"
 
-#: src/components/research/findings/shared.tsx:179
+#: src/components/research/findings/shared.tsx
 msgid "Already in CRM"
 msgstr "Ja al CRM"
 
-#: src/routes/oauth/consent.tsx:114
+#: src/routes/oauth/consent.tsx
 msgid "An AI assistant wants to connect to your Batuda account over MCP and act on your behalf. Only approve assistants you trust."
 msgstr "Un assistent d'IA vol connectar-se al teu compte de Batuda per MCP i actuar en nom teu. Aprova només els assistents en qui confiïs."
 
-#: src/routes/settings/api-keys/index.tsx:409
+#: src/routes/settings/api-keys/index.tsx
 msgid "Any agent using \"{confirmLabel}\" will stop working. This can't be undone."
 msgstr "Qualsevol agent que faci servir \"{confirmLabel}\" deixarà de funcionar. Això no es pot desfer."
 
-#: src/routes/settings/api-keys/index.tsx:201
-#: src/routes/settings/profile/index.tsx:123
+#: src/routes/settings/api-keys/index.tsx
+#: src/routes/settings/profile/index.tsx
 msgid "API keys"
 msgstr "Claus d'API"
 
-#: src/routes/emails/$threadId.tsx:376
-#: src/routes/emails/index.tsx:754
+#: src/routes/emails/$threadId.tsx
+#: src/routes/emails/index.tsx
 msgid "Archive"
 msgstr "Arxiva"
 
-#: src/routes/emails/index.tsx:1311
+#: src/routes/emails/index.tsx
 msgid "Archive thread"
 msgstr "Arxiva el fil"
 
-#: src/routes/emails/$threadId.tsx:335
-#: src/routes/emails/index.tsx:628
+#: src/routes/emails/$threadId.tsx
+#: src/routes/emails/index.tsx
 msgid "Archived"
 msgstr "Arxivat"
 
-#: src/components/shared/status-badge.tsx:46
+#: src/components/shared/status-badge.tsx
 msgid "Archived — not pursuing"
 msgstr "Arxivat — no el continuo"
 
-#: src/components/emails/attachment-picker.tsx:124
+#: src/components/emails/attachment-picker.tsx
 msgid "Attach"
 msgstr "Adjunta"
 
-#: src/routes/emails/$threadId.tsx:644
-#: src/routes/emails/$threadId.tsx:647
+#: src/routes/emails/$threadId.tsx
+#: src/routes/emails/$threadId.tsx
 msgid "attachment"
 msgstr "adjunt"
 
-#: src/routes/tasks/index.tsx:748
+#: src/routes/tasks/index.tsx
 msgid "Audit log"
 msgstr "Registre d'auditoria"
 
-#: src/routes/emails/inboxes.tsx:460
+#: src/routes/emails/inboxes.tsx
 msgid "Auth failed"
 msgstr "Error d'autenticació"
 
-#: src/routes/settings/profile/templates.tsx:187
+#: src/routes/settings/profile/templates.tsx
 msgid "Back to account"
 msgstr "Torna al compte"
 
-#: src/routes/research/$id.tsx:24
+#: src/routes/research/$id.tsx
 msgid "Back to companies"
 msgstr "Tornar a empreses"
 
-#: src/routes/emails/inboxes.tsx:317
+#: src/routes/emails/inboxes.tsx
 msgid "Back to emails"
 msgstr "Torna als correus"
 
-#: src/routes/emails/$threadId.tsx:303
-#: src/routes/emails/$threadId.tsx:328
+#: src/routes/emails/$threadId.tsx
+#: src/routes/emails/$threadId.tsx
 msgid "Back to inbox"
 msgstr "Torna a la safata"
 
-#: src/routes/settings/organization/invite.tsx:87
-#: src/routes/settings/organization/members.tsx:91
-#: src/routes/settings/organization/spend.tsx:111
-#: src/routes/settings/organization/templates.tsx:102
+#: src/routes/settings/organization/invite.tsx
+#: src/routes/settings/organization/members.tsx
+#: src/routes/settings/organization/spend.tsx
+#: src/routes/settings/organization/templates.tsx
 msgid "Back to organization"
 msgstr "Tornar a l'organització"
 
-#: src/routes/settings/api-keys/index.tsx:191
-#: src/routes/settings/mcp/connections.tsx:101
-#: src/routes/settings/mcp/index.tsx:107
+#: src/routes/settings/api-keys/index.tsx
+#: src/routes/settings/mcp/connections.tsx
+#: src/routes/settings/mcp/index.tsx
 msgid "Back to settings"
 msgstr "Torna a la configuració"
 
-#: src/routes/forgot-password.tsx:86
-#: src/routes/forgot-password.tsx:140
-#: src/routes/reset-password.tsx:82
+#: src/routes/forgot-password.tsx
+#: src/routes/forgot-password.tsx
+#: src/routes/reset-password.tsx
 msgid "Back to sign in"
 msgstr "Torna a iniciar sessió"
 
-#: src/i18n/lingui.tsx:56
+#: src/i18n/lingui.tsx
 msgid "Batuda"
 msgstr "Batuda"
 
-#: src/i18n/lingui.tsx:57
+#: src/i18n/lingui.tsx
 msgid "Batuda — a multi-tenant CRM for small agencies."
 msgstr "Batuda — un CRM multi-inquilí per a petites agències."
 
-#: src/components/layout/side-nav.tsx:21
+#: src/components/layout/side-nav.tsx
 msgid "Batuda home"
 msgstr "Inici de Batuda"
 
-#: src/routes/login.tsx:443
+#: src/routes/login.tsx
 msgid "Batuda is invite-only. Request access from the Engranatge team."
 msgstr "Batuda és només amb invitació. Demana accés a l'equip d'Engranatge."
 
-#: src/routes/settings/organization/templates.tsx:490
+#: src/routes/settings/organization/templates.tsx
 msgid "Batuda-written templates you can drop into the org and edit."
 msgstr "Plantilles escrites per Batuda que pots afegir a l'organització i editar."
 
-#: src/components/emails/compose-form.tsx:441
+#: src/components/emails/compose-form.tsx
 msgid "Bcc"
 msgstr "Bcc"
 
-#: src/routes/emails/index.tsx:1236
+#: src/routes/emails/index.tsx
 msgid "Blocked"
 msgstr "Bloquejat"
 
-#: src/routes/emails/$threadId.tsx:618
+#: src/routes/emails/$threadId.tsx
 msgid "Blocked by the provider. The body is shown for review only."
 msgstr "Bloquejat pel proveïdor. El cos es mostra només per revisar-lo."
 
-#: src/routes/calendar/index.tsx:194
+#: src/routes/calendar/index.tsx
 msgid "Book a meeting from a company page or forward an invitation to your inbox to see it here."
 msgstr "Reserva una reunió des d'una pàgina d'empresa o reenvia una invitació a la teva safata per veure-la aquí."
 
-#: src/components/emails/compose-form.tsx:503
+#: src/components/emails/compose-form.tsx
 msgid "bounced"
 msgstr "rebotat"
 
-#: src/routes/companies/$slug.tsx:1008
-#: src/routes/emails/$threadId.tsx:677
+#: src/routes/companies/$slug.tsx
+#: src/routes/emails/$threadId.tsx
 msgid "Bounced"
 msgstr "Rebotat"
 
-#: src/components/research/run-detail.tsx:117
+#: src/components/research/run-detail.tsx
 msgid "Brief"
 msgstr "Resum"
 
-#: src/components/interactions/quick-capture-dialog.tsx:314
+#: src/components/interactions/quick-capture-dialog.tsx
 msgid "Brief summary (optional)"
 msgstr "Resum breu (opcional)"
 
-#: src/routes/emails/index.tsx:717
+#: src/routes/emails/index.tsx
 msgid "Bulk thread actions"
 msgstr "Accions massives de fils"
 
-#: src/routes/settings/api-keys/index.tsx:302
+#: src/routes/settings/api-keys/index.tsx
 msgid "by {creatorName}"
 msgstr "per {creatorName}"
 
-#: src/routes/settings/organization/spend.tsx:168
+#: src/routes/settings/organization/spend.tsx
 msgid "By provider"
 msgstr "Per proveïdor"
 
-#: src/routes/settings/organization/spend.tsx:211
+#: src/routes/settings/organization/spend.tsx
 msgid "By tool"
 msgstr "Per eina"
 
-#: src/routes/settings/organization/spend.tsx:204
+#: src/routes/settings/organization/spend.tsx
 msgid "By user"
 msgstr "Per usuari"
 
-#: src/components/companies/cadence-card.tsx:51
-#: src/components/companies/cadence-card.tsx:78
+#: src/components/companies/cadence-card.tsx
+#: src/components/companies/cadence-card.tsx
 msgid "Cadence"
 msgstr "Cadència"
 
-#: src/components/companies/conversations-tab.tsx:161
-#: src/components/layout/nav-items.ts:74
-#: src/routes/calendar/index.tsx:179
+#: src/components/companies/conversations-tab.tsx
+#: src/components/layout/nav-items.ts
+#: src/routes/calendar/index.tsx
 msgid "Calendar"
 msgstr "Calendari"
 
-#: src/components/interactions/quick-capture-dialog.tsx:422
-#: src/components/shared/channel-icon.tsx:62
+#: src/components/interactions/quick-capture-dialog.tsx
+#: src/components/shared/channel-icon.tsx
 msgid "Call"
 msgstr "Trucada"
 
-#: src/routes/companies/$slug.tsx:794
+#: src/routes/companies/$slug.tsx
 msgid "Call phone"
 msgstr "Truca al telèfon"
 
-#: src/routes/settings/organization/spend.tsx:242
+#: src/routes/settings/organization/spend.tsx
 msgid "Calls"
 msgstr "Crides"
 
-#: src/components/instructions/template-delete-confirm.tsx:56
-#: src/components/instructions/template-editor-dialog.tsx:178
-#: src/components/interactions/quick-capture-dialog.tsx:400
-#: src/components/research/research-dialog.tsx:271
-#: src/routes/emails/inboxes.tsx:1144
-#: src/routes/emails/inboxes.tsx:1561
-#: src/routes/settings/api-keys/index.tsx:424
-#: src/routes/tasks/index.tsx:743
+#: src/components/instructions/template-delete-confirm.tsx
+#: src/components/instructions/template-editor-dialog.tsx
+#: src/components/interactions/quick-capture-dialog.tsx
+#: src/components/research/research-dialog.tsx
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
+#: src/routes/settings/api-keys/index.tsx
+#: src/routes/tasks/index.tsx
 msgid "Cancel"
 msgstr "Cancel·la"
 
-#: src/components/emails/attachment-picker.tsx:173
+#: src/components/emails/attachment-picker.tsx
 msgid "Cancel upload"
 msgstr "Cancel·la la pujada"
 
-#: src/routes/oauth/consent.tsx:152
+#: src/routes/oauth/consent.tsx
 msgid "Cancelling…"
 msgstr "Cancel·lant…"
 
-#: src/components/emails/compose-form.tsx:429
-#: src/routes/emails/$threadId.tsx:595
+#: src/components/emails/compose-form.tsx
+#: src/routes/emails/$threadId.tsx
 msgid "Cc"
 msgstr "Cc"
 
-#: src/routes/settings/profile/index.tsx:383
+#: src/routes/settings/profile/index.tsx
 msgid "Change my mind — set a password anyway"
 msgstr "Canvio d'opinió — vull posar contrasenya"
 
-#: src/routes/settings/profile/index.tsx:443
-#: src/routes/settings/profile/index.tsx:530
+#: src/routes/settings/profile/index.tsx
+#: src/routes/settings/profile/index.tsx
 msgid "Change password"
 msgstr "Canvia la contrasenya"
 
-#: src/routes/emails/inboxes.tsx:1022
+#: src/routes/emails/inboxes.tsx
 msgid "Change password (re-probes the connection)"
 msgstr "Canvia la contrasenya (reprova la connexió)"
 
-#: src/routes/companies/$slug.tsx:691
+#: src/routes/companies/$slug.tsx
 msgid "Change priority"
 msgstr "Canvia la prioritat"
 
-#: src/routes/companies/$slug.tsx:734
+#: src/routes/companies/$slug.tsx
 msgid "Change status"
 msgstr "Canvia l'estat"
 
-#: src/routes/pages/$id.tsx:192
+#: src/routes/pages/$id.tsx
 msgid "Changes have been saved."
 msgstr "S'han desat els canvis."
 
-#: src/components/interactions/quick-capture-dialog.tsx:232
+#: src/components/interactions/quick-capture-dialog.tsx
 msgid "Channel"
 msgstr "Canal"
 
-#: src/routes/settings/mcp/index.tsx:130
+#: src/routes/settings/mcp/index.tsx
 msgid "Chat interfaces (OAuth)"
 msgstr "Interfícies de xat (OAuth)"
 
-#: src/routes/settings/mcp/index.tsx:133
+#: src/routes/settings/mcp/index.tsx
 msgid "ChatGPT and Claude.ai can't send a key, so they connect over OAuth. Add this server by URL, approve it, and it appears under your connections."
 msgstr "ChatGPT i Claude.ai no poden enviar una clau, així que es connecten amb OAuth. Afegeix aquest servidor per URL, aprova'l i apareixerà a les teves connexions."
 
-#: src/routes/companies/$slug.tsx:333
-#: src/routes/emails/index.tsx:784
-#: src/routes/pages/$id.tsx:137
+#: src/routes/companies/$slug.tsx
+#: src/routes/emails/index.tsx
+#: src/routes/pages/$id.tsx
 msgid "Check that the session is valid or try again."
 msgstr "Comprova que la sessió sigui vàlida o torna-ho a provar."
 
-#: src/routes/companies/index.tsx:316
+#: src/routes/companies/index.tsx
 msgid "Check that your session is valid or try again."
 msgstr "Comprova que la teva sessió sigui vàlida o torna-ho a provar."
 
-#: src/routes/emails/inboxes.tsx:400
+#: src/routes/emails/inboxes.tsx
 msgid "Check the session or try again."
 msgstr "Comprova la sessió o torna-ho a provar."
 
-#: src/routes/forgot-password.tsx:69
-#: src/routes/login.tsx:481
+#: src/routes/forgot-password.tsx
+#: src/routes/login.tsx
 msgid "Check your inbox"
 msgstr "Mira la safata d'entrada"
 
-#: src/routes/settings/mcp/connections.tsx:181
+#: src/routes/settings/mcp/connections.tsx
 msgid "Choose organization"
 msgstr "Tria una organització"
 
-#: src/routes/emails/inboxes.tsx:365
-#: src/routes/emails/inboxes.tsx:366
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
 msgid "Choose primary inbox"
 msgstr "Tria la bústia principal"
 
-#: src/routes/settings/mcp/index.tsx:216
+#: src/routes/settings/mcp/index.tsx
 msgid "Claude Desktop can't reach a remote server directly, so this bridges through <0>mcp-remote</0> (needs Node installed). Or add it as an OAuth connector instead."
 msgstr "Claude Desktop no es pot connectar directament a un servidor remot, així que això fa de pont amb <0>mcp-remote</0> (cal tenir Node instal·lat). O afegeix-lo com a connector OAuth."
 
-#: src/components/shared/task-item.tsx:292
-#: src/routes/companies/$slug.tsx:1051
-#: src/routes/emails/index.tsx:769
+#: src/components/shared/task-item.tsx
+#: src/routes/companies/$slug.tsx
+#: src/routes/emails/index.tsx
 msgid "Clear"
 msgstr "Neteja"
 
-#: src/routes/companies/index.tsx:306
-#: src/routes/companies/index.tsx:336
-#: src/routes/emails/index.tsx:711
-#: src/routes/emails/index.tsx:807
+#: src/routes/companies/index.tsx
+#: src/routes/companies/index.tsx
+#: src/routes/emails/index.tsx
+#: src/routes/emails/index.tsx
 msgid "Clear filters"
 msgstr "Neteja els filtres"
 
-#: src/routes/emails/$threadId.tsx:689
+#: src/routes/emails/$threadId.tsx
 msgid "Clicked"
 msgstr "Clicat"
 
-#: src/components/shared/status-badge.tsx:33
-#: src/routes/companies/$slug.tsx:445
-#: src/routes/oauth/consent.tsx:121
+#: src/components/shared/status-badge.tsx
+#: src/routes/companies/$slug.tsx
+#: src/routes/oauth/consent.tsx
 msgid "Client"
 msgstr "Client"
 
-#: src/components/instructions/template-editor-dialog.tsx:95
-#: src/components/interactions/quick-capture-dialog.tsx:188
-#: src/components/research/research-dialog.tsx:159
-#: src/routes/calendar/index.tsx:367
-#: src/routes/emails/$threadId.tsx:353
-#: src/routes/emails/inboxes.tsx:842
-#: src/routes/emails/inboxes.tsx:1444
-#: src/routes/emails/index.tsx:732
+#: src/components/instructions/template-editor-dialog.tsx
+#: src/components/interactions/quick-capture-dialog.tsx
+#: src/components/research/research-dialog.tsx
+#: src/routes/calendar/index.tsx
+#: src/routes/emails/$threadId.tsx
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/index.tsx
 msgid "Close"
 msgstr "Tanca"
 
-#: src/components/emails/compose-window.tsx:81
+#: src/components/emails/compose-window.tsx
 msgid "Close draft"
 msgstr "Tanca l'esborrany"
 
-#: src/routes/emails/index.tsx:1290
+#: src/routes/emails/index.tsx
 msgid "Close thread"
 msgstr "Tanca el fil"
 
-#: src/components/shared/status-badge.tsx:34
-#: src/routes/companies/$slug.tsx:446
-#: src/routes/emails/$threadId.tsx:334
-#: src/routes/emails/index.tsx:627
+#: src/components/shared/status-badge.tsx
+#: src/routes/companies/$slug.tsx
+#: src/routes/emails/$threadId.tsx
+#: src/routes/emails/index.tsx
 msgid "Closed"
 msgstr "Tancat"
 
-#: src/components/shared/status-badge.tsx:45
+#: src/components/shared/status-badge.tsx
 msgid "Closed — won or lost"
 msgstr "Tancat — guanyat o perdut"
 
-#: src/routes/settings/mcp/index.tsx:175
+#: src/routes/settings/mcp/index.tsx
 msgid "Coding tools (API key)"
 msgstr "Eines de programació (clau API)"
 
-#: src/components/shared/status-badge.tsx:39
+#: src/components/shared/status-badge.tsx
 msgid "Cold lead — no contact yet"
 msgstr "Pista freda — encara sense contacte"
 
-#: src/routes/emails/index.tsx:1410
+#: src/routes/emails/index.tsx
 msgid "Collapse"
 msgstr "Plega"
 
-#: src/routes/emails/index.tsx:1334
+#: src/routes/emails/index.tsx
 msgid "Columns"
 msgstr "Columnes"
 
-#: src/components/emails/compose-form.tsx:434
-#: src/components/emails/compose-form.tsx:446
+#: src/components/emails/compose-form.tsx
+#: src/components/emails/compose-form.tsx
 msgid "Comma-separated"
 msgstr "Separats per comes"
 
-#: src/components/layout/nav-items.ts:46
-#: src/routes/companies/index.tsx:249
+#: src/components/layout/nav-items.ts
+#: src/routes/companies/index.tsx
 msgid "Companies"
 msgstr "Empreses"
 
-#: src/components/interactions/quick-capture-dialog.tsx:200
-#: src/components/interactions/quick-capture-dialog.tsx:209
-#: src/routes/emails/$threadId.tsx:427
-#: src/routes/emails/$threadId.tsx:467
-#: src/routes/index.tsx:318
-#: src/routes/index.tsx:395
-#: src/routes/index.tsx:435
+#: src/components/interactions/quick-capture-dialog.tsx
+#: src/components/interactions/quick-capture-dialog.tsx
+#: src/routes/emails/$threadId.tsx
+#: src/routes/emails/$threadId.tsx
+#: src/routes/index.tsx
+#: src/routes/index.tsx
+#: src/routes/index.tsx
 msgid "Company"
 msgstr "Empresa"
 
-#: src/components/research/research-dialog.tsx:43
+#: src/components/research/research-dialog.tsx
 msgid "Company enrichment"
 msgstr "Enriquiment d'empresa"
 
-#: src/components/research/research-dialog.tsx:48
+#: src/components/research/research-dialog.tsx
 msgid "Competitor scan"
 msgstr "Anàlisi de competidors"
 
-#: src/components/research/findings/company-enrichment-view.tsx:150
-#: src/components/research/findings/competitor-scan-view.tsx:106
+#: src/components/research/findings/company-enrichment-view.tsx
+#: src/components/research/findings/competitor-scan-view.tsx
 msgid "Competitors"
 msgstr "Competidors"
 
-#: src/components/emails/compose-form.tsx:503
+#: src/components/emails/compose-form.tsx
 msgid "complained"
 msgstr "marcat com a brossa"
 
-#: src/routes/companies/$slug.tsx:1009
-#: src/routes/emails/$threadId.tsx:679
+#: src/routes/companies/$slug.tsx
+#: src/routes/emails/$threadId.tsx
 msgid "Complained"
 msgstr "Marcat com a brossa"
 
-#: src/routes/tasks/index.tsx:728
+#: src/routes/tasks/index.tsx
 msgid "Complete"
 msgstr "Completa"
 
-#: src/components/companies/conversations-tab.tsx:206
-#: src/routes/emails/index.tsx:595
+#: src/components/companies/conversations-tab.tsx
+#: src/routes/emails/index.tsx
 msgid "Compose"
 msgstr "Redacta"
 
-#: src/components/interactions/quick-capture-dialog.tsx:341
+#: src/components/interactions/quick-capture-dialog.tsx
 msgid "Conclusion or commitment (optional)"
 msgstr "Conclusió o compromís (opcional)"
 
-#: src/routes/settings/profile/index.tsx:129
+#: src/routes/settings/profile/index.tsx
 msgid "Connect AI tools"
 msgstr "Connecta eines d'IA"
 
-#: src/routes/settings/mcp/index.tsx:117
+#: src/routes/settings/mcp/index.tsx
 msgid "Connect AI tools over MCP"
 msgstr "Connecta eines d'IA amb MCP"
 
-#: src/routes/emails/inboxes.tsx:462
+#: src/routes/emails/inboxes.tsx
 msgid "Connect failed"
 msgstr "Connexió fallida"
 
-#: src/routes/emails/inboxes.tsx:321
+#: src/routes/emails/inboxes.tsx
 msgid "Connect IMAP/SMTP mailboxes and choose your primary sender."
 msgstr "Connecta bústies IMAP/SMTP i tria el remitent principal."
 
-#: src/routes/emails/inboxes.tsx:331
-#: src/routes/emails/inboxes.tsx:415
-#: src/routes/emails/inboxes.tsx:838
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/index.tsx
 msgid "Connect mailbox"
 msgstr "Connecta una bústia"
 
-#: src/routes/oauth/consent.tsx:111
+#: src/routes/oauth/consent.tsx
 msgid "Connect to Batuda?"
 msgstr "Connectar a Batuda?"
 
-#: src/routes/emails/inboxes.tsx:406
+#: src/routes/emails/inboxes.tsx
 msgid "Connect your IMAP/SMTP mailbox to start sending and receiving email."
 msgstr "Connecta la teva bústia IMAP/SMTP per començar a enviar i rebre correu."
 
-#: src/routes/emails/inboxes.tsx:458
+#: src/routes/emails/inboxes.tsx
 msgid "Connected"
 msgstr "Connectada"
 
 #. placeholder {0}: formatDate(row.createdAt)
-#: src/routes/settings/mcp/connections.tsx:149
+#: src/routes/settings/mcp/connections.tsx
 msgid "Connected {0}"
 msgstr "Connectat {0}"
 
-#: src/routes/oauth/consent.tsx:163
+#: src/routes/oauth/consent.tsx
 msgid "Connecting…"
 msgstr "Connectant…"
 
-#: src/routes/emails/inboxes.tsx:258
+#: src/routes/emails/inboxes.tsx
 msgid "Connection tested"
 msgstr "Connexió provada"
 
-#: src/routes/settings/profile/index.tsx:138
+#: src/routes/settings/profile/index.tsx
 msgid "Connections"
 msgstr "Connexions"
 
-#: src/components/research/research-dialog.tsx:53
+#: src/components/research/research-dialog.tsx
 msgid "Contact discovery"
 msgstr "Descoberta de contactes"
 
-#: src/components/shared/status-badge.tsx:29
-#: src/routes/companies/$slug.tsx:441
+#: src/components/shared/status-badge.tsx
+#: src/routes/companies/$slug.tsx
 msgid "Contacted"
 msgstr "Contactat"
 
-#: src/components/research/findings/company-enrichment-view.tsx:174
+#: src/components/research/findings/company-enrichment-view.tsx
 msgid "Contacts"
 msgstr "Contactes"
 
-#: src/components/research/findings/contact-discovery-view.tsx:56
+#: src/components/research/findings/contact-discovery-view.tsx
 msgid "Contacts found"
 msgstr "Contactes trobats"
 
-#: src/routes/emails/inboxes.tsx:1531
+#: src/routes/emails/inboxes.tsx
 msgid "Content"
 msgstr "Contingut"
 
-#: src/routes/companies/$slug.tsx:367
-#: src/routes/companies/$slug.tsx:879
+#: src/routes/companies/$slug.tsx
+#: src/routes/companies/$slug.tsx
 msgid "Conversations"
 msgstr "Converses"
 
-#: src/components/companies/where-panel-client.client.tsx:61
+#: src/components/companies/where-panel-client.client.tsx
 msgid "Coordinates saved from the geocoder."
 msgstr "Coordenades desades del geocodificador."
 
-#: src/routes/settings/api-keys/index.tsx:369
-#: src/routes/settings/api-keys/index.tsx:372
+#: src/routes/settings/api-keys/index.tsx
+#: src/routes/settings/api-keys/index.tsx
 msgid "Copied"
 msgstr "Copiada"
 
-#: src/components/primitives/pri-copy-button.tsx:55
+#: src/components/primitives/pri-copy-button.tsx
 msgid "Copied {label}"
 msgstr "S'ha copiat {label}"
 
-#: src/routes/settings/api-keys/index.tsx:369
+#: src/routes/settings/api-keys/index.tsx
 msgid "Copy"
 msgstr "Copia"
 
-#: src/components/primitives/pri-copy-button.tsx:44
+#: src/components/primitives/pri-copy-button.tsx
 msgid "Copy {label}"
 msgstr "Copia {label}"
 
-#: src/routes/settings/api-keys/index.tsx:175
+#: src/routes/settings/api-keys/index.tsx
 msgid "Copy failed"
 msgstr "No s'ha pogut copiar"
 
-#: src/components/shared/company-card.tsx:125
+#: src/components/shared/company-card.tsx
 msgid "Copy slug"
 msgstr "Copia el slug"
 
-#: src/routes/settings/api-keys/index.tsx:348
+#: src/routes/settings/api-keys/index.tsx
 msgid "Copy your key now"
 msgstr "Copia la teva clau ara"
 
-#: src/routes/companies/$slug.tsx:629
+#: src/routes/companies/$slug.tsx
 msgid "Could not clear suppression"
 msgstr "No s'''ha pogut esborrar la supressió"
 
-#: src/routes/oauth/consent.tsx:68
+#: src/routes/oauth/consent.tsx
 msgid "Could not complete the connection. Please try again."
 msgstr "No s'ha pogut completar la connexió. Torna-ho a provar."
 
-#: src/routes/emails/inboxes.tsx:584
+#: src/routes/emails/inboxes.tsx
 msgid "Could not create the inbox. Check transport or credentials."
 msgstr "No s'ha pogut crear la bústia. Revisa el transport o les credencials."
 
-#: src/routes/settings/api-keys/index.tsx:142
+#: src/routes/settings/api-keys/index.tsx
 msgid "Could not create the key. Please try again."
 msgstr "No s'ha pogut crear la clau. Torna-ho a provar."
 
-#: src/routes/settings/api-keys/index.tsx:163
+#: src/routes/settings/api-keys/index.tsx
 msgid "Could not delete the key. Please try again."
 msgstr "No s'ha pogut eliminar la clau. Torna-ho a provar."
 
-#: src/routes/companies/index.tsx:315
+#: src/routes/companies/index.tsx
 msgid "Could not load companies"
 msgstr "No s'han pogut carregar les empreses"
 
-#: src/routes/emails/inboxes.tsx:399
+#: src/routes/emails/inboxes.tsx
 msgid "Could not load inboxes"
 msgstr "No s'han pogut carregar les safates"
 
-#: src/routes/companies/$slug.tsx:332
+#: src/routes/companies/$slug.tsx
 msgid "Could not load this company"
 msgstr "No s'ha pogut carregar aquesta empresa"
 
-#: src/routes/pages/$id.tsx:136
+#: src/routes/pages/$id.tsx
 msgid "Could not load this page"
 msgstr "No s'ha pogut carregar aquesta pàgina"
 
-#: src/components/research/run-detail.tsx:60
+#: src/components/research/run-detail.tsx
 msgid "Could not load this run."
 msgstr "No s'ha pogut carregar aquesta execució."
 
-#: src/routes/emails/index.tsx:783
+#: src/routes/emails/index.tsx
 msgid "Could not load threads"
 msgstr "No s'han pogut carregar els fils"
 
-#: src/routes/settings/mcp/connections.tsx:131
+#: src/routes/settings/mcp/connections.tsx
 msgid "Could not load your connections. Refresh to try again."
 msgstr "No s'han pogut carregar les connexions. Actualitza per tornar-ho a provar."
 
-#: src/routes/settings/api-keys/index.tsx:274
+#: src/routes/settings/api-keys/index.tsx
 msgid "Could not load your keys. Refresh to try again."
 msgstr "No s'han pogut carregar les teves claus. Actualitza per tornar-ho a provar."
 
-#: src/components/companies/where-panel-client.client.tsx:67
+#: src/components/companies/where-panel-client.client.tsx
 msgid "Could not locate"
 msgstr "No s'ha pogut localitzar"
 
-#: src/components/interactions/quick-capture-dialog.tsx:162
+#: src/components/interactions/quick-capture-dialog.tsx
 msgid "Could not log the interaction. Please try again."
 msgstr "No s'ha pogut registrar la interacció. Torna-ho a provar."
 
-#: src/routes/pages/$id.tsx:222
+#: src/routes/pages/$id.tsx
 msgid "Could not publish the page. Please try again."
 msgstr "No s'ha pogut publicar la pàgina. Torna-ho a provar."
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx:252
+#: src/routes/emails/inboxes.tsx
 msgid "Could not reach {0}."
 msgstr "No s'ha pogut arribar a {0}."
 
-#: src/routes/settings/organization/members.tsx:75
+#: src/routes/settings/organization/members.tsx
 msgid "Could not remove {email}. Please try again."
 msgstr "No s'ha pogut eliminar {email}. Torna-ho a provar."
 
-#: src/routes/companies/$slug.tsx:428
+#: src/routes/companies/$slug.tsx
 msgid "Could not save"
 msgstr "No s'ha pogut desar"
 
-#: src/routes/emails/inboxes.tsx:602
+#: src/routes/emails/inboxes.tsx
 msgid "Could not save the inbox."
 msgstr "No s'ha pogut desar la safata."
 
-#: src/routes/pages/$id.tsx:199
+#: src/routes/pages/$id.tsx
 msgid "Could not save the page. Please try again."
 msgstr "No s'ha pogut desar la pàgina. Torna-ho a provar."
 
-#: src/components/instructions/template-editor-dialog.tsx:72
+#: src/components/instructions/template-editor-dialog.tsx
 msgid "Could not save the template. Please try again."
 msgstr "No s'ha pogut desar la plantilla. Torna-ho a provar."
 
-#: src/routes/settings/organization/invite.tsx:70
+#: src/routes/settings/organization/invite.tsx
 msgid "Could not send the invitation. Please try again."
 msgstr "No s'''ha pogut enviar la invitació. Torna-ho a provar."
 
-#: src/routes/forgot-password.tsx:123
-#: src/routes/login.tsx:151
+#: src/routes/forgot-password.tsx
+#: src/routes/login.tsx
 msgid "Could not send the link. Try again in a few seconds."
 msgstr "No s'ha pogut enviar l'enllaç. Torna-ho a provar d'aquí uns segons."
 
-#: src/routes/emails/inboxes.tsx:296
+#: src/routes/emails/inboxes.tsx
 msgid "Could not set primary inbox"
 msgstr "No s'ha pogut establir la bústia principal"
 
-#: src/routes/emails/inboxes.tsx:236
+#: src/routes/emails/inboxes.tsx
 msgid "Could not set the default inbox."
 msgstr "No s'ha pogut establir la safata per defecte."
 
-#: src/routes/login.tsx:149
+#: src/routes/login.tsx
 msgid "Could not sign in. Check your email and password."
 msgstr "No s'ha pogut iniciar sessió. Comprova el correu i la contrasenya."
 
-#: src/components/research/research-dialog.tsx:125
+#: src/components/research/research-dialog.tsx
 msgid "Could not start the research run. Please try again."
 msgstr "No s'ha pogut iniciar la recerca. Torna-ho a provar."
 
-#: src/components/layout/org-switcher.tsx:49
+#: src/components/layout/org-switcher.tsx
 msgid "Could not switch organization. Please try again."
 msgstr "No s'ha pogut canviar d'organització. Torna-ho a provar."
 
-#: src/routes/emails/inboxes.tsx:215
+#: src/routes/emails/inboxes.tsx
 msgid "Could not toggle the inbox state."
 msgstr "No s'ha pogut canviar l'estat de la safata."
 
-#: src/routes/settings/mcp/connections.tsx:90
+#: src/routes/settings/mcp/connections.tsx
 msgid "Could not update"
 msgstr "No s'ha pogut actualitzar"
 
-#: src/routes/settings/organization/templates.tsx:298
+#: src/routes/settings/organization/templates.tsx
 msgid "Couldn't add it"
 msgstr "No s'ha pogut afegir"
 
-#: src/components/primitives/pri-copy-button.tsx:31
+#: src/components/primitives/pri-copy-button.tsx
 msgid "Couldn't copy"
 msgstr "No s'ha pogut copiar"
 
-#: src/routes/settings/organization/templates.tsx:312
+#: src/routes/settings/organization/templates.tsx
 msgid "Couldn't decline it"
 msgstr "No s'ha pogut rebutjar"
 
-#: src/routes/settings/organization/templates.tsx:250
-#: src/routes/settings/profile/templates.tsx:131
-#: src/routes/settings/profile/templates.tsx:151
+#: src/routes/settings/organization/templates.tsx
+#: src/routes/settings/profile/templates.tsx
+#: src/routes/settings/profile/templates.tsx
 msgid "Couldn't delete the template. Please try again."
 msgstr "No s'ha pogut eliminar la plantilla. Torna-ho a provar."
 
-#: src/routes/settings/organization/templates.tsx:336
+#: src/routes/settings/organization/templates.tsx
 msgid "Couldn't import it"
 msgstr "No s'ha pogut importar"
 
-#: src/routes/settings/organization/templates.tsx:411
+#: src/routes/settings/organization/templates.tsx
 msgid "Couldn't load the org default. Refresh to try again."
 msgstr "No s'ha pogut carregar el valor per defecte de l'organització. Actualitza per tornar-ho a provar."
 
-#: src/routes/settings/profile/templates.tsx:285
+#: src/routes/settings/profile/templates.tsx
 msgid "Couldn't load your default. Refresh to try again."
 msgstr "No s'ha pogut carregar el teu valor per defecte. Actualitza per tornar-ho a provar."
 
-#: src/routes/settings/profile/templates.tsx:222
+#: src/routes/settings/profile/templates.tsx
 msgid "Couldn't load your templates. Refresh to try again."
 msgstr "No s'han pogut carregar les teves plantilles. Actualitza per tornar-ho a provar."
 
-#: src/routes/settings/organization/templates.tsx:278
+#: src/routes/settings/organization/templates.tsx
 msgid "Couldn't save"
 msgstr "No s'ha pogut desar"
 
-#: src/routes/settings/profile/templates.tsx:176
+#: src/routes/settings/profile/templates.tsx
 msgid "Couldn't send it"
 msgstr "No s'ha pogut enviar"
 
-#: src/routes/settings/profile/index.tsx:388
+#: src/routes/settings/profile/index.tsx
 msgid "Couldn't update your preference. Try again."
 msgstr "No he pogut desar la teva preferència. Prova-ho de nou."
 
-#: src/routes/emails/inboxes.tsx:1573
+#: src/routes/emails/inboxes.tsx
 msgid "Create"
 msgstr "Crea"
 
-#: src/routes/emails/inboxes.tsx:1457
+#: src/routes/emails/inboxes.tsx
 msgid "Create a footer to append to outgoing emails from this inbox."
 msgstr "Crea un peu de pàgina per afegir als correus sortints d'aquesta bústia."
 
-#: src/routes/settings/api-keys/index.tsx:213
+#: src/routes/settings/api-keys/index.tsx
 msgid "Create a key"
 msgstr "Crea una clau"
 
-#: src/routes/pages/index.tsx:138
+#: src/routes/pages/index.tsx
 msgid "Create a prospect landing page from a company detail view or via the MCP tools."
 msgstr "Crea una pàgina d'aterratge per a un prospecte des del detall d'una empresa o amb les eines MCP."
 
-#: src/routes/companies/$slug.tsx:1124
+#: src/routes/companies/$slug.tsx
 msgid "Create a prospect landing page to share with this company."
 msgstr "Crea una pàgina d'aterratge per a un prospecte per compartir amb aquesta empresa."
 
-#: src/routes/settings/profile/templates.tsx:293
+#: src/routes/settings/profile/templates.tsx
 msgid "Create a template above first, then pick which ones run by default."
 msgstr "Crea primer una plantilla a dalt i després tria quines s'executen per defecte."
 
-#: src/routes/settings/mcp/index.tsx:184
+#: src/routes/settings/mcp/index.tsx
 msgid "Create an API key"
 msgstr "Crea una clau d'API"
 
-#: src/routes/settings/mcp/index.tsx:178
+#: src/routes/settings/mcp/index.tsx
 msgid "Create an API key, then paste the snippet for your tool — replacing <0>YOUR_API_KEY</0> with it. The key acts in this organization."
 msgstr "Crea una clau d'API i enganxa el fragment de la teva eina — substituint <0>YOUR_API_KEY</0> per la clau. La clau actua en aquesta organització."
 
-#: src/routes/emails/inboxes.tsx:477
-#: src/routes/emails/inboxes.tsx:910
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
 msgid "Create an app password →"
 msgstr "Crea una contrasenya d'aplicació →"
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx:473
+#: src/routes/emails/inboxes.tsx
 msgid "Create an app-specific password for {0}, opens in a new tab"
 msgstr "Crea una contrasenya d'aplicació per a {0}, s'obre en una pestanya nova"
 
-#: src/routes/emails/inboxes.tsx:903
+#: src/routes/emails/inboxes.tsx
 msgid "Create an app-specific password, opens in a new tab"
 msgstr "Crea una contrasenya d'aplicació, s'obre en una pestanya nova"
 
-#: src/routes/emails/inboxes.tsx:1351
+#: src/routes/emails/inboxes.tsx
 msgid "Create failed"
 msgstr "Error en crear"
 
-#: src/routes/calendar/index.tsx:349
+#: src/routes/calendar/index.tsx
 msgid "Create follow-up task"
 msgstr "Crea una tasca de seguiment"
 
-#: src/routes/emails/inboxes.tsx:1509
+#: src/routes/emails/inboxes.tsx
 msgid "Create footer"
 msgstr "Crea peu de pàgina"
 
-#: src/routes/settings/api-keys/index.tsx:258
+#: src/routes/settings/api-keys/index.tsx
 msgid "Create key"
 msgstr "Crea la clau"
 
-#: src/routes/emails/$threadId.tsx:498
-#: src/routes/emails/inboxes.tsx:427
+#: src/routes/emails/$threadId.tsx
+#: src/routes/emails/inboxes.tsx
 msgid "Created"
 msgstr "Creada"
 
 #. placeholder {0}: formatDate(row.createdAt)
-#: src/routes/settings/api-keys/index.tsx:298
+#: src/routes/settings/api-keys/index.tsx
 msgid "Created {0}"
 msgstr "Creada el {0}"
 
-#: src/components/shared/task-item.tsx:336
+#: src/components/shared/task-item.tsx
 msgid "Created by agent"
 msgstr "Creada per agent"
 
-#: src/routes/settings/api-keys/index.tsx:258
+#: src/routes/settings/api-keys/index.tsx
 msgid "Creating…"
 msgstr "Creant…"
 
-#: src/routes/settings/profile/index.tsx:457
+#: src/routes/settings/profile/index.tsx
 msgid "Current password"
 msgstr "Contrasenya actual"
 
-#: src/routes/settings/profile/index.tsx:507
+#: src/routes/settings/profile/index.tsx
 msgid "Current password is incorrect."
 msgstr "La contrasenya actual no és correcta."
 
-#: src/components/companies/about-section.tsx:100
-#: src/components/research/findings/company-enrichment-view.tsx:82
+#: src/components/companies/about-section.tsx
+#: src/components/research/findings/company-enrichment-view.tsx
 msgid "Current tools"
 msgstr "Eines actuals"
 
-#: src/components/interactions/quick-capture-dialog.tsx:360
+#: src/components/interactions/quick-capture-dialog.tsx
 msgid "Date"
 msgstr "Data"
 
-#: src/components/shared/status-badge.tsx:35
-#: src/routes/companies/$slug.tsx:447
+#: src/components/shared/status-badge.tsx
+#: src/routes/companies/$slug.tsx
 msgid "Dead"
 msgstr "Descartat"
 
-#: src/components/research/findings/contact-discovery-view.tsx:66
-#: src/routes/companies/$slug.tsx:996
+#: src/components/research/findings/contact-discovery-view.tsx
+#: src/routes/companies/$slug.tsx
 msgid "Decision maker"
 msgstr "Responsable de decisió"
 
-#: src/routes/calendar/index.tsx:337
+#: src/routes/calendar/index.tsx
 msgid "Decline"
 msgstr "Rebutja"
 
 #. placeholder {0}: d.name
-#: src/routes/settings/organization/templates.tsx:469
+#: src/routes/settings/organization/templates.tsx
 msgid "Decline {0}"
 msgstr "Rebutja {0}"
 
-#: src/routes/emails/inboxes.tsx:425
-#: src/routes/emails/inboxes.tsx:1466
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
 msgid "Default"
 msgstr "Per defecte"
 
-#: src/routes/emails/inboxes.tsx:501
+#: src/routes/emails/inboxes.tsx
 msgid "Default inbox"
 msgstr "Safata per defecte"
 
-#: src/routes/emails/inboxes.tsx:1009
+#: src/routes/emails/inboxes.tsx
 msgid "Defaults to the email address."
 msgstr "Per defecte, l'adreça electrònica."
 
-#: src/routes/emails/inboxes.tsx:1104
+#: src/routes/emails/inboxes.tsx
 msgid "Defaults to you when omitted."
 msgstr "Per defecte ets tu si s'omet."
 
-#: src/components/instructions/template-delete-confirm.tsx:51
-#: src/routes/emails/inboxes.tsx:1493
-#: src/routes/settings/api-keys/index.tsx:329
+#: src/components/instructions/template-delete-confirm.tsx
+#: src/routes/emails/inboxes.tsx
+#: src/routes/settings/api-keys/index.tsx
 msgid "Delete"
 msgstr "Elimina"
 
 #. placeholder {0}: row.name
-#: src/routes/settings/organization/templates.tsx:385
-#: src/routes/settings/profile/templates.tsx:267
+#: src/routes/settings/organization/templates.tsx
+#: src/routes/settings/profile/templates.tsx
 msgid "Delete {0}"
 msgstr "Elimina {0}"
 
-#: src/routes/emails/inboxes.tsx:276
-#: src/routes/emails/inboxes.tsx:1401
-#: src/routes/settings/api-keys/index.tsx:162
-#: src/routes/settings/organization/templates.tsx:249
-#: src/routes/settings/profile/templates.tsx:130
-#: src/routes/settings/profile/templates.tsx:150
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
+#: src/routes/settings/api-keys/index.tsx
+#: src/routes/settings/organization/templates.tsx
+#: src/routes/settings/profile/templates.tsx
+#: src/routes/settings/profile/templates.tsx
 msgid "Delete failed"
 msgstr "Error en eliminar"
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx:565
+#: src/routes/emails/inboxes.tsx
 msgid "Delete inbox {0}"
 msgstr "Suprimeix la bústia {0}"
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx:270
+#: src/routes/emails/inboxes.tsx
 msgid "Delete inbox {0}? Stored messages stay; the connection stops."
 msgstr "Suprimir la bústia {0}? Els missatges desats es mantenen; la connexió s'atura."
 
-#: src/routes/settings/api-keys/index.tsx:439
+#: src/routes/settings/api-keys/index.tsx
 msgid "Delete key"
 msgstr "Elimina la clau"
 
-#: src/routes/emails/inboxes.tsx:1394
+#: src/routes/emails/inboxes.tsx
 msgid "Delete this footer? This cannot be undone."
 msgstr "Eliminar aquest peu de pàgina? Aquesta acció no es pot desfer."
 
-#: src/routes/settings/api-keys/index.tsx:406
+#: src/routes/settings/api-keys/index.tsx
 msgid "Delete this key?"
 msgstr "Vols eliminar aquesta clau?"
 
-#: src/routes/settings/organization/templates.tsx:541
+#: src/routes/settings/organization/templates.tsx
 msgid "Delete this org template?"
 msgstr "Vols eliminar aquesta plantilla de l'organització?"
 
-#: src/routes/settings/profile/templates.tsx:329
+#: src/routes/settings/profile/templates.tsx
 msgid "Delete this template?"
 msgstr "Vols eliminar aquesta plantilla?"
 
-#: src/components/instructions/template-delete-confirm.tsx:51
-#: src/routes/settings/api-keys/index.tsx:329
-#: src/routes/settings/api-keys/index.tsx:439
+#: src/components/instructions/template-delete-confirm.tsx
+#: src/routes/settings/api-keys/index.tsx
+#: src/routes/settings/api-keys/index.tsx
 msgid "Deleting…"
 msgstr "Eliminant…"
 
-#: src/routes/emails/$threadId.tsx:675
+#: src/routes/emails/$threadId.tsx
 msgid "Delivered"
 msgstr "Lliurat"
 
-#: src/routes/oauth/consent.tsx:152
+#: src/routes/oauth/consent.tsx
 msgid "Deny"
 msgstr "Denega"
 
-#: src/components/interactions/quick-capture-dialog.tsx:256
+#: src/components/interactions/quick-capture-dialog.tsx
 msgid "Direction"
 msgstr "Direcció"
 
-#: src/routes/emails/inboxes.tsx:463
-#: src/routes/settings/api-keys/index.tsx:314
+#: src/routes/emails/inboxes.tsx
+#: src/routes/settings/api-keys/index.tsx
 msgid "Disabled"
 msgstr "Desactivada"
 
-#: src/components/emails/compose-form.tsx:545
+#: src/components/emails/compose-form.tsx
 msgid "Discard"
 msgstr "Descarta"
 
-#: src/components/companies/about-section.tsx:90
+#: src/components/companies/about-section.tsx
 msgid "Discovery"
 msgstr "Descoberta"
 
-#: src/routes/emails/inboxes.tsx:934
+#: src/routes/emails/inboxes.tsx
 msgid "Display name"
 msgstr "Nom a mostrar"
 
-#: src/components/shared/channel-icon.tsx:69
+#: src/components/shared/channel-icon.tsx
 msgid "Document"
 msgstr "Document"
 
-#: src/routes/companies/$slug.tsx:1150
+#: src/routes/companies/$slug.tsx
 msgid "Documents"
 msgstr "Documents"
 
 #. placeholder {0}: row.name
-#: src/routes/settings/profile/templates.tsx:251
+#: src/routes/settings/profile/templates.tsx
 msgid "Donate {0} to your organization"
 msgstr "Dona {0} a la teva organització"
 
-#: src/routes/settings/api-keys/index.tsx:384
+#: src/routes/settings/api-keys/index.tsx
 msgid "Done"
 msgstr "Fet"
 
-#: src/routes/tasks/index.tsx:513
+#: src/routes/tasks/index.tsx
 msgid "Done 7d"
 msgstr "Fetes 7d"
 
-#: src/routes/pages/index.tsx:127
+#: src/routes/pages/index.tsx
 msgid "Draft"
 msgstr "Esborrany"
 
 #. placeholder {0}: o.name
-#: src/components/instructions/stack-picker.tsx:114
+#: src/components/instructions/stack-picker.tsx
 msgid "Drag {0} to reorder"
 msgstr "Arrossega {0} per reordenar"
 
-#: src/components/shared/task-item.tsx:272
-#: src/routes/tasks/index.tsx:713
+#: src/components/shared/task-item.tsx
+#: src/routes/tasks/index.tsx
 msgid "Due"
 msgstr "Venciment"
 
-#: src/components/shared/task-item.tsx:284
+#: src/components/shared/task-item.tsx
 msgid "Due date"
 msgstr "Data de venciment"
 
-#: src/components/interactions/quick-capture-dialog.tsx:374
+#: src/components/interactions/quick-capture-dialog.tsx
 msgid "Duration (min)"
 msgstr "Durada (min)"
 
-#: src/components/instructions/template-editor-dialog.tsx:134
+#: src/components/instructions/template-editor-dialog.tsx
 msgid "e.g. [research] Spain hospitality sourcing"
 msgstr "p. ex. [research] Espanya prospecció d'hostaleria"
 
-#: src/routes/settings/api-keys/index.tsx:226
+#: src/routes/settings/api-keys/index.tsx
 msgid "e.g. Claude Desktop"
 msgstr "p. ex. Claude Desktop"
 
-#: src/routes/emails/inboxes.tsx:1527
+#: src/routes/emails/inboxes.tsx
 msgid "e.g. Company signature"
 msgstr "p. ex. Signatura de l'empresa"
 
-#: src/routes/emails/inboxes.tsx:940
+#: src/routes/emails/inboxes.tsx
 msgid "e.g. Sales — Acme"
 msgstr "p. ex. Vendes — Acme"
 
-#: src/routes/emails/inboxes.tsx:1484
+#: src/routes/emails/inboxes.tsx
 msgid "Edit"
 msgstr "Edita"
 
 #. placeholder {0}: row.name
-#: src/routes/settings/organization/templates.tsx:378
-#: src/routes/settings/profile/templates.tsx:260
+#: src/routes/settings/organization/templates.tsx
+#: src/routes/settings/profile/templates.tsx
 msgid "Edit {0}"
 msgstr "Edita {0}"
 
-#: src/components/shared/editable-field.tsx:141
+#: src/components/shared/editable-field.tsx
 msgid "Edit {label}"
 msgstr "Edita {label}"
 
-#: src/components/shared/task-item.tsx:261
+#: src/components/shared/task-item.tsx
 msgid "Edit due date"
 msgstr "Edita la data de venciment"
 
-#: src/routes/emails/inboxes.tsx:838
+#: src/routes/emails/inboxes.tsx
 msgid "Edit inbox"
 msgstr "Edita la safata"
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx:556
+#: src/routes/emails/inboxes.tsx
 msgid "Edit inbox {0}"
 msgstr "Edita la safata {0}"
 
-#: src/components/shared/task-item.tsx:216
+#: src/components/shared/task-item.tsx
 msgid "Edit task title"
 msgstr "Edita el títol de la tasca"
 
-#: src/components/instructions/template-editor-dialog.tsx:85
+#: src/components/instructions/template-editor-dialog.tsx
 msgid "Edit template"
 msgstr "Edita la plantilla"
 
-#: src/routes/pages/$id.tsx:154
-#: src/routes/pages/$id.tsx:291
+#: src/routes/pages/$id.tsx
+#: src/routes/pages/$id.tsx
 msgid "Editor"
 msgstr "Editor"
 
-#: src/components/companies/conversations-tab.tsx:160
-#: src/components/interactions/quick-capture-dialog.tsx:424
-#: src/components/research/findings/company-enrichment-view.tsx:187
-#: src/components/research/findings/contact-discovery-view.tsx:74
-#: src/components/shared/channel-icon.tsx:63
-#: src/routes/companies/$slug.tsx:860
-#: src/routes/emails/inboxes.tsx:422
-#: src/routes/forgot-password.tsx:109
-#: src/routes/login.tsx:378
-#: src/routes/settings/organization/invite.tsx:137
+#: src/components/companies/conversations-tab.tsx
+#: src/components/interactions/quick-capture-dialog.tsx
+#: src/components/research/findings/company-enrichment-view.tsx
+#: src/components/research/findings/contact-discovery-view.tsx
+#: src/components/shared/channel-icon.tsx
+#: src/routes/companies/$slug.tsx
+#: src/routes/emails/inboxes.tsx
+#: src/routes/forgot-password.tsx
+#: src/routes/login.tsx
+#: src/routes/settings/organization/invite.tsx
 msgid "Email"
 msgstr "Correu"
 
-#: src/routes/emails/inboxes.tsx:921
+#: src/routes/emails/inboxes.tsx
 msgid "Email address"
 msgstr "Adreça electrònica"
 
-#: src/components/emails/compose-dock.tsx:32
+#: src/components/emails/compose-dock.tsx
 msgid "Email drafts"
 msgstr "Esborranys de correu"
 
-#: src/routes/companies/$slug.tsx:1029
+#: src/routes/companies/$slug.tsx
 msgid "Email is dead-letter"
 msgstr "El correu electrònic és no entregable"
 
-#: src/routes/login.tsx:427
+#: src/routes/login.tsx
 msgid "Email me a sign-in link"
 msgstr "Envia'm un enllaç per correu"
 
-#: src/routes/login.tsx:147
+#: src/routes/login.tsx
 msgid "Email or password is incorrect."
 msgstr "El correu o la contrasenya no són correctes."
 
-#: src/routes/companies/$slug.tsx:1071
+#: src/routes/companies/$slug.tsx
 msgid "Email via Batuda"
 msgstr "Correu via Batuda"
 
-#: src/components/layout/nav-items.ts:53
-#: src/routes/emails/index.tsx:559
+#: src/components/layout/nav-items.ts
+#: src/routes/emails/index.tsx
 msgid "Emails"
 msgstr "Correus"
 
-#: src/routes/companies/$slug.tsx:938
+#: src/routes/companies/$slug.tsx
 msgid "Emails, calls, documents, and proposals will appear here as they happen."
 msgstr "Els emails, trucades, documents i propostes apareixeran aquí a mesura que passin."
 
-#: src/components/research/findings/company-enrichment-view.tsx:99
+#: src/components/research/findings/company-enrichment-view.tsx
 msgid "Enrichment"
 msgstr "Enriquiment"
 
-#: src/routes/login.tsx:153
+#: src/routes/login.tsx
 msgid "Enter a valid email above first."
 msgstr "Primer escriu un correu vàlid a sobre."
 
-#: src/routes/settings/organization/invite.tsx:54
+#: src/routes/settings/organization/invite.tsx
 msgid "Enter an email address."
 msgstr "Introdueix una adreça electrònica."
 
-#: src/components/shared/channel-icon.tsx:68
+#: src/components/shared/channel-icon.tsx
 msgid "Event"
 msgstr "Esdeveniment"
 
-#: src/components/emails/compose-window.tsx:69
+#: src/components/emails/compose-window.tsx
 msgid "Exit full screen"
 msgstr "Surt de pantalla completa"
 
-#: src/routes/emails/index.tsx:1410
+#: src/routes/emails/index.tsx
 msgid "Expand"
 msgstr "Desplega"
 
 #. placeholder {0}: formatDate(row.expiresAt)
-#: src/routes/settings/api-keys/index.tsx:307
+#: src/routes/settings/api-keys/index.tsx
 msgid "Expires {0}"
 msgstr "Caduca el {0}"
 
-#: src/routes/settings/api-keys/index.tsx:232
+#: src/routes/settings/api-keys/index.tsx
 msgid "Expires in (days)"
 msgstr "Caduca d'aquí a (dies)"
 
-#: src/routes/settings/api-keys/index.tsx:122
+#: src/routes/settings/api-keys/index.tsx
 msgid "Expiry must be a number of days greater than zero."
 msgstr "La caducitat ha de ser un nombre de dies més gran que zero."
 
-#: src/components/instructions/default-stack-editor.tsx:100
+#: src/components/instructions/default-stack-editor.tsx
 msgid "Extending the org default"
 msgstr "S'amplia el valor per defecte de l'organització"
 
-#: src/routes/emails/$threadId.tsx:681
+#: src/routes/emails/$threadId.tsx
 msgid "Failed"
 msgstr "Fallit"
 
-#: src/routes/companies/$slug.tsx:369
-#: src/routes/companies/$slug.tsx:885
+#: src/routes/companies/$slug.tsx
+#: src/routes/companies/$slug.tsx
 msgid "Files"
 msgstr "Arxius"
 
-#: src/components/research/research-dialog.tsx:44
+#: src/components/research/research-dialog.tsx
 msgid "Fill industry, size, location, contacts, competitors and proposed CRM updates for this company. Pick when you want every field on the company card answered."
 msgstr "Omple sector, mida, ubicació, contactes, competidors i actualitzacions de CRM proposades per a aquesta empresa. Tria-ho quan vulguis omplir tots els camps de la fitxa."
 
-#: src/routes/emails/index.tsx:660
+#: src/routes/emails/index.tsx
 msgid "Filter by inbox"
 msgstr "Filtra per safata"
 
-#: src/routes/companies/index.tsx:271
-#: src/routes/emails/index.tsx:617
+#: src/routes/companies/index.tsx
+#: src/routes/emails/index.tsx
 msgid "Filter by status"
 msgstr "Filtra per estat"
 
-#: src/routes/companies/index.tsx:255
+#: src/routes/companies/index.tsx
 msgid "Filter companies"
 msgstr "Filtra empreses"
 
-#: src/components/companies/conversations-tab.tsx:184
+#: src/components/companies/conversations-tab.tsx
 msgid "Filter conversations"
 msgstr "Filtra les converses"
 
-#: src/routes/emails/index.tsx:601
+#: src/routes/emails/index.tsx
 msgid "Filter emails"
 msgstr "Filtra correus"
 
-#: src/components/research/research-dialog.tsx:54
+#: src/components/research/research-dialog.tsx
 msgid "Find decision-makers and operational contacts at this company. Pick when you need names, emails, phones and roles to reach out."
 msgstr "Troba decisors i contactes operatius d'aquesta empresa. Tria-ho quan necessitis noms, correus, telèfons i rols per contactar-los."
 
-#: src/components/research/research-dialog.tsx:59
+#: src/components/research/research-dialog.tsx
 msgid "Find similar companies elsewhere with the same pain. Pick when you have closed a deal and want lookalikes."
 msgstr "Troba empreses similars amb el mateix problema. Tria-ho quan hagis tancat un acord i en vulguis trobar de semblants."
 
-#: src/components/research/run-detail.tsx:125
+#: src/components/research/run-detail.tsx
 msgid "Findings"
 msgstr "Troballes"
 
-#: src/components/shared/status-badge.tsx:40
+#: src/components/shared/status-badge.tsx
 msgid "First outreach sent"
 msgstr "Primer contacte enviat"
 
-#: src/routes/emails/$threadId.tsx:617
+#: src/routes/emails/$threadId.tsx
 msgid "Flagged as spam by the provider. The body is shown for review only."
 msgstr "El proveïdor l'ha marcat com a brossa. El cos es mostra només per revisar-lo."
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx:1441
+#: src/routes/emails/inboxes.tsx
 msgid "Footers — {0}"
 msgstr "Peus de pàgina — {0}"
 
-#: src/routes/login.tsx:434
+#: src/routes/login.tsx
 msgid "Forgot password?"
 msgstr "Has oblidat la contrasenya?"
 
-#: src/components/research/research-dialog.tsx:38
+#: src/components/research/research-dialog.tsx
 msgid "Freeform"
 msgstr "Lliure"
 
-#: src/routes/emails/$threadId.tsx:567
+#: src/routes/emails/$threadId.tsx
 msgid "From"
 msgstr "De"
 
-#: src/components/shared/task-item.tsx:340
+#: src/components/shared/task-item.tsx
 msgid "From booking"
 msgstr "De la reserva"
 
-#: src/components/shared/task-item.tsx:338
+#: src/components/shared/task-item.tsx
 msgid "From email"
 msgstr "Del correu"
 
-#: src/components/shared/task-item.tsx:341
+#: src/components/shared/task-item.tsx
 msgid "From webhook"
 msgstr "Del webhook"
 
-#: src/components/instructions/default-stack-editor.tsx:142
+#: src/components/instructions/default-stack-editor.tsx
 msgid "From your organization, applied first"
 msgstr "De la teva organització, s'aplica primer"
 
-#: src/components/emails/compose-window.tsx:69
+#: src/components/emails/compose-window.tsx
 msgid "Full screen"
 msgstr "Pantalla completa"
 
-#: src/routes/settings/mcp/index.tsx:120
+#: src/routes/settings/mcp/index.tsx
 msgid "Give an AI assistant access to this organization's CRM. Chat apps like ChatGPT and Claude.ai connect over OAuth; coding tools use an API key."
 msgstr "Dona a un assistent d'IA accés al CRM d'aquesta organització. Les aplicacions de xat com ChatGPT i Claude.ai es connecten amb OAuth; les eines de programació fan servir una clau API."
 
-#: src/routes/settings/api-keys/index.tsx:115
+#: src/routes/settings/api-keys/index.tsx
 msgid "Give the key a name so you can recognize it later."
 msgstr "Posa un nom a la clau perquè la puguis reconèixer més endavant."
 
-#: src/routes/oauth/consent.tsx:96
+#: src/routes/oauth/consent.tsx
 msgid "Go to connections"
 msgstr "Ves a connexions"
 
-#: src/routes/reset-password.tsx:173
+#: src/routes/reset-password.tsx
 msgid "Go to sign in"
 msgstr "Ves a iniciar sessió"
 
-#: src/routes/emails/inboxes.tsx:895
+#: src/routes/emails/inboxes.tsx
 msgid "Has two-factor authentication enabled? Use a provider app-specific password below, not your normal login password."
 msgstr "Tens la verificació en dos passos activada? Fes servir una contrasenya d'aplicació del proveïdor aquí sota, no la teva contrasenya d'inici de sessió habitual."
 
-#: src/routes/accept-invitation.$id.tsx:170
+#: src/routes/accept-invitation.$id.tsx
 msgid "Heading to the dashboard…"
 msgstr "Anant al tauler…"
 
-#: src/routes/emails/$threadId.tsx:590
+#: src/routes/emails/$threadId.tsx
 msgid "Hide Cc"
 msgstr "Amaga Cc"
 
-#: src/components/primitives/pri-password-input.tsx:97
+#: src/components/primitives/pri-password-input.tsx
 msgid "Hide password"
 msgstr "Amaga la contrasenya"
 
-#: src/routes/companies/$slug.tsx:453
+#: src/routes/companies/$slug.tsx
 msgid "High"
 msgstr "Alta"
 
-#: src/components/shared/priority-dot.tsx:47
-#: src/components/shared/task-item.tsx:309
-#: src/routes/index.tsx:462
+#: src/components/shared/priority-dot.tsx
+#: src/components/shared/task-item.tsx
+#: src/routes/index.tsx
 msgid "High priority"
 msgstr "Prioritat alta"
 
-#: src/components/instructions/default-stack-editor.tsx:115
+#: src/components/instructions/default-stack-editor.tsx
 msgid "How your default uses the org default"
 msgstr "Com es relaciona el teu valor per defecte amb el de l'organització"
 
-#: src/routes/emails/inboxes.tsx:487
-#: src/routes/emails/inboxes.tsx:1076
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
 msgid "Human"
 msgstr "Humà"
 
-#: src/components/profile/set-password-nudge.tsx:114
+#: src/components/profile/set-password-nudge.tsx
 msgid "I prefer passwordless"
 msgstr "Prefereixo sense contrasenya"
 
-#: src/routes/settings/profile/index.tsx:345
+#: src/routes/settings/profile/index.tsx
 msgid "I prefer passwordless — don't ask me again"
 msgstr "Prefereixo sense contrasenya — no m'ho tornis a preguntar"
 
-#: src/routes/forgot-password.tsx:72
+#: src/routes/forgot-password.tsx
 msgid "If <0>{submittedEmail}</0> is registered, a reset link is on its way. The link expires in 1 hour."
 msgstr "Si <0>{submittedEmail}</0> està registrat, t'arribarà un enllaç per restablir la contrasenya. L'enllaç caduca en 1 hora."
 
-#: src/routes/emails/inboxes.tsx:946
+#: src/routes/emails/inboxes.tsx
 msgid "IMAP host"
 msgstr "Servidor IMAP"
 
-#: src/routes/emails/inboxes.tsx:956
+#: src/routes/emails/inboxes.tsx
 msgid "IMAP port"
 msgstr "Port IMAP"
 
-#: src/routes/emails/inboxes.tsx:965
-#: src/routes/emails/inboxes.tsx:969
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
 msgid "IMAP security"
 msgstr "Seguretat IMAP"
 
-#: src/routes/settings/organization/templates.tsx:513
+#: src/routes/settings/organization/templates.tsx
 msgid "Import to org"
 msgstr "Importa a l'organització"
 
-#: src/routes/companies/index.tsx:252
+#: src/routes/companies/index.tsx
 msgid "In pipeline"
 msgstr "Al pipeline"
 
-#: src/components/interactions/quick-capture-dialog.tsx:271
-#: src/routes/emails/index.tsx:1209
+#: src/components/interactions/quick-capture-dialog.tsx
+#: src/routes/emails/index.tsx
 msgid "Inbound"
 msgstr "Entrant"
 
-#: src/routes/emails/index.tsx:795
+#: src/routes/emails/index.tsx
 msgid "Inbound and outbound emails will pin to this board once a thread exists."
 msgstr "Els correus entrants i sortints es fixaran en aquest tauler un cop existeixi un fil."
 
 #. placeholder {0}: msg.from
-#: src/routes/emails/$threadId.tsx:553
+#: src/routes/emails/$threadId.tsx
 msgid "Inbound message from {0}"
 msgstr "Missatge entrant de {0}"
 
-#: src/components/emails/compose-form.tsx:370
-#: src/routes/emails/$threadId.tsx:439
-#: src/routes/emails/$threadId.tsx:479
+#: src/components/emails/compose-form.tsx
+#: src/routes/emails/$threadId.tsx
+#: src/routes/emails/$threadId.tsx
 msgid "Inbox"
 msgstr "Safata"
 
-#: src/routes/emails/inboxes.tsx:590
+#: src/routes/emails/inboxes.tsx
 msgid "Inbox connected"
 msgstr "Bústia connectada"
 
-#: src/routes/emails/inboxes.tsx:320
+#: src/routes/emails/inboxes.tsx
 msgid "Inbox management"
 msgstr "Gestió de safates"
 
-#: src/routes/emails/inboxes.tsx:284
+#: src/routes/emails/inboxes.tsx
 msgid "Inbox removed"
 msgstr "Bústia eliminada"
 
-#: src/routes/emails/inboxes.tsx:607
+#: src/routes/emails/inboxes.tsx
 msgid "Inbox updated"
 msgstr "Safata actualitzada"
 
-#: src/components/companies/about-section.tsx:62
-#: src/components/research/findings/company-enrichment-view.tsx:76
-#: src/components/research/findings/prospect-scan-view.tsx:75
+#: src/components/companies/about-section.tsx
+#: src/components/research/findings/company-enrichment-view.tsx
+#: src/components/research/findings/prospect-scan-view.tsx
 msgid "Industry"
 msgstr "Sector"
 
-#: src/components/shared/channel-icon.tsx:66
+#: src/components/shared/channel-icon.tsx
 msgid "Instagram"
 msgstr "Instagram"
 
-#: src/routes/settings/organization/index.tsx:141
-#: src/routes/settings/profile/index.tsx:147
-#: src/routes/settings/profile/templates.tsx:194
+#: src/routes/settings/organization/index.tsx
+#: src/routes/settings/profile/index.tsx
+#: src/routes/settings/profile/templates.tsx
 msgid "Instruction templates"
 msgstr "Plantilles d'instruccions"
 
-#: src/components/instructions/template-editor-dialog.tsx:149
+#: src/components/instructions/template-editor-dialog.tsx
 msgid "Instructions"
 msgstr "Instruccions"
 
-#: src/components/research/research-dialog.tsx:221
+#: src/components/research/research-dialog.tsx
 msgid "Instructions for this run (optional)"
 msgstr "Instruccions per a aquesta recerca (opcional)"
 
-#: src/components/companies/conversations-tab.tsx:159
+#: src/components/companies/conversations-tab.tsx
 msgid "Interaction"
 msgstr "Interacció"
 
-#: src/components/interactions/quick-capture-dialog.tsx:154
+#: src/components/interactions/quick-capture-dialog.tsx
 msgid "Interaction logged"
 msgstr "Interacció registrada"
 
-#: src/routes/settings/organization/invite.tsx:120
+#: src/routes/settings/organization/invite.tsx
 msgid "Invitation sent to {sent}."
 msgstr "Invitació enviada a {sent}."
 
-#: src/routes/settings/organization/index.tsx:105
+#: src/routes/settings/organization/index.tsx
 msgid "Invite"
 msgstr "Convida"
 
-#: src/routes/settings/organization/invite.tsx:97
+#: src/routes/settings/organization/invite.tsx
 msgid "Invite a member"
 msgstr "Convida un membre"
 
-#: src/routes/settings/organization/index.tsx:100
+#: src/routes/settings/organization/index.tsx
 msgid "Invite a new member"
 msgstr "Convida un nou membre"
 
-#: src/routes/login.tsx:488
+#: src/routes/login.tsx
 msgid "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
 msgstr "Caduca en {MAGIC_LINK_EXPIRY_MINUTES} minuts. No el veus? Mira el correu brossa."
 
-#: src/routes/accept-invitation.$id.tsx:140
+#: src/routes/accept-invitation.$id.tsx
 msgid "Join the workspace"
 msgstr "Uneix-te a l'''espai de treball"
 
-#: src/routes/calendar/index.tsx:295
+#: src/routes/calendar/index.tsx
 msgid "Join video call"
 msgstr "Uneix-te a la videotrucada"
 
-#: src/routes/settings/organization/spend.tsx:236
+#: src/routes/settings/organization/spend.tsx
 msgid "Key"
 msgstr "Clau"
 
-#: src/routes/settings/api-keys/index.tsx:154
+#: src/routes/settings/api-keys/index.tsx
 msgid "Key deleted"
 msgstr "Clau eliminada"
 
-#: src/components/research/findings/competitor-scan-view.tsx:87
+#: src/components/research/findings/competitor-scan-view.tsx
 msgid "Key differentiators"
 msgstr "Diferenciadors clau"
 
-#: src/routes/settings/api-keys/index.tsx:204
+#: src/routes/settings/api-keys/index.tsx
 msgid "Keys let AI agents and MCP clients act on behalf of this organization."
 msgstr "Les claus permeten que els agents d'IA i els clients MCP actuïn en nom d'aquesta organització."
 
-#: src/routes/pages/index.tsx:146
+#: src/routes/pages/index.tsx
 msgid "Lang"
 msgstr "Idioma"
 
-#: src/components/profile/language-select.tsx:34
-#: src/routes/pages/$id.tsx:315
-#: src/routes/settings/profile/index.tsx:175
+#: src/components/profile/language-select.tsx
+#: src/routes/pages/$id.tsx
+#: src/routes/settings/profile/index.tsx
 msgid "Language"
 msgstr "Idioma"
 
-#: src/routes/settings/organization/spend.tsx:144
+#: src/routes/settings/organization/spend.tsx
 msgid "Last 30 days"
 msgstr "Últims 30 dies"
 
-#: src/routes/emails/$threadId.tsx:504
+#: src/routes/emails/$threadId.tsx
 msgid "Last activity"
 msgstr "Última activitat"
 
-#: src/components/companies/cadence-card.tsx:90
+#: src/components/companies/cadence-card.tsx
 msgid "Last call"
 msgstr "Última trucada"
 
-#: src/components/shared/company-card.tsx:95
-#: src/routes/companies/$slug.tsx:832
+#: src/components/shared/company-card.tsx
+#: src/routes/companies/$slug.tsx
 msgid "Last contact"
 msgstr "Últim contacte"
 
-#: src/components/companies/cadence-card.tsx:84
+#: src/components/companies/cadence-card.tsx
 msgid "Last email"
 msgstr "Últim email"
 
-#: src/components/companies/cadence-card.tsx:96
+#: src/components/companies/cadence-card.tsx
 msgid "Last meet"
 msgstr "Última visita"
 
-#: src/routes/tasks/index.tsx:486
+#: src/routes/tasks/index.tsx
 msgid "Later"
 msgstr "Més tard"
 
-#: src/components/research/findings/contact-discovery-view.tsx:92
-#: src/components/shared/channel-icon.tsx:65
+#: src/components/research/findings/contact-discovery-view.tsx
+#: src/components/shared/channel-icon.tsx
 msgid "LinkedIn"
 msgstr "LinkedIn"
 
-#: src/routes/calendar/index.tsx:190
+#: src/routes/calendar/index.tsx
 msgid "Loading calendar…"
 msgstr "S'està carregant el calendari…"
 
-#: src/routes/companies/index.tsx:312
+#: src/routes/companies/index.tsx
 msgid "Loading companies…"
 msgstr "Carregant empreses…"
 
-#: src/components/research/run-detail.tsx:50
+#: src/components/research/run-detail.tsx
 msgid "Loading run…"
 msgstr "Carregant l'execució…"
 
-#: src/components/companies/upcoming-meetings-card.tsx:57
-#: src/components/shared/loading-spinner.tsx:23
-#: src/routes/settings/api-keys/index.tsx:270
-#: src/routes/settings/mcp/connections.tsx:127
-#: src/routes/settings/organization/index.tsx:52
-#: src/routes/settings/organization/members.tsx:113
+#: src/components/companies/upcoming-meetings-card.tsx
+#: src/components/shared/loading-spinner.tsx
+#: src/routes/emails/inboxes.tsx
+#: src/routes/settings/api-keys/index.tsx
+#: src/routes/settings/mcp/connections.tsx
+#: src/routes/settings/organization/index.tsx
+#: src/routes/settings/organization/members.tsx
 msgid "Loading…"
 msgstr "Carregant…"
 
-#: src/routes/emails/inboxes.tsx:420
+#: src/routes/emails/inboxes.tsx
 msgid "Local inboxes"
 msgstr "Safates locals"
 
-#: src/components/companies/where-panel-client.client.tsx:138
+#: src/components/companies/where-panel-client.client.tsx
 msgid "Locate this company"
 msgstr "Localitza aquesta empresa"
 
-#: src/components/companies/where-panel-client.client.tsx:60
+#: src/components/companies/where-panel-client.client.tsx
 msgid "Located on the map"
 msgstr "Localitzada al mapa"
 
-#: src/components/companies/where-panel-client.client.tsx:136
+#: src/components/companies/where-panel-client.client.tsx
 msgid "Locating…"
 msgstr "Localitzant…"
 
-#: src/components/companies/about-section.tsx:72
-#: src/components/research/findings/company-enrichment-view.tsx:79
-#: src/routes/calendar/index.tsx:285
+#: src/components/companies/about-section.tsx
+#: src/components/research/findings/company-enrichment-view.tsx
+#: src/routes/calendar/index.tsx
 msgid "Location"
 msgstr "Ubicació"
 
-#: src/components/interactions/quick-capture-dialog.tsx:408
-#: src/components/layout/top-bar.tsx:53
+#: src/components/interactions/quick-capture-dialog.tsx
+#: src/components/layout/top-bar.tsx
 msgid "Log"
 msgstr "Registra"
 
-#: src/components/shared/task-item.tsx:121
+#: src/components/shared/task-item.tsx
 msgid "Log an interaction for this task"
 msgstr "Registra una interacció per a aquesta tasca"
 
-#: src/components/companies/cadence-card.tsx:65
+#: src/components/companies/cadence-card.tsx
 msgid "Log first interaction"
 msgstr "Registra la primera interacció"
 
-#: src/components/interactions/quick-capture-dialog.tsx:182
-#: src/components/shared/company-card.tsx:108
-#: src/routes/companies/$slug.tsx:847
+#: src/components/interactions/quick-capture-dialog.tsx
+#: src/components/shared/company-card.tsx
+#: src/routes/companies/$slug.tsx
 msgid "Log interaction"
 msgstr "Registra interacció"
 
-#: src/components/interactions/quick-capture-dialog.tsx:408
+#: src/components/interactions/quick-capture-dialog.tsx
 msgid "Logging…"
 msgstr "Registrant…"
 
-#: src/routes/companies/$slug.tsx:455
+#: src/routes/companies/$slug.tsx
 msgid "Low"
 msgstr "Baixa"
 
-#: src/components/shared/priority-dot.tsx:49
-#: src/components/shared/task-item.tsx:311
+#: src/components/shared/priority-dot.tsx
+#: src/components/shared/task-item.tsx
 msgid "Low priority"
 msgstr "Prioritat baixa"
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx:549
+#: src/routes/emails/inboxes.tsx
 msgid "Manage footers for {0}"
 msgstr "Gestiona els peus de pàgina de {0}"
 
-#: src/routes/emails/index.tsx:572
+#: src/routes/emails/index.tsx
 msgid "Manage inboxes"
 msgstr "Gestiona les safates"
 
-#: src/routes/settings/organization/index.tsx:83
+#: src/routes/settings/organization/index.tsx
 msgid "Manage members"
 msgstr "Gestiona els membres"
 
-#: src/routes/settings/organization/index.tsx:136
+#: src/routes/settings/organization/index.tsx
 msgid "Manage org instruction templates"
 msgstr "Gestiona les plantilles d'instruccions de l'organització"
 
-#: src/components/research/research-dialog.tsx:49
+#: src/components/research/research-dialog.tsx
 msgid "Map direct competitors with strengths, weaknesses, and a market-maturity summary. Pick when you need to know who you are up against."
 msgstr "Mapeja competidors directes amb fortaleses, debilitats i un resum de maduresa de mercat. Tria-ho quan necessitis saber contra qui competeixes."
 
 #. placeholder {0}: task.title
-#: src/components/shared/task-item.tsx:80
+#: src/components/shared/task-item.tsx
 msgid "Mark \"{0}\" as complete"
 msgstr "Marca «{0}» com a completada"
 
 #. placeholder {0}: task.title
-#: src/components/shared/task-item.tsx:79
+#: src/components/shared/task-item.tsx
 msgid "Mark \"{0}\" as pending"
 msgstr "Marca «{0}» com a pendent"
 
-#: src/routes/emails/inboxes.tsx:519
+#: src/routes/emails/inboxes.tsx
 msgid "Mark active"
 msgstr "Marca com a activa"
 
-#: src/routes/emails/inboxes.tsx:501
+#: src/routes/emails/inboxes.tsx
 msgid "Mark as default"
 msgstr "Marca com a per defecte"
 
-#: src/components/shared/company-card.tsx:118
+#: src/components/shared/company-card.tsx
 msgid "Mark contacted"
 msgstr "Marca com a contactat"
 
-#: src/routes/emails/inboxes.tsx:519
+#: src/routes/emails/inboxes.tsx
 msgid "Mark inactive"
 msgstr "Marca com a inactiva"
 
-#: src/routes/emails/index.tsx:765
-#: src/routes/emails/index.tsx:1269
+#: src/routes/emails/index.tsx
+#: src/routes/emails/index.tsx
 msgid "Mark read"
 msgstr "Marca com a llegit"
 
-#: src/routes/emails/$threadId.tsx:387
-#: src/routes/emails/index.tsx:1279
+#: src/routes/emails/$threadId.tsx
+#: src/routes/emails/index.tsx
 msgid "Mark unread"
 msgstr "Marca com a no llegit"
 
-#: src/components/research/findings/competitor-scan-view.tsx:66
+#: src/components/research/findings/competitor-scan-view.tsx
 msgid "Market summary"
 msgstr "Resum de mercat"
 
-#: src/components/research/findings/competitor-scan-view.tsx:78
+#: src/components/research/findings/competitor-scan-view.tsx
 msgid "Maturity"
 msgstr "Maduresa"
 
-#: src/routes/settings/mcp/connections.tsx:111
+#: src/routes/settings/mcp/connections.tsx
 msgid "MCP connections"
 msgstr "Connexions MCP"
 
-#: src/routes/companies/$slug.tsx:454
+#: src/routes/companies/$slug.tsx
 msgid "Medium"
 msgstr "Mitjana"
 
-#: src/components/shared/priority-dot.tsx:48
+#: src/components/shared/priority-dot.tsx
 msgid "Medium priority"
 msgstr "Prioritat mitjana"
 
-#: src/components/interactions/quick-capture-dialog.tsx:423
-#: src/components/shared/status-badge.tsx:31
-#: src/routes/companies/$slug.tsx:443
+#: src/components/interactions/quick-capture-dialog.tsx
+#: src/components/shared/status-badge.tsx
+#: src/routes/companies/$slug.tsx
 msgid "Meeting"
 msgstr "Reunió"
 
-#: src/components/shared/status-badge.tsx:42
+#: src/components/shared/status-badge.tsx
 msgid "Meeting booked"
 msgstr "Reunió programada"
 
-#: src/routes/calendar/index.tsx:182
+#: src/routes/calendar/index.tsx
 msgid "Meetings from bookings, email invitations, and internal blocks."
 msgstr "Reunions des de reserves, invitacions per correu i blocs interns."
 
-#: src/routes/settings/organization/invite.tsx:168
-#: src/routes/settings/organization/members.tsx:62
+#: src/routes/settings/organization/invite.tsx
+#: src/routes/settings/organization/members.tsx
 msgid "Member"
 msgstr "Membre"
 
-#: src/routes/settings/organization/templates.tsx:443
+#: src/routes/settings/organization/templates.tsx
 msgid "Member proposals"
 msgstr "Propostes dels membres"
 
-#: src/routes/settings/organization/index.tsx:88
-#: src/routes/settings/organization/members.tsx:101
+#: src/routes/settings/organization/index.tsx
+#: src/routes/settings/organization/members.tsx
 msgid "Members"
 msgstr "Membres"
 
-#: src/components/emails/compose-form.tsx:472
+#: src/components/emails/compose-form.tsx
 msgid "Message"
 msgstr "Missatge"
 
-#: src/routes/emails/$threadId.tsx:494
+#: src/routes/emails/$threadId.tsx
 msgid "Messages"
 msgstr "Missatges"
 
-#: src/routes/pages/$id.tsx:155
+#: src/routes/pages/$id.tsx
 msgid "Meta"
 msgstr "Meta"
 
-#: src/components/instructions/stack-picker.tsx:76
-#: src/routes/settings/profile/templates.tsx:244
+#: src/components/instructions/stack-picker.tsx
+#: src/routes/settings/profile/templates.tsx
 msgid "Mine"
 msgstr "Meva"
 
-#: src/components/emails/compose-window.tsx:62
+#: src/components/emails/compose-window.tsx
 msgid "Minimize"
 msgstr "Minimitza"
 
-#: src/components/instructions/template-editor-dialog.tsx:127
-#: src/routes/emails/inboxes.tsx:1521
-#: src/routes/settings/api-keys/index.tsx:219
+#: src/components/instructions/template-editor-dialog.tsx
+#: src/routes/emails/inboxes.tsx
+#: src/routes/settings/api-keys/index.tsx
 msgid "Name"
 msgstr "Nom"
 
-#: src/components/emails/compose-form.tsx:408
+#: src/components/emails/compose-form.tsx
 msgid "name@example.com, another@example.com"
 msgstr "nom@exemple.cat, altre@exemple.cat"
 
-#: src/routes/index.tsx:292
+#: src/routes/index.tsx
 msgid "Needs attention"
 msgstr "Necessita atenció"
 
-#: src/components/companies/cadence-card.tsx:86
-#: src/components/companies/cadence-card.tsx:92
-#: src/components/companies/cadence-card.tsx:98
-#: src/routes/companies/$slug.tsx:834
+#: src/components/companies/cadence-card.tsx
+#: src/components/companies/cadence-card.tsx
+#: src/components/companies/cadence-card.tsx
+#: src/routes/companies/$slug.tsx
 msgid "never"
 msgstr "mai"
 
-#: src/routes/settings/api-keys/index.tsx:240
+#: src/routes/settings/api-keys/index.tsx
 msgid "Never"
 msgstr "Mai"
 
-#: src/routes/settings/api-keys/index.tsx:309
+#: src/routes/settings/api-keys/index.tsx
 msgid "Never expires"
 msgstr "No caduca mai"
 
-#: src/components/instructions/template-editor-dialog.tsx:87
-#: src/routes/settings/organization/templates.tsx:356
+#: src/components/instructions/template-editor-dialog.tsx
+#: src/routes/settings/organization/templates.tsx
 msgid "New org template"
 msgstr "Nova plantilla d'organització"
 
-#: src/routes/reset-password.tsx:193
-#: src/routes/settings/profile/index.tsx:285
-#: src/routes/settings/profile/index.tsx:469
+#: src/routes/reset-password.tsx
+#: src/routes/settings/profile/index.tsx
+#: src/routes/settings/profile/index.tsx
 msgid "New password"
 msgstr "Contrasenya nova"
 
-#: src/routes/emails/inboxes.tsx:1031
+#: src/routes/emails/inboxes.tsx
 msgid "New password or app-password"
 msgstr "Contrasenya nova o d'aplicació"
 
-#: src/components/instructions/template-editor-dialog.tsx:89
-#: src/routes/settings/profile/templates.tsx:216
+#: src/components/instructions/template-editor-dialog.tsx
+#: src/routes/settings/profile/templates.tsx
 msgid "New template"
 msgstr "Nova plantilla"
 
-#: src/routes/emails/index.tsx:852
+#: src/routes/emails/index.tsx
 msgid "Next"
 msgstr "Següent"
 
-#: src/components/companies/next-action-card.tsx:31
-#: src/components/companies/next-action-card.tsx:36
-#: src/components/interactions/quick-capture-dialog.tsx:348
+#: src/components/companies/next-action-card.tsx
+#: src/components/companies/next-action-card.tsx
+#: src/components/interactions/quick-capture-dialog.tsx
 msgid "Next action"
 msgstr "Següent acció"
 
-#: src/components/companies/cadence-card.tsx:102
+#: src/components/companies/cadence-card.tsx
 msgid "Next event"
 msgstr "Pròxim esdeveniment"
 
 #. placeholder {0}: entry.nextAction
-#: src/components/shared/timeline-entry.tsx:62
+#: src/components/shared/timeline-entry.tsx
 msgid "Next: {0}"
 msgstr "Següent: {0}"
 
-#: src/components/layout/org-switcher.tsx:68
+#: src/components/layout/org-switcher.tsx
 msgid "No active organization"
 msgstr "Sense organització activa"
 
-#: src/routes/emails/index.tsx:778
+#: src/routes/emails/index.tsx
 msgid "No active organization on this session"
 msgstr "Cap organització activa en aquesta sessió"
 
-#: src/routes/settings/organization/index.tsx:58
+#: src/routes/settings/organization/index.tsx
 msgid "No active organization. Pick one from the switcher in the top bar."
 msgstr "Sense organització activa. Tria'n una al selector de la barra superior."
 
-#: src/routes/companies/$slug.tsx:937
+#: src/routes/companies/$slug.tsx
 msgid "No activity yet"
 msgstr "Encara no hi ha activitat"
 
-#: src/components/companies/calendar-tab.tsx:43
+#: src/components/companies/calendar-tab.tsx
 msgid "No calendar events for this company yet."
 msgstr "Encara no hi ha esdeveniments per a aquesta empresa."
 
-#: src/routes/calendar/index.tsx:193
+#: src/routes/calendar/index.tsx
 msgid "No calendar events yet"
 msgstr "Encara no hi ha esdeveniments al calendari"
 
-#: src/routes/tasks/index.tsx:752
+#: src/routes/tasks/index.tsx
 msgid "No changes recorded yet."
 msgstr "Encara no hi ha canvis enregistrats."
 
-#: src/routes/companies/index.tsx:322
+#: src/routes/companies/index.tsx
 msgid "No companies match the filters"
 msgstr "Cap empresa coincideix amb els filtres"
 
-#: src/routes/companies/index.tsx:323
+#: src/routes/companies/index.tsx
 msgid "No companies yet"
 msgstr "Encara no hi ha empreses"
 
-#: src/components/layout/org-switcher.tsx:62
-#: src/routes/accept-invitation.$id.tsx:98
-#: src/routes/login.tsx:152
-#: src/routes/oauth/consent.tsx:71
-#: src/routes/settings/organization/invite.tsx:77
-#: src/routes/settings/organization/members.tsx:81
-#: src/routes/settings/profile/index.tsx:91
+#: src/components/layout/org-switcher.tsx
+#: src/routes/accept-invitation.$id.tsx
+#: src/routes/login.tsx
+#: src/routes/oauth/consent.tsx
+#: src/routes/settings/organization/invite.tsx
+#: src/routes/settings/organization/members.tsx
+#: src/routes/settings/profile/index.tsx
 msgid "No connection to the server. Try again in a few seconds."
 msgstr "Sense connexió al servidor. Torna-ho a provar d'aquí a uns segons."
 
-#: src/routes/settings/mcp/connections.tsx:137
+#: src/routes/settings/mcp/connections.tsx
 msgid "No connections yet. Add this server in your AI assistant and authorize it, then it appears here."
 msgstr "Encara no hi ha connexions. Afegeix aquest servidor al teu assistent d'IA i autoritza'l; després apareixerà aquí."
 
-#: src/components/companies/cadence-card.tsx:56
+#: src/components/companies/cadence-card.tsx
 msgid "No contact yet."
 msgstr "Encara sense contacte."
 
-#: src/routes/companies/$slug.tsx:984
+#: src/routes/companies/$slug.tsx
 msgid "No contacts yet"
 msgstr "Encara no hi ha contactes"
 
-#: src/components/companies/conversations-tab.tsx:212
+#: src/components/companies/conversations-tab.tsx
 msgid "No conversations yet."
 msgstr "Encara cap conversa."
 
-#: src/components/companies/where-panel-client.client.tsx:113
+#: src/components/companies/where-panel-client.client.tsx
 msgid "No coordinates yet. Locate this company to plot it on the map."
 msgstr "Encara sense coordenades. Localitza aquesta empresa per situar-la al mapa."
 
-#: src/components/shared/task-item.tsx:104
-#: src/components/shared/task-item.tsx:264
-#: src/routes/tasks/index.tsx:718
+#: src/components/shared/task-item.tsx
+#: src/components/shared/task-item.tsx
+#: src/routes/tasks/index.tsx
 msgid "no date"
 msgstr "sense data"
 
-#: src/routes/companies/$slug.tsx:1154
+#: src/routes/companies/$slug.tsx
 msgid "No documents yet"
 msgstr "Encara no hi ha documents"
 
-#: src/components/companies/open-tasks-card.tsx:53
+#: src/components/companies/open-tasks-card.tsx
 msgid "no due date"
 msgstr "sense data de venciment"
 
-#: src/routes/tasks/index.tsx:495
+#: src/routes/tasks/index.tsx
 msgid "No due date"
 msgstr "Sense data de venciment"
 
-#: src/routes/emails/inboxes.tsx:1456
+#: src/routes/emails/inboxes.tsx
 msgid "No footers"
 msgstr "Sense peus de pàgina"
 
-#: src/routes/index.tsx:465
+#: src/routes/index.tsx
 msgid "No high-priority companies without a scheduled follow-up"
 msgstr "Cap empresa d'alta prioritat sense seguiment programat"
 
-#: src/routes/emails/inboxes.tsx:405
+#: src/routes/emails/inboxes.tsx
 msgid "No inboxes yet"
 msgstr "Encara no hi ha safates"
 
-#: src/routes/settings/api-keys/index.tsx:278
+#: src/routes/settings/api-keys/index.tsx
 msgid "No keys yet. Create one above to connect an agent."
 msgstr "Encara no tens cap clau. Crea'n una a dalt per connectar un agent."
 
-#: src/routes/calendar/index.tsx:300
+#: src/routes/calendar/index.tsx
 msgid "no location"
 msgstr "sense ubicació"
 
-#: src/routes/settings/organization/members.tsx:119
+#: src/routes/settings/organization/members.tsx
 msgid "No members yet."
 msgstr "Encara no hi ha membres."
 
-#: src/routes/emails/$threadId.tsx:454
+#: src/routes/emails/$threadId.tsx
 msgid "No messages in this thread"
 msgstr "No hi ha missatges en aquest fil"
 
-#: src/components/companies/open-tasks-card.tsx:45
+#: src/components/companies/open-tasks-card.tsx
 msgid "No open tasks."
 msgstr "Cap tasca oberta."
 
-#: src/routes/settings/organization/templates.tsx:145
+#: src/routes/settings/organization/templates.tsx
 msgid "No org templates yet."
 msgstr "Encara no hi ha plantilles d'organització."
 
-#: src/routes/settings/organization/templates.tsx:362
+#: src/routes/settings/organization/templates.tsx
 msgid "No org templates yet. Create one, import a preset, or accept a member's proposal."
 msgstr "Encara no hi ha plantilles d'organització. Crea'n una, importa una predefinida o accepta la proposta d'un membre."
 
-#: src/routes/index.tsx:304
+#: src/routes/index.tsx
 msgid "No overdue tasks, no pending follow-ups, no neglected companies."
 msgstr "Sense tasques endarrerides, sense seguiments pendents, sense empreses oblidades."
 
-#: src/routes/companies/$slug.tsx:1123
-#: src/routes/pages/index.tsx:137
+#: src/routes/companies/$slug.tsx
+#: src/routes/pages/index.tsx
 msgid "No pages yet"
 msgstr "Encara no hi ha pàgines"
 
-#: src/routes/settings/organization/spend.tsx:172
+#: src/routes/settings/organization/spend.tsx
 msgid "No paid calls in this range."
 msgstr "No hi ha crides de pagament en aquest interval."
 
-#: src/routes/settings/organization/templates.tsx:496
+#: src/routes/settings/organization/templates.tsx
 msgid "No presets available."
 msgstr "No hi ha plantilles predefinides disponibles."
 
-#: src/routes/emails/inboxes.tsx:339
+#: src/routes/emails/inboxes.tsx
 msgid "No primary inbox set."
 msgstr "No hi ha cap bústia principal."
 
-#: src/components/companies/about-section.tsx:121
+#: src/components/companies/about-section.tsx
 msgid "No products linked yet"
 msgstr "Encara sense productes vinculats"
 
-#: src/routes/settings/organization/templates.tsx:447
+#: src/routes/settings/organization/templates.tsx
 msgid "No proposals waiting for review."
 msgstr "No hi ha cap proposta pendent de revisió."
 
-#: src/components/research/run-list.tsx:29
+#: src/components/research/run-list.tsx
 msgid "No research runs yet for this company."
 msgstr "Encara no hi ha recerques per a aquesta empresa."
 
-#: src/components/companies/research-summary-card.tsx:47
+#: src/components/companies/research-summary-card.tsx
 msgid "No research yet."
 msgstr "Encara sense recerca."
 
-#: src/components/research/run-detail.tsx:143
-#: src/components/research/run-detail.tsx:154
+#: src/components/research/run-detail.tsx
+#: src/components/research/run-detail.tsx
 msgid "No structured findings."
 msgstr "No hi ha troballes estructurades."
 
-#: src/components/companies/about-section.tsx:115
+#: src/components/companies/about-section.tsx
 msgid "No tags yet"
 msgstr "Encara sense etiquetes"
 
-#: src/routes/index.tsx:382
+#: src/routes/index.tsx
 msgid "No tasks for today"
 msgstr "Cap tasca per a avui"
 
-#: src/components/instructions/stack-picker.tsx:94
+#: src/components/instructions/stack-picker.tsx
 msgid "No templates added yet."
 msgstr "Encara no has afegit cap plantilla."
 
-#: src/routes/settings/profile/templates.tsx:226
+#: src/routes/settings/profile/templates.tsx
 msgid "No templates yet. Create one to start shaping your runs."
 msgstr "Encara no hi ha plantilles. Crea'n una per començar a guiar les teves recerques."
 
-#: src/routes/emails/index.tsx:790
+#: src/routes/emails/index.tsx
 msgid "No threads match the filters"
 msgstr "Cap fil coincideix amb els filtres"
 
-#: src/routes/emails/index.tsx:790
+#: src/routes/emails/index.tsx
 msgid "No threads yet"
 msgstr "Encara no hi ha fils"
 
-#: src/routes/index.tsx:422
+#: src/routes/index.tsx
 msgid "No upcoming due dates"
 msgstr "Sense venciments propers"
 
-#: src/components/companies/upcoming-meetings-card.tsx:73
+#: src/components/companies/upcoming-meetings-card.tsx
 msgid "No upcoming meetings."
 msgstr "No hi ha reunions properes."
 
-#: src/components/companies/cadence-card.tsx:106
+#: src/components/companies/cadence-card.tsx
 msgid "none scheduled"
 msgstr "cap planificat"
 
-#: src/components/shared/task-item.tsx:312
+#: src/components/shared/task-item.tsx
 msgid "Normal priority"
 msgstr "Prioritat normal"
 
-#: src/routes/forgot-password.tsx:78
+#: src/routes/forgot-password.tsx
 msgid "Not seeing it? Check your spam folder. If you're sure the email is right and it never arrives, an admin can help."
 msgstr "No el veus? Mira la carpeta de correu brossa. Si estàs segur que el correu és correcte i no arriba mai, un administrador et pot ajudar."
 
-#: src/components/interactions/quick-capture-dialog.tsx:425
+#: src/components/interactions/quick-capture-dialog.tsx
 msgid "Note"
 msgstr "Nota"
 
-#: src/routes/tasks/index.tsx:815
+#: src/routes/tasks/index.tsx
 msgid "Nothing changed yet."
 msgstr "Encara no ha canviat res."
 
-#: src/routes/oauth/consent.tsx:80
+#: src/routes/oauth/consent.tsx
 msgid "Nothing to authorize"
 msgstr "Res a autoritzar"
 
-#: src/routes/settings/organization/spend.tsx:227
+#: src/routes/settings/organization/spend.tsx
 msgid "Nothing to show in this range."
 msgstr "Res a mostrar en aquest interval."
 
-#: src/routes/emails/$threadId.tsx:258
+#: src/routes/emails/$threadId.tsx
 msgid "On {date}, {who} wrote:"
 msgstr "El {date}, {who} va escriure:"
 
-#: src/routes/accept-invitation.$id.tsx:143
+#: src/routes/accept-invitation.$id.tsx
 msgid "One click to accept the invitation."
 msgstr "Un clic per acceptar la invitació."
 
-#: src/routes/settings/organization/invite.tsx:110
+#: src/routes/settings/organization/invite.tsx
 msgid "Only owners and admins can invite new members."
 msgstr "Només els propietaris i administradors poden convidar nous membres."
 
-#: src/routes/emails/$threadId.tsx:332
-#: src/routes/emails/index.tsx:625
-#: src/routes/tasks/index.tsx:444
+#: src/routes/emails/$threadId.tsx
+#: src/routes/emails/index.tsx
+#: src/routes/tasks/index.tsx
 msgid "Open"
 msgstr "Obert"
 
 #. placeholder {0}: provider.label
-#: src/routes/login.tsx:521
+#: src/routes/login.tsx
 msgid "Open {0}"
 msgstr "Obre {0}"
 
-#: src/routes/calendar/index.tsx:359
+#: src/routes/calendar/index.tsx
 msgid "Open company"
 msgstr "Obre l'empresa"
 
-#: src/routes/accept-invitation.$id.tsx:181
+#: src/routes/accept-invitation.$id.tsx
 msgid "Open dashboard"
 msgstr "Obre el tauler"
 
-#: src/components/companies/upcoming-meetings-card.tsx:108
+#: src/components/companies/upcoming-meetings-card.tsx
 msgid "Open in Cal.com"
 msgstr "Obre a Cal.com"
 
-#: src/components/companies/where-panel-client.client.tsx:94
-#: src/routes/companies/$slug.tsx:824
+#: src/components/companies/where-panel-client.client.tsx
+#: src/routes/companies/$slug.tsx
 msgid "Open in Google Maps"
 msgstr "Obre a Google Maps"
 
-#: src/components/shared/company-card.tsx:122
+#: src/components/shared/company-card.tsx
 msgid "Open in new tab"
 msgstr "Obre en una pestanya nova"
 
-#: src/routes/companies/$slug.tsx:814
+#: src/routes/companies/$slug.tsx
 msgid "Open Instagram"
 msgstr "Obre Instagram"
 
-#: src/routes/companies/$slug.tsx:804
+#: src/routes/companies/$slug.tsx
 msgid "Open LinkedIn"
 msgstr "Obre LinkedIn"
 
 #. placeholder {0}: run.query
-#: src/components/research/run-list.tsx:43
+#: src/components/research/run-list.tsx
 msgid "Open research run {0}"
 msgstr "Obre la recerca {0}"
 
-#: src/components/shared/task-item.tsx:112
+#: src/components/shared/task-item.tsx
 msgid "Open task details"
 msgstr "Obre els detalls de la tasca"
 
-#: src/components/companies/open-tasks-card.tsx:39
-#: src/routes/index.tsx:273
+#: src/components/companies/open-tasks-card.tsx
+#: src/routes/index.tsx
 msgid "Open tasks"
 msgstr "Tasques obertes"
 
-#: src/routes/settings/organization/index.tsx:118
+#: src/routes/settings/organization/index.tsx
 msgid "Open the org spend dashboard"
 msgstr "Obre el panell de despesa de l'organització"
 
-#: src/routes/emails/inboxes.tsx:904
+#: src/routes/emails/inboxes.tsx
 msgid "Open the setup guide, opens in a new tab"
 msgstr "Obre la guia de configuració, s'obre en una pestanya nova"
 
-#: src/routes/companies/$slug.tsx:778
+#: src/routes/companies/$slug.tsx
 msgid "Open website"
 msgstr "Obre el lloc web"
 
-#: src/components/research/research-dialog.tsx:39
+#: src/components/research/research-dialog.tsx
 msgid "Open-ended brief. Pick when the question does not fit a fixed shape — history, market trend, an opinion piece. No structured output."
 msgstr "Resum lliure. Tria-ho quan la pregunta no encaixa en una forma fixa — història, tendència de mercat, opinió. Sense sortida estructurada."
 
-#: src/routes/emails/$threadId.tsx:687
+#: src/routes/emails/$threadId.tsx
 msgid "Opened"
 msgstr "Obert"
 
-#: src/components/instructions/stack-picker.tsx:76
-#: src/routes/settings/organization/templates.tsx:138
-#: src/routes/settings/organization/templates.tsx:373
-#: src/routes/settings/profile/templates.tsx:242
+#: src/components/instructions/stack-picker.tsx
+#: src/routes/settings/organization/templates.tsx
+#: src/routes/settings/organization/templates.tsx
+#: src/routes/settings/profile/templates.tsx
 msgid "Org"
 msgstr "Org"
 
-#: src/routes/settings/organization/templates.tsx:273
+#: src/routes/settings/organization/templates.tsx
 msgid "Org default saved"
 msgstr "Valor per defecte de l'organització desat"
 
-#: src/routes/settings/organization/templates.tsx:109
+#: src/routes/settings/organization/templates.tsx
 msgid "Org instruction templates"
 msgstr "Plantilles d'instruccions de l'organització"
 
-#: src/routes/settings/organization/templates.tsx:347
+#: src/routes/settings/organization/templates.tsx
 msgid "Org templates"
 msgstr "Plantilles de l'organització"
 
-#: src/routes/settings/organization/index.tsx:42
-#: src/routes/settings/organization/invite.tsx:91
-#: src/routes/settings/organization/members.tsx:95
-#: src/routes/settings/profile/index.tsx:117
+#: src/routes/settings/organization/index.tsx
+#: src/routes/settings/organization/invite.tsx
+#: src/routes/settings/organization/members.tsx
+#: src/routes/settings/profile/index.tsx
 msgid "Organization"
 msgstr "Organització"
 
-#: src/routes/settings/organization/templates.tsx:401
+#: src/routes/settings/organization/templates.tsx
 msgid "Organization default"
 msgstr "Valor per defecte de l'organització"
 
 #. placeholder {0}: row.name ?? t`Unnamed client`
-#: src/routes/settings/mcp/connections.tsx:177
+#: src/routes/settings/mcp/connections.tsx
 msgid "Organization for {0}"
 msgstr "Organització per a {0}"
 
-#: src/routes/settings/mcp/connections.tsx:82
+#: src/routes/settings/mcp/connections.tsx
 msgid "Organization updated"
 msgstr "Organització actualitzada"
 
-#: src/components/layout/org-switcher.tsx:107
+#: src/components/layout/org-switcher.tsx
 msgid "Organizations"
 msgstr "Organitzacions"
 
-#: src/components/shared/channel-icon.tsx:73
+#: src/components/shared/channel-icon.tsx
 msgid "Other"
 msgstr "Altres"
 
-#: src/components/interactions/quick-capture-dialog.tsx:268
-#: src/routes/emails/index.tsx:1207
+#: src/components/interactions/quick-capture-dialog.tsx
+#: src/routes/emails/index.tsx
 msgid "Outbound"
 msgstr "Sortint"
 
 #. placeholder {0}: msg.to.join(', ')
-#: src/routes/emails/$threadId.tsx:554
+#: src/routes/emails/$threadId.tsx
 msgid "Outbound message to {0}"
 msgstr "Missatge sortint a {0}"
 
-#: src/components/interactions/quick-capture-dialog.tsx:334
+#: src/components/interactions/quick-capture-dialog.tsx
 msgid "Outcome"
 msgstr "Resultat"
 
 #. placeholder {0}: entry.outcome
-#: src/components/shared/timeline-entry.tsx:61
+#: src/components/shared/timeline-entry.tsx
 msgid "Outcome: {0}"
 msgstr "Resultat: {0}"
 
-#: src/routes/index.tsx:274
-#: src/routes/tasks/index.tsx:446
-#: src/routes/tasks/index.tsx:468
+#: src/routes/index.tsx
+#: src/routes/tasks/index.tsx
+#: src/routes/tasks/index.tsx
 msgid "Overdue"
 msgstr "Endarrerit"
 
-#: src/components/research/findings/competitor-scan-view.tsx:126
+#: src/components/research/findings/competitor-scan-view.tsx
 msgid "Overlap"
 msgstr "Solapament"
 
-#: src/routes/companies/$slug.tsx:366
-#: src/routes/companies/$slug.tsx:873
+#: src/routes/companies/$slug.tsx
+#: src/routes/companies/$slug.tsx
 msgid "Overview"
 msgstr "Resum"
 
-#: src/routes/settings/organization/members.tsx:60
+#: src/routes/settings/organization/members.tsx
 msgid "Owner"
 msgstr "Propietari"
 
-#: src/routes/emails/inboxes.tsx:1098
+#: src/routes/emails/inboxes.tsx
 msgid "Owner user ID"
 msgstr "ID d'usuari propietari"
 
-#: src/routes/emails/index.tsx:844
+#: src/routes/emails/index.tsx
 msgid "Page {page} of {totalPages}"
 msgstr "Pàgina {page} de {totalPages}"
 
-#: src/routes/pages/$id.tsx:214
+#: src/routes/pages/$id.tsx
 msgid "Page published"
 msgstr "Pàgina publicada"
 
-#: src/routes/pages/$id.tsx:191
+#: src/routes/pages/$id.tsx
 msgid "Page saved"
 msgstr "Pàgina desada"
 
-#: src/routes/pages/$id.tsx:244
+#: src/routes/pages/$id.tsx
 msgid "Page title"
 msgstr "Títol de la pàgina"
 
-#: src/components/layout/nav-items.ts:60
-#: src/routes/companies/$slug.tsx:1118
-#: src/routes/pages/$id.tsx:237
-#: src/routes/pages/index.tsx:106
+#: src/components/layout/nav-items.ts
+#: src/routes/companies/$slug.tsx
+#: src/routes/pages/$id.tsx
+#: src/routes/pages/index.tsx
 msgid "Pages"
 msgstr "Pàgines"
 
-#: src/routes/settings/organization/index.tsx:127
+#: src/routes/settings/organization/index.tsx
 msgid "Paid research API calls billed to this org."
 msgstr "Crides d'API de recerca pagades carregades a aquesta organització."
 
-#: src/routes/settings/organization/spend.tsx:121
+#: src/routes/settings/organization/spend.tsx
 msgid "Paid research API calls billed to this organization."
 msgstr "Crides d'API de recerca pagades carregades a aquesta organització."
 
-#: src/components/research/findings/prospect-scan-view.tsx:100
+#: src/components/research/findings/prospect-scan-view.tsx
 msgid "Pain indicators"
 msgstr "Indicadors de dolor"
 
-#: src/components/companies/about-section.tsx:94
-#: src/components/research/findings/company-enrichment-view.tsx:81
+#: src/components/companies/about-section.tsx
+#: src/components/research/findings/company-enrichment-view.tsx
 msgid "Pain points"
 msgstr "Punts febles"
 
-#: src/routes/login.tsx:393
+#: src/routes/login.tsx
 msgid "Password"
 msgstr "Contrasenya"
 
-#: src/routes/emails/inboxes.tsx:1032
+#: src/routes/emails/inboxes.tsx
 msgid "Password or app-password"
 msgstr "Contrasenya o contrasenya d'aplicació"
 
-#: src/routes/reset-password.tsx:157
+#: src/routes/reset-password.tsx
 msgid "Password updated"
 msgstr "Contrasenya actualitzada"
 
-#: src/routes/settings/profile/index.tsx:517
+#: src/routes/settings/profile/index.tsx
 msgid "Password updated."
 msgstr "Contrasenya actualitzada."
 
-#: src/routes/settings/profile/index.tsx:371
+#: src/routes/settings/profile/index.tsx
 msgid "Passwordless sign-in only"
 msgstr "Només inici de sessió sense contrasenya"
 
-#: src/routes/reset-password.tsx:221
-#: src/routes/settings/profile/index.tsx:311
-#: src/routes/settings/profile/index.tsx:495
+#: src/routes/reset-password.tsx
+#: src/routes/settings/profile/index.tsx
+#: src/routes/settings/profile/index.tsx
 msgid "Passwords need at least {MIN_PASSWORD_LENGTH} characters."
 msgstr "La contrasenya ha de tenir com a mínim {MIN_PASSWORD_LENGTH} caràcters."
 
-#: src/components/research/findings/shared.tsx:143
+#: src/components/research/findings/shared.tsx
 msgid "Pending paid actions"
 msgstr "Accions de pagament pendents"
 
-#: src/routes/companies/$slug.tsx:368
-#: src/routes/companies/$slug.tsx:882
+#: src/routes/companies/$slug.tsx
+#: src/routes/companies/$slug.tsx
 msgid "People"
 msgstr "Persones"
 
-#: src/routes/settings/organization/members.tsx:104
+#: src/routes/settings/organization/members.tsx
 msgid "People with access to this workspace."
 msgstr "Persones amb accés a aquest espai de treball."
 
-#: src/routes/calendar/index.tsx:254
-#: src/routes/tasks/index.tsx:333
-#: src/routes/tasks/index.tsx:689
+#: src/routes/calendar/index.tsx
+#: src/routes/tasks/index.tsx
+#: src/routes/tasks/index.tsx
 msgid "Personal"
 msgstr "Personal"
 
-#: src/components/research/findings/company-enrichment-view.tsx:197
-#: src/components/research/findings/contact-discovery-view.tsx:84
+#: src/components/research/findings/company-enrichment-view.tsx
+#: src/components/research/findings/contact-discovery-view.tsx
 msgid "Phone"
 msgstr "Telèfon"
 
-#: src/routes/settings/profile/index.tsx:446
+#: src/routes/settings/profile/index.tsx
 msgid "Pick a new password. Other signed-in devices will be signed out."
 msgstr "Tria una contrasenya nova. Els altres dispositius es desconnectaran."
 
-#: src/routes/reset-password.tsx:188
+#: src/routes/reset-password.tsx
 msgid "Pick a password you'll remember. Minimum 8 characters."
 msgstr "Tria una contrasenya que recordis. Mínim 8 caràcters."
 
-#: src/routes/emails/inboxes.tsx:863
+#: src/routes/emails/inboxes.tsx
 msgid "Pick a provider"
 msgstr "Tria un proveïdor"
 
-#: src/routes/emails/index.tsx:779
+#: src/routes/emails/index.tsx
 msgid "Pick an organization from the switcher in the header, or sign out and back in. After a recent dev DB reset, existing sessions can point at organization ids that the reset removed."
 msgstr "Tria una organització al selector de la barra superior, o tanca la sessió i torna a entrar. Després d'un reset recent de la base de dades de dev, les sessions existents poden apuntar a identificadors d'organització que el reset ha esborrat."
 
-#: src/routes/emails/inboxes.tsx:340
+#: src/routes/emails/inboxes.tsx
 msgid "Pick one to use as your default sender."
 msgstr "Tria'n una com a remitent per defecte."
 
-#: src/components/research/research-dialog.tsx:226
+#: src/components/research/research-dialog.tsx
 msgid "Pick templates to use just for this run. Leave empty to use your default."
 msgstr "Tria les plantilles per fer servir només en aquesta recerca. Deixa-ho buit per utilitzar el valor per defecte."
 
-#: src/components/layout/nav-items.ts:38
-#: src/routes/index.tsx:262
+#: src/components/layout/nav-items.ts
+#: src/routes/index.tsx
 msgid "Pipeline"
 msgstr "Pipeline"
 
-#: src/routes/emails/inboxes.tsx:1213
+#: src/routes/emails/inboxes.tsx
 msgid "Plain"
 msgstr "Sense xifrar"
 
-#: src/routes/settings/organization/templates.tsx:279
-#: src/routes/settings/organization/templates.tsx:299
-#: src/routes/settings/organization/templates.tsx:313
-#: src/routes/settings/organization/templates.tsx:337
-#: src/routes/settings/profile/templates.tsx:177
+#: src/routes/settings/organization/templates.tsx
+#: src/routes/settings/organization/templates.tsx
+#: src/routes/settings/organization/templates.tsx
+#: src/routes/settings/organization/templates.tsx
+#: src/routes/settings/profile/templates.tsx
 msgid "Please try again."
 msgstr "Torna-ho a provar."
 
-#: src/routes/calendar/index.tsx:198
+#: src/routes/calendar/index.tsx
 msgid "Preparing calendar view…"
 msgstr "S'està preparant la vista del calendari…"
 
-#: src/routes/pages/$id.tsx:257
-#: src/routes/pages/index.tsx:180
+#: src/routes/pages/$id.tsx
+#: src/routes/pages/index.tsx
 msgid "Preview"
 msgstr "Vista prèvia"
 
-#: src/routes/emails/index.tsx:842
+#: src/routes/emails/index.tsx
 msgid "Previous"
 msgstr "Anterior"
 
-#: src/routes/emails/inboxes.tsx:303
+#: src/routes/emails/inboxes.tsx
 msgid "Primary inbox set"
 msgstr "Bústia principal establerta"
 
-#: src/components/layout/bottom-nav.tsx:18
+#: src/components/layout/bottom-nav.tsx
 msgid "Primary navigation"
 msgstr "Navegació principal"
 
-#: src/routes/tasks/index.tsx:701
+#: src/routes/tasks/index.tsx
 msgid "Priority"
 msgstr "Prioritat"
 
-#: src/routes/emails/inboxes.tsx:447
+#: src/routes/emails/inboxes.tsx
 msgid "Private"
 msgstr "Privada"
 
-#: src/routes/emails/inboxes.tsx:1128
+#: src/routes/emails/inboxes.tsx
 msgid "Private — hide threads from other members"
 msgstr "Privada — amaga els fils a la resta de membres"
 
-#: src/routes/emails/inboxes.tsx:446
+#: src/routes/emails/inboxes.tsx
 msgid "Private inbox"
 msgstr "Bústia privada"
 
-#: src/components/companies/about-section.tsx:118
-#: src/components/research/findings/company-enrichment-view.tsx:117
+#: src/components/companies/about-section.tsx
+#: src/components/research/findings/company-enrichment-view.tsx
 msgid "Products fit"
 msgstr "Encaix de productes"
 
-#: src/routes/companies/$slug.tsx:1088
-#: src/routes/settings/profile/index.tsx:103
+#: src/routes/companies/$slug.tsx
+#: src/routes/settings/profile/index.tsx
 msgid "Profile"
 msgstr "Perfil"
 
-#: src/components/shared/channel-icon.tsx:70
-#: src/components/shared/status-badge.tsx:32
-#: src/routes/companies/$slug.tsx:444
+#: src/components/shared/channel-icon.tsx
+#: src/components/shared/status-badge.tsx
+#: src/routes/companies/$slug.tsx
 msgid "Proposal"
 msgstr "Proposta"
 
-#: src/routes/settings/organization/templates.tsx:309
+#: src/routes/settings/organization/templates.tsx
 msgid "Proposal declined"
 msgstr "Proposta rebutjada"
 
-#: src/components/shared/status-badge.tsx:43
+#: src/components/shared/status-badge.tsx
 msgid "Proposal in review"
 msgstr "Proposta en revisió"
 
-#: src/routes/companies/$slug.tsx:1155
+#: src/routes/companies/$slug.tsx
 msgid "Proposals, meeting notes and attachments will show up here."
 msgstr "Les propostes, notes de reunió i adjunts apareixeran aquí."
 
-#: src/components/research/findings/shared.tsx:93
+#: src/components/research/findings/shared.tsx
 msgid "Proposed updates"
 msgstr "Actualitzacions proposades"
 
-#: src/components/shared/status-badge.tsx:28
-#: src/routes/companies/$slug.tsx:440
+#: src/components/shared/status-badge.tsx
+#: src/routes/companies/$slug.tsx
 msgid "Prospect"
 msgstr "Prospecte"
 
-#: src/components/research/research-dialog.tsx:58
+#: src/components/research/research-dialog.tsx
 msgid "Prospect scan"
 msgstr "Escàner de prospectes"
 
-#: src/components/research/findings/prospect-scan-view.tsx:57
+#: src/components/research/findings/prospect-scan-view.tsx
 msgid "Prospects"
 msgstr "Prospectes"
 
-#: src/routes/emails/inboxes.tsx:852
-#: src/routes/emails/inboxes.tsx:860
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
 msgid "Provider preset"
 msgstr "Preestablit del proveïdor"
 
-#: src/routes/pages/$id.tsx:334
+#: src/routes/pages/$id.tsx
 msgid "Public URL"
 msgstr "URL pública"
 
-#: src/routes/pages/$id.tsx:282
+#: src/routes/pages/$id.tsx
 msgid "Publish"
 msgstr "Publica"
 
-#: src/routes/pages/$id.tsx:221
+#: src/routes/pages/$id.tsx
 msgid "Publish failed"
 msgstr "Ha fallat la publicació"
 
-#: src/routes/pages/index.tsx:128
-#: src/routes/pages/index.tsx:149
+#: src/routes/pages/index.tsx
+#: src/routes/pages/index.tsx
 msgid "Published"
 msgstr "Publicada"
 
-#: src/routes/pages/$id.tsx:282
+#: src/routes/pages/$id.tsx
 msgid "Publishing…"
 msgstr "Publicant…"
 
-#: src/routes/emails/inboxes.tsx:424
-#: src/routes/emails/inboxes.tsx:1046
-#: src/routes/emails/inboxes.tsx:1059
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
 msgid "Purpose"
 msgstr "Propòsit"
 
-#: src/components/research/research-dialog.tsx:172
+#: src/components/research/research-dialog.tsx
 msgid "Question"
 msgstr "Pregunta"
 
-#: src/routes/emails/$threadId.tsx:685
+#: src/routes/emails/$threadId.tsx
 msgid "Queued"
 msgstr "En cua"
 
-#: src/routes/tasks/index.tsx:639
+#: src/routes/tasks/index.tsx
 msgid "Quick add task"
 msgstr "Afegeix tasca ràpidament"
 
-#: src/routes/tasks/index.tsx:532
+#: src/routes/tasks/index.tsx
 msgid "Quick add: \"Call Acme tomorrow #high\""
 msgstr "Afegeix ràpid: «Truca a Acme demà #high»"
 
-#: src/routes/emails/index.tsx:525
+#: src/routes/emails/index.tsx
 msgid "Read state update failed"
 msgstr "Ha fallat l'actualització de l'estat de lectura"
 
-#: src/routes/tasks/index.tsx:524
-#: src/routes/tasks/index.tsx:806
+#: src/routes/tasks/index.tsx
+#: src/routes/tasks/index.tsx
 msgid "Recent changes"
 msgstr "Canvis recents"
 
-#: src/routes/companies/$slug.tsx:1030
+#: src/routes/companies/$slug.tsx
 msgid "Recipient marked as spam"
 msgstr "El destinatari ha marcat el missatge com a brossa"
 
-#: src/routes/emails/inboxes.tsx:259
+#: src/routes/emails/inboxes.tsx
 msgid "Refreshing inbox status…"
 msgstr "Actualitzant l'estat de la bústia…"
 
-#: src/components/companies/about-section.tsx:67
-#: src/components/research/findings/company-enrichment-view.tsx:78
-#: src/components/research/findings/prospect-scan-view.tsx:83
+#: src/components/companies/about-section.tsx
+#: src/components/research/findings/company-enrichment-view.tsx
+#: src/components/research/findings/prospect-scan-view.tsx
 msgid "Region"
 msgstr "Regió"
 
-#: src/routes/settings/organization/members.tsx:161
+#: src/routes/settings/organization/members.tsx
 msgid "Remove"
 msgstr "Elimina"
 
 #. placeholder {0}: target.name
-#: src/routes/settings/organization/templates.tsx:241
+#: src/routes/settings/organization/templates.tsx
 msgid "Remove \"{0}\" from the org default first, then delete it."
 msgstr "Treu «{0}» del valor per defecte de l'organització primer i després elimina-la."
 
 #. placeholder {0}: target.name
-#: src/routes/settings/profile/templates.tsx:142
+#: src/routes/settings/profile/templates.tsx
 msgid "Remove \"{0}\" from your default first, then delete it."
 msgstr "Treu «{0}» del teu valor per defecte primer i després elimina-la."
 
 #. placeholder {0}: att.filename
 #. placeholder {0}: o.name
-#: src/components/emails/attachment-picker.tsx:149
-#: src/components/instructions/stack-picker.tsx:115
+#: src/components/emails/attachment-picker.tsx
+#: src/components/instructions/stack-picker.tsx
 msgid "Remove {0}"
 msgstr "Elimina {0}"
 
-#: src/components/shared/editable-field.tsx:300
+#: src/components/shared/editable-field.tsx
 msgid "Remove {chip}"
 msgstr "Elimina {chip}"
 
-#: src/routes/settings/organization/members.tsx:66
+#: src/routes/settings/organization/members.tsx
 msgid "Remove {email} from this organization?"
 msgstr "Vols eliminar {email} d'aquesta organització?"
 
-#: src/routes/settings/organization/members.tsx:161
+#: src/routes/settings/organization/members.tsx
 msgid "Removing…"
 msgstr "Eliminant…"
 
-#: src/routes/emails/$threadId.tsx:364
-#: src/routes/emails/index.tsx:743
-#: src/routes/tasks/index.tsx:728
+#: src/routes/emails/$threadId.tsx
+#: src/routes/emails/index.tsx
+#: src/routes/tasks/index.tsx
 msgid "Reopen"
 msgstr "Reobre"
 
-#: src/routes/emails/index.tsx:1300
+#: src/routes/emails/index.tsx
 msgid "Reopen thread"
 msgstr "Reobre el fil"
 
-#: src/routes/reset-password.tsx:207
-#: src/routes/settings/profile/index.tsx:298
-#: src/routes/settings/profile/index.tsx:482
+#: src/routes/reset-password.tsx
+#: src/routes/settings/profile/index.tsx
+#: src/routes/settings/profile/index.tsx
 msgid "Repeat new password"
 msgstr "Repeteix la contrasenya nova"
 
-#: src/components/instructions/default-stack-editor.tsx:125
+#: src/components/instructions/default-stack-editor.tsx
 msgid "Replace the org default"
 msgstr "Substitueix el valor per defecte de l'organització"
 
-#: src/routes/emails/$threadId.tsx:403
+#: src/routes/emails/$threadId.tsx
 msgid "Reply"
 msgstr "Respon"
 
-#: src/routes/emails/$threadId.tsx:417
+#: src/routes/emails/$threadId.tsx
 msgid "Reply all"
 msgstr "Respon a tots"
 
-#: src/routes/reset-password.tsx:77
-#: src/routes/reset-password.tsx:140
+#: src/routes/reset-password.tsx
+#: src/routes/reset-password.tsx
 msgid "Request a new link"
 msgstr "Demana un enllaç nou"
 
-#: src/components/companies/research-summary-card.tsx:31
-#: src/components/shared/channel-icon.tsx:71
+#: src/components/companies/research-summary-card.tsx
+#: src/components/shared/channel-icon.tsx
 msgid "Research"
 msgstr "Recerca"
 
-#: src/routes/research/$id.tsx:18
+#: src/routes/research/$id.tsx
 msgid "Research run"
 msgstr "Recerca"
 
-#: src/routes/login.tsx:503
+#: src/routes/login.tsx
 msgid "Resend in"
 msgstr "Torna a enviar en"
 
-#: src/routes/login.tsx:509
+#: src/routes/login.tsx
 msgid "Resend link"
 msgstr "Torna a enviar l'enllaç"
 
-#: src/routes/emails/index.tsx:1364
+#: src/routes/emails/index.tsx
 msgid "Reset"
 msgstr "Restableix"
 
-#: src/routes/reset-password.tsx:66
+#: src/routes/reset-password.tsx
 msgid "Reset links expire after 1 hour and can only be used once. Ask for a new one and follow it within the hour."
 msgstr "Els enllaços per restablir caduquen en 1 hora i només es poden fer servir un cop. Demana'n un de nou i obre'l dins l'hora."
 
-#: src/routes/forgot-password.tsx:99
+#: src/routes/forgot-password.tsx
 msgid "Reset your password"
 msgstr "Restableix la contrasenya"
 
-#: src/routes/calendar/index.tsx:309
+#: src/routes/calendar/index.tsx
 msgid "Respond to the organizer"
 msgstr "Respon a l'organitzador"
 
-#: src/components/shared/status-badge.tsx:30
-#: src/routes/companies/$slug.tsx:442
+#: src/components/shared/status-badge.tsx
+#: src/routes/companies/$slug.tsx
 msgid "Responded"
 msgstr "Respost"
 
 #. placeholder {0}: drafts.length
-#: src/routes/emails/index.tsx:1394
+#: src/routes/emails/index.tsx
 msgid "Resume drafting ({0})"
 msgstr "Reprèn esborranys ({0})"
 
-#: src/routes/emails/index.tsx:1393
+#: src/routes/emails/index.tsx
 msgid "Resume drafting (1)"
 msgstr "Reprèn l'esborrany (1)"
 
-#: src/routes/settings/profile/templates.tsx:197
+#: src/routes/settings/profile/templates.tsx
 msgid "Reusable, standing guidance your research agent follows — what you sell, who you target, tone, and which sources to trust."
 msgstr "Orientació reutilitzable i permanent que segueix el teu agent de recerca: què vens, a qui t'adreces, el to i en quines fonts confiar."
 
-#: src/routes/settings/organization/invite.tsx:156
+#: src/routes/settings/organization/invite.tsx
 msgid "Role"
 msgstr "Rol"
 
-#: src/components/research/run-detail.tsx:106
+#: src/components/research/run-detail.tsx
 msgid "Run failed"
 msgstr "Execució fallida"
 
-#: src/components/research/run-detail.tsx:99
+#: src/components/research/run-detail.tsx
 msgid "Run in progress — events stream as they arrive."
 msgstr "Execució en curs — els esdeveniments arriben en temps real."
 
-#: src/components/companies/research-summary-card.tsx:41
+#: src/components/companies/research-summary-card.tsx
 msgid "Run new"
 msgstr "Executa una nova"
 
-#: src/components/research/research-dialog.tsx:152
+#: src/components/research/research-dialog.tsx
 msgid "Run new research"
 msgstr "Inicia una recerca"
 
-#: src/components/research/run-detail.tsx:71
+#: src/components/research/run-detail.tsx
 msgid "Run shape unrecognised."
 msgstr "Format d'execució no reconegut."
 
-#: src/components/companies/about-section.tsx:58
+#: src/components/companies/about-section.tsx
 msgid "Sales context"
 msgstr "Context comercial"
 
-#: src/components/instructions/template-editor-dialog.tsx:173
-#: src/routes/emails/inboxes.tsx:1154
-#: src/routes/emails/inboxes.tsx:1574
-#: src/routes/pages/$id.tsx:271
+#: src/components/instructions/template-editor-dialog.tsx
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
+#: src/routes/pages/$id.tsx
 msgid "Save"
 msgstr "Desa"
 
-#: src/components/instructions/default-stack-editor.tsx:193
+#: src/components/instructions/default-stack-editor.tsx
 msgid "Save as my default"
 msgstr "Desa com el meu valor per defecte"
 
-#: src/routes/pages/$id.tsx:198
+#: src/routes/pages/$id.tsx
 msgid "Save failed"
 msgstr "Ha fallat el desament"
 
-#: src/components/instructions/default-stack-editor.tsx:191
+#: src/components/instructions/default-stack-editor.tsx
 msgid "Save my additions"
 msgstr "Desa les meves aportacions"
 
-#: src/routes/reset-password.tsx:242
+#: src/routes/reset-password.tsx
 msgid "Save new password"
 msgstr "Desa la nova contrasenya"
 
-#: src/routes/settings/profile/index.tsx:336
+#: src/routes/settings/profile/index.tsx
 msgid "Save password"
 msgstr "Desa la contrasenya"
 
-#: src/routes/settings/organization/templates.tsx:434
+#: src/routes/settings/organization/templates.tsx
 msgid "Save the org default"
 msgstr "Desa el valor per defecte de l'organització"
 
-#: src/components/emails/compose-form.tsx:547
-#: src/components/instructions/template-editor-dialog.tsx:173
-#: src/routes/emails/inboxes.tsx:1571
-#: src/routes/pages/$id.tsx:271
-#: src/routes/reset-password.tsx:242
-#: src/routes/settings/profile/index.tsx:334
-#: src/routes/settings/profile/index.tsx:528
+#: src/components/emails/compose-form.tsx
+#: src/components/instructions/template-editor-dialog.tsx
+#: src/routes/emails/inboxes.tsx
+#: src/routes/pages/$id.tsx
+#: src/routes/reset-password.tsx
+#: src/routes/settings/profile/index.tsx
+#: src/routes/settings/profile/index.tsx
 msgid "Saving…"
 msgstr "Desant…"
 
-#: src/routes/companies/index.tsx:262
+#: src/routes/companies/index.tsx
 msgid "Search by name, industry, or location…"
 msgstr "Cerca per nom, sector o ubicació…"
 
-#: src/routes/emails/index.tsx:609
+#: src/routes/emails/index.tsx
 msgid "Search by subject…"
 msgstr "Cerca per assumpte…"
 
-#: src/routes/companies/index.tsx:265
+#: src/routes/companies/index.tsx
 msgid "Search companies"
 msgstr "Cerca empreses"
 
-#: src/routes/emails/index.tsx:612
+#: src/routes/emails/index.tsx
 msgid "Search threads"
 msgstr "Cerca fils"
 
-#: src/routes/settings/organization/index.tsx:92
+#: src/routes/settings/organization/index.tsx
 msgid "See who can access this workspace."
 msgstr "Veure qui té accés a aquest espai de treball."
 
-#: src/routes/emails/index.tsx:957
+#: src/routes/emails/index.tsx
 msgid "Select all threads on this page"
 msgstr "Selecciona tots els fils d'aquesta pàgina"
 
-#: src/components/emails/compose-form.tsx:378
+#: src/components/emails/compose-form.tsx
 msgid "Select inbox…"
 msgstr "Tria una safata…"
 
-#: src/routes/settings/api-keys/index.tsx:176
+#: src/routes/settings/api-keys/index.tsx
 msgid "Select the key and copy it manually."
 msgstr "Selecciona la clau i copia-la manualment."
 
-#: src/components/primitives/pri-copy-button.tsx:32
+#: src/components/primitives/pri-copy-button.tsx
 msgid "Select the text and copy it manually."
 msgstr "Selecciona el text i copia'l manualment."
 
 #. placeholder {0}: row.original.subject ?? '(no subject)'
-#: src/routes/emails/index.tsx:968
+#: src/routes/emails/index.tsx
 msgid "Select thread {0}"
 msgstr "Selecciona el fil {0}"
 
-#: src/routes/emails/inboxes.tsx:887
+#: src/routes/emails/inboxes.tsx
 msgid "Selecting a preset fills IMAP and SMTP defaults — you can still edit them."
 msgstr "Triar un preestablit omple els paràmetres IMAP i SMTP — encara els pots editar."
 
-#: src/routes/settings/mcp/connections.tsx:154
+#: src/routes/settings/mcp/connections.tsx
 msgid "Self-reported name"
 msgstr "Nom autodeclarat"
 
 #. placeholder {0}: row.redirectHost
-#: src/routes/settings/mcp/connections.tsx:153
+#: src/routes/settings/mcp/connections.tsx
 msgid "Self-reported name · sends you to {0}"
 msgstr "Nom autodeclarat · t'envia a {0}"
 
-#: src/components/emails/compose-form.tsx:534
+#: src/components/emails/compose-form.tsx
 msgid "Send"
 msgstr "Envia"
 
-#: src/routes/settings/organization/invite.tsx:100
+#: src/routes/settings/organization/invite.tsx
 msgid "Send a one-click invitation. The recipient signs in via the link in the email — no password to share."
 msgstr "Envia una invitació d'''un clic. El destinatari inicia sessió mitjançant l'''enllaç del correu — sense contrasenya per compartir."
 
-#: src/routes/settings/organization/index.tsx:109
+#: src/routes/settings/organization/index.tsx
 msgid "Send a one-click sign-in link to a teammate."
 msgstr "Envia un enllaç d'''inici de sessió d'''un clic a un company."
 
-#: src/components/emails/compose-form.tsx:497
+#: src/components/emails/compose-form.tsx
 msgid "Send blocked: these recipients cannot receive email"
 msgstr "Enviament bloquejat: aquests destinataris no poden rebre correu"
 
-#: src/routes/companies/$slug.tsx:786
+#: src/routes/companies/$slug.tsx
 msgid "Send email"
 msgstr "Envia correu"
 
-#: src/routes/settings/organization/invite.tsx:180
+#: src/routes/settings/organization/invite.tsx
 msgid "Send invitation"
 msgstr "Envia invitació"
 
-#: src/routes/forgot-password.tsx:134
+#: src/routes/forgot-password.tsx
 msgid "Send reset link"
 msgstr "Envia l'enllaç"
 
-#: src/components/emails/compose-form.tsx:534
-#: src/routes/forgot-password.tsx:134
-#: src/routes/login.tsx:426
-#: src/routes/settings/organization/invite.tsx:180
+#: src/components/emails/compose-form.tsx
+#: src/routes/forgot-password.tsx
+#: src/routes/login.tsx
+#: src/routes/settings/organization/invite.tsx
 msgid "Sending…"
 msgstr "Enviant…"
 
-#: src/routes/emails/$threadId.tsx:683
+#: src/routes/emails/$threadId.tsx
 msgid "Sent"
 msgstr "Enviat"
 
-#: src/routes/settings/profile/templates.tsx:169
+#: src/routes/settings/profile/templates.tsx
 msgid "Sent to your admins"
 msgstr "Enviada als administradors"
 
-#: src/routes/settings/mcp/index.tsx:144
+#: src/routes/settings/mcp/index.tsx
 msgid "server URL"
 msgstr "l'URL del servidor"
 
-#: src/routes/reset-password.tsx:185
+#: src/routes/reset-password.tsx
 msgid "Set a new password"
 msgstr "Posa una contrasenya nova"
 
-#: src/routes/settings/profile/index.tsx:274
+#: src/routes/settings/profile/index.tsx
 msgid "Set a password"
 msgstr "Posa una contrasenya"
 
-#: src/components/profile/set-password-nudge.tsx:93
+#: src/components/profile/set-password-nudge.tsx
 msgid "Set a password so you don't have to check your email next time."
 msgstr "Posa una contrasenya per no haver de mirar el correu la pròxima vegada."
 
-#: src/routes/emails/inboxes.tsx:1476
+#: src/routes/emails/inboxes.tsx
 msgid "Set as default"
 msgstr "Estableix com a predeterminat"
 
-#: src/components/profile/set-password-nudge.tsx:106
+#: src/components/profile/set-password-nudge.tsx
 msgid "Set password"
 msgstr "Posa contrasenya"
 
-#: src/components/research/research-dialog.tsx:239
+#: src/components/research/research-dialog.tsx
 msgid "Set up reusable <0>instruction templates</0> to guide every run."
 msgstr "Configura <0>plantilles d'instruccions</0> reutilitzables per guiar cada recerca."
 
-#: src/components/layout/nav-items.ts:81
-#: src/routes/pages/$id.tsx:294
-#: src/routes/settings/api-keys/index.tsx:194
-#: src/routes/settings/mcp/connections.tsx:104
-#: src/routes/settings/mcp/index.tsx:110
-#: src/routes/settings/profile/index.tsx:110
+#: src/components/layout/nav-items.ts
+#: src/routes/pages/$id.tsx
+#: src/routes/settings/api-keys/index.tsx
+#: src/routes/settings/mcp/connections.tsx
+#: src/routes/settings/mcp/index.tsx
+#: src/routes/settings/profile/index.tsx
 msgid "Settings"
 msgstr "Configuració"
 
-#: src/routes/emails/inboxes.tsx:911
+#: src/routes/emails/inboxes.tsx
 msgid "Setup guide →"
 msgstr "Guia de configuració →"
 
-#: src/components/research/run-detail.tsx:181
+#: src/components/research/run-detail.tsx
 msgid "Shaped by"
 msgstr "Modelat per"
 
-#: src/routes/emails/inboxes.tsx:490
-#: src/routes/emails/inboxes.tsx:1088
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
 msgid "Shared"
 msgstr "Compartida"
 
-#: src/routes/settings/organization/index.tsx:145
+#: src/routes/settings/organization/index.tsx
 msgid "Shared guidance and the org research default."
 msgstr "Orientació compartida i la recerca per defecte de l'organització."
 
-#: src/routes/settings/organization/templates.tsx:112
+#: src/routes/settings/organization/templates.tsx
 msgid "Shared guidance every member's research agent can use, plus the organization's default."
 msgstr "Orientació compartida que pot fer servir l'agent de recerca de cada membre, més el valor per defecte de l'organització."
 
-#: src/components/instructions/template-editor-dialog.tsx:106
+#: src/components/instructions/template-editor-dialog.tsx
 msgid "Shared with everyone in your organization — their research agent follows it on every run."
 msgstr "Compartida amb tothom de la teva organització; el seu agent de recerca la segueix en cada recerca."
 
 #. placeholder {0}: msg.cc.length
-#: src/routes/emails/$threadId.tsx:590
+#: src/routes/emails/$threadId.tsx
 msgid "Show Cc ({0})"
 msgstr "Mostra Cc ({0})"
 
-#: src/components/shared/timeline-entry.tsx:79
+#: src/components/shared/timeline-entry.tsx
 msgid "Show less"
 msgstr "Mostra menys"
 
-#: src/components/shared/timeline-entry.tsx:79
+#: src/components/shared/timeline-entry.tsx
 msgid "Show more"
 msgstr "Mostra més"
 
-#: src/components/primitives/pri-password-input.tsx:96
+#: src/components/primitives/pri-password-input.tsx
 msgid "Show password"
 msgstr "Mostra la contrasenya"
 
-#: src/routes/companies/$slug.tsx:932
+#: src/routes/companies/$slug.tsx
 msgid "Show system events"
 msgstr "Mostra esdeveniments del sistema"
 
-#: src/routes/emails/index.tsx:832
+#: src/routes/emails/index.tsx
 msgid "Showing {firstRow}–{lastRow} of {total}"
 msgstr "Mostrant {firstRow}–{lastRow} de {total}"
 
-#: src/routes/accept-invitation.$id.tsx:129
-#: src/routes/login.tsx:415
+#: src/routes/accept-invitation.$id.tsx
+#: src/routes/login.tsx
 msgid "Sign in"
 msgstr "Inicia sessió"
 
-#: src/routes/accept-invitation.$id.tsx:111
+#: src/routes/accept-invitation.$id.tsx
 msgid "Sign in to accept this invitation"
 msgstr "Inicia sessió per acceptar aquesta invitació"
 
-#: src/routes/login.tsx:368
+#: src/routes/login.tsx
 msgid "Sign in to continue"
 msgstr "Inicia sessió per continuar"
 
-#: src/routes/reset-password.tsx:160
+#: src/routes/reset-password.tsx
 msgid "Sign in with your new password. Other devices will need to sign in again too."
 msgstr "Inicia sessió amb la contrasenya nova. Els altres dispositius també hauran de tornar a iniciar sessió."
 
-#: src/routes/settings/profile/index.tsx:194
+#: src/routes/settings/profile/index.tsx
 msgid "Sign out"
 msgstr "Tanca sessió"
 
-#: src/routes/settings/profile/index.tsx:85
+#: src/routes/settings/profile/index.tsx
 msgid "Sign-out failed. Please try again."
 msgstr "No s'ha pogut tancar la sessió. Torna-ho a provar."
 
-#: src/routes/login.tsx:415
+#: src/routes/login.tsx
 msgid "Signing in…"
 msgstr "Iniciant sessió…"
 
-#: src/routes/settings/profile/index.tsx:194
+#: src/routes/settings/profile/index.tsx
 msgid "Signing out…"
 msgstr "Tancant sessió…"
 
-#: src/components/companies/about-section.tsx:77
-#: src/components/research/findings/company-enrichment-view.tsx:77
+#: src/components/companies/about-section.tsx
+#: src/components/research/findings/company-enrichment-view.tsx
 msgid "Size"
 msgstr "Mida"
 
-#: src/routes/pages/$id.tsx:309
-#: src/routes/pages/index.tsx:145
-#: src/routes/settings/organization/index.tsx:73
+#: src/routes/pages/$id.tsx
+#: src/routes/pages/index.tsx
+#: src/routes/settings/organization/index.tsx
 msgid "Slug"
 msgstr "Slug"
 
-#: src/routes/emails/inboxes.tsx:974
+#: src/routes/emails/inboxes.tsx
 msgid "SMTP host"
 msgstr "Servidor SMTP"
 
-#: src/routes/emails/inboxes.tsx:984
+#: src/routes/emails/inboxes.tsx
 msgid "SMTP port"
 msgstr "Port SMTP"
 
-#: src/routes/emails/inboxes.tsx:993
-#: src/routes/emails/inboxes.tsx:997
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
 msgid "SMTP security"
 msgstr "Seguretat SMTP"
 
-#: src/routes/tasks/index.tsx:736
+#: src/routes/tasks/index.tsx
 msgid "Snooze 1d"
 msgstr "Posposa 1d"
 
-#: src/routes/tasks/index.tsx:504
+#: src/routes/tasks/index.tsx
 msgid "Snoozed"
 msgstr "Posposades"
 
-#: src/routes/emails/$threadId.tsx:260
+#: src/routes/emails/$threadId.tsx
 msgid "someone"
 msgstr "algú"
 
-#: src/routes/oauth/consent.tsx:56
+#: src/routes/oauth/consent.tsx
 msgid "Something went wrong. Start the connection again from your assistant."
 msgstr "Alguna cosa ha anat malament. Torna a iniciar la connexió des del teu assistent."
 
-#: src/routes/reset-password.tsx:233
-#: src/routes/settings/profile/index.tsx:323
-#: src/routes/settings/profile/index.tsx:512
+#: src/routes/reset-password.tsx
+#: src/routes/settings/profile/index.tsx
+#: src/routes/settings/profile/index.tsx
 msgid "Something went wrong. Try again."
 msgstr "Alguna cosa ha fallat. Prova-ho de nou."
 
-#: src/components/companies/about-section.tsx:82
-#: src/routes/calendar/index.tsx:273
-#: src/routes/tasks/index.tsx:707
+#: src/components/companies/about-section.tsx
+#: src/routes/calendar/index.tsx
+#: src/routes/tasks/index.tsx
 msgid "Source"
 msgstr "Origen"
 
-#: src/routes/emails/index.tsx:1235
+#: src/routes/emails/index.tsx
 msgid "Spam"
 msgstr "Brossa"
 
-#: src/routes/settings/organization/index.tsx:123
-#: src/routes/settings/organization/spend.tsx:96
-#: src/routes/settings/organization/spend.tsx:118
-#: src/routes/settings/organization/spend.tsx:239
+#: src/routes/settings/organization/index.tsx
+#: src/routes/settings/organization/spend.tsx
+#: src/routes/settings/organization/spend.tsx
+#: src/routes/settings/organization/spend.tsx
 msgid "Spend"
 msgstr "Despesa"
 
-#: src/components/interactions/quick-capture-dialog.tsx:155
+#: src/components/interactions/quick-capture-dialog.tsx
 msgid "Stamped into the workshop ledger."
 msgstr "Segellat al llibre del taller."
 
-#: src/components/instructions/template-editor-dialog.tsx:157
+#: src/components/instructions/template-editor-dialog.tsx
 msgid "Standing guidance the agent should follow on every run…"
 msgstr "Orientació permanent que l'agent ha de seguir en cada recerca…"
 
-#: src/components/instructions/template-editor-dialog.tsx:111
+#: src/components/instructions/template-editor-dialog.tsx
 msgid "Standing guidance your research agent follows on every run."
 msgstr "Orientació permanent que el teu agent de recerca segueix en cada recerca."
 
-#: src/components/research/research-dialog.tsx:261
+#: src/components/research/research-dialog.tsx
 msgid "Start"
 msgstr "Inicia"
 
-#: src/routes/settings/organization/templates.tsx:487
+#: src/routes/settings/organization/templates.tsx
 msgid "Starter presets"
 msgstr "Plantilles predefinides per començar"
 
-#: src/components/research/research-dialog.tsx:261
+#: src/components/research/research-dialog.tsx
 msgid "Starting…"
 msgstr "Iniciant…"
 
-#: src/routes/emails/inboxes.tsx:1207
+#: src/routes/emails/inboxes.tsx
 msgid "STARTTLS"
 msgstr "STARTTLS"
 
-#: src/routes/calendar/index.tsx:279
-#: src/routes/emails/inboxes.tsx:423
-#: src/routes/pages/index.tsx:147
-#: src/routes/tasks/index.tsx:695
+#: src/routes/calendar/index.tsx
+#: src/routes/emails/inboxes.tsx
+#: src/routes/pages/index.tsx
+#: src/routes/tasks/index.tsx
 msgid "Status"
 msgstr "Estat"
 
-#: src/routes/emails/index.tsx:493
+#: src/routes/emails/index.tsx
 msgid "Status update failed"
 msgstr "Ha fallat l'actualització d'estat"
 
-#: src/routes/settings/organization/templates.tsx:240
-#: src/routes/settings/profile/templates.tsx:141
+#: src/routes/settings/organization/templates.tsx
+#: src/routes/settings/profile/templates.tsx
 msgid "Still in use"
 msgstr "Encara s'utilitza"
 
-#: src/routes/emails/inboxes.tsx:1039
+#: src/routes/emails/inboxes.tsx
 msgid "Stored encrypted with AES-256-GCM."
 msgstr "Es desa xifrada amb AES-256-GCM."
 
-#: src/components/research/findings/competitor-scan-view.tsx:134
+#: src/components/research/findings/competitor-scan-view.tsx
 msgid "Strengths"
 msgstr "Punts forts"
 
-#: src/components/emails/compose-form.tsx:457
-#: src/components/interactions/quick-capture-dialog.tsx:306
+#: src/components/emails/compose-form.tsx
+#: src/components/interactions/quick-capture-dialog.tsx
 msgid "Subject"
 msgstr "Assumpte"
 
-#: src/components/interactions/quick-capture-dialog.tsx:320
+#: src/components/interactions/quick-capture-dialog.tsx
 msgid "Summary"
 msgstr "Resum"
 
-#: src/components/layout/org-switcher.tsx:92
+#: src/components/layout/org-switcher.tsx
 msgid "Switch organization"
 msgstr "Canvia d'organització"
 
-#: src/components/shared/channel-icon.tsx:72
+#: src/components/shared/channel-icon.tsx
 msgid "System"
 msgstr "Sistema"
 
-#: src/components/companies/about-section.tsx:112
-#: src/components/research/findings/company-enrichment-view.tsx:131
+#: src/components/companies/about-section.tsx
+#: src/components/research/findings/company-enrichment-view.tsx
 msgid "Tags"
 msgstr "Etiquetes"
 
-#: src/components/companies/about-section.tsx:108
+#: src/components/companies/about-section.tsx
 msgid "Tags & fit"
 msgstr "Etiquetes i encaix"
 
-#: src/components/companies/conversations-tab.tsx:162
+#: src/components/companies/conversations-tab.tsx
 msgid "Task"
 msgstr "Tasca"
 
-#: src/components/shared/task-item.tsx:206
+#: src/components/shared/task-item.tsx
 msgid "Task title"
 msgstr "Títol de la tasca"
 
-#: src/components/layout/nav-items.ts:67
-#: src/routes/tasks/index.tsx:437
+#: src/components/layout/nav-items.ts
+#: src/routes/tasks/index.tsx
 msgid "Tasks"
 msgstr "Tasques"
 
-#: src/components/research/findings/prospect-scan-view.tsx:91
+#: src/components/research/findings/prospect-scan-view.tsx
 msgid "Tax ID"
 msgstr "NIF"
 
-#: src/routes/pages/$id.tsx:321
+#: src/routes/pages/$id.tsx
 msgid "Template"
 msgstr "Plantilla"
 
-#: src/routes/settings/organization/templates.tsx:256
-#: src/routes/settings/profile/templates.tsx:157
+#: src/routes/settings/organization/templates.tsx
+#: src/routes/settings/profile/templates.tsx
 msgid "Template deleted"
 msgstr "Plantilla eliminada"
 
-#: src/routes/settings/profile/templates.tsx:207
+#: src/routes/settings/profile/templates.tsx
 msgid "Templates"
 msgstr "Plantilles"
 
-#: src/routes/calendar/index.tsx:328
+#: src/routes/calendar/index.tsx
 msgid "Tentative"
 msgstr "Provisional"
 
-#: src/routes/emails/inboxes.tsx:1155
+#: src/routes/emails/inboxes.tsx
 msgid "Test & connect"
 msgstr "Prova i connecta"
 
 #. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx:542
+#: src/routes/emails/inboxes.tsx
 msgid "Test connection for {0}"
 msgstr "Prova la connexió de {0}"
 
-#: src/routes/emails/inboxes.tsx:251
+#: src/routes/emails/inboxes.tsx
 msgid "Test failed"
 msgstr "Prova fallida"
 
-#: src/routes/emails/inboxes.tsx:1152
+#: src/routes/emails/inboxes.tsx
 msgid "Testing connection…"
 msgstr "Provant la connexió…"
 
-#: src/routes/login.tsx:150
+#: src/routes/login.tsx
 msgid "That connection request expired. Start it again from your AI assistant."
 msgstr "Aquesta sol·licitud de connexió ha caducat. Torna a iniciar-la des del teu assistent d'IA."
 
-#: src/routes/login.tsx:155
+#: src/routes/login.tsx
 msgid "That link expired. Request a fresh one below."
 msgstr "L'enllaç ha caducat. Demana'n un de nou a sota."
 
-#: src/routes/login.tsx:156
+#: src/routes/login.tsx
 msgid "That link is no longer valid. Request a fresh one below."
 msgstr "L'enllaç ja no és vàlid. Demana'n un de nou a sota."
 
-#: src/routes/tasks/index.tsx:809
+#: src/routes/tasks/index.tsx
 msgid "The 20 most recently edited open tasks. Click one to reopen it."
 msgstr "Les 20 tasques obertes editades més recentment. Fes-hi clic per reobrir-ne una."
 
-#: src/routes/settings/api-keys/index.tsx:155
+#: src/routes/settings/api-keys/index.tsx
 msgid "The API key can no longer be used."
 msgstr "La clau d'API ja no es pot fer servir."
 
-#: src/routes/companies/$slug.tsx:630
+#: src/routes/companies/$slug.tsx
 msgid "The change didn't go through. Try again."
 msgstr "El canvi no s'ha completat. Torna-ho a provar."
 
-#: src/components/companies/where-panel-client.client.tsx:68
+#: src/components/companies/where-panel-client.client.tsx
 msgid "The geocoder did not return a match. Try editing the location field."
 msgstr "El geocodificador no ha trobat cap coincidència. Prova d'editar el camp d'ubicació."
 
 #. placeholder {0}: search.error
-#: src/routes/accept-invitation.$id.tsx:58
+#: src/routes/accept-invitation.$id.tsx
 msgid "The invitation link could not be verified ({0})."
 msgstr "No s'''ha pogut verificar l'''enllaç de la invitació ({0})."
 
-#: src/routes/accept-invitation.$id.tsx:114
+#: src/routes/accept-invitation.$id.tsx
 msgid "The invitation link signs you in automatically. If you're seeing this page, the link may have expired — sign in again to continue."
 msgstr "L'''enllaç de la invitació inicia sessió automàticament. Si veus aquesta pàgina, l'''enllaç pot haver caducat — inicia sessió de nou per continuar."
 
-#: src/routes/accept-invitation.$id.tsx:197
+#: src/routes/accept-invitation.$id.tsx
 msgid "The invitation may have expired or already been used."
 msgstr "La invitació pot haver caducat o ja s'''ha utilitzat."
 
-#: src/routes/settings/organization/invite.tsx:188
+#: src/routes/settings/organization/invite.tsx
 msgid "The invitee gets a 48-hour link. They can accept it once."
 msgstr "El convidat rep un enllaç de 48 hores. Pot acceptar-lo una sola vegada."
 
-#: src/routes/emails/inboxes.tsx:591
+#: src/routes/emails/inboxes.tsx
 msgid "The mailbox is ready."
 msgstr "La bústia està a punt."
 
-#: src/routes/pages/$id.tsx:215
+#: src/routes/pages/$id.tsx
 msgid "The page is now live."
 msgstr "La pàgina ja està publicada."
 
-#: src/components/research/findings/freeform-view.tsx:31
+#: src/components/research/findings/freeform-view.tsx
 msgid "The run finished without proposed updates or paid actions."
 msgstr "L'execució ha acabat sense actualitzacions proposades ni accions de pagament."
 
-#: src/routes/emails/$threadId.tsx:455
+#: src/routes/emails/$threadId.tsx
 msgid "The thread exists but the provider returned no messages."
 msgstr "El fil existeix però el proveïdor no ha retornat cap missatge."
 
-#: src/routes/emails/$threadId.tsx:299
+#: src/routes/emails/$threadId.tsx
 msgid "The thread may have been archived upstream or the link is stale."
 msgstr "Potser el fil s'ha arxivat al proveïdor o l'enllaç és obsolet."
 
-#: src/routes/reset-password.tsx:130
+#: src/routes/reset-password.tsx
 msgid "The token expired or was already used. Request a fresh link."
 msgstr "El token ha caducat o ja s'ha fet servir. Demana un enllaç nou."
 
-#: src/routes/settings/profile/index.tsx:502
+#: src/routes/settings/profile/index.tsx
 msgid "The two new password fields don't match."
 msgstr "Les dues contrasenyes noves no coincideixen."
 
-#: src/routes/settings/profile/index.tsx:318
+#: src/routes/settings/profile/index.tsx
 msgid "The two password fields don't match."
 msgstr "Les dues contrasenyes no coincideixen."
 
-#: src/routes/reset-password.tsx:228
+#: src/routes/reset-password.tsx
 msgid "The two passwords don't match."
 msgstr "Les dues contrasenyes no coincideixen."
 
-#: src/routes/tasks/index.tsx:440
+#: src/routes/tasks/index.tsx
 msgid "The workshop ledger — tear off one strip at a time."
 msgstr "El llibre del taller — arrenca-n'hi una tira cada vegada."
 
-#: src/routes/companies/$slug.tsx:429
+#: src/routes/companies/$slug.tsx
 msgid "The workshop rejected the change. Try again."
 msgstr "El taller ha rebutjat el canvi. Torna-ho a provar."
 
-#: src/routes/settings/organization/index.tsx:45
+#: src/routes/settings/organization/index.tsx
 msgid "The workspace your CRM data lives in."
 msgstr "L'espai de treball on viuen les dades del CRM."
 
-#: src/components/instructions/default-stack-editor.tsx:162
+#: src/components/instructions/default-stack-editor.tsx
 msgid "These come from your organization. Saving keeps your own copy, so your runs stop following later changes to the org default."
 msgstr "Aquestes vénen de la teva organització. Si les deses, en guardes una còpia pròpia i les teves recerques deixen de seguir els canvis posteriors del valor per defecte de l'organització."
 
-#: src/routes/settings/organization/templates.tsx:404
+#: src/routes/settings/organization/templates.tsx
 msgid "These templates run for every member who hasn't set their own — in order. Only org templates can go here."
 msgstr "Aquestes plantilles s'apliquen, en ordre, a cada membre que no n'hagi triat de pròpies. Aquí només hi poden anar plantilles de l'organització."
 
-#: src/components/instructions/default-stack-editor.tsx:107
+#: src/components/instructions/default-stack-editor.tsx
 msgid "These templates shape every research run, in order — unless you pick different ones for a single run."
 msgstr "Aquestes plantilles configuren cada recerca, en ordre, llevat que en triïs d'altres per a una recerca concreta."
 
-#: src/components/shared/status-badge.tsx:41
+#: src/components/shared/status-badge.tsx
 msgid "They replied — keep the thread warm"
 msgstr "Ha respost — manté el fil calent"
 
-#: src/routes/settings/mcp/connections.tsx:83
+#: src/routes/settings/mcp/connections.tsx
 msgid "This connection now acts in the chosen organization."
 msgstr "Aquesta connexió ara actua en l'organització triada."
 
-#: src/routes/accept-invitation.$id.tsx:193
+#: src/routes/accept-invitation.$id.tsx
 msgid "This invitation can't be accepted"
 msgstr "Aquesta invitació no es pot acceptar"
 
-#: src/routes/accept-invitation.$id.tsx:83
+#: src/routes/accept-invitation.$id.tsx
 msgid "This invitation is no longer valid."
 msgstr "Aquesta invitació ja no és vàlida."
 
-#: src/routes/accept-invitation.$id.tsx:57
+#: src/routes/accept-invitation.$id.tsx
 msgid "This invitation link is no longer valid. It may have already been used."
 msgstr "Aquest enllaç de la invitació ja no és vàlid. Pot haver-se utilitzat."
 
-#: src/routes/settings/api-keys/index.tsx:351
+#: src/routes/settings/api-keys/index.tsx
 msgid "This is the only time the full key is shown. Store it somewhere safe — I can't show it again."
 msgstr "Aquest és l'únic moment en què es mostra la clau sencera. Desa-la en un lloc segur — no te la puc tornar a mostrar."
 
-#: src/routes/reset-password.tsx:63
-#: src/routes/reset-password.tsx:127
+#: src/routes/reset-password.tsx
+#: src/routes/reset-password.tsx
 msgid "This link is no longer valid"
 msgstr "Aquest enllaç ja no és vàlid"
 
-#: src/routes/settings/organization/spend.tsx:134
+#: src/routes/settings/organization/spend.tsx
 msgid "This month"
 msgstr "Aquest mes"
 
-#: src/routes/oauth/consent.tsx:83
+#: src/routes/oauth/consent.tsx
 msgid "This page opens when an AI assistant asks to connect. Start the connection from your assistant."
 msgstr "Aquesta pàgina s'obre quan un assistent d'IA demana connectar-se. Inicia la connexió des del teu assistent."
 
-#: src/routes/index.tsx:420
-#: src/routes/tasks/index.tsx:477
+#: src/routes/index.tsx
+#: src/routes/tasks/index.tsx
 msgid "This week"
 msgstr "Aquesta setmana"
 
-#: src/routes/emails/$threadId.tsx:343
+#: src/routes/emails/$threadId.tsx
 msgid "Thread actions"
 msgstr "Accions del fil"
 
-#: src/routes/emails/$threadId.tsx:465
+#: src/routes/emails/$threadId.tsx
 msgid "Thread metadata"
 msgstr "Metadades del fil"
 
-#: src/routes/emails/$threadId.tsx:298
+#: src/routes/emails/$threadId.tsx
 msgid "Thread not found"
 msgstr "Fil no trobat"
 
-#: src/routes/settings/organization/spend.tsx:125
+#: src/routes/settings/organization/spend.tsx
 msgid "Time range"
 msgstr "Interval de temps"
 
-#: src/routes/companies/$slug.tsx:919
+#: src/routes/companies/$slug.tsx
 msgid "Timeline"
 msgstr "Cronologia"
 
-#: src/routes/pages/index.tsx:144
+#: src/routes/pages/index.tsx
 msgid "Title"
 msgstr "Títol"
 
-#: src/routes/emails/inboxes.tsx:1201
+#: src/routes/emails/inboxes.tsx
 msgid "TLS"
 msgstr "TLS"
 
-#: src/components/emails/compose-form.tsx:402
-#: src/routes/emails/$threadId.tsx:571
+#: src/components/emails/compose-form.tsx
+#: src/routes/emails/$threadId.tsx
 msgid "To"
 msgstr "Per a"
 
-#: src/routes/index.tsx:380
-#: src/routes/tasks/index.tsx:459
+#: src/routes/index.tsx
+#: src/routes/tasks/index.tsx
 msgid "Today"
 msgstr "Avui"
 
-#: src/routes/login.tsx:146
+#: src/routes/login.tsx
 msgid "Too many attempts. Try again in a minute."
 msgstr "Massa intents. Torna-ho a provar d'aquí un minut."
 
-#: src/components/research/findings/competitor-scan-view.tsx:71
+#: src/components/research/findings/competitor-scan-view.tsx
 msgid "Total competitors"
 msgstr "Total competidors"
 
-#: src/routes/companies/index.tsx:327
-#: src/routes/emails/index.tsx:794
+#: src/routes/companies/index.tsx
+#: src/routes/emails/index.tsx
 msgid "Try different criteria or clear the filters."
 msgstr "Prova amb criteris diferents o neteja els filtres."
 
-#: src/components/interactions/quick-capture-dialog.tsx:277
+#: src/components/interactions/quick-capture-dialog.tsx
 msgid "Type"
 msgstr "Tipus"
 
-#: src/components/shared/editable-field.tsx:320
+#: src/components/shared/editable-field.tsx
 msgid "Type and press Enter"
 msgstr "Escriu i prem Retorn"
 
-#: src/routes/forgot-password.tsx:102
+#: src/routes/forgot-password.tsx
 msgid "Type the email you sign in with. We'll send a reset link."
 msgstr "Escriu el correu amb què inicies sessió. T'enviaré un enllaç per restablir-la."
 
-#: src/components/companies/calendar-tab.tsx:60
-#: src/components/companies/conversations-tab.tsx:166
-#: src/components/companies/research-summary-card.tsx:60
-#: src/components/companies/upcoming-meetings-card.tsx:93
-#: src/routes/tasks/index.tsx:828
+#: src/components/companies/calendar-tab.tsx
+#: src/components/companies/conversations-tab.tsx
+#: src/components/companies/research-summary-card.tsx
+#: src/components/companies/upcoming-meetings-card.tsx
+#: src/routes/tasks/index.tsx
 msgid "unknown"
 msgstr "desconegut"
 
-#: src/routes/emails/index.tsx:1201
+#: src/routes/emails/index.tsx
 msgid "Unknown"
 msgstr "Desconegut"
 
-#: src/routes/settings/profile/index.tsx:96
+#: src/routes/settings/profile/index.tsx
 msgid "Unknown user"
 msgstr "Usuari desconegut"
 
-#: src/routes/emails/$threadId.tsx:475
+#: src/routes/emails/$threadId.tsx
 msgid "Unlinked"
 msgstr "Sense enllaçar"
 
-#: src/routes/settings/mcp/connections.tsx:147
-#: src/routes/settings/mcp/connections.tsx:177
+#: src/routes/settings/mcp/connections.tsx
+#: src/routes/settings/mcp/connections.tsx
 msgid "Unnamed client"
 msgstr "Client sense nom"
 
-#: src/routes/emails/index.tsx:1400
+#: src/routes/emails/index.tsx
 msgid "Untitled"
 msgstr "Sense títol"
 
-#: src/routes/settings/api-keys/index.tsx:283
+#: src/routes/settings/api-keys/index.tsx
 msgid "Untitled key"
 msgstr "Clau sense títol"
 
-#: src/components/companies/upcoming-meetings-card.tsx:53
-#: src/components/companies/upcoming-meetings-card.tsx:69
-#: src/components/companies/upcoming-meetings-card.tsx:84
+#: src/components/companies/upcoming-meetings-card.tsx
+#: src/components/companies/upcoming-meetings-card.tsx
+#: src/components/companies/upcoming-meetings-card.tsx
 msgid "Upcoming meetings"
 msgstr "Reunions properes"
 
-#: src/routes/emails/inboxes.tsx:214
-#: src/routes/emails/inboxes.tsx:235
-#: src/routes/emails/inboxes.tsx:1368
-#: src/routes/emails/inboxes.tsx:1420
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
 msgid "Update failed"
 msgstr "Ha fallat l'actualització"
 
-#: src/components/emails/attachment-picker.tsx:167
+#: src/components/emails/attachment-picker.tsx
 msgid "Upload failed"
 msgstr "Ha fallat la pujada"
 
-#: src/components/emails/attachment-picker.tsx:166
+#: src/components/emails/attachment-picker.tsx
 msgid "Uploading…"
 msgstr "Pujant…"
 
 #. placeholder {0}: primarySuggestions[0]?.email ?? ''
-#: src/routes/emails/inboxes.tsx:354
+#: src/routes/emails/inboxes.tsx
 msgid "Use {0} as primary"
 msgstr "Fes servir {0} com a principal"
 
-#: src/routes/settings/mcp/index.tsx:208
+#: src/routes/settings/mcp/index.tsx
 msgid "Use <0>httpUrl</0>, not <1>url</1> — plain <2>url</2> selects the old SSE transport."
 msgstr "Usa <0>httpUrl</0>, no <1>url</1> — <2>url</2> sol selecciona el transport SSE antic."
 
-#: src/routes/login.tsx:531
+#: src/routes/login.tsx
 msgid "Use a different email"
 msgstr "Fes servir un altre correu"
 
-#: src/routes/emails/inboxes.tsx:1552
+#: src/routes/emails/inboxes.tsx
 msgid "Use as default footer"
 msgstr "Utilitza com a peu de pàgina predeterminat"
 
-#: src/routes/emails/inboxes.tsx:1116
+#: src/routes/emails/inboxes.tsx
 msgid "Use as default for this purpose"
 msgstr "Usa com a per defecte per a aquest propòsit"
 
-#: src/routes/login.tsx:538
+#: src/routes/login.tsx
 msgid "Use password instead"
 msgstr "Fes servir contrasenya"
 
-#: src/components/instructions/default-stack-editor.tsx:205
+#: src/components/instructions/default-stack-editor.tsx
 msgid "Use the org default"
 msgstr "Utilitza el valor per defecte de l'organització"
 
-#: src/routes/emails/inboxes.tsx:1003
+#: src/routes/emails/inboxes.tsx
 msgid "Username"
 msgstr "Nom d'usuari"
 
-#: src/components/instructions/default-stack-editor.tsx:98
+#: src/components/instructions/default-stack-editor.tsx
 msgid "Using the org default"
 msgstr "S'utilitza el valor per defecte de l'organització"
 
-#: src/routes/settings/organization/invite.tsx:128
+#: src/routes/settings/organization/invite.tsx
 msgid "View members"
 msgstr "Veure membres"
 
-#: src/components/shared/timeline-entry.tsx:75
+#: src/components/shared/timeline-entry.tsx
 msgid "View thread"
 msgstr "Veure el fil"
 
-#: src/routes/pages/$id.tsx:327
-#: src/routes/pages/index.tsx:148
+#: src/routes/pages/$id.tsx
+#: src/routes/pages/index.tsx
 msgid "Views"
 msgstr "Visites"
 
-#: src/components/shared/channel-icon.tsx:64
+#: src/components/shared/channel-icon.tsx
 msgid "Visit"
 msgstr "Visita"
 
-#: src/routes/login.tsx:157
+#: src/routes/login.tsx
 msgid "We couldn't sign you in via that link. Try again."
 msgstr "No s'ha pogut iniciar sessió amb aquest enllaç. Torna-ho a provar."
 
-#: src/routes/login.tsx:154
+#: src/routes/login.tsx
 msgid "We don't recognize that email. Ask an admin to invite you."
 msgstr "No reconeixem aquest correu. Demana a un administrador que t'inviti."
 
-#: src/routes/login.tsx:484
+#: src/routes/login.tsx
 msgid "We sent a sign-in link to"
 msgstr "S'ha enviat un enllaç d'inici de sessió a"
 
-#: src/components/research/findings/competitor-scan-view.tsx:148
+#: src/components/research/findings/competitor-scan-view.tsx
 msgid "Weaknesses"
 msgstr "Punts febles"
 
-#: src/routes/emails/index.tsx:999
-#: src/routes/emails/index.tsx:1324
+#: src/routes/emails/index.tsx
+#: src/routes/emails/index.tsx
 msgid "What"
 msgstr "Què"
 
-#: src/components/research/research-dialog.tsx:179
+#: src/components/research/research-dialog.tsx
 msgid "What do you want to find out about this company?"
 msgstr "Què vols saber d'aquesta empresa?"
 
-#: src/components/interactions/quick-capture-dialog.tsx:328
+#: src/components/interactions/quick-capture-dialog.tsx
 msgid "What happened?"
 msgstr "Què ha passat?"
 
-#: src/components/emails/compose-form.tsx:463
+#: src/components/emails/compose-form.tsx
 msgid "What is this about?"
 msgstr "De què tracta?"
 
-#: src/components/research/research-dialog.tsx:189
+#: src/components/research/research-dialog.tsx
 msgid "What kind of research?"
 msgstr "Quin tipus de recerca?"
 
-#: src/components/interactions/quick-capture-dialog.tsx:355
+#: src/components/interactions/quick-capture-dialog.tsx
 msgid "What needs to happen?"
 msgstr "Què cal fer?"
 
-#: src/components/shared/channel-icon.tsx:67
+#: src/components/shared/channel-icon.tsx
 msgid "WhatsApp"
 msgstr "WhatsApp"
 
-#: src/routes/calendar/index.tsx:260
-#: src/routes/emails/index.tsx:1006
-#: src/routes/emails/index.tsx:1325
+#: src/routes/calendar/index.tsx
+#: src/routes/emails/index.tsx
+#: src/routes/emails/index.tsx
 msgid "When"
 msgstr "Quan"
 
-#: src/components/companies/where-panel-client.client.tsx:83
+#: src/components/companies/where-panel-client.client.tsx
 msgid "Where"
 msgstr "On"
 
-#: src/routes/emails/index.tsx:987
-#: src/routes/emails/index.tsx:1323
+#: src/routes/emails/index.tsx
+#: src/routes/emails/index.tsx
 msgid "Who"
 msgstr "Qui"
 
-#: src/routes/index.tsx:265
+#: src/routes/index.tsx
 msgid "Workshop floor — live counters on the bench."
 msgstr "Planta del taller — comptadors en viu al banc."
 
-#: src/routes/emails/inboxes.tsx:1541
+#: src/routes/emails/inboxes.tsx
 msgid "Write footer…"
 msgstr "Escriu el peu de pàgina…"
 
-#: src/components/emails/compose-form.tsx:478
+#: src/components/emails/compose-form.tsx
 msgid "Write your message…"
 msgstr "Escriu el teu missatge…"
 
-#: src/routes/settings/profile/index.tsx:277
+#: src/routes/settings/profile/index.tsx
 msgid "You currently sign in from email links. Add a password to skip checking your email next time."
 msgstr "Ara mateix entres des d'enllaços al correu. Afegeix una contrasenya per no haver de mirar el correu la pròxima vegada."
 
-#: src/routes/settings/organization/spend.tsx:99
+#: src/routes/settings/organization/spend.tsx
 msgid "You don't have permission to see this page."
 msgstr "No tens permís per veure aquesta pàgina."
 
-#: src/components/profile/set-password-nudge.tsx:90
+#: src/components/profile/set-password-nudge.tsx
 msgid "You got in from a link in your email."
 msgstr "Has entrat des d'un enllaç al teu correu."
 
-#: src/routes/settings/mcp/connections.tsx:91
+#: src/routes/settings/mcp/connections.tsx
 msgid "You may not be a member of that organization. Try again."
 msgstr "Potser no ets membre d'aquesta organització. Torna-ho a provar."
 
-#: src/routes/settings/profile/index.tsx:374
+#: src/routes/settings/profile/index.tsx
 msgid "You sign in from email links. I won't bring it up again."
 msgstr "Entres des d'enllaços al correu. No t'ho tornaré a esmentar."
 
-#: src/routes/accept-invitation.$id.tsx:166
+#: src/routes/accept-invitation.$id.tsx
 msgid "You're now a member of {orgName}."
 msgstr "Ja ets membre de {orgName}."
 
-#: src/routes/accept-invitation.$id.tsx:167
+#: src/routes/accept-invitation.$id.tsx
 msgid "You're now a member."
 msgstr "Ja ets membre."
 
-#: src/routes/emails/inboxes.tsx:927
+#: src/routes/emails/inboxes.tsx
 msgid "you@example.com"
 msgstr "tu@exemple.com"
 
-#: src/routes/settings/profile/index.tsx:106
+#: src/routes/settings/profile/index.tsx
 msgid "Your Batuda workbench identity."
 msgstr "La teva identitat al banc de Batuda."
 
-#: src/routes/settings/mcp/connections.tsx:123
-#: src/routes/settings/mcp/index.tsx:168
+#: src/routes/settings/mcp/connections.tsx
+#: src/routes/settings/mcp/index.tsx
 msgid "Your connections"
 msgstr "Les teves connexions"
 
-#: src/routes/login.tsx:148
+#: src/routes/login.tsx
 msgid "Your email isn't verified yet. Use the magic link instead."
 msgstr "El correu encara no està verificat. Fes servir l'enllaç de sessió."
 
-#: src/routes/settings/api-keys/index.tsx:266
+#: src/routes/settings/api-keys/index.tsx
 msgid "Your keys"
 msgstr "Les teves claus"
 
-#: src/components/instructions/default-stack-editor.tsx:152
+#: src/components/instructions/default-stack-editor.tsx
 msgid "Your organization has no default yet."
 msgstr "La teva organització encara no té cap valor per defecte."
 
-#: src/routes/settings/organization/templates.tsx:127
+#: src/routes/settings/organization/templates.tsx
 msgid "Your organization's admins manage these templates. You can use any of them in your own default or per run."
 msgstr "Els administradors de la teva organització gestionen aquestes plantilles. En pots fer servir qualsevol al teu valor per defecte o en cada recerca."
 
-#: src/components/instructions/default-stack-editor.tsx:102
+#: src/components/instructions/default-stack-editor.tsx
 msgid "Your own"
 msgstr "Pròpia"
 
-#: src/components/instructions/default-stack-editor.tsx:94
-#: src/routes/settings/profile/templates.tsx:290
+#: src/components/instructions/default-stack-editor.tsx
+#: src/routes/settings/profile/templates.tsx
 msgid "Your research default"
 msgstr "La teva recerca per defecte"
