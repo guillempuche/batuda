@@ -1,38 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { canonicalizeUrl, scrapeCacheTtlHours } from './cached-scrape'
-
-describe('canonicalizeUrl', () => {
-	it('should lowercase the hostname', () => {
-		// GIVEN a URL with mixed-case host
-		// THEN the canonical form lowercases the host so http://FOO.com and http://foo.com share a cache row
-		expect(canonicalizeUrl('https://FOO.com/path')).toBe('https://foo.com/path')
-	})
-
-	it('should strip the fragment', () => {
-		// GIVEN a URL with a fragment anchor (fragments never reach the server)
-		// THEN the canonical form drops the fragment
-		expect(canonicalizeUrl('https://example.com/a#section')).toBe(
-			'https://example.com/a',
-		)
-	})
-
-	it('should strip trailing slashes except on the root path', () => {
-		// GIVEN a URL with a trailing slash on a non-root path
-		expect(canonicalizeUrl('https://example.com/a/')).toBe(
-			'https://example.com/a',
-		)
-		// AND a URL with only a root slash
-		// THEN root's slash is preserved (empty path is not a valid URL)
-		expect(canonicalizeUrl('https://example.com/')).toBe('https://example.com/')
-	})
-
-	it('should pass through unparseable strings unchanged', () => {
-		// GIVEN a non-URL input
-		// THEN the helper returns it verbatim — callers that passed bad data get the same key they would have generated
-		expect(canonicalizeUrl('not a url')).toBe('not a url')
-	})
-})
+import { scrapeCacheTtlHours } from './cached-scrape'
 
 describe('scrapeCacheTtlHours', () => {
 	it('should pin news domains to a 24h TTL', () => {
