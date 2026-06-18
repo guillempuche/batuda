@@ -1,4 +1,5 @@
 import { defineConfig } from '@lingui/cli'
+import { formatter } from '@lingui/format-po'
 
 /**
  * Batuda serves English and Catalan. The UI runtime (`src/i18n.ts`)
@@ -17,6 +18,10 @@ import { defineConfig } from '@lingui/cli'
  * pre-compiled catalog is preferable.
  */
 export default defineConfig({
+	// Keep file-path origins but drop their line numbers: line numbers churn
+	// the catalogs whenever code shifts, with no runtime effect (Lingui matches
+	// by msgid), so dropping them keeps extracts free of noise-only diffs.
+	format: formatter({ lineNumbers: false }),
 	sourceLocale: 'en',
 	locales: ['en', 'ca'],
 	catalogs: [
