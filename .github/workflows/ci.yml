@@ -1,8 +1,6 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
 
@@ -58,13 +56,9 @@ jobs:
       - name: Test (unit)
         run: pnpm test
 
-      # The integration phase (ephemeral Neon branch, MinIO, seed, and the
-      # integration suite) only runs on pull requests. A merge into main
-      # arrives here as a `push` event whose content the PR already
-      # exercised against an identical branch, so re-running it would just
-      # spin up a second Neon branch for no extra signal. The post-merge
-      # push still runs the fast lint/build/type-check/unit steps above as
-      # a green-checkmark on main.
+      # Integration phase: ephemeral Neon branch, MinIO, seed, and the
+      # integration suite. CI runs only on pull requests, so this phase runs
+      # on every CI run.
       #
       # Spin up an ephemeral Neon branch for the integration phase.
       # Outputs are job-scoped + secret-marked per Neon's docs, so
@@ -72,12 +66,10 @@ jobs:
       # expires_at is a safety net: if the runner is killed before the
       # delete step runs, Neon auto-cleans the branch after 6 h.
       - name: Compute Neon branch expiry (6h)
-        if: github.event_name == 'pull_request'
         id: neon-expiry
         run: echo "iso=$(date -u -d '+6 hours' +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
       - name: Create Neon branch
-        if: github.event_name == 'pull_request'
         id: neon-branch
         uses: neondatabase/create-branch-action@v6
         with:
@@ -92,7 +84,6 @@ jobs:
           role: neondb_owner
 
       - name: Apply migrations to CI branch
-        if: github.event_name == 'pull_request'
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
         run: pnpm db:migrate
@@ -103,7 +94,6 @@ jobs:
       # bucket; `--wait` blocks until both services are healthy or, in
       # storage-init's case, have exited 0.
       - name: Start MinIO via docker compose
-        if: github.event_name == 'pull_request'
         run: docker compose -f docker/docker-compose.yml up -d --wait storage storage-init
 
       # Seed fixtures (notably the `taller` / `restaurant` orgs) that
@@ -112,7 +102,6 @@ jobs:
       # end-of-run. STORAGE_* points at the MinIO container started
       # above; the seedDemoEmails stage PUTs raw RFC822 bytes there.
       - name: Seed CI branch
-        if: github.event_name == 'pull_request'
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
           BETTER_AUTH_SECRET: ci-only-not-prod-ci-only-not-prod-ci
@@ -132,7 +121,6 @@ jobs:
       # files. The proper fix (per-test transactions in multi-org) is
       # tracked as a follow-up CI-perf slice.
       - name: Test (integration)
-        if: github.event_name == 'pull_request'
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
           BETTER_AUTH_SECRET: ci-only-not-prod-ci-only-not-prod-ci
