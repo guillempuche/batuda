@@ -35,6 +35,7 @@ import {
 	type ScrapeInput,
 	ScrapeProvider,
 } from '../application/ports'
+import { canonicalizeUrl } from '../application/source-key'
 import { ProviderError } from '../domain/errors'
 import { ScrapedPage } from '../domain/types'
 
@@ -46,20 +47,6 @@ interface SourcesCacheHit {
 
 const sha256Hex = (input: string): string =>
 	createHash('sha256').update(input).digest('hex')
-
-export const canonicalizeUrl = (url: string): string => {
-	try {
-		const u = new URL(url)
-		u.hostname = u.hostname.toLowerCase()
-		u.hash = ''
-		if (u.pathname.endsWith('/') && u.pathname !== '/') {
-			u.pathname = u.pathname.slice(0, -1)
-		}
-		return u.toString()
-	} catch {
-		return url
-	}
-}
 
 const extractDomain = (url: string): string => {
 	try {

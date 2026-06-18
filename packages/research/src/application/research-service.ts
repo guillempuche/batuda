@@ -25,6 +25,7 @@ import {
 	WriterLanguageModel,
 } from './ports'
 import { type FreeformSchema, schemaRegistry } from './schemas/index'
+import { urlHashForScrape } from './source-key'
 import { researchToolkit } from './tools'
 
 // A finished run is flipped to 'failed' for a real error or an unexpected
@@ -132,6 +133,17 @@ export const computeResearchCacheKey = (args: {
 		`${args.userId}|${normalizeResearchQuery(args.query)}|${args.schemaName}|${args.schemaVersion}|${sortedSubjects}|${hintsJson}|${args.templateFingerprint}`,
 	)
 }
+
+// Pull a string `url` out of a tool call's decoded params without trusting its
+// static type — the toolkit's param union widens across tools, so a scraped
+// page's URL is read defensively for run-source attribution.
+const readToolUrl = (params: unknown): string | null =>
+	typeof params === 'object' &&
+	params !== null &&
+	'url' in params &&
+	typeof params.url === 'string'
+		? params.url
+		: null
 
 // Assemble the phase-1 system prompt. Resolved instruction segments are fenced
 // and placed BELOW the invariants (never fabricate sources, etc.) so a template
@@ -564,6 +576,32 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 								updated_at = now()
 							WHERE id = ${researchId}
 						`
+
+						// Link the pages scraped this phase to the run so findings
+						// cite real sources. The scrape tool runs inside generateText,
+						// so the scraped URLs are read back off the response and matched
+						// to the sources row the cache upserted (by url_hash). Writes as
+						// the fiber's privileged role, like the research_runs update above.
+						const organizationId = (run as { organizationId: string })
+							.organizationId
+						const scrapedUrlHashes = Array.from(
+							new Set(
+								researchResponse.toolCalls
+									.filter(tc => tc.name === 'scrape_page')
+									.map(tc => readToolUrl(tc.params))
+									.filter((u): u is string => u !== null)
+									.map(urlHashForScrape),
+							),
+						)
+						for (const urlHash of scrapedUrlHashes) {
+							yield* sql`
+								INSERT INTO research_run_sources (organization_id, research_id, source_id, local_ref, fetched_at, cost_cents)
+								SELECT ${organizationId}, ${researchId}, s.id, s.url, now(), 0
+								FROM sources s
+								WHERE s.url_hash = ${urlHash}
+								ON CONFLICT DO NOTHING
+							`
+						}
 					}
 
 					// ── Phase 2: Structured output ──
