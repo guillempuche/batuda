@@ -4,10 +4,11 @@ import { expect, test } from '@playwright/test'
 
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
-// Thread-render path. The seed direct-INSERTs M1 + M2 (Pep × Alice) so this
-// spec opens the resulting thread and verifies that:
-//   1. Both message cards render with the right `data-direction`.
-//   2. Cards appear in chronological order (M1 received_at < M2).
+// Thread-render path. The seed direct-INSERTs three messages on the
+// booking-module thread (M1 + M2 inbound, then M9 outbound) so this spec
+// opens the thread and verifies that:
+//   1. The seeded message cards render with the right `data-direction`.
+//   2. They appear in chronological order (M1 < M2 < M9 by received_at).
 //   3. The Cc disclosure toggle reveals/hides the Cc line.
 //
 // Selectors verified against:
@@ -33,11 +34,13 @@ test.describe('thread render with multiple messages', () => {
 	})
 
 	test.describe('when the user opens the booking-module thread', () => {
-		test('should render two message cards in chronological order with correct direction', async ({
+		test('should render the seeded messages in chronological order with correct direction', async ({
 			page,
 		}) => {
-			// GIVEN the seeded thread root is M1 (inbound from Pep) and M2
-			// is Pep's reply, also inbound. Both have direction='inbound'.
+			// GIVEN the seeded thread carries three messages oldest-first: M1
+			// (inbound from Pep), M2 (inbound reply), then M9 (an outbound
+			// bounced-reply fixture). They sort by received_at, so any later
+			// reply lands after them.
 			const threadId = psql(
 				`SELECT id FROM email_thread_links WHERE subject = 'Quote for the booking module' LIMIT 1`,
 			)
@@ -46,16 +49,14 @@ test.describe('thread render with multiple messages', () => {
 			// WHEN the user navigates to the thread
 			await page.goto(`/emails/${threadId}`, { waitUntil: 'networkidle' })
 
-			// THEN exactly two message cards render
+			// THEN the first three cards are the seeded messages, in order:
+			// two inbound, then the outbound reply. Asserting the seeded prefix
+			// by position (not an exact total) keeps the test green when
+			// reply.test posts further replies onto the same thread.
 			const cards = page.getByTestId('thread-message-card')
-			await expect(cards).toHaveCount(2)
-
-			// AND both carry data-direction='inbound' (the seed only sends
-			// inbound; outbound only appears after a reply send)
-			const first = cards.nth(0)
-			const second = cards.nth(1)
-			await expect(first).toHaveAttribute('data-direction', 'inbound')
-			await expect(second).toHaveAttribute('data-direction', 'inbound')
+			await expect(cards.nth(0)).toHaveAttribute('data-direction', 'inbound')
+			await expect(cards.nth(1)).toHaveAttribute('data-direction', 'inbound')
+			await expect(cards.nth(2)).toHaveAttribute('data-direction', 'outbound')
 		})
 	})
 
