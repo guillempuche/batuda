@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-06-18 (server-v2026.6.18)
+
+### Features
+
+* **ui:** add fluid prose typescale for long-form reading ([4b089fe](https://github.com/guillempuche/batuda/commit/4b089fe186e3700d1f0b8f73c89f5da05312b3b7))
+
+### Bug Fixes
+
+* **server:** emit object-typed inputSchema for no-arg MCP tools ([fcd41db](https://github.com/guillempuche/batuda/commit/fcd41db95219cecd412c82d74e723969ac6710b4))
+* **server:** skip the Sent APPEND when the mailbox is absent ([e9a722d](https://github.com/guillempuche/batuda/commit/e9a722dcc451238cf229cb32d950519f132e6113))
+
+### CI/CD
+
+* **release:** ui v2026.6.18 ([f8992d8](https://github.com/guillempuche/batuda/commit/f8992d843f1c08e94e503b8900c221039e13a63a))
+
 ## 2026-06-15 (server-v2026.6.15-1)
 
 ### CI/CD
