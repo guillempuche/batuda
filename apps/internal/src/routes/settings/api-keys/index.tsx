@@ -1,4 +1,4 @@
-import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
+import { useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
@@ -55,8 +55,13 @@ type CreatedApiKey = {
 	readonly createdAt: string
 }
 
-// `list` carries no params/query/payload, so the request object is empty.
-const apiKeysListAtom = BatudaApiAtom.query('apiKeys', 'list', {})
+// The list query shares a reactivity key with the create/delete mutations
+// (`reactivityKeys: ['apiKeys']` on each). A successful mutation invalidates
+// that key, so the list re-fetches and re-renders on its own — no manual
+// refresh that could race the reveal dialog opening in the same tick.
+const apiKeysListAtom = BatudaApiAtom.query('apiKeys', 'list', {
+	reactivityKeys: ['apiKeys'],
+})
 
 export const Route = createFileRoute('/settings/api-keys/')({
 	head: () => ({ meta: [{ title: 'API keys — Batuda' }] }),
@@ -68,7 +73,6 @@ function ApiKeysPage() {
 	const toastManager = usePriToast()
 
 	const listResult = useAtomValue(apiKeysListAtom)
-	const refreshList = useAtomRefresh(apiKeysListAtom)
 
 	const createKey = useAtomSet(BatudaApiAtom.mutation('apiKeys', 'create'), {
 		mode: 'promiseExit',
@@ -127,7 +131,10 @@ function ApiKeysPage() {
 
 		setSubmitting(true)
 		setFormError(null)
-		const exit = await createKey({ payload } as never)
+		const exit = await createKey({
+			payload,
+			reactivityKeys: ['apiKeys'],
+		} as never)
 		setSubmitting(false)
 		if (exit._tag === 'Success') {
 			const minted = narrowCreated(exit.value)
@@ -135,7 +142,6 @@ function ApiKeysPage() {
 				setCopied(false)
 				setCreated(minted)
 				event.currentTarget.reset()
-				refreshList()
 				return
 			}
 		}
@@ -146,7 +152,10 @@ function ApiKeysPage() {
 		const target = confirmTarget
 		if (!target || deletingId !== null) return
 		setDeletingId(target.id)
-		const exit = await deleteKey({ params: { id: target.id } } as never)
+		const exit = await deleteKey({
+			params: { id: target.id },
+			reactivityKeys: ['apiKeys'],
+		} as never)
 		setDeletingId(null)
 		setConfirmTarget(null)
 		if (exit._tag === 'Success') {
@@ -155,7 +164,6 @@ function ApiKeysPage() {
 				description: t`The API key can no longer be used.`,
 				type: 'success',
 			})
-			refreshList()
 			return
 		}
 		toastManager.add({
