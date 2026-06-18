@@ -150,6 +150,8 @@ export const buildResearchSystemPrompt = (args: {
 		'You are a research agent for Batuda CRM.',
 		'Given a query, produce a thorough research brief with findings, sources, and citations.',
 		'Never fabricate sources. Every claim must be verifiable.',
+		'Confirm key facts (employee count, location, sector) from scraped page content — the company site, LinkedIn, or press — not from search snippets alone, and cite the scraped page for each.',
+		'When extracting structured data from a single page, use the company_enrichment_v1 schema (a per-company shape), not a whole-run aggregate schema.',
 		`Output schema: ${args.schemaName}`,
 		args.subjectContext,
 		args.hintsContext,

@@ -47,6 +47,8 @@ import { makeBraveSearch } from './brave/search'
 import { makeCachedExtract } from './cached-extract'
 import { makeCachedScrape } from './cached-scrape'
 import { makeCachedSearch } from './cached-search'
+import { makeFirecrawlExtract } from './firecrawl/extract'
+import { makeFirecrawlScrape } from './firecrawl/scrape'
 import { StubDiscoverProviderInstance } from './stub/discover'
 import { StubExtractProviderInstance } from './stub/extract'
 import { StubRegistryEsProviderInstance } from './stub/registry-es'
@@ -83,16 +85,12 @@ const searchInstance = (vendor: SearchVendor, slot: number) => {
 	}
 }
 
-const scrapeInstance = (vendor: ScrapeVendor, _slot: number) => {
+const scrapeInstance = (vendor: ScrapeVendor, slot: number) => {
 	switch (vendor) {
 		case 'stub':
 			return Effect.succeed(StubScrapeProviderInstance)
 		case 'firecrawl':
-			return Effect.succeed(
-				ScrapeProvider.of({
-					scrape: () => notYetImplementedError('scrape', 'firecrawl'),
-				}),
-			)
+			return makeFirecrawlScrape(slot)
 		case 'local':
 			return Effect.succeed(
 				ScrapeProvider.of({
@@ -102,16 +100,12 @@ const scrapeInstance = (vendor: ScrapeVendor, _slot: number) => {
 	}
 }
 
-const extractInstance = (vendor: ExtractVendor, _slot: number) => {
+const extractInstance = (vendor: ExtractVendor, slot: number) => {
 	switch (vendor) {
 		case 'stub':
 			return Effect.succeed(StubExtractProviderInstance)
 		case 'firecrawl':
-			return Effect.succeed(
-				ExtractProvider.of({
-					extract: () => notYetImplementedError('extract', 'firecrawl'),
-				}),
-			)
+			return makeFirecrawlExtract(slot)
 		case 'local':
 			return Effect.succeed(
 				ExtractProvider.of({
