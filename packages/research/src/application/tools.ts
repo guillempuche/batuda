@@ -105,7 +105,7 @@ export const ExtractStructuredTool = Tool.make('extract_structured', {
 
 export const RegistryLookupTool = Tool.make('registry_lookup', {
 	description:
-		'Look up a company in its national business registry (free tier). Returns legal name, tax id, status, and (when available) directors. Paid reports are not exposed to the agent.',
+		'Look up a company in its national business registry. Metered (~€0.29/lookup), so use it to confirm a specific company rather than browsing. Returns legal name, tax id, status, and (when available) directors.',
 	parameters: RegistryLookupParams,
 	success: ToolResultSchema,
 })
