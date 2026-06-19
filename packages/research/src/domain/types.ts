@@ -58,6 +58,9 @@ export class RegistryRecord extends Schema.Class<RegistryRecord>(
 	incorporationDate: Schema.optional(Schema.String),
 	capital: Schema.optional(Schema.String),
 	address: Schema.optional(Schema.String),
+	municipality: Schema.optional(Schema.String),
+	province: Schema.optional(Schema.String),
+	sector: Schema.optional(Schema.String),
 	directors: Schema.optional(
 		Schema.Array(
 			Schema.Struct({

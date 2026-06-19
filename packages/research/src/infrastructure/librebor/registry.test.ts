@@ -94,6 +94,10 @@ const companyBody = (overrides: Record<string, unknown> = {}) => ({
 		status: 'active',
 		capital: 15_920_000,
 		date_creation: '1977-01-01',
+		address: 'AV DEL MEDITERRANEO 5 (TAVERNES BLANQUES)',
+		municipality: 'TAVERNES BLANQUES',
+		province: 'Valencia',
+		cnae: '4711',
 		active_positions: [
 			{
 				name_person: 'ROIG ALFONSO JUAN',
@@ -143,13 +147,17 @@ describe('makeLibreborRegistry', () => {
 			}),
 		)
 
-		// THEN the record carries identity, status, capital, incorporation and directors
+		// THEN the record carries identity, status, capital, location, sector, incorporation and directors
 		const rec = recordOf(await exit)
 		expect(rec?.legalName).toBe('MERCADONA SA')
 		expect(rec?.taxId).toBe('A46103834')
 		expect(rec?.status).toBe('active')
 		expect(rec?.capital).toBe('15920000')
 		expect(rec?.incorporationDate).toBe('1977-01-01')
+		expect(rec?.address).toContain('MEDITERRANEO')
+		expect(rec?.municipality).toBe('TAVERNES BLANQUES')
+		expect(rec?.province).toBe('Valencia')
+		expect(rec?.sector).toBe('4711')
 		expect(rec?.directors?.[0]).toEqual({
 			name: 'ROIG ALFONSO JUAN',
 			role: 'Presidente',

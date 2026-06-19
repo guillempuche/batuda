@@ -38,6 +38,10 @@ const Company = Schema.Struct({
 	status: NullableString,
 	capital: Schema.optional(Schema.NullOr(Schema.Number)),
 	date_creation: NullableString,
+	address: NullableString,
+	municipality: NullableString,
+	province: NullableString,
+	cnae: NullableString,
 	active_positions: Schema.optional(
 		Schema.Array(
 			Schema.Struct({
@@ -116,6 +120,10 @@ export const makeLibreborRegistry = (slot: number) =>
 				status: company.status ?? undefined,
 				incorporationDate: company.date_creation ?? undefined,
 				capital: company.capital != null ? `${company.capital}` : undefined,
+				address: company.address ?? undefined,
+				municipality: company.municipality ?? undefined,
+				province: company.province ?? undefined,
+				sector: company.cnae ?? undefined,
 				directors: (company.active_positions ?? []).map(p => ({
 					name: p.name_person ?? '',
 					role: p.role ?? undefined,
