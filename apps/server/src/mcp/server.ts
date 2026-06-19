@@ -31,6 +31,10 @@ import {
 	ResearchLifecycleTools,
 } from './tools/research-lifecycle'
 import { ResearchMcpHandlersLive, ResearchMcpTools } from './tools/research-mcp'
+import {
+	ResearchRegistryHandlersLive,
+	ResearchRegistryTools,
+} from './tools/research-registry'
 import { TaskHandlersLive, TaskTools } from './tools/tasks'
 import { TimelineHandlersLive, TimelineTools } from './tools/timeline'
 
@@ -48,6 +52,7 @@ export const McpToolsLive = Layer.mergeAll(
 	McpServer.toolkit(RecordingTools),
 	McpServer.toolkit(ResearchLifecycleTools),
 	McpServer.toolkit(ResearchMcpTools),
+	McpServer.toolkit(ResearchRegistryTools),
 	McpServer.toolkit(InstructionsMcpTools),
 	McpServer.toolkit(TimelineTools),
 	McpServer.toolkit(CalendarTools),
@@ -75,6 +80,7 @@ export const McpToolsLive = Layer.mergeAll(
 	Layer.provide(RecordingHandlersLive),
 	Layer.provide(ResearchLifecycleHandlersLive),
 	Layer.provide(ResearchMcpHandlersLive),
+	Layer.provide(ResearchRegistryHandlersLive),
 	Layer.provide(InstructionsMcpHandlersLive),
 	Layer.provide(TimelineHandlersLive),
 	Layer.provide(CalendarHandlersLive),

@@ -1,25 +1,22 @@
 import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 
-import {
-	Budget,
-	ProviderQuota,
-	RegistryRouter,
-	ReportRouter,
-} from '@batuda/research'
+import { RegistryRouter } from '@batuda/research'
 
 // ── lookup_registry ──
-// One tool, two backends. depth='basic' → free registry (libreBORME).
-// depth='financials'|'full' → paid report (einforma), gated by budget.
+// Standalone, on-demand Spanish mercantile-registry (BORME) lookup via
+// libreBORME — for a quick identity check outside a research run (the agent's
+// in-run registry_lookup tool covers the same data during a run). Each lookup
+// spends one libreBORME credit (~€0.29); not enforced against a budget here
+// because the in-run tool loop doesn't meter paid providers either.
 
 const LookupRegistry = Tool.make('lookup_registry', {
 	description:
-		"Look up a company in the official registry. With depth='basic' (default): free, returns legal name, NIF, capital, directors from libreBORME. With depth='financials' or 'full': paid report from einforma with detailed financials and risk scores. Always try basic first.",
+		'Look up a Spanish company in the mercantile registry (libreBORME) by NIF or name. Returns legal name, NIF, status, capital, and directors. Metered: ~€0.29 per lookup.',
 	parameters: Schema.Struct({
 		country: Schema.Literal('ES'),
 		query: Schema.optional(Schema.String),
 		tax_id: Schema.optional(Schema.String),
-		depth: Schema.optional(Schema.Literals(['basic', 'financials', 'full'])),
 	}),
 	success: Schema.Unknown,
 })
@@ -35,44 +32,22 @@ export const ResearchRegistryTools = Toolkit.make(LookupRegistry)
 export const ResearchRegistryHandlersLive = ResearchRegistryTools.toLayer(
 	Effect.gen(function* () {
 		const registry = yield* RegistryRouter
-		const report = yield* ReportRouter
-		const quota = yield* ProviderQuota
-		const budget = yield* Budget
 
 		return {
 			lookup_registry: params =>
-				Effect.gen(function* () {
-					const depth = params.depth ?? 'basic'
-
-					if (depth === 'basic') {
-						// Free registry (libreBORME) — no budget gate needed.
-						const result = yield* registry.lookup({
-							country: params.country,
-							query: params.query,
-							taxId: params.tax_id,
-						})
-						return result
-					}
-
-					// Paid report path — requires tax_id to identify the company.
-					if (!params.tax_id) {
-						return {
-							error: 'tax_id is required for financials/full depth',
-						}
-					}
-
-					// Einforma charges ~3 EUR per report. The budget gate prevents
-					// accidental spend; the LLM should try depth='basic' first.
-					yield* quota.check('einforma', 1)
-					yield* budget.chargePaid('einforma', 300)
-					const result = yield* report.report({
+				registry
+					.lookup({
 						country: params.country,
+						query: params.query,
 						taxId: params.tax_id,
-						depth,
 					})
-					yield* quota.consume('einforma', result.units)
-					return result
-				}).pipe(Effect.orDie),
+					// Surface a provider failure (bad credential, not found, no credit)
+					// as a readable result the caller can act on, not an opaque defect.
+					.pipe(
+						Effect.catchTag('ProviderError', e =>
+							Effect.succeed({ error: e.message }),
+						),
+					),
 		}
 	}),
 )
