@@ -49,6 +49,7 @@ import { makeCachedScrape } from './cached-scrape'
 import { makeCachedSearch } from './cached-search'
 import { makeFirecrawlExtract } from './firecrawl/extract'
 import { makeFirecrawlScrape } from './firecrawl/scrape'
+import { makeLibreborRegistry } from './librebor/registry'
 import { StubDiscoverProviderInstance } from './stub/discover'
 import { StubExtractProviderInstance } from './stub/extract'
 import { StubRegistryEsProviderInstance } from './stub/registry-es'
@@ -143,17 +144,13 @@ const discoverInstance = (vendor: DiscoverVendor, _slot: number) => {
 	}
 }
 
-const registryInstance = (cc: Country, vendor: string, _slot: number) => {
+const registryInstance = (cc: Country, vendor: string, slot: number) => {
 	if (cc === 'ES') {
 		switch (vendor as (typeof REGISTRY_VENDORS_BY_COUNTRY)['ES'][number]) {
 			case 'stub':
 				return Effect.succeed(StubRegistryEsProviderInstance)
 			case 'librebor':
-				return Effect.succeed(
-					RegistryRouter.of({
-						lookup: () => notYetImplementedError('registry', 'librebor'),
-					}),
-				)
+				return makeLibreborRegistry(slot)
 			case 'none':
 				return Effect.succeed(
 					RegistryRouter.of({
