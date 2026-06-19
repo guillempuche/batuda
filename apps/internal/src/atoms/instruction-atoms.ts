@@ -7,12 +7,6 @@ export const instructionTemplatesAtom = BatudaApiAtom.query(
 	{},
 )
 
-export const instructionPresetsAtom = BatudaApiAtom.query(
-	'instructions',
-	'listPresets',
-	{ query: {} },
-)
-
 export const instructionDonationsAtom = BatudaApiAtom.query(
 	'instructions',
 	'listDonations',
@@ -65,10 +59,6 @@ export const transferTemplateAtom = BatudaApiAtom.mutation(
 export const donateTemplateAtom = BatudaApiAtom.mutation(
 	'instructions',
 	'donateTemplate',
-)
-export const importPresetAtom = BatudaApiAtom.mutation(
-	'instructions',
-	'importPreset',
 )
 export const setUserStackAtom = BatudaApiAtom.mutation(
 	'instructions',

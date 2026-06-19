@@ -21,7 +21,6 @@ export interface InstructionTemplate {
 	readonly ownerUserId: string | null
 	readonly name: string
 	readonly body: string
-	readonly sourcePresetId: string | null
 	readonly createdBy: string
 	readonly updatedAt: string
 }

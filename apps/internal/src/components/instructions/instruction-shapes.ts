@@ -19,12 +19,6 @@ export type DonationShape = {
 	readonly createdAt: string | null
 }
 
-export type PresetShape = {
-	readonly id: string
-	readonly name: string
-	readonly body: string
-}
-
 function str(r: Record<string, unknown>, key: string): string | null {
 	return typeof r[key] === 'string' ? (r[key] as string) : null
 }
@@ -94,20 +88,6 @@ export function narrowDonations(value: unknown): ReadonlyArray<DonationShape> {
 			status: str(r, 'status') ?? 'pending',
 			createdAt: str(r, 'createdAt'),
 		})
-	}
-	return out
-}
-
-export function narrowPresets(value: unknown): ReadonlyArray<PresetShape> {
-	if (!Array.isArray(value)) return []
-	const out: Array<PresetShape> = []
-	for (const row of value) {
-		if (!row || typeof row !== 'object') continue
-		const r = row as Record<string, unknown>
-		const id = str(r, 'id')
-		const name = str(r, 'name')
-		if (id === null || name === null) continue
-		out.push({ id, name, body: str(r, 'body') ?? '' })
 	}
 	return out
 }

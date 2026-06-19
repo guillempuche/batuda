@@ -33,21 +33,6 @@ const ManageTemplate = Tool.make('manage_instruction_template', {
 	.annotate(Tool.Title, 'Manage Instruction Templates')
 	.annotate(Tool.OpenWorld, false)
 
-const ManagePreset = Tool.make('manage_instruction_preset', {
-	description:
-		'List the Batuda instruction-template presets, or import one into the org (admin only) or your personal library.',
-	parameters: Schema.Struct({
-		action: Schema.Literals(['list', 'import']),
-		preset_id: Schema.optional(Schema.String),
-		scope: Schema.optional(Scope),
-		agent: Schema.optional(Schema.String),
-	}),
-	success: Schema.Unknown,
-	dependencies: REQUEST_DEPENDENCIES,
-})
-	.annotate(Tool.Title, 'Manage Instruction Presets')
-	.annotate(Tool.OpenWorld, false)
-
 const ManageDefaultStack = Tool.make('manage_instruction_default_stack', {
 	description:
 		'Get, set, or clear the default instruction stack for an agent. scope=org sets the org default (admin only); scope=personal sets your own; clear removes your own so you inherit the org default. composition=extend (personal scope) layers your templates on the live org default instead of replacing it.',
@@ -83,7 +68,6 @@ const ManageDonation = Tool.make('manage_instruction_donation', {
 
 export const InstructionsMcpTools = Toolkit.make(
 	ManageTemplate,
-	ManagePreset,
 	ManageDefaultStack,
 	ManageDonation,
 )
@@ -146,22 +130,6 @@ export const InstructionsMcpHandlersLive = InstructionsMcpTools.toLayer(
 								svc.transfer(org.id, userId, params.id, params.target_user_id),
 							)
 					}
-				}),
-
-			manage_instruction_preset: params =>
-				Effect.gen(function* () {
-					const org = yield* CurrentOrg
-					const { userId } = yield* SessionContext
-					if (params.action === 'list') {
-						const agent =
-							params.agent !== undefined ? parseAgent(params.agent) : null
-						return yield* run(svc.listPresets(agent ?? undefined))
-					}
-					if (params.preset_id === undefined || params.scope === undefined)
-						return { error: 'preset_id and scope are required to import' }
-					return yield* run(
-						svc.importPreset(org.id, userId, params.preset_id, params.scope),
-					)
 				}),
 
 			manage_instruction_default_stack: params =>

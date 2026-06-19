@@ -112,14 +112,12 @@ export const seedInstructions = ({
 						},
 					]
 				: []),
-			// An org template imported from a preset (records source_preset_id),
-			// and a personal template Alice created then handed to Carol so its
+			// A personal template Alice created then handed to Carol so its
 			// owner differs from its creator.
 			{
 				organizationId: tallerOrgId,
 				ownerUserId: null,
 				createdBy: alice,
-				sourcePresetId: 'research-concise-brief',
 				name: '[research] Concise brief',
 				body: 'Write the brief to be skimmed in under a minute: lead with the conclusion, then the few facts that back it, in short sentences with no filler.',
 			},
@@ -129,7 +127,6 @@ export const seedInstructions = ({
 							organizationId: tallerOrgId,
 							ownerUserId: carol,
 							createdBy: alice,
-							sourcePresetId: null,
 							name: '[lang] Catalan brief',
 							body: 'Write the final brief in Catalan, formal register, with the section headings in Catalan too.',
 						},

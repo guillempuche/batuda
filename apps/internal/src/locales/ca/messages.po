@@ -40,10 +40,6 @@ msgid "\"{0}\" will be removed for good. This can't be undone."
 msgstr "S'eliminarà «{0}» per sempre. Això no es pot desfer."
 
 #: src/routes/settings/organization/templates.tsx
-msgid "\"{name}\" is now an org template you can edit."
-msgstr "«{name}» ja és una plantilla de l'organització que pots editar."
-
-#: src/routes/settings/organization/templates.tsx
 msgid "\"{name}\" is now an org template."
 msgstr "«{name}» ja és una plantilla de l'organització."
 
@@ -258,7 +254,6 @@ msgid "Add to the org default"
 msgstr "Amplia el valor per defecte de l'organització"
 
 #: src/routes/settings/organization/templates.tsx
-#: src/routes/settings/organization/templates.tsx
 msgid "Added to the org"
 msgstr "Afegida a l'organització"
 
@@ -413,10 +408,6 @@ msgstr "Inici de Batuda"
 #: src/routes/login.tsx
 msgid "Batuda is invite-only. Request access from the Engranatge team."
 msgstr "Batuda és només amb invitació. Demana accés a l'equip d'Engranatge."
-
-#: src/routes/settings/organization/templates.tsx
-msgid "Batuda-written templates you can drop into the org and edit."
-msgstr "Plantilles escrites per Batuda que pots afegir a l'organització i editar."
 
 #: src/components/emails/compose-form.tsx
 msgid "Bcc"
@@ -967,10 +958,6 @@ msgstr "No s'ha pogut rebutjar"
 #: src/routes/settings/profile/templates.tsx
 msgid "Couldn't delete the template. Please try again."
 msgstr "No s'ha pogut eliminar la plantilla. Torna-ho a provar."
-
-#: src/routes/settings/organization/templates.tsx
-msgid "Couldn't import it"
-msgstr "No s'ha pogut importar"
 
 #: src/routes/settings/organization/templates.tsx
 msgid "Couldn't load the org default. Refresh to try again."
@@ -1568,10 +1555,6 @@ msgstr "Port IMAP"
 msgid "IMAP security"
 msgstr "Seguretat IMAP"
 
-#: src/routes/settings/organization/templates.tsx
-msgid "Import to org"
-msgstr "Importa a l'organització"
-
 #: src/routes/companies/index.tsx
 msgid "In pipeline"
 msgstr "Al pipeline"
@@ -2123,8 +2106,8 @@ msgid "No org templates yet."
 msgstr "Encara no hi ha plantilles d'organització."
 
 #: src/routes/settings/organization/templates.tsx
-msgid "No org templates yet. Create one, import a preset, or accept a member's proposal."
-msgstr "Encara no hi ha plantilles d'organització. Crea'n una, importa una predefinida o accepta la proposta d'un membre."
+msgid "No org templates yet. Create one or accept a member's proposal."
+msgstr "Encara no hi ha plantilles d'organització. Crea'n una o accepta una proposta d'un membre."
 
 #: src/routes/index.tsx
 msgid "No overdue tasks, no pending follow-ups, no neglected companies."
@@ -2138,10 +2121,6 @@ msgstr "Encara no hi ha pàgines"
 #: src/routes/settings/organization/spend.tsx
 msgid "No paid calls in this range."
 msgstr "No hi ha crides de pagament en aquest interval."
-
-#: src/routes/settings/organization/templates.tsx
-msgid "No presets available."
-msgstr "No hi ha plantilles predefinides disponibles."
 
 #: src/routes/emails/inboxes.tsx
 msgid "No primary inbox set."
@@ -2526,7 +2505,6 @@ msgstr "Pipeline"
 msgid "Plain"
 msgstr "Sense xifrar"
 
-#: src/routes/settings/organization/templates.tsx
 #: src/routes/settings/organization/templates.tsx
 #: src/routes/settings/organization/templates.tsx
 #: src/routes/settings/organization/templates.tsx
@@ -3168,10 +3146,6 @@ msgstr "Orientació permanent que el teu agent de recerca segueix en cada recerc
 #: src/components/research/research-dialog.tsx
 msgid "Start"
 msgstr "Inicia"
-
-#: src/routes/settings/organization/templates.tsx
-msgid "Starter presets"
-msgstr "Plantilles predefinides per començar"
 
 #: src/components/research/research-dialog.tsx
 msgid "Starting…"

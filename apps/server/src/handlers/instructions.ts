@@ -120,25 +120,6 @@ export const InstructionsLive = HttpApiBuilder.group(
 						)
 					}),
 				)
-				.handle('listPresets', _ =>
-					Effect.gen(function* () {
-						const requested =
-							_.query.agent !== undefined ? parseAgent(_.query.agent) : null
-						return yield* svc.listPresets(requested ?? undefined)
-					}),
-				)
-				.handle('importPreset', _ =>
-					Effect.gen(function* () {
-						const org = yield* CurrentOrg
-						const { userId } = yield* SessionContext
-						return yield* svc.importPreset(
-							org.id,
-							userId,
-							_.params.presetId,
-							_.payload.scope,
-						)
-					}),
-				)
 				.handle('listDonations', _ =>
 					Effect.gen(function* () {
 						const status = _.query.status

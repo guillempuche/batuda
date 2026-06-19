@@ -1,7 +1,7 @@
 {
 	"name": "@batuda/instructions",
 	"version": "0.0.1",
-	"description": "Batuda — AI instruction templates (org + user library, per-agent default stacks, resolver, preset catalog)",
+	"description": "Batuda — AI instruction templates (org + user library, per-agent default stacks, resolver)",
 	"type": "module",
 	"types": "./src/index.ts",
 	"main": "./src/index.ts",

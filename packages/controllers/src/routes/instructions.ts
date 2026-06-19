@@ -37,8 +37,6 @@ const SetStackInput = Schema.Struct({
 	composition: Schema.optional(Schema.Literals(['replace', 'extend'])),
 })
 
-const ImportPresetInput = Schema.Struct({ scope: Scope })
-
 // ── Route group ──
 
 export const InstructionsGroup = HttpApiGroup.make('instructions')
@@ -122,23 +120,6 @@ export const InstructionsGroup = HttpApiGroup.make('instructions')
 			{
 				params: { agent: Schema.String },
 				payload: SetStackInput,
-				success: Schema.Unknown,
-			},
-		),
-	)
-	.add(
-		HttpApiEndpoint.get('listPresets', '/instructions/presets', {
-			query: { agent: Schema.optional(Schema.String) },
-			success: Schema.Unknown,
-		}),
-	)
-	.add(
-		HttpApiEndpoint.post(
-			'importPreset',
-			'/instructions/presets/:presetId/import',
-			{
-				params: { presetId: Schema.String },
-				payload: ImportPresetInput,
 				success: Schema.Unknown,
 			},
 		),
