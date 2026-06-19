@@ -26,7 +26,6 @@ interface TemplateRow {
 	readonly ownerUserId: string | null
 	readonly name: string
 	readonly body: string
-	readonly sourcePresetId: string | null
 	readonly createdBy: string
 	readonly updatedAt: string
 }
@@ -37,7 +36,6 @@ const toTemplate = (row: TemplateRow): InstructionTemplate => ({
 	ownerUserId: row.ownerUserId,
 	name: row.name,
 	body: row.body,
-	sourcePresetId: row.sourcePresetId,
 	createdBy: row.createdBy,
 	updatedAt: row.updatedAt,
 })
@@ -47,7 +45,7 @@ export const listTemplates = (): Eff<ReadonlyArray<InstructionTemplate>> =>
 		const sql = yield* SqlClient.SqlClient
 		// RLS limits this to org-owned templates plus the actor's own.
 		const rows = yield* sql<TemplateRow>`
-			SELECT id, organization_id, owner_user_id, name, body, source_preset_id, created_by, updated_at::text AS updated_at
+			SELECT id, organization_id, owner_user_id, name, body, created_by, updated_at::text AS updated_at
 			FROM instruction_templates
 			ORDER BY owner_user_id NULLS FIRST, name ASC
 		`
@@ -58,7 +56,7 @@ export const getTemplate = (id: string): Eff<InstructionTemplate | undefined> =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
 		const rows = yield* sql<TemplateRow>`
-			SELECT id, organization_id, owner_user_id, name, body, source_preset_id, created_by, updated_at::text AS updated_at
+			SELECT id, organization_id, owner_user_id, name, body, created_by, updated_at::text AS updated_at
 			FROM instruction_templates WHERE id = ${id} LIMIT 1
 		`
 		const row = rows[0]
@@ -71,7 +69,6 @@ export interface CreateTemplateInput {
 	readonly name: string
 	readonly body: string
 	readonly createdBy: string
-	readonly sourcePresetId?: string | null
 }
 
 export const createTemplate = (
@@ -81,12 +78,12 @@ export const createTemplate = (
 		const sql = yield* SqlClient.SqlClient
 		const rows = yield* sql<TemplateRow>`
 			INSERT INTO instruction_templates
-				(organization_id, owner_user_id, name, body, source_preset_id, created_by)
+				(organization_id, owner_user_id, name, body, created_by)
 			VALUES (
 				${input.organizationId}, ${input.ownerUserId}, ${input.name},
-				${input.body}, ${input.sourcePresetId ?? null}, ${input.createdBy}
+				${input.body}, ${input.createdBy}
 			)
-			RETURNING id, organization_id, owner_user_id, name, body, source_preset_id, created_by, updated_at::text AS updated_at
+			RETURNING id, organization_id, owner_user_id, name, body, created_by, updated_at::text AS updated_at
 		`
 		const row = rows[0]
 		if (!row)
@@ -111,7 +108,7 @@ export const updateTemplateFields = (
 				body = COALESCE(${fields.body ?? null}, body),
 				updated_at = now()
 			WHERE id = ${id}
-			RETURNING id, organization_id, owner_user_id, name, body, source_preset_id, created_by, updated_at::text AS updated_at
+			RETURNING id, organization_id, owner_user_id, name, body, created_by, updated_at::text AS updated_at
 		`
 		const row = rows[0]
 		return row ? toTemplate(row) : undefined
@@ -132,7 +129,6 @@ export const forkTemplate = (
 			name: source.name,
 			body: source.body,
 			createdBy: opts.createdBy,
-			sourcePresetId: source.sourcePresetId,
 		})
 	})
 
@@ -149,7 +145,7 @@ export const transferTemplateToUser = (
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
 		const rows = yield* sql<TemplateRow>`
-			SELECT id, organization_id, owner_user_id, name, body, source_preset_id, created_by, updated_at::text AS updated_at
+			SELECT id, organization_id, owner_user_id, name, body, created_by, updated_at::text AS updated_at
 			FROM transfer_instruction_template(${id}, ${targetUserId})
 		`
 		const row = rows[0]

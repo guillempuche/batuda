@@ -43,8 +43,6 @@ export type {
 	TemplateEditMode,
 } from './management-logic'
 export { classifyStackTemplates, decideTemplateEdit } from './management-logic'
-export type { InstructionPreset } from './presets'
-export { instructionPresets, presetById, presetsForAgent } from './presets'
 export type {
 	ResolvedInstructions,
 	ResolveInstructionsArgs,

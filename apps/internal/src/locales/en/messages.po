@@ -40,10 +40,6 @@ msgid "\"{0}\" will be removed for good. This can't be undone."
 msgstr "\"{0}\" will be removed for good. This can't be undone."
 
 #: src/routes/settings/organization/templates.tsx
-msgid "\"{name}\" is now an org template you can edit."
-msgstr "\"{name}\" is now an org template you can edit."
-
-#: src/routes/settings/organization/templates.tsx
 msgid "\"{name}\" is now an org template."
 msgstr "\"{name}\" is now an org template."
 
@@ -258,7 +254,6 @@ msgid "Add to the org default"
 msgstr "Add to the org default"
 
 #: src/routes/settings/organization/templates.tsx
-#: src/routes/settings/organization/templates.tsx
 msgid "Added to the org"
 msgstr "Added to the org"
 
@@ -413,10 +408,6 @@ msgstr "Batuda home"
 #: src/routes/login.tsx
 msgid "Batuda is invite-only. Request access from the Engranatge team."
 msgstr "Batuda is invite-only. Request access from the Engranatge team."
-
-#: src/routes/settings/organization/templates.tsx
-msgid "Batuda-written templates you can drop into the org and edit."
-msgstr "Batuda-written templates you can drop into the org and edit."
 
 #: src/components/emails/compose-form.tsx
 msgid "Bcc"
@@ -967,10 +958,6 @@ msgstr "Couldn't decline it"
 #: src/routes/settings/profile/templates.tsx
 msgid "Couldn't delete the template. Please try again."
 msgstr "Couldn't delete the template. Please try again."
-
-#: src/routes/settings/organization/templates.tsx
-msgid "Couldn't import it"
-msgstr "Couldn't import it"
 
 #: src/routes/settings/organization/templates.tsx
 msgid "Couldn't load the org default. Refresh to try again."
@@ -1568,10 +1555,6 @@ msgstr "IMAP port"
 msgid "IMAP security"
 msgstr "IMAP security"
 
-#: src/routes/settings/organization/templates.tsx
-msgid "Import to org"
-msgstr "Import to org"
-
 #: src/routes/companies/index.tsx
 msgid "In pipeline"
 msgstr "In pipeline"
@@ -2123,8 +2106,8 @@ msgid "No org templates yet."
 msgstr "No org templates yet."
 
 #: src/routes/settings/organization/templates.tsx
-msgid "No org templates yet. Create one, import a preset, or accept a member's proposal."
-msgstr "No org templates yet. Create one, import a preset, or accept a member's proposal."
+msgid "No org templates yet. Create one or accept a member's proposal."
+msgstr "No org templates yet. Create one or accept a member's proposal."
 
 #: src/routes/index.tsx
 msgid "No overdue tasks, no pending follow-ups, no neglected companies."
@@ -2138,10 +2121,6 @@ msgstr "No pages yet"
 #: src/routes/settings/organization/spend.tsx
 msgid "No paid calls in this range."
 msgstr "No paid calls in this range."
-
-#: src/routes/settings/organization/templates.tsx
-msgid "No presets available."
-msgstr "No presets available."
 
 #: src/routes/emails/inboxes.tsx
 msgid "No primary inbox set."
@@ -2526,7 +2505,6 @@ msgstr "Pipeline"
 msgid "Plain"
 msgstr "Plain"
 
-#: src/routes/settings/organization/templates.tsx
 #: src/routes/settings/organization/templates.tsx
 #: src/routes/settings/organization/templates.tsx
 #: src/routes/settings/organization/templates.tsx
@@ -3168,10 +3146,6 @@ msgstr "Standing guidance your research agent follows on every run."
 #: src/components/research/research-dialog.tsx
 msgid "Start"
 msgstr "Start"
-
-#: src/routes/settings/organization/templates.tsx
-msgid "Starter presets"
-msgstr "Starter presets"
 
 #: src/components/research/research-dialog.tsx
 msgid "Starting…"

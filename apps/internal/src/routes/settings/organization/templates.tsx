@@ -5,7 +5,6 @@ import { AsyncResult } from 'effect/unstable/reactivity'
 import {
 	ArrowLeft,
 	Check,
-	Download,
 	Pencil,
 	Plus,
 	ScrollText,
@@ -21,9 +20,7 @@ import {
 	acceptDonationAtom,
 	defaultStacksAtom,
 	deleteTemplateAtom,
-	importPresetAtom,
 	instructionDonationsAtom,
-	instructionPresetsAtom,
 	instructionTemplatesAtom,
 	rejectDonationAtom,
 	setOrgStackAtom,
@@ -50,7 +47,6 @@ import {
 } from '#/components/instructions/instruction-page-chrome'
 import {
 	narrowDonations,
-	narrowPresets,
 	narrowStackIds,
 	narrowTemplates,
 	outcomeOf,
@@ -152,10 +148,10 @@ function OrgTemplatesPage() {
 }
 
 // The admin half of the org templates page: managing org templates, the org
-// default stack, the donation review queue, and preset import. It's mounted
-// only for owners/admins, so its donation, preset, and stack queries never
-// fire for a regular member — who can't act on that data anyway, since every
-// org write is admin-gated on the server.
+// default stack, and the donation review queue. It's mounted only for
+// owners/admins, so its donation and stack queries never fire for a regular
+// member — who can't act on that data anyway, since every org write is
+// admin-gated on the server.
 function OrgTemplateAdmin({
 	orgTemplates,
 	refreshTemplates,
@@ -168,7 +164,6 @@ function OrgTemplateAdmin({
 
 	const donationsResult = useAtomValue(instructionDonationsAtom)
 	const refreshDonations = useAtomRefresh(instructionDonationsAtom)
-	const presetsResult = useAtomValue(instructionPresetsAtom)
 	const stacksAtom = useMemo(() => defaultStacksAtom(AGENT), [])
 	const stacksResult = useAtomValue(stacksAtom)
 	const refreshStacks = useAtomRefresh(stacksAtom)
@@ -177,7 +172,6 @@ function OrgTemplateAdmin({
 	const setOrgStack = useAtomSet(setOrgStackAtom, { mode: 'promiseExit' })
 	const acceptDonation = useAtomSet(acceptDonationAtom, { mode: 'promiseExit' })
 	const rejectDonation = useAtomSet(rejectDonationAtom, { mode: 'promiseExit' })
-	const importPreset = useAtomSet(importPresetAtom, { mode: 'promiseExit' })
 
 	const pendingDonations = useMemo(
 		() =>
@@ -187,13 +181,6 @@ function OrgTemplateAdmin({
 					)
 				: [],
 		[donationsResult],
-	)
-	const presets = useMemo(
-		() =>
-			AsyncResult.isSuccess(presetsResult)
-				? narrowPresets(presetsResult.value)
-				: [],
-		[presetsResult],
 	)
 	const stacksFailed = AsyncResult.isFailure(stacksResult)
 	const orgStackIds = AsyncResult.isSuccess(stacksResult)
@@ -317,28 +304,6 @@ function OrgTemplateAdmin({
 		refreshDonations()
 	}
 
-	const importToOrg = async (presetId: string, name: string) => {
-		const exit = await importPreset({
-			params: { presetId },
-			payload: { scope: 'org' },
-		} as never)
-		const outcome = outcomeOf(exit)
-		if (outcome === 'imported') {
-			toast.add({
-				title: t`Added to the org`,
-				description: t`"${name}" is now an org template you can edit.`,
-				type: 'success',
-			})
-			refreshTemplates()
-			return
-		}
-		toast.add({
-			title: t`Couldn't import it`,
-			description: t`Please try again.`,
-			type: 'error',
-		})
-	}
-
 	return (
 		<>
 			<Section>
@@ -360,8 +325,7 @@ function OrgTemplateAdmin({
 				{orgTemplates.length === 0 ? (
 					<Empty>
 						<Trans>
-							No org templates yet. Create one, import a preset, or accept a
-							member's proposal.
+							No org templates yet. Create one or accept a member's proposal.
 						</Trans>
 					</Empty>
 				) : (
@@ -476,44 +440,6 @@ function OrgTemplateAdmin({
 									</ReviewActions>
 								</ReviewHead>
 								<BodyPreview>{preview(d.body)}</BodyPreview>
-							</ReviewItem>
-						))}
-					</ReviewList>
-				)}
-			</Section>
-
-			<Section>
-				<SectionTitle>
-					<Trans>Starter presets</Trans>
-				</SectionTitle>
-				<Hint>
-					<Trans>
-						Batuda-written templates you can drop into the org and edit.
-					</Trans>
-				</Hint>
-				{presets.length === 0 ? (
-					<Empty>
-						<Trans>No presets available.</Trans>
-					</Empty>
-				) : (
-					<ReviewList>
-						{presets.map(p => (
-							<ReviewItem key={p.id} data-testid='preset-row'>
-								<ReviewHead>
-									<TemplateName>{p.name}</TemplateName>
-									<PriButton
-										type='button'
-										$variant='outlined'
-										data-testid='preset-import'
-										onClick={() => {
-											void importToOrg(p.id, p.name)
-										}}
-									>
-										<Download size={14} aria-hidden />
-										<Trans>Import to org</Trans>
-									</PriButton>
-								</ReviewHead>
-								<BodyPreview>{preview(p.body)}</BodyPreview>
 							</ReviewItem>
 						))}
 					</ReviewList>

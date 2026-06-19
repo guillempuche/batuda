@@ -14,11 +14,8 @@ import {
 	getDefaultStacks,
 	getTemplate,
 	type InstructionTemplate,
-	instructionPresets,
 	listDonations,
 	listTemplates,
-	presetById,
-	presetsForAgent,
 	proposeDonation,
 	rejectDonation,
 	type StackComposition,
@@ -69,11 +66,6 @@ export type SetStackOutcome =
 			readonly offending: ReadonlyArray<string>
 	  }
 
-export type ImportOutcome =
-	| { readonly outcome: 'imported'; readonly template: InstructionTemplate }
-	| { readonly outcome: 'unknown_preset' }
-	| { readonly outcome: 'forbidden' }
-
 export type DonateOutcome =
 	| { readonly outcome: 'proposed'; readonly donation: Donation }
 	| { readonly outcome: 'forbidden' }
@@ -118,9 +110,6 @@ export class InstructionsService extends ServiceMap.Service<InstructionsService>
 				listTemplates: () => listTemplates().pipe(redactSql),
 
 				getTemplate: (id: string) => getTemplate(id).pipe(redactSql),
-
-				listPresets: (agent?: Agent | undefined) =>
-					Effect.succeed(agent ? presetsForAgent(agent) : instructionPresets),
 
 				create: (
 					organizationId: string,
@@ -218,28 +207,6 @@ export class InstructionsService extends ServiceMap.Service<InstructionsService>
 						return template
 							? { outcome: 'transferred' as const, template }
 							: { outcome: 'not_found' as const }
-					}).pipe(redactSql),
-
-				importPreset: (
-					organizationId: string,
-					userId: string,
-					presetId: string,
-					scope: Scope,
-				): Effect.Effect<ImportOutcome, never, SqlClient.SqlClient> =>
-					Effect.gen(function* () {
-						const preset = presetById(presetId)
-						if (!preset) return { outcome: 'unknown_preset' as const }
-						if (scope === 'org' && !(yield* isAdmin(userId)))
-							return { outcome: 'forbidden' as const }
-						const template = yield* createTemplate({
-							organizationId,
-							ownerUserId: scope === 'org' ? null : userId,
-							name: preset.name,
-							body: preset.body,
-							createdBy: userId,
-							sourcePresetId: preset.id,
-						})
-						return { outcome: 'imported' as const, template }
 					}).pipe(redactSql),
 
 				getDefaultStacks: (
