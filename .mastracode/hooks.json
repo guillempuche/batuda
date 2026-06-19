@@ -1,0 +1,109 @@
+{
+	"PreToolUse": [
+		{
+			"matcher": { "tool_name": "string_replace_lsp" },
+			"type": "command",
+			"description": "Warn before modifying an existing Effect SQL migration",
+			"command": "f=$(jq -r '.tool_input.path'); if [[ \"$f\" == *apps/server/src/db/migrations/0* ]]; then echo '{\"decision\": \"ask\", \"reason\": \"Modifying an existing Effect SQL migration can break deployments\"}'; else echo '{\"decision\": \"approve\"}'; fi"
+		},
+		{
+			"matcher": { "tool_name": "write_file" },
+			"type": "command",
+			"description": "Enforce NNNN_description.ts naming for new migration files",
+			"command": "f=$(jq -r '.tool_input.path'); if [[ \"$f\" == *apps/server/src/db/migrations/* ]]; then if [[ \"$f\" =~ [0-9]{4}_[a-z_]+\\.ts$ ]]; then echo '{\"decision\": \"approve\"}'; else echo '{\"decision\": \"block\", \"reason\": \"Migration must match NNNN_description.ts (e.g. 0002_add_contacts.ts)\"}'; fi; else echo '{\"decision\": \"approve\"}'; fi"
+		},
+		{
+			"matcher": { "tool_name": "view" },
+			"type": "command",
+			"description": "Block reading .env files — use Config.string() in Effect code instead",
+			"command": "f=$(jq -r '.tool_input.path'); if [[ \"$f\" == *.env ]] && [[ \"$f\" != *.env.example ]]; then echo '{\"decision\": \"block\", \"reason\": \"Never read .env or credentials. Use Config.string() in Effect code.\"}'; else echo '{\"decision\": \"approve\"}'; fi"
+		},
+		{
+			"matcher": { "tool_name": "execute_command" },
+			"type": "command",
+			"description": "Block git push --force; require --force-with-lease",
+			"command": "cmd=$(jq -r '.tool_input.command'); if echo \"$cmd\" | grep -qE 'git push.*(--force-with-lease)'; then echo '{\"decision\": \"approve\"}'; elif echo \"$cmd\" | grep -qE 'git push.*([[:space:]]--force([[:space:]]|$)|[[:space:]]-f([[:space:]]|$))'; then echo '{\"decision\": \"block\", \"reason\": \"Force push is destructive. Use --force-with-lease or ask the user first.\"}'; else echo '{\"decision\": \"approve\"}'; fi"
+		}
+	],
+	"PostToolUse": [
+		{
+			"matcher": { "tool_name": "string_replace_lsp" },
+			"type": "command",
+			"description": "Run Biome/dprint formatter after edits",
+			"command": "f=$(jq -r '.tool_input.path'); if [[ \"$f\" == *.ts || \"$f\" == *.tsx || \"$f\" == *.json ]]; then biome check --write --no-errors-on-unmatched \"$f\" 2>/dev/null; elif [[ \"$f\" == *.md ]]; then dprint fmt \"$f\" 2>/dev/null; fi; true",
+			"timeout": 10
+		},
+		{
+			"matcher": { "tool_name": "ast_smart_edit" },
+			"type": "command",
+			"description": "Run Biome/dprint formatter after AST edits",
+			"command": "f=$(jq -r '.tool_input.path'); if [[ \"$f\" == *.ts || \"$f\" == *.tsx || \"$f\" == *.json ]]; then biome check --write --no-errors-on-unmatched \"$f\" 2>/dev/null; elif [[ \"$f\" == *.md ]]; then dprint fmt \"$f\" 2>/dev/null; fi; true",
+			"timeout": 10
+		},
+		{
+			"matcher": { "tool_name": "write_file" },
+			"type": "command",
+			"description": "Run Biome/dprint formatter after writes",
+			"command": "f=$(jq -r '.tool_input.path'); if [[ \"$f\" == *.ts || \"$f\" == *.tsx || \"$f\" == *.json ]]; then biome check --write --no-errors-on-unmatched \"$f\" 2>/dev/null; elif [[ \"$f\" == *.md ]]; then dprint fmt \"$f\" 2>/dev/null; fi; true",
+			"timeout": 10
+		},
+		{
+			"matcher": { "tool_name": "string_replace_lsp" },
+			"type": "command",
+			"description": "Remind to write a migration when domain schema changes",
+			"command": "f=$(jq -r '.tool_input.path'); if [[ \"$f\" == *packages/domain/src/schema/*.ts ]] && [[ \"$f\" != *.test.ts ]]; then echo '{\"systemMessage\": \"Domain schema changed. Check if an Effect SQL migration is needed in apps/server/src/db/migrations/\"}'; fi; true"
+		},
+		{
+			"matcher": { "tool_name": "write_file" },
+			"type": "command",
+			"description": "Remind to write a migration when domain schema changes",
+			"command": "f=$(jq -r '.tool_input.path'); if [[ \"$f\" == *packages/domain/src/schema/*.ts ]] && [[ \"$f\" != *.test.ts ]]; then echo '{\"systemMessage\": \"Domain schema changed. Check if an Effect SQL migration is needed in apps/server/src/db/migrations/\"}'; fi; true"
+		},
+		{
+			"matcher": { "tool_name": "string_replace_lsp" },
+			"type": "command",
+			"description": "Remind to run Lingui extract when macros are added",
+			"command": "/Users/guillem/programacio/codi/autonom/batuda/.mastracode/hooks/lingui-remind.sh"
+		},
+		{
+			"matcher": { "tool_name": "ast_smart_edit" },
+			"type": "command",
+			"description": "Remind to run Lingui extract when macros are added",
+			"command": "/Users/guillem/programacio/codi/autonom/batuda/.mastracode/hooks/lingui-remind.sh"
+		},
+		{
+			"matcher": { "tool_name": "write_file" },
+			"type": "command",
+			"description": "Remind to run Lingui extract when macros are added",
+			"command": "/Users/guillem/programacio/codi/autonom/batuda/.mastracode/hooks/lingui-remind.sh"
+		},
+		{
+			"matcher": { "tool_name": "write_file" },
+			"type": "command",
+			"description": "Audit log for migration file writes",
+			"command": "f=$(jq -r '.tool_input.path'); if [[ \"$f\" == *apps/server/src/db/migrations/* ]]; then echo \"[$(date +'%Y-%m-%d %H:%M:%S')] $f\" >> /Users/guillem/programacio/codi/autonom/batuda/.claude/migration-audit.log; fi; true",
+			"async": true
+		},
+		{
+			"matcher": { "tool_name": "string_replace_lsp" },
+			"type": "command",
+			"description": "Audit log for migration file edits",
+			"command": "f=$(jq -r '.tool_input.path'); if [[ \"$f\" == *apps/server/src/db/migrations/* ]]; then echo \"[$(date +'%Y-%m-%d %H:%M:%S')] $f\" >> /Users/guillem/programacio/codi/autonom/batuda/.claude/migration-audit.log; fi; true",
+			"async": true
+		}
+	],
+	"SessionStart": [
+		{
+			"type": "command",
+			"description": "Provision per-worktree resources on session start",
+			"command": "/Users/guillem/programacio/codi/autonom/batuda/.claude/hooks/worktree-up.sh"
+		}
+	],
+	"Stop": [
+		{
+			"type": "command",
+			"description": "Remind to run pnpm check-types when TypeScript files changed",
+			"command": "cd /Users/guillem/programacio/codi/autonom/batuda && git diff --name-only HEAD 2>/dev/null | grep -qE '\\.(ts|tsx)$' && echo '{\"systemMessage\": \"TypeScript files changed. Run: pnpm check-types\"}' || true"
+		}
+	]
+}

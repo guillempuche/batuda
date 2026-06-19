@@ -1,0 +1,29 @@
+{
+	"mcpServers": {
+		"batuda": {
+			"command": "sh",
+			"args": [
+				"-c",
+				"exec npx -y mcp-remote https://api.batuda.co/mcp --header \"x-api-key: $BATUDA_API_KEY\" --transport http-only"
+			]
+		},
+		"cloudflare-api": {
+			"command": "sh",
+			"args": ["-c", "exec npx -y mcp-remote https://mcp.cloudflare.com/mcp"]
+		},
+		"neon": {
+			"command": "sh",
+			"args": [
+				"-c",
+				"exec npx -y @neondatabase/mcp-server-neon start \"$NEON_API_KEY\""
+			]
+		},
+		"firecrawl": {
+			"command": "sh",
+			"args": ["-c", "exec npx -y firecrawl-mcp"],
+			"env": {
+				"FIRECRAWL_API_KEY": "$FIRECRAWL_API_KEY"
+			}
+		}
+	}
+}
