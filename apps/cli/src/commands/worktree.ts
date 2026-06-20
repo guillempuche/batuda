@@ -61,6 +61,31 @@ const slugForBranch = (branch: string) =>
 const dbName = (slug: string) => `batuda_${slug.replace(/-/g, '_')}`
 const bucketName = (slug: string) => `batuda-assets-${slug}`
 
+// A worktree's real database + bucket, read from the `.env` it generated at
+// provision time. That file is the stable record of what `up` actually created;
+// the live branch is not, because `gh pr merge --delete-branch` checks `main`
+// out into the worktree after a merge — re-deriving a slug from the branch then
+// targets the wrong data (or the main checkout's). `down`/`doctor`/`ls`/`prune`
+// therefore key off the `.env`; only the portless URL still follows the branch
+// (portless does route by the live branch).
+const identityFromEnv = (
+	envPath: string,
+): { db: string; bucket: string } | null => {
+	if (!existsSync(envPath)) return null
+	const body = readFileSync(envPath, 'utf-8')
+	const url = body.match(/^DATABASE_URL=(.+)$/m)?.[1]?.trim()
+	const bucket = body.match(/^STORAGE_BUCKET=(.+)$/m)?.[1]?.trim()
+	// Last path segment of the DB URL, with any `?sslmode=…` query stripped.
+	const db = url?.match(/\/([^/?]+)(?:\?|$)/)?.[1]
+	return db && bucket ? { db, bucket } : null
+}
+
+// Guard for destructive ops: only a suffixed `batuda_<slug>` / `batuda-assets-<slug>`
+// pair belongs to a worktree. The main checkout's bare `batuda` / `batuda-assets`
+// must never be dropped, so anything without the suffix is refused.
+const isWorktreeOwned = (db: string, bucket: string) =>
+	db.startsWith('batuda_') && bucket.startsWith('batuda-assets-')
+
 // The shared `.git` is identical from any worktree, so its parent is the main
 // checkout — where the real .env (the values to inherit) lives.
 const mainCheckoutRoot = () =>
@@ -172,27 +197,29 @@ const ensureSharedStack = dockerFail(
 )
 
 // CREATE/DROP DATABASE can't run from inside the target database, so every call
-// goes through the shared db container's `postgres` maintenance database.
-const databaseExists = (slug: string) =>
+// goes through the shared db container's `postgres` maintenance database. These
+// take the resolved database NAME (not a slug): `up` derives it from the branch
+// slug, while `down`/`prune` read it from the worktree's `.env`.
+const databaseExists = (db: string) =>
 	execSilent(
-		`docker exec ${DB_CONTAINER} psql -U ${PG_USER} -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='${dbName(slug)}'"`,
+		`docker exec ${DB_CONTAINER} psql -U ${PG_USER} -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='${db}'"`,
 	).pipe(Effect.map(out => out.trim() === '1'))
 
-const createDatabase = (slug: string) =>
+const createDatabase = (db: string) =>
 	Effect.gen(function* () {
-		if (yield* databaseExists(slug)) return
+		if (yield* databaseExists(db)) return
 		yield* dockerFail(
 			exec(
-				`docker exec ${DB_CONTAINER} psql -U ${PG_USER} -d postgres -c "CREATE DATABASE ${dbName(slug)}"`,
+				`docker exec ${DB_CONTAINER} psql -U ${PG_USER} -d postgres -c "CREATE DATABASE ${db}"`,
 			),
 		)
 	})
 
 // WITH (FORCE) (PG13+) terminates any open sessions so the drop can't hang.
-const dropDatabase = (slug: string) =>
+const dropDatabase = (db: string) =>
 	dockerFail(
 		exec(
-			`docker exec ${DB_CONTAINER} psql -U ${PG_USER} -d postgres -c "DROP DATABASE IF EXISTS ${dbName(slug)} WITH (FORCE)"`,
+			`docker exec ${DB_CONTAINER} psql -U ${PG_USER} -d postgres -c "DROP DATABASE IF EXISTS ${db} WITH (FORCE)"`,
 		),
 	)
 
@@ -210,21 +237,27 @@ const mcCapture = (command: string) => execSilent(mcScript(command))
 const settle = <A, E, R>(self: Effect.Effect<A, E, R>) =>
 	self.pipe(Effect.retry(Schedule.spaced('2 seconds').pipe(Schedule.take(5))))
 
-// `git worktree list` includes the main checkout; deriving each branch's slug the
-// same way the up path does means a live worktree's data is never swept.
-const liveWorktreeSlugs = execSilent(
+// Each live worktree's real database + bucket, read from its generated `.env`.
+// Keyed off `.env`, not the branch, so a live worktree whose branch was swapped
+// (gh checking `main` out into it after a merge) is still recognised as owning
+// its data — otherwise prune would reap a live worktree's database.
+const liveOwnedResources = execSilent(
 	'git',
 	'worktree',
 	'list',
 	'--porcelain',
 ).pipe(
 	Effect.map(out => {
-		const slugs = new Set<string>()
-		for (const line of out.split('\n')) {
-			const m = line.match(/^branch refs\/heads\/(.+)$/)
-			if (m?.[1]) slugs.add(slugForBranch(m[1]))
+		const dbs = new Set<string>()
+		const buckets = new Set<string>()
+		for (const entry of parseWorktrees(out)) {
+			const id = identityFromEnv(resolve(entry.path, '.env'))
+			if (id) {
+				dbs.add(id.db)
+				buckets.add(id.bucket)
+			}
 		}
-		return slugs
+		return { dbs, buckets }
 	}),
 )
 
@@ -255,25 +288,15 @@ const listBuckets = mcCapture('mc ls local --json').pipe(
 	),
 )
 
-// Pure: from the databases + buckets that exist and the slugs of currently
-// checked-out worktrees, return the slugs whose data no live worktree owns. The
-// main checkout's `batuda` database / `batuda-assets` bucket lack the suffix, so
-// they're never matched.
-const findOrphanSlugs = (
-	dbNames: readonly string[],
-	bucketNames: readonly string[],
-	liveSlugs: ReadonlySet<string>,
-): string[] => {
-	const fromDbs = dbNames
-		.filter(n => n.startsWith('batuda_'))
-		.map(n => n.slice('batuda_'.length).replace(/_/g, '-'))
-	const fromBuckets = bucketNames
-		.filter(n => n.startsWith('batuda-assets-'))
-		.map(n => n.slice('batuda-assets-'.length))
-	const slugs = new Set([...fromDbs, ...fromBuckets])
-	// Drop empty slugs so a bare `batuda_` / `batuda-assets-` (e.g. main) is never swept.
-	return [...slugs].filter(s => s.length > 0 && !liveSlugs.has(s))
-}
+// Existing suffixed resources that no live worktree owns. The bare `batuda` /
+// `batuda-assets` (the main checkout) don't carry the `_`/`-` suffix the prefix
+// requires, so they can never be selected.
+const findOrphans = (
+	existing: readonly string[],
+	owned: ReadonlySet<string>,
+	prefix: string,
+): string[] =>
+	existing.filter(name => name.startsWith(prefix) && !owned.has(name))
 
 // True only when the shared Postgres answers — the cheapest "is the stack up?"
 // probe. Any docker/connection error folds into `false`.
@@ -335,7 +358,7 @@ export const worktreeUp = Effect.gen(function* () {
 	yield* Effect.logInfo(
 		`Provisioning database ${dbName(slug)} + bucket ${bucketName(slug)}…`,
 	)
-	yield* settle(createDatabase(slug))
+	yield* settle(createDatabase(dbName(slug)))
 	yield* settle(mc(`mc mb --ignore-existing local/${bucketName(slug)}`))
 
 	yield* writeWorktreeEnv(main, slug)
@@ -368,44 +391,77 @@ export const worktreeDown = Effect.gen(function* () {
 			new Error('Not in a worktree — refusing to drop the shared database.'),
 		)
 	}
-	const slug = yield* slugForCurrentWorktree
-	yield* Effect.logInfo(
-		`Dropping database ${dbName(slug)} + bucket ${bucketName(slug)}…`,
-	)
-	yield* dropDatabase(slug)
-	// The bucket may already be gone (or never created) — don't fail teardown on it.
-	yield* mc(`mc rb --force local/${bucketName(slug)}`).pipe(
-		Effect.catch(() => Effect.void),
-	)
-	yield* Console.log(
-		`✓ Removed ${dbName(slug)} and ${bucketName(slug)} (shared stack untouched).`,
-	)
-})
-
-export const worktreePrune = Effect.gen(function* () {
-	const dbNames = yield* listDatabases
-	const bucketNames = yield* listBuckets
-	const liveSlugs = yield* liveWorktreeSlugs
-	const orphans = findOrphanSlugs(dbNames, bucketNames, liveSlugs)
-
-	if (orphans.length === 0) {
-		yield* Console.log('No orphaned worktree data — nothing to prune.')
-		return
-	}
-
-	yield* Effect.logInfo(
-		`Pruning ${orphans.length} orphaned worktree(s): ${orphans.join(', ')}…`,
-	)
-	for (const slug of orphans) {
-		yield* dropDatabase(slug)
-		yield* mc(`mc rb --force local/${bucketName(slug)}`).pipe(
-			Effect.catch(() => Effect.void),
+	// Read the data this worktree actually provisioned from its `.env`, never the
+	// live branch — after a `gh pr merge --delete-branch` the branch is `main`,
+	// so a branch-derived slug would miss the real database (or hit main's).
+	const identity = identityFromEnv(resolve(ROOT, '.env'))
+	if (!identity) {
+		return yield* Effect.fail(
+			new Error(
+				'No provisioned .env here — nothing to drop. Run `pnpm cli worktree up` first, or it was already torn down.',
+			),
 		)
 	}
-	yield* Console.log(
-		`✓ Pruned ${orphans.length} orphaned worktree(s): ${orphans.join(', ')}.`,
+	const { db, bucket } = identity
+	if (!isWorktreeOwned(db, bucket)) {
+		return yield* Effect.fail(
+			new Error(
+				`This worktree's .env points at ${db} / ${bucket}, which look like the main checkout's shared data — refusing to drop. The worktree overrides were never written.`,
+			),
+		)
+	}
+	yield* Effect.logInfo(`Dropping database ${db} + bucket ${bucket}…`)
+	yield* dropDatabase(db)
+	// The bucket may already be gone (or never created) — don't fail teardown on it.
+	yield* mc(`mc rb --force local/${bucket}`).pipe(
+		Effect.catch(() => Effect.void),
 	)
+	yield* Console.log(`✓ Removed ${db} and ${bucket} (shared stack untouched).`)
 })
+
+// Dry-run by default: list the orphans and stop. `--yes` is required to drop,
+// so prune can never silently delete data — and because ownership is read from
+// each live worktree's `.env`, a worktree whose branch was swapped is never
+// mistaken for an orphan.
+export const worktreePrune = (apply: boolean) =>
+	Effect.gen(function* () {
+		const owned = yield* liveOwnedResources
+		const orphanDbs = findOrphans(yield* listDatabases, owned.dbs, 'batuda_')
+		const orphanBuckets = findOrphans(
+			yield* listBuckets,
+			owned.buckets,
+			'batuda-assets-',
+		)
+
+		if (orphanDbs.length === 0 && orphanBuckets.length === 0) {
+			yield* Console.log('No orphaned worktree data — nothing to prune.')
+			return
+		}
+
+		yield* Console.log('')
+		yield* Console.log('Orphaned worktree data (no live worktree owns it):')
+		for (const db of orphanDbs) yield* Console.log(`  database  ${db}`)
+		for (const bucket of orphanBuckets)
+			yield* Console.log(`  bucket    ${bucket}`)
+		yield* Console.log('')
+
+		if (!apply) {
+			yield* Console.log(
+				'Dry run — re-run with `--yes` to drop the above. (The main `batuda` / `batuda-assets` are never listed.)',
+			)
+			return
+		}
+
+		for (const db of orphanDbs) yield* dropDatabase(db)
+		for (const bucket of orphanBuckets) {
+			yield* mc(`mc rb --force local/${bucket}`).pipe(
+				Effect.catch(() => Effect.void),
+			)
+		}
+		yield* Console.log(
+			`✓ Pruned ${orphanDbs.length} database(s) + ${orphanBuckets.length} bucket(s).`,
+		)
+	})
 
 export const worktreeLs = Effect.gen(function* () {
 	const porcelain = yield* execSilent('git', 'worktree', 'list', '--porcelain')
@@ -415,13 +471,15 @@ export const worktreeLs = Effect.gen(function* () {
 
 	const rows = parseWorktrees(porcelain).map(e => {
 		// The main checkout owns the unsuffixed `batuda` database/bucket; every
-		// linked worktree owns its `batuda_<slug>` / `batuda-assets-<slug>` pair.
+		// linked worktree owns whatever its `.env` records — read that rather than
+		// re-derive from the branch, which drifts once gh checks out main.
 		const isMain = resolve(e.path) === resolve(main)
 		const branch = e.branch ?? '(detached)'
-		const slug = e.branch ? slugForBranch(e.branch) : ''
-		const db = isMain ? 'batuda' : dbName(slug)
-		const bucket = isMain ? 'batuda-assets' : bucketName(slug)
-		const provisioned = dbs.has(db) && buckets.has(bucket)
+		const identity = isMain ? null : identityFromEnv(resolve(e.path, '.env'))
+		const db = isMain ? 'batuda' : (identity?.db ?? '—')
+		const bucket = isMain ? 'batuda-assets' : identity?.bucket
+		const provisioned =
+			bucket !== undefined && dbs.has(db) && buckets.has(bucket)
 		const url = isMain
 			? 'https://batuda.localhost'
 			: e.branch
@@ -468,33 +526,42 @@ export const worktreeDoctor = Effect.gen(function* () {
 			detail: 'main checkout — uses the shared `batuda` database',
 		})
 	} else {
-		const slug = yield* slugForCurrentWorktree
-		const db = dbName(slug)
-		const dbOk = stackOk ? yield* databaseExists(slug) : false
-		checks.push({
-			ok: dbOk,
-			name: 'database',
-			detail: dbOk ? db : `${db} missing — run \`pnpm cli worktree up\``,
-		})
+		// Identity from the worktree's own `.env` — the branch is unreliable after
+		// a merge swaps it to main.
+		const identity = identityFromEnv(resolve(ROOT, '.env'))
+		if (!identity) {
+			checks.push({
+				ok: false,
+				name: 'database',
+				detail: 'no .env — run `pnpm cli worktree up`',
+			})
+		} else {
+			const { db, bucket } = identity
+			const dbOk = stackOk ? yield* databaseExists(db) : false
+			checks.push({
+				ok: dbOk,
+				name: 'database',
+				detail: dbOk ? db : `${db} missing — run \`pnpm cli worktree up\``,
+			})
 
-		const tables = dbOk ? yield* tableCount(db) : 0
-		checks.push({
-			ok: tables > 0,
-			name: 'migrations',
-			detail:
-				tables > 0 ? `${tables} tables` : 'none — run `pnpm cli worktree up`',
-		})
+			const tables = dbOk ? yield* tableCount(db) : 0
+			checks.push({
+				ok: tables > 0,
+				name: 'migrations',
+				detail:
+					tables > 0 ? `${tables} tables` : 'none — run `pnpm cli worktree up`',
+			})
 
-		const bucket = bucketName(slug)
-		let bucketOk = false
-		if (stackOk) bucketOk = new Set(yield* listBuckets).has(bucket)
-		checks.push({
-			ok: bucketOk,
-			name: 'bucket',
-			detail: bucketOk
-				? bucket
-				: `${bucket} missing — run \`pnpm cli worktree up\``,
-		})
+			let bucketOk = false
+			if (stackOk) bucketOk = new Set(yield* listBuckets).has(bucket)
+			checks.push({
+				ok: bucketOk,
+				name: 'bucket',
+				detail: bucketOk
+					? bucket
+					: `${bucket} missing — run \`pnpm cli worktree up\``,
+			})
+		}
 
 		const branch = yield* branchName
 		checks.push({

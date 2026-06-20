@@ -559,14 +559,25 @@ const worktreeDownCommand = Command.make('down', {}, () => worktreeDown).pipe(
 
 const worktreePruneCommand = Command.make(
 	'prune',
-	{},
-	() => worktreePrune,
+	{
+		yes: Flag.boolean('yes').pipe(
+			Flag.withDescription(
+				'Actually drop the orphans (without it, prune only lists them)',
+			),
+			Flag.withDefault(false),
+		),
+	},
+	({ yes }) => worktreePrune(yes),
 ).pipe(
-	Command.withShortDescription('Remove orphaned worktree databases + buckets'),
+	Command.withShortDescription(
+		'List (or, with --yes, drop) orphaned worktree data',
+	),
 	Command.withDescription(
-		'Drop databases and buckets left behind by worktrees that no longer exist ' +
+		'Find databases and buckets left behind by worktrees that no longer exist ' +
 			'(removed with `git worktree remove`, crashed sessions, non-interactive ' +
-			'runs). The main checkout and every live worktree are kept.',
+			'runs). Lists them by default; pass `--yes` to drop. Ownership is read ' +
+			'from each live worktree’s .env, so the main checkout and every live ' +
+			'worktree — even one whose branch was swapped — are kept.',
 	),
 )
 
