@@ -122,15 +122,15 @@ pnpm dev:server
 pnpm dev:internal
 ```
 
-Dev URLs use portless `*.localhost` hostnames (no `/etc/hosts` edit needed on modern macOS/Linux):
+Dev URLs use portless `*.localhost` hostnames (no `/etc/hosts` edit needed on modern macOS/Linux). portless binds 443 when it can, otherwise a non-privileged port (e.g. `:1355`) — so **open the exact URL the dev server prints on startup** (it carries that port; the hosts below omit it):
 
-- API: [https://api.batuda.localhost](https://api.batuda.localhost)
-- API docs (Scalar): [https://api.batuda.localhost/docs](https://api.batuda.localhost/docs)
-- Batuda web app: [https://batuda.localhost](https://batuda.localhost)
+- API: `https://api.batuda.localhost`
+- API docs (Scalar): `https://api.batuda.localhost/docs`
+- Batuda web app: `https://batuda.localhost`
 
 Each tenant runs its own public marketing site from a separate repo (e.g. the Engranatge tenant uses `engranatge-marketing`). Run the tenant's own `pnpm dev` if you need the full loop against a local CRM.
 
-Log in at `/sign-in` with the admin credentials you set in Step 5.
+Log in at `/login` with the admin credentials you set in Step 5.
 
 ---
 
