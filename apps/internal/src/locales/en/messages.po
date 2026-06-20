@@ -261,7 +261,7 @@ msgstr "Added to the org"
 msgid "Address"
 msgstr "Address"
 
-#: src/routes/settings/organization/invite.tsx
+#: src/routes/settings/organization/members.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Admin"
 msgstr "Admin"
@@ -374,7 +374,6 @@ msgstr "Back to emails"
 msgid "Back to inbox"
 msgstr "Back to inbox"
 
-#: src/routes/settings/organization/invite.tsx
 #: src/routes/settings/organization/members.tsx
 #: src/routes/settings/organization/spend.tsx
 #: src/routes/settings/organization/templates.tsx
@@ -493,6 +492,7 @@ msgstr "Calls"
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/api-keys/index.tsx
+#: src/routes/settings/organization/members.tsx
 #: src/routes/tasks/index.tsx
 msgid "Cancel"
 msgstr "Cancel"
@@ -611,12 +611,17 @@ msgstr "Client"
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/index.tsx
+#: src/routes/settings/organization/members.tsx
 msgid "Close"
 msgstr "Close"
 
 #: src/components/emails/compose-window.tsx
 msgid "Close draft"
 msgstr "Close draft"
+
+#: src/routes/settings/organization/members.tsx
+msgid "Close invite"
+msgstr "Close invite"
 
 #: src/routes/emails/index.tsx
 msgid "Close thread"
@@ -815,6 +820,10 @@ msgstr "Copy slug"
 msgid "Copy your key now"
 msgstr "Copy your key now"
 
+#: src/routes/settings/organization/members.tsx
+msgid "Could not cancel the invitation to {email}. Please try again."
+msgstr "Could not cancel the invitation to {email}. Please try again."
+
 #: src/routes/companies/$slug.tsx
 msgid "Could not clear suppression"
 msgstr "Could not clear suppression"
@@ -888,6 +897,11 @@ msgstr "Could not reach {0}."
 msgid "Could not remove {email}. Please try again."
 msgstr "Could not remove {email}. Please try again."
 
+#. placeholder {0}: invitation.email
+#: src/routes/settings/organization/members.tsx
+msgid "Could not resend the invitation to {0}. Please try again."
+msgstr "Could not resend the invitation to {0}. Please try again."
+
 #: src/routes/companies/$slug.tsx
 msgid "Could not save"
 msgstr "Could not save"
@@ -904,7 +918,7 @@ msgstr "Could not save the page. Please try again."
 msgid "Could not save the template. Please try again."
 msgstr "Could not save the template. Please try again."
 
-#: src/routes/settings/organization/invite.tsx
+#: src/routes/settings/organization/members.tsx
 msgid "Could not send the invitation. Please try again."
 msgstr "Could not send the invitation. Please try again."
 
@@ -1198,6 +1212,11 @@ msgstr "Discard"
 msgid "Discovery"
 msgstr "Discovery"
 
+#: src/routes/settings/organization/members.tsx
+#: src/routes/settings/organization/members.tsx
+msgid "Dismiss"
+msgstr "Dismiss"
+
 #: src/routes/emails/inboxes.tsx
 msgid "Display name"
 msgstr "Display name"
@@ -1310,7 +1329,7 @@ msgstr "Editor"
 #: src/routes/emails/inboxes.tsx
 #: src/routes/forgot-password.tsx
 #: src/routes/login.tsx
-#: src/routes/settings/organization/invite.tsx
+#: src/routes/settings/organization/members.tsx
 msgid "Email"
 msgstr "Email"
 
@@ -1355,7 +1374,7 @@ msgstr "Enrichment"
 msgid "Enter a valid email above first."
 msgstr "Enter a valid email above first."
 
-#: src/routes/settings/organization/invite.tsx
+#: src/routes/settings/organization/members.tsx
 msgid "Enter an email address."
 msgstr "Enter an email address."
 
@@ -1370,6 +1389,14 @@ msgstr "Exit full screen"
 #: src/routes/emails/index.tsx
 msgid "Expand"
 msgstr "Expand"
+
+#: src/routes/settings/organization/members.tsx
+msgid "Expired"
+msgstr "Expired"
+
+#: src/routes/settings/organization/members.tsx
+msgid "Expires"
+msgstr "Expires"
 
 #. placeholder {0}: formatDate(row.expiresAt)
 #: src/routes/settings/api-keys/index.tsx
@@ -1627,21 +1654,27 @@ msgstr "Interaction"
 msgid "Interaction logged"
 msgstr "Interaction logged"
 
-#: src/routes/settings/organization/invite.tsx
-msgid "Invitation sent to {sent}."
-msgstr "Invitation sent to {sent}."
+#: src/routes/settings/organization/members.tsx
+msgid "Invitation sent to {sentEmail}."
+msgstr "Invitation sent to {sentEmail}."
 
-#: src/routes/settings/organization/index.tsx
-msgid "Invite"
-msgstr "Invite"
+#. placeholder {0}: invitationNotice.email
+#: src/routes/settings/organization/members.tsx
+msgid "Invitation to {0} canceled."
+msgstr "Invitation to {0} canceled."
 
-#: src/routes/settings/organization/invite.tsx
+#. placeholder {0}: invitationNotice.email
+#: src/routes/settings/organization/members.tsx
+msgid "Invitation to {0} re-sent."
+msgstr "Invitation to {0} re-sent."
+
+#: src/routes/settings/organization/members.tsx
 msgid "Invite a member"
 msgstr "Invite a member"
 
-#: src/routes/settings/organization/index.tsx
-msgid "Invite a new member"
-msgstr "Invite a new member"
+#: src/routes/settings/organization/members.tsx
+msgid "Invite member"
+msgstr "Invite member"
 
 #: src/routes/login.tsx
 msgid "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
@@ -1733,6 +1766,7 @@ msgstr "Loading run…"
 #: src/routes/settings/api-keys/index.tsx
 #: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/organization/index.tsx
+#: src/routes/settings/organization/members.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Loading…"
 msgstr "Loading…"
@@ -1882,7 +1916,7 @@ msgstr "Meeting booked"
 msgid "Meetings from bookings, email invitations, and internal blocks."
 msgstr "Meetings from bookings, email invitations, and internal blocks."
 
-#: src/routes/settings/organization/invite.tsx
+#: src/routes/settings/organization/members.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Member"
 msgstr "Member"
@@ -2025,7 +2059,9 @@ msgstr "No companies yet"
 #: src/routes/accept-invitation.$id.tsx
 #: src/routes/login.tsx
 #: src/routes/oauth/consent.tsx
-#: src/routes/settings/organization/invite.tsx
+#: src/routes/settings/organization/members.tsx
+#: src/routes/settings/organization/members.tsx
+#: src/routes/settings/organization/members.tsx
 #: src/routes/settings/organization/members.tsx
 #: src/routes/settings/profile/index.tsx
 msgid "No connection to the server. Try again in a few seconds."
@@ -2122,6 +2158,10 @@ msgstr "No pages yet"
 msgid "No paid calls in this range."
 msgstr "No paid calls in this range."
 
+#: src/routes/settings/organization/members.tsx
+msgid "No pending invitations."
+msgstr "No pending invitations."
+
 #: src/routes/emails/inboxes.tsx
 msgid "No primary inbox set."
 msgstr "No primary inbox set."
@@ -2214,10 +2254,6 @@ msgstr "On {date}, {who} wrote:"
 #: src/routes/accept-invitation.$id.tsx
 msgid "One click to accept the invitation."
 msgstr "One click to accept the invitation."
-
-#: src/routes/settings/organization/invite.tsx
-msgid "Only owners and admins can invite new members."
-msgstr "Only owners and admins can invite new members."
 
 #: src/routes/emails/$threadId.tsx
 #: src/routes/emails/index.tsx
@@ -2313,7 +2349,6 @@ msgid "Org templates"
 msgstr "Org templates"
 
 #: src/routes/settings/organization/index.tsx
-#: src/routes/settings/organization/invite.tsx
 #: src/routes/settings/organization/members.tsx
 #: src/routes/settings/profile/index.tsx
 msgid "Organization"
@@ -2447,6 +2482,14 @@ msgstr "Passwordless sign-in only"
 #: src/routes/settings/profile/index.tsx
 msgid "Passwords need at least {MIN_PASSWORD_LENGTH} characters."
 msgstr "Passwords need at least {MIN_PASSWORD_LENGTH} characters."
+
+#: src/routes/settings/organization/members.tsx
+msgid "Pending"
+msgstr "Pending"
+
+#: src/routes/settings/organization/members.tsx
+msgid "Pending invitations"
+msgstr "Pending invitations"
 
 #: src/components/research/findings/shared.tsx
 msgid "Pending paid actions"
@@ -2740,6 +2783,10 @@ msgstr "Research"
 msgid "Research run"
 msgstr "Research run"
 
+#: src/routes/settings/organization/members.tsx
+msgid "Resend"
+msgstr "Resend"
+
 #: src/routes/login.tsx
 msgid "Resend in"
 msgstr "Resend in"
@@ -2782,7 +2829,7 @@ msgstr "Resume drafting (1)"
 msgid "Reusable, standing guidance your research agent follows — what you sell, who you target, tone, and which sources to trust."
 msgstr "Reusable, standing guidance your research agent follows — what you sell, who you target, tone, and which sources to trust."
 
-#: src/routes/settings/organization/invite.tsx
+#: src/routes/settings/organization/members.tsx
 msgid "Role"
 msgstr "Role"
 
@@ -2868,8 +2915,8 @@ msgid "Search threads"
 msgstr "Search threads"
 
 #: src/routes/settings/organization/index.tsx
-msgid "See who can access this workspace."
-msgstr "See who can access this workspace."
+msgid "See who can access this workspace, invite teammates, and manage pending invitations."
+msgstr "See who can access this workspace, invite teammates, and manage pending invitations."
 
 #: src/routes/emails/index.tsx
 msgid "Select all threads on this page"
@@ -2909,13 +2956,9 @@ msgstr "Self-reported name · sends you to {0}"
 msgid "Send"
 msgstr "Send"
 
-#: src/routes/settings/organization/invite.tsx
+#: src/routes/settings/organization/members.tsx
 msgid "Send a one-click invitation. The recipient signs in via the link in the email — no password to share."
 msgstr "Send a one-click invitation. The recipient signs in via the link in the email — no password to share."
-
-#: src/routes/settings/organization/index.tsx
-msgid "Send a one-click sign-in link to a teammate."
-msgstr "Send a one-click sign-in link to a teammate."
 
 #: src/components/emails/compose-form.tsx
 msgid "Send blocked: these recipients cannot receive email"
@@ -2925,7 +2968,7 @@ msgstr "Send blocked: these recipients cannot receive email"
 msgid "Send email"
 msgstr "Send email"
 
-#: src/routes/settings/organization/invite.tsx
+#: src/routes/settings/organization/members.tsx
 msgid "Send invitation"
 msgstr "Send invitation"
 
@@ -2936,11 +2979,12 @@ msgstr "Send reset link"
 #: src/components/emails/compose-form.tsx
 #: src/routes/forgot-password.tsx
 #: src/routes/login.tsx
-#: src/routes/settings/organization/invite.tsx
+#: src/routes/settings/organization/members.tsx
 msgid "Sending…"
 msgstr "Sending…"
 
 #: src/routes/emails/$threadId.tsx
+#: src/routes/settings/organization/members.tsx
 msgid "Sent"
 msgstr "Sent"
 
@@ -3297,7 +3341,7 @@ msgstr "The invitation link signs you in automatically. If you're seeing this pa
 msgid "The invitation may have expired or already been used."
 msgstr "The invitation may have expired or already been used."
 
-#: src/routes/settings/organization/invite.tsx
+#: src/routes/settings/organization/members.tsx
 msgid "The invitee gets a 48-hour link. They can accept it once."
 msgstr "The invitee gets a 48-hour link. They can accept it once."
 
@@ -3557,10 +3601,6 @@ msgstr "Username"
 msgid "Using the org default"
 msgstr "Using the org default"
 
-#: src/routes/settings/organization/invite.tsx
-msgid "View members"
-msgstr "View members"
-
 #: src/components/shared/timeline-entry.tsx
 msgid "View thread"
 msgstr "View thread"
@@ -3633,6 +3673,10 @@ msgstr "Where"
 #: src/routes/emails/index.tsx
 msgid "Who"
 msgstr "Who"
+
+#: src/routes/settings/organization/members.tsx
+msgid "Working…"
+msgstr "Working…"
 
 #: src/routes/index.tsx
 msgid "Workshop floor — live counters on the bench."
