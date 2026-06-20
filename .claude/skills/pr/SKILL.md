@@ -203,6 +203,7 @@ Media goes **with the PR** — never on a side branch. Two paths:
 
 - One-time per-laptop config (gitignored `.env.pr-media`, copied from `.env.example.pr-media`, filled from the team vault): `GITHUB_MEDIA_S3_ENDPOINT` + `GITHUB_MEDIA_S3_ACCESS_KEY_ID` + `GITHUB_MEDIA_S3_SECRET_ACCESS_KEY` + `GITHUB_MEDIA_PUBLIC_BASE` (the bucket's public r2.dev/custom URL — public access is required, since GitHub fetches the media unauthenticated). Namespaced `GITHUB_MEDIA_S3_*` so they never collide with the backend `STORAGE_*` or a teammate's `AWS_*`; the script maps them to `AWS_*` for the one subprocess. The `aws`, `cwebp`, and `ffmpeg` CLIs come from the nix dev shell (`flake.nix`), so `nix develop` / direnv covers it. Bucket + script are shared; only the keys are per-person.
 - If a var is missing the script exits naming it; fall back to the manual path.
+- **Worktree gotcha:** `.env.pr-media` is gitignored, so it exists only in the main checkout — a worktree never has it. From a worktree session, run `gh-pr-media.sh` from the main checkout (or source the config from there); don't conclude the automated path is unavailable just because the file is missing in the worktree. `pnpm cli doctor` lists this file's status to make the gap visible.
 
 **Manual (human) — GitHub user-attachments.** Drag the file into the PR description in the web UI; GitHub mints a `user-attachments` URL bound to the PR (a `.webm` becomes an inline player). Use this when no R2 token is set up — leave a `> _Drag the <thing> in here._` placeholder in the body so the spot is obvious.
 
