@@ -415,7 +415,7 @@ The `batuda.co/*` Workers Route is bound out-of-band, not by the deploy.
 
 ### Tenant marketing sites
 
-Each tenant deploys its own public site from its own repo. The first tenant is Engranatge: its marketing repo (`engranatge-marketing`) deploys to KraftCloud (service `engranatge-marketing` → `engranatge.com`). No coupling to this repo except the server's CORS allow-list (`ALLOWED_ORIGINS` includes the tool origin `https://batuda.co` and each tenant origin, e.g. `https://engranatge.com`).
+Each tenant deploys its own public site from its own repo. The first tenant is Engranatge: its marketing repo (`engranatge-marketing`) deploys to KraftCloud (service `engranatge-marketing` → `engranatge.com`). No coupling to this repo except the server's CORS allow-list — `ALLOWED_ORIGINS` lists the tool origin `https://batuda.co` and each tenant origin (e.g. `https://engranatge.com`) as literal entries (see [backend.md → Cross-origin policy](backend.md#cross-origin-policy)).
 
 The server runs on Unikraft (stateless Node.js, scales to zero when idle); the web app runs on Cloudflare Workers (SSR at the edge).
 

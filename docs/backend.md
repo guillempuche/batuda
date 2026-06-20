@@ -604,7 +604,7 @@ npx @modelcontextprotocol/inspector -- pnpm --filter @batuda/server dev:mcp
 echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{"elicitation":{}},"clientInfo":{"name":"test","version":"0.1"}}}' | pnpm --filter @batuda/server dev:mcp
 
 # HTTP endpoint
-curl -X POST http://localhost:3010/mcp -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{...}}'
+curl -X POST -k https://api.batuda.localhost:$(cat ~/.portless/proxy.port 2>/dev/null || echo 443)/mcp -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{...}}'
 
 # Claude Code — .mcp.json already configures the batuda stdio server
 ```
@@ -627,7 +627,7 @@ Key files:
 
 ### Cross-origin policy
 
-The Batuda web app lives on `:3000`, this API on `:3010`, and the tenant marketing site on `:3001` — every request is cross-origin. CORS is wired as a global `HttpRouter.middleware` in `src/main.ts` via `HttpMiddleware.cors({ allowedOrigins, credentials: true, ... })`, with `allowedOrigins` read from `ALLOWED_ORIGINS` env (comma-separated) and falling back to `http://localhost:3000,http://localhost:3001` in dev. The same env var is fed to Better-Auth as `trustedOrigins` in `src/lib/auth.ts` so both layers agree on what's legitimate. `credentials: true` is required for the browser to attach the `batuda.session_token` cookie on fetch calls that use `credentials: 'include'`.
+The web app and the API are different origins. In dev, portless serves the app at `https://batuda.localhost` and the API at `https://api.batuda.localhost` — binding 443 when it can, otherwise a non-privileged port like `:1355`, which it prints on startup; in prod the app (Cloudflare Workers, `batuda.co`) and API (Unikraft, `api.batuda.co`) split the same way. The browser fetches `/auth/*` same-origin (the Vite dev proxy / Worker forwards them to the API, so the session cookie lands on the app host) and `/v1/*` cross-origin to the API host. CORS is a global `HttpRouter.middleware` in `src/main.ts` via `HttpMiddleware.cors({ allowedOrigins, credentials: true, ... })`; `allowedOrigins` comes from the **required** `ALLOWED_ORIGINS` env — comma-separated **literal** origins matched exactly, with no wildcards (any `*` fails boot) and no dev fallback (boot fails if unset). The same array is fed to Better-Auth as `trustedOrigins` (`src/lib/auth.ts`) so CORS and CSRF agree, and `credentials: true` lets the browser attach the `__Secure-batuda.session_token` cookie on `credentials: 'include'` fetches. A git-worktree dev stack needs no per-worktree origin config: the server derives the worktree's `<branch>.batuda.localhost` origin from `PORTLESS_URL` and merges it into the trusted set (see the `worktrees` skill).
 
 ### Invite-only signup
 
