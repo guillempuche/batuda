@@ -23,15 +23,20 @@ Run these checks for each target app. Report results before deeper debugging.
 
 ### Portless proxy
 
-All dev URLs route through portless (web at `batuda.localhost`, API at `api.batuda.localhost`). If both apps fail with connection errors, check the proxy first before investigating individual apps.
+All dev URLs route through the portless proxy (web at `batuda.localhost`, API at `api.batuda.localhost`) on whatever port it bound — 443 when it can, otherwise a non-privileged fallback like `:1355`. Grab that port once and reuse it below (the internal app/server ports are portless-assigned, so `lsof -i :3010` finds nothing):
+
+```bash
+P=$(cat ~/.portless/proxy.port 2>/dev/null || echo 443)       # the portless proxy port
+WEB=https://batuda.localhost$([ "$P" = 443 ] || echo ":$P")   # the web origin (drops :443)
+```
+
+If both apps fail with connection errors, check the proxy first: `portless list` shows the registered routes and the local port each proxies to.
 
 ### Server (`api.batuda.localhost`)
 
 ```bash
-curl -sk https://api.batuda.localhost/health 2>/dev/null && echo "OK" || echo "DOWN"
-# If DOWN:
-lsof -i :3010 -sTCP:LISTEN 2>/dev/null | head -5
-# Start: pnpm dev:server
+curl -sk https://api.batuda.localhost:$P/health 2>/dev/null && echo "OK" || echo "DOWN"
+# If DOWN: `portless list` (is api.batuda registered?), then start: pnpm dev:server
 ```
 
 Check the persistent log file at `apps/server/server.log` (survives `node --watch` reloads). Grep for:
@@ -44,13 +49,11 @@ Check the persistent log file at `apps/server/server.log` (survives `node --watc
 ### Web / Internal (`batuda.localhost`)
 
 ```bash
-curl -sk https://batuda.localhost/ 2>/dev/null | head -20 && echo "OK" || echo "DOWN"
-# If DOWN:
-lsof -i :3000 -sTCP:LISTEN 2>/dev/null | head -5
-# Start: pnpm dev:internal
+curl -sk $WEB/ 2>/dev/null | head -20 && echo "OK" || echo "DOWN"
+# If DOWN: `portless list` (is batuda registered?), then start: pnpm dev:internal
 ```
 
-Verify `apps/internal/.env` contains `VITE_SERVER_URL=https://api.batuda.localhost`. Without it, client-side API calls fall back to `http://localhost:3010` which breaks under portless.
+In dev the client derives its API origin from the page (`<host>.api.batuda.localhost`), so `VITE_SERVER_URL` is prod-only — not needed locally. If `/v1/*` data won't load, confirm the page is open on the URL `pnpm dev` printed (with portless's port), not a bare `https://batuda.localhost`.
 
 ## Common issues
 
@@ -62,7 +65,7 @@ After pre-flight, check these in order. Stop when the cause is found.
 - All `RESEARCH_PROVIDER_*` vars set (server crashes without them; use `stub` for local dev)
 - `RESEARCH_PROVIDER_LLM` set (no auto-default; use `stub`)
 - All `RESEARCH_DEFAULT_*` and `RESEARCH_MAX_*` budget/concurrency vars set
-- `ALLOWED_ORIGINS` — the web origin(s): `https://batuda.localhost` plus the `https://*.batuda.localhost` wildcard that trusts each worktree's `<branch>.batuda.localhost`. Production origins must be listed explicitly (a wildcard whose suffix isn't `.localhost` is rejected at boot)
+- `ALLOWED_ORIGINS` — literal web origins, comma-separated (dev: `https://batuda.localhost`); no wildcards (any `*` fails boot). A worktree's `<branch>.batuda.localhost` origin is derived from `PORTLESS_URL` and merged in automatically — no entry needed. Details: `docs/backend.md` → Cross-origin policy
 - `BETTER_AUTH_BASE_URL=https://api.batuda.localhost` (in a worktree the server derives this + `APP_PUBLIC_URL` from `PORTLESS_URL`, so they point at the worktree's own host)
 - `EMAIL_PROVIDER` set explicitly (use `local-inbox` for dev)
 - Run `pnpm cli doctor` for a full automated environment health check
@@ -95,8 +98,8 @@ pnpm cli db reset     # truncate + migrate + seed (nuclear option)
 
 Auth spans server + internal. Both must be running.
 
-1. Verify CORS preflight: `curl -sk -X OPTIONS -H "Origin: https://batuda.localhost" -H "Access-Control-Request-Method: POST" https://api.batuda.localhost/auth/sign-in/email -D - -o /dev/null 2>&1 | grep -i 'access-control'`
-2. Verify session endpoint: `curl -sk https://api.batuda.localhost/auth/get-session`
+1. Verify CORS preflight (`$P`/`$WEB` from the pre-flight): `curl -sk -X OPTIONS -H "Origin: $WEB" -H "Access-Control-Request-Method: POST" https://api.batuda.localhost:$P/auth/sign-in/email -D - -o /dev/null 2>&1 | grep -i 'access-control'`
+2. Verify session endpoint: `curl -sk https://api.batuda.localhost:$P/auth/get-session`
 3. Check `apps/server/server.log` for `http.url="/auth/sign-in/email"` and its status
 4. Verify seed user exists: `pnpm cli seed --preset minimal` (idempotent)
 5. **Active org:** logging in does not set an active organization. If org-scoped pages (companies, emails, templates…) render "Couldn't load … Refresh to try again." and the switcher shows "NO ACTIVE ORGANIZATION", select one: `agent-browser find testid "org-switcher" click` then `find testid "org-switcher-option-<slug>" click` (Better Auth `setActive` + reload). The available `<slug>`s are the `org-switcher-option-*` entries in the open switcher's snapshot — one per membership, or run `pnpm cli data members`.
@@ -137,14 +140,15 @@ pnpm cli worktree down      # drop this worktree's DB + bucket
 pnpm cli worktree prune     # reap DBs/buckets of worktrees that no longer exist
 ```
 
-Verify: `curl -sk https://<label>.api.batuda.localhost/health` and drive
-`agent-browser` against `https://<label>.batuda.localhost` (use the host
-`pnpm cli worktree doctor` prints — portless takes the branch's last path segment).
+Verify: `curl -sk https://<label>.api.batuda.localhost:$P/health` and drive
+`agent-browser` against `https://<label>.batuda.localhost` (use the full URL
+`pnpm cli worktree doctor` prints — host plus portless's port).
 The server derives its own auth/app origins from
 `PORTLESS_URL`, so login, API calls, and minted links (invitations, auth redirects)
 all target the worktree's host automatically — no per-worktree `.env` edits. If the
-server won't boot with an `APP_PUBLIC_URL … not one of ALLOWED_ORIGINS` error, the
-main `.env` is missing the `https://*.batuda.localhost` wildcard — add it there.
+server won't boot with `ALLOWED_ORIGINS does not accept wildcard patterns`, a `.env`
+(main or worktree) still lists `https://*.batuda.localhost` — remove it; the worktree
+origin is derived from `PORTLESS_URL`, no wildcard needed.
 
 ## CLI commands reference
 
@@ -176,7 +180,7 @@ For the full command reference (login flow, navigation, interaction, network ins
 Quick login test:
 
 ```bash
-agent-browser open https://batuda.localhost/login
+agent-browser open "$WEB/login"                               # $WEB from the pre-flight
 agent-browser fill "input[name='email']" "admin@taller.cat"
 agent-browser fill "input[name='password']" "batuda-dev-2026"
 agent-browser click "button[type='submit']"
