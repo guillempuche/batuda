@@ -3,78 +3,83 @@ import { describe, expect, it } from 'vitest'
 import {
 	buildInvitationCallbackURL,
 	findPublicUrlNotAllowed,
-	findUnsafeWildcardOrigin,
+	findWildcardOrigin,
 	mergeWorktreeOrigin,
 } from './env.js'
 
-// Locks in the safety guard that refuses to boot when ALLOWED_ORIGINS
-// includes a wildcard pattern whose suffix is *not* `.localhost`. Without
-// this rule, a typo or copy-paste error in production env could grant
-// CORS + Better-Auth trust to every subdomain of an externally-resolvable
-// apex (e.g. `https://*.example.com`).
+// Locks in the boot guard that refuses any ALLOWED_ORIGINS entry containing a
+// `*`. Wildcards aren't a valid origin shape — a worktree's branch-prefixed
+// origin is derived from PORTLESS_URL and merged in literally — so a stray
+// `*.host` (dev or a production `*.example.com`) is a config mistake that must
+// fail boot, not silently never match.
 
-describe('findUnsafeWildcardOrigin', () => {
-	describe('with no wildcard patterns', () => {
+describe('findWildcardOrigin', () => {
+	describe('with only literal origins', () => {
 		it('should return null', () => {
 			// GIVEN a list of literal origins
 			// WHEN the validator runs
 			// THEN no offender is reported
-			// [lib/env.ts — first short-circuit branch]
+			// [lib/env.ts — no `*` found]
 			expect(
-				findUnsafeWildcardOrigin([
+				findWildcardOrigin([
 					'https://batuda.localhost',
 					'https://crm.example.com',
 				]),
 			).toBeNull()
 		})
+
+		it('should return null for an empty list', () => {
+			// GIVEN no configured origins
+			// WHEN the validator runs
+			// THEN null (nothing to reject)
+			// [lib/env.ts — empty loop]
+			expect(findWildcardOrigin([])).toBeNull()
+		})
 	})
 
 	describe('with a wildcard under .localhost', () => {
-		it('should accept worktree-friendly localhost wildcards', () => {
-			// GIVEN a wildcard pattern under .localhost
+		it('should report it so boot fails', () => {
+			// GIVEN a dev-style `*.batuda.localhost` wildcard
 			// WHEN the validator runs
-			// THEN no offender is reported (dev worktree subdomains are safe
-			//   because .localhost is not externally resolvable)
-			// [lib/env.ts — endsWith('.localhost') branch]
+			// THEN it is reported — wildcards are rejected even under .localhost; the
+			//   worktree origin is derived from PORTLESS_URL and merged in literally
+			// [lib/env.ts — pattern.includes('*')]
 			expect(
-				findUnsafeWildcardOrigin([
+				findWildcardOrigin([
 					'https://batuda.localhost',
 					'https://*.batuda.localhost',
 				]),
-			).toBeNull()
-		})
-
-		it('should accept the bare localhost suffix', () => {
-			// GIVEN `https://*.localhost`
-			// WHEN the validator runs
-			// THEN it is accepted
-			// [lib/env.ts — `suffix === 'localhost'` short-circuit]
-			expect(findUnsafeWildcardOrigin(['https://*.localhost'])).toBeNull()
+			).toBe('https://*.batuda.localhost')
 		})
 	})
 
-	describe('with a wildcard outside .localhost', () => {
-		it('should report the offending production-style pattern', () => {
-			// GIVEN a wildcard pattern under a routable apex
+	describe('with a wildcard under a routable apex', () => {
+		it('should report the production-style pattern', () => {
+			// GIVEN a `*.example.com` wildcard
 			// WHEN the validator runs
-			// THEN it returns the offending pattern so boot fails loudly
-			// [lib/env.ts — `return pattern` branch]
+			// THEN it is reported so a broad subdomain-trust hole never ships
+			// [lib/env.ts — pattern.includes('*')]
 			expect(
-				findUnsafeWildcardOrigin([
+				findWildcardOrigin([
 					'https://batuda.localhost',
 					'https://*.example.com',
 				]),
 			).toBe('https://*.example.com')
 		})
+	})
 
-		it('should reject sneaky `.localhost.attacker.com` suffixes', () => {
-			// GIVEN a wildcard whose suffix only superficially mentions localhost
+	describe('with several wildcards', () => {
+		it('should report the first one found', () => {
+			// GIVEN more than one wildcard entry
 			// WHEN the validator runs
-			// THEN it is rejected because the suffix doesn't end in `.localhost`
-			// [lib/env.ts — endsWith vs contains]
+			// THEN the first is returned (boot fails on it; order is the env order)
+			// [lib/env.ts — returns on first match]
 			expect(
-				findUnsafeWildcardOrigin(['https://*.localhost.attacker.com']),
-			).toBe('https://*.localhost.attacker.com')
+				findWildcardOrigin([
+					'https://*.batuda.localhost',
+					'https://*.example.com',
+				]),
+			).toBe('https://*.batuda.localhost')
 		})
 	})
 })
@@ -116,16 +121,17 @@ describe('buildInvitationCallbackURL', () => {
 	})
 })
 
-// APP_PUBLIC_URL must be trusted by ALLOWED_ORIGINS (literal or wildcard) or the
-// server refuses to boot, so an invite can't point at a host the app doesn't
-// actually trust. Wildcard matching lets a portless-derived worktree origin pass.
+// APP_PUBLIC_URL must be one of ALLOWED_ORIGINS (matched exactly) or the server
+// refuses to boot, so an invite can't point at a host the app doesn't trust. A
+// portless-derived worktree origin passes because it was merged into the list
+// literally — there is no wildcard widening.
 describe('findPublicUrlNotAllowed', () => {
 	describe('when the public URL is one of the allowed origins', () => {
 		it('should return null', () => {
 			// GIVEN APP_PUBLIC_URL listed literally in ALLOWED_ORIGINS
 			// WHEN the validator runs
 			// THEN it passes (null)
-			// [lib/env.ts — matchOrigin literal branch]
+			// [lib/env.ts — exact-match member]
 			expect(
 				findPublicUrlNotAllowed('https://batuda.co', [
 					'https://admin.batuda.co',
@@ -135,18 +141,33 @@ describe('findPublicUrlNotAllowed', () => {
 		})
 	})
 
-	describe('when the public URL matches an allowed wildcard origin', () => {
-		it('should return null', () => {
-			// GIVEN a derived worktree origin and a `*.batuda.localhost` wildcard
+	describe('when the public URL is a derived worktree origin in the list', () => {
+		it('should return null because it was merged in literally', () => {
+			// GIVEN a derived worktree origin (with its port) listed literally — the
+			//   shape mergeWorktreeOrigin produces in EnvVars
 			// WHEN the validator runs
-			// THEN the wildcard accepts it (the literal isn't listed)
-			// [lib/env.ts — matchOrigin wildcard branch]
+			// THEN it passes by exact match, not via any wildcard
+			// [lib/env.ts — exact-match member]
 			expect(
-				findPublicUrlNotAllowed('https://feature-x.batuda.localhost', [
+				findPublicUrlNotAllowed('https://feature-x.batuda.localhost:1355', [
+					'https://feature-x.batuda.localhost:1355',
 					'https://batuda.localhost',
-					'https://*.batuda.localhost',
 				]),
 			).toBeNull()
+		})
+	})
+
+	describe('when the public URL is a subdomain that is not listed', () => {
+		it('should return a message — no wildcard widens trust to it', () => {
+			// GIVEN a subdomain of a listed host, but not itself listed
+			// WHEN the validator runs
+			// THEN it is rejected — only exact origins pass, no `*.host` widening
+			// [lib/env.ts — non-membership branch]
+			const message = findPublicUrlNotAllowed(
+				'https://other.batuda.localhost',
+				['https://batuda.localhost'],
+			)
+			expect(message).not.toBeNull()
 		})
 	})
 
@@ -179,14 +200,10 @@ describe('mergeWorktreeOrigin', () => {
 			// [lib/env.ts — prepend branch]
 			expect(
 				mergeWorktreeOrigin(
-					['https://batuda.localhost', 'https://*.batuda.localhost'],
+					['https://batuda.localhost'],
 					'https://batuda.localhost:1355',
 				),
-			).toEqual([
-				'https://batuda.localhost:1355',
-				'https://batuda.localhost',
-				'https://*.batuda.localhost',
-			])
+			).toEqual(['https://batuda.localhost:1355', 'https://batuda.localhost'])
 		})
 
 		it('should let the merged list pass the APP_PUBLIC_URL boot check', () => {
@@ -197,7 +214,7 @@ describe('mergeWorktreeOrigin', () => {
 			// [lib/env.ts — mergeWorktreeOrigin feeds findPublicUrlNotAllowed]
 			const appPublicUrl = 'https://batuda.localhost:1355'
 			const merged = mergeWorktreeOrigin(
-				['https://batuda.localhost', 'https://*.batuda.localhost'],
+				['https://batuda.localhost'],
 				appPublicUrl,
 			)
 			expect(findPublicUrlNotAllowed(appPublicUrl, merged)).toBeNull()
@@ -211,16 +228,16 @@ describe('mergeWorktreeOrigin', () => {
 			// [lib/env.ts — includes() short-circuit]
 			expect(
 				mergeWorktreeOrigin(
-					['https://batuda.localhost', 'https://*.batuda.localhost'],
+					['https://batuda.localhost'],
 					'https://batuda.localhost',
 				),
-			).toEqual(['https://batuda.localhost', 'https://*.batuda.localhost'])
+			).toEqual(['https://batuda.localhost'])
 		})
 	})
 
 	describe('when there is no worktree origin (production)', () => {
 		it('should return the env list unchanged', () => {
-			// GIVEN null (deriveWorktreeOrigins returns null off *.batuda.localhost)
+			// GIVEN null (deriveWorktreeOrigins returns null off a batuda.localhost host)
 			// WHEN merged
 			// THEN the explicitly-configured production origins win untouched
 			// [lib/env.ts — null short-circuit]
