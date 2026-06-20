@@ -75,10 +75,12 @@ test.describe('sign-in', () => {
 			await page.getByTestId('login-submit').click()
 
 			// THEN the URL becomes / (NOT //evil.example/) — the open-redirect
-			// vector is closed
+			// vector is closed. The host must be batuda.localhost; the optional
+			// port tolerates portless's non-443 dev port without weakening the
+			// check that an evil host is rejected.
 			// [routes/login.tsx:20-22 — isSafeReturnTo rejects protocol-relative]
 			await page.waitForURL(/\/$/)
-			await expect(page).toHaveURL(/^https:\/\/batuda\.localhost\/$/)
+			await expect(page).toHaveURL(/^https:\/\/batuda\.localhost(:\d+)?\/$/)
 			await expect(page.getByTestId('login-form')).toHaveCount(0)
 		})
 	})

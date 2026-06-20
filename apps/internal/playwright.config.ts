@@ -1,3 +1,7 @@
+import { readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+
 import { defineConfig, devices } from '@playwright/test'
 
 // Golden-path E2E suite. Hits the running dev stack at
@@ -17,10 +21,25 @@ import { defineConfig, devices } from '@playwright/test'
 // when the next flow's testids land — don't pre-write tests for
 // selectors that don't exist yet.
 
-// Default targets the portless dev URL on :443 (its documented default).
-// Override with E2E_BASE_URL when running against a non-default port,
-// staging, or CI.
-const BASE_URL = process.env['E2E_BASE_URL'] ?? 'https://batuda.localhost'
+// E2E_BASE_URL wins (CI / staging / an explicit port). Otherwise target the
+// portless dev origin: portless can't bind 443 without root, so it falls back to
+// a non-privileged port and records it in ~/.portless/proxy.port — read that so
+// `pnpm test:e2e` hits the same origin the browser does, with no manual export.
+// Fall back to the bare host (portless on its 443 default, or no portless) when
+// the file is absent.
+const portlessPortSuffix = (() => {
+	try {
+		const port = readFileSync(
+			join(homedir(), '.portless', 'proxy.port'),
+			'utf8',
+		).trim()
+		return port && port !== '443' ? `:${port}` : ''
+	} catch {
+		return ''
+	}
+})()
+const BASE_URL =
+	process.env['E2E_BASE_URL'] ?? `https://batuda.localhost${portlessPortSuffix}`
 
 const STORAGE_STATE = 'tests/e2e/.auth/alice.json'
 

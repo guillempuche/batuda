@@ -32,9 +32,10 @@ const here = dirname(fileURLToPath(import.meta.url))
 //   1. `INTERNAL_API_URL` — explicit override.
 //   2. Derived from `PORTLESS_URL` (set by `portless run`) when the
 //      Vite dev server is itself on `*.batuda.localhost`. This makes
-//      a worktree at `feature-x.batuda.localhost` proxy to its
-//      matching API at `feature-x.api.batuda.localhost` with no per-
-//      worktree env file.
+//      a worktree at `feature-x.batuda.localhost:<port>` proxy to its
+//      matching API at `feature-x.api.batuda.localhost:<port>` — the
+//      same port portless bound (it falls back to a non-privileged port
+//      like :1355 when it can't bind 443) — with no per-worktree env file.
 //   3. Default `https://api.batuda.localhost` for the main checkout.
 const portlessUrl = process.env['PORTLESS_URL']
 const derivedApiTarget = (() => {
@@ -42,9 +43,13 @@ const derivedApiTarget = (() => {
 	const marker = 'batuda.localhost'
 	try {
 		const url = new URL(portlessUrl)
-		if (!url.host.endsWith(marker)) return null
-		const apiHost = url.host.replace(marker, `api.${marker}`)
-		return `${url.protocol}//${apiHost}`
+		if (!url.hostname.endsWith(marker)) return null
+		const apiHost = url.hostname.replace(marker, `api.${marker}`)
+		// Keep portless's bound port (e.g. :1355) so the proxy reaches the API
+		// portless actually serves, and pin https since portless fronts these
+		// hosts with TLS. The default :443 is left off the host.
+		const portSuffix = url.port && url.port !== '443' ? `:${url.port}` : ''
+		return `https://${apiHost}${portSuffix}`
 	} catch {
 		return null
 	}
