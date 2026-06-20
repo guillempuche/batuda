@@ -3,6 +3,7 @@ import { join } from 'node:path'
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test'
 
+import { openInvitePanel } from './helpers/invite-panel'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // End-to-end set/change password from /profile. The flow under test:
@@ -95,11 +96,10 @@ async function bootPasswordlessInvitee(
 }> {
 	const email = `${emailHint}-${Date.now()}@example.com`
 
-	await alicePage.goto('/settings/organization/invite', {
-		waitUntil: 'networkidle',
-	})
+	// Invites now live inline on the members page behind the "Invite member"
+	// CTA; role defaults to member, so no role interaction is needed here.
+	await openInvitePanel(alicePage)
 	await alicePage.getByTestId('invite-email').fill(email)
-	await alicePage.getByTestId('invite-role').selectOption('member')
 	await alicePage.getByTestId('invite-submit').click()
 	await expect(alicePage.getByTestId('invite-success')).toBeVisible({
 		timeout: 10_000,
@@ -119,7 +119,7 @@ async function bootPasswordlessInvitee(
 test.describe('setting a first password from /profile', () => {
 	test.beforeEach(async ({ page }) => {
 		// Sibling tests may have flipped Alice's active org; reset before
-		// each scenario so /settings/organization/invite resolves to taller.
+		// each scenario so /settings/organization/members resolves to taller.
 		await page.goto('/', { waitUntil: 'commit' })
 		await setActiveOrgBySlug(page, 'taller')
 	})

@@ -1,6 +1,6 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Building2, ScrollText, UserPlus, Users, Wallet } from 'lucide-react'
+import { Building2, ScrollText, Users, Wallet } from 'lucide-react'
 import styled from 'styled-components'
 
 import { authClient } from '#/lib/auth-client'
@@ -12,8 +12,8 @@ import {
 
 /**
  * Active-organization landing page. Shows the org's display name + slug,
- * plus a link to the members list. Future Slice 5 wires the Invite CTA
- * here when the invitation flow lands.
+ * plus a link to the members list — which is where members are invited,
+ * listed, and removed and pending invitations are managed.
  *
  * Aesthetic matches the Profile page: brushed-metal card, stenciled
  * heading, ruler-underline intro. Uses the Better Auth `organizationClient`
@@ -89,27 +89,12 @@ function OrganizationSettingsPage() {
 							</NavRowTitle>
 						</NavRowLabel>
 						<NavRowDescription>
-							<Trans>See who can access this workspace.</Trans>
+							<Trans>
+								See who can access this workspace, invite teammates, and manage
+								pending invitations.
+							</Trans>
 						</NavRowDescription>
 					</NavRow>
-
-					{canInvite ? (
-						<NavRow
-							to='/settings/organization/invite'
-							data-testid='settings-org-invite-link'
-							aria-label={t`Invite a new member`}
-						>
-							<NavRowLabel>
-								<UserPlus size={18} aria-hidden />
-								<NavRowTitle>
-									<Trans>Invite</Trans>
-								</NavRowTitle>
-							</NavRowLabel>
-							<NavRowDescription>
-								<Trans>Send a one-click sign-in link to a teammate.</Trans>
-							</NavRowDescription>
-						</NavRow>
-					) : null}
 
 					{canInvite ? (
 						<NavRow
