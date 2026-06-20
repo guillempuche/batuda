@@ -669,11 +669,18 @@ const emailInjectCommand = Command.make(
 	{
 		to: Flag.string('to').pipe(
 			Flag.withDescription('Recipient address (must match a seeded inbox)'),
+			Flag.withFallbackPrompt(
+				Prompt.text({ message: 'To (a seeded inbox address):' }),
+			),
 		),
 		from: Flag.string('from').pipe(
 			Flag.withDescription('Sender address (any value works locally)'),
+			Flag.withFallbackPrompt(Prompt.text({ message: 'From:' })),
 		),
-		subject: Flag.string('subject').pipe(Flag.withDescription('Subject line')),
+		subject: Flag.string('subject').pipe(
+			Flag.withDescription('Subject line'),
+			Flag.withFallbackPrompt(Prompt.text({ message: 'Subject:' })),
+		),
 		text: Flag.string('text').pipe(
 			Flag.withDescription('Plain-text body'),
 			Flag.optional,
@@ -727,13 +734,35 @@ const emailCommand = Command.make('email').pipe(
 // definition here (rather than in a separate `cli-tree.ts`) avoids splitting
 // the file just to share one const; the `isMain` guard below makes import
 // safe by deferring `runMain` until cli.ts is the entry script.
+// The TUI runs a leaf with no argv, so an entity picker only appears if the
+// argument itself prompts. Gate that prompt on an interactive stdin: the TUI
+// and a bare interactive `data` get the picker, while piped / non-TTY callers
+// (CI, scripts, agents) fall straight to the overview instead of blocking on a
+// prompt nothing will ever answer. `optional` stays outermost either way, so a
+// provided `data <entity>` skips the prompt and Esc lands on the overview.
+const dataEntityArg = (() => {
+	const base = Argument.choice('entity', ENTITY_NAMES).pipe(
+		Argument.withDescription(
+			'Seeded entity to list; omit (or Esc the prompt) for an overview',
+		),
+	)
+	return process.stdin.isTTY
+		? base.pipe(
+				Argument.withFallbackPrompt(
+					Prompt.select({
+						message: 'Which entity? (Esc for the overview)',
+						choices: ENTITY_NAMES.map(name => ({ title: name, value: name })),
+					}),
+				),
+				Argument.optional,
+			)
+		: base.pipe(Argument.optional)
+})()
+
 const dataCommand = Command.make(
 	'data',
 	{
-		entity: Argument.choice('entity', ENTITY_NAMES).pipe(
-			Argument.withDescription('Seeded entity to list; omit for an overview'),
-			Argument.optional,
-		),
+		entity: dataEntityArg,
 		json: Flag.boolean('json').pipe(
 			Flag.withDescription('Print JSON instead of a table'),
 			Flag.withDefault(false),
