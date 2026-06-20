@@ -11,22 +11,18 @@ import { matchOrigin } from './origin-match'
 import { deriveWorktreeOrigins } from './portless-origins'
 
 /**
- * Returns the first ALLOWED_ORIGINS pattern that uses a wildcard
- * subdomain whose suffix is NOT under `.localhost`, or `null` if every
- * pattern is safe. Production origins must be listed explicitly so a
- * misconfigured deploy can't grant CORS + Better-Auth trust to every
- * subdomain of an externally-resolvable apex.
+ * Returns the first ALLOWED_ORIGINS pattern that contains a `*` wildcard, or
+ * `null` if every pattern is a literal origin. ALLOWED_ORIGINS holds literal
+ * origins only: each is trusted explicitly, and a dev worktree's branch-prefixed
+ * origin is derived from `PORTLESS_URL` and merged in. A `*.host` entry is a
+ * config mistake — boot fails loudly rather than silently never matching (and a
+ * prod deploy can't grant trust to every subdomain of a routable apex).
  */
-export function findUnsafeWildcardOrigin(
+export function findWildcardOrigin(
 	patterns: ReadonlyArray<string>,
 ): string | null {
 	for (const pattern of patterns) {
-		const wildcardAt = pattern.indexOf('://*.')
-		if (wildcardAt === -1) continue
-		const suffix = pattern.slice(wildcardAt + '://*.'.length)
-		if (suffix === 'localhost') continue
-		if (suffix.endsWith('.localhost')) continue
-		return pattern
+		if (pattern.includes('*')) return pattern
 	}
 	return null
 }
@@ -47,9 +43,10 @@ export function buildInvitationCallbackURL(
 /**
  * Returns an explanatory message if `publicUrl` is not trusted by
  * `allowedOrigins`, else `null`. APP_PUBLIC_URL must be a trusted origin so the
- * links the server mints can't point at a host it won't serve. Matched with the
- * same wildcard rules as CORS, so a derived worktree origin
- * (`<branch>.batuda.localhost`) is accepted by the `*.batuda.localhost` wildcard.
+ * links the server mints can't point at a host it won't serve. Matched the same
+ * way as CORS (exact origin), so a derived worktree origin
+ * (`<branch>.batuda.localhost:<port>`) passes because it was merged into
+ * ALLOWED_ORIGINS, not via any wildcard.
  */
 export function findPublicUrlNotAllowed(
 	publicUrl: string,
@@ -65,8 +62,8 @@ export function findPublicUrlNotAllowed(
 /**
  * Folds a portless dev worktree's derived app origin into the trusted-origins
  * list. The browser's real Origin carries the port portless bound (e.g. :1355
- * when it can't bind 443); without this neither the literal nor the wildcard in
- * ALLOWED_ORIGINS matches it, so CORS and Better-Auth reject sign-in with 403.
+ * when it can't bind 443); without this the literal in ALLOWED_ORIGINS doesn't
+ * match it, so CORS and Better-Auth reject sign-in with 403.
  * Prepended and de-duplicated so the APP_PUBLIC_URL boot check accepts it too.
  * Returns the list unchanged off a worktree (production), where env values win.
  */
@@ -91,8 +88,8 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 		// In a dev worktree portless sets PORTLESS_URL to this worktree's own api
 		// host (`<branch>.api.batuda.localhost`); derive the matching origins so the
 		// server's canonical base and the links it mints use the worktree's host,
-		// not the main checkout's. Null off `*.batuda.localhost` (prod), where the
-		// explicit env values below win. Mirrors apps/internal/vite.config.ts.
+		// not the main checkout's. Null off a `batuda.localhost` host (prod), where
+		// the explicit env values below win. Mirrors apps/internal/vite.config.ts.
 		const PORTLESS_URL = yield* Config.string('PORTLESS_URL').pipe(
 			Config.withDefault(''),
 		)
@@ -141,25 +138,25 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 		const API_KEY_RATE_LIMIT_WINDOW_SECONDS = yield* Config.int(
 			'API_KEY_RATE_LIMIT_WINDOW_SECONDS',
 		)
-		// Comma-separated list of trusted origins (e.g.
-		// `https://batuda.localhost`). Each entry is either a literal
-		// origin matched exactly or a wildcard-subdomain pattern
-		// `https://*.host`. Wildcards are accepted only when the suffix
-		// ends in `.localhost` — production hosts (`*.example.com`) are
-		// rejected at boot to avoid shipping a broad subdomain-trust hole.
-		// Same array is reused as Better-Auth `trustedOrigins`.
+		// Comma-separated list of trusted origins, each a literal origin
+		// (`https://batuda.localhost` / `https://host:port`) matched exactly.
+		// Wildcards are not supported: a dev worktree's branch-prefixed origin
+		// is derived from PORTLESS_URL and merged in below, so every trusted
+		// origin is listed explicitly. A `*.host` entry fails boot rather than
+		// silently never matching. Same array is reused as Better-Auth
+		// `trustedOrigins`.
 		const allowedOriginsFromEnv = yield* Config.string('ALLOWED_ORIGINS').pipe(
 			Config.map(s => (s ? s.split(',').map(o => o.trim()) : [])),
 			Config.mapOrFail(patterns => {
-				const offending = findUnsafeWildcardOrigin(patterns)
+				const offending = findWildcardOrigin(patterns)
 				if (offending !== null) {
 					return Effect.fail(
 						new Config.ConfigError(
 							new ConfigProvider.SourceError({
 								message:
-									`ALLOWED_ORIGINS rejects wildcard pattern "${offending}": ` +
-									'wildcard subdomains are only allowed under .localhost. ' +
-									'List each production origin explicitly.',
+									`ALLOWED_ORIGINS does not accept wildcard patterns (got "${offending}"). ` +
+									'List each origin literally; a dev worktree derives its own origin ' +
+									'from PORTLESS_URL.',
 							}),
 						),
 					)

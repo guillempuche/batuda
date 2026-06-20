@@ -9,9 +9,9 @@ export { matchOrigin }
 
 export const CorsLive = Layer.unwrap(
 	Effect.gen(function* () {
-		// Reads the already-validated ALLOWED_ORIGINS list from EnvVars so
-		// any wildcard-pattern audit (see env.ts) applies here too. Same
-		// array is reused as Better-Auth `trustedOrigins` in lib/auth.ts.
+		// Reads the already-validated ALLOWED_ORIGINS list from EnvVars (the
+		// same literal origins, see env.ts). Same array is reused as Better-Auth
+		// `trustedOrigins` in lib/auth.ts.
 		const env = yield* EnvVars
 		const allowedOrigins = env.ALLOWED_ORIGINS
 
