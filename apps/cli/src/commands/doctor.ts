@@ -1,6 +1,6 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { request } from 'node:https'
-import { resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 
 import { Config, Effect } from 'effect'
 import type { ChildProcessSpawner } from 'effect/unstable/process'
@@ -30,6 +30,88 @@ interface Check {
 const ok = (detail: string) => ({ status: 'ok' as const, detail })
 const warn = (detail: string) => ({ status: 'warn' as const, detail })
 const fail = (detail: string) => ({ status: 'fail' as const, detail })
+
+// Worktrees only carry tracked files, so gitignored configs (`.env`,
+// `.env.pr-media`, …) live in the main checkout and never get copied in.
+// `worktree up` writes a worktree's own root `.env`, but the rest are absent
+// by design — the hint points there instead of crying "missing".
+const IN_WORKTREE = resolve(ROOT).includes(`${join('.claude', 'worktrees')}`)
+
+const envKeys = (content: string): Set<string> => {
+	const keys = new Set<string>()
+	for (const line of content.split('\n')) {
+		const trimmed = line.trim()
+		if (!trimmed || trimmed.startsWith('#')) continue
+		const eq = trimmed.indexOf('=')
+		if (eq !== -1) keys.add(trimmed.slice(0, eq))
+	}
+	return keys
+}
+
+// Every fillable `.env.example*` at the repo root or one level into
+// `apps/`/`packages/`. `.env.example` (and `apps/<x>/.env.example`) are
+// required — `setup` syncs them. Variants like `.env.example.pr-media` are
+// opt-in, per-workflow configs `setup` deliberately skips, so the only place to
+// learn they exist is here. A variant counts only if its header declares a
+// `Copy to \`.env.x\`` target; reference-only files (e.g. `.env.example.github`,
+// which documents GitHub-dashboard secrets and is never loaded) are skipped.
+const findEnvExamples = (): string[] => {
+	const results: string[] = []
+	for (const entry of readdirSync(ROOT)) {
+		if (entry === '.env.example') {
+			results.push(entry)
+		} else if (entry.startsWith('.env.example.')) {
+			const header = readFileSync(resolve(ROOT, entry), 'utf8')
+			if (header.includes('Copy to `')) results.push(entry)
+		}
+	}
+	for (const workspace of ['apps', 'packages']) {
+		const dir = resolve(ROOT, workspace)
+		if (!existsSync(dir)) continue
+		for (const entry of readdirSync(dir, { withFileTypes: true })) {
+			if (!entry.isDirectory()) continue
+			const rel = join(workspace, entry.name, '.env.example')
+			if (existsSync(resolve(ROOT, rel))) results.push(rel)
+		}
+	}
+	return results
+}
+
+const envFileCheck = (example: string): Check => {
+	// `.env.example` → `.env`; `.env.example.cloud` → `.env.cloud`.
+	const target = example.replace('.example', '')
+	const optional = !example.endsWith('.env.example')
+	return {
+		name: target,
+		run: Effect.sync(() => {
+			const targetPath = resolve(ROOT, target)
+			if (!existsSync(targetPath)) {
+				// In a worktree only the generated root `.env` is present; the rest
+				// are gitignored and intentionally not copied, so this isn't a fault.
+				if (IN_WORKTREE) {
+					return warn(
+						'lives in the main checkout (gitignored — not copied here)',
+					)
+				}
+				if (optional) {
+					return warn(
+						`optional, not set → \`cp ${example} ${target}\` and fill`,
+					)
+				}
+				return fail('missing → run `pnpm cli setup`')
+			}
+			const targetKeys = envKeys(readFileSync(targetPath, 'utf8'))
+			const missing = [
+				...envKeys(readFileSync(resolve(ROOT, example), 'utf8')),
+			].filter(key => !targetKeys.has(key))
+			return missing.length > 0
+				? warn(
+						`${missing.length} key(s) missing → \`pnpm cli setup --update\` (or fill by hand)`,
+					)
+				: ok('configured')
+		}),
+	}
+}
 
 const fileCheck = (rel: string, label: string): Check => ({
 	name: label,
@@ -282,8 +364,7 @@ const cloudAuthUrlCheck: Check = {
 }
 
 const localChecks: Check[] = [
-	fileCheck('.env', '.env file'),
-	fileCheck('apps/cli/.env', 'apps/cli/.env file'),
+	...findEnvExamples().map(envFileCheck),
 	emailCredentialKeyCheck,
 	dockerCheck,
 	composeCheck,
