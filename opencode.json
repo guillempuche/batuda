@@ -1,0 +1,46 @@
+{
+	"$schema": "https://opencode.ai/config.json",
+	"mcp": {
+		"batuda": {
+			"type": "remote",
+			"url": "https://api.batuda.co/mcp",
+			"oauth": false,
+			"headers": {
+				"x-api-key": "{env:BATUDA_API_KEY}"
+			}
+		},
+		"cloudflare-api": {
+			"type": "remote",
+			"url": "https://mcp.cloudflare.com/mcp"
+		},
+		"neon": {
+			"type": "local",
+			"command": [
+				"sh",
+				"-c",
+				"exec npx -y @neondatabase/mcp-server-neon start \"$NEON_API_KEY\""
+			]
+		}
+	},
+	"permission": {
+		"edit": {
+			"apps/server/src/db/migrations/0*.ts": "ask"
+		}
+	},
+	"formatter": {
+		"biome": {
+			"command": [
+				"biome",
+				"check",
+				"--write",
+				"--no-errors-on-unmatched",
+				"$FILE"
+			],
+			"extensions": [".ts", ".tsx", ".json"]
+		},
+		"dprint": {
+			"command": ["dprint", "fmt", "$FILE"],
+			"extensions": [".md"]
+		}
+	}
+}
