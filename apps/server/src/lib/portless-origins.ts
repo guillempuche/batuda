@@ -16,21 +16,28 @@ export const deriveWorktreeOrigins = (
 	portlessUrl: string | undefined,
 ): { apiOrigin: string; appOrigin: string } | null => {
 	if (!portlessUrl) return null
-	let apiHost: string
+	let url: URL
 	try {
-		apiHost = new URL(portlessUrl).hostname
+		url = new URL(portlessUrl)
 	} catch {
 		return null
 	}
-	if (!apiHost.endsWith(DEV_MARKER)) return null
+	const apiHost = url.hostname
+	// Match on a label boundary, not a bare suffix: a lookalike host like
+	// `xbatuda.localhost` must not slip through and self-derive a trusted origin.
+	if (apiHost !== DEV_MARKER && !apiHost.endsWith(`.${DEV_MARKER}`)) return null
 	// `<branch>.api.batuda.localhost` → `<branch>.batuda.localhost` (and the main
 	// checkout's `api.batuda.localhost` → `batuda.localhost`).
 	const appHost = apiHost.replace(`api.${DEV_MARKER}`, DEV_MARKER)
-	// portless serves these dev hosts over HTTPS but reports PORTLESS_URL as
-	// `http://…:443`; the browser origin that CORS + cookies must match is always
-	// https, so pin the scheme (and drop the port by using the hostname).
+	// portless fronts these dev hosts with HTTPS, so pin the scheme whatever
+	// PORTLESS_URL reports. Keep the port portless actually bound: it falls back
+	// to a non-privileged port (e.g. :1355) when it can't bind 443, and the
+	// browser's Origin header carries that port — so the derived origin must too,
+	// or CORS + Better-Auth reject the sign-in. The default :443 is dropped
+	// because the browser omits it from the Origin.
+	const portSuffix = url.port && url.port !== '443' ? `:${url.port}` : ''
 	return {
-		apiOrigin: `https://${apiHost}`,
-		appOrigin: `https://${appHost}`,
+		apiOrigin: `https://${apiHost}${portSuffix}`,
+		appOrigin: `https://${appHost}${portSuffix}`,
 	}
 }
