@@ -4,6 +4,7 @@ import {
 	buildInvitationCallbackURL,
 	findPublicUrlNotAllowed,
 	findUnsafeWildcardOrigin,
+	mergeWorktreeOrigin,
 } from './env.js'
 
 // Locks in the safety guard that refuses to boot when ALLOWED_ORIGINS
@@ -161,6 +162,74 @@ describe('findPublicUrlNotAllowed', () => {
 			])
 			expect(message).not.toBeNull()
 			expect(message).toContain('APP_PUBLIC_URL')
+		})
+	})
+})
+
+// portless can't bind 443 without privileges, so it falls back to a port like
+// :1355 and the browser's Origin becomes `https://batuda.localhost:1355`. That
+// port is absent from the static ALLOWED_ORIGINS, so the derived app origin must
+// be folded in or every sign-in 403s — the out-of-the-box dev failure this guards.
+describe('mergeWorktreeOrigin', () => {
+	describe('when a worktree app origin is given', () => {
+		it('should prepend the derived port-carrying origin to the trusted list', () => {
+			// GIVEN the static origins (no port) and the portless-derived origin
+			// WHEN they are merged
+			// THEN the ported origin leads the list so CORS + Better-Auth trust it
+			// [lib/env.ts — prepend branch]
+			expect(
+				mergeWorktreeOrigin(
+					['https://batuda.localhost', 'https://*.batuda.localhost'],
+					'https://batuda.localhost:1355',
+				),
+			).toEqual([
+				'https://batuda.localhost:1355',
+				'https://batuda.localhost',
+				'https://*.batuda.localhost',
+			])
+		})
+
+		it('should let the merged list pass the APP_PUBLIC_URL boot check', () => {
+			// GIVEN APP_PUBLIC_URL is the derived ported origin (set the same way in
+			//   EnvVars), absent from the static list
+			// WHEN the merged list is fed to the boot check
+			// THEN it passes — the merge is what keeps boot from failing on the port
+			// [lib/env.ts — mergeWorktreeOrigin feeds findPublicUrlNotAllowed]
+			const appPublicUrl = 'https://batuda.localhost:1355'
+			const merged = mergeWorktreeOrigin(
+				['https://batuda.localhost', 'https://*.batuda.localhost'],
+				appPublicUrl,
+			)
+			expect(findPublicUrlNotAllowed(appPublicUrl, merged)).toBeNull()
+		})
+
+		it('should not duplicate an origin already present in the list', () => {
+			// GIVEN the derived origin already listed literally (portless on 443, no
+			//   port, collapses onto the static entry)
+			// WHEN they are merged
+			// THEN the list is returned unchanged — no duplicate trusted origin
+			// [lib/env.ts — includes() short-circuit]
+			expect(
+				mergeWorktreeOrigin(
+					['https://batuda.localhost', 'https://*.batuda.localhost'],
+					'https://batuda.localhost',
+				),
+			).toEqual(['https://batuda.localhost', 'https://*.batuda.localhost'])
+		})
+	})
+
+	describe('when there is no worktree origin (production)', () => {
+		it('should return the env list unchanged', () => {
+			// GIVEN null (deriveWorktreeOrigins returns null off *.batuda.localhost)
+			// WHEN merged
+			// THEN the explicitly-configured production origins win untouched
+			// [lib/env.ts — null short-circuit]
+			expect(
+				mergeWorktreeOrigin(
+					['https://batuda.co', 'https://engranatge.com'],
+					null,
+				),
+			).toEqual(['https://batuda.co', 'https://engranatge.com'])
 		})
 	})
 })

@@ -62,6 +62,23 @@ export function findPublicUrlNotAllowed(
 	)
 }
 
+/**
+ * Folds a portless dev worktree's derived app origin into the trusted-origins
+ * list. The browser's real Origin carries the port portless bound (e.g. :1355
+ * when it can't bind 443); without this neither the literal nor the wildcard in
+ * ALLOWED_ORIGINS matches it, so CORS and Better-Auth reject sign-in with 403.
+ * Prepended and de-duplicated so the APP_PUBLIC_URL boot check accepts it too.
+ * Returns the list unchanged off a worktree (production), where env values win.
+ */
+export function mergeWorktreeOrigin(
+	allowedOrigins: string[],
+	worktreeAppOrigin: string | null,
+): string[] {
+	if (worktreeAppOrigin === null) return allowedOrigins
+	if (allowedOrigins.includes(worktreeAppOrigin)) return allowedOrigins
+	return [worktreeAppOrigin, ...allowedOrigins]
+}
+
 export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 	make: Effect.gen(function* () {
 		const DATABASE_URL = yield* Config.redacted('DATABASE_URL')
@@ -131,7 +148,7 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 		// ends in `.localhost` — production hosts (`*.example.com`) are
 		// rejected at boot to avoid shipping a broad subdomain-trust hole.
 		// Same array is reused as Better-Auth `trustedOrigins`.
-		const ALLOWED_ORIGINS = yield* Config.string('ALLOWED_ORIGINS').pipe(
+		const allowedOriginsFromEnv = yield* Config.string('ALLOWED_ORIGINS').pipe(
 			Config.map(s => (s ? s.split(',').map(o => o.trim()) : [])),
 			Config.mapOrFail(patterns => {
 				const offending = findUnsafeWildcardOrigin(patterns)
@@ -149,6 +166,16 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 				}
 				return Effect.succeed(patterns)
 			}),
+		)
+
+		// In a portless dev worktree the browser's real Origin carries the port
+		// portless bound (e.g. :1355 when it couldn't bind 443). Merge that derived
+		// app origin into the trusted list so CORS, Better-Auth trustedOrigins, and
+		// the APP_PUBLIC_URL boot check below all accept it — no per-machine
+		// ALLOWED_ORIGINS edit for whichever port portless grabbed.
+		const ALLOWED_ORIGINS = mergeWorktreeOrigin(
+			allowedOriginsFromEnv,
+			worktreeOrigins?.appOrigin ?? null,
 		)
 
 		// Canonical public origin for the links the server mints (invitation
