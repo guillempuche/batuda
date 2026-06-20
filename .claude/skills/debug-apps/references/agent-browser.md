@@ -2,6 +2,8 @@
 
 Playwright-based CLI for testing apps as a real user. Already installed in this environment.
 
+> **Dev URLs carry portless's port.** portless binds 443 when it can, otherwise a fallback like `:1355`. The `https://batuda.localhost/…` examples below omit it — substitute the URL `pnpm dev` printed (e.g. `https://batuda.localhost:1355/…`), or prefix with `$(cat ~/.portless/proxy.port)`.
+
 ## Dev login credentials
 
 Created by `pnpm cli seed` (any preset). Defined in `apps/cli/src/commands/seed.ts`:

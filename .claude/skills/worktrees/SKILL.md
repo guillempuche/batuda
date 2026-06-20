@@ -72,7 +72,13 @@ fires the auto-provision/teardown hooks below.
 
 ## CORS / auth (works per worktree, no per-worktree env)
 
-CORS trusts `https://*.batuda.localhost` (wildcard), the session cookie spans `batuda.localhost`,
-and the **server derives its own canonical origins from `PORTLESS_URL`** — so login, API calls,
-and minted links (invitations, auth redirects) all target the *worktree's* host automatically.
-Each worktree's own database keeps sessions/data isolated.
+The **server derives its canonical origins from `PORTLESS_URL`** and merges the worktree's
+`<label>.batuda.localhost:<port>` origin into the trusted set; the session cookie spans
+`batuda.localhost`; and the client derives its `<label>.api.batuda.localhost` API host the same
+way — so login, `/v1` data, API calls, and minted links (invitations, auth redirects) all target
+the *worktree's* host automatically. `ALLOWED_ORIGINS` is literal-only (no `*.batuda.localhost`
+wildcard). Each worktree's own database keeps sessions/data isolated.
+
+A worktree whose `.env` lists `https://*.batuda.localhost` won't boot — `ALLOWED_ORIGINS` is
+literal-only, so remove that line (or re-run `pnpm cli worktree up` to regenerate the `.env`,
+which re-seeds — see Caveats).
