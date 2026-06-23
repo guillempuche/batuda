@@ -11,6 +11,10 @@
 			"type": "http",
 			"url": "https://mcp.cloudflare.com/mcp"
 		},
+		"firecrawl": {
+			"type": "http",
+			"url": "https://mcp.firecrawl.dev/v2/mcp"
+		},
 		"neon": {
 			"command": "sh",
 			"args": [
