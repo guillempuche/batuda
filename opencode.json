@@ -13,6 +13,10 @@
 			"type": "remote",
 			"url": "https://mcp.cloudflare.com/mcp"
 		},
+		"firecrawl": {
+			"type": "remote",
+			"url": "https://mcp.firecrawl.dev/v2/mcp"
+		},
 		"neon": {
 			"type": "local",
 			"command": [
