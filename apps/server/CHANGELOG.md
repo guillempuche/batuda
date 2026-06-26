@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-06-26 (server-v2026.6.26-1)
+
+### Bug Fixes
+
+* **server:** add defaults for research/env vars and trim KraftCloud cmdline ([2e19c87](https://github.com/guillempuche/batuda/commit/2e19c87b1f1bfc2467298417accb22e9381572bb))
+
 ## 2026-06-26 (server-v2026.6.26)
 
 ### Features
