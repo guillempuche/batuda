@@ -13,6 +13,7 @@ import { seedDocuments } from './seed/documents'
 import { seedDemoEmails } from './seed/emails'
 import { seedInboxes } from './seed/inboxes'
 import { linkRunProvenance, seedInstructions } from './seed/instructions'
+import { seedMcpOAuth } from './seed/mcp-oauth'
 import { seedPages } from './seed/pages'
 import { seedPersonaActivity } from './seed/personas'
 import { seedProposals } from './seed/proposals'
@@ -86,6 +87,7 @@ export const seed = (preset: Preset) =>
 				const seededInboxes = yield* seedInboxes(ctx)
 				yield* seedDemoEmails(sql, seededInboxes)
 				const instructionTemplateIds = yield* seedInstructions(ctx)
+				yield* seedMcpOAuth(ctx)
 
 				if (preset === 'full') {
 					yield* seedDocuments(ctx, companyMap, insertedInteractions)
