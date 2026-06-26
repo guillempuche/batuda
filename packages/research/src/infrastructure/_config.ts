@@ -12,6 +12,7 @@ import { Config, Schema, SchemaGetter } from 'effect'
 export const providerListConfig = <const V extends ReadonlyArray<string>>(
 	vendors: V,
 	envName: string,
+	defaultValue?: ReadonlyArray<V[number]> & { readonly 0: V[number] },
 ) => {
 	const schema = Schema.String.pipe(
 		Schema.decodeTo(Schema.Array(Schema.String), {
@@ -27,7 +28,10 @@ export const providerListConfig = <const V extends ReadonlyArray<string>>(
 		}),
 		Schema.decodeTo(Schema.NonEmptyArray(Schema.Literals(vendors))),
 	)
-	return Config.schema(schema, envName)
+	const config = Config.schema(schema, envName)
+	return defaultValue === undefined
+		? config
+		: config.pipe(Config.withDefault(defaultValue))
 }
 
 /**

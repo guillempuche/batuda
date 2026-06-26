@@ -213,7 +213,7 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 		const EMAIL_PROVIDER = yield* Config.schema(
 			Schema.Literals(['local-inbox']),
 			'EMAIL_PROVIDER',
-		)
+		).pipe(Config.withDefault('local-inbox'))
 		// AES-256-GCM master key for encrypting per-inbox IMAP/SMTP
 		// credentials at rest. Base64-encoded 32 bytes. Per-inbox subkeys
 		// are derived via HKDF-SHA256 with the inbox id as `info`, so a
@@ -228,35 +228,35 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 		const GEOCODER_PROVIDER = yield* Config.schema(
 			Schema.Literals(['nominatim']),
 			'GEOCODER_PROVIDER',
-		)
+		).pipe(Config.withDefault('nominatim'))
 
 		// Budget defaults (system-level)
 		const RESEARCH_DEFAULT_BUDGET_CENTS = yield* Config.int(
 			'RESEARCH_DEFAULT_BUDGET_CENTS',
-		)
+		).pipe(Config.withDefault(100))
 		const RESEARCH_DEFAULT_PAID_BUDGET_CENTS = yield* Config.int(
 			'RESEARCH_DEFAULT_PAID_BUDGET_CENTS',
-		)
+		).pipe(Config.withDefault(500))
 		const RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS = yield* Config.int(
 			'RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS',
-		)
+		).pipe(Config.withDefault(200))
 		const RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS = yield* Config.int(
 			'RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS',
-		)
+		).pipe(Config.withDefault(2000))
 		const RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS = yield* Config.int(
 			'RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS',
-		)
+		).pipe(Config.withDefault(10000))
 
 		// Concurrency and safety
 		const RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL = yield* Config.int(
 			'RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL',
-		)
+		).pipe(Config.withDefault(3))
 		const RESEARCH_MAX_CONCURRENCY_FANOUT = yield* Config.int(
 			'RESEARCH_MAX_CONCURRENCY_FANOUT',
-		)
+		).pipe(Config.withDefault(3))
 		const RESEARCH_CONFIRM_THRESHOLD_FANOUT = yield* Config.int(
 			'RESEARCH_CONFIRM_THRESHOLD_FANOUT',
-		)
+		).pipe(Config.withDefault(10))
 
 		return {
 			DATABASE_URL,

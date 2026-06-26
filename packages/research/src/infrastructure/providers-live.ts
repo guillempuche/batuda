@@ -28,7 +28,7 @@ import {
 import {
 	type Country,
 	REGISTRY_VENDORS_BY_COUNTRY,
-	REPORT_VENDORS_BY_COUNTRY,
+	type REPORT_VENDORS_BY_COUNTRY,
 	SUPPORTED_COUNTRIES,
 } from '../domain/country'
 import type { ProviderError } from '../domain/errors'
@@ -263,6 +263,7 @@ const discoverLayer = Layer.effect(
 		const vendors = yield* providerListConfig(
 			DISCOVER_VENDORS,
 			'RESEARCH_PROVIDER_DISCOVER',
+			['none'] as const,
 		)
 		yield* Effect.logInfo(`research.discover: ${vendors.join(',')}`)
 		const instances = yield* Effect.all(
@@ -313,8 +314,9 @@ const buildRegistryDispatcher = (cc: Country) =>
 const buildReportDispatcher = (cc: Country) =>
 	Effect.gen(function* () {
 		const vendors = yield* providerListConfig(
-			REPORT_VENDORS_BY_COUNTRY[cc],
+			REGISTRY_VENDORS_BY_COUNTRY[cc],
 			`RESEARCH_PROVIDER_REPORT_${cc}`,
+			['none'] as const,
 		)
 		yield* Effect.logInfo(`research.report.${cc}: ${vendors.join(',')}`)
 		const instances = yield* Effect.all(

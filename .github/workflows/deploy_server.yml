@@ -141,7 +141,6 @@ jobs:
                 -e STORAGE_ACCESS_KEY_ID="${{ secrets.STORAGE_ACCESS_KEY_ID }}" \
                 -e STORAGE_SECRET_ACCESS_KEY="${{ secrets.STORAGE_SECRET_ACCESS_KEY }}" \
                 -e STORAGE_BUCKET="${{ vars.STORAGE_BUCKET }}" \
-                -e EMAIL_PROVIDER="${{ vars.EMAIL_PROVIDER }}" \
                 -e EMAIL_CREDENTIAL_KEY="${{ secrets.EMAIL_CREDENTIAL_KEY }}" \
                 -e EMAIL_PROVIDER_TRANSACTIONAL="${{ vars.EMAIL_PROVIDER_TRANSACTIONAL }}" \
                 -e EMAIL_API_KEY_TRANSACTIONAL="${{ secrets.EMAIL_API_KEY_TRANSACTIONAL }}" \
@@ -149,37 +148,20 @@ jobs:
                 -e CALENDAR_PROVIDER="${{ vars.CALENDAR_PROVIDER }}" \
                 -e CALENDAR_API_KEY="${{ secrets.CALENDAR_API_KEY }}" \
                 -e CALENDAR_WEBHOOK_SECRET="${{ secrets.CALENDAR_WEBHOOK_SECRET }}" \
-                -e GEOCODER_PROVIDER="${{ vars.GEOCODER_PROVIDER }}" \
                 -e RESEARCH_PROVIDER_SEARCH="${{ vars.RESEARCH_PROVIDER_SEARCH }}" \
                 -e RESEARCH_PROVIDER_SCRAPE="${{ vars.RESEARCH_PROVIDER_SCRAPE }}" \
                 -e RESEARCH_PROVIDER_EXTRACT="${{ vars.RESEARCH_PROVIDER_EXTRACT }}" \
-                -e RESEARCH_PROVIDER_DISCOVER="${{ vars.RESEARCH_PROVIDER_DISCOVER }}" \
                 -e RESEARCH_PROVIDER_REGISTRY_ES="${{ vars.RESEARCH_PROVIDER_REGISTRY_ES }}" \
-                -e RESEARCH_PROVIDER_REPORT_ES="${{ vars.RESEARCH_PROVIDER_REPORT_ES }}" \
                 -e RESEARCH_LLM_AGENT_PROVIDERS="${{ vars.RESEARCH_LLM_AGENT_PROVIDERS }}" \
-                -e RESEARCH_LLM_AGENT_MODEL="${{ vars.RESEARCH_LLM_AGENT_MODEL }}" \
-                -e RESEARCH_LLM_AGENT_BASE_URL="${{ vars.RESEARCH_LLM_AGENT_BASE_URL }}" \
                 -e RESEARCH_LLM_AGENT_API_KEY="${{ secrets.RESEARCH_LLM_AGENT_API_KEY }}" \
                 -e RESEARCH_LLM_EXTRACT_PROVIDERS="${{ vars.RESEARCH_LLM_EXTRACT_PROVIDERS }}" \
-                -e RESEARCH_LLM_EXTRACT_MODEL="${{ vars.RESEARCH_LLM_EXTRACT_MODEL }}" \
-                -e RESEARCH_LLM_EXTRACT_BASE_URL="${{ vars.RESEARCH_LLM_EXTRACT_BASE_URL }}" \
                 -e RESEARCH_LLM_EXTRACT_API_KEY="${{ secrets.RESEARCH_LLM_EXTRACT_API_KEY }}" \
                 -e RESEARCH_LLM_WRITER_PROVIDERS="${{ vars.RESEARCH_LLM_WRITER_PROVIDERS }}" \
-                -e RESEARCH_LLM_WRITER_MODEL="${{ vars.RESEARCH_LLM_WRITER_MODEL }}" \
-                -e RESEARCH_LLM_WRITER_BASE_URL="${{ vars.RESEARCH_LLM_WRITER_BASE_URL }}" \
                 -e RESEARCH_LLM_WRITER_API_KEY="${{ secrets.RESEARCH_LLM_WRITER_API_KEY }}" \
                 -e RESEARCH_API_KEY_SEARCH="${{ secrets.RESEARCH_API_KEY_SEARCH }}" \
                 -e RESEARCH_API_KEY_SCRAPE="${{ secrets.RESEARCH_API_KEY_SCRAPE }}" \
                 -e RESEARCH_API_KEY_EXTRACT="${{ secrets.RESEARCH_API_KEY_EXTRACT }}" \
                 -e RESEARCH_API_KEY_REGISTRY_ES="${{ secrets.RESEARCH_API_KEY_REGISTRY_ES }}" \
-                -e RESEARCH_DEFAULT_BUDGET_CENTS="${{ vars.RESEARCH_DEFAULT_BUDGET_CENTS }}" \
-                -e RESEARCH_DEFAULT_PAID_BUDGET_CENTS="${{ vars.RESEARCH_DEFAULT_PAID_BUDGET_CENTS }}" \
-                -e RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS="${{ vars.RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS }}" \
-                -e RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS="${{ vars.RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS }}" \
-                -e RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS="${{ vars.RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS }}" \
-                -e RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL="${{ vars.RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL }}" \
-                -e RESEARCH_MAX_CONCURRENCY_FANOUT="${{ vars.RESEARCH_MAX_CONCURRENCY_FANOUT }}" \
-                -e RESEARCH_CONFIRM_THRESHOLD_FANOUT="${{ vars.RESEARCH_CONFIRM_THRESHOLD_FANOUT }}" \
                 .
             else
               # First-time: create an explicitly-named service, then attach
@@ -221,7 +203,6 @@ jobs:
                 -e STORAGE_ACCESS_KEY_ID="${{ secrets.STORAGE_ACCESS_KEY_ID }}" \
                 -e STORAGE_SECRET_ACCESS_KEY="${{ secrets.STORAGE_SECRET_ACCESS_KEY }}" \
                 -e STORAGE_BUCKET="${{ vars.STORAGE_BUCKET }}" \
-                -e EMAIL_PROVIDER="${{ vars.EMAIL_PROVIDER }}" \
                 -e EMAIL_CREDENTIAL_KEY="${{ secrets.EMAIL_CREDENTIAL_KEY }}" \
                 -e EMAIL_PROVIDER_TRANSACTIONAL="${{ vars.EMAIL_PROVIDER_TRANSACTIONAL }}" \
                 -e EMAIL_API_KEY_TRANSACTIONAL="${{ secrets.EMAIL_API_KEY_TRANSACTIONAL }}" \
@@ -229,37 +210,20 @@ jobs:
                 -e CALENDAR_PROVIDER="${{ vars.CALENDAR_PROVIDER }}" \
                 -e CALENDAR_API_KEY="${{ secrets.CALENDAR_API_KEY }}" \
                 -e CALENDAR_WEBHOOK_SECRET="${{ secrets.CALENDAR_WEBHOOK_SECRET }}" \
-                -e GEOCODER_PROVIDER="${{ vars.GEOCODER_PROVIDER }}" \
                 -e RESEARCH_PROVIDER_SEARCH="${{ vars.RESEARCH_PROVIDER_SEARCH }}" \
                 -e RESEARCH_PROVIDER_SCRAPE="${{ vars.RESEARCH_PROVIDER_SCRAPE }}" \
                 -e RESEARCH_PROVIDER_EXTRACT="${{ vars.RESEARCH_PROVIDER_EXTRACT }}" \
-                -e RESEARCH_PROVIDER_DISCOVER="${{ vars.RESEARCH_PROVIDER_DISCOVER }}" \
                 -e RESEARCH_PROVIDER_REGISTRY_ES="${{ vars.RESEARCH_PROVIDER_REGISTRY_ES }}" \
-                -e RESEARCH_PROVIDER_REPORT_ES="${{ vars.RESEARCH_PROVIDER_REPORT_ES }}" \
                 -e RESEARCH_LLM_AGENT_PROVIDERS="${{ vars.RESEARCH_LLM_AGENT_PROVIDERS }}" \
-                -e RESEARCH_LLM_AGENT_MODEL="${{ vars.RESEARCH_LLM_AGENT_MODEL }}" \
-                -e RESEARCH_LLM_AGENT_BASE_URL="${{ vars.RESEARCH_LLM_AGENT_BASE_URL }}" \
                 -e RESEARCH_LLM_AGENT_API_KEY="${{ secrets.RESEARCH_LLM_AGENT_API_KEY }}" \
                 -e RESEARCH_LLM_EXTRACT_PROVIDERS="${{ vars.RESEARCH_LLM_EXTRACT_PROVIDERS }}" \
-                -e RESEARCH_LLM_EXTRACT_MODEL="${{ vars.RESEARCH_LLM_EXTRACT_MODEL }}" \
-                -e RESEARCH_LLM_EXTRACT_BASE_URL="${{ vars.RESEARCH_LLM_EXTRACT_BASE_URL }}" \
                 -e RESEARCH_LLM_EXTRACT_API_KEY="${{ secrets.RESEARCH_LLM_EXTRACT_API_KEY }}" \
                 -e RESEARCH_LLM_WRITER_PROVIDERS="${{ vars.RESEARCH_LLM_WRITER_PROVIDERS }}" \
-                -e RESEARCH_LLM_WRITER_MODEL="${{ vars.RESEARCH_LLM_WRITER_MODEL }}" \
-                -e RESEARCH_LLM_WRITER_BASE_URL="${{ vars.RESEARCH_LLM_WRITER_BASE_URL }}" \
                 -e RESEARCH_LLM_WRITER_API_KEY="${{ secrets.RESEARCH_LLM_WRITER_API_KEY }}" \
                 -e RESEARCH_API_KEY_SEARCH="${{ secrets.RESEARCH_API_KEY_SEARCH }}" \
                 -e RESEARCH_API_KEY_SCRAPE="${{ secrets.RESEARCH_API_KEY_SCRAPE }}" \
                 -e RESEARCH_API_KEY_EXTRACT="${{ secrets.RESEARCH_API_KEY_EXTRACT }}" \
                 -e RESEARCH_API_KEY_REGISTRY_ES="${{ secrets.RESEARCH_API_KEY_REGISTRY_ES }}" \
-                -e RESEARCH_DEFAULT_BUDGET_CENTS="${{ vars.RESEARCH_DEFAULT_BUDGET_CENTS }}" \
-                -e RESEARCH_DEFAULT_PAID_BUDGET_CENTS="${{ vars.RESEARCH_DEFAULT_PAID_BUDGET_CENTS }}" \
-                -e RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS="${{ vars.RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS }}" \
-                -e RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS="${{ vars.RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS }}" \
-                -e RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS="${{ vars.RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS }}" \
-                -e RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL="${{ vars.RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL }}" \
-                -e RESEARCH_MAX_CONCURRENCY_FANOUT="${{ vars.RESEARCH_MAX_CONCURRENCY_FANOUT }}" \
-                -e RESEARCH_CONFIRM_THRESHOLD_FANOUT="${{ vars.RESEARCH_CONFIRM_THRESHOLD_FANOUT }}" \
                 .
             fi
 
