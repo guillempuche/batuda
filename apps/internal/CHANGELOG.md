@@ -3,6 +3,47 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-06-26 (internal-v2026.6.26)
+
+### Features
+
+* expose lookup_registry as a standalone MCP tool ([e8518e9](https://github.com/guillempuche/batuda/commit/e8518e9398f9329346694e03e660a6564abc3a0d))
+* **internal:** auto-bind org at consent and show multi-org connections ([fe8f764](https://github.com/guillempuche/batuda/commit/fe8f7644c9cd2b83ea1bb4dfed01317c8c08e139))
+* **internal:** inline invitations on the organization members page ([7d419f6](https://github.com/guillempuche/batuda/commit/7d419f6d76f924ff9e5c0ab485bf0fcb85d8114b))
+* **research:** add Firecrawl scrape and extract providers ([0a7c543](https://github.com/guillempuche/batuda/commit/0a7c5431b6c788b56c80739892948b1f81c662da))
+* **research:** add LibreBOR registry adapter ([244d590](https://github.com/guillempuche/batuda/commit/244d5904d881b888d67c6d66008864d6d02e93b4))
+* **research:** attribute scraped pages to the run ([4ee0976](https://github.com/guillempuche/batuda/commit/4ee0976fd99ec80d9bde3cd2fb544bd82468b9c2))
+* **research:** map location and sector onto the registry record ([cd85ddc](https://github.com/guillempuche/batuda/commit/cd85ddc264eca7272604458803dec1e20bd7e328))
+* **server:** support multiple orgs per MCP OAuth connection ([bf0c957](https://github.com/guillempuche/batuda/commit/bf0c957d1e46a29e00d08ea805ea0ac9f56767ac))
+* **ui:** add fluid prose typescale for long-form reading ([4b089fe](https://github.com/guillempuche/batuda/commit/4b089fe186e3700d1f0b8f73c89f5da05312b3b7))
+
+### Bug Fixes
+
+* **internal:** derive the dev client API origin on portless's port ([de18633](https://github.com/guillempuche/batuda/commit/de1863351b63c397a53e11ef57fc408fae62580c))
+* **internal:** make attachment downloads work in dev and worktrees ([7fb9391](https://github.com/guillempuche/batuda/commit/7fb93917518416dcc19c71733024e0bf2cc2a48c))
+* **internal:** point dev API proxy and e2e at portless's port ([c15445a](https://github.com/guillempuche/batuda/commit/c15445add78acc99d2274c0228824b156a271e45))
+* **internal:** update the API-keys list after create and delete ([89b7ce7](https://github.com/guillempuche/batuda/commit/89b7ce7e852b9dcbaa69d03e8065d2be6b589108))
+
+### Refactoring
+
+* remove starter instruction presets and source_preset_id column ([389bdaf](https://github.com/guillempuche/batuda/commit/389bdaf7591c03b78fc0d3b4403bdec36d2d3f19))
+
+### Tests
+
+* **internal:** assert the seeded message shape in thread-render ([9e8850a](https://github.com/guillempuche/batuda/commit/9e8850ae556569eb6a470b29df1f8025a6042894))
+* **internal:** point the email e2e suite at the GreenMail catcher ([0615301](https://github.com/guillempuche/batuda/commit/06153015b24b9f4a747c78dffc85f65ad03c5a5c))
+* **internal:** stabilize the rich-compose and send-email e2e specs ([2cec8af](https://github.com/guillempuche/batuda/commit/2cec8af22a665de76debf65d0a20d764398faa63))
+* **research:** cover the Firecrawl adapters and HTTP hardener ([02b04c9](https://github.com/guillempuche/batuda/commit/02b04c93cea7fada9a8f726c0769e876249035ae))
+
+### CI/CD
+
+* make the Start plugin the single source for the route tree ([3d1cd9b](https://github.com/guillempuche/batuda/commit/3d1cd9b04f1d7ce5c7e314643541cd68d6966e01))
+* **release:** ui v2026.6.18 ([f8992d8](https://github.com/guillempuche/batuda/commit/f8992d843f1c08e94e503b8900c221039e13a63a))
+
+### Chores
+
+* **internal:** stop i18n catalog line-number churn ([ba736eb](https://github.com/guillempuche/batuda/commit/ba736eb718e2df9dfdffcdf894fbd6d964055916))
+
 ## 2026-06-15 (internal-v2026.6.15)
 
 ### Features
