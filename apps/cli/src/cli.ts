@@ -29,6 +29,7 @@ import { servicesDown, servicesStatus, servicesUp } from './commands/services'
 import { appendEnvKeys, resetEnvFile, setup } from './commands/setup'
 import {
 	worktreeDoctor,
+	worktreeDone,
 	worktreeDown,
 	worktreeLs,
 	worktreePrune,
@@ -557,6 +558,33 @@ const worktreeDownCommand = Command.make('down', {}, () => worktreeDown).pipe(
 	),
 )
 
+const worktreeDoneCommand = Command.make(
+	'done',
+	{
+		force: Flag.boolean('force').pipe(
+			Flag.withDescription(
+				'Ignore a dirty working tree and force branch/worktree removal',
+			),
+			Flag.withDefault(false),
+		),
+		stash: Flag.boolean('stash').pipe(
+			Flag.withDescription(
+				'Stash uncommitted changes before cleanup, then pop them on main',
+			),
+			Flag.withDefault(false),
+		),
+	},
+	({ force, stash }) => worktreeDone({ force, stash }),
+).pipe(
+	Command.withShortDescription('Finish a feature branch / linked worktree'),
+	Command.withDescription(
+		'Clean up after a merged PR: drop the worktree data, remove a linked ' +
+			'worktree directory, and delete the local feature branch. From the main ' +
+			'checkout it just checks out main, pulls, and deletes the branch. ' +
+			'Fails if the working tree is dirty unless --stash or --force is passed.',
+	),
+)
+
 const worktreePruneCommand = Command.make(
 	'prune',
 	{
@@ -616,6 +644,7 @@ const worktreeCommand = Command.make('worktree').pipe(
 	Command.withSubcommands([
 		worktreeUpCommand,
 		worktreeDownCommand,
+		worktreeDoneCommand,
 		worktreePruneCommand,
 		worktreeLsCommand,
 		worktreeDoctorCommand,
