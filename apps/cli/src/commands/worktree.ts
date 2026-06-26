@@ -109,6 +109,22 @@ export const isLinkedWorktree = Effect.gen(function* () {
 	return gitDir !== resolve(main, '.git')
 })
 
+const workingTreeClean = execSilent('git', 'status', '--porcelain').pipe(
+	Effect.map(out => out.trim() === ''),
+)
+
+const branchExists = (branch: string) =>
+	execSilent(
+		'git',
+		'show-ref',
+		'--verify',
+		'--quiet',
+		`refs/heads/${branch}`,
+	).pipe(
+		Effect.map(() => true),
+		Effect.catch(() => Effect.succeed(false)),
+	)
+
 const branchName = execSilent('git', 'rev-parse', '--abbrev-ref', 'HEAD')
 
 const slugForCurrentWorktree = branchName.pipe(Effect.map(slugForBranch))
@@ -418,6 +434,89 @@ export const worktreeDown = Effect.gen(function* () {
 	)
 	yield* Console.log(`✓ Removed ${db} and ${bucket} (shared stack untouched).`)
 })
+
+export const worktreeDone = (options: { force: boolean; stash: boolean }) =>
+	Effect.gen(function* () {
+		const { force, stash } = options
+		let didStash = false
+		const clean = yield* workingTreeClean
+
+		if (!clean) {
+			if (stash) {
+				yield* exec('git', 'stash', 'push', '-u', '-m', 'batuda-worktree-done')
+				didStash = true
+				yield* Console.log('✓ Stashed uncommitted changes')
+			} else if (!force) {
+				return yield* Effect.fail(
+					new Error(
+						'Working tree is not clean. Stash with --stash, commit manually, or pass --force to discard.',
+					),
+				)
+			}
+		}
+
+		const linked = yield* isLinkedWorktree
+		const mainRoot = yield* mainCheckoutRoot()
+
+		if (linked) {
+			const branch = yield* branchName
+			const worktreePath = resolve(
+				yield* execSilent('git', 'rev-parse', '--show-toplevel'),
+			)
+			yield* Console.log(
+				`Finishing linked worktree ${worktreePath} (branch ${branch})...`,
+			)
+
+			yield* worktreeDown
+
+			// Move to the main checkout before deleting the worktree directory,
+			// otherwise subsequent git commands would run from a deleted cwd.
+			process.chdir(mainRoot)
+			const removeArgs = force
+				? ['worktree', 'remove', '--force', worktreePath]
+				: ['worktree', 'remove', worktreePath]
+			yield* execIn(mainRoot, 'git', ...removeArgs)
+			yield* Console.log('✓ Removed linked worktree directory')
+
+			yield* execIn(mainRoot, 'git', 'checkout', 'main')
+			yield* execIn(mainRoot, 'git', 'pull', '--prune')
+
+			if (yield* branchExists(branch)) {
+				const deleteArgs = force
+					? ['branch', '-D', branch]
+					: ['branch', '-d', branch]
+				yield* execIn(mainRoot, 'git', ...deleteArgs)
+				yield* Console.log(`✓ Deleted local branch ${branch}`)
+			}
+		} else {
+			const branch = yield* branchName
+			if (branch === 'main') {
+				return yield* Effect.fail(
+					new Error(
+						'Already on the main branch. Run this from a feature branch or linked worktree.',
+					),
+				)
+			}
+			yield* Console.log(`Finishing feature branch ${branch}...`)
+			yield* exec('git', 'checkout', 'main')
+			yield* exec('git', 'pull', '--prune')
+
+			if (yield* branchExists(branch)) {
+				const deleteArgs = force
+					? ['branch', '-D', branch]
+					: ['branch', '-d', branch]
+				yield* exec('git', ...deleteArgs)
+				yield* Console.log(`✓ Deleted local branch ${branch}`)
+			}
+		}
+
+		yield* Console.log('✓ Done')
+
+		if (didStash) {
+			yield* exec('git', 'stash', 'pop')
+			yield* Console.log('✓ Popped stash')
+		}
+	})
 
 // Dry-run by default: list the orphans and stop. `--yes` is required to drop,
 // so prune can never silently delete data — and because ownership is read from
