@@ -1,12 +1,14 @@
+import { CheckboxGroup } from '@base-ui/react/checkbox-group'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { KeyRound } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 
-import { PriButton } from '@batuda/ui/pri'
+import { PriButton, PriCheckbox } from '@batuda/ui/pri'
 
 import { apiBaseUrl } from '#/lib/api-base'
+import { authClient } from '#/lib/auth-client'
 import { agedPaperSurface, stenciledTitle } from '#/lib/workshop-mixins'
 
 /**
@@ -15,6 +17,12 @@ import { agedPaperSurface, stenciledTitle } from '#/lib/workshop-mixins'
  * browser next — back to the assistant, now connected. The request is read
  * straight from the URL, untouched: it is signed, so any edit (even reordering)
  * would void it, and the router's parsed search would drop parts of it.
+ *
+ * Organization binding happens here, not later: a single-org user is auto-bound
+ * (no selector); a multi-org user must select one or more orgs before Allow.
+ * The binding is written through `/v1/mcp-oauth/select-orgs` before the
+ * consent POST, so the connection is usable the moment the assistant gets its
+ * code — no trip to /settings/mcp/connections first.
  */
 
 export const Route = createFileRoute('/oauth/consent')({
@@ -35,12 +43,40 @@ function ConsentPage() {
 	const [submitting, setSubmitting] = useState<'allow' | 'deny' | null>(null)
 	const [error, setError] = useState<string | null>(null)
 
+	const orgs = authClient.useListOrganizations()
+	const memberships = orgs.data ?? []
+	const isMultiOrg = memberships.length > 1
+	// The selected org ids, managed by BaseUI's CheckboxGroup. Pre-check all
+	// by default (the common "authorize everywhere" case is one click). The
+	// group's value is an array directly — the shape the API payload needs.
+	const allOrgIds = memberships.map(o => o.id)
+	const [selectedOrgIds, setSelectedOrgIds] = useState<string[]>(allOrgIds)
+	// Seed once when the org list first loads (it arrives async). A ref guard
+	// prevents re-seeding after the user deliberately unchecks everything.
+	const seededRef = useRef(false)
+	useEffect(() => {
+		if (!seededRef.current && allOrgIds.length > 0) {
+			seededRef.current = true
+			setSelectedOrgIds(allOrgIds)
+		}
+	}, [allOrgIds])
+
 	const scopes = scope.split(' ').filter(Boolean)
 
 	const respond = async (accept: boolean) => {
 		setSubmitting(accept ? 'allow' : 'deny')
 		setError(null)
 		try {
+			// For multi-org, validate the selection before anything hits the
+			// server — no point calling consent if there's nothing to bind.
+			if (accept && isMultiOrg && selectedOrgIds.length === 0) {
+				setSubmitting(null)
+				setError(t`Select at least one organization before allowing.`)
+				return
+			}
+			// Consent first: Better Auth validates the signed oauth_query and
+			// issues the authorization code. If the query is expired or
+			// tampered, we bail before writing any binding — no orphan rows.
 			const res = await fetch(`${apiBaseUrl()}/auth/oauth2/consent`, {
 				method: 'POST',
 				credentials: 'include',
@@ -58,6 +94,28 @@ function ConsentPage() {
 				return
 			}
 			const data = (await res.json()) as { url?: string }
+			// Bind orgs after consent succeeds but before redirecting, so the
+			// connection is usable the instant the assistant exchanges the
+			// code for a token. Single-org: auto-bind the lone org. Multi-org:
+			// bind the selected set.
+			if (accept) {
+				const orgIds = isMultiOrg
+					? selectedOrgIds
+					: memberships.length === 1
+						? [memberships[0]!.id]
+						: []
+				if (orgIds.length > 0) {
+					await fetch(`${apiBaseUrl()}/v1/mcp-oauth/select-orgs`, {
+						method: 'POST',
+						credentials: 'include',
+						headers: { 'content-type': 'application/json' },
+						body: JSON.stringify({
+							clientId: client_id,
+							organizationIds: orgIds,
+						}),
+					})
+				}
+			}
 			if (data.url) {
 				// Send the browser back to the assistant — connected, or
 				// told it was declined.
@@ -134,6 +192,37 @@ function ConsentPage() {
 						</ScopeList>
 					</Scopes>
 				) : null}
+				{isMultiOrg ? (
+					<OrgSection data-testid='oauth-consent-orgs'>
+						<ClientLabel>
+							<Trans>Organizations</Trans>
+						</ClientLabel>
+						<CheckboxGroup
+							value={selectedOrgIds}
+							onValueChange={setSelectedOrgIds}
+						>
+							<OrgList>
+								{memberships.map(org => (
+									<OrgRow key={org.id}>
+										<PriCheckbox.Root
+											name={org.id}
+											data-testid={`oauth-consent-org-${org.slug}`}
+										>
+											<PriCheckbox.Indicator />
+										</PriCheckbox.Root>
+										<OrgName>{org.name}</OrgName>
+									</OrgRow>
+								))}
+							</OrgList>
+						</CheckboxGroup>
+						<OrgHint>
+							<Trans>
+								Pick one or more. The assistant will ask which to use per
+								request.
+							</Trans>
+						</OrgHint>
+					</OrgSection>
+				) : null}
 				{error ? (
 					<ErrorText role='alert' data-testid='oauth-consent-error'>
 						{error}
@@ -154,7 +243,11 @@ function ConsentPage() {
 					<PriButton
 						type='button'
 						$variant='filled'
-						disabled={submitting !== null}
+						disabled={
+							submitting !== null ||
+							orgs.isPending ||
+							(isMultiOrg && selectedOrgIds.length === 0)
+						}
 						data-testid='oauth-consent-allow'
 						onClick={() => {
 							void respond(true)
@@ -260,6 +353,40 @@ const ScopeItem = styled.li.withConfig({ displayName: 'ConsentScopeItem' })`
 	border-radius: var(--shape-3xs);
 	background: color-mix(in oklab, var(--color-on-surface) 8%, transparent);
 	color: var(--color-on-surface);
+`
+
+const OrgSection = styled.div.withConfig({ displayName: 'ConsentOrgSection' })`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2xs);
+`
+
+const OrgList = styled.div.withConfig({ displayName: 'ConsentOrgList' })`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2xs);
+`
+
+const OrgRow = styled.label.withConfig({ displayName: 'ConsentOrgRow' })`
+	display: flex;
+	align-items: center;
+	gap: var(--space-2xs);
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-medium-size);
+	color: var(--color-on-surface);
+	cursor: pointer;
+`
+
+const OrgName = styled.span.withConfig({ displayName: 'ConsentOrgName' })`
+	font-family: var(--font-body);
+`
+
+const OrgHint = styled.p.withConfig({ displayName: 'ConsentOrgHint' })`
+	margin: 0;
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	font-style: italic;
+	color: var(--color-on-surface-variant);
 `
 
 const ErrorText = styled.p.withConfig({ displayName: 'ConsentError' })`
