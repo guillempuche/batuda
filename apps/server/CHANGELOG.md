@@ -3,6 +3,30 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-06-26 (server-v2026.6.26)
+
+### Features
+
+* expose lookup_registry as a standalone MCP tool ([e8518e9](https://github.com/guillempuche/batuda/commit/e8518e9398f9329346694e03e660a6564abc3a0d))
+* **research:** add Firecrawl scrape and extract providers ([0a7c543](https://github.com/guillempuche/batuda/commit/0a7c5431b6c788b56c80739892948b1f81c662da))
+* **research:** add LibreBOR registry adapter ([244d590](https://github.com/guillempuche/batuda/commit/244d5904d881b888d67c6d66008864d6d02e93b4))
+* **research:** attribute scraped pages to the run ([4ee0976](https://github.com/guillempuche/batuda/commit/4ee0976fd99ec80d9bde3cd2fb544bd82468b9c2))
+* **research:** map location and sector onto the registry record ([cd85ddc](https://github.com/guillempuche/batuda/commit/cd85ddc264eca7272604458803dec1e20bd7e328))
+* **server:** support multiple orgs per MCP OAuth connection ([bf0c957](https://github.com/guillempuche/batuda/commit/bf0c957d1e46a29e00d08ea805ea0ac9f56767ac))
+
+### Bug Fixes
+
+* **server:** trust portless's assigned port in dev origins ([855db11](https://github.com/guillempuche/batuda/commit/855db1178d95173f60bdc04ffffa797ac456b338))
+
+### Refactoring
+
+* remove starter instruction presets and source_preset_id column ([389bdaf](https://github.com/guillempuche/batuda/commit/389bdaf7591c03b78fc0d3b4403bdec36d2d3f19))
+* **server:** drop the redundant ALLOWED_ORIGINS wildcard ([113496e](https://github.com/guillempuche/batuda/commit/113496e19ec1d66188c9d525ccd430387cb10b3d))
+
+### Tests
+
+* **research:** cover the Firecrawl adapters and HTTP hardener ([02b04c9](https://github.com/guillempuche/batuda/commit/02b04c93cea7fada9a8f726c0769e876249035ae))
+
 ## 2026-06-18 (server-v2026.6.18)
 
 ### Features
