@@ -45,10 +45,57 @@ fires the auto-provision/teardown hooks below.
 3. **Run** — `pnpm dev` → portless serves `https://<label>.batuda.localhost` (the branch's last path segment).
 4. **Inspect** — `pnpm cli worktree ls` (every worktree + its DB/URL/provisioned state),
    `pnpm cli worktree doctor` (deep health of the current one).
-5. **Tear down** — auto when **Claude** removes the worktree (the `WorktreeRemove` hook drops
-   the DB + bucket). Or `pnpm cli worktree down` — it drops the database + bucket recorded in
-   this worktree's `.env` (not re-derived from the live branch), so it stays correct even after
-   the branch is switched, e.g. by a PR merge (see Caveats).
+5. **Tear down / finish** — after the PR merges, run `pnpm cli worktree done` once to drop the data, remove the linked worktree, and clean up the local branch. For manual teardown run `pnpm cli worktree down` (DB + bucket only) and then `git worktree remove`. Auto when **Claude** removes the worktree (the `WorktreeRemove` hook drops the DB + bucket).
+
+## Post-merge / branch cleanup
+
+After the PR is merged:
+
+```bash
+pnpm cli worktree done
+```
+
+This one command detects whether it is running inside a linked worktree or the main checkout and does the safe cleanup:
+
+- linked worktree: drops DB + bucket, removes the worktree directory, checks out `main`, pulls, and deletes the local branch if it still exists.
+- main checkout: checks out `main`, pulls, and deletes the local feature branch.
+
+It refuses if the working tree is dirty; pass `--stash` to safely stash uncommitted changes and pop them on `main`, or `--force` to discard them.
+
+### What if the local branch still has changes?
+
+- **Uncommitted changes**: `worktree done` stops by default. Use `pnpm cli worktree done --stash` to stash them before cleanup and pop the stash on `main`. Alternatively, stash manually (`git stash`) and run `worktree done`, then `git stash pop` on `main`.
+- **Committed changes after a rebase-merge**: the local branch may no longer be an ancestor of `main` because the merge rewrote commits. `git branch -d` then reports "not fully merged". This is expected — the PR code is already on `main` with new hashes. Use `pnpm cli worktree done --force` (or `git branch -D <branch>`) after confirming you do not need the old local commits.
+- **Linked worktree with changes**: the worktree directory is removed, so any uncommitted changes inside it are lost unless stashed or committed first. Prefer `pnpm cli worktree done --stash`.
+
+### Manual fallback (tools without the CLI)
+
+If the tool cannot run `pnpm cli worktree done`, fall back to the manual sequences below.
+
+#### Main checkout
+
+```bash
+gh pr merge <branch> --rebase --delete-branch
+# then locally
+git checkout main
+git pull --prune
+git branch -d <branch>
+```
+
+If `git branch -d` complains the branch is not fully merged, confirm the PR is merged upstream and the local branch has been rebased/squashed, then use `git branch -D <branch>`.
+
+#### Linked worktree
+
+```bash
+cd .claude/worktrees/<name>
+gh pr merge --rebase --delete-branch   # GitHub checks main into this directory
+pnpm cli worktree down                 # drop this worktree's DB + bucket
+git worktree remove .claude/worktrees/<name>
+cd /path/to/main/checkout
+git pull --prune
+```
+
+If the directory was removed manually before `worktree down`, run `pnpm cli worktree prune` from the main checkout to find and drop the orphaned database + bucket.
 
 ## Commands (`pnpm cli worktree …`; run `--help` for flags)
 
