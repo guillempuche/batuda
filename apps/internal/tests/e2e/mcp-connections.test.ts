@@ -42,4 +42,31 @@ test.describe('OAuth consent', () => {
 		// THEN it explains there's nothing to authorize rather than a broken form
 		await expect(page.getByText(/nothing to authorize/i)).toBeVisible()
 	})
+
+	test('should show the org selector for a multi-org user when a client_id is present', async ({
+		page,
+	}) => {
+		// GIVEN Alice (multi-org: taller + restaurant) opens consent with a
+		// client_id. The signed oauth query is not validated client-side, so
+		// the form renders; the org selector appears because she has >1 org.
+		await page.goto('/oauth/consent?client_id=test-client', {
+			waitUntil: 'networkidle',
+		})
+
+		// THEN the consent card renders with the client id and an org selector
+		await expect(page.getByTestId('oauth-consent')).toBeVisible()
+		await expect(page.getByTestId('oauth-consent-client')).toHaveText(
+			'test-client',
+		)
+		await expect(page.getByTestId('oauth-consent-orgs')).toBeVisible()
+		// Both orgs are listed and pre-checked (authorize-everywhere default).
+		await expect(page.getByTestId('oauth-consent-org-taller')).toBeChecked()
+		await expect(page.getByTestId('oauth-consent-org-restaurant')).toBeChecked()
+
+		// AND unchecking one disables Allow until at least one is selected
+		await page.getByTestId('oauth-consent-org-taller').uncheck()
+		await expect(page.getByTestId('oauth-consent-allow')).toBeEnabled()
+		await page.getByTestId('oauth-consent-org-restaurant').uncheck()
+		await expect(page.getByTestId('oauth-consent-allow')).toBeDisabled()
+	})
 })

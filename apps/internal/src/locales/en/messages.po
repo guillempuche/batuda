@@ -276,8 +276,8 @@ msgid "Agent"
 msgstr "Agent"
 
 #: src/routes/settings/mcp/connections.tsx
-msgid "AI assistants you've connected over MCP. Choose which organization each one acts in."
-msgstr "AI assistants you've connected over MCP. Choose which organization each one acts in."
+msgid "AI assistants you've connected over MCP. Each may act in one or more of your organizations; the assistant picks which per request."
+msgstr "AI assistants you've connected over MCP. Each may act in one or more of your organizations; the assistant picks which per request."
 
 #: src/routes/companies/index.tsx
 #: src/routes/emails/index.tsx
@@ -565,10 +565,6 @@ msgstr "Check the session or try again."
 #: src/routes/login.tsx
 msgid "Check your inbox"
 msgstr "Check your inbox"
-
-#: src/routes/settings/mcp/connections.tsx
-msgid "Choose organization"
-msgstr "Choose organization"
 
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
@@ -2145,6 +2141,10 @@ msgstr "No org templates yet."
 msgid "No org templates yet. Create one or accept a member's proposal."
 msgstr "No org templates yet. Create one or accept a member's proposal."
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "No organization selected"
+msgstr "No organization selected"
+
 #: src/routes/index.tsx
 msgid "No overdue tasks, no pending follow-ups, no neglected companies."
 msgstr "No overdue tasks, no pending follow-ups, no neglected companies."
@@ -2173,6 +2173,10 @@ msgstr "No products linked yet"
 #: src/routes/settings/organization/templates.tsx
 msgid "No proposals waiting for review."
 msgstr "No proposals waiting for review."
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "No redirect URI"
+msgstr "No redirect URI"
 
 #: src/components/research/run-list.tsx
 msgid "No research runs yet for this company."
@@ -2358,16 +2362,13 @@ msgstr "Organization"
 msgid "Organization default"
 msgstr "Organization default"
 
-#. placeholder {0}: row.name ?? t`Unnamed client`
 #: src/routes/settings/mcp/connections.tsx
-msgid "Organization for {0}"
-msgstr "Organization for {0}"
-
-#: src/routes/settings/mcp/connections.tsx
-msgid "Organization updated"
-msgstr "Organization updated"
+msgid "Organization removed"
+msgstr "Organization removed"
 
 #: src/components/layout/org-switcher.tsx
+#: src/routes/oauth/consent.tsx
+#: src/routes/settings/mcp/connections.tsx
 msgid "Organizations"
 msgstr "Organizations"
 
@@ -2530,6 +2531,10 @@ msgstr "Pick a provider"
 #: src/routes/emails/index.tsx
 msgid "Pick an organization from the switcher in the header, or sign out and back in. After a recent dev DB reset, existing sessions can point at organization ids that the reset removed."
 msgstr "Pick an organization from the switcher in the header, or sign out and back in. After a recent dev DB reset, existing sessions can point at organization ids that the reset removed."
+
+#: src/routes/oauth/consent.tsx
+msgid "Pick one or more. The assistant will ask which to use per request."
+msgstr "Pick one or more. The assistant will ask which to use per request."
 
 #: src/routes/emails/inboxes.tsx
 msgid "Pick one to use as your default sender."
@@ -2724,8 +2729,10 @@ msgstr "Remove \"{0}\" from your default first, then delete it."
 
 #. placeholder {0}: att.filename
 #. placeholder {0}: o.name
+#. placeholder {0}: orgNameById.get(orgId) ?? orgId
 #: src/components/emails/attachment-picker.tsx
 #: src/components/instructions/stack-picker.tsx
+#: src/routes/settings/mcp/connections.tsx
 msgid "Remove {0}"
 msgstr "Remove {0}"
 
@@ -2922,6 +2929,10 @@ msgstr "See who can access this workspace, invite teammates, and manage pending 
 msgid "Select all threads on this page"
 msgstr "Select all threads on this page"
 
+#: src/routes/oauth/consent.tsx
+msgid "Select at least one organization before allowing."
+msgstr "Select at least one organization before allowing."
+
 #: src/components/emails/compose-form.tsx
 msgid "Select inbox…"
 msgstr "Select inbox…"
@@ -2942,15 +2953,6 @@ msgstr "Select thread {0}"
 #: src/routes/emails/inboxes.tsx
 msgid "Selecting a preset fills IMAP and SMTP defaults — you can still edit them."
 msgstr "Selecting a preset fills IMAP and SMTP defaults — you can still edit them."
-
-#: src/routes/settings/mcp/connections.tsx
-msgid "Self-reported name"
-msgstr "Self-reported name"
-
-#. placeholder {0}: row.redirectHost
-#: src/routes/settings/mcp/connections.tsx
-msgid "Self-reported name · sends you to {0}"
-msgstr "Self-reported name · sends you to {0}"
 
 #: src/components/emails/compose-form.tsx
 msgid "Send"
@@ -2976,12 +2978,21 @@ msgstr "Send invitation"
 msgid "Send reset link"
 msgstr "Send reset link"
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "Send X-Batuda-Organization-Id with each request to pick."
+msgstr "Send X-Batuda-Organization-Id with each request to pick."
+
 #: src/components/emails/compose-form.tsx
 #: src/routes/forgot-password.tsx
 #: src/routes/login.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Sending…"
 msgstr "Sending…"
+
+#. placeholder {0}: row.redirectHost
+#: src/routes/settings/mcp/connections.tsx
+msgid "Sends you to {0}"
+msgstr "Sends you to {0}"
 
 #: src/routes/emails/$threadId.tsx
 #: src/routes/settings/organization/members.tsx
@@ -3410,8 +3421,8 @@ msgid "They replied — keep the thread warm"
 msgstr "They replied — keep the thread warm"
 
 #: src/routes/settings/mcp/connections.tsx
-msgid "This connection now acts in the chosen organization."
-msgstr "This connection now acts in the chosen organization."
+msgid "This connection is unbound. Bind an org to use it."
+msgstr "This connection is unbound. Bind an org to use it."
 
 #: src/routes/accept-invitation.$id.tsx
 msgid "This invitation can't be accepted"
@@ -3530,7 +3541,6 @@ msgstr "Unknown user"
 msgid "Unlinked"
 msgstr "Unlinked"
 
-#: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
 msgid "Unnamed client"
 msgstr "Unnamed client"

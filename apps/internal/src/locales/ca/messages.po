@@ -276,8 +276,8 @@ msgid "Agent"
 msgstr "Agent"
 
 #: src/routes/settings/mcp/connections.tsx
-msgid "AI assistants you've connected over MCP. Choose which organization each one acts in."
-msgstr "Assistents d'IA que has connectat per MCP. Tria en quina organització actua cadascun."
+msgid "AI assistants you've connected over MCP. Each may act in one or more of your organizations; the assistant picks which per request."
+msgstr "Assistents d'IA que has connectat per MCP. Cadascun pot actuar en una o més de les teves organitzacions; l'assistent tria quina en cada petició."
 
 #: src/routes/companies/index.tsx
 #: src/routes/emails/index.tsx
@@ -565,10 +565,6 @@ msgstr "Comprova la sessió o torna-ho a provar."
 #: src/routes/login.tsx
 msgid "Check your inbox"
 msgstr "Mira la safata d'entrada"
-
-#: src/routes/settings/mcp/connections.tsx
-msgid "Choose organization"
-msgstr "Tria una organització"
 
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
@@ -2145,6 +2141,10 @@ msgstr "Encara no hi ha plantilles d'organització."
 msgid "No org templates yet. Create one or accept a member's proposal."
 msgstr "Encara no hi ha plantilles d'organització. Crea'n una o accepta una proposta d'un membre."
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "No organization selected"
+msgstr "Cap organització seleccionada"
+
 #: src/routes/index.tsx
 msgid "No overdue tasks, no pending follow-ups, no neglected companies."
 msgstr "Sense tasques endarrerides, sense seguiments pendents, sense empreses oblidades."
@@ -2173,6 +2173,10 @@ msgstr "Encara sense productes vinculats"
 #: src/routes/settings/organization/templates.tsx
 msgid "No proposals waiting for review."
 msgstr "No hi ha cap proposta pendent de revisió."
+
+#: src/routes/settings/mcp/connections.tsx
+msgid "No redirect URI"
+msgstr "Sense URI de redirecció"
 
 #: src/components/research/run-list.tsx
 msgid "No research runs yet for this company."
@@ -2358,16 +2362,13 @@ msgstr "Organització"
 msgid "Organization default"
 msgstr "Valor per defecte de l'organització"
 
-#. placeholder {0}: row.name ?? t`Unnamed client`
 #: src/routes/settings/mcp/connections.tsx
-msgid "Organization for {0}"
-msgstr "Organització per a {0}"
-
-#: src/routes/settings/mcp/connections.tsx
-msgid "Organization updated"
-msgstr "Organització actualitzada"
+msgid "Organization removed"
+msgstr "Organització eliminada"
 
 #: src/components/layout/org-switcher.tsx
+#: src/routes/oauth/consent.tsx
+#: src/routes/settings/mcp/connections.tsx
 msgid "Organizations"
 msgstr "Organitzacions"
 
@@ -2530,6 +2531,10 @@ msgstr "Tria un proveïdor"
 #: src/routes/emails/index.tsx
 msgid "Pick an organization from the switcher in the header, or sign out and back in. After a recent dev DB reset, existing sessions can point at organization ids that the reset removed."
 msgstr "Tria una organització al selector de la barra superior, o tanca la sessió i torna a entrar. Després d'un reset recent de la base de dades de dev, les sessions existents poden apuntar a identificadors d'organització que el reset ha esborrat."
+
+#: src/routes/oauth/consent.tsx
+msgid "Pick one or more. The assistant will ask which to use per request."
+msgstr "Tria'n una o més. L'assistent demanarà quina fer servir en cada petició."
 
 #: src/routes/emails/inboxes.tsx
 msgid "Pick one to use as your default sender."
@@ -2724,8 +2729,10 @@ msgstr "Treu «{0}» del teu valor per defecte primer i després elimina-la."
 
 #. placeholder {0}: att.filename
 #. placeholder {0}: o.name
+#. placeholder {0}: orgNameById.get(orgId) ?? orgId
 #: src/components/emails/attachment-picker.tsx
 #: src/components/instructions/stack-picker.tsx
+#: src/routes/settings/mcp/connections.tsx
 msgid "Remove {0}"
 msgstr "Elimina {0}"
 
@@ -2922,6 +2929,10 @@ msgstr "Veure qui té accés a aquest espai de treball, convida companys i gesti
 msgid "Select all threads on this page"
 msgstr "Selecciona tots els fils d'aquesta pàgina"
 
+#: src/routes/oauth/consent.tsx
+msgid "Select at least one organization before allowing."
+msgstr "Selecciona almenys una organització abans d'autoritzar."
+
 #: src/components/emails/compose-form.tsx
 msgid "Select inbox…"
 msgstr "Tria una safata…"
@@ -2942,15 +2953,6 @@ msgstr "Selecciona el fil {0}"
 #: src/routes/emails/inboxes.tsx
 msgid "Selecting a preset fills IMAP and SMTP defaults — you can still edit them."
 msgstr "Triar un preestablit omple els paràmetres IMAP i SMTP — encara els pots editar."
-
-#: src/routes/settings/mcp/connections.tsx
-msgid "Self-reported name"
-msgstr "Nom autodeclarat"
-
-#. placeholder {0}: row.redirectHost
-#: src/routes/settings/mcp/connections.tsx
-msgid "Self-reported name · sends you to {0}"
-msgstr "Nom autodeclarat · t'envia a {0}"
 
 #: src/components/emails/compose-form.tsx
 msgid "Send"
@@ -2976,12 +2978,21 @@ msgstr "Envia invitació"
 msgid "Send reset link"
 msgstr "Envia l'enllaç"
 
+#: src/routes/settings/mcp/connections.tsx
+msgid "Send X-Batuda-Organization-Id with each request to pick."
+msgstr "Envia X-Batuda-Organization-Id amb cada petició per triar."
+
 #: src/components/emails/compose-form.tsx
 #: src/routes/forgot-password.tsx
 #: src/routes/login.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Sending…"
 msgstr "Enviant…"
+
+#. placeholder {0}: row.redirectHost
+#: src/routes/settings/mcp/connections.tsx
+msgid "Sends you to {0}"
+msgstr "T'envia a {0}"
 
 #: src/routes/emails/$threadId.tsx
 #: src/routes/settings/organization/members.tsx
@@ -3410,8 +3421,8 @@ msgid "They replied — keep the thread warm"
 msgstr "Ha respost — manté el fil calent"
 
 #: src/routes/settings/mcp/connections.tsx
-msgid "This connection now acts in the chosen organization."
-msgstr "Aquesta connexió ara actua en l'organització triada."
+msgid "This connection is unbound. Bind an org to use it."
+msgstr "Aquesta connexió no està vinculada. Vincula una organització per fer-la servir."
 
 #: src/routes/accept-invitation.$id.tsx
 msgid "This invitation can't be accepted"
@@ -3530,7 +3541,6 @@ msgstr "Usuari desconegut"
 msgid "Unlinked"
 msgstr "Sense enllaçar"
 
-#: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/connections.tsx
 msgid "Unnamed client"
 msgstr "Client sense nom"

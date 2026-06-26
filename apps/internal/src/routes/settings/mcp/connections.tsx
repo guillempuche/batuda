@@ -2,11 +2,11 @@ import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
-import { ArrowLeft, Check, ChevronsUpDown, Plug } from 'lucide-react'
+import { ArrowLeft, Plug, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import styled from 'styled-components'
 
-import { PriSelect, usePriToast } from '@batuda/ui/pri'
+import { PriButton, usePriToast } from '@batuda/ui/pri'
 
 import { authClient } from '#/lib/auth-client'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
@@ -18,16 +18,17 @@ import {
 
 /**
  * The AI assistants (ChatGPT, Claude.ai, …) a member has connected over MCP.
- * Belong to one organization and you never need this page — a connection just
- * acts in that org. Belong to several and you pick which org each assistant
- * acts in here; that choice is re-checked on every request it makes.
+ * Each connection may act in one or more organizations. Single-org users have
+ * their lone org auto-bound at consent time. Multi-org users pick one or more
+ * at consent time and can revise here; per-request org selection happens via
+ * the X-Batuda-Organization-Id header the MCP client sends.
  */
 
 type Connection = {
 	readonly clientId: string
 	readonly name: string | null
 	readonly createdAt: string
-	readonly organizationId: string | null
+	readonly organizationIds: ReadonlyArray<string>
 	readonly redirectHost: string | null
 }
 
@@ -38,27 +39,54 @@ export const Route = createFileRoute('/settings/mcp/connections')({
 	component: ConnectionsPage,
 })
 
+// Known MCP clients whose redirect host identifies them more usefully than the
+// self-asserted `oauthClient.name`. Lets the connections page show "ChatGPT"
+// rather than a generic library name when the host matches a known assistant.
+const KNOWN_CLIENTS: ReadonlyMap<string, string> = new Map([
+	['chatgpt.com', 'ChatGPT'],
+	['claude.ai', 'Claude'],
+	['chat.com', 'ChatGPT'],
+	['anthropic.com', 'Claude'],
+])
+
+// The connection's display title: the known-client name when the redirect
+// host matches (e.g. chatgpt.com → "ChatGPT"), else the self-reported name,
+// else a fallback. The redirect host is the trusted provenance signal;
+// the self-reported name is the fallback. Brand names from KNOWN_CLIENTS are
+// not translated; the fallback is wrapped at the call site with `t`.
+const connectionTitle = (
+	name: string | null,
+	redirectHost: string | null,
+	fallback: string,
+): string => {
+	if (redirectHost && KNOWN_CLIENTS.has(redirectHost)) {
+		return KNOWN_CLIENTS.get(redirectHost)!
+	}
+	return name ?? fallback
+}
+
 function ConnectionsPage() {
 	const { t } = useLingui()
 	const toastManager = usePriToast()
 
 	const listResult = useAtomValue(connectionsAtom)
 	const refreshList = useAtomRefresh(connectionsAtom)
-	const selectOrg = useAtomSet(
-		BatudaApiAtom.mutation('mcpOAuth', 'selectOrg'),
+	const selectOrgs = useAtomSet(
+		BatudaApiAtom.mutation('mcpOAuth', 'selectOrgs'),
 		{
 			mode: 'promiseExit',
 		},
 	)
 
 	const orgs = authClient.useListOrganizations()
-	const orgOptions = useMemo(
-		() => (orgs.data ?? []).map(o => ({ value: o.id, label: o.name })),
-		[orgs.data],
-	)
+	const orgNameById = useMemo(() => {
+		const map = new Map<string, string>()
+		for (const o of orgs.data ?? []) map.set(o.id, o.name)
+		return map
+	}, [orgs.data])
 
-	// The connection currently being saved, so its picker can disable until
-	// the save finishes and a second pick can't race it.
+	// The connection currently being saved, so its remove button can disable
+	// until the save finishes and a second remove can't race it.
 	const [savingId, setSavingId] = useState<string | null>(null)
 
 	const rows = useMemo<ReadonlyArray<Connection>>(
@@ -71,16 +99,29 @@ function ConnectionsPage() {
 	const isLoading = AsyncResult.isInitial(listResult)
 	const isFailure = AsyncResult.isFailure(listResult)
 
-	const handleSelect = async (clientId: string, organizationId: string) => {
-		setSavingId(clientId)
+	// Remove a single org from a connection's authorized set. Saves the
+	// remaining orgs (empty = unbind entirely). No-op on the last org is
+	// allowed — an unbound connection still works for single-org users via
+	// auto-resolution; for multi-org users the /mcp path will reject until
+	// they re-bind. Toast explains the per-request hint.
+	const handleRemoveOrg = async (
+		clientId: string,
+		organizationId: string,
+		currentOrgIds: ReadonlyArray<string>,
+	) => {
+		setSavingId(`${clientId}:${organizationId}`)
 		try {
-			const exit = await selectOrg({
-				payload: { clientId, organizationId },
+			const next = currentOrgIds.filter(id => id !== organizationId)
+			const exit = await selectOrgs({
+				payload: { clientId, organizationIds: next },
 			} as never)
 			if (exit._tag === 'Success') {
 				toastManager.add({
-					title: t`Organization updated`,
-					description: t`This connection now acts in the chosen organization.`,
+					title: t`Organization removed`,
+					description:
+						next.length === 0
+							? t`This connection is unbound. Bind an org to use it.`
+							: t`Send X-Batuda-Organization-Id with each request to pick.`,
 					type: 'success',
 				})
 				refreshList()
@@ -112,8 +153,8 @@ function ConnectionsPage() {
 				</Heading>
 				<Subtitle>
 					<Trans>
-						AI assistants you've connected over MCP. Choose which organization
-						each one acts in.
+						AI assistants you've connected over MCP. Each may act in one or more
+						of your organizations; the assistant picks which per request.
 					</Trans>
 				</Subtitle>
 			</Intro>
@@ -144,68 +185,58 @@ function ConnectionsPage() {
 						{rows.map(row => (
 							<ConnRow key={row.clientId} data-testid='mcp-connection-row'>
 								<ConnInfo>
-									<ConnName>{row.name ?? t`Unnamed client`}</ConnName>
+									<ConnName data-testid='mcp-connection-name'>
+										{connectionTitle(
+											row.name,
+											row.redirectHost,
+											t`Unnamed client`,
+										)}
+									</ConnName>
 									<ConnMeta>
 										<Trans>Connected {formatDate(row.createdAt)}</Trans>
 									</ConnMeta>
 									<ConnMeta>
 										{row.redirectHost
-											? t`Self-reported name · sends you to ${row.redirectHost}`
-											: t`Self-reported name`}
+											? t`Sends you to ${row.redirectHost}`
+											: t`No redirect URI`}
 									</ConnMeta>
 								</ConnInfo>
-								<PriSelect.Root
-									items={orgOptions}
-									value={row.organizationId ?? ''}
-									onValueChange={(value: string | null) => {
-										// Skip an empty, unchanged, or still-saving pick, so we
-										// never save the same choice twice.
-										if (
-											value &&
-											value !== row.organizationId &&
-											savingId !== row.clientId
-										) {
-											void handleSelect(row.clientId, value)
-										}
-									}}
-									disabled={
-										orgOptions.length === 0 || savingId === row.clientId
-									}
-								>
-									<SelectTrigger
-										data-testid='mcp-connection-org'
-										aria-label={t`Organization for ${row.name ?? t`Unnamed client`}`}
-									>
-										<PriSelect.Value>
-											{orgLabel(orgOptions, row.organizationId) ??
-												t`Choose organization`}
-										</PriSelect.Value>
-										<PriSelect.Icon>
-											<ChevronsUpDown size={12} aria-hidden />
-										</PriSelect.Icon>
-									</SelectTrigger>
-									<PriSelect.Portal>
-										<PriSelect.Positioner
-											alignItemWithTrigger={false}
-											sideOffset={6}
-										>
-											<PriSelect.Popup>
-												<PriSelect.List>
-													{orgOptions.map(opt => (
-														<PriSelect.Item key={opt.value} value={opt.value}>
-															<PriSelect.ItemIndicator>
-																<Check size={12} />
-															</PriSelect.ItemIndicator>
-															<PriSelect.ItemText>
-																{opt.label}
-															</PriSelect.ItemText>
-														</PriSelect.Item>
-													))}
-												</PriSelect.List>
-											</PriSelect.Popup>
-										</PriSelect.Positioner>
-									</PriSelect.Portal>
-								</PriSelect.Root>
+								<OrgsForConnection>
+									<OrgsLabel>
+										<Trans>Organizations</Trans>
+									</OrgsLabel>
+									{row.organizationIds.length === 0 ? (
+										<UnboundTag data-testid='mcp-connection-unbound'>
+											<Trans>No organization selected</Trans>
+										</UnboundTag>
+									) : (
+										<OrgChips>
+											{row.organizationIds.map(orgId => (
+												<OrgChip key={orgId} data-testid='mcp-connection-org'>
+													<OrgChipName>
+														{orgNameById.get(orgId) ?? orgId}
+													</OrgChipName>
+													<PriButton
+														type='button'
+														$variant='text'
+														aria-label={t`Remove ${orgNameById.get(orgId) ?? orgId}`}
+														data-testid='mcp-connection-org-remove'
+														disabled={savingId === `${row.clientId}:${orgId}`}
+														onClick={() => {
+															void handleRemoveOrg(
+																row.clientId,
+																orgId,
+																row.organizationIds,
+															)
+														}}
+													>
+														<X size={12} aria-hidden />
+													</PriButton>
+												</OrgChip>
+											))}
+										</OrgChips>
+									)}
+								</OrgsForConnection>
 							</ConnRow>
 						))}
 					</ConnList>
@@ -225,26 +256,21 @@ function narrowConnections(
 		const clientId = typeof r['clientId'] === 'string' ? r['clientId'] : null
 		const createdAt = typeof r['createdAt'] === 'string' ? r['createdAt'] : null
 		if (clientId === null || createdAt === null) continue
+		const organizationIdsRaw = r['organizationIds']
+		const organizationIds = Array.isArray(organizationIdsRaw)
+			? organizationIdsRaw.filter((id): id is string => typeof id === 'string')
+			: []
 		out.push({
 			clientId,
 			createdAt,
 			name: typeof r['name'] === 'string' ? r['name'] : null,
-			organizationId:
-				typeof r['organizationId'] === 'string' ? r['organizationId'] : null,
+			organizationIds,
 			redirectHost:
 				typeof r['redirectHost'] === 'string' ? r['redirectHost'] : null,
 		})
 	}
 	return out
 }
-
-const orgLabel = (
-	options: ReadonlyArray<{ value: string; label: string }>,
-	organizationId: string | null,
-): string | null =>
-	organizationId === null
-		? null
-		: (options.find(o => o.value === organizationId)?.label ?? null)
 
 function formatDate(iso: string): string {
 	const date = new Date(iso)
@@ -341,7 +367,7 @@ const ConnList = styled.ul.withConfig({ displayName: 'McpConnRows' })`
 
 const ConnRow = styled.li.withConfig({ displayName: 'McpConnRow' })`
 	display: flex;
-	align-items: center;
+	align-items: flex-start;
 	gap: var(--space-md);
 	flex-wrap: wrap;
 	padding: var(--space-sm) var(--space-md);
@@ -353,9 +379,9 @@ const ConnRow = styled.li.withConfig({ displayName: 'McpConnRow' })`
 const ConnInfo = styled.div.withConfig({ displayName: 'McpConnInfo' })`
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-2xs);
+	gap: var(--space-3xs);
 	flex: 1;
-	min-width: 0;
+	min-width: 12rem;
 `
 
 const ConnName = styled.span.withConfig({ displayName: 'McpConnName' })`
@@ -371,25 +397,58 @@ const ConnMeta = styled.span.withConfig({ displayName: 'McpConnMeta' })`
 	color: var(--color-on-surface-variant);
 `
 
-const SelectTrigger = styled(PriSelect.Trigger).withConfig({
-	displayName: 'McpConnSelectTrigger',
+const OrgsForConnection = styled.div.withConfig({
+	displayName: 'McpConnOrgs',
 })`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2xs);
+	flex: 1;
+	min-width: 12rem;
+`
+
+const OrgsLabel = styled.span.withConfig({ displayName: 'McpConnOrgsLabel' })`
+	font-family: var(--font-display);
+	font-size: var(--typescale-label-small-size);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--color-on-surface-variant);
+`
+
+const OrgChips = styled.div.withConfig({ displayName: 'McpConnOrgChips' })`
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-2xs);
+`
+
+const OrgChip = styled.span.withConfig({ displayName: 'McpConnOrgChip' })`
 	display: inline-flex;
 	align-items: center;
-	justify-content: space-between;
-	gap: var(--space-2xs);
-	min-width: 12rem;
-	padding: var(--space-2xs) var(--space-sm);
+	gap: var(--space-3xs);
+	padding: var(--space-3xs) var(--space-2xs);
 	border-radius: var(--shape-3xs);
-	border: 1px solid var(--color-outline);
-	background: var(--color-surface);
+	background: color-mix(in oklab, var(--color-primary) 10%, transparent);
+	border: 1px solid color-mix(in oklab, var(--color-primary) 25%, transparent);
+	color: var(--color-on-surface);
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
-	color: var(--color-on-surface);
-	cursor: pointer;
+`
 
-	&:disabled {
-		cursor: not-allowed;
-		opacity: 0.6;
-	}
+const OrgChipName = styled.span.withConfig({
+	displayName: 'McpConnOrgChipName',
+})`
+	font-weight: var(--typescale-label-medium-weight);
+`
+
+const UnboundTag = styled.span.withConfig({ displayName: 'McpConnUnbound' })`
+	display: inline-flex;
+	align-items: center;
+	padding: var(--space-3xs) var(--space-2xs);
+	border-radius: var(--shape-3xs);
+	background: color-mix(in srgb, var(--color-error) 8%, transparent);
+	border: 1px solid color-mix(in srgb, var(--color-error) 20%, transparent);
+	color: var(--color-error);
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	font-style: italic;
 `
