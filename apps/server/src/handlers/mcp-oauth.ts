@@ -15,13 +15,13 @@ export const McpOAuthLive = HttpApiBuilder.group(
 		Effect.gen(function* () {
 			const service = yield* McpOAuthService
 			return handlers
-				.handle('selectOrg', _ =>
+				.handle('selectOrgs', _ =>
 					Effect.gen(function* () {
 						const { userId } = yield* SessionContext
-						yield* service.selectOrg(
+						yield* service.selectOrgs(
 							userId,
 							_.payload.clientId,
-							_.payload.organizationId,
+							_.payload.organizationIds,
 						)
 					}),
 				)

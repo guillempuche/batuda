@@ -244,26 +244,27 @@ const McpAuthMiddleware = HttpRouter.middleware(
 								prmUrl,
 							)
 						}
-						// Read the caller's memberships (all their orgs) and their
-						// per-client selection under the resolver role: the user GUC's
-						// RLS confines both reads to this user even if a WHERE slips.
-						// enterUserScope returns plain values and commits before we
-						// enter org scope below — it must not nest inside enterScope.
-						const { orgIds, selectedOrgId } = yield* enterUserScope(
+						// Read the caller's memberships (all their orgs) and the
+						// per-client orgs they've authorized this connection to act in,
+						// under the resolver role: the user GUC's RLS confines both
+						// reads to this user even if a WHERE slips. enterUserScope
+						// returns plain values and commits before we enter org scope
+						// below — it must not nest inside enterScope.
+						const { orgIds, selectedOrgIds } = yield* enterUserScope(
 							sql,
 							userId,
 						)(
 							Effect.gen(function* () {
 								const memberships = yield* sql<{ organizationId: string }>`
-									SELECT "organizationId" FROM member WHERE "userId" = ${userId}
-								`
+								SELECT "organizationId" FROM member WHERE "userId" = ${userId}
+							`
 								const selection = yield* sql<{ organizationId: string }>`
-									SELECT organization_id FROM mcp_oauth_org
-									WHERE user_id = ${userId} AND client_id = ${clientId} LIMIT 1
-								`
+								SELECT organization_id FROM mcp_oauth_org_membership
+								WHERE user_id = ${userId} AND client_id = ${clientId}
+							`
 								return {
 									orgIds: memberships.map(m => m.organizationId),
-									selectedOrgId: selection[0]?.organizationId,
+									selectedOrgIds: selection.map(s => s.organizationId),
 								}
 							}),
 						)
@@ -274,21 +275,51 @@ const McpAuthMiddleware = HttpRouter.middleware(
 								'Token user is not a member of any organization',
 							)
 						}
-						// An explicit per-client selection wins, but only while it is
-						// still a live membership: a stale row (user left the org) falls
-						// back to auto-pick so the token can't read an org the user no
-						// longer belongs to.
-						const orgId =
-							selectedOrgId && orgIds.includes(selectedOrgId)
-								? selectedOrgId
-								: orgIds.length === 1
-									? orgIds[0]
-									: undefined
-						if (!orgId) {
+						// The orgs this connection is explicitly authorized to act in,
+						// narrowed to live memberships: a stale row (user left the org)
+						// is dropped so the token can't reach an org the user no longer
+						// belongs to. An unbound connection (no selection rows at all)
+						// falls back to the user's live orgs — single-org users get
+						// auto-resolution without ever visiting the connections page.
+						// But a connection that HAS a selection where every row is stale
+						// is rejected, not widened: the user deliberately scoped this
+						// connection, and silently widening it to orgs they never chose
+						// would be a privilege escalation.
+						const liveSelectedOrgIds = selectedOrgIds.filter(id =>
+							orgIds.includes(id),
+						)
+						const isUnbound = selectedOrgIds.length === 0
+						const allowedOrgIds = isUnbound ? orgIds : liveSelectedOrgIds
+						if (allowedOrgIds.length === 0) {
 							return yield* jsonRpcError(
 								403,
 								-32002,
 								'Select an organization for this connection at /settings/mcp/connections',
+							)
+						}
+						// An explicit per-request hint picks which authorized org this
+						// call acts in. A valid hint (within the authorized set) always
+						// wins; without a hint, a single authorized org auto-resolves.
+						// A hint that points at an org the connection is not authorized
+						// for is rejected — the client can't reach an org it never
+						// consented to even if the user is still a member of it.
+						const hint = headers.get('x-batuda-organization-id')
+						const orgId = hint
+							? allowedOrgIds.includes(hint)
+								? hint
+								: undefined
+							: allowedOrgIds.length === 1
+								? allowedOrgIds[0]
+								: undefined
+						if (!orgId) {
+							return yield* jsonRpcError(
+								403,
+								-32002,
+								hint
+									? 'X-Batuda-Organization-Id is not authorized for this connection'
+									: allowedOrgIds.length === 1
+										? 'Select an organization for this connection at /settings/mcp/connections'
+										: 'Send X-Batuda-Organization-Id with one of the authorized organizations',
 							)
 						}
 						const org = yield* loadOrg(orgId)
@@ -305,8 +336,8 @@ const McpAuthMiddleware = HttpRouter.middleware(
 							name: user.name,
 							isAgent: false,
 						})
+						// payload undefined → opaque/session bearer → fall through.
 					}
-					// payload undefined → opaque/session bearer → fall through.
 				}
 
 				// ── Cookie-session path (human/web).

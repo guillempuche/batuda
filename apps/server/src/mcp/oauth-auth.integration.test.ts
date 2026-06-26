@@ -33,7 +33,7 @@ const BASE_URL = process.env['BETTER_AUTH_BASE_URL'] as string
 const AUDIENCE = `${BASE_URL}/mcp`
 const FIXTURE_SLUG = `mcp-oauth-${randomUUID()}`
 const USER_EMAIL_LIKE = 'oauth-test+%@keys.batuda.internal'
-// One OAuth client id shared by the cases; resolution keys `mcp_oauth_org` on it.
+// One OAuth client id shared by the cases; resolution keys `mcp_oauth_org_membership` on it.
 const CLIENT_ID = `mcp-client-${randomUUID()}`
 
 type Org = { id: string; name: string; slug: string }
@@ -145,7 +145,8 @@ type BearerOutcome =
 // Reproduces the /mcp middleware's Bearer resolution: verify (JWKS + audience +
 // issuer) → user → memberships → selection (re-checked vs membership) →
 // auto-pick → enter org scope and read the marker companies (RLS proof).
-const resolveBearer = (token: string): Promise<BearerOutcome> =>
+// `hint` mirrors the X-Batuda-Organization-Id header the middleware reads.
+const resolveBearer = (token: string, hint?: string): Promise<BearerOutcome> =>
 	runtime.runPromise(
 		Effect.gen(function* () {
 			const auth = yield* Auth
@@ -188,9 +189,10 @@ const resolveBearer = (token: string): Promise<BearerOutcome> =>
 				SELECT id FROM "user" WHERE id = ${userId} LIMIT 1
 			`.pipe(Effect.orDie)
 			if (!userRows[0]) return { kind: 'challenge' } satisfies BearerOutcome
-			// Mirror the middleware: read memberships + selection under the
-			// resolver role so the suite exercises the same RLS-scoped path.
-			const { orgIds, selectedOrgId } = yield* enterUserScope(
+			// Mirror the middleware: read memberships + the per-client authorized
+			// org set under the resolver role so the suite exercises the same
+			// RLS-scoped path.
+			const { orgIds, selectedOrgIds } = yield* enterUserScope(
 				sql,
 				userId,
 			)(
@@ -199,23 +201,38 @@ const resolveBearer = (token: string): Promise<BearerOutcome> =>
 						SELECT "organizationId" FROM member WHERE "userId" = ${userId}
 					`
 					const selection = yield* sql<{ organizationId: string }>`
-						SELECT organization_id FROM mcp_oauth_org
-						WHERE user_id = ${userId} AND client_id = ${clientId} LIMIT 1
+						SELECT organization_id FROM mcp_oauth_org_membership
+						WHERE user_id = ${userId} AND client_id = ${clientId}
 					`
 					return {
 						orgIds: memberships.map(m => m.organizationId),
-						selectedOrgId: selection[0]?.organizationId,
+						selectedOrgIds: selection.map(s => s.organizationId),
 					}
 				}),
 			)
 			if (orgIds.length === 0)
 				return { kind: 'forbidden', code: -32002 } satisfies BearerOutcome
-			const orgId =
-				selectedOrgId && orgIds.includes(selectedOrgId)
-					? selectedOrgId
-					: orgIds.length === 1
-						? orgIds[0]
-						: undefined
+			// Mirror the middleware: narrow the selection to live memberships.
+			// An unbound connection (no selection) falls back to live orgs;
+			// a bound connection where every row is stale is rejected, not
+			// widened — silently widening would be a privilege escalation.
+			const liveSelectedOrgIds = selectedOrgIds.filter(id =>
+				orgIds.includes(id),
+			)
+			const isUnbound = selectedOrgIds.length === 0
+			const allowedOrgIds = isUnbound ? orgIds : liveSelectedOrgIds
+			if (allowedOrgIds.length === 0)
+				return { kind: 'forbidden', code: -32002 } satisfies BearerOutcome
+			// Mirror the middleware: a valid hint always wins; without a hint,
+			// a single authorized org auto-resolves; an unauthorized hint is
+			// rejected so the client can't reach an org it never consented to.
+			const orgId = hint
+				? allowedOrgIds.includes(hint)
+					? hint
+					: undefined
+				: allowedOrgIds.length === 1
+					? allowedOrgIds[0]
+					: undefined
 			if (!orgId)
 				return { kind: 'forbidden', code: -32002 } satisfies BearerOutcome
 			const orgRows = yield* sql<Org>`
@@ -233,14 +250,27 @@ const resolveBearer = (token: string): Promise<BearerOutcome> =>
 		}),
 	)
 
-const setSelection = (userId: string, organizationId: string) =>
-	pool.query(
-		`INSERT INTO mcp_oauth_org (user_id, client_id, organization_id, updated_at)
-		 VALUES ($1, $2, $3, now())
-		 ON CONFLICT (user_id, client_id)
-		 DO UPDATE SET organization_id = EXCLUDED.organization_id, updated_at = now()`,
-		[userId, CLIENT_ID, organizationId],
+// Set the per-connection authorized org set directly. Mirrors what
+// McpOAuthService.selectOrgs writes, so tests that need a specific binding can
+// stage it without going through the service.
+const setSelections = async (
+	userId: string,
+	organizationIds: ReadonlyArray<string>,
+) => {
+	await pool.query(
+		`DELETE FROM mcp_oauth_org_membership
+		 WHERE user_id = $1 AND client_id = $2`,
+		[userId, CLIENT_ID],
 	)
+	if (organizationIds.length > 0) {
+		await pool.query(
+			`INSERT INTO mcp_oauth_org_membership (user_id, client_id, organization_id, updated_at)
+			 SELECT $1, $2, org_id, now() FROM unnest($3::text[]) AS t(org_id)
+			 ON CONFLICT (user_id, client_id, organization_id) DO NOTHING`,
+			[userId, CLIENT_ID, organizationIds as string[]],
+		)
+	}
+}
 
 const seedConsentedClient = async (
 	userId: string,
@@ -263,7 +293,10 @@ const fixtureUserIds = () => [singleOrgUserId, multiOrgUserId, nonMemberUserId]
 
 const deleteFixtureRows = async () => {
 	const ids = fixtureUserIds()
-	await pool.query('DELETE FROM mcp_oauth_org WHERE user_id = ANY($1)', [ids])
+	await pool.query(
+		'DELETE FROM mcp_oauth_org_membership WHERE user_id = ANY($1)',
+		[ids],
+	)
 	await pool.query('DELETE FROM "oauthConsent" WHERE "userId" = ANY($1)', [ids])
 	await pool.query(`DELETE FROM "oauthClient" WHERE name = 'mcp-oauth-test'`)
 }
@@ -278,7 +311,7 @@ const cleanup = async () => {
 	await pool.query('DELETE FROM jwks')
 	await pool.query('DELETE FROM companies WHERE slug = $1', [FIXTURE_SLUG])
 	await pool.query(
-		`DELETE FROM mcp_oauth_org WHERE user_id IN (SELECT id FROM "user" WHERE email LIKE $1)`,
+		`DELETE FROM mcp_oauth_org_membership WHERE user_id IN (SELECT id FROM "user" WHERE email LIKE $1)`,
 		[USER_EMAIL_LIKE],
 	)
 	await pool.query(
@@ -457,7 +490,7 @@ describe('OAuth Bearer org resolution', () => {
 			// GIVEN a valid token for a user in taller AND restaurant, no selection
 			const token = await mintToken({ sub: multiOrgUserId })
 
-			// WHEN the Bearer path resolves
+			// WHEN the Bearer path resolves without a hint
 			const outcome = await resolveBearer(token)
 
 			// THEN it refuses (no org entered) with the select-an-org code
@@ -465,13 +498,13 @@ describe('OAuth Bearer org resolution', () => {
 		})
 	})
 
-	describe('a multi-org user with a live selection', () => {
+	describe('a multi-org user with a single-org selection', () => {
 		it('should scope to the selected org only', async () => {
-			// GIVEN the multi-org user selected restaurant for this client
-			await setSelection(multiOrgUserId, restaurant.id)
+			// GIVEN the multi-org user authorized restaurant for this client
+			await setSelections(multiOrgUserId, [restaurant.id])
 			const token = await mintToken({ sub: multiOrgUserId })
 
-			// WHEN the Bearer path resolves
+			// WHEN the Bearer path resolves (one authorized org → auto-pick)
 			const outcome = await resolveBearer(token)
 
 			// THEN it scopes to restaurant and reads only restaurant's marker
@@ -479,19 +512,67 @@ describe('OAuth Bearer org resolution', () => {
 		})
 	})
 
+	describe('a multi-org user with a multi-org selection and no hint', () => {
+		it('should refuse (ambiguous) with a select-an-org error', async () => {
+			// GIVEN the multi-org user authorized both taller and restaurant
+			await setSelections(multiOrgUserId, [taller.id, restaurant.id])
+			const token = await mintToken({ sub: multiOrgUserId })
+
+			// WHEN the Bearer path resolves without a hint
+			const outcome = await resolveBearer(token)
+
+			// THEN it refuses — the client must say which org per request
+			expect(outcome).toEqual({ kind: 'forbidden', code: -32002 })
+		})
+	})
+
+	describe('a multi-org user with a multi-org selection and a valid hint', () => {
+		it('should scope to the hinted org only', async () => {
+			// GIVEN the multi-org user authorized both taller and restaurant
+			await setSelections(multiOrgUserId, [taller.id, restaurant.id])
+			const token = await mintToken({ sub: multiOrgUserId })
+
+			// WHEN the Bearer path resolves with a hint pointing at taller
+			const outcome = await resolveBearer(token, taller.id)
+
+			// THEN it scopes to taller and reads only taller's marker
+			expect(outcome).toEqual({ kind: 'scoped', orgIds: [taller.id] })
+		})
+	})
+
+	describe('a multi-org user with a multi-org selection and an unauthorized hint', () => {
+		it('should refuse (hint outside the authorized set)', async () => {
+			// GIVEN the multi-org user authorized only restaurant
+			await setSelections(multiOrgUserId, [restaurant.id])
+			const token = await mintToken({ sub: multiOrgUserId })
+
+			// WHEN the Bearer path resolves with a hint pointing at taller
+			// (a live membership, but not authorized for this connection)
+			const outcome = await resolveBearer(token, taller.id)
+
+			// THEN it refuses — a hint is only valid within the authorized set.
+			// The single authorized org auto-picks only when no hint is sent;
+			// an explicit-but-unauthorized hint is rejected so the client can't
+			// reach an org it never consented to.
+			expect(outcome).toEqual({ kind: 'forbidden', code: -32002 })
+		})
+	})
+
 	describe('a selection that is no longer a live membership', () => {
-		it('should ignore the stale selection and auto-pick the live org', async () => {
+		it('should reject rather than widen to other live orgs', async () => {
 			// GIVEN a stale selection pointing at restaurant, where the single-org
 			// user is NOT a member (only taller)
-			await setSelection(singleOrgUserId, restaurant.id)
+			await setSelections(singleOrgUserId, [restaurant.id])
 			const token = await mintToken({ sub: singleOrgUserId })
 
 			// WHEN the Bearer path resolves
 			const outcome = await resolveBearer(token)
 
-			// THEN the stale restaurant selection is ignored and it reads only
-			// taller — never the org the user no longer belongs to
-			expect(outcome).toEqual({ kind: 'scoped', orgIds: [taller.id] })
+			// THEN it refuses — the connection was deliberately scoped to
+			// restaurant, and the user is no longer a member. It does NOT fall
+			// back to taller (a live org the connection was never authorized
+			// for), because silently widening would be a privilege escalation.
+			expect(outcome).toEqual({ kind: 'forbidden', code: -32002 })
 		})
 	})
 
@@ -522,56 +603,82 @@ describe('OAuth Bearer org resolution', () => {
 	})
 })
 
-describe('McpOAuthService.selectOrg', () => {
-	describe('the caller is a member of the target org', () => {
-		it('should upsert the connection binding', async () => {
+describe('McpOAuthService.selectOrgs', () => {
+	describe('the caller is a member of every target org', () => {
+		it('should upsert the full set of authorized orgs', async () => {
 			// GIVEN the single-org user is a member of taller
-			// WHEN selectOrg binds the connection to taller
+			// WHEN selectOrgs authorizes the connection for taller
 			await runtime.runPromise(
 				Effect.gen(function* () {
 					const service = yield* McpOAuthService
-					yield* service.selectOrg(singleOrgUserId, CLIENT_ID, taller.id)
+					yield* service.selectOrgs(singleOrgUserId, CLIENT_ID, [taller.id])
 				}),
 			)
 
-			// THEN a mcp_oauth_org row maps (user, client) → taller
+			// THEN exactly one membership row maps (user, client) → taller
 			const rows = await pool.query<{ organization_id: string }>(
-				'SELECT organization_id FROM mcp_oauth_org WHERE user_id = $1 AND client_id = $2',
+				'SELECT organization_id FROM mcp_oauth_org_membership WHERE user_id = $1 AND client_id = $2',
 				[singleOrgUserId, CLIENT_ID],
 			)
-			expect(rows.rows[0]?.organization_id).toBe(taller.id)
+			expect(rows.rows.map(r => r.organization_id)).toEqual([taller.id])
 		})
 
-		it('should overwrite an existing binding on conflict', async () => {
-			// GIVEN the multi-org user already bound this client to taller
+		it('should replace the prior set atomically', async () => {
+			// GIVEN the multi-org user authorized both taller and restaurant
 			await runtime.runPromise(
 				Effect.gen(function* () {
 					const service = yield* McpOAuthService
-					yield* service.selectOrg(multiOrgUserId, CLIENT_ID, taller.id)
-					// WHEN they re-bind it to restaurant
-					yield* service.selectOrg(multiOrgUserId, CLIENT_ID, restaurant.id)
+					yield* service.selectOrgs(multiOrgUserId, CLIENT_ID, [
+						taller.id,
+						restaurant.id,
+					])
+				}),
+			)
+			// WHEN they re-bind to only restaurant
+			await runtime.runPromise(
+				Effect.gen(function* () {
+					const service = yield* McpOAuthService
+					yield* service.selectOrgs(multiOrgUserId, CLIENT_ID, [restaurant.id])
 				}),
 			)
 
-			// THEN exactly one row remains, now pointing at restaurant
+			// THEN exactly one row remains, pointing at restaurant (taller dropped)
 			const rows = await pool.query<{ organization_id: string }>(
-				'SELECT organization_id FROM mcp_oauth_org WHERE user_id = $1 AND client_id = $2',
+				'SELECT organization_id FROM mcp_oauth_org_membership WHERE user_id = $1 AND client_id = $2 ORDER BY organization_id',
 				[multiOrgUserId, CLIENT_ID],
 			)
-			expect(rows.rowCount).toBe(1)
-			expect(rows.rows[0]?.organization_id).toBe(restaurant.id)
+			expect(rows.rows.map(r => r.organization_id)).toEqual([restaurant.id])
+		})
+
+		it('should accept an empty list and unbind the connection', async () => {
+			// GIVEN the single-org user has a binding to taller
+			await setSelections(singleOrgUserId, [taller.id])
+			// WHEN selectOrgs is called with an empty list
+			await runtime.runPromise(
+				Effect.gen(function* () {
+					const service = yield* McpOAuthService
+					yield* service.selectOrgs(singleOrgUserId, CLIENT_ID, [])
+				}),
+			)
+
+			// THEN no membership rows remain for this (user, client)
+			const rows = await pool.query(
+				'SELECT 1 FROM mcp_oauth_org_membership WHERE user_id = $1 AND client_id = $2',
+				[singleOrgUserId, CLIENT_ID],
+			)
+			expect(rows.rowCount).toBe(0)
 		})
 	})
 
-	describe('the caller is not a member of the target org', () => {
+	describe('the caller is not a member of every target org', () => {
 		it('should fail with Forbidden and write nothing', async () => {
-			// GIVEN the non-member user picks restaurant
-			// WHEN selectOrg runs
+			// GIVEN the non-member user authorizes restaurant (not a member)
+			// WHEN selectOrgs runs
 			const error = await runtime.runPromise(
 				Effect.gen(function* () {
 					const service = yield* McpOAuthService
 					return yield* Effect.flip(
-						service.selectOrg(nonMemberUserId, CLIENT_ID, restaurant.id),
+						service.selectOrgs(nonMemberUserId, CLIENT_ID, [restaurant.id]),
 					)
 				}),
 			)
@@ -579,8 +686,33 @@ describe('McpOAuthService.selectOrg', () => {
 			// THEN it is Forbidden and no binding was written
 			expect(error._tag).toBe('Forbidden')
 			const rows = await pool.query(
-				'SELECT 1 FROM mcp_oauth_org WHERE user_id = $1 AND client_id = $2',
+				'SELECT 1 FROM mcp_oauth_org_membership WHERE user_id = $1 AND client_id = $2',
 				[nonMemberUserId, CLIENT_ID],
+			)
+			expect(rows.rowCount).toBe(0)
+		})
+
+		it('should reject a mixed list if any org is not a membership', async () => {
+			// GIVEN the single-org user (member of taller) submits both taller
+			// and restaurant (not a member)
+			const error = await runtime.runPromise(
+				Effect.gen(function* () {
+					const service = yield* McpOAuthService
+					return yield* Effect.flip(
+						service.selectOrgs(singleOrgUserId, CLIENT_ID, [
+							taller.id,
+							restaurant.id,
+						]),
+					)
+				}),
+			)
+
+			// THEN it is Forbidden and no binding was written — a partial
+			// submission can't widen what the connection can later reach.
+			expect(error._tag).toBe('Forbidden')
+			const rows = await pool.query(
+				'SELECT 1 FROM mcp_oauth_org_membership WHERE user_id = $1 AND client_id = $2',
+				[singleOrgUserId, CLIENT_ID],
 			)
 			expect(rows.rowCount).toBe(0)
 		})
@@ -604,11 +736,11 @@ describe('McpOAuthService.listConnections', () => {
 		})
 	})
 
-	describe('a consented client bound to an org', () => {
-		it('should return the connection with its organization', async () => {
+	describe('a consented client bound to one org', () => {
+		it('should return the connection with that org in organizationIds', async () => {
 			// GIVEN a consented client and a binding to taller
 			await seedConsentedClient(singleOrgUserId, CLIENT_ID, 'mcp-oauth-test')
-			await setSelection(singleOrgUserId, taller.id)
+			await setSelections(singleOrgUserId, [taller.id])
 
 			// WHEN listConnections runs
 			const connections = await runtime.runPromise(
@@ -618,15 +750,36 @@ describe('McpOAuthService.listConnections', () => {
 				}),
 			)
 
-			// THEN the connection carries the client + its bound org
+			// THEN the connection carries the client + taller in its org list
 			expect(connections).toHaveLength(1)
 			expect(connections[0]?.clientId).toBe(CLIENT_ID)
-			expect(connections[0]?.organizationId).toBe(taller.id)
+			expect(connections[0]?.organizationIds).toEqual([taller.id])
+		})
+	})
+
+	describe('a consented client bound to multiple orgs', () => {
+		it('should return the connection with every bound org', async () => {
+			// GIVEN a consented client authorized for both taller and restaurant
+			await seedConsentedClient(multiOrgUserId, CLIENT_ID, 'mcp-oauth-test')
+			await setSelections(multiOrgUserId, [taller.id, restaurant.id])
+
+			// WHEN listConnections runs
+			const connections = await runtime.runPromise(
+				Effect.gen(function* () {
+					const service = yield* McpOAuthService
+					return yield* service.listConnections(multiOrgUserId)
+				}),
+			)
+
+			// THEN the connection carries both orgs (sorted, as array_agg does)
+			const expected = [restaurant.id, taller.id].sort()
+			expect(connections).toHaveLength(1)
+			expect(connections[0]?.organizationIds).toEqual(expected)
 		})
 	})
 
 	describe('a consented client with no org chosen', () => {
-		it('should return a null organization', async () => {
+		it('should return an empty organizationIds array', async () => {
 			// GIVEN a consented client but no selection
 			await seedConsentedClient(multiOrgUserId, CLIENT_ID, 'mcp-oauth-test')
 
@@ -638,9 +791,9 @@ describe('McpOAuthService.listConnections', () => {
 				}),
 			)
 
-			// THEN the connection's organization is null (unbound)
+			// THEN the connection's organizationIds is empty (unbound)
 			expect(connections).toHaveLength(1)
-			expect(connections[0]?.organizationId).toBeNull()
+			expect(connections[0]?.organizationIds).toEqual([])
 		})
 	})
 })
@@ -655,13 +808,13 @@ describe('RLS backstop on the resolver role', () => {
 	// the email/slug-keyed cleanup wouldn't catch; each case stays inside its own
 	// BEGIN…ROLLBACK so nothing persists past the test.
 
-	it("should hide another user's mcp_oauth_org rows even without a WHERE", async () => {
+	it("should hide another user's mcp_oauth_org_membership rows even without a WHERE", async () => {
 		const client = await pool.connect()
 		try {
 			// GIVEN two users each hold a connection binding
 			await client.query('BEGIN')
 			await client.query(
-				`INSERT INTO mcp_oauth_org (user_id, client_id, organization_id)
+				`INSERT INTO mcp_oauth_org_membership (user_id, client_id, organization_id)
 				 VALUES ('rls-a', 'rls-c', $1), ('rls-b', 'rls-c', $1)`,
 				[taller.id],
 			)
@@ -671,10 +824,10 @@ describe('RLS backstop on the resolver role', () => {
 				"SELECT set_config('app.current_user_id', 'rls-a', true)",
 			)
 			const all = await client.query<{ user_id: string }>(
-				'SELECT user_id FROM mcp_oauth_org',
+				'SELECT user_id FROM mcp_oauth_org_membership',
 			)
 			const reachForB = await client.query(
-				"SELECT 1 FROM mcp_oauth_org WHERE user_id = 'rls-b'",
+				"SELECT 1 FROM mcp_oauth_org_membership WHERE user_id = 'rls-b'",
 			)
 			// THEN only A's row is visible, even reaching for B's directly
 			expect(all.rows.every(r => r.user_id === 'rls-a')).toBe(true)
@@ -697,7 +850,7 @@ describe('RLS backstop on the resolver role', () => {
 			// WHEN it inserts a row owned by user B, THEN the WITH CHECK rejects it
 			await expect(
 				client.query(
-					`INSERT INTO mcp_oauth_org (user_id, client_id, organization_id)
+					`INSERT INTO mcp_oauth_org_membership (user_id, client_id, organization_id)
 					 VALUES ('rls-b', 'rls-c', $1)`,
 					[taller.id],
 				),
