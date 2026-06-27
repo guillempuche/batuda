@@ -44,12 +44,18 @@
             # at it to inspect traces, logs, and metrics while developing.
             # Upstream: https://github.com/ymtdzzz/otel-tui
             pkgs.otel-tui
+            # Infisical CLI — prod secrets for cloud CLI ops (`--env cloud`) and
+            # the Infisical→GitHub secret sync. Pinned here so the core team has
+            # it without a manual install; local dev runs on `pnpm cli setup`
+            # defaults and never needs it.
+            pkgs.infisical
           ];
 
           shellHook = ''
             echo "Forja dev environment"
             echo "Node:     $(node --version)"
             echo "pnpm:     $(pnpm --version)"
+            echo "infisical:$(infisical --version 2>/dev/null || echo ' available')"
             echo "wrangler: $(wrangler --version 2>/dev/null || echo 'available')"
             echo "aws:      $(aws --version 2>/dev/null || echo 'available')"
             echo "ffmpeg:   $(ffmpeg -version 2>/dev/null | head -1 | cut -d' ' -f3)"
