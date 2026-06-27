@@ -76,6 +76,51 @@ jobs:
             echo "Service batuda-server does not exist — will create it"
           fi
 
+      - name: Pre-flight cmdline size guard
+        run: |
+          # KraftCloud bakes every -e var into the unikernel kernel command
+          # line, which Unikraft caps at 4096 bytes / 60 args: past the byte
+          # cap the boot aborts with -E2BIG, past the arg cap argv is silently
+          # truncated and vars vanish at runtime. Assemble the exact -e payload
+          # this deploy will send and fail well under both ceilings, so an
+          # oversized release is caught here instead of at boot. Non-secret
+          # config ships in the baked file and is not counted. Secret values
+          # stay inside the array and are never printed.
+          E_ARGS=(
+            -e NODE_ENV=production
+            -e PORT=3000
+            -e SERVICE_VERSION="${{ steps.meta.outputs.version }}"
+            -e GIT_SHA="${{ github.sha }}"
+            -e REGION="${{ env.KRAFTCLOUD_METRO }}"
+            -e DATABASE_URL="${{ secrets.DATABASE_URL }}"
+            -e BETTER_AUTH_SECRET="${{ secrets.BETTER_AUTH_SECRET }}"
+            -e STORAGE_ACCESS_KEY_ID="${{ secrets.STORAGE_ACCESS_KEY_ID }}"
+            -e STORAGE_SECRET_ACCESS_KEY="${{ secrets.STORAGE_SECRET_ACCESS_KEY }}"
+            -e EMAIL_CREDENTIAL_KEY="${{ secrets.EMAIL_CREDENTIAL_KEY }}"
+            -e EMAIL_API_KEY_TRANSACTIONAL="${{ secrets.EMAIL_API_KEY_TRANSACTIONAL }}"
+            -e CALENDAR_API_KEY="${{ secrets.CALENDAR_API_KEY }}"
+            -e CALENDAR_WEBHOOK_SECRET="${{ secrets.CALENDAR_WEBHOOK_SECRET }}"
+            -e RESEARCH_LLM_AGENT_API_KEY="${{ secrets.RESEARCH_LLM_AGENT_API_KEY }}"
+            -e RESEARCH_LLM_EXTRACT_API_KEY="${{ secrets.RESEARCH_LLM_EXTRACT_API_KEY }}"
+            -e RESEARCH_LLM_WRITER_API_KEY="${{ secrets.RESEARCH_LLM_WRITER_API_KEY }}"
+            -e RESEARCH_API_KEY_SEARCH="${{ secrets.RESEARCH_API_KEY_SEARCH }}"
+            -e RESEARCH_API_KEY_SCRAPE="${{ secrets.RESEARCH_API_KEY_SCRAPE }}"
+            -e RESEARCH_API_KEY_EXTRACT="${{ secrets.RESEARCH_API_KEY_EXTRACT }}"
+            -e RESEARCH_API_KEY_REGISTRY_ES="${{ secrets.RESEARCH_API_KEY_REGISTRY_ES }}"
+          )
+          BYTES=$(printf '%s' "${E_ARGS[*]}" | wc -c | tr -d ' ')
+          FLAGS=0
+          for tok in "${E_ARGS[@]}"; do
+            if [ "$tok" = "-e" ]; then
+              FLAGS=$((FLAGS + 1))
+            fi
+          done
+          echo "Assembled -e payload: ${BYTES} bytes across ${FLAGS} -e flags (limits: 3500 bytes / 50 flags)"
+          if [ "$BYTES" -gt 3500 ] || [ "$FLAGS" -gt 50 ]; then
+            echo "::error::cmdline -e payload is ${BYTES} bytes / ${FLAGS} flags, over the pre-flight limit of 3500 bytes / 50 flags; move non-secret config into apps/server/config.production.json"
+            exit 1
+          fi
+
       - name: Deploy to KraftCloud
         uses: nick-fields/retry@v4
         env:
@@ -109,14 +154,19 @@ jobs:
           #   --service is mutually exclusive with -p/-d; those are set
           #   once during the first-time create branch below.
           command: |
-            if [ "${{ steps.service-check.outputs.exists }}" = "true" ]; then
+            # Shared deploy invocation: the -e block (secrets + build-meta)
+            # is identical for the rolling-update and first-time-create paths,
+            # so it lives in one function and the caller passes the rollout
+            # flags that differ between them. Non-secret config ships in the
+            # baked /app/config.production.json and is not passed on the
+            # cmdline.
+            deploy() {
               kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
                 --timeout 10s \
                 --restart on-failure \
                 --service batuda-server \
-                --rollout remove_sequential \
-                --rollout-wait 5s \
                 -M 2048 \
+                "$@" \
                 -e NODE_ENV=production \
                 -e PORT=3000 \
                 -e SERVICE_VERSION="${{ steps.meta.outputs.version }}" \
@@ -124,45 +174,23 @@ jobs:
                 -e REGION="${{ env.KRAFTCLOUD_METRO }}" \
                 -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
                 -e BETTER_AUTH_SECRET="${{ secrets.BETTER_AUTH_SECRET }}" \
-                -e BETTER_AUTH_BASE_URL="${{ vars.BETTER_AUTH_BASE_URL }}" \
-                -e ALLOWED_ORIGINS="${{ vars.ALLOWED_ORIGINS }}" \
-                -e APP_PUBLIC_URL="${{ vars.APP_PUBLIC_URL }}" \
-                -e MIN_LOG_LEVEL="${{ vars.MIN_LOG_LEVEL }}" \
-                -e BETTER_AUTH_INSECURE_COOKIES="${{ vars.BETTER_AUTH_INSECURE_COOKIES }}" \
-                -e BETTER_AUTH_RATE_LIMIT="${{ vars.BETTER_AUTH_RATE_LIMIT }}" \
-                -e OAUTH_ACCESS_TOKEN_TTL_SECONDS="${{ vars.OAUTH_ACCESS_TOKEN_TTL_SECONDS }}" \
-                -e OAUTH_CLIENT_GC_DAYS="${{ vars.OAUTH_CLIENT_GC_DAYS }}" \
-                -e API_KEY_RATE_LIMIT_ENABLED="${{ vars.API_KEY_RATE_LIMIT_ENABLED }}" \
-                -e API_KEY_RATE_LIMIT_MAX="${{ vars.API_KEY_RATE_LIMIT_MAX }}" \
-                -e API_KEY_RATE_LIMIT_WINDOW_SECONDS="${{ vars.API_KEY_RATE_LIMIT_WINDOW_SECONDS }}" \
-                -e EMAIL_HEALTH_PROBE_INTERVAL_SEC="${{ vars.EMAIL_HEALTH_PROBE_INTERVAL_SEC }}" \
-                -e STORAGE_ENDPOINT="${{ vars.STORAGE_ENDPOINT }}" \
-                -e STORAGE_REGION="${{ vars.STORAGE_REGION }}" \
                 -e STORAGE_ACCESS_KEY_ID="${{ secrets.STORAGE_ACCESS_KEY_ID }}" \
                 -e STORAGE_SECRET_ACCESS_KEY="${{ secrets.STORAGE_SECRET_ACCESS_KEY }}" \
-                -e STORAGE_BUCKET="${{ vars.STORAGE_BUCKET }}" \
                 -e EMAIL_CREDENTIAL_KEY="${{ secrets.EMAIL_CREDENTIAL_KEY }}" \
-                -e EMAIL_PROVIDER_TRANSACTIONAL="${{ vars.EMAIL_PROVIDER_TRANSACTIONAL }}" \
                 -e EMAIL_API_KEY_TRANSACTIONAL="${{ secrets.EMAIL_API_KEY_TRANSACTIONAL }}" \
-                -e EMAIL_FROM_TRANSACTIONAL="${{ vars.EMAIL_FROM_TRANSACTIONAL }}" \
-                -e CALENDAR_PROVIDER="${{ vars.CALENDAR_PROVIDER }}" \
                 -e CALENDAR_API_KEY="${{ secrets.CALENDAR_API_KEY }}" \
                 -e CALENDAR_WEBHOOK_SECRET="${{ secrets.CALENDAR_WEBHOOK_SECRET }}" \
-                -e RESEARCH_PROVIDER_SEARCH="${{ vars.RESEARCH_PROVIDER_SEARCH }}" \
-                -e RESEARCH_PROVIDER_SCRAPE="${{ vars.RESEARCH_PROVIDER_SCRAPE }}" \
-                -e RESEARCH_PROVIDER_EXTRACT="${{ vars.RESEARCH_PROVIDER_EXTRACT }}" \
-                -e RESEARCH_PROVIDER_REGISTRY_ES="${{ vars.RESEARCH_PROVIDER_REGISTRY_ES }}" \
-                -e RESEARCH_LLM_AGENT_PROVIDERS="${{ vars.RESEARCH_LLM_AGENT_PROVIDERS }}" \
                 -e RESEARCH_LLM_AGENT_API_KEY="${{ secrets.RESEARCH_LLM_AGENT_API_KEY }}" \
-                -e RESEARCH_LLM_EXTRACT_PROVIDERS="${{ vars.RESEARCH_LLM_EXTRACT_PROVIDERS }}" \
                 -e RESEARCH_LLM_EXTRACT_API_KEY="${{ secrets.RESEARCH_LLM_EXTRACT_API_KEY }}" \
-                -e RESEARCH_LLM_WRITER_PROVIDERS="${{ vars.RESEARCH_LLM_WRITER_PROVIDERS }}" \
                 -e RESEARCH_LLM_WRITER_API_KEY="${{ secrets.RESEARCH_LLM_WRITER_API_KEY }}" \
                 -e RESEARCH_API_KEY_SEARCH="${{ secrets.RESEARCH_API_KEY_SEARCH }}" \
                 -e RESEARCH_API_KEY_SCRAPE="${{ secrets.RESEARCH_API_KEY_SCRAPE }}" \
                 -e RESEARCH_API_KEY_EXTRACT="${{ secrets.RESEARCH_API_KEY_EXTRACT }}" \
                 -e RESEARCH_API_KEY_REGISTRY_ES="${{ secrets.RESEARCH_API_KEY_REGISTRY_ES }}" \
                 .
+            }
+            if [ "${{ steps.service-check.outputs.exists }}" = "true" ]; then
+              deploy --rollout remove_sequential --rollout-wait 5s
             else
               # First-time: create an explicitly-named service, then attach
               # the instance to it. `deploy --name` alone lets UKC auto-name
@@ -174,57 +202,7 @@ jobs:
                 -d api.batuda.co \
                 443:3000/tls+http \
                 80:443/http+redirect
-              kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
-                --timeout 10s \
-                --restart on-failure \
-                --service batuda-server \
-                -M 2048 \
-                -e NODE_ENV=production \
-                -e PORT=3000 \
-                -e SERVICE_VERSION="${{ steps.meta.outputs.version }}" \
-                -e GIT_SHA="${{ github.sha }}" \
-                -e REGION="${{ env.KRAFTCLOUD_METRO }}" \
-                -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-                -e BETTER_AUTH_SECRET="${{ secrets.BETTER_AUTH_SECRET }}" \
-                -e BETTER_AUTH_BASE_URL="${{ vars.BETTER_AUTH_BASE_URL }}" \
-                -e ALLOWED_ORIGINS="${{ vars.ALLOWED_ORIGINS }}" \
-                -e APP_PUBLIC_URL="${{ vars.APP_PUBLIC_URL }}" \
-                -e MIN_LOG_LEVEL="${{ vars.MIN_LOG_LEVEL }}" \
-                -e BETTER_AUTH_INSECURE_COOKIES="${{ vars.BETTER_AUTH_INSECURE_COOKIES }}" \
-                -e BETTER_AUTH_RATE_LIMIT="${{ vars.BETTER_AUTH_RATE_LIMIT }}" \
-                -e OAUTH_ACCESS_TOKEN_TTL_SECONDS="${{ vars.OAUTH_ACCESS_TOKEN_TTL_SECONDS }}" \
-                -e OAUTH_CLIENT_GC_DAYS="${{ vars.OAUTH_CLIENT_GC_DAYS }}" \
-                -e API_KEY_RATE_LIMIT_ENABLED="${{ vars.API_KEY_RATE_LIMIT_ENABLED }}" \
-                -e API_KEY_RATE_LIMIT_MAX="${{ vars.API_KEY_RATE_LIMIT_MAX }}" \
-                -e API_KEY_RATE_LIMIT_WINDOW_SECONDS="${{ vars.API_KEY_RATE_LIMIT_WINDOW_SECONDS }}" \
-                -e EMAIL_HEALTH_PROBE_INTERVAL_SEC="${{ vars.EMAIL_HEALTH_PROBE_INTERVAL_SEC }}" \
-                -e STORAGE_ENDPOINT="${{ vars.STORAGE_ENDPOINT }}" \
-                -e STORAGE_REGION="${{ vars.STORAGE_REGION }}" \
-                -e STORAGE_ACCESS_KEY_ID="${{ secrets.STORAGE_ACCESS_KEY_ID }}" \
-                -e STORAGE_SECRET_ACCESS_KEY="${{ secrets.STORAGE_SECRET_ACCESS_KEY }}" \
-                -e STORAGE_BUCKET="${{ vars.STORAGE_BUCKET }}" \
-                -e EMAIL_CREDENTIAL_KEY="${{ secrets.EMAIL_CREDENTIAL_KEY }}" \
-                -e EMAIL_PROVIDER_TRANSACTIONAL="${{ vars.EMAIL_PROVIDER_TRANSACTIONAL }}" \
-                -e EMAIL_API_KEY_TRANSACTIONAL="${{ secrets.EMAIL_API_KEY_TRANSACTIONAL }}" \
-                -e EMAIL_FROM_TRANSACTIONAL="${{ vars.EMAIL_FROM_TRANSACTIONAL }}" \
-                -e CALENDAR_PROVIDER="${{ vars.CALENDAR_PROVIDER }}" \
-                -e CALENDAR_API_KEY="${{ secrets.CALENDAR_API_KEY }}" \
-                -e CALENDAR_WEBHOOK_SECRET="${{ secrets.CALENDAR_WEBHOOK_SECRET }}" \
-                -e RESEARCH_PROVIDER_SEARCH="${{ vars.RESEARCH_PROVIDER_SEARCH }}" \
-                -e RESEARCH_PROVIDER_SCRAPE="${{ vars.RESEARCH_PROVIDER_SCRAPE }}" \
-                -e RESEARCH_PROVIDER_EXTRACT="${{ vars.RESEARCH_PROVIDER_EXTRACT }}" \
-                -e RESEARCH_PROVIDER_REGISTRY_ES="${{ vars.RESEARCH_PROVIDER_REGISTRY_ES }}" \
-                -e RESEARCH_LLM_AGENT_PROVIDERS="${{ vars.RESEARCH_LLM_AGENT_PROVIDERS }}" \
-                -e RESEARCH_LLM_AGENT_API_KEY="${{ secrets.RESEARCH_LLM_AGENT_API_KEY }}" \
-                -e RESEARCH_LLM_EXTRACT_PROVIDERS="${{ vars.RESEARCH_LLM_EXTRACT_PROVIDERS }}" \
-                -e RESEARCH_LLM_EXTRACT_API_KEY="${{ secrets.RESEARCH_LLM_EXTRACT_API_KEY }}" \
-                -e RESEARCH_LLM_WRITER_PROVIDERS="${{ vars.RESEARCH_LLM_WRITER_PROVIDERS }}" \
-                -e RESEARCH_LLM_WRITER_API_KEY="${{ secrets.RESEARCH_LLM_WRITER_API_KEY }}" \
-                -e RESEARCH_API_KEY_SEARCH="${{ secrets.RESEARCH_API_KEY_SEARCH }}" \
-                -e RESEARCH_API_KEY_SCRAPE="${{ secrets.RESEARCH_API_KEY_SCRAPE }}" \
-                -e RESEARCH_API_KEY_EXTRACT="${{ secrets.RESEARCH_API_KEY_EXTRACT }}" \
-                -e RESEARCH_API_KEY_REGISTRY_ES="${{ secrets.RESEARCH_API_KEY_REGISTRY_ES }}" \
-                .
+              deploy
             fi
 
       - name: Verify deployment
