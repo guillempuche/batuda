@@ -25,3 +25,28 @@ Operational procedures for production. Add a new section per procedure.
 
 - Set the jwt plugin's `rotationInterval` so keys expire and regenerate on a schedule, or
 - weigh `jwks.disablePrivateKeyEncryption` — removes the secret↔key coupling but stores the signing private key **unencrypted** in the DB.
+
+## Applying database migrations
+
+Where migrations run depends on the environment, and the boundary is deliberate.
+
+**Local / worktree** — `pnpm db:migrate` runs against your local stack, with `DATABASE_URL` from `.env`. It echoes its target first — e.g. `Migration target: "batuda_feature_x" on localhost (local)` — so you can see which database you are about to touch.
+
+**Production** — migrations run **in the deploy pipeline, never from a laptop**: the `Deploy Server` workflow applies them against the prod database immediately before `kraft cloud deploy`. There is intentionally no `db:migrate:prod` script.
+
+### Connection: schema owner, direct endpoint
+
+Migrations use a **different connection from the app runtime** on two axes, so they get their own secret (`MIGRATION_DATABASE_URL`) rather than reusing `DATABASE_URL`:
+
+- **Role `neondb_owner`**, not the runtime `app_service`. Migrations issue DDL plus `REVOKE`/`GRANT`/`ALTER DEFAULT PRIVILEGES` that wire RLS for `app_user` and `app_mcp_resolver` — only the schema owner may. `app_service` (BYPASSRLS) fails these with permission errors.
+- **Direct (unpooled) endpoint.** Neon's pooler is PgBouncer in transaction mode and drops the advisory locks + cross-statement transactions the migrators hold; `migrate.ts` refuses a pooled host outright.
+
+CI gets the same shape for free — its Neon branch is created with `role: neondb_owner` on the action's direct branch URL. Runtime (`DATABASE_URL`) stays `app_service` + pooled-capable; the server `SET LOCAL ROLE app_user` / `app_mcp_resolver` per request for RLS.
+
+### Rolling-deploy compatibility
+
+The deploy is a rolling update — the old instance keeps serving while the new one boots — so each migration must stay **backward-compatible with the running version**. Add the new shape now (a nullable/defaulted column, a new table) and drop or tighten the old shape in a **later** release; renaming or dropping a column the live version still reads breaks requests mid-rollout.
+
+### Rehearsing and re-running
+
+For a destructive or large change, rehearse on a Neon branch first (branch prod → apply → verify → let the pipeline run it on prod); CI already runs every migration on an ephemeral Neon branch per PR. The migrator is incremental — it records applied migrations and a re-run only applies the pending ones, so a re-run after a partial failure resumes safely.
