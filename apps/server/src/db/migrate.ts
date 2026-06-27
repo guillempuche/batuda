@@ -72,11 +72,52 @@ const authMigrate = Effect.promise(async () => {
 	await pool.end()
 })
 
+// Echo which database each run targets (flagging a local host) so a stray
+// `db:migrate` can't quietly hit the wrong one, and refuse a pooled endpoint
+// outright — migrating through the pooler half-applies and corrupts.
+const isLocalHost = (host: string): boolean =>
+	host === 'localhost' || host === '127.0.0.1' || host.endsWith('.localhost')
+
+// Neon's pooled endpoint (PgBouncer, transaction mode) drops the advisory
+// locks + cross-statement transactions the migrators hold, so migrating
+// through it half-applies. Runtime uses the pooled URL; migrations must use
+// the direct one (DATABASE_URL_UNPOOLED in prod, plain DATABASE_URL wherever
+// no pooler exists).
+const isPooledHost = (host: string): boolean =>
+	host.includes('-pooler') || host.includes('pgbouncer')
+
+const logMigrationTarget = Effect.gen(function* () {
+	const raw = process.env['DATABASE_URL']
+	if (!raw) return
+	let host = 'unknown'
+	let database = 'unknown'
+	try {
+		const url = new URL(raw)
+		host = url.hostname
+		database = url.pathname.replace(/^\//, '') || 'unknown'
+	} catch {
+		// a malformed URL is surfaced by the migration steps below
+	}
+	if (isPooledHost(host)) {
+		return yield* Effect.die(
+			new Error(
+				`Refusing to migrate through a pooled connection (${host}). Point ` +
+					`DATABASE_URL at the direct/unpooled endpoint — the pooler breaks ` +
+					`the locks and transactions migrations rely on.`,
+			),
+		)
+	}
+	yield* Effect.log(
+		`Migration target: "${database}" on ${host}${isLocalHost(host) ? ' (local)' : ''}`,
+	)
+})
+
 // Better Auth migrations run first so the CRM migration (0001_initial)
 // can reference Better Auth tables — specifically the FK from
 // member.primary_inbox_id → inboxes(id) needs the `member` table to
 // already exist when the ALTER TABLE fires.
 const program = Effect.gen(function* () {
+	yield* logMigrationTarget
 	yield* Effect.log('Running Better Auth migrations...')
 	yield* authMigrate
 	yield* Effect.log('Better Auth migrations complete')
