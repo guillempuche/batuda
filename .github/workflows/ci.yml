@@ -30,6 +30,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Secret scan (secretlint)
+        run: pnpm lint-secrets
+
       - name: Check (Biome + dprint)
         run: pnpm check
 
@@ -111,6 +114,8 @@ jobs:
           STORAGE_ACCESS_KEY_ID: batuda
           STORAGE_SECRET_ACCESS_KEY: batuda-secret
           STORAGE_BUCKET: batuda-assets
+          EMAIL_PROVIDER: local-inbox
+          GEOCODER_PROVIDER: nominatim
         run: pnpm cli seed
 
       # --concurrency=1 forces the workspaces' test:integration tasks to
