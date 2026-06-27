@@ -43,6 +43,7 @@ import { TimelineLive } from './handlers/timeline'
 import { WebhooksLive } from './handlers/webhooks'
 import { CalcomWebhookLive } from './handlers/webhooks-calcom'
 import { Auth } from './lib/auth'
+import { ConfigFileLive } from './lib/config-provider'
 import { CorsLive } from './lib/cors'
 import { installCrashGuards } from './lib/crash-guards'
 import { EnvVars } from './lib/env'
@@ -331,6 +332,11 @@ const program = HttpRouter.serve(AppLive).pipe(
 	Layer.provideMerge(ServerLive),
 	Layer.provide(LoggerLive),
 	Layer.provide(OtlpObservability),
+	// Bottom of the stack so the baked-file ConfigProvider underlies every
+	// Config reader above it — including LoggerLive's MIN_LOG_LEVEL, which in
+	// prod lives only in the file, not on the cmdline. A higher placement would
+	// leave the lower readers on env-only and fail when their keys aren't set.
+	Layer.provide(ConfigFileLive),
 	Layer.launch,
 )
 

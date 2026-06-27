@@ -1,0 +1,6 @@
+{
+	"MIN_LOG_LEVEL": "Info",
+	"STORAGE_ENDPOINT": "https://b4ffb72b6d377a7950e0d3a596d82d4b.eu.r2.cloudflarestorage.com",
+	"STORAGE_REGION": "auto",
+	"STORAGE_BUCKET": "batuda-assets"
+}

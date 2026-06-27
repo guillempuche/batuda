@@ -48,6 +48,11 @@ WORKDIR /app
 
 COPY --from=build --chown=app:app /deploy /app
 
+# Baked non-secret config, read at boot by lib/config-provider.ts. Kept off the
+# deploy command line (the unikernel caps its length); secrets still arrive via
+# -e. Build context is the repo root, so the source path is repo-relative.
+COPY --chown=app:app apps/server/config.production.json /app/config.production.json
+
 USER app
 
 CMD ["node", "dist/main.mjs"]

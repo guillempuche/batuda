@@ -47,6 +47,11 @@ WORKDIR /app
 
 COPY --from=build --chown=app:app /deploy /app
 
+# Bake the non-secret config the worker reads at boot. Kept off the deploy tree
+# (pnpm deploy only carries package files), so copy it in explicitly to the
+# WORKDIR the loader reads from (/app/config.production.json).
+COPY --chown=app:app apps/mail-worker/config.production.json /app/config.production.json
+
 USER app
 
 CMD ["node", "dist/main.mjs"]

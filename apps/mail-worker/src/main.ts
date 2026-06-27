@@ -9,6 +9,7 @@ import { PgLive } from './db.js'
 import { CredentialDecryptor } from './decrypt.js'
 import { WorkerEnvVars } from './env.js'
 import { runInboxSession } from './inbox-session.js'
+import { ConfigFileLive } from './lib/config-provider.js'
 import { RawMessageStorage } from './storage.js'
 
 // Top-level program: scan for unclaimed inboxes on a tick, fork a
@@ -98,6 +99,10 @@ const Live = Layer.mergeAll(
 	// inbox claim/session queries run by `program`.
 	Layer.provideMerge(PgLive),
 	Layer.provideMerge(WorkerEnvVars.layer),
+	// Install the baked-file config values before the readers above resolve, so
+	// the env-var layer and the database client can read non-secret settings
+	// that no longer travel on the boot command line.
+	Layer.provide(ConfigFileLive),
 )
 
 // Turn on the crash safety net before the worker starts: a rare low-level error
