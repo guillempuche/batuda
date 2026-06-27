@@ -75,9 +75,7 @@ const buildSlot = (
 		)
 		const baseUrl =
 			vendor === 'custom'
-				? yield* Config.string(keyForSlot(`${envPrefix}_BASE_URL`, slot)).pipe(
-						Config.withDefault('https://api.tokenfactory.nebius.com/v1'),
-					)
+				? yield* Config.string(keyForSlot(`${envPrefix}_BASE_URL`, slot))
 				: LLM_BASE_URLS[vendor]
 		const service = yield* OpenAiLanguageModel.make({ model }).pipe(
 			Effect.provide(
@@ -106,9 +104,7 @@ const buildTierLayer = <Self>(
 				return Layer.succeed(Tag)(stubLanguageModelService)
 			}
 
-			const model = yield* Config.string(`${envPrefix}_MODEL`).pipe(
-				Config.withDefault('Qwen/Qwen3-32B'),
-			)
+			const model = yield* Config.string(`${envPrefix}_MODEL`)
 			const slots = yield* Effect.forEach(vendors, (vendor, i) =>
 				buildSlot(vendor, envPrefix, i, model),
 			)

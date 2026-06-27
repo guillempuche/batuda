@@ -213,7 +213,7 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 		const EMAIL_PROVIDER = yield* Config.schema(
 			Schema.Literals(['local-inbox']),
 			'EMAIL_PROVIDER',
-		).pipe(Config.withDefault('local-inbox'))
+		)
 		// AES-256-GCM master key for encrypting per-inbox IMAP/SMTP
 		// credentials at rest. Base64-encoded 32 bytes. Per-inbox subkeys
 		// are derived via HKDF-SHA256 with the inbox id as `info`, so a
@@ -228,7 +228,7 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 		const GEOCODER_PROVIDER = yield* Config.schema(
 			Schema.Literals(['nominatim']),
 			'GEOCODER_PROVIDER',
-		).pipe(Config.withDefault('nominatim'))
+		)
 
 		// Budget defaults (system-level)
 		const RESEARCH_DEFAULT_BUDGET_CENTS = yield* Config.int(
