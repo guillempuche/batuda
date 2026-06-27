@@ -21,8 +21,42 @@ env:
   KRAFT_VERSION: v0.12.10
 
 jobs:
+  # Run pending migrations before the rolling deploy; they must be
+  # backward-compatible with the still-running version (docs/runbooks.md).
+  migrate:
+    name: Migrate prod database
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply migrations
+        # Migrations need a SEPARATE connection from the runtime DATABASE_URL:
+        # the schema owner `neondb_owner` (the runtime `app_service` role can't
+        # run the DDL + REVOKE/GRANT the migrations issue), over the direct
+        # (unpooled) endpoint (the pooler breaks migration locks). migrate.ts
+        # refuses a pooled host outright.
+        env:
+          DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
+        run: pnpm db:migrate
+
   deploy:
     name: Deploy to KraftCloud
+    needs: migrate
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: production
