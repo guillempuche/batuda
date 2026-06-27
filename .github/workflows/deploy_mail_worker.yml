@@ -10,6 +10,11 @@ concurrency:
   group: deploy-mail-worker
   cancel-in-progress: false
 
+# Least privilege: deploy authenticates to KraftCloud via secrets, not the
+# GitHub token. It only needs to read the repo.
+permissions:
+  contents: read
+
 env:
   KRAFTCLOUD_METRO: fra
   # Pinned to the same kraft CLI version as deploy_server.yml. Bump
@@ -25,7 +30,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - name: Prepare files for KraftCloud
         run: |
@@ -34,7 +39,7 @@ jobs:
 
       - name: Cache KraftCloud CLI
         id: kraft-cache
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: kraft.deb
           key: kraft-cli-${{ env.KRAFT_VERSION }}
@@ -105,7 +110,7 @@ jobs:
           fi
 
       - name: Deploy to KraftCloud
-        uses: nick-fields/retry@v4
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         env:
           KRAFTCLOUD_TOKEN: ${{ secrets.KRAFTCLOUD_TOKEN }}
         with:
