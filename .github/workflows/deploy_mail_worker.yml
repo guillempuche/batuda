@@ -71,6 +71,39 @@ jobs:
         run: |
           kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} instance remove batuda-mail-worker 2>&1 | grep -v "not found" || true
 
+      - name: Pre-flight cmdline size guard
+        run: |
+          # KraftCloud bakes every -e var into the unikernel kernel command
+          # line, which Unikraft caps at 4096 bytes / 60 args: past the byte
+          # cap the boot aborts with -E2BIG, past the arg cap argv is silently
+          # truncated and vars vanish at runtime. Assemble the exact -e payload
+          # this deploy will send and fail well under both ceilings, so an
+          # oversized release is caught here instead of at boot. Non-secret
+          # config ships in the baked file and is not counted. Secret values
+          # stay inside the array and are never printed.
+          E_ARGS=(
+            -e NODE_ENV=production
+            -e SERVICE_VERSION="${{ steps.meta.outputs.version }}"
+            -e GIT_SHA="${{ github.sha }}"
+            -e REGION="${{ env.KRAFTCLOUD_METRO }}"
+            -e DATABASE_URL="${{ secrets.DATABASE_URL }}"
+            -e EMAIL_CREDENTIAL_KEY="${{ secrets.EMAIL_CREDENTIAL_KEY }}"
+            -e STORAGE_ACCESS_KEY_ID="${{ secrets.STORAGE_ACCESS_KEY_ID }}"
+            -e STORAGE_SECRET_ACCESS_KEY="${{ secrets.STORAGE_SECRET_ACCESS_KEY }}"
+          )
+          BYTES=$(printf '%s' "${E_ARGS[*]}" | wc -c | tr -d ' ')
+          FLAGS=0
+          for tok in "${E_ARGS[@]}"; do
+            if [ "$tok" = "-e" ]; then
+              FLAGS=$((FLAGS + 1))
+            fi
+          done
+          echo "Assembled -e payload: ${BYTES} bytes across ${FLAGS} -e flags (limits: 3500 bytes / 50 flags)"
+          if [ "$BYTES" -gt 3500 ] || [ "$FLAGS" -gt 50 ]; then
+            echo "::error::cmdline -e payload is ${BYTES} bytes / ${FLAGS} flags, over the pre-flight limit of 3500 bytes / 50 flags; move non-secret config into apps/mail-worker/config.production.json"
+            exit 1
+          fi
+
       - name: Deploy to KraftCloud
         uses: nick-fields/retry@v4
         env:
@@ -102,11 +135,8 @@ jobs:
               -e REGION="${{ env.KRAFTCLOUD_METRO }}" \
               -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
               -e EMAIL_CREDENTIAL_KEY="${{ secrets.EMAIL_CREDENTIAL_KEY }}" \
-              -e STORAGE_ENDPOINT="${{ vars.STORAGE_ENDPOINT }}" \
-              -e STORAGE_REGION="${{ vars.STORAGE_REGION }}" \
               -e STORAGE_ACCESS_KEY_ID="${{ secrets.STORAGE_ACCESS_KEY_ID }}" \
               -e STORAGE_SECRET_ACCESS_KEY="${{ secrets.STORAGE_SECRET_ACCESS_KEY }}" \
-              -e STORAGE_BUCKET="${{ vars.STORAGE_BUCKET }}" \
               .
 
       - name: Verify deployment
