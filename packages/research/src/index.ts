@@ -4,6 +4,15 @@
 
 // ── Application (services) ─────────────────────────────────────────────────
 export { type BudgetConfig, makeBudgetLayer } from './application/budget'
+// ── Application (contact discovery) ────────────────────────────────────────
+export {
+	type ContactChannel,
+	ContactDiscovery,
+	type DiscoverContactsInput,
+	type DiscoverContactsOutcome,
+	type DiscoveredContact,
+	estimateDiscoverCostCents,
+} from './application/contact-discovery'
 export {
 	type PerRunOverrides,
 	resolvePolicy,
@@ -11,7 +20,10 @@ export {
 } from './application/policy'
 export type {
 	DiscoverInput,
+	EmailVerifyInput,
+	EnrichmentInput,
 	ExtractInput,
+	MxOutcome,
 	RegistryInput,
 	ReportInput,
 	ScrapeInput,
@@ -23,8 +35,11 @@ export {
 	BlobStorage,
 	Budget,
 	DiscoverProvider,
+	EmailVerifier,
+	EnrichmentProvider,
 	ExtractLanguageModel,
 	ExtractProvider,
+	MxResolver,
 	ProviderQuota,
 	RegistryRouter,
 	ReportRouter,
@@ -69,6 +84,8 @@ export type {
 	BudgetSnapshot,
 	CompanyReport,
 	DiscoverResult,
+	EmailVerification,
+	EnrichmentResult,
 	ExternalJobRef,
 	RegistryRecord,
 	ResolvedPolicy,
@@ -76,6 +93,7 @@ export type {
 	SearchResult,
 	SearchResultItem,
 } from './domain/types'
+export { VERIFICATION_VERDICTS, VerificationVerdict } from './domain/types'
 export { makeResearchLlmLive } from './infrastructure/llm-live'
 // ── Infrastructure (provider layers) ──────────────────────────────────────
 export { makeResearchProvidersLive } from './infrastructure/providers-live'

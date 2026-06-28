@@ -1,5 +1,5 @@
 /**
- * Boot-time provider selection layer for all 6 research capabilities.
+ * Boot-time provider selection layer for all research capabilities.
  *
  * For each capability, reads a `RESEARCH_PROVIDER_*` comma list at startup
  * (non-empty, literal-validated by Schema), builds one service instance per
@@ -14,6 +14,10 @@ import { Effect, Layer } from 'effect'
 import {
 	type DiscoverInput,
 	DiscoverProvider,
+	EmailVerifier,
+	type EmailVerifyInput,
+	type EnrichmentInput,
+	EnrichmentProvider,
 	type ExtractInput,
 	ExtractProvider,
 	type RegistryInput,
@@ -35,6 +39,8 @@ import type { ProviderError } from '../domain/errors'
 import type {
 	CompanyReport,
 	DiscoverResult,
+	EmailVerification,
+	EnrichmentResult,
 	ExternalJobRef,
 	RegistryRecord,
 	ScrapedPage,
@@ -49,13 +55,18 @@ import { makeCachedScrape } from './cached-scrape'
 import { makeCachedSearch } from './cached-search'
 import { makeFirecrawlExtract } from './firecrawl/extract'
 import { makeFirecrawlScrape } from './firecrawl/scrape'
+import { makeHunterEnrichment } from './hunter/enrichment'
+import { makeHunterVerifier } from './hunter/verifier'
 import { makeLibreborRegistry } from './librebor/registry'
+import { MxResolverLive } from './mx-verify'
 import { StubDiscoverProviderInstance } from './stub/discover'
+import { StubEnrichmentProviderInstance } from './stub/enrichment'
 import { StubExtractProviderInstance } from './stub/extract'
 import { StubRegistryEsProviderInstance } from './stub/registry-es'
 import { StubReportEsProviderInstance } from './stub/report-es'
 import { StubScrapeProviderInstance } from './stub/scrape'
 import { StubSearchProviderInstance } from './stub/search'
+import { StubEmailVerifierInstance } from './stub/verifier'
 
 // ── Vendor literal unions ──
 
@@ -63,11 +74,15 @@ const SEARCH_VENDORS = ['stub', 'brave', 'firecrawl'] as const
 const SCRAPE_VENDORS = ['stub', 'firecrawl', 'local'] as const
 const EXTRACT_VENDORS = ['stub', 'firecrawl', 'local'] as const
 const DISCOVER_VENDORS = ['stub', 'firecrawl', 'anthropic', 'none'] as const
+const ENRICH_VENDORS = ['stub', 'hunter', 'none'] as const
+const VERIFY_VENDORS = ['stub', 'hunter', 'none'] as const
 
 type SearchVendor = (typeof SEARCH_VENDORS)[number]
 type ScrapeVendor = (typeof SCRAPE_VENDORS)[number]
 type ExtractVendor = (typeof EXTRACT_VENDORS)[number]
 type DiscoverVendor = (typeof DISCOVER_VENDORS)[number]
+type EnrichVendor = (typeof ENRICH_VENDORS)[number]
+type VerifyVendor = (typeof VERIFY_VENDORS)[number]
 
 // ── Per-capability instance factories ──
 
@@ -139,6 +154,36 @@ const discoverInstance = (vendor: DiscoverVendor, _slot: number) => {
 				DiscoverProvider.of({
 					discover: () => notYetImplementedError('discover', 'anthropic'),
 					cancel: () => notYetImplementedError('discover', 'anthropic'),
+				}),
+			)
+	}
+}
+
+const enrichmentInstance = (vendor: EnrichVendor, slot: number) => {
+	switch (vendor) {
+		case 'stub':
+			return Effect.succeed(StubEnrichmentProviderInstance)
+		case 'hunter':
+			return makeHunterEnrichment(slot)
+		case 'none':
+			return Effect.succeed(
+				EnrichmentProvider.of({
+					findPeople: () => disabledError('enrich'),
+				}),
+			)
+	}
+}
+
+const verifierInstance = (vendor: VerifyVendor, slot: number) => {
+	switch (vendor) {
+		case 'stub':
+			return Effect.succeed(StubEmailVerifierInstance)
+		case 'hunter':
+			return makeHunterVerifier(slot)
+		case 'none':
+			return Effect.succeed(
+				EmailVerifier.of({
+					verify: () => disabledError('verify'),
 				}),
 			)
 	}
@@ -286,6 +331,55 @@ const discoverLayer = Layer.effect(
 	}),
 )
 
+const enrichmentLayer = Layer.effect(
+	EnrichmentProvider,
+	Effect.gen(function* () {
+		const vendors = yield* providerListConfig(
+			ENRICH_VENDORS,
+			'RESEARCH_PROVIDER_ENRICH',
+			['none'] as const,
+		)
+		yield* Effect.logInfo(`research.enrich: ${vendors.join(',')}`)
+		const instances = yield* Effect.all(
+			vendors.map((vendor, slot) => enrichmentInstance(vendor, slot)),
+		)
+		if (instances.length === 1) return instances[0]!
+		const findPeople = withFallback(
+			instances,
+			(
+				svc,
+				input: EnrichmentInput,
+			): Effect.Effect<EnrichmentResult, ProviderError> =>
+				svc.findPeople(input),
+		)
+		return EnrichmentProvider.of({ findPeople })
+	}),
+)
+
+const verifierLayer = Layer.effect(
+	EmailVerifier,
+	Effect.gen(function* () {
+		const vendors = yield* providerListConfig(
+			VERIFY_VENDORS,
+			'RESEARCH_PROVIDER_VERIFY',
+			['none'] as const,
+		)
+		yield* Effect.logInfo(`research.verify: ${vendors.join(',')}`)
+		const instances = yield* Effect.all(
+			vendors.map((vendor, slot) => verifierInstance(vendor, slot)),
+		)
+		if (instances.length === 1) return instances[0]!
+		const verify = withFallback(
+			instances,
+			(
+				svc,
+				input: EmailVerifyInput,
+			): Effect.Effect<EmailVerification, ProviderError> => svc.verify(input),
+		)
+		return EmailVerifier.of({ verify })
+	}),
+)
+
 // ── Country-dispatching layers for registry + report ──
 
 const buildRegistryDispatcher = (cc: Country) =>
@@ -378,6 +472,9 @@ export const makeResearchProvidersLive = Layer.mergeAll(
 	cachedScrapeLayer.pipe(Layer.provide(scrapeLayer)),
 	cachedExtractLayer.pipe(Layer.provide(extractLayer)),
 	discoverLayer,
+	enrichmentLayer,
+	verifierLayer,
+	MxResolverLive,
 	registryLayer,
 	reportLayer,
 )

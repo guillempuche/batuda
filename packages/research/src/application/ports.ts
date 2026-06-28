@@ -51,6 +51,8 @@ import type {
 	BudgetSnapshot,
 	CompanyReport,
 	DiscoverResult,
+	EmailVerification,
+	EnrichmentResult,
 	ExternalJobRef,
 	RegistryRecord,
 	ScrapedPage,
@@ -137,6 +139,49 @@ export class DiscoverProvider extends ServiceMap.Service<
 		) => Effect.Effect<void, ProviderError>
 	}
 >()('research/DiscoverProvider') {}
+
+// ── Enrichment (decision-maker name + email discovery, universal) ──
+
+export interface EnrichmentInput {
+	readonly domain: string
+	readonly companyName?: string | undefined
+	readonly country?: string | undefined
+}
+
+export class EnrichmentProvider extends ServiceMap.Service<
+	EnrichmentProvider,
+	{
+		readonly findPeople: (
+			input: EnrichmentInput,
+		) => Effect.Effect<EnrichmentResult, ProviderError>
+	}
+>()('research/EnrichmentProvider') {}
+
+// ── Email verification (deliverability of a guessed/found address) ──
+
+export interface EmailVerifyInput {
+	readonly email: string
+}
+
+export class EmailVerifier extends ServiceMap.Service<
+	EmailVerifier,
+	{
+		readonly verify: (
+			input: EmailVerifyInput,
+		) => Effect.Effect<EmailVerification, ProviderError>
+	}
+>()('research/EmailVerifier') {}
+
+// ── MX pre-gate (free DNS check before the paid verifier) ──
+
+export type MxOutcome = 'has_mx' | 'no_mx' | 'unknown'
+
+export class MxResolver extends ServiceMap.Service<
+	MxResolver,
+	{
+		readonly resolve: (domain: string) => Effect.Effect<MxOutcome>
+	}
+>()('research/MxResolver') {}
 
 // ── Registry (country-routed) ──
 

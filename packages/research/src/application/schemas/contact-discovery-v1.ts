@@ -1,5 +1,7 @@
 import { Schema } from 'effect'
 
+import { VerificationVerdict } from '../../domain/types'
+
 const Citation = Schema.Struct({
 	source_id: Schema.String,
 	quote: Schema.optional(Schema.String),
@@ -11,10 +13,20 @@ export const ContactDiscoveryV1Schema = Schema.Struct({
 		Schema.Struct({
 			name: Schema.String,
 			role: Schema.optional(Schema.String),
-			email: Schema.optional(Schema.String),
-			phone: Schema.optional(Schema.String),
-			linkedin: Schema.optional(Schema.String),
 			is_decision_maker: Schema.optional(Schema.Boolean),
+			// Open channel list (email, phone, linkedin, x, website, bluesky, …).
+			// Only the email channel carries a deliverability verdict + confidence.
+			channels: Schema.optional(
+				Schema.Array(
+					Schema.Struct({
+						kind: Schema.String,
+						value: Schema.String,
+						verification: Schema.optional(VerificationVerdict),
+						confidence: Schema.optional(Schema.Number),
+						is_primary: Schema.optional(Schema.Boolean),
+					}),
+				),
+			),
 			notes: Schema.optional(Schema.String),
 			citations: Schema.Array(Citation),
 		}),
