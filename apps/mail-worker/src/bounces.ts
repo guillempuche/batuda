@@ -139,11 +139,11 @@ export const parseBounce = (mail: ParsedMail): ParsedBounce | null => {
 // persisted by the regular inbound path so users see "Mail Delivery
 // Subsystem" as a normal entry in the inbox list.
 //
-// Org isolation: contacts/timeline_activity don't carry organization_id
-// in the current schema (multi-org for CRM core is a separate slice).
-// We rely on the original email_messages match (already org-scoped) to
-// gate everything that follows: only recipients of an email *we sent
-// from this org* get touched.
+// Org isolation: the email_messages match is org-scoped, and the channel
+// update narrows to this org explicitly (contact_channels carries
+// organization_id); timeline_activity has no org column, gated transitively
+// by the contacts it references. Only recipients of an email *we sent from
+// this org* get touched.
 export const applyBounce = (args: {
 	readonly organizationId: string
 	readonly bounce: ParsedBounce
@@ -173,17 +173,23 @@ export const applyBounce = (args: {
 
 		const isHard = bounce.bounceType === 'hard'
 		const recipients = bounce.recipients as unknown as string[]
+		// Suppression lives on the email channel now; match by address and
+		// scope to this org explicitly (the worker runs BYPASSRLS).
 		const updatedContacts = yield* sql<{ id: string; companyId: string }>`
-			UPDATE contacts
-			SET email_status = ${isHard ? 'bounced' : sql.literal('email_status')},
-			    email_status_reason = ${bounce.diagnostic},
-			    email_status_updated_at = now(),
-			    email_soft_bounce_count = CASE
-			      WHEN ${isHard} THEN email_soft_bounce_count
-			      ELSE email_soft_bounce_count + 1
+			UPDATE contact_channels ch
+			SET status = ${isHard ? 'bounced' : sql.literal('status')},
+			    status_reason = ${bounce.diagnostic},
+			    status_updated_at = now(),
+			    soft_bounce_count = CASE
+			      WHEN ${isHard} THEN ch.soft_bounce_count
+			      ELSE ch.soft_bounce_count + 1
 			    END
-			WHERE lower(email) = ANY(${recipients})
-			RETURNING id, company_id
+			FROM contacts c
+			WHERE ch.contact_id = c.id
+			  AND ch.kind = 'email'
+			  AND ch.organization_id = ${organizationId}
+			  AND lower(ch.value) = ANY(${recipients})
+			RETURNING c.id, c.company_id
 		`
 
 		// Soft-bounce promotion: if the rolling 7-day soft bounce count
@@ -192,12 +198,14 @@ export const applyBounce = (args: {
 		// natural trigger; idle accounts shouldn't be re-evaluated.
 		if (!isHard) {
 			yield* sql`
-				UPDATE contacts
-				SET email_status = 'bounced',
-				    email_status_updated_at = now()
-				WHERE lower(email) = ANY(${recipients})
-				  AND email_soft_bounce_count >= 3
-				  AND email_status_updated_at >= now() - interval '7 days'
+				UPDATE contact_channels
+				SET status = 'bounced',
+				    status_updated_at = now()
+				WHERE kind = 'email'
+				  AND organization_id = ${organizationId}
+				  AND lower(value) = ANY(${recipients})
+				  AND soft_bounce_count >= 3
+				  AND status_updated_at >= now() - interval '7 days'
 			`
 		}
 

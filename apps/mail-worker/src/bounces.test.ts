@@ -87,7 +87,7 @@ describe('parseBounce', () => {
 		// WHEN parseBounce runs
 		// THEN bounceType='hard', statusCode='5.1.1', and originalMessageId
 		//   resolves to the embedded original — these are the three fields
-		//   applyBounce uses to flip email_messages.status and contacts.email_status
+		//   applyBounce uses to flip email_messages.status and the email channel's status
 		const mail = await simpleParser(
 			dsn({
 				originalMessageId: '<orig-hard@example.com>',
@@ -108,8 +108,8 @@ describe('parseBounce', () => {
 	it('classifies a 4.x.x DSN as a soft bounce', async () => {
 		// GIVEN a DSN with Status: 4.2.2 (mailbox full / transient)
 		// WHEN parseBounce runs
-		// THEN bounceType='soft' so the caller bumps email_soft_bounce_count
-		//   instead of flipping the contact straight to bounced
+		// THEN bounceType='soft' so the caller bumps the email channel's
+		//   soft_bounce_count instead of flipping it straight to bounced
 		const mail = await simpleParser(
 			dsn({
 				originalMessageId: '<orig-soft@example.com>',
@@ -144,7 +144,7 @@ describe('parseBounce', () => {
 		// GIVEN a DSN where the delivery-status part omits Status
 		// WHEN parseBounce runs
 		// THEN bounceType='unknown' so the caller skips hard/soft side effects
-		//   (we still surface the row, but contacts/timeline stay untouched)
+		//   (we still surface the row, but the channel/timeline stay untouched)
 		const malformed = [
 			`From: MAILER-DAEMON@example.com`,
 			`To: alice@example.com`,

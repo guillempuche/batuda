@@ -4,6 +4,12 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
 
+import {
+	channelsOf,
+	clearEmailSuppression,
+	writeChannels,
+} from '../../services/contact-channels'
+
 // One reachable channel. `kind` is open (email, phone, linkedin, x, website,
 // bluesky, …); only the email channel carries a deliverability `verification`.
 const ChannelInput = Schema.Struct({
@@ -28,14 +34,11 @@ const ListContacts = Tool.make('list_contacts', {
 
 const CreateContact = Tool.make('create_contact', {
 	description:
-		'Create a contact linked to a company. Role examples: CEO, CTO, Marketing Director, Sales Manager. Pass channels[] for any reachable address (kind: email | phone | linkedin | x | website | bluesky | …); the primary email also populates the canonical email used for sending.',
+		'Create a contact linked to a company. Role examples: CEO, CTO, Marketing Director, Sales Manager. Pass channels[] for every reachable address (kind: email | phone | linkedin | x | website | bluesky | …); the primary email channel is the address used for sending.',
 	parameters: Schema.Struct({
 		company_id: Schema.String,
 		name: Schema.String,
 		role: Schema.optional(Schema.String),
-		email: Schema.optional(Schema.String),
-		phone: Schema.optional(Schema.String),
-		linkedin: Schema.optional(Schema.String),
 		notes: Schema.optional(Schema.String),
 		channels: Schema.optional(Schema.Array(ChannelInput)),
 	}),
@@ -48,14 +51,11 @@ const CreateContact = Tool.make('create_contact', {
 
 const UpdateContact = Tool.make('update_contact', {
 	description:
-		'Update one or more fields on an existing contact by UUID. Only include fields to change. Pass channels[] to add/refresh reachable addresses. Set clear_email_suppression=true to reset email_status to "unknown" (use after a bounced/complained contact confirms their address is good again — this re-enables outbound mail to that address).',
+		'Update one or more fields on an existing contact by UUID. Only include fields to change. Pass channels[] to add/refresh reachable addresses. Set clear_email_suppression=true to reset the email channel to "unknown" (use after a bounced/complained contact confirms their address is good again — this re-enables outbound mail to that address).',
 	parameters: Schema.Struct({
 		id: Schema.String,
 		name: Schema.optional(Schema.String),
 		role: Schema.optional(Schema.String),
-		email: Schema.optional(Schema.String),
-		phone: Schema.optional(Schema.String),
-		linkedin: Schema.optional(Schema.String),
 		notes: Schema.optional(Schema.String),
 		channels: Schema.optional(Schema.Array(ChannelInput)),
 		clear_email_suppression: Schema.optional(Schema.Boolean),
@@ -90,67 +90,9 @@ export const ContactTools = Toolkit.make(
 	DeleteContact,
 )
 
-type ChannelInputT = typeof ChannelInput.Type
-
-/**
- * The canonical send address for a contact: an explicit `email` field wins,
- * else the primary email channel, else the first email channel, else none.
- * `contacts.email` is what the outbound path reads, so this picks one address
- * deterministically from whatever the caller supplied.
- */
-export const primaryEmailFrom = (
-	email: string | undefined,
-	channels: ReadonlyArray<ChannelInputT> | undefined,
-): string | undefined =>
-	email ??
-	channels?.find(c => c.kind === 'email' && c.is_primary)?.value ??
-	channels?.find(c => c.kind === 'email')?.value
-
 export const ContactHandlersLive = ContactTools.toLayer(
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
-
-		// Upsert channels for a contact, mirroring the canonical email as a
-		// channel so a uniform `channels` list always includes it.
-		const writeChannels = (
-			orgId: string,
-			contactId: string,
-			channels: ReadonlyArray<ChannelInputT>,
-			canonicalEmail: string | undefined,
-		) =>
-			Effect.gen(function* () {
-				const channelsToWrite = [...channels]
-				if (
-					canonicalEmail &&
-					!channelsToWrite.some(
-						c => c.kind === 'email' && c.value === canonicalEmail,
-					)
-				) {
-					channelsToWrite.push({
-						kind: 'email',
-						value: canonicalEmail,
-						is_primary: true,
-					})
-				}
-				for (const c of channelsToWrite) {
-					yield* sql`
-						INSERT INTO contact_channels
-							(organization_id, contact_id, kind, value, verification, confidence, is_primary)
-						VALUES (
-							${orgId}, ${contactId}, ${c.kind}, ${c.value},
-							${c.verification ?? null}, ${c.confidence ?? null}, ${c.is_primary ?? false}
-						)
-						ON CONFLICT (contact_id, kind, value) DO UPDATE SET
-							verification = EXCLUDED.verification,
-							confidence = EXCLUDED.confidence,
-							is_primary = EXCLUDED.is_primary,
-							updated_at = now()
-					`
-				}
-			})
-
-		const channelsOf = (contactId: string) =>
-			sql`SELECT * FROM contact_channels WHERE contact_id = ${contactId} ORDER BY is_primary DESC, kind`
 
 		return {
 			list_contacts: ({ company_id }) =>
@@ -168,44 +110,31 @@ export const ContactHandlersLive = ContactTools.toLayer(
 			create_contact: ({ company_id, channels, ...fields }) =>
 				Effect.gen(function* () {
 					const currentOrg = yield* CurrentOrg
-					const email = primaryEmailFrom(fields.email, channels)
 					const rows = yield* sql`INSERT INTO contacts ${sql.insert({
 						organizationId: currentOrg.id,
 						companyId: company_id,
 						...fields,
-						...(email !== undefined ? { email } : {}),
 					})} RETURNING *`
 					const contact = rows[0] as { id: string }
 					if (channels && channels.length > 0) {
-						yield* writeChannels(currentOrg.id, contact.id, channels, email)
+						yield* writeChannels(sql, currentOrg.id, contact.id, channels)
 					}
-					const ch = yield* channelsOf(contact.id)
+					const ch = yield* channelsOf(sql, contact.id)
 					return { ...rows[0], channels: ch }
 				}).pipe(Effect.orDie),
 
 			update_contact: ({ id, channels, clear_email_suppression, ...fields }) =>
 				Effect.gen(function* () {
 					const currentOrg = yield* CurrentOrg
-					const email = primaryEmailFrom(fields.email, channels)
-					const data: Record<string, unknown> = {
+					const rows = yield* sql`UPDATE contacts SET ${sql.update({
 						...fields,
-						...(email !== undefined ? { email } : {}),
 						updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
-					}
-					if (clear_email_suppression) {
-						data['emailStatus'] = 'unknown'
-						data['emailStatusReason'] = null
-						data['emailStatusUpdatedAt'] = DateTime.toDateUtc(
-							DateTime.nowUnsafe(),
-						)
-						data['emailSoftBounceCount'] = 0
-					}
-					const rows =
-						yield* sql`UPDATE contacts SET ${sql.update(data, ['id'])} WHERE id = ${id} RETURNING *`
+					})} WHERE id = ${id} RETURNING *`
+					if (clear_email_suppression) yield* clearEmailSuppression(sql, id)
 					if (channels && channels.length > 0) {
-						yield* writeChannels(currentOrg.id, id, channels, email)
+						yield* writeChannels(sql, currentOrg.id, id, channels)
 					}
-					const ch = yield* channelsOf(id)
+					const ch = yield* channelsOf(sql, id)
 					return { ...rows[0], channels: ch }
 				}).pipe(Effect.orDie),
 

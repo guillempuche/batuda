@@ -15,6 +15,20 @@ export type CompanyRow = {
 	readonly status: string
 }
 export type ContactRow = { readonly id: string; readonly name: string }
+// A seed contact before its reachable addresses are split into channels.
+type ContactFixture = {
+	readonly companyId: string
+	readonly name: string
+	readonly role?: string
+	readonly isDecisionMaker?: boolean
+	readonly email?: string
+	readonly phone?: string
+	readonly whatsapp?: string
+	readonly linkedin?: string
+	readonly instagram?: string
+	readonly emailStatus?: string
+	readonly emailStatusReason?: string
+}
 export type InteractionRow = {
 	readonly id: string
 	readonly channel: string
@@ -110,13 +124,75 @@ export const seedContacts = (
 ) =>
 	Effect.gen(function* () {
 		yield* Effect.logInfo('Seeding contacts...')
-		const data = getPresetData(preset, companyMap, new Map())
+		const contacts = getPresetData(preset, companyMap, new Map())
+			.contacts as ReadonlyArray<ContactFixture>
+
+		// Identity rows only — reachable addresses become channels below.
 		const insertedContacts =
 			yield* sql<ContactRow>`INSERT INTO contacts ${sql.insert(
-				normalizeRows(stamp(data.contacts)),
+				normalizeRows(
+					stamp(
+						contacts.map(c => ({
+							companyId: c.companyId,
+							name: c.name,
+							role: c.role ?? null,
+							isDecisionMaker: c.isDecisionMaker ?? null,
+						})),
+					),
+				),
 			)} RETURNING id, name`
-
 		const contactMap = new Map(insertedContacts.map(c => [c.name, c.id]))
+
+		// Every reachable address is a channel; the email channel also carries
+		// any seeded suppression. Uniform shape so normalizeRows aligns the batch.
+		const channelRows = contacts.flatMap(c => {
+			const contactId = contactMap.get(c.name)
+			if (!contactId) return []
+			const channel = (
+				kind: string,
+				value: string,
+				isPrimary: boolean,
+				status: string,
+				statusReason: string | null,
+			) => ({
+				contactId,
+				kind,
+				value,
+				isPrimary,
+				verification: null,
+				confidence: null,
+				status,
+				statusReason,
+				softBounceCount: 0,
+			})
+			return [
+				c.email
+					? channel(
+							'email',
+							c.email,
+							true,
+							c.emailStatus ?? 'unknown',
+							c.emailStatusReason ?? null,
+						)
+					: null,
+				c.phone ? channel('phone', c.phone, false, 'unknown', null) : null,
+				c.whatsapp
+					? channel('whatsapp', c.whatsapp, false, 'unknown', null)
+					: null,
+				c.linkedin
+					? channel('linkedin', c.linkedin, false, 'unknown', null)
+					: null,
+				c.instagram
+					? channel('instagram', c.instagram, false, 'unknown', null)
+					: null,
+			].filter(r => r !== null)
+		})
+		if (channelRows.length > 0) {
+			yield* sql`INSERT INTO contact_channels ${sql.insert(
+				normalizeRows(stamp(channelRows)),
+			)}`
+		}
+
 		for (const c of insertedContacts) {
 			yield* Effect.logInfo(`  contact: ${c.name} (${c.id})`)
 		}

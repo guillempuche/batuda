@@ -113,9 +113,14 @@ export class CompanyService extends ServiceMap.Service<CompanyService>()(
 							})
 
 						const contacts = yield* sql`
-							SELECT * FROM contacts
-							WHERE company_id = ${company['id']}
-							  AND organization_id = ${currentOrg.id}
+							SELECT c.*, COALESCE(
+								(SELECT json_agg(ch ORDER BY ch.is_primary DESC, ch.kind)
+								 FROM contact_channels ch WHERE ch.contact_id = c.id),
+								'[]'::json
+							) AS channels
+							FROM contacts c
+							WHERE c.company_id = ${company['id']}
+							  AND c.organization_id = ${currentOrg.id}
 						`
 
 						const recentInteractions = yield* sql`
