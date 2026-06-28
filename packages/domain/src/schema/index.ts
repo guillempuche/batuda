@@ -5,6 +5,7 @@ export {
 	TranscriptStatus,
 } from './call-recordings'
 export { Company, CompanyId } from './companies'
+export { ContactChannel, ContactChannelId } from './contact-channels'
 export { Contact, ContactId, EmailStatus } from './contacts'
 export { Document, DocumentId } from './documents'
 export {
