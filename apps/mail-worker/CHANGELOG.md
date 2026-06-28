@@ -3,6 +3,41 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-06-28 (mail-worker-v2026.6.28)
+
+### Features
+
+* add instruction-template management API over HTTP and MCP ([08f1a50](https://github.com/guillempuche/batuda/commit/08f1a5059d8e93dbcaf4d3732ff381d3bd1348cc))
+* **instructions:** set and read stack composition via the API and MCP ([df1ae5e](https://github.com/guillempuche/batuda/commit/df1ae5e43e7bcfd43350e53d9a81dda43940c5e6))
+* load non-secret config from a baked file at boot ([c7939c6](https://github.com/guillempuche/batuda/commit/c7939c6ba958cf76b3df3d039c3905dea6ffedf0))
+* org-isolate the research cache and thread instruction templates ([fa6c6ef](https://github.com/guillempuche/batuda/commit/fa6c6eff56db43aac6da49ad57967e75212e3d92))
+* **server:** support multiple orgs per MCP OAuth connection ([bf0c957](https://github.com/guillempuche/batuda/commit/bf0c957d1e46a29e00d08ea805ea0ac9f56767ac))
+* **ui:** add fluid prose typescale for long-form reading ([4b089fe](https://github.com/guillempuche/batuda/commit/4b089fe186e3700d1f0b8f73c89f5da05312b3b7))
+* **ui:** adopt Utopia geometric ladder for fluid space tokens ([bdbfaa5](https://github.com/guillempuche/batuda/commit/bdbfaa5f76ef639896b47135e48f66109ab680b3))
+
+### Bug Fixes
+
+* harden research MCP input validation and lifecycle guards ([03a952d](https://github.com/guillempuche/batuda/commit/03a952d20c60f61a3aae44ba50d93fd1a0541d65))
+* **mail-worker:** sync from IMAP change events instead of a blocking idle() ([75121e3](https://github.com/guillempuche/batuda/commit/75121e34d788b72dd5512c822e05e4530627f165))
+* meet WCAG AA contrast and add ARIA to the mailbox connect form ([1326007](https://github.com/guillempuche/batuda/commit/1326007c3d3178d882dde6c4dd6d29d8b2896771)), closes [#b05220](https://github.com/guillempuche/batuda/issues/b05220) [#95400f](https://github.com/guillempuche/batuda/issues/95400f)
+* **ui:** add exports to publishConfig for npm distribution ([3c5cedb](https://github.com/guillempuche/batuda/commit/3c5cedb2b3d1564b549acaac8b17b6f9d51d6e37))
+* **ui:** match select popup width to its trigger ([839ae9b](https://github.com/guillempuche/batuda/commit/839ae9b803cdb896ce5d2ad896e75dbabd0d66d5))
+
+### Refactoring
+
+* remove starter instruction presets and source_preset_id column ([389bdaf](https://github.com/guillempuche/batuda/commit/389bdaf7591c03b78fc0d3b4403bdec36d2d3f19))
+
+### Documentation
+
+* **ui:** remove broken issue links from the v2026.6.14 changelog ([bfb0584](https://github.com/guillempuche/batuda/commit/bfb0584f06ffbf6f3e61cb15e8f6d4bd7ac7d16e))
+
+### CI/CD
+
+* **deploy:** keep lefthook disabled across prepare-script changes ([55433e7](https://github.com/guillempuche/batuda/commit/55433e7d207ba3d4f764b8499eef9c800bb9cc14))
+* **release:** ui v2026.6.14 ([ac6b83d](https://github.com/guillempuche/batuda/commit/ac6b83dd4f18e4b177adfef69a05f79d92bf5262))
+* **release:** ui v2026.6.14-1 ([7918100](https://github.com/guillempuche/batuda/commit/7918100c016129cf171d61d0e1587c39c2947f7b))
+* **release:** ui v2026.6.18 ([f8992d8](https://github.com/guillempuche/batuda/commit/f8992d843f1c08e94e503b8900c221039e13a63a))
+
 ## 2026-05-31 (mail-worker-v2026.5.31)
 
 ### Features
