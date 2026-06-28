@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-06-28 (server-v2026.6.28)
+
+### Features
+
+* load non-secret config from a baked file at boot ([c7939c6](https://github.com/guillempuche/batuda/commit/c7939c6ba958cf76b3df3d039c3905dea6ffedf0))
+* require explicit research, email, and geocoder config ([fc8b40d](https://github.com/guillempuche/batuda/commit/fc8b40d651861d8be01bfdb3cc7f2843e3ebac28))
+* **server:** log and refuse a pooled migration target ([f4bbd53](https://github.com/guillempuche/batuda/commit/f4bbd53e1bae669ff210546ac84cdaf7ed4c9bea))
+
 ## 2026-06-26 (server-v2026.6.26-1)
 
 ### Bug Fixes
