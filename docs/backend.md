@@ -825,6 +825,8 @@ Search:    stub | brave | firecrawl
 Scrape:    stub | firecrawl | local
 Extract:   stub | firecrawl | local
 Discover:  stub | firecrawl | anthropic | none
+Enrich:    stub | hunter | none          # decision-maker name + email discovery
+Verify:    stub | hunter | none          # email deliverability (MX pre-gate is built-in)
 Registry:  stub | librebor | none
 Report:    stub | einforma | none
 LLM:       stub | groq | fireworks | nebius | together | sambanova | custom
@@ -841,6 +843,8 @@ RESEARCH_PROVIDER_SEARCH=stub
 RESEARCH_PROVIDER_SCRAPE=stub
 RESEARCH_PROVIDER_EXTRACT=stub
 RESEARCH_PROVIDER_DISCOVER=stub
+RESEARCH_PROVIDER_ENRICH=stub
+RESEARCH_PROVIDER_VERIFY=stub
 RESEARCH_PROVIDER_REGISTRY_ES=stub
 RESEARCH_PROVIDER_REPORT_ES=stub
 RESEARCH_PROVIDER_LLM=stub
@@ -851,6 +855,8 @@ RESEARCH_PROVIDER_LLM=stub
 # RESEARCH_API_KEY_SCRAPE=fc-...
 # RESEARCH_API_KEY_EXTRACT=fc-...
 # RESEARCH_API_KEY_DISCOVER=fc-...
+# RESEARCH_API_KEY_ENRICH=          # Hunter.io key, when ENRICH=hunter
+# RESEARCH_API_KEY_VERIFY=          # Hunter.io key, when VERIFY=hunter
 # RESEARCH_API_KEY_REGISTRY_ES=
 # RESEARCH_API_KEY_REPORT_ES=
 # RESEARCH_API_KEY_LLM=gsk_...

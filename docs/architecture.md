@@ -139,7 +139,7 @@ Bounded context for company research. Owns the research agent loop, provider por
 
 - `domain/` — tagged errors (`ProviderError`, `BudgetExceeded`, `MonthlyCapExceeded`, `QuotaExhausted`, `ApprovalRequired`) + value types (`SearchResult`, `ScrapedPage`, `DiscoverResult`, `RegistryRecord`, `CompanyReport`, etc.)
 - `application/` — ports (`SearchProvider`, `ScrapeProvider`, `ExtractProvider`, `DiscoverProvider`, `RegistryRouter`, `ReportRouter`, `Budget`, `ProviderQuota`), `ResearchService` (fiber-per-run agent loop with PubSub for SSE), policy resolution, output schema registry (freeform, company-enrichment-v1, competitor-scan-v1, contact-discovery-v1, prospect-scan-v1)
-- `infrastructure/` — boot-time provider selection (`providers-live.ts` for 6 capability ports, `llm-live.ts` for LLM inference), stub providers for zero-cost local dev, real providers (Brave Search, Firecrawl, libreBORME, einforma), cached search wrapper, OpenAI-compatible LLM layer via `@effect/ai-openai-compat`
+- `infrastructure/` — boot-time provider selection (`providers-live.ts` for the capability ports, `llm-live.ts` for LLM inference), stub providers for zero-cost local dev, real providers (Brave Search, Firecrawl, libreBORME, einforma, Hunter), cached search wrapper, OpenAI-compatible LLM layer via `@effect/ai-openai-compat`
 
 Provider selection uses `Layer.unwrap + Config.schema` — env vars pick the implementation at startup, same pattern as `EmailProviderLive`. Each provider is a `Layer<PortTag, E, R>` with R declaring its dependencies (stubs need nothing, real providers need `HttpClient` + `Config`).
 
@@ -230,7 +230,7 @@ Batuda has three bounded contexts. Each owns its own domain errors and types; de
 │    packages/research  ──► apps/server                            │
 │      domain/     errors, value types (SearchResult, etc.)        │
 │      application/                                                │
-│        ports     6 capability ports + Budget + ProviderQuota     │
+│        ports     capability ports + Budget + ProviderQuota       │
 │        schemas/  output schemas (freeform, enrichment, etc.)     │
 │        research-service  fiber-per-run agent loop + PubSub       │
 │        budget    per-run + monthly spending control               │
@@ -252,7 +252,7 @@ Batuda has three bounded contexts. Each owns its own domain errors and types; de
 
 **Why research is a separate bounded context.** Research has its own domain model (providers, budgets, quotas, schemas), its own error hierarchy (`ProviderError`, `BudgetExceeded`, `QuotaExhausted`), and its own infrastructure concerns (external API keys, LLM inference, cost tracking). It reads CRM data (companies, contacts) but never writes directly — proposed changes go through the `propose_update` tool, reviewed by the outer AI or user before applying. This separation means research provider implementations, pricing models, and LLM providers can evolve independently of the CRM schema.
 
-**Provider selection pattern.** Each of the 6 research capabilities (search, scrape, extract, discover, registry, report) plus LLM inference is configured by an env var (`RESEARCH_PROVIDER_*`) that picks the implementation at boot time. The pattern is `Layer.unwrap(Config.schema(...) → switch → return Layer)` — same as `EmailProviderLive`. Stubs provide zero-cost deterministic data for local dev. Real providers (Brave, Firecrawl, libreBORME, einforma) declare their dependencies (`HttpClient`, `Config`) in the R type, satisfied at the composition root.
+**Provider selection pattern.** Each research capability (search, scrape, extract, discover, enrich, verify, registry, report) plus LLM inference is configured by an env var (`RESEARCH_PROVIDER_*`) that picks the implementation at boot time. The pattern is `Layer.unwrap(Config.schema(...) → switch → return Layer)` — same as `EmailProviderLive`. Stubs provide zero-cost deterministic data for local dev. Real providers (Brave, Firecrawl, libreBORME, einforma) declare their dependencies (`HttpClient`, `Config`) in the R type, satisfied at the composition root.
 
 ---
 
