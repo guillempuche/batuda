@@ -11,6 +11,7 @@ import { Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import {
 	AlertTriangle,
+	AtSign,
 	Briefcase,
 	Camera,
 	Check,
@@ -18,11 +19,14 @@ import {
 	ExternalLink,
 	FileText,
 	Globe,
+	Link2,
 	Mail,
 	MailPlus,
 	MapPin,
+	MessageCircle,
 	Phone,
 	Plus,
+	Settings2,
 } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useCallback, useMemo, useState } from 'react'
@@ -55,6 +59,14 @@ import { OpenTasksCard } from '#/components/companies/open-tasks-card'
 import { ResearchSummaryCard } from '#/components/companies/research-summary-card'
 import { UpcomingMeetingsCard } from '#/components/companies/upcoming-meetings-card'
 import { WherePanel } from '#/components/companies/where-panel'
+import {
+	channelHref,
+	type DisplayChannel,
+	type EmailChannelStatus,
+	narrowChannels,
+	primaryEmailChannel,
+} from '#/components/contacts/display-channels'
+import { ManageChannelsDialog } from '#/components/contacts/manage-channels-dialog'
 import { useSetDocumentTitle } from '#/components/layout/top-bar-title'
 import { ResearchDialog } from '#/components/research/research-dialog'
 import type { ResearchRunRow } from '#/components/research/run-list'
@@ -127,10 +139,10 @@ type ContactRow = {
 	readonly name: string
 	readonly role: string | null
 	readonly isDecisionMaker: boolean
+	readonly channels: ReadonlyArray<DisplayChannel>
+	// Derived from the primary email channel for the send action + suppression UI.
 	readonly email: string | null
-	readonly phone: string | null
-	readonly linkedin: string | null
-	readonly emailStatus: 'unknown' | 'valid' | 'bounced' | 'complained'
+	readonly emailStatus: EmailChannelStatus
 	readonly emailStatusReason: string | null
 }
 
@@ -484,6 +496,12 @@ function DetailBody({
 		[researchResult],
 	)
 	const [researchDialogOpen, setResearchDialogOpen] = useState(false)
+	const [manageChannelsContactId, setManageChannelsContactId] = useState<
+		string | null
+	>(null)
+	// Re-derived from the live list so the dialog reflects channel edits live.
+	const manageChannelsContact =
+		contacts.find(c => c.id === manageChannelsContactId) ?? null
 	type PageEntry = {
 		readonly id: string
 		readonly title: string
@@ -1054,42 +1072,51 @@ function DetailBody({
 											</SuppressionBanner>
 										)}
 										<ContactLinks>
+											{contact.channels.map(ch => {
+												const Icon = CHANNEL_ICON[ch.kind] ?? Link2
+												const { href, external } = channelHref(
+													ch.kind,
+													ch.value,
+												)
+												return (
+													<ContactLink
+														key={ch.id}
+														href={href}
+														{...(external
+															? {
+																	target: '_blank',
+																	rel: 'noopener noreferrer',
+																}
+															: {})}
+													>
+														<Icon size={14} aria-hidden />
+														<span>{ch.value}</span>
+														{external && <ExternalLink size={12} aria-hidden />}
+													</ContactLink>
+												)
+											})}
 											{contact.email && (
-												<ContactLink href={`mailto:${contact.email}`}>
-													<Mail size={14} aria-hidden />
-													<span>{contact.email}</span>
-												</ContactLink>
+												<ContactLinkButton
+													type='button'
+													onClick={() =>
+														handleEmailContact(contact.id, contact.email)
+													}
+												>
+													<MailPlus size={14} aria-hidden />
+													<span>
+														<Trans>Email via Batuda</Trans>
+													</span>
+												</ContactLinkButton>
 											)}
 											<ContactLinkButton
 												type='button'
-												onClick={() =>
-													handleEmailContact(contact.id, contact.email)
-												}
+												onClick={() => setManageChannelsContactId(contact.id)}
 											>
-												<MailPlus size={14} aria-hidden />
+												<Settings2 size={14} aria-hidden />
 												<span>
-													<Trans>Email via Batuda</Trans>
+													<Trans>Manage channels</Trans>
 												</span>
 											</ContactLinkButton>
-											{contact.phone && (
-												<ContactLink href={`tel:${contact.phone}`}>
-													<Phone size={14} aria-hidden />
-													<span>{contact.phone}</span>
-												</ContactLink>
-											)}
-											{contact.linkedin && (
-												<ContactLink
-													href={contact.linkedin}
-													target='_blank'
-													rel='noopener noreferrer'
-												>
-													<Briefcase size={14} aria-hidden />
-													<span>
-														<Trans>Profile</Trans>
-													</span>
-													<ExternalLink size={12} aria-hidden />
-												</ContactLink>
-											)}
 										</ContactLinks>
 									</ContactCard>
 								))}
@@ -1168,6 +1195,13 @@ function DetailBody({
 					refreshResearch()
 				}}
 			/>
+			<ManageChannelsDialog
+				contactId={manageChannelsContact?.id ?? null}
+				contactName={manageChannelsContact?.name ?? ''}
+				channels={manageChannelsContact?.channels ?? []}
+				onClose={() => setManageChannelsContactId(null)}
+				onChanged={refreshContacts}
+			/>
 		</Page>
 	)
 }
@@ -1245,28 +1279,31 @@ function narrowContacts(
 		const r = row as Record<string, unknown>
 		if (typeof r['id'] !== 'string') continue
 		if (typeof r['name'] !== 'string') continue
-		const emailStatus =
-			r['emailStatus'] === 'valid' ||
-			r['emailStatus'] === 'bounced' ||
-			r['emailStatus'] === 'complained'
-				? r['emailStatus']
-				: 'unknown'
+		const channels = narrowChannels(r['channels'])
+		const primaryEmail = primaryEmailChannel(channels)
 		out.push({
 			id: r['id'],
 			name: r['name'],
 			role: typeof r['role'] === 'string' ? r['role'] : null,
 			isDecisionMaker: r['isDecisionMaker'] === true,
-			email: typeof r['email'] === 'string' ? r['email'] : null,
-			phone: typeof r['phone'] === 'string' ? r['phone'] : null,
-			linkedin: typeof r['linkedin'] === 'string' ? r['linkedin'] : null,
-			emailStatus,
-			emailStatusReason:
-				typeof r['emailStatusReason'] === 'string'
-					? r['emailStatusReason']
-					: null,
+			channels,
+			email: primaryEmail?.value ?? null,
+			emailStatus: primaryEmail?.status ?? 'unknown',
+			emailStatusReason: primaryEmail?.statusReason ?? null,
 		})
 	}
 	return out
+}
+
+const CHANNEL_ICON: Record<string, typeof Mail> = {
+	email: Mail,
+	phone: Phone,
+	whatsapp: MessageCircle,
+	linkedin: Briefcase,
+	x: AtSign,
+	instagram: AtSign,
+	website: Globe,
+	bluesky: AtSign,
 }
 
 function timelineKindToChannel(kind: string, fallback: string | null): string {

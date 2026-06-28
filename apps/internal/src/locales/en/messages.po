@@ -192,6 +192,7 @@ msgstr "Active companies"
 msgid "Active organization"
 msgstr "Active organization"
 
+#: src/components/contacts/manage-channels-dialog.tsx
 #: src/routes/tasks/index.tsx
 msgid "Add"
 msgstr "Add"
@@ -539,6 +540,18 @@ msgstr "Changes have been saved."
 msgid "Channel"
 msgstr "Channel"
 
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Channel kind"
+msgstr "Channel kind"
+
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Channel value"
+msgstr "Channel value"
+
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Channels — {contactName}"
+msgstr "Channels — {contactName}"
+
 #: src/routes/settings/mcp/index.tsx
 msgid "Chat interfaces (OAuth)"
 msgstr "Chat interfaces (OAuth)"
@@ -598,6 +611,7 @@ msgstr "Clicked"
 msgid "Client"
 msgstr "Client"
 
+#: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/research/research-dialog.tsx
@@ -950,6 +964,10 @@ msgstr "Could not toggle the inbox state."
 #: src/routes/settings/mcp/connections.tsx
 msgid "Could not update"
 msgstr "Could not update"
+
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Could not update channels"
+msgstr "Could not update channels"
 
 #: src/routes/settings/organization/templates.tsx
 msgid "Couldn't add it"
@@ -1821,6 +1839,14 @@ msgstr "Low"
 msgid "Low priority"
 msgstr "Low priority"
 
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Make primary"
+msgstr "Make primary"
+
+#: src/routes/companies/$slug.tsx
+msgid "Manage channels"
+msgstr "Manage channels"
+
 #. placeholder {0}: row.email
 #: src/routes/emails/inboxes.tsx
 msgid "Manage footers for {0}"
@@ -1953,6 +1979,10 @@ msgstr "Minimize"
 msgid "Name"
 msgstr "Name"
 
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "name@company.com"
+msgstr "name@company.com"
+
 #: src/components/emails/compose-form.tsx
 msgid "name@example.com, another@example.com"
 msgstr "name@example.com, another@example.com"
@@ -2042,6 +2072,10 @@ msgstr "No calendar events yet"
 #: src/routes/tasks/index.tsx
 msgid "No changes recorded yet."
 msgstr "No changes recorded yet."
+
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "No channels yet. Add the first reachable address below."
+msgstr "No channels yet. Add the first reachable address below."
 
 #: src/routes/companies/index.tsx
 msgid "No companies match the filters"
@@ -2602,7 +2636,6 @@ msgstr "Private inbox"
 msgid "Products fit"
 msgstr "Products fit"
 
-#: src/routes/companies/$slug.tsx
 #: src/routes/settings/profile/index.tsx
 msgid "Profile"
 msgstr "Profile"
@@ -2743,6 +2776,10 @@ msgstr "Remove {chip}"
 #: src/routes/settings/organization/members.tsx
 msgid "Remove {email} from this organization?"
 msgstr "Remove {email} from this organization?"
+
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Remove channel"
+msgstr "Remove channel"
 
 #: src/routes/settings/organization/members.tsx
 msgid "Removing…"
@@ -3331,6 +3368,7 @@ msgstr "The 20 most recently edited open tasks. Click one to reopen it."
 msgid "The API key can no longer be used."
 msgstr "The API key can no longer be used."
 
+#: src/components/contacts/manage-channels-dialog.tsx
 #: src/routes/companies/$slug.tsx
 msgid "The change didn't go through. Try again."
 msgstr "The change didn't go through. Try again."
