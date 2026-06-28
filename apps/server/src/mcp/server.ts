@@ -27,6 +27,10 @@ import { ProductHandlersLive, ProductTools } from './tools/products'
 import { ProposalHandlersLive, ProposalTools } from './tools/proposals'
 import { RecordingHandlersLive, RecordingTools } from './tools/recordings'
 import {
+	ResearchContactsHandlersLive,
+	ResearchContactsTools,
+} from './tools/research-contacts'
+import {
 	ResearchLifecycleHandlersLive,
 	ResearchLifecycleTools,
 } from './tools/research-lifecycle'
@@ -52,6 +56,7 @@ export const McpToolsLive = Layer.mergeAll(
 	McpServer.toolkit(RecordingTools),
 	McpServer.toolkit(ResearchLifecycleTools),
 	McpServer.toolkit(ResearchMcpTools),
+	McpServer.toolkit(ResearchContactsTools),
 	McpServer.toolkit(ResearchRegistryTools),
 	McpServer.toolkit(InstructionsMcpTools),
 	McpServer.toolkit(TimelineTools),
@@ -80,6 +85,7 @@ export const McpToolsLive = Layer.mergeAll(
 	Layer.provide(RecordingHandlersLive),
 	Layer.provide(ResearchLifecycleHandlersLive),
 	Layer.provide(ResearchMcpHandlersLive),
+	Layer.provide(ResearchContactsHandlersLive),
 	Layer.provide(ResearchRegistryHandlersLive),
 	Layer.provide(InstructionsMcpHandlersLive),
 	Layer.provide(TimelineHandlersLive),

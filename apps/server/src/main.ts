@@ -14,6 +14,7 @@ import { BookingProviderLive, IcsParserLive } from '@batuda/calendar'
 import { BatudaApi } from '@batuda/controllers'
 import { ParticipantMatcher } from '@batuda/email/participant-matcher'
 import {
+	ContactDiscovery,
 	makeResearchLlmLive,
 	makeResearchProvidersLive,
 	ResearchEventSink,
@@ -223,6 +224,7 @@ const ServicesLive = Layer.mergeAll(
 	EmailService.layer,
 	RecordingService.layer,
 	ResearchService.layer,
+	ContactDiscovery.layer,
 	InstructionsService.layer,
 	Geocoder.layer,
 	// daemonLayer outputs `never` so a downstream `provideMerge` would
