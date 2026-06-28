@@ -433,7 +433,8 @@ The server runs on Unikraft (stateless Node.js, scales to zero when idle); the w
 
 ```
 companies           — core entity, all prospect/client data
-contacts            — people at companies
+contacts            — people at companies (email stays the canonical send address)
+contact_channels    — open per-contact channel list (email, phone, linkedin, x, website, bluesky...)
 interactions        — every touchpoint (call, visit, email, DM...)
 tasks               — follow-up queue
 products            — service/product catalog
