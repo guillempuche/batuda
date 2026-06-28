@@ -173,7 +173,7 @@ Cloud env requires `gh` authenticated locally (`gh auth status`). If `gh` is mis
 
 **I lost my admin password.** `pnpm cli auth reset-password --email <my-email>`. The CLI prompts for the new password and hashes it directly into `"account"`.
 
-**Magic link URL never prints.** Make sure you are on `--env local`. Cloud runs dispatch through AgentMail and intentionally do not leak the URL to stdout.
+**Magic link URL never prints.** Make sure you are on `--env local`. Cloud runs dispatch through the transactional email provider (Resend) and intentionally do not leak the URL to stdout.
 
 **Server logs look empty.** Effect logs persist to `apps/server/server.log` across `node --watch` reloads. `grep event apps/server/server.log | tail -n 20` is the fastest way to catch the last structured log lines.
 
