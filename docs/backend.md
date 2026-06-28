@@ -123,7 +123,7 @@ apps/server/src/
 │   └── better-auth.d.ts      # Type declarations for Better Auth
 └── services/                 # Business logic, called by both routes and MCP tools
     ├── companies.ts
-    ├── email.ts              # AgentMail: send outbound + handle inbound replies
+    ├── email.ts              # send outbound (SMTP) + handle inbound replies
     ├── email-provider-live.ts # Boot-time email provider selection (Layer.unwrap)
     ├── pages.ts              # page CRUD, view tracking, publish/archive
     ├── recordings.ts
@@ -617,7 +617,7 @@ Better Auth v1.5.6 handles all authentication. See [architecture.md](architectur
 
 Key files:
 
-- `src/lib/auth.ts` — Better Auth instance as `ServiceMap.Service`, with plugins: `openAPI`, `bearer`, `admin`, `apiKey`, `magicLink` (links are dispatched through `EmailProvider.sendMagicLink` — locally they land in `apps/server/.dev-inbox/` as `*sign-in-to-batuda*.md` files; in cloud they go through AgentMail)
+- `src/lib/auth.ts` — Better Auth instance as `ServiceMap.Service`, with plugins: `openAPI`, `bearer`, `admin`, `apiKey`, `magicLink` (links are dispatched through `EmailProvider.sendMagicLink` — locally they land in `apps/server/.dev-inbox/` as `*sign-in-to-batuda*.md` files; in cloud they go through the transactional email provider, Resend)
 - `src/lib/env.ts` — Centralized environment variables (DATABASE_URL, BETTER_AUTH_SECRET, etc.)
 - `src/middleware/session.ts` — `SessionMiddleware` validates sessions via `auth.api.getSession()`, provides `SessionContext`
 - `src/routes/auth.ts` — Wildcard `/auth/*` GET/POST routes
@@ -644,9 +644,9 @@ Sign-in is unaffected: `POST /auth/sign-in/email` still works for any existing u
 
 ---
 
-## Email service (AgentMail + React Email v6)
+## Email service (generic IMAP/SMTP + React Email v6)
 
-Outbound email (outreach, follow-ups, replies) and inbound handling via [AgentMail](https://agentmail.to). Authoring on both ends — humans in the web app's compose form, AI agents via MCP — converges on a single typed block tree, rendered through shared primitives in `packages/email`. AgentMail carries the final MIME; Batuda owns the authoring surface and the rendering pipeline.
+Outbound email (outreach, follow-ups, replies) goes through a bring-your-own IMAP/SMTP mailbox — `nodemailer` over SMTP for the send, then an IMAP `APPEND` into the Sent folder. Inbound + bounce handling runs in `apps/mail-worker` (one IMAP `IDLE` per inbox); per-inbox credentials are AES-256-GCM-encrypted on the `inboxes` row. Authoring on both ends — humans in the web app's compose form, AI agents via MCP — converges on a single typed block tree, rendered through shared primitives in `packages/email`. SMTP carries the final MIME; Batuda owns the authoring surface and the rendering pipeline.
 
 ### Package layout — `packages/email`
 
@@ -684,7 +684,7 @@ At render time, `staging` resolves to a `cid` via `email_attachment_staging` + t
 
 ### Draft body shadow (`email_draft_bodies`)
 
-AgentMail's draft API accepts only `{to, cc, bcc, subject, text, html, attachments, in_reply_to, send_at, client_id, labels}` — no metadata / JSON field. So a pure AgentMail round-trip would lose the block tree on every reload. The service keeps a local shadow keyed by provider `draft_id`:
+SMTP/IMAP carry only the final rendered MIME — there is no metadata field to round-trip the authoring block tree, so a draft that lived only as sent-mail bytes would lose its block tree on every reload. The service keeps a local shadow keyed by `draft_id`:
 
 ```sql
 CREATE TABLE email_draft_bodies (
@@ -695,7 +695,7 @@ CREATE TABLE email_draft_bodies (
 )
 ```
 
-Writes happen on every draft upsert; reads `LEFT JOIN` so the editor re-hydrates losslessly. `draft_id` is `TEXT` because upstream providers own its shape (AgentMail string, local filename stem). The provider still owns `html`/`text`/`attachments` — the shadow only carries the authoring tree.
+Writes happen on every draft upsert; reads `LEFT JOIN` so the editor re-hydrates losslessly. `draft_id` is `TEXT` because its shape is owned by where the draft lives (a server-minted id, or the local filename stem in dev). The rendered `html`/`text`/`attachments` are derived at send time — the shadow only carries the authoring tree.
 
 ### Attachment staging (`email_attachment_staging`)
 
@@ -741,23 +741,22 @@ The sanitizer is **allowlist-mapping, not strip-in-place**: HTML is parsed, walk
 
 Inbound parent inline images (`<img src="cid:…">`) map to `{ type: 'image', source: { kind: 'cid', cid } }` so on reply-send the server re-attaches the parent's inline parts (fetched via `EmailProvider.streamAttachment`) with the same `Content-ID`. Those bytes **do not** flow through `email_attachment_staging` — they're re-forwarded straight from the provider. Non-inline parent attachments are not carried forward (matches Gmail / Apple Mail behavior).
 
-Threading headers (`In-Reply-To`, `References`) are emitted by AgentMail when the server calls its reply endpoint with the parent's `thread_id` + `message_id`. No server-side header construction.
+Threading headers (`In-Reply-To`, `References`) are set by the server when it builds the reply MIME, from the parent message's `Message-ID` (and the inherited `References` chain), so the reply stitches into the thread in the recipient's client.
 
 ### Footer CRUD
 
 `inbox_footers.body_json JSONB` (replacing the prior `html` + `text_fallback` columns). Authored in `FooterManageDialog` via the same `EmailEditor` used for compose, just with `mode="footer"` — narrower palette (no H1, no divider, no lists; paragraphs + inline formatting + `image` blocks for logo-in-signature). No structured author/city/brand fields; the user composes the signature freely. At send time, footer blocks are appended to the user's block tree before `renderBlocks` runs — a single render step yields consistent footer placement in both `html` and `text`.
 
-### AgentMail inline-image semantics
+### Inline-image semantics
 
-`SendAttachmentInput` carries an explicit `disposition: 'inline' | 'attachment'`. Without it, AgentMail's MIME builder defaults to `attachment` and `<img src="cid:…">` in the body fails to resolve against the part. The server sets `disposition: 'inline'` whenever the staging row has `is_inline = true`; inbound parent inline parts are re-emitted the same way on reply.
+`SendAttachmentInput` carries an explicit `disposition: 'inline' | 'attachment'`. Without it, the MIME builder defaults to `attachment` and `<img src="cid:…">` in the body fails to resolve against the part. The server sets `disposition: 'inline'` whenever the staging row has `is_inline = true`; inbound parent inline parts are re-emitted the same way on reply.
 
 ### Env vars
 
 ```
-EMAIL_PROVIDER=agentmail          # or `local` for the filesystem catcher in dev
-AGENTMAIL_API_KEY=am_...
-AGENTMAIL_WEBHOOK_SECRET=whsec_...
-EMAIL_FROM=hello@taller.cat          # tenant's own verified sending domain
+EMAIL_PROVIDER=local-inbox            # dev filesystem catcher; real per-inbox IMAP/SMTP transport runs in the mail-worker
+EMAIL_PROVIDER_TRANSACTIONAL=local    # magic links / resets; `resend` in cloud (+ EMAIL_API_KEY_TRANSACTIONAL, EMAIL_FROM_TRANSACTIONAL)
+EMAIL_CREDENTIAL_KEY=<base64 32 bytes> # AES-256-GCM master key; a per-inbox HKDF subkey encrypts each inbox's IMAP/SMTP password
 ```
 
 The `EMAIL_PROVIDER` gate is required — there's no auto/NODE_ENV fallback (see `feedback_explicit_env_vars.md`).

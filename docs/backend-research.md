@@ -1547,7 +1547,7 @@ Named so the v1 shape doesn't preclude them.
 - **Per-provider trust** in `user_research_policy` as additional jsonb column (v2).
 - **Multi-agent coordination**: coordinator + specialized sub-agents (web, registry, CRM, email). Only worth adding at ≥30 tools or long horizons.
 - **MCP-as-the-abstraction**: let ops add research sources by configuring MCP servers instead of writing providers. Useful if the provider ecosystem matures further.
-- **Email as research channel** via AgentMail: send a clarifying question to a prospect's public address and treat the reply as a source.
+- **Email as research channel** via the outbound email service: send a clarifying question to a prospect's public address and treat the reply as a source.
 - **More countries**: UK Companies House, FR Pappers/Sirene, DE Handelsregister. Each is one `*-registry.ts` impl + a router branch.
 - **Native web_search tools**: if Anthropic's or OpenAI's native search tools improve enough, make them first-class `DiscoverProvider` implementations.
 
