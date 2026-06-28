@@ -53,6 +53,7 @@ import { makeBraveSearch } from './brave/search'
 import { makeCachedExtract } from './cached-extract'
 import { makeCachedScrape } from './cached-scrape'
 import { makeCachedSearch } from './cached-search'
+import { makeCompaniesHouseRegistry } from './companies-house/registry'
 import { makeFirecrawlExtract } from './firecrawl/extract'
 import { makeFirecrawlScrape } from './firecrawl/scrape'
 import { makeHunterEnrichment } from './hunter/enrichment'
@@ -63,6 +64,7 @@ import { StubDiscoverProviderInstance } from './stub/discover'
 import { StubEnrichmentProviderInstance } from './stub/enrichment'
 import { StubExtractProviderInstance } from './stub/extract'
 import { StubRegistryEsProviderInstance } from './stub/registry-es'
+import { StubRegistryGbProviderInstance } from './stub/registry-gb'
 import { StubReportEsProviderInstance } from './stub/report-es'
 import { StubScrapeProviderInstance } from './stub/scrape'
 import { StubSearchProviderInstance } from './stub/search'
@@ -204,6 +206,20 @@ const registryInstance = (cc: Country, vendor: string, slot: number) => {
 				)
 		}
 	}
+	if (cc === 'GB') {
+		switch (vendor as (typeof REGISTRY_VENDORS_BY_COUNTRY)['GB'][number]) {
+			case 'stub':
+				return Effect.succeed(StubRegistryGbProviderInstance)
+			case 'companies-house':
+				return makeCompaniesHouseRegistry(slot)
+			case 'none':
+				return Effect.succeed(
+					RegistryRouter.of({
+						lookup: () => disabledError('registry'),
+					}),
+				)
+		}
+	}
 	const _exhaust: never = cc
 	return _exhaust
 }
@@ -219,6 +235,16 @@ const reportInstance = (cc: Country, vendor: string, _slot: number) => {
 						report: () => notYetImplementedError('report', 'einforma'),
 					}),
 				)
+			case 'none':
+				return Effect.succeed(
+					ReportRouter.of({
+						report: () => disabledError('report'),
+					}),
+				)
+		}
+	}
+	if (cc === 'GB') {
+		switch (vendor as (typeof REPORT_VENDORS_BY_COUNTRY)['GB'][number]) {
 			case 'none':
 				return Effect.succeed(
 					ReportRouter.of({

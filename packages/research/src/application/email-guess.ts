@@ -65,6 +65,35 @@ const DEFAULT_PATTERNS = [
 	'{last}',
 ] as const
 
+export interface PersonName {
+	readonly firstName: string
+	readonly lastName: string
+}
+
+/**
+ * Split a single display name into first + last. Handles the
+ * "SURNAME, Forename" shape registries like Companies House return, as well as
+ * plain "First Last". A one-word name becomes the first name with no surname.
+ */
+export const splitPersonName = (name: string): PersonName => {
+	const trimmed = name.trim()
+	if (trimmed.includes(',')) {
+		const comma = trimmed.indexOf(',')
+		const last = trimmed.slice(0, comma).trim()
+		const first =
+			trimmed
+				.slice(comma + 1)
+				.trim()
+				.split(/\s+/)[0] ?? ''
+		return { firstName: first, lastName: last }
+	}
+	const tokens = trimmed.split(/\s+/).filter(t => t.length > 0)
+	return {
+		firstName: tokens[0] ?? '',
+		lastName: tokens.length > 1 ? (tokens[tokens.length - 1] ?? '') : '',
+	}
+}
+
 /** Ordered, de-duplicated candidate emails for a name at a domain. */
 export const guessEmails = (input: GuessNameInput): string[] => {
 	const first = normalize(input.firstName)
