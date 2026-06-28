@@ -14,11 +14,42 @@
 import { Config, Effect, Layer, ServiceMap } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
+import { type Country, SUPPORTED_COUNTRIES } from '../domain/country'
 import { EnrichmentResult, type VerificationVerdict } from '../domain/types'
 import { makeBudgetLayer } from './budget'
-import { guessEmails } from './email-guess'
+import { guessEmails, splitPersonName } from './email-guess'
 import { resolvePolicy, type SystemDefaults } from './policy'
-import { Budget, EmailVerifier, EnrichmentProvider, MxResolver } from './ports'
+import {
+	Budget,
+	EmailVerifier,
+	EnrichmentProvider,
+	MxResolver,
+	RegistryRouter,
+} from './ports'
+
+// A person from either name source (registry directors or the enrichment
+// vendor). Registry directors arrive with just a name + role; enrichment adds
+// emails, seniority, and other channels. Only the fields the pipeline reads.
+interface SourcePerson {
+	readonly firstName: string
+	readonly lastName: string
+	readonly position?: string | undefined
+	readonly seniority?: string | undefined
+	readonly email?: string | undefined
+	readonly emailConfidence?: number | undefined
+	readonly verification?: VerificationVerdict | undefined
+	readonly linkedin?: string | undefined
+	readonly x?: string | undefined
+	readonly phone?: string | undefined
+}
+
+// Narrow a free-text country hint to a country that has a national registry.
+const registryCountry = (hint: string | undefined): Country | undefined => {
+	const upper = hint?.trim().toUpperCase()
+	return upper && (SUPPORTED_COUNTRIES as readonly string[]).includes(upper)
+		? (upper as Country)
+		: undefined
+}
 
 // Fixed per-call cost estimates (cents). Hunter is credit-based; these meter the
 // run budget + monthly cap without trying to mirror exact credit pricing.
@@ -115,6 +146,7 @@ export class ContactDiscovery extends ServiceMap.Service<ContactDiscovery>()(
 			const sql = yield* SqlClient.SqlClient
 			const enrichment = yield* EnrichmentProvider
 			const verifier = yield* EmailVerifier
+			const registry = yield* RegistryRouter
 			const mx = yield* MxResolver
 			const fanout = yield* Config.int('RESEARCH_MAX_CONCURRENCY_FANOUT').pipe(
 				Config.withDefault(3),
@@ -174,23 +206,44 @@ export class ContactDiscovery extends ServiceMap.Service<ContactDiscovery>()(
 					const core = Effect.gen(function* () {
 						const budget = yield* Budget
 
-						// Names (universal path). A terminal enrichment failure
-						// degrades to "no people" rather than failing the run.
-						yield* budget.chargePaid('hunter-enrich', ENRICH_COST_CENTS)
-						const people = yield* enrichment
-							.findPeople({
-								domain: input.domain,
-								companyName: input.companyName,
-								country: input.country,
+						// Names: registry-first where a national registry exists
+						// (free/cheap, authoritative officers), else the universal
+						// enrichment vendor. Registry directors carry no email, so
+						// they flow through the same guess + verify below.
+						const supportedCountry = registryCountry(input.country)
+						let people: ReadonlyArray<SourcePerson> = []
+						if (supportedCountry) {
+							const record = yield* registry
+								.lookup({
+									country: supportedCountry,
+									query: input.companyName,
+								})
+								.pipe(
+									Effect.catchTag('ProviderError', () => Effect.succeed(null)),
+								)
+							people = (record?.directors ?? []).map(d => {
+								const { firstName, lastName } = splitPersonName(d.name)
+								return { firstName, lastName, position: d.role }
 							})
-							.pipe(
-								Effect.catchTag('ProviderError', () =>
-									Effect.succeed(
-										new EnrichmentResult({ people: [], units: 0 }),
+						}
+						// Universal fallback (paid) when no registry hit.
+						if (people.length === 0) {
+							yield* budget.chargePaid('hunter-enrich', ENRICH_COST_CENTS)
+							people = yield* enrichment
+								.findPeople({
+									domain: input.domain,
+									companyName: input.companyName,
+									country: input.country,
+								})
+								.pipe(
+									Effect.catchTag('ProviderError', () =>
+										Effect.succeed(
+											new EnrichmentResult({ people: [], units: 0 }),
+										),
 									),
-								),
-								Effect.map(r => r.people),
-							)
+									Effect.map(r => r.people),
+								)
+						}
 
 						const mxOutcome = yield* mx.resolve(input.domain)
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { guessEmails } from './email-guess'
+import { guessEmails, splitPersonName } from './email-guess'
 
 describe('guessEmails', () => {
 	describe('when given a full first and last name', () => {
@@ -138,6 +138,61 @@ describe('guessEmails', () => {
 				domain: '  ACME.COM  ',
 			})
 			expect(result[0]).toBe('jane.smith@acme.com')
+		})
+	})
+})
+
+describe('splitPersonName', () => {
+	describe('when the name is "SURNAME, Forename" (registry shape)', () => {
+		it('should map the part after the comma to the first name', () => {
+			// GIVEN a Companies House style officer name
+			// THEN surname/forename are un-swapped
+			expect(splitPersonName('SMITH, Jane')).toEqual({
+				firstName: 'Jane',
+				lastName: 'SMITH',
+			})
+		})
+
+		it('should take only the first given name when several follow', () => {
+			// GIVEN multiple forenames after the comma
+			// THEN only the first is used (best guess for an email local part)
+			expect(splitPersonName('PATEL, Arjun Kumar')).toEqual({
+				firstName: 'Arjun',
+				lastName: 'PATEL',
+			})
+		})
+	})
+
+	describe('when the name is plain "First Last"', () => {
+		it('should take the first and last tokens', () => {
+			// GIVEN a normal display name
+			expect(splitPersonName('Jane Smith')).toEqual({
+				firstName: 'Jane',
+				lastName: 'Smith',
+			})
+		})
+
+		it('should treat the final token as the surname when a middle name exists', () => {
+			// GIVEN a three-part name
+			expect(splitPersonName('Jane Q Smith')).toEqual({
+				firstName: 'Jane',
+				lastName: 'Smith',
+			})
+		})
+	})
+
+	describe('when the name is degenerate', () => {
+		it('should leave the surname empty for a single token', () => {
+			// GIVEN one word
+			expect(splitPersonName('Madonna')).toEqual({
+				firstName: 'Madonna',
+				lastName: '',
+			})
+		})
+
+		it('should return empties for a blank name', () => {
+			// GIVEN whitespace only
+			expect(splitPersonName('   ')).toEqual({ firstName: '', lastName: '' })
 		})
 	})
 })
