@@ -74,6 +74,60 @@ export class RegistryRecord extends Schema.Class<RegistryRecord>(
 	units: Schema.Number,
 }) {}
 
+/**
+ * Deliverability verdict for a guessed or found email, shared across the
+ * enrichment and verification steps of contact discovery.
+ */
+export const VERIFICATION_VERDICTS = [
+	'deliverable',
+	'risky',
+	'catch_all',
+	'undeliverable',
+	'unknown',
+] as const
+export const VerificationVerdict = Schema.Literals(VERIFICATION_VERDICTS)
+export type VerificationVerdict = (typeof VERIFICATION_VERDICTS)[number]
+
+/** People found for a company domain by an enrichment vendor (Hunter/Apollo). */
+export class EnrichmentResult extends Schema.Class<EnrichmentResult>(
+	'EnrichmentResult',
+)({
+	people: Schema.Array(
+		Schema.Struct({
+			firstName: Schema.String,
+			lastName: Schema.String,
+			position: Schema.optional(Schema.String),
+			seniority: Schema.optional(Schema.String),
+			department: Schema.optional(Schema.String),
+			email: Schema.optional(Schema.String),
+			emailConfidence: Schema.optional(Schema.Number),
+			// 'personal' | 'generic' (role mailbox) — generic ones rank lowest.
+			type: Schema.optional(Schema.String),
+			// A verdict the vendor already established for `email`, so the
+			// pipeline can skip a redundant paid verification call.
+			verification: Schema.optional(VerificationVerdict),
+			// Other channels the vendor returns for the same person (data-only —
+			// no verification today). Open-ended; only the ones a vendor fills
+			// are present. `x` carries the handle from Hunter's `twitter` field.
+			linkedin: Schema.optional(Schema.String),
+			x: Schema.optional(Schema.String),
+			phone: Schema.optional(Schema.String),
+		}),
+	),
+	units: Schema.Number,
+}) {}
+
+/** Deliverability check on a single email address. */
+export class EmailVerification extends Schema.Class<EmailVerification>(
+	'EmailVerification',
+)({
+	result: VerificationVerdict,
+	score: Schema.optional(Schema.Number),
+	catchAll: Schema.optional(Schema.Boolean),
+	mxFound: Schema.Boolean,
+	units: Schema.Number,
+}) {}
+
 /** A paid company report (e.g. einforma). */
 export class CompanyReport extends Schema.Class<CompanyReport>('CompanyReport')(
 	{
