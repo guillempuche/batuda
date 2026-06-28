@@ -50,12 +50,13 @@ pre-push:
         pnpm lint-secrets
 
     test:
-      # `--concurrency=1` because @batuda/server and @batuda/mail-worker
-      # both run live-DB integration tests against localhost:5433. Server's
-      # `multi-org-isolation.test.ts` TRUNCATEs `email_messages`/
-      # `email_thread_links` in beforeAll; mail-worker's
-      # `threading.test.ts` inserts into the same tables and races the
-      # truncate when both packages run in parallel. Serialise until we
-      # ship per-package DB isolation.
+      # Unit suite AND the live-DB integration suite. `turbo test` alone runs
+      # only the default config, which EXCLUDES `*.integration.test.ts`, so
+      # schema bugs used to slip straight to CI; `test:integration` closes that.
+      # It runs against a disposable `batuda_it` DB that
+      # scripts/integration-db-setup.ts creates, migrates to HEAD, and seeds, so
+      # local matches CI's fresh schema instead of a stale shared dev DB.
+      # `--concurrency=1` serialises @batuda/server and @batuda/mail-worker,
+      # which share that one DB and TRUNCATE shared tables in beforeAll.
       run: |
-        pnpm turbo test --concurrency=1
+        pnpm turbo test test:integration --concurrency=1
