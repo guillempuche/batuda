@@ -1,5 +1,6 @@
-import { Effect, Schema } from 'effect'
-import { Tool, Toolkit } from 'effect/unstable/ai'
+import { Config, Effect, Schema } from 'effect'
+import { McpSchema, McpServer, Tool, Toolkit } from 'effect/unstable/ai'
+import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg, SessionContext } from '@batuda/controllers'
 import { EmailBlocks } from '@batuda/email/schema'
@@ -14,7 +15,13 @@ import {
 // (apps/server/src/mcp/http.ts) provides both alongside CurrentUser, so
 // declaring them here lets the toolkit's static check see them as
 // satisfied requirements rather than free `R` channels.
-const REQUEST_DEPENDENCIES = [SessionContext, CurrentOrg]
+// McpServerClient lets the agent-facing tools raise an elicitation (the soft
+// send guardrails in send_email / reply_email); the MCP runtime provides it.
+const REQUEST_DEPENDENCIES = [
+	SessionContext,
+	CurrentOrg,
+	McpSchema.McpServerClient,
+]
 
 // Convert MCP snake_case refs to the service's camelCase StagingRef.
 // `inline: false` is the default; unspecified inline means tray-style
@@ -49,6 +56,12 @@ const SendEmailResult = Schema.Union([
 		contactStatus: Schema.Literals(['bounced', 'complained']),
 		recipient: Schema.String,
 		reason: Schema.NullOr(Schema.String),
+	}),
+	// Soft, agent-only: the agent declined the confirmation prompt for a risky
+	// address or an over-cap thread. Nothing was sent.
+	Schema.Struct({
+		_tag: Schema.Literal('cancelled'),
+		reason: Schema.String,
 	}),
 ])
 
@@ -591,80 +604,191 @@ export const EmailTools = Toolkit.make(
 	ManageInboxFooter,
 )
 
+// The soft send guard fires when an email channel has a verdict that isn't a
+// confirmed `deliverable` (risky / catch_all / undeliverable / unknown, or any
+// unrecognised value). A missing verdict (null) is not gated — there is no
+// evidence the address is bad.
+export const isRiskyEmailVerdict = (verification: string | null): boolean =>
+	verification !== null && verification !== 'deliverable'
+
 export const EmailHandlersLive = EmailTools.toLayer(
 	Effect.gen(function* () {
 		const svc = yield* EmailService
 		const staging = yield* EmailAttachmentStaging
+		const sql = yield* SqlClient.SqlClient
+		// Soft per-thread send limit for the agent path (humans are never gated).
+		const softThreadLimit = yield* Config.int(
+			'EMAIL_AGENT_SOFT_THREAD_LIMIT',
+		).pipe(Config.withDefault(3))
+
+		// A known-risky deliverability verdict on the contact's primary email
+		// channel (catch-all / undeliverable / unknown). null when the email is
+		// deliverable or has no verdict to act on.
+		const riskyEmailVerdict = (contactId: string) =>
+			sql<{ verification: string | null }>`
+				SELECT verification FROM contact_channels
+				WHERE contact_id = ${contactId} AND kind = 'email'
+				ORDER BY is_primary DESC NULLS LAST
+				LIMIT 1
+			`.pipe(
+				Effect.map(rows => {
+					const v = rows[0]?.verification ?? null
+					return isRiskyEmailVerdict(v) ? v : null
+				}),
+			)
+
+		// Outbound count + linked contact for a thread, for the reply guard.
+		const threadSendState = (threadLinkId: string, orgId: string) =>
+			Effect.gen(function* () {
+				const links = yield* sql<{
+					externalThreadId: string
+					contactId: string | null
+				}>`
+					SELECT external_thread_id, contact_id FROM email_thread_links
+					WHERE id = ${threadLinkId} AND organization_id = ${orgId}
+					LIMIT 1
+				`
+				const link = links[0]
+				if (!link) return { count: 0, contactId: null as string | null }
+				const counts = yield* sql<{ n: number }>`
+					SELECT count(*)::int AS n FROM email_messages
+					WHERE direction = 'outbound' AND organization_id = ${orgId}
+					AND (message_id = ${link.externalThreadId}
+					     OR ${link.externalThreadId} = ANY("references"))
+				`
+				return { count: counts[0]?.n ?? 0, contactId: link.contactId }
+			})
+
+		// Ask the agent to confirm; declining (or no human to answer) aborts.
+		const confirmSend = (reason: string) =>
+			McpServer.elicit({
+				message: `${reason}. Send anyway?`,
+				schema: Schema.Struct({ confirm: Schema.Literals(['yes', 'no']) }),
+			}).pipe(
+				Effect.catchTag('ElicitationDeclined', () =>
+					Effect.succeed({ confirm: 'no' as const }),
+				),
+				Effect.map(r => r.confirm === 'yes'),
+			)
+
 		return {
 			send_email: params =>
-				svc
-					.send(
-						params.inbox_id,
-						typeof params.to === 'string' ? params.to : [...params.to],
-						params.subject,
-						params.body_json,
-						params.company_id,
-						params.contact_id,
-						{
+				Effect.gen(function* () {
+					// Soft guard (agent-only): a known-risky recipient asks first.
+					if (params.contact_id) {
+						const risky = yield* riskyEmailVerdict(params.contact_id)
+						if (risky) {
+							const ok = yield* confirmSend(
+								`This contact's email is not confirmed deliverable (verification: ${risky})`,
+							)
+							if (!ok) {
+								return {
+									_tag: 'cancelled' as const,
+									reason: `email verification: ${risky}`,
+								}
+							}
+						}
+					}
+					return yield* svc
+						.send(
+							params.inbox_id,
+							typeof params.to === 'string' ? params.to : [...params.to],
+							params.subject,
+							params.body_json,
+							params.company_id,
+							params.contact_id,
+							{
+								...(params.cc !== undefined && { cc: [...params.cc] }),
+								...(params.bcc !== undefined && { bcc: [...params.bcc] }),
+								...(params.reply_to !== undefined && {
+									replyTo: params.reply_to,
+								}),
+								...(params.preview !== undefined && {
+									preview: params.preview,
+								}),
+								...(params.attachments !== undefined && {
+									attachmentRefs: toStagingRefs(params.attachments),
+								}),
+								...(params.skip_footer !== undefined && {
+									skipFooter: params.skip_footer,
+								}),
+							},
+						)
+						.pipe(
+							Effect.map(r => ({
+								_tag: 'sent' as const,
+								messageId: r.messageId,
+								threadId: r.threadId,
+							})),
+							Effect.catchTag('EmailSuppressed', e =>
+								Effect.succeed({
+									_tag: 'suppressed' as const,
+									contactStatus: e.status,
+									recipient: e.recipient,
+									reason: e.reason,
+								}),
+							),
+						)
+				}).pipe(Effect.orDie),
+			reply_email: params =>
+				Effect.gen(function* () {
+					// Soft guards (agent-only): risky recipient and/or an
+					// over-the-soft-limit thread ask for confirmation first.
+					const org = yield* CurrentOrg
+					const { count, contactId } = yield* threadSendState(
+						params.thread_id,
+						org.id,
+					)
+					const reasons: string[] = []
+					if (contactId) {
+						const risky = yield* riskyEmailVerdict(contactId)
+						if (risky) {
+							reasons.push(
+								`the contact's email is not confirmed deliverable (verification: ${risky})`,
+							)
+						}
+					}
+					if (count >= softThreadLimit) {
+						reasons.push(
+							`this thread already has ${count} outbound messages (soft limit ${softThreadLimit})`,
+						)
+					}
+					if (reasons.length > 0) {
+						const ok = yield* confirmSend(`Heads up: ${reasons.join('; ')}`)
+						if (!ok) {
+							return { _tag: 'cancelled' as const, reason: reasons.join('; ') }
+						}
+					}
+					return yield* svc
+						.reply(params.thread_id, params.body_json, {
 							...(params.cc !== undefined && { cc: [...params.cc] }),
 							...(params.bcc !== undefined && { bcc: [...params.bcc] }),
-							...(params.reply_to !== undefined && {
-								replyTo: params.reply_to,
+							...(params.preview !== undefined && {
+								preview: params.preview,
 							}),
-							...(params.preview !== undefined && { preview: params.preview }),
 							...(params.attachments !== undefined && {
 								attachmentRefs: toStagingRefs(params.attachments),
 							}),
 							...(params.skip_footer !== undefined && {
 								skipFooter: params.skip_footer,
 							}),
-						},
-					)
-					.pipe(
-						Effect.map(r => ({
-							_tag: 'sent' as const,
-							messageId: r.messageId,
-							threadId: r.threadId,
-						})),
-						Effect.catchTag('EmailSuppressed', e =>
-							Effect.succeed({
-								_tag: 'suppressed' as const,
-								contactStatus: e.status,
-								recipient: e.recipient,
-								reason: e.reason,
-							}),
-						),
-						Effect.orDie,
-					),
-			reply_email: params =>
-				svc
-					.reply(params.thread_id, params.body_json, {
-						...(params.cc !== undefined && { cc: [...params.cc] }),
-						...(params.bcc !== undefined && { bcc: [...params.bcc] }),
-						...(params.preview !== undefined && { preview: params.preview }),
-						...(params.attachments !== undefined && {
-							attachmentRefs: toStagingRefs(params.attachments),
-						}),
-						...(params.skip_footer !== undefined && {
-							skipFooter: params.skip_footer,
-						}),
-					})
-					.pipe(
-						Effect.map(r => ({
-							_tag: 'sent' as const,
-							messageId: r.messageId,
-							threadId: r.threadId,
-						})),
-						Effect.catchTag('EmailSuppressed', e =>
-							Effect.succeed({
-								_tag: 'suppressed' as const,
-								contactStatus: e.status,
-								recipient: e.recipient,
-								reason: e.reason,
-							}),
-						),
-						Effect.orDie,
-					),
+						})
+						.pipe(
+							Effect.map(r => ({
+								_tag: 'sent' as const,
+								messageId: r.messageId,
+								threadId: r.threadId,
+							})),
+							Effect.catchTag('EmailSuppressed', e =>
+								Effect.succeed({
+									_tag: 'suppressed' as const,
+									contactStatus: e.status,
+									recipient: e.recipient,
+									reason: e.reason,
+								}),
+							),
+						)
+				}).pipe(Effect.orDie),
 			stage_email_attachment: params =>
 				Effect.gen(function* () {
 					const bytes = Buffer.from(params.content_base64, 'base64')
