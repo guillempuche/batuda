@@ -192,6 +192,7 @@ msgstr "Empreses actives"
 msgid "Active organization"
 msgstr "Organització activa"
 
+#: src/components/contacts/manage-channels-dialog.tsx
 #: src/routes/tasks/index.tsx
 msgid "Add"
 msgstr "Afegeix"
@@ -539,6 +540,18 @@ msgstr "S'han desat els canvis."
 msgid "Channel"
 msgstr "Canal"
 
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Channel kind"
+msgstr "Tipus de canal"
+
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Channel value"
+msgstr "Valor del canal"
+
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Channels — {contactName}"
+msgstr "Canals — {contactName}"
+
 #: src/routes/settings/mcp/index.tsx
 msgid "Chat interfaces (OAuth)"
 msgstr "Interfícies de xat (OAuth)"
@@ -598,6 +611,7 @@ msgstr "Clicat"
 msgid "Client"
 msgstr "Client"
 
+#: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/research/research-dialog.tsx
@@ -950,6 +964,10 @@ msgstr "No s'ha pogut canviar l'estat de la safata."
 #: src/routes/settings/mcp/connections.tsx
 msgid "Could not update"
 msgstr "No s'ha pogut actualitzar"
+
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Could not update channels"
+msgstr "No s'han pogut actualitzar els canals"
 
 #: src/routes/settings/organization/templates.tsx
 msgid "Couldn't add it"
@@ -1821,6 +1839,14 @@ msgstr "Baixa"
 msgid "Low priority"
 msgstr "Prioritat baixa"
 
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Make primary"
+msgstr "Fes-lo principal"
+
+#: src/routes/companies/$slug.tsx
+msgid "Manage channels"
+msgstr "Gestiona els canals"
+
 #. placeholder {0}: row.email
 #: src/routes/emails/inboxes.tsx
 msgid "Manage footers for {0}"
@@ -1953,6 +1979,10 @@ msgstr "Minimitza"
 msgid "Name"
 msgstr "Nom"
 
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "name@company.com"
+msgstr "nom@empresa.com"
+
 #: src/components/emails/compose-form.tsx
 msgid "name@example.com, another@example.com"
 msgstr "nom@exemple.cat, altre@exemple.cat"
@@ -2042,6 +2072,10 @@ msgstr "Encara no hi ha esdeveniments al calendari"
 #: src/routes/tasks/index.tsx
 msgid "No changes recorded yet."
 msgstr "Encara no hi ha canvis enregistrats."
+
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "No channels yet. Add the first reachable address below."
+msgstr "Encara no hi ha canals. Afegeix la primera adreça de contacte a sota."
 
 #: src/routes/companies/index.tsx
 msgid "No companies match the filters"
@@ -2602,7 +2636,6 @@ msgstr "Bústia privada"
 msgid "Products fit"
 msgstr "Encaix de productes"
 
-#: src/routes/companies/$slug.tsx
 #: src/routes/settings/profile/index.tsx
 msgid "Profile"
 msgstr "Perfil"
@@ -2743,6 +2776,10 @@ msgstr "Elimina {chip}"
 #: src/routes/settings/organization/members.tsx
 msgid "Remove {email} from this organization?"
 msgstr "Vols eliminar {email} d'aquesta organització?"
+
+#: src/components/contacts/manage-channels-dialog.tsx
+msgid "Remove channel"
+msgstr "Elimina el canal"
 
 #: src/routes/settings/organization/members.tsx
 msgid "Removing…"
@@ -3331,6 +3368,7 @@ msgstr "Les 20 tasques obertes editades més recentment. Fes-hi clic per reobrir
 msgid "The API key can no longer be used."
 msgstr "La clau d'API ja no es pot fer servir."
 
+#: src/components/contacts/manage-channels-dialog.tsx
 #: src/routes/companies/$slug.tsx
 msgid "The change didn't go through. Try again."
 msgstr "El canvi no s'ha completat. Torna-ho a provar."
