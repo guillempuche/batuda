@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-06-28 (internal-v2026.6.28)
+
+### Features
+
+* **internal:** allow resending a pending invitation ([b4263c2](https://github.com/guillempuche/batuda/commit/b4263c2660e90dd4aba9828ed5c6b7682790a5a5))
+* require explicit research, email, and geocoder config ([fc8b40d](https://github.com/guillempuche/batuda/commit/fc8b40d651861d8be01bfdb3cc7f2843e3ebac28))
+
+### Bug Fixes
+
+* **server:** add defaults for research/env vars and trim KraftCloud cmdline ([2e19c87](https://github.com/guillempuche/batuda/commit/2e19c87b1f1bfc2467298417accb22e9381572bb))
+
 ## 2026-06-26 (internal-v2026.6.26)
 
 ### Features
