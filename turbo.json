@@ -47,7 +47,13 @@
 				"STORAGE_SECRET_ACCESS_KEY",
 				"STORAGE_BUCKET"
 			],
-			"inputs": ["$TURBO_DEFAULT$", "src/**/*", "**/*.integration.test.*"],
+			"passThroughEnv": ["CI"],
+			"inputs": [
+				"$TURBO_DEFAULT$",
+				"src/**/*",
+				"**/*.integration.test.*",
+				"../../scripts/integration-db-setup.ts"
+			],
 			"outputs": ["coverage/**/*"],
 			"cache": true
 		}
