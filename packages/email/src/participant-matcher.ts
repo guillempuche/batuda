@@ -67,10 +67,12 @@ export class ParticipantMatcher extends ServiceMap.Service<ParticipantMatcher>()
 							id: string
 							companyId: string
 						}>`
-							SELECT id, company_id FROM contacts
-							WHERE lower(email) = ${email}
-							  AND organization_id = ${currentOrg.id}
-							ORDER BY updated_at DESC
+							SELECT c.id, c.company_id FROM contact_channels ch
+							JOIN contacts c ON c.id = ch.contact_id
+							WHERE ch.kind = 'email'
+							  AND lower(ch.value) = ${email}
+							  AND ch.organization_id = ${currentOrg.id}
+							ORDER BY c.updated_at DESC
 						`
 						const [firstContact, secondContact] = contacts
 						if (firstContact && !secondContact) {
@@ -113,18 +115,9 @@ export class ParticipantMatcher extends ServiceMap.Service<ParticipantMatcher>()
 							INSERT INTO contacts ${sql.insert({
 								organizationId: currentOrg.id,
 								companyId,
-								email,
 								name: args.displayName ?? email,
 								role: null,
 								isDecisionMaker: null,
-								phone: null,
-								whatsapp: null,
-								linkedin: null,
-								instagram: null,
-								emailStatus: 'unknown',
-								emailStatusReason: null,
-								emailStatusUpdatedAt: null,
-								emailSoftBounceCount: 0,
 								notes: null,
 								metadata: null,
 							})} RETURNING id
@@ -135,6 +128,13 @@ export class ParticipantMatcher extends ServiceMap.Service<ParticipantMatcher>()
 								new Error('INSERT INTO contacts RETURNING id yielded no row'),
 							)
 						}
+						// The inbound sender address becomes the contact's primary
+						// email channel, so a later reply matches it back.
+						yield* sql`
+							INSERT INTO contact_channels
+								(organization_id, contact_id, kind, value, is_primary)
+							VALUES (${currentOrg.id}, ${createdContact.id}, 'email', ${email}, true)
+						`
 						return new CreatedContact({
 							contactId: createdContact.id,
 							companyId,
