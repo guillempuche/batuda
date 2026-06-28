@@ -65,9 +65,10 @@ export const retrySmtpSend = <A, E>(
 // PgClient.transformResultNames in apps/server/src/db/client.ts converts
 // snake_case columns to camelCase on read, so every row type in this file
 // is camelCase even though the SQL selects use snake_case.
+// The suppression query filters to these two, so the row type narrows to them.
 type ContactSuppressionRow = {
-	emailStatus: 'unknown' | 'valid' | 'bounced' | 'complained'
-	emailStatusReason: string | null
+	status: 'bounced' | 'complained'
+	statusReason: string | null
 }
 
 const firstRecipient = (to: string | string[]): string =>
@@ -412,22 +413,27 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 				recipient: string | string[],
 			) =>
 				Effect.gen(function* () {
+					// Suppression is per-address now: block only when the specific
+					// email channel being sent to is bounced/complained.
+					const recipients = (
+						Array.isArray(recipient) ? recipient : [recipient]
+					).map(r => r.toLowerCase())
 					const rows = yield* sql<ContactSuppressionRow>`
-						SELECT email_status, email_status_reason
-						FROM contacts
-						WHERE id = ${contactId}
+						SELECT status, status_reason
+						FROM contact_channels
+						WHERE contact_id = ${contactId}
+						  AND kind = 'email'
+						  AND lower(value) = ANY(${recipients})
+						  AND status IN ('bounced', 'complained')
 						LIMIT 1
 					`
 					const row = rows[0]
-					if (
-						row &&
-						(row.emailStatus === 'bounced' || row.emailStatus === 'complained')
-					) {
+					if (row) {
 						return yield* new EmailSuppressed({
 							contactId,
 							recipient: firstRecipient(recipient),
-							status: row.emailStatus,
-							reason: row.emailStatusReason,
+							status: row.status,
+							reason: row.statusReason,
 						})
 					}
 				})

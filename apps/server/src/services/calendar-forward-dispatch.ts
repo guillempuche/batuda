@@ -101,11 +101,13 @@ export const dispatchForwardInvitation = (args: {
 		// the suppression check + outbound log stay wired up the same
 		// way as any other agent-sent email.
 		const contactRows = yield* sql<{ id: string; companyId: string | null }>`
-			SELECT id, company_id AS "companyId"
-			FROM contacts
-			WHERE organization_id = ${currentOrg.id}
-			  AND lower(email) = ${args.toEmail.toLowerCase()}
-			ORDER BY created_at ASC
+			SELECT c.id, c.company_id AS "companyId"
+			FROM contact_channels ch
+			JOIN contacts c ON c.id = ch.contact_id
+			WHERE ch.organization_id = ${currentOrg.id}
+			  AND ch.kind = 'email'
+			  AND lower(ch.value) = ${args.toEmail.toLowerCase()}
+			ORDER BY c.created_at ASC
 			LIMIT 1
 		`
 		const contactId = contactRows[0]?.id ?? null

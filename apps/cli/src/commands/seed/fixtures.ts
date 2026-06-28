@@ -862,19 +862,6 @@ export const getPresetData = (
 		},
 	]
 
-	const withContactDefaults = <
-		T extends {
-			emailStatus?: string
-			emailSoftBounceCount?: number
-		},
-	>(
-		contact: T,
-	) => ({
-		emailStatus: 'unknown' as const,
-		emailSoftBounceCount: 0,
-		...contact,
-	})
-
 	// `normalizeRows` writes explicit NULL for missing keys, bypassing Postgres column defaults.
 	const withTaskDefaults = <
 		T extends { status?: string; source?: string; priority?: string },
@@ -889,9 +876,7 @@ export const getPresetData = (
 
 	if (preset === 'minimal') {
 		return {
-			contacts: allContacts
-				.filter(c => MINIMAL_CONTACT_NAMES.has(c.name))
-				.map(withContactDefaults),
+			contacts: allContacts.filter(c => MINIMAL_CONTACT_NAMES.has(c.name)),
 			interactions: allInteractions.filter(c =>
 				MINIMAL_COMPANY_SLUGS.has(
 					[...companyMap.entries()].find(([, id]) => id === c.companyId)?.[0] ??
@@ -911,7 +896,7 @@ export const getPresetData = (
 	}
 
 	return {
-		contacts: allContacts.map(withContactDefaults),
+		contacts: allContacts,
 		interactions: allInteractions,
 		tasks: allTasks.map(withTaskDefaults),
 	}

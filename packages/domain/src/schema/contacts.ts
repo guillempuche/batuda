@@ -3,14 +3,8 @@ import { Model } from 'effect/unstable/schema'
 
 export const ContactId = Schema.String.pipe(Schema.brand('ContactId'))
 
-export const EmailStatus = Schema.Literals([
-	'unknown',
-	'valid',
-	'bounced',
-	'complained',
-])
-export type EmailStatus = typeof EmailStatus.Type
-
+// Reachable addresses (email, phone, linkedin, …) live in `contact_channels`,
+// the single source of truth — `contacts` carries only identity + activity.
 export class Contact extends Model.Class<Contact>('Contact')({
 	id: Model.Generated(ContactId),
 	companyId: Schema.String,
@@ -18,17 +12,6 @@ export class Contact extends Model.Class<Contact>('Contact')({
 	name: Schema.String,
 	role: Schema.NullOr(Schema.String),
 	isDecisionMaker: Schema.NullOr(Schema.Boolean),
-
-	email: Schema.NullOr(Schema.String),
-	phone: Schema.NullOr(Schema.String),
-	whatsapp: Schema.NullOr(Schema.String),
-	linkedin: Schema.NullOr(Schema.String),
-	instagram: Schema.NullOr(Schema.String),
-
-	emailStatus: EmailStatus,
-	emailStatusReason: Schema.NullOr(Schema.String),
-	emailStatusUpdatedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
-	emailSoftBounceCount: Schema.Number,
 
 	notes: Schema.NullOr(Schema.String),
 	metadata: Schema.NullOr(Schema.Unknown),
