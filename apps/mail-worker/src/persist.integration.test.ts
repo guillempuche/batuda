@@ -68,11 +68,17 @@ const insertContact = async (
 	email: string,
 ): Promise<string> => {
 	const result = await pool.query<{ id: string }>(
-		`INSERT INTO contacts (organization_id, company_id, name, email) VALUES ($1, $2, $3, $4) RETURNING id`,
-		[ORG_ID, companyId, name, email],
+		`INSERT INTO contacts (organization_id, company_id, name) VALUES ($1, $2, $3) RETURNING id`,
+		[ORG_ID, companyId, name],
 	)
 	const row = result.rows[0]
 	if (!row) throw new Error(`failed to insert contact ${email}`)
+	// The address lives on the email channel now — that's what inbound
+	// matching joins against.
+	await pool.query(
+		`INSERT INTO contact_channels (organization_id, contact_id, kind, value, is_primary) VALUES ($1, $2, 'email', $3, true)`,
+		[ORG_ID, row.id, email],
+	)
 	return row.id
 }
 
