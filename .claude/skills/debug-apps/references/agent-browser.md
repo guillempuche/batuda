@@ -143,6 +143,17 @@ agent-browser set offline on                          # test offline behavior
 agent-browser set offline off
 ```
 
+## Recovering a hung session
+
+If commands start hanging or timing out — including a lone `screenshot` — the browser session is wedged (a prior command, often `eval` waiting on something that never resolves, can leave Chrome stuck). Don't keep retrying the same call; reset the session:
+
+```bash
+agent-browser close --all     # close every session and its Chrome
+# then re-open + re-login — the session is gone, so re-run the login flow
+```
+
+`close` without `--all` closes only the current session. Reach for this the moment 2–3 calls in a row fail or time out, rather than burning attempts (see the `pr` skill's "avoid rabbit holes" guidance).
+
 ## Record a video (WebM)
 
 Native Playwright recording — no ffmpeg. The recorder runs in a fresh context but preserves cookies and localStorage, so logging in (or navigating to the target page) before `record start` keeps the session; with no URL it captures the current page.
