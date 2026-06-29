@@ -32,7 +32,7 @@ Where migrations run depends on the environment, and the boundary is deliberate.
 
 **Local / worktree** — `pnpm db:migrate` runs against your local stack, with `DATABASE_URL` from `.env`. It echoes its target first — e.g. `Migration target: "batuda_feature_x" on localhost (local)` — so you can see which database you are about to touch.
 
-**Production** — migrations run **in the deploy pipeline, never from a laptop**: the `Deploy Server` workflow applies them against the prod database immediately before `kraft cloud deploy`. There is intentionally no `db:migrate:prod` script.
+**Production** — migrations run **in the deploy pipeline, never from a laptop**: the `Deploy Server` workflow applies them against the prod database immediately before `kraft cloud deploy`. There is intentionally no `db:migrate:prod` script. A required reviewer on the `production-db` GitHub environment gates the `migrate` job specifically, so it pauses for a one-click approval before any prod schema change lands — a final human checkpoint. Routine deploys (web, mail-worker, the server `deploy` job) are not gated. `MIGRATION_DATABASE_URL` lives on `production-db`.
 
 ### Connection: schema owner, direct endpoint
 
@@ -46,6 +46,8 @@ CI gets the same shape for free — its Neon branch is created with `role: neond
 ### Rolling-deploy compatibility
 
 The deploy is a rolling update — the old instance keeps serving while the new one boots — so each migration must stay **backward-compatible with the running version**. Add the new shape now (a nullable/defaulted column, a new table) and drop or tighten the old shape in a **later** release; renaming or dropping a column the live version still reads breaks requests mid-rollout.
+
+CI enforces this on every PR: `scripts/check-migration-safety.mjs` fails when a newly added migration drops/renames a column, drops a table, truncates, or adds a `NOT NULL` column without a default — unless the file opts in with an `// expand-contract: <reason>` marker. The marker is the deliberate escape hatch for a change that's safe despite the rule (the old reader shipped a release ago, or pre-production with no live instance to break) — it forces you to write down *why* rather than dropping silently.
 
 ### Rehearsing and re-running
 
