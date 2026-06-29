@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-06-29 (internal-v2026.6.29)
+
+### Features
+
+* **domain:** add the contact_channels model ([75b5560](https://github.com/guillempuche/batuda/commit/75b55604e58cddb92343793572d6a0bf4ba2acfd))
+* **internal:** display and manage contact channels ([378eb18](https://github.com/guillempuche/batuda/commit/378eb18647d97ade6ecf488528580701b2e65914))
+* migrate contacts to a channels-only model ([f9bb030](https://github.com/guillempuche/batuda/commit/f9bb0301694095f5d0769a5d18baba91f89f19d6))
+* **research:** add UK Companies House registry + registry-first discovery ([ee9c017](https://github.com/guillempuche/batuda/commit/ee9c01774bea2d508b3ff9a6e9804ad7ffa349e7))
+* **research:** discover verified decision-maker contacts ([fe20e4b](https://github.com/guillempuche/batuda/commit/fe20e4ba3b2a42415086fd732cd203ac28a0e355))
+
+### Bug Fixes
+
+* route inbound email matching through contact channels ([7474a68](https://github.com/guillempuche/batuda/commit/7474a680814b8a6099333122f40133f063a8617d))
+
 ## 2026-06-28 (internal-v2026.6.28)
 
 ### Features
