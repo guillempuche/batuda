@@ -32,7 +32,10 @@ jobs:
     name: Migrate prod database
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment: production
+    # `production-db` gates only this migrate job with a required reviewer —
+    # routine deploys (the `deploy` job, web, mail-worker) stay un-gated. Its
+    # MIGRATION_DATABASE_URL secret must be set on this environment.
+    environment: production-db
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -146,6 +149,9 @@ jobs:
             -e RESEARCH_API_KEY_SCRAPE="${{ secrets.RESEARCH_API_KEY_SCRAPE }}"
             -e RESEARCH_API_KEY_EXTRACT="${{ secrets.RESEARCH_API_KEY_EXTRACT }}"
             -e RESEARCH_API_KEY_REGISTRY_ES="${{ secrets.RESEARCH_API_KEY_REGISTRY_ES }}"
+            -e RESEARCH_API_KEY_ENRICH="${{ secrets.RESEARCH_API_KEY_ENRICH }}"
+            -e RESEARCH_API_KEY_VERIFY="${{ secrets.RESEARCH_API_KEY_VERIFY }}"
+            -e RESEARCH_API_KEY_REGISTRY_GB="${{ secrets.RESEARCH_API_KEY_REGISTRY_GB }}"
           )
           BYTES=$(printf '%s' "${E_ARGS[*]}" | wc -c | tr -d ' ')
           FLAGS=0
@@ -226,6 +232,9 @@ jobs:
                 -e RESEARCH_API_KEY_SCRAPE="${{ secrets.RESEARCH_API_KEY_SCRAPE }}" \
                 -e RESEARCH_API_KEY_EXTRACT="${{ secrets.RESEARCH_API_KEY_EXTRACT }}" \
                 -e RESEARCH_API_KEY_REGISTRY_ES="${{ secrets.RESEARCH_API_KEY_REGISTRY_ES }}" \
+                -e RESEARCH_API_KEY_ENRICH="${{ secrets.RESEARCH_API_KEY_ENRICH }}" \
+                -e RESEARCH_API_KEY_VERIFY="${{ secrets.RESEARCH_API_KEY_VERIFY }}" \
+                -e RESEARCH_API_KEY_REGISTRY_GB="${{ secrets.RESEARCH_API_KEY_REGISTRY_GB }}" \
                 .
             }
             if [ "${{ steps.service-check.outputs.exists }}" = "true" ]; then
