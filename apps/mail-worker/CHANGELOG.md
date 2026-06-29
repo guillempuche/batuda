@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-06-29 (mail-worker-v2026.6.29)
+
+### Features
+
+* **domain:** add the contact_channels model ([75b5560](https://github.com/guillempuche/batuda/commit/75b55604e58cddb92343793572d6a0bf4ba2acfd))
+* migrate contacts to a channels-only model ([f9bb030](https://github.com/guillempuche/batuda/commit/f9bb0301694095f5d0769a5d18baba91f89f19d6))
+
+### Bug Fixes
+
+* route inbound email matching through contact channels ([7474a68](https://github.com/guillempuche/batuda/commit/7474a680814b8a6099333122f40133f063a8617d))
+
+### CI/CD
+
+* gate integration tests against a migrated disposable DB ([9c6ce46](https://github.com/guillempuche/batuda/commit/9c6ce4621c1c413e435301b887486958cab89fb4))
+
 ## 2026-06-28 (mail-worker-v2026.6.28)
 
 ### Features
