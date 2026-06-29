@@ -3,6 +3,27 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-06-29 (server-v2026.6.29)
+
+### Features
+
+* **domain:** add the contact_channels model ([75b5560](https://github.com/guillempuche/batuda/commit/75b55604e58cddb92343793572d6a0bf4ba2acfd))
+* migrate contacts to a channels-only model ([f9bb030](https://github.com/guillempuche/batuda/commit/f9bb0301694095f5d0769a5d18baba91f89f19d6))
+* **research:** add UK Companies House registry + registry-first discovery ([ee9c017](https://github.com/guillempuche/batuda/commit/ee9c01774bea2d508b3ff9a6e9804ad7ffa349e7))
+* **research:** discover verified decision-maker contacts ([fe20e4b](https://github.com/guillempuche/batuda/commit/fe20e4ba3b2a42415086fd732cd203ac28a0e355))
+* **server:** add soft, agent-only send guardrails ([a4fbd2f](https://github.com/guillempuche/batuda/commit/a4fbd2f5697551c87e88a9e59722fcb5e50fb966))
+* **server:** expose discover_contacts MCP tool ([6fa6635](https://github.com/guillempuche/batuda/commit/6fa6635811b5ab5e20750c42a9725e6341c3796b))
+* **server:** persist contact channels alongside the canonical email ([0856a36](https://github.com/guillempuche/batuda/commit/0856a3628adbbe93c7844c1bdc67d24bbf35b36d))
+
+### Bug Fixes
+
+* route inbound email matching through contact channels ([7474a68](https://github.com/guillempuche/batuda/commit/7474a680814b8a6099333122f40133f063a8617d))
+
+### CI/CD
+
+* enable Hunter enrichment + Companies House registry in production ([add502e](https://github.com/guillempuche/batuda/commit/add502ed1d0c64ed5e0266ff6555100b27383018))
+* gate integration tests against a migrated disposable DB ([9c6ce46](https://github.com/guillempuche/batuda/commit/9c6ce4621c1c413e435301b887486958cab89fb4))
+
 ## 2026-06-28 (server-v2026.6.28)
 
 ### Features
