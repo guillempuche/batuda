@@ -33,6 +33,7 @@
 		"db:up": "docker compose -f docker/docker-compose.yml up -d",
 		"db:down": "docker compose -f docker/docker-compose.yml down",
 		"db:migrate": "pnpm --filter @batuda/server run migrate",
+		"check-migrations": "node scripts/check-migration-safety.mjs",
 		"______ Release ______": "",
 		"release:server": "release-it --config .release-it.server.cjs",
 		"release:internal": "release-it --config .release-it.internal.cjs",

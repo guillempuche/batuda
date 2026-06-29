@@ -31,6 +31,16 @@ jobs:
           node-version: "24"
           cache: "pnpm"
 
+      # A prod deploy is a rolling update — the old instance keeps serving while
+      # the new one boots — so a migration that drops/renames a column the old
+      # version still reads breaks it mid-rollout. Fail a PR that adds a
+      # non-backward-compatible migration unless it carries an `expand-contract:`
+      # marker (docs/runbooks.md). Runs before install — needs only git + node.
+      - name: Migration safety (expand-contract)
+        run: |
+          git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
+          node scripts/check-migration-safety.mjs "origin/$GITHUB_BASE_REF"
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
