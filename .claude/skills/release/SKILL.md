@@ -61,22 +61,18 @@ pnpm release:server:dry   # or release:internal:dry / release:ui:dry / release:m
 
 Show the expected version and changelog. Ask for confirmation.
 
-## Step 4.5: Apply DB Migrations (if schema changed)
+## Step 4.5: DB migrations — verify, don't run
 
-Only for `server` or `all` releases (mail-worker reads/writes existing schema; no migrations live under `apps/mail-worker/`). Check whether migration files changed since the last server tag:
+**Never run prod migrations from your machine.** The `Deploy Server` workflow's `migrate` job applies them against the prod database (the schema-owner `neondb_owner` role over the direct/unpooled endpoint) immediately before the rolling `kraft cloud deploy`, gated by a required reviewer on the `production-db` GitHub environment. There is intentionally no `db:migrate:prod`. Full rationale: `docs/runbooks.md` → *Applying database migrations*.
+
+Your job at release time is to confirm the pending migrations are **safe for a rolling deploy**, not to apply them. See what changed since the last server tag:
 
 ```bash
 last_tag=$(git describe --tags --match='server-v[0-9]*.[0-9]*.[0-9]*' --abbrev=0 2>/dev/null)
 git diff --name-only "$last_tag"..HEAD -- apps/server/src/db/migrations/
 ```
 
-If non-empty, run migrations against the direct (non-pooled) NeonDB URL from your machine before tagging:
-
-```bash
-DATABASE_URL="<neon-direct-url>" pnpm db:migrate
-```
-
-The deploy workflow does not run migrations — deploying new server code against an unmigrated schema will crash on boot.
+Each migration must be **backward-compatible with the still-running version** (expand-contract): the old instance keeps serving during the rollout, so dropping/renaming a column it still reads breaks it mid-deploy. CI already enforces this — `scripts/check-migration-safety.mjs` fails any PR that adds a non-backward-compatible migration unless it carries an `expand-contract:` marker — so a clean PR has already passed the gate. Drop the old shape only in a **later** release, once no running version reads it.
 
 ## Step 5: Execute Release
 
