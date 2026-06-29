@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 
 import { Console, Effect, Schedule } from 'effect'
@@ -49,6 +50,24 @@ const branchLabel = (branch: string) => branch.split('/').pop() ?? branch
 // The subdomain portless actually serves for this branch (capped at 63 as it does).
 const branchHost = (branch: string) =>
 	`${dnsLabel(branchLabel(branch), MAX_DNS_LABEL)}.batuda.localhost`
+
+// portless binds 443 when it can, else a non-privileged fallback (e.g. 1355).
+// A URL printed without that port gives ERR_CONNECTION_REFUSED, so append it.
+// `~/.portless/proxy.port` is the canonical source (the same one /debug-apps reads).
+const portSuffix = (): string => {
+	try {
+		const port = readFileSync(
+			resolve(homedir(), '.portless/proxy.port'),
+			'utf8',
+		).trim()
+		return port && port !== '443' ? `:${port}` : ''
+	} catch {
+		return ''
+	}
+}
+
+const branchUrl = (branch: string) =>
+	`https://${branchHost(branch)}${portSuffix()}`
 
 // Names this worktree's database + bucket — the same label as the host, capped
 // tighter so both identifiers stay valid.
@@ -395,7 +414,7 @@ export const worktreeUp = Effect.gen(function* () {
 			`  Database:  ${dbName(slug)}  (postgresql://batuda:batuda@localhost:5433/${dbName(slug)})`,
 			`  Bucket:    ${bucketName(slug)}  (MinIO http://localhost:9001, batuda / batuda-secret)`,
 			'  Mail catcher: http://localhost:8025  (GreenMail, shared across worktrees)',
-			`  Run \`pnpm dev\` → portless serves https://${branchHost(branch)}`,
+			`  Run \`pnpm dev\` → portless serves ${branchUrl(branch)}`,
 			'',
 		].join('\n'),
 	)
@@ -580,9 +599,9 @@ export const worktreeLs = Effect.gen(function* () {
 		const provisioned =
 			bucket !== undefined && dbs.has(db) && buckets.has(bucket)
 		const url = isMain
-			? 'https://batuda.localhost'
+			? `https://batuda.localhost${portSuffix()}`
 			: e.branch
-				? `https://${branchHost(e.branch)}`
+				? branchUrl(e.branch)
 				: '—'
 		return { branch, db, url, provisioned }
 	})
@@ -666,7 +685,7 @@ export const worktreeDoctor = Effect.gen(function* () {
 		checks.push({
 			ok: true,
 			name: 'url',
-			detail: `https://${branchHost(branch)} (run \`pnpm dev\`)`,
+			detail: `${branchUrl(branch)} (run \`pnpm dev\`)`,
 		})
 	}
 
