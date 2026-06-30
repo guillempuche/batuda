@@ -91,6 +91,7 @@ jobs:
             -e SERVICE_VERSION="${{ steps.meta.outputs.version }}"
             -e GIT_SHA="${{ github.sha }}"
             -e REGION="${{ env.KRAFTCLOUD_METRO }}"
+            -e OTEL_EXPORTER_OTLP_HEADERS="${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }},x-honeycomb-dataset=batuda-mail-worker"
             -e DATABASE_URL="${{ secrets.DATABASE_URL }}"
             -e EMAIL_CREDENTIAL_KEY="${{ secrets.EMAIL_CREDENTIAL_KEY }}"
             -e STORAGE_ACCESS_KEY_ID="${{ secrets.STORAGE_ACCESS_KEY_ID }}"
@@ -138,6 +139,7 @@ jobs:
               -e SERVICE_VERSION="${{ steps.meta.outputs.version }}" \
               -e GIT_SHA="${{ github.sha }}" \
               -e REGION="${{ env.KRAFTCLOUD_METRO }}" \
+              -e OTEL_EXPORTER_OTLP_HEADERS="${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }},x-honeycomb-dataset=batuda-mail-worker" \
               -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
               -e EMAIL_CREDENTIAL_KEY="${{ secrets.EMAIL_CREDENTIAL_KEY }}" \
               -e STORAGE_ACCESS_KEY_ID="${{ secrets.STORAGE_ACCESS_KEY_ID }}" \
