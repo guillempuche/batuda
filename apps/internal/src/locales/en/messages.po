@@ -143,10 +143,6 @@ msgstr "1 thread"
 msgid "1 thread selected"
 msgstr "1 thread selected"
 
-#: src/routes/emails/inboxes.tsx
-msgid "2FA accounts need an app-specific password."
-msgstr "2FA accounts need an app-specific password."
-
 #: src/components/instructions/template-editor-dialog.tsx
 msgid "A short label. Start it with a [tag] like [research] to group related templates if you like — the brackets are just part of the name."
 msgstr "A short label. Start it with a [tag] like [research] to group related templates if you like — the brackets are just part of the name."
@@ -175,10 +171,6 @@ msgstr "across {0} providers"
 #: src/routes/emails/inboxes.tsx
 msgid "Actions"
 msgstr "Actions"
-
-#: src/routes/emails/inboxes.tsx
-msgid "Active"
-msgstr "Active"
 
 #: src/components/shared/status-badge.tsx
 msgid "Active client"
@@ -254,6 +246,11 @@ msgstr "Add to org"
 msgid "Add to the org default"
 msgstr "Add to the org default"
 
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
+msgid "Added"
+msgstr "Added"
+
 #: src/routes/settings/organization/templates.tsx
 msgid "Added to the org"
 msgstr "Added to the org"
@@ -267,14 +264,21 @@ msgstr "Address"
 msgid "Admin"
 msgstr "Admin"
 
+#: src/routes/emails/inboxes.tsx
+msgid "Advanced settings (IMAP / SMTP)"
+msgstr "Advanced settings (IMAP / SMTP)"
+
 #: src/routes/settings/mcp/index.tsx
 msgid "After approving, manage which org each one acts in here."
 msgstr "After approving, manage which org each one acts in here."
 
 #: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
 msgid "Agent"
 msgstr "Agent"
+
+#: src/routes/emails/inboxes.tsx
+msgid "AI agent"
+msgstr "AI agent"
 
 #: src/routes/settings/mcp/connections.tsx
 msgid "AI assistants you've connected over MCP. Each may act in one or more of your organizations; the assistant picks which per request."
@@ -353,10 +357,6 @@ msgstr "attachment"
 #: src/routes/tasks/index.tsx
 msgid "Audit log"
 msgstr "Audit log"
-
-#: src/routes/emails/inboxes.tsx
-msgid "Auth failed"
-msgstr "Auth failed"
 
 #: src/routes/settings/profile/templates.tsx
 msgid "Back to account"
@@ -728,27 +728,26 @@ msgid "Connect AI tools over MCP"
 msgstr "Connect AI tools over MCP"
 
 #: src/routes/emails/inboxes.tsx
-msgid "Connect failed"
-msgstr "Connect failed"
+#: src/routes/emails/inboxes.tsx
+msgid "Connect an email"
+msgstr "Connect an email"
 
-#: src/routes/emails/inboxes.tsx
-msgid "Connect IMAP/SMTP mailboxes and choose your primary sender."
-msgstr "Connect IMAP/SMTP mailboxes and choose your primary sender."
-
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/index.tsx
 msgid "Connect mailbox"
 msgstr "Connect mailbox"
+
+#: src/routes/emails/inboxes.tsx
+msgid "Connect the email address you use with customers, so you can send and receive right here."
+msgstr "Connect the email address you use with customers, so you can send and receive right here."
 
 #: src/routes/oauth/consent.tsx
 msgid "Connect to Batuda?"
 msgstr "Connect to Batuda?"
 
 #: src/routes/emails/inboxes.tsx
-msgid "Connect your IMAP/SMTP mailbox to start sending and receiving email."
-msgstr "Connect your IMAP/SMTP mailbox to start sending and receiving email."
+msgid "Connect your email to get started"
+msgstr "Connect your email to get started"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Connected"
@@ -973,6 +972,10 @@ msgstr "Could not update channels"
 msgid "Couldn't add it"
 msgstr "Couldn't add it"
 
+#: src/routes/emails/inboxes.tsx
+msgid "Couldn't connect"
+msgstr "Couldn't connect"
+
 #: src/components/primitives/pri-copy-button.tsx
 msgid "Couldn't copy"
 msgstr "Couldn't copy"
@@ -1006,6 +1009,10 @@ msgstr "Couldn't save"
 #: src/routes/settings/profile/templates.tsx
 msgid "Couldn't send it"
 msgstr "Couldn't send it"
+
+#: src/routes/emails/inboxes.tsx
+msgid "Couldn't sign in"
+msgstr "Couldn't sign in"
 
 #: src/routes/settings/profile/index.tsx
 msgid "Couldn't update your preference. Try again."
@@ -1050,8 +1057,8 @@ msgstr "Create an app password →"
 
 #. placeholder {0}: row.email
 #: src/routes/emails/inboxes.tsx
-msgid "Create an app-specific password for {0}, opens in a new tab"
-msgstr "Create an app-specific password for {0}, opens in a new tab"
+msgid "Create an app password for {0}, opens in a new tab"
+msgstr "Create an app password for {0}, opens in a new tab"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Create an app-specific password, opens in a new tab"
@@ -1074,7 +1081,6 @@ msgid "Create key"
 msgstr "Create key"
 
 #: src/routes/emails/$threadId.tsx
-#: src/routes/emails/inboxes.tsx
 msgid "Created"
 msgstr "Created"
 
@@ -1128,13 +1134,8 @@ msgid "Decline {0}"
 msgstr "Decline {0}"
 
 #: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
 msgid "Default"
 msgstr "Default"
-
-#: src/routes/emails/inboxes.tsx
-msgid "Default inbox"
-msgstr "Default inbox"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Defaults to the email address."
@@ -1164,11 +1165,6 @@ msgstr "Delete {0}"
 #: src/routes/settings/profile/templates.tsx
 msgid "Delete failed"
 msgstr "Delete failed"
-
-#. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx
-msgid "Delete inbox {0}"
-msgstr "Delete inbox {0}"
 
 #. placeholder {0}: row.email
 #: src/routes/emails/inboxes.tsx
@@ -1213,7 +1209,6 @@ msgstr "Deny"
 msgid "Direction"
 msgstr "Direction"
 
-#: src/routes/emails/inboxes.tsx
 #: src/routes/settings/api-keys/index.tsx
 msgid "Disabled"
 msgstr "Disabled"
@@ -1316,10 +1311,9 @@ msgstr "Edit due date"
 msgid "Edit inbox"
 msgstr "Edit inbox"
 
-#. placeholder {0}: row.email
 #: src/routes/emails/inboxes.tsx
-msgid "Edit inbox {0}"
-msgstr "Edit inbox {0}"
+msgid "Edit settings"
+msgstr "Edit settings"
 
 #: src/components/shared/task-item.tsx
 msgid "Edit task title"
@@ -1367,6 +1361,10 @@ msgstr "Email me a sign-in link"
 msgid "Email or password is incorrect."
 msgstr "Email or password is incorrect."
 
+#: src/routes/emails/inboxes.tsx
+msgid "Email signature"
+msgstr "Email signature"
+
 #: src/routes/companies/$slug.tsx
 msgid "Email via Batuda"
 msgstr "Email via Batuda"
@@ -1391,6 +1389,10 @@ msgstr "Enter a valid email above first."
 #: src/routes/settings/organization/members.tsx
 msgid "Enter an email address."
 msgstr "Enter an email address."
+
+#: src/routes/emails/inboxes.tsx
+msgid "Enter your mail server settings below."
+msgstr "Enter your mail server settings below."
 
 #: src/components/shared/channel-icon.tsx
 msgid "Event"
@@ -1536,13 +1538,13 @@ msgstr "Go to connections"
 msgid "Go to sign in"
 msgstr "Go to sign in"
 
-#: src/routes/emails/inboxes.tsx
-msgid "Has two-factor authentication enabled? Use a provider app-specific password below, not your normal login password."
-msgstr "Has two-factor authentication enabled? Use a provider app-specific password below, not your normal login password."
-
 #: src/routes/accept-invitation.$id.tsx
 msgid "Heading to the dashboard…"
 msgstr "Heading to the dashboard…"
+
+#: src/routes/emails/inboxes.tsx
+msgid "Hide advanced settings"
+msgstr "Hide advanced settings"
 
 #: src/routes/emails/$threadId.tsx
 msgid "Hide Cc"
@@ -1567,7 +1569,6 @@ msgid "How your default uses the org default"
 msgstr "How your default uses the org default"
 
 #: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
 msgid "Human"
 msgstr "Human"
 
@@ -1579,9 +1580,17 @@ msgstr "I prefer passwordless"
 msgid "I prefer passwordless — don't ask me again"
 msgstr "I prefer passwordless — don't ask me again"
 
+#: src/routes/emails/inboxes.tsx
+msgid "I'll fill in the technical settings for you — you just add your email and password."
+msgstr "I'll fill in the technical settings for you — you just add your email and password."
+
 #: src/routes/forgot-password.tsx
 msgid "If <0>{submittedEmail}</0> is registered, a reset link is on its way. The link expires in 1 hour."
 msgstr "If <0>{submittedEmail}</0> is registered, a reset link is on its way. The link expires in 1 hour."
+
+#: src/routes/emails/inboxes.tsx
+msgid "If your account has two-factor authentication, use an app-specific password — not your normal login password."
+msgstr "If your account has two-factor authentication, use an app-specific password — not your normal login password."
 
 #: src/routes/emails/inboxes.tsx
 msgid "IMAP host"
@@ -1625,10 +1634,6 @@ msgid "Inbox connected"
 msgstr "Inbox connected"
 
 #: src/routes/emails/inboxes.tsx
-msgid "Inbox management"
-msgstr "Inbox management"
-
-#: src/routes/emails/inboxes.tsx
 msgid "Inbox removed"
 msgstr "Inbox removed"
 
@@ -1641,6 +1646,14 @@ msgstr "Inbox updated"
 #: src/components/research/findings/prospect-scan-view.tsx
 msgid "Industry"
 msgstr "Industry"
+
+#: src/routes/emails/inboxes.tsx
+msgid "Infomaniak needs a Mail app password created in your Mail service — not an account application password, and not your normal login password."
+msgstr "Infomaniak needs a Mail app password created in your Mail service — not an account application password, and not your normal login password."
+
+#: src/routes/emails/inboxes.tsx
+msgid "Infomaniak needs a Mail app password created in your Mail service — not an account application password."
+msgstr "Infomaniak needs a Mail app password created in your Mail service — not an account application password."
 
 #: src/components/shared/channel-icon.tsx
 msgid "Instagram"
@@ -1785,10 +1798,6 @@ msgstr "Loading run…"
 msgid "Loading…"
 msgstr "Loading…"
 
-#: src/routes/emails/inboxes.tsx
-msgid "Local inboxes"
-msgstr "Local inboxes"
-
 #: src/components/companies/where-panel-client.client.tsx
 msgid "Locate this company"
 msgstr "Locate this company"
@@ -1839,6 +1848,11 @@ msgstr "Low"
 msgid "Low priority"
 msgstr "Low priority"
 
+#. placeholder {0}: row.email
+#: src/routes/emails/inboxes.tsx
+msgid "Make {0} the primary sender"
+msgstr "Make {0} the primary sender"
+
 #: src/components/contacts/manage-channels-dialog.tsx
 msgid "Make primary"
 msgstr "Make primary"
@@ -1846,11 +1860,6 @@ msgstr "Make primary"
 #: src/routes/companies/$slug.tsx
 msgid "Manage channels"
 msgstr "Manage channels"
-
-#. placeholder {0}: row.email
-#: src/routes/emails/inboxes.tsx
-msgid "Manage footers for {0}"
-msgstr "Manage footers for {0}"
 
 #: src/routes/emails/index.tsx
 msgid "Manage inboxes"
@@ -1878,21 +1887,9 @@ msgstr "Mark \"{0}\" as complete"
 msgid "Mark \"{0}\" as pending"
 msgstr "Mark \"{0}\" as pending"
 
-#: src/routes/emails/inboxes.tsx
-msgid "Mark active"
-msgstr "Mark active"
-
-#: src/routes/emails/inboxes.tsx
-msgid "Mark as default"
-msgstr "Mark as default"
-
 #: src/components/shared/company-card.tsx
 msgid "Mark contacted"
 msgstr "Mark contacted"
-
-#: src/routes/emails/inboxes.tsx
-msgid "Mark inactive"
-msgstr "Mark inactive"
 
 #: src/routes/emails/index.tsx
 #: src/routes/emails/index.tsx
@@ -2143,10 +2140,6 @@ msgstr "No footers"
 msgid "No high-priority companies without a scheduled follow-up"
 msgstr "No high-priority companies without a scheduled follow-up"
 
-#: src/routes/emails/inboxes.tsx
-msgid "No inboxes yet"
-msgstr "No inboxes yet"
-
 #: src/routes/settings/api-keys/index.tsx
 msgid "No keys yet. Create one above to connect an agent."
 msgstr "No keys yet. Create one above to connect an agent."
@@ -2288,6 +2281,10 @@ msgstr "Nothing to show in this range."
 #: src/routes/emails/$threadId.tsx
 msgid "On {date}, {who} wrote:"
 msgstr "On {date}, {who} wrote:"
+
+#: src/routes/emails/inboxes.tsx
+msgid "Once it's connected, I can send and receive email for you right here — no switching tabs."
+msgstr "Once it's connected, I can send and receive email for you right here — no switching tabs."
 
 #: src/routes/accept-invitation.$id.tsx
 msgid "One click to accept the invitation."
@@ -2518,6 +2515,19 @@ msgstr "Passwordless sign-in only"
 msgid "Passwords need at least {MIN_PASSWORD_LENGTH} characters."
 msgstr "Passwords need at least {MIN_PASSWORD_LENGTH} characters."
 
+#: src/routes/emails/inboxes.tsx
+msgid "Paste an app password — I'll show you where to get one"
+msgstr "Paste an app password — I'll show you where to get one"
+
+#: src/routes/emails/inboxes.tsx
+msgid "Pause syncing"
+msgstr "Pause syncing"
+
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
+msgid "Paused"
+msgstr "Paused"
+
 #: src/routes/settings/organization/members.tsx
 msgid "Pending"
 msgstr "Pending"
@@ -2540,6 +2550,7 @@ msgid "People with access to this workspace."
 msgstr "People with access to this workspace."
 
 #: src/routes/calendar/index.tsx
+#: src/routes/emails/inboxes.tsx
 #: src/routes/tasks/index.tsx
 #: src/routes/tasks/index.tsx
 msgid "Personal"
@@ -2578,6 +2589,10 @@ msgstr "Pick one to use as your default sender."
 msgid "Pick templates to use just for this run. Leave empty to use your default."
 msgstr "Pick templates to use just for this run. Leave empty to use your default."
 
+#: src/routes/emails/inboxes.tsx
+msgid "Pick your email provider"
+msgstr "Pick your email provider"
+
 #: src/components/layout/nav-items.ts
 #: src/routes/index.tsx
 msgid "Pipeline"
@@ -2606,6 +2621,12 @@ msgstr "Preview"
 #: src/routes/emails/index.tsx
 msgid "Previous"
 msgstr "Previous"
+
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
+msgid "Primary"
+msgstr "Primary"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Primary inbox set"
@@ -2675,11 +2696,6 @@ msgstr "Prospect scan"
 msgid "Prospects"
 msgstr "Prospects"
 
-#: src/routes/emails/inboxes.tsx
-#: src/routes/emails/inboxes.tsx
-msgid "Provider preset"
-msgstr "Provider preset"
-
 #: src/routes/pages/$id.tsx
 msgid "Public URL"
 msgstr "Public URL"
@@ -2701,7 +2717,6 @@ msgstr "Published"
 msgid "Publishing…"
 msgstr "Publishing…"
 
-#: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
 msgid "Purpose"
@@ -2746,6 +2761,7 @@ msgstr "Refreshing inbox status…"
 msgid "Region"
 msgstr "Region"
 
+#: src/routes/emails/inboxes.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Remove"
 msgstr "Remove"
@@ -2869,6 +2885,10 @@ msgstr "Resume drafting ({0})"
 msgid "Resume drafting (1)"
 msgstr "Resume drafting (1)"
 
+#: src/routes/emails/inboxes.tsx
+msgid "Resume syncing"
+msgstr "Resume syncing"
+
 #: src/routes/settings/profile/templates.tsx
 msgid "Reusable, standing guidance your research agent follows — what you sell, who you target, tone, and which sources to trust."
 msgstr "Reusable, standing guidance your research agent follows — what you sell, who you target, tone, and which sources to trust."
@@ -2986,10 +3006,6 @@ msgstr "Select the text and copy it manually."
 #: src/routes/emails/index.tsx
 msgid "Select thread {0}"
 msgstr "Select thread {0}"
-
-#: src/routes/emails/inboxes.tsx
-msgid "Selecting a preset fills IMAP and SMTP defaults — you can still edit them."
-msgstr "Selecting a preset fills IMAP and SMTP defaults — you can still edit them."
 
 #: src/components/emails/compose-form.tsx
 msgid "Send"
@@ -3239,6 +3255,10 @@ msgstr "Standing guidance your research agent follows on every run."
 msgid "Start"
 msgstr "Start"
 
+#: src/routes/emails/inboxes.tsx
+msgid "Start sending and receiving"
+msgstr "Start sending and receiving"
+
 #: src/components/research/research-dialog.tsx
 msgid "Starting…"
 msgstr "Starting…"
@@ -3248,6 +3268,7 @@ msgid "STARTTLS"
 msgstr "STARTTLS"
 
 #: src/routes/calendar/index.tsx
+#: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/pages/index.tsx
 #: src/routes/tasks/index.tsx
@@ -3314,6 +3335,10 @@ msgstr "Tasks"
 msgid "Tax ID"
 msgstr "Tax ID"
 
+#: src/routes/emails/inboxes.tsx
+msgid "Technical details"
+msgstr "Technical details"
+
 #: src/routes/pages/$id.tsx
 msgid "Template"
 msgstr "Template"
@@ -3335,10 +3360,9 @@ msgstr "Tentative"
 msgid "Test & connect"
 msgstr "Test & connect"
 
-#. placeholder {0}: row.email
 #: src/routes/emails/inboxes.tsx
-msgid "Test connection for {0}"
-msgstr "Test connection for {0}"
+msgid "Test connection"
+msgstr "Test connection"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Test failed"
@@ -3642,6 +3666,15 @@ msgid "Use the org default"
 msgstr "Use the org default"
 
 #: src/routes/emails/inboxes.tsx
+msgid "Use your email provider's app-specific password — not your normal login password."
+msgstr "Use your email provider's app-specific password — not your normal login password."
+
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
+msgid "Used for"
+msgstr "Used for"
+
+#: src/routes/emails/inboxes.tsx
 msgid "Username"
 msgstr "Username"
 
@@ -3722,6 +3755,11 @@ msgstr "Where"
 msgid "Who"
 msgstr "Who"
 
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
+msgid "Who's your email provider?"
+msgstr "Who's your email provider?"
+
 #: src/routes/settings/organization/members.tsx
 msgid "Working…"
 msgstr "Working…"
@@ -3778,6 +3816,11 @@ msgstr "Your Batuda workbench identity."
 #: src/routes/settings/mcp/index.tsx
 msgid "Your connections"
 msgstr "Your connections"
+
+#: src/routes/emails/inboxes.tsx
+#: src/routes/emails/inboxes.tsx
+msgid "Your email connections"
+msgstr "Your email connections"
 
 #: src/routes/login.tsx
 msgid "Your email isn't verified yet. Use the magic link instead."

@@ -13,13 +13,16 @@ import {
 	ChevronLeft,
 	FileText,
 	Inbox as InboxIcon,
+	Pause,
 	Pencil,
+	Play,
 	Plus,
 	RefreshCw,
 	Star,
 	Trash2,
 	X,
 } from 'lucide-react'
+import type { ComponentType } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import styled, { css } from 'styled-components'
 
@@ -30,6 +33,7 @@ import {
 	PriDialog,
 	PriInput,
 	PriSelect,
+	PriTooltip,
 	usePriToast,
 } from '@batuda/ui/pri'
 
@@ -69,6 +73,9 @@ import {
 type InboxPurpose = 'human' | 'agent' | 'shared'
 type TransportSecurity = 'tls' | 'starttls' | 'plain'
 type GrantStatus = 'connected' | 'auth_failed' | 'connect_failed' | 'disabled'
+// What the status pill shows. A paused inbox (active=false) reads "Paused"
+// regardless of its last sign-in result, so it gets its own tone.
+type StatusTone = GrantStatus | 'paused'
 
 type InboxRow = {
 	readonly id: string
@@ -386,8 +393,8 @@ function InboxesPage() {
 							<span>{t`Back to emails`}</span>
 						</Link>
 					</BackLink>
-					<Title>{t`Inbox management`}</Title>
-					<Subtitle>{t`Connect IMAP/SMTP mailboxes and choose your primary sender.`}</Subtitle>
+					<Title>{t`Your email connections`}</Title>
+					<Subtitle>{t`Connect the email address you use with customers, so you can send and receive right here.`}</Subtitle>
 				</IntroText>
 				<IntroActions>
 					<PriButton
@@ -397,7 +404,7 @@ function InboxesPage() {
 						onClick={openCreate}
 					>
 						<Plus size={14} aria-hidden />
-						<span>{t`Connect mailbox`}</span>
+						<span>{t`Connect an email`}</span>
 					</PriButton>
 				</IntroActions>
 			</Intro>
@@ -471,8 +478,17 @@ function InboxesPage() {
 			) : rows.length === 0 ? (
 				<EmptyState
 					icon={InboxIcon}
-					title={t`No inboxes yet`}
-					description={t`Connect your IMAP/SMTP mailbox to start sending and receiving email.`}
+					title={t`Connect your email to get started`}
+					description={
+						<EmptyHelp>
+							<p>{t`Once it's connected, I can send and receive email for you right here — no switching tabs.`}</p>
+							<ol>
+								<li>{t`Pick your email provider`}</li>
+								<li>{t`Paste an app password — I'll show you where to get one`}</li>
+								<li>{t`Start sending and receiving`}</li>
+							</ol>
+						</EmptyHelp>
+					}
 					action={
 						<PriButton
 							type='button'
@@ -481,163 +497,167 @@ function InboxesPage() {
 							onClick={openCreate}
 						>
 							<Plus size={14} aria-hidden />
-							<span>{t`Connect mailbox`}</span>
+							<span>{t`Connect an email`}</span>
 						</PriButton>
 					}
 				/>
 			) : (
-				<InboxesTable role='table' aria-label={t`Local inboxes`}>
+				<InboxesTable role='table' aria-label={t`Your email connections`}>
 					<TableHead role='row'>
 						<HeadCell role='columnheader'>{t`Email`}</HeadCell>
 						<HeadCell role='columnheader'>{t`Status`}</HeadCell>
-						<HeadCell role='columnheader'>{t`Purpose`}</HeadCell>
-						<HeadCell role='columnheader'>{t`Default`}</HeadCell>
-						<HeadCell role='columnheader'>{t`Active`}</HeadCell>
-						<HeadCell role='columnheader'>{t`Created`}</HeadCell>
+						<HeadCell role='columnheader'>{t`Used for`}</HeadCell>
+						<HeadCell role='columnheader'>{t`Primary`}</HeadCell>
+						<HeadCell role='columnheader'>{t`Added`}</HeadCell>
 						<HeadCell role='columnheader' aria-label={t`Actions`}>
 							{' '}
 						</HeadCell>
 					</TableHead>
-					{rows.map(row => (
-						<TableRow key={row.id} role='row' $inactive={!row.active}>
-							<CellEmail role='cell'>
-								<EmailAddress>{row.email}</EmailAddress>
-								<EmailMeta>
-									{row.displayName !== null && row.displayName !== '' ? (
-										<DisplayName>{row.displayName}</DisplayName>
-									) : null}
-									{row.imapHost !== '' && (
-										<HostName title={`IMAP ${row.imapHost}:${row.imapPort}`}>
-											{row.imapHost}
-										</HostName>
-									)}
-									{row.isPrivate && (
-										<PrivacyTag aria-label={t`Private inbox`}>
-											{t`Private`}
-										</PrivacyTag>
-									)}
-								</EmailMeta>
-							</CellEmail>
-							<CellStatus role='cell'>
-								<StatusBadge
-									$status={row.grantStatus}
-									title={row.grantLastError ?? ''}
-								>
-									{row.grantStatus === 'connected'
-										? t`Connected`
-										: row.grantStatus === 'auth_failed'
-											? t`Auth failed`
-											: row.grantStatus === 'connect_failed'
-												? t`Connect failed`
-												: t`Disabled`}
-								</StatusBadge>
-								{row.grantStatus === 'auth_failed' && (
-									<AuthHint>
-										{t`2FA accounts need an app-specific password.`}
-										{authPasswordUrlFor(presets, row.imapHost) !== '' && (
-											<>
-												{' '}
-												<PresetLink
-													href={authPasswordUrlFor(presets, row.imapHost)}
-													aria-label={t`Create an app-specific password for ${row.email}, opens in a new tab`}
-													target='_blank'
-													rel='noreferrer noopener'
-												>
-													{t`Create an app password →`}
-												</PresetLink>
-											</>
+					{rows.map(row => {
+						const providerName = providerNameFor(presets, row.imapHost)
+						const appPwUrl = authPasswordUrlFor(presets, row.imapHost)
+						// A paused (inactive) inbox isn't syncing, so that takes
+						// precedence over whatever its last sign-in result was.
+						const statusTone: StatusTone = !row.active
+							? 'paused'
+							: row.grantStatus
+						const statusLabel = !row.active
+							? t`Paused`
+							: row.grantStatus === 'connected'
+								? t`Connected`
+								: row.grantStatus === 'auth_failed'
+									? t`Couldn't sign in`
+									: row.grantStatus === 'connect_failed'
+										? t`Couldn't connect`
+										: t`Paused`
+						return (
+							<TableRow key={row.id} role='row' $inactive={!row.active}>
+								<CellEmail role='cell'>
+									<EmailAddress>{row.email}</EmailAddress>
+									<EmailMeta>
+										{row.displayName !== null && row.displayName !== '' ? (
+											<DisplayName>{row.displayName}</DisplayName>
+										) : null}
+										{providerName !== '' && (
+											<ProviderName
+												title={`IMAP ${row.imapHost}:${row.imapPort}`}
+											>
+												{providerName}
+											</ProviderName>
 										)}
-									</AuthHint>
-								)}
-							</CellStatus>
-							<CellPurpose role='cell'>
-								<PurposeBadge $purpose={row.purpose}>
-									{row.purpose === 'human'
-										? t`Human`
-										: row.purpose === 'agent'
-											? t`Agent`
-											: t`Shared`}
-								</PurposeBadge>
-							</CellPurpose>
-							<CellDefault role='cell'>
-								<IconToggle
-									type='button'
-									$active={row.isDefault}
-									onClick={() => {
-										void setDefault(row)
-									}}
-									aria-label={
-										row.isDefault ? t`Default inbox` : t`Mark as default`
-									}
-									aria-pressed={row.isDefault}
-								>
-									<Star
-										size={14}
-										aria-hidden
-										fill={row.isDefault ? 'currentColor' : 'none'}
-									/>
-								</IconToggle>
-							</CellDefault>
-							<CellActive role='cell'>
-								<IconToggle
-									type='button'
-									$active={row.active}
-									onClick={() => {
-										void toggleActive(row)
-									}}
-									aria-label={row.active ? t`Mark inactive` : t`Mark active`}
-									aria-pressed={row.active}
-								>
-									{row.active ? (
-										<Check size={14} aria-hidden />
-									) : (
-										<X size={14} aria-hidden />
+										{row.isPrivate && (
+											<PrivacyTag aria-label={t`Private inbox`}>
+												{t`Private`}
+											</PrivacyTag>
+										)}
+									</EmailMeta>
+								</CellEmail>
+								<CellStatus role='cell'>
+									<MobileCaption>{t`Status`}</MobileCaption>
+									<StatusBadge $status={statusTone}>{statusLabel}</StatusBadge>
+									{row.active && row.grantStatus === 'auth_failed' && (
+										<AuthHint>
+											{row.imapHost === 'mail.infomaniak.com'
+												? t`Infomaniak needs a Mail app password created in your Mail service — not an account application password.`
+												: t`Use your email provider's app-specific password — not your normal login password.`}
+											{appPwUrl !== '' && (
+												<>
+													{' '}
+													<PresetLink
+														href={appPwUrl}
+														aria-label={t`Create an app password for ${row.email}, opens in a new tab`}
+														target='_blank'
+														rel='noreferrer noopener'
+													>
+														{t`Create an app password →`}
+													</PresetLink>
+												</>
+											)}
+										</AuthHint>
 									)}
-								</IconToggle>
-							</CellActive>
-							<CellDate role='cell'>
-								{row.createdAt !== null ? (
-									<RelativeDate value={row.createdAt} />
-								) : (
-									<Muted>—</Muted>
-								)}
-							</CellDate>
-							<CellActions role='cell'>
-								<IconAction
-									type='button'
-									onClick={() => {
-										void handleTest(row)
-									}}
-									aria-label={t`Test connection for ${row.email}`}
-								>
-									<RefreshCw size={14} aria-hidden />
-								</IconAction>
-								<IconAction
-									type='button'
-									onClick={() => openFooters(row)}
-									aria-label={t`Manage footers for ${row.email}`}
-								>
-									<FileText size={14} aria-hidden />
-								</IconAction>
-								<IconAction
-									type='button'
-									onClick={() => openEdit(row)}
-									aria-label={t`Edit inbox ${row.email}`}
-								>
-									<Pencil size={14} aria-hidden />
-								</IconAction>
-								<IconAction
-									type='button'
-									onClick={() => {
-										void handleDelete(row)
-									}}
-									aria-label={t`Delete inbox ${row.email}`}
-								>
-									<Trash2 size={14} aria-hidden />
-								</IconAction>
-							</CellActions>
-						</TableRow>
-					))}
+									{row.grantLastError !== null && row.grantLastError !== '' && (
+										<TechDetails>
+											<summary>{t`Technical details`}</summary>
+											<code>{row.grantLastError}</code>
+										</TechDetails>
+									)}
+								</CellStatus>
+								<CellPurpose role='cell'>
+									<MobileCaption>{t`Used for`}</MobileCaption>
+									<PurposeBadge $purpose={row.purpose}>
+										{row.purpose === 'human'
+											? t`Personal`
+											: row.purpose === 'agent'
+												? t`AI agent`
+												: t`Shared`}
+									</PurposeBadge>
+								</CellPurpose>
+								<CellDefault role='cell'>
+									<MobileCaption>{t`Primary`}</MobileCaption>
+									{row.isDefault ? (
+										<PrimaryLabel>
+											<Star size={12} aria-hidden fill='currentColor' />
+											{t`Primary`}
+										</PrimaryLabel>
+									) : (
+										<IconToggle
+											type='button'
+											$active={false}
+											onClick={() => {
+												void setDefault(row)
+											}}
+											aria-label={t`Make ${row.email} the primary sender`}
+										>
+											<Star size={14} aria-hidden fill='none' />
+										</IconToggle>
+									)}
+								</CellDefault>
+								<CellDate role='cell'>
+									<MobileCaption>{t`Added`}</MobileCaption>
+									{row.createdAt !== null ? (
+										<RelativeDate value={row.createdAt} />
+									) : (
+										<Muted>—</Muted>
+									)}
+								</CellDate>
+								<CellActions role='cell'>
+									<PriTooltip.Provider delay={300}>
+										<ActionButton
+											icon={RefreshCw}
+											label={t`Test connection`}
+											onClick={() => {
+												void handleTest(row)
+											}}
+										/>
+										<ActionButton
+											icon={FileText}
+											label={t`Email signature`}
+											onClick={() => openFooters(row)}
+										/>
+										<ActionButton
+											icon={Pencil}
+											label={t`Edit settings`}
+											onClick={() => openEdit(row)}
+										/>
+										<ActionButton
+											icon={row.active ? Pause : Play}
+											label={row.active ? t`Pause syncing` : t`Resume syncing`}
+											onClick={() => {
+												void toggleActive(row)
+											}}
+										/>
+										<ActionButton
+											icon={Trash2}
+											label={t`Remove`}
+											onClick={() => {
+												void handleDelete(row)
+											}}
+										/>
+									</PriTooltip.Provider>
+								</CellActions>
+							</TableRow>
+						)
+					})}
 				</InboxesTable>
 			)}
 
@@ -888,6 +908,16 @@ function InboxFormDialog({
 			? 'ix-provider-2fa-hint'
 			: undefined
 
+	// IMAP/SMTP host/port hide inside a collapsible "Advanced settings" section
+	// so the common path is just provider + email + password. A chosen preset
+	// with no host (Generic / Other) forces it open, since the user must type
+	// the servers; before any provider is picked it stays collapsed.
+	const [showAdvanced, setShowAdvanced] = useState(editing !== null)
+	const needsManualHosts =
+		selectedPreset !== null &&
+		(draft.imapHost.trim() === '' || draft.smtpHost.trim() === '')
+	const advancedOpen = showAdvanced || needsManualHosts
+
 	const usernameForSubmit = draft.username !== '' ? draft.username : draft.email
 
 	// Create requires email + transport + credentials. Edit lets the user
@@ -986,7 +1016,7 @@ function InboxFormDialog({
 					<Form onSubmit={handleSubmit}>
 						{editing === null && presets.length > 0 && (
 							<Field>
-								<Label>{t`Provider preset`}</Label>
+								<Label>{t`Who's your email provider?`}</Label>
 								<PriSelect.Root
 									value={presetName}
 									onValueChange={value => {
@@ -994,7 +1024,7 @@ function InboxFormDialog({
 									}}
 								>
 									<PriSelect.Trigger
-										aria-label={t`Provider preset`}
+										aria-label={t`Who's your email provider?`}
 										aria-describedby={providerHintId}
 									>
 										<PriSelect.Value placeholder={t`Pick a provider`} />
@@ -1021,7 +1051,7 @@ function InboxFormDialog({
 										</PriSelect.Positioner>
 									</PriSelect.Portal>
 								</PriSelect.Root>
-								<Hint>{t`Selecting a preset fills IMAP and SMTP defaults — you can still edit them.`}</Hint>
+								<Hint>{t`I'll fill in the technical settings for you — you just add your email and password.`}</Hint>
 								{selectedPreset !== null &&
 									(providerUnsupported ? (
 										<Warning role='alert' id='ix-provider-warning'>
@@ -1029,7 +1059,9 @@ function InboxFormDialog({
 										</Warning>
 									) : (
 										<Hint id='ix-provider-2fa-hint'>
-											{t`Has two-factor authentication enabled? Use a provider app-specific password below, not your normal login password.`}
+											{selectedPreset.imapHost === 'mail.infomaniak.com'
+												? t`Infomaniak needs a Mail app password created in your Mail service — not an account application password, and not your normal login password.`
+												: t`If your account has two-factor authentication, use an app-specific password — not your normal login password.`}
 											{setupUrl !== '' && (
 												<>
 													{' '}
@@ -1078,67 +1110,86 @@ function InboxFormDialog({
 							/>
 						</Field>
 
-						<TransportGrid>
-							<Field>
-								<Label htmlFor='ix-imap-host'>{t`IMAP host`}</Label>
-								<PriInput
-									id='ix-imap-host'
-									type='text'
-									value={draft.imapHost}
-									onChange={e => patchDraft({ imapHost: e.target.value })}
-									placeholder='imap.example.com'
-								/>
-							</Field>
-							<Field>
-								<Label htmlFor='ix-imap-port'>{t`IMAP port`}</Label>
-								<PriInput
-									id='ix-imap-port'
-									type='number'
-									value={draft.imapPort}
-									onChange={e =>
-										patchDraft({ imapPort: parseInt(e.target.value, 10) || 0 })
-									}
-								/>
-							</Field>
-							<Field>
-								<Label>{t`IMAP security`}</Label>
-								<SecuritySelect
-									value={draft.imapSecurity}
-									onChange={next => patchDraft({ imapSecurity: next })}
-									ariaLabel={t`IMAP security`}
-								/>
-							</Field>
+						{needsManualHosts ? (
+							<Hint>{t`Enter your mail server settings below.`}</Hint>
+						) : (
+							<AdvancedToggle
+								type='button'
+								onClick={() => setShowAdvanced(v => !v)}
+								aria-expanded={advancedOpen}
+							>
+								{advancedOpen
+									? t`Hide advanced settings`
+									: t`Advanced settings (IMAP / SMTP)`}
+							</AdvancedToggle>
+						)}
+						{advancedOpen && (
+							<TransportGrid>
+								<Field>
+									<Label htmlFor='ix-imap-host'>{t`IMAP host`}</Label>
+									<PriInput
+										id='ix-imap-host'
+										type='text'
+										value={draft.imapHost}
+										onChange={e => patchDraft({ imapHost: e.target.value })}
+										placeholder='imap.example.com'
+									/>
+								</Field>
+								<Field>
+									<Label htmlFor='ix-imap-port'>{t`IMAP port`}</Label>
+									<PriInput
+										id='ix-imap-port'
+										type='number'
+										value={draft.imapPort}
+										onChange={e =>
+											patchDraft({
+												imapPort: parseInt(e.target.value, 10) || 0,
+											})
+										}
+									/>
+								</Field>
+								<Field>
+									<Label>{t`IMAP security`}</Label>
+									<SecuritySelect
+										value={draft.imapSecurity}
+										onChange={next => patchDraft({ imapSecurity: next })}
+										ariaLabel={t`IMAP security`}
+									/>
+								</Field>
 
-							<Field>
-								<Label htmlFor='ix-smtp-host'>{t`SMTP host`}</Label>
-								<PriInput
-									id='ix-smtp-host'
-									type='text'
-									value={draft.smtpHost}
-									onChange={e => patchDraft({ smtpHost: e.target.value })}
-									placeholder='smtp.example.com'
-								/>
-							</Field>
-							<Field>
-								<Label htmlFor='ix-smtp-port'>{t`SMTP port`}</Label>
-								<PriInput
-									id='ix-smtp-port'
-									type='number'
-									value={draft.smtpPort}
-									onChange={e =>
-										patchDraft({ smtpPort: parseInt(e.target.value, 10) || 0 })
-									}
-								/>
-							</Field>
-							<Field>
-								<Label>{t`SMTP security`}</Label>
-								<SecuritySelect
-									value={draft.smtpSecurity}
-									onChange={next => patchDraft({ smtpSecurity: next })}
-									ariaLabel={t`SMTP security`}
-								/>
-							</Field>
-						</TransportGrid>
+								<Field>
+									<Label htmlFor='ix-smtp-host'>{t`SMTP host`}</Label>
+									<PriInput
+										id='ix-smtp-host'
+										type='text'
+										value={draft.smtpHost}
+										onChange={e => patchDraft({ smtpHost: e.target.value })}
+										placeholder='smtp.example.com'
+									/>
+								</Field>
+								<Field>
+									<Label htmlFor='ix-smtp-port'>{t`SMTP port`}</Label>
+									<PriInput
+										id='ix-smtp-port'
+										type='number'
+										value={draft.smtpPort}
+										onChange={e =>
+											patchDraft({
+												smtpPort: parseInt(e.target.value, 10) || 0,
+											})
+										}
+									/>
+								</Field>
+								<Field>
+									<Label>{t`SMTP security`}</Label>
+									<SecuritySelect
+										value={draft.smtpSecurity}
+										onChange={next => patchDraft({ smtpSecurity: next })}
+										ariaLabel={t`SMTP security`}
+									/>
+								</Field>
+							</TransportGrid>
+						)}
 
 						<Field>
 							<Label htmlFor='ix-username'>{t`Username`}</Label>
@@ -1373,6 +1424,49 @@ function authPasswordUrlFor(
 	if (imapHost === '') return ''
 	const preset = presets.find(p => p.imapHost === imapHost)
 	return preset?.appPasswordUrl ?? ''
+}
+
+// Friendly provider name ("Infomaniak") for an inbox's IMAP host so the list
+// shows a recognisable label instead of a raw server hostname. Falls back to
+// the host itself for mailboxes that don't match a known preset.
+function providerNameFor(
+	presets: ReadonlyArray<ProviderPreset>,
+	imapHost: string,
+): string {
+	if (imapHost === '') return ''
+	const preset = presets.find(p => p.imapHost === imapHost)
+	return preset?.name ?? imapHost
+}
+
+// One row action: an icon button that shows its label as a tooltip on
+// pointer/keyboard, and as inline text on small screens where tooltips never
+// open on tap. The caller passes an already-translated label.
+function ActionButton({
+	icon: Icon,
+	label,
+	onClick,
+}: {
+	icon: ComponentType<{ size?: number; 'aria-hidden'?: boolean }>
+	label: string
+	onClick: () => void
+}) {
+	return (
+		<PriTooltip.Root>
+			<PriTooltip.Trigger
+				render={
+					<IconAction type='button' onClick={onClick} aria-label={label}>
+						<Icon size={14} aria-hidden />
+						<ActionLabel>{label}</ActionLabel>
+					</IconAction>
+				}
+			/>
+			<PriTooltip.Portal>
+				<PriTooltip.Positioner side='top' sideOffset={6}>
+					<PriTooltip.Popup>{label}</PriTooltip.Popup>
+				</PriTooltip.Positioner>
+			</PriTooltip.Portal>
+		</PriTooltip.Root>
+	)
 }
 
 function narrowPresets(raw: unknown): ReadonlyArray<ProviderPreset> {
@@ -1883,23 +1977,37 @@ const InboxesTable = styled.div.withConfig({ displayName: 'InboxesTable' })`
 	background: var(--color-paper-aged);
 `
 
+// Columns: email · status · used-for · primary · added · actions.
 const gridTemplate = css`
 	display: grid;
 	grid-template-columns:
 		minmax(0, 2fr)
-		8rem
+		minmax(8rem, 0.9fr)
+		7rem
 		6rem
-		4rem
-		4rem
-		minmax(0, 1fr)
-		8rem;
+		minmax(0, 0.8fr)
+		auto;
 	align-items: center;
 	gap: var(--space-sm);
 	padding: var(--space-sm) var(--space-md);
+`
+
+// On small screens the header row is hidden, so each value cell carries its
+// own column name as a caption above the value. Real text (not CSS generated
+// content) so a screen reader reads it as part of the cell.
+const MobileCaption = styled.span.withConfig({
+	displayName: 'InboxesMobileCaption',
+})`
+	display: none;
 
 	@media (max-width: 767px) {
-		grid-template-columns: 1fr auto;
-		gap: var(--space-2xs);
+		display: block;
+		margin-bottom: var(--space-3xs);
+		font-family: var(--font-display);
+		font-size: var(--typescale-label-small-size);
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--color-on-surface-variant);
 	}
 `
 
@@ -1938,6 +2046,13 @@ const TableRow = styled.div.withConfig({
 	&:last-child {
 		border-bottom: none;
 	}
+
+	@media (max-width: 767px) {
+		display: flex;
+		flex-direction: column;
+		align-items: stretch;
+		gap: var(--space-sm);
+	}
 `
 
 const CellEmail = styled.div.withConfig({ displayName: 'InboxesCellEmail' })`
@@ -1950,9 +2065,7 @@ const EmailAddress = styled.span.withConfig({ displayName: 'InboxesEmail' })`
 	font-family: var(--font-body);
 	font-weight: var(--font-weight-medium);
 	color: var(--color-on-surface);
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	overflow-wrap: anywhere;
 `
 
 const DisplayName = styled.span.withConfig({
@@ -1970,7 +2083,12 @@ const CellPurpose = styled.div.withConfig({
 	displayName: 'InboxesCellPurpose',
 })``
 
-const CellStatus = styled.div.withConfig({ displayName: 'InboxesCellStatus' })``
+const CellStatus = styled.div.withConfig({ displayName: 'InboxesCellStatus' })`
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--space-3xs);
+`
 
 const EmailMeta = styled.div.withConfig({ displayName: 'InboxesEmailMeta' })`
 	display: flex;
@@ -1980,8 +2098,10 @@ const EmailMeta = styled.div.withConfig({ displayName: 'InboxesEmailMeta' })`
 	min-width: 0;
 `
 
-const HostName = styled.span.withConfig({ displayName: 'InboxesHostName' })`
-	font-family: var(--font-mono, monospace);
+const ProviderName = styled.span.withConfig({
+	displayName: 'InboxesProviderName',
+})`
+	font-family: var(--font-body);
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
 	overflow: hidden;
@@ -2005,7 +2125,7 @@ const PrivacyTag = styled.span.withConfig({ displayName: 'InboxesPrivacyTag' })`
 const StatusBadge = styled.span.withConfig({
 	displayName: 'InboxesStatusBadge',
 	shouldForwardProp: prop => prop !== '$status',
-})<{ $status: GrantStatus }>`
+})<{ $status: StatusTone }>`
 	display: inline-flex;
 	align-items: center;
 	padding: 2px var(--space-2xs);
@@ -2015,12 +2135,11 @@ const StatusBadge = styled.span.withConfig({
 	font-weight: var(--font-weight-bold);
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
-	cursor: ${p => (p.$status !== 'connected' ? 'help' : 'default')};
 	${p =>
 		p.$status === 'connected'
 			? css`
 					background: color-mix(in oklab, #16a34a 14%, transparent);
-					color: color-mix(in oklab, #166534 80%, black);
+					color: #0f5c29;
 					border: 1px solid color-mix(in oklab, #16a34a 40%, transparent);
 				`
 			: p.$status === 'auth_failed'
@@ -2118,6 +2237,27 @@ const Warning = styled.p.withConfig({ displayName: 'InboxFormWarning' })`
 	color: var(--color-error);
 `
 
+const AdvancedToggle = styled.button.withConfig({
+	displayName: 'InboxFormAdvancedToggle',
+})`
+	align-self: flex-start;
+	background: none;
+	border: none;
+	padding: 0;
+	cursor: pointer;
+	font-family: var(--font-display);
+	font-size: var(--typescale-label-small-size);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--color-primary);
+	text-decoration: underline;
+
+	&:focus-visible {
+		outline: none;
+		box-shadow: var(--glow-active);
+	}
+`
+
 const AuthHint = styled.p.withConfig({ displayName: 'InboxesAuthHint' })`
 	margin: var(--space-2xs) 0 0;
 	font-family: var(--font-body);
@@ -2128,15 +2268,10 @@ const AuthHint = styled.p.withConfig({ displayName: 'InboxesAuthHint' })`
 const CellDefault = styled.div.withConfig({
 	displayName: 'InboxesCellDefault',
 })``
-const CellActive = styled.div.withConfig({ displayName: 'InboxesCellActive' })``
 const CellDate = styled.div.withConfig({ displayName: 'InboxesCellDate' })`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
-
-	@media (max-width: 767px) {
-		display: none;
-	}
 `
 const CellActions = styled.div.withConfig({
 	displayName: 'InboxesCellActions',
@@ -2144,6 +2279,49 @@ const CellActions = styled.div.withConfig({
 	display: flex;
 	justify-content: flex-end;
 	gap: var(--space-3xs);
+
+	@media (max-width: 767px) {
+		flex-direction: column;
+		align-items: stretch;
+		justify-content: flex-start;
+		gap: var(--space-2xs);
+	}
+`
+
+const PrimaryLabel = styled.span.withConfig({
+	displayName: 'InboxesPrimaryLabel',
+})`
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-3xs);
+	color: var(--color-primary);
+	font-family: var(--font-display);
+	font-size: var(--typescale-label-small-size);
+	font-weight: var(--font-weight-bold);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+`
+
+const TechDetails = styled.details.withConfig({
+	displayName: 'InboxesTechDetails',
+})`
+	margin-top: var(--space-3xs);
+
+	> summary {
+		cursor: pointer;
+		font-family: var(--font-body);
+		font-size: var(--typescale-label-small-size);
+		color: var(--color-on-surface-variant);
+	}
+
+	> code {
+		display: block;
+		margin-top: var(--space-3xs);
+		font-family: var(--font-mono, monospace);
+		font-size: var(--typescale-label-small-size);
+		color: var(--color-on-surface-variant);
+		overflow-wrap: anywhere;
+	}
 `
 
 const PurposeBadge = styled.span.withConfig({
@@ -2223,20 +2401,44 @@ const IconAction = styled.button.withConfig({
 	height: 1.75rem;
 	padding: 0;
 	background: transparent;
-	border: 1px dashed var(--color-outline);
+	border: 1px solid var(--color-outline);
 	border-radius: var(--shape-2xs);
 	color: var(--color-on-surface-variant);
 	cursor: pointer;
+	transition:
+		color 160ms ease,
+		border-color 160ms ease;
 
 	&:hover:not(:disabled) {
 		color: var(--color-primary);
 		border-color: var(--color-primary);
-		border-style: solid;
 	}
 
 	&:focus-visible {
 		outline: none;
 		box-shadow: var(--glow-active);
+	}
+
+	/* On small screens the button carries a visible text label, so it grows
+	   to fit and left-aligns instead of staying an icon-only square. */
+	@media (max-width: 767px) {
+		width: auto;
+		height: auto;
+		justify-content: flex-start;
+		gap: var(--space-2xs);
+		padding: var(--space-2xs) var(--space-sm);
+	}
+`
+
+const ActionLabel = styled.span.withConfig({
+	displayName: 'InboxesActionLabel',
+})`
+	display: none;
+
+	@media (max-width: 767px) {
+		display: inline;
+		font-family: var(--font-body);
+		font-size: var(--typescale-label-medium-size);
 	}
 `
 
@@ -2244,6 +2446,30 @@ const Muted = styled.span.withConfig({ displayName: 'InboxesMuted' })`
 	color: var(--color-on-surface-variant);
 	font-style: italic;
 	opacity: 0.7;
+`
+
+const EmptyHelp = styled.div.withConfig({ displayName: 'InboxesEmptyHelp' })`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-sm);
+	align-items: flex-start;
+	text-align: left;
+
+	> p {
+		margin: 0;
+	}
+
+	> ol {
+		margin: 0;
+		padding-left: var(--space-md);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2xs);
+	}
+
+	> ol > li {
+		font-style: normal;
+	}
 `
 
 const DialogHeader = styled.div.withConfig({
