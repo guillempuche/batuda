@@ -539,67 +539,75 @@ Effect's `Otlp.layerJson` appends `/v1/traces`, `/v1/logs`, and `/v1/metrics` to
 
 ## Implementation Details
 
-### Server: Effect v4 Built-in OTLP
+### Shared OTLP layer: `@batuda/observability`
 
-Effect v4 includes OTLP export in `effect/unstable/observability` — no separate `@effect/opentelemetry` package needed:
-
-```typescript
-// apps/server/src/lib/observability.ts
-import { Otlp, OtlpTracer, OtlpLogger, OtlpMetrics, OtlpSerialization } from "effect/unstable/observability"
-import { FetchHttpClient } from "@effect/platform"
-import { Duration, Layer } from "effect"
-
-export const buildMeta = {
-  version: process.env.npm_package_version ?? process.env.SERVICE_VERSION ?? 'unknown',
-  commit: process.env.GIT_SHA ?? 'unknown',
-  commitShort: (process.env.GIT_SHA ?? 'unknown').slice(0, 7),
-  region: process.env.REGION ?? 'local',
-}
-
-// Combined layer — traces, logs, and metrics in one
-export const OtlpObservability = Otlp.layer({
-  baseUrl: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
-  resource: {
-    serviceName: 'batuda-server',
-    serviceVersion: buildMeta.version,
-    attributes: {
-      'deployment.environment': environment,
-      'vcs.revision': buildMeta.commit,
-      'cloud.region': buildMeta.region,
-    },
-  },
-  tracerExportInterval: Duration.seconds(5),
-  loggerExportInterval: Duration.seconds(1),
-  metricsExportInterval: Duration.seconds(60),
-  metricsTemporality: "cumulative",
-}).pipe(
-  Layer.provide(OtlpSerialization.layerJson),
-  Layer.provide(FetchHttpClient.layer)
-)
-```
-
-Individual layers are also available for granular control:
+Both processes (server, mail-worker) export through one tiny workspace package, `packages/observability`. It owns the build metadata (version/commit/region read from `process.env`) and a per-process exporter factory, `makeOtlpObservability({ serviceName })`. Effect v4 ships OTLP in `effect/unstable/observability` — no separate `@effect/opentelemetry` package, and the HTTP client comes from `effect/unstable/http`, not `@effect/platform`.
 
 ```typescript
-// Traces only
-OtlpTracer.layer({ url: "http://localhost:4318/v1/traces", resource, exportInterval: Duration.seconds(5) })
+// packages/observability/src/otlp.ts (shape — see the file for the full version)
+import { Config, Duration, Effect, Layer } from "effect"
+import { FetchHttpClient } from "effect/unstable/http"
+import { Otlp } from "effect/unstable/observability"
+import { buildMeta } from "./build-meta"
 
-// Logs only
-OtlpLogger.layer({ url: "http://localhost:4318/v1/logs", resource, exportInterval: Duration.seconds(1) })
-
-// Metrics only
-OtlpMetrics.layer({ url: "http://localhost:4318/v1/metrics", resource, temporality: "cumulative" })
+export const makeOtlpObservability = (options: { readonly serviceName: string }) =>
+  Layer.unwrap(
+    Effect.gen(function* () {
+      const baseUrl = yield* Config.string("OTEL_EXPORTER_OTLP_ENDPOINT").pipe(Config.withDefault(""))
+      const headersRaw = yield* Config.string("OTEL_EXPORTER_OTLP_HEADERS").pipe(Config.withDefault(""))
+      const environment = yield* Config.string("NODE_ENV")
+      // The endpoint is the on/off switch: no endpoint → no export (local dev).
+      if (!baseUrl) return Layer.empty
+      return Otlp.layerJson({
+        baseUrl,
+        resource: {
+          serviceName: options.serviceName, // batuda-server | batuda-mail-worker
+          serviceVersion: buildMeta.version,
+          attributes: {
+            "deployment.environment": environment,
+            "deployment.id": `${buildMeta.version}-${buildMeta.commitShort}`,
+            "vcs.revision": buildMeta.commit,
+            "cloud.region": buildMeta.region,
+          },
+        },
+        headers: parseOtlpHeaders(headersRaw),
+        tracerExportInterval: Duration.seconds(5),
+        loggerExportInterval: Duration.seconds(1),
+        metricsExportInterval: Duration.seconds(60),
+        metricsTemporality: "cumulative",
+      }).pipe(Layer.provide(FetchHttpClient.layer))
+    }),
+  )
 ```
+
+`Otlp.layerJson` registers a tracer, a metrics reader, AND an OTLP logger; the logger's `mergeWithExisting` defaults to `true`, so it adds to whatever console logger the process already has rather than replacing it. The server provides it in `apps/server/src/lib/observability.ts` (`serviceName: 'batuda-server'`); the mail-worker provides it around its `Live` layer in `apps/mail-worker/src/main.ts` (`serviceName: 'batuda-mail-worker'`).
 
 **Configuration:**
 
-- `OTEL_EXPORTER_OTLP_HEADERS` — comma-separated key=value pairs (e.g. `x-honeycomb-team=KEY`)
-- `OTEL_EXPORTER_OTLP_ENDPOINT` — OTLP endpoint base URL
+- `OTEL_EXPORTER_OTLP_ENDPOINT` — OTLP endpoint base URL (`https://api.honeycomb.io`). Non-secret, so it lives in each app's `config.production.json` alongside the other endpoints (`STORAGE_ENDPOINT`, the LLM base URLs) — NOT a CI secret. **It is also the on/off switch**: unset → export disabled. It is deliberately left OUT of `config.production.json` until Honeycomb is set up, so OTLP stays dark by default; adding the one line (plus the secret below) is what turns it on. Locally it comes from `.env` (`http://localhost:4318` for otel-tui).
+- `OTEL_EXPORTER_OTLP_HEADERS` — comma-separated `key=value` pairs. This DOES carry a secret (the Honeycomb team key), so it stays a CI secret holding the team key only (`x-honeycomb-team=KEY`); each deploy workflow appends its own non-secret `,x-honeycomb-dataset=…` (see below).
 - `SERVICE_VERSION` — CalVer version (injected by CI)
 - `GIT_SHA` — full commit SHA (short SHA derived at runtime)
 - `REGION` — Unikraft metro / deployment region
 
-When headers are not set, export is disabled (local development).
+**Per-service datasets + the metrics-routing gotcha.** Traces auto-route to a Honeycomb dataset named after the resource `service.name`, so `batuda-server` and `batuda-mail-worker` separate on their own. Logs and metrics, however, route by the `x-honeycomb-dataset` header — so each deploy workflow appends `x-honeycomb-dataset=batuda-server` / `batuda-mail-worker` to the shared team-key secret. One Honeycomb API key (environment-scoped) is enough for both.
+
+### Catch-all error logging + request tracing
+
+`apps/server/src/lib/observability-middleware.ts` (`ObservabilityLive`) is a global router middleware — attached in `AppLive` exactly like `CorsLive`. Per request it annotates the span and logs with `request.id` (reusing an upstream `x-request-id` when present), `http.method`, and `http.path_pattern` (UUIDs → `:id`, query/fragment dropped so a token in `?code=…` never lands in a span or log). It then logs the **full cause** of any defect (`Effect.tapCause`) or 5xx response at error level — the last line of defence so no API error escapes unlogged. `OrgMiddleware` adds `org.id` to the same span once the org resolves.
+
+`HttpMiddleware.tracer` is added to the `serve` chain in `apps/server/src/main.ts` so every request gets a span (Effect's `serve` adds only the request logger by default). A `TracerDisabledWhen` predicate exempts a few routes: `/health` (the uptime checker polls it constantly and would drown the real traces) and the routes whose URL itself carries a secret — magic-link verify (token in the query) and reset-password (token in the path). This matters because the tracer records `url.full`/`url.query` **unredacted** (header values like `authorization`/`cookie`/`x-api-key` are redacted by default, but the URL is not), so tracing those routes would export a single-use token to Honeycomb.
+
+### Better Auth error bridge
+
+Better Auth runs its callbacks outside the Effect fiber, so its internal errors (adapter failures, OAuth/OIDC) would be console-only. `apps/server/src/lib/auth.ts` captures the layer's services and forwards Better Auth's `logger.log` (warn+error) and `onAPIError.onError` onto that runtime via `Effect.runForkWith`, so they export through OTLP like every other log.
+
+### Auth-sensitive spans (added per-surface, not blanket)
+
+Per the scoping below, spans are added only where the MCP-drop class of bug needs them, not across every endpoint:
+
+- MCP auth chokepoint (`apps/server/src/mcp/http.ts`) — the request span gets `mcp.auth_method` (`api_key`/`oauth`/`cookie`), `mcp.org_id`, and `mcp.principal_is_agent`. Every 401/403 path also logs a `mcp.auth.rejected` reason.
+- `/auth/oauth2/token` (`apps/server/src/handlers/auth.ts`) — the span gets `auth.token_response_status` (the grant outcome) when the proxied path is the token endpoint.
 
 ### Wide Events Pattern
 
@@ -610,7 +618,7 @@ const span = yield* Effect.currentSpan
 span.attribute('company.id', companyId)
 span.attribute('interaction.channel', channel)
 span.attribute('interaction.direction', direction)
-span.event('interaction.logged', DateTime.unsafeNow(), { outcome: "interested" })
+span.event('interaction.logged', DateTime.nowUnsafe(), { outcome: "interested" })
 ```
 
 This produces a single rich event with all business context — ideal for exploration in Honeycomb or similar tools.
