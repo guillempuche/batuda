@@ -15,6 +15,7 @@
 		"@batuda/controllers": "workspace:*",
 		"@batuda/domain": "workspace:*",
 		"@batuda/email": "workspace:*",
+		"@batuda/observability": "workspace:*",
 		"@effect/platform-node": "4.0.0-beta.43",
 		"@effect/sql-pg": "4.0.0-beta.43",
 		"effect": "4.0.0-beta.43",

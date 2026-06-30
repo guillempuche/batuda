@@ -1,6 +1,7 @@
 /**
  * Build metadata resolved once at startup.
- * Shared by the health endpoint and OTLP resource attributes.
+ * Shared by the server health endpoint and OTLP resource attributes across
+ * every process (server, mail-worker).
  *
  * Fallback chains:
  * - version: npm_package_version (pnpm dev) → SERVICE_VERSION (CI) → "unknown"
