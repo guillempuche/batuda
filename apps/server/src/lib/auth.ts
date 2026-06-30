@@ -30,6 +30,55 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 			connectionString: Redacted.value(env.DATABASE_URL),
 		})
 
+		// Better Auth's `logger.log` and `onAPIError.onError` are plain callbacks
+		// that fire OUTSIDE the Effect fiber. Capture the layer's services here so
+		// those callbacks can fork log effects onto the real runtime — routing
+		// Better Auth's internal errors (adapter, OAuth/OIDC) through OTLP like
+		// every other log instead of leaving them console-only.
+		const services = yield* Effect.services<never>()
+		const forkLog = (effect: Effect.Effect<void, never, never>): void => {
+			Effect.runForkWith(services)(effect)
+		}
+		const betterAuthLogger: NonNullable<
+			Parameters<typeof buildBetterAuthConfig>[0]['logger']
+		> = {
+			// Capture warnings + errors. 'warn' is also Better Auth's own default
+			// level, so nothing it would normally surface is lost; info/debug are
+			// filtered out (a custom `log` replaces its console writer entirely).
+			level: 'warn',
+			log: (level, message, ...args) => {
+				forkLog(
+					(level === 'error'
+						? Effect.logError(message)
+						: Effect.logWarning(message)
+					).pipe(
+						Effect.annotateLogs({
+							event: 'auth.internal',
+							betterAuthLevel: level,
+							...(args.length > 0 ? { detail: args } : {}),
+						}),
+					),
+				)
+			},
+		}
+		const betterAuthOnAPIError: NonNullable<
+			Parameters<typeof buildBetterAuthConfig>[0]['onAPIError']
+		> = {
+			// Observe only — don't change Better Auth's response behaviour. Log the
+			// error message (not ctx: it holds headers/session) so OAuth/token
+			// failures are queryable instead of vanishing into the console buffer.
+			onError: error => {
+				forkLog(
+					Effect.logError('Better Auth API error').pipe(
+						Effect.annotateLogs({
+							event: 'auth.api_error',
+							error: error instanceof Error ? error.message : String(error),
+						}),
+					),
+				)
+			},
+		}
+
 		// The shared builder is the single source of truth for Batuda's
 		// Better-Auth config. CLI commands use the same builder with a
 		// narrower plugin list (no magicLink) so that API keys and sessions
@@ -79,6 +128,8 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 					rateLimit: env.BETTER_AUTH_RATE_LIMIT,
 				},
 				pool,
+				logger: betterAuthLogger,
+				onAPIError: betterAuthOnAPIError,
 				sendResetPassword: async data => {
 					// Mirror BA's default `resetPasswordTokenExpiresIn` (1h) and
 					// pass it through so the template can tell the recipient

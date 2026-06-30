@@ -42,6 +42,17 @@ export interface BuildBetterAuthConfigInput<
 	readonly pool: pg.Pool
 	readonly plugins: Plugins
 	readonly sendResetPassword?: SendResetPassword
+	/**
+	 * Routes Better Auth's own internal logs (adapter failures, OAuth/OIDC
+	 * errors) somewhere queryable. The server forwards them into the Effect
+	 * logger; the CLI omits it and keeps Better Auth's console default.
+	 */
+	readonly logger?: BetterAuthOptions['logger']
+	/**
+	 * Observes every API-level error Better Auth raises. The server forwards
+	 * these to the Effect logger so OAuth/token failures aren't console-only.
+	 */
+	readonly onAPIError?: BetterAuthOptions['onAPIError']
 }
 
 /**
@@ -203,5 +214,8 @@ export const buildBetterAuthConfig = <Plugins extends BetterAuthPlugin[]>(
 				: {}), // Set on all cookies, not just cross-subdomain ones.
 		},
 		trustedOrigins: [...input.env.trustedOrigins],
+		// Observability hooks — only present when the caller (server) wires them.
+		...(input.logger ? { logger: input.logger } : {}),
+		...(input.onAPIError ? { onAPIError: input.onAPIError } : {}),
 	} satisfies BetterAuthOptions // Type-checks fields without widening the inferred literal shape.
 }

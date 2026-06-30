@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto'
 
-import { DateTime, Effect, Layer, ServiceMap } from 'effect'
+import { Cause, DateTime, Effect, Layer, ServiceMap } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
@@ -95,7 +95,25 @@ export class WebhookService extends ServiceMap.Service<WebhookService>()(
 									),
 								),
 							{ concurrency: 'unbounded' },
-						).pipe(Effect.forkDetach)
+						).pipe(
+							// The per-endpoint catch above handles delivery failures, but a
+							// DEFECT inside this detached fiber (a bug, not a fetch
+							// rejection) would otherwise vanish with no trace. Catch the
+							// whole cause so it's logged; let a genuine interrupt
+							// (shutdown/cancel) propagate. Mirrors the research event sink.
+							Effect.catchCause(cause =>
+								Cause.hasInterruptsOnly(cause)
+									? Effect.interrupt
+									: Effect.logError('Webhook fan-out failed').pipe(
+											Effect.annotateLogs({
+												event: 'webhook.fanout.failed',
+												webhookEvent: event,
+												cause: Cause.pretty(cause),
+											}),
+										),
+							),
+							Effect.forkDetach,
+						)
 					}),
 
 				list: () =>
