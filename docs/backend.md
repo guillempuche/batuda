@@ -108,6 +108,7 @@ apps/server/src/
 │   │   ├── company.ts        # batuda://company/{slug} (parameterized)
 │   │   ├── pipeline.ts       # batuda://pipeline (static)
 │   │   ├── document.ts       # batuda://document/{id} (parameterized)
+│   │   ├── instructions.ts   # batuda://instructions/{agent} (parameterized)
 │   │   └── research.ts       # batuda://research/{id} (parameterized)
 │   └── prompts/
 │       ├── _lang.ts           # LangParam + langDirective helper (ca/es/en)
@@ -116,7 +117,8 @@ apps/server/src/
 │       ├── research-designer.ts  # Research plan design prompt
 │       ├── daily-briefing.ts
 │       ├── proposal-draft.ts
-│       └── interaction-follow-up.ts
+│       ├── interaction-follow-up.ts
+│       └── instructions.ts    # apply-instruction, save-instruction
 ├── middleware/
 │   └── session.ts            # SessionMiddleware — validates Better Auth sessions
 ├── types/
@@ -398,8 +400,8 @@ The MCP server uses `effect/unstable/ai` — tools, resources, prompts, and elic
 ```
 McpToolsLive (src/mcp/server.ts)
 ├── Toolkits: companies, contacts, interactions, tasks, documents, pages, pipeline
-├── Resources: batuda://company/{slug}, batuda://pipeline, batuda://document/{id}
-└── Prompts: company-research, daily-briefing, proposal-draft, interaction-follow-up
+├── Resources: batuda://company/{slug}, batuda://pipeline, batuda://document/{id}, batuda://research/{id}, batuda://instructions/{agent}
+└── Prompts: company-research, research-designer, daily-briefing, proposal-draft, interaction-follow-up, apply-instruction, save-instruction
     │
     ├── stdio transport (mcp-stdio.ts) — local Claude Code
     └── HTTP transport (mcp/http.ts) — remote AI at /mcp on main server
@@ -486,7 +488,7 @@ export const CompanyResource = McpServer.resource`batuda://company/${slugParam}`
 
 ### Prompt definition pattern
 
-Prompts are parameterized templates with auto-completion. All prompts accept `lang: 'ca' | 'es' | 'en'` (default `en`) for multilingual output.
+Prompts are parameterized templates with auto-completion. The synthesis prompts (company-research, daily-briefing, proposal-draft, interaction-follow-up, research-designer) accept `lang: 'ca' | 'es' | 'en'` (default `en`) for multilingual output; the action prompts (apply-instruction, save-instruction) emit a directive in the caller's language instead.
 
 ```typescript
 import { McpServer } from 'effect/unstable/ai'

@@ -3,7 +3,6 @@ import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg, SessionContext } from '@batuda/controllers'
-import { resolveInstructions } from '@batuda/instructions'
 import {
 	type CreateResearchInput,
 	ResearchService,
@@ -11,6 +10,11 @@ import {
 } from '@batuda/research'
 
 import { EnvVars } from '../../lib/env'
+import {
+	InstructionClarification,
+	InstructionsOverride,
+	resolveInstructionOverride,
+} from './_instructions-shared'
 import {
 	ResearchQuery,
 	redactDbErrors,
@@ -24,17 +28,22 @@ const REQUEST_DEPENDENCIES = [SessionContext, CurrentOrg]
 
 const StartResearch = Tool.make('start_research', {
 	description:
-		'Start a research run. Returns an ID immediately — use get_research to poll for results. Best for long-running research where you want to do other work while waiting.',
+		"Start a research run; returns {_tag:'started', id, status, applied_instructions} immediately — poll get_research for results. applied_instructions lists the instruction templates that shaped the run. The user's default research instructions apply automatically; pass `instructions` (template names or ids) to override them for this run. An unknown or ambiguous name returns {_tag:'instruction_clarification'} with candidates instead of starting. If the user states a new standing preference, save it with manage_instruction_template.",
 	parameters: Schema.Struct({
 		query: ResearchQuery,
 		context: Schema.optional(Schema.Unknown),
 		schema_name: Schema.optional(SchemaNameParam),
-		template_ids: Schema.optional(Schema.Array(Uuid)),
+		instructions: Schema.optional(InstructionsOverride),
 	}),
-	success: Schema.Struct({
-		id: Schema.String,
-		status: Schema.String,
-	}),
+	success: Schema.Union([
+		Schema.Struct({
+			_tag: Schema.Literal('started'),
+			id: Schema.String,
+			status: Schema.String,
+			applied_instructions: Schema.Array(Schema.String),
+		}),
+		InstructionClarification,
+	]),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Start Research')
@@ -45,7 +54,7 @@ const StartResearch = Tool.make('start_research', {
 
 const GetResearch = Tool.make('get_research', {
 	description:
-		'Get the current state of a research run. Returns status, findings (if complete), cost, and sources.',
+		'Get the current state of a research run. Returns status, findings (if complete), cost, sources, and applied_instructions — the instruction templates that shaped the run.',
 	parameters: Schema.Struct({
 		id: Uuid,
 	}),
@@ -61,12 +70,12 @@ const GetResearch = Tool.make('get_research', {
 
 const ResearchSync = Tool.make('research_sync', {
 	description:
-		'Run research to completion and return full findings inline. Blocks until done or timeout. Best for short research that fits in a single tool call.',
+		"Run research to completion and return full findings inline (blocks until done or timeout); best for short research. The returned run includes applied_instructions — the instruction templates that shaped it. The user's default research instructions apply automatically; pass `instructions` (template names or ids) to override them for this run. An unknown or ambiguous name returns {_tag:'instruction_clarification'} with candidates instead of running.",
 	parameters: Schema.Struct({
 		query: ResearchQuery,
 		context: Schema.optional(Schema.Unknown),
 		schema_name: Schema.optional(SchemaNameParam),
-		template_ids: Schema.optional(Schema.Array(Uuid)),
+		instructions: Schema.optional(InstructionsOverride),
 		max_wait_seconds: Schema.optional(Schema.Number),
 	}),
 	success: Schema.Unknown,
@@ -84,6 +93,20 @@ export const ResearchMcpTools = Toolkit.make(
 	ResearchSync,
 )
 
+// Surface the instruction templates a run applied under one consistent field.
+// svc.get returns the persisted column as `templateNames` (PgClient camelCases
+// result keys); normalize it to applied_instructions so sync/poll callers read
+// the same shape start_research returns.
+const withAppliedInstructions = (run: unknown): unknown => {
+	if (run === null || typeof run !== 'object') return run
+	const row = run as Record<string, unknown>
+	const names = row['templateNames'] ?? row['template_names']
+	return {
+		...row,
+		applied_instructions: Array.isArray(names) ? names : [],
+	}
+}
+
 export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 	Effect.gen(function* () {
 		const svc = yield* ResearchService
@@ -98,6 +121,21 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 			hardCeiling: env.RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS,
 		}
 
+		// Resolve a per-run override (names or ids) to the effective instruction
+		// stack, or a clarification to hand straight back when a name can't resolve.
+		const resolveForRun = (
+			orgId: string,
+			userId: string,
+			refs: ReadonlyArray<string>,
+		) =>
+			resolveInstructionOverride({
+				sql,
+				organizationId: orgId,
+				userId,
+				agent: 'research',
+				refs,
+			})
+
 		return {
 			start_research: params =>
 				Effect.gen(function* () {
@@ -106,12 +144,12 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 					// belong to the real person behind the key.
 					const userId = (yield* SessionContext).userId
 					const orgId = (yield* CurrentOrg).id
-					const instructions = yield* resolveInstructions({
-						organizationId: orgId,
+					const resolved = yield* resolveForRun(
+						orgId,
 						userId,
-						agent: 'research',
-						overrideTemplateIds: params.template_ids,
-					}).pipe(Effect.provideService(SqlClient.SqlClient, sql))
+						params.instructions ?? [],
+					)
+					if (!resolved.ok) return resolved.clarification
 					const result = yield* svc.create(
 						userId,
 						orgId,
@@ -121,27 +159,32 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 							schemaName: params.schema_name,
 						},
 						systemDefaults,
-						instructions,
+						resolved.instructions,
 					)
-					return result
+					return {
+						_tag: 'started' as const,
+						id: result.id,
+						status: result.status,
+						applied_instructions: resolved.instructions.templateNames,
+					}
 				}).pipe(redactDbErrors),
 
 			get_research: params =>
 				Effect.gen(function* () {
 					const run = yield* svc.get(params.id)
-					return run ?? { error: 'not found' }
+					return run ? withAppliedInstructions(run) : { error: 'not found' }
 				}).pipe(redactDbErrors),
 
 			research_sync: params =>
 				Effect.gen(function* () {
 					const userId = (yield* SessionContext).userId
 					const orgId = (yield* CurrentOrg).id
-					const instructions = yield* resolveInstructions({
-						organizationId: orgId,
+					const resolved = yield* resolveForRun(
+						orgId,
 						userId,
-						agent: 'research',
-						overrideTemplateIds: params.template_ids,
-					}).pipe(Effect.provideService(SqlClient.SqlClient, sql))
+						params.instructions ?? [],
+					)
+					if (!resolved.ok) return resolved.clarification
 					const { id } = yield* svc.create(
 						userId,
 						orgId,
@@ -151,7 +194,7 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 							schemaName: params.schema_name,
 						},
 						systemDefaults,
-						instructions,
+						resolved.instructions,
 					)
 
 					// Poll until the run reaches a terminal status or we exceed
@@ -171,7 +214,7 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 						run = yield* svc.get(id)
 					}
 
-					return run ?? { error: 'not found' }
+					return run ? withAppliedInstructions(run) : { error: 'not found' }
 				}).pipe(redactDbErrors),
 		}
 	}),

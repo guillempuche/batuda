@@ -3,11 +3,16 @@ import { McpServer } from 'effect/unstable/ai'
 
 import { CompanyResearchPrompt } from './prompts/company-research'
 import { DailyBriefingPrompt } from './prompts/daily-briefing'
+import {
+	ApplyInstructionPrompt,
+	SaveInstructionPrompt,
+} from './prompts/instructions'
 import { InteractionFollowUpPrompt } from './prompts/interaction-follow-up'
 import { ProposalDraftPrompt } from './prompts/proposal-draft'
 import { ResearchDesignerPrompt } from './prompts/research-designer'
 import { CompanyResource } from './resources/company'
 import { DocumentResource } from './resources/document'
+import { InstructionsResource } from './resources/instructions'
 import { PipelineResource } from './resources/pipeline'
 import { ResearchResource } from './resources/research'
 import { TimelineResource } from './resources/timeline'
@@ -65,12 +70,15 @@ export const McpToolsLive = Layer.mergeAll(
 	PipelineResource,
 	DocumentResource,
 	ResearchResource,
+	InstructionsResource,
 	TimelineResource,
 	CompanyResearchPrompt,
 	DailyBriefingPrompt,
 	ProposalDraftPrompt,
 	InteractionFollowUpPrompt,
 	ResearchDesignerPrompt,
+	ApplyInstructionPrompt,
+	SaveInstructionPrompt,
 ).pipe(
 	Layer.provide(CompanyHandlersLive),
 	Layer.provide(ContactHandlersLive),
