@@ -6,6 +6,7 @@ import { ArrowLeft, Gift, Pencil, Plus, ScrollText, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import styled from 'styled-components'
 
+import type { Agent } from '@batuda/instructions/domain'
 import { PriButton, usePriToast } from '@batuda/ui/pri'
 
 import {
@@ -14,6 +15,7 @@ import {
 	donateTemplateAtom,
 	instructionTemplatesAtom,
 } from '#/atoms/instruction-atoms'
+import { AgentSelector } from '#/components/instructions/agent-selector'
 import { DefaultStackEditor } from '#/components/instructions/default-stack-editor'
 import {
 	InstructionIconButton,
@@ -51,8 +53,6 @@ import {
 import { authClient } from '#/lib/auth-client'
 import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
 
-const AGENT = 'research'
-
 export const Route = createFileRoute('/settings/profile/templates')({
 	head: () => ({ meta: [{ title: 'Instruction templates — Batuda' }] }),
 	component: TemplatesPage,
@@ -64,9 +64,13 @@ function TemplatesPage() {
 	const session = authClient.useSession()
 	const myUserId = session.data?.user?.id ?? null
 
+	// Instructions are per surface; this picks which surface's default the editor
+	// below configures. Templates themselves are surface-neutral.
+	const [agent, setAgent] = useState<Agent>('research')
+
 	const templatesResult = useAtomValue(instructionTemplatesAtom)
 	const refreshTemplates = useAtomRefresh(instructionTemplatesAtom)
-	const stacksAtom = useMemo(() => defaultStacksAtom(AGENT), [])
+	const stacksAtom = useMemo(() => defaultStacksAtom(agent), [agent])
 	const stacksResult = useAtomValue(stacksAtom)
 	const refreshStacks = useAtomRefresh(stacksAtom)
 	const deleteTemplate = useAtomSet(deleteTemplateAtom, { mode: 'promiseExit' })
@@ -195,8 +199,8 @@ function TemplatesPage() {
 				</Heading>
 				<Subtitle>
 					<Trans>
-						Reusable, standing guidance your research agent follows — what you
-						sell, who you target, tone, and which sources to trust.
+						Reusable, standing guidance your agents follow — what you sell, who
+						you target, tone, and which sources to trust.
 					</Trans>
 				</Subtitle>
 			</Intro>
@@ -280,34 +284,47 @@ function TemplatesPage() {
 				)}
 			</Section>
 
-			{stacksFailed ? (
-				<Notice role='alert'>
-					<Trans>Couldn't load your default. Refresh to try again.</Trans>
-				</Notice>
-			) : templates.length === 0 ? (
-				<EmptyDefault>
-					<EmptyDefaultTitle>
-						<Trans>Your research default</Trans>
-					</EmptyDefaultTitle>
-					<Empty>
-						<Trans>
-							Create a template above first, then pick which ones run by
-							default.
-						</Trans>
-					</Empty>
-				</EmptyDefault>
-			) : (
-				<DefaultStackEditor
-					agent={AGENT}
-					options={options}
-					userStackIds={userStackIds}
-					orgStackIds={orgStackIds}
-					userComposition={userComposition}
-					onSaved={() => {
-						refreshStacks()
-					}}
-				/>
-			)}
+			<Section>
+				<SectionHead>
+					<SectionTitle id='profile-default-surface'>
+						<Trans>Default instructions</Trans>
+					</SectionTitle>
+					<AgentSelector
+						agent={agent}
+						onChange={setAgent}
+						labelledBy='profile-default-surface'
+					/>
+				</SectionHead>
+
+				{stacksFailed ? (
+					<Notice role='alert'>
+						<Trans>Couldn't load your default. Refresh to try again.</Trans>
+					</Notice>
+				) : templates.length === 0 ? (
+					<EmptyDefault>
+						<EmptyDefaultTitle>
+							<Trans>Your default</Trans>
+						</EmptyDefaultTitle>
+						<Empty>
+							<Trans>
+								Create a template above first, then pick which ones run by
+								default.
+							</Trans>
+						</Empty>
+					</EmptyDefault>
+				) : (
+					<DefaultStackEditor
+						agent={agent}
+						options={options}
+						userStackIds={userStackIds}
+						orgStackIds={orgStackIds}
+						userComposition={userComposition}
+						onSaved={() => {
+							refreshStacks()
+						}}
+					/>
+				)}
+			</Section>
 
 			<TemplateEditorDialog
 				open={dialogOpen}

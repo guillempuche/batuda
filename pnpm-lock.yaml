@@ -134,6 +134,9 @@ importers:
       '@batuda/email':
         specifier: workspace:*
         version: link:../../packages/email
+      '@batuda/instructions':
+        specifier: workspace:*
+        version: link:../../packages/instructions
       '@batuda/research':
         specifier: workspace:*
         version: link:../../packages/research

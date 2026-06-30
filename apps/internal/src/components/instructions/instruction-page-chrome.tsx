@@ -80,6 +80,9 @@ export const SectionHead = styled.div`
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--space-sm);
+	/* On a narrow phone the title and its action (a button or the surface
+	   selector) drop to separate rows instead of crowding one line. */
+	flex-wrap: wrap;
 `
 
 export const SectionTitle = styled.h3`

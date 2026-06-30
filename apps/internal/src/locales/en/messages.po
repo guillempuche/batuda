@@ -1137,6 +1137,10 @@ msgstr "Decline {0}"
 msgid "Default"
 msgstr "Default"
 
+#: src/routes/settings/profile/templates.tsx
+msgid "Default instructions"
+msgstr "Default instructions"
+
 #: src/routes/emails/inboxes.tsx
 msgid "Defaults to the email address."
 msgstr "Defaults to the email address."
@@ -1329,6 +1333,7 @@ msgid "Editor"
 msgstr "Editor"
 
 #: src/components/companies/conversations-tab.tsx
+#: src/components/instructions/agent-selector.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/findings/contact-discovery-view.tsx
@@ -2835,6 +2840,7 @@ msgid "Request a new link"
 msgstr "Request a new link"
 
 #: src/components/companies/research-summary-card.tsx
+#: src/components/instructions/agent-selector.tsx
 #: src/components/shared/channel-icon.tsx
 msgid "Research"
 msgstr "Research"
@@ -2890,8 +2896,12 @@ msgid "Resume syncing"
 msgstr "Resume syncing"
 
 #: src/routes/settings/profile/templates.tsx
-msgid "Reusable, standing guidance your research agent follows — what you sell, who you target, tone, and which sources to trust."
-msgstr "Reusable, standing guidance your research agent follows — what you sell, who you target, tone, and which sources to trust."
+msgid "Reusable, standing guidance your agents follow — what you sell, who you target, tone, and which sources to trust."
+msgstr "Reusable, standing guidance your agents follow — what you sell, who you target, tone, and which sources to trust."
+
+#: src/routes/settings/profile/templates.tsx
+#~ msgid "Reusable, standing guidance your research agent follows — what you sell, who you target, tone, and which sources to trust."
+#~ msgstr "Reusable, standing guidance your research agent follows — what you sell, who you target, tone, and which sources to trust."
 
 #: src/routes/settings/organization/members.tsx
 msgid "Role"
@@ -3111,8 +3121,12 @@ msgid "Shared guidance and the org research default."
 msgstr "Shared guidance and the org research default."
 
 #: src/routes/settings/organization/templates.tsx
-msgid "Shared guidance every member's research agent can use, plus the organization's default."
-msgstr "Shared guidance every member's research agent can use, plus the organization's default."
+msgid "Shared guidance every member's agents can use, plus the organization's default."
+msgstr "Shared guidance every member's agents can use, plus the organization's default."
+
+#: src/routes/settings/organization/templates.tsx
+#~ msgid "Shared guidance every member's research agent can use, plus the organization's default."
+#~ msgstr "Shared guidance every member's research agent can use, plus the organization's default."
 
 #: src/components/instructions/template-editor-dialog.tsx
 msgid "Shared with everyone in your organization — their research agent follows it on every run."
@@ -3475,8 +3489,12 @@ msgid "These templates run for every member who hasn't set their own — in orde
 msgstr "These templates run for every member who hasn't set their own — in order. Only org templates can go here."
 
 #: src/components/instructions/default-stack-editor.tsx
-msgid "These templates shape every research run, in order — unless you pick different ones for a single run."
-msgstr "These templates shape every research run, in order — unless you pick different ones for a single run."
+#~ msgid "These templates shape every research run, in order — unless you pick different ones for a single run."
+#~ msgstr "These templates shape every research run, in order — unless you pick different ones for a single run."
+
+#: src/components/instructions/default-stack-editor.tsx
+msgid "These templates shape every run, in order — unless you pick different ones for a single run."
+msgstr "These templates shape every run, in order — unless you pick different ones for a single run."
 
 #: src/components/shared/status-badge.tsx
 msgid "They replied — keep the thread warm"
@@ -3817,6 +3835,11 @@ msgstr "Your Batuda workbench identity."
 msgid "Your connections"
 msgstr "Your connections"
 
+#: src/components/instructions/default-stack-editor.tsx
+#: src/routes/settings/profile/templates.tsx
+msgid "Your default"
+msgstr "Your default"
+
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
 msgid "Your email connections"
@@ -3844,5 +3867,5 @@ msgstr "Your own"
 
 #: src/components/instructions/default-stack-editor.tsx
 #: src/routes/settings/profile/templates.tsx
-msgid "Your research default"
-msgstr "Your research default"
+#~ msgid "Your research default"
+#~ msgstr "Your research default"
