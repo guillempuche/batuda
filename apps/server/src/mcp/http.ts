@@ -29,6 +29,19 @@ const jsonRpcError = (
 		{ status, ...(headers ? { headers } : {}) },
 	)
 
+// MCP clients (ChatGPT, Claude.ai) surface an auth rejection as a silent retry
+// loop, not a visible error — so every 401/403 path logs why it fired. `reason`
+// is a fixed enum-like string (never a token or key) so the rejections are
+// queryable without leaking a credential.
+const rejectAuth = <A, E, R>(
+	reason: string,
+	response: Effect.Effect<A, E, R>,
+) =>
+	Effect.logWarning('MCP auth rejected').pipe(
+		Effect.annotateLogs({ event: 'mcp.auth.rejected', reason }),
+		Effect.andThen(response),
+	)
+
 // 401 that advertises the OAuth Authorization Server per RFC 9728: keeps the
 // JSON-RPC error body the MCP transport expects and points clients at the
 // protected-resource metadata. `Access-Control-Expose-Headers` lets a browser
@@ -79,6 +92,7 @@ const McpAuthMiddleware = HttpRouter.middleware(
 				// controllers-package SessionContext, so service-layer code works
 				// across transports) and enter the org's app_user scope.
 				const enterScope = (
+					authMethod: 'api_key' | 'oauth' | 'cookie',
 					org: { id: string; name: string; slug: string },
 					principal: {
 						readonly userId: string
@@ -87,20 +101,32 @@ const McpAuthMiddleware = HttpRouter.middleware(
 						readonly isAgent: boolean
 					},
 				) =>
-					httpEffect.pipe(
-						Effect.provideService(CurrentUser, {
-							userId: principal.userId,
-							email: principal.email,
-							name: principal.name ?? 'Unknown',
-							isAgent: principal.isAgent,
-						}),
-						Effect.provideService(SessionContext, {
-							userId: principal.userId,
-							email: principal.email,
-							name: principal.name ?? undefined,
-							isAgent: principal.isAgent,
-						}),
-						enterOrgScope(sql, { org, userId: principal.userId }),
+					// Tag the request span with how the caller authenticated and the
+					// org it resolved to BEFORE running the tool — the tool-call context
+					// needed to debug an MCP "disconnection" (silent 401 loop) from
+					// Honeycomb alone, present even if the tool then fails.
+					Effect.annotateCurrentSpan({
+						'mcp.auth_method': authMethod,
+						'mcp.org_id': org.id,
+						'mcp.principal_is_agent': principal.isAgent,
+					}).pipe(
+						Effect.andThen(
+							httpEffect.pipe(
+								Effect.provideService(CurrentUser, {
+									userId: principal.userId,
+									email: principal.email,
+									name: principal.name ?? 'Unknown',
+									isAgent: principal.isAgent,
+								}),
+								Effect.provideService(SessionContext, {
+									userId: principal.userId,
+									email: principal.email,
+									name: principal.name ?? undefined,
+									isAgent: principal.isAgent,
+								}),
+								enterOrgScope(sql, { org, userId: principal.userId }),
+							),
+						),
 					)
 
 				// ── API-key path (AI/MCP clients): the org and the creating member
@@ -134,7 +160,10 @@ const McpAuthMiddleware = HttpRouter.middleware(
 									: undefined,
 							)
 						}
-						return yield* jsonRpcError(401, -32001, 'Invalid API key')
+						return yield* rejectAuth(
+							'invalid_api_key',
+							jsonRpcError(401, -32001, 'Invalid API key'),
+						)
 					}
 					const meta = verified.key.metadata as {
 						organizationId?: string
@@ -142,16 +171,18 @@ const McpAuthMiddleware = HttpRouter.middleware(
 					} | null
 					const orgId = meta?.organizationId
 					if (!orgId) {
-						return yield* jsonRpcError(401, -32001, 'API key is not org-scoped')
+						return yield* rejectAuth(
+							'api_key_not_org_scoped',
+							jsonRpcError(401, -32001, 'API key is not org-scoped'),
+						)
 					}
 					// Required, never silently org-attributed: a key with no creator
 					// in its metadata is rejected outright.
 					const createdByUserId = meta?.createdByUserId
 					if (!createdByUserId) {
-						return yield* jsonRpcError(
-							403,
-							-32003,
-							'API key has no creator; recreate it',
+						return yield* rejectAuth(
+							'api_key_no_creator',
+							jsonRpcError(403, -32003, 'API key has no creator; recreate it'),
 						)
 					}
 					const org = yield* loadOrg(orgId)
@@ -168,13 +199,16 @@ const McpAuthMiddleware = HttpRouter.middleware(
 					`.pipe(Effect.orDie)
 					const creator = creatorRows[0]
 					if (!org || !creator) {
-						return yield* jsonRpcError(
-							403,
-							-32003,
-							'API key creator is no longer a member of its organization',
+						return yield* rejectAuth(
+							'api_key_creator_not_member',
+							jsonRpcError(
+								403,
+								-32003,
+								'API key creator is no longer a member of its organization',
+							),
 						)
 					}
-					return yield* enterScope(org, {
+					return yield* enterScope('api_key', org, {
 						userId: creator.id,
 						email: creator.email,
 						name: creator.name,
@@ -216,10 +250,13 @@ const McpAuthMiddleware = HttpRouter.middleware(
 						}),
 					)
 					if (!outcome.ok) {
-						return yield* bearerChallenge(
-							-32001,
-							'Invalid or expired access token',
-							prmUrl,
+						return yield* rejectAuth(
+							'invalid_or_expired_token',
+							bearerChallenge(
+								-32001,
+								'Invalid or expired access token',
+								prmUrl,
+							),
 						)
 					}
 					const payload = outcome.payload
@@ -238,10 +275,13 @@ const McpAuthMiddleware = HttpRouter.middleware(
 						`.pipe(Effect.orDie)
 						const user = userRows[0]
 						if (!user) {
-							return yield* bearerChallenge(
-								-32003,
-								'Token user is no longer available',
-								prmUrl,
+							return yield* rejectAuth(
+								'token_user_unavailable',
+								bearerChallenge(
+									-32003,
+									'Token user is no longer available',
+									prmUrl,
+								),
 							)
 						}
 						// Read the caller's memberships (all their orgs) and the
@@ -269,10 +309,13 @@ const McpAuthMiddleware = HttpRouter.middleware(
 							}),
 						)
 						if (orgIds.length === 0) {
-							return yield* jsonRpcError(
-								403,
-								-32002,
-								'Token user is not a member of any organization',
+							return yield* rejectAuth(
+								'token_user_no_org',
+								jsonRpcError(
+									403,
+									-32002,
+									'Token user is not a member of any organization',
+								),
 							)
 						}
 						// The orgs this connection is explicitly authorized to act in,
@@ -291,10 +334,13 @@ const McpAuthMiddleware = HttpRouter.middleware(
 						const isUnbound = selectedOrgIds.length === 0
 						const allowedOrgIds = isUnbound ? orgIds : liveSelectedOrgIds
 						if (allowedOrgIds.length === 0) {
-							return yield* jsonRpcError(
-								403,
-								-32002,
-								'Select an organization for this connection at /settings/mcp/connections',
+							return yield* rejectAuth(
+								'no_authorized_org',
+								jsonRpcError(
+									403,
+									-32002,
+									'Select an organization for this connection at /settings/mcp/connections',
+								),
 							)
 						}
 						// An explicit per-request hint picks which authorized org this
@@ -312,25 +358,27 @@ const McpAuthMiddleware = HttpRouter.middleware(
 								? allowedOrgIds[0]
 								: undefined
 						if (!orgId) {
-							return yield* jsonRpcError(
-								403,
-								-32002,
-								hint
-									? 'X-Batuda-Organization-Id is not authorized for this connection'
-									: allowedOrgIds.length === 1
-										? 'Select an organization for this connection at /settings/mcp/connections'
-										: 'Send X-Batuda-Organization-Id with one of the authorized organizations',
+							return yield* rejectAuth(
+								hint ? 'org_hint_not_authorized' : 'org_selection_required',
+								jsonRpcError(
+									403,
+									-32002,
+									hint
+										? 'X-Batuda-Organization-Id is not authorized for this connection'
+										: allowedOrgIds.length === 1
+											? 'Select an organization for this connection at /settings/mcp/connections'
+											: 'Send X-Batuda-Organization-Id with one of the authorized organizations',
+								),
 							)
 						}
 						const org = yield* loadOrg(orgId)
 						if (!org) {
-							return yield* jsonRpcError(
-								403,
-								-32003,
-								`Organization ${orgId} not found`,
+							return yield* rejectAuth(
+								'org_not_found',
+								jsonRpcError(403, -32003, `Organization ${orgId} not found`),
 							)
 						}
-						return yield* enterScope(org, {
+						return yield* enterScope('oauth', org, {
 							userId: user.id,
 							email: user.email,
 							name: user.name,
@@ -345,7 +393,10 @@ const McpAuthMiddleware = HttpRouter.middleware(
 					instance.api.getSession({ headers }),
 				)
 				if (!result) {
-					return yield* bearerChallenge(-32001, 'Unauthorized', prmUrl)
+					return yield* rejectAuth(
+						'no_session',
+						bearerChallenge(-32001, 'Unauthorized', prmUrl),
+					)
 				}
 
 				// `activeOrganizationId` is contributed by the Better-Auth
@@ -356,21 +407,27 @@ const McpAuthMiddleware = HttpRouter.middleware(
 					result.session as { activeOrganizationId?: string | null }
 				).activeOrganizationId
 				if (!activeOrgId) {
-					return yield* jsonRpcError(
-						403,
-						-32002,
-						'No active organization on session — call /auth/organization/set-active first',
+					return yield* rejectAuth(
+						'no_active_org',
+						jsonRpcError(
+							403,
+							-32002,
+							'No active organization on session — call /auth/organization/set-active first',
+						),
 					)
 				}
 				const org = yield* loadOrg(activeOrgId)
 				if (!org) {
-					return yield* jsonRpcError(
-						403,
-						-32003,
-						`Active organization ${activeOrgId} not found`,
+					return yield* rejectAuth(
+						'active_org_not_found',
+						jsonRpcError(
+							403,
+							-32003,
+							`Active organization ${activeOrgId} not found`,
+						),
 					)
 				}
-				return yield* enterScope(org, {
+				return yield* enterScope('cookie', org, {
 					userId: result.user.id,
 					email: result.user.email,
 					name: result.user.name ?? null,

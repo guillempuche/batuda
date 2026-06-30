@@ -4,6 +4,7 @@ import { NodeHttpServer, NodeRuntime } from '@effect/platform-node'
 import { Cause, Config, DateTime, Effect, Layer } from 'effect'
 import {
 	FetchHttpClient,
+	HttpMiddleware,
 	HttpRouter,
 	HttpServerResponse,
 } from 'effect/unstable/http'
@@ -50,6 +51,7 @@ import { installCrashGuards } from './lib/crash-guards'
 import { EnvVars } from './lib/env'
 import { LoggerLive } from './lib/logger'
 import { OtlpObservability } from './lib/observability'
+import { ObservabilityLive } from './lib/observability-middleware'
 import { WellKnownLive } from './lib/well-known'
 import { McpHttpLive } from './mcp/http'
 import { OrgMiddlewareLive, resolveSystemOrg } from './middleware/org'
@@ -282,10 +284,29 @@ const OpenApiJsonLive = HttpRouter.add(
 	HttpServerResponse.json(OpenApi.fromApi(BatudaApi)),
 )
 
+// Routes where tracing is suppressed. The tracer records `url.full`/`url.query`
+// UNREDACTED, so any route whose URL itself carries a secret must be exempt or
+// the token lands in Honeycomb: magic-link verify (token in query) and
+// reset-password (token in path). `/health` is exempt too — the uptime checker
+// polls it constantly and would otherwise drown the real traces. Matched on the
+// path alone so a query string (e.g. `/health?x=1`) doesn't slip through.
+const TracerDisabledLive = Layer.succeed(HttpMiddleware.TracerDisabledWhen)(
+	request => {
+		const path = request.url.split('?')[0] ?? request.url
+		return (
+			path === '/health' ||
+			path.startsWith('/auth/magic-link/verify') ||
+			path.startsWith('/auth/reset-password')
+		)
+	},
+)
+
 const AppLive = Layer.mergeAll(
 	ApiLive,
 	McpHttpLive,
 	CorsLive,
+	ObservabilityLive,
+	TracerDisabledLive,
 	DocsLive,
 	OpenApiJsonLive,
 	WellKnownLive,
@@ -312,7 +333,18 @@ const AppLive = Layer.mergeAll(
 // capture to request time; `main.boot.test.ts:149-156` is the regression
 // guard (not in `pnpm test` today — run via `pnpm test:integration`).
 
-const program = HttpRouter.serve(AppLive).pipe(
+// `HttpMiddleware.tracer` wraps the whole server chain in a per-request span so
+// traces export to OTLP and per-route span annotations (request id, org id, tool
+// name) have a span to attach to. `serve` already adds the request logger; this
+// adds the missing tracer. `/health` is exempted from tracing inside AppLive.
+const program = HttpRouter.serve(AppLive, {
+	middleware: HttpMiddleware.tracer,
+	// Disable Effect's built-in request logger: in this version it annotates
+	// `http.url` with the RAW request URL, so a magic-link/reset token in the URL
+	// would export verbatim to OTLP. ObservabilityLive emits a sanitized
+	// completion log (path_pattern, query stripped) in its place.
+	disableLogger: true,
+}).pipe(
 	Layer.provide(ServicesLive),
 	Layer.provide(BookingProviderLive),
 	Layer.provide(IcsParserLive),
@@ -332,8 +364,15 @@ const program = HttpRouter.serve(AppLive).pipe(
 	Layer.provide(EnvVars.layer),
 	Layer.provide(PgLive),
 	Layer.provideMerge(ServerLive),
-	Layer.provide(LoggerLive),
+	// OtlpObservability sits ABOVE LoggerLive so its OTLP logger merges ON TOP of
+	// LoggerLive's clean console+tracer+file set (OtlpLogger defaults to
+	// mergeWithExisting). The reverse order would let LoggerLive — which REPLACES
+	// the logger set — drop the OTLP logger, so non-span logs (detached fibers,
+	// boot, Better Auth callbacks) would never reach Honeycomb's /v1/logs. When
+	// OTLP is off, OtlpObservability is Layer.empty and LoggerLive's set shows
+	// through unchanged (no duplicated default logger).
 	Layer.provide(OtlpObservability),
+	Layer.provide(LoggerLive),
 	// Bottom of the stack so the baked-file ConfigProvider underlies every
 	// Config reader above it — including LoggerLive's MIN_LOG_LEVEL, which in
 	// prod lives only in the file, not on the cmdline. A higher placement would

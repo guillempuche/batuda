@@ -197,6 +197,11 @@ export const OrgMiddlewareLive = Layer.effect(
 					})
 				}
 
+				// Tag the request span with the resolved org so errors and traces
+				// can be filtered to one tenant. ObservabilityMiddleware runs before
+				// this and already set request id + route on the same span.
+				yield* Effect.annotateCurrentSpan({ 'org.id': row.id })
+
 				// Enter the org scope (role + both GUCs + CurrentOrg) for the
 				// rest of the request via the shared combinator, keeping the
 				// HTTP and MCP transports in lockstep. The user GUC backs
