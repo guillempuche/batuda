@@ -21,7 +21,7 @@ export function EmptyState({
 }: {
 	icon?: ComponentType<{ size?: number | string; 'aria-hidden'?: boolean }>
 	title: string
-	description?: string
+	description?: ReactNode
 	action?: ReactNode
 }) {
 	return (
@@ -82,7 +82,7 @@ const Title = styled.p.withConfig({ displayName: 'EmptyStateTitle' })`
 	text-shadow: var(--text-shadow-emboss);
 `
 
-const Description = styled.p.withConfig({
+const Description = styled.div.withConfig({
 	displayName: 'EmptyStateDescription',
 })`
 	margin: 0;
