@@ -5,6 +5,7 @@ import { SqlClient } from 'effect/unstable/sql'
 import { CurrentOrg } from '@batuda/controllers'
 
 import { TaskService } from '../../services/tasks'
+import { ListResult, toItems } from './_result'
 
 // MCP writes are agent-driven; task_events records actor_kind='agent' with no
 // individual user id.
@@ -83,7 +84,7 @@ const ListTasks = Tool.make('list_tasks', {
 		limit: Schema.optional(Schema.Number),
 		offset: Schema.optional(Schema.Number),
 	}),
-	success: Schema.Array(Schema.Unknown),
+	success: ListResult(Schema.Unknown),
 	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'List Tasks')
@@ -104,7 +105,7 @@ const SearchTasks = Tool.make('search_tasks', {
 		source: Schema.optional(TaskSource),
 		limit: Schema.optional(Schema.Number),
 	}),
-	success: Schema.Array(Schema.Unknown),
+	success: ListResult(Schema.Unknown),
 	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Search Tasks')
@@ -224,7 +225,7 @@ const GetTaskEvents = Tool.make('get_task_events', {
 	description:
 		'List audit events recorded for a task (created/updated/completed/cancelled/snoozed/rescheduled). Returns up to the 100 most recent events sorted by occurrence time descending.',
 	parameters: Schema.Struct({ id: Schema.String }),
-	success: Schema.Array(Schema.Unknown),
+	success: ListResult(Schema.Unknown),
 	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Get Task Events')
@@ -311,7 +312,7 @@ export const TaskHandlersLive = TaskTools.toLayer(
 							offset: params.offset ?? 0,
 						},
 					)
-					.pipe(Effect.orDie),
+					.pipe(Effect.orDie, Effect.map(toItems)),
 
 			search_tasks: params =>
 				taskService
@@ -327,7 +328,7 @@ export const TaskHandlersLive = TaskTools.toLayer(
 						},
 						{ sort: 'due', limit: params.limit ?? 25, offset: 0 },
 					)
-					.pipe(Effect.orDie),
+					.pipe(Effect.orDie, Effect.map(toItems)),
 
 			update_task: params =>
 				Effect.gen(function* () {
@@ -398,7 +399,7 @@ export const TaskHandlersLive = TaskTools.toLayer(
 						SELECT * FROM task_events WHERE task_id = ${id}
 						ORDER BY at DESC LIMIT 100
 					`
-				}).pipe(Effect.orDie),
+				}).pipe(Effect.orDie, Effect.map(toItems)),
 
 			reopen_task: ({ id }) =>
 				taskService.reopen(id, AGENT_ACTOR).pipe(

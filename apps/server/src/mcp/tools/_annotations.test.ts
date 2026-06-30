@@ -102,6 +102,25 @@ describe('MCP tool annotation coverage', () => {
 						).toBe('object')
 					})
 
+					it('should not encode structured output as a bare array', () => {
+						// GIVEN a tool's success schema — Effect copies the encoded
+						//       value straight into the result's structuredContent
+						// WHEN converting that schema to JSON Schema
+						// THEN the root is not type:"array" — MCP requires
+						//      structuredContent to be a JSON object, so a strict
+						//      client rejects a bare-array result and hides the tool.
+						//      List tools must wrap rows in an object (_result.ts
+						//      ListResult → { items }).
+						// [tools/${toolkitName} — structured-output object invariant]
+						const outputSchema = Tool.getJsonSchemaFromSchema(
+							tool.successSchema,
+						) as { type?: unknown }
+						expect(
+							outputSchema.type,
+							`${toolName} success schema must not encode to a JSON array; wrap the list in an object (ListResult / { items })`,
+						).not.toBe('array')
+					})
+
 					if (READ_ONLY_NAME.test(toolName)) {
 						it('should declare Tool.Readonly = true', () => {
 							// GIVEN a tool whose name matches a read-only convention

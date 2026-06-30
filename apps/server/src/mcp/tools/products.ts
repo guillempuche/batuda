@@ -4,12 +4,14 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
 
+import { ListResult, toItems } from './_result'
+
 const REQUEST_DEPENDENCIES = [CurrentOrg]
 
 const ListProducts = Tool.make('list_products', {
 	description:
 		'List products in the organization. Returns id, slug, name, type, status, default_price, price_type, target_industries, metadata, created_at.',
-	success: Schema.Array(Schema.Unknown),
+	success: ListResult(Schema.Unknown),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Products')
@@ -73,6 +75,7 @@ export const ProductHandlersLive = ProductTools.toLayer(
 			list_products: () =>
 				sql`SELECT id, slug, name, type, status, default_price, price_type, target_industries, metadata, created_at FROM products ORDER BY created_at DESC`.pipe(
 					Effect.orDie,
+					Effect.map(toItems),
 				),
 			create_product: params =>
 				Effect.gen(function* () {

@@ -9,6 +9,7 @@ import { CalendarService } from '../../services/calendar'
 import { dispatchForwardInvitation } from '../../services/calendar-forward-dispatch'
 import { dispatchRsvpReply } from '../../services/calendar-rsvp-dispatch'
 import { EmailService } from '../../services/email'
+import { ListResult, toItems } from './_result'
 
 // Per-request services the dispatcher tools depend on. The MCP HTTP middleware
 // (apps/server/src/mcp/http.ts) provides both alongside CurrentUser, so
@@ -38,7 +39,7 @@ const FindAvailability = Tool.make('find_availability', {
 		from: Schema.String,
 		to: Schema.String,
 	}),
-	success: Schema.Array(Schema.Unknown),
+	success: ListResult(Schema.Unknown),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Find Availability')
@@ -122,7 +123,7 @@ const RsvpPendingInvitations = Tool.make('rsvp_pending_invitations', {
 		attendee_email: Schema.String,
 		limit: Schema.optional(Schema.Number),
 	}),
-	success: Schema.Array(Schema.Unknown),
+	success: ListResult(Schema.Unknown),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Pending Invitations')
@@ -158,7 +159,7 @@ const ListUpcoming = Tool.make('list_upcoming_meetings', {
 		source: Schema.optional(Schema.Literals(['booking', 'email', 'internal'])),
 		limit: Schema.optional(Schema.Number),
 	}),
-	success: Schema.Array(Schema.Unknown),
+	success: ListResult(Schema.Unknown),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Upcoming Meetings')
@@ -172,7 +173,7 @@ const ListEventTypes = Tool.make('list_event_types', {
 	parameters: Schema.Struct({
 		active: Schema.optional(Schema.Boolean),
 	}),
-	success: Schema.Array(Schema.Unknown),
+	success: ListResult(Schema.Unknown),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Event Types')
@@ -261,7 +262,7 @@ export const CalendarHandlersLive = CalendarTools.toLayer(
 						from: new Date(params.from),
 						to: new Date(params.to),
 					})
-					.pipe(Effect.orDie),
+					.pipe(Effect.orDie, Effect.map(toItems)),
 			schedule_meeting: params =>
 				svc
 					.scheduleMeeting({
@@ -337,7 +338,7 @@ export const CalendarHandlersLive = CalendarTools.toLayer(
 						attendeeEmail: params.attendee_email,
 						limit: params.limit ?? 25,
 					})
-					.pipe(Effect.orDie),
+					.pipe(Effect.orDie, Effect.map(toItems)),
 			forward_invitation: params =>
 				dispatchForwardInvitation({
 					calendarEventId: params.calendar_event_id,
@@ -390,7 +391,7 @@ export const CalendarHandlersLive = CalendarTools.toLayer(
 						ORDER BY start_at ASC
 						LIMIT ${limit}
 					`
-				}).pipe(Effect.orDie),
+				}).pipe(Effect.orDie, Effect.map(toItems)),
 			list_event_types: params =>
 				Effect.gen(function* () {
 					const conditions: Array<Statement.Fragment> = []
@@ -401,7 +402,7 @@ export const CalendarHandlersLive = CalendarTools.toLayer(
 						${conditions.length > 0 ? sql`WHERE ${sql.and(conditions)}` : sql``}
 						ORDER BY slug
 					`
-				}).pipe(Effect.orDie),
+				}).pipe(Effect.orDie, Effect.map(toItems)),
 			get_calendar_event: ({ id }) =>
 				Effect.gen(function* () {
 					const rows =

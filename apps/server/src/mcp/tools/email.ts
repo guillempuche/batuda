@@ -10,6 +10,7 @@ import {
 	EmailAttachmentStaging,
 	type StagingRef,
 } from '../../services/email-attachment-staging'
+import { ListResult, toItems } from './_result'
 
 // Per-request services every email tool depends on. The MCP HTTP middleware
 // (apps/server/src/mcp/http.ts) provides both alongside CurrentUser, so
@@ -314,7 +315,7 @@ const ListEmailInboxes = Tool.make('list_email_inboxes', {
 		active: Schema.optional(Schema.Boolean),
 		owner_user_id: Schema.optional(Schema.String),
 	}),
-	success: Schema.Array(Schema.Unknown),
+	success: ListResult(Schema.Unknown),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Email Inboxes')
@@ -325,7 +326,7 @@ const ListEmailInboxes = Tool.make('list_email_inboxes', {
 const ListEmailProviderPresets = Tool.make('list_email_provider_presets', {
 	description:
 		'List the built-in mailbox presets (Infomaniak, Fastmail, iCloud Mail, Yahoo Mail, Gmail Workspace, Microsoft 365, Proton Bridge, Generic IMAP). Each entry pre-fills IMAP and SMTP host/port/security, plus appPasswordUrl (where the user generates an app-specific password for a 2FA account) and passwordAuthSupported (false for Gmail and Microsoft 365, which no longer allow password sign-in and need OAuth). create_email_inbox callers only need to add credentials. Static — safe to cache.',
-	success: Schema.Array(Schema.Unknown),
+	success: ListResult(Schema.Unknown),
 })
 	.annotate(Tool.Title, 'List Email Provider Presets')
 	.annotate(Tool.Readonly, true)
@@ -480,7 +481,7 @@ const ListEmailDrafts = Tool.make('list_email_drafts', {
 	parameters: Schema.Struct({
 		inbox_id: Schema.optional(Schema.String),
 	}),
-	success: Schema.Array(Schema.Unknown),
+	success: ListResult(Schema.Unknown),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Email Drafts')
@@ -531,7 +532,7 @@ const ListInboxFooters = Tool.make('list_inbox_footers', {
 	parameters: Schema.Struct({
 		inbox_id: Schema.String,
 	}),
-	success: Schema.Array(Schema.Unknown),
+	success: ListResult(Schema.Unknown),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Inbox Footers')
@@ -895,14 +896,17 @@ export const EmailHandlersLive = EmailTools.toLayer(
 					Effect.orDie,
 				),
 			list_email_inboxes: params =>
-				svc.listLocalInboxes({
-					...(params.purpose !== undefined && { purpose: params.purpose }),
-					...(params.active !== undefined && { active: params.active }),
-					...(params.owner_user_id !== undefined && {
-						ownerUserId: params.owner_user_id,
-					}),
-				}),
-			list_email_provider_presets: () => svc.listProviderPresets(),
+				svc
+					.listLocalInboxes({
+						...(params.purpose !== undefined && { purpose: params.purpose }),
+						...(params.active !== undefined && { active: params.active }),
+						...(params.owner_user_id !== undefined && {
+							ownerUserId: params.owner_user_id,
+						}),
+					})
+					.pipe(Effect.map(toItems)),
+			list_email_provider_presets: () =>
+				svc.listProviderPresets().pipe(Effect.map(toItems)),
 			get_email_inbox_status: () => svc.inboxStatus(),
 			create_email_inbox: params =>
 				svc
@@ -1066,10 +1070,11 @@ export const EmailHandlersLive = EmailTools.toLayer(
 				}
 			},
 			list_email_drafts: params =>
-				svc.listDrafts(params.inbox_id).pipe(Effect.orDie),
+				svc.listDrafts(params.inbox_id).pipe(Effect.orDie, Effect.map(toItems)),
 			get_email_draft: ({ inbox_id, draft_id }) =>
 				svc.getDraft(inbox_id, draft_id).pipe(Effect.orDie),
-			list_inbox_footers: params => svc.listFooters(params.inbox_id),
+			list_inbox_footers: params =>
+				svc.listFooters(params.inbox_id).pipe(Effect.map(toItems)),
 			get_inbox_footer: ({ id }) => svc.getFooter(id).pipe(Effect.orDie),
 			manage_inbox_footer: params => {
 				switch (params.action) {
