@@ -110,6 +110,12 @@
      apps/server HTTP API  (/webhooks/...)
 ```
 
+### Intelligence locus
+
+The primary intelligence is *external* — the MCP client (Claude, ChatGPT) the user talks to does most of the reasoning and generation (email bodies, chat replies, synthesis). apps/server is the data, tools, and authoring surface; it hosts *specialized* server-side intelligence only where it earns its place — `research` runs a server-side agent loop because it needs the budget/provider/cache and fan-out the external client can't run. So the leverage is being an excellent MCP context provider (tools, resources, prompts) plus a few deep specialized agents, not a general brain.
+
+Instruction templates follow the same split, *per surface*: the research agent enforces its resolved stack server-side, while client-composed surfaces (email, chat) expose their stack as advisory context the external client reads — via the `batuda://instructions/{agent}` resource — and follows when it composes.
+
 ---
 
 ## Packages
@@ -142,6 +148,16 @@ Bounded context for company research. Owns the research agent loop, provider por
 - `infrastructure/` — boot-time provider selection (`providers-live.ts` for the capability ports, `llm-live.ts` for LLM inference), stub providers for zero-cost local dev, real providers (Brave Search, Firecrawl, libreBORME, einforma, Hunter), cached search wrapper, OpenAI-compatible LLM layer via `@effect/ai-openai-compat`
 
 Provider selection uses `Layer.unwrap + Config.schema` — env vars pick the implementation at startup, same pattern as `EmailProviderLive`. Each provider is a `Layer<PortTag, E, R>` with R declaring its dependencies (stubs need nothing, real providers need `HttpClient` + `Config`).
+
+### `packages/instructions`
+
+Bounded context for AI instruction templates — named, reusable prompt blocks (org- or user-owned) plus per-(surface, scope) default stacks that compose an agent's prompt. Surface-neutral: the same template can apply to any agent. Layered as:
+
+- `domain/` — the code-defined surface set (`research`, `email`; a string set, not a DB enum, so adding a surface is a code change, never a migration), plus template/stack/donation value types. Exposed at the browser-safe `@batuda/instructions/domain` subpath so the web shares the same surface set.
+- pure logic — the precedence ladder (per-run override > user stack > org default > none), name/id reference resolution scoped by RLS, replace/extend stack composition, and the donation flow (personal → org)
+- `resolveInstructions` turns a run's (org, user, agent) into ordered prompt segments + a cache fingerprint; the table DDL lives with the app's migrations, not here
+
+The research agent enforces its resolved stack server-side; client-composed surfaces (email) read their stack as advisory context via the `batuda://instructions/{agent}` MCP resource. See §Intelligence locus.
 
 ### `packages/controllers`
 
