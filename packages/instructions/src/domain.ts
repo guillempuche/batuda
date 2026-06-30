@@ -1,10 +1,10 @@
 import { Schema } from 'effect'
 
 // The code-defined set of AI agents that compose instruction templates into
-// their prompt. Research today; email/chat/outreach later. Kept as a string
+// their prompt. Research and email today; chat/outreach later. Kept as a string
 // set (not a DB enum) so adding an agent is a code change, never a migration —
 // the same convention research uses for its schema_name registry.
-export const agents = ['research'] as const
+export const agents = ['research', 'email'] as const
 
 export type Agent = (typeof agents)[number]
 

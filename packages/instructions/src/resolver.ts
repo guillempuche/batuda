@@ -67,6 +67,84 @@ export const personalTemplatesInOrgStack = (
 ): ReadonlyArray<string> =>
 	items.filter(item => item.ownerUserId !== null).map(item => item.templateId)
 
+// ── Per-run override refs (names or ids) ───────────────────────────────────
+
+// A per-run override lets a caller name templates by human name OR id. This is
+// the surface a chat AI uses to apply a specific instruction to one run without
+// knowing its UUID. An id passes straight through; a name is matched against the
+// templates the actor can read (RLS scopes that to the org's plus their own). A
+// name with no match is reported back so the caller can fix the typo, and a name
+// that matches more than one template (e.g. a personal and an org template share
+// a name) is ambiguous — its candidates come back with their scope so the AI can
+// re-ask with the exact id instead of silently running the wrong one.
+
+const UUID_RE =
+	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export const isUuidRef = (ref: string): boolean => UUID_RE.test(ref)
+
+export interface InstructionCandidate {
+	readonly id: string
+	readonly name: string
+	readonly scope: 'personal' | 'org'
+}
+
+export interface AmbiguousRef {
+	readonly query: string
+	readonly candidates: ReadonlyArray<InstructionCandidate>
+}
+
+export type ResolveRefsResult =
+	| { readonly ok: true; readonly templateIds: ReadonlyArray<string> }
+	| {
+			readonly ok: false
+			readonly unknown: ReadonlyArray<string>
+			readonly ambiguous: ReadonlyArray<AmbiguousRef>
+	  }
+
+// Pure resolution: given the refs (order preserved, since stack order shapes the
+// prompt) and the templates found by name, map each ref to a single id or record
+// why it couldn't resolve. Ids are taken at face value; names that match exactly
+// one template resolve, the rest are split into unknown vs ambiguous.
+export const classifyInstructionRefs = (args: {
+	readonly refs: ReadonlyArray<string>
+	readonly found: ReadonlyArray<{
+		readonly id: string
+		readonly name: string
+		readonly ownerUserId: string | null
+	}>
+}): ResolveRefsResult => {
+	const byName = new Map<string, Array<InstructionCandidate>>()
+	for (const row of args.found) {
+		const scope = row.ownerUserId === null ? 'org' : 'personal'
+		const list = byName.get(row.name) ?? []
+		list.push({ id: row.id, name: row.name, scope })
+		byName.set(row.name, list)
+	}
+
+	const templateIds: Array<string> = []
+	const unknown: Array<string> = []
+	const ambiguous: Array<AmbiguousRef> = []
+	for (const ref of args.refs) {
+		if (isUuidRef(ref)) {
+			templateIds.push(ref)
+			continue
+		}
+		const candidates = byName.get(ref) ?? []
+		const [first] = candidates
+		if (!first) unknown.push(ref)
+		else if (candidates.length === 1) templateIds.push(first.id)
+		else ambiguous.push({ query: ref, candidates })
+	}
+
+	// Collapse repeats so the same template can't appear twice in the prompt —
+	// whether the caller listed a name twice, an id twice, or a name alongside its
+	// own id (both resolve to one id). First position wins, matching stack order.
+	return unknown.length > 0 || ambiguous.length > 0
+		? { ok: false, unknown, ambiguous }
+		: { ok: true, templateIds: dedupeKeepFirst(templateIds) }
+}
+
 // ── DB resolution (exercised end-to-end when research is wired) ────────────
 
 export interface ResolveInstructionsArgs {
@@ -204,4 +282,32 @@ export const resolveInstructions = (
 			templateNames: ordered.map(row => row.name),
 			source,
 		}
+	})
+
+// Turn a caller's per-run override (template names or ids) into the ordered ids
+// resolveInstructions expects. Must run inside the request transaction: the name
+// lookup reads through RLS, so an actor only ever matches the org's templates and
+// their own. Returns the ids on success, or the unresolved names so the caller
+// can re-ask (a typo) or disambiguate (a name shared by two templates) before any
+// run starts.
+export const resolveInstructionRefs = (
+	refs: ReadonlyArray<string>,
+): Effect.Effect<ResolveRefsResult, SqlError.SqlError, SqlClient.SqlClient> =>
+	Effect.gen(function* () {
+		if (refs.length === 0) return { ok: true, templateIds: [] }
+		const sql = yield* SqlClient.SqlClient
+		const names = [...new Set(refs.filter(ref => !isUuidRef(ref)))]
+		const found =
+			names.length === 0
+				? []
+				: yield* sql<{
+						id: string
+						name: string
+						ownerUserId: string | null
+					}>`
+						SELECT id, name, owner_user_id
+						FROM instruction_templates
+						WHERE name IN ${sql.in(names)}
+					`
+		return classifyInstructionRefs({ refs, found })
 	})
