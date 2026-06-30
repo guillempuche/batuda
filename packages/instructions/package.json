@@ -9,6 +9,10 @@
 		".": {
 			"types": "./src/index.ts",
 			"import": "./src/index.ts"
+		},
+		"./domain": {
+			"types": "./src/domain.ts",
+			"import": "./src/domain.ts"
 		}
 	},
 	"scripts": {

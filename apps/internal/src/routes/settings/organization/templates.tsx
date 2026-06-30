@@ -14,6 +14,7 @@ import {
 import { useMemo, useState } from 'react'
 import styled from 'styled-components'
 
+import type { Agent } from '@batuda/instructions/domain'
 import { PriButton, usePriToast } from '@batuda/ui/pri'
 
 import {
@@ -25,6 +26,7 @@ import {
 	rejectDonationAtom,
 	setOrgStackAtom,
 } from '#/atoms/instruction-atoms'
+import { AgentSelector } from '#/components/instructions/agent-selector'
 import {
 	InstructionIconButton,
 	OwnerBadge,
@@ -63,8 +65,6 @@ import {
 } from '#/components/instructions/template-editor-dialog'
 import { authClient } from '#/lib/auth-client'
 import { ruledLedgerRow } from '#/lib/workshop-mixins'
-
-const AGENT = 'research'
 
 export const Route = createFileRoute('/settings/organization/templates')({
 	head: () => ({ meta: [{ title: 'Org instruction templates — Batuda' }] }),
@@ -106,7 +106,7 @@ function OrgTemplatesPage() {
 				</Heading>
 				<Subtitle>
 					<Trans>
-						Shared guidance every member's research agent can use, plus the
+						Shared guidance every member's agents can use, plus the
 						organization's default.
 					</Trans>
 				</Subtitle>
@@ -162,9 +162,13 @@ function OrgTemplateAdmin({
 	const { t } = useLingui()
 	const toast = usePriToast()
 
+	// Instructions are per surface; this picks which surface's org default the
+	// section below edits. Org templates themselves are surface-neutral.
+	const [agent, setAgent] = useState<Agent>('research')
+
 	const donationsResult = useAtomValue(instructionDonationsAtom)
 	const refreshDonations = useAtomRefresh(instructionDonationsAtom)
-	const stacksAtom = useMemo(() => defaultStacksAtom(AGENT), [])
+	const stacksAtom = useMemo(() => defaultStacksAtom(agent), [agent])
 	const stacksResult = useAtomValue(stacksAtom)
 	const refreshStacks = useAtomRefresh(stacksAtom)
 
@@ -204,6 +208,13 @@ function OrgTemplateAdmin({
 	const [stackIds, setStackIds] = useState<ReadonlyArray<string> | null>(null)
 	const [savingStack, setSavingStack] = useState(false)
 	const effectiveStack = stackIds ?? orgStackIds ?? []
+
+	// Switching surface re-seeds the picker from that surface's saved org default,
+	// dropping any unsaved edits to the previous surface.
+	const selectAgent = (next: Agent) => {
+		setAgent(next)
+		setStackIds(null)
+	}
 
 	const openCreate = () => {
 		setEditing(null)
@@ -251,7 +262,7 @@ function OrgTemplateAdmin({
 		// dangling reference the server would only reject.
 		const ids = effectiveStack.filter(id => stackOptions.some(o => o.id === id))
 		const exit = await setOrgStack({
-			params: { agent: AGENT },
+			params: { agent },
 			payload: { template_ids: ids },
 		} as never)
 		setSavingStack(false)
@@ -361,9 +372,16 @@ function OrgTemplateAdmin({
 			</Section>
 
 			<Section data-testid='org-default-stack'>
-				<SectionTitle>
-					<Trans>Organization default</Trans>
-				</SectionTitle>
+				<SectionHead>
+					<SectionTitle id='org-default-surface'>
+						<Trans>Organization default</Trans>
+					</SectionTitle>
+					<AgentSelector
+						agent={agent}
+						onChange={selectAgent}
+						labelledBy='org-default-surface'
+					/>
+				</SectionHead>
 				<Hint>
 					<Trans>
 						These templates run for every member who hasn't set their own — in

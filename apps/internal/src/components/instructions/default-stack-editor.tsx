@@ -91,7 +91,7 @@ export function DefaultStackEditor({
 		<Card data-testid='default-stack-editor'>
 			<Head>
 				<Title>
-					<Trans>Your research default</Trans>
+					<Trans>Your default</Trans>
 				</Title>
 				<Badge>
 					{inheriting ? (
@@ -105,8 +105,8 @@ export function DefaultStackEditor({
 			</Head>
 			<Hint>
 				<Trans>
-					These templates shape every research run, in order — unless you pick
-					different ones for a single run.
+					These templates shape every run, in order — unless you pick different
+					ones for a single run.
 				</Trans>
 			</Hint>
 

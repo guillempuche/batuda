@@ -19,6 +19,7 @@
 		"@batuda/controllers": "workspace:*",
 		"@batuda/domain": "workspace:*",
 		"@batuda/email": "workspace:*",
+		"@batuda/instructions": "workspace:*",
 		"@batuda/research": "workspace:*",
 		"@batuda/ui": "workspace:*",
 		"@dnd-kit/core": "^6.3.1",
