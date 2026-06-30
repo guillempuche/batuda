@@ -2,8 +2,7 @@ import { Effect } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
 import { BatudaApi } from '@batuda/controllers'
-
-import { buildMeta } from '../lib/build-meta'
+import { buildMeta } from '@batuda/observability'
 
 export const HealthLive = HttpApiBuilder.group(BatudaApi, 'health', handlers =>
 	Effect.succeed(

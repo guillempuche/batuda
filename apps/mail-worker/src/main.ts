@@ -1,7 +1,8 @@
 import { NodeRuntime } from '@effect/platform-node'
-import { Effect, type Fiber, Layer, Ref, Schedule } from 'effect'
+import { DateTime, Effect, type Fiber, Layer, Ref, Schedule } from 'effect'
 
 import { ParticipantMatcher } from '@batuda/email/participant-matcher'
+import { makeOtlpObservability } from '@batuda/observability'
 
 import { type ClaimedInbox, claimAvailableInboxes } from './claim.js'
 import { installCrashGuards } from './crash-guards.js'
@@ -38,6 +39,22 @@ const program = Effect.gen(function* () {
 		new Map(),
 	)
 
+	// Liveness signal. A dead/crash-looping worker exports no telemetry, so a
+	// Honeycomb absence trigger watches for a gap in this event. The scan tick
+	// fires every 5s; throttle the heartbeat to ~1/min so it stays a cheap
+	// "still alive" pulse rather than per-tick noise. Starts at 0 so the first
+	// tick emits immediately (a boot heartbeat).
+	const HEARTBEAT_INTERVAL_MS = 60_000
+	const lastHeartbeatAt = yield* Ref.make(0)
+	const emitHeartbeat = Effect.gen(function* () {
+		const now = DateTime.toEpochMillis(DateTime.nowUnsafe())
+		if (now - (yield* Ref.get(lastHeartbeatAt)) < HEARTBEAT_INTERVAL_MS) return
+		yield* Ref.set(lastHeartbeatAt, now)
+		yield* Effect.logInfo('mail-worker heartbeat').pipe(
+			Effect.annotateLogs({ event: 'mail_worker.heartbeat' }),
+		)
+	})
+
 	const reapFinished = Effect.gen(function* () {
 		const current = yield* Ref.get(running)
 		const next = new Map(current)
@@ -52,6 +69,7 @@ const program = Effect.gen(function* () {
 	})
 
 	const tick: Effect.Effect<void, never, never> = Effect.gen(function* () {
+		yield* emitHeartbeat
 		yield* reapFinished
 		const claimed: readonly ClaimedInbox[] = yield* claimAvailableInboxes.pipe(
 			Effect.catchCause(cause =>
@@ -99,6 +117,12 @@ const Live = Layer.mergeAll(
 	// inbox claim/session queries run by `program`.
 	Layer.provideMerge(PgLive),
 	Layer.provideMerge(WorkerEnvVars.layer),
+	// Export traces, logs, and metrics to the batuda-mail-worker Honeycomb
+	// dataset when OTEL_EXPORTER_OTLP_ENDPOINT is set. Without this the worker's
+	// IMAP disconnects, credential failures, and session-fiber deaths die in the
+	// console ring-buffer. Sits above ConfigFileLive so it can read NODE_ENV +
+	// the OTEL_* settings; merges with the default console logger, not replacing it.
+	Layer.provide(makeOtlpObservability({ serviceName: 'batuda-mail-worker' })),
 	// Install the baked-file config values before the readers above resolve, so
 	// the env-var layer and the database client can read non-secret settings
 	// that no longer travel on the boot command line.
