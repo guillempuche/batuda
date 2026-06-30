@@ -5,6 +5,7 @@ import { CurrentOrg, SessionContext } from '@batuda/controllers'
 import { ResearchService } from '@batuda/research'
 
 import { redactDbErrors, Uuid } from './_research-shared'
+import { ListResult, toItems } from './_result'
 
 const REQUEST_DEPENDENCIES = [SessionContext, CurrentOrg]
 
@@ -24,7 +25,7 @@ const ListResearch = Tool.make('list_research', {
 		limit: Schema.optional(Schema.Number),
 		offset: Schema.optional(Schema.Number),
 	}),
-	success: Schema.Array(Schema.Unknown),
+	success: ListResult(Schema.Unknown),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Research')
@@ -111,7 +112,7 @@ const ListResearchProposedUpdates = Tool.make(
 		parameters: Schema.Struct({
 			id: Schema.String,
 		}),
-		success: Schema.Array(Schema.Unknown),
+		success: ListResult(Schema.Unknown),
 		dependencies: REQUEST_DEPENDENCIES,
 	},
 )
@@ -167,7 +168,7 @@ const GetResearchSpend = Tool.make('get_research_spend', {
 		range: Schema.optional(SpendRange),
 		group_by: Schema.optional(SpendGroupBy),
 	}),
-	success: Schema.Array(Schema.Unknown),
+	success: ListResult(Schema.Unknown),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Get Research Spend')
@@ -202,7 +203,7 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 						limit: filters.limit,
 						offset: filters.offset,
 					})
-					.pipe(redactDbErrors),
+					.pipe(redactDbErrors, Effect.map(toItems)),
 			cancel_research: ({ id }) =>
 				Effect.gen(function* () {
 					const res = yield* svc.cancel(id)
@@ -244,7 +245,7 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 						proposed_updates?: unknown[]
 					} | null
 					return findings?.proposed_updates ?? []
-				}).pipe(redactDbErrors),
+				}).pipe(redactDbErrors, Effect.map(toItems)),
 			resolve_research_proposed_update: ({ decision }) =>
 				// Placeholder: the OCC-protected CRM write that would land on
 				// apply is not yet wired, so this returns the resolution
@@ -278,7 +279,7 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 						...(range !== undefined && { range }),
 						...(group_by !== undefined && { groupBy: group_by }),
 					})
-					.pipe(redactDbErrors),
+					.pipe(redactDbErrors, Effect.map(toItems)),
 		}
 	}),
 )

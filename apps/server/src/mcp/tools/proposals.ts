@@ -8,6 +8,7 @@ import {
 	ProposalEvent,
 	TimelineActivityService,
 } from '../../services/timeline-activity'
+import { ListResult, toItems } from './_result'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg]
 
@@ -25,7 +26,7 @@ const ListProposals = Tool.make('list_proposals', {
 	parameters: Schema.Struct({
 		company_id: Schema.optional(Schema.String),
 	}),
-	success: Schema.Array(Schema.Unknown),
+	success: ListResult(Schema.Unknown),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Proposals')
@@ -91,7 +92,7 @@ export const ProposalHandlersLive = ProposalTools.toLayer(
 						return yield* sql`SELECT * FROM proposals WHERE company_id = ${company_id} ORDER BY created_at DESC`
 					}
 					return yield* sql`SELECT * FROM proposals ORDER BY created_at DESC`
-				}).pipe(Effect.orDie),
+				}).pipe(Effect.orDie, Effect.map(toItems)),
 			create_proposal: params =>
 				Effect.gen(function* () {
 					const currentOrg = yield* CurrentOrg
