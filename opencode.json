@@ -17,6 +17,14 @@
 			"type": "remote",
 			"url": "https://mcp.firecrawl.dev/v2/mcp"
 		},
+		"honeycomb": {
+			"type": "remote",
+			"url": "https://mcp.honeycomb.io/mcp",
+			"oauth": false,
+			"headers": {
+				"Authorization": "Bearer {env:HONEYCOMB_API_KEY}"
+			}
+		},
 		"neon": {
 			"type": "local",
 			"command": [
