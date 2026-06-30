@@ -44,14 +44,20 @@ export type {
 } from './management-logic'
 export { classifyStackTemplates, decideTemplateEdit } from './management-logic'
 export type {
+	AmbiguousRef,
+	InstructionCandidate,
 	ResolvedInstructions,
 	ResolveInstructionsArgs,
+	ResolveRefsResult,
 	StackComposition,
 	StackSource,
 } from './resolver'
 export {
 	assembleSegments,
+	classifyInstructionRefs,
+	isUuidRef,
 	personalTemplatesInOrgStack,
 	pickStackSource,
+	resolveInstructionRefs,
 	resolveInstructions,
 } from './resolver'

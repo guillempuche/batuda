@@ -2,10 +2,15 @@ import { describe, expect, it } from 'vitest'
 
 import {
 	assembleSegments,
+	classifyInstructionRefs,
 	dedupeKeepFirst,
+	isUuidRef,
 	personalTemplatesInOrgStack,
 	pickStackSource,
 } from './resolver'
+
+const UUID_A = '11111111-1111-4111-8111-111111111111'
+const UUID_B = '22222222-2222-4222-8222-222222222222'
 
 describe('pickStackSource', () => {
 	describe('when a per-run override is present', () => {
@@ -167,6 +172,162 @@ describe('dedupeKeepFirst', () => {
 		it('should return an empty list', () => {
 			// GIVEN no ids [resolver.ts:dedupeKeepFirst]
 			expect(dedupeKeepFirst([])).toEqual([])
+		})
+	})
+})
+
+describe('isUuidRef', () => {
+	describe('when the ref is a UUID', () => {
+		it('should treat it as an id regardless of case', () => {
+			// GIVEN a canonical and an upper-case UUID [resolver.ts:isUuidRef]
+			// THEN both read as ids
+			expect(isUuidRef(UUID_A)).toBe(true)
+			expect(isUuidRef(UUID_A.toUpperCase())).toBe(true)
+		})
+	})
+
+	describe('when the ref is a human name', () => {
+		it('should not mistake a name for an id', () => {
+			// GIVEN a plain template name [resolver.ts:isUuidRef]
+			// THEN it is not a UUID
+			expect(isUuidRef('sell to hotels')).toBe(false)
+			expect(isUuidRef('')).toBe(false)
+		})
+	})
+})
+
+describe('classifyInstructionRefs', () => {
+	describe('when a ref is already a UUID', () => {
+		it('should pass the id through without needing a name match', () => {
+			// GIVEN a UUID ref and no matching rows [resolver.ts:classifyInstructionRefs]
+			const result = classifyInstructionRefs({ refs: [UUID_A], found: [] })
+			// THEN the id is taken at face value
+			expect(result).toEqual({ ok: true, templateIds: [UUID_A] })
+		})
+	})
+
+	describe('when a name matches exactly one readable template', () => {
+		it('should resolve the name to that template id', () => {
+			// GIVEN a single org template found by name [resolver.ts:classifyInstructionRefs]
+			const result = classifyInstructionRefs({
+				refs: ['be terse'],
+				found: [{ id: UUID_A, name: 'be terse', ownerUserId: null }],
+			})
+			// THEN the name resolves to the id
+			expect(result).toEqual({ ok: true, templateIds: [UUID_A] })
+		})
+	})
+
+	describe('when ids and names are mixed', () => {
+		it('should preserve the requested order so stack order is kept', () => {
+			// GIVEN a name, then an id, then another name [resolver.ts:classifyInstructionRefs]
+			const result = classifyInstructionRefs({
+				refs: ['be terse', UUID_B, 'sell to hotels'],
+				found: [
+					{ id: UUID_A, name: 'be terse', ownerUserId: 'user_1' },
+					{
+						id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+						name: 'sell to hotels',
+						ownerUserId: null,
+					},
+				],
+			})
+			// THEN ids come back in the order the caller asked for them
+			expect(result).toEqual({
+				ok: true,
+				templateIds: [UUID_A, UUID_B, 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'],
+			})
+		})
+	})
+
+	describe('when a name matches no readable template', () => {
+		it('should report it as unknown so the caller can fix the typo', () => {
+			// GIVEN a name with no matching row [resolver.ts:classifyInstructionRefs]
+			const result = classifyInstructionRefs({ refs: ['nope'], found: [] })
+			// THEN the run is blocked and the unmatched name is surfaced
+			expect(result).toEqual({ ok: false, unknown: ['nope'], ambiguous: [] })
+		})
+	})
+
+	describe('when a name matches both a personal and an org template', () => {
+		it('should report the candidates with their scope so the AI can re-ask by id', () => {
+			// GIVEN one name shared by an org and a personal template
+			// [resolver.ts:classifyInstructionRefs]
+			const result = classifyInstructionRefs({
+				refs: ['tone'],
+				found: [
+					{ id: UUID_A, name: 'tone', ownerUserId: null },
+					{ id: UUID_B, name: 'tone', ownerUserId: 'user_1' },
+				],
+			})
+			// THEN the collision is flagged with both candidates and their scope
+			expect(result).toEqual({
+				ok: false,
+				unknown: [],
+				ambiguous: [
+					{
+						query: 'tone',
+						candidates: [
+							{ id: UUID_A, name: 'tone', scope: 'org' },
+							{ id: UUID_B, name: 'tone', scope: 'personal' },
+						],
+					},
+				],
+			})
+		})
+	})
+
+	describe('when some refs are unknown and others ambiguous', () => {
+		it('should collect both failures in one response', () => {
+			// GIVEN an unknown name and an ambiguous name together
+			// [resolver.ts:classifyInstructionRefs]
+			const result = classifyInstructionRefs({
+				refs: ['ghost', 'tone'],
+				found: [
+					{ id: UUID_A, name: 'tone', ownerUserId: null },
+					{ id: UUID_B, name: 'tone', ownerUserId: 'user_1' },
+				],
+			})
+			// THEN both reasons come back so the caller fixes everything at once
+			expect(result.ok).toBe(false)
+			if (!result.ok) {
+				expect(result.unknown).toEqual(['ghost'])
+				expect(result.ambiguous.map(a => a.query)).toEqual(['tone'])
+			}
+		})
+	})
+
+	describe('when no refs are given', () => {
+		it('should resolve to an empty id list', () => {
+			// GIVEN no refs [resolver.ts:classifyInstructionRefs]
+			// THEN there is nothing to override with
+			expect(classifyInstructionRefs({ refs: [], found: [] })).toEqual({
+				ok: true,
+				templateIds: [],
+			})
+		})
+	})
+
+	describe('when the same template is referenced twice', () => {
+		it('should collapse a repeated name to a single id', () => {
+			// GIVEN one name listed twice [resolver.ts:classifyInstructionRefs]
+			const result = classifyInstructionRefs({
+				refs: ['be terse', 'be terse'],
+				found: [{ id: UUID_A, name: 'be terse', ownerUserId: null }],
+			})
+			// THEN the template appears once, so the prompt isn't doubled
+			expect(result).toEqual({ ok: true, templateIds: [UUID_A] })
+		})
+
+		it('should collapse a name listed alongside its own id', () => {
+			// GIVEN the same template referenced by name then by id
+			// [resolver.ts:classifyInstructionRefs]
+			const result = classifyInstructionRefs({
+				refs: ['be terse', UUID_A],
+				found: [{ id: UUID_A, name: 'be terse', ownerUserId: null }],
+			})
+			// THEN both refs resolve to one id, kept in first position
+			expect(result).toEqual({ ok: true, templateIds: [UUID_A] })
 		})
 	})
 })
