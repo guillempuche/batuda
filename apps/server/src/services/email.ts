@@ -350,8 +350,12 @@ const PROVIDER_PRESETS = [
 		smtpPort: 465,
 		smtpSecurity: 'tls',
 		helpUrl: 'https://www.infomaniak.com/en/support/faq/2427',
+		// Infomaniak splits passwords in two: the account-level "application
+		// password" (FAQ 2855) only works for contacts/calendars, never IMAP.
+		// IMAP/SMTP needs a per-mailbox device password created in Mail Service
+		// (FAQ 1321) — point users there or they hit "Invalid login or password".
 		appPasswordUrl:
-			'https://www.infomaniak.com/en/support/faq/2855/manage-application-passwords',
+			'https://www.infomaniak.com/en/support/faq/1321/add-a-device-generate-app-specific-password-via-the-mail-app',
 		passwordAuthSupported: true,
 	},
 	{
