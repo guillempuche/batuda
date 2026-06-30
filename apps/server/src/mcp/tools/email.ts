@@ -84,7 +84,7 @@ const AttachmentRef = Schema.Struct({
 
 const SendEmail = Tool.make('send_email', {
 	description:
-		'Send a new email. The body is a structured block tree (paragraph / heading / list / quote / divider / image) — not raw html/text. Omit inbox_id to use the calling member’s primary inbox in the active org. Attachments reference staging_ids returned by stage_email_attachment; set inline=true for cid-referenced inline images. Returns {_tag:"sent"} on success or {_tag:"suppressed"} if a recipient is suppressed. Set skip_footer=true to omit the inbox default footer.',
+		'Send a new email. The body is a structured block tree (paragraph / heading / list / quote / divider / image) — not raw html/text. Omit inbox_id to use the calling member’s primary inbox in the active org. Attachments reference staging_ids returned by stage_email_attachment; set inline=true for cid-referenced inline images. Before composing, read the member’s standing email instructions (writing style, sign-off, do/don’t rules) from the batuda://instructions/email resource and write the body to follow them. Returns {_tag:"sent"} on success or {_tag:"suppressed"} if a recipient is suppressed. Set skip_footer=true to omit the inbox default footer.',
 	parameters: Schema.Struct({
 		inbox_id: Schema.optional(Schema.String),
 		to: Recipients,
@@ -108,7 +108,7 @@ const SendEmail = Tool.make('send_email', {
 
 const ReplyEmail = Tool.make('reply_email', {
 	description:
-		'Reply to the latest message in an existing email thread. Body is a structured block tree — if you want the parent quoted, emit a `quote` block wrapping sanitized parent blocks (you can read the parent via get_email_thread). Optional Cc/Bcc extend the thread. Attachments reference staging_ids from stage_email_attachment. Returns {_tag:"sent"} or {_tag:"suppressed"}. Set skip_footer=true to omit the inbox default footer.',
+		'Reply to the latest message in an existing email thread. Body is a structured block tree — if you want the parent quoted, emit a `quote` block wrapping sanitized parent blocks (you can read the parent via get_email_thread). Optional Cc/Bcc extend the thread. Attachments reference staging_ids from stage_email_attachment. Before composing, read the member’s standing email instructions from the batuda://instructions/email resource and write the reply to follow them. Returns {_tag:"sent"} or {_tag:"suppressed"}. Set skip_footer=true to omit the inbox default footer.',
 	parameters: Schema.Struct({
 		thread_id: Schema.String,
 		body_json: EmailBlocks,

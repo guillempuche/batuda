@@ -1144,16 +1144,20 @@ Same toolkit used by the research fiber, with two differences:
 1. `**research_sync**` — synchronous variant of `/research`:
 
 ```ts
-research_sync({ query, context?, schema_name?, max_wait_seconds?: 120 })
+research_sync({ query, context?, schema_name?, instructions?, max_wait_seconds?: 120 })
 ```
 
-Runs the fiber to completion or deadline, returns full findings inline. Better UX for tool-calling LLM hosts that don't want to poll.
+Runs the fiber to completion or deadline, returns full findings inline (with `applied_instructions`). Better UX for tool-calling LLM hosts that don't want to poll.
 2. `**start_research**` and `**get_research**` — async pair for Claude Desktop users doing long-running research:
 
 ```ts
-start_research({ query, context?, schema_name?, ... }) → { id }
-get_research({ id }) → { status, findings, cost }
+start_research({ query, context?, schema_name?, instructions? })
+  → { _tag: 'started', id, status, applied_instructions }
+  | { _tag: 'instruction_clarification', unknown, ambiguous }
+get_research({ id }) → { status, findings, cost, applied_instructions }
 ```
+
+`instructions` is a per-run override naming instruction templates by name or id (overriding the saved default stack); `applied_instructions` echoes the templates that shaped the run. An unresolved name returns the clarification instead of starting.
 
 ### 15.2 Prompts
 
