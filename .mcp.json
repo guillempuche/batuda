@@ -15,6 +15,13 @@
 			"type": "http",
 			"url": "https://mcp.firecrawl.dev/v2/mcp"
 		},
+		"honeycomb": {
+			"type": "http",
+			"url": "https://mcp.honeycomb.io/mcp",
+			"headers": {
+				"Authorization": "Bearer ${HONEYCOMB_API_KEY}"
+			}
+		},
 		"neon": {
 			"command": "sh",
 			"args": [
