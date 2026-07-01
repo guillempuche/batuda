@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-01 (server-v2026.7.1)
+
+### Features
+
+* **instructions:** resolve per-run override by name or id ([7d9ef78](https://github.com/guillempuche/batuda/commit/7d9ef7807b7bf77088c58c39bb246575e0717c45))
+* **internal:** add per-surface selector for instruction default stacks ([d219df0](https://github.com/guillempuche/batuda/commit/d219df00fa05a30e42e9d0949777e1ad18c538d7))
+* **observability:** add shared OTLP package for both processes ([953458e](https://github.com/guillempuche/batuda/commit/953458e3f8f9e2f800450d057c2784f3b17bbcce))
+* **server:** make instruction templates usable from MCP chat ([5adb6b1](https://github.com/guillempuche/batuda/commit/5adb6b1eec2355353b46e3553229097ac4c3d935))
+* **server:** route every unhandled error to Honeycomb ([d1cead7](https://github.com/guillempuche/batuda/commit/d1cead727344bd86cec5b187dfb7602bc94b0320))
+
+### Bug Fixes
+
+* **server:** point Infomaniak preset at the Mail device-password guide ([907c837](https://github.com/guillempuche/batuda/commit/907c8378749a84083ecfe5d5a1c16926bb142984))
+* **server:** wrap MCP list-tool output in an object envelope ([82e7b37](https://github.com/guillempuche/batuda/commit/82e7b37c546f9f9838fec100e571167093a3773e))
+
+### CI/CD
+
+* enable Honeycomb OTLP export in production ([6abe971](https://github.com/guillempuche/batuda/commit/6abe971227d664cedd80d3e02ceb8e5894107535)), closes [#153](https://github.com/guillempuche/batuda/issues/153)
+
 ## 2026-06-29 (server-v2026.6.29)
 
 ### Features
