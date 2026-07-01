@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-01 (mail-worker-v2026.7.1)
+
+### Features
+
+* **observability:** add shared OTLP package for both processes ([953458e](https://github.com/guillempuche/batuda/commit/953458e3f8f9e2f800450d057c2784f3b17bbcce))
+
+### CI/CD
+
+* enable Honeycomb OTLP export in production ([6abe971](https://github.com/guillempuche/batuda/commit/6abe971227d664cedd80d3e02ceb8e5894107535)), closes [#153](https://github.com/guillempuche/batuda/issues/153)
+
 ## 2026-06-29 (mail-worker-v2026.6.29)
 
 ### Features
