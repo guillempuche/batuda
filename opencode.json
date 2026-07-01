@@ -19,11 +19,7 @@
 		},
 		"honeycomb": {
 			"type": "remote",
-			"url": "https://mcp.honeycomb.io/mcp",
-			"oauth": false,
-			"headers": {
-				"Authorization": "Bearer {env:HONEYCOMB_API_KEY}"
-			}
+			"url": "https://mcp.eu1.honeycomb.io/mcp"
 		},
 		"neon": {
 			"type": "local",
