@@ -2,47 +2,47 @@ import { Schema } from 'effect'
 
 const Citation = Schema.Struct({
 	source_id: Schema.String,
-	quote: Schema.optional(Schema.String),
-	confidence: Schema.optional(Schema.Number),
+	quote: Schema.optionalKey(Schema.String),
+	confidence: Schema.optionalKey(Schema.Number),
 })
 
 export const CompanyEnrichmentV1Schema = Schema.Struct({
 	enrichment: Schema.Struct({
-		industry: Schema.optional(Schema.String),
-		size_range: Schema.optional(Schema.String),
-		pain_points: Schema.optional(Schema.String),
-		current_tools: Schema.optional(Schema.String),
-		products_fit: Schema.optional(Schema.Array(Schema.String)),
-		tags: Schema.optional(Schema.Array(Schema.String)),
-		location: Schema.optional(Schema.String),
-		region: Schema.optional(Schema.String),
-		address: Schema.optional(Schema.String),
-		latitude: Schema.optional(Schema.Number),
-		longitude: Schema.optional(Schema.Number),
+		industry: Schema.optionalKey(Schema.String),
+		size_range: Schema.optionalKey(Schema.String),
+		pain_points: Schema.optionalKey(Schema.String),
+		current_tools: Schema.optionalKey(Schema.String),
+		products_fit: Schema.optionalKey(Schema.Array(Schema.String)),
+		tags: Schema.optionalKey(Schema.Array(Schema.String)),
+		location: Schema.optionalKey(Schema.String),
+		region: Schema.optionalKey(Schema.String),
+		address: Schema.optionalKey(Schema.String),
+		latitude: Schema.optionalKey(Schema.Number),
+		longitude: Schema.optionalKey(Schema.Number),
 		citations: Schema.Array(Citation),
 	}),
-	competitors: Schema.optional(
+	competitors: Schema.optionalKey(
 		Schema.Array(
 			Schema.Struct({
 				name: Schema.String,
-				website: Schema.optional(Schema.String),
-				why: Schema.optional(Schema.String),
+				website: Schema.optionalKey(Schema.String),
+				why: Schema.optionalKey(Schema.String),
 				citations: Schema.Array(Citation),
 			}),
 		),
 	),
-	contacts: Schema.optional(
+	contacts: Schema.optionalKey(
 		Schema.Array(
 			Schema.Struct({
 				name: Schema.String,
-				role: Schema.optional(Schema.String),
-				email: Schema.optional(Schema.String),
-				phone: Schema.optional(Schema.String),
+				role: Schema.optionalKey(Schema.String),
+				email: Schema.optionalKey(Schema.String),
+				phone: Schema.optionalKey(Schema.String),
 				citations: Schema.Array(Citation),
 			}),
 		),
 	),
-	discovered_existing: Schema.optional(
+	discovered_existing: Schema.optionalKey(
 		Schema.Array(
 			Schema.Struct({
 				subject_table: Schema.Literals(['companies', 'contacts']),
@@ -51,23 +51,27 @@ export const CompanyEnrichmentV1Schema = Schema.Struct({
 			}),
 		),
 	),
-	proposed_updates: Schema.optional(
+	proposed_updates: Schema.optionalKey(
 		Schema.Array(
 			Schema.Struct({
 				subject_table: Schema.Literals(['companies', 'contacts']),
 				subject_id: Schema.String,
 				expected_version: Schema.Number,
-				fields: Schema.Unknown,
+				// Open-ended field map; sent as a JSON-encoded string because OpenAI
+				// structured output has no "any shape" type — decodes back to an
+				// object automatically.
+				fields: Schema.UnknownFromJsonString,
 				reason: Schema.String,
 				citations: Schema.Array(Citation),
 			}),
 		),
 	),
-	pending_paid_actions: Schema.optional(
+	pending_paid_actions: Schema.optionalKey(
 		Schema.Array(
 			Schema.Struct({
 				tool: Schema.String,
-				args: Schema.Unknown,
+				// Same open-ended-map rationale as `fields` above.
+				args: Schema.UnknownFromJsonString,
 				estimated_cents: Schema.Number,
 				reason: Schema.String,
 			}),

@@ -35,14 +35,14 @@ const WebSearchParams = Schema.Struct({
 	query: Schema.String.annotate({
 		description: 'Search query; concise keywords work best',
 	}),
-	limit: Schema.optional(Schema.Number).annotate({
+	limit: Schema.optionalKey(Schema.Number).annotate({
 		description: 'Max results to return (default 10)',
 	}),
-	recency_days: Schema.optional(Schema.Number).annotate({
+	recency_days: Schema.optionalKey(Schema.Number).annotate({
 		description:
 			'Restrict to results published within the last N days. Omit for no filter.',
 	}),
-	location: Schema.optional(Schema.String).annotate({
+	location: Schema.optionalKey(Schema.String).annotate({
 		description: 'Geographic locale hint (e.g. "ES", "es-ES")',
 	}),
 })
@@ -58,7 +58,7 @@ const ExtractStructuredParams = Schema.Struct({
 	schema_name: Schema.String.annotate({
 		description: `Name of a registered schema. One of: ${Object.keys(schemaRegistry).join(', ')}`,
 	}),
-	prompt: Schema.optional(Schema.String).annotate({
+	prompt: Schema.optionalKey(Schema.String).annotate({
 		description:
 			'Optional extra guidance for the extractor (e.g. "focus on revenue figures").',
 	}),
@@ -68,10 +68,10 @@ const RegistryLookupParams = Schema.Struct({
 	country: Schema.Literals(SUPPORTED_COUNTRIES).annotate({
 		description: 'ISO country code; determines which registry to query',
 	}),
-	query: Schema.optional(Schema.String).annotate({
+	query: Schema.optionalKey(Schema.String).annotate({
 		description: 'Company name or fuzzy search string',
 	}),
-	tax_id: Schema.optional(Schema.String).annotate({
+	tax_id: Schema.optionalKey(Schema.String).annotate({
 		description: 'National tax id (e.g. ES CIF/NIF) — more precise than query',
 	}),
 })
