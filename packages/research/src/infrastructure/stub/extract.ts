@@ -3,8 +3,8 @@
  *
  * Exports both the instance (for the provider factory table in
  * `providers-live.ts`) and the standalone Layer (single-slot callers, tests).
- * Returns `unknown` matching the ExtractProvider port — the caller decodes
- * with Schema.decodeUnknown(schema)(raw).
+ * Returns `unknown` matching the ExtractProvider port — the raw object is
+ * handed to the calling model as-is, not decoded against the requested schema.
  */
 
 import { Effect, Layer } from 'effect'

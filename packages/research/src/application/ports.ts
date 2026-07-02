@@ -99,7 +99,8 @@ export class ScrapeProvider extends ServiceMap.Service<
 >()('research/ScrapeProvider') {}
 
 // ── Extract ──
-// Returns `unknown` — caller decodes with Schema.decodeUnknown(schema)(raw).
+// Returns `unknown`: the raw provider result is handed to the calling model
+// as-is (it reads untyped JSON), not decoded against the requested schema.
 // Generic methods on ServiceMap.Service lose type params through the tag.
 
 export interface ExtractInput {
