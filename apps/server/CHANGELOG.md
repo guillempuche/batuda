@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-02 (server-v2026.7.2)
+
+### Bug Fixes
+
+* **research:** unblock research runs on OpenAI structured output ([1ab6c95](https://github.com/guillempuche/batuda/commit/1ab6c9599e7f36fd882d83be2a0b19ac9db0f1c1))
+* **server:** return 404 for an unknown MCP session so clients recover ([d1c9fba](https://github.com/guillempuche/batuda/commit/d1c9fba137d12e10048ecc6ad3c0c06bc2167bb3))
+
+### Refactoring
+
+* **research:** share duplicated research output schema fragments ([76507a4](https://github.com/guillempuche/batuda/commit/76507a487727d495aab756e2b27de144a2805027))
+
 ## 2026-07-01 (server-v2026.7.1)
 
 ### Features
