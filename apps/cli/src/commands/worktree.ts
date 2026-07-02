@@ -211,6 +211,38 @@ const writeWorktreeEnv = (mainRoot: string, slug: string) =>
 		}
 	})
 
+// Active `KEY=` assignments in a .env body, ignoring comments (`# KEY=`) and
+// blanks. Mirrors mergeEnv's key regex so the two agree on what a "key" is.
+const envKeys = (body: string): Set<string> => {
+	const keys = new Set<string>()
+	for (const line of body.split('\n')) {
+		const key = line.match(/^([A-Z0-9_]+)=/)?.[1]
+		if (key) keys.add(key)
+	}
+	return keys
+}
+
+// Keys the committed .env.example declares but the local .env lacks. A worktree
+// inherits its .env from the main checkout, so a key added to the template but
+// not to that .env is missing here too — and the server reads it at boot and dies
+// with a cryptic ConfigError. Surfacing the names turns that into a fixable hint.
+const missingEnvKeys = (exampleBody: string, currentBody: string): string[] => {
+	const present = envKeys(currentBody)
+	return [...envKeys(exampleBody)].filter(key => !present.has(key))
+}
+
+// The current worktree's missing keys, or [] when either file is absent (nothing
+// to compare against).
+const missingWorktreeEnvKeys = (): string[] => {
+	const examplePath = resolve(ROOT, '.env.example')
+	const envPath = resolve(ROOT, '.env')
+	if (!existsSync(examplePath) || !existsSync(envPath)) return []
+	return missingEnvKeys(
+		readFileSync(examplePath, 'utf-8'),
+		readFileSync(envPath, 'utf-8'),
+	)
+}
+
 const dockerFail = <A, E, R>(self: Effect.Effect<A, E, R>) =>
 	self.pipe(
 		Effect.catch(() =>
@@ -400,6 +432,15 @@ export const worktreeUp = Effect.gen(function* () {
 	// Make the just-written values visible to this process + every subprocess
 	// (migrate/seed) it spawns, so they target this worktree's database, not main's.
 	for (const [k, v] of Object.entries(envOverrides(slug))) process.env[k] = v
+
+	// Catch a stale inherited .env now, with the key names, instead of leaving
+	// the server to die at boot with a bare "Expected string, got undefined".
+	const missingEnv = missingWorktreeEnvKeys()
+	if (missingEnv.length > 0) {
+		yield* Effect.logWarning(
+			`.env is missing ${missingEnv.length} key(s) that .env.example declares: ${missingEnv.join(', ')}. The server reads these at boot and will fail until you copy their values from .env.example into the main checkout's .env.`,
+		)
+	}
 
 	yield* Effect.logInfo('Running migrations…')
 	yield* settle(dbMigrate)
@@ -678,6 +719,18 @@ export const worktreeDoctor = Effect.gen(function* () {
 				detail: bucketOk
 					? bucket
 					: `${bucket} missing — run \`pnpm cli worktree up\``,
+			})
+
+			// A .env missing keys that .env.example declares boots the server into a
+			// cryptic ConfigError; name them here so the fix is obvious.
+			const missingEnv = missingWorktreeEnvKeys()
+			checks.push({
+				ok: missingEnv.length === 0,
+				name: 'env',
+				detail:
+					missingEnv.length === 0
+						? 'has every key from .env.example'
+						: `.env.example declares keys this .env lacks: ${missingEnv.join(', ')} — copy their values in or the server won't boot`,
 			})
 		}
 
