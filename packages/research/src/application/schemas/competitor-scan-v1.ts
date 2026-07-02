@@ -2,31 +2,31 @@ import { Schema } from 'effect'
 
 const Citation = Schema.Struct({
 	source_id: Schema.String,
-	quote: Schema.optional(Schema.String),
-	confidence: Schema.optional(Schema.Number),
+	quote: Schema.optionalKey(Schema.String),
+	confidence: Schema.optionalKey(Schema.Number),
 })
 
 export const CompetitorScanV1Schema = Schema.Struct({
 	competitors: Schema.Array(
 		Schema.Struct({
 			name: Schema.String,
-			website: Schema.optional(Schema.String),
-			description: Schema.optional(Schema.String),
-			strengths: Schema.optional(Schema.Array(Schema.String)),
-			weaknesses: Schema.optional(Schema.Array(Schema.String)),
-			overlap: Schema.optional(Schema.String),
+			website: Schema.optionalKey(Schema.String),
+			description: Schema.optionalKey(Schema.String),
+			strengths: Schema.optionalKey(Schema.Array(Schema.String)),
+			weaknesses: Schema.optionalKey(Schema.Array(Schema.String)),
+			overlap: Schema.optionalKey(Schema.String),
 			citations: Schema.Array(Citation),
 		}),
 	),
-	market_summary: Schema.optional(
+	market_summary: Schema.optionalKey(
 		Schema.Struct({
 			total_competitors_found: Schema.Number,
-			market_maturity: Schema.optional(Schema.String),
-			key_differentiators: Schema.optional(Schema.Array(Schema.String)),
+			market_maturity: Schema.optionalKey(Schema.String),
+			key_differentiators: Schema.optionalKey(Schema.Array(Schema.String)),
 			citations: Schema.Array(Citation),
 		}),
 	),
-	discovered_existing: Schema.optional(
+	discovered_existing: Schema.optionalKey(
 		Schema.Array(
 			Schema.Struct({
 				subject_table: Schema.Literals(['companies', 'contacts']),
@@ -35,23 +35,27 @@ export const CompetitorScanV1Schema = Schema.Struct({
 			}),
 		),
 	),
-	proposed_updates: Schema.optional(
+	proposed_updates: Schema.optionalKey(
 		Schema.Array(
 			Schema.Struct({
 				subject_table: Schema.Literals(['companies', 'contacts']),
 				subject_id: Schema.String,
 				expected_version: Schema.Number,
-				fields: Schema.Unknown,
+				// Open-ended field map; sent as a JSON-encoded string because OpenAI
+				// structured output has no "any shape" type — decodes back to an
+				// object automatically.
+				fields: Schema.UnknownFromJsonString,
 				reason: Schema.String,
 				citations: Schema.Array(Citation),
 			}),
 		),
 	),
-	pending_paid_actions: Schema.optional(
+	pending_paid_actions: Schema.optionalKey(
 		Schema.Array(
 			Schema.Struct({
 				tool: Schema.String,
-				args: Schema.Unknown,
+				// Same open-ended-map rationale as `fields` above.
+				args: Schema.UnknownFromJsonString,
 				estimated_cents: Schema.Number,
 				reason: Schema.String,
 			}),
