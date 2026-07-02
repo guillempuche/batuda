@@ -62,6 +62,78 @@ const bearerChallenge = (
 		},
 	)
 
+// A redeploy starts a fresh process whose in-memory MCP session table is empty,
+// so effect's McpServer no longer knows the session id a connected client keeps
+// sending and raises "Mcp-Session-Id does not exist". It runs tool calls in the
+// background and folds that failure into a normal HTTP 200 body, so the
+// client is never told to re-initialize and replays the dead id forever. The MCP
+// spec's fix is to answer 404 (a compliant client then drops the session and
+// re-`initialize`s), so we detect that failure in McpServer's own reply and swap
+// it for a 404 — keeping McpServer the sole owner of sessions. Matching its
+// message is the only signal it exposes.
+const UNKNOWN_SESSION_DIE_MESSAGE = 'Mcp-Session-Id does not exist'
+
+// Reused across every MCP reply rather than reallocated per request.
+const mcpBodyDecoder = new TextDecoder()
+
+// True when a decoded JSON-RPC reply carries McpServer's unknown-session
+// failure, not a tool result that merely echoed the same phrase. McpServer
+// buries that failure deep in the reply's error cause, shaped like
+// `{ error: { data: [{ _tag: 'Die', defect: { message } }] } }` — so we check
+// exactly that spot. Handles a single reply or a batched array of them.
+const isUnknownSessionErrorBody = (parsed: unknown): boolean => {
+	const replies = Array.isArray(parsed) ? parsed : [parsed]
+	return replies.some(reply => {
+		const failures = (reply as { error?: { data?: unknown } } | null)?.error
+			?.data
+		return (
+			Array.isArray(failures) &&
+			failures.some(failure => {
+				const die = failure as {
+					_tag?: string
+					defect?: { message?: string }
+				} | null
+				return (
+					die?._tag === 'Die' &&
+					die?.defect?.message === UNKNOWN_SESSION_DIE_MESSAGE
+				)
+			})
+		)
+	})
+}
+
+// Turn McpServer's unknown-session failure — which it hides inside a normal 200
+// reply — into the MCP spec's 404 so the client re-initializes. Any other reply
+// passes through untouched. Exported for its unit test.
+export const recoverUnknownSession = (
+	response: HttpServerResponse.HttpServerResponse,
+) => {
+	const body = response.body
+	// The JSON-RPC transport never streams, so the whole reply body is in hand.
+	if (body._tag !== 'Uint8Array') return Effect.succeed(response)
+	const text = mcpBodyDecoder.decode(body.body)
+	// Cheap gate: only the unknown-session reply contains this phrase, so skip
+	// parsing every other MCP reply.
+	if (!text.includes(UNKNOWN_SESSION_DIE_MESSAGE))
+		return Effect.succeed(response)
+	let parsed: unknown
+	try {
+		parsed = JSON.parse(text)
+	} catch {
+		return Effect.succeed(response)
+	}
+	if (!isUnknownSessionErrorBody(parsed)) return Effect.succeed(response)
+	// Mark the request span so Honeycomb can count how often clients replay a
+	// session the process forgot (chiefly right after a redeploy). The generic
+	// completion log still records the app-layer 200; this is the signal that the
+	// reply was swapped to a 404.
+	return Effect.annotateCurrentSpan({ 'mcp.session_recovered': true }).pipe(
+		Effect.andThen(
+			jsonRpcError(404, -32001, 'MCP session expired; reinitialize'),
+		),
+	)
+}
+
 const McpAuthMiddleware = HttpRouter.middleware(
 	Effect.gen(function* () {
 		const { instance } = yield* Auth
@@ -125,6 +197,9 @@ const McpAuthMiddleware = HttpRouter.middleware(
 									isAgent: principal.isAgent,
 								}),
 								enterOrgScope(sql, { org, userId: principal.userId }),
+								// Recover a client whose session id predates the last redeploy:
+								// turn McpServer's hidden failure into a 404 it can act on.
+								Effect.flatMap(recoverUnknownSession),
 							),
 						),
 					)
