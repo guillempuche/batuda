@@ -197,6 +197,7 @@ export class ContactDiscovery extends ServiceMap.Service<ContactDiscovery>()(
 					// Per-call budget, with the captured sql supplied so the layer
 					// requires nothing from the caller's context.
 					const budgetLayer = makeBudgetLayer({
+						organizationId: input.organizationId,
 						userId: input.userId,
 						researchId,
 						policy,

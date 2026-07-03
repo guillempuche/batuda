@@ -9,6 +9,7 @@ import { Budget } from './ports'
 
 interface ChargeWithinCapInput {
 	readonly sql: SqlClient.SqlClient
+	readonly organizationId: string
 	readonly userId: string
 	readonly cents: number
 	readonly researchId: string
@@ -45,25 +46,32 @@ const chargeWithinCap = (input: ChargeWithinCapInput) =>
 			})
 		}
 
-		// Idempotency: UNIQUE on idempotency_key. If this is a retry after
-		// a network timeout, the INSERT is a conflict no-op and the budget
-		// accounting stays correct.
-		yield* sql`
+		// Idempotency: UNIQUE on (organization_id, idempotency_key) — the same
+		// key is safe to reuse across orgs. If this is a retry after a network
+		// timeout, the INSERT is a conflict no-op; the caller uses the
+		// returned row to know whether to count this charge again.
+		const inserted = yield* sql`
 			INSERT INTO research_paid_spend (
-				research_id, user_id, provider, tool, idempotency_key,
+				organization_id, research_id, user_id, provider, tool, idempotency_key,
 				amount_cents, args, auto_approved, at
 			) VALUES (
-				${input.researchId}, ${input.userId}, ${input.provider},
+				${input.organizationId}, ${input.researchId}, ${input.userId}, ${input.provider},
 				${input.tool}, ${input.idempotencyKey},
 				${input.cents}, ${JSON.stringify(input.args)},
 				${input.autoApproved}, now()
-			) ON CONFLICT (idempotency_key) DO NOTHING
+			) ON CONFLICT (organization_id, idempotency_key) DO NOTHING
+			RETURNING id
 		`
-	}).pipe(Effect.orDie)
+
+		return inserted.length > 0
+		// Only unexpected DB failures become defects here — MonthlyCapExceeded
+		// above must stay a typed error so callers can catch and degrade on it.
+	}).pipe(Effect.catchTag('SqlError', Effect.die))
 
 // ── Budget Layer factory ──
 
 export interface BudgetConfig {
+	readonly organizationId: string
 	readonly userId: string
 	readonly researchId: string
 	readonly policy: ResolvedPolicy
@@ -139,8 +147,9 @@ export const makeBudgetLayer = (config: BudgetConfig) =>
 							})
 						}
 
-						yield* chargeWithinCap({
+						const charged = yield* chargeWithinCap({
 							sql,
+							organizationId: config.organizationId,
 							userId: config.userId,
 							cents,
 							researchId: config.researchId,
@@ -155,11 +164,15 @@ export const makeBudgetLayer = (config: BudgetConfig) =>
 							systemCeiling: config.systemCeiling,
 						})
 
-						yield* Ref.update(paidRef, s => ({
-							...s,
-							spent: s.spent + cents,
-							remaining: s.remaining - cents,
-						}))
+						// A retried idempotency key is a DB no-op — skip counting the
+						// same real-world charge against this run's budget twice.
+						if (charged) {
+							yield* Ref.update(paidRef, s => ({
+								...s,
+								spent: s.spent + cents,
+								remaining: s.remaining - cents,
+							}))
+						}
 					}).pipe(
 						Effect.tap(() =>
 							Effect.logDebug('budget.chargePaid').pipe(
