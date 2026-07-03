@@ -513,8 +513,8 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					// phase; on resume we skip already-completed phases.
 					const checkpointPhase = ((run as { phase?: number | null }).phase ??
 						0) as number
-					const cachedResearchText = (run as { research_text?: string | null })
-						.research_text
+					const cachedResearchText = (run as { researchText?: string | null })
+						.researchText
 					const existingFindings = run['findings'] as Record<
 						string,
 						unknown
@@ -554,8 +554,13 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						subjects.length > 0
 							? `\n\nSubject data (frozen snapshot):\n${JSON.stringify(subjects, null, 2)}`
 							: ''
-					const hintsContext = context?.hints
-						? `\n\nHints: language=${context.hints.language ?? 'en'}, recency=${context.hints.recency_days ?? 'any'}, location=${context.hints.location ?? 'any'}`
+					// The stored hints round-trip through the camelCasing row transform,
+					// so read `recencyDays`, not the request's `recency_days`.
+					const hints = context?.hints as
+						| { language?: string; recencyDays?: number; location?: string }
+						| undefined
+					const hintsContext = hints
+						? `\n\nHints: language=${hints.language ?? 'en'}, recency=${hints.recencyDays ?? 'any'}, location=${hints.location ?? 'any'}`
 						: ''
 					const systemPrompt = buildResearchSystemPrompt({
 						schemaName,
