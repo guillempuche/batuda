@@ -180,6 +180,14 @@ Match recent PRs (`gh pr view 67 --json body`, `gh pr view 64 --json body`). Inc
 
 Voice: first-person singular ("I"), never "we". No AI attribution.
 
+### Linking the issue — pick the keyword deliberately
+
+If the PR resolves a tracked issue, end the body with a reference — but the **word matters**, because only `Closes` / `Fixes` / `Resolves` (+ `#N`) auto-close the issue on merge. `Addresses` / `Related to` / a bare `#N` link *without* closing.
+
+Default to **`Closes #N`** — merging the fix into `main` is what resolves the issue; the release is a separate delivery step and the issue can be reopened if prod verification fails. This is the common case; don't overthink it.
+
+Use a non-closing link (`Addresses #N`) **only** when merge genuinely does not resolve the issue and something outside this PR must land first (a coordinated deploy, a follow-up slice, a data migration the reviewer will run). When you choose non-closing, say so in one line and **ask the user** whether they'd rather close on merge — don't silently leave it open. A merged fix that leaves its issue open (with no one told why) reads as unfinished work.
+
 ### The important text — blast radius to surface (architecture-aware)
 
 These are the things a human reviewer of *this* system must act on or verify and **cannot infer from the diff**. Call out every one that the change touches — usually in `## Impact`, or inline where it fits:
