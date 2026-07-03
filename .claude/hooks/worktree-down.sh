@@ -20,6 +20,11 @@ if [ -z "$wt" ] || [ ! -d "$wt" ]; then
 fi
 [ -n "$wt" ] && [ -d "$wt" ] || exit 0
 
+# Stop any dev servers running inside the worktree before its directory is
+# removed, so a server isn't left bound to a deleted path. Same script the CLI
+# teardown uses; self-guarding and always exits 0.
+bash "${CLAUDE_PROJECT_DIR:-.}/scripts/worktree-stop-procs.sh" "$wt" "$$" 2>/dev/null || true
+
 # Mirror the CLI's slug: branch name with a leading `worktree-` dropped,
 # lowercased, non-alphanumerics collapsed to `-`, capped at 24 chars. The
 # database swaps `-` for `_` (Postgres identifiers); the bucket keeps `-`.

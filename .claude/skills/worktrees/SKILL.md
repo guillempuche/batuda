@@ -114,6 +114,11 @@ If the directory was removed manually before `worktree down`, run `pnpm cli work
   `pnpm cli worktree down` **first**, or `pnpm cli worktree prune` later. `prune` only *lists*
   orphans by default (pass `--yes` to drop) and keys ownership off each live worktree's `.env`,
   so it never reaps a live worktree — even one whose branch was switched.
+- **Teardown stops the worktree's dev server too.** `worktree down`/`done` (and the `WorktreeRemove`
+  hook) kill any `pnpm dev` servers running inside the worktree before its data + directory go away,
+  so nothing is left serving a deleted checkout and holding its port. The shared portless proxy is
+  never touched. A server orphaned by a *crashed* session (its `pnpm dev` gone but the port still
+  held) is reaped by `pnpm cli worktree prune --yes`.
 - **Merging a worktree's PR switches its branch.** `gh pr merge --delete-branch` checks `main`
   out into the worktree (the PR branch is gone). `down`/`doctor`/`ls`/`prune` read this worktree's
   identity from its `.env`, not the live branch, so teardown stays correct — but the portless
