@@ -30,19 +30,22 @@ import {
 import { schemaRegistry } from './schemas/index'
 
 // ── Tool parameter schemas ──
+// Optional params accept `null` (via `NullOr`) because a model may send an
+// explicit `null` for a field it isn't using instead of omitting it; the
+// handlers below treat that null as "not provided".
 
 const WebSearchParams = Schema.Struct({
 	query: Schema.String.annotate({
 		description: 'Search query; concise keywords work best',
 	}),
-	limit: Schema.optionalKey(Schema.Number).annotate({
+	limit: Schema.optionalKey(Schema.NullOr(Schema.Number)).annotate({
 		description: 'Max results to return (default 10)',
 	}),
-	recency_days: Schema.optionalKey(Schema.Number).annotate({
+	recency_days: Schema.optionalKey(Schema.NullOr(Schema.Number)).annotate({
 		description:
 			'Restrict to results published within the last N days. Omit for no filter.',
 	}),
-	location: Schema.optionalKey(Schema.String).annotate({
+	location: Schema.optionalKey(Schema.NullOr(Schema.String)).annotate({
 		description: 'Geographic locale hint (e.g. "ES", "es-ES")',
 	}),
 })
@@ -58,7 +61,7 @@ const ExtractStructuredParams = Schema.Struct({
 	schema_name: Schema.String.annotate({
 		description: `Name of a registered schema. One of: ${Object.keys(schemaRegistry).join(', ')}`,
 	}),
-	prompt: Schema.optionalKey(Schema.String).annotate({
+	prompt: Schema.optionalKey(Schema.NullOr(Schema.String)).annotate({
 		description:
 			'Optional extra guidance for the extractor (e.g. "focus on revenue figures").',
 	}),
@@ -68,10 +71,10 @@ const RegistryLookupParams = Schema.Struct({
 	country: Schema.Literals(SUPPORTED_COUNTRIES).annotate({
 		description: 'ISO country code; determines which registry to query',
 	}),
-	query: Schema.optionalKey(Schema.String).annotate({
+	query: Schema.optionalKey(Schema.NullOr(Schema.String)).annotate({
 		description: 'Company name or fuzzy search string',
 	}),
-	tax_id: Schema.optionalKey(Schema.String).annotate({
+	tax_id: Schema.optionalKey(Schema.NullOr(Schema.String)).annotate({
 		description: 'National tax id (e.g. ES CIF/NIF) — more precise than query',
 	}),
 })
@@ -144,12 +147,12 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 				search
 					.search({
 						query: params.query,
-						limit: params.limit,
+						limit: params.limit ?? undefined,
 						recency:
-							params.recency_days !== undefined
+							params.recency_days != null
 								? { days: params.recency_days }
 								: undefined,
-						location: params.location,
+						location: params.location ?? undefined,
 					})
 					.pipe(Effect.catchCause(cause => mapToolError('web_search')(cause))),
 
@@ -170,7 +173,7 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 						url: params.url,
 						schema,
 						schemaName: params.schema_name,
-						prompt: params.prompt,
+						prompt: params.prompt ?? undefined,
 					})
 					.pipe(
 						Effect.catchCause(cause =>
@@ -183,8 +186,8 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 				registry
 					.lookup({
 						country: params.country,
-						query: params.query,
-						taxId: params.tax_id,
+						query: params.query ?? undefined,
+						taxId: params.tax_id ?? undefined,
 					})
 					.pipe(
 						Effect.catchCause(cause => mapToolError('registry_lookup')(cause)),
