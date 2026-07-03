@@ -10,13 +10,14 @@ import {
 	Layer,
 	PartitionedSemaphore,
 	PubSub,
+	Queue,
 	Ref,
+	Schedule,
 	ServiceMap,
 	Stream,
 } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
-import type { ResolvedPolicy } from '../domain/types'
 import { resolvePolicy, type SystemDefaults } from './policy'
 import {
 	AgentLanguageModel,
@@ -263,9 +264,9 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 
 			const ORPHAN_AGE_SECONDS = 900
 
-			// Reclaim runs that cannot progress after a server restart:
-			// 'running' rows whose fiber vanished mid-execution, and 'queued'
-			// rows whose in-memory permit-wait slot vanished.
+			// Fail 'running' rows whose fiber vanished mid-execution after a
+			// server restart. A paid run isn't safe to silently re-run, so it is
+			// not re-dispatched. (Queued rows are re-offered below instead.)
 			const sweepOrphanRuns = (maxAgeSeconds: number) =>
 				Effect.gen(function* () {
 					// COALESCE guards NULL findings: jsonb_set(NULL, …) returns
@@ -283,33 +284,18 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						  AND (idempotency_key IS NULL OR idempotency_key NOT LIKE 'seed:%')
 						RETURNING id
 					`
-					// Queued rows have no started_at — the fiber never reached
-					// the status-to-running flip. Fall back to created_at.
-					const queued = yield* sql<{ id: string }>`
-						UPDATE research_runs
-						SET status = 'failed',
-							findings = jsonb_set(COALESCE(findings, '{}'::jsonb), '{error}', '"server restarted before fiber started"'),
-							completed_at = now(),
-							updated_at = now()
-						WHERE status = 'queued'
-						  AND created_at < now() - interval '1 second' * ${maxAgeSeconds}
-						  AND (idempotency_key IS NULL OR idempotency_key NOT LIKE 'seed:%')
-						RETURNING id
-					`
-					return { running, queued }
+					return { running }
 				}).pipe(sql.withTransaction)
 
 			// ── Startup sweep ──
 			const swept = yield* sweepOrphanRuns(ORPHAN_AGE_SECONDS)
-			if (swept.running.length > 0 || swept.queued.length > 0) {
+			if (swept.running.length > 0) {
 				yield* Effect.logWarning(
-					'research.sweepOrphans: marked orphaned runs as failed',
+					'research.sweepOrphans: failed runs orphaned mid-run',
 				).pipe(
 					Effect.annotateLogs({
 						running_count: swept.running.length,
-						queued_count: swept.queued.length,
 						running_ids: swept.running.map(r => r.id),
-						queued_ids: swept.queued.map(r => r.id),
 					}),
 				)
 			}
@@ -331,6 +317,50 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 			)
 			const fiberSem = yield* PartitionedSemaphore.make<string>({
 				permits: maxConcurrentFibersTotal,
+			})
+
+			// Dispatch channel: create() offers a queued run here; the
+			// layer-scoped consumer (below) drains it and runs each job on the
+			// service's own connection. Unbounded so create() never blocks —
+			// concurrency is bounded by the permit pool above. research_runs is
+			// the durable record and this queue is only an in-process hand-off,
+			// so the reconcile below re-offers any run left queued.
+			const dispatch = yield* Queue.unbounded<{
+				researchId: string
+				userId: string
+			}>()
+
+			// Re-offer every committed queued run to the dispatch queue. create()
+			// also offers on the request path, but it does so while the run's row is
+			// still uncommitted in the request transaction, so the consumer's own
+			// connection may not see it yet. This runs outside any request
+			// transaction, so it picks up every run left queued — a raced offer, a
+			// crash, or another process. The consumer skips runs already in flight,
+			// so re-offers never double-run.
+			const reofferQueued = Effect.gen(function* () {
+				const pending = yield* sql<{ id: string; createdBy: string }>`
+					SELECT id, created_by FROM research_runs
+					WHERE status = 'queued'
+					  AND (idempotency_key IS NULL OR idempotency_key NOT LIKE 'seed:%')
+					-- Oldest first, capped at the concurrency limit so a large backlog
+					-- drains in waves instead of forking every run at once.
+					ORDER BY created_at
+					LIMIT ${maxConcurrentFibersTotal}
+				`
+				yield* Effect.forEach(
+					pending,
+					row =>
+						Queue.offer(dispatch, {
+							researchId: row.id,
+							userId: row.createdBy,
+						}),
+					{ discard: true },
+				)
+				if (pending.length > 0) {
+					yield* Effect.logInfo(
+						'research.dispatch: re-offered queued runs',
+					).pipe(Effect.annotateLogs({ count: pending.length }))
+				}
 			})
 
 			// ── Event sink (observability: webhooks, metrics) ──
@@ -420,29 +450,41 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					`
 				}).pipe(sql.withTransaction)
 
+			// Release a run's in-memory resources on any exit — success, failure, or
+			// an interrupt while it is still waiting for a concurrency slot. Applied
+			// around the whole job below (permit wait included), not inside it, so a
+			// cancel before the run acquires a slot still shuts the channel down and
+			// clears the maps.
+			const cleanupRun = (researchId: string) =>
+				Effect.gen(function* () {
+					// Shut the channel before dropping the map entry so the terminal
+					// signal reaches subscribers; otherwise the subscriber's event
+					// stream stays open until the HTTP socket drops.
+					const pubsubMap = yield* Ref.get(activePubSubs)
+					const maybePubSub = HashMap.get(pubsubMap, researchId)
+					if (maybePubSub._tag === 'Some') {
+						yield* PubSub.shutdown(maybePubSub.value)
+					}
+					yield* Ref.update(activePubSubs, m => HashMap.remove(m, researchId))
+					yield* Ref.update(activeFibers, m => HashMap.remove(m, researchId))
+				})
+
 			// ── Core: run a single research fiber ──
 
-			const runFiber = (
-				researchId: string,
-				userId: string,
-				// Reserved for the full budget/quota wiring (not yet plumbed
-				// into the LLM tool loop — will feed makeBudgetLayer).
-				_policy: ResolvedPolicy,
-				_systemCeiling: number,
-				// Resolved instruction segments + their fingerprint, threaded from
-				// create() so the detached fiber never re-resolves (its RLS GUCs
-				// are unset). Segments shape phase 1; the fingerprint keys the
-				// cache write-back to match the read-check.
-				segments: ReadonlyArray<string>,
-				templateFingerprint: string,
-			) =>
+			const runFiber = (researchId: string, userId: string) =>
 				Effect.gen(function* () {
-					// Update status to running
-					yield* sql`
+					// Claim the run: proceed only if it is still queued. The consumer
+					// forks this after acquiring a concurrency permit, so the flip to
+					// running lands when work actually starts (a run waiting for a
+					// slot stays queued), and a run cancelled or already claimed while
+					// it waited is skipped.
+					const [claimed] = yield* sql<{ id: string }>`
 						UPDATE research_runs
 						SET status = 'running', started_at = now(), updated_at = now()
-						WHERE id = ${researchId}
+						WHERE id = ${researchId} AND status = 'queued'
+						RETURNING id
 					`
+					if (!claimed) return
 
 					yield* publishEvent(researchId, 'run.started', {})
 
@@ -451,6 +493,16 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						SELECT * FROM research_runs WHERE id = ${researchId}
 					`
 					if (!run) return
+
+					// The run's inputs live on the row so the dispatch consumer can
+					// reconstruct it (including after a restart): segments shape the
+					// phase-1 prompt, the fingerprint keys the cache write-back.
+					const segments = ((
+						run as { instructionSegments?: ReadonlyArray<string> }
+					).instructionSegments ?? []) as ReadonlyArray<string>
+					const templateFingerprint =
+						(run as { templateFingerprint?: string | null })
+							.templateFingerprint ?? ''
 
 					const context = run['context'] as CreateResearchInput['context']
 					const schemaName =
@@ -486,7 +538,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							SET status = 'failed',
 								findings = ${JSON.stringify({ error: `Unknown schema: ${schemaName}` })},
 								completed_at = now(), updated_at = now()
-							WHERE id = ${researchId}
+							WHERE id = ${researchId} AND status = 'running'
 						`
 						yield* publishEvent(researchId, 'run.failed', {
 							error: `Unknown schema: ${schemaName}`,
@@ -690,7 +742,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							tool_log = ${JSON.stringify(finalToolLog)},
 							completed_at = now(),
 							updated_at = now()
-						WHERE id = ${researchId}
+						WHERE id = ${researchId} AND status = 'running'
 					`
 
 					// ── Write to research_cache so identical requests can skip the fiber ──
@@ -739,7 +791,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 										findings = ${JSON.stringify({ error: detail })},
 										completed_at = now(),
 										updated_at = now()
-									WHERE id = ${researchId}
+									WHERE id = ${researchId} AND status = 'running'
 								`
 								yield* publishEvent(researchId, 'run.failed', {
 									error: detail,
@@ -750,26 +802,6 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						// path sets the status itself, so don't overwrite it.
 						return Effect.interrupt
 					}),
-					Effect.ensuring(
-						Effect.gen(function* () {
-							// Without this shutdown, Stream.fromPubSub keeps the
-							// subscriber channel open past the terminal event — the
-							// stream only ends when the HTTP socket drops. Shut
-							// down before removing the map entry so the interrupt
-							// signal reaches waiting subscribers.
-							const pubsubMap = yield* Ref.get(activePubSubs)
-							const maybePubSub = HashMap.get(pubsubMap, researchId)
-							if (maybePubSub._tag === 'Some') {
-								yield* PubSub.shutdown(maybePubSub.value)
-							}
-							yield* Ref.update(activePubSubs, m =>
-								HashMap.remove(m, researchId),
-							)
-							yield* Ref.update(activeFibers, m =>
-								HashMap.remove(m, researchId),
-							)
-						}),
-					),
 					Effect.annotateLogs({
 						research_id: researchId,
 						user_id: userId,
@@ -777,8 +809,52 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					}),
 				)
 
+			// ── Dispatch ──
+			// Two layer-scoped daemons: the reconcile re-offers committed queued
+			// runs, and the consumer drains the queue and runs each job on the layer
+			// fiber's clean services — never a request's committed connection. Runs
+			// fork into the layer scope so a shutdown interrupts them; their rows are
+			// reclaimed on the next boot. A failure in either is logged, not fatal.
+			const layerScope = yield* Effect.scope
+			yield* reofferQueued.pipe(
+				Effect.catchCause(cause =>
+					Effect.logError('research.dispatch: reconcile failed').pipe(
+						Effect.annotateLogs({ cause: Cause.pretty(cause) }),
+					),
+				),
+				Effect.repeat(Schedule.spaced('2 seconds')),
+				Effect.forkScoped,
+			)
+			yield* Queue.take(dispatch).pipe(
+				Effect.flatMap(({ researchId, userId }) =>
+					Effect.gen(function* () {
+						// Skip a run already in flight: the reconcile re-offers queued
+						// rows, so the same run can arrive twice. (The guarded claim is
+						// the final backstop; this just avoids a redundant fiber.)
+						const inFlight = yield* Ref.get(activeFibers)
+						if (HashMap.has(inFlight, researchId)) return
+						const fiber = yield* fiberSem
+							.withPermit(userId)(runFiber(researchId, userId))
+							.pipe(
+								Effect.ensuring(cleanupRun(researchId)),
+								Effect.forkIn(layerScope),
+							)
+						yield* Ref.update(activeFibers, m =>
+							HashMap.set(m, researchId, fiber),
+						)
+					}),
+				),
+				Effect.catchCause(cause =>
+					Effect.logError('research.dispatch: failed to start run').pipe(
+						Effect.annotateLogs({ cause: Cause.pretty(cause) }),
+					),
+				),
+				Effect.forever,
+				Effect.forkScoped,
+			)
+
 			return {
-				/** Create a research run, fork the fiber, return the run id. */
+				/** Create a research run, enqueue it, and return the run id. */
 				create: (
 					userId: string,
 					organizationId: string,
@@ -929,7 +1005,8 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 								query, mode, schema_name, status, context,
 								budget_cents, paid_budget_cents,
 								paid_policy, idempotency_key, created_by,
-								template_ids, template_names, template_fingerprint
+								template_ids, template_names, template_fingerprint,
+								instruction_segments
 							) VALUES (
 								${organizationId},
 								${input.query},
@@ -944,7 +1021,8 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 								${userId},
 								${JSON.stringify(templateIds)},
 								${JSON.stringify(templateNames)},
-								${templateFingerprint}
+								${templateFingerprint},
+								${JSON.stringify(segments)}
 							) RETURNING id
 						`
 						const researchId = (row as { id: string }).id
@@ -967,26 +1045,12 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							HashMap.set(m, researchId, pubsub),
 						)
 
-						// withPermit is wrapped inside the fork, not around it, so
-						// create() returns immediately and the permit wait plus its
-						// interrupt handler live on the forked fiber. Cancellation
-						// while queued then releases the slot cleanly without
-						// touching the caller's flow.
-						const fiber = yield* Effect.forkDetach(
-							fiberSem.withPermit(userId)(
-								runFiber(
-									researchId,
-									userId,
-									policy,
-									systemDefaults.hardCeiling,
-									segments,
-									templateFingerprint,
-								),
-							),
-						)
-						yield* Ref.update(activeFibers, m =>
-							HashMap.set(m, researchId, fiber),
-						)
+						// The row is queued; the dispatch consumer runs it on the
+						// service's own connection once a concurrency slot frees.
+						// Running it on this request's fiber would reuse the request
+						// transaction's connection — already committed by the time
+						// the job writes its first cache row.
+						yield* Queue.offer(dispatch, { researchId, userId })
 
 						return { id: researchId, status: 'queued' as const }
 					}),
