@@ -461,6 +461,17 @@ export const worktreeUp = Effect.gen(function* () {
 	)
 })
 
+// Stop any dev servers running inside this worktree before its data and
+// directory go away — otherwise a server keeps running against a deleted
+// checkout and holds its port. Delegates to the shared script (also called by
+// the WorktreeRemove hook); the script is self-guarding and always exits 0, so
+// this can never block teardown. `process.pid` is passed so the script won't
+// signal the CLI running the teardown, whose own cwd is inside the worktree.
+const stopWorktreeDevServers = (worktreePath: string) =>
+	exec(
+		`bash "${resolve(ROOT, 'scripts/worktree-stop-procs.sh')}" "${worktreePath}" ${process.pid}`,
+	).pipe(Effect.catch(() => Effect.void))
+
 export const worktreeDown = Effect.gen(function* () {
 	if (!(yield* isLinkedWorktree)) {
 		return yield* Effect.fail(
@@ -486,6 +497,9 @@ export const worktreeDown = Effect.gen(function* () {
 			),
 		)
 	}
+	// Only now that teardown is actually going ahead — stop the worktree's dev
+	// servers before its data + directory go away, not on a path that refuses.
+	yield* stopWorktreeDevServers(ROOT)
 	yield* Effect.logInfo(`Dropping database ${db} + bucket ${bucket}…`)
 	yield* dropDatabase(db)
 	// The bucket may already be gone (or never created) — don't fail teardown on it.
@@ -578,10 +592,19 @@ export const worktreeDone = (options: { force: boolean; stash: boolean }) =>
 		}
 	})
 
+// Reap dev servers left behind by crashed sessions — those whose owning CLI is
+// gone but whose port is still held. portless finds them from its own route
+// registry, so the shared proxy (which is not a route) is never touched. Runs
+// only on `--yes`; portless has no dry-run, and best-effort so it can't fail the
+// prune.
+const pruneOrphanDevServers = exec('pnpm exec portless prune').pipe(
+	Effect.catch(() => Effect.void),
+)
+
 // Dry-run by default: list the orphans and stop. `--yes` is required to drop,
 // so prune can never silently delete data — and because ownership is read from
 // each live worktree's `.env`, a worktree whose branch was swapped is never
-// mistaken for an orphan.
+// mistaken for an orphan. Orphaned dev servers are reaped on `--yes` too.
 export const worktreePrune = (apply: boolean) =>
 	Effect.gen(function* () {
 		const owned = yield* liveOwnedResources
@@ -591,22 +614,24 @@ export const worktreePrune = (apply: boolean) =>
 			owned.buckets,
 			'batuda-assets-',
 		)
+		const hasData = orphanDbs.length > 0 || orphanBuckets.length > 0
 
-		if (orphanDbs.length === 0 && orphanBuckets.length === 0) {
-			yield* Console.log('No orphaned worktree data — nothing to prune.')
-			return
+		if (hasData) {
+			yield* Console.log('')
+			yield* Console.log('Orphaned worktree data (no live worktree owns it):')
+			for (const db of orphanDbs) yield* Console.log(`  database  ${db}`)
+			for (const bucket of orphanBuckets)
+				yield* Console.log(`  bucket    ${bucket}`)
+			yield* Console.log('')
+		} else {
+			yield* Console.log('No orphaned worktree data.')
 		}
 
-		yield* Console.log('')
-		yield* Console.log('Orphaned worktree data (no live worktree owns it):')
-		for (const db of orphanDbs) yield* Console.log(`  database  ${db}`)
-		for (const bucket of orphanBuckets)
-			yield* Console.log(`  bucket    ${bucket}`)
-		yield* Console.log('')
-
 		if (!apply) {
+			// Orphaned dev servers can't be listed without stopping them (portless
+			// has no dry-run), so name the action rather than the count.
 			yield* Console.log(
-				'Dry run — re-run with `--yes` to drop the above. (The main `batuda` / `batuda-assets` are never listed.)',
+				'Re-run with `--yes` to drop any listed data and stop dev servers orphaned by crashed sessions. (The main `batuda` / `batuda-assets` are never listed.)',
 			)
 			return
 		}
@@ -617,6 +642,8 @@ export const worktreePrune = (apply: boolean) =>
 				Effect.catch(() => Effect.void),
 			)
 		}
+		// Reports its own result line for the dev-server side.
+		yield* pruneOrphanDevServers
 		yield* Console.log(
 			`✓ Pruned ${orphanDbs.length} database(s) + ${orphanBuckets.length} bucket(s).`,
 		)

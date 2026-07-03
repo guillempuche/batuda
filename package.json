@@ -54,7 +54,7 @@
 		"@secretlint/secretlint-rule-preset-recommend": "^13.0.2",
 		"dprint": "^0.53.1",
 		"lefthook": "^2.1.4",
-		"portless": "^0.10.2",
+		"portless": "^0.15.1",
 		"release-it": "^19.0.0",
 		"secretlint": "^13.0.2",
 		"syncpack": "^14.3.0",
