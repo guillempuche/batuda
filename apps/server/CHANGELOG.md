@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-03 (server-v2026.7.3)
+
+### Bug Fixes
+
+* **research:** tolerate null service_tier in LLM provider responses ([248aa3c](https://github.com/guillempuche/batuda/commit/248aa3cc18ff674342214a616ccac9af11360973))
+
 ## 2026-07-02 (server-v2026.7.2)
 
 ### Bug Fixes
