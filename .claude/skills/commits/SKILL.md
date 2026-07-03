@@ -135,8 +135,9 @@ If ALL changed files match `ai` patterns → use `ai` type. If mixed with non-AI
 3. **No attribution**: Never include "Co-Authored-By", "Generated with", or any AI/author attribution
 4. **AI-only changes**: When changes are exclusively AI-related (see AI Scope), always use `ai` type
 5. **No mechanical cleanup or implementation narration**: Don't mention consequences obvious from the primary change (removed unused imports, unwrapped single-child fragments, updated indentation), and don't describe how the diff achieves the change ("added a helper that maps X to Y" when the diff is the helper). Focus on intent / why, not mechanism
-6. **No tautology**: The subject must not repeat the type as a verb. The type already conveys the action — e.g., `fix: fix the login` → `fix: resolve login failure`, `refactor: refactor auth` → `refactor: simplify auth flow`
-7. **No bare `#` tokens in the body**: The changelog generator reads `#<token>` as a GitHub issue reference and renders it as a "closes" link, so a hex color or fragment becomes a broken issue link in the release notes — write `b05220 → 95400f`, not `#b05220 → #95400f`
+6. **Plain language for everyone**: Write the subject and body so a non-technical reader and a brand-new contributor can follow the change without prior context. Lead with the everyday-terms "what changed and why it matters," spell out an acronym or internal name (a table, a service, a flag) the first time it appears, and don't lean on unstated background. Keep the precise technical terms — add the plain-language point on top, don't drop it. (Commit messages outlive their context: they're read in `git blame`, changelogs, and release notes long after the surrounding work is forgotten.)
+7. **No tautology**: The subject must not repeat the type as a verb. The type already conveys the action — e.g., `fix: fix the login` → `fix: resolve login failure`, `refactor: refactor auth` → `refactor: simplify auth flow`
+8. **No bare `#` tokens in the body**: The changelog generator reads `#<token>` as a GitHub issue reference and renders it as a "closes" link, so a hex color or fragment becomes a broken issue link in the release notes — write `b05220 → 95400f`, not `#b05220 → #95400f`
 
 ## Body sizing
 

@@ -167,9 +167,11 @@ gh pr view --json number,state,isDraft 2>/dev/null \
 
 The reviewer is one person (the solo founder), reading on a phone between other work. The diff already shows *what code changed* — the PR text exists to carry **what the diff can't show**: the intent, and the blast radius across this architecture (`docs/architecture.md`). Every line should answer "what does the reviewer need to know that reading the diff wouldn't tell them?" Cut anything that just narrates the diff.
 
+Write it so it also lands for a reader who isn't that reviewer and doesn't hold today's context — a non-technical stakeholder, or a new contributor opening this PR a year from now. Open with the plain-language point (what changes for the product or the person using it, and why it matters), spell out acronyms and internal names — a table, a service, a bounded context — the first time they appear, and don't assume the surrounding context is already in the reader's head. This is *added on top of* the technical precision, not traded for it: keep the exact terms, just don't lead with them.
+
 Match recent PRs (`gh pr view 67 --json body`, `gh pr view 64 --json body`). Include only the sections that apply, in this order:
 
-- `## What` — one paragraph: what the change does and **why**. Name the bounded context / surface it lives in (CRM / Auth / Research; `server` / `internal` / `cli` / `mail-worker` / `ui`) so the reviewer knows where to stand.
+- `## What` — one paragraph, opening in plain language a non-technical reader could follow: what the change does and **why it matters**, before any jargon. Name the bounded context / surface it lives in (CRM / Auth / Research; `server` / `internal` / `cli` / `mail-worker` / `ui`) so the reviewer knows where to stand.
 - `## Changes` (or `## The fix` for a bug) — the substantive changes as bullets describing **intent**, not file lists. The diff already shows the files.
 - `## Impact` — the blast radius (see checklist below). The single most valuable section for this codebase, because the surfaces are decoupled and the diff doesn't reveal the ripple. Omit only if genuinely none apply.
 - `## Review guide` — how to review this fast: where to look first, the riskiest part and why, any decision I made that you might overrule, and anything I couldn't fully verify (e.g. Snyk unavailable). Mark generated or mechanical parts as skip-able. This is where the self-review (Step 3) surfaces what it couldn't resolve.
@@ -178,7 +180,7 @@ Match recent PRs (`gh pr view 67 --json body`, `gh pr view 64 --json body`). Inc
 - `## Verification` — only what you **actually ran** (verify-before-assert): the gates you executed (`check-types` / `test` / `build`) and the live-stack or UI check you actually performed. Never write "all tests pass" you didn't run — an unverified claim here is worse than saying nothing.
 - `## Deferred` — follow-ups intentionally not in this PR.
 
-Voice: first-person singular ("I"), never "we". No AI attribution.
+Voice: first-person singular ("I"), never "we". Understandable by a non-technical reader and a new contributor without prior context. No AI attribution.
 
 ### Linking the issue — pick the keyword deliberately
 
@@ -279,6 +281,6 @@ If rebase hits conflicts: pause and surface to the user — rebase the branch lo
 - Readability pass, then commit via `/commits` with an explain-and-wait gate per commit.
 - Tests ride with their logic in one commit.
 - Verification gates: `install` → `check-types` + `test` → `build`.
-- PR body in the house style with a Review guide; `## Verification` claims only what was actually run; first-person singular; no AI attribution.
+- PR body in the house style with a Review guide; `## Verification` claims only what was actually run; first-person singular; understandable by a non-technical reader and a new contributor without prior context; no AI attribution.
 - Open ready by default (draft only for nameable WIP); watch CI to green; address review through the same gates; keep the PR body in sync.
 - Merge by rebase or squash (consult first), never a merge-commit.
