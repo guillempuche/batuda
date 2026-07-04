@@ -59,6 +59,7 @@ import { SessionMiddlewareLive } from './middleware/session'
 import { ApiKeyService } from './services/api-keys'
 import { CalendarService } from './services/calendar'
 import { CompanyService } from './services/companies'
+import { geocodeCompany } from './services/company-geocoding'
 import { CredentialCrypto } from './services/credential-crypto'
 import { EmailService } from './services/email'
 import { EmailAttachmentStaging } from './services/email-attachment-staging'
@@ -132,6 +133,8 @@ const ResearchEventSinkLive = Layer.effect(
 		const webhooks = yield* WebhookService
 		const timeline = yield* TimelineActivityService
 		const sql = yield* SqlClient.SqlClient
+		const companyService = yield* CompanyService
+		const geocoder = yield* Geocoder
 		return ResearchEventSink.of({
 			fire: (event, payload) =>
 				Effect.gen(function* () {
@@ -147,8 +150,9 @@ const ResearchEventSinkLive = Layer.effect(
 						createdBy: string | null
 						query: string
 						briefMd: string | null
+						schemaName: string | null
 					}>`
-						SELECT organization_id, created_by, query, brief_md
+						SELECT organization_id, created_by, query, brief_md, schema_name
 						FROM research_runs
 						WHERE id = ${researchId} LIMIT 1
 					`
@@ -167,22 +171,58 @@ const ResearchEventSinkLive = Layer.effect(
 						Effect.gen(function* () {
 							yield* webhooks.fire(event, payload)
 							if (!status) return
-							const linkRows = yield* sql<{ subjectId: string }>`
-								SELECT subject_id FROM research_links
-								WHERE research_id = ${researchId}
-								  AND subject_table = 'companies'
-								  AND link_kind = 'input'
+							const linkRows = yield* sql<{
+								subjectId: string
+								location: string | null
+								needsCoords: boolean | null
+							}>`
+								SELECT rl.subject_id, c.location, (c.latitude IS NULL) AS needs_coords
+								FROM research_links rl
+								LEFT JOIN companies c
+									ON c.id = rl.subject_id
+									AND c.organization_id = ${run.organizationId}
+								WHERE rl.research_id = ${researchId}
+								  AND rl.subject_table = 'companies'
+								  AND rl.link_kind = 'input'
 								LIMIT 1
 							`
+							const linked = linkRows[0]
 							yield* timeline.record(
 								new ResearchRunCompleted({
 									researchRunId: researchId,
-									companyId: linkRows[0]?.subjectId ?? null,
+									companyId: linked?.subjectId ?? null,
 									summary: run.briefMd ?? run.query,
 									status,
 									occurredAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 								}),
 							)
+
+							// An enrichment run no longer asks the model for coordinates,
+							// so resolve them the deterministic way here: when the run
+							// succeeded for a linked company that has a written location
+							// but no coordinates yet, look the location up in the geocoder
+							// and store lat/long. Best-effort — a miss or failure must
+							// never disturb the timeline and webhook fan-out above.
+							if (
+								status === 'succeeded' &&
+								run.schemaName === 'company_enrichment_v1' &&
+								linked?.location &&
+								linked.needsCoords
+							) {
+								yield* geocodeCompany(linked.subjectId).pipe(
+									Effect.provideService(CompanyService, companyService),
+									Effect.provideService(Geocoder, geocoder),
+									Effect.catchCause(cause =>
+										Effect.logWarning('post-enrichment geocode failed').pipe(
+											Effect.annotateLogs({
+												event: 'research.geocode.failed',
+												companyId: linked.subjectId,
+												cause: Cause.pretty(cause),
+											}),
+										),
+									),
+								)
+							}
 						}),
 					).pipe(
 						// Org deleted between run completion and fan-out: skip
@@ -243,7 +283,15 @@ const ServicesLive = Layer.mergeAll(
 	Layer.provideMerge(CalendarService.layer),
 	Layer.provideMerge(EmailAttachmentStaging.layer),
 	Layer.provideMerge(DraftStore.layer),
-	Layer.provideMerge(ResearchEventSinkLive),
+	// The sink resolves the enriched company and geocodes it, so it needs
+	// CompanyService + Geocoder at build time. They live in the merged base
+	// below, which feeds consumers but not this provider — supply them here.
+	Layer.provideMerge(
+		ResearchEventSinkLive.pipe(
+			Layer.provide(CompanyService.layer),
+			Layer.provide(Geocoder.layer),
+		),
+	),
 	Layer.provideMerge(ParticipantMatcher.layer),
 	Layer.provideMerge(TimelineActivityService.layer),
 	Layer.provideMerge(WebhookService.layer),

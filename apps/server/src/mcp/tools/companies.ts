@@ -1,9 +1,10 @@
-import { DateTime, Effect, Schema } from 'effect'
+import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 
 import { CurrentOrg } from '@batuda/controllers'
 
 import { CompanyService } from '../../services/companies'
+import { geocodeCompany } from '../../services/company-geocoding'
 import { Geocoder } from '../../services/geocoder'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg]
@@ -174,22 +175,11 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 					return rows[0]
 				}).pipe(Effect.orDie),
 			geocode_company: ({ id }) =>
-				Effect.gen(function* () {
-					const company = yield* service.findById(id)
-					const name = company['name'] as string | null
-					const location = company['location'] as string | null
-					const query = [name, location].filter(Boolean).join(', ')
-					if (!query) return null
-					const hit = yield* geocoder.lookup(query)
-					if (!hit) return null
-					const rows = yield* service.update(id, {
-						latitude: hit.latitude,
-						longitude: hit.longitude,
-						geocodedAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
-						geocodeSource: hit.source,
-					})
-					return rows[0]
-				}).pipe(Effect.orDie),
+				geocodeCompany(id).pipe(
+					Effect.provideService(CompanyService, service),
+					Effect.provideService(Geocoder, geocoder),
+					Effect.orDie,
+				),
 		}
 	}),
 )
