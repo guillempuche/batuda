@@ -1,5 +1,7 @@
 import { Schema } from 'effect'
 
+import { TolerantJsonString } from './_shared'
+
 /** Freeform research — no structured output, markdown brief only. */
 export const FreeformSchema = Schema.Struct({
 	proposed_updates: Schema.optionalKey(
@@ -8,10 +10,7 @@ export const FreeformSchema = Schema.Struct({
 				subject_table: Schema.Literals(['companies', 'contacts']),
 				subject_id: Schema.String,
 				expected_version: Schema.Number,
-				// Open-ended field map; sent as a JSON-encoded string because OpenAI
-				// structured output has no "any shape" type — decodes back to an
-				// object automatically.
-				fields: Schema.UnknownFromJsonString,
+				fields: TolerantJsonString,
 				reason: Schema.String,
 				citations: Schema.Array(
 					Schema.Struct({
@@ -26,8 +25,7 @@ export const FreeformSchema = Schema.Struct({
 		Schema.Array(
 			Schema.Struct({
 				tool: Schema.String,
-				// Same open-ended-map rationale as `fields` above.
-				args: Schema.UnknownFromJsonString,
+				args: TolerantJsonString,
 				estimated_cents: Schema.Number,
 				reason: Schema.String,
 			}),
