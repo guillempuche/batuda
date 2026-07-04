@@ -1,14 +1,15 @@
 /**
  * Shared helpers for research provider infrastructure.
  *
- * Two factory patterns for non-functional providers:
+ * Factory helpers for non-functional providers:
  * - `disabledError` — capability intentionally turned off (provider=none)
  * - `notYetImplementedError` — provider value recognised but code not written yet
+ * - `noRegistryError` — country has no national registry (a routing outcome)
  */
 
 import { Effect } from 'effect'
 
-import { ProviderError } from '../domain/errors'
+import { NoRegistry, ProviderError } from '../domain/errors'
 
 /** Error for a capability that is intentionally disabled (provider=none). */
 export const disabledError = (capability: string) =>
@@ -29,3 +30,11 @@ export const notYetImplementedError = (capability: string, provider: string) =>
 			recoverable: false,
 		}),
 	)
+
+/**
+ * Outcome for a country with no national business registry. Distinct from
+ * `disabledError`: no configuration can add a registry that doesn't exist, so
+ * the tools surface this as an explicit no_registry result, not a failure.
+ */
+export const noRegistryError = (country: string) =>
+	Effect.fail(new NoRegistry({ country }))

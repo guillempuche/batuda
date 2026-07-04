@@ -1,20 +1,28 @@
 import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 
-import { RegistryRouter } from '@batuda/research'
+import {
+	AcceptedCountry,
+	noRegistryResult,
+	RegistryRouter,
+} from '@batuda/research'
 
 // ── lookup_registry ──
-// Standalone, on-demand Spanish mercantile-registry (BORME) lookup via
-// libreBORME — for a quick identity check outside a research run (the agent's
-// in-run registry_lookup tool covers the same data during a run). Each lookup
-// spends one libreBORME credit (~€0.29); not enforced against a budget here
+// Standalone, on-demand national-registry lookup — for a quick identity check
+// outside a research run (the agent's in-run registry_lookup tool covers the
+// same data during a run). Routes by country: ES → libreBORME, GB → Companies
+// House; a country with no national registry comes back as {status:"no_registry"}.
+// A paid lookup (e.g. libreBORME ~€0.29) isn't enforced against a budget here
 // because the in-run tool loop doesn't meter paid providers either.
 
 const LookupRegistry = Tool.make('lookup_registry', {
 	description:
-		'Look up a Spanish company in the mercantile registry (libreBORME) by NIF or name. Returns legal name, NIF, status, capital, and directors. Metered: ~€0.29 per lookup.',
+		'Look up a company in its national business registry by tax id or name. Returns legal name, tax id, status, and (when available) directors. A country without a national registry returns {status:"no_registry"} — use discover_contacts there. Some registries are metered (e.g. ES libreBORME ~€0.29/lookup).',
 	parameters: Schema.Struct({
-		country: Schema.Literal('ES'),
+		country: AcceptedCountry.annotate({
+			description:
+				'ISO 3166-1 alpha-2 country code (any case). Determines which national registry to query.',
+		}),
 		query: Schema.optional(Schema.String),
 		tax_id: Schema.optional(Schema.String),
 	}),
@@ -37,13 +45,18 @@ export const ResearchRegistryHandlersLive = ResearchRegistryTools.toLayer(
 			lookup_registry: params =>
 				registry
 					.lookup({
-						country: params.country,
+						country: params.country.toUpperCase(),
 						query: params.query,
 						taxId: params.tax_id,
 					})
-					// Surface a provider failure (bad credential, not found, no credit)
-					// as a readable result the caller can act on, not an opaque defect.
 					.pipe(
+						// A registry-less country is a routing answer, not a failure —
+						// hand it back as data pointing at the universal contact path.
+						Effect.catchTag('NoRegistry', e =>
+							Effect.succeed(noRegistryResult(e.country)),
+						),
+						// Surface a provider failure (bad credential, not found, no credit)
+						// as a readable result the caller can act on, not an opaque defect.
 						Effect.catchTag('ProviderError', e =>
 							Effect.succeed({ error: e.message }),
 						),

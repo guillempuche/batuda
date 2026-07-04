@@ -20,7 +20,8 @@
 import { Effect, Schema } from 'effect'
 import { AiError, Tool, Toolkit } from 'effect/unstable/ai'
 
-import { SUPPORTED_COUNTRIES } from '../domain/country'
+import { AcceptedCountry } from '../domain/country'
+import { noRegistryResult } from '../domain/errors'
 import {
 	ExtractProvider,
 	RegistryRouter,
@@ -68,8 +69,9 @@ const ExtractStructuredParams = Schema.Struct({
 })
 
 const RegistryLookupParams = Schema.Struct({
-	country: Schema.Literals(SUPPORTED_COUNTRIES).annotate({
-		description: 'ISO country code; determines which registry to query',
+	country: AcceptedCountry.annotate({
+		description:
+			'ISO 3166-1 alpha-2 country code (any case). A country without a national registry returns {status:"no_registry"} — use discover_contacts there instead.',
 	}),
 	query: Schema.optionalKey(Schema.NullOr(Schema.String)).annotate({
 		description: 'Company name or fuzzy search string',
@@ -108,7 +110,7 @@ export const ExtractStructuredTool = Tool.make('extract_structured', {
 
 export const RegistryLookupTool = Tool.make('registry_lookup', {
 	description:
-		'Look up a company in its national business registry. Metered (~€0.29/lookup), so use it to confirm a specific company rather than browsing. Returns legal name, tax id, status, and (when available) directors.',
+		'Look up a company in its national business registry. Accepts any ISO country; one without a national registry returns {status:"no_registry"} — use discover_contacts for contact enrichment there. Metered (~€0.29/lookup), so use it to confirm a specific company rather than browsing. Returns legal name, tax id, status, and (when available) directors.',
 	parameters: RegistryLookupParams,
 	success: ToolResultSchema,
 })
@@ -185,11 +187,16 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 			registry_lookup: params =>
 				registry
 					.lookup({
-						country: params.country,
+						country: params.country.toUpperCase(),
 						query: params.query ?? undefined,
 						taxId: params.tax_id ?? undefined,
 					})
 					.pipe(
+						// A registry-less country is a routing answer, not a failure:
+						// hand it back as data so the model can switch to discover_contacts.
+						Effect.catchTag('NoRegistry', e =>
+							Effect.succeed(noRegistryResult(e.country)),
+						),
 						Effect.catchCause(cause => mapToolError('registry_lookup')(cause)),
 					),
 		})
