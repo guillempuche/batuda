@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { CurrentOrg } from '@batuda/controllers'
 
 import { CompanyService } from './companies'
-import { geocodeCompany } from './company-geocoding'
+import { geocodeCompany, locationWasReplaced } from './company-geocoding'
 import { Geocoder } from './geocoder'
 
 const unused = new Error('method not used in this test')
@@ -108,6 +108,69 @@ describe('geocodeCompany', () => {
 			// THEN the lookup is skipped entirely — no write, nothing stored
 			expect(updates).toHaveLength(0)
 			expect(result).toBeNull()
+		})
+	})
+})
+
+// The decision to re-geocode (a pure predicate) is unit-tested here; the actual
+// detached, org-scoped write on a fresh connection is exercised end-to-end
+// against a running server, since a stub can't model the transaction/RLS scope
+// that made the naive fork wrong.
+describe('locationWasReplaced', () => {
+	describe('when the update sets a new, non-empty location', () => {
+		it('should report the coordinates as stale', () => {
+			// GIVEN a company whose location changes to a different place
+			// THEN a re-geocode is warranted
+			expect(
+				locationWasReplaced(
+					{ location: 'St. Louis, MO' },
+					{ location: 'Kansas City, MO' },
+				),
+			).toBe(true)
+		})
+	})
+
+	describe('when the company had no location before', () => {
+		it('should report a new location as replacing the (absent) old one', () => {
+			// GIVEN a company that gains a location for the first time
+			expect(
+				locationWasReplaced({ location: null }, { location: 'Sitges' }),
+			).toBe(true)
+			// GIVEN there was no prior row at all
+			expect(locationWasReplaced(null, { location: 'Sitges' })).toBe(true)
+		})
+	})
+
+	describe('when the update keeps the same location', () => {
+		it('should not warrant a re-geocode', () => {
+			// GIVEN the location value is written back unchanged
+			expect(
+				locationWasReplaced({ location: 'Sitges' }, { location: 'Sitges' }),
+			).toBe(false)
+		})
+	})
+
+	describe('when the update clears the location', () => {
+		it('should not re-geocode, since a name-only lookup could plant a wrong pin', () => {
+			// GIVEN the location is emptied or nulled
+			expect(
+				locationWasReplaced({ location: 'Sitges' }, { location: '' }),
+			).toBe(false)
+			expect(
+				locationWasReplaced({ location: 'Sitges' }, { location: '   ' }),
+			).toBe(false)
+			expect(
+				locationWasReplaced({ location: 'Sitges' }, { location: null }),
+			).toBe(false)
+		})
+	})
+
+	describe('when the update does not touch the location at all', () => {
+		it('should not re-geocode', () => {
+			// GIVEN a payload that changes a different field
+			expect(
+				locationWasReplaced({ location: 'Sitges' }, { status: 'client' }),
+			).toBe(false)
 		})
 	})
 })

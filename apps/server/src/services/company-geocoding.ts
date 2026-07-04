@@ -1,7 +1,29 @@
-import { DateTime, Effect } from 'effect'
+import { Cause, DateTime, Effect, ServiceMap } from 'effect'
+import { SqlClient } from 'effect/unstable/sql'
 
+import { CurrentOrg } from '@batuda/controllers'
+
+import { enterOrgScope } from '../middleware/org'
 import { CompanyService } from './companies'
 import { Geocoder } from './geocoder'
+
+/**
+ * Drop the ambient transaction connection so a following `withTransaction`
+ * opens a fresh top-level transaction instead of a savepoint on the caller's
+ * (about-to-commit) connection. `TransactionConnection` is read via
+ * `serviceOption` and is never part of `R`, so removing it leaves the
+ * requirements unchanged — the assertion only tells the compiler that.
+ */
+const detachFromTransaction = <A, E, R>(
+	self: Effect.Effect<A, E, R>,
+): Effect.Effect<A, E, R> =>
+	Effect.updateServices(
+		self,
+		(services: ServiceMap.ServiceMap<R>) =>
+			ServiceMap.omit(SqlClient.TransactionConnection)(
+				services,
+			) as ServiceMap.ServiceMap<R>,
+	)
 
 /**
  * Resolve a company's coordinates from the deterministic geocoder and store
@@ -36,4 +58,89 @@ export const geocodeCompany = (id: string) =>
 			geocodeSource: hit.source,
 		})
 		return rows[0] ?? null
+	})
+
+/**
+ * Whether an update replaced a company's location with a new, non-empty place —
+ * the only case that makes the stored coordinates stale. Clearing the location
+ * (empty string or null) does not qualify: geocoding by the company name alone
+ * could plant a wrong pin, so the old coordinates are left in place instead.
+ */
+export const locationWasReplaced = (
+	before: Record<string, unknown> | null,
+	fields: Record<string, unknown>,
+): boolean => {
+	if (!Object.hasOwn(fields, 'location')) return false
+	const next = fields['location']
+	if (typeof next !== 'string' || next.trim() === '') return false
+	return before?.['location'] !== next
+}
+
+/**
+ * Re-geocode a company off the update path, on its own connection.
+ *
+ * The geocoder call runs ~1.5s (Nominatim's rate limit) and must not block the
+ * update response, so it forks. But it must NOT reuse the request's transaction:
+ * that connection commits and returns to the pool the moment the response is
+ * sent. Dropping the inherited `TransactionConnection` makes `enterOrgScope`
+ * open its own top-level transaction on a fresh pooled connection and re-apply
+ * the app_user role + org GUC, so the coordinate write passes RLS. Best-effort:
+ * a miss or failure just leaves the previous coordinates in place. Mirrors the
+ * research event sink's out-of-band, org-scoped write.
+ */
+const regeocodeOutOfBand = (id: string) =>
+	Effect.gen(function* () {
+		const sql = yield* SqlClient.SqlClient
+		const org = yield* CurrentOrg
+		yield* enterOrgScope(sql, { org })(geocodeCompany(id)).pipe(
+			// Strip the request's transaction connection so this fork's
+			// `enterOrgScope` opens its own top-level transaction on a fresh pooled
+			// connection, instead of a savepoint on the request's committed one.
+			detachFromTransaction,
+			Effect.catchCause(cause =>
+				Cause.hasInterruptsOnly(cause)
+					? Effect.interrupt
+					: Effect.logWarning('post-update geocode failed').pipe(
+							Effect.annotateLogs({
+								event: 'company.geocode.failed',
+								companyId: id,
+								cause: Cause.pretty(cause),
+							}),
+						),
+			),
+			Effect.forkDetach,
+		)
+	})
+
+/**
+ * Update a company, then keep its coordinates in step with a changed location.
+ *
+ * Runs the normal update inside the request's transaction, and when the write
+ * actually replaces `location` with a new place, kicks off a detached
+ * re-geocode (see `regeocodeOutOfBand`) so the fresh location gets fresh
+ * coordinates without the slow geocoder call blocking the response. The current
+ * row is read only when the payload carries `location`, so an update that cannot
+ * move the pin pays no extra query.
+ */
+export const updateCompanyRegeocoding = (
+	id: string,
+	fields: Record<string, unknown>,
+) =>
+	Effect.gen(function* () {
+		const service = yield* CompanyService
+
+		const before = Object.hasOwn(fields, 'location')
+			? yield* service
+					.findById(id)
+					.pipe(Effect.catchTag('NotFound', () => Effect.succeed(null)))
+			: null
+
+		const rows = yield* service.update(id, fields)
+		const updated = rows[0] ?? null
+
+		if (updated && locationWasReplaced(before, fields)) {
+			yield* regeocodeOutOfBand(id)
+		}
+
+		return updated
 	})

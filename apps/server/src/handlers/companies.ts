@@ -5,7 +5,10 @@ import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import { BatudaApi, NotFound } from '@batuda/controllers'
 
 import { CompanyService } from '../services/companies'
-import { geocodeCompany } from '../services/company-geocoding'
+import {
+	geocodeCompany,
+	updateCompanyRegeocoding,
+} from '../services/company-geocoding'
 import { Geocoder } from '../services/geocoder'
 
 export const CompaniesLive = HttpApiBuilder.group(
@@ -52,7 +55,9 @@ export const CompaniesLive = HttpApiBuilder.group(
 					),
 				)
 				.handle('update', _ =>
-					svc.update(_.params.id, _.payload).pipe(
+					updateCompanyRegeocoding(_.params.id, _.payload).pipe(
+						Effect.provideService(CompanyService, svc),
+						Effect.provideService(Geocoder, geocoder),
 						Effect.tap(() =>
 							Effect.logInfo('Company updated').pipe(
 								Effect.annotateLogs({
@@ -61,7 +66,6 @@ export const CompaniesLive = HttpApiBuilder.group(
 								}),
 							),
 						),
-						Effect.map(r => r[0]),
 						Effect.orDie,
 					),
 				)
