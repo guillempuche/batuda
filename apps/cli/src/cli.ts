@@ -20,6 +20,7 @@ import {
 	calendarSimulateWebhook,
 	SIMULATE_TRIGGERS,
 } from './commands/calendar/simulate-webhook'
+import { companiesBackfillGeocode } from './commands/companies'
 import { dataInspect, ENTITY_NAMES } from './commands/data'
 import { dbMigrate, dbReset } from './commands/db'
 import { doctor } from './commands/doctor'
@@ -816,6 +817,27 @@ const dataCommand = Command.make(
 	),
 )
 
+const companiesBackfillGeocodeCommand = Command.make(
+	'backfill-geocode',
+	{
+		dryRun: Flag.boolean('dry-run').pipe(
+			Flag.withDescription('List what would be geocoded without writing'),
+			Flag.withDefault(false),
+		),
+	},
+	({ dryRun }) => withDb(companiesBackfillGeocode(dryRun)),
+).pipe(
+	Command.withShortDescription('Geocode companies missing coordinates'),
+	Command.withDescription(
+		'One-time backfill: geocode every company that has a location but no coordinates. Calls Nominatim at ~1 request/second across all orgs; add --dry-run to preview.',
+	),
+)
+
+const companiesCommand = Command.make('companies').pipe(
+	Command.withDescription('Company maintenance tasks'),
+	Command.withSubcommands([companiesBackfillGeocodeCommand]),
+)
+
 export const batuda = Command.make('batuda').pipe(
 	Command.withDescription('Batuda CLI'),
 	Command.withSubcommands([
@@ -824,6 +846,7 @@ export const batuda = Command.make('batuda').pipe(
 		seedCommand,
 		dbCommand,
 		dataCommand,
+		companiesCommand,
 		authCommand,
 		servicesCommand,
 		worktreeCommand,
