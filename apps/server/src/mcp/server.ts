@@ -1,5 +1,4 @@
 import { Layer } from 'effect'
-import { McpServer } from 'effect/unstable/ai'
 
 import { CompanyResearchPrompt } from './prompts/company-research'
 import { DailyBriefingPrompt } from './prompts/daily-briefing'
@@ -16,6 +15,7 @@ import { InstructionsResource } from './resources/instructions'
 import { PipelineResource } from './resources/pipeline'
 import { ResearchResource } from './resources/research'
 import { TimelineResource } from './resources/timeline'
+import { mcpToolkitSafe } from './safe-toolkit'
 import { CalendarHandlersLive, CalendarTools } from './tools/calendar'
 import { CompanyHandlersLive, CompanyTools } from './tools/companies'
 import { ContactHandlersLive, ContactTools } from './tools/contacts'
@@ -48,24 +48,24 @@ import { TaskHandlersLive, TaskTools } from './tools/tasks'
 import { TimelineHandlersLive, TimelineTools } from './tools/timeline'
 
 export const McpToolsLive = Layer.mergeAll(
-	McpServer.toolkit(CompanyTools),
-	McpServer.toolkit(ContactTools),
-	McpServer.toolkit(InteractionTools),
-	McpServer.toolkit(TaskTools),
-	McpServer.toolkit(DocumentTools),
-	McpServer.toolkit(PageTools),
-	McpServer.toolkit(PipelineTools),
-	McpServer.toolkit(ProductTools),
-	McpServer.toolkit(ProposalTools),
-	McpServer.toolkit(EmailTools),
-	McpServer.toolkit(RecordingTools),
-	McpServer.toolkit(ResearchLifecycleTools),
-	McpServer.toolkit(ResearchMcpTools),
-	McpServer.toolkit(ResearchContactsTools),
-	McpServer.toolkit(ResearchRegistryTools),
-	McpServer.toolkit(InstructionsMcpTools),
-	McpServer.toolkit(TimelineTools),
-	McpServer.toolkit(CalendarTools),
+	mcpToolkitSafe(CompanyTools),
+	mcpToolkitSafe(ContactTools),
+	mcpToolkitSafe(InteractionTools),
+	mcpToolkitSafe(TaskTools),
+	mcpToolkitSafe(DocumentTools),
+	mcpToolkitSafe(PageTools),
+	mcpToolkitSafe(PipelineTools),
+	mcpToolkitSafe(ProductTools),
+	mcpToolkitSafe(ProposalTools),
+	mcpToolkitSafe(EmailTools),
+	mcpToolkitSafe(RecordingTools),
+	mcpToolkitSafe(ResearchLifecycleTools),
+	mcpToolkitSafe(ResearchMcpTools),
+	mcpToolkitSafe(ResearchContactsTools),
+	mcpToolkitSafe(ResearchRegistryTools),
+	mcpToolkitSafe(InstructionsMcpTools),
+	mcpToolkitSafe(TimelineTools),
+	mcpToolkitSafe(CalendarTools),
 	CompanyResource,
 	PipelineResource,
 	DocumentResource,
