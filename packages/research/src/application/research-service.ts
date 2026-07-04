@@ -264,9 +264,23 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 
 			const ORPHAN_AGE_SECONDS = 900
 
-			// Fail 'running' rows whose fiber vanished mid-execution after a
-			// server restart. A paid run isn't safe to silently re-run, so it is
-			// not re-dispatched. (Queued rows are re-offered below instead.)
+			// Heartbeat cadence, the staleness window before a run counts as crashed,
+			// and how often the sweep runs. These only tune timing, so a default is
+			// safe when a var is unset — unlike the vars that switch behavior on or off.
+			const heartbeatIntervalSeconds = yield* Config.int(
+				'RESEARCH_HEARTBEAT_INTERVAL_SEC',
+			).pipe(Config.withDefault(30))
+			const orphanStaleSeconds = yield* Config.int(
+				'RESEARCH_ORPHAN_STALE_SEC',
+			).pipe(Config.withDefault(90))
+			const orphanSweepIntervalSeconds = yield* Config.int(
+				'RESEARCH_ORPHAN_SWEEP_INTERVAL_SEC',
+			).pipe(Config.withDefault(60))
+
+			// Fail 'running' rows whose worker died — detected by a heartbeat that
+			// stopped refreshing (a live long run keeps beating, so it is spared).
+			// Rows from before heartbeats existed fall back to age. A paid run isn't
+			// safe to silently re-run, so it is not re-dispatched.
 			const sweepOrphanRuns = (maxAgeSeconds: number) =>
 				Effect.gen(function* () {
 					// COALESCE guards NULL findings: jsonb_set(NULL, …) returns
@@ -280,25 +294,15 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							completed_at = now(),
 							updated_at = now()
 						WHERE status = 'running'
-						  AND started_at < now() - interval '1 second' * ${maxAgeSeconds}
+						  AND (
+						        heartbeat_at < now() - interval '1 second' * ${orphanStaleSeconds}
+						     OR (heartbeat_at IS NULL AND started_at < now() - interval '1 second' * ${maxAgeSeconds})
+						  )
 						  AND (idempotency_key IS NULL OR idempotency_key NOT LIKE 'seed:%')
 						RETURNING id
 					`
 					return { running }
 				}).pipe(sql.withTransaction)
-
-			// ── Startup sweep ──
-			const swept = yield* sweepOrphanRuns(ORPHAN_AGE_SECONDS)
-			if (swept.running.length > 0) {
-				yield* Effect.logWarning(
-					'research.sweepOrphans: failed runs orphaned mid-run',
-				).pipe(
-					Effect.annotateLogs({
-						running_count: swept.running.length,
-						running_ids: swept.running.map(r => r.id),
-					}),
-				)
-			}
 
 			// Active runs: pubsub channels and fibers for cancellation
 			const activePubSubs = yield* Ref.make(
@@ -480,11 +484,25 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					// it waited is skipped.
 					const [claimed] = yield* sql<{ id: string }>`
 						UPDATE research_runs
-						SET status = 'running', started_at = now(), updated_at = now()
+						SET status = 'running', started_at = now(), heartbeat_at = now(), updated_at = now()
 						WHERE id = ${researchId} AND status = 'queued'
 						RETURNING id
 					`
 					if (!claimed) return
+
+					// Refresh the heartbeat while this run works, so the sweep can
+					// tell a live long-running job from one whose worker died. Forked
+					// into the run's own scope (below), so it stops when the run ends.
+					yield* sql`
+						UPDATE research_runs SET heartbeat_at = now()
+						WHERE id = ${researchId} AND status = 'running'
+					`.pipe(
+						Effect.catchCause(() => Effect.void),
+						Effect.repeat(
+							Schedule.spaced(`${heartbeatIntervalSeconds} seconds`),
+						),
+						Effect.forkScoped,
+					)
 
 					yield* publishEvent(researchId, 'run.started', {})
 
@@ -786,6 +804,9 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						tokensOut,
 					})
 				}).pipe(
+					// Scope the run so the heartbeat fiber (forked above) is
+					// interrupted the moment the run finishes, fails, or is cancelled.
+					Effect.scoped,
 					Effect.catchCause(cause => {
 						if (shouldMarkRunFailed(cause)) {
 							return Effect.gen(function* () {
@@ -815,11 +836,12 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 				)
 
 			// ── Dispatch ──
-			// Two layer-scoped daemons: the reconcile re-offers committed queued
-			// runs, and the consumer drains the queue and runs each job on the layer
-			// fiber's clean services — never a request's committed connection. Runs
-			// fork into the layer scope so a shutdown interrupts them; their rows are
-			// reclaimed on the next boot. A failure in either is logged, not fatal.
+			// Three layer-scoped daemons: the reconcile re-offers committed queued
+			// runs, a periodic sweep fails runs whose worker died (stale heartbeat),
+			// and the consumer drains the queue and runs each job on the layer fiber's
+			// clean services — never a request's committed connection. Runs fork into
+			// the layer scope so a shutdown interrupts them; the periodic sweep then
+			// reclaims their rows. A failure in any is logged, not fatal.
 			const layerScope = yield* Effect.scope
 			yield* reofferQueued.pipe(
 				Effect.catchCause(cause =>
@@ -828,6 +850,27 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					),
 				),
 				Effect.repeat(Schedule.spaced('2 seconds')),
+				Effect.forkScoped,
+			)
+			yield* Effect.gen(function* () {
+				const swept = yield* sweepOrphanRuns(ORPHAN_AGE_SECONDS)
+				if (swept.running.length > 0) {
+					yield* Effect.logWarning(
+						'research.sweepOrphans: failed runs orphaned mid-run',
+					).pipe(
+						Effect.annotateLogs({
+							running_count: swept.running.length,
+							running_ids: swept.running.map(r => r.id),
+						}),
+					)
+				}
+			}).pipe(
+				Effect.catchCause(cause =>
+					Effect.logError('research.dispatch: sweep failed').pipe(
+						Effect.annotateLogs({ cause: Cause.pretty(cause) }),
+					),
+				),
+				Effect.repeat(Schedule.spaced(`${orphanSweepIntervalSeconds} seconds`)),
 				Effect.forkScoped,
 			)
 			yield* Queue.take(dispatch).pipe(
