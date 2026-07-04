@@ -18,8 +18,6 @@ export const CompanyEnrichmentV1Schema = Schema.Struct({
 		location: Schema.optionalKey(Schema.String),
 		region: Schema.optionalKey(Schema.String),
 		address: Schema.optionalKey(Schema.String),
-		latitude: Schema.optionalKey(Schema.Number),
-		longitude: Schema.optionalKey(Schema.Number),
 		citations: Schema.Array(Citation),
 	}),
 	competitors: Schema.optionalKey(

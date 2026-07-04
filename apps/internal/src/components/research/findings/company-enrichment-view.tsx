@@ -43,8 +43,6 @@ type EnrichmentBlock = {
 	readonly location?: string
 	readonly region?: string
 	readonly address?: string
-	readonly latitude?: number
-	readonly longitude?: number
 	readonly citations?: ReadonlyArray<Citation>
 }
 
