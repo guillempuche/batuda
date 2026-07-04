@@ -14,17 +14,20 @@ common="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" ||
 
 root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 
-# Already provisioned if this worktree's database exists in the shared Postgres.
-# Mirror the CLI's slug (branch, drop a leading `worktree-`, lowercase, non-alnum
-# → `-`, cap 24; the database swaps `-` for `_`). Best-effort: if the stack is down
-# or docker is missing the probe is empty and we (re-)provision below.
-branch="$(git -C "$root" rev-parse --abbrev-ref HEAD 2>/dev/null)" || exit 0
-slug="$(printf '%s' "${branch#worktree-}" | tr '[:upper:]' '[:lower:]' \
-	| sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' | cut -c1-24)"
-db="batuda_${slug//-/_}"
-exists="$(docker exec batuda-db psql -U batuda -d postgres -tAc \
-	"SELECT 1 FROM pg_database WHERE datname='$db'" 2>/dev/null | tr -d '[:space:]')"
-[ "$exists" = "1" ] && exit 0
+# Already provisioned if this worktree's `.env` exists and names a database that
+# lives in the shared Postgres. Key off the `.env` `up` wrote, not the live
+# branch: a PR merge or a branch switch moves HEAD away from what was created, so
+# a branch-derived name would miss the real database and re-provision (which
+# re-seeds) on every start. No `.env` yet ⇒ first run ⇒ fall through to provision.
+env_file="$root/.env"
+if [ -f "$env_file" ]; then
+	db="$(sed -nE 's#^DATABASE_URL=.*/([^/?[:space:]]+).*#\1#p' "$env_file" | head -1)"
+	if [ -n "$db" ]; then
+		exists="$(docker exec batuda-db psql -U batuda -d postgres -tAc \
+			"SELECT 1 FROM pg_database WHERE datname='$db'" 2>/dev/null | tr -d '[:space:]')"
+		[ "$exists" = "1" ] && exit 0
+	fi
+fi
 
 cd "$root" || exit 0
 log="$root/.claude/worktree-up.log"

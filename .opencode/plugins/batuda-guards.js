@@ -71,9 +71,19 @@ export const BatudaGuards = async ({ client, $, directory }) => {
 		},
 
 		// Provision a linked worktree's database + bucket on session start.
-		// The script exits 0 in non-worktree contexts and on all error paths.
-		'session.created': async () => {
-			await $`${directory}/.claude/hooks/worktree-up.sh`.quiet().nothrow()
+		// opencode delivers session lifecycle through the generic `event` hook,
+		// not a top-level `session.created` key, so subscribe there. The script
+		// no-ops in the main checkout and on every error path, so running it for
+		// each session is safe and idempotent.
+		//
+		// There is no teardown counterpart: opencode has no worktree-removal event
+		// (its session events are session-scoped, not worktree-scoped), so dropping
+		// a worktree's data from one would race other sessions. Tear a worktree
+		// down with `pnpm cli worktree done` until an upstream lifecycle hook lands.
+		event: async ({ event }) => {
+			if (event.type === 'session.created') {
+				await $`${directory}/.claude/hooks/worktree-up.sh`.quiet().nothrow()
+			}
 		},
 	}
 }
