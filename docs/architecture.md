@@ -270,6 +270,8 @@ Batuda has three bounded contexts. Each owns its own domain errors and types; de
 
 **Provider selection pattern.** Each research capability (search, scrape, extract, discover, enrich, verify, registry, report) plus LLM inference is configured by an env var (`RESEARCH_PROVIDER_*`) that picks the implementation at boot time. The pattern is `Layer.unwrap(Config.schema(...) → switch → return Layer)` — same as `EmailProviderLive`. Stubs provide zero-cost deterministic data for local dev. Real providers (Brave, Firecrawl, libreBORME, einforma) declare their dependencies (`HttpClient`, `Config`) in the R type, satisfied at the composition root.
 
+**Run dispatch & reclaim.** `start_research` commits a `research_runs` row as `queued` inside the request transaction and returns; a layer-scoped consumer daemon then drains queued rows and runs each as a fiber on its own connection (never the request's already-committed one), with a reconcile daemon re-offering anything a raced commit left queued. Those fibers live in the server process, so a stop — usually a deploy — interrupts in-flight runs and leaves their rows `running`. To recover them safely a running job refreshes a `heartbeat_at` timestamp while it works, and a periodic sweep fails any `running` row whose beat has gone stale (rows without a beat, predating the column, fall back to run age); an orphaned run is thus reclaimed within about a minute, while a legitimately long run keeps beating and is never mistaken for a dead one. Reclaim only marks `failed` — a paid run is never silently re-run — and the cadences are tuned by `RESEARCH_HEARTBEAT_INTERVAL_SEC` / `RESEARCH_ORPHAN_STALE_SEC` / `RESEARCH_ORPHAN_SWEEP_INTERVAL_SEC`.
+
 ---
 
 ## Data flow
@@ -287,8 +289,8 @@ Agent calls get_company(slug)
 
 ```
 Agent calls start_research(query, schemaName, subjects)
-  → POST /v1/research → creates research_runs row (status: queued)
-  → Server forks an Effect Fiber for the run
+  → POST /v1/research → commits a research_runs row (status: queued), returns
+  → A layer-scoped consumer drains the queue, runs the job as a fiber (§Run dispatch & reclaim)
 
   Fiber phases (inside packages/research ResearchService):
     Phase 1 — Tool loop: LLM calls web_search, web_read, lookup_registry, crm_lookup
