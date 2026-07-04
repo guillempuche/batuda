@@ -37,20 +37,32 @@ import { ProviderError } from '../domain/errors'
 const DEFAULT_TIMEOUT: Duration.Input = '120 seconds'
 const DEFAULT_MAX_ATTEMPTS = 3
 
-const toProviderError = (provider: string, err: unknown): ProviderError => {
-	if (err instanceof AiError.AiError) {
-		return new ProviderError({
-			provider,
-			message: err.message,
-			recoverable: err.isRetryable,
-		})
+// Pull a human-usable message out of an arbitrary thrown value, or `undefined`
+// when there is nothing usable (an absent/blank message, or a bare object).
+const messageOf = (err: unknown): string | undefined => {
+	if (err instanceof Error) return err.message || undefined
+	if (typeof err === 'string') return err || undefined
+	if (err === null || err === undefined) return undefined
+	// Some callers throw a bare object that carries the message (e.g. `{ message,
+	// code }`); read it before falling back to `String(err)`'s "[object Object]".
+	if (typeof err === 'object' && 'message' in err) {
+		const inner = err.message
+		if (typeof inner === 'string' && inner.length > 0) return inner
 	}
+	const text = String(err)
+	return text === '[object Object]' ? undefined : text
+}
+
+const toProviderError = (provider: string, err: unknown): ProviderError => {
 	if (err instanceof ProviderError) return err
-	return new ProviderError({
-		provider,
-		message: err instanceof Error ? err.message : String(err),
-		recoverable: true,
-	})
+	// A ProviderError's `message` is a required string; building one with an
+	// empty or missing message makes the error class reject its own construction
+	// and throw — a second, contentless error that buries the real failure.
+	// Always hand it a usable string so the true cause is what gets reported.
+	const message = messageOf(err) ?? `${provider} request failed`
+	return err instanceof AiError.AiError
+		? new ProviderError({ provider, message, recoverable: err.isRetryable })
+		: new ProviderError({ provider, message, recoverable: true })
 }
 
 const isRetryableFailure = (err: unknown): boolean =>

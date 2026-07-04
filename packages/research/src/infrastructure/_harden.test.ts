@@ -4,6 +4,7 @@ import type { LanguageModel } from 'effect/unstable/ai'
 import { AiError } from 'effect/unstable/ai'
 import { describe, expect, it } from 'vitest'
 
+import { ProviderError } from '../domain/errors'
 import { hardenLanguageModel, withFallbackLanguageModel } from './_harden'
 
 // ── Test helpers ──
@@ -109,6 +110,22 @@ const invokeGenerateText = (
 			o: unknown,
 		) => Effect.Effect<unknown, unknown, never>
 	)({ prompt: 'hi' })
+
+const invokeGenerateObject = (
+	svc: LanguageModel.Service,
+): Effect.Effect<unknown, unknown, never> =>
+	(
+		svc.generateObject as unknown as (
+			o: unknown,
+		) => Effect.Effect<unknown, unknown, never>
+	)({ prompt: 'hi', schema: {} })
+
+const makeObjectFailingLm = (fail: unknown): LanguageModel.Service =>
+	({
+		generateText: () => Effect.succeed({}),
+		generateObject: () => Effect.fail(fail),
+		streamText: () => Effect.succeed({}),
+	}) as unknown as LanguageModel.Service
 
 describe('hardenLanguageModel', () => {
 	it('should return the successful response after transient failures under its retry budget', async () => {
@@ -229,6 +246,68 @@ describe('hardenLanguageModel', () => {
 
 		// THEN the harness surfaces a failure (timeout does not trigger the retry gate)
 		expect(Exit.isFailure(exit)).toBe(true)
+	})
+
+	it('should surface a ProviderError carrying the real message when the inner extract error has one', async () => {
+		// GIVEN an extract call whose inner failure carries a real message
+		const hardened = hardenLanguageModel(
+			makeObjectFailingLm(new Error('firecrawl 500')),
+			'together',
+		)
+
+		// WHEN generateObject is invoked and its failure is captured
+		const error = await Effect.runPromise(
+			Effect.flip(invokeGenerateObject(hardened)),
+		)
+
+		// THEN the underlying message is what surfaces, not a wrapper artifact
+		expect(error).toBeInstanceOf(ProviderError)
+		if (error instanceof ProviderError) {
+			expect(error.message).toContain('firecrawl 500')
+		}
+	})
+
+	it('should still surface a ProviderError instead of crashing when the inner extract error has no message', async () => {
+		// GIVEN the production failure mode: the wrapped error's `message` is
+		// undefined, which used to make the ProviderError schema reject its own
+		// construction and throw a contentless error over the real one
+		const noMessage = new Error('placeholder')
+		Object.defineProperty(noMessage, 'message', { value: undefined })
+		const hardened = hardenLanguageModel(
+			makeObjectFailingLm(noMessage),
+			'together',
+		)
+
+		// WHEN generateObject is invoked and its failure is captured — a
+		// construction crash would surface as an uncaught defect here
+		const error = await Effect.runPromise(
+			Effect.flip(invokeGenerateObject(hardened)),
+		)
+
+		// THEN a ProviderError still surfaces, with a non-empty fallback message
+		expect(error).toBeInstanceOf(ProviderError)
+		if (error instanceof ProviderError) {
+			expect(error.message.length).toBeGreaterThan(0)
+		}
+	})
+
+	it('should read the message off a bare error object that is not an Error instance', async () => {
+		// GIVEN a non-Error thrown value that still carries a message
+		const hardened = hardenLanguageModel(
+			makeObjectFailingLm({ message: 'quota exceeded', code: 429 }),
+			'together',
+		)
+
+		// WHEN generateObject is invoked and its failure is captured
+		const error = await Effect.runPromise(
+			Effect.flip(invokeGenerateObject(hardened)),
+		)
+
+		// THEN the object's own message surfaces, not the generic fallback
+		expect(error).toBeInstanceOf(ProviderError)
+		if (error instanceof ProviderError) {
+			expect(error.message).toContain('quota exceeded')
+		}
 	})
 })
 
