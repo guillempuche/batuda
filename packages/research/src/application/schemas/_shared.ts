@@ -30,10 +30,32 @@ export const TolerantJsonString = Schema.String.annotate({
 	}),
 )
 
+// Numeric fields the model fills in. Open-weights models sometimes return the
+// text "NaN" or "Infinity" for a number they could not work out; strict
+// decoding rejects that string and fails the whole extraction. Accepting a
+// string on the wire lets decoding turn any non-finite value into "no value"
+// (null) instead — the same family of fix as TolerantJsonString above.
+const coerceFinite = (value: number | string): number | null => {
+	const n =
+		typeof value === 'string'
+			? value.trim() === ''
+				? Number.NaN // Number('') is 0; treat a blank string as "no value", not zero.
+				: Number(value)
+			: value
+	return Number.isFinite(n) ? n : null
+}
+
+export const LenientNumber = Schema.Union([Schema.Number, Schema.String]).pipe(
+	Schema.decodeTo(Schema.NullOr(Schema.Number), {
+		decode: SchemaGetter.transform(coerceFinite),
+		encode: SchemaGetter.transform((n: number | null) => n ?? Number.NaN),
+	}),
+)
+
 export const Citation = Schema.Struct({
 	source_id: Schema.String,
 	quote: Schema.optionalKey(Schema.String),
-	confidence: Schema.optionalKey(Schema.Number),
+	confidence: Schema.optionalKey(LenientNumber),
 })
 
 export const DiscoveredExisting = Schema.Struct({
@@ -45,7 +67,7 @@ export const DiscoveredExisting = Schema.Struct({
 export const ProposedUpdate = Schema.Struct({
 	subject_table: Schema.Literals(['companies', 'contacts']),
 	subject_id: Schema.String,
-	expected_version: Schema.Number,
+	expected_version: LenientNumber,
 	fields: TolerantJsonString,
 	reason: Schema.String,
 	citations: Schema.Array(Citation),
@@ -54,6 +76,6 @@ export const ProposedUpdate = Schema.Struct({
 export const PendingPaidAction = Schema.Struct({
 	tool: Schema.String,
 	args: TolerantJsonString,
-	estimated_cents: Schema.Number,
+	estimated_cents: LenientNumber,
 	reason: Schema.String,
 })
