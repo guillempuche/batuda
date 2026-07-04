@@ -77,18 +77,18 @@ export const locationWasReplaced = (
 }
 
 /**
- * Re-geocode a company off the update path, on its own connection.
+ * Re-geocode a company in the background, on its own connection.
  *
  * The geocoder call runs ~1.5s (Nominatim's rate limit) and must not block the
- * update response, so it forks. But it must NOT reuse the request's transaction:
- * that connection commits and returns to the pool the moment the response is
- * sent. Dropping the inherited `TransactionConnection` makes `enterOrgScope`
- * open its own top-level transaction on a fresh pooled connection and re-apply
- * the app_user role + org GUC, so the coordinate write passes RLS. Best-effort:
- * a miss or failure just leaves the previous coordinates in place. Mirrors the
- * research event sink's out-of-band, org-scoped write.
+ * caller's response, so it forks. But it must NOT reuse the request's
+ * transaction: that connection commits and returns to the pool the moment the
+ * response is sent. Dropping the inherited `TransactionConnection` makes
+ * `enterOrgScope` open its own top-level transaction on a fresh pooled
+ * connection and re-apply the app_user role + org GUC, so the coordinate write
+ * passes RLS. Best-effort: a miss or failure just leaves the previous
+ * coordinates in place. Callers: a location edit and an applied research update.
  */
-const regeocodeOutOfBand = (id: string) =>
+export const forkCompanyRegeocode = (id: string) =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
 		const org = yield* CurrentOrg
@@ -100,7 +100,7 @@ const regeocodeOutOfBand = (id: string) =>
 			Effect.catchCause(cause =>
 				Cause.hasInterruptsOnly(cause)
 					? Effect.interrupt
-					: Effect.logWarning('post-update geocode failed').pipe(
+					: Effect.logWarning('background geocode failed').pipe(
 							Effect.annotateLogs({
 								event: 'company.geocode.failed',
 								companyId: id,
@@ -139,7 +139,7 @@ export const updateCompanyRegeocoding = (
 		const updated = rows[0] ?? null
 
 		if (updated && locationWasReplaced(before, fields)) {
-			yield* regeocodeOutOfBand(id)
+			yield* forkCompanyRegeocode(id)
 		}
 
 		return updated
