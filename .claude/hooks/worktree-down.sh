@@ -25,15 +25,20 @@ fi
 # teardown uses; self-guarding and always exits 0.
 bash "${CLAUDE_PROJECT_DIR:-.}/scripts/worktree-stop-procs.sh" "$wt" "$$" 2>/dev/null || true
 
-# Mirror the CLI's slug: branch name with a leading `worktree-` dropped,
-# lowercased, non-alphanumerics collapsed to `-`, capped at 24 chars. The
-# database swaps `-` for `_` (Postgres identifiers); the bucket keeps `-`.
-branch="$(git -C "$wt" rev-parse --abbrev-ref HEAD 2>/dev/null)" || exit 0
-slug="$(printf '%s' "${branch#worktree-}" | tr '[:upper:]' '[:lower:]' \
-	| sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' | cut -c1-24)"
-[ -n "$slug" ] || exit 0
-db="batuda_${slug//-/_}"
-bucket="batuda-assets-${slug}"
+# Read this worktree's real database + bucket from the `.env` it generated at
+# provision time — never re-derive them from the live branch. `gh pr merge
+# --delete-branch` checks `main` out into the worktree, and switching branches
+# inside it likewise leaves HEAD pointing away from what `up` created; deriving
+# from the branch then would drop the wrong data — or another worktree's. This
+# mirrors the CLI's `down`/`prune`, which key off `.env` for exactly this reason.
+env_file="$wt/.env"
+[ -f "$env_file" ] || exit 0
+db="$(sed -nE 's#^DATABASE_URL=.*/([^/?[:space:]]+).*#\1#p' "$env_file" | head -1)"
+bucket="$(sed -nE 's#^STORAGE_BUCKET=([^[:space:]]+).*#\1#p' "$env_file" | head -1)"
+# Only a suffixed `batuda_<slug>` / `batuda-assets-<slug>` pair belongs to a
+# worktree; the main checkout's bare `batuda` / `batuda-assets` must never drop.
+case "$db" in batuda_?*) ;; *) exit 0 ;; esac
+case "$bucket" in batuda-assets-?*) ;; *) exit 0 ;; esac
 
 docker exec batuda-db psql -U batuda -d postgres \
 	-c "DROP DATABASE IF EXISTS ${db} WITH (FORCE)" >/dev/null 2>&1 || true
