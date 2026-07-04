@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-04 (server-v2026.7.4)
+
+### Features
+
+* reclaim interrupted research runs via a run heartbeat ([0e37736](https://github.com/guillempuche/batuda/commit/0e37736a5d7d6cc0598902430deb48d728c99bfd))
+
+### Bug Fixes
+
+* record paid research spend with per-org idempotency key ([56d2695](https://github.com/guillempuche/batuda/commit/56d2695640df791bd96449843b7c04e5201e0619))
+* **research:** accept model-emitted null for optional tool params ([e05a43d](https://github.com/guillempuche/batuda/commit/e05a43d9f842fa2dee176e6c55892d014583443f))
+* **research:** read run-row fields under the camelCase transform ([85d24b1](https://github.com/guillempuche/batuda/commit/85d24b1152b55e79602c0147061340c2fed7f872))
+* run research jobs from a background queue, not the web request ([c94bc20](https://github.com/guillempuche/batuda/commit/c94bc2093a7ab55c58da5e2f6206ad88e387f17a))
+
 ## 2026-07-03 (server-v2026.7.3)
 
 ### Bug Fixes
