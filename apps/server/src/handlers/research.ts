@@ -1,5 +1,6 @@
 import { DateTime, Effect, Stream } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
+import { SqlClient } from 'effect/unstable/sql'
 
 import {
 	BatudaApi,
@@ -15,6 +16,9 @@ import {
 } from '@batuda/research'
 
 import { EnvVars } from '../lib/env'
+import { CompanyService } from '../services/companies'
+import { Geocoder } from '../services/geocoder'
+import { resolveResearchProposedUpdate } from '../services/research-apply'
 
 export const ResearchLive = HttpApiBuilder.group(
 	BatudaApi,
@@ -23,6 +27,37 @@ export const ResearchLive = HttpApiBuilder.group(
 		Effect.gen(function* () {
 			const svc = yield* ResearchService
 			const env = yield* EnvVars
+			// Applying a proposed update writes a CRM row and may fork an
+			// org-scoped re-geocode; resolve those services here so both the apply
+			// and reject handlers can provide them to the shared resolver.
+			const companyService = yield* CompanyService
+			const geocoder = yield* Geocoder
+			const sql = yield* SqlClient.SqlClient
+
+			// Shared apply/reject path: run the resolver, then surface a missing run
+			// or proposal as a 404 and let any DB fault die as a defect.
+			const resolveProposal = (
+				id: string,
+				puId: string,
+				decision: 'apply' | 'reject',
+			) =>
+				resolveResearchProposedUpdate(id, puId, decision).pipe(
+					Effect.provideService(CompanyService, companyService),
+					Effect.provideService(Geocoder, geocoder),
+					Effect.provideService(SqlClient.SqlClient, sql),
+					Effect.flatMap(result =>
+						result.outcome === 'run_not_found'
+							? Effect.fail(new NotFound({ entity: 'research', id }))
+							: result.outcome === 'proposal_not_found'
+								? Effect.fail(
+										new NotFound({ entity: 'proposed-update', id: puId }),
+									)
+								: Effect.succeed(result),
+					),
+					Effect.catch(e =>
+						e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+					),
+				)
 
 			const systemDefaults: SystemDefaults = {
 				budgetCents: env.RESEARCH_DEFAULT_BUDGET_CENTS,
@@ -242,10 +277,12 @@ export const ResearchLive = HttpApiBuilder.group(
 								entity: 'research',
 								id: _.params.id,
 							})
+						// The SQL client camelCases JSONB keys on read, so the stored
+						// `proposed_updates` surfaces here as `proposedUpdates`.
 						const findings = (run as { findings: unknown }).findings as {
-							proposed_updates?: unknown[]
+							proposedUpdates?: unknown[]
 						}
-						return findings?.proposed_updates ?? []
+						return findings?.proposedUpdates ?? []
 					}).pipe(
 						Effect.catch(e =>
 							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
@@ -253,12 +290,10 @@ export const ResearchLive = HttpApiBuilder.group(
 					),
 				)
 				.handle('applyProposedUpdate', _ =>
-					// Fires the domain update endpoint with OCC.
-					// Placeholder for now.
-					Effect.succeed({ status: 'applied' }),
+					resolveProposal(_.params.id, _.params.puId, 'apply'),
 				)
 				.handle('rejectProposedUpdate', _ =>
-					Effect.succeed({ status: 'rejected' }),
+					resolveProposal(_.params.id, _.params.puId, 'reject'),
 				)
 				.handle('getPolicy', _ =>
 					Effect.gen(function* () {

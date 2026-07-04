@@ -1,9 +1,13 @@
 import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
+import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg, SessionContext } from '@batuda/controllers'
 import { ResearchService } from '@batuda/research'
 
+import { CompanyService } from '../../services/companies'
+import { Geocoder } from '../../services/geocoder'
+import { resolveResearchProposedUpdate } from '../../services/research-apply'
 import { redactDbErrors, Uuid } from './_research-shared'
 import { ListResult, toItems } from './_result'
 
@@ -191,6 +195,12 @@ export const ResearchLifecycleTools = Toolkit.make(
 export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 	Effect.gen(function* () {
 		const svc = yield* ResearchService
+		// The apply path writes a CRM row and, on a location change, forks an
+		// org-scoped re-geocode — resolve those services here and provide them,
+		// keeping CurrentOrg as the only per-request service the handler needs.
+		const companyService = yield* CompanyService
+		const geocoder = yield* Geocoder
+		const sql = yield* SqlClient.SqlClient
 		return {
 			list_research: filters =>
 				svc
@@ -241,19 +251,23 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 				Effect.gen(function* () {
 					const run = yield* svc.get(id)
 					if (!run) return []
+					// The SQL client camelCases JSONB keys on read, so the stored
+					// `proposed_updates` surfaces here as `proposedUpdates`.
 					const findings = (run as { findings: unknown }).findings as {
-						proposed_updates?: unknown[]
+						proposedUpdates?: unknown[]
 					} | null
-					return findings?.proposed_updates ?? []
+					return findings?.proposedUpdates ?? []
 				}).pipe(redactDbErrors, Effect.map(toItems)),
-			resolve_research_proposed_update: ({ decision }) =>
-				// Placeholder: the OCC-protected CRM write that would land on
-				// apply is not yet wired, so this returns the resolution
-				// shape without mutating any row.
-				Effect.succeed(
-					decision === 'apply'
-						? { status: 'applied' as const }
-						: { status: 'rejected' as const },
+			resolve_research_proposed_update: ({
+				id,
+				proposed_update_id,
+				decision,
+			}) =>
+				resolveResearchProposedUpdate(id, proposed_update_id, decision).pipe(
+					Effect.provideService(CompanyService, companyService),
+					Effect.provideService(Geocoder, geocoder),
+					Effect.provideService(SqlClient.SqlClient, sql),
+					redactDbErrors,
 				),
 			research_policy: params =>
 				Effect.gen(function* () {

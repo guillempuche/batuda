@@ -11,6 +11,7 @@ import {
 	researchCacheTtlDaysFor,
 	schemaVersionFor,
 	shouldMarkRunFailed,
+	withProposalIds,
 } from './research-service'
 
 describe('normalizeResearchQuery', () => {
@@ -30,6 +31,46 @@ describe('normalizeResearchQuery', () => {
 		// GIVEN a query with numbers and punctuation
 		// THEN punctuation is kept — only whitespace and case are normalized
 		expect(normalizeResearchQuery('Q3 2025 revenue?')).toBe('q3 2025 revenue?')
+	})
+})
+
+describe('withProposalIds', () => {
+	describe('when findings carry proposed updates', () => {
+		it('should give each a stable id and a pending status, keeping its fields', () => {
+			// GIVEN Phase-2 findings whose proposals have no id or status yet
+			const out = withProposalIds({
+				enrichment: { industry: 'logistics' },
+				proposed_updates: [
+					{ subject_table: 'companies', subject_id: 'c-1', fields: {} },
+				],
+			}) as {
+				enrichment: unknown
+				proposed_updates: Array<Record<string, unknown>>
+			}
+
+			// THEN each proposal gains an id + pending status, other keys untouched
+			expect(out.enrichment).toEqual({ industry: 'logistics' })
+			expect(typeof out.proposed_updates[0]?.['id']).toBe('string')
+			expect(out.proposed_updates[0]?.['status']).toBe('pending')
+			expect(out.proposed_updates[0]?.['subject_id']).toBe('c-1')
+		})
+	})
+
+	describe('when findings have no proposed updates', () => {
+		it('should pass them through untouched', () => {
+			// GIVEN findings without a proposed_updates array
+			const findings = { competitors: [] }
+			// THEN nothing is added
+			expect(withProposalIds(findings)).toBe(findings)
+		})
+	})
+
+	describe('when findings are not an object', () => {
+		it('should return them as-is', () => {
+			// GIVEN a non-object findings value (e.g. a bare string)
+			expect(withProposalIds('oops')).toBe('oops')
+			expect(withProposalIds(null)).toBe(null)
+		})
 	})
 })
 

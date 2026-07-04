@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 
 import {
 	Cause,
@@ -68,6 +68,34 @@ export const normalizeResearchQuery = (query: string): string =>
 export const schemaVersionFor = (schemaName: string): number => {
 	const match = schemaName.match(/_v(\d+)$/)
 	return match ? Number(match[1]) : 1
+}
+
+/**
+ * Give each extracted proposed-update a stable id and a pending status before
+ * the findings are stored, so a human can later apply or reject that exact
+ * proposal by id (the apply surface addresses them by id). Non-object findings
+ * and every other key pass through untouched.
+ */
+export const withProposalIds = (findings: unknown): unknown => {
+	if (
+		typeof findings !== 'object' ||
+		findings === null ||
+		Array.isArray(findings)
+	)
+		return findings
+	const record = findings as Record<string, unknown>
+	const proposals = record['proposed_updates']
+	if (!Array.isArray(proposals)) return findings
+	return {
+		...record,
+		proposed_updates: proposals.map(proposal =>
+			typeof proposal === 'object' &&
+			proposal !== null &&
+			!Array.isArray(proposal)
+				? { id: randomUUID(), status: 'pending', ...proposal }
+				: proposal,
+		),
+	}
 }
 
 // Clamp list pagination so out-of-range input can't reach SQL: a negative limit
@@ -700,7 +728,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							schema: outputSchema as typeof FreeformSchema,
 							prompt: `Based on this research, produce structured findings:\n\n${researchText}`,
 						})
-						findings = structuredResponse.value as unknown
+						findings = withProposalIds(structuredResponse.value as unknown)
 						tokensOut += structuredResponse.usage.outputTokens.total ?? 0
 						yield* Ref.update(toolLog, log => [
 							...log,

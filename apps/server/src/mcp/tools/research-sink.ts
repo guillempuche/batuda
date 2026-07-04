@@ -96,6 +96,10 @@ export const ResearchSinkHandlersLive = ResearchSinkTools.toLayer(
 							COALESCE(findings->'proposed_updates', '[]'::jsonb)
 								|| ${JSON.stringify([
 									{
+										// Stable id so a human can later apply or reject this
+										// exact proposal — the resolve/apply surfaces address
+										// proposals by id.
+										id: crypto.randomUUID(),
 										subject_table: params.subject_table,
 										subject_id: params.subject_id,
 										expected_version: params.expected_version,
