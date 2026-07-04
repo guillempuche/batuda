@@ -73,10 +73,13 @@ export {
 } from './application/schemas/index'
 export { researchToolkit, researchToolkitLayer } from './application/tools'
 // ── Domain ─────────────────────────────────────────────────────────────────
+export { AcceptedCountry } from './domain/country'
 export {
 	ApprovalRequired,
 	BudgetExceeded,
 	MonthlyCapExceeded,
+	NoRegistry,
+	noRegistryResult,
 	ProviderError,
 	QuotaExhausted,
 } from './domain/errors'

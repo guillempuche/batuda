@@ -52,3 +52,22 @@ export class ApprovalRequired extends Schema.TaggedErrorClass<ApprovalRequired>(
 		estimatedCents: Schema.Number,
 	},
 ) {}
+
+/**
+ * The requested country has no national business registry — a routing outcome,
+ * not a failure. It marks the lookup as one to satisfy through universal
+ * contact enrichment instead of a registry.
+ */
+export class NoRegistry extends Schema.TaggedErrorClass<NoRegistry>()(
+	'NoRegistry',
+	{
+		country: Schema.String,
+	},
+) {}
+
+/** The no_registry outcome rendered as a plain result value. */
+export const noRegistryResult = (country: string) => ({
+	status: 'no_registry' as const,
+	country,
+	message: `No national business registry for ${country}. Use discover_contacts for contact enrichment.`,
+})

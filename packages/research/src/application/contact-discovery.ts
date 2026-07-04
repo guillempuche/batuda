@@ -14,7 +14,7 @@
 import { Config, Effect, Layer, ServiceMap } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { type Country, SUPPORTED_COUNTRIES } from '../domain/country'
+import { isRegistryCountry, type RegistryCountry } from '../domain/country'
 import { EnrichmentResult, type VerificationVerdict } from '../domain/types'
 import { makeBudgetLayer } from './budget'
 import { guessEmails, splitPersonName } from './email-guess'
@@ -44,11 +44,11 @@ interface SourcePerson {
 }
 
 // Narrow a free-text country hint to a country that has a national registry.
-const registryCountry = (hint: string | undefined): Country | undefined => {
+const registryCountry = (
+	hint: string | undefined,
+): RegistryCountry | undefined => {
 	const upper = hint?.trim().toUpperCase()
-	return upper && (SUPPORTED_COUNTRIES as readonly string[]).includes(upper)
-		? (upper as Country)
-		: undefined
+	return upper && isRegistryCountry(upper) ? upper : undefined
 }
 
 // Fixed per-call cost estimates (cents). Hunter is credit-based; these meter the
@@ -211,16 +211,21 @@ export class ContactDiscovery extends ServiceMap.Service<ContactDiscovery>()(
 						// (free/cheap, authoritative officers), else the universal
 						// enrichment vendor. Registry directors carry no email, so
 						// they flow through the same guess + verify below.
-						const supportedCountry = registryCountry(input.country)
+						const countryWithRegistry = registryCountry(input.country)
 						let people: ReadonlyArray<SourcePerson> = []
-						if (supportedCountry) {
+						if (countryWithRegistry) {
 							const record = yield* registry
 								.lookup({
-									country: supportedCountry,
+									country: countryWithRegistry,
 									query: input.companyName,
 								})
 								.pipe(
-									Effect.catchTag('ProviderError', () => Effect.succeed(null)),
+									// Registry is best-effort here; any miss (provider failure
+									// or a country with no registry) falls through to enrichment.
+									Effect.catchTags({
+										ProviderError: () => Effect.succeed(null),
+										NoRegistry: () => Effect.succeed(null),
+									}),
 								)
 							people = (record?.directors ?? []).map(d => {
 								const { firstName, lastName } = splitPersonName(d.name)

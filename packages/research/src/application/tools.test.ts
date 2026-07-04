@@ -1,6 +1,7 @@
 import { Effect, Layer, Schema, Stream } from 'effect'
 import { describe, expect, it } from 'vitest'
 
+import { NoRegistry, type ProviderError } from '../domain/errors'
 import { RegistryRecord, ScrapedPage, SearchResult } from '../domain/types'
 import { StubExtractProvider } from '../infrastructure/stub/extract'
 import { StubRegistryEsProvider } from '../infrastructure/stub/registry-es'
@@ -67,7 +68,7 @@ const webSearchInput = async (params: {
 }
 
 const registryLookupInput = async (params: {
-	country: 'ES' | 'GB'
+	country: string
 	query?: string | null
 	tax_id?: string | null
 }): Promise<RegistryInput> => {
@@ -98,6 +99,30 @@ const registryLookupInput = async (params: {
 		throw new Error('registry_lookup handler never called the registry router')
 	}
 	return captured
+}
+
+// Drive registry_lookup with a custom router and return the tool's final result
+// value — asserts what the model receives, not what the router was handed.
+const registryLookupResult = async (
+	lookup: (
+		input: RegistryInput,
+	) => Effect.Effect<RegistryRecord, ProviderError | NoRegistry>,
+	params: { country: string; query?: string | null; tax_id?: string | null },
+): Promise<unknown> => {
+	const ports = Layer.mergeAll(
+		Layer.succeed(RegistryRouter)(RegistryRouter.of({ lookup })),
+		StubSearchProvider,
+		StubScrapeProvider,
+		StubExtractProvider,
+	)
+	const results = await Effect.runPromise(
+		Effect.gen(function* () {
+			const toolkit = yield* researchToolkit
+			const stream = yield* toolkit.handle('registry_lookup', params)
+			return yield* Stream.runCollect(stream)
+		}).pipe(Effect.provide(researchToolkitLayer.pipe(Layer.provide(ports)))),
+	)
+	return results[results.length - 1]?.result
 }
 
 const extractInput = async (params: {
@@ -291,6 +316,35 @@ describe('researchToolkit tool params — model-emitted null is treated as omitt
 
 				// THEN the empty string survives
 				expect(input.query).toBe('')
+			})
+		})
+
+		describe('when the country is lowercase', () => {
+			it('should upper-case it at the boundary before the router sees it', async () => {
+				// GIVEN a model emitting a lowercase code
+				// WHEN registry_lookup is handled
+				const input = await registryLookupInput({ country: 'gb' })
+
+				// THEN the router receives the normalized upper-case code
+				expect(input.country).toBe('GB')
+			})
+		})
+
+		describe('when the country has no national registry', () => {
+			it('should hand back a no_registry result, not a tool error', async () => {
+				// GIVEN a router that reports no registry for the country
+				// WHEN registry_lookup is handled
+				const result = await registryLookupResult(
+					() => Effect.fail(new NoRegistry({ country: 'US' })),
+					{ country: 'US' },
+				)
+
+				// THEN the model receives structured no_registry data pointing elsewhere
+				expect(result).toEqual({
+					status: 'no_registry',
+					country: 'US',
+					message: expect.stringContaining('discover_contacts'),
+				})
 			})
 		})
 	})

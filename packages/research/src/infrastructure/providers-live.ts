@@ -30,12 +30,13 @@ import {
 	SearchProvider,
 } from '../application/ports'
 import {
-	type Country,
+	isRegistryCountry,
+	REGISTRY_COUNTRIES,
 	REGISTRY_VENDORS_BY_COUNTRY,
-	type REPORT_VENDORS_BY_COUNTRY,
-	SUPPORTED_COUNTRIES,
+	REPORT_VENDORS_BY_COUNTRY,
+	type RegistryCountry,
 } from '../domain/country'
-import type { ProviderError } from '../domain/errors'
+import type { NoRegistry, ProviderError } from '../domain/errors'
 import type {
 	CompanyReport,
 	DiscoverResult,
@@ -48,7 +49,11 @@ import type {
 } from '../domain/types'
 import { providerListConfig } from './_config'
 import { withFallback } from './_fallback'
-import { disabledError, notYetImplementedError } from './_shared'
+import {
+	disabledError,
+	noRegistryError,
+	notYetImplementedError,
+} from './_shared'
 import { makeBraveSearch } from './brave/search'
 import { makeCachedExtract } from './cached-extract'
 import { makeCachedScrape } from './cached-scrape'
@@ -191,8 +196,11 @@ const verifierInstance = (vendor: VerifyVendor, slot: number) => {
 	}
 }
 
-const registryInstance = (cc: Country, vendor: string, slot: number) => {
-	if (cc === 'ES') {
+// One builder per registry country. Keyed by RegistryCountry so adding a
+// country is a new entry here plus its vendor-table row — no exhaustiveness
+// switch to hand-edit. The inner switch selects the vendor within a country.
+const REGISTRY_BUILDERS = {
+	ES: (vendor: string, slot: number) => {
 		switch (vendor as (typeof REGISTRY_VENDORS_BY_COUNTRY)['ES'][number]) {
 			case 'stub':
 				return Effect.succeed(StubRegistryEsProviderInstance)
@@ -200,13 +208,11 @@ const registryInstance = (cc: Country, vendor: string, slot: number) => {
 				return makeLibreborRegistry(slot)
 			case 'none':
 				return Effect.succeed(
-					RegistryRouter.of({
-						lookup: () => disabledError('registry'),
-					}),
+					RegistryRouter.of({ lookup: () => disabledError('registry') }),
 				)
 		}
-	}
-	if (cc === 'GB') {
+	},
+	GB: (vendor: string, slot: number) => {
 		switch (vendor as (typeof REGISTRY_VENDORS_BY_COUNTRY)['GB'][number]) {
 			case 'stub':
 				return Effect.succeed(StubRegistryGbProviderInstance)
@@ -214,18 +220,16 @@ const registryInstance = (cc: Country, vendor: string, slot: number) => {
 				return makeCompaniesHouseRegistry(slot)
 			case 'none':
 				return Effect.succeed(
-					RegistryRouter.of({
-						lookup: () => disabledError('registry'),
-					}),
+					RegistryRouter.of({ lookup: () => disabledError('registry') }),
 				)
 		}
-	}
-	const _exhaust: never = cc
-	return _exhaust
-}
+	},
+} satisfies Record<RegistryCountry, (vendor: string, slot: number) => unknown>
 
-const reportInstance = (cc: Country, vendor: string, _slot: number) => {
-	if (cc === 'ES') {
+// One builder per country that can produce a paid report. Same data-driven
+// shape as REGISTRY_BUILDERS.
+const REPORT_BUILDERS = {
+	ES: (vendor: string, _slot: number) => {
 		switch (vendor as (typeof REPORT_VENDORS_BY_COUNTRY)['ES'][number]) {
 			case 'stub':
 				return Effect.succeed(StubReportEsProviderInstance)
@@ -237,25 +241,19 @@ const reportInstance = (cc: Country, vendor: string, _slot: number) => {
 				)
 			case 'none':
 				return Effect.succeed(
-					ReportRouter.of({
-						report: () => disabledError('report'),
-					}),
+					ReportRouter.of({ report: () => disabledError('report') }),
 				)
 		}
-	}
-	if (cc === 'GB') {
+	},
+	GB: (vendor: string, _slot: number) => {
 		switch (vendor as (typeof REPORT_VENDORS_BY_COUNTRY)['GB'][number]) {
 			case 'none':
 				return Effect.succeed(
-					ReportRouter.of({
-						report: () => disabledError('report'),
-					}),
+					ReportRouter.of({ report: () => disabledError('report') }),
 				)
 		}
-	}
-	const _exhaust: never = cc
-	return _exhaust
-}
+	},
+} satisfies Record<RegistryCountry, (vendor: string, slot: number) => unknown>
 
 // ── Layer builders ──
 
@@ -408,15 +406,16 @@ const verifierLayer = Layer.effect(
 
 // ── Country-dispatching layers for registry + report ──
 
-const buildRegistryDispatcher = (cc: Country) =>
+const buildRegistryDispatcher = (cc: RegistryCountry) =>
 	Effect.gen(function* () {
 		const vendors = yield* providerListConfig(
 			REGISTRY_VENDORS_BY_COUNTRY[cc],
 			`RESEARCH_PROVIDER_REGISTRY_${cc}`,
+			['none'] as const,
 		)
 		yield* Effect.logInfo(`research.registry.${cc}: ${vendors.join(',')}`)
 		const instances = yield* Effect.all(
-			vendors.map((vendor, slot) => registryInstance(cc, vendor, slot)),
+			vendors.map((vendor, slot) => REGISTRY_BUILDERS[cc](vendor, slot)),
 		)
 		if (instances.length === 1) {
 			const head = instances[0]!
@@ -427,20 +426,21 @@ const buildRegistryDispatcher = (cc: Country) =>
 			(
 				svc,
 				input: RegistryInput,
-			): Effect.Effect<RegistryRecord, ProviderError> => svc.lookup(input),
+			): Effect.Effect<RegistryRecord, ProviderError | NoRegistry> =>
+				svc.lookup(input),
 		)
 	})
 
-const buildReportDispatcher = (cc: Country) =>
+const buildReportDispatcher = (cc: RegistryCountry) =>
 	Effect.gen(function* () {
 		const vendors = yield* providerListConfig(
-			REGISTRY_VENDORS_BY_COUNTRY[cc],
+			REPORT_VENDORS_BY_COUNTRY[cc],
 			`RESEARCH_PROVIDER_REPORT_${cc}`,
 			['none'] as const,
 		)
 		yield* Effect.logInfo(`research.report.${cc}: ${vendors.join(',')}`)
 		const instances = yield* Effect.all(
-			vendors.map((vendor, slot) => reportInstance(cc, vendor, slot)),
+			vendors.map((vendor, slot) => REPORT_BUILDERS[cc](vendor, slot)),
 		)
 		if (instances.length === 1) {
 			const head = instances[0]!
@@ -448,26 +448,33 @@ const buildReportDispatcher = (cc: Country) =>
 		}
 		return withFallback(
 			instances,
-			(svc, input: ReportInput): Effect.Effect<CompanyReport, ProviderError> =>
+			(
+				svc,
+				input: ReportInput,
+			): Effect.Effect<CompanyReport, ProviderError | NoRegistry> =>
 				svc.report(input),
 		)
 	})
 
-const registryLayer = Layer.effect(
+export const registryLayer = Layer.effect(
 	RegistryRouter,
 	Effect.gen(function* () {
 		const byCountry = {} as Record<
-			Country,
-			(input: RegistryInput) => Effect.Effect<RegistryRecord, ProviderError>
+			RegistryCountry,
+			(
+				input: RegistryInput,
+			) => Effect.Effect<RegistryRecord, ProviderError | NoRegistry>
 		>
-		for (const cc of SUPPORTED_COUNTRIES) {
+		for (const cc of REGISTRY_COUNTRIES) {
 			byCountry[cc] = yield* buildRegistryDispatcher(cc)
 		}
 		return RegistryRouter.of({
-			lookup: input => {
-				const invoke = byCountry[input.country]
-				return invoke ? invoke(input) : disabledError('registry')
-			},
+			// A registry country dispatches to its adapter; any other country is an
+			// explicit no_registry outcome, not a hard failure.
+			lookup: input =>
+				isRegistryCountry(input.country)
+					? byCountry[input.country](input)
+					: noRegistryError(input.country),
 		})
 	}),
 )
@@ -476,17 +483,19 @@ const reportLayer = Layer.effect(
 	ReportRouter,
 	Effect.gen(function* () {
 		const byCountry = {} as Record<
-			Country,
-			(input: ReportInput) => Effect.Effect<CompanyReport, ProviderError>
+			RegistryCountry,
+			(
+				input: ReportInput,
+			) => Effect.Effect<CompanyReport, ProviderError | NoRegistry>
 		>
-		for (const cc of SUPPORTED_COUNTRIES) {
+		for (const cc of REGISTRY_COUNTRIES) {
 			byCountry[cc] = yield* buildReportDispatcher(cc)
 		}
 		return ReportRouter.of({
-			report: input => {
-				const invoke = byCountry[input.country]
-				return invoke ? invoke(input) : disabledError('report')
-			},
+			report: input =>
+				isRegistryCountry(input.country)
+					? byCountry[input.country](input)
+					: noRegistryError(input.country),
 		})
 	}),
 )
