@@ -4,6 +4,7 @@ import { VerificationVerdict } from '../../domain/types'
 import {
 	Citation,
 	DiscoveredExisting,
+	LenientNumber,
 	PendingPaidAction,
 	ProposedUpdate,
 } from './_shared'
@@ -22,7 +23,7 @@ export const ContactDiscoveryV1Schema = Schema.Struct({
 						kind: Schema.String,
 						value: Schema.String,
 						verification: Schema.optionalKey(VerificationVerdict),
-						confidence: Schema.optionalKey(Schema.Number),
+						confidence: Schema.optionalKey(LenientNumber),
 						is_primary: Schema.optionalKey(Schema.Boolean),
 					}),
 				),

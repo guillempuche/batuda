@@ -3,6 +3,7 @@ import { Schema } from 'effect'
 import {
 	Citation,
 	DiscoveredExisting,
+	LenientNumber,
 	PendingPaidAction,
 	ProposedUpdate,
 } from './_shared'
@@ -21,7 +22,7 @@ export const CompetitorScanV1Schema = Schema.Struct({
 	),
 	market_summary: Schema.optionalKey(
 		Schema.Struct({
-			total_competitors_found: Schema.Number,
+			total_competitors_found: LenientNumber,
 			market_maturity: Schema.optionalKey(Schema.String),
 			key_differentiators: Schema.optionalKey(Schema.Array(Schema.String)),
 			citations: Schema.Array(Citation),
