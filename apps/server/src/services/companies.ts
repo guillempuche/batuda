@@ -11,6 +11,12 @@ export interface CompanyFilters {
 	readonly priority?: number | undefined
 	readonly productFit?: string | undefined
 	readonly query?: string | undefined
+	// Bounding box on the geocoded coordinates. Each bound is applied
+	// independently, so a partial box (e.g. only a southern edge) still narrows.
+	readonly minLat?: number | undefined
+	readonly maxLat?: number | undefined
+	readonly minLng?: number | undefined
+	readonly maxLng?: number | undefined
 	readonly limit?: number | undefined
 	readonly offset?: number | undefined
 }
@@ -36,10 +42,21 @@ export class CompanyService extends ServiceMap.Service<CompanyService>()(
 							conditions.push(sql`priority = ${filters.priority}`)
 						if (filters.query)
 							conditions.push(sql`name ILIKE ${`%${filters.query}%`}`)
+						if (filters.minLat !== undefined)
+							conditions.push(sql`latitude >= ${filters.minLat}`)
+						if (filters.maxLat !== undefined)
+							conditions.push(sql`latitude <= ${filters.maxLat}`)
+						if (filters.minLng !== undefined)
+							conditions.push(sql`longitude >= ${filters.minLng}`)
+						if (filters.maxLng !== undefined)
+							conditions.push(sql`longitude <= ${filters.maxLng}`)
 
 						return yield* sql`
 							SELECT id, slug, name, status, industry, region, priority,
-								next_action, next_action_at, last_contacted_at, tags
+								next_action, next_action_at, last_contacted_at, tags,
+								-- NUMERIC comes back as a string over the wire; cast so
+								-- callers get real numbers for the coordinates.
+								latitude::float8 AS latitude, longitude::float8 AS longitude
 							FROM companies
 							WHERE ${sql.and(conditions)}
 							ORDER BY priority, updated_at DESC

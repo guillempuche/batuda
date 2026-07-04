@@ -1,17 +1,21 @@
 import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
+import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
 
 import { CompanyService } from '../../services/companies'
-import { geocodeCompany } from '../../services/company-geocoding'
+import {
+	geocodeCompany,
+	updateCompanyRegeocoding,
+} from '../../services/company-geocoding'
 import { Geocoder } from '../../services/geocoder'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg]
 
 const SearchCompanies = Tool.make('search_companies', {
 	description:
-		'Filter companies by status, region, industry, priority, or search query. Returns summaries only — call get_company for full details.',
+		'Filter companies by status, region, industry, priority, search query, or a geographic bounding box. The box is any subset of min_lat/max_lat/min_lng/max_lng (decimal degrees); each bound is applied independently and only matches companies with stored coordinates. Returns summaries (including latitude/longitude) — call get_company for full details.',
 	parameters: Schema.Struct({
 		status: Schema.optional(Schema.String),
 		region: Schema.optional(Schema.String),
@@ -19,6 +23,10 @@ const SearchCompanies = Tool.make('search_companies', {
 		priority: Schema.optional(Schema.Number),
 		product_fit: Schema.optional(Schema.String),
 		query: Schema.optional(Schema.String),
+		min_lat: Schema.optional(Schema.Number),
+		max_lat: Schema.optional(Schema.Number),
+		min_lng: Schema.optional(Schema.Number),
+		max_lng: Schema.optional(Schema.Number),
 		limit: Schema.optional(Schema.Number),
 	}),
 	success: Schema.Unknown,
@@ -146,6 +154,10 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 	Effect.gen(function* () {
 		const service = yield* CompanyService
 		const geocoder = yield* Geocoder
+		// The re-geocode fork re-enters org scope on its own connection, so it
+		// needs the SqlClient; resolve it here (like research-sink) and provide
+		// it to the update path, keeping CurrentOrg as the only request service.
+		const sql = yield* SqlClient.SqlClient
 		return {
 			search_companies: params =>
 				Effect.gen(function* () {
@@ -156,6 +168,10 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 						priority: params.priority,
 						productFit: params.product_fit,
 						query: params.query,
+						minLat: params.min_lat,
+						maxLat: params.max_lat,
+						minLng: params.min_lng,
+						maxLng: params.max_lng,
 						limit: params.limit,
 					})
 				}).pipe(Effect.orDie),
@@ -170,10 +186,12 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 					return rows[0]
 				}).pipe(Effect.orDie),
 			update_company: ({ id, ...fields }) =>
-				Effect.gen(function* () {
-					const rows = yield* service.update(id, fields)
-					return rows[0]
-				}).pipe(Effect.orDie),
+				updateCompanyRegeocoding(id, fields).pipe(
+					Effect.provideService(CompanyService, service),
+					Effect.provideService(Geocoder, geocoder),
+					Effect.provideService(SqlClient.SqlClient, sql),
+					Effect.orDie,
+				),
 			geocode_company: ({ id }) =>
 				geocodeCompany(id).pipe(
 					Effect.provideService(CompanyService, service),
