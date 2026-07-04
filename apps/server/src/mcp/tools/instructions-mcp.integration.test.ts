@@ -331,6 +331,26 @@ describe('MCP instruction tools against live Postgres', () => {
 		})
 	})
 
+	describe('when an agent lists instruction templates', () => {
+		it('should wrap the rows in an items object, never a bare array', async () => {
+			// GIVEN the member owns at least one template
+			const id = await createPersonalTemplate(memberId, 'list-shape')
+
+			// WHEN the agent lists templates
+			// [instructions-mcp.ts manage_instruction_template:list]
+			const res = await callTool(memberId, 'manage_instruction_template', {
+				action: 'list',
+			})
+
+			// THEN the result is an object under `items`, not a bare array — a bare
+			// array is not valid MCP structured output and strict clients reject it
+			expect(Array.isArray(res)).toBe(false)
+			expect(res).toMatchObject({ items: expect.any(Array) })
+			const { items } = res as { items: ReadonlyArray<{ id: string }> }
+			expect(items.some(t => t.id === id)).toBe(true)
+		})
+	})
+
 	// The transfer function self-elevates (BYPASSRLS), so it re-checks the rules
 	// the service checks above. These call it directly, past the service, to prove
 	// the elevation can't be abused even if a caller's checks were wrong.

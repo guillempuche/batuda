@@ -7,6 +7,7 @@ import { type Agent, AgentSchema } from '@batuda/instructions'
 
 import { InstructionsService } from '../../services/instructions'
 import { Uuid } from './_research-shared'
+import { toItems } from './_result'
 
 // Consolidated, action-based management tools so the MCP surface gains the
 // instruction-template controls without ~16 individual tools. Each acts as the
@@ -90,7 +91,9 @@ export const InstructionsMcpHandlersLive = InstructionsMcpTools.toLayer(
 					const { userId } = yield* SessionContext
 					switch (params.action) {
 						case 'list':
-							return yield* run(svc.listTemplates())
+							// Wrap the row list in an object — a bare array is not valid
+							// MCP structured output and strict clients reject it.
+							return toItems(yield* run(svc.listTemplates()))
 						case 'create':
 							if (
 								params.name === undefined ||

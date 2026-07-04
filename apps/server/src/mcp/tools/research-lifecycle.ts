@@ -260,7 +260,9 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 					const { userId } = yield* SessionContext
 					if (params.action === 'get') {
 						const policy = yield* svc.getPolicy(userId)
-						return policy ?? null
+						// A missing policy row must still come back as an object — the
+						// MCP contract rejects a bare `null` as structured output.
+						return { policy: policy ?? null }
 					}
 					return yield* svc
 						.updatePolicy(userId, {
