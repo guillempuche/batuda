@@ -1,10 +1,11 @@
-import { DateTime, Effect } from 'effect'
+import { Effect } from 'effect'
 import { HttpServerResponse } from 'effect/unstable/http'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
 import { BatudaApi, NotFound } from '@batuda/controllers'
 
 import { CompanyService } from '../services/companies'
+import { geocodeCompany } from '../services/company-geocoding'
 import { Geocoder } from '../services/geocoder'
 
 export const CompaniesLive = HttpApiBuilder.group(
@@ -65,39 +66,25 @@ export const CompaniesLive = HttpApiBuilder.group(
 					),
 				)
 				.handle('geocode', _ =>
-					Effect.gen(function* () {
-						const company = yield* svc.findById(_.params.id)
-						const name = company['name'] as string | null
-						const location = company['location'] as string | null
-						const query = [name, location].filter(Boolean).join(', ')
-						if (!query) {
-							return yield* new NotFound({
-								entity: 'geocode-query',
-								id: _.params.id,
-							})
-						}
-						const hit = yield* geocoder.lookup(query)
-						if (!hit) {
-							return yield* new NotFound({
-								entity: 'geocode-miss',
-								id: _.params.id,
-							})
-						}
-						const rows = yield* svc.update(_.params.id, {
-							latitude: hit.latitude,
-							longitude: hit.longitude,
-							geocodedAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
-							geocodeSource: hit.source,
-						})
-						yield* Effect.logInfo('Company geocoded').pipe(
-							Effect.annotateLogs({
-								event: 'company.geocoded',
-								companyId: _.params.id,
-								source: hit.source,
-							}),
-						)
-						return rows[0]
-					}).pipe(
+					geocodeCompany(_.params.id).pipe(
+						Effect.provideService(CompanyService, svc),
+						Effect.provideService(Geocoder, geocoder),
+						// The helper returns null when there's no address to search on or
+						// the geocoder found no match; the endpoint reports both as a
+						// 404 the Where panel renders as "no match".
+						Effect.flatMap(row =>
+							row === null
+								? Effect.fail(
+										new NotFound({ entity: 'geocode-miss', id: _.params.id }),
+									)
+								: Effect.logInfo('Company geocoded').pipe(
+										Effect.annotateLogs({
+											event: 'company.geocoded',
+											companyId: _.params.id,
+										}),
+										Effect.as(row),
+									),
+						),
 						Effect.catch(e =>
 							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
 						),
