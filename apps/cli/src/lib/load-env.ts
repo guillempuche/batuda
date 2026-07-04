@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { config as dotenvConfig } from 'dotenv'
+import { config as dotenvConfig, parse as dotenvParse } from 'dotenv'
 
 const ROOT = resolve(import.meta.dirname, '../../../..')
 
@@ -148,11 +148,18 @@ const fetchGhVariables = (): void => {
  *   4. `<repo>/.env.cloud`                (cloud only — secrets + overrides)
  *   5. `<repo>/apps/cli/.env.cloud`       (cloud only)
  *
+ * A value the caller already exported into the environment wins over the
+ * baseline files, and a blank entry (`KEY=`) never overwrites a value another
+ * file provided. Both matter for the integration db-setup, which exports
+ * `DATABASE_URL` for a throwaway test DB and shells out to the CLI: a stray
+ * empty `apps/cli/.env` line must not blank that out, and the baseline dev URL
+ * must not shadow it (that would point `db reset` at the wrong database).
+ *
  * Why gh fetch runs *between* the baselines and `.env.cloud`: the baseline
  * usually carries dev defaults like `BETTER_AUTH_BASE_URL=…localhost`, and
  * cloud mode must not inherit those. `.env.cloud` is reserved for secrets
- * (which gh can't expose) and rare local overrides — putting it last keeps
- * the user's explicit overrides authoritative.
+ * (which gh can't expose) and rare local overrides — putting it last, and
+ * still authoritative, keeps those overrides in charge.
  *
  * Must run before `NodeRuntime.runMain` / any Effect Config resolution so
  * process.env is populated before the layer stack is built.
@@ -168,16 +175,38 @@ export const loadEnv = (): EnvTarget => {
 		resolve(ROOT, 'apps/cli/.env.cloud'),
 	]
 
-	const loadFile = (file: string): void => {
+	// Keys the caller exported before invoking the CLI. The baseline files must
+	// not overwrite these, so an explicit `DATABASE_URL=…` stays authoritative.
+	const callerProvided = new Set(
+		Object.entries(process.env)
+			.filter(([, value]) => value !== undefined && value !== '')
+			.map(([key]) => key),
+	)
+
+	// Baseline load: later file wins, but skip blank entries and keys the caller
+	// already set, so neither an empty line nor a dev default can shadow them.
+	const loadBaseline = (file: string): void => {
+		if (!existsSync(file)) return
+		for (const [key, value] of Object.entries(
+			dotenvParse(readFileSync(file)),
+		)) {
+			if (value === '' || callerProvided.has(key)) continue
+			process.env[key] = value
+		}
+	}
+
+	// Cloud overrides are authoritative for secrets and rare local overrides, so
+	// they replace whatever the baselines or gh set.
+	const loadCloudOverride = (file: string): void => {
 		if (existsSync(file)) {
 			dotenvConfig({ path: file, override: true, quiet: true })
 		}
 	}
 
-	for (const file of baselineFiles) loadFile(file)
+	for (const file of baselineFiles) loadBaseline(file)
 	if (target === 'cloud') {
 		fetchGhVariables()
-		for (const file of cloudOverrideFiles) loadFile(file)
+		for (const file of cloudOverrideFiles) loadCloudOverride(file)
 	}
 
 	resolvedTarget = target
