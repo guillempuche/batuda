@@ -32,6 +32,7 @@
 	"devDependencies": {
 		"@batuda/auth": "workspace:*",
 		"@batuda/calendar": "workspace:*",
+		"@batuda/communications": "workspace:*",
 		"@batuda/controllers": "workspace:*",
 		"@batuda/domain": "workspace:*",
 		"@batuda/email": "workspace:*",

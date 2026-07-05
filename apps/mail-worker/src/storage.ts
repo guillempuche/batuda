@@ -6,16 +6,16 @@ import { Effect, Layer, Redacted, ServiceMap } from 'effect'
 import { WorkerEnvVars } from './env.js'
 
 // S3-compatible object store (R2 in prod, MinIO in dev). The worker
-// uploads raw RFC822 bytes under a stable key derived from inbox +
+// uploads raw RFC822 bytes under a stable key derived from mailbox +
 // uidvalidity + uid so a re-fetch of the same UID overwrites in place
 // (the bytes are identical) without spawning a duplicate object.
 export const rawMessageKey = (args: {
 	readonly organizationId: string
-	readonly inboxId: string
+	readonly mailboxId: string
 	readonly uidValidity: number
 	readonly uid: number
 }): string =>
-	`messages/${args.organizationId}/${args.inboxId}/${args.uidValidity}/${args.uid}.eml`
+	`messages/${args.organizationId}/${args.mailboxId}/${args.uidValidity}/${args.uid}.eml`
 
 // Per-attachment object key. Sibling of the raw RFC822 under the same
 // message prefix, so a download is one GET (the read path never reaches
@@ -24,12 +24,12 @@ export const rawMessageKey = (args: {
 // the attachments JSONB metadata.
 export const attachmentKey = (args: {
 	readonly organizationId: string
-	readonly inboxId: string
+	readonly mailboxId: string
 	readonly uidValidity: number
 	readonly uid: number
 	readonly index: number
 }): string =>
-	`messages/${args.organizationId}/${args.inboxId}/${args.uidValidity}/${args.uid}/attachment-${args.index}.bin`
+	`messages/${args.organizationId}/${args.mailboxId}/${args.uidValidity}/${args.uid}/attachment-${args.index}.bin`
 
 export class RawMessageStorage extends ServiceMap.Service<RawMessageStorage>()(
 	'RawMessageStorage',

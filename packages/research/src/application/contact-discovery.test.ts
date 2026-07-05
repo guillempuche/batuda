@@ -17,8 +17,8 @@ const contact = (over: {
 	is_decision_maker: over.is_decision_maker ?? false,
 	channels: [
 		{
-			kind: 'email',
-			value: 'test@acme.com',
+			channel: 'email',
+			address: 'test@acme.com',
 			verification: over.verification ?? 'deliverable',
 			confidence: over.confidence,
 			is_primary: true,
@@ -155,7 +155,9 @@ describe('compareContacts', () => {
 			const socialOnly: DiscoveredContact = {
 				name: 'Social Only',
 				is_decision_maker: false,
-				channels: [{ kind: 'linkedin', value: 'https://linkedin.com/in/x' }],
+				channels: [
+					{ channel: 'linkedin', address: 'https://linkedin.com/in/x' },
+				],
 			}
 			expect([socialOnly, withEmail].sort(compareContacts)[0]).toBe(withEmail)
 		})
@@ -170,12 +172,16 @@ describe('emailChannel', () => {
 				name: 'Has Email',
 				is_decision_maker: false,
 				channels: [
-					{ kind: 'linkedin', value: 'https://linkedin.com/in/x' },
-					{ kind: 'email', value: 'x@acme.com', verification: 'deliverable' },
+					{ channel: 'linkedin', address: 'https://linkedin.com/in/x' },
+					{
+						channel: 'email',
+						address: 'x@acme.com',
+						verification: 'deliverable',
+					},
 				],
 			}
 			// THEN the email channel is the one returned (the ranking signal)
-			expect(emailChannel(c)?.value).toBe('x@acme.com')
+			expect(emailChannel(c)?.address).toBe('x@acme.com')
 		})
 	})
 
@@ -185,7 +191,7 @@ describe('emailChannel', () => {
 			const c: DiscoveredContact = {
 				name: 'No Email',
 				is_decision_maker: false,
-				channels: [{ kind: 'phone', value: '+34000000000' }],
+				channels: [{ channel: 'phone', address: '+34000000000' }],
 			}
 			// THEN there is no email channel to rank on
 			expect(emailChannel(c)).toBeUndefined()

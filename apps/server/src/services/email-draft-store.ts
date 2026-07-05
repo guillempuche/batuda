@@ -7,7 +7,7 @@ import { CurrentOrg, NotFound } from '@batuda/controllers'
 
 // Owns the full draft state in Postgres: recipient lists, subject, the
 // editor block tree, threading metadata. Replaces the
-// LocalInboxProvider's filesystem-backed draft surface so drafts survive
+// LocalMailboxProvider's filesystem-backed draft surface so drafts survive
 // server restarts and remain visible to org members on multiple machines.
 //
 // All operations are org-scoped via CurrentOrg. RLS on `email_drafts`
@@ -18,7 +18,7 @@ import { CurrentOrg, NotFound } from '@batuda/controllers'
 export interface DraftRow {
 	readonly draftId: string
 	readonly organizationId: string
-	readonly inboxId: string
+	readonly mailboxId: string
 	readonly mode: 'new' | 'reply'
 	readonly toAddresses: ReadonlyArray<string>
 	readonly ccAddresses: ReadonlyArray<string>
@@ -33,7 +33,7 @@ export interface DraftRow {
 }
 
 export interface CreateDraftInput {
-	readonly inboxId: string
+	readonly mailboxId: string
 	readonly mode?: 'new' | 'reply'
 	readonly to?: ReadonlyArray<string>
 	readonly cc?: ReadonlyArray<string>
@@ -54,9 +54,9 @@ export interface UpdateDraftInput {
 }
 
 const SELECT_COLUMNS = `
-	draft_id, organization_id, inbox_id, mode,
+	draft_id, organization_id, connection_id AS "mailboxId", mode,
 	to_addresses, cc_addresses, bcc_addresses,
-	subject, in_reply_to, thread_link_id, client_id,
+	subject, in_reply_to, conversation_id AS "threadLinkId", client_id,
 	body_json, created_at, updated_at
 `
 
@@ -72,14 +72,14 @@ export class DraftStore extends ServiceMap.Service<DraftStore>()('DraftStore', {
 					INSERT INTO email_drafts ${sql.insert({
 						draftId,
 						organizationId: currentOrg.id,
-						inboxId: input.inboxId,
+						connectionId: input.mailboxId,
 						mode: input.mode ?? 'new',
 						toAddresses: input.to ?? [],
 						ccAddresses: input.cc ?? [],
 						bccAddresses: input.bcc ?? [],
 						subject: input.subject ?? null,
 						inReplyTo: input.inReplyTo ?? null,
-						threadLinkId: input.threadLinkId ?? null,
+						conversationId: input.threadLinkId ?? null,
 						clientId: input.clientId ?? null,
 						bodyJson: JSON.stringify(input.bodyJson ?? {}),
 					})}
@@ -111,14 +111,14 @@ export class DraftStore extends ServiceMap.Service<DraftStore>()('DraftStore', {
 				return row
 			})
 
-		const list = (inboxId?: string) =>
+		const list = (mailboxId?: string) =>
 			Effect.gen(function* () {
 				const currentOrg = yield* CurrentOrg
-				if (inboxId) {
+				if (mailboxId) {
 					return yield* sql<DraftRow>`
 						SELECT ${sql.unsafe(SELECT_COLUMNS)}
 						FROM email_drafts
-						WHERE inbox_id = ${inboxId}
+						WHERE connection_id = ${mailboxId}
 						  AND organization_id = ${currentOrg.id}
 						ORDER BY updated_at DESC
 					`.pipe(Effect.orDie)

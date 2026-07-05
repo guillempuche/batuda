@@ -27,7 +27,7 @@ export interface TaskFilters {
 	readonly search?: string | undefined
 }
 
-// `recent` surfaces newest-first for the web inbox; `due` surfaces the most
+// `recent` surfaces newest-first for the web mailbox; `due` surfaces the most
 // overdue first for an agent picking the next thing to act on.
 export type TaskSort = 'recent' | 'due'
 
@@ -129,7 +129,7 @@ export class TaskService extends ServiceMap.Service<TaskService>()(
 				return conditions
 			}
 
-			// Append-only audit row consumed by the tasks-inbox undo drawer
+			// Append-only audit row consumed by the tasks-mailbox undo drawer
 			// (`apps/internal` reads it via GET /tasks/:id/events). `change` is a
 			// field diff (`{ field: [old, new] }`) or `{ kind: 'created' }`.
 			const recordEvent = (

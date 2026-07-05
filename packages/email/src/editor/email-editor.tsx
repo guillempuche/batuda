@@ -46,7 +46,7 @@ export interface EmailEditorPayload {
 }
 
 export interface EmailEditorProps {
-	readonly inboxId: string
+	readonly mailboxId: string
 	readonly mode: 'compose' | 'footer'
 	readonly initialJson?: EmailBlocks | undefined
 	readonly onChange: (payload: EmailEditorPayload) => void
@@ -114,7 +114,7 @@ export const enforceModePalette = (
 
 export const EmailEditor = (props: EmailEditorProps) => {
 	const {
-		inboxId,
+		mailboxId,
 		mode,
 		initialJson,
 		onChange,
@@ -130,8 +130,8 @@ export const EmailEditor = (props: EmailEditorProps) => {
 		emailBlocksToTiptap(initialJson ?? []),
 	)
 	const uploader: ImageUploader = useMemo(
-		() => createImageUploader({ inboxId, endpoint: stagingEndpoint }),
-		[inboxId, stagingEndpoint],
+		() => createImageUploader({ mailboxId, endpoint: stagingEndpoint }),
+		[mailboxId, stagingEndpoint],
 	)
 	const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -197,7 +197,7 @@ export const EmailEditor = (props: EmailEditorProps) => {
 
 	return (
 		<EmailEditorBridge
-			inboxId={inboxId}
+			mailboxId={mailboxId}
 			doc={doc}
 			uploader={uploader}
 			placeholder={placeholder}
@@ -252,7 +252,7 @@ const blocksToPlainText = (blocks: EmailBlocks): string => {
 //      drop-out set.
 
 interface BridgeProps {
-	readonly inboxId: string
+	readonly mailboxId: string
 	readonly doc: TiptapDoc
 	readonly uploader: ImageUploader
 	readonly placeholder?: string | undefined

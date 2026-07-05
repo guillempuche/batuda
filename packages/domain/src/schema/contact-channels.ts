@@ -16,7 +16,7 @@ export const EmailStatus = Schema.Literals([
 ])
 export type EmailStatus = typeof EmailStatus.Type
 
-// One reachable channel for a contact. `kind` is open free text — `email`,
+// One reachable channel for a contact. `channel` is open free text — `email`,
 // `phone`, `linkedin`, `x`, `website`, `bluesky`, `mastodon`, … — so a new
 // platform needs no migration. The email channel additionally carries a
 // deliverability `verification` (discovery verdict) and a send-suppression
@@ -26,8 +26,8 @@ export class ContactChannel extends Model.Class<ContactChannel>(
 )({
 	id: Model.Generated(ContactChannelId),
 	contactId: Schema.String,
-	kind: Schema.String,
-	value: Schema.String,
+	channel: Schema.String,
+	address: Schema.String,
 	verification: Schema.NullOr(Schema.String),
 	confidence: Schema.NullOr(Schema.Number),
 	isPrimary: Schema.Boolean,

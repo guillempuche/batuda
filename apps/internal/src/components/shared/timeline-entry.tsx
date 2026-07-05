@@ -25,7 +25,7 @@ export type TimelineEntryData = {
 	date: Date | string
 	/**
 	 * When the entry came from an email interaction and we could resolve the
-	 * local `email_thread_links.id`, this hyperlinks the row to the thread
+	 * local `conversations.id`, this hyperlinks the row to the thread
 	 * detail page.
 	 */
 	threadId?: string | null

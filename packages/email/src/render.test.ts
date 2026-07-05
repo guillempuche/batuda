@@ -198,21 +198,21 @@ describe('renderBlocks', () => {
 		it.todo(
 			// GIVEN a preview longer than 150 chars
 			// WHEN rendered
-			// THEN the preview is truncated or warned about — inbox snippet cap is ~140
-			'should handle preview strings longer than inbox snippet cap',
+			// THEN the preview is truncated or warned about — mailbox snippet cap is ~140
+			'should handle preview strings longer than mailbox snippet cap',
 		)
 
 		it.todo(
 			// GIVEN a preview with HTML-sensitive characters
 			// WHEN rendered
-			// THEN they are escaped so the inbox snippet shows the literal text
+			// THEN they are escaped so the mailbox snippet shows the literal text
 			'should escape HTML-sensitive characters in preview',
 		)
 
 		it.todo(
 			// GIVEN no preview option
 			// WHEN rendered
-			// THEN no <Preview> node is emitted — inbox shows provider default snippet
+			// THEN no <Preview> node is emitted — mailbox shows provider default snippet
 			'should omit preview entirely when not provided',
 		)
 	})

@@ -70,8 +70,8 @@ export const dispatchRsvpReply = (args: {
 		// RFC thread id.
 		const linkRows = yield* sql<{ id: string }>`
 			SELECT etl.id
-			FROM email_messages em
-			JOIN email_thread_links etl
+			FROM messages em
+			JOIN conversations etl
 			  ON etl.organization_id = em.organization_id
 			 AND (
 			   etl.external_thread_id = em.message_id

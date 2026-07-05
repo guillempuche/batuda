@@ -10,7 +10,7 @@ import {
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // Sends a brand-new email via the compose UI and asserts it lands on the
-// mail catcher's REST API. The seeded inbox points at localhost:1025/1143
+// mail catcher's REST API. The seeded mailbox points at localhost:1025/1143
 // with security='plain', so the round-trip works.
 //
 // Selectors verified against:
@@ -49,21 +49,21 @@ test.describe('compose and send via the mail catcher', () => {
 	test.beforeEach(async ({ page }) => {
 		// GIVEN the catcher is empty for this spec and Alice's session is on Taller
 		await clearCatcher()
-		// AND the seeded inbox's grant_status is forced to `connected`. The
-		// inbox-health probe (services/inbox-health-probe.ts) marks the inbox
+		// AND the seeded mailbox's grant_status is forced to `connected`. The
+		// mailbox-health probe (services/mailbox-health-probe.ts) marks the mailbox
 		// connected against the reachable catcher, but it runs on a 15-min
 		// cadence and its first tick can lose the race to a cold-booting
 		// catcher; this UPDATE keeps the send pipeline (which blocks on
 		// GrantUnavailable) asserting only what it owns.
 		psql(
-			`UPDATE inboxes SET grant_status='connected' WHERE email='admin@taller.cat'`,
+			`UPDATE channel_connections SET grant_status='connected' WHERE external_id='admin@taller.cat'`,
 		)
 		await page.goto('/', { waitUntil: 'commit' })
 		await setActiveOrgBySlug(page, 'taller')
 	})
 
 	test.describe('when an authenticated user sends a brand-new email', () => {
-		test("should write the message to the catcher's inbox (poll until present)", async ({
+		test("should write the message to the catcher's mailbox (poll until present)", async ({
 			page,
 		}) => {
 			// Unique recipient + subject keeps the catcher lookup deterministic

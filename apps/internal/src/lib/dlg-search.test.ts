@@ -5,7 +5,7 @@ import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
 import { validateSearchWith } from '#/lib/search-schema'
 
 // A representative route vocabulary: one dialog that opens on its own and two
-// that target a row. This mirrors how routes/emails/inboxes.tsx declares its
+// that target a row. This mirrors how routes/emails/mailboxes.tsx declares its
 // dialogs, so the decode behaviour asserted here is the real route contract.
 const dlg = Schema.Union([
 	dlgNoId('create'),
@@ -35,11 +35,11 @@ describe('dialog search-param vocabulary [dlg-search.ts]', () => {
 
 	describe('when the param targets a row with a non-empty id', () => {
 		it('should decode kind and id together', () => {
-			// GIVEN ?dlg={kind:'edit',id:'inbox-42'}
+			// GIVEN ?dlg={kind:'edit',id:'mailbox-42'}
 			// WHEN validated
 			// THEN both fields round-trip [dlg-search.ts:18 dlgWithId]
-			expect(decode({ dlg: { kind: 'edit', id: 'inbox-42' } })).toEqual({
-				dlg: { kind: 'edit', id: 'inbox-42' },
+			expect(decode({ dlg: { kind: 'edit', id: 'mailbox-42' } })).toEqual({
+				dlg: { kind: 'edit', id: 'mailbox-42' },
 			})
 		})
 	})
@@ -88,12 +88,12 @@ describe('dialog search-param vocabulary [dlg-search.ts]', () => {
 		it('should round-trip the structured value', () => {
 			// GIVEN a shared link ?dlg=<url-encoded JSON>
 			const encoded =
-				'%7B%22kind%22%3A%22edit%22%2C%22id%22%3A%22inbox-42%22%7D'
+				'%7B%22kind%22%3A%22edit%22%2C%22id%22%3A%22mailbox-42%22%7D'
 			// WHEN the browser decodes + parses it the way TanStack does
 			const parsed: unknown = JSON.parse(decodeURIComponent(encoded))
 			// THEN validateSearch recovers the typed dialog
 			expect(decode({ dlg: parsed })).toEqual({
-				dlg: { kind: 'edit', id: 'inbox-42' },
+				dlg: { kind: 'edit', id: 'mailbox-42' },
 			})
 		})
 	})

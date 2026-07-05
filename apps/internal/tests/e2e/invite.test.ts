@@ -15,7 +15,7 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 //   2. The server's `sendInvitationEmail` callback pre-creates the invitee,
 //      mints a magic-link sign-in URL pointing at /accept-invitation/<id>, and
 //      ships it via the local transactional provider. The .md lands under
-//      apps/server/.dev-inbox/ with `labels: invitation`.
+//      apps/server/.dev-mailbox/ with `labels: invitation`.
 //   3. The test reads the .md and extracts the magic-link URL.
 //   4. A FRESH browser context (no Alice cookie) opens the URL: BA's
 //      magic-link verify endpoint signs the invitee in AND redirects via the
@@ -30,7 +30,7 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 // Auth: Alice's session comes from `auth.setup`'s storageState. Invitees and
 // the member-view persona use fresh contexts so we never reuse Alice's cookie.
 
-const INBOX_DIR = join(process.cwd(), '..', 'server', '.dev-inbox')
+const INBOX_DIR = join(process.cwd(), '..', 'server', '.dev-mailbox')
 
 const BASE_URL = process.env['E2E_BASE_URL'] ?? 'https://batuda.localhost'
 
@@ -39,7 +39,7 @@ interface InvitationMail {
 	readonly url: string
 }
 
-// Reads the dev-inbox dir, finds the most recent .md whose recipient slug
+// Reads the dev-mailbox dir, finds the most recent .md whose recipient slug
 // matches the invitee, and pulls the magic-link URL out of the body. Polls
 // because the API returns before the file is on disk in some test runs.
 async function pollInvitationMail(

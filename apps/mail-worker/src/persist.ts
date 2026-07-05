@@ -2,8 +2,8 @@ import { Effect } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 import type { ParsedMail } from 'mailparser'
 
+import { NoMatch, ParticipantMatcher } from '@batuda/communications'
 import { CurrentOrg } from '@batuda/domain'
-import { NoMatch, ParticipantMatcher } from '@batuda/email/participant-matcher'
 
 import { resolveThreadId } from './threading.js'
 
@@ -68,7 +68,7 @@ export const fromParsedMail = (mail: ParsedMail): ParsedInbound => {
 	}
 }
 
-// Per-attachment metadata persisted as a JSONB array on email_messages.
+// Per-attachment metadata persisted as a JSONB array on messages.
 // `storageKey` points at the bytes uploaded by `RawMessageStorage.putAttachment`
 // — the download path is a single GET, no parse-on-request.
 export interface AttachmentMetadata {
@@ -84,11 +84,11 @@ export interface AttachmentMetadata {
 // Insert a parsed inbound message + its participants + (re)link to a
 // thread. Caller is responsible for `SET LOCAL app.current_org_id`
 // inside the surrounding transaction; the worker connects as
-// `app_service` (BYPASSRLS) and resolves org from the inbox row before
+// `app_service` (BYPASSRLS) and resolves org from the mailbox row before
 // each insert batch.
 export const persistInboundMessage = (args: {
 	readonly organizationId: string
-	readonly inboxId: string
+	readonly mailboxId: string
 	readonly folder: string
 	readonly imapUid: number
 	readonly imapUidvalidity: number
@@ -116,7 +116,8 @@ export const persistInboundMessage = (args: {
 		const match = args.parsed.fromAddress
 			? yield* matcher
 					.match({
-						email: args.parsed.fromAddress,
+						channel: 'email',
+						address: args.parsed.fromAddress,
 						createPolicy: 'never',
 					})
 					.pipe(
@@ -126,7 +127,7 @@ export const persistInboundMessage = (args: {
 							slug: '',
 						}),
 					)
-			: new NoMatch({ email: '' })
+			: new NoMatch({ channel: 'email', address: '' })
 
 		// Ambiguous and NoMatch deliberately fall through to null on both
 		// IDs — we never pick a winner when the address resolves to more
@@ -152,25 +153,25 @@ export const persistInboundMessage = (args: {
 		// the first message on a thread sets the link, later messages
 		// from a different sender don't re-home the whole thread.
 		yield* sql`
-			INSERT INTO email_thread_links (organization_id, inbox_id, external_thread_id, company_id, contact_id, updated_at)
-			VALUES (${args.organizationId}, ${args.inboxId}, ${externalThreadId}, ${companyId}, ${contactId}, now())
+			INSERT INTO conversations (organization_id, connection_id, external_thread_id, company_id, contact_id, updated_at)
+			VALUES (${args.organizationId}, ${args.mailboxId}, ${externalThreadId}, ${companyId}, ${contactId}, now())
 			ON CONFLICT (organization_id, external_thread_id)
 			DO UPDATE SET updated_at = now()
 		`
 
-		// `idx_email_messages_imap_dedupe` makes the (inbox_id,
-		// uidvalidity, uid) tuple unique, so re-fetches of the same UID
+		// A unique index on (connection_id,
+		// uidvalidity, uid), so re-fetches of the same UID
 		// after a worker restart are no-ops.
 		const inserted = yield* sql<{ id: string }>`
-			INSERT INTO email_messages (
-				organization_id, inbox_id, folder, imap_uid, imap_uidvalidity,
+			INSERT INTO messages (
+				organization_id, connection_id, folder, imap_uid, imap_uidvalidity,
 				message_id, in_reply_to, "references",
 				subject, received_at, text_body, html_body, text_preview,
 				raw_rfc822_ref, recipients, attachments, status, status_updated_at,
 				direction, company_id, contact_id
 			)
 			VALUES (
-				${args.organizationId}, ${args.inboxId}, ${args.folder},
+				${args.organizationId}, ${args.mailboxId}, ${args.folder},
 				${args.imapUid}, ${args.imapUidvalidity},
 				${args.parsed.messageId}, ${args.parsed.inReplyTo},
 				${args.parsed.references as unknown as string[]},
@@ -186,7 +187,7 @@ export const persistInboundMessage = (args: {
 				'normal', now(),
 				'inbound', ${companyId}, ${contactId}
 			)
-			ON CONFLICT (inbox_id, imap_uidvalidity, imap_uid)
+			ON CONFLICT (connection_id, imap_uidvalidity, imap_uid)
 			  WHERE imap_uid IS NOT NULL
 			DO NOTHING
 			RETURNING id
@@ -200,31 +201,52 @@ export const persistInboundMessage = (args: {
 		// recordset columns by exact (case-sensitive) name, and
 		// Postgres folds unquoted column identifiers to lowercase, so
 		// the JSON keys must be lowercase snake_case to match
-		// `message_id`/`address`/`role`.
-		type Row = { message_id: string; address: string; role: string }
+		// `message_id`/`address`/`role`/`channel`.
+		type Row = {
+			message_id: string
+			address: string
+			role: string
+			channel: string
+		}
 		const rows: Row[] = []
 		if (args.parsed.fromAddress) {
 			rows.push({
 				message_id: messageDbId,
 				address: args.parsed.fromAddress,
 				role: 'from',
+				channel: 'email',
 			})
 		}
 		for (const a of args.parsed.toAddresses) {
-			rows.push({ message_id: messageDbId, address: a, role: 'to' })
+			rows.push({
+				message_id: messageDbId,
+				address: a,
+				role: 'to',
+				channel: 'email',
+			})
 		}
 		for (const a of args.parsed.ccAddresses) {
-			rows.push({ message_id: messageDbId, address: a, role: 'cc' })
+			rows.push({
+				message_id: messageDbId,
+				address: a,
+				role: 'cc',
+				channel: 'email',
+			})
 		}
 		for (const a of args.parsed.bccAddresses) {
-			rows.push({ message_id: messageDbId, address: a, role: 'bcc' })
+			rows.push({
+				message_id: messageDbId,
+				address: a,
+				role: 'bcc',
+				channel: 'email',
+			})
 		}
 		if (rows.length > 0) {
 			yield* sql`
-				INSERT INTO message_participants (email_message_id, email_address, role)
-				SELECT v.message_id, v.address, v.role
+				INSERT INTO message_participants (message_id, address, role, channel)
+				SELECT v.message_id, v.address, v.role, v.channel
 				FROM jsonb_to_recordset(${JSON.stringify(rows)}::jsonb)
-				  AS v(message_id uuid, address text, role text)
+				  AS v(message_id uuid, address text, role text, channel text)
 				ON CONFLICT DO NOTHING
 			`
 		}

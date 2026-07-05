@@ -24,7 +24,6 @@ import {
 	type Slot,
 	UnsupportedRsvp,
 } from '@batuda/calendar'
-import { CurrentOrg } from '@batuda/controllers'
 import {
 	Ambiguous,
 	CreatedContact,
@@ -32,7 +31,8 @@ import {
 	MatchedContact,
 	NoMatch,
 	ParticipantMatcher,
-} from '@batuda/email/participant-matcher'
+} from '@batuda/communications'
+import { CurrentOrg } from '@batuda/controllers'
 
 import {
 	MeetingCancelled,
@@ -232,7 +232,8 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 			}) =>
 				participantMatcher
 					.match({
-						email: attendee.email,
+						channel: 'email',
+						address: attendee.email,
 						createPolicy: 'contact-only',
 						...(attendee.name ? { displayName: attendee.name } : {}),
 					})
@@ -1273,7 +1274,7 @@ export class CalendarService extends ServiceMap.Service<CalendarService>()(
 
 			// Rebuilds a METHOD=REQUEST ICS from scratch so forwarding an
 			// invitation to a new attendee shares the same `UID` — downstream
-			// inboxes dedup the event against their original copy.
+			// mailboxes dedup the event against their original copy.
 			const forwardInvitation = (args: {
 				readonly calendarEventId: string
 				readonly toEmail: string

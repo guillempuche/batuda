@@ -10,8 +10,8 @@ import {
 	EmailError,
 	EmailSuppressed,
 	GrantUnavailable,
-	InboxInactive,
-	NoDefaultInbox,
+	MailboxInactive,
+	NoDefaultMailbox,
 	NotFound,
 	SessionContext,
 } from '@batuda/controllers'
@@ -25,19 +25,21 @@ import type { EmailBlocks } from '@batuda/email/schema'
 const UUID_PATTERN =
 	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+import type {
+	OutboundAttachment,
+	OutboundMessage,
+} from '@batuda/communications'
+
 import { CalendarService } from './calendar.js'
 import { CredentialCrypto } from './credential-crypto.js'
 import type { ResolvedStaging, StagingRef } from './email-attachment-staging.js'
 import { EmailAttachmentStaging } from './email-attachment-staging.js'
 import { DraftStore } from './email-draft-store.js'
-import type { SendAttachmentInput } from './email-provider.js'
-import { EmailProvider } from './email-provider.js'
-import type {
-	DecryptedCreds,
-	OutboundAttachment,
-	OutboundMessage,
+import {
+	connectionAuth,
+	type DecryptedCreds,
+	MailTransport,
 } from './mail-transport.js'
-import { MailTransport } from './mail-transport.js'
 import { StorageProvider } from './storage-provider.js'
 import { EmailSent, TimelineActivityService } from './timeline-activity.js'
 
@@ -45,7 +47,7 @@ import { EmailSent, TimelineActivityService } from './timeline-activity.js'
 // claims the orphaned attachment objects instead of leaking on a 500.
 export class SmtpSendFailed extends Data.TaggedError('SmtpSendFailed')<{
 	readonly cause: unknown
-	readonly inboxId: string
+	readonly mailboxId: string
 }> {}
 
 // 1 + 3 retries spaced 1s/2s/4s → ~7s worst case before surfacing.
@@ -55,11 +57,11 @@ export const smtpRetrySchedule = Schedule.exponential('1 second', 2).pipe(
 
 export const retrySmtpSend = <A, E>(
 	send: Effect.Effect<A, E>,
-	inboxId: string,
+	mailboxId: string,
 ): Effect.Effect<A, SmtpSendFailed> =>
 	send.pipe(
 		Effect.retry(smtpRetrySchedule),
-		Effect.mapError(cause => new SmtpSendFailed({ cause, inboxId })),
+		Effect.mapError(cause => new SmtpSendFailed({ cause, mailboxId })),
 	)
 
 // PgClient.transformResultNames in apps/server/src/db/client.ts converts
@@ -137,7 +139,7 @@ const toStagedRefs = (
 
 const toSendAttachments = (
 	staged: readonly ResolvedStaging[],
-): readonly SendAttachmentInput[] =>
+): readonly OutboundAttachment[] =>
 	staged.map(s => ({
 		filename: s.filename,
 		contentType: s.contentType,
@@ -147,7 +149,7 @@ const toSendAttachments = (
 	}))
 
 const toOutboundAttachments = (
-	atts: readonly SendAttachmentInput[],
+	atts: readonly OutboundAttachment[],
 ): readonly OutboundAttachment[] =>
 	atts.map(a => ({
 		filename: a.filename,
@@ -159,17 +161,17 @@ const toOutboundAttachments = (
 
 // Outbound R2 key. The IMAP UID isn't known until the worker re-syncs the
 // Sent folder, so the key shape diverges from the inbound one
-// (`messages/<org>/<inbox>/<uidvalidity>/<uid>.eml`). Sanitize the
+// (`messages/<org>/<mailbox>/<uidvalidity>/<uid>.eml`). Sanitize the
 // Message-ID — nodemailer returns `<random@host>`; angle-brackets and
 // any non-filename-safe glyph get folded to `_` so the path stays valid
 // across S3-compatible backends.
 const sentRawKey = (
 	organizationId: string,
-	inboxId: string,
+	mailboxId: string,
 	messageId: string,
 ): string => {
 	const safe = messageId.replace(/[<>]/g, '').replace(/[^a-zA-Z0-9@.\-_]/g, '_')
-	return `messages/${organizationId}/${inboxId}/sent/${safe}.eml`
+	return `messages/${organizationId}/${mailboxId}/sent/${safe}.eml`
 }
 
 const toRecipientArray = (
@@ -194,7 +196,7 @@ const toRecipientArray = (
 // them to ISO strings on the wire, so they don't need special handling.
 type DraftProviderShape = {
 	readonly draftId: string
-	readonly inboxId: string
+	readonly mailboxId: string
 	readonly to: ReadonlyArray<string>
 	readonly cc: ReadonlyArray<string>
 	readonly bcc: ReadonlyArray<string>
@@ -207,7 +209,7 @@ type DraftProviderShape = {
 }
 const draftRowToProviderShape = (row: {
 	readonly draftId: string
-	readonly inboxId: string
+	readonly mailboxId: string
 	readonly clientId: string | null
 	readonly toAddresses: ReadonlyArray<string>
 	readonly ccAddresses: ReadonlyArray<string>
@@ -219,7 +221,7 @@ const draftRowToProviderShape = (row: {
 	readonly updatedAt: Date
 }): DraftProviderShape => ({
 	draftId: row.draftId,
-	inboxId: row.inboxId,
+	mailboxId: row.mailboxId,
 	to: row.toAddresses,
 	cc: row.ccAddresses,
 	bcc: row.bccAddresses,
@@ -258,7 +260,7 @@ const projectAttachmentsForWire = <T extends Record<string, unknown>>(
 }
 
 // Vendor-neutral mailbox presets for the connect-mailbox picker. The transport
-// fields mirror the createInbox payload; helpUrl, appPasswordUrl and
+// fields mirror the createMailbox payload; helpUrl, appPasswordUrl and
 // passwordAuthSupported are UI-only hints. Most providers accept an app-specific
 // password under two-factor authentication, and appPasswordUrl points to where
 // the user creates one. Gmail and Microsoft 365 are passwordAuthSupported=false:
@@ -372,9 +374,10 @@ const PROVIDER_PRESETS = [
 	},
 ] as const
 
-type InboxRow = {
+type MailboxRow = {
 	id: string
 	organizationId: string
+	provider: 'imap-smtp' | 'gmail-oauth' | 'm365-oauth'
 	email: string
 	displayName: string | null
 	purpose: 'human' | 'agent' | 'shared'
@@ -400,7 +403,6 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 	'EmailService',
 	{
 		make: Effect.gen(function* () {
-			const provider = yield* EmailProvider
 			const sql = yield* SqlClient.SqlClient
 			const timeline = yield* TimelineActivityService
 			const staging = yield* EmailAttachmentStaging
@@ -426,8 +428,8 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						SELECT status, status_reason
 						FROM contact_channels
 						WHERE contact_id = ${contactId}
-						  AND kind = 'email'
-						  AND lower(value) = ANY(${recipients})
+						  AND channel = 'email'
+						  AND lower(address) = ANY(${recipients})
 						  AND status IN ('bounced', 'complained')
 						LIMIT 1
 					`
@@ -442,26 +444,26 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					}
 				})
 
-			// ── Inbox lookups (org-scoped) ────────────────────────────────
+			// ── Mailbox lookups (org-scoped) ────────────────────────────────
 			//
-			// Every inbox read narrows by the active organization id so a
+			// Every mailbox read narrows by the active organization id so a
 			// caller cannot accidentally (or deliberately) reach across orgs
 			// even if the planner skips the RLS policy.
 
-			const selectInboxColumns = sql`
-				id, organization_id, email, display_name, purpose, owner_user_id,
+			const selectMailboxColumns = sql`
+				id, organization_id, provider, external_id AS "email", display_name, purpose, owner_user_id,
 				is_default, is_private, active, imap_host, imap_port, imap_security,
 				smtp_host, smtp_port, smtp_security, username,
 				grant_status, grant_last_error, grant_last_seen_at,
 				created_at, updated_at
 			`
 
-			const resolveInbox = (inboxId: string) =>
+			const resolveMailbox = (mailboxId: string) =>
 				Effect.gen(function* () {
 					const currentOrg = yield* CurrentOrg
-					const rows = yield* sql<InboxRow>`
-						SELECT ${selectInboxColumns} FROM inboxes
-						WHERE id = ${inboxId}
+					const rows = yield* sql<MailboxRow>`
+						SELECT ${selectMailboxColumns} FROM channel_connections
+						WHERE id = ${mailboxId}
 						  AND organization_id = ${currentOrg.id}
 						LIMIT 1
 					`.pipe(Effect.orDie)
@@ -470,10 +472,10 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 
 			// Decrypt the stored credentials in-memory, run an IMAP LOGIN + SMTP
 			// verify against the configured hosts, and persist the outcome so the
-			// status badge reflects reality. Shared by testInbox (a manual
-			// re-test) and updateInbox (immediate feedback after a credential or
+			// status badge reflects reality. Shared by testMailbox (a manual
+			// re-test) and updateMailbox (immediate feedback after a credential or
 			// transport change) so both report connect/auth failures identically.
-			const reprobeInbox = (id: string) =>
+			const reprobeMailbox = (id: string) =>
 				Effect.gen(function* () {
 					const currentOrg = yield* CurrentOrg
 
@@ -485,9 +487,10 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						smtpPort: number
 						smtpSecurity: 'tls' | 'starttls' | 'plain'
 						username: string
-						passwordCiphertext: Uint8Array
-						passwordNonce: Uint8Array
-						passwordTag: Uint8Array
+						provider: 'imap-smtp' | 'gmail-oauth' | 'm365-oauth'
+						configCiphertext: Uint8Array
+						configNonce: Uint8Array
+						configTag: Uint8Array
 					}>`
 						SELECT
 							imap_host          AS "imapHost",
@@ -497,29 +500,30 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							smtp_port          AS "smtpPort",
 							smtp_security      AS "smtpSecurity",
 							username,
-							password_ciphertext AS "passwordCiphertext",
-							password_nonce     AS "passwordNonce",
-							password_tag       AS "passwordTag"
-						FROM inboxes
+							provider,
+							config_ciphertext AS "configCiphertext",
+							config_nonce     AS "configNonce",
+							config_tag       AS "configTag"
+						FROM channel_connections
 						WHERE id = ${id}
 						  AND organization_id = ${currentOrg.id}
 						LIMIT 1
 					`.pipe(Effect.orDie)
 					const cred = credRows[0]
 					if (!cred) {
-						return yield* new NotFound({ entity: 'Inbox', id })
+						return yield* new NotFound({ entity: 'Mailbox', id })
 					}
 
-					const password = crypto.decryptPassword({
-						inboxId: id,
-						ciphertext: cred.passwordCiphertext,
-						nonce: cred.passwordNonce,
-						tag: cred.passwordTag,
+					const password = crypto.decryptConfig({
+						connectionId: id,
+						ciphertext: cred.configCiphertext,
+						nonce: cred.configNonce,
+						tag: cred.configTag,
 					})
 
 					const probe = yield* transport
 						.probe({
-							inboxId: id,
+							connectionId: id,
 							imapHost: cred.imapHost,
 							imapPort: cred.imapPort,
 							imapSecurity: cred.imapSecurity,
@@ -527,7 +531,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							smtpPort: cred.smtpPort,
 							smtpSecurity: cred.smtpSecurity,
 							username: cred.username,
-							password,
+							auth: connectionAuth(cred.provider, password),
 						})
 						.pipe(
 							Effect.match({
@@ -547,8 +551,8 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							}),
 						)
 
-					const rows = yield* sql<InboxRow>`
-						UPDATE inboxes
+					const rows = yield* sql<MailboxRow>`
+						UPDATE channel_connections
 						SET
 							grant_status = ${probe.status},
 							grant_last_error = ${probe.detail},
@@ -556,20 +560,20 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							updated_at = now()
 						WHERE id = ${id}
 						  AND organization_id = ${currentOrg.id}
-						RETURNING ${selectInboxColumns}
+						RETURNING ${selectMailboxColumns}
 					`
 					if (rows.length === 0) {
-						return yield* new NotFound({ entity: 'Inbox', id })
+						return yield* new NotFound({ entity: 'Mailbox', id })
 					}
 					return rows[0]!
 				})
 
-			const resolveDefaultInboxForCurrentUser = () =>
+			const resolveDefaultMailboxForCurrentUser = () =>
 				Effect.gen(function* () {
 					const currentOrg = yield* CurrentOrg
 					const session = yield* SessionContext
-					const rows = yield* sql<InboxRow>`
-						SELECT ${selectInboxColumns} FROM inboxes
+					const rows = yield* sql<MailboxRow>`
+						SELECT ${selectMailboxColumns} FROM channel_connections
 						WHERE organization_id = ${currentOrg.id}
 						  AND owner_user_id = ${session.userId}
 						  AND purpose = 'human'
@@ -579,37 +583,37 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					`.pipe(Effect.orDie)
 					const row = rows[0]
 					if (!row) {
-						return yield* new NoDefaultInbox({
+						return yield* new NoDefaultMailbox({
 							message:
-								'No primary inbox configured. Connect a mailbox in Settings → Email.',
+								'No primary mailbox configured. Connect a mailbox in Settings → Email.',
 						})
 					}
 					return row
 				})
 
-			// Single guard used before every send/reply so the inbox-state
+			// Single guard used before every send/reply so the mailbox-state
 			// failure modes (deactivated row, broken IMAP/SMTP credentials) all
 			// raise the same tagged errors the route maps to 409s.
-			const assertInboxUsable = (inbox: InboxRow) =>
+			const assertMailboxUsable = (mailbox: MailboxRow) =>
 				Effect.gen(function* () {
-					if (!inbox.active) {
-						return yield* new InboxInactive({ inboxId: inbox.id })
+					if (!mailbox.active) {
+						return yield* new MailboxInactive({ mailboxId: mailbox.id })
 					}
-					if (inbox.grantStatus !== 'connected') {
+					if (mailbox.grantStatus !== 'connected') {
 						return yield* new GrantUnavailable({
-							inboxId: inbox.id,
-							grantStatus: inbox.grantStatus,
+							mailboxId: mailbox.id,
+							grantStatus: mailbox.grantStatus,
 						})
 					}
 				})
 
 			type FooterRow = { bodyJson: EmailBlocks }
-			const resolveDefaultFooter = (inboxId: string) =>
+			const resolveDefaultFooter = (mailboxId: string) =>
 				Effect.gen(function* () {
 					const currentOrg = yield* CurrentOrg
 					const rows = yield* sql<FooterRow>`
-						SELECT body_json FROM inbox_footers
-						WHERE inbox_id = ${inboxId}
+						SELECT body_json FROM connection_footers
+						WHERE connection_id =${mailboxId}
 						  AND organization_id = ${currentOrg.id}
 						  AND is_default = true
 						LIMIT 1
@@ -618,15 +622,16 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 				})
 
 			type ParticipantRow = {
-				emailMessageId: string
-				emailAddress: string
+				messageId: string
+				channel: string
+				address: string
 				displayName: string | null
 				role: 'from' | 'to' | 'cc' | 'bcc'
 				contactId: string | null
 			}
 
 			const buildParticipants = (
-				emailMessageId: string,
+				messageId: string,
 				fromAddress: string | null,
 				to: readonly string[],
 				cc: readonly string[],
@@ -637,8 +642,9 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					const trimmed = address.trim()
 					if (!trimmed) return
 					rows.push({
-						emailMessageId,
-						emailAddress: trimmed.toLowerCase(),
+						messageId,
+						channel: 'email',
+						address: trimmed.toLowerCase(),
 						displayName: null,
 						role,
 						contactId: null,
@@ -651,50 +657,50 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 				return rows
 			}
 
-			// Pull the encrypted credential blob for an inbox and decrypt it
+			// Pull the encrypted credential blob for an mailbox and decrypt it
 			// in-process. Plaintext stays in memory only for the duration of
 			// the SMTP send + IMAP APPEND below; never logged, never returned.
 			const loadDecryptedCreds = (
-				inbox: InboxRow,
+				mailbox: MailboxRow,
 			): Effect.Effect<DecryptedCreds, never, never> =>
 				Effect.gen(function* () {
 					const credRows = yield* sql<{
-						passwordCiphertext: Uint8Array
-						passwordNonce: Uint8Array
-						passwordTag: Uint8Array
+						configCiphertext: Uint8Array
+						configNonce: Uint8Array
+						configTag: Uint8Array
 					}>`
 						SELECT
-							password_ciphertext AS "passwordCiphertext",
-							password_nonce      AS "passwordNonce",
-							password_tag        AS "passwordTag"
-						FROM inboxes
-						WHERE id = ${inbox.id}
+							config_ciphertext AS "configCiphertext",
+							config_nonce      AS "configNonce",
+							config_tag        AS "configTag"
+						FROM channel_connections
+						WHERE id = ${mailbox.id}
 						LIMIT 1
 					`.pipe(Effect.orDie)
 					const cred = credRows[0]
 					if (!cred) {
 						return yield* Effect.die(
 							new Error(
-								`inbox ${inbox.id} disappeared between resolve and send`,
+								`mailbox ${mailbox.id} disappeared between resolve and send`,
 							),
 						)
 					}
-					const password = crypto.decryptPassword({
-						inboxId: inbox.id,
-						ciphertext: cred.passwordCiphertext,
-						nonce: cred.passwordNonce,
-						tag: cred.passwordTag,
+					const blob = crypto.decryptConfig({
+						connectionId: mailbox.id,
+						ciphertext: cred.configCiphertext,
+						nonce: cred.configNonce,
+						tag: cred.configTag,
 					})
 					return {
-						inboxId: inbox.id,
-						imapHost: inbox.imapHost,
-						imapPort: inbox.imapPort,
-						imapSecurity: inbox.imapSecurity,
-						smtpHost: inbox.smtpHost,
-						smtpPort: inbox.smtpPort,
-						smtpSecurity: inbox.smtpSecurity,
-						username: inbox.username,
-						password,
+						connectionId: mailbox.id,
+						imapHost: mailbox.imapHost,
+						imapPort: mailbox.imapPort,
+						imapSecurity: mailbox.imapSecurity,
+						smtpHost: mailbox.smtpHost,
+						smtpPort: mailbox.smtpPort,
+						smtpSecurity: mailbox.smtpSecurity,
+						username: mailbox.username,
+						auth: connectionAuth(mailbox.provider, blob),
 					}
 				})
 
@@ -703,11 +709,11 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 			// the provider-side mailbox mirrors what we shipped. The APPEND
 			// is best-effort because some providers (Gmail, M365) auto-copy
 			// outbound to Sent and a duplicate would make the worker's next
-			// IDLE tick churn — `idx_email_messages_msgid` would dedupe but
+			// IDLE tick churn — `idx_messages_msgid` would dedupe but
 			// we save the round trip when we know the provider already did
 			// it. APPEND failures land in the log; the row stays canonical.
 			const dispatchOutbound = (
-				inbox: InboxRow,
+				mailbox: MailboxRow,
 				message: OutboundMessage,
 			): Effect.Effect<
 				{ messageId: string; rawRef: string },
@@ -715,19 +721,19 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 				never
 			> =>
 				Effect.gen(function* () {
-					const creds = yield* loadDecryptedCreds(inbox)
+					const creds = yield* loadDecryptedCreds(mailbox)
 					const sent = yield* retrySmtpSend(
 						transport.send(creds, message),
-						inbox.id,
+						mailbox.id,
 					)
 					const messageId = sent.messageId
-					const key = sentRawKey(inbox.organizationId, inbox.id, messageId)
+					const key = sentRawKey(mailbox.organizationId, mailbox.id, messageId)
 					yield* storage
 						.put({ key, body: sent.raw, contentType: 'message/rfc822' })
 						.pipe(
 							Effect.catchCause(cause =>
 								Effect.logWarning(
-									`outbound raw upload failed inbox=${inbox.id} key=${key}`,
+									`outbound raw upload failed mailbox=${mailbox.id} key=${key}`,
 								).pipe(Effect.andThen(Effect.logError(cause))),
 							),
 						)
@@ -736,7 +742,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						.pipe(
 							Effect.catchCause(cause =>
 								Effect.logWarning(
-									`appendToSent failed inbox=${inbox.id} (provider may auto-copy)`,
+									`appendToSent failed mailbox=${mailbox.id} (provider may auto-copy)`,
 								).pipe(Effect.andThen(Effect.logError(cause))),
 							),
 						)
@@ -751,7 +757,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 			// storage key that holds the wire bytes — set by `dispatchOutbound`.
 			const recordOutbound = (args: {
 				result: { messageId: string; threadId: string }
-				inbox: InboxRow
+				mailbox: MailboxRow
 				companyId: string | null
 				contactId: string | null
 				subject: string | null
@@ -784,10 +790,10 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								inReplyTo = null
 								referencesArr = []
 								yield* sql`
-									INSERT INTO email_thread_links ${sql.insert({
+									INSERT INTO conversations ${sql.insert({
 										organizationId: currentOrg.id,
 										externalThreadId,
-										inboxId: args.inbox.id,
+										connectionId: args.mailbox.id,
 										companyId: args.companyId,
 										contactId: args.contactId,
 										subject: args.subject,
@@ -798,9 +804,9 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 
 							const sentAt = DateTime.toDateUtc(DateTime.nowUnsafe())
 							const emailRows = yield* sql<{ id: string }>`
-								INSERT INTO email_messages ${sql.insert({
+								INSERT INTO messages ${sql.insert({
 									organizationId: currentOrg.id,
-									inboxId: args.inbox.id,
+									connectionId: args.mailbox.id,
 									messageId: args.result.messageId,
 									inReplyTo,
 									references: referencesArr,
@@ -832,15 +838,13 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							const [emailMessage] = emailRows
 							if (!emailMessage) {
 								return yield* Effect.die(
-									new Error(
-										'INSERT INTO email_messages RETURNING id yielded no row',
-									),
+									new Error('INSERT INTO messages RETURNING id yielded no row'),
 								)
 							}
 
 							const participants = buildParticipants(
 								emailMessage.id,
-								args.inbox.email,
+								args.mailbox.email,
 								args.to,
 								args.cc,
 								args.bcc,
@@ -870,7 +874,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 
 			return {
 				send: (
-					inboxId: string | undefined,
+					mailboxId: string | undefined,
 					to: string | string[],
 					subject: string,
 					bodyJson: EmailBlocks,
@@ -882,7 +886,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						replyTo?: string | undefined
 						preview?: string | undefined
 						attachmentRefs?: readonly StagingRef[] | undefined
-						rawAttachments?: readonly SendAttachmentInput[] | undefined
+						rawAttachments?: readonly OutboundAttachment[] | undefined
 						skipFooter?: boolean | undefined
 					},
 				) =>
@@ -892,27 +896,27 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						const attachmentRefs = extras?.attachmentRefs ?? []
 						const rawAttachments = extras?.rawAttachments ?? []
 
-						// Resolve to the calling member's primary human inbox when no
+						// Resolve to the calling member's primary human mailbox when no
 						// id is supplied — the contract for /v1/email/send.
-						const inbox = inboxId
-							? yield* resolveInbox(inboxId).pipe(
+						const mailbox = mailboxId
+							? yield* resolveMailbox(mailboxId).pipe(
 									Effect.flatMap(row =>
 										row
 											? Effect.succeed(row)
-											: Effect.fail(new InboxInactive({ inboxId })),
+											: Effect.fail(new MailboxInactive({ mailboxId })),
 									),
 								)
-							: yield* resolveDefaultInboxForCurrentUser()
-						yield* assertInboxUsable(inbox)
+							: yield* resolveDefaultMailboxForCurrentUser()
+						yield* assertMailboxUsable(mailbox)
 
 						if (contactId) {
 							yield* assertContactNotSuppressed(contactId, to)
 						}
 
-						const staged = yield* staging.resolve(inbox.id, attachmentRefs)
+						const staged = yield* staging.resolve(mailbox.id, attachmentRefs)
 						let blocks: EmailBlocks = bodyJson
 						if (!extras?.skipFooter) {
-							const footerBlocks = yield* resolveDefaultFooter(inbox.id)
+							const footerBlocks = yield* resolveDefaultFooter(mailbox.id)
 							if (footerBlocks) blocks = [...bodyJson, ...footerBlocks]
 						}
 						const rendered = yield* Effect.tryPromise({
@@ -935,7 +939,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						const toList = Array.isArray(to) ? to : [to]
 
 						const outbound: OutboundMessage = {
-							from: inbox.email,
+							from: mailbox.email,
 							to: toList,
 							subject,
 							text: rendered.text,
@@ -950,7 +954,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							}),
 						}
 
-						const dispatched = yield* dispatchOutbound(inbox, outbound)
+						const dispatched = yield* dispatchOutbound(mailbox, outbound)
 						// Outbound start-of-thread: the SMTP-assigned Message-ID
 						// becomes the canonical thread root id. Replies will reuse
 						// it via In-Reply-To / References.
@@ -961,7 +965,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 
 						yield* recordOutbound({
 							result,
-							inbox,
+							mailbox,
 							companyId,
 							contactId: contactId ?? null,
 							subject,
@@ -989,8 +993,8 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						return result
 					}),
 
-				// `threadId` is the local `email_thread_links.id` (UUID); the
-				// service hops from there to the inbox + the most recent
+				// `threadId` is the local `conversations.id` (UUID); the
+				// service hops from there to the mailbox + the most recent
 				// message's RFC Message-ID, which is what the provider needs
 				// to thread a reply.
 				reply: (
@@ -1001,7 +1005,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						bcc?: string[] | undefined
 						preview?: string | undefined
 						attachmentRefs?: readonly StagingRef[] | undefined
-						rawAttachments?: readonly SendAttachmentInput[] | undefined
+						rawAttachments?: readonly OutboundAttachment[] | undefined
 						skipFooter?: boolean | undefined
 					},
 				) =>
@@ -1015,13 +1019,13 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						const links = yield* sql<{
 							id: string
 							externalThreadId: string
-							inboxId: string | null
+							mailboxId: string | null
 							companyId: string | null
 							contactId: string | null
 							subject: string | null
 						}>`
-							SELECT id, external_thread_id, inbox_id, company_id, contact_id, subject
-							FROM email_thread_links
+							SELECT id, external_thread_id, connection_id AS "mailboxId", company_id, contact_id, subject
+							FROM conversations
 							WHERE id = ${threadId}
 							  AND organization_id = ${currentOrg.id}
 							LIMIT 1
@@ -1034,18 +1038,20 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						}
 						const link = links[0]!
 
-						if (!link.inboxId) {
-							return yield* new InboxInactive({ inboxId: link.id })
+						if (!link.mailboxId) {
+							return yield* new MailboxInactive({ mailboxId: link.id })
 						}
 
-						const inbox = yield* resolveInbox(link.inboxId).pipe(
+						const mailbox = yield* resolveMailbox(link.mailboxId).pipe(
 							Effect.flatMap(row =>
 								row
 									? Effect.succeed(row)
-									: Effect.fail(new InboxInactive({ inboxId: link.inboxId! })),
+									: Effect.fail(
+											new MailboxInactive({ mailboxId: link.mailboxId! }),
+										),
 							),
 						)
-						yield* assertInboxUsable(inbox)
+						yield* assertMailboxUsable(mailbox)
 
 						// Most recent message in the thread anchors the reply. We
 						// match on `message_id = external_thread_id` (root) OR
@@ -1055,7 +1061,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							recipients: { from?: string; to?: string[] }
 						}>`
 							SELECT message_id, recipients
-							FROM email_messages
+							FROM messages
 							WHERE organization_id = ${currentOrg.id}
 							  AND (
 							    message_id = ${link.externalThreadId}
@@ -1081,10 +1087,10 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							yield* assertContactNotSuppressed(link.contactId, replyRecipients)
 						}
 
-						const staged = yield* staging.resolve(inbox.id, attachmentRefs)
+						const staged = yield* staging.resolve(mailbox.id, attachmentRefs)
 						let blocks: EmailBlocks = bodyJson
 						if (!extras?.skipFooter) {
-							const footerBlocks = yield* resolveDefaultFooter(inbox.id)
+							const footerBlocks = yield* resolveDefaultFooter(mailbox.id)
 							if (footerBlocks) blocks = [...bodyJson, ...footerBlocks]
 						}
 						const rendered = yield* Effect.tryPromise({
@@ -1116,7 +1122,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							: ''
 
 						const outbound: OutboundMessage = {
-							from: inbox.email,
+							from: mailbox.email,
 							to: replyRecipients,
 							subject: replySubject,
 							text: rendered.text,
@@ -1132,7 +1138,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							}),
 						}
 
-						const dispatched = yield* dispatchOutbound(inbox, outbound)
+						const dispatched = yield* dispatchOutbound(mailbox, outbound)
 						const result = {
 							messageId: dispatched.messageId,
 							threadId: link.externalThreadId,
@@ -1140,7 +1146,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 
 						yield* recordOutbound({
 							result,
-							inbox,
+							mailbox,
 							companyId: link.companyId,
 							contactId: link.contactId,
 							subject: link.subject,
@@ -1189,7 +1195,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						const links = yield* sql<{
 							id: string
 							externalThreadId: string
-							inboxId: string | null
+							mailboxId: string | null
 							companyId: string | null
 							contactId: string | null
 							subject: string | null
@@ -1197,16 +1203,16 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							lastReadAt: Date | null
 							createdAt: Date
 							updatedAt: Date
-							inboxEmail: string | null
-							inboxDisplayName: string | null
-							inboxPurpose: 'human' | 'agent' | 'shared' | null
-							inboxIsPrivate: boolean | null
-							inboxOwnerUserId: string | null
+							mailboxEmail: string | null
+							mailboxDisplayName: string | null
+							mailboxPurpose: 'human' | 'agent' | 'shared' | null
+							mailboxIsPrivate: boolean | null
+							mailboxOwnerUserId: string | null
 						}>`
 							SELECT
 								tl.id,
 								tl.external_thread_id,
-								tl.inbox_id,
+								tl.connection_id AS "mailboxId",
 								tl.company_id,
 								tl.contact_id,
 								tl.subject,
@@ -1214,13 +1220,13 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								tl.last_read_at,
 								tl.created_at,
 								tl.updated_at,
-								i.email AS inbox_email,
-								i.display_name AS inbox_display_name,
-								i.purpose AS inbox_purpose,
-								i.is_private AS inbox_is_private,
-								i.owner_user_id AS inbox_owner_user_id
-							FROM email_thread_links tl
-							LEFT JOIN inboxes i ON i.id = tl.inbox_id
+								i.email AS mailbox_email,
+								i.display_name AS mailbox_display_name,
+								i.purpose AS mailbox_purpose,
+								i.is_private AS mailbox_is_private,
+								i.owner_user_id AS mailbox_owner_user_id
+							FROM conversations tl
+							LEFT JOIN channel_connections i ON i.id = tl.connection_id
 							WHERE tl.id = ${threadId}
 							  AND tl.organization_id = ${currentOrg.id}
 							LIMIT 1
@@ -1233,13 +1239,13 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						}
 						const link = links[0]!
 
-						// Privacy gate: a thread anchored to a private inbox is
+						// Privacy gate: a thread anchored to a private mailbox is
 						// invisible to anyone other than its owner. Surfaced as
-						// NotFound so org-mates cannot enumerate private inboxes
+						// NotFound so org-mates cannot enumerate private mailboxes
 						// by trial-and-error.
 						if (
-							link.inboxIsPrivate === true &&
-							link.inboxOwnerUserId !== session.userId
+							link.mailboxIsPrivate === true &&
+							link.mailboxOwnerUserId !== session.userId
 						) {
 							return yield* new NotFound({
 								entity: 'EmailThreadLink',
@@ -1250,7 +1256,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						// JOIN message_participants so the wire response can carry
 						// `from` per message — the table stores sender as a
 						// participant row with role='from' rather than a column on
-						// email_messages. Without the JOIN the UI's `From` field
+						// messages. Without the JOIN the UI's `From` field
 						// renders empty for every card.
 						const messages = yield* sql<{
 							id: string
@@ -1289,13 +1295,13 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							       em.status, em.status_reason, em.bounce_type, em.bounce_sub_type,
 							       em.inbound_classification, em.status_updated_at,
 							       (
-							         SELECT mp.email_address
+							         SELECT mp.address
 							         FROM message_participants mp
-							         WHERE mp.email_message_id = em.id
+							         WHERE mp.message_id = em.id
 							           AND mp.role = 'from'
 							         LIMIT 1
 							       ) AS from_address
-							FROM email_messages em
+							FROM messages em
 							WHERE em.organization_id = ${currentOrg.id}
 							  AND (
 							    em.message_id = ${link.externalThreadId}
@@ -1367,12 +1373,12 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							companyId: link.companyId,
 							contactId: link.contactId,
 							messages: messagesOut,
-							inbox:
-								link.inboxEmail && link.inboxPurpose
+							mailbox:
+								link.mailboxEmail && link.mailboxPurpose
 									? {
-											email: link.inboxEmail,
-											displayName: link.inboxDisplayName,
-											purpose: link.inboxPurpose,
+											email: link.mailboxEmail,
+											displayName: link.mailboxDisplayName,
+											purpose: link.mailboxPurpose,
 										}
 									: null,
 						}
@@ -1385,7 +1391,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						const rows = yield* sql`
-							UPDATE email_thread_links
+							UPDATE conversations
 							SET status = ${status}, updated_at = now()
 							WHERE id = ${threadId}
 							  AND organization_id = ${currentOrg.id}
@@ -1404,7 +1410,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						yield* sql`
-							UPDATE email_thread_links
+							UPDATE conversations
 							SET last_read_at = now()
 							WHERE id = ${threadId}
 							  AND organization_id = ${currentOrg.id}
@@ -1415,7 +1421,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						yield* sql`
-							UPDATE email_thread_links
+							UPDATE conversations
 							SET last_read_at = NULL
 							WHERE id = ${threadId}
 							  AND organization_id = ${currentOrg.id}
@@ -1423,7 +1429,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					}).pipe(Effect.orDie),
 
 				listThreads: (filters?: {
-					inboxId?: string
+					mailboxId?: string
 					companyId?: string
 					status?: string
 					purpose?: 'human' | 'agent' | 'shared'
@@ -1439,14 +1445,14 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						const offset = filters?.offset ?? 0
 						const conditions: Array<Statement.Fragment> = [
 							sql`tl.organization_id = ${currentOrg.id}`,
-							// Privacy gate: a private inbox is hidden from anyone
+							// Privacy gate: a private mailbox is hidden from anyone
 							// other than its owner. Phrased as a join-side filter so
-							// thread rows that have NO inbox (legacy / inbox deleted)
+							// thread rows that have NO mailbox (legacy / mailbox deleted)
 							// stay visible to whoever was already on the thread.
 							sql`(i.id IS NULL OR i.is_private = false OR i.owner_user_id = ${session.userId})`,
 						]
-						if (filters?.inboxId)
-							conditions.push(sql`tl.inbox_id = ${filters.inboxId}`)
+						if (filters?.mailboxId)
+							conditions.push(sql`tl.connection_id = ${filters.mailboxId}`)
 						if (filters?.companyId)
 							conditions.push(sql`tl.company_id = ${filters.companyId}`)
 						if (filters?.status)
@@ -1463,19 +1469,19 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								// reply).
 								conditions.push(sql`(
 									EXISTS (
-										SELECT 1 FROM email_messages em
+										SELECT 1 FROM messages em
 										WHERE em.organization_id = tl.organization_id
 										  AND (em.message_id = tl.external_thread_id
 										       OR tl.external_thread_id = ANY(em."references"))
 										  AND em.search_vector @@ plainto_tsquery('simple', ${trimmedQuery})
 									)
 									OR EXISTS (
-										SELECT 1 FROM email_messages em2
-										JOIN message_participants mp ON mp.email_message_id = em2.id
+										SELECT 1 FROM messages em2
+										JOIN message_participants mp ON mp.message_id = em2.id
 										WHERE em2.organization_id = tl.organization_id
 										  AND (em2.message_id = tl.external_thread_id
 										       OR tl.external_thread_id = ANY(em2."references"))
-										  AND mp.email_address ILIKE ${`%${trimmedQuery}%`}
+										  AND mp.address ILIKE ${`%${trimmedQuery}%`}
 									)
 								)`)
 							}
@@ -1490,7 +1496,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						const rows = yield* sql<{
 							id: string
 							externalThreadId: string
-							inboxId: string | null
+							mailboxId: string | null
 							companyId: string | null
 							contactId: string | null
 							subject: string | null
@@ -1498,9 +1504,9 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							lastReadAt: Date | null
 							createdAt: Date
 							updatedAt: Date
-							inboxEmail: string | null
-							inboxDisplayName: string | null
-							inboxPurpose: 'human' | 'agent' | 'shared' | null
+							mailboxEmail: string | null
+							mailboxDisplayName: string | null
+							mailboxPurpose: 'human' | 'agent' | 'shared' | null
 							messageCount: string | number
 							lastMessageAt: Date | null
 							lastMessageDirection: 'inbound' | 'outbound' | null
@@ -1512,7 +1518,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							SELECT
 								tl.id,
 								tl.external_thread_id,
-								tl.inbox_id,
+								tl.connection_id AS "mailboxId",
 								tl.company_id,
 								tl.contact_id,
 								tl.subject,
@@ -1520,23 +1526,23 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								tl.last_read_at,
 								tl.created_at,
 								tl.updated_at,
-								i.email AS inbox_email,
-								i.display_name AS inbox_display_name,
-								i.purpose AS inbox_purpose,
+								i.email AS mailbox_email,
+								i.display_name AS mailbox_display_name,
+								i.purpose AS mailbox_purpose,
 								(
-									SELECT COUNT(*) FROM email_messages m
+									SELECT COUNT(*) FROM messages m
 									WHERE m.organization_id = tl.organization_id
 									  AND (m.message_id = tl.external_thread_id
 									       OR tl.external_thread_id = ANY(m."references"))
 								) AS message_count,
 								(
-									SELECT MAX(m.status_updated_at) FROM email_messages m
+									SELECT MAX(m.status_updated_at) FROM messages m
 									WHERE m.organization_id = tl.organization_id
 									  AND (m.message_id = tl.external_thread_id
 									       OR tl.external_thread_id = ANY(m."references"))
 								) AS last_message_at,
 								(
-									SELECT m.direction FROM email_messages m
+									SELECT m.direction FROM messages m
 									WHERE m.organization_id = tl.organization_id
 									  AND (m.message_id = tl.external_thread_id
 									       OR tl.external_thread_id = ANY(m."references"))
@@ -1544,14 +1550,14 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 									LIMIT 1
 								) AS last_message_direction,
 								(
-									SELECT MAX(m.status_updated_at) FROM email_messages m
+									SELECT MAX(m.status_updated_at) FROM messages m
 									WHERE m.organization_id = tl.organization_id
 									  AND (m.message_id = tl.external_thread_id
 									       OR tl.external_thread_id = ANY(m."references"))
 									  AND m.direction = 'inbound'
 								) AS last_inbound_at,
 								(
-									SELECT m.inbound_classification FROM email_messages m
+									SELECT m.inbound_classification FROM messages m
 									WHERE m.organization_id = tl.organization_id
 									  AND (m.message_id = tl.external_thread_id
 									       OR tl.external_thread_id = ANY(m."references"))
@@ -1561,7 +1567,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								) AS last_inbound_classification,
 								(
 									(
-										SELECT MAX(m.status_updated_at) FROM email_messages m
+										SELECT MAX(m.status_updated_at) FROM messages m
 										WHERE m.organization_id = tl.organization_id
 										  AND (m.message_id = tl.external_thread_id
 										       OR tl.external_thread_id = ANY(m."references"))
@@ -1569,8 +1575,8 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 									) > COALESCE(tl.last_read_at, 'epoch'::timestamptz)
 								) AS is_unread,
 								COUNT(*) OVER () AS total
-							FROM email_thread_links tl
-							LEFT JOIN inboxes i ON i.id = tl.inbox_id
+							FROM conversations tl
+							LEFT JOIN channel_connections i ON i.id = tl.connection_id
 							${whereClause}
 							ORDER BY tl.updated_at DESC
 							LIMIT ${limit}
@@ -1581,21 +1587,21 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						const items = rows.map(r => {
 							const {
 								total: _t,
-								inboxEmail,
-								inboxDisplayName,
-								inboxPurpose,
+								mailboxEmail,
+								mailboxDisplayName,
+								mailboxPurpose,
 								messageCount,
 								...rest
 							} = r
 							return {
 								...rest,
 								messageCount: Number(messageCount),
-								inbox:
-									inboxEmail && inboxPurpose
+								mailbox:
+									mailboxEmail && mailboxPurpose
 										? {
-												email: inboxEmail,
-												displayName: inboxDisplayName,
-												purpose: inboxPurpose,
+												email: mailboxEmail,
+												displayName: mailboxDisplayName,
+												purpose: mailboxPurpose,
 											}
 										: null,
 							}
@@ -1623,7 +1629,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							conditions.push(sql`status = ${filters.status}`)
 
 						const rows = yield* sql`
-							SELECT * FROM email_messages
+							SELECT * FROM messages
 							WHERE ${sql.and(conditions)}
 							ORDER BY status_updated_at DESC
 							LIMIT ${filters?.limit ?? 50}
@@ -1640,7 +1646,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						const rows = yield* sql`
-							SELECT * FROM email_messages
+							SELECT * FROM messages
 							WHERE organization_id = ${currentOrg.id}
 							  AND (id::text = ${messageId} OR message_id = ${messageId})
 							LIMIT 1
@@ -1654,11 +1660,11 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						return projectAttachmentsForWire(rows[0] as Record<string, unknown>)
 					}),
 
-				// ── Inbox CRUD ────────────────────────────────────────────────
+				// ── Mailbox CRUD ────────────────────────────────────────────────
 
 				listProviderPresets: () => Effect.succeed(PROVIDER_PRESETS),
 
-				listLocalInboxes: (filters?: {
+				listLocalMailboxes: (filters?: {
 					purpose?: 'human' | 'agent' | 'shared'
 					active?: boolean
 					ownerUserId?: string
@@ -1668,7 +1674,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						const session = yield* SessionContext
 						const conditions: Array<Statement.Fragment> = [
 							sql`organization_id = ${currentOrg.id}`,
-							// Same privacy gate as listThreads — own private inboxes
+							// Same privacy gate as listThreads — own private mailboxes
 							// always show; others' never do.
 							sql`(is_private = false OR owner_user_id = ${session.userId})`,
 						]
@@ -1679,19 +1685,19 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						if (filters?.ownerUserId)
 							conditions.push(sql`owner_user_id = ${filters.ownerUserId}`)
 						return yield* sql`
-							SELECT ${selectInboxColumns}
-							FROM inboxes
+							SELECT ${selectMailboxColumns}
+							FROM channel_connections
 							WHERE ${sql.and(conditions)}
 							ORDER BY is_default DESC, purpose, email
 						`
 					}).pipe(Effect.orDie),
 
-				inboxStatus: () =>
+				mailboxStatus: () =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						const session = yield* SessionContext
 						const rows = yield* sql<{ id: string; email: string }>`
-							SELECT id, email FROM inboxes
+							SELECT id, external_id AS "email" FROM channel_connections
 							WHERE organization_id = ${currentOrg.id}
 							  AND owner_user_id = ${session.userId}
 							  AND purpose = 'human'
@@ -1705,11 +1711,11 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						}
 						return {
 							hasDefault: true,
-							primary: { inboxId: row.id, email: row.email },
+							primary: { mailboxId: row.id, email: row.email },
 						}
 					}),
 
-				createInbox: (input: {
+				createMailbox: (input: {
 					email: string
 					displayName?: string | undefined
 					purpose: 'human' | 'agent' | 'shared'
@@ -1731,7 +1737,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 
 						// purpose CHECK constraint demands an owner for human/agent
 						// and forbids one for shared. Default to the caller for
-						// human inboxes when ownerUserId is omitted; reject the
+						// human mailboxes when ownerUserId is omitted; reject the
 						// shared+owner mismatch up-front so the DB error stays
 						// internal.
 						const ownerUserId =
@@ -1740,16 +1746,16 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								: (input.ownerUserId ?? session.userId)
 						if (input.purpose === 'shared' && input.isPrivate === true) {
 							return yield* new BadRequest({
-								message: 'Shared inboxes cannot be private',
+								message: 'Shared mailboxes cannot be private',
 							})
 						}
 
-						// Generate the inbox id up-front so HKDF can derive a stable
+						// Generate the mailbox id up-front so HKDF can derive a stable
 						// per-row subkey before INSERT.
-						const inboxId = randomUUID()
+						const mailboxId = randomUUID()
 
-						const encrypted = crypto.encryptPassword({
-							inboxId,
+						const encrypted = crypto.encryptConfig({
+							connectionId: mailboxId,
 							plain: input.password,
 						})
 
@@ -1762,7 +1768,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								? sql`owner_user_id = ${ownerUserId}`
 								: sql`owner_user_id IS NULL`
 							yield* sql`
-								UPDATE inboxes
+								UPDATE channel_connections
 								SET is_default = false, updated_at = now()
 								WHERE organization_id = ${currentOrg.id}
 								  AND ${ownerCondition}
@@ -1775,11 +1781,11 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						// credentials. We still INSERT the row on probe failure so
 						// the user sees it in settings and can fix the password —
 						// `grant_status` records why the connection isn't usable
-						// yet, and the worker will skip it until `testInbox`
+						// yet, and the worker will skip it until `testMailbox`
 						// flips the status back to `connected`.
 						const probe = yield* transport
 							.probe({
-								inboxId,
+								connectionId: mailboxId,
 								imapHost: input.imapHost,
 								imapPort: input.imapPort,
 								imapSecurity: input.imapSecurity,
@@ -1787,7 +1793,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								smtpPort: input.smtpPort,
 								smtpSecurity: input.smtpSecurity,
 								username: input.username,
-								password: input.password,
+								auth: { kind: 'password', password: input.password },
 							})
 							.pipe(
 								Effect.match({
@@ -1807,11 +1813,13 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								}),
 							)
 
-						const rows = yield* sql<InboxRow>`
-							INSERT INTO inboxes ${sql.insert({
-								id: inboxId,
+						const rows = yield* sql<MailboxRow>`
+							INSERT INTO channel_connections ${sql.insert({
+								id: mailboxId,
 								organizationId: currentOrg.id,
-								email: input.email,
+								externalId: input.email,
+								channel: 'email',
+								provider: 'imap-smtp',
 								displayName: input.displayName ?? null,
 								purpose: input.purpose,
 								ownerUserId,
@@ -1825,19 +1833,19 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								smtpPort: input.smtpPort,
 								smtpSecurity: input.smtpSecurity,
 								username: input.username,
-								passwordCiphertext: encrypted.ciphertext,
-								passwordNonce: encrypted.nonce,
-								passwordTag: encrypted.tag,
+								configCiphertext: encrypted.ciphertext,
+								configNonce: encrypted.nonce,
+								configTag: encrypted.tag,
 								grantStatus: probe.status,
 								grantLastError: probe.detail,
 								grantLastSeenAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
-								folderState: '{}',
+								syncState: '{}',
 							})}
-							RETURNING ${selectInboxColumns}
+							RETURNING ${selectMailboxColumns}
 						`
-						yield* Effect.logInfo('Inbox created').pipe(
+						yield* Effect.logInfo('Mailbox created').pipe(
 							Effect.annotateLogs({
-								event: 'inbox.created',
+								event: 'mailbox.created',
 								email: input.email,
 								purpose: input.purpose,
 							}),
@@ -1845,7 +1853,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						return rows[0]!
 					}),
 
-				updateInbox: (
+				updateMailbox: (
 					id: string,
 					patch: {
 						displayName?: string | null | undefined
@@ -1869,9 +1877,9 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 
 						// Existence + org scope first so the rest of the work cannot
 						// silently target someone else's row.
-						const existing = yield* resolveInbox(id)
+						const existing = yield* resolveMailbox(id)
 						if (!existing) {
-							return yield* new NotFound({ entity: 'Inbox', id })
+							return yield* new NotFound({ entity: 'Mailbox', id })
 						}
 
 						const sets: Array<Statement.Fragment> = []
@@ -1902,13 +1910,13 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						if (patch.username !== undefined)
 							sets.push(sql`username = ${patch.username}`)
 						if (patch.password !== undefined) {
-							const encrypted = crypto.encryptPassword({
-								inboxId: id,
+							const encrypted = crypto.encryptConfig({
+								connectionId: id,
 								plain: patch.password,
 							})
-							sets.push(sql`password_ciphertext = ${encrypted.ciphertext}`)
-							sets.push(sql`password_nonce = ${encrypted.nonce}`)
-							sets.push(sql`password_tag = ${encrypted.tag}`)
+							sets.push(sql`config_ciphertext = ${encrypted.ciphertext}`)
+							sets.push(sql`config_nonce = ${encrypted.nonce}`)
+							sets.push(sql`config_tag = ${encrypted.tag}`)
 						}
 
 						if (sets.length === 0) {
@@ -1917,7 +1925,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 
 						// A credential or transport change is re-probed after the
 						// write so the returned row reflects the real connection
-						// state — createInbox probes up-front, and an edit that only
+						// state — createMailbox probes up-front, and an edit that only
 						// touches metadata (e.g. display name) skips the probe.
 						const credentialsChanged =
 							patch.password !== undefined ||
@@ -1930,7 +1938,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							patch.smtpSecurity !== undefined
 
 						// Promoting to default requires clearing the prior default
-						// in the same (owner, purpose) bucket, mirroring createInbox.
+						// in the same (owner, purpose) bucket, mirroring createMailbox.
 						if (patch.isDefault === true) {
 							const targetPurpose = patch.purpose ?? existing.purpose
 							const targetOwner =
@@ -1941,7 +1949,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								? sql`owner_user_id = ${targetOwner}`
 								: sql`owner_user_id IS NULL`
 							yield* sql`
-								UPDATE inboxes
+								UPDATE channel_connections
 								SET is_default = false, updated_at = now()
 								WHERE organization_id = ${currentOrg.id}
 								  AND ${ownerCondition}
@@ -1953,79 +1961,79 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 
 						sets.push(sql`updated_at = now()`)
 
-						const rows = yield* sql<InboxRow>`
-							UPDATE inboxes
+						const rows = yield* sql<MailboxRow>`
+							UPDATE channel_connections
 							SET ${sql.csv(sets)}
 							WHERE id = ${id}
 							  AND organization_id = ${currentOrg.id}
-							RETURNING ${selectInboxColumns}
+							RETURNING ${selectMailboxColumns}
 						`
 						if (rows.length === 0) {
-							return yield* new NotFound({ entity: 'Inbox', id })
+							return yield* new NotFound({ entity: 'Mailbox', id })
 						}
 						if (credentialsChanged) {
-							return yield* reprobeInbox(id)
+							return yield* reprobeMailbox(id)
 						}
 						return rows[0]!
 					}),
 
-				deleteInbox: (id: string) =>
+				deleteMailbox: (id: string) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						// Soft delete: thread history (and message search) needs the
-						// inbox row to keep resolving long after the user removes it.
-						// `active=false` flips the worker off and hides the inbox
+						// mailbox row to keep resolving long after the user removes it.
+						// `active=false` flips the worker off and hides the mailbox
 						// from compose/picker UIs.
-						const rows = yield* sql<InboxRow>`
-							UPDATE inboxes
+						const rows = yield* sql<MailboxRow>`
+							UPDATE channel_connections
 							SET active = false, is_default = false, updated_at = now()
 							WHERE id = ${id}
 							  AND organization_id = ${currentOrg.id}
-							RETURNING ${selectInboxColumns}
+							RETURNING ${selectMailboxColumns}
 						`
 						if (rows.length === 0) {
-							return yield* new NotFound({ entity: 'Inbox', id })
+							return yield* new NotFound({ entity: 'Mailbox', id })
 						}
 						return rows[0]!
 					}),
 
 				// Manual re-test of a stored mailbox — decrypt, probe, and write
-				// back the grant status. Shares reprobeInbox with updateInbox.
-				testInbox: (id: string) => reprobeInbox(id),
+				// back the grant status. Shares reprobeMailbox with updateMailbox.
+				testMailbox: (id: string) => reprobeMailbox(id),
 
-				// Promotes a single inbox to `is_default=true` for the calling
+				// Promotes a single mailbox to `is_default=true` for the calling
 				// member. Validates ownership so a member cannot promote an
-				// org-mate's inbox (or a shared inbox) into their own primary
+				// org-mate's mailbox (or a shared mailbox) into their own primary
 				// slot.
-				setPrimaryInbox: (id: string) =>
+				setPrimaryMailbox: (id: string) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						const session = yield* SessionContext
 
-						const target = yield* resolveInbox(id)
+						const target = yield* resolveMailbox(id)
 						if (!target) {
-							return yield* new NotFound({ entity: 'Inbox', id })
+							return yield* new NotFound({ entity: 'Mailbox', id })
 						}
 						if (target.purpose !== 'human') {
 							return yield* new BadRequest({
-								message: 'Only human inboxes can be set as primary',
+								message: 'Only human mailboxes can be set as primary',
 							})
 						}
 						if (target.ownerUserId !== session.userId) {
 							return yield* new BadRequest({
-								message: 'Cannot set someone else’s inbox as primary',
+								message: 'Cannot set someone else’s mailbox as primary',
 							})
 						}
 						if (!target.active) {
 							return yield* new BadRequest({
-								message: 'Cannot set an inactive inbox as primary',
+								message: 'Cannot set an inactive mailbox as primary',
 							})
 						}
 
 						yield* sql.withTransaction(
 							Effect.gen(function* () {
 								yield* sql`
-									UPDATE inboxes
+									UPDATE channel_connections
 									SET is_default = false, updated_at = now()
 									WHERE organization_id = ${currentOrg.id}
 									  AND owner_user_id = ${session.userId}
@@ -2034,14 +2042,14 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 									  AND id <> ${id}
 								`
 								yield* sql`
-									UPDATE inboxes
+									UPDATE channel_connections
 									SET is_default = true, updated_at = now()
 									WHERE id = ${id}
 									  AND organization_id = ${currentOrg.id}
 								`
 							}),
 						)
-						const refreshed = yield* resolveInbox(id)
+						const refreshed = yield* resolveMailbox(id)
 						return refreshed!
 					}),
 
@@ -2054,8 +2062,6 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						const rows = yield* sql<{
-							inboxId: string | null
-							messageIdRfc: string
 							attachments: ReadonlyArray<{
 								index: number
 								filename: string
@@ -2066,62 +2072,51 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								storageKey: string
 							}>
 						}>`
-							SELECT
-								inbox_id,
-								message_id AS message_id_rfc,
-								attachments
-							FROM email_messages
+							SELECT attachments
+							FROM messages
 							WHERE organization_id = ${currentOrg.id}
 							  AND (id::text = ${messageId} OR message_id = ${messageId})
 							LIMIT 1
 						`.pipe(Effect.orDie)
 						const row = rows[0]
-						if (!row || !row.inboxId) {
+						if (!row) {
 							return yield* new NotFound({
 								entity: 'EmailMessage',
 								id: messageId,
 							})
 						}
 
-						// Prefer the JSONB path when the row has metadata: parse the
-						// `attachmentId` URL segment as the array index. Anything
-						// else (provider attachment ids, cid lookups) falls through
-						// to the provider so legacy paths still work.
+						// Attachment bytes live in object storage under the
+						// `storageKey` recorded on the message's attachment metadata;
+						// the `attachmentId` URL segment is the array index.
 						const idx = Number.parseInt(attachmentId, 10)
 						const meta = row.attachments?.[idx]
-						if (
-							row.attachments &&
-							row.attachments.length > 0 &&
-							Number.isFinite(idx) &&
-							meta !== undefined
-						) {
-							const bytes = yield* storage.get(meta.storageKey).pipe(
-								Effect.mapError(
-									err =>
-										new EmailError({
-											message: `attachment fetch failed: ${err.message}`,
-										}),
-								),
-							)
-							const stream = new ReadableStream<Uint8Array>({
-								start(controller) {
-									controller.enqueue(bytes)
-									controller.close()
-								},
+						if (!meta) {
+							return yield* new NotFound({
+								entity: 'EmailAttachment',
+								id: attachmentId,
 							})
-							return {
-								stream,
-								contentType: meta.contentType,
-								filename: meta.filename,
-								size: meta.sizeBytes,
-							}
 						}
-
-						return yield* provider.streamAttachment(
-							row.inboxId,
-							row.messageIdRfc,
-							attachmentId,
+						const bytes = yield* storage.get(meta.storageKey).pipe(
+							Effect.mapError(
+								err =>
+									new EmailError({
+										message: `attachment fetch failed: ${err.message}`,
+									}),
+							),
 						)
+						const stream = new ReadableStream<Uint8Array>({
+							start(controller) {
+								controller.enqueue(bytes)
+								controller.close()
+							},
+						})
+						return {
+							stream,
+							contentType: meta.contentType,
+							filename: meta.filename,
+							size: meta.sizeBytes,
+						}
 					}),
 
 				// ── Drafts ──────────────────────────────────────────────────
@@ -2131,7 +2126,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 				// columns now — no clientId-string stuffing.
 
 				createDraft: (
-					inboxId: string,
+					mailboxId: string,
 					params: {
 						to?: string | string[] | undefined
 						cc?: string | string[] | undefined
@@ -2148,12 +2143,12 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					},
 				) =>
 					Effect.gen(function* () {
-						const inbox = yield* resolveInbox(inboxId)
-						if (!inbox) {
-							return yield* new NotFound({ entity: 'Inbox', id: inboxId })
+						const mailbox = yield* resolveMailbox(mailboxId)
+						if (!mailbox) {
+							return yield* new NotFound({ entity: 'Mailbox', id: mailboxId })
 						}
 						const draft = yield* drafts.create({
-							inboxId: inbox.id,
+							mailboxId: mailbox.id,
 							mode: context?.mode === 'reply' ? 'reply' : 'new',
 							to: toRecipientArray(params.to) ?? [],
 							cc: toRecipientArray(params.cc) ?? [],
@@ -2168,7 +2163,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					}),
 
 				updateDraft: (
-					inboxId: string,
+					mailboxId: string,
 					draftId: string,
 					params: {
 						to?: string | string[] | undefined
@@ -2179,9 +2174,9 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					},
 				) =>
 					Effect.gen(function* () {
-						const inbox = yield* resolveInbox(inboxId)
-						if (!inbox) {
-							return yield* new NotFound({ entity: 'Inbox', id: inboxId })
+						const mailbox = yield* resolveMailbox(mailboxId)
+						if (!mailbox) {
+							return yield* new NotFound({ entity: 'Mailbox', id: mailboxId })
 						}
 						const updated = yield* drafts.update(draftId, {
 							...(params.to !== undefined && {
@@ -2201,42 +2196,42 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						return draftRowToProviderShape(updated)
 					}),
 
-				deleteDraft: (inboxId: string, draftId: string) =>
+				deleteDraft: (mailboxId: string, draftId: string) =>
 					Effect.gen(function* () {
-						const inbox = yield* resolveInbox(inboxId)
-						if (!inbox) {
-							return yield* new NotFound({ entity: 'Inbox', id: inboxId })
+						const mailbox = yield* resolveMailbox(mailboxId)
+						if (!mailbox) {
+							return yield* new NotFound({ entity: 'Mailbox', id: mailboxId })
 						}
 						yield* staging.sweepForDraft(draftId).pipe(Effect.ignore)
 						yield* drafts.remove(draftId)
 					}),
 
-				getDraft: (inboxId: string, draftId: string) =>
+				getDraft: (mailboxId: string, draftId: string) =>
 					Effect.gen(function* () {
-						const inbox = yield* resolveInbox(inboxId)
-						if (!inbox) {
-							return yield* new NotFound({ entity: 'Inbox', id: inboxId })
+						const mailbox = yield* resolveMailbox(mailboxId)
+						if (!mailbox) {
+							return yield* new NotFound({ entity: 'Mailbox', id: mailboxId })
 						}
 						const draft = yield* drafts.get(draftId)
 						return draftRowToProviderShape(draft)
 					}),
 
-				listDrafts: (inboxId?: string) =>
+				listDrafts: (mailboxId?: string) =>
 					Effect.gen(function* () {
-						const list = yield* drafts.list(inboxId)
+						const list = yield* drafts.list(mailboxId)
 						return list
 							.map(draftRowToProviderShape)
 							.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
 					}),
 
-				sendDraft: (inboxId: string, draftId: string) =>
+				sendDraft: (mailboxId: string, draftId: string) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
-						const inbox = yield* resolveInbox(inboxId)
-						if (!inbox) {
-							return yield* new NotFound({ entity: 'Inbox', id: inboxId })
+						const mailbox = yield* resolveMailbox(mailboxId)
+						if (!mailbox) {
+							return yield* new NotFound({ entity: 'Mailbox', id: mailboxId })
 						}
-						yield* assertInboxUsable(inbox)
+						yield* assertMailboxUsable(mailbox)
 
 						const draft = yield* drafts.get(draftId)
 						const ctx = parseClientId(draft.clientId ?? undefined)
@@ -2264,7 +2259,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								externalThreadId: string
 							}>`
 								SELECT id, external_thread_id
-								FROM email_thread_links
+								FROM conversations
 								WHERE id = ${threadLinkId}
 								  AND organization_id = ${currentOrg.id}
 								LIMIT 1
@@ -2275,7 +2270,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						// Resolve staged attachments for this draft + render the
 						// editor block tree to text/html. Footer is appended
 						// unconditionally — DraftStore doesn't expose a skipFooter
-						// flag yet, so drafts always get the inbox's default footer.
+						// flag yet, so drafts always get the mailbox's default footer.
 						const refRows = yield* sql<{
 							stagingId: string
 							isInline: boolean
@@ -2293,8 +2288,8 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							...(r.cid !== null && { cid: r.cid }),
 							filename: r.filename,
 						}))
-						const staged = yield* staging.resolve(inbox.id, stagedRefs)
-						const footerBlocks = yield* resolveDefaultFooter(inbox.id)
+						const staged = yield* staging.resolve(mailbox.id, stagedRefs)
+						const footerBlocks = yield* resolveDefaultFooter(mailbox.id)
 						const blocks: EmailBlocks = footerBlocks
 							? [
 									...(Array.isArray(draft.bodyJson)
@@ -2317,7 +2312,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						})
 
 						const outbound: OutboundMessage = {
-							from: inbox.email,
+							from: mailbox.email,
 							to: draft.toAddresses as string[],
 							subject: draft.subject ?? '',
 							text: rendered.text,
@@ -2337,7 +2332,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							}),
 						}
 
-						const dispatched = yield* dispatchOutbound(inbox, outbound)
+						const dispatched = yield* dispatchOutbound(mailbox, outbound)
 						const result = {
 							messageId: dispatched.messageId,
 							threadId: existingThreadLink
@@ -2347,7 +2342,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 
 						yield* recordOutbound({
 							result,
-							inbox,
+							mailbox,
 							companyId: ctx.companyId,
 							contactId: ctx.contactId,
 							subject: draft.subject ?? null,
@@ -2379,12 +2374,12 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 
 				// ── Footers ─────────────────────────────────────────────────
 
-				listFooters: (inboxId: string) =>
+				listFooters: (mailboxId: string) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						return yield* sql`
-							SELECT * FROM inbox_footers
-							WHERE inbox_id = ${inboxId}
+							SELECT * FROM connection_footers
+							WHERE connection_id =${mailboxId}
 							  AND organization_id = ${currentOrg.id}
 							ORDER BY is_default DESC, name
 						`
@@ -2394,14 +2389,14 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						const rows = yield* sql`
-							SELECT * FROM inbox_footers
+							SELECT * FROM connection_footers
 							WHERE id = ${id}
 							  AND organization_id = ${currentOrg.id}
 							LIMIT 1
 						`
 						if (rows.length === 0) {
 							return yield* new NotFound({
-								entity: 'InboxFooter',
+								entity: 'MailboxFooter',
 								id,
 							})
 						}
@@ -2409,33 +2404,33 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					}),
 
 				createFooter: (input: {
-					inboxId: string
+					mailboxId: string
 					name: string
 					bodyJson: EmailBlocks
 					isDefault?: boolean
 				}) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
-						const inbox = yield* resolveInbox(input.inboxId)
-						if (!inbox) {
+						const mailbox = yield* resolveMailbox(input.mailboxId)
+						if (!mailbox) {
 							return yield* new NotFound({
-								entity: 'Inbox',
-								id: input.inboxId,
+								entity: 'Mailbox',
+								id: input.mailboxId,
 							})
 						}
 						if (input.isDefault) {
 							yield* sql`
-								UPDATE inbox_footers
+								UPDATE connection_footers
 								SET is_default = false, updated_at = now()
-								WHERE inbox_id = ${input.inboxId}
+								WHERE connection_id =${input.mailboxId}
 								  AND organization_id = ${currentOrg.id}
 								  AND is_default = true
 							`
 						}
 						const rows = yield* sql`
-							INSERT INTO inbox_footers ${sql.insert({
+							INSERT INTO connection_footers ${sql.insert({
 								organizationId: currentOrg.id,
-								inboxId: input.inboxId,
+								connectionId: input.mailboxId,
 								name: input.name,
 								bodyJson: JSON.stringify(input.bodyJson),
 								isDefault: input.isDefault ?? false,
@@ -2456,17 +2451,17 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						if (patch.isDefault === true) {
-							const existing = yield* sql<{ inboxId: string }>`
-								SELECT inbox_id FROM inbox_footers
+							const existing = yield* sql<{ mailboxId: string }>`
+								SELECT connection_id AS "mailboxId" FROM connection_footers
 								WHERE id = ${id}
 								  AND organization_id = ${currentOrg.id}
 								LIMIT 1
 							`
 							if (existing[0]) {
 								yield* sql`
-									UPDATE inbox_footers
+									UPDATE connection_footers
 									SET is_default = false, updated_at = now()
-									WHERE inbox_id = ${existing[0].inboxId}
+									WHERE connection_id =${existing[0].mailboxId}
 									  AND organization_id = ${currentOrg.id}
 									  AND is_default = true
 									  AND id <> ${id}
@@ -2481,14 +2476,14 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							sets.push(sql`is_default = ${patch.isDefault}`)
 						if (sets.length === 0) {
 							const r = yield* sql`
-								SELECT * FROM inbox_footers
+								SELECT * FROM connection_footers
 								WHERE id = ${id}
 								  AND organization_id = ${currentOrg.id}
 								LIMIT 1
 							`
 							if (r.length === 0) {
 								return yield* new NotFound({
-									entity: 'InboxFooter',
+									entity: 'MailboxFooter',
 									id,
 								})
 							}
@@ -2496,7 +2491,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						}
 						sets.push(sql`updated_at = now()`)
 						const rows = yield* sql`
-							UPDATE inbox_footers
+							UPDATE connection_footers
 							SET ${sql.csv(sets)}
 							WHERE id = ${id}
 							  AND organization_id = ${currentOrg.id}
@@ -2504,7 +2499,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						`
 						if (rows.length === 0) {
 							return yield* new NotFound({
-								entity: 'InboxFooter',
+								entity: 'MailboxFooter',
 								id,
 							})
 						}
@@ -2515,7 +2510,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						yield* sql`
-							DELETE FROM inbox_footers
+							DELETE FROM connection_footers
 							WHERE id = ${id}
 							  AND organization_id = ${currentOrg.id}
 						`

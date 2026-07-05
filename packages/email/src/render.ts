@@ -149,7 +149,7 @@ const renderBlocksText = (
 	options: RenderOptions,
 ): string => {
 	const lines: string[] = []
-	// Many clients show the preview string as the inbox snippet; the
+	// Many clients show the preview string as the mailbox snippet; the
 	// HTML path emits it via <Preview>. We skip it in text — it's a
 	// visual-client hint only.
 	for (const block of blocks) renderBlockText(block, lines, 0)

@@ -10,7 +10,7 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 //
 //   1. Alice invites a fresh user → org plugin's sendInvitationEmail
 //      pre-creates them without a password and ships a magic-link
-//      sign-in URL to apps/server/.dev-inbox/.
+//      sign-in URL to apps/server/.dev-mailbox/.
 //   2. A fresh browser context opens the URL: BA's magic-link verify
 //      signs the new user in. Their `account` table has no credential
 //      row, so `fetchSecurityState` derives `hasPassword: false`.
@@ -29,7 +29,7 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 //   apps/server/src/plugins/set-password-route.ts
 //   apps/internal/src/lib/security-state.ts
 
-const INBOX_DIR = join(process.cwd(), '..', 'server', '.dev-inbox')
+const INBOX_DIR = join(process.cwd(), '..', 'server', '.dev-mailbox')
 
 const NEW_PASSWORD = 'first-real-password-1234'
 
@@ -38,7 +38,7 @@ interface InvitationMail {
 	readonly url: string
 }
 
-// Polls .dev-inbox/ for an `invitation`-labelled .md whose filename
+// Polls .dev-mailbox/ for an `invitation`-labelled .md whose filename
 // contains the recipient slug, then extracts the magic-link URL. Same
 // pattern as invite.test.ts:44-89 — the file appears asynchronously
 // after the API responds.

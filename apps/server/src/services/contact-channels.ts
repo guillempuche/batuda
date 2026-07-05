@@ -35,12 +35,12 @@ export const writeChannels = (
 		channels,
 		c => sql`
 			INSERT INTO contact_channels
-				(organization_id, contact_id, kind, value, verification, confidence, is_primary)
+				(organization_id, contact_id, channel, address, verification, confidence, is_primary)
 			VALUES (
 				${orgId}, ${contactId}, ${c.kind}, ${c.value},
 				${c.verification ?? null}, ${c.confidence ?? null}, ${c.is_primary ?? false}
 			)
-			ON CONFLICT (contact_id, kind, value) DO UPDATE SET
+			ON CONFLICT (contact_id, channel, address) DO UPDATE SET
 				verification = EXCLUDED.verification,
 				confidence = EXCLUDED.confidence,
 				is_primary = EXCLUDED.is_primary,
@@ -54,7 +54,7 @@ export const channelsOf = (sql: Sql, contactId: string) =>
 	sql`
 		SELECT * FROM contact_channels
 		WHERE contact_id = ${contactId}
-		ORDER BY is_primary DESC, kind
+		ORDER BY is_primary DESC, channel
 	`
 
 /** Add a single channel (the UI's "add"), returning the stored row. */
@@ -66,12 +66,12 @@ export const addChannel = (
 ) =>
 	sql`
 		INSERT INTO contact_channels
-			(organization_id, contact_id, kind, value, verification, confidence, is_primary)
+			(organization_id, contact_id, channel, address, verification, confidence, is_primary)
 		VALUES (
 			${orgId}, ${contactId}, ${c.kind}, ${c.value},
 			${c.verification ?? null}, ${c.confidence ?? null}, ${c.is_primary ?? false}
 		)
-		ON CONFLICT (contact_id, kind, value) DO UPDATE SET
+		ON CONFLICT (contact_id, channel, address) DO UPDATE SET
 			is_primary = EXCLUDED.is_primary,
 			updated_at = now()
 		RETURNING *
@@ -95,8 +95,8 @@ export const patchChannel = (
 		const data: Record<string, unknown> = {
 			updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 		}
-		if (patch.kind !== undefined) data['kind'] = patch.kind
-		if (patch.value !== undefined) data['value'] = patch.value
+		if (patch.kind !== undefined) data['channel'] = patch.kind
+		if (patch.value !== undefined) data['address'] = patch.value
 		if (patch.is_primary !== undefined) data['isPrimary'] = patch.is_primary
 		const rows = yield* sql`
 			UPDATE contact_channels SET ${sql.update(data)}
@@ -121,5 +121,5 @@ export const clearEmailSuppression = (sql: Sql, contactId: string) =>
 		    status_reason = NULL,
 		    status_updated_at = now(),
 		    soft_bounce_count = 0
-		WHERE contact_id = ${contactId} AND kind = 'email'
+		WHERE contact_id = ${contactId} AND channel = 'email'
 	`

@@ -2,7 +2,7 @@ import { NodeRuntime, NodeStdio } from '@effect/platform-node'
 import { Config, Effect, Layer, Logger } from 'effect'
 import { McpServer } from 'effect/unstable/ai'
 
-import { ParticipantMatcher } from '@batuda/email/participant-matcher'
+import { ParticipantMatcher } from '@batuda/communications'
 
 import { PgLive } from './db/client'
 import { McpLoggerLive } from './lib/logger'
@@ -13,7 +13,6 @@ import { CompanyService } from './services/companies'
 import { CredentialCrypto } from './services/credential-crypto'
 import { EmailService } from './services/email'
 import { DraftStore } from './services/email-draft-store'
-import { LocalInboxProviderLive } from './services/local-inbox-provider'
 import { MailTransport } from './services/mail-transport'
 import { PageService } from './services/pages'
 import { PipelineService } from './services/pipeline'
@@ -62,7 +61,6 @@ const ServerLayer = McpToolsLive.pipe(
 		}),
 	),
 	Layer.provide(ServicesLive),
-	Layer.provide(LocalInboxProviderLive),
 	Layer.provide(S3StorageProviderLive),
 	Layer.provide(PgLive),
 	Layer.provide(

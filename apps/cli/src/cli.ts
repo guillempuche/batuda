@@ -746,9 +746,9 @@ const emailInjectCommand = Command.make(
 	'inject',
 	{
 		to: Flag.string('to').pipe(
-			Flag.withDescription('Recipient address (must match a seeded inbox)'),
+			Flag.withDescription('Recipient address (must match a seeded mailbox)'),
 			Flag.withFallbackPrompt(
-				Prompt.text({ message: 'To (a seeded inbox address):' }),
+				Prompt.text({ message: 'To (a seeded mailbox address):' }),
 			),
 		),
 		from: Flag.string('from').pipe(
@@ -794,7 +794,7 @@ const emailInjectCommand = Command.make(
 ).pipe(
 	Command.withShortDescription('SMTP a canned message into the mail catcher'),
 	Command.withDescription(
-		'SMTP a canned message into the mail catcher (visible via its REST API; if addressed to a seeded inbox with the worker running, it is also ingested over IMAP)',
+		'SMTP a canned message into the mail catcher (visible via its REST API; if addressed to a seeded mailbox with the worker running, it is also ingested over IMAP)',
 	),
 )
 
@@ -850,7 +850,7 @@ const dataCommand = Command.make(
 ).pipe(
 	Command.withShortDescription('List seeded mock data'),
 	Command.withDescription(
-		'Inspect seeded mock data: run bare for a row-count overview, or `data <entity>` (orgs, members, companies, templates, stacks, inboxes, tasks, pages) for the rows. Add --json to script the output.',
+		'Inspect seeded mock data: run bare for a row-count overview, or `data <entity>` (orgs, members, companies, templates, stacks, mailboxes, tasks, pages) for the rows. Add --json to script the output.',
 	),
 )
 

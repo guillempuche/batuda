@@ -46,7 +46,7 @@ const authMigrate = Effect.promise(async () => {
 				schema: {
 					member: {
 						additionalFields: {
-							primaryInboxId: {
+							primaryMailboxId: {
 								type: 'string',
 								required: false,
 								fieldName: 'primary_inbox_id',
@@ -114,7 +114,7 @@ const logMigrationTarget = Effect.gen(function* () {
 
 // Better Auth migrations run first so the CRM migration (0001_initial)
 // can reference Better Auth tables — specifically the FK from
-// member.primary_inbox_id → inboxes(id) needs the `member` table to
+// member.primary_inbox_id → mailboxes(id) needs the `member` table to
 // already exist when the ALTER TABLE fires.
 const program = Effect.gen(function* () {
 	yield* logMigrationTarget

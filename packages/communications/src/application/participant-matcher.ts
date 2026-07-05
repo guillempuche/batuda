@@ -3,6 +3,8 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/domain'
 
+import type { Channel } from '../domain/channel'
+
 export class MatchedContact extends Data.TaggedClass('MatchedContact')<{
 	readonly contactId: string
 	readonly companyId: string
@@ -30,7 +32,8 @@ export class Ambiguous extends Data.TaggedClass('Ambiguous')<{
 }> {}
 
 export class NoMatch extends Data.TaggedClass('NoMatch')<{
-	readonly email: string
+	readonly channel: Channel
+	readonly address: string
 }> {}
 
 export type ParticipantMatch =
@@ -44,7 +47,8 @@ export type ParticipantMatch =
 export type CreatePolicy = 'never' | 'contact-only' | 'both'
 
 export interface MatchArgs {
-	readonly email: string
+	readonly channel: Channel
+	readonly address: string
 	readonly displayName?: string | undefined
 	readonly createPolicy: CreatePolicy
 }
@@ -61,7 +65,7 @@ export class ParticipantMatcher extends ServiceMap.Service<ParticipantMatcher>()
 				): Effect.Effect<ParticipantMatch, never, CurrentOrg> =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
-						const email = args.email.trim().toLowerCase()
+						const address = args.address.trim().toLowerCase()
 
 						const contacts = yield* sql<{
 							id: string
@@ -69,8 +73,8 @@ export class ParticipantMatcher extends ServiceMap.Service<ParticipantMatcher>()
 						}>`
 							SELECT c.id, c.company_id FROM contact_channels ch
 							JOIN contacts c ON c.id = ch.contact_id
-							WHERE ch.kind = 'email'
-							  AND lower(ch.value) = ${email}
+							WHERE ch.channel = ${args.channel}
+							  AND lower(ch.address) = ${address}
 							  AND ch.organization_id = ${currentOrg.id}
 							ORDER BY c.updated_at DESC
 						`
@@ -90,8 +94,11 @@ export class ParticipantMatcher extends ServiceMap.Service<ParticipantMatcher>()
 							})
 						}
 
-						const domain = email.split('@')[1]
-						if (!domain) return new NoMatch({ email })
+						// Company fallback matches on the email domain; only the email
+						// channel carries an @-domain, so a non-email address with no
+						// contact hit resolves to NoMatch here.
+						const domain = address.split('@')[1]
+						if (!domain) return new NoMatch({ channel: args.channel, address })
 
 						const companies = yield* sql<{ id: string }>`
 							SELECT id FROM companies
@@ -104,7 +111,7 @@ export class ParticipantMatcher extends ServiceMap.Service<ParticipantMatcher>()
 							LIMIT 1
 						`
 						const [company] = companies
-						if (!company) return new NoMatch({ email })
+						if (!company) return new NoMatch({ channel: args.channel, address })
 						const companyId = company.id
 
 						if (args.createPolicy === 'never') {
@@ -115,7 +122,7 @@ export class ParticipantMatcher extends ServiceMap.Service<ParticipantMatcher>()
 							INSERT INTO contacts ${sql.insert({
 								organizationId: currentOrg.id,
 								companyId,
-								name: args.displayName ?? email,
+								name: args.displayName ?? address,
 								role: null,
 								isDecisionMaker: null,
 								notes: null,
@@ -128,12 +135,12 @@ export class ParticipantMatcher extends ServiceMap.Service<ParticipantMatcher>()
 								new Error('INSERT INTO contacts RETURNING id yielded no row'),
 							)
 						}
-						// The inbound sender address becomes the contact's primary
-						// email channel, so a later reply matches it back.
+						// The inbound sender's address becomes the contact's primary
+						// channel handle, so a later reply matches it back.
 						yield* sql`
 							INSERT INTO contact_channels
-								(organization_id, contact_id, kind, value, is_primary)
-							VALUES (${currentOrg.id}, ${createdContact.id}, 'email', ${email}, true)
+								(organization_id, contact_id, channel, address, is_primary)
+							VALUES (${currentOrg.id}, ${createdContact.id}, ${args.channel}, ${address}, true)
 						`
 						return new CreatedContact({
 							contactId: createdContact.id,

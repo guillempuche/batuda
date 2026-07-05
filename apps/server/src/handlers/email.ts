@@ -2,18 +2,25 @@ import { Effect, Stream } from 'effect'
 import { HttpServerResponse, Multipart } from 'effect/unstable/http'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
-import { BadRequest, BatudaApi } from '@batuda/controllers'
+import {
+	BadRequest,
+	BatudaApi,
+	CurrentOrg,
+	SessionContext,
+} from '@batuda/controllers'
 
 import { EmailService } from '../services/email'
 import {
 	EmailAttachmentStaging,
 	type StagingRef,
 } from '../services/email-attachment-staging'
+import { OauthTokenService } from '../services/email-oauth'
 
 export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 	Effect.gen(function* () {
 		const svc = yield* EmailService
 		const staging = yield* EmailAttachmentStaging
+		const oauth = yield* OauthTokenService
 
 		// Convert the on-wire ref shape to the staging service's StagingRef.
 		// Defaults `inline: false` when caller omits it — same policy the
@@ -40,7 +47,7 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 				.handle('send', _ =>
 					svc
 						.send(
-							_.payload.inboxId,
+							_.payload.mailboxId,
 							typeof _.payload.to === 'string'
 								? _.payload.to
 								: [..._.payload.to],
@@ -68,7 +75,7 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 							},
 						)
 						.pipe(
-							// Surface the inbox-state failures as the route's declared
+							// Surface the mailbox-state failures as the route's declared
 							// 409s; collapse internal errors to die().
 							Effect.catchTag('EmailError', e => Effect.die(e)),
 							Effect.catchTag('SqlError', e => Effect.die(e)),
@@ -100,8 +107,8 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 				)
 				.handle('listThreads', _ =>
 					svc.listThreads({
-						...(_.query.inboxId !== undefined && {
-							inboxId: _.query.inboxId,
+						...(_.query.mailboxId !== undefined && {
+							mailboxId: _.query.mailboxId,
 						}),
 						...(_.query.companyId !== undefined && {
 							companyId: _.query.companyId,
@@ -169,8 +176,8 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 							),
 						),
 				)
-				.handle('listInboxes', _ =>
-					svc.listLocalInboxes({
+				.handle('listMailboxes', _ =>
+					svc.listLocalMailboxes({
 						...(_.query.purpose !== undefined && {
 							purpose: _.query.purpose,
 						}),
@@ -183,10 +190,10 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 					}),
 				)
 				.handle('listProviderPresets', () => svc.listProviderPresets())
-				.handle('inboxStatus', () => svc.inboxStatus())
-				.handle('createInbox', _ =>
+				.handle('mailboxStatus', () => svc.mailboxStatus())
+				.handle('createMailbox', _ =>
 					svc
-						.createInbox({
+						.createMailbox({
 							email: _.payload.email,
 							...(_.payload.displayName !== undefined && {
 								displayName: _.payload.displayName,
@@ -212,9 +219,9 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 						})
 						.pipe(Effect.catchTag('SqlError', e => Effect.die(e))),
 				)
-				.handle('updateInbox', _ =>
+				.handle('updateMailbox', _ =>
 					svc
-						.updateInbox(_.params.id, {
+						.updateMailbox(_.params.id, {
 							...(_.payload.displayName !== undefined && {
 								displayName: _.payload.displayName,
 							}),
@@ -260,28 +267,28 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 						})
 						.pipe(Effect.catchTag('SqlError', e => Effect.die(e))),
 				)
-				.handle('deleteInbox', _ =>
-					svc.deleteInbox(_.params.id).pipe(
+				.handle('deleteMailbox', _ =>
+					svc.deleteMailbox(_.params.id).pipe(
 						Effect.map(() => undefined as void),
 						Effect.catchTag('NotFound', e => Effect.die(e)),
 						Effect.catchTag('SqlError', e => Effect.die(e)),
 					),
 				)
-				.handle('testInbox', _ =>
+				.handle('testMailbox', _ =>
 					svc
-						.testInbox(_.params.id)
+						.testMailbox(_.params.id)
 						.pipe(Effect.catchTag('SqlError', e => Effect.die(e))),
 				)
-				.handle('setPrimaryInbox', _ =>
+				.handle('setPrimaryMailbox', _ =>
 					svc
-						.setPrimaryInbox(_.params.id)
+						.setPrimaryMailbox(_.params.id)
 						.pipe(Effect.catchTag('SqlError', e => Effect.die(e))),
 				)
 				// ── Drafts ──
 				.handle('createDraft', _ =>
 					svc
 						.createDraft(
-							_.payload.inboxId,
+							_.payload.mailboxId,
 							{
 								...(_.payload.to !== undefined && {
 									to:
@@ -317,14 +324,14 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 						.pipe(Effect.orDie),
 				)
 				.handle('listDrafts', _ =>
-					svc.listDrafts(_.query.inboxId).pipe(Effect.orDie),
+					svc.listDrafts(_.query.mailboxId).pipe(Effect.orDie),
 				)
 				.handle('getDraft', _ =>
-					svc.getDraft(_.query.inboxId, _.params.draftId).pipe(Effect.orDie),
+					svc.getDraft(_.query.mailboxId, _.params.draftId).pipe(Effect.orDie),
 				)
 				.handle('updateDraft', _ =>
 					svc
-						.updateDraft(_.payload.inboxId, _.params.draftId, {
+						.updateDraft(_.payload.mailboxId, _.params.draftId, {
 							...(_.payload.to !== undefined && {
 								to:
 									typeof _.payload.to === 'string'
@@ -343,15 +350,17 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 						.pipe(Effect.orDie),
 				)
 				.handle('deleteDraft', _ =>
-					svc.deleteDraft(_.query.inboxId, _.params.draftId).pipe(Effect.orDie),
+					svc
+						.deleteDraft(_.query.mailboxId, _.params.draftId)
+						.pipe(Effect.orDie),
 				)
 				.handle('sendDraft', _ =>
-					svc.sendDraft(_.payload.inboxId, _.params.draftId).pipe(
+					svc.sendDraft(_.payload.mailboxId, _.params.draftId).pipe(
 						Effect.catchTags({
 							EmailError: e =>
 								Effect.fail(new BadRequest({ message: e.message })),
 							NotFound: e => Effect.die(e),
-							InboxInactive: e => Effect.die(e),
+							MailboxInactive: e => Effect.die(e),
 							GrantUnavailable: e => Effect.die(e),
 							BadRequest: e => Effect.die(e),
 							SqlError: e => Effect.die(e),
@@ -361,12 +370,12 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 				)
 				// ── Footers ──
 				.handle('listFooters', _ =>
-					svc.listFooters(_.params.inboxId).pipe(Effect.orDie),
+					svc.listFooters(_.params.mailboxId).pipe(Effect.orDie),
 				)
 				.handle('createFooter', _ =>
 					svc
 						.createFooter({
-							inboxId: _.params.inboxId,
+							mailboxId: _.params.mailboxId,
 							name: _.payload.name,
 							bodyJson: _.payload.bodyJson,
 							...(_.payload.isDefault !== undefined && {
@@ -400,7 +409,7 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 				.handle('deleteFooter', _ => svc.deleteFooter(_.params.id))
 				.handle('discardStagedAttachment', _ =>
 					staging
-						.discard(_.query.inboxId, _.params.stagingId)
+						.discard(_.query.mailboxId, _.params.stagingId)
 						.pipe(Effect.catchTag('BadRequest', e => Effect.fail(e))),
 				)
 				.handleRaw(
@@ -409,7 +418,7 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 						let bytes: Uint8Array | undefined
 						let filename: string | undefined
 						let contentType: string | undefined
-						let inboxId: string | undefined
+						let mailboxId: string | undefined
 						let inline = false
 						let draftId: string | undefined
 
@@ -424,8 +433,8 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 									}
 									if (Multipart.isField(part)) {
 										const value = part.value
-										if (part.key === 'inboxId' && typeof value === 'string') {
-											inboxId = value
+										if (part.key === 'mailboxId' && typeof value === 'string') {
+											mailboxId = value
 										} else if (
 											part.key === 'inline' &&
 											typeof value === 'string'
@@ -452,11 +461,11 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 								{ status: 400 },
 							)
 						}
-						if (!inboxId) {
+						if (!mailboxId) {
 							return HttpServerResponse.jsonUnsafe(
 								{
 									_tag: 'BadRequest',
-									message: 'Missing inboxId field in multipart upload',
+									message: 'Missing mailboxId field in multipart upload',
 								},
 								{ status: 400 },
 							)
@@ -464,7 +473,7 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 
 						const result = yield* staging
 							.stage({
-								inboxId,
+								mailboxId,
 								bytes,
 								filename: filename ?? 'attachment',
 								contentType,
@@ -535,6 +544,31 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 							...(piped.size !== undefined && { contentLength: piped.size }),
 							headers: { 'content-disposition': disposition },
 						})
+					}),
+				)
+				.handleRaw(
+					'oauthStart',
+					Effect.fnUntraced(function* ({ params }) {
+						// Sign the caller's org + user into `state` so the public
+						// callback can trust who this consent flow is for without a
+						// session cookie, then bounce the browser to the provider.
+						const currentOrg = yield* CurrentOrg
+						const session = yield* SessionContext
+						const state = oauth.signState({
+							orgId: currentOrg.id,
+							userId: session.userId,
+						})
+						const url = oauth.authorizationUrl({
+							provider: params.provider,
+							state,
+						})
+						if (url === null) {
+							return HttpServerResponse.redirect(
+								'/emails/mailboxes?error=oauth_unconfigured',
+								{ status: 302 },
+							)
+						}
+						return HttpServerResponse.redirect(url, { status: 302 })
 					}),
 				)
 		)

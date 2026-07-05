@@ -8,8 +8,8 @@ import {
 } from 'react'
 
 /**
- * Boundary note: page-scoped dialogs (e.g. the inbox dialogs in
- * routes/emails/inboxes.tsx) live in the `?dlg=` URL param so they are
+ * Boundary note: page-scoped dialogs (e.g. the mailbox dialogs in
+ * routes/emails/mailboxes.tsx) live in the `?dlg=` URL param so they are
  * deep-linkable and the back button closes them. Quick Capture stays a
  * React context instead: it is the one app-global dialog (opens from
  * anywhere via Shift+I), and its imperative `onSubmitted` pre-fill callback

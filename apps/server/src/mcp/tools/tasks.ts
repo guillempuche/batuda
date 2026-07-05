@@ -52,7 +52,7 @@ const CreateTask = Tool.make('create_task', {
 		assignee_id: Schema.optional(Schema.NullOr(Schema.String)),
 		linked_interaction_id: Schema.optional(Schema.NullOr(Schema.String)),
 		linked_calendar_event_id: Schema.optional(Schema.NullOr(Schema.String)),
-		linked_thread_link_id: Schema.optional(Schema.NullOr(Schema.String)),
+		linked_thread_id: Schema.optional(Schema.NullOr(Schema.String)),
 		linked_proposal_id: Schema.optional(Schema.NullOr(Schema.String)),
 		metadata: Schema.optional(Schema.NullOr(Schema.Unknown)),
 	}),
@@ -130,7 +130,7 @@ const UpdateTask = Tool.make('update_task', {
 		contact_id: Schema.optional(Schema.NullOr(Schema.String)),
 		linked_interaction_id: Schema.optional(Schema.NullOr(Schema.String)),
 		linked_calendar_event_id: Schema.optional(Schema.NullOr(Schema.String)),
-		linked_thread_link_id: Schema.optional(Schema.NullOr(Schema.String)),
+		linked_thread_id: Schema.optional(Schema.NullOr(Schema.String)),
 		linked_proposal_id: Schema.optional(Schema.NullOr(Schema.String)),
 		metadata: Schema.optional(Schema.NullOr(Schema.Unknown)),
 	}),
@@ -277,7 +277,7 @@ export const TaskHandlersLive = TaskTools.toLayer(
 							assigneeId: params.assignee_id ?? null,
 							linkedInteractionId: params.linked_interaction_id ?? null,
 							linkedCalendarEventId: params.linked_calendar_event_id ?? null,
-							linkedThreadLinkId: params.linked_thread_link_id ?? null,
+							linkedThreadLinkId: params.linked_thread_id ?? null,
 							linkedProposalId: params.linked_proposal_id ?? null,
 							metadata:
 								params.metadata !== undefined && params.metadata !== null
@@ -351,8 +351,8 @@ export const TaskHandlersLive = TaskTools.toLayer(
 						fields['linked_interaction_id'] = params.linked_interaction_id
 					if (params.linked_calendar_event_id !== undefined)
 						fields['linked_calendar_event_id'] = params.linked_calendar_event_id
-					if (params.linked_thread_link_id !== undefined)
-						fields['linked_thread_link_id'] = params.linked_thread_link_id
+					if (params.linked_thread_id !== undefined)
+						fields['linked_conversation_id'] = params.linked_thread_id
 					if (params.linked_proposal_id !== undefined)
 						fields['linked_proposal_id'] = params.linked_proposal_id
 					if (params.metadata !== undefined)

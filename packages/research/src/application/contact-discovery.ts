@@ -82,13 +82,13 @@ export const isDecisionMaker = (
 }
 
 /**
- * One reachable channel for a contact. `kind` is open (`email`, `phone`,
+ * One reachable channel for a contact. `channel` is open (`email`, `phone`,
  * `linkedin`, `x`, `website`, `bluesky`, …) so a new channel needs no schema
  * change. Only `email` carries a deliverability `verification` today.
  */
 export interface ContactChannel {
-	readonly kind: string
-	readonly value: string
+	readonly channel: string
+	readonly address: string
 	readonly verification?: VerificationVerdict | undefined
 	readonly confidence?: number | undefined
 	readonly is_primary?: boolean | undefined
@@ -122,7 +122,7 @@ export interface DiscoverContactsInput {
 /** The email channel (when present) carries the deliverability signal we rank on. */
 export const emailChannel = (
 	c: DiscoveredContact,
-): ContactChannel | undefined => c.channels.find(ch => ch.kind === 'email')
+): ContactChannel | undefined => c.channels.find(ch => ch.channel === 'email')
 
 export const compareContacts = (
 	a: DiscoveredContact,
@@ -320,8 +320,8 @@ export class ContactDiscovery extends ServiceMap.Service<ContactDiscovery>()(
 										}
 										if (verdict !== 'undeliverable') {
 											channels.push({
-												kind: 'email',
-												value: chosen,
+												channel: 'email',
+												address: chosen,
 												verification: verdict,
 												confidence,
 												is_primary: true,
@@ -331,13 +331,16 @@ export class ContactDiscovery extends ServiceMap.Service<ContactDiscovery>()(
 
 									// Other channels the vendor returned (data-only).
 									if (person.linkedin) {
-										channels.push({ kind: 'linkedin', value: person.linkedin })
+										channels.push({
+											channel: 'linkedin',
+											address: person.linkedin,
+										})
 									}
 									if (person.x) {
-										channels.push({ kind: 'x', value: person.x })
+										channels.push({ channel: 'x', address: person.x })
 									}
 									if (person.phone) {
-										channels.push({ kind: 'phone', value: person.phone })
+										channels.push({ channel: 'phone', address: person.phone })
 									}
 
 									if (channels.length === 0) return null

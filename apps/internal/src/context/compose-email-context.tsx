@@ -18,7 +18,7 @@ export type DraftWindowState = 'open' | 'minimized' | 'fullscreen'
 export type Draft = {
 	readonly id: string
 	readonly serverId: string | null
-	readonly inboxId: string
+	readonly mailboxId: string
 	readonly mode: DraftMode
 	readonly windowState: DraftWindowState
 	readonly saving: boolean
@@ -35,7 +35,7 @@ export type OpenComposeInput = {
 	readonly threadId?: string
 	readonly companyId?: string
 	readonly contactId?: string
-	readonly inboxId?: string
+	readonly mailboxId?: string
 	readonly to?: string
 	readonly cc?: string
 	readonly bcc?: string
@@ -92,7 +92,8 @@ export function ComposeEmailProvider({
 						recovered.push({
 							id: generateDraftId(),
 							serverId: draftId,
-							inboxId: typeof sd['inboxId'] === 'string' ? sd['inboxId'] : '',
+							mailboxId:
+								typeof sd['mailboxId'] === 'string' ? sd['mailboxId'] : '',
 							mode: ctx.mode === 'reply' ? 'reply' : 'new',
 							windowState: 'minimized',
 							saving: false,
@@ -119,7 +120,7 @@ export function ComposeEmailProvider({
 		const draft: Draft = {
 			id,
 			serverId: null,
-			inboxId: input.inboxId ?? '',
+			mailboxId: input.mailboxId ?? '',
 			mode: input.mode,
 			windowState: 'open',
 			saving: false,

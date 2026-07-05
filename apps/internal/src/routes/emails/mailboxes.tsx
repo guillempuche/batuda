@@ -12,7 +12,7 @@ import {
 	Check,
 	ChevronLeft,
 	FileText,
-	Inbox as InboxIcon,
+	Mailbox as MailboxIcon,
 	Pause,
 	Pencil,
 	Play,
@@ -39,23 +39,23 @@ import {
 
 import {
 	createFooterAtom,
-	createInboxAtom,
+	createMailboxAtom,
 	deleteFooterAtom,
-	deleteInboxAtom,
+	deleteMailboxAtom,
 	footersAtomFor,
-	inboxesListAtom,
-	inboxStatusAtom,
+	mailboxesListAtom,
+	mailboxStatusAtom,
 	providerPresetsAtom,
-	setPrimaryInboxAtom,
-	testInboxAtom,
+	setPrimaryMailboxAtom,
+	testMailboxAtom,
 	updateFooterAtom,
-	updateInboxAtom,
+	updateMailboxAtom,
 } from '#/atoms/emails-atoms'
 import {
-	emptyInboxDraft,
-	type InboxDraft,
-	inboxDraftAtom,
-} from '#/atoms/inbox-draft-atoms'
+	emptyMailboxDraft,
+	type MailboxDraft,
+	mailboxDraftAtom,
+} from '#/atoms/mailbox-draft-atoms'
 import { EmptyState } from '#/components/shared/empty-state'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { SkeletonRows } from '#/components/shared/skeleton-row'
@@ -70,18 +70,18 @@ import {
 	stenciledTitle,
 } from '#/lib/workshop-mixins'
 
-type InboxPurpose = 'human' | 'agent' | 'shared'
+type MailboxPurpose = 'human' | 'agent' | 'shared'
 type TransportSecurity = 'tls' | 'starttls' | 'plain'
 type GrantStatus = 'connected' | 'auth_failed' | 'connect_failed' | 'disabled'
-// What the status pill shows. A paused inbox (active=false) reads "Paused"
+// What the status pill shows. A paused mailbox (active=false) reads "Paused"
 // regardless of its last sign-in result, so it gets its own tone.
 type StatusTone = GrantStatus | 'paused'
 
-type InboxRow = {
+type MailboxRow = {
 	readonly id: string
 	readonly email: string
 	readonly displayName: string | null
-	readonly purpose: InboxPurpose
+	readonly purpose: MailboxPurpose
 	readonly ownerUserId: string | null
 	readonly isDefault: boolean
 	readonly isPrivate: boolean
@@ -113,7 +113,7 @@ type ProviderPreset = {
 	readonly passwordAuthSupported: boolean
 }
 
-async function loadInboxesOnServer(): Promise<ReadonlyArray<unknown>> {
+async function loadMailboxesOnServer(): Promise<ReadonlyArray<unknown>> {
 	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
 		import('effect'),
 		import('#/lib/batuda-api-server'),
@@ -121,7 +121,7 @@ async function loadInboxesOnServer(): Promise<ReadonlyArray<unknown>> {
 	])
 	const program = Effect.gen(function* () {
 		const client = yield* makeBatudaApiServer(cookie ?? undefined)
-		return yield* client.email.listInboxes({ query: {} })
+		return yield* client.email.listMailboxes({ query: {} })
 	})
 	return Effect.runPromise(program)
 }
@@ -130,32 +130,32 @@ async function loadInboxesOnServer(): Promise<ReadonlyArray<unknown>> {
 // deep-linkable and the back button closes them. This route owns exactly three
 // dialogs; a `?dlg=` value outside this set fails to decode and stays closed.
 // `dlg` is intentionally not a loaderDep — opening a dialog never refetches.
-const inboxDlgSchema = Schema.Union([
+const mailboxDlgSchema = Schema.Union([
 	dlgNoId('create'),
 	dlgWithId('edit'),
 	dlgWithId('footers'),
 ])
-type InboxDlg = Schema.Schema.Type<typeof inboxDlgSchema>
-const decodeInboxDlg = Schema.decodeUnknownOption(inboxDlgSchema)
+type MailboxDlg = Schema.Schema.Type<typeof mailboxDlgSchema>
+const decodeMailboxDlg = Schema.decodeUnknownOption(mailboxDlgSchema)
 
-export const Route = createFileRoute('/emails/inboxes')({
-	validateSearch: validateSearchWith({ dlg: inboxDlgSchema }),
+export const Route = createFileRoute('/emails/mailboxes')({
+	validateSearch: validateSearchWith({ dlg: mailboxDlgSchema }),
 	loader: async () => {
 		if (!import.meta.env.SSR) return { dehydrated: [] as const }
 		try {
-			const inboxes = await loadInboxesOnServer()
+			const mailboxes = await loadMailboxesOnServer()
 			return {
 				dehydrated: [
-					dehydrateAtom(inboxesListAtom, AsyncResult.success(inboxes)),
+					dehydrateAtom(mailboxesListAtom, AsyncResult.success(mailboxes)),
 				] as const,
 			}
 		} catch (error) {
-			console.warn('[InboxesLoader] falling back to empty hydration:', error)
+			console.warn('[MailboxesLoader] falling back to empty hydration:', error)
 			return { dehydrated: [] as const }
 		}
 	},
-	head: () => ({ meta: [{ title: 'Inboxes — Batuda' }] }),
-	component: InboxesPage,
+	head: () => ({ meta: [{ title: 'Mailboxes — Batuda' }] }),
+	component: MailboxesPage,
 })
 
 // Open pushes a history entry (so Back closes the dialog); close drops `dlg`
@@ -167,17 +167,17 @@ export const Route = createFileRoute('/emails/inboxes')({
 // re-resolves it), so the dialog wouldn't close. The URL always reflects the
 // truth, so we decode it through the same schema here — keeping the scope gate
 // (an unknown `dlg` decodes to nothing) without casts.
-function useInboxDlg() {
+function useMailboxDlg() {
 	const rawDlg = useLocation({ select: l => l.search?.dlg })
 	const dlg = useMemo(
-		() => Option.getOrUndefined(decodeInboxDlg(rawDlg)),
+		() => Option.getOrUndefined(decodeMailboxDlg(rawDlg)),
 		[rawDlg],
 	)
 	const navigate = Route.useNavigate()
 	const open = useCallback(
-		(next: InboxDlg) => {
+		(next: MailboxDlg) => {
 			void navigate({
-				to: '/emails/inboxes',
+				to: '/emails/mailboxes',
 				search: prev => ({ ...prev, dlg: next }),
 			})
 		},
@@ -188,7 +188,7 @@ function useInboxDlg() {
 		// Drop the `dlg` key entirely (rather than blank it) so the param
 		// disappears from the address bar and the URL goes back to clean.
 		void navigate({
-			to: '/emails/inboxes',
+			to: '/emails/mailboxes',
 			search: ({ dlg: _, ...rest }) => rest,
 			replace: true,
 		})
@@ -196,30 +196,30 @@ function useInboxDlg() {
 	return { dlg, open, close }
 }
 
-function InboxesPage() {
+function MailboxesPage() {
 	const { t } = useLingui()
 	const toastManager = usePriToast()
-	const inboxesResult = useAtomValue(inboxesListAtom)
-	const refreshInboxes = useAtomRefresh(inboxesListAtom)
-	const inboxStatusResult = useAtomValue(inboxStatusAtom)
-	const refreshInboxStatus = useAtomRefresh(inboxStatusAtom)
+	const mailboxesResult = useAtomValue(mailboxesListAtom)
+	const refreshMailboxes = useAtomRefresh(mailboxesListAtom)
+	const mailboxStatusResult = useAtomValue(mailboxStatusAtom)
+	const refreshMailboxStatus = useAtomRefresh(mailboxStatusAtom)
 
-	const createInbox = useAtomSet(createInboxAtom, { mode: 'promiseExit' })
-	const updateInbox = useAtomSet(updateInboxAtom, { mode: 'promiseExit' })
-	const deleteInbox = useAtomSet(deleteInboxAtom, { mode: 'promiseExit' })
-	const testInbox = useAtomSet(testInboxAtom, { mode: 'promiseExit' })
-	const setPrimaryInbox = useAtomSet(setPrimaryInboxAtom, {
+	const createMailbox = useAtomSet(createMailboxAtom, { mode: 'promiseExit' })
+	const updateMailbox = useAtomSet(updateMailboxAtom, { mode: 'promiseExit' })
+	const deleteMailbox = useAtomSet(deleteMailboxAtom, { mode: 'promiseExit' })
+	const testMailbox = useAtomSet(testMailboxAtom, { mode: 'promiseExit' })
+	const setPrimaryMailbox = useAtomSet(setPrimaryMailboxAtom, {
 		mode: 'promiseExit',
 	})
 
-	const { dlg, open, close } = useInboxDlg()
+	const { dlg, open, close } = useMailboxDlg()
 
-	const rows = useMemo<ReadonlyArray<InboxRow>>(
+	const rows = useMemo<ReadonlyArray<MailboxRow>>(
 		() =>
-			AsyncResult.isSuccess(inboxesResult)
-				? narrowInboxRows(inboxesResult.value)
+			AsyncResult.isSuccess(mailboxesResult)
+				? narrowMailboxRows(mailboxesResult.value)
 				: [],
-		[inboxesResult],
+		[mailboxesResult],
 	)
 	const presetsResult = useAtomValue(providerPresetsAtom)
 	const presets = useMemo<ReadonlyArray<ProviderPreset>>(
@@ -229,10 +229,11 @@ function InboxesPage() {
 				: [],
 		[presetsResult],
 	)
-	const isLoading = AsyncResult.isInitial(inboxesResult)
-	const isFailure = AsyncResult.isFailure(inboxesResult)
+	const isLoading = AsyncResult.isInitial(mailboxesResult)
+	const isFailure = AsyncResult.isFailure(mailboxesResult)
 	const listSettled =
-		AsyncResult.isSuccess(inboxesResult) || AsyncResult.isFailure(inboxesResult)
+		AsyncResult.isSuccess(mailboxesResult) ||
+		AsyncResult.isFailure(mailboxesResult)
 
 	// Edit/footers dialogs carry only the row id in the URL; resolve the row
 	// from the loaded list. A deep link to a row that no longer exists closes
@@ -246,14 +247,14 @@ function InboxesPage() {
 		if (listSettled && targetRow === null) close()
 	}, [dlg, listSettled, targetRow, close])
 
-	// hasDefault is the only signal we need from inboxStatus to drive the
-	// banner; the picker walks the inbox list itself.
+	// hasDefault is the only signal we need from mailboxStatus to drive the
+	// banner; the picker walks the mailbox list itself.
 	const hasPrimary = useMemo(
 		() =>
-			AsyncResult.isSuccess(inboxStatusResult) &&
-			isInboxStatus(inboxStatusResult.value) &&
-			inboxStatusResult.value.hasDefault,
-		[inboxStatusResult],
+			AsyncResult.isSuccess(mailboxStatusResult) &&
+			isMailboxStatus(mailboxStatusResult.value) &&
+			mailboxStatusResult.value.hasDefault,
+		[mailboxStatusResult],
 	)
 
 	const primarySuggestions = useMemo(
@@ -271,57 +272,57 @@ function InboxesPage() {
 
 	const openCreate = useCallback(() => open({ kind: 'create' }), [open])
 	const openEdit = useCallback(
-		(row: InboxRow) => open({ kind: 'edit', id: row.id }),
+		(row: MailboxRow) => open({ kind: 'edit', id: row.id }),
 		[open],
 	)
 	const openFooters = useCallback(
-		(row: InboxRow) => open({ kind: 'footers', id: row.id }),
+		(row: MailboxRow) => open({ kind: 'footers', id: row.id }),
 		[open],
 	)
 
 	const toggleActive = useCallback(
-		async (row: InboxRow) => {
-			const exit = await updateInbox({
+		async (row: MailboxRow) => {
+			const exit = await updateMailbox({
 				params: { id: row.id },
 				payload: { active: !row.active },
 			})
 			if (exit._tag !== 'Success') {
 				toastManager.add({
 					title: t`Update failed`,
-					description: t`Could not toggle the inbox state.`,
+					description: t`Could not toggle the mailbox state.`,
 					type: 'error',
 				})
 				return
 			}
-			refreshInboxes()
-			refreshInboxStatus()
+			refreshMailboxes()
+			refreshMailboxStatus()
 		},
-		[updateInbox, refreshInboxes, refreshInboxStatus, toastManager, t],
+		[updateMailbox, refreshMailboxes, refreshMailboxStatus, toastManager, t],
 	)
 
 	const setDefault = useCallback(
-		async (row: InboxRow) => {
+		async (row: MailboxRow) => {
 			if (row.isDefault) return
-			const exit = await updateInbox({
+			const exit = await updateMailbox({
 				params: { id: row.id },
 				payload: { isDefault: true },
 			})
 			if (exit._tag !== 'Success') {
 				toastManager.add({
 					title: t`Update failed`,
-					description: t`Could not set the default inbox.`,
+					description: t`Could not set the default mailbox.`,
 					type: 'error',
 				})
 				return
 			}
-			refreshInboxes()
+			refreshMailboxes()
 		},
-		[updateInbox, refreshInboxes, toastManager, t],
+		[updateMailbox, refreshMailboxes, toastManager, t],
 	)
 
 	const handleTest = useCallback(
-		async (row: InboxRow) => {
-			const exit = await testInbox({ params: { id: row.id } })
+		async (row: MailboxRow) => {
+			const exit = await testMailbox({ params: { id: row.id } })
 			if (exit._tag !== 'Success') {
 				toastManager.add({
 					title: t`Test failed`,
@@ -332,21 +333,21 @@ function InboxesPage() {
 			}
 			toastManager.add({
 				title: t`Connection tested`,
-				description: t`Refreshing inbox status…`,
+				description: t`Refreshing mailbox status…`,
 				type: 'success',
 			})
-			refreshInboxes()
+			refreshMailboxes()
 		},
-		[testInbox, refreshInboxes, toastManager, t],
+		[testMailbox, refreshMailboxes, toastManager, t],
 	)
 
 	const handleDelete = useCallback(
-		async (row: InboxRow) => {
+		async (row: MailboxRow) => {
 			const ok = window.confirm(
-				t`Delete inbox ${row.email}? Stored messages stay; the connection stops.`,
+				t`Delete mailbox ${row.email}? Stored messages stay; the connection stops.`,
 			)
 			if (!ok) return
-			const exit = await deleteInbox({ params: { id: row.id } })
+			const exit = await deleteMailbox({ params: { id: row.id } })
 			if (exit._tag !== 'Success') {
 				toastManager.add({
 					title: t`Delete failed`,
@@ -354,33 +355,33 @@ function InboxesPage() {
 				})
 				return
 			}
-			refreshInboxes()
-			refreshInboxStatus()
+			refreshMailboxes()
+			refreshMailboxStatus()
 			toastManager.add({
-				title: t`Inbox removed`,
+				title: t`Mailbox removed`,
 				type: 'success',
 			})
 		},
-		[deleteInbox, refreshInboxes, refreshInboxStatus, toastManager, t],
+		[deleteMailbox, refreshMailboxes, refreshMailboxStatus, toastManager, t],
 	)
 
 	const handleSetPrimary = useCallback(
 		async (id: string) => {
-			const exit = await setPrimaryInbox({ params: { id } })
+			const exit = await setPrimaryMailbox({ params: { id } })
 			if (exit._tag !== 'Success') {
 				toastManager.add({
-					title: t`Could not set primary inbox`,
+					title: t`Could not set primary mailbox`,
 					type: 'error',
 				})
 				return
 			}
-			refreshInboxStatus()
+			refreshMailboxStatus()
 			toastManager.add({
-				title: t`Primary inbox set`,
+				title: t`Primary mailbox set`,
 				type: 'success',
 			})
 		},
-		[setPrimaryInbox, refreshInboxStatus, toastManager, t],
+		[setPrimaryMailbox, refreshMailboxStatus, toastManager, t],
 	)
 
 	return (
@@ -400,7 +401,7 @@ function InboxesPage() {
 					<PriButton
 						type='button'
 						$variant='filled'
-						data-testid='inboxes-connect'
+						data-testid='mailboxes-connect'
 						onClick={openCreate}
 					>
 						<Plus size={14} aria-hidden />
@@ -412,7 +413,7 @@ function InboxesPage() {
 			{showPrimaryBanner && (
 				<PrimaryBanner role='status'>
 					<PrimaryBannerText>
-						<strong>{t`No primary inbox set.`}</strong>{' '}
+						<strong>{t`No primary mailbox set.`}</strong>{' '}
 						<span>{t`Pick one to use as your default sender.`}</span>
 					</PrimaryBannerText>
 					<PrimaryBannerActions>
@@ -438,8 +439,8 @@ function InboxesPage() {
 									}
 								}}
 							>
-								<PriSelect.Trigger aria-label={t`Choose primary inbox`}>
-									<PriSelect.Value placeholder={t`Choose primary inbox`} />
+								<PriSelect.Trigger aria-label={t`Choose primary mailbox`}>
+									<PriSelect.Value placeholder={t`Choose primary mailbox`} />
 									<PriSelect.Icon>
 										<ChevronLeft
 											size={14}
@@ -472,12 +473,12 @@ function InboxesPage() {
 				<SkeletonRows count={5} height='3rem' />
 			) : isFailure ? (
 				<EmptyState
-					title={t`Could not load inboxes`}
+					title={t`Could not load mailboxes`}
 					description={t`Check the session or try again.`}
 				/>
 			) : rows.length === 0 ? (
 				<EmptyState
-					icon={InboxIcon}
+					icon={MailboxIcon}
 					title={t`Connect your email to get started`}
 					description={
 						<EmptyHelp>
@@ -493,7 +494,7 @@ function InboxesPage() {
 						<PriButton
 							type='button'
 							$variant='filled'
-							data-testid='inboxes-empty-connect'
+							data-testid='mailboxes-empty-connect'
 							onClick={openCreate}
 						>
 							<Plus size={14} aria-hidden />
@@ -502,7 +503,7 @@ function InboxesPage() {
 					}
 				/>
 			) : (
-				<InboxesTable role='table' aria-label={t`Your email connections`}>
+				<MailboxesTable role='table' aria-label={t`Your email connections`}>
 					<TableHead role='row'>
 						<HeadCell role='columnheader'>{t`Email`}</HeadCell>
 						<HeadCell role='columnheader'>{t`Status`}</HeadCell>
@@ -516,7 +517,7 @@ function InboxesPage() {
 					{rows.map(row => {
 						const providerName = providerNameFor(presets, row.imapHost)
 						const appPwUrl = authPasswordUrlFor(presets, row.imapHost)
-						// A paused (inactive) inbox isn't syncing, so that takes
+						// A paused (inactive) mailbox isn't syncing, so that takes
 						// precedence over whatever its last sign-in result was.
 						const statusTone: StatusTone = !row.active
 							? 'paused'
@@ -546,7 +547,7 @@ function InboxesPage() {
 											</ProviderName>
 										)}
 										{row.isPrivate && (
-											<PrivacyTag aria-label={t`Private inbox`}>
+											<PrivacyTag aria-label={t`Private mailbox`}>
 												{t`Private`}
 											</PrivacyTag>
 										)}
@@ -658,45 +659,45 @@ function InboxesPage() {
 							</TableRow>
 						)
 					})}
-				</InboxesTable>
+				</MailboxesTable>
 			)}
 
 			{dlg !== undefined &&
 				(dlg.kind === 'create' ||
 					(dlg.kind === 'edit' && targetRow !== null)) && (
-					<InboxFormDialog
+					<MailboxFormDialog
 						key={dlg.kind === 'edit' ? `edit:${dlg.id}` : 'create'}
 						editing={dlg.kind === 'edit' ? targetRow : null}
 						onClose={close}
 						onCreate={async input => {
-							const exit = await createInbox({ payload: input } as never)
+							const exit = await createMailbox({ payload: input } as never)
 							if (exit._tag !== 'Success') {
 								return {
 									ok: false,
-									error: t`Could not create the inbox. Check transport or credentials.`,
+									error: t`Could not create the mailbox. Check transport or credentials.`,
 								}
 							}
-							refreshInboxes()
-							refreshInboxStatus()
+							refreshMailboxes()
+							refreshMailboxStatus()
 							toastManager.add({
-								title: t`Inbox connected`,
+								title: t`Mailbox connected`,
 								description: t`The mailbox is ready.`,
 								type: 'success',
 							})
 							return { ok: true }
 						}}
 						onUpdate={async (id, patch) => {
-							const exit = await updateInbox({
+							const exit = await updateMailbox({
 								params: { id },
 								payload: patch,
 							})
 							if (exit._tag !== 'Success') {
-								return { ok: false, error: t`Could not save the inbox.` }
+								return { ok: false, error: t`Could not save the mailbox.` }
 							}
-							refreshInboxes()
-							refreshInboxStatus()
+							refreshMailboxes()
+							refreshMailboxStatus()
 							toastManager.add({
-								title: t`Inbox updated`,
+								title: t`Mailbox updated`,
 								type: 'success',
 							})
 							return { ok: true }
@@ -721,7 +722,7 @@ function InboxesPage() {
 }
 
 // Shown briefly when a deep link names a row (?dlg={kind:'edit',id}) before the
-// inbox list has loaded, so the dialog doesn't flash empty or closed.
+// mailbox list has loaded, so the dialog doesn't flash empty or closed.
 function DialogPending({ onClose }: { readonly onClose: () => void }) {
 	const { t } = useLingui()
 	return (
@@ -751,9 +752,9 @@ function DialogPending({ onClose }: { readonly onClose: () => void }) {
 	)
 }
 
-function isInboxStatus(value: unknown): value is {
+function isMailboxStatus(value: unknown): value is {
 	hasDefault: boolean
-	primary: { inboxId: string; email: string } | null
+	primary: { mailboxId: string; email: string } | null
 } {
 	if (!value || typeof value !== 'object') return false
 	const r = value as Record<string, unknown>
@@ -769,7 +770,7 @@ type MutationResult =
 type CreatePayload = {
 	readonly email: string
 	readonly displayName?: string
-	readonly purpose: InboxPurpose
+	readonly purpose: MailboxPurpose
 	readonly ownerUserId?: string
 	readonly isDefault?: boolean
 	readonly isPrivate?: boolean
@@ -785,7 +786,7 @@ type CreatePayload = {
 
 type UpdatePayload = {
 	readonly displayName?: string | null
-	readonly purpose?: InboxPurpose
+	readonly purpose?: MailboxPurpose
 	readonly ownerUserId?: string | null
 	readonly isDefault?: boolean
 	readonly isPrivate?: boolean
@@ -802,7 +803,7 @@ type UpdatePayload = {
 
 // Seed the edit form from a row. Password is intentionally omitted — it is
 // never read back, only set when the user opts to change it.
-function rowToDraft(row: InboxRow): InboxDraft {
+function rowToDraft(row: MailboxRow): MailboxDraft {
 	return {
 		email: row.email,
 		displayName: row.displayName ?? '',
@@ -820,13 +821,13 @@ function rowToDraft(row: InboxRow): InboxDraft {
 	}
 }
 
-function InboxFormDialog({
+function MailboxFormDialog({
 	editing,
 	onClose,
 	onCreate,
 	onUpdate,
 }: {
-	readonly editing: InboxRow | null
+	readonly editing: MailboxRow | null
 	readonly onClose: () => void
 	readonly onCreate: (input: CreatePayload) => Promise<MutationResult>
 	readonly onUpdate: (
@@ -848,15 +849,15 @@ function InboxFormDialog({
 
 	// Create keeps its draft in a global atom so a half-filled form survives
 	// closing the dialog and navigating away; edit uses local state seeded from
-	// the row. Both share the InboxDraft shape, so the form binds to one `draft`
+	// the row. Both share the MailboxDraft shape, so the form binds to one `draft`
 	// regardless of mode. The password is never part of the draft.
-	const [createDraft, setCreateDraft] = useAtom(inboxDraftAtom)
-	const [editDraft, setEditDraft] = useState<InboxDraft>(() =>
-		editing !== null ? rowToDraft(editing) : emptyInboxDraft,
+	const [createDraft, setCreateDraft] = useAtom(mailboxDraftAtom)
+	const [editDraft, setEditDraft] = useState<MailboxDraft>(() =>
+		editing !== null ? rowToDraft(editing) : emptyMailboxDraft,
 	)
 	const draft = isCreate ? createDraft : editDraft
 	const patchDraft = useCallback(
-		(partial: Partial<InboxDraft>) => {
+		(partial: Partial<MailboxDraft>) => {
 			if (isCreate) setCreateDraft(prev => ({ ...prev, ...partial }))
 			else setEditDraft(prev => ({ ...prev, ...partial }))
 		},
@@ -982,7 +983,7 @@ function InboxFormDialog({
 		if (result.ok) {
 			// Clear the persisted create draft only after a successful connect;
 			// closing or navigating away keeps it.
-			if (isCreate) setCreateDraft(emptyInboxDraft)
+			if (isCreate) setCreateDraft(emptyMailboxDraft)
 			onClose()
 			return
 		}
@@ -1002,7 +1003,7 @@ function InboxFormDialog({
 				<PriDialog.Popup>
 					<DialogHeader>
 						<PriDialog.Title>
-							{editing !== null ? t`Edit inbox` : t`Connect mailbox`}
+							{editing !== null ? t`Edit mailbox` : t`Connect mailbox`}
 						</PriDialog.Title>
 						<PriDialog.Close
 							render={props => (
@@ -1414,8 +1415,8 @@ function SecuritySelect({
 	)
 }
 
-// App-password page for the provider matching an inbox's IMAP host, or '' when
-// the host isn't a known preset. Points an auth-failed inbox (usually a 2FA
+// App-password page for the provider matching an mailbox's IMAP host, or '' when
+// the host isn't a known preset. Points an auth-failed mailbox (usually a 2FA
 // account missing its app password) at the right place to create one.
 function authPasswordUrlFor(
 	presets: ReadonlyArray<ProviderPreset>,
@@ -1426,7 +1427,7 @@ function authPasswordUrlFor(
 	return preset?.appPasswordUrl ?? ''
 }
 
-// Friendly provider name ("Infomaniak") for an inbox's IMAP host so the list
+// Friendly provider name ("Infomaniak") for an mailbox's IMAP host so the list
 // shows a recognisable label instead of a raw server hostname. Falls back to
 // the host itself for mailboxes that don't match a known preset.
 function providerNameFor(
@@ -1525,7 +1526,7 @@ function FooterManageDialog({
 	row,
 	onClose,
 }: {
-	readonly row: InboxRow
+	readonly row: MailboxRow
 	readonly onClose: () => void
 }) {
 	const { t } = useLingui()
@@ -1577,7 +1578,7 @@ function FooterManageDialog({
 		setSubmitting(true)
 		if (editing.kind === 'create') {
 			const exit = await createFooter({
-				params: { inboxId: row.id },
+				params: { mailboxId: row.id },
 				payload: {
 					name,
 					bodyJson,
@@ -1692,7 +1693,7 @@ function FooterManageDialog({
 								<EmptyState
 									icon={FileText}
 									title={t`No footers`}
-									description={t`Create a footer to append to outgoing emails from this inbox.`}
+									description={t`Create a footer to append to outgoing emails from this mailbox.`}
 								/>
 							) : (
 								<FooterTable>
@@ -1770,7 +1771,7 @@ function FooterManageDialog({
 								<FooterEditorWrap>
 									<EmailEditor
 										mode='footer'
-										inboxId={row.id}
+										mailboxId={row.id}
 										initialJson={bodyJson}
 										onChange={({ json, text }) => {
 											setBodyJson(json)
@@ -1842,9 +1843,9 @@ function narrowFooterRows(raw: unknown): ReadonlyArray<FooterRow> {
 
 // ── Narrowing ────────────────────────────────────────────────────
 
-function narrowInboxRows(rows: unknown): ReadonlyArray<InboxRow> {
+function narrowMailboxRows(rows: unknown): ReadonlyArray<MailboxRow> {
 	if (!Array.isArray(rows)) return []
-	const out: Array<InboxRow> = []
+	const out: Array<MailboxRow> = []
 	const sec = (v: unknown): TransportSecurity =>
 		v === 'starttls' ? 'starttls' : v === 'plain' ? 'plain' : 'tls'
 	const status = (v: unknown): GrantStatus =>
@@ -1897,13 +1898,13 @@ function narrowInboxRows(rows: unknown): ReadonlyArray<InboxRow> {
 
 // ── Styles ───────────────────────────────────────────────────────
 
-const Page = styled.div.withConfig({ displayName: 'InboxesPage' })`
+const Page = styled.div.withConfig({ displayName: 'MailboxesPage' })`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-lg);
 `
 
-const Intro = styled.div.withConfig({ displayName: 'InboxesIntro' })`
+const Intro = styled.div.withConfig({ displayName: 'MailboxesIntro' })`
 	display: grid;
 	gap: var(--space-md);
 	align-items: end;
@@ -1913,7 +1914,7 @@ const Intro = styled.div.withConfig({ displayName: 'InboxesIntro' })`
 	}
 `
 
-const IntroText = styled.div.withConfig({ displayName: 'InboxesIntroText' })`
+const IntroText = styled.div.withConfig({ displayName: 'MailboxesIntroText' })`
 	${rulerUnderRule}
 	display: flex;
 	flex-direction: column;
@@ -1922,7 +1923,7 @@ const IntroText = styled.div.withConfig({ displayName: 'InboxesIntroText' })`
 `
 
 const IntroActions = styled.div.withConfig({
-	displayName: 'InboxesIntroActions',
+	displayName: 'MailboxesIntroActions',
 })`
 	display: flex;
 	gap: var(--space-xs);
@@ -1934,7 +1935,7 @@ const IntroActions = styled.div.withConfig({
 	}
 `
 
-const BackLink = styled.div.withConfig({ displayName: 'InboxesBackLink' })`
+const BackLink = styled.div.withConfig({ displayName: 'MailboxesBackLink' })`
 	> a {
 		display: inline-flex;
 		align-items: center;
@@ -1952,14 +1953,14 @@ const BackLink = styled.div.withConfig({ displayName: 'InboxesBackLink' })`
 	}
 `
 
-const Title = styled.h2.withConfig({ displayName: 'InboxesTitle' })`
+const Title = styled.h2.withConfig({ displayName: 'MailboxesTitle' })`
 	${stenciledTitle}
 	font-size: var(--typescale-headline-large-size);
 	line-height: var(--typescale-headline-large-line);
 	margin: 0;
 `
 
-const Subtitle = styled.p.withConfig({ displayName: 'InboxesSubtitle' })`
+const Subtitle = styled.p.withConfig({ displayName: 'MailboxesSubtitle' })`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-large-size);
 	line-height: var(--typescale-body-large-line);
@@ -1968,7 +1969,7 @@ const Subtitle = styled.p.withConfig({ displayName: 'InboxesSubtitle' })`
 	margin: 0;
 `
 
-const InboxesTable = styled.div.withConfig({ displayName: 'InboxesTable' })`
+const MailboxesTable = styled.div.withConfig({ displayName: 'MailboxesTable' })`
 	display: flex;
 	flex-direction: column;
 	border: 1px solid var(--color-ledger-line);
@@ -1996,7 +1997,7 @@ const gridTemplate = css`
 // own column name as a caption above the value. Real text (not CSS generated
 // content) so a screen reader reads it as part of the cell.
 const MobileCaption = styled.span.withConfig({
-	displayName: 'InboxesMobileCaption',
+	displayName: 'MailboxesMobileCaption',
 })`
 	display: none;
 
@@ -2011,7 +2012,7 @@ const MobileCaption = styled.span.withConfig({
 	}
 `
 
-const TableHead = styled.div.withConfig({ displayName: 'InboxesTableHead' })`
+const TableHead = styled.div.withConfig({ displayName: 'MailboxesTableHead' })`
 	${gridTemplate}
 	background: linear-gradient(
 		145deg,
@@ -2032,10 +2033,10 @@ const TableHead = styled.div.withConfig({ displayName: 'InboxesTableHead' })`
 	}
 `
 
-const HeadCell = styled.div.withConfig({ displayName: 'InboxesHeadCell' })``
+const HeadCell = styled.div.withConfig({ displayName: 'MailboxesHeadCell' })``
 
 const TableRow = styled.div.withConfig({
-	displayName: 'InboxesTableRow',
+	displayName: 'MailboxesTableRow',
 	shouldForwardProp: prop => prop !== '$inactive',
 })<{ $inactive: boolean }>`
 	${gridTemplate}
@@ -2055,13 +2056,13 @@ const TableRow = styled.div.withConfig({
 	}
 `
 
-const CellEmail = styled.div.withConfig({ displayName: 'InboxesCellEmail' })`
+const CellEmail = styled.div.withConfig({ displayName: 'MailboxesCellEmail' })`
 	display: flex;
 	flex-direction: column;
 	min-width: 0;
 `
 
-const EmailAddress = styled.span.withConfig({ displayName: 'InboxesEmail' })`
+const EmailAddress = styled.span.withConfig({ displayName: 'MailboxesEmail' })`
 	font-family: var(--font-body);
 	font-weight: var(--font-weight-medium);
 	color: var(--color-on-surface);
@@ -2069,7 +2070,7 @@ const EmailAddress = styled.span.withConfig({ displayName: 'InboxesEmail' })`
 `
 
 const DisplayName = styled.span.withConfig({
-	displayName: 'InboxesDisplayName',
+	displayName: 'MailboxesDisplayName',
 })`
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-small-size);
@@ -2080,17 +2081,19 @@ const DisplayName = styled.span.withConfig({
 `
 
 const CellPurpose = styled.div.withConfig({
-	displayName: 'InboxesCellPurpose',
+	displayName: 'MailboxesCellPurpose',
 })``
 
-const CellStatus = styled.div.withConfig({ displayName: 'InboxesCellStatus' })`
+const CellStatus = styled.div.withConfig({
+	displayName: 'MailboxesCellStatus',
+})`
 	display: flex;
 	flex-direction: column;
 	align-items: flex-start;
 	gap: var(--space-3xs);
 `
 
-const EmailMeta = styled.div.withConfig({ displayName: 'InboxesEmailMeta' })`
+const EmailMeta = styled.div.withConfig({ displayName: 'MailboxesEmailMeta' })`
 	display: flex;
 	align-items: center;
 	gap: var(--space-2xs);
@@ -2099,7 +2102,7 @@ const EmailMeta = styled.div.withConfig({ displayName: 'InboxesEmailMeta' })`
 `
 
 const ProviderName = styled.span.withConfig({
-	displayName: 'InboxesProviderName',
+	displayName: 'MailboxesProviderName',
 })`
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-small-size);
@@ -2109,7 +2112,9 @@ const ProviderName = styled.span.withConfig({
 	white-space: nowrap;
 `
 
-const PrivacyTag = styled.span.withConfig({ displayName: 'InboxesPrivacyTag' })`
+const PrivacyTag = styled.span.withConfig({
+	displayName: 'MailboxesPrivacyTag',
+})`
 	display: inline-flex;
 	padding: 1px var(--space-2xs);
 	border-radius: var(--shape-2xs);
@@ -2123,7 +2128,7 @@ const PrivacyTag = styled.span.withConfig({ displayName: 'InboxesPrivacyTag' })`
 `
 
 const StatusBadge = styled.span.withConfig({
-	displayName: 'InboxesStatusBadge',
+	displayName: 'MailboxesStatusBadge',
 	shouldForwardProp: prop => prop !== '$status',
 })<{ $status: StatusTone }>`
 	display: inline-flex;
@@ -2163,7 +2168,7 @@ const StatusBadge = styled.span.withConfig({
 `
 
 const PrimaryBanner = styled.div.withConfig({
-	displayName: 'InboxesPrimaryBanner',
+	displayName: 'MailboxesPrimaryBanner',
 })`
 	${agedPaperRow}
 	display: flex;
@@ -2182,7 +2187,7 @@ const PrimaryBanner = styled.div.withConfig({
 `
 
 const PrimaryBannerText = styled.p.withConfig({
-	displayName: 'InboxesPrimaryBannerText',
+	displayName: 'MailboxesPrimaryBannerText',
 })`
 	margin: 0;
 	font-family: var(--font-body);
@@ -2198,14 +2203,14 @@ const PrimaryBannerText = styled.p.withConfig({
 `
 
 const PrimaryBannerActions = styled.div.withConfig({
-	displayName: 'InboxesPrimaryBannerActions',
+	displayName: 'MailboxesPrimaryBannerActions',
 })`
 	display: flex;
 	gap: var(--space-xs);
 `
 
 const TransportGrid = styled.div.withConfig({
-	displayName: 'InboxFormTransportGrid',
+	displayName: 'MailboxFormTransportGrid',
 })`
 	display: grid;
 	grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2216,7 +2221,7 @@ const TransportGrid = styled.div.withConfig({
 	}
 `
 
-const Hint = styled.p.withConfig({ displayName: 'InboxFormHint' })`
+const Hint = styled.p.withConfig({ displayName: 'MailboxFormHint' })`
 	margin: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-small-size);
@@ -2224,13 +2229,15 @@ const Hint = styled.p.withConfig({ displayName: 'InboxFormHint' })`
 	font-style: italic;
 `
 
-const PresetLink = styled.a.withConfig({ displayName: 'InboxFormPresetLink' })`
+const PresetLink = styled.a.withConfig({
+	displayName: 'MailboxFormPresetLink',
+})`
 	color: var(--color-primary);
 	font-style: normal;
 	text-decoration: underline;
 `
 
-const Warning = styled.p.withConfig({ displayName: 'InboxFormWarning' })`
+const Warning = styled.p.withConfig({ displayName: 'MailboxFormWarning' })`
 	margin: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-small-size);
@@ -2238,7 +2245,7 @@ const Warning = styled.p.withConfig({ displayName: 'InboxFormWarning' })`
 `
 
 const AdvancedToggle = styled.button.withConfig({
-	displayName: 'InboxFormAdvancedToggle',
+	displayName: 'MailboxFormAdvancedToggle',
 })`
 	align-self: flex-start;
 	background: none;
@@ -2258,7 +2265,7 @@ const AdvancedToggle = styled.button.withConfig({
 	}
 `
 
-const AuthHint = styled.p.withConfig({ displayName: 'InboxesAuthHint' })`
+const AuthHint = styled.p.withConfig({ displayName: 'MailboxesAuthHint' })`
 	margin: var(--space-2xs) 0 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-label-small-size);
@@ -2266,15 +2273,15 @@ const AuthHint = styled.p.withConfig({ displayName: 'InboxesAuthHint' })`
 `
 
 const CellDefault = styled.div.withConfig({
-	displayName: 'InboxesCellDefault',
+	displayName: 'MailboxesCellDefault',
 })``
-const CellDate = styled.div.withConfig({ displayName: 'InboxesCellDate' })`
+const CellDate = styled.div.withConfig({ displayName: 'MailboxesCellDate' })`
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
 `
 const CellActions = styled.div.withConfig({
-	displayName: 'InboxesCellActions',
+	displayName: 'MailboxesCellActions',
 })`
 	display: flex;
 	justify-content: flex-end;
@@ -2289,7 +2296,7 @@ const CellActions = styled.div.withConfig({
 `
 
 const PrimaryLabel = styled.span.withConfig({
-	displayName: 'InboxesPrimaryLabel',
+	displayName: 'MailboxesPrimaryLabel',
 })`
 	display: inline-flex;
 	align-items: center;
@@ -2303,7 +2310,7 @@ const PrimaryLabel = styled.span.withConfig({
 `
 
 const TechDetails = styled.details.withConfig({
-	displayName: 'InboxesTechDetails',
+	displayName: 'MailboxesTechDetails',
 })`
 	margin-top: var(--space-3xs);
 
@@ -2325,9 +2332,9 @@ const TechDetails = styled.details.withConfig({
 `
 
 const PurposeBadge = styled.span.withConfig({
-	displayName: 'InboxesPurposeBadge',
+	displayName: 'MailboxesPurposeBadge',
 	shouldForwardProp: prop => prop !== '$purpose',
-})<{ $purpose: InboxPurpose }>`
+})<{ $purpose: MailboxPurpose }>`
 	display: inline-flex;
 	align-items: center;
 	padding: 2px var(--space-2xs);
@@ -2359,7 +2366,7 @@ const PurposeBadge = styled.span.withConfig({
 `
 
 const IconToggle = styled.button.withConfig({
-	displayName: 'InboxesIconToggle',
+	displayName: 'MailboxesIconToggle',
 	shouldForwardProp: prop => prop !== '$active',
 })<{ $active: boolean }>`
 	display: inline-flex;
@@ -2392,7 +2399,7 @@ const IconToggle = styled.button.withConfig({
 `
 
 const IconAction = styled.button.withConfig({
-	displayName: 'InboxesIconAction',
+	displayName: 'MailboxesIconAction',
 })`
 	display: inline-flex;
 	align-items: center;
@@ -2431,7 +2438,7 @@ const IconAction = styled.button.withConfig({
 `
 
 const ActionLabel = styled.span.withConfig({
-	displayName: 'InboxesActionLabel',
+	displayName: 'MailboxesActionLabel',
 })`
 	display: none;
 
@@ -2442,13 +2449,13 @@ const ActionLabel = styled.span.withConfig({
 	}
 `
 
-const Muted = styled.span.withConfig({ displayName: 'InboxesMuted' })`
+const Muted = styled.span.withConfig({ displayName: 'MailboxesMuted' })`
 	color: var(--color-on-surface-variant);
 	font-style: italic;
 	opacity: 0.7;
 `
 
-const EmptyHelp = styled.div.withConfig({ displayName: 'InboxesEmptyHelp' })`
+const EmptyHelp = styled.div.withConfig({ displayName: 'MailboxesEmptyHelp' })`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-sm);
@@ -2473,7 +2480,7 @@ const EmptyHelp = styled.div.withConfig({ displayName: 'InboxesEmptyHelp' })`
 `
 
 const DialogHeader = styled.div.withConfig({
-	displayName: 'InboxFormHeader',
+	displayName: 'MailboxFormHeader',
 })`
 	display: flex;
 	align-items: center;
@@ -2483,7 +2490,7 @@ const DialogHeader = styled.div.withConfig({
 `
 
 const CloseButton = styled.button.withConfig({
-	displayName: 'InboxFormClose',
+	displayName: 'MailboxFormClose',
 })`
 	${brushedMetalPlate}
 	display: inline-flex;
@@ -2501,25 +2508,25 @@ const CloseButton = styled.button.withConfig({
 	}
 `
 
-const Form = styled.form.withConfig({ displayName: 'InboxForm' })`
+const Form = styled.form.withConfig({ displayName: 'MailboxForm' })`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
 `
 
-const Field = styled.div.withConfig({ displayName: 'InboxFormField' })`
+const Field = styled.div.withConfig({ displayName: 'MailboxFormField' })`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const Label = styled.label.withConfig({ displayName: 'InboxFormLabel' })`
+const Label = styled.label.withConfig({ displayName: 'MailboxFormLabel' })`
 	${stenciledTitle}
 	font-size: var(--typescale-label-small-size);
 `
 
 const CheckboxRow = styled.div.withConfig({
-	displayName: 'InboxFormCheckboxRow',
+	displayName: 'MailboxFormCheckboxRow',
 })`
 	display: flex;
 	align-items: center;
@@ -2528,7 +2535,7 @@ const CheckboxRow = styled.div.withConfig({
 	font-size: var(--typescale-body-medium-size);
 `
 
-const ErrorText = styled.p.withConfig({ displayName: 'InboxFormError' })`
+const ErrorText = styled.p.withConfig({ displayName: 'MailboxFormError' })`
 	margin: 0;
 	padding: var(--space-2xs) var(--space-sm);
 	border-left: 3px solid var(--color-error);
@@ -2539,7 +2546,7 @@ const ErrorText = styled.p.withConfig({ displayName: 'InboxFormError' })`
 	font-style: italic;
 `
 
-const Footer = styled.div.withConfig({ displayName: 'InboxFormFooter' })`
+const Footer = styled.div.withConfig({ displayName: 'MailboxFormFooter' })`
 	${rulerUnderRule}
 	display: flex;
 	justify-content: flex-end;

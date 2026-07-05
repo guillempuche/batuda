@@ -82,7 +82,7 @@ export const TasksGroup = HttpApiGroup.make('tasks')
 				dueFrom: Schema.optional(Schema.String),
 				dueTo: Schema.optional(Schema.String),
 				search: Schema.optional(Schema.String),
-				// Legacy alias kept until the Forja tasks inbox is rewritten in PR #4
+				// Legacy alias kept until the Forja tasks mailbox is rewritten in PR #4
 				// (§7 of the calendar plan). `completed=true` → status='done';
 				// `completed=false` → status NOT IN ('done','cancelled').
 				completed: Schema.optional(Schema.String),

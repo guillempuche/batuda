@@ -62,7 +62,7 @@ describe('CalendarEventSource', () => {
 describe('CalendarEventProvider', () => {
 	it('should accept every provider plus the synthetic email provider', () => {
 		// GIVEN a provider column on calendar_events that also admits 'email'
-		// (ICS-sourced rows have no vendor backend — they come from an inbox)
+		// (ICS-sourced rows have no vendor backend — they come from an mailbox)
 		// WHEN each is decoded
 		// THEN all round-trip
 		for (const value of [

@@ -42,7 +42,7 @@ import {
 } from '#/lib/workshop-mixins'
 
 /**
- * Task inbox — extends `openTasksAtom` (dashboard) with a smart-view rail
+ * Task mailbox — extends `openTasksAtom` (dashboard) with a smart-view rail
  * (today / overdue / this week / later / no due / snoozed / done 7d),
  * inline edit on title + due, and a right-pane detail editor backed by
  * `task_events`. Mutations go through `@batuda/controllers` typed atoms

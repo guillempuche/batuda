@@ -48,7 +48,7 @@ function pendingOAuthQuery(): string {
 
 // Cross-tab sign-in coordination channel: when the magic-link verify
 // endpoint lands the user in a fresh tab, we broadcast so the original
-// `/login` tab can navigate off the stale "Check your inbox" panel.
+// `/login` tab can navigate off the stale "Check your mailbox" panel.
 const AUTH_CHANNEL = 'batuda-auth'
 
 /**
@@ -168,7 +168,7 @@ function LoginPage() {
 	const navigate = useNavigate()
 	const search = Route.useSearch()
 	const emailFieldRef = useRef<HTMLInputElement | null>(null)
-	const inboxHeadingRef = useRef<HTMLHeadingElement | null>(null)
+	const mailboxHeadingRef = useRef<HTMLHeadingElement | null>(null)
 	const [magicLinkStatus, setMagicLinkStatus] = useState<MagicLinkStatus>({
 		kind: 'idle',
 	})
@@ -258,7 +258,7 @@ function LoginPage() {
 	}, [resendCountdown])
 
 	// When the magic-link verify endpoint lands the user in a fresh tab,
-	// the original /login tab is left on the stale inbox panel. Listen for
+	// the original /login tab is left on the stale mailbox panel. Listen for
 	// the sibling navigation event so we follow them off the page.
 	useEffect(() => {
 		if (typeof BroadcastChannel === 'undefined') return
@@ -273,11 +273,11 @@ function LoginPage() {
 		}
 	}, [navigate, search.returnTo])
 
-	// Focus management on swap: when the form is replaced by the inbox
+	// Focus management on swap: when the form is replaced by the mailbox
 	// panel, focus follows the heading so screen readers re-anchor.
 	useEffect(() => {
-		if (magicLinkStatus.kind === 'sent' && inboxHeadingRef.current) {
-			inboxHeadingRef.current.focus()
+		if (magicLinkStatus.kind === 'sent' && mailboxHeadingRef.current) {
+			mailboxHeadingRef.current.focus()
 		}
 	}, [magicLinkStatus.kind])
 
@@ -349,13 +349,13 @@ function LoginPage() {
 
 	if (magicLinkStatus.kind === 'sent') {
 		return (
-			<InboxView
+			<MailboxView
 				email={magicLinkStatus.email}
 				resendCountdown={resendCountdown}
 				onResend={resendMagicLink}
 				onChangeEmail={changeEmail}
 				onUsePassword={usePasswordInstead}
-				headingRef={inboxHeadingRef}
+				headingRef={mailboxHeadingRef}
 			/>
 		)
 	}
@@ -449,7 +449,7 @@ function LoginPage() {
 	)
 }
 
-interface InboxViewProps {
+interface MailboxViewProps {
 	readonly email: string
 	readonly resendCountdown: number
 	readonly onResend: () => void
@@ -458,14 +458,14 @@ interface InboxViewProps {
 	readonly headingRef: React.RefObject<HTMLHeadingElement | null>
 }
 
-function InboxView({
+function MailboxView({
 	email,
 	resendCountdown,
 	onResend,
 	onChangeEmail,
 	onUsePassword,
 	headingRef,
-}: InboxViewProps) {
+}: MailboxViewProps) {
 	const { t } = useLingui()
 	const provider = providerDeepLinkFor(email)
 
@@ -477,9 +477,9 @@ function InboxView({
 				data-testid='magic-link-sent-panel'
 			>
 				<Brand>Batuda</Brand>
-				<InboxHeading ref={headingRef} tabIndex={-1}>
-					<Trans>Check your inbox</Trans>
-				</InboxHeading>
+				<MailboxHeading ref={headingRef} tabIndex={-1}>
+					<Trans>Check your mailbox</Trans>
+				</MailboxHeading>
 				<Subtitle>
 					<Trans>We sent a sign-in link to</Trans>{' '}
 					<strong data-testid='magic-link-sent-email'>{email}</strong>.
@@ -776,8 +776,8 @@ const MagicLinkTrigger = styled.button.withConfig({
 	}
 `
 
-const InboxHeading = styled.h2.withConfig({
-	displayName: 'LoginInboxHeading',
+const MailboxHeading = styled.h2.withConfig({
+	displayName: 'LoginMailboxHeading',
 })`
 	${stenciledTitle}
 	font-size: var(--typescale-headline-small-size);
@@ -787,7 +787,9 @@ const InboxHeading = styled.h2.withConfig({
 	}
 `
 
-const ButtonRow = styled.div.withConfig({ displayName: 'LoginInboxButtonRow' })`
+const ButtonRow = styled.div.withConfig({
+	displayName: 'LoginMailboxButtonRow',
+})`
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-sm);
@@ -795,7 +797,7 @@ const ButtonRow = styled.div.withConfig({ displayName: 'LoginInboxButtonRow' })`
 `
 
 const SecondaryRow = styled.div.withConfig({
-	displayName: 'LoginInboxSecondaryRow',
+	displayName: 'LoginMailboxSecondaryRow',
 })`
 	display: flex;
 	flex-wrap: wrap;
@@ -804,7 +806,7 @@ const SecondaryRow = styled.div.withConfig({
 `
 
 const SecondaryLink = styled.button.withConfig({
-	displayName: 'LoginInboxSecondaryLink',
+	displayName: 'LoginMailboxSecondaryLink',
 })`
 	background: none;
 	border: none;

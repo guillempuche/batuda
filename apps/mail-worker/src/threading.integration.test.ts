@@ -49,14 +49,10 @@ describe('resolveThreadId', () => {
 
 	afterAll(async () => {
 		for (const oid of seededOrgIds) {
-			await pool.query(
-				`DELETE FROM email_messages WHERE organization_id = $1`,
-				[oid],
-			)
-			await pool.query(
-				`DELETE FROM email_thread_links WHERE organization_id = $1`,
-				[oid],
-			)
+			await pool.query(`DELETE FROM messages WHERE organization_id = $1`, [oid])
+			await pool.query(`DELETE FROM conversations WHERE organization_id = $1`, [
+				oid,
+			])
 		}
 		await pool.end()
 	})
@@ -79,12 +75,12 @@ describe('resolveThreadId', () => {
 		// finds them. raw_rfc822_ref carries a sentinel — the threading
 		// query never reads object storage.
 		await pool.query(
-			`INSERT INTO email_thread_links (organization_id, external_thread_id, subject)
+			`INSERT INTO conversations (organization_id, external_thread_id, subject)
 			 VALUES ($1, $2, 'parent') ON CONFLICT DO NOTHING`,
 			[orgId, opts.externalThreadId],
 		)
 		await pool.query(
-			`INSERT INTO email_messages
+			`INSERT INTO messages
 			   (organization_id, message_id, "references",
 			    direction, folder, raw_rfc822_ref, status)
 			 VALUES ($1, $2, $3,

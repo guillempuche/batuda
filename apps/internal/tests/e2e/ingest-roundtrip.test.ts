@@ -8,7 +8,7 @@ import { injectViaSmtp } from './helpers/smtp-inject'
 // Cross-process IMAP-ingest roundtrip. Local-only: it drives the running
 // mail-worker (started by `pnpm dev`) end to end — SMTP-inject to the dev
 // catcher (GreenMail) → the worker's IMAP IDLE/folder-sync tick → assert an
-// inbound `email_messages` row. Playwright e2e doesn't run in CI, so this is a
+// inbound `messages` row. Playwright e2e doesn't run in CI, so this is a
 // local check. Prereq: `pnpm cli services up && pnpm cli db reset && pnpm cli
 // seed`, then `pnpm dev` so the worker is live before running this spec.
 
@@ -44,11 +44,11 @@ test.describe('SMTP → IMAP → DB roundtrip (live; needs services + worker)', 
 	})
 
 	test.describe('when an external sender SMTPs a fresh message', () => {
-		test('should appear as an inbound email_messages row within the worker tick window', async () => {
+		test('should appear as an inbound messages row within the worker tick window', async () => {
 			const testId = `roundtrip-${Date.now()}`
 			const subject = `e2e roundtrip ${testId}`
 
-			// WHEN we SMTP-inject a message addressed to Alice's seeded inbox
+			// WHEN we SMTP-inject a message addressed to Alice's seeded mailbox
 			await injectViaSmtp({
 				to: 'admin@taller.cat',
 				from: `sender-${testId}@example.com`,
@@ -61,7 +61,7 @@ test.describe('SMTP → IMAP → DB roundtrip (live; needs services + worker)', 
 			// agnostic.
 			const direction = await waitForRow(() =>
 				psql(
-					`SELECT direction FROM email_messages
+					`SELECT direction FROM messages
 					 WHERE subject = '${subject.replace(/'/g, "''")}'`,
 				),
 			)

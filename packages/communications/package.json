@@ -1,0 +1,35 @@
+{
+	"name": "@batuda/communications",
+	"version": "0.0.1",
+	"description": "Batuda — communications bounded context (channel-agnostic transport port + participant matching; email reseated onto it)",
+	"type": "module",
+	"types": "./src/index.ts",
+	"main": "./src/index.ts",
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"import": "./src/index.ts"
+		}
+	},
+	"scripts": {
+		"build": "tsdown",
+		"check-types": "tsc --noEmit",
+		"test": "vitest run",
+		"test:integration": "vitest run --config vitest.integration.config.ts",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"@batuda/domain": "workspace:*",
+		"effect": "4.0.0-beta.43"
+	},
+	"devDependencies": {
+		"@effect/sql-pg": "4.0.0-beta.43",
+		"@types/node": "^22.15.0",
+		"@types/pg": "^8.20.0",
+		"pg": "^8.20.0",
+		"tsdown": "^0.21.7",
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.4"
+	},
+	"private": true
+}

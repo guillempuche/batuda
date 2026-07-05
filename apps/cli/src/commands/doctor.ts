@@ -248,7 +248,7 @@ const emailCredentialKeyCheck: Check = {
 	run: Effect.sync(() => {
 		const value = process.env['EMAIL_CREDENTIAL_KEY'] ?? ''
 		if (!value) {
-			return fail('not set → required for inbox seed; run `pnpm cli setup`')
+			return fail('not set → required for mailbox seed; run `pnpm cli setup`')
 		}
 		const decoded = Buffer.from(value, 'base64')
 		if (decoded.length !== 32) {
@@ -311,7 +311,7 @@ const mailWorkerCheck: Check = {
 			const pids = lines.map(l => l.split(/\s+/, 1)[0]).join(',')
 			if (lines.length === 1) return ok(`running (PID ${pids})`)
 			return warn(
-				`${lines.length} instances running (PIDs ${pids}) — competing on inbox claims; kill duplicates with \`kill ${pids.replace(/,/g, ' ')}\``,
+				`${lines.length} instances running (PIDs ${pids}) — competing on mailbox claims; kill duplicates with \`kill ${pids.replace(/,/g, ' ')}\``,
 			)
 		}),
 		Effect.catch(() =>

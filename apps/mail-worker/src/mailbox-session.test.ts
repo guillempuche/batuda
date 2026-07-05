@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events'
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { onImapClientError } from './inbox-session.js'
+import { onImapClientError } from './mailbox-session.js'
 
 // Spy on console.warn so the handler's single JSON line is captured, not printed.
 const captureWarn = () =>
@@ -20,10 +20,10 @@ describe('onImapClientError', () => {
 	describe('when the client emits an Error with the listener attached', () => {
 		it('should swallow the error without throwing', () => {
 			// GIVEN an emitter wired exactly like the ImapFlow client
-			// [inbox-session.ts — client.on('error', onImapClientError(claimed.id))]
+			// [mailbox-session.ts — client.on('error', onImapClientError(claimed.id))]
 			captureWarn()
 			const client = new EventEmitter()
-			client.on('error', onImapClientError('inbox_123'))
+			client.on('error', onImapClientError('mailbox_123'))
 
 			// WHEN a socket-style error fires mid-session
 			const emit = () => client.emit('error', new Error('socket hang up'))
@@ -32,21 +32,21 @@ describe('onImapClientError', () => {
 			expect(emit).not.toThrow()
 		})
 
-		it('should log one WARN entry naming the inbox and the error message', () => {
+		it('should log one WARN entry naming the mailbox and the error message', () => {
 			// GIVEN the wired emitter
 			const warn = captureWarn()
 			const client = new EventEmitter()
-			client.on('error', onImapClientError('inbox_123'))
+			client.on('error', onImapClientError('mailbox_123'))
 
 			// WHEN it emits an Error
 			client.emit('error', new Error('socket hang up'))
 
 			// THEN exactly one structured WARN line is written
-			// AND it carries the inbox id and the error's message
+			// AND it carries the mailbox id and the error's message
 			expect(warn).toHaveBeenCalledOnce()
 			expect(loggedPayload(warn)).toMatchObject({
 				level: 'WARN',
-				inboxId: 'inbox_123',
+				mailboxId: 'mailbox_123',
 				error: 'socket hang up',
 			})
 		})
@@ -55,10 +55,10 @@ describe('onImapClientError', () => {
 	describe('when the emitted value is not an Error instance', () => {
 		it('should still swallow it and stringify the value', () => {
 			// GIVEN a non-Error payload — some providers surface a bare code/string
-			// [inbox-session.ts — `error instanceof Error ? … : String(error)`]
+			// [mailbox-session.ts — `error instanceof Error ? … : String(error)`]
 			const warn = captureWarn()
 			const client = new EventEmitter()
-			client.on('error', onImapClientError('inbox_456'))
+			client.on('error', onImapClientError('mailbox_456'))
 
 			// WHEN a non-Error value is emitted
 			const emit = () => client.emit('error', 'ECONNRESET')
@@ -66,7 +66,7 @@ describe('onImapClientError', () => {
 			// THEN it does not throw, and the stringified value is logged
 			expect(emit).not.toThrow()
 			expect(loggedPayload(warn)).toMatchObject({
-				inboxId: 'inbox_456',
+				mailboxId: 'mailbox_456',
 				error: 'ECONNRESET',
 			})
 		})
@@ -75,7 +75,7 @@ describe('onImapClientError', () => {
 			// GIVEN a null payload (the degenerate non-Error case)
 			const warn = captureWarn()
 			const client = new EventEmitter()
-			client.on('error', onImapClientError('inbox_789'))
+			client.on('error', onImapClientError('mailbox_789'))
 
 			// WHEN null is emitted
 			const emit = () => client.emit('error', null)

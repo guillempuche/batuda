@@ -3,13 +3,15 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import { CredentialCrypto } from './credential-crypto.js'
 import {
+	connectionAuth,
 	type DecryptedCreds,
 	type MailSecurity,
 	MailTransport,
 } from './mail-transport.js'
 
-interface ActiveInboxRow {
+interface ActiveMailboxRow {
 	readonly id: string
+	readonly provider: 'imap-smtp' | 'gmail-oauth' | 'm365-oauth'
 	readonly imapHost: string
 	readonly imapPort: number
 	readonly imapSecurity: MailSecurity
@@ -17,9 +19,9 @@ interface ActiveInboxRow {
 	readonly smtpPort: number
 	readonly smtpSecurity: MailSecurity
 	readonly username: string
-	readonly passwordCiphertext: Uint8Array
-	readonly passwordNonce: Uint8Array
-	readonly passwordTag: Uint8Array
+	readonly configCiphertext: Uint8Array
+	readonly configNonce: Uint8Array
+	readonly configTag: Uint8Array
 }
 
 type GrantState = 'connected' | 'auth_failed' | 'connect_failed'
@@ -27,8 +29,8 @@ type GrantState = 'connected' | 'auth_failed' | 'connect_failed'
 const stateForFailure = (tag: string): Exclude<GrantState, 'connected'> =>
 	tag === 'GrantAuthFailed' ? 'auth_failed' : 'connect_failed'
 
-export class InboxHealthProbe extends ServiceMap.Service<InboxHealthProbe>()(
-	'InboxHealthProbe',
+export class MailboxHealthProbe extends ServiceMap.Service<MailboxHealthProbe>()(
+	'MailboxHealthProbe',
 	{
 		make: Effect.gen(function* () {
 			const sql = yield* SqlClient.SqlClient
@@ -36,34 +38,34 @@ export class InboxHealthProbe extends ServiceMap.Service<InboxHealthProbe>()(
 			const crypto = yield* CredentialCrypto
 			const intervalSec = yield* Config.int('EMAIL_HEALTH_PROBE_INTERVAL_SEC')
 
-			const probeOne = (inbox: ActiveInboxRow) =>
+			const probeOne = (mailbox: ActiveMailboxRow) =>
 				Effect.gen(function* () {
-					const password = crypto.decryptPassword({
-						inboxId: inbox.id,
-						ciphertext: inbox.passwordCiphertext,
-						nonce: inbox.passwordNonce,
-						tag: inbox.passwordTag,
+					const blob = crypto.decryptConfig({
+						connectionId: mailbox.id,
+						ciphertext: mailbox.configCiphertext,
+						nonce: mailbox.configNonce,
+						tag: mailbox.configTag,
 					})
 					const creds: DecryptedCreds = {
-						inboxId: inbox.id,
-						imapHost: inbox.imapHost,
-						imapPort: inbox.imapPort,
-						imapSecurity: inbox.imapSecurity,
-						smtpHost: inbox.smtpHost,
-						smtpPort: inbox.smtpPort,
-						smtpSecurity: inbox.smtpSecurity,
-						username: inbox.username,
-						password,
+						connectionId: mailbox.id,
+						imapHost: mailbox.imapHost,
+						imapPort: mailbox.imapPort,
+						imapSecurity: mailbox.imapSecurity,
+						smtpHost: mailbox.smtpHost,
+						smtpPort: mailbox.smtpPort,
+						smtpSecurity: mailbox.smtpSecurity,
+						username: mailbox.username,
+						auth: connectionAuth(mailbox.provider, blob),
 					}
 
 					const result = yield* Effect.exit(transport.probe(creds))
 					if (result._tag === 'Success') {
 						yield* sql`
-							UPDATE inboxes
+							UPDATE channel_connections
 							SET grant_status = 'connected',
 							    grant_last_error = NULL,
 							    grant_last_seen_at = now()
-							WHERE id = ${inbox.id}
+							WHERE id = ${mailbox.id}
 						`
 						return
 					}
@@ -83,20 +85,21 @@ export class InboxHealthProbe extends ServiceMap.Service<InboxHealthProbe>()(
 							? ((failure.value as { detail?: string | null }).detail ?? null)
 							: null
 					yield* sql`
-						UPDATE inboxes
+						UPDATE channel_connections
 						SET grant_status = ${stateForFailure(tag)},
 						    grant_last_error = ${detail},
 						    grant_last_seen_at = now()
-						WHERE id = ${inbox.id}
+						WHERE id = ${mailbox.id}
 					`
 				})
 
 			const tick = sql.withTransaction(
 				Effect.gen(function* () {
 					yield* sql`SET LOCAL ROLE app_service`
-					const rows = yield* sql<ActiveInboxRow>`
+					const rows = yield* sql<ActiveMailboxRow>`
 						SELECT
 							id,
+							provider,
 							imap_host          AS "imapHost",
 							imap_port          AS "imapPort",
 							imap_security      AS "imapSecurity",
@@ -104,11 +107,12 @@ export class InboxHealthProbe extends ServiceMap.Service<InboxHealthProbe>()(
 							smtp_port          AS "smtpPort",
 							smtp_security      AS "smtpSecurity",
 							username,
-							password_ciphertext AS "passwordCiphertext",
-							password_nonce      AS "passwordNonce",
-							password_tag        AS "passwordTag"
-						FROM inboxes
+							config_ciphertext AS "configCiphertext",
+							config_nonce      AS "configNonce",
+							config_tag        AS "configTag"
+						FROM channel_connections
 						WHERE active = true
+						  AND provider IN ('imap-smtp', 'gmail-oauth', 'm365-oauth')
 					`
 					yield* Effect.forEach(rows, probeOne, { concurrency: 4 })
 				}),
@@ -126,11 +130,11 @@ export class InboxHealthProbe extends ServiceMap.Service<InboxHealthProbe>()(
 	// would skip building it and the probe would never start.
 	static readonly daemonLayer = Layer.effectDiscard(
 		Effect.gen(function* () {
-			const probe = yield* InboxHealthProbe
-			yield* Effect.logInfo(`inbox health probe: every ${probe.intervalSec}s`)
+			const probe = yield* MailboxHealthProbe
+			yield* Effect.logInfo(`mailbox health probe: every ${probe.intervalSec}s`)
 			yield* probe.tick.pipe(
 				Effect.catchCause(cause =>
-					Effect.logError('inbox health probe tick failed', cause),
+					Effect.logError('mailbox health probe tick failed', cause),
 				),
 				Effect.repeat(Schedule.spaced(`${probe.intervalSec} seconds`)),
 				Effect.forkScoped,

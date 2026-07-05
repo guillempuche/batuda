@@ -14,7 +14,7 @@ import {
 import { StorageProvider } from './storage-provider.js'
 
 // Durable, StorageProvider-backed staging. Uploaded bytes live in object
-// storage under "email/staging/<inboxId>/<stagingId>"; a shadow row in
+// storage under "email/staging/<mailboxId>/<stagingId>"; a shadow row in
 // email_attachment_staging tracks each entry so we can sweep on draft
 // delete, send, or TTL. Survives server restarts so in-progress drafts
 // keep their attachments.
@@ -29,7 +29,7 @@ const URL_TTL_SEC = 600 // 10min — editor canvas inline-preview URL
 // ────────────────────────────────────────────────────────────────────
 
 export interface StageInput {
-	readonly inboxId: string
+	readonly mailboxId: string
 	readonly bytes: Uint8Array
 	readonly filename: string
 	readonly contentType: string
@@ -70,7 +70,7 @@ export interface ResolvedStaging {
 // transformResultNames. Declaring the shape explicitly keeps JSON queries honest.
 interface StagingRow {
 	readonly stagingId: string
-	readonly inboxId: string
+	readonly mailboxId: string
 	readonly draftId: string | null
 	readonly storageKey: string
 	readonly filename: string
@@ -122,7 +122,7 @@ export class EmailAttachmentStaging extends ServiceMap.Service<EmailAttachmentSt
 							}
 
 					const stagingId = `stg_${randomUUID()}`
-					const storageKey = `${STORAGE_PREFIX}/${input.inboxId}/${stagingId}`
+					const storageKey = `${STORAGE_PREFIX}/${input.mailboxId}/${stagingId}`
 					const safeFilename = sanitizeFilename(input.filename)
 					const now = DateTime.nowUnsafe()
 					const expiresAt = DateTime.addDuration(now, `${TTL_MS} millis`)
@@ -149,11 +149,11 @@ export class EmailAttachmentStaging extends ServiceMap.Service<EmailAttachmentSt
 
 					const insertResult = yield* sql`
 						INSERT INTO email_attachment_staging (
-							staging_id, organization_id, inbox_id, draft_id, storage_key,
+							staging_id, organization_id, connection_id, draft_id, storage_key,
 							filename, content_type, size_bytes, is_inline,
 							expires_at
 						) VALUES (
-							${stagingId}, ${currentOrg.id}, ${input.inboxId}, ${input.draftId ?? null}, ${storageKey},
+							${stagingId}, ${currentOrg.id}, ${input.mailboxId}, ${input.draftId ?? null}, ${storageKey},
 							${safeFilename}, ${compressed.contentType}, ${compressed.bytes.byteLength}, ${input.isInline},
 							${DateTime.toDate(expiresAt)}
 						)
@@ -189,7 +189,7 @@ export class EmailAttachmentStaging extends ServiceMap.Service<EmailAttachmentSt
 			// provider (bytes + Content-ID) and the renderer (stagingId →
 			// cid) so the caller doesn't need a second query.
 			const resolve = (
-				inboxId: string,
+				mailboxId: string,
 				refs: ReadonlyArray<StagingRef>,
 			): Effect.Effect<readonly ResolvedStaging[], BadRequest> =>
 				Effect.gen(function* () {
@@ -197,7 +197,7 @@ export class EmailAttachmentStaging extends ServiceMap.Service<EmailAttachmentSt
 
 					const ids = [...new Set(refs.map(r => r.stagingId))]
 					const rows = yield* sql<StagingRow>`
-						SELECT staging_id, inbox_id, draft_id, storage_key,
+						SELECT staging_id, connection_id AS "mailboxId", draft_id, storage_key,
 						       filename, content_type, size_bytes, is_inline, cid, sent_at
 						FROM email_attachment_staging
 						WHERE staging_id IN ${sql.in(ids)}
@@ -218,9 +218,9 @@ export class EmailAttachmentStaging extends ServiceMap.Service<EmailAttachmentSt
 								message: `Staging id ${ref.stagingId} not found or expired`,
 							})
 						}
-						if (row.inboxId !== inboxId) {
+						if (row.mailboxId !== mailboxId) {
 							return yield* new BadRequest({
-								message: `Staging id ${ref.stagingId} belongs to a different inbox`,
+								message: `Staging id ${ref.stagingId} belongs to a different mailbox`,
 							})
 						}
 						const bytes = yield* storage.get(row.storageKey).pipe(
@@ -256,15 +256,15 @@ export class EmailAttachmentStaging extends ServiceMap.Service<EmailAttachmentSt
 
 			// ── discard ── explicit deletion: node-remove, chip-remove.
 			const discard = (
-				inboxId: string,
+				mailboxId: string,
 				stagingId: string,
 			): Effect.Effect<void, BadRequest> =>
 				Effect.gen(function* () {
 					const rows = yield* sql<{
 						readonly storageKey: string
-						readonly inboxId: string
+						readonly mailboxId: string
 					}>`
-						SELECT storage_key, inbox_id
+						SELECT storage_key, connection_id AS "mailboxId"
 						FROM email_attachment_staging
 						WHERE staging_id = ${stagingId}
 					`.pipe(
@@ -274,9 +274,9 @@ export class EmailAttachmentStaging extends ServiceMap.Service<EmailAttachmentSt
 					)
 					const row = rows[0]
 					if (!row) return // idempotent
-					if (row.inboxId !== inboxId) {
+					if (row.mailboxId !== mailboxId) {
 						return yield* new BadRequest({
-							message: `Cannot discard staging id belonging to a different inbox`,
+							message: `Cannot discard staging id belonging to a different mailbox`,
 						})
 					}
 					yield* sql`
@@ -389,15 +389,15 @@ export class EmailAttachmentStaging extends ServiceMap.Service<EmailAttachmentSt
 
 			// ── signedPreviewUrl ── short-lived URL for the editor canvas.
 			const signedPreviewUrl = (
-				inboxId: string,
+				mailboxId: string,
 				stagingId: string,
 			): Effect.Effect<string | null, BadRequest> =>
 				Effect.gen(function* () {
 					const rows = yield* sql<{
 						readonly storageKey: string
-						readonly inboxId: string
+						readonly mailboxId: string
 					}>`
-						SELECT storage_key, inbox_id
+						SELECT storage_key, connection_id AS "mailboxId"
 						FROM email_attachment_staging
 						WHERE staging_id = ${stagingId}
 					`.pipe(
@@ -407,9 +407,9 @@ export class EmailAttachmentStaging extends ServiceMap.Service<EmailAttachmentSt
 					)
 					const row = rows[0]
 					if (!row) return null
-					if (row.inboxId !== inboxId) {
+					if (row.mailboxId !== mailboxId) {
 						return yield* new BadRequest({
-							message: 'Cannot preview staging from a different inbox',
+							message: 'Cannot preview staging from a different mailbox',
 						})
 					}
 					return yield* storage.signedUrl(row.storageKey, URL_TTL_SEC).pipe(

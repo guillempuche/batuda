@@ -8,7 +8,7 @@ import { expect, test } from '@playwright/test'
 //   1. Visitor clicks "Forgot password?" on /login → lands on /forgot-password.
 //   2. Submits the email → frontend calls authClient.requestPasswordReset
 //      with redirectTo=`${origin}/reset-password`.
-//   3. Better Auth opaque-succeeds and writes a .md to .dev-inbox/
+//   3. Better Auth opaque-succeeds and writes a .md to .dev-mailbox/
 //      with `labels: password-reset`. The .md carries a URL like
 //      ${apiHost}/auth/reset-password/${token}?callbackURL=${redirectTo}.
 //   4. Visitor opens that URL → BA's reset-password/:token callback
@@ -22,14 +22,14 @@ import { expect, test } from '@playwright/test'
 //   apps/internal/src/routes/reset-password.tsx
 //   apps/server/src/services/local-transactional-provider.ts (label key)
 
-const INBOX_DIR = join(process.cwd(), '..', 'server', '.dev-inbox')
+const INBOX_DIR = join(process.cwd(), '..', 'server', '.dev-mailbox')
 
 interface ResetMail {
 	readonly file: string
 	readonly url: string
 }
 
-// Polls .dev-inbox/ for a `password-reset`-labelled .md whose filename
+// Polls .dev-mailbox/ for a `password-reset`-labelled .md whose filename
 // contains the recipient slug, then extracts the reset URL. Same shape
 // as invite.test.ts's helper — the file appears asynchronously after
 // the API responds.
@@ -102,7 +102,7 @@ test.describe('forgot-password end-to-end', () => {
 				timeout: 10_000,
 			})
 
-			// AND a .md should land in .dev-inbox/ with the reset URL
+			// AND a .md should land in .dev-mailbox/ with the reset URL
 			//   [local-transactional-provider.ts — label: 'password-reset']
 			const mail = await pollResetMail(recipient, 5_000)
 			expect(mail.url).toContain('/auth/reset-password/')
@@ -167,7 +167,7 @@ test.describe('forgot-password end-to-end', () => {
 	})
 
 	test.describe('when an unregistered email is submitted', () => {
-		test('should still render the opaque "check your inbox" panel (no enumeration)', async ({
+		test('should still render the opaque "check your mailbox" panel (no enumeration)', async ({
 			page,
 		}) => {
 			// GIVEN /forgot-password

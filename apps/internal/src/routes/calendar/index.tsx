@@ -191,7 +191,7 @@ function CalendarPage() {
 				) : empty ? (
 					<EmptyState
 						title={t`No calendar events yet`}
-						description={t`Book a meeting from a company page or forward an invitation to your inbox to see it here.`}
+						description={t`Book a meeting from a company page or forward an invitation to your mailbox to see it here.`}
 					/>
 				) : (
 					<Suspense

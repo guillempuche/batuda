@@ -10,17 +10,17 @@ import { Atom } from 'effect/unstable/reactivity'
  * never enters the atom (nor the URL). It stays in the form's local state and
  * is read only on submit.
  *
- * The string-literal unions mirror the inbox domain; they're duplicated here
+ * The string-literal unions mirror the mailbox domain; they're duplicated here
  * (rather than imported from the route) to keep this atom free of UI imports.
  */
 
-type InboxPurpose = 'human' | 'agent' | 'shared'
+type MailboxPurpose = 'human' | 'agent' | 'shared'
 type TransportSecurity = 'tls' | 'starttls' | 'plain'
 
-export type InboxDraft = {
+export type MailboxDraft = {
 	readonly email: string
 	readonly displayName: string
-	readonly purpose: InboxPurpose
+	readonly purpose: MailboxPurpose
 	readonly ownerUserId: string
 	readonly isDefault: boolean
 	readonly isPrivate: boolean
@@ -33,7 +33,7 @@ export type InboxDraft = {
 	readonly username: string
 }
 
-export const emptyInboxDraft: InboxDraft = {
+export const emptyMailboxDraft: MailboxDraft = {
 	email: '',
 	displayName: '',
 	purpose: 'human',
@@ -49,4 +49,4 @@ export const emptyInboxDraft: InboxDraft = {
 	username: '',
 }
 
-export const inboxDraftAtom = Atom.make<InboxDraft>(emptyInboxDraft)
+export const mailboxDraftAtom = Atom.make<MailboxDraft>(emptyMailboxDraft)

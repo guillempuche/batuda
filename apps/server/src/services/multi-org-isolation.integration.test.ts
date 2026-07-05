@@ -83,12 +83,12 @@ const ORGS = {
 // untouched if the user is iterating on them in parallel.
 const TABLES_TO_TRUNCATE = [
 	'message_participants',
-	'email_messages',
-	'email_thread_links',
+	'messages',
+	'conversations',
 	'email_attachment_staging',
-	'inbox_footers',
+	'connection_footers',
 	'email_drafts',
-	'inboxes',
+	'channel_connections',
 	'"member"',
 	'"invitation"',
 	'"organization"',
@@ -271,10 +271,10 @@ const withSuper = async <T>(
 	}
 }
 
-const fakeInbox = (orgId: string, ownerUserId: string, email: string) => ({
+const fakeMailbox = (orgId: string, ownerUserId: string, email: string) => ({
 	organization_id: orgId,
 	owner_user_id: ownerUserId,
-	email,
+	external_id: email,
 	purpose: 'human',
 	imap_host: 'imap.example.com',
 	imap_port: 993,
@@ -283,63 +283,63 @@ const fakeInbox = (orgId: string, ownerUserId: string, email: string) => ({
 	smtp_port: 465,
 	smtp_security: 'tls',
 	username: email,
-	password_ciphertext: Buffer.from('x'),
-	password_nonce: Buffer.from('x'),
-	password_tag: Buffer.from('x'),
+	config_ciphertext: Buffer.from('x'),
+	config_nonce: Buffer.from('x'),
+	config_tag: Buffer.from('x'),
 })
 
 describe('multi-org isolation', () => {
 	describe('RLS USING-clause stripping', () => {
-		it('inboxes selected as app_user with current_org_id=taller hides restaurant inboxes', async () => {
-			// GIVEN one inbox in each org
-			// WHEN selecting * from inboxes as app_user with current_org_id=taller
+		it('mailboxes selected as app_user with current_org_id=taller hides restaurant mailboxes', async () => {
+			// GIVEN one mailbox in each org
+			// WHEN selecting * from mailboxes as app_user with current_org_id=taller
 			// THEN only the taller row is visible
-			const tallerInbox = fakeInbox(
+			const tallerMailbox = fakeMailbox(
 				ctx.tallerOrgId,
 				ctx.aliceId,
 				'alice@taller.cat',
 			)
-			const restaurantInbox = fakeInbox(
+			const restaurantMailbox = fakeMailbox(
 				ctx.restaurantOrgId,
 				ctx.bobId,
 				'bob@restaurant.demo',
 			)
 			await withSuper(async client => {
 				await client.query(
-					`INSERT INTO inboxes (${Object.keys(tallerInbox).join(',')}) VALUES (${Object.keys(
-						tallerInbox,
+					`INSERT INTO channel_connections (${Object.keys(tallerMailbox).join(',')}) VALUES (${Object.keys(
+						tallerMailbox,
 					)
 						.map((_, i) => `$${i + 1}`)
 						.join(',')})`,
-					Object.values(tallerInbox),
+					Object.values(tallerMailbox),
 				)
 				await client.query(
-					`INSERT INTO inboxes (${Object.keys(restaurantInbox).join(',')}) VALUES (${Object.keys(
-						restaurantInbox,
+					`INSERT INTO channel_connections (${Object.keys(restaurantMailbox).join(',')}) VALUES (${Object.keys(
+						restaurantMailbox,
 					)
 						.map((_, i) => `$${i + 1}`)
 						.join(',')})`,
-					Object.values(restaurantInbox),
+					Object.values(restaurantMailbox),
 				)
 				await client.query(`SET LOCAL ROLE app_user`)
 				await client.query(
 					`SET LOCAL app.current_org_id = '${ctx.tallerOrgId}'`,
 				)
 				const visible = await client.query<{ organization_id: string }>(
-					'SELECT organization_id FROM inboxes',
+					'SELECT organization_id FROM channel_connections',
 				)
 				expect(visible.rows.length).toBe(1)
 				expect(visible.rows[0]?.organization_id).toBe(ctx.tallerOrgId)
 			})
 		})
 
-		it('email_messages selected without WHERE organization_id still strips cross-org', async () => {
-			// GIVEN one outbound message in each org's inbox
-			// WHEN selecting * from email_messages without a WHERE clause as app_user (taller)
+		it('messages selected without WHERE organization_id still strips cross-org', async () => {
+			// GIVEN one outbound message in each org's mailbox
+			// WHEN selecting * from messages without a WHERE clause as app_user (taller)
 			// THEN only the taller row is visible — RLS USING fires regardless of query shape
 			await withSuper(async client => {
-				const inboxIns = await client.query<{ id: string }>(
-					`INSERT INTO inboxes (organization_id, owner_user_id, email, purpose, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
+				const mailboxIns = await client.query<{ id: string }>(
+					`INSERT INTO channel_connections (organization_id, owner_user_id, external_id, purpose, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, config_ciphertext, config_nonce, config_tag)
 					 VALUES ($1,$2,$3,'human','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x'),
 					        ($4,$5,$6,'human','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x') RETURNING id, organization_id`,
 					[
@@ -351,18 +351,18 @@ describe('multi-org isolation', () => {
 						'b@b',
 					],
 				)
-				const tallerInboxId = inboxIns.rows[0]?.id
-				const restaurantInboxId = inboxIns.rows[1]?.id
+				const tallerMailboxId = mailboxIns.rows[0]?.id
+				const restaurantMailboxId = mailboxIns.rows[1]?.id
 
 				await client.query(
-					`INSERT INTO email_messages (organization_id, inbox_id, message_id, direction, folder, raw_rfc822_ref, status)
+					`INSERT INTO messages (organization_id, connection_id, message_id, direction, folder, raw_rfc822_ref, status)
 					 VALUES ($1,$2,'<m1@x>','outbound','Sent','r/1','normal'),
 					        ($3,$4,'<m2@x>','outbound','Sent','r/2','normal')`,
 					[
 						ctx.tallerOrgId,
-						tallerInboxId,
+						tallerMailboxId,
 						ctx.restaurantOrgId,
-						restaurantInboxId,
+						restaurantMailboxId,
 					],
 				)
 
@@ -371,32 +371,32 @@ describe('multi-org isolation', () => {
 					`SET LOCAL app.current_org_id = '${ctx.tallerOrgId}'`,
 				)
 				const all = await client.query<{ organization_id: string }>(
-					'SELECT organization_id FROM email_messages',
+					'SELECT organization_id FROM messages',
 				)
 				expect(all.rows.length).toBe(1)
 				expect(all.rows[0]?.organization_id).toBe(ctx.tallerOrgId)
 			})
 		})
 
-		it('email_thread_links is org-scoped under RLS', async () => {
-			// GIVEN one thread per org pinned to a per-org inbox
-			// WHEN selecting from email_thread_links as app_user (taller)
+		it('conversations is org-scoped under RLS', async () => {
+			// GIVEN one thread per org pinned to a per-org mailbox
+			// WHEN selecting from conversations as app_user (taller)
 			// THEN only taller's thread row is visible
 			await withSuper(async client => {
-				const inboxIns = await client.query<{ id: string }>(
-					`INSERT INTO inboxes (organization_id, owner_user_id, email, purpose, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
+				const mailboxIns = await client.query<{ id: string }>(
+					`INSERT INTO channel_connections (organization_id, owner_user_id, external_id, purpose, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, config_ciphertext, config_nonce, config_tag)
 					 VALUES ($1,$2,'a@a','human','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x'),
 					        ($3,$4,'b@b','human','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x') RETURNING id`,
 					[ctx.tallerOrgId, ctx.aliceId, ctx.restaurantOrgId, ctx.bobId],
 				)
 				await client.query(
-					`INSERT INTO email_thread_links (organization_id, external_thread_id, inbox_id)
+					`INSERT INTO conversations (organization_id, external_thread_id, connection_id)
 					 VALUES ($1, '<t1@x>', $2), ($3, '<t2@x>', $4)`,
 					[
 						ctx.tallerOrgId,
-						inboxIns.rows[0]?.id,
+						mailboxIns.rows[0]?.id,
 						ctx.restaurantOrgId,
-						inboxIns.rows[1]?.id,
+						mailboxIns.rows[1]?.id,
 					],
 				)
 				await client.query(`SET LOCAL ROLE app_user`)
@@ -404,48 +404,48 @@ describe('multi-org isolation', () => {
 					`SET LOCAL app.current_org_id = '${ctx.tallerOrgId}'`,
 				)
 				const visible = await client.query(
-					'SELECT organization_id FROM email_thread_links',
+					'SELECT organization_id FROM conversations',
 				)
 				expect(visible.rows.length).toBe(1)
 			})
 		})
 
-		it('message_participants is transitively scoped via email_messages subquery policy', async () => {
+		it('message_participants is transitively scoped via messages subquery policy', async () => {
 			// GIVEN a message + participant row in each org
 			// WHEN selecting message_participants as app_user (taller)
 			// THEN only the taller participant is visible — proves the EXISTS subquery policy
 			await withSuper(async client => {
-				const inboxIns = await client.query<{ id: string }>(
-					`INSERT INTO inboxes (organization_id, owner_user_id, email, purpose, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
+				const mailboxIns = await client.query<{ id: string }>(
+					`INSERT INTO channel_connections (organization_id, owner_user_id, external_id, purpose, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, config_ciphertext, config_nonce, config_tag)
 					 VALUES ($1,$2,'a@a','human','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x'),
 					        ($3,$4,'b@b','human','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x') RETURNING id`,
 					[ctx.tallerOrgId, ctx.aliceId, ctx.restaurantOrgId, ctx.bobId],
 				)
 				const msgIns = await client.query<{ id: string }>(
-					`INSERT INTO email_messages (organization_id, inbox_id, message_id, direction, folder, raw_rfc822_ref, status)
+					`INSERT INTO messages (organization_id, connection_id, message_id, direction, folder, raw_rfc822_ref, status)
 					 VALUES ($1,$2,'<m1@x>','outbound','Sent','r/1','normal'),
 					        ($3,$4,'<m2@x>','outbound','Sent','r/2','normal') RETURNING id`,
 					[
 						ctx.tallerOrgId,
-						inboxIns.rows[0]?.id,
+						mailboxIns.rows[0]?.id,
 						ctx.restaurantOrgId,
-						inboxIns.rows[1]?.id,
+						mailboxIns.rows[1]?.id,
 					],
 				)
 				await client.query(
-					`INSERT INTO message_participants (email_message_id, email_address, role)
-					 VALUES ($1, 'x@x', 'to'), ($2, 'y@y', 'to')`,
+					`INSERT INTO message_participants (message_id, address, role, channel)
+					 VALUES ($1, 'x@x', 'to', 'email'), ($2, 'y@y', 'to', 'email')`,
 					[msgIns.rows[0]?.id, msgIns.rows[1]?.id],
 				)
 				await client.query(`SET LOCAL ROLE app_user`)
 				await client.query(
 					`SET LOCAL app.current_org_id = '${ctx.tallerOrgId}'`,
 				)
-				const visible = await client.query<{ email_address: string }>(
-					'SELECT email_address FROM message_participants',
+				const visible = await client.query<{ address: string }>(
+					'SELECT address FROM message_participants',
 				)
 				expect(visible.rows.length).toBe(1)
-				expect(visible.rows[0]?.email_address).toBe('x@x')
+				expect(visible.rows[0]?.address).toBe('x@x')
 			})
 		})
 	})
@@ -794,18 +794,18 @@ describe('multi-org isolation', () => {
 		const insertDraft = async (
 			client: pg.PoolClient,
 			orgId: string,
-			inboxId: string,
+			mailboxId: string,
 			draftId: string,
 		) =>
 			client.query(
-				`INSERT INTO email_drafts (draft_id, organization_id, inbox_id, mode, body_json)
+				`INSERT INTO email_drafts (draft_id, organization_id, connection_id, mode, body_json)
 				 VALUES ($1, $2, $3, 'new', '{}'::jsonb)`,
-				[draftId, orgId, inboxId],
+				[draftId, orgId, mailboxId],
 			)
 
-		const seedTwoInboxes = async (client: pg.PoolClient) => {
+		const seedTwoMailboxes = async (client: pg.PoolClient) => {
 			const ins = await client.query<{ id: string }>(
-				`INSERT INTO inboxes (organization_id, owner_user_id, email, purpose, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
+				`INSERT INTO channel_connections (organization_id, owner_user_id, external_id, purpose, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, config_ciphertext, config_nonce, config_tag)
 				 VALUES ($1,$2,'a@a','human','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x'),
 				        ($3,$4,'b@b','human','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x')
 				 RETURNING id`,
@@ -821,13 +821,13 @@ describe('multi-org isolation', () => {
 				// THEN only the taller draft should be visible
 				// [migrations/0001_initial.ts — org_isolation_email_drafts policy]
 				await withSuper(async client => {
-					const [tallerInboxId, restaurantInboxId] =
-						await seedTwoInboxes(client)
-					await insertDraft(client, ctx.tallerOrgId, tallerInboxId, 'd-t')
+					const [tallerMailboxId, restaurantMailboxId] =
+						await seedTwoMailboxes(client)
+					await insertDraft(client, ctx.tallerOrgId, tallerMailboxId, 'd-t')
 					await insertDraft(
 						client,
 						ctx.restaurantOrgId,
-						restaurantInboxId,
+						restaurantMailboxId,
 						'd-r',
 					)
 					await client.query(`SET LOCAL ROLE app_user`)
@@ -849,16 +849,16 @@ describe('multi-org isolation', () => {
 				// WHEN an INSERT runs with organization_id=restaurant
 				// THEN RLS WITH CHECK should reject it
 				await withSuper(async client => {
-					const [, restaurantInboxId] = await seedTwoInboxes(client)
+					const [, restaurantMailboxId] = await seedTwoMailboxes(client)
 					await client.query(`SET LOCAL ROLE app_user`)
 					await client.query(
 						`SET LOCAL app.current_org_id = '${ctx.tallerOrgId}'`,
 					)
 					await expect(
 						client.query(
-							`INSERT INTO email_drafts (draft_id, organization_id, inbox_id, mode, body_json)
+							`INSERT INTO email_drafts (draft_id, organization_id, connection_id, mode, body_json)
 							 VALUES ('d-leak', $1, $2, 'new', '{}'::jsonb)`,
-							[ctx.restaurantOrgId, restaurantInboxId],
+							[ctx.restaurantOrgId, restaurantMailboxId],
 						),
 					).rejects.toThrow(/policy|row-level/i)
 				})
@@ -868,16 +868,18 @@ describe('multi-org isolation', () => {
 
 	describe('DB-level invariants', () => {
 		it("CHECK rejects purpose='shared' + is_private=true on insert", async () => {
-			// GIVEN an attempt to create a shared inbox marked private (nonsensical)
+			// GIVEN an attempt to create a shared mailbox marked private (nonsensical)
 			// WHEN INSERT runs
 			// THEN the table-level CHECK constraint rejects it
 			await expect(
 				ctx.pool.query(
-					`INSERT INTO inboxes (organization_id, owner_user_id, email, purpose, is_private, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
+					`INSERT INTO channel_connections (organization_id, owner_user_id, external_id, purpose, is_private, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, config_ciphertext, config_nonce, config_tag)
 					 VALUES ($1, NULL, 'shared@x', 'shared', true, 'x', 1, 'tls', 'x', 1, 'tls', 'u', '\\x', '\\x', '\\x')`,
 					[ctx.tallerOrgId],
 				),
-			).rejects.toThrow(/inboxes_purpose_owner_chk|check constraint/i)
+			).rejects.toThrow(
+				/channel_connections_purpose_owner_chk|check constraint/i,
+			)
 		})
 
 		it('idx_email_messages_msgid is org-scoped (same Message-ID across orgs allowed; within an org rejected)', async () => {
@@ -886,56 +888,60 @@ describe('multi-org isolation', () => {
 			// THEN the unique index allows it (org pair makes it unique)
 			// AND a duplicate within the same org is rejected
 			await withSuper(async client => {
-				const inboxIns = await client.query<{ id: string }>(
-					`INSERT INTO inboxes (organization_id, owner_user_id, email, purpose, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
+				const mailboxIns = await client.query<{ id: string }>(
+					`INSERT INTO channel_connections (organization_id, owner_user_id, external_id, purpose, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, config_ciphertext, config_nonce, config_tag)
 					 VALUES ($1,$2,'a@a','human','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x'),
 					        ($3,$4,'b@b','human','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x') RETURNING id`,
 					[ctx.tallerOrgId, ctx.aliceId, ctx.restaurantOrgId, ctx.bobId],
 				)
 				// Same Message-ID in two different orgs — allowed.
 				await client.query(
-					`INSERT INTO email_messages (organization_id, inbox_id, message_id, direction, folder, raw_rfc822_ref, status)
+					`INSERT INTO messages (organization_id, connection_id, message_id, direction, folder, raw_rfc822_ref, status)
 					 VALUES ($1,$2,'<shared@x>','outbound','Sent','r/1','normal'),
 					        ($3,$4,'<shared@x>','outbound','Sent','r/2','normal')`,
 					[
 						ctx.tallerOrgId,
-						inboxIns.rows[0]?.id,
+						mailboxIns.rows[0]?.id,
 						ctx.restaurantOrgId,
-						inboxIns.rows[1]?.id,
+						mailboxIns.rows[1]?.id,
 					],
 				)
 				// Duplicate inside the same org — rejected.
 				await expect(
 					client.query(
-						`INSERT INTO email_messages (organization_id, inbox_id, message_id, direction, folder, raw_rfc822_ref, status)
+						`INSERT INTO messages (organization_id, connection_id, message_id, direction, folder, raw_rfc822_ref, status)
 						 VALUES ($1, $2, '<shared@x>', 'outbound', 'Sent', 'r/3', 'normal')`,
-						[ctx.tallerOrgId, inboxIns.rows[0]?.id],
+						[ctx.tallerOrgId, mailboxIns.rows[0]?.id],
 					),
 				).rejects.toThrow(/duplicate key|unique/i)
 			})
 		})
 
-		it('member.primary_inbox_id is nulled when the referenced inbox row is deleted', async () => {
-			// GIVEN a member with primary_inbox_id pointing at an inbox row
-			// WHEN the inbox row is deleted
-			// THEN ON DELETE SET NULL fires and the member's primary_inbox_id reads NULL
+		it('member.primary_connection_id is nulled when the referenced mailbox row is deleted', async () => {
+			// GIVEN a member with primary_connection_id pointing at an mailbox row
+			// WHEN the mailbox row is deleted
+			// THEN ON DELETE SET NULL fires and the member's primary_connection_id reads NULL
 			await withSuper(async client => {
-				const inboxIns = await client.query<{ id: string }>(
-					`INSERT INTO inboxes (organization_id, owner_user_id, email, purpose, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, password_ciphertext, password_nonce, password_tag)
+				const mailboxIns = await client.query<{ id: string }>(
+					`INSERT INTO channel_connections (organization_id, owner_user_id, external_id, purpose, imap_host, imap_port, imap_security, smtp_host, smtp_port, smtp_security, username, config_ciphertext, config_nonce, config_tag)
 					 VALUES ($1,$2,'a@a','human','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x') RETURNING id`,
 					[ctx.tallerOrgId, ctx.aliceId],
 				)
-				const inboxId = inboxIns.rows[0]?.id
+				const mailboxId = mailboxIns.rows[0]?.id
 				await client.query(
-					`UPDATE "member" SET primary_inbox_id = $1 WHERE "userId" = $2 AND "organizationId" = $3`,
-					[inboxId, ctx.aliceId, ctx.tallerOrgId],
+					`UPDATE "member" SET primary_connection_id = $1 WHERE "userId" = $2 AND "organizationId" = $3`,
+					[mailboxId, ctx.aliceId, ctx.tallerOrgId],
 				)
-				await client.query(`DELETE FROM inboxes WHERE id = $1`, [inboxId])
-				const after = await client.query<{ primary_inbox_id: string | null }>(
-					`SELECT primary_inbox_id FROM "member" WHERE "userId" = $1 AND "organizationId" = $2`,
+				await client.query(`DELETE FROM channel_connections WHERE id = $1`, [
+					mailboxId,
+				])
+				const after = await client.query<{
+					primary_connection_id: string | null
+				}>(
+					`SELECT primary_connection_id FROM "member" WHERE "userId" = $1 AND "organizationId" = $2`,
 					[ctx.aliceId, ctx.tallerOrgId],
 				)
-				expect(after.rows[0]?.primary_inbox_id).toBeNull()
+				expect(after.rows[0]?.primary_connection_id).toBeNull()
 			})
 		})
 	})

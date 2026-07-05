@@ -10,7 +10,7 @@ import {
 } from './helpers/mail-catcher'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
-// Sends an email after configuring a default footer on the seeded inbox
+// Sends an email after configuring a default footer on the seeded mailbox
 // and asserts the wire bytes carry the footer text. Slice 6.4 deferred
 // this spec until a real catcher could observe what nodemailer wrote to
 // the SMTP socket.
@@ -26,7 +26,7 @@ const DATABASE_URL =
 	process.env['DATABASE_URL'] ??
 	'postgresql://batuda:batuda@localhost:5433/batuda'
 
-const SEEDED_INBOX_EMAIL = 'admin@taller.cat'
+const SEEDED_MAILBOX_EMAIL = 'admin@taller.cat'
 
 const psql = (sqlText: string): string =>
 	execSync(`psql "${DATABASE_URL}" -tA -c "${sqlText.replace(/"/g, '\\"')}"`, {
@@ -50,14 +50,14 @@ test.describe('compose with footer', () => {
 	const footerMarker = `BATUDA_E2E_FOOTER_${Date.now()}`
 
 	test.beforeAll(() => {
-		// GIVEN a default footer is configured for Alice's seeded inbox
-		const inboxId = psql(
-			`SELECT id FROM inboxes WHERE email='${SEEDED_INBOX_EMAIL}' LIMIT 1`,
+		// GIVEN a default footer is configured for Alice's seeded mailbox
+		const mailboxId = psql(
+			`SELECT id FROM channel_connections WHERE external_id='${SEEDED_MAILBOX_EMAIL}' LIMIT 1`,
 		)
-		expect(inboxId, 'seeded inbox row must exist').not.toBe('')
+		expect(mailboxId, 'seeded mailbox row must exist').not.toBe('')
 
 		const orgId = psql(
-			`SELECT organization_id FROM inboxes WHERE id='${inboxId}'`,
+			`SELECT organization_id FROM channel_connections WHERE id='${mailboxId}'`,
 		)
 		const bodyJson = JSON.stringify([
 			{
@@ -66,23 +66,23 @@ test.describe('compose with footer', () => {
 			},
 		]).replace(/'/g, "''")
 
-		// Drop any leftover footer for this inbox so a previous run that
+		// Drop any leftover footer for this mailbox so a previous run that
 		// died before afterAll doesn't trip the
-		// `idx_inbox_footers_single_default` unique constraint.
-		psql(`DELETE FROM inbox_footers WHERE inbox_id='${inboxId}'`)
+		// `idx_connection_footers_single_default` unique constraint.
+		psql(`DELETE FROM connection_footers WHERE connection_id='${mailboxId}'`)
 
 		// `psql -tA -c "INSERT ... RETURNING id"` emits the id followed by
 		// the INSERT command tag on its own line ("INSERT 0 1"), and the
 		// caller's `.trim()` doesn't strip the inner newline. Read the
 		// first line so the captured footerId is a clean UUID.
 		footerId = psql(
-			`INSERT INTO inbox_footers (organization_id, inbox_id, name, body_json, is_default) VALUES ('${orgId}', '${inboxId}', 'e2e-footer', '${bodyJson}'::jsonb, true) RETURNING id`,
+			`INSERT INTO connection_footers (organization_id, connection_id, name, body_json, is_default) VALUES ('${orgId}', '${mailboxId}', 'e2e-footer', '${bodyJson}'::jsonb, true) RETURNING id`,
 		).split('\n')[0]!
 	})
 
 	test.afterAll(() => {
 		if (footerId !== null && footerId !== '') {
-			psql(`DELETE FROM inbox_footers WHERE id='${footerId}'`)
+			psql(`DELETE FROM connection_footers WHERE id='${footerId}'`)
 		}
 	})
 
@@ -91,13 +91,13 @@ test.describe('compose with footer', () => {
 		// See send-email.test.ts for the rationale: force `connected` so a
 		// cold-catcher probe tick can't trip GrantUnavailable on sendDraft.
 		psql(
-			`UPDATE inboxes SET grant_status='connected' WHERE email='admin@taller.cat'`,
+			`UPDATE channel_connections SET grant_status='connected' WHERE external_id='admin@taller.cat'`,
 		)
 		await page.goto('/', { waitUntil: 'commit' })
 		await setActiveOrgBySlug(page, 'taller')
 	})
 
-	test.describe('when the inbox has a default footer configured', () => {
+	test.describe('when the mailbox has a default footer configured', () => {
 		test('should append the footer to the sent message body', async ({
 			page,
 		}) => {

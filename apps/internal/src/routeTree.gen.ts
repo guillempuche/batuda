@@ -23,7 +23,7 @@ import { Route as CalendarIndexRouteImport } from './routes/calendar/index'
 import { Route as ResearchIdRouteImport } from './routes/research/$id'
 import { Route as PagesIdRouteImport } from './routes/pages/$id'
 import { Route as OauthConsentRouteImport } from './routes/oauth/consent'
-import { Route as EmailsInboxesRouteImport } from './routes/emails/inboxes'
+import { Route as EmailsMailboxesRouteImport } from './routes/emails/mailboxes'
 import { Route as EmailsThreadIdRouteImport } from './routes/emails/$threadId'
 import { Route as CompaniesSlugRouteImport } from './routes/companies/$slug'
 import { Route as AcceptInvitationIdRouteImport } from './routes/accept-invitation.$id'
@@ -107,9 +107,9 @@ const OauthConsentRoute = OauthConsentRouteImport.update({
   path: '/oauth/consent',
   getParentRoute: () => rootRouteImport,
 } as any)
-const EmailsInboxesRoute = EmailsInboxesRouteImport.update({
-  id: '/emails/inboxes',
-  path: '/emails/inboxes',
+const EmailsMailboxesRoute = EmailsMailboxesRouteImport.update({
+  id: '/emails/mailboxes',
+  path: '/emails/mailboxes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EmailsThreadIdRoute = EmailsThreadIdRouteImport.update({
@@ -186,7 +186,7 @@ export interface FileRoutesByFullPath {
   '/accept-invitation/$id': typeof AcceptInvitationIdRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/emails/$threadId': typeof EmailsThreadIdRoute
-  '/emails/inboxes': typeof EmailsInboxesRoute
+  '/emails/mailboxes': typeof EmailsMailboxesRoute
   '/oauth/consent': typeof OauthConsentRoute
   '/pages/$id': typeof PagesIdRoute
   '/research/$id': typeof ResearchIdRoute
@@ -215,7 +215,7 @@ export interface FileRoutesByTo {
   '/accept-invitation/$id': typeof AcceptInvitationIdRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/emails/$threadId': typeof EmailsThreadIdRoute
-  '/emails/inboxes': typeof EmailsInboxesRoute
+  '/emails/mailboxes': typeof EmailsMailboxesRoute
   '/oauth/consent': typeof OauthConsentRoute
   '/pages/$id': typeof PagesIdRoute
   '/research/$id': typeof ResearchIdRoute
@@ -245,7 +245,7 @@ export interface FileRoutesById {
   '/accept-invitation/$id': typeof AcceptInvitationIdRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/emails/$threadId': typeof EmailsThreadIdRoute
-  '/emails/inboxes': typeof EmailsInboxesRoute
+  '/emails/mailboxes': typeof EmailsMailboxesRoute
   '/oauth/consent': typeof OauthConsentRoute
   '/pages/$id': typeof PagesIdRoute
   '/research/$id': typeof ResearchIdRoute
@@ -276,7 +276,7 @@ export interface FileRouteTypes {
     | '/accept-invitation/$id'
     | '/companies/$slug'
     | '/emails/$threadId'
-    | '/emails/inboxes'
+    | '/emails/mailboxes'
     | '/oauth/consent'
     | '/pages/$id'
     | '/research/$id'
@@ -305,7 +305,7 @@ export interface FileRouteTypes {
     | '/accept-invitation/$id'
     | '/companies/$slug'
     | '/emails/$threadId'
-    | '/emails/inboxes'
+    | '/emails/mailboxes'
     | '/oauth/consent'
     | '/pages/$id'
     | '/research/$id'
@@ -334,7 +334,7 @@ export interface FileRouteTypes {
     | '/accept-invitation/$id'
     | '/companies/$slug'
     | '/emails/$threadId'
-    | '/emails/inboxes'
+    | '/emails/mailboxes'
     | '/oauth/consent'
     | '/pages/$id'
     | '/research/$id'
@@ -364,7 +364,7 @@ export interface RootRouteChildren {
   AcceptInvitationIdRoute: typeof AcceptInvitationIdRoute
   CompaniesSlugRoute: typeof CompaniesSlugRoute
   EmailsThreadIdRoute: typeof EmailsThreadIdRoute
-  EmailsInboxesRoute: typeof EmailsInboxesRoute
+  EmailsMailboxesRoute: typeof EmailsMailboxesRoute
   OauthConsentRoute: typeof OauthConsentRoute
   PagesIdRoute: typeof PagesIdRoute
   ResearchIdRoute: typeof ResearchIdRoute
@@ -486,11 +486,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OauthConsentRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/emails/inboxes': {
-      id: '/emails/inboxes'
-      path: '/emails/inboxes'
-      fullPath: '/emails/inboxes'
-      preLoaderRoute: typeof EmailsInboxesRouteImport
+    '/emails/mailboxes': {
+      id: '/emails/mailboxes'
+      path: '/emails/mailboxes'
+      fullPath: '/emails/mailboxes'
+      preLoaderRoute: typeof EmailsMailboxesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/emails/$threadId': {
@@ -588,7 +588,7 @@ const rootRouteChildren: RootRouteChildren = {
   AcceptInvitationIdRoute: AcceptInvitationIdRoute,
   CompaniesSlugRoute: CompaniesSlugRoute,
   EmailsThreadIdRoute: EmailsThreadIdRoute,
-  EmailsInboxesRoute: EmailsInboxesRoute,
+  EmailsMailboxesRoute: EmailsMailboxesRoute,
   OauthConsentRoute: OauthConsentRoute,
   PagesIdRoute: PagesIdRoute,
   ResearchIdRoute: ResearchIdRoute,

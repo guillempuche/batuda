@@ -84,22 +84,22 @@ const cleanupEvent = (id: string) =>
 		yield* sql`DELETE FROM calendar_events WHERE id = ${id}::uuid`
 	})
 
-// `multi-org-isolation.test.ts` TRUNCATEs `inboxes` between runs, so we
-// can't rely on the seed's admin@taller.cat inbox being there. Use a
+// `multi-org-isolation.test.ts` TRUNCATEs `mailboxes` between runs, so we
+// can't rely on the seed's admin@taller.cat mailbox being there. Use a
 // dedicated fixture email scoped to this test instead.
 const FIXTURE_INBOX_EMAIL = 'webhooks-calcom-fixture@taller.test'
 
-const ensureFixtureInbox = (orgId: string) =>
+const ensureFixtureMailbox = (orgId: string) =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
 		yield* sql`SET LOCAL ROLE app_service`
 		const placeholder = new Uint8Array([0])
 		yield* sql`
-			INSERT INTO inboxes (
-				organization_id, email, purpose, owner_user_id,
+			INSERT INTO channel_connections (
+				organization_id, external_id, purpose, owner_user_id,
 				imap_host, imap_port, imap_security,
 				smtp_host, smtp_port, smtp_security,
-				username, password_ciphertext, password_nonce, password_tag,
+				username, config_ciphertext, config_nonce, config_tag,
 				active
 			) VALUES (
 				${orgId}, ${FIXTURE_INBOX_EMAIL}, 'human', 'webhooks-calcom-test-user',
@@ -112,10 +112,10 @@ const ensureFixtureInbox = (orgId: string) =>
 		`
 	})
 
-const cleanupFixtureInbox = Effect.gen(function* () {
+const cleanupFixtureMailbox = Effect.gen(function* () {
 	const sql = yield* SqlClient.SqlClient
 	yield* sql`SET LOCAL ROLE app_service`
-	yield* sql`DELETE FROM inboxes WHERE email = ${FIXTURE_INBOX_EMAIL}`
+	yield* sql`DELETE FROM channel_connections WHERE external_id = ${FIXTURE_INBOX_EMAIL}`
 })
 
 describe('webhook org-resolution + enterOrgScope pipeline', () => {
@@ -131,7 +131,7 @@ describe('webhook org-resolution + enterOrgScope pipeline', () => {
 			>,
 		)
 		await Effect.runPromise(
-			ensureFixtureInbox(orgIds.taller).pipe(
+			ensureFixtureMailbox(orgIds.taller).pipe(
 				Effect.provide(PgLive),
 			) as Effect.Effect<void, never, never>,
 		)
@@ -141,7 +141,7 @@ describe('webhook org-resolution + enterOrgScope pipeline', () => {
 		await Effect.runPromise(
 			Effect.gen(function* () {
 				for (const id of seededEvents) yield* cleanupEvent(id)
-				yield* cleanupFixtureInbox
+				yield* cleanupFixtureMailbox
 			}).pipe(Effect.provide(PgLive)) as Effect.Effect<void, never, never>,
 		)
 	})
@@ -253,7 +253,7 @@ describe('webhook org-resolution + enterOrgScope pipeline', () => {
 			const count = await Effect.runPromise(
 				Effect.gen(function* () {
 					const orgRes = yield* OrgResolution
-					// Resolve via organizer-email tier using the fixture inbox.
+					// Resolve via organizer-email tier using the fixture mailbox.
 					const org = yield* orgRes
 						.resolveOrgForCalcomWebhook({
 							organizer: { email: FIXTURE_INBOX_EMAIL },

@@ -8,7 +8,7 @@ import { BatudaApiAtom } from '#/lib/batuda-api-atom'
  * stable across equivalent searches.
  */
 export type EmailsSearch = {
-	readonly inboxId?: string
+	readonly mailboxId?: string
 	readonly companyId?: string
 	readonly status?: 'open' | 'closed' | 'archived'
 	readonly purpose?: 'human' | 'agent' | 'shared'
@@ -23,8 +23,8 @@ const cache = new Map<string, ReturnType<typeof makeListAtom>>()
 
 function makeListAtom(search: EmailsSearch) {
 	const query: Record<string, string | number> = {}
-	if (search.inboxId !== undefined && search.inboxId !== '') {
-		query['inboxId'] = search.inboxId
+	if (search.mailboxId !== undefined && search.mailboxId !== '') {
+		query['mailboxId'] = search.mailboxId
 	}
 	if (search.companyId !== undefined && search.companyId !== '') {
 		query['companyId'] = search.companyId
@@ -50,8 +50,8 @@ export function emailsSearchAtom(search: EmailsSearch) {
 
 export function canonicalKey(search: EmailsSearch): string {
 	const entries: Array<[string, string | number]> = []
-	if (search.inboxId !== undefined && search.inboxId !== '') {
-		entries.push(['inboxId', search.inboxId])
+	if (search.mailboxId !== undefined && search.mailboxId !== '') {
+		entries.push(['mailboxId', search.mailboxId])
 	}
 	if (search.companyId !== undefined && search.companyId !== '') {
 		entries.push(['companyId', search.companyId])
@@ -67,7 +67,7 @@ export function canonicalKey(search: EmailsSearch): string {
 	return JSON.stringify(Object.fromEntries(entries))
 }
 
-export const inboxesListAtom = BatudaApiAtom.query('email', 'listInboxes', {
+export const mailboxesListAtom = BatudaApiAtom.query('email', 'listMailboxes', {
 	query: {},
 })
 
@@ -108,16 +108,29 @@ export const markThreadUnreadAtom = BatudaApiAtom.mutation(
 	'markThreadUnread',
 )
 
-export const createInboxAtom = BatudaApiAtom.mutation('email', 'createInbox')
-export const updateInboxAtom = BatudaApiAtom.mutation('email', 'updateInbox')
-export const deleteInboxAtom = BatudaApiAtom.mutation('email', 'deleteInbox')
-export const testInboxAtom = BatudaApiAtom.mutation('email', 'testInbox')
-export const setPrimaryInboxAtom = BatudaApiAtom.mutation(
+export const createMailboxAtom = BatudaApiAtom.mutation(
 	'email',
-	'setPrimaryInbox',
+	'createMailbox',
+)
+export const updateMailboxAtom = BatudaApiAtom.mutation(
+	'email',
+	'updateMailbox',
+)
+export const deleteMailboxAtom = BatudaApiAtom.mutation(
+	'email',
+	'deleteMailbox',
+)
+export const testMailboxAtom = BatudaApiAtom.mutation('email', 'testMailbox')
+export const setPrimaryMailboxAtom = BatudaApiAtom.mutation(
+	'email',
+	'setPrimaryMailbox',
 )
 
-export const inboxStatusAtom = BatudaApiAtom.query('email', 'inboxStatus', {})
+export const mailboxStatusAtom = BatudaApiAtom.query(
+	'email',
+	'mailboxStatus',
+	{},
+)
 export const providerPresetsAtom = BatudaApiAtom.query(
 	'email',
 	'listProviderPresets',
@@ -139,15 +152,15 @@ export const updateFooterAtom = BatudaApiAtom.mutation('email', 'updateFooter')
 export const deleteFooterAtom = BatudaApiAtom.mutation('email', 'deleteFooter')
 
 const footerCache = new Map<string, ReturnType<typeof makeFooterAtom>>()
-function makeFooterAtom(inboxId: string) {
+function makeFooterAtom(mailboxId: string) {
 	return BatudaApiAtom.query('email', 'listFooters', {
-		params: { inboxId },
+		params: { mailboxId },
 	})
 }
-export function footersAtomFor(inboxId: string) {
-	const existing = footerCache.get(inboxId)
+export function footersAtomFor(mailboxId: string) {
+	const existing = footerCache.get(mailboxId)
 	if (existing !== undefined) return existing
-	const atom = makeFooterAtom(inboxId)
-	footerCache.set(inboxId, atom)
+	const atom = makeFooterAtom(mailboxId)
+	footerCache.set(mailboxId, atom)
 	return atom
 }

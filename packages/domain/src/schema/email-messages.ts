@@ -28,7 +28,7 @@ export class EmailMessage extends Model.Class<EmailMessage>('EmailMessage')({
 	provider: Schema.String,
 	providerMessageId: Schema.String,
 	providerThreadId: Schema.String,
-	providerInboxId: Schema.String,
+	providerMailboxId: Schema.String,
 	direction: EmailDirection,
 	companyId: Schema.NullOr(Schema.String),
 	contactId: Schema.NullOr(Schema.String),

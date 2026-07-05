@@ -12,8 +12,8 @@ import { HttpApiBuilder, HttpApiScalar, OpenApi } from 'effect/unstable/httpapi'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { BookingProviderLive, IcsParserLive } from '@batuda/calendar'
+import { ParticipantMatcher } from '@batuda/communications'
 import { BatudaApi } from '@batuda/controllers'
-import { ParticipantMatcher } from '@batuda/email/participant-matcher'
 import {
 	ContactDiscovery,
 	makeResearchLlmLive,
@@ -31,6 +31,7 @@ import { CompaniesLive } from './handlers/companies'
 import { ContactsLive } from './handlers/contacts'
 import { DocumentsLive } from './handlers/documents'
 import { EmailLive } from './handlers/email'
+import { EmailOauthLive } from './handlers/email-oauth'
 import { HealthLive } from './handlers/health'
 import { InstructionsLive } from './handlers/instructions'
 import { InteractionsLive } from './handlers/interactions'
@@ -64,11 +65,12 @@ import { CredentialCrypto } from './services/credential-crypto'
 import { EmailService } from './services/email'
 import { EmailAttachmentStaging } from './services/email-attachment-staging'
 import { DraftStore } from './services/email-draft-store'
-import { EmailProviderLive } from './services/email-provider-live'
+import { OauthTokenService } from './services/email-oauth'
 import { Geocoder } from './services/geocoder'
-import { InboxHealthProbe } from './services/inbox-health-probe'
 import { InstructionsService } from './services/instructions'
 import { MailTransport } from './services/mail-transport'
+import { MailboxHealthProbe } from './services/mailbox-health-probe'
+import { MailboxTokenRefresher } from './services/mailbox-token-refresher'
 import { McpOAuthService } from './services/mcp-oauth'
 import { OrgResolution } from './services/org-resolution'
 import { PageService } from './services/pages'
@@ -99,6 +101,7 @@ const ApiLive = HttpApiBuilder.layer(BatudaApi).pipe(
 		PagesLive,
 		WebhooksLive,
 		EmailLive,
+		EmailOauthLive,
 		RecordingsLive,
 		ResearchLive,
 		InstructionsLive,
@@ -272,7 +275,10 @@ const ServicesLive = Layer.mergeAll(
 	// daemonLayer outputs `never` so a downstream `provideMerge` would
 	// skip building it (nothing requires it). Listing it inside `mergeAll`
 	// forces the build, which fires the side-effect that forks the probe.
-	InboxHealthProbe.daemonLayer.pipe(Layer.provide(InboxHealthProbe.layer)),
+	MailboxHealthProbe.daemonLayer.pipe(Layer.provide(MailboxHealthProbe.layer)),
+	MailboxTokenRefresher.daemonLayer.pipe(
+		Layer.provide(MailboxTokenRefresher.layer),
+	),
 	// Same `never`-output trick; EmailAttachmentStaging is supplied via the `provideMerge` below.
 	EmailAttachmentStaging.sweepDaemonLayer,
 ).pipe(
@@ -295,6 +301,9 @@ const ServicesLive = Layer.mergeAll(
 	Layer.provideMerge(ParticipantMatcher.layer),
 	Layer.provideMerge(TimelineActivityService.layer),
 	Layer.provideMerge(WebhookService.layer),
+	// provideMerge (not a plain member) so it reaches the MailboxTokenRefresher
+	// daemon that requires it, not only the handlers that read the merged output.
+	Layer.provideMerge(OauthTokenService.layer),
 	Layer.provideMerge(CredentialCrypto.layer),
 	Layer.provideMerge(MailTransport.layer),
 	Layer.provideMerge(OrgResolution.layer),
@@ -396,7 +405,6 @@ const program = HttpRouter.serve(AppLive, {
 	Layer.provide(ServicesLive),
 	Layer.provide(BookingProviderLive),
 	Layer.provide(IcsParserLive),
-	Layer.provide(EmailProviderLive),
 	Layer.provide(researchToolkitLayer),
 	Layer.provide(makeResearchProvidersLive),
 	Layer.provide(makeResearchLlmLive),
@@ -406,7 +414,7 @@ const program = HttpRouter.serve(AppLive, {
 	Layer.provide(SessionMiddlewareLive),
 	Layer.provide(Auth.layer),
 	// Provided once at the bottom of the stack so every layer above (booking,
-	// brave search, calcom, geocoder, inbox-health-probe, …) can pick up
+	// brave search, calcom, geocoder, mailbox-health-probe, …) can pick up
 	// `HttpClient.HttpClient` from a single shared fetch.
 	Layer.provide(FetchHttpClient.layer),
 	Layer.provide(EnvVars.layer),

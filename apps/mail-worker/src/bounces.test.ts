@@ -87,7 +87,7 @@ describe('parseBounce', () => {
 		// WHEN parseBounce runs
 		// THEN bounceType='hard', statusCode='5.1.1', and originalMessageId
 		//   resolves to the embedded original — these are the three fields
-		//   applyBounce uses to flip email_messages.status and the email channel's status
+		//   applyBounce uses to flip messages.status and the email channel's status
 		const mail = await simpleParser(
 			dsn({
 				originalMessageId: '<orig-hard@example.com>',
@@ -127,7 +127,7 @@ describe('parseBounce', () => {
 		//   Exchange both prefer this form), not a full message/rfc822
 		// WHEN parseBounce runs
 		// THEN the original Message-ID is still resolved from the headers-only
-		//   part — the join key into email_messages must work for both shapes
+		//   part — the join key into messages must work for both shapes
 		const mail = await simpleParser(
 			dsn({
 				originalMessageId: '<headers-only@example.com>',

@@ -64,7 +64,7 @@ export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 								: null,
 							linked_interaction_id: _.payload.linkedInteractionId ?? null,
 							linked_calendar_event_id: _.payload.linkedCalendarEventId ?? null,
-							linked_thread_link_id: _.payload.linkedThreadLinkId ?? null,
+							linked_conversation_id: _.payload.linkedThreadLinkId ?? null,
 							linked_proposal_id: _.payload.linkedProposalId ?? null,
 							metadata: _.payload.metadata ?? null,
 						},

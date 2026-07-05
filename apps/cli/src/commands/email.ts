@@ -1,7 +1,7 @@
 /**
  * Inject a canned RFC822 message into the local mail catcher over SMTP.
  * Useful for eyeballing a wire-format payload via the catcher's REST API (or
- * for the outbound-assertion side of e2e specs). Addressed to a seeded inbox
+ * for the outbound-assertion side of e2e specs). Addressed to a seeded mailbox
  * with the mail-worker running, it is also ingested over IMAP; otherwise it
  * just sits in the catcher.
  */

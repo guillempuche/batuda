@@ -60,7 +60,7 @@ type DeliverabilityStatus =
 	| 'opened'
 	| 'clicked'
 
-type ThreadInbox = {
+type ThreadMailbox = {
 	readonly email: string
 	readonly displayName: string | null
 	readonly purpose: 'human' | 'agent' | 'shared'
@@ -104,7 +104,7 @@ type ThreadDetail = {
 	readonly status: ThreadStatus
 	readonly companyId: string | null
 	readonly contactId: string | null
-	readonly inbox: ThreadInbox | null
+	readonly mailbox: ThreadMailbox | null
 	readonly createdAt: string
 	readonly updatedAt: string
 	readonly messages: ReadonlyArray<ThreadMessage>
@@ -238,7 +238,7 @@ function ThreadDetailPage() {
 			const lastInbound = findLastInbound(detail.messages)
 			const last = detail.messages[detail.messages.length - 1] ?? null
 			const seed = lastInbound ?? last
-			const selfEmail = detail.inbox?.email.toLowerCase() ?? null
+			const selfEmail = detail.mailbox?.email.toLowerCase() ?? null
 			const toList =
 				seed !== null
 					? seed.direction === 'inbound'
@@ -300,7 +300,7 @@ function ThreadDetailPage() {
 					action={
 						<BackLink to='/emails'>
 							<ChevronLeft size={14} aria-hidden />
-							<span>{t`Back to inbox`}</span>
+							<span>{t`Back to mailbox`}</span>
 						</BackLink>
 					}
 				/>
@@ -325,7 +325,7 @@ function ThreadDetailPage() {
 				<BackRow>
 					<BackLink to='/emails'>
 						<ChevronLeft size={14} aria-hidden />
-						<span>{t`Back to inbox`}</span>
+						<span>{t`Back to mailbox`}</span>
 					</BackLink>
 					<StatusChip $status={status}>
 						{status === 'open'
@@ -436,11 +436,11 @@ function ThreadDetailPage() {
 							)}
 						</MetaItem>
 						<MetaItem>
-							<MetaLabel>{t`Inbox`}</MetaLabel>
-							{detail.inbox !== null ? (
-								<InboxBadge $purpose={detail.inbox.purpose}>
-									{detail.inbox.email}
-								</InboxBadge>
+							<MetaLabel>{t`Mailbox`}</MetaLabel>
+							{detail.mailbox !== null ? (
+								<MailboxBadge $purpose={detail.mailbox.purpose}>
+									{detail.mailbox.email}
+								</MailboxBadge>
 							) : (
 								<MetaValueMuted>{t`—`}</MetaValueMuted>
 							)}
@@ -476,14 +476,14 @@ function ThreadDetailPage() {
 						)}
 					</SideSection>
 					<SideSection>
-						<SideLabel>{t`Inbox`}</SideLabel>
-						{detail.inbox !== null ? (
+						<SideLabel>{t`Mailbox`}</SideLabel>
+						{detail.mailbox !== null ? (
 							<div>
-								<InboxBadge $purpose={detail.inbox.purpose}>
-									{detail.inbox.email}
-								</InboxBadge>
-								{detail.inbox.displayName ? (
-									<SideValueMuted>{detail.inbox.displayName}</SideValueMuted>
+								<MailboxBadge $purpose={detail.mailbox.purpose}>
+									{detail.mailbox.email}
+								</MailboxBadge>
+								{detail.mailbox.displayName ? (
+									<SideValueMuted>{detail.mailbox.displayName}</SideValueMuted>
 								) : null}
 							</div>
 						) : (
@@ -705,7 +705,7 @@ function narrowDetail(raw: unknown): ThreadDetail | null {
 	if (!raw || typeof raw !== 'object') return null
 	const r = raw as Record<string, unknown>
 	if (typeof r['id'] !== 'string') return null
-	const inbox = narrowInbox(r['inbox'])
+	const mailbox = narrowMailbox(r['mailbox'])
 	const messages = narrowMessages(r['messages'])
 	return {
 		id: r['id'],
@@ -720,14 +720,14 @@ function narrowDetail(raw: unknown): ThreadDetail | null {
 				: 'open',
 		companyId: typeof r['companyId'] === 'string' ? r['companyId'] : null,
 		contactId: typeof r['contactId'] === 'string' ? r['contactId'] : null,
-		inbox,
+		mailbox,
 		createdAt: toDateString(r['createdAt']),
 		updatedAt: toDateString(r['updatedAt']),
 		messages,
 	}
 }
 
-function narrowInbox(raw: unknown): ThreadInbox | null {
+function narrowMailbox(raw: unknown): ThreadMailbox | null {
 	if (!raw || typeof raw !== 'object') return null
 	const r = raw as Record<string, unknown>
 	if (typeof r['email'] !== 'string') return null
@@ -1052,7 +1052,7 @@ const CompanyLinkWrap = styled.div.withConfig({
 	}
 `
 
-const inboxTone = (purpose: 'human' | 'agent' | 'shared') => {
+const mailboxTone = (purpose: 'human' | 'agent' | 'shared') => {
 	if (purpose === 'human')
 		return css`
 			background: color-mix(in oklab, var(--color-primary) 10%, transparent);
@@ -1069,7 +1069,9 @@ const inboxTone = (purpose: 'human' | 'agent' | 'shared') => {
 	`
 }
 
-const InboxBadge = styled.span.withConfig({ displayName: 'ThreadInboxBadge' })<{
+const MailboxBadge = styled.span.withConfig({
+	displayName: 'ThreadMailboxBadge',
+})<{
 	readonly $purpose: 'human' | 'agent' | 'shared'
 }>`
 	display: inline-flex;
@@ -1078,7 +1080,7 @@ const InboxBadge = styled.span.withConfig({ displayName: 'ThreadInboxBadge' })<{
 	border-radius: var(--shape-2xs);
 	font-family: var(--font-mono, ui-monospace, monospace);
 	font-size: var(--typescale-label-small-size);
-	${({ $purpose }) => inboxTone($purpose)}
+	${({ $purpose }) => mailboxTone($purpose)}
 `
 
 const SideRail = styled.aside.withConfig({ displayName: 'ThreadSideRail' })`

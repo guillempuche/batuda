@@ -9,8 +9,8 @@ import type { ParsedMail } from 'mailparser'
 //   3. message/rfc822 (or text/rfc822-headers) — the original message
 // We only ever read part (2) for status codes and part (3) for the
 // original RFC Message-ID. Part (1) is ignored on the parse side; the
-// DSN itself is still persisted as a normal email_messages row so it
-// surfaces in the inbox list.
+// DSN itself is still persisted as a normal messages row so it
+// surfaces in the mailbox list.
 
 export interface ParsedBounce {
 	readonly originalMessageId: string | null
@@ -137,9 +137,9 @@ export const parseBounce = (mail: ParsedMail): ParsedBounce | null => {
 // message to status='bounced', mark the contact rows that bounced, and
 // emit an `email_bounced` row on the timeline. The DSN itself is still
 // persisted by the regular inbound path so users see "Mail Delivery
-// Subsystem" as a normal entry in the inbox list.
+// Subsystem" as a normal entry in the mailbox list.
 //
-// Org isolation: the email_messages match is org-scoped, and the channel
+// Org isolation: the messages match is org-scoped, and the channel
 // update narrows to this org explicitly (contact_channels carries
 // organization_id); timeline_activity has no org column, gated transitively
 // by the contacts it references. Only recipients of an email *we sent from
@@ -157,7 +157,7 @@ export const applyBounce = (args: {
 		}
 
 		const originals = yield* sql<{ id: string }>`
-			UPDATE email_messages
+			UPDATE messages
 			SET status = 'bounced',
 			    bounce_type = ${bounce.bounceType === 'unknown' ? null : bounce.bounceType},
 			    bounce_sub_type = ${bounce.statusCode},
@@ -186,9 +186,9 @@ export const applyBounce = (args: {
 			    END
 			FROM contacts c
 			WHERE ch.contact_id = c.id
-			  AND ch.kind = 'email'
+			  AND ch.channel = 'email'
 			  AND ch.organization_id = ${organizationId}
-			  AND lower(ch.value) = ANY(${recipients})
+			  AND lower(ch.address) = ANY(${recipients})
 			RETURNING c.id, c.company_id
 		`
 
@@ -201,9 +201,9 @@ export const applyBounce = (args: {
 				UPDATE contact_channels
 				SET status = 'bounced',
 				    status_updated_at = now()
-				WHERE kind = 'email'
+				WHERE channel = 'email'
 				  AND organization_id = ${organizationId}
-				  AND lower(value) = ANY(${recipients})
+				  AND lower(address) = ANY(${recipients})
 				  AND soft_bounce_count >= 3
 				  AND status_updated_at >= now() - interval '7 days'
 			`

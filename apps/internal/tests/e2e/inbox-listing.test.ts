@@ -4,16 +4,16 @@ import { expect, test } from '@playwright/test'
 
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
-// Inbox-listing path. The seed leaves Alice with two inboxes on Taller
+// Mailbox-listing path. The seed leaves Alice with two mailboxes on Taller
 // — admin@taller.cat (human, default) and agent@taller.cat (agent) —
-// so the inbox-filter dropdown is meaningfully exercised. Threads on
-// the agent inbox (M4) must filter out when the human inbox is
+// so the mailbox-filter dropdown is meaningfully exercised. Threads on
+// the agent mailbox (M4) must filter out when the human mailbox is
 // selected, and vice versa.
 //
 // Selectors verified against:
 //   apps/internal/src/routes/emails/index.tsx
-//     (thread-row-{id}, inbox-filter-trigger, inbox-filter-option,
-//      data-inbox-email)
+//     (thread-row-{id}, mailbox-filter-trigger, mailbox-filter-option,
+//      data-mailbox-email)
 
 const DATABASE_URL =
 	process.env['E2E_DATABASE_URL'] ??
@@ -25,7 +25,7 @@ const psql = (sqlText: string): string =>
 		encoding: 'utf8',
 	}).trim()
 
-test.describe('emails inbox listing', () => {
+test.describe('emails mailbox listing', () => {
 	test.beforeEach(async ({ page }) => {
 		// GIVEN Alice's session is active and pointed at Taller.
 		await page.goto('/', { waitUntil: 'commit' })
@@ -37,12 +37,12 @@ test.describe('emails inbox listing', () => {
 			page,
 		}) => {
 			// GIVEN the seed produces 4 inbound threads on Taller (M1+M2
-			// share, M3 single, M4 single on agent inbox, M8 single).
+			// share, M3 single, M4 single on agent mailbox, M8 single).
 			// Resolve the count from the DB so the assertion stays in
 			// sync if the seed shape changes.
 			const expected = Number(
 				psql(
-					`SELECT count(*) FROM email_thread_links l
+					`SELECT count(*) FROM conversations l
 					 JOIN organization o ON o.id = l.organization_id
 					 WHERE o.slug = 'taller'`,
 				),
@@ -58,31 +58,33 @@ test.describe('emails inbox listing', () => {
 		})
 	})
 
-	test.describe('when the user filters by the agent inbox', () => {
-		test('should hide threads that live on the human inbox', async ({
+	test.describe('when the user filters by the agent mailbox', () => {
+		test('should hide threads that live on the human mailbox', async ({
 			page,
 		}) => {
 			await page.goto('/emails', { waitUntil: 'networkidle' })
 
-			// WHEN Alice opens the inbox-filter dropdown and picks the agent
-			await page.getByTestId('inbox-filter-trigger').click()
+			// WHEN Alice opens the mailbox-filter dropdown and picks the agent
+			await page.getByTestId('mailbox-filter-trigger').click()
 			await page
 				.locator(
-					'[data-testid="inbox-filter-option"][data-inbox-email="agent@taller.cat"]',
+					'[data-testid="mailbox-filter-option"][data-mailbox-email="agent@taller.cat"]',
 				)
 				.click()
 
 			// THEN only threads on agent@taller.cat remain. The seed puts
-			// M4 ("Visit photos attached") on the agent inbox; the human
+			// M4 ("Visit photos attached") on the agent mailbox; the human
 			// threads (M1/M2/M3/M8) must drop off the list.
 			const expectedAgent = Number(
 				psql(
-					`SELECT count(*) FROM email_thread_links l
-					 JOIN inboxes i ON i.id = l.inbox_id
-					 WHERE i.email = 'agent@taller.cat'`,
+					`SELECT count(*) FROM conversations l
+					 JOIN channel_connections i ON i.id = l.connection_id
+					 WHERE i.external_id = 'agent@taller.cat'`,
 				),
 			)
-			expect(expectedAgent, 'agent inbox must have threads').toBeGreaterThan(0)
+			expect(expectedAgent, 'agent mailbox must have threads').toBeGreaterThan(
+				0,
+			)
 			const rows = page.locator('[data-testid^="thread-row-"]')
 			await expect(rows).toHaveCount(expectedAgent)
 		})

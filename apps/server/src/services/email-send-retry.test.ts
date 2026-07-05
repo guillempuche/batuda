@@ -33,7 +33,9 @@ describe('retrySmtpSend', () => {
 
 				// WHEN the retry-wrapped send is forked and the clock advances
 				// through the 1s + 2s back-off windows
-				const fiber = yield* Effect.forkChild(retrySmtpSend(send, 'inbox-test'))
+				const fiber = yield* Effect.forkChild(
+					retrySmtpSend(send, 'mailbox-test'),
+				)
 				yield* TestClock.adjust('1 second')
 				yield* TestClock.adjust('2 seconds')
 
@@ -64,7 +66,7 @@ describe('retrySmtpSend', () => {
 				// WHEN the retry-wrapped send is forked and the clock advances
 				// past every back-off window (1s + 2s + 4s = 7s)
 				const fiber = yield* Effect.forkChild(
-					Effect.exit(retrySmtpSend(send, 'inbox-test')),
+					Effect.exit(retrySmtpSend(send, 'mailbox-test')),
 				)
 				yield* TestClock.adjust('10 seconds')
 
@@ -73,7 +75,7 @@ describe('retrySmtpSend', () => {
 				expect(Exit.isFailure(exit)).toBe(true)
 				const failure = Exit.isFailure(exit) ? extractFailure(exit.cause) : null
 				expect(failure?._tag).toBe('SmtpSendFailed')
-				expect((failure as SmtpSendFailed).inboxId).toBe('inbox-test')
+				expect((failure as SmtpSendFailed).mailboxId).toBe('mailbox-test')
 
 				// AND the underlying send was called 4 times (1 initial + 3 retries)
 				expect(yield* Ref.get(calls)).toBe(4)
@@ -96,7 +98,7 @@ describe('retrySmtpSend', () => {
 				})
 
 				// WHEN the retry-wrapped send runs without any clock advance
-				const result = yield* retrySmtpSend(send, 'inbox-test')
+				const result = yield* retrySmtpSend(send, 'mailbox-test')
 
 				// THEN it resolves immediately with the happy-path messageId
 				expect(result.messageId).toBe('happy-path')

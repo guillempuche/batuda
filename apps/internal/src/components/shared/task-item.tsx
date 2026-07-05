@@ -27,7 +27,7 @@ import { RelativeDate } from './relative-date'
  * the title struck through.
  *
  * Dashboard callers only pass the required read-only fields; the tasks
- * inbox additionally wires `priority`, `source`, and the `onEdit*`
+ * mailbox additionally wires `priority`, `source`, and the `onEdit*`
  * callbacks to light up inline edit + badge chrome.
  */
 export type TaskPriorityLabel = 'low' | 'normal' | 'high'

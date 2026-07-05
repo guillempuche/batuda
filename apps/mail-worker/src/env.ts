@@ -18,7 +18,7 @@ export class WorkerEnvVars extends ServiceMap.Service<WorkerEnvVars>()(
 			)
 
 			// Same R2/MinIO bucket the server writes drafts/attachments to —
-			// raw RFC822 lives under `messages/<org>/<inbox>/<uidvalidity>/<uid>.eml`.
+			// raw RFC822 lives under `messages/<org>/<mailbox>/<uidvalidity>/<uid>.eml`.
 			const STORAGE_ENDPOINT = yield* Config.string('STORAGE_ENDPOINT')
 			const STORAGE_REGION = yield* Config.string('STORAGE_REGION')
 			const STORAGE_ACCESS_KEY_ID = yield* Config.string(
@@ -30,7 +30,7 @@ export class WorkerEnvVars extends ServiceMap.Service<WorkerEnvVars>()(
 			const STORAGE_BUCKET = yield* Config.string('STORAGE_BUCKET')
 
 			// Same master key as the server — credential rows are encrypted at
-			// write time by the server (createInbox/updateInbox) and decrypted
+			// write time by the server (createMailbox/updateMailbox) and decrypted
 			// here at session-establishment time. A mismatch fails decryption.
 			const EMAIL_CREDENTIAL_KEY = yield* Config.redacted(
 				'EMAIL_CREDENTIAL_KEY',
@@ -43,7 +43,7 @@ export class WorkerEnvVars extends ServiceMap.Service<WorkerEnvVars>()(
 				'EMAIL_WORKER_MAX_CONNECTIONS',
 			).pipe(Config.withDefault(50))
 
-			// Initial fetch horizon when an inbox is first connected. 30 days
+			// Initial fetch horizon when an mailbox is first connected. 30 days
 			// is enough for "yesterday's thread" while keeping the first sync
 			// bounded; UI users can request a deeper backfill via a manual op.
 			const EMAIL_WORKER_BACKFILL_DAYS = yield* Config.int(

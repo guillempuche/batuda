@@ -11,7 +11,7 @@ import { SqlClient } from 'effect/unstable/sql'
 //  3. Else this is a thread root → its `external_thread_id` is its
 //     own `messageId`.
 //
-// The unique index on `email_thread_links(organization_id,
+// The unique index on `conversations(organization_id,
 // external_thread_id)` keeps the upsert race-free across worker
 // replicas.
 export const resolveThreadId = (args: {
@@ -26,8 +26,8 @@ export const resolveThreadId = (args: {
 		if (args.inReplyTo) {
 			const rows = yield* sql<{ externalThreadId: string }>`
 				SELECT external_thread_id AS "externalThreadId"
-				FROM email_messages em
-				JOIN email_thread_links etl
+				FROM messages em
+				JOIN conversations etl
 				  ON etl.organization_id = em.organization_id
 				 AND (
 				   etl.external_thread_id = em.message_id
@@ -47,8 +47,8 @@ export const resolveThreadId = (args: {
 		for (const ref of refs) {
 			const rows = yield* sql<{ externalThreadId: string }>`
 				SELECT external_thread_id AS "externalThreadId"
-				FROM email_messages em
-				JOIN email_thread_links etl
+				FROM messages em
+				JOIN conversations etl
 				  ON etl.organization_id = em.organization_id
 				 AND (
 				   etl.external_thread_id = em.message_id

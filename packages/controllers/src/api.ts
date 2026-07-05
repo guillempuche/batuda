@@ -8,6 +8,7 @@ import { CompaniesGroup } from './routes/companies'
 import { ContactsGroup } from './routes/contacts'
 import { DocumentsGroup } from './routes/documents'
 import { EmailGroup } from './routes/email'
+import { EmailOauthCallbackGroup } from './routes/email-oauth'
 import { HealthGroup } from './routes/health'
 import { InstructionsGroup } from './routes/instructions'
 import { InteractionsGroup } from './routes/interactions'
@@ -44,6 +45,7 @@ export const BatudaApi = HttpApi.make('BatudaApi')
 	.add(PagesGroup)
 	.add(WebhooksGroup)
 	.add(EmailGroup)
+	.add(EmailOauthCallbackGroup)
 	.add(RecordingsGroup)
 	.add(ResearchGroup)
 	.add(InstructionsGroup)

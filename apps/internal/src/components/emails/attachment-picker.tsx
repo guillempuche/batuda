@@ -23,21 +23,21 @@ type PendingUpload = {
  * objects up to the parent via `onChange`. In-flight uploads live in
  * local state with abort controllers so the user can cancel mid-flight.
  *
- * `inboxId` is required by the staging endpoint — every attachment is
- * scoped to the inbox that will eventually send it, both for org-scope
+ * `mailboxId` is required by the staging endpoint — every attachment is
+ * scoped to the mailbox that will eventually send it, both for org-scope
  * isolation and for storage-key namespacing.
  */
 export function AttachmentPicker({
 	value,
 	onChange,
 	disabled,
-	inboxId,
+	mailboxId,
 	draftId,
 }: {
 	readonly value: ReadonlyArray<StagedAttachment>
 	readonly onChange: (next: ReadonlyArray<StagedAttachment>) => void
 	readonly disabled?: boolean
-	readonly inboxId: string | null
+	readonly mailboxId: string | null
 	readonly draftId?: string
 }) {
 	const { t } = useLingui()
@@ -47,7 +47,7 @@ export function AttachmentPicker({
 
 	const startUpload = useCallback(
 		(file: File) => {
-			if (inboxId === null) return // No inbox yet; the picker should be disabled.
+			if (mailboxId === null) return // No mailbox yet; the picker should be disabled.
 			const controller = new AbortController()
 			const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 			const entry: PendingUpload = {
@@ -59,7 +59,7 @@ export function AttachmentPicker({
 			setPending(prev => [...prev, entry])
 
 			uploadAttachment(file, {
-				inboxId,
+				mailboxId,
 				...(draftId !== undefined && { draftId }),
 				signal: controller.signal,
 			})
@@ -81,7 +81,7 @@ export function AttachmentPicker({
 					)
 				})
 		},
-		[onChange, value, inboxId, draftId],
+		[onChange, value, mailboxId, draftId],
 	)
 
 	const handleFiles = useCallback(

@@ -6,15 +6,15 @@ import { describe, expect, it } from 'vitest'
 import { decryptWithKey } from './decrypt'
 
 // Round-trip the AES-256-GCM blob the server writes when a user
-// connects an inbox. The encrypt side is duplicated inline (a cross-
+// connects an mailbox. The encrypt side is duplicated inline (a cross-
 // app import would couple the worker test to apps/server's build);
 // that's why the helper below tracks the same HKDF-SHA256 + per-
-// inbox subkey scheme the server uses
+// mailbox subkey scheme the server uses
 // (apps/server/src/services/credential-crypto.ts).
 
-const encryptForInbox = (
+const encryptForMailbox = (
 	masterKey: Buffer,
-	inboxId: string,
+	connectionId: string,
 	plaintext: string,
 ): { ciphertext: Buffer; nonce: Buffer; tag: Buffer } => {
 	const subkey = Buffer.from(
@@ -22,7 +22,7 @@ const encryptForInbox = (
 			'sha256',
 			masterKey,
 			Buffer.alloc(0),
-			Buffer.from(inboxId, 'utf8'),
+			Buffer.from(connectionId, 'utf8'),
 			32,
 		),
 	)
@@ -37,18 +37,18 @@ const encryptForInbox = (
 }
 
 describe('decryptWithKey', () => {
-	describe('when the masterKey, inboxId, ciphertext, nonce and tag match', () => {
+	describe('when the masterKey, connectionId, ciphertext, nonce and tag match', () => {
 		it('should round-trip the original plaintext', () => {
-			// GIVEN a 32-byte master key + a known inbox id + a plaintext
+			// GIVEN a 32-byte master key + a known mailbox id + a plaintext
 			// WHEN we encrypt then decrypt
 			// THEN the recovered string equals the original
 			// [decrypt.ts:31 — decryptWithKey]
 			const masterKey = randomBytes(32)
-			const inboxId = randomUUID()
-			const blob = encryptForInbox(masterKey, inboxId, 'hunter2-secret')
+			const connectionId = randomUUID()
+			const blob = encryptForMailbox(masterKey, connectionId, 'hunter2-secret')
 
 			const recovered = decryptWithKey(masterKey, {
-				inboxId,
+				connectionId,
 				ciphertext: blob.ciphertext,
 				nonce: blob.nonce,
 				tag: blob.tag,
@@ -58,20 +58,20 @@ describe('decryptWithKey', () => {
 		})
 	})
 
-	describe('when the inboxId does not match the encrypting one', () => {
-		it('should throw because the per-inbox subkey diverges', () => {
-			// GIVEN a blob encrypted under inbox A
-			// WHEN we attempt to decrypt with inbox B
+	describe('when the connectionId does not match the encrypting one', () => {
+		it('should throw because the per-mailbox subkey diverges', () => {
+			// GIVEN a blob encrypted under mailbox A
+			// WHEN we attempt to decrypt with mailbox B
 			// THEN the GCM tag mismatch raises
-			// [decrypt.ts:13 — deriveSubkey binds inboxId into HKDF info]
+			// [decrypt.ts:13 — deriveSubkey binds connectionId into HKDF info]
 			const masterKey = randomBytes(32)
-			const inboxA = randomUUID()
-			const inboxB = randomUUID()
-			const blob = encryptForInbox(masterKey, inboxA, 'shared-secret')
+			const mailboxA = randomUUID()
+			const mailboxB = randomUUID()
+			const blob = encryptForMailbox(masterKey, mailboxA, 'shared-secret')
 
 			expect(() =>
 				decryptWithKey(masterKey, {
-					inboxId: inboxB,
+					connectionId: mailboxB,
 					ciphertext: blob.ciphertext,
 					nonce: blob.nonce,
 					tag: blob.tag,
@@ -86,15 +86,15 @@ describe('decryptWithKey', () => {
 			// WHEN one byte of the ciphertext is flipped
 			// THEN GCM final() throws
 			const masterKey = randomBytes(32)
-			const inboxId = randomUUID()
-			const blob = encryptForInbox(masterKey, inboxId, 'tamper-me')
+			const connectionId = randomUUID()
+			const blob = encryptForMailbox(masterKey, connectionId, 'tamper-me')
 
 			const tampered = Buffer.from(blob.ciphertext)
 			tampered[0] = (tampered[0]! ^ 0xff) & 0xff
 
 			expect(() =>
 				decryptWithKey(masterKey, {
-					inboxId,
+					connectionId,
 					ciphertext: tampered,
 					nonce: blob.nonce,
 					tag: blob.tag,

@@ -11,7 +11,7 @@ export class EmailThreadLink extends Model.Class<EmailThreadLink>(
 	id: Model.Generated(EmailThreadLinkId),
 	provider: Schema.String,
 	providerThreadId: Schema.String,
-	providerInboxId: Schema.String,
+	providerMailboxId: Schema.String,
 	companyId: Schema.NullOr(Schema.String),
 	contactId: Schema.NullOr(Schema.String),
 	subject: Schema.NullOr(Schema.String),

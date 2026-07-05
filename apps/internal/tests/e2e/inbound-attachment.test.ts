@@ -5,9 +5,9 @@ import { expect, test } from '@playwright/test'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // Inbound-attachment download path. The seed direct-INSERTs M4
-// ("Visit photos attached") on the agent inbox and uploads the bytes
-// to MinIO at `messages/<org>/<inbox>/seed/<slug>/attachment-0.bin`,
-// with `email_messages.attachments` JSONB pointing at the key. This
+// ("Visit photos attached") on the agent mailbox and uploads the bytes
+// to MinIO at `messages/<org>/<mailbox>/seed/<slug>/attachment-0.bin`,
+// with `messages.attachments` JSONB pointing at the key. This
 // spec opens the resulting thread and exercises the chip click →
 // server hands the bytes back through `StorageProvider.get`. M8
 // ("Vendor quote — final") is the multi-attachment variant.
@@ -37,7 +37,7 @@ test.describe('inbound attachment chips', () => {
 			page,
 		}) => {
 			const threadId = psql(
-				`SELECT id FROM email_thread_links WHERE subject = 'Visit photos attached' LIMIT 1`,
+				`SELECT id FROM conversations WHERE subject = 'Visit photos attached' LIMIT 1`,
 			)
 			expect(threadId, 'seeded M4 thread must exist').not.toBe('')
 
@@ -64,7 +64,7 @@ test.describe('inbound attachment chips', () => {
 			page,
 		}) => {
 			const threadId = psql(
-				`SELECT id FROM email_thread_links WHERE subject = 'Vendor quote — final' LIMIT 1`,
+				`SELECT id FROM conversations WHERE subject = 'Vendor quote — final' LIMIT 1`,
 			)
 			expect(threadId, 'seeded M8 thread must exist').not.toBe('')
 
