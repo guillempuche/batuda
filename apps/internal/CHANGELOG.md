@@ -3,6 +3,35 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-05 (internal-v2026.7.5)
+
+### Features
+
+* apply research proposed-updates to the CRM row ([99de720](https://github.com/guillempuche/batuda/commit/99de7207df952abfbcfa2b71c2b9ad51f75998a6))
+* **instructions:** resolve per-run override by name or id ([7d9ef78](https://github.com/guillempuche/batuda/commit/7d9ef7807b7bf77088c58c39bb246575e0717c45))
+* **internal:** add per-surface selector for instruction default stacks ([d219df0](https://github.com/guillempuche/batuda/commit/d219df00fa05a30e42e9d0949777e1ad18c538d7))
+* **internal:** make the inbox connections screen beginner-friendly ([88bef75](https://github.com/guillempuche/batuda/commit/88bef7522002714d8fe68ba71eeaef81492602e6))
+* reclaim interrupted research runs via a run heartbeat ([0e37736](https://github.com/guillempuche/batuda/commit/0e37736a5d7d6cc0598902430deb48d728c99bfd))
+* research companies in any country, not just Spain and the UK ([de9fdd6](https://github.com/guillempuche/batuda/commit/de9fdd66081354f7e83a4943822739f71c0cc823))
+* **server:** add bounding-box company search and location re-geocode ([259137b](https://github.com/guillempuche/batuda/commit/259137b7ff2b4fd8d1688a72c8ccf91cb08de10c))
+
+### Bug Fixes
+
+* record paid research spend with per-org idempotency key ([56d2695](https://github.com/guillempuche/batuda/commit/56d2695640df791bd96449843b7c04e5201e0619))
+* **research:** accept model-emitted null for optional tool params ([e05a43d](https://github.com/guillempuche/batuda/commit/e05a43d9f842fa2dee176e6c55892d014583443f))
+* **research:** coerce model "NaN" numbers to null in extraction schemas ([4c3d43a](https://github.com/guillempuche/batuda/commit/4c3d43ae0c9fa48d1344006f0da7a4338dd52ca0))
+* **research:** read run-row fields under the camelCase transform ([85d24b1](https://github.com/guillempuche/batuda/commit/85d24b1152b55e79602c0147061340c2fed7f872))
+* **research:** surface the real error instead of a wrapper crash ([4fe8de9](https://github.com/guillempuche/batuda/commit/4fe8de9c31052d89980d13ea7d87399d40c3cf09))
+* **research:** tolerate null service_tier in LLM provider responses ([248aa3c](https://github.com/guillempuche/batuda/commit/248aa3cc18ff674342214a616ccac9af11360973))
+* **research:** tolerate plain text where extraction expects JSON ([eab94e2](https://github.com/guillempuche/batuda/commit/eab94e28cbcb2db357028bb92c62b7b5ccd169e0))
+* **research:** unblock research runs on OpenAI structured output ([1ab6c95](https://github.com/guillempuche/batuda/commit/1ab6c9599e7f36fd882d83be2a0b19ac9db0f1c1))
+* run research jobs from a background queue, not the web request ([c94bc20](https://github.com/guillempuche/batuda/commit/c94bc2093a7ab55c58da5e2f6206ad88e387f17a))
+* stop company enrichment asking the model for coordinates ([a2713e9](https://github.com/guillempuche/batuda/commit/a2713e9ffc333dab9471561df021f936de91cf18))
+
+### Refactoring
+
+* **research:** share duplicated research output schema fragments ([76507a4](https://github.com/guillempuche/batuda/commit/76507a487727d495aab756e2b27de144a2805027))
+
 ## 2026-06-29 (internal-v2026.6.29)
 
 ### Features
