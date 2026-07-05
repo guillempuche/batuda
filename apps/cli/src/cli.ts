@@ -27,7 +27,8 @@ import { doctor } from './commands/doctor'
 import { emailInject } from './commands/email'
 import { seed, seedIdentities } from './commands/seed'
 import { servicesDown, servicesStatus, servicesUp } from './commands/services'
-import { appendEnvKeys, resetEnvFile, setup } from './commands/setup'
+import type { EnvFileResult } from './commands/setup'
+import { setup } from './commands/setup'
 import {
 	worktreeDoctor,
 	worktreeDone,
@@ -37,6 +38,7 @@ import {
 	worktreeUp,
 } from './commands/worktree'
 import { withDb } from './db'
+import { appendEnvKeys, resetEnvFile } from './lib/env-file'
 import { loadEnv } from './lib/load-env'
 import { recoveryHint } from './lib/recovery-hint'
 
@@ -104,15 +106,24 @@ const seedCommand = Command.make(
 
 // ── Setup ──────────────────────────────────────────────────
 
+// The db/bucket names a worktree-managed result actually carries — only the
+// keys that file receives (e.g. `apps/cli/.env` never gets a bucket).
+const worktreeIdentity = (result: EnvFileResult): string =>
+	[result.worktree?.db, result.worktree?.bucket].filter(Boolean).join(' / ')
+
 const setupCommand = Command.make(
 	'setup',
 	{
 		update: Flag.boolean('update').pipe(
-			Flag.withDescription('Append missing .env keys from .env.example'),
+			Flag.withDescription(
+				'Append missing .env keys from .env.example (no effect on the worktree-managed .env/apps/cli/.env)',
+			),
 			Flag.withDefault(false),
 		),
 		reset: Flag.boolean('reset').pipe(
-			Flag.withDescription('Replace .env files entirely from .env.example'),
+			Flag.withDescription(
+				'Replace .env files entirely from .env.example (no effect on the worktree-managed .env/apps/cli/.env)',
+			),
 			Flag.withDefault(false),
 		),
 	},
@@ -121,6 +132,26 @@ const setupCommand = Command.make(
 			yield* Effect.logInfo('Setting up project...')
 			const results = yield* setup
 			for (const result of results) {
+				// Per-worktree overrides: never templated, never reset from the
+				// example — `--update`/`--reset` don't apply to these two files.
+				if (result.status === 'worktree-synced') {
+					yield* Console.log(
+						`  ${result.target} → ${worktreeIdentity(result)} (this worktree)`,
+					)
+					continue
+				}
+				if (result.status === 'worktree-unprovisioned') {
+					yield* Console.log(
+						`  ${result.target}: ${worktreeIdentity(result)} not provisioned yet → run \`pnpm cli worktree up\``,
+					)
+					continue
+				}
+				if (result.status === 'worktree-error') {
+					yield* Console.log(
+						`  ${result.target}: couldn't sync from this worktree's data — ${result.error}`,
+					)
+					continue
+				}
 				if (result.status === 'skipped') {
 					yield* Console.log(`  skip ${result.target} (no ${result.example})`)
 					continue
@@ -162,7 +193,13 @@ const setupCommand = Command.make(
 		}),
 ).pipe(
 	Command.withShortDescription('Copy .env templates into place'),
-	Command.withDescription('Set up local environment (copy .env files)'),
+	Command.withDescription(
+		'Set up local environment (copy .env files). Inside a linked worktree, ' +
+			'`.env` and `apps/cli/.env` are instead repaired from that worktree’s ' +
+			'own database/bucket if already provisioned, or left alone with a hint ' +
+			'to run `pnpm cli worktree up` — this command never creates a database ' +
+			'or bucket.',
+	),
 )
 
 // ── Doctor ─────────────────────────────────────────────────
