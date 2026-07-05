@@ -8,7 +8,7 @@ import { Schema } from 'effect'
  * dialog that opens on its own, or `{ kind, id }` for one that targets a row.
  * TanStack already turns the nested search object back into JS before
  * `validateSearch` runs, so each route validates `dlg` as a plain
- * `Schema.Union` of these structs (see `routes/emails/inboxes.tsx`).
+ * `Schema.Union` of these structs (see `routes/emails/mailboxes.tsx`).
  *
  * Because each route lists only the kinds it owns, a `?dlg=` value a route
  * doesn't recognise fails to decode and the dialog simply stays closed — a

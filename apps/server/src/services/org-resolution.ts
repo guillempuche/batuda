@@ -7,7 +7,7 @@ import type { CalcomWebhookPayload } from './calendar'
  * Two-tier org lookup for inbound cal.com webhooks.
  *
  *   1. iCalUID against an existing cal.com calendar_event row
- *   2. organizer.email against an active inboxes row
+ *   2. organizer.email against an active mailboxes row
  *   3. otherwise fail with `UnknownOrg`
  *
  * Runs as `app_service` (BYPASSRLS) inside its own transaction — the
@@ -58,22 +58,22 @@ export class OrgResolution extends ServiceMap.Service<OrgResolution>()(
 							if (hit) return hit
 						}
 
-						// Tier 2: organizer email against an active inbox row.
-						// No global UNIQUE on inboxes.email — multiple orgs CAN
-						// share an email (a person owning inboxes in two orgs).
+						// Tier 2: organizer email against an active mailbox row.
+						// No global UNIQUE on mailboxes.email — multiple orgs CAN
+						// share an email (a person owning mailboxes in two orgs).
 						// `ORDER BY created_at ASC LIMIT 1` favours the longest-
-						// standing inbox for deterministic ambiguity resolution.
+						// standing mailbox for deterministic ambiguity resolution.
 						if (organizerEmail !== undefined && organizerEmail.length > 0) {
-							const inboxRows = yield* sql<OrgScope>`
+							const mailboxRows = yield* sql<OrgScope>`
 								SELECT o.id, o.name, o.slug
-								FROM inboxes i
+								FROM channel_connections i
 								JOIN "organization" o ON o.id = i.organization_id
-								WHERE lower(i.email) = lower(${organizerEmail})
+								WHERE lower(i.external_id) = lower(${organizerEmail})
 									AND i.active = true
 								ORDER BY i.created_at ASC
 								LIMIT 1
 							`
-							const hit = inboxRows[0]
+							const hit = mailboxRows[0]
 							if (hit) return hit
 						}
 

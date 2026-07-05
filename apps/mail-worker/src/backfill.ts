@@ -3,19 +3,19 @@ import type { ImapFlow } from 'imapflow'
 
 import { ingestRawMessage } from './ingest.js'
 
-// Initial backfill — runs once per (folder, inbox) when folder_state is
+// Initial backfill — runs once per (folder, mailbox) when sync_state is
 // missing or its uidvalidity no longer matches the server's. Strategy:
 // IMAP `SEARCH SINCE <date>` returns UIDs of every message dated within
 // the window, then we ingest each. The window is bounded by the env
-// var EMAIL_WORKER_BACKFILL_DAYS so a brand-new inbox doesn't yank
+// var EMAIL_WORKER_BACKFILL_DAYS so a brand-new mailbox doesn't yank
 // years of mail on first connect.
 //
 // Returns the highest UID observed (or 0 if the search returned
-// nothing) so the caller can persist folder_state.lastUid afterwards.
+// nothing) so the caller can persist sync_state.lastUid afterwards.
 export const backfillSinceDate = (args: {
 	readonly client: ImapFlow
 	readonly organizationId: string
-	readonly inboxId: string
+	readonly mailboxId: string
 	readonly folder: string
 	readonly uidvalidity: number
 	readonly sinceDate: Date
@@ -49,7 +49,7 @@ export const backfillSinceDate = (args: {
 		for (const m of messages) {
 			yield* ingestRawMessage({
 				organizationId: args.organizationId,
-				inboxId: args.inboxId,
+				mailboxId: args.mailboxId,
 				folder: args.folder,
 				imapUid: m.uid,
 				imapUidvalidity: args.uidvalidity,
@@ -57,7 +57,7 @@ export const backfillSinceDate = (args: {
 			}).pipe(
 				Effect.catchCause(cause =>
 					Effect.logWarning(
-						`mail-worker: backfill ingest failed inbox=${args.inboxId} uid=${m.uid}`,
+						`mail-worker: backfill ingest failed mailbox=${args.mailboxId} uid=${m.uid}`,
 					).pipe(Effect.andThen(Effect.logError(cause))),
 				),
 			)

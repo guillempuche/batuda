@@ -38,10 +38,10 @@ const editorOf = (page: import('@playwright/test').Page) =>
 
 test.describe('compose with rich formatting', () => {
 	test.beforeEach(async ({ page }) => {
-		// GIVEN the catcher is empty and the seeded inbox is reachable.
+		// GIVEN the catcher is empty and the seeded mailbox is reachable.
 		await clearCatcher()
 		psql(
-			`UPDATE inboxes SET grant_status='connected' WHERE email='admin@taller.cat'`,
+			`UPDATE channel_connections SET grant_status='connected' WHERE external_id='admin@taller.cat'`,
 		)
 		await page.goto('/', { waitUntil: 'commit' })
 		await setActiveOrgBySlug(page, 'taller')

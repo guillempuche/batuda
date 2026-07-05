@@ -166,17 +166,17 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 					// orgs; `session.activeOrganizationId` drives which org a request
 					// reads/writes. Tables that own org-scoped data carry an
 					// `organization_id` column populated from `CurrentOrg`.
-					// `member.primary_inbox_id` is the member's default From identity
+					// `member.primary_mailbox_id` is the member's default From identity
 					// in this org; the column + FK + ON DELETE SET NULL are added by
 					// the migration since `additionalFields` does not generate FKs.
 					organization({
 						schema: {
 							member: {
 								additionalFields: {
-									primaryInboxId: {
+									primaryMailboxId: {
 										type: 'string' as const,
 										required: false,
-										fieldName: 'primary_inbox_id' as const,
+										fieldName: 'primary_connection_id' as const,
 									},
 								},
 							},

@@ -7,10 +7,10 @@
 //
 // What it does: SMTP-inject a message → connect ImapFlow as the seeded
 // admin@taller.cat → open INBOX → call `fetchAndIngestNewerThan` against the
-// same SqlClient layer the worker uses → assert that an `email_messages` row
+// same SqlClient layer the worker uses → assert that a `messages` row
 // with the test subject lands. The IMAP + SMTP connections are real wire
 // interactions; the only thing we mock is the `Effect.never` outer loop in
-// `runInboxSession` so the test terminates.
+// `runMailboxSession` so the test terminates.
 
 process.env['DATABASE_URL'] ??=
 	'postgresql://batuda:batuda@localhost:5433/batuda'
@@ -22,7 +22,7 @@ import nodemailer from 'nodemailer'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { ParticipantMatcher } from '@batuda/email/participant-matcher'
+import { ParticipantMatcher } from '@batuda/communications'
 
 import { fetchAndIngestNewerThan, markExpunged } from './folder-sync'
 import { RawMessageStorage } from './storage'
@@ -101,7 +101,7 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 	() => {
 		let pool: pg.Pool
 		let orgId: string
-		let inboxId: string
+		let mailboxId: string
 
 		beforeAll(async () => {
 			pool = new pg.Pool({ connectionString: DATABASE_URL, max: 4 })
@@ -116,16 +116,16 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 			}
 			orgId = oid
 
-			const inboxes = await pool.query<{ id: string }>(
-				`SELECT id FROM inboxes WHERE email = 'admin@taller.cat' LIMIT 1`,
+			const connections = await pool.query<{ id: string }>(
+				`SELECT id FROM channel_connections WHERE external_id = 'admin@taller.cat' LIMIT 1`,
 			)
-			const iid = inboxes.rows[0]?.id
+			const iid = connections.rows[0]?.id
 			if (!iid) {
 				throw new Error(
-					"admin@taller.cat inbox missing — run 'pnpm cli db reset && pnpm cli seed' first",
+					"admin@taller.cat mailbox missing — run 'pnpm cli db reset && pnpm cli seed' first",
 				)
 			}
-			inboxId = iid
+			mailboxId = iid
 		})
 
 		afterAll(async () => {
@@ -145,17 +145,17 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 		}
 
 		describe('when an SMTP-injected message arrives and the worker runs one fetch tick', () => {
-			it('should INSERT an inbound email_messages row keyed by the IMAP UID', async () => {
+			it('should INSERT an inbound messages row keyed by the IMAP UID', async () => {
 				const subject = `roundtrip ${Date.now()}`
 
 				// Clean the catcher so the only fetched UID is ours.
 				await clearCatcher()
 				await pool.query(
-					`DELETE FROM email_messages WHERE subject = $1 AND organization_id = $2`,
+					`DELETE FROM messages WHERE subject = $1 AND organization_id = $2`,
 					[subject, orgId],
 				)
 
-				// GIVEN an SMTP-injected message addressed to the seeded inbox
+				// GIVEN an SMTP-injected message addressed to the seeded mailbox
 				await smtpInject({
 					to: 'admin@taller.cat',
 					from: 'roundtrip-sender@example.com',
@@ -174,7 +174,7 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 						fetchAndIngestNewerThan({
 							client,
 							organizationId: orgId,
-							inboxId,
+							mailboxId,
 							folder: 'INBOX',
 							uidvalidity,
 							sinceUid: 0,
@@ -186,7 +186,7 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 						),
 					)
 
-					// THEN an inbound email_messages row exists with our subject
+					// THEN an inbound messages row exists with our subject
 					const rows = await pool.query<{
 						id: string
 						direction: string
@@ -194,7 +194,7 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 						imap_uidvalidity: number
 					}>(
 						`SELECT id, direction, imap_uid, imap_uidvalidity
-					 FROM email_messages
+					 FROM messages
 					 WHERE subject = $1 AND organization_id = $2`,
 						[subject, orgId],
 					)
@@ -213,7 +213,7 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 				const subject = `dedupe ${Date.now()}`
 				await clearCatcher()
 				await pool.query(
-					`DELETE FROM email_messages WHERE subject = $1 AND organization_id = $2`,
+					`DELETE FROM messages WHERE subject = $1 AND organization_id = $2`,
 					[subject, orgId],
 				)
 				await smtpInject({
@@ -233,7 +233,7 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 						fetchAndIngestNewerThan({
 							client,
 							organizationId: orgId,
-							inboxId,
+							mailboxId,
 							folder: 'INBOX',
 							uidvalidity,
 							sinceUid: 0,
@@ -250,7 +250,7 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 						fetchAndIngestNewerThan({
 							client,
 							organizationId: orgId,
-							inboxId,
+							mailboxId,
 							folder: 'INBOX',
 							uidvalidity,
 							sinceUid: 0,
@@ -264,7 +264,7 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 
 					const rows = await pool.query<{ count: string }>(
 						`SELECT count(*)::text AS count
-					 FROM email_messages
+					 FROM messages
 					 WHERE subject = $1 AND organization_id = $2`,
 						[subject, orgId],
 					)
@@ -280,7 +280,7 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 				const subject = `expunge ${Date.now()}`
 				await clearCatcher()
 				await pool.query(
-					`DELETE FROM email_messages WHERE subject = $1 AND organization_id = $2`,
+					`DELETE FROM messages WHERE subject = $1 AND organization_id = $2`,
 					[subject, orgId],
 				)
 				await smtpInject({
@@ -300,7 +300,7 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 						fetchAndIngestNewerThan({
 							client,
 							organizationId: orgId,
-							inboxId,
+							mailboxId,
 							folder: 'INBOX',
 							uidvalidity,
 							sinceUid: 0,
@@ -314,7 +314,7 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 
 					// Resolve the UID we just ingested.
 					const inserted = await pool.query<{ imap_uid: number }>(
-						`SELECT imap_uid FROM email_messages
+						`SELECT imap_uid FROM messages
 					 WHERE subject = $1 AND organization_id = $2`,
 						[subject, orgId],
 					)
@@ -324,7 +324,7 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 					// WHEN markExpunged fires for that UID
 					await runWith(
 						markExpunged({
-							inboxId,
+							mailboxId,
 							imapUidvalidity: uidvalidity,
 							imapUid: uid!,
 						}).pipe(Effect.provide(PgLive)),
@@ -332,7 +332,7 @@ describe.skipIf(!process.env['MAIL_CATCHER_LIVE'])(
 
 					// THEN the row's deleted_at is non-NULL
 					const after = await pool.query<{ deleted_at: Date | null }>(
-						`SELECT deleted_at FROM email_messages
+						`SELECT deleted_at FROM messages
 					 WHERE subject = $1 AND organization_id = $2`,
 						[subject, orgId],
 					)

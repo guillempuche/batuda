@@ -56,37 +56,37 @@ export class EmailError extends Schema.TaggedErrorClass<EmailError>()(
 	{ message: Schema.String },
 ) {}
 
-// ── Inbox lifecycle errors (route-level, status-mapped) ──
+// ── Mailbox lifecycle errors (route-level, status-mapped) ──
 
-/** No default inbox configured for the calling member. Returned as 409. */
-export class NoDefaultInbox extends Schema.TaggedErrorClass<NoDefaultInbox>()(
-	'NoDefaultInbox',
+/** No default mailbox configured for the calling member. Returned as 409. */
+export class NoDefaultMailbox extends Schema.TaggedErrorClass<NoDefaultMailbox>()(
+	'NoDefaultMailbox',
 	{ message: Schema.String },
 ) {}
 
-/** Inbox row exists but is `active=false`. Returned as 409. */
-export class InboxInactive extends Schema.TaggedErrorClass<InboxInactive>()(
-	'InboxInactive',
-	{ inboxId: Schema.String },
+/** Mailbox row exists but is `active=false`. Returned as 409. */
+export class MailboxInactive extends Schema.TaggedErrorClass<MailboxInactive>()(
+	'MailboxInactive',
+	{ mailboxId: Schema.String },
 ) {}
 
 /** IMAP/SMTP probe rejected the credentials. Returned as 409. */
 export class GrantAuthFailed extends Schema.TaggedErrorClass<GrantAuthFailed>()(
 	'GrantAuthFailed',
-	{ inboxId: Schema.String, detail: Schema.NullOr(Schema.String) },
+	{ mailboxId: Schema.String, detail: Schema.NullOr(Schema.String) },
 ) {}
 
 /** IMAP/SMTP probe could not reach the server. Returned as 409. */
 export class GrantConnectFailed extends Schema.TaggedErrorClass<GrantConnectFailed>()(
 	'GrantConnectFailed',
-	{ inboxId: Schema.String, detail: Schema.NullOr(Schema.String) },
+	{ mailboxId: Schema.String, detail: Schema.NullOr(Schema.String) },
 ) {}
 
-/** Inbox grant is in a non-`connected` state. Returned as 409. */
+/** Mailbox grant is in a non-`connected` state. Returned as 409. */
 export class GrantUnavailable extends Schema.TaggedErrorClass<GrantUnavailable>()(
 	'GrantUnavailable',
 	{
-		inboxId: Schema.String,
+		mailboxId: Schema.String,
 		grantStatus: Schema.Literals(['auth_failed', 'connect_failed', 'disabled']),
 	},
 ) {}

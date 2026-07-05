@@ -2,18 +2,18 @@ import { readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 
 /**
- * Resolves the dev-inbox dir against the e2e runner's CWD. The local
+ * Resolves the dev-mailbox dir against the e2e runner's CWD. The local
  * transactional provider writes here whenever the server dispatches
  * email under the LOCAL provider. Tests poll this directory to capture
  * the URL embedded in the .md body.
  */
-const INBOX_DIR = join(process.cwd(), '..', 'server', '.dev-inbox')
+const INBOX_DIR = join(process.cwd(), '..', 'server', '.dev-mailbox')
 
 /**
  * Labels the local provider stamps on each .md. Filtering by label
- * avoids collisions when several tests share the inbox in sequence.
+ * avoids collisions when several tests share the mailbox in sequence.
  */
-export type DevInboxLabel = 'invitation' | 'magic-link' | 'password-reset'
+export type DevMailboxLabel = 'invitation' | 'magic-link' | 'password-reset'
 
 export interface FoundEmail {
 	readonly file: string
@@ -23,7 +23,7 @@ export interface FoundEmail {
 
 interface FindLatestOptions {
 	readonly recipient: string
-	readonly label: DevInboxLabel
+	readonly label: DevMailboxLabel
 	/**
 	 * Only consider files whose mtime is at or after this epoch
 	 * (typically `Date.now()` captured at test start). Filters out
@@ -39,7 +39,7 @@ interface FindLatestOptions {
 }
 
 /**
- * Polls the dev-inbox directory for the newest `.md` matching all three
+ * Polls the dev-mailbox directory for the newest `.md` matching all three
  * filters (recipient slug + label + mtime), and pulls out the first
  * URL pointing at an auth-related endpoint we care about.
  */

@@ -382,7 +382,7 @@ export const RICH_CONTACTS_HOSTAL = [
 		phone: '+34 974 551 235',
 		is_decision_maker: false,
 		notes:
-			'Daughter of Arnau. Handles 90% of inbound emails. Asked us to copy her on every reply to keep the inbox sane.',
+			'Daughter of Arnau. Handles 90% of inbound emails. Asked us to copy her on every reply to keep the mailbox sane.',
 		citations: [{ source_id: 'src_firecrawl_003', confidence: 0.78 }],
 	},
 	{

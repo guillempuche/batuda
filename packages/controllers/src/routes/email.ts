@@ -13,8 +13,8 @@ import {
 	GrantAuthFailed,
 	GrantConnectFailed,
 	GrantUnavailable,
-	InboxInactive,
-	NoDefaultInbox,
+	MailboxInactive,
+	NoDefaultMailbox,
 	NotFound,
 } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
@@ -23,7 +23,7 @@ import { SessionMiddleware } from '../middleware/session'
 const Recipients = Schema.Union([Schema.String, Schema.Array(Schema.String)])
 
 const ThreadStatus = Schema.Literals(['open', 'closed', 'archived'])
-const InboxPurpose = Schema.Literals(['human', 'agent', 'shared'])
+const MailboxPurpose = Schema.Literals(['human', 'agent', 'shared'])
 
 // Outbound attachment reference. The client uploads bytes via the
 // staging endpoint first, then the send payload just names stagingIds.
@@ -36,11 +36,11 @@ const SendAttachmentRef = Schema.Struct({
 	cid: Schema.optional(Schema.String),
 })
 
-// Inbox-lifecycle errors share a common 409 envelope on send/reply paths so
-// the client gets a consistent shape when an inbox can't actually transmit.
-const InboxOpFailures = [
-	NoDefaultInbox.pipe(HttpApiSchema.status(409)),
-	InboxInactive.pipe(HttpApiSchema.status(409)),
+// Mailbox-lifecycle errors share a common 409 envelope on send/reply paths so
+// the client gets a consistent shape when an mailbox can't actually transmit.
+const MailboxOpFailures = [
+	NoDefaultMailbox.pipe(HttpApiSchema.status(409)),
+	MailboxInactive.pipe(HttpApiSchema.status(409)),
 	GrantAuthFailed.pipe(HttpApiSchema.status(409)),
 	GrantConnectFailed.pipe(HttpApiSchema.status(409)),
 	GrantUnavailable.pipe(HttpApiSchema.status(409)),
@@ -51,8 +51,8 @@ export const EmailGroup = HttpApiGroup.make('email')
 		HttpApiEndpoint.post('send', '/email/send', {
 			payload: Schema.Struct({
 				// Optional — server falls back to the calling member's primary
-				// human inbox when omitted (NoDefaultInbox if none is set).
-				inboxId: Schema.optional(Schema.String),
+				// human mailbox when omitted (NoDefaultMailbox if none is set).
+				mailboxId: Schema.optional(Schema.String),
 				to: Recipients,
 				cc: Schema.optional(Schema.Array(Schema.String)),
 				bcc: Schema.optional(Schema.Array(Schema.String)),
@@ -72,7 +72,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 			error: Schema.Union([
 				EmailSuppressed.pipe(HttpApiSchema.status(409)),
 				BadRequest.pipe(HttpApiSchema.status(400)),
-				...InboxOpFailures,
+				...MailboxOpFailures,
 			]),
 		}),
 	)
@@ -95,17 +95,17 @@ export const EmailGroup = HttpApiGroup.make('email')
 				EmailSuppressed.pipe(HttpApiSchema.status(409)),
 				BadRequest.pipe(HttpApiSchema.status(400)),
 				NotFound.pipe(HttpApiSchema.status(404)),
-				...InboxOpFailures,
+				...MailboxOpFailures,
 			]),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.get('listThreads', '/email/threads', {
 			query: {
-				inboxId: Schema.optional(Schema.String),
+				mailboxId: Schema.optional(Schema.String),
 				companyId: Schema.optional(Schema.String),
 				status: Schema.optional(ThreadStatus),
-				purpose: Schema.optional(InboxPurpose),
+				purpose: Schema.optional(MailboxPurpose),
 				query: Schema.optional(Schema.String),
 				limit: Schema.optional(Schema.NumberFromString),
 				offset: Schema.optional(Schema.NumberFromString),
@@ -169,9 +169,9 @@ export const EmailGroup = HttpApiGroup.make('email')
 		}),
 	)
 	.add(
-		HttpApiEndpoint.get('listInboxes', '/email/inboxes', {
+		HttpApiEndpoint.get('listMailboxes', '/email/mailboxes', {
 			query: {
-				purpose: Schema.optional(InboxPurpose),
+				purpose: Schema.optional(MailboxPurpose),
 				active: Schema.optional(Schema.Literals(['true', 'false'])),
 				ownerUserId: Schema.optional(Schema.String),
 			},
@@ -192,11 +192,11 @@ export const EmailGroup = HttpApiGroup.make('email')
 		// supplies host/port/security/username/password. Server runs an
 		// LOGIN/EHLO probe; on auth/connect failure it still inserts the
 		// row (with grant_status set) so the user can fix it from settings.
-		HttpApiEndpoint.post('createInbox', '/email/inboxes', {
+		HttpApiEndpoint.post('createMailbox', '/email/mailboxes', {
 			payload: Schema.Struct({
 				email: Schema.String,
 				displayName: Schema.optional(Schema.String),
-				purpose: InboxPurpose,
+				purpose: MailboxPurpose,
 				ownerUserId: Schema.optional(Schema.String),
 				isPrivate: Schema.optional(Schema.Boolean),
 				isDefault: Schema.optional(Schema.Boolean),
@@ -214,11 +214,11 @@ export const EmailGroup = HttpApiGroup.make('email')
 		}),
 	)
 	.add(
-		HttpApiEndpoint.patch('updateInbox', '/email/inboxes/:id', {
+		HttpApiEndpoint.patch('updateMailbox', '/email/mailboxes/:id', {
 			params: { id: Schema.String },
 			payload: Schema.Struct({
 				displayName: Schema.optional(Schema.NullOr(Schema.String)),
-				purpose: Schema.optional(InboxPurpose),
+				purpose: Schema.optional(MailboxPurpose),
 				ownerUserId: Schema.optional(Schema.NullOr(Schema.String)),
 				isPrivate: Schema.optional(Schema.Boolean),
 				isDefault: Schema.optional(Schema.Boolean),
@@ -242,7 +242,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 		}),
 	)
 	.add(
-		HttpApiEndpoint.delete('deleteInbox', '/email/inboxes/:id', {
+		HttpApiEndpoint.delete('deleteMailbox', '/email/mailboxes/:id', {
 			params: { id: Schema.String },
 			success: Schema.Void,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
@@ -251,17 +251,17 @@ export const EmailGroup = HttpApiGroup.make('email')
 	.add(
 		// Re-probe credentials. Updates grant_status / grant_last_error /
 		// grant_last_seen_at and returns the refreshed row.
-		HttpApiEndpoint.post('testInbox', '/email/inboxes/:id/test', {
+		HttpApiEndpoint.post('testMailbox', '/email/mailboxes/:id/test', {
 			params: { id: Schema.String },
 			success: Schema.Unknown,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(
-		// Set the calling member's primary_inbox_id. Validates ownership
+		// Set the calling member's primary_mailbox_id. Validates ownership
 		// (same org + same user) so the call cannot point at someone else's
-		// inbox.
-		HttpApiEndpoint.post('setPrimaryInbox', '/email/inboxes/:id/primary', {
+		// mailbox.
+		HttpApiEndpoint.post('setPrimaryMailbox', '/email/mailboxes/:id/primary', {
 			params: { id: Schema.String },
 			success: Schema.Unknown,
 			error: Schema.Union([
@@ -272,13 +272,13 @@ export const EmailGroup = HttpApiGroup.make('email')
 	)
 	.add(
 		// Cheap "do I have a primary?" probe used to drive the settings
-		// banner without paying for the full inbox list.
-		HttpApiEndpoint.get('inboxStatus', '/email/inbox-status', {
+		// banner without paying for the full mailbox list.
+		HttpApiEndpoint.get('mailboxStatus', '/email/mailbox-status', {
 			success: Schema.Struct({
 				hasDefault: Schema.Boolean,
 				primary: Schema.NullOr(
 					Schema.Struct({
-						inboxId: Schema.String,
+						mailboxId: Schema.String,
 						email: Schema.String,
 					}),
 				),
@@ -288,7 +288,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 	.add(
 		// Multipart upload — body parsed by the raw handler, so the declared
 		// payload is Unknown. Expected parts: `file` (bytes + filename +
-		// contentType), `inboxId`, optional `inline` flag (`"true"`/`"false"`),
+		// contentType), `mailboxId`, optional `inline` flag (`"true"`/`"false"`),
 		// optional `draftId` for immediate attachment.
 		HttpApiEndpoint.post('stageAttachment', '/email/attachments/staging', {
 			payload: Schema.Unknown,
@@ -309,7 +309,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 			'/email/attachments/staging/:stagingId',
 			{
 				params: { stagingId: Schema.String },
-				query: { inboxId: Schema.String },
+				query: { mailboxId: Schema.String },
 				success: Schema.Void,
 				error: Schema.Union([
 					NotFound.pipe(HttpApiSchema.status(404)),
@@ -339,7 +339,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 	.add(
 		HttpApiEndpoint.post('createDraft', '/email/drafts', {
 			payload: Schema.Struct({
-				inboxId: Schema.String,
+				mailboxId: Schema.String,
 				to: Schema.optional(Recipients),
 				cc: Schema.optional(Schema.Array(Schema.String)),
 				bcc: Schema.optional(Schema.Array(Schema.String)),
@@ -357,7 +357,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 	.add(
 		HttpApiEndpoint.get('listDrafts', '/email/drafts', {
 			query: {
-				inboxId: Schema.optional(Schema.String),
+				mailboxId: Schema.optional(Schema.String),
 			},
 			success: Schema.Array(Schema.Unknown),
 		}),
@@ -365,7 +365,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 	.add(
 		HttpApiEndpoint.get('getDraft', '/email/drafts/:draftId', {
 			params: { draftId: Schema.String },
-			query: { inboxId: Schema.String },
+			query: { mailboxId: Schema.String },
 			success: Schema.Unknown,
 		}),
 	)
@@ -373,7 +373,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 		HttpApiEndpoint.patch('updateDraft', '/email/drafts/:draftId', {
 			params: { draftId: Schema.String },
 			payload: Schema.Struct({
-				inboxId: Schema.String,
+				mailboxId: Schema.String,
 				to: Schema.optional(Recipients),
 				cc: Schema.optional(Schema.Array(Schema.String)),
 				bcc: Schema.optional(Schema.Array(Schema.String)),
@@ -386,7 +386,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 	.add(
 		HttpApiEndpoint.delete('deleteDraft', '/email/drafts/:draftId', {
 			params: { draftId: Schema.String },
-			query: { inboxId: Schema.String },
+			query: { mailboxId: Schema.String },
 			success: Schema.Void,
 		}),
 	)
@@ -394,7 +394,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 		HttpApiEndpoint.post('sendDraft', '/email/drafts/:draftId/send', {
 			params: { draftId: Schema.String },
 			payload: Schema.Struct({
-				inboxId: Schema.String,
+				mailboxId: Schema.String,
 			}),
 			success: Schema.Struct({
 				messageId: Schema.String,
@@ -408,21 +408,25 @@ export const EmailGroup = HttpApiGroup.make('email')
 	)
 	// ── Footers ──
 	.add(
-		HttpApiEndpoint.get('listFooters', '/email/inboxes/:inboxId/footers', {
-			params: { inboxId: Schema.String },
+		HttpApiEndpoint.get('listFooters', '/email/mailboxes/:mailboxId/footers', {
+			params: { mailboxId: Schema.String },
 			success: Schema.Array(Schema.Unknown),
 		}),
 	)
 	.add(
-		HttpApiEndpoint.post('createFooter', '/email/inboxes/:inboxId/footers', {
-			params: { inboxId: Schema.String },
-			payload: Schema.Struct({
-				name: Schema.String,
-				bodyJson: EmailBlocks,
-				isDefault: Schema.optional(Schema.Boolean),
-			}),
-			success: Schema.Unknown,
-		}),
+		HttpApiEndpoint.post(
+			'createFooter',
+			'/email/mailboxes/:mailboxId/footers',
+			{
+				params: { mailboxId: Schema.String },
+				payload: Schema.Struct({
+					name: Schema.String,
+					bodyJson: EmailBlocks,
+					isDefault: Schema.optional(Schema.Boolean),
+				}),
+				success: Schema.Unknown,
+			},
+		),
 	)
 	.add(
 		HttpApiEndpoint.get('getFooter', '/email/footers/:id', {
@@ -447,6 +451,17 @@ export const EmailGroup = HttpApiGroup.make('email')
 		HttpApiEndpoint.delete('deleteFooter', '/email/footers/:id', {
 			params: { id: Schema.String },
 			success: Schema.Void,
+		}),
+	)
+	// ── Native-mailbox OAuth ──
+	.add(
+		// Begin the native-mailbox OAuth consent flow. Stays in the
+		// authenticated group so the handler can sign the caller's org + user
+		// into the `state` the public callback later verifies. Responds with a
+		// 302 to the provider's consent screen.
+		HttpApiEndpoint.get('oauthStart', '/email/oauth/:provider/start', {
+			params: { provider: Schema.Literals(['gmail-oauth', 'm365-oauth']) },
+			success: Schema.Unknown,
 		}),
 	)
 	.middleware(SessionMiddleware)

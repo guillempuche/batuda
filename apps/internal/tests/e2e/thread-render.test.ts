@@ -42,7 +42,7 @@ test.describe('thread render with multiple messages', () => {
 			// bounced-reply fixture). They sort by received_at, so any later
 			// reply lands after them.
 			const threadId = psql(
-				`SELECT id FROM email_thread_links WHERE subject = 'Quote for the booking module' LIMIT 1`,
+				`SELECT id FROM conversations WHERE subject = 'Quote for the booking module' LIMIT 1`,
 			)
 			expect(threadId, 'seeded thread must exist').not.toBe('')
 
@@ -68,7 +68,7 @@ test.describe('thread render with multiple messages', () => {
 			// only renders when `msg.cc.length > 0`, so its absence is the
 			// behavior under test — proves the disclosure is gated.
 			const threadId = psql(
-				`SELECT id FROM email_thread_links WHERE subject = 'Quote for the booking module' LIMIT 1`,
+				`SELECT id FROM conversations WHERE subject = 'Quote for the booking module' LIMIT 1`,
 			)
 			expect(threadId, 'seeded thread must exist').not.toBe('')
 

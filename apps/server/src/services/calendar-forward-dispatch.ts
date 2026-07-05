@@ -25,7 +25,7 @@ export const dispatchForwardInvitation = (args: {
 		const { ics } = yield* calendar.forwardInvitation(args)
 
 		// Re-load the event so we have title, company, and the
-		// source-email breadcrumb for inbox selection.
+		// source-email breadcrumb for mailbox selection.
 		const eventRows = yield* sql<{
 			id: string
 			title: string
@@ -51,9 +51,9 @@ export const dispatchForwardInvitation = (args: {
 			return { ics }
 		}
 
-		// For email-sourced events the cleanest inbox to forward from is
+		// For email-sourced events the cleanest mailbox to forward from is
 		// the one that received the original invitation. For booking and
-		// internal events we fall back to the user's default inbox. If
+		// internal events we fall back to the user's default mailbox. If
 		// neither resolves, return the bytes without sending so the caller
 		// can decide.
 		const meta = event.metadata ?? null
@@ -61,36 +61,36 @@ export const dispatchForwardInvitation = (args: {
 			meta && typeof meta === 'object' && 'sourceEmailMessageId' in meta
 				? (meta as { sourceEmailMessageId?: unknown }).sourceEmailMessageId
 				: null
-		let inboxId: string | null = null
+		let mailboxId: string | null = null
 		if (
 			typeof sourceEmailMessageId === 'string' &&
 			sourceEmailMessageId.length > 0
 		) {
-			const messageRows = yield* sql<{ inboxId: string | null }>`
-				SELECT inbox_id AS "inboxId"
-				FROM email_messages
+			const messageRows = yield* sql<{ mailboxId: string | null }>`
+				SELECT connection_id AS "mailboxId"
+				FROM messages
 				WHERE id = ${sourceEmailMessageId}
 				  AND organization_id = ${currentOrg.id}
 				LIMIT 1
 			`
-			inboxId = messageRows[0]?.inboxId ?? null
+			mailboxId = messageRows[0]?.mailboxId ?? null
 		}
-		if (!inboxId) {
+		if (!mailboxId) {
 			const fallbackRows = yield* sql<{ id: string }>`
-				SELECT id FROM inboxes
+				SELECT id FROM channel_connections
 				WHERE organization_id = ${currentOrg.id}
 				  AND active = true
 				ORDER BY created_at ASC
 				LIMIT 1
 			`
-			inboxId = fallbackRows[0]?.id ?? null
+			mailboxId = fallbackRows[0]?.id ?? null
 		}
-		if (!inboxId) {
+		if (!mailboxId) {
 			yield* Effect.logWarning(
-				'forward_invitation bytes built but no inbox available to send',
+				'forward_invitation bytes built but no mailbox available to send',
 			).pipe(
 				Effect.annotateLogs({
-					event: 'calendar.forward_no_inbox',
+					event: 'calendar.forward_no_mailbox',
 					calendarEventId: args.calendarEventId,
 				}),
 			)
@@ -105,8 +105,8 @@ export const dispatchForwardInvitation = (args: {
 			FROM contact_channels ch
 			JOIN contacts c ON c.id = ch.contact_id
 			WHERE ch.organization_id = ${currentOrg.id}
-			  AND ch.kind = 'email'
-			  AND lower(ch.value) = ${args.toEmail.toLowerCase()}
+			  AND ch.channel = 'email'
+			  AND lower(ch.address) = ${args.toEmail.toLowerCase()}
 			ORDER BY c.created_at ASC
 			LIMIT 1
 		`
@@ -149,7 +149,7 @@ export const dispatchForwardInvitation = (args: {
 
 		const sendResult = yield* email
 			.send(
-				inboxId,
+				mailboxId,
 				args.toEmail,
 				`Fwd: ${event.title}`,
 				paragraphs,

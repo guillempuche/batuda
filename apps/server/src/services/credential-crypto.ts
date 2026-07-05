@@ -16,26 +16,26 @@ export interface EncryptedCredential {
 	readonly tag: Uint8Array
 }
 
-// Per-inbox subkey via HKDF-SHA256. The inbox id is bound into the key
-// derivation so identical plaintexts under different inbox ids produce
-// different ciphertexts, and a compromised row blob cannot be replayed
-// against another row without also having the master key.
-const deriveSubkey = (masterKey: Buffer, inboxId: string): Buffer =>
+// Per-connection subkey via HKDF-SHA256. The connection id is bound into
+// the key derivation so identical plaintexts under different connection ids
+// produce different ciphertexts, and a compromised row blob cannot be
+// replayed against another row without also having the master key.
+const deriveSubkey = (masterKey: Buffer, connectionId: string): Buffer =>
 	Buffer.from(
 		hkdfSync(
 			'sha256',
 			masterKey,
 			Buffer.alloc(0),
-			Buffer.from(inboxId, 'utf8'),
+			Buffer.from(connectionId, 'utf8'),
 			32,
 		),
 	)
 
 export const encryptWithKey = (
 	masterKey: Buffer,
-	input: { inboxId: string; plain: string },
+	input: { connectionId: string; plain: string },
 ): EncryptedCredential => {
-	const key = deriveSubkey(masterKey, input.inboxId)
+	const key = deriveSubkey(masterKey, input.connectionId)
 	const nonce = randomBytes(12)
 	const cipher = createCipheriv('aes-256-gcm', key, nonce)
 	const ciphertext = Buffer.concat([
@@ -48,13 +48,13 @@ export const encryptWithKey = (
 export const decryptWithKey = (
 	masterKey: Buffer,
 	input: {
-		inboxId: string
+		connectionId: string
 		ciphertext: Uint8Array
 		nonce: Uint8Array
 		tag: Uint8Array
 	},
 ): string => {
-	const key = deriveSubkey(masterKey, input.inboxId)
+	const key = deriveSubkey(masterKey, input.connectionId)
 	const decipher = createDecipheriv('aes-256-gcm', key, input.nonce)
 	decipher.setAuthTag(Buffer.from(input.tag))
 	const plain = Buffer.concat([
@@ -82,10 +82,10 @@ export class CredentialCrypto extends ServiceMap.Service<CredentialCrypto>()(
 			}
 
 			return {
-				encryptPassword: (input: { inboxId: string; plain: string }) =>
+				encryptConfig: (input: { connectionId: string; plain: string }) =>
 					encryptWithKey(masterKey, input),
-				decryptPassword: (input: {
-					inboxId: string
+				decryptConfig: (input: {
+					connectionId: string
 					ciphertext: Uint8Array
 					nonce: Uint8Array
 					tag: Uint8Array

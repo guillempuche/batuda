@@ -4,7 +4,7 @@ import { SqlClient } from 'effect/unstable/sql'
 import { printTable } from '../lib/table'
 
 // Read-only inspector over the seeded mock data. Each entity lists by the key
-// you actually navigate by (org/company/page slug, template/inbox id), so e2e
+// you actually navigate by (org/company/page slug, template/mailbox id), so e2e
 // and agent-browser setup can look up a real value instead of guessing. The
 // CLI's DB role bypasses RLS, so this sees every org at once.
 
@@ -14,7 +14,7 @@ export const ENTITY_NAMES = [
 	'companies',
 	'templates',
 	'stacks',
-	'inboxes',
+	'mailboxes',
 	'tasks',
 	'pages',
 ] as const
@@ -105,17 +105,17 @@ export const dataInspect = (entity: Option.Option<EntityName>, json: boolean) =>
 					FROM agent_default_stacks s JOIN organization o ON o.id = s.organization_id
 					ORDER BY o.slug, scope, s.agent`,
 			},
-			inboxes: {
+			mailboxes: {
 				columns: [
 					col('Org', 14, 'org'),
-					col('Email', 32, 'email'),
+					col('Email', 32, 'externalId'),
 					col('Name', 24, 'displayName'),
 					col('Active', 0, 'active'),
 				],
 				rows: () => sql<Row>`
-					SELECT o.slug AS org, i.email, i.display_name, i.active
-					FROM inboxes i JOIN organization o ON o.id = i.organization_id
-					ORDER BY o.slug, i.email`,
+					SELECT o.slug AS org, i.external_id, i.display_name, i.active
+					FROM channel_connections i JOIN organization o ON o.id = i.organization_id
+					ORDER BY o.slug, i.external_id`,
 			},
 			tasks: {
 				columns: [

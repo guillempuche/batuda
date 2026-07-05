@@ -10,7 +10,7 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 //
 // We seed the bounced state directly via psql instead of driving the
 // mail-worker's DSN parser end-to-end — the worker is a separate process
-// that watches real IMAP, not the dev .dev-inbox/, so a true round-trip
+// that watches real IMAP, not the dev .dev-mailbox/, so a true round-trip
 // here would require a maildev container. The DSN→DB path is unit-tested
 // in apps/mail-worker/src/bounces.test.ts; this spec asserts the UI
 // renders the resulting state correctly.

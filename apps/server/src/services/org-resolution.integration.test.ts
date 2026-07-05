@@ -67,7 +67,7 @@ const cleanupEvent = (id: string) =>
 		yield* sql`DELETE FROM calendar_events WHERE id = ${id}::uuid`
 	})
 
-const insertInbox = (args: {
+const insertMailbox = (args: {
 	id: string
 	orgId: string
 	email: string
@@ -81,11 +81,11 @@ const insertInbox = (args: {
 		const created = args.createdAt
 		if (created !== undefined) {
 			yield* sql`
-				INSERT INTO inboxes (
-					id, organization_id, email, purpose, owner_user_id,
+				INSERT INTO channel_connections (
+					id, organization_id, external_id, purpose, owner_user_id,
 					imap_host, imap_port, imap_security,
 					smtp_host, smtp_port, smtp_security,
-					username, password_ciphertext, password_nonce, password_tag,
+					username, config_ciphertext, config_nonce, config_tag,
 					active, created_at
 				) VALUES (
 					${args.id}::uuid, ${args.orgId}, ${args.email}, 'human', 'org-resolution-test-user',
@@ -98,11 +98,11 @@ const insertInbox = (args: {
 			return
 		}
 		yield* sql`
-			INSERT INTO inboxes (
-				id, organization_id, email, purpose, owner_user_id,
+			INSERT INTO channel_connections (
+				id, organization_id, external_id, purpose, owner_user_id,
 				imap_host, imap_port, imap_security,
 				smtp_host, smtp_port, smtp_security,
-				username, password_ciphertext, password_nonce, password_tag,
+				username, config_ciphertext, config_nonce, config_tag,
 				active
 			) VALUES (
 				${args.id}::uuid, ${args.orgId}, ${args.email}, 'human', 'org-resolution-test-user',
@@ -114,11 +114,11 @@ const insertInbox = (args: {
 		`
 	})
 
-const cleanupInbox = (id: string) =>
+const cleanupMailbox = (id: string) =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
 		yield* sql`SET LOCAL ROLE app_service`
-		yield* sql`DELETE FROM inboxes WHERE id = ${id}::uuid`
+		yield* sql`DELETE FROM channel_connections WHERE id = ${id}::uuid`
 	})
 
 const fetchOrgIds = Effect.gen(function* () {
@@ -138,7 +138,7 @@ const fetchOrgIds = Effect.gen(function* () {
 
 describe('resolveOrgForCalcomWebhook', () => {
 	let orgIds: OrgIds
-	const seededRows: Array<{ kind: 'event' | 'inbox'; id: string }> = []
+	const seededRows: Array<{ kind: 'event' | 'mailbox'; id: string }> = []
 
 	beforeAll(async () => {
 		orgIds = await Effect.runPromise(
@@ -155,7 +155,7 @@ describe('resolveOrgForCalcomWebhook', () => {
 			Effect.gen(function* () {
 				for (const r of seededRows) {
 					if (r.kind === 'event') yield* cleanupEvent(r.id)
-					else yield* cleanupInbox(r.id)
+					else yield* cleanupMailbox(r.id)
 				}
 			}).pipe(Effect.provide(PgLive)) as Effect.Effect<void, never, never>,
 		)
@@ -164,16 +164,16 @@ describe('resolveOrgForCalcomWebhook', () => {
 	describe('when the iCalUID matches an existing cal.com calendar_event', () => {
 		it("should return the event's org regardless of organizer email", async () => {
 			// GIVEN a calendar_events row with provider=calcom + source=booking in taller
-			//       AND an inboxes row in restaurant for some-organizer@example.com
+			//       AND an mailboxes row in restaurant for some-organizer@example.com
 			// WHEN the resolver is called with that iCalUID + an organizer email registered in restaurant
 			// THEN the iCalUID match wins (taller is returned)
 			// [org-resolution.ts — tier-1 SELECT, source/provider filter]
 			const eventId = randomUUID()
-			const inboxId = randomUUID()
+			const mailboxId = randomUUID()
 			const icalUid = `t1-${eventId}`
 			const email = `t1-${eventId}@example.com`
 			seededRows.push({ kind: 'event', id: eventId })
-			seededRows.push({ kind: 'inbox', id: inboxId })
+			seededRows.push({ kind: 'mailbox', id: mailboxId })
 
 			await Effect.runPromise(
 				Effect.gen(function* () {
@@ -184,8 +184,8 @@ describe('resolveOrgForCalcomWebhook', () => {
 						source: 'booking',
 						provider: 'calcom',
 					})
-					yield* insertInbox({
-						id: inboxId,
+					yield* insertMailbox({
+						id: mailboxId,
 						orgId: orgIds.restaurant,
 						email,
 						active: true,
@@ -212,20 +212,20 @@ describe('resolveOrgForCalcomWebhook', () => {
 		})
 	})
 
-	describe('when no iCalUID row exists and the organizer email matches an active inbox', () => {
-		it("should return the inbox owner's org (case-insensitive on email)", async () => {
+	describe('when no iCalUID row exists and the organizer email matches an active mailbox', () => {
+		it("should return the mailbox owner's org (case-insensitive on email)", async () => {
 			// GIVEN no calendar_events row
-			//       AND an inboxes row in taller for case-test@example.com (active=true)
+			//       AND an mailboxes row in taller for case-test@example.com (active=true)
 			// WHEN the resolver is called with mixed-case organizer email
 			// THEN lower(email) = lower($1) matches and resolves to taller
 			// [org-resolution.ts — tier-2 SELECT]
-			const inboxId = randomUUID()
-			const lowerEmail = `case-test-${inboxId}@example.com`
-			seededRows.push({ kind: 'inbox', id: inboxId })
+			const mailboxId = randomUUID()
+			const lowerEmail = `case-test-${mailboxId}@example.com`
+			seededRows.push({ kind: 'mailbox', id: mailboxId })
 
 			await Effect.runPromise(
-				insertInbox({
-					id: inboxId,
+				insertMailbox({
+					id: mailboxId,
 					orgId: orgIds.taller,
 					email: lowerEmail,
 					active: true,
@@ -328,29 +328,29 @@ describe('resolveOrgForCalcomWebhook', () => {
 		})
 	})
 
-	describe('when two inboxes across two orgs share the same email', () => {
+	describe('when two mailboxes across two orgs share the same email', () => {
 		it('should return the longest-standing org (ORDER BY created_at ASC LIMIT 1)', async () => {
-			// GIVEN inboxes(org=taller, email=x, created_at=2025-12-01)
-			//       AND inboxes(org=restaurant, email=x, created_at=2026-04-01)
+			// GIVEN mailboxes(org=taller, email=x, created_at=2025-12-01)
+			//       AND mailboxes(org=restaurant, email=x, created_at=2026-04-01)
 			// WHEN the resolver is called with email=x and no iCalUID
 			// THEN taller is returned (oldest)
 			// [org-resolution.ts — ambiguity tie-break]
 			const olderId = randomUUID()
 			const newerId = randomUUID()
 			const sharedEmail = `dual-${olderId}@example.com`
-			seededRows.push({ kind: 'inbox', id: olderId })
-			seededRows.push({ kind: 'inbox', id: newerId })
+			seededRows.push({ kind: 'mailbox', id: olderId })
+			seededRows.push({ kind: 'mailbox', id: newerId })
 
 			await Effect.runPromise(
 				Effect.gen(function* () {
-					yield* insertInbox({
+					yield* insertMailbox({
 						id: olderId,
 						orgId: orgIds.taller,
 						email: sharedEmail,
 						active: true,
 						createdAt: new Date('2025-12-01T00:00:00Z'),
 					})
-					yield* insertInbox({
+					yield* insertMailbox({
 						id: newerId,
 						orgId: orgIds.restaurant,
 						email: sharedEmail,

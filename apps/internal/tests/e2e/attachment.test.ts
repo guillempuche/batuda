@@ -11,7 +11,7 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // Sends an email with a small PDF attachment via the compose UI and
 // asserts the mail catcher's parsed metadata carries the file. The seeded
-// inbox points at the dev SMTP catcher, so the round-trip works.
+// mailbox points at the dev SMTP catcher, so the round-trip works.
 //
 // Selectors verified against:
 //   apps/internal/src/components/emails/compose-form.tsx (compose-{form,to,
@@ -67,10 +67,10 @@ test.describe('compose with attachment', () => {
 	test.beforeEach(async ({ page }) => {
 		await clearCatcher()
 		// See send-email.test.ts beforeEach for the rationale: force the
-		// seeded inbox `connected` so a cold-catcher probe tick can't trip
+		// seeded mailbox `connected` so a cold-catcher probe tick can't trip
 		// GrantUnavailable on sendDraft.
 		psql(
-			`UPDATE inboxes SET grant_status='connected' WHERE email='admin@taller.cat'`,
+			`UPDATE channel_connections SET grant_status='connected' WHERE external_id='admin@taller.cat'`,
 		)
 		await page.goto('/', { waitUntil: 'commit' })
 		await setActiveOrgBySlug(page, 'taller')

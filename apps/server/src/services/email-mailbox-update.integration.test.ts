@@ -25,19 +25,18 @@ import {
 import { EmailService } from './email.js'
 import { EmailAttachmentStaging } from './email-attachment-staging.js'
 import { DraftStore } from './email-draft-store.js'
-import { EmailProvider } from './email-provider.js'
 import { type DecryptedCreds, MailTransport } from './mail-transport.js'
 import { StorageProvider } from './storage-provider.js'
 import { TimelineActivityService } from './timeline-activity.js'
 
 // Real Postgres + real SqlClient + stubbed MailTransport/CredentialCrypto. The
-// contract under test is updateInbox's re-probe: a credential or transport
+// contract under test is updateMailbox's re-probe: a credential or transport
 // change must run a fresh probe and persist the real outcome, while a
 // metadata-only edit must not probe at all. The cipher round-trip and the live
 // IMAP/SMTP probe are owned by their own suites.
 
-const TEST_ORG = 'inbox-update-test-org'
-const TEST_USER = 'inbox-update-test-user'
+const TEST_ORG = 'mailbox-update-test-org'
+const TEST_USER = 'mailbox-update-test-user'
 
 const stubTransport = (
 	probe: (creds: DecryptedCreds) => Effect.Effect<void, unknown>,
@@ -49,15 +48,15 @@ const stubTransport = (
 	} as never)
 
 const stubCrypto = Layer.succeed(CredentialCrypto, {
-	encryptPassword: () => ({
+	encryptConfig: () => ({
 		ciphertext: new Uint8Array([0]),
 		nonce: new Uint8Array([0]),
 		tag: new Uint8Array([0]),
 	}),
-	decryptPassword: () => 'stubbed-password',
+	decryptConfig: () => 'stubbed-password',
 } as never)
 
-// updateInbox/reprobeInbox only touch sql, crypto, transport and CurrentOrg.
+// updateMailbox/reprobeMailbox only touch sql, crypto, transport and CurrentOrg.
 // The other EmailService dependencies are captured at construction but never
 // called on this path, so empty stubs are enough to build the layer.
 const serviceLayer = (
@@ -67,7 +66,6 @@ const serviceLayer = (
 		Layer.provide([
 			stubCrypto,
 			stubTransport(probe),
-			Layer.succeed(EmailProvider, {} as never),
 			Layer.succeed(TimelineActivityService, {} as never),
 			Layer.succeed(EmailAttachmentStaging, {} as never),
 			Layer.succeed(DraftStore, {} as never),
@@ -88,18 +86,18 @@ interface GrantRow {
 	readonly displayName: string | null
 }
 
-describe('EmailService.updateInbox re-probe', () => {
-	let inboxId: string
+describe('EmailService.updateMailbox re-probe', () => {
+	let mailboxId: string
 
-	const seedInbox = Effect.gen(function* () {
+	const seedMailbox = Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
 		const placeholder = new Uint8Array([0])
 		const rows = yield* sql<{ id: string }>`
-			INSERT INTO inboxes (
-				organization_id, email, display_name, purpose, owner_user_id,
+			INSERT INTO channel_connections (
+				organization_id, external_id, display_name, purpose, owner_user_id,
 				imap_host, imap_port, imap_security,
 				smtp_host, smtp_port, smtp_security,
-				username, password_ciphertext, password_nonce, password_tag,
+				username, config_ciphertext, config_nonce, config_tag,
 				active, grant_status
 			) VALUES (
 				${TEST_ORG}, 'update@test.local', 'Baseline', 'human', ${TEST_USER},
@@ -117,7 +115,7 @@ describe('EmailService.updateInbox re-probe', () => {
 		Effect.gen(function* () {
 			const sql = yield* SqlClient.SqlClient
 			yield* sql`
-				UPDATE inboxes
+				UPDATE channel_connections
 				SET grant_status = 'connected',
 				    grant_last_error = NULL,
 				    display_name = 'Baseline'
@@ -132,14 +130,14 @@ describe('EmailService.updateInbox re-probe', () => {
 				SELECT grant_status AS "grantStatus",
 				       grant_last_error AS "grantLastError",
 				       display_name AS "displayName"
-				FROM inboxes WHERE id = ${id}
+				FROM channel_connections WHERE id = ${id}
 			`
 			return rows[0]
 		})
 
 	beforeAll(async () => {
-		inboxId = await Effect.runPromise(
-			seedInbox.pipe(Effect.provide(PgLive)) as Effect.Effect<
+		mailboxId = await Effect.runPromise(
+			seedMailbox.pipe(Effect.provide(PgLive)) as Effect.Effect<
 				string,
 				never,
 				never
@@ -148,11 +146,11 @@ describe('EmailService.updateInbox re-probe', () => {
 	})
 
 	afterAll(async () => {
-		if (inboxId) {
+		if (mailboxId) {
 			await Effect.runPromise(
 				Effect.gen(function* () {
 					const sql = yield* SqlClient.SqlClient
-					yield* sql`DELETE FROM inboxes WHERE id = ${inboxId}`
+					yield* sql`DELETE FROM channel_connections WHERE id = ${mailboxId}`
 				}).pipe(Effect.provide(PgLive)) as Effect.Effect<void, never, never>,
 			)
 		}
@@ -160,7 +158,7 @@ describe('EmailService.updateInbox re-probe', () => {
 
 	beforeEach(async () => {
 		await Effect.runPromise(
-			resetRow(inboxId).pipe(Effect.provide(PgLive)) as Effect.Effect<
+			resetRow(mailboxId).pipe(Effect.provide(PgLive)) as Effect.Effect<
 				void,
 				never,
 				never
@@ -170,7 +168,7 @@ describe('EmailService.updateInbox re-probe', () => {
 
 	describe('when the password changes and the probe fails to authenticate', () => {
 		it('should persist auth_failed with the upstream detail', async () => {
-			// [email.ts:1956 — updateInbox: credentialsChanged → reprobeInbox(id)]
+			// [email.ts:1956 — updateMailbox: credentialsChanged → reprobeMailbox(id)]
 			// GIVEN a probe that rejects the new credentials
 			const detail = 'NO Invalid login or password'
 
@@ -178,12 +176,12 @@ describe('EmailService.updateInbox re-probe', () => {
 			await Effect.runPromise(
 				Effect.gen(function* () {
 					const svc = yield* EmailService
-					yield* svc.updateInbox(inboxId, { password: 'app-pw-wrong' })
+					yield* svc.updateMailbox(mailboxId, { password: 'app-pw-wrong' })
 				}).pipe(
 					Effect.provide(
 						serviceLayer(creds =>
 							Effect.fail(
-								new GrantAuthFailed({ inboxId: creds.inboxId, detail }),
+								new GrantAuthFailed({ mailboxId: creds.connectionId, detail }),
 							),
 						),
 					),
@@ -195,7 +193,7 @@ describe('EmailService.updateInbox re-probe', () => {
 			// THEN the row reflects the real probe outcome, not an optimistic
 			// connected
 			const grant = await Effect.runPromise(
-				readGrant(inboxId).pipe(Effect.provide(PgLive)) as Effect.Effect<
+				readGrant(mailboxId).pipe(Effect.provide(PgLive)) as Effect.Effect<
 					GrantRow | undefined,
 					never,
 					never
@@ -208,12 +206,12 @@ describe('EmailService.updateInbox re-probe', () => {
 
 	describe('when the password changes and the probe succeeds', () => {
 		it('should persist connected and clear the previous error', async () => {
-			// [email.ts:466 — reprobeInbox writes connected and clears grant_last_error]
+			// [email.ts:466 — reprobeMailbox writes connected and clears grant_last_error]
 			// GIVEN the row was previously failing
 			await Effect.runPromise(
 				Effect.gen(function* () {
 					const sql = yield* SqlClient.SqlClient
-					yield* sql`UPDATE inboxes SET grant_status = 'auth_failed', grant_last_error = 'stale' WHERE id = ${inboxId}`
+					yield* sql`UPDATE channel_connections SET grant_status = 'auth_failed', grant_last_error = 'stale' WHERE id = ${mailboxId}`
 				}).pipe(Effect.provide(PgLive)) as Effect.Effect<void, never, never>,
 			)
 
@@ -221,7 +219,7 @@ describe('EmailService.updateInbox re-probe', () => {
 			await Effect.runPromise(
 				Effect.gen(function* () {
 					const svc = yield* EmailService
-					yield* svc.updateInbox(inboxId, { password: 'app-pw-good' })
+					yield* svc.updateMailbox(mailboxId, { password: 'app-pw-good' })
 				}).pipe(
 					Effect.provide(serviceLayer(() => Effect.void)),
 					Effect.provide(orgContext),
@@ -229,9 +227,9 @@ describe('EmailService.updateInbox re-probe', () => {
 				) as Effect.Effect<void, never, never>,
 			)
 
-			// THEN the inbox recovers to connected with no error
+			// THEN the mailbox recovers to connected with no error
 			const grant = await Effect.runPromise(
-				readGrant(inboxId).pipe(Effect.provide(PgLive)) as Effect.Effect<
+				readGrant(mailboxId).pipe(Effect.provide(PgLive)) as Effect.Effect<
 					GrantRow | undefined,
 					never,
 					never
@@ -250,7 +248,7 @@ describe('EmailService.updateInbox re-probe', () => {
 			await Effect.runPromise(
 				Effect.gen(function* () {
 					const svc = yield* EmailService
-					yield* svc.updateInbox(inboxId, { displayName: 'Renamed' })
+					yield* svc.updateMailbox(mailboxId, { displayName: 'Renamed' })
 				}).pipe(
 					Effect.provide(
 						serviceLayer(() =>
@@ -264,7 +262,7 @@ describe('EmailService.updateInbox re-probe', () => {
 
 			// THEN the name changed but the grant state is untouched
 			const grant = await Effect.runPromise(
-				readGrant(inboxId).pipe(Effect.provide(PgLive)) as Effect.Effect<
+				readGrant(mailboxId).pipe(Effect.provide(PgLive)) as Effect.Effect<
 					GrantRow | undefined,
 					never,
 					never
@@ -310,8 +308,8 @@ describe('EmailService.listProviderPresets', () => {
 	})
 })
 
-describe('EmailService.updateInbox re-probe — real credential round-trip', () => {
-	// Real AES-GCM round-trip (HKDF subkey per inbox id); only the network
+describe('EmailService.updateMailbox re-probe — real credential round-trip', () => {
+	// Real AES-GCM round-trip (HKDF subkey per mailbox id); only the network
 	// probe is stubbed, and it captures the credentials it receives. This proves
 	// the part the stubbed-crypto suite above cannot see: that the password the
 	// caller passes is encrypted, stored, re-read and decrypted back to the
@@ -320,10 +318,10 @@ describe('EmailService.updateInbox re-probe — real credential round-trip', () 
 	const ORIGINAL_PW = 'original-app-pw'
 
 	const realCrypto = Layer.succeed(CredentialCrypto, {
-		encryptPassword: (input: { inboxId: string; plain: string }) =>
+		encryptConfig: (input: { connectionId: string; plain: string }) =>
 			encryptWithKey(TEST_KEY, input),
-		decryptPassword: (input: {
-			inboxId: string
+		decryptConfig: (input: {
+			connectionId: string
 			ciphertext: Uint8Array
 			nonce: Uint8Array
 			tag: Uint8Array
@@ -344,7 +342,6 @@ describe('EmailService.updateInbox re-probe — real credential round-trip', () 
 		Layer.provide([
 			realCrypto,
 			capturingTransport,
-			Layer.succeed(EmailProvider, {} as never),
 			Layer.succeed(TimelineActivityService, {} as never),
 			Layer.succeed(EmailAttachmentStaging, {} as never),
 			Layer.succeed(DraftStore, {} as never),
@@ -354,20 +351,23 @@ describe('EmailService.updateInbox re-probe — real credential round-trip', () 
 		Layer.provide(PgLive),
 	)
 
-	const inboxId = randomUUID()
+	const mailboxId = randomUUID()
 
 	const seedOriginal = Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
-		const enc = encryptWithKey(TEST_KEY, { inboxId, plain: ORIGINAL_PW })
+		const enc = encryptWithKey(TEST_KEY, {
+			connectionId: mailboxId,
+			plain: ORIGINAL_PW,
+		})
 		yield* sql`
-			UPDATE inboxes
-			SET password_ciphertext = ${enc.ciphertext},
-			    password_nonce = ${enc.nonce},
-			    password_tag = ${enc.tag},
+			UPDATE channel_connections
+			SET config_ciphertext = ${enc.ciphertext},
+			    config_nonce = ${enc.nonce},
+			    config_tag = ${enc.tag},
 			    imap_host = 'imap.test.local',
 			    grant_status = 'connected',
 			    grant_last_error = NULL
-			WHERE id = ${inboxId}
+			WHERE id = ${mailboxId}
 		`
 	})
 
@@ -375,16 +375,19 @@ describe('EmailService.updateInbox re-probe — real credential round-trip', () 
 		await Effect.runPromise(
 			Effect.gen(function* () {
 				const sql = yield* SqlClient.SqlClient
-				const enc = encryptWithKey(TEST_KEY, { inboxId, plain: ORIGINAL_PW })
+				const enc = encryptWithKey(TEST_KEY, {
+					connectionId: mailboxId,
+					plain: ORIGINAL_PW,
+				})
 				yield* sql`
-					INSERT INTO inboxes (
-						id, organization_id, email, display_name, purpose, owner_user_id,
+					INSERT INTO channel_connections (
+						id, organization_id, external_id, display_name, purpose, owner_user_id,
 						imap_host, imap_port, imap_security,
 						smtp_host, smtp_port, smtp_security,
-						username, password_ciphertext, password_nonce, password_tag,
+						username, config_ciphertext, config_nonce, config_tag,
 						active, grant_status
 					) VALUES (
-						${inboxId}, ${TEST_ORG}, 'roundtrip@test.local', 'Roundtrip', 'human', ${TEST_USER},
+						${mailboxId}, ${TEST_ORG}, 'roundtrip@test.local', 'Roundtrip', 'human', ${TEST_USER},
 						'imap.test.local', 993, 'tls',
 						'smtp.test.local', 587, 'starttls',
 						'roundtrip@test.local', ${enc.ciphertext}, ${enc.nonce}, ${enc.tag},
@@ -399,7 +402,7 @@ describe('EmailService.updateInbox re-probe — real credential round-trip', () 
 		await Effect.runPromise(
 			Effect.gen(function* () {
 				const sql = yield* SqlClient.SqlClient
-				yield* sql`DELETE FROM inboxes WHERE id = ${inboxId}`
+				yield* sql`DELETE FROM channel_connections WHERE id = ${mailboxId}`
 			}).pipe(Effect.provide(PgLive), Effect.orDie),
 		)
 	})
@@ -413,13 +416,13 @@ describe('EmailService.updateInbox re-probe — real credential round-trip', () 
 
 	describe('when the password is rotated', () => {
 		it('should probe with the newly entered password', async () => {
-			// [email.ts:1956 — reprobeInbox re-reads and decrypts the freshly stored ciphertext]
-			// GIVEN a working inbox
+			// [email.ts:1956 — reprobeMailbox re-reads and decrypts the freshly stored ciphertext]
+			// GIVEN a working mailbox
 			// WHEN the password is changed to a fresh app password
 			await Effect.runPromise(
 				Effect.gen(function* () {
 					const svc = yield* EmailService
-					yield* svc.updateInbox(inboxId, { password: 'rotated-app-pw' })
+					yield* svc.updateMailbox(mailboxId, { password: 'rotated-app-pw' })
 				}).pipe(
 					Effect.provide(realServiceLayer),
 					Effect.provide(orgContext),
@@ -431,7 +434,10 @@ describe('EmailService.updateInbox re-probe — real credential round-trip', () 
 			// THEN the probe received exactly the new password — proving the
 			// encrypt → store → re-read → decrypt chain on the update path
 			expect(probeCalls).toHaveLength(1)
-			expect(probeCalls[0]?.password).toBe('rotated-app-pw')
+			expect(probeCalls[0]?.auth).toEqual({
+				kind: 'password',
+				password: 'rotated-app-pw',
+			})
 		})
 	})
 
@@ -443,7 +449,7 @@ describe('EmailService.updateInbox re-probe — real credential round-trip', () 
 			await Effect.runPromise(
 				Effect.gen(function* () {
 					const svc = yield* EmailService
-					yield* svc.updateInbox(inboxId, {
+					yield* svc.updateMailbox(mailboxId, {
 						imapHost: 'imap.rotated.example',
 					})
 				}).pipe(
@@ -457,7 +463,10 @@ describe('EmailService.updateInbox re-probe — real credential round-trip', () 
 			// THEN the probe used the decrypted stored password against the new
 			// host
 			expect(probeCalls).toHaveLength(1)
-			expect(probeCalls[0]?.password).toBe(ORIGINAL_PW)
+			expect(probeCalls[0]?.auth).toEqual({
+				kind: 'password',
+				password: ORIGINAL_PW,
+			})
 			expect(probeCalls[0]?.imapHost).toBe('imap.rotated.example')
 		})
 	})

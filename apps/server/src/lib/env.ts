@@ -206,7 +206,7 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 		)
 		const STORAGE_BUCKET = yield* Config.string('STORAGE_BUCKET')
 
-		// Local-inbox is the only provider during the BYO-mailbox migration;
+		// Local-mailbox is the only provider during the BYO-mailbox migration;
 		// real outbound SMTP / inbound IMAP transport ships in the mail-worker
 		// slice. Kept as a literal schema so the variable shape is stable when
 		// new transports are added.
@@ -214,13 +214,30 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 			Schema.Literals(['local-inbox']),
 			'EMAIL_PROVIDER',
 		)
-		// AES-256-GCM master key for encrypting per-inbox IMAP/SMTP
-		// credentials at rest. Base64-encoded 32 bytes. Per-inbox subkeys
-		// are derived via HKDF-SHA256 with the inbox id as `info`, so a
+		// AES-256-GCM master key for encrypting per-mailbox IMAP/SMTP
+		// credentials at rest. Base64-encoded 32 bytes. Per-mailbox subkeys
+		// are derived via HKDF-SHA256 with the mailbox id as `info`, so a
 		// row-level leak doesn't compromise other rows without this key.
 		// Required, no default — boot fails rather than ship plaintext.
 		// Generate with: node -e "console.log(crypto.randomBytes(32).toString('base64'))"
 		const EMAIL_CREDENTIAL_KEY = yield* Config.redacted('EMAIL_CREDENTIAL_KEY')
+
+		// Google / Microsoft OAuth client credentials for native mailbox OAuth
+		// (XOAUTH2). Optional — a provider's connect flow is unavailable until
+		// its id + secret are set, so a deployment without OAuth still boots.
+		// The redirect URI is derived from BETTER_AUTH_BASE_URL (the API host).
+		const GOOGLE_OAUTH_CLIENT_ID = yield* Config.option(
+			Config.string('GOOGLE_OAUTH_CLIENT_ID'),
+		)
+		const GOOGLE_OAUTH_CLIENT_SECRET = yield* Config.option(
+			Config.redacted('GOOGLE_OAUTH_CLIENT_SECRET'),
+		)
+		const MICROSOFT_OAUTH_CLIENT_ID = yield* Config.option(
+			Config.string('MICROSOFT_OAUTH_CLIENT_ID'),
+		)
+		const MICROSOFT_OAUTH_CLIENT_SECRET = yield* Config.option(
+			Config.redacted('MICROSOFT_OAUTH_CLIENT_SECRET'),
+		)
 
 		// No default — the developer must explicitly opt into a geocoding
 		// provider. Nominatim is the only option today; the variable is
@@ -281,6 +298,10 @@ export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
 			STORAGE_BUCKET,
 			EMAIL_PROVIDER,
 			EMAIL_CREDENTIAL_KEY,
+			GOOGLE_OAUTH_CLIENT_ID,
+			GOOGLE_OAUTH_CLIENT_SECRET,
+			MICROSOFT_OAUTH_CLIENT_ID,
+			MICROSOFT_OAUTH_CLIENT_SECRET,
 			GEOCODER_PROVIDER,
 			RESEARCH_DEFAULT_BUDGET_CENTS,
 			RESEARCH_DEFAULT_PAID_BUDGET_CENTS,

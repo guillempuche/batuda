@@ -23,25 +23,25 @@ const failureFrom = (cause: Cause.Cause<unknown>): EmailSendError | null => {
 }
 
 // Local provider tests are integration: they exercise the real FS writer
-// (the dev-inbox reader contract is the file format on disk). Resend
+// (the dev-mailbox reader contract is the file format on disk). Resend
 // tests are unit: they stub `fetch` because the contract under test is
 // the request shape sent to Resend's REST API.
 
 describe('TransactionalEmailProvider — Local (integration)', () => {
-	let inboxRoot: string
+	let mailboxRoot: string
 
 	beforeEach(async () => {
-		// LocalTransactionalProviderLive resolves the inbox dir relative to
+		// LocalTransactionalProviderLive resolves the mailbox dir relative to
 		// `import.meta.dirname` of the impl file — we can't redirect that
 		// without monkey-patching, so the test asserts files appeared in
-		// the real `apps/server/.dev-inbox/`. Each test stamps its messages
+		// the real `apps/server/.dev-mailbox/`. Each test stamps its messages
 		// with a unique recipient so the isolation comes from the slug, not
 		// the directory.
-		inboxRoot = await mkdtemp(join(tmpdir(), 'batuda-inbox-test-'))
+		mailboxRoot = await mkdtemp(join(tmpdir(), 'batuda-mailbox-test-'))
 	})
 
 	afterEach(async () => {
-		await rm(inboxRoot, { recursive: true, force: true })
+		await rm(mailboxRoot, { recursive: true, force: true })
 	})
 
 	const program = (
@@ -53,7 +53,7 @@ describe('TransactionalEmailProvider — Local (integration)', () => {
 
 	describe('sendInvitation', () => {
 		describe('when called with valid params', () => {
-			it('should write a .md file under apps/server/.dev-inbox/ with labels: invitation', async () => {
+			it('should write a .md file under apps/server/.dev-mailbox/ with labels: invitation', async () => {
 				// GIVEN the local transactional provider
 				// AND a unique recipient address scoped to this test
 				const recipient = `it-invitation-${Date.now()}@example.com`
@@ -74,9 +74,9 @@ describe('TransactionalEmailProvider — Local (integration)', () => {
 					}),
 				)
 
-				// THEN a .md file should appear in the dev-inbox dir
-				const inbox = join(__dirname, '..', '..', '.dev-inbox')
-				const files = await readdir(inbox)
+				// THEN a .md file should appear in the dev-mailbox dir
+				const mailbox = join(__dirname, '..', '..', '.dev-mailbox')
+				const files = await readdir(mailbox)
 				const match = files.find(name =>
 					name.includes(recipient.split('@')[0]!),
 				)
@@ -86,7 +86,7 @@ describe('TransactionalEmailProvider — Local (integration)', () => {
 				).toBeTruthy()
 
 				// AND the frontmatter should carry labels: ['invitation']
-				const body = await readFile(join(inbox, match!), 'utf8')
+				const body = await readFile(join(mailbox, match!), 'utf8')
 				expect(body).toMatch(/labels:\s*\n\s+- invitation/)
 
 				// AND the body should include the inviter name, org name, and URL
@@ -97,8 +97,8 @@ describe('TransactionalEmailProvider — Local (integration)', () => {
 				// AND the expiry date should be surfaced so the recipient knows by when
 				expect(body).toContain(expiresAt.toISOString())
 
-				// Cleanup so subsequent runs don't accumulate test inbox noise.
-				await rm(join(inbox, match!), { force: true })
+				// Cleanup so subsequent runs don't accumulate test mailbox noise.
+				await rm(join(mailbox, match!), { force: true })
 			})
 		})
 	})
@@ -123,10 +123,10 @@ describe('TransactionalEmailProvider — Local (integration)', () => {
 					}),
 				)
 
-				// THEN a .md file should appear in the dev-inbox dir
+				// THEN a .md file should appear in the dev-mailbox dir
 				//   [local-transactional-provider.ts — sendResetPassword writeMd branch]
-				const inbox = join(__dirname, '..', '..', '.dev-inbox')
-				const files = await readdir(inbox)
+				const mailbox = join(__dirname, '..', '..', '.dev-mailbox')
+				const files = await readdir(mailbox)
 				const match = files.find(name =>
 					name.includes(recipient.split('@')[0]!),
 				)
@@ -136,7 +136,7 @@ describe('TransactionalEmailProvider — Local (integration)', () => {
 				).toBeTruthy()
 
 				// AND the frontmatter should carry labels: ['password-reset']
-				const body = await readFile(join(inbox, match!), 'utf8')
+				const body = await readFile(join(mailbox, match!), 'utf8')
 				expect(body).toMatch(/labels:\s*\n\s+- password-reset/)
 
 				// AND the body should include the URL + ISO expiry so the recipient
@@ -144,7 +144,7 @@ describe('TransactionalEmailProvider — Local (integration)', () => {
 				expect(body).toContain('/auth/reset-password/tok-1')
 				expect(body).toContain(expiresAt.toISOString())
 
-				await rm(join(inbox, match!), { force: true })
+				await rm(join(mailbox, match!), { force: true })
 			})
 		})
 	})
@@ -168,15 +168,15 @@ describe('TransactionalEmailProvider — Local (integration)', () => {
 				)
 
 				// THEN the file's labels frontmatter should still read magic-link
-				const inbox = join(__dirname, '..', '..', '.dev-inbox')
-				const files = await readdir(inbox)
+				const mailbox = join(__dirname, '..', '..', '.dev-mailbox')
+				const files = await readdir(mailbox)
 				const match = files.find(name =>
 					name.includes(recipient.split('@')[0]!),
 				)
 				expect(match).toBeTruthy()
-				const body = await readFile(join(inbox, match!), 'utf8')
+				const body = await readFile(join(mailbox, match!), 'utf8')
 				expect(body).toMatch(/labels:\s*\n\s+- magic-link/)
-				await rm(join(inbox, match!), { force: true })
+				await rm(join(mailbox, match!), { force: true })
 			})
 		})
 	})

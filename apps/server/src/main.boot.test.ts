@@ -111,19 +111,19 @@ const waitForHealth = async (url: string, timeoutMs: number) => {
 describe('apps/server program boot', () => {
 	let proc: ChildProcess
 	let output: ReturnType<typeof collectOutput>
-	let tmpInbox: string
+	let tmpMailbox: string
 
 	beforeAll(async () => {
-		// Local-inbox provider writes magic-link emails to disk; isolate
-		// per-test-run so we don't dirty the dev inbox.
-		tmpInbox = mkdtempSync(join(tmpdir(), 'batuda-boot-test-inbox-'))
+		// Local-mailbox provider writes magic-link emails to disk; isolate
+		// per-test-run so we don't dirty the dev mailbox.
+		tmpMailbox = mkdtempSync(join(tmpdir(), 'batuda-boot-test-mailbox-'))
 
 		proc = spawn('node', ['dist/main.mjs'], {
 			cwd: new URL('..', import.meta.url),
 			env: {
 				...process.env,
 				...env,
-				LOCAL_INBOX_DIR: tmpInbox,
+				LOCAL_INBOX_DIR: tmpMailbox,
 			},
 			stdio: ['ignore', 'pipe', 'pipe'],
 		})
@@ -137,8 +137,8 @@ describe('apps/server program boot', () => {
 		if (proc && !proc.killed) {
 			proc.kill('SIGTERM')
 		}
-		if (tmpInbox) {
-			rmSync(tmpInbox, { recursive: true, force: true })
+		if (tmpMailbox) {
+			rmSync(tmpMailbox, { recursive: true, force: true })
 		}
 	})
 

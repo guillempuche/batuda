@@ -1,5 +1,5 @@
 // Self-sufficient integration test for the inbound-attachment storage
-// contract. The test creates its own org+inbox with synthetic ids, uploads
+// contract. The test creates its own org+mailbox with synthetic ids, uploads
 // bytes to MinIO at the worker's deterministic key shape, and asserts a
 // SELECT-then-GET round-trip — i.e. the contract the
 // `GET /v1/email/messages/:id/attachments/:idx/download` route is built
@@ -7,7 +7,7 @@
 // end-to-end by `apps/internal/tests/e2e/inbound-attachment.test.ts`.
 //
 // Why we don't rely on the seed: `multi-org-isolation.test.ts` runs
-// `TRUNCATE inboxes CASCADE` in its beforeAll, so the seeded
+// `TRUNCATE mailboxes CASCADE` in its beforeAll, so the seeded
 // admin@taller.cat row vanishes between vitest runs. The previous
 // version of this test resolved admin@taller.cat at startup and
 // failed on the second pre-push. Synthetic fixtures + DELETE-by-id in
@@ -50,10 +50,10 @@ const ONE_PIXEL_PNG = Buffer.from(
 const FIXTURE_INBOX_EMAIL = `email-attachment-fixture-${randomUUID()}@taller.test`
 const FIXTURE_ORG_ID = `email-attachment-test-org-${randomUUID()}`
 
-describe('email_messages.attachments storage contract', () => {
+describe('messages.attachments storage contract', () => {
 	let pool: pg.Pool
 	let s3: S3Client
-	let inboxId: string
+	let mailboxId: string
 	const seededMessageIds: string[] = []
 	const seededStorageKeys: string[] = []
 
@@ -69,17 +69,17 @@ describe('email_messages.attachments storage contract', () => {
 			forcePathStyle: true,
 		})
 
-		// `inboxes.organization_id` is `TEXT NOT NULL` with no foreign key,
+		// `mailboxes.organization_id` is `TEXT NOT NULL` with no foreign key,
 		// so we can insert a synthetic value without touching the
 		// `organization` table that other tests truncate.
 		const placeholder = Buffer.from([0])
 		const id = randomUUID()
 		await pool.query(
-			`INSERT INTO inboxes (
-				id, organization_id, email, purpose, owner_user_id,
+			`INSERT INTO channel_connections (
+				id, organization_id, external_id, purpose, owner_user_id,
 				imap_host, imap_port, imap_security,
 				smtp_host, smtp_port, smtp_security,
-				username, password_ciphertext, password_nonce, password_tag,
+				username, config_ciphertext, config_nonce, config_tag,
 				active
 			) VALUES (
 				$1::uuid, $2, $3, 'human', 'email-attachment-test-user',
@@ -91,16 +91,14 @@ describe('email_messages.attachments storage contract', () => {
 			ON CONFLICT DO NOTHING`,
 			[id, FIXTURE_ORG_ID, FIXTURE_INBOX_EMAIL, placeholder],
 		)
-		inboxId = id
+		mailboxId = id
 	})
 
 	afterAll(async () => {
 		for (const messageId of seededMessageIds) {
-			await pool.query(`DELETE FROM email_messages WHERE id = $1::uuid`, [
-				messageId,
-			])
+			await pool.query(`DELETE FROM messages WHERE id = $1::uuid`, [messageId])
 		}
-		await pool.query(`DELETE FROM inboxes WHERE email = $1`, [
+		await pool.query(`DELETE FROM channel_connections WHERE external_id = $1`, [
 			FIXTURE_INBOX_EMAIL,
 		])
 		for (const key of seededStorageKeys) {
@@ -119,7 +117,7 @@ describe('email_messages.attachments storage contract', () => {
 	}): Promise<{ messageId: string; storageKey: string }> => {
 		const messageId = randomUUID()
 		seededMessageIds.push(messageId)
-		const storageKey = `messages/${FIXTURE_ORG_ID}/${inboxId}/test-${messageId}/attachment-0.bin`
+		const storageKey = `messages/${FIXTURE_ORG_ID}/${mailboxId}/test-${messageId}/attachment-0.bin`
 		seededStorageKeys.push(storageKey)
 
 		await s3.send(
@@ -144,15 +142,15 @@ describe('email_messages.attachments storage contract', () => {
 		])
 
 		await pool.query(
-			`INSERT INTO email_messages
-			   (id, organization_id, inbox_id, message_id, direction, folder,
+			`INSERT INTO messages
+			   (id, organization_id, connection_id, message_id, direction, folder,
 			    raw_rfc822_ref, subject, attachments, status)
 			 VALUES ($1::uuid, $2, $3::uuid, $4, 'inbound', 'INBOX',
 			         'sentinel', 'attachment test', $5::jsonb, 'normal')`,
 			[
 				messageId,
 				FIXTURE_ORG_ID,
-				inboxId,
+				mailboxId,
 				`<test-${messageId}@example.com>`,
 				attachments,
 			],
@@ -171,7 +169,7 @@ describe('email_messages.attachments storage contract', () => {
 
 			// WHEN we read the row's storage key and GET from MinIO
 			const rows = await pool.query<{ attachments: unknown }>(
-				`SELECT attachments FROM email_messages WHERE id = $1::uuid`,
+				`SELECT attachments FROM messages WHERE id = $1::uuid`,
 				[messageId],
 			)
 			expect(rows.rows.length).toBe(1)
@@ -202,7 +200,7 @@ describe('email_messages.attachments storage contract', () => {
 			// GIVEN a row whose storage_key never had bytes uploaded
 			const messageId = randomUUID()
 			seededMessageIds.push(messageId)
-			const ghostKey = `messages/${FIXTURE_ORG_ID}/${inboxId}/test-${messageId}/attachment-ghost.bin`
+			const ghostKey = `messages/${FIXTURE_ORG_ID}/${mailboxId}/test-${messageId}/attachment-ghost.bin`
 			const attachments = JSON.stringify([
 				{
 					index: 0,
@@ -215,15 +213,15 @@ describe('email_messages.attachments storage contract', () => {
 				},
 			])
 			await pool.query(
-				`INSERT INTO email_messages
-				   (id, organization_id, inbox_id, message_id, direction, folder,
+				`INSERT INTO messages
+				   (id, organization_id, connection_id, message_id, direction, folder,
 				    raw_rfc822_ref, subject, attachments, status)
 				 VALUES ($1::uuid, $2, $3::uuid, $4, 'inbound', 'INBOX',
 				         'sentinel', 'ghost', $5::jsonb, 'normal')`,
 				[
 					messageId,
 					FIXTURE_ORG_ID,
-					inboxId,
+					mailboxId,
 					`<ghost-${messageId}@example.com>`,
 					attachments,
 				],

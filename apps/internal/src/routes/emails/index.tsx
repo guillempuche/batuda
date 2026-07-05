@@ -33,8 +33,8 @@ import {
 	Columns,
 	Eye,
 	EyeOff,
-	Inbox as InboxIcon,
 	Mail,
+	Mailbox as MailboxIcon,
 	Pencil,
 	PencilLine,
 	Plus,
@@ -65,7 +65,7 @@ import {
 	EMAILS_PAGE_SIZE,
 	type EmailsSearch,
 	emailsSearchAtom,
-	inboxesListAtom,
+	mailboxesListAtom,
 	markThreadReadAtom,
 	markThreadUnreadAtom,
 	threadAtomFor,
@@ -90,7 +90,7 @@ type ThreadStatus = 'open' | 'closed' | 'archived'
 type Direction = 'inbound' | 'outbound'
 type InboundClassification = 'normal' | 'spam' | 'blocked'
 
-type ThreadInbox = {
+type ThreadMailbox = {
 	readonly email: string
 	readonly displayName: string | null
 	readonly purpose: 'human' | 'agent' | 'shared'
@@ -109,10 +109,10 @@ type ThreadRow = {
 	readonly isUnread: boolean
 	readonly hasDraft: boolean
 	readonly updatedAt: string
-	readonly inbox: ThreadInbox | null
+	readonly mailbox: ThreadMailbox | null
 }
 
-type InboxOption = {
+type MailboxOption = {
 	readonly id: string
 	readonly email: string
 	readonly displayName: string | null
@@ -142,7 +142,7 @@ const SEARCH_DEBOUNCE_MS = 300
  * and is filtered to positive finite values.
  */
 const validateSearch = validateSearchWith({
-	inboxId: Schema.NonEmptyString,
+	mailboxId: Schema.NonEmptyString,
 	companyId: Schema.NonEmptyString,
 	status: Schema.Literals(['open', 'closed', 'archived'] as const),
 	purpose: Schema.Literals(['human', 'agent', 'shared'] as const),
@@ -159,7 +159,7 @@ function toWireSearch(
 	const page = search.page ?? 1
 	const offset = (page - 1) * EMAILS_PAGE_SIZE
 	const wire: {
-		inboxId?: string
+		mailboxId?: string
 		companyId?: string
 		status?: 'open' | 'closed' | 'archived'
 		purpose?: 'human' | 'agent' | 'shared'
@@ -168,7 +168,7 @@ function toWireSearch(
 		offset?: number
 	} = { limit: EMAILS_PAGE_SIZE }
 	if (offset > 0) wire.offset = offset
-	if (search.inboxId !== undefined) wire.inboxId = search.inboxId
+	if (search.mailboxId !== undefined) wire.mailboxId = search.mailboxId
 	if (search.companyId !== undefined) wire.companyId = search.companyId
 	if (search.status !== undefined) wire.status = search.status
 	if (search.purpose !== undefined) wire.purpose = search.purpose
@@ -178,7 +178,7 @@ function toWireSearch(
 
 async function loadThreadsOnServer(wire: EmailsSearch): Promise<{
 	envelope: ListEnvelope
-	inboxes: ReadonlyArray<unknown>
+	mailboxes: ReadonlyArray<unknown>
 }> {
 	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
 		import('effect'),
@@ -186,7 +186,7 @@ async function loadThreadsOnServer(wire: EmailsSearch): Promise<{
 		getServerCookieHeader(),
 	])
 	const queryForServer: Record<string, string | number> = {}
-	if (wire.inboxId !== undefined) queryForServer['inboxId'] = wire.inboxId
+	if (wire.mailboxId !== undefined) queryForServer['mailboxId'] = wire.mailboxId
 	if (wire.companyId !== undefined) queryForServer['companyId'] = wire.companyId
 	if (wire.status !== undefined) queryForServer['status'] = wire.status
 	if (wire.purpose !== undefined) queryForServer['purpose'] = wire.purpose
@@ -195,14 +195,14 @@ async function loadThreadsOnServer(wire: EmailsSearch): Promise<{
 	if (wire.offset !== undefined) queryForServer['offset'] = wire.offset
 	const program = Effect.gen(function* () {
 		const client = yield* makeBatudaApiServer(cookie ?? undefined)
-		const [envelope, inboxes] = yield* Effect.all(
+		const [envelope, mailboxes] = yield* Effect.all(
 			[
 				client.email.listThreads({ query: queryForServer }),
-				client.email.listInboxes({ query: {} }),
+				client.email.listMailboxes({ query: {} }),
 			],
 			{ concurrency: 2 },
 		)
-		return { envelope, inboxes }
+		return { envelope, mailboxes }
 	})
 	return Effect.runPromise(program)
 }
@@ -216,11 +216,11 @@ export const Route = createFileRoute('/emails/')({
 		}
 		try {
 			const wire = toWireSearch(search)
-			const { envelope, inboxes } = await loadThreadsOnServer(wire)
+			const { envelope, mailboxes } = await loadThreadsOnServer(wire)
 			return {
 				dehydrated: [
 					dehydrateAtom(emailsSearchAtom(wire), AsyncResult.success(envelope)),
-					dehydrateAtom(inboxesListAtom, AsyncResult.success(inboxes)),
+					dehydrateAtom(mailboxesListAtom, AsyncResult.success(mailboxes)),
 				] as const,
 			}
 		} catch (error) {
@@ -261,7 +261,7 @@ function EmailsIndexPage() {
 	const result = useAtomValue(atom)
 	const refreshList = useAtomRefresh(atom)
 
-	const inboxesResult = useAtomValue(inboxesListAtom)
+	const mailboxesResult = useAtomValue(mailboxesListAtom)
 	const companiesResult = useAtomValue(companiesListAtom)
 
 	const updateStatus = useAtomSet(updateThreadStatusAtom, {
@@ -335,12 +335,12 @@ function EmailsIndexPage() {
 		return false
 	}, [result])
 
-	const inboxOptions = useMemo<ReadonlyArray<InboxOption>>(
+	const mailboxOptions = useMemo<ReadonlyArray<MailboxOption>>(
 		() =>
-			AsyncResult.isSuccess(inboxesResult)
-				? narrowInboxes(inboxesResult.value)
+			AsyncResult.isSuccess(mailboxesResult)
+				? narrowMailboxes(mailboxesResult.value)
 				: [],
-		[inboxesResult],
+		[mailboxesResult],
 	)
 	const companiesById = useMemo<Map<string, CompanyLookup>>(() => {
 		if (!AsyncResult.isSuccess(companiesResult)) return new Map()
@@ -367,7 +367,7 @@ function EmailsIndexPage() {
 	// Push the debounced input to the URL. Guard against the URL-sync
 	// effect above to avoid a loop. Uses `replace: true` so a typing
 	// session collapses into one history entry — back escapes the whole
-	// search, not one keystroke. Status pills, inbox select, pagination,
+	// search, not one keystroke. Status pills, mailbox select, pagination,
 	// and Clear all still push (deliberate filter choices).
 	useEffect(() => {
 		const current = search.query ?? ''
@@ -398,11 +398,11 @@ function EmailsIndexPage() {
 		},
 		[navigate],
 	)
-	const handleInboxFilter = useCallback(
-		(inboxId: string | undefined) => {
+	const handleMailboxFilter = useCallback(
+		(mailboxId: string | undefined) => {
 			void navigate({
 				to: '/emails',
-				search: prev => mergeSearch(prev, { inboxId, page: undefined }),
+				search: prev => mergeSearch(prev, { mailboxId, page: undefined }),
 			})
 		},
 		[navigate],
@@ -563,7 +563,7 @@ function EmailsIndexPage() {
 				<IntroActions>
 					{/*
 					 * Cross-route dialog opener: a real <Link> (cmd/middle-clickable,
-					 * shareable) that lands on /emails/inboxes with the connect dialog
+					 * shareable) that lands on /emails/mailboxes with the connect dialog
 					 * already open via the `?dlg=` param. Back returns here.
 					 */}
 					<PriButton
@@ -571,7 +571,7 @@ function EmailsIndexPage() {
 						data-testid='emails-connect-mailbox'
 						render={props => (
 							<Link
-								to='/emails/inboxes'
+								to='/emails/mailboxes'
 								search={{ dlg: { kind: 'create' } }}
 								{...props}
 							/>
@@ -583,13 +583,13 @@ function EmailsIndexPage() {
 					<PriButton
 						type='button'
 						$variant='outlined'
-						data-testid='emails-manage-inboxes'
+						data-testid='emails-manage-mailboxes'
 						onClick={() => {
-							void navigate({ to: '/emails/inboxes' })
+							void navigate({ to: '/emails/mailboxes' })
 						}}
 					>
-						<InboxIcon size={14} aria-hidden />
-						<span>{t`Manage inboxes`}</span>
+						<MailboxIcon size={14} aria-hidden />
+						<span>{t`Manage mailboxes`}</span>
 					</PriButton>
 					{/*
 					 * `<form action>` instead of a plain onClick so React 19
@@ -665,21 +665,21 @@ function EmailsIndexPage() {
 					})}
 				</StatusFilters>
 
-				{inboxOptions.length > 0 && (
-					<InboxSelectWrap>
+				{mailboxOptions.length > 0 && (
+					<MailboxSelectWrap>
 						<PriSelect.Root
-							value={search.inboxId ?? '__all__'}
+							value={search.mailboxId ?? '__all__'}
 							onValueChange={value =>
-								handleInboxFilter(
+								handleMailboxFilter(
 									value === '__all__' ? undefined : String(value),
 								)
 							}
 						>
 							<PriSelect.Trigger
-								data-testid='inbox-filter-trigger'
-								aria-label={t`Filter by inbox`}
+								data-testid='mailbox-filter-trigger'
+								aria-label={t`Filter by mailbox`}
 							>
-								<PriSelect.Value placeholder={t`All inboxes`} />
+								<PriSelect.Value placeholder={t`All mailboxes`} />
 								<PriSelect.Icon>
 									<ChevronRight size={14} aria-hidden />
 								</PriSelect.Icon>
@@ -689,28 +689,28 @@ function EmailsIndexPage() {
 									<PriSelect.Popup>
 										<PriSelect.Item
 											value='__all__'
-											data-testid='inbox-filter-option'
-											data-inbox-email='__all__'
+											data-testid='mailbox-filter-option'
+											data-mailbox-email='__all__'
 										>
 											<PriSelect.ItemIndicator>
 												<Check size={12} aria-hidden />
 											</PriSelect.ItemIndicator>
-											<PriSelect.ItemText>{t`All inboxes`}</PriSelect.ItemText>
+											<PriSelect.ItemText>{t`All mailboxes`}</PriSelect.ItemText>
 										</PriSelect.Item>
-										{inboxOptions.map(inbox => (
+										{mailboxOptions.map(mailbox => (
 											<PriSelect.Item
-												key={inbox.id}
-												value={inbox.id}
-												data-testid='inbox-filter-option'
-												data-inbox-email={inbox.email}
+												key={mailbox.id}
+												value={mailbox.id}
+												data-testid='mailbox-filter-option'
+												data-mailbox-email={mailbox.email}
 											>
 												<PriSelect.ItemIndicator>
 													<Check size={12} aria-hidden />
 												</PriSelect.ItemIndicator>
 												<PriSelect.ItemText>
-													{inbox.displayName
-														? `${inbox.displayName} <${inbox.email}>`
-														: inbox.email}
+													{mailbox.displayName
+														? `${mailbox.displayName} <${mailbox.email}>`
+														: mailbox.email}
 												</PriSelect.ItemText>
 											</PriSelect.Item>
 										))}
@@ -718,7 +718,7 @@ function EmailsIndexPage() {
 								</PriSelect.Positioner>
 							</PriSelect.Portal>
 						</PriSelect.Root>
-					</InboxSelectWrap>
+					</MailboxSelectWrap>
 				)}
 
 				{activeFilters && (
@@ -1218,7 +1218,7 @@ function WhoCell({
 }) {
 	const { t } = useLingui()
 	const senderLabel =
-		thread.inbox?.displayName ?? thread.inbox?.email ?? t`Unknown`
+		thread.mailbox?.displayName ?? thread.mailbox?.email ?? t`Unknown`
 	return (
 		<WhoStack>
 			<WhoLine1>
@@ -1438,7 +1438,7 @@ function DraftsResumeStrip({ drafts }: { drafts: ReadonlyArray<StripDraft> }) {
 function mergeSearch(
 	prev: EmailsSearch & { page?: number },
 	next: Partial<{
-		inboxId: string | undefined
+		mailboxId: string | undefined
 		companyId: string | undefined
 		status: ThreadStatus | undefined
 		purpose: 'human' | 'agent' | 'shared' | undefined
@@ -1447,15 +1447,15 @@ function mergeSearch(
 	}>,
 ): EmailsSearch & { page?: number } {
 	const result: {
-		inboxId?: string
+		mailboxId?: string
 		companyId?: string
 		status?: ThreadStatus
 		purpose?: 'human' | 'agent' | 'shared'
 		query?: string
 		page?: number
 	} = {}
-	const inboxId = 'inboxId' in next ? next.inboxId : prev.inboxId
-	if (inboxId !== undefined && inboxId !== '') result.inboxId = inboxId
+	const mailboxId = 'mailboxId' in next ? next.mailboxId : prev.mailboxId
+	if (mailboxId !== undefined && mailboxId !== '') result.mailboxId = mailboxId
 	const companyId = 'companyId' in next ? next.companyId : prev.companyId
 	if (companyId !== undefined && companyId !== '') result.companyId = companyId
 	const status = 'status' in next ? next.status : prev.status
@@ -1471,7 +1471,7 @@ function mergeSearch(
 
 function hasActiveFilters(search: EmailsSearch & { page?: number }): boolean {
 	return (
-		search.inboxId !== undefined ||
+		search.mailboxId !== undefined ||
 		search.companyId !== undefined ||
 		search.status !== undefined ||
 		search.purpose !== undefined ||
@@ -1532,13 +1532,13 @@ function narrowThreads(rows: ReadonlyArray<unknown>): ReadonlyArray<ThreadRow> {
 				typeof r['updatedAt'] === 'string'
 					? r['updatedAt']
 					: new Date(0).toISOString(),
-			inbox: narrowInbox(r['inbox']),
+			mailbox: narrowMailbox(r['mailbox']),
 		})
 	}
 	return out
 }
 
-function narrowInbox(value: unknown): ThreadInbox | null {
+function narrowMailbox(value: unknown): ThreadMailbox | null {
 	if (!value || typeof value !== 'object') return null
 	const v = value as Record<string, unknown>
 	if (typeof v['email'] !== 'string') return null
@@ -1553,10 +1553,10 @@ function narrowInbox(value: unknown): ThreadInbox | null {
 	}
 }
 
-function narrowInboxes(
+function narrowMailboxes(
 	rows: ReadonlyArray<unknown>,
-): ReadonlyArray<InboxOption> {
-	const out: Array<InboxOption> = []
+): ReadonlyArray<MailboxOption> {
+	const out: Array<MailboxOption> = []
 	for (const row of rows) {
 		if (!row || typeof row !== 'object') continue
 		const r = row as Record<string, unknown>
@@ -1718,8 +1718,8 @@ const StatusFilterButton = styled.button.withConfig({
 	}
 `
 
-const InboxSelectWrap = styled.div.withConfig({
-	displayName: 'EmailsIndexInboxSelectWrap',
+const MailboxSelectWrap = styled.div.withConfig({
+	displayName: 'EmailsIndexMailboxSelectWrap',
 })`
 	display: flex;
 `

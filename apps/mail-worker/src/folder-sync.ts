@@ -4,7 +4,7 @@ import type { ImapFlow } from 'imapflow'
 
 import { ingestRawMessage } from './ingest.js'
 
-// Per-folder sync state stored under inboxes.folder_state JSONB:
+// Per-folder sync state stored under channel_connections.sync_state JSONB:
 //   { "INBOX": { "uidvalidity": 1234, "lastUid": 9876, "syncedAt": "2026-..." } }
 // Read defensively — folder may not exist yet, fields may be wrong type.
 export interface FolderState {
@@ -29,21 +29,21 @@ export const readFolderState = (
 }
 
 const writeFolderState = (
-	inboxId: string,
+	mailboxId: string,
 	folder: string,
 	state: FolderState,
 ) =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
 		yield* sql`
-			UPDATE inboxes
-			SET folder_state = jsonb_set(
-				COALESCE(folder_state, '{}'::jsonb),
+			UPDATE channel_connections
+			SET sync_state = jsonb_set(
+				COALESCE(sync_state, '{}'::jsonb),
 				ARRAY[${folder}],
 				${JSON.stringify(state)}::jsonb,
 				true
 			)
-			WHERE id = ${inboxId}
+			WHERE id = ${mailboxId}
 		`
 	})
 
@@ -51,16 +51,16 @@ const writeFolderState = (
 // Worker-issued; safe under concurrent EXPUNGE/EXISTS because UID is
 // monotonic per uidvalidity epoch.
 export const markExpunged = (args: {
-	readonly inboxId: string
+	readonly mailboxId: string
 	readonly imapUidvalidity: number
 	readonly imapUid: number
 }) =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
 		yield* sql`
-			UPDATE email_messages
+			UPDATE messages
 			SET deleted_at = now()
-			WHERE inbox_id = ${args.inboxId}
+			WHERE connection_id = ${args.mailboxId}
 			  AND imap_uidvalidity = ${args.imapUidvalidity}
 			  AND imap_uid = ${args.imapUid}
 			  AND deleted_at IS NULL
@@ -69,12 +69,12 @@ export const markExpunged = (args: {
 
 // Fetch every UID strictly greater than `sinceUid` and ingest each.
 // Returns the highest UID actually persisted so the caller can advance
-// folder_state.lastUid. When no new messages exist, returns sinceUid
+// sync_state.lastUid. When no new messages exist, returns sinceUid
 // unchanged.
 export const fetchAndIngestNewerThan = (args: {
 	readonly client: ImapFlow
 	readonly organizationId: string
-	readonly inboxId: string
+	readonly mailboxId: string
 	readonly folder: string
 	readonly uidvalidity: number
 	readonly sinceUid: number
@@ -100,19 +100,19 @@ export const fetchAndIngestNewerThan = (args: {
 		for (const m of messages) {
 			yield* ingestRawMessage({
 				organizationId: args.organizationId,
-				inboxId: args.inboxId,
+				mailboxId: args.mailboxId,
 				folder: args.folder,
 				imapUid: m.uid,
 				imapUidvalidity: args.uidvalidity,
 				raw: new Uint8Array(m.source),
 			}).pipe(
 				// One bad message must not block the rest of the batch — ingest
-				// failures land in logs and folder_state still advances on
+				// failures land in logs and sync_state still advances on
 				// successes. The dedupe index makes a re-fetch on next sync
 				// idempotent if the cause was transient.
 				Effect.catchCause(cause =>
 					Effect.logWarning(
-						`mail-worker: ingest failed inbox=${args.inboxId} uid=${m.uid}`,
+						`mail-worker: ingest failed mailbox=${args.mailboxId} uid=${m.uid}`,
 					).pipe(Effect.andThen(Effect.logError(cause))),
 				),
 			)
@@ -120,7 +120,7 @@ export const fetchAndIngestNewerThan = (args: {
 		}
 
 		if (highest !== args.sinceUid) {
-			yield* writeFolderState(args.inboxId, args.folder, {
+			yield* writeFolderState(args.mailboxId, args.folder, {
 				uidvalidity: args.uidvalidity,
 				lastUid: highest,
 				syncedAt: new Date().toISOString(),
@@ -134,12 +134,12 @@ export const fetchAndIngestNewerThan = (args: {
 // session resumes from there. Backfill computes lastUid itself because
 // it doesn't go through the sinceUid+1 fetch path.
 export const recordFolderHead = (args: {
-	readonly inboxId: string
+	readonly mailboxId: string
 	readonly folder: string
 	readonly uidvalidity: number
 	readonly lastUid: number
 }) =>
-	writeFolderState(args.inboxId, args.folder, {
+	writeFolderState(args.mailboxId, args.folder, {
 		uidvalidity: args.uidvalidity,
 		lastUid: args.lastUid,
 		syncedAt: new Date().toISOString(),

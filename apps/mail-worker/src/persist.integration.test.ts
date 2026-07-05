@@ -1,6 +1,6 @@
 // Live-DB integration test for the matcher → persist auto-link wiring.
 // Verifies that `persistInboundMessage` populates `company_id` and
-// `contact_id` on both `email_messages` and `email_thread_links` based
+// `contact_id` on both `messages` and `conversations` based
 // on the inbound sender address.
 //
 // Prereq: `pnpm cli services up` so Postgres is reachable on
@@ -17,7 +17,7 @@ import { Config, Effect, Redacted } from 'effect'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { ParticipantMatcher } from '@batuda/email/participant-matcher'
+import { ParticipantMatcher } from '@batuda/communications'
 
 import { type ParsedInbound, persistInboundMessage } from './persist.js'
 
@@ -48,7 +48,7 @@ const ORG_ID = `test-org-${randomUUID()}`
 const ACME_DOMAIN = `acme-${randomUUID()}.example`
 
 let pool: pg.Pool
-let inboxId: string
+let mailboxId: string
 let acmeCompanyId: string
 let aliceContactId: string
 
@@ -76,7 +76,7 @@ const insertContact = async (
 	// The address lives on the email channel now — that's what inbound
 	// matching joins against.
 	await pool.query(
-		`INSERT INTO contact_channels (organization_id, contact_id, kind, value, is_primary) VALUES ($1, $2, 'email', $3, true)`,
+		`INSERT INTO contact_channels (organization_id, contact_id, channel, address, is_primary) VALUES ($1, $2, 'email', $3, true)`,
 		[ORG_ID, row.id, email],
 	)
 	return row.id
@@ -98,13 +98,13 @@ const buildParsed = (overrides: Partial<ParsedInbound>): ParsedInbound => ({
 	...overrides,
 })
 
-// Per-test imap_uid so the (inbox_id, uidvalidity, uid) dedupe index
+// Per-test imap_uid so the (connection_id, uidvalidity, uid) dedupe index
 // doesn't swallow inserts. uidvalidity stays constant for the suite.
 let nextUid = 1
 const persist = (parsed: ParsedInbound) =>
 	persistInboundMessage({
 		organizationId: ORG_ID,
-		inboxId,
+		mailboxId,
 		folder: 'INBOX',
 		imapUid: nextUid++,
 		imapUidvalidity: 100,
@@ -116,24 +116,24 @@ const persist = (parsed: ParsedInbound) =>
 beforeAll(async () => {
 	pool = new pg.Pool({ connectionString: DATABASE_URL, max: 4 })
 
-	// One inbox row keyed off ORG_ID. Most columns are unused by persist;
-	// they exist purely to satisfy NOT NULL constraints on inboxes.
-	const inboxResult = await pool.query<{ id: string }>(
-		`INSERT INTO inboxes
-		 (organization_id, owner_user_id, email, purpose,
+	// One channel_connections row keyed off ORG_ID. Most columns are unused by
+	// persist; they exist purely to satisfy its NOT NULL constraints.
+	const mailboxResult = await pool.query<{ id: string }>(
+		`INSERT INTO channel_connections
+		 (organization_id, owner_user_id, external_id, purpose,
 		  imap_host, imap_port, imap_security,
 		  smtp_host, smtp_port, smtp_security,
-		  username, password_ciphertext, password_nonce, password_tag)
+		  username, config_ciphertext, config_nonce, config_tag)
 		 VALUES ($1, $2, $3, 'human',
 		         'imap.example.com', 993, 'tls',
 		         'smtp.example.com', 465, 'tls',
 		         $3, '\\x00'::bytea, '\\x00'::bytea, '\\x00'::bytea)
 		 RETURNING id`,
-		[ORG_ID, `test-user-${randomUUID()}`, `inbox@${ACME_DOMAIN}`],
+		[ORG_ID, `test-user-${randomUUID()}`, `mailbox@${ACME_DOMAIN}`],
 	)
-	const inboxRow = inboxResult.rows[0]
-	if (!inboxRow) throw new Error('failed to insert test inbox')
-	inboxId = inboxRow.id
+	const mailboxRow = mailboxResult.rows[0]
+	if (!mailboxRow) throw new Error('failed to insert test mailbox')
+	mailboxId = mailboxRow.id
 
 	acmeCompanyId = await insertCompany('acme', `info@${ACME_DOMAIN}`)
 	aliceContactId = await insertContact(
@@ -146,19 +146,19 @@ beforeAll(async () => {
 afterAll(async () => {
 	// Order matters: child rows before parents (no CASCADE on all FKs).
 	await pool.query(
-		`DELETE FROM message_participants WHERE email_message_id IN (SELECT id FROM email_messages WHERE organization_id = $1)`,
+		`DELETE FROM message_participants WHERE message_id IN (SELECT id FROM messages WHERE organization_id = $1)`,
 		[ORG_ID],
 	)
-	await pool.query(`DELETE FROM email_messages WHERE organization_id = $1`, [
+	await pool.query(`DELETE FROM messages WHERE organization_id = $1`, [ORG_ID])
+	await pool.query(`DELETE FROM conversations WHERE organization_id = $1`, [
 		ORG_ID,
 	])
-	await pool.query(
-		`DELETE FROM email_thread_links WHERE organization_id = $1`,
-		[ORG_ID],
-	)
 	await pool.query(`DELETE FROM contacts WHERE organization_id = $1`, [ORG_ID])
 	await pool.query(`DELETE FROM companies WHERE organization_id = $1`, [ORG_ID])
-	await pool.query(`DELETE FROM inboxes WHERE organization_id = $1`, [ORG_ID])
+	await pool.query(
+		`DELETE FROM channel_connections WHERE organization_id = $1`,
+		[ORG_ID],
+	)
 	await pool.end()
 })
 
@@ -166,10 +166,9 @@ const fetchMessage = async (messageId: string) => {
 	const rows = await pool.query<{
 		company_id: string | null
 		contact_id: string | null
-	}>(
-		`SELECT company_id, contact_id FROM email_messages WHERE message_id = $1`,
-		[messageId],
-	)
+	}>(`SELECT company_id, contact_id FROM messages WHERE message_id = $1`, [
+		messageId,
+	])
 	return rows.rows[0]
 }
 
@@ -178,7 +177,7 @@ const fetchThreadLink = async (externalThreadId: string) => {
 		company_id: string | null
 		contact_id: string | null
 	}>(
-		`SELECT company_id, contact_id FROM email_thread_links WHERE external_thread_id = $1`,
+		`SELECT company_id, contact_id FROM conversations WHERE external_thread_id = $1`,
 		[externalThreadId],
 	)
 	return rows.rows[0]
@@ -186,7 +185,7 @@ const fetchThreadLink = async (externalThreadId: string) => {
 
 describe('persistInboundMessage — CRM auto-link', () => {
 	describe('when the sender matches an existing contact', () => {
-		it('should populate company_id and contact_id on email_messages', async () => {
+		it('should populate company_id and contact_id on messages', async () => {
 			// GIVEN an inbound email from alice@acme (a seeded contact)
 			const messageId = `<contact-msg-${randomUUID()}@example>`
 			const parsed = buildParsed({
@@ -197,7 +196,7 @@ describe('persistInboundMessage — CRM auto-link', () => {
 			// WHEN we persist it through the real ingest path
 			await runIngest(persist(parsed))
 
-			// THEN the email_messages row carries both IDs
+			// THEN the messages row carries both IDs
 			const row = await fetchMessage(messageId)
 			expect(row?.company_id).toBe(acmeCompanyId)
 			// AND the contact_id matches the seeded contact
@@ -220,7 +219,7 @@ describe('persistInboundMessage — CRM auto-link', () => {
 			const link = await fetchThreadLink(messageId)
 			expect(link?.company_id).toBe(acmeCompanyId)
 			expect(link?.contact_id).toBe(aliceContactId)
-			// [apps/mail-worker/src/persist.ts — INSERT INTO email_thread_links … company_id, contact_id]
+			// [apps/mail-worker/src/persist.ts — INSERT INTO conversations … company_id, contact_id]
 		})
 	})
 

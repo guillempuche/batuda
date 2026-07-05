@@ -98,7 +98,7 @@ export const ContactHandlersLive = ContactTools.toLayer(
 			list_contacts: ({ company_id }) =>
 				sql`
 					SELECT c.*, COALESCE(
-						(SELECT json_agg(ch ORDER BY ch.is_primary DESC, ch.kind)
+						(SELECT json_agg(ch ORDER BY ch.is_primary DESC, ch.channel)
 						 FROM contact_channels ch WHERE ch.contact_id = c.id),
 						'[]'::json
 					) AS channels

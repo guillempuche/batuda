@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { findLatestEmail } from './helpers/dev-inbox'
+import { findLatestEmail } from './helpers/dev-mailbox'
 
 // Magic-link sign-in golden + recovery paths. Selectors are verified
 // against apps/internal/src/routes/login.tsx and apps/server/src/lib/auth.ts
@@ -8,13 +8,13 @@ import { findLatestEmail } from './helpers/dev-inbox'
 //
 // This file runs in the `unauth` Playwright project (no storageState).
 // The dev server must be running with EMAIL_PROVIDER=local so the
-// transactional provider writes .md files to apps/server/.dev-inbox/.
+// transactional provider writes .md files to apps/server/.dev-mailbox/.
 
 const SEED_USER_EMAIL = 'admin@taller.cat'
 
 test.describe('magic-link sign-in from /login', () => {
 	test.describe('when a registered user requests a sign-in link', () => {
-		test('should swap the form for the inbox panel and sign her in on click', async ({
+		test('should swap the form for the mailbox panel and sign her in on click', async ({
 			browser,
 			page,
 		}) => {
@@ -29,7 +29,7 @@ test.describe('magic-link sign-in from /login', () => {
 			await page.getByTestId('login-email').fill(SEED_USER_EMAIL)
 			await page.getByTestId('login-magic-link-trigger').click()
 
-			// THEN the form unmounts and the inbox panel renders with the
+			// THEN the form unmounts and the mailbox panel renders with the
 			// captured email shown back to the user
 			// [routes/login.tsx — magicLinkStatus.kind === 'sent' branch]
 			await expect(page.getByTestId('magic-link-sent-panel')).toBeVisible({
@@ -68,7 +68,7 @@ test.describe('magic-link sign-in from /login', () => {
 	})
 
 	test.describe('when an unregistered email requests a sign-in link', () => {
-		test('should render the inbox panel without writing an email (no enumeration)', async ({
+		test('should render the mailbox panel without writing an email (no enumeration)', async ({
 			page,
 		}) => {
 			// GIVEN /login is open
@@ -83,14 +83,14 @@ test.describe('magic-link sign-in from /login', () => {
 			await page.getByTestId('login-email').fill(unknownEmail)
 			await page.getByTestId('login-magic-link-trigger').click()
 
-			// THEN the UI shows the same inbox panel — the response shape
+			// THEN the UI shows the same mailbox panel — the response shape
 			// stays opaque so an attacker cannot tell registered apart from
 			// unregistered. Same UX, no information leak.
 			await expect(page.getByTestId('magic-link-sent-panel')).toBeVisible({
 				timeout: 10_000,
 			})
 
-			// AND the dev-inbox does NOT receive a .md for this recipient —
+			// AND the dev-mailbox does NOT receive a .md for this recipient —
 			// the existence pre-check inside sendMagicLink silently no-ops
 			// for unknown emails.
 			let caught = false
@@ -108,9 +108,9 @@ test.describe('magic-link sign-in from /login', () => {
 		})
 	})
 
-	test.describe('when the user toggles back to password from the inbox panel', () => {
+	test.describe('when the user toggles back to password from the mailbox panel', () => {
 		test('should restore the password form intact', async ({ page }) => {
-			// GIVEN the inbox panel is rendered after a successful magic-link send
+			// GIVEN the mailbox panel is rendered after a successful magic-link send
 			await page.goto('/login')
 			await page.getByTestId('login-email').fill(SEED_USER_EMAIL)
 			await page.getByTestId('login-magic-link-trigger').click()

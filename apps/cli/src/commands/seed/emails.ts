@@ -4,7 +4,7 @@ import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { Config, Effect, Redacted } from 'effect'
 import type { SqlClient } from 'effect/unstable/sql'
 
-import type { SeededInbox } from './inboxes'
+import type { SeededMailbox } from './mailboxes'
 import { ONE_PIXEL_PNG, TINY_PDF } from './shared'
 
 // Direct INSERTs keep the seed fast and deterministic — no SMTP round-trip or
@@ -17,7 +17,7 @@ interface SeedAttachment {
 }
 
 interface SeedMessageArgs {
-	readonly inbox: SeededInbox
+	readonly mailbox: SeededMailbox
 	readonly threadRootMessageId: string
 	readonly threadSubject: string
 	readonly threadStatus?: 'open' | 'closed' | 'archived'
@@ -50,7 +50,7 @@ const slugMessageId = (id: string): string =>
 
 export const seedDemoEmails = (
 	sql: SqlClient.SqlClient,
-	seededInboxes: ReadonlyArray<SeededInbox>,
+	seededMailboxes: ReadonlyArray<SeededMailbox>,
 ) =>
 	Effect.gen(function* () {
 		const seedStorageEndpoint = yield* Config.string('STORAGE_ENDPOINT')
@@ -73,9 +73,9 @@ export const seedDemoEmails = (
 		const insertSeedMessage = (args: SeedMessageArgs) =>
 			Effect.gen(function* () {
 				yield* sql`
-					INSERT INTO email_thread_links ${sql.insert({
-						organizationId: args.inbox.orgId,
-						inboxId: args.inbox.id,
+					INSERT INTO conversations ${sql.insert({
+						organizationId: args.mailbox.orgId,
+						connectionId: args.mailbox.id,
 						externalThreadId: args.threadRootMessageId,
 						subject: args.threadSubject,
 						status: args.threadStatus ?? 'open',
@@ -86,7 +86,7 @@ export const seedDemoEmails = (
 				`
 
 				const slug = slugMessageId(args.messageId)
-				const rawRfc822Ref = `messages/${args.inbox.orgId}/${args.inbox.id}/seed/${slug}.eml`
+				const rawRfc822Ref = `messages/${args.mailbox.orgId}/${args.mailbox.id}/seed/${slug}.eml`
 
 				const attachmentsMeta: Array<{
 					index: number
@@ -99,7 +99,7 @@ export const seedDemoEmails = (
 				}> = []
 				if (args.attachments) {
 					for (const [i, a] of args.attachments.entries()) {
-						const storageKey = `messages/${args.inbox.orgId}/${args.inbox.id}/seed/${slug}/attachment-${i}.bin`
+						const storageKey = `messages/${args.mailbox.orgId}/${args.mailbox.id}/seed/${slug}/attachment-${i}.bin`
 						yield* Effect.tryPromise({
 							try: () =>
 								seedS3.send(
@@ -128,8 +128,8 @@ export const seedDemoEmails = (
 				}
 
 				const dbMessageRow: Record<string, unknown> = {
-					organizationId: args.inbox.orgId,
-					inboxId: args.inbox.id,
+					organizationId: args.mailbox.orgId,
+					connectionId: args.mailbox.id,
 					messageId: args.messageId,
 					inReplyTo: args.inReplyTo ?? null,
 					references: args.references ?? [],
@@ -157,32 +157,36 @@ export const seedDemoEmails = (
 					inboundClassification: args.inboundClassification ?? null,
 				}
 				const insertedRows = yield* sql<{ id: string }>`
-					INSERT INTO email_messages ${sql.insert(dbMessageRow)}
+					INSERT INTO messages ${sql.insert(dbMessageRow)}
 					RETURNING id
 				`
 				const inserted = insertedRows[0]
 				if (!inserted) return
 
 				type Participant = {
-					emailMessageId: string
-					emailAddress: string
+					messageId: string
+					address: string
 					role: string
+					channel: string
 				}
 				const participants: Participant[] = [
 					{
-						emailMessageId: inserted.id,
-						emailAddress: args.fromAddress.toLowerCase(),
+						messageId: inserted.id,
+						address: args.fromAddress.toLowerCase(),
 						role: 'from',
+						channel: 'email',
 					},
 					...args.toAddresses.map(addr => ({
-						emailMessageId: inserted.id,
-						emailAddress: addr.toLowerCase(),
+						messageId: inserted.id,
+						address: addr.toLowerCase(),
 						role: 'to',
+						channel: 'email',
 					})),
 					...(args.ccAddresses ?? []).map(addr => ({
-						emailMessageId: inserted.id,
-						emailAddress: addr.toLowerCase(),
+						messageId: inserted.id,
+						address: addr.toLowerCase(),
 						role: 'cc',
+						channel: 'email',
 					})),
 				]
 				yield* sql`
@@ -191,18 +195,22 @@ export const seedDemoEmails = (
 				`
 			})
 
-		const tallerHuman = seededInboxes.find(i => i.email === 'admin@taller.cat')
-		const tallerAgent = seededInboxes.find(i => i.email === 'agent@taller.cat')
-		const restaurantHuman = seededInboxes.find(
+		const tallerHuman = seededMailboxes.find(
+			i => i.email === 'admin@taller.cat',
+		)
+		const tallerAgent = seededMailboxes.find(
+			i => i.email === 'agent@taller.cat',
+		)
+		const restaurantHuman = seededMailboxes.find(
 			i => i.email === 'admin@restaurant.demo',
 		)
-		const restaurantAgent = seededInboxes.find(
+		const restaurantAgent = seededMailboxes.find(
 			i => i.email === 'agent@restaurant.demo',
 		)
 
 		// Resolve the seeded company + contact (by slug / email within the org)
 		// so at least one thread lands on the CRM timeline. Same lookup style as
-		// the inbox seed; ids stay null if the CRM seed was skipped.
+		// the mailbox seed; ids stay null if the CRM seed was skipped.
 		const tallerOrgId = tallerHuman?.orgId
 		let calPepCompanyId: string | null = null
 		let pepContactId: string | null = null
@@ -217,8 +225,8 @@ export const seedDemoEmails = (
 				SELECT c.id FROM contacts c
 				JOIN contact_channels ch ON ch.contact_id = c.id
 				WHERE c.organization_id = ${tallerOrgId}
-				  AND ch.kind = 'email'
-				  AND ch.value = 'pep@calpepfonda.cat'
+				  AND ch.channel = 'email'
+				  AND ch.address = 'pep@calpepfonda.cat'
 				LIMIT 1
 			`
 			pepContactId = contactRows[0]?.id ?? null
@@ -235,7 +243,7 @@ export const seedDemoEmails = (
 			const m14Id = `<m14-${randomUUID()}@malware.example>`
 
 			yield* insertSeedMessage({
-				inbox: tallerHuman,
+				mailbox: tallerHuman,
 				threadRootMessageId: m1Id,
 				threadSubject: 'Quote for the booking module',
 				// Pep is a seeded CRM contact at Cal Pep Fonda — linking the thread
@@ -253,7 +261,7 @@ export const seedDemoEmails = (
 				receivedAt: new Date('2026-04-30T09:00:00Z'),
 			})
 			yield* insertSeedMessage({
-				inbox: tallerHuman,
+				mailbox: tallerHuman,
 				threadRootMessageId: m1Id,
 				threadSubject: 'Quote for the booking module',
 				messageId: m2Id,
@@ -269,7 +277,7 @@ export const seedDemoEmails = (
 				receivedAt: new Date('2026-05-01T10:30:00Z'),
 			})
 			yield* insertSeedMessage({
-				inbox: tallerHuman,
+				mailbox: tallerHuman,
 				threadRootMessageId: m3Id,
 				threadSubject: 'Project kickoff materials',
 				threadStatus: 'closed',
@@ -288,7 +296,7 @@ export const seedDemoEmails = (
 				receivedAt: new Date('2026-05-01T14:00:00Z'),
 			})
 			yield* insertSeedMessage({
-				inbox: tallerHuman,
+				mailbox: tallerHuman,
 				threadRootMessageId: m8Id,
 				threadSubject: 'Vendor quote — final',
 				threadStatus: 'archived',
@@ -313,7 +321,7 @@ export const seedDemoEmails = (
 			})
 
 			yield* insertSeedMessage({
-				inbox: tallerHuman,
+				mailbox: tallerHuman,
 				threadRootMessageId: m1Id,
 				threadSubject: 'Quote for the booking module',
 				messageId: m9Id,
@@ -338,7 +346,7 @@ export const seedDemoEmails = (
 			})
 
 			yield* insertSeedMessage({
-				inbox: tallerHuman,
+				mailbox: tallerHuman,
 				threadRootMessageId: m12Id,
 				threadSubject: 'URGENT: wire transfer needed',
 				messageId: m12Id,
@@ -351,10 +359,10 @@ export const seedDemoEmails = (
 				receivedAt: new Date('2026-05-03T08:00:00Z'),
 			})
 
-			// Spam-quarantined message: hidden from the default inbox view, listed
+			// Spam-quarantined message: hidden from the default mailbox view, listed
 			// under the spam filter. status and classification both flag it.
 			yield* insertSeedMessage({
-				inbox: tallerHuman,
+				mailbox: tallerHuman,
 				threadRootMessageId: m13Id,
 				threadSubject: 'You have won a prize!!!',
 				messageId: m13Id,
@@ -371,7 +379,7 @@ export const seedDemoEmails = (
 			// Blocked message: a hard-blocked sender (e.g. malware). Drives the
 			// blocked status badge and the blocked inbound-classification banner.
 			yield* insertSeedMessage({
-				inbox: tallerHuman,
+				mailbox: tallerHuman,
 				threadRootMessageId: m14Id,
 				threadSubject: 'Invoice attached',
 				messageId: m14Id,
@@ -387,9 +395,9 @@ export const seedDemoEmails = (
 
 			// An in-flight reply draft on Pep's quote thread, so /emails shows a
 			// resumable draft. body_json is the EmailBlocks block tree (same shape
-			// as inbox footers); thread_link_id ties it back to the M1 thread.
+			// as mailbox footers); conversation_id ties it back to the M1 thread.
 			const threadLinkRows = yield* sql<{ id: string }>`
-				SELECT id FROM email_thread_links
+				SELECT id FROM conversations
 				WHERE organization_id = ${tallerHuman.orgId}
 				  AND external_thread_id = ${m1Id}
 				LIMIT 1
@@ -399,14 +407,14 @@ export const seedDemoEmails = (
 				INSERT INTO email_drafts ${sql.insert({
 					draftId: `draft_seed-${randomUUID()}`,
 					organizationId: tallerHuman.orgId,
-					inboxId: tallerHuman.id,
+					connectionId: tallerHuman.id,
 					mode: 'reply',
 					toAddresses: ['pep@calpepfonda.cat'],
 					ccAddresses: [],
 					bccAddresses: [],
 					subject: 'Re: Quote for the booking module',
 					inReplyTo: m1Id,
-					threadLinkId: m1ThreadLinkId,
+					conversationId: m1ThreadLinkId,
 					clientId: null,
 					bodyJson: JSON.stringify([
 						{
@@ -430,7 +438,7 @@ export const seedDemoEmails = (
 		if (tallerAgent) {
 			const m4Id = '<m4-photos@hostalpirineu.com>'
 			yield* insertSeedMessage({
-				inbox: tallerAgent,
+				mailbox: tallerAgent,
 				threadRootMessageId: m4Id,
 				threadSubject: 'Visit photos attached',
 				messageId: m4Id,
@@ -453,7 +461,7 @@ export const seedDemoEmails = (
 			const m5Id = '<m5-welcome@batuda.dev>'
 			const m6Id = '<m6-welcome-followup@batuda.dev>'
 			yield* insertSeedMessage({
-				inbox: restaurantHuman,
+				mailbox: restaurantHuman,
 				threadRootMessageId: m5Id,
 				threadSubject: 'Welcome to Batuda',
 				messageId: m5Id,
@@ -461,11 +469,11 @@ export const seedDemoEmails = (
 				toAddresses: ['admin@restaurant.demo'],
 				subject: 'Welcome to Batuda',
 				textBody:
-					'Welcome Bob! Reply when ready and we’ll set up your first inbox.',
+					'Welcome Bob! Reply when ready and we’ll set up your first mailbox.',
 				receivedAt: new Date('2026-05-01T09:00:00Z'),
 			})
 			yield* insertSeedMessage({
-				inbox: restaurantHuman,
+				mailbox: restaurantHuman,
 				threadRootMessageId: m5Id,
 				threadSubject: 'Welcome to Batuda',
 				messageId: m6Id,
@@ -482,7 +490,7 @@ export const seedDemoEmails = (
 		if (restaurantAgent) {
 			const m7Id = '<m7-ooo@example.com>'
 			yield* insertSeedMessage({
-				inbox: restaurantAgent,
+				mailbox: restaurantAgent,
 				threadRootMessageId: m7Id,
 				threadSubject: 'Out of office',
 				messageId: m7Id,

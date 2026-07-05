@@ -11,9 +11,9 @@ export {
 	GrantAuthFailed,
 	GrantConnectFailed,
 	GrantUnavailable,
-	InboxInactive,
 	InsufficientBudget,
-	NoDefaultInbox,
+	MailboxInactive,
+	NoDefaultMailbox,
 	NotFound,
 	StorageError,
 	StorageErrorOperation,
@@ -28,6 +28,7 @@ export { CompaniesGroup } from './routes/companies'
 export { ContactsGroup } from './routes/contacts'
 export { DocumentsGroup } from './routes/documents'
 export { EmailGroup } from './routes/email'
+export { EmailOauthCallbackGroup } from './routes/email-oauth'
 export { HealthGroup } from './routes/health'
 export { InteractionsGroup } from './routes/interactions'
 export { PagesGroup } from './routes/pages'

@@ -14,7 +14,7 @@ import {
 	createDraftAtom,
 	deleteDraftAtom,
 	emailsSearchAtom,
-	inboxesListAtom,
+	mailboxesListAtom,
 	sendDraftAtom,
 	threadAtomFor,
 	updateDraftAtom,
@@ -23,7 +23,7 @@ import { AttachmentPicker } from '#/components/emails/attachment-picker'
 import { type Draft, useComposeEmail } from '#/context/compose-email-context'
 import type { StagedAttachment } from '#/lib/email-attachments'
 
-type InboxOption = {
+type MailboxOption = {
 	readonly id: string
 	readonly email: string
 	readonly displayName: string | null
@@ -33,7 +33,7 @@ type InboxOption = {
 }
 
 type DraftForm = {
-	inboxId: string | null
+	mailboxId: string | null
 	to: string
 	cc: string
 	bcc: string
@@ -56,7 +56,7 @@ const SAVE_DEBOUNCE_MS = 300
 export function ComposeForm({ draft }: { readonly draft: Draft }) {
 	const { t } = useLingui()
 	const { close, updateMeta } = useComposeEmail()
-	const inboxesResult = useAtomValue(inboxesListAtom)
+	const mailboxesResult = useAtomValue(mailboxesListAtom)
 
 	const createDraft = useAtomSet(createDraftAtom, { mode: 'promiseExit' })
 	const updateDraft = useAtomSet(updateDraftAtom, { mode: 'promiseExit' })
@@ -67,25 +67,25 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 		threadAtomFor(draft.threadId ?? '__unused__'),
 	)
 
-	const inboxes = useMemo<ReadonlyArray<InboxOption>>(
+	const mailboxes = useMemo<ReadonlyArray<MailboxOption>>(
 		() =>
-			AsyncResult.isSuccess(inboxesResult)
-				? narrowInboxes(inboxesResult.value)
+			AsyncResult.isSuccess(mailboxesResult)
+				? narrowMailboxes(mailboxesResult.value)
 				: [],
-		[inboxesResult],
+		[mailboxesResult],
 	)
 
-	const defaultInboxId = useMemo(
+	const defaultMailboxId = useMemo(
 		() =>
 			(
-				inboxes.find(i => i.purpose === 'human' && i.isDefault && i.active) ??
-				inboxes.find(i => i.purpose === 'human' && i.active)
+				mailboxes.find(i => i.purpose === 'human' && i.isDefault && i.active) ??
+				mailboxes.find(i => i.purpose === 'human' && i.active)
 			)?.id ?? null,
-		[inboxes],
+		[mailboxes],
 	)
 
 	const [form, setForm] = useState<DraftForm>(() => ({
-		inboxId: draft.inboxId || null,
+		mailboxId: draft.mailboxId || null,
 		to: draft.to,
 		cc: '',
 		bcc: '',
@@ -95,7 +95,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 		attachments: [],
 	}))
 
-	const effectiveInboxId = form.inboxId ?? defaultInboxId
+	const effectiveMailboxId = form.mailboxId ?? defaultMailboxId
 
 	// `serverId` is mirrored from the ref into state so `canSend`'s
 	// useMemo re-runs when createDraft resolves -- refs aren't dep-
@@ -131,13 +131,13 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 	useEffect(() => {
 		if (draftCreationStartedRef.current) return
 		if (serverIdRef.current !== null) return
-		const inboxId = effectiveInboxId
-		if (inboxId === null) return
+		const mailboxId = effectiveMailboxId
+		if (mailboxId === null) return
 
 		draftCreationStartedRef.current = true
 		updateMeta(draft.id, { saving: true })
 
-		const params: Record<string, unknown> = { inboxId }
+		const params: Record<string, unknown> = { mailboxId }
 		if (draft.to) params['to'] = draft.to
 		if (draft.subject) params['subject'] = draft.subject
 		if (draft.companyId) params['companyId'] = draft.companyId
@@ -155,13 +155,13 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 				setServerId(id)
 				updateMeta(draft.id, { serverId: id, saving: false })
 			} else {
-				// Reset the sentinel so a later inboxId change can retry.
+				// Reset the sentinel so a later mailboxId change can retry.
 				draftCreationStartedRef.current = false
 				updateMeta(draft.id, { saving: false })
 			}
 		})
 	}, [
-		effectiveInboxId,
+		effectiveMailboxId,
 		draft.id,
 		draft.to,
 		draft.subject,
@@ -189,13 +189,13 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 			}
 			saveTimerRef.current = setTimeout(() => {
 				const serverId = serverIdRef.current
-				const inboxId = effectiveInboxId
-				if (serverId === null || inboxId === null) return
+				const mailboxId = effectiveMailboxId
+				if (serverId === null || mailboxId === null) return
 
 				const merged = pendingPatchRef.current
 				pendingPatchRef.current = {}
 				updateMeta(draft.id, { saving: true })
-				const payload: Record<string, unknown> = { inboxId }
+				const payload: Record<string, unknown> = { mailboxId }
 				if (merged.to !== undefined) payload['to'] = merged.to
 				if (merged.cc !== undefined) {
 					const list = splitAddresses(merged.cc)
@@ -218,7 +218,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 				})
 			}, SAVE_DEBOUNCE_MS)
 		},
-		[effectiveInboxId, draft.id, updateDraft, updateMeta],
+		[effectiveMailboxId, draft.id, updateDraft, updateMeta],
 	)
 
 	useEffect(
@@ -267,7 +267,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 		if (draft.mode === 'reply') {
 			return draft.threadId !== undefined
 		}
-		if (effectiveInboxId === null) return false
+		if (effectiveMailboxId === null) return false
 		if (form.to.trim() === '') return false
 		return true
 	}, [
@@ -275,14 +275,14 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 		form.bodyText,
 		form.to,
 		suppressed,
-		effectiveInboxId,
+		effectiveMailboxId,
 		draft,
 		serverId,
 	])
 
 	const handleSend = useCallback(async () => {
 		const serverId = serverIdRef.current
-		if (serverId === null || effectiveInboxId === null) return
+		if (serverId === null || effectiveMailboxId === null) return
 
 		// Cancel any pending debounced save and flush the current form
 		// state synchronously. Without this, a click on Send that lands
@@ -295,7 +295,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 			saveTimerRef.current = null
 		}
 		const flushPayload: Record<string, unknown> = {
-			inboxId: effectiveInboxId,
+			mailboxId: effectiveMailboxId,
 			to: form.to,
 			subject: form.subject,
 			bodyJson: form.bodyJson,
@@ -314,7 +314,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 		try {
 			const exit = await sendDraft({
 				params: { draftId: serverId },
-				payload: { inboxId: effectiveInboxId },
+				payload: { mailboxId: effectiveMailboxId },
 			})
 			if (exit._tag !== 'Success') {
 				throw new Error('Send failed')
@@ -329,7 +329,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 			)
 		}
 	}, [
-		effectiveInboxId,
+		effectiveMailboxId,
 		form.to,
 		form.cc,
 		form.bcc,
@@ -346,14 +346,14 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 
 	const handleDiscard = useCallback(async () => {
 		const serverId = serverIdRef.current
-		if (serverId !== null && effectiveInboxId !== null) {
+		if (serverId !== null && effectiveMailboxId !== null) {
 			await deleteDraft({
 				params: { draftId: serverId },
-				query: { inboxId: effectiveInboxId },
+				query: { mailboxId: effectiveMailboxId },
 			} as never)
 		}
 		close(draft.id)
-	}, [effectiveInboxId, deleteDraft, close, draft.id])
+	}, [effectiveMailboxId, deleteDraft, close, draft.id])
 
 	const isReply = draft.mode === 'reply'
 
@@ -367,26 +367,26 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 		>
 			{!isReply ? (
 				<Field>
-					<FieldLabel htmlFor={`inbox-${draft.id}`}>{t`Inbox`}</FieldLabel>
+					<FieldLabel htmlFor={`mailbox-${draft.id}`}>{t`Mailbox`}</FieldLabel>
 					<PriSelect.Root
-						value={effectiveInboxId ?? ''}
+						value={effectiveMailboxId ?? ''}
 						onValueChange={value => {
-							patchForm({ inboxId: value === '' ? null : value })
+							patchForm({ mailboxId: value === '' ? null : value })
 						}}
 					>
-						<PriSelect.Trigger id={`inbox-${draft.id}`}>
-							<PriSelect.Value placeholder={t`Select inbox…`} />
+						<PriSelect.Trigger id={`mailbox-${draft.id}`}>
+							<PriSelect.Value placeholder={t`Select mailbox…`} />
 							<PriSelect.Icon />
 						</PriSelect.Trigger>
 						<PriSelect.Portal>
 							<PriSelect.Positioner>
 								<PriSelect.Popup>
-									{inboxes
+									{mailboxes
 										.filter(i => i.active && i.purpose !== 'agent')
-										.map(inbox => (
-											<PriSelect.Item key={inbox.id} value={inbox.id}>
+										.map(mailbox => (
+											<PriSelect.Item key={mailbox.id} value={mailbox.id}>
 												<PriSelect.ItemText>
-													{inbox.displayName ?? inbox.email}
+													{mailbox.displayName ?? mailbox.email}
 												</PriSelect.ItemText>
 											</PriSelect.Item>
 										))}
@@ -472,7 +472,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 				<BodyLabel>{t`Message`}</BodyLabel>
 				<EmailEditor
 					mode='compose'
-					inboxId={effectiveInboxId ?? ''}
+					mailboxId={effectiveMailboxId ?? ''}
 					initialJson={form.bodyJson}
 					onChange={handleBodyChange}
 					placeholder={t`Write your message…`}
@@ -519,7 +519,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 				onChange={next => {
 					patchForm({ attachments: next })
 				}}
-				inboxId={effectiveInboxId}
+				mailboxId={effectiveMailboxId}
 				{...(serverIdRef.current !== null && { draftId: serverIdRef.current })}
 			/>
 
@@ -613,9 +613,9 @@ function splitAddresses(raw: string): ReadonlyArray<string> {
 		.filter(s => s.length > 0)
 }
 
-function narrowInboxes(raw: unknown): ReadonlyArray<InboxOption> {
+function narrowMailboxes(raw: unknown): ReadonlyArray<MailboxOption> {
 	if (!Array.isArray(raw)) return []
-	const out: InboxOption[] = []
+	const out: MailboxOption[] = []
 	for (const entry of raw) {
 		if (!entry || typeof entry !== 'object') continue
 		const r = entry as Record<string, unknown>

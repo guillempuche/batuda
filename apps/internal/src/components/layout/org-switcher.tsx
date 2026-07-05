@@ -19,7 +19,7 @@ import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
  *
  * Aesthetic match — sheet-metal trigger styled like the TopBar's stenciled
  * title, dropdown popup uses the brushed-metal plate. Same Pri primitives
- * and workshop mixins as Profile + Inboxes pages.
+ * and workshop mixins as Profile + Mailboxes pages.
  */
 export function OrgSwitcher() {
 	const { t } = useLingui()

@@ -1,5 +1,5 @@
 // Live-DB integration test for the email FTS rewrite. Verifies that the
-// generated tsvector + GIN index on email_messages let listThreads
+// generated tsvector + GIN index on messages let listThreads
 // match against subject + preview + body per message, and that the
 // participants subquery catches sender/recipient hits.
 //
@@ -22,7 +22,7 @@ const ORG_ID = `test-org-${randomUUID()}`
 const ACME_DOMAIN = `acme-${randomUUID()}.example`
 
 let pool: pg.Pool
-let inboxId: string
+let mailboxId: string
 let bodyOnlyThreadId: string
 let subjectOnlyThreadId: string
 let recipientOnlyThreadId: string
@@ -34,23 +34,23 @@ const searchThreads = async (q: string): Promise<string[]> => {
 	const rows = await pool.query<{ id: string }>(
 		`
 		SELECT tl.id
-		FROM email_thread_links tl
+		FROM conversations tl
 		WHERE tl.organization_id = $1
 		  AND (
 		    EXISTS (
-		      SELECT 1 FROM email_messages em
+		      SELECT 1 FROM messages em
 		      WHERE em.organization_id = tl.organization_id
 		        AND (em.message_id = tl.external_thread_id
 		             OR tl.external_thread_id = ANY(em."references"))
 		        AND em.search_vector @@ plainto_tsquery('simple', $2)
 		    )
 		    OR EXISTS (
-		      SELECT 1 FROM email_messages em2
-		      JOIN message_participants mp ON mp.email_message_id = em2.id
+		      SELECT 1 FROM messages em2
+		      JOIN message_participants mp ON mp.message_id = em2.id
 		      WHERE em2.organization_id = tl.organization_id
 		        AND (em2.message_id = tl.external_thread_id
 		             OR tl.external_thread_id = ANY(em2."references"))
-		        AND mp.email_address ILIKE $3
+		        AND mp.address ILIKE $3
 		    )
 		  )
 		`,
@@ -67,23 +67,23 @@ const insertThreadWithMessage = async (args: {
 	recipient?: string | undefined
 }): Promise<string> => {
 	const link = await pool.query<{ id: string }>(
-		`INSERT INTO email_thread_links (organization_id, external_thread_id, inbox_id, subject)
+		`INSERT INTO conversations (organization_id, external_thread_id, connection_id, subject)
 		 VALUES ($1, $2, $3, $4) RETURNING id`,
-		[ORG_ID, args.externalThreadId, inboxId, args.subject],
+		[ORG_ID, args.externalThreadId, mailboxId, args.subject],
 	)
 	const linkRow = link.rows[0]
 	if (!linkRow) throw new Error('failed to insert thread link')
 
 	const msg = await pool.query<{ id: string }>(
-		`INSERT INTO email_messages
-		 (organization_id, inbox_id, message_id, direction, folder, raw_rfc822_ref,
+		`INSERT INTO messages
+		 (organization_id, connection_id, message_id, direction, folder, raw_rfc822_ref,
 		  subject, text_preview, text_body, status, imap_uid, imap_uidvalidity)
 		 VALUES ($1, $2, $3, 'inbound', 'INBOX', 'sentinel',
 		         $4, $5, $6, 'normal', $7, 100)
 		 RETURNING id`,
 		[
 			ORG_ID,
-			inboxId,
+			mailboxId,
 			args.externalThreadId,
 			args.subject,
 			args.textPreview,
@@ -96,8 +96,8 @@ const insertThreadWithMessage = async (args: {
 
 	if (args.recipient) {
 		await pool.query(
-			`INSERT INTO message_participants (email_message_id, email_address, role)
-			 VALUES ($1, $2, 'to')`,
+			`INSERT INTO message_participants (message_id, address, role, channel)
+			 VALUES ($1, $2, 'to', 'email')`,
 			[msgRow.id, args.recipient],
 		)
 	}
@@ -108,22 +108,22 @@ const insertThreadWithMessage = async (args: {
 beforeAll(async () => {
 	pool = new pg.Pool({ connectionString: DATABASE_URL, max: 4 })
 
-	const inboxResult = await pool.query<{ id: string }>(
-		`INSERT INTO inboxes
-		 (organization_id, owner_user_id, email, purpose,
+	const mailboxResult = await pool.query<{ id: string }>(
+		`INSERT INTO channel_connections
+		 (organization_id, owner_user_id, external_id, purpose,
 		  imap_host, imap_port, imap_security,
 		  smtp_host, smtp_port, smtp_security,
-		  username, password_ciphertext, password_nonce, password_tag)
+		  username, config_ciphertext, config_nonce, config_tag)
 		 VALUES ($1, $2, $3, 'human',
 		         'imap.example.com', 993, 'tls',
 		         'smtp.example.com', 465, 'tls',
 		         $3, '\\x00'::bytea, '\\x00'::bytea, '\\x00'::bytea)
 		 RETURNING id`,
-		[ORG_ID, `test-user-${randomUUID()}`, `inbox@${ACME_DOMAIN}`],
+		[ORG_ID, `test-user-${randomUUID()}`, `mailbox@${ACME_DOMAIN}`],
 	)
-	const inboxRow = inboxResult.rows[0]
-	if (!inboxRow) throw new Error('failed to insert test inbox')
-	inboxId = inboxRow.id
+	const mailboxRow = mailboxResult.rows[0]
+	if (!mailboxRow) throw new Error('failed to insert test mailbox')
+	mailboxId = mailboxRow.id
 
 	bodyOnlyThreadId = await insertThreadWithMessage({
 		externalThreadId: `<body-${randomUUID()}@${ACME_DOMAIN}>`,
@@ -157,17 +157,17 @@ beforeAll(async () => {
 
 afterAll(async () => {
 	await pool.query(
-		`DELETE FROM message_participants WHERE email_message_id IN (SELECT id FROM email_messages WHERE organization_id = $1)`,
+		`DELETE FROM message_participants WHERE message_id IN (SELECT id FROM messages WHERE organization_id = $1)`,
 		[ORG_ID],
 	)
-	await pool.query(`DELETE FROM email_messages WHERE organization_id = $1`, [
+	await pool.query(`DELETE FROM messages WHERE organization_id = $1`, [ORG_ID])
+	await pool.query(`DELETE FROM conversations WHERE organization_id = $1`, [
 		ORG_ID,
 	])
 	await pool.query(
-		`DELETE FROM email_thread_links WHERE organization_id = $1`,
+		`DELETE FROM channel_connections WHERE organization_id = $1`,
 		[ORG_ID],
 	)
-	await pool.query(`DELETE FROM inboxes WHERE organization_id = $1`, [ORG_ID])
 	await pool.end()
 })
 

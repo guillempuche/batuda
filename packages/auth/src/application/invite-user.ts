@@ -19,7 +19,7 @@ export interface InviteUserInput {
  * user clicks the link, lands in an authenticated session, and optionally
  * sets a password via the admin UI afterwards.
  *
- * Locally the magic link is written to `apps/server/.dev-inbox/`; in cloud it
+ * Locally the magic link is written to `apps/server/.dev-mailbox/`; in cloud it
  * goes through AgentMail. The CLI layer is responsible for surfacing (or
  * *not* surfacing, in cloud) the resulting URL.
  */

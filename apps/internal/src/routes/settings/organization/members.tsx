@@ -44,7 +44,7 @@ import {
  *
  * Owners/admins manage; regular members get a read-only view (the invite CTA
  * and the remove/cancel/resend controls are hidden), mirroring how the
- * inboxes page hides destructive controls for roles that can't act.
+ * mailboxes page hides destructive controls for roles that can't act.
  */
 
 interface MemberRow {
@@ -144,7 +144,7 @@ function MembersPage() {
 				email: trimmed,
 				role: inviteRole,
 				// Let people re-invite someone who hasn't accepted yet: reuse
-				// the open invitation (the link already in their inbox keeps
+				// the open invitation (the link already in their mailbox keeps
 				// working) instead of erroring on the second try.
 				resend: true,
 			})

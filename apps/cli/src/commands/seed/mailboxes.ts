@@ -4,7 +4,7 @@ import { Config, Effect } from 'effect'
 
 import type { SeedCtx } from './shared'
 
-interface InboxSpec {
+interface MailboxSpec {
 	readonly email: string
 	readonly id: string
 	readonly displayName: string
@@ -20,23 +20,23 @@ interface InboxSpec {
 		| 'disabled'
 }
 
-export type SeededInbox = {
+export type SeededMailbox = {
 	readonly id: string
 	readonly email: string
 	readonly orgId: string
 }
 
-// Stable demo-inbox UUIDs so saved /emails URLs survive a re-seed.
+// Stable demo-mailbox UUIDs so saved /emails URLs survive a re-seed.
 const TALLER_HUMAN_INBOX_ID = '11111111-1111-4111-8111-111111111111'
 const TALLER_AGENT_INBOX_ID = '22222222-2222-4222-8222-222222222222'
 const RESTAURANT_HUMAN_INBOX_ID = '33333333-3333-4333-8333-333333333333'
 const RESTAURANT_AGENT_INBOX_ID = '44444444-4444-4444-8444-444444444444'
-// Unhealthy-grant demo inboxes so the inbox list renders every status tone.
+// Unhealthy-grant demo mailboxes so the mailbox list renders every status tone.
 const TALLER_AUTH_FAILED_INBOX_ID = '55555555-5555-4555-8555-555555555555'
 const TALLER_CONNECT_FAILED_INBOX_ID = '66666666-6666-4666-8666-666666666666'
 const TALLER_DISABLED_INBOX_ID = '77777777-7777-4777-8777-777777777777'
 
-export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
+export const seedMailboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 	Effect.gen(function* () {
 		const masterKeyB64 = yield* Config.string('EMAIL_CREDENTIAL_KEY')
 		const masterKey = Buffer.from(masterKeyB64, 'base64')
@@ -48,7 +48,7 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 			)
 		}
 
-		const inboxSpecs: InboxSpec[] = [
+		const mailboxSpecs: MailboxSpec[] = [
 			{
 				id: TALLER_HUMAN_INBOX_ID,
 				email: 'admin@taller.cat',
@@ -71,7 +71,7 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 				footerText: "Automated response from Alice's agent.",
 				grantStatus: 'connected',
 			},
-			// Unhealthy inboxes round out the four grant states the list styles.
+			// Unhealthy mailboxes round out the four grant states the list styles.
 			{
 				id: TALLER_AUTH_FAILED_INBOX_ID,
 				email: 'alerts@taller.cat',
@@ -107,7 +107,7 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 			},
 		]
 		if (restaurantOrgId !== null) {
-			inboxSpecs.push(
+			mailboxSpecs.push(
 				{
 					id: RESTAURANT_HUMAN_INBOX_ID,
 					email: 'admin@restaurant.demo',
@@ -133,30 +133,30 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 			)
 		}
 
-		const ownerEmails = [...new Set(inboxSpecs.map(s => s.ownerEmail))]
+		const ownerEmails = [...new Set(mailboxSpecs.map(s => s.ownerEmail))]
 		const ownerRows = yield* sql<{
 			id: string
 			email: string
 		}>`SELECT id, email FROM "user" WHERE email = ANY(${ownerEmails as string[]})`
 		const userIdByEmail = new Map(ownerRows.map(r => [r.email, r.id]))
 
-		const seededInboxes: SeededInbox[] = []
+		const seededMailboxes: SeededMailbox[] = []
 
-		for (const spec of inboxSpecs) {
+		for (const spec of mailboxSpecs) {
 			const ownerId = userIdByEmail.get(spec.ownerEmail)
 			if (!ownerId) {
 				yield* Effect.logInfo(
-					`  (skipped inbox ${spec.email} — owner not found, run seed auth first)`,
+					`  (skipped mailbox ${spec.email} — owner not found, run seed auth first)`,
 				)
 				continue
 			}
-			const inboxId = spec.id
+			const mailboxId = spec.id
 			const subkey = Buffer.from(
 				hkdfSync(
 					'sha256',
 					masterKey,
 					Buffer.alloc(0),
-					Buffer.from(inboxId, 'utf8'),
+					Buffer.from(mailboxId, 'utf8'),
 					32,
 				),
 			)
@@ -168,10 +168,12 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 			])
 			const tag = cipher.getAuthTag()
 			yield* sql`
-				INSERT INTO inboxes ${sql.insert({
-					id: inboxId,
+				INSERT INTO channel_connections ${sql.insert({
+					id: mailboxId,
 					organizationId: spec.orgId,
-					email: spec.email,
+					channel: 'email',
+					provider: 'imap-smtp',
+					externalId: spec.email,
 					displayName: spec.displayName,
 					purpose: spec.purpose,
 					ownerUserId: ownerId,
@@ -185,16 +187,16 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 					smtpPort: 1025,
 					smtpSecurity: 'plain',
 					username: spec.email,
-					passwordCiphertext: ciphertext,
-					passwordNonce: nonce,
-					passwordTag: tag,
+					configCiphertext: ciphertext,
+					configNonce: nonce,
+					configTag: tag,
 					grantStatus: spec.grantStatus,
 				})}
 			`
 			yield* sql`
-				INSERT INTO inbox_footers ${sql.insert({
+				INSERT INTO connection_footers ${sql.insert({
 					organizationId: spec.orgId,
-					inboxId,
+					connectionId: mailboxId,
 					name: 'default',
 					bodyJson: JSON.stringify([
 						{
@@ -206,14 +208,14 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 				})}
 			`
 			yield* Effect.logInfo(
-				`  inbox: ${spec.email} (${spec.purpose}, owner ${ownerId})`,
+				`  mailbox: ${spec.email} (${spec.purpose}, owner ${ownerId})`,
 			)
-			seededInboxes.push({
-				id: inboxId,
+			seededMailboxes.push({
+				id: mailboxId,
 				email: spec.email,
 				orgId: spec.orgId,
 			})
 		}
 
-		return seededInboxes
+		return seededMailboxes
 	})

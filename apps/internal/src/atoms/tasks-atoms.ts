@@ -1,13 +1,13 @@
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 
 /**
- * Dedicated atom registry for the tasks inbox (§7 of the calendar plan).
+ * Dedicated atom registry for the tasks mailbox (§7 of the calendar plan).
  *
  * `openTasksAtom` + `companiesListAtom` still live in
  * `pipeline-atoms.ts` because the dashboard and the tasks page both read
  * them — they MUST share identity so SSR hydration doesn't refetch.
  *
- * Everything here is tasks-inbox-only:
+ * Everything here is tasks-mailbox-only:
  *   - Smart-view queries that never fire on the dashboard (snoozed,
  *     done-recently).
  *   - Id-keyed event feed for the right-pane audit log.

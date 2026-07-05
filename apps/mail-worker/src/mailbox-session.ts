@@ -3,7 +3,7 @@ import { SqlClient } from 'effect/unstable/sql'
 import { ImapFlow } from 'imapflow'
 
 import { backfillSinceDate } from './backfill.js'
-import type { ClaimedInbox } from './claim.js'
+import type { ClaimedMailbox } from './claim.js'
 import { CredentialDecryptor } from './decrypt.js'
 import { WorkerEnvVars } from './env.js'
 import {
@@ -18,63 +18,63 @@ import {
 // worker — taking down every mailbox it watches, not just this one. So we
 // listen and just record it; the worker's retry loop reconnects on its own.
 export const onImapClientError =
-	(inboxId: string) =>
+	(mailboxId: string) =>
 	(error: unknown): void => {
 		console.warn(
 			JSON.stringify({
 				level: 'WARN',
 				message: 'imap client error (will reconnect)',
-				inboxId,
+				mailboxId,
 				error: error instanceof Error ? error.message : String(error),
 			}),
 		)
 	}
 
-// Folders we monitor per inbox. Most providers have INBOX + Sent;
+// Folders we monitor per mailbox. Most providers have INBOX + Sent;
 // Gmail's "All Mail" duplicates everything (covered by IMAP \All
 // special-use), so we skip it. Outbound rows we APPEND to "Sent" still
-// land here on the next sync — `idx_email_messages_msgid` dedupes.
+// land here on the next sync — a unique message-id index dedupes.
 const TRACKED_FOLDERS: readonly string[] = ['INBOX', 'Sent']
 
-// Flip an inbox's grant_status when authentication or connection
+// Flip an mailbox's grant_status when authentication or connection
 // proves broken across retries. Worker writes this; UI surfaces it via
-// inboxes.grant_status badge so the user can re-enter credentials.
+// channel_connections.grant_status badge so the user can re-enter credentials.
 const markGrantFailure = (
-	inboxId: string,
+	mailboxId: string,
 	status: 'auth_failed' | 'connect_failed',
 	detail: string,
 ) =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
 		yield* sql`
-			UPDATE inboxes
+			UPDATE channel_connections
 			SET grant_status = ${status},
 			    grant_last_error = ${detail.slice(0, 500)},
 			    grant_last_seen_at = now()
-			WHERE id = ${inboxId}
+			WHERE id = ${mailboxId}
 		`
 	})
 
-const markHealthy = (inboxId: string) =>
+const markHealthy = (mailboxId: string) =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
 		yield* sql`
-			UPDATE inboxes
+			UPDATE channel_connections
 			SET grant_last_seen_at = now(),
 			    grant_last_error = NULL
-			WHERE id = ${inboxId}
+			WHERE id = ${mailboxId}
 			  AND grant_status = 'connected'
 		`
 	})
 
-// Open a single mailbox, sync from folder_state.lastUid forward (or
+// Open a single mailbox, sync from sync_state.lastUid forward (or
 // backfill if we have no resume point / uidvalidity drifted), drain
 // any EXPUNGE events accumulated since the last tick, then idle until
 // the server reports a change. Returns when idle resolves; the caller
 // loops.
 const syncOneFolderTick = (args: {
 	readonly client: ImapFlow
-	readonly inbox: ClaimedInbox
+	readonly mailbox: ClaimedMailbox
 	readonly folder: string
 	readonly backfillDays: number
 	readonly expungedQueue: Array<{ uid: number; uidValidity: number }>
@@ -99,13 +99,13 @@ const syncOneFolderTick = (args: {
 			const e = args.expungedQueue.shift()
 			if (e === undefined) break
 			yield* markExpunged({
-				inboxId: args.inbox.id,
+				mailboxId: args.mailbox.id,
 				imapUidvalidity: e.uidValidity,
 				imapUid: e.uid,
 			}).pipe(Effect.catchCause(cause => Effect.logError(cause)))
 		}
 
-		const known = readFolderState(args.inbox.folderState, args.folder)
+		const known = readFolderState(args.mailbox.syncState, args.folder)
 		const needsBackfill =
 			known === null || known.uidvalidity !== serverUidvalidity
 
@@ -115,14 +115,14 @@ const syncOneFolderTick = (args: {
 			)
 			const highest = yield* backfillSinceDate({
 				client: args.client,
-				organizationId: args.inbox.organizationId,
-				inboxId: args.inbox.id,
+				organizationId: args.mailbox.organizationId,
+				mailboxId: args.mailbox.id,
 				folder: args.folder,
 				uidvalidity: serverUidvalidity,
 				sinceDate,
 			})
 			yield* recordFolderHead({
-				inboxId: args.inbox.id,
+				mailboxId: args.mailbox.id,
 				folder: args.folder,
 				uidvalidity: serverUidvalidity,
 				lastUid: highest,
@@ -130,8 +130,8 @@ const syncOneFolderTick = (args: {
 		} else {
 			yield* fetchAndIngestNewerThan({
 				client: args.client,
-				organizationId: args.inbox.organizationId,
-				inboxId: args.inbox.id,
+				organizationId: args.mailbox.organizationId,
+				mailboxId: args.mailbox.id,
 				folder: args.folder,
 				uidvalidity: serverUidvalidity,
 				sinceUid: known.lastUid,
@@ -150,29 +150,79 @@ const syncOneFolderTick = (args: {
 		yield* args.waitForChange
 	})
 
-// One inbox = one IMAP connection per tracked folder. We keep things
+// One mailbox = one IMAP connection per tracked folder. We keep things
 // simple by processing folders sequentially within a single client:
 // imapflow can only have one active mailbox per connection at a time,
 // so a "two folders, one client" model means we round-robin. For an
 // MVP that's good enough; large mailboxes can later be split onto
 // separate clients keyed by folder.
-export const runInboxSession = (claimed: ClaimedInbox) =>
+export const runMailboxSession = (claimed: ClaimedMailbox) =>
 	Effect.gen(function* () {
 		const env = yield* WorkerEnvVars
 		const decryptor = yield* CredentialDecryptor
 
-		const password = decryptor.decrypt({
-			inboxId: claimed.id,
-			ciphertext: claimed.passwordCiphertext,
-			nonce: claimed.passwordNonce,
-			tag: claimed.passwordTag,
+		// Re-read the encrypted config on every (re)connect — the retry loop
+		// below re-enters this whole block, so a token the server's refresher
+		// rewrote while this session held a now-expired one is picked up on
+		// reconnect rather than the session retrying forever with a stale token.
+		const sql = yield* SqlClient.SqlClient
+		const cfgRows = yield* sql<{
+			configCiphertext: Uint8Array
+			configNonce: Uint8Array
+			configTag: Uint8Array
+		}>`
+			SELECT config_ciphertext AS "configCiphertext",
+			       config_nonce      AS "configNonce",
+			       config_tag        AS "configTag"
+			FROM channel_connections
+			WHERE id = ${claimed.id}
+		`
+		const cfg = cfgRows[0]
+		if (cfg === undefined) {
+			return yield* Effect.fail(
+				new Error(`connection ${claimed.id} vanished before connect`),
+			)
+		}
+		const blob = decryptor.decrypt({
+			connectionId: claimed.id,
+			ciphertext: cfg.configCiphertext,
+			nonce: cfg.configNonce,
+			tag: cfg.configTag,
 		})
+		// imap-smtp blobs are the password; OAuth blobs are {accessToken,
+		// refreshToken} JSON. Authenticate with the stored access token: the
+		// server's token refresher keeps it fresh, and the config re-read above
+		// picks up the refreshed one on each reconnect.
+		let imapAuth: {
+			readonly user: string
+			readonly pass?: string
+			readonly accessToken?: string
+		}
+		if (claimed.provider === 'imap-smtp') {
+			imapAuth = { user: claimed.username, pass: blob }
+		} else {
+			let parsed: { accessToken?: unknown }
+			try {
+				parsed = JSON.parse(blob) as { accessToken?: unknown }
+			} catch {
+				throw new Error(`corrupt OAuth config for mailbox ${claimed.id}`)
+			}
+			if (
+				typeof parsed.accessToken !== 'string' ||
+				parsed.accessToken.length === 0
+			) {
+				throw new Error(
+					`OAuth config for mailbox ${claimed.id} has no access token`,
+				)
+			}
+			imapAuth = { user: claimed.username, accessToken: parsed.accessToken }
+		}
 
 		const client = new ImapFlow({
 			host: claimed.imapHost,
 			port: claimed.imapPort,
 			secure: claimed.imapSecurity === 'tls',
-			auth: { user: claimed.username, pass: password },
+			auth: imapAuth,
 			logger: false,
 			// RFC 2177 caps IDLE at 30 minutes; we re-issue at ~29 (env-tunable)
 			// so the connection breaks idle slightly before the server would.
@@ -245,7 +295,7 @@ export const runInboxSession = (claimed: ClaimedInbox) =>
 
 		yield* markHealthy(claimed.id)
 
-		// Per inbox we sync each tracked folder in a round-robin, parking on
+		// Per mailbox we sync each tracked folder in a round-robin, parking on
 		// server change-events (or a poll timeout) between passes.
 		//
 		// Only sync folders the server actually exposes. Providers vary —
@@ -261,7 +311,7 @@ export const runInboxSession = (claimed: ClaimedInbox) =>
 		const folders = TRACKED_FOLDERS.filter(f => availablePaths.has(f))
 		if (folders.length === 0) {
 			return yield* Effect.fail(
-				new Error(`no tracked folders available for inbox=${claimed.id}`),
+				new Error(`no tracked folders available for mailbox=${claimed.id}`),
 			)
 		}
 
@@ -270,7 +320,7 @@ export const runInboxSession = (claimed: ClaimedInbox) =>
 				for (const folder of folders) {
 					yield* syncOneFolderTick({
 						client,
-						inbox: claimed,
+						mailbox: claimed,
 						folder,
 						backfillDays: env.EMAIL_WORKER_BACKFILL_DAYS,
 						expungedQueue,
@@ -278,7 +328,7 @@ export const runInboxSession = (claimed: ClaimedInbox) =>
 					}).pipe(
 						Effect.catchCause(cause =>
 							Effect.logWarning(
-								`mail-worker: folder tick failed inbox=${claimed.id} folder=${folder}`,
+								`mail-worker: folder tick failed mailbox=${claimed.id} folder=${folder}`,
 							).pipe(Effect.andThen(Effect.logError(cause))),
 						),
 					)

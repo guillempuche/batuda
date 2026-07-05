@@ -33,10 +33,6 @@
 		"./editor": {
 			"types": "./src/editor/index.ts",
 			"import": "./src/editor/index.ts"
-		},
-		"./participant-matcher": {
-			"types": "./src/participant-matcher.ts",
-			"import": "./src/participant-matcher.ts"
 		}
 	},
 	"scripts": {

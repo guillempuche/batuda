@@ -4,14 +4,32 @@ import { Effect, Layer, ServiceMap } from 'effect'
 import { ImapFlow } from 'imapflow'
 import nodemailer from 'nodemailer'
 
+import {
+	type ChannelTransport,
+	EMAIL_CAPABILITIES,
+	type OutboundMessage,
+	Sent,
+} from '@batuda/communications'
 import { GrantAuthFailed, GrantConnectFailed } from '@batuda/controllers'
 
+import type { OauthProvider } from './email-oauth.js'
+
 // ── Types the transport speaks in ─────────────────────────────
+// `OutboundMessage`/`OutboundAttachment` + the `Sent` outcome now live in the
+// channel-agnostic spine (`@batuda/communications`); this transport is the
+// email implementation of its `ChannelTransport` port.
 
 export type MailSecurity = 'tls' | 'starttls' | 'plain'
 
+// How a connection authenticates: a password for imap-smtp, or a short-lived
+// XOAUTH2 access token for the OAuth providers. A discriminated union so the
+// wire builders pick the right nodemailer / ImapFlow auth shape.
+export type ConnectionAuth =
+	| { readonly kind: 'password'; readonly password: string }
+	| { readonly kind: 'xoauth2'; readonly accessToken: string }
+
 export interface DecryptedCreds {
-	readonly inboxId: string
+	readonly connectionId: string
 	readonly imapHost: string
 	readonly imapPort: number
 	readonly imapSecurity: MailSecurity
@@ -19,39 +37,36 @@ export interface DecryptedCreds {
 	readonly smtpPort: number
 	readonly smtpSecurity: MailSecurity
 	readonly username: string
-	readonly password: string
+	readonly auth: ConnectionAuth
 }
 
-export interface OutboundAttachment {
-	readonly filename: string
-	readonly contentType: string
-	readonly contentBase64: string
-	readonly contentId?: string | undefined
-	readonly disposition?: 'inline' | 'attachment' | undefined
-}
-
-export interface OutboundMessage {
-	readonly from: string
-	readonly to: readonly string[]
-	readonly cc?: readonly string[] | undefined
-	readonly bcc?: readonly string[] | undefined
-	readonly replyTo?: readonly string[] | undefined
-	readonly subject: string
-	readonly text?: string | undefined
-	readonly html?: string | undefined
-	readonly inReplyTo?: string | undefined
-	readonly references?: readonly string[] | undefined
-	readonly headers?: Readonly<Record<string, string>> | undefined
-	readonly attachments?: readonly OutboundAttachment[] | undefined
-}
-
-export interface SentResult {
-	// RFC 5322 Message-ID returned by the SMTP serializer (with `<>`).
-	readonly messageId: string
-	// Wire bytes nodemailer produced — the same payload IMAP APPENDs to
-	// "Sent" so the server-side Sent folder mirrors what the recipient
-	// actually saw.
-	readonly raw: Uint8Array
+// Interpret a decrypted config blob by the connection's provider: imap-smtp
+// blobs are the raw password; OAuth blobs are {accessToken, refreshToken} JSON,
+// and we authenticate with the stored access token, which the token refresher
+// (mailbox-token-refresher) keeps fresh out of band: sends and probes re-read
+// the config each time, so an expired token is rewritten before it is used.
+export const connectionAuth = (
+	provider: OauthProvider | 'imap-smtp',
+	blob: string,
+): ConnectionAuth => {
+	if (provider === 'imap-smtp') {
+		return { kind: 'password', password: blob }
+	}
+	let parsed: { accessToken?: unknown }
+	try {
+		parsed = JSON.parse(blob) as { accessToken?: unknown }
+	} catch {
+		throw new Error(`corrupt OAuth config for the ${provider} connection`)
+	}
+	if (
+		typeof parsed.accessToken !== 'string' ||
+		parsed.accessToken.length === 0
+	) {
+		throw new Error(
+			`OAuth config for the ${provider} connection has no access token`,
+		)
+	}
+	return { kind: 'xoauth2', accessToken: parsed.accessToken }
 }
 
 // ── Error-classification helpers ──────────────────────────────
@@ -87,19 +102,19 @@ const formatSmtpDetail = (err: unknown): string | null => {
 
 const classifySmtpError = (
 	err: unknown,
-	inboxId: string,
+	mailboxId: string,
 ): GrantAuthFailed | GrantConnectFailed => {
 	const e = err as { code?: string; responseCode?: number }
 	const detail = formatSmtpDetail(err)
 	if (e?.code === 'EAUTH' || e?.responseCode === 535) {
-		return new GrantAuthFailed({ inboxId, detail })
+		return new GrantAuthFailed({ mailboxId, detail })
 	}
-	return new GrantConnectFailed({ inboxId, detail })
+	return new GrantConnectFailed({ mailboxId, detail })
 }
 
 const classifyImapError = (
 	err: unknown,
-	inboxId: string,
+	mailboxId: string,
 ): GrantAuthFailed | GrantConnectFailed => {
 	const e = err as {
 		authenticationFailed?: boolean
@@ -107,9 +122,9 @@ const classifyImapError = (
 	}
 	const detail = formatSmtpDetail(err)
 	if (e?.authenticationFailed === true || e?.code === 'AUTHENTICATIONFAILED') {
-		return new GrantAuthFailed({ inboxId, detail })
+		return new GrantAuthFailed({ mailboxId, detail })
 	}
-	return new GrantConnectFailed({ inboxId, detail })
+	return new GrantConnectFailed({ mailboxId, detail })
 }
 
 // ── Wire builders ─────────────────────────────────────────────
@@ -120,7 +135,14 @@ const buildSmtpTransport = (creds: DecryptedCreds) =>
 		port: creds.smtpPort,
 		secure: creds.smtpSecurity === 'tls',
 		requireTLS: creds.smtpSecurity === 'starttls',
-		auth: { user: creds.username, pass: creds.password },
+		auth:
+			creds.auth.kind === 'xoauth2'
+				? {
+						type: 'OAuth2',
+						user: creds.username,
+						accessToken: creds.auth.accessToken,
+					}
+				: { user: creds.username, pass: creds.auth.password },
 		// 5s socket-level guard so a dead host fails the probe fast
 		// instead of hanging the request thread.
 		connectionTimeout: 5_000,
@@ -133,7 +155,10 @@ const openImapClient = (creds: DecryptedCreds): ImapFlow =>
 		host: creds.imapHost,
 		port: creds.imapPort,
 		secure: creds.imapSecurity === 'tls',
-		auth: { user: creds.username, pass: creds.password },
+		auth:
+			creds.auth.kind === 'xoauth2'
+				? { user: creds.username, accessToken: creds.auth.accessToken }
+				: { user: creds.username, pass: creds.auth.password },
 		// imapflow logs every protocol line at info — silence in prod
 		// so the structured Effect log isn't drowned in low-level chatter.
 		logger: false,
@@ -152,7 +177,7 @@ export class MailTransport extends ServiceMap.Service<MailTransport>()(
 					const imap = openImapClient(creds)
 					yield* Effect.tryPromise({
 						try: () => imap.connect(),
-						catch: err => classifyImapError(err, creds.inboxId),
+						catch: err => classifyImapError(err, creds.connectionId),
 					})
 					yield* Effect.promise(() => imap.logout()).pipe(
 						Effect.catchCause(() => Effect.void),
@@ -161,7 +186,7 @@ export class MailTransport extends ServiceMap.Service<MailTransport>()(
 					const smtp = buildSmtpTransport(creds)
 					yield* Effect.tryPromise({
 						try: () => smtp.verify(),
-						catch: err => classifySmtpError(err, creds.inboxId),
+						catch: err => classifySmtpError(err, creds.connectionId),
 					})
 					smtp.close()
 				})
@@ -207,7 +232,7 @@ export class MailTransport extends ServiceMap.Service<MailTransport>()(
 					})
 					const compiled = yield* Effect.tryPromise({
 						try: () => compiler.sendMail(mailOpts),
-						catch: err => classifySmtpError(err, creds.inboxId),
+						catch: err => classifySmtpError(err, creds.connectionId),
 					})
 					const raw = compiled.message as Buffer
 					const messageId = compiled.messageId ?? ''
@@ -226,13 +251,13 @@ export class MailTransport extends ServiceMap.Service<MailTransport>()(
 								},
 								raw,
 							}),
-						catch: err => classifySmtpError(err, creds.inboxId),
+						catch: err => classifySmtpError(err, creds.connectionId),
 					}).pipe(Effect.ensuring(Effect.sync(() => transport.close())))
 
-					return {
+					return new Sent({
 						messageId,
 						raw: new Uint8Array(raw),
-					} satisfies SentResult
+					})
 				})
 
 			const appendToSent = (creds: DecryptedCreds, raw: Uint8Array) =>
@@ -240,7 +265,7 @@ export class MailTransport extends ServiceMap.Service<MailTransport>()(
 					const imap = openImapClient(creds)
 					yield* Effect.tryPromise({
 						try: () => imap.connect(),
-						catch: err => classifyImapError(err, creds.inboxId),
+						catch: err => classifyImapError(err, creds.connectionId),
 					})
 					yield* Effect.tryPromise({
 						try: async () => {
@@ -264,11 +289,19 @@ export class MailTransport extends ServiceMap.Service<MailTransport>()(
 								box.release()
 							}
 						},
-						catch: err => classifyImapError(err, creds.inboxId),
+						catch: err => classifyImapError(err, creds.connectionId),
 					}).pipe(Effect.ensuring(Effect.promise(() => imap.logout())))
 				})
 
-			return { probe, send, appendToSent } as const
+			return {
+				capabilities: EMAIL_CAPABILITIES,
+				probe,
+				send,
+				appendToSent,
+			} satisfies ChannelTransport<
+				DecryptedCreds,
+				GrantAuthFailed | GrantConnectFailed
+			>
 		}),
 	},
 ) {

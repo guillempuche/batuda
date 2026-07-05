@@ -48,12 +48,12 @@ test.describe('reply on a seeded thread', () => {
 	test.beforeEach(async ({ page }) => {
 		// GIVEN the catcher is empty and Alice's session is active on Taller.
 		await clearCatcher()
-		// AND the seeded inbox's grant is forced `connected` — the inbox-health
+		// AND the seeded mailbox's grant is forced `connected` — the mailbox-health
 		// probe marks it connected against the reachable catcher, but its first
 		// tick can lose the race to a cold catcher; this keeps sendDraft (which
 		// blocks on GrantUnavailable) asserting the reply path itself.
 		psql(
-			`UPDATE inboxes SET grant_status='connected' WHERE email='admin@taller.cat'`,
+			`UPDATE channel_connections SET grant_status='connected' WHERE external_id='admin@taller.cat'`,
 		)
 		await page.goto('/', { waitUntil: 'commit' })
 		await setActiveOrgBySlug(page, 'taller')
@@ -64,11 +64,11 @@ test.describe('reply on a seeded thread', () => {
 			page,
 		}) => {
 			// GIVEN the seeded thread "Quote for the booking module" is in
-			// the inbox; resolve its threadId from the DB so we navigate
+			// the mailbox; resolve its threadId from the DB so we navigate
 			// straight to the route (clicking the row would also work, but
 			// pulls in the listing render path which has its own spec).
 			const threadId = psql(
-				`SELECT id FROM email_thread_links WHERE subject = 'Quote for the booking module' LIMIT 1`,
+				`SELECT id FROM conversations WHERE subject = 'Quote for the booking module' LIMIT 1`,
 			)
 			expect(threadId, 'seeded thread must exist').not.toBe('')
 
@@ -103,7 +103,7 @@ test.describe('reply on a seeded thread', () => {
 			// is a no-op rather than a regression). This baseline exists so
 			// that future seed expansions of M1's Cc list trip the assertion.
 			const threadId = psql(
-				`SELECT id FROM email_thread_links WHERE subject = 'Quote for the booking module' LIMIT 1`,
+				`SELECT id FROM conversations WHERE subject = 'Quote for the booking module' LIMIT 1`,
 			)
 			expect(threadId, 'seeded thread must exist').not.toBe('')
 

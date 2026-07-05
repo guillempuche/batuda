@@ -36,7 +36,7 @@ describe('CreateTaskInput', () => {
 		// GIVEN a payload where title is an empty string
 		// WHEN decode runs
 		// THEN it fails (Schema.isMinLength(1) guards against whitespace-only titles
-		// leaking into the inbox)
+		// leaking into the mailbox)
 		const exit = decodeExit(CreateTaskInput, { type: 'call', title: '' })
 		expect(exit._tag).toBe('Failure')
 	})

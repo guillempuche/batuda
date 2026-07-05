@@ -26,7 +26,7 @@ export interface UploadInput {
 }
 
 export interface ImageUploaderConfig {
-	readonly inboxId: string
+	readonly mailboxId: string
 	readonly endpoint: string
 	readonly fetchImpl?: typeof fetch | undefined
 	readonly maxBytes?: number | undefined
@@ -58,7 +58,7 @@ export const createImageUploader = (
 				)
 			}
 			const body = new FormData()
-			body.set('inbox_id', config.inboxId)
+			body.set('mailbox_id', config.mailboxId)
 			body.set('filename', input.filename)
 			body.set('content_type', input.contentType)
 			body.set('inline', input.inline ? 'true' : 'false')

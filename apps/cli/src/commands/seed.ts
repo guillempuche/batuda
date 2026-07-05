@@ -11,8 +11,8 @@ import {
 } from './seed/crm'
 import { seedDocuments } from './seed/documents'
 import { seedDemoEmails } from './seed/emails'
-import { seedInboxes } from './seed/inboxes'
 import { linkRunProvenance, seedInstructions } from './seed/instructions'
+import { seedMailboxes } from './seed/mailboxes'
 import { seedMcpOAuth } from './seed/mcp-oauth'
 import { seedPages } from './seed/pages'
 import { seedPersonaActivity } from './seed/personas'
@@ -84,8 +84,8 @@ export const seed = (preset: Preset) =>
 				const insertedTasks = yield* seedTasks(ctx, dataWithContacts)
 				yield* seedCalendar(ctx, companyMap, insertedTasks)
 				const testUser = yield* seedResearchPolicy(ctx)
-				const seededInboxes = yield* seedInboxes(ctx)
-				yield* seedDemoEmails(sql, seededInboxes)
+				const seededMailboxes = yield* seedMailboxes(ctx)
+				yield* seedDemoEmails(sql, seededMailboxes)
 				const instructionTemplateIds = yield* seedInstructions(ctx)
 				yield* seedMcpOAuth(ctx)
 

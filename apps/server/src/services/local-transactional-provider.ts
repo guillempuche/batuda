@@ -13,9 +13,9 @@ import {
 	TransactionalEmailProvider,
 } from './transactional-email-provider.js'
 
-// Anchor relative to this file so the inbox dir is the same one the
-// `LocalInboxProvider` reader scans, regardless of cwd.
-const INBOX_DIR = resolve(import.meta.dirname, '..', '..', '.dev-inbox')
+// Anchor relative to this file so the mailbox dir is the same one the
+// `LocalMailboxProvider` reader scans, regardless of cwd.
+const INBOX_DIR = resolve(import.meta.dirname, '..', '..', '.dev-mailbox')
 
 const DEV_INBOX_FROM = 'dev@batuda.local'
 
@@ -42,8 +42,8 @@ const formatList = (items: readonly string[], indent = '  '): string => {
 
 // On-disk format mirrors `local-inbox-provider.ts`'s writer so the same
 // reader (frontmatter parser + `labels:` filter) surfaces transactional
-// mail in the dev inbox without provider-specific glue. The label is
-// what the dev-inbox UI keys on (magic-link, invitation, …).
+// mail in the dev mailbox without provider-specific glue. The label is
+// what the dev-mailbox UI keys on (magic-link, invitation, …).
 const formatTransactional = (args: {
 	readonly sentAt: Date
 	readonly messageId: string
@@ -72,7 +72,7 @@ const formatTransactional = (args: {
 	return `---\n${fm}\n---\n\n${args.bodyText}\n`
 }
 
-const ensureInboxDir = Effect.tryPromise({
+const ensureMailboxDir = Effect.tryPromise({
 	try: () => mkdir(INBOX_DIR, { recursive: true }),
 	catch: e =>
 		new EmailSendError({
@@ -82,9 +82,9 @@ const ensureInboxDir = Effect.tryPromise({
 		}),
 })
 
-// Writes a transactional `.md` file under `apps/server/.dev-inbox/` so a
+// Writes a transactional `.md` file under `apps/server/.dev-mailbox/` so a
 // developer can pick the URL up locally without sending real mail. The
-// `labels:` value is what the dev-inbox reader keys on
+// `labels:` value is what the dev-mailbox reader keys on
 // (magic-link, invitation, …) — keep these strings stable.
 export const LocalTransactionalProviderLive = Layer.effect(
 	TransactionalEmailProvider,
@@ -96,7 +96,7 @@ export const LocalTransactionalProviderLive = Layer.effect(
 			readonly label: string
 		}): Effect.Effect<void, EmailSendError> =>
 			Effect.gen(function* () {
-				yield* ensureInboxDir
+				yield* ensureMailboxDir
 				const sentAt = DateTime.toDateUtc(DateTime.nowUnsafe())
 				const messageId = `msg_local_${randomUUID()}`
 				const threadId = `thr_local_${randomUUID()}`

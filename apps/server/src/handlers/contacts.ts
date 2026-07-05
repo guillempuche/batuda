@@ -28,7 +28,7 @@ export const ContactsLive = HttpApiBuilder.group(
 							conditions.push(sql`c.company_id = ${_.query.companyId}`)
 						return yield* sql`
 							SELECT c.*, COALESCE(
-								(SELECT json_agg(ch ORDER BY ch.is_primary DESC, ch.kind)
+								(SELECT json_agg(ch ORDER BY ch.is_primary DESC, ch.channel)
 								 FROM contact_channels ch WHERE ch.contact_id = c.id),
 								'[]'::json
 							) AS channels

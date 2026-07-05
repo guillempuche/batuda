@@ -30,7 +30,7 @@ describe('TaskStatus', () => {
 	it('should reject an unknown literal like "archived"', () => {
 		// GIVEN 'archived' (not in the union)
 		// WHEN decode runs
-		// THEN it fails — guards against typos in callers and the inbox UI
+		// THEN it fails — guards against typos in callers and the mailbox UI
 		const exit = decodeExit(TaskStatus, 'archived')
 		expect(exit._tag).toBe('Failure')
 	})

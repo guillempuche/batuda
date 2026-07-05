@@ -18,7 +18,7 @@ import { attachmentKey, RawMessageStorage, rawMessageKey } from './storage.js'
 //  3. R2 PUT of the raw RFC822 (idempotent on the deterministic key)
 //  4. R2 PUT of each parsed attachment as its own object so the read
 //     path is a single GET, not a parse-on-demand.
-//  5. INSERT email_messages + participants + thread link, carrying
+//  5. INSERT messages + participants + thread link, carrying
 //     `attachments` JSONB metadata that points at the keys from step 4.
 //
 // SET LOCAL app.current_org_id pins the GUC for the surrounding TX so
@@ -27,7 +27,7 @@ import { attachmentKey, RawMessageStorage, rawMessageKey } from './storage.js'
 // here, but matters for later observability / cross-worker debugging.
 export const ingestRawMessage = (args: {
 	readonly organizationId: string
-	readonly inboxId: string
+	readonly mailboxId: string
 	readonly folder: string
 	readonly imapUid: number
 	readonly imapUidvalidity: number
@@ -43,7 +43,7 @@ export const ingestRawMessage = (args: {
 
 		const key = rawMessageKey({
 			organizationId: args.organizationId,
-			inboxId: args.inboxId,
+			mailboxId: args.mailboxId,
 			uidValidity: args.imapUidvalidity,
 			uid: args.imapUid,
 		})
@@ -62,7 +62,7 @@ export const ingestRawMessage = (args: {
 			const a = mail.attachments[i]!
 			const aKey = attachmentKey({
 				organizationId: args.organizationId,
-				inboxId: args.inboxId,
+				mailboxId: args.mailboxId,
 				uidValidity: args.imapUidvalidity,
 				uid: args.imapUid,
 				index: i,
@@ -96,7 +96,7 @@ export const ingestRawMessage = (args: {
 
 				// Bounce check first: a DSN both updates the original message
 				// status AND gets persisted as its own inbound row so the user
-				// sees "Mail Delivery Subsystem" in the inbox list.
+				// sees "Mail Delivery Subsystem" in the mailbox list.
 				const bounce = parseBounce(mail)
 				if (bounce) {
 					yield* applyBounce({
@@ -107,7 +107,7 @@ export const ingestRawMessage = (args: {
 
 				yield* persistInboundMessage({
 					organizationId: args.organizationId,
-					inboxId: args.inboxId,
+					mailboxId: args.mailboxId,
 					folder: args.folder,
 					imapUid: args.imapUid,
 					imapUidvalidity: args.imapUidvalidity,

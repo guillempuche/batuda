@@ -163,7 +163,7 @@ function RootComponent() {
 		// an MCP client) — render it focused, without the org-aware chrome.
 		location.pathname === '/oauth/consent'
 
-	// Tell any stale `/login` tab (left on the "Check your inbox" panel
+	// Tell any stale `/login` tab (left on the "Check your mailbox" panel
 	// after a cross-tab magic-link verify) to navigate off. Listener lives
 	// in login.tsx; firing on every authed-shell mount covers all sign-in
 	// paths uniformly.

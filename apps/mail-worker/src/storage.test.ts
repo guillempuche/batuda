@@ -10,18 +10,18 @@ import { attachmentKey, rawMessageKey } from './storage'
 
 describe('rawMessageKey', () => {
 	describe('when given canonical inputs', () => {
-		it('should produce messages/<org>/<inbox>/<uidv>/<uid>.eml', () => {
+		it('should produce messages/<org>/<mailbox>/<uidv>/<uid>.eml', () => {
 			// GIVEN canonical inputs
 			// WHEN rawMessageKey runs
 			const key = rawMessageKey({
 				organizationId: 'org-1',
-				inboxId: 'inbox-1',
+				mailboxId: 'mailbox-1',
 				uidValidity: 12345,
 				uid: 67,
 			})
 			// THEN the format is the worker contract
 			// [storage.ts:18]
-			expect(key).toBe('messages/org-1/inbox-1/12345/67.eml')
+			expect(key).toBe('messages/org-1/mailbox-1/12345/67.eml')
 		})
 	})
 })
@@ -33,14 +33,14 @@ describe('attachmentKey', () => {
 			// WHEN attachmentKey runs
 			const key = attachmentKey({
 				organizationId: 'org-1',
-				inboxId: 'inbox-1',
+				mailboxId: 'mailbox-1',
 				uidValidity: 12345,
 				uid: 67,
 				index: 0,
 			})
 			// THEN the key sits under the same message prefix as rawMessageKey
 			// [storage.ts:30]
-			expect(key).toBe('messages/org-1/inbox-1/12345/67/attachment-0.bin')
+			expect(key).toBe('messages/org-1/mailbox-1/12345/67/attachment-0.bin')
 		})
 
 		it('should use the supplied index for the suffix', () => {
@@ -50,7 +50,7 @@ describe('attachmentKey', () => {
 			// position so a re-fetch overwrites in place).
 			const key = attachmentKey({
 				organizationId: 'org-1',
-				inboxId: 'inbox-1',
+				mailboxId: 'mailbox-1',
 				uidValidity: 12345,
 				uid: 67,
 				index: 2,

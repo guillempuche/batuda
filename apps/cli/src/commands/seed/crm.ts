@@ -156,8 +156,8 @@ export const seedContacts = (
 				statusReason: string | null,
 			) => ({
 				contactId,
-				kind,
-				value,
+				channel: kind,
+				address: value,
 				isPrimary,
 				verification: null,
 				confidence: null,

@@ -88,7 +88,7 @@ describe('FOOTER_ALLOWED_BLOCKS / COMPOSE_ALLOWED_BLOCKS', () => {
 describe('EmailEditor component', () => {
 	describe('rendering', () => {
 		it.todo(
-			// GIVEN <EmailEditor inboxId="ibx_1" mode="compose" initialJson={[]} onChange={fn} />
+			// GIVEN <EmailEditor mailboxId="ibx_1" mode="compose" initialJson={[]} onChange={fn} />
 			// WHEN mounted
 			// THEN the underlying @react-email/editor canvas renders inside the DOM tree
 			'should mount the react-email editor with a doc derived from initialJson',

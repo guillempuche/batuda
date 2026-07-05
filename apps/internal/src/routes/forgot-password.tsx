@@ -16,7 +16,7 @@ import { stenciledTitle } from '#/lib/workshop-mixins'
  * regardless of whether the email exists (anti-enumeration); we render
  * the same "if this email is registered…" confirmation either way.
  *
- * The email lands in `apps/server/.dev-inbox/` with `labels: password-reset`
+ * The email lands in `apps/server/.dev-mailbox/` with `labels: password-reset`
  * in dev; in prod it ships via the configured transactional provider.
  */
 
@@ -66,7 +66,7 @@ function ForgotPasswordPage() {
 				>
 					<Brand>Batuda</Brand>
 					<Heading>
-						<Trans>Check your inbox</Trans>
+						<Trans>Check your mailbox</Trans>
 					</Heading>
 					<Body>
 						<Trans>

@@ -1,29 +1,29 @@
 import { NodeRuntime } from '@effect/platform-node'
 import { DateTime, Effect, type Fiber, Layer, Ref, Schedule } from 'effect'
 
-import { ParticipantMatcher } from '@batuda/email/participant-matcher'
+import { ParticipantMatcher } from '@batuda/communications'
 import { makeOtlpObservability } from '@batuda/observability'
 
-import { type ClaimedInbox, claimAvailableInboxes } from './claim.js'
+import { type ClaimedMailbox, claimAvailableMailboxes } from './claim.js'
 import { installCrashGuards } from './crash-guards.js'
 import { PgLive } from './db.js'
 import { CredentialDecryptor } from './decrypt.js'
 import { WorkerEnvVars } from './env.js'
-import { runInboxSession } from './inbox-session.js'
 import { ConfigFileLive } from './lib/config-provider.js'
+import { runMailboxSession } from './mailbox-session.js'
 import { RawMessageStorage } from './storage.js'
 
-// Top-level program: scan for unclaimed inboxes on a tick, fork a
-// session fiber per newly-claimed inbox, and let session fibers retry
-// internally on transient failure. A fiber exits only when the inbox
+// Top-level program: scan for unclaimed mailboxes on a tick, fork a
+// session fiber per newly-claimed mailbox, and let session fibers retry
+// internally on transient failure. A fiber exits only when the mailbox
 // is permanently disabled (auth_failed beyond retry) — at which point
 // the advisory lock releases (next scan won't re-claim it because
-// grant_status != 'connected'), and the inbox sits dormant until a
+// grant_status != 'connected'), and the mailbox sits dormant until a
 // user re-enters credentials and re-uploads to the server.
 //
 // Today the scan is purely time-based (5s tick); a future revision
-// will add LISTEN inbox_changed so server-side createInbox /
-// updateInbox / deleteInbox NOTIFYs wake the scan within ~1s instead
+// will add LISTEN mailbox_changed so server-side createMailbox /
+// updateMailbox / deleteMailbox NOTIFYs wake the scan within ~1s instead
 // of waiting up to a tick.
 const program = Effect.gen(function* () {
 	yield* Effect.logInfo('mail-worker: starting')
@@ -32,7 +32,7 @@ const program = Effect.gen(function* () {
 		`mail-worker: env loaded (NODE_ENV=${env.NODE_ENV}, max_conn=${env.EMAIL_WORKER_MAX_CONNECTIONS})`,
 	)
 
-	// Track which inboxes already have a running session fiber so we
+	// Track which mailboxes already have a running session fiber so we
 	// don't double-claim within the same process. Across processes the
 	// pg_advisory_lock is the source of truth.
 	const running = yield* Ref.make<Map<string, Fiber.Fiber<unknown, unknown>>>(
@@ -71,24 +71,25 @@ const program = Effect.gen(function* () {
 	const tick: Effect.Effect<void, never, never> = Effect.gen(function* () {
 		yield* emitHeartbeat
 		yield* reapFinished
-		const claimed: readonly ClaimedInbox[] = yield* claimAvailableInboxes.pipe(
-			Effect.catchCause(cause =>
-				Effect.logError(cause).pipe(
-					Effect.andThen(Effect.succeed([] as readonly ClaimedInbox[])),
+		const claimed: readonly ClaimedMailbox[] =
+			yield* claimAvailableMailboxes.pipe(
+				Effect.catchCause(cause =>
+					Effect.logError(cause).pipe(
+						Effect.andThen(Effect.succeed([] as readonly ClaimedMailbox[])),
+					),
 				),
-			),
-		)
+			)
 		if (claimed.length === 0) return
 		const current = yield* Ref.get(running)
 		const newlyForked = new Map(current)
-		for (const inbox of claimed) {
-			if (current.has(inbox.id)) continue
+		for (const mailbox of claimed) {
+			if (current.has(mailbox.id)) continue
 			yield* Effect.logInfo(
-				`mail-worker: claimed inbox=${inbox.id} org=${inbox.organizationId}`,
+				`mail-worker: claimed mailbox=${mailbox.id} org=${mailbox.organizationId}`,
 			)
-			const fiber = yield* Effect.forkChild(runInboxSession(inbox))
+			const fiber = yield* Effect.forkChild(runMailboxSession(mailbox))
 			newlyForked.set(
-				inbox.id,
+				mailbox.id,
 				fiber as unknown as Fiber.Fiber<unknown, unknown>,
 			)
 		}
@@ -114,7 +115,7 @@ const Live = Layer.mergeAll(
 	// ParticipantMatcher reads contacts/companies via SqlClient, so PgLive must
 	// be PROVIDED to the merged layers — `mergeAll` alongside it leaves that
 	// requirement unsatisfied. provideMerge also re-exposes SqlClient for the
-	// inbox claim/session queries run by `program`.
+	// mailbox claim/session queries run by `program`.
 	Layer.provideMerge(PgLive),
 	Layer.provideMerge(WorkerEnvVars.layer),
 	// Export traces, logs, and metrics to the batuda-mail-worker Honeycomb
