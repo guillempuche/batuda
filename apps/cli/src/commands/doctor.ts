@@ -7,8 +7,10 @@ import type { ChildProcessSpawner } from 'effect/unstable/process'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { SqlLive } from '../db'
+import { parseEnvKeys } from '../lib/env-file'
 import { getTarget } from '../lib/load-env'
 import { execSilent, ROOT } from '../shell'
+import { isLinkedWorktree } from './worktree'
 
 export type Status = 'ok' | 'warn' | 'fail'
 
@@ -30,23 +32,6 @@ interface Check {
 const ok = (detail: string) => ({ status: 'ok' as const, detail })
 const warn = (detail: string) => ({ status: 'warn' as const, detail })
 const fail = (detail: string) => ({ status: 'fail' as const, detail })
-
-// Worktrees only carry tracked files, so gitignored configs (`.env`,
-// `.env.pr-media`, …) live in the main checkout and never get copied in.
-// `worktree up` writes a worktree's own root `.env`, but the rest are absent
-// by design — the hint points there instead of crying "missing".
-const IN_WORKTREE = resolve(ROOT).includes(`${join('.claude', 'worktrees')}`)
-
-const envKeys = (content: string): Set<string> => {
-	const keys = new Set<string>()
-	for (const line of content.split('\n')) {
-		const trimmed = line.trim()
-		if (!trimmed || trimmed.startsWith('#')) continue
-		const eq = trimmed.indexOf('=')
-		if (eq !== -1) keys.add(trimmed.slice(0, eq))
-	}
-	return keys
-}
 
 // Every fillable `.env.example*` at the repo root or one level into
 // `apps/`/`packages/`. `.env.example` (and `apps/<x>/.env.example`) are
@@ -77,7 +62,7 @@ const findEnvExamples = (): string[] => {
 	return results
 }
 
-const envFileCheck = (example: string): Check => {
+const envFileCheck = (example: string, inWorktree: boolean): Check => {
 	// `.env.example` → `.env`; `.env.example.cloud` → `.env.cloud`.
 	const target = example.replace('.example', '')
 	const optional = !example.endsWith('.env.example')
@@ -86,9 +71,12 @@ const envFileCheck = (example: string): Check => {
 		run: Effect.sync(() => {
 			const targetPath = resolve(ROOT, target)
 			if (!existsSync(targetPath)) {
-				// In a worktree only the generated root `.env` is present; the rest
-				// are gitignored and intentionally not copied, so this isn't a fault.
-				if (IN_WORKTREE) {
+				// Worktrees only carry tracked files, so gitignored configs (`.env`,
+				// `.env.pr-media`, …) live in the main checkout and never get copied
+				// in. `worktree up`/`setup` write a worktree's own root `.env`, but
+				// the rest are absent by design — the hint points there instead of
+				// crying "missing".
+				if (inWorktree) {
 					return warn(
 						'lives in the main checkout (gitignored — not copied here)',
 					)
@@ -100,9 +88,9 @@ const envFileCheck = (example: string): Check => {
 				}
 				return fail('missing → run `pnpm cli setup`')
 			}
-			const targetKeys = envKeys(readFileSync(targetPath, 'utf8'))
+			const targetKeys = parseEnvKeys(readFileSync(targetPath, 'utf8'))
 			const missing = [
-				...envKeys(readFileSync(resolve(ROOT, example), 'utf8')),
+				...parseEnvKeys(readFileSync(resolve(ROOT, example), 'utf8')),
 			].filter(key => !targetKeys.has(key))
 			return missing.length > 0
 				? warn(
@@ -363,8 +351,8 @@ const cloudAuthUrlCheck: Check = {
 	}),
 }
 
-const localChecks: Check[] = [
-	...findEnvExamples().map(envFileCheck),
+const localChecks = (inWorktree: boolean): Check[] => [
+	...findEnvExamples().map(example => envFileCheck(example, inWorktree)),
 	emailCredentialKeyCheck,
 	dockerCheck,
 	composeCheck,
@@ -395,7 +383,8 @@ export const doctor = Effect.gen(function* () {
 		status: 'ok',
 		detail: target === 'cloud' ? 'CLOUD ⚠' : 'local',
 	}
-	const checks = target === 'cloud' ? cloudChecks : localChecks
+	const checks =
+		target === 'cloud' ? cloudChecks : localChecks(yield* isLinkedWorktree)
 	const results: CheckResult[] = [targetResult]
 	for (const check of checks) {
 		const result = yield* check.run

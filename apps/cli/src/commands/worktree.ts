@@ -6,6 +6,7 @@ import { dirname, resolve } from 'node:path'
 
 import { Console, Effect, Schedule } from 'effect'
 
+import { mergeEnvOverrides, missingEnvEntries, tryFs } from '../lib/env-file'
 import { exec, execIn, execSilent, ROOT } from '../shell'
 import { dbMigrate } from './db'
 
@@ -115,7 +116,10 @@ const mainCheckoutRoot = () =>
 		'--git-common-dir',
 	).pipe(Effect.map(dirname))
 
-export const isLinkedWorktree = Effect.gen(function* () {
+// Whether the current checkout is a linked worktree (vs the main checkout),
+// together with the main checkout's path — computed together so a caller that
+// needs both (provisioning, teardown) doesn't shell out to git twice for it.
+export const worktreeContext = Effect.gen(function* () {
 	const gitDir = yield* execSilent(
 		'git',
 		'rev-parse',
@@ -125,8 +129,13 @@ export const isLinkedWorktree = Effect.gen(function* () {
 	const main = yield* mainCheckoutRoot()
 	// In the main checkout gitDir is `<main>/.git`; in a linked worktree it is
 	// `<main>/.git/worktrees/<name>`, so it sits below the common `.git`.
-	return gitDir !== resolve(main, '.git')
+	const isLinked = gitDir !== resolve(main, '.git')
+	return { isLinked, main }
 })
+
+export const isLinkedWorktree = worktreeContext.pipe(
+	Effect.map(c => c.isLinked),
+)
 
 const workingTreeClean = execSilent('git', 'status', '--porcelain').pipe(
 	Effect.map(out => out.trim() === ''),
@@ -141,7 +150,7 @@ const branchExists = (branch: string) =>
 		`refs/heads/${branch}`,
 	).pipe(
 		Effect.map(() => true),
-		Effect.catch(() => Effect.succeed(false)),
+		Effect.orElseSucceed(() => false),
 	)
 
 const branchName = execSilent('git', 'rev-parse', '--abbrev-ref', 'HEAD')
@@ -150,105 +159,87 @@ const slugForCurrentWorktree = branchName.pipe(Effect.map(slugForBranch))
 
 // Only the worktree's own database and bucket differ from main; the shared
 // endpoints (Postgres host/port, MinIO, GreenMail) are inherited as-is.
-const envOverrides = (slug: string): Record<string, string> => ({
-	DATABASE_URL: `postgresql://batuda:batuda@localhost:5433/${dbName(slug)}`,
-	STORAGE_BUCKET: bucketName(slug),
+const envOverridesForNames = (
+	db: string,
+	bucket: string,
+): Record<string, string> => ({
+	DATABASE_URL: `postgresql://batuda:batuda@localhost:5433/${db}`,
+	STORAGE_BUCKET: bucket,
 })
 
-// Rewrite matching keys in a .env body, appending any that weren't present, so the
-// worktree inherits every other value from the main checkout's file.
-const mergeEnv = (base: string, overrides: Record<string, string>): string => {
-	const remaining = new Set(Object.keys(overrides))
-	const lines = base.split('\n').map(line => {
-		const match = line.match(/^([A-Z0-9_]+)=/)
-		const key = match?.[1]
-		if (key && key in overrides) {
-			remaining.delete(key)
-			return `${key}=${overrides[key]}`
-		}
-		return line
-	})
-	for (const key of remaining) lines.push(`${key}=${overrides[key]}`)
-	return lines.join('\n')
-}
+const envOverrides = (slug: string): Record<string, string> =>
+	envOverridesForNames(dbName(slug), bucketName(slug))
 
-// Read the main checkout's .env (the source of every shared value), apply the
-// worktree overrides, and write the worktree's copy. Both apps/server (root .env)
-// and the CLI (apps/cli/.env) need the DB url, so write both.
-const writeWorktreeEnv = (mainRoot: string, slug: string) =>
+// The files `writeWorktreeEnv` overrides, and which of the two keys each one
+// actually receives — `setup` keys its own worktree-aware handling (which
+// files to repair instead of template-copy, and which values to report for
+// each) off this same list, so the two can't disagree about what's
+// worktree-managed.
+export const WORKTREE_ENV_FILES: ReadonlyArray<{
+	path: string
+	keys: readonly string[]
+}> = [
+	{ path: '.env', keys: ['DATABASE_URL', 'STORAGE_BUCKET'] },
+	{ path: 'apps/cli/.env', keys: ['DATABASE_URL'] },
+]
+
+// Read the main checkout's .env files (the source of every shared value),
+// apply the worktree overrides, and write the worktree's copies. Every source
+// is checked for existence before any target is written, so a missing file
+// can't leave the worktree with one target rewritten and the other untouched.
+const writeWorktreeEnv = (
+	mainRoot: string,
+	overrides: Record<string, string>,
+) =>
 	Effect.gen(function* () {
-		const overrides = envOverrides(slug)
-		const targets: Array<{
-			from: string
-			to: string
-			keys?: readonly string[]
-		}> = [
-			{ from: resolve(mainRoot, '.env'), to: resolve(ROOT, '.env') },
-			{
-				from: resolve(mainRoot, 'apps/cli/.env'),
-				to: resolve(ROOT, 'apps/cli/.env'),
-				keys: ['DATABASE_URL'],
-			},
-		]
+		const targets = WORKTREE_ENV_FILES.map(f => ({
+			from: resolve(mainRoot, f.path),
+			to: resolve(ROOT, f.path),
+			keys: f.keys,
+		}))
+
+		const missing = targets.filter(t => !existsSync(t.from))
+		if (missing.length > 0) {
+			return yield* Effect.fail(
+				new Error(
+					`No ${missing.map(t => t.from).join(', ')} in the main checkout — run \`pnpm cli setup\` there first.`,
+				),
+			)
+		}
+
 		for (const t of targets) {
-			if (!existsSync(t.from)) {
-				return yield* Effect.fail(
-					new Error(
-						`No ${t.from} in the main checkout — run \`pnpm cli setup\` there first.`,
-					),
-				)
-			}
 			const base = readFileSync(t.from, 'utf-8')
-			const subset = t.keys
-				? Object.fromEntries(
-						t.keys.flatMap(k => {
-							const v = overrides[k]
-							return v === undefined ? [] : [[k, v] as const]
-						}),
-					)
-				: overrides
-			yield* Effect.promise(() => writeFile(t.to, mergeEnv(base, subset)))
+			const subset = Object.fromEntries(
+				t.keys.flatMap(k => {
+					const v = overrides[k]
+					return v === undefined ? [] : [[k, v] as const]
+				}),
+			)
+			yield* tryFs(`write ${t.to}`, () =>
+				writeFile(t.to, mergeEnvOverrides(base, subset)),
+			)
 		}
 	})
 
-// Active `KEY=` assignments in a .env body, ignoring comments (`# KEY=`) and
-// blanks. Mirrors mergeEnv's key regex so the two agree on what a "key" is.
-const envKeys = (body: string): Set<string> => {
-	const keys = new Set<string>()
-	for (const line of body.split('\n')) {
-		const key = line.match(/^([A-Z0-9_]+)=/)?.[1]
-		if (key) keys.add(key)
-	}
-	return keys
-}
-
-// Keys the committed .env.example declares but the local .env lacks. A worktree
-// inherits its .env from the main checkout, so a key added to the template but
-// not to that .env is missing here too — and the server reads it at boot and dies
-// with a cryptic ConfigError. Surfacing the names turns that into a fixable hint.
-const missingEnvKeys = (exampleBody: string, currentBody: string): string[] => {
-	const present = envKeys(currentBody)
-	return [...envKeys(exampleBody)].filter(key => !present.has(key))
-}
-
-// The current worktree's missing keys, or [] when either file is absent (nothing
-// to compare against).
+// Key names the committed .env.example declares but the local .env lacks. A
+// worktree inherits its .env from the main checkout, so a key added to the
+// template but not to that .env is missing here too — and the server reads it
+// at boot and dies with a cryptic ConfigError. Surfacing the names turns that
+// into a fixable hint.
 const missingWorktreeEnvKeys = (): string[] => {
 	const examplePath = resolve(ROOT, '.env.example')
 	const envPath = resolve(ROOT, '.env')
 	if (!existsSync(examplePath) || !existsSync(envPath)) return []
-	return missingEnvKeys(
+	return missingEnvEntries(
 		readFileSync(examplePath, 'utf-8'),
 		readFileSync(envPath, 'utf-8'),
-	)
+	).map(e => e.key)
 }
 
 const dockerFail = <A, E, R>(self: Effect.Effect<A, E, R>) =>
 	self.pipe(
-		Effect.catch(() =>
-			Effect.fail(
-				new Error('Docker command failed. Is Docker/OrbStack running?'),
-			),
+		Effect.mapError(
+			() => new Error('Docker command failed. Is Docker/OrbStack running?'),
 		),
 	)
 
@@ -267,10 +258,20 @@ const ensureSharedStack = dockerFail(
 // goes through the shared db container's `postgres` maintenance database. These
 // take the resolved database NAME (not a slug): `up` derives it from the branch
 // slug, while `down`/`prune` read it from the worktree's `.env`.
+//
+// Falls back to `false` on any docker/connection error — same reasoning as
+// `stackReachable`/`bucketExists` below: a transient failure here must not
+// crash a caller that's only trying to decide whether a worktree is
+// provisioned yet. `createDatabase`'s own `CREATE DATABASE` call still fails
+// (and so still gets retried by its caller's `settle`) if the container
+// genuinely isn't ready, so this fallback doesn't mask that case.
 const databaseExists = (db: string) =>
 	execSilent(
 		`docker exec ${DB_CONTAINER} psql -U ${PG_USER} -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='${db}'"`,
-	).pipe(Effect.map(out => out.trim() === '1'))
+	).pipe(
+		Effect.map(out => out.trim() === '1'),
+		Effect.orElseSucceed(() => false),
+	)
 
 const createDatabase = (db: string) =>
 	Effect.gen(function* () {
@@ -355,6 +356,16 @@ const listBuckets = mcCapture('mc ls local --json').pipe(
 	),
 )
 
+// Unlike `databaseExists`, MinIO is a separate service from the Postgres
+// `stackReachable` probes — falls back to `false` on any docker/mc error so a
+// bucket check can never itself crash a caller that's only trying to decide
+// whether this worktree is provisioned yet.
+const bucketExists = (bucket: string) =>
+	listBuckets.pipe(
+		Effect.map(names => names.includes(bucket)),
+		Effect.orElseSucceed(() => false),
+	)
+
 // Existing suffixed resources that no live worktree owns. The bare `batuda` /
 // `batuda-assets` (the main checkout) don't carry the `_`/`-` suffix the prefix
 // requires, so they can never be selected.
@@ -371,8 +382,100 @@ const stackReachable = execSilent(
 	`docker exec ${DB_CONTAINER} psql -U ${PG_USER} -d postgres -tAc "SELECT 1"`,
 ).pipe(
 	Effect.map(out => out.trim() === '1'),
-	Effect.catch(() => Effect.succeed(false)),
+	Effect.orElseSucceed(() => false),
 )
+
+export type WorktreeEnvSync = {
+	synced: boolean
+	db: string
+	bucket: string
+	/** Set only when provisioned but the repair write itself failed. */
+	error?: string
+}
+
+// A couple of short retries while the stack answers "not ready" instead of
+// erroring outright — long enough to ride out a stack someone else (another
+// worktree's session-start hook, a concurrent `services up`) started moments
+// ago, short enough that `setup` still stays fast when the stack is genuinely
+// down. `worktreeDoctor` calls the un-retried `stackReachable` directly since
+// it should fail fast, not wait, when reporting the stack as down.
+//
+// `Effect.repeat({while, times, schedule})` looks like the purpose-built tool
+// for "retry while this boolean is false," but its result is the *schedule's*
+// output (an attempt count), not the wrapped effect's last value — confirmed
+// empirically, not just from the docs. Converting the falsy result to a
+// failure first (so plain `Effect.retry` retries it) keeps the original
+// boolean as the actual success value.
+const stackReachableSettled = stackReachable.pipe(
+	Effect.flatMap(ok =>
+		ok ? Effect.succeed(true) : Effect.fail(new Error('not ready')),
+	),
+	Effect.retry(Schedule.spaced('1 second').pipe(Schedule.take(2))),
+	Effect.orElseSucceed(() => false),
+)
+
+// For `setup`, called only from inside a linked worktree: if this worktree's
+// database + bucket already exist and are migrated, (re)write its `.env` +
+// `apps/cli/.env` from the main checkout's real `.env` (at `main`) — the same
+// thing `up` does, minus provisioning. Reports `synced: false` (and writes
+// nothing) when the resources aren't ready yet, so `setup` can point the
+// caller at `worktree up` instead of producing a `.env` that names data
+// nothing created.
+//
+// Identity comes from the worktree's own `.env` when it already names a real,
+// existing database/bucket — re-deriving from the current branch would target
+// the wrong data once a merge swaps the branch to `main` before teardown runs
+// (the same reasoning `identityFromEnv`'s other callers already follow). Only
+// when `.env` can't name an identity at all (missing, or a blank
+// `DATABASE_URL` — the exact corruption this command exists to repair) does
+// it fall back to the branch-derived name.
+export const syncWorktreeEnvIfProvisioned = (main: string) =>
+	Effect.gen(function* () {
+		const recorded = identityFromEnv(resolve(ROOT, '.env'))
+		const fallbackSlug = yield* slugForCurrentWorktree
+		const db = recorded?.db ?? dbName(fallbackSlug)
+		const bucket = recorded?.bucket ?? bucketName(fallbackSlug)
+
+		// Postgres and MinIO are independent services, so check both at once
+		// once the stack itself answers — no point paying for either
+		// individually if the stack isn't even up.
+		const stackOk = yield* stackReachableSettled
+		const [dbExists, bucketOk] = stackOk
+			? yield* Effect.all([databaseExists(db), bucketExists(bucket)], {
+					concurrency: 'unbounded',
+				})
+			: [false, false]
+		const migrated = dbExists && (yield* tableCount(db)) > 0
+		const provisioned = stackOk && dbExists && bucketOk && migrated
+
+		if (!provisioned) {
+			const result: WorktreeEnvSync = { synced: false, db, bucket }
+			return result
+		}
+
+		const overrides = envOverridesForNames(db, bucket)
+		const write: WorktreeEnvSync = yield* writeWorktreeEnv(
+			main,
+			overrides,
+		).pipe(
+			Effect.map(() => ({ synced: true as const, db, bucket })),
+			Effect.catch(error =>
+				Effect.succeed({
+					synced: false as const,
+					db,
+					bucket,
+					error: error.message,
+				}),
+			),
+		)
+		// Make the just-written values visible to this process + every
+		// subprocess it spawns, so a follow-up command in the same process (the
+		// TUI) targets this worktree's database, not a stale one from startup.
+		if (write.synced) {
+			for (const [k, v] of Object.entries(overrides)) process.env[k] = v
+		}
+		return write
+	})
 
 // How many public tables a database has — 0 means it exists but isn't migrated.
 const tableCount = (db: string) =>
@@ -380,7 +483,7 @@ const tableCount = (db: string) =>
 		`docker exec ${DB_CONTAINER} psql -U ${PG_USER} -d ${db} -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'"`,
 	).pipe(
 		Effect.map(out => Number(out.trim()) || 0),
-		Effect.catch(() => Effect.succeed(0)),
+		Effect.orElseSucceed(() => 0),
 	)
 
 // Parse `git worktree list --porcelain` into one entry per worktree; `branch` is
@@ -409,14 +512,14 @@ const parseWorktrees = (
 }
 
 export const worktreeUp = Effect.gen(function* () {
-	if (!(yield* isLinkedWorktree)) {
+	const { isLinked, main } = yield* worktreeContext
+	if (!isLinked) {
 		return yield* Effect.fail(
 			new Error(
 				'Not in a worktree. Use `pnpm cli services up` for the main checkout’s shared stack.',
 			),
 		)
 	}
-	const main = yield* mainCheckoutRoot()
 	const slug = yield* slugForCurrentWorktree
 
 	yield* Effect.logInfo('Ensuring the shared stack is up…')
@@ -428,10 +531,11 @@ export const worktreeUp = Effect.gen(function* () {
 	yield* settle(createDatabase(dbName(slug)))
 	yield* settle(mc(`mc mb --ignore-existing local/${bucketName(slug)}`))
 
-	yield* writeWorktreeEnv(main, slug)
+	const overrides = envOverrides(slug)
+	yield* writeWorktreeEnv(main, overrides)
 	// Make the just-written values visible to this process + every subprocess
 	// (migrate/seed) it spawns, so they target this worktree's database, not main's.
-	for (const [k, v] of Object.entries(envOverrides(slug))) process.env[k] = v
+	for (const [k, v] of Object.entries(overrides)) process.env[k] = v
 
 	// Catch a stale inherited .env now, with the key names, instead of leaving
 	// the server to die at boot with a bare "Expected string, got undefined".
@@ -529,8 +633,7 @@ export const worktreeDone = (options: { force: boolean; stash: boolean }) =>
 			}
 		}
 
-		const linked = yield* isLinkedWorktree
-		const mainRoot = yield* mainCheckoutRoot()
+		const { isLinked: linked, main: mainRoot } = yield* worktreeContext
 
 		if (linked) {
 			const branch = yield* branchName
@@ -607,10 +710,19 @@ const pruneOrphanDevServers = exec('pnpm exec portless prune').pipe(
 // mistaken for an orphan. Orphaned dev servers are reaped on `--yes` too.
 export const worktreePrune = (apply: boolean) =>
 	Effect.gen(function* () {
-		const owned = yield* liveOwnedResources
-		const orphanDbs = findOrphans(yield* listDatabases, owned.dbs, 'batuda_')
+		// Three independent reads (git+fs, docker, mc) — no reason to pay for
+		// them one after another.
+		const { owned, databases, bucketList } = yield* Effect.all(
+			{
+				owned: liveOwnedResources,
+				databases: listDatabases,
+				bucketList: listBuckets,
+			},
+			{ concurrency: 'unbounded' },
+		)
+		const orphanDbs = findOrphans(databases, owned.dbs, 'batuda_')
 		const orphanBuckets = findOrphans(
-			yield* listBuckets,
+			bucketList,
 			owned.buckets,
 			'batuda-assets-',
 		)
@@ -650,10 +762,19 @@ export const worktreePrune = (apply: boolean) =>
 	})
 
 export const worktreeLs = Effect.gen(function* () {
-	const porcelain = yield* execSilent('git', 'worktree', 'list', '--porcelain')
-	const main = yield* mainCheckoutRoot()
-	const dbs = new Set(yield* listDatabases)
-	const buckets = new Set(yield* listBuckets)
+	// Four independent reads (git metadata, docker, docker, mc) — no reason to
+	// pay for them one after another.
+	const { porcelain, main, databases, bucketList } = yield* Effect.all(
+		{
+			porcelain: execSilent('git', 'worktree', 'list', '--porcelain'),
+			main: mainCheckoutRoot(),
+			databases: listDatabases,
+			bucketList: listBuckets,
+		},
+		{ concurrency: 'unbounded' },
+	)
+	const dbs = new Set(databases)
+	const buckets = new Set(bucketList)
 
 	const rows = parseWorktrees(porcelain).map(e => {
 		// The main checkout owns the unsuffixed `batuda` database/bucket; every
@@ -723,7 +844,13 @@ export const worktreeDoctor = Effect.gen(function* () {
 			})
 		} else {
 			const { db, bucket } = identity
-			const dbOk = stackOk ? yield* databaseExists(db) : false
+			// Independent services, checked at once — the display order below
+			// (database, migrations, bucket) is unaffected either way.
+			const [dbOk, bucketOk] = stackOk
+				? yield* Effect.all([databaseExists(db), bucketExists(bucket)], {
+						concurrency: 'unbounded',
+					})
+				: [false, false]
 			checks.push({
 				ok: dbOk,
 				name: 'database',
@@ -738,8 +865,6 @@ export const worktreeDoctor = Effect.gen(function* () {
 					tables > 0 ? `${tables} tables` : 'none — run `pnpm cli worktree up`',
 			})
 
-			let bucketOk = false
-			if (stackOk) bucketOk = new Set(yield* listBuckets).has(bucket)
 			checks.push({
 				ok: bucketOk,
 				name: 'bucket',

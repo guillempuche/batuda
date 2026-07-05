@@ -1,12 +1,23 @@
 import { existsSync, readdirSync, statSync } from 'node:fs'
-import { copyFile, readFile, writeFile } from 'node:fs/promises'
+import { copyFile, readFile } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 
 import { Effect } from 'effect'
 
-const ROOT = resolve(import.meta.dirname, '../../../..')
+import type { EnvEntry } from '../lib/env-file'
+import { missingEnvEntries, tryFs } from '../lib/env-file'
+import { ROOT } from '../shell'
+import {
+	syncWorktreeEnvIfProvisioned,
+	WORKTREE_ENV_FILES,
+	worktreeContext,
+} from './worktree'
 
 const WORKSPACE_DIRS = ['apps', 'packages'] as const
+
+// The paths from `WORKTREE_ENV_FILES` alone, for the generic loop's skip
+// check below — kept in sync with `writeWorktreeEnv`'s own list by construction.
+const WORKTREE_ENV_TARGETS = new Set(WORKTREE_ENV_FILES.map(f => f.path))
 
 /**
  * Return repo-relative paths to every `.env.example` (exact name) located at
@@ -35,88 +46,80 @@ const findEnvExamples = (): string[] => {
 	return results
 }
 
-// ── .env parsing ──────────────────────────────────────────
-
-export type EnvEntry = {
-	key: string
-	line: string
-	/** Comment lines immediately preceding this key (reset by blank lines). */
-	comments: string[]
-}
-
 export type EnvFileResult = {
 	example: string
 	target: string
-	status: 'created' | 'up-to-date' | 'stale' | 'skipped'
+	status:
+		| 'created'
+		| 'up-to-date'
+		| 'stale'
+		| 'skipped'
+		| 'worktree-synced'
+		| 'worktree-unprovisioned'
+		| 'worktree-error'
 	missing: EnvEntry[]
-}
-
-/** Extract the set of defined keys from a .env file. */
-const parseEnvKeys = (content: string): Set<string> => {
-	const keys = new Set<string>()
-	for (const line of content.split('\n')) {
-		const trimmed = line.trim()
-		if (!trimmed || trimmed.startsWith('#')) continue
-		const eq = trimmed.indexOf('=')
-		if (eq !== -1) keys.add(trimmed.slice(0, eq))
-	}
-	return keys
-}
-
-/** Parse a .env file into entries with preceding comment context. */
-const parseEnvEntries = (content: string): EnvEntry[] => {
-	const entries: EnvEntry[] = []
-	let comments: string[] = []
-
-	for (const raw of content.split('\n')) {
-		const trimmed = raw.trim()
-		if (trimmed === '') {
-			comments = []
-			continue
-		}
-		if (trimmed.startsWith('#')) {
-			comments.push(raw)
-			continue
-		}
-		const eq = trimmed.indexOf('=')
-		if (eq !== -1) {
-			entries.push({
-				key: trimmed.slice(0, eq),
-				line: raw,
-				comments: [...comments],
-			})
-		}
-		comments = []
-	}
-
-	return entries
+	/** Set only for the worktree-* statuses: this worktree's intended database
+	 * and/or bucket — only the keys this specific file actually receives. */
+	worktree?: { db?: string | undefined; bucket?: string | undefined }
+	/** Set only for 'worktree-error': what went wrong repairing this file. */
+	error?: string | undefined
 }
 
 // ── Commands ──────────────────────────────────────────────
 
-export const setup: Effect.Effect<EnvFileResult[]> = Effect.gen(function* () {
+export const setup = Effect.gen(function* () {
 	const results: EnvFileResult[] = []
+	const { isLinked: inWorktree, main } = yield* worktreeContext
+
+	// Read-only context detection: in a worktree, `.env` + `apps/cli/.env` are
+	// repaired from this worktree's own database/bucket (if already provisioned)
+	// instead of synced from the template — never created here. `worktree up`
+	// remains the only path that provisions.
+	if (inWorktree) {
+		const sync = yield* syncWorktreeEnvIfProvisioned(main)
+		for (const file of WORKTREE_ENV_FILES) {
+			results.push({
+				example: `${file.path}.example`,
+				target: file.path,
+				status: sync.error
+					? 'worktree-error'
+					: sync.synced
+						? 'worktree-synced'
+						: 'worktree-unprovisioned',
+				missing: [],
+				worktree: {
+					db: file.keys.includes('DATABASE_URL') ? sync.db : undefined,
+					bucket: file.keys.includes('STORAGE_BUCKET')
+						? sync.bucket
+						: undefined,
+				},
+				error: sync.error,
+			})
+		}
+	}
 
 	for (const example of findEnvExamples()) {
 		const target = example.replace(/\.example$/, '')
+		if (inWorktree && WORKTREE_ENV_TARGETS.has(target)) continue
+
 		const src = resolve(ROOT, example)
 		const dst = resolve(ROOT, target)
 
 		if (!existsSync(dst)) {
-			yield* Effect.promise(() => copyFile(src, dst))
+			yield* tryFs(`create ${target}`, () => copyFile(src, dst))
 			results.push({ example, target, status: 'created', missing: [] })
 			continue
 		}
 
-		const [exampleContent, targetContent] = yield* Effect.all([
-			Effect.promise(() => readFile(src, 'utf-8')),
-			Effect.promise(() => readFile(dst, 'utf-8')),
-		])
-
-		const targetKeys = parseEnvKeys(targetContent)
-		const missing = parseEnvEntries(exampleContent).filter(
-			e => !targetKeys.has(e.key),
+		const { exampleContent, targetContent } = yield* Effect.all(
+			{
+				exampleContent: tryFs(`read ${example}`, () => readFile(src, 'utf-8')),
+				targetContent: tryFs(`read ${target}`, () => readFile(dst, 'utf-8')),
+			},
+			{ concurrency: 'unbounded' },
 		)
+
+		const missing = missingEnvEntries(exampleContent, targetContent)
 
 		results.push({
 			example,
@@ -128,19 +131,3 @@ export const setup: Effect.Effect<EnvFileResult[]> = Effect.gen(function* () {
 
 	return results
 })
-
-/** Append missing entries (with their comments) to an existing .env file. */
-export const appendEnvKeys = (targetRel: string, entries: EnvEntry[]) =>
-	Effect.promise(async () => {
-		const dst = resolve(ROOT, targetRel)
-		const existing = await readFile(dst, 'utf-8')
-		const block = entries.flatMap(e => [...e.comments, e.line]).join('\n')
-		const separator = existing.endsWith('\n') ? '\n' : '\n\n'
-		await writeFile(dst, `${existing}${separator}${block}\n`)
-	})
-
-/** Replace target .env entirely with .env.example content. */
-export const resetEnvFile = (exampleRel: string, targetRel: string) =>
-	Effect.promise(() =>
-		copyFile(resolve(ROOT, exampleRel), resolve(ROOT, targetRel)),
-	)
