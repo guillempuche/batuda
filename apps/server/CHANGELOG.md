@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-05 (server-v2026.7.5)
+
+### Features
+
+* apply research proposed-updates to the CRM row ([99de720](https://github.com/guillempuche/batuda/commit/99de7207df952abfbcfa2b71c2b9ad51f75998a6))
+* research companies in any country, not just Spain and the UK ([de9fdd6](https://github.com/guillempuche/batuda/commit/de9fdd66081354f7e83a4943822739f71c0cc823))
+* **server:** add bounding-box company search and location re-geocode ([259137b](https://github.com/guillempuche/batuda/commit/259137b7ff2b4fd8d1688a72c8ccf91cb08de10c))
+* **server:** store company coordinates after enrichment succeeds ([a0191f0](https://github.com/guillempuche/batuda/commit/a0191f02859dae73b4b31b418e86ac2a18f9458b))
+
+### Bug Fixes
+
+* **research:** coerce model "NaN" numbers to null in extraction schemas ([4c3d43a](https://github.com/guillempuche/batuda/commit/4c3d43ae0c9fa48d1344006f0da7a4338dd52ca0))
+* **research:** surface the real error instead of a wrapper crash ([4fe8de9](https://github.com/guillempuche/batuda/commit/4fe8de9c31052d89980d13ea7d87399d40c3cf09))
+* **research:** tolerate plain text where extraction expects JSON ([eab94e2](https://github.com/guillempuche/batuda/commit/eab94e28cbcb2db357028bb92c62b7b5ccd169e0))
+* **server:** keep MCP tool results valid and hide internal errors ([52125b9](https://github.com/guillempuche/batuda/commit/52125b910dfbc48273ef9b3de96c5938a691efcd))
+* **server:** return an object when reading policy or listing templates ([71b2f4a](https://github.com/guillempuche/batuda/commit/71b2f4ad375fb94cd3aa12f43cac68172369715f))
+* stop company enrichment asking the model for coordinates ([a2713e9](https://github.com/guillempuche/batuda/commit/a2713e9ffc333dab9471561df021f936de91cf18))
+
 ## 2026-07-04 (server-v2026.7.4)
 
 ### Features
