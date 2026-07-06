@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-06 (server-v2026.7.6)
+
+### Features
+
+* add Firecrawl web search and make it the primary provider ([cc9711c](https://github.com/guillempuche/batuda/commit/cc9711cfff59cba7f9b23eb75467ee9ed6dffabd))
+* create newly discovered contacts in the CRM under the run budget ([72f223d](https://github.com/guillempuche/batuda/commit/72f223d2e6c36ea7f61680c80d8083c27198143a))
+* ground research findings in a reflect loop, refusing fabrication ([c0a9cf5](https://github.com/guillempuche/batuda/commit/c0a9cf5c04ac372e2af397e33b513aa8866fb37d))
+
+### Bug Fixes
+
+* stop invented contact details from surviving in research findings ([c52a60b](https://github.com/guillempuche/batuda/commit/c52a60b81c65f32db43409eb79e63759c0aede2f))
+
+### CI/CD
+
+* mark migration 0022 status widening as a clean break ([c528455](https://github.com/guillempuche/batuda/commit/c528455707a9d1e99416365b6adab6c7052c1e16))
+
 ## 2026-07-05 (server-v2026.7.5)
 
 ### Features
