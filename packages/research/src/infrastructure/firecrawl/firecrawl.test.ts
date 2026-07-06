@@ -22,6 +22,7 @@ import { describe, expect, it } from 'vitest'
 import { ProviderError } from '../../domain/errors'
 import { makeFirecrawlExtract } from './extract'
 import { makeFirecrawlScrape } from './scrape'
+import { makeFirecrawlSearch } from './search'
 
 // ── Test helpers ──
 
@@ -140,6 +141,25 @@ const runExtract = (
 			Effect.provide(
 				ConfigProvider.layer(
 					ConfigProvider.fromEnv({ env: { RESEARCH_API_KEY_EXTRACT: 'fc_k' } }),
+				),
+			),
+		),
+	)
+	return { exit, log }
+}
+
+const runSearch = (status: number, body: unknown, query = 'acme logistics') => {
+	const log: CallLog = { count: 0, last: undefined }
+	const client = countingClient(log, status, body)
+	const exit = runWithVirtualClock(() =>
+		Effect.gen(function* () {
+			const provider = yield* makeFirecrawlSearch(0)
+			return yield* provider.search({ query })
+		}).pipe(
+			Effect.provideService(HttpClient.HttpClient, client),
+			Effect.provide(
+				ConfigProvider.layer(
+					ConfigProvider.fromEnv({ env: { RESEARCH_API_KEY_SEARCH: 'fc_k' } }),
 				),
 			),
 		),
@@ -283,6 +303,103 @@ describe('makeFirecrawlExtract', () => {
 		const { exit, log } = runExtract(400, { error: 'bad request' })
 
 		// THEN it fails on the first attempt, non-recoverably
+		const resolved = await exit
+		expect(log.count).toBe(1)
+		expect(errorOf(resolved)?.recoverable).toBe(false)
+	})
+})
+
+describe('makeFirecrawlSearch', () => {
+	it('should map web results to items with markdown content and the real credit cost', async () => {
+		// GIVEN a search response with scraped markdown on the first result, the
+		// second result missing title/description/markdown, and a credit total
+		const { exit } = runSearch(200, {
+			data: {
+				web: [
+					{
+						url: 'https://acme.es',
+						title: 'Acme',
+						description: 'Freight forwarder',
+						markdown: '# Acme\nFull page content.',
+					},
+					{ url: 'https://acme.es/about' },
+				],
+			},
+			creditsUsed: 7,
+		})
+
+		// THEN each result maps to a SearchResultItem (missing title/snippet
+		// default to empty strings), the markdown becomes content, and the run
+		// is billed the reported credits rather than a flat 1
+		const resolved = await exit
+		const result = Exit.isSuccess(resolved) ? resolved.value : undefined
+		expect(result?.items.map(i => i.url)).toEqual([
+			'https://acme.es',
+			'https://acme.es/about',
+		])
+		expect(result?.items[0]?.snippet).toBe('Freight forwarder')
+		expect(result?.items[0]?.content).toBe('# Acme\nFull page content.')
+		expect(result?.items[1]?.title).toBe('')
+		expect(result?.items[1]?.content).toBeUndefined()
+		expect(result?.units).toBe(7)
+	})
+
+	it('should bill one unit when the response omits a credit total', async () => {
+		// GIVEN a 2xx response without creditsUsed
+		const { exit } = runSearch(200, { data: { web: [] } })
+
+		// THEN units falls back to 1
+		const resolved = await exit
+		const result = Exit.isSuccess(resolved) ? resolved.value : undefined
+		expect(result?.units).toBe(1)
+	})
+
+	it('should return no items when the web array is absent', async () => {
+		// GIVEN a 2xx response whose data omits the web array
+		const { exit } = runSearch(200, { data: {} })
+
+		// THEN the result carries an empty item list rather than throwing
+		const resolved = await exit
+		const result = Exit.isSuccess(resolved) ? resolved.value : undefined
+		expect(result?.items).toEqual([])
+	})
+
+	it('should POST to the Firecrawl search endpoint with a bearer key', async () => {
+		// GIVEN any successful search
+		const { exit, log } = runSearch(200, { data: { web: [] } })
+		await exit
+
+		// THEN the request is a POST to /v2/search carrying the configured key
+		expect(log.last?.method).toBe('POST')
+		expect(log.last?.url).toContain('api.firecrawl.dev/v2/search')
+		expect(log.last?.headers['authorization']).toBe('Bearer fc_k')
+	})
+
+	it('should retry a 5xx as recoverable', async () => {
+		// GIVEN Firecrawl returns 503 on every attempt
+		const { exit, log } = runSearch(503, { error: 'unavailable' })
+
+		// THEN it retries to the max and fails with a recoverable error
+		const resolved = await exit
+		expect(log.count).toBe(3)
+		expect(errorOf(resolved)?.recoverable).toBe(true)
+	})
+
+	it('should fail fast on a 401 without retrying', async () => {
+		// GIVEN an auth failure
+		const { exit, log } = runSearch(401, { error: 'bad key' })
+
+		// THEN it fails on the first attempt with a non-recoverable error
+		const resolved = await exit
+		expect(log.count).toBe(1)
+		expect(errorOf(resolved)?.recoverable).toBe(false)
+	})
+
+	it('should fail non-recoverably on a malformed body', async () => {
+		// GIVEN a 2xx response missing the `data` envelope
+		const { exit, log } = runSearch(200, { wrong: 'shape' })
+
+		// THEN the decode error is non-recoverable and not retried
 		const resolved = await exit
 		expect(log.count).toBe(1)
 		expect(errorOf(resolved)?.recoverable).toBe(false)

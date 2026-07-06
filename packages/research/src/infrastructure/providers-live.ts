@@ -61,6 +61,7 @@ import { makeCachedSearch } from './cached-search'
 import { makeCompaniesHouseRegistry } from './companies-house/registry'
 import { makeFirecrawlExtract } from './firecrawl/extract'
 import { makeFirecrawlScrape } from './firecrawl/scrape'
+import { makeFirecrawlSearch } from './firecrawl/search'
 import { makeHunterEnrichment } from './hunter/enrichment'
 import { makeHunterVerifier } from './hunter/verifier'
 import { makeLibreborRegistry } from './librebor/registry'
@@ -100,11 +101,7 @@ const searchInstance = (vendor: SearchVendor, slot: number) => {
 		case 'brave':
 			return makeBraveSearch(slot)
 		case 'firecrawl':
-			return Effect.succeed(
-				SearchProvider.of({
-					search: () => notYetImplementedError('search', 'firecrawl'),
-				}),
-			)
+			return makeFirecrawlSearch(slot)
 	}
 }
 

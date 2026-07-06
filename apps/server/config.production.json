@@ -47,7 +47,7 @@
 	"RESEARCH_PROVIDER_REPORT_ES": "none",
 	"RESEARCH_PROVIDER_REPORT_GB": "none",
 	"RESEARCH_PROVIDER_SCRAPE": "firecrawl",
-	"RESEARCH_PROVIDER_SEARCH": "brave",
+	"RESEARCH_PROVIDER_SEARCH": "firecrawl,brave",
 	"RESEARCH_PROVIDER_VERIFY": "hunter",
 	"STORAGE_BUCKET": "batuda-assets",
 	"STORAGE_ENDPOINT": "https://b4ffb72b6d377a7950e0d3a596d82d4b.eu.r2.cloudflarestorage.com",
