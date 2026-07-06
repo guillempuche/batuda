@@ -9,6 +9,11 @@ export class SearchResultItem extends Schema.Class<SearchResultItem>(
 	url: Schema.String,
 	title: Schema.String,
 	snippet: Schema.String,
+	// Richer per-result context beyond the one-line snippet: the page's main
+	// content as markdown (Firecrawl `scrapeOptions`) or a provider's extra
+	// excerpts (Brave `extra_snippets`). Present only when the provider returns
+	// it; a result with real page content can also ground the run.
+	content: Schema.optional(Schema.String),
 	publishedAt: Schema.optional(Schema.DateTimeUtc),
 	score: Schema.optional(Schema.Number),
 }) {}

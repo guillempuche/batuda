@@ -53,10 +53,14 @@ export const makeCachedExtract = () =>
 						`${contentHash}|${input.schemaName}|${version}|${DEFAULT_MODEL}`,
 					)
 
+					// The cache key is derived from the URL, not the page's actual
+					// content, so a page that changed keeps the same key. Bound how
+					// long a stale extraction can be served before it is refreshed.
 					const hits = yield* sql<{ result: unknown }>`
 						SELECT result
 						FROM extraction_cache
 						WHERE key_hash = ${keyHash}
+							AND cached_at > now() - interval '7 days'
 						LIMIT 1
 					`
 					if (hits[0]) {
@@ -77,6 +81,7 @@ export const makeCachedExtract = () =>
 							SELECT result
 							FROM extraction_cache
 							WHERE key_hash = ${keyHash}
+								AND cached_at > now() - interval '7 days'
 							LIMIT 1
 						`
 						if (rehits[0]) return rehits[0].result
