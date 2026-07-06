@@ -4,6 +4,7 @@ import { SqlClient } from 'effect/unstable/sql'
 import { CurrentOrg } from '@batuda/controllers'
 
 import { forkCompanyRegeocode } from './company-geocoding'
+import { type ChannelInput, writeChannels } from './contact-channels'
 
 /**
  * Apply (or reject) a research-proposed CRM update — the one place a research
@@ -45,17 +46,10 @@ const COMPANY_FIELDS = new Set([
 	'currentTools',
 ])
 
-const CONTACT_FIELDS = new Set([
-	'name',
-	'role',
-	'isDecisionMaker',
-	'email',
-	'phone',
-	'whatsapp',
-	'linkedin',
-	'instagram',
-	'notes',
-])
+// Reachable addresses (email/phone/whatsapp/linkedin/instagram) live on
+// contact_channels, not on `contacts`, so they are not settable here; only
+// the row's own columns remain.
+const CONTACT_FIELDS = new Set(['name', 'role', 'isDecisionMaker', 'notes'])
 
 const snakeToCamel = (s: string) =>
 	s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
@@ -109,6 +103,70 @@ export const validate = (proposal: Record<string, unknown>): Validated => {
 		subjectId,
 		expectedVersion,
 		fields: fields as Record<string, unknown>,
+	}
+}
+
+// Channels arrive from contact discovery as { kind, value, verification?,
+// confidence?, is_primary? }. Keep only well-formed entries — a channel needs
+// both a kind and a value to be reachable.
+const parseChannels = (raw: unknown): ReadonlyArray<ChannelInput> => {
+	if (!Array.isArray(raw)) return []
+	const channels: ChannelInput[] = []
+	for (const entry of raw) {
+		if (typeof entry !== 'object' || entry === null) continue
+		const record = entry as Record<string, unknown>
+		const kind = record['kind']
+		const value = record['value']
+		if (typeof kind !== 'string' || typeof value !== 'string') continue
+		const verification = record['verification']
+		const confidence = record['confidence']
+		const isPrimary = record['is_primary']
+		channels.push({
+			kind,
+			value,
+			verification: typeof verification === 'string' ? verification : undefined,
+			confidence: typeof confidence === 'number' ? confidence : undefined,
+			is_primary: typeof isPrimary === 'boolean' ? isPrimary : undefined,
+		})
+	}
+	return channels
+}
+
+export type ValidatedCreate =
+	| {
+			readonly ok: true
+			readonly companyId: string
+			readonly fields: Record<string, unknown>
+			readonly channels: ReadonlyArray<ChannelInput>
+	  }
+	| { readonly ok: false; readonly reason: string }
+
+// A create proposal carries a newly discovered contact: its row data plus the
+// company it belongs to (contacts.company_id is required) and its channels.
+export const validateCreate = (
+	proposal: Record<string, unknown>,
+): ValidatedCreate => {
+	if (proposal['subject_table'] !== 'contacts')
+		return { ok: false, reason: 'create is only supported for contacts' }
+	const fieldsRaw = proposal['fields']
+	if (
+		typeof fieldsRaw !== 'object' ||
+		fieldsRaw === null ||
+		Array.isArray(fieldsRaw)
+	)
+		return { ok: false, reason: 'fields is not an object' }
+	const fields = fieldsRaw as Record<string, unknown>
+	const name = fields['name']
+	if (typeof name !== 'string' || name.trim() === '')
+		return { ok: false, reason: 'missing name' }
+	const companyId = fields['company_id'] ?? fields['companyId']
+	if (typeof companyId !== 'string' || companyId === '')
+		return { ok: false, reason: 'missing company_id' }
+	return {
+		ok: true,
+		companyId,
+		fields: allowlistFields('contacts', fields),
+		channels: parseChannels(fields['channels']),
 	}
 }
 
@@ -168,6 +226,12 @@ export type ResolveOutcome =
 			readonly subject_id: string
 			readonly version: number
 	  }
+	| {
+			readonly outcome: 'created'
+			readonly subject_table: 'contacts'
+			readonly subject_id: string
+			readonly version: number
+	  }
 	| { readonly outcome: 'rejected' }
 	| { readonly outcome: 'conflict' }
 	| { readonly outcome: 'invalid'; readonly reason: string }
@@ -210,6 +274,44 @@ export const resolveResearchProposedUpdate = (
 		if (decision === 'reject') {
 			yield* setProposalStatus(sql, runId, org.id, index, 'rejected')
 			return { outcome: 'rejected' } satisfies ResolveOutcome
+		}
+
+		// A discovered contact has no row yet: create it (with its channels)
+		// instead of updating an existing one, and link the new row to the run.
+		if (proposal['operation'] === 'create') {
+			const created = validateCreate(proposal)
+			if (!created.ok)
+				return {
+					outcome: 'invalid',
+					reason: created.reason,
+				} satisfies ResolveOutcome
+			const [row] = yield* sql<{ id: string; version: number }>`
+				INSERT INTO contacts ${sql.insert({
+					...created.fields,
+					companyId: created.companyId,
+					organizationId: org.id,
+				})}
+				RETURNING id, version
+			`
+			if (!row)
+				return {
+					outcome: 'invalid',
+					reason: 'contact insert returned no row',
+				} satisfies ResolveOutcome
+			// Deliverability verdict + confidence land on the channels, not the row.
+			yield* writeChannels(sql, org.id, row.id, created.channels)
+			yield* sql`
+				INSERT INTO research_links (organization_id, research_id, subject_table, subject_id, link_kind)
+				VALUES (${org.id}, ${runId}, 'contacts', ${row.id}, 'finding')
+				ON CONFLICT DO NOTHING
+			`
+			yield* setProposalStatus(sql, runId, org.id, index, 'applied')
+			return {
+				outcome: 'created',
+				subject_table: 'contacts',
+				subject_id: row.id,
+				version: row.version,
+			} satisfies ResolveOutcome
 		}
 
 		const validated = validate(proposal)

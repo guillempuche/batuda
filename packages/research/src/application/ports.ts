@@ -2,7 +2,12 @@ import { type Effect, type Schema, ServiceMap } from 'effect'
 import type { LanguageModel } from 'effect/unstable/ai'
 
 import type { AcceptedCountry } from '../domain/country'
-import type { NoRegistry, ProviderError } from '../domain/errors'
+import type {
+	BudgetExceeded,
+	MonthlyCapExceeded,
+	NoRegistry,
+	ProviderError,
+} from '../domain/errors'
 
 // ── Research run context (available inside the LLM tool loop fiber) ──
 
@@ -236,29 +241,23 @@ export class ResearchEventSink extends ServiceMap.Service<
 
 // ── Budget ──
 
-export class Budget extends ServiceMap.Service<
-	Budget,
-	{
-		readonly init: (
-			cheapCents: number,
-			paidCents: number,
-		) => Effect.Effect<void>
-		readonly chargeCheap: (
-			provider: string,
-			cents: number,
-		) => Effect.Effect<void, import('../domain/errors').BudgetExceeded>
-		readonly chargePaid: (
-			provider: string,
-			cents: number,
-			idempotencyKey?: string,
-		) => Effect.Effect<
-			void,
-			| import('../domain/errors').BudgetExceeded
-			| import('../domain/errors').MonthlyCapExceeded
-		>
-		readonly snapshot: () => Effect.Effect<BudgetSnapshot>
-	}
->()('research/Budget') {}
+export interface BudgetService {
+	readonly init: (cheapCents: number, paidCents: number) => Effect.Effect<void>
+	readonly chargeCheap: (
+		provider: string,
+		cents: number,
+	) => Effect.Effect<void, BudgetExceeded>
+	readonly chargePaid: (
+		provider: string,
+		cents: number,
+		idempotencyKey?: string,
+	) => Effect.Effect<void, BudgetExceeded | MonthlyCapExceeded>
+	readonly snapshot: () => Effect.Effect<BudgetSnapshot>
+}
+
+export class Budget extends ServiceMap.Service<Budget, BudgetService>()(
+	'research/Budget',
+) {}
 
 // ── Provider Quota ──
 
