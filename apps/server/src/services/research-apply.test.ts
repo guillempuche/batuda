@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { allowlistFields, validate } from './research-apply'
+import { allowlistFields, validate, validateCreate } from './research-apply'
 
 describe('allowlistFields', () => {
 	describe('when a company proposal carries writable and non-writable keys', () => {
@@ -99,6 +99,98 @@ describe('validate', () => {
 			).toBe(false)
 			// GIVEN an array, which is also not a field map
 			expect(validate({ ...base, fields: ['industry'] }).ok).toBe(false)
+		})
+	})
+})
+
+describe('validateCreate', () => {
+	const base = {
+		operation: 'create',
+		subject_table: 'contacts',
+		fields: {
+			name: 'Ada Lovelace',
+			company_id: 'co-1',
+			role: 'CTO',
+			is_decision_maker: true,
+			industry: 'company-only, should drop',
+			channels: [
+				{
+					kind: 'email',
+					value: 'ada@acme.es',
+					verification: 'valid',
+					confidence: 90,
+					is_primary: true,
+				},
+				// Malformed — a channel with no value is not reachable, so dropped
+				{ kind: 'phone' },
+			],
+		},
+	}
+
+	describe('when a discovered contact is well-formed', () => {
+		it('should accept it, keep only contact columns, and parse the channels', () => {
+			// GIVEN a discovered contact carrying company-only and identity keys too
+			const result = validateCreate(base)
+
+			// THEN it validates, exposing the company link, the contact columns, and
+			// the reachable channels only
+			expect(result.ok).toBe(true)
+			if (!result.ok) return
+			expect(result.companyId).toBe('co-1')
+			expect(result.fields).toEqual({
+				name: 'Ada Lovelace',
+				role: 'CTO',
+				isDecisionMaker: true,
+			})
+			expect(result.channels).toEqual([
+				{
+					kind: 'email',
+					value: 'ada@acme.es',
+					verification: 'valid',
+					confidence: 90,
+					is_primary: true,
+				},
+			])
+		})
+	})
+
+	describe('when the target is not a contact', () => {
+		it('should reject it — create is contacts-only', () => {
+			expect(validateCreate({ ...base, subject_table: 'companies' }).ok).toBe(
+				false,
+			)
+		})
+	})
+
+	describe('when the name is missing or blank', () => {
+		it('should reject it', () => {
+			expect(
+				validateCreate({ ...base, fields: { company_id: 'co-1' } }).ok,
+			).toBe(false)
+			expect(
+				validateCreate({ ...base, fields: { name: '   ', company_id: 'co-1' } })
+					.ok,
+			).toBe(false)
+		})
+	})
+
+	describe('when the company_id is missing', () => {
+		it('should reject it, since contacts.company_id is required', () => {
+			expect(validateCreate({ ...base, fields: { name: 'Ada' } }).ok).toBe(
+				false,
+			)
+		})
+	})
+
+	describe('when the contact has no channels', () => {
+		it('should accept it with an empty channel list', () => {
+			const result = validateCreate({
+				...base,
+				fields: { name: 'Ada', company_id: 'co-1' },
+			})
+			expect(result.ok).toBe(true)
+			if (!result.ok) return
+			expect(result.channels).toEqual([])
 		})
 	})
 })

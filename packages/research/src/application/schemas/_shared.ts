@@ -66,8 +66,14 @@ export const DiscoveredExisting = Schema.Struct({
 
 export const ProposedUpdate = Schema.Struct({
 	subject_table: Schema.Literals(['companies', 'contacts']),
-	subject_id: Schema.String,
-	expected_version: LenientNumber,
+	// 'create' inserts a newly discovered row (contacts only); the default,
+	// 'update', applies the fields to an existing row. A create carries the new
+	// row's data in `fields` and omits subject_id/expected_version (there is no
+	// row yet); an update keeps requiring them (the apply path rejects one that
+	// leaves them out).
+	operation: Schema.optionalKey(Schema.Literals(['create', 'update'])),
+	subject_id: Schema.optionalKey(Schema.String),
+	expected_version: Schema.optionalKey(LenientNumber),
 	fields: TolerantJsonString,
 	reason: Schema.String,
 	citations: Schema.Array(Citation),

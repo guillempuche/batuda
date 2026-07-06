@@ -21,6 +21,7 @@ import { guessEmails, splitPersonName } from './email-guess'
 import { resolvePolicy, type SystemDefaults } from './policy'
 import {
 	Budget,
+	type BudgetService,
 	EmailVerifier,
 	EnrichmentProvider,
 	MxResolver,
@@ -114,9 +115,16 @@ export interface DiscoverContactsInput {
 	readonly companyName: string
 	readonly domain: string
 	readonly country?: string | undefined
-	readonly userId: string
-	readonly organizationId: string
-	readonly systemDefaults: SystemDefaults
+	// Standalone path: discover builds its own anchor run + per-call budget.
+	readonly userId?: string | undefined
+	readonly organizationId?: string | undefined
+	readonly systemDefaults?: SystemDefaults | undefined
+	// In-loop path: reuse the calling research run's id + budget, so the paid
+	// spend lands on that run and its cap still applies. Mutually exclusive with
+	// the standalone fields above.
+	readonly runContext?:
+		| { readonly researchId: string; readonly budget: BudgetService }
+		| undefined
 }
 
 /** The email channel (when present) carries the deliverability signal we rank on. */
@@ -156,53 +164,75 @@ export class ContactDiscovery extends ServiceMap.Service<ContactDiscovery>()(
 				input: DiscoverContactsInput,
 			): Effect.Effect<DiscoverContactsOutcome> =>
 				Effect.gen(function* () {
-					const policy = yield* resolvePolicy({
-						sql,
-						userId: input.userId,
-						systemDefaults: input.systemDefaults,
-					})
+					// Two paths. Called standalone, discover builds its own anchor run
+					// and a per-call budget; called inside a research run, it reuses
+					// that run's id and budget so the paid spend lands on the run and
+					// the run's cap still applies.
+					let researchId: string
+					let budgetLayer: Layer.Layer<Budget>
+					if (input.runContext) {
+						researchId = input.runContext.researchId
+						budgetLayer = Layer.succeed(Budget)(input.runContext.budget)
+					} else {
+						if (
+							input.userId === undefined ||
+							input.organizationId === undefined ||
+							input.systemDefaults === undefined
+						) {
+							return yield* Effect.die(
+								new Error(
+									'discover requires userId, organizationId and systemDefaults, or a runContext',
+								),
+							)
+						}
+						const policy = yield* resolvePolicy({
+							sql,
+							userId: input.userId,
+							systemDefaults: input.systemDefaults,
+						})
 
-					// Anchor row: a 'discover'-mode run satisfies the
-					// research_paid_spend FK and records provenance. Reuses the
-					// existing `kind='leaf'` (the kind CHECK forbids new values).
-					const anchor = yield* sql<{ id: string }>`
-						INSERT INTO research_runs (
-							organization_id, query, mode, schema_name, status, context,
-							budget_cents, paid_budget_cents, paid_policy, created_by,
-							template_ids, template_names, template_fingerprint,
-							started_at, completed_at
-						) VALUES (
-							${input.organizationId},
-							${`discover_contacts: ${input.companyName} (${input.domain})`},
-							'discover',
-							'contact_discovery_v1',
-							'succeeded',
-							${JSON.stringify({
-								company: {
-									name: input.companyName,
-									domain: input.domain,
-									country: input.country ?? null,
-								},
-							})},
-							${policy.budgetCents},
-							${policy.paidBudgetCents},
-							${JSON.stringify(policy)},
-							${input.userId},
-							${JSON.stringify([])}, ${JSON.stringify([])}, ${''},
-							now(), now()
-						) RETURNING id
-					`
-					const researchId = anchor[0]!.id
+						// Anchor row: a 'discover'-mode run satisfies the
+						// research_paid_spend FK and records provenance. Reuses the
+						// existing `kind='leaf'` (the kind CHECK forbids new values).
+						const anchor = yield* sql<{ id: string }>`
+							INSERT INTO research_runs (
+								organization_id, query, mode, schema_name, status, context,
+								budget_cents, paid_budget_cents, paid_policy, created_by,
+								template_ids, template_names, template_fingerprint,
+								started_at, completed_at
+							) VALUES (
+								${input.organizationId},
+								${`discover_contacts: ${input.companyName} (${input.domain})`},
+								'discover',
+								'contact_discovery_v1',
+								'succeeded',
+								${JSON.stringify({
+									company: {
+										name: input.companyName,
+										domain: input.domain,
+										country: input.country ?? null,
+									},
+								})},
+								${policy.budgetCents},
+								${policy.paidBudgetCents},
+								${JSON.stringify(policy)},
+								${input.userId},
+								${JSON.stringify([])}, ${JSON.stringify([])}, ${''},
+								now(), now()
+							) RETURNING id
+						`
+						researchId = anchor[0]!.id
 
-					// Per-call budget, with the captured sql supplied so the layer
-					// requires nothing from the caller's context.
-					const budgetLayer = makeBudgetLayer({
-						organizationId: input.organizationId,
-						userId: input.userId,
-						researchId,
-						policy,
-						systemCeiling: input.systemDefaults.hardCeiling,
-					}).pipe(Layer.provide(Layer.succeed(SqlClient.SqlClient)(sql)))
+						// Per-call budget, with the captured sql supplied so the layer
+						// requires nothing from the caller's context.
+						budgetLayer = makeBudgetLayer({
+							organizationId: input.organizationId,
+							userId: input.userId,
+							researchId,
+							policy,
+							systemCeiling: input.systemDefaults.hardCeiling,
+						}).pipe(Layer.provide(Layer.succeed(SqlClient.SqlClient)(sql)))
+					}
 
 					const core = Effect.gen(function* () {
 						const budget = yield* Budget
@@ -234,7 +264,13 @@ export class ContactDiscovery extends ServiceMap.Service<ContactDiscovery>()(
 						}
 						// Universal fallback (paid) when no registry hit.
 						if (people.length === 0) {
-							yield* budget.chargePaid('hunter-enrich', ENRICH_COST_CENTS)
+							yield* budget.chargePaid(
+								'hunter-enrich',
+								ENRICH_COST_CENTS,
+								// Idempotency key: a resumed research run re-charges the same
+								// enrichment as a DB no-op instead of paying Hunter twice.
+								`${researchId}:hunter-enrich:${input.domain}`,
+							)
 							people = yield* enrichment
 								.findPeople({
 									domain: input.domain,
@@ -257,7 +293,13 @@ export class ContactDiscovery extends ServiceMap.Service<ContactDiscovery>()(
 						// to 'unknown' so a hit cap returns what was gathered.
 						const verifyEmail = (email: string) =>
 							Effect.gen(function* () {
-								yield* budget.chargePaid('hunter-verify', VERIFY_COST_CENTS)
+								yield* budget.chargePaid(
+									'hunter-verify',
+									VERIFY_COST_CENTS,
+									// Idempotency key so a resumed run does not re-pay to
+									// verify the same address.
+									`${researchId}:hunter-verify:${email}`,
+								)
 								const v = yield* verifier.verify({ email })
 								return {
 									verdict: v.result,
@@ -318,7 +360,21 @@ export class ContactDiscovery extends ServiceMap.Service<ContactDiscovery>()(
 											verdict = r.verdict
 											confidence = r.confidence ?? person.emailConfidence
 										}
-										if (verdict !== 'undeliverable') {
+										// A guessed address (no vendor-provided email) is only
+										// asserted when the verifier positively confirms it. An
+										// 'unknown' (verify failed or budget ran out), 'catch_all'
+										// (domain accepts anything, so the specific mailbox is
+										// unconfirmed), or 'undeliverable' guess is not evidence
+										// the mailbox exists, so it is dropped rather than invented.
+										// A vendor-provided address keeps the softer bar (drop only
+										// 'undeliverable') since the vendor found that exact address.
+										const wasGuessed = person.email !== chosen
+										const guessedConfirmed =
+											verdict === 'deliverable' || verdict === 'risky'
+										if (
+											verdict !== 'undeliverable' &&
+											(!wasGuessed || guessedConfirmed)
+										) {
 											channels.push({
 												kind: 'email',
 												value: chosen,
