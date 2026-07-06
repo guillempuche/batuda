@@ -4,6 +4,9 @@ import { SqlClient } from 'effect/unstable/sql'
 // A research run that fetched no page fails closed to `no_reliable_data` rather
 // than reporting success with ungrounded findings. The status check has to admit
 // that new terminal value, so the original inline check is replaced.
+//
+// expand-contract: pre-production, no backward-compatibility guarantee — the old
+// check is dropped outright, a clean break like every schema change here.
 
 export default Effect.gen(function* () {
 	const sql = yield* SqlClient.SqlClient
