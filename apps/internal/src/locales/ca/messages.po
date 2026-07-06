@@ -2210,6 +2210,10 @@ msgstr "No hi ha cap proposta pendent de revisió."
 msgid "No redirect URI"
 msgstr "Sense URI de redirecció"
 
+#: src/components/research/run-detail.tsx
+msgid "No reliable data found"
+msgstr "No s'han trobat dades fiables"
+
 #: src/components/research/run-list.tsx
 msgid "No research runs yet for this company."
 msgstr "Encara no hi ha recerques per a aquesta empresa."
@@ -2899,10 +2903,6 @@ msgstr "Reprèn la sincronització"
 msgid "Reusable, standing guidance your agents follow — what you sell, who you target, tone, and which sources to trust."
 msgstr "Orientació reutilitzable i permanent que segueixen els teus agents: què vens, a qui t'adreces, el to i en quines fonts confiar."
 
-#: src/routes/settings/profile/templates.tsx
-#~ msgid "Reusable, standing guidance your research agent follows — what you sell, who you target, tone, and which sources to trust."
-#~ msgstr "Orientació reutilitzable i permanent que segueix el teu agent de recerca: què vens, a qui t'adreces, el to i en quines fonts confiar."
-
 #: src/routes/settings/organization/members.tsx
 msgid "Role"
 msgstr "Rol"
@@ -3123,10 +3123,6 @@ msgstr "Orientació compartida i la recerca per defecte de l'organització."
 #: src/routes/settings/organization/templates.tsx
 msgid "Shared guidance every member's agents can use, plus the organization's default."
 msgstr "Orientació compartida que poden fer servir els agents de cada membre, més el valor per defecte de l'organització."
-
-#: src/routes/settings/organization/templates.tsx
-#~ msgid "Shared guidance every member's research agent can use, plus the organization's default."
-#~ msgstr "Orientació compartida que pot fer servir l'agent de recerca de cada membre, més el valor per defecte de l'organització."
 
 #: src/components/instructions/template-editor-dialog.tsx
 msgid "Shared with everyone in your organization — their research agent follows it on every run."
@@ -3487,10 +3483,6 @@ msgstr "Aquestes vénen de la teva organització. Si les deses, en guardes una c
 #: src/routes/settings/organization/templates.tsx
 msgid "These templates run for every member who hasn't set their own — in order. Only org templates can go here."
 msgstr "Aquestes plantilles s'apliquen, en ordre, a cada membre que no n'hagi triat de pròpies. Aquí només hi poden anar plantilles de l'organització."
-
-#: src/components/instructions/default-stack-editor.tsx
-#~ msgid "These templates shape every research run, in order — unless you pick different ones for a single run."
-#~ msgstr "Aquestes plantilles configuren cada recerca, en ordre, llevat que en triïs d'altres per a una recerca concreta."
 
 #: src/components/instructions/default-stack-editor.tsx
 msgid "These templates shape every run, in order — unless you pick different ones for a single run."
@@ -3864,8 +3856,3 @@ msgstr "Els administradors de la teva organització gestionen aquestes plantille
 #: src/components/instructions/default-stack-editor.tsx
 msgid "Your own"
 msgstr "Pròpia"
-
-#: src/components/instructions/default-stack-editor.tsx
-#: src/routes/settings/profile/templates.tsx
-#~ msgid "Your research default"
-#~ msgstr "La teva recerca per defecte"

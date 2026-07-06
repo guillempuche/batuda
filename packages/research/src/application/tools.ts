@@ -22,13 +22,28 @@ import { AiError, Tool, Toolkit } from 'effect/unstable/ai'
 
 import { AcceptedCountry } from '../domain/country'
 import { noRegistryResult } from '../domain/errors'
+import { ScrapedPage } from '../domain/types'
+import { ContactDiscovery } from './contact-discovery'
 import {
+	Budget,
 	ExtractProvider,
 	RegistryRouter,
+	ResearchRunContext,
 	ScrapeProvider,
 	SearchProvider,
 } from './ports'
 import { schemaRegistry } from './schemas/index'
+import {
+	EXTRACT_COST_CENTS,
+	REGISTRY_LOOKUP_COST_CENTS,
+	SCRAPE_COST_CENTS,
+	SEARCH_COST_CENTS,
+} from './tool-costs'
+
+// Cap a scraped page before the model sees it: the reflect loop re-sends every
+// round's tool results, so an uncapped page would grow the running prompt past
+// the model's context window over several rounds.
+const SCRAPE_MARKDOWN_MAX_CHARS = 8000
 
 // ── Tool parameter schemas ──
 // Optional params accept `null` (via `NullOr`) because a model may send an
@@ -81,6 +96,18 @@ const RegistryLookupParams = Schema.Struct({
 	}),
 })
 
+const DiscoverContactsParams = Schema.Struct({
+	company_name: Schema.String.annotate({
+		description: 'Company legal or trading name',
+	}),
+	domain: Schema.String.annotate({
+		description: 'Company web domain, e.g. "acme.com" (no scheme, no @)',
+	}),
+	country: Schema.optionalKey(Schema.NullOr(Schema.String)).annotate({
+		description: 'ISO 3166-1 alpha-2 country hint (helps pick a registry)',
+	}),
+})
+
 // ── Tool results (unknown jsonb — agent treats as opaque blob) ──
 
 const ToolResultSchema = Schema.Unknown
@@ -115,11 +142,19 @@ export const RegistryLookupTool = Tool.make('registry_lookup', {
 	success: ToolResultSchema,
 })
 
+export const DiscoverContactsTool = Tool.make('discover_contacts', {
+	description:
+		'Find verified decision-maker contacts for a company: guesses likely emails, MX-gates them, and pays to verify deliverability. Metered against this run. Returns ranked candidates each with a deliverability verdict, or {status:"no_reliable_contact"}. Fold the results into contact_discovery_v1 findings; to persist a new contact, add a proposed_updates entry with operation:"create" carrying the contact and its channels.',
+	parameters: DiscoverContactsParams,
+	success: ToolResultSchema,
+})
+
 export const researchToolkit = Toolkit.make(
 	WebSearchTool,
 	ScrapePageTool,
 	ExtractStructuredTool,
 	RegistryLookupTool,
+	DiscoverContactsTool,
 )
 
 // ── Handler layer ──
@@ -137,17 +172,30 @@ const mapToolError = (toolName: string) => (err: unknown) =>
 		}),
 	)
 
+// Charged against the run before each vendor call (cheap tier for
+// search/scrape/extract, paid tier for the registry). When the budget refuses,
+// the refusal is handed back to the model as a tool result so it stops using
+// that tool and wraps up; the loop's own budget check is the hard halt.
+const cheapExhausted = (tool: string) => (e: { readonly remaining: number }) =>
+	mapToolError(tool)(
+		`cheap budget exhausted (${e.remaining}¢ left) — stop searching and summarize what you have`,
+	)
+
 export const researchToolkitLayer = researchToolkit.toLayer(
 	Effect.gen(function* () {
 		const search = yield* SearchProvider
 		const scrape = yield* ScrapeProvider
 		const extract = yield* ExtractProvider
 		const registry = yield* RegistryRouter
+		const contactDiscovery = yield* ContactDiscovery
+		const budget = yield* Budget
+		const { researchId } = yield* ResearchRunContext
 
 		return researchToolkit.of({
 			web_search: params =>
-				search
-					.search({
+				Effect.gen(function* () {
+					yield* budget.chargeCheap('search', SEARCH_COST_CENTS)
+					return yield* search.search({
 						query: params.query,
 						limit: params.limit ?? undefined,
 						recency:
@@ -156,12 +204,29 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 								: undefined,
 						location: params.location ?? undefined,
 					})
-					.pipe(Effect.catchCause(cause => mapToolError('web_search')(cause))),
+				}).pipe(
+					Effect.catchTag('BudgetExceeded', cheapExhausted('web_search')),
+					Effect.catchCause(cause => mapToolError('web_search')(cause)),
+				),
 
 			scrape_page: params =>
-				scrape
-					.scrape({ url: params.url, formats: ['markdown'] })
-					.pipe(Effect.catchCause(cause => mapToolError('scrape_page')(cause))),
+				Effect.gen(function* () {
+					yield* budget.chargeCheap('scrape', SCRAPE_COST_CENTS)
+					const page = yield* scrape.scrape({
+						url: params.url,
+						formats: ['markdown'],
+					})
+					return page.markdown !== undefined &&
+						page.markdown.length > SCRAPE_MARKDOWN_MAX_CHARS
+						? new ScrapedPage({
+								...page,
+								markdown: `${page.markdown.slice(0, SCRAPE_MARKDOWN_MAX_CHARS)}…[truncated]`,
+							})
+						: page
+				}).pipe(
+					Effect.catchTag('BudgetExceeded', cheapExhausted('scrape_page')),
+					Effect.catchCause(cause => mapToolError('scrape_page')(cause)),
+				),
 
 			extract_structured: params => {
 				const schema = schemaRegistry[params.schema_name]
@@ -170,34 +235,72 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 						`Unknown schema_name: ${params.schema_name}. Valid names: ${Object.keys(schemaRegistry).join(', ')}`,
 					)
 				}
-				return extract
-					.extract({
+				return Effect.gen(function* () {
+					yield* budget.chargeCheap('extract', EXTRACT_COST_CENTS)
+					return yield* extract.extract({
 						url: params.url,
 						schema,
 						schemaName: params.schema_name,
 						prompt: params.prompt ?? undefined,
 					})
-					.pipe(
-						Effect.catchCause(cause =>
-							mapToolError('extract_structured')(cause),
-						),
-					)
+				}).pipe(
+					Effect.catchTag(
+						'BudgetExceeded',
+						cheapExhausted('extract_structured'),
+					),
+					Effect.catchCause(cause => mapToolError('extract_structured')(cause)),
+				)
 			},
 
 			registry_lookup: params =>
-				registry
-					.lookup({
-						country: params.country.toUpperCase(),
+				Effect.gen(function* () {
+					const country = params.country.toUpperCase()
+					// Deterministic key: a resumed run re-charging the same lookup is
+					// a DB no-op, so a crash mid-run never double-charges for it.
+					const idempotencyKey = `${researchId}:registry:${country}:${params.tax_id ?? params.query ?? ''}`
+					yield* budget.chargePaid(
+						'registry',
+						REGISTRY_LOOKUP_COST_CENTS,
+						idempotencyKey,
+					)
+					return yield* registry.lookup({
+						country,
 						query: params.query ?? undefined,
 						taxId: params.tax_id ?? undefined,
 					})
-					.pipe(
-						// A registry-less country is a routing answer, not a failure:
-						// hand it back as data so the model can switch to discover_contacts.
-						Effect.catchTag('NoRegistry', e =>
-							Effect.succeed(noRegistryResult(e.country)),
+				}).pipe(
+					// A registry-less country is a routing answer, not a failure:
+					// hand it back as data so the model can switch to discover_contacts.
+					Effect.catchTag('NoRegistry', e =>
+						Effect.succeed(noRegistryResult(e.country)),
+					),
+					Effect.catchTag('BudgetExceeded', e =>
+						mapToolError('registry_lookup')(
+							`paid budget exhausted (${e.remaining}¢ left) — stop using registry_lookup`,
 						),
-						Effect.catchCause(cause => mapToolError('registry_lookup')(cause)),
+					),
+					Effect.catchTag('MonthlyCapExceeded', e =>
+						mapToolError('registry_lookup')(
+							`monthly paid cap reached (${e.spentCents}/${e.capCents}¢) — stop using registry_lookup`,
+						),
+					),
+					Effect.catchCause(cause => mapToolError('registry_lookup')(cause)),
+				),
+
+			// Reuses this run's id + budget so paid enrichment/verification lands on
+			// the run and its cap applies — no separate anchor run or allowance.
+			discover_contacts: params =>
+				contactDiscovery
+					.discover({
+						companyName: params.company_name,
+						domain: params.domain,
+						country: params.country ?? undefined,
+						runContext: { researchId, budget },
+					})
+					.pipe(
+						Effect.catchCause(cause =>
+							mapToolError('discover_contacts')(cause),
+						),
 					),
 		})
 	}),

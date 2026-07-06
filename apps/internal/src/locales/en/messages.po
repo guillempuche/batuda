@@ -2210,6 +2210,10 @@ msgstr "No proposals waiting for review."
 msgid "No redirect URI"
 msgstr "No redirect URI"
 
+#: src/components/research/run-detail.tsx
+msgid "No reliable data found"
+msgstr "No reliable data found"
+
 #: src/components/research/run-list.tsx
 msgid "No research runs yet for this company."
 msgstr "No research runs yet for this company."
@@ -2899,10 +2903,6 @@ msgstr "Resume syncing"
 msgid "Reusable, standing guidance your agents follow — what you sell, who you target, tone, and which sources to trust."
 msgstr "Reusable, standing guidance your agents follow — what you sell, who you target, tone, and which sources to trust."
 
-#: src/routes/settings/profile/templates.tsx
-#~ msgid "Reusable, standing guidance your research agent follows — what you sell, who you target, tone, and which sources to trust."
-#~ msgstr "Reusable, standing guidance your research agent follows — what you sell, who you target, tone, and which sources to trust."
-
 #: src/routes/settings/organization/members.tsx
 msgid "Role"
 msgstr "Role"
@@ -3123,10 +3123,6 @@ msgstr "Shared guidance and the org research default."
 #: src/routes/settings/organization/templates.tsx
 msgid "Shared guidance every member's agents can use, plus the organization's default."
 msgstr "Shared guidance every member's agents can use, plus the organization's default."
-
-#: src/routes/settings/organization/templates.tsx
-#~ msgid "Shared guidance every member's research agent can use, plus the organization's default."
-#~ msgstr "Shared guidance every member's research agent can use, plus the organization's default."
 
 #: src/components/instructions/template-editor-dialog.tsx
 msgid "Shared with everyone in your organization — their research agent follows it on every run."
@@ -3487,10 +3483,6 @@ msgstr "These come from your organization. Saving keeps your own copy, so your r
 #: src/routes/settings/organization/templates.tsx
 msgid "These templates run for every member who hasn't set their own — in order. Only org templates can go here."
 msgstr "These templates run for every member who hasn't set their own — in order. Only org templates can go here."
-
-#: src/components/instructions/default-stack-editor.tsx
-#~ msgid "These templates shape every research run, in order — unless you pick different ones for a single run."
-#~ msgstr "These templates shape every research run, in order — unless you pick different ones for a single run."
 
 #: src/components/instructions/default-stack-editor.tsx
 msgid "These templates shape every run, in order — unless you pick different ones for a single run."
@@ -3864,8 +3856,3 @@ msgstr "Your organization's admins manage these templates. You can use any of th
 #: src/components/instructions/default-stack-editor.tsx
 msgid "Your own"
 msgstr "Your own"
-
-#: src/components/instructions/default-stack-editor.tsx
-#: src/routes/settings/profile/templates.tsx
-#~ msgid "Your research default"
-#~ msgstr "Your research default"

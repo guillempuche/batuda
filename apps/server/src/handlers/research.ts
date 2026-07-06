@@ -142,7 +142,13 @@ export const ResearchLive = HttpApiBuilder.group(
 
 						// If already terminal, return final state immediately
 						if (
-							['succeeded', 'failed', 'cancelled', 'deleted'].includes(status)
+							[
+								'succeeded',
+								'failed',
+								'cancelled',
+								'deleted',
+								'no_reliable_data',
+							].includes(status)
 						) {
 							return {
 								status,
@@ -173,7 +179,8 @@ export const ResearchLive = HttpApiBuilder.group(
 								evt =>
 									evt.type === 'run.succeeded' ||
 									evt.type === 'run.failed' ||
-									evt.type === 'run.cancelled',
+									evt.type === 'run.cancelled' ||
+									evt.type === 'run.no_reliable_data',
 							),
 							Stream.tap(evt =>
 								Effect.sync(() => {
@@ -194,9 +201,12 @@ export const ResearchLive = HttpApiBuilder.group(
 									: status,
 							events,
 							done: events.some(e =>
-								['run.succeeded', 'run.failed', 'run.cancelled'].includes(
-									(e as { type: string }).type,
-								),
+								[
+									'run.succeeded',
+									'run.failed',
+									'run.cancelled',
+									'run.no_reliable_data',
+								].includes((e as { type: string }).type),
 							),
 						}
 					}).pipe(
