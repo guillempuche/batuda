@@ -38,6 +38,12 @@ export type LoopStopReason = 'model-final' | 'step-cap' | 'budget' | 'context'
 export interface AgentLoopResult {
 	/** Rendered transcript of the whole loop — the grounding input for phase 2. */
 	readonly researchText: string
+	/**
+	 * Tool-result evidence only (scraped pages, registry / discovery output),
+	 * with the model's own prose excluded — the corpus the value guard checks
+	 * findings against, so a value the model merely asserted cannot confirm itself.
+	 */
+	readonly evidenceText: string
 	readonly scrapedUrlHashes: ReadonlyArray<string>
 	readonly tokensIn: number
 	readonly tokensOut: number
@@ -75,6 +81,9 @@ export const runAgentResearchLoop = <E, R>(
 	Effect.gen(function* () {
 		const transcript: string[] =
 			params.priorText && params.priorText.length > 0 ? [params.priorText] : []
+		// Tool results only — never the model's own text — so the value guard's
+		// evidence can't be poisoned by a value the model merely asserted.
+		const evidenceParts: string[] = []
 		const urlHashes = new Set<string>()
 		let tokensIn = params.priorTokensIn ?? 0
 		let tokensOut = params.priorTokensOut ?? 0
@@ -89,7 +98,10 @@ export const runAgentResearchLoop = <E, R>(
 			tokensOut += result.outputTokens
 			totalPromptChars += result.promptChars
 			if (result.text.length > 0) transcript.push(result.text)
-			for (const rendered of result.renderedResults) transcript.push(rendered)
+			for (const rendered of result.renderedResults) {
+				transcript.push(rendered)
+				evidenceParts.push(rendered)
+			}
 			for (const hash of result.scrapeUrlHashes) urlHashes.add(hash)
 
 			// The stop conditions are independent: the model finishing, the step
@@ -119,6 +131,7 @@ export const runAgentResearchLoop = <E, R>(
 
 		return {
 			researchText: transcript.join('\n\n'),
+			evidenceText: evidenceParts.join('\n\n'),
 			scrapedUrlHashes: Array.from(urlHashes),
 			tokensIn,
 			tokensOut,

@@ -35,7 +35,7 @@ import {
 import { type FreeformSchema, schemaRegistry } from './schemas/index'
 import { canonicalizeUrl, urlHashForScrape } from './source-key'
 import { researchToolkit, researchToolkitLayer } from './tools'
-import { verifyProposalProvenance } from './value-guard'
+import { verifyValueProvenance } from './value-guard'
 
 // A finished run is flipped to 'failed' for a real error or an unexpected
 // crash, but NOT when it was simply cancelled or shut down (a pure interrupt) —
@@ -651,6 +651,9 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					// ── Phase 1: LLM research pass ──
 					// Skipped on resume if the checkpoint captured research_text.
 					let researchText: string
+					// Evidence-only corpus (tool results, no model prose) for the value
+					// guard; empty on a resume that skips phase 1.
+					let evidenceText = ''
 					let tokensIn = priorTokensIn
 					let tokensOut = priorTokensOut
 					// Full scraped page content gathered this run — the corpus the value
@@ -754,19 +757,40 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 									// count toward grounding; keep the content for the value guard.
 									const scrapeUrlHashes: string[] = []
 									for (const tr of response.toolResults) {
-										if (tr.name !== 'scrape_page') continue
-										const page = tr.result as
-											| { url?: unknown; markdown?: unknown }
-											| null
-											| undefined
-										if (
-											page != null &&
-											typeof page.url === 'string' &&
-											typeof page.markdown === 'string' &&
-											page.markdown.trim().length > 0
-										) {
-											scrapeUrlHashes.push(urlHashForScrape(page.url))
-											scrapeCorpus.push(page.markdown)
+										if (tr.name === 'scrape_page') {
+											const page = tr.result as
+												| { url?: unknown; markdown?: unknown }
+												| null
+												| undefined
+											if (
+												page != null &&
+												typeof page.url === 'string' &&
+												typeof page.markdown === 'string' &&
+												page.markdown.trim().length > 0
+											) {
+												scrapeUrlHashes.push(urlHashForScrape(page.url))
+												scrapeCorpus.push(page.markdown)
+											}
+										} else if (tr.name === 'web_search') {
+											// A search that returned scraped page content (Firecrawl
+											// scrapeOptions) is real fetched evidence — ground on each
+											// such result, exactly like a scrape. The sources row was
+											// upserted by the search cache when the tool ran.
+											const searchResult = tr.result as
+												| { items?: ReadonlyArray<unknown> }
+												| null
+												| undefined
+											for (const raw of searchResult?.items ?? []) {
+												const item = raw as { url?: unknown; content?: unknown }
+												if (
+													typeof item.url === 'string' &&
+													typeof item.content === 'string' &&
+													item.content.trim().length > 0
+												) {
+													scrapeUrlHashes.push(urlHashForScrape(item.url))
+													scrapeCorpus.push(item.content)
+												}
+											}
 										}
 									}
 									const renderedResults = response.toolResults.map(
@@ -803,6 +827,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						)
 
 						researchText = loopResult.researchText
+						evidenceText = loopResult.evidenceText
 						tokensIn = loopResult.tokensIn
 						tokensOut = loopResult.tokensOut
 
@@ -896,17 +921,21 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						// proposed CRM write whose email/phone/tax-id value appears nowhere
 						// in the run's evidence (scraped pages + the tool transcript) — that
 						// value was invented, real citation or not.
-						const evidenceCorpus = [researchText, ...scrapeCorpus].join('\n')
-						const valueCheck = verifyProposalProvenance(
-							findings,
-							evidenceCorpus,
-						)
+						// Check findings against tool-result evidence only — never the
+						// model's own prose (researchText) — so a value the model merely
+						// asserted in its reasoning cannot vouch for itself.
+						const evidenceCorpus = [evidenceText, ...scrapeCorpus].join('\n')
+						const valueCheck = verifyValueProvenance(findings, evidenceCorpus)
 						findings = valueCheck.findings
-						if (valueCheck.droppedProposals > 0) {
-							yield* Effect.logWarning('research.proposals.unsupported').pipe(
+						if (
+							valueCheck.droppedProposals > 0 ||
+							valueCheck.strippedValues > 0
+						) {
+							yield* Effect.logWarning('research.values.unsupported').pipe(
 								Effect.annotateLogs({
 									research_id: researchId,
-									dropped: valueCheck.droppedProposals,
+									dropped_proposals: valueCheck.droppedProposals,
+									stripped_values: valueCheck.strippedValues,
 								}),
 							)
 						}
@@ -944,7 +973,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					})
 
 					const briefResponse = yield* writerLlm.generateText({
-						prompt: `Write a concise human-readable research brief in ${briefLang} based on these findings:\n\n${JSON.stringify(findings)}`,
+						prompt: `Write a concise human-readable research brief in ${briefLang}, summarizing ONLY the structured findings below. Do not add any fact, number, name, or contact detail that is not present in the findings.\n\n${JSON.stringify(findings)}`,
 					})
 
 					const briefMd = briefResponse.text
