@@ -285,14 +285,31 @@ export const resolveResearchProposedUpdate = (
 					outcome: 'invalid',
 					reason: created.reason,
 				} satisfies ResolveOutcome
-			const [row] = yield* sql<{ id: string; version: number }>`
+			const inserted = yield* sql<{ id: string; version: number }>`
 				INSERT INTO contacts ${sql.insert({
 					...created.fields,
 					companyId: created.companyId,
 					organizationId: org.id,
 				})}
 				RETURNING id, version
-			`
+			`.pipe(
+				Effect.catchTag('SqlError', e => {
+					const code = (e.cause as { code?: unknown } | null | undefined)?.code
+					// A hallucinated company_id is a bad proposal, not a server error: a
+					// company that doesn't exist trips the foreign key (23503), a value
+					// that isn't a UUID trips text parsing (22P02). Report it as invalid
+					// like any other unusable proposal, rather than failing the request.
+					return code === '23503' || code === '22P02'
+						? Effect.succeed(null)
+						: Effect.fail(e)
+				}),
+			)
+			if (inserted === null)
+				return {
+					outcome: 'invalid',
+					reason: 'company_id does not reference a known company',
+				} satisfies ResolveOutcome
+			const [row] = inserted
 			if (!row)
 				return {
 					outcome: 'invalid',
