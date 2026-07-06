@@ -3,6 +3,7 @@
 process.env['DATABASE_URL'] ??=
 	'postgresql://batuda:batuda@localhost:5433/batuda_it'
 process.env['RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL'] ??= '4'
+process.env['RESEARCH_MAX_AGENT_STEPS'] ??= '6'
 // Beat once a second so a bump is observable within the test's short window.
 process.env['RESEARCH_HEARTBEAT_INTERVAL_SEC'] ??= '1'
 // Keep the periodic orphan sweep out of the way — this suite watches a live run.
@@ -15,13 +16,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
 	AgentLanguageModel,
+	ContactDiscovery,
 	type CreateResearchInput,
 	ExtractLanguageModel,
 	ExtractProvider,
 	RegistryRouter,
 	ResearchEventSink,
 	ResearchService,
-	researchToolkitLayer,
 	ScrapeProvider,
 	SearchProvider,
 	type SystemDefaults,
@@ -112,7 +113,16 @@ const eventSinkLayer = Layer.succeed(ResearchEventSink)(
 
 const ResearchLive = ResearchService.layer.pipe(
 	Layer.provide(llmLayer),
-	Layer.provide(researchToolkitLayer.pipe(Layer.provide(providersLayer))),
+	Layer.provide(providersLayer),
+	Layer.provide(
+		Layer.succeed(ContactDiscovery)({
+			discover: () =>
+				Effect.succeed({
+					status: 'no_reliable_contact' as const,
+					researchId: 'test',
+				}),
+		}),
+	),
 	Layer.provide(eventSinkLayer),
 	Layer.provideMerge(PgLive),
 )

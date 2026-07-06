@@ -8,10 +8,16 @@ import { StubRegistryEsProvider } from '../infrastructure/stub/registry-es'
 import { StubScrapeProvider } from '../infrastructure/stub/scrape'
 import { StubSearchProvider } from '../infrastructure/stub/search'
 import {
+	ContactDiscovery,
+	type DiscoverContactsInput,
+} from './contact-discovery'
+import {
+	Budget,
 	type ExtractInput,
 	ExtractProvider,
 	type RegistryInput,
 	RegistryRouter,
+	ResearchRunContext,
 	type ScrapeInput,
 	ScrapeProvider,
 	type SearchInput,
@@ -25,6 +31,40 @@ import {
 	ScrapePageTool,
 	WebSearchTool,
 } from './tools'
+
+// Budget + run context the toolkit handlers now require. These tests exercise
+// param mapping, not spend, so the charges are no-ops and the snapshot is
+// generous enough that nothing is ever refused.
+const stubBudget = Layer.succeed(Budget)(
+	Budget.of({
+		init: () => Effect.void,
+		chargeCheap: () => Effect.void,
+		chargePaid: () => Effect.void,
+		snapshot: () =>
+			Effect.succeed({
+				cheapBudget: 1000,
+				cheapSpent: 0,
+				cheapRemaining: 1000,
+				paidBudget: 1000,
+				paidSpent: 0,
+				paidRemaining: 1000,
+			}),
+	}),
+)
+const stubRunContext = Layer.succeed(ResearchRunContext)({
+	researchId: 'test-run',
+})
+const testInfra = Layer.mergeAll(
+	stubBudget,
+	stubRunContext,
+	Layer.succeed(ContactDiscovery)({
+		discover: () =>
+			Effect.succeed({
+				status: 'no_reliable_contact' as const,
+				researchId: 'test-run',
+			}),
+	}),
+)
 
 // ── Test harness ──
 // Each helper drives one tool through the real toolkit. `researchToolkit.handle`
@@ -59,7 +99,13 @@ const webSearchInput = async (params: {
 			const toolkit = yield* researchToolkit
 			const stream = yield* toolkit.handle('web_search', params)
 			yield* Stream.runDrain(stream)
-		}).pipe(Effect.provide(researchToolkitLayer.pipe(Layer.provide(ports)))),
+		}).pipe(
+			Effect.provide(
+				researchToolkitLayer.pipe(
+					Layer.provide(Layer.mergeAll(ports, testInfra)),
+				),
+			),
+		),
 	)
 	if (captured === undefined) {
 		throw new Error('web_search handler never called the search provider')
@@ -93,7 +139,13 @@ const registryLookupInput = async (params: {
 			const toolkit = yield* researchToolkit
 			const stream = yield* toolkit.handle('registry_lookup', params)
 			yield* Stream.runDrain(stream)
-		}).pipe(Effect.provide(researchToolkitLayer.pipe(Layer.provide(ports)))),
+		}).pipe(
+			Effect.provide(
+				researchToolkitLayer.pipe(
+					Layer.provide(Layer.mergeAll(ports, testInfra)),
+				),
+			),
+		),
 	)
 	if (captured === undefined) {
 		throw new Error('registry_lookup handler never called the registry router')
@@ -120,7 +172,13 @@ const registryLookupResult = async (
 			const toolkit = yield* researchToolkit
 			const stream = yield* toolkit.handle('registry_lookup', params)
 			return yield* Stream.runCollect(stream)
-		}).pipe(Effect.provide(researchToolkitLayer.pipe(Layer.provide(ports)))),
+		}).pipe(
+			Effect.provide(
+				researchToolkitLayer.pipe(
+					Layer.provide(Layer.mergeAll(ports, testInfra)),
+				),
+			),
+		),
 	)
 	return results[results.length - 1]?.result
 }
@@ -149,7 +207,13 @@ const extractInput = async (params: {
 			const toolkit = yield* researchToolkit
 			const stream = yield* toolkit.handle('extract_structured', params)
 			yield* Stream.runDrain(stream)
-		}).pipe(Effect.provide(researchToolkitLayer.pipe(Layer.provide(ports)))),
+		}).pipe(
+			Effect.provide(
+				researchToolkitLayer.pipe(
+					Layer.provide(Layer.mergeAll(ports, testInfra)),
+				),
+			),
+		),
 	)
 	if (captured === undefined) {
 		throw new Error(
@@ -181,10 +245,52 @@ const scrapeInput = async (params: { url: string }): Promise<ScrapeInput> => {
 			const toolkit = yield* researchToolkit
 			const stream = yield* toolkit.handle('scrape_page', params)
 			yield* Stream.runDrain(stream)
-		}).pipe(Effect.provide(researchToolkitLayer.pipe(Layer.provide(ports)))),
+		}).pipe(
+			Effect.provide(
+				researchToolkitLayer.pipe(
+					Layer.provide(Layer.mergeAll(ports, testInfra)),
+				),
+			),
+		),
 	)
 	if (captured === undefined) {
 		throw new Error('scrape_page handler never called the scrape provider')
+	}
+	return captured
+}
+
+const discoverContactsInput = async (params: {
+	company_name: string
+	domain: string
+	country?: string | null
+}): Promise<DiscoverContactsInput> => {
+	let captured: DiscoverContactsInput | undefined
+	const infra = Layer.mergeAll(
+		stubBudget,
+		stubRunContext,
+		Layer.succeed(ContactDiscovery)({
+			discover: input => {
+				captured = input
+				return Effect.succeed({
+					status: 'no_reliable_contact' as const,
+					researchId: 'test-run',
+				})
+			},
+		}),
+		StubSearchProvider,
+		StubScrapeProvider,
+		StubExtractProvider,
+		StubRegistryEsProvider,
+	)
+	await Effect.runPromise(
+		Effect.gen(function* () {
+			const toolkit = yield* researchToolkit
+			const stream = yield* toolkit.handle('discover_contacts', params)
+			yield* Stream.runDrain(stream)
+		}).pipe(Effect.provide(researchToolkitLayer.pipe(Layer.provide(infra)))),
+	)
+	if (captured === undefined) {
+		throw new Error('discover_contacts handler never called ContactDiscovery')
 	}
 	return captured
 }
@@ -461,6 +567,42 @@ describe('researchToolkit tool params — model-emitted null is treated as omitt
 					}),
 				).toThrow()
 			})
+		})
+	})
+})
+
+describe('discover_contacts handler — delegates to the shared ContactDiscovery', () => {
+	describe('when called with a company and domain', () => {
+		it('should map the params and ride the run id + budget, not a new anchor', async () => {
+			// GIVEN a discover_contacts tool call inside a run
+			const input = await discoverContactsInput({
+				company_name: 'Acme Corp',
+				domain: 'acme.es',
+				country: 'ES',
+			})
+
+			// THEN the params map onto the service input unchanged
+			expect(input.companyName).toBe('Acme Corp')
+			expect(input.domain).toBe('acme.es')
+			expect(input.country).toBe('ES')
+			// AND it reuses the run's id + budget rather than a standalone anchor
+			expect(input.runContext?.researchId).toBe('test-run')
+			expect(input.runContext?.budget).toBeDefined()
+			expect(input.userId).toBeUndefined()
+		})
+	})
+
+	describe('when country is explicit null', () => {
+		it('should fold it to undefined, like the other tools', async () => {
+			// GIVEN a model that sent null for the country hint
+			const input = await discoverContactsInput({
+				company_name: 'Acme Corp',
+				domain: 'acme.es',
+				country: null,
+			})
+
+			// THEN the null folds to "not provided"
+			expect(input.country).toBeUndefined()
 		})
 	})
 })

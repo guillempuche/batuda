@@ -20,7 +20,6 @@ import {
 	makeResearchProvidersLive,
 	ResearchEventSink,
 	ResearchService,
-	researchToolkitLayer,
 } from '@batuda/research'
 
 import { PgLive } from './db/client'
@@ -265,8 +264,10 @@ const ServicesLive = Layer.mergeAll(
 	PageService.layer,
 	EmailService.layer,
 	RecordingService.layer,
-	ResearchService.layer,
-	ContactDiscovery.layer,
+	// ResearchService's in-loop discover_contacts tool delegates to
+	// ContactDiscovery, so it is provided here — and re-exposed via provideMerge
+	// so the standalone discover_contacts tool, which also uses it, still sees it.
+	ResearchService.layer.pipe(Layer.provideMerge(ContactDiscovery.layer)),
 	InstructionsService.layer,
 	Geocoder.layer,
 	// daemonLayer outputs `never` so a downstream `provideMerge` would
@@ -397,7 +398,6 @@ const program = HttpRouter.serve(AppLive, {
 	Layer.provide(BookingProviderLive),
 	Layer.provide(IcsParserLive),
 	Layer.provide(EmailProviderLive),
-	Layer.provide(researchToolkitLayer),
 	Layer.provide(makeResearchProvidersLive),
 	Layer.provide(makeResearchLlmLive),
 	Layer.provide(ResearchBlobStorageLive),

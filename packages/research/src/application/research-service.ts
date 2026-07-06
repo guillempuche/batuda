@@ -16,18 +16,26 @@ import {
 	ServiceMap,
 	Stream,
 } from 'effect'
+import { Prompt } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
+import type { ResolvedPolicy } from '../domain/types'
+import { runAgentResearchLoop } from './agent-loop'
+import { makeBudgetLayer } from './budget'
+import { validateFindingCitations } from './citation-guard'
 import { resolvePolicy, type SystemDefaults } from './policy'
 import {
 	AgentLanguageModel,
+	Budget,
 	ExtractLanguageModel,
 	ResearchEventSink,
+	ResearchRunContext,
 	WriterLanguageModel,
 } from './ports'
 import { type FreeformSchema, schemaRegistry } from './schemas/index'
-import { urlHashForScrape } from './source-key'
-import { researchToolkit } from './tools'
+import { canonicalizeUrl, urlHashForScrape } from './source-key'
+import { researchToolkit, researchToolkitLayer } from './tools'
+import { verifyProposalProvenance } from './value-guard'
 
 // A finished run is flipped to 'failed' for a real error or an unexpected
 // crash, but NOT when it was simply cancelled or shut down (a pure interrupt) —
@@ -38,6 +46,25 @@ export const shouldMarkRunFailed = (cause: Cause.Cause<unknown>): boolean =>
 
 const sha256Hex = (input: string): string =>
 	createHash('sha256').update(input).digest('hex')
+
+// Cap a tool result before it goes into the phase-1 transcript, so a large
+// scraped page can't blow up the phase-2 prompt or the next round's context.
+const boundedToolResult = (value: unknown, maxChars = 4000): string => {
+	const text = typeof value === 'string' ? value : (JSON.stringify(value) ?? '')
+	return text.length > maxChars
+		? `${text.slice(0, maxChars)}…[truncated]`
+		: text
+}
+
+// A run that fetched no page has nothing to ground its findings on. Below this
+// many linked sources it fails closed as no_reliable_data instead of reporting
+// success with fabricated findings.
+const MIN_GROUNDED_SOURCES = 1
+
+// Stop the reflect loop before its accumulated prompt (which re-sends every
+// round's tool results) can exceed the agent model's context window. A rough
+// character budget — scrapes are capped per page but many of them still add up.
+const MAX_LOOP_PROMPT_CHARS = 90000
 
 /**
  * Deterministic JSON serializer: sorts object keys and drops function values
@@ -163,17 +190,6 @@ export const computeResearchCacheKey = (args: {
 	)
 }
 
-// Pull a string `url` out of a tool call's decoded params without trusting its
-// static type — the toolkit's param union widens across tools, so a scraped
-// page's URL is read defensively for run-source attribution.
-const readToolUrl = (params: unknown): string | null =>
-	typeof params === 'object' &&
-	params !== null &&
-	'url' in params &&
-	typeof params.url === 'string'
-		? params.url
-		: null
-
 // Assemble the phase-1 system prompt. Resolved instruction segments are fenced
 // and placed BELOW the invariants (never fabricate sources, etc.) so a template
 // can't override them — fencing is mitigation, not a guarantee.
@@ -192,6 +208,7 @@ export const buildResearchSystemPrompt = (args: {
 		'Given a query, produce a thorough research brief with findings, sources, and citations.',
 		'Never fabricate sources. Every claim must be verifiable.',
 		'Confirm key facts (employee count, location, sector) from scraped page content — the company site, LinkedIn, or press — not from search snippets alone, and cite the scraped page for each.',
+		'For every citation, set source_id to the exact URL you scraped with scrape_page. Never invent an identifier — a citation that does not match a fetched page is dropped.',
 		'When extracting structured data from a single page, use the company_enrichment_v1 schema (a per-company shape), not a whole-run aggregate schema.',
 		`Output schema: ${args.schemaName}`,
 		args.subjectContext,
@@ -212,6 +229,7 @@ export type ResearchEventType =
 	| 'run.succeeded'
 	| 'run.failed'
 	| 'run.cancelled'
+	| 'run.no_reliable_data'
 	| 'provider.circuit_open'
 
 export interface ResearchEvent {
@@ -285,10 +303,10 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 			const agentLlm = yield* AgentLanguageModel
 			const extractLlm = yield* ExtractLanguageModel
 			const writerLlm = yield* WriterLanguageModel
-			// Resolve the toolkit + handlers once at layer-build time so the
-			// forked research fiber does not carry `HandlersFor<Tools>` as a
-			// lingering context requirement.
-			const toolkit = yield* researchToolkit
+			// The toolkit handlers are resolved per-run inside `runFiber` (not
+			// here) so each run's paid tools charge that run's Budget. Resolving
+			// them there discharges `HandlersFor<Tools>` inside the fiber, so it
+			// never leaks out as a lingering context requirement.
 
 			const ORPHAN_AGE_SECONDS = 900
 
@@ -347,6 +365,15 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 			const maxConcurrentFibersTotal = yield* Config.int(
 				'RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL',
 			)
+			// Hard cap on reflect-loop rounds per run. Bounds how far the agent can
+			// search, so it is required with no default — like the concurrency cap.
+			const maxAgentSteps = yield* Config.int('RESEARCH_MAX_AGENT_STEPS')
+			// System ceiling on monthly paid spend; the per-call cap check takes the
+			// min of this and the user's cap. Already set in production config, with a
+			// default so local and test boots don't need it.
+			const monthlyCapHardCeilingCents = yield* Config.int(
+				'RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS',
+			).pipe(Config.withDefault(10000))
 			const fiberSem = yield* PartitionedSemaphore.make<string>({
 				permits: maxConcurrentFibersTotal,
 			})
@@ -467,7 +494,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							WHEN (SELECT COUNT(*) FILTER (WHERE status IN ('queued','running'))
 								FROM research_runs WHERE parent_id = ${parentId} AND status != 'deleted') > 0
 							THEN 'running'
-							WHEN (SELECT COUNT(*) FILTER (WHERE status = 'failed')
+							WHEN (SELECT COUNT(*) FILTER (WHERE status IN ('failed', 'no_reliable_data'))
 								FROM research_runs WHERE parent_id = ${parentId} AND status != 'deleted') > 0
 							THEN 'failed'
 							ELSE 'succeeded'
@@ -626,6 +653,10 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					let researchText: string
 					let tokensIn = priorTokensIn
 					let tokensOut = priorTokensOut
+					// Full scraped page content gathered this run — the corpus the value
+					// guard checks findings against. Kept separate from the model-facing
+					// transcript (capped per page); empty on a resume that skips phase 1.
+					const scrapeCorpus: string[] = []
 					if (checkpointPhase >= 1 && cachedResearchText) {
 						researchText = cachedResearchText
 						yield* Effect.logInfo('research.phase1.resume').pipe(
@@ -635,41 +666,146 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							}),
 						)
 					} else {
-						yield* publishEvent(researchId, 'tool.called', {
-							tool: 'llm.generateText',
-							phase: 1,
-						})
-						const researchResponse = yield* agentLlm.generateText({
-							prompt: `${systemPrompt}\n\n${(run as { query: string }).query}`,
-							toolkit,
-							toolChoice: 'auto',
-						})
-						researchText = researchResponse.text
-						tokensIn += researchResponse.usage.inputTokens.total ?? 0
-						tokensOut += researchResponse.usage.outputTokens.total ?? 0
-						yield* Ref.update(toolLog, log => [
-							...log,
-							{
-								timestamp: DateTime.nowUnsafe().toString(),
-								type: 'call' as const,
-								tool: 'llm.generateText',
-								input: {
+						const organizationId = (run as { organizationId: string })
+							.organizationId
+						const query = (run as { query: string }).query
+
+						// The policy was validated and frozen onto the row at create
+						// time, so it round-trips back here as a ResolvedPolicy.
+						const policy = (run as { paidPolicy: ResolvedPolicy }).paidPolicy
+						// Per-run budget, built from that frozen policy plus the system
+						// ceiling. The tool handlers charge it before each vendor call,
+						// and the loop reads it to halt when spend runs out. The fiber's
+						// own connection backs the cap check.
+						const budgetLayer = makeBudgetLayer({
+							organizationId,
+							userId,
+							researchId,
+							policy,
+							systemCeiling: monthlyCapHardCeilingCents,
+						}).pipe(Layer.provide(Layer.succeed(SqlClient.SqlClient)(sql)))
+
+						// One tool-log + SSE pair per round, so a multi-round run is
+						// visible in the run's toolLog and its live stream.
+						const emitRound = (
+							round: number,
+							textLength: number,
+							toolCalls: number,
+						) =>
+							Effect.gen(function* () {
+								yield* publishEvent(researchId, 'tool.called', {
+									tool: 'llm.generateText',
 									phase: 1,
-									query: (run as { query: string }).query,
-								},
-							},
-							{
-								timestamp: DateTime.nowUnsafe().toString(),
-								type: 'result' as const,
-								tool: 'llm.generateText',
-								output: { textLength: researchText.length },
-							},
-						])
-						yield* publishEvent(researchId, 'tool.result', {
-							tool: 'llm.generateText',
-							phase: 1,
-							textLength: researchText.length,
-						})
+									round,
+								})
+								yield* Ref.update(toolLog, log => [
+									...log,
+									{
+										timestamp: DateTime.nowUnsafe().toString(),
+										type: 'call' as const,
+										tool: 'llm.generateText',
+										input: { phase: 1, round, query },
+									},
+									{
+										timestamp: DateTime.nowUnsafe().toString(),
+										type: 'result' as const,
+										tool: 'llm.generateText',
+										output: { round, toolCalls, textLength },
+									},
+								])
+								yield* publishEvent(researchId, 'tool.result', {
+									tool: 'llm.generateText',
+									phase: 1,
+									round,
+									toolCalls,
+									textLength,
+								})
+							})
+
+						// The reflect-and-retry loop runs under the per-run Budget +
+						// ResearchRunContext, resolving the toolkit so paid tools charge
+						// this run. `runRound` threads the growing prompt — each round's
+						// assistant text and tool results feed the next — and maps the
+						// model response into the plain data the loop decides on.
+						const loopResult = yield* Effect.gen(function* () {
+							const budget = yield* Budget
+							const toolkit = yield* researchToolkit
+							let prompt: Prompt.Prompt = Prompt.make(
+								`${systemPrompt}\n\n${query}`,
+							)
+							const runRound = (round: number) =>
+								Effect.gen(function* () {
+									const response = yield* agentLlm.generateText({
+										prompt,
+										toolkit,
+										// Force a tool on the first round so the model can't
+										// answer from memory without gathering evidence (which
+										// would leave zero sources and fail the grounding gate
+										// on a legitimate company); reflect freely after.
+										toolChoice: round === 1 ? 'required' : 'auto',
+									})
+									prompt = Prompt.concat(
+										prompt,
+										Prompt.fromResponseParts(response.content),
+									)
+									// Attribute sources only to scrapes that actually returned
+									// content this round — read off the tool RESULTS, not the
+									// requested calls — so a failed or empty scrape can never
+									// count toward grounding; keep the content for the value guard.
+									const scrapeUrlHashes: string[] = []
+									for (const tr of response.toolResults) {
+										if (tr.name !== 'scrape_page') continue
+										const page = tr.result as
+											| { url?: unknown; markdown?: unknown }
+											| null
+											| undefined
+										if (
+											page != null &&
+											typeof page.url === 'string' &&
+											typeof page.markdown === 'string' &&
+											page.markdown.trim().length > 0
+										) {
+											scrapeUrlHashes.push(urlHashForScrape(page.url))
+											scrapeCorpus.push(page.markdown)
+										}
+									}
+									const renderedResults = response.toolResults.map(
+										tr =>
+											`[${tr.name}] ${boundedToolResult(tr.encodedResult ?? tr.result)}`,
+									)
+									yield* emitRound(
+										round,
+										response.text.length,
+										response.toolCalls.length,
+									)
+									return {
+										text: response.text,
+										hasToolCalls: response.toolCalls.length > 0,
+										scrapeUrlHashes,
+										renderedResults,
+										promptChars: JSON.stringify(response.content).length,
+										inputTokens: response.usage.inputTokens.total ?? 0,
+										outputTokens: response.usage.outputTokens.total ?? 0,
+									}
+								})
+							return yield* runAgentResearchLoop({
+								maxSteps: maxAgentSteps,
+								maxPromptChars: MAX_LOOP_PROMPT_CHARS,
+								runRound,
+								budgetSnapshot: budget.snapshot(),
+								priorTokensIn,
+								priorTokensOut,
+							})
+						}).pipe(
+							Effect.provide(researchToolkitLayer),
+							Effect.provide(budgetLayer),
+							Effect.provide(Layer.succeed(ResearchRunContext)({ researchId })),
+						)
+
+						researchText = loopResult.researchText
+						tokensIn = loopResult.tokensIn
+						tokensOut = loopResult.tokensOut
+
 						yield* sql`
 							UPDATE research_runs
 							SET phase = 1,
@@ -680,23 +816,13 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							WHERE id = ${researchId}
 						`
 
-						// Link the pages scraped this phase to the run so findings
-						// cite real sources. The scrape tool runs inside generateText,
-						// so the scraped URLs are read back off the response and matched
-						// to the sources row the cache upserted (by url_hash). Writes as
-						// the fiber's privileged role, like the research_runs update above.
-						const organizationId = (run as { organizationId: string })
-							.organizationId
-						const scrapedUrlHashes = Array.from(
-							new Set(
-								researchResponse.toolCalls
-									.filter(tc => tc.name === 'scrape_page')
-									.map(tc => readToolUrl(tc.params))
-									.filter((u): u is string => u !== null)
-									.map(urlHashForScrape),
-							),
-						)
-						for (const urlHash of scrapedUrlHashes) {
+						// Link every page scraped across the loop's rounds to the run so
+						// findings cite real sources. Scrapes run inside generateText, so
+						// the URLs of pages that returned content are collected each round
+						// and matched to the sources row the cache upserted (by url_hash).
+						// Writes as the fiber's privileged role, like the research_runs
+						// update above.
+						for (const urlHash of loopResult.scrapedUrlHashes) {
 							yield* sql`
 								INSERT INTO research_run_sources (organization_id, research_id, source_id, local_ref, fetched_at, cost_cents)
 								SELECT ${organizationId}, ${researchId}, s.id, s.url, now(), 0
@@ -726,9 +852,64 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						// but Schema.Top erases that — the cast is safe.
 						const structuredResponse = yield* extractLlm.generateObject({
 							schema: outputSchema as typeof FreeformSchema,
-							prompt: `Based on this research, produce structured findings:\n\n${researchText}`,
+							// Ground the extraction: the model may only output values that
+							// appear in the transcript, and must leave unsupported fields
+							// empty rather than filling them from prior knowledge — otherwise
+							// it will confidently invent phones, tax ids, and emails.
+							prompt: `Produce structured findings STRICTLY from the research transcript below. Only include a value that appears in the transcript; if the transcript does not support a field, omit it or leave it null — never fill a field from prior knowledge. Set each citation's source_id to the exact scraped URL the value came from.\n\nResearch transcript:\n\n${researchText}`,
 						})
 						findings = withProposalIds(structuredResponse.value as unknown)
+						// Drop citations the model invented: keep only source_ids that map
+						// to a page this run actually fetched. A proposed CRM update left
+						// with no valid citation is dropped whole. Cleaned before the
+						// checkpoint below, so a resumed run reads the validated findings.
+						const groundedRows = yield* sql<{
+							localRef: string
+							sourceId: string
+						}>`
+							SELECT local_ref AS "localRef", source_id AS "sourceId"
+							FROM research_run_sources WHERE research_id = ${researchId}
+						`
+						const groundedKeys = new Set<string>()
+						for (const row of groundedRows) {
+							groundedKeys.add(canonicalizeUrl(row.localRef))
+							groundedKeys.add(row.sourceId)
+						}
+						const citationCheck = validateFindingCitations(
+							findings,
+							sourceId =>
+								groundedKeys.has(canonicalizeUrl(sourceId)) ||
+								groundedKeys.has(sourceId),
+						)
+						findings = citationCheck.findings
+						if (citationCheck.total > citationCheck.kept) {
+							yield* Effect.logWarning('research.citations.dropped').pipe(
+								Effect.annotateLogs({
+									research_id: researchId,
+									total: citationCheck.total,
+									kept: citationCheck.kept,
+								}),
+							)
+						}
+						// Value provenance: the citation guard proved the cited pages were
+						// fetched, not that they contain the claimed values. Drop any
+						// proposed CRM write whose email/phone/tax-id value appears nowhere
+						// in the run's evidence (scraped pages + the tool transcript) — that
+						// value was invented, real citation or not.
+						const evidenceCorpus = [researchText, ...scrapeCorpus].join('\n')
+						const valueCheck = verifyProposalProvenance(
+							findings,
+							evidenceCorpus,
+						)
+						findings = valueCheck.findings
+						if (valueCheck.droppedProposals > 0) {
+							yield* Effect.logWarning('research.proposals.unsupported').pipe(
+								Effect.annotateLogs({
+									research_id: researchId,
+									dropped: valueCheck.droppedProposals,
+								}),
+							)
+						}
 						tokensOut += structuredResponse.usage.outputTokens.total ?? 0
 						yield* Ref.update(toolLog, log => [
 							...log,
@@ -781,6 +962,35 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 
 					// ── Persist results ──
 					const finalToolLog = yield* Ref.get(toolLog)
+
+					// Grounding gate (fail-closed): a run that fetched no page cannot
+					// ground its findings, so it is marked no_reliable_data instead of
+					// reporting success with fabricated data. Returns before the cache
+					// write and parent merge below, like any run that does not succeed.
+					const [sources] = yield* sql<{ n: number }>`
+						SELECT COUNT(*)::int AS n FROM research_run_sources
+						WHERE research_id = ${researchId}
+					`
+					if ((sources?.n ?? 0) < MIN_GROUNDED_SOURCES) {
+						yield* sql`
+							UPDATE research_runs
+							SET status = 'no_reliable_data',
+								phase = 3,
+								findings = ${JSON.stringify({
+									error:
+										'No pages were fetched, so the findings could not be grounded.',
+									reason: 'no_reliable_data',
+								})},
+								tool_log = ${JSON.stringify(finalToolLog)},
+								completed_at = now(),
+								updated_at = now()
+							WHERE id = ${researchId} AND status = 'running'
+						`
+						yield* publishEvent(researchId, 'run.no_reliable_data', {
+							sourceCount: sources?.n ?? 0,
+						})
+						return
+					}
 
 					yield* sql`
 						UPDATE research_runs

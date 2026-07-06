@@ -4,6 +4,7 @@ process.env['DATABASE_URL'] ??=
 	'postgresql://batuda:batuda@localhost:5433/batuda_it'
 // The service reads this concurrency gate via Config at layer-build time.
 process.env['RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL'] ??= '4'
+process.env['RESEARCH_MAX_AGENT_STEPS'] ??= '6'
 // Park the periodic sweep daemon far out so the only sweep that runs after the
 // rows are inserted is the manual sweepOrphans() call under test (its first tick
 // still fires at layer build, before any row exists).
@@ -16,12 +17,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
 	AgentLanguageModel,
+	ContactDiscovery,
 	ExtractLanguageModel,
 	ExtractProvider,
 	RegistryRouter,
 	ResearchEventSink,
 	ResearchService,
-	researchToolkitLayer,
 	ScrapeProvider,
 	SearchProvider,
 	WriterLanguageModel,
@@ -85,7 +86,16 @@ const eventSinkLayer = Layer.succeed(ResearchEventSink)(
 
 const ResearchLive = ResearchService.layer.pipe(
 	Layer.provide(llmLayer),
-	Layer.provide(researchToolkitLayer.pipe(Layer.provide(providersLayer))),
+	Layer.provide(providersLayer),
+	Layer.provide(
+		Layer.succeed(ContactDiscovery)({
+			discover: () =>
+				Effect.succeed({
+					status: 'no_reliable_contact' as const,
+					researchId: 'test',
+				}),
+		}),
+	),
 	Layer.provide(eventSinkLayer),
 	Layer.provideMerge(PgLive),
 )

@@ -138,6 +138,8 @@ function statusColor(status: string): string {
 			return 'color-mix(in oklab, var(--color-primary) 60%, white)'
 		case 'failed':
 			return 'color-mix(in oklab, var(--color-error, #c6664b) 70%, white)'
+		case 'no_reliable_data':
+			return 'color-mix(in oklab, var(--color-error, #c6664b) 40%, white)'
 		case 'running':
 		case 'queued':
 			return 'color-mix(in oklab, var(--color-primary) 30%, white)'

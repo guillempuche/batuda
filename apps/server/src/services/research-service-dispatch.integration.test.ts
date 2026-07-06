@@ -4,6 +4,7 @@ process.env['DATABASE_URL'] ??=
 	'postgresql://batuda:batuda@localhost:5433/batuda_it'
 // The service reads this concurrency gate via Config at layer-build time.
 process.env['RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL'] ??= '4'
+process.env['RESEARCH_MAX_AGENT_STEPS'] ??= '6'
 
 import { randomUUID } from 'node:crypto'
 
@@ -14,13 +15,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
 	AgentLanguageModel,
+	ContactDiscovery,
 	type CreateResearchInput,
 	ExtractLanguageModel,
 	ExtractProvider,
 	RegistryRouter,
 	ResearchEventSink,
 	ResearchService,
-	researchToolkitLayer,
 	ScrapeProvider,
 	SearchProvider,
 	type SystemDefaults,
@@ -158,7 +159,16 @@ const eventSinkLayer = Layer.succeed(ResearchEventSink)(
 // runtime wiring.
 const ResearchLive = ResearchService.layer.pipe(
 	Layer.provide(llmLayer),
-	Layer.provide(researchToolkitLayer.pipe(Layer.provide(providersLayer))),
+	Layer.provide(providersLayer),
+	Layer.provide(
+		Layer.succeed(ContactDiscovery)({
+			discover: () =>
+				Effect.succeed({
+					status: 'no_reliable_contact' as const,
+					researchId: 'test',
+				}),
+		}),
+	),
 	Layer.provide(eventSinkLayer),
 	Layer.provideMerge(PgLive),
 )
@@ -177,7 +187,12 @@ const researchInput: CreateResearchInput = {
 	forceFresh: true,
 }
 
-const TERMINAL = new Set(['succeeded', 'failed', 'cancelled'])
+const TERMINAL = new Set([
+	'succeeded',
+	'failed',
+	'cancelled',
+	'no_reliable_data',
+])
 
 const ctx = {} as { org: Org }
 let userId = ''
@@ -227,14 +242,15 @@ afterAll(async () => {
 
 describe('ResearchService dispatch', () => {
 	describe('when a run is created inside a request transaction', () => {
-		it('should run to succeeded on the consumer’s clean connection and commit its cache write', async () => {
+		it('should commit its cache write on the consumer’s clean connection', async () => {
 			// GIVEN the real ResearchService with stub providers + LLMs, where the
 			//   Agent tier performs the #171-shaped sql.withTransaction cache write
 			// WHEN create() runs inside enterOrgScope (a real request transaction)
 			//   and the layer-scoped consumer picks the queued run up and runs it
-			// THEN the run reaches 'succeeded' and the cache row committed — proving
-			//   the job's own transaction opened on a clean connection, not the
-			//   request's already-committed one
+			// THEN the cache row committed — proving the job's own transaction opened
+			//   on a clean connection, not the request's already-committed one. The
+			//   run itself ends no_reliable_data: the Agent stub emits no tool calls,
+			//   so nothing is scraped and the grounding gate fails it closed.
 			const outcome = await Effect.runPromise(
 				Effect.gen(function* () {
 					const svc = yield* ResearchService
@@ -299,10 +315,13 @@ describe('ResearchService dispatch', () => {
 
 			expect(outcome.createStatus).toBe('queued')
 			expect(outcome.queuedId).toBeTruthy()
+			// The stub scrapes nothing, so the run fails closed to no_reliable_data;
+			// what matters here is that its search_cache write committed on a clean
+			// connection — which happens in phase 1 regardless of the final verdict.
 			expect(
 				outcome.status,
-				`run did not succeed: ${outcome.errorMessage ?? '(no error recorded)'}`,
-			).toBe('succeeded')
+				`run not terminal: ${outcome.errorMessage ?? '(no error recorded)'}`,
+			).toBe('no_reliable_data')
 			expect(outcome.cacheCommitted).toBe(true)
 		}, 30_000)
 	})

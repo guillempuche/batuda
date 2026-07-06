@@ -100,10 +100,14 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 				</RunningBanner>
 			) : null}
 
-			{run.status === 'failed' ? (
+			{run.status === 'failed' || run.status === 'no_reliable_data' ? (
 				<ErrorBlock role='alert' data-testid={`research-run-failure-${run.id}`}>
 					<strong>
-						<Trans>Run failed</Trans>
+						{run.status === 'no_reliable_data' ? (
+							<Trans>No reliable data found</Trans>
+						) : (
+							<Trans>Run failed</Trans>
+						)}
 					</strong>
 					{run.errorMessage !== undefined && run.errorMessage !== null ? (
 						<span>{run.errorMessage}</span>
