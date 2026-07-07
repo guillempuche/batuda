@@ -1,10 +1,14 @@
-import { Effect } from 'effect'
+import { Cause, DateTime, Effect } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
 
 import { forkCompanyRegeocode } from './company-geocoding'
 import { type ChannelInput, writeChannels } from './contact-channels'
+import {
+	ResearchProposalApplied,
+	TimelineActivityService,
+} from './timeline-activity'
 
 /**
  * Apply (or reject) a research-proposed CRM update — the one place a research
@@ -401,10 +405,45 @@ export const resolveResearchProposedUpdate = (
 	runId: string,
 	proposedUpdateId: string,
 	decision: 'apply' | 'reject',
+	actorUserId: string | null,
 ) =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
 		const org = yield* CurrentOrg
+		const timeline = yield* TimelineActivityService
+
+		// Write an audit entry when a change lands, linked to both the run and
+		// the subject. Best-effort: the change is already applied, so if the
+		// audit write fails, log a warning rather than failing the whole apply.
+		const recordApplied = (
+			operation: 'created' | 'updated' | 'duplicate',
+			subjectTable: 'companies' | 'contacts',
+			subjectId: string,
+			companyId: string | null,
+			contactId: string | null,
+			appliedFields: ReadonlyArray<string>,
+		) =>
+			timeline
+				.record(
+					new ResearchProposalApplied({
+						researchRunId: runId,
+						companyId,
+						contactId,
+						subjectTable,
+						subjectId,
+						operation,
+						appliedFields,
+						actorUserId,
+						occurredAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
+					}),
+				)
+				.pipe(
+					Effect.catchCause(cause =>
+						Effect.logWarning('research apply timeline write failed').pipe(
+							Effect.annotateLogs({ cause: Cause.pretty(cause) }),
+						),
+					),
+				)
 
 		const rows = yield* sql<{ findings: string | null }>`
 			SELECT findings::text AS findings FROM research_runs
@@ -477,6 +516,14 @@ export const resolveResearchProposedUpdate = (
 					citations,
 				)
 				yield* setProposalStatus(sql, runId, org.id, index, 'applied')
+				yield* recordApplied(
+					'duplicate',
+					'contacts',
+					existingId,
+					created.companyId,
+					existingId,
+					Object.keys(created.fields),
+				)
 				return {
 					outcome: 'duplicate',
 					subject_table: 'contacts',
@@ -517,6 +564,14 @@ export const resolveResearchProposedUpdate = (
 			yield* writeChannels(sql, org.id, row.id, created.channels)
 			yield* linkSubjectToRun(sql, org.id, runId, 'contacts', row.id, citations)
 			yield* setProposalStatus(sql, runId, org.id, index, 'applied')
+			yield* recordApplied(
+				'created',
+				'contacts',
+				row.id,
+				created.companyId,
+				row.id,
+				Object.keys(created.fields),
+			)
 			return {
 				outcome: 'created',
 				subject_table: 'contacts',
@@ -555,6 +610,14 @@ export const resolveResearchProposedUpdate = (
 			validated.table,
 			validated.subjectId,
 			citations,
+		)
+		yield* recordApplied(
+			'updated',
+			validated.table,
+			validated.subjectId,
+			validated.table === 'companies' ? validated.subjectId : null,
+			validated.table === 'contacts' ? validated.subjectId : null,
+			Object.keys(fields),
 		)
 
 		// Applying a new location makes the stored coordinates stale; refresh them

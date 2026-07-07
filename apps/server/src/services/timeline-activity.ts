@@ -68,6 +68,23 @@ export class ResearchRunCompleted extends Data.TaggedClass(
 	readonly occurredAt: Date
 }> {}
 
+// A research suggestion a human (or the auto-apply policy) accepted onto a CRM
+// row: records who applied it, when, from which run, and which fields changed,
+// so the change is auditable on the subject's and company's timeline.
+export class ResearchProposalApplied extends Data.TaggedClass(
+	'ResearchProposalApplied',
+)<{
+	readonly researchRunId: string
+	readonly companyId: string | null
+	readonly contactId: string | null
+	readonly subjectTable: 'companies' | 'contacts'
+	readonly subjectId: string
+	readonly operation: 'created' | 'updated' | 'duplicate'
+	readonly appliedFields: ReadonlyArray<string>
+	readonly actorUserId: string | null
+	readonly occurredAt: Date
+}> {}
+
 export class SystemEvent extends Data.TaggedClass('SystemEvent')<{
 	readonly entityType: string
 	readonly entityId: string
@@ -157,6 +174,7 @@ export type TimelineEvent =
 	| DocumentCreated
 	| ProposalEvent
 	| ResearchRunCompleted
+	| ResearchProposalApplied
 	| SystemEvent
 	| MeetingScheduled
 	| MeetingRescheduled
@@ -190,6 +208,7 @@ export const denormColumnFor = (
 		case 'DocumentCreated':
 		case 'ProposalEvent':
 		case 'ResearchRunCompleted':
+		case 'ResearchProposalApplied':
 		case 'SystemEvent':
 		case 'MeetingCancelled':
 		case 'MeetingRsvp':
@@ -217,6 +236,7 @@ type TimelineKind =
 	| 'proposal_viewed'
 	| 'proposal_responded'
 	| 'research_run'
+	| 'research_applied'
 	| 'system_event'
 	| 'meeting_scheduled'
 	| 'meeting_rescheduled'
@@ -351,6 +371,24 @@ const rowBase = (event: TimelineEvent): TimelineRowBase => {
 				occurredAt: event.occurredAt,
 				summary: event.summary,
 				payload: { status: event.status },
+			}
+		case 'ResearchProposalApplied':
+			return {
+				kind: 'research_applied',
+				entityType: 'research_run',
+				companyId: event.companyId,
+				contactId: event.contactId,
+				channel: null,
+				direction: null,
+				actorUserId: event.actorUserId,
+				occurredAt: event.occurredAt,
+				summary: null,
+				payload: {
+					subjectTable: event.subjectTable,
+					subjectId: event.subjectId,
+					operation: event.operation,
+					appliedFields: event.appliedFields,
+				},
 			}
 		case 'SystemEvent':
 			return {
@@ -561,6 +599,7 @@ export const mapEventToInteraction = (
 		case 'DocumentCreated':
 		case 'ProposalEvent':
 		case 'ResearchRunCompleted':
+		case 'ResearchProposalApplied':
 		case 'SystemEvent':
 		case 'MeetingScheduled':
 		case 'MeetingRescheduled':
@@ -595,6 +634,7 @@ const entityIdFor = (
 		case 'ProposalEvent':
 			return event.proposalId
 		case 'ResearchRunCompleted':
+		case 'ResearchProposalApplied':
 			return event.researchRunId
 		case 'SystemEvent':
 			return event.entityId

@@ -8,6 +8,7 @@ import { ResearchService } from '@batuda/research'
 import { CompanyService } from '../../services/companies'
 import { Geocoder } from '../../services/geocoder'
 import { resolveResearchProposedUpdate } from '../../services/research-apply'
+import { TimelineActivityService } from '../../services/timeline-activity'
 import { redactDbErrors, Uuid } from './_research-shared'
 import { ListResult, toItems } from './_result'
 
@@ -201,6 +202,7 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 		const companyService = yield* CompanyService
 		const geocoder = yield* Geocoder
 		const sql = yield* SqlClient.SqlClient
+		const timeline = yield* TimelineActivityService
 		return {
 			list_research: filters =>
 				svc
@@ -263,12 +265,20 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 				proposed_update_id,
 				decision,
 			}) =>
-				resolveResearchProposedUpdate(id, proposed_update_id, decision).pipe(
-					Effect.provideService(CompanyService, companyService),
-					Effect.provideService(Geocoder, geocoder),
-					Effect.provideService(SqlClient.SqlClient, sql),
-					redactDbErrors,
-				),
+				Effect.gen(function* () {
+					const { userId } = yield* SessionContext
+					return yield* resolveResearchProposedUpdate(
+						id,
+						proposed_update_id,
+						decision,
+						userId,
+					).pipe(
+						Effect.provideService(CompanyService, companyService),
+						Effect.provideService(Geocoder, geocoder),
+						Effect.provideService(SqlClient.SqlClient, sql),
+						Effect.provideService(TimelineActivityService, timeline),
+					)
+				}).pipe(redactDbErrors),
 			research_policy: params =>
 				Effect.gen(function* () {
 					const { userId } = yield* SessionContext
