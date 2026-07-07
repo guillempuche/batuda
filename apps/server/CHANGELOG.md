@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-07 (server-v2026.7.7-1)
+
+### Bug Fixes
+
+* **research:** normalize web_search location to a valid country code ([ee3a0f9](https://github.com/guillempuche/batuda/commit/ee3a0f99491ccb995df349c3d488766ce5b04ec8))
+* **research:** rebuild cached LLM responses so tool results survive ([45f26e3](https://github.com/guillempuche/batuda/commit/45f26e39a0eca49fae9ca627abb3becbca958570))
+
 ## 2026-07-07 (server-v2026.7.7)
 
 ### Features
