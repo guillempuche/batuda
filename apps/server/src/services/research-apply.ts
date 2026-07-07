@@ -219,19 +219,89 @@ const occUpdate = (
 				RETURNING version
 			`
 
-// Record that a contact row came from this run, so the timeline and provenance
-// can trace it back to its evidence. Idempotent — re-applying the same finding
-// leaves a single link.
-const linkContactToRun = (
+// A citation the model attached to a suggestion: which fetched source backed a
+// claim, so the applied row can point back at its evidence.
+export type Citation = {
+	readonly source_id: string
+	readonly quote?: string
+	readonly confidence?: number
+}
+
+// Keep only well-formed citations — one needs a source id to resolve to a URL.
+const parseCitations = (raw: unknown): ReadonlyArray<Citation> => {
+	if (!Array.isArray(raw)) return []
+	const out: Citation[] = []
+	for (const entry of raw) {
+		if (typeof entry !== 'object' || entry === null) continue
+		const record = entry as Record<string, unknown>
+		const sourceId = record['source_id']
+		if (typeof sourceId !== 'string' || sourceId === '') continue
+		const quote = record['quote']
+		const confidence = record['confidence']
+		out.push({
+			source_id: sourceId,
+			...(typeof quote === 'string' ? { quote } : {}),
+			...(typeof confidence === 'number' ? { confidence } : {}),
+		})
+	}
+	return out
+}
+
+// Record that a row came from this run, carrying the citations that back the
+// change, so the row keeps a resolvable pointer to its evidence for later
+// display (worded by the presentation layer). Idempotent — re-applying
+// refreshes the citations on the single link; an existing input link keeps its
+// kind and only has its citations updated.
+export const linkSubjectToRun = (
 	sql: SqlClient.SqlClient,
 	orgId: string,
 	runId: string,
-	contactId: string,
+	subjectTable: 'companies' | 'contacts',
+	subjectId: string,
+	citations: ReadonlyArray<Citation>,
 ) =>
 	sql`
-		INSERT INTO research_links (organization_id, research_id, subject_table, subject_id, link_kind)
-		VALUES (${orgId}, ${runId}, 'contacts', ${contactId}, 'finding')
-		ON CONFLICT DO NOTHING
+		INSERT INTO research_links
+			(organization_id, research_id, subject_table, subject_id, link_kind, citations)
+		VALUES (
+			${orgId}, ${runId}, ${subjectTable}, ${subjectId}, 'finding',
+			${JSON.stringify(citations)}::jsonb
+		)
+		ON CONFLICT (research_id, subject_table, subject_id)
+			DO UPDATE SET citations = EXCLUDED.citations
+	`
+
+export interface ProvenanceEntry {
+	readonly runId: string
+	readonly runCompletedAt: Date | null
+	readonly sources: ReadonlyArray<{ sourceId: string; url: string }>
+}
+
+// Where an applied row's evidence came from: for every research run linked to
+// the row, the run's completion date and the URLs of the sources its citations
+// point at. Resolves from the run↔row link and the sources table alone, so it
+// still works after a run's bulkier transcript is pruned for retention.
+export const researchProvenance = (
+	sql: SqlClient.SqlClient,
+	orgId: string,
+	subjectTable: 'companies' | 'contacts',
+	subjectId: string,
+) =>
+	sql<ProvenanceEntry>`
+		SELECT
+			rl.research_id AS run_id,
+			r.completed_at AS run_completed_at,
+			COALESCE((
+				SELECT json_agg(json_build_object('sourceId', s.id, 'url', s.url))
+				FROM jsonb_array_elements(rl.citations) cit
+				JOIN sources s ON s.id = cit->>'source_id'
+			), '[]'::json) AS sources
+		FROM research_links rl
+		JOIN research_runs r ON r.id = rl.research_id
+		WHERE rl.organization_id = ${orgId}
+			AND rl.subject_table = ${subjectTable}
+			AND rl.subject_id = ${subjectId}
+		ORDER BY r.completed_at DESC NULLS LAST
 	`
 
 // A create proposal describes a newly discovered person. Before inserting a
@@ -370,6 +440,10 @@ export const resolveResearchProposedUpdate = (
 			return { outcome: 'rejected' } satisfies ResolveOutcome
 		}
 
+		// The sources the model cited for this change, stored with the applied
+		// row so its evidence trail survives a later transcript prune.
+		const citations = parseCitations(proposal['citations'])
+
 		// A discovered contact has no row yet: create it (with its channels)
 		// instead of updating an existing one, and link the new row to the run.
 		if (proposal['operation'] === 'create') {
@@ -394,7 +468,14 @@ export const resolveResearchProposedUpdate = (
 				// (additive — the human-owned scalar fields stay untouched) and link
 				// the run, rather than inserting a second contact for the same person.
 				yield* writeChannels(sql, org.id, existingId, created.channels)
-				yield* linkContactToRun(sql, org.id, runId, existingId)
+				yield* linkSubjectToRun(
+					sql,
+					org.id,
+					runId,
+					'contacts',
+					existingId,
+					citations,
+				)
 				yield* setProposalStatus(sql, runId, org.id, index, 'applied')
 				return {
 					outcome: 'duplicate',
@@ -434,7 +515,7 @@ export const resolveResearchProposedUpdate = (
 				} satisfies ResolveOutcome
 			// Deliverability verdict + confidence land on the channels, not the row.
 			yield* writeChannels(sql, org.id, row.id, created.channels)
-			yield* linkContactToRun(sql, org.id, runId, row.id)
+			yield* linkSubjectToRun(sql, org.id, runId, 'contacts', row.id, citations)
 			yield* setProposalStatus(sql, runId, org.id, index, 'applied')
 			return {
 				outcome: 'created',
@@ -467,6 +548,14 @@ export const resolveResearchProposedUpdate = (
 			return { outcome: 'conflict' } satisfies ResolveOutcome
 
 		yield* setProposalStatus(sql, runId, org.id, index, 'applied')
+		yield* linkSubjectToRun(
+			sql,
+			org.id,
+			runId,
+			validated.table,
+			validated.subjectId,
+			citations,
+		)
 
 		// Applying a new location makes the stored coordinates stale; refresh them
 		// the same background, org-scoped way a manual location edit does.

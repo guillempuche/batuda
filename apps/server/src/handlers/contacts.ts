@@ -26,12 +26,31 @@ export const ContactsLive = HttpApiBuilder.group(
 						const conditions: Array<Statement.Fragment> = []
 						if (_.query.companyId)
 							conditions.push(sql`c.company_id = ${_.query.companyId}`)
+						// `provenance` traces a contact back to the research runs that
+						// wrote it and the sources those runs cited, so the reader can
+						// tell a researched contact from a hand-entered one. Row-level
+						// security limits the linked runs to the caller's org; how the
+						// trail is worded is left to the presentation layer.
 						return yield* sql`
 							SELECT c.*, COALESCE(
 								(SELECT json_agg(ch ORDER BY ch.is_primary DESC, ch.kind)
 								 FROM contact_channels ch WHERE ch.contact_id = c.id),
 								'[]'::json
-							) AS channels
+							) AS channels,
+							COALESCE((
+								SELECT json_agg(json_build_object(
+									'runId', rl.research_id,
+									'runCompletedAt', r.completed_at,
+									'sources', COALESCE((
+										SELECT json_agg(json_build_object('sourceId', s.id, 'url', s.url))
+										FROM jsonb_array_elements(rl.citations) cit
+										JOIN sources s ON s.id = cit->>'source_id'
+									), '[]'::json)
+								) ORDER BY r.completed_at DESC NULLS LAST)
+								FROM research_links rl
+								JOIN research_runs r ON r.id = rl.research_id
+								WHERE rl.subject_table = 'contacts' AND rl.subject_id = c.id
+							), '[]'::json) AS provenance
 							FROM contacts c
 							WHERE ${sql.and(conditions)}
 							ORDER BY c.name
