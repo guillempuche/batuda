@@ -194,6 +194,23 @@ const setProposalStatus = (
 		WHERE id = ${runId} AND organization_id = ${orgId}
 	`
 
+// The Postgres error code (e.g. '22P02' bad-uuid, '23503' fk-violation) can sit a
+// couple of `cause` levels down inside a wrapped SqlError, so walk the chain
+// rather than reading only the top cause.
+const pgErrorCode = (error: unknown): string | undefined => {
+	let cursor: unknown = error
+	for (
+		let depth = 0;
+		depth < 6 && cursor != null && typeof cursor === 'object';
+		depth++
+	) {
+		const code = (cursor as { code?: unknown }).code
+		if (typeof code === 'string') return code
+		cursor = (cursor as { cause?: unknown }).cause
+	}
+	return undefined
+}
+
 // Optimistic-concurrency write: lands only if `version` still equals the version
 // the proposal was made against, and bumps it. Branches on the table so the name
 // is never interpolated. Returns the new row (empty on a version/id mismatch).
@@ -539,7 +556,7 @@ export const resolveResearchProposedUpdate = (
 				RETURNING id, version
 			`.pipe(
 				Effect.catchTag('SqlError', e => {
-					const code = (e.cause as { code?: unknown } | null | undefined)?.code
+					const code = pgErrorCode(e)
 					// A hallucinated company_id is a bad proposal, not a server error: a
 					// company that doesn't exist trips the foreign key (23503), a value
 					// that isn't a UUID trips text parsing (22P02). Report it as invalid
@@ -591,6 +608,9 @@ export const resolveResearchProposedUpdate = (
 		if (Object.keys(fields).length === 0)
 			return { outcome: 'no_applicable_fields' } satisfies ResolveOutcome
 
+		// A subject_id that isn't a UUID trips text parsing (22P02) in the WHERE
+		// clause; that is a bad proposal (the model can invent an id), not a server
+		// error, so report it as invalid the way the create branch does.
 		const updatedRows = yield* occUpdate(
 			sql,
 			validated.table,
@@ -598,7 +618,19 @@ export const resolveResearchProposedUpdate = (
 			org.id,
 			validated.expectedVersion,
 			fields,
+		).pipe(
+			Effect.catchTag('SqlError', e => {
+				const code = pgErrorCode(e)
+				return code === '22P02' || code === '23503'
+					? Effect.succeed(null)
+					: Effect.fail(e)
+			}),
 		)
+		if (updatedRows === null)
+			return {
+				outcome: 'invalid',
+				reason: 'subject_id does not reference a known row',
+			} satisfies ResolveOutcome
 		if (updatedRows.length === 0)
 			return { outcome: 'conflict' } satisfies ResolveOutcome
 
