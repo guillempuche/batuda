@@ -1,8 +1,10 @@
+import { LanguageModel } from 'effect/unstable/ai'
 import { describe, expect, it } from 'vitest'
 
 import {
 	computeLlmCacheKey,
 	isLlmCacheable,
+	rehydrateCachedResponse,
 	stableStringifyForCache,
 } from './cached-llm'
 
@@ -101,6 +103,90 @@ describe('stableStringifyForCache', () => {
 
 		// THEN the function is omitted — two calls with different closures hash the same
 		expect(serialized).toBe('{"prompt":"x"}')
+	})
+})
+
+describe('rehydrateCachedResponse', () => {
+	// text, toolCalls, toolResults, and usage are all getters derived from
+	// `content`; the cache stores only `content` as JSON, so a Pg hit returns a
+	// bare object where those getters read undefined — the reflect loop then
+	// crashes iterating `response.toolResults`.
+	const content = [
+		{ type: 'text', text: 'Acme is a logistics company.' },
+		{
+			type: 'tool-call',
+			id: 'call_1',
+			name: 'scrape_page',
+			params: { url: 'https://acme.example' },
+		},
+		{
+			type: 'tool-result',
+			id: 'call_1',
+			name: 'scrape_page',
+			result: { url: 'https://acme.example', markdown: '# Acme' },
+			encodedResult: undefined,
+		},
+		{
+			type: 'finish',
+			reason: 'stop',
+			usage: {
+				inputTokens: {
+					uncached: undefined,
+					total: 12,
+					cacheRead: undefined,
+					cacheWrite: undefined,
+				},
+				outputTokens: { total: 7, text: undefined, reasoning: undefined },
+			},
+		},
+	] as ConstructorParameters<typeof LanguageModel.GenerateTextResponse>[0]
+
+	describe('when a text response is replayed from the JSON cache', () => {
+		it('should restore the getters a fresh generation would expose', () => {
+			// GIVEN a real text response serialized to the cache and read back (Pg hit)
+			const original = new LanguageModel.GenerateTextResponse(content)
+			const stored = JSON.parse(JSON.stringify(original)) as unknown
+
+			// THEN the bare JSON has lost its getters — the exact crash the loop hit
+			expect((stored as { toolResults?: unknown }).toolResults).toBeUndefined()
+
+			// WHEN it is rehydrated
+			const replayed = rehydrateCachedResponse(
+				'text',
+				stored,
+			) as typeof original
+
+			// THEN every getter behaves exactly like the fresh response
+			expect(replayed.toolResults.length).toBe(1)
+			expect((replayed.toolResults[0] as { name: string }).name).toBe(
+				'scrape_page',
+			)
+			expect(replayed.text).toBe(original.text)
+			expect(replayed.toolCalls.length).toBe(1)
+			expect(replayed.usage.inputTokens.total).toBe(12)
+		})
+	})
+
+	describe('when an object response is replayed', () => {
+		it('should restore the parsed value alongside the getters', () => {
+			// GIVEN a structured (object) response round-tripped through the cache
+			const original = new LanguageModel.GenerateObjectResponse(
+				{ company: 'Acme' },
+				content,
+			)
+			const stored = JSON.parse(JSON.stringify(original)) as unknown
+
+			// WHEN it is rehydrated as an object result
+			const replayed = rehydrateCachedResponse(
+				'object',
+				stored,
+			) as typeof original
+
+			// THEN both the parsed value and the derived getters come back
+			expect(replayed.value).toEqual({ company: 'Acme' })
+			expect(replayed.toolResults.length).toBe(1)
+			expect(replayed.text).toBe(original.text)
+		})
 	})
 })
 
