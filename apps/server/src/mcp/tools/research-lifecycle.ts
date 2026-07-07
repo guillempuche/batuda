@@ -240,15 +240,14 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 					yield* svc.softDelete(id)
 					return { status: 'deleted' as const }
 				}).pipe(redactDbErrors),
-			resolve_research_paid_action: ({ decision }) =>
-				// Placeholder: returns the resolution shape but the follow-up
-				// run that performs the paid call is not yet wired, so no DB
-				// writes happen here. needsApproval still gates approve.
-				Effect.succeed(
-					decision === 'approve'
-						? { status: 'approved' as const, followup_run_id: null }
-						: { status: 'skipped' as const },
-				),
+			resolve_research_paid_action: ({ id, paid_action_id, decision }) =>
+				Effect.gen(function* () {
+					if (decision === 'approve') {
+						const { userId } = yield* SessionContext
+						return yield* svc.approvePaidAction(id, paid_action_id, userId)
+					}
+					return yield* svc.skipPaidAction(id, paid_action_id)
+				}).pipe(redactDbErrors),
 			list_research_proposed_updates: ({ id }) =>
 				Effect.gen(function* () {
 					const run = yield* svc.get(id)
