@@ -61,6 +61,7 @@ export {
 	type ResearchEventType,
 	ResearchService,
 	type ToolLogEntry,
+	withProposalIds,
 } from './application/research-service'
 export type { SchemaName } from './application/schemas/index'
 // ── Application (schemas) ──────────────────────────────────────────────────

@@ -273,18 +273,43 @@ export const ResearchLive = HttpApiBuilder.group(
 					svc.bySubject(_.params.table, _.params.subjectId).pipe(Effect.orDie),
 				)
 				.handle('approvePaidAction', _ =>
-					// Follow-up run mechanic — creates a new
-					// kind='followup' run with the approved action.
-					// Placeholder for now.
-					Effect.succeed({
-						status: 'approved',
-						followup_run_id: null,
-					}),
+					Effect.gen(function* () {
+						const { userId } = yield* SessionContext
+						const result = yield* svc.approvePaidAction(
+							_.params.id,
+							_.params.paId,
+							userId,
+						)
+						if (
+							result.status === 'run_not_found' ||
+							result.status === 'action_not_found'
+						)
+							return yield* Effect.fail(
+								new NotFound({ entity: 'research', id: _.params.id }),
+							)
+						return result
+					}).pipe(
+						Effect.catch(e =>
+							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+						),
+					),
 				)
 				.handle('skipPaidAction', _ =>
-					Effect.succeed({
-						status: 'skipped',
-					}),
+					Effect.gen(function* () {
+						const result = yield* svc.skipPaidAction(_.params.id, _.params.paId)
+						if (
+							result.status === 'run_not_found' ||
+							result.status === 'action_not_found'
+						)
+							return yield* Effect.fail(
+								new NotFound({ entity: 'research', id: _.params.id }),
+							)
+						return result
+					}).pipe(
+						Effect.catch(e =>
+							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+						),
+					),
 				)
 				.handle('listPendingProposals', _ =>
 					Effect.gen(function* () {

@@ -13,12 +13,14 @@ import {
 	Queue,
 	Ref,
 	Schedule,
+	Schema,
 	ServiceMap,
 	Stream,
 } from 'effect'
 import { Prompt } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
+import { AcceptedCountry } from '../domain/country'
 import type { ResolvedPolicy } from '../domain/types'
 import { runAgentResearchLoop } from './agent-loop'
 import { makeBudgetLayer } from './budget'
@@ -28,12 +30,14 @@ import {
 	AgentLanguageModel,
 	Budget,
 	ExtractLanguageModel,
+	RegistryRouter,
 	ResearchEventSink,
 	ResearchRunContext,
 	WriterLanguageModel,
 } from './ports'
 import { type FreeformSchema, schemaRegistry } from './schemas/index'
 import { canonicalizeUrl, urlHashForScrape } from './source-key'
+import { REGISTRY_LOOKUP_COST_CENTS } from './tool-costs'
 import { researchToolkit, researchToolkitLayer } from './tools'
 import { verifyValueProvenance } from './value-guard'
 
@@ -97,11 +101,22 @@ export const schemaVersionFor = (schemaName: string): number => {
 	return match ? Number(match[1]) : 1
 }
 
+// Stamp each element of an in-findings review list with an id + pending status,
+// so it can later be addressed and resolved one at a time.
+const withPendingIds = (items: unknown): unknown =>
+	Array.isArray(items)
+		? items.map(item =>
+				typeof item === 'object' && item !== null && !Array.isArray(item)
+					? { id: randomUUID(), status: 'pending', ...item }
+					: item,
+			)
+		: items
+
 /**
- * Give each extracted proposed-update a stable id and a pending status before
- * the findings are stored, so a human can later apply or reject that exact
- * proposal by id (the apply surface addresses them by id). Non-object findings
- * and every other key pass through untouched.
+ * Give each entry in the two human-reviewed findings lists — the proposed CRM
+ * updates and the paid follow-up actions — a stable id and a pending status
+ * before the findings are stored, so a human can later resolve that exact entry
+ * by id. Non-object findings and every other key pass through untouched.
  */
 export const withProposalIds = (findings: unknown): unknown => {
 	if (
@@ -111,17 +126,18 @@ export const withProposalIds = (findings: unknown): unknown => {
 	)
 		return findings
 	const record = findings as Record<string, unknown>
-	const proposals = record['proposed_updates']
-	if (!Array.isArray(proposals)) return findings
+	const hasProposals = Array.isArray(record['proposed_updates'])
+	const hasPaidActions = Array.isArray(record['pending_paid_actions'])
+	// No list to stamp: hand the findings back untouched (same reference).
+	if (!hasProposals && !hasPaidActions) return findings
 	return {
 		...record,
-		proposed_updates: proposals.map(proposal =>
-			typeof proposal === 'object' &&
-			proposal !== null &&
-			!Array.isArray(proposal)
-				? { id: randomUUID(), status: 'pending', ...proposal }
-				: proposal,
-		),
+		...(hasProposals
+			? { proposed_updates: withPendingIds(record['proposed_updates']) }
+			: {}),
+		...(hasPaidActions
+			? { pending_paid_actions: withPendingIds(record['pending_paid_actions']) }
+			: {}),
 	}
 }
 
@@ -644,6 +660,146 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					yield* rollupParentStatus(parentId)
 				}).pipe(sql.withTransaction)
 
+			// Append a follow-up run's result onto the run that proposed it, under an
+			// advisory lock. Deliberately does NOT recompute the origin's status: the
+			// origin already finished, and the follow-up is extra evidence, not a child
+			// whose outcome should change the origin's.
+			const mergeFollowupToOrigin = (originId: string, result: unknown) =>
+				Effect.gen(function* () {
+					yield* sql`SELECT pg_advisory_xact_lock(hashtext(${originId}))`
+					yield* sql`
+						UPDATE research_runs
+						SET findings = jsonb_set(
+							findings,
+							'{followup_results}',
+							COALESCE(findings->'followup_results', '[]'::jsonb)
+								|| ${JSON.stringify([result])}::jsonb
+						),
+						updated_at = now()
+						WHERE id = ${originId}
+					`
+				}).pipe(sql.withTransaction)
+
+			// Run one approved paid action in a follow-up run. Only a registry lookup
+			// runs automatically — anything else is refused so an unrecognized action
+			// can never spend. Its arguments are validated, the run's budget + monthly
+			// cap are charged (fail-closed with no spend when over cap), and the result
+			// is merged back onto the origin run.
+			const runFollowup = (researchId: string, run: Record<string, unknown>) =>
+				Effect.gen(function* () {
+					// Read the context as raw text so its keys keep the snake_case they
+					// were stored with; the SQL client would otherwise camelCase every
+					// nested key and hide the paid action.
+					const [ctxRow] = yield* sql<{ context: string | null }>`
+						SELECT context::text AS context FROM research_runs WHERE id = ${researchId}
+					`
+					const paidContext = (
+						ctxRow?.context ? JSON.parse(ctxRow.context) : null
+					) as {
+						paid_action?: {
+							tool?: unknown
+							args?: unknown
+							origin_run_id?: unknown
+						}
+					} | null
+					const paidAction = paidContext?.paid_action
+					const originId =
+						typeof paidAction?.origin_run_id === 'string'
+							? paidAction.origin_run_id
+							: null
+					const tool = paidAction?.tool
+
+					const finishFailed = (error: string) =>
+						Effect.gen(function* () {
+							// Merge onto the origin before marking this run terminal, so a
+							// caller that sees the terminal status also sees the result —
+							// the origin write is durable before the followup reports done.
+							if (originId)
+								yield* mergeFollowupToOrigin(originId, {
+									tool: typeof tool === 'string' ? tool : null,
+									error,
+								})
+							yield* sql`
+								UPDATE research_runs
+								SET status = 'failed',
+									findings = ${JSON.stringify({ error })},
+									completed_at = now(), updated_at = now()
+								WHERE id = ${researchId} AND status = 'running'
+							`
+							yield* publishEvent(researchId, 'run.failed', { error })
+						})
+
+					if (!originId)
+						return yield* finishFailed('follow-up run has no origin')
+					if (tool !== 'registry_lookup')
+						return yield* finishFailed(`unsupported paid tool: ${String(tool)}`)
+
+					const args = (paidAction?.args ?? {}) as {
+						country?: unknown
+						tax_id?: unknown
+						query?: unknown
+					}
+					const countryRaw =
+						typeof args.country === 'string' ? args.country.toUpperCase() : null
+					if (!countryRaw)
+						return yield* finishFailed('registry_lookup requires a country')
+					if (!Schema.is(AcceptedCountry)(countryRaw))
+						return yield* finishFailed(`unsupported country: ${countryRaw}`)
+					const country = countryRaw
+					const taxId =
+						typeof args.tax_id === 'string' ? args.tax_id : undefined
+					const query = typeof args.query === 'string' ? args.query : undefined
+
+					const organizationId = (run as { organizationId: string })
+						.organizationId
+					const createdBy =
+						(run as { createdBy: string | null }).createdBy ?? ''
+					const policy = (run as { paidPolicy: ResolvedPolicy }).paidPolicy
+					const budgetLayer = makeBudgetLayer({
+						organizationId,
+						userId: createdBy,
+						researchId,
+						policy,
+						systemCeiling: monthlyCapHardCeilingCents,
+					}).pipe(Layer.provide(Layer.succeed(SqlClient.SqlClient)(sql)))
+
+					const outcome = yield* Effect.gen(function* () {
+						const budget = yield* Budget
+						const registry = yield* RegistryRouter
+						// Deterministic key: an approve-retry reuses the same follow-up id,
+						// so re-charging the same lookup is a no-op, never a double spend.
+						const key = `${researchId}:registry:${country}:${taxId ?? query ?? ''}`
+						yield* budget.chargePaid(
+							'registry',
+							REGISTRY_LOOKUP_COST_CENTS,
+							key,
+						)
+						return yield* registry.lookup({ country, taxId, query })
+					}).pipe(Effect.provide(budgetLayer), Effect.result)
+
+					if (outcome._tag === 'Failure') {
+						// Over the monthly cap the charge is refused before any spend row
+						// is written, so this fails closed with no money moved.
+						const err = outcome.failure as { _tag?: string }
+						return yield* finishFailed(err._tag ?? 'paid lookup failed')
+					}
+
+					// Merge onto the origin before marking this run terminal, so a caller
+					// that sees 'succeeded' also sees the result already recorded.
+					yield* mergeFollowupToOrigin(originId, {
+						tool: 'registry_lookup',
+						result: outcome.success,
+					})
+					yield* sql`
+						UPDATE research_runs
+						SET status = 'succeeded',
+							findings = ${JSON.stringify({ paid_action_result: outcome.success })},
+							completed_at = now(), updated_at = now()
+						WHERE id = ${researchId} AND status = 'running'
+					`
+					yield* publishEvent(researchId, 'run.succeeded', {})
+				})
+
 			// Release a run's in-memory resources on any exit — success, failure, or
 			// an interrupt while it is still waiting for a concurrency slot. Applied
 			// around the whole job below (permit wait included), not inside it, so a
@@ -737,6 +893,13 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					const subjects = context?.subjects
 						? yield* snapshotSubjects(context.subjects)
 						: []
+
+					// A follow-up run performs one approved paid call instead of the
+					// normal research loop, then merges the result onto the origin run.
+					if ((run as { kind?: string }).kind === 'followup') {
+						yield* runFollowup(researchId, run as Record<string, unknown>)
+						return
+					}
 
 					// Resolve the schema
 					const outputSchema = schemaRegistry[schemaName]
@@ -1911,6 +2074,115 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							`
 						}
 						return { outcome }
+					}),
+
+				/**
+				 * Approve a pending paid action: spawn a follow-up run that performs
+				 * the paid call and merges its result onto the origin run. Idempotent —
+				 * a re-approve returns the follow-up already spawned rather than
+				 * charging again.
+				 */
+				approvePaidAction: (runId: string, paId: string, userId: string) =>
+					Effect.gen(function* () {
+						const [origin] = yield* sql<{
+							findings: string | null
+							organizationId: string
+							paidPolicy: string | null
+							createdBy: string | null
+						}>`
+							SELECT findings::text AS findings, organization_id,
+								paid_policy::text AS paid_policy, created_by
+							FROM research_runs WHERE id = ${runId}
+						`
+						if (!origin) return { status: 'run_not_found' as const }
+						const findings = (
+							origin.findings ? JSON.parse(origin.findings) : null
+						) as {
+							pending_paid_actions?: Array<Record<string, unknown>>
+						} | null
+						const actions = findings?.pending_paid_actions ?? []
+						const index = actions.findIndex(a => a['id'] === paId)
+						if (index === -1) return { status: 'action_not_found' as const }
+						const action = actions[index] as Record<string, unknown>
+						const existing = action['followup_run_id']
+						if (typeof existing === 'string')
+							return { status: 'approved' as const, followup_run_id: existing }
+						if (action['status'] !== 'pending')
+							return { status: 'not_pending' as const }
+						if (action['tool'] !== 'registry_lookup')
+							return { status: 'unsupported_tool' as const }
+
+						const paidPolicy = origin.paidPolicy
+							? (JSON.parse(origin.paidPolicy) as {
+									budgetCents?: number
+									paidBudgetCents?: number
+								})
+							: {}
+						const followupContext = {
+							paid_action: {
+								tool: action['tool'],
+								args: action['args'] ?? {},
+								origin_run_id: runId,
+								action_id: paId,
+							},
+						}
+						const [followup] = yield* sql<{ id: string }>`
+							INSERT INTO research_runs (
+								organization_id, parent_id, query, mode, kind, status, context,
+								budget_cents, paid_budget_cents, paid_policy, created_by
+							) VALUES (
+								${origin.organizationId}, ${runId}, 'paid follow-up', 'deep',
+								'followup', 'queued', ${JSON.stringify(followupContext)},
+								${paidPolicy.budgetCents ?? 0}, ${paidPolicy.paidBudgetCents ?? 0},
+								${origin.paidPolicy ?? '{}'}::jsonb, ${origin.createdBy ?? userId}
+							) RETURNING id
+						`
+						const followupId = (followup as { id: string }).id
+						yield* sql`
+							UPDATE research_runs SET findings = jsonb_set(
+								jsonb_set(
+									findings,
+									${`{pending_paid_actions,${index},status}`}::text[],
+									'"approved"'::jsonb
+								),
+								${`{pending_paid_actions,${index},followup_run_id}`}::text[],
+								${JSON.stringify(followupId)}::jsonb
+							), updated_at = now() WHERE id = ${runId}
+						`
+						const pubsub = yield* PubSub.unbounded<ResearchEvent>()
+						yield* Ref.update(activePubSubs, m =>
+							HashMap.set(m, followupId, pubsub),
+						)
+						yield* Queue.offer(dispatch, {
+							researchId: followupId,
+							userId: origin.createdBy ?? userId,
+						})
+						return { status: 'approved' as const, followup_run_id: followupId }
+					}),
+
+				/** Skip a pending paid action: record the decision, spend nothing. */
+				skipPaidAction: (runId: string, paId: string) =>
+					Effect.gen(function* () {
+						const [origin] = yield* sql<{ findings: string | null }>`
+							SELECT findings::text AS findings FROM research_runs WHERE id = ${runId}
+						`
+						if (!origin) return { status: 'run_not_found' as const }
+						const findings = (
+							origin.findings ? JSON.parse(origin.findings) : null
+						) as {
+							pending_paid_actions?: Array<Record<string, unknown>>
+						} | null
+						const actions = findings?.pending_paid_actions ?? []
+						const index = actions.findIndex(a => a['id'] === paId)
+						if (index === -1) return { status: 'action_not_found' as const }
+						yield* sql`
+							UPDATE research_runs SET findings = jsonb_set(
+								findings,
+								${`{pending_paid_actions,${index},status}`}::text[],
+								'"skipped"'::jsonb
+							), updated_at = now() WHERE id = ${runId}
+						`
+						return { status: 'skipped' as const }
 					}),
 
 				/** Get user's research policy. */
