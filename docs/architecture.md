@@ -472,12 +472,15 @@ research_runs       — one row per research run (leaf, group, or followup)
                       findings (jsonb), brief_md, tool_log, cost tracking columns
 sources             — globally deduped web/registry/report sources (keyed by url_hash)
 research_run_sources — many-to-many: runs ↔ sources (with local_ref citation key)
-research_links      — polymorphic: runs ↔ companies/contacts (input or finding)
+research_links      — polymorphic: runs ↔ companies/contacts (input or finding);
+                      citations (jsonb) carries the applied row's provenance trail
 research_paid_spend — audit log: every paid API call with idempotency_key
-user_research_policy — per-user budget/quota preferences
+user_research_policy — per-user budget/quota preferences + auto_apply_min_confidence
 provider_quotas     — per-user per-provider quota config (monthly plan or pay-per-call)
 provider_usage      — consumption counter per provider per billing period
 ```
+
+**Retention.** A scheduled sweep (`ResearchRetention`, in `ServicesLive`) runs hourly and prunes storage that would otherwise grow unbounded: expired cache rows (their TTL only gates reads), the `research_text` + `tool_log` transcript of runs older than `RESEARCH_RETENTION_DAYS` (default 90), and scrape blobs whose `sources` row no surviving run fetches and no applied contact cites. It keeps the run rows, `sources`, `research_run_sources`, and `research_links.citations`, so a contact's provenance trail survives the prune (`docs/backend-research.md` §21.3).
 
 ### Better Auth tables (auto-managed)
 

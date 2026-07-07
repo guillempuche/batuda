@@ -76,6 +76,7 @@ import { PipelineService } from './services/pipeline'
 import { RecordingService } from './services/recordings'
 import { resolveResearchProposedUpdate } from './services/research-apply'
 import { ResearchBlobStorageLive } from './services/research-blob-storage'
+import { ResearchRetention } from './services/research-retention'
 import { S3StorageProviderLive } from './services/s3-storage-provider'
 import { TaskService } from './services/tasks'
 import {
@@ -323,6 +324,9 @@ const ServicesLive = Layer.mergeAll(
 	InboxHealthProbe.daemonLayer.pipe(Layer.provide(InboxHealthProbe.layer)),
 	// Same `never`-output trick; EmailAttachmentStaging is supplied via the `provideMerge` below.
 	EmailAttachmentStaging.sweepDaemonLayer,
+	// Prunes expired research caches, old run transcripts, and orphaned scrape
+	// blobs. Same `never`-output trick; the service is supplied below.
+	ResearchRetention.sweepDaemonLayer,
 ).pipe(
 	// CalendarService sits below EmailService because EmailService's
 	// inbound-webhook path delegates text/calendar parts to it. Keep
@@ -330,6 +334,7 @@ const ServicesLive = Layer.mergeAll(
 	// CalendarService still see it in the merged service map.
 	Layer.provideMerge(CalendarService.layer),
 	Layer.provideMerge(EmailAttachmentStaging.layer),
+	Layer.provideMerge(ResearchRetention.layer),
 	Layer.provideMerge(DraftStore.layer),
 	// The sink resolves the enriched company and geocodes it, so it needs
 	// CompanyService + Geocoder at build time. They live in the merged base
