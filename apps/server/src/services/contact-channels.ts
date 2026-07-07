@@ -21,6 +21,22 @@ export interface ChannelInput {
 type Sql = SqlClient.SqlClient
 
 /**
+ * Normalize a channel confidence to the 0–100 whole number the column stores.
+ * Sources disagree on scale: the research model reports a 0–1 fraction, while
+ * email-verification and enrichment scores already arrive on 0–100. A value up
+ * to 1 is read as a fraction and scaled up; anything above 1 is treated as an
+ * already-scaled score. The result is rounded and kept within 0–100 so no
+ * fractional or out-of-range value can reach the whole-number column.
+ */
+export const clampConfidence = (
+	confidence: number | null | undefined,
+): number | null => {
+	if (confidence == null || !Number.isFinite(confidence)) return null
+	const score = confidence <= 1 ? confidence * 100 : confidence
+	return Math.round(Math.max(0, Math.min(100, score)))
+}
+
+/**
  * Upsert channels for a contact — additive: re-discovering a handle refreshes
  * it in place and never deletes the others. `status` is deliberately left out
  * of the conflict update so a prior bounced/complained verdict survives.
@@ -38,7 +54,7 @@ export const writeChannels = (
 				(organization_id, contact_id, kind, value, verification, confidence, is_primary)
 			VALUES (
 				${orgId}, ${contactId}, ${c.kind}, ${c.value},
-				${c.verification ?? null}, ${c.confidence ?? null}, ${c.is_primary ?? false}
+				${c.verification ?? null}, ${clampConfidence(c.confidence)}, ${c.is_primary ?? false}
 			)
 			ON CONFLICT (contact_id, kind, value) DO UPDATE SET
 				verification = EXCLUDED.verification,
@@ -69,7 +85,7 @@ export const addChannel = (
 			(organization_id, contact_id, kind, value, verification, confidence, is_primary)
 		VALUES (
 			${orgId}, ${contactId}, ${c.kind}, ${c.value},
-			${c.verification ?? null}, ${c.confidence ?? null}, ${c.is_primary ?? false}
+			${c.verification ?? null}, ${clampConfidence(c.confidence)}, ${c.is_primary ?? false}
 		)
 		ON CONFLICT (contact_id, kind, value) DO UPDATE SET
 			is_primary = EXCLUDED.is_primary,

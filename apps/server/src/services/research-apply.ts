@@ -219,6 +219,86 @@ const occUpdate = (
 				RETURNING version
 			`
 
+// Record that a contact row came from this run, so the timeline and provenance
+// can trace it back to its evidence. Idempotent — re-applying the same finding
+// leaves a single link.
+const linkContactToRun = (
+	sql: SqlClient.SqlClient,
+	orgId: string,
+	runId: string,
+	contactId: string,
+) =>
+	sql`
+		INSERT INTO research_links (organization_id, research_id, subject_table, subject_id, link_kind)
+		VALUES (${orgId}, ${runId}, 'contacts', ${contactId}, 'finding')
+		ON CONFLICT DO NOTHING
+	`
+
+// A create proposal describes a newly discovered person. Before inserting a
+// fresh row, look for one that is already the same person, so two runs on the
+// same contact don't leave two rows. In order of strength: (1) a contact already
+// reachable at one of the proposed channel values, matched on the (kind, value)
+// pair so a shared switchboard number can't merge two different people; (2) one
+// the model itself flagged as already existing; (3) same name under the same
+// company.
+export const findDuplicateContact = (
+	sql: SqlClient.SqlClient,
+	orgId: string,
+	name: string,
+	companyId: string,
+	channels: ReadonlyArray<ChannelInput>,
+	discoveredExisting: ReadonlyArray<{
+		subject_table?: string
+		subject_id?: string
+		name?: string
+	}>,
+) =>
+	Effect.gen(function* () {
+		const searchableChannels = channels.filter(c => c.value.length > 0)
+		if (searchableChannels.length > 0) {
+			const pairs = searchableChannels.map(
+				c => sql`(kind = ${c.kind} AND value = ${c.value})`,
+			)
+			const rows = yield* sql<{ contactId: string }>`
+				SELECT contact_id FROM contact_channels
+				WHERE organization_id = ${orgId} AND (${sql.or(pairs)})
+				LIMIT 1
+			`
+			if (rows[0]) return rows[0].contactId
+		}
+
+		const flagged = discoveredExisting.find(
+			e =>
+				e.subject_table === 'contacts' &&
+				typeof e.subject_id === 'string' &&
+				typeof e.name === 'string' &&
+				e.name.trim().toLowerCase() === name.trim().toLowerCase(),
+		)
+		if (flagged?.subject_id) {
+			// The id came from the model, so a value that isn't a UUID would trip
+			// text parsing (22P02); treat that as simply no match.
+			const rows = yield* sql<{ id: string }>`
+				SELECT id FROM contacts
+				WHERE id = ${flagged.subject_id} AND organization_id = ${orgId}
+				LIMIT 1
+			`.pipe(
+				Effect.catchTag('SqlError', () =>
+					Effect.succeed([] as ReadonlyArray<{ id: string }>),
+				),
+			)
+			if (rows[0]) return rows[0].id
+		}
+
+		const byName = yield* sql<{ id: string }>`
+			SELECT id FROM contacts
+			WHERE organization_id = ${orgId}
+				AND company_id = ${companyId}
+				AND lower(name) = lower(${name})
+			LIMIT 1
+		`
+		return byName[0]?.id ?? null
+	})
+
 export type ResolveOutcome =
 	| {
 			readonly outcome: 'applied'
@@ -231,6 +311,14 @@ export type ResolveOutcome =
 			readonly subject_table: 'contacts'
 			readonly subject_id: string
 			readonly version: number
+	  }
+	| {
+			// A create proposal for a person who already has a contact row: the
+			// discovered channels were merged onto the existing row instead of
+			// inserting a second contact.
+			readonly outcome: 'duplicate'
+			readonly subject_table: 'contacts'
+			readonly subject_id: string
 	  }
 	| { readonly outcome: 'rejected' }
 	| { readonly outcome: 'conflict' }
@@ -262,8 +350,14 @@ export const resolveResearchProposedUpdate = (
 		// `proposed_updates` to `proposedUpdates` and hide every proposal.
 		const findings = (run.findings ? JSON.parse(run.findings) : null) as {
 			proposed_updates?: Array<Record<string, unknown>>
+			discovered_existing?: Array<{
+				subject_table?: string
+				subject_id?: string
+				name?: string
+			}>
 		} | null
 		const proposals = findings?.proposed_updates ?? []
+		const discoveredExisting = findings?.discovered_existing ?? []
 		const index = proposals.findIndex(
 			p => p['id'] === proposedUpdateId && p['status'] === 'pending',
 		)
@@ -285,6 +379,29 @@ export const resolveResearchProposedUpdate = (
 					outcome: 'invalid',
 					reason: created.reason,
 				} satisfies ResolveOutcome
+			const existingId = yield* findDuplicateContact(
+				sql,
+				org.id,
+				typeof created.fields['name'] === 'string'
+					? (created.fields['name'] as string)
+					: '',
+				created.companyId,
+				created.channels,
+				discoveredExisting,
+			)
+			if (existingId) {
+				// Merge the discovered channels onto the person's existing row
+				// (additive — the human-owned scalar fields stay untouched) and link
+				// the run, rather than inserting a second contact for the same person.
+				yield* writeChannels(sql, org.id, existingId, created.channels)
+				yield* linkContactToRun(sql, org.id, runId, existingId)
+				yield* setProposalStatus(sql, runId, org.id, index, 'applied')
+				return {
+					outcome: 'duplicate',
+					subject_table: 'contacts',
+					subject_id: existingId,
+				} satisfies ResolveOutcome
+			}
 			const inserted = yield* sql<{ id: string; version: number }>`
 				INSERT INTO contacts ${sql.insert({
 					...created.fields,
@@ -317,11 +434,7 @@ export const resolveResearchProposedUpdate = (
 				} satisfies ResolveOutcome
 			// Deliverability verdict + confidence land on the channels, not the row.
 			yield* writeChannels(sql, org.id, row.id, created.channels)
-			yield* sql`
-				INSERT INTO research_links (organization_id, research_id, subject_table, subject_id, link_kind)
-				VALUES (${org.id}, ${runId}, 'contacts', ${row.id}, 'finding')
-				ON CONFLICT DO NOTHING
-			`
+			yield* linkContactToRun(sql, org.id, runId, row.id)
 			yield* setProposalStatus(sql, runId, org.id, index, 'applied')
 			return {
 				outcome: 'created',
