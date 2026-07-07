@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-07 (server-v2026.7.7)
+
+### Features
+
+* add cross-run review inbox and type review endpoints ([bbf3a56](https://github.com/guillempuche/batuda/commit/bbf3a5663f99c6b68a173acb96633cef68d5d544))
+* apply or reject many research proposals in one call ([1f3aeb2](https://github.com/guillempuche/batuda/commit/1f3aeb2cca8d291eccf3a63fb718029e9f2f3932))
+* auto-apply high-confidence verified research findings ([99814b8](https://github.com/guillempuche/batuda/commit/99814b85c7d2158789e01059e408ff8b53acd791))
+* execute an approved paid research follow-up safely ([bb86d93](https://github.com/guillempuche/batuda/commit/bb86d93684f139c700f6f37a34e3a7db2d14edf7))
+* fan a selector run out across matching companies ([94be140](https://github.com/guillempuche/batuda/commit/94be140f6e369f12b7ed26d0bc73e2ff69c7e3ad))
+* prune research storage on a schedule ([421fb24](https://github.com/guillempuche/batuda/commit/421fb24543f0f384ca6add2ec663680c47474ea5))
+* record who applied a research suggestion to the CRM ([da1304e](https://github.com/guillempuche/batuda/commit/da1304e0c881d2121b7dff3ed249327596d78f11))
+* **server:** trace applied research rows back to their sources ([a8c06fc](https://github.com/guillempuche/batuda/commit/a8c06fc63d618b3abc91ab1cb96043ea37896891))
+
+### Bug Fixes
+
+* **server:** store confidence scores and avoid duplicate contacts ([ca342a7](https://github.com/guillempuche/batuda/commit/ca342a7ad9791963ed985eb2cb3d7434b8509fb9))
+
 ## 2026-07-06 (server-v2026.7.6-1)
 
 ## 2026-07-06 (server-v2026.7.6)
