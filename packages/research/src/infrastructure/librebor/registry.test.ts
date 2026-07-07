@@ -167,6 +167,17 @@ describe('makeLibreborRegistry', () => {
 		expect(log.count).toBe(1)
 	})
 
+	it('should not expose the raw provider payload', async () => {
+		// GIVEN a resolved NIF lookup
+		const { exit } = runLookup({ country: 'ES', taxId: 'A46103834' }, () => ({
+			status: 200,
+			body: companyBody(),
+		}))
+		// THEN the parsed record carries no raw passthrough duplicating its fields
+		const rec = recordOf(await exit)
+		expect(Object.keys(rec ?? {})).not.toContain('raw')
+	})
+
 	it('should send HTTP Basic auth from the AccessId:AccessKey pair', async () => {
 		// GIVEN any successful lookup with the credential pair "id:key"
 		const { exit, log } = runLookup(

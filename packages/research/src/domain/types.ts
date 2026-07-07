@@ -75,7 +75,6 @@ export class RegistryRecord extends Schema.Class<RegistryRecord>(
 			}),
 		),
 	),
-	raw: Schema.optional(Schema.Unknown),
 	units: Schema.Number,
 }) {}
 

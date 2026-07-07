@@ -177,6 +177,17 @@ describe('makeCompaniesHouseRegistry', () => {
 			expect(log.count).toBe(2)
 		})
 
+		it('should not expose the raw provider payload or any resigned officer', async () => {
+			// GIVEN the same lookup whose officers include a resigned director
+			const { exit } = runLookup({ country: 'GB', taxId: '12345678' }, routeOk)
+			// WHEN the record is built
+			const rec = recordOf(await exit)
+			// THEN there is no raw passthrough, and the resigned officer that used
+			// to ride along in raw.officers is nowhere in the record
+			expect(Object.keys(rec ?? {})).not.toContain('raw')
+			expect(JSON.stringify(rec)).not.toContain('OLD')
+		})
+
 		it('should authenticate with the key as the Basic username', async () => {
 			// GIVEN any successful lookup with key "chkey"
 			const { exit, log } = runLookup(
