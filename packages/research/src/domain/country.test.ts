@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
 	AcceptedCountry,
 	isRegistryCountry,
+	parseCountryAlpha2,
 	REGISTRY_COUNTRIES,
 } from './country'
 
@@ -74,6 +75,59 @@ describe('isRegistryCountry', () => {
 			// WHEN a lowercase registry code is checked
 			// THEN it is not recognized
 			expect(isRegistryCountry('es')).toBe(false)
+		})
+	})
+})
+
+describe('parseCountryAlpha2', () => {
+	describe('when the hint is already a two-letter code', () => {
+		it('should upper-case it', () => {
+			// GIVEN a bare alpha-2 in either case
+			// WHEN it is parsed
+			// THEN it is normalized to upper-case (adapters re-case per API)
+			expect(parseCountryAlpha2('US')).toBe('US')
+			expect(parseCountryAlpha2('us')).toBe('US')
+			expect(parseCountryAlpha2('es')).toBe('ES')
+		})
+
+		it('should ignore surrounding whitespace', () => {
+			// GIVEN a code padded with spaces
+			// WHEN it is parsed
+			// THEN the code is trimmed and upper-cased
+			expect(parseCountryAlpha2('  gb ')).toBe('GB')
+		})
+
+		it('should accept any two letters without an ISO lookup', () => {
+			// GIVEN a two-letter token that is not a real country (e.g. a language)
+			// WHEN it is parsed
+			// THEN it still passes through, matching AcceptedCountry's shape-only
+			// rule — we deliberately ship no country table (the model sends valid
+			// hints), so this is a known, documented limitation
+			expect(parseCountryAlpha2('en')).toBe('EN')
+		})
+	})
+
+	describe('when the hint is a language-and-region locale', () => {
+		it('should keep only the region subtag', () => {
+			// GIVEN a locale the model commonly sends (the exact 422 trigger)
+			// WHEN it is parsed
+			// THEN just the region is kept, upper-cased — never the whole locale
+			expect(parseCountryAlpha2('en-US')).toBe('US')
+			expect(parseCountryAlpha2('es-ES')).toBe('ES')
+			expect(parseCountryAlpha2('es_ES')).toBe('ES')
+		})
+	})
+
+	describe('when the hint is not a recognizable country', () => {
+		it('should drop it so no invalid country reaches the search API', () => {
+			// GIVEN a full name, a language-only tag, junk, empty, or missing input
+			// WHEN each is parsed
+			// THEN nothing is returned and the caller omits the country param
+			expect(parseCountryAlpha2('United States')).toBeUndefined()
+			expect(parseCountryAlpha2('USA')).toBeUndefined()
+			expect(parseCountryAlpha2('123')).toBeUndefined()
+			expect(parseCountryAlpha2('')).toBeUndefined()
+			expect(parseCountryAlpha2(undefined)).toBeUndefined()
 		})
 	})
 })

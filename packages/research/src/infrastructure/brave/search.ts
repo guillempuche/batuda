@@ -12,6 +12,7 @@ import { Config, Effect, Layer, Redacted, Schema } from 'effect'
 import { HttpClient, HttpClientResponse } from 'effect/unstable/http'
 
 import { type SearchInput, SearchProvider } from '../../application/ports'
+import { parseCountryAlpha2 } from '../../domain/country'
 import { ProviderError } from '../../domain/errors'
 import { SearchResult, SearchResultItem } from '../../domain/types'
 import { keyForSlot } from '../_config'
@@ -59,6 +60,9 @@ export const makeBraveSearch = (slot: number) =>
 			search: (input: SearchInput) =>
 				harden(
 					Effect.gen(function* () {
+						// Brave's `country` wants an upper-case two-letter code; a raw model
+						// hint like "en-US" is invalid, so normalize it or leave it out.
+						const country = parseCountryAlpha2(input.location)
 						const response = yield* client
 							.get('https://api.search.brave.com/res/v1/web/search', {
 								headers: {
@@ -74,7 +78,7 @@ export const makeBraveSearch = (slot: number) =>
 									...(input.recency
 										? { freshness: freshnessForRecency(input.recency.days) }
 										: {}),
-									...(input.location ? { country: input.location } : {}),
+									...(country ? { country } : {}),
 									...(input.languages?.[0]
 										? { search_lang: input.languages[0] }
 										: {}),
