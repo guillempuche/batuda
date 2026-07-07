@@ -172,4 +172,40 @@ describe('resolveResearchProposedUpdatesBatch', () => {
 			expect(rows.rows[0]?.role).toBe('CTO')
 		})
 	})
+
+	describe('when an update proposal has a non-UUID subject_id', () => {
+		it('should report it invalid rather than crash on the bad id', async () => {
+			// GIVEN a run whose update proposal carries a hallucinated non-UUID id
+			// with an otherwise valid fields object, so only the id disqualifies it
+			const run = await pool.query<{ id: string }>(
+				`INSERT INTO research_runs (organization_id, query, status, created_by, findings)
+				 VALUES ($1, 'q', 'succeeded', 'u1', $2::jsonb) RETURNING id`,
+				[
+					ORG,
+					JSON.stringify({
+						proposed_updates: [
+							proposal({
+								id: 'bad',
+								subject_table: 'contacts',
+								operation: 'update',
+								subject_id: 'not-a-uuid',
+								expected_version: 0,
+								fields: { role: 'Ghost' },
+							}),
+						],
+					}),
+				],
+			)
+			const badRunId = run.rows[0]!.id
+
+			// WHEN it is applied
+			const results = await runBatch([
+				{ researchId: badRunId, proposedUpdateId: 'bad', decision: 'apply' },
+			])
+
+			// THEN the bad id is reported as invalid, not raised as a server error
+			expect(results).toHaveLength(1)
+			expect(results[0]?.outcome).toBe('invalid')
+		})
+	})
 })
