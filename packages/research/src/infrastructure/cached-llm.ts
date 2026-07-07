@@ -20,7 +20,7 @@
 import { createHash } from 'node:crypto'
 
 import { Cache, Duration, Effect, Option } from 'effect'
-import type { LanguageModel } from 'effect/unstable/ai'
+import { LanguageModel } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
 export type LlmTier = 'agent' | 'extract' | 'writer'
@@ -59,6 +59,24 @@ export const isLlmCacheable = (options: unknown): boolean => {
 	const temperature = o['temperature']
 	if (typeof temperature === 'number' && temperature > 0) return false
 	return true
+}
+
+// A cached response is stored as plain JSON of its parts, which loses the
+// helpers that read back its text, tool calls, and tool results. Rebuild the
+// proper response object from those parts so a cache hit behaves exactly like a
+// fresh answer — otherwise the research loop reads nothing back for its tool
+// results and crashes the whole run.
+export const rehydrateCachedResponse = (
+	method: 'text' | 'object',
+	raw: unknown,
+): unknown => {
+	const row = (raw ?? {}) as { content?: unknown; value?: unknown }
+	const content = (
+		Array.isArray(row.content) ? row.content : []
+	) as ConstructorParameters<typeof LanguageModel.GenerateTextResponse>[0]
+	return method === 'object'
+		? new LanguageModel.GenerateObjectResponse(row.value, content)
+		: new LanguageModel.GenerateTextResponse(content)
 }
 
 const promptPreview = (options: unknown): string => {
@@ -186,11 +204,15 @@ export const makeCachedLanguageModel = (
 				const hit = hits[0]
 				if (hit) {
 					yield* bumpHitCount(keyHash)
-					yield* Cache.set(memCache, keyHash, hit.response)
+					// Storing JSON dropped the response class, so rebuild it before
+					// use and keep the rebuilt one in memory — the mem-hit path above
+					// then always hands back a usable response, never bare JSON.
+					const response = rehydrateCachedResponse(method, hit.response)
+					yield* Cache.set(memCache, keyHash, response)
 					yield* Effect.logDebug('cache.hit').pipe(
 						Effect.annotateLogs({ ...baseAttrs, layer: 'pg' }),
 					)
-					return hit.response as A
+					return response as A
 				}
 
 				const response = yield* call
