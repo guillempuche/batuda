@@ -490,6 +490,11 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 			const monthlyCapHardCeilingCents = yield* Config.int(
 				'RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS',
 			).pipe(Config.withDefault(10000))
+			// Most companies one selector run may fan out across, so a broad filter
+			// can't spawn an unbounded number of leaf runs.
+			const selectorMaxCompanies = yield* Config.int(
+				'RESEARCH_SELECTOR_MAX_COMPANIES',
+			).pipe(Config.withDefault(100))
 			const fiberSem = yield* PartitionedSemaphore.make<string>({
 				permits: maxConcurrentFibersTotal,
 			})
@@ -588,6 +593,30 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					return snapshots
 				})
 
+			// Recompute a group parent's status from its children: still running if
+			// any child is in flight, failed if any finished without success, else
+			// succeeded. Sets completed_at once no child is in flight.
+			const rollupParentStatus = (parentId: string) =>
+				sql`
+					UPDATE research_runs
+					SET status = CASE
+						WHEN (SELECT COUNT(*) FILTER (WHERE status IN ('queued','running'))
+							FROM research_runs WHERE parent_id = ${parentId} AND status != 'deleted') > 0
+						THEN 'running'
+						WHEN (SELECT COUNT(*) FILTER (WHERE status IN ('failed', 'no_reliable_data'))
+							FROM research_runs WHERE parent_id = ${parentId} AND status != 'deleted') > 0
+						THEN 'failed'
+						ELSE 'succeeded'
+					END,
+					completed_at = CASE
+						WHEN (SELECT COUNT(*) FILTER (WHERE status IN ('queued','running'))
+							FROM research_runs WHERE parent_id = ${parentId} AND status != 'deleted') = 0
+						THEN now() ELSE completed_at
+					END,
+					updated_at = now()
+					WHERE id = ${parentId}
+				`
+
 			/** Merge leaf findings into parent group row (advisory-locked). */
 			const mergeToParent = (parentId: string, leafFindings: unknown) =>
 				Effect.gen(function* () {
@@ -603,26 +632,16 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						updated_at = now()
 						WHERE id = ${parentId}
 					`
-					// Rollup parent status based on children (inside same lock)
-					yield* sql`
-						UPDATE research_runs
-						SET status = CASE
-							WHEN (SELECT COUNT(*) FILTER (WHERE status IN ('queued','running'))
-								FROM research_runs WHERE parent_id = ${parentId} AND status != 'deleted') > 0
-							THEN 'running'
-							WHEN (SELECT COUNT(*) FILTER (WHERE status IN ('failed', 'no_reliable_data'))
-								FROM research_runs WHERE parent_id = ${parentId} AND status != 'deleted') > 0
-							THEN 'failed'
-							ELSE 'succeeded'
-						END,
-						completed_at = CASE
-							WHEN (SELECT COUNT(*) FILTER (WHERE status IN ('queued','running'))
-								FROM research_runs WHERE parent_id = ${parentId} AND status != 'deleted') = 0
-							THEN now() ELSE completed_at
-						END,
-						updated_at = now()
-						WHERE id = ${parentId}
-					`
+					yield* rollupParentStatus(parentId)
+				}).pipe(sql.withTransaction)
+
+			// Roll a group parent up from its children under the same advisory lock,
+			// without appending findings — used when a leaf ends without success, so
+			// an all-failed group still resolves instead of hanging.
+			const rollupParentLocked = (parentId: string) =>
+				Effect.gen(function* () {
+					yield* sql`SELECT pg_advisory_xact_lock(hashtext(${parentId}))`
+					yield* rollupParentStatus(parentId)
 				}).pipe(sql.withTransaction)
 
 			// Release a run's in-memory resources on any exit — success, failure, or
@@ -1134,6 +1153,8 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						yield* publishEvent(researchId, 'run.no_reliable_data', {
 							sourceCount: sources?.n ?? 0,
 						})
+						const parentGroupId = (run as { parentId: string | null }).parentId
+						if (parentGroupId) yield* rollupParentLocked(parentGroupId)
 						return
 					}
 
@@ -1205,6 +1226,13 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 								yield* publishEvent(researchId, 'run.failed', {
 									error: detail,
 								})
+								// If this leaf belongs to a group, roll the parent up now so
+								// an all-failed group resolves instead of hanging in 'running'.
+								const [failedParent] = yield* sql<{
+									parentId: string | null
+								}>`SELECT parent_id FROM research_runs WHERE id = ${researchId}`
+								if (failedParent?.parentId)
+									yield* rollupParentLocked(failedParent.parentId)
 							})
 						}
 						// Pure interrupt (cancel/shutdown): propagate it; the cancel
@@ -1428,6 +1456,130 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 								autoApprovePaidCents: input.autoApprovePaidCents,
 							},
 						})
+
+						// A selector fans the run out across matching companies: one
+						// group parent plus a leaf run per company, sharing this run's
+						// policy and instructions. The group's status rolls up from the
+						// leaves as they finish. This runs after (and instead of) the
+						// cache check above — a fan-out is not one cacheable result.
+						const selector = input.context?.selector
+						if (selector) {
+							const selectorMax = selectorMaxCompanies
+
+							// Resolve targets from a safe subset of company columns — never
+							// raw SQL, so the filter can't inject.
+							const filter = selector.filter as {
+								status?: string
+								industry?: string
+								region?: string
+								tags?: ReadonlyArray<string>
+							}
+							const conds: Array<
+								import('effect/unstable/sql').Statement.Fragment
+							> = [
+								sql`organization_id = ${organizationId}`,
+								sql`deleted_at IS NULL`,
+							]
+							if (filter.status) conds.push(sql`status = ${filter.status}`)
+							if (filter.industry)
+								conds.push(sql`industry = ${filter.industry}`)
+							if (filter.region) conds.push(sql`region = ${filter.region}`)
+							if (filter.tags && filter.tags.length > 0)
+								conds.push(sql`tags && ${filter.tags}`)
+
+							// Fetch one past the cap so a truncated fan-out is visible.
+							const matched = yield* sql<{ id: string }>`
+								SELECT id FROM companies
+								WHERE ${sql.and(conds)}
+								ORDER BY created_at
+								LIMIT ${selectorMax + 1}
+							`
+							const capped = matched.length > selectorMax
+							const targets = capped ? matched.slice(0, selectorMax) : matched
+							if (capped) {
+								yield* Effect.logWarning('research.selector.capped').pipe(
+									Effect.annotateLogs({
+										user_id: userId,
+										matched: matched.length,
+										cap: selectorMax,
+									}),
+								)
+							}
+
+							// The group is 'running' with no heartbeat/started_at, so the
+							// orphan sweep (which only reclaims stale 'running' rows) never
+							// touches it, and it is never dispatched or run itself.
+							const [groupRow] = yield* sql<{ id: string }>`
+								INSERT INTO research_runs (
+									organization_id, query, mode, schema_name, kind, status,
+									context, budget_cents, paid_budget_cents, paid_policy,
+									created_by, template_ids, template_names,
+									template_fingerprint, instruction_segments
+								) VALUES (
+									${organizationId}, ${input.query}, ${input.mode ?? 'deep'},
+									${input.schemaName ?? null}, 'group', 'running',
+									${JSON.stringify(input.context ?? {})},
+									${policy.budgetCents}, ${policy.paidBudgetCents},
+									${JSON.stringify(policy)}, ${userId},
+									${JSON.stringify(templateIds)}, ${JSON.stringify(templateNames)},
+									${templateFingerprint}, ${JSON.stringify(segments)}
+								) RETURNING id
+							`
+							const groupId = (groupRow as { id: string }).id
+
+							yield* Effect.forEach(targets, company =>
+								Effect.gen(function* () {
+									// The leaf researches one company; it inherits the hints
+									// but not the selector, so it runs as an ordinary subject.
+									const leafContext = {
+										...(input.context ?? {}),
+										selector: undefined,
+										subjects: [{ table: 'companies' as const, id: company.id }],
+									}
+									const [leafRow] = yield* sql<{ id: string }>`
+										INSERT INTO research_runs (
+											organization_id, parent_id, query, mode, schema_name,
+											kind, status, context, budget_cents, paid_budget_cents,
+											paid_policy, created_by, template_ids, template_names,
+											template_fingerprint, instruction_segments
+										) VALUES (
+											${organizationId}, ${groupId}, ${input.query},
+											${input.mode ?? 'deep'}, ${input.schemaName ?? null},
+											'leaf', 'queued', ${JSON.stringify(leafContext)},
+											${policy.budgetCents}, ${policy.paidBudgetCents},
+											${JSON.stringify(policy)}, ${userId},
+											${JSON.stringify(templateIds)},
+											${JSON.stringify(templateNames)},
+											${templateFingerprint}, ${JSON.stringify(segments)}
+										) RETURNING id
+									`
+									const leafId = (leafRow as { id: string }).id
+									yield* sql`
+										INSERT INTO research_links (organization_id, research_id, subject_table, subject_id, link_kind)
+										VALUES (${organizationId}, ${leafId}, 'companies', ${company.id}, 'input')
+										ON CONFLICT DO NOTHING
+									`
+									const leafPubsub = yield* PubSub.unbounded<ResearchEvent>()
+									yield* Ref.update(activePubSubs, m =>
+										HashMap.set(m, leafId, leafPubsub),
+									)
+									yield* Queue.offer(dispatch, { researchId: leafId, userId })
+								}),
+							)
+
+							// Set the group's initial status from its leaves (and resolve it
+							// straight away when the selector matched nothing).
+							yield* rollupParentLocked(groupId)
+
+							yield* Effect.logInfo('research.selector.fanout').pipe(
+								Effect.annotateLogs({
+									user_id: userId,
+									group_id: groupId,
+									leaves: targets.length,
+								}),
+							)
+							return { id: groupId, status: 'running' as const }
+						}
 
 						// Insert the run row
 						const [row] = yield* sql`
