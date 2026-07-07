@@ -52,6 +52,11 @@ const SCRAPED_HOST = new URL(SCRAPED_URL).hostname
 const URL_HASH = createHash('sha256').update(SCRAPED_URL).digest('hex')
 const SOURCE_ID = randomUUID()
 
+// Set in beforeAll: a real contact the grounded proposal targets, and its
+// company, so the applicability guard keeps that proposal and cleanup cascades.
+let realContactId = ''
+let seededCompanyId = ''
+
 // The scraped markdown carries the real phone the grounded proposal cites, so
 // the value guard finds it in the evidence and keeps that proposal.
 const SCRAPE_MARKDOWN =
@@ -127,7 +132,7 @@ const extractLlm: LanguageModel.Service = {
 				proposed_updates: [
 					{
 						subject_table: 'contacts',
-						subject_id: 'c-real',
+						subject_id: realContactId,
 						operation: 'update',
 						expected_version: 0,
 						fields: { phone: '936 123 456' },
@@ -256,15 +261,35 @@ beforeAll(async () => {
 				)
 				ON CONFLICT (url_hash) DO NOTHING
 			`
-			return { org, userId: user.id }
+			// A real contact the grounded proposal updates, so the applicability
+			// guard keeps it — a proposal targeting a row that does not exist is
+			// dropped as un-appliable.
+			const [company] = yield* sql<{ id: string }>`
+				INSERT INTO companies (organization_id, slug, name)
+				VALUES (${org.id}, ${`grounding-${randomUUID()}`}, 'Acme Logistics')
+				RETURNING id
+			`
+			const [contact] = yield* sql<{ id: string }>`
+				INSERT INTO contacts (organization_id, company_id, name)
+				VALUES (${org.id}, ${company?.id ?? ''}, 'Grace Hopper')
+				RETURNING id
+			`
+			return {
+				org,
+				userId: user.id,
+				companyId: company?.id ?? '',
+				contactId: contact?.id ?? '',
+			}
 		}).pipe(Effect.provide(PgLive)) as Effect.Effect<
-			{ org: Org; userId: string },
+			{ org: Org; userId: string; companyId: string; contactId: string },
 			never,
 			never
 		>,
 	)
 	ctx.org = seed.org
 	userId = seed.userId
+	seededCompanyId = seed.companyId
+	realContactId = seed.contactId
 }, 60_000)
 
 afterAll(async () => {
@@ -277,6 +302,10 @@ afterAll(async () => {
 				yield* sql`DELETE FROM research_runs WHERE id = ${runId}::uuid`
 			}
 			yield* sql`DELETE FROM sources WHERE url_hash = ${URL_HASH}`
+			if (seededCompanyId) {
+				// Cascades the seeded contact.
+				yield* sql`DELETE FROM companies WHERE id = ${seededCompanyId}::uuid`
+			}
 		}).pipe(Effect.provide(PgLive)) as Effect.Effect<void, never, never>,
 	)
 })
@@ -364,7 +393,7 @@ describe('ResearchService grounding', () => {
 					proposedUpdates?: Array<{ subjectId: string }>
 				} | null
 			)?.proposedUpdates
-			expect(proposals?.map(p => p.subjectId)).toEqual(['c-real'])
+			expect(proposals?.map(p => p.subjectId)).toEqual([realContactId])
 		}, 30_000)
 	})
 })

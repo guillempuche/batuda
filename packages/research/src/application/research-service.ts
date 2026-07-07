@@ -23,8 +23,14 @@ import { SqlClient } from 'effect/unstable/sql'
 import { AcceptedCountry } from '../domain/country'
 import type { ResolvedPolicy } from '../domain/types'
 import { runAgentResearchLoop } from './agent-loop'
+import { filterApplicableProposals } from './applicability-guard'
 import { makeBudgetLayer } from './budget'
 import { validateFindingCitations } from './citation-guard'
+import {
+	classifyEntityMatch,
+	deriveEntityTargets,
+	type EntityMatch,
+} from './entity-guard'
 import { resolvePolicy, type SystemDefaults } from './policy'
 import {
 	AgentLanguageModel,
@@ -894,6 +900,29 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						? yield* snapshotSubjects(context.subjects)
 						: []
 
+					// The keys that prove the fetched evidence is about the requested
+					// company (its name or its own domain). A scan or freeform run with
+					// no anchored subject is not entity-gated (targets is null). The
+					// verdict is computed from the phase-1 evidence below and, on resume,
+					// read back from the row so the weak-match handling survives a restart.
+					const entityTargets = deriveEntityTargets({
+						schemaName,
+						query: (run as { query: string }).query,
+						subjects: subjects.map(s => {
+							const row = s.snapshot as Record<string, unknown>
+							return {
+								table: s.table,
+								name: typeof row['name'] === 'string' ? row['name'] : undefined,
+								website:
+									typeof row['website'] === 'string'
+										? row['website']
+										: undefined,
+							}
+						}),
+					})
+					let entityMatch: EntityMatch | null =
+						(run as { entityMatch?: EntityMatch | null }).entityMatch ?? null
+
 					// A follow-up run performs one approved paid call instead of the
 					// normal research loop, then merges the result onto the origin run.
 					if ((run as { kind?: string }).kind === 'followup') {
@@ -1095,6 +1124,21 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 										tr =>
 											`[${tr.name}] ${boundedToolResult(tr.encodedResult ?? tr.result)}`,
 									)
+									// Record each fetch the model gave up on (a dead URL, a
+									// provider 4xx) so the skipped page shows in the run's tool
+									// log; the run keeps going and only fails if nothing grounds it.
+									for (const tr of response.toolResults) {
+										if (!tr.isFailure) continue
+										yield* Ref.update(toolLog, log => [
+											...log,
+											{
+												timestamp: DateTime.nowUnsafe().toString(),
+												type: 'result' as const,
+												tool: tr.name,
+												error: boundedToolResult(tr.encodedResult ?? tr.result),
+											},
+										])
+									}
 									yield* emitRound(
 										round,
 										response.text.length,
@@ -1129,10 +1173,47 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						tokensIn = loopResult.tokensIn
 						tokensOut = loopResult.tokensOut
 
+						// Entity grounding gate: from the fetched evidence alone (never the
+						// model's prose), classify how strongly the pages concern the
+						// requested company. Nothing about the target → fail closed now,
+						// before spending phase 2/3, so the run cannot report another
+						// company's data as a success. Strong/weak is carried into phase 2.
+						entityMatch = entityTargets
+							? classifyEntityMatch(
+									entityTargets,
+									[evidenceText, ...scrapeCorpus].join('\n'),
+								)
+							: null
+						if (entityMatch === 'absent') {
+							const absentToolLog = yield* Ref.get(toolLog)
+							yield* sql`
+								UPDATE research_runs
+								SET status = 'no_reliable_data',
+									phase = 1,
+									findings = ${JSON.stringify({
+										error:
+											'The fetched pages were not about the requested company, so the findings could not be grounded.',
+										reason: 'no_reliable_data',
+									})},
+									tool_log = ${JSON.stringify(absentToolLog)},
+									completed_at = now(),
+									updated_at = now()
+								WHERE id = ${researchId} AND status = 'running'
+							`
+							yield* publishEvent(researchId, 'run.no_reliable_data', {
+								reason: 'entity_mismatch',
+							})
+							const parentGroupId = (run as { parentId: string | null })
+								.parentId
+							if (parentGroupId) yield* rollupParentLocked(parentGroupId)
+							return
+						}
+
 						yield* sql`
 							UPDATE research_runs
 							SET phase = 1,
 								research_text = ${researchText},
+								entity_match = ${entityMatch},
 								tokens_in = ${tokensIn},
 								tokens_out = ${tokensOut},
 								updated_at = now()
@@ -1234,6 +1315,86 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 									research_id: researchId,
 									dropped_proposals: valueCheck.droppedProposals,
 									stripped_values: valueCheck.strippedValues,
+								}),
+							)
+						}
+						// A weak entity match means the fetched pages only glancingly
+						// mention the target: keep the brief but withhold every CRM write
+						// and flag the low confidence, so a reviewer treats these findings
+						// with care rather than trusting an auto-applied update.
+						if (
+							entityMatch === 'weak' &&
+							findings != null &&
+							typeof findings === 'object' &&
+							!Array.isArray(findings)
+						) {
+							const current = findings as Record<string, unknown>
+							const strippedProposals = Array.isArray(
+								current['proposed_updates'],
+							)
+								? (current['proposed_updates'] as unknown[]).length
+								: 0
+							findings = {
+								...current,
+								proposed_updates: [],
+								entity_confidence: 'low',
+							}
+							yield* Effect.logWarning('research.entity.weak').pipe(
+								Effect.annotateLogs({
+									research_id: researchId,
+									stripped_proposals: strippedProposals,
+								}),
+							)
+						}
+						// Applicability: drop any proposed CRM update that could never be
+						// applied — an update whose subject_id names no live row (the model
+						// can invent one for a company that does not exist), or a proposal
+						// whose fields carry no real values. Existence is checked against
+						// the org's own rows; a malformed id trips a cast error read as
+						// "not found".
+						const organizationId = (run as { organizationId: string })
+							.organizationId
+						const proposalList =
+							findings != null &&
+							typeof findings === 'object' &&
+							!Array.isArray(findings)
+								? (findings as Record<string, unknown>)['proposed_updates']
+								: undefined
+						const liveSubjects = new Set<string>()
+						if (Array.isArray(proposalList)) {
+							for (const proposal of proposalList) {
+								if (proposal == null || typeof proposal !== 'object') continue
+								const pu = proposal as Record<string, unknown>
+								if (pu['operation'] === 'create') continue
+								const table = pu['subject_table']
+								const id = pu['subject_id']
+								if (
+									(table !== 'companies' && table !== 'contacts') ||
+									typeof id !== 'string' ||
+									id.trim() === '' ||
+									liveSubjects.has(`${table}:${id}`)
+								)
+									continue
+								const rows = yield* sql`
+									SELECT id FROM ${sql(table)}
+									WHERE id = ${id}
+										AND organization_id = ${organizationId}
+										AND deleted_at IS NULL
+									LIMIT 1
+								`.pipe(Effect.catchTag('SqlError', () => Effect.succeed([])))
+								if (rows.length > 0) liveSubjects.add(`${table}:${id}`)
+							}
+						}
+						const applicability = filterApplicableProposals(
+							findings,
+							(table, id) => liveSubjects.has(`${table}:${id}`),
+						)
+						findings = applicability.findings
+						if (applicability.dropped > 0) {
+							yield* Effect.logWarning('research.proposals.unappliable').pipe(
+								Effect.annotateLogs({
+									research_id: researchId,
+									dropped: applicability.dropped,
 								}),
 							)
 						}

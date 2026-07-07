@@ -1,7 +1,7 @@
 import { Effect, Layer, Schema, Stream } from 'effect'
 import { describe, expect, it } from 'vitest'
 
-import { NoRegistry, type ProviderError } from '../domain/errors'
+import { NoRegistry, ProviderError } from '../domain/errors'
 import { RegistryRecord, ScrapedPage, SearchResult } from '../domain/types'
 import { StubExtractProvider } from '../infrastructure/stub/extract'
 import { StubRegistryEsProvider } from '../infrastructure/stub/registry-es'
@@ -181,6 +181,63 @@ const registryLookupResult = async (
 		),
 	)
 	return results[results.length - 1]?.result
+}
+
+// Drive a web-fetch tool with a failing provider and return the final stream
+// element, so a test can assert the model saw a failure (isFailure) rather than
+// the run fiber being aborted.
+const scrapePageResult = async (
+	scrape: (input: ScrapeInput) => Effect.Effect<ScrapedPage, ProviderError>,
+	params: { url: string },
+): Promise<{ result: unknown; isFailure: boolean }> => {
+	const ports = Layer.mergeAll(
+		Layer.succeed(ScrapeProvider)(ScrapeProvider.of({ scrape })),
+		StubSearchProvider,
+		StubExtractProvider,
+		StubRegistryEsProvider,
+	)
+	const results = await Effect.runPromise(
+		Effect.gen(function* () {
+			const toolkit = yield* researchToolkit
+			const stream = yield* toolkit.handle('scrape_page', params)
+			return yield* Stream.runCollect(stream)
+		}).pipe(
+			Effect.provide(
+				researchToolkitLayer.pipe(
+					Layer.provide(Layer.mergeAll(ports, testInfra)),
+				),
+			),
+		),
+	)
+	const last = results[results.length - 1]
+	return { result: last?.result, isFailure: last?.isFailure ?? false }
+}
+
+const webSearchResult = async (
+	search: (input: SearchInput) => Effect.Effect<SearchResult, ProviderError>,
+	params: { query: string },
+): Promise<{ result: unknown; isFailure: boolean }> => {
+	const ports = Layer.mergeAll(
+		Layer.succeed(SearchProvider)(SearchProvider.of({ search })),
+		StubScrapeProvider,
+		StubExtractProvider,
+		StubRegistryEsProvider,
+	)
+	const results = await Effect.runPromise(
+		Effect.gen(function* () {
+			const toolkit = yield* researchToolkit
+			const stream = yield* toolkit.handle('web_search', params)
+			return yield* Stream.runCollect(stream)
+		}).pipe(
+			Effect.provide(
+				researchToolkitLayer.pipe(
+					Layer.provide(Layer.mergeAll(ports, testInfra)),
+				),
+			),
+		),
+	)
+	const last = results[results.length - 1]
+	return { result: last?.result, isFailure: last?.isFailure ?? false }
 }
 
 const extractInput = async (params: {
@@ -603,6 +660,53 @@ describe('discover_contacts handler — delegates to the shared ContactDiscovery
 
 			// THEN the null folds to "not provided"
 			expect(input.country).toBeUndefined()
+		})
+	})
+})
+
+describe('researchToolkit — a web-fetch failure is non-fatal', () => {
+	describe('scrape_page handler', () => {
+		describe('when the scrape provider fails with a ProviderError', () => {
+			it('should surface the failure to the model instead of aborting the run', async () => {
+				// GIVEN a scrape provider that rejects the page with a 401
+				const { isFailure } = await scrapePageResult(
+					() =>
+						Effect.fail(
+							new ProviderError({
+								provider: 'firecrawl',
+								message: 'scrape failed: HTTP 401',
+								recoverable: false,
+							}),
+						),
+					{ url: 'https://dead.example' },
+				)
+
+				// THEN handling completes and the last result is a failure the model
+				// can read — the fiber running generateText is never killed
+				expect(isFailure).toBe(true)
+			})
+		})
+	})
+
+	describe('web_search handler', () => {
+		describe('when the search provider fails with a ProviderError', () => {
+			it('should surface the failure to the model instead of aborting the run', async () => {
+				// GIVEN a search provider that returns a 422
+				const { isFailure } = await webSearchResult(
+					() =>
+						Effect.fail(
+							new ProviderError({
+								provider: 'brave',
+								message: 'search failed: HTTP 422',
+								recoverable: false,
+							}),
+						),
+					{ query: 'acme corp' },
+				)
+
+				// THEN the model receives a failure result and the run continues
+				expect(isFailure).toBe(true)
+			})
 		})
 	})
 })
