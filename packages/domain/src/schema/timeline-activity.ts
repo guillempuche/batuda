@@ -14,6 +14,7 @@ export const TimelineKind = Schema.Literals([
 	'proposal_viewed',
 	'proposal_responded',
 	'research_run',
+	'research_applied',
 	'system_event',
 	'meeting_scheduled',
 	'meeting_rescheduled',

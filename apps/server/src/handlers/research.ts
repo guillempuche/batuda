@@ -19,6 +19,7 @@ import { EnvVars } from '../lib/env'
 import { CompanyService } from '../services/companies'
 import { Geocoder } from '../services/geocoder'
 import { resolveResearchProposedUpdate } from '../services/research-apply'
+import { TimelineActivityService } from '../services/timeline-activity'
 
 export const ResearchLive = HttpApiBuilder.group(
 	BatudaApi,
@@ -33,6 +34,7 @@ export const ResearchLive = HttpApiBuilder.group(
 			const companyService = yield* CompanyService
 			const geocoder = yield* Geocoder
 			const sql = yield* SqlClient.SqlClient
+			const timeline = yield* TimelineActivityService
 
 			// Shared apply/reject path: run the resolver, then surface a missing run
 			// or proposal as a 404 and let any DB fault die as a defect.
@@ -40,11 +42,13 @@ export const ResearchLive = HttpApiBuilder.group(
 				id: string,
 				puId: string,
 				decision: 'apply' | 'reject',
+				userId: string,
 			) =>
-				resolveResearchProposedUpdate(id, puId, decision).pipe(
+				resolveResearchProposedUpdate(id, puId, decision, userId).pipe(
 					Effect.provideService(CompanyService, companyService),
 					Effect.provideService(Geocoder, geocoder),
 					Effect.provideService(SqlClient.SqlClient, sql),
+					Effect.provideService(TimelineActivityService, timeline),
 					Effect.flatMap(result =>
 						result.outcome === 'run_not_found'
 							? Effect.fail(new NotFound({ entity: 'research', id }))
@@ -300,10 +304,26 @@ export const ResearchLive = HttpApiBuilder.group(
 					),
 				)
 				.handle('applyProposedUpdate', _ =>
-					resolveProposal(_.params.id, _.params.puId, 'apply'),
+					Effect.gen(function* () {
+						const { userId } = yield* SessionContext
+						return yield* resolveProposal(
+							_.params.id,
+							_.params.puId,
+							'apply',
+							userId,
+						)
+					}),
 				)
 				.handle('rejectProposedUpdate', _ =>
-					resolveProposal(_.params.id, _.params.puId, 'reject'),
+					Effect.gen(function* () {
+						const { userId } = yield* SessionContext
+						return yield* resolveProposal(
+							_.params.id,
+							_.params.puId,
+							'reject',
+							userId,
+						)
+					}),
 				)
 				.handle('getPolicy', _ =>
 					Effect.gen(function* () {
