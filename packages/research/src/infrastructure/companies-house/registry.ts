@@ -191,7 +191,6 @@ export const makeCompaniesHouseRegistry = (slot: number) =>
 								role: o.officer_role ?? undefined,
 								since: o.appointed_on ?? undefined,
 							})),
-							raw: { profile, officers },
 							units: 1,
 						})
 					}),

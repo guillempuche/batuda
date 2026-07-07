@@ -129,7 +129,6 @@ export const makeLibreborRegistry = (slot: number) =>
 					role: p.role ?? undefined,
 					since: p.date_from ?? undefined,
 				})),
-				raw: company,
 				units: 1,
 			})
 
