@@ -9,6 +9,7 @@ import { ConfirmRequired, InsufficientBudget, NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 import {
+	BulkResolveResult,
 	PendingProposal,
 	ProposedUpdateResult,
 	ResearchEvents,
@@ -68,6 +69,16 @@ const UpdatePolicyInput = Schema.Struct({
 const AttachInput = Schema.Struct({
 	subject_table: Schema.Literals(['companies', 'contacts']),
 	subject_id: Schema.String,
+})
+
+const BulkResolveInput = Schema.Struct({
+	items: Schema.Array(
+		Schema.Struct({
+			research_id: Schema.String,
+			proposed_update_id: Schema.String,
+			decision: Schema.Literals(['apply', 'reject']),
+		}),
+	),
 })
 
 // ── Route group ──
@@ -219,6 +230,18 @@ export const ResearchGroup = HttpApiGroup.make('research')
 				params: { id: Schema.String, puId: Schema.String },
 				success: ProposedUpdateResult,
 				error: NotFound.pipe(HttpApiSchema.status(404)),
+			},
+		),
+	)
+	// Bulk apply/reject across runs — one outcome per item, so a conflict or
+	// error on one proposal never aborts the others.
+	.add(
+		HttpApiEndpoint.post(
+			'resolveProposedUpdatesBatch',
+			'/research/proposed-updates/resolve',
+			{
+				payload: BulkResolveInput,
+				success: BulkResolveResult,
 			},
 		),
 	)

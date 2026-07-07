@@ -633,3 +633,57 @@ export const resolveResearchProposedUpdate = (
 			version: updatedRows[0]?.version ?? validated.expectedVersion + 1,
 		} satisfies ResolveOutcome
 	})
+
+export type BatchResolveItem = {
+	readonly researchId: string
+	readonly proposedUpdateId: string
+	readonly decision: 'apply' | 'reject'
+}
+
+export type BatchResolveItemResult =
+	| (ResolveOutcome & {
+			readonly research_id: string
+			readonly proposed_update_id: string
+	  })
+	| {
+			readonly outcome: 'error'
+			readonly research_id: string
+			readonly proposed_update_id: string
+	  }
+
+// Resolve many proposals in one call, returning a per-item outcome. Runs the
+// items one at a time on purpose: two proposals in the same run each rewrite
+// that run's findings by array position, so resolving them at the same time
+// could clobber each other. A failure on one item is caught into an `error`
+// outcome so the rest of the batch still runs.
+export const resolveResearchProposedUpdatesBatch = (
+	items: ReadonlyArray<BatchResolveItem>,
+	actorUserId: string | null,
+) =>
+	Effect.forEach(items, item =>
+		resolveResearchProposedUpdate(
+			item.researchId,
+			item.proposedUpdateId,
+			item.decision,
+			actorUserId,
+		).pipe(
+			Effect.map(
+				outcome =>
+					({
+						research_id: item.researchId,
+						proposed_update_id: item.proposedUpdateId,
+						...outcome,
+					}) satisfies BatchResolveItemResult,
+			),
+			Effect.catchCause(cause =>
+				Effect.logWarning('bulk proposed-update resolve failed').pipe(
+					Effect.annotateLogs({ cause: Cause.pretty(cause) }),
+					Effect.as({
+						research_id: item.researchId,
+						proposed_update_id: item.proposedUpdateId,
+						outcome: 'error' as const,
+					} satisfies BatchResolveItemResult),
+				),
+			),
+		),
+	)

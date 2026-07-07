@@ -63,3 +63,35 @@ export const ResearchEvents = Schema.Struct({
 	done: Schema.Boolean,
 })
 export type ResearchEvents = typeof ResearchEvents.Type
+
+/**
+ * One entry in a bulk apply/reject response. Each names the run + proposal it
+ * refers to and its own outcome, so a conflict or error on one proposal doesn't
+ * hide the results of the rest. `error` marks a proposal whose resolution threw
+ * (as opposed to a clean `conflict`/`invalid`).
+ */
+export const BulkResolveItemResult = Schema.Struct({
+	research_id: Schema.String,
+	proposed_update_id: Schema.String,
+	outcome: Schema.Literals([
+		'applied',
+		'created',
+		'duplicate',
+		'rejected',
+		'conflict',
+		'invalid',
+		'no_applicable_fields',
+		'run_not_found',
+		'proposal_not_found',
+		'error',
+	]),
+	subject_table: Schema.optional(Schema.String),
+	subject_id: Schema.optional(Schema.String),
+	version: Schema.optional(Schema.Number),
+	reason: Schema.optional(Schema.String),
+})
+
+export const BulkResolveResult = Schema.Struct({
+	results: Schema.Array(BulkResolveItemResult),
+})
+export type BulkResolveResult = typeof BulkResolveResult.Type
