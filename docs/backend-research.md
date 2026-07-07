@@ -1533,11 +1533,16 @@ Server restart mid-run kills the fiber. v1 solution: on boot, mark `status='runn
 
 Research stores contact emails and personal details discovered from public sources. EU cooperatives = GDPR applies.
 
-- **Retention policy**: default expire `sources.content_ref` and `research_runs.findings` after N days unless the user pins a run.
-- **DSAR support**: ability to purge all sources + findings referencing a specific email/name.
+- **Retention policy (implemented)**: a scheduled sweep (`ResearchRetention`, wired into `ServicesLive`) runs hourly and prunes storage that would otherwise grow without bound:
+  - expired cache rows (`search_cache` / `llm_cache` / `research_cache` by `expires_at`, `extraction_cache` by a 7-day `cached_at`) — their TTL only gates reads, so nothing deleted them before;
+  - the bulky transcript (`research_runs.research_text` + `tool_log`) of any run whose `completed_at` is older than `RESEARCH_RETENTION_DAYS` (default 90);
+  - scrape blobs whose `sources` row no surviving run fetches (`research_run_sources`) and no applied contact cites (`research_links.citations`) — the blob and its global `sources` row are removed together, oldest-first.
+- **Provenance is preserved**: the sweep keeps the run row, its `sources`, `research_run_sources`, and `research_links.citations`, so a contact's "sourced from research" trail survives the transcript prune. A source is only garbage-collected once nothing references it, which keeps every cited URL resolvable.
+- **Cadence + window**: `RESEARCH_RETENTION_SWEEP_INTERVAL_SEC` (default 3600) and `RESEARCH_RETENTION_DAYS` (default 90); the window is in days, so a missed tick can't leak anything past its retention.
+- **DSAR support** (not yet): ability to purge all sources + findings referencing a specific email/name.
 - **Consent record**: note in ToS that using research on a subject is a legitimate-interest processing activity.
 
-**Recommendation:** document the policy before shipping (paid registry lookups pull personal data). Don't ship until this is in writing.
+**Recommendation:** paid registry lookups pull personal data — keep the retention window and consent note in writing before broad rollout.
 
 ---
 
