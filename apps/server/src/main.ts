@@ -18,6 +18,7 @@ import {
 	ContactDiscovery,
 	makeResearchLlmLive,
 	makeResearchProvidersLive,
+	queryPendingProposals,
 	ResearchEventSink,
 	ResearchService,
 } from '@batuda/research'
@@ -73,6 +74,7 @@ import { OrgResolution } from './services/org-resolution'
 import { PageService } from './services/pages'
 import { PipelineService } from './services/pipeline'
 import { RecordingService } from './services/recordings'
+import { resolveResearchProposedUpdate } from './services/research-apply'
 import { ResearchBlobStorageLive } from './services/research-blob-storage'
 import { S3StorageProviderLive } from './services/s3-storage-provider'
 import { TaskService } from './services/tasks'
@@ -150,8 +152,10 @@ const ResearchEventSinkLive = Layer.effect(
 						query: string
 						briefMd: string | null
 						schemaName: string | null
+						paidPolicy: { autoApplyMinConfidence?: number | null } | null
 					}>`
-						SELECT organization_id, created_by, query, brief_md, schema_name
+						SELECT organization_id, created_by, query, brief_md, schema_name,
+							paid_policy
 						FROM research_runs
 						WHERE id = ${researchId} LIMIT 1
 					`
@@ -218,6 +222,49 @@ const ResearchEventSinkLive = Layer.effect(
 												companyId: linked.subjectId,
 												cause: Cause.pretty(cause),
 											}),
+										),
+									),
+								)
+							}
+
+							// Confidence-aware auto-apply: when the run's creator set a
+							// threshold, findings that are machine-checkable, verified
+							// deliverable, and confident enough are written to the CRM
+							// without waiting for a person; everything else stays pending
+							// for review. Best-effort per finding — a failure just leaves
+							// that finding pending.
+							const autoApplyMin =
+								run.paidPolicy?.autoApplyMinConfidence ?? null
+							if (status === 'succeeded' && autoApplyMin != null) {
+								const eligible = yield* queryPendingProposals(sql, {
+									researchId,
+									machineCheckable: true,
+									minConfidence: autoApplyMin,
+								})
+								const deliverable = eligible.filter(
+									(p): p is typeof p & { proposedUpdateId: string } =>
+										p.verification === 'deliverable' &&
+										p.proposedUpdateId !== null,
+								)
+								yield* Effect.forEach(deliverable, p =>
+									resolveResearchProposedUpdate(
+										researchId,
+										p.proposedUpdateId,
+										'apply',
+										null,
+									).pipe(
+										Effect.provideService(CompanyService, companyService),
+										Effect.provideService(Geocoder, geocoder),
+										Effect.provideService(SqlClient.SqlClient, sql),
+										Effect.provideService(TimelineActivityService, timeline),
+										Effect.catchCause(cause =>
+											Effect.logWarning('research auto-apply failed').pipe(
+												Effect.annotateLogs({
+													event: 'research.autoapply.failed',
+													researchId,
+													cause: Cause.pretty(cause),
+												}),
+											),
 										),
 									),
 								)

@@ -373,6 +373,7 @@ export const ResearchLive = HttpApiBuilder.group(
 								paid_budget_cents: systemDefaults.paidBudgetCents,
 								auto_approve_paid_cents: systemDefaults.autoApprovePaidCents,
 								paid_monthly_cap_cents: systemDefaults.paidMonthlyCapCents,
+								auto_apply_min_confidence: null,
 							}
 						)
 					}).pipe(Effect.orDie),
@@ -385,6 +386,7 @@ export const ResearchLive = HttpApiBuilder.group(
 							paidBudgetCents: _.payload.paid_budget_cents,
 							autoApprovePaidCents: _.payload.auto_approve_paid_cents,
 							paidMonthlyCapCents: _.payload.paid_monthly_cap_cents,
+							autoApplyMinConfidence: _.payload.auto_apply_min_confidence,
 						})
 					}).pipe(
 						Effect.map(rows => rows[0]),

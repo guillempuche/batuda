@@ -34,7 +34,7 @@ export const resolvePolicy = (input: {
 		// Load user policy (or use system defaults if no row exists)
 		const rows = yield* sql`
 			SELECT budget_cents, paid_budget_cents, auto_approve_paid_cents,
-				   paid_monthly_cap_cents
+				   paid_monthly_cap_cents, auto_apply_min_confidence
 			FROM user_research_policy
 			WHERE user_id = ${userId}
 			LIMIT 1
@@ -47,6 +47,7 @@ export const resolvePolicy = (input: {
 					paidBudgetCents: number
 					autoApprovePaidCents: number
 					paidMonthlyCapCents: number
+					autoApplyMinConfidence: number | null
 			  }
 			| undefined
 
@@ -75,6 +76,9 @@ export const resolvePolicy = (input: {
 				base.autoApprovePaidCents,
 			),
 			paidMonthlyCapCents: base.paidMonthlyCapCents,
+			// A data-trust threshold, not a spending limit, so it isn't clamped;
+			// null (the default) means findings never auto-apply.
+			autoApplyMinConfidence: userPolicy?.autoApplyMinConfidence ?? null,
 		})
 
 		return resolved
