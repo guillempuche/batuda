@@ -18,7 +18,10 @@ import {
 import { EnvVars } from '../lib/env'
 import { CompanyService } from '../services/companies'
 import { Geocoder } from '../services/geocoder'
-import { resolveResearchProposedUpdate } from '../services/research-apply'
+import {
+	resolveResearchProposedUpdate,
+	resolveResearchProposedUpdatesBatch,
+} from '../services/research-apply'
 import { TimelineActivityService } from '../services/timeline-activity'
 
 export const ResearchLive = HttpApiBuilder.group(
@@ -340,6 +343,25 @@ export const ResearchLive = HttpApiBuilder.group(
 							userId,
 						)
 					}),
+				)
+				.handle('resolveProposedUpdatesBatch', _ =>
+					Effect.gen(function* () {
+						const { userId } = yield* SessionContext
+						const results = yield* resolveResearchProposedUpdatesBatch(
+							_.payload.items.map(i => ({
+								researchId: i.research_id,
+								proposedUpdateId: i.proposed_update_id,
+								decision: i.decision,
+							})),
+							userId,
+						).pipe(
+							Effect.provideService(CompanyService, companyService),
+							Effect.provideService(Geocoder, geocoder),
+							Effect.provideService(SqlClient.SqlClient, sql),
+							Effect.provideService(TimelineActivityService, timeline),
+						)
+						return { results }
+					}).pipe(Effect.orDie),
 				)
 				.handle('getPolicy', _ =>
 					Effect.gen(function* () {
