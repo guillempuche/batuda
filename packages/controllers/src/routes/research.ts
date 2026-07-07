@@ -64,6 +64,8 @@ const UpdatePolicyInput = Schema.Struct({
 	paid_budget_cents: Schema.optional(Schema.Number),
 	auto_approve_paid_cents: Schema.optional(Schema.Number),
 	paid_monthly_cap_cents: Schema.optional(Schema.Number),
+	// Nullable so the client can turn auto-apply off by sending null.
+	auto_apply_min_confidence: Schema.optional(Schema.NullOr(Schema.Number)),
 })
 
 const AttachInput = Schema.Struct({

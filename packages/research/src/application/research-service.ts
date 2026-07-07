@@ -171,6 +171,7 @@ export interface PendingProposalRow {
 export const queryPendingProposals = (
 	sql: SqlClient.SqlClient,
 	filters: {
+		researchId?: string | undefined
 		subjectTable?: string | undefined
 		status?: string | undefined
 		minConfidence?: number | undefined
@@ -182,6 +183,8 @@ export const queryPendingProposals = (
 	Effect.gen(function* () {
 		const conditions: Array<import('effect/unstable/sql').Statement.Fragment> =
 			[]
+		if (filters.researchId)
+			conditions.push(sql`research_id = ${filters.researchId}`)
 		if (filters.subjectTable)
 			conditions.push(sql`subject_table = ${filters.subjectTable}`)
 		if (filters.status) conditions.push(sql`run_status = ${filters.status}`)
@@ -1775,16 +1778,18 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						paidBudgetCents?: number | undefined
 						autoApprovePaidCents?: number | undefined
 						paidMonthlyCapCents?: number | undefined
+						autoApplyMinConfidence?: number | null | undefined
 					},
 				) =>
 					sql`
-						INSERT INTO user_research_policy (user_id, budget_cents, paid_budget_cents, auto_approve_paid_cents, paid_monthly_cap_cents, updated_at)
+						INSERT INTO user_research_policy (user_id, budget_cents, paid_budget_cents, auto_approve_paid_cents, paid_monthly_cap_cents, auto_apply_min_confidence, updated_at)
 						VALUES (
 							${userId},
 							${fields.budgetCents ?? 100},
 							${fields.paidBudgetCents ?? 500},
 							${fields.autoApprovePaidCents ?? 200},
 							${fields.paidMonthlyCapCents ?? 2000},
+							${fields.autoApplyMinConfidence ?? null},
 							now()
 						)
 						ON CONFLICT (user_id) DO UPDATE SET
@@ -1792,6 +1797,14 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							paid_budget_cents = COALESCE(${fields.paidBudgetCents ?? null}, user_research_policy.paid_budget_cents),
 							auto_approve_paid_cents = COALESCE(${fields.autoApprovePaidCents ?? null}, user_research_policy.auto_approve_paid_cents),
 							paid_monthly_cap_cents = COALESCE(${fields.paidMonthlyCapCents ?? null}, user_research_policy.paid_monthly_cap_cents),
+							-- Nullable on purpose: passing null turns auto-apply off, so a
+							-- provided value (even null) is honored while an omitted one keeps
+							-- the current setting.
+							auto_apply_min_confidence = CASE
+								WHEN ${fields.autoApplyMinConfidence !== undefined}
+								THEN ${fields.autoApplyMinConfidence ?? null}
+								ELSE user_research_policy.auto_apply_min_confidence
+							END,
 							updated_at = now()
 						RETURNING *
 					`,
