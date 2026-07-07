@@ -81,6 +81,7 @@ interface SearchArgs {
 	readonly query: string
 	readonly recency?: { days: number }
 	readonly languages?: string[]
+	readonly location?: string
 }
 
 const runSearch = (
@@ -158,6 +159,34 @@ describe('makeBraveSearch', () => {
 		expect(has('extra_snippets', 'true')).toBe(true)
 		expect(has('freshness', 'pw')).toBe(true)
 		expect(has('search_lang', 'es')).toBe(true)
+	})
+
+	it('should send a normalized upper-case country for a locale hint', async () => {
+		// GIVEN the model passes a language-and-region locale as the location
+		const { exit, log } = runSearch(
+			200,
+			{ web: { results: [] } },
+			{ query: 'acme', location: 'en-US' },
+		)
+		await exit
+
+		// THEN Brave receives a valid upper-case alpha-2, not the raw locale
+		const params = [...(log.last?.urlParams ?? [])]
+		expect(params.some(([k, v]) => k === 'country' && v === 'US')).toBe(true)
+	})
+
+	it('should omit country when the location hint is not a country', async () => {
+		// GIVEN a free-form place name Brave would reject
+		const { exit, log } = runSearch(
+			200,
+			{ web: { results: [] } },
+			{ query: 'acme', location: 'United States' },
+		)
+		await exit
+
+		// THEN no country param is sent rather than an invalid one
+		const params = [...(log.last?.urlParams ?? [])]
+		expect(params.some(([k]) => k === 'country')).toBe(false)
 	})
 
 	it('should surface an HTTP error instead of masking it as an empty result', async () => {

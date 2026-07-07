@@ -19,6 +19,7 @@ import {
 } from 'effect/unstable/http'
 import { describe, expect, it } from 'vitest'
 
+import type { SearchInput } from '../../application/ports'
 import { ProviderError } from '../../domain/errors'
 import { makeFirecrawlExtract } from './extract'
 import { makeFirecrawlScrape } from './scrape'
@@ -90,6 +91,19 @@ const runWithVirtualClock = async <A, E>(
 	)
 }
 
+// Decode the JSON body an adapter POSTed, so tests can assert the exact params
+// (e.g. the normalized `country`) sent to the provider.
+const bodyJson = (
+	request: HttpClientRequest.HttpClientRequest | undefined,
+): Record<string, unknown> => {
+	const body = request?.body
+	if (body?._tag !== 'Uint8Array') return {}
+	return JSON.parse(new TextDecoder().decode(body.body)) as Record<
+		string,
+		unknown
+	>
+}
+
 const errorOf = (
 	exit: Exit.Exit<unknown, unknown>,
 ): ProviderError | undefined => {
@@ -148,13 +162,17 @@ const runExtract = (
 	return { exit, log }
 }
 
-const runSearch = (status: number, body: unknown, query = 'acme logistics') => {
+const runSearch = (
+	status: number,
+	body: unknown,
+	input: Partial<SearchInput> = {},
+) => {
 	const log: CallLog = { count: 0, last: undefined }
 	const client = countingClient(log, status, body)
 	const exit = runWithVirtualClock(() =>
 		Effect.gen(function* () {
 			const provider = yield* makeFirecrawlSearch(0)
-			return yield* provider.search({ query })
+			return yield* provider.search({ query: 'acme logistics', ...input })
 		}).pipe(
 			Effect.provideService(HttpClient.HttpClient, client),
 			Effect.provide(
@@ -373,6 +391,32 @@ describe('makeFirecrawlSearch', () => {
 		expect(log.last?.method).toBe('POST')
 		expect(log.last?.url).toContain('api.firecrawl.dev/v2/search')
 		expect(log.last?.headers['authorization']).toBe('Bearer fc_k')
+	})
+
+	it('should send a normalized lower-case country for a locale hint', async () => {
+		// GIVEN the model passes a language-and-region locale (the 422 trigger)
+		const { exit, log } = runSearch(
+			200,
+			{ data: { web: [] } },
+			{ location: 'en-US' },
+		)
+		await exit
+
+		// THEN Firecrawl receives a valid lower-case alpha-2, not the raw locale
+		expect(bodyJson(log.last)['country']).toBe('us')
+	})
+
+	it('should omit country when the location hint is not a country', async () => {
+		// GIVEN a free-form place name the search API would reject
+		const { exit, log } = runSearch(
+			200,
+			{ data: { web: [] } },
+			{ location: 'United States' },
+		)
+		await exit
+
+		// THEN no country param is sent rather than an invalid one
+		expect(bodyJson(log.last)).not.toHaveProperty('country')
 	})
 
 	it('should retry a 5xx as recoverable', async () => {

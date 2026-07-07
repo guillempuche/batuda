@@ -19,6 +19,7 @@ import {
 } from 'effect/unstable/http'
 
 import { type SearchInput, SearchProvider } from '../../application/ports'
+import { parseCountryAlpha2 } from '../../domain/country'
 import { ProviderError } from '../../domain/errors'
 import { SearchResult, SearchResultItem } from '../../domain/types'
 import { keyForSlot } from '../_config'
@@ -67,6 +68,9 @@ export const makeFirecrawlSearch = (slot: number) =>
 			search: (input: SearchInput) =>
 				harden(
 					Effect.gen(function* () {
+						// Firecrawl's `country` wants a lower-case two-letter code; a raw
+						// model hint like "en-US" is rejected (422), so normalize or drop it.
+						const country = parseCountryAlpha2(input.location)
 						const request = HttpClientRequest.post(SEARCH_URL).pipe(
 							HttpClientRequest.setHeaders({
 								Authorization: `Bearer ${Redacted.value(apiKey)}`,
@@ -87,7 +91,7 @@ export const makeFirecrawlSearch = (slot: number) =>
 								...(input.recency
 									? { tbs: tbsForRecency(input.recency.days) }
 									: {}),
-								...(input.location ? { country: input.location } : {}),
+								...(country ? { country: country.toLowerCase() } : {}),
 							}),
 						)
 						const response = yield* client.execute(request).pipe(
