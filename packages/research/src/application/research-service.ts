@@ -142,6 +142,119 @@ export const clampPagination = (
 	}
 }
 
+export interface PendingProposalRow {
+	readonly researchId: string
+	readonly runKind: string
+	readonly runStatus: string
+	readonly runQuery: string
+	readonly runCreatedAt: Date
+	readonly proposedUpdateId: string | null
+	readonly subjectTable: string | null
+	readonly subjectId: string | null
+	readonly operation: string
+	readonly reason: string | null
+	readonly confidence: number | null
+	readonly verification: string | null
+	readonly machineCheckable: boolean
+}
+
+/**
+ * Pending proposed updates across every run in the org — what the review inbox
+ * reads. Each run keeps its proposals inside its own findings, so this unnests
+ * them and returns one row per pending proposal with the run + subject context
+ * and the trust signals a reviewer sorts by: a 0–100 confidence (the strongest
+ * channel score), the email deliverability verdict, and whether the value is
+ * machine-checkable (an email or phone the system can verify) rather than free
+ * text. Filtered and paginated in SQL so the inbox stays cheap at volume; the
+ * org scope is enforced by row-level security, like the run list.
+ */
+export const queryPendingProposals = (
+	sql: SqlClient.SqlClient,
+	filters: {
+		subjectTable?: string | undefined
+		status?: string | undefined
+		minConfidence?: number | undefined
+		machineCheckable?: boolean | undefined
+		limit?: number | undefined
+		offset?: number | undefined
+	},
+) =>
+	Effect.gen(function* () {
+		const conditions: Array<import('effect/unstable/sql').Statement.Fragment> =
+			[]
+		if (filters.subjectTable)
+			conditions.push(sql`subject_table = ${filters.subjectTable}`)
+		if (filters.status) conditions.push(sql`run_status = ${filters.status}`)
+		if (filters.minConfidence != null)
+			conditions.push(sql`confidence >= ${filters.minConfidence}`)
+		if (filters.machineCheckable != null)
+			conditions.push(sql`machine_checkable = ${filters.machineCheckable}`)
+
+		const { limit, offset } = clampPagination(filters.limit, filters.offset)
+
+		// A channel's confidence can be a 0–1 fraction (model) or a 0–100 score
+		// (enrichment); normalize to 0–100 so the reviewer's minimum-confidence
+		// filter compares like with like. The CASE guards keep a stray non-array
+		// `proposed_updates`/`channels` from breaking the row expansion.
+		return yield* sql<PendingProposalRow>`
+			WITH pending AS (
+				SELECT
+					r.id AS research_id,
+					r.kind AS run_kind,
+					r.status AS run_status,
+					r.query AS run_query,
+					r.created_at AS run_created_at,
+					pu->>'id' AS proposed_update_id,
+					pu->>'subject_table' AS subject_table,
+					pu->>'subject_id' AS subject_id,
+					COALESCE(pu->>'operation', 'update') AS operation,
+					pu->>'reason' AS reason,
+					(
+						SELECT max(
+							CASE
+								WHEN jsonb_typeof(ch->'confidence') = 'number'
+								THEN CASE
+									WHEN (ch->>'confidence')::numeric <= 1
+									THEN (ch->>'confidence')::numeric * 100
+									ELSE (ch->>'confidence')::numeric
+								END
+							END
+						)
+						FROM jsonb_array_elements(
+							CASE WHEN jsonb_typeof(pu->'fields'->'channels') = 'array'
+								THEN pu->'fields'->'channels' ELSE '[]'::jsonb END
+						) ch
+					)::int AS confidence,
+					(
+						SELECT ch->>'verification'
+						FROM jsonb_array_elements(
+							CASE WHEN jsonb_typeof(pu->'fields'->'channels') = 'array'
+								THEN pu->'fields'->'channels' ELSE '[]'::jsonb END
+						) ch
+						WHERE ch->>'kind' = 'email'
+						LIMIT 1
+					) AS verification,
+					jsonb_path_exists(
+						CASE WHEN jsonb_typeof(pu->'fields'->'channels') = 'array'
+							THEN pu->'fields'->'channels' ELSE '[]'::jsonb END,
+						'$[*] ? (@.kind == "email" || @.kind == "phone")'
+					) AS machine_checkable
+				FROM research_runs r,
+					LATERAL jsonb_array_elements(
+						CASE WHEN jsonb_typeof(r.findings->'proposed_updates') = 'array'
+							THEN r.findings->'proposed_updates' ELSE '[]'::jsonb END
+					) pu
+				WHERE r.status != 'deleted'
+					AND pu->>'status' = 'pending'
+			)
+			SELECT * FROM pending
+			WHERE ${sql.and(conditions)}
+			ORDER BY run_created_at DESC
+			LIMIT ${limit}
+			OFFSET ${offset}
+		`
+	})
+
 // Outcome of a cancel attempt, decided from whether a queued/running row
 // actually flipped to cancelled and whether the run exists at all.
 export const cancelOutcome = (
@@ -1479,6 +1592,16 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							OFFSET ${offset}
 						`
 					}),
+
+				/** Pending proposed updates across the org, for the review inbox. */
+				listPendingProposals: (filters: {
+					subjectTable?: string | undefined
+					status?: string | undefined
+					minConfidence?: number | undefined
+					machineCheckable?: boolean | undefined
+					limit?: number | undefined
+					offset?: number | undefined
+				}) => queryPendingProposals(sql, filters),
 
 				/** Get all runs linked to a subject row. */
 				bySubject: (table: string, id: string) =>

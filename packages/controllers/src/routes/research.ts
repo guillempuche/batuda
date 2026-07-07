@@ -8,6 +8,11 @@ import {
 import { ConfirmRequired, InsufficientBudget, NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
+import {
+	PendingProposal,
+	ProposedUpdateResult,
+	ResearchEvents,
+} from './research-schemas'
 
 // ── Input schemas ──
 
@@ -16,9 +21,17 @@ const SubjectRef = Schema.Struct({
 	id: Schema.String,
 })
 
+// A selector fans a run out across matching companies. The filter is a small,
+// safe subset of company columns (not arbitrary SQL) so it can be turned into a
+// parameterized query without opening an injection surface.
 const SelectorRef = Schema.Struct({
 	table: Schema.Literal('companies'),
-	filter: Schema.Unknown,
+	filter: Schema.Struct({
+		status: Schema.optional(Schema.String),
+		industry: Schema.optional(Schema.String),
+		region: Schema.optional(Schema.String),
+		tags: Schema.optional(Schema.Array(Schema.String)),
+	}),
 })
 
 const Hints = Schema.Struct({
@@ -94,11 +107,12 @@ export const ResearchGroup = HttpApiGroup.make('research')
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
-	// GET /research/:id/events — SSE live stream
+	// GET /research/:id/events — 30-second JSON long-poll of run progress; the
+	// client re-polls until `done`. Not a raw event stream.
 	.add(
 		HttpApiEndpoint.get('events', '/research/:id/events', {
 			params: { id: Schema.String },
-			success: Schema.Unknown,
+			success: ResearchEvents,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
@@ -159,6 +173,21 @@ export const ResearchGroup = HttpApiGroup.make('research')
 			},
 		),
 	)
+	// Cross-run review inbox: every pending proposed update in the org, not
+	// scoped to one run. Static path wins over /research/:id, like /preferences.
+	.add(
+		HttpApiEndpoint.get('listPendingProposals', '/research/proposed-updates', {
+			query: {
+				subject_table: Schema.optional(Schema.String),
+				status: Schema.optional(Schema.String),
+				min_confidence: Schema.optional(Schema.NumberFromString),
+				machine_checkable: Schema.optional(Schema.String),
+				limit: Schema.optional(Schema.NumberFromString),
+				offset: Schema.optional(Schema.NumberFromString),
+			},
+			success: Schema.Array(PendingProposal),
+		}),
+	)
 	// Proposed update workflow
 	.add(
 		HttpApiEndpoint.get(
@@ -177,7 +206,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 			'/research/:id/proposed-updates/:puId/apply',
 			{
 				params: { id: Schema.String, puId: Schema.String },
-				success: Schema.Unknown,
+				success: ProposedUpdateResult,
 				error: NotFound.pipe(HttpApiSchema.status(404)),
 			},
 		),
@@ -188,7 +217,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 			'/research/:id/proposed-updates/:puId/reject',
 			{
 				params: { id: Schema.String, puId: Schema.String },
-				success: Schema.Unknown,
+				success: ProposedUpdateResult,
 				error: NotFound.pipe(HttpApiSchema.status(404)),
 			},
 		),

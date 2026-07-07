@@ -55,6 +55,8 @@ export {
 } from './application/provider-quota'
 export {
 	type CreateResearchInput,
+	type PendingProposalRow,
+	queryPendingProposals,
 	type ResearchEvent,
 	type ResearchEventType,
 	ResearchService,

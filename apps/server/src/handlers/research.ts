@@ -283,6 +283,22 @@ export const ResearchLive = HttpApiBuilder.group(
 						status: 'skipped',
 					}),
 				)
+				.handle('listPendingProposals', _ =>
+					Effect.gen(function* () {
+						// Org scope is enforced by RLS; the boolean filter arrives as a
+						// query string, so map it back to a tri-state (unset = either).
+						const mc = _.query.machine_checkable
+						return yield* svc.listPendingProposals({
+							subjectTable: _.query.subject_table,
+							status: _.query.status,
+							minConfidence: _.query.min_confidence,
+							machineCheckable:
+								mc === 'true' ? true : mc === 'false' ? false : undefined,
+							limit: _.query.limit,
+							offset: _.query.offset,
+						})
+					}).pipe(Effect.orDie),
+				)
 				.handle('listProposedUpdates', _ =>
 					Effect.gen(function* () {
 						const run = yield* svc.get(_.params.id)
