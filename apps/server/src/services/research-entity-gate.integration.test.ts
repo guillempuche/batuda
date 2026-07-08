@@ -33,8 +33,9 @@ import { enterOrgScope } from '../middleware/org.js'
 // The entity grounding gate end to end: an enrichment run whose fetched evidence
 // is about a DIFFERENT company must fail closed to no_reliable_data; one that
 // clearly names the target must still succeed; a run that only glancingly
-// mentions it succeeds but is flagged low-confidence with its CRM writes stripped;
-// and a run whose only scrape FAILS must resolve to no_reliable_data, not failed.
+// mentions it (a weak match) must also fail closed to no_reliable_data rather than
+// present a lookalike's profile; and a run whose only scrape FAILS must resolve to
+// no_reliable_data, not failed.
 //
 // One shared ResearchService layer drives every case (a fresh layer per case
 // would start a fresh dispatcher + connection pool each time and exhaust the CI
@@ -244,7 +245,6 @@ interface RunResult {
 	readonly sourceCount: number
 	readonly findings: {
 		proposedUpdates?: unknown[]
-		entityConfidence?: string
 	} | null
 }
 
@@ -368,7 +368,7 @@ describe('ResearchService entity grounding gate', () => {
 	})
 
 	describe('when the fetched evidence clearly names the target', () => {
-		it('should succeed and keep its proposal without a low-confidence flag', async () => {
+		it('should succeed and keep its create proposal intact', async () => {
 			// GIVEN an enrichment run whose scrape names the target company in full
 			const result = await runScenario({
 				query: 'Acme Logistics',
@@ -379,20 +379,19 @@ describe('ResearchService entity grounding gate', () => {
 				isFailure: false,
 			})
 
-			// THEN it succeeds with its create proposal intact and no low-confidence flag
+			// THEN it succeeds with its create proposal intact
 			expect(
 				result.status,
 				`unexpected status: ${result.errorMessage ?? '(none)'}`,
 			).toBe('succeeded')
 			expect(result.findings?.proposedUpdates).toHaveLength(1)
-			expect(result.findings?.entityConfidence).toBeUndefined()
 		}, 30_000)
 	})
 
 	describe('when the fetched evidence only glancingly mentions the target', () => {
-		it('should succeed but strip CRM writes and flag low confidence', async () => {
+		it('should fail closed to no_reliable_data instead of presenting a lookalike', async () => {
 			// GIVEN an enrichment run whose scrape mentions the brand word but never
-			//   the full name or the company's own site
+			//   the full name or the company's own site (a weak match)
 			const result = await runScenario({
 				query: 'Acme Logistics',
 				schemaName: 'company_enrichment_v1',
@@ -401,13 +400,12 @@ describe('ResearchService entity grounding gate', () => {
 				isFailure: false,
 			})
 
-			// THEN it still succeeds, but its proposals are withheld and it is flagged
+			// THEN it fails closed — the evidence never clearly named the target, so no
+			//   lookalike profile is extracted or presented
 			expect(
 				result.status,
 				`unexpected status: ${result.errorMessage ?? '(none)'}`,
-			).toBe('succeeded')
-			expect(result.findings?.proposedUpdates).toHaveLength(0)
-			expect(result.findings?.entityConfidence).toBe('low')
+			).toBe('no_reliable_data')
 		}, 30_000)
 	})
 
