@@ -2,6 +2,7 @@ const {
 	getCommitPathsArray,
 	changelogPreset,
 	changelogHeader,
+	changelogWriterOpts,
 } = require('./scripts/release-utils.cjs')
 
 module.exports = {
@@ -34,9 +35,7 @@ module.exports = {
 			ignoreRecommendedBump: true,
 			infile: 'apps/mail-worker/CHANGELOG.md',
 			preset: changelogPreset,
-			writerOpts: {
-				headerPartial: '## {{date}} ({{currentTag}})\n',
-			},
+			writerOpts: changelogWriterOpts,
 		},
 	},
 }
