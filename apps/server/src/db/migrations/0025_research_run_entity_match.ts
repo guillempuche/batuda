@@ -2,10 +2,10 @@ import { Effect } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 // How strongly a completed run's fetched evidence was about the company it
-// researched: 'strong' | 'weak' | null. A weak run keeps its brief but withholds
-// CRM writes and is flagged low-confidence; the verdict is stored so that
-// handling survives a resume after a crash. Null means the run was not
-// entity-gated (a scan or freeform run whose findings are about third parties).
+// researched: 'strong' | 'weak' | 'absent' | null. Only a strong match proceeds;
+// a weak or absent run fails closed to no_reliable_data, and the verdict is stored
+// so a reviewer can tell the two apart. Null means the run was not entity-gated
+// (a scan or freeform run whose findings are about third parties).
 
 export default Effect.gen(function* () {
 	const sql = yield* SqlClient.SqlClient

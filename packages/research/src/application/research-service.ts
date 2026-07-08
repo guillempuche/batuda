@@ -958,6 +958,37 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					// Tool log accumulator
 					const toolLog = yield* Ref.make<ToolLogEntry[]>([])
 
+					// Fail a run closed as no_reliable_data because its evidence was not clearly
+					// about the requested company. Called by the phase-1 entity gate and again on
+					// resume, where that gate is skipped — so a weak or absent match never reaches
+					// extraction to present a lookalike's profile.
+					const failClosedOnEntity = (verdict: EntityMatch) =>
+						Effect.gen(function* () {
+							const toolLogNow = yield* Ref.get(toolLog)
+							yield* sql`
+								UPDATE research_runs
+								SET status = 'no_reliable_data',
+									phase = 1,
+									entity_match = ${verdict},
+									findings = ${JSON.stringify({
+										error:
+											'The fetched pages were not clearly about the requested company, so the findings could not be grounded.',
+										reason: 'no_reliable_data',
+									})},
+									tool_log = ${JSON.stringify(toolLogNow)},
+									completed_at = now(),
+									updated_at = now()
+								WHERE id = ${researchId} AND status = 'running'
+							`
+							yield* publishEvent(researchId, 'run.no_reliable_data', {
+								reason: verdict === 'weak' ? 'entity_weak' : 'entity_mismatch',
+								entityMatch: verdict,
+							})
+							const parentGroupId = (run as { parentId: string | null })
+								.parentId
+							if (parentGroupId) yield* rollupParentLocked(parentGroupId)
+						})
+
 					// Build system prompt
 					const subjectContext =
 						subjects.length > 0
@@ -1004,12 +1035,10 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					// Phase-2 extraction + every grounding guard, shared so both the
 					// normal path and the discovery-scan retry run the same logic. Returns
 					// cleaned findings and the model's output tokens; the caller writes the
-					// single phase-2 checkpoint. `match` carries the entity verdict for the
-					// weak-match strip (null for a scan, which is never entity-gated).
+					// single phase-2 checkpoint.
 					const extractStructuredFindings = (
 						transcript: string,
 						evidenceCorpus: string,
-						match: EntityMatch | null,
 					) =>
 						Effect.gen(function* () {
 							yield* publishEvent(researchId, 'tool.called', {
@@ -1076,34 +1105,6 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 										research_id: researchId,
 										dropped_proposals: valueCheck.droppedProposals,
 										stripped_values: valueCheck.strippedValues,
-									}),
-								)
-							}
-							// A weak entity match means the fetched pages only glancingly
-							// mention the target: keep the brief but withhold every CRM write
-							// and flag the low confidence, so a reviewer treats these findings
-							// with care rather than trusting an auto-applied update.
-							if (
-								match === 'weak' &&
-								result != null &&
-								typeof result === 'object' &&
-								!Array.isArray(result)
-							) {
-								const current = result as Record<string, unknown>
-								const strippedProposals = Array.isArray(
-									current['proposed_updates'],
-								)
-									? (current['proposed_updates'] as unknown[]).length
-									: 0
-								result = {
-									...current,
-									proposed_updates: [],
-									entity_confidence: 'low',
-								}
-								yield* Effect.logWarning('research.entity.weak').pipe(
-									Effect.annotateLogs({
-										research_id: researchId,
-										stripped_proposals: strippedProposals,
 									}),
 								)
 							}
@@ -1399,7 +1400,6 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 								let extracted = yield* extractStructuredFindings(
 									loop.researchText,
 									[loop.evidenceText, ...scrapeCorpus].join('\n'),
-									null,
 								)
 								findings = extracted.findings
 								extractOutputTokens += extracted.outputTokens
@@ -1444,7 +1444,6 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 									extracted = yield* extractStructuredFindings(
 										loop.researchText,
 										[loop.evidenceText, ...scrapeCorpus].join('\n'),
-										null,
 									)
 									findings = extracted.findings
 									extractOutputTokens += extracted.outputTokens
@@ -1468,37 +1467,18 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 
 						// Entity grounding gate: from the fetched evidence alone (never the
 						// model's prose), classify how strongly the pages concern the
-						// requested company. Nothing about the target → fail closed now,
-						// before spending phase 2/3, so the run cannot report another
-						// company's data as a success. Strong/weak is carried into phase 2.
+						// requested company. Nothing about the target ('absent'), or only a
+						// glancing mention of it ('weak'), fails closed now — before phase 2
+						// extraction can turn a lookalike's pages into a confident profile.
+						// Only a strong match proceeds.
 						entityMatch = entityTargets
 							? classifyEntityMatch(
 									entityTargets,
 									[evidenceText, ...scrapeCorpus].join('\n'),
 								)
 							: null
-						if (entityMatch === 'absent') {
-							const absentToolLog = yield* Ref.get(toolLog)
-							yield* sql`
-								UPDATE research_runs
-								SET status = 'no_reliable_data',
-									phase = 1,
-									findings = ${JSON.stringify({
-										error:
-											'The fetched pages were not about the requested company, so the findings could not be grounded.',
-										reason: 'no_reliable_data',
-									})},
-									tool_log = ${JSON.stringify(absentToolLog)},
-									completed_at = now(),
-									updated_at = now()
-								WHERE id = ${researchId} AND status = 'running'
-							`
-							yield* publishEvent(researchId, 'run.no_reliable_data', {
-								reason: 'entity_mismatch',
-							})
-							const parentGroupId = (run as { parentId: string | null })
-								.parentId
-							if (parentGroupId) yield* rollupParentLocked(parentGroupId)
+						if (entityMatch === 'absent' || entityMatch === 'weak') {
+							yield* failClosedOnEntity(entityMatch)
 							return
 						}
 
@@ -1519,6 +1499,15 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						yield* linkRunSources(loopResult.scrapedUrlHashes)
 					}
 
+					// The phase-1 entity gate is skipped when a run resumes from a checkpoint
+					// (the loop that decides the verdict does not re-run), so re-check the stored
+					// verdict here: a weak or absent match fails closed before phase 2 instead of
+					// extracting a lookalike's profile on resume.
+					if (entityMatch === 'weak' || entityMatch === 'absent') {
+						yield* failClosedOnEntity(entityMatch)
+						return
+					}
+
 					// ── Phase 2: Structured output ──
 					// Skipped on resume if findings were already captured.
 					let findings: unknown
@@ -1537,7 +1526,6 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							const extracted = yield* extractStructuredFindings(
 								researchText,
 								[evidenceText, ...scrapeCorpus].join('\n'),
-								entityMatch,
 							)
 							findings = extracted.findings
 							tokensOut += extracted.outputTokens

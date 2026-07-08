@@ -10,11 +10,11 @@
  *
  * Three verdicts drive the run:
  *  - 'strong'  the target's full name or its own domain appears in the evidence;
- *  - 'weak'    only a distinctive word of the name appears — it might be the
- *              target, so the run still completes, but its CRM writes are withheld
- *              and the findings are flagged low-confidence for the reviewer;
+ *  - 'weak'    only a distinctive word of the name appears — the run never
+ *              clearly landed on the target, so it fails closed as no_reliable_data
+ *              rather than present a lookalike's pages as the target's profile;
  *  - 'absent'  nothing in the evidence names the target — the run is misattributed
- *              and is failed closed as no_reliable_data.
+ *              and also fails closed as no_reliable_data.
  */
 
 // Legal-form suffixes dropped before matching, so "Acme Logistics S.L." and a
