@@ -80,6 +80,14 @@ trap 'rm -rf "$tmpdir"' EXIT
 export AWS_ACCESS_KEY_ID="$GITHUB_MEDIA_S3_ACCESS_KEY_ID"
 export AWS_SECRET_ACCESS_KEY="$GITHUB_MEDIA_S3_SECRET_ACCESS_KEY"
 export AWS_REGION="$region"
+# Cloudflare R2 rejects awscli 2.x's default request checksums (the newer
+# CRC-based integrity headers), which shows up as an intermittent
+# "SSL: UNEXPECTED_EOF" partway through an upload. Only send/verify a checksum
+# when the operation genuinely needs one so uploads to R2 stay reliable.
+export AWS_REQUEST_CHECKSUM_CALCULATION=WHEN_REQUIRED
+export AWS_RESPONSE_CHECKSUM_VALIDATION=WHEN_REQUIRED
+# Let the CLI itself retry a transient connection drop before the outer loop does.
+export AWS_MAX_ATTEMPTS=5
 s3api() { "$awscli" s3api "$@" --endpoint-url "$endpoint"; }
 
 lc() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
@@ -159,10 +167,21 @@ for f in "$@"; do
 	local_file="$(prepare "$f")" || exit 1
 	# content-type so .webp/.mp4 render inline; cache-control immutable since a
 	# given PR-media object never changes once posted.
-	s3api put-object --bucket "$bucket" --key "$key" --body "$local_file" \
-		--content-type "$(mime "$name")" \
-		--cache-control "public, max-age=31536000, immutable" >/dev/null || {
-		echo "upload failed: ${key}" >&2
+	# R2 can still drop a connection mid-upload (an intermittent SSL EOF), so
+	# retry a few times before giving up rather than failing the whole PR on one
+	# blip; each try is idempotent (same key + immutable object).
+	uploaded=""
+	for attempt in 1 2 3 4 5; do
+		if s3api put-object --bucket "$bucket" --key "$key" --body "$local_file" \
+			--content-type "$(mime "$name")" \
+			--cache-control "public, max-age=31536000, immutable" >/dev/null 2>&1; then
+			uploaded=1
+			break
+		fi
+		sleep 2
+	done
+	[ -n "$uploaded" ] || {
+		echo "upload failed after retries: ${key}" >&2
 		exit 1
 	}
 	# Remember this object so the delete pass below knows not to remove it.
