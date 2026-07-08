@@ -22,10 +22,15 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import { AcceptedCountry } from '../domain/country'
 import type { ResolvedPolicy } from '../domain/types'
-import { runAgentResearchLoop } from './agent-loop'
+import { canAffordAnotherRound, runAgentResearchLoop } from './agent-loop'
 import { filterApplicableProposals } from './applicability-guard'
 import { makeBudgetLayer } from './budget'
 import { validateFindingCitations } from './citation-guard'
+import {
+	isDiscoveryScanEmpty,
+	isRetryEligible,
+	REFINE_HINT,
+} from './discovery-scan'
 import {
 	classifyEntityMatch,
 	deriveEntityTargets,
@@ -347,6 +352,8 @@ export const buildResearchSystemPrompt = (args: {
 		'Never fabricate sources. Every claim must be verifiable.',
 		'Confirm key facts (employee count, location, sector) from scraped page content — the company site, LinkedIn, or press — not from search snippets alone, and cite the scraped page for each.',
 		'For every citation, set source_id to the exact URL you scraped with scrape_page. Never invent an identifier — a citation that does not match a fetched page is dropped.',
+		'When you search, use plain keywords, and only add a site: filter for a real domain you know — never a placeholder like site:example.com.',
+		'For discovery or prospecting queries, prefer authoritative sources — business directories, industry association member lists, and sector registries — over social media, forums, or glossary pages.',
 		'When extracting structured data from a single page, use the company_enrichment_v1 schema (a per-company shape), not a whole-run aggregate schema.',
 		`Output schema: ${args.schemaName}`,
 		args.subjectContext,
@@ -368,6 +375,7 @@ export type ResearchEventType =
 	| 'run.failed'
 	| 'run.cancelled'
 	| 'run.no_reliable_data'
+	| 'run.refining'
 	| 'provider.circuit_open'
 
 export interface ResearchEvent {
@@ -778,6 +786,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						yield* budget.chargePaid(
 							'registry',
 							REGISTRY_LOOKUP_COST_CENTS,
+							'registry_lookup',
 							key,
 						)
 						return yield* registry.lookup({ country, taxId, query })
@@ -987,6 +996,198 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					// guard checks findings against. Kept separate from the model-facing
 					// transcript (capped per page); empty on a resume that skips phase 1.
 					const scrapeCorpus: string[] = []
+					// Findings the discovery-scan retry path extracts under the shared
+					// budget; undefined on every other path (which extracts in phase 2).
+					let retryFindings: unknown
+					let retryExtractTokens = 0
+
+					// Phase-2 extraction + every grounding guard, shared so both the
+					// normal path and the discovery-scan retry run the same logic. Returns
+					// cleaned findings and the model's output tokens; the caller writes the
+					// single phase-2 checkpoint. `match` carries the entity verdict for the
+					// weak-match strip (null for a scan, which is never entity-gated).
+					const extractStructuredFindings = (
+						transcript: string,
+						evidenceCorpus: string,
+						match: EntityMatch | null,
+					) =>
+						Effect.gen(function* () {
+							yield* publishEvent(researchId, 'tool.called', {
+								tool: 'llm.generateObject',
+								phase: 2,
+								schema: schemaName,
+							})
+							// Cast schema to satisfy generateObject's Encoder constraint.
+							// Registry schemas are all Structs with DecodingServices=never,
+							// but Schema.Top erases that — the cast is safe.
+							const structuredResponse = yield* extractLlm.generateObject({
+								schema: outputSchema as typeof FreeformSchema,
+								// Ground the extraction: the model may only output values that
+								// appear in the transcript, and must leave unsupported fields
+								// empty rather than filling them from prior knowledge — otherwise
+								// it will confidently invent phones, tax ids, and emails.
+								prompt: `Produce structured findings STRICTLY from the research transcript below. Only include a value that appears in the transcript; if the transcript does not support a field, omit it or leave it null — never fill a field from prior knowledge. Set each citation's source_id to the exact scraped URL the value came from.\n\nResearch transcript:\n\n${transcript}`,
+							})
+							let result = withProposalIds(structuredResponse.value as unknown)
+							// Drop citations the model invented: keep only source_ids that map
+							// to a page this run actually fetched. A proposed CRM update left
+							// with no valid citation is dropped whole.
+							const groundedRows = yield* sql<{
+								localRef: string
+								sourceId: string
+							}>`
+								SELECT local_ref AS "localRef", source_id AS "sourceId"
+								FROM research_run_sources WHERE research_id = ${researchId}
+							`
+							const groundedKeys = new Set<string>()
+							for (const row of groundedRows) {
+								groundedKeys.add(canonicalizeUrl(row.localRef))
+								groundedKeys.add(row.sourceId)
+							}
+							const citationCheck = validateFindingCitations(
+								result,
+								sourceId =>
+									groundedKeys.has(canonicalizeUrl(sourceId)) ||
+									groundedKeys.has(sourceId),
+							)
+							result = citationCheck.findings
+							if (citationCheck.total > citationCheck.kept) {
+								yield* Effect.logWarning('research.citations.dropped').pipe(
+									Effect.annotateLogs({
+										research_id: researchId,
+										total: citationCheck.total,
+										kept: citationCheck.kept,
+									}),
+								)
+							}
+							// Value provenance: the citation guard proved the cited pages were
+							// fetched, not that they contain the claimed values. Drop any
+							// proposed CRM write whose email/phone/tax-id value appears nowhere
+							// in the run's evidence — that value was invented, real citation or
+							// not. Evidence is tool results only, never the model's own prose.
+							const valueCheck = verifyValueProvenance(result, evidenceCorpus)
+							result = valueCheck.findings
+							if (
+								valueCheck.droppedProposals > 0 ||
+								valueCheck.strippedValues > 0
+							) {
+								yield* Effect.logWarning('research.values.unsupported').pipe(
+									Effect.annotateLogs({
+										research_id: researchId,
+										dropped_proposals: valueCheck.droppedProposals,
+										stripped_values: valueCheck.strippedValues,
+									}),
+								)
+							}
+							// A weak entity match means the fetched pages only glancingly
+							// mention the target: keep the brief but withhold every CRM write
+							// and flag the low confidence, so a reviewer treats these findings
+							// with care rather than trusting an auto-applied update.
+							if (
+								match === 'weak' &&
+								result != null &&
+								typeof result === 'object' &&
+								!Array.isArray(result)
+							) {
+								const current = result as Record<string, unknown>
+								const strippedProposals = Array.isArray(
+									current['proposed_updates'],
+								)
+									? (current['proposed_updates'] as unknown[]).length
+									: 0
+								result = {
+									...current,
+									proposed_updates: [],
+									entity_confidence: 'low',
+								}
+								yield* Effect.logWarning('research.entity.weak').pipe(
+									Effect.annotateLogs({
+										research_id: researchId,
+										stripped_proposals: strippedProposals,
+									}),
+								)
+							}
+							// Applicability: drop any proposed CRM update that could never be
+							// applied — an update whose subject_id names no live row (the model
+							// can invent one for a company that does not exist), or a proposal
+							// whose fields carry no real values. Existence is checked against
+							// the org's own rows; a malformed id trips a cast error read as
+							// "not found".
+							const organizationId = (run as { organizationId: string })
+								.organizationId
+							const proposalList =
+								result != null &&
+								typeof result === 'object' &&
+								!Array.isArray(result)
+									? (result as Record<string, unknown>)['proposed_updates']
+									: undefined
+							const liveSubjects = new Set<string>()
+							if (Array.isArray(proposalList)) {
+								for (const proposal of proposalList) {
+									if (proposal == null || typeof proposal !== 'object') continue
+									const pu = proposal as Record<string, unknown>
+									if (pu['operation'] === 'create') continue
+									const table = pu['subject_table']
+									const id = pu['subject_id']
+									if (
+										(table !== 'companies' && table !== 'contacts') ||
+										typeof id !== 'string' ||
+										id.trim() === '' ||
+										liveSubjects.has(`${table}:${id}`)
+									)
+										continue
+									const rows = yield* sql`
+										SELECT id FROM ${sql(table)}
+										WHERE id = ${id}
+											AND organization_id = ${organizationId}
+											AND deleted_at IS NULL
+										LIMIT 1
+									`.pipe(Effect.catchTag('SqlError', () => Effect.succeed([])))
+									if (rows.length > 0) liveSubjects.add(`${table}:${id}`)
+								}
+							}
+							const applicability = filterApplicableProposals(
+								result,
+								(table, id) => liveSubjects.has(`${table}:${id}`),
+							)
+							result = applicability.findings
+							if (applicability.dropped > 0) {
+								yield* Effect.logWarning('research.proposals.unappliable').pipe(
+									Effect.annotateLogs({
+										research_id: researchId,
+										dropped: applicability.dropped,
+									}),
+								)
+							}
+							yield* publishEvent(researchId, 'tool.result', {
+								tool: 'llm.generateObject',
+								phase: 2,
+								schema: schemaName,
+							})
+							return {
+								findings: result as unknown,
+								outputTokens: structuredResponse.usage.outputTokens.total ?? 0,
+							}
+						})
+
+					// Link each page that returned content to the run so findings cite
+					// real sources; the sources row was upserted by the search cache
+					// (matched by url_hash). Re-running is a no-op via ON CONFLICT.
+					const linkRunSources = (hashes: ReadonlyArray<string>) =>
+						Effect.gen(function* () {
+							const organizationId = (run as { organizationId: string })
+								.organizationId
+							for (const urlHash of hashes) {
+								yield* sql`
+									INSERT INTO research_run_sources (organization_id, research_id, source_id, local_ref, fetched_at, cost_cents)
+									SELECT ${organizationId}, ${researchId}, s.id, s.url, now(), 0
+									FROM sources s
+									WHERE s.url_hash = ${urlHash}
+									ON CONFLICT DO NOTHING
+								`
+							}
+						})
+
 					if (checkpointPhase >= 1 && cachedResearchText) {
 						researchText = cachedResearchText
 						yield* Effect.logInfo('research.phase1.resume').pipe(
@@ -1057,121 +1258,213 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						// this run. `runRound` threads the growing prompt — each round's
 						// assistant text and tool results feed the next — and maps the
 						// model response into the plain data the loop decides on.
-						const loopResult = yield* Effect.gen(function* () {
+						const phaseOutcome = yield* Effect.gen(function* () {
 							const budget = yield* Budget
 							const toolkit = yield* researchToolkit
-							let prompt: Prompt.Prompt = Prompt.make(
-								`${systemPrompt}\n\n${query}`,
-							)
-							const runRound = (round: number) =>
+
+							// One agent pass = a fresh reflect-and-retry loop. Both the initial
+							// pass and a refined retry run here, under the SAME budget + toolkit:
+							// re-providing the layer would build a fresh MemoMap and reset the
+							// per-run spend, letting one run silently pay twice.
+							const runPass = (
+								basePrompt: string,
+								carryTokensIn: number,
+								carryTokensOut: number,
+							) =>
 								Effect.gen(function* () {
-									const response = yield* agentLlm.generateText({
-										prompt,
-										toolkit,
-										// Force a tool on the first round so the model can't
-										// answer from memory without gathering evidence (which
-										// would leave zero sources and fail the grounding gate
-										// on a legitimate company); reflect freely after.
-										toolChoice: round === 1 ? 'required' : 'auto',
-									})
-									prompt = Prompt.concat(
-										prompt,
-										Prompt.fromResponseParts(response.content),
-									)
-									// Attribute sources only to scrapes that actually returned
-									// content this round — read off the tool RESULTS, not the
-									// requested calls — so a failed or empty scrape can never
-									// count toward grounding; keep the content for the value guard.
-									const scrapeUrlHashes: string[] = []
-									for (const tr of response.toolResults) {
-										if (tr.name === 'scrape_page') {
-											const page = tr.result as
-												| { url?: unknown; markdown?: unknown }
-												| null
-												| undefined
-											if (
-												page != null &&
-												typeof page.url === 'string' &&
-												typeof page.markdown === 'string' &&
-												page.markdown.trim().length > 0
-											) {
-												scrapeUrlHashes.push(urlHashForScrape(page.url))
-												scrapeCorpus.push(page.markdown)
-											}
-										} else if (tr.name === 'web_search') {
-											// A search that returned scraped page content (Firecrawl
-											// scrapeOptions) is real fetched evidence — ground on each
-											// such result, exactly like a scrape. The sources row was
-											// upserted by the search cache when the tool ran.
-											const searchResult = tr.result as
-												| { items?: ReadonlyArray<unknown> }
-												| null
-												| undefined
-											for (const raw of searchResult?.items ?? []) {
-												const item = raw as { url?: unknown; content?: unknown }
-												if (
-													typeof item.url === 'string' &&
-													typeof item.content === 'string' &&
-													item.content.trim().length > 0
-												) {
-													scrapeUrlHashes.push(urlHashForScrape(item.url))
-													scrapeCorpus.push(item.content)
+									let prompt: Prompt.Prompt = Prompt.make(basePrompt)
+									const runRound = (round: number) =>
+										Effect.gen(function* () {
+											const response = yield* agentLlm.generateText({
+												prompt,
+												toolkit,
+												// Force a tool on the first round so the model can't
+												// answer from memory without gathering evidence (which
+												// would leave zero sources and fail the grounding gate
+												// on a legitimate company); reflect freely after.
+												toolChoice: round === 1 ? 'required' : 'auto',
+											})
+											prompt = Prompt.concat(
+												prompt,
+												Prompt.fromResponseParts(response.content),
+											)
+											// Attribute sources only to scrapes that actually returned
+											// content this round — read off the tool RESULTS, not the
+											// requested calls — so a failed or empty scrape can never
+											// count toward grounding; keep the content for the value guard.
+											const scrapeUrlHashes: string[] = []
+											for (const tr of response.toolResults) {
+												if (tr.name === 'scrape_page') {
+													const page = tr.result as
+														| { url?: unknown; markdown?: unknown }
+														| null
+														| undefined
+													if (
+														page != null &&
+														typeof page.url === 'string' &&
+														typeof page.markdown === 'string' &&
+														page.markdown.trim().length > 0
+													) {
+														scrapeUrlHashes.push(urlHashForScrape(page.url))
+														scrapeCorpus.push(page.markdown)
+													}
+												} else if (tr.name === 'web_search') {
+													// A search that returned scraped page content (Firecrawl
+													// scrapeOptions) is real fetched evidence — ground on each
+													// such result, exactly like a scrape. The sources row was
+													// upserted by the search cache when the tool ran.
+													const searchResult = tr.result as
+														| { items?: ReadonlyArray<unknown> }
+														| null
+														| undefined
+													for (const raw of searchResult?.items ?? []) {
+														const item = raw as {
+															url?: unknown
+															content?: unknown
+														}
+														if (
+															typeof item.url === 'string' &&
+															typeof item.content === 'string' &&
+															item.content.trim().length > 0
+														) {
+															scrapeUrlHashes.push(urlHashForScrape(item.url))
+															scrapeCorpus.push(item.content)
+														}
+													}
 												}
 											}
-										}
-									}
-									const renderedResults = response.toolResults.map(
-										tr =>
-											`[${tr.name}] ${boundedToolResult(tr.encodedResult ?? tr.result)}`,
-									)
-									// Record each fetch the model gave up on (a dead URL, a
-									// provider 4xx) so the skipped page shows in the run's tool
-									// log; the run keeps going and only fails if nothing grounds it.
-									for (const tr of response.toolResults) {
-										if (!tr.isFailure) continue
-										yield* Ref.update(toolLog, log => [
-											...log,
-											{
-												timestamp: DateTime.nowUnsafe().toString(),
-												type: 'result' as const,
-												tool: tr.name,
-												error: boundedToolResult(tr.encodedResult ?? tr.result),
-											},
-										])
-									}
-									yield* emitRound(
-										round,
-										response.text.length,
-										response.toolCalls.length,
-									)
-									return {
-										text: response.text,
-										hasToolCalls: response.toolCalls.length > 0,
-										scrapeUrlHashes,
-										renderedResults,
-										promptChars: JSON.stringify(response.content).length,
-										inputTokens: response.usage.inputTokens.total ?? 0,
-										outputTokens: response.usage.outputTokens.total ?? 0,
-									}
+											const renderedResults = response.toolResults.map(
+												tr =>
+													`[${tr.name}] ${boundedToolResult(tr.encodedResult ?? tr.result)}`,
+											)
+											// Record each fetch the model gave up on (a dead URL, a
+											// provider 4xx) so the skipped page shows in the run's tool
+											// log; the run keeps going and only fails if nothing grounds it.
+											for (const tr of response.toolResults) {
+												if (!tr.isFailure) continue
+												yield* Ref.update(toolLog, log => [
+													...log,
+													{
+														timestamp: DateTime.nowUnsafe().toString(),
+														type: 'result' as const,
+														tool: tr.name,
+														error: boundedToolResult(
+															tr.encodedResult ?? tr.result,
+														),
+													},
+												])
+											}
+											yield* emitRound(
+												round,
+												response.text.length,
+												response.toolCalls.length,
+											)
+											return {
+												text: response.text,
+												hasToolCalls: response.toolCalls.length > 0,
+												scrapeUrlHashes,
+												renderedResults,
+												promptChars: JSON.stringify(response.content).length,
+												inputTokens: response.usage.inputTokens.total ?? 0,
+												outputTokens: response.usage.outputTokens.total ?? 0,
+											}
+										})
+									return yield* runAgentResearchLoop({
+										maxSteps: maxAgentSteps,
+										maxPromptChars: MAX_LOOP_PROMPT_CHARS,
+										runRound,
+										budgetSnapshot: budget.snapshot(),
+										priorTokensIn: carryTokensIn,
+										priorTokensOut: carryTokensOut,
+									})
 								})
-							return yield* runAgentResearchLoop({
-								maxSteps: maxAgentSteps,
-								maxPromptChars: MAX_LOOP_PROMPT_CHARS,
-								runRound,
-								budgetSnapshot: budget.snapshot(),
+
+							let loop = yield* runPass(
+								`${systemPrompt}\n\n${query}`,
 								priorTokensIn,
 								priorTokensOut,
-							})
+							)
+
+							// A non-anchored discovery scan (prospect / competitor) that comes
+							// back empty gets ONE refined retry before we accept "found
+							// nothing": only here does an empty primary list mean the search —
+							// not the data — fell short, and only here is the entity gate a
+							// no-op. Extraction runs now so the emptiness check sees real
+							// structured findings; the retry reuses this pass's budget.
+							let findings: unknown
+							let refined = false
+							let extractOutputTokens = 0
+							if (isRetryEligible(schemaName) && entityTargets === null) {
+								yield* linkRunSources(loop.scrapedUrlHashes)
+								let extracted = yield* extractStructuredFindings(
+									loop.researchText,
+									[loop.evidenceText, ...scrapeCorpus].join('\n'),
+									null,
+								)
+								findings = extracted.findings
+								extractOutputTokens += extracted.outputTokens
+								if (
+									isDiscoveryScanEmpty(schemaName, findings) &&
+									canAffordAnotherRound(yield* budget.snapshot())
+								) {
+									refined = true
+									yield* Effect.logInfo('research.refining').pipe(
+										Effect.annotateLogs({
+											research_id: researchId,
+											schema: schemaName,
+										}),
+									)
+									yield* publishEvent(researchId, 'run.refining', {
+										schema: schemaName,
+									})
+									const retryLoop = yield* runPass(
+										`${systemPrompt}\n\n${query}\n\n${REFINE_HINT}`,
+										0,
+										0,
+									)
+									loop = {
+										researchText: [loop.researchText, retryLoop.researchText]
+											.filter(t => t.length > 0)
+											.join('\n\n'),
+										evidenceText: [loop.evidenceText, retryLoop.evidenceText]
+											.filter(t => t.length > 0)
+											.join('\n\n'),
+										scrapedUrlHashes: [
+											...new Set([
+												...loop.scrapedUrlHashes,
+												...retryLoop.scrapedUrlHashes,
+											]),
+										],
+										tokensIn: loop.tokensIn + retryLoop.tokensIn,
+										tokensOut: loop.tokensOut + retryLoop.tokensOut,
+										rounds: loop.rounds + retryLoop.rounds,
+										stopReason: retryLoop.stopReason,
+									}
+									yield* linkRunSources(retryLoop.scrapedUrlHashes)
+									extracted = yield* extractStructuredFindings(
+										loop.researchText,
+										[loop.evidenceText, ...scrapeCorpus].join('\n'),
+										null,
+									)
+									findings = extracted.findings
+									extractOutputTokens += extracted.outputTokens
+								}
+							}
+
+							return { loop, findings, refined, extractOutputTokens }
 						}).pipe(
 							Effect.provide(researchToolkitLayer),
 							Effect.provide(budgetLayer),
 							Effect.provide(Layer.succeed(ResearchRunContext)({ researchId })),
 						)
 
+						const loopResult = phaseOutcome.loop
 						researchText = loopResult.researchText
 						evidenceText = loopResult.evidenceText
 						tokensIn = loopResult.tokensIn
 						tokensOut = loopResult.tokensOut
+						retryFindings = phaseOutcome.findings
+						retryExtractTokens = phaseOutcome.extractOutputTokens
 
 						// Entity grounding gate: from the fetched evidence alone (never the
 						// model's prose), classify how strongly the pages concern the
@@ -1221,20 +1514,9 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						`
 
 						// Link every page scraped across the loop's rounds to the run so
-						// findings cite real sources. Scrapes run inside generateText, so
-						// the URLs of pages that returned content are collected each round
-						// and matched to the sources row the cache upserted (by url_hash).
-						// Writes as the fiber's privileged role, like the research_runs
-						// update above.
-						for (const urlHash of loopResult.scrapedUrlHashes) {
-							yield* sql`
-								INSERT INTO research_run_sources (organization_id, research_id, source_id, local_ref, fetched_at, cost_cents)
-								SELECT ${organizationId}, ${researchId}, s.id, s.url, now(), 0
-								FROM sources s
-								WHERE s.url_hash = ${urlHash}
-								ON CONFLICT DO NOTHING
-							`
-						}
+						// findings cite real sources (a discovery-scan retry may have linked
+						// some already — ON CONFLICT makes the re-link a no-op).
+						yield* linkRunSources(loopResult.scrapedUrlHashes)
 					}
 
 					// ── Phase 2: Structured output ──
@@ -1246,159 +1528,20 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							Effect.annotateLogs({ research_id: researchId }),
 						)
 					} else {
-						yield* publishEvent(researchId, 'tool.called', {
-							tool: 'llm.generateObject',
-							phase: 2,
-							schema: schemaName,
-						})
-						// Cast schema to satisfy generateObject's Encoder constraint.
-						// Registry schemas are all Structs with DecodingServices=never,
-						// but Schema.Top erases that — the cast is safe.
-						const structuredResponse = yield* extractLlm.generateObject({
-							schema: outputSchema as typeof FreeformSchema,
-							// Ground the extraction: the model may only output values that
-							// appear in the transcript, and must leave unsupported fields
-							// empty rather than filling them from prior knowledge — otherwise
-							// it will confidently invent phones, tax ids, and emails.
-							prompt: `Produce structured findings STRICTLY from the research transcript below. Only include a value that appears in the transcript; if the transcript does not support a field, omit it or leave it null — never fill a field from prior knowledge. Set each citation's source_id to the exact scraped URL the value came from.\n\nResearch transcript:\n\n${researchText}`,
-						})
-						findings = withProposalIds(structuredResponse.value as unknown)
-						// Drop citations the model invented: keep only source_ids that map
-						// to a page this run actually fetched. A proposed CRM update left
-						// with no valid citation is dropped whole. Cleaned before the
-						// checkpoint below, so a resumed run reads the validated findings.
-						const groundedRows = yield* sql<{
-							localRef: string
-							sourceId: string
-						}>`
-							SELECT local_ref AS "localRef", source_id AS "sourceId"
-							FROM research_run_sources WHERE research_id = ${researchId}
-						`
-						const groundedKeys = new Set<string>()
-						for (const row of groundedRows) {
-							groundedKeys.add(canonicalizeUrl(row.localRef))
-							groundedKeys.add(row.sourceId)
-						}
-						const citationCheck = validateFindingCitations(
-							findings,
-							sourceId =>
-								groundedKeys.has(canonicalizeUrl(sourceId)) ||
-								groundedKeys.has(sourceId),
-						)
-						findings = citationCheck.findings
-						if (citationCheck.total > citationCheck.kept) {
-							yield* Effect.logWarning('research.citations.dropped').pipe(
-								Effect.annotateLogs({
-									research_id: researchId,
-									total: citationCheck.total,
-									kept: citationCheck.kept,
-								}),
+						if (retryFindings !== undefined) {
+							// The discovery-scan retry path already ran extraction under the
+							// shared budget — reuse those findings and their token cost.
+							findings = retryFindings
+							tokensOut += retryExtractTokens
+						} else {
+							const extracted = yield* extractStructuredFindings(
+								researchText,
+								[evidenceText, ...scrapeCorpus].join('\n'),
+								entityMatch,
 							)
+							findings = extracted.findings
+							tokensOut += extracted.outputTokens
 						}
-						// Value provenance: the citation guard proved the cited pages were
-						// fetched, not that they contain the claimed values. Drop any
-						// proposed CRM write whose email/phone/tax-id value appears nowhere
-						// in the run's evidence (scraped pages + the tool transcript) — that
-						// value was invented, real citation or not.
-						// Check findings against tool-result evidence only — never the
-						// model's own prose (researchText) — so a value the model merely
-						// asserted in its reasoning cannot vouch for itself.
-						const evidenceCorpus = [evidenceText, ...scrapeCorpus].join('\n')
-						const valueCheck = verifyValueProvenance(findings, evidenceCorpus)
-						findings = valueCheck.findings
-						if (
-							valueCheck.droppedProposals > 0 ||
-							valueCheck.strippedValues > 0
-						) {
-							yield* Effect.logWarning('research.values.unsupported').pipe(
-								Effect.annotateLogs({
-									research_id: researchId,
-									dropped_proposals: valueCheck.droppedProposals,
-									stripped_values: valueCheck.strippedValues,
-								}),
-							)
-						}
-						// A weak entity match means the fetched pages only glancingly
-						// mention the target: keep the brief but withhold every CRM write
-						// and flag the low confidence, so a reviewer treats these findings
-						// with care rather than trusting an auto-applied update.
-						if (
-							entityMatch === 'weak' &&
-							findings != null &&
-							typeof findings === 'object' &&
-							!Array.isArray(findings)
-						) {
-							const current = findings as Record<string, unknown>
-							const strippedProposals = Array.isArray(
-								current['proposed_updates'],
-							)
-								? (current['proposed_updates'] as unknown[]).length
-								: 0
-							findings = {
-								...current,
-								proposed_updates: [],
-								entity_confidence: 'low',
-							}
-							yield* Effect.logWarning('research.entity.weak').pipe(
-								Effect.annotateLogs({
-									research_id: researchId,
-									stripped_proposals: strippedProposals,
-								}),
-							)
-						}
-						// Applicability: drop any proposed CRM update that could never be
-						// applied — an update whose subject_id names no live row (the model
-						// can invent one for a company that does not exist), or a proposal
-						// whose fields carry no real values. Existence is checked against
-						// the org's own rows; a malformed id trips a cast error read as
-						// "not found".
-						const organizationId = (run as { organizationId: string })
-							.organizationId
-						const proposalList =
-							findings != null &&
-							typeof findings === 'object' &&
-							!Array.isArray(findings)
-								? (findings as Record<string, unknown>)['proposed_updates']
-								: undefined
-						const liveSubjects = new Set<string>()
-						if (Array.isArray(proposalList)) {
-							for (const proposal of proposalList) {
-								if (proposal == null || typeof proposal !== 'object') continue
-								const pu = proposal as Record<string, unknown>
-								if (pu['operation'] === 'create') continue
-								const table = pu['subject_table']
-								const id = pu['subject_id']
-								if (
-									(table !== 'companies' && table !== 'contacts') ||
-									typeof id !== 'string' ||
-									id.trim() === '' ||
-									liveSubjects.has(`${table}:${id}`)
-								)
-									continue
-								const rows = yield* sql`
-									SELECT id FROM ${sql(table)}
-									WHERE id = ${id}
-										AND organization_id = ${organizationId}
-										AND deleted_at IS NULL
-									LIMIT 1
-								`.pipe(Effect.catchTag('SqlError', () => Effect.succeed([])))
-								if (rows.length > 0) liveSubjects.add(`${table}:${id}`)
-							}
-						}
-						const applicability = filterApplicableProposals(
-							findings,
-							(table, id) => liveSubjects.has(`${table}:${id}`),
-						)
-						findings = applicability.findings
-						if (applicability.dropped > 0) {
-							yield* Effect.logWarning('research.proposals.unappliable').pipe(
-								Effect.annotateLogs({
-									research_id: researchId,
-									dropped: applicability.dropped,
-								}),
-							)
-						}
-						tokensOut += structuredResponse.usage.outputTokens.total ?? 0
 						yield* Ref.update(toolLog, log => [
 							...log,
 							{
@@ -1408,11 +1551,6 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 								output: { schema: schemaName },
 							},
 						])
-						yield* publishEvent(researchId, 'tool.result', {
-							tool: 'llm.generateObject',
-							phase: 2,
-							schema: schemaName,
-						})
 						yield* sql`
 							UPDATE research_runs
 							SET phase = 2,
@@ -1476,6 +1614,36 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						`
 						yield* publishEvent(researchId, 'run.no_reliable_data', {
 							sourceCount: sources?.n ?? 0,
+						})
+						const parentGroupId = (run as { parentId: string | null }).parentId
+						if (parentGroupId) yield* rollupParentLocked(parentGroupId)
+						return
+					}
+
+					// An open-ended discovery scan that came back empty even after a
+					// refined retry has no reliable findings to report — mark it
+					// no_reliable_data instead of a green success over an empty list.
+					if (
+						entityTargets === null &&
+						isRetryEligible(schemaName) &&
+						isDiscoveryScanEmpty(schemaName, findings)
+					) {
+						yield* sql`
+							UPDATE research_runs
+							SET status = 'no_reliable_data',
+								phase = 3,
+								findings = ${JSON.stringify({
+									error:
+										'The search found no companies matching the criteria, even after a refined retry, so there are no reliable findings to report.',
+									reason: 'no_reliable_data',
+								})},
+								tool_log = ${JSON.stringify(finalToolLog)},
+								completed_at = now(),
+								updated_at = now()
+							WHERE id = ${researchId} AND status = 'running'
+						`
+						yield* publishEvent(researchId, 'run.no_reliable_data', {
+							reason: 'no_results',
 						})
 						const parentGroupId = (run as { parentId: string | null }).parentId
 						if (parentGroupId) yield* rollupParentLocked(parentGroupId)

@@ -29,6 +29,7 @@ import {
 	researchToolkit,
 	researchToolkitLayer,
 	ScrapePageTool,
+	stripPlaceholderSiteFilters,
 	WebSearchTool,
 } from './tools'
 
@@ -757,6 +758,93 @@ describe('researchToolkit — a web-fetch failure is non-fatal', () => {
 				// fiber is not killed, so one forbidden page can't sink the whole run
 				expect(isFailure).toBe(true)
 			})
+		})
+	})
+})
+
+describe('stripPlaceholderSiteFilters', () => {
+	describe('when real keywords carry a placeholder site: filter', () => {
+		it('should drop the filter and keep the keywords', () => {
+			// GIVEN a query with a made-up site:example.com filter
+			const query = 'midsize US 3PL freight brokerage site:example.com'
+
+			// WHEN the placeholder filter is stripped
+			const result = stripPlaceholderSiteFilters(query)
+
+			// THEN only the real keywords remain, with no double spaces
+			expect(result).toBe('midsize US 3PL freight brokerage')
+		})
+	})
+
+	describe('when the placeholder uses a non-.com or family host', () => {
+		it('should strip example.org, yourdomain.*, domain.*, and placeholder.*', () => {
+			// GIVEN queries with each recognised placeholder family
+			// WHEN each is stripped
+			// THEN the placeholder token is removed
+			expect(stripPlaceholderSiteFilters('freight site:example.org')).toBe(
+				'freight',
+			)
+			expect(stripPlaceholderSiteFilters('freight site:yourdomain.com')).toBe(
+				'freight',
+			)
+			expect(stripPlaceholderSiteFilters('freight site:domain.net')).toBe(
+				'freight',
+			)
+			expect(stripPlaceholderSiteFilters('freight site:placeholder.io')).toBe(
+				'freight',
+			)
+		})
+	})
+
+	describe('when the placeholder host has trailing punctuation', () => {
+		it('should still recognise and strip it', () => {
+			// GIVEN a site: filter followed by a comma
+			const query = 'brokers site:example.com, midsize'
+
+			// WHEN stripped
+			const result = stripPlaceholderSiteFilters(query)
+
+			// THEN the placeholder is gone and the rest is kept
+			expect(result).toBe('brokers midsize')
+		})
+	})
+
+	describe('when the site: filter targets a real domain', () => {
+		it('should keep it untouched', () => {
+			// GIVEN a query filtering by a real, known domain
+			const query = 'ocado directors site:gov.uk'
+
+			// WHEN stripped
+			const result = stripPlaceholderSiteFilters(query)
+
+			// THEN the real filter is preserved
+			expect(result).toBe('ocado directors site:gov.uk')
+		})
+	})
+
+	describe('when there is no site: filter at all', () => {
+		it('should return the query unchanged', () => {
+			// GIVEN a plain keyword query
+			const query = 'midsize US freight brokerage companies'
+
+			// WHEN stripped
+			const result = stripPlaceholderSiteFilters(query)
+
+			// THEN it is returned as-is
+			expect(result).toBe(query)
+		})
+	})
+
+	describe('when the query is only a placeholder site: filter', () => {
+		it('should keep the original so the search still runs', () => {
+			// GIVEN a query that is nothing but the placeholder filter
+			const query = 'site:example.com'
+
+			// WHEN stripping would leave an empty query
+			const result = stripPlaceholderSiteFilters(query)
+
+			// THEN the original is preserved rather than searching for nothing
+			expect(result).toBe('site:example.com')
 		})
 	})
 })

@@ -187,6 +187,14 @@ const spendCount = async (user: string): Promise<number> => {
 	return r.rows[0]?.n ?? 0
 }
 
+const spendTools = async (user: string): Promise<string[]> => {
+	const r = await pool.query<{ tool: string }>(
+		`SELECT tool FROM research_paid_spend WHERE user_id = $1 ORDER BY at`,
+		[user],
+	)
+	return r.rows.map(row => row.tool)
+}
+
 const originFindings = async (
 	id: string,
 ): Promise<{
@@ -243,6 +251,9 @@ describe('paid-action follow-up', () => {
 			// origin run
 			expect(registryCalls).toBe(before + 1)
 			expect(await spendCount(user)).toBe(1)
+			// AND the spend row records the real tool name, so a by-tool
+			// breakdown is meaningful (not the old hardcoded 'paid')
+			expect(await spendTools(user)).toEqual(['registry_lookup'])
 			const findings = await originFindings(origin)
 			expect(findings.followup_results?.length).toBe(1)
 			expect(findings.pending_paid_actions?.[0]?.['status']).toBe('approved')
