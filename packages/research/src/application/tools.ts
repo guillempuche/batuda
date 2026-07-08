@@ -115,9 +115,10 @@ const ToolResultSchema = Schema.Unknown
 // ── Tool definitions ──
 
 // A failed fetch (a dead URL, a provider 4xx) comes back to the model as a tool
-// result instead of aborting the run, so one unreachable page can't sink a whole
-// research pass — the model reads the error and moves on to another source. Only
-// the two web-fetch tools opt in; budget and registry failures stay fatal.
+// result instead of aborting the run, so one unreachable page or a forbidden
+// extraction can't sink a whole research pass — the model reads the error and
+// moves on to another source. All three web-fetch tools (search, scrape, extract)
+// opt in; budget and registry failures stay fatal.
 export const WebSearchTool = Tool.make('web_search', {
 	description:
 		'Search the public web for URLs relevant to a query. Returns a list of (url, title, snippet). Prefer this over scrape_page when you do not yet have a specific URL.',
@@ -139,6 +140,7 @@ export const ExtractStructuredTool = Tool.make('extract_structured', {
 		'Re-extract a page into a named structured schema. Use when downstream consumers need typed fields rather than prose.',
 	parameters: ExtractStructuredParams,
 	success: ToolResultSchema,
+	failureMode: 'return',
 })
 
 export const RegistryLookupTool = Tool.make('registry_lookup', {

@@ -213,6 +213,33 @@ const scrapePageResult = async (
 	return { result: last?.result, isFailure: last?.isFailure ?? false }
 }
 
+const extractStructuredResult = async (
+	extract: (input: ExtractInput) => Effect.Effect<unknown, ProviderError>,
+	params: { url: string; schema_name: string },
+): Promise<{ result: unknown; isFailure: boolean }> => {
+	const ports = Layer.mergeAll(
+		Layer.succeed(ExtractProvider)(ExtractProvider.of({ extract })),
+		StubSearchProvider,
+		StubScrapeProvider,
+		StubRegistryEsProvider,
+	)
+	const results = await Effect.runPromise(
+		Effect.gen(function* () {
+			const toolkit = yield* researchToolkit
+			const stream = yield* toolkit.handle('extract_structured', params)
+			return yield* Stream.runCollect(stream)
+		}).pipe(
+			Effect.provide(
+				researchToolkitLayer.pipe(
+					Layer.provide(Layer.mergeAll(ports, testInfra)),
+				),
+			),
+		),
+	)
+	const last = results[results.length - 1]
+	return { result: last?.result, isFailure: last?.isFailure ?? false }
+}
+
 const webSearchResult = async (
 	search: (input: SearchInput) => Effect.Effect<SearchResult, ProviderError>,
 	params: { query: string },
@@ -705,6 +732,29 @@ describe('researchToolkit — a web-fetch failure is non-fatal', () => {
 				)
 
 				// THEN the model receives a failure result and the run continues
+				expect(isFailure).toBe(true)
+			})
+		})
+	})
+
+	describe('extract_structured handler', () => {
+		describe('when the extract provider fails with a forbidden ProviderError', () => {
+			it('should surface the failure to the model instead of aborting the run', async () => {
+				// GIVEN an extract provider that rejects the page with a 403 (forbidden)
+				const { isFailure } = await extractStructuredResult(
+					() =>
+						Effect.fail(
+							new ProviderError({
+								provider: 'firecrawl',
+								message: 'extract failed: HTTP 403',
+								recoverable: false,
+							}),
+						),
+					{ url: 'https://acmecorp.es', schema_name: 'freeform' },
+				)
+
+				// THEN the model reads the failure and moves on — the generateText
+				// fiber is not killed, so one forbidden page can't sink the whole run
 				expect(isFailure).toBe(true)
 			})
 		})
