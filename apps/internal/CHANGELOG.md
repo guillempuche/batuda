@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-08 (internal-v2026.7.8)
+
+### Features
+
+* add cross-run review inbox and type review endpoints ([bbf3a56](https://github.com/guillempuche/batuda/commit/bbf3a5663f99c6b68a173acb96633cef68d5d544))
+* apply or reject many research proposals in one call ([1f3aeb2](https://github.com/guillempuche/batuda/commit/1f3aeb2cca8d291eccf3a63fb718029e9f2f3932))
+* auto-apply high-confidence verified research findings ([99814b8](https://github.com/guillempuche/batuda/commit/99814b85c7d2158789e01059e408ff8b53acd791))
+* execute an approved paid research follow-up safely ([bb86d93](https://github.com/guillempuche/batuda/commit/bb86d93684f139c700f6f37a34e3a7db2d14edf7))
+* fan a selector run out across matching companies ([94be140](https://github.com/guillempuche/batuda/commit/94be140f6e369f12b7ed26d0bc73e2ff69c7e3ad))
+* **internal:** add the research review UI ([67494e5](https://github.com/guillempuche/batuda/commit/67494e50d02176c0369f2b16bad5ff819446eeae))
+* make research runs honest about the company they researched ([01aaf6d](https://github.com/guillempuche/batuda/commit/01aaf6dcc0376ed3cd237c18fd3727d09c8dd547))
+* record who applied a research suggestion to the CRM ([da1304e](https://github.com/guillempuche/batuda/commit/da1304e0c881d2121b7dff3ed249327596d78f11))
+
+### Bug Fixes
+
+* **research:** normalize web_search location to a valid country code ([ee3a0f9](https://github.com/guillempuche/batuda/commit/ee3a0f99491ccb995df349c3d488766ce5b04ec8))
+* **research:** rebuild cached LLM responses so tool results survive ([45f26e3](https://github.com/guillempuche/batuda/commit/45f26e39a0eca49fae9ca627abb3becbca958570))
+* **research:** stop the company registry returning its raw provider payload ([673c54d](https://github.com/guillempuche/batuda/commit/673c54da7eb9348e87d5f76e39e09b46e0fc71d7))
+* **research:** stop website noise from polluting enrichment output ([574411f](https://github.com/guillempuche/batuda/commit/574411fb341bef8af4fa58a295f4a5f7ea2e9a84))
+
 ## 2026-07-06 (internal-v2026.7.6)
 
 ### Features
