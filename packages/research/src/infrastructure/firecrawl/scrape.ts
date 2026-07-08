@@ -24,6 +24,7 @@ import { ProviderError } from '../../domain/errors'
 import { ScrapedPage } from '../../domain/types'
 import { keyForSlot } from '../_config'
 import { hardenHttp } from '../_http-harden'
+import { cleanScrapedMarkdown } from './clean-scraped-markdown'
 
 const SCRAPE_URL = 'https://api.firecrawl.dev/v2/scrape'
 
@@ -103,7 +104,10 @@ export const makeFirecrawlScrape = (slot: number) =>
 									}),
 							),
 						)
-						const markdown = body.data.markdown ?? ''
+						// Clean page-builder markup out of the fetched markdown; an empty
+						// result means the page was mostly scaffolding, so it carries no
+						// content and the loop's grounding check skips it.
+						const markdown = cleanScrapedMarkdown(body.data.markdown ?? '')
 						return new ScrapedPage({
 							url: input.url,
 							markdown,
