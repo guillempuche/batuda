@@ -24,6 +24,7 @@ import { ProviderError } from '../../domain/errors'
 import { SearchResult, SearchResultItem } from '../../domain/types'
 import { keyForSlot } from '../_config'
 import { hardenHttp } from '../_http-harden'
+import { cleanScrapedMarkdown } from './clean-scraped-markdown'
 
 const SEARCH_URL = 'https://api.firecrawl.dev/v2/search'
 
@@ -126,17 +127,18 @@ export const makeFirecrawlSearch = (slot: number) =>
 							),
 						)
 						return new SearchResult({
-							items: (body.data.web ?? []).map(
-								r =>
-									new SearchResultItem({
-										url: r.url,
-										title: r.title ?? '',
-										snippet: r.description ?? '',
-										...(r.markdown && r.markdown.trim().length > 0
-											? { content: r.markdown }
-											: {}),
-									}),
-							),
+							items: (body.data.web ?? []).map(r => {
+								// Clean page-builder markup out of the scraped content before
+								// it becomes grounding evidence; an empty result means the page
+								// was mostly scaffolding, so the item carries no content.
+								const content = cleanScrapedMarkdown(r.markdown ?? '')
+								return new SearchResultItem({
+									url: r.url,
+									title: r.title ?? '',
+									snippet: r.description ?? '',
+									...(content.length > 0 ? { content } : {}),
+								})
+							}),
 							// Bill the credits Firecrawl actually charged (search plus the
 							// per-result scrape), not a flat 1, so the run budget is honest.
 							units: body.creditsUsed ?? 1,
