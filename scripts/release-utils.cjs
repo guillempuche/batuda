@@ -81,9 +81,55 @@ const changelogPreset = {
 const changelogHeader =
 	'# Changelog\n\nAll notable changes to this project will be documented in this file.\n'
 
+// The release version is the date (YYYY.M.D). A second release on the same day
+// gets a "-N" suffix so the base stays a valid 3-segment SemVer, which pnpm's
+// workspace resolver requires. This is the single source of truth for the
+// version — used by both the release-it version plugin and the changelog
+// finalizeContext below, so the two can never disagree.
+function computeCalverVersion(latestVersion) {
+	const now = new Date()
+	const todayPrefix = `${now.getFullYear()}.${now.getMonth() + 1}.${now.getDate()}`
+	if (latestVersion) {
+		const match = latestVersion.match(/^(\d+\.\d+\.\d+)(?:-(\d+))?$/)
+		if (match && match[1] === todayPrefix) {
+			const n = match[2] === undefined ? 1 : parseInt(match[2], 10) + 1
+			return `${todayPrefix}-${n}`
+		}
+	}
+	return todayPrefix
+}
+
+// The changelog writer fills the header's {{currentTag}} from a standard SemVer
+// bump of the last version (a feature is a minor bump), which disagrees with the
+// date-based version the release actually tags — so a release with a feature
+// previewed the wrong number in the header. This rewrites the render context to
+// the date-based version, keeping the header in step with the tag. The previous
+// tag (e.g. "server-v2026.7.7-1") supplies both the tag prefix and the version to
+// bump from.
+function calverFinalizeContext(context) {
+	const priorTag = context.previousTag || context.currentTag || ''
+	const match = priorTag.match(/^(.*?v)(\d.*)$/)
+	if (match) {
+		const version = computeCalverVersion(match[2])
+		context.version = version
+		context.currentTag = `${match[1]}${version}`
+	}
+	return context
+}
+
+// Shared changelog writer options for every target's release config, so the
+// header template and the version-alignment fix live in one place.
+const changelogWriterOpts = {
+	headerPartial: '## {{date}} ({{currentTag}})\n',
+	finalizeContext: calverFinalizeContext,
+}
+
 module.exports = {
 	getCommitPaths,
 	getCommitPathsArray,
 	changelogPreset,
 	changelogHeader,
+	computeCalverVersion,
+	calverFinalizeContext,
+	changelogWriterOpts,
 }
