@@ -131,7 +131,7 @@ If ALL changed files match `ai` patterns → use `ai` type. If mixed with non-AI
 ## Rules
 
 1. **Subject**: Imperative mood, lowercase after colon, no period, max 72 chars
-2. **Body**: Past tense, capital start, period at end
+2. **Body**: Past tense, capital start, period at end. One physical line per bullet — never hard-wrap a bullet mid-sentence at ~72 columns; only the subject has a length limit. Let the terminal soft-wrap.
 3. **No attribution**: Never include "Co-Authored-By", "Generated with", or any AI/author attribution
 4. **AI-only changes**: When changes are exclusively AI-related (see AI Scope), always use `ai` type
 5. **No mechanical cleanup or implementation narration**: Don't mention consequences obvious from the primary change (removed unused imports, unwrapped single-child fragments, updated indentation), and don't describe how the diff achieves the change ("added a helper that maps X to Y" when the diff is the helper). Focus on intent / why, not mechanism
@@ -175,6 +175,7 @@ Run this checklist on every message **before** returning the preview:
 3. **Tautology**: Verify the subject does not repeat the type word (fix/fix, refactor/refactor, feat/feat, docs/docs, etc.)
 4. **Mood**: Subject uses imperative ("add", "fix", "migrate") — not past tense ("added", "fixed")
 5. **Body**: Every bullet starts with a capital letter, uses past tense, ends with a period
+6. **Body wrapping**: Each bullet is a single physical line — no hard wrap mid-sentence
 
 ## Examples
 
