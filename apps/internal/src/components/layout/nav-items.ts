@@ -5,8 +5,11 @@ import {
 	Calendar,
 	CheckSquare,
 	FileText,
+	FolderOpen,
 	Gauge,
 	Mail,
+	MessagesSquare,
+	Microscope,
 	Settings,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
@@ -50,6 +53,13 @@ export const navItems: ReadonlyArray<NavItem> = [
 		testId: 'companies',
 	},
 	{
+		label: msg`Research`,
+		path: '/research',
+		icon: Microscope,
+		color: 'var(--color-status-prospect)',
+		testId: 'research',
+	},
+	{
 		label: msg`Emails`,
 		path: '/emails',
 		icon: Mail,
@@ -83,5 +93,69 @@ export const navItems: ReadonlyArray<NavItem> = [
 		icon: Settings,
 		color: 'var(--color-status-prospect)',
 		testId: 'settings',
+	},
+]
+
+/**
+ * Mobile-only grouping of the nav. The desktop SideNav shows every
+ * `navItems` entry in a scrollable rack, but the fixed bottom belt only
+ * fits a few knobs — so on small screens the sections are folded into four
+ * belt slots. A slot with a single member is a plain link (Pipeline,
+ * Settings); a slot with several opens a small popover listing its members
+ * (Records, Comms). Members keep the same `testId` inside the popover, so a
+ * tap-through still lands on `nav-<testId>`.
+ */
+export type NavGroup = {
+	label: MessageDescriptor
+	icon: ComponentType<{ size?: number | string }>
+	color: string
+	testId: string
+	items: ReadonlyArray<NavItem>
+}
+
+function itemByPath(path: string): NavItem {
+	const found = navItems.find(entry => entry.path === path)
+	if (found === undefined) {
+		throw new Error(`nav-items: no nav item for path "${path}"`)
+	}
+	return found
+}
+
+export const navGroups: ReadonlyArray<NavGroup> = [
+	{
+		label: msg`Pipeline`,
+		icon: Gauge,
+		color: 'var(--color-status-meeting)',
+		testId: 'pipeline',
+		items: [itemByPath('/')],
+	},
+	{
+		label: msg`Records`,
+		icon: FolderOpen,
+		color: 'var(--color-status-client)',
+		testId: 'records',
+		items: [
+			itemByPath('/companies'),
+			itemByPath('/research'),
+			itemByPath('/pages'),
+		],
+	},
+	{
+		label: msg`Comms`,
+		icon: MessagesSquare,
+		color: 'var(--color-status-contacted)',
+		testId: 'comms',
+		items: [
+			itemByPath('/emails'),
+			itemByPath('/calendar'),
+			itemByPath('/tasks'),
+		],
+	},
+	{
+		label: msg`Settings`,
+		icon: Settings,
+		color: 'var(--color-status-prospect)',
+		testId: 'settings',
+		items: [itemByPath('/settings')],
 	},
 ]

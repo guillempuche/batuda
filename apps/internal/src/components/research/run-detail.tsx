@@ -13,6 +13,9 @@ import { CompetitorScanView } from '#/components/research/findings/competitor-sc
 import { ContactDiscoveryView } from '#/components/research/findings/contact-discovery-view'
 import { FreeformView } from '#/components/research/findings/freeform-view'
 import { ProspectScanView } from '#/components/research/findings/prospect-scan-view'
+import { ProposedUpdatesReview } from '#/components/research/review/proposed-updates-review'
+import { RunProgress } from '#/components/research/run-progress'
+import { useResearchEvents } from '#/hooks/use-research-events'
 import {
 	brushedMetalPlate,
 	rulerUnderRule,
@@ -43,6 +46,12 @@ type ResearchRunDetail = {
 export function RunDetail({ researchId }: { readonly researchId: string }) {
 	const result = useAtomValue(researchDetailAtom(researchId))
 
+	// Narrow up front so the live-progress hook (a Hook, so it can't sit behind
+	// an early return) knows whether the run is still in flight.
+	const run = AsyncResult.isSuccess(result) ? narrowRun(result.value) : null
+	const isRunning = run?.status === 'running' || run?.status === 'queued'
+	const { progress } = useResearchEvents(researchId, { enabled: isRunning })
+
 	if (AsyncResult.isInitial(result) || AsyncResult.isWaiting(result)) {
 		return (
 			<Panel data-testid='research-run-detail'>
@@ -63,7 +72,6 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 		)
 	}
 
-	const run = narrowRun(result.value)
 	if (run === null) {
 		return (
 			<Panel data-testid='research-run-detail'>
@@ -73,8 +81,6 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 			</Panel>
 		)
 	}
-
-	const isRunning = run.status === 'running' || run.status === 'queued'
 
 	return (
 		<Panel data-testid='research-run-detail'>
@@ -94,11 +100,7 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 				<ShapedBy templateNames={run.templateNames} />
 			</Header>
 
-			{isRunning ? (
-				<RunningBanner data-testid='research-run-running'>
-					<Trans>Run in progress — events stream as they arrive.</Trans>
-				</RunningBanner>
-			) : null}
+			{isRunning ? <RunProgress progress={progress} /> : null}
 
 			{run.status === 'failed' || run.status === 'no_reliable_data' ? (
 				<ErrorBlock role='alert' data-testid={`research-run-failure-${run.id}`}>
@@ -123,6 +125,8 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 					<MarkdownView source={run.briefMd} />
 				</Section>
 			) : null}
+
+			{isRunning ? null : <ProposedUpdatesReview researchId={run.id} />}
 
 			<Section data-testid='research-run-findings'>
 				<SectionTitle>
@@ -271,13 +275,6 @@ const StatusText = styled.span.withConfig({
 
 const SchemaText = styled.span`
 	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
-`
-
-const RunningBanner = styled.div`
-	font-family: var(--font-body);
-	font-size: var(--typescale-body-small-size);
-	font-style: italic;
-	color: var(--color-on-surface-variant);
 `
 
 const ErrorBlock = styled.div`

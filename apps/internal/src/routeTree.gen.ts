@@ -15,6 +15,7 @@ import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TasksIndexRouteImport } from './routes/tasks/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
+import { Route as ResearchIndexRouteImport } from './routes/research/index'
 import { Route as ProfileIndexRouteImport } from './routes/profile/index'
 import { Route as PagesIndexRouteImport } from './routes/pages/index'
 import { Route as EmailsIndexRouteImport } from './routes/emails/index'
@@ -34,6 +35,7 @@ import { Route as SettingsApiKeysIndexRouteImport } from './routes/settings/api-
 import { Route as SettingsProfileTemplatesRouteImport } from './routes/settings/profile/templates'
 import { Route as SettingsOrganizationTemplatesRouteImport } from './routes/settings/organization/templates'
 import { Route as SettingsOrganizationSpendRouteImport } from './routes/settings/organization/spend'
+import { Route as SettingsOrganizationPolicyRouteImport } from './routes/settings/organization/policy'
 import { Route as SettingsOrganizationMembersRouteImport } from './routes/settings/organization/members'
 import { Route as SettingsMcpConnectionsRouteImport } from './routes/settings/mcp/connections'
 
@@ -65,6 +67,11 @@ const TasksIndexRoute = TasksIndexRouteImport.update({
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
   id: '/settings/',
   path: '/settings/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResearchIndexRoute = ResearchIndexRouteImport.update({
+  id: '/research/',
+  path: '/research/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfileIndexRoute = ProfileIndexRouteImport.update({
@@ -166,6 +173,12 @@ const SettingsOrganizationSpendRoute =
     path: '/settings/organization/spend',
     getParentRoute: () => rootRouteImport,
   } as any)
+const SettingsOrganizationPolicyRoute =
+  SettingsOrganizationPolicyRouteImport.update({
+    id: '/settings/organization/policy',
+    path: '/settings/organization/policy',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const SettingsOrganizationMembersRoute =
   SettingsOrganizationMembersRouteImport.update({
     id: '/settings/organization/members',
@@ -195,10 +208,12 @@ export interface FileRoutesByFullPath {
   '/emails/': typeof EmailsIndexRoute
   '/pages/': typeof PagesIndexRoute
   '/profile/': typeof ProfileIndexRoute
+  '/research/': typeof ResearchIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/tasks/': typeof TasksIndexRoute
   '/settings/mcp/connections': typeof SettingsMcpConnectionsRoute
   '/settings/organization/members': typeof SettingsOrganizationMembersRoute
+  '/settings/organization/policy': typeof SettingsOrganizationPolicyRoute
   '/settings/organization/spend': typeof SettingsOrganizationSpendRoute
   '/settings/organization/templates': typeof SettingsOrganizationTemplatesRoute
   '/settings/profile/templates': typeof SettingsProfileTemplatesRoute
@@ -224,10 +239,12 @@ export interface FileRoutesByTo {
   '/emails': typeof EmailsIndexRoute
   '/pages': typeof PagesIndexRoute
   '/profile': typeof ProfileIndexRoute
+  '/research': typeof ResearchIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/tasks': typeof TasksIndexRoute
   '/settings/mcp/connections': typeof SettingsMcpConnectionsRoute
   '/settings/organization/members': typeof SettingsOrganizationMembersRoute
+  '/settings/organization/policy': typeof SettingsOrganizationPolicyRoute
   '/settings/organization/spend': typeof SettingsOrganizationSpendRoute
   '/settings/organization/templates': typeof SettingsOrganizationTemplatesRoute
   '/settings/profile/templates': typeof SettingsProfileTemplatesRoute
@@ -254,10 +271,12 @@ export interface FileRoutesById {
   '/emails/': typeof EmailsIndexRoute
   '/pages/': typeof PagesIndexRoute
   '/profile/': typeof ProfileIndexRoute
+  '/research/': typeof ResearchIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/tasks/': typeof TasksIndexRoute
   '/settings/mcp/connections': typeof SettingsMcpConnectionsRoute
   '/settings/organization/members': typeof SettingsOrganizationMembersRoute
+  '/settings/organization/policy': typeof SettingsOrganizationPolicyRoute
   '/settings/organization/spend': typeof SettingsOrganizationSpendRoute
   '/settings/organization/templates': typeof SettingsOrganizationTemplatesRoute
   '/settings/profile/templates': typeof SettingsProfileTemplatesRoute
@@ -285,10 +304,12 @@ export interface FileRouteTypes {
     | '/emails/'
     | '/pages/'
     | '/profile/'
+    | '/research/'
     | '/settings/'
     | '/tasks/'
     | '/settings/mcp/connections'
     | '/settings/organization/members'
+    | '/settings/organization/policy'
     | '/settings/organization/spend'
     | '/settings/organization/templates'
     | '/settings/profile/templates'
@@ -314,10 +335,12 @@ export interface FileRouteTypes {
     | '/emails'
     | '/pages'
     | '/profile'
+    | '/research'
     | '/settings'
     | '/tasks'
     | '/settings/mcp/connections'
     | '/settings/organization/members'
+    | '/settings/organization/policy'
     | '/settings/organization/spend'
     | '/settings/organization/templates'
     | '/settings/profile/templates'
@@ -343,10 +366,12 @@ export interface FileRouteTypes {
     | '/emails/'
     | '/pages/'
     | '/profile/'
+    | '/research/'
     | '/settings/'
     | '/tasks/'
     | '/settings/mcp/connections'
     | '/settings/organization/members'
+    | '/settings/organization/policy'
     | '/settings/organization/spend'
     | '/settings/organization/templates'
     | '/settings/profile/templates'
@@ -373,10 +398,12 @@ export interface RootRouteChildren {
   EmailsIndexRoute: typeof EmailsIndexRoute
   PagesIndexRoute: typeof PagesIndexRoute
   ProfileIndexRoute: typeof ProfileIndexRoute
+  ResearchIndexRoute: typeof ResearchIndexRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
   TasksIndexRoute: typeof TasksIndexRoute
   SettingsMcpConnectionsRoute: typeof SettingsMcpConnectionsRoute
   SettingsOrganizationMembersRoute: typeof SettingsOrganizationMembersRoute
+  SettingsOrganizationPolicyRoute: typeof SettingsOrganizationPolicyRoute
   SettingsOrganizationSpendRoute: typeof SettingsOrganizationSpendRoute
   SettingsOrganizationTemplatesRoute: typeof SettingsOrganizationTemplatesRoute
   SettingsProfileTemplatesRoute: typeof SettingsProfileTemplatesRoute
@@ -428,6 +455,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings/'
       preLoaderRoute: typeof SettingsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/research/': {
+      id: '/research/'
+      path: '/research'
+      fullPath: '/research/'
+      preLoaderRoute: typeof ResearchIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profile/': {
@@ -563,6 +597,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsOrganizationSpendRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/organization/policy': {
+      id: '/settings/organization/policy'
+      path: '/settings/organization/policy'
+      fullPath: '/settings/organization/policy'
+      preLoaderRoute: typeof SettingsOrganizationPolicyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/organization/members': {
       id: '/settings/organization/members'
       path: '/settings/organization/members'
@@ -597,10 +638,12 @@ const rootRouteChildren: RootRouteChildren = {
   EmailsIndexRoute: EmailsIndexRoute,
   PagesIndexRoute: PagesIndexRoute,
   ProfileIndexRoute: ProfileIndexRoute,
+  ResearchIndexRoute: ResearchIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
   TasksIndexRoute: TasksIndexRoute,
   SettingsMcpConnectionsRoute: SettingsMcpConnectionsRoute,
   SettingsOrganizationMembersRoute: SettingsOrganizationMembersRoute,
+  SettingsOrganizationPolicyRoute: SettingsOrganizationPolicyRoute,
   SettingsOrganizationSpendRoute: SettingsOrganizationSpendRoute,
   SettingsOrganizationTemplatesRoute: SettingsOrganizationTemplatesRoute,
   SettingsProfileTemplatesRoute: SettingsProfileTemplatesRoute,

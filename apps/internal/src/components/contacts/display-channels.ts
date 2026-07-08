@@ -10,6 +10,8 @@ export type DisplayChannel = {
 	readonly kind: string
 	readonly value: string
 	readonly verification: string | null
+	/** Stored 0–100 confidence score, or null. Shown as a trust badge. */
+	readonly confidence: number | null
 	readonly isPrimary: boolean
 	readonly status: EmailChannelStatus
 	readonly statusReason: string | null
@@ -36,6 +38,7 @@ export function narrowChannels(raw: unknown): ReadonlyArray<DisplayChannel> {
 			value: r['value'],
 			verification:
 				typeof r['verification'] === 'string' ? r['verification'] : null,
+			confidence: typeof r['confidence'] === 'number' ? r['confidence'] : null,
 			isPrimary: r['is_primary'] === true,
 			status: asEmailStatus(r['status']),
 			statusReason:

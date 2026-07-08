@@ -39,10 +39,25 @@ describe('narrowChannels', () => {
 				kind: 'email',
 				value: 'pep@calpepfonda.cat',
 				verification: 'deliverable',
+				confidence: null,
 				isPrimary: true,
 				status: 'bounced',
 				statusReason: 'Permanent',
 			})
+		})
+
+		it('should read a stored confidence score', () => {
+			// GIVEN a channel carrying a 0–100 confidence
+			// THEN it is kept for the trust badge
+			const [c] = narrowChannels([channel({ confidence: 82 })])
+			expect(c?.confidence).toBe(82)
+		})
+
+		it('should default a missing confidence to null', () => {
+			// GIVEN a channel with no confidence
+			// THEN confidence is null (no badge score)
+			const [c] = narrowChannels([channel()])
+			expect(c?.confidence).toBeNull()
 		})
 
 		it('should narrow an unrecognized status to unknown', () => {

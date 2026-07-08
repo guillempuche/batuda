@@ -43,10 +43,6 @@ msgstr "S'eliminarà «{0}» per sempre. Això no es pot desfer."
 msgid "\"{name}\" is now an org template."
 msgstr "«{name}» ja és una plantilla de l'organització."
 
-#: src/components/research/run-list.tsx
-msgid "(no schema)"
-msgstr "(sense esquema)"
-
 #: src/components/companies/conversations-tab.tsx
 #: src/routes/emails/$threadId.tsx
 #: src/routes/emails/index.tsx
@@ -88,15 +84,33 @@ msgstr "{0} missatges"
 msgid "{0} no longer allows password sign-in for mail apps, so it can't be connected here yet — it needs an OAuth sign-in. Pick another provider or use Generic IMAP."
 msgstr "{0} ja no permet iniciar la sessió amb contrasenya a les aplicacions de correu, així que de moment no es pot connectar aquí: necessita un inici de sessió OAuth. Tria un altre proveïdor o fes servir IMAP genèric."
 
+#. placeholder {0}: progress.sourceCount
+#: src/components/research/run-progress.tsx
+msgid "{0} sources"
+msgstr "{0} fonts"
+
+#. placeholder {0}: progress.toolCalls
+#: src/components/research/run-progress.tsx
+msgid "{0} steps run"
+msgstr "{0} passos fets"
+
 #. placeholder {0}: failedIds.length
 #: src/routes/emails/index.tsx
 #: src/routes/emails/index.tsx
 msgid "{0} thread could not be updated."
 msgstr "No s'han pogut actualitzar {0} fils."
 
+#: src/components/layout/nav-group-knob.tsx
+msgid "{groupLabel} sections"
+msgstr "Seccions de {groupLabel}"
+
 #: src/routes/emails/index.tsx
 msgid "{selectedCount} threads selected"
 msgstr "{selectedCount} fils seleccionats"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "{threshold}%"
+msgstr "{threshold}%"
 
 #: src/routes/emails/index.tsx
 msgid "{total} threads"
@@ -284,6 +298,7 @@ msgstr "Agent IA"
 msgid "AI assistants you've connected over MCP. Each may act in one or more of your organizations; the assistant picks which per request."
 msgstr "Assistents d'IA que has connectat per MCP. Cadascun pot actuar en una o més de les teves organitzacions; l'assistent tria quina en cada petició."
 
+#: src/components/research/inbox/research-inbox.tsx
 #: src/routes/companies/index.tsx
 #: src/routes/emails/index.tsx
 msgid "All"
@@ -314,6 +329,10 @@ msgstr "Permet"
 msgid "Already in CRM"
 msgstr "Ja al CRM"
 
+#: src/components/research/proposal-outcome.tsx
+msgid "Already resolved"
+msgstr "Ja resolt"
+
 #: src/routes/oauth/consent.tsx
 msgid "An AI assistant wants to connect to your Batuda account over MCP and act on your behalf. Only approve assistants you trust."
 msgstr "Un assistent d'IA vol connectar-se al teu compte de Batuda per MCP i actuar en nom teu. Aprova només els assistents en qui confiïs."
@@ -326,6 +345,42 @@ msgstr "Qualsevol agent que faci servir \"{confirmLabel}\" deixarà de funcionar
 #: src/routes/settings/profile/index.tsx
 msgid "API keys"
 msgstr "Claus d'API"
+
+#: src/components/research/proposal-outcome.tsx
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Applied"
+msgstr "Aplicat"
+
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Apply"
+msgstr "Aplica"
+
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Apply {cardLabel}"
+msgstr "Aplica {cardLabel}"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Apply {subjectLabel}"
+msgstr "Aplica {subjectLabel}"
+
+#. placeholder {0}: verifiedPending.length
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Apply all verified ({0})"
+msgstr "Aplica tot el verificat ({0})"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Apply all verified ({verifiedToApply})"
+msgstr "Aplica tot el verificat ({verifiedToApply})"
+
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Applying a discovered contact merges it into a matching record if one already exists."
+msgstr "En aplicar un contacte descobert, es fusiona amb un registre coincident si ja existeix."
+
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Applying…"
+msgstr "Aplicant…"
 
 #: src/routes/emails/$threadId.tsx
 #: src/routes/emails/index.tsx
@@ -354,17 +409,30 @@ msgstr "Adjunta"
 msgid "attachment"
 msgstr "adjunt"
 
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Attention needed"
+msgstr "Requereix atenció"
+
 #: src/routes/tasks/index.tsx
 msgid "Audit log"
 msgstr "Registre d'auditoria"
 
+#: src/routes/settings/organization/policy.tsx
+msgid "Auto-apply"
+msgstr "Aplica automàticament"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Auto-apply verified findings"
+msgstr "Aplica automàticament les conclusions verificades"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Auto-approve paid calls under"
+msgstr "Aprova automàticament les crides de pagament per sota de"
+
 #: src/routes/settings/profile/templates.tsx
 msgid "Back to account"
 msgstr "Torna al compte"
-
-#: src/routes/research/$id.tsx
-msgid "Back to companies"
-msgstr "Tornar a empreses"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Back to emails"
@@ -376,10 +444,15 @@ msgid "Back to inbox"
 msgstr "Torna a la safata"
 
 #: src/routes/settings/organization/members.tsx
+#: src/routes/settings/organization/policy.tsx
 #: src/routes/settings/organization/spend.tsx
 #: src/routes/settings/organization/templates.tsx
 msgid "Back to organization"
 msgstr "Tornar a l'organització"
+
+#: src/routes/research/$id.tsx
+msgid "Back to research"
+msgstr "Torna a la recerca"
 
 #: src/routes/settings/api-keys/index.tsx
 #: src/routes/settings/mcp/connections.tsx
@@ -505,6 +578,10 @@ msgstr "Cancel·la la pujada"
 #: src/routes/oauth/consent.tsx
 msgid "Cancelling…"
 msgstr "Cancel·lant…"
+
+#: src/components/research/trust-badge.tsx
+msgid "Catch-all"
+msgstr "Genèric"
 
 #: src/components/emails/compose-form.tsx
 #: src/routes/emails/$threadId.tsx
@@ -670,6 +747,11 @@ msgid "Comma-separated"
 msgstr "Separats per comes"
 
 #: src/components/layout/nav-items.ts
+msgid "Comms"
+msgstr "Comunicació"
+
+#: src/components/layout/nav-items.ts
+#: src/components/research/inbox/research-inbox.tsx
 #: src/routes/companies/index.tsx
 msgid "Companies"
 msgstr "Empreses"
@@ -718,6 +800,10 @@ msgstr "Redacta"
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Conclusion or commitment (optional)"
 msgstr "Conclusió o compromís (opcional)"
+
+#: src/components/research/trust-badge.tsx
+msgid "Confirmed"
+msgstr "Confirmat"
 
 #: src/routes/settings/profile/index.tsx
 msgid "Connect AI tools"
@@ -780,6 +866,7 @@ msgid "Contacted"
 msgstr "Contactat"
 
 #: src/components/research/findings/company-enrichment-view.tsx
+#: src/components/research/inbox/research-inbox.tsx
 msgid "Contacts"
 msgstr "Contactes"
 
@@ -829,6 +916,11 @@ msgstr "Copia el slug"
 msgid "Copy your key now"
 msgstr "Copia la teva clau ara"
 
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Could not apply the batch."
+msgstr "No s'ha pogut aplicar el lot."
+
 #: src/routes/settings/organization/members.tsx
 msgid "Could not cancel the invitation to {email}. Please try again."
 msgstr "No s'ha pogut cancel·lar la invitació a {email}. Torna-ho a provar."
@@ -860,6 +952,10 @@ msgstr "No s'han pogut carregar les empreses"
 #: src/routes/emails/inboxes.tsx
 msgid "Could not load inboxes"
 msgstr "No s'han pogut carregar les safates"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Could not load the review queue."
+msgstr "No s'ha pogut carregar la cua de revisió."
 
 #: src/routes/companies/$slug.tsx
 msgid "Could not load this company"
@@ -911,9 +1007,18 @@ msgstr "No s'ha pogut eliminar {email}. Torna-ho a provar."
 msgid "Could not resend the invitation to {0}. Please try again."
 msgstr "No s'ha pogut reenviar la invitació a {0}. Torna-ho a provar."
 
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Could not resolve this proposal."
+msgstr "No s'ha pogut resoldre aquesta proposta."
+
 #: src/routes/companies/$slug.tsx
 msgid "Could not save"
 msgstr "No s'ha pogut desar"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Could not save the budget."
+msgstr "No s'ha pogut desar el pressupost."
 
 #: src/routes/emails/inboxes.tsx
 msgid "Could not save the inbox."
@@ -1080,6 +1185,7 @@ msgstr "Crea peu de pàgina"
 msgid "Create key"
 msgstr "Crea la clau"
 
+#: src/components/research/proposal-outcome.tsx
 #: src/routes/emails/$threadId.tsx
 msgid "Created"
 msgstr "Creada"
@@ -1395,9 +1501,17 @@ msgstr "Primer escriu un correu vàlid a sobre."
 msgid "Enter an email address."
 msgstr "Introdueix una adreça electrònica."
 
+#: src/routes/settings/organization/policy.tsx
+msgid "Enter valid amounts before saving."
+msgstr "Introdueix imports vàlids abans de desar."
+
 #: src/routes/emails/inboxes.tsx
 msgid "Enter your mail server settings below."
 msgstr "Introdueix la configuració del servidor de correu a sota."
+
+#: src/components/research/proposal-outcome.tsx
+msgid "Error"
+msgstr "Error"
 
 #: src/components/shared/channel-icon.tsx
 msgid "Event"
@@ -1436,6 +1550,10 @@ msgstr "La caducitat ha de ser un nombre de dies més gran que zero."
 msgid "Extending the org default"
 msgstr "S'amplia el valor per defecte de l'organització"
 
+#: src/components/research/run-progress.tsx
+msgid "Extracting findings"
+msgstr "Extraient conclusions"
+
 #: src/routes/emails/$threadId.tsx
 msgid "Failed"
 msgstr "Fallit"
@@ -1457,6 +1575,10 @@ msgstr "Filtra per safata"
 #: src/routes/emails/index.tsx
 msgid "Filter by status"
 msgstr "Filtra per estat"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Filter by subject"
+msgstr "Filtra per subjecte"
 
 #: src/routes/companies/index.tsx
 msgid "Filter companies"
@@ -1499,6 +1621,14 @@ msgstr "Peus de pàgina — {0}"
 msgid "Forgot password?"
 msgstr "Has oblidat la contrasenya?"
 
+#: src/routes/settings/organization/policy.tsx
+msgid "Free research work allowed for one run."
+msgstr "Treball de recerca gratuït permès per a una execució."
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Free-text, low-confidence or unverified — read before applying."
+msgstr "Text lliure, poca confiança o sense verificar — llegeix-ho abans d'aplicar."
+
 #: src/components/research/research-dialog.tsx
 msgid "Freeform"
 msgstr "Lliure"
@@ -1527,6 +1657,10 @@ msgstr "De la teva organització, s'aplica primer"
 msgid "Full screen"
 msgstr "Pantalla completa"
 
+#: src/components/research/run-progress.tsx
+msgid "Gathering evidence"
+msgstr "Recollint proves"
+
 #: src/routes/settings/mcp/index.tsx
 msgid "Give an AI assistant access to this organization's CRM. Chat apps like ChatGPT and Claude.ai connect over OAuth; coding tools use an API key."
 msgstr "Dona a un assistent d'IA accés al CRM d'aquesta organització. Les aplicacions de xat com ChatGPT i Claude.ai es connecten amb OAuth; les eines de programació fan servir una clau API."
@@ -1542,6 +1676,10 @@ msgstr "Ves a connexions"
 #: src/routes/reset-password.tsx
 msgid "Go to sign in"
 msgstr "Ves a iniciar sessió"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Hard limit on paid research spend each month."
+msgstr "Límit màxim de despesa de recerca de pagament cada mes."
 
 #: src/routes/accept-invitation.$id.tsx
 msgid "Heading to the dashboard…"
@@ -1686,6 +1824,10 @@ msgstr "Interacció"
 msgid "Interaction logged"
 msgstr "Interacció registrada"
 
+#: src/components/research/proposal-outcome.tsx
+msgid "Invalid"
+msgstr "No vàlid"
+
 #: src/routes/settings/organization/members.tsx
 msgid "Invitation sent to {sentEmail}."
 msgstr "Invitació enviada a {sentEmail}."
@@ -1791,6 +1933,14 @@ msgstr "Carregant empreses…"
 #: src/components/research/run-detail.tsx
 msgid "Loading run…"
 msgstr "Carregant l'execució…"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Loading the review queue…"
+msgstr "Carregant la cua de revisió…"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Loading your research budget…"
+msgstr "Carregant el teu pressupost de recerca…"
 
 #: src/components/companies/upcoming-meetings-card.tsx
 #: src/components/shared/loading-spinner.tsx
@@ -1954,6 +2104,10 @@ msgstr "Propostes dels membres"
 msgid "Members"
 msgstr "Membres"
 
+#: src/components/research/proposal-outcome.tsx
+msgid "Merged into existing"
+msgstr "Fusionat amb un existent"
+
 #: src/components/emails/compose-form.tsx
 msgid "Message"
 msgstr "Missatge"
@@ -1975,6 +2129,18 @@ msgstr "Meva"
 msgid "Minimize"
 msgstr "Minimitza"
 
+#: src/routes/settings/organization/policy.tsx
+msgid "Minimum confidence"
+msgstr "Confiança mínima"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Minimum confidence to auto-apply"
+msgstr "Confiança mínima per aplicar automàticament"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Monthly paid cap"
+msgstr "Límit mensual de pagament"
+
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/api-keys/index.tsx
@@ -1992,6 +2158,10 @@ msgstr "nom@exemple.cat, altre@exemple.cat"
 #: src/routes/index.tsx
 msgid "Needs attention"
 msgstr "Necessita atenció"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Needs your review"
+msgstr "Necessita la teva revisió"
 
 #: src/components/companies/cadence-card.tsx
 #: src/components/companies/cadence-card.tsx
@@ -2210,13 +2380,10 @@ msgstr "No hi ha cap proposta pendent de revisió."
 msgid "No redirect URI"
 msgstr "Sense URI de redirecció"
 
+#: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/run-detail.tsx
 msgid "No reliable data found"
 msgstr "No s'han trobat dades fiables"
-
-#: src/components/research/run-list.tsx
-msgid "No research runs yet for this company."
-msgstr "Encara no hi ha recerques per a aquesta empresa."
 
 #: src/components/companies/research-summary-card.tsx
 msgid "No research yet."
@@ -2279,9 +2446,17 @@ msgstr "Nota"
 msgid "Nothing changed yet."
 msgstr "Encara no ha canviat res."
 
+#: src/components/research/proposal-outcome.tsx
+msgid "Nothing to apply"
+msgstr "Res per aplicar"
+
 #: src/routes/oauth/consent.tsx
 msgid "Nothing to authorize"
 msgstr "Res a autoritzar"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Nothing to review right now."
+msgstr "Ara mateix no hi ha res per revisar."
 
 #: src/routes/settings/organization/spend.tsx
 msgid "Nothing to show in this range."
@@ -2299,6 +2474,11 @@ msgstr "Un cop connectat, puc enviar i rebre correu per tu des d'aquí, sense ca
 msgid "One click to accept the invitation."
 msgstr "Un clic per acceptar la invitació."
 
+#: src/routes/settings/organization/policy.tsx
+msgid "Only machine-verified values apply on their own; free-text always waits for review."
+msgstr "Només els valors verificats per màquina s'apliquen sols; el text lliure sempre espera revisió."
+
+#: src/components/research/inbox/research-inbox.tsx
 #: src/routes/emails/$threadId.tsx
 #: src/routes/emails/index.tsx
 #: src/routes/tasks/index.tsx
@@ -2339,10 +2519,18 @@ msgstr "Obre Instagram"
 msgid "Open LinkedIn"
 msgstr "Obre LinkedIn"
 
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Open run"
+msgstr "Obre l'execució"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Open run for {subjectLabel}"
+msgstr "Obre l'execució de {subjectLabel}"
+
 #. placeholder {0}: run.query
-#: src/components/research/run-list.tsx
-msgid "Open research run {0}"
-msgstr "Obre la recerca {0}"
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Open run: {0}"
+msgstr "Obre l'execució: {0}"
 
 #: src/components/shared/task-item.tsx
 msgid "Open task details"
@@ -2481,6 +2669,14 @@ msgstr "Títol de la pàgina"
 msgid "Pages"
 msgstr "Pàgines"
 
+#: src/routes/settings/organization/policy.tsx
+msgid "Paid calls at or below this run without asking."
+msgstr "Les crides de pagament iguals o inferiors a aquest import s'executen sense preguntar."
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Paid provider calls allowed within one run."
+msgstr "Crides a proveïdors de pagament permeses en una execució."
+
 #: src/routes/settings/organization/index.tsx
 msgid "Paid research API calls billed to this org."
 msgstr "Crides d'API de recerca pagades carregades a aquesta organització."
@@ -2488,6 +2684,10 @@ msgstr "Crides d'API de recerca pagades carregades a aquesta organització."
 #: src/routes/settings/organization/spend.tsx
 msgid "Paid research API calls billed to this organization."
 msgstr "Crides d'API de recerca pagades carregades a aquesta organització."
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Paid spend this month"
+msgstr "Despesa de pagament aquest mes"
 
 #: src/components/research/findings/prospect-scan-view.tsx
 msgid "Pain indicators"
@@ -2549,6 +2749,10 @@ msgstr "Invitacions pendents"
 msgid "Pending paid actions"
 msgstr "Accions de pagament pendents"
 
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Pending review"
+msgstr "Pendent de revisió"
+
 #: src/routes/companies/$slug.tsx
 #: src/routes/companies/$slug.tsx
 msgid "People"
@@ -2557,6 +2761,14 @@ msgstr "Persones"
 #: src/routes/settings/organization/members.tsx
 msgid "People with access to this workspace."
 msgstr "Persones amb accés a aquest espai de treball."
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Per-run budget"
+msgstr "Pressupost per execució"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Per-run paid budget"
+msgstr "Pressupost de pagament per execució"
 
 #: src/routes/calendar/index.tsx
 #: src/routes/emails/inboxes.tsx
@@ -2602,6 +2814,7 @@ msgstr "Tria les plantilles per fer servir només en aquesta recerca. Deixa-ho b
 msgid "Pick your email provider"
 msgstr "Tria el teu proveïdor de correu"
 
+#: src/components/layout/nav-items.ts
 #: src/components/layout/nav-items.ts
 #: src/routes/index.tsx
 msgid "Pipeline"
@@ -2688,7 +2901,7 @@ msgstr "Proposta en revisió"
 msgid "Proposals, meeting notes and attachments will show up here."
 msgstr "Les propostes, notes de reunió i adjunts apareixeran aquí."
 
-#: src/components/research/findings/shared.tsx
+#: src/components/research/review/proposed-updates-review.tsx
 msgid "Proposed updates"
 msgstr "Actualitzacions proposades"
 
@@ -2751,14 +2964,35 @@ msgstr "Afegeix ràpid: «Truca a Acme demà #high»"
 msgid "Read state update failed"
 msgstr "Ha fallat l'actualització de l'estat de lectura"
 
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Ready to apply"
+msgstr "A punt per aplicar"
+
 #: src/routes/tasks/index.tsx
 #: src/routes/tasks/index.tsx
 msgid "Recent changes"
 msgstr "Canvis recents"
 
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Recent runs"
+msgstr "Execucions recents"
+
 #: src/routes/companies/$slug.tsx
 msgid "Recipient marked as spam"
 msgstr "El destinatari ha marcat el missatge com a brossa"
+
+#: src/components/research/proposal-outcome.tsx
+msgid "Record changed since research"
+msgstr "El registre ha canviat des de la recerca"
+
+#: src/components/layout/nav-items.ts
+msgid "Records"
+msgstr "Registres"
+
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Refresh"
+msgstr "Actualitza"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Refreshing inbox status…"
@@ -2769,6 +3003,24 @@ msgstr "Actualitzant l'estat de la bústia…"
 #: src/components/research/findings/prospect-scan-view.tsx
 msgid "Region"
 msgstr "Regió"
+
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Reject"
+msgstr "Rebutja"
+
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Reject {cardLabel}"
+msgstr "Rebutja {cardLabel}"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Reject {subjectLabel}"
+msgstr "Rebutja {subjectLabel}"
+
+#: src/components/research/proposal-outcome.tsx
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Rejected"
+msgstr "Rebutjat"
 
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/organization/members.tsx
@@ -2845,9 +3097,21 @@ msgstr "Demana un enllaç nou"
 
 #: src/components/companies/research-summary-card.tsx
 #: src/components/instructions/agent-selector.tsx
+#: src/components/layout/nav-items.ts
+#: src/components/research/inbox/research-inbox.tsx
 #: src/components/shared/channel-icon.tsx
 msgid "Research"
 msgstr "Recerca"
+
+#: src/routes/settings/organization/index.tsx
+#: src/routes/settings/organization/policy.tsx
+#: src/routes/settings/organization/policy.tsx
+msgid "Research budget"
+msgstr "Pressupost de recerca"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Research budget saved."
+msgstr "Pressupost de recerca desat."
 
 #: src/routes/research/$id.tsx
 msgid "Research run"
@@ -2903,17 +3167,22 @@ msgstr "Reprèn la sincronització"
 msgid "Reusable, standing guidance your agents follow — what you sell, who you target, tone, and which sources to trust."
 msgstr "Orientació reutilitzable i permanent que segueixen els teus agents: què vens, a qui t'adreces, el to i en quines fonts confiar."
 
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Review what the research agent found and decide what enters the CRM."
+msgstr "Revisa què ha trobat l'agent de recerca i decideix què entra al CRM."
+
+#: src/components/research/trust-badge.tsx
+msgid "Risky"
+msgstr "Arriscat"
+
 #: src/routes/settings/organization/members.tsx
 msgid "Role"
 msgstr "Rol"
 
+#: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/run-detail.tsx
 msgid "Run failed"
 msgstr "Execució fallida"
-
-#: src/components/research/run-detail.tsx
-msgid "Run in progress — events stream as they arrive."
-msgstr "Execució en curs — els esdeveniments arriben en temps real."
 
 #: src/components/companies/research-summary-card.tsx
 msgid "Run new"
@@ -2922,6 +3191,10 @@ msgstr "Executa una nova"
 #: src/components/research/research-dialog.tsx
 msgid "Run new research"
 msgstr "Inicia una recerca"
+
+#: src/components/research/proposal-outcome.tsx
+msgid "Run not found"
+msgstr "Execució no trobada"
 
 #: src/components/research/run-detail.tsx
 msgid "Run shape unrecognised."
@@ -2941,6 +3214,10 @@ msgstr "Desa"
 #: src/components/instructions/default-stack-editor.tsx
 msgid "Save as my default"
 msgstr "Desa com el meu valor per defecte"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Save budget"
+msgstr "Desa el pressupost"
 
 #: src/routes/pages/$id.tsx
 msgid "Save failed"
@@ -2967,6 +3244,7 @@ msgstr "Desa el valor per defecte de l'organització"
 #: src/routes/emails/inboxes.tsx
 #: src/routes/pages/$id.tsx
 #: src/routes/reset-password.tsx
+#: src/routes/settings/organization/policy.tsx
 #: src/routes/settings/profile/index.tsx
 #: src/routes/settings/profile/index.tsx
 msgid "Saving…"
@@ -2987,6 +3265,10 @@ msgstr "Cerca empreses"
 #: src/routes/emails/index.tsx
 msgid "Search threads"
 msgstr "Cerca fils"
+
+#: src/components/research/run-progress.tsx
+msgid "Searching and reasoning"
+msgstr "Cercant i raonant"
 
 #: src/routes/settings/organization/index.tsx
 msgid "See who can access this workspace, invite teammates, and manage pending invitations."
@@ -3090,10 +3372,15 @@ msgstr "Estableix com a predeterminat"
 msgid "Set password"
 msgstr "Posa contrasenya"
 
+#: src/routes/settings/organization/index.tsx
+msgid "Set research budgets and auto-apply"
+msgstr "Configura els pressupostos de recerca i l'aplicació automàtica"
+
 #: src/components/research/research-dialog.tsx
 msgid "Set up reusable <0>instruction templates</0> to guide every run."
 msgstr "Configura <0>plantilles d'instruccions</0> reutilitzables per guiar cada recerca."
 
+#: src/components/layout/nav-items.ts
 #: src/components/layout/nav-items.ts
 #: src/routes/pages/$id.tsx
 #: src/routes/settings/api-keys/index.tsx
@@ -3238,6 +3525,14 @@ msgstr "Alguna cosa ha fallat. Prova-ho de nou."
 msgid "Source"
 msgstr "Origen"
 
+#: src/components/research/provenance.tsx
+msgid "Sourced from research"
+msgstr "Obtingut de la recerca"
+
+#: src/components/research/provenance.tsx
+msgid "Sourced from research on {dateLabel}"
+msgstr "Obtingut de la recerca el {dateLabel}"
+
 #: src/routes/emails/index.tsx
 msgid "Spam"
 msgstr "Brossa"
@@ -3248,6 +3543,18 @@ msgstr "Brossa"
 #: src/routes/settings/organization/spend.tsx
 msgid "Spend"
 msgstr "Despesa"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Spend ceilings"
+msgstr "Límits de despesa"
+
+#: src/routes/settings/organization/index.tsx
+msgid "Spend ceilings and the confidence needed to auto-apply findings."
+msgstr "Límits de despesa i la confiança necessària per aplicar automàticament les conclusions."
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Spend ceilings for research and how confident a finding must be to apply on its own."
+msgstr "Límits de despesa per a la recerca i quina confiança ha de tenir una conclusió per aplicar-se sola."
 
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Stamped into the workshop ledger."
@@ -3269,6 +3576,10 @@ msgstr "Inicia"
 msgid "Start sending and receiving"
 msgstr "Comença a enviar i rebre"
 
+#: src/components/research/run-progress.tsx
+msgid "Starting the run…"
+msgstr "Iniciant l'execució…"
+
 #: src/components/research/research-dialog.tsx
 msgid "Starting…"
 msgstr "Iniciant…"
@@ -3289,6 +3600,11 @@ msgstr "Estat"
 msgid "Status update failed"
 msgstr "Ha fallat l'actualització d'estat"
 
+#. placeholder {0}: progress.phase
+#: src/components/research/run-progress.tsx
+msgid "Step {0} of 3"
+msgstr "Pas {0} de 3"
+
 #: src/routes/settings/organization/templates.tsx
 #: src/routes/settings/profile/templates.tsx
 msgid "Still in use"
@@ -3301,6 +3617,10 @@ msgstr "Es desa xifrada amb AES-256-GCM."
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Strengths"
 msgstr "Punts forts"
+
+#: src/components/research/run-progress.tsx
+msgid "Structuring the findings"
+msgstr "Estructurant les conclusions"
 
 #: src/components/emails/compose-form.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
@@ -3593,6 +3913,10 @@ msgstr "Escriu i prem Retorn"
 msgid "Type the email you sign in with. We'll send a reset link."
 msgstr "Escriu el correu amb què inicies sessió. T'enviaré un enllaç per restablir-la."
 
+#: src/components/research/trust-badge.tsx
+msgid "Undeliverable"
+msgstr "No es pot lliurar"
+
 #: src/components/companies/calendar-tab.tsx
 #: src/components/companies/conversations-tab.tsx
 #: src/components/companies/research-summary-card.tsx
@@ -3624,6 +3948,11 @@ msgstr "Sense títol"
 #: src/routes/settings/api-keys/index.tsx
 msgid "Untitled key"
 msgstr "Clau sense títol"
+
+#: src/components/research/trust-badge.tsx
+#: src/components/research/trust-badge.tsx
+msgid "Unverified"
+msgstr "Sense verificar"
 
 #: src/components/companies/upcoming-meetings-card.tsx
 #: src/components/companies/upcoming-meetings-card.tsx
@@ -3691,6 +4020,10 @@ msgstr "Nom d'usuari"
 #: src/components/instructions/default-stack-editor.tsx
 msgid "Using the org default"
 msgstr "S'utilitza el valor per defecte de l'organització"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Verified emails and grounded values — safe to apply in one click."
+msgstr "Correus verificats i valors fonamentats — segurs per aplicar amb un clic."
 
 #: src/components/shared/timeline-entry.tsx
 msgid "View thread"
@@ -3770,6 +4103,8 @@ msgstr "Qui"
 msgid "Who's your email provider?"
 msgstr "Quin és el teu proveïdor de correu?"
 
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/review/proposed-updates-review.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Working…"
 msgstr "Processant…"
@@ -3786,10 +4121,15 @@ msgstr "Escriu el peu de pàgina…"
 msgid "Write your message…"
 msgstr "Escriu el teu missatge…"
 
+#: src/components/research/run-progress.tsx
+msgid "Writing the brief"
+msgstr "Redactant l'informe"
+
 #: src/routes/settings/profile/index.tsx
 msgid "You currently sign in from email links. Add a password to skip checking your email next time."
 msgstr "Ara mateix entres des d'enllaços al correu. Afegeix una contrasenya per no haver de mirar el correu la pròxima vegada."
 
+#: src/routes/settings/organization/policy.tsx
 #: src/routes/settings/organization/spend.tsx
 msgid "You don't have permission to see this page."
 msgstr "No tens permís per veure aquesta pàgina."
