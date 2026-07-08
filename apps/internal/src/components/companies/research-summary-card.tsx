@@ -5,7 +5,7 @@ import styled from 'styled-components'
 
 import { PriButton } from '@batuda/ui/pri'
 
-import type { ResearchRunRow } from '#/components/research/run-list'
+import type { ResearchRunRow } from '#/components/research/run-shapes'
 import { RelativeDate } from '#/components/shared/relative-date'
 import {
 	agedPaperSurface,

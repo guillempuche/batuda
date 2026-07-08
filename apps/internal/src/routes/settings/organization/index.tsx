@@ -1,6 +1,12 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Building2, ScrollText, Users, Wallet } from 'lucide-react'
+import {
+	Building2,
+	ScrollText,
+	SlidersHorizontal,
+	Users,
+	Wallet,
+} from 'lucide-react'
 import styled from 'styled-components'
 
 import { authClient } from '#/lib/auth-client'
@@ -110,6 +116,27 @@ function OrganizationSettingsPage() {
 							</NavRowLabel>
 							<NavRowDescription>
 								<Trans>Paid research API calls billed to this org.</Trans>
+							</NavRowDescription>
+						</NavRow>
+					) : null}
+
+					{canInvite ? (
+						<NavRow
+							to='/settings/organization/policy'
+							data-testid='settings-org-policy-link'
+							aria-label={t`Set research budgets and auto-apply`}
+						>
+							<NavRowLabel>
+								<SlidersHorizontal size={18} aria-hidden />
+								<NavRowTitle>
+									<Trans>Research budget</Trans>
+								</NavRowTitle>
+							</NavRowLabel>
+							<NavRowDescription>
+								<Trans>
+									Spend ceilings and the confidence needed to auto-apply
+									findings.
+								</Trans>
 							</NavRowDescription>
 						</NavRow>
 					) : null}

@@ -81,56 +81,6 @@ export function CitationList({
 	)
 }
 
-export function ProposedUpdatesSection({
-	updates,
-}: {
-	readonly updates: ReadonlyArray<ProposedUpdate>
-}) {
-	if (updates.length === 0) return null
-	return (
-		<Section data-testid='research-proposed-updates'>
-			<SectionTitle>
-				<Trans>Proposed updates</Trans>
-			</SectionTitle>
-			<List>
-				{updates.map(u => {
-					const key = stableKey([
-						'pu',
-						u.subjectTable,
-						u.subjectId ?? '',
-						u.reason ?? '',
-						u.fields ? JSON.stringify(u.fields) : '',
-					])
-					return (
-						<ListItem key={key}>
-							<RowHead>
-								<Pill>{u.subjectTable}</Pill>
-								{u.subjectId !== undefined ? (
-									<SubjectId>{u.subjectId}</SubjectId>
-								) : null}
-							</RowHead>
-							{u.fields !== undefined ? (
-								<FieldsTable>
-									{Object.entries(u.fields).map(([k, v]) => (
-										<FieldRow key={k}>
-											<FieldKey>{k}</FieldKey>
-											<FieldValue>
-												{typeof v === 'string' ? v : JSON.stringify(v)}
-											</FieldValue>
-										</FieldRow>
-									))}
-								</FieldsTable>
-							) : null}
-							{u.reason !== undefined ? <Reason>{u.reason}</Reason> : null}
-							<CitationList citations={u.citations} />
-						</ListItem>
-					)
-				})}
-			</List>
-		</Section>
-	)
-}
-
 export function PendingPaidActionsSection({
 	actions,
 }: {
@@ -196,19 +146,14 @@ export function CommonSections({
 }: {
 	readonly findings: CommonFindings | null | undefined
 }) {
-	const proposed = findings?.proposedUpdates ?? []
+	// Proposed updates and already-in-CRM matches are shown by the actionable
+	// review on the run page, so the read-only findings block only keeps the
+	// pending paid actions.
 	const paid = findings?.pendingPaidActions ?? []
-	const existing = findings?.discoveredExisting ?? []
-	if (proposed.length === 0 && paid.length === 0 && existing.length === 0) {
+	if (paid.length === 0) {
 		return null
 	}
-	return (
-		<>
-			<DiscoveredExistingSection matches={existing} />
-			<ProposedUpdatesSection updates={proposed} />
-			<PendingPaidActionsSection actions={paid} />
-		</>
-	)
+	return <PendingPaidActionsSection actions={paid} />
 }
 
 // ── Shared styled primitives ──

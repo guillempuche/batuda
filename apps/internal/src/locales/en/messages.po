@@ -43,10 +43,6 @@ msgstr "\"{0}\" will be removed for good. This can't be undone."
 msgid "\"{name}\" is now an org template."
 msgstr "\"{name}\" is now an org template."
 
-#: src/components/research/run-list.tsx
-msgid "(no schema)"
-msgstr "(no schema)"
-
 #: src/components/companies/conversations-tab.tsx
 #: src/routes/emails/$threadId.tsx
 #: src/routes/emails/index.tsx
@@ -88,15 +84,33 @@ msgstr "{0} msgs"
 msgid "{0} no longer allows password sign-in for mail apps, so it can't be connected here yet — it needs an OAuth sign-in. Pick another provider or use Generic IMAP."
 msgstr "{0} no longer allows password sign-in for mail apps, so it can't be connected here yet — it needs an OAuth sign-in. Pick another provider or use Generic IMAP."
 
+#. placeholder {0}: progress.sourceCount
+#: src/components/research/run-progress.tsx
+msgid "{0} sources"
+msgstr "{0} sources"
+
+#. placeholder {0}: progress.toolCalls
+#: src/components/research/run-progress.tsx
+msgid "{0} steps run"
+msgstr "{0} steps run"
+
 #. placeholder {0}: failedIds.length
 #: src/routes/emails/index.tsx
 #: src/routes/emails/index.tsx
 msgid "{0} thread could not be updated."
 msgstr "{0} thread could not be updated."
 
+#: src/components/layout/nav-group-knob.tsx
+msgid "{groupLabel} sections"
+msgstr "{groupLabel} sections"
+
 #: src/routes/emails/index.tsx
 msgid "{selectedCount} threads selected"
 msgstr "{selectedCount} threads selected"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "{threshold}%"
+msgstr "{threshold}%"
 
 #: src/routes/emails/index.tsx
 msgid "{total} threads"
@@ -284,6 +298,7 @@ msgstr "AI agent"
 msgid "AI assistants you've connected over MCP. Each may act in one or more of your organizations; the assistant picks which per request."
 msgstr "AI assistants you've connected over MCP. Each may act in one or more of your organizations; the assistant picks which per request."
 
+#: src/components/research/inbox/research-inbox.tsx
 #: src/routes/companies/index.tsx
 #: src/routes/emails/index.tsx
 msgid "All"
@@ -314,6 +329,10 @@ msgstr "Allow"
 msgid "Already in CRM"
 msgstr "Already in CRM"
 
+#: src/components/research/proposal-outcome.tsx
+msgid "Already resolved"
+msgstr "Already resolved"
+
 #: src/routes/oauth/consent.tsx
 msgid "An AI assistant wants to connect to your Batuda account over MCP and act on your behalf. Only approve assistants you trust."
 msgstr "An AI assistant wants to connect to your Batuda account over MCP and act on your behalf. Only approve assistants you trust."
@@ -326,6 +345,42 @@ msgstr "Any agent using \"{confirmLabel}\" will stop working. This can't be undo
 #: src/routes/settings/profile/index.tsx
 msgid "API keys"
 msgstr "API keys"
+
+#: src/components/research/proposal-outcome.tsx
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Applied"
+msgstr "Applied"
+
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Apply"
+msgstr "Apply"
+
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Apply {cardLabel}"
+msgstr "Apply {cardLabel}"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Apply {subjectLabel}"
+msgstr "Apply {subjectLabel}"
+
+#. placeholder {0}: verifiedPending.length
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Apply all verified ({0})"
+msgstr "Apply all verified ({0})"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Apply all verified ({verifiedToApply})"
+msgstr "Apply all verified ({verifiedToApply})"
+
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Applying a discovered contact merges it into a matching record if one already exists."
+msgstr "Applying a discovered contact merges it into a matching record if one already exists."
+
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Applying…"
+msgstr "Applying…"
 
 #: src/routes/emails/$threadId.tsx
 #: src/routes/emails/index.tsx
@@ -354,17 +409,30 @@ msgstr "Attach"
 msgid "attachment"
 msgstr "attachment"
 
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Attention needed"
+msgstr "Attention needed"
+
 #: src/routes/tasks/index.tsx
 msgid "Audit log"
 msgstr "Audit log"
 
+#: src/routes/settings/organization/policy.tsx
+msgid "Auto-apply"
+msgstr "Auto-apply"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Auto-apply verified findings"
+msgstr "Auto-apply verified findings"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Auto-approve paid calls under"
+msgstr "Auto-approve paid calls under"
+
 #: src/routes/settings/profile/templates.tsx
 msgid "Back to account"
 msgstr "Back to account"
-
-#: src/routes/research/$id.tsx
-msgid "Back to companies"
-msgstr "Back to companies"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Back to emails"
@@ -376,10 +444,15 @@ msgid "Back to inbox"
 msgstr "Back to inbox"
 
 #: src/routes/settings/organization/members.tsx
+#: src/routes/settings/organization/policy.tsx
 #: src/routes/settings/organization/spend.tsx
 #: src/routes/settings/organization/templates.tsx
 msgid "Back to organization"
 msgstr "Back to organization"
+
+#: src/routes/research/$id.tsx
+msgid "Back to research"
+msgstr "Back to research"
 
 #: src/routes/settings/api-keys/index.tsx
 #: src/routes/settings/mcp/connections.tsx
@@ -505,6 +578,10 @@ msgstr "Cancel upload"
 #: src/routes/oauth/consent.tsx
 msgid "Cancelling…"
 msgstr "Cancelling…"
+
+#: src/components/research/trust-badge.tsx
+msgid "Catch-all"
+msgstr "Catch-all"
 
 #: src/components/emails/compose-form.tsx
 #: src/routes/emails/$threadId.tsx
@@ -670,6 +747,11 @@ msgid "Comma-separated"
 msgstr "Comma-separated"
 
 #: src/components/layout/nav-items.ts
+msgid "Comms"
+msgstr "Comms"
+
+#: src/components/layout/nav-items.ts
+#: src/components/research/inbox/research-inbox.tsx
 #: src/routes/companies/index.tsx
 msgid "Companies"
 msgstr "Companies"
@@ -718,6 +800,10 @@ msgstr "Compose"
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Conclusion or commitment (optional)"
 msgstr "Conclusion or commitment (optional)"
+
+#: src/components/research/trust-badge.tsx
+msgid "Confirmed"
+msgstr "Confirmed"
 
 #: src/routes/settings/profile/index.tsx
 msgid "Connect AI tools"
@@ -780,6 +866,7 @@ msgid "Contacted"
 msgstr "Contacted"
 
 #: src/components/research/findings/company-enrichment-view.tsx
+#: src/components/research/inbox/research-inbox.tsx
 msgid "Contacts"
 msgstr "Contacts"
 
@@ -829,6 +916,11 @@ msgstr "Copy slug"
 msgid "Copy your key now"
 msgstr "Copy your key now"
 
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Could not apply the batch."
+msgstr "Could not apply the batch."
+
 #: src/routes/settings/organization/members.tsx
 msgid "Could not cancel the invitation to {email}. Please try again."
 msgstr "Could not cancel the invitation to {email}. Please try again."
@@ -860,6 +952,10 @@ msgstr "Could not load companies"
 #: src/routes/emails/inboxes.tsx
 msgid "Could not load inboxes"
 msgstr "Could not load inboxes"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Could not load the review queue."
+msgstr "Could not load the review queue."
 
 #: src/routes/companies/$slug.tsx
 msgid "Could not load this company"
@@ -911,9 +1007,18 @@ msgstr "Could not remove {email}. Please try again."
 msgid "Could not resend the invitation to {0}. Please try again."
 msgstr "Could not resend the invitation to {0}. Please try again."
 
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Could not resolve this proposal."
+msgstr "Could not resolve this proposal."
+
 #: src/routes/companies/$slug.tsx
 msgid "Could not save"
 msgstr "Could not save"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Could not save the budget."
+msgstr "Could not save the budget."
 
 #: src/routes/emails/inboxes.tsx
 msgid "Could not save the inbox."
@@ -1080,6 +1185,7 @@ msgstr "Create footer"
 msgid "Create key"
 msgstr "Create key"
 
+#: src/components/research/proposal-outcome.tsx
 #: src/routes/emails/$threadId.tsx
 msgid "Created"
 msgstr "Created"
@@ -1395,9 +1501,17 @@ msgstr "Enter a valid email above first."
 msgid "Enter an email address."
 msgstr "Enter an email address."
 
+#: src/routes/settings/organization/policy.tsx
+msgid "Enter valid amounts before saving."
+msgstr "Enter valid amounts before saving."
+
 #: src/routes/emails/inboxes.tsx
 msgid "Enter your mail server settings below."
 msgstr "Enter your mail server settings below."
+
+#: src/components/research/proposal-outcome.tsx
+msgid "Error"
+msgstr "Error"
 
 #: src/components/shared/channel-icon.tsx
 msgid "Event"
@@ -1436,6 +1550,10 @@ msgstr "Expiry must be a number of days greater than zero."
 msgid "Extending the org default"
 msgstr "Extending the org default"
 
+#: src/components/research/run-progress.tsx
+msgid "Extracting findings"
+msgstr "Extracting findings"
+
 #: src/routes/emails/$threadId.tsx
 msgid "Failed"
 msgstr "Failed"
@@ -1457,6 +1575,10 @@ msgstr "Filter by inbox"
 #: src/routes/emails/index.tsx
 msgid "Filter by status"
 msgstr "Filter by status"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Filter by subject"
+msgstr "Filter by subject"
 
 #: src/routes/companies/index.tsx
 msgid "Filter companies"
@@ -1499,6 +1621,14 @@ msgstr "Footers — {0}"
 msgid "Forgot password?"
 msgstr "Forgot password?"
 
+#: src/routes/settings/organization/policy.tsx
+msgid "Free research work allowed for one run."
+msgstr "Free research work allowed for one run."
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Free-text, low-confidence or unverified — read before applying."
+msgstr "Free-text, low-confidence or unverified — read before applying."
+
 #: src/components/research/research-dialog.tsx
 msgid "Freeform"
 msgstr "Freeform"
@@ -1527,6 +1657,10 @@ msgstr "From your organization, applied first"
 msgid "Full screen"
 msgstr "Full screen"
 
+#: src/components/research/run-progress.tsx
+msgid "Gathering evidence"
+msgstr "Gathering evidence"
+
 #: src/routes/settings/mcp/index.tsx
 msgid "Give an AI assistant access to this organization's CRM. Chat apps like ChatGPT and Claude.ai connect over OAuth; coding tools use an API key."
 msgstr "Give an AI assistant access to this organization's CRM. Chat apps like ChatGPT and Claude.ai connect over OAuth; coding tools use an API key."
@@ -1542,6 +1676,10 @@ msgstr "Go to connections"
 #: src/routes/reset-password.tsx
 msgid "Go to sign in"
 msgstr "Go to sign in"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Hard limit on paid research spend each month."
+msgstr "Hard limit on paid research spend each month."
 
 #: src/routes/accept-invitation.$id.tsx
 msgid "Heading to the dashboard…"
@@ -1686,6 +1824,10 @@ msgstr "Interaction"
 msgid "Interaction logged"
 msgstr "Interaction logged"
 
+#: src/components/research/proposal-outcome.tsx
+msgid "Invalid"
+msgstr "Invalid"
+
 #: src/routes/settings/organization/members.tsx
 msgid "Invitation sent to {sentEmail}."
 msgstr "Invitation sent to {sentEmail}."
@@ -1791,6 +1933,14 @@ msgstr "Loading companies…"
 #: src/components/research/run-detail.tsx
 msgid "Loading run…"
 msgstr "Loading run…"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Loading the review queue…"
+msgstr "Loading the review queue…"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Loading your research budget…"
+msgstr "Loading your research budget…"
 
 #: src/components/companies/upcoming-meetings-card.tsx
 #: src/components/shared/loading-spinner.tsx
@@ -1954,6 +2104,10 @@ msgstr "Member proposals"
 msgid "Members"
 msgstr "Members"
 
+#: src/components/research/proposal-outcome.tsx
+msgid "Merged into existing"
+msgstr "Merged into existing"
+
 #: src/components/emails/compose-form.tsx
 msgid "Message"
 msgstr "Message"
@@ -1975,6 +2129,18 @@ msgstr "Mine"
 msgid "Minimize"
 msgstr "Minimize"
 
+#: src/routes/settings/organization/policy.tsx
+msgid "Minimum confidence"
+msgstr "Minimum confidence"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Minimum confidence to auto-apply"
+msgstr "Minimum confidence to auto-apply"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Monthly paid cap"
+msgstr "Monthly paid cap"
+
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/api-keys/index.tsx
@@ -1992,6 +2158,10 @@ msgstr "name@example.com, another@example.com"
 #: src/routes/index.tsx
 msgid "Needs attention"
 msgstr "Needs attention"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Needs your review"
+msgstr "Needs your review"
 
 #: src/components/companies/cadence-card.tsx
 #: src/components/companies/cadence-card.tsx
@@ -2210,13 +2380,10 @@ msgstr "No proposals waiting for review."
 msgid "No redirect URI"
 msgstr "No redirect URI"
 
+#: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/run-detail.tsx
 msgid "No reliable data found"
 msgstr "No reliable data found"
-
-#: src/components/research/run-list.tsx
-msgid "No research runs yet for this company."
-msgstr "No research runs yet for this company."
 
 #: src/components/companies/research-summary-card.tsx
 msgid "No research yet."
@@ -2279,9 +2446,17 @@ msgstr "Note"
 msgid "Nothing changed yet."
 msgstr "Nothing changed yet."
 
+#: src/components/research/proposal-outcome.tsx
+msgid "Nothing to apply"
+msgstr "Nothing to apply"
+
 #: src/routes/oauth/consent.tsx
 msgid "Nothing to authorize"
 msgstr "Nothing to authorize"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Nothing to review right now."
+msgstr "Nothing to review right now."
 
 #: src/routes/settings/organization/spend.tsx
 msgid "Nothing to show in this range."
@@ -2299,6 +2474,11 @@ msgstr "Once it's connected, I can send and receive email for you right here —
 msgid "One click to accept the invitation."
 msgstr "One click to accept the invitation."
 
+#: src/routes/settings/organization/policy.tsx
+msgid "Only machine-verified values apply on their own; free-text always waits for review."
+msgstr "Only machine-verified values apply on their own; free-text always waits for review."
+
+#: src/components/research/inbox/research-inbox.tsx
 #: src/routes/emails/$threadId.tsx
 #: src/routes/emails/index.tsx
 #: src/routes/tasks/index.tsx
@@ -2339,10 +2519,18 @@ msgstr "Open Instagram"
 msgid "Open LinkedIn"
 msgstr "Open LinkedIn"
 
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Open run"
+msgstr "Open run"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Open run for {subjectLabel}"
+msgstr "Open run for {subjectLabel}"
+
 #. placeholder {0}: run.query
-#: src/components/research/run-list.tsx
-msgid "Open research run {0}"
-msgstr "Open research run {0}"
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Open run: {0}"
+msgstr "Open run: {0}"
 
 #: src/components/shared/task-item.tsx
 msgid "Open task details"
@@ -2481,6 +2669,14 @@ msgstr "Page title"
 msgid "Pages"
 msgstr "Pages"
 
+#: src/routes/settings/organization/policy.tsx
+msgid "Paid calls at or below this run without asking."
+msgstr "Paid calls at or below this run without asking."
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Paid provider calls allowed within one run."
+msgstr "Paid provider calls allowed within one run."
+
 #: src/routes/settings/organization/index.tsx
 msgid "Paid research API calls billed to this org."
 msgstr "Paid research API calls billed to this org."
@@ -2488,6 +2684,10 @@ msgstr "Paid research API calls billed to this org."
 #: src/routes/settings/organization/spend.tsx
 msgid "Paid research API calls billed to this organization."
 msgstr "Paid research API calls billed to this organization."
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Paid spend this month"
+msgstr "Paid spend this month"
 
 #: src/components/research/findings/prospect-scan-view.tsx
 msgid "Pain indicators"
@@ -2549,6 +2749,10 @@ msgstr "Pending invitations"
 msgid "Pending paid actions"
 msgstr "Pending paid actions"
 
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Pending review"
+msgstr "Pending review"
+
 #: src/routes/companies/$slug.tsx
 #: src/routes/companies/$slug.tsx
 msgid "People"
@@ -2557,6 +2761,14 @@ msgstr "People"
 #: src/routes/settings/organization/members.tsx
 msgid "People with access to this workspace."
 msgstr "People with access to this workspace."
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Per-run budget"
+msgstr "Per-run budget"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Per-run paid budget"
+msgstr "Per-run paid budget"
 
 #: src/routes/calendar/index.tsx
 #: src/routes/emails/inboxes.tsx
@@ -2602,6 +2814,7 @@ msgstr "Pick templates to use just for this run. Leave empty to use your default
 msgid "Pick your email provider"
 msgstr "Pick your email provider"
 
+#: src/components/layout/nav-items.ts
 #: src/components/layout/nav-items.ts
 #: src/routes/index.tsx
 msgid "Pipeline"
@@ -2688,7 +2901,7 @@ msgstr "Proposal in review"
 msgid "Proposals, meeting notes and attachments will show up here."
 msgstr "Proposals, meeting notes and attachments will show up here."
 
-#: src/components/research/findings/shared.tsx
+#: src/components/research/review/proposed-updates-review.tsx
 msgid "Proposed updates"
 msgstr "Proposed updates"
 
@@ -2751,14 +2964,35 @@ msgstr "Quick add: \"Call Acme tomorrow #high\""
 msgid "Read state update failed"
 msgstr "Read state update failed"
 
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Ready to apply"
+msgstr "Ready to apply"
+
 #: src/routes/tasks/index.tsx
 #: src/routes/tasks/index.tsx
 msgid "Recent changes"
 msgstr "Recent changes"
 
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Recent runs"
+msgstr "Recent runs"
+
 #: src/routes/companies/$slug.tsx
 msgid "Recipient marked as spam"
 msgstr "Recipient marked as spam"
+
+#: src/components/research/proposal-outcome.tsx
+msgid "Record changed since research"
+msgstr "Record changed since research"
+
+#: src/components/layout/nav-items.ts
+msgid "Records"
+msgstr "Records"
+
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Refresh"
+msgstr "Refresh"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Refreshing inbox status…"
@@ -2769,6 +3003,24 @@ msgstr "Refreshing inbox status…"
 #: src/components/research/findings/prospect-scan-view.tsx
 msgid "Region"
 msgstr "Region"
+
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Reject"
+msgstr "Reject"
+
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Reject {cardLabel}"
+msgstr "Reject {cardLabel}"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Reject {subjectLabel}"
+msgstr "Reject {subjectLabel}"
+
+#: src/components/research/proposal-outcome.tsx
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Rejected"
+msgstr "Rejected"
 
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/organization/members.tsx
@@ -2845,9 +3097,21 @@ msgstr "Request a new link"
 
 #: src/components/companies/research-summary-card.tsx
 #: src/components/instructions/agent-selector.tsx
+#: src/components/layout/nav-items.ts
+#: src/components/research/inbox/research-inbox.tsx
 #: src/components/shared/channel-icon.tsx
 msgid "Research"
 msgstr "Research"
+
+#: src/routes/settings/organization/index.tsx
+#: src/routes/settings/organization/policy.tsx
+#: src/routes/settings/organization/policy.tsx
+msgid "Research budget"
+msgstr "Research budget"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Research budget saved."
+msgstr "Research budget saved."
 
 #: src/routes/research/$id.tsx
 msgid "Research run"
@@ -2903,17 +3167,22 @@ msgstr "Resume syncing"
 msgid "Reusable, standing guidance your agents follow — what you sell, who you target, tone, and which sources to trust."
 msgstr "Reusable, standing guidance your agents follow — what you sell, who you target, tone, and which sources to trust."
 
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Review what the research agent found and decide what enters the CRM."
+msgstr "Review what the research agent found and decide what enters the CRM."
+
+#: src/components/research/trust-badge.tsx
+msgid "Risky"
+msgstr "Risky"
+
 #: src/routes/settings/organization/members.tsx
 msgid "Role"
 msgstr "Role"
 
+#: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/run-detail.tsx
 msgid "Run failed"
 msgstr "Run failed"
-
-#: src/components/research/run-detail.tsx
-msgid "Run in progress — events stream as they arrive."
-msgstr "Run in progress — events stream as they arrive."
 
 #: src/components/companies/research-summary-card.tsx
 msgid "Run new"
@@ -2922,6 +3191,10 @@ msgstr "Run new"
 #: src/components/research/research-dialog.tsx
 msgid "Run new research"
 msgstr "Run new research"
+
+#: src/components/research/proposal-outcome.tsx
+msgid "Run not found"
+msgstr "Run not found"
 
 #: src/components/research/run-detail.tsx
 msgid "Run shape unrecognised."
@@ -2941,6 +3214,10 @@ msgstr "Save"
 #: src/components/instructions/default-stack-editor.tsx
 msgid "Save as my default"
 msgstr "Save as my default"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Save budget"
+msgstr "Save budget"
 
 #: src/routes/pages/$id.tsx
 msgid "Save failed"
@@ -2967,6 +3244,7 @@ msgstr "Save the org default"
 #: src/routes/emails/inboxes.tsx
 #: src/routes/pages/$id.tsx
 #: src/routes/reset-password.tsx
+#: src/routes/settings/organization/policy.tsx
 #: src/routes/settings/profile/index.tsx
 #: src/routes/settings/profile/index.tsx
 msgid "Saving…"
@@ -2987,6 +3265,10 @@ msgstr "Search companies"
 #: src/routes/emails/index.tsx
 msgid "Search threads"
 msgstr "Search threads"
+
+#: src/components/research/run-progress.tsx
+msgid "Searching and reasoning"
+msgstr "Searching and reasoning"
 
 #: src/routes/settings/organization/index.tsx
 msgid "See who can access this workspace, invite teammates, and manage pending invitations."
@@ -3090,10 +3372,15 @@ msgstr "Set as default"
 msgid "Set password"
 msgstr "Set password"
 
+#: src/routes/settings/organization/index.tsx
+msgid "Set research budgets and auto-apply"
+msgstr "Set research budgets and auto-apply"
+
 #: src/components/research/research-dialog.tsx
 msgid "Set up reusable <0>instruction templates</0> to guide every run."
 msgstr "Set up reusable <0>instruction templates</0> to guide every run."
 
+#: src/components/layout/nav-items.ts
 #: src/components/layout/nav-items.ts
 #: src/routes/pages/$id.tsx
 #: src/routes/settings/api-keys/index.tsx
@@ -3238,6 +3525,14 @@ msgstr "Something went wrong. Try again."
 msgid "Source"
 msgstr "Source"
 
+#: src/components/research/provenance.tsx
+msgid "Sourced from research"
+msgstr "Sourced from research"
+
+#: src/components/research/provenance.tsx
+msgid "Sourced from research on {dateLabel}"
+msgstr "Sourced from research on {dateLabel}"
+
 #: src/routes/emails/index.tsx
 msgid "Spam"
 msgstr "Spam"
@@ -3248,6 +3543,18 @@ msgstr "Spam"
 #: src/routes/settings/organization/spend.tsx
 msgid "Spend"
 msgstr "Spend"
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Spend ceilings"
+msgstr "Spend ceilings"
+
+#: src/routes/settings/organization/index.tsx
+msgid "Spend ceilings and the confidence needed to auto-apply findings."
+msgstr "Spend ceilings and the confidence needed to auto-apply findings."
+
+#: src/routes/settings/organization/policy.tsx
+msgid "Spend ceilings for research and how confident a finding must be to apply on its own."
+msgstr "Spend ceilings for research and how confident a finding must be to apply on its own."
 
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Stamped into the workshop ledger."
@@ -3269,6 +3576,10 @@ msgstr "Start"
 msgid "Start sending and receiving"
 msgstr "Start sending and receiving"
 
+#: src/components/research/run-progress.tsx
+msgid "Starting the run…"
+msgstr "Starting the run…"
+
 #: src/components/research/research-dialog.tsx
 msgid "Starting…"
 msgstr "Starting…"
@@ -3289,6 +3600,11 @@ msgstr "Status"
 msgid "Status update failed"
 msgstr "Status update failed"
 
+#. placeholder {0}: progress.phase
+#: src/components/research/run-progress.tsx
+msgid "Step {0} of 3"
+msgstr "Step {0} of 3"
+
 #: src/routes/settings/organization/templates.tsx
 #: src/routes/settings/profile/templates.tsx
 msgid "Still in use"
@@ -3301,6 +3617,10 @@ msgstr "Stored encrypted with AES-256-GCM."
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Strengths"
 msgstr "Strengths"
+
+#: src/components/research/run-progress.tsx
+msgid "Structuring the findings"
+msgstr "Structuring the findings"
 
 #: src/components/emails/compose-form.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
@@ -3593,6 +3913,10 @@ msgstr "Type and press Enter"
 msgid "Type the email you sign in with. We'll send a reset link."
 msgstr "Type the email you sign in with. We'll send a reset link."
 
+#: src/components/research/trust-badge.tsx
+msgid "Undeliverable"
+msgstr "Undeliverable"
+
 #: src/components/companies/calendar-tab.tsx
 #: src/components/companies/conversations-tab.tsx
 #: src/components/companies/research-summary-card.tsx
@@ -3624,6 +3948,11 @@ msgstr "Untitled"
 #: src/routes/settings/api-keys/index.tsx
 msgid "Untitled key"
 msgstr "Untitled key"
+
+#: src/components/research/trust-badge.tsx
+#: src/components/research/trust-badge.tsx
+msgid "Unverified"
+msgstr "Unverified"
 
 #: src/components/companies/upcoming-meetings-card.tsx
 #: src/components/companies/upcoming-meetings-card.tsx
@@ -3691,6 +4020,10 @@ msgstr "Username"
 #: src/components/instructions/default-stack-editor.tsx
 msgid "Using the org default"
 msgstr "Using the org default"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Verified emails and grounded values — safe to apply in one click."
+msgstr "Verified emails and grounded values — safe to apply in one click."
 
 #: src/components/shared/timeline-entry.tsx
 msgid "View thread"
@@ -3770,6 +4103,8 @@ msgstr "Who"
 msgid "Who's your email provider?"
 msgstr "Who's your email provider?"
 
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/review/proposed-updates-review.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Working…"
 msgstr "Working…"
@@ -3786,10 +4121,15 @@ msgstr "Write footer…"
 msgid "Write your message…"
 msgstr "Write your message…"
 
+#: src/components/research/run-progress.tsx
+msgid "Writing the brief"
+msgstr "Writing the brief"
+
 #: src/routes/settings/profile/index.tsx
 msgid "You currently sign in from email links. Add a password to skip checking your email next time."
 msgstr "You currently sign in from email links. Add a password to skip checking your email next time."
 
+#: src/routes/settings/organization/policy.tsx
 #: src/routes/settings/organization/spend.tsx
 msgid "You don't have permission to see this page."
 msgstr "You don't have permission to see this page."

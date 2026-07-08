@@ -2,7 +2,8 @@ import { useLingui } from '@lingui/react/macro'
 import styled from 'styled-components'
 
 import { MachineButton } from './machine-button'
-import { navItems } from './nav-items'
+import { NavGroupKnob } from './nav-group-knob'
+import { navGroups } from './nav-items'
 import { NavLink } from './nav-link'
 
 /**
@@ -11,33 +12,43 @@ import { NavLink } from './nav-link'
  * component the desktop SideNav uses at `size='full'`). Visible at
  * <1024px; above that the desktop SideNav takes over and this bar
  * hides. Active tab lights the amber focus ring on the housing.
+ *
+ * The belt shows the four `navGroups` slots rather than every section: a
+ * one-member slot is a direct link, a many-member slot is a popover knob.
+ * This keeps the belt from overflowing as sections are added — the desktop
+ * rack still lists them all.
  */
 export function BottomNav() {
 	const { t, i18n } = useLingui()
 	return (
 		<Bar role='navigation' aria-label={t`Primary navigation`}>
-			{navItems.map(item => {
-				const Icon = item.icon
-				const label = i18n._(item.label)
-				return (
-					<NavLink
-						key={item.path}
-						to={item.path}
-						exact={item.exact}
-						aria-label={label}
-						data-testid={`nav-${item.testId}`}
-					>
-						{({ isActive }) => (
-							<MachineButton
-								icon={Icon}
-								label={label}
-								color={item.color}
-								active={isActive}
-								size='compact'
-							/>
-						)}
-					</NavLink>
-				)
+			{navGroups.map(group => {
+				const [only] = group.items
+				if (group.items.length === 1 && only !== undefined) {
+					const item = only
+					const Icon = item.icon
+					const label = i18n._(item.label)
+					return (
+						<NavLink
+							key={group.testId}
+							to={item.path}
+							exact={item.exact}
+							aria-label={label}
+							data-testid={`nav-${item.testId}`}
+						>
+							{({ isActive }) => (
+								<MachineButton
+									icon={Icon}
+									label={label}
+									color={item.color}
+									active={isActive}
+									size='compact'
+								/>
+							)}
+						</NavLink>
+					)
+				}
+				return <NavGroupKnob key={group.testId} group={group} />
 			})}
 		</Bar>
 	)

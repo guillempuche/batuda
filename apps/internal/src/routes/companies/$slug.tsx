@@ -68,8 +68,13 @@ import {
 } from '#/components/contacts/display-channels'
 import { ManageChannelsDialog } from '#/components/contacts/manage-channels-dialog'
 import { useSetDocumentTitle } from '#/components/layout/top-bar-title'
+import { Provenance } from '#/components/research/provenance'
 import { ResearchDialog } from '#/components/research/research-dialog'
-import type { ResearchRunRow } from '#/components/research/run-list'
+import {
+	narrowResearch,
+	type ResearchRunRow,
+} from '#/components/research/run-shapes'
+import { TrustBadge } from '#/components/research/trust-badge'
 import { EmptyState } from '#/components/shared/empty-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { PriorityDot } from '#/components/shared/priority-dot'
@@ -134,6 +139,12 @@ type CompanyDetail = {
 	readonly geocodeSource: string | null
 }
 
+type ContactProvenance = {
+	readonly runId: string
+	readonly runCompletedAt: string | null
+	readonly sources: ReadonlyArray<{ readonly url: string }>
+}
+
 type ContactRow = {
 	readonly id: string
 	readonly name: string
@@ -144,6 +155,8 @@ type ContactRow = {
 	readonly email: string | null
 	readonly emailStatus: EmailChannelStatus
 	readonly emailStatusReason: string | null
+	// Research runs this contact was sourced from, newest first.
+	readonly provenance: ReadonlyArray<ContactProvenance>
 }
 
 type TimelineRow = {
@@ -1078,21 +1091,37 @@ function DetailBody({
 													ch.kind,
 													ch.value,
 												)
+												// Only research-touched channels carry a verdict or
+												// confidence — a hand-typed one shows no badge.
+												const hasTrust =
+													ch.verification !== null || ch.confidence !== null
 												return (
-													<ContactLink
-														key={ch.id}
-														href={href}
-														{...(external
-															? {
-																	target: '_blank',
-																	rel: 'noopener noreferrer',
+													<ChannelGroup key={ch.id}>
+														<ContactLink
+															href={href}
+															{...(external
+																? {
+																		target: '_blank',
+																		rel: 'noopener noreferrer',
+																	}
+																: {})}
+														>
+															<Icon size={14} aria-hidden />
+															<span>{ch.value}</span>
+															{external && (
+																<ExternalLink size={12} aria-hidden />
+															)}
+														</ContactLink>
+														{hasTrust ? (
+															<TrustBadge
+																verification={ch.verification}
+																confidence={ch.confidence}
+																machineCheckable={
+																	ch.kind === 'email' || ch.kind === 'phone'
 																}
-															: {})}
-													>
-														<Icon size={14} aria-hidden />
-														<span>{ch.value}</span>
-														{external && <ExternalLink size={12} aria-hidden />}
-													</ContactLink>
+															/>
+														) : null}
+													</ChannelGroup>
 												)
 											})}
 											{contact.email && (
@@ -1118,6 +1147,12 @@ function DetailBody({
 												</span>
 											</ContactLinkButton>
 										</ContactLinks>
+										{contact.provenance.length > 0 ? (
+											<Provenance
+												date={contact.provenance[0]?.runCompletedAt ?? null}
+												sources={contact.provenance.flatMap(p => p.sources)}
+											/>
+										) : null}
 									</ContactCard>
 								))}
 							</ContactList>
@@ -1290,6 +1325,34 @@ function narrowContacts(
 			email: primaryEmail?.value ?? null,
 			emailStatus: primaryEmail?.status ?? 'unknown',
 			emailStatusReason: primaryEmail?.statusReason ?? null,
+			provenance: narrowContactProvenance(r['provenance']),
+		})
+	}
+	return out
+}
+
+function narrowContactProvenance(
+	raw: unknown,
+): ReadonlyArray<ContactProvenance> {
+	if (!Array.isArray(raw)) return []
+	const out: Array<ContactProvenance> = []
+	for (const item of raw) {
+		if (!item || typeof item !== 'object') continue
+		const r = item as Record<string, unknown>
+		if (typeof r['runId'] !== 'string') continue
+		const sources: Array<{ url: string }> = []
+		if (Array.isArray(r['sources'])) {
+			for (const source of r['sources']) {
+				if (!source || typeof source !== 'object') continue
+				const url = (source as Record<string, unknown>)['url']
+				if (typeof url === 'string') sources.push({ url })
+			}
+		}
+		out.push({
+			runId: r['runId'],
+			runCompletedAt:
+				typeof r['runCompletedAt'] === 'string' ? r['runCompletedAt'] : null,
+			sources,
 		})
 	}
 	return out
@@ -1375,31 +1438,6 @@ function narrowTasks(rows: ReadonlyArray<unknown>): ReadonlyArray<TaskEntry> {
 			dueAt: typeof r['dueAt'] === 'string' ? r['dueAt'] : null,
 			completedAt:
 				typeof r['completedAt'] === 'string' ? r['completedAt'] : null,
-		})
-	}
-	return out
-}
-
-function narrowResearch(
-	rows: ReadonlyArray<unknown>,
-): ReadonlyArray<ResearchRunRow> {
-	const out: Array<ResearchRunRow> = []
-	for (const row of rows) {
-		if (!row || typeof row !== 'object') continue
-		const r = row as Record<string, unknown>
-		if (typeof r['id'] !== 'string') continue
-		if (typeof r['query'] !== 'string') continue
-		if (typeof r['status'] !== 'string') continue
-		const createdAt = r['createdAt']
-		if (typeof createdAt !== 'string') continue
-		out.push({
-			id: r['id'],
-			query: r['query'],
-			schemaName: typeof r['schemaName'] === 'string' ? r['schemaName'] : null,
-			kind: typeof r['kind'] === 'string' ? r['kind'] : 'leaf',
-			status: r['status'],
-			costCents: typeof r['costCents'] === 'number' ? r['costCents'] : 0,
-			createdAt,
 		})
 	}
 	return out
@@ -1795,6 +1833,14 @@ const ContactLinks = styled.div.withConfig({
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-sm);
+`
+
+const ChannelGroup = styled.span.withConfig({
+	displayName: 'CompanyDetailChannelGroup',
+})`
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2xs);
 `
 
 const ContactLink = styled.a.withConfig({
