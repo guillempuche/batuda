@@ -9,7 +9,9 @@
  *
  * Errors from the underlying `StorageProvider` are re-raised as plain
  * defects since `BlobStorage`'s Effect signature is error-free — the
- * caller (`cached-scrape.ts`) maps them to `ProviderError` itself.
+ * caller (`cached-scrape.ts`) can't recover from them. `StorageProvider`
+ * itself already logs and traces the failure before it gets here, so
+ * nothing is lost by discarding the typed error at this boundary.
  */
 
 import { Effect, Layer } from 'effect'

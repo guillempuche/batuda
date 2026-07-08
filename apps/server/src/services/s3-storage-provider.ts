@@ -42,6 +42,12 @@ export const S3StorageProviderLive = Layer.effect(
 				secretAccessKey: Redacted.value(secretAccessKey),
 			},
 			forcePathStyle: true,
+			// Cloudflare R2 rejects the CRC-based integrity headers the AWS SDK
+			// sends by default on every request — only send/verify a checksum
+			// when the operation genuinely needs one, matching the fix already
+			// applied to scripts/gh-pr-media.sh for the same R2 behavior.
+			requestChecksumCalculation: 'WHEN_REQUIRED',
+			responseChecksumValidation: 'WHEN_REQUIRED',
 		})
 
 		const put = (params: PutParams): Effect.Effect<void, StorageError> =>
@@ -62,7 +68,25 @@ export const S3StorageProviderLive = Layer.effect(
 						operation: 'put',
 						key: params.key,
 					}),
-			}).pipe(Effect.asVoid)
+			}).pipe(
+				Effect.asVoid,
+				// Every caller (recordings, media, research blob) shares this one
+				// client, so logging and tracing it here — rather than in each
+				// caller — is what makes a write failure visible no matter who
+				// asked for it.
+				Effect.tapError(error =>
+					Effect.logError('storage.put failed').pipe(
+						Effect.annotateLogs({
+							key: params.key,
+							bucket,
+							message: error.message,
+						}),
+					),
+				),
+				Effect.withSpan('storage.put', {
+					attributes: { key: params.key, bucket },
+				}),
+			)
 
 		const get = (key: string): Effect.Effect<Uint8Array, StorageError> =>
 			Effect.tryPromise({
@@ -83,7 +107,16 @@ export const S3StorageProviderLive = Layer.effect(
 						operation: 'get',
 						key,
 					}),
-			})
+			}).pipe(
+				Effect.tapError(error =>
+					Effect.logError('storage.get failed').pipe(
+						Effect.annotateLogs({ key, bucket, message: error.message }),
+					),
+				),
+				Effect.withSpan('storage.get', {
+					attributes: { key, bucket },
+				}),
+			)
 
 		const del = (key: string): Effect.Effect<void, StorageError> =>
 			Effect.tryPromise({

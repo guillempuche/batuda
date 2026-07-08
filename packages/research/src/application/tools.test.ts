@@ -759,6 +759,29 @@ describe('researchToolkit — a web-fetch failure is non-fatal', () => {
 				expect(isFailure).toBe(true)
 			})
 		})
+
+		describe('when schema_name is not a registered schema', () => {
+			it('should surface the plain validation message, not a re-wrapped failure cause', async () => {
+				// GIVEN a schema_name the model made up — the extract provider is never
+				// reached, so its result here is irrelevant
+				const { isFailure, result } = await extractStructuredResult(
+					() => Effect.succeed({}),
+					{ url: 'https://acmecorp.es', schema_name: 'totally_bogus_schema' },
+				)
+
+				// THEN the model reads a failure...
+				expect(isFailure).toBe(true)
+				// AND the message names the bad value and lists the valid ones in
+				// plain text, not a stringified Cause/Fail dump — that shape appears
+				// if this validation error is ever re-caught and re-wrapped by the
+				// same handling that logs a genuine provider failure
+				const description = (result as { reason: { description: string } })
+					.reason.description
+				expect(description).toBe(
+					'extract_structured: Unknown schema_name: totally_bogus_schema. Valid names: freeform, company_enrichment_v1, competitor_scan_v1, contact_discovery_v1, prospect_scan_v1',
+				)
+			})
+		})
 	})
 })
 
