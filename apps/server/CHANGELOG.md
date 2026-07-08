@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-08 (server-v2026.7.8)
+
+### Features
+
+* make research runs honest about the company they researched ([01aaf6d](https://github.com/guillempuche/batuda/commit/01aaf6dcc0376ed3cd237c18fd3727d09c8dd547))
+
+### Bug Fixes
+
+* **research:** stop the company registry returning its raw provider payload ([673c54d](https://github.com/guillempuche/batuda/commit/673c54da7eb9348e87d5f76e39e09b46e0fc71d7))
+* **research:** stop website noise from polluting enrichment output ([574411f](https://github.com/guillempuche/batuda/commit/574411fb341bef8af4fa58a295f4a5f7ea2e9a84))
+* **server:** reject a research suggestion whose target row does not exist ([7684486](https://github.com/guillempuche/batuda/commit/76844862c7e2d6108d8def2df039dd59c180df90))
+
 ## 2026-07-07 (server-v2026.7.7-1)
 
 ### Bug Fixes
