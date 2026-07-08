@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-08 (server-v2026.7.8-1)
+
+### Bug Fixes
+
+* **research:** fail closed when a run can't confirm the target company ([3523fd8](https://github.com/guillempuche/batuda/commit/3523fd8c1bc4d68fe572bcecd6fdfffa3f5fa13f))
+* **research:** keep a rejected page extraction from failing the run ([02715c4](https://github.com/guillempuche/batuda/commit/02715c46a496a85486bf844cca658ca5cc768cb3))
+* **research:** per-tool spend breakdown and honest empty-scan handling ([197d752](https://github.com/guillempuche/batuda/commit/197d752d415ce6dfa97e619aafb0765fc1290c15))
+* **research:** strip page-builder markup from scraped pages ([3a34d99](https://github.com/guillempuche/batuda/commit/3a34d994c42df681ee129379505e36de2b564bd2))
+
 ## 2026-07-08 (server-v2026.7.8)
 
 ### Features
