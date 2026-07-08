@@ -17,7 +17,7 @@
  * `ProviderError` cascade through the harness, not inside tool calls.
  */
 
-import { Effect, Schema } from 'effect'
+import { Cause, Effect, Schema } from 'effect'
 import { AiError, Tool, Toolkit } from 'effect/unstable/ai'
 
 import { AcceptedCountry } from '../domain/country'
@@ -180,15 +180,6 @@ const mapToolError = (toolName: string) => (err: unknown) =>
 		}),
 	)
 
-// Charged against the run before each vendor call (cheap tier for
-// search/scrape/extract, paid tier for the registry). When the budget refuses,
-// the refusal is handed back to the model as a tool result so it stops using
-// that tool and wraps up; the loop's own budget check is the hard halt.
-const cheapExhausted = (tool: string) => (e: { readonly remaining: number }) =>
-	mapToolError(tool)(
-		`cheap budget exhausted (${e.remaining}¢ left) — stop searching and summarize what you have`,
-	)
-
 // A model sometimes appends a made-up "site:" filter (e.g. site:example.com) to a
 // search, which guarantees zero results. Detect the obvious placeholder hosts so
 // such a filter can be dropped before the query reaches the provider.
@@ -232,6 +223,44 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 		const budget = yield* Budget
 		const { researchId } = yield* ResearchRunContext
 
+		// Charged against the run before each vendor call (cheap tier for
+		// search/scrape/extract, paid tier for the registry). When the budget
+		// refuses, the refusal is handed back to the model as a tool result so it
+		// stops using that tool and wraps up; the loop's own budget check is the
+		// hard halt. Logged at warning (not error) since running out of budget is
+		// an expected signal, not a failure.
+		const cheapExhausted =
+			(toolName: string) => (e: { readonly remaining: number }) =>
+				Effect.logWarning('research.tool.budget_exhausted').pipe(
+					Effect.annotateLogs({
+						tool: toolName,
+						'research.run_id': researchId,
+						remaining_cents: e.remaining,
+					}),
+					Effect.andThen(
+						mapToolError(toolName)(
+							`cheap budget exhausted (${e.remaining}¢ left) — stop searching and summarize what you have`,
+						),
+					),
+				)
+
+		// A tool failure otherwise reaches the model and the run's tool_log but
+		// never the telemetry backend, so a systemic failure (e.g. every
+		// scrape_page call rejected by the object store) stays invisible outside
+		// the DB. Logged here, before the cause is mapped to the model-facing
+		// tool result, so it shows up in Honeycomb regardless of what kind of
+		// failure it was.
+		const logToolFailure =
+			(toolName: string) => (cause: Cause.Cause<unknown>) =>
+				Effect.logError('research.tool.failed').pipe(
+					Effect.annotateLogs({
+						tool: toolName,
+						'research.run_id': researchId,
+						cause: Cause.pretty(cause),
+					}),
+					Effect.andThen(mapToolError(toolName)(cause)),
+				)
+
 		return researchToolkit.of({
 			web_search: params =>
 				Effect.gen(function* () {
@@ -255,7 +284,14 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 					})
 				}).pipe(
 					Effect.catchTag('BudgetExceeded', cheapExhausted('web_search')),
-					Effect.catchCause(cause => mapToolError('web_search')(cause)),
+					Effect.catchCause(logToolFailure('web_search')),
+					Effect.withSpan('research.tool.web_search', {
+						attributes: {
+							'research.tool': 'web_search',
+							'research.run_id': researchId,
+							query: params.query,
+						},
+					}),
 				),
 
 			scrape_page: params =>
@@ -274,14 +310,37 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 						: page
 				}).pipe(
 					Effect.catchTag('BudgetExceeded', cheapExhausted('scrape_page')),
-					Effect.catchCause(cause => mapToolError('scrape_page')(cause)),
+					Effect.catchCause(logToolFailure('scrape_page')),
+					Effect.withSpan('research.tool.scrape_page', {
+						attributes: {
+							'research.tool': 'scrape_page',
+							'research.run_id': researchId,
+							url: params.url,
+						},
+					}),
 				),
 
 			extract_structured: params => {
+				// Both branches reuse these span options so the early return still
+				// emits a research.tool.extract_structured span, but only the
+				// extraction branch runs through catchCause below. An unknown
+				// schema_name is an expected, model-caused error whose message is
+				// already clean; sending it through catchCause too would re-wrap and
+				// pretty-print the cause, burying that message in an unreadable dump.
+				const spanOptions = {
+					attributes: {
+						'research.tool': 'extract_structured',
+						'research.run_id': researchId,
+						url: params.url,
+						schema_name: params.schema_name,
+					},
+				}
 				const schema = schemaRegistry[params.schema_name]
 				if (!schema) {
 					return mapToolError('extract_structured')(
 						`Unknown schema_name: ${params.schema_name}. Valid names: ${Object.keys(schemaRegistry).join(', ')}`,
+					).pipe(
+						Effect.withSpan('research.tool.extract_structured', spanOptions),
 					)
 				}
 				return Effect.gen(function* () {
@@ -297,7 +356,8 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 						'BudgetExceeded',
 						cheapExhausted('extract_structured'),
 					),
-					Effect.catchCause(cause => mapToolError('extract_structured')(cause)),
+					Effect.catchCause(logToolFailure('extract_structured')),
+					Effect.withSpan('research.tool.extract_structured', spanOptions),
 				)
 			},
 

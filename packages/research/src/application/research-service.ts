@@ -1169,7 +1169,14 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 								findings: result as unknown,
 								outputTokens: structuredResponse.usage.outputTokens.total ?? 0,
 							}
-						})
+						}).pipe(
+							Effect.withSpan('research.phase2', {
+								attributes: {
+									'research.run_id': researchId,
+									schema: schemaName,
+								},
+							}),
+						)
 
 					// Link each page that returned content to the run so findings cite
 					// real sources; the sources row was upserted by the search cache
@@ -1455,6 +1462,9 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							Effect.provide(researchToolkitLayer),
 							Effect.provide(budgetLayer),
 							Effect.provide(Layer.succeed(ResearchRunContext)({ researchId })),
+							Effect.withSpan('research.phase1', {
+								attributes: { 'research.run_id': researchId },
+							}),
 						)
 
 						const loopResult = phaseOutcome.loop
@@ -1551,28 +1561,38 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 
 					// ── Phase 3: Brief generation ──
 					const briefLang = context?.hints?.language ?? 'en'
-					yield* publishEvent(researchId, 'tool.called', {
-						tool: 'llm.generateText',
-						phase: 3,
-						language: briefLang,
-					})
-
-					const briefResponse = yield* writerLlm.generateText({
-						prompt: `Write a concise human-readable research brief in ${briefLang}, summarizing ONLY the structured findings below. Do not add any fact, number, name, or contact detail that is not present in the findings.\n\n${JSON.stringify(findings)}`,
-					})
-
-					const briefMd = briefResponse.text
-					tokensOut += briefResponse.usage.outputTokens.total ?? 0
-
-					yield* Ref.update(toolLog, log => [
-						...log,
-						{
-							timestamp: DateTime.nowUnsafe().toString(),
-							type: 'result' as const,
+					const briefMd = yield* Effect.gen(function* () {
+						yield* publishEvent(researchId, 'tool.called', {
 							tool: 'llm.generateText',
-							output: { phase: 3, briefLength: briefMd.length },
-						},
-					])
+							phase: 3,
+							language: briefLang,
+						})
+
+						const briefResponse = yield* writerLlm.generateText({
+							prompt: `Write a concise human-readable research brief in ${briefLang}, summarizing ONLY the structured findings below. Do not add any fact, number, name, or contact detail that is not present in the findings.\n\n${JSON.stringify(findings)}`,
+						})
+
+						tokensOut += briefResponse.usage.outputTokens.total ?? 0
+
+						yield* Ref.update(toolLog, log => [
+							...log,
+							{
+								timestamp: DateTime.nowUnsafe().toString(),
+								type: 'result' as const,
+								tool: 'llm.generateText',
+								output: { phase: 3, briefLength: briefResponse.text.length },
+							},
+						])
+
+						return briefResponse.text
+					}).pipe(
+						Effect.withSpan('research.phase3', {
+							attributes: {
+								'research.run_id': researchId,
+								language: briefLang,
+							},
+						}),
+					)
 
 					// ── Persist results ──
 					const finalToolLog = yield* Ref.get(toolLog)
@@ -1688,6 +1708,12 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						tokensOut,
 					})
 				}).pipe(
+					// One span covering the whole run, so every phase/tool span nests
+					// under it and a failed run points straight at the phase/tool that
+					// broke it.
+					Effect.withSpan('research.run', {
+						attributes: { 'research.run_id': researchId, user_id: userId },
+					}),
 					// Scope the run so the heartbeat fiber (forked above) is
 					// interrupted the moment the run finishes, fails, or is cancelled.
 					Effect.scoped,
