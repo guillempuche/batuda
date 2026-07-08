@@ -250,6 +250,7 @@ export interface BudgetService {
 	readonly chargePaid: (
 		provider: string,
 		cents: number,
+		tool: string,
 		idempotencyKey?: string,
 	) => Effect.Effect<void, BudgetExceeded | MonthlyCapExceeded>
 	readonly snapshot: () => Effect.Effect<BudgetSnapshot>

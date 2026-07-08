@@ -135,6 +135,7 @@ export const makeBudgetLayer = (config: BudgetConfig) =>
 				chargePaid: (
 					provider: string,
 					cents: number,
+					tool: string,
 					idempotencyKey?: string,
 				) =>
 					Effect.gen(function* () {
@@ -154,7 +155,8 @@ export const makeBudgetLayer = (config: BudgetConfig) =>
 							cents,
 							researchId: config.researchId,
 							provider,
-							tool: 'paid',
+							// The calling tool's name, so a spend breakdown by tool is real.
+							tool,
 							idempotencyKey:
 								idempotencyKey ??
 								`${config.researchId}:${provider}:${Date.now()}`,
@@ -176,7 +178,7 @@ export const makeBudgetLayer = (config: BudgetConfig) =>
 					}).pipe(
 						Effect.tap(() =>
 							Effect.logDebug('budget.chargePaid').pipe(
-								Effect.annotateLogs({ provider, cents }),
+								Effect.annotateLogs({ provider, tool, cents }),
 							),
 						),
 					),

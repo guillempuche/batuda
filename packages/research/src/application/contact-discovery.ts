@@ -267,6 +267,7 @@ export class ContactDiscovery extends ServiceMap.Service<ContactDiscovery>()(
 							yield* budget.chargePaid(
 								'hunter-enrich',
 								ENRICH_COST_CENTS,
+								'discover_contacts',
 								// Idempotency key: a resumed research run re-charges the same
 								// enrichment as a DB no-op instead of paying Hunter twice.
 								`${researchId}:hunter-enrich:${input.domain}`,
@@ -296,6 +297,7 @@ export class ContactDiscovery extends ServiceMap.Service<ContactDiscovery>()(
 								yield* budget.chargePaid(
 									'hunter-verify',
 									VERIFY_COST_CENTS,
+									'discover_contacts',
 									// Idempotency key so a resumed run does not re-pay to
 									// verify the same address.
 									`${researchId}:hunter-verify:${email}`,

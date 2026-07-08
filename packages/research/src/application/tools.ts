@@ -189,6 +189,39 @@ const cheapExhausted = (tool: string) => (e: { readonly remaining: number }) =>
 		`cheap budget exhausted (${e.remaining}¢ left) — stop searching and summarize what you have`,
 	)
 
+// A model sometimes appends a made-up "site:" filter (e.g. site:example.com) to a
+// search, which guarantees zero results. Detect the obvious placeholder hosts so
+// such a filter can be dropped before the query reaches the provider.
+const isPlaceholderSiteHost = (host: string): boolean => {
+	const normalizedHost = host
+		.toLowerCase()
+		.replace(/^www\./, '')
+		.replace(/[).,;:'"]+$/, '')
+	return (
+		/^example\.[a-z]{2,}$/.test(normalizedHost) ||
+		normalizedHost === 'example' ||
+		/^(your|my)domain\.[a-z]{2,}$/.test(normalizedHost) ||
+		/^domain\.[a-z]{2,}$/.test(normalizedHost) ||
+		/^placeholder\.[a-z]{2,}$/.test(normalizedHost) ||
+		/^(your|my)site\.[a-z]{2,}$/.test(normalizedHost)
+	)
+}
+
+/**
+ * Removes any `site:` filter that targets an obvious placeholder host from a
+ * search query. If stripping would leave nothing to search, the original query
+ * is kept so the search still runs.
+ */
+export const stripPlaceholderSiteFilters = (query: string): string => {
+	const stripped = query
+		.replace(/\bsite:(\S+)/gi, (match, host: string) =>
+			isPlaceholderSiteHost(host) ? '' : match,
+		)
+		.replace(/\s{2,}/g, ' ')
+		.trim()
+	return stripped.length > 0 ? stripped : query
+}
+
 export const researchToolkitLayer = researchToolkit.toLayer(
 	Effect.gen(function* () {
 		const search = yield* SearchProvider
@@ -203,8 +236,16 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 			web_search: params =>
 				Effect.gen(function* () {
 					yield* budget.chargeCheap('search', SEARCH_COST_CENTS)
+					// Drop a made-up placeholder site: filter (e.g. site:example.com)
+					// so it can't force a zero-result search.
+					const query = stripPlaceholderSiteFilters(params.query)
+					if (query !== params.query) {
+						yield* Effect.logWarning(
+							'research.search.placeholder_site_stripped',
+						).pipe(Effect.annotateLogs({ tool: 'web_search' }))
+					}
 					return yield* search.search({
-						query: params.query,
+						query,
 						limit: params.limit ?? undefined,
 						recency:
 							params.recency_days != null
@@ -269,6 +310,7 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 					yield* budget.chargePaid(
 						'registry',
 						REGISTRY_LOOKUP_COST_CENTS,
+						'registry_lookup',
 						idempotencyKey,
 					)
 					return yield* registry.lookup({

@@ -89,7 +89,12 @@ const charge = (
 
 			const chargeEffect = Effect.gen(function* () {
 				const budget = yield* Budget
-				yield* budget.chargePaid('test-provider', 50, idempotencyKey)
+				yield* budget.chargePaid(
+					'test-provider',
+					50,
+					'discover_contacts',
+					idempotencyKey,
+				)
 			})
 
 			yield* chargeEffect.pipe(Effect.provide(budgetLayer))
@@ -128,12 +133,18 @@ const chargeThenObserve = (
 			return yield* Effect.gen(function* () {
 				const budget = yield* Budget
 				for (const { cents, key } of setupCharges) {
-					yield* budget.chargePaid('test-provider', cents, key)
+					yield* budget.chargePaid(
+						'test-provider',
+						cents,
+						'discover_contacts',
+						key,
+					)
 				}
 				return yield* Effect.result(
 					budget.chargePaid(
 						'test-provider',
 						observedCharge.cents,
+						'discover_contacts',
 						observedCharge.key,
 					),
 				)
