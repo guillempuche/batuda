@@ -10,24 +10,23 @@ concurrency:
   group: deploy-server
   cancel-in-progress: false
 
-# Least privilege: deploy authenticates to KraftCloud via secrets, not the
+# Least privilege: deploy authenticates to Unikraft Cloud via secrets, not the
 # GitHub token. It only needs to read the repo.
 permissions:
   contents: read
 
 env:
   KRAFTCLOUD_METRO: fra
-  # Pinned to a known-good kraft CLI version. UKC's API caps the
-  # `--timeout` per-RPC value at 10000ms and rejects anything higher with
-  # HTTP 400 ("Timeout value must be in the range -1 to 10000"); kraft's
-  # default of 60s (60000ms) trips this on every deploy, so the
-  # invocation explicitly passes `--timeout 10s`. Bump this version
-  # deliberately after verifying the new release against a dry-run deploy.
-  KRAFT_VERSION: v0.12.10
+  # Pinned new Unikraft CLI (`unikraft`, from unikraft-cloud/cli) version.
+  # Bump deliberately after verifying a new release against a dry-run deploy.
+  UNIKRAFT_CLI_VERSION: "0.4.1"
+  # Image namespace on Unikraft Cloud is the organization slug; published
+  # images and running instances live under `<org>/<name>`.
+  KRAFTCLOUD_ORG: gaaaa
 
 jobs:
-  # Run pending migrations before the rolling deploy; they must be
-  # backward-compatible with the still-running version (docs/runbooks.md).
+  # Run pending migrations before the deploy; they must be backward-compatible
+  # with the still-running version (docs/runbooks.md).
   migrate:
     name: Migrate prod database
     runs-on: ubuntu-latest
@@ -63,13 +62,11 @@ jobs:
         run: pnpm db:migrate
 
   deploy:
-    name: Deploy to KraftCloud
+    name: Deploy to Unikraft Cloud
     needs: migrate
     runs-on: ubuntu-latest
-    # An uncached re-run rebuilds the whole server image from scratch, which on
-    # its own overran the old 15-minute limit and got auto-cancelled mid-build,
-    # before the KraftCloud rollout. 30 covers an uncached build + push + rollout
-    # until build caching lands.
+    # The image now builds once in its own step (below); an uncached build is
+    # the long pole, so keep a generous ceiling until build caching lands.
     timeout-minutes: 30
     environment: production
 
@@ -77,27 +74,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
-      - name: Prepare files for KraftCloud
+      - name: Prepare files for Unikraft Cloud
         run: |
           cp apps/server/Kraftfile Kraftfile
           cp apps/server/Dockerfile Dockerfile
 
-      - name: Cache KraftCloud CLI
-        id: kraft-cache
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+      # Installs the `unikraft` CLI and logs it in headlessly. The new CLI keeps
+      # its own auth store (a legacy `kraft`/UKC_TOKEN login does not carry
+      # over), so every deploy authenticates here via the org token.
+      - name: Install and log in to Unikraft Cloud
+        uses: unikraft/setup-action@29c9cce5bc7e894f8929c845d4fba518ef8f1015 # v1
         with:
-          path: kraft.deb
-          key: kraft-cli-${{ env.KRAFT_VERSION }}
-
-      - name: Download KraftCloud CLI
-        if: steps.kraft-cache.outputs.cache-hit != 'true'
-        run: |
-          curl -sSfL "https://github.com/unikraft/kraftkit/releases/download/${KRAFT_VERSION}/kraftkit_${KRAFT_VERSION#v}_linux_amd64.deb" -o kraft.deb
-
-      - name: Install KraftCloud CLI
-        run: |
-          sudo dpkg -i kraft.deb
-          which kraft
+          version: ${{ env.UNIKRAFT_CLI_VERSION }}
+          token: ${{ secrets.KRAFTCLOUD_TOKEN }}
+          organization: ${{ env.KRAFTCLOUD_ORG }}
 
       - name: Extract version from tag
         id: meta
@@ -109,22 +99,38 @@ jobs:
           fi
           echo "short_sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
-      - name: Check if KraftCloud service exists
-        id: service-check
-        env:
-          KRAFTCLOUD_TOKEN: ${{ secrets.KRAFTCLOUD_TOKEN }}
+      # Build and publish the image ONCE. The new CLI separates packaging from
+      # running, so the deploy step below only re-runs the fast `unikraft run`
+      # on retry — never a fresh ~9-min image build (the old kraftkit path
+      # rebuilt on every retry and ran out of each attempt's window). The build
+      # (~9-min compile + ~300 MiB push) has no tight deadline of its own; the
+      # job's timeout-minutes is its single ceiling, so a slow uncached build
+      # isn't killed by a second, shorter clock.
+      - name: Build and publish image
         run: |
-          if kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} service get batuda-server >/dev/null 2>&1; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-            echo "Service batuda-server already exists — will perform rolling update"
+          unikraft build . \
+            --output ${{ env.KRAFTCLOUD_ORG }}/batuda-server:${{ steps.meta.outputs.version }}
+
+      # The service (load balancer) owns the domain + ports and persists across
+      # releases; instances are attached to it. It already exists in prod, so
+      # this is an idempotent safety net for a from-scratch environment.
+      - name: Ensure Unikraft Cloud service exists
+        run: |
+          if unikraft services get batuda-server >/dev/null 2>&1; then
+            echo "Service batuda-server already exists"
           else
-            echo "exists=false" >> $GITHUB_OUTPUT
-            echo "Service batuda-server does not exist — will create it"
+            echo "Creating service batuda-server"
+            unikraft services create \
+              --name batuda-server \
+              --metro ${{ env.KRAFTCLOUD_METRO }} \
+              --domains api.batuda.co \
+              --services 443:3000/tls+http \
+              --services 80:443/http+redirect
           fi
 
       - name: Pre-flight cmdline size guard
         run: |
-          # KraftCloud bakes every -e var into the unikernel kernel command
+          # Unikraft Cloud bakes every -e var into the unikernel kernel command
           # line, which Unikraft caps at 4096 bytes / 60 args: past the byte
           # cap the boot aborts with -E2BIG, past the arg cap argv is silently
           # truncated and vars vanish at runtime. Assemble the exact -e payload
@@ -172,101 +178,78 @@ jobs:
             exit 1
           fi
 
-      - name: Deploy to KraftCloud
+      - name: Deploy to Unikraft Cloud
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
-        env:
-          KRAFTCLOUD_TOKEN: ${{ secrets.KRAFTCLOUD_TOKEN }}
         with:
           max_attempts: 3
           retry_wait_seconds: 30
           timeout_minutes: 10
-          # Rollout strategy:
-          #   --rollout remove_sequential: new instance starts first, old
-          #     one is removed only after --rollout-wait, so the API keeps
-          #     serving traffic during the swap (zero downtime).
-          #   --rollout-wait 5s: capped by UKC's 10s per-RPC limit (see
-          #     timeout note below); 30s tripped HTTP 400 and aborted the
-          #     rollout. Node + DB pool warm-up fits in 5s on the cold
-          #     unikernel path because connection-pool init is lazy.
+          #   --timeout 5m gives the deploy up to 5 minutes to wait for the
+          #     freshly-pushed ~300 MiB image to become available before the
+          #     instance is created — the Unikraft team's guidance for the
+          #     propagation delay. The new CLI's --timeout is a whole-command
+          #     deadline that takes a real duration; the old kraftkit API
+          #     capped per-RPC timeouts at 10s (HTTP 400 above 10000ms).
+          #   --service batuda-server attaches the instance to the existing
+          #     load balancer that owns api.batuda.co + the ports; do NOT pass
+          #     -p/--domain here (the service owns them).
+          #   --name batuda-server-<sha> is unique per release so retries and
+          #     future deploys never collide on the name.
+          #   -m 2048M: pnpm v11 hoisted deploy ships apps/server's full install
+          #     tree (~303 MB); 1024 ran out of initrd RAM extracting the CPIO.
           #   --restart on-failure: if the process crashes (non-zero exit) the
-          #     platform starts a fresh instance, instead of leaving a dead-but-
-          #     "running" box that serves nothing. A clean shutdown (exit 0) is
-          #     left alone. Pairs with the process crash-guards in main.ts.
-          #   -M 2048: pnpm v11 hoisted-mode `pnpm deploy --prod` under legacy
-          #     deploy doesn't prune to apps/server's runtime deps — /deploy
-          #     ends up with the workspace's full install tree (~303 MB).
-          #     1024 ran out of initrd RAM extracting the CPIO. 2048 fits.
-          #     Slimming the image is tracked as a follow-up; bumping memory
-          #     unblocks the first prod boot today.
-          #   --timeout 10s is mandatory: kraft's default per-RPC timeout
-          #     is 60s, but UKC's API caps it at 10000ms and rejects
-          #     anything higher with HTTP 400 ("Timeout value must be in
-          #     the range -1 to 10000"). 10s is the maximum allowed.
-          #   --service is mutually exclusive with -p/-d; those are set
-          #   once during the first-time create branch below.
+          #     platform starts a fresh instance instead of leaving a dead-but-
+          #     "running" box. A clean shutdown (exit 0) is left alone. Pairs
+          #     with the process crash-guards in main.ts.
+          #   Scale-to-zero stays off via the Kraftfile label (baked in).
           command: |
-            # Shared deploy invocation: the -e block (secrets + build-meta)
-            # is identical for the rolling-update and first-time-create paths,
-            # so it lives in one function and the caller passes the rollout
-            # flags that differ between them. Non-secret config ships in the
-            # baked /app/config.production.json and is not passed on the
-            # cmdline.
-            deploy() {
-              kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
-                --timeout 10s \
-                --restart on-failure \
-                --service batuda-server \
-                -M 2048 \
-                "$@" \
-                -e NODE_ENV=production \
-                -e PORT=3000 \
-                -e SERVICE_VERSION="${{ steps.meta.outputs.version }}" \
-                -e GIT_SHA="${{ github.sha }}" \
-                -e REGION="${{ env.KRAFTCLOUD_METRO }}" \
-                -e OTEL_EXPORTER_OTLP_HEADERS="${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }},x-honeycomb-dataset=batuda-server" \
-                -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-                -e BETTER_AUTH_SECRET="${{ secrets.BETTER_AUTH_SECRET }}" \
-                -e STORAGE_ACCESS_KEY_ID="${{ secrets.STORAGE_ACCESS_KEY_ID }}" \
-                -e STORAGE_SECRET_ACCESS_KEY="${{ secrets.STORAGE_SECRET_ACCESS_KEY }}" \
-                -e EMAIL_CREDENTIAL_KEY="${{ secrets.EMAIL_CREDENTIAL_KEY }}" \
-                -e EMAIL_API_KEY_TRANSACTIONAL="${{ secrets.EMAIL_API_KEY_TRANSACTIONAL }}" \
-                -e CALENDAR_API_KEY="${{ secrets.CALENDAR_API_KEY }}" \
-                -e CALENDAR_WEBHOOK_SECRET="${{ secrets.CALENDAR_WEBHOOK_SECRET }}" \
-                -e RESEARCH_LLM_AGENT_API_KEY="${{ secrets.RESEARCH_LLM_AGENT_API_KEY }}" \
-                -e RESEARCH_LLM_EXTRACT_API_KEY="${{ secrets.RESEARCH_LLM_EXTRACT_API_KEY }}" \
-                -e RESEARCH_LLM_WRITER_API_KEY="${{ secrets.RESEARCH_LLM_WRITER_API_KEY }}" \
-                -e RESEARCH_API_KEY_SEARCH="${{ secrets.RESEARCH_API_KEY_SEARCH }}" \
-                -e RESEARCH_API_KEY_SEARCH_2="${{ secrets.RESEARCH_API_KEY_SEARCH_2 }}" \
-                -e RESEARCH_API_KEY_SCRAPE="${{ secrets.RESEARCH_API_KEY_SCRAPE }}" \
-                -e RESEARCH_API_KEY_EXTRACT="${{ secrets.RESEARCH_API_KEY_EXTRACT }}" \
-                -e RESEARCH_API_KEY_REGISTRY_ES="${{ secrets.RESEARCH_API_KEY_REGISTRY_ES }}" \
-                -e RESEARCH_API_KEY_ENRICH="${{ secrets.RESEARCH_API_KEY_ENRICH }}" \
-                -e RESEARCH_API_KEY_VERIFY="${{ secrets.RESEARCH_API_KEY_VERIFY }}" \
-                -e RESEARCH_API_KEY_REGISTRY_GB="${{ secrets.RESEARCH_API_KEY_REGISTRY_GB }}" \
-                .
-            }
-            if [ "${{ steps.service-check.outputs.exists }}" = "true" ]; then
-              deploy --rollout remove_sequential --rollout-wait 5s
-            else
-              # First-time: create an explicitly-named service, then attach
-              # the instance to it. `deploy --name` alone lets UKC auto-name
-              # the service, which breaks the next deploy's service lookup.
-              # The explicit `service create` makes the name stable across
-              # releases so --rollout remove_sequential works.
-              kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} service create \
-                --name batuda-server \
-                -d api.batuda.co \
-                443:3000/tls+http \
-                80:443/http+redirect
-              deploy
-            fi
+            # No users yet, so a brief gap is fine: remove every current
+            # batuda-server instance (the old release, plus any half-created one
+            # from a failed retry) so the new instance is the sole member of the
+            # service and the /health check below unambiguously tests this
+            # release. -f name -o quiet prints only names — never the instance
+            # env, which the API returns in cleartext.
+            for old in $(unikraft instances list --filter 'image~="${{ env.KRAFTCLOUD_ORG }}/batuda-server"' -f name -o quiet); do
+              unikraft instances delete "$old" --metro ${{ env.KRAFTCLOUD_METRO }} 2>&1 | grep -v "not found" || true
+            done
+            unikraft run \
+              --timeout 5m \
+              --metro ${{ env.KRAFTCLOUD_METRO }} \
+              --service batuda-server \
+              --name batuda-server-${{ steps.meta.outputs.short_sha }} \
+              --image ${{ env.KRAFTCLOUD_ORG }}/batuda-server:${{ steps.meta.outputs.version }} \
+              -m 2048M \
+              --restart on-failure \
+              -e NODE_ENV=production \
+              -e PORT=3000 \
+              -e SERVICE_VERSION="${{ steps.meta.outputs.version }}" \
+              -e GIT_SHA="${{ github.sha }}" \
+              -e REGION="${{ env.KRAFTCLOUD_METRO }}" \
+              -e OTEL_EXPORTER_OTLP_HEADERS="${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }},x-honeycomb-dataset=batuda-server" \
+              -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+              -e BETTER_AUTH_SECRET="${{ secrets.BETTER_AUTH_SECRET }}" \
+              -e STORAGE_ACCESS_KEY_ID="${{ secrets.STORAGE_ACCESS_KEY_ID }}" \
+              -e STORAGE_SECRET_ACCESS_KEY="${{ secrets.STORAGE_SECRET_ACCESS_KEY }}" \
+              -e EMAIL_CREDENTIAL_KEY="${{ secrets.EMAIL_CREDENTIAL_KEY }}" \
+              -e EMAIL_API_KEY_TRANSACTIONAL="${{ secrets.EMAIL_API_KEY_TRANSACTIONAL }}" \
+              -e CALENDAR_API_KEY="${{ secrets.CALENDAR_API_KEY }}" \
+              -e CALENDAR_WEBHOOK_SECRET="${{ secrets.CALENDAR_WEBHOOK_SECRET }}" \
+              -e RESEARCH_LLM_AGENT_API_KEY="${{ secrets.RESEARCH_LLM_AGENT_API_KEY }}" \
+              -e RESEARCH_LLM_EXTRACT_API_KEY="${{ secrets.RESEARCH_LLM_EXTRACT_API_KEY }}" \
+              -e RESEARCH_LLM_WRITER_API_KEY="${{ secrets.RESEARCH_LLM_WRITER_API_KEY }}" \
+              -e RESEARCH_API_KEY_SEARCH="${{ secrets.RESEARCH_API_KEY_SEARCH }}" \
+              -e RESEARCH_API_KEY_SEARCH_2="${{ secrets.RESEARCH_API_KEY_SEARCH_2 }}" \
+              -e RESEARCH_API_KEY_SCRAPE="${{ secrets.RESEARCH_API_KEY_SCRAPE }}" \
+              -e RESEARCH_API_KEY_EXTRACT="${{ secrets.RESEARCH_API_KEY_EXTRACT }}" \
+              -e RESEARCH_API_KEY_REGISTRY_ES="${{ secrets.RESEARCH_API_KEY_REGISTRY_ES }}" \
+              -e RESEARCH_API_KEY_ENRICH="${{ secrets.RESEARCH_API_KEY_ENRICH }}" \
+              -e RESEARCH_API_KEY_VERIFY="${{ secrets.RESEARCH_API_KEY_VERIFY }}" \
+              -e RESEARCH_API_KEY_REGISTRY_GB="${{ secrets.RESEARCH_API_KEY_REGISTRY_GB }}"
 
       - name: Verify deployment
-        env:
-          KRAFTCLOUD_TOKEN: ${{ secrets.KRAFTCLOUD_TOKEN }}
         run: |
           sleep 5
-          kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} instance list | grep batuda-server || true
+          unikraft instances list --filter 'image~="${{ env.KRAFTCLOUD_ORG }}/batuda-server"' -f name,state -o table || true
           # Gate the deploy on /health actually serving. curl already retries
           # to absorb cold-boot latency; fail the job if it never comes up so a
           # broken release doesn't pass with only a warning.

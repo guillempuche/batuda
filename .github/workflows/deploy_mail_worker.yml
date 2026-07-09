@@ -10,49 +10,47 @@ concurrency:
   group: deploy-mail-worker
   cancel-in-progress: false
 
-# Least privilege: deploy authenticates to KraftCloud via secrets, not the
+# Least privilege: deploy authenticates to Unikraft Cloud via secrets, not the
 # GitHub token. It only needs to read the repo.
 permissions:
   contents: read
 
 env:
   KRAFTCLOUD_METRO: fra
-  # Pinned to the same kraft CLI version as deploy_server.yml. Bump
-  # both together after a dry-run on one target.
-  KRAFT_VERSION: v0.12.10
+  # Pinned new Unikraft CLI (`unikraft`, from unikraft-cloud/cli) version.
+  # Bump deliberately after verifying a new release against a dry-run deploy.
+  UNIKRAFT_CLI_VERSION: "0.4.1"
+  # Image namespace on Unikraft Cloud is the organization slug; published
+  # images and running instances live under `<org>/<name>`.
+  KRAFTCLOUD_ORG: gaaaa
 
 jobs:
   deploy:
-    name: Deploy to KraftCloud
+    name: Deploy to Unikraft Cloud
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # The image now builds once in its own step (below); an uncached build is
+    # the long pole, so keep a generous ceiling until build caching lands.
+    timeout-minutes: 30
     environment: production
 
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
-      - name: Prepare files for KraftCloud
+      - name: Prepare files for Unikraft Cloud
         run: |
           cp apps/mail-worker/Kraftfile Kraftfile
           cp apps/mail-worker/Dockerfile Dockerfile
 
-      - name: Cache KraftCloud CLI
-        id: kraft-cache
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+      # Installs the `unikraft` CLI and logs it in headlessly. The new CLI keeps
+      # its own auth store (a legacy `kraft`/UKC_TOKEN login does not carry
+      # over), so every deploy authenticates here via the org token.
+      - name: Install and log in to Unikraft Cloud
+        uses: unikraft/setup-action@29c9cce5bc7e894f8929c845d4fba518ef8f1015 # v1
         with:
-          path: kraft.deb
-          key: kraft-cli-${{ env.KRAFT_VERSION }}
-
-      - name: Download KraftCloud CLI
-        if: steps.kraft-cache.outputs.cache-hit != 'true'
-        run: |
-          curl -sSfL "https://github.com/unikraft/kraftkit/releases/download/${KRAFT_VERSION}/kraftkit_${KRAFT_VERSION#v}_linux_amd64.deb" -o kraft.deb
-
-      - name: Install KraftCloud CLI
-        run: |
-          sudo dpkg -i kraft.deb
-          which kraft
+          version: ${{ env.UNIKRAFT_CLI_VERSION }}
+          token: ${{ secrets.KRAFTCLOUD_TOKEN }}
+          organization: ${{ env.KRAFTCLOUD_ORG }}
 
       - name: Extract version from tag
         id: meta
@@ -64,21 +62,21 @@ jobs:
           fi
           echo "short_sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
-      # Background worker — no public HTTP endpoint, so no service. Use a
-      # stable instance name (`batuda-mail-worker`) mirroring the
-      # batuda-server / batuda-web naming so ops commands target a
-      # predictable identity. The IMAP IDLE connections drop on any
-      # restart and the worker's claim-and-reconnect loop re-establishes
-      # them, so a ~5s gap between delete + recreate is acceptable.
-      - name: Delete previous instance (idempotent)
-        env:
-          KRAFTCLOUD_TOKEN: ${{ secrets.KRAFTCLOUD_TOKEN }}
+      # Build and publish the image ONCE. The new CLI separates packaging from
+      # running, so the deploy step below only re-runs the fast `unikraft run`
+      # on retry — never a fresh ~9-min image build (the old kraftkit path
+      # rebuilt on every retry and ran out of each attempt's window). The build
+      # (~9-min compile + ~300 MiB push) has no tight deadline of its own; the
+      # job's timeout-minutes is its single ceiling, so a slow uncached build
+      # isn't killed by a second, shorter clock.
+      - name: Build and publish image
         run: |
-          kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} instance remove batuda-mail-worker 2>&1 | grep -v "not found" || true
+          unikraft build . \
+            --output ${{ env.KRAFTCLOUD_ORG }}/batuda-mail-worker:${{ steps.meta.outputs.version }}
 
       - name: Pre-flight cmdline size guard
         run: |
-          # KraftCloud bakes every -e var into the unikernel kernel command
+          # Unikraft Cloud bakes every -e var into the unikernel kernel command
           # line, which Unikraft caps at 4096 bytes / 60 args: past the byte
           # cap the boot aborts with -E2BIG, past the arg cap argv is silently
           # truncated and vars vanish at runtime. Assemble the exact -e payload
@@ -110,30 +108,44 @@ jobs:
             exit 1
           fi
 
-      - name: Deploy to KraftCloud
+      - name: Deploy to Unikraft Cloud
         uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
-        env:
-          KRAFTCLOUD_TOKEN: ${{ secrets.KRAFTCLOUD_TOKEN }}
         with:
           max_attempts: 3
           retry_wait_seconds: 30
           timeout_minutes: 10
-          # -M 2048 mirrors server's footprint; mail-worker's deploy tree
-          # (aws-sdk + imapflow + mailparser + pg + effect) is comparable.
-          # --timeout 10s is mandatory: UKC caps per-RPC timeouts at
-          # 10000ms; kraft's 60s default is rejected with HTTP 400.
-          # --scale-to-zero off matches the Kraftfile label and keeps the
-          # IDLE-holding worker always-warm.
-          # --restart on-failure: if the worker crashes (non-zero exit), the
-          # platform starts a fresh one instead of leaving it dead but still
-          # listed as "running" and processing no mail. A clean shutdown
-          # (exit 0) is left alone. Pairs with the crash-guards in main.ts.
+          # Background worker — no public HTTP endpoint, so no service group.
+          # Use a stable instance name (`batuda-mail-worker`, mirroring the
+          # batuda-server / batuda-web naming) so ops commands target a
+          # predictable identity. The IMAP IDLE connections drop on any
+          # restart and the worker's claim-and-reconnect loop re-establishes
+          # them, so a ~5s gap between delete + recreate is acceptable.
+          #   Each retry first deletes any leftover instance so the fixed name
+          #     is free before `run` recreates it (a half-created instance from
+          #     a failed attempt would otherwise collide on the name).
+          #   -m 2048M mirrors server's footprint; the deploy tree (aws-sdk +
+          #     imapflow + mailparser + pg + effect) is comparable. 1024 ran
+          #     out of initrd RAM extracting the CPIO.
+          #   --restart on-failure: if the worker crashes (non-zero exit), the
+          #     platform starts a fresh one instead of leaving it dead but still
+          #     listed as "running" and processing no mail. A clean shutdown
+          #     (exit 0) is left alone. Pairs with the crash-guards in main.ts.
+          #   --timeout 5m gives the deploy up to 5 minutes to wait for the
+          #     freshly-pushed ~300 MiB image to become available before the
+          #     instance is created — the Unikraft team's guidance for the
+          #     propagation delay. The new CLI's --timeout is a whole-command
+          #     deadline that takes a real duration; the old kraftkit API
+          #     capped per-RPC timeouts at 10s (HTTP 400 above 10000ms).
+          #   Scale-to-zero stays off via the Kraftfile label (baked into the
+          #     image), keeping the IDLE-holding worker always-warm.
           command: |
-            kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} deploy \
-              --timeout 10s \
+            unikraft instances delete batuda-mail-worker --metro ${{ env.KRAFTCLOUD_METRO }} 2>&1 | grep -v "not found" || true
+            unikraft run \
+              --timeout 5m \
+              --metro ${{ env.KRAFTCLOUD_METRO }} \
               --name batuda-mail-worker \
-              -M 2048 \
-              --scale-to-zero off \
+              --image ${{ env.KRAFTCLOUD_ORG }}/batuda-mail-worker:${{ steps.meta.outputs.version }} \
+              -m 2048M \
               --restart on-failure \
               -e NODE_ENV=production \
               -e SERVICE_VERSION="${{ steps.meta.outputs.version }}" \
@@ -143,15 +155,12 @@ jobs:
               -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
               -e EMAIL_CREDENTIAL_KEY="${{ secrets.EMAIL_CREDENTIAL_KEY }}" \
               -e STORAGE_ACCESS_KEY_ID="${{ secrets.STORAGE_ACCESS_KEY_ID }}" \
-              -e STORAGE_SECRET_ACCESS_KEY="${{ secrets.STORAGE_SECRET_ACCESS_KEY }}" \
-              .
+              -e STORAGE_SECRET_ACCESS_KEY="${{ secrets.STORAGE_SECRET_ACCESS_KEY }}"
 
       - name: Verify deployment
-        env:
-          KRAFTCLOUD_TOKEN: ${{ secrets.KRAFTCLOUD_TOKEN }}
         run: |
           sleep 5
-          kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} instance get batuda-mail-worker
+          unikraft instances get batuda-mail-worker --metro ${{ env.KRAFTCLOUD_METRO }}
           # claimAvailableInboxes runs every 5 s, so an IDLE-established
           # log line should appear within ~10 s if any inbox is provisioned.
-          kraft cloud --metro ${{ env.KRAFTCLOUD_METRO }} instance logs batuda-mail-worker --tail 100 || echo "::warning::No logs yet"
+          unikraft instances logs batuda-mail-worker --metro ${{ env.KRAFTCLOUD_METRO }} --tail 100 || echo "::warning::No logs yet"
