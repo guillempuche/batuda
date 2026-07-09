@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-09 (server-v2026.7.9)
+
+### Bug Fixes
+
+* resolve blob uploads failing against Cloudflare R2 ([c6323f9](https://github.com/guillempuche/batuda/commit/c6323f95aea1453ea1919ddac9e4c2baa8f56516))
+
 ## 2026-07-08 (server-v2026.7.8-1)
 
 ### Bug Fixes
