@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-09 (mail-worker-v2026.7.9)
+
+### Features
+
+* add cross-run review inbox and type review endpoints ([bbf3a56](https://github.com/guillempuche/batuda/commit/bbf3a5663f99c6b68a173acb96633cef68d5d544))
+* apply or reject many research proposals in one call ([1f3aeb2](https://github.com/guillempuche/batuda/commit/1f3aeb2cca8d291eccf3a63fb718029e9f2f3932))
+* auto-apply high-confidence verified research findings ([99814b8](https://github.com/guillempuche/batuda/commit/99814b85c7d2158789e01059e408ff8b53acd791))
+* record who applied a research suggestion to the CRM ([da1304e](https://github.com/guillempuche/batuda/commit/da1304e0c881d2121b7dff3ed249327596d78f11))
+* **server:** add bounding-box company search and location re-geocode ([259137b](https://github.com/guillempuche/batuda/commit/259137b7ff2b4fd8d1688a72c8ccf91cb08de10c))
+
 ## 2026-07-01 (mail-worker-v2026.7.1)
 
 ### Features
