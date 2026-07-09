@@ -1,5 +1,5 @@
 ---
-name: worktrees
+name: worktree
 description: This skill should be used when working with git worktrees for parallel Claude/dev sessions on Batuda — creating, provisioning, running, listing/diagnosing, or tearing down a worktree's dev stack, or cleaning up orphaned data. Covers the shared-services model (one Docker stack; each worktree gets its own Postgres database + MinIO bucket), the `pnpm cli worktree` commands, lifecycle hooks, and per-worktree CORS/portless.
 allowed-tools: Bash(pnpm:*) Bash(git:*) Bash(docker:*) Read
 ---

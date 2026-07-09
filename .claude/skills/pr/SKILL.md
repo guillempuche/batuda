@@ -1,6 +1,6 @@
 ---
 name: pr
-description: This skill should be used when the user asks to "open a PR", "create a pull request", "raise a PR", "PR this", or "send it for review" — turning a finished change (usually already committed on a local branch) into a reviewable, mergeable pull request. Drives the full Batuda PR lifecycle — re-baseline on main, verify end-to-end (with screenshots/recording for UI changes), self-review for pattern drift and AI-code smells, commit via /commits when there are new changes, run the verification gates, write an architecture-aware PR body in the house style, work the review loop (watch CI, address comments), and merge by rebase or squash. Stops at merge into `main`; deploying a merged change to production is `/release`.
+description: This skill should be used when the user asks to "open a PR", "create a pull request", "raise a PR", "PR this", or "send it for review" — turning a finished change (usually already committed on a local branch) into a reviewable, mergeable pull request. Drives the full Batuda PR lifecycle — re-baseline on main, verify end-to-end (with screenshots/recording for UI changes), self-review for pattern drift and AI-code smells, commit via /commit when there are new changes, run the verification gates, write an architecture-aware PR body in the house style, work the review loop (watch CI, address comments), and merge by rebase or squash. Stops at merge into `main`; deploying a merged change to production is `/release`.
 allowed-tools: Bash(git:*) Bash(gh:*) Bash(pnpm:*) Bash(agent-browser:*) Bash(curl:*) Bash(mktemp:*) Bash(cp:*) Bash(mkdir:*) Read AskUserQuestion
 ---
 
@@ -37,14 +37,14 @@ gh pr view --json number,state,isDraft 2>/dev/null || echo "no PR yet"
 ```
 
 - **Already committed (common):** Steps 2–3 review the whole branch; Steps 4–5 fire only if you make fixes.
-- **Uncommitted (rarer):** the full readability → `/commits` flow (Steps 4–5) applies before the gates.
+- **Uncommitted (rarer):** the full readability → `/commit` flow (Steps 4–5) applies before the gates.
 - **PR already exists:** you'll update it, not open a duplicate (Step 7).
 
 ## Step 2 — Verify end-to-end (do not skip)
 
 Type-checks and unit tests are **not** enough — they have passed on changes that produced wrong behavior at runtime. Run the changed path against the live local stack and confirm the user-visible behavior. If the stack is unhealthy, run `/debug-apps` first.
 
-**In a git worktree** (the recommended setup): provision its own stack with `pnpm cli worktree up` (not `services up`), then `pnpm dev`, and target the worktree's own host — `https://<label>.batuda.localhost` (web) / `https://<label>.api.batuda.localhost` (api), where `<label>` is the host `pnpm cli worktree doctor` prints (portless takes the branch's **last path segment**, so `ui/foo` → `foo.batuda.localhost`) — everywhere this step (and the screenshot commands below) say `batuda.localhost`. The server, login, and minted links all work at that host automatically. See `/worktrees`.
+**In a git worktree** (the recommended setup): provision its own stack with `pnpm cli worktree up` (not `services up`), then `pnpm dev`, and target the worktree's own host — `https://<label>.batuda.localhost` (web) / `https://<label>.api.batuda.localhost` (api), where `<label>` is the host `pnpm cli worktree doctor` prints (portless takes the branch's **last path segment**, so `ui/foo` → `foo.batuda.localhost`) — everywhere this step (and the screenshot commands below) say `batuda.localhost`. The server, login, and minted links all work at that host automatically. See `/worktree`.
 
 - **CLI** — run the actual command (`pnpm cli seed`, `pnpm cli doctor`, …) and inspect output / DB state.
 - **Server** — hit the endpoint (curl or via the running app), check the response and `apps/server/server.log`.
@@ -124,12 +124,12 @@ Steps 4–5 fire **only if there are uncommitted changes to land** — the origi
 
 When there are changes: before staging, run the `readability-improver:readability-improver` agent on the files you're about to commit. It is selective and skips self-documenting code, so the cost is low. Skip only for trivial commits (single-line typo, dependency bump, rename with no body change). Re-run type-check after it edits.
 
-## Step 5 — Commit via the /commits skill (when there are changes)
+## Step 5 — Commit via the /commit skill (when there are changes)
 
 Same condition as Step 4 — only when there's something uncommitted to land.
 
 - Stage one logical group at a time (`git add <paths>`). **Tests ride in the same commit as the logic they cover** — never a separate logic/test split. A standalone `test:` commit is fine only when no logic changed.
-- Call `Skill(skill="commits")` to draft and validate the message(s); use the validated preview verbatim. Never hand-roll a message and skip the skill.
+- Call `Skill(skill="commit")` to draft and validate the message(s); use the validated preview verbatim. Never hand-roll a message and skip the skill.
 - **Before each `git commit`**, give a plain-English explanation of what is about to land and why (which files, what the diff does, any risk), then **wait for the user's OK**. Applies to every commit, one at a time — don't batch "here are the next three, OK?".
 - Commit shape: **one PR per slice with focused commits**; or, when a multi-slice plan chose it, **one shared worktree + one PR + one commit per area**. Never split a slice across PRs.
 - **No AI attribution** anywhere — no "Generated with Claude Code", no "Co-Authored-By".
@@ -160,7 +160,7 @@ gh pr view --json number,state,isDraft 2>/dev/null \
 
 - **Open ready for review by default.** A committed, self-reviewed, verified change is finished — reserve `--draft` for work you can *name* as unfinished (a partial slice, a known-broken intermediate, something opened early for direction). CI status shows on the PR either way; protect the reviewer by working CI to green and only merging or handing off when it passes (Step 8), not by parking finished work in draft.
 - **If you're unsure about anything in the PR, ask the user.** A judgment call you can't settle, a path you couldn't verify, an ambiguity in scope — raise it as a question rather than guessing or burying it in the body.
-- The title mirrors the lead commit's subject (same type/scope rules as `/commits`).
+- The title mirrors the lead commit's subject (same type/scope rules as `/commit`).
 - **Stacked PR:** if this branch depends on another unmerged branch, set `--base <dep-branch>` (not `main`) so the diff shows only this slice; re-target to `main` after the dependency merges. **CI only runs on main-targeting PRs** (`ci.yml` is `pull_request: branches: [main]`), so a stacked PR gets *no checks* until it's retargeted — and a base change alone won't fire them, so push a fresh commit (empty or amended) to trigger the run.
 
 ### PR body — house style
@@ -241,7 +241,7 @@ gh pr ready <N>
 gh pr view <N> --comments       # read the reviewer's threads
 ```
 
-- Treat each fix as a normal change: re-run the Step 3 self-review on it → readability (Step 4) → `/commits` (Step 5, with the explain-and-wait gate) → push. Don't bypass the gates for "small" review fixes — that's how regressions and drift slip in.
+- Treat each fix as a normal change: re-run the Step 3 self-review on it → readability (Step 4) → `/commit` (Step 5, with the explain-and-wait gate) → push. Don't bypass the gates for "small" review fixes — that's how regressions and drift slip in.
 - Reply to each thread with what you did and resolve it once pushed; re-request review when all are addressed.
 - **Keep the PR body in sync** as commits land: if the scope grew, update `## What` / `## Changes` / `## Impact` (the description grows as slices land — your shared-worktree convention).
 
@@ -258,7 +258,7 @@ git log main..HEAD --oneline
 ```
 
 - **Rebase** — each commit is independently meaningful and worth keeping on main (matches one-PR-per-slice, each commit a focused topic).
-- **Squash** — the trail has cleanup / fix-on-fix commits not worth preserving. If squashing, draft the squashed message via `/commits` first so it's reviewable.
+- **Squash** — the trail has cleanup / fix-on-fix commits not worth preserving. If squashing, draft the squashed message via `/commit` first so it's reviewable.
 
 Default to **rebase** unless squashing serves a specific reason.
 
@@ -275,10 +275,10 @@ If rebase hits conflicts: pause and surface to the user — rebase the branch lo
 ## Conventions this skill encodes
 
 - Re-baseline long sessions on `origin/main` before editing or finalizing.
-- Default path assumes the branch is already committed; readability + `/commits` (Steps 4–5) fire only for new fixes.
+- Default path assumes the branch is already committed; readability + `/commit` (Steps 4–5) fire only for new fixes.
 - Verify end-to-end; screenshots/recording for UI.
 - Self-review the whole branch: reuse-not-reinvent, pattern conformance (`AGENTS.md` / `docs/*`), scope discipline, AI-code smells; escalate to `/code-review`, `/security-review` (+ Snyk), and the a11y agent by risk.
-- Readability pass, then commit via `/commits` with an explain-and-wait gate per commit.
+- Readability pass, then commit via `/commit` with an explain-and-wait gate per commit.
 - Tests ride with their logic in one commit.
 - Verification gates: `install` → `check-types` + `test` → `build`.
 - PR body in the house style with a Review guide; `## Verification` claims only what was actually run; first-person singular; understandable by a non-technical reader and a new contributor without prior context; no AI attribution.

@@ -124,7 +124,7 @@ own Postgres database (`batuda_<slug>`) and MinIO bucket (`batuda-assets-<slug>`
 **not** a stack per worktree. portless serves it at `<label>.batuda.localhost` (web)
 and `<label>.api.batuda.localhost` (server), where `<label>`/`<slug>` is the branch's
 last path segment (so `ui/foo` → `foo.batuda.localhost`), so there's no clash
-with the main checkout. See the `/worktrees` skill for the full model.
+with the main checkout. See the `/worktree` skill for the full model.
 
 ```bash
 # Provision this worktree: creates its DB + bucket, writes .env, migrates + seeds.
