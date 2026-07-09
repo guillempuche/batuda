@@ -139,7 +139,9 @@ jobs:
           #   Scale-to-zero stays off via the Kraftfile label (baked into the
           #     image), keeping the IDLE-holding worker always-warm.
           command: |
-            unikraft instances delete batuda-mail-worker --metro ${{ env.KRAFTCLOUD_METRO }} 2>&1 | grep -v "not found" || true
+            # instances delete/get/logs take a bare name and reject --metro
+            # (only run/services create accept it); the login profile spans metros.
+            unikraft instances delete batuda-mail-worker 2>&1 | grep -v "not found" || true
             unikraft run \
               --timeout 5m \
               --metro ${{ env.KRAFTCLOUD_METRO }} \
@@ -160,7 +162,7 @@ jobs:
       - name: Verify deployment
         run: |
           sleep 5
-          unikraft instances get batuda-mail-worker --metro ${{ env.KRAFTCLOUD_METRO }}
+          unikraft instances get batuda-mail-worker
           # claimAvailableInboxes runs every 5 s, so an IDLE-established
           # log line should appear within ~10 s if any inbox is provisioned.
-          unikraft instances logs batuda-mail-worker --metro ${{ env.KRAFTCLOUD_METRO }} --tail 100 || echo "::warning::No logs yet"
+          unikraft instances logs batuda-mail-worker --tail 100 || echo "::warning::No logs yet"

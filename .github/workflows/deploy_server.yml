@@ -209,8 +209,10 @@ jobs:
             # service and the /health check below unambiguously tests this
             # release. -f name -o quiet prints only names — never the instance
             # env, which the API returns in cleartext.
+            # instances list/delete take a bare name and reject --metro (only
+            # run/services create accept it); the login profile spans metros.
             for old in $(unikraft instances list --filter 'image~="${{ env.KRAFTCLOUD_ORG }}/batuda-server"' -f name -o quiet); do
-              unikraft instances delete "$old" --metro ${{ env.KRAFTCLOUD_METRO }} 2>&1 | grep -v "not found" || true
+              unikraft instances delete "$old" 2>&1 | grep -v "not found" || true
             done
             unikraft run \
               --timeout 5m \
