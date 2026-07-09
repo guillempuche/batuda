@@ -66,7 +66,11 @@ jobs:
     name: Deploy to KraftCloud
     needs: migrate
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # An uncached re-run rebuilds the whole server image from scratch, which on
+    # its own overran the old 15-minute limit and got auto-cancelled mid-build,
+    # before the KraftCloud rollout. 30 covers an uncached build + push + rollout
+    # until build caching lands.
+    timeout-minutes: 30
     environment: production
 
     steps:
