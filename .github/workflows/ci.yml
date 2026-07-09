@@ -3,6 +3,9 @@ name: CI
 on:
   pull_request:
     branches: [main]
+    # Run on ready-for-review too (not a default type), so a draft flipped to
+    # ready is checked immediately instead of waiting for the next push.
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -15,6 +18,8 @@ permissions:
 jobs:
   ci:
     name: Lint, Build, Type Check, Test
+    # A draft PR is work in progress, so skip CI until it's marked ready.
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
