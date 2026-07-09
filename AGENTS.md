@@ -290,8 +290,8 @@ RESEARCH_API_KEY_SEARCH_2=fc_...           # slot 1 key
 
 ## Skills
 
-| Skill      | Use for                                                                           |
-| ---------- | --------------------------------------------------------------------------------- |
-| `/crm`     | CRM data operations — MCP tools, companies, interactions, documents, tasks, pages |
-| `/commits` | Git commit messages following project conventions                                 |
-| `/debug`   | Diagnose server and internal apps — health checks, logs, Docker, auth             |
+| Skill     | Use for                                                                           |
+| --------- | --------------------------------------------------------------------------------- |
+| `/crm`    | CRM data operations — MCP tools, companies, interactions, documents, tasks, pages |
+| `/commit` | Git commit messages following project conventions                                 |
+| `/debug`  | Diagnose server and internal apps — health checks, logs, Docker, auth             |

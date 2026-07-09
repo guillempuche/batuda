@@ -1,5 +1,5 @@
 ---
-name: commits
+name: commit
 description: Generates consistent git commit messages following project conventions. Use when committing changes, creating PRs, or when asked to write commit messages. Also validates if proposed messages follow project format.
 ---
 

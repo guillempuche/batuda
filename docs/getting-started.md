@@ -136,7 +136,7 @@ Log in at `/login` with the admin credentials you set in Step 5.
 
 ## (Optional) Parallel work in git worktrees
 
-Work on several branches at once without a second Docker stack: each git worktree is a *tenant* in the shared stack with its own database + bucket. The `/worktrees` skill has the full model; the short version:
+Work on several branches at once without a second Docker stack: each git worktree is a *tenant* in the shared stack with its own database + bucket. The `/worktree` skill has the full model; the short version:
 
 ```bash
 git worktree add .claude/worktrees/<name> -b <branch>   # create
