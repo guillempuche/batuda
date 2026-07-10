@@ -4,6 +4,7 @@ process.env['DATABASE_URL'] ??=
 	'postgresql://batuda:batuda@localhost:5433/batuda_it'
 process.env['RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL'] ??= '4'
 process.env['RESEARCH_MAX_AGENT_STEPS'] ??= '6'
+process.env['RESEARCH_MAX_LOOP_PROMPT_TOKENS'] ??= '24000'
 // Run the periodic sweep every second and treat a beat older than a second as
 // dead, so the daemon reclaims a planted orphan within the test window.
 process.env['RESEARCH_ORPHAN_SWEEP_INTERVAL_SEC'] ??= '1'

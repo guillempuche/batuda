@@ -4,6 +4,7 @@ process.env['DATABASE_URL'] ??=
 	'postgresql://batuda:batuda@localhost:5433/batuda_it'
 process.env['RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL'] ??= '4'
 process.env['RESEARCH_MAX_AGENT_STEPS'] ??= '6'
+process.env['RESEARCH_MAX_LOOP_PROMPT_TOKENS'] ??= '24000'
 // Beat once a second so a bump is observable within the test's short window.
 process.env['RESEARCH_HEARTBEAT_INTERVAL_SEC'] ??= '1'
 // Keep the periodic orphan sweep out of the way — this suite watches a live run.

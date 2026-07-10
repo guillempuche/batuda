@@ -311,6 +311,27 @@ export const ResearchLive = HttpApiBuilder.group(
 						),
 					),
 				)
+				.handle('rerun', _ =>
+					Effect.gen(function* () {
+						const { userId } = yield* SessionContext
+						const currentOrg = yield* CurrentOrg
+						const result = yield* svc.rerun(
+							userId,
+							currentOrg.id,
+							_.params.id,
+							_.payload.domain,
+						)
+						if (result.status === 'run_not_found')
+							return yield* Effect.fail(
+								new NotFound({ entity: 'research', id: _.params.id }),
+							)
+						return result
+					}).pipe(
+						Effect.catch(e =>
+							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+						),
+					),
+				)
 				.handle('listPendingProposals', _ =>
 					Effect.gen(function* () {
 						// Org scope is enforced by RLS; the boolean filter arrives as a
