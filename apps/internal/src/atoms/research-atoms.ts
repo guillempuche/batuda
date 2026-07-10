@@ -81,6 +81,9 @@ export function runProposedUpdatesAtom(researchId: string) {
 
 export const createResearchAtom = BatudaApiAtom.mutation('research', 'create')
 
+/** Target correction: re-run a run anchored to a user-supplied official domain. */
+export const rerunResearchAtom = BatudaApiAtom.mutation('research', 'rerun')
+
 /**
  * One pending proposal in the cross-run review inbox. The
  * `listPendingProposals` endpoint is typed server-side, so the atom already

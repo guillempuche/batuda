@@ -1,6 +1,7 @@
 import { Trans } from '@lingui/react/macro'
 import styled from 'styled-components'
 
+import { normalizeConfidence } from '#/components/research/proposal-logic'
 import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
 
 /**
@@ -64,19 +65,23 @@ export function CitationList({
 	if (!citations || citations.length === 0) return null
 	return (
 		<CitationsUl>
-			{citations.map(c => (
-				<CitationLi key={stableKey(['cit', c.sourceId, c.quote ?? ''])}>
-					<CitationKey>{c.sourceId}</CitationKey>
-					{c.quote !== undefined ? (
-						<CitationQuote>“{c.quote}”</CitationQuote>
-					) : null}
-					{c.confidence !== undefined ? (
-						<CitationConfidence>
-							{Math.round(c.confidence * 100)}%
-						</CitationConfidence>
-					) : null}
-				</CitationLi>
-			))}
+			{citations.map(c => {
+				// Route confidence through the one shared 0–100 normalizer: a raw
+				// model score arrives as a 0–1 fraction, so the old ×100 turned an
+				// already-0–100 value into "8500%".
+				const confidence = normalizeConfidence(c.confidence)
+				return (
+					<CitationLi key={stableKey(['cit', c.sourceId, c.quote ?? ''])}>
+						<CitationKey>{c.sourceId}</CitationKey>
+						{c.quote !== undefined ? (
+							<CitationQuote>“{c.quote}”</CitationQuote>
+						) : null}
+						{confidence !== null ? (
+							<CitationConfidence>{confidence}%</CitationConfidence>
+						) : null}
+					</CitationLi>
+				)
+			})}
 		</CitationsUl>
 	)
 }

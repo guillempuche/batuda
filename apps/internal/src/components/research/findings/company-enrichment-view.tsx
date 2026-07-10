@@ -33,17 +33,40 @@ import {
  * camelCase end-to-end (see ./shared.tsx).
  */
 
+// Wire shape of a per-field Sourced value (camelCased from the stored
+// { value, source_id, quote?, confidence? }): the value plus the source backing it.
+type SourcedString = {
+	readonly value: string
+	readonly sourceId: string
+	readonly quote?: string
+	readonly confidence?: number
+}
+
+const sourcedToCitations = (
+	field: SourcedString | null | undefined,
+): ReadonlyArray<Citation> =>
+	field != null
+		? [
+				{
+					sourceId: field.sourceId,
+					...(field.quote !== undefined ? { quote: field.quote } : {}),
+					...(field.confidence !== undefined
+						? { confidence: field.confidence }
+						: {}),
+				},
+			]
+		: []
+
 type EnrichmentBlock = {
-	readonly industry?: string
-	readonly sizeRange?: string
-	readonly painPoints?: string
-	readonly currentTools?: string
+	readonly industry?: SourcedString
+	readonly sizeRange?: SourcedString
+	readonly painPoints?: SourcedString
+	readonly currentTools?: SourcedString
 	readonly productsFit?: ReadonlyArray<string>
 	readonly tags?: ReadonlyArray<string>
-	readonly location?: string
-	readonly region?: string
-	readonly address?: string
-	readonly citations?: ReadonlyArray<Citation>
+	readonly location?: SourcedString
+	readonly region?: SourcedString
+	readonly address?: SourcedString
 }
 
 type CompetitorEntry = {
@@ -55,10 +78,9 @@ type CompetitorEntry = {
 
 type ContactEntry = {
 	readonly name: string
-	readonly role?: string
-	readonly email?: string
-	readonly phone?: string
-	readonly citations?: ReadonlyArray<Citation>
+	readonly role?: SourcedString
+	readonly email?: SourcedString
+	readonly phone?: SourcedString
 }
 
 type CompanyEnrichmentFindings = CommonFindings & {
@@ -68,7 +90,14 @@ type CompanyEnrichmentFindings = CommonFindings & {
 }
 
 const ENRICHMENT_FIELDS: ReadonlyArray<{
-	readonly key: keyof EnrichmentBlock
+	readonly key:
+		| 'industry'
+		| 'sizeRange'
+		| 'region'
+		| 'location'
+		| 'address'
+		| 'painPoints'
+		| 'currentTools'
 	readonly label: ReactNode
 }> = [
 	{ key: 'industry', label: <Trans>Industry</Trans> },
@@ -98,14 +127,17 @@ export function CompanyEnrichmentView({
 					</SectionTitle>
 					<FieldsTable>
 						{ENRICHMENT_FIELDS.map(({ key, label }) => {
-							const value = e[key]
-							if (value === undefined || value === null || value === '') {
+							const field = e[key]
+							if (field == null || field.value === '') {
 								return null
 							}
 							return (
-								<FieldRow key={String(key)}>
+								<FieldRow key={key}>
 									<FieldKey>{label}</FieldKey>
-									<FieldValue>{String(value)}</FieldValue>
+									<FieldValue>
+										{field.value}
+										<CitationList citations={sourcedToCitations(field)} />
+									</FieldValue>
 								</FieldRow>
 							)
 						})}
@@ -138,7 +170,6 @@ export function CompanyEnrichmentView({
 							</FieldRow>
 						) : null}
 					</FieldsTable>
-					<CitationList citations={e.citations} />
 				</Section>
 			) : null}
 
@@ -173,32 +204,39 @@ export function CompanyEnrichmentView({
 					</SectionTitle>
 					<List>
 						{contacts.map(c => (
-							<ListItem key={`${c.name}|${c.email ?? c.phone ?? ''}`}>
+							<ListItem
+								key={`${c.name}|${c.email?.value ?? c.phone?.value ?? ''}`}
+							>
 								<RowHead>
 									<Pill>{c.name}</Pill>
-									{c.role !== undefined ? <Reason>{c.role}</Reason> : null}
+									{c.role?.value !== undefined ? (
+										<Reason>{c.role.value}</Reason>
+									) : null}
 								</RowHead>
 								<FieldsTable>
-									{c.email !== undefined ? (
+									{c.email?.value != null ? (
 										<FieldRow>
 											<FieldKey>
 												<Trans>Email</Trans>
 											</FieldKey>
 											<FieldValue>
-												<a href={`mailto:${c.email}`}>{c.email}</a>
+												<a href={`mailto:${c.email.value}`}>{c.email.value}</a>
+												<CitationList citations={sourcedToCitations(c.email)} />
 											</FieldValue>
 										</FieldRow>
 									) : null}
-									{c.phone !== undefined ? (
+									{c.phone?.value != null ? (
 										<FieldRow>
 											<FieldKey>
 												<Trans>Phone</Trans>
 											</FieldKey>
-											<FieldValue>{c.phone}</FieldValue>
+											<FieldValue>
+												{c.phone.value}
+												<CitationList citations={sourcedToCitations(c.phone)} />
+											</FieldValue>
 										</FieldRow>
 									) : null}
 								</FieldsTable>
-								<CitationList citations={c.citations} />
 							</ListItem>
 						))}
 					</List>
