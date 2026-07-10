@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-10 (server-v2026.7.10-1)
+
+### Features
+
+* **controllers:** add the anchored re-run endpoint ([3f79160](https://github.com/guillempuche/batuda/commit/3f791607c52c108d053cfdc38f1b86b942fe5fe7))
+* **domain:** add company classification vocabularies ([dcc709c](https://github.com/guillempuche/batuda/commit/dcc709cac76703731efe0f3f81a05e44c46aebca))
+* **research:** confirm the right company and extract clean, measured fields ([cb1f8e9](https://github.com/guillempuche/batuda/commit/cb1f8e9c9e12dcae9eb1120a4e99174ae30749aa))
+* **server:** persist failure reasons and extract with Qwen3-235B ([dde8478](https://github.com/guillempuche/batuda/commit/dde84787175953692f37c3d005c08a578e8d57c9))
+
 ## 2026-07-10 (server-v2026.7.10)
 
 ## 2026-07-09 (server-v2026.7.9-3)
