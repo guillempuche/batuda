@@ -4,7 +4,16 @@ export {
 	CallRecordingId,
 	TranscriptStatus,
 } from './call-recordings'
-export { Company, CompanyId } from './companies'
+export {
+	COMPANY_INDUSTRIES,
+	COMPANY_REGIONS,
+	COMPANY_SIZE_RANGES,
+	Company,
+	CompanyId,
+	CompanyIndustry,
+	CompanyRegion,
+	CompanySizeRange,
+} from './companies'
 export {
 	ContactChannel,
 	ContactChannelId,

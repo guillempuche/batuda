@@ -3,6 +3,38 @@ import { Model } from 'effect/unstable/schema'
 
 export const CompanyId = Schema.String.pipe(Schema.brand('CompanyId'))
 
+// The CRM's fixed vocabularies for a company's classification. The columns stay
+// free text in the database; these are the allowed values the research pipeline
+// maps to and the UI offers. Exported as tuples so both a Schema.Literals and a
+// plain-array membership check read from one source.
+export const COMPANY_INDUSTRIES = [
+	'restauració',
+	'construcció',
+	'retail',
+	'manufactura',
+	'serveis',
+	'hostaleria',
+	'distribució',
+	'transport',
+	'other',
+] as const
+export const CompanyIndustry = Schema.Literals(COMPANY_INDUSTRIES)
+export type CompanyIndustry = typeof CompanyIndustry.Type
+
+export const COMPANY_REGIONS = ['cat', 'ara', 'cv'] as const
+export const CompanyRegion = Schema.Literals(COMPANY_REGIONS)
+export type CompanyRegion = typeof CompanyRegion.Type
+
+export const COMPANY_SIZE_RANGES = [
+	'1-5',
+	'6-10',
+	'11-25',
+	'26-50',
+	'51-200',
+] as const
+export const CompanySizeRange = Schema.Literals(COMPANY_SIZE_RANGES)
+export type CompanySizeRange = typeof CompanySizeRange.Type
+
 export class Company extends Model.Class<Company>('Company')({
 	id: Model.Generated(CompanyId),
 	slug: Schema.String,
@@ -13,14 +45,12 @@ export class Company extends Model.Class<Company>('Company')({
 	// values: prospect | contacted | responded | meeting
 	//         | proposal | client | closed | dead
 
-	// Classification
+	// Classification. Allowed values are COMPANY_INDUSTRIES / COMPANY_SIZE_RANGES /
+	// COMPANY_REGIONS above; the columns stay free text (the research vocabulary
+	// guard is the enforcement point) so a manual edit is never decode-rejected.
 	industry: Schema.NullOr(Schema.String),
-	// values: restauració | construcció | retail | manufactura
-	//         | serveis | hostaleria | distribució | transport | other
 	sizeRange: Schema.NullOr(Schema.String),
-	// values: 1-5 | 6-10 | 11-25 | 26-50 | 51-200
 	region: Schema.NullOr(Schema.String),
-	// values: cat | ara | cv
 	location: Schema.NullOr(Schema.String),
 	source: Schema.NullOr(Schema.String),
 	// values: firecrawl | exa | google_maps | referral
