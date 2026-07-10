@@ -32,7 +32,7 @@ Where migrations run depends on the environment, and the boundary is deliberate.
 
 **Local / worktree** — `pnpm db:migrate` runs against your local stack, with `DATABASE_URL` from `.env`. It echoes its target first — e.g. `Migration target: "batuda_feature_x" on localhost (local)` — so you can see which database you are about to touch.
 
-**Production** — migrations run **in the deploy pipeline, never from a laptop**: the `Deploy Server` workflow applies them against the prod database immediately before `kraft cloud deploy`. There is intentionally no `db:migrate:prod` script. A required reviewer on the `production-db` GitHub environment gates the `migrate` job specifically, so it pauses for a one-click approval before any prod schema change lands — a final human checkpoint. Routine deploys (web, mail-worker, the server `deploy` job) are not gated. `MIGRATION_DATABASE_URL` lives on `production-db`.
+**Production** — migrations run **in the deploy pipeline, never from a laptop**: the `Deploy Server` workflow applies them against the prod database immediately before the deploy. There is intentionally no `db:migrate:prod` script. The `migrate` job runs **only when a release actually adds a migration** — a `detect-migrations` step diffs the migration files since the previous `server-v*` tag — so a routine deploy with no schema change skips it entirely and ships straight away. When it does run, a required reviewer on the `production-db` GitHub environment gates it, pausing for a one-click approval before the prod schema change lands — a final human checkpoint. Web and mail-worker deploys, and the server `deploy` job, are never gated. `MIGRATION_DATABASE_URL` lives on `production-db`.
 
 ### Connection: schema owner, direct endpoint
 
