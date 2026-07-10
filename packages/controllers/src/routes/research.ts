@@ -73,6 +73,10 @@ const AttachInput = Schema.Struct({
 	subject_id: Schema.String,
 })
 
+const RerunInput = Schema.Struct({
+	domain: Schema.String,
+})
+
 const BulkResolveInput = Schema.Struct({
 	items: Schema.Array(
 		Schema.Struct({
@@ -142,6 +146,15 @@ export const ResearchGroup = HttpApiGroup.make('research')
 		HttpApiEndpoint.post('attach', '/research/:id/attach', {
 			params: { id: Schema.String },
 			payload: AttachInput,
+			success: Schema.Unknown,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
+		}),
+	)
+	// POST /research/:id/rerun — target correction: re-run anchored to a domain
+	.add(
+		HttpApiEndpoint.post('rerun', '/research/:id/rerun', {
+			params: { id: Schema.String },
+			payload: RerunInput,
 			success: Schema.Unknown,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
