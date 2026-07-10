@@ -1,10 +1,16 @@
 import { useAtomValue } from '@effect/atom-react'
-import { Trans } from '@lingui/react/macro'
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import type { ComponentType } from 'react'
 import styled from 'styled-components'
 
-import type { SchemaName } from '@batuda/research'
+import {
+	RESEARCH_REASON_CODES,
+	type ReasonCode,
+	type SchemaName,
+} from '@batuda/research'
 
 import { researchDetailAtom } from '#/atoms/research-atoms'
 import { MarkdownView } from '#/components/markdown/markdown-view'
@@ -15,6 +21,7 @@ import { FreeformView } from '#/components/research/findings/freeform-view'
 import { ProspectScanView } from '#/components/research/findings/prospect-scan-view'
 import { ProposedUpdatesReview } from '#/components/research/review/proposed-updates-review'
 import { RunProgress } from '#/components/research/run-progress'
+import { TargetCorrection } from '#/components/research/target-correction'
 import { useResearchEvents } from '#/hooks/use-research-events'
 import {
 	brushedMetalPlate,
@@ -32,6 +39,18 @@ const FINDINGS_VIEWS: Record<SchemaName, ComponentType<FindingsViewProps>> = {
 	prospect_scan_v1: ProspectScanView,
 }
 
+// Localized sentence for each terminal failure reason, keyed by the run's
+// reason_code so the backend stays language-free — it returns the code, the UI
+// translates it. Exhaustive against ReasonCode.
+const REASON_LABEL: Record<ReasonCode, MessageDescriptor> = {
+	entity_mismatch: msg`The pages I found were about a different company, so I didn't save anything.`,
+	weak_no_official_site: msg`I couldn't confirm the company's own website, so the findings weren't reliable enough to keep.`,
+	site_unreadable: msg`I couldn't read the company's website, so there was nothing to work from.`,
+	name_too_generic: msg`The name matched too many companies to tell them apart.`,
+	no_sources: msg`I couldn't find any usable pages for this company.`,
+	internal_error: msg`Something went wrong while running this research.`,
+}
+
 type ResearchRunDetail = {
 	readonly id: string
 	readonly query: string
@@ -41,6 +60,7 @@ type ResearchRunDetail = {
 	readonly briefMd: string | null
 	readonly findings: unknown
 	readonly errorMessage?: string | null
+	readonly reasonCode?: ReasonCode | null
 }
 
 export function RunDetail({ researchId }: { readonly researchId: string }) {
@@ -111,10 +131,15 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 							<Trans>Run failed</Trans>
 						)}
 					</strong>
-					{run.errorMessage !== undefined && run.errorMessage !== null ? (
-						<span>{run.errorMessage}</span>
+					{run.reasonCode != null ? (
+						<FailureReason reasonCode={run.reasonCode} />
 					) : null}
 				</ErrorBlock>
+			) : null}
+
+			{!isRunning &&
+			(run.status === 'no_reliable_data' || run.status === 'succeeded') ? (
+				<TargetCorrection researchId={run.id} />
 			) : null}
 
 			{run.briefMd !== null && run.briefMd !== '' ? (
@@ -193,6 +218,14 @@ function ShapedBy({
 	)
 }
 
+// A failed / no_reliable_data run's reason as a localized sentence keyed off the
+// structured reason_code. A run predating the column (reasonCode null) shows only
+// the generic heading above, never a raw English sentence.
+function FailureReason({ reasonCode }: { readonly reasonCode: ReasonCode }) {
+	const { i18n } = useLingui()
+	return <span>{i18n._(REASON_LABEL[reasonCode])}</span>
+}
+
 function narrowRun(raw: unknown): ResearchRunDetail | null {
 	if (!raw || typeof raw !== 'object') return null
 	const r = raw as Record<string, unknown>
@@ -211,6 +244,11 @@ function narrowRun(raw: unknown): ResearchRunDetail | null {
 		findings: r['findings'] ?? null,
 		errorMessage:
 			typeof r['errorMessage'] === 'string' ? r['errorMessage'] : null,
+		reasonCode:
+			typeof r['reasonCode'] === 'string' &&
+			(RESEARCH_REASON_CODES as readonly string[]).includes(r['reasonCode'])
+				? (r['reasonCode'] as ReasonCode)
+				: null,
 	}
 }
 

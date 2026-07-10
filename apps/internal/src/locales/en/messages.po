@@ -177,6 +177,10 @@ msgstr "Accepting the invitation…"
 msgid "Access"
 msgstr "Access"
 
+#: src/components/research/target-correction.tsx
+msgid "acme.com"
+msgstr "acme.com"
+
 #. placeholder {0}: provider.length
 #: src/routes/settings/organization/spend.tsx
 msgid "across {0} providers"
@@ -1053,6 +1057,10 @@ msgstr "Could not set the default inbox."
 msgid "Could not sign in. Check your email and password."
 msgstr "Could not sign in. Check your email and password."
 
+#: src/components/research/target-correction.tsx
+msgid "Could not start the re-run. Please try again."
+msgstr "Could not start the re-run. Please try again."
+
 #: src/components/research/research-dialog.tsx
 msgid "Could not start the research run. Please try again."
 msgstr "Could not start the research run. Please try again."
@@ -1714,6 +1722,18 @@ msgstr "How your default uses the org default"
 #: src/routes/emails/inboxes.tsx
 msgid "Human"
 msgstr "Human"
+
+#: src/components/research/run-detail.tsx
+msgid "I couldn't confirm the company's own website, so the findings weren't reliable enough to keep."
+msgstr "I couldn't confirm the company's own website, so the findings weren't reliable enough to keep."
+
+#: src/components/research/run-detail.tsx
+msgid "I couldn't find any usable pages for this company."
+msgstr "I couldn't find any usable pages for this company."
+
+#: src/components/research/run-detail.tsx
+msgid "I couldn't read the company's website, so there was nothing to work from."
+msgstr "I couldn't read the company's website, so there was nothing to work from."
 
 #: src/components/profile/set-password-nudge.tsx
 msgid "I prefer passwordless"
@@ -2960,6 +2980,14 @@ msgstr "Quick add task"
 msgid "Quick add: \"Call Acme tomorrow #high\""
 msgstr "Quick add: \"Call Acme tomorrow #high\""
 
+#: src/components/research/target-correction.tsx
+msgid "Re-run with this domain"
+msgstr "Re-run with this domain"
+
+#: src/components/research/target-correction.tsx
+msgid "Re-running…"
+msgstr "Re-running…"
+
 #: src/routes/emails/index.tsx
 msgid "Read state update failed"
 msgstr "Read state update failed"
@@ -3509,6 +3537,10 @@ msgstr "Snoozed"
 msgid "someone"
 msgstr "someone"
 
+#: src/components/research/run-detail.tsx
+msgid "Something went wrong while running this research."
+msgstr "Something went wrong while running this research."
+
 #: src/routes/oauth/consent.tsx
 msgid "Something went wrong. Start the connection again from your assistant."
 msgstr "Something went wrong. Start the connection again from your assistant."
@@ -3706,6 +3738,10 @@ msgstr "Testing connection…"
 msgid "That connection request expired. Start it again from your AI assistant."
 msgstr "That connection request expired. Start it again from your AI assistant."
 
+#: src/components/research/target-correction.tsx
+msgid "That does not look like a website. Try the company's domain, like acme.com."
+msgstr "That does not look like a website. Try the company's domain, like acme.com."
+
 #: src/routes/login.tsx
 msgid "That link expired. Request a fresh one below."
 msgstr "That link expired. Request a fresh one below."
@@ -3752,9 +3788,17 @@ msgstr "The invitee gets a 48-hour link. They can accept it once."
 msgid "The mailbox is ready."
 msgstr "The mailbox is ready."
 
+#: src/components/research/run-detail.tsx
+msgid "The name matched too many companies to tell them apart."
+msgstr "The name matched too many companies to tell them apart."
+
 #: src/routes/pages/$id.tsx
 msgid "The page is now live."
 msgstr "The page is now live."
+
+#: src/components/research/run-detail.tsx
+msgid "The pages I found were about a different company, so I didn't save anything."
+msgstr "The pages I found were about a different company, so I didn't save anything."
 
 #: src/components/research/findings/freeform-view.tsx
 msgid "The run finished without proposed updates or paid actions."
@@ -3840,6 +3884,10 @@ msgstr "This link is no longer valid"
 #: src/routes/settings/organization/spend.tsx
 msgid "This month"
 msgstr "This month"
+
+#: src/components/research/target-correction.tsx
+msgid "This overrides the site I auto-detected and re-runs the research locked onto the company at that domain."
+msgstr "This overrides the site I auto-detected and re-runs the research locked onto the company at that domain."
 
 #: src/routes/oauth/consent.tsx
 msgid "This page opens when an AI assistant asks to connect. Start the connection from your assistant."
@@ -4124,6 +4172,10 @@ msgstr "Write your message…"
 #: src/components/research/run-progress.tsx
 msgid "Writing the brief"
 msgstr "Writing the brief"
+
+#: src/components/research/target-correction.tsx
+msgid "Wrong company? Enter its official website"
+msgstr "Wrong company? Enter its official website"
 
 #: src/routes/settings/profile/index.tsx
 msgid "You currently sign in from email links. Add a password to skip checking your email next time."
