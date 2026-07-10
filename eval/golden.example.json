@@ -1,0 +1,80 @@
+[
+	{
+		"id": "brompton-bicycle",
+		"query": "Brompton Bicycle, London",
+		"expectedOutput": {
+			"officialDomain": "brompton.com",
+			"fields": { "industry": "manufactura", "location": "London" }
+		}
+	},
+	{
+		"id": "gymshark",
+		"query": "Gymshark, Solihull",
+		"expectedOutput": {
+			"officialDomain": "gymshark.com",
+			"fields": { "industry": "retail", "location": "Solihull" }
+		}
+	},
+	{
+		"id": "monzo",
+		"query": "Monzo Bank, London",
+		"expectedOutput": {
+			"officialDomain": "monzo.com",
+			"fields": { "industry": "serveis", "location": "London" }
+		}
+	},
+	{
+		"id": "dyson",
+		"query": "Dyson, Malmesbury",
+		"expectedOutput": {
+			"officialDomain": "dyson.com",
+			"altDomains": ["dyson.co.uk"],
+			"fields": { "industry": "manufactura", "location": "Malmesbury" }
+		}
+	},
+	{
+		"id": "jcb",
+		"query": "JCB, Rocester",
+		"expectedOutput": {
+			"officialDomain": "jcb.com",
+			"altDomains": ["jcb.co.uk"],
+			"fields": { "industry": "manufactura", "location": "Rocester" }
+		}
+	},
+	{
+		"id": "nandos",
+		"query": "Nando's, London",
+		"expectedOutput": {
+			"officialDomain": "nandos.co.uk",
+			"altDomains": ["nandos.com"],
+			"fields": { "industry": "restauració", "location": "London" }
+		}
+	},
+	{
+		"id": "greggs",
+		"query": "Greggs, Newcastle",
+		"expectedOutput": {
+			"officialDomain": "greggs.co.uk",
+			"altDomains": ["greggs.com"],
+			"fields": { "location": "Newcastle" }
+		}
+	},
+	{
+		"id": "deliveroo",
+		"query": "Deliveroo, London",
+		"expectedOutput": {
+			"officialDomain": "deliveroo.co.uk",
+			"altDomains": ["deliveroo.com"],
+			"fields": { "location": "London" }
+		}
+	},
+	{
+		"id": "ocado",
+		"query": "Ocado, Hatfield",
+		"expectedOutput": {
+			"officialDomain": "ocado.com",
+			"altDomains": ["ocadogroup.com", "ocado.co.uk"],
+			"fields": { "location": "Hatfield" }
+		}
+	}
+]
