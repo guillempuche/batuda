@@ -58,6 +58,18 @@ const CONTACT_FIELDS = new Set(['name', 'role', 'isDecisionMaker', 'notes'])
 const snakeToCamel = (s: string) =>
 	s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
 
+// A field value the model may have wrapped as { value, source_id, … } — the
+// per-field provenance shape enrichment findings use. CRM columns hold plain
+// text, so unwrap to the inner value before writing; a plain value is unchanged.
+const unwrapSourced = (value: unknown): unknown =>
+	value !== null &&
+	typeof value === 'object' &&
+	!Array.isArray(value) &&
+	'value' in value &&
+	'source_id' in (value as Record<string, unknown>)
+		? (value as { value: unknown }).value
+		: value
+
 /**
  * Keep only the proposal fields that map to a writable column on the target
  * table, normalizing snake_case keys to the camelCase the SQL client expects.
@@ -70,7 +82,7 @@ export const allowlistFields = (
 	const out: Record<string, unknown> = {}
 	for (const [key, value] of Object.entries(fields)) {
 		const camel = snakeToCamel(key)
-		if (allowed.has(camel)) out[camel] = value
+		if (allowed.has(camel)) out[camel] = unwrapSourced(value)
 	}
 	return out
 }

@@ -4,6 +4,7 @@ process.env['DATABASE_URL'] ??=
 	'postgresql://batuda:batuda@localhost:5433/batuda_it'
 process.env['RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL'] ??= '4'
 process.env['RESEARCH_MAX_AGENT_STEPS'] ??= '4'
+process.env['RESEARCH_MAX_LOOP_PROMPT_TOKENS'] ??= '24000'
 
 import { createHash, randomUUID } from 'node:crypto'
 

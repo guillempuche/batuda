@@ -5,6 +5,7 @@ process.env['DATABASE_URL'] ??=
 // The service reads this concurrency gate via Config at layer-build time.
 process.env['RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL'] ??= '4'
 process.env['RESEARCH_MAX_AGENT_STEPS'] ??= '6'
+process.env['RESEARCH_MAX_LOOP_PROMPT_TOKENS'] ??= '24000'
 // Park the periodic sweep daemon far out so the only sweep that runs after the
 // rows are inserted is the manual sweepOrphans() call under test (its first tick
 // still fires at layer build, before any row exists).
