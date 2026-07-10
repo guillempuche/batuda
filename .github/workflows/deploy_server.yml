@@ -25,14 +25,56 @@ env:
   KRAFTCLOUD_ORG: gaaaa
 
 jobs:
-  # Run pending migrations before the deploy; they must be backward-compatible
-  # with the still-running version (docs/runbooks.md).
+  # Detect whether this release adds any new migrations. The gated migrate job
+  # below runs ONLY when it does, so a routine deploy with no schema change
+  # skips the human approval and ships straight away. (CI's
+  # check-migration-safety.mjs already ensures any migration reaching here is
+  # backward-compatible or a deliberate, documented expand-contract change.)
+  detect-migrations:
+    name: Detect pending migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      has_migrations: ${{ steps.detect.outputs.has_migrations }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          # Tags + full history so we can diff migrations since the last release.
+          fetch-depth: 0
+
+      - name: Detect new migrations since the previous release
+        id: detect
+        run: |
+          # New migration files between the previous server-v* tag and this one.
+          # When there's no previous tag (first deploy) we gate, to be safe.
+          prev=$(git describe --tags --match='server-v[0-9]*' --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -z "$prev" ]; then
+            echo "No previous server tag found — gating the migrate to be safe."
+            echo "has_migrations=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          files=$(git diff --name-only "$prev..HEAD" -- apps/server/src/db/migrations/ | grep '\.sql$' || true)
+          if [ -n "$files" ]; then
+            echo "New migrations since $prev:"; echo "$files"
+            echo "has_migrations=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No new migrations since $prev — skipping the migrate gate."
+            echo "has_migrations=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Apply pending migrations before the deploy, gated by a required reviewer on
+  # the production-db environment — a one-click human checkpoint before any prod
+  # schema change. Runs ONLY when detect-migrations found new migration files,
+  # so routine no-migration releases need no approval. Migrations must stay
+  # backward-compatible with the still-running version (docs/runbooks.md).
   migrate:
     name: Migrate prod database
+    needs: detect-migrations
+    if: ${{ needs.detect-migrations.outputs.has_migrations == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # `production-db` gates only this migrate job with a required reviewer —
-    # routine deploys (the `deploy` job, web, mail-worker) stay un-gated. Its
+    # `production-db` gates this job with a required reviewer; its
     # MIGRATION_DATABASE_URL secret must be set on this environment.
     environment: production-db
     steps:
@@ -63,7 +105,10 @@ jobs:
 
   deploy:
     name: Deploy to Unikraft Cloud
-    needs: migrate
+    needs: [detect-migrations, migrate]
+    # Deploy when migrate succeeded OR was skipped (no new migrations); block
+    # only if detection failed or the migration itself failed.
+    if: ${{ !cancelled() && needs.detect-migrations.result == 'success' && needs.migrate.result != 'failure' }}
     runs-on: ubuntu-latest
     # The image now builds once in its own step (below); an uncached build is
     # the long pole, so keep a generous ceiling until build caching lands.
