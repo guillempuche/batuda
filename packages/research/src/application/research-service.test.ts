@@ -1,12 +1,14 @@
 import { Cause } from 'effect'
 import { describe, expect, it } from 'vitest'
 
+import type { EntityTargets } from './entity-guard'
 import {
 	attachOutcome,
 	buildResearchSystemPrompt,
 	cancelOutcome,
 	clampPagination,
 	computeResearchCacheKey,
+	groundedPageTexts,
 	normalizeResearchQuery,
 	researchCacheTtlDaysFor,
 	schemaVersionFor,
@@ -495,4 +497,53 @@ describe('research lifecycle (integration)', () => {
 	it.todo(
 		'should refuse to attach a run to a company or contact that does not exist, writing no research_links row',
 	)
+})
+
+describe('groundedPageTexts', () => {
+	const targets: EntityTargets = {
+		cores: ['acmelogistics'],
+		words: ['acme'],
+		domains: ['acme.es'],
+	}
+
+	describe('when the run has no entity target', () => {
+		it('should return every page unfiltered', () => {
+			// GIVEN a scan run with no target to ground against
+			const pages = [
+				{ urlHash: 'h1', text: 'anything' },
+				{ urlHash: 'h2', text: 'other' },
+			]
+			// WHEN filtered with null targets — THEN nothing is dropped
+			expect(groundedPageTexts(null, pages)).toEqual(['anything', 'other'])
+		})
+	})
+
+	describe('when some pages are the target and some a look-alike', () => {
+		it('should keep only the pages that concern the target', () => {
+			// GIVEN one page on the target's own site and one about another company
+			const pages = [
+				{ urlHash: 'h1', text: 'Acme Logistics at acme.es' },
+				{ urlHash: 'h2', text: 'CEVA is a global freight leader' },
+			]
+			// WHEN filtered — THEN only the target's page text survives
+			expect(groundedPageTexts(targets, pages)).toEqual([
+				'Acme Logistics at acme.es',
+			])
+		})
+	})
+
+	describe('when no page concerns the target', () => {
+		it('should fall back to every page so extraction is not starved', () => {
+			// GIVEN only unrelated pages, none grounding the target
+			const pages = [
+				{ urlHash: 'h1', text: 'CEVA freight' },
+				{ urlHash: 'h2', text: 'DHL logistics' },
+			]
+			// WHEN none ground — THEN all pages are returned rather than none
+			expect(groundedPageTexts(targets, pages)).toEqual([
+				'CEVA freight',
+				'DHL logistics',
+			])
+		})
+	})
 })

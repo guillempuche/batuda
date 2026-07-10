@@ -347,4 +347,63 @@ describe('verifyValueProvenance', () => {
 			expect(result.strippedValues).toBe(1)
 		})
 	})
+
+	describe('when a contact field carries its value inside a source wrapper', () => {
+		it('should blank an invented email wrapper to null, not a sourced-empty object', () => {
+			// GIVEN a per-field email wrapper whose address is nowhere in the evidence
+			const corpus = 'Reach us at hello@acme.es'
+			const findings = {
+				contacts: [
+					{ name: 'Ada', email: { value: 'ceo@fake.io', source_id: 's1' } },
+				],
+			}
+
+			// WHEN checked
+			const result = verifyValueProvenance(findings, corpus)
+
+			// THEN the whole field is nulled — no { value: null } ghost — and counted
+			const f = result.findings as { contacts: Array<{ email: unknown }> }
+			expect(f.contacts[0]?.email).toBeNull()
+			expect(result.strippedValues).toBe(1)
+		})
+
+		it('should keep a supported email wrapper untouched', () => {
+			// GIVEN a wrapper whose address is in the evidence
+			const corpus = 'Reach Ada at ada@acme.es'
+			const findings = {
+				contacts: [
+					{ name: 'Ada', email: { value: 'ada@acme.es', source_id: 's1' } },
+				],
+			}
+
+			// WHEN checked
+			const result = verifyValueProvenance(findings, corpus)
+
+			// THEN the wrapper survives unchanged
+			const f = result.findings as { contacts: Array<{ email: unknown }> }
+			expect(f.contacts[0]?.email).toEqual({
+				value: 'ada@acme.es',
+				source_id: 's1',
+			})
+			expect(result.strippedValues).toBe(0)
+		})
+
+		it('should leave a free-text scalar wrapper alone — only email/phone are checkable', () => {
+			// GIVEN an enrichment industry wrapper: free text the guard never checks
+			const findings = {
+				enrichment: { industry: { value: 'logistics', source_id: 's1' } },
+			}
+
+			// WHEN checked against an unrelated corpus
+			const result = verifyValueProvenance(findings, 'unrelated')
+
+			// THEN it passes through untouched
+			const f = result.findings as { enrichment: { industry: unknown } }
+			expect(f.enrichment.industry).toEqual({
+				value: 'logistics',
+				source_id: 's1',
+			})
+			expect(result.strippedValues).toBe(0)
+		})
+	})
 })

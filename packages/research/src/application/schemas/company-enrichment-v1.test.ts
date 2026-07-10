@@ -6,29 +6,37 @@ import { CompanyEnrichmentV1Schema } from './company-enrichment-v1'
 const decode = Schema.decodeUnknownSync(CompanyEnrichmentV1Schema)
 
 describe('CompanyEnrichmentV1Schema', () => {
-	describe('when decoding an enrichment payload with the location in words but no coordinates', () => {
-		it('should decode and expose no latitude or longitude', () => {
-			// GIVEN a model result shaped like a real enrichment: the location is
-			// described in words, and coordinates are absent (their real source is
-			// the deterministic geocoder, not the model)
+	describe('when decoding an enrichment payload with per-field sources', () => {
+		it('should decode each field to its value paired with a source', () => {
+			// GIVEN a model result shaped like a real enrichment: every scalar field
+			// carries its own value plus the source that backs it (industry from one
+			// page, region from another), instead of one citation list for the block
 			const payload = {
 				enrichment: {
-					industry: 'Freight & logistics',
-					size_range: '51-200',
-					location: 'St. Louis, MO',
-					region: 'United States',
-					citations: [{ source_id: 'src-1' }],
+					industry: { value: 'Freight & logistics', source_id: 'src-1' },
+					size_range: { value: '51-200', source_id: 'src-1' },
+					location: { value: 'St. Louis, MO', source_id: 'src-1' },
+					region: { value: 'United States', source_id: 'src-2' },
 				},
+				contacts: [
+					{
+						name: 'Ada Lovelace',
+						role: { value: 'CTO', source_id: 'src-1' },
+						email: { value: 'ada@acme.es', source_id: 'src-1' },
+						phone: { value: '+34 900 000 000', source_id: 'src-2' },
+					},
+				],
 			}
 
 			// WHEN it is decoded against the schema
 			const decoded = decode(payload)
 
-			// THEN it succeeds, keeps the textual location, and carries no
-			// coordinate fields at all
-			expect(decoded.enrichment.location).toBe('St. Louis, MO')
-			expect(decoded.enrichment).not.toHaveProperty('latitude')
-			expect(decoded.enrichment).not.toHaveProperty('longitude')
+			// THEN each field exposes its value alongside the citing source
+			expect(decoded.enrichment.location?.value).toBe('St. Louis, MO')
+			expect(decoded.enrichment.location?.source_id).toBe('src-1')
+			expect(decoded.enrichment.industry?.value).toBe('Freight & logistics')
+			expect(decoded.contacts?.[0]?.email?.value).toBe('ada@acme.es')
+			expect(decoded.contacts?.[0]?.role?.value).toBe('CTO')
 		})
 	})
 
@@ -38,17 +46,16 @@ describe('CompanyEnrichmentV1Schema', () => {
 			// real coordinates, the model filled both fields with the string "NaN"
 			const payload = {
 				enrichment: {
-					industry: 'Freight & logistics',
-					location: 'St. Louis, MO',
+					industry: { value: 'Freight & logistics', source_id: 'src-1' },
+					location: { value: 'St. Louis, MO', source_id: 'src-1' },
 					latitude: 'NaN',
 					longitude: 'NaN',
-					citations: [{ source_id: 'src-1' }],
 				},
 			}
 
 			// WHEN it is decoded
-			// THEN decode does not throw — the coordinate keys are no longer part of
-			// the schema, so a stray value is ignored rather than rejected, and an
+			// THEN decode does not throw — the coordinate keys are not part of the
+			// schema, so a stray value is ignored rather than rejected, and an
 			// unlocatable company no longer blocks the whole extraction
 			expect(() => decode(payload)).not.toThrow()
 			expect(decode(payload).enrichment).not.toHaveProperty('latitude')
@@ -60,10 +67,9 @@ describe('CompanyEnrichmentV1Schema', () => {
 			// GIVEN a payload where the model guessed plausible-looking numbers
 			const payload = {
 				enrichment: {
-					location: 'St. Louis, MO',
+					location: { value: 'St. Louis, MO', source_id: 'src-1' },
 					latitude: 38.627,
 					longitude: -90.199,
-					citations: [{ source_id: 'src-1' }],
 				},
 			}
 

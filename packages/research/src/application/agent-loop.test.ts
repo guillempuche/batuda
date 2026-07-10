@@ -153,6 +153,65 @@ describe('runAgentResearchLoop', () => {
 			expect(result.tokensOut).toBe(220)
 		})
 	})
+
+	describe('when the model finishes but the target is not yet grounded', () => {
+		it('should run another round when the continue hook asks to keep going', async () => {
+			// GIVEN the model finishes each round, and the grounding hook asks to
+			// continue once (the corrective nudge) then accepts the second result
+			let asked = 0
+			const result = await Effect.runPromise(
+				runAgentResearchLoop({
+					maxSteps: 10,
+					runRound: scriptedRounds([
+						finalRound('thin'),
+						finalRound('grounded'),
+					]),
+					budgetSnapshot: Effect.succeed(snapshot(100, 100)),
+					shouldContinueAfterFinal: () =>
+						Effect.sync(() => {
+							asked++
+							return asked === 1
+						}),
+				}),
+			)
+
+			// THEN the first final answer triggered exactly one extra round
+			expect(result.rounds).toBe(2)
+			expect(result.stopReason).toBe('model-final')
+			expect(result.researchText).toContain('grounded')
+		})
+
+		it('should end on the first final answer when no continue hook is given', async () => {
+			// GIVEN a model that finishes on round one and no grounding-retry hook
+			const result = await Effect.runPromise(
+				runAgentResearchLoop({
+					maxSteps: 10,
+					runRound: scriptedRounds([finalRound('done')]),
+					budgetSnapshot: Effect.succeed(snapshot(100, 100)),
+				}),
+			)
+
+			// THEN it stops after the single final round
+			expect(result.rounds).toBe(1)
+			expect(result.stopReason).toBe('model-final')
+		})
+
+		it('should still stop at the step cap when the hook always asks to continue', async () => {
+			// GIVEN a grounding hook that never accepts the result
+			const result = await Effect.runPromise(
+				runAgentResearchLoop({
+					maxSteps: 3,
+					runRound: scriptedRounds([finalRound('thin')]),
+					budgetSnapshot: Effect.succeed(snapshot(100, 100)),
+					shouldContinueAfterFinal: () => Effect.succeed(true),
+				}),
+			)
+
+			// THEN the step cap bounds the retries rather than looping forever
+			expect(result.rounds).toBe(3)
+			expect(result.stopReason).toBe('step-cap')
+		})
+	})
 })
 
 describe('canAffordAnotherRound', () => {
@@ -175,6 +234,111 @@ describe('canAffordAnotherRound', () => {
 		it('should stop the loop', () => {
 			// GIVEN no cheap budget and less than a registry lookup costs
 			expect(canAffordAnotherRound(snapshot(0, 28))).toBe(false)
+		})
+	})
+})
+
+describe('runAgentResearchLoop — token budget', () => {
+	// A round with an explicit prompt-token occupancy; a tool round so the loop
+	// keeps going and reaches the cap check.
+	const tokenRound = (inputTokens: number): LoopRound => ({
+		...toolRound(1),
+		inputTokens,
+	})
+
+	describe("when the latest round's prompt occupancy exceeds the budget", () => {
+		it('should halt on context using the latest round, not the running sum', async () => {
+			// GIVEN rounds whose occupancy grows 1000 -> 2000 -> 3000 and a 2500 budget
+			const result = await Effect.runPromise(
+				runAgentResearchLoop({
+					maxSteps: 10,
+					maxPromptTokens: 2500,
+					runRound: scriptedRounds([
+						tokenRound(1000),
+						tokenRound(2000),
+						tokenRound(3000),
+					]),
+					budgetSnapshot: Effect.succeed(snapshot(100, 100)),
+				}),
+			)
+			// THEN it stops at round 3 (3000 >= 2500), not round 2 — an accumulated
+			// sum would have tripped at round 2 (1000 + 2000)
+			expect(result.stopReason).toBe('context')
+			expect(result.rounds).toBe(3)
+		})
+	})
+
+	describe('when the provider omits token usage', () => {
+		it('should ignore the token budget so the run falls through to the step cap', async () => {
+			// GIVEN rounds reporting 0 input tokens (usage absent) and no char cap
+			const result = await Effect.runPromise(
+				runAgentResearchLoop({
+					maxSteps: 2,
+					maxPromptTokens: 100,
+					runRound: scriptedRounds([tokenRound(0)]),
+					budgetSnapshot: Effect.succeed(snapshot(100, 100)),
+				}),
+			)
+			// THEN the token cap never fires (0 < 100) and the step cap ends it
+			expect(result.stopReason).toBe('step-cap')
+			expect(result.rounds).toBe(2)
+		})
+	})
+
+	describe('when usage is absent but a char budget is set', () => {
+		it('should still halt on the char backstop', async () => {
+			// GIVEN 0-token rounds that each add 100 prompt chars, a 100-token budget
+			// and a 150-char backstop
+			const charRound: LoopRound = {
+				...toolRound(1),
+				inputTokens: 0,
+				promptChars: 100,
+			}
+			const result = await Effect.runPromise(
+				runAgentResearchLoop({
+					maxSteps: 10,
+					maxPromptTokens: 100,
+					maxPromptChars: 150,
+					runRound: scriptedRounds([charRound]),
+					budgetSnapshot: Effect.succeed(snapshot(100, 100)),
+				}),
+			)
+			// THEN the token cap stays inert and the char cap trips at round 2 (200 >= 150)
+			expect(result.stopReason).toBe('context')
+			expect(result.rounds).toBe(2)
+		})
+	})
+
+	describe("when the budget is below even the first round's prompt", () => {
+		it('should stop immediately on context', async () => {
+			// GIVEN a single round already occupying 5000 tokens and a 1000 budget
+			const result = await Effect.runPromise(
+				runAgentResearchLoop({
+					maxSteps: 10,
+					maxPromptTokens: 1000,
+					runRound: scriptedRounds([tokenRound(5000)]),
+					budgetSnapshot: Effect.succeed(snapshot(100, 100)),
+				}),
+			)
+			// THEN it stops on the very first round
+			expect(result.stopReason).toBe('context')
+			expect(result.rounds).toBe(1)
+		})
+	})
+
+	describe('when the run stays well under the token budget', () => {
+		it("should finish on the model's final answer", async () => {
+			// GIVEN a small round then a final answer, under a generous budget
+			const result = await Effect.runPromise(
+				runAgentResearchLoop({
+					maxSteps: 10,
+					maxPromptTokens: 24000,
+					runRound: scriptedRounds([tokenRound(100), finalRound('done')]),
+					budgetSnapshot: Effect.succeed(snapshot(100, 100)),
+				}),
+			)
+			// THEN the token cap is a no-op and the model finishing ends it
+			expect(result.stopReason).toBe('model-final')
 		})
 	})
 })

@@ -168,6 +168,29 @@ export const verifyValueProvenance = (
 			return value.map(item => walk(item))
 		}
 		if (value !== null && typeof value === 'object') {
+			// A per-field Sourced wrapper ({ value, source_id, … }): check its inner
+			// value the same way as a dedicated field, but blank the WHOLE field to
+			// null when the email/phone is invented, rather than leaving a
+			// sourced-but-empty { value: null } behind.
+			const wrapper = value as { value?: unknown; source_id?: unknown }
+			if ('value' in wrapper && typeof wrapper.source_id === 'string') {
+				if (typeof wrapper.value === 'string') {
+					const t = wrapper.value.trim()
+					if (EMAIL_RE.test(t) && !emailSupported(ev, t)) {
+						strippedValues++
+						return null
+					}
+					if (
+						PHONE_ONLY_RE.test(t) &&
+						digitsOnly(t).length >= 7 &&
+						!digitsSupported(ev, t)
+					) {
+						strippedValues++
+						return null
+					}
+				}
+				return value
+			}
 			return Object.fromEntries(
 				Object.entries(value as Record<string, unknown>).map(([k, v]) => {
 					if (typeof v === 'string') {
