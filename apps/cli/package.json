@@ -13,6 +13,7 @@
 		"@batuda/auth": "workspace:*",
 		"@batuda/calendar": "workspace:*",
 		"@batuda/domain": "workspace:*",
+		"@batuda/research": "workspace:*",
 		"@better-auth/api-key": "1.6.11",
 		"@clack/prompts": "^1.2.0",
 		"@effect/platform-node": "4.0.0-beta.43",
