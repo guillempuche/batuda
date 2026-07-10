@@ -25,6 +25,7 @@ import { dataInspect, ENTITY_NAMES } from './commands/data'
 import { dbMigrate, dbReset } from './commands/db'
 import { doctor } from './commands/doctor'
 import { emailInject } from './commands/email'
+import { researchEval, researchProbe } from './commands/research'
 import { seed, seedIdentities } from './commands/seed'
 import { servicesDown, servicesStatus, servicesUp } from './commands/services'
 import type { EnvFileResult } from './commands/setup'
@@ -805,6 +806,99 @@ const emailCommand = Command.make('email').pipe(
 	Command.withSubcommands([emailInjectCommand]),
 )
 
+// ── Research ───────────────────────────────────────────────
+
+const researchProbeCommand = Command.make(
+	'probe',
+	{
+		baseUrl: Flag.string('base-url').pipe(
+			Flag.withDescription('OpenAI-compatible endpoint to probe'),
+			Flag.withDefault('https://api.tokenfactory.nebius.com/v1'),
+		),
+		apiKey: Flag.redacted('api-key').pipe(
+			Flag.withDescription('API key (defaults to RESEARCH_LLM_AGENT_API_KEY)'),
+			Flag.optional,
+		),
+		models: Flag.string('models').pipe(
+			Flag.withDescription('Comma-separated model ids to probe'),
+			Flag.withDefault(
+				'openai/gpt-oss-120b,Qwen/Qwen3-235B-A22B-Instruct-2507,deepseek-ai/DeepSeek-V4-Pro,zai-org/GLM-5.2',
+			),
+		),
+	},
+	({ baseUrl, apiKey, models }) =>
+		researchProbe({
+			baseUrl,
+			apiKey,
+			models: models
+				.split(',')
+				.map(model => model.trim())
+				.filter(model => model.length > 0),
+		}),
+).pipe(
+	Command.withShortDescription(
+		'Check models for tool-calling + JSON-schema support',
+	),
+	Command.withDescription(
+		'Probe each candidate model on an OpenAI-compatible endpoint (Nebius by default) for forced tool calling and strict JSON-schema output — the two features the research agent and extract tiers depend on. Use it to gate a model out before trusting it in a tier.',
+	),
+)
+
+const researchEvalCommand = Command.make(
+	'eval',
+	{
+		org: Flag.string('org').pipe(
+			Flag.withDescription('Organization id to run the research under'),
+		),
+		user: Flag.string('user').pipe(
+			Flag.withDescription('User id the runs are attributed to'),
+		),
+		golden: Flag.string('golden').pipe(
+			Flag.withDescription('Path to the golden-set JSON file'),
+		),
+		schema: Flag.string('schema').pipe(
+			Flag.withDescription('Research output schema to run'),
+			Flag.withDefault('company_enrichment_v1'),
+		),
+		concurrency: Flag.integer('concurrency').pipe(
+			Flag.withDescription('How many runs to execute at once'),
+			Flag.withDefault(3),
+		),
+		runs: Flag.integer('runs').pipe(
+			Flag.withDescription(
+				'How many times to run each company; rates are averaged over them, since grounding is noisy per run',
+			),
+			Flag.withDefault(1),
+		),
+		out: Flag.string('out').pipe(
+			Flag.withDescription('Write the full JSON report to this path'),
+			Flag.optional,
+		),
+	},
+	({ org, user, golden, schema, concurrency, runs, out }) =>
+		researchEval({
+			org,
+			user,
+			goldenPath: golden,
+			schemaName: schema,
+			concurrency,
+			runs,
+			out,
+		}),
+).pipe(
+	Command.withShortDescription(
+		'Score the research pipeline against a golden set',
+	),
+	Command.withDescription(
+		'Drive each company in a golden-set JSON file through the live research pipeline and report grounding accuracy, field precision, field recall, wrong-company rate, and empty rate. Needs the research env configured (LLM + provider keys, DATABASE_URL) and an --org / --user to run as. Writes a full per-run report with --out.',
+	),
+)
+
+const researchCommand = Command.make('research').pipe(
+	Command.withDescription('Research context tools'),
+	Command.withSubcommands([researchProbeCommand, researchEvalCommand]),
+)
+
 // ── Root ───────────────────────────────────────────────────
 
 // Exported so the TUI walker (`apps/cli/src/tui.ts`) can introspect the
@@ -889,6 +983,7 @@ export const batuda = Command.make('batuda').pipe(
 		worktreeCommand,
 		calendarCommand,
 		emailCommand,
+		researchCommand,
 	]),
 )
 
