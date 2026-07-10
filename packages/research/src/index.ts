@@ -13,6 +13,31 @@ export {
 	type DiscoveredContact,
 	estimateDiscoverCostCents,
 } from './application/contact-discovery'
+// ── Application (eval harness) ─────────────────────────────────────────────
+export {
+	type GoldenParseResult,
+	parseGoldenRow,
+	parseGoldenSet,
+	type RawGoldenRow,
+} from './application/eval-golden'
+export { outcomeFromRun } from './application/eval-outcome'
+export {
+	buildEvalReport,
+	type EvalReport,
+	type ScorePayload,
+	scorePayloadsForRun,
+} from './application/eval-report'
+export {
+	type EvalSummary,
+	type GoldenExpectation,
+	type RunOutcome,
+	type RunScore,
+	SCORABLE_FIELDS,
+	type ScorableField,
+	scoreRun,
+	summarizeScores,
+	type TerminalStatus,
+} from './application/eval-scoring'
 export {
 	type PerRunOverrides,
 	resolvePolicy,
@@ -78,6 +103,14 @@ export { researchToolkit, researchToolkitLayer } from './application/tools'
 // ── Domain ─────────────────────────────────────────────────────────────────
 export { AcceptedCountry } from './domain/country'
 export {
+	CRM_INDUSTRIES,
+	CRM_REGIONS,
+	CRM_SIZE_RANGES,
+	type CrmIndustry,
+	type CrmRegion,
+	type CrmSizeRange,
+} from './domain/crm-vocabulary'
+export {
 	ApprovalRequired,
 	BudgetExceeded,
 	MonthlyCapExceeded,
@@ -99,7 +132,17 @@ export type {
 	SearchResult,
 	SearchResultItem,
 } from './domain/types'
-export { VERIFICATION_VERDICTS, VerificationVerdict } from './domain/types'
+export {
+	RESEARCH_REASON_CODES,
+	ReasonCode,
+	VERIFICATION_VERDICTS,
+	VerificationVerdict,
+} from './domain/types'
+export {
+	type ModelProbeResult,
+	type ProbeCheck,
+	probeModelCapabilities,
+} from './infrastructure/capability-probe'
 export { makeResearchLlmLive } from './infrastructure/llm-live'
 // ── Infrastructure (provider layers) ──────────────────────────────────────
 export { makeResearchProvidersLive } from './infrastructure/providers-live'

@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 
 import { describe, expect, it } from 'vitest'
 
-import { canonicalizeUrl, urlHashForScrape } from './source-key'
+import { canonicalizeUrl, hostOf, urlHashForScrape } from './source-key'
 
 describe('canonicalizeUrl', () => {
 	it('should lowercase the hostname', () => {
@@ -133,5 +133,29 @@ describe('urlHashForScrape', () => {
 		expect(urlHashForScrape('https://example.com/a')).not.toBe(
 			urlHashForScrape('https://example.com/b'),
 		)
+	})
+})
+
+describe('hostOf', () => {
+	describe('when comparing URLs by their site', () => {
+		it('should reduce www, case, scheme, and path to the same host', () => {
+			// GIVEN the same site written several ways a model might tidy it
+			// THEN each reduces to the bare host
+			expect(hostOf('https://www.Acme.es/contact')).toBe('acme.es')
+			expect(hostOf('https://acme.es')).toBe('acme.es')
+			expect(hostOf('http://ACME.es/a/b?x=1')).toBe('acme.es')
+		})
+
+		it('should resolve a scheme-less bare domain via a retry', () => {
+			// GIVEN a tidied citation with no scheme (which `new URL` rejects)
+			// WHEN parsed — THEN the retry with a scheme recovers the host
+			expect(hostOf('monzo.com')).toBe('monzo.com')
+			expect(hostOf('www.acme.es/careers')).toBe('acme.es')
+		})
+
+		it('should return null for text that is not a URL', () => {
+			// GIVEN a non-URL citation (a title, prose)
+			expect(hostOf('Monzo Bank plc')).toBeNull()
+		})
 	})
 })

@@ -2,7 +2,7 @@ import { Schema } from 'effect'
 import { OpenAiStructuredOutput } from 'effect/unstable/ai'
 import { describe, expect, it } from 'vitest'
 
-import { LenientNumber, TolerantJsonString } from './_shared'
+import { LenientNumber, Sourced, TolerantJsonString } from './_shared'
 import { CompetitorScanV1Schema } from './competitor-scan-v1'
 import { ContactDiscoveryV1Schema } from './contact-discovery-v1'
 import { FreeformSchema } from './freeform'
@@ -252,6 +252,58 @@ describe('numeric guards on model-produced fields', () => {
 			// THEN the inlined copies decode to null too
 			expect(decoded.proposed_updates?.[0]?.expected_version).toBeNull()
 			expect(decoded.pending_paid_actions?.[0]?.estimated_cents).toBeNull()
+		})
+	})
+})
+
+describe('Sourced', () => {
+	const decode = Schema.decodeUnknownSync(Sourced(Schema.String))
+
+	describe('when a field carries its value and a source', () => {
+		it('should decode to the value plus its citation fields', () => {
+			// GIVEN a per-field wrapper the model filled with a value and its source
+			const decoded = decode({
+				value: 'manufacturing',
+				source_id: 'https://acme.es',
+				quote: 'We manufacture bicycles',
+				confidence: 0.9,
+			})
+			// THEN the value and the source ride together in one object
+			expect(decoded.value).toBe('manufacturing')
+			expect(decoded.source_id).toBe('https://acme.es')
+			expect(decoded.quote).toBe('We manufacture bicycles')
+			expect(decoded.confidence).toBe(0.9)
+		})
+	})
+
+	describe('when only the value and source are present', () => {
+		it('should decode with quote and confidence absent', () => {
+			// GIVEN the minimal wrapper — the source is required, the rest optional
+			const decoded = decode({ value: 'retail', source_id: 's1' })
+			// THEN it decodes, carrying no quote
+			expect(decoded.value).toBe('retail')
+			expect(decoded).not.toHaveProperty('quote')
+		})
+	})
+
+	describe('when the confidence is the string "NaN" the model could not work out', () => {
+		it('should coerce it to null, reusing the shared lenient-number rule', () => {
+			// GIVEN a wrapper whose confidence came back as the literal "NaN"
+			const decoded = decode({
+				value: 'serveis',
+				source_id: 's1',
+				confidence: 'NaN',
+			})
+			// THEN it becomes null rather than failing the whole decode
+			expect(decoded.confidence).toBeNull()
+		})
+	})
+
+	describe('when the value is missing', () => {
+		it('should reject the wrapper — a source with no value is meaningless', () => {
+			// GIVEN a wrapper that cites a source but carries no value
+			// THEN decoding fails (value is required inside the wrapper)
+			expect(() => decode({ source_id: 's1' })).toThrow()
 		})
 	})
 })

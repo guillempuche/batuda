@@ -64,8 +64,27 @@ export interface RunAgentResearchLoopParams<E, R> {
 	/** Character budget for the accumulated prompt; stops the loop before the
 	 * agent model's context window overflows. Omitted = unbounded. */
 	readonly maxPromptChars?: number | undefined
+	/**
+	 * Token budget compared against the LATEST round's inputTokens — the
+	 * provider-reported occupancy of the whole current prompt, so it is NOT
+	 * accumulated like promptChars. This is the primary depth stop; the char cap
+	 * is the provider-independent backstop for when usage is unavailable (then
+	 * inputTokens is 0 and this never fires). Omitted = no token stop.
+	 */
+	readonly maxPromptTokens?: number | undefined
 	readonly runRound: (round: number) => Effect.Effect<LoopRound, E, R>
 	readonly budgetSnapshot: Effect.Effect<BudgetSnapshot, E, R>
+	/**
+	 * Consulted when the model finishes with no tool calls. Return true to keep
+	 * going instead of ending — the caller appends a corrective instruction to the
+	 * prompt first, so the next round searches again. This is the grounding-retry
+	 * seam: a run that stopped before confirming the target company gets pushed to
+	 * look harder rather than failing closed on thin evidence. Omitted = end on the
+	 * model's first final answer.
+	 */
+	readonly shouldContinueAfterFinal?:
+		| (() => Effect.Effect<boolean, E, R>)
+		| undefined
 	/** Carried across a resume so token totals and text survive a restart. */
 	readonly priorText?: string | undefined
 	readonly priorTokensIn?: number | undefined
@@ -104,12 +123,21 @@ export const runAgentResearchLoop = <E, R>(
 			}
 			for (const hash of result.scrapeUrlHashes) urlHashes.add(hash)
 
-			// The stop conditions are independent: the model finishing, the step
-			// cap, the prompt outgrowing the context window, and the budget each
-			// end the loop on their own.
+			// The stop conditions are independent: the model finishing (unless the
+			// grounding-retry hook asks for one more round), the step cap, the prompt
+			// outgrowing the context window (a token budget on the latest round's
+			// occupancy, with the char cap as a provider-independent backstop), and
+			// the budget each end the loop on their own.
 			if (!result.hasToolCalls) {
-				stopReason = 'model-final'
-				break
+				const keepGoing = params.shouldContinueAfterFinal
+					? yield* params.shouldContinueAfterFinal()
+					: false
+				if (!keepGoing) {
+					stopReason = 'model-final'
+					break
+				}
+				// The caller appended a corrective instruction; fall through to the
+				// step and budget caps, then let the next round search again.
 			}
 			if (round >= params.maxSteps) {
 				stopReason = 'step-cap'
@@ -118,6 +146,17 @@ export const runAgentResearchLoop = <E, R>(
 			if (
 				params.maxPromptChars !== undefined &&
 				totalPromptChars >= params.maxPromptChars
+			) {
+				stopReason = 'context'
+				break
+			}
+			// Token budget: the latest round's full-prompt occupancy (not the
+			// running sum, which double-counts across rounds). When the provider
+			// omits usage, inputTokens is 0, so this never fires and the char cap
+			// above governs.
+			if (
+				params.maxPromptTokens !== undefined &&
+				result.inputTokens >= params.maxPromptTokens
 			) {
 				stopReason = 'context'
 				break

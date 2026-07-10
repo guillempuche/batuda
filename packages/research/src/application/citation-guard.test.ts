@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { validateFindingCitations } from './citation-guard'
+import {
+	groundedCitationTest,
+	validateFindingCitations,
+} from './citation-guard'
 
 // Only this one URL was actually fetched by the run.
 const isGrounded = (id: string) => id === 'https://acme.es'
@@ -86,33 +89,81 @@ describe('validateFindingCitations', () => {
 		})
 	})
 
-	describe('when citations are nested at several depths', () => {
-		it('should validate them wherever they appear', () => {
-			// GIVEN a company-enrichment shape with citations at multiple levels
+	describe('when sources sit at several depths and shapes', () => {
+		it('should judge a per-field wrapper, a block array, and a proposal each on its own', () => {
+			// GIVEN a company-enrichment shape mixing per-field sources (the new
+			// wrapper) with the block-level citation arrays competitors + proposals
+			// still use
 			const findings = {
 				enrichment: {
-					citations: [{ source_id: 'https://acme.es' }, { source_id: 'x' }],
+					industry: { value: 'Retail', source_id: 'https://acme.es' },
+					location: { value: 'Barcelona', source_id: 'x' },
 				},
 				competitors: [{ name: 'Rival', citations: [{ source_id: 'x' }] }],
 				proposed_updates: [
-					{ subject_id: 'c1', citations: [{ source_id: 'https://acme.es' }] },
+					{
+						subject_id: 'c1',
+						fields: {},
+						citations: [{ source_id: 'https://acme.es' }],
+					},
 				],
 			}
 
 			// WHEN validated
 			const result = validateFindingCitations(findings, isGrounded)
 
-			// THEN each depth is filtered independently
+			// THEN each is filtered independently: the grounded wrapper keeps its
+			// source, the ungrounded wrapper keeps only its value, the invented
+			// competitor citation is dropped, the grounded proposal survives
 			const f = result.findings as {
-				enrichment: { citations: unknown[] }
+				enrichment: { industry: unknown; location: unknown }
 				competitors: Array<{ citations: unknown[] }>
 				proposed_updates: unknown[]
 			}
-			expect(f.enrichment.citations).toEqual([{ source_id: 'https://acme.es' }])
+			expect(f.enrichment.industry).toEqual({
+				value: 'Retail',
+				source_id: 'https://acme.es',
+			})
+			expect(f.enrichment.location).toEqual({ value: 'Barcelona' })
 			expect(f.competitors[0]?.citations).toEqual([])
 			expect(f.proposed_updates).toHaveLength(1)
 			expect(result.total).toBe(4)
 			expect(result.kept).toBe(2)
+		})
+	})
+
+	describe('when a per-field wrapper carries quote and confidence', () => {
+		it('should keep them on a grounded field and drop them all on an ungrounded one', () => {
+			// GIVEN two sourced fields — one citing the fetched page, one invented
+			const findings = {
+				enrichment: {
+					industry: {
+						value: 'Retail',
+						source_id: 'https://acme.es',
+						quote: 'a shop',
+						confidence: 0.9,
+					},
+					region: { value: 'Catalonia', source_id: 'invented' },
+				},
+			}
+
+			// WHEN validated against the one fetched source
+			const result = validateFindingCitations(findings, isGrounded)
+
+			// THEN the grounded field keeps its full provenance; the invented one
+			// keeps only its value
+			const f = result.findings as {
+				enrichment: { industry: unknown; region: unknown }
+			}
+			expect(f.enrichment.industry).toEqual({
+				value: 'Retail',
+				source_id: 'https://acme.es',
+				quote: 'a shop',
+				confidence: 0.9,
+			})
+			expect(f.enrichment.region).toEqual({ value: 'Catalonia' })
+			expect(result.total).toBe(2)
+			expect(result.kept).toBe(1)
 		})
 	})
 
@@ -130,6 +181,34 @@ describe('validateFindingCitations', () => {
 			).contacts
 			expect(contacts[0]?.citations).toEqual([])
 			expect(result.kept).toBe(0)
+		})
+	})
+})
+
+describe('groundedCitationTest', () => {
+	// The run fetched one page on the target's own site.
+	const grounded = groundedCitationTest([
+		{ localRef: 'https://acme.es/about', sourceId: 'src_abc' },
+	])
+
+	describe('when a citation points at the fetched page or its site', () => {
+		it('should keep an exact URL, the opaque source id, and tidied same-site forms', () => {
+			// GIVEN citations that match the fetched page exactly or just its site
+			// THEN each is accepted, so a model that tidied the URL is still credited
+			expect(grounded('https://acme.es/about')).toBe(true) // exact page
+			expect(grounded('src_abc')).toBe(true) // opaque source id
+			expect(grounded('https://www.acme.es/about')).toBe(true) // www added
+			expect(grounded('https://acme.es')).toBe(true) // homepage, not the page
+			expect(grounded('acme.es')).toBe(true) // scheme dropped
+		})
+	})
+
+	describe('when a citation points off the fetched site', () => {
+		it('should reject an aggregator domain or a non-URL', () => {
+			// GIVEN a citation to a domain the run never fetched, or to prose
+			// THEN it is rejected, so fabricated / look-alike citations do not pass
+			expect(grounded('https://directory.example.com/acme')).toBe(false)
+			expect(grounded('made up text')).toBe(false)
 		})
 	})
 })

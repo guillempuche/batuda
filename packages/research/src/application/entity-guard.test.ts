@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest'
 
 import {
 	classifyEntityMatch,
+	classifyEntityMatchPerSource,
 	deriveEntityTargets,
+	domainHost,
 	type EntityTargets,
+	groundedSourceIds,
 } from './entity-guard'
 
 describe('deriveEntityTargets', () => {
@@ -148,6 +151,120 @@ describe('classifyEntityMatch', () => {
 			expect(
 				classifyEntityMatch(targets!, 'Topia and Sunset are freight brokers'),
 			).toBe('absent')
+		})
+	})
+})
+
+describe('classifyEntityMatchPerSource', () => {
+	const targets = deriveEntityTargets({
+		schemaName: 'company_enrichment_v1',
+		query: 'Acme Logistics',
+		subjects: [
+			{
+				table: 'companies',
+				name: 'Acme Logistics',
+				website: 'https://acme.es',
+			},
+		],
+	})
+
+	describe('when the sources mix the target and a look-alike', () => {
+		it('should tag each source on its own', () => {
+			// GIVEN one page on the target's own site and one about a same-named other firm
+			const verdicts = classifyEntityMatchPerSource(targets!, [
+				{
+					sourceId: 'a',
+					text: 'Welcome to acme.es — Acme Logistics of Barcelona',
+				},
+				{ sourceId: 'b', text: 'CEVA is a global freight leader' },
+			])
+
+			// WHEN classified per source — THEN the target's page is strong, the other absent
+			expect(verdicts).toEqual([
+				{ sourceId: 'a', match: 'strong' },
+				{ sourceId: 'b', match: 'absent' },
+			])
+		})
+	})
+})
+
+describe('groundedSourceIds', () => {
+	describe('when some sources are the target and some are not', () => {
+		it('should keep the strong and weak ones and drop the absent', () => {
+			// GIVEN a mix of per-source verdicts
+			// WHEN filtered — THEN only the target's pages remain
+			expect(
+				groundedSourceIds([
+					{ sourceId: 'a', match: 'strong' },
+					{ sourceId: 'b', match: 'absent' },
+					{ sourceId: 'c', match: 'weak' },
+				]),
+			).toEqual(['a', 'c'])
+		})
+	})
+})
+
+describe('deriveEntityTargets with an anchor domain', () => {
+	describe('when a correction supplies the correct official domain', () => {
+		it('should add the anchor host as a strong domain key even when the subject website is missing', () => {
+			// GIVEN an anchored subject whose stored website is absent, plus a
+			// user-supplied anchor domain
+			const targets = deriveEntityTargets({
+				schemaName: 'company_enrichment_v1',
+				query: 'Acme',
+				subjects: [{ table: 'companies', name: 'Acme Widgets' }],
+				anchorDomain: 'https://www.acme.com/contact',
+			})
+			// THEN the anchor host is a strong-match domain key, its label a weak word
+			expect(targets?.domains).toContain('acme.com')
+			expect(targets?.words).toContain('acme')
+		})
+
+		it('should ground a query-only enrichment on the anchor host', () => {
+			// GIVEN a query-only enrichment (no subject) with an anchor domain
+			const targets = deriveEntityTargets({
+				schemaName: 'company_enrichment_v1',
+				query: 'some company',
+				subjects: [],
+				anchorDomain: 'monzo.com',
+			})
+			// THEN the host still becomes a domain key
+			expect(targets?.domains).toContain('monzo.com')
+		})
+
+		it('should ignore an unparseable anchor domain', () => {
+			// GIVEN an anchor value that is not a domain
+			const withJunk = deriveEntityTargets({
+				schemaName: 'company_enrichment_v1',
+				query: 'Acme',
+				subjects: [{ table: 'companies', name: 'Acme Widgets' }],
+				anchorDomain: 'not a domain',
+			})
+			const without = deriveEntityTargets({
+				schemaName: 'company_enrichment_v1',
+				query: 'Acme',
+				subjects: [{ table: 'companies', name: 'Acme Widgets' }],
+			})
+			// THEN it is dropped and the result matches the no-anchor derivation
+			expect(withJunk?.domains).toEqual(without?.domains)
+		})
+	})
+})
+
+describe('domainHost', () => {
+	describe('when given a full URL', () => {
+		it('should reduce it to the bare registrable host', () => {
+			// GIVEN a URL with scheme, www, path, and mixed case
+			expect(domainHost('https://www.Acme.co.uk/about')).toBe('acme.co.uk')
+			expect(domainHost('monzo.com')).toBe('monzo.com')
+		})
+	})
+
+	describe('when given something that is not a host', () => {
+		it('should return undefined', () => {
+			// GIVEN text with no dot, or too short to be a host
+			expect(domainHost('localhost')).toBeUndefined()
+			expect(domainHost('a.b')).toBeUndefined()
 		})
 	})
 })

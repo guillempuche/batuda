@@ -21,11 +21,19 @@ import { Prompt } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { AcceptedCountry } from '../domain/country'
-import type { ResolvedPolicy } from '../domain/types'
+import type { ReasonCode, ResolvedPolicy } from '../domain/types'
 import { canAffordAnotherRound, runAgentResearchLoop } from './agent-loop'
 import { filterApplicableProposals } from './applicability-guard'
 import { makeBudgetLayer } from './budget'
-import { validateFindingCitations } from './citation-guard'
+import {
+	groundedCitationTest,
+	validateFindingCitations,
+} from './citation-guard'
+import {
+	CriticVerdictsSchema,
+	criticPrompt,
+	critiqueFieldSupport,
+} from './critic-guard'
 import {
 	isDiscoveryScanEmpty,
 	isRetryEligible,
@@ -33,8 +41,12 @@ import {
 } from './discovery-scan'
 import {
 	classifyEntityMatch,
+	classifyEntityMatchPerSource,
 	deriveEntityTargets,
+	domainHost,
 	type EntityMatch,
+	type EntityTargets,
+	groundedSourceIds,
 } from './entity-guard'
 import { resolvePolicy, type SystemDefaults } from './policy'
 import {
@@ -47,10 +59,11 @@ import {
 	WriterLanguageModel,
 } from './ports'
 import { type FreeformSchema, schemaRegistry } from './schemas/index'
-import { canonicalizeUrl, urlHashForScrape } from './source-key'
+import { urlHashForScrape } from './source-key'
 import { REGISTRY_LOOKUP_COST_CENTS } from './tool-costs'
 import { researchToolkit, researchToolkitLayer } from './tools'
 import { verifyValueProvenance } from './value-guard'
+import { constrainVocabulary } from './vocabulary-guard'
 
 // A finished run is flipped to 'failed' for a real error or an unexpected
 // crash, but NOT when it was simply cancelled or shut down (a pure interrupt) —
@@ -76,10 +89,43 @@ const boundedToolResult = (value: unknown, maxChars = 4000): string => {
 // success with fabricated findings.
 const MIN_GROUNDED_SOURCES = 1
 
-// Stop the reflect loop before its accumulated prompt (which re-sends every
-// round's tool results) can exceed the agent model's context window. A rough
-// character budget — scrapes are capped per page but many of them still add up.
+// Provider-independent backstop for the reflect-loop depth: a rough character
+// budget on the accumulated prompt (which re-sends every round's tool results),
+// used when the model provider omits token usage so the token budget below can't
+// fire. Scrapes are capped per page but many of them still add up.
 const MAX_LOOP_PROMPT_CHARS = 90000
+
+// When the model finishes without the evidence confirming the target company, it
+// gets this many corrective nudges to search harder before the run fails closed.
+const MAX_GROUNDING_RETRIES = 1
+
+// Appended after such a premature finish: push the model to reach the company's
+// own site (or its registry) rather than answering from look-alike pages.
+const GROUNDING_RETRY_INSTRUCTION =
+	'You have not yet confirmed this is the right company from its own website. Before giving a final answer, use web_search to find the official website (try the company name together with its city or country), then scrape_page that site — or look up the company in the official registry. Do not answer from the pages you already have if none of them is its own official site.'
+
+// Appended to a re-run's first prompt when a human supplied the correct official
+// domain: point the model straight at that site so it grounds on the right company.
+const ANCHOR_DOMAIN_INSTRUCTION = (host: string): string =>
+	`The correct official website for this company is https://${host}. Use scrape_page on that site first and treat it as the authoritative source for the company's identity and details.`
+
+// Feed extraction only the fetched pages that concern the target, so a look-alike
+// company's page pulled in alongside it cannot leak into the extracted fields.
+// Falls back to every page when the per-source check grounds none, so a run that
+// matched only through a search snippet still has something to extract from.
+export const groundedPageTexts = (
+	targets: EntityTargets | null,
+	pages: ReadonlyArray<{ readonly urlHash: string; readonly text: string }>,
+): ReadonlyArray<string> => {
+	if (targets === null) return pages.map(page => page.text)
+	const verdicts = classifyEntityMatchPerSource(
+		targets,
+		pages.map(page => ({ sourceId: page.urlHash, text: page.text })),
+	)
+	const keep = new Set(groundedSourceIds(verdicts))
+	const grounded = pages.filter(page => keep.has(page.urlHash))
+	return (grounded.length > 0 ? grounded : pages).map(page => page.text)
+}
 
 /**
  * Deterministic JSON serializer: sorts object keys and drops function values
@@ -404,6 +450,7 @@ export interface CreateResearchInput {
 	readonly mode?: string | undefined
 	readonly context?:
 		| {
+				anchorDomain?: string | undefined
 				subjects?:
 					| Array<{ table: 'companies' | 'contacts'; id: string }>
 					| undefined
@@ -482,6 +529,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					const running = yield* sql<{ id: string }>`
 						UPDATE research_runs
 						SET status = 'failed',
+							reason_code = ${'internal_error' satisfies ReasonCode},
 							findings = jsonb_set(COALESCE(findings, '{}'::jsonb), '{error}', '"server restarted mid-run"'),
 							completed_at = now(),
 							updated_at = now()
@@ -514,6 +562,12 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 			// Hard cap on reflect-loop rounds per run. Bounds how far the agent can
 			// search, so it is required with no default — like the concurrency cap.
 			const maxAgentSteps = yield* Config.int('RESEARCH_MAX_AGENT_STEPS')
+			// How many prompt tokens the reflect loop may reach before it stops
+			// searching, so a bigger-context model can look further. Required with no
+			// default — set per the chosen agent model's context window.
+			const maxLoopPromptTokens = yield* Config.int(
+				'RESEARCH_MAX_LOOP_PROMPT_TOKENS',
+			)
 			// System ceiling on monthly paid spend; the per-call cap check takes the
 			// min of this and the user's cap. Already set in production config, with a
 			// default so local and test boots don't need it.
@@ -736,6 +790,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							yield* sql`
 								UPDATE research_runs
 								SET status = 'failed',
+									reason_code = ${'internal_error' satisfies ReasonCode},
 									findings = ${JSON.stringify({ error })},
 									completed_at = now(), updated_at = now()
 								WHERE id = ${researchId} AND status = 'running'
@@ -884,6 +939,16 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							.templateFingerprint ?? ''
 
 					const context = run['context'] as CreateResearchInput['context']
+					// A target-correction re-run seeds context.anchorDomain: point both
+					// the grounding path and the model's first prompt at that official site.
+					const anchorHost =
+						context?.anchorDomain != null
+							? domainHost(context.anchorDomain)
+							: undefined
+					const anchorInstruction =
+						anchorHost !== undefined
+							? `\n\n${ANCHOR_DOMAIN_INSTRUCTION(anchorHost)}`
+							: ''
 					const schemaName =
 						(run as { schemaName: string | null }).schemaName ?? 'freeform'
 
@@ -916,6 +981,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					// read back from the row so the weak-match handling survives a restart.
 					const entityTargets = deriveEntityTargets({
 						schemaName,
+						anchorDomain: context?.anchorDomain,
 						query: (run as { query: string }).query,
 						subjects: subjects.map(s => {
 							const row = s.snapshot as Record<string, unknown>
@@ -945,6 +1011,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						yield* sql`
 							UPDATE research_runs
 							SET status = 'failed',
+								reason_code = ${'internal_error' satisfies ReasonCode},
 								findings = ${JSON.stringify({ error: `Unknown schema: ${schemaName}` })},
 								completed_at = now(), updated_at = now()
 							WHERE id = ${researchId} AND status = 'running'
@@ -968,6 +1035,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							yield* sql`
 								UPDATE research_runs
 								SET status = 'no_reliable_data',
+									reason_code = ${(verdict === 'weak' ? 'weak_no_official_site' : 'entity_mismatch') satisfies ReasonCode},
 									phase = 1,
 									entity_match = ${verdict},
 									findings = ${JSON.stringify({
@@ -1026,7 +1094,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					// Full scraped page content gathered this run — the corpus the value
 					// guard checks findings against. Kept separate from the model-facing
 					// transcript (capped per page); empty on a resume that skips phase 1.
-					const scrapeCorpus: string[] = []
+					const scrapeCorpus: Array<{ urlHash: string; text: string }> = []
 					// Findings the discovery-scan retry path extracts under the shared
 					// budget; undefined on every other path (which extracts in phase 2).
 					let retryFindings: unknown
@@ -1046,6 +1114,21 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 								phase: 2,
 								schema: schemaName,
 							})
+							// The model must cite the exact fetched URL, but the transcript
+							// buries URLs inside tool-result JSON — so hand it the run's fetched
+							// sources explicitly and have it copy one verbatim. Without this it
+							// tends to cite a tidied URL the guard can't match, or omit citations.
+							const sourceRows = yield* sql<{ url: string }>`
+								SELECT DISTINCT s.url
+								FROM research_run_sources rs JOIN sources s ON s.id = rs.source_id
+								WHERE rs.research_id = ${researchId}
+								ORDER BY s.url
+							`
+							const sourceManifest = sourceRows.map(row => row.url).join('\n')
+							const citationInstruction =
+								sourceManifest.length > 0
+									? `For each citation, set source_id to one of these exact fetched source URLs, copied verbatim — prefer the company's own official website, and never cite a URL not in this list:\n\n${sourceManifest}`
+									: "Set each citation's source_id to the exact scraped URL the value came from."
 							// Cast schema to satisfy generateObject's Encoder constraint.
 							// Registry schemas are all Structs with DecodingServices=never,
 							// but Schema.Top erases that — the cast is safe.
@@ -1055,7 +1138,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 								// appear in the transcript, and must leave unsupported fields
 								// empty rather than filling them from prior knowledge — otherwise
 								// it will confidently invent phones, tax ids, and emails.
-								prompt: `Produce structured findings STRICTLY from the research transcript below. Only include a value that appears in the transcript; if the transcript does not support a field, omit it or leave it null — never fill a field from prior knowledge. Set each citation's source_id to the exact scraped URL the value came from.\n\nResearch transcript:\n\n${transcript}`,
+								prompt: `Produce structured findings STRICTLY from the research transcript below. Only include a value that appears in the transcript; if the transcript does not support a field, omit it or leave it null — never fill a field from prior knowledge.\n\n${citationInstruction}\n\nResearch transcript:\n\n${transcript}`,
 							})
 							let result = withProposalIds(structuredResponse.value as unknown)
 							// Drop citations the model invented: keep only source_ids that map
@@ -1068,16 +1151,9 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 								SELECT local_ref AS "localRef", source_id AS "sourceId"
 								FROM research_run_sources WHERE research_id = ${researchId}
 							`
-							const groundedKeys = new Set<string>()
-							for (const row of groundedRows) {
-								groundedKeys.add(canonicalizeUrl(row.localRef))
-								groundedKeys.add(row.sourceId)
-							}
 							const citationCheck = validateFindingCitations(
 								result,
-								sourceId =>
-									groundedKeys.has(canonicalizeUrl(sourceId)) ||
-									groundedKeys.has(sourceId),
+								groundedCitationTest(groundedRows),
 							)
 							result = citationCheck.findings
 							if (citationCheck.total > citationCheck.kept) {
@@ -1105,6 +1181,22 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 										research_id: researchId,
 										dropped_proposals: valueCheck.droppedProposals,
 										stripped_values: valueCheck.strippedValues,
+									}),
+								)
+							}
+							// Vocabulary: rewrite industry/region/size to the CRM's fixed codes so
+							// what reaches the CRM matches the classification the UI offers — a
+							// real-but-uncategorized value becomes 'other', junk is dropped. Runs
+							// before applicability, so a proposal emptied by dropping its only
+							// field is then dropped as unappliable.
+							const vocab = constrainVocabulary(result)
+							result = vocab.findings
+							if (vocab.mapped > 0 || vocab.blanked > 0) {
+								yield* Effect.logInfo('research.vocabulary.normalized').pipe(
+									Effect.annotateLogs({
+										research_id: researchId,
+										mapped: vocab.mapped,
+										blanked: vocab.blanked,
 									}),
 								)
 							}
@@ -1165,9 +1257,55 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 								phase: 2,
 								schema: schemaName,
 							})
+							// Critic: a final per-field second look. For each value still carrying a
+							// source + quote, ask the extract model whether the quote really backs
+							// the value and is about the target company — the deterministic guards
+							// proved the value is in the evidence, this checks the cited quote
+							// supports it. Fail open: a judge error keeps the guarded fields.
+							const targetSnapshot = subjects[0]?.snapshot as
+								| Record<string, unknown>
+								| undefined
+							const criticTarget = {
+								name:
+									typeof targetSnapshot?.['name'] === 'string'
+										? targetSnapshot['name']
+										: (run as { query: string }).query,
+								domain:
+									typeof targetSnapshot?.['website'] === 'string'
+										? targetSnapshot['website']
+										: entityTargets?.domains[0],
+							}
+							const critiqued = yield* critiqueFieldSupport(result, claims =>
+								extractLlm
+									.generateObject({
+										schema: CriticVerdictsSchema,
+										prompt: criticPrompt(criticTarget, claims),
+									})
+									.pipe(
+										Effect.map(response => ({
+											verdicts: response.value.verdicts,
+											outputTokens: response.usage.outputTokens.total ?? 0,
+										})),
+										Effect.catchCause(() =>
+											Effect.succeed({ verdicts: [], outputTokens: 0 }),
+										),
+									),
+							)
+							result = critiqued.findings
+							if (critiqued.dropped > 0) {
+								yield* Effect.logWarning('research.critic.dropped').pipe(
+									Effect.annotateLogs({
+										research_id: researchId,
+										criticised: critiqued.criticised,
+										dropped: critiqued.dropped,
+									}),
+								)
+							}
 							return {
 								findings: result as unknown,
-								outputTokens: structuredResponse.usage.outputTokens.total ?? 0,
+								outputTokens:
+									(structuredResponse.usage.outputTokens.total ?? 0) +
+									critiqued.outputTokens,
 							}
 						}).pipe(
 							Effect.withSpan('research.phase2', {
@@ -1314,7 +1452,10 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 														page.markdown.trim().length > 0
 													) {
 														scrapeUrlHashes.push(urlHashForScrape(page.url))
-														scrapeCorpus.push(page.markdown)
+														scrapeCorpus.push({
+															urlHash: urlHashForScrape(page.url),
+															text: page.markdown,
+														})
 													}
 												} else if (tr.name === 'web_search') {
 													// A search that returned scraped page content (Firecrawl
@@ -1336,7 +1477,10 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 															item.content.trim().length > 0
 														) {
 															scrapeUrlHashes.push(urlHashForScrape(item.url))
-															scrapeCorpus.push(item.content)
+															scrapeCorpus.push({
+																urlHash: urlHashForScrape(item.url),
+																text: item.content,
+															})
 														}
 													}
 												}
@@ -1377,10 +1521,33 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 												outputTokens: response.usage.outputTokens.total ?? 0,
 											}
 										})
+									// When the model stops early without the evidence confirming the
+									// target, nudge it to find and read the company's own site before
+									// finishing; bounded so a run that still cannot ground fails closed.
+									let groundingRetries = 0
+									const shouldContinueAfterFinal = () =>
+										Effect.sync(() => {
+											if (entityTargets === null) return false
+											if (groundingRetries >= MAX_GROUNDING_RETRIES)
+												return false
+											const verdict = classifyEntityMatch(
+												entityTargets,
+												scrapeCorpus.map(page => page.text).join('\n'),
+											)
+											if (verdict === 'strong') return false
+											groundingRetries++
+											prompt = Prompt.concat(
+												prompt,
+												Prompt.make(GROUNDING_RETRY_INSTRUCTION),
+											)
+											return true
+										})
 									return yield* runAgentResearchLoop({
 										maxSteps: maxAgentSteps,
 										maxPromptChars: MAX_LOOP_PROMPT_CHARS,
+										maxPromptTokens: maxLoopPromptTokens,
 										runRound,
+										shouldContinueAfterFinal,
 										budgetSnapshot: budget.snapshot(),
 										priorTokensIn: carryTokensIn,
 										priorTokensOut: carryTokensOut,
@@ -1388,7 +1555,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 								})
 
 							let loop = yield* runPass(
-								`${systemPrompt}\n\n${query}`,
+								`${systemPrompt}\n\n${query}${anchorInstruction}`,
 								priorTokensIn,
 								priorTokensOut,
 							)
@@ -1406,7 +1573,10 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 								yield* linkRunSources(loop.scrapedUrlHashes)
 								let extracted = yield* extractStructuredFindings(
 									loop.researchText,
-									[loop.evidenceText, ...scrapeCorpus].join('\n'),
+									[
+										loop.evidenceText,
+										...scrapeCorpus.map(page => page.text),
+									].join('\n'),
 								)
 								findings = extracted.findings
 								extractOutputTokens += extracted.outputTokens
@@ -1450,7 +1620,10 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 									yield* linkRunSources(retryLoop.scrapedUrlHashes)
 									extracted = yield* extractStructuredFindings(
 										loop.researchText,
-										[loop.evidenceText, ...scrapeCorpus].join('\n'),
+										[
+											loop.evidenceText,
+											...scrapeCorpus.map(page => page.text),
+										].join('\n'),
 									)
 									findings = extracted.findings
 									extractOutputTokens += extracted.outputTokens
@@ -1484,7 +1657,9 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						entityMatch = entityTargets
 							? classifyEntityMatch(
 									entityTargets,
-									[evidenceText, ...scrapeCorpus].join('\n'),
+									[evidenceText, ...scrapeCorpus.map(page => page.text)].join(
+										'\n',
+									),
 								)
 							: null
 						if (entityMatch === 'absent' || entityMatch === 'weak') {
@@ -1535,7 +1710,10 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						} else {
 							const extracted = yield* extractStructuredFindings(
 								researchText,
-								[evidenceText, ...scrapeCorpus].join('\n'),
+								[
+									evidenceText,
+									...groundedPageTexts(entityTargets, scrapeCorpus),
+								].join('\n'),
 							)
 							findings = extracted.findings
 							tokensOut += extracted.outputTokens
@@ -1609,6 +1787,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						yield* sql`
 							UPDATE research_runs
 							SET status = 'no_reliable_data',
+								reason_code = ${'no_sources' satisfies ReasonCode},
 								phase = 3,
 								findings = ${JSON.stringify({
 									error:
@@ -1639,6 +1818,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						yield* sql`
 							UPDATE research_runs
 							SET status = 'no_reliable_data',
+								reason_code = ${'no_sources' satisfies ReasonCode},
 								phase = 3,
 								findings = ${JSON.stringify({
 									error:
@@ -1724,6 +1904,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 								yield* sql`
 									UPDATE research_runs
 									SET status = 'failed',
+										reason_code = ${'internal_error' satisfies ReasonCode},
 										findings = ${JSON.stringify({ error: detail })},
 										completed_at = now(),
 										updated_at = now()
@@ -2425,6 +2606,113 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 				 * a re-approve returns the follow-up already spawned rather than
 				 * charging again.
 				 */
+				/**
+				 * Re-run a run that grounded on the wrong company, locking onto a
+				 * human-supplied correct official domain. Reuses the origin's inputs and
+				 * frozen policy, seeding context.anchorDomain so the grounding path treats
+				 * that site as authoritative. A clean top-level run, not a child of origin.
+				 */
+				rerun: (
+					userId: string,
+					organizationId: string,
+					originRunId: string,
+					domain: string,
+				) =>
+					Effect.gen(function* () {
+						const host = domainHost(domain)
+						if (host === undefined) return { status: 'invalid_domain' as const }
+						const [origin] = yield* sql<{
+							query: string
+							mode: string | null
+							schemaName: string | null
+							context: unknown
+							budgetCents: number
+							paidBudgetCents: number
+							paidPolicy: string | null
+							templateIds: unknown
+							templateNames: unknown
+							templateFingerprint: string | null
+							instructionSegments: unknown
+						}>`
+							SELECT query, mode, schema_name AS "schemaName", context,
+								budget_cents AS "budgetCents",
+								paid_budget_cents AS "paidBudgetCents",
+								paid_policy::text AS "paidPolicy",
+								template_ids AS "templateIds",
+								template_names AS "templateNames",
+								template_fingerprint AS "templateFingerprint",
+								instruction_segments AS "instructionSegments"
+							FROM research_runs
+							WHERE id = ${originRunId} AND organization_id = ${organizationId}
+							LIMIT 1
+						`
+						if (!origin) return { status: 'run_not_found' as const }
+
+						const originContext =
+							origin.context != null && typeof origin.context === 'object'
+								? (origin.context as Record<string, unknown>)
+								: {}
+						const mergedContext: Record<string, unknown> = {
+							...originContext,
+							anchorDomain: host,
+						}
+
+						const [row] = yield* sql<{ id: string }>`
+							INSERT INTO research_runs (
+								organization_id,
+								query, mode, schema_name, status, context,
+								budget_cents, paid_budget_cents,
+								paid_policy, idempotency_key, created_by,
+								template_ids, template_names, template_fingerprint,
+								instruction_segments
+							) VALUES (
+								${organizationId},
+								${origin.query},
+								${origin.mode ?? 'deep'},
+								${origin.schemaName},
+								'queued',
+								${JSON.stringify(mergedContext)},
+								${origin.budgetCents},
+								${origin.paidBudgetCents},
+								${origin.paidPolicy ?? '{}'}::jsonb,
+								${null},
+								${userId},
+								${JSON.stringify(origin.templateIds ?? [])},
+								${JSON.stringify(origin.templateNames ?? [])},
+								${origin.templateFingerprint ?? ''},
+								${JSON.stringify(origin.instructionSegments ?? [])}
+							) RETURNING id
+						`
+						const researchId = (row as { id: string }).id
+
+						// Re-link the origin's input subjects onto the new run.
+						const subjects = Array.isArray(mergedContext['subjects'])
+							? (mergedContext['subjects'] as Array<{
+									table?: unknown
+									id?: unknown
+								}>)
+							: []
+						for (const s of subjects) {
+							if (
+								(s.table === 'companies' || s.table === 'contacts') &&
+								typeof s.id === 'string'
+							) {
+								yield* sql`
+									INSERT INTO research_links (organization_id, research_id, subject_table, subject_id, link_kind)
+									VALUES (${organizationId}, ${researchId}, ${s.table}, ${s.id}, 'input')
+									ON CONFLICT DO NOTHING
+								`
+							}
+						}
+
+						const pubsub = yield* PubSub.unbounded<ResearchEvent>()
+						yield* Ref.update(activePubSubs, m =>
+							HashMap.set(m, researchId, pubsub),
+						)
+						yield* Queue.offer(dispatch, { researchId, userId })
+						return { status: 'started' as const, id: researchId }
+					}),
+
 				approvePaidAction: (runId: string, paId: string, userId: string) =>
 					Effect.gen(function* () {
 						const [origin] = yield* sql<{

@@ -139,7 +139,7 @@ const distinctiveWords = (name: string): string[] =>
 // The bare host of a website — "acme.co.uk" from "https://www.acme.co.uk/about".
 // A page that references this exact host really points at the target's site,
 // unlike a passing mention of the brand word, so it is a strong signal.
-const domainHost = (website: string): string | undefined => {
+export const domainHost = (website: string): string | undefined => {
 	const host = website
 		.trim()
 		.toLowerCase()
@@ -197,6 +197,13 @@ export const deriveEntityTargets = (args: {
 	schemaName: string
 	query: string
 	subjects: ReadonlyArray<EntityTarget>
+	/**
+	 * A human-supplied correct official domain, from a target-correction re-run.
+	 * Folded in like a subject's website — its host becomes a strong-match key —
+	 * so the re-run locks onto the right company even when the stored subject's
+	 * website was null or wrong. An unparseable value is ignored.
+	 */
+	anchorDomain?: string | undefined
 }): EntityTargets | null => {
 	const anchored = args.subjects.length > 0
 	if (!ENTITY_GROUNDED_SCHEMAS.has(args.schemaName) && !anchored) return null
@@ -209,9 +216,15 @@ export const deriveEntityTargets = (args: {
 	const websites = args.subjects
 		.map(s => s.website)
 		.filter((w): w is string => w != null && w.trim() !== '')
+	const anchorHost =
+		args.anchorDomain != null ? domainHost(args.anchorDomain) : undefined
 
 	const domains = [
-		...new Set(websites.map(domainHost).filter((h): h is string => h != null)),
+		...new Set(
+			[...websites.map(domainHost), anchorHost].filter(
+				(h): h is string => h != null,
+			),
+		),
 	]
 	const cores = names.map(nameCore).filter(c => c.length >= 4)
 	const words = [
@@ -249,3 +262,30 @@ export const classifyEntityMatch = (
 	const weak = targets.words.some(word => collapsed.includes(word))
 	return weak ? 'weak' : 'absent'
 }
+
+export interface SourceEntityVerdict {
+	readonly sourceId: string
+	readonly match: EntityMatch
+}
+
+/**
+ * Classify each fetched source on its own. A run that reached the target's pages
+ * AND a same-named other company's pages can then keep the target's and drop the
+ * rest, instead of blurring them into one whole-corpus verdict.
+ */
+export const classifyEntityMatchPerSource = (
+	targets: EntityTargets,
+	sources: ReadonlyArray<{ readonly sourceId: string; readonly text: string }>,
+): ReadonlyArray<SourceEntityVerdict> =>
+	sources.map(source => ({
+		sourceId: source.sourceId,
+		match: classifyEntityMatch(targets, source.text),
+	}))
+
+/** The sources that concern the target (strong or weak) — the pages worth keeping. */
+export const groundedSourceIds = (
+	verdicts: ReadonlyArray<SourceEntityVerdict>,
+): ReadonlyArray<string> =>
+	verdicts
+		.filter(verdict => verdict.match !== 'absent')
+		.map(verdict => verdict.sourceId)

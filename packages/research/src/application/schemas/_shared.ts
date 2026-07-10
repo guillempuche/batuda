@@ -58,6 +58,14 @@ export const Citation = Schema.Struct({
 	confidence: Schema.optionalKey(LenientNumber),
 })
 
+// A single field paired with the source that backs it: a value plus the same
+// { source_id, quote?, confidence? } a citation carries. This lets each extracted
+// field own its own evidence — industry from this page, a phone from that one —
+// instead of one citation list for a whole block, so a single unsupported field
+// can be dropped on its own without discarding its neighbours.
+export const Sourced = <Value extends Schema.Top>(value: Value) =>
+	Schema.Struct({ value, ...Citation.fields })
+
 export const DiscoveredExisting = Schema.Struct({
 	subject_table: Schema.Literals(['companies', 'contacts']),
 	subject_id: Schema.String,

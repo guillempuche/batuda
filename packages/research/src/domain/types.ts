@@ -92,6 +92,23 @@ export const VERIFICATION_VERDICTS = [
 export const VerificationVerdict = Schema.Literals(VERIFICATION_VERDICTS)
 export type VerificationVerdict = (typeof VERIFICATION_VERDICTS)[number]
 
+/**
+ * Why a run ended without usable data — a structured code the UI localizes and
+ * the eval aggregates, instead of an English sentence buried in findings.error.
+ * (site_unreadable and name_too_generic are reserved for the grounding-retry and
+ * generic-name paths and may not be written at a terminal-failure site yet.)
+ */
+export const RESEARCH_REASON_CODES = [
+	'entity_mismatch',
+	'weak_no_official_site',
+	'site_unreadable',
+	'name_too_generic',
+	'no_sources',
+	'internal_error',
+] as const
+export const ReasonCode = Schema.Literals(RESEARCH_REASON_CODES)
+export type ReasonCode = (typeof RESEARCH_REASON_CODES)[number]
+
 /** People found for a company domain by an enrichment vendor (Hunter/Apollo). */
 export class EnrichmentResult extends Schema.Class<EnrichmentResult>(
 	'EnrichmentResult',

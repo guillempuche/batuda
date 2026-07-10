@@ -13,11 +13,44 @@
  * in every findings schema, so it filters wherever it finds a `citations` array.
  */
 
+import { canonicalizeUrl, hostOf } from './source-key'
+
 export interface CitationValidation {
 	readonly findings: unknown
 	/** How many citations were seen and how many survived, for observability. */
 	readonly total: number
 	readonly kept: number
+}
+
+/**
+ * Builds the "is this citation backed by a fetched source" test for a run from its
+ * linked sources. A citation is accepted when its URL matches a fetched source
+ * exactly (canonical URL or the opaque source id) OR when its site (host) matches
+ * one a fetched source belongs to — so a model that tidied the URL (dropped the
+ * path, added `www.`, cited the homepage) is still credited to the page it read,
+ * while an off-site (aggregator or fabricated) citation is still rejected. Judging
+ * grounding by site matches what the eval measures; per-value truth is unaffected,
+ * since the value-provenance guard checks each value against the evidence separately.
+ */
+export const groundedCitationTest = (
+	sources: ReadonlyArray<{
+		readonly localRef: string
+		readonly sourceId: string
+	}>,
+): ((sourceId: string) => boolean) => {
+	const keys = new Set<string>()
+	const hosts = new Set<string>()
+	for (const source of sources) {
+		keys.add(canonicalizeUrl(source.localRef))
+		keys.add(source.sourceId)
+		const host = hostOf(source.localRef)
+		if (host !== null) hosts.add(host)
+	}
+	return sourceId => {
+		if (keys.has(canonicalizeUrl(sourceId)) || keys.has(sourceId)) return true
+		const host = hostOf(sourceId)
+		return host !== null && hosts.has(host)
+	}
 }
 
 const hasCitations = (entry: unknown): boolean => {
@@ -49,6 +82,21 @@ export const validateFindingCitations = (
 			return key === 'proposed_updates' ? walked.filter(hasCitations) : walked
 		}
 		if (value !== null && typeof value === 'object') {
+			// A per-field Sourced wrapper carries its own `source_id` beside a
+			// `value` (a bare citation entry has a source_id but no `value`). Judge it
+			// like a citation: keep the whole wrapper when the source was fetched,
+			// otherwise drop just the provenance and let the field's value stand
+			// unsourced — the same "keep the data, remove the fabricated source" rule
+			// the citations array follows.
+			const record = value as { source_id?: unknown; value?: unknown }
+			if (typeof record.source_id === 'string' && 'value' in record) {
+				total++
+				if (isGrounded(record.source_id)) {
+					kept++
+					return value
+				}
+				return { value: walk(record.value) }
+			}
 			return Object.fromEntries(
 				Object.entries(value as Record<string, unknown>).map(
 					([k, v]) => [k, walk(v, k)] as const,

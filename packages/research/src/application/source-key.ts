@@ -29,3 +29,23 @@ export const canonicalizeUrl = (url: string): string => {
 /** The `sources.url_hash` a scraped URL maps to — the natural key a run links by. */
 export const urlHashForScrape = (url: string): string =>
 	createHash('sha256').update(canonicalizeUrl(url)).digest('hex')
+
+/**
+ * The `www.`-stripped, lowercased host of a URL, or null if it doesn't parse — for
+ * comparing two URLs by the SITE they belong to rather than the exact page.
+ */
+export const hostOf = (url: string): string | null => {
+	try {
+		return new URL(url).hostname.toLowerCase().replace(/^www\./, '')
+	} catch {
+		// A scheme-less "monzo.com" or "www.acme.es/x" — the tidied form a model
+		// often emits — throws above; retry with a scheme so it still resolves.
+		try {
+			return new URL(`https://${url}`).hostname
+				.toLowerCase()
+				.replace(/^www\./, '')
+		} catch {
+			return null
+		}
+	}
+}
