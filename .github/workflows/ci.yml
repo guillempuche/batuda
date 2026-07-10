@@ -21,7 +21,11 @@ jobs:
     # A draft PR is work in progress, so skip CI until it's marked ready.
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # The integration phase runs the whole suite against a remote Neon branch,
+    # which is ~15x slower per query than local Postgres; it already sat near the
+    # old 15-minute cap (14m32s–14m52s on passing runs) and grows with the suite,
+    # so give it headroom rather than tip over the ceiling on a slow run.
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
