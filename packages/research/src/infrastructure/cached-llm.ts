@@ -124,7 +124,13 @@ const MEM_CACHE_TTL = Duration.minutes(5)
 export const makeCachedLanguageModel = (
 	inner: LanguageModel.Service,
 	tier: LlmTier,
+	// Model used for the cache key + logs: the tier's primary model, kept stable
+	// so a cached answer is shared across fallback slots and changing the primary
+	// model busts the cache.
 	model: string,
+	// Model recorded on the cache row: the one that actually produced the bytes —
+	// a fallback vendor's model when the primary was down. Defaults to `model`.
+	answeredModel: string = model,
 ): Effect.Effect<LanguageModel.Service, never, SqlClient.SqlClient> =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
@@ -152,7 +158,7 @@ export const makeCachedLanguageModel = (
 					tokens_in, tokens_out,
 					cached_at, expires_at
 				) VALUES (
-					${keyHash}, ${tier}, ${model},
+					${keyHash}, ${tier}, ${answeredModel},
 					${promptPreview(options)},
 					${JSON.stringify(response)}::jsonb,
 					${tokensIn}, ${tokensOut},

@@ -538,6 +538,12 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 			const orphanSweepIntervalSeconds = yield* Config.int(
 				'RESEARCH_ORPHAN_SWEEP_INTERVAL_SEC',
 			).pipe(Config.withDefault(60))
+			// Whole-run wall-clock cap (applied on the run pipe below). Generous
+			// default — above a deep run's normal duration — so it only fires on a
+			// run that wedges, never on a slow-but-healthy one.
+			const runDeadlineSeconds = yield* Config.int(
+				'RESEARCH_RUN_DEADLINE_SEC',
+			).pipe(Config.withDefault(1200))
 
 			// Fail 'running' rows whose worker died — detected by a heartbeat that
 			// stopped refreshing (a live long run keeps beating, so it is spared).
@@ -2013,6 +2019,20 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					// broke it.
 					Effect.withSpan('research.run', {
 						attributes: { 'research.run_id': researchId, user_id: userId },
+					}),
+					// Whole-run deadline: fail a run that keeps its heartbeat beating
+					// but never finishes — creeping across many slow-but-not-timed-out
+					// model calls — which the stale-heartbeat sweep can't catch (it
+					// spares a still-beating run). Fails into the catchCause below, so
+					// it records + rolls up like any error.
+					Effect.timeoutOrElse({
+						duration: `${runDeadlineSeconds} seconds`,
+						orElse: () =>
+							Effect.fail(
+								new Error(
+									`research run exceeded its ${runDeadlineSeconds}s time limit`,
+								),
+							),
 					}),
 					// Scope the run so the heartbeat fiber (forked above) is
 					// interrupted the moment the run finishes, fails, or is cancelled.

@@ -71,6 +71,44 @@ describe('llm cache key computation', () => {
 	})
 })
 
+describe('fallback slot cache keying', () => {
+	describe('when a tier answers from a fallback slot on a different model', () => {
+		it('should key every slot on the tier primary model so one answer is shared across slots', () => {
+			// GIVEN one extract tier whose primary is the Nebius 235B and whose
+			// fallback slot answers as a different vendor's model
+			const primaryModel = 'Qwen/Qwen3-235B-A22B-Instruct-2507'
+			const answeringModel = 'accounts/fireworks/models/gpt-oss-120b'
+			const opts = { prompt: 'enrich Acme Ltd', temperature: 0 }
+
+			// WHEN the key is computed the way every slot computes it — always from
+			// the tier's primary model, never from whichever model answered
+			const primarySlotKey = computeLlmCacheKey(
+				'extract',
+				primaryModel,
+				'object',
+				opts,
+			)
+			const fallbackSlotKey = computeLlmCacheKey(
+				'extract',
+				primaryModel,
+				'object',
+				opts,
+			)
+
+			// THEN both slots land on the same key, so an answer the fallback
+			// produced is reused once the primary is back and neither re-hits a
+			// provider
+			expect(fallbackSlotKey).toBe(primarySlotKey)
+
+			// AND keying on the answering model instead would fragment the cache
+			// per vendor — the failure this keying avoids
+			expect(
+				computeLlmCacheKey('extract', answeringModel, 'object', opts),
+			).not.toBe(primarySlotKey)
+		})
+	})
+})
+
 describe('stableStringifyForCache', () => {
 	it('should sort object keys so permuted options serialize identically', () => {
 		// GIVEN two objects with the same entries in different orders
@@ -199,5 +237,8 @@ describe('llm cache layers (integration)', () => {
 	)
 	it.todo(
 		'should collapse concurrent misses to a single inner call via pg_advisory_xact_lock',
+	)
+	it.todo(
+		'should record the model that answered on the cache row while keying the row under the tier primary model',
 	)
 })
