@@ -4,6 +4,7 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import {
 	BatudaApi,
+	ConfirmRequired,
 	CurrentOrg,
 	NotFound,
 	SessionContext,
@@ -95,14 +96,28 @@ export const ResearchLive = HttpApiBuilder.group(
 							agent: 'research',
 							overrideTemplateIds: _.payload.template_ids,
 						})
-						return yield* svc.create(
+						const result = yield* svc.create(
 							userId,
 							currentOrg.id,
 							input,
 							systemDefaults,
 							instructions,
 						)
-					}).pipe(Effect.orDie),
+						// A selector fan-out the caller hasn't confirmed comes back as
+						// a cost estimate; surface it as the 409 the create contract
+						// declares so the caller can re-submit with `confirm: true`.
+						if (result.status === 'confirm_required') {
+							return yield* new ConfirmRequired({
+								estimatedCostCents: result.estimatedCostCents,
+								subjectCount: result.subjectCount,
+							})
+						}
+						return result
+					}).pipe(
+						Effect.catch(e =>
+							e._tag === 'ConfirmRequired' ? Effect.fail(e) : Effect.die(e),
+						),
+					),
 				)
 				.handle('list', _ =>
 					Effect.gen(function* () {

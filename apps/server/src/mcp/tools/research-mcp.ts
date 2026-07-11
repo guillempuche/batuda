@@ -157,10 +157,23 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 							query: params.query,
 							context: params.context as CreateResearchInput['context'],
 							schemaName: params.schema_name,
+							// An agent that picks a selector is intentionally batching, so
+							// auto-confirm the fan-out instead of bouncing a cost prompt it
+							// would only echo back.
+							confirm: true,
 						},
 						systemDefaults,
 						resolved.instructions,
 					)
+					if (result.status === 'confirm_required') {
+						// Unreachable given the auto-confirm above, but the widened
+						// result type carries the estimate variant, so rule it out.
+						return yield* Effect.die(
+							new Error(
+								'research fan-out returned confirm_required despite confirm',
+							),
+						)
+					}
 					return {
 						_tag: 'started' as const,
 						id: result.id,
@@ -185,17 +198,28 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 						params.instructions ?? [],
 					)
 					if (!resolved.ok) return resolved.clarification
-					const { id } = yield* svc.create(
+					const created = yield* svc.create(
 						userId,
 						orgId,
 						{
 							query: params.query,
 							context: params.context as CreateResearchInput['context'],
 							schemaName: params.schema_name,
+							// A synchronous agent run intends to batch when it passes a
+							// selector, so auto-confirm the fan-out.
+							confirm: true,
 						},
 						systemDefaults,
 						resolved.instructions,
 					)
+					if (created.status === 'confirm_required') {
+						return yield* Effect.die(
+							new Error(
+								'research fan-out returned confirm_required despite confirm',
+							),
+						)
+					}
+					const { id } = created
 
 					// Poll until the run reaches a terminal status or we exceed
 					// the caller's timeout (default 2 minutes).
