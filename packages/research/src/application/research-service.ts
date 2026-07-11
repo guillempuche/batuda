@@ -1292,12 +1292,13 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 									),
 							)
 							result = critiqued.findings
-							if (critiqued.dropped > 0) {
+							if (critiqued.dropped > 0 || critiqued.flagged > 0) {
 								yield* Effect.logWarning('research.critic.dropped').pipe(
 									Effect.annotateLogs({
 										research_id: researchId,
 										criticised: critiqued.criticised,
 										dropped: critiqued.dropped,
+										flagged: critiqued.flagged,
 									}),
 								)
 							}

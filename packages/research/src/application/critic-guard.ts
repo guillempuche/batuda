@@ -4,9 +4,12 @@
  * The deterministic guards prove a value appears somewhere in the run's evidence
  * and that its citation was fetched — but not that the *cited quote* actually
  * backs the value, nor that the quote is about the target company rather than a
- * look-alike. This guard asks exactly that, one question per sourced field, and
- * blanks the fields that fail. It is the only guard that calls a model, so it runs
- * LAST (after the free deterministic guards have pruned the findings) and only
+ * look-alike. This guard asks exactly that, one question per sourced field. It
+ * blanks a field only on a clear "no"; a field it cannot vouch for but cannot rule
+ * out either is kept and marked low-confidence, not deleted — so a caution about a
+ * thin quote no longer costs a probably-correct value. It is the only guard that
+ * calls a model, so it runs LAST (after the free deterministic guards have pruned
+ * the findings) and only
  * looks at values that still carry a source + quote — the per-field Sourced shape
  * introduced for enrichment scalars and contact channels.
  *
@@ -26,12 +29,21 @@ export interface FieldClaim {
 	readonly quote: string
 }
 
-// The judge's ruling on one field: keep it, or drop it (with an optional reason).
+// The judge's ruling on one field: the quote backs it ('supported', keep as-is),
+// clearly does not ('unsupported', drop), or is too thin to tell ('unsure', keep
+// the value but flag it low-confidence rather than deleting a maybe-correct field).
+export type CriticVerdictType = 'supported' | 'unsupported' | 'unsure'
+
 export interface CriticVerdict {
 	readonly id: string
-	readonly keep: boolean
+	readonly verdict: CriticVerdictType
 	readonly reason?: string
 }
+
+// The confidence stamped on an 'unsure' field: kept, but marked shaky so the UI
+// shows it as low-confidence. 0.3 normalizes to 30%, under the 70 the UI treats as
+// trustworthy.
+export const CRITIC_UNSURE_CONFIDENCE = 0.3
 
 export interface CriticJudgeResult {
 	readonly verdicts: ReadonlyArray<CriticVerdict>
@@ -47,8 +59,10 @@ export interface FieldCritiqueResult {
 	readonly findings: unknown
 	/** Fields sent to the judge. */
 	readonly criticised: number
-	/** Fields the judge rejected and this blanked. */
+	/** Fields the judge clearly rejected and this blanked. */
 	readonly dropped: number
+	/** Fields the judge was unsure about — kept, but marked low-confidence. */
+	readonly flagged: number
 	readonly outputTokens: number
 }
 
@@ -63,7 +77,7 @@ export const CriticVerdictsSchema = Schema.Struct({
 	verdicts: Schema.Array(
 		Schema.Struct({
 			id: Schema.String,
-			keep: Schema.Boolean,
+			verdict: Schema.Literals(['supported', 'unsupported', 'unsure']),
 			reason: Schema.optionalKey(Schema.String),
 		}),
 	),
@@ -124,11 +138,23 @@ export const collectFieldClaims = (
 export const applyCriticVerdicts = (
 	findings: unknown,
 	verdicts: ReadonlyArray<CriticVerdict>,
-): { readonly findings: unknown; readonly dropped: number } => {
-	// An id absent from `drop` (unknown id, or a field the judge gave no verdict
-	// for) defaults to keep — the critic only removes what it affirmatively rejects.
-	const drop = new Set(verdicts.filter(v => v.keep === false).map(v => v.id))
+): {
+	readonly findings: unknown
+	readonly dropped: number
+	readonly flagged: number
+} => {
+	// Only an affirmative ruling changes a field: 'unsupported' blanks it, 'unsure'
+	// keeps the value but stamps it low-confidence. An id absent from both (unknown
+	// id, no verdict, or 'supported') is left exactly as the guards produced it — the
+	// critic never removes or downgrades what it did not clearly rule against.
+	const drop = new Set(
+		verdicts.filter(v => v.verdict === 'unsupported').map(v => v.id),
+	)
+	const flag = new Set(
+		verdicts.filter(v => v.verdict === 'unsure').map(v => v.id),
+	)
 	let dropped = 0
+	let flagged = 0
 	const apply = (value: unknown, path: string): unknown => {
 		if (Array.isArray(value)) {
 			return value.map((item, i) => apply(item, childPath(path, String(i))))
@@ -145,6 +171,9 @@ export const applyCriticVerdicts = (
 				if (drop.has(p)) {
 					dropped++
 					out[key] = null
+				} else if (flag.has(p)) {
+					flagged++
+					out[key] = { ...v, confidence: CRITIC_UNSURE_CONFIDENCE }
 				} else {
 					out[key] = v
 				}
@@ -154,7 +183,7 @@ export const applyCriticVerdicts = (
 		}
 		return out
 	}
-	return { findings: apply(findings, ''), dropped }
+	return { findings: apply(findings, ''), dropped, flagged }
 }
 
 export const critiqueFieldSupport = <E, R>(
@@ -166,17 +195,25 @@ export const critiqueFieldSupport = <E, R>(
 		// No sourced+quoted fields (a scan/freeform schema, or empty findings) →
 		// don't spend a model call.
 		if (claims.length === 0) {
-			return { findings, criticised: 0, dropped: 0, outputTokens: 0 }
+			return {
+				findings,
+				criticised: 0,
+				dropped: 0,
+				flagged: 0,
+				outputTokens: 0,
+			}
 		}
 		const { verdicts, outputTokens } = yield* judge(claims)
-		const { findings: applied, dropped } = applyCriticVerdicts(
-			findings,
-			verdicts,
-		)
+		const {
+			findings: applied,
+			dropped,
+			flagged,
+		} = applyCriticVerdicts(findings, verdicts)
 		return {
 			findings: applied,
 			criticised: claims.length,
 			dropped,
+			flagged,
 			outputTokens,
 		}
 	})
@@ -200,13 +237,18 @@ export const criticPrompt = (
 		`You are auditing extracted CRM fields for the company "${target.name}"${
 			target.domain ? ` (official site ${target.domain})` : ''
 		}.`,
-		'For each field, set keep=true only if BOTH hold:',
-		'1) the quote actually supports the value, and',
-		'2) the quote is about this company, not a different or look-alike one.',
+		'For each field, return exactly one verdict:',
+		'- "supported": the quote clearly backs the value AND is about this company,',
+		'  not a different or look-alike one.',
+		'- "unsupported": the quote clearly contradicts the value, or is clearly about a',
+		'  different or look-alike company. Use this ONLY when you are confident it is wrong.',
+		'- "unsure": the quote is thin, ambiguous, or you cannot tell — not clearly wrong,',
+		'  just not clearly right. Prefer "unsure" over "unsupported" whenever in doubt;',
+		'  the value is kept but flagged low-confidence rather than thrown away.',
 		'A value may be a short CRM category code (e.g. "serveis" = a services or',
 		'finance business, "retail" = a shop, "manufactura" = a maker); judge whether',
 		'the quote fits that category, not an exact word match.',
-		'Otherwise set keep=false. Return exactly one verdict per id, matching the id verbatim.',
+		'Return exactly one verdict per id, matching the id verbatim.',
 		'',
 		'Fields:',
 		fields,
