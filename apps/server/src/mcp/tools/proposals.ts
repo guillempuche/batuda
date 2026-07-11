@@ -20,6 +20,14 @@ const statusToEventKind = (status: string): ProposalEvent['kind'] | null => {
 	return null
 }
 
+// Statuses that mean the customer got back to us — stamped when they responded.
+const RESPONDED_STATUSES = new Set([
+	'responded',
+	'negotiating',
+	'accepted',
+	'rejected',
+])
+
 const ListProposals = Tool.make('list_proposals', {
 	description:
 		'List proposals in the organization, optionally filtered by company_id. Returns id, company_id, contact_id, status, title, line_items, total_value, currency, sent_at, expires_at, responded_at, notes, metadata, created_at.',
@@ -137,6 +145,17 @@ export const ProposalHandlersLive = ProposalTools.toLayer(
 						data['totalValue'] = rest.total_value
 					if (rest.notes !== undefined) data['notes'] = rest.notes
 					if (rest.metadata !== undefined) data['metadata'] = rest.metadata
+					// Stamp the send/first-response moments on the transition into each.
+					if (rest.status === 'sent' && before?.status !== 'sent') {
+						data['sentAt'] = DateTime.toDateUtc(DateTime.nowUnsafe())
+					}
+					if (
+						rest.status !== undefined &&
+						RESPONDED_STATUSES.has(rest.status) &&
+						!RESPONDED_STATUSES.has(before?.status ?? '')
+					) {
+						data['respondedAt'] = DateTime.toDateUtc(DateTime.nowUnsafe())
+					}
 					const rows = yield* sql`
 						UPDATE proposals SET ${sql.update(data, ['id'])}
 						WHERE id = ${id} RETURNING *
