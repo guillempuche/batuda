@@ -1,7 +1,11 @@
 import { Trans } from '@lingui/react/macro'
+import { AlertTriangle } from 'lucide-react'
 import styled from 'styled-components'
 
-import { normalizeConfidence } from '#/components/research/proposal-logic'
+import {
+	DEFAULT_TRUST_THRESHOLD,
+	normalizeConfidence,
+} from '#/components/research/proposal-logic'
 import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
 
 /**
@@ -70,6 +74,11 @@ export function CitationList({
 				// model score arrives as a 0–1 fraction, so the old ×100 turned an
 				// already-0–100 value into "8500%".
 				const confidence = normalizeConfidence(c.confidence)
+				// Below the trust threshold reads as a caution: the critic keeps a
+				// value it could not vouch for but could not rule out, marking it
+				// shaky — so a reader tells a confirmed value from a kept-but-uncertain
+				// one at a glance (the low % plus a warning mark).
+				const low = confidence !== null && confidence < DEFAULT_TRUST_THRESHOLD
 				return (
 					<CitationLi key={stableKey(['cit', c.sourceId, c.quote ?? ''])}>
 						<CitationKey>{c.sourceId}</CitationKey>
@@ -77,7 +86,10 @@ export function CitationList({
 							<CitationQuote>“{c.quote}”</CitationQuote>
 						) : null}
 						{confidence !== null ? (
-							<CitationConfidence>{confidence}%</CitationConfidence>
+							<CitationConfidence $low={low} data-low={low}>
+								{low ? <AlertTriangle size={11} aria-hidden /> : null}
+								{confidence}%
+							</CitationConfidence>
 						) : null}
 					</CitationLi>
 				)
@@ -317,10 +329,13 @@ const CitationQuote = styled.span`
 	font-style: italic;
 `
 
-const CitationConfidence = styled.span`
+const CitationConfidence = styled.span<{ $low?: boolean }>`
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-3xs);
 	font-variant-numeric: tabular-nums;
 	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
-	color: var(--color-primary);
+	color: ${p => (p.$low ? 'var(--color-error, #c6664b)' : 'var(--color-primary)')};
 `
 
 const DiscoveredList = styled.ul`

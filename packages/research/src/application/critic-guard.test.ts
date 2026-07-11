@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
 	applyCriticVerdicts,
+	CRITIC_UNSURE_CONFIDENCE,
 	type CriticJudge,
 	collectFieldClaims,
 	critiqueFieldSupport,
@@ -89,9 +90,9 @@ describe('collectFieldClaims', () => {
 })
 
 describe('applyCriticVerdicts', () => {
-	describe('when a verdict rejects a field', () => {
+	describe('when a verdict clearly rejects a field', () => {
 		it('should blank exactly that field to null and leave its siblings', () => {
-			// GIVEN two sourced fields and a verdict dropping one
+			// GIVEN two sourced fields and an 'unsupported' verdict on one
 			const findings = {
 				enrichment: {
 					industry: sourced('retail', 'sells clothes'),
@@ -101,27 +102,52 @@ describe('applyCriticVerdicts', () => {
 
 			// WHEN the rejecting verdict is applied
 			const result = applyCriticVerdicts(findings, [
-				{ id: 'enrichment.industry', keep: false },
-				{ id: 'enrichment.location', keep: true },
+				{ id: 'enrichment.industry', verdict: 'unsupported' },
+				{ id: 'enrichment.location', verdict: 'supported' },
 			])
 
-			// THEN only the rejected field is nulled
+			// THEN only the rejected field is nulled; the supported one is untouched
 			const e = (result.findings as { enrichment: Record<string, unknown> })
 				.enrichment
 			expect(e['industry']).toBeNull()
 			expect(e['location']).toEqual(sourced('Barcelona', 'based here'))
 			expect(result.dropped).toBe(1)
+			expect(result.flagged).toBe(0)
+		})
+	})
+
+	describe('when a verdict is unsure about a field', () => {
+		it('should keep the value but stamp it low-confidence', () => {
+			// GIVEN a sourced field the judge cannot vouch for or rule out
+			const findings = {
+				enrichment: { industry: sourced('retail', 'maybe a shop') },
+			}
+
+			// WHEN an 'unsure' verdict is applied
+			const result = applyCriticVerdicts(findings, [
+				{ id: 'enrichment.industry', verdict: 'unsure' },
+			])
+
+			// THEN the value survives, carries the low-confidence stamp, and is counted
+			const e = (result.findings as { enrichment: Record<string, unknown> })
+				.enrichment
+			expect(e['industry']).toEqual({
+				...sourced('retail', 'maybe a shop'),
+				confidence: CRITIC_UNSURE_CONFIDENCE,
+			})
+			expect(result.dropped).toBe(0)
+			expect(result.flagged).toBe(1)
 		})
 	})
 
 	describe('when a verdict id is unknown or a field has no verdict', () => {
 		it('should default to keep', () => {
-			// GIVEN a field with no matching verdict and a verdict for a ghost id
+			// GIVEN a field with no matching verdict and an 'unsupported' verdict for a ghost id
 			const findings = { enrichment: { industry: sourced('retail', 'q') } }
 
 			// WHEN applied
 			const result = applyCriticVerdicts(findings, [
-				{ id: 'enrichment.ghost', keep: false },
+				{ id: 'enrichment.ghost', verdict: 'unsupported' },
 			])
 
 			// THEN the real field is untouched
@@ -129,12 +155,13 @@ describe('applyCriticVerdicts', () => {
 				.enrichment
 			expect(e['industry']).toEqual(sourced('retail', 'q'))
 			expect(result.dropped).toBe(0)
+			expect(result.flagged).toBe(0)
 		})
 	})
 })
 
 describe('critiqueFieldSupport', () => {
-	describe('when the judge rejects one field', () => {
+	describe('when the judge clearly rejects one field', () => {
 		it('should blank it, keep the rest, and thread the judge tokens', async () => {
 			// GIVEN a supported industry, an unsupported size, and a quote-less
 			// location (which is never sent to the judge)
@@ -149,7 +176,8 @@ describe('critiqueFieldSupport', () => {
 				Effect.succeed({
 					verdicts: claims.map(c => ({
 						id: c.id,
-						keep: c.id !== 'enrichment.size_range',
+						verdict:
+							c.id === 'enrichment.size_range' ? 'unsupported' : 'supported',
 					})),
 					outputTokens: 42,
 				})
@@ -167,7 +195,45 @@ describe('critiqueFieldSupport', () => {
 			expect(e['location']).toEqual(sourced('Barcelona'))
 			expect(result.criticised).toBe(2)
 			expect(result.dropped).toBe(1)
+			expect(result.flagged).toBe(0)
 			expect(result.outputTokens).toBe(42)
+		})
+	})
+
+	describe('when the judge is unsure about a field', () => {
+		it('should keep the value, stamp it low-confidence, and count it flagged', async () => {
+			// GIVEN a supported industry and an unsure size
+			const findings = {
+				enrichment: {
+					industry: sourced('retail', 'a shop'),
+					size_range: sourced('26-50', 'a vague headcount hint'),
+				},
+			}
+			const judge: CriticJudge = claims =>
+				Effect.succeed({
+					verdicts: claims.map(c => ({
+						id: c.id,
+						verdict: c.id === 'enrichment.size_range' ? 'unsure' : 'supported',
+					})),
+					outputTokens: 7,
+				})
+
+			// WHEN critiqued
+			const result = await Effect.runPromise(
+				critiqueFieldSupport(findings, judge),
+			)
+
+			// THEN the unsure field survives with the low-confidence stamp; nothing dropped
+			const e = (result.findings as { enrichment: Record<string, unknown> })
+				.enrichment
+			expect(e['size_range']).toEqual({
+				...sourced('26-50', 'a vague headcount hint'),
+				confidence: CRITIC_UNSURE_CONFIDENCE,
+			})
+			expect(e['industry']).toEqual(sourced('retail', 'a shop'))
+			expect(result.dropped).toBe(0)
+			expect(result.flagged).toBe(1)
+			expect(result.outputTokens).toBe(7)
 		})
 	})
 
