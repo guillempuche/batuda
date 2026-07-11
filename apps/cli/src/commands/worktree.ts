@@ -7,7 +7,14 @@ import { dirname, resolve } from 'node:path'
 import { Console, Effect, Schedule } from 'effect'
 
 import { mergeEnvOverrides, missingEnvEntries, tryFs } from '../lib/env-file'
-import { exec, execArgs, execIn, execSilent, ROOT } from '../shell'
+import {
+	exec,
+	execArgs,
+	execIn,
+	execSilent,
+	execSilentArgs,
+	ROOT,
+} from '../shell'
 import { dbMigrate } from './db'
 
 // The whole machine runs ONE shared Docker stack (the `batuda` compose project).
@@ -908,9 +915,11 @@ export const worktreeDoctor = Effect.gen(function* () {
 // developer running several sessions at once can watch each one navigate the
 // app side by side. The window is a per-worktree agent-browser session named
 // after the branch, so it's identifiable at a glance and re-running `watch`
-// reuses it instead of opening a second. Teardown (`--stop`) closes only this
-// worktree's window — never every session — so cleaning up one worktree can't
-// kill another's live view.
+// reuses it instead of opening a second. A brand-new window is tiled into a free
+// cell of a 2×2 grid so several fit on screen without stacking; a reused one is
+// left where it was dragged. Teardown (`--stop`) closes only this worktree's
+// window — never every session — so cleaning up one worktree can't kill
+// another's live view.
 
 // A readable, per-worktree window name (branch label, not an opaque hash) so
 // the window is easy to spot; distinct per worktree, so parallel windows never
@@ -922,6 +931,132 @@ const watchSessionName = (branch: string) => `ai-${slugForBranch(branch)}`
 // (portless routes it there, not to `main.batuda.localhost`).
 const watchUrl = (isLinked: boolean, branch: string) =>
 	isLinked ? branchUrl(branch) : `https://batuda.localhost${portSuffix()}`
+
+// The browser windows currently alive, one name per line. `agent-browser session
+// list` prints a header then `→ name` (focused) / `  name` (others); strip the
+// markers. Best-effort — if agent-browser can't be reached, treat none as open.
+const liveWatchSessions = execSilent('agent-browser session list').pipe(
+	Effect.map(out =>
+		out
+			.split('\n')
+			.map(line => line.replace(/^[→\s]+/, '').trim())
+			.filter(name => name && name !== 'Active sessions:'),
+	),
+	Effect.orElseSucceed(() => [] as string[]),
+)
+
+// One cell of a 2×2 grid over the usable screen — the window bounds for `slot`.
+// Past four windows the slots wrap and overlap (rare: more than four worktrees
+// watched at once).
+const gridCell = (screenW: number, screenH: number, slot: number) => {
+	const cellW = Math.floor(screenW / 2)
+	const cellH = Math.floor(screenH / 2)
+	const cell = slot % 4
+	return {
+		left: (cell % 2) * cellW,
+		top: Math.floor(cell / 2) * cellH,
+		width: cellW,
+		height: cellH,
+	}
+}
+
+// Move a Chrome window to exact screen coordinates over the DevTools Protocol.
+// agent-browser ignores Chrome's `--window-position` launch flags in headed mode,
+// but `Browser.setWindowBounds` on the session's OWN debugger endpoint moves its
+// window directly — so there's no ambiguity about which window belongs to which
+// session. Resolves when the window has moved, rejects on any protocol error.
+type CdpTarget = { type: string; targetId: string }
+const cdpSetWindowBounds = (
+	cdpUrl: string,
+	bounds: { left: number; top: number; width: number; height: number },
+): Promise<void> =>
+	new Promise<void>((resolve, reject) => {
+		const socket = new WebSocket(cdpUrl)
+		const pending = new Map<
+			number,
+			{
+				resolve: (value: Record<string, unknown>) => void
+				reject: (error: Error) => void
+			}
+		>()
+		let nextId = 0
+		const finish = (error?: Error) => {
+			clearTimeout(timer)
+			socket.close()
+			error ? reject(error) : resolve()
+		}
+		const timer = setTimeout(() => finish(new Error('CDP timed out')), 5000)
+		const call = (method: string, params: Record<string, unknown> = {}) =>
+			new Promise<Record<string, unknown>>((res, rej) => {
+				const id = ++nextId
+				pending.set(id, { resolve: res, reject: rej })
+				socket.send(JSON.stringify({ id, method, params }))
+			})
+		socket.onmessage = event => {
+			const message = JSON.parse(String(event.data)) as {
+				id?: number
+				result?: Record<string, unknown>
+				error?: { message: string }
+			}
+			if (message.id === undefined) return
+			const waiting = pending.get(message.id)
+			if (!waiting) return
+			pending.delete(message.id)
+			if (message.error) waiting.reject(new Error(message.error.message))
+			else waiting.resolve(message.result ?? {})
+		}
+		socket.onerror = () => finish(new Error('CDP socket error'))
+		socket.onopen = () => {
+			void (async () => {
+				const targets = await call('Target.getTargets')
+				const page = (targets['targetInfos'] as CdpTarget[] | undefined)?.find(
+					target => target.type === 'page',
+				)
+				if (!page) throw new Error('no page target')
+				const win = await call('Browser.getWindowForTarget', {
+					targetId: page.targetId,
+				})
+				await call('Browser.setWindowBounds', {
+					windowId: win['windowId'],
+					bounds: { ...bounds, windowState: 'normal' },
+				})
+				finish()
+			})().catch(finish)
+		}
+	})
+
+// Tile a freshly-opened watch window into its grid cell. Reads the usable screen
+// from the browser itself (cross-display, no OS permissions) and moves the window
+// over CDP. Best-effort at every step: if the screen can't be read or the window
+// can't be reached, it simply stays where Chrome put it and is arranged by hand.
+const tileWindow = (session: string, slot: number) =>
+	Effect.gen(function* () {
+		const size = yield* execSilentArgs('agent-browser', [
+			'--session',
+			session,
+			'eval',
+			'screen.availWidth + "," + screen.availHeight',
+		]).pipe(Effect.orElseSucceed(() => ''))
+		const dims = size.replace(/"/g, '').split(',')
+		const screenW = Number(dims[0])
+		const screenH = Number(dims[1])
+		if (!(screenW > 0 && screenH > 0)) return
+
+		const cdpUrl = yield* execSilentArgs('agent-browser', [
+			'--session',
+			session,
+			'get',
+			'cdp-url',
+		]).pipe(
+			Effect.map(out => out.match(/ws:\/\/\S+/)?.[0] ?? ''),
+			Effect.orElseSucceed(() => ''),
+		)
+		if (!cdpUrl) return
+
+		yield* Effect.tryPromise(() =>
+			cdpSetWindowBounds(cdpUrl, gridCell(screenW, screenH, slot)),
+		).pipe(Effect.catch(() => Effect.void))
+	})
 
 export const worktreeWatch = (options: { stop: boolean }) =>
 	Effect.gen(function* () {
@@ -943,6 +1078,12 @@ export const worktreeWatch = (options: { stop: boolean }) =>
 		}
 
 		const target = watchUrl(isLinked, branch)
+		// A window already up for this session is reused (and left where it was
+		// dragged); a brand-new one is tiled below. Snapshot the open windows
+		// before launching, so this window's grid slot is the count that preceded it.
+		const openBefore = yield* liveWatchSessions
+		const isNew = !openBefore.includes(session)
+
 		// `open` launches a new headed window for this session, or re-points the
 		// existing one — `--headed` is a no-op once the window is up, so the one
 		// call both creates and reuses. Passed through `execArgs` (no shell) so the
@@ -954,6 +1095,13 @@ export const worktreeWatch = (options: { stop: boolean }) =>
 			'open',
 			`${target}/login`,
 		])
+
+		if (isNew) {
+			// Only watch windows are named `ai-…`; other agent-browser sessions
+			// don't count toward this window's grid slot.
+			const slot = openBefore.filter(name => name.startsWith('ai-')).length
+			yield* tileWindow(session, slot)
+		}
 
 		yield* Console.log(
 			[

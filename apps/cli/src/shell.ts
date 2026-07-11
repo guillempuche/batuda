@@ -75,3 +75,25 @@ export const execSilent = (cmd: string, ...args: string[]) =>
 			.toString()
 			.trim()
 	}).pipe(Effect.scoped)
+
+/**
+ * Like `execSilent`, but runs the command directly WITHOUT a shell: `args` are
+ * passed as an array, so a derived argument (a name, a script to evaluate) can't
+ * be read as shell syntax. Returns the command's stdout, trimmed.
+ */
+export const execSilentArgs = (cmd: string, args: string[]) =>
+	Effect.gen(function* () {
+		const handle = yield* ChildProcess.make(cmd, args, {
+			shell: false,
+		})
+		const chunks = yield* Stream.runCollect(handle.stdout)
+		const code = yield* handle.exitCode
+		if (code !== 0) {
+			return yield* Effect.fail(
+				new Error(`\`${cmd} ${args.join(' ')}\` exited with code ${code}`),
+			)
+		}
+		return Buffer.concat([...chunks])
+			.toString()
+			.trim()
+	}).pipe(Effect.scoped)
