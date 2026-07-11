@@ -1,8 +1,9 @@
-import { useAtomValue } from '@effect/atom-react'
+import { useAtomRefresh, useAtomValue } from '@effect/atom-react'
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { AsyncResult } from 'effect/unstable/reactivity'
+import { RefreshCw } from 'lucide-react'
 import type { ComponentType } from 'react'
 import styled from 'styled-components'
 
@@ -11,6 +12,7 @@ import {
 	type ReasonCode,
 	type SchemaName,
 } from '@batuda/research'
+import { PriButton } from '@batuda/ui/pri'
 
 import { researchDetailAtom } from '#/atoms/research-atoms'
 import { MarkdownView } from '#/components/markdown/markdown-view'
@@ -69,12 +71,15 @@ type ResearchRunDetail = {
 
 export function RunDetail({ researchId }: { readonly researchId: string }) {
 	const result = useAtomValue(researchDetailAtom(researchId))
+	const refreshRun = useAtomRefresh(researchDetailAtom(researchId))
 
 	// Narrow up front so the live-progress hook (a Hook, so it can't sit behind
 	// an early return) knows whether the run is still in flight.
 	const run = AsyncResult.isSuccess(result) ? narrowRun(result.value) : null
 	const isRunning = run?.status === 'running' || run?.status === 'queued'
-	const { progress } = useResearchEvents(researchId, { enabled: isRunning })
+	const { progress, failed, stalled } = useResearchEvents(researchId, {
+		enabled: isRunning,
+	})
 
 	if (AsyncResult.isInitial(result) || AsyncResult.isWaiting(result)) {
 		return (
@@ -126,7 +131,29 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 					<RunActions run={run} />
 				</Header>
 
-				{isRunning ? <RunProgress progress={progress} /> : null}
+				{isRunning && !failed && !stalled ? (
+					<RunProgress progress={progress} />
+				) : null}
+
+				{isRunning && (failed || stalled) ? (
+					<StalledNotice role='status' data-testid='research-run-stalled'>
+						<span>
+							<Trans>
+								Live updates paused. This run may still be working — refresh to
+								check its latest status.
+							</Trans>
+						</span>
+						<PriButton
+							type='button'
+							$variant='outlined'
+							data-testid='research-run-refresh'
+							onClick={() => refreshRun()}
+						>
+							<RefreshCw size={14} aria-hidden />
+							<Trans>Refresh</Trans>
+						</PriButton>
+					</StalledNotice>
+				) : null}
 
 				{run.status === 'failed' || run.status === 'no_reliable_data' ? (
 					<ErrorBlock
@@ -336,6 +363,20 @@ const ErrorBlock = styled.div`
 	color: var(--color-error, #c6664b);
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
+`
+
+const StalledNotice = styled.div`
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-sm);
+	padding: var(--space-sm);
+	border: 1px solid var(--color-outline);
+	border-radius: var(--shape-2xs);
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	color: var(--color-on-surface-variant);
 `
 
 const Section = styled.section`

@@ -42,6 +42,9 @@ export function useResearchEvents(
 	const [events, setEvents] = useState<ReadonlyArray<ResearchEventItem>>([])
 	const [done, setDone] = useState(false)
 	const [failed, setFailed] = useState(false)
+	// The loop gave up polling before the run finished (too many empty rounds).
+	// The page uses this to swap the endless progress bar for a manual refresh.
+	const [stalled, setStalled] = useState(false)
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: `result` is the poll signal — the loop re-runs each time a poll resolves.
 	useEffect(() => {
@@ -60,6 +63,8 @@ export function useResearchEvents(
 			for (const event of fresh) seenRef.current.add(eventKey(event))
 			setEvents(prev => [...prev, ...fresh])
 			emptyPollsRef.current = 0
+			// New events mean the stream is alive again — clear any prior stall.
+			setStalled(false)
 		} else {
 			emptyPollsRef.current += 1
 		}
@@ -90,10 +95,13 @@ export function useResearchEvents(
 				clearTimeout(timer)
 			}
 		}
+		// Stopped without a terminal event — the run may still be going but we
+		// stopped listening, so flag a stall for the manual-refresh affordance.
+		if (!value.done) setStalled(true)
 		return
 	}, [result, enabled])
 
 	const progress = useMemo(() => deriveProgress(events), [events])
 
-	return { progress, events, done, failed }
+	return { progress, events, done, failed, stalled }
 }
