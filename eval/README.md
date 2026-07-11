@@ -67,10 +67,14 @@ Match the CRM's own vocabulary, or the value can never match what the pipeline e
 
 ## Registries: UK is free, ES is paid
 
-The `RegistryRouter` picks a registry by the company's country. **Companies House (UK)** is free — register a key at `developer.company-information.service.gov.uk` and set `RESEARCH_PROVIDER_REGISTRY_GB=companies-house`. **libreBORME (ES)** is ~€0.29/lookup. So a UK golden set costs nothing on the registry side, which makes it the low-barrier default for contributors; use Catalan/Spanish companies (and fill `region`) when you want the product's real domain.
+The `RegistryRouter` picks a registry by the company's country. **Companies House (UK)** is free — register a key at `developer.company-information.service.gov.uk` and set `RESEARCH_PROVIDER_REGISTRY_GB=companies-house`. **libreBORME (ES)** is ~€0.29/lookup — set `RESEARCH_PROVIDER_REGISTRY_ES=librebor` with `RESEARCH_API_KEY_REGISTRY_ES` (an `AccessId:AccessKey` pair). Turn both on for the Spanish set so the pipeline can confirm each company against its official register.
+
+A registry lookup that resolves the target company by its legal name now counts toward grounding — it proves the run reached the right legal entity even when the company's own site was never scraped, which is common for small businesses with a thin web presence. So running the Spanish set with the registers on makes the "did it reach the company" number trustworthy in a way a keyless run cannot.
 
 ## Note
 
-`golden.example.json` ships three real UK companies with verified official domains, carrying only the fields that are objectively checkable (`industry`, `location`) and omitting `region` (it is ES-only). Replace them with your own targets — the pipeline extracts English industry terms for UK companies, so `industry` precision there mostly measures the vocabulary gap, not grounding.
+`golden.example.json` ships a mix of real, verified companies: UK ones (whose register, Companies House, is free) that exercise grounding and the wrong-company rate, and Catalan/Spanish small businesses that exercise `region` and `size_range` — the two fields that are Spain-SMB-only in the CRM (region codes `cat`/`ara`/`cv`, size brackets up to `51-200`). Replace them with your own targets; for UK companies the pipeline extracts English industry terms, so `industry` precision there mostly measures the vocabulary gap, not grounding.
 
-Pushing the per-run scores to the observability dashboard is a separate step (it needs each run recorded as a trace first); today the report is the JSON file and the console summary.
+## Charting runs on the monitoring board
+
+Each run's scores are also exported to the monitoring board (Honeycomb) as spans when `OTEL_EXPORTER_OTLP_ENDPOINT` (+ `OTEL_EXPORTER_OTLP_HEADERS` with `x-honeycomb-dataset`) is set — one span per run plus a batch-summary span, tagged with the agent/extract model, so you can chart grounding accuracy, field precision/recall, and the empty rate drifting across model and prompt changes instead of eyeballing two terminal outputs. Without those env vars the eval still prints its table and writes `--out`, just with no export.
