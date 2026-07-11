@@ -1,4 +1,4 @@
-import { Effect } from 'effect'
+import { DateTime, Effect } from 'effect'
 import { HttpServerResponse } from 'effect/unstable/http'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
@@ -111,6 +111,36 @@ export const CompaniesLive = HttpApiBuilder.group(
 										Effect.as(row),
 									),
 						),
+						Effect.catch(e =>
+							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+						),
+					),
+				)
+				.handle('verify', _ =>
+					Effect.gen(function* () {
+						const session = yield* SessionContext
+						// Stamp who confirmed the lead and when, or clear both.
+						const rows = yield* svc.update(_.params.id, {
+							verifiedAt: _.payload.verified
+								? DateTime.toDateUtc(DateTime.nowUnsafe())
+								: null,
+							verifiedBy: _.payload.verified ? session.userId : null,
+						})
+						const row = (rows as ReadonlyArray<unknown>)[0]
+						if (row === undefined)
+							return yield* new NotFound({
+								entity: 'company',
+								id: _.params.id,
+							})
+						yield* Effect.logInfo('Company verification changed').pipe(
+							Effect.annotateLogs({
+								event: 'company.verified',
+								companyId: _.params.id,
+								verified: _.payload.verified,
+							}),
+						)
+						return row
+					}).pipe(
 						Effect.catch(e =>
 							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
 						),
