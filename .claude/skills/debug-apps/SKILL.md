@@ -183,6 +183,7 @@ Quick login test:
 agent-browser open "$WEB/login"                               # $WEB from the pre-flight
 agent-browser fill "input[name='email']" "admin@taller.cat"
 agent-browser fill "input[name='password']" "batuda-dev-2026"
+agent-browser wait 500                                        # let controlled inputs commit first
 agent-browser click "button[type='submit']"
 agent-browser wait 3000
 agent-browser find testid "org-switcher" click                # org-scoped pages error
@@ -190,6 +191,25 @@ agent-browser find testid "org-switcher-option-taller" click  # without an activ
 agent-browser wait 3000
 agent-browser snapshot
 ```
+
+## Watch several worktrees at once
+
+One AI session per worktree — give each its own **headed** window (the default here, via `AGENT_BROWSER_HEADED=1`) to watch them navigate live, side by side. Each worktree owns a distinct `agent-browser` session, so the windows never clash:
+
+```bash
+# inside a worktree — open ITS app in a dedicated window (URL from `worktree doctor`/`ls`)
+agent-browser --session "ai-<slug>" open "<worktree-url>/login"
+```
+
+Tile them instead of stacking with `--args "--window-position=X,Y,--window-size=W,H"`.
+
+Tear down **only this worktree's** window — never blanket-kill while others are live:
+
+```bash
+agent-browser --session "ai-<slug>" close   # closes ONLY this worktree's browser
+```
+
+`agent-browser close --all` (and any `pkill -f .../browsers/chrome`) kill EVERY session's browser at once — use only when no other worktree window is open.
 
 ## Reporting
 

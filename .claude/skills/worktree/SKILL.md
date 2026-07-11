@@ -42,7 +42,7 @@ fires the auto-provision/teardown hooks below.
    `pnpm install && pnpm cli worktree up`, then skips once the worktree's database exists). Or
    run `pnpm cli worktree up` yourself: it ensures the shared stack is up, creates the DB +
    bucket, writes `.env`, and migrates + seeds (re-running re-seeds — see Caveats).
-3. **Run** — `pnpm dev` → portless serves `https://<label>.batuda.localhost` (the branch's last path segment).
+3. **Run** — `pnpm dev` → portless serves `https://<label>.batuda.localhost` (the branch's last path segment). To watch a worktree's app live in a browser — one headed window per worktree — see the `/debug-apps` skill → *Watch several worktrees at once*.
 4. **Inspect** — `pnpm cli worktree ls` (every worktree + its DB/URL/provisioned state),
    `pnpm cli worktree doctor` (deep health of the current one).
 5. **Tear down / finish** — after the PR merges, run `pnpm cli worktree done` once to drop the data, remove the linked worktree, and clean up the local branch. For manual teardown run `pnpm cli worktree down` (DB + bucket only) and then `git worktree remove`. Auto when **Claude** removes the worktree (the `WorktreeRemove` hook drops the DB + bucket).
