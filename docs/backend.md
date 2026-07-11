@@ -169,6 +169,8 @@ pnpm dev:server   # starts the server (also runs migrations on startup)
 
 For production, `DATABASE_URL` points to NeonDB (or any Postgres). The db layer works with any Postgres — local Docker or cloud.
 
+For how environment variables and secrets are sourced across local dev and the deployed cloud — the `.env` baseline, `infisical run` for real dev keys, and the Infisical → GitHub Actions sync that feeds the deploy — see [architecture.md → Environment variables & secrets](architecture.md#environment-variables--secrets).
+
 ---
 
 ## Database layer (`apps/server/src/db/`)
