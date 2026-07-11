@@ -6,7 +6,7 @@ import { ArrowRight, Microscope, Search } from 'lucide-react'
 import { type ReactNode, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
-import { PriButton, usePriToast } from '@batuda/ui/pri'
+import { PriButton, PriInput, usePriToast } from '@batuda/ui/pri'
 
 import {
 	applyProposalAtom,
@@ -23,9 +23,14 @@ import {
 } from '#/components/research/proposal-logic'
 import { OutcomeBadge } from '#/components/research/proposal-outcome'
 import { ResearchDialog } from '#/components/research/research-dialog'
+import {
+	operationLabel,
+	subjectTableLabel,
+} from '#/components/research/run-labels'
 import { narrowResearch } from '#/components/research/run-shapes'
 import { TrustBadge } from '#/components/research/trust-badge'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import { formatMoneyCents } from '#/lib/format-money'
 import {
 	agedPaperSurface,
 	brushedMetalPlate,
@@ -64,7 +69,7 @@ function tierOf(p: PendingProposal) {
 }
 
 export function ResearchInbox() {
-	const { t } = useLingui()
+	const { t, i18n } = useLingui()
 	const toast = usePriToast()
 	const navigate = useNavigate()
 	const [discoveryOpen, setDiscoveryOpen] = useState(false)
@@ -92,6 +97,9 @@ export function ResearchInbox() {
 	})
 
 	const [subject, setSubject] = useState<SubjectFilter>('all')
+	const [search, setSearch] = useState('')
+	const [minConfidence, setMinConfidence] = useState(0)
+	const [machineOnly, setMachineOnly] = useState(false)
 	const [results, setResults] = useState<Record<string, ResolveState>>({})
 	const [busy, setBusy] = useState<Record<string, boolean>>({})
 	const [batchBusy, setBatchBusy] = useState(false)
@@ -112,13 +120,26 @@ export function ResearchInbox() {
 		[spendResult],
 	)
 
-	const visible = useMemo(
-		() =>
-			subject === 'all'
-				? proposals
-				: proposals.filter(p => p.subjectTable === subject),
-		[proposals, subject],
-	)
+	const visible = useMemo(() => {
+		const term = search.trim().toLowerCase()
+		return proposals.filter(p => {
+			if (subject !== 'all' && p.subjectTable !== subject) return false
+			if (machineOnly && !p.machineCheckable) return false
+			// A minimum keeps only rows scored at least that high; an unscored row
+			// (no channel confidence) can't clear a positive bar, so it drops out.
+			if (
+				minConfidence > 0 &&
+				(p.confidence === null || p.confidence < minConfidence)
+			)
+				return false
+			if (term.length > 0) {
+				const haystack =
+					`${p.subjectName ?? ''} ${p.runQuery} ${p.reason ?? ''}`.toLowerCase()
+				if (!haystack.includes(term)) return false
+			}
+			return true
+		})
+	}, [proposals, subject, machineOnly, minConfidence, search])
 
 	const trustworthy = useMemo(
 		() => visible.filter(p => tierOf(p) === 'trustworthy'),
@@ -262,7 +283,9 @@ export function ResearchInbox() {
 					</TileLabel>
 				</Tile>
 				<Tile>
-					<TileValue>{formatCents(paidSpendCents)}</TileValue>
+					<TileValue>
+						{formatMoneyCents(paidSpendCents, { locale: i18n.locale })}
+					</TileValue>
 					<TileLabel>
 						<Trans>Paid spend this month</Trans>
 					</TileLabel>
@@ -296,6 +319,36 @@ export function ResearchInbox() {
 						<Trans>Contacts</Trans>
 					</SegButton>
 				</Segmented>
+				<Filters>
+					<PriInput
+						type='search'
+						value={search}
+						placeholder={t`Search name or query`}
+						aria-label={t`Search the review queue`}
+						data-testid='research-inbox-search'
+						onChange={e => setSearch(e.target.value)}
+					/>
+					<FilterSelect
+						value={String(minConfidence)}
+						aria-label={t`Minimum confidence`}
+						data-testid='research-inbox-min-confidence'
+						onChange={e => setMinConfidence(Number(e.target.value))}
+					>
+						<option value='0'>{t`Any confidence`}</option>
+						<option value='50'>{t`50%+`}</option>
+						<option value='70'>{t`70%+`}</option>
+						<option value='90'>{t`90%+`}</option>
+					</FilterSelect>
+					<ToggleLabel>
+						<input
+							type='checkbox'
+							checked={machineOnly}
+							data-testid='research-inbox-machine-only'
+							onChange={e => setMachineOnly(e.target.checked)}
+						/>
+						<Trans>Verifiable only</Trans>
+					</ToggleLabel>
+				</Filters>
 				<PriButton
 					type='button'
 					$variant='filled'
@@ -319,13 +372,23 @@ export function ResearchInbox() {
 			</Toolbar>
 
 			{isLoading ? (
-				<Empty role='status'>
-					<Trans>Loading the review queue…</Trans>
-				</Empty>
+				<SkeletonList role='status' aria-label={t`Loading the review queue`}>
+					{[0, 1, 2, 3].map(i => (
+						<SkeletonRow key={i} />
+					))}
+				</SkeletonList>
 			) : isFailure ? (
-				<Empty role='alert'>
+				<FailureBox role='alert'>
 					<Trans>Could not load the review queue.</Trans>
-				</Empty>
+					<PriButton
+						type='button'
+						$variant='outlined'
+						data-testid='research-inbox-retry'
+						onClick={() => refreshProposals()}
+					>
+						<Trans>Retry</Trans>
+					</PriButton>
+				</FailureBox>
 			) : (
 				<>
 					{attention.length > 0 ? (
@@ -451,19 +514,31 @@ function ProposalRow({
 		decision: 'apply' | 'reject',
 	) => Promise<void>
 }) {
-	const { t } = useLingui()
-	const subjectLabel =
+	const { t, i18n } = useLingui()
+	// Prefer the subject's real name; fall back to a localized "Company · 1a2b3c"
+	// tag, then to the run's query when the proposal has no subject yet.
+	const tableLabel =
 		proposal.subjectTable !== null
+			? subjectTableLabel(proposal.subjectTable)
+			: null
+	const subjectLabel =
+		proposal.subjectName ??
+		(proposal.subjectTable !== null
 			? proposal.subjectId !== null
-				? `${proposal.subjectTable} · ${proposal.subjectId.slice(0, 8)}`
-				: proposal.subjectTable
-			: proposal.runQuery
+				? `${tableLabel ? i18n._(tableLabel) : proposal.subjectTable} · ${proposal.subjectId.slice(0, 8)}`
+				: tableLabel
+					? i18n._(tableLabel)
+					: proposal.subjectTable
+			: proposal.runQuery)
+	const opLabel = operationLabel(proposal.operation)
 
 	return (
 		<Row data-testid='research-inbox-row'>
 			<RowMain>
 				<RowHead>
-					<Operation>{proposal.operation}</Operation>
+					<Operation>
+						{opLabel ? i18n._(opLabel) : proposal.operation}
+					</Operation>
 					<RowQuery>{subjectLabel}</RowQuery>
 				</RowHead>
 				{proposal.reason !== null ? (
@@ -475,6 +550,13 @@ function ProposalRow({
 						confidence={proposal.confidence}
 						machineCheckable={proposal.machineCheckable}
 					/>
+					{proposal.runCostCents > 0 ? (
+						<RowCost data-testid='research-inbox-row-cost'>
+							{formatMoneyCents(proposal.runCostCents, {
+								locale: i18n.locale,
+							})}
+						</RowCost>
+					) : null}
 					<OpenRunLink
 						id={proposal.researchId}
 						label={t`Open run for ${subjectLabel}`}
@@ -524,11 +606,6 @@ function sumSpend(rows: ReadonlyArray<unknown>): number {
 		if (typeof amount === 'number') total += amount
 	}
 	return total
-}
-
-function formatCents(cents: number): string {
-	if (cents === 0) return '€0.00'
-	return `€${(cents / 100).toFixed(2)}`
 }
 
 // ── Styles ───────────────────────────────────────────────────────
@@ -641,6 +718,38 @@ const Toolbar = styled.div`
 	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--space-sm);
+`
+
+const Filters = styled.div`
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-2xs);
+`
+
+const FilterSelect = styled.select`
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	padding: var(--space-3xs) var(--space-2xs);
+	border-radius: var(--shape-2xs);
+	border: 1px solid color-mix(in oklab, var(--color-on-surface) 24%, transparent);
+	background: var(--color-surface);
+	color: var(--color-on-surface);
+
+	&:focus-visible {
+		outline: none;
+		box-shadow: var(--glow-active);
+	}
+`
+
+const ToggleLabel = styled.label`
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-3xs);
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	color: var(--color-on-surface-variant);
+	cursor: pointer;
 `
 
 const Segmented = styled.div`
@@ -756,6 +865,12 @@ const RowQuery = styled.span`
 	color: var(--color-on-surface);
 `
 
+const RowCost = styled.span`
+	font-family: var(--font-display);
+	font-size: var(--typescale-label-small-size);
+	color: var(--color-on-surface-variant);
+`
+
 const RowReason = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
@@ -832,4 +947,48 @@ const Empty = styled.p`
 	font-style: italic;
 	color: var(--color-on-surface-variant);
 	margin: 0;
+`
+
+const FailureBox = styled.div`
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--space-sm);
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-medium-size);
+	color: var(--color-on-surface-variant);
+`
+
+const SkeletonList = styled.div`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2xs);
+`
+
+// A shimmering placeholder row that stands in for a queue item while the review
+// list loads, so the page shows its shape instead of a bare "Loading…" line.
+const SkeletonRow = styled.div`
+	height: 3.5rem;
+	border-radius: var(--shape-2xs);
+	background: linear-gradient(
+		90deg,
+		color-mix(in oklab, var(--color-on-surface) 6%, transparent) 25%,
+		color-mix(in oklab, var(--color-on-surface) 12%, transparent) 37%,
+		color-mix(in oklab, var(--color-on-surface) 6%, transparent) 63%
+	);
+	background-size: 400% 100%;
+	animation: shimmer 1.4s ease infinite;
+
+	@keyframes shimmer {
+		0% {
+			background-position: 100% 50%;
+		}
+		100% {
+			background-position: 0% 50%;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		animation: none;
+	}
 `

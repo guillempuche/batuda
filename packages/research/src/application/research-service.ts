@@ -231,11 +231,17 @@ export interface PendingProposalRow {
 	readonly proposedUpdateId: string | null
 	readonly subjectTable: string | null
 	readonly subjectId: string | null
+	// The subject row's current name (e.g. "Acme Bakery"), looked up from its id.
+	// Null for a proposal that would create a brand-new row.
+	readonly subjectName: string | null
 	readonly operation: string
 	readonly reason: string | null
 	readonly confidence: number | null
 	readonly verification: string | null
 	readonly machineCheckable: boolean
+	// The run's total spend so far, in cents; the same value repeats on every
+	// proposal that came from the same run.
+	readonly runCostCents: number
 }
 
 /**
@@ -287,6 +293,7 @@ export const queryPendingProposals = (
 					r.status AS run_status,
 					r.query AS run_query,
 					r.created_at AS run_created_at,
+					r.cost_cents AS run_cost_cents,
 					pu->>'id' AS proposed_update_id,
 					pu->>'subject_table' AS subject_table,
 					pu->>'subject_id' AS subject_id,
@@ -330,7 +337,16 @@ export const queryPendingProposals = (
 				WHERE r.status != 'deleted'
 					AND pu->>'status' = 'pending'
 			)
-			SELECT * FROM pending
+			SELECT
+				p.*,
+				-- Resolve the subject's current name from its table and id; these
+				-- joins are org-scoped by row-level security like the rest of the query.
+				COALESCE(c.name, ct.name) AS subject_name
+			FROM pending p
+			LEFT JOIN companies c
+				ON p.subject_table = 'companies' AND c.id::text = p.subject_id
+			LEFT JOIN contacts ct
+				ON p.subject_table = 'contacts' AND ct.id::text = p.subject_id
 			WHERE ${sql.and(conditions)}
 			ORDER BY run_created_at DESC
 			LIMIT ${limit}

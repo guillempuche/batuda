@@ -162,6 +162,18 @@ msgstr "1 fil"
 msgid "1 thread selected"
 msgstr "1 fil seleccionat"
 
+#: src/components/research/inbox/research-inbox.tsx
+msgid "50%+"
+msgstr "50%+"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "70%+"
+msgstr "70%+"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "90%+"
+msgstr "90%+"
+
 #: src/components/instructions/template-editor-dialog.tsx
 msgid "A short label. Start it with a [tag] like [research] to group related templates if you like — the brackets are just part of the name."
 msgstr "Una etiqueta curta. Si vols, comença-la amb un [tag] com ara [research] per agrupar plantilles relacionades; els claudàtors només formen part del nom."
@@ -256,6 +268,10 @@ msgstr "Afegeix adjunt"
 #: src/components/emails/compose-form.tsx
 msgid "Add Cc / Bcc"
 msgstr "Afegeix Cc / Bcc"
+
+#: src/components/research/run-labels.ts
+msgid "Add channel"
+msgstr "Afegeix canal"
 
 #: src/components/shared/company-card.tsx
 msgid "Add task"
@@ -373,6 +389,10 @@ msgstr "Qualsevol"
 #: src/routes/settings/api-keys/index.tsx
 msgid "Any agent using \"{confirmLabel}\" will stop working. This can't be undone."
 msgstr "Qualsevol agent que faci servir \"{confirmLabel}\" deixarà de funcionar. Això no es pot desfer."
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Any confidence"
+msgstr "Qualsevol confiança"
 
 #: src/routes/companies/index.tsx
 msgid "Any priority"
@@ -839,6 +859,7 @@ msgstr "Empreses"
 
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
+#: src/components/research/run-labels.ts
 #: src/routes/emails/$threadId.tsx
 #: src/routes/emails/$threadId.tsx
 #: src/routes/index.tsx
@@ -936,6 +957,10 @@ msgstr "Connexió provada"
 #: src/routes/settings/profile/index.tsx
 msgid "Connections"
 msgstr "Connexions"
+
+#: src/components/research/run-labels.ts
+msgid "Contact"
+msgstr "Contacte"
 
 #: src/components/research/research-dialog.tsx
 msgid "Contact discovery"
@@ -2127,6 +2152,10 @@ msgstr "LinkedIn"
 msgid "List"
 msgstr "Llista"
 
+#: src/components/research/run-detail.tsx
+msgid "Live updates paused. This run may still be working — refresh to check its latest status."
+msgstr "Actualitzacions en directe pausades. Aquesta execució encara pot estar treballant — actualitza per veure el seu estat més recent."
+
 #. placeholder {0}: total - loaded
 #: src/components/companies/pipeline-board.tsx
 msgid "Load {0} more"
@@ -2157,8 +2186,8 @@ msgid "Loading runs…"
 msgstr "S'estan carregant les execucions…"
 
 #: src/components/research/inbox/research-inbox.tsx
-msgid "Loading the review queue…"
-msgstr "Carregant la cua de revisió…"
+msgid "Loading the review queue"
+msgstr "S'està carregant la cua de revisió"
 
 #: src/routes/settings/organization/policy.tsx
 msgid "Loading your research budget…"
@@ -2332,6 +2361,10 @@ msgstr "Propostes dels membres"
 msgid "Members"
 msgstr "Membres"
 
+#: src/components/research/run-labels.ts
+msgid "Merge"
+msgstr "Fusiona"
+
 #: src/components/research/proposal-outcome.tsx
 msgid "Merged into existing"
 msgstr "Fusionat amb un existent"
@@ -2357,6 +2390,7 @@ msgstr "Meva"
 msgid "Minimize"
 msgstr "Minimitza"
 
+#: src/components/research/inbox/research-inbox.tsx
 #: src/routes/settings/organization/policy.tsx
 msgid "Minimum confidence"
 msgstr "Confiança mínima"
@@ -2422,6 +2456,10 @@ msgstr "Mai"
 #: src/routes/settings/api-keys/index.tsx
 msgid "Never expires"
 msgstr "No caduca mai"
+
+#: src/components/research/run-labels.ts
+msgid "New"
+msgstr "Nova"
 
 #: src/routes/companies/$slug.tsx
 msgid "New client — set the next action (kick off onboarding)."
@@ -3290,6 +3328,7 @@ msgstr "Registres"
 
 #: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/review/proposed-updates-review.tsx
+#: src/components/research/run-detail.tsx
 msgid "Refresh"
 msgstr "Actualitza"
 
@@ -3475,6 +3514,10 @@ msgstr "Reprèn l'esborrany (1)"
 msgid "Resume syncing"
 msgstr "Reprèn la sincronització"
 
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Retry"
+msgstr "Torna-ho a provar"
+
 #: src/routes/settings/profile/templates.tsx
 msgid "Reusable, standing guidance your agents follow — what you sell, who you target, tone, and which sources to trust."
 msgstr "Orientació reutilitzable i permanent que segueixen els teus agents: què vens, a qui t'adreces, el to i en quines fonts confiar."
@@ -3585,6 +3628,14 @@ msgstr "Cerca per assumpte…"
 #: src/routes/companies/index.tsx
 msgid "Search companies"
 msgstr "Cerca empreses"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Search name or query"
+msgstr "Cerca nom o consulta"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Search the review queue"
+msgstr "Cerca a la cua de revisió"
 
 #: src/routes/emails/index.tsx
 msgid "Search threads"
@@ -4241,6 +4292,10 @@ msgstr "Això substitueix el lloc que he detectat automàticament i torna a exec
 msgid "This page opens when an AI assistant asks to connect. Start the connection from your assistant."
 msgstr "Aquesta pàgina s'obre quan un assistent d'IA demana connectar-se. Inicia la connexió des del teu assistent."
 
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "This run found no changes to review."
+msgstr "Aquesta execució no ha trobat cap canvi per revisar."
+
 #. placeholder {0}: pendingConfirm.subjectCount
 #. placeholder {1}: formatMoneyCents(pendingConfirm.estimatedCostCents, { locale: i18n.locale, })
 #: src/components/research/research-dialog.tsx
@@ -4371,6 +4426,10 @@ msgstr "Sense verificar"
 msgid "Upcoming meetings"
 msgstr "Reunions properes"
 
+#: src/components/research/run-labels.ts
+msgid "Update"
+msgstr "Actualitza"
+
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
@@ -4431,6 +4490,10 @@ msgstr "Nom d'usuari"
 #: src/components/instructions/default-stack-editor.tsx
 msgid "Using the org default"
 msgstr "S'utilitza el valor per defecte de l'organització"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Verifiable only"
+msgstr "Només verificables"
 
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Verified emails and grounded values — safe to apply in one click."

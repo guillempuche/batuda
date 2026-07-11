@@ -162,6 +162,18 @@ msgstr "1 thread"
 msgid "1 thread selected"
 msgstr "1 thread selected"
 
+#: src/components/research/inbox/research-inbox.tsx
+msgid "50%+"
+msgstr "50%+"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "70%+"
+msgstr "70%+"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "90%+"
+msgstr "90%+"
+
 #: src/components/instructions/template-editor-dialog.tsx
 msgid "A short label. Start it with a [tag] like [research] to group related templates if you like — the brackets are just part of the name."
 msgstr "A short label. Start it with a [tag] like [research] to group related templates if you like — the brackets are just part of the name."
@@ -256,6 +268,10 @@ msgstr "Add attachment"
 #: src/components/emails/compose-form.tsx
 msgid "Add Cc / Bcc"
 msgstr "Add Cc / Bcc"
+
+#: src/components/research/run-labels.ts
+msgid "Add channel"
+msgstr "Add channel"
 
 #: src/components/shared/company-card.tsx
 msgid "Add task"
@@ -373,6 +389,10 @@ msgstr "Any"
 #: src/routes/settings/api-keys/index.tsx
 msgid "Any agent using \"{confirmLabel}\" will stop working. This can't be undone."
 msgstr "Any agent using \"{confirmLabel}\" will stop working. This can't be undone."
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Any confidence"
+msgstr "Any confidence"
 
 #: src/routes/companies/index.tsx
 msgid "Any priority"
@@ -839,6 +859,7 @@ msgstr "Companies"
 
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
+#: src/components/research/run-labels.ts
 #: src/routes/emails/$threadId.tsx
 #: src/routes/emails/$threadId.tsx
 #: src/routes/index.tsx
@@ -936,6 +957,10 @@ msgstr "Connection tested"
 #: src/routes/settings/profile/index.tsx
 msgid "Connections"
 msgstr "Connections"
+
+#: src/components/research/run-labels.ts
+msgid "Contact"
+msgstr "Contact"
 
 #: src/components/research/research-dialog.tsx
 msgid "Contact discovery"
@@ -2127,6 +2152,10 @@ msgstr "LinkedIn"
 msgid "List"
 msgstr "List"
 
+#: src/components/research/run-detail.tsx
+msgid "Live updates paused. This run may still be working — refresh to check its latest status."
+msgstr "Live updates paused. This run may still be working — refresh to check its latest status."
+
 #. placeholder {0}: total - loaded
 #: src/components/companies/pipeline-board.tsx
 msgid "Load {0} more"
@@ -2157,8 +2186,8 @@ msgid "Loading runs…"
 msgstr "Loading runs…"
 
 #: src/components/research/inbox/research-inbox.tsx
-msgid "Loading the review queue…"
-msgstr "Loading the review queue…"
+msgid "Loading the review queue"
+msgstr "Loading the review queue"
 
 #: src/routes/settings/organization/policy.tsx
 msgid "Loading your research budget…"
@@ -2332,6 +2361,10 @@ msgstr "Member proposals"
 msgid "Members"
 msgstr "Members"
 
+#: src/components/research/run-labels.ts
+msgid "Merge"
+msgstr "Merge"
+
 #: src/components/research/proposal-outcome.tsx
 msgid "Merged into existing"
 msgstr "Merged into existing"
@@ -2357,6 +2390,7 @@ msgstr "Mine"
 msgid "Minimize"
 msgstr "Minimize"
 
+#: src/components/research/inbox/research-inbox.tsx
 #: src/routes/settings/organization/policy.tsx
 msgid "Minimum confidence"
 msgstr "Minimum confidence"
@@ -2422,6 +2456,10 @@ msgstr "Never"
 #: src/routes/settings/api-keys/index.tsx
 msgid "Never expires"
 msgstr "Never expires"
+
+#: src/components/research/run-labels.ts
+msgid "New"
+msgstr "New"
 
 #: src/routes/companies/$slug.tsx
 msgid "New client — set the next action (kick off onboarding)."
@@ -3290,6 +3328,7 @@ msgstr "Records"
 
 #: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/review/proposed-updates-review.tsx
+#: src/components/research/run-detail.tsx
 msgid "Refresh"
 msgstr "Refresh"
 
@@ -3475,6 +3514,10 @@ msgstr "Resume drafting (1)"
 msgid "Resume syncing"
 msgstr "Resume syncing"
 
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Retry"
+msgstr "Retry"
+
 #: src/routes/settings/profile/templates.tsx
 msgid "Reusable, standing guidance your agents follow — what you sell, who you target, tone, and which sources to trust."
 msgstr "Reusable, standing guidance your agents follow — what you sell, who you target, tone, and which sources to trust."
@@ -3585,6 +3628,14 @@ msgstr "Search by subject…"
 #: src/routes/companies/index.tsx
 msgid "Search companies"
 msgstr "Search companies"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Search name or query"
+msgstr "Search name or query"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Search the review queue"
+msgstr "Search the review queue"
 
 #: src/routes/emails/index.tsx
 msgid "Search threads"
@@ -4241,6 +4292,10 @@ msgstr "This overrides the site I auto-detected and re-runs the research locked 
 msgid "This page opens when an AI assistant asks to connect. Start the connection from your assistant."
 msgstr "This page opens when an AI assistant asks to connect. Start the connection from your assistant."
 
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "This run found no changes to review."
+msgstr "This run found no changes to review."
+
 #. placeholder {0}: pendingConfirm.subjectCount
 #. placeholder {1}: formatMoneyCents(pendingConfirm.estimatedCostCents, { locale: i18n.locale, })
 #: src/components/research/research-dialog.tsx
@@ -4371,6 +4426,10 @@ msgstr "Unverified"
 msgid "Upcoming meetings"
 msgstr "Upcoming meetings"
 
+#: src/components/research/run-labels.ts
+msgid "Update"
+msgstr "Update"
+
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
@@ -4431,6 +4490,10 @@ msgstr "Username"
 #: src/components/instructions/default-stack-editor.tsx
 msgid "Using the org default"
 msgstr "Using the org default"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Verifiable only"
+msgstr "Verifiable only"
 
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Verified emails and grounded values — safe to apply in one click."
