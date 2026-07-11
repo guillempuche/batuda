@@ -1,5 +1,6 @@
 import { Select } from '@base-ui/react/select'
 import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
+import { useLingui as useLinguiBase } from '@lingui/react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import {
 	createFileRoute,
@@ -53,6 +54,7 @@ import { pagesSearchAtom } from '#/atoms/pages-atoms'
 import { researchListAtom } from '#/atoms/research-atoms'
 import { AboutSection } from '#/components/companies/about-section'
 import { CadenceCard } from '#/components/companies/cadence-card'
+import { CompanyOwnerControl } from '#/components/companies/company-owner-control'
 import { ConversationsTab } from '#/components/companies/conversations-tab'
 import { NextActionCard } from '#/components/companies/next-action-card'
 import { OpenTasksCard } from '#/components/companies/open-tasks-card'
@@ -79,7 +81,11 @@ import { EmptyState } from '#/components/shared/empty-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { PriorityDot } from '#/components/shared/priority-dot'
 import { RelativeDate } from '#/components/shared/relative-date'
-import { asCompanyStatus, StatusBadge } from '#/components/shared/status-badge'
+import {
+	asCompanyStatus,
+	StatusBadge,
+	statusLabels,
+} from '#/components/shared/status-badge'
 import {
 	TimelineEntry,
 	type TimelineEntryData,
@@ -110,6 +116,7 @@ type CompanyDetail = {
 	readonly slug: string
 	readonly name: string
 	readonly status: string
+	readonly ownerId: string | null
 	readonly industry: string | null
 	readonly sizeRange: string | null
 	readonly region: string | null
@@ -165,6 +172,7 @@ type TimelineRow = {
 	readonly channel: string
 	readonly date: string
 	readonly summary: string | null
+	readonly payload: Record<string, unknown> | null
 	readonly entityType: string
 	readonly entityId: string
 }
@@ -435,6 +443,7 @@ function DetailBody({
 	const refreshContacts = useAtomRefresh(contactsAtom)
 
 	const toast = usePriToast()
+	const { i18n } = useLinguiBase()
 	const updateCompany = useAtomSet(
 		BatudaApiAtom.mutation('companies', 'update'),
 		{ mode: 'promiseExit' },
@@ -458,6 +467,29 @@ function DetailBody({
 			throw new Error('update-failed')
 		},
 		[updateCompany, company.id, refreshCompany, toast, t],
+	)
+
+	const handleStatusChange = useCallback(
+		async (next: string) => {
+			const prev = company.status
+			await saveField('status', next)
+			if (next === prev) return
+			// Forward/active stages suggest the next action; terminal ones don't.
+			const nudge =
+				next === 'contacted'
+					? t`Contacted — set the next action (a follow-up date).`
+					: next === 'responded'
+						? t`They responded — set the next action to keep it warm.`
+						: next === 'meeting'
+							? t`Meeting stage — set the next action (agenda, follow-up).`
+							: next === 'proposal'
+								? t`Proposal stage — set the next action (send it, chase a decision).`
+								: next === 'client'
+									? t`New client — set the next action (kick off onboarding).`
+									: null
+			if (nudge) toast.add({ title: nudge, type: 'info' })
+		},
+		[company.status, saveField, toast, t],
 	)
 
 	const statusOptions = useMemo(
@@ -588,7 +620,10 @@ function DetailBody({
 	const conversationInteractions = useMemo(
 		() =>
 			timelineEntries
-				.filter(entry => entry.kind !== 'system_event')
+				.filter(
+					entry =>
+						entry.kind !== 'system_event' && entry.kind !== 'stage_changed',
+				)
 				.map(entry => ({
 					id: entry.id,
 					channel: entry.channel,
@@ -755,7 +790,7 @@ function DetailBody({
 							value={company.status}
 							onValueChange={next => {
 								if (typeof next !== 'string' || next.length === 0) return
-								void saveField('status', next)
+								void handleStatusChange(next)
 							}}
 						>
 							<HeaderSelectTrigger
@@ -796,6 +831,11 @@ function DetailBody({
 								</PriSelect.Positioner>
 							</PriSelect.Portal>
 						</PriSelect.Root>
+						<CompanyOwnerControl
+							companyId={company.id}
+							ownerId={company.ownerId}
+							onChanged={refreshCompany}
+						/>
 					</HeaderMeta>
 				</IdentityRow>
 
@@ -971,11 +1011,20 @@ function DetailBody({
 													) : (
 														<TimelineList>
 															{visibleTimeline.map(row => {
+																const isStage = row.kind === 'stage_changed'
+																const stageFrom = asCompanyStatus(
+																	String(row.payload?.['from'] ?? 'prospect'),
+																)
+																const stageTo = asCompanyStatus(
+																	String(row.payload?.['to'] ?? 'prospect'),
+																)
 																const entry: TimelineEntryData = {
 																	id: row.id,
 																	channel: row.channel,
-																	subject: null,
-																	summary: row.summary,
+																	subject: isStage ? t`Stage changed` : null,
+																	summary: isStage
+																		? `${i18n._(statusLabels[stageFrom])} → ${i18n._(statusLabels[stageTo])}`
+																		: row.summary,
 																	outcome: null,
 																	nextAction: null,
 																	date: row.date,
@@ -1275,6 +1324,7 @@ function narrowCompany(raw: unknown): CompanyDetail | null {
 		slug: r['slug'],
 		name: r['name'],
 		status: r['status'],
+		ownerId: str('ownerId'),
 		industry: str('industry'),
 		sizeRange: str('sizeRange'),
 		region: str('region'),
@@ -1389,6 +1439,7 @@ function timelineKindToChannel(kind: string, fallback: string | null): string {
 		case 'meeting_cancelled':
 			return 'event'
 		case 'system_event':
+		case 'stage_changed':
 			return 'system'
 		default:
 			return fallback ?? 'other'
@@ -1415,6 +1466,10 @@ function narrowTimeline(
 			channel: timelineKindToChannel(r['kind'], rawChannel),
 			date: occurredAt,
 			summary: typeof r['summary'] === 'string' ? r['summary'] : null,
+			payload:
+				typeof r['payload'] === 'object' && r['payload'] !== null
+					? (r['payload'] as Record<string, unknown>)
+					: null,
 			entityType: r['entityType'],
 			entityId: r['entityId'],
 		})

@@ -6,7 +6,11 @@ import { motion } from 'motion/react'
 import { useCallback, useMemo } from 'react'
 import styled from 'styled-components'
 
-import { companiesListAtom, openTasksAtom } from '#/atoms/pipeline-atoms'
+import {
+	companiesListAtom,
+	openTasksAtom,
+	pipelineAtom,
+} from '#/atoms/pipeline-atoms'
 import { SetPasswordNudge } from '#/components/profile/set-password-nudge'
 import { CompanyCard } from '#/components/shared/company-card'
 import { EmptyState } from '#/components/shared/empty-state'
@@ -138,6 +142,8 @@ function PipelinePage() {
 	const openTasksResult = useAtomValue(openTasksAtom)
 	const refreshCompanies = useAtomRefresh(companiesListAtom)
 	const refreshTasks = useAtomRefresh(openTasksAtom)
+	const pipelineResult = useAtomValue(pipelineAtom)
+	const refreshPipeline = useAtomRefresh(pipelineAtom)
 	const completeTask = useAtomSet(completeTaskAtom, { mode: 'promiseExit' })
 	const { open: openQuickCapture } = useQuickCapture()
 
@@ -160,6 +166,7 @@ function PipelinePage() {
 			await completeTask({ params: { id: taskId } })
 			refreshTasks()
 			refreshCompanies()
+			refreshPipeline()
 		},
 		[completeTask, refreshCompanies, refreshTasks],
 	)
@@ -188,6 +195,19 @@ function PipelinePage() {
 	const sevenDaysOut = now + 7 * 86400_000
 
 	const statusCounts = useMemo(() => countByStatus(companies), [companies])
+	// Prefer the server pipeline snapshot; fall back to the client aggregate
+	// until it loads so the first paint still shows real numbers.
+	const snapshot = AsyncResult.isSuccess(pipelineResult)
+		? (pipelineResult.value as {
+				statusCounts?: Record<string, number>
+				overdueTaskCount?: number
+				companiesWithoutNextAction?: number
+			})
+		: null
+	const countFor = (status: string) =>
+		snapshot?.statusCounts
+			? (snapshot.statusCounts[status] ?? 0)
+			: (statusCounts.get(status) ?? 0)
 
 	const overdueTasks = useMemo(
 		() =>
@@ -271,14 +291,21 @@ function PipelinePage() {
 			<KpiRow>
 				<KpiCounter value={companies.length} label={t`Active companies`} />
 				<KpiCounter value={openTasks.length} label={t`Open tasks`} />
-				<KpiCounter value={overdueTasksCount} label={t`Overdue`} />
+				<KpiCounter
+					value={snapshot?.overdueTaskCount ?? overdueTasksCount}
+					label={t`Overdue`}
+				/>
+				<KpiCounter
+					value={snapshot?.companiesWithoutNextAction ?? 0}
+					label={t`Needs action`}
+				/>
 			</KpiRow>
 
 			<StatusStrip>
 				{STATUS_ORDER.map(status => (
 					<StatusChip key={status} data-testid={`pipeline-column-${status}`}>
 						<StatusBadge status={status} size='lg' />
-						<StatusCount>{statusCounts.get(status) ?? 0}</StatusCount>
+						<StatusCount>{countFor(status)}</StatusCount>
 					</StatusChip>
 				))}
 			</StatusStrip>

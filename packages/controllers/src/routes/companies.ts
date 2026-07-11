@@ -40,6 +40,8 @@ const CreateCompanyInput = Schema.Struct({
 
 const UpdateCompanyInput = Schema.Struct({
 	name: Schema.optional(Schema.String),
+	// null clears the owner (release a lead); omitting leaves it unchanged.
+	ownerId: Schema.optional(Schema.NullOr(Schema.String)),
 	status: Schema.optional(Schema.String),
 	industry: Schema.optional(Schema.String),
 	sizeRange: Schema.optional(Schema.String),
@@ -74,6 +76,8 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 				region: Schema.optional(Schema.String),
 				industry: Schema.optional(Schema.String),
 				priority: Schema.optional(Schema.NumberFromString),
+				owner: Schema.optional(Schema.String),
+				sort: Schema.optional(Schema.String),
 				query: Schema.optional(Schema.String),
 				minLat: Schema.optional(Schema.NumberFromString),
 				maxLat: Schema.optional(Schema.NumberFromString),

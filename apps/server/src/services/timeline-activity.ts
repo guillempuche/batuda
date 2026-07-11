@@ -167,6 +167,17 @@ export class TaskCompleted extends Data.TaggedClass('TaskCompleted')<{
 	readonly occurredAt: Date
 }> {}
 
+// A pipeline stage transition (company.status changed from → to). Recorded as a
+// system-kind activity so it shows on the company's history; the human-readable
+// label is localized in the UI from the structured payload, never here.
+export class StageChanged extends Data.TaggedClass('StageChanged')<{
+	readonly companyId: string
+	readonly from: string | null
+	readonly to: string
+	readonly actorUserId: string | null
+	readonly occurredAt: Date
+}> {}
+
 export type TimelineEvent =
 	| EmailSent
 	| EmailReceived
@@ -176,6 +187,7 @@ export type TimelineEvent =
 	| ResearchRunCompleted
 	| ResearchProposalApplied
 	| SystemEvent
+	| StageChanged
 	| MeetingScheduled
 	| MeetingRescheduled
 	| MeetingCancelled
@@ -205,6 +217,8 @@ export const denormColumnFor = (
 		case 'MeetingScheduled':
 		case 'MeetingRescheduled':
 			return isPast(event.startAt, now) ? 'last_meeting_at' : null
+		case 'StageChanged':
+			return null
 		case 'DocumentCreated':
 		case 'ProposalEvent':
 		case 'ResearchRunCompleted':
@@ -238,6 +252,7 @@ type TimelineKind =
 	| 'research_run'
 	| 'research_applied'
 	| 'system_event'
+	| 'stage_changed'
 	| 'meeting_scheduled'
 	| 'meeting_rescheduled'
 	| 'meeting_cancelled'
@@ -402,6 +417,19 @@ const rowBase = (event: TimelineEvent): TimelineRowBase => {
 				occurredAt: event.occurredAt,
 				summary: event.summary,
 				payload: event.payload,
+			}
+		case 'StageChanged':
+			return {
+				kind: 'stage_changed',
+				entityType: 'system',
+				companyId: event.companyId,
+				contactId: null,
+				channel: null,
+				direction: null,
+				actorUserId: event.actorUserId,
+				occurredAt: event.occurredAt,
+				summary: null,
+				payload: { from: event.from, to: event.to },
 			}
 		case 'MeetingScheduled':
 			return {
@@ -596,6 +624,9 @@ export const mapEventToInteraction = (
 				durationMin: event.durationMin,
 				metadata: null,
 			}
+		case 'StageChanged': {
+			return null
+		}
 		case 'DocumentCreated':
 		case 'ProposalEvent':
 		case 'ResearchRunCompleted':
@@ -638,6 +669,8 @@ const entityIdFor = (
 			return event.researchRunId
 		case 'SystemEvent':
 			return event.entityId
+		case 'StageChanged':
+			return event.companyId
 		case 'MeetingScheduled':
 		case 'MeetingRescheduled':
 		case 'MeetingCancelled':

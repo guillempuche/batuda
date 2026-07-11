@@ -84,6 +84,11 @@ msgstr "{0} missatges"
 msgid "{0} no longer allows password sign-in for mail apps, so it can't be connected here yet — it needs an OAuth sign-in. Pick another provider or use Generic IMAP."
 msgstr "{0} ja no permet iniciar la sessió amb contrasenya a les aplicacions de correu, així que de moment no es pot connectar aquí: necessita un inici de sessió OAuth. Tria un altre proveïdor o fes servir IMAP genèric."
 
+#. placeholder {0}: selection.selectedCount
+#: src/components/companies/pipeline-board.tsx
+msgid "{0} selected"
+msgstr "{0} seleccionats"
+
 #. placeholder {0}: progress.sourceCount
 #: src/components/research/run-progress.tsx
 msgid "{0} sources"
@@ -313,6 +318,18 @@ msgstr "Tots"
 msgid "All inboxes"
 msgstr "Totes les safates"
 
+#: src/routes/companies/index.tsx
+msgid "All industries"
+msgstr "Tots els sectors"
+
+#: src/routes/companies/index.tsx
+msgid "All owners"
+msgstr "Tots els responsables"
+
+#: src/routes/companies/index.tsx
+msgid "All regions"
+msgstr "Totes les regions"
+
 #: src/routes/pages/index.tsx
 msgid "All statuses"
 msgstr "Tots els estats"
@@ -344,6 +361,10 @@ msgstr "Un assistent d'IA vol connectar-se al teu compte de Batuda per MCP i act
 #: src/routes/settings/api-keys/index.tsx
 msgid "Any agent using \"{confirmLabel}\" will stop working. This can't be undone."
 msgstr "Qualsevol agent que faci servir \"{confirmLabel}\" deixarà de funcionar. Això no es pot desfer."
+
+#: src/routes/companies/index.tsx
+msgid "Any priority"
+msgstr "Qualsevol prioritat"
 
 #: src/routes/settings/api-keys/index.tsx
 #: src/routes/settings/profile/index.tsx
@@ -403,6 +424,10 @@ msgstr "Arxivat"
 #: src/components/shared/status-badge.tsx
 msgid "Archived — not pursuing"
 msgstr "Arxivat — no el continuo"
+
+#: src/components/companies/company-owner-control.tsx
+msgid "Assign to me"
+msgstr "Assigna-me'l"
 
 #: src/components/emails/attachment-picker.tsx
 msgid "Attach"
@@ -498,6 +523,11 @@ msgstr "Bloquejat"
 msgid "Blocked by the provider. The body is shown for review only."
 msgstr "Bloquejat pel proveïdor. El cos es mostra només per revisar-lo."
 
+#: src/routes/companies/board.tsx
+#: src/routes/companies/index.tsx
+msgid "Board"
+msgstr "Tauler"
+
 #: src/routes/calendar/index.tsx
 msgid "Book a meeting from a company page or forward an invitation to your inbox to see it here."
 msgstr "Reserva una reunió des d'una pàgina d'empresa o reenvia una invitació a la teva safata per veure-la aquí."
@@ -518,6 +548,10 @@ msgstr "Resum"
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Brief summary (optional)"
 msgstr "Resum breu (opcional)"
+
+#: src/components/companies/pipeline-board.tsx
+msgid "Bulk actions"
+msgstr "Accions massives"
 
 #: src/routes/emails/index.tsx
 msgid "Bulk thread actions"
@@ -647,6 +681,7 @@ msgstr "ChatGPT i Claude.ai no poden enviar una clau, així que es connecten amb
 msgid "Check that the session is valid or try again."
 msgstr "Comprova que la sessió sigui vàlida o torna-ho a provar."
 
+#: src/components/companies/pipeline-board.tsx
 #: src/routes/companies/index.tsx
 msgid "Check that your session is valid or try again."
 msgstr "Comprova que la teva sessió sigui vàlida o torna-ho a provar."
@@ -669,6 +704,7 @@ msgstr "Tria la bústia principal"
 msgid "Claude Desktop can't reach a remote server directly, so this bridges through <0>mcp-remote</0> (needs Node installed). Or add it as an OAuth connector instead."
 msgstr "Claude Desktop no es pot connectar directament a un servidor remot, així que això fa de pont amb <0>mcp-remote</0> (cal tenir Node instal·lat). O afegeix-lo com a connector OAuth."
 
+#: src/components/companies/pipeline-board.tsx
 #: src/components/shared/task-item.tsx
 #: src/routes/companies/$slug.tsx
 #: src/routes/emails/index.tsx
@@ -732,6 +768,10 @@ msgstr "Tancat — guanyat o perdut"
 #: src/routes/settings/mcp/index.tsx
 msgid "Coding tools (API key)"
 msgstr "Eines de programació (clau API)"
+
+#: src/routes/companies/index.tsx
+msgid "Cold"
+msgstr "Fred"
 
 #: src/components/shared/status-badge.tsx
 msgid "Cold lead — no contact yet"
@@ -869,6 +909,10 @@ msgstr "Descoberta de contactes"
 msgid "Contacted"
 msgstr "Contactat"
 
+#: src/routes/companies/$slug.tsx
+msgid "Contacted — set the next action (a follow-up date)."
+msgstr "Contactat — defineix la següent acció (una data de seguiment)."
+
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Contacts"
@@ -929,6 +973,10 @@ msgstr "No s'ha pogut aplicar el lot."
 msgid "Could not cancel the invitation to {email}. Please try again."
 msgstr "No s'ha pogut cancel·lar la invitació a {email}. Torna-ho a provar."
 
+#: src/components/companies/company-owner-control.tsx
+msgid "Could not change owner"
+msgstr "No s'ha pogut canviar el responsable"
+
 #: src/routes/companies/$slug.tsx
 msgid "Could not clear suppression"
 msgstr "No s'''ha pogut esborrar la supressió"
@@ -956,6 +1004,10 @@ msgstr "No s'han pogut carregar les empreses"
 #: src/routes/emails/inboxes.tsx
 msgid "Could not load inboxes"
 msgstr "No s'han pogut carregar les safates"
+
+#: src/components/companies/pipeline-board.tsx
+msgid "Could not load the board"
+msgstr "No s'ha pogut carregar el tauler"
 
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Could not load the review queue."
@@ -992,6 +1044,10 @@ msgstr "No s'ha pogut localitzar"
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Could not log the interaction. Please try again."
 msgstr "No s'ha pogut registrar la interacció. Torna-ho a provar."
+
+#: src/components/companies/pipeline-board.tsx
+msgid "Could not move the lead"
+msgstr "No s'ha pogut moure el lead"
 
 #: src/routes/pages/$id.tsx
 msgid "Could not publish the page. Please try again."
@@ -1373,10 +1429,19 @@ msgstr "Fetes 7d"
 msgid "Draft"
 msgstr "Esborrany"
 
+#. placeholder {0}: card.name
+#: src/components/companies/pipeline-board.tsx
+msgid "Drag {0}"
+msgstr "Arrossega {0}"
+
 #. placeholder {0}: o.name
 #: src/components/instructions/stack-picker.tsx
 msgid "Drag {0} to reorder"
 msgstr "Arrossega {0} per reordenar"
+
+#: src/routes/companies/board.tsx
+msgid "Drag a lead across stages, or use its Move menu."
+msgstr "Arrossega un lead entre etapes, o fes servir el seu menú Mou."
 
 #: src/components/shared/task-item.tsx
 #: src/routes/tasks/index.tsx
@@ -1496,6 +1561,10 @@ msgstr "Correus"
 #: src/routes/companies/$slug.tsx
 msgid "Emails, calls, documents, and proposals will appear here as they happen."
 msgstr "Els emails, trucades, documents i propostes apareixeran aquí a mesura que passin."
+
+#: src/components/companies/pipeline-board.tsx
+msgid "Empty"
+msgstr "Buit"
 
 #: src/components/research/findings/company-enrichment-view.tsx
 msgid "Enrichment"
@@ -1629,6 +1698,10 @@ msgstr "Peus de pàgina — {0}"
 msgid "Forgot password?"
 msgstr "Has oblidat la contrasenya?"
 
+#: src/components/companies/company-owner-control.tsx
+msgid "Former member"
+msgstr "Antic membre"
+
 #: src/routes/settings/organization/policy.tsx
 msgid "Free research work allowed for one run."
 msgstr "Treball de recerca gratuït permès per a una execució."
@@ -1714,6 +1787,10 @@ msgstr "Alta"
 #: src/routes/index.tsx
 msgid "High priority"
 msgstr "Prioritat alta"
+
+#: src/routes/companies/index.tsx
+msgid "Hot"
+msgstr "Calent"
 
 #: src/components/instructions/default-stack-editor.tsx
 msgid "How your default uses the org default"
@@ -1807,6 +1884,7 @@ msgstr "Safata actualitzada"
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/findings/prospect-scan-view.tsx
+#: src/routes/companies/index.tsx
 msgid "Industry"
 msgstr "Sector"
 
@@ -1941,6 +2019,24 @@ msgstr "Més tard"
 #: src/components/shared/channel-icon.tsx
 msgid "LinkedIn"
 msgstr "LinkedIn"
+
+#: src/routes/companies/board.tsx
+#: src/routes/companies/index.tsx
+msgid "List"
+msgstr "Llista"
+
+#. placeholder {0}: total - loaded
+#: src/components/companies/pipeline-board.tsx
+msgid "Load {0} more"
+msgstr "Carrega'n {0} més"
+
+#: src/routes/companies/index.tsx
+msgid "Load more"
+msgstr "Carrega'n més"
+
+#: src/routes/companies/board.tsx
+msgid "Loading board…"
+msgstr "S'està carregant el tauler…"
 
 #: src/routes/calendar/index.tsx
 msgid "Loading calendar…"
@@ -2089,6 +2185,7 @@ msgid "MCP connections"
 msgstr "Connexions MCP"
 
 #: src/routes/companies/$slug.tsx
+#: src/routes/companies/index.tsx
 msgid "Medium"
 msgstr "Mitjana"
 
@@ -2105,6 +2202,10 @@ msgstr "Reunió"
 #: src/components/shared/status-badge.tsx
 msgid "Meeting booked"
 msgstr "Reunió programada"
+
+#: src/routes/companies/$slug.tsx
+msgid "Meeting stage — set the next action (agenda, follow-up)."
+msgstr "Etapa de reunió — defineix la següent acció (agenda, seguiment)."
 
 #: src/routes/calendar/index.tsx
 msgid "Meetings from bookings, email invitations, and internal blocks."
@@ -2161,7 +2262,20 @@ msgstr "Confiança mínima per aplicar automàticament"
 msgid "Monthly paid cap"
 msgstr "Límit mensual de pagament"
 
+#: src/components/companies/pipeline-board.tsx
+msgid "Move"
+msgstr "Mou"
+
+#: src/components/companies/pipeline-board.tsx
+msgid "Move to…"
+msgstr "Mou a…"
+
+#: src/routes/companies/index.tsx
+msgid "My leads"
+msgstr "Els meus leads"
+
 #: src/components/instructions/template-editor-dialog.tsx
+#: src/routes/companies/index.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/api-keys/index.tsx
 msgid "Name"
@@ -2174,6 +2288,10 @@ msgstr "nom@empresa.com"
 #: src/components/emails/compose-form.tsx
 msgid "name@example.com, another@example.com"
 msgstr "nom@exemple.cat, altre@exemple.cat"
+
+#: src/routes/index.tsx
+msgid "Needs action"
+msgstr "Necessita acció"
 
 #: src/routes/index.tsx
 msgid "Needs attention"
@@ -2197,6 +2315,10 @@ msgstr "Mai"
 #: src/routes/settings/api-keys/index.tsx
 msgid "Never expires"
 msgstr "No caduca mai"
+
+#: src/routes/companies/$slug.tsx
+msgid "New client — set the next action (kick off onboarding)."
+msgstr "Client nou — defineix la següent acció (inicia l'onboarding)."
 
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/routes/settings/organization/templates.tsx
@@ -2658,6 +2780,8 @@ msgstr "Solapament"
 msgid "Overview"
 msgstr "Resum"
 
+#: src/components/companies/company-owner-control.tsx
+#: src/routes/companies/index.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Owner"
 msgstr "Propietari"
@@ -2840,6 +2964,10 @@ msgstr "Tria el teu proveïdor de correu"
 msgid "Pipeline"
 msgstr "Pipeline"
 
+#: src/routes/companies/board.tsx
+msgid "Pipeline board"
+msgstr "Tauler del pipeline"
+
 #: src/routes/emails/inboxes.tsx
 msgid "Plain"
 msgstr "Sense xifrar"
@@ -2878,6 +3006,8 @@ msgstr "Bústia principal establerta"
 msgid "Primary navigation"
 msgstr "Navegació principal"
 
+#: src/routes/companies/index.tsx
+#: src/routes/companies/index.tsx
 #: src/routes/tasks/index.tsx
 msgid "Priority"
 msgstr "Prioritat"
@@ -2916,6 +3046,10 @@ msgstr "Proposta rebutjada"
 #: src/components/shared/status-badge.tsx
 msgid "Proposal in review"
 msgstr "Proposta en revisió"
+
+#: src/routes/companies/$slug.tsx
+msgid "Proposal stage — set the next action (send it, chase a decision)."
+msgstr "Etapa de proposta — defineix la següent acció (envia-la, persegueix una decisió)."
 
 #: src/routes/companies/$slug.tsx
 msgid "Proposals, meeting notes and attachments will show up here."
@@ -3005,6 +3139,14 @@ msgstr "Canvis recents"
 msgid "Recent runs"
 msgstr "Execucions recents"
 
+#: src/routes/companies/index.tsx
+msgid "Recently contacted"
+msgstr "Contactats recentment"
+
+#: src/routes/companies/index.tsx
+msgid "Recently updated"
+msgstr "Actualitzats recentment"
+
 #: src/routes/companies/$slug.tsx
 msgid "Recipient marked as spam"
 msgstr "El destinatari ha marcat el missatge com a brossa"
@@ -3029,6 +3171,7 @@ msgstr "Actualitzant l'estat de la bústia…"
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/findings/prospect-scan-view.tsx
+#: src/routes/companies/index.tsx
 msgid "Region"
 msgstr "Regió"
 
@@ -3049,6 +3192,10 @@ msgstr "Rebutja {subjectLabel}"
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Rejected"
 msgstr "Rebutjat"
+
+#: src/components/companies/pipeline-board.tsx
+msgid "Release owner"
+msgstr "Allibera el responsable"
 
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/organization/members.tsx
@@ -3302,6 +3449,11 @@ msgstr "Cercant i raonant"
 msgid "See who can access this workspace, invite teammates, and manage pending invitations."
 msgstr "Veure qui té accés a aquest espai de treball, convida companys i gestiona les invitacions pendents."
 
+#. placeholder {0}: card.name
+#: src/components/companies/pipeline-board.tsx
+msgid "Select {0}"
+msgstr "Selecciona {0}"
+
 #: src/routes/emails/index.tsx
 msgid "Select all threads on this page"
 msgstr "Selecciona tots els fils d'aquesta pàgina"
@@ -3551,6 +3703,10 @@ msgstr "Alguna cosa ha anat malament. Torna a iniciar la connexió des del teu a
 msgid "Something went wrong. Try again."
 msgstr "Alguna cosa ha fallat. Prova-ho de nou."
 
+#: src/routes/companies/index.tsx
+msgid "Sort"
+msgstr "Ordena"
+
 #: src/components/companies/about-section.tsx
 #: src/routes/calendar/index.tsx
 #: src/routes/tasks/index.tsx
@@ -3587,6 +3743,10 @@ msgstr "Límits de despesa i la confiança necessària per aplicar automàticame
 #: src/routes/settings/organization/policy.tsx
 msgid "Spend ceilings for research and how confident a finding must be to apply on its own."
 msgstr "Límits de despesa per a la recerca i quina confiança ha de tenir una conclusió per aplicar-se sola."
+
+#: src/routes/companies/$slug.tsx
+msgid "Stage changed"
+msgstr "Etapa canviada"
 
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Stamped into the workshop ledger."
@@ -3666,6 +3826,11 @@ msgstr "Resum"
 #: src/components/layout/org-switcher.tsx
 msgid "Switch organization"
 msgstr "Canvia d'organització"
+
+#: src/routes/companies/board.tsx
+#: src/routes/companies/index.tsx
+msgid "Switch view"
+msgstr "Canvia de vista"
 
 #: src/components/shared/channel-icon.tsx
 msgid "System"
@@ -3856,6 +4021,10 @@ msgstr "Aquestes plantilles configuren cada execució, en ordre, llevat que en t
 msgid "They replied — keep the thread warm"
 msgstr "Ha respost — manté el fil calent"
 
+#: src/routes/companies/$slug.tsx
+msgid "They responded — set the next action to keep it warm."
+msgstr "Han respost — defineix la següent acció per mantenir-ho actiu."
+
 #: src/routes/settings/mcp/connections.tsx
 msgid "This connection is unbound. Bind an org to use it."
 msgstr "Aquesta connexió no està vinculada. Vincula una organització per fer-la servir."
@@ -3960,6 +4129,15 @@ msgstr "Escriu i prem Retorn"
 #: src/routes/forgot-password.tsx
 msgid "Type the email you sign in with. We'll send a reset link."
 msgstr "Escriu el correu amb què inicies sessió. T'enviaré un enllaç per restablir-la."
+
+#: src/components/companies/company-owner-control.tsx
+msgid "Unassign"
+msgstr "Desassigna"
+
+#: src/components/companies/company-owner-control.tsx
+#: src/routes/companies/index.tsx
+msgid "Unassigned"
+msgstr "Sense assignar"
 
 #: src/components/research/trust-badge.tsx
 msgid "Undeliverable"

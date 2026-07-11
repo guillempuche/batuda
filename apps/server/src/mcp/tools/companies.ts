@@ -9,7 +9,9 @@ import {
 	geocodeCompany,
 	updateCompanyRegeocoding,
 } from '../../services/company-geocoding'
+import { recordStageChange } from '../../services/company-stage-change'
 import { Geocoder } from '../../services/geocoder'
+import { TimelineActivityService } from '../../services/timeline-activity'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg]
 
@@ -158,6 +160,7 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 		// needs the SqlClient; resolve it here (like research-sink) and provide
 		// it to the update path, keeping CurrentOrg as the only request service.
 		const sql = yield* SqlClient.SqlClient
+		const timeline = yield* TimelineActivityService
 		return {
 			search_companies: params =>
 				Effect.gen(function* () {
@@ -186,12 +189,31 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 					return rows[0]
 				}).pipe(Effect.orDie),
 			update_company: ({ id, ...fields }) =>
-				updateCompanyRegeocoding(id, fields).pipe(
-					Effect.provideService(CompanyService, service),
-					Effect.provideService(Geocoder, geocoder),
-					Effect.provideService(SqlClient.SqlClient, sql),
-					Effect.orDie,
-				),
+				Effect.gen(function* () {
+					// Capture the stage before the write so an agent-driven change
+					// is recorded on the timeline too (actor unknown → null).
+					const before =
+						fields.status === undefined
+							? null
+							: yield* service.findById(id).pipe(
+									Effect.map(row =>
+										typeof row['status'] === 'string' ? row['status'] : null,
+									),
+									Effect.catch(() => Effect.succeed(null)),
+								)
+					const result = yield* updateCompanyRegeocoding(id, fields).pipe(
+						Effect.provideService(CompanyService, service),
+						Effect.provideService(Geocoder, geocoder),
+						Effect.provideService(SqlClient.SqlClient, sql),
+					)
+					yield* recordStageChange({
+						companyId: id,
+						from: before,
+						to: fields.status,
+						actorUserId: null,
+					}).pipe(Effect.provideService(TimelineActivityService, timeline))
+					return result
+				}).pipe(Effect.orDie),
 			geocode_company: ({ id }) =>
 				geocodeCompany(id).pipe(
 					Effect.provideService(CompanyService, service),

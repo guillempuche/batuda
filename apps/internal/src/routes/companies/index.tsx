@@ -3,14 +3,22 @@ import { useLingui } from '@lingui/react/macro'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
-import { Search, X } from 'lucide-react'
+import {
+	Check,
+	ChevronsUpDown,
+	Columns3,
+	LayoutGrid,
+	Search,
+	X,
+} from 'lucide-react'
 import { LayoutGroup, motion } from 'motion/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
-import { PriButton, PriInput } from '@batuda/ui/pri'
+import { PriButton, PriInput, PriSelect } from '@batuda/ui/pri'
 
 import {
+	COMPANIES_PAGE_SIZE,
 	type CompaniesSearch,
 	canonicalSearchKey,
 	companiesSearchAtom,
@@ -21,10 +29,12 @@ import { KpiCounter } from '#/components/shared/kpi-counter'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import {
 	type CompanyStatus,
+	STATUS_ORDER,
 	StatusBadge,
 } from '#/components/shared/status-badge'
 import { useQuickCapture } from '#/context/quick-capture-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
+import { useOrgMembers } from '#/lib/org-members'
 import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import {
@@ -48,6 +58,7 @@ type CompanyRow = {
 	readonly region: string | null
 	readonly priority: number | null
 	readonly lastContactedAt: string | null
+	readonly ownerId: string | null
 }
 
 /**
@@ -65,6 +76,8 @@ const validateSearch = validateSearchWith({
 	region: Schema.NonEmptyString,
 	industry: Schema.NonEmptyString,
 	priority: Schema.Union([Schema.Number, Schema.NumberFromString]),
+	owner: Schema.NonEmptyString,
+	sort: Schema.NonEmptyString,
 	query: Schema.NonEmptyString,
 })
 
@@ -84,7 +97,9 @@ async function loadCompaniesOnServer(
 	])
 	const program = Effect.gen(function* () {
 		const client = yield* makeBatudaApiServer(cookie ?? undefined)
-		return yield* client.companies.list({ query: search })
+		return yield* client.companies.list({
+			query: { ...search, limit: COMPANIES_PAGE_SIZE },
+		})
 	})
 	const companies = await Effect.runPromise(program)
 	return { companies }
@@ -105,7 +120,7 @@ export const Route = createFileRoute('/companies/')({
 			return {
 				dehydrated: [
 					dehydrateAtom(
-						companiesSearchAtom(search),
+						companiesSearchAtom(search, COMPANIES_PAGE_SIZE),
 						AsyncResult.success(companies),
 					),
 				] as const,
@@ -126,33 +141,39 @@ export const Route = createFileRoute('/companies/')({
  */
 const SEARCH_DEBOUNCE_MS = 300
 
-/**
- * Status pill order on the filter bar. Matches the enum order in
- * `packages/domain/src/schema/companies.ts` and the dashboard's
- * `STATUS_ORDER`.
- */
-const STATUS_ORDER: ReadonlyArray<CompanyStatus> = [
-	'prospect',
-	'contacted',
-	'responded',
-	'meeting',
-	'proposal',
-	'client',
-	'closed',
-	'dead',
-]
+const ALL = '__all__'
+
+function isNonEmpty(value: string | null): value is string {
+	return value !== null && value !== ''
+}
+
+/** Strip `status` from the search when linking to the board — its columns are
+ * the statuses, so a status filter there makes no sense. */
+function boardSearch(search: CompaniesSearch): CompaniesSearch {
+	const { status: _status, ...rest } = search
+	return rest
+}
 
 function CompaniesListPage() {
 	const { t } = useLingui()
 	const search = Route.useSearch()
 	const navigate = useNavigate({ from: Route.fullPath })
 	const { open: openQuickCapture } = useQuickCapture()
+	const { members, meUserId } = useOrgMembers()
 
-	// The atom identity depends on the search's canonical key, not its
-	// object reference — so memo on the key to avoid re-subscribing the
-	// registry just because TanStack Router re-created the search object.
+	// "Load more" grows the fetched window; reset it whenever the filters change.
 	const searchKey = canonicalSearchKey(search)
-	const atom = useMemo(() => companiesSearchAtom(search), [searchKey])
+	const [visibleLimit, setVisibleLimit] = useState(COMPANIES_PAGE_SIZE)
+	useEffect(() => {
+		setVisibleLimit(COMPANIES_PAGE_SIZE)
+	}, [searchKey])
+
+	const atom = useMemo(
+		() => companiesSearchAtom(search, visibleLimit),
+		// searchKey + visibleLimit fully identify the atom; `search` is unstable.
+		// biome-ignore lint/correctness/useExhaustiveDependencies: keyed by searchKey
+		[searchKey, visibleLimit],
+	)
 	const result = useAtomValue(atom)
 
 	const companies = useMemo<ReadonlyArray<CompanyRow>>(
@@ -161,22 +182,14 @@ function CompaniesListPage() {
 	)
 	const isLoading = AsyncResult.isInitial(result)
 	const isFailure = AsyncResult.isFailure(result)
+	// A full window came back, so there is probably another page to load.
+	const hasMore = companies.length >= visibleLimit
 
 	// ── Search input (debounced URL write) ──────────────────────
 	const [searchInput, setSearchInput] = useState(search.query ?? '')
-
-	// Sync the controlled input back to URL state when the URL changes
-	// out-of-band (back button, link click, etc).
 	useEffect(() => {
 		setSearchInput(search.query ?? '')
 	}, [search.query])
-
-	// Push the debounced input to the URL. Only navigates when the value
-	// actually differs from what's already in the URL, otherwise we'd
-	// loop through the URL-sync effect above. Uses `replace: true` so a
-	// typing session collapses into a single history entry — the back
-	// button escapes the whole search, not one keystroke at a time.
-	// Status pills and Clear still push (deliberate filter choices).
 	useEffect(() => {
 		const current = search.query ?? ''
 		if (searchInput === current) return
@@ -193,16 +206,21 @@ function CompaniesListPage() {
 	}, [searchInput, search.query, navigate])
 
 	// ── Filter handlers ─────────────────────────────────────────
-	const handleStatusFilter = useCallback(
-		(status: CompanyStatus | undefined) => {
+	const applyPatch = useCallback(
+		(patch: Parameters<typeof mergeSearch>[1]) => {
 			void navigate({
 				to: '/companies',
-				search: prev => mergeSearch(prev, { status }),
+				search: prev => mergeSearch(prev, patch),
 			})
 		},
 		[navigate],
 	)
-
+	const handleStatusFilter = useCallback(
+		(status: CompanyStatus | undefined) => {
+			applyPatch({ status })
+		},
+		[applyPatch],
+	)
 	const handleClearFilters = useCallback(() => {
 		setSearchInput('')
 		void navigate({ to: '/companies', search: {} })
@@ -211,27 +229,21 @@ function CompaniesListPage() {
 	// ── Row actions ─────────────────────────────────────────────
 	const handleLogInteraction = useCallback(
 		(company: CompanyRow) => {
-			openQuickCapture({
-				companyId: company.id,
-				companyName: company.name,
-			})
+			openQuickCapture({ companyId: company.id, companyName: company.name })
 		},
 		[openQuickCapture],
 	)
 
-	// Client-side sort: priority ASC (1 first, then 2, 3, null), then
-	// last-contacted DESC within priority buckets so recently-touched
-	// companies surface first.
-	const sorted = useMemo(
+	// Region + industry options are the distinct values present in the loaded
+	// companies — international, never a hardcoded Spanish vocabulary. Priority
+	// and sort are fixed, geography-neutral sets.
+	const regionOptions = useMemo(
+		() => [...new Set(companies.map(c => c.region).filter(isNonEmpty))].sort(),
+		[companies],
+	)
+	const industryOptions = useMemo(
 		() =>
-			[...companies].sort((a, b) => {
-				const pa = a.priority ?? Number.POSITIVE_INFINITY
-				const pb = b.priority ?? Number.POSITIVE_INFINITY
-				if (pa !== pb) return pa - pb
-				const la = a.lastContactedAt ? Date.parse(a.lastContactedAt) : 0
-				const lb = b.lastContactedAt ? Date.parse(b.lastContactedAt) : 0
-				return lb - la
-			}),
+			[...new Set(companies.map(c => c.industry).filter(isNonEmpty))].sort(),
 		[companies],
 	)
 
@@ -241,6 +253,35 @@ function CompaniesListPage() {
 		: companies.length === 1
 			? t`1 company`
 			: t`${companies.length} companies`
+
+	const regionItems = [
+		{ value: ALL, label: t`All regions` },
+		...regionOptions.map(r => ({ value: r, label: r })),
+	]
+	const industryItems = [
+		{ value: ALL, label: t`All industries` },
+		...industryOptions.map(r => ({ value: r, label: r })),
+	]
+	const priorityItems = [
+		{ value: ALL, label: t`Any priority` },
+		{ value: '1', label: t`Hot` },
+		{ value: '2', label: t`Medium` },
+		{ value: '3', label: t`Cold` },
+	]
+	const ownerItems = [
+		{ value: ALL, label: t`All owners` },
+		...(meUserId ? [{ value: meUserId, label: t`My leads` }] : []),
+		{ value: 'none', label: t`Unassigned` },
+		...members
+			.filter(m => m.userId !== meUserId)
+			.map(m => ({ value: m.userId, label: m.name })),
+	]
+	const sortItems = [
+		{ value: 'priority', label: t`Priority` },
+		{ value: 'name', label: t`Name` },
+		{ value: 'recent_contact', label: t`Recently contacted` },
+		{ value: 'recent_update', label: t`Recently updated` },
+	]
 
 	return (
 		<Page>
@@ -253,20 +294,40 @@ function CompaniesListPage() {
 			</Intro>
 
 			<Filters role='group' aria-label={t`Filter companies`}>
-				<SearchWrap>
-					<SearchIcon>
-						<Search size={16} aria-hidden />
-					</SearchIcon>
-					<PriInput
-						type='search'
-						placeholder={t`Search by name, industry, or location…`}
-						value={searchInput}
-						onChange={event => setSearchInput(event.target.value)}
-						aria-label={t`Search companies`}
-						style={{ paddingLeft: 'calc(var(--space-sm) * 2 + 16px)' }}
-						data-testid='companies-search'
-					/>
-				</SearchWrap>
+				<TopRow>
+					<SearchWrap>
+						<SearchIcon>
+							<Search size={16} aria-hidden />
+						</SearchIcon>
+						<PriInput
+							type='search'
+							placeholder={t`Search by name, industry, or location…`}
+							value={searchInput}
+							onChange={event => setSearchInput(event.target.value)}
+							aria-label={t`Search companies`}
+							style={{ paddingLeft: 'calc(var(--space-sm) * 2 + 16px)' }}
+							data-testid='companies-search'
+						/>
+					</SearchWrap>
+					<ViewToggle role='group' aria-label={t`Switch view`}>
+						<ViewLink
+							$active
+							href='/companies'
+							data-testid='companies-view-list'
+							aria-current='page'
+						>
+							<LayoutGrid size={14} aria-hidden />
+							<span>{t`List`}</span>
+						</ViewLink>
+						<ViewLink
+							href={boardHref(boardSearch(search))}
+							data-testid='companies-view-board'
+						>
+							<Columns3 size={14} aria-hidden />
+							<span>{t`Board`}</span>
+						</ViewLink>
+					</ViewToggle>
+				</TopRow>
 
 				<StatusFilters role='group' aria-label={t`Filter by status`}>
 					<StatusFilterButton
@@ -295,17 +356,58 @@ function CompaniesListPage() {
 					))}
 				</StatusFilters>
 
-				{activeFilters && (
-					<PriButton
-						type='button'
-						$variant='outlined'
-						onClick={handleClearFilters}
-						data-testid='companies-clear-filters'
-					>
-						<X size={14} aria-hidden />
-						<span>{t`Clear filters`}</span>
-					</PriButton>
-				)}
+				<DropdownRow>
+					<FilterSelect
+						label={t`Region`}
+						value={search.region ?? ALL}
+						options={regionItems}
+						onChange={v => applyPatch({ region: v === ALL ? undefined : v })}
+						testId='companies-filter-region'
+					/>
+					<FilterSelect
+						label={t`Industry`}
+						value={search.industry ?? ALL}
+						options={industryItems}
+						onChange={v => applyPatch({ industry: v === ALL ? undefined : v })}
+						testId='companies-filter-industry'
+					/>
+					<FilterSelect
+						label={t`Priority`}
+						value={
+							search.priority !== undefined ? String(search.priority) : ALL
+						}
+						options={priorityItems}
+						onChange={v =>
+							applyPatch({ priority: v === ALL ? undefined : Number(v) })
+						}
+						testId='companies-filter-priority'
+					/>
+					<FilterSelect
+						label={t`Owner`}
+						value={search.owner ?? ALL}
+						options={ownerItems}
+						onChange={v => applyPatch({ owner: v === ALL ? undefined : v })}
+						testId='companies-filter-owner'
+					/>
+					<FilterSelect
+						label={t`Sort`}
+						value={search.sort ?? 'priority'}
+						options={sortItems}
+						onChange={v => applyPatch({ sort: v })}
+						testId='companies-filter-sort'
+					/>
+					{activeFilters && (
+						<PriButton
+							type='button'
+							$variant='outlined'
+							onClick={handleClearFilters}
+							data-testid='companies-clear-filters'
+						>
+							<X size={14} aria-hidden />
+							<span>{t`Clear filters`}</span>
+						</PriButton>
+					)}
+				</DropdownRow>
 			</Filters>
 
 			{isLoading ? (
@@ -315,7 +417,7 @@ function CompaniesListPage() {
 					title={t`Could not load companies`}
 					description={t`Check that your session is valid or try again.`}
 				/>
-			) : sorted.length === 0 ? (
+			) : companies.length === 0 ? (
 				<EmptyState
 					title={
 						activeFilters
@@ -340,30 +442,107 @@ function CompaniesListPage() {
 						: {})}
 				/>
 			) : (
-				<LayoutGroup>
-					<Grid layout>
-						{sorted.map(company => (
-							<CompanyCard
-								key={company.id}
-								company={{
-									slug: company.slug,
-									name: company.name,
-									status: company.status,
-									industry: company.industry,
-									location: company.location,
-									region: company.region,
-									priority: company.priority,
-									lastContactedAt: company.lastContactedAt,
-								}}
-								actions={{
-									onLogInteraction: () => handleLogInteraction(company),
-								}}
-							/>
-						))}
-					</Grid>
-				</LayoutGroup>
+				<>
+					<LayoutGroup>
+						<Grid layout>
+							{companies.map(company => (
+								<CompanyCard
+									key={company.id}
+									company={{
+										slug: company.slug,
+										name: company.name,
+										status: company.status,
+										industry: company.industry,
+										location: company.location,
+										region: company.region,
+										priority: company.priority,
+										lastContactedAt: company.lastContactedAt,
+									}}
+									actions={{
+										onLogInteraction: () => handleLogInteraction(company),
+									}}
+								/>
+							))}
+						</Grid>
+					</LayoutGroup>
+					{hasMore && (
+						<LoadMoreWrap>
+							<PriButton
+								type='button'
+								$variant='outlined'
+								onClick={() => setVisibleLimit(l => l + COMPANIES_PAGE_SIZE)}
+								data-testid='companies-load-more'
+							>
+								<span>{t`Load more`}</span>
+							</PriButton>
+						</LoadMoreWrap>
+					)}
+				</>
 			)}
 		</Page>
+	)
+}
+
+/** Build the /companies/board URL, carrying the shared filters as query params. */
+function boardHref(search: CompaniesSearch): string {
+	const params = new URLSearchParams()
+	if (search.region) params.set('region', search.region)
+	if (search.industry) params.set('industry', search.industry)
+	if (search.priority !== undefined)
+		params.set('priority', String(search.priority))
+	if (search.owner) params.set('owner', search.owner)
+	if (search.sort) params.set('sort', search.sort)
+	if (search.query) params.set('query', search.query)
+	const qs = params.toString()
+	return qs ? `/companies/board?${qs}` : '/companies/board'
+}
+
+function FilterSelect({
+	label,
+	value,
+	options,
+	onChange,
+	testId,
+}: {
+	readonly label: string
+	readonly value: string
+	readonly options: ReadonlyArray<{ value: string; label: string }>
+	readonly onChange: (value: string) => void
+	readonly testId: string
+}) {
+	return (
+		<PriSelect.Root
+			items={options}
+			value={value}
+			onValueChange={v => {
+				if (typeof v === 'string') onChange(v)
+			}}
+		>
+			<PriSelect.Trigger data-testid={testId} aria-label={label}>
+				<PriSelect.Value />
+				<PriSelect.Icon>
+					<ChevronsUpDown size={14} aria-hidden />
+				</PriSelect.Icon>
+			</PriSelect.Trigger>
+			<PriSelect.Portal>
+				<PriSelect.Positioner sideOffset={6}>
+					<PriSelect.Popup>
+						{options.map(opt => (
+							<PriSelect.Item
+								key={opt.value}
+								value={opt.value}
+								data-testid={`${testId}-option-${opt.value}`}
+							>
+								<PriSelect.ItemIndicator>
+									<Check size={12} aria-hidden />
+								</PriSelect.ItemIndicator>
+								<PriSelect.ItemText>{opt.label}</PriSelect.ItemText>
+							</PriSelect.Item>
+						))}
+					</PriSelect.Popup>
+				</PriSelect.Positioner>
+			</PriSelect.Portal>
+		</PriSelect.Root>
 	)
 }
 
@@ -383,6 +562,8 @@ function mergeSearch(
 		region: string | undefined
 		industry: string | undefined
 		priority: number | undefined
+		owner: string | undefined
+		sort: string | undefined
 		query: string | undefined
 	}>,
 ): CompaniesSearch {
@@ -391,6 +572,8 @@ function mergeSearch(
 		region?: string
 		industry?: string
 		priority?: number
+		owner?: string
+		sort?: string
 		query?: string
 	} = {}
 
@@ -409,6 +592,12 @@ function mergeSearch(
 	const query = 'query' in next ? next.query : prev.query
 	if (query !== undefined && query !== '') result.query = query
 
+	const owner = 'owner' in next ? next.owner : prev.owner
+	if (owner !== undefined && owner !== '') result.owner = owner
+
+	const sort = 'sort' in next ? next.sort : prev.sort
+	if (sort !== undefined && sort !== '') result.sort = sort
+
 	return result
 }
 
@@ -418,6 +607,7 @@ function hasActiveFilters(search: CompaniesSearch): boolean {
 		search.region !== undefined ||
 		search.industry !== undefined ||
 		search.priority !== undefined ||
+		search.owner !== undefined ||
 		search.query !== undefined
 	)
 }
@@ -444,6 +634,7 @@ function narrowCompanies(
 			priority: typeof r['priority'] === 'number' ? r['priority'] : null,
 			lastContactedAt:
 				typeof r['lastContactedAt'] === 'string' ? r['lastContactedAt'] : null,
+			ownerId: typeof r['ownerId'] === 'string' ? r['ownerId'] : null,
 		})
 	}
 	return out
@@ -608,4 +799,78 @@ const Grid = styled(motion.div).withConfig({
 	& > :nth-child(3n + 3) {
 		--card-rotate: -0.15deg;
 	}
+`
+
+const TopRow = styled.div.withConfig({ displayName: 'CompaniesListTopRow' })`
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-sm);
+
+	@media (min-width: 640px) {
+		flex-wrap: nowrap;
+	}
+
+	& > :first-child {
+		flex: 1 1 12rem;
+	}
+`
+
+const ViewToggle = styled.div.withConfig({
+	displayName: 'CompaniesListViewToggle',
+})`
+	display: inline-flex;
+	align-items: stretch;
+	border: 2px solid var(--color-outline);
+	border-radius: var(--shape-2xs);
+	overflow: hidden;
+	flex-shrink: 0;
+`
+
+const ViewLink = styled.a.withConfig({
+	displayName: 'CompaniesListViewLink',
+	shouldForwardProp: prop => prop !== '$active',
+})<{ $active?: boolean }>`
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2xs);
+	padding: var(--space-2xs) var(--space-sm);
+	font-family: var(--font-display);
+	font-size: var(--typescale-label-small-size);
+	font-weight: var(--font-weight-bold);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	text-decoration: none;
+	background: ${p => (p.$active ? 'var(--color-primary)' : 'transparent')};
+	color: ${p => (p.$active ? 'var(--color-on-primary)' : 'var(--color-on-surface)')};
+
+	& + & {
+		border-left: 2px solid var(--color-outline);
+	}
+
+	&:hover {
+		color: ${p => (p.$active ? 'var(--color-on-primary)' : 'var(--color-primary)')};
+	}
+
+	&:focus-visible {
+		outline: none;
+		box-shadow: var(--glow-active);
+	}
+`
+
+const DropdownRow = styled.div.withConfig({
+	displayName: 'CompaniesListDropdownRow',
+})`
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-2xs);
+`
+
+const LoadMoreWrap = styled.div.withConfig({
+	displayName: 'CompaniesListLoadMore',
+})`
+	display: flex;
+	justify-content: center;
+	padding: var(--space-md) 0;
 `

@@ -12,6 +12,8 @@ export type CompaniesSearch = {
 	readonly region?: string
 	readonly industry?: string
 	readonly priority?: number
+	readonly owner?: string
+	readonly sort?: string
 	readonly query?: string
 }
 
@@ -29,8 +31,18 @@ export type CompaniesSearch = {
  */
 const cache = new Map<string, ReturnType<typeof makeCompaniesSearchAtom>>()
 
-function makeCompaniesSearchAtom(search: CompaniesSearch) {
-	return BatudaApiAtom.query('companies', 'list', { query: search })
+/**
+ * Page size for the list + board "load more": the initial window and the number
+ * of rows each "load more" adds. The growing window is part of the atom cache
+ * key (see below), so each step fetches its own cached result and hydrates on
+ * SSR for the first page.
+ */
+export const COMPANIES_PAGE_SIZE = 60
+
+function makeCompaniesSearchAtom(search: CompaniesSearch, limit: number) {
+	return BatudaApiAtom.query('companies', 'list', {
+		query: { ...search, limit },
+	})
 }
 
 /**
@@ -41,11 +53,16 @@ function makeCompaniesSearchAtom(search: CompaniesSearch) {
  * Because both sides hit the same cache with the same canonical key,
  * hydration actually lands on the atom the component will observe.
  */
-export function companiesSearchAtom(search: CompaniesSearch) {
-	const key = canonicalSearchKey(search)
+export function companiesSearchAtom(
+	search: CompaniesSearch,
+	limit: number = COMPANIES_PAGE_SIZE,
+) {
+	// The visible window is part of the identity so "load more" (a larger limit)
+	// resolves to its own cached atom instead of mutating the current one.
+	const key = `${canonicalSearchKey(search)}::${limit}`
 	const existing = cache.get(key)
 	if (existing !== undefined) return existing
-	const atom = makeCompaniesSearchAtom(search)
+	const atom = makeCompaniesSearchAtom(search, limit)
 	cache.set(key, atom)
 	return atom
 }
@@ -72,6 +89,12 @@ export function canonicalSearchKey(search: CompaniesSearch): string {
 	}
 	if (search.priority !== undefined) {
 		entries.push(['priority', search.priority])
+	}
+	if (search.owner !== undefined && search.owner !== '') {
+		entries.push(['owner', search.owner])
+	}
+	if (search.sort !== undefined && search.sort !== '') {
+		entries.push(['sort', search.sort])
 	}
 	if (search.query !== undefined && search.query !== '') {
 		entries.push(['query', search.query])

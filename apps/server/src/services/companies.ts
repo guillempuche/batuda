@@ -10,6 +10,10 @@ export interface CompanyFilters {
 	readonly industry?: string | undefined
 	readonly priority?: number | undefined
 	readonly productFit?: string | undefined
+	// Owner id to match, or the literal 'none' to match only unassigned companies.
+	readonly owner?: string | undefined
+	// One of the whitelisted sort keys below; anything else falls back to priority.
+	readonly sort?: string | undefined
 	readonly query?: string | undefined
 	// Bounding box on the geocoded coordinates. Each bound is applied
 	// independently, so a partial box (e.g. only a southern edge) still narrows.
@@ -40,6 +44,10 @@ export class CompanyService extends ServiceMap.Service<CompanyService>()(
 							conditions.push(sql`industry = ${filters.industry}`)
 						if (filters.priority)
 							conditions.push(sql`priority = ${filters.priority}`)
+						// 'none' narrows to unassigned leads; any other value matches one owner.
+						if (filters.owner === 'none') conditions.push(sql`owner_id IS NULL`)
+						else if (filters.owner)
+							conditions.push(sql`owner_id = ${filters.owner}`)
 						if (filters.query)
 							conditions.push(sql`name ILIKE ${`%${filters.query}%`}`)
 						if (filters.minLat !== undefined)
@@ -51,15 +59,30 @@ export class CompanyService extends ServiceMap.Service<CompanyService>()(
 						if (filters.maxLng !== undefined)
 							conditions.push(sql`longitude <= ${filters.maxLng}`)
 
+						// Whitelisted sort key → a fixed ORDER BY fragment; never
+						// interpolate raw sort text into the query.
+						const orderBy = ((): Statement.Fragment => {
+							switch (filters.sort) {
+								case 'name':
+									return sql`name ASC`
+								case 'recent_contact':
+									return sql`last_contacted_at DESC NULLS LAST`
+								case 'recent_update':
+									return sql`updated_at DESC`
+								default:
+									return sql`priority, updated_at DESC`
+							}
+						})()
+
 						return yield* sql`
-							SELECT id, slug, name, status, industry, region, priority,
+							SELECT id, slug, name, status, industry, region, priority, owner_id,
 								next_action, next_action_at, last_contacted_at, tags,
 								-- NUMERIC comes back as a string over the wire; cast so
 								-- callers get real numbers for the coordinates.
 								latitude::float8 AS latitude, longitude::float8 AS longitude
 							FROM companies
 							WHERE ${sql.and(conditions)}
-							ORDER BY priority, updated_at DESC
+							ORDER BY ${orderBy}
 							LIMIT ${filters.limit ?? 20} OFFSET ${filters.offset ?? 0}
 						`
 					}),

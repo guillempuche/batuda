@@ -84,6 +84,11 @@ msgstr "{0} msgs"
 msgid "{0} no longer allows password sign-in for mail apps, so it can't be connected here yet — it needs an OAuth sign-in. Pick another provider or use Generic IMAP."
 msgstr "{0} no longer allows password sign-in for mail apps, so it can't be connected here yet — it needs an OAuth sign-in. Pick another provider or use Generic IMAP."
 
+#. placeholder {0}: selection.selectedCount
+#: src/components/companies/pipeline-board.tsx
+msgid "{0} selected"
+msgstr "{0} selected"
+
 #. placeholder {0}: progress.sourceCount
 #: src/components/research/run-progress.tsx
 msgid "{0} sources"
@@ -313,6 +318,18 @@ msgstr "All"
 msgid "All inboxes"
 msgstr "All inboxes"
 
+#: src/routes/companies/index.tsx
+msgid "All industries"
+msgstr "All industries"
+
+#: src/routes/companies/index.tsx
+msgid "All owners"
+msgstr "All owners"
+
+#: src/routes/companies/index.tsx
+msgid "All regions"
+msgstr "All regions"
+
 #: src/routes/pages/index.tsx
 msgid "All statuses"
 msgstr "All statuses"
@@ -344,6 +361,10 @@ msgstr "An AI assistant wants to connect to your Batuda account over MCP and act
 #: src/routes/settings/api-keys/index.tsx
 msgid "Any agent using \"{confirmLabel}\" will stop working. This can't be undone."
 msgstr "Any agent using \"{confirmLabel}\" will stop working. This can't be undone."
+
+#: src/routes/companies/index.tsx
+msgid "Any priority"
+msgstr "Any priority"
 
 #: src/routes/settings/api-keys/index.tsx
 #: src/routes/settings/profile/index.tsx
@@ -403,6 +424,10 @@ msgstr "Archived"
 #: src/components/shared/status-badge.tsx
 msgid "Archived — not pursuing"
 msgstr "Archived — not pursuing"
+
+#: src/components/companies/company-owner-control.tsx
+msgid "Assign to me"
+msgstr "Assign to me"
 
 #: src/components/emails/attachment-picker.tsx
 msgid "Attach"
@@ -498,6 +523,11 @@ msgstr "Blocked"
 msgid "Blocked by the provider. The body is shown for review only."
 msgstr "Blocked by the provider. The body is shown for review only."
 
+#: src/routes/companies/board.tsx
+#: src/routes/companies/index.tsx
+msgid "Board"
+msgstr "Board"
+
 #: src/routes/calendar/index.tsx
 msgid "Book a meeting from a company page or forward an invitation to your inbox to see it here."
 msgstr "Book a meeting from a company page or forward an invitation to your inbox to see it here."
@@ -518,6 +548,10 @@ msgstr "Brief"
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Brief summary (optional)"
 msgstr "Brief summary (optional)"
+
+#: src/components/companies/pipeline-board.tsx
+msgid "Bulk actions"
+msgstr "Bulk actions"
 
 #: src/routes/emails/index.tsx
 msgid "Bulk thread actions"
@@ -647,6 +681,7 @@ msgstr "ChatGPT and Claude.ai can't send a key, so they connect over OAuth. Add 
 msgid "Check that the session is valid or try again."
 msgstr "Check that the session is valid or try again."
 
+#: src/components/companies/pipeline-board.tsx
 #: src/routes/companies/index.tsx
 msgid "Check that your session is valid or try again."
 msgstr "Check that your session is valid or try again."
@@ -669,6 +704,7 @@ msgstr "Choose primary inbox"
 msgid "Claude Desktop can't reach a remote server directly, so this bridges through <0>mcp-remote</0> (needs Node installed). Or add it as an OAuth connector instead."
 msgstr "Claude Desktop can't reach a remote server directly, so this bridges through <0>mcp-remote</0> (needs Node installed). Or add it as an OAuth connector instead."
 
+#: src/components/companies/pipeline-board.tsx
 #: src/components/shared/task-item.tsx
 #: src/routes/companies/$slug.tsx
 #: src/routes/emails/index.tsx
@@ -732,6 +768,10 @@ msgstr "Closed — won or lost"
 #: src/routes/settings/mcp/index.tsx
 msgid "Coding tools (API key)"
 msgstr "Coding tools (API key)"
+
+#: src/routes/companies/index.tsx
+msgid "Cold"
+msgstr "Cold"
 
 #: src/components/shared/status-badge.tsx
 msgid "Cold lead — no contact yet"
@@ -869,6 +909,10 @@ msgstr "Contact discovery"
 msgid "Contacted"
 msgstr "Contacted"
 
+#: src/routes/companies/$slug.tsx
+msgid "Contacted — set the next action (a follow-up date)."
+msgstr "Contacted — set the next action (a follow-up date)."
+
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Contacts"
@@ -929,6 +973,10 @@ msgstr "Could not apply the batch."
 msgid "Could not cancel the invitation to {email}. Please try again."
 msgstr "Could not cancel the invitation to {email}. Please try again."
 
+#: src/components/companies/company-owner-control.tsx
+msgid "Could not change owner"
+msgstr "Could not change owner"
+
 #: src/routes/companies/$slug.tsx
 msgid "Could not clear suppression"
 msgstr "Could not clear suppression"
@@ -956,6 +1004,10 @@ msgstr "Could not load companies"
 #: src/routes/emails/inboxes.tsx
 msgid "Could not load inboxes"
 msgstr "Could not load inboxes"
+
+#: src/components/companies/pipeline-board.tsx
+msgid "Could not load the board"
+msgstr "Could not load the board"
 
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Could not load the review queue."
@@ -992,6 +1044,10 @@ msgstr "Could not locate"
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Could not log the interaction. Please try again."
 msgstr "Could not log the interaction. Please try again."
+
+#: src/components/companies/pipeline-board.tsx
+msgid "Could not move the lead"
+msgstr "Could not move the lead"
 
 #: src/routes/pages/$id.tsx
 msgid "Could not publish the page. Please try again."
@@ -1373,10 +1429,19 @@ msgstr "Done 7d"
 msgid "Draft"
 msgstr "Draft"
 
+#. placeholder {0}: card.name
+#: src/components/companies/pipeline-board.tsx
+msgid "Drag {0}"
+msgstr "Drag {0}"
+
 #. placeholder {0}: o.name
 #: src/components/instructions/stack-picker.tsx
 msgid "Drag {0} to reorder"
 msgstr "Drag {0} to reorder"
+
+#: src/routes/companies/board.tsx
+msgid "Drag a lead across stages, or use its Move menu."
+msgstr "Drag a lead across stages, or use its Move menu."
 
 #: src/components/shared/task-item.tsx
 #: src/routes/tasks/index.tsx
@@ -1496,6 +1561,10 @@ msgstr "Emails"
 #: src/routes/companies/$slug.tsx
 msgid "Emails, calls, documents, and proposals will appear here as they happen."
 msgstr "Emails, calls, documents, and proposals will appear here as they happen."
+
+#: src/components/companies/pipeline-board.tsx
+msgid "Empty"
+msgstr "Empty"
 
 #: src/components/research/findings/company-enrichment-view.tsx
 msgid "Enrichment"
@@ -1629,6 +1698,10 @@ msgstr "Footers — {0}"
 msgid "Forgot password?"
 msgstr "Forgot password?"
 
+#: src/components/companies/company-owner-control.tsx
+msgid "Former member"
+msgstr "Former member"
+
 #: src/routes/settings/organization/policy.tsx
 msgid "Free research work allowed for one run."
 msgstr "Free research work allowed for one run."
@@ -1714,6 +1787,10 @@ msgstr "High"
 #: src/routes/index.tsx
 msgid "High priority"
 msgstr "High priority"
+
+#: src/routes/companies/index.tsx
+msgid "Hot"
+msgstr "Hot"
 
 #: src/components/instructions/default-stack-editor.tsx
 msgid "How your default uses the org default"
@@ -1807,6 +1884,7 @@ msgstr "Inbox updated"
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/findings/prospect-scan-view.tsx
+#: src/routes/companies/index.tsx
 msgid "Industry"
 msgstr "Industry"
 
@@ -1941,6 +2019,24 @@ msgstr "Later"
 #: src/components/shared/channel-icon.tsx
 msgid "LinkedIn"
 msgstr "LinkedIn"
+
+#: src/routes/companies/board.tsx
+#: src/routes/companies/index.tsx
+msgid "List"
+msgstr "List"
+
+#. placeholder {0}: total - loaded
+#: src/components/companies/pipeline-board.tsx
+msgid "Load {0} more"
+msgstr "Load {0} more"
+
+#: src/routes/companies/index.tsx
+msgid "Load more"
+msgstr "Load more"
+
+#: src/routes/companies/board.tsx
+msgid "Loading board…"
+msgstr "Loading board…"
 
 #: src/routes/calendar/index.tsx
 msgid "Loading calendar…"
@@ -2089,6 +2185,7 @@ msgid "MCP connections"
 msgstr "MCP connections"
 
 #: src/routes/companies/$slug.tsx
+#: src/routes/companies/index.tsx
 msgid "Medium"
 msgstr "Medium"
 
@@ -2105,6 +2202,10 @@ msgstr "Meeting"
 #: src/components/shared/status-badge.tsx
 msgid "Meeting booked"
 msgstr "Meeting booked"
+
+#: src/routes/companies/$slug.tsx
+msgid "Meeting stage — set the next action (agenda, follow-up)."
+msgstr "Meeting stage — set the next action (agenda, follow-up)."
 
 #: src/routes/calendar/index.tsx
 msgid "Meetings from bookings, email invitations, and internal blocks."
@@ -2161,7 +2262,20 @@ msgstr "Minimum confidence to auto-apply"
 msgid "Monthly paid cap"
 msgstr "Monthly paid cap"
 
+#: src/components/companies/pipeline-board.tsx
+msgid "Move"
+msgstr "Move"
+
+#: src/components/companies/pipeline-board.tsx
+msgid "Move to…"
+msgstr "Move to…"
+
+#: src/routes/companies/index.tsx
+msgid "My leads"
+msgstr "My leads"
+
 #: src/components/instructions/template-editor-dialog.tsx
+#: src/routes/companies/index.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/api-keys/index.tsx
 msgid "Name"
@@ -2174,6 +2288,10 @@ msgstr "name@company.com"
 #: src/components/emails/compose-form.tsx
 msgid "name@example.com, another@example.com"
 msgstr "name@example.com, another@example.com"
+
+#: src/routes/index.tsx
+msgid "Needs action"
+msgstr "Needs action"
 
 #: src/routes/index.tsx
 msgid "Needs attention"
@@ -2197,6 +2315,10 @@ msgstr "Never"
 #: src/routes/settings/api-keys/index.tsx
 msgid "Never expires"
 msgstr "Never expires"
+
+#: src/routes/companies/$slug.tsx
+msgid "New client — set the next action (kick off onboarding)."
+msgstr "New client — set the next action (kick off onboarding)."
 
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/routes/settings/organization/templates.tsx
@@ -2658,6 +2780,8 @@ msgstr "Overlap"
 msgid "Overview"
 msgstr "Overview"
 
+#: src/components/companies/company-owner-control.tsx
+#: src/routes/companies/index.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Owner"
 msgstr "Owner"
@@ -2840,6 +2964,10 @@ msgstr "Pick your email provider"
 msgid "Pipeline"
 msgstr "Pipeline"
 
+#: src/routes/companies/board.tsx
+msgid "Pipeline board"
+msgstr "Pipeline board"
+
 #: src/routes/emails/inboxes.tsx
 msgid "Plain"
 msgstr "Plain"
@@ -2878,6 +3006,8 @@ msgstr "Primary inbox set"
 msgid "Primary navigation"
 msgstr "Primary navigation"
 
+#: src/routes/companies/index.tsx
+#: src/routes/companies/index.tsx
 #: src/routes/tasks/index.tsx
 msgid "Priority"
 msgstr "Priority"
@@ -2916,6 +3046,10 @@ msgstr "Proposal declined"
 #: src/components/shared/status-badge.tsx
 msgid "Proposal in review"
 msgstr "Proposal in review"
+
+#: src/routes/companies/$slug.tsx
+msgid "Proposal stage — set the next action (send it, chase a decision)."
+msgstr "Proposal stage — set the next action (send it, chase a decision)."
 
 #: src/routes/companies/$slug.tsx
 msgid "Proposals, meeting notes and attachments will show up here."
@@ -3005,6 +3139,14 @@ msgstr "Recent changes"
 msgid "Recent runs"
 msgstr "Recent runs"
 
+#: src/routes/companies/index.tsx
+msgid "Recently contacted"
+msgstr "Recently contacted"
+
+#: src/routes/companies/index.tsx
+msgid "Recently updated"
+msgstr "Recently updated"
+
 #: src/routes/companies/$slug.tsx
 msgid "Recipient marked as spam"
 msgstr "Recipient marked as spam"
@@ -3029,6 +3171,7 @@ msgstr "Refreshing inbox status…"
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/findings/prospect-scan-view.tsx
+#: src/routes/companies/index.tsx
 msgid "Region"
 msgstr "Region"
 
@@ -3049,6 +3192,10 @@ msgstr "Reject {subjectLabel}"
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Rejected"
 msgstr "Rejected"
+
+#: src/components/companies/pipeline-board.tsx
+msgid "Release owner"
+msgstr "Release owner"
 
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/organization/members.tsx
@@ -3302,6 +3449,11 @@ msgstr "Searching and reasoning"
 msgid "See who can access this workspace, invite teammates, and manage pending invitations."
 msgstr "See who can access this workspace, invite teammates, and manage pending invitations."
 
+#. placeholder {0}: card.name
+#: src/components/companies/pipeline-board.tsx
+msgid "Select {0}"
+msgstr "Select {0}"
+
 #: src/routes/emails/index.tsx
 msgid "Select all threads on this page"
 msgstr "Select all threads on this page"
@@ -3551,6 +3703,10 @@ msgstr "Something went wrong. Start the connection again from your assistant."
 msgid "Something went wrong. Try again."
 msgstr "Something went wrong. Try again."
 
+#: src/routes/companies/index.tsx
+msgid "Sort"
+msgstr "Sort"
+
 #: src/components/companies/about-section.tsx
 #: src/routes/calendar/index.tsx
 #: src/routes/tasks/index.tsx
@@ -3587,6 +3743,10 @@ msgstr "Spend ceilings and the confidence needed to auto-apply findings."
 #: src/routes/settings/organization/policy.tsx
 msgid "Spend ceilings for research and how confident a finding must be to apply on its own."
 msgstr "Spend ceilings for research and how confident a finding must be to apply on its own."
+
+#: src/routes/companies/$slug.tsx
+msgid "Stage changed"
+msgstr "Stage changed"
 
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Stamped into the workshop ledger."
@@ -3666,6 +3826,11 @@ msgstr "Summary"
 #: src/components/layout/org-switcher.tsx
 msgid "Switch organization"
 msgstr "Switch organization"
+
+#: src/routes/companies/board.tsx
+#: src/routes/companies/index.tsx
+msgid "Switch view"
+msgstr "Switch view"
 
 #: src/components/shared/channel-icon.tsx
 msgid "System"
@@ -3856,6 +4021,10 @@ msgstr "These templates shape every run, in order — unless you pick different 
 msgid "They replied — keep the thread warm"
 msgstr "They replied — keep the thread warm"
 
+#: src/routes/companies/$slug.tsx
+msgid "They responded — set the next action to keep it warm."
+msgstr "They responded — set the next action to keep it warm."
+
 #: src/routes/settings/mcp/connections.tsx
 msgid "This connection is unbound. Bind an org to use it."
 msgstr "This connection is unbound. Bind an org to use it."
@@ -3960,6 +4129,15 @@ msgstr "Type and press Enter"
 #: src/routes/forgot-password.tsx
 msgid "Type the email you sign in with. We'll send a reset link."
 msgstr "Type the email you sign in with. We'll send a reset link."
+
+#: src/components/companies/company-owner-control.tsx
+msgid "Unassign"
+msgstr "Unassign"
+
+#: src/components/companies/company-owner-control.tsx
+#: src/routes/companies/index.tsx
+msgid "Unassigned"
+msgstr "Unassigned"
 
 #: src/components/research/trust-badge.tsx
 msgid "Undeliverable"

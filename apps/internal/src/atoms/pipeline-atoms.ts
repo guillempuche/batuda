@@ -38,3 +38,18 @@ export const companiesListAtom = BatudaApiAtom.query('companies', 'list', {
 export const openTasksAtom = BatudaApiAtom.query('tasks', 'list', {
 	query: { completed: 'false' },
 })
+
+/**
+ * Server-computed pipeline snapshot — the status histogram plus the two
+ * attention counters (overdue tasks, companies without a next action). Replaces
+ * the dashboard's client-side `countByStatus` and drives the board column totals.
+ */
+export const pipelineAtom = BatudaApiAtom.query('pipeline', 'get', {})
+
+/**
+ * Server-computed next steps: the open-task queue (ordered by due date) and the
+ * companies past their next-action date. Feeds the dashboard's "needs attention".
+ */
+export const nextStepsAtom = BatudaApiAtom.query('pipeline', 'nextSteps', {
+	query: {},
+})

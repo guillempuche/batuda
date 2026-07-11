@@ -26,6 +26,7 @@ import { Route as PagesIdRouteImport } from './routes/pages/$id'
 import { Route as OauthConsentRouteImport } from './routes/oauth/consent'
 import { Route as EmailsInboxesRouteImport } from './routes/emails/inboxes'
 import { Route as EmailsThreadIdRouteImport } from './routes/emails/$threadId'
+import { Route as CompaniesBoardRouteImport } from './routes/companies/board'
 import { Route as CompaniesSlugRouteImport } from './routes/companies/$slug'
 import { Route as AcceptInvitationIdRouteImport } from './routes/accept-invitation.$id'
 import { Route as SettingsProfileIndexRouteImport } from './routes/settings/profile/index'
@@ -124,6 +125,11 @@ const EmailsThreadIdRoute = EmailsThreadIdRouteImport.update({
   path: '/emails/$threadId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CompaniesBoardRoute = CompaniesBoardRouteImport.update({
+  id: '/companies/board',
+  path: '/companies/board',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CompaniesSlugRoute = CompaniesSlugRouteImport.update({
   id: '/companies/$slug',
   path: '/companies/$slug',
@@ -198,6 +204,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/accept-invitation/$id': typeof AcceptInvitationIdRoute
   '/companies/$slug': typeof CompaniesSlugRoute
+  '/companies/board': typeof CompaniesBoardRoute
   '/emails/$threadId': typeof EmailsThreadIdRoute
   '/emails/inboxes': typeof EmailsInboxesRoute
   '/oauth/consent': typeof OauthConsentRoute
@@ -229,6 +236,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/accept-invitation/$id': typeof AcceptInvitationIdRoute
   '/companies/$slug': typeof CompaniesSlugRoute
+  '/companies/board': typeof CompaniesBoardRoute
   '/emails/$threadId': typeof EmailsThreadIdRoute
   '/emails/inboxes': typeof EmailsInboxesRoute
   '/oauth/consent': typeof OauthConsentRoute
@@ -261,6 +269,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/accept-invitation/$id': typeof AcceptInvitationIdRoute
   '/companies/$slug': typeof CompaniesSlugRoute
+  '/companies/board': typeof CompaniesBoardRoute
   '/emails/$threadId': typeof EmailsThreadIdRoute
   '/emails/inboxes': typeof EmailsInboxesRoute
   '/oauth/consent': typeof OauthConsentRoute
@@ -294,6 +303,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/accept-invitation/$id'
     | '/companies/$slug'
+    | '/companies/board'
     | '/emails/$threadId'
     | '/emails/inboxes'
     | '/oauth/consent'
@@ -325,6 +335,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/accept-invitation/$id'
     | '/companies/$slug'
+    | '/companies/board'
     | '/emails/$threadId'
     | '/emails/inboxes'
     | '/oauth/consent'
@@ -356,6 +367,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/accept-invitation/$id'
     | '/companies/$slug'
+    | '/companies/board'
     | '/emails/$threadId'
     | '/emails/inboxes'
     | '/oauth/consent'
@@ -388,6 +400,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   AcceptInvitationIdRoute: typeof AcceptInvitationIdRoute
   CompaniesSlugRoute: typeof CompaniesSlugRoute
+  CompaniesBoardRoute: typeof CompaniesBoardRoute
   EmailsThreadIdRoute: typeof EmailsThreadIdRoute
   EmailsInboxesRoute: typeof EmailsInboxesRoute
   OauthConsentRoute: typeof OauthConsentRoute
@@ -534,6 +547,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EmailsThreadIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/companies/board': {
+      id: '/companies/board'
+      path: '/companies/board'
+      fullPath: '/companies/board'
+      preLoaderRoute: typeof CompaniesBoardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/companies/$slug': {
       id: '/companies/$slug'
       path: '/companies/$slug'
@@ -628,6 +648,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   AcceptInvitationIdRoute: AcceptInvitationIdRoute,
   CompaniesSlugRoute: CompaniesSlugRoute,
+  CompaniesBoardRoute: CompaniesBoardRoute,
   EmailsThreadIdRoute: EmailsThreadIdRoute,
   EmailsInboxesRoute: EmailsInboxesRoute,
   OauthConsentRoute: OauthConsentRoute,
