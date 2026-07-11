@@ -253,6 +253,10 @@ msgstr "Add a template"
 msgid "Add an org template first."
 msgstr "Add an org template first."
 
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Add as lead"
+msgstr "Add as lead"
+
 #: src/components/instructions/default-stack-editor.tsx
 msgid "Add at least one template before saving a default."
 msgstr "Add at least one template before saving a default."
@@ -272,6 +276,11 @@ msgstr "Add Cc / Bcc"
 #: src/components/research/run-labels.ts
 msgid "Add channel"
 msgstr "Add channel"
+
+#: src/components/contacts/contact-edit-dialog.tsx
+#: src/routes/companies/$slug.tsx
+msgid "Add contact"
+msgstr "Add contact"
 
 #: src/components/shared/company-card.tsx
 msgid "Add task"
@@ -294,9 +303,17 @@ msgstr "Add to the org default"
 msgid "Added"
 msgstr "Added"
 
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Added as a verified lead"
+msgstr "Added as a verified lead"
+
 #: src/routes/settings/organization/templates.tsx
 msgid "Added to the org"
 msgstr "Added to the org"
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Adding…"
+msgstr "Adding…"
 
 #: src/components/research/findings/company-enrichment-view.tsx
 msgid "Address"
@@ -652,6 +669,7 @@ msgstr "Call phone"
 msgid "Calls"
 msgstr "Calls"
 
+#: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/instructions/template-delete-confirm.tsx
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
@@ -794,6 +812,7 @@ msgstr "Clicked"
 msgid "Client"
 msgstr "Client"
 
+#: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
@@ -1044,6 +1063,10 @@ msgstr "Copy slug"
 msgid "Copy your key now"
 msgstr "Copy your key now"
 
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Could not add as a lead"
+msgstr "Could not add as a lead"
+
 #: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Could not apply the batch."
@@ -1172,6 +1195,10 @@ msgstr "Could not save"
 msgid "Could not save the budget."
 msgstr "Could not save the budget."
 
+#: src/components/contacts/contact-edit-dialog.tsx
+msgid "Could not save the contact"
+msgstr "Could not save the contact"
+
 #: src/routes/emails/inboxes.tsx
 msgid "Could not save the inbox."
 msgstr "Could not save the inbox."
@@ -1236,6 +1263,10 @@ msgstr "Could not update channels"
 #: src/components/research/findings/shared.tsx
 msgid "Could not update the paid action"
 msgstr "Could not update the paid action"
+
+#: src/routes/companies/$slug.tsx
+msgid "Could not update verification"
+msgstr "Could not update verification"
 
 #: src/routes/settings/organization/templates.tsx
 msgid "Couldn't add it"
@@ -1389,6 +1420,7 @@ msgstr "Date"
 msgid "Dead"
 msgstr "Dead"
 
+#: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/research/findings/contact-discovery-view.tsx
 #: src/routes/companies/$slug.tsx
 msgid "Decision maker"
@@ -1581,6 +1613,10 @@ msgstr "e.g. Claude Desktop"
 msgid "e.g. Company signature"
 msgstr "e.g. Company signature"
 
+#: src/components/contacts/contact-edit-dialog.tsx
+msgid "e.g. Head of Operations"
+msgstr "e.g. Head of Operations"
+
 #: src/components/research/research-dialog.tsx
 msgid "e.g. hospitality"
 msgstr "e.g. hospitality"
@@ -1588,6 +1624,10 @@ msgstr "e.g. hospitality"
 #: src/components/research/research-dialog.tsx
 msgid "e.g. independent bakeries in Barcelona with 5–20 staff"
 msgstr "e.g. independent bakeries in Barcelona with 5–20 staff"
+
+#: src/components/contacts/contact-edit-dialog.tsx
+msgid "e.g. Marta Puig"
+msgstr "e.g. Marta Puig"
 
 #: src/routes/emails/inboxes.tsx
 msgid "e.g. Sales — Acme"
@@ -1597,6 +1637,7 @@ msgstr "e.g. Sales — Acme"
 msgid "e.g. vip, warm"
 msgstr "e.g. vip, warm"
 
+#: src/routes/companies/$slug.tsx
 #: src/routes/emails/inboxes.tsx
 msgid "Edit"
 msgstr "Edit"
@@ -1610,6 +1651,10 @@ msgstr "Edit {0}"
 #: src/components/shared/editable-field.tsx
 msgid "Edit {label}"
 msgstr "Edit {label}"
+
+#: src/components/contacts/contact-edit-dialog.tsx
+msgid "Edit contact"
+msgstr "Edit contact"
 
 #: src/components/shared/task-item.tsx
 msgid "Edit due date"
@@ -2312,6 +2357,10 @@ msgstr "Mark \"{0}\" as complete"
 msgid "Mark \"{0}\" as pending"
 msgstr "Mark \"{0}\" as pending"
 
+#: src/routes/companies/$slug.tsx
+msgid "Mark as verified"
+msgstr "Mark as verified"
+
 #: src/components/shared/company-card.tsx
 msgid "Mark contacted"
 msgstr "Mark contacted"
@@ -2325,6 +2374,10 @@ msgstr "Mark read"
 #: src/routes/emails/index.tsx
 msgid "Mark unread"
 msgstr "Mark unread"
+
+#: src/routes/companies/$slug.tsx
+msgid "Marked as a verified lead"
+msgstr "Marked as a verified lead"
 
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Market summary"
@@ -2433,6 +2486,7 @@ msgstr "Move to…"
 msgid "My leads"
 msgstr "My leads"
 
+#: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/routes/companies/index.tsx
 #: src/routes/emails/inboxes.tsx
@@ -3557,6 +3611,10 @@ msgstr "Risky"
 msgid "Role"
 msgstr "Role"
 
+#: src/components/contacts/contact-edit-dialog.tsx
+msgid "Role (optional)"
+msgstr "Role (optional)"
+
 #: src/components/research/run-actions.tsx
 msgid "Run again"
 msgstr "Run again"
@@ -3594,6 +3652,7 @@ msgstr "Running"
 msgid "Sales context"
 msgstr "Sales context"
 
+#: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
@@ -3629,6 +3688,7 @@ msgstr "Save password"
 msgid "Save the org default"
 msgstr "Save the org default"
 
+#: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/emails/compose-form.tsx
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/routes/emails/inboxes.tsx
@@ -4523,9 +4583,21 @@ msgstr "Using the org default"
 msgid "Verifiable only"
 msgstr "Verifiable only"
 
+#: src/routes/companies/$slug.tsx
+msgid "Verification cleared"
+msgstr "Verification cleared"
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Verified emails and grounded values — safe to apply in one click."
 msgstr "Verified emails and grounded values — safe to apply in one click."
+
+#: src/routes/companies/$slug.tsx
+msgid "Verified lead"
+msgstr "Verified lead"
+
+#: src/routes/companies/$slug.tsx
+msgid "Verified lead — click to clear"
+msgstr "Verified lead — click to clear"
 
 #: src/components/shared/timeline-entry.tsx
 msgid "View thread"
