@@ -119,4 +119,39 @@ describe('outcomeFromRun', () => {
 			expect(outcome.reachedDomains).toEqual(['acme.es'])
 		})
 	})
+
+	describe('when the pipeline confirmed the target in the official register', () => {
+		it('should carry registryConfirmed through, in snake or camel case', () => {
+			// GIVEN a run that fetched no site but stamped the registry-confirmation flag
+			const snake = outcomeFromRun({
+				status: 'no_reliable_data',
+				findings: { registry_confirmed: true, error: 'no site fetched' },
+				fetchedUrls: [],
+			})
+			// AND the CLI's camelCasing client can deliver the same flag camelCased
+			const camel = outcomeFromRun({
+				status: 'succeeded',
+				findings: { registryConfirmed: true, enrichment: { region: 'cat' } },
+				fetchedUrls: [],
+			})
+
+			// WHEN adapted — THEN both surface the reached-via-registry signal
+			expect(snake.registryConfirmed).toBe(true)
+			expect(camel.registryConfirmed).toBe(true)
+		})
+	})
+
+	describe('when no registry confirmation was recorded', () => {
+		it('should leave registryConfirmed false', () => {
+			// GIVEN findings without the flag
+			const outcome = outcomeFromRun({
+				status: 'succeeded',
+				findings: { enrichment: { industry: 'transport' } },
+				fetchedUrls: [],
+			})
+
+			// WHEN adapted — THEN the flag defaults false
+			expect(outcome.registryConfirmed).toBe(false)
+		})
+	})
 })

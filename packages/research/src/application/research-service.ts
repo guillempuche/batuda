@@ -47,6 +47,7 @@ import {
 	type EntityMatch,
 	type EntityTargets,
 	groundedSourceIds,
+	isConfirmedRegistryMatch,
 } from './entity-guard'
 import { resolvePolicy, type SystemDefaults } from './policy'
 import {
@@ -1025,6 +1026,18 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					// Tool log accumulator
 					const toolLog = yield* Ref.make<ToolLogEntry[]>([])
 
+					// True once a registry_lookup this run resolved the target company by
+					// its legal name — a strong, site-independent confirmation the run
+					// reached the right entity. Stamped onto the findings so the eval can
+					// count it toward grounding even when the company's own site was never
+					// fetched; nothing in the product reads it. A resumed run skips phase 1
+					// and so never sets it (the eval always runs fresh, so it never resumes).
+					let registryConfirmed = false
+					const withRegistryFlag = (
+						obj: Record<string, unknown>,
+					): Record<string, unknown> =>
+						registryConfirmed ? { ...obj, registry_confirmed: true } : obj
+
 					// Fail a run closed as no_reliable_data because its evidence was not clearly
 					// about the requested company. Called by the phase-1 entity gate and again on
 					// resume, where that gate is skipped — so a weak or absent match never reaches
@@ -1038,11 +1051,13 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 									reason_code = ${(verdict === 'weak' ? 'weak_no_official_site' : 'entity_mismatch') satisfies ReasonCode},
 									phase = 1,
 									entity_match = ${verdict},
-									findings = ${JSON.stringify({
-										error:
-											'The fetched pages were not clearly about the requested company, so the findings could not be grounded.',
-										reason: 'no_reliable_data',
-									})},
+									findings = ${JSON.stringify(
+										withRegistryFlag({
+											error:
+												'The fetched pages were not clearly about the requested company, so the findings could not be grounded.',
+											reason: 'no_reliable_data',
+										}),
+									)},
 									tool_log = ${JSON.stringify(toolLogNow)},
 									completed_at = now(),
 									updated_at = now()
@@ -1507,6 +1522,21 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 													},
 												])
 											}
+											// A registry_lookup that resolved the target by its legal name
+											// strongly confirms the run reached the right company, even if
+											// its own site was never scraped. OR-accumulate across rounds.
+											if (!registryConfirmed) {
+												for (const tr of response.toolResults) {
+													if (
+														!tr.isFailure &&
+														tr.name === 'registry_lookup' &&
+														isConfirmedRegistryMatch(entityTargets, tr.result)
+													) {
+														registryConfirmed = true
+														break
+													}
+												}
+											}
 											yield* emitRound(
 												round,
 												response.text.length,
@@ -1790,11 +1820,13 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							SET status = 'no_reliable_data',
 								reason_code = ${'no_sources' satisfies ReasonCode},
 								phase = 3,
-								findings = ${JSON.stringify({
-									error:
-										'No pages were fetched, so the findings could not be grounded.',
-									reason: 'no_reliable_data',
-								})},
+								findings = ${JSON.stringify(
+									withRegistryFlag({
+										error:
+											'No pages were fetched, so the findings could not be grounded.',
+										reason: 'no_reliable_data',
+									}),
+								)},
 								tool_log = ${JSON.stringify(finalToolLog)},
 								completed_at = now(),
 								updated_at = now()
@@ -1843,7 +1875,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						UPDATE research_runs
 						SET status = 'succeeded',
 							phase = 3,
-							findings = ${JSON.stringify(findings)},
+							findings = ${JSON.stringify(withRegistryFlag(findings as Record<string, unknown>))},
 							brief_md = ${briefMd},
 							tokens_in = ${tokensIn},
 							tokens_out = ${tokensOut},

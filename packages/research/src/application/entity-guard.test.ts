@@ -7,6 +7,7 @@ import {
 	domainHost,
 	type EntityTargets,
 	groundedSourceIds,
+	isConfirmedRegistryMatch,
 } from './entity-guard'
 
 describe('deriveEntityTargets', () => {
@@ -151,6 +152,70 @@ describe('classifyEntityMatch', () => {
 			expect(
 				classifyEntityMatch(targets!, 'Topia and Sunset are freight brokers'),
 			).toBe('absent')
+		})
+	})
+})
+
+describe('isConfirmedRegistryMatch', () => {
+	const targets = deriveEntityTargets({
+		schemaName: 'company_enrichment_v1',
+		query: 'Acme Logistics, Barcelona',
+		subjects: [],
+	})
+
+	describe('when the lookup resolved the target company', () => {
+		it('should confirm on a legal name that strongly matches the target', () => {
+			// GIVEN a resolved record whose legal name spells the target with a legal form
+			// WHEN checked against the target's keys
+			// THEN the registry lookup confirms the run reached the right company
+			expect(
+				isConfirmedRegistryMatch(targets, {
+					legalName: 'ACME LOGISTICS SL',
+					taxId: 'B12345678',
+					status: 'active',
+				}),
+			).toBe(true)
+		})
+	})
+
+	describe('when the lookup resolved a same-named different company', () => {
+		it('should not confirm when the legal name does not match the target', () => {
+			// GIVEN a resolved record for an unrelated firm
+			// WHEN checked
+			// THEN a look-alike registry hit does not count as reaching the target
+			expect(
+				isConfirmedRegistryMatch(targets, {
+					legalName: 'Global Freight Partners SA',
+					status: 'active',
+				}),
+			).toBe(false)
+		})
+	})
+
+	describe('when the country has no registry match', () => {
+		it('should not confirm on a no_registry result', () => {
+			// GIVEN the tool returned {status:'no_registry'} (no company resolved)
+			// WHEN checked
+			// THEN there is nothing to confirm
+			expect(
+				isConfirmedRegistryMatch(targets, {
+					status: 'no_registry',
+					country: 'ES',
+				}),
+			).toBe(false)
+		})
+	})
+
+	describe('when there is no target or the result is not a record', () => {
+		it('should not confirm without targets, or on a non-object result', () => {
+			// GIVEN a discovery run has no entity targets, or a failed/empty result
+			// WHEN checked
+			// THEN neither can confirm a target
+			expect(
+				isConfirmedRegistryMatch(null, { legalName: 'ACME LOGISTICS SL' }),
+			).toBe(false)
+			expect(isConfirmedRegistryMatch(targets, null)).toBe(false)
+			expect(isConfirmedRegistryMatch(targets, 'not a record')).toBe(false)
 		})
 	})
 })

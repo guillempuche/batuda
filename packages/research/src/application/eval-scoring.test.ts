@@ -85,6 +85,24 @@ describe('scoreRun', () => {
 		})
 	})
 
+	describe('when a registry lookup confirmed the target but no page was reached', () => {
+		it('should count as grounded and not wrong-company', () => {
+			// GIVEN a run that fetched no page but resolved the company in the register
+			const result = scoreRun(
+				acme,
+				outcome({
+					reachedDomains: [],
+					registryConfirmed: true,
+					fields: { region: 'cat' },
+				}),
+			)
+
+			// WHEN scored — THEN the registry confirmation grounds it; not a look-alike
+			expect(result.grounded).toBe(true)
+			expect(result.wrongCompany).toBe(false)
+		})
+	})
+
 	describe('when a succeeded run returned data but never reached the target', () => {
 		it('should flag it as wrong-company', () => {
 			// GIVEN a confident run whose sources are a same-named different company

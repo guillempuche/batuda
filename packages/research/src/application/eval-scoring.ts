@@ -14,6 +14,9 @@
  * once per-field citations point at whichever page stated each fact, a run that
  * correctly reached the target's own site still cites third-party pages per field,
  * so citation hosts no longer track "reached the right company" — the fetch log does.
+ * A run is also grounded without fetching the target's site at all when an official
+ * company-register lookup resolved the target by legal name — an independent proof
+ * the right entity was reached.
  */
 
 /**
@@ -72,6 +75,12 @@ export interface RunOutcome {
 	readonly reachedDomains: ReadonlyArray<string>
 	/** Extracted enrichment scalars; a missing/blank value counts as unfilled. */
 	readonly fields: Partial<Record<ScorableField, string | null>>
+	/**
+	 * Whether an official-registry lookup this run resolved the target company by
+	 * its legal name. Independent of the fetched pages: a company confirmed in the
+	 * register was reached even if its own site was never scraped.
+	 */
+	readonly registryConfirmed?: boolean
 }
 
 export interface RunScore {
@@ -179,15 +188,20 @@ export const scoreRun = (
 	const anchors = [expected.officialDomain, ...(expected.altDomains ?? [])].map(
 		normalizeDomain,
 	)
-	const grounded = outcome.reachedDomains.some(reached => {
-		const host = normalizeDomain(reached)
-		// The official host itself, or a subdomain of it (careers.acme.com,
-		// us.acme.com) — both are the company's own pages, so both prove the run
-		// reached the target. A look-alike host never ends with ".<official>".
-		return anchors.some(
-			anchor => host === anchor || host.endsWith(`.${anchor}`),
-		)
-	})
+	// Reached the target either by fetching its own site (or a subdomain / alt
+	// domain), or by resolving it in the official company register — a registry
+	// confirmation grounds a company whose own site was never scraped.
+	const grounded =
+		outcome.registryConfirmed === true ||
+		outcome.reachedDomains.some(reached => {
+			const host = normalizeDomain(reached)
+			// The official host itself, or a subdomain of it (careers.acme.com,
+			// us.acme.com) — both are the company's own pages, so both prove the run
+			// reached the target. A look-alike host never ends with ".<official>".
+			return anchors.some(
+				anchor => host === anchor || host.endsWith(`.${anchor}`),
+			)
+		})
 
 	let fieldsExpected = 0
 	let fieldsScored = 0
