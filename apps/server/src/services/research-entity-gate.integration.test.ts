@@ -268,6 +268,12 @@ const runScenario = async (next: Scenario): Promise<RunResult> => {
 			const created = yield* enterOrgScope(sql, { org: ctx.org, userId })(
 				svc.create(userId, ctx.org.id, input, systemDefaults),
 			)
+			// A non-selector input never fans out, so it always carries a run id;
+			// rule out the confirm-required variant to keep the type honest.
+			if (created.status === 'confirm_required')
+				return yield* Effect.die(
+					new Error('entity-gate test input should not fan out'),
+				)
 			createdRunIds.push(created.id)
 
 			const poll = (

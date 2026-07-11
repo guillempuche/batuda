@@ -198,6 +198,10 @@ const driveOne = (
 			forceFresh: true,
 		}
 		const created = yield* svc.create(user, org, input, defaults)
+		// A single-subject eval never fans out, so it always carries a run id;
+		// rule out the confirm-required variant to keep the type honest.
+		if (created.status === 'confirm_required')
+			return yield* Effect.die(new Error('eval run should not fan out'))
 		// A deep run does several search/scrape/LLM rounds, so allow up to ~15
 		// minutes to finish (900 one-second polls) before reporting its last status.
 		const run = yield* pollToTerminal(created.id, 900)

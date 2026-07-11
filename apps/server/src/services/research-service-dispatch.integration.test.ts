@@ -263,6 +263,12 @@ describe('ResearchService dispatch', () => {
 						org: ctx.org,
 						userId,
 					})(svc.create(userId, ctx.org.id, researchInput, systemDefaults))
+					// A non-selector input never fans out, so it always carries a run
+					// id; rule out the confirm-required variant to keep the type honest.
+					if (created.status === 'confirm_required')
+						return yield* Effect.die(
+							new Error('dispatch test input should not fan out'),
+						)
 					runId = created.id
 
 					// Poll get() until the dispatch consumer drives the run terminal.

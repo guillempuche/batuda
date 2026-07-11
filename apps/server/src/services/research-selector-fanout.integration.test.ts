@@ -150,11 +150,18 @@ const createSelectorRun = (tag: string) =>
 		const input: CreateResearchInput = {
 			query: 'fan-out',
 			schemaName: 'company_enrichment_v1',
+			// Confirm up front so the fan-out actually launches; the unconfirmed
+			// path (which returns a cost estimate instead) is covered separately.
+			confirm: true,
 			context: { selector: { table: 'companies', filter: { tags: [tag] } } },
 		}
 		const created = yield* enterOrgScope(sql, { org: ctx.org, userId })(
 			svc.create(userId, ctx.org.id, input, systemDefaults),
 		)
+		if (created.status === 'confirm_required')
+			return yield* Effect.die(
+				new Error('a confirmed selector run should not require confirmation'),
+			)
 		groupIds.push(created.id)
 
 		const poll = (
@@ -176,6 +183,45 @@ const createSelectorRun = (tag: string) =>
 		return yield* poll(60)
 	}).pipe(Effect.provide(ResearchLive)) as Effect.Effect<
 		{ status: string; children: number },
+		never,
+		never
+	>
+
+// Create a selector run WITHOUT confirming and return the raw create result —
+// the cost gate should stop it before any run row is written.
+const previewSelectorRun = (tag: string) =>
+	Effect.gen(function* () {
+		const svc = yield* ResearchService
+		const sql = yield* SqlClient.SqlClient
+		const input: CreateResearchInput = {
+			query: 'fan-out',
+			schemaName: 'company_enrichment_v1',
+			context: { selector: { table: 'companies', filter: { tags: [tag] } } },
+		}
+		const created = yield* enterOrgScope(sql, { org: ctx.org, userId })(
+			svc.create(userId, ctx.org.id, input, systemDefaults),
+		).pipe(Effect.orDie)
+		const result: {
+			status: string
+			id?: string
+			subjectCount?: number
+			estimatedCostCents?: number
+		} =
+			created.status === 'confirm_required'
+				? {
+						status: created.status,
+						subjectCount: created.subjectCount,
+						estimatedCostCents: created.estimatedCostCents,
+					}
+				: { status: created.status, id: created.id }
+		return result
+	}).pipe(Effect.provide(ResearchLive)) as Effect.Effect<
+		{
+			status: string
+			id?: string
+			subjectCount?: number
+			estimatedCostCents?: number
+		},
 		never,
 		never
 	>
@@ -250,6 +296,23 @@ describe('selector fan-out', () => {
 			// THEN the group has no children and completes right away
 			expect(result.children).toBe(0)
 			expect(result.status).toBe('succeeded')
+		})
+	})
+
+	describe('when a selector matches companies but the caller did not confirm', () => {
+		it('should return a cost estimate instead of starting the fan-out', async () => {
+			// GIVEN two companies match the tag and the caller omits `confirm`
+			// WHEN a selector run is created
+			const result = await Effect.runPromise(previewSelectorRun(TAG))
+
+			// THEN it comes back as a confirm-required estimate, not a started run
+			expect(result.status).toBe('confirm_required')
+			expect(result.id).toBeUndefined()
+			// AND it reports how many companies the fan-out would cover
+			expect(result.subjectCount).toBe(2)
+			// AND it carries a non-negative estimated cost for the batch
+			expect(typeof result.estimatedCostCents).toBe('number')
+			expect(result.estimatedCostCents).toBeGreaterThanOrEqual(0)
 		})
 	})
 })

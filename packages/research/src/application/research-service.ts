@@ -2297,6 +2297,28 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 								)
 							}
 
+							// Fan-out cost gate: a selector launches one run per matched
+							// company, so a caller that hasn't set `confirm` gets the
+							// scale back first and re-submits with `confirm: true` once the
+							// count is acceptable. Nothing has been written yet, so
+							// returning here leaves no partial group behind. The estimate
+							// is the paid-data ceiling summed across the fan-out.
+							if (targets.length > 0 && input.confirm !== true) {
+								yield* Effect.logInfo(
+									'research.selector.confirm_required',
+								).pipe(
+									Effect.annotateLogs({
+										user_id: userId,
+										subject_count: targets.length,
+									}),
+								)
+								return {
+									status: 'confirm_required' as const,
+									subjectCount: targets.length,
+									estimatedCostCents: targets.length * policy.paidBudgetCents,
+								}
+							}
+
 							// The group is 'running' with no heartbeat/started_at, so the
 							// orphan sweep (which only reclaims stale 'running' rows) never
 							// touches it, and it is never dispatched or run itself.
