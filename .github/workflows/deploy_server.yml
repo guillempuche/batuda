@@ -5,6 +5,11 @@ on:
     tags:
       - "server-v*"
   workflow_dispatch:
+    inputs:
+      force_migrate:
+        description: "Apply pending prod migrations even when none are newly detected, then skip the redeploy. For a migration that missed its deploy, or a re-run after a partial failure. Still gated by the production-db reviewer."
+        type: boolean
+        default: false
 
 concurrency:
   group: deploy-server
@@ -45,7 +50,18 @@ jobs:
 
       - name: Detect new migrations since the previous release
         id: detect
+        env:
+          FORCE_MIGRATE: ${{ inputs.force_migrate }}
         run: |
+          # A manual force_migrate dispatch runs the gated migrate even when no
+          # new migration is detected — for a migration that missed its deploy,
+          # or a re-run after a partial failure. The migrator is incremental, so
+          # it applies only what is still pending.
+          if [ "$FORCE_MIGRATE" = "true" ]; then
+            echo "force_migrate requested — gating the migrate."
+            echo "has_migrations=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           # New migration files between the previous server-v* tag and this one.
           # When there's no previous tag (first deploy) we gate, to be safe.
           prev=$(git describe --tags --match='server-v[0-9]*' --abbrev=0 HEAD^ 2>/dev/null || echo "")
@@ -54,7 +70,9 @@ jobs:
             echo "has_migrations=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          files=$(git diff --name-only "$prev..HEAD" -- apps/server/src/db/migrations/ | grep '\.sql$' || true)
+          # Migrations are TypeScript (Effect SqlClient), named NNNN_*.ts — not .sql,
+          # so the old '\.sql$' filter matched nothing and silently skipped every migrate.
+          files=$(git diff --name-only "$prev..HEAD" -- apps/server/src/db/migrations/ | grep -E '[0-9]{4}_.*\.(ts|sql)$' || true)
           if [ -n "$files" ]; then
             echo "New migrations since $prev:"; echo "$files"
             echo "has_migrations=true" >> "$GITHUB_OUTPUT"
@@ -107,8 +125,10 @@ jobs:
     name: Deploy to Unikraft Cloud
     needs: [detect-migrations, migrate]
     # Deploy when migrate succeeded OR was skipped (no new migrations); block
-    # only if detection failed or the migration itself failed.
-    if: ${{ !cancelled() && needs.detect-migrations.result == 'success' && needs.migrate.result != 'failure' }}
+    # only if detection failed or the migration itself failed. A force_migrate
+    # dispatch is migrate-only — it skips the redeploy (the running version is
+    # unchanged), so a branch dispatch never ships branch code to prod.
+    if: ${{ !cancelled() && needs.detect-migrations.result == 'success' && needs.migrate.result != 'failure' && !inputs.force_migrate }}
     runs-on: ubuntu-latest
     # The image now builds once in its own step (below); an uncached build is
     # the long pole, so keep a generous ceiling until build caching lands.
