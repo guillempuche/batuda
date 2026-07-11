@@ -289,6 +289,10 @@ msgstr "Afegeix contacte"
 msgid "Add document"
 msgstr "Afegeix document"
 
+#: src/components/companies/proposals-panel.tsx
+msgid "Add line"
+msgstr "Afegeix línia"
+
 #: src/components/shared/company-card.tsx
 msgid "Add task"
 msgstr "Afegeix tasca"
@@ -1558,6 +1562,10 @@ msgstr "Lliurat"
 msgid "Deny"
 msgstr "Denega"
 
+#: src/components/companies/proposals-panel.tsx
+msgid "Description"
+msgstr "Descripció"
+
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Direction"
 msgstr "Direcció"
@@ -1680,6 +1688,10 @@ msgstr "p. ex. Marta Puig"
 #: src/routes/emails/inboxes.tsx
 msgid "e.g. Sales — Acme"
 msgstr "p. ex. Vendes — Acme"
+
+#: src/components/companies/proposals-panel.tsx
+msgid "e.g. Setup fee"
+msgstr "p. ex. Tarifa d'instal·lació"
 
 #: src/components/research/research-dialog.tsx
 msgid "e.g. vip, warm"
@@ -2276,6 +2288,10 @@ msgstr "Última visita"
 #: src/routes/tasks/index.tsx
 msgid "Later"
 msgstr "Més tard"
+
+#: src/components/companies/proposals-panel.tsx
+msgid "Line items"
+msgstr "Línies"
 
 #: src/components/research/findings/contact-discovery-view.tsx
 #: src/components/shared/channel-icon.tsx
@@ -3327,6 +3343,10 @@ msgstr "Vista prèvia"
 msgid "Previous"
 msgstr "Anterior"
 
+#: src/components/companies/proposals-panel.tsx
+msgid "Price"
+msgstr "Preu"
+
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
@@ -3432,6 +3452,14 @@ msgstr "Publicant…"
 #: src/routes/emails/inboxes.tsx
 msgid "Purpose"
 msgstr "Propòsit"
+
+#: src/components/companies/proposals-panel.tsx
+msgid "Qty"
+msgstr "Quant."
+
+#: src/components/companies/proposals-panel.tsx
+msgid "Quantity"
+msgstr "Quantitat"
 
 #: src/components/research/research-dialog.tsx
 msgid "Question"
@@ -3579,6 +3607,10 @@ msgstr "Vols eliminar {email} d'aquesta organització?"
 #: src/components/contacts/manage-channels-dialog.tsx
 msgid "Remove channel"
 msgstr "Elimina el canal"
+
+#: src/components/companies/proposals-panel.tsx
+msgid "Remove line"
+msgstr "Elimina la línia"
 
 #: src/routes/settings/organization/members.tsx
 msgid "Removing…"
@@ -4546,13 +4578,13 @@ msgstr "Avui"
 msgid "Too many attempts. Try again in a minute."
 msgstr "Massa intents. Torna-ho a provar d'aquí un minut."
 
+#: src/components/companies/proposals-panel.tsx
+msgid "Total"
+msgstr "Total"
+
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Total competitors"
 msgstr "Total competidors"
-
-#: src/components/companies/proposals-panel.tsx
-msgid "Total value"
-msgstr "Valor total"
 
 #: src/routes/companies/index.tsx
 #: src/routes/emails/index.tsx
@@ -4589,6 +4621,10 @@ msgstr "No es pot lliurar"
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Undo"
 msgstr "Desfés"
+
+#: src/components/companies/proposals-panel.tsx
+msgid "Unit price"
+msgstr "Preu unitari"
 
 #: src/components/companies/conversations-tab.tsx
 #: src/components/companies/research-summary-card.tsx

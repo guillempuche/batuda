@@ -289,6 +289,10 @@ msgstr "Add contact"
 msgid "Add document"
 msgstr "Add document"
 
+#: src/components/companies/proposals-panel.tsx
+msgid "Add line"
+msgstr "Add line"
+
 #: src/components/shared/company-card.tsx
 msgid "Add task"
 msgstr "Add task"
@@ -1558,6 +1562,10 @@ msgstr "Delivered"
 msgid "Deny"
 msgstr "Deny"
 
+#: src/components/companies/proposals-panel.tsx
+msgid "Description"
+msgstr "Description"
+
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Direction"
 msgstr "Direction"
@@ -1680,6 +1688,10 @@ msgstr "e.g. Marta Puig"
 #: src/routes/emails/inboxes.tsx
 msgid "e.g. Sales — Acme"
 msgstr "e.g. Sales — Acme"
+
+#: src/components/companies/proposals-panel.tsx
+msgid "e.g. Setup fee"
+msgstr "e.g. Setup fee"
 
 #: src/components/research/research-dialog.tsx
 msgid "e.g. vip, warm"
@@ -2276,6 +2288,10 @@ msgstr "Last meet"
 #: src/routes/tasks/index.tsx
 msgid "Later"
 msgstr "Later"
+
+#: src/components/companies/proposals-panel.tsx
+msgid "Line items"
+msgstr "Line items"
 
 #: src/components/research/findings/contact-discovery-view.tsx
 #: src/components/shared/channel-icon.tsx
@@ -3327,6 +3343,10 @@ msgstr "Preview"
 msgid "Previous"
 msgstr "Previous"
 
+#: src/components/companies/proposals-panel.tsx
+msgid "Price"
+msgstr "Price"
+
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
@@ -3432,6 +3452,14 @@ msgstr "Publishing…"
 #: src/routes/emails/inboxes.tsx
 msgid "Purpose"
 msgstr "Purpose"
+
+#: src/components/companies/proposals-panel.tsx
+msgid "Qty"
+msgstr "Qty"
+
+#: src/components/companies/proposals-panel.tsx
+msgid "Quantity"
+msgstr "Quantity"
 
 #: src/components/research/research-dialog.tsx
 msgid "Question"
@@ -3579,6 +3607,10 @@ msgstr "Remove {email} from this organization?"
 #: src/components/contacts/manage-channels-dialog.tsx
 msgid "Remove channel"
 msgstr "Remove channel"
+
+#: src/components/companies/proposals-panel.tsx
+msgid "Remove line"
+msgstr "Remove line"
 
 #: src/routes/settings/organization/members.tsx
 msgid "Removing…"
@@ -4546,13 +4578,13 @@ msgstr "Today"
 msgid "Too many attempts. Try again in a minute."
 msgstr "Too many attempts. Try again in a minute."
 
+#: src/components/companies/proposals-panel.tsx
+msgid "Total"
+msgstr "Total"
+
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Total competitors"
 msgstr "Total competitors"
-
-#: src/components/companies/proposals-panel.tsx
-msgid "Total value"
-msgstr "Total value"
 
 #: src/routes/companies/index.tsx
 #: src/routes/emails/index.tsx
@@ -4589,6 +4621,10 @@ msgstr "Undeliverable"
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Undo"
 msgstr "Undo"
+
+#: src/components/companies/proposals-panel.tsx
+msgid "Unit price"
+msgstr "Unit price"
 
 #: src/components/companies/conversations-tab.tsx
 #: src/components/companies/research-summary-card.tsx
