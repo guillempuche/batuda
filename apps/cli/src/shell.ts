@@ -21,6 +21,26 @@ export const exec = (cmd: string, ...args: string[]) =>
 		}
 	}).pipe(Effect.scoped)
 
+/**
+ * Like `exec`, but runs the command directly WITHOUT a shell: `args` are passed
+ * as an array, so no interpolated value (a name, a URL) can be read as shell
+ * syntax. Use this whenever an argument is derived rather than a fixed literal.
+ */
+export const execArgs = (cmd: string, args: string[]) =>
+	Effect.gen(function* () {
+		const handle = yield* ChildProcess.make(cmd, args, {
+			shell: false,
+			stdout: 'inherit',
+			stderr: 'inherit',
+		})
+		const code = yield* handle.exitCode
+		if (code !== 0) {
+			return yield* Effect.fail(
+				new Error(`\`${cmd} ${args.join(' ')}\` exited with code ${code}`),
+			)
+		}
+	}).pipe(Effect.scoped)
+
 /** Like `exec`, but runs in a specific working directory. */
 export const execIn = (cwd: string, cmd: string, ...args: string[]) =>
 	Effect.gen(function* () {
