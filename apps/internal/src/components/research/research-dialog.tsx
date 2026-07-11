@@ -61,6 +61,10 @@ const SCHEMA_CARDS: ReadonlyArray<SchemaCard> = [
 	},
 ]
 
+// Keep free-text inputs to sane lengths so a runaway paste can't be submitted.
+const QUERY_MAX_LENGTH = 2000
+const FILTER_MAX_LENGTH = 120
+
 // The pipeline stages a company moves through; a discovery run can fan out
 // across the ones already in a stage instead of finding net-new companies.
 const STATUS_OPTIONS: ReadonlyArray<string> = [
@@ -287,6 +291,7 @@ export function ResearchDialog({
 								data-testid='research-dialog-query'
 								value={query}
 								rows={3}
+								maxLength={QUERY_MAX_LENGTH}
 								placeholder={
 									isDiscovery
 										? t`e.g. independent bakeries in Barcelona with 5–20 staff`
@@ -350,6 +355,7 @@ export function ResearchDialog({
 										<PriInput
 											id='discovery-location'
 											data-testid='discovery-location'
+											maxLength={FILTER_MAX_LENGTH}
 											value={location}
 											placeholder={t`e.g. Catalonia`}
 											onChange={e => setLocation(e.target.value)}
@@ -398,6 +404,7 @@ export function ResearchDialog({
 										<PriInput
 											id='discovery-industry'
 											data-testid='discovery-industry'
+											maxLength={FILTER_MAX_LENGTH}
 											value={filterIndustry}
 											placeholder={t`e.g. hospitality`}
 											onChange={e => setFilterIndustry(e.target.value)}
@@ -410,6 +417,7 @@ export function ResearchDialog({
 										<PriInput
 											id='discovery-region'
 											data-testid='discovery-region'
+											maxLength={FILTER_MAX_LENGTH}
 											value={filterRegion}
 											placeholder={t`e.g. Barcelona`}
 											onChange={e => setFilterRegion(e.target.value)}
@@ -422,6 +430,7 @@ export function ResearchDialog({
 										<PriInput
 											id='discovery-tags'
 											data-testid='discovery-tags'
+											maxLength={FILTER_MAX_LENGTH}
 											value={filterTags}
 											placeholder={t`e.g. vip, warm`}
 											onChange={e => setFilterTags(e.target.value)}
