@@ -91,3 +91,56 @@ export const buildEvalReport = (
 	summary: summarizeScores(scores),
 	runs: scores,
 })
+
+/**
+ * Flatten one run's score into span attributes for the monitoring board, so a
+ * chart can group runs by company and average the rates over time. Precision and
+ * recall ride along only where there was something to judge — the same rule the
+ * summary uses, so a run that filled nothing charts no precision rather than a
+ * misleading zero.
+ */
+export const evalSpanAttributes = (
+	score: RunScore,
+): Record<string, string | number | boolean> => {
+	const attributes: Record<string, string | number | boolean> = {
+		'eval.company_id': score.id,
+		'eval.grounded': score.grounded,
+		'eval.wrong_company': score.wrongCompany,
+		'eval.empty': score.empty,
+		'eval.fields_expected': score.fieldsExpected,
+		'eval.fields_scored': score.fieldsScored,
+		'eval.fields_correct': score.fieldsCorrect,
+	}
+	if (score.fieldsScored > 0) {
+		attributes['eval.field_precision'] =
+			score.fieldsCorrect / score.fieldsScored
+	}
+	if (score.fieldsExpected > 0) {
+		attributes['eval.field_recall'] = score.fieldsCorrect / score.fieldsExpected
+	}
+	return attributes
+}
+
+/**
+ * Flatten the whole-batch summary into span attributes for the monitoring board —
+ * the top-line rates a drift chart tracks across model and prompt changes. A null
+ * precision/recall (nothing filled, or no known fields) is left off rather than
+ * charted as a zero.
+ */
+export const evalSummaryAttributes = (
+	summary: EvalSummary,
+): Record<string, string | number | boolean> => {
+	const attributes: Record<string, string | number | boolean> = {
+		'eval.runs': summary.runs,
+		'eval.grounding_accuracy': summary.groundingAccuracy,
+		'eval.wrong_company_rate': summary.wrongCompanyRate,
+		'eval.empty_rate': summary.emptyRate,
+	}
+	if (summary.fieldPrecision !== null) {
+		attributes['eval.field_precision'] = summary.fieldPrecision
+	}
+	if (summary.fieldRecall !== null) {
+		attributes['eval.field_recall'] = summary.fieldRecall
+	}
+	return attributes
+}
