@@ -445,6 +445,34 @@ The server runs on Unikraft (stateless Node.js, scales to zero when idle); the w
 
 ---
 
+## Environment variables & secrets
+
+Configuration splits two ways: **secret vs non-secret** (secrets are never committed), and **where the code runs** — a developer's machine versus the deployed cloud. The through-line is that Infisical is the single source of truth for every secret, while non-secret values are committed to the repo.
+
+### Local machine
+
+A local process (server, CLI, tests) reads a gitignored root `.env`, seeded from the committed `.env.example` template — Docker Postgres/MinIO endpoints, `stub` research providers, throwaway dev secrets — so a fresh clone runs end-to-end with no real credentials. `apps/internal/.env.example` is the web app's template; a git worktree gets its own generated `.env` from `pnpm cli worktree up` (see the `worktrees` skill).
+
+There are two ways to reach **real** cloud values from a local machine, both ultimately fed by Infisical:
+
+- `infisical run --env=dev -- <command>` injects one Infisical environment's secrets into a single process (how the research eval gets real dev-tier keys) — nothing lands on disk.
+- The CLI's `--env cloud` mode (§ `apps/cli` above) layers non-secret GitHub Actions **Variables** (`gh variable list --env production`) over the `.env` baseline, plus the developer's local `.env.cloud` for secrets — because GitHub, unlike Infisical, never serves its Actions **Secrets** back over the API.
+
+### Deployed cloud — Infisical → GitHub Actions → the instance
+
+Infisical (project pinned in `.infisical.json`) holds the cloud secrets, organized by **environment** (`dev`, `prod`) and by **folder**, and a sync in Infisical's GitHub integration pushes each folder down into a GitHub Actions **environment**. No workflow calls `infisical` — the deploy only ever reads `${{ secrets.* }}`. The folder → GitHub-environment split mirrors a trust boundary: the one credential that can rewrite the prod schema sits alone, behind its own reviewer gate.
+
+| Infisical `prod` folder | GitHub environment | Read by                                                                 | Holds                                                                                                                                                                             |
+| ----------------------- | ------------------ | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/` (root)              | `production`       | server `deploy` job → injected into the Unikraft instance as `-e VAR=…` | runtime secrets — `DATABASE_URL` (pooled, `app_service`), `BETTER_AUTH_SECRET`, `STORAGE_*`, `EMAIL_*`, `RESEARCH_*`, `CALENDAR_*`, plus `KRAFTCLOUD_TOKEN` for the deploy itself |
+| `/ci`                   | `production-db`    | gated `migrate` job                                                     | only `MIGRATION_DATABASE_URL` — schema-owner `neondb_owner` over the **unpooled** endpoint, the connection that runs DDL/`GRANT`; `production-db` requires a reviewer's approval  |
+
+So adding or rotating a cloud secret is an edit in Infisical (the matching `prod` folder) — never in GitHub and never in a file — and the sync carries it to the right environment. The prod migration credential, for instance, is `MIGRATION_DATABASE_URL` in `prod` → `/ci`; see [runbooks.md → Applying database migrations](runbooks.md#applying-database-migrations) for why it is quarantined and reviewer-gated.
+
+Non-secret deployed config does **not** ride this path: boot-required non-secret values (`ALLOWED_ORIGINS`, the research provider/model selections, `RESEARCH_MAX_*`) live in `apps/server/config.production.json`, shipped with the image and loaded at boot — `apps/server/src/lib/config-provider.ts` throws if the file is missing. The GitHub Actions **Variables** mentioned above are a separate non-secret store, used only by the CLI's cloud mode, not by the deploy.
+
+---
+
 ## Tables
 
 ### CRM tables (Effect SQL migrations)
