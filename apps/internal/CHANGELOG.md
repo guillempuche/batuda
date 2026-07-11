@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-11 (internal-v2026.7.11)
+
+### Features
+
+* **controllers:** add the anchored re-run endpoint ([3f79160](https://github.com/guillempuche/batuda/commit/3f791607c52c108d053cfdc38f1b86b942fe5fe7))
+* **domain:** add company classification vocabularies ([dcc709c](https://github.com/guillempuche/batuda/commit/dcc709cac76703731efe0f3f81a05e44c46aebca))
+* **internal:** show per-field sources, reasons, and target correction ([943cfcf](https://github.com/guillempuche/batuda/commit/943cfcfabed371608b5043e2602c97d4c860c96e))
+* **research:** confirm the right company and extract clean, measured fields ([cb1f8e9](https://github.com/guillempuche/batuda/commit/cb1f8e9c9e12dcae9eb1120a4e99174ae30749aa))
+
+### Bug Fixes
+
+* **research:** fail closed when a run can't confirm the target company ([3523fd8](https://github.com/guillempuche/batuda/commit/3523fd8c1bc4d68fe572bcecd6fdfffa3f5fa13f))
+* **research:** keep a rejected page extraction from failing the run ([02715c4](https://github.com/guillempuche/batuda/commit/02715c46a496a85486bf844cca658ca5cc768cb3))
+* **research:** per-tool spend breakdown and honest empty-scan handling ([197d752](https://github.com/guillempuche/batuda/commit/197d752d415ce6dfa97e619aafb0765fc1290c15))
+* **research:** strip page-builder markup from scraped pages ([3a34d99](https://github.com/guillempuche/batuda/commit/3a34d994c42df681ee129379505e36de2b564bd2))
+* resolve blob uploads failing against Cloudflare R2 ([c6323f9](https://github.com/guillempuche/batuda/commit/c6323f95aea1453ea1919ddac9e4c2baa8f56516))
+
 ## 2026-07-08 (internal-v2026.7.8)
 
 ### Features
