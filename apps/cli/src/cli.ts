@@ -37,6 +37,7 @@ import {
 	worktreeLs,
 	worktreePrune,
 	worktreeUp,
+	worktreeWatch,
 } from './commands/worktree'
 import { withDb } from './db'
 import { appendEnvKeys, resetEnvFile } from './lib/env-file'
@@ -671,6 +672,27 @@ const worktreeDoctorCommand = Command.make(
 	),
 )
 
+const worktreeWatchCommand = Command.make(
+	'watch',
+	{
+		stop: Flag.boolean('stop').pipe(
+			Flag.withDescription(
+				'Close this worktree’s watch window (leaves other worktrees’ windows open)',
+			),
+			Flag.withDefault(false),
+		),
+	},
+	({ stop }) => worktreeWatch({ stop }),
+).pipe(
+	Command.withShortDescription('Open this worktree in a live browser window'),
+	Command.withDescription(
+		'Open this worktree’s app in its own visible Chrome window (a stable ' +
+			'per-worktree browser session), so parallel worktrees can be watched ' +
+			'navigating live, side by side. Re-running reuses the same window; ' +
+			'`--stop` closes only this worktree’s window, never the others.',
+	),
+)
+
 const worktreeCommand = Command.make('worktree').pipe(
 	Command.withShortDescription('Per-worktree dev data on the shared stack'),
 	Command.withDescription(
@@ -687,6 +709,7 @@ const worktreeCommand = Command.make('worktree').pipe(
 		worktreePruneCommand,
 		worktreeLsCommand,
 		worktreeDoctorCommand,
+		worktreeWatchCommand,
 	]),
 )
 

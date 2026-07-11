@@ -7,7 +7,7 @@ import { dirname, resolve } from 'node:path'
 import { Console, Effect, Schedule } from 'effect'
 
 import { mergeEnvOverrides, missingEnvEntries, tryFs } from '../lib/env-file'
-import { exec, execIn, execSilent, ROOT } from '../shell'
+import { exec, execArgs, execIn, execSilent, ROOT } from '../shell'
 import { dbMigrate } from './db'
 
 // The whole machine runs ONE shared Docker stack (the `batuda` compose project).
@@ -901,3 +901,69 @@ export const worktreeDoctor = Effect.gen(function* () {
 	}
 	yield* Console.log('')
 })
+
+// ── watch: one live browser window per worktree ──────────────
+//
+// `watch` opens THIS worktree's app in its own visible Chrome window, so a
+// developer running several sessions at once can watch each one navigate the
+// app side by side. The window is a per-worktree agent-browser session named
+// after the branch, so it's identifiable at a glance and re-running `watch`
+// reuses it instead of opening a second. Teardown (`--stop`) closes only this
+// worktree's window — never every session — so cleaning up one worktree can't
+// kill another's live view.
+
+// A readable, per-worktree window name (branch label, not an opaque hash) so
+// the window is easy to spot; distinct per worktree, so parallel windows never
+// collide.
+const watchSessionName = (branch: string) => `ai-${slugForBranch(branch)}`
+
+// The URL this checkout actually serves: a linked worktree is on its own
+// <label>.batuda.localhost; the main checkout is on the bare batuda.localhost
+// (portless routes it there, not to `main.batuda.localhost`).
+const watchUrl = (isLinked: boolean, branch: string) =>
+	isLinked ? branchUrl(branch) : `https://batuda.localhost${portSuffix()}`
+
+export const worktreeWatch = (options: { stop: boolean }) =>
+	Effect.gen(function* () {
+		const { isLinked } = yield* worktreeContext
+		const branch = yield* branchName
+		const session = watchSessionName(branch)
+
+		if (options.stop) {
+			// Scoped to THIS worktree's window only — never `close --all`, which
+			// would take down every other worktree's live window too. Closing a
+			// window that was never opened is a no-op, not an error.
+			yield* execArgs('agent-browser', ['--session', session, 'close']).pipe(
+				Effect.catch(() => Effect.void),
+			)
+			yield* Console.log(
+				`✓ Closed watch window ${session} (other worktrees untouched).`,
+			)
+			return
+		}
+
+		const target = watchUrl(isLinked, branch)
+		// `open` launches a new headed window for this session, or re-points the
+		// existing one — `--headed` is a no-op once the window is up, so the one
+		// call both creates and reuses. Passed through `execArgs` (no shell) so the
+		// derived name/URL can never be read as shell syntax.
+		yield* execArgs('agent-browser', [
+			'--session',
+			session,
+			'--headed',
+			'open',
+			`${target}/login`,
+		])
+
+		yield* Console.log(
+			[
+				'',
+				`✓ Watching this worktree at ${target}`,
+				`  Window:  ${session}  (a visible Chrome window — look for it on screen)`,
+				'  Stop:    pnpm cli worktree watch --stop',
+				'',
+				'Run `pnpm dev` in this worktree if the window shows a connection error.',
+				'',
+			].join('\n'),
+		)
+	})
