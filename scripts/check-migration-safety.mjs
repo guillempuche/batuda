@@ -28,9 +28,12 @@ const DESTRUCTIVE = [
 	['RENAME TO', /\bRENAME\s+TO\b/i],
 	['DROP CONSTRAINT', /\bDROP\s+CONSTRAINT\b/i],
 	// A required column with no default rejects the old instance's inserts, which don't fill it in.
+	// A `NOT NULL` that reads as `IS NOT NULL` is a query predicate (a partial index's WHERE, a
+	// CHECK) that happens to share the file with an ADD COLUMN — it never makes a column
+	// required, so the lookbehind skips it and only a real required-column add trips this.
 	[
 		'DROP NOT NULL→NOT NULL add',
-		/ADD\s+COLUMN\b[^;]*\bNOT\s+NULL\b(?![^;]*DEFAULT)/i,
+		/ADD\s+COLUMN\b[^;]*(?<!\bIS\s)\bNOT\s+NULL\b(?![^;]*DEFAULT)/i,
 	],
 ]
 const MARKER = /expand-contract:/i
