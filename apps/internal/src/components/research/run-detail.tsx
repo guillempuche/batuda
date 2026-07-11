@@ -19,7 +19,9 @@ import { CompetitorScanView } from '#/components/research/findings/competitor-sc
 import { ContactDiscoveryView } from '#/components/research/findings/contact-discovery-view'
 import { FreeformView } from '#/components/research/findings/freeform-view'
 import { ProspectScanView } from '#/components/research/findings/prospect-scan-view'
+import { ResearchRunIdProvider } from '#/components/research/research-run-context'
 import { ProposedUpdatesReview } from '#/components/research/review/proposed-updates-review'
+import { RunActions } from '#/components/research/run-actions'
 import { RunProgress } from '#/components/research/run-progress'
 import { TargetCorrection } from '#/components/research/target-correction'
 import { useResearchEvents } from '#/hooks/use-research-events'
@@ -61,6 +63,8 @@ type ResearchRunDetail = {
 	readonly findings: unknown
 	readonly errorMessage?: string | null
 	readonly reasonCode?: ReasonCode | null
+	// Carried so "Run again" can re-target the same subjects.
+	readonly context: unknown
 }
 
 export function RunDetail({ researchId }: { readonly researchId: string }) {
@@ -103,63 +107,69 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 	}
 
 	return (
-		<Panel data-testid='research-run-detail'>
-			<Header>
-				<Heading>{run.query}</Heading>
-				<HeaderMeta>
-					<StatusText
-						$status={run.status}
-						data-testid={`research-run-status-${run.id}`}
+		<ResearchRunIdProvider value={run.id}>
+			<Panel data-testid='research-run-detail'>
+				<Header>
+					<Heading>{run.query}</Heading>
+					<HeaderMeta>
+						<StatusText
+							$status={run.status}
+							data-testid={`research-run-status-${run.id}`}
+						>
+							{run.status}
+						</StatusText>
+						{run.schemaName !== null ? (
+							<SchemaText>{run.schemaName}</SchemaText>
+						) : null}
+					</HeaderMeta>
+					<ShapedBy templateNames={run.templateNames} />
+					<RunActions run={run} />
+				</Header>
+
+				{isRunning ? <RunProgress progress={progress} /> : null}
+
+				{run.status === 'failed' || run.status === 'no_reliable_data' ? (
+					<ErrorBlock
+						role='alert'
+						data-testid={`research-run-failure-${run.id}`}
 					>
-						{run.status}
-					</StatusText>
-					{run.schemaName !== null ? (
-						<SchemaText>{run.schemaName}</SchemaText>
-					) : null}
-				</HeaderMeta>
-				<ShapedBy templateNames={run.templateNames} />
-			</Header>
+						<strong>
+							{run.status === 'no_reliable_data' ? (
+								<Trans>No reliable data found</Trans>
+							) : (
+								<Trans>Run failed</Trans>
+							)}
+						</strong>
+						{run.reasonCode != null ? (
+							<FailureReason reasonCode={run.reasonCode} />
+						) : null}
+					</ErrorBlock>
+				) : null}
 
-			{isRunning ? <RunProgress progress={progress} /> : null}
+				{!isRunning &&
+				(run.status === 'no_reliable_data' || run.status === 'succeeded') ? (
+					<TargetCorrection researchId={run.id} />
+				) : null}
 
-			{run.status === 'failed' || run.status === 'no_reliable_data' ? (
-				<ErrorBlock role='alert' data-testid={`research-run-failure-${run.id}`}>
-					<strong>
-						{run.status === 'no_reliable_data' ? (
-							<Trans>No reliable data found</Trans>
-						) : (
-							<Trans>Run failed</Trans>
-						)}
-					</strong>
-					{run.reasonCode != null ? (
-						<FailureReason reasonCode={run.reasonCode} />
-					) : null}
-				</ErrorBlock>
-			) : null}
+				{run.briefMd !== null && run.briefMd !== '' ? (
+					<Section data-testid='research-run-brief'>
+						<SectionTitle>
+							<Trans>Brief</Trans>
+						</SectionTitle>
+						<MarkdownView source={run.briefMd} />
+					</Section>
+				) : null}
 
-			{!isRunning &&
-			(run.status === 'no_reliable_data' || run.status === 'succeeded') ? (
-				<TargetCorrection researchId={run.id} />
-			) : null}
+				{isRunning ? null : <ProposedUpdatesReview researchId={run.id} />}
 
-			{run.briefMd !== null && run.briefMd !== '' ? (
-				<Section data-testid='research-run-brief'>
+				<Section data-testid='research-run-findings'>
 					<SectionTitle>
-						<Trans>Brief</Trans>
+						<Trans>Findings</Trans>
 					</SectionTitle>
-					<MarkdownView source={run.briefMd} />
+					<FindingsView schemaName={run.schemaName} findings={run.findings} />
 				</Section>
-			) : null}
-
-			{isRunning ? null : <ProposedUpdatesReview researchId={run.id} />}
-
-			<Section data-testid='research-run-findings'>
-				<SectionTitle>
-					<Trans>Findings</Trans>
-				</SectionTitle>
-				<FindingsView schemaName={run.schemaName} findings={run.findings} />
-			</Section>
-		</Panel>
+			</Panel>
+		</ResearchRunIdProvider>
 	)
 }
 
@@ -249,6 +259,7 @@ function narrowRun(raw: unknown): ResearchRunDetail | null {
 			(RESEARCH_REASON_CODES as readonly string[]).includes(r['reasonCode'])
 				? (r['reasonCode'] as ReasonCode)
 				: null,
+		context: r['context'] ?? null,
 	}
 }
 

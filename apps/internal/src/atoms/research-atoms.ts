@@ -84,6 +84,24 @@ export const createResearchAtom = BatudaApiAtom.mutation('research', 'create')
 /** Target correction: re-run a run anchored to a user-supplied official domain. */
 export const rerunResearchAtom = BatudaApiAtom.mutation('research', 'rerun')
 
+/** Stop a queued/running run from the run-detail screen. */
+export const cancelResearchAtom = BatudaApiAtom.mutation('research', 'cancel')
+
+/** Soft-delete a run so it drops out of the run list and inbox. */
+export const deleteResearchAtom = BatudaApiAtom.mutation('research', 'delete')
+
+/** Approve a paused run's pending paid action so the run can spend and continue. */
+export const approvePaidActionAtom = BatudaApiAtom.mutation(
+	'research',
+	'approvePaidAction',
+)
+
+/** Skip a paused run's pending paid action so the run continues without it. */
+export const skipPaidActionAtom = BatudaApiAtom.mutation(
+	'research',
+	'skipPaidAction',
+)
+
 /**
  * One pending proposal in the cross-run review inbox. The
  * `listPendingProposals` endpoint is typed server-side, so the atom already

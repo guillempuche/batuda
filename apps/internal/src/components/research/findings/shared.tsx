@@ -1,11 +1,22 @@
-import { Trans } from '@lingui/react/macro'
+import { useAtomRefresh, useAtomSet } from '@effect/atom-react'
+import { Trans, useLingui } from '@lingui/react/macro'
 import { AlertTriangle } from 'lucide-react'
+import { useState } from 'react'
 import styled from 'styled-components'
 
+import { PriButton, usePriToast } from '@batuda/ui/pri'
+
+import {
+	approvePaidActionAtom,
+	researchDetailAtom,
+	skipPaidActionAtom,
+} from '#/atoms/research-atoms'
 import {
 	DEFAULT_TRUST_THRESHOLD,
 	normalizeConfidence,
 } from '#/components/research/proposal-logic'
+import { useResearchRunId } from '#/components/research/research-run-context'
+import { formatMoneyCents } from '#/lib/format-money'
 import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
 
 /**
@@ -39,6 +50,10 @@ export type ProposedUpdate = {
 }
 
 export type PendingPaidAction = {
+	// Stamped onto each action when the run stores it, so a human can approve or
+	// skip that exact entry. Absent on runs from before the id stamp.
+	readonly id?: string
+	readonly status?: string
 	readonly tool: string
 	readonly args?: Readonly<Record<string, unknown>>
 	readonly estimatedCents?: number
@@ -117,20 +132,92 @@ export function PendingPaidActionsSection({
 						a.reason ?? '',
 						a.args ? JSON.stringify(a.args) : '',
 					])
-					return (
-						<ListItem key={key}>
-							<RowHead>
-								<Pill>{a.tool}</Pill>
-								{a.estimatedCents !== undefined ? (
-									<Cost>{`€${(a.estimatedCents / 100).toFixed(2)}`}</Cost>
-								) : null}
-							</RowHead>
-							{a.reason !== undefined ? <Reason>{a.reason}</Reason> : null}
-						</ListItem>
-					)
+					return <PaidActionRow key={key} action={a} />
 				})}
 			</List>
 		</Section>
+	)
+}
+
+// One paid action, with approve/skip controls when it is still pending and the
+// run id is in context. Resolving refreshes the run so the row's status flips.
+function PaidActionRow({ action }: { readonly action: PendingPaidAction }) {
+	const { t, i18n } = useLingui()
+	const toast = usePriToast()
+	const runId = useResearchRunId()
+	const approve = useAtomSet(approvePaidActionAtom, { mode: 'promiseExit' })
+	const skip = useAtomSet(skipPaidActionAtom, { mode: 'promiseExit' })
+	// A hook must run every render, so stand in a placeholder id when there is no
+	// run; refresh only ever fires after a resolve, which requires a real id.
+	const refreshRun = useAtomRefresh(researchDetailAtom(runId ?? '__no_run__'))
+	const [busy, setBusy] = useState(false)
+
+	const canResolve =
+		runId !== null &&
+		action.id !== undefined &&
+		(action.status === undefined || action.status === 'pending')
+
+	const resolve = async (decision: 'approve' | 'skip') => {
+		if (runId === null || action.id === undefined) return
+		setBusy(true)
+		const call = decision === 'approve' ? approve : skip
+		const exit = await call({
+			params: { id: runId, paId: action.id },
+		} as never)
+		setBusy(false)
+		if (exit._tag === 'Success') {
+			refreshRun()
+			toast.add({
+				title:
+					decision === 'approve'
+						? t`Paid action approved`
+						: t`Paid action skipped`,
+				type: 'success',
+			})
+		} else {
+			toast.add({ title: t`Could not update the paid action`, type: 'error' })
+		}
+	}
+
+	return (
+		<ListItem>
+			<RowHead>
+				<Pill>{action.tool}</Pill>
+				{action.estimatedCents !== undefined ? (
+					<Cost>
+						{formatMoneyCents(action.estimatedCents, { locale: i18n.locale })}
+					</Cost>
+				) : null}
+				{action.status !== undefined && action.status !== 'pending' ? (
+					<ResolvedTag data-testid='paid-action-resolved'>
+						{action.status}
+					</ResolvedTag>
+				) : null}
+			</RowHead>
+			{action.reason !== undefined ? <Reason>{action.reason}</Reason> : null}
+			{canResolve ? (
+				<PaidActions>
+					<PriButton
+						type='button'
+						$variant='filled'
+						data-testid='paid-action-approve'
+						disabled={busy}
+						onClick={() => void resolve('approve')}
+					>
+						<Trans>Approve</Trans>
+					</PriButton>
+					<PriButton
+						type='button'
+						$variant='text'
+						data-testid='paid-action-skip'
+						disabled={busy}
+						onClick={() => void resolve('skip')}
+					>
+						<Trans>Skip</Trans>
+					</PriButton>
+				</PaidActions>
+			) : null}
+		</ListItem>
 	)
 }
 
@@ -259,6 +346,20 @@ export const Reason = styled.p`
 	font-style: italic;
 	color: var(--color-on-surface-variant);
 	margin: 0;
+`
+
+const PaidActions = styled.div`
+	display: flex;
+	gap: var(--space-2xs);
+	margin-top: var(--space-2xs);
+`
+
+const ResolvedTag = styled.span`
+	font-family: var(--font-display);
+	font-size: var(--typescale-label-small-size);
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--color-secondary);
 `
 
 export const FieldsTable = styled.dl`

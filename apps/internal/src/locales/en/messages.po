@@ -191,6 +191,10 @@ msgstr "acme.com"
 msgid "across {0} providers"
 msgstr "across {0} providers"
 
+#: src/components/research/research-dialog.tsx
+msgid "Across companies in stage"
+msgstr "Across companies in stage"
+
 #: src/routes/emails/inboxes.tsx
 msgid "Actions"
 msgstr "Actions"
@@ -330,6 +334,10 @@ msgstr "All owners"
 msgid "All regions"
 msgstr "All regions"
 
+#: src/components/research/inbox/research-inbox.tsx
+msgid "All runs"
+msgstr "All runs"
+
 #: src/routes/pages/index.tsx
 msgid "All statuses"
 msgstr "All statuses"
@@ -357,6 +365,10 @@ msgstr "Already resolved"
 #: src/routes/oauth/consent.tsx
 msgid "An AI assistant wants to connect to your Batuda account over MCP and act on your behalf. Only approve assistants you trust."
 msgstr "An AI assistant wants to connect to your Batuda account over MCP and act on your behalf. Only approve assistants you trust."
+
+#: src/components/research/research-dialog.tsx
+msgid "Any"
+msgstr "Any"
 
 #: src/routes/settings/api-keys/index.tsx
 msgid "Any agent using \"{confirmLabel}\" will stop working. This can't be undone."
@@ -406,6 +418,10 @@ msgstr "Applying a discovered contact merges it into a matching record if one al
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Applying…"
 msgstr "Applying…"
+
+#: src/components/research/findings/shared.tsx
+msgid "Approve"
+msgstr "Approve"
 
 #: src/routes/emails/$threadId.tsx
 #: src/routes/emails/index.tsx
@@ -459,6 +475,10 @@ msgstr "Auto-apply verified findings"
 msgid "Auto-approve paid calls under"
 msgstr "Auto-approve paid calls under"
 
+#: src/components/research/research-dialog.tsx
+msgid "Back"
+msgstr "Back"
+
 #: src/routes/settings/profile/templates.tsx
 msgid "Back to account"
 msgstr "Back to account"
@@ -483,6 +503,10 @@ msgstr "Back to organization"
 msgid "Back to research"
 msgstr "Back to research"
 
+#: src/components/research/run-list.tsx
+msgid "Back to review queue"
+msgstr "Back to review queue"
+
 #: src/routes/settings/api-keys/index.tsx
 #: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/index.tsx
@@ -494,6 +518,10 @@ msgstr "Back to settings"
 #: src/routes/reset-password.tsx
 msgid "Back to sign in"
 msgstr "Back to sign in"
+
+#: src/components/research/run-list.tsx
+msgid "Batch"
+msgstr "Batch"
 
 #: src/i18n/lingui.tsx
 msgid "Batuda"
@@ -601,6 +629,7 @@ msgstr "Calls"
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/research/research-dialog.tsx
+#: src/components/research/run-actions.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/api-keys/index.tsx
@@ -613,9 +642,17 @@ msgstr "Cancel"
 msgid "Cancel upload"
 msgstr "Cancel upload"
 
+#: src/components/research/run-labels.ts
+msgid "Cancelled"
+msgstr "Cancelled"
+
 #: src/routes/oauth/consent.tsx
 msgid "Cancelling…"
 msgstr "Cancelling…"
+
+#: src/components/research/research-dialog.tsx
+msgid "Catalan"
+msgstr "Catalan"
 
 #: src/components/research/trust-badge.tsx
 msgid "Catch-all"
@@ -973,6 +1010,10 @@ msgstr "Could not apply the batch."
 msgid "Could not cancel the invitation to {email}. Please try again."
 msgstr "Could not cancel the invitation to {email}. Please try again."
 
+#: src/components/research/run-actions.tsx
+msgid "Could not cancel the run"
+msgstr "Could not cancel the run"
+
 #: src/components/companies/company-owner-control.tsx
 msgid "Could not change owner"
 msgstr "Could not change owner"
@@ -996,6 +1037,10 @@ msgstr "Could not create the key. Please try again."
 #: src/routes/settings/api-keys/index.tsx
 msgid "Could not delete the key. Please try again."
 msgstr "Could not delete the key. Please try again."
+
+#: src/components/research/run-actions.tsx
+msgid "Could not delete the run"
+msgstr "Could not delete the run"
 
 #: src/routes/companies/index.tsx
 msgid "Could not load companies"
@@ -1036,6 +1081,10 @@ msgstr "Could not load your connections. Refresh to try again."
 #: src/routes/settings/api-keys/index.tsx
 msgid "Could not load your keys. Refresh to try again."
 msgstr "Could not load your keys. Refresh to try again."
+
+#: src/components/research/run-list.tsx
+msgid "Could not load your runs."
+msgstr "Could not load your runs."
 
 #: src/components/companies/where-panel-client.client.tsx
 msgid "Could not locate"
@@ -1113,6 +1162,10 @@ msgstr "Could not set the default inbox."
 msgid "Could not sign in. Check your email and password."
 msgstr "Could not sign in. Check your email and password."
 
+#: src/components/research/run-actions.tsx
+msgid "Could not start a new run"
+msgstr "Could not start a new run"
+
 #: src/components/research/target-correction.tsx
 msgid "Could not start the re-run. Please try again."
 msgstr "Could not start the re-run. Please try again."
@@ -1136,6 +1189,10 @@ msgstr "Could not update"
 #: src/components/contacts/manage-channels-dialog.tsx
 msgid "Could not update channels"
 msgstr "Could not update channels"
+
+#: src/components/research/findings/shared.tsx
+msgid "Could not update the paid action"
+msgstr "Could not update the paid action"
 
 #: src/routes/settings/organization/templates.tsx
 msgid "Couldn't add it"
@@ -1320,6 +1377,7 @@ msgid "Defaults to you when omitted."
 msgstr "Defaults to you when omitted."
 
 #: src/components/instructions/template-delete-confirm.tsx
+#: src/components/research/run-actions.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/api-keys/index.tsx
 msgid "Delete"
@@ -1364,6 +1422,10 @@ msgstr "Delete this org template?"
 #: src/routes/settings/profile/templates.tsx
 msgid "Delete this template?"
 msgstr "Delete this template?"
+
+#: src/components/research/run-labels.ts
+msgid "Deleted"
+msgstr "Deleted"
 
 #: src/components/instructions/template-delete-confirm.tsx
 #: src/routes/settings/api-keys/index.tsx
@@ -1460,6 +1522,14 @@ msgstr "Duration (min)"
 msgid "e.g. [research] Spain hospitality sourcing"
 msgstr "e.g. [research] Spain hospitality sourcing"
 
+#: src/components/research/research-dialog.tsx
+msgid "e.g. Barcelona"
+msgstr "e.g. Barcelona"
+
+#: src/components/research/research-dialog.tsx
+msgid "e.g. Catalonia"
+msgstr "e.g. Catalonia"
+
 #: src/routes/settings/api-keys/index.tsx
 msgid "e.g. Claude Desktop"
 msgstr "e.g. Claude Desktop"
@@ -1468,9 +1538,21 @@ msgstr "e.g. Claude Desktop"
 msgid "e.g. Company signature"
 msgstr "e.g. Company signature"
 
+#: src/components/research/research-dialog.tsx
+msgid "e.g. hospitality"
+msgstr "e.g. hospitality"
+
+#: src/components/research/research-dialog.tsx
+msgid "e.g. independent bakeries in Barcelona with 5–20 staff"
+msgstr "e.g. independent bakeries in Barcelona with 5–20 staff"
+
 #: src/routes/emails/inboxes.tsx
 msgid "e.g. Sales — Acme"
 msgstr "e.g. Sales — Acme"
+
+#: src/components/research/research-dialog.tsx
+msgid "e.g. vip, warm"
+msgstr "e.g. vip, warm"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Edit"
@@ -1566,6 +1648,10 @@ msgstr "Emails, calls, documents, and proposals will appear here as they happen.
 msgid "Empty"
 msgstr "Empty"
 
+#: src/components/research/research-dialog.tsx
+msgid "English"
+msgstr "English"
+
 #: src/components/research/findings/company-enrichment-view.tsx
 msgid "Enrichment"
 msgstr "Enrichment"
@@ -1631,6 +1717,7 @@ msgstr "Extending the org default"
 msgid "Extracting findings"
 msgstr "Extracting findings"
 
+#: src/components/research/run-labels.ts
 #: src/routes/emails/$threadId.tsx
 msgid "Failed"
 msgstr "Failed"
@@ -1669,13 +1756,24 @@ msgstr "Filter conversations"
 msgid "Filter emails"
 msgstr "Filter emails"
 
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/research-dialog.tsx
+#: src/components/research/research-dialog.tsx
+#: src/components/research/run-list.tsx
+msgid "Find companies"
+msgstr "Find companies"
+
+#: src/components/research/research-dialog.tsx
+msgid "Find companies matching a profile — industry, size, location. Pick when you want net-new companies to add as leads."
+msgstr "Find companies matching a profile — industry, size, location. Pick when you want net-new companies to add as leads."
+
 #: src/components/research/research-dialog.tsx
 msgid "Find decision-makers and operational contacts at this company. Pick when you need names, emails, phones and roles to reach out."
 msgstr "Find decision-makers and operational contacts at this company. Pick when you need names, emails, phones and roles to reach out."
 
 #: src/components/research/research-dialog.tsx
-msgid "Find similar companies elsewhere with the same pain. Pick when you have closed a deal and want lookalikes."
-msgstr "Find similar companies elsewhere with the same pain. Pick when you have closed a deal and want lookalikes."
+msgid "Find net-new"
+msgstr "Find net-new"
 
 #: src/components/research/run-detail.tsx
 msgid "Findings"
@@ -1888,6 +1986,10 @@ msgstr "Inbox updated"
 msgid "Industry"
 msgstr "Industry"
 
+#: src/components/research/research-dialog.tsx
+msgid "Industry filter"
+msgstr "Industry filter"
+
 #: src/routes/emails/inboxes.tsx
 msgid "Infomaniak needs a Mail app password created in your Mail service — not an account application password, and not your normal login password."
 msgstr "Infomaniak needs a Mail app password created in your Mail service — not an account application password, and not your normal login password."
@@ -2050,6 +2152,10 @@ msgstr "Loading companies…"
 msgid "Loading run…"
 msgstr "Loading run…"
 
+#: src/components/research/run-list.tsx
+msgid "Loading runs…"
+msgstr "Loading runs…"
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Loading the review queue…"
 msgstr "Loading the review queue…"
@@ -2083,6 +2189,7 @@ msgstr "Locating…"
 
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
+#: src/components/research/research-dialog.tsx
 #: src/routes/calendar/index.tsx
 msgid "Location"
 msgstr "Location"
@@ -2522,10 +2629,18 @@ msgstr "No proposals waiting for review."
 msgid "No redirect URI"
 msgstr "No redirect URI"
 
+#: src/components/research/run-labels.ts
+msgid "No reliable data"
+msgstr "No reliable data"
+
 #: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/run-detail.tsx
 msgid "No reliable data found"
 msgstr "No reliable data found"
+
+#: src/components/research/run-list.tsx
+msgid "No research runs yet. Find companies to get started."
+msgstr "No research runs yet. Find companies to get started."
 
 #: src/components/companies/research-summary-card.tsx
 msgid "No research yet."
@@ -2575,6 +2690,10 @@ msgstr "none scheduled"
 #: src/components/shared/task-item.tsx
 msgid "Normal priority"
 msgstr "Normal priority"
+
+#: src/components/research/research-dialog.tsx
+msgid "Not enough research budget for this run. Raise the budget or narrow the search."
+msgstr "Not enough research budget for this run. Raise the budget or narrow the search."
 
 #: src/routes/forgot-password.tsx
 msgid "Not seeing it? Check your spam folder. If you're sure the email is right and it never arrives, an admin can help."
@@ -2813,6 +2932,14 @@ msgstr "Page title"
 msgid "Pages"
 msgstr "Pages"
 
+#: src/components/research/findings/shared.tsx
+msgid "Paid action approved"
+msgstr "Paid action approved"
+
+#: src/components/research/findings/shared.tsx
+msgid "Paid action skipped"
+msgstr "Paid action skipped"
+
 #: src/routes/settings/organization/policy.tsx
 msgid "Paid calls at or below this run without asking."
 msgstr "Paid calls at or below this run without asking."
@@ -2876,6 +3003,7 @@ msgstr "Paste an app password — I'll show you where to get one"
 msgid "Pause syncing"
 msgstr "Pause syncing"
 
+#: src/components/research/run-labels.ts
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
 msgid "Paused"
@@ -3102,6 +3230,7 @@ msgstr "Purpose"
 msgid "Question"
 msgstr "Question"
 
+#: src/components/research/run-labels.ts
 #: src/routes/emails/$threadId.tsx
 msgid "Queued"
 msgstr "Queued"
@@ -3174,6 +3303,10 @@ msgstr "Refreshing inbox status…"
 #: src/routes/companies/index.tsx
 msgid "Region"
 msgstr "Region"
+
+#: src/components/research/research-dialog.tsx
+msgid "Region filter"
+msgstr "Region filter"
 
 #: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/review/proposed-updates-review.tsx
@@ -3292,6 +3425,10 @@ msgstr "Research budget saved."
 msgid "Research run"
 msgstr "Research run"
 
+#: src/components/research/run-list.tsx
+msgid "Research runs"
+msgstr "Research runs"
+
 #: src/routes/settings/organization/members.tsx
 msgid "Resend"
 msgstr "Resend"
@@ -3354,6 +3491,14 @@ msgstr "Risky"
 msgid "Role"
 msgstr "Role"
 
+#: src/components/research/run-actions.tsx
+msgid "Run again"
+msgstr "Run again"
+
+#: src/components/research/run-actions.tsx
+msgid "Run cancelled"
+msgstr "Run cancelled"
+
 #: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/run-detail.tsx
 msgid "Run failed"
@@ -3374,6 +3519,10 @@ msgstr "Run not found"
 #: src/components/research/run-detail.tsx
 msgid "Run shape unrecognised."
 msgstr "Run shape unrecognised."
+
+#: src/components/research/run-labels.ts
+msgid "Running"
+msgstr "Running"
 
 #: src/components/companies/about-section.tsx
 msgid "Sales context"
@@ -3658,6 +3807,10 @@ msgstr "Signing out…"
 msgid "Size"
 msgstr "Size"
 
+#: src/components/research/findings/shared.tsx
+msgid "Skip"
+msgstr "Skip"
+
 #: src/routes/pages/$id.tsx
 #: src/routes/pages/index.tsx
 #: src/routes/settings/organization/index.tsx
@@ -3721,9 +3874,17 @@ msgstr "Sourced from research"
 msgid "Sourced from research on {dateLabel}"
 msgstr "Sourced from research on {dateLabel}"
 
+#: src/components/research/research-dialog.tsx
+msgid "Sources language"
+msgstr "Sources language"
+
 #: src/routes/emails/index.tsx
 msgid "Spam"
 msgstr "Spam"
+
+#: src/components/research/research-dialog.tsx
+msgid "Spanish"
+msgstr "Spanish"
 
 #: src/routes/settings/organization/index.tsx
 #: src/routes/settings/organization/spend.tsx
@@ -3764,6 +3925,11 @@ msgstr "Standing guidance your research agent follows on every run."
 msgid "Start"
 msgstr "Start"
 
+#. placeholder {0}: pendingConfirm.subjectCount
+#: src/components/research/research-dialog.tsx
+msgid "Start {0} runs"
+msgstr "Start {0} runs"
+
 #: src/routes/emails/inboxes.tsx
 msgid "Start sending and receiving"
 msgstr "Start sending and receiving"
@@ -3772,6 +3938,7 @@ msgstr "Start sending and receiving"
 msgid "Starting the run…"
 msgstr "Starting the run…"
 
+#: src/components/research/research-dialog.tsx
 #: src/components/research/research-dialog.tsx
 msgid "Starting…"
 msgstr "Starting…"
@@ -3791,6 +3958,10 @@ msgstr "Status"
 #: src/routes/emails/index.tsx
 msgid "Status update failed"
 msgstr "Status update failed"
+
+#: src/components/research/research-dialog.tsx
+msgid "Steer a net-new search, or set a status/industry/region/tag filter to run across companies you already track."
+msgstr "Steer a net-new search, or set a status/industry/region/tag filter to run across companies you already track."
 
 #. placeholder {0}: progress.phase
 #: src/components/research/run-progress.tsx
@@ -3819,6 +3990,10 @@ msgstr "Structuring the findings"
 msgid "Subject"
 msgstr "Subject"
 
+#: src/components/research/run-labels.ts
+msgid "Succeeded"
+msgstr "Succeeded"
+
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Summary"
 msgstr "Summary"
@@ -3844,6 +4019,10 @@ msgstr "Tags"
 #: src/components/companies/about-section.tsx
 msgid "Tags & fit"
 msgstr "Tags & fit"
+
+#: src/components/research/research-dialog.tsx
+msgid "Tags filter (comma-separated)"
+msgstr "Tags filter (comma-separated)"
 
 #: src/components/companies/conversations-tab.tsx
 msgid "Task"
@@ -4061,6 +4240,12 @@ msgstr "This overrides the site I auto-detected and re-runs the research locked 
 #: src/routes/oauth/consent.tsx
 msgid "This page opens when an AI assistant asks to connect. Start the connection from your assistant."
 msgstr "This page opens when an AI assistant asks to connect. Start the connection from your assistant."
+
+#. placeholder {0}: pendingConfirm.subjectCount
+#. placeholder {1}: formatMoneyCents(pendingConfirm.estimatedCostCents, { locale: i18n.locale, })
+#: src/components/research/research-dialog.tsx
+msgid "This runs research on {0} companies, up to about {1} in paid data. Start the batch?"
+msgstr "This runs research on {0} companies, up to about {1} in paid data. Start the batch?"
 
 #: src/routes/index.tsx
 #: src/routes/tasks/index.tsx
@@ -4286,6 +4471,10 @@ msgid "What"
 msgstr "What"
 
 #: src/components/research/research-dialog.tsx
+msgid "What are you looking for?"
+msgstr "What are you looking for?"
+
+#: src/components/research/research-dialog.tsx
 msgid "What do you want to find out about this company?"
 msgstr "What do you want to find out about this company?"
 
@@ -4318,6 +4507,10 @@ msgstr "When"
 #: src/components/companies/where-panel-client.client.tsx
 msgid "Where"
 msgstr "Where"
+
+#: src/components/research/research-dialog.tsx
+msgid "Where to look (optional)"
+msgstr "Where to look (optional)"
 
 #: src/routes/emails/index.tsx
 #: src/routes/emails/index.tsx

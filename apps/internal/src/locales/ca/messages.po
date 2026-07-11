@@ -191,6 +191,10 @@ msgstr "acme.com"
 msgid "across {0} providers"
 msgstr "en {0} proveïdors"
 
+#: src/components/research/research-dialog.tsx
+msgid "Across companies in stage"
+msgstr "A través d'empreses en l'etapa"
+
 #: src/routes/emails/inboxes.tsx
 msgid "Actions"
 msgstr "Accions"
@@ -330,6 +334,10 @@ msgstr "Tots els responsables"
 msgid "All regions"
 msgstr "Totes les regions"
 
+#: src/components/research/inbox/research-inbox.tsx
+msgid "All runs"
+msgstr "Totes les execucions"
+
 #: src/routes/pages/index.tsx
 msgid "All statuses"
 msgstr "Tots els estats"
@@ -357,6 +365,10 @@ msgstr "Ja resolt"
 #: src/routes/oauth/consent.tsx
 msgid "An AI assistant wants to connect to your Batuda account over MCP and act on your behalf. Only approve assistants you trust."
 msgstr "Un assistent d'IA vol connectar-se al teu compte de Batuda per MCP i actuar en nom teu. Aprova només els assistents en qui confiïs."
+
+#: src/components/research/research-dialog.tsx
+msgid "Any"
+msgstr "Qualsevol"
 
 #: src/routes/settings/api-keys/index.tsx
 msgid "Any agent using \"{confirmLabel}\" will stop working. This can't be undone."
@@ -406,6 +418,10 @@ msgstr "En aplicar un contacte descobert, es fusiona amb un registre coincident 
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Applying…"
 msgstr "Aplicant…"
+
+#: src/components/research/findings/shared.tsx
+msgid "Approve"
+msgstr "Aprova"
 
 #: src/routes/emails/$threadId.tsx
 #: src/routes/emails/index.tsx
@@ -459,6 +475,10 @@ msgstr "Aplica automàticament les conclusions verificades"
 msgid "Auto-approve paid calls under"
 msgstr "Aprova automàticament les crides de pagament per sota de"
 
+#: src/components/research/research-dialog.tsx
+msgid "Back"
+msgstr "Enrere"
+
 #: src/routes/settings/profile/templates.tsx
 msgid "Back to account"
 msgstr "Torna al compte"
@@ -483,6 +503,10 @@ msgstr "Tornar a l'organització"
 msgid "Back to research"
 msgstr "Torna a la recerca"
 
+#: src/components/research/run-list.tsx
+msgid "Back to review queue"
+msgstr "Torna a la cua de revisió"
+
 #: src/routes/settings/api-keys/index.tsx
 #: src/routes/settings/mcp/connections.tsx
 #: src/routes/settings/mcp/index.tsx
@@ -494,6 +518,10 @@ msgstr "Torna a la configuració"
 #: src/routes/reset-password.tsx
 msgid "Back to sign in"
 msgstr "Torna a iniciar sessió"
+
+#: src/components/research/run-list.tsx
+msgid "Batch"
+msgstr "Lot"
 
 #: src/i18n/lingui.tsx
 msgid "Batuda"
@@ -601,6 +629,7 @@ msgstr "Crides"
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
 #: src/components/research/research-dialog.tsx
+#: src/components/research/run-actions.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/api-keys/index.tsx
@@ -613,9 +642,17 @@ msgstr "Cancel·la"
 msgid "Cancel upload"
 msgstr "Cancel·la la pujada"
 
+#: src/components/research/run-labels.ts
+msgid "Cancelled"
+msgstr "Cancel·lada"
+
 #: src/routes/oauth/consent.tsx
 msgid "Cancelling…"
 msgstr "Cancel·lant…"
+
+#: src/components/research/research-dialog.tsx
+msgid "Catalan"
+msgstr "Català"
 
 #: src/components/research/trust-badge.tsx
 msgid "Catch-all"
@@ -973,6 +1010,10 @@ msgstr "No s'ha pogut aplicar el lot."
 msgid "Could not cancel the invitation to {email}. Please try again."
 msgstr "No s'ha pogut cancel·lar la invitació a {email}. Torna-ho a provar."
 
+#: src/components/research/run-actions.tsx
+msgid "Could not cancel the run"
+msgstr "No s'ha pogut cancel·lar l'execució"
+
 #: src/components/companies/company-owner-control.tsx
 msgid "Could not change owner"
 msgstr "No s'ha pogut canviar el responsable"
@@ -996,6 +1037,10 @@ msgstr "No s'ha pogut crear la clau. Torna-ho a provar."
 #: src/routes/settings/api-keys/index.tsx
 msgid "Could not delete the key. Please try again."
 msgstr "No s'ha pogut eliminar la clau. Torna-ho a provar."
+
+#: src/components/research/run-actions.tsx
+msgid "Could not delete the run"
+msgstr "No s'ha pogut eliminar l'execució"
 
 #: src/routes/companies/index.tsx
 msgid "Could not load companies"
@@ -1036,6 +1081,10 @@ msgstr "No s'han pogut carregar les connexions. Actualitza per tornar-ho a prova
 #: src/routes/settings/api-keys/index.tsx
 msgid "Could not load your keys. Refresh to try again."
 msgstr "No s'han pogut carregar les teves claus. Actualitza per tornar-ho a provar."
+
+#: src/components/research/run-list.tsx
+msgid "Could not load your runs."
+msgstr "No s'han pogut carregar les teves execucions."
 
 #: src/components/companies/where-panel-client.client.tsx
 msgid "Could not locate"
@@ -1113,6 +1162,10 @@ msgstr "No s'ha pogut establir la safata per defecte."
 msgid "Could not sign in. Check your email and password."
 msgstr "No s'ha pogut iniciar sessió. Comprova el correu i la contrasenya."
 
+#: src/components/research/run-actions.tsx
+msgid "Could not start a new run"
+msgstr "No s'ha pogut iniciar una nova execució"
+
 #: src/components/research/target-correction.tsx
 msgid "Could not start the re-run. Please try again."
 msgstr "No he pogut iniciar la reexecució. Torna-ho a provar."
@@ -1136,6 +1189,10 @@ msgstr "No s'ha pogut actualitzar"
 #: src/components/contacts/manage-channels-dialog.tsx
 msgid "Could not update channels"
 msgstr "No s'han pogut actualitzar els canals"
+
+#: src/components/research/findings/shared.tsx
+msgid "Could not update the paid action"
+msgstr "No s'ha pogut actualitzar l'acció de pagament"
 
 #: src/routes/settings/organization/templates.tsx
 msgid "Couldn't add it"
@@ -1320,6 +1377,7 @@ msgid "Defaults to you when omitted."
 msgstr "Per defecte ets tu si s'omet."
 
 #: src/components/instructions/template-delete-confirm.tsx
+#: src/components/research/run-actions.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/api-keys/index.tsx
 msgid "Delete"
@@ -1364,6 +1422,10 @@ msgstr "Vols eliminar aquesta plantilla de l'organització?"
 #: src/routes/settings/profile/templates.tsx
 msgid "Delete this template?"
 msgstr "Vols eliminar aquesta plantilla?"
+
+#: src/components/research/run-labels.ts
+msgid "Deleted"
+msgstr "Eliminada"
 
 #: src/components/instructions/template-delete-confirm.tsx
 #: src/routes/settings/api-keys/index.tsx
@@ -1460,6 +1522,14 @@ msgstr "Durada (min)"
 msgid "e.g. [research] Spain hospitality sourcing"
 msgstr "p. ex. [research] Espanya prospecció d'hostaleria"
 
+#: src/components/research/research-dialog.tsx
+msgid "e.g. Barcelona"
+msgstr "p. ex. Barcelona"
+
+#: src/components/research/research-dialog.tsx
+msgid "e.g. Catalonia"
+msgstr "p. ex. Catalunya"
+
 #: src/routes/settings/api-keys/index.tsx
 msgid "e.g. Claude Desktop"
 msgstr "p. ex. Claude Desktop"
@@ -1468,9 +1538,21 @@ msgstr "p. ex. Claude Desktop"
 msgid "e.g. Company signature"
 msgstr "p. ex. Signatura de l'empresa"
 
+#: src/components/research/research-dialog.tsx
+msgid "e.g. hospitality"
+msgstr "p. ex. hostaleria"
+
+#: src/components/research/research-dialog.tsx
+msgid "e.g. independent bakeries in Barcelona with 5–20 staff"
+msgstr "p. ex. fleques independents a Barcelona amb 5–20 treballadors"
+
 #: src/routes/emails/inboxes.tsx
 msgid "e.g. Sales — Acme"
 msgstr "p. ex. Vendes — Acme"
+
+#: src/components/research/research-dialog.tsx
+msgid "e.g. vip, warm"
+msgstr "p. ex. vip, càlid"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Edit"
@@ -1566,6 +1648,10 @@ msgstr "Els emails, trucades, documents i propostes apareixeran aquí a mesura q
 msgid "Empty"
 msgstr "Buit"
 
+#: src/components/research/research-dialog.tsx
+msgid "English"
+msgstr "Anglès"
+
 #: src/components/research/findings/company-enrichment-view.tsx
 msgid "Enrichment"
 msgstr "Enriquiment"
@@ -1631,6 +1717,7 @@ msgstr "S'amplia el valor per defecte de l'organització"
 msgid "Extracting findings"
 msgstr "Extraient conclusions"
 
+#: src/components/research/run-labels.ts
 #: src/routes/emails/$threadId.tsx
 msgid "Failed"
 msgstr "Fallit"
@@ -1669,13 +1756,24 @@ msgstr "Filtra les converses"
 msgid "Filter emails"
 msgstr "Filtra correus"
 
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/research-dialog.tsx
+#: src/components/research/research-dialog.tsx
+#: src/components/research/run-list.tsx
+msgid "Find companies"
+msgstr "Cerca empreses"
+
+#: src/components/research/research-dialog.tsx
+msgid "Find companies matching a profile — industry, size, location. Pick when you want net-new companies to add as leads."
+msgstr "Cerca empreses que encaixin amb un perfil — sector, mida, ubicació. Tria-ho quan vulguis empreses noves per afegir com a oportunitats."
+
 #: src/components/research/research-dialog.tsx
 msgid "Find decision-makers and operational contacts at this company. Pick when you need names, emails, phones and roles to reach out."
 msgstr "Troba decisors i contactes operatius d'aquesta empresa. Tria-ho quan necessitis noms, correus, telèfons i rols per contactar-los."
 
 #: src/components/research/research-dialog.tsx
-msgid "Find similar companies elsewhere with the same pain. Pick when you have closed a deal and want lookalikes."
-msgstr "Troba empreses similars amb el mateix problema. Tria-ho quan hagis tancat un acord i en vulguis trobar de semblants."
+msgid "Find net-new"
+msgstr "Cerca de noves"
 
 #: src/components/research/run-detail.tsx
 msgid "Findings"
@@ -1888,6 +1986,10 @@ msgstr "Safata actualitzada"
 msgid "Industry"
 msgstr "Sector"
 
+#: src/components/research/research-dialog.tsx
+msgid "Industry filter"
+msgstr "Filtre de sector"
+
 #: src/routes/emails/inboxes.tsx
 msgid "Infomaniak needs a Mail app password created in your Mail service — not an account application password, and not your normal login password."
 msgstr "Infomaniak necessita una contrasenya d'aplicació de Mail creada al teu servei Mail; no la contrasenya d'aplicació del compte ni la contrasenya d'inici de sessió habitual."
@@ -2050,6 +2152,10 @@ msgstr "Carregant empreses…"
 msgid "Loading run…"
 msgstr "Carregant l'execució…"
 
+#: src/components/research/run-list.tsx
+msgid "Loading runs…"
+msgstr "S'estan carregant les execucions…"
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Loading the review queue…"
 msgstr "Carregant la cua de revisió…"
@@ -2083,6 +2189,7 @@ msgstr "Localitzant…"
 
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
+#: src/components/research/research-dialog.tsx
 #: src/routes/calendar/index.tsx
 msgid "Location"
 msgstr "Ubicació"
@@ -2522,10 +2629,18 @@ msgstr "No hi ha cap proposta pendent de revisió."
 msgid "No redirect URI"
 msgstr "Sense URI de redirecció"
 
+#: src/components/research/run-labels.ts
+msgid "No reliable data"
+msgstr "Sense dades fiables"
+
 #: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/run-detail.tsx
 msgid "No reliable data found"
 msgstr "No s'han trobat dades fiables"
+
+#: src/components/research/run-list.tsx
+msgid "No research runs yet. Find companies to get started."
+msgstr "Encara no hi ha execucions de recerca. Cerca empreses per començar."
 
 #: src/components/companies/research-summary-card.tsx
 msgid "No research yet."
@@ -2575,6 +2690,10 @@ msgstr "cap planificat"
 #: src/components/shared/task-item.tsx
 msgid "Normal priority"
 msgstr "Prioritat normal"
+
+#: src/components/research/research-dialog.tsx
+msgid "Not enough research budget for this run. Raise the budget or narrow the search."
+msgstr "No hi ha prou pressupost de recerca per a aquesta execució. Augmenta el pressupost o acota la cerca."
 
 #: src/routes/forgot-password.tsx
 msgid "Not seeing it? Check your spam folder. If you're sure the email is right and it never arrives, an admin can help."
@@ -2813,6 +2932,14 @@ msgstr "Títol de la pàgina"
 msgid "Pages"
 msgstr "Pàgines"
 
+#: src/components/research/findings/shared.tsx
+msgid "Paid action approved"
+msgstr "Acció de pagament aprovada"
+
+#: src/components/research/findings/shared.tsx
+msgid "Paid action skipped"
+msgstr "Acció de pagament omesa"
+
 #: src/routes/settings/organization/policy.tsx
 msgid "Paid calls at or below this run without asking."
 msgstr "Les crides de pagament iguals o inferiors a aquest import s'executen sense preguntar."
@@ -2876,6 +3003,7 @@ msgstr "Enganxa una contrasenya d'aplicació; jo et mostraré on aconseguir-ne u
 msgid "Pause syncing"
 msgstr "Atura la sincronització"
 
+#: src/components/research/run-labels.ts
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
 msgid "Paused"
@@ -3102,6 +3230,7 @@ msgstr "Propòsit"
 msgid "Question"
 msgstr "Pregunta"
 
+#: src/components/research/run-labels.ts
 #: src/routes/emails/$threadId.tsx
 msgid "Queued"
 msgstr "En cua"
@@ -3174,6 +3303,10 @@ msgstr "Actualitzant l'estat de la bústia…"
 #: src/routes/companies/index.tsx
 msgid "Region"
 msgstr "Regió"
+
+#: src/components/research/research-dialog.tsx
+msgid "Region filter"
+msgstr "Filtre de regió"
 
 #: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/review/proposed-updates-review.tsx
@@ -3292,6 +3425,10 @@ msgstr "Pressupost de recerca desat."
 msgid "Research run"
 msgstr "Recerca"
 
+#: src/components/research/run-list.tsx
+msgid "Research runs"
+msgstr "Execucions de recerca"
+
 #: src/routes/settings/organization/members.tsx
 msgid "Resend"
 msgstr "Reenvia"
@@ -3354,6 +3491,14 @@ msgstr "Arriscat"
 msgid "Role"
 msgstr "Rol"
 
+#: src/components/research/run-actions.tsx
+msgid "Run again"
+msgstr "Torna a executar"
+
+#: src/components/research/run-actions.tsx
+msgid "Run cancelled"
+msgstr "Execució cancel·lada"
+
 #: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/run-detail.tsx
 msgid "Run failed"
@@ -3374,6 +3519,10 @@ msgstr "Execució no trobada"
 #: src/components/research/run-detail.tsx
 msgid "Run shape unrecognised."
 msgstr "Format d'execució no reconegut."
+
+#: src/components/research/run-labels.ts
+msgid "Running"
+msgstr "En execució"
 
 #: src/components/companies/about-section.tsx
 msgid "Sales context"
@@ -3658,6 +3807,10 @@ msgstr "Tancant sessió…"
 msgid "Size"
 msgstr "Mida"
 
+#: src/components/research/findings/shared.tsx
+msgid "Skip"
+msgstr "Omet"
+
 #: src/routes/pages/$id.tsx
 #: src/routes/pages/index.tsx
 #: src/routes/settings/organization/index.tsx
@@ -3721,9 +3874,17 @@ msgstr "Obtingut de la recerca"
 msgid "Sourced from research on {dateLabel}"
 msgstr "Obtingut de la recerca el {dateLabel}"
 
+#: src/components/research/research-dialog.tsx
+msgid "Sources language"
+msgstr "Idioma de les fonts"
+
 #: src/routes/emails/index.tsx
 msgid "Spam"
 msgstr "Brossa"
+
+#: src/components/research/research-dialog.tsx
+msgid "Spanish"
+msgstr "Castellà"
 
 #: src/routes/settings/organization/index.tsx
 #: src/routes/settings/organization/spend.tsx
@@ -3764,6 +3925,11 @@ msgstr "Orientació permanent que el teu agent de recerca segueix en cada recerc
 msgid "Start"
 msgstr "Inicia"
 
+#. placeholder {0}: pendingConfirm.subjectCount
+#: src/components/research/research-dialog.tsx
+msgid "Start {0} runs"
+msgstr "Inicia {0} execucions"
+
 #: src/routes/emails/inboxes.tsx
 msgid "Start sending and receiving"
 msgstr "Comença a enviar i rebre"
@@ -3772,6 +3938,7 @@ msgstr "Comença a enviar i rebre"
 msgid "Starting the run…"
 msgstr "Iniciant l'execució…"
 
+#: src/components/research/research-dialog.tsx
 #: src/components/research/research-dialog.tsx
 msgid "Starting…"
 msgstr "Iniciant…"
@@ -3791,6 +3958,10 @@ msgstr "Estat"
 #: src/routes/emails/index.tsx
 msgid "Status update failed"
 msgstr "Ha fallat l'actualització d'estat"
+
+#: src/components/research/research-dialog.tsx
+msgid "Steer a net-new search, or set a status/industry/region/tag filter to run across companies you already track."
+msgstr "Orienta una cerca de noves empreses, o defineix un filtre d'estat/sector/regió/etiqueta per executar-la sobre empreses que ja segueixes."
 
 #. placeholder {0}: progress.phase
 #: src/components/research/run-progress.tsx
@@ -3819,6 +3990,10 @@ msgstr "Estructurant les conclusions"
 msgid "Subject"
 msgstr "Assumpte"
 
+#: src/components/research/run-labels.ts
+msgid "Succeeded"
+msgstr "Completada"
+
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Summary"
 msgstr "Resum"
@@ -3844,6 +4019,10 @@ msgstr "Etiquetes"
 #: src/components/companies/about-section.tsx
 msgid "Tags & fit"
 msgstr "Etiquetes i encaix"
+
+#: src/components/research/research-dialog.tsx
+msgid "Tags filter (comma-separated)"
+msgstr "Filtre d'etiquetes (separades per comes)"
 
 #: src/components/companies/conversations-tab.tsx
 msgid "Task"
@@ -4061,6 +4240,12 @@ msgstr "Això substitueix el lloc que he detectat automàticament i torna a exec
 #: src/routes/oauth/consent.tsx
 msgid "This page opens when an AI assistant asks to connect. Start the connection from your assistant."
 msgstr "Aquesta pàgina s'obre quan un assistent d'IA demana connectar-se. Inicia la connexió des del teu assistent."
+
+#. placeholder {0}: pendingConfirm.subjectCount
+#. placeholder {1}: formatMoneyCents(pendingConfirm.estimatedCostCents, { locale: i18n.locale, })
+#: src/components/research/research-dialog.tsx
+msgid "This runs research on {0} companies, up to about {1} in paid data. Start the batch?"
+msgstr "Això farà recerca sobre {0} empreses, fins a uns {1} en dades de pagament. Vols iniciar el lot?"
 
 #: src/routes/index.tsx
 #: src/routes/tasks/index.tsx
@@ -4286,6 +4471,10 @@ msgid "What"
 msgstr "Què"
 
 #: src/components/research/research-dialog.tsx
+msgid "What are you looking for?"
+msgstr "Què estàs cercant?"
+
+#: src/components/research/research-dialog.tsx
 msgid "What do you want to find out about this company?"
 msgstr "Què vols saber d'aquesta empresa?"
 
@@ -4318,6 +4507,10 @@ msgstr "Quan"
 #: src/components/companies/where-panel-client.client.tsx
 msgid "Where"
 msgstr "On"
+
+#: src/components/research/research-dialog.tsx
+msgid "Where to look (optional)"
+msgstr "On cercar (opcional)"
 
 #: src/routes/emails/index.tsx
 #: src/routes/emails/index.tsx
