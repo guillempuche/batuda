@@ -165,6 +165,20 @@ const domainLabelOf = (host: string): string | undefined => {
 // ("Sunset Transportation, St. Louis MO"); fall back to the whole query.
 const queryName = (query: string): string => query.split(',')[0] ?? query
 
+// A domain-shaped token inside free text: one or more dot-separated labels then a
+// 2–24 letter top-level part. The letters-only tail keeps decimals ("3.5") and
+// abbreviations ("e.g", "U.S.A") from matching.
+const DOMAIN_IN_TEXT = /(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}/i
+
+// A caller often writes the company's own domain straight into the query, e.g.
+// "Sunset Transportation (sunsettrans.com)". Pull the first domain-shaped token so
+// the run can treat it as the target's official site. Normalised and validated
+// through domainHost, so only a real registrable host comes back.
+export const parseQueryDomain = (query: string): string | undefined => {
+	const match = query.match(DOMAIN_IN_TEXT)
+	return match ? domainHost(match[0]) : undefined
+}
+
 export interface EntityTarget {
 	readonly table: string
 	readonly name?: string | undefined
@@ -218,10 +232,13 @@ export const deriveEntityTargets = (args: {
 		.filter((w): w is string => w != null && w.trim() !== '')
 	const anchorHost =
 		args.anchorDomain != null ? domainHost(args.anchorDomain) : undefined
+	// A domain written into the query is the target's own site too — fold it in so
+	// a page that references it counts as a strong match, like an anchor domain.
+	const queryHost = parseQueryDomain(args.query)
 
 	const domains = [
 		...new Set(
-			[...websites.map(domainHost), anchorHost].filter(
+			[...websites.map(domainHost), anchorHost, queryHost].filter(
 				(h): h is string => h != null,
 			),
 		),
@@ -237,6 +254,34 @@ export const deriveEntityTargets = (args: {
 	if (cores.length === 0 && words.length === 0 && domains.length === 0)
 		return null
 	return { cores, words, domains }
+}
+
+/**
+ * The single official-site host to fetch up front for an entity run, or undefined
+ * when there is none to anchor on. The human-corrected domain wins, then an
+ * anchored subject's own website, then a domain written into the query. Only a
+ * single-target run (an entity-grounded schema, or one with an anchored subject)
+ * reads the query — a scan has no one official site, so it never anchors.
+ */
+export const deriveAnchorHost = (args: {
+	schemaName: string
+	query: string
+	subjects: ReadonlyArray<EntityTarget>
+	anchorDomain?: string | undefined
+}): string | undefined => {
+	const fromAnchor =
+		args.anchorDomain != null ? domainHost(args.anchorDomain) : undefined
+	if (fromAnchor !== undefined) return fromAnchor
+	const fromSubject = args.subjects
+		.map(s => s.website)
+		.filter((w): w is string => w != null && w.trim() !== '')
+		.map(domainHost)
+		.find((h): h is string => h !== undefined)
+	if (fromSubject !== undefined) return fromSubject
+	const anchored = args.subjects.length > 0
+	if (!ENTITY_GROUNDED_SCHEMAS.has(args.schemaName) && !anchored)
+		return undefined
+	return parseQueryDomain(args.query)
 }
 
 export type EntityMatch = 'strong' | 'weak' | 'absent'
