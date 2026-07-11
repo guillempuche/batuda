@@ -3,11 +3,13 @@ import { describe, expect, it } from 'vitest'
 import {
 	classifyEntityMatch,
 	classifyEntityMatchPerSource,
+	deriveAnchorHost,
 	deriveEntityTargets,
 	domainHost,
 	type EntityTargets,
 	groundedSourceIds,
 	isConfirmedRegistryMatch,
+	parseQueryDomain,
 } from './entity-guard'
 
 describe('deriveEntityTargets', () => {
@@ -312,6 +314,125 @@ describe('deriveEntityTargets with an anchor domain', () => {
 			})
 			// THEN it is dropped and the result matches the no-anchor derivation
 			expect(withJunk?.domains).toEqual(without?.domains)
+		})
+	})
+})
+
+describe('deriveEntityTargets with a domain in the query', () => {
+	describe('when the caller writes the official domain into the query text', () => {
+		it('should fold that host into the strong-match domain keys', () => {
+			// GIVEN a query-only enrichment whose text carries the company's domain
+			const targets = deriveEntityTargets({
+				schemaName: 'company_enrichment_v1',
+				query: 'Sunset Transportation (sunsettrans.com)',
+				subjects: [],
+			})
+			// THEN a page referencing that host will strong-match the target
+			expect(targets?.domains).toContain('sunsettrans.com')
+		})
+	})
+})
+
+describe('parseQueryDomain', () => {
+	describe('when the query carries a domain-shaped token', () => {
+		it('should pull it out of parentheses, plain text, or an email address', () => {
+			// GIVEN queries that mention the company domain in different shapes
+			// THEN each yields the bare registrable host
+			expect(parseQueryDomain('Sunset Transportation (sunsettrans.com)')).toBe(
+				'sunsettrans.com',
+			)
+			expect(parseQueryDomain('Echo Global Logistics echo.com')).toBe(
+				'echo.com',
+			)
+			expect(parseQueryDomain('reach me at jane@acme.co.uk please')).toBe(
+				'acme.co.uk',
+			)
+			expect(parseQueryDomain('visit https://www.monzo.com/about')).toBe(
+				'monzo.com',
+			)
+		})
+	})
+
+	describe('when the query has no real domain', () => {
+		it('should return undefined rather than match an abbreviation or decimal', () => {
+			// GIVEN text with dotted tokens that are not domains
+			// THEN nothing is treated as a domain
+			expect(parseQueryDomain('Sunset Transportation, St. Louis MO')).toBe(
+				undefined,
+			)
+			expect(parseQueryDomain('e.g. a freight broker')).toBe(undefined)
+			expect(parseQueryDomain('revenue grew 3.5 last year')).toBe(undefined)
+			expect(parseQueryDomain('just a plain company name')).toBe(undefined)
+		})
+	})
+})
+
+describe('deriveAnchorHost', () => {
+	describe('when several domain signals are present', () => {
+		it('should prefer the corrected anchor domain over the subject website', () => {
+			// GIVEN a subject website and a later human-corrected anchor domain
+			const host = deriveAnchorHost({
+				schemaName: 'company_enrichment_v1',
+				query: 'Acme (acme-query.com)',
+				subjects: [
+					{ table: 'companies', name: 'Acme', website: 'https://sub.com' },
+				],
+				anchorDomain: 'https://www.corrected.com/x',
+			})
+			// THEN the corrected domain wins
+			expect(host).toBe('corrected.com')
+		})
+
+		it('should prefer the subject website over a domain in the query', () => {
+			// GIVEN a subject website and a domain in the query, but no anchor domain
+			const host = deriveAnchorHost({
+				schemaName: 'company_enrichment_v1',
+				query: 'Acme (acme-query.com)',
+				subjects: [
+					{ table: 'companies', name: 'Acme', website: 'https://sub.com' },
+				],
+			})
+			// THEN the subject's own site wins
+			expect(host).toBe('sub.com')
+		})
+	})
+
+	describe('when only the query carries a domain', () => {
+		it('should anchor an entity-grounded run on the query domain', () => {
+			// GIVEN a query-only enrichment with the domain in the text
+			// THEN the query domain is the anchor
+			expect(
+				deriveAnchorHost({
+					schemaName: 'company_enrichment_v1',
+					query: 'Echo Global Logistics echo.com',
+					subjects: [],
+				}),
+			).toBe('echo.com')
+		})
+
+		it('should not read the query for a scan run with no subject', () => {
+			// GIVEN a scan schema (reports third parties) with a domain in the query
+			// THEN there is no single official site to anchor on
+			expect(
+				deriveAnchorHost({
+					schemaName: 'prospect_scan_v1',
+					query: 'freight brokers near acme.com',
+					subjects: [],
+				}),
+			).toBe(undefined)
+		})
+	})
+
+	describe('when no domain signal is present', () => {
+		it('should return undefined', () => {
+			// GIVEN a plain company-name query with no subject or anchor
+			expect(
+				deriveAnchorHost({
+					schemaName: 'company_enrichment_v1',
+					query: 'Sunset Transportation, St. Louis MO',
+					subjects: [],
+				}),
+			).toBe(undefined)
 		})
 	})
 })

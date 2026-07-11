@@ -42,6 +42,7 @@ import {
 import {
 	classifyEntityMatch,
 	classifyEntityMatchPerSource,
+	deriveAnchorHost,
 	deriveEntityTargets,
 	domainHost,
 	type EntityMatch,
@@ -57,12 +58,17 @@ import {
 	RegistryRouter,
 	ResearchEventSink,
 	ResearchRunContext,
+	ScrapeProvider,
 	WriterLanguageModel,
 } from './ports'
 import { type FreeformSchema, schemaRegistry } from './schemas/index'
 import { urlHashForScrape } from './source-key'
-import { REGISTRY_LOOKUP_COST_CENTS } from './tool-costs'
-import { researchToolkit, researchToolkitLayer } from './tools'
+import { REGISTRY_LOOKUP_COST_CENTS, SCRAPE_COST_CENTS } from './tool-costs'
+import {
+	isUnsupportedScrapeUrl,
+	researchToolkit,
+	researchToolkitLayer,
+} from './tools'
 import { verifyValueProvenance } from './value-guard'
 import { constrainVocabulary } from './vocabulary-guard'
 
@@ -940,16 +946,6 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							.templateFingerprint ?? ''
 
 					const context = run['context'] as CreateResearchInput['context']
-					// A target-correction re-run seeds context.anchorDomain: point both
-					// the grounding path and the model's first prompt at that official site.
-					const anchorHost =
-						context?.anchorDomain != null
-							? domainHost(context.anchorDomain)
-							: undefined
-					const anchorInstruction =
-						anchorHost !== undefined
-							? `\n\n${ANCHOR_DOMAIN_INSTRUCTION(anchorHost)}`
-							: ''
 					const schemaName =
 						(run as { schemaName: string | null }).schemaName ?? 'freeform'
 
@@ -980,24 +976,39 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					// no anchored subject is not entity-gated (targets is null). The
 					// verdict is computed from the phase-1 evidence below and, on resume,
 					// read back from the row so the weak-match handling survives a restart.
+					const subjectTargets = subjects.map(s => {
+						const row = s.snapshot as Record<string, unknown>
+						return {
+							table: s.table,
+							name: typeof row['name'] === 'string' ? row['name'] : undefined,
+							website:
+								typeof row['website'] === 'string' ? row['website'] : undefined,
+						}
+					})
 					const entityTargets = deriveEntityTargets({
 						schemaName,
 						anchorDomain: context?.anchorDomain,
 						query: (run as { query: string }).query,
-						subjects: subjects.map(s => {
-							const row = s.snapshot as Record<string, unknown>
-							return {
-								table: s.table,
-								name: typeof row['name'] === 'string' ? row['name'] : undefined,
-								website:
-									typeof row['website'] === 'string'
-										? row['website']
-										: undefined,
-							}
-						}),
+						subjects: subjectTargets,
 					})
 					let entityMatch: EntityMatch | null =
 						(run as { entityMatch?: EntityMatch | null }).entityMatch ?? null
+
+					// The company's own official site to fetch up front, when the caller
+					// gave its domain — a target-correction re-run's anchor, an anchored
+					// subject's website, or a domain written into the query. The instruction
+					// nudges the model there; the seeded scrape below guarantees the page is
+					// fetched even if the model never navigates to it.
+					const anchorHost = deriveAnchorHost({
+						schemaName,
+						anchorDomain: context?.anchorDomain,
+						query: (run as { query: string }).query,
+						subjects: subjectTargets,
+					})
+					const anchorInstruction =
+						anchorHost !== undefined
+							? `\n\n${ANCHOR_DOMAIN_INSTRUCTION(anchorHost)}`
+							: ''
 
 					// A follow-up run performs one approved paid call instead of the
 					// normal research loop, then merges the result onto the origin run.
@@ -1110,6 +1121,11 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					// guard checks findings against. Kept separate from the model-facing
 					// transcript (capped per page); empty on a resume that skips phase 1.
 					const scrapeCorpus: Array<{ urlHash: string; text: string }> = []
+					// The anchor site fetched up front (see below): its url hash to link as
+					// a source, and its capped rendered text to prepend to the transcript so
+					// phase-2 extraction reads the official site even if the model never did.
+					const seededAnchorHashes: string[] = []
+					const seededTranscriptParts: string[] = []
 					// Findings the discovery-scan retry path extracts under the shared
 					// budget; undefined on every other path (which extracts in phase 2).
 					let retryFindings: unknown
@@ -1423,6 +1439,53 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						const phaseOutcome = yield* Effect.gen(function* () {
 							const budget = yield* Budget
 							const toolkit = yield* researchToolkit
+							const scrape = yield* ScrapeProvider
+
+							// Anchor: when the caller handed in the company's own domain, fetch
+							// that official site once now so grounding has the right company's
+							// page even if the model never navigates there. Best-effort — a
+							// refused, unreachable, or empty site just falls back to the model's
+							// own searching, and a people directory (LinkedIn) is left to
+							// discover_contacts rather than fetched here.
+							if (
+								anchorHost !== undefined &&
+								!isUnsupportedScrapeUrl(`https://${anchorHost}`)
+							) {
+								yield* Effect.gen(function* () {
+									yield* budget.chargeCheap('scrape', SCRAPE_COST_CENTS)
+									const page = yield* scrape.scrape({
+										url: `https://${anchorHost}`,
+										formats: ['markdown'],
+									})
+									if (
+										page.markdown !== undefined &&
+										page.markdown.trim().length > 0
+									) {
+										const hash = urlHashForScrape(page.url)
+										scrapeCorpus.push({ urlHash: hash, text: page.markdown })
+										seededAnchorHashes.push(hash)
+										seededTranscriptParts.push(
+											`[scrape_page] ${boundedToolResult({ url: page.url, markdown: page.markdown })}`,
+										)
+										yield* Effect.logInfo('research.anchor.seeded').pipe(
+											Effect.annotateLogs({
+												research_id: researchId,
+												host: anchorHost,
+											}),
+										)
+									}
+								}).pipe(
+									Effect.catchCause(cause =>
+										Effect.logWarning('research.anchor.seed_failed').pipe(
+											Effect.annotateLogs({
+												research_id: researchId,
+												host: anchorHost,
+												cause: Cause.pretty(cause),
+											}),
+										),
+									),
+								)
+							}
 
 							// One agent pass = a fresh reflect-and-retry loop. Both the initial
 							// pass and a refined retry run here, under the SAME budget + toolkit:
@@ -1672,7 +1735,11 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						)
 
 						const loopResult = phaseOutcome.loop
-						researchText = loopResult.researchText
+						// Prepend the anchor site's content so phase-2 extraction reads the
+						// official page first; empty when nothing was seeded.
+						researchText = [...seededTranscriptParts, loopResult.researchText]
+							.filter(part => part.length > 0)
+							.join('\n\n')
 						evidenceText = loopResult.evidenceText
 						tokensIn = loopResult.tokensIn
 						tokensOut = loopResult.tokensOut
@@ -1709,10 +1776,14 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							WHERE id = ${researchId}
 						`
 
-						// Link every page scraped across the loop's rounds to the run so
-						// findings cite real sources (a discovery-scan retry may have linked
-						// some already — ON CONFLICT makes the re-link a no-op).
-						yield* linkRunSources(loopResult.scrapedUrlHashes)
+						// Link every page scraped across the loop's rounds — plus the anchor
+						// site seeded before the loop — to the run so findings cite real
+						// sources (a discovery-scan retry may have linked some already —
+						// ON CONFLICT makes the re-link a no-op).
+						yield* linkRunSources([
+							...loopResult.scrapedUrlHashes,
+							...seededAnchorHashes,
+						])
 					}
 
 					// The phase-1 entity gate is skipped when a run resumes from a checkpoint
