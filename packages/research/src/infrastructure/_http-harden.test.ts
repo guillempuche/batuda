@@ -2,7 +2,7 @@ import { Cause, Effect, Exit, Fiber, Option, Ref } from 'effect'
 import { TestClock } from 'effect/testing'
 import { describe, expect, it } from 'vitest'
 
-import { ProviderError } from '../domain/errors'
+import { ProviderError, UnsupportedSite } from '../domain/errors'
 import { hardenHttp } from './_http-harden'
 
 // ── Test helpers ──
@@ -111,6 +111,32 @@ describe('hardenHttp', () => {
 		// THEN it fails on the first attempt with no retry
 		expect(Ref.getUnsafe(callsRef)).toBe(1)
 		expect(errorOf(exit)?.recoverable).toBe(false)
+	})
+
+	it('should pass a non-ProviderError routing error straight through, un-retried', async () => {
+		// GIVEN an inner call that fails with a routing error that is NOT a
+		// ProviderError — the scrape provider refusing an unsupported site
+		const callsRef = Ref.makeUnsafe(0)
+		const inner = Effect.gen(function* () {
+			yield* Ref.update(callsRef, x => x + 1)
+			return yield* Effect.fail(
+				new UnsupportedSite({
+					provider: 'firecrawl',
+					url: 'https://www.linkedin.com/company/x',
+				}),
+			)
+		})
+
+		// WHEN it runs through the hardener
+		const exit = await runWithVirtualClock(() => hardenHttp('test')(inner))
+
+		// THEN it fails on the first attempt (no retry) and keeps its identity —
+		// never re-cast to a recoverable "timed out" ProviderError
+		expect(Ref.getUnsafe(callsRef)).toBe(1)
+		const err = Exit.isFailure(exit)
+			? Option.getOrUndefined(Cause.findErrorOption(exit.cause))
+			: undefined
+		expect(err).toBeInstanceOf(UnsupportedSite)
 	})
 
 	it('should convert a timed-out attempt into a recoverable error and retry', async () => {

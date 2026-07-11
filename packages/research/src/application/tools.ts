@@ -213,6 +213,47 @@ export const stripPlaceholderSiteFilters = (query: string): string => {
 	return stripped.length > 0 ? stripped : query
 }
 
+// People directories the loop should not scrape: their staff/decision-maker data
+// belongs in discover_contacts, and the scrape provider refuses them anyway
+// (Firecrawl 403s LinkedIn). Skipping them up front spends no scrape on a fetch
+// that can't help; the provider-side UnsupportedSite catch is the backstop for
+// any site not listed here that the provider still turns away. Registrable hosts.
+const SCRAPE_SKIP_HOSTS = new Set(['linkedin.com'])
+
+const registrableHost = (url: string): string | undefined => {
+	try {
+		return new URL(url).hostname.toLowerCase().replace(/^www\./, '')
+	} catch {
+		return undefined
+	}
+}
+
+/**
+ * Whether a URL points at a site the scrape provider won't fetch — LinkedIn and
+ * other people directories. A subdomain (e.g. es.linkedin.com) counts too.
+ */
+export const isUnsupportedScrapeUrl = (url: string): boolean => {
+	const host = registrableHost(url)
+	if (host === undefined) return false
+	return [...SCRAPE_SKIP_HOSTS].some(
+		skip => host === skip || host.endsWith(`.${skip}`),
+	)
+}
+
+/**
+ * The model-facing result for a scrape the loop skips: not a failure, just a
+ * pointer to fetch that data another way — discover_contacts for people, the
+ * company's own site for the company. Mirrors `noRegistryResult`'s shape.
+ */
+export const scrapeSkipResult = (url: string) =>
+	({
+		status: 'skipped',
+		url,
+		reason: 'unsupported_site',
+		message:
+			"This site can't be fetched with scrape_page. For a company's decision-makers or staff, use discover_contacts with the company domain; for the company itself, scrape its official website instead.",
+	}) as const
+
 export const researchToolkitLayer = researchToolkit.toLayer(
 	Effect.gen(function* () {
 		const search = yield* SearchProvider
@@ -261,6 +302,20 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 					Effect.andThen(mapToolError(toolName)(cause)),
 				)
 
+		// A scrape the provider refuses (or one of the known people directories) is
+		// logged as a skip, not a failure, so it stays queryable without the
+		// error-level noise a starved-run investigation would otherwise sift.
+		const skipUnsupportedScrape = (url: string) =>
+			Effect.logInfo('research.scrape.skipped_unsupported').pipe(
+				Effect.annotateLogs({
+					tool: 'scrape_page',
+					'research.run_id': researchId,
+					url,
+					reason: 'unsupported_site',
+				}),
+				Effect.as(scrapeSkipResult(url)),
+			)
+
 		return researchToolkit.of({
 			web_search: params =>
 				Effect.gen(function* () {
@@ -296,6 +351,11 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 
 			scrape_page: params =>
 				Effect.gen(function* () {
+					// Skip a site the provider refuses (LinkedIn etc.) before spending a
+					// scrape: hand the model a routing hint, not a guaranteed-failing fetch.
+					if (isUnsupportedScrapeUrl(params.url)) {
+						return yield* skipUnsupportedScrape(params.url)
+					}
 					yield* budget.chargeCheap('scrape', SCRAPE_COST_CENTS)
 					const page = yield* scrape.scrape({
 						url: params.url,
@@ -309,6 +369,10 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 							})
 						: page
 				}).pipe(
+					// The provider refused the site (a 403 no key or retry can fix):
+					// skip the URL and let the loop keep going, rather than logging a
+					// failure and handing the model an error it can't act on.
+					Effect.catchTag('UnsupportedSite', e => skipUnsupportedScrape(e.url)),
 					Effect.catchTag('BudgetExceeded', cheapExhausted('scrape_page')),
 					Effect.catchCause(logToolFailure('scrape_page')),
 					Effect.withSpan('research.tool.scrape_page', {

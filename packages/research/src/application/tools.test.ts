@@ -1,7 +1,7 @@
 import { Effect, Layer, Schema, Stream } from 'effect'
 import { describe, expect, it } from 'vitest'
 
-import { NoRegistry, ProviderError } from '../domain/errors'
+import { NoRegistry, ProviderError, UnsupportedSite } from '../domain/errors'
 import { RegistryRecord, ScrapedPage, SearchResult } from '../domain/types'
 import { StubExtractProvider } from '../infrastructure/stub/extract'
 import { StubRegistryEsProvider } from '../infrastructure/stub/registry-es'
@@ -25,10 +25,12 @@ import {
 } from './ports'
 import {
 	ExtractStructuredTool,
+	isUnsupportedScrapeUrl,
 	RegistryLookupTool,
 	researchToolkit,
 	researchToolkitLayer,
 	ScrapePageTool,
+	scrapeSkipResult,
 	stripPlaceholderSiteFilters,
 	WebSearchTool,
 } from './tools'
@@ -188,7 +190,9 @@ const registryLookupResult = async (
 // element, so a test can assert the model saw a failure (isFailure) rather than
 // the run fiber being aborted.
 const scrapePageResult = async (
-	scrape: (input: ScrapeInput) => Effect.Effect<ScrapedPage, ProviderError>,
+	scrape: (
+		input: ScrapeInput,
+	) => Effect.Effect<ScrapedPage, ProviderError | UnsupportedSite>,
 	params: { url: string },
 ): Promise<{ result: unknown; isFailure: boolean }> => {
 	const ports = Layer.mergeAll(
@@ -781,6 +785,117 @@ describe('researchToolkit — a web-fetch failure is non-fatal', () => {
 					'extract_structured: Unknown schema_name: totally_bogus_schema. Valid names: freeform, company_enrichment_v1, competitor_scan_v1, contact_discovery_v1, prospect_scan_v1',
 				)
 			})
+		})
+	})
+})
+
+describe('researchToolkit scrape_page — an unsupported site is skipped, not failed', () => {
+	describe('when the url is a known people directory (LinkedIn)', () => {
+		it('should return a discover_contacts skip result without ever calling the scrape provider', async () => {
+			// GIVEN a scrape provider that would fail loudly if it were ever reached
+			let called = false
+			const { result, isFailure } = await scrapePageResult(
+				() => {
+					called = true
+					return Effect.fail(
+						new ProviderError({
+							provider: 'firecrawl',
+							message: 'should not be called',
+							recoverable: false,
+						}),
+					)
+				},
+				{ url: 'https://www.linkedin.com/company/echo-global-logistics' },
+			)
+
+			// THEN the provider is never invoked (no scrape spent) and the model
+			// reads a non-failure skip that routes people lookups to discover_contacts
+			expect(called).toBe(false)
+			expect(isFailure).toBe(false)
+			expect(result).toEqual(
+				scrapeSkipResult(
+					'https://www.linkedin.com/company/echo-global-logistics',
+				),
+			)
+		})
+	})
+
+	describe('when the provider refuses the site with UnsupportedSite', () => {
+		it('should map the refusal to a non-failure skip so the run keeps going', async () => {
+			// GIVEN a scrape provider that reports the site is unsupported (the 403 no
+			// key or retry can fix)
+			const { result, isFailure } = await scrapePageResult(
+				() =>
+					Effect.fail(
+						new UnsupportedSite({
+							provider: 'firecrawl',
+							url: 'https://directory.example/profile',
+						}),
+					),
+				{ url: 'https://directory.example/profile' },
+			)
+
+			// THEN the model receives a skip result rather than a failure it can't act on
+			expect(isFailure).toBe(false)
+			expect(result).toEqual(
+				scrapeSkipResult('https://directory.example/profile'),
+			)
+		})
+	})
+})
+
+describe('isUnsupportedScrapeUrl', () => {
+	describe('when the url is a LinkedIn page or subdomain', () => {
+		it('should flag the apex, www, a country subdomain, and a company path', () => {
+			// GIVEN LinkedIn urls the loop must never scrape
+			// THEN each is recognised regardless of subdomain or path
+			expect(isUnsupportedScrapeUrl('https://linkedin.com')).toBe(true)
+			expect(isUnsupportedScrapeUrl('https://www.linkedin.com/in/jane')).toBe(
+				true,
+			)
+			expect(
+				isUnsupportedScrapeUrl('https://es.linkedin.com/company/acme'),
+			).toBe(true)
+		})
+	})
+
+	describe('when the url is a normal company site', () => {
+		it('should not flag a homepage, and must not match a look-alike host', () => {
+			// GIVEN a real company site and a host that merely contains the word
+			// THEN neither is treated as unsupported — only the real registrable host is
+			expect(isUnsupportedScrapeUrl('https://www.echo.com')).toBe(false)
+			expect(isUnsupportedScrapeUrl('https://sunsettrans.com/about')).toBe(
+				false,
+			)
+			expect(isUnsupportedScrapeUrl('https://notlinkedin.com')).toBe(false)
+			expect(isUnsupportedScrapeUrl('https://linkedin.com.evil.example')).toBe(
+				false,
+			)
+		})
+	})
+
+	describe('when the url is unparseable', () => {
+		it('should return false rather than throw', () => {
+			// GIVEN a value that is not a url
+			// THEN classification is a safe false
+			expect(isUnsupportedScrapeUrl('not a url')).toBe(false)
+			expect(isUnsupportedScrapeUrl('')).toBe(false)
+		})
+	})
+})
+
+describe('scrapeSkipResult', () => {
+	describe('when building the model-facing skip', () => {
+		it('should carry the url, the unsupported_site reason, and a discover_contacts pointer', () => {
+			// GIVEN a url the loop skipped
+			const result = scrapeSkipResult('https://www.linkedin.com/company/acme')
+
+			// THEN the shape is a non-failure status that names the reason and the
+			// next tool to use
+			expect(result.status).toBe('skipped')
+			expect(result.reason).toBe('unsupported_site')
+			expect(result.url).toBe('https://www.linkedin.com/company/acme')
+			expect(result.message).toContain('discover_contacts')
 		})
 	})
 })
