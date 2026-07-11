@@ -926,6 +926,10 @@ POST /v1/research → create run row (status: queued) → fork fiber
 
 Fan-out groups: a `kind='group'` parent creates N `kind='leaf'` children. Each leaf completion merges findings onto the parent (`pg_advisory_xact_lock` for serialization) and rolls up the parent status.
 
+### Research eval
+
+A CLI harness measures the pipeline's quality against a fixed set of companies whose correct answers are known (the "golden set"), so a change to grounding or extraction shows up as a number instead of a guess. `pnpm cli research eval` drives the same pipeline the server runs — from the CLI, on demand, never in production — and reports grounding accuracy, field precision and recall, and the wrong-company and empty rates; `pnpm cli research probe` checks which candidate LLMs support the forced tool-calling and strict-JSON output the research tiers need. It needs the research env configured (real LLM + provider keys, `DATABASE_URL`) and an org/user to run as, and can export each run's scores to the monitoring board (Honeycomb). See [../eval/README.md](../eval/README.md).
+
 ---
 
 ## Code quality — Biome

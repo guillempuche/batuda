@@ -171,6 +171,8 @@ pnpm cli db reset         # truncate + migrate + seed (clean slate)
 pnpm cli services up      # start Docker Postgres
 pnpm cli services down    # stop Docker services
 pnpm cli services status  # show Docker status
+pnpm cli research eval    # measure research quality vs a golden set (needs real keys; see eval/README.md)
+pnpm cli research probe   # check which LLMs support the research tiers' features
 pnpm cli:tui              # interactive TUI (same commands)
 ```
 
