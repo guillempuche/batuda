@@ -61,6 +61,7 @@ import { ConversationsTab } from '#/components/companies/conversations-tab'
 import { DocumentsPanel } from '#/components/companies/documents-panel'
 import { NextActionCard } from '#/components/companies/next-action-card'
 import { OpenTasksCard } from '#/components/companies/open-tasks-card'
+import { ProposalsPanel } from '#/components/companies/proposals-panel'
 import { ResearchSummaryCard } from '#/components/companies/research-summary-card'
 import { UpcomingMeetingsCard } from '#/components/companies/upcoming-meetings-card'
 import { WherePanel } from '#/components/companies/where-panel'
@@ -1351,6 +1352,12 @@ function DetailBody({
 									<Trans>Documents</Trans>
 								</FilesGroupTitle>
 								<DocumentsPanel companyId={company.id} />
+							</FilesGroup>
+							<FilesGroup>
+								<FilesGroupTitle>
+									<Trans>Proposals</Trans>
+								</FilesGroupTitle>
+								<ProposalsPanel companyId={company.id} />
 							</FilesGroup>
 						</Stack>
 					</PanelWrap>

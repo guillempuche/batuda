@@ -186,6 +186,10 @@ msgstr "Sobre l'empresa"
 msgid "Accept"
 msgstr "Accepta"
 
+#: src/components/companies/proposals-panel.tsx
+msgid "Accepted"
+msgstr "Acceptada"
+
 #: src/routes/accept-invitation.$id.tsx
 msgid "Accepting the invitation…"
 msgstr "Acceptant la invitació…"
@@ -679,6 +683,7 @@ msgid "Calls"
 msgstr "Crides"
 
 #: src/components/companies/documents-panel.tsx
+#: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/instructions/template-delete-confirm.tsx
 #: src/components/instructions/template-editor-dialog.tsx
@@ -823,6 +828,7 @@ msgid "Client"
 msgstr "Client"
 
 #: src/components/companies/documents-panel.tsx
+#: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/instructions/template-editor-dialog.tsx
@@ -1226,6 +1232,10 @@ msgstr "No s'ha pogut desar la safata."
 msgid "Could not save the page. Please try again."
 msgstr "No s'ha pogut desar la pàgina. Torna-ho a provar."
 
+#: src/components/companies/proposals-panel.tsx
+msgid "Could not save the proposal"
+msgstr "No s'ha pogut desar la proposta"
+
 #: src/components/instructions/template-editor-dialog.tsx
 msgid "Could not save the template. Please try again."
 msgstr "No s'ha pogut desar la plantilla. Torna-ho a provar."
@@ -1417,6 +1427,10 @@ msgstr "Creada per agent"
 msgid "Creating…"
 msgstr "Creant…"
 
+#: src/components/companies/proposals-panel.tsx
+msgid "Currency"
+msgstr "Moneda"
+
 #: src/routes/settings/profile/index.tsx
 msgid "Current password"
 msgstr "Contrasenya actual"
@@ -1582,6 +1596,7 @@ msgstr "Fet"
 msgid "Done 7d"
 msgstr "Fetes 7d"
 
+#: src/components/companies/proposals-panel.tsx
 #: src/routes/pages/index.tsx
 msgid "Draft"
 msgstr "Esborrany"
@@ -1689,6 +1704,10 @@ msgstr "Edita la data de venciment"
 #: src/routes/emails/inboxes.tsx
 msgid "Edit inbox"
 msgstr "Edita la safata"
+
+#: src/components/companies/proposals-panel.tsx
+msgid "Edit proposal"
+msgstr "Edita la proposta"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Edit settings"
@@ -1802,6 +1821,7 @@ msgstr "Surt de pantalla completa"
 msgid "Expand"
 msgstr "Desplega"
 
+#: src/components/companies/proposals-panel.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Expired"
 msgstr "Caducada"
@@ -1809,6 +1829,10 @@ msgstr "Caducada"
 #: src/routes/settings/organization/members.tsx
 msgid "Expires"
 msgstr "Caduca"
+
+#: src/components/companies/proposals-panel.tsx
+msgid "Expires (optional)"
+msgstr "Caduca (opcional)"
 
 #. placeholder {0}: formatDate(row.expiresAt)
 #: src/routes/settings/api-keys/index.tsx
@@ -2552,6 +2576,10 @@ msgstr "Necessita atenció"
 msgid "Needs your review"
 msgstr "Necessita la teva revisió"
 
+#: src/components/companies/proposals-panel.tsx
+msgid "Negotiating"
+msgstr "En negociació"
+
 #: src/components/companies/cadence-card.tsx
 #: src/components/companies/cadence-card.tsx
 #: src/components/companies/cadence-card.tsx
@@ -2589,6 +2617,11 @@ msgstr "Contrasenya nova"
 #: src/routes/emails/inboxes.tsx
 msgid "New password or app-password"
 msgstr "Contrasenya nova o d'aplicació"
+
+#: src/components/companies/proposals-panel.tsx
+#: src/components/companies/proposals-panel.tsx
+msgid "New proposal"
+msgstr "Nova proposta"
 
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/routes/settings/profile/templates.tsx
@@ -2773,6 +2806,10 @@ msgstr "Encara sense productes vinculats"
 msgid "No proposals waiting for review."
 msgstr "No hi ha cap proposta pendent de revisió."
 
+#: src/components/companies/proposals-panel.tsx
+msgid "No proposals yet."
+msgstr "Encara no hi ha propostes."
+
 #: src/routes/settings/mcp/connections.tsx
 msgid "No redirect URI"
 msgstr "Sense URI de redirecció"
@@ -2850,6 +2887,10 @@ msgstr "No el veus? Mira la carpeta de correu brossa. Si estàs segur que el cor
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Note"
 msgstr "Nota"
+
+#: src/components/companies/proposals-panel.tsx
+msgid "Notes (optional)"
+msgstr "Notes (opcional)"
 
 #: src/routes/tasks/index.tsx
 msgid "Nothing changed yet."
@@ -3327,6 +3368,10 @@ msgstr "Proposta en revisió"
 msgid "Proposal stage — set the next action (send it, chase a decision)."
 msgstr "Etapa de proposta — defineix la següent acció (envia-la, persegueix una decisió)."
 
+#: src/routes/companies/$slug.tsx
+msgid "Proposals"
+msgstr "Propostes"
+
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Proposed updates"
 msgstr "Actualitzacions proposades"
@@ -3466,6 +3511,7 @@ msgstr "Rebutja {cardLabel}"
 msgid "Reject {subjectLabel}"
 msgstr "Rebutja {subjectLabel}"
 
+#: src/components/companies/proposals-panel.tsx
 #: src/components/research/proposal-outcome.tsx
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Rejected"
@@ -3688,6 +3734,7 @@ msgid "Sales context"
 msgstr "Context comercial"
 
 #: src/components/companies/documents-panel.tsx
+#: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/routes/emails/inboxes.tsx
@@ -3725,6 +3772,7 @@ msgid "Save the org default"
 msgstr "Desa el valor per defecte de l'organització"
 
 #: src/components/companies/documents-panel.tsx
+#: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/emails/compose-form.tsx
 #: src/components/instructions/template-editor-dialog.tsx
@@ -3839,6 +3887,7 @@ msgstr "Enviant…"
 msgid "Sends you to {0}"
 msgstr "T'envia a {0}"
 
+#: src/components/companies/proposals-panel.tsx
 #: src/routes/emails/$threadId.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Sent"
@@ -4118,6 +4167,7 @@ msgstr "Iniciant…"
 msgid "STARTTLS"
 msgstr "STARTTLS"
 
+#: src/components/companies/proposals-panel.tsx
 #: src/routes/calendar/index.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
@@ -4447,6 +4497,7 @@ msgstr "Interval de temps"
 msgid "Timeline"
 msgstr "Cronologia"
 
+#: src/components/companies/proposals-panel.tsx
 #: src/routes/pages/index.tsx
 msgid "Title"
 msgstr "Títol"
@@ -4476,6 +4527,10 @@ msgstr "Massa intents. Torna-ho a provar d'aquí un minut."
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Total competitors"
 msgstr "Total competidors"
+
+#: src/components/companies/proposals-panel.tsx
+msgid "Total value"
+msgstr "Valor total"
 
 #: src/routes/companies/index.tsx
 #: src/routes/emails/index.tsx
@@ -4644,6 +4699,10 @@ msgstr "Oportunitat verificada — clica per esborrar"
 #: src/components/shared/timeline-entry.tsx
 msgid "View thread"
 msgstr "Veure el fil"
+
+#: src/components/companies/proposals-panel.tsx
+msgid "Viewed"
+msgstr "Vista"
 
 #: src/routes/pages/$id.tsx
 #: src/routes/pages/index.tsx
