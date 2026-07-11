@@ -29,6 +29,61 @@ type ProposalRow = {
 	readonly notes: string | null
 	readonly expiresAt: string | null
 	readonly updatedAt: string | null
+	readonly lineItems: unknown
+}
+
+// One editable row in the proposal — a thing being quoted, its quantity, and
+// its unit price. Kept as strings while editing so a half-typed number is fine.
+// `id` is a client-only key so removing a middle row doesn't shuffle the inputs
+// (a plain array index would); it isn't saved.
+type LineItem = {
+	readonly id: string
+	readonly description: string
+	readonly qty: string
+	readonly price: string
+}
+
+let lineIdCounter = 0
+const nextLineId = () => {
+	lineIdCounter += 1
+	return `line-${lineIdCounter}`
+}
+
+// Pull saved line items back into the editable shape. Anything unexpected in the
+// stored JSON is skipped rather than breaking the form.
+function narrowLineItems(raw: unknown): ReadonlyArray<LineItem> {
+	if (!Array.isArray(raw)) return []
+	const out: Array<LineItem> = []
+	for (const item of raw) {
+		if (!item || typeof item !== 'object') continue
+		const r = item as Record<string, unknown>
+		const description =
+			typeof r['description'] === 'string'
+				? r['description']
+				: typeof r['notes'] === 'string'
+					? r['notes']
+					: ''
+		out.push({
+			id: nextLineId(),
+			description,
+			qty: r['qty'] === undefined || r['qty'] === null ? '' : String(r['qty']),
+			price:
+				r['price'] === undefined || r['price'] === null
+					? ''
+					: String(r['price']),
+		})
+	}
+	return out
+}
+
+// Sum the line items into a proposal total (quantity × unit price).
+function lineItemsTotal(items: ReadonlyArray<LineItem>): number {
+	return items.reduce((sum, item) => {
+		const qty = Number.parseFloat(item.qty)
+		const price = Number.parseFloat(item.price)
+		if (!Number.isFinite(qty) || !Number.isFinite(price)) return sum
+		return sum + qty * price
+	}, 0)
 }
 
 // The proposal lifecycle statuses (see proposals.ts schema).
@@ -62,6 +117,7 @@ function narrowProposals(
 			notes: typeof r['notes'] === 'string' ? r['notes'] : null,
 			expiresAt: typeof r['expiresAt'] === 'string' ? r['expiresAt'] : null,
 			updatedAt: typeof r['updatedAt'] === 'string' ? r['updatedAt'] : null,
+			lineItems: r['lineItems'] ?? null,
 		})
 	}
 	return out
@@ -183,10 +239,10 @@ function ProposalDialog({
 	const editing = target !== 'new' && target !== null ? target : null
 	const [title, setTitle] = useState('')
 	const [status, setStatus] = useState('draft')
-	const [totalValue, setTotalValue] = useState('')
 	const [currency, setCurrency] = useState('EUR')
 	const [expiresAt, setExpiresAt] = useState('')
 	const [notes, setNotes] = useState('')
+	const [lineItems, setLineItems] = useState<ReadonlyArray<LineItem>>([])
 	const [busy, setBusy] = useState(false)
 
 	const key = editing ? editing.id : target === 'new' ? 'new' : 'closed'
@@ -195,25 +251,50 @@ function ProposalDialog({
 		seeded.current = key
 		setTitle(editing?.title ?? '')
 		setStatus(editing?.status ?? 'draft')
-		setTotalValue(editing?.totalValue ?? '')
 		setCurrency(editing?.currency ?? 'EUR')
 		setExpiresAt(editing?.expiresAt ? editing.expiresAt.slice(0, 10) : '')
 		setNotes(editing?.notes ?? '')
+		setLineItems(editing ? narrowLineItems(editing.lineItems) : [])
 		setBusy(false)
 	}
+
+	const total = lineItemsTotal(lineItems)
+
+	const setLine = (index: number, patch: Partial<LineItem>) =>
+		setLineItems(items =>
+			items.map((item, i) => (i === index ? { ...item, ...patch } : item)),
+		)
+	const addLine = () =>
+		setLineItems(items => [
+			...items,
+			{ id: nextLineId(), description: '', qty: '1', price: '' },
+		])
+	const removeLine = (index: number) =>
+		setLineItems(items => items.filter((_, i) => i !== index))
 
 	const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault()
 		const trimmedTitle = title.trim()
 		if (trimmedTitle.length === 0 || busy) return
 		setBusy(true)
+		// Drop blank rows; the total is derived from the lines, not typed by hand.
+		const cleanItems = lineItems
+			.filter(li => li.description.trim() || li.qty.trim() || li.price.trim())
+			.map(li => ({
+				product_id: null,
+				notes: li.description.trim(),
+				qty: Number.parseFloat(li.qty) || 0,
+				price: Number.parseFloat(li.price) || 0,
+			}))
+		const totalValue = total > 0 ? total.toFixed(2) : undefined
 		const exit = editing
 			? await update({
 					params: { id: editing.id },
 					payload: {
 						title: trimmedTitle,
 						status,
-						...(totalValue.trim() ? { totalValue: totalValue.trim() } : {}),
+						lineItems: cleanItems,
+						...(totalValue ? { totalValue } : {}),
 						notes,
 					},
 				} as never)
@@ -221,10 +302,9 @@ function ProposalDialog({
 					payload: {
 						companyId,
 						title: trimmedTitle,
-						// A draft starts with no line items; they're edited later.
-						lineItems: [],
+						lineItems: cleanItems,
 						currency,
-						...(totalValue.trim() ? { totalValue: totalValue.trim() } : {}),
+						...(totalValue ? { totalValue } : {}),
 						...(expiresAt ? { expiresAt } : {}),
 						...(notes.trim() ? { notes } : {}),
 					},
@@ -278,34 +358,82 @@ function ProposalDialog({
 								required
 							/>
 						</Field>
-						<TwoCol>
-							<Field>
-								<Label htmlFor='proposal-total'>
-									<Trans>Total value</Trans>
-								</Label>
-								<PriInput
-									id='proposal-total'
-									data-testid='proposal-total'
-									value={totalValue}
-									inputMode='decimal'
-									placeholder='0.00'
-									onChange={e => setTotalValue(e.target.value)}
-								/>
-							</Field>
+						<Field>
+							<Label>
+								<Trans>Line items</Trans>
+							</Label>
+							<Lines>
+								{lineItems.map((line, index) => (
+									<LineRow key={line.id} data-testid='proposal-line'>
+										<PriInput
+											aria-label={t`Description`}
+											data-testid='proposal-line-description'
+											value={line.description}
+											maxLength={200}
+											placeholder={t`e.g. Setup fee`}
+											onChange={e =>
+												setLine(index, { description: e.target.value })
+											}
+										/>
+										<QtyInput
+											aria-label={t`Quantity`}
+											data-testid='proposal-line-qty'
+											value={line.qty}
+											inputMode='decimal'
+											placeholder={t`Qty`}
+											onChange={e => setLine(index, { qty: e.target.value })}
+										/>
+										<PriceInput
+											aria-label={t`Unit price`}
+											data-testid='proposal-line-price'
+											value={line.price}
+											inputMode='decimal'
+											placeholder={t`Price`}
+											onChange={e => setLine(index, { price: e.target.value })}
+										/>
+										<RemoveLine
+											type='button'
+											aria-label={t`Remove line`}
+											data-testid='proposal-line-remove'
+											onClick={() => removeLine(index)}
+										>
+											<X size={14} aria-hidden />
+										</RemoveLine>
+									</LineRow>
+								))}
+								<AddLine
+									type='button'
+									data-testid='proposal-line-add'
+									onClick={addLine}
+								>
+									<Plus size={14} aria-hidden />
+									<Trans>Add line</Trans>
+								</AddLine>
+								<TotalRow data-testid='proposal-computed-total'>
+									<Trans>Total</Trans>
+									<TotalValue>
+										{formatMoneyCents(Math.round(total * 100), {
+											currency: currency || 'EUR',
+											locale: i18n.locale,
+										})}
+									</TotalValue>
+								</TotalRow>
+							</Lines>
+						</Field>
+						{!editing ? (
 							<Field>
 								<Label htmlFor='proposal-currency'>
 									<Trans>Currency</Trans>
 								</Label>
-								<PriInput
+								<CurrencyInput
 									id='proposal-currency'
 									data-testid='proposal-currency'
 									value={currency}
 									maxLength={3}
-									disabled={editing !== null}
 									onChange={e => setCurrency(e.target.value.toUpperCase())}
 								/>
 							</Field>
-						</TwoCol>
+						) : null}
 						{editing ? (
 							<Field>
 								<Label htmlFor='proposal-status'>
@@ -481,10 +609,81 @@ const Form = styled.form`
 	margin-top: var(--space-sm);
 `
 
-const TwoCol = styled.div`
+const Lines = styled.div`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2xs);
+`
+
+const LineRow = styled.div`
 	display: grid;
-	grid-template-columns: 2fr 1fr;
-	gap: var(--space-sm);
+	grid-template-columns: 1fr 4rem 6rem auto;
+	gap: var(--space-2xs);
+	align-items: center;
+`
+
+const QtyInput = styled(PriInput)`
+	text-align: right;
+`
+
+const PriceInput = styled(PriInput)`
+	text-align: right;
+`
+
+const CurrencyInput = styled(PriInput)`
+	max-width: 6rem;
+`
+
+const RemoveLine = styled.button`
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: var(--space-2xs);
+	background: none;
+	border: none;
+	color: var(--color-on-surface-variant);
+	cursor: pointer;
+
+	&:hover {
+		color: var(--color-error);
+	}
+`
+
+const AddLine = styled.button`
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-3xs);
+	align-self: flex-start;
+	padding: var(--space-2xs) 0;
+	background: none;
+	border: none;
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	color: var(--color-primary);
+	cursor: pointer;
+
+	&:hover {
+		text-decoration: underline;
+	}
+`
+
+const TotalRow = styled.div`
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	padding-top: var(--space-2xs);
+	border-top: 1px solid var(--color-outline-variant);
+	font-family: var(--font-display);
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	font-size: var(--typescale-label-small-size);
+	color: var(--color-on-surface-variant);
+`
+
+const TotalValue = styled.span`
+	font-size: var(--typescale-title-medium-size);
+	color: var(--color-on-surface);
+	text-transform: none;
 `
 
 const Field = styled.div`
