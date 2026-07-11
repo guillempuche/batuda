@@ -9,10 +9,8 @@ import styled from 'styled-components'
 import { PriButton, PriInput, usePriToast } from '@batuda/ui/pri'
 
 import {
-	applyProposalAtom,
 	type PendingProposal,
 	pendingProposalsAtom,
-	rejectProposalAtom,
 	researchListAtom,
 	resolveProposalsBatchAtom,
 } from '#/atoms/research-atoms'
@@ -29,6 +27,11 @@ import {
 } from '#/components/research/run-labels'
 import { narrowResearch } from '#/components/research/run-shapes'
 import { TrustBadge } from '#/components/research/trust-badge'
+import {
+	type ResolveDecision,
+	type ResolveOutcome,
+	useProposalResolution,
+} from '#/hooks/use-proposal-resolution'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import { formatMoneyCents } from '#/lib/format-money'
 import {
@@ -50,11 +53,6 @@ export function inboxPendingProposalsAtom() {
 const ATTENTION_STATUSES = new Set(['failed', 'no_reliable_data'])
 
 type SubjectFilter = 'all' | 'companies' | 'contacts'
-
-type ResolveState = {
-	readonly outcome: ProposalOutcome
-	readonly reason: string | null
-}
 
 function rowKey(p: PendingProposal): string {
 	return `${p.researchId}::${p.proposedUpdateId ?? ''}`
@@ -90,18 +88,18 @@ export function ResearchInbox() {
 	)
 	const spendResult = useAtomValue(spendAtom)
 
-	const apply = useAtomSet(applyProposalAtom, { mode: 'promiseExit' })
-	const reject = useAtomSet(rejectProposalAtom, { mode: 'promiseExit' })
 	const resolveBatch = useAtomSet(resolveProposalsBatchAtom, {
 		mode: 'promiseExit',
 	})
+	const { results, pending, resolve, undo, setResults } =
+		useProposalResolution()
 
 	const [subject, setSubject] = useState<SubjectFilter>('all')
 	const [search, setSearch] = useState('')
 	const [minConfidence, setMinConfidence] = useState(0)
 	const [machineOnly, setMachineOnly] = useState(false)
-	const [results, setResults] = useState<Record<string, ResolveState>>({})
-	const [busy, setBusy] = useState<Record<string, boolean>>({})
+	// Whether the "apply all verified" button is waiting on its confirm step.
+	const [confirmingBatch, setConfirmingBatch] = useState(false)
 	const [batchBusy, setBatchBusy] = useState(false)
 
 	const proposals = useMemo<ReadonlyArray<PendingProposal>>(
@@ -168,35 +166,21 @@ export function ResearchInbox() {
 	const isLoading = AsyncResult.isInitial(proposalsResult)
 	const isFailure = AsyncResult.isFailure(proposalsResult)
 
-	async function resolveOne(
-		p: PendingProposal,
-		decision: 'apply' | 'reject',
-	): Promise<void> {
+	function resolveOne(p: PendingProposal, decision: ResolveDecision): void {
 		if (p.proposedUpdateId === null) return
-		const key = rowKey(p)
-		setBusy(b => ({ ...b, [key]: true }))
-		const run = decision === 'apply' ? apply : reject
-		const exit = await run({
-			params: { id: p.researchId, puId: p.proposedUpdateId },
-		})
-		setBusy(b => ({ ...b, [key]: false }))
-		if (exit._tag === 'Success') {
-			setResults(r => ({
-				...r,
-				[key]: {
-					outcome: exit.value.outcome,
-					reason: exit.value.reason ?? null,
-				},
-			}))
-		} else {
-			toast.add({ title: t`Could not resolve this proposal.`, type: 'error' })
-		}
+		resolve(rowKey(p), p.researchId, p.proposedUpdateId, decision, () =>
+			toast.add({ title: t`Could not resolve this proposal.`, type: 'error' }),
+		)
 	}
 
 	async function applyAllVerified(): Promise<void> {
+		setConfirmingBatch(false)
 		const items = trustworthy
 			.filter(
-				p => p.proposedUpdateId !== null && results[rowKey(p)] === undefined,
+				p =>
+					p.proposedUpdateId !== null &&
+					results[rowKey(p)] === undefined &&
+					pending[rowKey(p)] === undefined,
 			)
 			.map(p => ({
 				research_id: p.researchId,
@@ -223,8 +207,13 @@ export function ResearchInbox() {
 		}
 	}
 
+	// A row already resolved, or held inside its undo window, is no longer part
+	// of the batch — count and gather only the still-actionable ones.
 	const verifiedToApply = trustworthy.filter(
-		p => p.proposedUpdateId !== null && results[rowKey(p)] === undefined,
+		p =>
+			p.proposedUpdateId !== null &&
+			results[rowKey(p)] === undefined &&
+			pending[rowKey(p)] === undefined,
 	).length
 
 	return (
@@ -349,17 +338,35 @@ export function ResearchInbox() {
 						<Trans>Verifiable only</Trans>
 					</ToggleLabel>
 				</Filters>
-				<PriButton
-					type='button'
-					$variant='filled'
-					disabled={verifiedToApply === 0 || batchBusy}
-					onClick={() => void applyAllVerified()}
-					data-testid='research-inbox-apply-all'
-				>
-					{batchBusy
-						? t`Applying…`
-						: t`Apply all verified (${verifiedToApply})`}
-				</PriButton>
+				{confirmingBatch ? (
+					<ConfirmBatch>
+						<PriButton
+							type='button'
+							$variant='filled'
+							disabled={batchBusy}
+							onClick={() => void applyAllVerified()}
+							data-testid='research-inbox-apply-all-confirm'
+						>
+							{batchBusy ? t`Applying…` : t`Confirm apply ${verifiedToApply}`}
+						</PriButton>
+						<RefreshLink
+							type='button'
+							onClick={() => setConfirmingBatch(false)}
+						>
+							<Trans>Cancel</Trans>
+						</RefreshLink>
+					</ConfirmBatch>
+				) : (
+					<PriButton
+						type='button'
+						$variant='filled'
+						disabled={verifiedToApply === 0 || batchBusy}
+						onClick={() => setConfirmingBatch(true)}
+						data-testid='research-inbox-apply-all'
+					>
+						{t`Apply all verified (${verifiedToApply})`}
+					</PriButton>
+				)}
 				<RefreshLink
 					type='button'
 					onClick={() => {
@@ -425,8 +432,9 @@ export function ResearchInbox() {
 						hint={t`Verified emails and grounded values — safe to apply in one click.`}
 						proposals={trustworthy}
 						results={results}
-						busy={busy}
+						pending={pending}
 						onResolve={resolveOne}
+						onUndo={undo}
 					/>
 
 					<ProposalSection
@@ -435,8 +443,9 @@ export function ResearchInbox() {
 						hint={t`Free-text, low-confidence or unverified — read before applying.`}
 						proposals={needsReview}
 						results={results}
-						busy={busy}
+						pending={pending}
 						onResolve={resolveOne}
+						onUndo={undo}
 					/>
 
 					{trustworthy.length === 0 &&
@@ -466,19 +475,18 @@ function ProposalSection({
 	hint,
 	proposals,
 	results,
-	busy,
+	pending,
 	onResolve,
+	onUndo,
 }: {
 	readonly testId: string
 	readonly title: string
 	readonly hint: string
 	readonly proposals: ReadonlyArray<PendingProposal>
-	readonly results: Record<string, ResolveState>
-	readonly busy: Record<string, boolean>
-	readonly onResolve: (
-		p: PendingProposal,
-		decision: 'apply' | 'reject',
-	) => Promise<void>
+	readonly results: Record<string, ResolveOutcome>
+	readonly pending: Record<string, ResolveDecision>
+	readonly onResolve: (p: PendingProposal, decision: ResolveDecision) => void
+	readonly onUndo: (key: string) => void
 }) {
 	if (proposals.length === 0) return null
 	return (
@@ -491,8 +499,9 @@ function ProposalSection({
 						key={rowKey(p)}
 						proposal={p}
 						result={results[rowKey(p)]}
-						busy={busy[rowKey(p)] === true}
+						pending={pending[rowKey(p)]}
 						onResolve={onResolve}
+						onUndo={() => onUndo(rowKey(p))}
 					/>
 				))}
 			</Rows>
@@ -503,16 +512,15 @@ function ProposalSection({
 function ProposalRow({
 	proposal,
 	result,
-	busy,
+	pending,
 	onResolve,
+	onUndo,
 }: {
 	readonly proposal: PendingProposal
-	readonly result: ResolveState | undefined
-	readonly busy: boolean
-	readonly onResolve: (
-		p: PendingProposal,
-		decision: 'apply' | 'reject',
-	) => Promise<void>
+	readonly result: ResolveOutcome | undefined
+	readonly pending: ResolveDecision | undefined
+	readonly onResolve: (p: PendingProposal, decision: ResolveDecision) => void
+	readonly onUndo: () => void
 }) {
 	const { t, i18n } = useLingui()
 	// Prefer the subject's real name; fall back to a localized "Company · 1a2b3c"
@@ -568,25 +576,41 @@ function ProposalRow({
 			</RowMain>
 			<RowActions>
 				{result !== undefined ? (
-					<OutcomeBadge outcome={result.outcome} reason={result.reason} />
+					<OutcomeBadge
+						outcome={result.outcome as ProposalOutcome}
+						reason={result.reason}
+					/>
+				) : pending !== undefined ? (
+					<PendingResolve data-testid='research-inbox-pending'>
+						<PendingLabel>
+							{pending === 'apply' ? t`Applying…` : t`Rejecting…`}
+						</PendingLabel>
+						<UndoButton
+							type='button'
+							onClick={onUndo}
+							data-testid='research-inbox-undo'
+						>
+							<Trans>Undo</Trans>
+						</UndoButton>
+					</PendingResolve>
 				) : (
 					<>
 						<PriButton
 							type='button'
 							$variant='filled'
 							aria-label={t`Apply ${subjectLabel}`}
-							disabled={busy || proposal.proposedUpdateId === null}
-							onClick={() => void onResolve(proposal, 'apply')}
+							disabled={proposal.proposedUpdateId === null}
+							onClick={() => onResolve(proposal, 'apply')}
 							data-testid='research-inbox-apply'
 						>
-							{busy ? t`Working…` : t`Apply`}
+							{t`Apply`}
 						</PriButton>
 						<PriButton
 							type='button'
 							$variant='outlined'
 							aria-label={t`Reject ${subjectLabel}`}
-							disabled={busy || proposal.proposedUpdateId === null}
-							onClick={() => void onResolve(proposal, 'reject')}
+							disabled={proposal.proposedUpdateId === null}
+							onClick={() => onResolve(proposal, 'reject')}
 							data-testid='research-inbox-reject'
 						>
 							{t`Reject`}
@@ -896,6 +920,47 @@ const RowActions = styled.div`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);
+`
+
+const ConfirmBatch = styled.div`
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2xs);
+`
+
+const PendingResolve = styled.div`
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2xs);
+`
+
+const PendingLabel = styled.span`
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	font-style: italic;
+	color: var(--color-on-surface-variant);
+`
+
+const UndoButton = styled.button`
+	font-family: var(--font-display);
+	font-size: var(--typescale-label-small-size);
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--color-primary);
+	background: none;
+	border: none;
+	cursor: pointer;
+	padding: var(--space-3xs) var(--space-2xs);
+
+	&:hover {
+		text-decoration: underline;
+	}
+
+	&:focus-visible {
+		outline: none;
+		box-shadow: var(--glow-active);
+		border-radius: var(--shape-2xs);
+	}
 `
 
 // Styling `Link` directly with styled-components erases TanStack's typed

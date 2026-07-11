@@ -430,11 +430,18 @@ msgstr "Apply all verified ({0})"
 msgid "Apply all verified ({verifiedToApply})"
 msgstr "Apply all verified ({verifiedToApply})"
 
+#. placeholder {0}: fieldOnlyPending.length
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Apply field updates ({0})"
+msgstr "Apply field updates ({0})"
+
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Applying a discovered contact merges it into a matching record if one already exists."
 msgstr "Applying a discovered contact merges it into a matching record if one already exists."
 
 #: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/review/proposed-updates-review.tsx
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Applying…"
 msgstr "Applying…"
@@ -648,7 +655,9 @@ msgstr "Calls"
 #: src/components/instructions/template-delete-confirm.tsx
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
+#: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/research-dialog.tsx
+#: src/components/research/review/proposed-updates-review.tsx
 #: src/components/research/run-actions.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
@@ -902,6 +911,15 @@ msgstr "Compose"
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Conclusion or commitment (optional)"
 msgstr "Conclusion or commitment (optional)"
+
+#. placeholder {0}: verifiedPending.length
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Confirm apply {0}"
+msgstr "Confirm apply {0}"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Confirm apply {verifiedToApply}"
+msgstr "Confirm apply {verifiedToApply}"
 
 #: src/components/research/trust-badge.tsx
 msgid "Confirmed"
@@ -3365,6 +3383,11 @@ msgstr "Reject {subjectLabel}"
 msgid "Rejected"
 msgstr "Rejected"
 
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Rejecting…"
+msgstr "Rejecting…"
+
 #: src/components/companies/pipeline-board.tsx
 msgid "Release owner"
 msgstr "Release owner"
@@ -4383,6 +4406,11 @@ msgstr "Unassigned"
 msgid "Undeliverable"
 msgstr "Undeliverable"
 
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Undo"
+msgstr "Undo"
+
 #: src/components/companies/calendar-tab.tsx
 #: src/components/companies/conversations-tab.tsx
 #: src/components/companies/research-summary-card.tsx
@@ -4585,8 +4613,6 @@ msgstr "Who"
 msgid "Who's your email provider?"
 msgstr "Who's your email provider?"
 
-#: src/components/research/inbox/research-inbox.tsx
-#: src/components/research/review/proposed-updates-review.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Working…"
 msgstr "Working…"
