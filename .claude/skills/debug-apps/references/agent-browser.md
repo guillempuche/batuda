@@ -2,6 +2,8 @@
 
 Playwright-based CLI for testing apps as a real user. Already installed in this environment.
 
+Windows show by default here (`AGENT_BROWSER_HEADED=1` in `~/.zshenv`); pass `--headed=false` for a one-off headless run. The `snapshot`/`screenshot` commands below work the same either way.
+
 > **Dev URLs carry portless's port.** portless binds 443 when it can, otherwise a fallback like `:1355`. The `https://batuda.localhost/…` examples below omit it — substitute the URL `pnpm dev` printed (e.g. `https://batuda.localhost:1355/…`), or prefix with `$(cat ~/.portless/proxy.port)`.
 
 ## Dev login credentials
@@ -22,6 +24,7 @@ agent-browser open https://batuda.localhost/login
 agent-browser snapshot                                        # see the login form
 agent-browser fill "input[name='email']" "admin@taller.cat"
 agent-browser fill "input[name='password']" "batuda-dev-2026"
+agent-browser wait 500                                        # let controlled inputs commit — a click too soon submits an empty form
 agent-browser click "button[type='submit']"
 agent-browser wait 3000
 agent-browser snapshot                                        # should show dashboard
@@ -111,6 +114,8 @@ agent-browser find testid "company-card-tancaments-garraf" click
 agent-browser find testid "tab-where" click
 ```
 
+Valid device names (curated set): `iPhone 15`, `iPhone 16`, `iPhone 16 Pro`, `iPhone 17`, `iPad`, `iPad Pro`, `Pixel 9`, `Galaxy S25`. `set device` emulates viewport + device-scale + mobile user-agent, but **not touch** — `ontouchstart` stays absent and `pointer: coarse` stays false, so touch-only handlers and `@media (pointer: coarse)` branches don't fire under emulation. Real touch needs a real device.
+
 ## Verify state
 
 ```bash
@@ -145,14 +150,14 @@ agent-browser set offline off
 
 ## Recovering a hung session
 
-If commands start hanging or timing out — including a lone `screenshot` — the browser session is wedged (a prior command, often `eval` waiting on something that never resolves, can leave Chrome stuck). Don't keep retrying the same call; reset the session:
+If commands start hanging or timing out — including a lone `screenshot` — the browser session is wedged (a prior command, often `eval` waiting on something that never resolves, can leave Chrome stuck). Don't keep retrying the same call; reset **only the wedged session**:
 
 ```bash
-agent-browser close --all     # close every session and its Chrome
-# then re-open + re-login — the session is gone, so re-run the login flow
+agent-browser --session <name> close   # reset ONLY this session (safe while others run)
+# then re-open + re-login that session — its state is gone, so re-run the login flow
 ```
 
-`close` without `--all` closes only the current session. Reach for this the moment 2–3 calls in a row fail or time out, rather than burning attempts (see the `pr` skill's "avoid rabbit holes" guidance).
+`agent-browser close --all` — and any `pkill -f .../browsers/chrome` — kill **every** session's Chrome at once, so never use them to fix one session while other worktree windows are live; reach for them only when nothing else is running. Reset the moment 2–3 calls in a row fail or time out, rather than burning attempts (see the `pr` skill's "avoid rabbit holes" guidance).
 
 ## Record a video (WebM)
 
