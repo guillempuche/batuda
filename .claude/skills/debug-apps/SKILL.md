@@ -169,6 +169,7 @@ origin is derived from `PORTLESS_URL`, no wildcard needed.
 | `pnpm cli worktree doctor` | Diagnose the current worktree's data layer     |
 | `pnpm cli worktree down`   | Drop this worktree's DB + bucket               |
 | `pnpm cli worktree prune`  | Reap orphaned worktree DBs + buckets           |
+| `pnpm cli worktree watch`  | Open this worktree in a live browser window    |
 | `pnpm cli:tui`             | Interactive TUI (same commands)                |
 
 ## Browser debugging
@@ -194,22 +195,23 @@ agent-browser snapshot
 
 ## Watch several worktrees at once
 
-One AI session per worktree — give each its own **headed** window (the default here, via `AGENT_BROWSER_HEADED=1`) to watch them navigate live, side by side. Each worktree owns a distinct `agent-browser` session, so the windows never clash:
+One AI session per worktree — give each its own **headed** browser window (the default here, via `AGENT_BROWSER_HEADED=1`) to watch them navigate live, side by side. From inside each worktree:
 
 ```bash
-# inside a worktree — open ITS app in a dedicated window (URL from `worktree doctor`/`ls`)
-agent-browser --session "ai-<slug>" open "<worktree-url>/login"
+pnpm cli worktree watch          # opens THIS worktree's app in its own visible window
+pnpm cli worktree watch --stop   # closes only this worktree's window (others untouched)
 ```
 
-Tile them instead of stacking with `--args "--window-position=X,Y,--window-size=W,H"`.
+`watch` opens a stable per-worktree `agent-browser` session (`ai-<slug>`) at the worktree's URL; `--stop` closes only that one. Arrange the windows with your OS window manager (macOS tiling / Rectangle) — agent-browser can't position them itself.
 
-Tear down **only this worktree's** window — never blanket-kill while others are live:
+For an extra tile of the same worktree (e.g. a mobile viewport), open another named session by hand:
 
 ```bash
-agent-browser --session "ai-<slug>" close   # closes ONLY this worktree's browser
+agent-browser --session "ai-<slug>-mobile" set device "iPhone 16 Pro"
+agent-browser --session "ai-<slug>-mobile" open "<worktree-url>/login"
 ```
 
-`agent-browser close --all` (and any `pkill -f .../browsers/chrome`) kill EVERY session's browser at once — use only when no other worktree window is open.
+Never `agent-browser close --all` (or `pkill -f .../browsers/chrome`) while other worktree windows are live — those close **every** session at once.
 
 ## Reporting
 
