@@ -13,69 +13,85 @@
  */
 
 import { type ChildProcess, spawn } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 const PORT = 34_040
 
-const env = {
+// The env the deployed instance actually boots with is the union of two
+// sources: the non-secret config baked into `config.production.json`, and the
+// secrets the deploy workflow hands the instance with `-e VAR=`. Build the boot
+// env from EXACTLY those two sources so this test boots the real production
+// contract. If `config.production.json` declares a provider slot whose API key
+// the deploy never injects — the outage this guards, where a fallback vendor
+// made the server read `RESEARCH_LLM_EXTRACT_API_KEY_2` at boot but the deploy
+// passed no such key — the key is absent here too and the server crashes on
+// boot, so the test goes red instead of production.
+const readServerFile = (rel: string) =>
+	readFileSync(new URL(rel, import.meta.url), 'utf8')
+
+// Every `-e VAR=` the deploy hands the instance (secrets + a few literals). A
+// dummy satisfies the boot-time Config read — only presence is checked at boot,
+// the value is never called. If config.production.json declares a provider slot
+// whose key the deploy never injects (the outage this guards), the dummy is
+// absent and the server crashes on boot, so the test goes red instead of prod.
+const injectedByDeploy = Object.fromEntries(
+	[
+		...readServerFile('../../../.github/workflows/deploy_server.yml').matchAll(
+			/-e\s+([A-Z0-9_]+)=/g,
+		),
+	]
+		.map(m => m[1])
+		.filter((name): name is string => name !== undefined)
+		.map(name => [name, `boot-test-${name.toLowerCase()}`]),
+)
+
+// The non-secret config comes from the real config.production.json, read by the
+// app itself via CONFIG_DIR — not re-parsed here — so this boots the exact
+// production contract. These overrides only swap the infra + external endpoints
+// for local fixtures so the process reaches /health without a network; they are
+// runtime substrate, not the env contract under test.
+const localOverrides: Record<string, string> = {
 	NODE_ENV: 'production',
+	// Point the app's baked-config reader at the repo's own config.production.json.
+	CONFIG_DIR: fileURLToPath(new URL('..', import.meta.url)),
 	PORT: String(PORT),
-	// Local dev fixtures from `pnpm cli services up` (docker-compose sets
-	// POSTGRES_PASSWORD=batuda).
-	DATABASE_URL: 'postgres://batuda:batuda@localhost:5433/batuda',
-	STORAGE_ENDPOINT: 'http://localhost:9000',
-	STORAGE_REGION: 'auto',
-	STORAGE_ACCESS_KEY_ID: 'batuda',
-	STORAGE_SECRET_ACCESS_KEY: 'batuda-secret',
-	STORAGE_BUCKET: 'batuda-assets',
-	// Boot-time tags must be set; the actual auth flow isn't exercised.
-	BETTER_AUTH_SECRET: '00000000000000000000000000000000',
+	// Infra points at whatever fixtures the environment already provides (CI
+	// hands over a Neon branch + MinIO), falling back to the local
+	// `pnpm cli services up` stack — so the substrate adapts instead of being
+	// pinned to one machine.
+	DATABASE_URL:
+		process.env['DATABASE_URL'] ??
+		'postgres://batuda:batuda@localhost:5433/batuda',
+	STORAGE_ENDPOINT: process.env['STORAGE_ENDPOINT'] ?? 'http://localhost:9000',
+	STORAGE_REGION: process.env['STORAGE_REGION'] ?? 'auto',
+	STORAGE_BUCKET: process.env['STORAGE_BUCKET'] ?? 'batuda-assets',
+	STORAGE_ACCESS_KEY_ID: process.env['STORAGE_ACCESS_KEY_ID'] ?? 'batuda',
+	STORAGE_SECRET_ACCESS_KEY:
+		process.env['STORAGE_SECRET_ACCESS_KEY'] ?? 'batuda-secret',
+	BETTER_AUTH_SECRET: '0'.repeat(32),
+	// APP_PUBLIC_URL is validated ∈ ALLOWED_ORIGINS at boot, so keep them a pair.
 	BETTER_AUTH_BASE_URL: `http://localhost:${PORT}`,
-	// APP_PUBLIC_URL is required and validated ∈ ALLOWED_ORIGINS at boot, so
-	// these must be a consistent pair (was ALLOWED_ORIGINS='').
-	ALLOWED_ORIGINS: `http://localhost:${PORT}`,
 	APP_PUBLIC_URL: `http://localhost:${PORT}`,
+	ALLOWED_ORIGINS: `http://localhost:${PORT}`,
 	EMAIL_CREDENTIAL_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
-	EMAIL_PROVIDER: 'local-inbox',
+	// External senders/providers the boot must not dial with dummy creds.
 	EMAIL_PROVIDER_TRANSACTIONAL: 'local',
 	CALENDAR_PROVIDER: 'stub',
-	GEOCODER_PROVIDER: 'nominatim',
-	// Research: every provider stubbed so no external network is needed.
-	RESEARCH_PROVIDER_SEARCH: 'stub',
-	RESEARCH_PROVIDER_SCRAPE: 'stub',
-	RESEARCH_PROVIDER_EXTRACT: 'stub',
-	RESEARCH_PROVIDER_DISCOVER: 'stub',
-	RESEARCH_PROVIDER_REGISTRY_ES: 'stub',
-	RESEARCH_PROVIDER_REGISTRY_GB: 'stub',
-	RESEARCH_PROVIDER_REPORT_ES: 'none',
-	RESEARCH_LLM_AGENT_PROVIDERS: 'stub',
-	RESEARCH_LLM_EXTRACT_PROVIDERS: 'stub',
-	RESEARCH_LLM_WRITER_PROVIDERS: 'stub',
-	RESEARCH_DEFAULT_BUDGET_CENTS: '100',
-	RESEARCH_DEFAULT_PAID_BUDGET_CENTS: '500',
-	RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS: '200',
-	RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS: '2000',
-	RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS: '10000',
-	RESEARCH_MAX_AGENT_STEPS: '6',
-	RESEARCH_MAX_LOOP_PROMPT_TOKENS: '24000',
-	RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL: '3',
-	RESEARCH_MAX_CONCURRENCY_FANOUT: '3',
-	RESEARCH_CONFIRM_THRESHOLD_FANOUT: '10',
-	// Required (no code default) — the full app reads these at boot.
-	MIN_LOG_LEVEL: 'Info',
-	BETTER_AUTH_INSECURE_COOKIES: 'false',
-	BETTER_AUTH_RATE_LIMIT: 'strict',
-	OAUTH_ACCESS_TOKEN_TTL_SECONDS: '900',
-	OAUTH_CLIENT_GC_DAYS: '7',
-	API_KEY_RATE_LIMIT_ENABLED: 'true',
-	API_KEY_RATE_LIMIT_MAX: '600',
-	API_KEY_RATE_LIMIT_WINDOW_SECONDS: '60',
-	EMAIL_HEALTH_PROBE_INTERVAL_SEC: '900',
-} as const
+	// Off so the boot dials no telemetry collector.
+	OTEL_EXPORTER_OTLP_ENDPOINT: '',
+}
+
+// The env provider is consulted first, so these secrets + local overrides win
+// over the baked file for the keys they name.
+const env: Record<string, string> = {
+	...injectedByDeploy,
+	...localOverrides,
+}
 
 const collectOutput = (proc: ChildProcess) => {
 	let stdout = ''
@@ -132,7 +148,13 @@ describe('apps/server program boot', () => {
 
 		output = collectOutput(proc)
 
-		await waitForHealth(`http://localhost:${PORT}/health`, 20_000)
+		try {
+			await waitForHealth(`http://localhost:${PORT}/health`, 20_000)
+		} catch (e) {
+			console.error('=== BOOT STDOUT ===\n', output.stdout)
+			console.error('=== BOOT STDERR ===\n', output.stderr)
+			throw e
+		}
 	}, 30_000)
 
 	afterAll(() => {

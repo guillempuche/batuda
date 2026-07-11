@@ -160,6 +160,21 @@ jobs:
           STORAGE_BUCKET: batuda-assets
         run: pnpm exec turbo test:integration --concurrency=1
 
+      # Boot the built server against the REAL config.production.json + the
+      # deploy workflow's exact `-e` secret list (dummy values), so a release
+      # where the baked config needs a key the deploy never injects fails the
+      # build instead of crashing on boot and taking prod down (2026-07-11).
+      # Reuses the Neon branch + MinIO the integration job already stood up.
+      - name: Test (deploy boot parity)
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          STORAGE_ENDPOINT: http://localhost:9000
+          STORAGE_REGION: us-east-1
+          STORAGE_ACCESS_KEY_ID: batuda
+          STORAGE_SECRET_ACCESS_KEY: batuda-secret
+          STORAGE_BUCKET: batuda-assets
+        run: pnpm --filter @batuda/server exec vitest run src/main.boot.test.ts --config vitest.boot.config.ts
+
       # Cleanup runs even on test failure; only skipped if the branch was
       # never created (e.g. earlier step failed).
       - name: Delete Neon branch

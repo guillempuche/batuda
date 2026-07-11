@@ -38,7 +38,14 @@ export function resolveConfigEnv(
 	return undefined
 }
 
-const fileEnv = resolveConfigEnv('/app', process.env['NODE_ENV'])
+// `/app` is the image WORKDIR where the baked config file ships. `CONFIG_DIR`
+// overrides only the directory (never a value), so a local prod-mode boot — the
+// deploy-parity test — can point at the repo's own `config.production.json`
+// instead. Unset in the image, so production reads `/app` exactly as before.
+const fileEnv = resolveConfigEnv(
+	process.env['CONFIG_DIR'] ?? '/app',
+	process.env['NODE_ENV'],
+)
 
 /**
  * Adds the baked file (when present) as a fallback beneath the ambient
