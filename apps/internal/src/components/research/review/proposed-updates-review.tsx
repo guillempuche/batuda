@@ -86,7 +86,16 @@ export function ProposedUpdatesReview({
 		[detailResult],
 	)
 
-	if (proposals.length === 0) return null
+	// A terminal run with nothing proposed and no CRM matches still deserves a
+	// clear "nothing here" line rather than a blank gap on the page.
+	if (proposals.length === 0 && context.discoveredExisting.length === 0)
+		return (
+			<Section data-testid='research-review-empty'>
+				<EmptyReview>
+					<Trans>This run found no changes to review.</Trans>
+				</EmptyReview>
+			</Section>
+		)
 
 	const pending = proposals.filter(
 		p => p.status === 'pending' && results[p.id] === undefined,
@@ -394,6 +403,14 @@ const Section = styled.section`
 	gap: var(--space-sm);
 	padding: var(--space-md);
 	border-radius: var(--shape-2xs);
+`
+
+const EmptyReview = styled.p`
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-medium-size);
+	font-style: italic;
+	color: var(--color-on-surface-variant);
+	margin: 0;
 `
 
 const Head = styled.div`

@@ -113,9 +113,11 @@ export type PendingProposal = {
 	readonly runStatus: string
 	readonly runQuery: string
 	readonly runCreatedAt: unknown
+	readonly runCostCents: number
 	readonly proposedUpdateId: string | null
 	readonly subjectTable: string | null
 	readonly subjectId: string | null
+	readonly subjectName: string | null
 	readonly operation: string
 	readonly reason: string | null
 	readonly confidence: number | null

@@ -39,3 +39,25 @@ const STATUS_TONE: Record<string, Tone> = {
 export function statusTone(status: string): Tone {
 	return STATUS_TONE[status] ?? 'neutral'
 }
+
+const OPERATION_LABEL: Record<string, MessageDescriptor> = {
+	create: msg`New`,
+	update: msg`Update`,
+	add_channel: msg`Add channel`,
+	merge: msg`Merge`,
+}
+
+/** Localized label for a proposal operation, or null for an unknown token. */
+export function operationLabel(operation: string): MessageDescriptor | null {
+	return OPERATION_LABEL[operation] ?? null
+}
+
+const SUBJECT_TABLE_LABEL: Record<string, MessageDescriptor> = {
+	companies: msg`Company`,
+	contacts: msg`Contact`,
+}
+
+/** Localized label for a subject table name, or null for an unknown token. */
+export function subjectTableLabel(table: string): MessageDescriptor | null {
+	return SUBJECT_TABLE_LABEL[table] ?? null
+}
