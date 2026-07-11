@@ -219,8 +219,11 @@ jobs:
             -e CALENDAR_API_KEY="${{ secrets.CALENDAR_API_KEY }}"
             -e CALENDAR_WEBHOOK_SECRET="${{ secrets.CALENDAR_WEBHOOK_SECRET }}"
             -e RESEARCH_LLM_AGENT_API_KEY="${{ secrets.RESEARCH_LLM_AGENT_API_KEY }}"
+            -e RESEARCH_LLM_AGENT_API_KEY_2="${{ secrets.RESEARCH_LLM_AGENT_API_KEY_2 }}"
             -e RESEARCH_LLM_EXTRACT_API_KEY="${{ secrets.RESEARCH_LLM_EXTRACT_API_KEY }}"
+            -e RESEARCH_LLM_EXTRACT_API_KEY_2="${{ secrets.RESEARCH_LLM_EXTRACT_API_KEY_2 }}"
             -e RESEARCH_LLM_WRITER_API_KEY="${{ secrets.RESEARCH_LLM_WRITER_API_KEY }}"
+            -e RESEARCH_LLM_WRITER_API_KEY_2="${{ secrets.RESEARCH_LLM_WRITER_API_KEY_2 }}"
             -e RESEARCH_API_KEY_SEARCH="${{ secrets.RESEARCH_API_KEY_SEARCH }}"
             -e RESEARCH_API_KEY_SEARCH_2="${{ secrets.RESEARCH_API_KEY_SEARCH_2 }}"
             -e RESEARCH_API_KEY_SCRAPE="${{ secrets.RESEARCH_API_KEY_SCRAPE }}"
@@ -302,8 +305,11 @@ jobs:
               -e CALENDAR_API_KEY="${{ secrets.CALENDAR_API_KEY }}" \
               -e CALENDAR_WEBHOOK_SECRET="${{ secrets.CALENDAR_WEBHOOK_SECRET }}" \
               -e RESEARCH_LLM_AGENT_API_KEY="${{ secrets.RESEARCH_LLM_AGENT_API_KEY }}" \
+              -e RESEARCH_LLM_AGENT_API_KEY_2="${{ secrets.RESEARCH_LLM_AGENT_API_KEY_2 }}" \
               -e RESEARCH_LLM_EXTRACT_API_KEY="${{ secrets.RESEARCH_LLM_EXTRACT_API_KEY }}" \
+              -e RESEARCH_LLM_EXTRACT_API_KEY_2="${{ secrets.RESEARCH_LLM_EXTRACT_API_KEY_2 }}" \
               -e RESEARCH_LLM_WRITER_API_KEY="${{ secrets.RESEARCH_LLM_WRITER_API_KEY }}" \
+              -e RESEARCH_LLM_WRITER_API_KEY_2="${{ secrets.RESEARCH_LLM_WRITER_API_KEY_2 }}" \
               -e RESEARCH_API_KEY_SEARCH="${{ secrets.RESEARCH_API_KEY_SEARCH }}" \
               -e RESEARCH_API_KEY_SEARCH_2="${{ secrets.RESEARCH_API_KEY_SEARCH_2 }}" \
               -e RESEARCH_API_KEY_SCRAPE="${{ secrets.RESEARCH_API_KEY_SCRAPE }}" \
