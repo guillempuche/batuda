@@ -683,6 +683,7 @@ msgid "Calls"
 msgstr "Crides"
 
 #: src/components/companies/documents-panel.tsx
+#: src/components/companies/followup-dialog.tsx
 #: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/instructions/template-delete-confirm.tsx
@@ -828,6 +829,7 @@ msgid "Client"
 msgstr "Client"
 
 #: src/components/companies/documents-panel.tsx
+#: src/components/companies/followup-dialog.tsx
 #: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
@@ -1113,6 +1115,10 @@ msgstr "No s'''ha pogut esborrar la supressió"
 msgid "Could not complete the connection. Please try again."
 msgstr "No s'ha pogut completar la connexió. Torna-ho a provar."
 
+#: src/components/companies/followup-dialog.tsx
+msgid "Could not create the follow-up. Try again."
+msgstr "No s'ha pogut crear el seguiment. Torna-ho a provar."
+
 #: src/routes/emails/inboxes.tsx
 msgid "Could not create the inbox. Check transport or credentials."
 msgstr "No s'ha pogut crear la bústia. Revisa el transport o les credencials."
@@ -1397,6 +1403,10 @@ msgstr "Crea una contrasenya d'aplicació, s'obre en una pestanya nova"
 msgid "Create failed"
 msgstr "Error en crear"
 
+#: src/components/companies/followup-dialog.tsx
+msgid "Create follow-up"
+msgstr "Crea el seguiment"
+
 #: src/routes/calendar/index.tsx
 msgid "Create follow-up task"
 msgstr "Crea una tasca de seguiment"
@@ -1423,6 +1433,7 @@ msgstr "Creada el {0}"
 msgid "Created by agent"
 msgstr "Creada per agent"
 
+#: src/components/companies/followup-dialog.tsx
 #: src/routes/settings/api-keys/index.tsx
 msgid "Creating…"
 msgstr "Creant…"
@@ -1623,6 +1634,10 @@ msgstr "Venciment"
 #: src/components/shared/task-item.tsx
 msgid "Due date"
 msgstr "Data de venciment"
+
+#: src/components/companies/followup-dialog.tsx
+msgid "Due date (optional)"
+msgstr "Data de venciment (opcional)"
 
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Duration (min)"
@@ -1924,6 +1939,11 @@ msgstr "Primer contacte enviat"
 #: src/routes/emails/$threadId.tsx
 msgid "Flagged as spam by the provider. The body is shown for review only."
 msgstr "El proveïdor l'ha marcat com a brossa. El cos es mostra només per revisar-lo."
+
+#: src/components/companies/followup-dialog.tsx
+#: src/routes/companies/$slug.tsx
+msgid "Follow up"
+msgstr "Fes seguiment"
 
 #. placeholder {0}: row.email
 #: src/routes/emails/inboxes.tsx
@@ -2602,6 +2622,10 @@ msgstr "Nova"
 #: src/routes/companies/$slug.tsx
 msgid "New client — set the next action (kick off onboarding)."
 msgstr "Client nou — defineix la següent acció (inicia l'onboarding)."
+
+#: src/components/companies/followup-dialog.tsx
+msgid "New follow-up"
+msgstr "Nou seguiment"
 
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/routes/settings/organization/templates.tsx
@@ -3785,6 +3809,10 @@ msgstr "Desa el valor per defecte de l'organització"
 msgid "Saving…"
 msgstr "Desant…"
 
+#: src/routes/companies/$slug.tsx
+msgid "Schedule a call via Cal.com"
+msgstr "Programa una trucada amb Cal.com"
+
 #: src/routes/companies/index.tsx
 msgid "Search by name, industry, or location…"
 msgstr "Cerca per nom, sector o ubicació…"
@@ -4761,6 +4789,10 @@ msgstr "Quin tipus de recerca?"
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "What needs to happen?"
 msgstr "Què cal fer?"
+
+#: src/components/companies/followup-dialog.tsx
+msgid "What to follow up on"
+msgstr "Sobre què fer seguiment"
 
 #: src/components/shared/channel-icon.tsx
 msgid "WhatsApp"

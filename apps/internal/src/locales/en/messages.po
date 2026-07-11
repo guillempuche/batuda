@@ -683,6 +683,7 @@ msgid "Calls"
 msgstr "Calls"
 
 #: src/components/companies/documents-panel.tsx
+#: src/components/companies/followup-dialog.tsx
 #: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/instructions/template-delete-confirm.tsx
@@ -828,6 +829,7 @@ msgid "Client"
 msgstr "Client"
 
 #: src/components/companies/documents-panel.tsx
+#: src/components/companies/followup-dialog.tsx
 #: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
@@ -1113,6 +1115,10 @@ msgstr "Could not clear suppression"
 msgid "Could not complete the connection. Please try again."
 msgstr "Could not complete the connection. Please try again."
 
+#: src/components/companies/followup-dialog.tsx
+msgid "Could not create the follow-up. Try again."
+msgstr "Could not create the follow-up. Try again."
+
 #: src/routes/emails/inboxes.tsx
 msgid "Could not create the inbox. Check transport or credentials."
 msgstr "Could not create the inbox. Check transport or credentials."
@@ -1397,6 +1403,10 @@ msgstr "Create an app-specific password, opens in a new tab"
 msgid "Create failed"
 msgstr "Create failed"
 
+#: src/components/companies/followup-dialog.tsx
+msgid "Create follow-up"
+msgstr "Create follow-up"
+
 #: src/routes/calendar/index.tsx
 msgid "Create follow-up task"
 msgstr "Create follow-up task"
@@ -1423,6 +1433,7 @@ msgstr "Created {0}"
 msgid "Created by agent"
 msgstr "Created by agent"
 
+#: src/components/companies/followup-dialog.tsx
 #: src/routes/settings/api-keys/index.tsx
 msgid "Creating…"
 msgstr "Creating…"
@@ -1623,6 +1634,10 @@ msgstr "Due"
 #: src/components/shared/task-item.tsx
 msgid "Due date"
 msgstr "Due date"
+
+#: src/components/companies/followup-dialog.tsx
+msgid "Due date (optional)"
+msgstr "Due date (optional)"
 
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Duration (min)"
@@ -1924,6 +1939,11 @@ msgstr "First outreach sent"
 #: src/routes/emails/$threadId.tsx
 msgid "Flagged as spam by the provider. The body is shown for review only."
 msgstr "Flagged as spam by the provider. The body is shown for review only."
+
+#: src/components/companies/followup-dialog.tsx
+#: src/routes/companies/$slug.tsx
+msgid "Follow up"
+msgstr "Follow up"
 
 #. placeholder {0}: row.email
 #: src/routes/emails/inboxes.tsx
@@ -2602,6 +2622,10 @@ msgstr "New"
 #: src/routes/companies/$slug.tsx
 msgid "New client — set the next action (kick off onboarding)."
 msgstr "New client — set the next action (kick off onboarding)."
+
+#: src/components/companies/followup-dialog.tsx
+msgid "New follow-up"
+msgstr "New follow-up"
 
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/routes/settings/organization/templates.tsx
@@ -3785,6 +3809,10 @@ msgstr "Save the org default"
 msgid "Saving…"
 msgstr "Saving…"
 
+#: src/routes/companies/$slug.tsx
+msgid "Schedule a call via Cal.com"
+msgstr "Schedule a call via Cal.com"
+
 #: src/routes/companies/index.tsx
 msgid "Search by name, industry, or location…"
 msgstr "Search by name, industry, or location…"
@@ -4761,6 +4789,10 @@ msgstr "What kind of research?"
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "What needs to happen?"
 msgstr "What needs to happen?"
+
+#: src/components/companies/followup-dialog.tsx
+msgid "What to follow up on"
+msgstr "What to follow up on"
 
 #: src/components/shared/channel-icon.tsx
 msgid "WhatsApp"
