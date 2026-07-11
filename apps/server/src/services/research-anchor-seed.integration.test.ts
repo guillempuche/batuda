@@ -300,6 +300,12 @@ describe('ResearchService anchor seed', () => {
 						org: ctx.org,
 						userId,
 					})(svc.create(userId, ctx.org.id, researchInput, systemDefaults))
+					// A non-selector input never fans out, so it always carries a run
+					// id; rule out the confirm-required variant to keep the type honest.
+					if (created.status === 'confirm_required')
+						return yield* Effect.die(
+							new Error('anchor-seed test input should not fan out'),
+						)
 					runId = created.id
 
 					const poll = (
