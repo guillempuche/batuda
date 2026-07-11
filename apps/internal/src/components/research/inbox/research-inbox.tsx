@@ -1,8 +1,8 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
-import { ArrowRight, Microscope } from 'lucide-react'
+import { ArrowRight, Microscope, Search } from 'lucide-react'
 import { type ReactNode, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
@@ -22,6 +22,7 @@ import {
 	verdictRank,
 } from '#/components/research/proposal-logic'
 import { OutcomeBadge } from '#/components/research/proposal-outcome'
+import { ResearchDialog } from '#/components/research/research-dialog'
 import { narrowResearch } from '#/components/research/run-shapes'
 import { TrustBadge } from '#/components/research/trust-badge'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
@@ -65,6 +66,8 @@ function tierOf(p: PendingProposal) {
 export function ResearchInbox() {
 	const { t } = useLingui()
 	const toast = usePriToast()
+	const navigate = useNavigate()
+	const [discoveryOpen, setDiscoveryOpen] = useState(false)
 
 	const proposalsResult = useAtomValue(inboxPendingProposalsAtom())
 	const refreshProposals = useAtomRefresh(inboxPendingProposalsAtom())
@@ -205,17 +208,35 @@ export function ResearchInbox() {
 
 	return (
 		<Page>
-			<Intro>
-				<Heading>
-					<Microscope size={20} aria-hidden />
-					<Trans>Research</Trans>
-				</Heading>
-				<Subtitle>
-					<Trans>
-						Review what the research agent found and decide what enters the CRM.
-					</Trans>
-				</Subtitle>
-			</Intro>
+			<IntroRow>
+				<Intro>
+					<Heading>
+						<Microscope size={20} aria-hidden />
+						<Trans>Research</Trans>
+					</Heading>
+					<Subtitle>
+						<Trans>
+							Review what the research agent found and decide what enters the
+							CRM.
+						</Trans>
+					</Subtitle>
+				</Intro>
+				<IntroActions>
+					<PriButton
+						type='button'
+						$variant='filled'
+						data-testid='discovery-open'
+						onClick={() => setDiscoveryOpen(true)}
+					>
+						<Search size={16} aria-hidden />
+						<Trans>Find companies</Trans>
+					</PriButton>
+					<RunsLink to='/research/runs' data-testid='inbox-runs-link'>
+						<Trans>All runs</Trans>
+						<ArrowRight size={14} aria-hidden />
+					</RunsLink>
+				</IntroActions>
+			</IntroRow>
 
 			<Counters data-testid='research-inbox-counters'>
 				<Tile>
@@ -364,6 +385,14 @@ export function ResearchInbox() {
 					) : null}
 				</>
 			)}
+
+			<ResearchDialog
+				open={discoveryOpen}
+				onOpenChange={setDiscoveryOpen}
+				onCreated={id => {
+					void navigate({ to: '/research/$id', params: { id } })
+				}}
+			/>
 		</Page>
 	)
 }
@@ -510,12 +539,48 @@ const Page = styled.div`
 	gap: var(--space-lg);
 `
 
+const IntroRow = styled.div`
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: var(--space-md);
+	flex-wrap: wrap;
+`
+
+const IntroActions = styled.div`
+	display: flex;
+	align-items: center;
+	gap: var(--space-sm);
+	padding-bottom: var(--space-xs);
+`
+
+const RunsLink = styled(Link)`
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-3xs);
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	color: var(--color-primary);
+	text-decoration: none;
+
+	&:hover {
+		text-decoration: underline;
+	}
+
+	&:focus-visible {
+		outline: none;
+		box-shadow: var(--glow-active);
+		border-radius: var(--shape-2xs);
+	}
+`
+
 const Intro = styled.div`
 	${rulerUnderRule}
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 	padding-bottom: var(--space-xs);
+	flex: 1 1 20rem;
 `
 
 const Heading = styled.h2`

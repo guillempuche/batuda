@@ -21,6 +21,7 @@ import { Route as PagesIndexRouteImport } from './routes/pages/index'
 import { Route as EmailsIndexRouteImport } from './routes/emails/index'
 import { Route as CompaniesIndexRouteImport } from './routes/companies/index'
 import { Route as CalendarIndexRouteImport } from './routes/calendar/index'
+import { Route as ResearchRunsRouteImport } from './routes/research/runs'
 import { Route as ResearchIdRouteImport } from './routes/research/$id'
 import { Route as PagesIdRouteImport } from './routes/pages/$id'
 import { Route as OauthConsentRouteImport } from './routes/oauth/consent'
@@ -98,6 +99,11 @@ const CompaniesIndexRoute = CompaniesIndexRouteImport.update({
 const CalendarIndexRoute = CalendarIndexRouteImport.update({
   id: '/calendar/',
   path: '/calendar/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResearchRunsRoute = ResearchRunsRouteImport.update({
+  id: '/research/runs',
+  path: '/research/runs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResearchIdRoute = ResearchIdRouteImport.update({
@@ -210,6 +216,7 @@ export interface FileRoutesByFullPath {
   '/oauth/consent': typeof OauthConsentRoute
   '/pages/$id': typeof PagesIdRoute
   '/research/$id': typeof ResearchIdRoute
+  '/research/runs': typeof ResearchRunsRoute
   '/calendar/': typeof CalendarIndexRoute
   '/companies/': typeof CompaniesIndexRoute
   '/emails/': typeof EmailsIndexRoute
@@ -242,6 +249,7 @@ export interface FileRoutesByTo {
   '/oauth/consent': typeof OauthConsentRoute
   '/pages/$id': typeof PagesIdRoute
   '/research/$id': typeof ResearchIdRoute
+  '/research/runs': typeof ResearchRunsRoute
   '/calendar': typeof CalendarIndexRoute
   '/companies': typeof CompaniesIndexRoute
   '/emails': typeof EmailsIndexRoute
@@ -275,6 +283,7 @@ export interface FileRoutesById {
   '/oauth/consent': typeof OauthConsentRoute
   '/pages/$id': typeof PagesIdRoute
   '/research/$id': typeof ResearchIdRoute
+  '/research/runs': typeof ResearchRunsRoute
   '/calendar/': typeof CalendarIndexRoute
   '/companies/': typeof CompaniesIndexRoute
   '/emails/': typeof EmailsIndexRoute
@@ -309,6 +318,7 @@ export interface FileRouteTypes {
     | '/oauth/consent'
     | '/pages/$id'
     | '/research/$id'
+    | '/research/runs'
     | '/calendar/'
     | '/companies/'
     | '/emails/'
@@ -341,6 +351,7 @@ export interface FileRouteTypes {
     | '/oauth/consent'
     | '/pages/$id'
     | '/research/$id'
+    | '/research/runs'
     | '/calendar'
     | '/companies'
     | '/emails'
@@ -373,6 +384,7 @@ export interface FileRouteTypes {
     | '/oauth/consent'
     | '/pages/$id'
     | '/research/$id'
+    | '/research/runs'
     | '/calendar/'
     | '/companies/'
     | '/emails/'
@@ -406,6 +418,7 @@ export interface RootRouteChildren {
   OauthConsentRoute: typeof OauthConsentRoute
   PagesIdRoute: typeof PagesIdRoute
   ResearchIdRoute: typeof ResearchIdRoute
+  ResearchRunsRoute: typeof ResearchRunsRoute
   CalendarIndexRoute: typeof CalendarIndexRoute
   CompaniesIndexRoute: typeof CompaniesIndexRoute
   EmailsIndexRoute: typeof EmailsIndexRoute
@@ -510,6 +523,13 @@ declare module '@tanstack/react-router' {
       path: '/calendar'
       fullPath: '/calendar/'
       preLoaderRoute: typeof CalendarIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/research/runs': {
+      id: '/research/runs'
+      path: '/research/runs'
+      fullPath: '/research/runs'
+      preLoaderRoute: typeof ResearchRunsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/research/$id': {
@@ -654,6 +674,7 @@ const rootRouteChildren: RootRouteChildren = {
   OauthConsentRoute: OauthConsentRoute,
   PagesIdRoute: PagesIdRoute,
   ResearchIdRoute: ResearchIdRoute,
+  ResearchRunsRoute: ResearchRunsRoute,
   CalendarIndexRoute: CalendarIndexRoute,
   CompaniesIndexRoute: CompaniesIndexRoute,
   EmailsIndexRoute: EmailsIndexRoute,

@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
 import type { SchemaName } from '@batuda/research'
-import { PriButton, PriDialog, PriTextarea } from '@batuda/ui/pri'
+import { PriButton, PriDialog, PriInput, PriTextarea } from '@batuda/ui/pri'
 
 import { instructionTemplatesAtom } from '#/atoms/instruction-atoms'
 import { createResearchAtom } from '#/atoms/research-atoms'
@@ -19,6 +19,7 @@ import {
 	type StackOption,
 	StackPicker,
 } from '#/components/instructions/stack-picker'
+import { formatMoneyCents } from '#/lib/format-money'
 import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
 
 // Type-only import; adding a schema server-side forces an option here.
@@ -56,8 +57,19 @@ const SCHEMA_CARDS: ReadonlyArray<SchemaCard> = [
 	{
 		value: 'prospect_scan_v1',
 		label: msg`Prospect scan`,
-		description: msg`Find similar companies elsewhere with the same pain. Pick when you have closed a deal and want lookalikes.`,
+		description: msg`Find companies matching a profile — industry, size, location. Pick when you want net-new companies to add as leads.`,
 	},
+]
+
+// The pipeline stages a company moves through; a discovery run can fan out
+// across the ones already in a stage instead of finding net-new companies.
+const STATUS_OPTIONS: ReadonlyArray<string> = [
+	'prospect',
+	'contacted',
+	'responded',
+	'meeting',
+	'proposal',
+	'client',
 ]
 
 export function ResearchDialog({
@@ -68,16 +80,35 @@ export function ResearchDialog({
 }: {
 	readonly open: boolean
 	readonly onOpenChange: (next: boolean) => void
-	readonly companyId: string
+	// Omitted for discovery — a subject-less run that finds net-new companies,
+	// optionally fanned out across existing ones via the selector filters.
+	readonly companyId?: string
 	readonly onCreated?: (researchId: string) => void
 }) {
 	const { i18n, t } = useLingui()
+	const isDiscovery = companyId === undefined
 	const createResearch = useAtomSet(createResearchAtom, { mode: 'promiseExit' })
 	const [query, setQuery] = useState('')
-	const [schema, setSchema] = useState<SchemaOption>('freeform')
+	const [schema, setSchema] = useState<SchemaOption>(
+		isDiscovery ? 'prospect_scan_v1' : 'freeform',
+	)
 	const [submitting, setSubmitting] = useState(false)
 	const [errorMessage, setErrorMessage] = useState<string | null>(null)
 	const [templateIds, setTemplateIds] = useState<ReadonlyArray<string>>([])
+	// Discovery-only scope fields: hints steer a net-new search, the selector
+	// filters fan the run out over existing companies.
+	const [location, setLocation] = useState('')
+	const [language, setLanguage] = useState<'' | 'ca' | 'es' | 'en'>('')
+	const [filterStatus, setFilterStatus] = useState('')
+	const [filterIndustry, setFilterIndustry] = useState('')
+	const [filterRegion, setFilterRegion] = useState('')
+	const [filterTags, setFilterTags] = useState('')
+	// Set once a selector fan-out returns needing confirmation, so the footer
+	// swaps to a cost prompt instead of starting straight away.
+	const [pendingConfirm, setPendingConfirm] = useState<{
+		readonly subjectCount: number
+		readonly estimatedCostCents: number
+	} | null>(null)
 	const templatesResult = useAtomValue(instructionTemplatesAtom)
 	const templateOptions = useMemo<ReadonlyArray<StackOption>>(
 		() =>
@@ -90,51 +121,123 @@ export function ResearchDialog({
 	useEffect(() => {
 		if (!open) return
 		setQuery('')
-		setSchema('freeform')
+		setSchema(isDiscovery ? 'prospect_scan_v1' : 'freeform')
 		setSubmitting(false)
 		setErrorMessage(null)
 		setTemplateIds([])
-	}, [open])
+		setLocation('')
+		setLanguage('')
+		setFilterStatus('')
+		setFilterIndustry('')
+		setFilterRegion('')
+		setFilterTags('')
+		setPendingConfirm(null)
+	}, [open, isDiscovery])
 
 	const canSubmit = query.trim().length > 0 && !submitting
 
-	// React 19 form action — queues through hydration so a pre-hydration click can't navigate.
+	const buildContext = useCallback((): Record<string, unknown> | undefined => {
+		const context: Record<string, unknown> = {}
+		if (companyId !== undefined) {
+			context['subjects'] = [{ table: 'companies', id: companyId }]
+		}
+		if (isDiscovery) {
+			const filter: Record<string, unknown> = {}
+			if (filterStatus) filter['status'] = filterStatus
+			if (filterIndustry.trim()) filter['industry'] = filterIndustry.trim()
+			if (filterRegion.trim()) filter['region'] = filterRegion.trim()
+			const tags = filterTags
+				.split(',')
+				.map(s => s.trim())
+				.filter(Boolean)
+			if (tags.length > 0) filter['tags'] = tags
+			if (Object.keys(filter).length > 0) {
+				context['selector'] = { table: 'companies', filter }
+			}
+			const hints: Record<string, unknown> = {}
+			if (language) hints['language'] = language
+			if (location.trim()) hints['location'] = location.trim()
+			if (Object.keys(hints).length > 0) context['hints'] = hints
+		}
+		return Object.keys(context).length > 0 ? context : undefined
+	}, [
+		companyId,
+		isDiscovery,
+		filterStatus,
+		filterIndustry,
+		filterRegion,
+		filterTags,
+		language,
+		location,
+	])
+
+	const submit = useCallback(
+		async (confirm: boolean) => {
+			setSubmitting(true)
+			setErrorMessage(null)
+			const context = buildContext()
+			const exit = await createResearch({
+				payload: {
+					query: query.trim(),
+					schema_name: schema,
+					...(context ? { context } : {}),
+					...(templateIds.length > 0 ? { template_ids: templateIds } : {}),
+					...(confirm ? { confirm: true } : {}),
+				},
+			} as never)
+
+			if (exit._tag === 'Success') {
+				const value = exit.value as Record<string, unknown> | null
+				const newId = typeof value?.['id'] === 'string' ? value['id'] : null
+				if (newId !== null && onCreated) onCreated(newId)
+				onOpenChange(false)
+				return
+			}
+
+			// A selector fan-out the user hasn't confirmed comes back as a 409
+			// carrying the scale + estimate; show the cost step instead of a
+			// generic error, then resubmit with `confirm` once they approve.
+			const confirmErr = taggedFailure(exit.cause, 'ConfirmRequired')
+			if (confirmErr && !confirm) {
+				setPendingConfirm({
+					subjectCount:
+						typeof confirmErr['subjectCount'] === 'number'
+							? confirmErr['subjectCount']
+							: 0,
+					estimatedCostCents:
+						typeof confirmErr['estimatedCostCents'] === 'number'
+							? confirmErr['estimatedCostCents']
+							: 0,
+				})
+				setSubmitting(false)
+				return
+			}
+			const budgetErr = taggedFailure(exit.cause, 'InsufficientBudget')
+			setErrorMessage(
+				budgetErr
+					? t`Not enough research budget for this run. Raise the budget or narrow the search.`
+					: t`Could not start the research run. Please try again.`,
+			)
+			setSubmitting(false)
+		},
+		[
+			buildContext,
+			createResearch,
+			query,
+			schema,
+			templateIds,
+			onCreated,
+			onOpenChange,
+			t,
+		],
+	)
+
+	// React 19 form action — queues through hydration so a pre-hydration click
+	// can't fire early.
 	const handleAction = useCallback(async () => {
 		if (!canSubmit) return
-		setSubmitting(true)
-		setErrorMessage(null)
-
-		const exit = await createResearch({
-			payload: {
-				query: query.trim(),
-				schema_name: schema,
-				context: {
-					subjects: [{ table: 'companies', id: companyId }],
-				},
-				...(templateIds.length > 0 ? { template_ids: templateIds } : {}),
-			},
-		} as never)
-
-		if (exit._tag === 'Success') {
-			const value = exit.value as Record<string, unknown> | null
-			const newId = typeof value?.['id'] === 'string' ? value['id'] : null
-			if (newId !== null && onCreated) onCreated(newId)
-			onOpenChange(false)
-			return
-		}
-		setErrorMessage(t`Could not start the research run. Please try again.`)
-		setSubmitting(false)
-	}, [
-		canSubmit,
-		createResearch,
-		query,
-		schema,
-		companyId,
-		templateIds,
-		onCreated,
-		onOpenChange,
-		t,
-	])
+		await submit(false)
+	}, [canSubmit, submit])
 
 	return (
 		<PriDialog.Root
@@ -149,7 +252,11 @@ export function ResearchDialog({
 					<Header>
 						<PriDialog.Title>
 							<Heading>
-								<Trans>Run new research</Trans>
+								{isDiscovery ? (
+									<Trans>Find companies</Trans>
+								) : (
+									<Trans>Run new research</Trans>
+								)}
 							</Heading>
 						</PriDialog.Title>
 						<PriDialog.Close
@@ -169,14 +276,22 @@ export function ResearchDialog({
 					<Form action={handleAction} data-testid='research-dialog-form'>
 						<Field>
 							<Label htmlFor='research-query'>
-								<Trans>Question</Trans>
+								{isDiscovery ? (
+									<Trans>What are you looking for?</Trans>
+								) : (
+									<Trans>Question</Trans>
+								)}
 							</Label>
 							<PriTextarea
 								id='research-query'
 								data-testid='research-dialog-query'
 								value={query}
 								rows={3}
-								placeholder={t`What do you want to find out about this company?`}
+								placeholder={
+									isDiscovery
+										? t`e.g. independent bakeries in Barcelona with 5–20 staff`
+										: t`What do you want to find out about this company?`
+								}
 								onChange={event => {
 									setQuery(event.target.value)
 								}}
@@ -216,6 +331,106 @@ export function ResearchDialog({
 							</SchemaGrid>
 						</Field>
 
+						{isDiscovery ? (
+							<Field>
+								<Label as='div'>
+									<Trans>Where to look (optional)</Trans>
+								</Label>
+								<HelpText>
+									<Trans>
+										Steer a net-new search, or set a status/industry/region/tag
+										filter to run across companies you already track.
+									</Trans>
+								</HelpText>
+								<ScopeGrid>
+									<ScopeField>
+										<ScopeLabel htmlFor='discovery-location'>
+											<Trans>Location</Trans>
+										</ScopeLabel>
+										<PriInput
+											id='discovery-location'
+											data-testid='discovery-location'
+											value={location}
+											placeholder={t`e.g. Catalonia`}
+											onChange={e => setLocation(e.target.value)}
+										/>
+									</ScopeField>
+									<ScopeField>
+										<ScopeLabel htmlFor='discovery-language'>
+											<Trans>Sources language</Trans>
+										</ScopeLabel>
+										<SelectInput
+											id='discovery-language'
+											data-testid='discovery-language'
+											value={language}
+											onChange={e =>
+												setLanguage(e.target.value as '' | 'ca' | 'es' | 'en')
+											}
+										>
+											<option value=''>{t`Any`}</option>
+											<option value='ca'>{t`Catalan`}</option>
+											<option value='es'>{t`Spanish`}</option>
+											<option value='en'>{t`English`}</option>
+										</SelectInput>
+									</ScopeField>
+									<ScopeField>
+										<ScopeLabel htmlFor='discovery-status'>
+											<Trans>Across companies in stage</Trans>
+										</ScopeLabel>
+										<SelectInput
+											id='discovery-status'
+											data-testid='discovery-status'
+											value={filterStatus}
+											onChange={e => setFilterStatus(e.target.value)}
+										>
+											<option value=''>{t`Find net-new`}</option>
+											{STATUS_OPTIONS.map(s => (
+												<option key={s} value={s}>
+													{s}
+												</option>
+											))}
+										</SelectInput>
+									</ScopeField>
+									<ScopeField>
+										<ScopeLabel htmlFor='discovery-industry'>
+											<Trans>Industry filter</Trans>
+										</ScopeLabel>
+										<PriInput
+											id='discovery-industry'
+											data-testid='discovery-industry'
+											value={filterIndustry}
+											placeholder={t`e.g. hospitality`}
+											onChange={e => setFilterIndustry(e.target.value)}
+										/>
+									</ScopeField>
+									<ScopeField>
+										<ScopeLabel htmlFor='discovery-region'>
+											<Trans>Region filter</Trans>
+										</ScopeLabel>
+										<PriInput
+											id='discovery-region'
+											data-testid='discovery-region'
+											value={filterRegion}
+											placeholder={t`e.g. Barcelona`}
+											onChange={e => setFilterRegion(e.target.value)}
+										/>
+									</ScopeField>
+									<ScopeField>
+										<ScopeLabel htmlFor='discovery-tags'>
+											<Trans>Tags filter (comma-separated)</Trans>
+										</ScopeLabel>
+										<PriInput
+											id='discovery-tags'
+											data-testid='discovery-tags'
+											value={filterTags}
+											placeholder={t`e.g. vip, warm`}
+											onChange={e => setFilterTags(e.target.value)}
+										/>
+									</ScopeField>
+								</ScopeGrid>
+							</Field>
+						) : null}
+
 						<Field>
 							<Label as='div'>
 								<Trans>Instructions for this run (optional)</Trans>
@@ -251,33 +466,104 @@ export function ResearchDialog({
 							<ErrorBanner role='alert'>{errorMessage}</ErrorBanner>
 						) : null}
 
-						<Footer>
-							<PriButton
-								type='submit'
-								$variant='filled'
-								data-testid='research-dialog-submit'
-								disabled={!canSubmit}
-							>
-								{submitting ? <Trans>Starting…</Trans> : <Trans>Start</Trans>}
-							</PriButton>
-							<PriDialog.Close
-								render={props => (
+						{pendingConfirm !== null ? (
+							<ConfirmPanel role='alert' data-testid='research-confirm'>
+								<ConfirmText>
+									<Trans>
+										This runs research on {pendingConfirm.subjectCount}{' '}
+										companies, up to about{' '}
+										{formatMoneyCents(pendingConfirm.estimatedCostCents, {
+											locale: i18n.locale,
+										})}{' '}
+										in paid data. Start the batch?
+									</Trans>
+								</ConfirmText>
+								<Footer>
+									<PriButton
+										type='button'
+										$variant='filled'
+										data-testid='research-confirm-start'
+										disabled={submitting}
+										onClick={() => {
+											void submit(true)
+										}}
+									>
+										{submitting ? (
+											<Trans>Starting…</Trans>
+										) : (
+											<Trans>Start {pendingConfirm.subjectCount} runs</Trans>
+										)}
+									</PriButton>
 									<PriButton
 										type='button'
 										$variant='text'
-										data-testid='research-dialog-cancel'
-										{...props}
+										data-testid='research-confirm-back'
+										disabled={submitting}
+										onClick={() => setPendingConfirm(null)}
 									>
-										<Trans>Cancel</Trans>
+										<Trans>Back</Trans>
 									</PriButton>
-								)}
-							/>
-						</Footer>
+								</Footer>
+							</ConfirmPanel>
+						) : (
+							<Footer>
+								<PriButton
+									type='submit'
+									$variant='filled'
+									data-testid='research-dialog-submit'
+									disabled={!canSubmit}
+								>
+									{submitting ? (
+										<Trans>Starting…</Trans>
+									) : isDiscovery ? (
+										<Trans>Find companies</Trans>
+									) : (
+										<Trans>Start</Trans>
+									)}
+								</PriButton>
+								<PriDialog.Close
+									render={props => (
+										<PriButton
+											type='button'
+											$variant='text'
+											data-testid='research-dialog-cancel'
+											{...props}
+										>
+											<Trans>Cancel</Trans>
+										</PriButton>
+									)}
+								/>
+							</Footer>
+						)}
 					</Form>
 				</PriDialog.Popup>
 			</PriDialog.Portal>
 		</PriDialog.Root>
 	)
+}
+
+// Pull a specific tagged error out of a promiseExit failure cause. The atom
+// client fails with the decoded API error, so it sits as `error` on one of the
+// cause's reasons; anything else (or a success) reads as null.
+function taggedFailure(
+	cause: unknown,
+	tag: string,
+): Record<string, unknown> | null {
+	if (!cause || typeof cause !== 'object') return null
+	const reasons = (cause as { reasons?: unknown }).reasons
+	if (!Array.isArray(reasons)) return null
+	for (const reason of reasons) {
+		if (!reason || typeof reason !== 'object') continue
+		const error = (reason as { error?: unknown }).error
+		if (
+			error !== null &&
+			typeof error === 'object' &&
+			(error as { _tag?: unknown })._tag === tag
+		) {
+			return error as Record<string, unknown>
+		}
+	}
+	return null
 }
 
 function narrowOptions(value: unknown): ReadonlyArray<StackOption> {
@@ -369,6 +655,43 @@ const Label = styled.label`
 	color: var(--color-on-surface-variant);
 `
 
+const ScopeGrid = styled.div`
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--space-sm);
+
+	@media (min-width: 32rem) {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+`
+
+const ScopeField = styled.div`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3xs);
+`
+
+const ScopeLabel = styled.label`
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	color: var(--color-on-surface-variant);
+`
+
+const SelectInput = styled.select`
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-medium-size);
+	padding: var(--space-2xs) var(--space-xs);
+	border-radius: var(--shape-2xs);
+	border: 1px solid color-mix(in oklab, var(--color-on-surface) 24%, transparent);
+	background: var(--color-surface);
+	color: var(--color-on-surface);
+
+	&:focus-visible {
+		outline: none;
+		box-shadow: var(--glow-active);
+	}
+`
+
 const ErrorBanner = styled.div`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
@@ -376,6 +699,23 @@ const ErrorBanner = styled.div`
 	padding: var(--space-2xs) var(--space-sm);
 	border: 1px solid var(--color-error);
 	border-radius: var(--shape-2xs);
+`
+
+const ConfirmPanel = styled.div`
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-sm);
+	padding: var(--space-sm);
+	border: 1px solid var(--color-primary);
+	border-radius: var(--shape-2xs);
+	background: color-mix(in oklab, var(--color-primary) 8%, transparent);
+`
+
+const ConfirmText = styled.p`
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-medium-size);
+	color: var(--color-on-surface);
+	margin: 0;
 `
 
 const Footer = styled.div`
