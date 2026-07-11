@@ -202,7 +202,7 @@ pnpm cli worktree watch          # opens THIS worktree's app in its own visible 
 pnpm cli worktree watch --stop   # closes only this worktree's window (others untouched)
 ```
 
-`watch` opens a stable per-worktree `agent-browser` session (`ai-<slug>`) at the worktree's URL; `--stop` closes only that one. Arrange the windows with your OS window manager (macOS tiling / Rectangle) — agent-browser can't position them itself.
+`watch` opens a stable per-worktree `agent-browser` session (`ai-<slug>`) at the worktree's URL; `--stop` closes only that one. A freshly opened window auto-tiles into a 2×2 grid cell (up to four side by side), so parallel worktrees don't stack on top of each other; a reused window is left where you dragged it.
 
 For an extra tile of the same worktree (e.g. a mobile viewport), open another named session by hand:
 
