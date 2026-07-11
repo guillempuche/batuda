@@ -186,6 +186,10 @@ msgstr "About"
 msgid "Accept"
 msgstr "Accept"
 
+#: src/components/companies/proposals-panel.tsx
+msgid "Accepted"
+msgstr "Accepted"
+
 #: src/routes/accept-invitation.$id.tsx
 msgid "Accepting the invitation…"
 msgstr "Accepting the invitation…"
@@ -679,6 +683,7 @@ msgid "Calls"
 msgstr "Calls"
 
 #: src/components/companies/documents-panel.tsx
+#: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/instructions/template-delete-confirm.tsx
 #: src/components/instructions/template-editor-dialog.tsx
@@ -823,6 +828,7 @@ msgid "Client"
 msgstr "Client"
 
 #: src/components/companies/documents-panel.tsx
+#: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/instructions/template-editor-dialog.tsx
@@ -1226,6 +1232,10 @@ msgstr "Could not save the inbox."
 msgid "Could not save the page. Please try again."
 msgstr "Could not save the page. Please try again."
 
+#: src/components/companies/proposals-panel.tsx
+msgid "Could not save the proposal"
+msgstr "Could not save the proposal"
+
 #: src/components/instructions/template-editor-dialog.tsx
 msgid "Could not save the template. Please try again."
 msgstr "Could not save the template. Please try again."
@@ -1417,6 +1427,10 @@ msgstr "Created by agent"
 msgid "Creating…"
 msgstr "Creating…"
 
+#: src/components/companies/proposals-panel.tsx
+msgid "Currency"
+msgstr "Currency"
+
 #: src/routes/settings/profile/index.tsx
 msgid "Current password"
 msgstr "Current password"
@@ -1582,6 +1596,7 @@ msgstr "Done"
 msgid "Done 7d"
 msgstr "Done 7d"
 
+#: src/components/companies/proposals-panel.tsx
 #: src/routes/pages/index.tsx
 msgid "Draft"
 msgstr "Draft"
@@ -1689,6 +1704,10 @@ msgstr "Edit due date"
 #: src/routes/emails/inboxes.tsx
 msgid "Edit inbox"
 msgstr "Edit inbox"
+
+#: src/components/companies/proposals-panel.tsx
+msgid "Edit proposal"
+msgstr "Edit proposal"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Edit settings"
@@ -1802,6 +1821,7 @@ msgstr "Exit full screen"
 msgid "Expand"
 msgstr "Expand"
 
+#: src/components/companies/proposals-panel.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Expired"
 msgstr "Expired"
@@ -1809,6 +1829,10 @@ msgstr "Expired"
 #: src/routes/settings/organization/members.tsx
 msgid "Expires"
 msgstr "Expires"
+
+#: src/components/companies/proposals-panel.tsx
+msgid "Expires (optional)"
+msgstr "Expires (optional)"
 
 #. placeholder {0}: formatDate(row.expiresAt)
 #: src/routes/settings/api-keys/index.tsx
@@ -2552,6 +2576,10 @@ msgstr "Needs attention"
 msgid "Needs your review"
 msgstr "Needs your review"
 
+#: src/components/companies/proposals-panel.tsx
+msgid "Negotiating"
+msgstr "Negotiating"
+
 #: src/components/companies/cadence-card.tsx
 #: src/components/companies/cadence-card.tsx
 #: src/components/companies/cadence-card.tsx
@@ -2589,6 +2617,11 @@ msgstr "New password"
 #: src/routes/emails/inboxes.tsx
 msgid "New password or app-password"
 msgstr "New password or app-password"
+
+#: src/components/companies/proposals-panel.tsx
+#: src/components/companies/proposals-panel.tsx
+msgid "New proposal"
+msgstr "New proposal"
 
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/routes/settings/profile/templates.tsx
@@ -2773,6 +2806,10 @@ msgstr "No products linked yet"
 msgid "No proposals waiting for review."
 msgstr "No proposals waiting for review."
 
+#: src/components/companies/proposals-panel.tsx
+msgid "No proposals yet."
+msgstr "No proposals yet."
+
 #: src/routes/settings/mcp/connections.tsx
 msgid "No redirect URI"
 msgstr "No redirect URI"
@@ -2850,6 +2887,10 @@ msgstr "Not seeing it? Check your spam folder. If you're sure the email is right
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Note"
 msgstr "Note"
+
+#: src/components/companies/proposals-panel.tsx
+msgid "Notes (optional)"
+msgstr "Notes (optional)"
 
 #: src/routes/tasks/index.tsx
 msgid "Nothing changed yet."
@@ -3327,6 +3368,10 @@ msgstr "Proposal in review"
 msgid "Proposal stage — set the next action (send it, chase a decision)."
 msgstr "Proposal stage — set the next action (send it, chase a decision)."
 
+#: src/routes/companies/$slug.tsx
+msgid "Proposals"
+msgstr "Proposals"
+
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Proposed updates"
 msgstr "Proposed updates"
@@ -3466,6 +3511,7 @@ msgstr "Reject {cardLabel}"
 msgid "Reject {subjectLabel}"
 msgstr "Reject {subjectLabel}"
 
+#: src/components/companies/proposals-panel.tsx
 #: src/components/research/proposal-outcome.tsx
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Rejected"
@@ -3688,6 +3734,7 @@ msgid "Sales context"
 msgstr "Sales context"
 
 #: src/components/companies/documents-panel.tsx
+#: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/routes/emails/inboxes.tsx
@@ -3725,6 +3772,7 @@ msgid "Save the org default"
 msgstr "Save the org default"
 
 #: src/components/companies/documents-panel.tsx
+#: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/emails/compose-form.tsx
 #: src/components/instructions/template-editor-dialog.tsx
@@ -3839,6 +3887,7 @@ msgstr "Sending…"
 msgid "Sends you to {0}"
 msgstr "Sends you to {0}"
 
+#: src/components/companies/proposals-panel.tsx
 #: src/routes/emails/$threadId.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Sent"
@@ -4118,6 +4167,7 @@ msgstr "Starting…"
 msgid "STARTTLS"
 msgstr "STARTTLS"
 
+#: src/components/companies/proposals-panel.tsx
 #: src/routes/calendar/index.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
@@ -4447,6 +4497,7 @@ msgstr "Time range"
 msgid "Timeline"
 msgstr "Timeline"
 
+#: src/components/companies/proposals-panel.tsx
 #: src/routes/pages/index.tsx
 msgid "Title"
 msgstr "Title"
@@ -4476,6 +4527,10 @@ msgstr "Too many attempts. Try again in a minute."
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Total competitors"
 msgstr "Total competitors"
+
+#: src/components/companies/proposals-panel.tsx
+msgid "Total value"
+msgstr "Total value"
 
 #: src/routes/companies/index.tsx
 #: src/routes/emails/index.tsx
@@ -4644,6 +4699,10 @@ msgstr "Verified lead — click to clear"
 #: src/components/shared/timeline-entry.tsx
 msgid "View thread"
 msgstr "View thread"
+
+#: src/components/companies/proposals-panel.tsx
+msgid "Viewed"
+msgstr "Viewed"
 
 #: src/routes/pages/$id.tsx
 #: src/routes/pages/index.tsx
