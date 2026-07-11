@@ -15,6 +15,8 @@ import {
 	AtSign,
 	BadgeCheck,
 	Briefcase,
+	CalendarClock,
+	CalendarPlus,
 	Camera,
 	Check,
 	ChevronRight,
@@ -59,6 +61,7 @@ import { CadenceCard } from '#/components/companies/cadence-card'
 import { CompanyOwnerControl } from '#/components/companies/company-owner-control'
 import { ConversationsTab } from '#/components/companies/conversations-tab'
 import { DocumentsPanel } from '#/components/companies/documents-panel'
+import { FollowupDialog } from '#/components/companies/followup-dialog'
 import { NextActionCard } from '#/components/companies/next-action-card'
 import { OpenTasksCard } from '#/components/companies/open-tasks-card'
 import { ProposalsPanel } from '#/components/companies/proposals-panel'
@@ -119,6 +122,11 @@ import {
  * and the list page). Promoting these to shared typed schemas is a
  * follow-up.
  */
+// Where the "Schedule via Cal.com" button sends the operator to book a call.
+// Native in-app scheduling is deferred; this opens Cal.com's own booking flow.
+// Configurable per deploy; defaults to the Cal.com app.
+const CAL_COM_URL = import.meta.env['VITE_CAL_COM_URL'] ?? 'https://app.cal.com'
+
 type CompanyDetail = {
 	readonly id: string
 	readonly slug: string
@@ -450,6 +458,8 @@ function DetailBody({
 	const refreshInteractions = useAtomRefresh(interactionsAtom)
 	const refreshTimeline = useAtomRefresh(timelineAtom)
 	const refreshContacts = useAtomRefresh(contactsAtom)
+	const refreshTasks = useAtomRefresh(tasksAtom)
+	const [followupOpen, setFollowupOpen] = useState(false)
 
 	const toast = usePriToast()
 	const { i18n } = useLinguiBase()
@@ -913,8 +923,17 @@ function DetailBody({
 						)}
 						{company.email && (
 							<ExternalLinkButton
-								href={`mailto:${company.email}`}
+								as='button'
+								type='button'
+								data-testid='company-email-compose'
 								aria-label={t`Send email`}
+								onClick={() =>
+									openCompose({
+										mode: 'new',
+										companyId: company.id,
+										...(company.email ? { to: company.email } : {}),
+									})
+								}
 							>
 								<Mail size={16} aria-hidden />
 							</ExternalLinkButton>
@@ -927,6 +946,15 @@ function DetailBody({
 								<Phone size={16} aria-hidden />
 							</ExternalLinkButton>
 						)}
+						<ExternalLinkButton
+							href={CAL_COM_URL}
+							target='_blank'
+							rel='noopener noreferrer'
+							data-testid='company-schedule-cal'
+							aria-label={t`Schedule a call via Cal.com`}
+						>
+							<CalendarPlus size={16} aria-hidden />
+						</ExternalLinkButton>
 						{company.linkedin && (
 							<ExternalLinkButton
 								href={company.linkedin}
@@ -991,10 +1019,15 @@ function DetailBody({
 							<Trans>Email</Trans>
 						</PriButton>
 					</form>
-					{/* "Add task" and "New proposal" are gated on flows that
-					 * don't exist yet (no task-create endpoint, no
-					 * proposal-create endpoint). Showing them disabled reads
-					 * as broken; they'll surface when their flows land. */}
+					<PriButton
+						type='button'
+						$variant='outlined'
+						data-testid='action-followup'
+						onClick={() => setFollowupOpen(true)}
+					>
+						<CalendarClock size={16} aria-hidden />
+						<Trans>Follow up</Trans>
+					</PriButton>
 				</PrimaryActions>
 			</Header>
 
@@ -1386,6 +1419,16 @@ function DetailBody({
 				contact={contactDialog.contact}
 				onClose={() => setContactDialog({ open: false, contact: null })}
 				onSaved={refreshContacts}
+			/>
+
+			<FollowupDialog
+				open={followupOpen}
+				companyId={company.id}
+				onClose={() => setFollowupOpen(false)}
+				onSaved={() => {
+					refreshTasks()
+					refreshTimeline()
+				}}
 			/>
 		</Page>
 	)
