@@ -16,7 +16,7 @@
  * cascade in `_fallback.ts`.
  */
 
-import { Duration, Effect, Schedule } from 'effect'
+import { Cause, Duration, Effect, Schedule } from 'effect'
 
 import { ProviderError } from '../domain/errors'
 
@@ -55,28 +55,33 @@ export interface HttpHardenOptions {
  * Wrap one HTTP provider call with timeout + recoverable-only retry. Returns a
  * function so a provider builds it once (`const harden = hardenHttp('firecrawl')`)
  * and reuses it per request.
+ *
+ * The wrapped call may also fail with an extra routing error `Ex` (e.g. a scrape
+ * of a site the provider flatly refuses). Only the timeout is re-cast to a
+ * recoverable ProviderError; a ProviderError keeps its own `recoverable` flag and
+ * an `Ex` passes straight through — never retried and never mislabeled a timeout.
  */
 export const hardenHttp =
 	(provider: string, opts?: HttpHardenOptions) =>
-	<A, R>(
-		eff: Effect.Effect<A, ProviderError, R>,
-	): Effect.Effect<A, ProviderError, R> => {
+	<A, Ex, R>(
+		eff: Effect.Effect<A, ProviderError | Ex, R>,
+	): Effect.Effect<A, ProviderError | Ex, R> => {
 		const attempt = Effect.timeout(eff, opts?.timeout ?? DEFAULT_TIMEOUT).pipe(
-			Effect.mapError(
-				(err): ProviderError =>
-					err instanceof ProviderError
-						? err
-						: new ProviderError({
-								provider,
-								message: 'request timed out',
-								recoverable: true,
-							}),
+			Effect.mapError((err): ProviderError | Ex =>
+				Cause.isTimeoutError(err)
+					? new ProviderError({
+							provider,
+							message: 'request timed out',
+							recoverable: true,
+						})
+					: err,
 			),
 		)
 		return attempt.pipe(
 			Effect.retry({
 				schedule: makeSchedule(provider),
-				while: (e: ProviderError) => e.recoverable,
+				while: (e: ProviderError | Ex) =>
+					e instanceof ProviderError && e.recoverable,
 			}),
 		)
 	}

@@ -20,7 +20,7 @@ import {
 } from 'effect/unstable/http'
 
 import { type ScrapeInput, ScrapeProvider } from '../../application/ports'
-import { ProviderError } from '../../domain/errors'
+import { ProviderError, UnsupportedSite } from '../../domain/errors'
 import { ScrapedPage } from '../../domain/types'
 import { keyForSlot } from '../_config'
 import { hardenHttp } from '../_http-harden'
@@ -49,6 +49,26 @@ const sha256Hex = (input: string): string =>
 // 429 + 5xx are transient (retry); other 4xx are auth/quota/bad-request (fail fast).
 const statusRecoverable = (status: number): boolean =>
 	status === 429 || status >= 500
+
+// Firecrawl answers a fetch of a site it refuses (LinkedIn and other people
+// directories) with 403 + a body like {"success":false,"error":"…we do not
+// support this site…"}. That is the site being off-limits, not a credential,
+// quota, or rate problem — so it is told apart from every other 403 (which stays
+// a fail-fast auth/quota error) and surfaced as a skip the run can route around.
+const UNSUPPORTED_SITE_PATTERN =
+	/unsupported|not\s+support|no longer\s+support/i
+
+const isUnsupportedSiteBody = (body: string): boolean => {
+	const errorField = ((): string => {
+		try {
+			const parsed = JSON.parse(body) as { error?: unknown }
+			return typeof parsed.error === 'string' ? parsed.error : body
+		} catch {
+			return body
+		}
+	})()
+	return UNSUPPORTED_SITE_PATTERN.test(errorField)
+}
 
 export const makeFirecrawlScrape = (slot: number) =>
 	Effect.gen(function* () {
@@ -84,6 +104,22 @@ export const makeFirecrawlScrape = (slot: number) =>
 							),
 						)
 						if (response.status < 200 || response.status >= 300) {
+							// A 403 whose body says the site is off-limits means Firecrawl
+							// refuses to fetch it at all (LinkedIn etc.): surface a skip the
+							// run routes around, not a fail-fast error that could starve it.
+							if (response.status === 403) {
+								const body = yield* response.text.pipe(
+									Effect.orElseSucceed(() => ''),
+								)
+								if (isUnsupportedSiteBody(body)) {
+									return yield* Effect.fail(
+										new UnsupportedSite({
+											provider: 'firecrawl',
+											url: input.url,
+										}),
+									)
+								}
+							}
 							return yield* Effect.fail(
 								new ProviderError({
 									provider: 'firecrawl',

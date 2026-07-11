@@ -7,6 +7,7 @@ import type {
 	MonthlyCapExceeded,
 	NoRegistry,
 	ProviderError,
+	UnsupportedSite,
 } from '../domain/errors'
 
 // ── Research run context (available inside the LLM tool loop fiber) ──
@@ -99,7 +100,9 @@ export class ScrapeProvider extends ServiceMap.Service<
 	{
 		readonly scrape: (
 			input: ScrapeInput,
-		) => Effect.Effect<ScrapedPage, ProviderError>
+			// UnsupportedSite is a routing outcome (the provider refuses this site),
+			// not a fetch failure — the tool loop catches it and skips the URL.
+		) => Effect.Effect<ScrapedPage, ProviderError | UnsupportedSite>
 	}
 >()('research/ScrapeProvider') {}
 

@@ -36,7 +36,11 @@ import {
 	REPORT_VENDORS_BY_COUNTRY,
 	type RegistryCountry,
 } from '../domain/country'
-import type { NoRegistry, ProviderError } from '../domain/errors'
+import type {
+	NoRegistry,
+	ProviderError,
+	UnsupportedSite,
+} from '../domain/errors'
 import type {
 	CompanyReport,
 	DiscoverResult,
@@ -295,7 +299,12 @@ const scrapeLayer = Layer.effect(
 		if (instances.length === 1) return instances[0]!
 		const scrape = withFallback(
 			instances,
-			(svc, input: ScrapeInput): Effect.Effect<ScrapedPage, ProviderError> =>
+			(
+				svc,
+				input: ScrapeInput,
+				// UnsupportedSite passes through withFallback un-cascaded (every key
+				// refuses the same site), so it never wastefully retries a second slot.
+			): Effect.Effect<ScrapedPage, ProviderError | UnsupportedSite> =>
 				svc.scrape(input),
 		)
 		return ScrapeProvider.of({ scrape })

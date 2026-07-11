@@ -71,3 +71,20 @@ export const noRegistryResult = (country: string) => ({
 	country,
 	message: `No national business registry for ${country}. Use discover_contacts for contact enrichment.`,
 })
+
+/**
+ * The scrape provider flatly refuses this site — Firecrawl answers a page fetch
+ * with "we do not support this site" (LinkedIn and other people directories).
+ * A routing outcome, not a failure: the page can never be fetched no matter the
+ * key or the retry, so the run should skip it and gather that data another way
+ * (its own official site, or discover_contacts for people). Kept distinct from
+ * ProviderError so it neither retries, cascades to another key, nor counts as a
+ * tool failure.
+ */
+export class UnsupportedSite extends Schema.TaggedErrorClass<UnsupportedSite>()(
+	'UnsupportedSite',
+	{
+		provider: Schema.String,
+		url: Schema.String,
+	},
+) {}

@@ -20,7 +20,7 @@ import {
 import { describe, expect, it } from 'vitest'
 
 import type { SearchInput } from '../../application/ports'
-import { ProviderError } from '../../domain/errors'
+import { ProviderError, UnsupportedSite } from '../../domain/errors'
 import { makeFirecrawlExtract } from './extract'
 import { makeFirecrawlScrape } from './scrape'
 import { makeFirecrawlSearch } from './search'
@@ -259,6 +259,56 @@ describe('makeFirecrawlScrape', () => {
 		const resolved = await exit
 		expect(log.count).toBe(1)
 		expect(errorOf(resolved)?.recoverable).toBe(false)
+	})
+
+	it('should map a 403 "we do not support this site" to an UnsupportedSite skip, not retried', async () => {
+		// GIVEN Firecrawl refuses the site (its LinkedIn/people-directory response)
+		const { exit, log } = runScrape(
+			403,
+			{ success: false, error: 'This website is no longer supported' },
+			'https://www.linkedin.com/company/echo',
+		)
+
+		// THEN it fails once (no retry) with UnsupportedSite carrying the url — a
+		// routing outcome, not a ProviderError the run treats as a hard failure
+		const resolved = await exit
+		expect(log.count).toBe(1)
+		expect(Exit.isFailure(resolved)).toBe(true)
+		const err = Exit.isFailure(resolved)
+			? Option.getOrUndefined(Cause.findErrorOption(resolved.cause))
+			: undefined
+		expect(err).toBeInstanceOf(UnsupportedSite)
+		expect((err as UnsupportedSite | undefined)?.url).toBe(
+			'https://www.linkedin.com/company/echo',
+		)
+	})
+
+	it('should keep a plain 403 (no unsupported-site body) as a non-recoverable ProviderError', async () => {
+		// GIVEN a 403 that is a real auth/permission refusal, not an unsupported site
+		const { exit, log } = runScrape(403, { error: 'forbidden' })
+
+		// THEN it stays a fail-fast ProviderError — only the unsupported-site body
+		// is treated as a skip
+		const resolved = await exit
+		expect(log.count).toBe(1)
+		expect(errorOf(resolved)?.recoverable).toBe(false)
+		expect(errorOf(resolved)?.message).toContain('HTTP 403')
+	})
+
+	it('should detect the unsupported-site phrase even when it is not in an `error` field', async () => {
+		// GIVEN a 403 whose off-limits message rides a different field than `error`
+		// (Firecrawl's exact JSON shape is not guaranteed)
+		const { exit } = runScrape(403, {
+			success: false,
+			message: 'we do not support this site',
+		})
+
+		// THEN the whole-body fallback still recognises it as an UnsupportedSite skip
+		const resolved = await exit
+		const err = Exit.isFailure(resolved)
+			? Option.getOrUndefined(Cause.findErrorOption(resolved.cause))
+			: undefined
+		expect(err).toBeInstanceOf(UnsupportedSite)
 	})
 
 	it('should fail non-recoverably on a malformed body', async () => {
