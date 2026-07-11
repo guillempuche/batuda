@@ -430,11 +430,18 @@ msgstr "Aplica tot el verificat ({0})"
 msgid "Apply all verified ({verifiedToApply})"
 msgstr "Aplica tot el verificat ({verifiedToApply})"
 
+#. placeholder {0}: fieldOnlyPending.length
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Apply field updates ({0})"
+msgstr "Aplica actualitzacions de camps ({0})"
+
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Applying a discovered contact merges it into a matching record if one already exists."
 msgstr "En aplicar un contacte descobert, es fusiona amb un registre coincident si ja existeix."
 
 #: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/review/proposed-updates-review.tsx
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Applying…"
 msgstr "Aplicant…"
@@ -648,7 +655,9 @@ msgstr "Crides"
 #: src/components/instructions/template-delete-confirm.tsx
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
+#: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/research-dialog.tsx
+#: src/components/research/review/proposed-updates-review.tsx
 #: src/components/research/run-actions.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
@@ -902,6 +911,15 @@ msgstr "Redacta"
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Conclusion or commitment (optional)"
 msgstr "Conclusió o compromís (opcional)"
+
+#. placeholder {0}: verifiedPending.length
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Confirm apply {0}"
+msgstr "Confirma aplicar-ne {0}"
+
+#: src/components/research/inbox/research-inbox.tsx
+msgid "Confirm apply {verifiedToApply}"
+msgstr "Confirma aplicar-ne {verifiedToApply}"
 
 #: src/components/research/trust-badge.tsx
 msgid "Confirmed"
@@ -3365,6 +3383,11 @@ msgstr "Rebutja {subjectLabel}"
 msgid "Rejected"
 msgstr "Rebutjat"
 
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Rejecting…"
+msgstr "S'està rebutjant…"
+
 #: src/components/companies/pipeline-board.tsx
 msgid "Release owner"
 msgstr "Allibera el responsable"
@@ -4383,6 +4406,11 @@ msgstr "Sense assignar"
 msgid "Undeliverable"
 msgstr "No es pot lliurar"
 
+#: src/components/research/inbox/research-inbox.tsx
+#: src/components/research/review/proposed-updates-review.tsx
+msgid "Undo"
+msgstr "Desfés"
+
 #: src/components/companies/calendar-tab.tsx
 #: src/components/companies/conversations-tab.tsx
 #: src/components/companies/research-summary-card.tsx
@@ -4585,8 +4613,6 @@ msgstr "Qui"
 msgid "Who's your email provider?"
 msgstr "Quin és el teu proveïdor de correu?"
 
-#: src/components/research/inbox/research-inbox.tsx
-#: src/components/research/review/proposed-updates-review.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Working…"
 msgstr "Processant…"

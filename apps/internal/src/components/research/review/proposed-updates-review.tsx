@@ -7,8 +7,6 @@ import styled from 'styled-components'
 import { PriButton, usePriToast } from '@batuda/ui/pri'
 
 import {
-	applyProposalAtom,
-	rejectProposalAtom,
 	researchDetailAtom,
 	resolveProposalsBatchAtom,
 	runProposedUpdatesAtom,
@@ -36,12 +34,12 @@ import {
 	strongestChannelTrust,
 } from '#/components/research/review/proposal-narrow'
 import { TrustBadge } from '#/components/research/trust-badge'
+import {
+	type ResolveDecision,
+	type ResolveOutcome,
+	useProposalResolution,
+} from '#/hooks/use-proposal-resolution'
 import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
-
-type ResolveState = {
-	readonly outcome: ProposalOutcome
-	readonly reason: string | null
-}
 
 type RunContext = {
 	readonly completedAt: string | null
@@ -61,14 +59,18 @@ export function ProposedUpdatesReview({
 	const refreshProposals = useAtomRefresh(runProposedUpdatesAtom(researchId))
 	const detailResult = useAtomValue(researchDetailAtom(researchId))
 
-	const apply = useAtomSet(applyProposalAtom, { mode: 'promiseExit' })
-	const reject = useAtomSet(rejectProposalAtom, { mode: 'promiseExit' })
 	const resolveBatch = useAtomSet(resolveProposalsBatchAtom, {
 		mode: 'promiseExit',
 	})
+	const {
+		results,
+		pending: pendingResolve,
+		resolve,
+		undo,
+		setResults,
+	} = useProposalResolution()
 
-	const [results, setResults] = useState<Record<string, ResolveState>>({})
-	const [busy, setBusy] = useState<Record<string, boolean>>({})
+	const [confirmingBatch, setConfirmingBatch] = useState(false)
 	const [batchBusy, setBatchBusy] = useState(false)
 
 	const proposals = useMemo<ReadonlyArray<ReviewProposal>>(
@@ -98,37 +100,31 @@ export function ProposedUpdatesReview({
 		)
 
 	const pending = proposals.filter(
-		p => p.status === 'pending' && results[p.id] === undefined,
+		p =>
+			p.status === 'pending' &&
+			results[p.id] === undefined &&
+			pendingResolve[p.id] === undefined,
 	)
 	const verifiedPending = pending.filter(
 		p => trustTier(strongestChannelTrust(p.channels)) === 'trustworthy',
 	)
+	// Proposals that only touch plain fields (no email/phone channel) — the
+	// lowest-risk batch, since there's no deliverability to get wrong.
+	const fieldOnlyPending = pending.filter(
+		p => p.channels.length === 0 && p.scalarFields.length > 0,
+	)
 
-	async function resolveOne(
+	function resolveOne(
 		proposal: ReviewProposal,
-		decision: 'apply' | 'reject',
-	): Promise<void> {
-		setBusy(b => ({ ...b, [proposal.id]: true }))
-		const run = decision === 'apply' ? apply : reject
-		const exit = await run({
-			params: { id: researchId, puId: proposal.id },
-		})
-		setBusy(b => ({ ...b, [proposal.id]: false }))
-		if (exit._tag === 'Success') {
-			setResults(r => ({
-				...r,
-				[proposal.id]: {
-					outcome: exit.value.outcome,
-					reason: exit.value.reason ?? null,
-				},
-			}))
-		} else {
-			toast.add({ title: t`Could not resolve this proposal.`, type: 'error' })
-		}
+		decision: ResolveDecision,
+	): void {
+		resolve(proposal.id, researchId, proposal.id, decision, () =>
+			toast.add({ title: t`Could not resolve this proposal.`, type: 'error' }),
+		)
 	}
 
-	async function applyAllVerified(): Promise<void> {
-		const items = verifiedPending.map(p => ({
+	async function runBatch(list: ReadonlyArray<ReviewProposal>): Promise<void> {
+		const items = list.map(p => ({
 			research_id: researchId,
 			proposed_update_id: p.id,
 			decision: 'apply' as const,
@@ -153,6 +149,11 @@ export function ProposedUpdatesReview({
 		}
 	}
 
+	async function applyAllVerified(): Promise<void> {
+		setConfirmingBatch(false)
+		await runBatch(verifiedPending)
+	}
+
 	return (
 		<Section data-testid='research-review'>
 			<Head>
@@ -160,18 +161,49 @@ export function ProposedUpdatesReview({
 					<Trans>Proposed updates</Trans>
 				</SectionTitle>
 				<HeadActions>
-					{verifiedPending.length > 0 ? (
+					{fieldOnlyPending.length > 0 ? (
 						<PriButton
 							type='button'
-							$variant='filled'
+							$variant='outlined'
 							disabled={batchBusy}
-							onClick={() => void applyAllVerified()}
-							data-testid='research-review-apply-all'
+							onClick={() => void runBatch(fieldOnlyPending)}
+							data-testid='research-review-apply-fields'
 						>
-							{batchBusy
-								? t`Applying…`
-								: t`Apply all verified (${verifiedPending.length})`}
+							{t`Apply field updates (${fieldOnlyPending.length})`}
 						</PriButton>
+					) : null}
+					{verifiedPending.length > 0 ? (
+						confirmingBatch ? (
+							<>
+								<PriButton
+									type='button'
+									$variant='filled'
+									disabled={batchBusy}
+									onClick={() => void applyAllVerified()}
+									data-testid='research-review-apply-all-confirm'
+								>
+									{batchBusy
+										? t`Applying…`
+										: t`Confirm apply ${verifiedPending.length}`}
+								</PriButton>
+								<RefreshButton
+									type='button'
+									onClick={() => setConfirmingBatch(false)}
+								>
+									<Trans>Cancel</Trans>
+								</RefreshButton>
+							</>
+						) : (
+							<PriButton
+								type='button'
+								$variant='filled'
+								disabled={batchBusy}
+								onClick={() => setConfirmingBatch(true)}
+								data-testid='research-review-apply-all'
+							>
+								{t`Apply all verified (${verifiedPending.length})`}
+							</PriButton>
+						)
 					) : null}
 					<RefreshButton
 						type='button'
@@ -200,10 +232,11 @@ export function ProposedUpdatesReview({
 						key={proposal.id}
 						proposal={proposal}
 						result={results[proposal.id]}
-						busy={busy[proposal.id] === true}
+						pending={pendingResolve[proposal.id]}
 						completedAt={context.completedAt}
 						sources={sourcesFor(proposal, context.sourceById)}
 						onResolve={resolveOne}
+						onUndo={() => undo(proposal.id)}
 					/>
 				))}
 			</List>
@@ -214,20 +247,19 @@ export function ProposedUpdatesReview({
 function ProposalCard({
 	proposal,
 	result,
-	busy,
+	pending,
 	completedAt,
 	sources,
 	onResolve,
+	onUndo,
 }: {
 	readonly proposal: ReviewProposal
-	readonly result: ResolveState | undefined
-	readonly busy: boolean
+	readonly result: ResolveOutcome | undefined
+	readonly pending: ResolveDecision | undefined
 	readonly completedAt: string | null
 	readonly sources: ReadonlyArray<ProvenanceSource>
-	readonly onResolve: (
-		p: ReviewProposal,
-		decision: 'apply' | 'reject',
-	) => Promise<void>
+	readonly onResolve: (p: ReviewProposal, decision: ResolveDecision) => void
+	readonly onUndo: () => void
 }) {
 	const { t } = useLingui()
 	const trust = strongestChannelTrust(proposal.channels)
@@ -283,7 +315,23 @@ function ProposalCard({
 
 			<CardActions>
 				{result !== undefined ? (
-					<OutcomeBadge outcome={result.outcome} reason={result.reason} />
+					<OutcomeBadge
+						outcome={result.outcome as ProposalOutcome}
+						reason={result.reason}
+					/>
+				) : pending !== undefined ? (
+					<PendingResolve data-testid='research-review-pending'>
+						<PendingLabel>
+							{pending === 'apply' ? t`Applying…` : t`Rejecting…`}
+						</PendingLabel>
+						<UndoButton
+							type='button'
+							onClick={onUndo}
+							data-testid='research-review-undo'
+						>
+							<Trans>Undo</Trans>
+						</UndoButton>
+					</PendingResolve>
 				) : alreadyResolved ? (
 					<ResolvedNote>
 						{proposal.status === 'applied' ? (
@@ -298,18 +346,16 @@ function ProposalCard({
 							type='button'
 							$variant='filled'
 							aria-label={t`Apply ${cardLabel}`}
-							disabled={busy}
-							onClick={() => void onResolve(proposal, 'apply')}
+							onClick={() => onResolve(proposal, 'apply')}
 							data-testid='research-review-apply'
 						>
-							{busy ? t`Working…` : t`Apply`}
+							{t`Apply`}
 						</PriButton>
 						<PriButton
 							type='button'
 							$variant='outlined'
 							aria-label={t`Reject ${cardLabel}`}
-							disabled={busy}
-							onClick={() => void onResolve(proposal, 'reject')}
+							onClick={() => onResolve(proposal, 'reject')}
 							data-testid='research-review-reject'
 						>
 							{t`Reject`}
@@ -546,4 +592,39 @@ const ResolvedNote = styled.span`
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
 	color: var(--color-on-surface-variant);
+`
+
+const PendingResolve = styled.div`
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2xs);
+`
+
+const PendingLabel = styled.span`
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	font-style: italic;
+	color: var(--color-on-surface-variant);
+`
+
+const UndoButton = styled.button`
+	font-family: var(--font-display);
+	font-size: var(--typescale-label-small-size);
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--color-primary);
+	background: none;
+	border: none;
+	cursor: pointer;
+	padding: var(--space-3xs) var(--space-2xs);
+
+	&:hover {
+		text-decoration: underline;
+	}
+
+	&:focus-visible {
+		outline: none;
+		box-shadow: var(--glow-active);
+		border-radius: var(--shape-2xs);
+	}
 `
