@@ -3,6 +3,29 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-11 (server-v2026.7.11)
+
+### Features
+
+* add pipeline board and book-of-business views ([#225](https://github.com/guillempuche/batuda/issues/225)) ([efa50ad](https://github.com/guillempuche/batuda/commit/efa50ad2a61641fd4336cdae750b38a43fc01529))
+* export eval run scores to the monitoring board as spans ([5925278](https://github.com/guillempuche/batuda/commit/59252786deca1325fe487879c11e0a8f3ebeabd6))
+* gate research batch fan-outs behind a cost confirmation ([7675306](https://github.com/guillempuche/batuda/commit/767530600eb441a3357b8e354d6ca49bba369744))
+* keep a research run alive when its language-model call stalls ([01286df](https://github.com/guillempuche/batuda/commit/01286df1dbab1a907df36b32db920e7a0e847e64)), closes [#235](https://github.com/guillempuche/batuda/issues/235)
+* let a human mark a company as a verified lead ([ba42040](https://github.com/guillempuche/batuda/commit/ba42040d9bcb6d44a5adcba9b623378c2b3724ff))
+* make the research review inbox filterable and readable ([11e3dfe](https://github.com/guillempuche/batuda/commit/11e3dfec26f8ef910b156e8240149fb393ad03ab))
+* **research:** count an official-registry match toward eval grounding ([940ded3](https://github.com/guillempuche/batuda/commit/940ded3ad7a4d1b42a3627b20266232dc8041483))
+* **research:** keep uncertain fields instead of dropping them ([d6bd64b](https://github.com/guillempuche/batuda/commit/d6bd64b96760314ced4d2745a029ed8257357d9b))
+
+### Bug Fixes
+
+* **research:** fetch the caller's domain up front so the run grounds ([3f28845](https://github.com/guillempuche/batuda/commit/3f28845815d5238feb9d08c0c5b04fd61ae0b1de))
+* **research:** treat a refused-site scrape as a skip, not a run failure ([571b773](https://github.com/guillempuche/batuda/commit/571b773f08ee3481927f62523453bafc88b87c61))
+* unbreak proposal creation and stamp its lifecycle dates ([dea55e2](https://github.com/guillempuche/batuda/commit/dea55e2fbb386f0f337088b5d45fe3eae90f02ee))
+
+### Tests
+
+* **server:** rule out the confirm-required result in the anchor-seed run ([3627dac](https://github.com/guillempuche/batuda/commit/3627dac6169192d945a87a0d37b8058e8d07a95c))
+
 ## 2026-07-10 (server-v2026.7.10-1)
 
 ### Features
