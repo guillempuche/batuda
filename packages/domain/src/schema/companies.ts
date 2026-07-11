@@ -49,6 +49,13 @@ export class Company extends Model.Class<Company>('Company')({
 	// nobody has claimed it. Powers the "my leads" view.
 	ownerId: Schema.NullOr(Schema.String),
 
+	// When a human confirmed this is a real lead worth working, and who did (a
+	// Better Auth user id). Null until verified. Independent of the pipeline
+	// stage — a company can be verified at any status, and a research-discovered
+	// one stays unverified until someone vouches for it.
+	verifiedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+	verifiedBy: Schema.NullOr(Schema.String),
+
 	// Classification. Allowed values are COMPANY_INDUSTRIES / COMPANY_SIZE_RANGES /
 	// COMPANY_REGIONS above; the columns stay free text (the research vocabulary
 	// guard is the enforcement point) so a manual edit is never decode-rejected.

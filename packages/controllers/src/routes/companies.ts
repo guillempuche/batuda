@@ -116,6 +116,16 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
+	.add(
+		// Mark a company as a verified lead (or clear it). `verified: true` stamps
+		// who verified it and when; `false` clears both.
+		HttpApiEndpoint.post('verify', '/companies/:id/verify', {
+			params: { id: Schema.String },
+			payload: Schema.Struct({ verified: Schema.Boolean }),
+			success: Schema.Unknown,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
+		}),
+	)
 	.middleware(SessionMiddleware)
 	.middleware(OrgMiddleware)
 	.prefix('/v1')
