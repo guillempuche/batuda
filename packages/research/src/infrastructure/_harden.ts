@@ -2,7 +2,10 @@
  * Reliability harness for tier-level `LanguageModel.Service` instances.
  *
  * `hardenLanguageModel` wraps `generateText` / `generateObject` with:
- *   - `Effect.timeout('120 seconds')` — bounded latency per call
+ *   - `Effect.timeout(<per-tier>)` — bounded latency per call. Each tier passes
+ *     its own `RESEARCH_LLM_<TIER>_TIMEOUT_SEC` (default 60s); a timeout is not
+ *     retried, so a wedged endpoint fails fast and cascades to the next slot
+ *     instead of hanging the whole run.
  *   - `Retry-After` honoring: when the provider returns a `RateLimitError`
  *     carrying a `retryAfter` Duration, the harness sleeps that long before
  *     letting the retry schedule's own backoff fire. Prevents thundering-herd
@@ -13,6 +16,9 @@
  *     schedule actually decides to retry — not on the final exhausted attempt.
  *   - AiError → `ProviderError { provider, message, recoverable }` at the exit,
  *     so the fallback cascade can pattern-match on the tagged error.
+ *   - Before that mapping erases it, the failure's real shape (timeout vs the
+ *     provider's HTTP status / reason) is written to the `llm.call` span and an
+ *     error log, so a generic "<provider> request failed" stays diagnosable.
  *   - Optional `Semaphore`-bounded concurrency: when a `permits` option is
  *     supplied the wrapper caps concurrent in-flight calls — defends a shared
  *     tier key against stampede without a full gateway service.
@@ -28,13 +34,13 @@
  * generateObject).
  */
 
-import { Duration, Effect, Schedule, Semaphore } from 'effect'
+import { Cause, Duration, Effect, Schedule, Semaphore } from 'effect'
 import type { LanguageModel } from 'effect/unstable/ai'
 import { AiError } from 'effect/unstable/ai'
 
 import { ProviderError } from '../domain/errors'
 
-const DEFAULT_TIMEOUT: Duration.Input = '120 seconds'
+const DEFAULT_TIMEOUT: Duration.Input = '60 seconds'
 const DEFAULT_MAX_ATTEMPTS = 3
 
 // Pull a human-usable message out of an arbitrary thrown value, or `undefined`
@@ -53,16 +59,98 @@ const messageOf = (err: unknown): string | undefined => {
 	return text === '[object Object]' ? undefined : text
 }
 
-const toProviderError = (provider: string, err: unknown): ProviderError => {
+// The HTTP status the provider returned, when the failure carries one. A
+// transport failure (connection reset, DNS, TLS) never received a response, so
+// it reports no status; a 429 / 5xx / 4xx does.
+const httpStatusOf = (err: AiError.AiError): number | undefined => {
+	const reason = err.reason
+	return 'http' in reason ? reason.http?.response?.status : undefined
+}
+
+interface FailureInfo {
+	readonly kind: 'timeout' | 'provider' | 'unknown'
+	readonly reason?: string
+	readonly status?: number
+	readonly message: string
+}
+
+// Read the true shape of a failure before it collapses into a ProviderError
+// (only provider + message + recoverable). `Effect.timeout` raises a bare
+// TimeoutError with no message, and a provider blip can arrive as an AiError
+// whose message we couldn't extract — both used to surface as the contentless
+// "<provider> request failed", hiding whether it was a timeout, a 429, or a 500.
+const describeFailure = (
+	provider: string,
+	err: unknown,
+	timeout: Duration.Input,
+): FailureInfo => {
+	if (Cause.isTimeoutError(err)) {
+		return {
+			kind: 'timeout',
+			message: `${provider} request timed out after ${Duration.format(Duration.fromInputUnsafe(timeout))}`,
+		}
+	}
+	if (err instanceof AiError.AiError) {
+		const status = httpStatusOf(err)
+		return {
+			kind: 'provider',
+			reason: err.reason._tag,
+			...(status !== undefined ? { status } : {}),
+			message: err.message,
+		}
+	}
+	return {
+		kind: 'unknown',
+		message: messageOf(err) ?? `${provider} request failed`,
+	}
+}
+
+const toProviderError = (
+	provider: string,
+	err: unknown,
+	timeout: Duration.Input,
+): ProviderError => {
 	if (err instanceof ProviderError) return err
-	// A ProviderError's `message` is a required string; building one with an
-	// empty or missing message makes the error class reject its own construction
-	// and throw — a second, contentless error that buries the real failure.
-	// Always hand it a usable string so the true cause is what gets reported.
-	const message = messageOf(err) ?? `${provider} request failed`
+	// `describeFailure` always yields a non-empty message; a ProviderError built
+	// with an empty message rejects its own construction and throws a second,
+	// contentless error over the real one — so the non-empty invariant matters.
+	const message = describeFailure(provider, err, timeout).message
 	return err instanceof AiError.AiError
 		? new ProviderError({ provider, message, recoverable: err.isRetryable })
 		: new ProviderError({ provider, message, recoverable: true })
+}
+
+// Emit the failure's real shape onto the `llm.call` span and a log line before
+// the mapping above erases it, so a "<provider> request failed" run stays
+// diagnosable in one query. Fires once on the final surfaced failure after
+// retries, not per attempt. Logged at warning, not error: one slot failing may
+// still be recovered by the fallback cascade — the real error is the run-level
+// failure, recorded when every slot is exhausted.
+const reportFailure = (
+	provider: string,
+	tier: string | undefined,
+	err: unknown,
+	timeout: Duration.Input,
+) => {
+	const info = describeFailure(provider, err, timeout)
+	return Effect.annotateCurrentSpan({
+		'llm.error.kind': info.kind,
+		...(info.reason !== undefined ? { 'llm.error.reason': info.reason } : {}),
+		...(info.status !== undefined ? { 'llm.error.status': info.status } : {}),
+	}).pipe(
+		Effect.flatMap(() =>
+			Effect.logWarning('llm.call_failed').pipe(
+				Effect.annotateLogs({
+					event: 'llm.call_failed',
+					provider,
+					kind: info.kind,
+					...(tier !== undefined ? { tier } : {}),
+					...(info.reason !== undefined ? { reason: info.reason } : {}),
+					...(info.status !== undefined ? { status: info.status } : {}),
+				}),
+			),
+		),
+	)
 }
 
 const isRetryableFailure = (err: unknown): boolean =>
@@ -168,7 +256,12 @@ const harden =
 		>
 		const wrapped = timed.pipe(
 			Effect.retry({ schedule, while: isRetryableFailure }),
-			Effect.mapError((err: unknown) => toProviderError(provider, err)),
+			Effect.tapError((err: unknown) =>
+				reportFailure(provider, tier, err, timeout),
+			),
+			Effect.mapError((err: unknown) =>
+				toProviderError(provider, err, timeout),
+			),
 		) as Effect.Effect<A, ProviderError, R>
 		return semaphore ? semaphore.withPermits(1)(wrapped) : wrapped
 	}

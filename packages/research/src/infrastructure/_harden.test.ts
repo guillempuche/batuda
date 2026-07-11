@@ -1,4 +1,4 @@
-import { Duration, Effect, Exit, Fiber, Ref } from 'effect'
+import { Cause, Duration, Effect, Exit, Fiber, Ref } from 'effect'
 import { TestClock } from 'effect/testing'
 import type { LanguageModel } from 'effect/unstable/ai'
 import { AiError } from 'effect/unstable/ai'
@@ -101,6 +101,11 @@ const runWithVirtualClock = async <A, E>(
 		Effect.scoped(program).pipe(Effect.provide(TestClock.layer())),
 	)
 }
+
+// Pull the surfaced error out of a failed Exit — the repo idiom for reading a
+// ProviderError back off a run under the virtual clock.
+const failureOf = (exit: Exit.Exit<unknown, unknown>): unknown =>
+	Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined
 
 const invokeGenerateText = (
 	svc: LanguageModel.Service,
@@ -248,6 +253,37 @@ describe('hardenLanguageModel', () => {
 		expect(Exit.isFailure(exit)).toBe(true)
 	})
 
+	it('should name the timeout in the ProviderError instead of the generic fallback', async () => {
+		// GIVEN a never-resolving call on the `custom` vendor with a 1-second
+		// timeout — the exact production shape whose failure used to collapse into
+		// the contentless "custom request failed", hiding that it was a timeout
+		const neverSvc = {
+			generateText: () =>
+				Effect.sleep('5 hours').pipe(Effect.as({ text: 'never', usage: {} })),
+			generateObject: () => Effect.succeed({}),
+			streamText: () => Effect.succeed({}),
+		} as unknown as LanguageModel.Service
+		const hardened = hardenLanguageModel(neverSvc, 'custom', {
+			timeout: '1 second',
+		})
+
+		// WHEN the call times out under virtual time and its failure is captured
+		const exit = await runWithVirtualClock(
+			() => invokeGenerateText(hardened),
+			5_000,
+		)
+
+		// THEN a ProviderError surfaces whose message says it timed out — not the
+		// generic "<provider> request failed"
+		expect(Exit.isFailure(exit)).toBe(true)
+		const error = failureOf(exit)
+		expect(error).toBeInstanceOf(ProviderError)
+		if (error instanceof ProviderError) {
+			expect(error.message).toContain('timed out')
+			expect(error.message).not.toBe('custom request failed')
+		}
+	})
+
 	it('should surface a ProviderError carrying the real message when the inner extract error has one', async () => {
 		// GIVEN an extract call whose inner failure carries a real message
 		const hardened = hardenLanguageModel(
@@ -361,6 +397,47 @@ describe('withFallbackLanguageModel', () => {
 		expect(Exit.isSuccess(exit)).toBe(true)
 		const calls = Ref.getUnsafe(callsRef)
 		expect(calls.filter(c => c === 'a').length).toBe(3)
+		expect(calls.filter(c => c === 'b').length).toBe(1)
+	})
+
+	it('should cascade to the next slot when the primary times out', async () => {
+		// GIVEN slot 0 never resolves within its 1-second timeout, slot 1 succeeds —
+		// the failure mode this guards against: a wedged primary must fall through
+		// to a different vendor rather than fail the whole run
+		const callsRef = Ref.makeUnsafe<ReadonlyArray<string>>([])
+		const wedgedSvc = {
+			generateText: () =>
+				Effect.gen(function* () {
+					yield* Ref.update(callsRef, xs => [...xs, 'a'])
+					return yield* Effect.sleep('5 hours').pipe(
+						Effect.as({ text: 'a', usage: {} }),
+					)
+				}),
+			generateObject: () => Effect.succeed({}),
+			streamText: () => Effect.succeed({}),
+		} as unknown as LanguageModel.Service
+		const slot0 = hardenLanguageModel(wedgedSvc, 'nebius', {
+			timeout: '1 second',
+		})
+		const slot1 = hardenLanguageModel(
+			makeTaggedStub('b', callsRef, () =>
+				Effect.succeed({ text: 'b', usage: {} }),
+			),
+			'groq',
+		)
+		const composed = withFallbackLanguageModel([slot0, slot1])
+
+		// WHEN the composed model is invoked under virtual time
+		const exit = await runWithVirtualClock(
+			() => invokeGenerateText(composed),
+			5_000,
+		)
+
+		// THEN slot 0 timed out once (a timeout is not retried) and the cascade
+		// advanced to slot 1, which answered
+		expect(Exit.isSuccess(exit)).toBe(true)
+		const calls = Ref.getUnsafe(callsRef)
+		expect(calls.filter(c => c === 'a').length).toBe(1)
 		expect(calls.filter(c => c === 'b').length).toBe(1)
 	})
 })

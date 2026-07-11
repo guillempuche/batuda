@@ -12,7 +12,10 @@ export const CompetitorScanV1Schema = Schema.Struct({
 	competitors: Schema.Array(
 		Schema.Struct({
 			name: Schema.String,
-			website: Schema.optionalKey(Schema.String),
+			website: Schema.optionalKey(Schema.String).annotate({
+				description:
+					"The competitor's own official website. It must belong to the named competitor — not a directory/aggregator profile page and not another company that happened to appear in search results.",
+			}),
 			description: Schema.optionalKey(Schema.String),
 			strengths: Schema.optionalKey(Schema.Array(Schema.String)),
 			weaknesses: Schema.optionalKey(Schema.Array(Schema.String)),
