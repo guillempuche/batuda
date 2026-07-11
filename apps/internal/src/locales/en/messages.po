@@ -282,6 +282,11 @@ msgstr "Add channel"
 msgid "Add contact"
 msgstr "Add contact"
 
+#: src/components/companies/documents-panel.tsx
+#: src/components/companies/documents-panel.tsx
+msgid "Add document"
+msgstr "Add document"
+
 #: src/components/shared/company-card.tsx
 msgid "Add task"
 msgstr "Add task"
@@ -661,6 +666,10 @@ msgstr "Calendar"
 msgid "Call"
 msgstr "Call"
 
+#: src/components/companies/documents-panel.tsx
+msgid "Call notes"
+msgstr "Call notes"
+
 #: src/routes/companies/$slug.tsx
 msgid "Call phone"
 msgstr "Call phone"
@@ -669,6 +678,7 @@ msgstr "Call phone"
 msgid "Calls"
 msgstr "Calls"
 
+#: src/components/companies/documents-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/instructions/template-delete-confirm.tsx
 #: src/components/instructions/template-editor-dialog.tsx
@@ -812,6 +822,7 @@ msgstr "Clicked"
 msgid "Client"
 msgstr "Client"
 
+#: src/components/companies/documents-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/instructions/template-editor-dialog.tsx
@@ -1025,6 +1036,10 @@ msgstr "Contacts found"
 msgid "Content"
 msgstr "Content"
 
+#: src/components/companies/documents-panel.tsx
+msgid "Content (Markdown)"
+msgstr "Content (Markdown)"
+
 #: src/routes/companies/$slug.tsx
 #: src/routes/companies/$slug.tsx
 msgid "Conversations"
@@ -1198,6 +1213,10 @@ msgstr "Could not save the budget."
 #: src/components/contacts/contact-edit-dialog.tsx
 msgid "Could not save the contact"
 msgstr "Could not save the contact"
+
+#: src/components/companies/documents-panel.tsx
+msgid "Could not save the document"
+msgstr "Could not save the document"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Could not save the inbox."
@@ -1541,6 +1560,7 @@ msgstr "Dismiss"
 msgid "Display name"
 msgstr "Display name"
 
+#: src/components/companies/documents-panel.tsx
 #: src/components/shared/channel-icon.tsx
 msgid "Document"
 msgstr "Document"
@@ -1637,6 +1657,7 @@ msgstr "e.g. Sales — Acme"
 msgid "e.g. vip, warm"
 msgstr "e.g. vip, warm"
 
+#: src/components/companies/documents-panel.tsx
 #: src/routes/companies/$slug.tsx
 #: src/routes/emails/inboxes.tsx
 msgid "Edit"
@@ -1655,6 +1676,11 @@ msgstr "Edit {label}"
 #: src/components/contacts/contact-edit-dialog.tsx
 msgid "Edit contact"
 msgstr "Edit contact"
+
+#: src/components/companies/documents-panel.tsx
+#: src/components/companies/documents-panel.tsx
+msgid "Edit document"
+msgstr "Edit document"
 
 #: src/components/shared/task-item.tsx
 msgid "Edit due date"
@@ -1927,6 +1953,10 @@ msgstr "Full screen"
 #: src/components/research/run-progress.tsx
 msgid "Gathering evidence"
 msgstr "Gathering evidence"
+
+#: src/components/companies/documents-panel.tsx
+msgid "General"
+msgstr "General"
 
 #: src/routes/settings/mcp/index.tsx
 msgid "Give an AI assistant access to this organization's CRM. Chat apps like ChatGPT and Claude.ai connect over OAuth; coding tools use an API key."
@@ -2410,6 +2440,14 @@ msgstr "Meeting"
 msgid "Meeting booked"
 msgstr "Meeting booked"
 
+#: src/components/companies/documents-panel.tsx
+msgid "Meeting notes"
+msgstr "Meeting notes"
+
+#: src/components/companies/documents-panel.tsx
+msgid "Meeting prep"
+msgstr "Meeting prep"
+
 #: src/routes/companies/$slug.tsx
 msgid "Meeting stage — set the next action (agenda, follow-up)."
 msgstr "Meeting stage — set the next action (agenda, follow-up)."
@@ -2654,9 +2692,9 @@ msgstr "No coordinates yet. Locate this company to plot it on the map."
 msgid "no date"
 msgstr "no date"
 
-#: src/routes/companies/$slug.tsx
-msgid "No documents yet"
-msgstr "No documents yet"
+#: src/components/companies/documents-panel.tsx
+msgid "No documents yet."
+msgstr "No documents yet."
 
 #: src/components/companies/open-tasks-card.tsx
 msgid "no due date"
@@ -3289,10 +3327,6 @@ msgstr "Proposal in review"
 msgid "Proposal stage — set the next action (send it, chase a decision)."
 msgstr "Proposal stage — set the next action (send it, chase a decision)."
 
-#: src/routes/companies/$slug.tsx
-msgid "Proposals, meeting notes and attachments will show up here."
-msgstr "Proposals, meeting notes and attachments will show up here."
-
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Proposed updates"
 msgstr "Proposed updates"
@@ -3519,6 +3553,7 @@ msgstr "Reply all"
 msgid "Request a new link"
 msgstr "Request a new link"
 
+#: src/components/companies/documents-panel.tsx
 #: src/components/companies/research-summary-card.tsx
 #: src/components/instructions/agent-selector.tsx
 #: src/components/layout/nav-items.ts
@@ -3652,6 +3687,7 @@ msgstr "Running"
 msgid "Sales context"
 msgstr "Sales context"
 
+#: src/components/companies/documents-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/routes/emails/inboxes.tsx
@@ -3688,6 +3724,7 @@ msgstr "Save password"
 msgid "Save the org default"
 msgstr "Save the org default"
 
+#: src/components/companies/documents-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/emails/compose-form.tsx
 #: src/components/instructions/template-editor-dialog.tsx
@@ -4414,6 +4451,10 @@ msgstr "Timeline"
 msgid "Title"
 msgstr "Title"
 
+#: src/components/companies/documents-panel.tsx
+msgid "Title (optional)"
+msgstr "Title (optional)"
+
 #: src/routes/emails/inboxes.tsx
 msgid "TLS"
 msgstr "TLS"
@@ -4441,6 +4482,7 @@ msgstr "Total competitors"
 msgid "Try different criteria or clear the filters."
 msgstr "Try different criteria or clear the filters."
 
+#: src/components/companies/documents-panel.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Type"
 msgstr "Type"
@@ -4611,6 +4653,10 @@ msgstr "Views"
 #: src/components/shared/channel-icon.tsx
 msgid "Visit"
 msgstr "Visit"
+
+#: src/components/companies/documents-panel.tsx
+msgid "Visit notes"
+msgstr "Visit notes"
 
 #: src/routes/login.tsx
 msgid "We couldn't sign you in via that link. Try again."

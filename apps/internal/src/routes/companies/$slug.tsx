@@ -58,6 +58,7 @@ import { AboutSection } from '#/components/companies/about-section'
 import { CadenceCard } from '#/components/companies/cadence-card'
 import { CompanyOwnerControl } from '#/components/companies/company-owner-control'
 import { ConversationsTab } from '#/components/companies/conversations-tab'
+import { DocumentsPanel } from '#/components/companies/documents-panel'
 import { NextActionCard } from '#/components/companies/next-action-card'
 import { OpenTasksCard } from '#/components/companies/open-tasks-card'
 import { ResearchSummaryCard } from '#/components/companies/research-summary-card'
@@ -1349,11 +1350,7 @@ function DetailBody({
 								<FilesGroupTitle>
 									<Trans>Documents</Trans>
 								</FilesGroupTitle>
-								<EmptyState
-									icon={FileText}
-									title={t`No documents yet`}
-									description={t`Proposals, meeting notes and attachments will show up here.`}
-								/>
+								<DocumentsPanel companyId={company.id} />
 							</FilesGroup>
 						</Stack>
 					</PanelWrap>

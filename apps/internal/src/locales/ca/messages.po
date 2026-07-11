@@ -282,6 +282,11 @@ msgstr "Afegeix canal"
 msgid "Add contact"
 msgstr "Afegeix contacte"
 
+#: src/components/companies/documents-panel.tsx
+#: src/components/companies/documents-panel.tsx
+msgid "Add document"
+msgstr "Afegeix document"
+
 #: src/components/shared/company-card.tsx
 msgid "Add task"
 msgstr "Afegeix tasca"
@@ -661,6 +666,10 @@ msgstr "Calendari"
 msgid "Call"
 msgstr "Trucada"
 
+#: src/components/companies/documents-panel.tsx
+msgid "Call notes"
+msgstr "Notes de trucada"
+
 #: src/routes/companies/$slug.tsx
 msgid "Call phone"
 msgstr "Truca al telèfon"
@@ -669,6 +678,7 @@ msgstr "Truca al telèfon"
 msgid "Calls"
 msgstr "Crides"
 
+#: src/components/companies/documents-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/instructions/template-delete-confirm.tsx
 #: src/components/instructions/template-editor-dialog.tsx
@@ -812,6 +822,7 @@ msgstr "Clicat"
 msgid "Client"
 msgstr "Client"
 
+#: src/components/companies/documents-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/instructions/template-editor-dialog.tsx
@@ -1025,6 +1036,10 @@ msgstr "Contactes trobats"
 msgid "Content"
 msgstr "Contingut"
 
+#: src/components/companies/documents-panel.tsx
+msgid "Content (Markdown)"
+msgstr "Contingut (Markdown)"
+
 #: src/routes/companies/$slug.tsx
 #: src/routes/companies/$slug.tsx
 msgid "Conversations"
@@ -1198,6 +1213,10 @@ msgstr "No s'ha pogut desar el pressupost."
 #: src/components/contacts/contact-edit-dialog.tsx
 msgid "Could not save the contact"
 msgstr "No s'ha pogut desar el contacte"
+
+#: src/components/companies/documents-panel.tsx
+msgid "Could not save the document"
+msgstr "No s'ha pogut desar el document"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Could not save the inbox."
@@ -1541,6 +1560,7 @@ msgstr "Descarta"
 msgid "Display name"
 msgstr "Nom a mostrar"
 
+#: src/components/companies/documents-panel.tsx
 #: src/components/shared/channel-icon.tsx
 msgid "Document"
 msgstr "Document"
@@ -1637,6 +1657,7 @@ msgstr "p. ex. Vendes — Acme"
 msgid "e.g. vip, warm"
 msgstr "p. ex. vip, càlid"
 
+#: src/components/companies/documents-panel.tsx
 #: src/routes/companies/$slug.tsx
 #: src/routes/emails/inboxes.tsx
 msgid "Edit"
@@ -1655,6 +1676,11 @@ msgstr "Edita {label}"
 #: src/components/contacts/contact-edit-dialog.tsx
 msgid "Edit contact"
 msgstr "Edita el contacte"
+
+#: src/components/companies/documents-panel.tsx
+#: src/components/companies/documents-panel.tsx
+msgid "Edit document"
+msgstr "Edita el document"
 
 #: src/components/shared/task-item.tsx
 msgid "Edit due date"
@@ -1927,6 +1953,10 @@ msgstr "Pantalla completa"
 #: src/components/research/run-progress.tsx
 msgid "Gathering evidence"
 msgstr "Recollint proves"
+
+#: src/components/companies/documents-panel.tsx
+msgid "General"
+msgstr "General"
 
 #: src/routes/settings/mcp/index.tsx
 msgid "Give an AI assistant access to this organization's CRM. Chat apps like ChatGPT and Claude.ai connect over OAuth; coding tools use an API key."
@@ -2410,6 +2440,14 @@ msgstr "Reunió"
 msgid "Meeting booked"
 msgstr "Reunió programada"
 
+#: src/components/companies/documents-panel.tsx
+msgid "Meeting notes"
+msgstr "Notes de reunió"
+
+#: src/components/companies/documents-panel.tsx
+msgid "Meeting prep"
+msgstr "Preparació de reunió"
+
 #: src/routes/companies/$slug.tsx
 msgid "Meeting stage — set the next action (agenda, follow-up)."
 msgstr "Etapa de reunió — defineix la següent acció (agenda, seguiment)."
@@ -2654,9 +2692,9 @@ msgstr "Encara sense coordenades. Localitza aquesta empresa per situar-la al map
 msgid "no date"
 msgstr "sense data"
 
-#: src/routes/companies/$slug.tsx
-msgid "No documents yet"
-msgstr "Encara no hi ha documents"
+#: src/components/companies/documents-panel.tsx
+msgid "No documents yet."
+msgstr "Encara no hi ha documents."
 
 #: src/components/companies/open-tasks-card.tsx
 msgid "no due date"
@@ -3289,10 +3327,6 @@ msgstr "Proposta en revisió"
 msgid "Proposal stage — set the next action (send it, chase a decision)."
 msgstr "Etapa de proposta — defineix la següent acció (envia-la, persegueix una decisió)."
 
-#: src/routes/companies/$slug.tsx
-msgid "Proposals, meeting notes and attachments will show up here."
-msgstr "Les propostes, notes de reunió i adjunts apareixeran aquí."
-
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Proposed updates"
 msgstr "Actualitzacions proposades"
@@ -3519,6 +3553,7 @@ msgstr "Respon a tots"
 msgid "Request a new link"
 msgstr "Demana un enllaç nou"
 
+#: src/components/companies/documents-panel.tsx
 #: src/components/companies/research-summary-card.tsx
 #: src/components/instructions/agent-selector.tsx
 #: src/components/layout/nav-items.ts
@@ -3652,6 +3687,7 @@ msgstr "En execució"
 msgid "Sales context"
 msgstr "Context comercial"
 
+#: src/components/companies/documents-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/routes/emails/inboxes.tsx
@@ -3688,6 +3724,7 @@ msgstr "Desa la contrasenya"
 msgid "Save the org default"
 msgstr "Desa el valor per defecte de l'organització"
 
+#: src/components/companies/documents-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/emails/compose-form.tsx
 #: src/components/instructions/template-editor-dialog.tsx
@@ -4414,6 +4451,10 @@ msgstr "Cronologia"
 msgid "Title"
 msgstr "Títol"
 
+#: src/components/companies/documents-panel.tsx
+msgid "Title (optional)"
+msgstr "Títol (opcional)"
+
 #: src/routes/emails/inboxes.tsx
 msgid "TLS"
 msgstr "TLS"
@@ -4441,6 +4482,7 @@ msgstr "Total competidors"
 msgid "Try different criteria or clear the filters."
 msgstr "Prova amb criteris diferents o neteja els filtres."
 
+#: src/components/companies/documents-panel.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Type"
 msgstr "Tipus"
@@ -4611,6 +4653,10 @@ msgstr "Visites"
 #: src/components/shared/channel-icon.tsx
 msgid "Visit"
 msgstr "Visita"
+
+#: src/components/companies/documents-panel.tsx
+msgid "Visit notes"
+msgstr "Notes de visita"
 
 #: src/routes/login.tsx
 msgid "We couldn't sign you in via that link. Try again."
