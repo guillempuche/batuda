@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildEvalReport, scorePayloadsForRun } from './eval-report'
+import {
+	buildEvalReport,
+	evalSpanAttributes,
+	evalSummaryAttributes,
+	scorePayloadsForRun,
+} from './eval-report'
 import type { RunScore } from './eval-scoring'
 
 const score = (over: Partial<RunScore>): RunScore => ({
@@ -99,6 +104,82 @@ describe('scorePayloadsForRun', () => {
 
 			// WHEN mapped — THEN recall is not reported
 			expect(payloads.has('field_recall')).toBe(false)
+		})
+	})
+})
+
+describe('evalSpanAttributes', () => {
+	describe('when a run filled and scored some fields', () => {
+		it('should carry the booleans and both rates', () => {
+			// GIVEN a grounded run, 1 correct of 2 filled, 1 of 4 known
+			const attrs = evalSpanAttributes(
+				score({
+					id: 'acme',
+					grounded: true,
+					fieldsExpected: 4,
+					fieldsScored: 2,
+					fieldsCorrect: 1,
+				}),
+			)
+
+			// WHEN flattened — THEN the id, booleans, and both rates ride along
+			expect(attrs['eval.company_id']).toBe('acme')
+			expect(attrs['eval.grounded']).toBe(true)
+			expect(attrs['eval.field_precision']).toBe(0.5)
+			expect(attrs['eval.field_recall']).toBe(0.25)
+		})
+	})
+
+	describe('when a run filled no fields', () => {
+		it('should omit precision but keep recall', () => {
+			// GIVEN a run that filled nothing but had known fields
+			const attrs = evalSpanAttributes(
+				score({ fieldsExpected: 3, fieldsScored: 0, fieldsCorrect: 0 }),
+			)
+
+			// WHEN flattened — THEN there is no precision to chart, but recall (0) rides
+			expect('eval.field_precision' in attrs).toBe(false)
+			expect(attrs['eval.field_recall']).toBe(0)
+		})
+	})
+})
+
+describe('evalSummaryAttributes', () => {
+	describe('when precision and recall are present', () => {
+		it('should carry every rate', () => {
+			// GIVEN a full summary
+			const attrs = evalSummaryAttributes({
+				runs: 4,
+				groundingAccuracy: 0.5,
+				wrongCompanyRate: 0.25,
+				emptyRate: 0.25,
+				fieldPrecision: 0.75,
+				fieldRecall: 0.5,
+			})
+
+			// WHEN flattened — THEN each top-line rate is present
+			expect(attrs['eval.runs']).toBe(4)
+			expect(attrs['eval.grounding_accuracy']).toBe(0.5)
+			expect(attrs['eval.field_precision']).toBe(0.75)
+			expect(attrs['eval.field_recall']).toBe(0.5)
+		})
+	})
+
+	describe('when nothing was filled to judge', () => {
+		it('should omit the null precision', () => {
+			// GIVEN a summary whose precision is null (nothing filled)
+			const attrs = evalSummaryAttributes({
+				runs: 1,
+				groundingAccuracy: 1,
+				wrongCompanyRate: 0,
+				emptyRate: 1,
+				fieldPrecision: null,
+				fieldRecall: 0,
+			})
+
+			// WHEN flattened — THEN a null precision is left off, not charted as zero
+			expect('eval.field_precision' in attrs).toBe(false)
+			expect(attrs['eval.field_recall']).toBe(0)
 		})
 	})
 })

@@ -67,6 +67,9 @@ importers:
       '@batuda/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@batuda/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       '@batuda/research':
         specifier: workspace:*
         version: link:../../packages/research

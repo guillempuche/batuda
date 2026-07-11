@@ -24,6 +24,8 @@ export { outcomeFromRun } from './application/eval-outcome'
 export {
 	buildEvalReport,
 	type EvalReport,
+	evalSpanAttributes,
+	evalSummaryAttributes,
 	type ScorePayload,
 	scorePayloadsForRun,
 } from './application/eval-report'

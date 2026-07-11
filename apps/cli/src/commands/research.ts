@@ -5,12 +5,15 @@ import { Config, Console, Effect, Layer, Option, type Redacted } from 'effect'
 import { FetchHttpClient } from 'effect/unstable/http'
 import { SqlClient } from 'effect/unstable/sql'
 
+import { makeOtlpObservability } from '@batuda/observability'
 import {
 	BlobStorage,
 	buildEvalReport,
 	ContactDiscovery,
 	type CreateResearchInput,
 	type EvalSummary,
+	evalSpanAttributes,
+	evalSummaryAttributes,
 	type GoldenExpectation,
 	type ModelProbeResult,
 	makeResearchLlmLive,
@@ -275,6 +278,20 @@ export const researchEval = (opts: {
 		}
 		yield* Console.log(`Evaluating ${golden.length} companies…\n`)
 
+		// Tag the run's spans so a drift chart can group quality by which models
+		// produced it; the endpoint/commit ride the OTLP resource, not here.
+		const agentModel = yield* Config.string('RESEARCH_LLM_AGENT_MODEL').pipe(
+			Config.withDefault('unknown'),
+		)
+		const extractModel = yield* Config.string(
+			'RESEARCH_LLM_EXTRACT_MODEL',
+		).pipe(Config.withDefault('unknown'))
+		yield* Effect.annotateCurrentSpan({
+			'eval.agent_model': agentModel,
+			'eval.extract_model': extractModel,
+			'eval.companies': golden.length,
+		})
+
 		const scores = yield* Effect.gen(function* () {
 			const defaults = yield* systemDefaults
 			// Each company runs `runs` times: per-run grounding is noisy, so averaging
@@ -286,7 +303,26 @@ export const researchEval = (opts: {
 			return yield* Effect.forEach(
 				tasks,
 				company =>
-					driveOne(opts.org, opts.user, defaults, company, opts.schemaName),
+					driveOne(
+						opts.org,
+						opts.user,
+						defaults,
+						company,
+						opts.schemaName,
+					).pipe(
+						Effect.tap(score =>
+							Effect.annotateCurrentSpan(evalSpanAttributes(score)),
+						),
+						Effect.withSpan('research_eval.run', {
+							attributes: {
+								'eval.company_id': company.id,
+								'eval.query': company.query,
+								'eval.schema': opts.schemaName,
+								'eval.agent_model': agentModel,
+								'eval.extract_model': extractModel,
+							},
+						}),
+					),
 				{ concurrency: opts.concurrency },
 			)
 		}).pipe(Effect.provide(researchLive))
@@ -302,6 +338,7 @@ export const researchEval = (opts: {
 
 		const report = buildEvalReport(scores)
 		yield* Console.log(formatSummary(report.summary))
+		yield* Effect.annotateCurrentSpan(evalSummaryAttributes(report.summary))
 		yield* Option.match(opts.out, {
 			onNone: () => Effect.void,
 			onSome: path =>
@@ -315,4 +352,17 @@ export const researchEval = (opts: {
 					),
 				),
 		})
-	})
+	}).pipe(
+		// One span per eval run plus this batch span, exported to the monitoring
+		// board when OTEL_EXPORTER_OTLP_ENDPOINT is set; a no-op native tracer
+		// otherwise, so a local run still prints its table and writes its report.
+		Effect.withSpan('research_eval.batch', {
+			attributes: {
+				'eval.schema': opts.schemaName,
+				'eval.runs_per_company': opts.runs,
+			},
+		}),
+		Effect.provide(
+			makeOtlpObservability({ serviceName: 'batuda-research-eval' }),
+		),
+	)
