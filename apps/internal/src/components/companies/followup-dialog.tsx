@@ -48,6 +48,7 @@ export function FollowupDialog({
 		if (trimmed.length === 0 || busy) return
 		setBusy(true)
 		setError(null)
+		// A date-only pick becomes 9am local time — a due moment at the start of the workday.
 		const due = dueAt ? new Date(`${dueAt}T09:00:00`) : null
 		const exit = await createTask({
 			payload: {

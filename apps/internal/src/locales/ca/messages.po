@@ -54,7 +54,6 @@ msgid "(no summary)"
 msgstr "(sense resum)"
 
 #. placeholder {0}: ev.attendeeCount
-#: src/components/companies/calendar-tab.tsx
 #: src/components/companies/upcoming-meetings-card.tsx
 msgid "{0} attendees"
 msgstr "{0} assistents"
@@ -137,7 +136,6 @@ msgstr "<0>ChatGPT:</0> Configuració → Connectors → activa el mode desenvol
 msgid "<0>Claude.ai:</0> Settings → Connectors → Add custom connector → paste the URL above."
 msgstr "<0>Claude.ai:</0> Configuració → Connectors → Afegeix un connector personalitzat → enganxa l'URL de dalt."
 
-#: src/components/companies/calendar-tab.tsx
 #: src/components/companies/upcoming-meetings-card.tsx
 msgid "1 attendee"
 msgstr "1 assistent"
@@ -2687,10 +2685,6 @@ msgstr "Sense organització activa. Tria'n una al selector de la barra superior.
 msgid "No activity yet"
 msgstr "Encara no hi ha activitat"
 
-#: src/components/companies/calendar-tab.tsx
-msgid "No calendar events for this company yet."
-msgstr "Encara no hi ha esdeveniments per a aquesta empresa."
-
 #: src/routes/calendar/index.tsx
 msgid "No calendar events yet"
 msgstr "Encara no hi ha esdeveniments al calendari"
@@ -4596,7 +4590,6 @@ msgstr "No es pot lliurar"
 msgid "Undo"
 msgstr "Desfés"
 
-#: src/components/companies/calendar-tab.tsx
 #: src/components/companies/conversations-tab.tsx
 #: src/components/companies/research-summary-card.tsx
 #: src/components/companies/upcoming-meetings-card.tsx

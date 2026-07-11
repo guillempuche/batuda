@@ -4,7 +4,7 @@ import { BatudaApiAtom } from '#/lib/batuda-api-atom'
  * Id/slug-keyed atom factories for the Company Detail page.
  *
  * The company-detail route loader fetches the company + four parallel
- * relations (contacts, interactions, tasks, proposals) and needs to
+ * relations (contacts, interactions, tasks, timeline) and needs to
  * hydrate five distinct atoms. These atoms are parameterized by runtime
  * ids (slug for the company, companyId for the relations) so we can't
  * just export a module-level constant — we need one atom *per* company.
