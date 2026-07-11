@@ -76,5 +76,65 @@
 			"altDomains": ["ocadogroup.com", "ocado.co.uk"],
 			"fields": { "location": "Hatfield" }
 		}
+	},
+	{
+		"id": "enganches-aragon",
+		"query": "Enganches Aragón, Zaragoza",
+		"expectedOutput": {
+			"officialDomain": "enganchesaragon.com",
+			"fields": {
+				"industry": "manufactura",
+				"size_range": "51-200",
+				"region": "ara",
+				"location": "Zaragoza"
+			}
+		}
+	},
+	{
+		"id": "cohitech",
+		"query": "Cohitech, Balsareny",
+		"expectedOutput": {
+			"officialDomain": "cohitech.net",
+			"fields": {
+				"industry": "manufactura",
+				"size_range": "51-200",
+				"region": "cat",
+				"location": "Balsareny"
+			}
+		}
+	},
+	{
+		"id": "pronimetal",
+		"query": "Pronimetal, Alagón",
+		"expectedOutput": {
+			"officialDomain": "pronimetal.com",
+			"fields": {
+				"industry": "manufactura",
+				"size_range": "51-200",
+				"region": "ara",
+				"location": "Alagón"
+			}
+		}
+	},
+	{
+		"id": "pcex-automotive",
+		"query": "PCEX Automotive, Alicante",
+		"expectedOutput": {
+			"officialDomain": "pcexautomotive.com",
+			"fields": {
+				"industry": "distribució",
+				"size_range": "11-25",
+				"region": "cv",
+				"location": "Alicante"
+			}
+		}
+	},
+	{
+		"id": "canteras-la-ponderosa",
+		"query": "Canteras La Ponderosa, Alcover",
+		"expectedOutput": {
+			"officialDomain": "canteralaponderosa.com",
+			"fields": { "region": "cat", "location": "Alcover" }
+		}
 	}
 ]
