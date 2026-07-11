@@ -253,6 +253,10 @@ msgstr "Afegeix una plantilla"
 msgid "Add an org template first."
 msgstr "Afegeix primer una plantilla de l'organització."
 
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Add as lead"
+msgstr "Afegeix com a oportunitat"
+
 #: src/components/instructions/default-stack-editor.tsx
 msgid "Add at least one template before saving a default."
 msgstr "Afegeix almenys una plantilla abans de desar un valor per defecte."
@@ -272,6 +276,11 @@ msgstr "Afegeix Cc / Bcc"
 #: src/components/research/run-labels.ts
 msgid "Add channel"
 msgstr "Afegeix canal"
+
+#: src/components/contacts/contact-edit-dialog.tsx
+#: src/routes/companies/$slug.tsx
+msgid "Add contact"
+msgstr "Afegeix contacte"
 
 #: src/components/shared/company-card.tsx
 msgid "Add task"
@@ -294,9 +303,17 @@ msgstr "Amplia el valor per defecte de l'organització"
 msgid "Added"
 msgstr "Afegit"
 
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Added as a verified lead"
+msgstr "Afegit com a oportunitat verificada"
+
 #: src/routes/settings/organization/templates.tsx
 msgid "Added to the org"
 msgstr "Afegida a l'organització"
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Adding…"
+msgstr "S'està afegint…"
 
 #: src/components/research/findings/company-enrichment-view.tsx
 msgid "Address"
@@ -652,6 +669,7 @@ msgstr "Truca al telèfon"
 msgid "Calls"
 msgstr "Crides"
 
+#: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/instructions/template-delete-confirm.tsx
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
@@ -794,6 +812,7 @@ msgstr "Clicat"
 msgid "Client"
 msgstr "Client"
 
+#: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
@@ -1044,6 +1063,10 @@ msgstr "Copia el slug"
 msgid "Copy your key now"
 msgstr "Copia la teva clau ara"
 
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Could not add as a lead"
+msgstr "No s'ha pogut afegir com a oportunitat"
+
 #: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Could not apply the batch."
@@ -1172,6 +1195,10 @@ msgstr "No s'ha pogut desar"
 msgid "Could not save the budget."
 msgstr "No s'ha pogut desar el pressupost."
 
+#: src/components/contacts/contact-edit-dialog.tsx
+msgid "Could not save the contact"
+msgstr "No s'ha pogut desar el contacte"
+
 #: src/routes/emails/inboxes.tsx
 msgid "Could not save the inbox."
 msgstr "No s'ha pogut desar la safata."
@@ -1236,6 +1263,10 @@ msgstr "No s'han pogut actualitzar els canals"
 #: src/components/research/findings/shared.tsx
 msgid "Could not update the paid action"
 msgstr "No s'ha pogut actualitzar l'acció de pagament"
+
+#: src/routes/companies/$slug.tsx
+msgid "Could not update verification"
+msgstr "No s'ha pogut actualitzar la verificació"
 
 #: src/routes/settings/organization/templates.tsx
 msgid "Couldn't add it"
@@ -1389,6 +1420,7 @@ msgstr "Data"
 msgid "Dead"
 msgstr "Descartat"
 
+#: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/research/findings/contact-discovery-view.tsx
 #: src/routes/companies/$slug.tsx
 msgid "Decision maker"
@@ -1581,6 +1613,10 @@ msgstr "p. ex. Claude Desktop"
 msgid "e.g. Company signature"
 msgstr "p. ex. Signatura de l'empresa"
 
+#: src/components/contacts/contact-edit-dialog.tsx
+msgid "e.g. Head of Operations"
+msgstr "p. ex. Cap d'operacions"
+
 #: src/components/research/research-dialog.tsx
 msgid "e.g. hospitality"
 msgstr "p. ex. hostaleria"
@@ -1588,6 +1624,10 @@ msgstr "p. ex. hostaleria"
 #: src/components/research/research-dialog.tsx
 msgid "e.g. independent bakeries in Barcelona with 5–20 staff"
 msgstr "p. ex. fleques independents a Barcelona amb 5–20 treballadors"
+
+#: src/components/contacts/contact-edit-dialog.tsx
+msgid "e.g. Marta Puig"
+msgstr "p. ex. Marta Puig"
 
 #: src/routes/emails/inboxes.tsx
 msgid "e.g. Sales — Acme"
@@ -1597,6 +1637,7 @@ msgstr "p. ex. Vendes — Acme"
 msgid "e.g. vip, warm"
 msgstr "p. ex. vip, càlid"
 
+#: src/routes/companies/$slug.tsx
 #: src/routes/emails/inboxes.tsx
 msgid "Edit"
 msgstr "Edita"
@@ -1610,6 +1651,10 @@ msgstr "Edita {0}"
 #: src/components/shared/editable-field.tsx
 msgid "Edit {label}"
 msgstr "Edita {label}"
+
+#: src/components/contacts/contact-edit-dialog.tsx
+msgid "Edit contact"
+msgstr "Edita el contacte"
 
 #: src/components/shared/task-item.tsx
 msgid "Edit due date"
@@ -2312,6 +2357,10 @@ msgstr "Marca «{0}» com a completada"
 msgid "Mark \"{0}\" as pending"
 msgstr "Marca «{0}» com a pendent"
 
+#: src/routes/companies/$slug.tsx
+msgid "Mark as verified"
+msgstr "Marca com a verificada"
+
 #: src/components/shared/company-card.tsx
 msgid "Mark contacted"
 msgstr "Marca com a contactat"
@@ -2325,6 +2374,10 @@ msgstr "Marca com a llegit"
 #: src/routes/emails/index.tsx
 msgid "Mark unread"
 msgstr "Marca com a no llegit"
+
+#: src/routes/companies/$slug.tsx
+msgid "Marked as a verified lead"
+msgstr "Marcada com a oportunitat verificada"
 
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Market summary"
@@ -2433,6 +2486,7 @@ msgstr "Mou a…"
 msgid "My leads"
 msgstr "Els meus leads"
 
+#: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/routes/companies/index.tsx
 #: src/routes/emails/inboxes.tsx
@@ -3557,6 +3611,10 @@ msgstr "Arriscat"
 msgid "Role"
 msgstr "Rol"
 
+#: src/components/contacts/contact-edit-dialog.tsx
+msgid "Role (optional)"
+msgstr "Càrrec (opcional)"
+
 #: src/components/research/run-actions.tsx
 msgid "Run again"
 msgstr "Torna a executar"
@@ -3594,6 +3652,7 @@ msgstr "En execució"
 msgid "Sales context"
 msgstr "Context comercial"
 
+#: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
@@ -3629,6 +3688,7 @@ msgstr "Desa la contrasenya"
 msgid "Save the org default"
 msgstr "Desa el valor per defecte de l'organització"
 
+#: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/emails/compose-form.tsx
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/routes/emails/inboxes.tsx
@@ -4523,9 +4583,21 @@ msgstr "S'utilitza el valor per defecte de l'organització"
 msgid "Verifiable only"
 msgstr "Només verificables"
 
+#: src/routes/companies/$slug.tsx
+msgid "Verification cleared"
+msgstr "Verificació esborrada"
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Verified emails and grounded values — safe to apply in one click."
 msgstr "Correus verificats i valors fonamentats — segurs per aplicar amb un clic."
+
+#: src/routes/companies/$slug.tsx
+msgid "Verified lead"
+msgstr "Oportunitat verificada"
+
+#: src/routes/companies/$slug.tsx
+msgid "Verified lead — click to clear"
+msgstr "Oportunitat verificada — clica per esborrar"
 
 #: src/components/shared/timeline-entry.tsx
 msgid "View thread"

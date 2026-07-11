@@ -13,6 +13,7 @@ import { AsyncResult } from 'effect/unstable/reactivity'
 import {
 	AlertTriangle,
 	AtSign,
+	BadgeCheck,
 	Briefcase,
 	Camera,
 	Check,
@@ -25,6 +26,7 @@ import {
 	MailPlus,
 	MapPin,
 	MessageCircle,
+	Pencil,
 	Phone,
 	Plus,
 	Settings2,
@@ -61,6 +63,10 @@ import { OpenTasksCard } from '#/components/companies/open-tasks-card'
 import { ResearchSummaryCard } from '#/components/companies/research-summary-card'
 import { UpcomingMeetingsCard } from '#/components/companies/upcoming-meetings-card'
 import { WherePanel } from '#/components/companies/where-panel'
+import {
+	ContactEditDialog,
+	type EditableContact,
+} from '#/components/contacts/contact-edit-dialog'
 import {
 	channelHref,
 	type DisplayChannel,
@@ -117,6 +123,7 @@ type CompanyDetail = {
 	readonly name: string
 	readonly status: string
 	readonly ownerId: string | null
+	readonly verifiedAt: string | null
 	readonly industry: string | null
 	readonly sizeRange: string | null
 	readonly region: string | null
@@ -469,6 +476,31 @@ function DetailBody({
 		[updateCompany, company.id, refreshCompany, toast, t],
 	)
 
+	const verifyCompany = useAtomSet(
+		BatudaApiAtom.mutation('companies', 'verify'),
+		{ mode: 'promiseExit' },
+	)
+	const handleVerify = useCallback(
+		async (verified: boolean) => {
+			const exit = await verifyCompany({
+				params: { id: company.id },
+				payload: { verified },
+			} as never)
+			if (exit._tag === 'Success') {
+				refreshCompany()
+				toast.add({
+					title: verified
+						? t`Marked as a verified lead`
+						: t`Verification cleared`,
+					type: 'success',
+				})
+				return
+			}
+			toast.add({ title: t`Could not update verification`, type: 'error' })
+		},
+		[verifyCompany, company.id, refreshCompany, toast, t],
+	)
+
 	const handleStatusChange = useCallback(
 		async (next: string) => {
 			const prev = company.status
@@ -547,6 +579,11 @@ function DetailBody({
 	// Re-derived from the live list so the dialog reflects channel edits live.
 	const manageChannelsContact =
 		contacts.find(c => c.id === manageChannelsContactId) ?? null
+	// null contact = add; an EditableContact = edit. Closed when not open.
+	const [contactDialog, setContactDialog] = useState<{
+		readonly open: boolean
+		readonly contact: EditableContact | null
+	}>({ open: false, contact: null })
 	type PageEntry = {
 		readonly id: string
 		readonly title: string
@@ -836,6 +873,27 @@ function DetailBody({
 							ownerId={company.ownerId}
 							onChanged={refreshCompany}
 						/>
+						{company.verifiedAt !== null ? (
+							<VerifiedControl
+								type='button'
+								data-testid='company-verified'
+								$verified
+								onClick={() => void handleVerify(false)}
+								title={t`Verified lead — click to clear`}
+							>
+								<BadgeCheck size={14} aria-hidden />
+								<Trans>Verified lead</Trans>
+							</VerifiedControl>
+						) : (
+							<VerifiedControl
+								type='button'
+								data-testid='company-verify'
+								onClick={() => void handleVerify(true)}
+							>
+								<BadgeCheck size={14} aria-hidden />
+								<Trans>Mark as verified</Trans>
+							</VerifiedControl>
+						)}
 					</HeaderMeta>
 				</IdentityRow>
 
@@ -1059,6 +1117,17 @@ function DetailBody({
 
 				<PriTabs.Panel value='people'>
 					<PanelWrap>
+						<PeopleHeader>
+							<PriButton
+								type='button'
+								$variant='outlined'
+								data-testid='company-add-contact'
+								onClick={() => setContactDialog({ open: true, contact: null })}
+							>
+								<Plus size={14} aria-hidden />
+								<Trans>Add contact</Trans>
+							</PriButton>
+						</PeopleHeader>
 						{contacts.length === 0 ? (
 							<EmptyState
 								title={t`No contacts yet`}
@@ -1188,6 +1257,26 @@ function DetailBody({
 											)}
 											<ContactLinkButton
 												type='button'
+												data-testid={`contact-edit-${contact.id}`}
+												onClick={() =>
+													setContactDialog({
+														open: true,
+														contact: {
+															id: contact.id,
+															name: contact.name,
+															role: contact.role,
+															isDecisionMaker: contact.isDecisionMaker,
+														},
+													})
+												}
+											>
+												<Pencil size={14} aria-hidden />
+												<span>
+													<Trans>Edit</Trans>
+												</span>
+											</ContactLinkButton>
+											<ContactLinkButton
+												type='button'
 												onClick={() => setManageChannelsContactId(contact.id)}
 											>
 												<Settings2 size={14} aria-hidden />
@@ -1286,6 +1375,14 @@ function DetailBody({
 				onClose={() => setManageChannelsContactId(null)}
 				onChanged={refreshContacts}
 			/>
+
+			<ContactEditDialog
+				open={contactDialog.open}
+				companyId={company.id}
+				contact={contactDialog.contact}
+				onClose={() => setContactDialog({ open: false, contact: null })}
+				onSaved={refreshContacts}
+			/>
 		</Page>
 	)
 }
@@ -1325,6 +1422,7 @@ function narrowCompany(raw: unknown): CompanyDetail | null {
 		name: r['name'],
 		status: r['status'],
 		ownerId: str('ownerId'),
+		verifiedAt: str('verifiedAt'),
 		industry: str('industry'),
 		sizeRange: str('sizeRange'),
 		region: str('region'),
@@ -1565,6 +1663,42 @@ const HeaderMeta = styled.div.withConfig({
 	gap: var(--space-sm);
 `
 
+const VerifiedControl = styled.button.withConfig({
+	displayName: 'CompanyDetailVerifiedControl',
+	shouldForwardProp: prop => prop !== '$verified',
+})<{ $verified?: boolean }>`
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-3xs);
+	font-family: var(--font-display);
+	font-size: var(--typescale-label-small-size);
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	padding: var(--space-3xs) var(--space-2xs);
+	border-radius: var(--shape-full);
+	cursor: pointer;
+	color: ${p =>
+		p.$verified ? 'var(--color-secondary)' : 'var(--color-on-surface-variant)'};
+	background: ${p =>
+		p.$verified
+			? 'color-mix(in oklab, var(--color-secondary) 14%, transparent)'
+			: 'transparent'};
+	border: 1px solid
+		${p =>
+			p.$verified
+				? 'color-mix(in oklab, var(--color-secondary) 40%, transparent)'
+				: 'var(--color-outline)'};
+
+	&:hover {
+		border-color: var(--color-secondary);
+	}
+
+	&:focus-visible {
+		outline: none;
+		box-shadow: var(--glow-active);
+	}
+`
+
 const HeaderSelectTrigger = styled(Select.Trigger).withConfig({
 	displayName: 'CompanyDetailHeaderSelectTrigger',
 })`
@@ -1715,6 +1849,14 @@ const FilesGroupTitle = styled.h3.withConfig({
 	margin: 0;
 	font-size: var(--typescale-title-medium-size);
 	line-height: var(--typescale-title-medium-line);
+`
+
+const PeopleHeader = styled.div.withConfig({
+	displayName: 'CompanyDetailPeopleHeader',
+})`
+	display: flex;
+	justify-content: flex-end;
+	margin-bottom: var(--space-sm);
 `
 
 const ContactList = styled.ul.withConfig({
