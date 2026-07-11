@@ -263,6 +263,28 @@ export const classifyEntityMatch = (
 	return weak ? 'weak' : 'absent'
 }
 
+/**
+ * Whether a `registry_lookup` tool result confirms the target company. True only
+ * when the lookup resolved a real company — a record carrying a `legalName`, not a
+ * `{status:'no_registry'}` miss — whose legal name strongly matches the run's
+ * entity targets. A registry's fuzzy name search can surface a look-alike, so the
+ * legal name must clear the same 'strong' bar scraped evidence does, not merely be
+ * present. Returns false when there are no targets (a discovery scan) or the result
+ * is not a resolved record.
+ */
+export const isConfirmedRegistryMatch = (
+	targets: EntityTargets | null,
+	result: unknown,
+): boolean => {
+	if (targets === null) return false
+	if (result === null || typeof result !== 'object') return false
+	const record = result as { legalName?: unknown; status?: unknown }
+	if (typeof record.legalName !== 'string' || record.legalName.trim() === '')
+		return false
+	if (record.status === 'no_registry') return false
+	return classifyEntityMatch(targets, record.legalName) === 'strong'
+}
+
 export interface SourceEntityVerdict {
 	readonly sourceId: string
 	readonly match: EntityMatch

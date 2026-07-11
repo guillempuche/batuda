@@ -105,5 +105,17 @@ export const outcomeFromRun = (input: {
 		if (host !== null) reachedDomains.push(host)
 	}
 
-	return { status: toTerminalStatus(input.status), reachedDomains, fields }
+	// The pipeline stamps this on the findings when a registry lookup resolved the
+	// target company by legal name — a reached signal independent of the fetch log.
+	const registryConfirmed =
+		findings !== null &&
+		typeof findings === 'object' &&
+		(findings as { registry_confirmed?: unknown }).registry_confirmed === true
+
+	return {
+		status: toTerminalStatus(input.status),
+		reachedDomains,
+		fields,
+		registryConfirmed,
+	}
 }
