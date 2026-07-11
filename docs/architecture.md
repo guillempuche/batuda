@@ -559,6 +559,10 @@ pages: UNIQUE(slug, lang) — each language version is a separate row
 
 ## Key decisions
 
+**Language & scope.** The code and UI are English-first, and Batuda is internationally scoped — a company can be anywhere (US, NL, …), not only Spain.
+Catalan/Spanish appears only in seed/mock data (the repo owner's nationality) and in the research pipeline's classification vocabularies (`COMPANY_INDUSTRIES`, `COMPANY_REGIONS`, `COMPANY_SIZE_RANGES` in `packages/domain/src/schema/companies.ts`), which are a research-mapping aid the enrichment guard maps to — not a CRM constraint.
+CRM surfaces (the company filters, the pipeline board) therefore treat region and industry as open, data-driven values, never a fixed Spanish list.
+
 **Why NeonDB over SQLite:** analytics queries, JSONB for evolving metadata, email/calendar integrations planned. Postgres is the right foundation.
 
 **Why Unikraft for server:** lightweight unikernel deployment, fast cold starts, matches the "lean infrastructure" philosophy of the project.

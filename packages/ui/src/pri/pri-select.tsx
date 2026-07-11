@@ -150,6 +150,9 @@ const PriItem = styled(Select.Item).withConfig({
 	cursor: pointer;
 	user-select: none;
 	outline: none;
+	/* Let a long option (a member name, an industry) grow the popup instead of
+	 * wrapping to two cramped lines. */
+	white-space: nowrap;
 
 	&[data-highlighted] {
 		background: color-mix(in srgb, rgba(245, 158, 11, 0.28), transparent);

@@ -2,13 +2,14 @@ import { Effect } from 'effect'
 import { HttpServerResponse } from 'effect/unstable/http'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
-import { BatudaApi, NotFound } from '@batuda/controllers'
+import { BatudaApi, NotFound, SessionContext } from '@batuda/controllers'
 
 import { CompanyService } from '../services/companies'
 import {
 	geocodeCompany,
 	updateCompanyRegeocoding,
 } from '../services/company-geocoding'
+import { recordStageChange } from '../services/company-stage-change'
 import { Geocoder } from '../services/geocoder'
 
 export const CompaniesLive = HttpApiBuilder.group(
@@ -55,19 +56,40 @@ export const CompaniesLive = HttpApiBuilder.group(
 					),
 				)
 				.handle('update', _ =>
-					updateCompanyRegeocoding(_.params.id, _.payload).pipe(
-						Effect.provideService(CompanyService, svc),
-						Effect.provideService(Geocoder, geocoder),
-						Effect.tap(() =>
-							Effect.logInfo('Company updated').pipe(
-								Effect.annotateLogs({
-									event: 'company.updated',
-									companyId: _.params.id,
-								}),
-							),
-						),
-						Effect.orDie,
-					),
+					Effect.gen(function* () {
+						// Capture the stage before the write so a change can be recorded
+						// with its from→to. Only read it when the update touches status.
+						const before =
+							_.payload.status === undefined
+								? null
+								: yield* svc.findById(_.params.id).pipe(
+										Effect.map(row =>
+											typeof row['status'] === 'string' ? row['status'] : null,
+										),
+										Effect.catch(() => Effect.succeed(null)),
+									)
+						const result = yield* updateCompanyRegeocoding(
+							_.params.id,
+							_.payload,
+						).pipe(
+							Effect.provideService(CompanyService, svc),
+							Effect.provideService(Geocoder, geocoder),
+						)
+						yield* Effect.logInfo('Company updated').pipe(
+							Effect.annotateLogs({
+								event: 'company.updated',
+								companyId: _.params.id,
+							}),
+						)
+						const session = yield* SessionContext
+						yield* recordStageChange({
+							companyId: _.params.id,
+							from: before,
+							to: _.payload.status,
+							actorUserId: session.userId,
+						})
+						return result
+					}).pipe(Effect.orDie),
 				)
 				.handle('geocode', _ =>
 					geocodeCompany(_.params.id).pipe(

@@ -24,7 +24,20 @@ export type CompanyStatus =
 	| 'closed'
 	| 'dead'
 
-const statusLabels: Record<CompanyStatus, MessageDescriptor> = {
+// Canonical pipeline order — the single source used by the list filter bar, the
+// board columns, and the dashboard strip.
+export const STATUS_ORDER: ReadonlyArray<CompanyStatus> = [
+	'prospect',
+	'contacted',
+	'responded',
+	'meeting',
+	'proposal',
+	'client',
+	'closed',
+	'dead',
+]
+
+export const statusLabels: Record<CompanyStatus, MessageDescriptor> = {
 	prospect: msg`Prospect`,
 	contacted: msg`Contacted`,
 	responded: msg`Responded`,

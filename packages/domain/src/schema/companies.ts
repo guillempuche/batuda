@@ -45,6 +45,10 @@ export class Company extends Model.Class<Company>('Company')({
 	// values: prospect | contacted | responded | meeting
 	//         | proposal | client | closed | dead
 
+	// The org member who owns this lead (a Better Auth user id), or null when
+	// nobody has claimed it. Powers the "my leads" view.
+	ownerId: Schema.NullOr(Schema.String),
+
 	// Classification. Allowed values are COMPANY_INDUSTRIES / COMPANY_SIZE_RANGES /
 	// COMPANY_REGIONS above; the columns stay free text (the research vocabulary
 	// guard is the enforcement point) so a manual edit is never decode-rejected.
