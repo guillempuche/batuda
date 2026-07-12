@@ -1,7 +1,15 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { isAbsolute, resolve } from 'node:path'
 
-import { Config, Console, Effect, Layer, Option, type Redacted } from 'effect'
+import {
+	Config,
+	ConfigProvider,
+	Console,
+	Effect,
+	Layer,
+	Option,
+	type Redacted,
+} from 'effect'
 import { FetchHttpClient } from 'effect/unstable/http'
 import { SqlClient } from 'effect/unstable/sql'
 
@@ -479,22 +487,18 @@ export const researchEvalContacts = (opts: {
 	readonly out: Option.Option<string>
 }) =>
 	Effect.gen(function* () {
-		// Set before the layer reads Config — the CLI's loadEnv → process.env →
-		// Config model means the chosen chain/mode must be in the env first.
-		yield* Option.match(opts.enrich, {
-			onNone: () => Effect.void,
-			onSome: value =>
-				Effect.sync(() => {
-					process.env['RESEARCH_PROVIDER_ENRICH'] = value
-				}),
-		})
-		yield* Option.match(opts.enrichMode, {
-			onNone: () => Effect.void,
-			onSome: value =>
-				Effect.sync(() => {
-					process.env['RESEARCH_ENRICH_MODE'] = value
-				}),
-		})
+		// The --enrich / --enrich-mode flags need to reach the settings the
+		// enrichment step reads. Those settings are captured from the environment
+		// once, before this handler runs, so writing to process.env now would be
+		// ignored. Instead the flag values become a top-priority settings source
+		// that wins over the existing one, which still supplies everything else.
+		const enrichOverrides: Record<string, string> = {}
+		if (Option.isSome(opts.enrich)) {
+			enrichOverrides['RESEARCH_PROVIDER_ENRICH'] = opts.enrich.value
+		}
+		if (Option.isSome(opts.enrichMode)) {
+			enrichOverrides['RESEARCH_ENRICH_MODE'] = opts.enrichMode.value
+		}
 
 		const raw = yield* Effect.tryPromise({
 			try: () => readFile(fromRepoRoot(opts.goldenPath), 'utf8'),
@@ -542,7 +546,15 @@ export const researchEvalContacts = (opts: {
 					),
 				{ concurrency: opts.concurrency },
 			)
-		}).pipe(Effect.provide(contactsLive))
+		}).pipe(
+			Effect.provide(contactsLive),
+			Effect.provide(
+				ConfigProvider.layerAdd(
+					ConfigProvider.fromEnv({ env: enrichOverrides }),
+					{ asPrimary: true },
+				),
+			),
+		)
 
 		for (const company of golden) {
 			yield* Console.log(
