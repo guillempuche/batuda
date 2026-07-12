@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-12 (server-v2026.7.12-1)
+
+### Features
+
+* **research:** add FullEnrich people search for decision-makers ([6fcfa75](https://github.com/guillempuche/batuda/commit/6fcfa758178b60593d5bda53cc5e91fcb32da47a))
+* **research:** fall back to the next enrichment vendor on a miss ([89b2004](https://github.com/guillempuche/batuda/commit/89b20047ac253488fd52c3aafc4020b7167ec712))
+* score decision-maker discovery against a golden set ([362c404](https://github.com/guillempuche/batuda/commit/362c4046e7de990dadaabb3b14ae5d9009e8aa8f))
+
+### Bug Fixes
+
+* **research:** drop form pop-ups from scraped page content ([d505c20](https://github.com/guillempuche/batuda/commit/d505c20ff648d77e6c003da30a424bedc5df10d8))
+* **research:** make the LLM fallback accept our tool and output schemas ([195c166](https://github.com/guillempuche/batuda/commit/195c166c16fe033b834dc40141b7d4ef71d72bde))
+* **research:** recover facts seen only in a search result ([d97f042](https://github.com/guillempuche/batuda/commit/d97f042a2f54f953cccf7e4d69f6b6f7171f7600))
+
+### CI/CD
+
+* **deploy:** turn FullEnrich on in production ([400400a](https://github.com/guillempuche/batuda/commit/400400a5c6cbefe5192df211d5c8d5fd41d03c20))
+
 ## 2026-07-12 (server-v2026.7.12)
 
 ### Bug Fixes
