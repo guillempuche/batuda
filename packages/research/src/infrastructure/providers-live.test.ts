@@ -2,9 +2,9 @@ import { Cause, ConfigProvider, Effect, Exit, Layer } from 'effect'
 import { FetchHttpClient } from 'effect/unstable/http'
 import { describe, expect, it } from 'vitest'
 
-import { RegistryRouter } from '../application/ports'
+import { EnrichmentChain, RegistryRouter } from '../application/ports'
 import { NoRegistry, ProviderError } from '../domain/errors'
-import { registryLayer } from './providers-live'
+import { enrichmentLayer, registryLayer } from './providers-live'
 
 // registryLayer's type carries an HttpClient requirement (the libreBORME /
 // Companies House builders need one). A stub-vendor boot never calls it, so a
@@ -79,6 +79,80 @@ describe('registryLayer routing', () => {
 			// THEN the layer built with no ConfigError and GB defaulted to disabled,
 			// so the variable is no longer boot-mandatory
 			expect(failure).toBeInstanceOf(ProviderError)
+		})
+	})
+})
+
+// enrichmentLayer turns RESEARCH_PROVIDER_ENRICH / RESEARCH_ENRICH_MODE into the
+// ordered chain the discovery waterfall runs. Reading .attempts only inspects
+// each vendor's findPeople reference, so no vendor is called and nothing hits
+// the network — the dummy Hunter key merely lets that instance build.
+const bootChain = (env: Record<string, string>) =>
+	Effect.runPromise(
+		Effect.gen(function* () {
+			return yield* EnrichmentChain
+		}).pipe(
+			Effect.provide(
+				enrichmentLayer.pipe(
+					Layer.provide(FetchHttpClient.layer),
+					Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env }))),
+				),
+			),
+		),
+	)
+
+const labelsOf = (chain: {
+	readonly attempts: ReadonlyArray<{ readonly label: string }>
+}): string[] => chain.attempts.map(a => a.label)
+
+describe('enrichmentLayer chain assembly', () => {
+	describe('when one vendor is configured', () => {
+		it('should build a single labelled attempt and default to fallback mode', async () => {
+			// GIVEN only the stub enrich vendor, with the mode unset
+			const chain = await bootChain({ RESEARCH_PROVIDER_ENRICH: 'stub' })
+			// THEN one attempt named by the vendor, and the cheaper default mode
+			expect(labelsOf(chain)).toEqual(['stub'])
+			expect(chain.mode).toBe('fallback')
+		})
+	})
+
+	describe('when several vendors are configured', () => {
+		it('should keep the attempts in configured order', async () => {
+			// GIVEN a two-vendor chain (a dummy key lets Hunter's instance build)
+			const chain = await bootChain({
+				RESEARCH_PROVIDER_ENRICH: 'hunter,stub',
+				RESEARCH_API_KEY_ENRICH: 'dummy',
+			})
+			// THEN the waterfall will try them in the order the operator wrote
+			expect(labelsOf(chain)).toEqual(['hunter', 'stub'])
+		})
+	})
+
+	describe('when a slot is disabled', () => {
+		it('should contribute no attempt for a none slot', async () => {
+			// GIVEN a real vendor followed by an explicit none
+			const chain = await bootChain({ RESEARCH_PROVIDER_ENRICH: 'stub,none' })
+			// THEN none adds nothing — no charge and no call for it
+			expect(labelsOf(chain)).toEqual(['stub'])
+		})
+
+		it('should build an empty chain when enrichment is unconfigured', async () => {
+			// GIVEN no RESEARCH_PROVIDER_ENRICH at all (defaults to none)
+			const chain = await bootChain({})
+			// THEN there are no attempts, so discovery never charges enrichment
+			expect(labelsOf(chain)).toEqual([])
+		})
+	})
+
+	describe('when union mode is selected', () => {
+		it('should read union from RESEARCH_ENRICH_MODE', async () => {
+			// GIVEN the union-mode override
+			const chain = await bootChain({
+				RESEARCH_PROVIDER_ENRICH: 'stub',
+				RESEARCH_ENRICH_MODE: 'union',
+			})
+			// THEN the chain carries union so the caller runs every vendor and merges
+			expect(chain.mode).toBe('union')
 		})
 	})
 })

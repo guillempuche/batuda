@@ -9,14 +9,15 @@
  * `domain/country.ts`.
  */
 
-import { Effect, Layer } from 'effect'
+import { Config, Effect, Layer, Schema } from 'effect'
 
 import {
 	type DiscoverInput,
 	DiscoverProvider,
 	EmailVerifier,
 	type EmailVerifyInput,
-	type EnrichmentInput,
+	type EnrichmentAttempt,
+	EnrichmentChain,
 	EnrichmentProvider,
 	type ExtractInput,
 	ExtractProvider,
@@ -45,7 +46,6 @@ import type {
 	CompanyReport,
 	DiscoverResult,
 	EmailVerification,
-	EnrichmentResult,
 	ExternalJobRef,
 	RegistryRecord,
 	ScrapedPage,
@@ -361,28 +361,39 @@ const discoverLayer = Layer.effect(
 	}),
 )
 
-const enrichmentLayer = Layer.effect(
-	EnrichmentProvider,
+export const enrichmentLayer = Layer.effect(
+	EnrichmentChain,
 	Effect.gen(function* () {
 		const vendors = yield* providerListConfig(
 			ENRICH_VENDORS,
 			'RESEARCH_PROVIDER_ENRICH',
 			['none'] as const,
 		)
-		yield* Effect.logInfo(`research.enrich: ${vendors.join(',')}`)
-		const instances = yield* Effect.all(
-			vendors.map((vendor, slot) => enrichmentInstance(vendor, slot)),
+		const mode = yield* Config.schema(
+			Schema.Literals(['fallback', 'union']),
+			'RESEARCH_ENRICH_MODE',
+		).pipe(Config.withDefault('fallback' as const))
+		yield* Effect.logInfo(`research.enrich: ${vendors.join(',')} (${mode})`)
+		// A 'none'/empty slot contributes no attempt — no charge, no call. The
+		// original list index stays the slot so RESEARCH_API_KEY_ENRICH_2 keeps
+		// naming the second vendor even when a 'none' precedes it.
+		const attempts = yield* Effect.all(
+			vendors.map((vendor, slot) =>
+				vendor === 'none'
+					? Effect.succeed(null)
+					: enrichmentInstance(vendor, slot).pipe(
+							Effect.map(
+								(inst): EnrichmentAttempt => ({
+									label: vendor,
+									findPeople: inst.findPeople,
+								}),
+							),
+						),
+			),
+		).pipe(
+			Effect.map(xs => xs.filter((x): x is EnrichmentAttempt => x !== null)),
 		)
-		if (instances.length === 1) return instances[0]!
-		const findPeople = withFallback(
-			instances,
-			(
-				svc,
-				input: EnrichmentInput,
-			): Effect.Effect<EnrichmentResult, ProviderError> =>
-				svc.findPeople(input),
-		)
-		return EnrichmentProvider.of({ findPeople })
+		return EnrichmentChain.of({ attempts, mode })
 	}),
 )
 
