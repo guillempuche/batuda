@@ -145,7 +145,7 @@ Bounded context for company research. Owns the research agent loop, provider por
 
 - `domain/` — tagged errors (`ProviderError`, `BudgetExceeded`, `MonthlyCapExceeded`, `QuotaExhausted`, `ApprovalRequired`) + value types (`SearchResult`, `ScrapedPage`, `DiscoverResult`, `RegistryRecord`, `CompanyReport`, etc.)
 - `application/` — ports (`SearchProvider`, `ScrapeProvider`, `ExtractProvider`, `DiscoverProvider`, `RegistryRouter`, `ReportRouter`, `Budget`, `ProviderQuota`), `ResearchService` (fiber-per-run agent loop with PubSub for SSE), policy resolution, output schema registry (freeform, company-enrichment-v1, competitor-scan-v1, contact-discovery-v1, prospect-scan-v1)
-- `infrastructure/` — boot-time provider selection (`providers-live.ts` for the capability ports, `llm-live.ts` for LLM inference), stub providers for zero-cost local dev, real providers (Brave Search, Firecrawl, libreBORME, einforma, Hunter), cached search wrapper, OpenAI-compatible LLM layer via `@effect/ai-openai-compat`
+- `infrastructure/` — boot-time provider selection (`providers-live.ts` for the capability ports, `llm-live.ts` for LLM inference), stub providers for zero-cost local dev, real providers (Brave Search, Firecrawl, libreBORME, Companies House, Hunter), cached search wrapper, OpenAI-compatible LLM layer via `@effect/ai-openai-compat`
 
 Provider selection uses `Layer.unwrap + Config.schema` — env vars pick the implementation at startup, same pattern as `EmailProviderLive`. Each provider is a `Layer<PortTag, E, R>` with R declaring its dependencies (stubs need nothing, real providers need `HttpClient` + `Config`).
 
@@ -268,9 +268,7 @@ Batuda has three bounded contexts. Each owns its own domain errors and types; de
 
 **Why research is a separate bounded context.** Research has its own domain model (providers, budgets, quotas, schemas), its own error hierarchy (`ProviderError`, `BudgetExceeded`, `QuotaExhausted`), and its own infrastructure concerns (external API keys, LLM inference, cost tracking). It reads CRM data (companies, contacts) but never writes directly — proposed changes go through the `propose_update` tool, reviewed by the outer AI or user before applying. This separation means research provider implementations, pricing models, and LLM providers can evolve independently of the CRM schema.
 
-**Provider selection pattern.** Each research capability (search, scrape, extract, discover, enrich, verify, registry, report) plus LLM inference is configured by an env var (`RESEARCH_PROVIDER_*`) that picks the implementation at boot time. The pattern is `Layer.unwrap(Config.schema(...) → switch → return Layer)` — same as `EmailProviderLive`. Stubs provide zero-cost deterministic data for local dev. Real providers (Brave, Firecrawl, libreBORME, einforma) declare their dependencies (`HttpClient`, `Config`) in the R type, satisfied at the composition root.
-
-**Run dispatch & reclaim.** `start_research` commits a `research_runs` row as `queued` inside the request transaction and returns; a layer-scoped consumer daemon then drains queued rows and runs each as a fiber on its own connection (never the request's already-committed one), with a reconcile daemon re-offering anything a raced commit left queued. Those fibers live in the server process, so a stop — usually a deploy — interrupts in-flight runs and leaves their rows `running`. To recover them safely a running job refreshes a `heartbeat_at` timestamp while it works, and a periodic sweep fails any `running` row whose beat has gone stale (rows without a beat, predating the column, fall back to run age); an orphaned run is thus reclaimed within about a minute, while a legitimately long run keeps beating and is never mistaken for a dead one. Reclaim only marks `failed` — a paid run is never silently re-run — and the cadences are tuned by `RESEARCH_HEARTBEAT_INTERVAL_SEC` / `RESEARCH_ORPHAN_STALE_SEC` / `RESEARCH_ORPHAN_SWEEP_INTERVAL_SEC`.
+**Provider selection pattern.** Each research capability (search, scrape, extract, discover, enrich, verify, registry, report) plus LLM inference is configured by an env var (`RESEARCH_PROVIDER_*`) that picks the implementation at boot time. The pattern is `Layer.unwrap(Config.schema(...) → switch → return Layer)` — same as `EmailProviderLive`. Stubs provide zero-cost deterministic data for local dev. Real providers (Brave, Firecrawl, libreBORME, Companies House, Hunter) declare their dependencies (`HttpClient`, `Config`) in the R type, satisfied at the composition root.
 
 ---
 
@@ -287,35 +285,7 @@ Agent calls get_company(slug)
 
 ### AI agent researches a new prospect
 
-```
-Agent calls start_research(query, schemaName, subjects)
-  → POST /v1/research → commits a research_runs row (status: queued), returns
-  → A layer-scoped consumer drains the queue, runs the job as a fiber (§Run dispatch & reclaim)
-
-  Fiber phases (inside packages/research ResearchService):
-    Phase 1 — Tool loop: LLM calls web_search, web_read, lookup_registry, crm_lookup
-      Each tool call → routes through the matching provider port (Brave, Firecrawl, etc.)
-      Findings accumulated, sources deduped and archived
-    Phase 2 — Structured output: LLM.generateObject with the run's schema
-      Findings → typed JSON (e.g. CompanyEnrichmentV1)
-    Phase 3 — Brief generation: LLM.generateText → markdown summary
-
-  → SSE events streamed to GET /v1/research/:id/events
-  → Agent reads findings via get_research(id)
-  → Agent calls propose_update to suggest CRM changes (reviewed before applying)
-  → Agent calls create_task({ type: "call", ... }) for follow-up
-```
-
-### AI agent runs a fan-out prospect scan
-
-```
-Agent calls start_research(query, schemaName, selector: { table: companies, filter })
-  → Server creates a parent group run + N leaf runs (one per matching company)
-  → Leaf fibers run concurrently (capped by RESEARCH_MAX_CONCURRENCY_FANOUT)
-  → Each leaf completion merges findings onto parent row (advisory-locked)
-  → Parent status rolls up automatically (running → succeeded/failed)
-  → Agent calls get_research(parentId) → gets full group with children inline
-```
+Research runs its own server-side agent loop across MCP, HTTP, and the web app. Its input modes (including the selector fan-out scan), run lifecycle, contact discovery, cost rails, and surfaces are documented together in [§Research](#research).
 
 ### User logs a visit in the web UI
 
@@ -358,6 +328,75 @@ Company status updated to "client" via MCP or web
   → Server fires webhook POST to all endpoints listening for "company.status_changed"
   → n8n receives payload, starts onboarding workflow
 ```
+
+---
+
+## Research
+
+Research is Batuda's largest feature and the one place the server runs its own AI agent loop. An agent — Claude or ChatGPT over MCP, or a team member through the web app — asks a question; the server drives a tool-calling loop over the external web and structured-data providers, produces findings with inline citations, and proposes (never applies) changes to CRM rows. It spans all three surfaces: the MCP tools an external agent calls, the HTTP API and SSE stream the web app drives, and the `packages/research` bounded context that runs the loop. This section is the flow-level reference; the code shape lives in [backend.md](backend.md) and evolves independently of it.
+
+### Why it runs server-side
+
+Most Batuda intelligence is external — the MCP client does the reasoning and generation (see [Intelligence locus](#intelligence-locus)). Research is the deliberate exception: it needs a budget governor, provider selection and caching, a citation ledger, and bounded fan-out that an external client cannot run. So the server hosts the loop and the external agent consumes it as tools. Research reads CRM data (companies, contacts) but never writes it directly — every change is a proposal a human or the outer agent applies.
+
+### Capabilities
+
+Every external capability is a role, not a vendor. Each is a port selected at boot by a `RESEARCH_PROVIDER_*` env var, with a comma-list fallback chain and a zero-cost stub for local dev. The roles:
+
+- **search** — web search (e.g. Firecrawl, Brave)
+- **scrape / extract** — fetch a page as markdown, or as structured JSON against a schema (Firecrawl)
+- **discover** — autonomous multi-page browsing (optional; disabled by default)
+- **enrich** — decision-maker name + email discovery for a company (Hunter)
+- **verify** — email deliverability, with a free DNS MX pre-gate in front of it (Hunter)
+- **registry** — company identity + officers, routed by country (libreBORME for Spain, Companies House for the UK)
+- **report** — a paid deep company report, routed by country (the port is defined; no live vendor is wired yet)
+
+The agent sees the role (`registry_lookup`, not the vendor); swapping a provider is an env change plus an adapter, never a change to the loop.
+
+### Input modes
+
+One entry point, three shapes of request:
+
+- **Free-text exploratory** — "agroecology cooperatives frustrated with spreadsheets." No anchor; the loop searches, reads, dedupes against the CRM, and returns a standalone list of prospects the user can import.
+- **Subject-anchored** — "enrich this company." The run is pinned to a CRM row, snapshotted at a known version; proposed updates target that row and are blocked by optimistic concurrency if it changed meanwhile.
+- **Selector fan-out** — "for each lead matching this filter, find recent funding news." The server expands the filter into N child runs under one parent, runs them with bounded concurrency, and rolls their cost and status up to the parent.
+
+### The run flow
+
+A run is dispatched, not run inline. `start_research` commits a run row as `queued` inside the request transaction and returns immediately; a consumer daemon drains the queue and runs each as a fiber on its own connection. The fiber has three phases: a tool-calling loop (search, read, registry, CRM lookup — accumulating findings and archiving each source), a structured-output pass that validates the findings against the run's schema, and a brief pass that renders a human-readable markdown summary. Tool calls stream to the web app over SSE as they happen; findings, sources, and the tool log persist at the end.
+
+Because those fibers live in the server process, a deploy interrupts in-flight runs. A running fiber refreshes a heartbeat while it works, and a periodic sweep fails any run whose heartbeat has gone stale — so an orphaned run is reclaimed within about a minute, while a legitimately long run keeps beating and is never mistaken for dead. Reclaim only marks a run `failed`; a paid run is never silently re-run.
+
+### Contact discovery
+
+Turning a company into ranked, verified decision-maker contacts is its own flow, shared by the `discover_contacts` tool and the in-loop path. It is registry-first where a national registry exists — those officers are free and authoritative — and falls back to the paid enrichment provider elsewhere. For each person it takes the vendor's email or generates ordered pattern guesses (`first.last`, `flast`, …), gates every candidate through the free MX check, and verifies deliverability. A guessed address is asserted only when the verifier positively confirms it; a vendor-provided address is kept unless it verifies as undeliverable. Contacts come back ranked — decision-makers first, then by deliverability verdict — and the flow never writes CRM rows; the caller decides what to keep.
+
+### Cost & safety rails
+
+Two independent layers gate every external call, and the agent experiences both only as tool errors — it never reads a policy.
+
+- **Provider quota** (hard limit) — does the user have units left with this provider? A `QuotaExhausted` tells the agent to try an alternative provider.
+- **Resource budget** (volume governor) — notional per-run and per-month cents, so one run cannot burn a disproportionate share even of prepaid credits. A `BudgetExceeded` tells the agent to finish with what it has.
+
+The rules the loop follows: climb cost tiers only when a cheaper one cannot answer (cheap web search and scrape before a paid per-company report); never exceed the paid budget without proposing the paid action for human approval; and the monthly cap is the only rail a user cannot override per-run, enforced exactly under a per-user advisory lock so concurrent fan-out fibers cannot overshoot it.
+
+Three safety invariants hold regardless of budget: the agent never mutates a CRM row (it proposes; a human applies, under optimistic concurrency), every claim in the findings must carry a citation that resolves to an archived source (an uncited claim fails the run), and paid calls are metered idempotently so a retried fiber is never double-charged.
+
+### Surfaces
+
+The same loop is reached three ways. External agents call the MCP tools (`start_research`, `get_research`, and the in-loop `web_search` / `scrape_page` / `registry_lookup` / `discover_contacts` and the propose-update family) and read a run as an MCP resource. The web app drives the HTTP API — create a run, poll or stream it over SSE, approve a paid action, apply or reject a proposed update. And the research page renders the findings, the human brief, the source list with archived snapshots, and the proposals panel where a human applies changes.
+
+### Data model
+
+Research owns a small set of tables, created together in the `research` migration: `research_runs` (one row per run — leaf, group, or follow-up — with findings, brief, cost, and tool log), `sources` and `research_run_sources` (globally-deduped sources linked to runs with a stable citation ref), `research_links` (polymorphic run ↔ company/contact links carrying applied-change provenance), `research_paid_spend` (an idempotent audit row per paid call), and the policy and quota tables (`user_research_policy`, `provider_quotas`, `provider_usage`). Companies and contacts are soft-deleted so a research link never dangles, and carry a version column so a proposed update cannot silently overwrite a human edit made mid-run. An hourly sweep prunes run transcripts and orphaned scrape blobs past their retention window while keeping every applied contact's provenance trail.
+
+### Quality — the eval harness
+
+A CLI eval measures the pipeline against a fixed golden set of companies whose correct answers are known, so a change to grounding or extraction shows up as a number rather than a guess. It reports grounding accuracy (did the run reach the target company's own site, or confirm it in a registry?), field precision and recall, and the wrong-company and empty rates — the look-alike failure the harness exists to catch. It runs on demand from the CLI, never in production, and can export each run's scores to the observability board.
+
+### Observability
+
+The run lifecycle fires webhook events (`research.created`, `research.tool_called`, `research.budget_exceeded`, `research.approval_required`, `research.succeeded`, `research.failed`, `research.paid_spend_recorded`, `research.quota_exhausted`, and the proposed-update-applied event) and emits spans and metrics; see [observability.md](observability.md).
 
 ---
 
@@ -508,7 +547,7 @@ provider_quotas     — per-user per-provider quota config (monthly plan or pay-
 provider_usage      — consumption counter per provider per billing period
 ```
 
-**Retention.** A scheduled sweep (`ResearchRetention`, in `ServicesLive`) runs hourly and prunes storage that would otherwise grow unbounded: expired cache rows (their TTL only gates reads), the `research_text` + `tool_log` transcript of runs older than `RESEARCH_RETENTION_DAYS` (default 90), and scrape blobs whose `sources` row no surviving run fetches and no applied contact cites. It keeps the run rows, `sources`, `research_run_sources`, and `research_links.citations`, so a contact's provenance trail survives the prune (`docs/backend-research.md` §21.3).
+**Retention.** A scheduled sweep (`ResearchRetention`, in `ServicesLive`) runs hourly and prunes storage that would otherwise grow unbounded: expired cache rows (their TTL only gates reads), the `research_text` + `tool_log` transcript of runs older than `RESEARCH_RETENTION_DAYS` (default 90), and scrape blobs whose `sources` row no surviving run fetches and no applied contact cites. It keeps the run rows, `sources`, `research_run_sources`, and `research_links.citations`, so a contact's provenance trail survives the prune (see [§Research](#research)).
 
 ### Better Auth tables (auto-managed)
 

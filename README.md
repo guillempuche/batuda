@@ -138,7 +138,7 @@ pnpm check             # lint + format (CI mode)
 
 - [Architecture](docs/architecture.md) — system design, data flow, deployment.
 - [Backend](docs/backend.md) — Effect patterns, routes, MCP tools.
-- [Backend — research](docs/backend-research.md) — the agent loop, pluggable capability providers, citations, budget policy. Start here for the research surface.
+- [Research](docs/architecture.md#research) — the server-side agent loop, pluggable capability providers, citations, budget policy, and data-sourcing strategy. Batuda's biggest feature.
 - [Frontend](docs/frontend.md) — design tokens, MD3, BaseUI, components.
 
 **Strategic context**
