@@ -58,6 +58,7 @@ import {
 	noRegistryError,
 	notYetImplementedError,
 } from './_shared'
+import { makeBraveLlmContextSearch } from './brave/llm-context'
 import { makeBraveSearch } from './brave/search'
 import { makeCachedExtract } from './cached-extract'
 import { makeCachedScrape } from './cached-scrape'
@@ -83,7 +84,7 @@ import { StubEmailVerifierInstance } from './stub/verifier'
 
 // ── Vendor literal unions ──
 
-const SEARCH_VENDORS = ['stub', 'brave', 'firecrawl'] as const
+const SEARCH_VENDORS = ['stub', 'brave', 'brave-context', 'firecrawl'] as const
 const SCRAPE_VENDORS = ['stub', 'firecrawl', 'local'] as const
 const EXTRACT_VENDORS = ['stub', 'firecrawl', 'local'] as const
 const DISCOVER_VENDORS = ['stub', 'firecrawl', 'anthropic', 'none'] as const
@@ -105,6 +106,8 @@ const searchInstance = (vendor: SearchVendor, slot: number) => {
 			return Effect.succeed(StubSearchProviderInstance)
 		case 'brave':
 			return makeBraveSearch(slot)
+		case 'brave-context':
+			return makeBraveLlmContextSearch(slot)
 		case 'firecrawl':
 			return makeFirecrawlSearch(slot)
 	}
