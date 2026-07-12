@@ -170,8 +170,17 @@ export const researchToolkit = Toolkit.make(
 // failures land in the model's context as strings rather than killing the
 // outer `generateText` effect.
 
-const errorMessage = (err: unknown): string =>
-	err instanceof Error ? err.message : String(err)
+// The tool-failure handlers below feed this a `Cause` (from `catchCause`), not
+// a bare error. `String(cause)` would drop a tagged error's `message` — it
+// extends `Error`, whose `message` is non-enumerable — leaving only
+// `{provider,recoverable,_tag}` in the tool log, which never names the failing
+// line. Squash the cause to its underlying error and read `.message` directly.
+const errorMessage = (err: unknown): string => {
+	if (typeof err === 'string') return err
+	if (Cause.isCause(err)) return errorMessage(Cause.squash(err))
+	if (err instanceof Error) return err.message
+	return String(err)
+}
 
 const mapToolError = (toolName: string) => (err: unknown) =>
 	Effect.fail(
