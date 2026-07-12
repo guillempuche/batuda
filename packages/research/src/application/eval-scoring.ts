@@ -121,13 +121,14 @@ const normalizeDomain = (value: string): string => {
 }
 
 /** Case- and space-insensitive text, for comparing enum-ish field values. */
-const normalizeText = (value: string): string =>
+export const normalizeText = (value: string): string =>
 	value.trim().toLowerCase().replace(/\s+/g, ' ')
 
 const isFilled = (value: string | null | undefined): value is string =>
 	typeof value === 'string' && value.trim().length > 0
 
-const foldDiacritics = (value: string): string =>
+/** Strip accents so "García" and "Garcia" compare equal. */
+export const foldDiacritics = (value: string): string =>
 	value.normalize('NFD').replace(/\p{Diacritic}/gu, '')
 
 /**

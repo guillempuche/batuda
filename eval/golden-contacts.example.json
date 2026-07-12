@@ -1,0 +1,81 @@
+[
+	{
+		"id": "dyson",
+		"companyName": "Dyson",
+		"domain": "dyson.com",
+		"country": "GB",
+		"expectedContacts": [{ "name": "James Dyson", "role": "Founder" }]
+	},
+	{
+		"id": "virgin",
+		"companyName": "Virgin Group",
+		"domain": "virgin.com",
+		"country": "GB",
+		"expectedContacts": [{ "name": "Richard Branson", "role": "Founder" }]
+	},
+	{
+		"id": "jcb",
+		"companyName": "JCB",
+		"domain": "jcb.com",
+		"country": "GB",
+		"expectedContacts": [{ "name": "Anthony Bamford", "role": "Chairman" }]
+	},
+	{
+		"id": "mercadona",
+		"companyName": "Mercadona",
+		"domain": "mercadona.es",
+		"country": "ES",
+		"expectedContacts": [{ "name": "Juan Roig", "role": "President" }]
+	},
+	{
+		"id": "inditex",
+		"companyName": "Inditex",
+		"domain": "inditex.com",
+		"country": "ES",
+		"expectedContacts": [
+			{ "name": "Amancio Ortega", "role": "Founder" },
+			{ "name": "Marta Ortega Pérez", "role": "Chair" }
+		]
+	},
+	{
+		"id": "puig",
+		"companyName": "Puig",
+		"domain": "puig.com",
+		"country": "ES",
+		"expectedContacts": [{ "name": "Marc Puig", "role": "Chairman and CEO" }]
+	},
+	{
+		"id": "mercadolibre",
+		"companyName": "MercadoLibre",
+		"domain": "mercadolibre.com",
+		"country": "AR",
+		"expectedContacts": [
+			{ "name": "Marcos Galperín", "role": "Founder and CEO" }
+		]
+	},
+	{
+		"id": "globant",
+		"companyName": "Globant",
+		"domain": "globant.com",
+		"country": "AR",
+		"expectedContacts": [
+			{ "name": "Martín Migoya", "role": "Co-founder and CEO" }
+		]
+	},
+	{
+		"id": "nubank",
+		"companyName": "Nubank",
+		"domain": "nubank.com.br",
+		"country": "BR",
+		"expectedContacts": [{ "name": "David Vélez", "role": "Founder and CEO" }]
+	},
+	{
+		"id": "rappi",
+		"companyName": "Rappi",
+		"domain": "rappi.com",
+		"country": "CO",
+		"expectedContacts": [
+			{ "name": "Simón Borrero", "role": "Co-founder and CEO" }
+		]
+	}
+]
