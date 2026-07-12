@@ -25,7 +25,11 @@ import { dataInspect, ENTITY_NAMES } from './commands/data'
 import { dbMigrate, dbReset } from './commands/db'
 import { doctor } from './commands/doctor'
 import { emailInject } from './commands/email'
-import { researchEval, researchProbe } from './commands/research'
+import {
+	researchEval,
+	researchEvalContacts,
+	researchProbe,
+} from './commands/research'
 import { seed, seedIdentities } from './commands/seed'
 import { servicesDown, servicesStatus, servicesUp } from './commands/services'
 import type { EnvFileResult } from './commands/setup'
@@ -917,9 +921,70 @@ const researchEvalCommand = Command.make(
 	),
 )
 
+const researchEvalContactsCommand = Command.make(
+	'eval-contacts',
+	{
+		org: Flag.string('org').pipe(
+			Flag.withDescription('Organization id to run discovery under'),
+		),
+		user: Flag.string('user').pipe(
+			Flag.withDescription('User id the runs are attributed to'),
+		),
+		golden: Flag.string('golden').pipe(
+			Flag.withDescription('Path to the contact golden-set JSON file'),
+		),
+		concurrency: Flag.integer('concurrency').pipe(
+			Flag.withDescription('How many companies to discover at once'),
+			Flag.withDefault(3),
+		),
+		runs: Flag.integer('runs').pipe(
+			Flag.withDescription(
+				'How many times to run each company; discovery is largely deterministic, so 1 is usually enough',
+			),
+			Flag.withDefault(1),
+		),
+		enrich: Flag.string('enrich').pipe(
+			Flag.withDescription(
+				'Override RESEARCH_PROVIDER_ENRICH for this run, e.g. "hunter" or "hunter,fullenrich"',
+			),
+			Flag.optional,
+		),
+		enrichMode: Flag.string('enrich-mode').pipe(
+			Flag.withDescription(
+				'Override RESEARCH_ENRICH_MODE: fallback (stop at the first vendor with people) or union (run all + dedupe)',
+			),
+			Flag.optional,
+		),
+		out: Flag.string('out').pipe(
+			Flag.withDescription('Write the full JSON report to this path'),
+			Flag.optional,
+		),
+	},
+	({ org, user, golden, concurrency, runs, enrich, enrichMode, out }) =>
+		researchEvalContacts({
+			org,
+			user,
+			goldenPath: golden,
+			concurrency,
+			runs,
+			enrich,
+			enrichMode,
+			out,
+		}),
+).pipe(
+	Command.withShortDescription('Score contact discovery against a golden set'),
+	Command.withDescription(
+		'Drive each company in a contact golden-set JSON file through the live discover_contacts flow and report contact recall, decision-maker recall, email precision, empty rate, and cost per verified contact. --enrich / --enrich-mode pick the vendor chain and fallback-vs-union, so the same set can be scored across configs to read recall lift against cost delta. Needs the research env (provider keys, DATABASE_URL) and an --org / --user to run as.',
+	),
+)
+
 const researchCommand = Command.make('research').pipe(
 	Command.withDescription('Research context tools'),
-	Command.withSubcommands([researchProbeCommand, researchEvalCommand]),
+	Command.withSubcommands([
+		researchProbeCommand,
+		researchEvalCommand,
+		researchEvalContactsCommand,
+	]),
 )
 
 // ── Root ───────────────────────────────────────────────────

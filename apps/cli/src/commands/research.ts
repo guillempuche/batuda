@@ -8,9 +8,15 @@ import { SqlClient } from 'effect/unstable/sql'
 import { makeOtlpObservability } from '@batuda/observability'
 import {
 	BlobStorage,
+	buildContactEvalReport,
 	buildEvalReport,
 	ContactDiscovery,
+	type ContactEvalSummary,
+	type ContactGoldenExpectation,
+	type ContactRunScore,
 	type CreateResearchInput,
+	contactEvalSpanAttributes,
+	contactEvalSummaryAttributes,
 	type EvalSummary,
 	evalSpanAttributes,
 	evalSummaryAttributes,
@@ -18,14 +24,18 @@ import {
 	type ModelProbeResult,
 	makeResearchLlmLive,
 	makeResearchProvidersLive,
+	outcomeFromContactRun,
 	outcomeFromRun,
+	parseContactGoldenSet,
 	parseGoldenSet,
 	probeModelCapabilities,
+	type RawContactGoldenRow,
 	type RawGoldenRow,
 	ResearchEventSink,
 	ResearchService,
 	type RunScore,
 	type SystemDefaults,
+	scoreContactRun,
 	scoreRun,
 } from '@batuda/research'
 
@@ -368,5 +378,204 @@ export const researchEval = (opts: {
 		}),
 		Effect.provide(
 			makeOtlpObservability({ serviceName: 'batuda-research-eval' }),
+		),
+	)
+
+// ── eval-contacts ──────────────────────────────────────────
+
+// Same minimal wiring as researchLive, minus the LLM tiers and ResearchService:
+// ContactDiscovery is the thing under test, so it runs live. inMemoryBlob stays
+// because makeResearchProvidersLive's cached-scrape layer requires a blob store
+// even though contact discovery never scrapes.
+const contactsLive = ContactDiscovery.layer.pipe(
+	Layer.provide(makeResearchProvidersLive),
+	Layer.provide(inMemoryBlob),
+	Layer.provide(FetchHttpClient.layer),
+	Layer.provideMerge(SqlLive),
+)
+
+// Drive one company through discover_contacts and score the ranked contacts.
+// Discovery runs synchronously (no create→poll loop the research eval needs), so
+// this reads the paid spend straight off the anchor run discovery wrote.
+const driveContactOne = (
+	org: string,
+	user: string,
+	defaults: SystemDefaults,
+	golden: ContactGoldenExpectation,
+) =>
+	Effect.gen(function* () {
+		const discovery = yield* ContactDiscovery
+		const outcome = yield* discovery.discover({
+			companyName: golden.companyName,
+			domain: golden.domain,
+			country: golden.country,
+			userId: user,
+			organizationId: org,
+			systemDefaults: defaults,
+		})
+		// Paid spend metered to this discovery, summed across the vendors it ran
+		// (hunter-enrich, fullenrich-enrich, hunter-verify) — so a config that calls
+		// two finders costs more than one that short-circuits. Runs under the CLI's
+		// BYPASS-RLS role, so the org-scoped rows are readable by research_id.
+		const sql = yield* SqlClient.SqlClient
+		const spend = yield* sql<{ cents: number }>`
+			SELECT COALESCE(SUM(amount_cents), 0)::int AS cents
+			FROM research_paid_spend
+			WHERE research_id = ${outcome.researchId}
+		`
+		const spendCents = spend[0]?.cents ?? 0
+		return scoreContactRun(
+			golden,
+			outcomeFromContactRun(outcome, { spendCents }),
+		)
+	})
+
+const formatContactCompany = (
+	id: string,
+	scores: ReadonlyArray<ContactRunScore>,
+): string => {
+	const total = scores.length
+	const sum = (pick: (score: ContactRunScore) => number): number =>
+		scores.reduce((acc, score) => acc + pick(score), 0)
+	const expected = sum(score => score.contactsExpected)
+	const matched = sum(score => score.contactsMatched)
+	const deliverable = sum(score => score.deliverableReturned)
+	const spend = sum(score => score.spendCents)
+	const empty = scores.filter(score => score.empty).length
+	const recall = expected === 0 ? 'n/a' : pct(matched / expected)
+	return `${id.padEnd(20)} recall ${recall}  deliverable ${deliverable}  spend ${spend}¢  empty ${empty}/${total}`
+}
+
+const formatContactSummary = (summary: ContactEvalSummary): string =>
+	[
+		'',
+		`Runs:                    ${summary.runs}`,
+		`Contact recall:          ${pct(summary.contactRecall)}`,
+		`Decision-maker recall:   ${pct(summary.decisionMakerRecall)}`,
+		`Email precision:         ${pct(summary.emailPrecision)}`,
+		`Empty rate:              ${pct(summary.emptyRate)}`,
+		`Cost / verified contact: ${
+			summary.costPerVerifiedContact === null
+				? 'n/a'
+				: `${summary.costPerVerifiedContact.toFixed(1)}¢`
+		}`,
+	].join('\n')
+
+/**
+ * Run the contact golden set through the live discover_contacts flow and report
+ * recall / email precision / cost per verified contact. --enrich and
+ * --enrich-mode pick the vendor chain and fallback-vs-union for the run, so the
+ * same golden set can be scored under hunter, hunter+fullenrich, and union to
+ * read the recall lift against the cost delta.
+ */
+export const researchEvalContacts = (opts: {
+	readonly org: string
+	readonly user: string
+	readonly goldenPath: string
+	readonly concurrency: number
+	readonly runs: number
+	readonly enrich: Option.Option<string>
+	readonly enrichMode: Option.Option<string>
+	readonly out: Option.Option<string>
+}) =>
+	Effect.gen(function* () {
+		// Set before the layer reads Config — the CLI's loadEnv → process.env →
+		// Config model means the chosen chain/mode must be in the env first.
+		yield* Option.match(opts.enrich, {
+			onNone: () => Effect.void,
+			onSome: value =>
+				Effect.sync(() => {
+					process.env['RESEARCH_PROVIDER_ENRICH'] = value
+				}),
+		})
+		yield* Option.match(opts.enrichMode, {
+			onNone: () => Effect.void,
+			onSome: value =>
+				Effect.sync(() => {
+					process.env['RESEARCH_ENRICH_MODE'] = value
+				}),
+		})
+
+		const raw = yield* Effect.tryPromise({
+			try: () => readFile(fromRepoRoot(opts.goldenPath), 'utf8'),
+			catch: error => new Error(`cannot read golden set: ${String(error)}`),
+		})
+		const rows = JSON.parse(raw) as ReadonlyArray<RawContactGoldenRow>
+		const { golden, errors } = parseContactGoldenSet(rows)
+		for (const bad of errors) {
+			yield* Console.error(`skipped ${bad.id}: ${bad.error}`)
+		}
+		if (golden.length === 0) {
+			return yield* Effect.fail(
+				new Error('contact golden set has no valid rows'),
+			)
+		}
+		const enrichLabel = Option.getOrElse(opts.enrich, () => '(env default)')
+		const modeLabel = Option.getOrElse(opts.enrichMode, () => 'fallback')
+		yield* Console.log(
+			`Evaluating ${golden.length} companies (enrich=${enrichLabel}, mode=${modeLabel})…\n`,
+		)
+		yield* Effect.annotateCurrentSpan({
+			'eval.enrich': enrichLabel,
+			'eval.enrich_mode': modeLabel,
+			'eval.companies': golden.length,
+		})
+
+		const scores = yield* Effect.gen(function* () {
+			const defaults = yield* systemDefaults
+			const tasks = golden.flatMap(company =>
+				Array.from({ length: opts.runs }, () => company),
+			)
+			return yield* Effect.forEach(
+				tasks,
+				company =>
+					driveContactOne(opts.org, opts.user, defaults, company).pipe(
+						Effect.tap(score =>
+							Effect.annotateCurrentSpan(contactEvalSpanAttributes(score)),
+						),
+						Effect.withSpan('research_eval_contacts.run', {
+							attributes: {
+								'eval.company_id': company.id,
+								'eval.domain': company.domain,
+							},
+						}),
+					),
+				{ concurrency: opts.concurrency },
+			)
+		}).pipe(Effect.provide(contactsLive))
+
+		for (const company of golden) {
+			yield* Console.log(
+				formatContactCompany(
+					company.id,
+					scores.filter(score => score.id === company.id),
+				),
+			)
+		}
+
+		const report = buildContactEvalReport(scores)
+		yield* Console.log(formatContactSummary(report.summary))
+		yield* Effect.annotateCurrentSpan(
+			contactEvalSummaryAttributes(report.summary),
+		)
+		yield* Option.match(opts.out, {
+			onNone: () => Effect.void,
+			onSome: path =>
+				Effect.tryPromise({
+					try: () =>
+						writeFile(fromRepoRoot(path), JSON.stringify(report, null, 2)),
+					catch: error => new Error(`cannot write report: ${String(error)}`),
+				}).pipe(
+					Effect.tap(() =>
+						Console.log(`\nReport written to ${fromRepoRoot(path)}`),
+					),
+				),
+		})
+	}).pipe(
+		Effect.withSpan('research_eval_contacts.batch', {
+			attributes: { 'eval.runs_per_company': opts.runs },
+		}),
+		Effect.provide(
+			makeOtlpObservability({ serviceName: 'batuda-research-eval-contacts' }),
 		),
 	)

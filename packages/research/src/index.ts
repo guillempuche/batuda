@@ -13,6 +13,31 @@ export {
 	type DiscoveredContact,
 	estimateDiscoverCostCents,
 } from './application/contact-discovery'
+// ── Application (contact-finding eval) ─────────────────────────────────────
+export {
+	type ContactGoldenParseResult,
+	parseContactGoldenRow,
+	parseContactGoldenSet,
+	type RawContactGoldenRow,
+} from './application/eval-contacts-golden'
+export { outcomeFromContactRun } from './application/eval-contacts-outcome'
+export {
+	buildContactEvalReport,
+	type ContactEvalReport,
+	contactEvalSpanAttributes,
+	contactEvalSummaryAttributes,
+} from './application/eval-contacts-report'
+export {
+	type ContactEvalSummary,
+	type ContactGoldenExpectation,
+	type ContactRunOutcome,
+	type ContactRunScore,
+	type ContactTerminalStatus,
+	type GoldenContact,
+	type OutcomeContact,
+	scoreContactRun,
+	summarizeContactScores,
+} from './application/eval-contacts-scoring'
 // ── Application (eval harness) ─────────────────────────────────────────────
 export {
 	type GoldenParseResult,

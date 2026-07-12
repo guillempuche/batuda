@@ -78,3 +78,35 @@ A registry lookup that resolves the target company by its legal name now counts 
 ## Charting runs on the monitoring board
 
 Each run's scores are also exported to the monitoring board (Honeycomb) as spans when `OTEL_EXPORTER_OTLP_ENDPOINT` (+ `OTEL_EXPORTER_OTLP_HEADERS` with `x-honeycomb-dataset`) is set — one span per run plus a batch-summary span, tagged with the agent/extract model, so you can chart grounding accuracy, field precision/recall, and the empty rate drifting across model and prompt changes instead of eyeballing two terminal outputs. Without those env vars the eval still prints its table and writes `--out`, just with no export.
+
+## Contact-finding eval
+
+A parallel harness for the other half of the pipeline: `discover_contacts` (a company → ranked, verified decision-maker contacts). It answers the vendor question the [lead-sourcing strategy](../docs/drafts/lead-reach-apis.md) leaves open — does adding **FullEnrich** as Hunter's miss-fallback (and running it in `union` mode) earn its ~5–6¢/lookup — on Batuda's own numbers rather than the vendor's.
+
+```bash
+# Score the same set under each enrich config and read the recall lift against the cost delta.
+pnpm cli research eval-contacts --org <org-id> --user <user-id> --golden eval/golden-contacts.json --enrich hunter
+pnpm cli research eval-contacts --org <org-id> --user <user-id> --golden eval/golden-contacts.json --enrich hunter,fullenrich --enrich-mode fallback
+pnpm cli research eval-contacts --org <org-id> --user <user-id> --golden eval/golden-contacts.json --enrich hunter,fullenrich --enrich-mode union
+```
+
+It prints **contact recall**, **decision-maker recall**, **email precision**, **empty rate**, and **cost per verified contact**, and writes a full per-run report with `--out`. `--enrich` / `--enrich-mode` override `RESEARCH_PROVIDER_ENRICH` / `RESEARCH_ENRICH_MODE` for the run, so one golden set scores every config; leave them off to use the env.
+
+### The contact golden file
+
+A JSON array of companies with their known decision-makers. Copy `golden-contacts.example.json` to your own `golden-contacts.json` and replace every row with real, verified people — a fabricated "known contact" silently poisons recall and precision exactly as a wrong field value does.
+
+```json
+{
+  "id": "short-stable-id",
+  "companyName": "Company Name",
+  "domain": "company.com",
+  "country": "ES",
+  "expectedContacts": [{ "name": "Ada Lovelace", "role": "CEO", "email": "ada@company.com" }]
+}
+```
+
+- `domain` — the company domain `discover_contacts` searches on. **Required.**
+- `expectedContacts` — the known decision-makers. Each needs a `name` (recall matches on it, accent- and middle-name-tolerant); `role` marks decision-makers (scored by decision-maker recall); `email` is the verified sendable address (scored by email precision). **Email is optional** — a name-only row is a valid recall target, and email precision is judged only over rows that carry a verified address.
+
+The shipped example seeds real, durably-public founders/leaders (UK, Spain, LATAM) as name-only recall targets. Two curation steps make the numbers decision-grade: **add verified emails** (so email precision means something), and — since FullEnrich matters most exactly where registries and Hunter come up empty — **add real LATAM SMBs** (Paraguay and the officer-less long tail), the case the FullEnrich spend decision actually turns on. `country` routes the registry (§ *Registries* above), so a Spanish row with the register on confirms officers cheaply.
