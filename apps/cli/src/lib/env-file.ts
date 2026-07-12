@@ -68,6 +68,26 @@ export const missingEnvEntries = (
 	return parseEnvEntries(exampleBody).filter(e => !present.has(e.key))
 }
 
+/** Append to `base` every active key the template declares but `base` lacks,
+ * carrying each key's default value and its doc comments. A worktree inherits its
+ * `.env` from the main checkout, so a required key added to the template but never
+ * synced into that `.env` is absent here too and the server dies at boot on the
+ * missing var; filling it from the template's default keeps the worktree bootable.
+ * Returns the merged body plus the names it added, so the caller can report them. */
+export const fillMissingFromExample = (
+	base: string,
+	exampleBody: string,
+): { body: string; filled: string[] } => {
+	const missing = missingEnvEntries(exampleBody, base)
+	if (missing.length === 0) return { body: base, filled: [] }
+	const block = missing.flatMap(e => [...e.comments, e.line]).join('\n')
+	const separator = base.endsWith('\n') ? '' : '\n'
+	return {
+		body: `${base}${separator}${block}\n`,
+		filled: missing.map(e => e.key),
+	}
+}
+
 /** Rewrite matching keys in a .env body, appending any that weren't present, so
  * every other line is preserved as-is. Used to layer per-worktree overrides
  * (`DATABASE_URL`, `STORAGE_BUCKET`) onto a copy of another `.env`'s content. */
