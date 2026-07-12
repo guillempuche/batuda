@@ -65,6 +65,7 @@ import {
 import { guardScalarFields } from './scalar-field-guard'
 import { type FreeformSchema, schemaRegistry } from './schemas/index'
 import { urlHashForScrape } from './source-key'
+import { enforceSourceTier } from './source-tier-guard'
 import { REGISTRY_LOOKUP_COST_CENTS, SCRAPE_COST_CENTS } from './tool-costs'
 import {
 	isUnsupportedScrapeUrl,
@@ -108,7 +109,15 @@ const MAX_LOOP_PROMPT_CHARS = 90000
 // transcript. The transcript caps each tool result at 4000 chars for the agent
 // loop; the extractor gets the fuller pages here so a fact sitting past that cut
 // (a leadership list, a tools section) still reaches the structured output.
-const MAX_EXTRACTION_PAGE_CHARS = 60000
+//
+// Sized to the extract tier's real capacity: the primary model serves a 256k-token
+// window and the fallback ~128k, so ~45k tokens of pages (this) plus the ~24k-token
+// transcript and the schema/output still leave headroom on the smaller of the two —
+// far above the old 60k-char (~15k-token) budget, which truncated content-rich
+// targets and multi-company discovery scans. A per-page cap keeps one very long
+// page from crowding out the others, so breadth survives when the budget is tight.
+const MAX_EXTRACTION_PAGE_CHARS = 180000
+const MAX_EXTRACTION_CHARS_PER_PAGE = 40000
 
 // When the model finishes without the evidence confirming the target company, it
 // gets this many corrective nudges to search harder before the run fails closed.
@@ -1223,9 +1232,15 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 									if (text.trim().length === 0) continue
 									const remaining = MAX_EXTRACTION_PAGE_CHARS - total
 									if (remaining <= 0) break
+									// Cap each page so one very long page can't consume the whole
+									// budget and starve the pages after it.
+									const budget = Math.min(
+										remaining,
+										MAX_EXTRACTION_CHARS_PER_PAGE,
+									)
 									const slice =
-										text.length > remaining
-											? `${text.slice(0, remaining)}…[truncated]`
+										text.length > budget
+											? `${text.slice(0, budget)}…[truncated]`
 											: text
 									parts.push(slice)
 									total += slice.length
@@ -1438,6 +1453,23 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 										criticised: critiqued.criticised,
 										dropped: critiqued.dropped,
 										flagged: critiqued.flagged,
+									}),
+								)
+							}
+							// Source tier: a value cited to a third-party company-profile site
+							// (an aggregator surfaced by the richer search vendors), rather than
+							// the company's own domain, has its confidence held to medium — so an
+							// outside estimate never ships trusted like the company's own word.
+							const sourceTier = enforceSourceTier(
+								result,
+								entityTargets?.domains ?? [],
+							)
+							result = sourceTier.findings
+							if (sourceTier.capped > 0) {
+								yield* Effect.logInfo('research.source_tier.capped').pipe(
+									Effect.annotateLogs({
+										research_id: researchId,
+										capped: sourceTier.capped,
 									}),
 								)
 							}
