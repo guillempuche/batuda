@@ -6,12 +6,10 @@ export {
 } from './call-recordings'
 export {
 	COMPANY_INDUSTRIES,
-	COMPANY_REGIONS,
 	COMPANY_SIZE_RANGES,
 	Company,
 	CompanyId,
 	CompanyIndustry,
-	CompanyRegion,
 	CompanySizeRange,
 } from './companies'
 export {

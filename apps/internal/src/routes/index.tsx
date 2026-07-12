@@ -40,7 +40,7 @@ type DashboardCompany = {
 	readonly status: string
 	readonly industry: string | null
 	readonly location: string | null
-	readonly region: string | null
+	readonly country: string | null
 	readonly priority: number | null
 	readonly lastContactedAt: string | null
 	readonly nextAction: string | null
@@ -573,7 +573,7 @@ function narrowCompanies(
 			status: r['status'],
 			industry: typeof r['industry'] === 'string' ? r['industry'] : null,
 			location: typeof r['location'] === 'string' ? r['location'] : null,
-			region: typeof r['region'] === 'string' ? r['region'] : null,
+			country: typeof r['country'] === 'string' ? r['country'] : null,
 			priority: typeof r['priority'] === 'number' ? r['priority'] : null,
 			lastContactedAt:
 				typeof r['lastContactedAt'] === 'string' ? r['lastContactedAt'] : null,

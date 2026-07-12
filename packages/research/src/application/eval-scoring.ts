@@ -27,9 +27,8 @@
 export const SCORABLE_FIELDS = [
 	'industry',
 	'size_range',
-	'region',
+	'country',
 	'location',
-	'address',
 ] as const
 
 export type ScorableField = (typeof SCORABLE_FIELDS)[number]
@@ -164,10 +163,10 @@ const fieldMatches = (
 	const normalizedActual = normalizeText(actual)
 	if (normalizedExpected.length === 0 || normalizedActual.length === 0)
 		return false
-	// An address or location is written differently by every source (order,
-	// abbreviations, postcode placement), so accept either string containing the
-	// other rather than demanding a character-exact match.
-	if (field === 'address' || field === 'location') {
+	// A location is written differently by every source (order, abbreviations,
+	// postcode placement), so accept either string containing the other rather than
+	// demanding a character-exact match.
+	if (field === 'location') {
 		return (
 			normalizedActual.includes(normalizedExpected) ||
 			normalizedExpected.includes(normalizedActual)
@@ -176,7 +175,7 @@ const fieldMatches = (
 	if (field === 'industry') {
 		return industryMatches(normalizedExpected, normalizedActual)
 	}
-	// region and size_range are codes the pipeline is meant to emit verbatim, so
+	// country and size_range are codes the pipeline is meant to emit verbatim, so
 	// they hold to an exact match.
 	return normalizedActual === normalizedExpected
 }

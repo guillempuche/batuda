@@ -143,7 +143,7 @@ describe('validateFindingCitations', () => {
 						quote: 'a shop',
 						confidence: 0.9,
 					},
-					region: { value: 'Catalonia', source_id: 'invented' },
+					country: { value: 'ES', source_id: 'invented' },
 				},
 			}
 
@@ -153,7 +153,7 @@ describe('validateFindingCitations', () => {
 			// THEN the grounded field keeps its full provenance; the invented one
 			// keeps only its value
 			const f = result.findings as {
-				enrichment: { industry: unknown; region: unknown }
+				enrichment: { industry: unknown; country: unknown }
 			}
 			expect(f.enrichment.industry).toEqual({
 				value: 'Retail',
@@ -161,7 +161,7 @@ describe('validateFindingCitations', () => {
 				quote: 'a shop',
 				confidence: 0.9,
 			})
-			expect(f.enrichment.region).toEqual({ value: 'Catalonia' })
+			expect(f.enrichment.country).toEqual({ value: 'ES' })
 			expect(result.total).toBe(2)
 			expect(result.kept).toBe(1)
 		})

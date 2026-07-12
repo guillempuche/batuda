@@ -326,10 +326,6 @@ msgstr "Afegida a l'organització"
 msgid "Adding…"
 msgstr "S'està afegint…"
 
-#: src/components/research/findings/company-enrichment-view.tsx
-msgid "Address"
-msgstr "Adreça"
-
 #: src/routes/settings/organization/members.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Admin"
@@ -361,6 +357,10 @@ msgstr "Assistents d'IA que has connectat per MCP. Cadascun pot actuar en una o 
 msgid "All"
 msgstr "Tots"
 
+#: src/routes/companies/index.tsx
+msgid "All countries"
+msgstr "Tots els països"
+
 #: src/routes/emails/index.tsx
 #: src/routes/emails/index.tsx
 msgid "All inboxes"
@@ -373,10 +373,6 @@ msgstr "Tots els sectors"
 #: src/routes/companies/index.tsx
 msgid "All owners"
 msgstr "Tots els responsables"
-
-#: src/routes/companies/index.tsx
-msgid "All regions"
-msgstr "Totes les regions"
 
 #: src/components/research/inbox/research-inbox.tsx
 msgid "All runs"
@@ -1355,6 +1351,17 @@ msgstr "No s'ha pogut iniciar la sessió"
 msgid "Couldn't update your preference. Try again."
 msgstr "No he pogut desar la teva preferència. Prova-ho de nou."
 
+#: src/components/companies/about-section.tsx
+#: src/components/research/findings/company-enrichment-view.tsx
+#: src/components/research/findings/prospect-scan-view.tsx
+#: src/routes/companies/index.tsx
+msgid "Country"
+msgstr "País"
+
+#: src/components/research/research-dialog.tsx
+msgid "Country filter"
+msgstr "Filtre de país"
+
 #: src/routes/emails/inboxes.tsx
 msgid "Create"
 msgstr "Crea"
@@ -1654,10 +1661,6 @@ msgid "e.g. [research] Spain hospitality sourcing"
 msgstr "p. ex. [research] Espanya prospecció d'hostaleria"
 
 #: src/components/research/research-dialog.tsx
-msgid "e.g. Barcelona"
-msgstr "p. ex. Barcelona"
-
-#: src/components/research/research-dialog.tsx
 msgid "e.g. Catalonia"
 msgstr "p. ex. Catalunya"
 
@@ -1668,6 +1671,10 @@ msgstr "p. ex. Claude Desktop"
 #: src/routes/emails/inboxes.tsx
 msgid "e.g. Company signature"
 msgstr "p. ex. Signatura de l'empresa"
+
+#: src/components/research/research-dialog.tsx
+msgid "e.g. ES"
+msgstr "p. ex. ES"
 
 #: src/components/contacts/contact-edit-dialog.tsx
 msgid "e.g. Head of Operations"
@@ -3533,17 +3540,6 @@ msgstr "Actualitza"
 msgid "Refreshing inbox status…"
 msgstr "Actualitzant l'estat de la bústia…"
 
-#: src/components/companies/about-section.tsx
-#: src/components/research/findings/company-enrichment-view.tsx
-#: src/components/research/findings/prospect-scan-view.tsx
-#: src/routes/companies/index.tsx
-msgid "Region"
-msgstr "Regió"
-
-#: src/components/research/research-dialog.tsx
-msgid "Region filter"
-msgstr "Filtre de regió"
-
 #: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Reject"
@@ -4235,8 +4231,8 @@ msgid "Status update failed"
 msgstr "Ha fallat l'actualització d'estat"
 
 #: src/components/research/research-dialog.tsx
-msgid "Steer a net-new search, or set a status/industry/region/tag filter to run across companies you already track."
-msgstr "Orienta una cerca de noves empreses, o defineix un filtre d'estat/sector/regió/etiqueta per executar-la sobre empreses que ja segueixes."
+msgid "Steer a net-new search, or set a status/industry/country/tag filter to run across companies you already track."
+msgstr "Orienta una cerca de noves empreses, o defineix un filtre d'estat/sector/país/etiqueta per executar-la sobre empreses que ja segueixes."
 
 #. placeholder {0}: progress.phase
 #: src/components/research/run-progress.tsx

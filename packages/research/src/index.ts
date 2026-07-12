@@ -131,10 +131,8 @@ export { researchToolkit, researchToolkitLayer } from './application/tools'
 export { AcceptedCountry } from './domain/country'
 export {
 	CRM_INDUSTRIES,
-	CRM_REGIONS,
 	CRM_SIZE_RANGES,
 	type CrmIndustry,
-	type CrmRegion,
 	type CrmSizeRange,
 } from './domain/crm-vocabulary'
 export {

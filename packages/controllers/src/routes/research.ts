@@ -30,7 +30,7 @@ const SelectorRef = Schema.Struct({
 	filter: Schema.Struct({
 		status: Schema.optional(Schema.String),
 		industry: Schema.optional(Schema.String),
-		region: Schema.optional(Schema.String),
+		country: Schema.optional(Schema.String),
 		tags: Schema.optional(Schema.Array(Schema.String)),
 	}),
 })

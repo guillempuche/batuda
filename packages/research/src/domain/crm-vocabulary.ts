@@ -1,8 +1,8 @@
 // The CRM's fixed vocabulary for the classification fields research writes back —
-// a local mirror of @batuda/domain's Company schema (industry / region /
-// size_range). Kept as a copy so this package keeps its zero-workspace-dependency
-// boundary; a sync test in apps/server (which sees both packages) fails if the
-// two ever drift apart.
+// a local mirror of @batuda/domain's Company schema (industry / size_range).
+// Kept as a copy so this package keeps its zero-workspace-dependency boundary; a
+// sync test in apps/server (which sees both packages) fails if the two ever drift
+// apart.
 
 export const CRM_INDUSTRIES = [
 	'restauració',
@@ -16,9 +16,6 @@ export const CRM_INDUSTRIES = [
 	'other',
 ] as const
 export type CrmIndustry = (typeof CRM_INDUSTRIES)[number]
-
-export const CRM_REGIONS = ['cat', 'ara', 'cv'] as const
-export type CrmRegion = (typeof CRM_REGIONS)[number]
 
 export const CRM_SIZE_RANGES = [
 	'1-5',

@@ -4,7 +4,11 @@
 		"query": "Brompton Bicycle, London",
 		"expectedOutput": {
 			"officialDomain": "brompton.com",
-			"fields": { "industry": "manufactura", "location": "London" }
+			"fields": {
+				"industry": "manufactura",
+				"country": "GB",
+				"location": "London"
+			}
 		}
 	},
 	{
@@ -12,7 +16,11 @@
 		"query": "Gymshark, Solihull",
 		"expectedOutput": {
 			"officialDomain": "gymshark.com",
-			"fields": { "industry": "retail", "location": "Solihull" }
+			"fields": {
+				"industry": "retail",
+				"country": "GB",
+				"location": "Solihull"
+			}
 		}
 	},
 	{
@@ -20,7 +28,7 @@
 		"query": "Monzo Bank, London",
 		"expectedOutput": {
 			"officialDomain": "monzo.com",
-			"fields": { "industry": "serveis", "location": "London" }
+			"fields": { "industry": "serveis", "country": "GB", "location": "London" }
 		}
 	},
 	{
@@ -29,7 +37,11 @@
 		"expectedOutput": {
 			"officialDomain": "dyson.com",
 			"altDomains": ["dyson.co.uk"],
-			"fields": { "industry": "manufactura", "location": "Malmesbury" }
+			"fields": {
+				"industry": "manufactura",
+				"country": "GB",
+				"location": "Malmesbury"
+			}
 		}
 	},
 	{
@@ -38,7 +50,11 @@
 		"expectedOutput": {
 			"officialDomain": "jcb.com",
 			"altDomains": ["jcb.co.uk"],
-			"fields": { "industry": "manufactura", "location": "Rocester" }
+			"fields": {
+				"industry": "manufactura",
+				"country": "GB",
+				"location": "Rocester"
+			}
 		}
 	},
 	{
@@ -47,7 +63,11 @@
 		"expectedOutput": {
 			"officialDomain": "nandos.co.uk",
 			"altDomains": ["nandos.com"],
-			"fields": { "industry": "restauració", "location": "London" }
+			"fields": {
+				"industry": "restauració",
+				"country": "GB",
+				"location": "London"
+			}
 		}
 	},
 	{
@@ -56,7 +76,7 @@
 		"expectedOutput": {
 			"officialDomain": "greggs.co.uk",
 			"altDomains": ["greggs.com"],
-			"fields": { "location": "Newcastle" }
+			"fields": { "country": "GB", "location": "Newcastle" }
 		}
 	},
 	{
@@ -65,7 +85,7 @@
 		"expectedOutput": {
 			"officialDomain": "deliveroo.co.uk",
 			"altDomains": ["deliveroo.com"],
-			"fields": { "location": "London" }
+			"fields": { "country": "GB", "location": "London" }
 		}
 	},
 	{
@@ -74,7 +94,7 @@
 		"expectedOutput": {
 			"officialDomain": "ocado.com",
 			"altDomains": ["ocadogroup.com", "ocado.co.uk"],
-			"fields": { "location": "Hatfield" }
+			"fields": { "country": "GB", "location": "Hatfield" }
 		}
 	},
 	{
@@ -85,7 +105,7 @@
 			"fields": {
 				"industry": "manufactura",
 				"size_range": "51-200",
-				"region": "ara",
+				"country": "ES",
 				"location": "Zaragoza"
 			}
 		}
@@ -98,7 +118,7 @@
 			"fields": {
 				"industry": "manufactura",
 				"size_range": "51-200",
-				"region": "cat",
+				"country": "ES",
 				"location": "Balsareny"
 			}
 		}
@@ -111,7 +131,7 @@
 			"fields": {
 				"industry": "manufactura",
 				"size_range": "51-200",
-				"region": "ara",
+				"country": "ES",
 				"location": "Alagón"
 			}
 		}
@@ -124,7 +144,7 @@
 			"fields": {
 				"industry": "distribució",
 				"size_range": "11-25",
-				"region": "cv",
+				"country": "ES",
 				"location": "Alicante"
 			}
 		}
@@ -134,7 +154,7 @@
 		"query": "Canteras La Ponderosa, Alcover",
 		"expectedOutput": {
 			"officialDomain": "canteralaponderosa.com",
-			"fields": { "region": "cat", "location": "Alcover" }
+			"fields": { "country": "ES", "location": "Alcover" }
 		}
 	},
 	{
@@ -142,7 +162,11 @@
 		"query": "Arrive Logistics, Austin",
 		"expectedOutput": {
 			"officialDomain": "arrivelogistics.com",
-			"fields": { "size_range": "51-200", "location": "Austin" }
+			"fields": {
+				"size_range": "51-200",
+				"country": "US",
+				"location": "Austin"
+			}
 		}
 	}
 ]

@@ -24,7 +24,7 @@ describe('parseGoldenRow', () => {
 					expectedOutput: {
 						officialDomain: 'acme.es',
 						altDomains: ['librebor.es'],
-						fields: { industry: 'transport', region: 'cat' },
+						fields: { industry: 'transport', country: 'ES' },
 					},
 				}),
 			)
@@ -37,7 +37,7 @@ describe('parseGoldenRow', () => {
 					query: 'Acme Logistics, Barcelona',
 					officialDomain: 'acme.es',
 					altDomains: ['librebor.es'],
-					fields: { industry: 'transport', region: 'cat' },
+					fields: { industry: 'transport', country: 'ES' },
 				},
 			})
 		})
@@ -111,7 +111,7 @@ describe('parseGoldenRow', () => {
 				row({
 					expectedOutput: {
 						officialDomain: 'acme.es',
-						fields: { region: 5 },
+						fields: { country: 5 },
 					},
 				}),
 			)
@@ -177,6 +177,7 @@ describe('parseGoldenSet', () => {
 			const arrive = result.golden.find(g => g.id === 'arrive-logistics')
 			expect(arrive?.fields.size_range).toBe('51-200')
 			expect(arrive?.fields.location).toBe('Austin')
+			expect(arrive?.fields.country).toBe('US')
 		})
 	})
 })

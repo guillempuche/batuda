@@ -24,8 +24,14 @@ export const CompanyEnrichmentV1Schema = Schema.Struct({
 		products_fit: Schema.optionalKey(Schema.Array(Schema.String)),
 		tags: Schema.optionalKey(Schema.Array(Schema.String)),
 		location: Schema.optionalKey(Sourced(Schema.String)),
-		region: Schema.optionalKey(Sourced(Schema.String)),
-		address: Schema.optionalKey(Sourced(Schema.String)),
+		country: Schema.optionalKey(
+			Sourced(
+				Schema.String.annotate({
+					description:
+						'ISO 3166-1 alpha-2 country code, e.g. US, ES, DE — the country the company is based in.',
+				}),
+			),
+		),
 	}),
 	competitors: Schema.optionalKey(
 		Schema.Array(

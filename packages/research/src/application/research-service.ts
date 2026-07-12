@@ -20,7 +20,7 @@ import {
 import { Prompt } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { AcceptedCountry } from '../domain/country'
+import { AcceptedCountry, parseCountryAlpha2 } from '../domain/country'
 import type { ReasonCode, ResolvedPolicy } from '../domain/types'
 import { canAffordAnotherRound, runAgentResearchLoop } from './agent-loop'
 import { filterApplicableProposals } from './applicability-guard'
@@ -203,6 +203,26 @@ export const withProposalIds = (findings: unknown): unknown => {
 			? { pending_paid_actions: withPendingIds(record['pending_paid_actions']) }
 			: {}),
 	}
+}
+
+// The country the model extracted for the target, read from `enrichment.country`.
+// The value may be a bare string or the `{ value, source_id }` per-field-citation
+// wrapper; return the inner text, or nothing when the field is absent.
+export const readEnrichmentCountry = (
+	findings: unknown,
+): string | undefined => {
+	if (typeof findings !== 'object' || findings === null) return undefined
+	const enrichment = (findings as { enrichment?: unknown }).enrichment
+	if (typeof enrichment !== 'object' || enrichment === null) return undefined
+	const country = (enrichment as { country?: unknown }).country
+	if (typeof country === 'string') return country
+	if (
+		typeof country === 'object' &&
+		country !== null &&
+		typeof (country as { value?: unknown }).value === 'string'
+	)
+		return (country as { value: string }).value
+	return undefined
 }
 
 // Clamp list pagination so out-of-range input can't reach SQL: a negative limit
@@ -1237,7 +1257,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 									}),
 								)
 							}
-							// Vocabulary: rewrite industry/region/size to the CRM's fixed codes so
+							// Vocabulary: rewrite industry/size to the CRM's fixed codes so
 							// what reaches the CRM matches the classification the UI offers — a
 							// real-but-uncategorized value becomes 'other', junk is dropped. Runs
 							// before applicability, so a proposal emptied by dropping its only
@@ -1964,11 +1984,19 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						return
 					}
 
+					// The country this run was about, taken from the model's extracted
+					// country and normalized to an ISO alpha-2 code. Stored on the run so
+					// applying its findings can stamp the country onto the company; null
+					// when the model gave no country or gave something that isn't a code.
+					const runCountry =
+						parseCountryAlpha2(readEnrichmentCountry(findings)) ?? null
+
 					yield* sql`
 						UPDATE research_runs
 						SET status = 'succeeded',
 							phase = 3,
 							findings = ${JSON.stringify(withRegistryFlag(findings as Record<string, unknown>))},
+							country = ${runCountry},
 							brief_md = ${briefMd},
 							tokens_in = ${tokensIn},
 							tokens_out = ${tokensOut},
@@ -2301,7 +2329,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							const filter = selector.filter as {
 								status?: string
 								industry?: string
-								region?: string
+								country?: string
 								tags?: ReadonlyArray<string>
 							}
 							const conds: Array<
@@ -2313,7 +2341,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							if (filter.status) conds.push(sql`status = ${filter.status}`)
 							if (filter.industry)
 								conds.push(sql`industry = ${filter.industry}`)
-							if (filter.region) conds.push(sql`region = ${filter.region}`)
+							if (filter.country) conds.push(sql`country = ${filter.country}`)
 							if (filter.tags && filter.tags.length > 0)
 								conds.push(sql`tags && ${filter.tags}`)
 

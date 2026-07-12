@@ -12,7 +12,7 @@ import { agedPaperSurface, stenciledTitle } from '#/lib/workshop-mixins'
 
 export type AboutCompany = {
 	readonly industry: string | null
-	readonly region: string | null
+	readonly country: string | null
 	readonly location: string | null
 	readonly sizeRange: string | null
 	readonly source: string | null
@@ -28,7 +28,7 @@ export type AboutCompany = {
  * Overview leads with deal-driving signals (next action, cadence,
  * tasks, timeline). Three subsections:
  *
- *   - Sales context (industry, region, location, size, source)
+ *   - Sales context (industry, country, location, size, source)
  *   - Discovery (pain points, current tools)
  *   - Tags & fit (tags, products fit)
  *
@@ -64,9 +64,9 @@ export function AboutSection({
 								onSave={next => onSave('industry', next)}
 							/>
 							<EditableField
-								label={t`Region`}
-								value={company.region}
-								onSave={next => onSave('region', next)}
+								label={t`Country`}
+								value={company.country}
+								onSave={next => onSave('country', next)}
 							/>
 							<EditableField
 								label={t`Location`}

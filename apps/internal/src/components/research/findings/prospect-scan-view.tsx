@@ -30,7 +30,7 @@ import {
 
 /**
  * Renders a `prospect_scan_v1` research finding. Each prospect carries
- * a `whyRelevant` rationale + optional industry/region/taxId +
+ * a `whyRelevant` rationale + optional industry/country/taxId +
  * pain-indicator tags + citations.
  */
 
@@ -39,7 +39,7 @@ type ProspectEntry = {
 	readonly website?: string
 	readonly taxId?: string
 	readonly industry?: string
-	readonly region?: string
+	readonly country?: string
 	readonly whyRelevant: string
 	readonly painIndicators?: ReadonlyArray<string>
 	readonly citations?: ReadonlyArray<Citation>
@@ -84,12 +84,12 @@ export function ProspectScanView({
 											<FieldValue>{p.industry}</FieldValue>
 										</FieldRow>
 									) : null}
-									{p.region !== undefined ? (
+									{p.country !== undefined ? (
 										<FieldRow>
 											<FieldKey>
-												<Trans>Region</Trans>
+												<Trans>Country</Trans>
 											</FieldKey>
-											<FieldValue>{p.region}</FieldValue>
+											<FieldValue>{p.country}</FieldValue>
 										</FieldRow>
 									) : null}
 									{p.taxId !== undefined ? (
@@ -156,7 +156,7 @@ function AddAsLeadButton({ prospect }: { readonly prospect: ProspectEntry }) {
 				status: 'prospect',
 				source: 'research',
 				...(prospect.industry ? { industry: prospect.industry } : {}),
-				...(prospect.region ? { region: prospect.region } : {}),
+				...(prospect.country ? { country: prospect.country } : {}),
 				...(prospect.website ? { website: prospect.website } : {}),
 			},
 		} as never)

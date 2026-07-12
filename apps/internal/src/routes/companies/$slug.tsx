@@ -136,7 +136,7 @@ type CompanyDetail = {
 	readonly verifiedAt: string | null
 	readonly industry: string | null
 	readonly sizeRange: string | null
-	readonly region: string | null
+	readonly country: string | null
 	readonly location: string | null
 	readonly source: string | null
 	readonly priority: number | null
@@ -1472,7 +1472,7 @@ function narrowCompany(raw: unknown): CompanyDetail | null {
 		verifiedAt: str('verifiedAt'),
 		industry: str('industry'),
 		sizeRange: str('sizeRange'),
-		region: str('region'),
+		country: str('country'),
 		location: str('location'),
 		source: str('source'),
 		priority: num('priority'),

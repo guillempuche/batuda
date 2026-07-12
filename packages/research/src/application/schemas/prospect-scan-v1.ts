@@ -14,7 +14,11 @@ export const ProspectScanV1Schema = Schema.Struct({
 			website: Schema.optionalKey(Schema.String),
 			tax_id: Schema.optionalKey(Schema.String),
 			industry: Schema.optionalKey(Schema.String),
-			region: Schema.optionalKey(Schema.String),
+			country: Schema.optionalKey(
+				Schema.String.annotate({
+					description: 'ISO 3166-1 alpha-2 country code, e.g. US, ES, DE.',
+				}),
+			),
 			why_relevant: Schema.String,
 			pain_indicators: Schema.optionalKey(Schema.Array(Schema.String)),
 			citations: Schema.Array(Citation),

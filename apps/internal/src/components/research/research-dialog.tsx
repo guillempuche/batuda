@@ -105,7 +105,7 @@ export function ResearchDialog({
 	const [language, setLanguage] = useState<'' | 'ca' | 'es' | 'en'>('')
 	const [filterStatus, setFilterStatus] = useState('')
 	const [filterIndustry, setFilterIndustry] = useState('')
-	const [filterRegion, setFilterRegion] = useState('')
+	const [filterCountry, setFilterCountry] = useState('')
 	const [filterTags, setFilterTags] = useState('')
 	// Set once a selector fan-out returns needing confirmation, so the footer
 	// swaps to a cost prompt instead of starting straight away.
@@ -133,7 +133,7 @@ export function ResearchDialog({
 		setLanguage('')
 		setFilterStatus('')
 		setFilterIndustry('')
-		setFilterRegion('')
+		setFilterCountry('')
 		setFilterTags('')
 		setPendingConfirm(null)
 	}, [open, isDiscovery])
@@ -149,7 +149,7 @@ export function ResearchDialog({
 			const filter: Record<string, unknown> = {}
 			if (filterStatus) filter['status'] = filterStatus
 			if (filterIndustry.trim()) filter['industry'] = filterIndustry.trim()
-			if (filterRegion.trim()) filter['region'] = filterRegion.trim()
+			if (filterCountry.trim()) filter['country'] = filterCountry.trim()
 			const tags = filterTags
 				.split(',')
 				.map(s => s.trim())
@@ -169,7 +169,7 @@ export function ResearchDialog({
 		isDiscovery,
 		filterStatus,
 		filterIndustry,
-		filterRegion,
+		filterCountry,
 		filterTags,
 		language,
 		location,
@@ -343,7 +343,7 @@ export function ResearchDialog({
 								</Label>
 								<HelpText>
 									<Trans>
-										Steer a net-new search, or set a status/industry/region/tag
+										Steer a net-new search, or set a status/industry/country/tag
 										filter to run across companies you already track.
 									</Trans>
 								</HelpText>
@@ -411,16 +411,16 @@ export function ResearchDialog({
 										/>
 									</ScopeField>
 									<ScopeField>
-										<ScopeLabel htmlFor='discovery-region'>
-											<Trans>Region filter</Trans>
+										<ScopeLabel htmlFor='discovery-country'>
+											<Trans>Country filter</Trans>
 										</ScopeLabel>
 										<PriInput
-											id='discovery-region'
-											data-testid='discovery-region'
+											id='discovery-country'
+											data-testid='discovery-country'
 											maxLength={FILTER_MAX_LENGTH}
-											value={filterRegion}
-											placeholder={t`e.g. Barcelona`}
-											onChange={e => setFilterRegion(e.target.value)}
+											value={filterCountry}
+											placeholder={t`e.g. ES`}
+											onChange={e => setFilterCountry(e.target.value)}
 										/>
 									</ScopeField>
 									<ScopeField>

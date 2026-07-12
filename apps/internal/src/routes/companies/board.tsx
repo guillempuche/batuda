@@ -12,7 +12,7 @@ import { rulerUnderRule, stenciledTitle } from '#/lib/workshop-mixins'
 
 // Same filters as the list minus `status` — the board's columns are the statuses.
 const validateSearch = validateSearchWith({
-	region: Schema.NonEmptyString,
+	country: Schema.NonEmptyString,
 	industry: Schema.NonEmptyString,
 	priority: Schema.Union([Schema.Number, Schema.NumberFromString]),
 	owner: Schema.NonEmptyString,
@@ -33,7 +33,7 @@ function BoardPage() {
 	// Carry the active filters back to the list view.
 	const listHref = (() => {
 		const p = new URLSearchParams()
-		if (search.region) p.set('region', search.region)
+		if (search.country) p.set('country', search.country)
 		if (search.industry) p.set('industry', search.industry)
 		if (search.priority !== undefined)
 			p.set('priority', String(search.priority))

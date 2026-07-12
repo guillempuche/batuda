@@ -9,7 +9,7 @@ import { BatudaApiAtom } from '#/lib/batuda-api-atom'
  */
 export type CompaniesSearch = {
 	readonly status?: string
-	readonly region?: string
+	readonly country?: string
 	readonly industry?: string
 	readonly priority?: number
 	readonly owner?: string
@@ -81,8 +81,8 @@ export function canonicalSearchKey(search: CompaniesSearch): string {
 	if (search.status !== undefined && search.status !== '') {
 		entries.push(['status', search.status])
 	}
-	if (search.region !== undefined && search.region !== '') {
-		entries.push(['region', search.region])
+	if (search.country !== undefined && search.country !== '') {
+		entries.push(['country', search.country])
 	}
 	if (search.industry !== undefined && search.industry !== '') {
 		entries.push(['industry', search.industry])

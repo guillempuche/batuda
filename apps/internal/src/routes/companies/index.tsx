@@ -46,7 +46,7 @@ import {
 /**
  * Narrow row shape for the list view. The server returns `Schema.Unknown`
  * so we runtime-narrow at the boundary. Shares the same fields the
- * dashboard needs plus `region` (used by the Region filter).
+ * dashboard needs plus `country` (used by the Country filter).
  */
 type CompanyRow = {
 	readonly id: string
@@ -55,7 +55,7 @@ type CompanyRow = {
 	readonly status: string
 	readonly industry: string | null
 	readonly location: string | null
-	readonly region: string | null
+	readonly country: string | null
 	readonly priority: number | null
 	readonly lastContactedAt: string | null
 	readonly ownerId: string | null
@@ -73,7 +73,7 @@ type CompanyRow = {
  */
 const validateSearch = validateSearchWith({
 	status: Schema.NonEmptyString,
-	region: Schema.NonEmptyString,
+	country: Schema.NonEmptyString,
 	industry: Schema.NonEmptyString,
 	priority: Schema.Union([Schema.Number, Schema.NumberFromString]),
 	owner: Schema.NonEmptyString,
@@ -234,11 +234,11 @@ function CompaniesListPage() {
 		[openQuickCapture],
 	)
 
-	// Region + industry options are the distinct values present in the loaded
+	// Country + industry options are the distinct values present in the loaded
 	// companies — international, never a hardcoded Spanish vocabulary. Priority
 	// and sort are fixed, geography-neutral sets.
-	const regionOptions = useMemo(
-		() => [...new Set(companies.map(c => c.region).filter(isNonEmpty))].sort(),
+	const countryOptions = useMemo(
+		() => [...new Set(companies.map(c => c.country).filter(isNonEmpty))].sort(),
 		[companies],
 	)
 	const industryOptions = useMemo(
@@ -254,9 +254,9 @@ function CompaniesListPage() {
 			? t`1 company`
 			: t`${companies.length} companies`
 
-	const regionItems = [
-		{ value: ALL, label: t`All regions` },
-		...regionOptions.map(r => ({ value: r, label: r })),
+	const countryItems = [
+		{ value: ALL, label: t`All countries` },
+		...countryOptions.map(r => ({ value: r, label: r })),
 	]
 	const industryItems = [
 		{ value: ALL, label: t`All industries` },
@@ -358,11 +358,11 @@ function CompaniesListPage() {
 
 				<DropdownRow>
 					<FilterSelect
-						label={t`Region`}
-						value={search.region ?? ALL}
-						options={regionItems}
-						onChange={v => applyPatch({ region: v === ALL ? undefined : v })}
-						testId='companies-filter-region'
+						label={t`Country`}
+						value={search.country ?? ALL}
+						options={countryItems}
+						onChange={v => applyPatch({ country: v === ALL ? undefined : v })}
+						testId='companies-filter-country'
 					/>
 					<FilterSelect
 						label={t`Industry`}
@@ -454,7 +454,7 @@ function CompaniesListPage() {
 										status: company.status,
 										industry: company.industry,
 										location: company.location,
-										region: company.region,
+										country: company.country,
 										priority: company.priority,
 										lastContactedAt: company.lastContactedAt,
 									}}
@@ -486,7 +486,7 @@ function CompaniesListPage() {
 /** Build the /companies/board URL, carrying the shared filters as query params. */
 function boardHref(search: CompaniesSearch): string {
 	const params = new URLSearchParams()
-	if (search.region) params.set('region', search.region)
+	if (search.country) params.set('country', search.country)
 	if (search.industry) params.set('industry', search.industry)
 	if (search.priority !== undefined)
 		params.set('priority', String(search.priority))
@@ -559,7 +559,7 @@ function mergeSearch(
 	prev: CompaniesSearch,
 	next: Partial<{
 		status: string | undefined
-		region: string | undefined
+		country: string | undefined
 		industry: string | undefined
 		priority: number | undefined
 		owner: string | undefined
@@ -569,7 +569,7 @@ function mergeSearch(
 ): CompaniesSearch {
 	const result: {
 		status?: string
-		region?: string
+		country?: string
 		industry?: string
 		priority?: number
 		owner?: string
@@ -580,8 +580,8 @@ function mergeSearch(
 	const status = 'status' in next ? next.status : prev.status
 	if (status !== undefined && status !== '') result.status = status
 
-	const region = 'region' in next ? next.region : prev.region
-	if (region !== undefined && region !== '') result.region = region
+	const country = 'country' in next ? next.country : prev.country
+	if (country !== undefined && country !== '') result.country = country
 
 	const industry = 'industry' in next ? next.industry : prev.industry
 	if (industry !== undefined && industry !== '') result.industry = industry
@@ -604,7 +604,7 @@ function mergeSearch(
 function hasActiveFilters(search: CompaniesSearch): boolean {
 	return (
 		search.status !== undefined ||
-		search.region !== undefined ||
+		search.country !== undefined ||
 		search.industry !== undefined ||
 		search.priority !== undefined ||
 		search.owner !== undefined ||
@@ -630,7 +630,7 @@ function narrowCompanies(
 			status: r['status'],
 			industry: typeof r['industry'] === 'string' ? r['industry'] : null,
 			location: typeof r['location'] === 'string' ? r['location'] : null,
-			region: typeof r['region'] === 'string' ? r['region'] : null,
+			country: typeof r['country'] === 'string' ? r['country'] : null,
 			priority: typeof r['priority'] === 'number' ? r['priority'] : null,
 			lastContactedAt:
 				typeof r['lastContactedAt'] === 'string' ? r['lastContactedAt'] : null,

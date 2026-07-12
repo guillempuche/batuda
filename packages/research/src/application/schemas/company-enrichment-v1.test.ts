@@ -10,7 +10,7 @@ describe('CompanyEnrichmentV1Schema', () => {
 		it('should decode each field to its value paired with a source', () => {
 			// GIVEN a model result shaped like a real enrichment: every scalar field
 			// carries its own value plus the source that backs it (industry from one
-			// page, region from another), instead of one citation list for the block
+			// page, country from another), instead of one citation list for the block
 			const payload = {
 				enrichment: {
 					industry: {
@@ -24,8 +24,8 @@ describe('CompanyEnrichmentV1Schema', () => {
 						source_id: 'src-1',
 						confidence: null,
 					},
-					region: {
-						value: 'United States',
+					country: {
+						value: 'US',
 						source_id: 'src-2',
 						confidence: null,
 					},
@@ -55,6 +55,8 @@ describe('CompanyEnrichmentV1Schema', () => {
 			expect(decoded.enrichment.location?.value).toBe('St. Louis, MO')
 			expect(decoded.enrichment.location?.source_id).toBe('src-1')
 			expect(decoded.enrichment.industry?.value).toBe('Freight & logistics')
+			expect(decoded.enrichment.country?.value).toBe('US')
+			expect(decoded.enrichment.country?.source_id).toBe('src-2')
 			expect(decoded.contacts?.[0]?.email?.value).toBe('ada@acme.es')
 			expect(decoded.contacts?.[0]?.role?.value).toBe('CTO')
 		})

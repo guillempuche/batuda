@@ -326,10 +326,6 @@ msgstr "Added to the org"
 msgid "Adding…"
 msgstr "Adding…"
 
-#: src/components/research/findings/company-enrichment-view.tsx
-msgid "Address"
-msgstr "Address"
-
 #: src/routes/settings/organization/members.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Admin"
@@ -361,6 +357,10 @@ msgstr "AI assistants you've connected over MCP. Each may act in one or more of 
 msgid "All"
 msgstr "All"
 
+#: src/routes/companies/index.tsx
+msgid "All countries"
+msgstr "All countries"
+
 #: src/routes/emails/index.tsx
 #: src/routes/emails/index.tsx
 msgid "All inboxes"
@@ -373,10 +373,6 @@ msgstr "All industries"
 #: src/routes/companies/index.tsx
 msgid "All owners"
 msgstr "All owners"
-
-#: src/routes/companies/index.tsx
-msgid "All regions"
-msgstr "All regions"
 
 #: src/components/research/inbox/research-inbox.tsx
 msgid "All runs"
@@ -1355,6 +1351,17 @@ msgstr "Couldn't sign in"
 msgid "Couldn't update your preference. Try again."
 msgstr "Couldn't update your preference. Try again."
 
+#: src/components/companies/about-section.tsx
+#: src/components/research/findings/company-enrichment-view.tsx
+#: src/components/research/findings/prospect-scan-view.tsx
+#: src/routes/companies/index.tsx
+msgid "Country"
+msgstr "Country"
+
+#: src/components/research/research-dialog.tsx
+msgid "Country filter"
+msgstr "Country filter"
+
 #: src/routes/emails/inboxes.tsx
 msgid "Create"
 msgstr "Create"
@@ -1654,10 +1661,6 @@ msgid "e.g. [research] Spain hospitality sourcing"
 msgstr "e.g. [research] Spain hospitality sourcing"
 
 #: src/components/research/research-dialog.tsx
-msgid "e.g. Barcelona"
-msgstr "e.g. Barcelona"
-
-#: src/components/research/research-dialog.tsx
 msgid "e.g. Catalonia"
 msgstr "e.g. Catalonia"
 
@@ -1668,6 +1671,10 @@ msgstr "e.g. Claude Desktop"
 #: src/routes/emails/inboxes.tsx
 msgid "e.g. Company signature"
 msgstr "e.g. Company signature"
+
+#: src/components/research/research-dialog.tsx
+msgid "e.g. ES"
+msgstr "e.g. ES"
 
 #: src/components/contacts/contact-edit-dialog.tsx
 msgid "e.g. Head of Operations"
@@ -3533,17 +3540,6 @@ msgstr "Refresh"
 msgid "Refreshing inbox status…"
 msgstr "Refreshing inbox status…"
 
-#: src/components/companies/about-section.tsx
-#: src/components/research/findings/company-enrichment-view.tsx
-#: src/components/research/findings/prospect-scan-view.tsx
-#: src/routes/companies/index.tsx
-msgid "Region"
-msgstr "Region"
-
-#: src/components/research/research-dialog.tsx
-msgid "Region filter"
-msgstr "Region filter"
-
 #: src/components/research/inbox/research-inbox.tsx
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Reject"
@@ -4235,8 +4231,8 @@ msgid "Status update failed"
 msgstr "Status update failed"
 
 #: src/components/research/research-dialog.tsx
-msgid "Steer a net-new search, or set a status/industry/region/tag filter to run across companies you already track."
-msgstr "Steer a net-new search, or set a status/industry/region/tag filter to run across companies you already track."
+msgid "Steer a net-new search, or set a status/industry/country/tag filter to run across companies you already track."
+msgstr "Steer a net-new search, or set a status/industry/country/tag filter to run across companies you already track."
 
 #. placeholder {0}: progress.phase
 #: src/components/research/run-progress.tsx

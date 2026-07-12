@@ -8,13 +8,13 @@ describe('outcomeFromRun', () => {
 			// GIVEN today's block-shaped findings
 			const outcome = outcomeFromRun({
 				status: 'succeeded',
-				findings: { enrichment: { industry: 'transport', region: 'cat' } },
+				findings: { enrichment: { industry: 'transport', country: 'ES' } },
 				fetchedUrls: [],
 			})
 
 			// WHEN adapted — THEN the values come through
 			expect(outcome.fields.industry).toBe('transport')
-			expect(outcome.fields.region).toBe('cat')
+			expect(outcome.fields.country).toBe('ES')
 		})
 	})
 
@@ -131,7 +131,7 @@ describe('outcomeFromRun', () => {
 			// AND the CLI's camelCasing client can deliver the same flag camelCased
 			const camel = outcomeFromRun({
 				status: 'succeeded',
-				findings: { registryConfirmed: true, enrichment: { region: 'cat' } },
+				findings: { registryConfirmed: true, enrichment: { country: 'ES' } },
 				fetchedUrls: [],
 			})
 
