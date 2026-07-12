@@ -193,6 +193,8 @@ export const PgLive = PgClient.layerConfig({
 
 The transform functions handle snake_case ↔ camelCase mapping automatically — `sql.insert({ sizeRange: 'x' })` generates `INSERT INTO ... (size_range) VALUES ('x')`, and SELECT results map `size_range` → `sizeRange`.
 
+**This result mapping applies to *every* query, raw `` sql`…` `` template literals included** — not just the `sql.insert`/query-builder helpers. A `SELECT foo_bar` column comes back on the row as `fooBar`, **not** `foo_bar`. So read result columns in camelCase and type your `` sql<{ … }>` `` row shapes in camelCase, even though the SQL text itself — column names, `WHERE`, `INSERT`/`UPDATE` targets — stays snake_case. The trap: reading a snake_case key that the transform renamed (`row.foo_bar`) returns `undefined` with no type error and no runtime error, so the miss reads as an empty/missing value and slips through silently.
+
 ### Migrator layer (`@effect/sql-pg/PgMigrator`)
 
 ```typescript
