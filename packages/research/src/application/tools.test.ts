@@ -717,6 +717,33 @@ describe('researchToolkit — a web-fetch failure is non-fatal', () => {
 				// can read — the fiber running generateText is never killed
 				expect(isFailure).toBe(true)
 			})
+
+			it('should carry the provider error message into the model-facing result', async () => {
+				// GIVEN a scrape whose cache layer rejects the page with a classified
+				//   provider:'cache' failure that names the offending row
+				const { result, isFailure } = await scrapePageResult(
+					() =>
+						Effect.fail(
+							new ProviderError({
+								provider: 'cache',
+								message: 'sources row src_deadbeef has no content_ref',
+								recoverable: false,
+							}),
+						),
+					{ url: 'https://warm.example' },
+				)
+
+				// THEN the model reads a failure whose description surfaces that exact
+				//   message — not a {provider,recoverable,_tag} dump that drops the
+				//   non-enumerable Error.message — so the failing line is named in the
+				//   run's tool log
+				expect(isFailure).toBe(true)
+				const description = (result as { reason: { description: string } })
+					.reason.description
+				expect(description).toBe(
+					'scrape_page: sources row src_deadbeef has no content_ref',
+				)
+			})
 		})
 	})
 
