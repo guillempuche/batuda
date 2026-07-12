@@ -6,7 +6,12 @@ import { dirname, resolve } from 'node:path'
 
 import { Console, Effect, Schedule } from 'effect'
 
-import { mergeEnvOverrides, missingEnvEntries, tryFs } from '../lib/env-file'
+import {
+	fillMissingFromExample,
+	mergeEnvOverrides,
+	missingEnvEntries,
+	tryFs,
+} from '../lib/env-file'
 import {
 	exec,
 	execArgs,
@@ -200,6 +205,7 @@ const writeWorktreeEnv = (
 ) =>
 	Effect.gen(function* () {
 		const targets = WORKTREE_ENV_FILES.map(f => ({
+			path: f.path,
 			from: resolve(mainRoot, f.path),
 			to: resolve(ROOT, f.path),
 			keys: f.keys,
@@ -214,8 +220,23 @@ const writeWorktreeEnv = (
 			)
 		}
 
+		// The committed template, the source of default values for any required key
+		// the main checkout's `.env` never synced.
+		const examplePath = resolve(ROOT, '.env.example')
+		const exampleBody = existsSync(examplePath)
+			? readFileSync(examplePath, 'utf-8')
+			: undefined
+		const filled: string[] = []
+
 		for (const t of targets) {
 			const base = readFileSync(t.from, 'utf-8')
+			// Only the root `.env` is gap-filled against the template — `apps/cli/.env`
+			// is a deliberately small subset, not a copy of the whole template.
+			const source =
+				t.path === '.env' && exampleBody !== undefined
+					? fillMissingFromExample(base, exampleBody)
+					: { body: base, filled: [] as string[] }
+			filled.push(...source.filled)
 			const subset = Object.fromEntries(
 				t.keys.flatMap(k => {
 					const v = overrides[k]
@@ -223,9 +244,10 @@ const writeWorktreeEnv = (
 				}),
 			)
 			yield* tryFs(`write ${t.to}`, () =>
-				writeFile(t.to, mergeEnvOverrides(base, subset)),
+				writeFile(t.to, mergeEnvOverrides(source.body, subset)),
 			)
 		}
+		return filled
 	})
 
 // Key names the committed .env.example declares but the local .env lacks. A
@@ -539,17 +561,18 @@ export const worktreeUp = Effect.gen(function* () {
 	yield* settle(mc(`mc mb --ignore-existing local/${bucketName(slug)}`))
 
 	const overrides = envOverrides(slug)
-	yield* writeWorktreeEnv(main, overrides)
+	const filledEnv = yield* writeWorktreeEnv(main, overrides)
 	// Make the just-written values visible to this process + every subprocess
 	// (migrate/seed) it spawns, so they target this worktree's database, not main's.
 	for (const [k, v] of Object.entries(overrides)) process.env[k] = v
 
-	// Catch a stale inherited .env now, with the key names, instead of leaving
-	// the server to die at boot with a bare "Expected string, got undefined".
-	const missingEnv = missingWorktreeEnvKeys()
-	if (missingEnv.length > 0) {
-		yield* Effect.logWarning(
-			`.env is missing ${missingEnv.length} key(s) that .env.example declares: ${missingEnv.join(', ')}. The server reads these at boot and will fail until you copy their values from .env.example into the main checkout's .env.`,
+	// A required key the inherited .env never carried was just filled from the
+	// template's default so this worktree boots instead of dying at boot with a
+	// bare "Expected string, got undefined". Name them so a non-default value can
+	// be set deliberately when the default doesn't fit.
+	if (filledEnv.length > 0) {
+		yield* Effect.logInfo(
+			`Filled ${filledEnv.length} key(s) missing from the inherited .env with .env.example defaults: ${filledEnv.join(', ')}. Set a value in the main checkout's .env if a default doesn't fit.`,
 		)
 	}
 
