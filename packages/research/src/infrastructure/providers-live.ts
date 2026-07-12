@@ -66,6 +66,7 @@ import { makeCompaniesHouseRegistry } from './companies-house/registry'
 import { makeFirecrawlExtract } from './firecrawl/extract'
 import { makeFirecrawlScrape } from './firecrawl/scrape'
 import { makeFirecrawlSearch } from './firecrawl/search'
+import { makeFullEnrichEnrichment } from './fullenrich/enrichment'
 import { makeHunterEnrichment } from './hunter/enrichment'
 import { makeHunterVerifier } from './hunter/verifier'
 import { makeLibreborRegistry } from './librebor/registry'
@@ -86,7 +87,7 @@ const SEARCH_VENDORS = ['stub', 'brave', 'firecrawl'] as const
 const SCRAPE_VENDORS = ['stub', 'firecrawl', 'local'] as const
 const EXTRACT_VENDORS = ['stub', 'firecrawl', 'local'] as const
 const DISCOVER_VENDORS = ['stub', 'firecrawl', 'anthropic', 'none'] as const
-const ENRICH_VENDORS = ['stub', 'hunter', 'none'] as const
+const ENRICH_VENDORS = ['stub', 'hunter', 'fullenrich', 'none'] as const
 const VERIFY_VENDORS = ['stub', 'hunter', 'none'] as const
 
 type SearchVendor = (typeof SEARCH_VENDORS)[number]
@@ -173,6 +174,8 @@ const enrichmentInstance = (vendor: EnrichVendor, slot: number) => {
 			return Effect.succeed(StubEnrichmentProviderInstance)
 		case 'hunter':
 			return makeHunterEnrichment(slot)
+		case 'fullenrich':
+			return makeFullEnrichEnrichment(slot)
 		case 'none':
 			return Effect.succeed(
 				EnrichmentProvider.of({
