@@ -23,7 +23,10 @@ import {
 	Budget,
 	type BudgetService,
 	EmailVerifier,
-	EnrichmentProvider,
+	type EnrichmentAttempt,
+	EnrichmentChain,
+	type EnrichmentInput,
+	type EnrichmentMode,
 	MxResolver,
 	RegistryRouter,
 } from './ports'
@@ -44,6 +47,61 @@ interface SourcePerson {
 	readonly phone?: string | undefined
 }
 
+// Merge people gathered from more than one enrichment vendor into one entry per
+// person (union mode). Keyed by name — so the same person from two vendors
+// collapses to a single contact — with a record that carries an email winning
+// over a name-only duplicate, so a vendor-found address survives the merge.
+export const dedupePeople = (
+	people: ReadonlyArray<SourcePerson>,
+): SourcePerson[] => {
+	const byPerson = new Map<string, SourcePerson>()
+	for (const person of people) {
+		const key =
+			`${person.firstName} ${person.lastName}`.trim().toLowerCase() ||
+			person.email?.toLowerCase() ||
+			person.linkedin ||
+			''
+		const existing = byPerson.get(key)
+		if (
+			existing === undefined ||
+			(existing.email === undefined && person.email !== undefined)
+		) {
+			byPerson.set(key, person)
+		}
+	}
+	return [...byPerson.values()]
+}
+
+// Run the enrichment chain when the registry found nobody: bill each configured
+// vendor (via `charge`) and call it in turn. 'fallback' stops at the first
+// vendor that returns anyone (cheapest); 'union' runs every vendor and merges
+// the people (more cost, more recall). A vendor error degrades to no people, so
+// the next vendor is still tried. Generic over the charge's error so the budget
+// rails propagate unchanged.
+export const runEnrichmentChain = <E>(
+	chain: {
+		readonly attempts: ReadonlyArray<EnrichmentAttempt>
+		readonly mode: EnrichmentMode
+	},
+	input: EnrichmentInput,
+	charge: (label: string) => Effect.Effect<void, E>,
+): Effect.Effect<ReadonlyArray<SourcePerson>, E> =>
+	Effect.gen(function* () {
+		const collected: SourcePerson[] = []
+		for (const attempt of chain.attempts) {
+			yield* charge(attempt.label)
+			const found = yield* attempt.findPeople(input).pipe(
+				Effect.catchTag('ProviderError', () =>
+					Effect.succeed(new EnrichmentResult({ people: [], units: 0 })),
+				),
+				Effect.map(r => r.people),
+			)
+			collected.push(...found)
+			if (chain.mode === 'fallback' && collected.length > 0) break
+		}
+		return chain.mode === 'union' ? dedupePeople(collected) : collected
+	})
+
 // Narrow a free-text country hint to a country that has a national registry.
 const registryCountry = (
 	hint: string | undefined,
@@ -52,14 +110,28 @@ const registryCountry = (
 	return upper && isRegistryCountry(upper) ? upper : undefined
 }
 
-// Fixed per-call cost estimates (cents). Hunter is credit-based; these meter the
-// run budget + monthly cap without trying to mirror exact credit pricing.
+// Fixed per-call cost estimates (cents). Hunter/FullEnrich are credit-based;
+// these meter the run budget + monthly cap without mirroring exact credit
+// pricing. Kept per-vendor so the spend row (and the eval's cost metric) names
+// the finder that actually ran.
 const ENRICH_COST_CENTS = 5
+const FULLENRICH_COST_CENTS = 6
 const VERIFY_COST_CENTS = 1
 
-/** Rough up-front cost the MCP handler compares to the auto-approve threshold. */
+const ENRICH_COST_BY_VENDOR: Record<string, number> = {
+	hunter: ENRICH_COST_CENTS,
+	fullenrich: FULLENRICH_COST_CENTS,
+}
+const enrichCostFor = (label: string): number =>
+	ENRICH_COST_BY_VENDOR[label] ?? ENRICH_COST_CENTS
+
+/**
+ * Rough up-front cost the MCP handler compares to its auto-approve threshold.
+ * Worst case: both paid finders run (a registry miss, or union mode) before a
+ * few verifies — so a real run never costs more than the confirm-gate saw.
+ */
 export const estimateDiscoverCostCents =
-	ENRICH_COST_CENTS + 5 * VERIFY_COST_CENTS
+	ENRICH_COST_CENTS + FULLENRICH_COST_CENTS + 5 * VERIFY_COST_CENTS
 
 // Lower is better — deliverable first, undeliverable last (and then dropped).
 const VERDICT_RANK: Record<VerificationVerdict, number> = {
@@ -152,7 +224,7 @@ export class ContactDiscovery extends ServiceMap.Service<ContactDiscovery>()(
 	{
 		make: Effect.gen(function* () {
 			const sql = yield* SqlClient.SqlClient
-			const enrichment = yield* EnrichmentProvider
+			const enrichment = yield* EnrichmentChain
 			const verifier = yield* EmailVerifier
 			const registry = yield* RegistryRouter
 			const mx = yield* MxResolver
@@ -262,30 +334,25 @@ export class ContactDiscovery extends ServiceMap.Service<ContactDiscovery>()(
 								return { firstName, lastName, position: d.role }
 							})
 						}
-						// Universal fallback (paid) when no registry hit.
+						// Universal fallback (paid) when no registry hit. runEnrichmentChain
+						// bills + calls each configured vendor; the idempotency key names the
+						// vendor so a resumed run re-charges it as a DB no-op, not a re-pay.
 						if (people.length === 0) {
-							yield* budget.chargePaid(
-								'hunter-enrich',
-								ENRICH_COST_CENTS,
-								'discover_contacts',
-								// Idempotency key: a resumed research run re-charges the same
-								// enrichment as a DB no-op instead of paying Hunter twice.
-								`${researchId}:hunter-enrich:${input.domain}`,
-							)
-							people = yield* enrichment
-								.findPeople({
+							people = yield* runEnrichmentChain(
+								enrichment,
+								{
 									domain: input.domain,
 									companyName: input.companyName,
 									country: input.country,
-								})
-								.pipe(
-									Effect.catchTag('ProviderError', () =>
-										Effect.succeed(
-											new EnrichmentResult({ people: [], units: 0 }),
-										),
+								},
+								label =>
+									budget.chargePaid(
+										`${label}-enrich`,
+										enrichCostFor(label),
+										'discover_contacts',
+										`${researchId}:${label}-enrich:${input.domain}`,
 									),
-									Effect.map(r => r.people),
-								)
+							)
 						}
 
 						const mxOutcome = yield* mx.resolve(input.domain)

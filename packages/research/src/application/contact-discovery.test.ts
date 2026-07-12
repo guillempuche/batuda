@@ -1,11 +1,15 @@
+import { Effect, Exit } from 'effect'
 import { describe, expect, it } from 'vitest'
 
-import type { VerificationVerdict } from '../domain/types'
+import { BudgetExceeded, ProviderError } from '../domain/errors'
+import { EnrichmentResult, type VerificationVerdict } from '../domain/types'
 import {
 	compareContacts,
 	type DiscoveredContact,
+	dedupePeople,
 	emailChannel,
 	isDecisionMaker,
+	runEnrichmentChain,
 } from './contact-discovery'
 
 const contact = (over: {
@@ -189,6 +193,257 @@ describe('emailChannel', () => {
 			}
 			// THEN there is no email channel to rank on
 			expect(emailChannel(c)).toBeUndefined()
+		})
+	})
+})
+
+// ── Enrichment waterfall (runEnrichmentChain + dedupePeople) ──
+
+// A person as an enrichment vendor returns it — only the fields the waterfall
+// reads. Wrapped into an EnrichmentResult by the attempt helpers below.
+const somePerson = (
+	firstName: string,
+	lastName: string,
+	email?: string,
+): { firstName: string; lastName: string; email?: string } =>
+	email === undefined ? { firstName, lastName } : { firstName, lastName, email }
+
+// An attempt that returns people and records (in `calls`) that it ran, so a
+// test can assert which vendors the waterfall actually reached.
+const vendorReturns = (
+	label: string,
+	people: ReadonlyArray<{
+		firstName: string
+		lastName: string
+		email?: string
+	}>,
+	calls: string[],
+) => ({
+	label,
+	findPeople: () =>
+		Effect.sync(() => {
+			calls.push(label)
+			return new EnrichmentResult({ people: [...people], units: people.length })
+		}),
+})
+
+// An attempt that fails the way a real provider outage does.
+const vendorFails = (label: string, calls: string[]) => ({
+	label,
+	findPeople: () =>
+		Effect.suspend(() => {
+			calls.push(label)
+			return Effect.fail(
+				new ProviderError({
+					provider: label,
+					message: 'down',
+					recoverable: false,
+				}),
+			)
+		}),
+})
+
+const anInput = { domain: 'acme.example' }
+const recordCharge =
+	(charged: string[]) =>
+	(label: string): Effect.Effect<void> =>
+		Effect.sync(() => {
+			charged.push(label)
+		})
+
+describe('runEnrichmentChain', () => {
+	describe('when mode is fallback', () => {
+		it('should stop at the first vendor that finds anyone', async () => {
+			// GIVEN two vendors that both have people
+			const calls: string[] = []
+			const charged: string[] = []
+			const people = await Effect.runPromise(
+				runEnrichmentChain(
+					{
+						attempts: [
+							vendorReturns('hunter', [somePerson('Ada', 'One')], calls),
+							vendorReturns('fullenrich', [somePerson('Bo', 'Two')], calls),
+						],
+						mode: 'fallback',
+					},
+					anInput,
+					recordCharge(charged),
+				),
+			)
+			// THEN only the first vendor ran, was billed, and shaped the result
+			expect(calls).toEqual(['hunter'])
+			expect(charged).toEqual(['hunter'])
+			expect(people.map(p => p.firstName)).toEqual(['Ada'])
+		})
+
+		it('should advance to the next vendor when one finds nobody', async () => {
+			// GIVEN the first vendor returns nobody
+			const calls: string[] = []
+			const charged: string[] = []
+			const people = await Effect.runPromise(
+				runEnrichmentChain(
+					{
+						attempts: [
+							vendorReturns('hunter', [], calls),
+							vendorReturns('fullenrich', [somePerson('Bo', 'Two')], calls),
+						],
+						mode: 'fallback',
+					},
+					anInput,
+					recordCharge(charged),
+				),
+			)
+			// THEN both vendors were billed (Hunter missed → FullEnrich) and the
+			// second vendor's people came back
+			expect(charged).toEqual(['hunter', 'fullenrich'])
+			expect(people.map(p => p.firstName)).toEqual(['Bo'])
+		})
+
+		it('should bill and skip past a vendor that errors', async () => {
+			// GIVEN the first vendor is down
+			const calls: string[] = []
+			const charged: string[] = []
+			const people = await Effect.runPromise(
+				runEnrichmentChain(
+					{
+						attempts: [
+							vendorFails('hunter', calls),
+							vendorReturns('fullenrich', [somePerson('Bo', 'Two')], calls),
+						],
+						mode: 'fallback',
+					},
+					anInput,
+					recordCharge(charged),
+				),
+			)
+			// THEN its error degrades to no people, so the next vendor still runs
+			expect(calls).toEqual(['hunter', 'fullenrich'])
+			expect(charged).toEqual(['hunter', 'fullenrich'])
+			expect(people.map(p => p.firstName)).toEqual(['Bo'])
+		})
+	})
+
+	describe('when mode is union', () => {
+		it('should run and bill every vendor and merge their people', async () => {
+			// GIVEN two vendors that each find a different person
+			const calls: string[] = []
+			const charged: string[] = []
+			const people = await Effect.runPromise(
+				runEnrichmentChain(
+					{
+						attempts: [
+							vendorReturns('hunter', [somePerson('Ada', 'One')], calls),
+							vendorReturns('fullenrich', [somePerson('Bo', 'Two')], calls),
+						],
+						mode: 'union',
+					},
+					anInput,
+					recordCharge(charged),
+				),
+			)
+			// THEN every vendor ran and was billed, and the union holds both people
+			expect(charged).toEqual(['hunter', 'fullenrich'])
+			expect(people.map(p => p.firstName).sort()).toEqual(['Ada', 'Bo'])
+		})
+
+		it('should collapse the same person found by two vendors, keeping the email', async () => {
+			// GIVEN both vendors return the same person, only one with an email
+			const people = await Effect.runPromise(
+				runEnrichmentChain(
+					{
+						attempts: [
+							vendorReturns('hunter', [somePerson('Ada', 'One')], []),
+							vendorReturns(
+								'fullenrich',
+								[somePerson('Ada', 'One', 'ada@acme.example')],
+								[],
+							),
+						],
+						mode: 'union',
+					},
+					anInput,
+					recordCharge([]),
+				),
+			)
+			// THEN one entry survives, carrying the vendor-found address
+			expect(people).toHaveLength(1)
+			expect(people[0]?.email).toBe('ada@acme.example')
+		})
+	})
+
+	describe('when the budget rejects the charge', () => {
+		it('should abort before calling the vendor and surface the budget error', async () => {
+			// GIVEN the per-run budget rejects the charge
+			const calls: string[] = []
+			const exit = await Effect.runPromiseExit(
+				runEnrichmentChain(
+					{
+						attempts: [
+							vendorReturns('hunter', [somePerson('Ada', 'One')], calls),
+						],
+						mode: 'fallback',
+					},
+					anInput,
+					() =>
+						Effect.fail(
+							new BudgetExceeded({ tier: 'paid-run', needed: 6, remaining: 0 }),
+						),
+				),
+			)
+			// THEN the chain fails (the rail propagates) and the vendor never ran —
+			// the charge is taken before the paid call
+			expect(Exit.isFailure(exit)).toBe(true)
+			expect(calls).toEqual([])
+		})
+	})
+})
+
+describe('dedupePeople', () => {
+	describe('when the same person appears from two vendors', () => {
+		it('should keep one entry and prefer the record that has an email', () => {
+			// GIVEN a name-only record and an email-bearing one for the same person
+			const merged = dedupePeople([
+				somePerson('Ada', 'One'),
+				somePerson('Ada', 'One', 'ada@acme.example'),
+			])
+			// THEN they collapse to one, keeping the address a vendor found
+			expect(merged).toHaveLength(1)
+			expect(merged[0]?.email).toBe('ada@acme.example')
+		})
+
+		it('should keep the first address when both records already have one', () => {
+			// GIVEN two email-bearing records for the same person
+			const merged = dedupePeople([
+				somePerson('Ada', 'One', 'first@acme.example'),
+				somePerson('Ada', 'One', 'second@acme.example'),
+			])
+			// THEN the first wins — there is nothing better to prefer
+			expect(merged).toHaveLength(1)
+			expect(merged[0]?.email).toBe('first@acme.example')
+		})
+	})
+
+	describe('when the people are distinct', () => {
+		it('should preserve every distinct person', () => {
+			// GIVEN two different people
+			const merged = dedupePeople([
+				somePerson('Ada', 'One'),
+				somePerson('Bo', 'Two'),
+			])
+			// THEN both survive the merge
+			expect(merged).toHaveLength(2)
+		})
+	})
+
+	describe('when a record carries no name', () => {
+		it('should identify nameless people by email so they are not merged', () => {
+			// GIVEN two nameless records with different emails
+			const merged = dedupePeople([
+				somePerson('', '', 'x@acme.example'),
+				somePerson('', '', 'y@acme.example'),
+			])
+			// THEN the email fallback key keeps them distinct
+			expect(merged).toHaveLength(2)
 		})
 	})
 })

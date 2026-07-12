@@ -169,6 +169,29 @@ export class EnrichmentProvider extends ServiceMap.Service<
 	}
 >()('research/EnrichmentProvider') {}
 
+// ── Enrichment chain (ordered per-vendor attempts + how to run them) ──
+// Contact discovery runs these itself so it can bill each vendor it calls and
+// pick fallback (stop at the first vendor that finds anyone) or union (call
+// every vendor and merge the people). Each attempt is one vendor's findPeople,
+// labelled so the spend row names the vendor that actually ran.
+
+export interface EnrichmentAttempt {
+	readonly label: string
+	readonly findPeople: (
+		input: EnrichmentInput,
+	) => Effect.Effect<EnrichmentResult, ProviderError>
+}
+
+export type EnrichmentMode = 'fallback' | 'union'
+
+export class EnrichmentChain extends ServiceMap.Service<
+	EnrichmentChain,
+	{
+		readonly attempts: ReadonlyArray<EnrichmentAttempt>
+		readonly mode: EnrichmentMode
+	}
+>()('research/EnrichmentChain') {}
+
 // ── Email verification (deliverability of a guessed/found address) ──
 
 export interface EmailVerifyInput {
