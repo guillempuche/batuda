@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-12 (ui-v2026.7.12)
+
+### Features
+
+* add pipeline board and book-of-business views ([#225](https://github.com/guillempuche/batuda/issues/225)) ([efa50ad](https://github.com/guillempuche/batuda/commit/efa50ad2a61641fd4336cdae750b38a43fc01529))
+
 ## 2026-06-18 (ui-v2026.6.18)
 
 ### Features
