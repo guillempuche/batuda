@@ -140,6 +140,7 @@ export {
 	VERIFICATION_VERDICTS,
 	VerificationVerdict,
 } from './domain/types'
+export { makeCachedScrape } from './infrastructure/cached-scrape'
 export {
 	type ModelProbeResult,
 	type ProbeCheck,

@@ -7,16 +7,17 @@
  * research runtime use the same object store the rest of the app uses
  * (scrape markdown cache, recordings, etc.).
  *
- * Errors from the underlying `StorageProvider` are re-raised as plain
- * defects since `BlobStorage`'s Effect signature is error-free — the
- * caller (`cached-scrape.ts`) can't recover from them. `StorageProvider`
- * itself already logs and traces the failure before it gets here, so
- * nothing is lost by discarding the typed error at this boundary.
+ * A `StorageProvider` failure is mapped to a typed `ProviderError` (provider
+ * `cache`) rather than raised as a defect. That classification is what lets the
+ * scrape cache (`cached-scrape.ts`) recover from a broken read — degrading to a
+ * fresh fetch — instead of failing the whole scrape and denying the model the
+ * page. `StorageProvider` still logs and traces the failure before it reaches
+ * here, so this only adds a typed error channel; it drops nothing.
  */
 
 import { Effect, Layer } from 'effect'
 
-import { BlobStorage } from '@batuda/research'
+import { BlobStorage, ProviderError } from '@batuda/research'
 
 import { StorageProvider } from './storage-provider'
 
@@ -26,8 +27,27 @@ export const ResearchBlobStorageLive = Layer.effect(
 		const storage = yield* StorageProvider
 		return BlobStorage.of({
 			put: (key, bytes, contentType) =>
-				storage.put({ key, body: bytes, contentType }).pipe(Effect.orDie),
-			get: key => storage.get(key).pipe(Effect.orDie),
+				storage.put({ key, body: bytes, contentType }).pipe(
+					Effect.mapError(
+						error =>
+							new ProviderError({
+								provider: 'cache',
+								message: `blob put failed for ${key}: ${error.message}`,
+								recoverable: false,
+							}),
+					),
+				),
+			get: key =>
+				storage.get(key).pipe(
+					Effect.mapError(
+						error =>
+							new ProviderError({
+								provider: 'cache',
+								message: `blob get failed for ${key}: ${error.message}`,
+								recoverable: false,
+							}),
+					),
+				),
 		})
 	}),
 )
