@@ -113,7 +113,7 @@ describe('validateFindingCitations', () => {
 			const result = validateFindingCitations(findings, isGrounded)
 
 			// THEN each is filtered independently: the grounded wrapper keeps its
-			// source, the ungrounded wrapper keeps only its value, the invented
+			// source, the ungrounded scalar wrapper is dropped whole, the invented
 			// competitor citation is dropped, the grounded proposal survives
 			const f = result.findings as {
 				enrichment: { industry: unknown; location: unknown }
@@ -124,7 +124,7 @@ describe('validateFindingCitations', () => {
 				value: 'Retail',
 				source_id: 'https://acme.es',
 			})
-			expect(f.enrichment.location).toEqual({ value: 'Barcelona' })
+			expect(f.enrichment.location).toBeNull()
 			expect(f.competitors[0]?.citations).toEqual([])
 			expect(f.proposed_updates).toHaveLength(1)
 			expect(result.total).toBe(4)
@@ -133,7 +133,7 @@ describe('validateFindingCitations', () => {
 	})
 
 	describe('when a per-field wrapper carries quote and confidence', () => {
-		it('should keep them on a grounded field and drop them all on an ungrounded one', () => {
+		it('should keep a grounded field whole and drop an ungrounded one', () => {
 			// GIVEN two sourced fields — one citing the fetched page, one invented
 			const findings = {
 				enrichment: {
@@ -150,8 +150,8 @@ describe('validateFindingCitations', () => {
 			// WHEN validated against the one fetched source
 			const result = validateFindingCitations(findings, isGrounded)
 
-			// THEN the grounded field keeps its full provenance; the invented one
-			// keeps only its value
+			// THEN the grounded field keeps its full provenance; the invented one is
+			// dropped whole (a scalar fact with a fabricated source is treated as absent)
 			const f = result.findings as {
 				enrichment: { industry: unknown; country: unknown }
 			}
@@ -161,7 +161,7 @@ describe('validateFindingCitations', () => {
 				quote: 'a shop',
 				confidence: 0.9,
 			})
-			expect(f.enrichment.country).toEqual({ value: 'ES' })
+			expect(f.enrichment.country).toBeNull()
 			expect(result.total).toBe(2)
 			expect(result.kept).toBe(1)
 		})
