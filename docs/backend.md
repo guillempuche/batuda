@@ -30,7 +30,7 @@ packages/research/src/        # Research bounded context
 │   ├── errors.ts             # ProviderError, BudgetExceeded, QuotaExhausted, ...
 │   └── types.ts              # SearchResult, ScrapedPage, RegistryRecord, ...
 ├── application/
-│   ├── ports.ts              # 6 capability ports + Budget + ProviderQuota
+│   ├── ports.ts              # 8 capability ports + Budget + ProviderQuota
 │   ├── research-service.ts   # ResearchService — fiber-per-run agent loop
 │   ├── budget.ts             # Per-run + monthly spending control
 │   ├── provider-quota.ts     # Per-provider quota tracking
@@ -44,7 +44,7 @@ packages/research/src/        # Research bounded context
 │       └── prospect-scan-v1.ts
 ├── infrastructure/
 │   ├── _shared.ts            # disabledError, notYetImplementedError factories
-│   ├── providers-live.ts     # Boot-time selection for 6 capability ports
+│   ├── providers-live.ts     # Boot-time selection for 8 capability ports
 │   ├── llm-live.ts           # Boot-time LLM provider selection
 │   ├── cached-search.ts      # TTL cache wrapping SearchProvider
 │   ├── stub/                 # Zero-cost deterministic fake data (local dev)
@@ -251,7 +251,7 @@ const program = HttpRouter.serve(AppLive).pipe(
   Layer.provide(ServicesLive),
   Layer.provide(EmailProviderLive),
   Layer.provide(S3StorageProviderLive),
-  Layer.provide(makeResearchProvidersLive),  // 6 capability ports (search, scrape, etc.)
+  Layer.provide(makeResearchProvidersLive),  // 8 capability ports (search, scrape, etc.)
   Layer.provide(makeResearchLlmLive),        // LanguageModel for agent loop
   Layer.provide(SessionMiddlewareLive),
   Layer.provide(Auth.layer),
@@ -817,118 +817,9 @@ Events fired:
 
 ## Research bounded context (`packages/research`)
 
-The research system lets AI agents autonomously gather and structure company intelligence. It runs as a fiber-per-research-run inside the server process, with SSE streaming and budget controls.
+The research system runs a server-side AI agent loop that gathers and structures company intelligence, with pluggable capability providers, budget and quota controls, mandatory citations, and SSE streaming. Its architecture and flows — capabilities, input modes, the run lifecycle, contact discovery, cost rails, surfaces, data model, and the data-sourcing strategy — live in [architecture.md → §Research](architecture.md#research).
 
-### Provider matrix
-
-Each capability is backed by a swappable provider, selected at boot via env vars:
-
-```
-Search:    stub | brave | firecrawl
-Scrape:    stub | firecrawl | local
-Extract:   stub | firecrawl | local
-Discover:  stub | firecrawl | anthropic | none
-Enrich:    stub | hunter | none          # decision-maker name + email discovery
-Verify:    stub | hunter | none          # email deliverability (MX pre-gate is built-in)
-Registry:  stub | librebor | none
-Report:    stub | einforma | none
-LLM:       stub | groq | fireworks | nebius | together | sambanova | custom
-```
-
-`stub` = zero-cost deterministic fake data (default for local dev). `none` = capability disabled, fails with a clear error on call.
-
-### Env vars
-
-```bash
-# Capability providers (role-first, vendor-neutral — comma list accepted
-# for fallback chain on ProviderError). Boot fails on unset / unknown.
-RESEARCH_PROVIDER_SEARCH=stub
-RESEARCH_PROVIDER_SCRAPE=stub
-RESEARCH_PROVIDER_EXTRACT=stub
-RESEARCH_PROVIDER_DISCOVER=stub
-RESEARCH_PROVIDER_ENRICH=stub
-RESEARCH_PROVIDER_VERIFY=stub
-RESEARCH_PROVIDER_REGISTRY_ES=stub
-RESEARCH_PROVIDER_REPORT_ES=stub
-RESEARCH_PROVIDER_LLM=stub
-
-# API keys (parallel grammar). Slot 1 = unsuffixed, slot N = `_2`, `_3`, …
-# Same key pasted across capabilities if one vendor covers several.
-# RESEARCH_API_KEY_SEARCH=BSA...
-# RESEARCH_API_KEY_SCRAPE=fc-...
-# RESEARCH_API_KEY_EXTRACT=fc-...
-# RESEARCH_API_KEY_DISCOVER=fc-...
-# RESEARCH_API_KEY_ENRICH=          # Hunter.io key, when ENRICH=hunter
-# RESEARCH_API_KEY_VERIFY=          # Hunter.io key, when VERIFY=hunter
-# RESEARCH_API_KEY_REGISTRY_ES=
-# RESEARCH_API_KEY_REPORT_ES=
-# RESEARCH_API_KEY_LLM=gsk_...
-# RESEARCH_API_KEY_SEARCH_2=      # only when SEARCH list has ≥2 vendors
-
-# LLM-specific (only when RESEARCH_PROVIDER_LLM != stub)
-# RESEARCH_MODEL_LLM=qwen/qwen3-32b
-# RESEARCH_BASE_URL_LLM=          # only for custom provider
-
-# Budget defaults (system-level, overridable per-user via user_research_policy)
-RESEARCH_DEFAULT_BUDGET_CENTS=100
-RESEARCH_DEFAULT_PAID_BUDGET_CENTS=500
-RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS=200
-RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS=2000
-RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS=10000
-
-# Concurrency
-RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL=3
-RESEARCH_MAX_CONCURRENCY_FANOUT=3
-RESEARCH_CONFIRM_THRESHOLD_FANOUT=10
-```
-
-### Layer composition
-
-```
-                     main.ts (composition root)
-                           │
-           ┌───────────────┼──────────────────┐
-           │               │                  │
-    FetchHttpClient     PgLive            EnvVars
-    (satisfies           (satisfies       (satisfies
-     HttpClient)          SqlClient)       Config)
-           │               │                  │
-           └───────────────┼──────────────────┘
-                   ┌───────┴───────┐
-                   │               │
-      makeResearchProvidersLive  makeResearchLlmLive
-      (6x Layer.unwrap)         (1x Layer.unwrap)
-                   │               │
-      ┌────────┬───┘          ┌────┴────┐
-      │        │              │         │
-StubSearch BraveSearch   StubLlm  OpenAiCompat
-R=never   R=HttpClient  R=never  R=HttpClient
-```
-
-Three kinds of provider layers:
-
-1. **Stub** — `Layer.succeed`, zero deps (`R = never`), deterministic fake data
-2. **Disabled** — `Layer.succeed`, zero deps, methods fail with `ProviderError`
-3. **Real** — `Layer.effect`, declares `R = HttpClient + Config`, real API calls
-
-### Research run lifecycle
-
-```
-POST /v1/research → create run row (status: queued) → fork fiber
-  Fiber:
-    Phase 1 — Tool loop (LLM calls tools: web_search, web_read, lookup_registry, ...)
-    Phase 2 — Structured output (LLM.generateObject with run's schema)
-    Phase 3 — Brief generation (markdown summary)
-  → SSE events via GET /v1/research/:id/events
-  → Findings persisted to research_runs.findings (jsonb)
-  → Sources deduped and archived to sources table
-```
-
-Fan-out groups: a `kind='group'` parent creates N `kind='leaf'` children. Each leaf completion merges findings onto the parent (`pg_advisory_xact_lock` for serialization) and rolls up the parent status.
-
-### Research eval
-
-A CLI harness measures the pipeline's quality against a fixed set of companies whose correct answers are known (the "golden set"), so a change to grounding or extraction shows up as a number instead of a guess. `pnpm cli research eval` drives the same pipeline the server runs — from the CLI, on demand, never in production — and reports grounding accuracy, field precision and recall, and the wrong-company and empty rates; `pnpm cli research probe` checks which candidate LLMs support the forced tool-calling and strict-JSON output the research tiers need. It needs the research env configured (real LLM + provider keys, `DATABASE_URL`) and an org/user to run as, and can export each run's scores to the monitoring board (Honeycomb). See [../eval/README.md](../eval/README.md).
+What stays here is the code-facing detail. Providers are selected at boot by `RESEARCH_PROVIDER_*` env vars with a comma-list fallback chain; `brave/search.ts` is the template adapter and [Adding a new research capability provider](#adding-a-new-research-capability-provider) below is the recipe. The eval harness runs from the CLI, never in production — `pnpm cli research eval` reports grounding accuracy, field precision and recall, and the wrong-company and empty rates, and `pnpm cli research probe` checks which candidate LLMs support the forced tool-calling and strict-JSON output the tiers need; see [../eval/README.md](../eval/README.md).
 
 ---
 
@@ -979,7 +870,7 @@ Style: 2-space indent, 100-char line width, single quotes, ES5 trailing commas, 
 
 ## Adding a new research capability provider
 
-Research capability providers implement one of the 6 ports in `packages/research/src/application/ports.ts`. Use `brave/search.ts` as a template.
+Research capability providers implement one of the 8 ports in `packages/research/src/application/ports.ts`. Use `brave/search.ts` as a template.
 
 1. Create `packages/research/src/infrastructure/{vendor}/{capability}.ts`
 2. Use `Layer.effect(PortTag, Effect.gen(function* () { ... }))` pattern
