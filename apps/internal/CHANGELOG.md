@@ -3,6 +3,47 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-12 (internal-v2026.7.12)
+
+### Features
+
+* add pipeline board and book-of-business views ([#225](https://github.com/guillempuche/batuda/issues/225)) ([efa50ad](https://github.com/guillempuche/batuda/commit/efa50ad2a61641fd4336cdae750b38a43fc01529))
+* export eval run scores to the monitoring board as spans ([5925278](https://github.com/guillempuche/batuda/commit/59252786deca1325fe487879c11e0a8f3ebeabd6))
+* gate research batch fan-outs behind a cost confirmation ([7675306](https://github.com/guillempuche/batuda/commit/767530600eb441a3357b8e354d6ca49bba369744))
+* **internal:** add a documents surface to the company Files tab ([0f9e372](https://github.com/guillempuche/batuda/commit/0f9e372b3d64a9a0d5d7e4667ef7538a39a51150))
+* **internal:** add a line-item editor to proposals ([311d6a4](https://github.com/guillempuche/batuda/commit/311d6a49ff2dc268ce12855f8b9e49504470f311))
+* **internal:** add a proposals surface to the company Files tab ([31d95d1](https://github.com/guillempuche/batuda/commit/31d95d17024af79230c0f48ea773abf8624d49af))
+* **internal:** add confirm and undo to the research proposal review ([71a1cb6](https://github.com/guillempuche/batuda/commit/71a1cb65e7032d260a82dc0f2e3d77dceeb4e220))
+* **internal:** add follow-ups, tracked email, and a Cal.com CTA to a company ([f8c2f19](https://github.com/guillempuche/batuda/commit/f8c2f19ccb9a1a583979ecb1f6e1ec6c8f644a05))
+* **internal:** add research discovery and run-management screens ([7843014](https://github.com/guillempuche/batuda/commit/784301400d9c6f00144d2d1382d46334d6f45dca))
+* **internal:** cap the research-dialog free-text input lengths ([228ded8](https://github.com/guillempuche/batuda/commit/228ded8fcaaba723d2af496420e97207aae1034e))
+* **internal:** verify leads, manage contacts, and add prospects as leads ([308fed5](https://github.com/guillempuche/batuda/commit/308fed55ce9127a39938066ab3cd28d3e83ebb37))
+* keep a research run alive when its language-model call stalls ([01286df](https://github.com/guillempuche/batuda/commit/01286df1dbab1a907df36b32db920e7a0e847e64)), closes [#235](https://github.com/guillempuche/batuda/issues/235)
+* let a human mark a company as a verified lead ([ba42040](https://github.com/guillempuche/batuda/commit/ba42040d9bcb6d44a5adcba9b623378c2b3724ff))
+* make the research review inbox filterable and readable ([11e3dfe](https://github.com/guillempuche/batuda/commit/11e3dfec26f8ef910b156e8240149fb393ad03ab))
+* **research:** add FullEnrich people search for decision-makers ([6fcfa75](https://github.com/guillempuche/batuda/commit/6fcfa758178b60593d5bda53cc5e91fcb32da47a))
+* **research:** count an official-registry match toward eval grounding ([940ded3](https://github.com/guillempuche/batuda/commit/940ded3ad7a4d1b42a3627b20266232dc8041483))
+* **research:** fall back to the next enrichment vendor on a miss ([89b2004](https://github.com/guillempuche/batuda/commit/89b20047ac253488fd52c3aafc4020b7167ec712))
+* **research:** keep uncertain fields instead of dropping them ([d6bd64b](https://github.com/guillempuche/batuda/commit/d6bd64b96760314ced4d2745a029ed8257357d9b))
+* score decision-maker discovery against a golden set ([362c404](https://github.com/guillempuche/batuda/commit/362c4046e7de990dadaabb3b14ae5d9009e8aa8f))
+
+### Bug Fixes
+
+* **internal:** recover the run page when live updates stall ([d4621ef](https://github.com/guillempuche/batuda/commit/d4621ef22d3feab6db3eb890c4b5c1e234933734))
+* read camelCase result keys in run reuse and provider quota ([ef6b51f](https://github.com/guillempuche/batuda/commit/ef6b51f0514dd74797024cdc50555ec7e0a558be))
+* **research:** drop form pop-ups from scraped page content ([d505c20](https://github.com/guillempuche/batuda/commit/d505c20ff648d77e6c003da30a424bedc5df10d8))
+* **research:** fetch the caller's domain up front so the run grounds ([3f28845](https://github.com/guillempuche/batuda/commit/3f28845815d5238feb9d08c0c5b04fd61ae0b1de))
+* **research:** make the LLM fallback accept our tool and output schemas ([195c166](https://github.com/guillempuche/batuda/commit/195c166c16fe033b834dc40141b7d4ef71d72bde))
+* **research:** recover facts seen only in a search result ([d97f042](https://github.com/guillempuche/batuda/commit/d97f042a2f54f953cccf7e4d69f6b6f7171f7600))
+* **research:** surface the provider error message in tool-failure logs ([c0b88bd](https://github.com/guillempuche/batuda/commit/c0b88bd854249282ad91dbea7954c0eeb8cbc9ef))
+* **research:** treat a refused-site scrape as a skip, not a run failure ([571b773](https://github.com/guillempuche/batuda/commit/571b773f08ee3481927f62523453bafc88b87c61))
+* stop the scrape cache from starving research into fabrication ([a445c33](https://github.com/guillempuche/batuda/commit/a445c33c7b9f4a27ca67d77a3f9e37e4b7ca6fd0))
+* unbreak proposal creation and stamp its lifecycle dates ([dea55e2](https://github.com/guillempuche/batuda/commit/dea55e2fbb386f0f337088b5d45fe3eae90f02ee))
+
+### Refactoring
+
+* **internal:** drop the dead calendar tab and fix a stale atoms comment ([71f7a20](https://github.com/guillempuche/batuda/commit/71f7a20ee707aef1d204efda8c4e5c2ae637b274))
+
 ## 2026-07-11 (internal-v2026.7.11)
 
 ### Features
