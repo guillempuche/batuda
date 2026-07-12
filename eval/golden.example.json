@@ -168,5 +168,17 @@
 				"location": "Austin"
 			}
 		}
+	},
+	{
+		"id": "ascent-global-logistics",
+		"query": "Ascent Global Logistics (ascentgl.com), Belleville MI",
+		"expectedOutput": {
+			"officialDomain": "ascentlogistics.com",
+			"altDomains": ["ascentgl.com"],
+			"fields": {
+				"country": "US",
+				"location": "Belleville"
+			}
+		}
 	}
 ]

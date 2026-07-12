@@ -58,6 +58,21 @@ const ANCHOR_URL_HASH = createHash('sha256')
 const ANCHOR_MARKDOWN =
 	'Acme Anchor Logistics — freight forwarding based in Barcelona.'
 
+// Redirect (rebrand) scenario: the caller's domain 301s to a different canonical
+// host. The seed fetches the old host; the stub reports the destination in
+// resolvedUrl, and its markdown names neither the old host nor the full company
+// name — only a distinctive word — so ONLY following the redirect and folding the
+// destination host in can push the run to a strong match.
+const REBRAND_OLD_HOST = `zephyr-old-${randomUUID()}.example`
+const REBRAND_NEW_HOST = `zephyr-new-${randomUUID()}.example`
+const REBRAND_OLD_URL = `https://${REBRAND_OLD_HOST}`
+const REBRAND_OLD_URL_HASH = createHash('sha256')
+	.update(new URL(REBRAND_OLD_URL).toString())
+	.digest('hex')
+const REBRAND_NEW_URL = `https://${REBRAND_NEW_HOST}/`
+const REBRAND_MARKDOWN =
+	'Zephyr keeps time-critical freight moving across the region.'
+
 const usage = {
 	inputTokens: {
 		uncached: undefined,
@@ -154,18 +169,33 @@ const providersLayer = Layer.mergeAll(
 		ScrapeProvider.of({
 			// ScrapedPage is re-exported as a type only, so hand back a plain object
 			// of the same shape (the seed reads its url + markdown) rather than newing
-			// the class. Any url but the anchor is a bug — the model fetches nothing.
-			scrape: input =>
-				input.url === ANCHOR_URL
-					? Effect.succeed({
-							url: ANCHOR_URL,
-							markdown: ANCHOR_MARKDOWN,
-							contentHash: createHash('sha256')
-								.update(ANCHOR_MARKDOWN)
-								.digest('hex'),
-							units: 1,
-						} as ScrapedPage)
-					: Effect.die(`unexpected scrape url: ${input.url}`),
+			// the class. The anchor host serves its page; the rebrand host serves a
+			// page that resolved (301) to a different host via resolvedUrl. Any other
+			// url is a bug — the model fetches nothing.
+			scrape: input => {
+				if (input.url === ANCHOR_URL) {
+					return Effect.succeed({
+						url: ANCHOR_URL,
+						markdown: ANCHOR_MARKDOWN,
+						contentHash: createHash('sha256')
+							.update(ANCHOR_MARKDOWN)
+							.digest('hex'),
+						units: 1,
+					} as ScrapedPage)
+				}
+				if (input.url === REBRAND_OLD_URL) {
+					return Effect.succeed({
+						url: REBRAND_OLD_URL,
+						resolvedUrl: REBRAND_NEW_URL,
+						markdown: REBRAND_MARKDOWN,
+						contentHash: createHash('sha256')
+							.update(REBRAND_MARKDOWN)
+							.digest('hex'),
+						units: 1,
+					} as ScrapedPage)
+				}
+				return Effect.die(`unexpected scrape url: ${input.url}`)
+			},
 		}),
 	),
 	Layer.succeed(ExtractProvider)(
@@ -219,6 +249,14 @@ const researchInput: CreateResearchInput = {
 	forceFresh: true,
 }
 
+// The rebrand run: the query carries the OLD domain (no quotes, no clean name, so
+// the name core can't rescue it) — grounding must come from following the 301.
+const redirectInput: CreateResearchInput = {
+	query: `Zephyr Freight Systems (${REBRAND_OLD_HOST}), Denver CO`,
+	schemaName: 'company_enrichment_v1',
+	forceFresh: true,
+}
+
 const TERMINAL = new Set([
 	'succeeded',
 	'failed',
@@ -229,6 +267,7 @@ const TERMINAL = new Set([
 const ctx = {} as { org: Org }
 let userId = ''
 let runId: string | null = null
+let redirectRunId: string | null = null
 
 beforeAll(async () => {
 	const seed = await Effect.runPromise(
@@ -256,6 +295,16 @@ beforeAll(async () => {
 				)
 				ON CONFLICT (url_hash) DO NOTHING
 			`
+			// Same stand-in row for the rebrand run — the seed links the anchor fetch
+			// by the OLD host's url_hash (page.url is the requested address).
+			yield* sql`
+				INSERT INTO sources (id, kind, provider, url, url_hash, domain, content_hash)
+				VALUES (
+					${randomUUID()}, 'web', 'it-stub', ${new URL(REBRAND_OLD_URL).toString()}, ${REBRAND_OLD_URL_HASH},
+					${REBRAND_OLD_HOST}, ${createHash('sha256').update(REBRAND_MARKDOWN).digest('hex')}
+				)
+				ON CONFLICT (url_hash) DO NOTHING
+			`
 			return { org, userId: user.id }
 		}).pipe(Effect.provide(PgLive)) as Effect.Effect<
 			{ org: Org; userId: string },
@@ -271,12 +320,14 @@ afterAll(async () => {
 	await Effect.runPromise(
 		Effect.gen(function* () {
 			const sql = yield* SqlClient.SqlClient
-			if (runId) {
+			for (const id of [runId, redirectRunId]) {
+				if (!id) continue
 				// research_cache has no cascade from research_runs; delete it first.
-				yield* sql`DELETE FROM research_cache WHERE research_id = ${runId}::uuid`
-				yield* sql`DELETE FROM research_runs WHERE id = ${runId}::uuid`
+				yield* sql`DELETE FROM research_cache WHERE research_id = ${id}::uuid`
+				yield* sql`DELETE FROM research_runs WHERE id = ${id}::uuid`
 			}
 			yield* sql`DELETE FROM sources WHERE url_hash = ${ANCHOR_URL_HASH}`
+			yield* sql`DELETE FROM sources WHERE url_hash = ${REBRAND_OLD_URL_HASH}`
 		}).pipe(Effect.provide(PgLive)) as Effect.Effect<void, never, never>,
 	)
 })
@@ -368,6 +419,92 @@ describe('ResearchService anchor seed', () => {
 			// The anchor site was fetched and linked, even though the model never did.
 			expect(outcome.anchorSourceCount).toBeGreaterThanOrEqual(1)
 			// Grounding is strong on the official page alone.
+			expect(outcome.entityMatch).toBe('strong')
+		})
+	})
+
+	describe('when the anchor domain redirects to a rebranded host', () => {
+		it('should follow the 301, anchor on the destination, and ground the run', async () => {
+			// GIVEN a run whose query carries a domain that 301s to a different host,
+			//   whose fetched page names only the new host + a distinctive word (never
+			//   the old host or the full name), and a model that gathers nothing itself
+			// WHEN the fiber seeds the anchor, follows the redirect, and folds the
+			//   destination host into the entity targets
+			// THEN the run grounds (strong) and succeeds instead of failing closed as
+			//   no_reliable_data — and the seeded page is linked by the old host's hash
+			const outcome = await Effect.runPromise(
+				Effect.gen(function* () {
+					const svc = yield* ResearchService
+					const sql = yield* SqlClient.SqlClient
+
+					const created = yield* enterOrgScope(sql, {
+						org: ctx.org,
+						userId,
+					})(svc.create(userId, ctx.org.id, redirectInput, systemDefaults))
+					if (created.status === 'confirm_required')
+						return yield* Effect.die(
+							new Error('redirect anchor test input should not fan out'),
+						)
+					redirectRunId = created.id
+
+					const poll = (
+						attemptsLeft: number,
+					): Effect.Effect<
+						{ status: string; errorMessage: string | null },
+						never,
+						never
+					> =>
+						Effect.gen(function* () {
+							const run = (yield* svc.get(created.id).pipe(Effect.orDie)) as {
+								status?: string
+								errorMessage?: string | null
+							} | null
+							const status = run?.status ?? 'unknown'
+							if (TERMINAL.has(status) || attemptsLeft <= 0) {
+								return { status, errorMessage: run?.errorMessage ?? null }
+							}
+							yield* Effect.sleep('300 millis')
+							return yield* poll(attemptsLeft - 1)
+						})
+
+					const final = yield* poll(50)
+
+					const [sourceRow] = yield* sql<{ n: number }>`
+						SELECT COUNT(*)::int AS n FROM research_run_sources
+						WHERE research_id = ${created.id}::uuid
+							AND source_id IN (
+								SELECT id FROM sources WHERE url_hash = ${REBRAND_OLD_URL_HASH}
+							)
+					`.pipe(Effect.orDie)
+
+					const [entityRow] = yield* sql<{ entityMatch: string | null }>`
+						SELECT entity_match AS "entityMatch"
+						FROM research_runs WHERE id = ${created.id}::uuid
+					`.pipe(Effect.orDie)
+
+					return {
+						status: final.status,
+						errorMessage: final.errorMessage,
+						anchorSourceCount: sourceRow?.n ?? 0,
+						entityMatch: entityRow?.entityMatch ?? null,
+					}
+				}).pipe(Effect.provide(ResearchLive)) as Effect.Effect<
+					{
+						status: string
+						errorMessage: string | null
+						anchorSourceCount: number
+						entityMatch: string | null
+					},
+					never,
+					never
+				>,
+			)
+
+			expect(
+				outcome.status,
+				`redirect run not succeeded: ${outcome.errorMessage ?? '(no error recorded)'}`,
+			).toBe('succeeded')
+			expect(outcome.anchorSourceCount).toBeGreaterThanOrEqual(1)
 			expect(outcome.entityMatch).toBe('strong')
 		})
 	})

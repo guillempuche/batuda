@@ -10,6 +10,7 @@ import {
 	groundedSourceIds,
 	isConfirmedRegistryMatch,
 	parseQueryDomain,
+	withRedirectDomain,
 } from './entity-guard'
 
 describe('deriveEntityTargets', () => {
@@ -44,6 +45,34 @@ describe('deriveEntityTargets', () => {
 			expect(targets?.cores).toContain('sunsettransportation')
 		})
 
+		it('should read the company name from a quoted phrase in an instruction query', () => {
+			// GIVEN an instruction-style query that names the company in quotes and
+			// then adds its domain and location (how the MCP client phrases runs)
+			const targets = deriveEntityTargets({
+				schemaName: 'company_enrichment_v1',
+				query:
+					'Research "Ascent Global Logistics" (ascentgl.com, Belleville, MI) — a US 3PL. Find headcount.',
+				subjects: [],
+			})
+			// THEN the quoted name — not the whole sentence — becomes the core, so it
+			// can actually match the company's own pages
+			expect(targets?.cores).toContain('ascentgloballogistics')
+			expect(targets?.cores).not.toContain(
+				'researchascentgloballogisticsascentglcom',
+			)
+		})
+
+		it('should read the company name from curly quotes too', () => {
+			// GIVEN a query whose name is wrapped in typographic quotes
+			const targets = deriveEntityTargets({
+				schemaName: 'company_enrichment_v1',
+				query: 'Look up “Cohitech”, Balsareny',
+				subjects: [],
+			})
+			// THEN the curly-quoted phrase is the core
+			expect(targets?.cores).toContain('cohitech')
+		})
+
 		it('should derive keys from the subject name and website when anchored', () => {
 			// GIVEN any schema but with an anchored company subject
 			const targets = deriveEntityTargets({
@@ -75,6 +104,48 @@ describe('deriveEntityTargets', () => {
 					subjects: [{ table: 'companies' }],
 				}),
 			).toBeNull()
+		})
+	})
+})
+
+describe('withRedirectDomain', () => {
+	const baseTargets: EntityTargets = {
+		cores: ['ascentgloballogistics'],
+		words: ['ascent'],
+		domains: ['ascentgl.com'],
+	}
+
+	describe('when the anchor domain redirected to a new host', () => {
+		it('should fold the destination host in as a strong-match key', () => {
+			// GIVEN targets built from the caller's old domain, and a rebrand
+			// destination the fetch resolved to
+			// WHEN the destination host is folded in
+			const folded = withRedirectDomain(baseTargets, 'ascentlogistics.com')
+			// THEN both hosts are strong-match domains and the new label is a weak key
+			expect(folded.domains).toEqual(['ascentgl.com', 'ascentlogistics.com'])
+			expect(folded.words).toContain('ascentlogistics')
+			// AND a page under the new host now strong-matches
+			expect(
+				classifyEntityMatch(folded, 'see https://ascentlogistics.com/'),
+			).toBe('strong')
+		})
+
+		it('should leave the name cores untouched', () => {
+			// GIVEN any targets
+			// WHEN a destination host is folded in
+			// THEN the name cores are unchanged (only domain/word keys grow)
+			expect(withRedirectDomain(baseTargets, 'ascentlogistics.com').cores).toBe(
+				baseTargets.cores,
+			)
+		})
+	})
+
+	describe('when the destination is already a target domain', () => {
+		it('should return the targets unchanged', () => {
+			// GIVEN a destination host that is already a known domain (no real redirect)
+			// WHEN it is folded in
+			// THEN the same targets come back, unmodified
+			expect(withRedirectDomain(baseTargets, 'ascentgl.com')).toBe(baseTargets)
 		})
 	})
 })

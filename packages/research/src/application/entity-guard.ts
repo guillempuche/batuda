@@ -161,9 +161,17 @@ const domainLabelOf = (host: string): string | undefined => {
 	return label && label.length >= 4 ? label : undefined
 }
 
-// A free-text query's company name is usually the part before the first comma
-// ("Sunset Transportation, St. Louis MO"); fall back to the whole query.
-const queryName = (query: string): string => query.split(',')[0] ?? query
+// A caller often wraps the company name in quotes inside a longer instruction
+// ("Research \"Acme Corp\" (acme.com) — find headcount…"), so the quoted phrase,
+// not the whole sentence, is the name to match on. Straight and curly double
+// quotes, 2–80 chars so it can't swallow a paragraph.
+const QUOTED_NAME = /["“]([^"”]{2,80})["”]/
+
+// A free-text query's company name: the first quoted phrase if one is present,
+// else the part before the first comma ("Sunset Transportation, St. Louis MO");
+// fall back to the whole query.
+const queryName = (query: string): string =>
+	query.match(QUOTED_NAME)?.[1] ?? query.split(',')[0] ?? query
 
 // A domain-shaped token inside free text: one or more dot-separated labels then a
 // 2–24 letter top-level part. The letters-only tail keeps decimals ("3.5") and
@@ -254,6 +262,29 @@ export const deriveEntityTargets = (args: {
 	if (cores.length === 0 && words.length === 0 && domains.length === 0)
 		return null
 	return { cores, words, domains }
+}
+
+/**
+ * Fold a redirect destination host into a run's targets. When the caller's own
+ * domain 301/302-redirects to a different host — a rebrand — that destination is
+ * the same company's official site, so its host becomes a strong-match key (and
+ * its label a weak one), exactly as if the caller had supplied it as the website.
+ * A no-op when the host is already a target domain.
+ */
+export const withRedirectDomain = (
+	targets: EntityTargets,
+	destHost: string,
+): EntityTargets => {
+	if (targets.domains.includes(destHost)) return targets
+	const label = domainLabelOf(destHost)
+	return {
+		cores: targets.cores,
+		domains: [...targets.domains, destHost],
+		words:
+			label != null && !targets.words.includes(label)
+				? [...targets.words, label]
+				: targets.words,
+	}
 }
 
 /**

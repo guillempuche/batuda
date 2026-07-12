@@ -38,6 +38,10 @@ const ScrapeResponse = Schema.Struct({
 			Schema.Struct({
 				title: Schema.optional(Schema.String),
 				language: Schema.optional(Schema.String),
+				// The address the page finally resolved to after Firecrawl followed
+				// any redirects; `sourceURL` is what we asked for. They differ when
+				// the requested domain 301s elsewhere (a rebrand).
+				url: Schema.optional(Schema.String),
 			}),
 		),
 	}),
@@ -153,6 +157,7 @@ export const makeFirecrawlScrape = (slot: number) =>
 						const markdown = cleanScrapedMarkdown(body.data.markdown ?? '')
 						return new ScrapedPage({
 							url: input.url,
+							resolvedUrl: body.data.metadata?.url,
 							markdown,
 							html: body.data.html,
 							links: body.data.links,
