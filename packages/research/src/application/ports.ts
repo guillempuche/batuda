@@ -39,7 +39,10 @@ export class WriterLanguageModel extends ServiceMap.Service<
 
 // ── BlobStorage port (research-local view of app storage) ──
 // Narrow put/get used by scrape caching. Server wires this to S3StorageProvider
-// so research stays independent of the server package.
+// so research stays independent of the server package. A store failure surfaces
+// as a typed ProviderError (not a defect) so the scrape cache can degrade a
+// broken read to a fresh fetch instead of failing — and denying the model the
+// page, which makes it invent facts.
 
 export class BlobStorage extends ServiceMap.Service<
 	BlobStorage,
@@ -48,8 +51,8 @@ export class BlobStorage extends ServiceMap.Service<
 			key: string,
 			bytes: Uint8Array,
 			contentType: string,
-		) => Effect.Effect<void>
-		readonly get: (key: string) => Effect.Effect<Uint8Array>
+		) => Effect.Effect<void, ProviderError>
+		readonly get: (key: string) => Effect.Effect<Uint8Array, ProviderError>
 	}
 >()('research/BlobStorage') {}
 
