@@ -157,7 +157,9 @@ export const mapSizeRange = (raw: string): CrmSizeRange | null => {
 	// Take the first integer — a single head-count, or the lower bound of an
 	// "N-M" / "N to M" range — and bucket it; a value above the top bracket falls
 	// to the closest one. A qualitative size ("SME", "small") has no integer → null.
-	const firstInt = n.match(/\d+/)?.[0]
+	// Strip a thousands separator sitting between digits first ("1,700" / "1.700"
+	// employees), or the match would read "1" and bucket a 1,700-person company as 1-5.
+	const firstInt = n.replace(/(?<=\d)[.,](?=\d)/g, '').match(/\d+/)?.[0]
 	if (firstInt === undefined) return null
 	const count = Number(firstInt)
 	if (!Number.isFinite(count) || count <= 0) return null

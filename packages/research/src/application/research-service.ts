@@ -419,8 +419,8 @@ export const buildResearchSystemPrompt = (args: {
 		'You are a research agent for Batuda CRM.',
 		'Given a query, produce a thorough research brief with findings, sources, and citations.',
 		'Never fabricate sources. Every claim must be verifiable.',
-		'Confirm key facts (employee count, location, sector) from scraped page content — the company site, LinkedIn, or press — not from search snippets alone, and cite the scraped page for each.',
-		'For every citation, set source_id to the exact URL you scraped with scrape_page. Never invent an identifier — a citation that does not match a fetched page is dropped.',
+		'Confirm key facts (employee count, location, sector) from scraped page content where you can — the company site, LinkedIn, or press — and cite the page. When such a fact appears only in a search result you could not open as a page, still report it and quote the search snippet rather than dropping a real, sourced fact; never invent one that appears nowhere.',
+		'For a citation to a page you scraped, set source_id to the exact URL you scraped with scrape_page. Never invent an identifier — a made-up source is dropped.',
 		'When you search, use plain keywords, and only add a site: filter for a real domain you know — never a placeholder like site:example.com.',
 		'For discovery or prospecting queries, prefer authoritative sources — business directories, industry association member lists, and sector registries — over social media, forums, or glossary pages.',
 		'When extracting structured data from a single page, use the company_enrichment_v1 schema (a per-company shape), not a whole-run aggregate schema.',
@@ -1180,8 +1180,8 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							const sourceManifest = sourceRows.map(row => row.url).join('\n')
 							const citationInstruction =
 								sourceManifest.length > 0
-									? `For each citation, set source_id to one of these exact fetched source URLs, copied verbatim — prefer the company's own official website, and never cite a URL not in this list:\n\n${sourceManifest}`
-									: "Set each citation's source_id to the exact scraped URL the value came from."
+									? `For each citation, prefer one of these exact fetched source URLs, copied verbatim — especially the company's own official website:\n\n${sourceManifest}\n\nIf a value appears only in a search result in the transcript, still include it and quote the snippet, citing that result's URL — do not drop a real fact just because its page was not fetched.`
+									: "Cite the URL each value came from; if it was only a search result, quote its snippet and cite that result's URL."
 							// Cast schema to satisfy generateObject's Encoder constraint.
 							// Registry schemas are all Structs with DecodingServices=never,
 							// but Schema.Top erases that — the cast is safe.

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -152,6 +154,29 @@ describe('parseGoldenSet', () => {
 			expect(result.errors).toEqual([
 				{ id: 'bad', error: expect.stringContaining('officialDomain') },
 			])
+		})
+	})
+
+	describe('when parsing the shipped golden.example.json', () => {
+		it('should parse every row and score the US logistics headcount+location row', () => {
+			// GIVEN the golden set the eval CLI ships — a malformed row here would
+			// silently shrink live coverage
+			const raw = JSON.parse(
+				readFileSync(
+					new URL('../../../../eval/golden.example.json', import.meta.url),
+					'utf8',
+				),
+			) as ReadonlyArray<RawGoldenRow>
+
+			// WHEN parsed
+			const result = parseGoldenSet(raw)
+
+			// THEN nothing is rejected AND the Arrive Logistics row asserts the
+			// headcount (size_range) + location an earlier run lost from a search snippet
+			expect(result.errors).toEqual([])
+			const arrive = result.golden.find(g => g.id === 'arrive-logistics')
+			expect(arrive?.fields.size_range).toBe('51-200')
+			expect(arrive?.fields.location).toBe('Austin')
 		})
 	})
 })

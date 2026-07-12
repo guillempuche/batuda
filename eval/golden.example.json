@@ -136,5 +136,13 @@
 			"officialDomain": "canteralaponderosa.com",
 			"fields": { "region": "cat", "location": "Alcover" }
 		}
+	},
+	{
+		"id": "arrive-logistics",
+		"query": "Arrive Logistics, Austin",
+		"expectedOutput": {
+			"officialDomain": "arrivelogistics.com",
+			"fields": { "size_range": "51-200", "location": "Austin" }
+		}
 	}
 ]

@@ -92,6 +92,10 @@ describe('mapSizeRange', () => {
 		it('should fall a value above the top bucket to the closest one', () => {
 			// GIVEN a company larger than the top bracket
 			expect(mapSizeRange('500')).toBe('51-200')
+			// AND a head-count written with a thousands separator — "1,700" must read
+			// as 1700, not 1, so a large company is not bucketed as 1-5
+			expect(mapSizeRange('1,700 employees')).toBe('51-200')
+			expect(mapSizeRange('1.700 empleados')).toBe('51-200')
 		})
 	})
 
