@@ -220,6 +220,17 @@ describe('makeFirecrawlScrape', () => {
 		expect(log.last?.headers['authorization']).toBe('Bearer fc_k')
 	})
 
+	it('should exclude <form> blocks so a contact-form pop-up cannot stand in for the page', async () => {
+		// GIVEN any successful scrape
+		const { exit, log } = runScrape(200, { data: { markdown: 'x' } })
+		await exit
+
+		// THEN the request drops <form> content while keeping main-content extraction
+		const body = bodyJson(log.last)
+		expect(body['excludeTags']).toEqual(['form'])
+		expect(body['onlyMainContent']).toBe(true)
+	})
+
 	it('should default missing markdown to an empty string', async () => {
 		// GIVEN a 2xx response whose data omits markdown
 		const { exit } = runScrape(200, { data: { metadata: { title: 'Acme' } } })
@@ -441,6 +452,19 @@ describe('makeFirecrawlSearch', () => {
 		expect(log.last?.method).toBe('POST')
 		expect(log.last?.url).toContain('api.firecrawl.dev/v2/search')
 		expect(log.last?.headers['authorization']).toBe('Bearer fc_k')
+	})
+
+	it('should exclude <form> blocks from the per-result scrape', async () => {
+		// GIVEN any successful search
+		const { exit, log } = runSearch(200, { data: { web: [] } })
+		await exit
+
+		// THEN the embedded scrapeOptions drop <form> content, matching the adapter
+		const scrapeOptions = bodyJson(log.last)['scrapeOptions'] as Record<
+			string,
+			unknown
+		>
+		expect(scrapeOptions?.['excludeTags']).toEqual(['form'])
 	})
 
 	it('should send a normalized lower-case country for a locale hint', async () => {

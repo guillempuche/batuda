@@ -85,9 +85,12 @@ export const makeFirecrawlSearch = (slot: number) =>
 								sources: [{ type: 'web' }],
 								// Return each result's main content as markdown, so one
 								// search can ground the run without a separate scrape.
+								// Drop <form> blocks so a "contact us" pop-up form doesn't
+								// stand in for the page body (same fix as the scrape adapter).
 								scrapeOptions: {
 									formats: ['markdown'],
 									onlyMainContent: true,
+									excludeTags: ['form'],
 								},
 								...(input.recency
 									? { tbs: tbsForRecency(input.recency.days) }

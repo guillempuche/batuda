@@ -91,6 +91,13 @@ export const makeFirecrawlScrape = (slot: number) =>
 								url: input.url,
 								formats: input.formats ?? ['markdown'],
 								onlyMainContent: true,
+								// Drop <form> blocks. A homepage often opens with a "contact
+								// us" pop-up form that renders first, so main-content
+								// extraction prepends the whole form; on a long page it can
+								// crowd the real body out of the downstream length cap. The
+								// facts we want (headcount, services, location) live in prose,
+								// never in a form.
+								excludeTags: ['form'],
 							}),
 						)
 						const response = yield* client.execute(request).pipe(
