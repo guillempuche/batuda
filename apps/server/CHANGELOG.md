@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-12 (server-v2026.7.12)
+
+### Bug Fixes
+
+* read camelCase result keys in run reuse and provider quota ([ef6b51f](https://github.com/guillempuche/batuda/commit/ef6b51f0514dd74797024cdc50555ec7e0a558be))
+* **research:** surface the provider error message in tool-failure logs ([c0b88bd](https://github.com/guillempuche/batuda/commit/c0b88bd854249282ad91dbea7954c0eeb8cbc9ef))
+* stop the scrape cache from starving research into fabrication ([a445c33](https://github.com/guillempuche/batuda/commit/a445c33c7b9f4a27ca67d77a3f9e37e4b7ca6fd0))
+
 ## 2026-07-11 (server-v2026.7.11)
 
 ### Features
