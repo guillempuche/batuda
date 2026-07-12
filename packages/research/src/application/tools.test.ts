@@ -13,8 +13,6 @@ import {
 } from './contact-discovery'
 import {
 	Budget,
-	type ExtractInput,
-	ExtractProvider,
 	type RegistryInput,
 	RegistryRouter,
 	ResearchRunContext,
@@ -24,7 +22,6 @@ import {
 	SearchProvider,
 } from './ports'
 import {
-	ExtractStructuredTool,
 	isUnsupportedScrapeUrl,
 	RegistryLookupTool,
 	researchToolkit,
@@ -231,36 +228,6 @@ const scrapePageResult = async (
 	return { result: last?.result, isFailure: last?.isFailure ?? false }
 }
 
-const extractStructuredResult = async (
-	extract: (input: ExtractInput) => Effect.Effect<unknown, ProviderError>,
-	params: { url: string; schema_name: string },
-): Promise<{ result: unknown; isFailure: boolean }> => {
-	const ports = Layer.mergeAll(
-		Layer.succeed(ExtractProvider)(ExtractProvider.of({ extract })),
-		StubSearchProvider,
-		StubScrapeProvider,
-		StubRegistryEsProvider,
-	)
-	const results = await Effect.runPromise(
-		Effect.gen(function* () {
-			const toolkit = yield* researchToolkit
-			const stream = yield* toolkit.handle('extract_structured', {
-				prompt: null,
-				...params,
-			})
-			return yield* Stream.runCollect(stream)
-		}).pipe(
-			Effect.provide(
-				researchToolkitLayer.pipe(
-					Layer.provide(Layer.mergeAll(ports, testInfra)),
-				),
-			),
-		),
-	)
-	const last = results[results.length - 1]
-	return { result: last?.result, isFailure: last?.isFailure ?? false }
-}
-
 const webSearchResult = async (
 	search: (input: SearchInput) => Effect.Effect<SearchResult, ProviderError>,
 	params: { query: string },
@@ -291,49 +258,6 @@ const webSearchResult = async (
 	)
 	const last = results[results.length - 1]
 	return { result: last?.result, isFailure: last?.isFailure ?? false }
-}
-
-const extractInput = async (params: {
-	url: string
-	schema_name: string
-	prompt?: string | null
-}): Promise<ExtractInput> => {
-	let captured: ExtractInput | undefined
-	const ports = Layer.mergeAll(
-		Layer.succeed(ExtractProvider)(
-			ExtractProvider.of({
-				extract: input => {
-					captured = input
-					return Effect.succeed({})
-				},
-			}),
-		),
-		StubSearchProvider,
-		StubScrapeProvider,
-		StubRegistryEsProvider,
-	)
-	await Effect.runPromise(
-		Effect.gen(function* () {
-			const toolkit = yield* researchToolkit
-			const stream = yield* toolkit.handle('extract_structured', {
-				prompt: null,
-				...params,
-			})
-			yield* Stream.runDrain(stream)
-		}).pipe(
-			Effect.provide(
-				researchToolkitLayer.pipe(
-					Layer.provide(Layer.mergeAll(ports, testInfra)),
-				),
-			),
-		),
-	)
-	if (captured === undefined) {
-		throw new Error(
-			'extract_structured handler never called the extract provider',
-		)
-	}
-	return captured
 }
 
 const scrapeInput = async (params: { url: string }): Promise<ScrapeInput> => {
@@ -571,39 +495,6 @@ describe('researchToolkit tool params — model-emitted null is treated as omitt
 		})
 	})
 
-	describe('extract_structured handler', () => {
-		describe('when prompt is null', () => {
-			it('should hand the extractor undefined for prompt', async () => {
-				// GIVEN a registered schema name and a null prompt
-				// WHEN the extract_structured tool call is handled
-				const input = await extractInput({
-					url: 'https://acmecorp.es',
-					schema_name: 'freeform',
-					prompt: null,
-				})
-
-				// THEN the null prompt folds to undefined while schema wiring is preserved
-				expect(input.prompt).toBeUndefined()
-				expect(input.schemaName).toBe('freeform')
-			})
-		})
-
-		describe('when prompt carries a value', () => {
-			it('should pass it through', async () => {
-				// GIVEN extra guidance for the extractor
-				// WHEN handled
-				const input = await extractInput({
-					url: 'https://acmecorp.es',
-					schema_name: 'freeform',
-					prompt: 'focus on revenue figures',
-				})
-
-				// THEN the prompt reaches the extractor unchanged
-				expect(input.prompt).toBe('focus on revenue figures')
-			})
-		})
-	})
-
 	describe('scrape_page handler (no optional params — unaffected by the fix)', () => {
 		describe('when called with a url', () => {
 			it('should pass the url through and request the markdown format', async () => {
@@ -637,11 +528,6 @@ describe('researchToolkit tool params — model-emitted null is treated as omitt
 				expect(web.limit).toBeNull()
 				expect(web.recency_days).toBeNull()
 				expect(web.location).toBeNull()
-
-				const extract = Schema.decodeUnknownSync(
-					ExtractStructuredTool.parametersSchema,
-				)({ url: 'https://x.test', schema_name: 'freeform', prompt: null })
-				expect(extract.prompt).toBeNull()
 
 				const registry = Schema.decodeUnknownSync(
 					RegistryLookupTool.parametersSchema,
@@ -802,52 +688,6 @@ describe('researchToolkit — a web-fetch failure is non-fatal', () => {
 
 				// THEN the model receives a failure result and the run continues
 				expect(isFailure).toBe(true)
-			})
-		})
-	})
-
-	describe('extract_structured handler', () => {
-		describe('when the extract provider fails with a forbidden ProviderError', () => {
-			it('should surface the failure to the model instead of aborting the run', async () => {
-				// GIVEN an extract provider that rejects the page with a 403 (forbidden)
-				const { isFailure } = await extractStructuredResult(
-					() =>
-						Effect.fail(
-							new ProviderError({
-								provider: 'firecrawl',
-								message: 'extract failed: HTTP 403',
-								recoverable: false,
-							}),
-						),
-					{ url: 'https://acmecorp.es', schema_name: 'freeform' },
-				)
-
-				// THEN the model reads the failure and moves on — the generateText
-				// fiber is not killed, so one forbidden page can't sink the whole run
-				expect(isFailure).toBe(true)
-			})
-		})
-
-		describe('when schema_name is not a registered schema', () => {
-			it('should surface the plain validation message, not a re-wrapped failure cause', async () => {
-				// GIVEN a schema_name the model made up — the extract provider is never
-				// reached, so its result here is irrelevant
-				const { isFailure, result } = await extractStructuredResult(
-					() => Effect.succeed({}),
-					{ url: 'https://acmecorp.es', schema_name: 'totally_bogus_schema' },
-				)
-
-				// THEN the model reads a failure...
-				expect(isFailure).toBe(true)
-				// AND the message names the bad value and lists the valid ones in
-				// plain text, not a stringified Cause/Fail dump — that shape appears
-				// if this validation error is ever re-caught and re-wrapped by the
-				// same handling that logs a genuine provider failure
-				const description = (result as { reason: { description: string } })
-					.reason.description
-				expect(description).toBe(
-					'extract_structured: Unknown schema_name: totally_bogus_schema. Valid names: freeform, company_enrichment_v1, competitor_scan_v1, contact_discovery_v1, prospect_scan_v1',
-				)
 			})
 		})
 	})

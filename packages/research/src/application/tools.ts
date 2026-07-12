@@ -26,15 +26,12 @@ import { ScrapedPage } from '../domain/types'
 import { ContactDiscovery } from './contact-discovery'
 import {
 	Budget,
-	ExtractProvider,
 	RegistryRouter,
 	ResearchRunContext,
 	ScrapeProvider,
 	SearchProvider,
 } from './ports'
-import { schemaRegistry } from './schemas/index'
 import {
-	EXTRACT_COST_CENTS,
 	REGISTRY_LOOKUP_COST_CENTS,
 	SCRAPE_COST_CENTS,
 	SEARCH_COST_CENTS,
@@ -72,19 +69,6 @@ const WebSearchParams = Schema.Struct({
 
 const ScrapePageParams = Schema.Struct({
 	url: Schema.String.annotate({ description: 'Absolute URL to scrape' }),
-})
-
-const ExtractStructuredParams = Schema.Struct({
-	url: Schema.String.annotate({
-		description: 'URL of the page whose content should be re-extracted',
-	}),
-	schema_name: Schema.String.annotate({
-		description: `Name of a registered schema. One of: ${Object.keys(schemaRegistry).join(', ')}`,
-	}),
-	prompt: Schema.NullOr(Schema.String).annotate({
-		description:
-			'Optional extra guidance for the extractor (e.g. "focus on revenue figures"); null for none.',
-	}),
 })
 
 const RegistryLookupParams = Schema.Struct({
@@ -141,14 +125,6 @@ export const ScrapePageTool = Tool.make('scrape_page', {
 	failureMode: 'return',
 })
 
-export const ExtractStructuredTool = Tool.make('extract_structured', {
-	description:
-		'Re-extract a page into a named structured schema. Use when downstream consumers need typed fields rather than prose.',
-	parameters: ExtractStructuredParams,
-	success: ToolResultSchema,
-	failureMode: 'return',
-})
-
 export const RegistryLookupTool = Tool.make('registry_lookup', {
 	description:
 		'Look up a company in its national business registry. Accepts any ISO country; one without a national registry returns {status:"no_registry"} — use discover_contacts for contact enrichment there. Metered (~€0.29/lookup), so use it to confirm a specific company rather than browsing. Returns legal name, tax id, status, and (when available) directors.',
@@ -166,7 +142,6 @@ export const DiscoverContactsTool = Tool.make('discover_contacts', {
 export const researchToolkit = Toolkit.make(
 	WebSearchTool,
 	ScrapePageTool,
-	ExtractStructuredTool,
 	RegistryLookupTool,
 	DiscoverContactsTool,
 )
@@ -273,14 +248,13 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 	Effect.gen(function* () {
 		const search = yield* SearchProvider
 		const scrape = yield* ScrapeProvider
-		const extract = yield* ExtractProvider
 		const registry = yield* RegistryRouter
 		const contactDiscovery = yield* ContactDiscovery
 		const budget = yield* Budget
 		const { researchId } = yield* ResearchRunContext
 
 		// Charged against the run before each vendor call (cheap tier for
-		// search/scrape/extract, paid tier for the registry). When the budget
+		// search/scrape, paid tier for the registry). When the budget
 		// refuses, the refusal is handed back to the model as a tool result so it
 		// stops using that tool and wraps up; the loop's own budget check is the
 		// hard halt. Logged at warning (not error) since running out of budget is
@@ -398,47 +372,6 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 						},
 					}),
 				),
-
-			extract_structured: params => {
-				// Both branches reuse these span options so the early return still
-				// emits a research.tool.extract_structured span, but only the
-				// extraction branch runs through catchCause below. An unknown
-				// schema_name is an expected, model-caused error whose message is
-				// already clean; sending it through catchCause too would re-wrap and
-				// pretty-print the cause, burying that message in an unreadable dump.
-				const spanOptions = {
-					attributes: {
-						'research.tool': 'extract_structured',
-						'research.run_id': researchId,
-						url: params.url,
-						schema_name: params.schema_name,
-					},
-				}
-				const schema = schemaRegistry[params.schema_name]
-				if (!schema) {
-					return mapToolError('extract_structured')(
-						`Unknown schema_name: ${params.schema_name}. Valid names: ${Object.keys(schemaRegistry).join(', ')}`,
-					).pipe(
-						Effect.withSpan('research.tool.extract_structured', spanOptions),
-					)
-				}
-				return Effect.gen(function* () {
-					yield* budget.chargeCheap('extract', EXTRACT_COST_CENTS)
-					return yield* extract.extract({
-						url: params.url,
-						schema,
-						schemaName: params.schema_name,
-						prompt: params.prompt ?? undefined,
-					})
-				}).pipe(
-					Effect.catchTag(
-						'BudgetExceeded',
-						cheapExhausted('extract_structured'),
-					),
-					Effect.catchCause(logToolFailure('extract_structured')),
-					Effect.withSpan('research.tool.extract_structured', spanOptions),
-				)
-			},
 
 			registry_lookup: params =>
 				Effect.gen(function* () {
