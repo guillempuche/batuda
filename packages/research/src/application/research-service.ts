@@ -61,6 +61,7 @@ import {
 	ScrapeProvider,
 	WriterLanguageModel,
 } from './ports'
+import { guardScalarFields } from './scalar-field-guard'
 import { type FreeformSchema, schemaRegistry } from './schemas/index'
 import { urlHashForScrape } from './source-key'
 import { REGISTRY_LOOKUP_COST_CENTS, SCRAPE_COST_CENTS } from './tool-costs'
@@ -101,6 +102,12 @@ const MIN_GROUNDED_SOURCES = 1
 // used when the model provider omits token usage so the token budget below can't
 // fire. Scrapes are capped per page but many of them still add up.
 const MAX_LOOP_PROMPT_CHARS = 90000
+
+// How much full fetched-page text phase-2 extraction may read on top of the
+// transcript. The transcript caps each tool result at 4000 chars for the agent
+// loop; the extractor gets the fuller pages here so a fact sitting past that cut
+// (a leadership list, a tools section) still reaches the structured output.
+const MAX_EXTRACTION_PAGE_CHARS = 60000
 
 // When the model finishes without the evidence confirming the target company, it
 // gets this many corrective nudges to search harder before the run fails closed.
@@ -443,7 +450,6 @@ export const buildResearchSystemPrompt = (args: {
 		'For a citation to a page you scraped, set source_id to the exact URL you scraped with scrape_page. Never invent an identifier — a made-up source is dropped.',
 		'When you search, use plain keywords, and only add a site: filter for a real domain you know — never a placeholder like site:example.com.',
 		'For discovery or prospecting queries, prefer authoritative sources — business directories, industry association member lists, and sector registries — over social media, forums, or glossary pages.',
-		'When extracting structured data from a single page, use the company_enrichment_v1 schema (a per-company shape), not a whole-run aggregate schema.',
 		`Output schema: ${args.schemaName}`,
 		args.subjectContext,
 		args.hintsContext,
@@ -1180,6 +1186,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 					const extractStructuredFindings = (
 						transcript: string,
 						evidenceCorpus: string,
+						pages: ReadonlyArray<string> = [],
 					) =>
 						Effect.gen(function* () {
 							yield* publishEvent(researchId, 'tool.called', {
@@ -1202,16 +1209,39 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 								sourceManifest.length > 0
 									? `For each citation, prefer one of these exact fetched source URLs, copied verbatim — especially the company's own official website:\n\n${sourceManifest}\n\nIf a value appears only in a search result in the transcript, still include it and quote the snippet, citing that result's URL — do not drop a real fact just because its page was not fetched.`
 									: "Cite the URL each value came from; if it was only a search result, quote its snippet and cite that result's URL."
+							// The full fetched pages, ahead of the transcript, so a fact past the
+							// transcript's per-result cut still reaches extraction. Bounded so a
+							// handful of long pages can't blow up the phase-2 prompt.
+							const pagesSection = (() => {
+								const parts: string[] = []
+								let total = 0
+								for (const text of pages) {
+									if (text.trim().length === 0) continue
+									const remaining = MAX_EXTRACTION_PAGE_CHARS - total
+									if (remaining <= 0) break
+									const slice =
+										text.length > remaining
+											? `${text.slice(0, remaining)}…[truncated]`
+											: text
+									parts.push(slice)
+									total += slice.length
+								}
+								return parts.length > 0
+									? `Fetched pages (primary evidence — read these first):\n\n${parts.join('\n\n---\n\n')}\n\n`
+									: ''
+							})()
 							// Cast schema to satisfy generateObject's Encoder constraint.
 							// Registry schemas are all Structs with DecodingServices=never,
 							// but Schema.Top erases that — the cast is safe.
 							const structuredResponse = yield* extractLlm.generateObject({
 								schema: outputSchema as typeof FreeformSchema,
 								// Ground the extraction: the model may only output values that
-								// appear in the transcript, and must leave unsupported fields
+								// appear in the evidence, and must leave unsupported fields
 								// empty rather than filling them from prior knowledge — otherwise
-								// it will confidently invent phones, tax ids, and emails.
-								prompt: `Produce structured findings STRICTLY from the research transcript below. Only include a value that appears in the transcript; if the transcript does not support a field, omit it or leave it null — never fill a field from prior knowledge.\n\n${citationInstruction}\n\nResearch transcript:\n\n${transcript}`,
+								// it will confidently invent phones, tax ids, and emails. Never
+								// emit a schema field's name or a placeholder ("headquarters",
+								// "unknown") as a value; omit a field with no real value instead.
+								prompt: `Produce structured findings STRICTLY from the evidence below (the fetched pages and the research transcript). Only include a value that appears in the evidence; if it does not support a field, omit it or leave it null — never fill a field from prior knowledge, and never put a placeholder or the field's own name as its value.\n\n${citationInstruction}\n\n${pagesSection}Research transcript:\n\n${transcript}`,
 							})
 							let result = withProposalIds(structuredResponse.value as unknown)
 							// Drop citations the model invented: keep only source_ids that map
@@ -1238,6 +1268,38 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 									}),
 								)
 							}
+							// Scalar grounding: hold each per-field value to "grounded or absent".
+							// The citation guard has just removed fabricated sources, so a scalar
+							// left without one is dropped here rather than shipped unsourced; a
+							// placeholder word or a quote that does not back the value goes too.
+							const scalarCheck = guardScalarFields(result, evidenceCorpus)
+							result = scalarCheck.findings
+							if (
+								scalarCheck.droppedPlaceholder > 0 ||
+								scalarCheck.droppedUngrounded > 0 ||
+								scalarCheck.droppedUnsupported > 0
+							) {
+								yield* Effect.logWarning('research.fields.ungrounded').pipe(
+									Effect.annotateLogs({
+										research_id: researchId,
+										dropped_placeholder: scalarCheck.droppedPlaceholder,
+										dropped_ungrounded: scalarCheck.droppedUngrounded,
+										dropped_unsupported: scalarCheck.droppedUnsupported,
+									}),
+								)
+							}
+							// Grounding telemetry on the phase-2 span, so the share of fields a
+							// run drops for want of a real source is a dashboard, not an anecdote.
+							yield* Effect.annotateCurrentSpan({
+								'research.citations.total': citationCheck.total,
+								'research.citations.kept': citationCheck.kept,
+								'research.fields.dropped_placeholder':
+									scalarCheck.droppedPlaceholder,
+								'research.fields.dropped_ungrounded':
+									scalarCheck.droppedUngrounded,
+								'research.fields.dropped_unsupported':
+									scalarCheck.droppedUnsupported,
+							})
 							// Value provenance: the citation guard proved the cited pages were
 							// fetched, not that they contain the claimed values. Drop any
 							// proposed CRM write whose email/phone/tax-id value appears nowhere
@@ -1713,6 +1775,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 										loop.evidenceText,
 										...scrapeCorpus.map(page => page.text),
 									].join('\n'),
+									scrapeCorpus.map(page => page.text),
 								)
 								findings = extracted.findings
 								extractOutputTokens += extracted.outputTokens
@@ -1760,6 +1823,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 											loop.evidenceText,
 											...scrapeCorpus.map(page => page.text),
 										].join('\n'),
+										scrapeCorpus.map(page => page.text),
 									)
 									findings = extracted.findings
 									extractOutputTokens += extracted.outputTokens
@@ -1858,6 +1922,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 									evidenceText,
 									...groundedPageTexts(entityTargets, scrapeCorpus),
 								].join('\n'),
+								groundedPageTexts(entityTargets, scrapeCorpus),
 							)
 							findings = extracted.findings
 							tokensOut += extracted.outputTokens

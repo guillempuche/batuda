@@ -84,10 +84,12 @@ export const validateFindingCitations = (
 		if (value !== null && typeof value === 'object') {
 			// A per-field Sourced wrapper carries its own `source_id` beside a
 			// `value` (a bare citation entry has a source_id but no `value`). Judge it
-			// like a citation: keep the whole wrapper when the source was fetched,
-			// otherwise drop just the provenance and let the field's value stand
-			// unsourced — the same "keep the data, remove the fabricated source" rule
-			// the citations array follows.
+			// like a citation, but drop the whole field when the source was not
+			// fetched: a single scalar with a fabricated source is treated as absent
+			// rather than shipped unsourced, so a value that never reached a real page
+			// cannot survive. (A descriptive finding's citations array still keeps its
+			// value and drops only the bad citation — that rule is for prose, not a
+			// scalar fact.)
 			const record = value as { source_id?: unknown; value?: unknown }
 			if (typeof record.source_id === 'string' && 'value' in record) {
 				total++
@@ -95,7 +97,7 @@ export const validateFindingCitations = (
 					kept++
 					return value
 				}
-				return { value: walk(record.value) }
+				return null
 			}
 			return Object.fromEntries(
 				Object.entries(value as Record<string, unknown>).map(
