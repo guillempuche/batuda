@@ -13,17 +13,37 @@ describe('CompanyEnrichmentV1Schema', () => {
 			// page, region from another), instead of one citation list for the block
 			const payload = {
 				enrichment: {
-					industry: { value: 'Freight & logistics', source_id: 'src-1' },
-					size_range: { value: '51-200', source_id: 'src-1' },
-					location: { value: 'St. Louis, MO', source_id: 'src-1' },
-					region: { value: 'United States', source_id: 'src-2' },
+					industry: {
+						value: 'Freight & logistics',
+						source_id: 'src-1',
+						confidence: null,
+					},
+					size_range: { value: '51-200', source_id: 'src-1', confidence: null },
+					location: {
+						value: 'St. Louis, MO',
+						source_id: 'src-1',
+						confidence: null,
+					},
+					region: {
+						value: 'United States',
+						source_id: 'src-2',
+						confidence: null,
+					},
 				},
 				contacts: [
 					{
 						name: 'Ada Lovelace',
-						role: { value: 'CTO', source_id: 'src-1' },
-						email: { value: 'ada@acme.es', source_id: 'src-1' },
-						phone: { value: '+34 900 000 000', source_id: 'src-2' },
+						role: { value: 'CTO', source_id: 'src-1', confidence: null },
+						email: {
+							value: 'ada@acme.es',
+							source_id: 'src-1',
+							confidence: null,
+						},
+						phone: {
+							value: '+34 900 000 000',
+							source_id: 'src-2',
+							confidence: null,
+						},
 					},
 				],
 			}
@@ -46,8 +66,16 @@ describe('CompanyEnrichmentV1Schema', () => {
 			// real coordinates, the model filled both fields with the string "NaN"
 			const payload = {
 				enrichment: {
-					industry: { value: 'Freight & logistics', source_id: 'src-1' },
-					location: { value: 'St. Louis, MO', source_id: 'src-1' },
+					industry: {
+						value: 'Freight & logistics',
+						source_id: 'src-1',
+						confidence: null,
+					},
+					location: {
+						value: 'St. Louis, MO',
+						source_id: 'src-1',
+						confidence: null,
+					},
 					latitude: 'NaN',
 					longitude: 'NaN',
 				},
@@ -67,7 +95,11 @@ describe('CompanyEnrichmentV1Schema', () => {
 			// GIVEN a payload where the model guessed plausible-looking numbers
 			const payload = {
 				enrichment: {
-					location: { value: 'St. Louis, MO', source_id: 'src-1' },
+					location: {
+						value: 'St. Louis, MO',
+						source_id: 'src-1',
+						confidence: null,
+					},
 					latitude: 38.627,
 					longitude: -90.199,
 				},

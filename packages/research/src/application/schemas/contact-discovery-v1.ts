@@ -23,7 +23,10 @@ export const ContactDiscoveryV1Schema = Schema.Struct({
 						kind: Schema.String,
 						value: Schema.String,
 						verification: Schema.optionalKey(VerificationVerdict),
-						confidence: Schema.optionalKey(LenientNumber),
+						// Required + nullable (see _shared LenientNumber): `optionalKey`
+						// around a union serialises to a nested anyOf a strict provider
+						// rejects; a channel with no confidence sends null.
+						confidence: LenientNumber,
 						is_primary: Schema.optionalKey(Schema.Boolean),
 					}),
 				),

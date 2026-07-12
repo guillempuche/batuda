@@ -35,7 +35,13 @@ export const TolerantJsonString = Schema.String.annotate({
 // decoding rejects that string and fails the whole extraction. Accepting a
 // string on the wire lets decoding turn any non-finite value into "no value"
 // (null) instead — the same family of fix as TolerantJsonString above.
-const coerceFinite = (value: number | string): number | null => {
+//
+// The wire type is `Finite | String | Null` (not a bare `Schema.Number`, whose
+// NaN/Infinity encoding serialises to a nested anyOf a strict provider rejects,
+// and with `Null` folded in so this stays a single non-nested union even when a
+// field is required + nullable).
+const coerceFinite = (value: number | string | null): number | null => {
+	if (value === null) return null
 	const n =
 		typeof value === 'string'
 			? value.trim() === ''
@@ -45,17 +51,24 @@ const coerceFinite = (value: number | string): number | null => {
 	return Number.isFinite(n) ? n : null
 }
 
-export const LenientNumber = Schema.Union([Schema.Number, Schema.String]).pipe(
+export const LenientNumber = Schema.Union([
+	Schema.Finite,
+	Schema.String,
+	Schema.Null,
+]).pipe(
 	Schema.decodeTo(Schema.NullOr(Schema.Number), {
 		decode: SchemaGetter.transform(coerceFinite),
-		encode: SchemaGetter.transform((n: number | null) => n ?? Number.NaN),
+		encode: SchemaGetter.transform((n: number | null) => n),
 	}),
 )
 
 export const Citation = Schema.Struct({
 	source_id: Schema.String,
 	quote: Schema.optionalKey(Schema.String),
-	confidence: Schema.optionalKey(LenientNumber),
+	// Required + nullable, not optional: `optionalKey` around a union serialises
+	// to a nested anyOf a strict provider rejects. LenientNumber already carries
+	// null, so a model with no confidence sends null.
+	confidence: LenientNumber,
 })
 
 // A single field paired with the source that backs it: a value plus the same
@@ -81,7 +94,8 @@ export const ProposedUpdate = Schema.Struct({
 	// leaves them out).
 	operation: Schema.optionalKey(Schema.Literals(['create', 'update'])),
 	subject_id: Schema.optionalKey(Schema.String),
-	expected_version: Schema.optionalKey(LenientNumber),
+	// Required + nullable (see Citation.confidence): a 'create' carries null here.
+	expected_version: LenientNumber,
 	fields: TolerantJsonString,
 	reason: Schema.String,
 	citations: Schema.Array(Citation),

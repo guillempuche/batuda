@@ -100,7 +100,12 @@ const webSearchInput = async (params: {
 	await Effect.runPromise(
 		Effect.gen(function* () {
 			const toolkit = yield* researchToolkit
-			const stream = yield* toolkit.handle('web_search', params)
+			const stream = yield* toolkit.handle('web_search', {
+				limit: null,
+				recency_days: null,
+				location: null,
+				...params,
+			})
 			yield* Stream.runDrain(stream)
 		}).pipe(
 			Effect.provide(
@@ -140,7 +145,11 @@ const registryLookupInput = async (params: {
 	await Effect.runPromise(
 		Effect.gen(function* () {
 			const toolkit = yield* researchToolkit
-			const stream = yield* toolkit.handle('registry_lookup', params)
+			const stream = yield* toolkit.handle('registry_lookup', {
+				query: null,
+				tax_id: null,
+				...params,
+			})
 			yield* Stream.runDrain(stream)
 		}).pipe(
 			Effect.provide(
@@ -173,7 +182,11 @@ const registryLookupResult = async (
 	const results = await Effect.runPromise(
 		Effect.gen(function* () {
 			const toolkit = yield* researchToolkit
-			const stream = yield* toolkit.handle('registry_lookup', params)
+			const stream = yield* toolkit.handle('registry_lookup', {
+				query: null,
+				tax_id: null,
+				...params,
+			})
 			return yield* Stream.runCollect(stream)
 		}).pipe(
 			Effect.provide(
@@ -231,7 +244,10 @@ const extractStructuredResult = async (
 	const results = await Effect.runPromise(
 		Effect.gen(function* () {
 			const toolkit = yield* researchToolkit
-			const stream = yield* toolkit.handle('extract_structured', params)
+			const stream = yield* toolkit.handle('extract_structured', {
+				prompt: null,
+				...params,
+			})
 			return yield* Stream.runCollect(stream)
 		}).pipe(
 			Effect.provide(
@@ -258,7 +274,12 @@ const webSearchResult = async (
 	const results = await Effect.runPromise(
 		Effect.gen(function* () {
 			const toolkit = yield* researchToolkit
-			const stream = yield* toolkit.handle('web_search', params)
+			const stream = yield* toolkit.handle('web_search', {
+				limit: null,
+				recency_days: null,
+				location: null,
+				...params,
+			})
 			return yield* Stream.runCollect(stream)
 		}).pipe(
 			Effect.provide(
@@ -294,7 +315,10 @@ const extractInput = async (params: {
 	await Effect.runPromise(
 		Effect.gen(function* () {
 			const toolkit = yield* researchToolkit
-			const stream = yield* toolkit.handle('extract_structured', params)
+			const stream = yield* toolkit.handle('extract_structured', {
+				prompt: null,
+				...params,
+			})
 			yield* Stream.runDrain(stream)
 		}).pipe(
 			Effect.provide(
@@ -374,7 +398,10 @@ const discoverContactsInput = async (params: {
 	await Effect.runPromise(
 		Effect.gen(function* () {
 			const toolkit = yield* researchToolkit
-			const stream = yield* toolkit.handle('discover_contacts', params)
+			const stream = yield* toolkit.handle('discover_contacts', {
+				country: null,
+				...params,
+			})
 			yield* Stream.runDrain(stream)
 		}).pipe(Effect.provide(researchToolkitLayer.pipe(Layer.provide(infra)))),
 	)
@@ -592,13 +619,15 @@ describe('researchToolkit tool params — model-emitted null is treated as omitt
 	})
 
 	describe('tool parameter schemas — decode contract', () => {
-		describe('when an optional param is explicit null', () => {
-			it('should decode without rejecting for every widened optional param', () => {
-				// GIVEN the raw args a model sends with null for unused optionals — the
-				// exact decode that threw "Expected number, got null" before the fix
+		describe('when a nullable param is explicit null', () => {
+			it('should decode without rejecting for every nullable param', () => {
+				// GIVEN the raw args a model sends with null for the params it is not
+				// using — the exact decode that threw "Expected number, got null" before
+				// the fix. The params are required + nullable, so a real model always
+				// sends every one.
 				// WHEN each tool schema decodes them
 				// THEN the null passes through instead of failing validation
-				// [Schema.optionalKey(Schema.NullOr(...))]
+				// [Schema.NullOr(...)]
 				const web = Schema.decodeUnknownSync(WebSearchTool.parametersSchema)({
 					query: 'acme',
 					limit: null,
@@ -622,32 +651,40 @@ describe('researchToolkit tool params — model-emitted null is treated as omitt
 			})
 		})
 
-		describe('when an optional param has a wrong, non-null type', () => {
-			it('should still reject — the schema was widened to null, not to anything', () => {
-				// GIVEN a string where a number is expected
-				// THEN decode still fails (null tolerance did not loosen the value type)
+		describe('when a nullable param has a wrong, non-null type', () => {
+			it('should still reject — null tolerance did not loosen the value type', () => {
+				// GIVEN a string where a number is expected, with the other params set
+				// to null so the rejection is about the value type, not a missing field
+				// THEN decode still fails
 				expect(() =>
 					Schema.decodeUnknownSync(WebSearchTool.parametersSchema)({
 						query: 'acme',
+						limit: null,
 						recency_days: 'soon',
+						location: null,
 					}),
 				).toThrow()
 				expect(() =>
 					Schema.decodeUnknownSync(WebSearchTool.parametersSchema)({
 						query: 'acme',
 						limit: 'ten',
+						recency_days: null,
+						location: null,
 					}),
 				).toThrow()
 			})
 		})
 
-		describe('when a required field is null', () => {
-			it('should reject — only the optional params were widened', () => {
-				// GIVEN null for a required field
-				// THEN decode fails, because required fields were left as bare String
+		describe('when a non-nullable field is null', () => {
+			it('should reject — only the optional params accept null', () => {
+				// GIVEN null for a field that is required and not nullable (query, url)
+				// THEN decode fails, because those fields stay bare String
 				expect(() =>
 					Schema.decodeUnknownSync(WebSearchTool.parametersSchema)({
 						query: null,
+						limit: null,
+						recency_days: null,
+						location: null,
 					}),
 				).toThrow()
 				expect(() =>
