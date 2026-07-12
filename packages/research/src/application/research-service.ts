@@ -49,6 +49,7 @@ import {
 	type EntityTargets,
 	groundedSourceIds,
 	isConfirmedRegistryMatch,
+	withRedirectDomain,
 } from './entity-guard'
 import { resolvePolicy, type SystemDefaults } from './policy'
 import {
@@ -1033,7 +1034,10 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 								typeof row['website'] === 'string' ? row['website'] : undefined,
 						}
 					})
-					const entityTargets = deriveEntityTargets({
+					// `let`, not `const`: when the seeded anchor domain redirects to a
+					// different host (a rebrand), the seed below folds that destination
+					// in as a strong-match key so the run grounds on the live site.
+					let entityTargets = deriveEntityTargets({
 						schemaName,
 						anchorDomain: context?.anchorDomain,
 						query: (run as { query: string }).query,
@@ -1566,15 +1570,43 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 										page.markdown.trim().length > 0
 									) {
 										const hash = urlHashForScrape(page.url)
-										scrapeCorpus.push({ urlHash: hash, text: page.markdown })
+										// The caller's own domain may 301 to a different host (a
+										// rebrand); the fetch followed it, so the destination is the
+										// same company's official site. Fold that host in as a
+										// strong-match key and put the reached URL in the corpus, so
+										// grounding lands on the live site instead of failing closed
+										// when the rebranded page never names the old domain.
+										const resolvedUrl = page.resolvedUrl ?? page.url
+										const destHost = domainHost(resolvedUrl)
+										const followedRedirect =
+											destHost !== undefined && destHost !== anchorHost
+										scrapeCorpus.push({
+											urlHash: hash,
+											text: followedRedirect
+												? `${resolvedUrl}\n${page.markdown}`
+												: page.markdown,
+										})
+										if (followedRedirect && entityTargets !== null) {
+											entityTargets = withRedirectDomain(
+												entityTargets,
+												destHost,
+											)
+										}
 										seededAnchorHashes.push(hash)
 										seededTranscriptParts.push(
 											`[scrape_page] ${boundedToolResult({ url: page.url, markdown: page.markdown })}`,
 										)
-										yield* Effect.logInfo('research.anchor.seeded').pipe(
+										yield* Effect.logInfo(
+											followedRedirect
+												? 'research.anchor.redirect_followed'
+												: 'research.anchor.seeded',
+										).pipe(
 											Effect.annotateLogs({
 												research_id: researchId,
 												host: anchorHost,
+												...(followedRedirect
+													? { resolved_host: destHost }
+													: {}),
 											}),
 										)
 									}

@@ -47,6 +47,7 @@ import { ScrapedPage } from '../domain/types'
 // read them by those names, not the SQL spelling.
 interface SourcesCacheHit {
 	readonly id: string
+	readonly url: string
 	readonly contentRef: string | null
 	readonly contentHash: string
 }
@@ -137,6 +138,9 @@ export const makeCachedScrape = () =>
 								Option.some(
 									new ScrapedPage({
 										url: canonical,
+										// The row stores the URL the page finally resolved to, so a
+										// cached hit still knows a redirect destination (a rebrand).
+										resolvedUrl: row.url,
 										markdown,
 										contentHash: row.contentHash,
 										units: 0,
@@ -158,7 +162,7 @@ export const makeCachedScrape = () =>
 						)
 
 					const hits = yield* sql<SourcesCacheHit>`
-						SELECT id, content_ref, content_hash
+						SELECT id, url, content_ref, content_hash
 						FROM sources
 						WHERE url_hash = ${urlHash}
 							AND last_fetched_at > now() - (${`${ttl} hours`})::interval
@@ -186,7 +190,7 @@ export const makeCachedScrape = () =>
 						yield* sql`SELECT pg_advisory_xact_lock(hashtext(${`scrape:${urlHash}`}))`
 
 						const rehits = yield* sql<SourcesCacheHit>`
-							SELECT id, content_ref, content_hash
+							SELECT id, url, content_ref, content_hash
 							FROM sources
 							WHERE url_hash = ${urlHash}
 								AND last_fetched_at > now() - (${`${ttl} hours`})::interval
@@ -202,6 +206,19 @@ export const makeCachedScrape = () =>
 
 						const page = yield* inner.scrape(input)
 						const markdown = page.markdown ?? ''
+
+						// Persist the URL the page actually resolved to, but only when it
+						// truly landed on a different host (a redirect/rebrand) — otherwise
+						// keep the canonical requested url so non-redirect rows are
+						// unchanged. The row stays keyed by the requested url_hash so the
+						// lookup still hits; storing the destination lets a later cache hit
+						// recover it for grounding.
+						const storedUrl =
+							page.resolvedUrl !== undefined &&
+							extractDomain(page.resolvedUrl) !== extractDomain(canonical)
+								? page.resolvedUrl
+								: canonical
+						const storedDomain = extractDomain(storedUrl)
 
 						// Best-effort cache write: the page is already in hand, so a store
 						// failure must not fail the scrape. On failure we record no
@@ -240,13 +257,15 @@ export const makeCachedScrape = () =>
 								title, language, content_hash, content_ref,
 								first_fetched_at, last_fetched_at
 							) VALUES (
-								${sourceIdFor(urlHash)}, 'web', 'scrape', ${canonical}, ${urlHash}, ${domain},
+								${sourceIdFor(urlHash)}, 'web', 'scrape', ${storedUrl}, ${urlHash}, ${storedDomain},
 								${page.title ?? null}, ${page.language ?? null},
 								${page.contentHash}, ${storedRef},
 								now(), now()
 							)
 							ON CONFLICT (url_hash) DO UPDATE SET
 								last_fetched_at = now(),
+								url             = EXCLUDED.url,
+								domain          = EXCLUDED.domain,
 								content_hash    = EXCLUDED.content_hash,
 								content_ref     = EXCLUDED.content_ref,
 								title           = COALESCE(EXCLUDED.title, sources.title),

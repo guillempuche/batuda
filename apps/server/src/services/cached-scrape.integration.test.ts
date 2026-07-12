@@ -94,6 +94,23 @@ const readContentRef = (urlHash: string): Promise<string | null> =>
 		>,
 	)
 
+const readUrlAndDomain = (
+	urlHash: string,
+): Promise<{ url: string; domain: string } | null> =>
+	Effect.runPromise(
+		Effect.gen(function* () {
+			const sql = yield* SqlClient.SqlClient
+			const rows = yield* sql<{ url: string; domain: string }>`
+				SELECT url, domain FROM sources WHERE url_hash = ${urlHash} LIMIT 1
+			`
+			return rows[0] ?? null
+		}).pipe(Effect.provide(PgLive)) as Effect.Effect<
+			{ url: string; domain: string } | null,
+			never,
+			never
+		>,
+	)
+
 // Drive one scrape through the cached wrapper with the given fakes wired in.
 const runScrape = (opts: {
 	url: string
@@ -279,6 +296,74 @@ describe('scrape cache — a broken cache degrades to a fresh fetch', () => {
 			//   re-fetches rather than pointing at a blob that was never written
 			expect(page.markdown).toBe('FRESH DESPITE WRITE FAILURE')
 			expect(await readContentRef(urlHash)).toBeNull()
+		})
+	})
+})
+
+describe('scrape cache — a redirect destination survives the cache', () => {
+	describe('when a freshly-fetched page resolved to a different host', () => {
+		it('should store the resolved url + domain, keyed by the requested url_hash', async () => {
+			// GIVEN a cache miss on a domain that 301s elsewhere (a rebrand), so the
+			//   inner provider reports the destination in resolvedUrl
+			const requested = `https://${freshHost()}/`
+			const destination = `https://dest-${randomUUID()}.example/`
+			const urlHash = track(hashOf(requested))
+
+			// WHEN the wrapper fetches it fresh
+			const page = await runScrape({
+				url: requested,
+				inner: () =>
+					Effect.succeed({
+						url: requested,
+						resolvedUrl: destination,
+						markdown: 'REBRANDED SITE',
+						contentHash: 'redirect-1',
+						units: 1,
+					} as ScrapedPage),
+				blobGet: failingBlobGet,
+				blobPut: okBlobPut,
+			})
+
+			// THEN the returned page keeps the requested url but carries the
+			//   destination, and the persisted row records the destination the page
+			//   really resolved to (still keyed by the requested url_hash so the
+			//   lookup hits)
+			expect(page.resolvedUrl).toBe(destination)
+			const stored = await readUrlAndDomain(urlHash)
+			expect(stored?.url).toBe(destination)
+			expect(stored?.domain).toBe(new URL(destination).hostname)
+		})
+	})
+
+	describe('when a warm row was stored under a redirect destination', () => {
+		it('should return the destination as resolvedUrl on a cache hit', async () => {
+			// GIVEN a warm sources row whose stored url is the redirect destination,
+			//   keyed by the requested host's url_hash, with a readable blob
+			const requested = `https://${freshHost()}/`
+			const destination = `https://dest-${randomUUID()}.example/`
+			const urlHash = track(hashOf(requested))
+			await seedWarmSource({
+				url: destination,
+				urlHash,
+				contentRef: 'scrape/redirect-hit',
+				contentHash: 'redirect-hit',
+			})
+
+			// WHEN the wrapper serves the requested URL from cache
+			const page = await runScrape({
+				url: requested,
+				inner: () =>
+					Effect.die('inner.scrape must not be called on a cache hit'),
+				blobGet: () =>
+					Effect.succeed(new TextEncoder().encode('CACHED REBRAND')),
+				blobPut: okBlobPut,
+			})
+
+			// THEN the hit exposes the destination via resolvedUrl (so grounding can
+			//   still follow the rebrand) while url stays the requested address
+			expect(page.markdown).toBe('CACHED REBRAND')
+			expect(page.resolvedUrl).toBe(destination)
+			expect(page.url).toBe(new URL(requested).toString())
 		})
 	})
 })

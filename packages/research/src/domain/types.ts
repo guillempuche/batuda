@@ -26,6 +26,10 @@ export class SearchResult extends Schema.Class<SearchResult>('SearchResult')({
 /** A scraped page returned by ScrapeProvider. */
 export class ScrapedPage extends Schema.Class<ScrapedPage>('ScrapedPage')({
 	url: Schema.String,
+	// The final URL after the fetch followed any redirects — differs from `url`
+	// when the requested address 301/302s elsewhere (e.g. a rebranded domain).
+	// Absent when the provider doesn't report it or nothing redirected.
+	resolvedUrl: Schema.optional(Schema.String),
 	markdown: Schema.optional(Schema.String),
 	html: Schema.optional(Schema.String),
 	links: Schema.optional(Schema.Array(Schema.String)),

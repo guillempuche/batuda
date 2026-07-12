@@ -207,6 +207,29 @@ describe('makeFirecrawlScrape', () => {
 		expect(page?.contentHash).toBe(sha256('# Acme'))
 		expect(page?.units).toBe(1)
 		expect(log.count).toBe(1)
+		// AND no resolvedUrl when the response reports no final URL
+		expect(page?.resolvedUrl).toBeUndefined()
+	})
+
+	it('should carry the final URL from metadata.url when the fetch followed a redirect', async () => {
+		// GIVEN a scrape of a domain that 301s elsewhere, so Firecrawl reports the
+		// resolved address in metadata.url
+		const { exit } = runScrape(200, {
+			data: {
+				markdown: '# Ascent',
+				metadata: {
+					title: 'Ascent',
+					sourceURL: 'https://ascentgl.com',
+					url: 'https://ascentlogistics.com/',
+				},
+			},
+		})
+
+		// THEN the page keeps the requested url but exposes the resolved destination
+		const resolved = await exit
+		const page = Exit.isSuccess(resolved) ? resolved.value : undefined
+		expect(page?.url).toBe('https://acme.es/about')
+		expect(page?.resolvedUrl).toBe('https://ascentlogistics.com/')
 	})
 
 	it('should POST to the Firecrawl scrape endpoint with a bearer key', async () => {
