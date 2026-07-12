@@ -131,7 +131,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				products_fit: ['gestio-reserves', 'web-starter'],
 				tags: ['gastro', 'garraf'],
 				location: 'Vilanova i la Geltrú',
-				region: 'cat',
+				country: 'ES',
 				latitude: 41.2241,
 				longitude: 1.7254,
 				citations: [
@@ -182,7 +182,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				products_fit: ['automatitzacions'],
 				tags: ['indústria', 'facturació'],
 				address: 'Cornellà de Llobregat — Pol. Ind. Almeda',
-				region: 'cat',
+				country: 'ES',
 				citations: [
 					{ source_id: 'src_registry_001', confidence: 0.95 },
 					{ source_id: 'src_report_001', confidence: 0.9 },
@@ -420,7 +420,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					name: 'Vidres Palafrugell',
 					website: 'https://vidrespalafrugell.cat',
 					industry: 'manufactura',
-					region: 'cat',
+					country: 'ES',
 					why_relevant:
 						'Sells exclusively in physical store; Instagram catalogue suggests latent online demand.',
 					pain_indicators: [
@@ -433,7 +433,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'Forja Empordà',
 					industry: 'manufactura',
-					region: 'cat',
+					country: 'ES',
 					why_relevant:
 						'Wrought-iron workshop next to La Bisbal; potential ecommerce-local fit.',
 					pain_indicators: ['static-website', 'no online catalogue'],
@@ -499,7 +499,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			enrichment: {
 				industry: 'distribució',
 				location: 'Manresa',
-				region: 'cat',
+				country: 'ES',
 				citations: [
 					{
 						source_id: 'src_archive_001',
@@ -531,7 +531,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'Taller Mecànic Jove',
 					industry: 'serveis',
-					region: 'cat',
+					country: 'ES',
 					why_relevant:
 						'Existing prospect — last contact 2025-09. Worth a follow-up DM via Instagram.',
 					pain_indicators: ['instagram-only', 'no booking page'],
@@ -577,7 +577,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				products_fit: ['gestio-reserves', 'web-starter'],
 				tags: ['gastro', 'garraf', 'audit'],
 				location: 'Vilanova i la Geltrú',
-				region: 'cat',
+				country: 'ES',
 				latitude: 41.2241,
 				longitude: 1.7254,
 				citations: [
@@ -607,7 +607,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					subject_table: 'companies',
 					subject_id: '<cal-pep-id>',
 					expected_version: 1,
-					fields: { sizeRange: '6-10', region: 'cat' },
+					fields: { sizeRange: '6-10', country: 'ES' },
 					reason: 'Confirmed via on-site visit and Google Business Profile.',
 					citations: [{ source_id: 'src_firecrawl_001' }],
 				},
@@ -703,7 +703,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					name: 'Galvanitzats Penedès',
 					website: 'https://galvanitzatspenedes.cat',
 					industry: 'manufactura',
-					region: 'cat',
+					country: 'ES',
 					why_relevant:
 						'Posted on LinkedIn about "tancar mes amb errors" — direct match for our automation pitch.',
 					pain_indicators: ['linkedin signal', 'no current vendor'],
@@ -712,7 +712,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'Foneria Marina',
 					industry: 'manufactura',
-					region: 'cat',
+					country: 'ES',
 					why_relevant:
 						'Family foundry north of Mataró. Heavy Contaplus + Excel. No visible IT vendor.',
 					pain_indicators: ['contaplus-only', 'family-run'],
@@ -721,7 +721,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'Acer Inoxidable Vallès',
 					industry: 'manufactura',
-					region: 'cat',
+					country: 'ES',
 					why_relevant:
 						'Mid-size stainless-steel fabricator. Existing finance manager publicly looking for ERP help.',
 					pain_indicators: ['hiring signal', 'public job post'],
@@ -844,7 +844,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'Forn La Coloma',
 					industry: 'restauració',
-					region: 'cat',
+					country: 'ES',
 					why_relevant:
 						'Berguedà obrador, similar size; runs Saturday market in Berga next to Forn Queralt.',
 					pain_indicators: ['no-web', 'cash-only'],
@@ -853,7 +853,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'Pa de Cardona',
 					industry: 'restauració',
-					region: 'cat',
+					country: 'ES',
 					why_relevant:
 						'Bages obrador with Instagram preorder via DM — overwhelmed weekly.',
 					pain_indicators: ['DM-only orders'],
@@ -886,7 +886,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				current_tools: 'Paper + Sage 200 + WhatsApp.',
 				products_fit: ['automatitzacions'],
 				tags: ['logistics', 'maresme'],
-				region: 'cat',
+				country: 'ES',
 				location: 'Mataró',
 				latitude: 41.5388,
 				longitude: 2.4449,
@@ -952,7 +952,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				products_fit: ['gestio-reserves', 'web-starter'],
 				tags: ['turisme', 'ribagorça', 'rate-strategy'],
 				location: 'Benasc',
-				region: 'ara',
+				country: 'ES',
 				citations: [{ source_id: 'src_firecrawl_003', confidence: 0.95 }],
 			},
 			contacts: RICH_CONTACTS_HOSTAL,
@@ -1135,7 +1135,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				products_fit: ['ecommerce-local', 'web-starter'],
 				tags: ['artesania', 'empordà', 'cluster'],
 				location: "La Bisbal d'Empordà",
-				region: 'cat',
+				country: 'ES',
 				citations: [{ source_id: 'src_firecrawl_002' }],
 			},
 		},
@@ -1214,7 +1214,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'Consultoria Vega',
 					industry: 'other',
-					region: 'cv',
+					country: 'ES',
 					why_relevant:
 						'Adjacent niche to Beta; same target customer (boutique B2B firms).',
 					pain_indicators: ['static brochure', 'gmail addresses'],
@@ -1223,7 +1223,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'Asesores Riba',
 					industry: 'other',
-					region: 'cv',
+					country: 'ES',
 					why_relevant:
 						'Tax + ops consultancy in València; same buyer profile.',
 					pain_indicators: ['no website analytics'],
@@ -1456,7 +1456,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'Estudi Marró',
 					industry: 'comerç',
-					region: 'cat',
+					country: 'ES',
 					why_relevant: 'Gràcia concept store with own brand; sells via DMs.',
 					pain_indicators: ['DM-only', 'no payment'],
 					citations: [{ source_id: 'src_exa_002' }],
@@ -1465,7 +1465,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					name: 'Tela Cruda',
 					website: 'https://telacruda.cat',
 					industry: 'comerç',
-					region: 'cat',
+					country: 'ES',
 					why_relevant:
 						'Born sustainable-textile boutique; broken cart, no payment integration.',
 					pain_indicators: ['broken-cart', 'no-payment'],
@@ -1474,7 +1474,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'Casa Petita',
 					industry: 'comerç',
-					region: 'cat',
+					country: 'ES',
 					why_relevant: 'Eixample kids brand. Pop-ups but no online channel.',
 					pain_indicators: ['no-online', 'pop-up driven'],
 					citations: [],
@@ -1482,7 +1482,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'Prendes Vell',
 					industry: 'comerç',
-					region: 'cat',
+					country: 'ES',
 					why_relevant: 'Gòtic vintage shop selling via Wallapop links.',
 					pain_indicators: ['marketplace-leaning'],
 					citations: [],
@@ -1490,7 +1490,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'El Modisto',
 					industry: 'comerç',
-					region: 'cat',
+					country: 'ES',
 					why_relevant: 'Sant Antoni bespoke menswear; deposits via Bizum.',
 					pain_indicators: ['Bizum-only payments'],
 					citations: [],
@@ -1498,7 +1498,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'Florín',
 					industry: 'comerç',
-					region: 'cat',
+					country: 'ES',
 					why_relevant: 'Poble Sec florist + lifestyle; ships via WhatsApp.',
 					pain_indicators: ['whatsapp-driven'],
 					citations: [],
@@ -1550,7 +1550,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				products_fit: ['web-starter', 'automatitzacions'],
 				tags: ['electricitat', 'vallès', 'lead-gen'],
 				location: 'Granollers',
-				region: 'cat',
+				country: 'ES',
 				latitude: 41.6075,
 				longitude: 2.2879,
 				address: 'Polígon Congost, Granollers',
@@ -1574,7 +1574,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					subject_table: 'companies',
 					subject_id: '<electricitat-id>',
 					expected_version: 1,
-					fields: { sizeRange: '11-25', region: 'cat' },
+					fields: { sizeRange: '11-25', country: 'ES' },
 					reason: 'Confirmed via libreBORME + on-site signage check.',
 					citations: [{ source_id: 'src_registry_001' }],
 				},
@@ -1678,7 +1678,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				products_fit: ['ecommerce-local', 'web-starter'],
 				tags: ['fornería', 'berguedà', 'mercats'],
 				location: 'Berga',
-				region: 'cat',
+				country: 'ES',
 				address: 'C. Major 12, Berga',
 				latitude: 42.1051,
 				longitude: 1.8456,
@@ -1982,7 +1982,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				products_fit: ['web-starter'],
 				tags: ['agency', 'design', 'barcelona'],
 				location: 'Barcelona',
-				region: 'cat',
+				country: 'ES',
 				address: 'Eixample, Barcelona',
 				latitude: 41.391,
 				longitude: 2.166,
@@ -2162,7 +2162,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				products_fit: ['web-starter'],
 				tags: ['tancaments', 'garraf', 'closeout'],
 				location: 'Vilanova i la Geltrú',
-				region: 'cat',
+				country: 'ES',
 				address: 'Polígon Roquetes, Vilanova',
 				latitude: 41.2231,
 				longitude: 1.7244,
@@ -2230,7 +2230,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				products_fit: ['web-starter', 'automatitzacions'],
 				tags: ['consultoria', 'valencia', 'b2b'],
 				location: 'València',
-				region: 'cv',
+				country: 'ES',
 				address: 'Eixample, València',
 				latitude: 39.4699,
 				longitude: -0.3763,
@@ -2249,7 +2249,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					subject_table: 'companies',
 					subject_id: '<consultoria-id>',
 					expected_version: 1,
-					fields: { region: 'cv', sizeRange: '6-10' },
+					fields: { country: 'ES', sizeRange: '6-10' },
 					reason: 'Confirmed via AEAT registry sample.',
 					citations: [{ source_id: 'src_exa_001' }],
 				},
@@ -2394,7 +2394,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				products_fit: ['gestio-reserves', 'web-starter'],
 				tags: ['taller', 'granollers', 'auto'],
 				location: 'Granollers',
-				region: 'cat',
+				country: 'ES',
 				latitude: 41.6075,
 				longitude: 2.2879,
 				address: 'Granollers, Vallès Oriental',
@@ -2542,7 +2542,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				current_tools: 'Paper + Sage 200 + WhatsApp.',
 				products_fit: ['automatitzacions'],
 				tags: ['logistics', 'maresme'],
-				region: 'cat',
+				country: 'ES',
 				location: 'Mataró',
 				citations: [{ source_id: 'src_exa_001', confidence: 0.8 }],
 			},
@@ -2591,7 +2591,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 					name: 'Mecanitzats Sant Boi',
 					website: 'https://mecanitzatssantboi.cat',
 					industry: 'manufactura',
-					region: 'cat',
+					country: 'ES',
 					why_relevant:
 						'CNC shop in Sant Boi with manual invoicing; not yet contacted.',
 					pain_indicators: ['excel-invoicing', 'no-vendor'],
@@ -3040,7 +3040,7 @@ export const seedResearchRuns = (
 								products_fit: ['gestio-reserves'],
 								tags: ['gastro', 'sitges'],
 								location: 'Sitges',
-								region: 'cat',
+								country: 'ES',
 								citations: [],
 							},
 						}),

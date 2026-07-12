@@ -69,7 +69,7 @@ test.describe
 					{
 						subject_table: 'companies',
 						subject_id: companyId,
-						fields: { region: 'Osona', size_range: 'small' },
+						fields: { location: 'Osona', size_range: 'small' },
 						reason: 'Mentioned on their about page.',
 						citations: [{ source_id: 'src-fixture-1', confidence: 0.9 }],
 					},
@@ -153,7 +153,7 @@ test.describe
 				).toBeVisible()
 				await expect(
 					page.getByTestId('research-proposed-updates'),
-				).toContainText('region')
+				).toContainText('location')
 			})
 		})
 

@@ -6,10 +6,13 @@ describe('allowlistFields', () => {
 	describe('when a company proposal carries writable and non-writable keys', () => {
 		it('should keep only known columns and drop everything else', () => {
 			// GIVEN a proposal mixing real company columns with fields that must
-			// never be written from a suggestion (identity, coordinates, version)
+			// never be written from a suggestion (identity, coordinates, version, and
+			// country — country is stamped from the run's own resolved country, never
+			// taken from the model's per-field suggestions)
 			const kept = allowlistFields('companies', {
 				industry: 'logistics',
 				location: 'Sitges',
+				country: 'US',
 				id: 'should-drop',
 				latitude: 1.23,
 				version: 99,

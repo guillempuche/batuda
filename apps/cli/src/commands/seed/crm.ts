@@ -91,7 +91,7 @@ export const seedCompanies = ({
 						status: 'client',
 						industry: 'restauració',
 						sizeRange: '6-10',
-						region: 'cat',
+						country: 'ES',
 						location: 'Sitges',
 						source: 'referral',
 						priority: 1,

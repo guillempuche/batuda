@@ -34,7 +34,6 @@ const COMPANY_FIELDS = new Set([
 	'status',
 	'industry',
 	'sizeRange',
-	'region',
 	'location',
 	'source',
 	'priority',
@@ -474,8 +473,13 @@ export const resolveResearchProposedUpdate = (
 					),
 				)
 
-		const rows = yield* sql<{ findings: string | null }>`
-			SELECT findings::text AS findings FROM research_runs
+		const rows = yield* sql<{
+			findings: string | null
+			context: string | null
+			country: string | null
+		}>`
+			SELECT findings::text AS findings, context::text AS context, country
+			FROM research_runs
 			WHERE id = ${runId} AND organization_id = ${org.id}
 			LIMIT 1
 		`
@@ -496,6 +500,19 @@ export const resolveResearchProposedUpdate = (
 		} | null
 		const proposals = findings?.proposed_updates ?? []
 		const discoveredExisting = findings?.discovered_existing ?? []
+
+		// The company this run was about — its subject. The run's country describes
+		// that company, so it is stamped only onto that company's update, never onto
+		// another company the run merely mentioned (a competitor in a different
+		// country would otherwise be mis-tagged).
+		const context = (run.context ? JSON.parse(run.context) : null) as {
+			subjects?: Array<{ table?: string; id?: string }>
+		} | null
+		const targetCompanyIds = new Set(
+			(context?.subjects ?? [])
+				.filter(s => s?.table === 'companies' && typeof s?.id === 'string')
+				.map(s => s.id as string),
+		)
 		const index = proposals.findIndex(
 			p => p['id'] === proposedUpdateId && p['status'] === 'pending',
 		)
@@ -617,6 +634,15 @@ export const resolveResearchProposedUpdate = (
 			} satisfies ResolveOutcome
 
 		const fields = allowlistFields(validated.table, validated.fields)
+		// Persist the run's country onto its own target company as the run's
+		// findings are applied. `country` is not an allowlisted proposal field —
+		// it comes from the run, not the model's per-field suggestions.
+		if (
+			validated.table === 'companies' &&
+			run.country !== null &&
+			targetCompanyIds.has(validated.subjectId)
+		)
+			fields['country'] = run.country
 		if (Object.keys(fields).length === 0)
 			return { outcome: 'no_applicable_fields' } satisfies ResolveOutcome
 

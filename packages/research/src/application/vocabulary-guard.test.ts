@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import {
 	constrainVocabulary,
 	mapIndustry,
-	mapRegion,
 	mapSizeRange,
 } from './vocabulary-guard'
 
@@ -29,6 +28,19 @@ describe('mapIndustry', () => {
 		})
 	})
 
+	describe('when a valid industry is written as a long, wordy value', () => {
+		it('should map on its keyword instead of discarding it as a sentence', () => {
+			// GIVEN the extractor's own wordy label — over five words, but plainly
+			// logistics — the keyword match must win over the long-sentence bail-out
+			expect(mapIndustry('Third-party logistics (3PL)')).toBe('transport')
+			expect(
+				mapIndustry(
+					'Third-party logistics (3PL), transportation, warehousing, customs clearance',
+				),
+			).toBe('transport')
+		})
+	})
+
 	describe('when the text is not an industry at all', () => {
 		it('should blank a URL, an email, a placeholder, or a sentence to null', () => {
 			// GIVEN junk the model sometimes emits for a field it could not fill
@@ -40,34 +52,6 @@ describe('mapIndustry', () => {
 				mapIndustry('We are a company that does many things across sectors'),
 			).toBeNull()
 			expect(mapIndustry('')).toBeNull()
-		})
-	})
-})
-
-describe('mapRegion', () => {
-	describe('when the text names a place in the CRM regional domain', () => {
-		it('should map a province or region name to its code', () => {
-			// GIVEN place names inside Catalonia, Aragon, or the Valencian Community
-			expect(mapRegion('Catalonia')).toBe('cat')
-			expect(mapRegion('Barcelona')).toBe('cat')
-			expect(mapRegion('Zaragoza')).toBe('ara')
-			expect(mapRegion('Comunitat Valenciana')).toBe('cv')
-			expect(mapRegion('Alicante')).toBe('cv')
-		})
-	})
-
-	describe('when the text is already a code', () => {
-		it('should pass an exact code through', () => {
-			// GIVEN a value that is already a CRM code
-			expect(mapRegion('cat')).toBe('cat')
-		})
-	})
-
-	describe('when the place is outside the CRM regional domain', () => {
-		it('should return null so region stays empty', () => {
-			// GIVEN a place the CRM has no region for
-			expect(mapRegion('Madrid')).toBeNull()
-			expect(mapRegion('London')).toBeNull()
 		})
 	})
 })
@@ -96,6 +80,11 @@ describe('mapSizeRange', () => {
 			// as 1700, not 1, so a large company is not bucketed as 1-5
 			expect(mapSizeRange('1,700 employees')).toBe('51-200')
 			expect(mapSizeRange('1.700 empleados')).toBe('51-200')
+			// AND a size written as a long sentence still buckets on its first integer,
+			// instead of being discarded for having more than five words
+			expect(
+				mapSizeRange('over 1,700 employees across North America and Europe'),
+			).toBe('51-200')
 		})
 	})
 
@@ -112,13 +101,12 @@ describe('mapSizeRange', () => {
 describe('constrainVocabulary', () => {
 	describe('when an enrichment block holds mappable and junk values', () => {
 		it('should rewrite the mappable ones, drop the junk key, and count both', () => {
-			// GIVEN an enrichment block mixing mappable values, an out-of-domain
-			// region, and an untouched free-text field
+			// GIVEN an enrichment block mixing a mappable industry, a qualitative
+			// (unmappable) size, and an untouched free-text field
 			const findings = {
 				enrichment: {
 					industry: 'freight & logistics',
-					region: 'Madrid',
-					size_range: '50 employees',
+					size_range: 'small',
 					pain_points: 'high churn',
 				},
 			}
@@ -126,15 +114,14 @@ describe('constrainVocabulary', () => {
 			// WHEN constrained to the CRM codes
 			const result = constrainVocabulary(findings)
 
-			// THEN mappable values become codes, the out-of-domain region key is
+			// THEN the mappable value becomes a code, the qualitative size key is
 			// dropped, the free-text field is untouched, and the counters are accurate
 			const e = (result.findings as { enrichment: Record<string, unknown> })
 				.enrichment
 			expect(e['industry']).toBe('transport')
-			expect(e['size_range']).toBe('26-50')
-			expect(e).not.toHaveProperty('region')
+			expect(e).not.toHaveProperty('size_range')
 			expect(e['pain_points']).toBe('high churn')
-			expect(result.mapped).toBe(2)
+			expect(result.mapped).toBe(1)
 			expect(result.blanked).toBe(1)
 		})
 	})

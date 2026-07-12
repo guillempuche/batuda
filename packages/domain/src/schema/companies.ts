@@ -21,10 +21,6 @@ export const COMPANY_INDUSTRIES = [
 export const CompanyIndustry = Schema.Literals(COMPANY_INDUSTRIES)
 export type CompanyIndustry = typeof CompanyIndustry.Type
 
-export const COMPANY_REGIONS = ['cat', 'ara', 'cv'] as const
-export const CompanyRegion = Schema.Literals(COMPANY_REGIONS)
-export type CompanyRegion = typeof CompanyRegion.Type
-
 export const COMPANY_SIZE_RANGES = [
 	'1-5',
 	'6-10',
@@ -56,12 +52,13 @@ export class Company extends Model.Class<Company>('Company')({
 	verifiedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
 	verifiedBy: Schema.NullOr(Schema.String),
 
-	// Classification. Allowed values are COMPANY_INDUSTRIES / COMPANY_SIZE_RANGES /
-	// COMPANY_REGIONS above; the columns stay free text (the research vocabulary
+	// Classification. Allowed values for industry / size are COMPANY_INDUSTRIES /
+	// COMPANY_SIZE_RANGES above; the columns stay free text (the research vocabulary
 	// guard is the enforcement point) so a manual edit is never decode-rejected.
+	// country is the global geographic segment — an ISO 3166-1 alpha-2 code.
 	industry: Schema.NullOr(Schema.String),
 	sizeRange: Schema.NullOr(Schema.String),
-	region: Schema.NullOr(Schema.String),
+	country: Schema.NullOr(Schema.String),
 	location: Schema.NullOr(Schema.String),
 	source: Schema.NullOr(Schema.String),
 	// values: firecrawl | exa | google_maps | referral

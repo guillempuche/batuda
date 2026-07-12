@@ -15,7 +15,7 @@ const CreateCompanyInput = Schema.Struct({
 	status: Schema.optional(Schema.String),
 	industry: Schema.optional(Schema.String),
 	sizeRange: Schema.optional(Schema.String),
-	region: Schema.optional(Schema.String),
+	country: Schema.optional(Schema.String),
 	location: Schema.optional(Schema.String),
 	source: Schema.optional(Schema.String),
 	priority: Schema.optional(Schema.Number),
@@ -45,7 +45,7 @@ const UpdateCompanyInput = Schema.Struct({
 	status: Schema.optional(Schema.String),
 	industry: Schema.optional(Schema.String),
 	sizeRange: Schema.optional(Schema.String),
-	region: Schema.optional(Schema.String),
+	country: Schema.optional(Schema.String),
 	location: Schema.optional(Schema.String),
 	source: Schema.optional(Schema.String),
 	priority: Schema.optional(Schema.Number),
@@ -73,7 +73,7 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 		HttpApiEndpoint.get('list', '/companies', {
 			query: {
 				status: Schema.optional(Schema.String),
-				region: Schema.optional(Schema.String),
+				country: Schema.optional(Schema.String),
 				industry: Schema.optional(Schema.String),
 				priority: Schema.optional(Schema.NumberFromString),
 				owner: Schema.optional(Schema.String),

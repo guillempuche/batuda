@@ -41,7 +41,7 @@ A JSON array of rows. Copy `golden.example.json` to your own `golden.json` and r
   "expectedOutput": {
     "officialDomain": "company.com",
     "altDomains": ["a-registry-profile.example"],
-    "fields": { "industry": "…", "size_range": "…", "region": "…", "location": "…", "address": "…" }
+    "fields": { "industry": "…", "size_range": "…", "country": "…", "location": "…" }
   }
 }
 ```
@@ -49,7 +49,7 @@ A JSON array of rows. Copy `golden.example.json` to your own `golden.json` and r
 - `query` — what the pipeline is asked to research (add the city for a generic name).
 - `officialDomain` — the company's own website host; the primary proof the run reached the target. **Required.**
 - `altDomains` — other hosts that also prove the target was reached (a registry profile, a known subsidiary). Optional.
-- `fields` — the known-correct values. Only these five keys are scored, and a misspelled key is rejected loudly. All optional — score only the fields you can verify.
+- `fields` — the known-correct values. Only these four keys are scored, and a misspelled key is rejected loudly. All optional — score only the fields you can verify.
 
 ### Allowed field values
 
@@ -57,13 +57,13 @@ Match the CRM's own vocabulary, or the value can never match what the pipeline e
 
 - `industry` — `restauració` · `construcció` · `retail` · `manufactura` · `serveis` · `hostaleria` · `distribució` · `transport` · `other`
 - `size_range` — `1-5` · `6-10` · `11-25` · `26-50` · `51-200`
-- `region` — `cat` · `ara` · `cv`
-- `location`, `address` — free text (matched by containment, so formatting differences are tolerated)
+- `country` — ISO 3166-1 alpha-2 code (e.g. `GB` · `ES` · `US`)
+- `location` — free text (matched by containment, so formatting differences are tolerated)
 
 ## Two kinds of row to include
 
-- **Clean companies** — a company clearly in the CRM's region domain (`cat`/`ara`/`cv`), with the fields filled in. These score field precision and recall.
-- **Generic / look-alike names** — a company whose name is common (many "Sunset Logistics" exist). Give the `query` a city and the real `officialDomain`; leave `region` unset if it's outside the domain. These catch the pipeline confidently returning a same-named *different* company (the wrong-company rate).
+- **Clean companies** — a company with its fields filled in (`country`, `location`, `industry`, and `size_range` where known). These score field precision and recall.
+- **Generic / look-alike names** — a company whose name is common (many "Sunset Logistics" exist). Give the `query` a city and the real `officialDomain`; leave a field unset if you can't verify it. These catch the pipeline confidently returning a same-named *different* company (the wrong-company rate).
 
 ## Registries: UK is free, ES is paid
 
@@ -73,7 +73,7 @@ A registry lookup that resolves the target company by its legal name now counts 
 
 ## Note
 
-`golden.example.json` ships a mix of real, verified companies: UK ones (whose register, Companies House, is free) that exercise grounding and the wrong-company rate, and Catalan/Spanish small businesses that exercise `region` and `size_range` — the two fields that are Spain-SMB-only in the CRM (region codes `cat`/`ara`/`cv`, size brackets up to `51-200`). Replace them with your own targets; for UK companies the pipeline extracts English industry terms, so `industry` precision there mostly measures the vocabulary gap, not grounding.
+`golden.example.json` ships a mix of real, verified companies: UK ones (whose register, Companies House, is free) that exercise grounding and the wrong-company rate, and Spanish small businesses (whose register, libreBORME, is paid) that exercise `country` (`ES`) and `size_range` against a thin web presence. Replace them with your own targets in any country; for UK companies the pipeline extracts English industry terms, so `industry` precision there mostly measures the vocabulary gap, not grounding.
 
 ## Charting runs on the monitoring board
 

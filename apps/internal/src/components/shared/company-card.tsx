@@ -28,7 +28,7 @@ export type CompanyCardData = {
 	status: string
 	industry?: string | null
 	location?: string | null
-	region?: string | null
+	country?: string | null
 	priority?: number | null
 	lastContactedAt?: Date | string | null
 }

@@ -65,8 +65,7 @@ type EnrichmentBlock = {
 	readonly productsFit?: ReadonlyArray<string>
 	readonly tags?: ReadonlyArray<string>
 	readonly location?: SourcedString
-	readonly region?: SourcedString
-	readonly address?: SourcedString
+	readonly country?: SourcedString
 }
 
 type CompetitorEntry = {
@@ -93,18 +92,16 @@ const ENRICHMENT_FIELDS: ReadonlyArray<{
 	readonly key:
 		| 'industry'
 		| 'sizeRange'
-		| 'region'
+		| 'country'
 		| 'location'
-		| 'address'
 		| 'painPoints'
 		| 'currentTools'
 	readonly label: ReactNode
 }> = [
 	{ key: 'industry', label: <Trans>Industry</Trans> },
 	{ key: 'sizeRange', label: <Trans>Size</Trans> },
-	{ key: 'region', label: <Trans>Region</Trans> },
+	{ key: 'country', label: <Trans>Country</Trans> },
 	{ key: 'location', label: <Trans>Location</Trans> },
-	{ key: 'address', label: <Trans>Address</Trans> },
 	{ key: 'painPoints', label: <Trans>Pain points</Trans> },
 	{ key: 'currentTools', label: <Trans>Current tools</Trans> },
 ]

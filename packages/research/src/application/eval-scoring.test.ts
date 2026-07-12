@@ -14,9 +14,8 @@ const acme: GoldenExpectation = {
 	officialDomain: 'acme.es',
 	fields: {
 		industry: 'transport',
-		region: 'cat',
+		country: 'ES',
 		size_range: '26-50',
-		address: 'Carrer del Ferro 12, 08040 Barcelona',
 	},
 }
 
@@ -59,7 +58,7 @@ describe('scoreRun', () => {
 				withAlt,
 				outcome({
 					reachedDomains: ['librebor.es'],
-					fields: { region: 'cat' },
+					fields: { country: 'ES' },
 				}),
 			)
 
@@ -93,7 +92,7 @@ describe('scoreRun', () => {
 				outcome({
 					reachedDomains: [],
 					registryConfirmed: true,
-					fields: { region: 'cat' },
+					fields: { country: 'ES' },
 				}),
 			)
 
@@ -144,7 +143,7 @@ describe('scoreRun', () => {
 			// GIVEN a run that succeeded but produced only blanks
 			const result = scoreRun(
 				acme,
-				outcome({ fields: { industry: '  ', region: null } }),
+				outcome({ fields: { industry: '  ', country: null } }),
 			)
 
 			// WHEN scored — THEN there is no usable data
@@ -186,10 +185,10 @@ describe('scoreRun', () => {
 
 	describe('when scoring the fields it filled', () => {
 		it('should count a correct filled field and ignore an unfilled one', () => {
-			// GIVEN industry correct, region left blank
+			// GIVEN industry correct, country left blank
 			const result = scoreRun(
 				acme,
-				outcome({ fields: { industry: 'Transport', region: null } }),
+				outcome({ fields: { industry: 'Transport', country: null } }),
 			)
 
 			// WHEN scored — THEN only the filled field is judged, and it matched
@@ -220,13 +219,13 @@ describe('scoreRun', () => {
 			expect(result.fieldsCorrect).toBe(1)
 		})
 
-		it('should match an address that differs only in formatting', () => {
-			// GIVEN an extracted address that contains the golden postal core
+		it('should match a location that differs only in formatting', () => {
+			// GIVEN an extracted location that contains the golden city
 			const result = scoreRun(
-				acme,
+				{ ...acme, fields: { location: 'Barcelona' } },
 				outcome({
 					fields: {
-						address: 'Carrer del Ferro 12, 08040 Barcelona, Catalonia, Spain',
+						location: 'Barcelona, Catalonia, Spain',
 					},
 				}),
 			)
@@ -237,14 +236,14 @@ describe('scoreRun', () => {
 		})
 
 		it('should count every known field as expected, even the unfilled ones', () => {
-			// GIVEN a run that fills 2 of acme's 4 golden fields, both correct
+			// GIVEN a run that fills 2 of acme's 3 golden fields, both correct
 			const result = scoreRun(
 				acme,
-				outcome({ fields: { industry: 'transport', region: 'cat' } }),
+				outcome({ fields: { industry: 'transport', country: 'ES' } }),
 			)
 
-			// WHEN scored — THEN all 4 known fields count toward recall; 2 were filled
-			expect(result.fieldsExpected).toBe(4)
+			// WHEN scored — THEN all 3 known fields count toward recall; 2 were filled
+			expect(result.fieldsExpected).toBe(3)
 			expect(result.fieldsScored).toBe(2)
 			expect(result.fieldsCorrect).toBe(2)
 		})

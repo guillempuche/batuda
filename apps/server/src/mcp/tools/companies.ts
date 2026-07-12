@@ -17,10 +17,10 @@ const REQUEST_DEPENDENCIES = [CurrentOrg]
 
 const SearchCompanies = Tool.make('search_companies', {
 	description:
-		'Filter companies by status, region, industry, priority, search query, or a geographic bounding box. The box is any subset of min_lat/max_lat/min_lng/max_lng (decimal degrees); each bound is applied independently and only matches companies with stored coordinates. Returns summaries (including latitude/longitude) — call get_company for full details.',
+		'Filter companies by status, country (ISO 3166-1 alpha-2, e.g. US/ES/DE), industry, priority, search query, or a geographic bounding box. The box is any subset of min_lat/max_lat/min_lng/max_lng (decimal degrees); each bound is applied independently and only matches companies with stored coordinates. Returns summaries (including latitude/longitude) — call get_company for full details.',
 	parameters: Schema.Struct({
 		status: Schema.optional(Schema.String),
-		region: Schema.optional(Schema.String),
+		country: Schema.optional(Schema.String),
 		industry: Schema.optional(Schema.String),
 		priority: Schema.optional(Schema.Number),
 		product_fit: Schema.optional(Schema.String),
@@ -62,7 +62,7 @@ const CreateCompany = Tool.make('create_company', {
 		status: Schema.optional(Schema.String),
 		industry: Schema.optional(Schema.String),
 		sizeRange: Schema.optional(Schema.String),
-		region: Schema.optional(Schema.String),
+		country: Schema.optional(Schema.String),
 		location: Schema.optional(Schema.String),
 		source: Schema.optional(Schema.String),
 		priority: Schema.optional(Schema.Number),
@@ -100,7 +100,7 @@ const UpdateCompany = Tool.make('update_company', {
 		status: Schema.optional(Schema.String),
 		industry: Schema.optional(Schema.String),
 		sizeRange: Schema.optional(Schema.String),
-		region: Schema.optional(Schema.String),
+		country: Schema.optional(Schema.String),
 		location: Schema.optional(Schema.String),
 		source: Schema.optional(Schema.String),
 		priority: Schema.optional(Schema.Number),
@@ -166,7 +166,7 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 				Effect.gen(function* () {
 					return yield* service.search({
 						status: params.status,
-						region: params.region,
+						country: params.country,
 						industry: params.industry,
 						priority: params.priority,
 						productFit: params.product_fit,

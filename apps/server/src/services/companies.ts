@@ -6,7 +6,7 @@ import { CurrentOrg, NotFound } from '@batuda/controllers'
 
 export interface CompanyFilters {
 	readonly status?: string | undefined
-	readonly region?: string | undefined
+	readonly country?: string | undefined
 	readonly industry?: string | undefined
 	readonly priority?: number | undefined
 	readonly productFit?: string | undefined
@@ -39,7 +39,8 @@ export class CompanyService extends ServiceMap.Service<CompanyService>()(
 							sql`organization_id = ${currentOrg.id}`,
 						]
 						if (filters.status) conditions.push(sql`status = ${filters.status}`)
-						if (filters.region) conditions.push(sql`region = ${filters.region}`)
+						if (filters.country)
+							conditions.push(sql`country = ${filters.country}`)
 						if (filters.industry)
 							conditions.push(sql`industry = ${filters.industry}`)
 						if (filters.priority)
@@ -75,7 +76,7 @@ export class CompanyService extends ServiceMap.Service<CompanyService>()(
 						})()
 
 						return yield* sql`
-							SELECT id, slug, name, status, industry, region, priority, owner_id,
+							SELECT id, slug, name, status, industry, country, priority, owner_id,
 								next_action, next_action_at, last_contacted_at, tags,
 								-- NUMERIC comes back as a string over the wire; cast so
 								-- callers get real numbers for the coordinates.

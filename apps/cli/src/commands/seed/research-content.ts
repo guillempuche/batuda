@@ -401,7 +401,7 @@ export const RICH_PROSPECTS_GIRONA = [
 		name: 'Cal Forn de Banyoles',
 		website: 'https://calforn-banyoles.cat',
 		industry: 'restauració',
-		region: 'cat',
+		country: 'ES',
 		why_relevant:
 			'Family restaurant in Banyoles with 40 covers; phone-only reservations; recently posted on Instagram about "no donar a l\'abast els caps de setmana".',
 		pain_indicators: ['phone-only', 'no website', 'visible weekend overflow'],
@@ -411,7 +411,7 @@ export const RICH_PROSPECTS_GIRONA = [
 		name: 'Hostal Empordà',
 		website: 'https://hostalemporda.cat',
 		industry: 'hostaleria',
-		region: 'cat',
+		country: 'ES',
 		why_relevant:
 			'12-room hostal in Figueres; rate-parity clause friction with Booking.com; identical pattern to Hostal del Pirineu.',
 		pain_indicators: ['booking.com 17%', 'no direct channel'],
@@ -420,7 +420,7 @@ export const RICH_PROSPECTS_GIRONA = [
 	{
 		name: 'Botiga del Pa',
 		industry: 'restauració',
-		region: 'cat',
+		country: 'ES',
 		why_relevant:
 			'Artisan bakery chain (3 locations) in Girona. Sell-out by 11:00 every Saturday; preorder via WhatsApp is unmanageable for them.',
 		pain_indicators: ['whatsapp-driven preorders', 'manual fulfilment'],
@@ -430,7 +430,7 @@ export const RICH_PROSPECTS_GIRONA = [
 		name: 'Mas Silencis',
 		website: 'https://massilencis.cat',
 		industry: 'hostaleria',
-		region: 'cat',
+		country: 'ES',
 		why_relevant:
 			'Boutique 6-room agroturisme; growing French customer base; no FR localisation today.',
 		pain_indicators: ['single-language', 'low domain authority'],
@@ -854,7 +854,7 @@ export const RICH_PROSPECTS_LOGISTICS = [
 		name: 'Transports Ferrer',
 		website: 'https://transportsferrer.cat',
 		industry: 'transport',
-		region: 'cat',
+		country: 'ES',
 		why_relevant:
 			'Mid-size carrier in Maresme with same paper-PoD pain. Recent LinkedIn post about "perdem albarans cada setmana".',
 		pain_indicators: ['paper PoD', 'lost-note signal'],
@@ -864,7 +864,7 @@ export const RICH_PROSPECTS_LOGISTICS = [
 		name: 'Logística Vallès',
 		website: 'https://logvalles.cat',
 		industry: 'transport',
-		region: 'cat',
+		country: 'ES',
 		why_relevant:
 			'Vallès Oriental fleet, 22 vehicles. Hiring a "responsable digitalització" per public job post.',
 		pain_indicators: ['hiring signal', 'no current vendor'],
@@ -873,7 +873,7 @@ export const RICH_PROSPECTS_LOGISTICS = [
 	{
 		name: 'Distribució Maresme',
 		industry: 'transport',
-		region: 'cat',
+		country: 'ES',
 		why_relevant:
 			'Adjacent SME in Maresme. Sage 200 user — same integration shape as Coastal.',
 		pain_indicators: ['sage-200', 'similar profile'],
@@ -883,7 +883,7 @@ export const RICH_PROSPECTS_LOGISTICS = [
 		name: 'Trans Garraf',
 		website: 'https://transgarraf.cat',
 		industry: 'transport',
-		region: 'cat',
+		country: 'ES',
 		why_relevant:
 			'Smaller fleet (8 vehicles) but rapidly growing; clean field for a fleet-app rollout.',
 		pain_indicators: ['growth-mode', 'paper PoD'],
@@ -896,7 +896,7 @@ export const RICH_PROSPECTS_ELECTRICAL = [
 		name: 'Instal·lacions Bages',
 		website: 'https://instalbages.cat',
 		industry: 'manufactura',
-		region: 'cat',
+		country: 'ES',
 		why_relevant:
 			'Bages-area electrical contractor; pulled three Google ads for "electricista urgent" — paying for leads they can\'t qualify.',
 		pain_indicators: ['paid-lead-spend', 'no-CRM'],
@@ -905,7 +905,7 @@ export const RICH_PROSPECTS_ELECTRICAL = [
 	{
 		name: 'Electricitat Osona',
 		industry: 'manufactura',
-		region: 'cat',
+		country: 'ES',
 		why_relevant:
 			'Vic-based; similar size to Electricitat del Vallès; weak digital posture.',
 		pain_indicators: ['weak-digital'],
@@ -915,7 +915,7 @@ export const RICH_PROSPECTS_ELECTRICAL = [
 		name: 'Electrosolucions Penedès',
 		website: 'https://electroso-penedes.cat',
 		industry: 'manufactura',
-		region: 'cat',
+		country: 'ES',
 		why_relevant: 'New entrant; has a fast site but no booking flow.',
 		pain_indicators: ['no-booking'],
 		citations: [],
@@ -926,7 +926,7 @@ export const RICH_PROSPECTS_FANTASMA = [
 	{
 		name: 'Magatzem Bages',
 		industry: 'distribució',
-		region: 'cat',
+		country: 'ES',
 		why_relevant:
 			"Small distributor in same Manresa industrial belt. Same low-signal profile as L'Ànec d'Or; worth a postal-mail touch.",
 		pain_indicators: ['no-web', 'low-google-presence'],
@@ -935,7 +935,7 @@ export const RICH_PROSPECTS_FANTASMA = [
 	{
 		name: 'Distribució Cardona',
 		industry: 'distribució',
-		region: 'cat',
+		country: 'ES',
 		why_relevant:
 			'Family distributor; runs on phone + paper. Postal mail and a cold visit may unlock dialogue.',
 		pain_indicators: ['phone-only'],

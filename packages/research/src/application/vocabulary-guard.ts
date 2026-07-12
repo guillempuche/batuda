@@ -1,22 +1,21 @@
 /**
- * Rewrites a run's extracted industry / region / size to the CRM's fixed codes.
+ * Rewrites a run's extracted industry / size to the CRM's fixed codes.
  *
  * The extractor emits these fields in whatever words the source page used
- * ("manufacturing", "Catalonia", "50 employees"), but the CRM stores a fixed set
- * of codes. This guard maps each value to the closest code by deterministic
- * keyword rules — model-independent, so it does not regress if the extract model
- * changes — sending a real-but-uncategorized industry to 'other' and blanking
- * true junk (a URL, an email, a sentence, "N/A", a qualitative size). It runs in
- * the phase-2 guard chain after value-provenance and before applicability, so a
- * proposal whose only field is blanked ends up empty and is dropped downstream.
+ * ("manufacturing", "50 employees"), but the CRM stores a fixed set of codes.
+ * This guard maps each value to the closest code by deterministic keyword rules —
+ * model-independent, so it does not regress if the extract model changes —
+ * sending a real-but-uncategorized industry to 'other' and blanking true junk (a
+ * URL, an email, a sentence that names no category, "N/A", a qualitative size).
+ * It runs in the phase-2 guard chain after value-provenance and before
+ * applicability, so a proposal whose only field is blanked ends up empty and is
+ * dropped downstream.
  */
 
 import {
 	CRM_INDUSTRIES,
-	CRM_REGIONS,
 	CRM_SIZE_RANGES,
 	type CrmIndustry,
-	type CrmRegion,
 	type CrmSizeRange,
 } from '../domain/crm-vocabulary'
 
@@ -29,14 +28,19 @@ const normalize = (raw: string): string =>
 		.normalize('NFD')
 		.replace(/\p{Diacritic}/gu, '')
 
-// Text that is plainly not a category value — a link, an email, a "no value"
-// placeholder, or a whole sentence — is blanked, not mapped.
-const isJunk = (n: string): boolean =>
+// Text that can never be a category value — a link, an email, an empty string, or
+// a "no value" placeholder — is always blanked, before any keyword match.
+const isHardJunk = (n: string): boolean =>
 	n === '' ||
 	n.includes('://') ||
 	n.includes('@') ||
-	['n/a', 'na', 'none', 'null', 'unknown', 'tbd', '-'].includes(n) ||
-	n.split(/\s+/).length > 5
+	['n/a', 'na', 'none', 'null', 'unknown', 'tbd', '-'].includes(n)
+
+// More than five words reads as a whole sentence, not a label. This is only a
+// last-resort bail-out, checked *after* the keyword match fails — so a wordy value
+// that still names a known sector ("Third-party logistics (3PL), transportation,
+// warehousing, customs clearance") maps on its keyword instead of being discarded.
+const isSentence = (n: string): boolean => n.split(/\s+/).length > 5
 
 // Industry keyword table, most specific bucket first so a broad word ("servei")
 // never shadows a specific one ("transport"). Stems span Catalan, Spanish, and
@@ -111,47 +115,20 @@ const INDUSTRY_RULES: ReadonlyArray<
 
 export const mapIndustry = (raw: string): CrmIndustry | null => {
 	const n = normalize(raw)
-	if (isJunk(n)) return null
+	if (isHardJunk(n)) return null
 	if ((CRM_INDUSTRIES as readonly string[]).includes(n)) return n as CrmIndustry
 	for (const [code, keywords] of INDUSTRY_RULES) {
 		if (keywords.some(k => n.includes(k))) return code
 	}
-	// A plausible label matching no bucket is a real-but-uncategorized industry →
-	// 'other', never blanked (only junk is blanked).
+	// No keyword matched. A wordy value is a stray sentence with no category in it →
+	// blank; a short plausible label is a real-but-uncategorized industry → 'other'.
+	if (isSentence(n)) return null
 	return 'other'
-}
-
-const REGION_RULES: ReadonlyArray<readonly [CrmRegion, ReadonlyArray<string>]> =
-	[
-		['cat', ['catalu', 'catalo', 'barcelona', 'girona', 'lleida', 'tarragona']],
-		['ara', ['arago', 'zaragoza', 'saragossa', 'huesca', 'osca', 'teruel']],
-		[
-			'cv',
-			[
-				'valenc',
-				'comunitat valenciana',
-				'comunidad valenciana',
-				'alicante',
-				'alacant',
-				'castell',
-			],
-		],
-	]
-
-export const mapRegion = (raw: string): CrmRegion | null => {
-	const n = normalize(raw)
-	if (isJunk(n)) return null
-	if ((CRM_REGIONS as readonly string[]).includes(n)) return n as CrmRegion
-	for (const [code, keywords] of REGION_RULES) {
-		if (keywords.some(k => n.includes(k))) return code
-	}
-	// A place outside the CRM's regional domain (Madrid, London) → no region.
-	return null
 }
 
 export const mapSizeRange = (raw: string): CrmSizeRange | null => {
 	const n = normalize(raw)
-	if (isJunk(n)) return null
+	if (isHardJunk(n)) return null
 	if ((CRM_SIZE_RANGES as readonly string[]).includes(n))
 		return n as CrmSizeRange
 	// Take the first integer — a single head-count, or the lower bound of an
@@ -172,7 +149,6 @@ export const mapSizeRange = (raw: string): CrmSizeRange | null => {
 
 const MAPPERS: Record<string, (raw: string) => string | null> = {
 	industry: mapIndustry,
-	region: mapRegion,
 	// Match the size key in either casing: findings may carry it snake_cased
 	// (`size_range`) or camelCased (`sizeRange`).
 	size_range: mapSizeRange,

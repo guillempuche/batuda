@@ -126,7 +126,7 @@ test.describe('company-detail Overview tab', () => {
 			// AND every grouped field label is reachable inside the panel
 			//   Sales context (5)
 			await expect(panel.getByText('Industry', { exact: true })).toBeVisible()
-			await expect(panel.getByText('Region', { exact: true })).toBeVisible()
+			await expect(panel.getByText('Country', { exact: true })).toBeVisible()
 			await expect(panel.getByText('Location', { exact: true })).toBeVisible()
 			await expect(panel.getByText('Size', { exact: true })).toBeVisible()
 			await expect(panel.getByText('Source', { exact: true })).toBeVisible()
