@@ -38,7 +38,11 @@ describe('ProspectScanV1Schema (shared PendingPaidAction.args)', () => {
 	const decode = Schema.decodeUnknownSync(ProspectScanV1Schema)
 	const withArgs = (args: string) => ({
 		prospects: [
-			{ name: 'Acme', why_relevant: 'fit', citations: [{ source_id: 's1' }] },
+			{
+				name: 'Acme',
+				why_relevant: 'fit',
+				citations: [{ source_id: 's1', confidence: null }],
+			},
 		],
 		pending_paid_actions: [
 			{ tool: 'lookup_registry', args, estimated_cents: 10, reason: 'need id' },
@@ -120,14 +124,13 @@ describe('LenientNumber', () => {
 
 	describe('when the model emits a value it could not work out', () => {
 		it('should coerce every non-finite value to null instead of failing', () => {
-			// GIVEN the strings and numbers a model returns for "no value" — the
+			// GIVEN the strings a model returns for "no value" — JSON has no NaN or
+			// Infinity literal, so a non-finite value always arrives quoted, and the
 			// literal "NaN" is the exact shape that failed enrichment runs
 			// THEN each becomes null rather than throwing a decode error
 			expect(decode('NaN')).toBeNull()
 			expect(decode('Infinity')).toBeNull()
 			expect(decode('-Infinity')).toBeNull()
-			expect(decode(Number.NaN)).toBeNull()
-			expect(decode(Number.POSITIVE_INFINITY)).toBeNull()
 			expect(decode('')).toBeNull()
 			expect(decode('not a number')).toBeNull()
 		})
@@ -180,7 +183,7 @@ describe('numeric guards on model-produced fields', () => {
 					{
 						name: 'Maria',
 						channels: [{ kind: 'email', value: 'm@x.cat', confidence: 'NaN' }],
-						citations: [{ source_id: 's1' }],
+						citations: [{ source_id: 's1', confidence: null }],
 					},
 				],
 			})
@@ -198,7 +201,7 @@ describe('numeric guards on model-produced fields', () => {
 					{
 						name: 'Acme',
 						why_relevant: 'fit',
-						citations: [{ source_id: 's1' }],
+						citations: [{ source_id: 's1', confidence: null }],
 					},
 				],
 				proposed_updates: [
@@ -208,7 +211,7 @@ describe('numeric guards on model-produced fields', () => {
 						expected_version: 'NaN',
 						fields: '{"industry":"logistics"}',
 						reason: 'r',
-						citations: [{ source_id: 's1' }],
+						citations: [{ source_id: 's1', confidence: null }],
 					},
 				],
 				pending_paid_actions: [
@@ -276,12 +279,18 @@ describe('Sourced', () => {
 		})
 	})
 
-	describe('when only the value and source are present', () => {
-		it('should decode with quote and confidence absent', () => {
-			// GIVEN the minimal wrapper — the source is required, the rest optional
-			const decoded = decode({ value: 'retail', source_id: 's1' })
+	describe('when only the value, source, and null confidence are present', () => {
+		it('should decode with the optional quote absent', () => {
+			// GIVEN the minimal wrapper — value and source are required, confidence is
+			// required + nullable (so it stays a single non-nested union), quote optional
+			const decoded = decode({
+				value: 'retail',
+				source_id: 's1',
+				confidence: null,
+			})
 			// THEN it decodes, carrying no quote
 			expect(decoded.value).toBe('retail')
+			expect(decoded.confidence).toBeNull()
 			expect(decoded).not.toHaveProperty('quote')
 		})
 	})

@@ -46,22 +46,26 @@ import {
 const SCRAPE_MARKDOWN_MAX_CHARS = 8000
 
 // ── Tool parameter schemas ──
-// Optional params accept `null` (via `NullOr`) because a model may send an
-// explicit `null` for a field it isn't using instead of omitting it; the
-// handlers below treat that null as "not provided".
+// Optional params are required + nullable (`Schema.NullOr(...)`), not
+// `optionalKey`: a model not using one sends an explicit `null`, which the
+// handlers treat as "not provided". This shape also serializes to a single,
+// non-nested union — `optionalKey` wraps the value in a second nullable layer,
+// and a bare `Schema.Number` adds a NaN/Infinity string branch; either nesting
+// makes a stricter provider (groq, fireworks) reject the whole tool schema. So
+// numerics use `Schema.Finite`, which serializes to a plain number.
 
 const WebSearchParams = Schema.Struct({
 	query: Schema.String.annotate({
 		description: 'Search query; concise keywords work best',
 	}),
-	limit: Schema.optionalKey(Schema.NullOr(Schema.Number)).annotate({
+	limit: Schema.NullOr(Schema.Finite).annotate({
 		description: 'Max results to return (default 10)',
 	}),
-	recency_days: Schema.optionalKey(Schema.NullOr(Schema.Number)).annotate({
+	recency_days: Schema.NullOr(Schema.Finite).annotate({
 		description:
-			'Restrict to results published within the last N days. Omit for no filter.',
+			'Restrict to results published within the last N days. Null for no filter.',
 	}),
-	location: Schema.optionalKey(Schema.NullOr(Schema.String)).annotate({
+	location: Schema.NullOr(Schema.String).annotate({
 		description: 'Geographic locale hint (e.g. "ES", "es-ES")',
 	}),
 })
@@ -77,9 +81,9 @@ const ExtractStructuredParams = Schema.Struct({
 	schema_name: Schema.String.annotate({
 		description: `Name of a registered schema. One of: ${Object.keys(schemaRegistry).join(', ')}`,
 	}),
-	prompt: Schema.optionalKey(Schema.NullOr(Schema.String)).annotate({
+	prompt: Schema.NullOr(Schema.String).annotate({
 		description:
-			'Optional extra guidance for the extractor (e.g. "focus on revenue figures").',
+			'Optional extra guidance for the extractor (e.g. "focus on revenue figures"); null for none.',
 	}),
 })
 
@@ -88,11 +92,12 @@ const RegistryLookupParams = Schema.Struct({
 		description:
 			'ISO 3166-1 alpha-2 country code (any case). A country without a national registry returns {status:"no_registry"} — use discover_contacts there instead.',
 	}),
-	query: Schema.optionalKey(Schema.NullOr(Schema.String)).annotate({
-		description: 'Company name or fuzzy search string',
+	query: Schema.NullOr(Schema.String).annotate({
+		description: 'Company name or fuzzy search string; null if using tax_id',
 	}),
-	tax_id: Schema.optionalKey(Schema.NullOr(Schema.String)).annotate({
-		description: 'National tax id (e.g. ES CIF/NIF) — more precise than query',
+	tax_id: Schema.NullOr(Schema.String).annotate({
+		description:
+			'National tax id (e.g. ES CIF/NIF) — more precise than query; null if using query',
 	}),
 })
 
@@ -103,8 +108,9 @@ const DiscoverContactsParams = Schema.Struct({
 	domain: Schema.String.annotate({
 		description: 'Company web domain, e.g. "acme.com" (no scheme, no @)',
 	}),
-	country: Schema.optionalKey(Schema.NullOr(Schema.String)).annotate({
-		description: 'ISO 3166-1 alpha-2 country hint (helps pick a registry)',
+	country: Schema.NullOr(Schema.String).annotate({
+		description:
+			'ISO 3166-1 alpha-2 country hint (helps pick a registry); null if unknown',
 	}),
 })
 
