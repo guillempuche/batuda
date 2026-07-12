@@ -2184,7 +2184,10 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							templateFingerprint,
 						})
 						if (!input.forceFresh) {
-							const hits = yield* sql<{ research_id: string }>`
+							// The SQL client camelCases result keys (snake_case DB ↔
+							// camelCase TS), so a selected `research_id` column arrives as
+							// `researchId`.
+							const hits = yield* sql<{ researchId: string }>`
 								SELECT research_id
 								FROM research_cache
 								WHERE key_hash = ${cacheKey}
@@ -2194,12 +2197,12 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 								LIMIT 1
 							`
 							if (hits[0]) {
-								const cachedId = hits[0].research_id
+								const cachedId = hits[0].researchId
 								const [cachedRun] = yield* sql<{
 									findings: unknown
-									brief_md: string | null
-									tokens_in: number
-									tokens_out: number
+									briefMd: string | null
+									tokensIn: number
+									tokensOut: number
 								}>`
 									SELECT findings, brief_md, tokens_in, tokens_out
 									FROM research_runs
@@ -2226,9 +2229,9 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 											'succeeded',
 											${JSON.stringify(input.context ?? {})},
 											${JSON.stringify(cachedRun.findings)},
-											${cachedRun.brief_md},
-											${cachedRun.tokens_in},
-											${cachedRun.tokens_out},
+											${cachedRun.briefMd},
+											${cachedRun.tokensIn},
+											${cachedRun.tokensOut},
 											0, 0,
 											${input.idempotencyKey ?? null},
 											${userId},

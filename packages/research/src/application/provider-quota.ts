@@ -18,6 +18,9 @@ export const makeProviderQuotaLayer = (config: ProviderQuotaConfig) =>
 
 			// Read the quota config for a provider. Returns null if no quota
 			// is configured (quota check is skipped — budget is the only gate).
+			// The SQL client camelCases result keys (snake_case DB ↔ camelCase TS),
+			// so the selected columns arrive as `quotaTotal`/`quotaUnit`/… — read
+			// them by those names, not the SQL spelling.
 			const getQuotaConfig = (provider: string) =>
 				Effect.gen(function* () {
 					const rows = yield* sql`
@@ -29,13 +32,13 @@ export const makeProviderQuotaLayer = (config: ProviderQuotaConfig) =>
 					`
 					return rows[0] as
 						| {
-								quota_total: number
-								quota_unit: string
-								period_months: number
-								period_anchor: string | null
-								sync_mode: string
-								billing_model: string
-								cents_per_unit: number
+								quotaTotal: number
+								quotaUnit: string
+								periodMonths: number
+								periodAnchor: string | null
+								syncMode: string
+								billingModel: string
+								centsPerUnit: number
 						  }
 						| undefined
 				}).pipe(Effect.orDie)
@@ -43,14 +46,14 @@ export const makeProviderQuotaLayer = (config: ProviderQuotaConfig) =>
 			// Get current usage for a provider in the current period.
 			const getCurrentUsage = (provider: string) =>
 				Effect.gen(function* () {
-					const [row] = yield* sql<{ units_consumed: number }>`
+					const [row] = yield* sql<{ unitsConsumed: number }>`
 						SELECT COALESCE(units_consumed, 0)::int AS units_consumed
 						FROM provider_usage
 						WHERE user_id = ${config.userId}
 						  AND provider = ${provider}
 						  AND period_start = date_trunc('month', now())::date
 					`
-					return row?.units_consumed ?? 0
+					return row?.unitsConsumed ?? 0
 				}).pipe(Effect.orDie)
 
 			return ProviderQuota.of({
@@ -61,11 +64,11 @@ export const makeProviderQuotaLayer = (config: ProviderQuotaConfig) =>
 						if (!quota) return
 
 						const used = yield* getCurrentUsage(provider)
-						const remaining = quota.quota_total - used
+						const remaining = quota.quotaTotal - used
 						if (remaining < units) {
 							return yield* new QuotaExhausted({
 								provider,
-								unit: quota.quota_unit,
+								unit: quota.quotaUnit,
 								remaining: Math.max(0, remaining),
 							})
 						}
@@ -77,11 +80,11 @@ export const makeProviderQuotaLayer = (config: ProviderQuotaConfig) =>
 						if (!quota) return
 
 						const used = yield* getCurrentUsage(provider)
-						const remaining = quota.quota_total - used
+						const remaining = quota.quotaTotal - used
 						if (remaining < units) {
 							return yield* new QuotaExhausted({
 								provider,
-								unit: quota.quota_unit,
+								unit: quota.quotaUnit,
 								remaining: Math.max(0, remaining),
 							})
 						}
@@ -103,19 +106,19 @@ export const makeProviderQuotaLayer = (config: ProviderQuotaConfig) =>
 
 						const used = yield* getCurrentUsage(provider)
 						return {
-							total: quota.quota_total,
+							total: quota.quotaTotal,
 							used,
-							unit: quota.quota_unit,
+							unit: quota.quotaUnit,
 						}
 					}),
 
 				sync: (provider: string) =>
 					Effect.gen(function* () {
 						const quota = yield* getQuotaConfig(provider)
-						if (!quota || quota.sync_mode !== 'api') {
+						if (!quota || quota.syncMode !== 'api') {
 							return yield* new ProviderError({
 								provider,
-								message: `sync not supported for ${provider} (sync_mode=${quota?.sync_mode ?? 'none'})`,
+								message: `sync not supported for ${provider} (sync_mode=${quota?.syncMode ?? 'none'})`,
 								recoverable: false,
 							})
 						}
