@@ -14,7 +14,9 @@ pnpm cli research probe --api-key <nebius-key>
 pnpm cli research eval --org <org-id> --user <user-id> --golden eval/golden.json --out report.json
 ```
 
-`eval` prints the five metrics — grounding accuracy, field precision, field recall, wrong-company rate, empty rate — and writes a full per-run report with `--out`.
+`eval` prints the metrics — grounding accuracy, field precision, field recall, titled-contact recall, wrong-company rate, empty rate — and writes a full per-run report with `--out`.
+
+Titled-contact recall answers a gap the four scalar fields miss: of the people a company is known to publish, how many the run returned **with a title**. Contacts sit outside the scored field set, so a run can pass every field yet hand back the decision-makers with no title — the exact symptom this metric watches. It only appears (else `n/a`) for rows that list expected `contacts`.
 
 ## Providing keys
 
@@ -41,7 +43,8 @@ A JSON array of rows. Copy `golden.example.json` to your own `golden.json` and r
   "expectedOutput": {
     "officialDomain": "company.com",
     "altDomains": ["a-registry-profile.example"],
-    "fields": { "industry": "…", "size_range": "…", "country": "…", "location": "…" }
+    "fields": { "industry": "…", "size_range": "…", "country": "…", "location": "…" },
+    "contacts": ["Ada Lovelace", { "name": "Alan Turing" }]
   }
 }
 ```
@@ -50,6 +53,7 @@ A JSON array of rows. Copy `golden.example.json` to your own `golden.json` and r
 - `officialDomain` — the company's own website host; the primary proof the run reached the target. **Required.**
 - `altDomains` — other hosts that also prove the target was reached (a registry profile, a known subsidiary). Optional.
 - `fields` — the known-correct values. Only these four keys are scored, and a misspelled key is rejected loudly. All optional — score only the fields you can verify.
+- `contacts` — people the company is known to publish, each a name string or a `{ "name": "…" }` object. They score titled-contact recall: how many came back with a title. Name matching folds accents and tolerates a middle name/initial, but it tokenizes on Latin letters — a name written only in a non-Latin script (CJK, Cyrillic, Greek, Arabic) won't match, so romanize it in the golden row. Optional; a fabricated name skews the metric exactly as a wrong field value does, so list only real, verifiable people. No `role` here — the metric checks that the run supplied *some* title, not which one.
 
 ### Allowed field values
 

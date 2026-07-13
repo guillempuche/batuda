@@ -76,6 +76,17 @@ export const scorePayloadsForRun = (score: RunScore): ScorePayload[] => {
 			feedback: `${score.fieldsCorrect}/${score.fieldsExpected} known fields recovered`,
 		})
 	}
+	// Contacts are outside the scorable-field set, so their recall is tracked on its
+	// own — a run can fill every field yet return the decision-makers with no title,
+	// the exact gap this metric watches.
+	if (score.contactsExpected > 0) {
+		payloads.push({
+			name: 'contact_recall',
+			value: score.contactsFound / score.contactsExpected,
+			passed: score.contactsFound === score.contactsExpected,
+			feedback: `${score.contactsFound}/${score.contactsExpected} known contacts found with a title`,
+		})
+	}
 	return payloads
 }
 
@@ -110,6 +121,8 @@ export const evalSpanAttributes = (
 		'eval.fields_expected': score.fieldsExpected,
 		'eval.fields_scored': score.fieldsScored,
 		'eval.fields_correct': score.fieldsCorrect,
+		'eval.contacts_expected': score.contactsExpected,
+		'eval.contacts_found': score.contactsFound,
 	}
 	if (score.fieldsScored > 0) {
 		attributes['eval.field_precision'] =
@@ -117,6 +130,10 @@ export const evalSpanAttributes = (
 	}
 	if (score.fieldsExpected > 0) {
 		attributes['eval.field_recall'] = score.fieldsCorrect / score.fieldsExpected
+	}
+	if (score.contactsExpected > 0) {
+		attributes['eval.contact_recall'] =
+			score.contactsFound / score.contactsExpected
 	}
 	return attributes
 }
@@ -141,6 +158,9 @@ export const evalSummaryAttributes = (
 	}
 	if (summary.fieldRecall !== null) {
 		attributes['eval.field_recall'] = summary.fieldRecall
+	}
+	if (summary.contactRecall !== null) {
+		attributes['eval.contact_recall'] = summary.contactRecall
 	}
 	return attributes
 }

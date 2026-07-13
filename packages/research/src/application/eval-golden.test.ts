@@ -137,6 +137,81 @@ describe('parseGoldenRow', () => {
 			expect(result.ok).toBe(false)
 		})
 	})
+
+	describe('when contacts are given as names and objects', () => {
+		it('should accept both forms and carry the names through', () => {
+			// GIVEN a bare name string and a { name } object side by side
+			const result = parseGoldenRow(
+				row({
+					expectedOutput: {
+						officialDomain: 'acme.es',
+						contacts: ['Ada Lovelace', { name: 'Alan Turing' }],
+					},
+				}),
+			)
+
+			// WHEN parsed — THEN both are normalized to { name } entries
+			expect(result).toMatchObject({
+				ok: true,
+				value: {
+					contacts: [{ name: 'Ada Lovelace' }, { name: 'Alan Turing' }],
+				},
+			})
+		})
+	})
+
+	describe('when a row lists no contacts', () => {
+		it('should omit the contacts key rather than emit an empty array', () => {
+			// GIVEN a well-formed row with no contacts field
+			const result = parseGoldenRow(
+				row({ expectedOutput: { officialDomain: 'acme.es' } }),
+			)
+
+			// WHEN parsed — THEN contacts is absent, so recall stays inert (not 0/0)
+			expect(result).toMatchObject({ ok: true })
+			if (result.ok) expect('contacts' in result.value).toBe(false)
+		})
+	})
+
+	describe('when contacts is not an array', () => {
+		it('should fail rather than guess', () => {
+			// GIVEN a single object where an array is required
+			const result = parseGoldenRow(
+				row({
+					expectedOutput: {
+						officialDomain: 'acme.es',
+						contacts: { name: 'Ada Lovelace' },
+					},
+				}),
+			)
+
+			// WHEN parsed — THEN it is rejected
+			expect(result.ok).toBe(false)
+		})
+	})
+
+	describe('when a contact has no usable name', () => {
+		it('should fail — a nameless contact cannot be matched', () => {
+			// GIVEN a blank name and, separately, a nameless object
+			expect(
+				parseGoldenRow(
+					row({
+						expectedOutput: { officialDomain: 'acme.es', contacts: ['  '] },
+					}),
+				).ok,
+			).toBe(false)
+			expect(
+				parseGoldenRow(
+					row({
+						expectedOutput: {
+							officialDomain: 'acme.es',
+							contacts: [{ role: 'CEO' }],
+						},
+					}),
+				).ok,
+			).toBe(false)
+		})
+	})
 })
 
 describe('parseGoldenSet', () => {
@@ -178,6 +253,9 @@ describe('parseGoldenSet', () => {
 			expect(arrive?.fields.size_range).toBe('51-200')
 			expect(arrive?.fields.location).toBe('Austin')
 			expect(arrive?.fields.country).toBe('US')
+			// AND the Brompton row carries the contact that seeds titled-contact recall
+			const brompton = result.golden.find(g => g.id === 'brompton-bicycle')
+			expect(brompton?.contacts).toEqual([{ name: 'Will Butler-Adams' }])
 		})
 	})
 })

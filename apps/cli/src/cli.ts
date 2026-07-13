@@ -924,7 +924,7 @@ const researchEvalCommand = Command.make(
 		'Score the research pipeline against a golden set',
 	),
 	Command.withDescription(
-		'Drive each company in a golden-set JSON file through the live research pipeline and report grounding accuracy, field precision, field recall, wrong-company rate, and empty rate. Needs the research env configured (LLM + provider keys, DATABASE_URL) and an --org / --user to run as. Writes a full per-run report with --out.',
+		'Drive each company in a golden-set JSON file through the live research pipeline and report grounding accuracy, field precision, field recall, titled-contact recall, wrong-company rate, and empty rate. Needs the research env configured (LLM + provider keys, DATABASE_URL) and an --org / --user to run as. Writes a full per-run report with --out.',
 	),
 )
 
