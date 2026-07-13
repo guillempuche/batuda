@@ -357,6 +357,12 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 
 	const isReply = draft.mode === 'reply'
 
+	// Base UI's Select.Value needs the value→label map to render the chosen
+	// inbox as its name rather than its raw id.
+	const inboxItems = inboxes
+		.filter(i => i.active && i.purpose !== 'agent')
+		.map(i => ({ value: i.id, label: i.displayName ?? i.email }))
+
 	return (
 		<Form
 			data-testid='compose-form'
@@ -369,6 +375,7 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 				<Field>
 					<FieldLabel htmlFor={`inbox-${draft.id}`}>{t`Inbox`}</FieldLabel>
 					<PriSelect.Root
+						items={inboxItems}
 						value={effectiveInboxId ?? ''}
 						onValueChange={value => {
 							patchForm({ inboxId: value === '' ? null : value })
@@ -381,15 +388,11 @@ export function ComposeForm({ draft }: { readonly draft: Draft }) {
 						<PriSelect.Portal>
 							<PriSelect.Positioner>
 								<PriSelect.Popup>
-									{inboxes
-										.filter(i => i.active && i.purpose !== 'agent')
-										.map(inbox => (
-											<PriSelect.Item key={inbox.id} value={inbox.id}>
-												<PriSelect.ItemText>
-													{inbox.displayName ?? inbox.email}
-												</PriSelect.ItemText>
-											</PriSelect.Item>
-										))}
+									{inboxItems.map(item => (
+										<PriSelect.Item key={item.value} value={item.value}>
+											<PriSelect.ItemText>{item.label}</PriSelect.ItemText>
+										</PriSelect.Item>
+									))}
 								</PriSelect.Popup>
 							</PriSelect.Positioner>
 						</PriSelect.Portal>
@@ -645,7 +648,9 @@ const Form = styled.form.withConfig({ displayName: 'ComposeForm' })`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-sm);
-	padding: var(--space-md);
+	/* No bottom padding — the pinned Footer owns the bottom edge so nothing
+	   peeks below it as the fields scroll. */
+	padding: var(--space-md) var(--space-md) 0;
 	flex: 1 1 auto;
 	min-height: 0;
 	overflow-y: auto;
@@ -707,10 +712,19 @@ const BodyLabel = styled.div.withConfig({ displayName: 'ComposeBodyLabel' })`
 `
 
 const Footer = styled.div.withConfig({ displayName: 'ComposeFooter' })`
+	/* Pinned to the bottom of the scrolling form so Send/Discard stay reachable
+	   even with the on-screen keyboard shrinking the sheet. margin-top pushes it
+	   down when the content is short; the opaque paper hides fields scrolling
+	   behind it. */
+	position: sticky;
+	bottom: 0;
+	margin-top: auto;
 	display: flex;
 	align-items: center;
 	gap: var(--space-xs);
 	padding-top: var(--space-xs);
+	padding-bottom: var(--space-md);
+	background: var(--color-surface);
 	border-top: 1px dashed var(--color-outline);
 `
 

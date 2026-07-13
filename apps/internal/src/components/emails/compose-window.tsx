@@ -56,14 +56,16 @@ export function ComposeWindow({ draft }: { readonly draft: Draft }) {
 					{previewText !== null && <Preview>{previewText}</Preview>}
 				</HeaderTitle>
 				<HeaderActions>
-					<ChromeButton
+					{/* Minimize + full-screen are desktop window affordances; on a
+					    phone the sheet is already full-width, so only Close remains. */}
+					<DesktopChromeButton
 						type='button'
 						onClick={handleMinimize}
 						aria-label={t`Minimize`}
 					>
 						<Minus size={14} aria-hidden />
-					</ChromeButton>
-					<ChromeButton
+					</DesktopChromeButton>
+					<DesktopChromeButton
 						type='button'
 						onClick={handleFullscreen}
 						aria-label={isFullscreen ? t`Exit full screen` : t`Full screen`}
@@ -73,7 +75,7 @@ export function ComposeWindow({ draft }: { readonly draft: Draft }) {
 						) : (
 							<Maximize2 size={14} aria-hidden />
 						)}
-					</ChromeButton>
+					</DesktopChromeButton>
 					<ChromeButton
 						type='button'
 						data-testid='compose-close'
@@ -135,9 +137,15 @@ const Shell = styled.div.withConfig({
 					height: 560px;
 					max-height: 80vh;
 
+					/* Full-width bottom sheet: flush to the sides, rounded only at
+					   the top, tall enough to compose while a strip of the page
+					   peeks above it, and padded clear of the home indicator. */
 					@media (max-width: 767px) {
-						width: 96vw;
-						height: 84vh;
+						width: 100%;
+						height: 88dvh;
+						max-height: none;
+						border-radius: var(--shape-sm) var(--shape-sm) 0 0;
+						padding-bottom: env(safe-area-inset-bottom, 0px);
 					}
 				`}
 `
@@ -231,6 +239,14 @@ const ChromeButton = styled.button.withConfig({
 	&:focus-visible {
 		outline: none;
 		box-shadow: var(--glow-active);
+	}
+`
+
+const DesktopChromeButton = styled(ChromeButton).withConfig({
+	displayName: 'ComposeWindowDesktopChromeButton',
+})`
+	@media (max-width: 767px) {
+		display: none;
 	}
 `
 
