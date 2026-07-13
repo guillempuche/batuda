@@ -887,6 +887,12 @@ const researchEvalCommand = Command.make(
 			Flag.withDescription('Research output schema to run'),
 			Flag.withDefault('company_enrichment_v1'),
 		),
+		language: Flag.string('language').pipe(
+			Flag.withDescription(
+				"Language hint for the runs (e.g. es, ca, en) — carried into the search so it looks in the target's own language, for testing non-English targets",
+			),
+			Flag.optional,
+		),
 		concurrency: Flag.integer('concurrency').pipe(
 			Flag.withDescription('How many runs to execute at once'),
 			Flag.withDefault(3),
@@ -902,12 +908,13 @@ const researchEvalCommand = Command.make(
 			Flag.optional,
 		),
 	},
-	({ org, user, golden, schema, concurrency, runs, out }) =>
+	({ org, user, golden, schema, language, concurrency, runs, out }) =>
 		researchEval({
 			org,
 			user,
 			goldenPath: golden,
 			schemaName: schema,
+			language,
 			concurrency,
 			runs,
 			out,
