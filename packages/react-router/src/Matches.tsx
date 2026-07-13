@@ -1,9 +1,12 @@
+'use client'
+
 import * as React from 'react'
 import { useStore } from '@tanstack/react-store'
-import { replaceEqualDeep, rootRouteId } from '@tanstack/router-core'
+import { rootRouteId } from '@tanstack/router-core'
 import { isServer } from '@tanstack/router-core/isServer'
 import { CatchBoundary, ErrorComponent } from './CatchBoundary'
 import { useRouter } from './useRouter'
+import { useStructuralSharing } from './useMatch'
 import { Transitioner } from './Transitioner'
 import { matchContext } from './matchContext'
 import { Match } from './Match'
@@ -22,11 +25,8 @@ import type {
   MakeRouteMatchUnion,
   MaskOptions,
   MatchRouteOptions,
-  NoInfer,
   RegisteredRouter,
-  ResolveRelativePath,
   ResolveRoute,
-  RouteByPath,
   ToSubOptionsProps,
 } from '@tanstack/router-core'
 
@@ -78,11 +78,11 @@ function MatchesInner() {
   const router = useRouter()
   const _isServer = isServer ?? router.isServer
   const matchId = _isServer
-    ? router.stores.firstMatchId.state
+    ? router.stores.firstId.get()
     : // eslint-disable-next-line react-hooks/rules-of-hooks
-      useStore(router.stores.firstMatchId, (id) => id)
+      useStore(router.stores.firstId, (id) => id)
   const resetKey = _isServer
-    ? router.stores.loadedAt.state
+    ? router.stores.loadedAt.get()
     : // eslint-disable-next-line react-hooks/rules-of-hooks
       useStore(router.stores.loadedAt, (loadedAt) => loadedAt)
 
@@ -143,7 +143,7 @@ export function useMatchRoute<TRouter extends AnyRouter = RegisteredRouter>() {
 
   if (!(isServer ?? router.isServer)) {
     // eslint-disable-next-line react-hooks/rules-of-hooks
-    useStore(router.stores.matchRouteReactivity, (d) => d)
+    useStore(router.stores.matchRouteDeps, (d) => d)
   }
 
   return React.useCallback(
@@ -180,10 +180,9 @@ export type MakeMatchRouteOptions<
   // If a function is passed as a child, it will be given the `isActive` boolean to aid in further styling on the element it returns
   children?:
     | ((
-        params?: RouteByPath<
-          TRouter['routeTree'],
-          ResolveRelativePath<TFrom, NoInfer<TTo>>
-        >['types']['allParams'],
+        params?: Expand<
+          ResolveRoute<TRouter, TFrom, TTo>['types']['allParams']
+        >,
       ) => React.ReactNode)
     | React.ReactNode
 }
@@ -236,13 +235,9 @@ export function useMatches<
     StructuralSharingOption<TRouter, TSelected, TStructuralSharing>,
 ): UseMatchesResult<TRouter, TSelected> {
   const router = useRouter<TRouter>()
-  const previousResult =
-    React.useRef<ValidateSelected<TRouter, TSelected, TStructuralSharing>>(
-      undefined,
-    )
 
   if (isServer ?? router.isServer) {
-    const matches = router.stores.activeMatchesSnapshot.state as Array<
+    const matches = router.stores.matches.get() as Array<
       MakeRouteMatchUnion<TRouter>
     >
     return (opts?.select ? opts.select(matches) : matches) as UseMatchesResult<
@@ -251,20 +246,12 @@ export function useMatches<
     >
   }
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  return useStore(router.stores.activeMatchesSnapshot, (matches) => {
-    const selected = opts?.select
-      ? opts.select(matches as Array<MakeRouteMatchUnion<TRouter>>)
-      : (matches as any)
-
-    if (opts?.structuralSharing ?? router.options.defaultStructuralSharing) {
-      const shared = replaceEqualDeep(previousResult.current, selected)
-      previousResult.current = shared
-      return shared
-    }
-
-    return selected
-  }) as UseMatchesResult<TRouter, TSelected>
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- condition is static
+  return useStore(
+    router.stores.matches,
+    // eslint-disable-next-line react-hooks/rules-of-hooks -- condition is static
+    useStructuralSharing(opts, router),
+  ) as UseMatchesResult<TRouter, TSelected>
 }
 
 /**

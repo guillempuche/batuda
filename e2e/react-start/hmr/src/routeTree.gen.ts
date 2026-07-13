@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ServerFnHmrRouteImport } from './routes/server-fn-hmr'
 import { Route as InputsRouteImport } from './routes/inputs'
 import { Route as ComponentHmrNamedSplitRouteImport } from './routes/component-hmr-named-split'
 import { Route as ComponentHmrNamedNosplitRouteImport } from './routes/component-hmr-named-nosplit'
@@ -19,7 +20,14 @@ import { Route as ComponentHmrInlineErrorSplitRouteImport } from './routes/compo
 import { Route as ComponentHmrRouteImport } from './routes/component-hmr'
 import { Route as ChildRouteImport } from './routes/child'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AliasedRouteImportsIdRouteImport } from './routes/aliased-route-imports.$id'
+import { Route as AliasedRouteImportsIdChildRouteImport } from './routes/aliased-route-imports.$id.child'
 
+const ServerFnHmrRoute = ServerFnHmrRouteImport.update({
+  id: '/server-fn-hmr',
+  path: '/server-fn-hmr',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const InputsRoute = InputsRouteImport.update({
   id: '/inputs',
   path: '/inputs',
@@ -74,6 +82,17 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AliasedRouteImportsIdRoute = AliasedRouteImportsIdRouteImport.update({
+  id: '/aliased-route-imports/$id',
+  path: '/aliased-route-imports/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AliasedRouteImportsIdChildRoute =
+  AliasedRouteImportsIdChildRouteImport.update({
+    id: '/child',
+    path: '/child',
+    getParentRoute: () => AliasedRouteImportsIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -86,6 +105,9 @@ export interface FileRoutesByFullPath {
   '/component-hmr-named-nosplit': typeof ComponentHmrNamedNosplitRoute
   '/component-hmr-named-split': typeof ComponentHmrNamedSplitRoute
   '/inputs': typeof InputsRoute
+  '/server-fn-hmr': typeof ServerFnHmrRoute
+  '/aliased-route-imports/$id': typeof AliasedRouteImportsIdRouteWithChildren
+  '/aliased-route-imports/$id/child': typeof AliasedRouteImportsIdChildRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -98,6 +120,9 @@ export interface FileRoutesByTo {
   '/component-hmr-named-nosplit': typeof ComponentHmrNamedNosplitRoute
   '/component-hmr-named-split': typeof ComponentHmrNamedSplitRoute
   '/inputs': typeof InputsRoute
+  '/server-fn-hmr': typeof ServerFnHmrRoute
+  '/aliased-route-imports/$id': typeof AliasedRouteImportsIdRouteWithChildren
+  '/aliased-route-imports/$id/child': typeof AliasedRouteImportsIdChildRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -111,6 +136,9 @@ export interface FileRoutesById {
   '/component-hmr-named-nosplit': typeof ComponentHmrNamedNosplitRoute
   '/component-hmr-named-split': typeof ComponentHmrNamedSplitRoute
   '/inputs': typeof InputsRoute
+  '/server-fn-hmr': typeof ServerFnHmrRoute
+  '/aliased-route-imports/$id': typeof AliasedRouteImportsIdRouteWithChildren
+  '/aliased-route-imports/$id/child': typeof AliasedRouteImportsIdChildRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -125,6 +153,9 @@ export interface FileRouteTypes {
     | '/component-hmr-named-nosplit'
     | '/component-hmr-named-split'
     | '/inputs'
+    | '/server-fn-hmr'
+    | '/aliased-route-imports/$id'
+    | '/aliased-route-imports/$id/child'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -137,6 +168,9 @@ export interface FileRouteTypes {
     | '/component-hmr-named-nosplit'
     | '/component-hmr-named-split'
     | '/inputs'
+    | '/server-fn-hmr'
+    | '/aliased-route-imports/$id'
+    | '/aliased-route-imports/$id/child'
   id:
     | '__root__'
     | '/'
@@ -149,6 +183,9 @@ export interface FileRouteTypes {
     | '/component-hmr-named-nosplit'
     | '/component-hmr-named-split'
     | '/inputs'
+    | '/server-fn-hmr'
+    | '/aliased-route-imports/$id'
+    | '/aliased-route-imports/$id/child'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -162,10 +199,19 @@ export interface RootRouteChildren {
   ComponentHmrNamedNosplitRoute: typeof ComponentHmrNamedNosplitRoute
   ComponentHmrNamedSplitRoute: typeof ComponentHmrNamedSplitRoute
   InputsRoute: typeof InputsRoute
+  ServerFnHmrRoute: typeof ServerFnHmrRoute
+  AliasedRouteImportsIdRoute: typeof AliasedRouteImportsIdRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/server-fn-hmr': {
+      id: '/server-fn-hmr'
+      path: '/server-fn-hmr'
+      fullPath: '/server-fn-hmr'
+      preLoaderRoute: typeof ServerFnHmrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/inputs': {
       id: '/inputs'
       path: '/inputs'
@@ -236,8 +282,35 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/aliased-route-imports/$id': {
+      id: '/aliased-route-imports/$id'
+      path: '/aliased-route-imports/$id'
+      fullPath: '/aliased-route-imports/$id'
+      preLoaderRoute: typeof AliasedRouteImportsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/aliased-route-imports/$id/child': {
+      id: '/aliased-route-imports/$id/child'
+      path: '/child'
+      fullPath: '/aliased-route-imports/$id/child'
+      preLoaderRoute: typeof AliasedRouteImportsIdChildRouteImport
+      parentRoute: typeof AliasedRouteImportsIdRoute
+    }
   }
 }
+
+interface AliasedRouteImportsIdRouteChildren {
+  AliasedRouteImportsIdChildRoute: typeof AliasedRouteImportsIdChildRoute
+}
+
+const AliasedRouteImportsIdRouteChildren: AliasedRouteImportsIdRouteChildren = {
+  AliasedRouteImportsIdChildRoute: AliasedRouteImportsIdChildRoute,
+}
+
+const AliasedRouteImportsIdRouteWithChildren =
+  AliasedRouteImportsIdRoute._addFileChildren(
+    AliasedRouteImportsIdRouteChildren,
+  )
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -250,6 +323,8 @@ const rootRouteChildren: RootRouteChildren = {
   ComponentHmrNamedNosplitRoute: ComponentHmrNamedNosplitRoute,
   ComponentHmrNamedSplitRoute: ComponentHmrNamedSplitRoute,
   InputsRoute: InputsRoute,
+  ServerFnHmrRoute: ServerFnHmrRoute,
+  AliasedRouteImportsIdRoute: AliasedRouteImportsIdRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

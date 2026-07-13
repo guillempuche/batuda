@@ -42,7 +42,7 @@
     },
     "test:e2e": {
       "cache": true,
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "test:e2e--*"],
       "inputs": ["default", "^production"]
     },
     "test:e2e:nitro": {
@@ -65,6 +65,11 @@
       "dependsOn": ["^build"],
       "inputs": ["default", "^production"]
     },
+    "test:types:ssr": {
+      "cache": true,
+      "dependsOn": ["^build"],
+      "inputs": ["default", "^production"]
+    },
     "build": {
       "cache": true,
       "dependsOn": ["^build"],
@@ -76,5 +81,12 @@
       "dependsOn": ["build"],
       "inputs": ["production"]
     }
-  }
+  },
+  "plugins": [
+    {
+      "name": "Playwright Sharding Plugin",
+      "plugin": "./scripts/nx/playwright-plugin.ts"
+    }
+  ],
+  "analytics": true
 }

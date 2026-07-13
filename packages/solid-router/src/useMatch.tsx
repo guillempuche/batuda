@@ -76,7 +76,7 @@ export function useMatch<
 
   const match = () => {
     if (opts.from) {
-      return router.stores.getMatchStoreByRouteId(opts.from).state
+      return router.stores.getRouteMatchStore(opts.from).get()
     }
 
     return nearestMatch?.match()
@@ -88,12 +88,12 @@ export function useMatch<
     }
 
     const hasPendingMatch = opts.from
-      ? Boolean(router.stores.pendingRouteIds.state[opts.from!])
+      ? Boolean(router.stores.pendingRouteIds.get()[opts.from!])
       : (nearestMatch?.hasPending() ?? false)
 
     if (
       !hasPendingMatch &&
-      !router.stores.isTransitioning.state &&
+      !router.stores.isTransitioning.get() &&
       (opts.shouldThrow ?? true)
     ) {
       if (process.env.NODE_ENV !== 'production') {
@@ -109,8 +109,22 @@ export function useMatch<
   return Solid.createMemo((prev: TSelected | undefined) => {
     const selectedMatch = match()
 
-    if (selectedMatch === undefined) return undefined
-    const res = opts.select ? opts.select(selectedMatch as any) : selectedMatch
+    if (selectedMatch === undefined) {
+      const hasPendingMatch = opts.from
+        ? Boolean(router.stores.pendingRouteIds.get()[opts.from!])
+        : (nearestMatch?.hasPending() ?? false)
+
+      if (
+        prev !== undefined &&
+        (hasPendingMatch || router.stores.isTransitioning.get())
+      ) {
+        return prev
+      }
+
+      return undefined
+    }
+
+    const res = opts.select ? opts.select(selectedMatch) : selectedMatch
     if (prev === undefined) return res as TSelected
     return replaceEqualDeep(prev, res) as TSelected
   }) as any
