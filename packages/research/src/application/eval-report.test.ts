@@ -16,6 +16,8 @@ const score = (over: Partial<RunScore>): RunScore => ({
 	fieldsExpected: 0,
 	fieldsScored: 0,
 	fieldsCorrect: 0,
+	contactsExpected: 0,
+	contactsFound: 0,
 	...over,
 })
 
@@ -155,6 +157,7 @@ describe('evalSummaryAttributes', () => {
 				emptyRate: 0.25,
 				fieldPrecision: 0.75,
 				fieldRecall: 0.5,
+				contactRecall: 0.6,
 			})
 
 			// WHEN flattened — THEN each top-line rate is present
@@ -162,12 +165,13 @@ describe('evalSummaryAttributes', () => {
 			expect(attrs['eval.grounding_accuracy']).toBe(0.5)
 			expect(attrs['eval.field_precision']).toBe(0.75)
 			expect(attrs['eval.field_recall']).toBe(0.5)
+			expect(attrs['eval.contact_recall']).toBe(0.6)
 		})
 	})
 
 	describe('when nothing was filled to judge', () => {
 		it('should omit the null precision', () => {
-			// GIVEN a summary whose precision is null (nothing filled)
+			// GIVEN a summary whose precision and contact recall are null (nothing to judge)
 			const attrs = evalSummaryAttributes({
 				runs: 1,
 				groundingAccuracy: 1,
@@ -175,10 +179,12 @@ describe('evalSummaryAttributes', () => {
 				emptyRate: 1,
 				fieldPrecision: null,
 				fieldRecall: 0,
+				contactRecall: null,
 			})
 
-			// WHEN flattened — THEN a null precision is left off, not charted as zero
+			// WHEN flattened — THEN each null rate is left off, not charted as zero
 			expect('eval.field_precision' in attrs).toBe(false)
+			expect('eval.contact_recall' in attrs).toBe(false)
 			expect(attrs['eval.field_recall']).toBe(0)
 		})
 	})

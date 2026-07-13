@@ -1280,9 +1280,9 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							})
 							let result = withProposalIds(structuredResponse.value as unknown)
 							let rescueOutputTokens = 0
-							// The company the focused rescue passes below target — the subject's
-							// name + its own domain, so a recovered person or fact is tied to the
-							// right company. Only company_enrichment runs these passes.
+							// The focused rescue passes below aim at one company — the subject's
+							// name + its own domain — so a recovered person or fact is tied to
+							// the right company. Only company_enrichment runs these passes.
 							const rescueSnapshot = subjects[0]?.snapshot as
 								| Record<string, unknown>
 								| undefined

@@ -99,6 +99,23 @@ export const outcomeFromRun = (input: {
 		}
 	}
 
+	// The people the run kept (after the entity + grounding guards), each with the
+	// title it found or null — so the scorer can measure how many known contacts
+	// came back with a title.
+	const contacts: Array<{ name: string; role: string | null }> = []
+	const rawContacts = (findings as { contacts?: unknown }).contacts
+	if (Array.isArray(rawContacts)) {
+		for (const contact of rawContacts) {
+			if (contact === null || typeof contact !== 'object') continue
+			const name = (contact as { name?: unknown }).name
+			if (typeof name !== 'string' || name.trim() === '') continue
+			contacts.push({
+				name,
+				role: readFieldValue((contact as { role?: unknown }).role),
+			})
+		}
+	}
+
 	const reachedDomains: string[] = []
 	for (const url of input.fetchedUrls) {
 		const host = hostOf(url)
@@ -116,6 +133,7 @@ export const outcomeFromRun = (input: {
 		status: toTerminalStatus(input.status),
 		reachedDomains,
 		fields,
+		contacts,
 		registryConfirmed,
 	}
 }

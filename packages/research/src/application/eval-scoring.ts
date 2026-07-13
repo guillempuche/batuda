@@ -1,11 +1,15 @@
 /**
  * Pure scoring for the research eval harness. Given a company's known-correct
  * answer (the golden expectation) and a normalized view of what one research run
- * produced, it computes the four numbers the harness reports:
+ * produced, it computes the numbers the harness reports:
  *
  *   grounding accuracy   did the run actually reach the *target* company's own site?
  *   field precision      of the fields it filled that we have a true answer for,
  *                        how many are right?
+ *   contact recall       of the people the company is known to publish, how many
+ *                        came back *with a title* — contacts sit outside the scorable
+ *                        field set, so a run can pass every field yet lose the
+ *                        decision-makers' titles, the exact gap this metric watches.
  *   wrong-company rate   did it confidently return data without reaching the target
  *                        (the look-alike failure this harness exists to catch)?
  *   empty rate           did it return no usable data at all?
@@ -55,6 +59,9 @@ export interface GoldenExpectation {
 	readonly altDomains?: ReadonlyArray<string>
 	/** Known-correct field values. Only fields listed here are scored for precision. */
 	readonly fields: Partial<Record<ScorableField, string>>
+	/** People the company is known to publish; scores whether the run recovered them
+	 * *with a title* — the recall the focused contacts pass exists to lift. */
+	readonly contacts?: ReadonlyArray<{ readonly name: string }>
 }
 
 /**
@@ -74,6 +81,12 @@ export interface RunOutcome {
 	readonly reachedDomains: ReadonlyArray<string>
 	/** Extracted enrichment scalars; a missing/blank value counts as unfilled. */
 	readonly fields: Partial<Record<ScorableField, string | null>>
+	/** Contacts the run extracted (after the guards), each with the title it found
+	 * or null — a named person recovered without a title still counts as titleless. */
+	readonly contacts: ReadonlyArray<{
+		readonly name: string
+		readonly role: string | null
+	}>
 	/**
 	 * Whether an official-registry lookup this run resolved the target company by
 	 * its legal name. Independent of the fetched pages: a company confirmed in the
@@ -93,6 +106,10 @@ export interface RunScore {
 	readonly fieldsScored: number
 	/** Of the filled-and-checkable fields, how many matched (the shared numerator). */
 	readonly fieldsCorrect: number
+	/** Known-published people we expected the run to recover (contact recall's denominator). */
+	readonly contactsExpected: number
+	/** Of those, how many the run returned *with a title* (contact recall's numerator). */
+	readonly contactsFound: number
 }
 
 export interface EvalSummary {
@@ -104,6 +121,9 @@ export interface EvalSummary {
 	readonly fieldPrecision: number | null
 	/** Micro-averaged correct ÷ known across all runs; null when the golden set specified no fields. */
 	readonly fieldRecall: number | null
+	/** Micro-averaged known people recovered *with a title* ÷ known people, across all
+	 * runs; null when no golden row listed expected contacts. */
+	readonly contactRecall: number | null
 }
 
 /**
@@ -129,6 +149,30 @@ const isFilled = (value: string | null | undefined): value is string =>
 /** Strip accents so "García" and "Garcia" compare equal. */
 export const foldDiacritics = (value: string): string =>
 	value.normalize('NFD').replace(/\p{Diacritic}/gu, '')
+
+// A person's name as its accent-folded, lower-cased word tokens. Single-character
+// tokens (a middle initial) are kept, so two people who differ only by initial stay
+// distinct — the same tokenizing the contact-discovery eval uses.
+const nameTokens = (name: string): ReadonlyArray<string> =>
+	foldDiacritics(name)
+		.toLowerCase()
+		.split(/[^a-z0-9]+/)
+		.filter(token => token.length > 0)
+
+// Two names refer to the same person when the shorter one's tokens are all in the
+// longer's — so "Andrew Smith" matches "Andrew J. Smith" without matching a
+// different Smith. A lone shared token (just a first name) is too weak to confirm
+// the same person, so the shorter name must carry at least two tokens — the same
+// rule the contact-discovery eval uses, so both agree on what "same person" means.
+// Conservative on purpose: an unmatched real person is a miss the eval should show,
+// not paper over.
+const contactNameMatches = (expected: string, actual: string): boolean => {
+	const e = nameTokens(expected)
+	const a = nameTokens(actual)
+	const [small, big] = e.length <= a.length ? [e, new Set(a)] : [a, new Set(e)]
+	if (small.length < 2) return false
+	return small.every(token => big.has(token))
+}
 
 /**
  * Industry is an open free-text field: the pipeline reports it in the source page's
@@ -226,6 +270,19 @@ export const scoreRun = (
 	// the look-alike bug: it returned some other company's data as a success.
 	const wrongCompany = outcome.status === 'succeeded' && !empty && !grounded
 
+	// Contact recall: of the people we know the company publishes, how many the run
+	// returned WITH a title — a named person with no title doesn't count, since a
+	// titleless contact is the gap the focused pass exists to close.
+	const expectedContacts = expected.contacts ?? []
+	let contactsFound = 0
+	for (const person of expectedContacts) {
+		const match = outcome.contacts.some(
+			found =>
+				isFilled(found.role) && contactNameMatches(person.name, found.name),
+		)
+		if (match) contactsFound++
+	}
+
 	return {
 		id: expected.id,
 		grounded,
@@ -234,10 +291,12 @@ export const scoreRun = (
 		fieldsExpected,
 		fieldsScored,
 		fieldsCorrect,
+		contactsExpected: expectedContacts.length,
+		contactsFound,
 	}
 }
 
-/** Roll per-run scores up into the four rates the harness reports. */
+/** Roll per-run scores up into the rates the harness reports. */
 export const summarizeScores = (
 	scores: ReadonlyArray<RunScore>,
 ): EvalSummary => {
@@ -250,6 +309,7 @@ export const summarizeScores = (
 			emptyRate: 0,
 			fieldPrecision: null,
 			fieldRecall: null,
+			contactRecall: null,
 		}
 	}
 
@@ -259,6 +319,8 @@ export const summarizeScores = (
 	let totalExpected = 0
 	let totalScored = 0
 	let totalCorrect = 0
+	let totalContactsExpected = 0
+	let totalContactsFound = 0
 	for (const score of scores) {
 		if (score.grounded) grounded++
 		if (score.wrongCompany) wrong++
@@ -266,6 +328,8 @@ export const summarizeScores = (
 		totalExpected += score.fieldsExpected
 		totalScored += score.fieldsScored
 		totalCorrect += score.fieldsCorrect
+		totalContactsExpected += score.contactsExpected
+		totalContactsFound += score.contactsFound
 	}
 
 	return {
@@ -275,5 +339,9 @@ export const summarizeScores = (
 		emptyRate: empty / runs,
 		fieldPrecision: totalScored === 0 ? null : totalCorrect / totalScored,
 		fieldRecall: totalExpected === 0 ? null : totalCorrect / totalExpected,
+		contactRecall:
+			totalContactsExpected === 0
+				? null
+				: totalContactsFound / totalContactsExpected,
 	}
 }

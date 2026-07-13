@@ -259,7 +259,17 @@ const formatCompanyRuns = (
 	const scored = scores.reduce((sum, score) => sum + score.fieldsScored, 0)
 	const correct = scores.reduce((sum, score) => sum + score.fieldsCorrect, 0)
 	const fields = scored === 0 ? 'n/a' : pct(correct / scored)
-	return `${id.padEnd(20)} grounded ${share(grounded)}  wrong ${share(wrong)}  empty ${share(empty)}  fields ${fields}`
+	const contactsExpected = scores.reduce(
+		(sum, score) => sum + score.contactsExpected,
+		0,
+	)
+	const contactsFound = scores.reduce(
+		(sum, score) => sum + score.contactsFound,
+		0,
+	)
+	const contacts =
+		contactsExpected === 0 ? 'n/a' : `${contactsFound}/${contactsExpected}`
+	return `${id.padEnd(20)} grounded ${share(grounded)}  wrong ${share(wrong)}  empty ${share(empty)}  fields ${fields}  contacts ${contacts}`
 }
 
 const pct = (value: number | null): string =>
@@ -268,12 +278,13 @@ const pct = (value: number | null): string =>
 const formatSummary = (summary: EvalSummary): string =>
 	[
 		'',
-		`Runs:               ${summary.runs}`,
-		`Grounding accuracy: ${pct(summary.groundingAccuracy)}`,
-		`Field precision:    ${pct(summary.fieldPrecision)}`,
-		`Field recall:       ${pct(summary.fieldRecall)}`,
-		`Wrong-company rate: ${pct(summary.wrongCompanyRate)}`,
-		`Empty rate:         ${pct(summary.emptyRate)}`,
+		`Runs:                   ${summary.runs}`,
+		`Grounding accuracy:     ${pct(summary.groundingAccuracy)}`,
+		`Field precision:        ${pct(summary.fieldPrecision)}`,
+		`Field recall:           ${pct(summary.fieldRecall)}`,
+		`Titled-contact recall:  ${pct(summary.contactRecall)}`,
+		`Wrong-company rate:     ${pct(summary.wrongCompanyRate)}`,
+		`Empty rate:             ${pct(summary.emptyRate)}`,
 	].join('\n')
 
 /**

@@ -23,6 +23,7 @@ const outcome = (over: Partial<RunOutcome>): RunOutcome => ({
 	status: 'succeeded',
 	reachedDomains: ['acme.es'],
 	fields: {},
+	contacts: [],
 	...over,
 })
 
@@ -248,6 +249,101 @@ describe('scoreRun', () => {
 			expect(result.fieldsCorrect).toBe(2)
 		})
 	})
+
+	describe('when the golden set lists expected contacts', () => {
+		const withContacts: GoldenExpectation = {
+			...acme,
+			contacts: [{ name: 'Andrew Smith' }, { name: 'María García' }],
+		}
+
+		it('should count a known contact returned with a title as found', () => {
+			// GIVEN a run that returned one of the two known people, with a title
+			const result = scoreRun(
+				withContacts,
+				outcome({
+					contacts: [{ name: 'Andrew Smith', role: 'CEO' }],
+				}),
+			)
+
+			// WHEN scored — THEN both are expected, one was recovered with a title
+			expect(result.contactsExpected).toBe(2)
+			expect(result.contactsFound).toBe(1)
+		})
+
+		it('should not count a known contact returned without a title', () => {
+			// GIVEN the person came back as a bare name, no role
+			const result = scoreRun(
+				withContacts,
+				outcome({
+					contacts: [{ name: 'Andrew Smith', role: null }],
+				}),
+			)
+
+			// WHEN scored — THEN a titleless contact is the gap this metric watches, so it isn't "found"
+			expect(result.contactsExpected).toBe(2)
+			expect(result.contactsFound).toBe(0)
+		})
+
+		it('should match a name that carries an extra middle token or an accent', () => {
+			// GIVEN the run reports a fuller name and an un-accented spelling
+			const result = scoreRun(
+				withContacts,
+				outcome({
+					contacts: [
+						{ name: 'Andrew J. Smith', role: 'CEO' },
+						{ name: 'Maria Garcia', role: 'CFO' },
+					],
+				}),
+			)
+
+			// WHEN scored — THEN token-subset + accent-folding match both people
+			expect(result.contactsFound).toBe(2)
+		})
+
+		it('should not match a different person who shares one name token', () => {
+			// GIVEN a same-surname stranger the run returned with a title
+			const result = scoreRun(
+				withContacts,
+				outcome({
+					contacts: [{ name: 'Robert Smith', role: 'Intern' }],
+				}),
+			)
+
+			// WHEN scored — THEN a partial token overlap is not a match; recall stays honest
+			expect(result.contactsFound).toBe(0)
+		})
+
+		it('should not match two people who differ only by a middle initial', () => {
+			// GIVEN a golden person whose name carries a middle initial
+			const withInitial: GoldenExpectation = {
+				...acme,
+				contacts: [{ name: 'Jon A Park' }],
+			}
+
+			// WHEN the run returns a different person with the same first+last but
+			// another initial
+			const result = scoreRun(
+				withInitial,
+				outcome({ contacts: [{ name: 'Jon B Park', role: 'CEO' }] }),
+			)
+
+			// THEN the differing initial keeps them distinct — the initial is a real
+			// token, not dropped, so recall doesn't over-count a look-alike name
+			expect(result.contactsFound).toBe(0)
+		})
+
+		it('should expect zero contacts when the golden set lists none', () => {
+			// GIVEN acme, whose golden row has no contacts, and a run that found one
+			const result = scoreRun(
+				acme,
+				outcome({ contacts: [{ name: 'Someone', role: 'CEO' }] }),
+			)
+
+			// WHEN scored — THEN there is nothing to recall, so the metric is inert
+			expect(result.contactsExpected).toBe(0)
+			expect(result.contactsFound).toBe(0)
+		})
+	})
 })
 
 describe('summarizeScores', () => {
@@ -259,6 +355,8 @@ describe('summarizeScores', () => {
 		fieldsExpected: 0,
 		fieldsScored: 0,
 		fieldsCorrect: 0,
+		contactsExpected: 0,
+		contactsFound: 0,
 		...over,
 	})
 
@@ -275,6 +373,7 @@ describe('summarizeScores', () => {
 				emptyRate: 0,
 				fieldPrecision: null,
 				fieldRecall: null,
+				contactRecall: null,
 			})
 		})
 	})
@@ -322,6 +421,29 @@ describe('summarizeScores', () => {
 			// everything known was missed (recall 0) — the two are not the same signal
 			expect(summary.fieldPrecision).toBeNull()
 			expect(summary.fieldRecall).toBe(0)
+		})
+	})
+
+	describe('when runs listed expected contacts', () => {
+		it('should micro-average contact recall over all known contacts', () => {
+			// GIVEN 3 found of 5 known contacts across two runs
+			const summary = summarizeScores([
+				score({ contactsExpected: 2, contactsFound: 2 }),
+				score({ contactsExpected: 3, contactsFound: 1 }),
+			])
+
+			// WHEN summarized — THEN recall is found÷known across the batch, not a per-run mean
+			expect(summary.contactRecall).toBe(0.6)
+		})
+	})
+
+	describe('when no run listed expected contacts', () => {
+		it('should report contact recall null, not zero', () => {
+			// GIVEN runs whose golden rows named no people to recover
+			const summary = summarizeScores([score({}), score({})])
+
+			// WHEN summarized — THEN there was nothing to recall, so the rate is absent
+			expect(summary.contactRecall).toBeNull()
 		})
 	})
 })

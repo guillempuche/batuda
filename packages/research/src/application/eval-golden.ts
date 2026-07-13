@@ -97,6 +97,26 @@ export const parseGoldenRow = (row: RawGoldenRow): GoldenParseResult => {
 		}
 	}
 
+	// Expected people, given as a name string or a `{ name }` object. Optional —
+	// only rows that list them are scored for contact recall.
+	const contacts: Array<{ name: string }> = []
+	const rawContacts = answer['contacts']
+	if (rawContacts !== undefined) {
+		if (!Array.isArray(rawContacts)) {
+			return { ok: false, error: 'contacts must be an array' }
+		}
+		for (const item of rawContacts) {
+			const name = typeof item === 'string' ? item : asRecord(item)?.['name']
+			if (typeof name !== 'string' || name.trim() === '') {
+				return {
+					ok: false,
+					error: 'each contact must be a name string or a { name } object',
+				}
+			}
+			contacts.push({ name })
+		}
+	}
+
 	return {
 		ok: true,
 		value: {
@@ -105,6 +125,7 @@ export const parseGoldenRow = (row: RawGoldenRow): GoldenParseResult => {
 			officialDomain,
 			...(rawAltDomains !== undefined ? { altDomains: rawAltDomains } : {}),
 			fields,
+			...(contacts.length > 0 ? { contacts } : {}),
 		},
 	}
 }
