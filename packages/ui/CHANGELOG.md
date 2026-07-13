@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-13 (ui-v2026.7.13)
+
+### Features
+
+* **ui:** add PriMenu action-menu primitive ([8bf09a8](https://github.com/guillempuche/batuda/commit/8bf09a8dc819c5c2b1303c86f4212bad5a7cec5f))
+
 ## 2026-07-12 (ui-v2026.7.12)
 
 ### Features
