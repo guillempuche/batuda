@@ -2,6 +2,7 @@ import * as Vue from 'vue'
 import {
   deepEqual,
   exactPathTest,
+  hasKeys,
   isDangerousProtocol,
   preloadWarning,
   removeTrailingSlash,
@@ -186,7 +187,7 @@ export function useLinkProps<
     })
 
     const isActive = getIsActive({
-      loc: router.stores.location.state,
+      loc: router.stores.location.get(),
       nextLoc: next,
       activeOptions: options.activeOptions,
       router,
@@ -226,7 +227,7 @@ export function useLinkProps<
     // Rebuild when inherited search/hash or the current route context changes.
 
     const opts = { _fromLocation: currentLocation.value, ...options }
-    return router.buildLocation(opts as any)
+    return router.buildLocation(opts)
   })
 
   const preload = Vue.computed(() => {
@@ -393,38 +394,32 @@ export function useLinkProps<
 
   // Create static event handlers that don't change between renders
   const staticEventHandlers = {
-    onClick: composeEventHandlers<PointerEvent>([
-      options.onClick,
-      handleClick,
-    ]) as any,
-    onBlur: composeEventHandlers<FocusEvent>([
-      options.onBlur,
-      handleLeave,
-    ]) as any,
+    onClick: composeEventHandlers<PointerEvent>([options.onClick, handleClick]),
+    onBlur: composeEventHandlers<FocusEvent>([options.onBlur, handleLeave]),
     onFocus: composeEventHandlers<FocusEvent>([
       options.onFocus,
       enqueueIntentPreload,
-    ]) as any,
+    ]),
     onMouseenter: composeEventHandlers<MouseEvent>([
       eventHandlers.onMouseenter,
       enqueueIntentPreload,
-    ]) as any,
+    ]),
     onMouseover: composeEventHandlers<MouseEvent>([
       eventHandlers.onMouseover,
       enqueueIntentPreload,
-    ]) as any,
+    ]),
     onMouseleave: composeEventHandlers<MouseEvent>([
       eventHandlers.onMouseleave,
       handleLeave,
-    ]) as any,
+    ]),
     onMouseout: composeEventHandlers<MouseEvent>([
       eventHandlers.onMouseout,
       handleLeave,
-    ]) as any,
+    ]),
     onTouchstart: composeEventHandlers<TouchEvent>([
       eventHandlers.onTouchstart,
       handleTouchStart,
-    ]) as any,
+    ]),
   }
 
   // Compute all props synchronously to avoid hydration mismatches
@@ -498,7 +493,7 @@ function resolveStyleProps({
     Object.assign(result, resolvedInactiveProps.style)
   }
 
-  const resolvedStyle = Object.keys(result).length > 0 ? result : undefined
+  const resolvedStyle = hasKeys(result) ? result : undefined
   return {
     resolvedActiveProps,
     resolvedInactiveProps,
@@ -597,58 +592,57 @@ function getLinkEventHandlers(
   }
 }
 
-const propsUnsafeToSpread = new Set([
-  'activeProps',
-  'inactiveProps',
-  'activeOptions',
-  'to',
-  'preload',
-  'preloadDelay',
-  'hashScrollIntoView',
-  'replace',
-  'startTransition',
-  'resetScroll',
-  'viewTransition',
-  'children',
-  'target',
-  'disabled',
-  'style',
-  'class',
-  'onClick',
-  'onBlur',
-  'onFocus',
-  'onMouseEnter',
-  'onMouseenter',
-  'onMouseLeave',
-  'onMouseleave',
-  'onMouseOver',
-  'onMouseover',
-  'onMouseOut',
-  'onMouseout',
-  'onTouchStart',
-  'onTouchstart',
-  'ignoreBlocker',
-  'params',
-  'search',
-  'hash',
-  'state',
-  'mask',
-  'reloadDocument',
-  '_asChild',
-  'from',
-  'additionalProps',
-])
-
-// Create safe props that can be spread
 const getPropsSafeToSpread = (options: AnyLinkPropsOptions) => {
-  const result: Record<string, unknown> = {}
-  for (const key in options) {
-    if (!propsUnsafeToSpread.has(key)) {
-      result[key] = (options as Record<string, unknown>)[key]
-    }
+  const {
+    activeProps: _activeProps,
+    inactiveProps: _inactiveProps,
+    activeOptions: _activeOptions,
+    to: _to,
+    preload: _preload,
+    preloadDelay: _preloadDelay,
+    preloadIntentProximity: _preloadIntentProximity,
+    hashScrollIntoView: _hashScrollIntoView,
+    replace: _replace,
+    startTransition: _startTransition,
+    resetScroll: _resetScroll,
+    viewTransition: _viewTransition,
+    children: _children,
+    target: _target,
+    disabled: _disabled,
+    style: _style,
+    class: _class,
+    onClick: _onClick,
+    onBlur: _onBlur,
+    onFocus: _onFocus,
+    onMouseEnter: _onMouseEnter,
+    onMouseenter: _onMouseenter,
+    onMouseLeave: _onMouseLeave,
+    onMouseleave: _onMouseleave,
+    onMouseOver: _onMouseOver,
+    onMouseover: _onMouseover,
+    onMouseOut: _onMouseOut,
+    onMouseout: _onMouseout,
+    onTouchStart: _onTouchStart,
+    onTouchstart: _onTouchstart,
+    ignoreBlocker: _ignoreBlocker,
+    params: _params,
+    search: _search,
+    hash: _hash,
+    state: _state,
+    mask: _mask,
+    reloadDocument: _reloadDocument,
+    unsafeRelative: _unsafeRelative,
+    _asChild: __asChild,
+    from: _from,
+    additionalProps: _additionalProps,
+    ...propsSafeToSpread
+  } = options as AnyLinkPropsOptions & {
+    additionalProps?: unknown
+    children?: unknown
+    _asChild?: unknown
   }
 
-  return result
+  return propsSafeToSpread
 }
 
 function getIsActive({
@@ -859,7 +853,7 @@ export function createLink<const TComp>(
     name: 'CreatedLink',
     inheritAttrs: false,
     setup(_, { attrs, slots }) {
-      return () => Vue.h(LinkImpl as any, { ...attrs, _asChild: Comp }, slots)
+      return () => Vue.h(LinkImpl, { ...attrs, _asChild: Comp }, slots)
     },
   }) as any
 }
@@ -872,6 +866,7 @@ const LinkImpl = Vue.defineComponent({
     'to',
     'preload',
     'preloadDelay',
+    'preloadIntentProximity',
     'activeProps',
     'inactiveProps',
     'activeOptions',
@@ -895,7 +890,7 @@ const LinkImpl = Vue.defineComponent({
   setup(props, { attrs, slots }) {
     // Call useLinkProps ONCE during setup with combined props and attrs
     const allProps = { ...props, ...attrs }
-    const linkPropsSource = useLinkProps(allProps as any) as
+    const linkPropsSource = useLinkProps(allProps) as
       | LinkHTMLAttributes
       | Vue.ComputedRef<LinkHTMLAttributes>
 

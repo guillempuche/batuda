@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import { promises as fsp } from 'node:fs'
 import path from 'node:path'
 import { parseArgs as parseNodeArgs } from 'node:util'
+import vm from 'node:vm'
 
 const DEFAULT_MARKER = '<!-- bundle-size-benchmark -->'
 const INT_FORMAT = new Intl.NumberFormat('en-US', {
@@ -68,11 +69,9 @@ function parseMaybeDataJs(raw) {
   const trimmed = raw.trim()
 
   if (trimmed.startsWith('window.BENCHMARK_DATA')) {
-    return JSON.parse(
-      trimmed
-        .replace(/^window\.BENCHMARK_DATA\s*=\s*/, '')
-        .replace(/;\s*$/, ''),
-    )
+    const sandbox = { window: {} }
+    vm.runInNewContext(trimmed, sandbox, { timeout: 1000 })
+    return sandbox.window.BENCHMARK_DATA
   }
 
   return JSON.parse(trimmed)
@@ -290,6 +289,7 @@ async function main() {
       current: metric.gzipBytes,
       raw: metric.rawBytes,
       brotli: metric.brotliBytes,
+      initial: metric.initialGzipBytes,
       deltaCell: formatDelta(metric.gzipBytes, baselineValue),
       trendCell: sparkline(historySeries.slice(-args.trendPoints)),
     })
@@ -309,19 +309,19 @@ async function main() {
   }
   lines.push('')
   lines.push(
-    '| Scenario | Current (gzip) | Delta vs baseline | Raw | Brotli | Trend |',
+    '| Scenario | Current (gzip) | Delta vs baseline | Initial gzip | Raw | Brotli | Trend |',
   )
-  lines.push('| --- | ---: | ---: | ---: | ---: | --- |')
+  lines.push('| --- | ---: | ---: | ---: | ---: | ---: | --- |')
 
   for (const row of rows) {
     lines.push(
-      `| \`${row.id}\` | ${formatBytes(row.current)} | ${row.deltaCell} | ${formatBytes(row.raw)} | ${formatBytes(row.brotli)} | ${row.trendCell} |`,
+      `| \`${row.id}\` | ${formatBytes(row.current)} | ${row.deltaCell} | ${formatBytes(row.initial)} | ${formatBytes(row.raw)} | ${formatBytes(row.brotli)} | ${row.trendCell} |`,
     )
   }
 
   lines.push('')
   lines.push(
-    '_Trend sparkline is historical gzip bytes ending with this PR measurement; lower is better._',
+    '_Current gzip tracks all emitted client JS chunks. Initial gzip tracks only the entry/import graph. Trend sparkline is historical current gzip ending with this PR measurement; lower is better._',
   )
 
   const markdown = lines.join('\n') + '\n'

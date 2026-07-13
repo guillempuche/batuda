@@ -22,6 +22,8 @@ This skill builds on start-core. Read [start-core](../../../start-client-core/sk
 
 This skill covers the React-specific bindings, setup, and patterns for TanStack Start.
 
+For React Server Components patterns, see [react-start/server-components](./server-components/SKILL.md).
+
 > **CRITICAL**: All code is ISOMORPHIC by default. Loaders run on BOTH server and client. Use `createServerFn` for server-only logic.
 
 > **CRITICAL**: Do not confuse `@tanstack/react-start` with Next.js or Remix. They are completely different frameworks with different APIs.
@@ -179,7 +181,7 @@ Use `useServerFn` to call server functions from React components with proper int
 import { createServerFn, useServerFn } from '@tanstack/react-start'
 
 const updatePost = createServerFn({ method: 'POST' })
-  .inputValidator((data: { id: string; title: string }) => data)
+  .validator((data: { id: string; title: string }) => data)
   .handler(async ({ data }) => {
     await db.posts.update(data.id, { title: data.title })
     return { success: true }

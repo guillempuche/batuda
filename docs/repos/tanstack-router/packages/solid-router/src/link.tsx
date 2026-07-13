@@ -6,6 +6,7 @@ import {
   deepEqual,
   exactPathTest,
   functionalUpdate,
+  hasKeys,
   isDangerousProtocol,
   preloadWarning,
   removeTrailingSlash,
@@ -63,6 +64,7 @@ export function useLinkProps<
       'to',
       'preload',
       'preloadDelay',
+      'preloadIntentProximity',
       'hashScrollIntoView',
       'replace',
       'startTransition',
@@ -120,10 +122,11 @@ export function useLinkProps<
     'mask',
     'reloadDocument',
     'unsafeRelative',
+    'from',
   ])
 
   const currentLocation = Solid.createMemo(
-    () => router.stores.location.state,
+    () => router.stores.location.get(),
     undefined,
     { equals: (prev, next) => prev.href === next.href },
   )
@@ -463,7 +466,7 @@ export function useLinkProps<
       ...activeProps,
       ...inactiveProps,
       ...base,
-      ...(Object.keys(style).length ? { style } : undefined),
+      ...(hasKeys(style) ? { style } : undefined),
       ...(className ? { class: className } : undefined),
       ...(active && STATIC_ACTIVE_ATTRIBUTES),
     } as ResolvedLinkStateProps

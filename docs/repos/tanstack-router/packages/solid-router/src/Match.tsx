@@ -24,7 +24,7 @@ export const Match = (props: { matchId: string }) => {
   const match = Solid.createMemo(() => {
     const id = props.matchId
     if (!id) return undefined
-    return router.stores.activeMatchStoresById.get(id)?.state
+    return router.stores.matchStores.get(id)?.get()
   })
 
   const rawMatchState = Solid.createMemo(() => {
@@ -49,7 +49,7 @@ export const Match = (props: { matchId: string }) => {
   const hasPendingMatch = Solid.createMemo(() => {
     const currentRouteId = rawMatchState()?.routeId
     return currentRouteId
-      ? Boolean(router.stores.pendingRouteIds.state[currentRouteId])
+      ? Boolean(router.stores.pendingRouteIds.get()[currentRouteId])
       : false
   })
   const nearestMatch = {
@@ -86,6 +86,11 @@ export const Match = (props: { matchId: string }) => {
           currentMatchState().ssr === false ||
           currentMatchState().ssr === 'data-only'
 
+        const shouldSkipSuspenseFallback =
+          (isServer ?? router.isServer)
+            ? resolvedNoSsr
+            : currentMatchState().ssr === 'data-only'
+
         const ResolvedSuspenseBoundary = () => Solid.Suspense
 
         const ResolvedCatchBoundary = () =>
@@ -105,15 +110,16 @@ export const Match = (props: { matchId: string }) => {
               <Dynamic
                 component={ResolvedSuspenseBoundary()}
                 fallback={
-                  // Don't show fallback on server when using no-ssr mode to avoid hydration mismatch
-                  (isServer ?? router.isServer) && resolvedNoSsr ? undefined : (
+                  // Data-only SSR renders the inner fallback on the server, so
+                  // avoid adding an extra suspense fallback on the client.
+                  shouldSkipSuspenseFallback ? undefined : (
                     <Dynamic component={resolvePendingComponent()} />
                   )
                 }
               >
                 <Dynamic
                   component={ResolvedCatchBoundary()}
-                  getResetKey={() => router.stores.loadedAt.state}
+                  getResetKey={() => router.stores.loadedAt.get()}
                   errorComponent={routeErrorComponent() || ErrorComponent}
                   onCatch={(error: Error) => {
                     // Forward not found errors (we don't want to show the error component for these)
@@ -202,15 +208,15 @@ function OnRendered() {
   const router = useRouter()
 
   const location = Solid.createMemo(
-    () => router.stores.resolvedLocation.state?.state.__TSR_key,
+    () => router.stores.resolvedLocation.get()?.state.__TSR_key,
   )
   Solid.createEffect(
     Solid.on([location], () => {
       router.emit({
         type: 'onRendered',
         ...getLocationChangeInfo(
-          router.stores.location.state,
-          router.stores.resolvedLocation.state,
+          router.stores.location.get(),
+          router.stores.resolvedLocation.get(),
         ),
       })
     }),
@@ -273,6 +279,22 @@ export const MatchInner = (): any => {
           return <Outlet />
         }
 
+        const getLoadPromise = (
+          matchId: string,
+          fallbackMatch:
+            | {
+                _nonReactive: {
+                  loadPromise?: Promise<void>
+                }
+              }
+            | undefined,
+        ) => {
+          return (
+            router.getMatch(matchId)?._nonReactive.loadPromise ??
+            fallbackMatch?._nonReactive.loadPromise
+          )
+        }
+
         const keyedOut = () => (
           <Solid.Show when={componentKey()} keyed>
             {(_key) => out()}
@@ -332,7 +354,7 @@ export const MatchInner = (): any => {
                 }
 
                 const [loaderResult] = Solid.createResource(async () => {
-                  await new Promise((r) => setTimeout(r, 0))
+                  await Promise.resolve()
                   return router.getMatch(currentMatch().id)?._nonReactive
                     .loadPromise
                 })
@@ -375,6 +397,9 @@ export const MatchInner = (): any => {
             </Solid.Match>
             <Solid.Match when={currentMatch().status === 'redirected'}>
               {(_) => {
+                const matchId = currentMatch().id
+                const routerMatch = router.getMatch(matchId)
+
                 if (!isRedirect(currentMatch().error)) {
                   if (process.env.NODE_ENV !== 'production') {
                     throw new Error(
@@ -386,9 +411,8 @@ export const MatchInner = (): any => {
                 }
 
                 const [loaderResult] = Solid.createResource(async () => {
-                  await new Promise((r) => setTimeout(r, 0))
-                  return router.getMatch(currentMatch().id)?._nonReactive
-                    .loadPromise
+                  await Promise.resolve()
+                  return getLoadPromise(matchId, routerMatch)
                 })
 
                 return <>{loaderResult()}</>
@@ -441,23 +465,30 @@ export const Outlet = () => {
   const childMatchId = Solid.createMemo(() => {
     const currentRouteId = routeId()
     return currentRouteId
-      ? router.stores.childMatchIdByRouteId.state[currentRouteId]
+      ? router.stores.childMatchIdByRouteId.get()[currentRouteId]
       : undefined
   })
 
   const childMatchStatus = Solid.createMemo(() => {
     const id = childMatchId()
     if (!id) return undefined
-    return router.stores.activeMatchStoresById.get(id)?.state.status
+    return router.stores.matchStores.get(id)?.get().status
   })
 
-  // Only show not-found if we're not in a redirected state
   const shouldShowNotFound = () =>
     childMatchStatus() !== 'redirected' && parentGlobalNotFound()
 
+  const childRouteKey = Solid.createMemo(() => {
+    if (shouldShowNotFound()) return undefined
+    const cid = childMatchId()
+    if (!cid) return undefined
+    return router.stores.matchStores.get(cid)?.routeId ?? cid
+  })
+
   return (
     <Solid.Show
-      when={!shouldShowNotFound() && childMatchId()}
+      when={childRouteKey()}
+      keyed
       fallback={
         <Solid.Show when={shouldShowNotFound() && route()}>
           {(resolvedRoute) =>
@@ -466,20 +497,18 @@ export const Outlet = () => {
         </Solid.Show>
       }
     >
-      {(childMatchIdAccessor) => {
-        const currentMatchId = Solid.createMemo(() => childMatchIdAccessor())
-
+      {(_routeKey: string) => {
         return (
           <Solid.Show
             when={routeId() === rootRouteId}
-            fallback={<Match matchId={currentMatchId()} />}
+            fallback={<Match matchId={childMatchId()!} />}
           >
             <Solid.Suspense
               fallback={
                 <Dynamic component={router.options.defaultPendingComponent} />
               }
             >
-              <Match matchId={currentMatchId()} />
+              <Match matchId={childMatchId()!} />
             </Solid.Suspense>
           </Solid.Show>
         )

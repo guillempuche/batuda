@@ -134,7 +134,7 @@ skills:
       - '@tanstack/start-server-core'
     covers:
       - createServerFn (GET/POST)
-      - inputValidator (Zod or function)
+      - validator (Zod or function)
       - useServerFn hook
       - Server context utilities (getRequest, getRequestHeader, setResponseHeader, setResponseStatus)
       - Error handling (throw errors, redirect, notFound)
@@ -229,7 +229,7 @@ skills:
       - Middleware factories
       - Fetch override precedence
       - Header merging
-      - Method order enforcement (middleware → inputValidator → client → server)
+      - Method order enforcement (middleware → validator → client → server)
     tasks:
       - 'Add authentication middleware'
       - 'Pass context through middleware chain'
@@ -247,7 +247,7 @@ skills:
 
       - mistake: 'Wrong middleware method order'
         mechanism: >-
-          TypeScript enforces method order: middleware → inputValidator
+          TypeScript enforces method order: middleware → validator
           → client → server. Wrong order causes type errors and
           runtime failures.
         source: 'docs/start/framework/react/guide/middleware.md'
@@ -441,6 +441,65 @@ skills:
           restrictive (true → data-only → false). A child cannot
           set ssr: true if parent has ssr: false.
         source: 'docs/start/framework/react/guide/selective-ssr.md'
+        priority: MEDIUM
+        status: active
+
+  - name: 'Server Components'
+    slug: 'server-components'
+    domain: 'deployment-and-rendering'
+    description: >-
+      Implement and debug TanStack Start React Server Components with
+      renderServerComponent, createCompositeComponent, low-level
+      Flight streaming APIs, Router vs Query cache ownership, refresh
+      paths, and selective SSR modes.
+    type: sub-skill
+    packages:
+      - '@tanstack/react-start'
+      - '@tanstack/react-start-rsc'
+    covers:
+      - renderServerComponent
+      - createCompositeComponent
+      - CompositeComponent
+      - renderToReadableStream
+      - createFromReadableStream
+      - createFromFetch
+      - Router-owned RSC caching
+      - Query-owned RSC caching
+      - Refresh ownership (router.invalidate, invalidateQueries, refetchQueries)
+      - "Selective SSR modes (ssr: 'data-only', ssr: false)"
+      - 'structuralSharing: false for Query-cached RSC values'
+    tasks:
+      - 'Implement route-owned React Server Components'
+      - 'Choose between renderServerComponent and createCompositeComponent'
+      - 'Debug stale RSC data and invalidation'
+      - 'Migrate Next App Router RSC patterns to TanStack Start'
+    failure_modes:
+      - mistake: 'Using renderServerComponent when the UI needs slots'
+        mechanism: >-
+          renderServerComponent returns a renderable value and does
+          not support client-provided children, render props, or
+          component props. Use createCompositeComponent and render it
+          with CompositeComponent when the server output must accept
+          slots.
+        source: 'docs/start/framework/react/guide/server-components.md'
+        priority: HIGH
+        status: active
+
+      - mistake: 'Omitting structuralSharing: false for Query-cached RSC values'
+        mechanism: >-
+          Query-cached RSC values must disable structural sharing.
+          Otherwise the cache may try to merge Flight payloads across
+          fetches, which can cause errors.
+        source: 'docs/start/framework/react/guide/server-components.md'
+        priority: HIGH
+        status: active
+
+      - mistake: 'Copying stale renderRsc or .validator examples into current code'
+        mechanism: >-
+          Older snippets may use renderRsc or .validator(...).
+          Normalize them to renderServerComponent and
+          .validator(...) before using them in current code.
+        source: 'docs/start/framework/react/guide/server-functions.md'
         priority: MEDIUM
         status: active
 
