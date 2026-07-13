@@ -1,4 +1,12 @@
 /**
+ * Serves static files for Effect HTTP applications.
+ *
+ * `HttpStaticServer` turns request paths into file responses under a configured
+ * root directory. It can be used as an application value or mounted onto an
+ * `HttpRouter`, and it handles index files, optional single-page application
+ * fallback, MIME type headers, cache-control headers, byte ranges, and
+ * conditional `304 Not Modified` responses.
+ *
  * @since 4.0.0
  */
 import * as Effect from "../../Effect.ts"
@@ -16,10 +24,11 @@ import * as HttpServerResponse from "./HttpServerResponse.ts"
 /**
  * Creates an `HttpApp` that serves files from a directory.
  *
- * @example
+ * **Example** (Serving files from a directory)
+ *
  * ```ts
  * import { Effect } from "effect"
- * import * as HttpStaticServer from "effect/unstable/http/HttpStaticServer"
+ * import { HttpStaticServer } from "effect/unstable/http"
  *
  * const program = Effect.gen(function*() {
  *   const app = yield* HttpStaticServer.make({ root: "./public" })
@@ -27,8 +36,8 @@ import * as HttpServerResponse from "./HttpServerResponse.ts"
  * })
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const make: (options: {
   readonly root: string
@@ -168,12 +177,11 @@ export const make: (options: {
 /**
  * Creates a layer that mounts static files on an `HttpRouter`.
  *
- * @example
+ * **Example** (Mounting static files on a router)
+ *
  * ```ts
  * import { Layer } from "effect"
- * import * as HttpRouter from "effect/unstable/http/HttpRouter"
- * import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse"
- * import * as HttpStaticServer from "effect/unstable/http/HttpStaticServer"
+ * import { HttpRouter, HttpServerResponse, HttpStaticServer } from "effect/unstable/http"
  *
  * const ApiLayer = HttpRouter.add("GET", "/health", HttpServerResponse.text("ok"))
  *
@@ -185,8 +193,8 @@ export const make: (options: {
  * const AppLayer = Layer.mergeAll(ApiLayer, StaticFilesLayer)
  * ```
  *
- * @since 4.0.0
  * @category layers
+ * @since 4.0.0
  */
 export const layer = (options: {
   readonly root: string

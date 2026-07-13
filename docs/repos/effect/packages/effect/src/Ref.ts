@@ -1,30 +1,12 @@
 /**
- * This module provides utilities for working with mutable references in a functional context.
+ * Stores fiber-safe mutable state inside Effect programs.
  *
- * A Ref is a mutable reference that can be read, written, and atomically modified. Unlike plain
- * mutable variables, Refs are thread-safe and work seamlessly with Effect's concurrency model.
- * They provide atomic operations for safe state management in concurrent programs.
- *
- * @example
- * ```ts
- * import { Effect, Ref } from "effect"
- *
- * const program = Effect.gen(function*() {
- *   // Create a ref with initial value
- *   const counter = yield* Ref.make(0)
- *
- *   // Atomic operations
- *   yield* Ref.update(counter, (n) => n + 1)
- *   yield* Ref.update(counter, (n) => n * 2)
- *
- *   const value = yield* Ref.get(counter)
- *   console.log(value) // 2
- *
- *   // Atomic modify with return value
- *   const previous = yield* Ref.getAndSet(counter, 100)
- *   console.log(previous) // 2
- * })
- * ```
+ * A `Ref<A>` holds one value and exposes reads, writes, and atomic
+ * transformations as effects, so state changes compose with Effect's
+ * concurrency model. This module includes constructors, safe and unsafe reads,
+ * set and get-and-set helpers, update and modify helpers, and conditional
+ * update variants that leave the value unchanged when an `Option.none` result
+ * is returned.
  *
  * @since 2.0.0
  */
@@ -41,11 +23,18 @@ const TypeId = "~effect/Ref"
 /**
  * A mutable reference that provides atomic read, write, and update operations.
  *
- * Ref is a thread-safe mutable reference type that allows for atomic operations
- * on shared state. It supports both simple read/write operations and complex
- * atomic transformations.
+ * **When to use**
  *
- * @example
+ * Use to keep shared mutable state that is read and updated inside Effect
+ * programs.
+ *
+ * **Details**
+ *
+ * A `Ref` is a thread-safe mutable reference type for shared state. It supports
+ * simple read and write operations as well as atomic transformations.
+ *
+ * **Example** (Reading and updating a ref)
+ *
  * ```ts
  * import { Effect, Ref } from "effect"
  *
@@ -66,8 +55,12 @@ const TypeId = "~effect/Ref"
  * })
  * ```
  *
- * @since 2.0.0
+ * @see {@link make} for creating a `Ref`
+ * @see {@link get} for reading the current value
+ * @see {@link set} for replacing the current value
+ *
  * @category models
+ * @since 2.0.0
  */
 export interface Ref<in out A> extends Ref.Variance<A>, Pipeable {
   readonly ref: MutableRef.MutableRef<A>
@@ -76,14 +69,22 @@ export interface Ref<in out A> extends Ref.Variance<A>, Pipeable {
 /**
  * The Ref namespace containing type definitions and utilities.
  *
+ * **When to use**
+ *
+ * Use when referring to type members nested under the `Ref` namespace.
+ *
  * @since 2.0.0
- * @category models
  */
 export declare namespace Ref {
   /**
    * Variance interface for Ref types, defining the type parameter constraints.
    *
-   * @example
+   * **When to use**
+   *
+   * Use when working with the type-level variance marker carried by `Ref`.
+   *
+   * **Example** (Using invariant refs)
+   *
    * ```ts
    * import { Effect, Ref } from "effect"
    *
@@ -98,8 +99,8 @@ export declare namespace Ref {
    * })
    * ```
    *
-   * @since 2.0.0
    * @category models
+   * @since 2.0.0
    */
   export interface Variance<in out A> {
     readonly [TypeId]: {
@@ -124,10 +125,17 @@ const RefProto = {
 /**
  * Creates a new Ref with the specified initial value (unsafe version).
  *
- * This function creates a Ref synchronously without wrapping in Effect.
- * Use this only when you're sure about the safety of immediate creation.
+ * **When to use**
  *
- * @example
+ * Use when you need immediate synchronous construction and can guarantee
+ * that creating the `Ref` outside of `Effect` is safe.
+ *
+ * **Gotchas**
+ *
+ * Prefer `Ref.make` for Effect-wrapped creation in Effect programs.
+ *
+ * **Example** (Creating a ref unsafely)
+ *
  * ```ts
  * import { Ref } from "effect"
  *
@@ -142,8 +150,8 @@ const RefProto = {
  * // Prefer Ref.make for Effect-wrapped creation
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const makeUnsafe = <A>(value: A): Ref<A> => {
   const self = Object.create(RefProto)
@@ -154,10 +162,12 @@ export const makeUnsafe = <A>(value: A): Ref<A> => {
 /**
  * Creates a new Ref with the specified initial value.
  *
- * @param value - The initial value for the Ref
- * @returns An Effect that creates a new Ref
+ * **When to use**
  *
- * @example
+ * Use to create a `Ref` for shared mutable state inside an Effect program.
+ *
+ * **Example** (Creating a ref)
+ *
  * ```ts
  * import { Effect, Ref } from "effect"
  *
@@ -168,15 +178,22 @@ export const makeUnsafe = <A>(value: A): Ref<A> => {
  * })
  * ```
  *
- * @since 2.0.0
+ * @see {@link makeUnsafe} for synchronous construction outside Effect code
+ *
  * @category constructors
+ * @since 2.0.0
  */
 export const make = <A>(value: A): Effect.Effect<Ref<A>> => Effect.sync(() => makeUnsafe(value))
 
 /**
  * Gets the current value of the Ref.
  *
- * @example
+ * **When to use**
+ *
+ * Use to read the current `Ref` value without changing it.
+ *
+ * **Example** (Getting the current value)
+ *
  * ```ts
  * import { Effect, Ref } from "effect"
  *
@@ -187,15 +204,22 @@ export const make = <A>(value: A): Effect.Effect<Ref<A>> => Effect.sync(() => ma
  * })
  * ```
  *
- * @since 2.0.0
+ * @see {@link set} for replacing the current value
+ *
  * @category getters
+ * @since 2.0.0
  */
 export const get = <A>(self: Ref<A>) => Effect.sync(() => self.ref.current)
 
 /**
  * Sets the value of the Ref to the specified value.
  *
- * @example
+ * **When to use**
+ *
+ * Use to replace the current `Ref` value with a known value.
+ *
+ * **Example** (Setting a value)
+ *
  * ```ts
  * import { Effect, Ref } from "effect"
  *
@@ -215,8 +239,11 @@ export const get = <A>(self: Ref<A>) => Effect.sync(() => self.ref.current)
  * })
  * ```
  *
- * @since 2.0.0
+ * @see {@link getAndSet} for setting while returning the previous value
+ * @see {@link setAndGet} for setting while returning the new value
+ *
  * @category setters
+ * @since 2.0.0
  */
 export const set = dual<
   <A>(value: A) => (self: Ref<A>) => Effect.Effect<void>,
@@ -224,11 +251,14 @@ export const set = dual<
 >(2, <A>(self: Ref<A>, value: A) => Effect.sync(() => MutableRef.set(self.ref, value)))
 
 /**
- * Atomically gets the current value of the Ref and sets it to the specified value.
+ * Gets the current value of the Ref, sets it to the specified value, and returns the previous value atomically.
  *
- * Returns the value that was in the Ref before the update.
+ * **When to use**
  *
- * @example
+ * Use to replace a plain `Ref` value while returning the previous value.
+ *
+ * **Example** (Replacing a value atomically)
+ *
  * ```ts
  * import { Effect, Ref } from "effect"
  *
@@ -244,8 +274,11 @@ export const set = dual<
  * })
  * ```
  *
+ * @see {@link set} for setting without returning the previous value
+ * @see {@link getAndUpdate} for deriving the new value from the previous value
+ *
+ * @category mutations
  * @since 2.0.0
- * @category utils
  */
 export const getAndSet = dual<
   <A>(value: A) => (self: Ref<A>) => Effect.Effect<A>,
@@ -258,11 +291,14 @@ export const getAndSet = dual<
   }))
 
 /**
- * Atomically gets the current value of the Ref and updates it with the given function.
+ * Gets the current value of the Ref, updates it with the given function, and returns the previous value atomically.
  *
- * Returns the value that was in the Ref before the update.
+ * **When to use**
  *
- * @example
+ * Use to derive a new `Ref` value while returning the previous value.
+ *
+ * **Example** (Updating and returning the previous value)
+ *
  * ```ts
  * import { Effect, Ref } from "effect"
  *
@@ -278,8 +314,11 @@ export const getAndSet = dual<
  * })
  * ```
  *
+ * @see {@link update} for updating without returning the previous value
+ * @see {@link updateAndGet} for returning the new value instead
+ *
+ * @category mutations
  * @since 2.0.0
- * @category utils
  */
 export const getAndUpdate = dual<
   <A>(f: (a: A) => A) => (self: Ref<A>) => Effect.Effect<A>,
@@ -292,16 +331,22 @@ export const getAndUpdate = dual<
   }))
 
 /**
- * Atomically gets the current value of the Ref and updates it with the given partial function.
+ * Gets the current value of the Ref and updates it atomically with the given partial function.
  *
- * If the partial function returns `Option.some`, the Ref is updated with the new value.
- * If it returns `Option.none`, the Ref is left unchanged.
- * Always returns the value that was in the Ref before the attempted update.
+ * **When to use**
  *
- * @example
+ * Use to return the previous `Ref` value while applying a conditional update.
+ *
+ * **Details**
+ *
+ * If the partial function returns `Option.some`, the Ref is updated with the
+ * new value. If it returns `Option.none`, the Ref is left unchanged. The effect
+ * always returns the value that was in the Ref before the attempted update.
+ *
+ * **Example** (Conditionally updating and returning the previous value)
+ *
  * ```ts
- * import { Effect, Ref } from "effect"
- * import * as Option from "effect/Option"
+ * import { Effect, Option, Ref } from "effect"
  *
  * const program = Effect.gen(function*() {
  *   const counter = yield* Ref.make(5)
@@ -328,8 +373,11 @@ export const getAndUpdate = dual<
  * })
  * ```
  *
+ * @see {@link getAndUpdate} for always applying an update
+ * @see {@link updateSome} for conditional updates without returning the previous value
+ *
+ * @category mutations
  * @since 2.0.0
- * @category utils
  */
 export const getAndUpdateSome = dual<
   <A>(pf: (a: A) => Option.Option<A>) => (self: Ref<A>) => Effect.Effect<A>,
@@ -345,11 +393,15 @@ export const getAndUpdateSome = dual<
   }))
 
 /**
- * Atomically sets the value of the Ref to the specified value and returns the new value.
+ * Sets the value of the Ref atomically to the specified value and returns the new value.
  *
- * This is useful when you want to set a value and immediately get it back in one atomic operation.
+ * **When to use**
  *
- * @example
+ * Use when you want to set a `Ref` value and immediately get it back in one
+ * atomic operation.
+ *
+ * **Example** (Setting and returning the new value)
+ *
  * ```ts
  * import { Effect, Ref } from "effect"
  *
@@ -374,8 +426,8 @@ export const getAndUpdateSome = dual<
  * })
  * ```
  *
+ * @category mutations
  * @since 2.0.0
- * @category utils
  */
 export const setAndGet = dual<
   <A>(value: A) => (self: Ref<A>) => Effect.Effect<A>,
@@ -383,12 +435,21 @@ export const setAndGet = dual<
 >(2, <A>(self: Ref<A>, value: A) => Effect.sync(() => self.ref.current = value))
 
 /**
- * Atomically modifies the value of the Ref using the given function.
+ * Modifies the value of the Ref atomically using the given function.
  *
- * The function receives the current value and returns a tuple of [result, newValue].
- * The Ref is updated with the newValue and the result is returned.
+ * **When to use**
  *
- * @example
+ * Use to compute both a separate return value and the next stored `Ref` value
+ * in one atomic update.
+ *
+ * **Details**
+ *
+ * The function receives the current value and returns a tuple of
+ * `[result, newValue]`. The Ref is updated with `newValue`, and `result` is
+ * returned by the effect.
+ *
+ * **Example** (Modifying a value atomically)
+ *
  * ```ts
  * import { Effect, Ref } from "effect"
  *
@@ -420,8 +481,11 @@ export const setAndGet = dual<
  * })
  * ```
  *
- * @since 2.0.0
+ * @see {@link updateAndGet} for returning the new stored value
+ * @see {@link modifySome} for optionally updating while returning a separate result
+ *
  * @category setters
+ * @since 2.0.0
  */
 export const modify = dual<
   <A, B>(f: (a: A) => readonly [B, A]) => (self: Ref<A>) => Effect.Effect<B>,
@@ -434,16 +498,23 @@ export const modify = dual<
   }))
 
 /**
- * Atomically modifies the value of the Ref using the given partial function.
+ * Computes a result atomically and optionally updates the value of the `Ref`.
  *
- * The function receives the current value and returns an Option of [result, newValue].
- * If the function returns `Option.some([result, newValue])`, the Ref is updated with newValue and result is returned.
- * If it returns `Option.none()`, the Ref is left unchanged and the fallback value is returned.
+ * **When to use**
  *
- * @example
+ * Use to compute a return value while optionally updating a plain `Ref`.
+ *
+ * **Details**
+ *
+ * The callback receives the current value and returns `[result, nextValue]`,
+ * where `nextValue` is an `Option`. If `nextValue` is `Option.some(value)`,
+ * the `Ref` is updated to `value`; if it is `Option.none()`, the `Ref` is left
+ * unchanged. The returned effect always succeeds with `result`.
+ *
+ * **Example** (Conditionally modifying a value)
+ *
  * ```ts
- * import { Effect, Ref } from "effect"
- * import * as Option from "effect/Option"
+ * import { Effect, Option, Ref } from "effect"
  *
  * const program = Effect.gen(function*() {
  *   const counter = yield* Ref.make(5)
@@ -478,8 +549,11 @@ export const modify = dual<
  * })
  * ```
  *
- * @since 2.0.0
+ * @see {@link modify} for always storing a new value
+ * @see {@link updateSome} for optional updates without a separate return value
+ *
  * @category setters
+ * @since 2.0.0
  */
 export const modifySome: {
   <B, A>(pf: (a: A) => readonly [B, Option.Option<A>]): (self: Ref<A>) => Effect.Effect<B>
@@ -499,9 +573,14 @@ export const modifySome: {
   }))
 
 /**
- * Atomically updates the value of the Ref using the given function.
+ * Updates the value of the Ref atomically using the given function.
  *
- * @example
+ * **When to use**
+ *
+ * Use to apply a `Ref` state transition without returning a value.
+ *
+ * **Example** (Updating a value)
+ *
  * ```ts
  * import { Effect, Ref } from "effect"
  *
@@ -524,8 +603,11 @@ export const modifySome: {
  * })
  * ```
  *
- * @since 2.0.0
+ * @see {@link updateAndGet} for returning the new value
+ * @see {@link getAndUpdate} for returning the previous value
+ *
  * @category setters
+ * @since 2.0.0
  */
 export const update = dual<
   <A>(f: (a: A) => A) => (self: Ref<A>) => Effect.Effect<void>,
@@ -536,9 +618,14 @@ export const update = dual<
   }))
 
 /**
- * Atomically updates the value of the Ref using the given function and returns the new value.
+ * Updates the value of the Ref atomically using the given function and returns the new value.
  *
- * @example
+ * **When to use**
+ *
+ * Use to apply a `Ref` state transition and return the new stored value.
+ *
+ * **Example** (Updating and returning the new value)
+ *
  * ```ts
  * import { Effect, Ref } from "effect"
  *
@@ -555,8 +642,11 @@ export const update = dual<
  * })
  * ```
  *
+ * @see {@link update} for updating without returning the new value
+ * @see {@link getAndUpdate} for returning the previous value instead
+ *
+ * @category mutations
  * @since 2.0.0
- * @category utils
  */
 export const updateAndGet = dual<
   <A>(f: (a: A) => A) => (self: Ref<A>) => Effect.Effect<A>,
@@ -564,15 +654,21 @@ export const updateAndGet = dual<
 >(2, <A>(self: Ref<A>, f: (a: A) => A) => Effect.sync(() => self.ref.current = f(self.ref.current)))
 
 /**
- * Atomically updates the value of the Ref using the given partial function.
+ * Updates the value of the Ref atomically using the given partial function.
  *
- * If the partial function returns `Option.some`, the Ref is updated with the new value.
- * If it returns `Option.none`, the Ref is left unchanged.
+ * **When to use**
  *
- * @example
+ * Use to apply a conditional `Ref` update without returning a value.
+ *
+ * **Details**
+ *
+ * If the partial function returns `Option.some`, the Ref is updated with the
+ * new value. If it returns `Option.none`, the Ref is left unchanged.
+ *
+ * **Example** (Conditionally updating a value)
+ *
  * ```ts
- * import { Effect, Ref } from "effect"
- * import * as Option from "effect/Option"
+ * import { Effect, Option, Ref } from "effect"
  *
  * const program = Effect.gen(function*() {
  *   const counter = yield* Ref.make(5)
@@ -598,8 +694,11 @@ export const updateAndGet = dual<
  * })
  * ```
  *
- * @since 2.0.0
+ * @see {@link update} for always applying an update
+ * @see {@link updateSomeAndGet} for returning the resulting current value
+ *
  * @category setters
+ * @since 2.0.0
  */
 export const updateSome = dual<
   <A>(f: (a: A) => Option.Option<A>) => (self: Ref<A>) => Effect.Effect<void>,
@@ -613,16 +712,23 @@ export const updateSome = dual<
   }))
 
 /**
- * Atomically updates the value of the Ref using the given partial function and returns the current value.
+ * Updates the value of the Ref atomically using the given partial function and returns the current value.
  *
- * If the partial function returns `Option.some`, the Ref is updated with the new value.
- * If it returns `Option.none`, the Ref is left unchanged.
- * Returns the current value of the Ref after the potential update.
+ * **When to use**
  *
- * @example
+ * Use to apply a conditional `Ref` update and return the resulting current
+ * value.
+ *
+ * **Details**
+ *
+ * If the partial function returns `Option.some`, the Ref is updated with the
+ * new value. If it returns `Option.none`, the Ref is left unchanged. The effect
+ * returns the current value of the Ref after the potential update.
+ *
+ * **Example** (Conditionally updating and returning the current value)
+ *
  * ```ts
- * import { Effect, Ref } from "effect"
- * import * as Option from "effect/Option"
+ * import { Effect, Option, Ref } from "effect"
  *
  * const program = Effect.gen(function*() {
  *   const counter = yield* Ref.make(10)
@@ -643,8 +749,11 @@ export const updateSome = dual<
  * })
  * ```
  *
+ * @see {@link updateSome} for conditional updates without returning a value
+ * @see {@link updateAndGet} for always updating and returning the new value
+ *
+ * @category mutations
  * @since 2.0.0
- * @category utils
  */
 export const updateSomeAndGet = dual<
   <A>(pf: (a: A) => Option.Option<A>) => (self: Ref<A>) => Effect.Effect<A>,
@@ -661,10 +770,17 @@ export const updateSomeAndGet = dual<
 /**
  * Gets the current value of the Ref synchronously (unsafe version).
  *
- * This function reads the current value without wrapping in Effect.
- * Use this only when you're sure about the safety of immediate access.
+ * **When to use**
  *
- * @example
+ * Use when you need immediate synchronous access and can guarantee that
+ * reading the `Ref` outside of `Effect` is safe.
+ *
+ * **Gotchas**
+ *
+ * Prefer `Ref.get` for Effect-wrapped access in Effect programs.
+ *
+ * **Example** (Reading a ref unsafely)
+ *
  * ```ts
  * import { Ref } from "effect"
  *
@@ -679,7 +795,7 @@ export const updateSomeAndGet = dual<
  * // Prefer Ref.get for Effect-wrapped access
  * ```
  *
- * @since 2.0.0
  * @category getters
+ * @since 4.0.0
  */
 export const getUnsafe = <A>(self: Ref<A>): A => self.ref.current

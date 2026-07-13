@@ -1,28 +1,44 @@
 /**
+ * Client-side worker primitives shared by browser, Node, and Bun adapters.
+ *
+ * This module defines the platform-neutral `Worker` client, the `WorkerPlatform`
+ * service that creates workers by numeric id, and the `Spawner` service used to
+ * find platform-specific worker instances. `makePlatform` wraps platform setup
+ * and listen hooks into a `WorkerPlatform`, buffers outgoing messages until the
+ * worker is ready, runs incoming messages with Effect handlers, and ties worker
+ * cleanup to scope lifetime.
+ *
  * @since 4.0.0
  */
+import * as Context from "../../Context.ts"
 import type * as Deferred from "../../Deferred.ts"
 import * as Effect from "../../Effect.ts"
 import * as FiberSet from "../../FiberSet.ts"
 import * as Latch from "../../Latch.ts"
 import * as Layer from "../../Layer.ts"
 import * as Scope from "../../Scope.ts"
-import * as ServiceMap from "../../ServiceMap.ts"
 import { WorkerError, WorkerSendError } from "./WorkerError.ts"
 
 /**
- * @since 4.0.0
+ * Service that spawns effect `Worker` instances for numeric worker ids using
+ * the configured `Spawner`.
+ *
  * @category models
+ * @since 4.0.0
  */
-export class WorkerPlatform extends ServiceMap.Service<WorkerPlatform, {
+export class WorkerPlatform extends Context.Service<WorkerPlatform, {
   readonly spawn: <O = unknown, I = unknown>(
     id: number
   ) => Effect.Effect<Worker<O, I>, WorkerError, Spawner>
 }>()("effect/workers/Worker/WorkerPlatform") {}
 
 /**
- * @since 4.0.0
+ * Effect-based worker abstraction that can send input messages and run a
+ * long-lived handler for output messages, failing with `WorkerError` or handler
+ * errors.
+ *
  * @category models
+ * @since 4.0.0
  */
 export interface Worker<O = unknown, I = unknown> {
   readonly send: (
@@ -40,8 +56,12 @@ export interface Worker<O = unknown, I = unknown> {
 }
 
 /**
- * @since 4.0.0
+ * Wraps platform-specific send and run functions into a `Worker`, translating
+ * platform ready/data messages and running the optional `onSpawn` effect when
+ * the worker reports readiness.
+ *
  * @category models
+ * @since 4.0.0
  */
 export const makeUnsafe = (options: {
   readonly send: (
@@ -63,45 +83,63 @@ export const makeUnsafe = (options: {
 })
 
 /**
- * @since 4.0.0
+ * Internal worker platform protocol message: `[0]` signals readiness and
+ * `[1, payload]` carries data.
+ *
  * @category models
+ * @since 4.0.0
  */
 export type PlatformMessage = readonly [ready: 0] | readonly [data: 1, unknown]
 
 /**
- * @since 4.0.0
+ * Phantom identifier for the service that maps worker ids to platform-specific
+ * worker instances.
+ *
  * @category models
+ * @since 4.0.0
  */
 export interface Spawner {
   readonly _: unique symbol
 }
 
 /**
+ * Service tag for the worker `SpawnerFn`.
+ *
+ * @category services
  * @since 4.0.0
- * @category tags
  */
-export const Spawner: ServiceMap.Service<
+export const Spawner: Context.Service<
   Spawner,
   SpawnerFn<unknown>
-> = ServiceMap.Service("effect/workers/Worker/Spawner")
+> = Context.Service("effect/workers/Worker/Spawner")
 
 /**
- * @since 4.0.0
+ * Function that creates or locates a platform-specific worker instance for a
+ * numeric worker id.
+ *
  * @category models
+ * @since 4.0.0
  */
 export interface SpawnerFn<W = unknown> {
   (id: number): W
 }
 
 /**
- * @since 4.0.0
+ * Creates a layer that provides a worker `Spawner` service from a `SpawnerFn`.
+ *
  * @category layers
+ * @since 4.0.0
  */
 export const layerSpawner: <W = unknown>(
   spawner: SpawnerFn<W>
 ) => Layer.Layer<Spawner> = Layer.succeed(Spawner)
 
 /**
+ * Creates a `WorkerPlatform` from platform-specific setup and listen hooks,
+ * buffering sent messages until the worker is ready and scoping port cleanup to
+ * the worker run.
+ *
+ * @category constructors
  * @since 4.0.0
  */
 export const makePlatform = <W>() =>

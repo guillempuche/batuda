@@ -1,4 +1,14 @@
 /**
+ * Low-level helpers for adapting push-based SQL row sources into Effect
+ * streams.
+ *
+ * SQL drivers often expose large query results through cursors, event emitters,
+ * or driver-specific streams that push rows as they arrive. This module
+ * provides the small interop layer used by SQL integrations to turn those
+ * producers into `Stream` values for `Statement.stream` and
+ * `Connection.executeStream`, so callers can process large result sets
+ * incrementally instead of materializing every row in memory.
+ *
  * @since 4.0.0
  */
 import * as Cause from "../../Cause.ts"
@@ -8,6 +18,10 @@ import type * as Scope from "../../Scope.ts"
 import * as Stream from "../../Stream.ts"
 
 /**
+ * Creates a stream from a callback-style producer with pause and resume
+ * callbacks that are triggered when the internal queue applies backpressure.
+ *
+ * @category constructors
  * @since 4.0.0
  */
 export const asyncPauseResume = <A, E = never, R = never>(

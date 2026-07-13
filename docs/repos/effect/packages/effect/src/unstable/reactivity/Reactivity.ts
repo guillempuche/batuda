@@ -1,6 +1,15 @@
 /**
+ * Process-local invalidation for connecting writes to dependent reads.
+ *
+ * This module does not cache values itself. It lets callers register handlers
+ * for keys, invalidate those keys, wrap successful mutations so they invalidate
+ * keys, and expose effects as queues or streams that rerun when matching keys
+ * change. The service can also batch invalidations so handlers run after the
+ * batch completes.
+ *
  * @since 4.0.0
  */
+import * as Context from "../../Context.ts"
 import * as Effect from "../../Effect.ts"
 import type * as Exit from "../../Exit.ts"
 import * as Fiber from "../../Fiber.ts"
@@ -10,14 +19,26 @@ import * as Layer from "../../Layer.ts"
 import * as Queue from "../../Queue.ts"
 import type { ReadonlyRecord } from "../../Record.ts"
 import * as Scope from "../../Scope.ts"
-import * as ServiceMap from "../../ServiceMap.ts"
 import * as Stream from "../../Stream.ts"
 
 /**
+ * Service for key-based reactive invalidation.
+ *
+ * **When to use**
+ *
+ * Use to provide the invalidation service that refreshes queries, streams, and
+ * atoms when application keys change.
+ *
+ * **Details**
+ *
+ * The service can register handlers for keys, invalidate those keys, wrap
+ * mutations so successful effects invalidate keys, and turn query effects into
+ * queues or streams that rerun when keys are invalidated.
+ *
+ * @category services
  * @since 4.0.0
- * @category tags
  */
-export class Reactivity extends ServiceMap.Service<
+export class Reactivity extends Context.Service<
   Reactivity,
   {
     readonly invalidateUnsafe: (keys: ReadonlyArray<unknown> | ReadonlyRecord<string, ReadonlyArray<unknown>>) => void
@@ -45,8 +66,15 @@ export class Reactivity extends ServiceMap.Service<
 >()("effect/reactivity/Reactivity") {}
 
 /**
- * @since 4.0.0
+ * Creates an in-memory `Reactivity` service.
+ *
+ * **Details**
+ *
+ * The service tracks handlers by hashed keys and runs the registered handlers when
+ * matching keys are invalidated.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const make = Effect.sync(() => {
   const handlers = new Map<number | string, Set<() => void>>()
@@ -62,7 +90,7 @@ export const make = Effect.sync(() => {
   const invalidate = (
     keys: ReadonlyArray<unknown> | ReadonlyRecord<string, ReadonlyArray<unknown>>
   ): Effect.Effect<void> =>
-    Effect.servicesWith((services) => {
+    Effect.contextWith((services) => {
       const pending = services.mapUnsafe.get(PendingInvalidation.key) as Set<string | number> | undefined
       if (pending) {
         keysToHashes(keys, (hash) => {
@@ -109,8 +137,8 @@ export const make = Effect.sync(() => {
     effect: Effect.Effect<A, E, R>
   ): Effect.Effect<Queue.Dequeue<A, E>, never, R | Scope.Scope> =>
     Effect.gen(function*() {
-      const services = yield* Effect.services<Scope.Scope | R>()
-      const scope = ServiceMap.get(services, Scope.Scope)
+      const services = yield* Effect.context<Scope.Scope | R>()
+      const scope = Context.get(services, Scope.Scope)
       const results = yield* Queue.make<A, E>()
       const runFork = flow(Effect.runForkWith(services), Fiber.runIn(scope))
 
@@ -183,13 +211,19 @@ export const make = Effect.sync(() => {
   })
 })
 
-class PendingInvalidation extends ServiceMap.Service<PendingInvalidation, Set<string | number>>()(
+class PendingInvalidation extends Context.Service<PendingInvalidation, Set<string | number>>()(
   "effect/reactivity/Reactivity/PendingInvalidation"
 ) {}
 
 /**
- * @since 4.0.0
+ * Wraps an effect so the supplied keys are invalidated after the effect succeeds.
+ *
+ * **Gotchas**
+ *
+ * If the effect fails, the keys are not invalidated.
+ *
  * @category accessors
+ * @since 4.0.0
  */
 export const mutation: {
   (
@@ -205,8 +239,15 @@ export const mutation: {
 ): Effect.Effect<A, E, R | Reactivity> => Reactivity.use((_) => _.mutation(keys, effect)))
 
 /**
- * @since 4.0.0
+ * Runs an effect as a query tied to the supplied invalidation keys.
+ *
+ * **Details**
+ *
+ * The returned queue receives the initial result and each later result after the
+ * keys are invalidated. The registration is removed when the current scope closes.
+ *
  * @category accessors
+ * @since 4.0.0
  */
 export const query: {
   (
@@ -225,8 +266,15 @@ export const query: {
   Reactivity.use((r) => r.query(keys, effect)))
 
 /**
- * @since 4.0.0
+ * Runs an effect as a stream of query results tied to the supplied invalidation
+ * keys.
+ *
+ * **Details**
+ *
+ * The effect runs initially and reruns whenever the keys are invalidated.
+ *
  * @category accessors
+ * @since 4.0.0
  */
 export const stream: {
   (
@@ -246,16 +294,25 @@ export const stream: {
   ))
 
 /**
- * @since 4.0.0
+ * Invalidates the supplied keys through the `Reactivity` service.
+ *
+ * **Details**
+ *
+ * Registered queries for matching keys are rerun immediately, or collected until
+ * the enclosing reactivity batch completes.
+ *
  * @category accessors
+ * @since 4.0.0
  */
 export const invalidate = (
   keys: ReadonlyArray<unknown> | ReadonlyRecord<string, ReadonlyArray<unknown>>
 ): Effect.Effect<void, never, Reactivity> => Reactivity.use((r) => r.invalidate(keys))
 
 /**
- * @since 4.0.0
+ * The default layer that provides an in-memory `Reactivity` service.
+ *
  * @category layers
+ * @since 4.0.0
  */
 export const layer: Layer.Layer<Reactivity> = Layer.effect(Reactivity)(make)
 

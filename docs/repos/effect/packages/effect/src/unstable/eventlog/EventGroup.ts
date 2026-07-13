@@ -1,4 +1,12 @@
 /**
+ * Defines groups of typed events for the unstable event-log system.
+ *
+ * An `EventGroup` collects event definitions that belong together. Start with
+ * `empty`, add events with their payload, success, and error schemas, then use
+ * the group to build clients with `EventLog.schema` and server handlers with
+ * `EventLog.group`. The group only describes events; it does not write or run
+ * them.
+ *
  * @since 4.0.0
  */
 import { type Pipeable, pipeArguments } from "../../Pipeable.ts"
@@ -8,37 +16,44 @@ import type * as Schema from "../../Schema.ts"
 import * as Event from "./Event.ts"
 
 /**
+ * Unique type identifier used to mark event log event groups.
+ *
+ * @category type IDs
  * @since 4.0.0
- * @category type ids
  */
 export type TypeId = "~effect/eventlog/EventGroup"
 
 /**
+ * Runtime type identifier used to mark event log event groups.
+ *
+ * @category type IDs
  * @since 4.0.0
- * @category type ids
  */
 export const TypeId: TypeId = "~effect/eventlog/EventGroup"
 
 /**
- * @since 4.0.0
+ * Returns `true` when a value is an event log event group.
+ *
  * @category guards
+ * @since 4.0.0
  */
 export const isEventGroup = (u: unknown): u is Any => Predicate.hasProperty(u, TypeId)
 
 /**
- * An `EventGroup` is a collection of `Event`s. You can use an `EventGroup` to
- * represent a portion of your domain.
+ * Typed collection of event definitions that represents a portion of an event log
+ * domain.
  *
- * The events can be implemented later using the `EventLogBuilder.group` api.
+ * **When to use**
  *
- * @since 4.0.0
+ * Use when build groups from `empty.add(...)`, then provide implementations for the events
+ * with `EventLog.group`.
+ *
  * @category models
+ * @since 4.0.0
  */
 export interface EventGroup<
   out Events extends Event.Any = Event.Any
 > extends Pipeable {
-  readonly _?: symbol
-  readonly __type?: Events | undefined
   readonly [TypeId]: TypeId
   readonly events: Record.ReadonlyRecord<string, Events>
 
@@ -65,42 +80,54 @@ export interface EventGroup<
 }
 
 /**
- * @since 4.0.0
+ * Type-erased marker for an event log event group.
+ *
  * @category models
+ * @since 4.0.0
  */
 export interface Any {
   readonly [TypeId]: TypeId
 }
 
 /**
- * @since 4.0.0
+ * Type-erased event group with its events record available structurally.
+ *
  * @category models
+ * @since 4.0.0
  */
 export type AnyWithProps = EventGroup<Event.Any>
 
 /**
- * @since 4.0.0
+ * Derives the handler service markers required for all events in an event group.
+ *
  * @category models
+ * @since 4.0.0
  */
 export type ToService<A> = A extends EventGroup<infer _Events> ? Event.ToService<_Events>
   : never
 
 /**
- * @since 4.0.0
+ * Extracts the union of event definitions contained in an event group.
+ *
  * @category models
+ * @since 4.0.0
  */
 export type Events<Group> = Group extends EventGroup<infer _Events> ? _Events
   : never
 
 /**
- * @since 4.0.0
+ * Client-side schema services required by all events in an event group.
+ *
  * @category models
+ * @since 4.0.0
  */
 export type ServicesClient<Group> = Event.ServicesClient<Events<Group>>
 
 /**
- * @since 4.0.0
+ * Server-side schema services required by all events in an event group.
+ *
  * @category models
+ * @since 4.0.0
  */
 export type ServicesServer<Group> = Event.ServicesServer<Events<Group>>
 
@@ -112,8 +139,6 @@ const makeProto = <
   const EventGroupClass = (_: never) => {}
   const group = Object.assign(EventGroupClass, {
     [TypeId]: TypeId,
-    _: Symbol.for("~effect/eventlog/EventGroup"),
-    __type: undefined,
     events: options.events,
     add<
       Tag extends string,
@@ -155,12 +180,14 @@ const makeProto = <
 }
 
 /**
- * An `EventGroup` is a collection of `Event`s. You can use an `EventGroup` to
- * represent a portion of your domain.
+ * Creates an empty event group used as the starting point for defining a group.
  *
- * The events can be implemented later using the `EventLog.group` api.
+ * **When to use**
  *
- * @since 4.0.0
+ * Use when you need the starting `EventGroup` value before adding event
+ * definitions with `.add(...)`.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const empty: EventGroup<never> = makeProto({ events: Record.empty() })

@@ -1,24 +1,44 @@
 /**
+ * Mutable reactive references for local, in-memory state.
+ *
+ * `AtomRef` provides small observable state cells that can be read, updated,
+ * mapped, and subscribed to without going through an `AtomRegistry`. Mutable
+ * refs can also create refs for nested properties. The module also provides a
+ * collection helper that stores item refs and notifies subscribers when items are
+ * inserted, removed, or changed.
+ *
  * @since 4.0.0
  */
 import * as Equal from "../../Equal.ts"
 import * as Hash from "../../Hash.ts"
 
 /**
+ * The literal type used to identify `AtomRef` values.
+ *
+ * @category type IDs
  * @since 4.0.0
- * @category type ids
  */
 export type TypeId = "~effect/reactivity/AtomRef"
 
 /**
+ * The runtime type id used to identify `AtomRef` values.
+ *
+ * @category type IDs
  * @since 4.0.0
- * @category type ids
  */
 export const TypeId: TypeId = "~effect/reactivity/AtomRef"
 
 /**
- * @since 4.0.0
+ * A read-only reactive reference.
+ *
+ * **Details**
+ *
+ * It exposes a stable key, the current value, subscriptions to value changes, and
+ * `map` for creating derived read-only references. Equality and hashing are based
+ * on the current value.
+ *
  * @category models
+ * @since 4.0.0
  */
 export interface ReadonlyRef<A> extends Equal.Equal {
   readonly [TypeId]: TypeId
@@ -29,8 +49,15 @@ export interface ReadonlyRef<A> extends Equal.Equal {
 }
 
 /**
- * @since 4.0.0
+ * A mutable reactive reference.
+ *
+ * **Details**
+ *
+ * It supports replacing the whole value, updating it from the current value, and
+ * creating mutable references to nested properties.
+ *
  * @category models
+ * @since 4.0.0
  */
 export interface AtomRef<A> extends ReadonlyRef<A> {
   readonly prop: <K extends keyof A>(prop: K) => AtomRef<A[K]>
@@ -39,8 +66,15 @@ export interface AtomRef<A> extends ReadonlyRef<A> {
 }
 
 /**
- * @since 4.0.0
+ * A reactive collection of mutable item references.
+ *
+ * **Details**
+ *
+ * The collection can push, insert, and remove item refs, and `toArray` returns the
+ * current raw item values.
+ *
  * @category models
+ * @since 4.0.0
  */
 export interface Collection<A> extends ReadonlyRef<ReadonlyArray<AtomRef<A>>> {
   readonly push: (item: A) => Collection<A>
@@ -50,14 +84,23 @@ export interface Collection<A> extends ReadonlyRef<ReadonlyArray<AtomRef<A>>> {
 }
 
 /**
- * @since 4.0.0
+ * Creates a mutable reactive reference initialized with the supplied value.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const make = <A>(value: A): AtomRef<A> => new AtomRefImpl(value)
 
 /**
- * @since 4.0.0
+ * Creates a reactive collection from an iterable of initial item values.
+ *
+ * **Details**
+ *
+ * Each item is wrapped in an `AtomRef`, and changes to item refs notify the
+ * collection subscribers.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const collection = <A>(items: Iterable<A>): Collection<A> => new CollectionImpl(items)
 
@@ -85,25 +128,36 @@ class ReadonlyRefImpl<A> implements ReadonlyRef<A> {
     return Hash.hash(this.value)
   }
 
-  listeners: Array<(a: A) => void> = []
-  listenerCount = 0
+  listeners: Listener<A> | null = null
 
   notify(a: A) {
-    for (let i = 0; i < this.listenerCount; i++) {
-      this.listeners[i](a)
+    let listener = this.listeners
+    while (listener !== null) {
+      listener.f(a)
+      listener = listener.next
     }
   }
 
   subscribe(f: (a: A) => void): () => void {
-    this.listeners.push(f)
-    this.listenerCount++
+    const listener: Listener<A> = {
+      f,
+      prev: null,
+      next: this.listeners
+    }
+    if (this.listeners) {
+      this.listeners.prev = listener
+    }
+    this.listeners = listener
 
     return () => {
-      const index = this.listeners.indexOf(f)
-      if (index !== -1) {
-        this.listeners[index] = this.listeners[this.listenerCount - 1]
-        this.listeners.pop()
-        this.listenerCount--
+      if (this.listeners === listener) {
+        this.listeners = listener.next
+      }
+      if (listener.prev) {
+        listener.prev.next = listener.next
+      }
+      if (listener.next) {
+        listener.next.prev = listener.prev
       }
     }
   }
@@ -111,6 +165,12 @@ class ReadonlyRefImpl<A> implements ReadonlyRef<A> {
   map<B>(f: (a: A) => B): ReadonlyRef<B> {
     return new MapRefImpl(this, f)
   }
+}
+
+type Listener<A> = {
+  readonly f: (a: A) => void
+  prev: Listener<A> | null
+  next: Listener<A> | null
 }
 
 class AtomRefImpl<A> extends ReadonlyRefImpl<A> implements AtomRef<A> {

@@ -1,26 +1,46 @@
 /**
+ * Serializes RPC protocol messages for transports.
+ *
+ * `RpcSerialization` is the boundary between `RpcMessage` envelopes and the
+ * bytes or strings carried by a transport. This module provides built-in
+ * serializers for JSON, newline-delimited JSON, JSON-RPC 2.0, and MessagePack,
+ * including framed formats that can decode multiple messages from streaming
+ * chunks.
+ *
  * @since 4.0.0
  */
 import * as Msgpackr from "msgpackr"
+import * as Context from "../../Context.ts"
 import * as Layer from "../../Layer.ts"
 import * as Predicate from "../../Predicate.ts"
 import { hasProperty } from "../../Predicate.ts"
-import * as ServiceMap from "../../ServiceMap.ts"
 import type * as RpcMessage from "./RpcMessage.ts"
 
 /**
- * @since 4.0.0
+ * Service that describes how RPC protocol messages are encoded and decoded,
+ * including the content type and whether the serialization format provides
+ * message framing.
+ *
+ * **When to use**
+ *
+ * Use to provide the serialization boundary shared by RPC clients and servers
+ * for a chosen wire format.
+ *
  * @category serialization
+ * @since 4.0.0
  */
-export class RpcSerialization extends ServiceMap.Service<RpcSerialization, {
+export class RpcSerialization extends Context.Service<RpcSerialization, {
   makeUnsafe(): Parser
   readonly contentType: string
   readonly includesFraming: boolean
 }>()("effect/rpc/RpcSerialization") {}
 
 /**
- * @since 4.0.0
+ * A stateful parser for an RPC serialization format, able to decode input
+ * chunks into protocol messages and encode messages for transport.
+ *
  * @category serialization
+ * @since 4.0.0
  */
 export interface Parser {
   readonly decode: (data: Uint8Array | string) => ReadonlyArray<unknown>
@@ -28,8 +48,12 @@ export interface Parser {
 }
 
 /**
- * @since 4.0.0
+ * JSON RPC serialization for whole message payloads. It does not include
+ * message framing, so it is intended for transports that frame responses
+ * themselves.
+ *
  * @category serialization
+ * @since 4.0.0
  */
 export const json: RpcSerialization["Service"] = RpcSerialization.of({
   contentType: "application/json",
@@ -47,8 +71,11 @@ export const json: RpcSerialization["Service"] = RpcSerialization.of({
 })
 
 /**
- * @since 4.0.0
+ * Serializes RPC protocol messages as newline-delimited JSON, framing each message
+ * with a trailing newline.
+ *
  * @category serialization
+ * @since 4.0.0
  */
 export const ndjson: RpcSerialization["Service"] = RpcSerialization.of({
   contentType: "application/ndjson",
@@ -87,8 +114,11 @@ export const ndjson: RpcSerialization["Service"] = RpcSerialization.of({
 })
 
 /**
- * @since 4.0.0
+ * Creates a JSON-RPC 2.0 serialization for RPC protocol messages without
+ * additional message framing.
+ *
  * @category serialization
+ * @since 4.0.0
  */
 export const jsonRpc = (options?: {
   readonly contentType?: string | undefined
@@ -98,9 +128,9 @@ export const jsonRpc = (options?: {
     includesFraming: false,
     makeUnsafe: () => {
       const decoder = new TextDecoder()
-      const batches = new Map<string, {
+      const batches = new Map<string | number, {
         readonly size: number
-        readonly responses: Map<string, RpcMessage.FromServerEncoded>
+        readonly responses: Map<string | number, RpcMessage.FromServerEncoded>
       }>()
       return {
         decode: (bytes) => {
@@ -118,8 +148,11 @@ export const jsonRpc = (options?: {
   })
 
 /**
- * @since 4.0.0
+ * Creates a newline-delimited JSON-RPC 2.0 serialization for RPC protocol
+ * messages.
+ *
  * @category serialization
+ * @since 4.0.0
  */
 export const ndJsonRpc = (options?: {
   readonly contentType?: string | undefined
@@ -154,9 +187,9 @@ export const ndJsonRpc = (options?: {
 
 function decodeJsonRpcRaw(
   decoded: JsonRpcMessage | Array<JsonRpcMessage>,
-  batches: Map<string, {
+  batches: Map<string | number, {
     readonly size: number
-    readonly responses: Map<string, RpcMessage.FromServerEncoded>
+    readonly responses: Map<string | number, RpcMessage.FromServerEncoded>
   }>
 ) {
   if (Array.isArray(decoded)) {
@@ -188,13 +221,13 @@ function decodeJsonRpcMessage(decoded: JsonRpcMessage): RpcMessage.FromClientEnc
       return requestId ?
         {
           _tag: tag,
-          requestId: String(requestId)
+          requestId
         } as any :
         { _tag: tag } as any
     }
     return {
       _tag: "Request",
-      id: Predicate.isNotNullish(decoded.id) ? String(decoded.id) : "",
+      id: decoded.id ?? "",
       tag: decoded.method,
       payload: decoded.params ?? null,
       headers: decoded.headers ?? [],
@@ -214,13 +247,13 @@ function decodeJsonRpcMessage(decoded: JsonRpcMessage): RpcMessage.FromClientEnc
   } else if (decoded.chunk === true) {
     return {
       _tag: "Chunk",
-      requestId: String(decoded.id),
+      requestId: decoded.id ?? "",
       values: decoded.result as any
     }
   }
   return {
     _tag: "Exit",
-    requestId: String(decoded.id),
+    requestId: decoded.id ?? "",
     exit: decoded.error != null ?
       {
         _tag: "Failure",
@@ -240,9 +273,9 @@ function decodeJsonRpcMessage(decoded: JsonRpcMessage): RpcMessage.FromClientEnc
 
 function encodeJsonRpcRaw(
   response: RpcMessage.FromServerEncoded | RpcMessage.FromClientEncoded,
-  batches: Map<string, {
+  batches: Map<string | number, {
     readonly size: number
-    readonly responses: Map<string, RpcMessage.FromServerEncoded>
+    readonly responses: Map<string | number, RpcMessage.FromServerEncoded>
   }>
 ) {
   if (!("requestId" in response)) {
@@ -265,9 +298,9 @@ function encodeJsonRpcResponse(
     | RpcMessage.FromServerEncoded
     | RpcMessage.FromClientEncoded
     | Array<RpcMessage.FromServerEncoded | RpcMessage.FromClientEncoded>,
-  batches: Map<string, {
+  batches: Map<string | number, {
     readonly size: number
-    readonly responses: Map<string, RpcMessage.FromServerEncoded>
+    readonly responses: Map<string | number, RpcMessage.FromServerEncoded>
   }>
 ) {
   if (Array.isArray(response) === false) {
@@ -308,7 +341,7 @@ function encodeJsonRpcMessage(response: RpcMessage.FromServerEncoded | RpcMessag
         jsonrpc: "2.0",
         method: response.tag,
         params: response.payload,
-        id: response.id !== "" ? Number(response.id) : "",
+        id: response.id,
         headers: response.headers,
         traceId: response.traceId,
         spanId: response.spanId,
@@ -328,21 +361,21 @@ function encodeJsonRpcMessage(response: RpcMessage.FromServerEncoded | RpcMessag
       return {
         jsonrpc: "2.0",
         chunk: true,
-        id: Number(response.requestId),
+        id: response.requestId,
         result: response.values
       }
     case "Exit": {
       if (response.exit._tag === "Success") {
         return {
           jsonrpc: "2.0",
-          id: response.requestId !== "" ? Number(response.requestId) : undefined,
+          id: response.requestId ?? undefined,
           result: response.exit.value
         } as any
       }
       const error = response.exit.cause.find((failure) => failure._tag === "Fail")
       return {
         jsonrpc: "2.0",
-        id: response.requestId !== "" ? Number(response.requestId) : undefined,
+        id: response.requestId ?? undefined,
         error: response.exit._tag === "Failure" ?
           {
             _tag: "Cause",
@@ -400,98 +433,114 @@ interface JsonRpcResponse {
 type JsonRpcMessage = JsonRpcRequest | JsonRpcResponse
 
 /**
- * @since 4.0.0
+ * Create a MessagePack serialization with custom msgpackr options.
+ *
  * @category serialization
+ * @since 4.0.0
  */
-export const msgPack: RpcSerialization["Service"] = RpcSerialization.of({
-  contentType: "application/msgpack",
-  includesFraming: true,
-  makeUnsafe: () => {
-    const unpackr = new Msgpackr.Unpackr({
-      useRecords: true
-    })
-    const packr = new Msgpackr.Packr({
-      useRecords: true
-    })
-    const encoder = new TextEncoder()
-    let incomplete: Uint8Array | undefined = undefined
-    return {
-      decode: (bytes) => {
-        let buf = typeof bytes === "string" ? encoder.encode(bytes) : bytes
-        if (incomplete !== undefined) {
-          const prev = buf
-          bytes = new Uint8Array(incomplete.length + buf.length)
-          bytes.set(incomplete)
-          bytes.set(prev, incomplete.length)
-          buf = bytes
-          incomplete = undefined
-        }
-        try {
-          return unpackr.unpackMultiple(buf)
-        } catch (error_) {
-          const error = error_ as any
-          if (error.incomplete) {
-            incomplete = buf.subarray(error.lastPosition)
-            return error.values ?? []
+export const makeMsgPack = (options?: Msgpackr.Options | undefined): RpcSerialization["Service"] =>
+  RpcSerialization.of({
+    contentType: "application/msgpack",
+    includesFraming: true,
+    makeUnsafe: () => {
+      const unpackr = new Msgpackr.Unpackr(options)
+      const packr = new Msgpackr.Packr(options)
+      const encoder = new TextEncoder()
+      let incomplete: Uint8Array | undefined = undefined
+      return {
+        decode(bytes) {
+          let buf = typeof bytes === "string" ? encoder.encode(bytes) : bytes
+          if (incomplete !== undefined) {
+            const prev = buf
+            bytes = new Uint8Array(incomplete.length + buf.length)
+            bytes.set(incomplete)
+            bytes.set(prev, incomplete.length)
+            buf = bytes
+            incomplete = undefined
           }
-          return []
-        }
-      },
-      encode: (response) => packr.pack(response)
+          try {
+            return unpackr.unpackMultiple(buf)
+          } catch (error_) {
+            const error = error_ as any
+            if (error.incomplete) {
+              incomplete = buf.subarray(error.lastPosition)
+              return error.values ?? []
+            }
+            throw error_
+          }
+        },
+        encode: (response) => packr.pack(response)
+      }
     }
-  }
-})
+  })
 
 /**
- * A rpc serialization layer that uses JSON for serialization.
+ * Default MessagePack RPC serialization using record support and built-in
+ * message framing.
  *
- * Use this if your protocol supports framing for messages, otherwise use
- * {@link layerNdjson}.
- *
- * @since 4.0.0
  * @category serialization
+ * @since 4.0.0
+ */
+export const msgPack: RpcSerialization["Service"] = makeMsgPack({ useRecords: true })
+
+/**
+ * RPC serialization layer that uses JSON for serialization.
+ *
+ * **When to use**
+ *
+ * Use when you have a transport protocol that already provides message framing.
+ *
+ * @see {@link layerNdjson} for transports that need newline-delimited framing
+ *
+ * @category serialization
+ * @since 4.0.0
  */
 export const layerJson: Layer.Layer<RpcSerialization> = Layer.succeed(RpcSerialization)(json)
 
 /**
- * A rpc serialization layer that uses NDJSON for serialization.
+ * RPC serialization layer that uses NDJSON for serialization.
  *
- * Use this if your protocol does not support framing for messages, otherwise
- * use {@link layerJson}.
+ * **When to use**
  *
- * @since 4.0.0
+ * Use when you have a transport protocol that does not provide message framing.
+ *
+ * @see {@link layerJson} for transports that already provide message framing
+ *
  * @category serialization
+ * @since 4.0.0
  */
 export const layerNdjson: Layer.Layer<RpcSerialization> = Layer.succeed(RpcSerialization)(ndjson)
 
 /**
- * A rpc serialization layer that uses JSON-RPC for serialization.
+ * RPC serialization layer that uses JSON-RPC for serialization.
  *
- * @since 4.0.0
  * @category serialization
+ * @since 4.0.0
  */
 export const layerJsonRpc = (options?: {
   readonly contentType?: string | undefined
 }): Layer.Layer<RpcSerialization> => Layer.succeed(RpcSerialization)(jsonRpc(options))
 
 /**
- * A rpc serialization layer that uses JSON-RPC for serialization seperated by
- * new lines.
+ * RPC serialization layer that uses newline-delimited JSON-RPC for
+ * serialization.
  *
- * @since 4.0.0
  * @category serialization
+ * @since 4.0.0
  */
 export const layerNdJsonRpc = (options?: {
   readonly contentType?: string | undefined
 }): Layer.Layer<RpcSerialization> => Layer.succeed(RpcSerialization)(ndJsonRpc(options))
 
 /**
- * A rpc serialization layer that uses MessagePack for serialization.
+ * RPC serialization layer that uses MessagePack for serialization.
+ *
+ * **Details**
  *
  * MessagePack has a more compact binary format compared to JSON and NDJSON. It
  * also has better support for binary data.
  *
- * @since 4.0.0
  * @category serialization
+ * @since 4.0.0
  */
 export const layerMsgPack: Layer.Layer<RpcSerialization> = Layer.succeed(RpcSerialization)(msgPack)

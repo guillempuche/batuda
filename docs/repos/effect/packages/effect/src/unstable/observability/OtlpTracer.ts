@@ -1,7 +1,18 @@
 /**
+ * Exports Effect tracing spans over OTLP/HTTP.
+ *
+ * This module creates a `Tracer.Tracer` backed by the shared OTLP batch
+ * exporter, so spans created by Effect tracing APIs can be sent to an
+ * OpenTelemetry Collector, vendor endpoint, or local collector. Exported spans
+ * include identifiers, parent links, attributes, events, timing, kind, and
+ * status information. Use the constructor directly or install it through the
+ * provided layer.
+ *
  * @since 4.0.0
  */
 import * as Cause from "../../Cause.ts"
+import * as Config from "../../Config.ts"
+import type * as Context from "../../Context.ts"
 import * as Duration from "../../Duration.ts"
 import * as Effect from "../../Effect.ts"
 import type * as Exit from "../../Exit.ts"
@@ -9,11 +20,11 @@ import { flow } from "../../Function.ts"
 import * as Layer from "../../Layer.ts"
 import * as Option from "../../Option.ts"
 import type * as Scope from "../../Scope.ts"
-import type * as ServiceMap from "../../ServiceMap.ts"
 import * as Tracer from "../../Tracer.ts"
 import type { ExtractTag, Mutable } from "../../Types.ts"
 import type * as Headers from "../http/Headers.ts"
 import type * as HttpClient from "../http/HttpClient.ts"
+import * as OtlpEnv from "./internal/otlpEnv.ts"
 import * as Exporter from "./OtlpExporter.ts"
 import type { KeyValue, Resource } from "./OtlpResource.ts"
 import { entriesToAttributes } from "./OtlpResource.ts"
@@ -21,8 +32,15 @@ import * as OtlpResource from "./OtlpResource.ts"
 import { OtlpSerialization } from "./OtlpSerialization.ts"
 
 /**
+ * Creates a `Tracer` that exports ended sampled spans to an OTLP traces endpoint.
+ *
+ * **Details**
+ *
+ * Spans are batched using the configured interval and batch size, serialized
+ * with `OtlpSerialization`, and flushed when the surrounding `Scope` closes.
+ *
+ * @category constructors
  * @since 4.0.0
- * @category Constructors
  */
 export const make: (
   options: {
@@ -99,8 +117,10 @@ export const make: (
 })
 
 /**
+ * Provides `Tracer.Tracer` using the OTLP tracer created by `make`.
+ *
+ * @category layers
  * @since 4.0.0
- * @category Layers
  */
 export const layer: (options: {
   readonly url: string
@@ -115,6 +135,59 @@ export const layer: (options: {
   readonly context?: (<X>(primitive: Tracer.EffectPrimitive<X>, span: Tracer.AnySpan) => X) | undefined
   readonly shutdownTimeout?: Duration.Input | undefined
 }) => Layer.Layer<never, never, OtlpSerialization | HttpClient.HttpClient> = flow(make, Layer.effect(Tracer.Tracer))
+
+/**
+ * Creates an OTLP traces layer from OpenTelemetry configuration.
+ *
+ * @category layers
+ * @since 4.0.0
+ */
+export const layerFromConfig = (options?: {
+  readonly resource?: {
+    readonly serviceName?: string | undefined
+    readonly serviceVersion?: string | undefined
+    readonly attributes?: Record<string, unknown>
+  } | undefined
+  readonly headers?: Headers.Input | undefined
+  readonly context?: (<X>(primitive: Tracer.EffectPrimitive<X>, span: Tracer.AnySpan) => X) | undefined
+}): Layer.Layer<never, never, HttpClient.HttpClient | OtlpSerialization> =>
+  Effect.gen(function*() {
+    const { disabled, endpoint, exporters } = yield* Config.all({
+      disabled: Config.boolean("OTEL_SDK_DISABLED").pipe(Config.withDefault(false)),
+      endpoint: OtlpEnv.endpoint("TRACES"),
+      exporters: OtlpEnv.exporters("TRACES")
+    })
+
+    if (disabled || !endpoint || !exporters.includes("otlp")) {
+      return Layer.empty
+    }
+
+    const { baseTimeout, tracesTimeout, exportTimeout, scheduleDelay, maxBatchSize } = yield* Config.all({
+      baseTimeout: Config.option(Config.int("OTEL_EXPORTER_OTLP_TIMEOUT")),
+      tracesTimeout: Config.option(Config.int("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT")),
+      exportTimeout: Config.option(Config.int("OTEL_BSP_EXPORT_TIMEOUT")),
+      scheduleDelay: Config.option(
+        Config.int("OTEL_BSP_SCHEDULE_DELAY").pipe(
+          Config.map(Duration.millis)
+        )
+      ),
+      maxBatchSize: Config.option(Config.int("OTEL_BSP_MAX_EXPORT_BATCH_SIZE"))
+    })
+
+    const shutdownTimeout = Option.firstSomeOf([tracesTimeout, baseTimeout, exportTimeout]).pipe(
+      Option.map((_) => Duration.millis(_))
+    )
+
+    return layer({
+      url: endpoint.toString(),
+      resource: options?.resource,
+      headers: options?.headers ?? (yield* OtlpEnv.headers("TRACES")),
+      exportInterval: Option.getOrUndefined(scheduleDelay),
+      maxBatchSize: Option.getOrUndefined(maxBatchSize),
+      context: options?.context,
+      shutdownTimeout: Option.getOrUndefined(shutdownTimeout)
+    })
+  }).pipe(Effect.orDie, Layer.unwrap)
 
 // internal
 
@@ -152,7 +225,7 @@ type RemainingSpanImpl = Omit<Tracer.Span, (keyof typeof SpanProto) | "traceId" 
 const makeSpan = (options: {
   readonly name: string
   readonly parent: Option.Option<Tracer.AnySpan>
-  readonly annotations: ServiceMap.ServiceMap<never>
+  readonly annotations: Context.Context<never>
   readonly status: Tracer.SpanStatus
   readonly attributes: ReadonlyMap<string, unknown>
   readonly links: ReadonlyArray<Tracer.SpanLink>
@@ -211,7 +284,9 @@ const makeOtlpSpan = (self: SpanImpl): OtlpSpan => {
       value: { boolValue: true }
     })
   } else {
-    const errors = Cause.prettyErrors(status.exit.cause)
+    const errors = Cause.prettyErrors(status.exit.cause, {
+      includeCauseInStack: true
+    })
     otelStatus = {
       code: StatusCode.Error
     }
@@ -274,6 +349,9 @@ const makeOtlpSpan = (self: SpanImpl): OtlpSpan => {
 }
 
 /**
+ * Root OTLP traces payload containing spans grouped by resource.
+ *
+ * @category models
  * @since 4.0.0
  */
 export interface TraceData {
@@ -281,6 +359,9 @@ export interface TraceData {
 }
 
 /**
+ * Group of OTLP scope spans associated with a single resource.
+ *
+ * @category models
  * @since 4.0.0
  */
 export interface ResourceSpan {
@@ -290,6 +371,9 @@ export interface ResourceSpan {
 }
 
 /**
+ * Group of OTLP spans emitted by a single instrumentation scope.
+ *
+ * @category models
  * @since 4.0.0
  */
 export interface ScopeSpan {

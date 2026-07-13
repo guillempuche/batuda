@@ -1,5 +1,11 @@
 /**
- * @since 1.0.0
+ * React helpers for applying dehydrated Effect Atom state to a React subtree.
+ * The `HydrationBoundary` component reads the nearest `RegistryContext`,
+ * hydrates new Atom values before children render, and delays updates for
+ * existing Atom values until after commit so React transitions do not update
+ * the current UI too early.
+ *
+ * @since 4.0.0
  */
 "use client"
 import * as Hydration from "effect/unstable/reactivity/Hydration"
@@ -7,8 +13,11 @@ import * as React from "react"
 import { RegistryContext } from "./RegistryContext.ts"
 
 /**
- * @since 1.0.0
+ * Props for a boundary that applies dehydrated Atom values to the nearest
+ * {@link RegistryContext} while rendering its children.
+ *
  * @category components
+ * @since 4.0.0
  */
 export interface HydrationBoundaryProps {
   state?: Iterable<Hydration.DehydratedAtom>
@@ -16,8 +25,25 @@ export interface HydrationBoundaryProps {
 }
 
 /**
- * @since 1.0.0
+ * Provides a React hydration boundary that loads dehydrated Atom values into
+ * the current Atom registry.
+ *
+ * **When to use**
+ *
+ * Use to apply dehydrated Atom state to a React subtree that reads from the
+ * nearest `RegistryContext`.
+ *
+ * **Details**
+ *
+ * New Atom values are hydrated during render so descendants can read them
+ * immediately, while values for existing Atoms are deferred until after commit
+ * so transition data does not update the current UI before React accepts it.
+ *
+ * @see {@link Hydration.dehydrate} for producing dehydrated Atom state
+ * @see {@link Hydration.hydrate} for lower-level non-React hydration
+ *
  * @category components
+ * @since 4.0.0
  */
 export const HydrationBoundary: React.FC<HydrationBoundaryProps> = ({
   children,

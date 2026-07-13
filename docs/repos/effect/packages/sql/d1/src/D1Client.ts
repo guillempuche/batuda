@@ -1,15 +1,24 @@
 /**
- * @since 1.0.0
+ * Cloudflare D1 client implementation for Effect SQL, backed by a Workers `D1Database` binding.
+ *
+ * This module adapts a Cloudflare D1 database binding into both the
+ * D1-specific `D1Client` service and the generic Effect `SqlClient` service.
+ * It uses the SQLite statement compiler, caches prepared statements, maps D1
+ * failures to `SqlError`, and provides direct or config-backed layers.
+ * Transactions, streaming queries, and `updateValues` are not supported by this
+ * driver.
+ *
+ * @since 4.0.0
  */
 import type { D1Database, D1PreparedStatement } from "@cloudflare/workers-types"
 import * as Cache from "effect/Cache"
 import * as Config from "effect/Config"
+import * as Context from "effect/Context"
 import * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
 import { identity } from "effect/Function"
 import * as Layer from "effect/Layer"
 import type * as Scope from "effect/Scope"
-import * as ServiceMap from "effect/ServiceMap"
 import * as Stream from "effect/Stream"
 import * as Reactivity from "effect/unstable/reactivity/Reactivity"
 import * as Client from "effect/unstable/sql/SqlClient"
@@ -23,20 +32,26 @@ const classifyError = (cause: unknown, message: string, operation: string) =>
   new UnknownError({ cause, message, operation })
 
 /**
- * @category type ids
- * @since 1.0.0
+ * Unique runtime identifier used to tag `D1Client` values.
+ *
+ * @category type IDs
+ * @since 4.0.0
  */
 export const TypeId: TypeId = "~@effect/sql-d1/D1Client"
 
 /**
- * @category type ids
- * @since 1.0.0
+ * Type-level literal for the `D1Client` runtime identifier.
+ *
+ * @category type IDs
+ * @since 4.0.0
  */
 export type TypeId = "~@effect/sql-d1/D1Client"
 
 /**
+ * Cloudflare D1 SQL client service, extending `SqlClient` with its D1 configuration and no `updateValues` support.
+ *
  * @category models
- * @since 1.0.0
+ * @since 4.0.0
  */
 export interface D1Client extends Client.SqlClient {
   readonly [TypeId]: TypeId
@@ -47,14 +62,23 @@ export interface D1Client extends Client.SqlClient {
 }
 
 /**
- * @category tags
- * @since 1.0.0
+ * Service tag for the Cloudflare D1 SQL client.
+ *
+ * **When to use**
+ *
+ * Use to access or provide a Cloudflare D1 SQL client through the Effect
+ * context.
+ *
+ * @category services
+ * @since 4.0.0
  */
-export const D1Client = ServiceMap.Service<D1Client>("@effect/sql-d1/D1Client")
+export const D1Client = Context.Service<D1Client>("@effect/sql-d1/D1Client")
 
 /**
+ * Configuration for a Cloudflare D1 client, including the `D1Database`, prepared statement cache settings, span attributes, and query/result name transforms.
+ *
  * @category models
- * @since 1.0.0
+ * @since 4.0.0
  */
 export interface D1ClientConfig {
   readonly db: D1Database
@@ -67,8 +91,10 @@ export interface D1ClientConfig {
 }
 
 /**
- * @category constructor
- * @since 1.0.0
+ * Creates a scoped Cloudflare D1 SQL client. Prepared statements are cached, while transactions and streaming queries are not supported by this driver.
+ *
+ * @category constructors
+ * @since 4.0.0
  */
 export const make = (
   options: D1ClientConfig
@@ -141,6 +167,21 @@ export const make = (
             })
         )
 
+      const runValuesUncached = (
+        sql: string,
+        params: ReadonlyArray<unknown>
+      ) =>
+        Effect.tryPromise({
+          try: () => {
+            return db.prepare(sql).bind(...params).raw() as Promise<
+              ReadonlyArray<
+                ReadonlyArray<unknown>
+              >
+            >
+          },
+          catch: (cause) => new SqlError({ reason: classifyError(cause, "Failed to execute statement", "execute") })
+        })
+
       return identity<Connection>({
         execute(sql, params, transformRows) {
           return transformRows
@@ -152,6 +193,9 @@ export const make = (
         },
         executeValues(sql, params) {
           return runValues(sql, params)
+        },
+        executeValuesUnprepared(sql, params) {
+          return runValuesUncached(sql, params)
         },
         executeUnprepared(sql, params, transformRows) {
           return transformRows
@@ -187,33 +231,37 @@ export const make = (
   })
 
 /**
+ * Creates a layer from a `Config`-wrapped D1 client configuration, providing both `D1Client` and `SqlClient`.
+ *
  * @category layers
- * @since 1.0.0
+ * @since 4.0.0
  */
 export const layerConfig = (
   config: Config.Wrap<D1ClientConfig>
 ): Layer.Layer<D1Client | Client.SqlClient, Config.ConfigError> =>
-  Layer.effectServices(
-    Config.unwrap(config).asEffect().pipe(
+  Layer.effectContext(
+    Config.unwrap(config).pipe(
       Effect.flatMap(make),
       Effect.map((client) =>
-        ServiceMap.make(D1Client, client).pipe(
-          ServiceMap.add(Client.SqlClient, client)
+        Context.make(D1Client, client).pipe(
+          Context.add(Client.SqlClient, client)
         )
       )
     )
   ).pipe(Layer.provide(Reactivity.layer))
 
 /**
+ * Creates a layer from a concrete D1 client configuration, providing both `D1Client` and `SqlClient`.
+ *
  * @category layers
- * @since 1.0.0
+ * @since 4.0.0
  */
 export const layer = (
   config: D1ClientConfig
 ): Layer.Layer<D1Client | Client.SqlClient, Config.ConfigError> =>
-  Layer.effectServices(
+  Layer.effectContext(
     Effect.map(make(config), (client) =>
-      ServiceMap.make(D1Client, client).pipe(
-        ServiceMap.add(Client.SqlClient, client)
+      Context.make(D1Client, client).pipe(
+        Context.add(Client.SqlClient, client)
       ))
   ).pipe(Layer.provide(Reactivity.layer))

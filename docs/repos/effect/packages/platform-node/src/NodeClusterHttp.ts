@@ -1,5 +1,14 @@
 /**
- * @since 1.0.0
+ * Node.js HTTP and WebSocket layers for Effect Cluster runners.
+ *
+ * The main `layer` builds a sharding layer for HTTP or WebSocket transport,
+ * choosing serialization, runner health checks, runner storage, message
+ * storage, and optional client-only mode from the supplied options.
+ * `layerHttpServer` provides the Node HTTP server used by cluster runners, and
+ * this module re-exports the Kubernetes HTTP client layer used by runner health
+ * checks.
+ *
+ * @since 4.0.0
  */
 import type * as Config from "effect/Config"
 import * as Effect from "effect/Effect"
@@ -29,15 +38,21 @@ import * as NodeSocket from "./NodeSocket.ts"
 
 export {
   /**
-   * @since 1.0.0
-   * @category Re-exports
+   * Provides the Kubernetes HTTP client layer used by Kubernetes runner health checks.
+   *
+   * @category re-exports
+   * @since 4.0.0
    */
   layerK8sHttpClient
 } from "./NodeClusterSocket.ts"
 
 /**
- * @since 1.0.0
- * @category Layers
+ * Builds the Node cluster HTTP/WebSocket sharding layer, configuring runner
+ * transport, RPC serialization, message storage, runner health checks, and
+ * optional client-only mode.
+ *
+ * @category layers
+ * @since 4.0.0
  */
 export const layer = <
   const ClientOnly extends boolean = false,
@@ -117,8 +132,11 @@ export const layer = <
 }
 
 /**
- * @since 1.0.0
- * @category Layers
+ * Provides the HTTP server and Node HTTP services used by cluster runners,
+ * listening on `ShardingConfig.runnerListenAddress` or `runnerAddress`.
+ *
+ * @category layers
+ * @since 4.0.0
  */
 export const layerHttpServer: Layer.Layer<
   | HttpPlatform

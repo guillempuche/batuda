@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
-import { Cause, Effect, Exit, Option, Schema } from "effect"
+import { Cause, Context, Effect, Exit, Option, Schema } from "effect"
 import { Headers } from "effect/unstable/http"
 import { Rpc, RpcGroup } from "effect/unstable/rpc"
 import { RequestId } from "effect/unstable/rpc/RpcMessage"
@@ -20,8 +20,14 @@ describe("Rpc", () => {
         Effect.provide(TwoHandler)
       )
       const result = yield* handler(void 0, {
-        clientId: 1,
-        requestId: RequestId(1n),
+        client: {
+          id: 1,
+          annotations: Context.empty(),
+          annotate() {
+            return this
+          }
+        },
+        requestId: RequestId("1"),
         headers: Headers.empty
       })
       assert.strictEqual(result, "two")

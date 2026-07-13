@@ -1,4 +1,10 @@
 /**
+ * Describes request values whose results can be persisted.
+ *
+ * A `Persistable` request has a primary key and schemas for its success and
+ * error results. `Persistence` and `PersistedCache` use that information to
+ * store the request's `Exit` value and restore it later from a backing store.
+ *
  * @since 4.0.0
  */
 import type * as Duration from "../../Duration.ts"
@@ -11,16 +17,27 @@ import type * as Types from "../../Types.ts"
 import type { PersistenceError } from "./Persistence.ts"
 
 /**
+ * Defines the property key used to attach success and error schemas to persistable
+ * requests.
+ *
+ * **When to use**
+ *
+ * Use to implement persistable request values by attaching success and error
+ * schemas at this property key.
+ *
+ * @category symbols
  * @since 4.0.0
- * @category Symbols
  */
 export const symbol = "~effect/persistence/Persistable" as const
 
 /**
+ * A primary-keyed request value whose success and error results can be
+ * serialized for persistence.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
-export interface Persistable<A extends Schema.Top, E extends Schema.Top> extends PrimaryKey.PrimaryKey {
+export interface Persistable<A extends Schema.Constraint, E extends Schema.Constraint> extends PrimaryKey.PrimaryKey {
   readonly [symbol]: {
     readonly success: A
     readonly error: E
@@ -28,54 +45,72 @@ export interface Persistable<A extends Schema.Top, E extends Schema.Top> extends
 }
 
 /**
+ * Any persistable request regardless of its success and error schemas.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
-export type Any = Persistable<Schema.Top, Schema.Top>
+export type Any = Persistable<Schema.Constraint, Schema.Constraint>
 
 /**
+ * Extracts the success schema from a persistable request.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
 export type SuccessSchema<A extends Any> = A["~effect/persistence/Persistable"]["success"]
 
 /**
+ * Extracts the success value type from a persistable request.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
 export type Success<A extends Any> = A["~effect/persistence/Persistable"]["success"]["Type"]
 
 /**
+ * Extracts the error schema from a persistable request.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
 export type ErrorSchema<A extends Any> = A["~effect/persistence/Persistable"]["error"]
 
 /**
+ * Extracts the error value type from a persistable request.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
 export type Error<A extends Any> = A["~effect/persistence/Persistable"]["error"]["Type"]
 
 /**
+ * Services required to decode a persisted success or error value for the
+ * request.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
 export type DecodingServices<A extends Any> =
   | A["~effect/persistence/Persistable"]["success"]["DecodingServices"]
   | A["~effect/persistence/Persistable"]["error"]["DecodingServices"]
 
 /**
+ * Services required to encode a success or error value for persistence.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
 export type EncodingServices<A extends Any> =
   | A["~effect/persistence/Persistable"]["success"]["EncodingServices"]
   | A["~effect/persistence/Persistable"]["error"]["EncodingServices"]
 
 /**
+ * All schema services required to encode and decode a persistable request
+ * result.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
 export type Services<A extends Any> =
   | A["~effect/persistence/Persistable"]["success"]["DecodingServices"]
@@ -84,14 +119,24 @@ export type Services<A extends Any> =
   | A["~effect/persistence/Persistable"]["error"]["EncodingServices"]
 
 /**
+ * Computes the time to live for a persisted result from the result `Exit` and
+ * request value.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
 export type TimeToLiveFn<K extends Any> = (exit: Exit.Exit<Success<K>, Error<K>>, request: K) => Duration.Input
 
 /**
+ * Creates request classes that implement `Persistable` and `Request.Request`.
+ *
+ * **Details**
+ *
+ * The generated class stores the supplied tag, derives its primary key from
+ * the payload, and carries schemas for persisted success and error exits.
+ *
+ * @category constructors
  * @since 4.0.0
- * @category Constructors
  */
 export const Class = <
   Config extends {
@@ -102,8 +147,8 @@ export const Class = <
 >() =>
 <
   const Tag extends string,
-  A extends Schema.Top = Schema.Void,
-  E extends Schema.Top = Schema.Never
+  A extends Schema.Constraint = Schema.Void,
+  E extends Schema.Constraint = Schema.Never
 >(tag: Tag, options: {
   readonly primaryKey: (payload: Config["payload"]) => string
   readonly success?: A | undefined
@@ -154,15 +199,18 @@ export const Class = <
 }
 
 /**
+ * Returns the cached `Exit` schema for a persistable request's success and
+ * error schemas.
+ *
+ * @category accessors
  * @since 4.0.0
- * @category Accessors
  */
-export const exitSchema = <A extends Schema.Top, E extends Schema.Top>(
+export const exitSchema = <A extends Schema.Constraint, E extends Schema.Constraint>(
   self: Persistable<A, E>
 ): Schema.Exit<A, E, Schema.Defect> => {
   let schema = exitSchemaCache.get(self)
   if (schema) return schema as Schema.Exit<A, E, Schema.Defect>
-  schema = Schema.Exit(self[symbol].success, self[symbol].error, Schema.Defect)
+  schema = Schema.Exit(self[symbol].success, self[symbol].error, Schema.Defect())
   exitSchemaCache.set(self, schema)
   return schema as Schema.Exit<A, E, Schema.Defect>
 }
@@ -170,10 +218,13 @@ export const exitSchema = <A extends Schema.Top, E extends Schema.Top>(
 const exitSchemaCache = new WeakMap<Persistable<any, any>, Schema.Exit<any, any, Schema.Defect>>()
 
 /**
+ * Encodes an `Exit` for a persistable request using its success and error
+ * schemas.
+ *
+ * @category serialization
  * @since 4.0.0
- * @category Serialization
  */
-export const serializeExit = <A extends Schema.Top, E extends Schema.Top>(
+export const serializeExit = <A extends Schema.Constraint, E extends Schema.Constraint>(
   self: Persistable<A, E>,
   exit: Exit.Exit<A["Type"], E["Type"]>
 ): Effect.Effect<unknown, Schema.SchemaError, A["EncodingServices"] | E["EncodingServices"]> => {
@@ -182,10 +233,13 @@ export const serializeExit = <A extends Schema.Top, E extends Schema.Top>(
 }
 
 /**
+ * Decodes a persisted value into an `Exit` for a persistable request using its
+ * success and error schemas.
+ *
+ * @category serialization
  * @since 4.0.0
- * @category Serialization
  */
-export const deserializeExit = <A extends Schema.Top, E extends Schema.Top>(
+export const deserializeExit = <A extends Schema.Constraint, E extends Schema.Constraint>(
   self: Persistable<A, E>,
   encoded: unknown
 ): Effect.Effect<

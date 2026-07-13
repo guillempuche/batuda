@@ -1,58 +1,11 @@
 /**
- * The `Channel` module provides a powerful abstraction for bi-directional communication
- * and streaming operations. A `Channel` is a nexus of I/O operations that supports both
- * reading and writing, forming the foundation for Effect's Stream and Sink abstractions.
+ * Provides low-level building blocks for streaming data through Effect.
  *
- * ## What is a Channel?
- *
- * A `Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>` represents:
- * - **OutElem**: The type of elements the channel outputs
- * - **OutErr**: The type of errors the channel can produce
- * - **OutDone**: The type of the final value when the channel completes
- * - **InElem**: The type of elements the channel reads
- * - **InErr**: The type of errors the channel can receive
- * - **InDone**: The type of the final value from upstream
- * - **Env**: The environment/context required by the channel
- *
- * ## Key Features
- *
- * - **Bi-directional**: Channels can both read and write
- * - **Composable**: Channels can be piped, sequenced, and concatenated
- * - **Resource-safe**: Automatic cleanup and resource management
- * - **Error-handling**: Built-in error propagation and handling
- * - **Concurrent**: Support for concurrent operations
- *
- * ## Composition Patterns
- *
- * 1. **Piping**: Connect channels where output of one becomes input of another
- * 2. **Sequencing**: Use the result of one channel to create another
- * 3. **Concatenating**: Combine multiple channels into a single channel
- *
- * @example
- * ```ts
- * import { Channel } from "effect"
- *
- * // Simple channel that outputs numbers
- * const numberChannel = Channel.succeed(42)
- *
- * // Transform channel that doubles values
- * const doubleChannel = Channel.map(numberChannel, (n) => n * 2)
- *
- * // Running the channel would output: 84
- * ```
- *
- * @example
- * ```ts
- * import { Channel } from "effect"
- *
- * // Channel from an array of values
- * const arrayChannel = Channel.fromArray([1, 2, 3, 4, 5])
- *
- * // Transform the channel by mapping over values
- * const transformedChannel = Channel.map(arrayChannel, (n) => n * 2)
- *
- * // This channel will output: 2, 4, 6, 8, 10
- * ```
+ * A `Channel` can read input elements, write output elements, fail with a typed
+ * error, and finish with a typed result while managing resources safely.
+ * Streams and sinks are built on channels, so most application code uses those
+ * higher-level modules instead. This module is useful when implementing stream
+ * operators or specialized streaming workflows.
  *
  * @since 2.0.0
  */
@@ -60,6 +13,7 @@
 import * as Arr from "./Array.ts"
 import * as Cause from "./Cause.ts"
 import * as Chunk from "./Chunk.ts"
+import * as Context from "./Context.ts"
 import * as Effect from "./Effect.ts"
 import * as Exit from "./Exit.ts"
 import * as Fiber from "./Fiber.ts"
@@ -85,7 +39,6 @@ import * as Result from "./Result.ts"
 import * as Schedule from "./Schedule.ts"
 import * as Scope from "./Scope.ts"
 import * as Semaphore from "./Semaphore.ts"
-import * as ServiceMap from "./ServiceMap.ts"
 import * as String from "./String.ts"
 import * as Take from "./Take.ts"
 import { ParentSpan, type SpanOptions } from "./Tracer.ts"
@@ -93,21 +46,27 @@ import type * as Types from "./Types.ts"
 import type * as Unify from "./Unify.ts"
 
 /**
+ * String literal type used as the unique brand for `Channel` values.
+ *
+ * @category type IDs
  * @since 4.0.0
- * @category Type Identifiers
  */
 export type TypeId = "~effect/Channel"
 
 /**
+ * Runtime identifier stored on `Channel` values and used by `isChannel` to
+ * recognize them.
+ *
+ * @category type IDs
  * @since 4.0.0
- * @category Type Identifiers
  */
 export const TypeId: TypeId = "~effect/Channel"
 
 /**
- * Tests if a value is a `Channel`.
+ * Checks whether a value is a `Channel`.
  *
- * @example
+ * **Example** (Checking for channels)
+ *
  * ```ts
  * import { Channel } from "effect"
  *
@@ -129,6 +88,8 @@ export const isChannel = (
  * `OutElem`. When the channel finishes, it yields a value of type `OutDone`. A
  * channel may fail with a value of type `OutErr`.
  *
+ * **Details**
+ *
  * Channels are the foundation of Streams: both streams and sinks are built on
  * channels. Most users shouldn't have to use channels directly, as streams and
  * sinks are much more convenient and cover all common use cases. However, when
@@ -146,7 +107,8 @@ export const isChannel = (
  *    channels, which are all concatenated together. The first channel and the
  *    function that makes the other channels can be composed into a channel.
  *
- * @example
+ * **Example** (Typing channels)
+ *
  * ```ts
  * import type { Channel } from "effect"
  *
@@ -168,8 +130,8 @@ export const isChannel = (
  * >
  * ```
  *
- * @since 2.0.0
  * @category models
+ * @since 2.0.0
  */
 export interface Channel<
   out OutElem,
@@ -186,8 +148,16 @@ export interface Channel<
 }
 
 /**
- * @since 2.0.0
+ * Type-level unification support for `Channel` values.
+ *
+ * **Details**
+ *
+ * This preserves all `Channel` type parameters when `Unify` normalizes unions
+ * or generic return types that include channels. Users normally do not need to
+ * reference this interface directly.
+ *
  * @category models
+ * @since 2.0.0
  */
 export interface ChannelUnify<A extends { [Unify.typeSymbol]?: any }> extends Effect.EffectUnify<A> {
   Channel?: () => A[Unify.typeSymbol] extends
@@ -197,6 +167,15 @@ export interface ChannelUnify<A extends { [Unify.typeSymbol]?: any }> extends Ef
 }
 
 /**
+ * Marker used by `Unify` while resolving `Channel` values.
+ *
+ * **Details**
+ *
+ * It prevents the inherited `Effect` unifier from being selected when the
+ * channel-specific unifier should preserve `Channel` input, output, and
+ * environment type parameters. Users normally do not need to reference this
+ * interface directly.
+ *
  * @category models
  * @since 2.0.0
  */
@@ -209,8 +188,17 @@ type TagsWithReason<E> = {
 }[Types.Tags<E>]
 
 /**
- * @since 2.0.0
+ * Phantom variance marker for the type parameters of `Channel`.
+ *
+ * **Details**
+ *
+ * Output element, output error, output done, and environment types are
+ * covariant. Input element, input error, and input done types are
+ * contravariant. This is type-level machinery and is not used directly at
+ * runtime.
+ *
  * @category models
+ * @since 2.0.0
  */
 export interface Variance<
   out OutElem,
@@ -224,8 +212,17 @@ export interface Variance<
   readonly [TypeId]: VarianceStruct<OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>
 }
 /**
- * @since 2.0.0
+ * Structural encoding used by `Variance` to record each `Channel` type
+ * parameter's variance.
+ *
+ * **Details**
+ *
+ * The `_OutElem`, `_OutErr`, `_OutDone`, and `_Env` fields are covariant; the
+ * `_InElem`, `_InErr`, and `_InDone` fields are contravariant. Users normally
+ * do not need to reference this interface directly.
+ *
  * @category models
+ * @since 2.0.0
  */
 export interface VarianceStruct<
   out OutElem,
@@ -265,7 +262,8 @@ const ChannelProto = {
 /**
  * Creates a `Channel` from a transformation function that operates on upstream pulls.
  *
- * @example
+ * **Example** (Creating channels from transforms)
+ *
  * ```ts
  * import { Channel, Effect } from "effect"
  *
@@ -300,7 +298,8 @@ export const fromTransform = <OutElem, OutErr, OutDone, InElem, InErr, InDone, E
 /**
  * Transforms a Channel by applying a function to its Pull implementation.
  *
- * @example
+ * **Example** (Transforming pull behavior)
+ *
  * ```ts
  * import { Channel, Effect } from "effect"
  *
@@ -353,7 +352,8 @@ export const transformPull = <
 /**
  * Creates a `Channel` from an `Effect` that produces a `Pull`.
  *
- * @example
+ * **Example** (Creating channels from pulls)
+ *
  * ```ts
  * import { Channel, Effect } from "effect"
  *
@@ -375,8 +375,15 @@ export const fromPull = <OutElem, OutErr, OutDone, EX, EnvX, Env>(
  * pulls, but also provides a forked scope that closes when the resulting
  * Channel completes.
  *
- * @since 4.0.0
+ * **When to use**
+ *
+ * Use when building channels that require scoped resource lifecycle management,
+ * providing both the channel scope and a forked scope that automatically closes
+ * when the channel completes.
+ *
+ * @see {@link fromTransform} for a simpler transformation without a forked scope
  * @category constructors
+ * @since 4.0.0
  */
 export const fromTransformBracket = <OutElem, OutErr, OutDone, InElem, InErr, InDone, EX, EnvX, Env>(
   f: (
@@ -401,7 +408,8 @@ export const fromTransformBracket = <OutElem, OutErr, OutDone, InElem, InErr, In
 /**
  * Converts a `Channel` back to its underlying transformation function.
  *
- * @example
+ * **Example** (Extracting channel transforms)
+ *
  * ```ts
  * import { Channel } from "effect"
  *
@@ -423,7 +431,8 @@ export const toTransform = <OutElem, OutErr, OutDone, InElem, InErr, InDone, Env
 /**
  * The default chunk size used by channels for batching operations.
  *
- * @example
+ * **Example** (Reading the default chunk size)
+ *
  * ```ts
  * import { Channel } from "effect"
  *
@@ -431,7 +440,7 @@ export const toTransform = <OutElem, OutErr, OutDone, InElem, InErr, InDone, Env
  * ```
  *
  * @category constants
- * @since 2.0.0
+ * @since 4.0.0
  */
 export const DefaultChunkSize: number = 4096
 
@@ -454,7 +463,8 @@ const asyncQueue = <A, E = never, R = never>(
 /**
  * Creates a `Channel` that interacts with a callback function using a queue.
  *
- * @example
+ * **Example** (Creating channels from callbacks)
+ *
  * ```ts
  * import { Channel, Effect, Queue } from "effect"
  *
@@ -468,7 +478,7 @@ const asyncQueue = <A, E = never, R = never>(
  * ```
  *
  * @category constructors
- * @since 2.0.0
+ * @since 4.0.0
  */
 export const callback = <A, E = never, R = never>(
   f: (queue: Queue.Queue<A, E | Cause.Done>) => Effect.Effect<unknown, E, R | Scope.Scope>,
@@ -482,7 +492,8 @@ export const callback = <A, E = never, R = never>(
 /**
  * Creates a `Channel` that interacts with a callback function using a queue, emitting arrays.
  *
- * @example
+ * **Example** (Creating array channels from callbacks)
+ *
  * ```ts
  * import { Channel, Effect, Queue } from "effect"
  *
@@ -508,7 +519,8 @@ export const callbackArray = <A, E = never, R = never>(
 /**
  * Creates a `Channel` that lazily evaluates to another channel.
  *
- * @example
+ * **Example** (Suspending channel creation)
+ *
  * ```ts
  * import { Channel } from "effect"
  *
@@ -525,9 +537,17 @@ export const suspend = <OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>(
   fromTransform((upstream, scope) => Effect.suspend(() => toTransform(evaluate())(upstream, scope)))
 
 /**
- * Creates a `Channel` with resource management using acquire-use-release pattern.
+ * Acquires a resource, uses it to build a `Channel`, and guarantees that
+ * `release` runs with the channel's `Exit` when the channel completes, fails,
+ * or is interrupted.
  *
- * @example
+ * **Details**
+ *
+ * Acquisition is uninterruptible. If acquisition fails, `use` is not run and
+ * `release` is not registered.
+ *
+ * **Example** (Managing resources with acquire-use-release)
+ *
  * ```ts
  * import { Channel, Effect } from "effect"
  *
@@ -560,9 +580,17 @@ export const acquireUseRelease = <A, E, R, OutElem, OutErr, OutDone, InElem, InE
   )
 
 /**
- * Creates a `Channel` with resource management using acquire-release pattern.
+ * Acquires a resource, emits the acquired value as a single channel element,
+ * and registers `release` in the channel scope.
  *
- * @example
+ * **Details**
+ *
+ * The release action runs when the channel scope closes and receives the scope
+ * exit. If acquisition fails, no element is emitted and `release` is not
+ * registered.
+ *
+ * **Example** (Managing resources with acquire-release)
+ *
  * ```ts
  * import { Channel, Effect } from "effect"
  *
@@ -573,7 +601,7 @@ export const acquireUseRelease = <A, E, R, OutElem, OutErr, OutDone, InElem, InE
  * ```
  *
  * @category constructors
- * @since 2.0.0
+ * @since 4.0.0
  */
 export const acquireRelease: {
   <Z>(
@@ -595,7 +623,8 @@ export const acquireRelease: {
 /**
  * Creates a `Channel` from an iterator.
  *
- * @example
+ * **Example** (Creating channels from iterators)
+ *
  * ```ts
  * import { Channel } from "effect"
  *
@@ -605,7 +634,7 @@ export const acquireRelease: {
  * ```
  *
  * @category constructors
- * @since 2.0.0
+ * @since 4.0.0
  */
 export const fromIterator = <A, L>(iterator: LazyArg<Iterator<A, L>>): Channel<A, never, L> =>
   fromPull(
@@ -621,7 +650,8 @@ export const fromIterator = <A, L>(iterator: LazyArg<Iterator<A, L>>): Channel<A
 /**
  * Creates a `Channel` that emits all elements from an array.
  *
- * @example
+ * **Example** (Creating channels from arrays)
+ *
  * ```ts
  * import { Channel } from "effect"
  *
@@ -630,7 +660,7 @@ export const fromIterator = <A, L>(iterator: LazyArg<Iterator<A, L>>): Channel<A
  * ```
  *
  * @category constructors
- * @since 2.0.0
+ * @since 4.0.0
  */
 export const fromArray = <A>(array: ReadonlyArray<A>): Channel<A> =>
   fromPull(Effect.sync(() => {
@@ -641,7 +671,8 @@ export const fromArray = <A>(array: ReadonlyArray<A>): Channel<A> =>
 /**
  * Creates a `Channel` that emits all elements from a chunk.
  *
- * @example
+ * **Example** (Creating channels from chunks)
+ *
  * ```ts
  * import { Channel, Chunk } from "effect"
  *
@@ -651,14 +682,15 @@ export const fromArray = <A>(array: ReadonlyArray<A>): Channel<A> =>
  * ```
  *
  * @category constructors
- * @since 2.0.0
+ * @since 4.0.0
  */
 export const fromChunk = <A>(chunk: Chunk.Chunk<A>): Channel<A> => fromArray(Chunk.toReadonlyArray(chunk))
 
 /**
  * Creates a `Channel` from an iterator that emits arrays of elements.
  *
- * @example
+ * **Example** (Batching iterator output)
+ *
  * ```ts
  * import { Channel } from "effect"
  *
@@ -679,7 +711,8 @@ export const fromChunk = <A>(chunk: Chunk.Chunk<A>): Channel<A> => fromArray(Chu
  * // This will emit arrays: [0, 1], [2], then complete with "finished"
  * ```
  *
- * @example
+ * **Example** (Batching generator output)
+ *
  * ```ts
  * import { Channel } from "effect"
  *
@@ -696,8 +729,8 @@ export const fromChunk = <A>(chunk: Chunk.Chunk<A>): Channel<A> => fromArray(Chu
  * // Emits: [0, 1, 1], [2, 3], then completes
  * ```
  *
- * @since 2.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const fromIteratorArray = <A, L>(
   iterator: LazyArg<Iterator<A, L>>,
@@ -729,7 +762,8 @@ export const fromIteratorArray = <A, L>(
 /**
  * Creates a `Channel` that emits all elements from an iterable.
  *
- * @example
+ * **Example** (Creating channels from iterables)
+ *
  * ```ts
  * import { Channel } from "effect"
  *
@@ -739,7 +773,7 @@ export const fromIteratorArray = <A, L>(
  * ```
  *
  * @category constructors
- * @since 2.0.0
+ * @since 4.0.0
  */
 export const fromIterable = <A, L>(iterable: Iterable<A, L>): Channel<A, never, L> =>
   fromIterator(() => iterable[Symbol.iterator]())
@@ -747,7 +781,8 @@ export const fromIterable = <A, L>(iterable: Iterable<A, L>): Channel<A, never, 
 /**
  * Creates a `Channel` that emits arrays of elements from an iterable.
  *
- * @example
+ * **Example** (Batching iterable output)
+ *
  * ```ts
  * import { Channel } from "effect"
  *
@@ -757,7 +792,7 @@ export const fromIterable = <A, L>(iterable: Iterable<A, L>): Channel<A, never, 
  * ```
  *
  * @category constructors
- * @since 2.0.0
+ * @since 4.0.0
  */
 export const fromIterableArray = <A, L>(
   iterable: Iterable<A, L>,
@@ -767,7 +802,8 @@ export const fromIterableArray = <A, L>(
 /**
  * Creates a `Channel` that emits a single value and then ends.
  *
- * @example
+ * **Example** (Creating channels that succeed)
+ *
  * ```ts
  * import { Channel } from "effect"
  *
@@ -783,7 +819,8 @@ export const succeed = <A>(value: A): Channel<A> => fromEffect(Effect.succeed(va
 /**
  * Creates a `Channel` that immediately ends with the specified value.
  *
- * @example
+ * **Example** (Ending with a value)
+ *
  * ```ts
  * import { Channel } from "effect"
  *
@@ -808,12 +845,18 @@ export const endSync = <A>(evaluate: LazyArg<A>): Channel<never, never, A> =>
 /**
  * Creates a `Channel` that emits a single value computed by a lazy evaluation.
  *
- * @example
+ * **Example** (Computing values lazily)
+ *
  * ```ts
  * import { Channel } from "effect"
  *
- * const channel = Channel.sync(() => Math.random())
- * // Emits a random number computed when the channel runs
+ * let requests = 0
+ *
+ * const channel = Channel.sync(() => {
+ *   requests += 1
+ *   return `request-${requests}`
+ * })
+ * // Emits "request-1" when the channel runs for the first time
  * ```
  *
  * @category constructors
@@ -822,9 +865,10 @@ export const endSync = <A>(evaluate: LazyArg<A>): Channel<never, never, A> =>
 export const sync = <A>(evaluate: LazyArg<A>): Channel<A> => fromEffect(Effect.sync(evaluate))
 
 /**
- * Represents an Channel that emits no elements
+ * Represents a `Channel` that emits no elements.
  *
- * @example
+ * **Example** (Creating empty channels)
+ *
  * ```ts
  * import { Channel } from "effect"
  *
@@ -840,15 +884,16 @@ export const sync = <A>(evaluate: LazyArg<A>): Channel<A> => fromEffect(Effect.s
  *   shouldEmit ? Channel.succeed("data") : Channel.empty
  * ```
  *
- * @since 2.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const empty: Channel<never> = fromPull(Effect.succeed(Cause.done()))
 
 /**
- * Represents an Channel that never completes
+ * Represents a `Channel` that never completes.
  *
- * @example
+ * **Example** (Creating non-terminating channels)
+ *
  * ```ts
  * import { Channel } from "effect"
  *
@@ -866,15 +911,16 @@ export const empty: Channel<never> = fromPull(Effect.succeed(Cause.done()))
  *   shouldComplete ? Channel.succeed("done") : Channel.never
  * ```
  *
- * @since 2.0.0
  * @category constructors
+ * @since 2.0.0
  */
 export const never: Channel<never, never, never> = fromPull(Effect.succeed(Effect.never))
 
 /**
  * Constructs a channel that fails immediately with the specified error.
  *
- * @example
+ * **Example** (Failing with an error)
+ *
  * ```ts
  * import { Channel } from "effect"
  *
@@ -897,8 +943,8 @@ export const never: Channel<never, never, never> = fromPull(Effect.succeed(Effec
  * )
  * ```
  *
- * @since 2.0.0
  * @category constructors
+ * @since 2.0.0
  */
 export const fail = <E>(error: E): Channel<never, E, never> => fromPull(Effect.succeed(Effect.fail(error)))
 
@@ -906,7 +952,13 @@ export const fail = <E>(error: E): Channel<never, E, never> => fromPull(Effect.s
  * Constructs a channel that fails immediately with the specified lazily
  * evaluated error.
  *
- * @example
+ * **When to use**
+ *
+ * Use when the error value should be computed each time the channel runs instead
+ * of when the channel is constructed.
+ *
+ * **Example** (Failing with a lazy error)
+ *
  * ```ts
  * import { Channel } from "effect"
  *
@@ -917,26 +969,34 @@ export const fail = <E>(error: E): Channel<never, E, never> => fromPull(Effect.s
  * })
  *
  * // The error computation is deferred until the channel runs
- * const conditionalError = Channel.failSync(() =>
- *   Math.random() > 0.5 ? "Error A" : "Error B"
- * )
+ * let attempts = 0
+ * const conditionalError = Channel.failSync(() => {
+ *   attempts += 1
+ *   return `Error after attempt ${attempts}`
+ * })
  *
  * // Use with expensive error construction
  * const expensiveError = Channel.failSync(() => {
- *   const timestamp = Date.now()
- *   return new Error(`Failed at: ${timestamp}`)
+ *   const requestId = "request-123"
+ *   return new Error(`Failed while processing ${requestId}`)
  * })
  * ```
  *
- * @since 2.0.0
  * @category constructors
+ * @since 2.0.0
  */
 export const failSync = <E>(evaluate: LazyArg<E>): Channel<never, E, never> => fromPull(Effect.failSync(evaluate))
 
 /**
  * Constructs a channel that fails immediately with the specified `Cause`.
  *
- * @example
+ * **When to use**
+ *
+ * Use when the channel failure must preserve a full `Cause`, such as defects,
+ * interruptions, or combined failures.
+ *
+ * **Example** (Failing with causes)
+ *
  * ```ts
  * import { Cause, Channel } from "effect"
  *
@@ -953,8 +1013,8 @@ export const failSync = <E>(evaluate: LazyArg<E>): Channel<never, E, never> => f
  * const simpleFail = Channel.failCause(failCause)
  * ```
  *
- * @since 2.0.0
  * @category constructors
+ * @since 2.0.0
  */
 export const failCause = <E>(cause: Cause.Cause<E>): Channel<never, E, never> => fromPull(Effect.failCause(cause))
 
@@ -962,25 +1022,27 @@ export const failCause = <E>(cause: Cause.Cause<E>): Channel<never, E, never> =>
  * Constructs a channel that fails immediately with the specified lazily
  * evaluated `Cause`.
  *
- * @example
+ * **Example** (Failing with lazy causes)
+ *
  * ```ts
  * import { Cause, Channel } from "effect"
  *
  * // Create a channel that fails with a lazily computed cause
+ * let attempts = 0
  * const failedChannel = Channel.failCauseSync(() => {
- *   const errorType = Math.random() > 0.5 ? "A" : "B"
- *   return Cause.fail(`Runtime error ${errorType}`)
+ *   attempts += 1
+ *   return Cause.fail(`Runtime error after attempt ${attempts}`)
  * })
  *
  * // Create a channel with die cause computation
  * const dieCauseChannel = Channel.failCauseSync(() => {
- *   const timestamp = Date.now()
- *   return Cause.die(`Error at ${timestamp}`)
+ *   const operation = "load-profile"
+ *   return Cause.die(`Unexpected defect during ${operation}`)
  * })
  * ```
  *
- * @since 2.0.0
  * @category constructors
+ * @since 2.0.0
  */
 export const failCauseSync = <E>(
   evaluate: LazyArg<Cause.Cause<E>>
@@ -989,7 +1051,8 @@ export const failCauseSync = <E>(
 /**
  * Constructs a channel that fails immediately with the specified defect.
  *
- * @example
+ * **Example** (Dying with defects)
+ *
  * ```ts
  * import { Channel } from "effect"
  *
@@ -1006,15 +1069,16 @@ export const failCauseSync = <E>(
  * })
  * ```
  *
- * @since 2.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const die = (defect: unknown): Channel<never, never, never> => failCause(Cause.die(defect))
 
 /**
- * Use an effect to write a single value to the channel.
+ * Uses an effect to write a single value to the channel.
  *
- * @example
+ * **Example** (Creating channels from effects)
+ *
  * ```ts
  * import { Channel, Data, Effect } from "effect"
  *
@@ -1044,8 +1108,8 @@ export const die = (defect: unknown): Channel<never, never, never> => failCause(
  * )
  * ```
  *
- * @since 2.0.0
  * @category constructors
+ * @since 2.0.0
  */
 export const fromEffect = <A, E, R>(
   effect: Effect.Effect<A, E, R>
@@ -1062,8 +1126,15 @@ export const fromEffect = <A, E, R>(
   )
 
 /**
- * @since 4.0.0
+ * Creates a channel that evaluates an effect and uses its successful value as
+ * the channel's done value without emitting any output elements.
+ *
+ * **Details**
+ *
+ * If the effect fails, the channel fails with the effect's error.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const fromEffectDone = <A, E, R>(
   effect: Effect.Effect<A, E, R>
@@ -1071,18 +1142,26 @@ export const fromEffectDone = <A, E, R>(
   fromPull(Effect.succeed(Effect.flatMap(effect, Cause.done)))
 
 /**
- * Use an effect and discard its result.
+ * Uses an effect and discards its result.
  *
- * @since 4.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const fromEffectDrain = <A, E, R>(
   effect: Effect.Effect<A, E, R>
 ): Channel<never, E, void, unknown, unknown, unknown, R> => fromPull(Effect.flatMap(effect, () => Cause.done())) as any
 
 /**
- * @since 4.0.0
+ * Creates a channel from an effect that produces a `Take`.
+ *
+ * **Details**
+ *
+ * A successful `Take` emits a non-empty array of output elements. A failed
+ * `Take` fails the channel. A done `Take` completes the channel with its done
+ * value.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const fromEffectTake = <A, E, Done, E2, R>(
   effect: Effect.Effect<Take.Take<A, E, Done>, E2, R>
@@ -1090,9 +1169,10 @@ export const fromEffectTake = <A, E, Done, E2, R>(
   fromPull(Effect.succeed(Effect.flatMap(effect, Take.toPull)))
 
 /**
- * Create a channel from a queue
+ * Creates a channel from a queue.
  *
- * @example
+ * **Example** (Creating channels from queues)
+ *
  * ```ts
  * import { Channel, Data, Effect, Queue } from "effect"
  *
@@ -1124,17 +1204,18 @@ export const fromEffectTake = <A, E, Done, E2, R>(
  * })
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 2.0.0
  */
 export const fromQueue = <A, E>(
   queue: Queue.Dequeue<A, E>
 ): Channel<A, Exclude<E, Cause.Done>> => fromPull(Effect.succeed(Queue.take(queue)))
 
 /**
- * Create a channel from a queue that emits arrays of elements
+ * Creates a channel from a queue that emits arrays of elements.
  *
- * @example
+ * **Example** (Creating batched channels from queues)
+ *
  * ```ts
  * import { Channel, Data, Effect, Queue } from "effect"
  *
@@ -1170,24 +1251,28 @@ export const fromQueue = <A, E>(
  * })
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const fromQueueArray = <A, E>(
   queue: Queue.Dequeue<A, E>
 ): Channel<Arr.NonEmptyReadonlyArray<A>, Exclude<E, Cause.Done>> => fromPull(Effect.succeed(Queue.takeAll(queue)))
 
 /**
+ * Creates a channel that forwards upstream input elements, input errors, and
+ * the upstream done value unchanged.
+ *
+ * @category constructors
  * @since 2.0.0
- * @category Constructors
  */
 export const identity = <Elem, Err, Done>(): Channel<Elem, Err, Done, Elem, Err, Done> =>
   fromTransform((upstream, _scope) => Effect.succeed(upstream))
 
 /**
- * Create a channel from a PubSub subscription
+ * Creates a channel from a PubSub subscription.
  *
- * @example
+ * **Example** (Creating channels from subscriptions)
+ *
  * ```ts
  * import { Channel, Data, Effect, PubSub } from "effect"
  *
@@ -1224,24 +1309,24 @@ export const identity = <Elem, Err, Done>(): Channel<Elem, Err, Done, Elem, Err,
  * })
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const fromSubscription = <A>(
   subscription: PubSub.Subscription<A>
 ): Channel<A> => fromPull(Effect.succeed(Effect.onInterrupt(PubSub.take(subscription), () => Cause.done())))
 
 /**
- * Create a channel from a PubSub subscription that outputs arrays of values.
+ * Creates a channel from a PubSub subscription that outputs arrays of values.
+ *
+ * **Details**
  *
  * This constructor creates a channel that reads from a PubSub subscription and outputs
  * arrays of values in chunks. It's useful when you want to process multiple values at once
  * for better performance.
  *
- * @param subscription - The PubSub subscription to read from
- * @param chunkSize - The maximum number of elements to read in each chunk (default: 4096)
+ * **Example** (Batching subscription values)
  *
- * @example
  * ```ts
  * import { Channel, Data, Effect, PubSub } from "effect"
  *
@@ -1267,7 +1352,8 @@ export const fromSubscription = <A>(
  * })
  * ```
  *
- * @example
+ * **Example** (Processing subscription values in batches)
+ *
  * ```ts
  * import { Channel, Data, Effect, PubSub } from "effect"
  *
@@ -1292,13 +1378,10 @@ export const fromSubscription = <A>(
  * })
  * ```
  *
- * @example
- * ```ts
- * import { Channel, Data, Effect, PubSub } from "effect"
+ * **Example** (Aggregating subscription metrics)
  *
- * class MetricsError extends Data.TaggedError("MetricsError")<{
- *   readonly cause: string
- * }> {}
+ * ```ts
+ * import { Channel, Effect, PubSub } from "effect"
  *
  * const metricsAggregator = Effect.gen(function*() {
  *   const metricsPubSub = yield* PubSub.bounded<
@@ -1323,7 +1406,8 @@ export const fromSubscription = <A>(
  *       average: avg,
  *       min,
  *       max,
- *       timestamp: Date.now()
+ *       firstTimestamp: Math.min(...metrics.map((m) => m.timestamp)),
+ *       lastTimestamp: Math.max(...metrics.map((m) => m.timestamp))
  *     }
  *   })
  *
@@ -1331,8 +1415,8 @@ export const fromSubscription = <A>(
  * })
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const fromSubscriptionArray = <A>(
   subscription: PubSub.Subscription<A>
@@ -1340,15 +1424,16 @@ export const fromSubscriptionArray = <A>(
   fromPull(Effect.succeed(Effect.onInterrupt(PubSub.takeAll(subscription), () => Cause.done())))
 
 /**
- * Create a channel from a PubSub that outputs individual values.
+ * Creates a channel from a PubSub that outputs individual values.
+ *
+ * **Details**
  *
  * This constructor creates a channel that reads from a PubSub by automatically
  * subscribing to it. The channel outputs individual values as they are published
  * to the PubSub, making it ideal for real-time streaming scenarios.
  *
- * @param pubsub - The PubSub to read from
+ * **Example** (Creating channels from PubSubs)
  *
- * @example
  * ```ts
  * import { Channel, Data, Effect, PubSub } from "effect"
  *
@@ -1372,13 +1457,10 @@ export const fromSubscriptionArray = <A>(
  * })
  * ```
  *
- * @example
- * ```ts
- * import { Channel, Data, Effect, PubSub } from "effect"
+ * **Example** (Streaming PubSub notifications)
  *
- * class NotificationError extends Data.TaggedError("NotificationError")<{
- *   readonly reason: string
- * }> {}
+ * ```ts
+ * import { Channel, Effect, PubSub } from "effect"
  *
  * const notificationService = Effect.gen(function*() {
  *   const notificationPubSub = yield* PubSub.bounded<string>(50)
@@ -1387,24 +1469,21 @@ export const fromSubscriptionArray = <A>(
  *   const notificationChannel = Channel.fromPubSub(notificationPubSub)
  *
  *   // Transform notifications to add timestamps
+ *   const receivedAt = "2024-01-01T00:00:00.000Z"
  *   const timestampedChannel = Channel.map(notificationChannel, (message) => ({
  *     message,
- *     timestamp: new Date().toISOString(),
- *     id: Math.random().toString(36).substr(2, 9)
+ *     receivedAt,
+ *     id: `notification:${message}`
  *   }))
  *
  *   return timestampedChannel
  * })
  * ```
  *
- * @example
- * ```ts
- * import { Channel, Data, Effect, PubSub } from "effect"
+ * **Example** (Processing PubSub events)
  *
- * class EventProcessingError extends Data.TaggedError("EventProcessingError")<{
- *   readonly eventType: string
- *   readonly cause: string
- * }> {}
+ * ```ts
+ * import { Channel, Effect, PubSub } from "effect"
  *
  * interface DomainEvent {
  *   readonly type: string
@@ -1424,7 +1503,7 @@ export const fromSubscriptionArray = <A>(
  *       return {
  *         ...event,
  *         processed: true,
- *         processedAt: Date.now()
+ *         processedAt: event.timestamp + 1
  *       }
  *     }
  *     return event
@@ -1434,24 +1513,24 @@ export const fromSubscriptionArray = <A>(
  * })
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 2.0.0
  */
 export const fromPubSub = <A>(
   pubsub: PubSub.PubSub<A>
 ): Channel<A> => unwrap(Effect.map(PubSub.subscribe(pubsub), fromSubscription))
 
 /**
- * Create a channel from a PubSub that outputs arrays of values.
+ * Creates a channel from a PubSub that outputs arrays of values.
+ *
+ * **Details**
  *
  * This constructor creates a channel that reads from a PubSub by automatically
  * subscribing to it and collecting values into arrays. The channel outputs
  * arrays of values in chunks, making it ideal for batch processing scenarios.
  *
- * @param pubsub - The PubSub to read from
- * @param chunkSize - The maximum number of elements to collect in each array (default: 4096)
+ * **Example** (Batching PubSub values)
  *
- * @example
  * ```ts
  * import { Channel, Data, Effect, PubSub } from "effect"
  *
@@ -1476,20 +1555,17 @@ export const fromPubSub = <A>(
  * })
  * ```
  *
- * @example
- * ```ts
- * import { Channel, Data, Effect, PubSub } from "effect"
+ * **Example** (Processing PubSub orders in batches)
  *
- * class OrderProcessingError extends Data.TaggedError("OrderProcessingError")<{
- *   readonly orderId: string
- *   readonly reason: string
- * }> {}
+ * ```ts
+ * import { Channel, Effect, PubSub } from "effect"
  *
  * interface Order {
  *   readonly id: string
  *   readonly customerId: string
  *   readonly items: ReadonlyArray<string>
  *   readonly total: number
+ *   readonly submittedAt: number
  * }
  *
  * const orderBatchProcessor = Effect.gen(function*() {
@@ -1509,7 +1585,7 @@ export const fromPubSub = <A>(
  *       batchSize: orderBatch.length,
  *       totalRevenue,
  *       uniqueCustomers: customerCount,
- *       processedAt: Date.now(),
+ *       firstSubmittedAt: Math.min(...orderBatch.map((order) => order.submittedAt)),
  *       orders: orderBatch
  *     }
  *   })
@@ -1518,14 +1594,10 @@ export const fromPubSub = <A>(
  * })
  * ```
  *
- * @example
- * ```ts
- * import { Channel, Data, Effect, PubSub } from "effect"
+ * **Example** (Processing PubSub logs in batches)
  *
- * class LogProcessingError extends Data.TaggedError("LogProcessingError")<{
- *   readonly batchId: string
- *   readonly cause: string
- * }> {}
+ * ```ts
+ * import { Channel, Effect, PubSub } from "effect"
  *
  * interface LogEntry {
  *   readonly timestamp: number
@@ -1552,7 +1624,7 @@ export const fromPubSub = <A>(
  *     }
  *
  *     return {
- *       batchId: Math.random().toString(36).substr(2, 9),
+ *       batchId: `${timeRange.start}-${timeRange.end}`,
  *       totalEntries: logBatch.length,
  *       errorCount,
  *       warnCount,
@@ -1566,15 +1638,22 @@ export const fromPubSub = <A>(
  * })
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const fromPubSubArray = <A>(pubsub: PubSub.PubSub<A>): Channel<Arr.NonEmptyReadonlyArray<A>> =>
   unwrap(Effect.map(PubSub.subscribe(pubsub), fromSubscriptionArray))
 
 /**
- * @since 4.0.0
+ * Subscribes to a `PubSub` of `Take` values and exposes them as a channel.
+ *
+ * **Details**
+ *
+ * Output `Take` values are emitted as non-empty arrays. Failed `Take` values
+ * fail the channel. Done `Take` values complete the channel.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const fromPubSubTake = <A, E, Done>(
   pubsub: PubSub.PubSub<Take.Take<A, E, Done>>
@@ -1584,8 +1663,8 @@ export const fromPubSubTake = <A, E, Done>(
 /**
  * Creates a Channel from a Schedule.
  *
- * @since 4.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const fromSchedule = <O, E, R>(
   schedule: Schedule.Schedule<O, unknown, E, R>
@@ -1593,10 +1672,17 @@ export const fromSchedule = <O, E, R>(
   fromPull(Effect.map(Schedule.toStepWithSleep(schedule), (step) => step(void 0)))
 
 /**
- * Creates a Channel from a AsyncIterable.
+ * Creates a channel that pulls values from an `AsyncIterable`.
  *
- * @since 4.0.0
+ * **Details**
+ *
+ * Each yielded value is emitted as an output element. The iterator's return
+ * value becomes the channel's done value. Thrown or rejected iterator errors
+ * are converted with `onError`. If the channel scope closes early and the
+ * iterator has a `return` method, that method is called.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const fromAsyncIterable = <A, D, E>(
   iterable: AsyncIterable<A, D>,
@@ -1617,10 +1703,17 @@ export const fromAsyncIterable = <A, D, E>(
   }))
 
 /**
- * Creates a Channel from a AsyncIterable that emits arrays of elements.
+ * Creates a channel from an `AsyncIterable`, emitting each yielded value as a
+ * single-element non-empty array.
  *
- * @since 4.0.0
+ * **Details**
+ *
+ * The iterator's return value becomes the channel's done value. Thrown or
+ * rejected iterator errors are converted with `onError`. If the channel scope
+ * closes early and the iterator has a `return` method, that method is called.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const fromAsyncIterableArray = <A, D, E>(
   iterable: AsyncIterable<A, D>,
@@ -1630,7 +1723,8 @@ export const fromAsyncIterableArray = <A, D, E>(
 /**
  * Maps the output of this channel using the specified function.
  *
- * @example
+ * **Example** (Mapping channel output)
+ *
  * ```ts
  * import { Channel, Data } from "effect"
  *
@@ -1662,8 +1756,8 @@ export const fromAsyncIterableArray = <A, D, E>(
  * }))
  * ```
  *
+ * @category sequencing
  * @since 2.0.0
- * @category Sequencing
  */
 export const map: {
   <OutElem, OutElem2>(
@@ -1691,8 +1785,8 @@ export const map: {
 /**
  * Maps the done value of this channel using the specified function.
  *
- * @since 2.0.0
- * @category Sequencing
+ * @category sequencing
+ * @since 4.0.0
  */
 export const mapDone: {
   <OutDone, OutDone2>(
@@ -1715,8 +1809,13 @@ export const mapDone: {
 /**
  * Maps the done value of this channel using the specified effectful function.
  *
- * @since 2.0.0
- * @category Sequencing
+ * **When to use**
+ *
+ * Use when the terminal done value transformation needs services or can fail,
+ * while emitted elements should pass through unchanged.
+ *
+ * @category sequencing
+ * @since 4.0.0
  */
 export const mapDoneEffect: {
   <OutDone, OutDone2, E, R>(
@@ -1746,13 +1845,23 @@ const concurrencyIsSequential = (
 ) => concurrency === undefined || (concurrency !== "unbounded" && concurrency <= 1)
 
 /**
- * Returns a new channel, which sequentially combines this channel, together
- * with the provided factory function, which creates a second channel based on
- * the output values of this channel. The result is a channel that will first
- * perform the functions of this channel, before performing the functions of
- * the created channel (including yielding its terminal value).
+ * Maps each output element with an effectful function, preserving the source
+ * channel's done value.
  *
- * @example
+ * **When to use**
+ *
+ * Use when transforming each channel output needs an Effect, service
+ * dependency, failure channel, or configured concurrency.
+ *
+ * **Details**
+ *
+ * The mapping function receives the output element and its zero-based index.
+ * By default elements are mapped sequentially. Use `options.concurrency` to
+ * map multiple elements concurrently, and `options.unordered` to allow
+ * concurrently mapped outputs to be emitted as soon as they complete.
+ *
+ * **Example** (Mapping channel output with effects)
+ *
  * ```ts
  * import { Channel, Data, Effect } from "effect"
  *
@@ -1789,8 +1898,8 @@ const concurrencyIsSequential = (
  * )
  * ```
  *
- * @since 2.0.0
  * @category sequencing
+ * @since 2.0.0
  */
 export const mapEffect: {
   <OutElem, OutElem1, OutErr1, Env1>(
@@ -1874,7 +1983,7 @@ const mapEffectConcurrent = <
       const queue = yield* Queue.bounded<OutElem2, OutErr | EX | Cause.Done<OutDone>>(0)
       yield* Scope.addFinalizer(forkedScope, Queue.shutdown(queue))
 
-      const runFork = Effect.runForkWith(yield* Effect.services<RX>())
+      const runFork = Effect.runForkWith(yield* Effect.context<RX>())
       const trackFiber = Fiber.runIn(forkedScope)
 
       if (options.unordered) {
@@ -1948,8 +2057,8 @@ const mapEffectConcurrent = <
  * Returns a new channel which is the same as this one but applies the given
  * function to the input channel’s input elements.
  *
- * @since 2.0.0
  * @category sequencing
+ * @since 2.0.0
  */
 export const mapInput: {
   <InElem, InElem2, InErr, R = never>(
@@ -1976,8 +2085,8 @@ export const mapInput: {
  * Returns a new channel which is the same as this one but applies the given
  * function to the input errors.
  *
- * @since 2.0.0
  * @category sequencing
+ * @since 2.0.0
  */
 export const mapInputError: {
   <InErr, InErr2, R = never>(
@@ -2007,11 +2116,14 @@ export const mapInputError: {
  * Applies a side effect function to each output element of the channel,
  * returning a new channel that emits the same elements.
  *
+ * **Details**
+ *
  * The `tap` function allows you to perform side effects (like logging or
  * debugging) on each element emitted by a channel without modifying the
  * elements themselves.
  *
- * @example
+ * **Example** (Tapping channel output)
+ *
  * ```ts
  * import { Channel, Console, Data } from "effect"
  *
@@ -2032,8 +2144,8 @@ export const mapInputError: {
  * // Outputs: 1, 2, 3 (while logging each)
  * ```
  *
- * @since 4.0.0
  * @category sequencing
+ * @since 4.0.0
  */
 export const tap: {
   <OutElem, X, OutErr1, Env1>(
@@ -2064,13 +2176,18 @@ export const tap: {
 )
 
 /**
- * Returns a new channel, which sequentially combines this channel, together
- * with the provided factory function, which creates a second channel based on
- * the output values of this channel. The result is a channel that will first
- * perform the functions of this channel, before performing the functions of
- * the created channel (including yielding its terminal value).
+ * Maps each output element to a channel and flattens the child channel
+ * outputs.
  *
- * @example
+ * **Details**
+ *
+ * The source channel's done value is preserved. Child channel done values are
+ * used only for child-channel completion. By default child channels are run
+ * sequentially. Use `options.concurrency` and `options.bufferSize` to run child
+ * channels concurrently.
+ *
+ * **Example** (Flat mapping channel output)
+ *
  * ```ts
  * import { Channel, Data } from "effect"
  *
@@ -2092,8 +2209,8 @@ export const tap: {
  * // Outputs: "item-1-0", "item-2-0", "item-2-1", "item-3-0", "item-3-1", "item-3-2"
  * ```
  *
- * @since 2.0.0
  * @category sequencing
+ * @since 2.0.0
  */
 export const flatMap: {
   <OutElem, OutElem1, OutErr1, OutDone1, InElem1, InErr1, InDone1, Env1>(
@@ -2275,7 +2392,8 @@ const flatMapConcurrent = <
  * Concatenates this channel with another channel created from the terminal value
  * of this channel. The new channel is created using the provided function.
  *
- * @example
+ * **Example** (Concatenating with completion values)
+ *
  * ```ts
  * import { Channel, Data } from "effect"
  *
@@ -2292,8 +2410,8 @@ const flatMapConcurrent = <
  * // Outputs: 1, 2, 3, then "Completed processing"
  * ```
  *
- * @since 2.0.0
  * @category sequencing
+ * @since 4.0.0
  */
 export const concatWith: {
   <OutDone, OutElem1, OutErr1, OutDone1, InElem1, InErr1, InDone1, Env1>(
@@ -2387,7 +2505,8 @@ export const concatWith: {
  * Concatenates this channel with another channel, so that the second channel
  * starts emitting values after the first channel has completed.
  *
- * @example
+ * **Example** (Concatenating channels)
+ *
  * ```ts
  * import { Channel, Data } from "effect"
  *
@@ -2405,8 +2524,8 @@ export const concatWith: {
  * // Outputs: 1, 2, 3, "a", "b", "c"
  * ```
  *
- * @since 2.0.0
  * @category sequencing
+ * @since 4.0.0
  */
 export const concat: {
   <OutElem1, OutErr1, OutDone1, InElem1, InErr1, InDone1, Env1>(
@@ -2478,14 +2597,21 @@ export const concat: {
 > => concatWith(self, (_) => that))
 
 /**
- * Combines the elements from this channel and the specified channel by
- * repeatedly applying the function `f` to extract an element using both sides
- * and conceptually "offer" it to the destination channel. `f` can maintain
- * some internal state to control the combining process, with the initial
- * state being specified by `s`.
+ * Combines two channels with a stateful pull function.
  *
- * @since 4.0.0
+ * **When to use**
+ *
+ * Use to coordinate pulling from two channels when each output element depends
+ * on both sides and local state.
+ *
+ * **Details**
+ *
+ * The combining function receives the current state and pull functions for the
+ * left and right channels. It returns the next output element together with the
+ * next state.
+ *
  * @category sequencing
+ * @since 4.0.0
  */
 export const combine: {
   <OutElem2, OutErr2, OutDone2, InElem2, InErr2, InDone2, Env2, S, OutElem, OutErr, OutDone, A, E, R>(
@@ -2593,8 +2719,17 @@ export const combine: {
   })))
 
 /**
- * @since 2.0.0
+ * Runs a fallback channel if this channel completes without emitting any
+ * output elements.
+ *
+ * **Details**
+ *
+ * If the source emits at least one element, the source is used unchanged. If
+ * the source completes before emitting an element, the fallback function
+ * receives the source done value and returns the replacement channel.
+ *
  * @category sequencing
+ * @since 4.0.0
  */
 export const orElseIfEmpty: {
   <OutDone, OutElem1, OutErr1, OutDone1, InElem1, InErr1, InDone1, Env1>(
@@ -2692,9 +2827,10 @@ export const orElseIfEmpty: {
   ))
 
 /**
- * Flatten a channel of channels.
+ * Flattens a channel of channels.
  *
- * @example
+ * **Example** (Flattening nested channels)
+ *
  * ```ts
  * import { Channel, Data } from "effect"
  *
@@ -2715,8 +2851,8 @@ export const orElseIfEmpty: {
  * // Outputs: 1, 2, 3, 4, 5, 6
  * ```
  *
- * @since 2.0.0
  * @category constructors
+ * @since 2.0.0
  */
 export const flatten = <
   OutElem,
@@ -2748,7 +2884,8 @@ export const flatten = <
 /**
  * Flattens a channel that outputs arrays into a channel that outputs individual elements.
  *
- * @example
+ * **Example** (Flattening arrays of channel output)
+ *
  * ```ts
  * import { Channel, Data } from "effect"
  *
@@ -2769,8 +2906,8 @@ export const flatten = <
  * // Outputs: 1, 2, 3, 4, 5, 6, 7, 8, 9
  * ```
  *
+ * @category transforming
  * @since 4.0.0
- * @category utils
  */
 export const flattenArray = <
   OutElem,
@@ -2812,8 +2949,16 @@ export const flattenArray = <
   })
 
 /**
+ * Flattens a channel that emits `Take` values into a channel that emits the
+ * `Take` outputs directly.
+ *
+ * **Details**
+ *
+ * Output `Take` values are emitted as non-empty arrays. Failed `Take` values
+ * fail the returned channel. Done `Take` values complete the returned channel.
+ *
+ * @category transforming
  * @since 4.0.0
- * @category utils
  */
 export const flattenTake = <
   OutElem,
@@ -2834,7 +2979,8 @@ export const flattenTake = <
  * Creates a new channel that consumes all output from the source channel
  * but emits nothing, preserving only the completion value.
  *
- * @example
+ * **Example** (Draining channel output)
+ *
  * ```ts
  * import { Channel } from "effect"
  *
@@ -2848,8 +2994,8 @@ export const flattenTake = <
  * // Useful for consuming side effects without collecting output
  * ```
  *
- * @since 2.0.0
  * @category constructors
+ * @since 2.0.0
  */
 export const drain = <
   OutElem,
@@ -2875,8 +3021,8 @@ export const drain = <
 /**
  * Repeats this channel according to the provided schedule.
  *
+ * @category repetition
  * @since 4.0.0
- * @category utils
  */
 export const repeat: {
   <SO, OutDone, SE, SR>(
@@ -2935,16 +3081,26 @@ export const repeat: {
 /**
  * Repeats this channel forever.
  *
+ * @category repetition
  * @since 4.0.0
- * @category utils
  */
 export const forever = <OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>(
   self: Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>
 ): Channel<OutElem, OutErr, never, InElem, InErr, InDone, Env> => concatWith(self, () => forever(self))
 
 /**
+ * Runs a schedule step for each output element while preserving the emitted
+ * elements.
+ *
+ * **Details**
+ *
+ * The schedule receives each output element as input. Schedule delays are
+ * applied between emitted elements. If the schedule fails, the returned channel
+ * fails. If the schedule finishes, the returned channel completes with the
+ * schedule output.
+ *
+ * @category sequencing
  * @since 4.0.0
- * @category utils
  */
 export const schedule: {
   <SO, OutElem, SE, SR>(
@@ -2981,7 +3137,8 @@ export const schedule: {
  * Filters the output elements of a channel using a predicate function.
  * Elements that don't match the predicate are discarded.
  *
- * @example
+ * **Example** (Filtering channel output)
+ *
  * ```ts
  * import { Channel } from "effect"
  *
@@ -3001,8 +3158,8 @@ export const schedule: {
  * // Outputs: 1, 2, 3 (all typed as numbers)
  * ```
  *
- * @since 2.0.0
- * @category Filtering
+ * @category filtering
+ * @since 4.0.0
  */
 export const filter: {
   <OutElem, B extends OutElem>(
@@ -3040,8 +3197,25 @@ export const filter: {
   ))
 
 /**
+ * Filters and maps output elements using a `Filter`.
+ *
+ * **When to use**
+ *
+ * Use to keep only channel output elements accepted by a `Filter` and emit
+ * each filter success value.
+ *
+ * **Details**
+ *
+ * Successful filter results are emitted as mapped values. Failed filter
+ * results are discarded. The source channel's errors and done value are
+ * preserved.
+ *
+ * @see {@link filter} for keeping original output elements with a predicate
+ * @see {@link filterMapEffect} for using an effectful `Filter`
+ * @see {@link filterMapArray} for filtering arrays of output elements
+ *
+ * @category filtering
  * @since 4.0.0
- * @category Filtering
  */
 export const filterMap: {
   <OutElem, B, X>(
@@ -3071,8 +3245,21 @@ export const filterMap: {
   ))
 
 /**
+ * Filters output elements with an effectful predicate.
+ *
+ * **When to use**
+ *
+ * Use when the keep/discard decision depends on an Effect or service and
+ * predicate failures should fail the returned channel.
+ *
+ * **Details**
+ *
+ * Elements for which the predicate succeeds with `true` are emitted. Elements
+ * for which the predicate succeeds with `false` are discarded. Predicate
+ * failures fail the returned channel.
+ *
+ * @category filtering
  * @since 4.0.0
- * @category Filtering
  */
 export const filterEffect: {
   <OutElem, E, R>(
@@ -3105,8 +3292,26 @@ export const filterEffect: {
   ))
 
 /**
+ * Filters and maps output elements using an effectful `Filter`.
+ *
+ * **When to use**
+ *
+ * Use to apply effectful logic that can discard channel output elements and
+ * emit transformed values for the elements that pass.
+ *
+ * **Details**
+ *
+ * Successful filter results are emitted as mapped values. Failed filter
+ * results are discarded. Failures from the effectful filter fail the returned
+ * channel.
+ *
+ * @see {@link filterMap} for using a synchronous `Filter`
+ * @see {@link filterEffect} for effectfully keeping original output elements
+ * @see {@link mapEffect} for effectfully transforming every output element
+ * @see {@link filterMapArrayEffect} for effectful filtering of array outputs
+ *
+ * @category filtering
  * @since 4.0.0
- * @category Filtering
  */
 export const filterMapEffect: {
   <OutElem, B, X, EX, RX>(
@@ -3142,7 +3347,8 @@ export const filterMapEffect: {
  * Filters arrays of elements emitted by a channel, applying the filter
  * to each element within the arrays and only emitting non-empty filtered arrays.
  *
- * @example
+ * **Example** (Filtering array output)
+ *
  * ```ts
  * import { Array, Channel } from "effect"
  *
@@ -3170,8 +3376,8 @@ export const filterMapEffect: {
  * // Outputs: [2, 4] (the arrays [1,3,5] and [7,9] are discarded)
  * ```
  *
+ * @category filtering
  * @since 4.0.0
- * @category Filtering
  */
 export const filterArray: {
   <OutElem, B extends OutElem>(
@@ -3213,8 +3419,16 @@ export const filterArray: {
     ))))
 
 /**
+ * Filters and maps each element inside emitted non-empty arrays using a
+ * `Filter`.
+ *
+ * **Details**
+ *
+ * Successful filter results are kept as mapped values. Failed filter results
+ * are removed from the array. Arrays that become empty are discarded.
+ *
+ * @category filtering
  * @since 4.0.0
- * @category Filtering
  */
 export const filterMapArray: {
   <OutElem, B, X>(
@@ -3248,8 +3462,22 @@ export const filterMapArray: {
     ))))
 
 /**
+ * Filters each element inside emitted non-empty arrays with an effectful
+ * predicate.
+ *
+ * **When to use**
+ *
+ * Use when filtering array-valued channel outputs requires Effects or services,
+ * and arrays that become empty should be skipped.
+ *
+ * **Details**
+ *
+ * The predicate receives the element and its index within the array. Elements
+ * for which the predicate succeeds with `true` are kept. Arrays that become
+ * empty are discarded. Predicate failures fail the returned channel.
+ *
+ * @category filtering
  * @since 4.0.0
- * @category Filtering
  */
 export const filterArrayEffect: {
   <OutElem, E, R>(
@@ -3276,8 +3504,22 @@ export const filterArrayEffect: {
   }))
 
 /**
+ * Filters and maps each element inside emitted non-empty arrays using an
+ * effectful `Filter`.
+ *
+ * **When to use**
+ *
+ * Use when array-valued channel outputs need an effectful filter-map that can
+ * fail and can discard arrays that become empty.
+ *
+ * **Details**
+ *
+ * Successful filter results are kept as mapped values. Failed filter results
+ * are removed from the array. Arrays that become empty are discarded. Failures
+ * from the effectful filter fail the returned channel.
+ *
+ * @category filtering
  * @since 4.0.0
- * @category Filtering
  */
 export const filterMapArrayEffect: {
   <OutElem, B, X, EX, RX>(
@@ -3308,9 +3550,10 @@ export const filterMapArrayEffect: {
     ))))
 
 /**
- * Statefully maps over a channel with an accumulator, where each element can produce multiple output values.
+ * Maps over a channel statefully with an accumulator, where each element can produce multiple output values.
  *
- * @example
+ * **Example** (Mapping with accumulated state)
+ *
  * ```ts
  * import { Channel, Effect } from "effect"
  *
@@ -3341,8 +3584,8 @@ export const filterMapArrayEffect: {
  * )
  * ```
  *
- * @since 2.0.0
- * @category Sequencing
+ * @category sequencing
+ * @since 4.0.0
  */
 export const mapAccum: {
   <S, OutElem, B, E = never, R = never>(
@@ -3448,10 +3691,11 @@ export const mapAccum: {
 )
 
 /**
- * Statefully transforms a channel by scanning over its output with an accumulator function.
+ * Transforms a channel statefully by scanning over its output with an accumulator function.
  * Emits the intermediate results of the scan operation.
  *
- * @example
+ * **Example** (Scanning channel output)
+ *
  * ```ts
  * import { Channel } from "effect"
  *
@@ -3473,8 +3717,8 @@ export const mapAccum: {
  * // Outputs: "", "hello", "hello world", "hello world from", "hello world from effect"
  * ```
  *
- * @since 2.0.0
- * @category Sequencing
+ * @category sequencing
+ * @since 4.0.0
  */
 export const scan: {
   <S, OutElem>(initial: S, f: (s: S, a: Types.NoInfer<OutElem>) => S): <
@@ -3506,10 +3750,16 @@ export const scan: {
   scanEffect(self, initial, (s, a) => Effect.succeed(f(s, a))))
 
 /**
- * Statefully transforms a channel by scanning over its output with an effectful accumulator function.
+ * Transforms a channel statefully by scanning over its output with an effectful accumulator function.
  * Emits the intermediate results of the scan operation.
  *
- * @example
+ * **When to use**
+ *
+ * Use when maintaining accumulated state over channel output requires Effects
+ * or can fail, while still emitting each intermediate state.
+ *
+ * **Example** (Scanning channel output with effects)
+ *
  * ```ts
  * import { Channel, Data, Effect } from "effect"
  *
@@ -3546,8 +3796,8 @@ export const scan: {
  * )
  * ```
  *
- * @since 2.0.0
- * @category Sequencing
+ * @category sequencing
+ * @since 4.0.0
  */
 export const scanEffect: {
   <S, OutElem, E, R>(initial: S, f: (s: S, a: Types.NoInfer<OutElem>) => Effect.Effect<S, E, R>): <
@@ -3600,7 +3850,8 @@ export const scanEffect: {
  * Catches any cause of failure from the channel and allows recovery by
  * creating a new channel based on the caught cause.
  *
- * @example
+ * **Example** (Recovering from failure causes)
+ *
  * ```ts
  * import { Cause, Channel, Data } from "effect"
  *
@@ -3628,8 +3879,8 @@ export const scanEffect: {
  * // The channel recovers gracefully from errors
  * ```
  *
- * @since 4.0.0
- * @category Error handling
+ * @category error handling
+ * @since 2.0.0
  */
 export const catchCause: {
   <OutErr, OutElem1, OutErr1, OutDone1, InElem1, InErr1, InDone1, Env1>(
@@ -3728,8 +3979,21 @@ export const catchCause: {
   }))
 
 /**
+ * Runs an effect with the full failure `Cause` when the channel fails, then
+ * fails the returned channel with the original cause.
+ *
+ * **When to use**
+ *
+ * Use when observing the full channel failure `Cause` is needed without
+ * changing successful output or replacing the original cause.
+ *
+ * **Details**
+ *
+ * Use this for observing failures, such as logging or metrics. If the observer
+ * effect fails, that failure can fail the returned channel.
+ *
+ * @category error handling
  * @since 4.0.0
- * @category Error handling
  */
 export const tapCause: {
   <OutErr, A, E, R>(
@@ -3801,8 +4065,23 @@ export const tapCause: {
  * Catches causes of failure that match a specific filter, allowing
  * conditional error recovery based on the type of failure.
  *
+ * **When to use**
+ *
+ * Use to recover a channel only when its full `Cause` satisfies a boolean
+ * predicate.
+ *
+ * **Details**
+ *
+ * When the predicate matches, the recovery function receives the original
+ * cause. When it does not match, the returned channel fails with the original
+ * cause.
+ *
+ * @see {@link catchCauseFilter} for selecting causes with a `Filter`
+ * @see {@link catchCause} for recovering from every cause
+ * @see {@link catchIf} for recovering from typed channel errors
+ *
+ * @category error handling
  * @since 4.0.0
- * @category Error handling
  */
 export const catchCauseIf: {
   <
@@ -3909,8 +4188,26 @@ export const catchCauseIf: {
   ))
 
 /**
+ * Recovers from channel failures whose full `Cause` is selected by a `Filter`.
+ *
+ * **When to use**
+ *
+ * Use when you need to recover a channel only from causes selected by a
+ * `Filter`, while giving the recovery both the selected value and the original
+ * `Cause`.
+ *
+ * **Details**
+ *
+ * When the filter succeeds, the recovery function receives the selected value
+ * and the original cause. When the filter fails, the returned channel fails
+ * with the residual cause produced by the filter.
+ *
+ * @see {@link catchCauseIf} for selecting causes with a predicate
+ * @see {@link catchFilter} for selecting typed errors with a `Filter`
+ * @see {@link catchCause} for recovering from every cause
+ *
+ * @category error handling
  * @since 4.0.0
- * @category Error handling
  */
 export const catchCauseFilter: {
   <
@@ -4108,15 +4405,25 @@ const catch_: {
 
 export {
   /**
+   * Recovers from typed channel errors by running a fallback channel.
+   *
+   * @category error handling
    * @since 4.0.0
-   * @category Error handling
    */
   catch_ as catch
 }
 
 /**
+ * Runs an effect when the channel fails with a typed error, then preserves the
+ * original channel failure.
+ *
+ * **Details**
+ *
+ * The effect is not run for normal channel completion. If the observer effect
+ * fails, that failure can fail the returned channel.
+ *
+ * @category error handling
  * @since 4.0.0
- * @category Error handling
  */
 export const tapError: {
   <OutErr, A, E, R>(
@@ -4193,8 +4500,26 @@ export const tapError: {
   ))
 
 /**
+ * Recovers from typed channel errors that match a predicate or refinement.
+ *
+ * **When to use**
+ *
+ * Use to recover from typed channel errors when a predicate or refinement
+ * selects the failures that should switch to a recovery channel.
+ *
+ * **Details**
+ *
+ * Matching errors are handled by the recovery function. Non-matching errors
+ * are handled by `orElse` when provided. Without `orElse`, non-matching errors
+ * are re-failed.
+ *
+ * @see {@link catch_ catch} for recovering from every typed channel error
+ * @see {@link catchFilter} for selecting typed errors with a `Filter`
+ * @see {@link catchTag} for selecting tagged typed errors
+ * @see {@link catchCauseFilter} for selecting full causes with a `Filter`
+ *
+ * @category error handling
  * @since 4.0.0
- * @category Error handling
  */
 export const catchIf: {
   <
@@ -4207,8 +4532,8 @@ export const catchIf: {
     InErr1,
     InDone1,
     Env1,
-    OutElem2 = never,
-    OutErr2 = Exclude<OutErr, EB>,
+    OutElem2 = Types.unassigned,
+    OutErr2 = never,
     OutDone2 = never,
     InElem2 = unknown,
     InErr2 = unknown,
@@ -4230,8 +4555,8 @@ export const catchIf: {
     InDone,
     Env
   >(self: Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>) => Channel<
-    OutElem | OutElem1 | OutElem2,
-    OutErr1 | OutErr2,
+    OutElem | OutElem1 | Exclude<OutElem2, Types.unassigned>,
+    OutErr1 | OutErr2 | (OutElem2 extends Types.unassigned ? Exclude<OutErr, EB> : never),
     OutDone | OutDone1 | OutDone2,
     InElem & InElem1 & InElem2,
     InErr & InErr1 & InErr2,
@@ -4247,8 +4572,8 @@ export const catchIf: {
     InErr1,
     InDone1,
     Env1,
-    OutElem2 = never,
-    OutErr2 = OutErr,
+    OutElem2 = Types.unassigned,
+    OutErr2 = never,
     OutDone2 = never,
     InElem2 = unknown,
     InErr2 = unknown,
@@ -4270,8 +4595,8 @@ export const catchIf: {
     InDone,
     Env
   >(self: Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>) => Channel<
-    OutElem | OutElem1 | OutElem2,
-    OutErr1 | OutErr2,
+    OutElem | OutElem1 | Exclude<OutElem2, Types.unassigned>,
+    OutErr1 | OutErr2 | (OutElem2 extends Types.unassigned ? OutErr : never),
     OutDone | OutDone1 | OutDone2,
     InElem & InElem1 & InElem2,
     InErr & InErr1 & InErr2,
@@ -4294,8 +4619,8 @@ export const catchIf: {
     InErr1,
     InDone1,
     Env1,
-    OutElem2 = never,
-    OutErr2 = Exclude<OutErr, EB>,
+    OutElem2 = Types.unassigned,
+    OutErr2 = never,
     OutDone2 = never,
     InElem2 = unknown,
     InErr2 = unknown,
@@ -4311,8 +4636,8 @@ export const catchIf: {
       ) => Channel<OutElem2, OutErr2, OutDone2, InElem2, InErr2, InDone2, Env2>)
       | undefined
   ): Channel<
-    OutElem | OutElem1 | OutElem2,
-    OutErr1 | OutErr2,
+    OutElem | OutElem1 | Exclude<OutElem2, Types.unassigned>,
+    OutErr1 | OutErr2 | (OutElem2 extends Types.unassigned ? Exclude<OutErr, EB> : never),
     OutDone | OutDone1 | OutDone2,
     InElem & InElem1 & InElem2,
     InErr & InErr1 & InErr2,
@@ -4334,8 +4659,8 @@ export const catchIf: {
     InErr1,
     InDone1,
     Env1,
-    OutElem2 = never,
-    OutErr2 = OutErr,
+    OutElem2 = Types.unassigned,
+    OutErr2 = never,
     OutDone2 = never,
     InElem2 = unknown,
     InErr2 = unknown,
@@ -4351,8 +4676,8 @@ export const catchIf: {
       ) => Channel<OutElem2, OutErr2, OutDone2, InElem2, InErr2, InDone2, Env2>)
       | undefined
   ): Channel<
-    OutElem | OutElem1 | OutElem2,
-    OutErr1 | OutErr2,
+    OutElem | OutElem1 | Exclude<OutElem2, Types.unassigned>,
+    OutErr1 | OutErr2 | (OutElem2 extends Types.unassigned ? OutErr : never),
     OutDone | OutDone1 | OutDone2,
     InElem & InElem1 & InElem2,
     InErr & InErr1 & InErr2,
@@ -4419,8 +4744,25 @@ export const catchIf: {
   ))
 
 /**
+ * Recovers from typed channel errors selected by a `Filter`.
+ *
+ * **When to use**
+ *
+ * Use to recover from channel errors with a reusable `Filter` when matching
+ * can also narrow or transform the error before choosing the recovery channel.
+ *
+ * **Details**
+ *
+ * Successful filter results are handled by the recovery function. Failed
+ * filter results are handled by `orElse` when provided. Without `orElse`,
+ * failed filter results are re-failed.
+ *
+ * @see {@link catchIf} for selecting typed errors with a predicate
+ * @see {@link catchTag} for selecting tagged typed errors
+ * @see {@link catchCauseFilter} for selecting full causes with a `Filter`
+ *
+ * @category error handling
  * @since 4.0.0
- * @category Error handling
  */
 export const catchFilter: {
   <
@@ -4434,8 +4776,8 @@ export const catchFilter: {
     InErr1,
     InDone1,
     Env1,
-    OutElem2 = never,
-    OutErr2 = X,
+    OutElem2 = Types.unassigned,
+    OutErr2 = never,
     OutDone2 = never,
     InElem2 = unknown,
     InErr2 = unknown,
@@ -4457,8 +4799,8 @@ export const catchFilter: {
     InDone,
     Env
   >(self: Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>) => Channel<
-    OutElem | OutElem1 | OutElem2,
-    OutErr1 | OutErr2,
+    OutElem | OutElem1 | Exclude<OutElem2, Types.unassigned>,
+    OutErr1 | OutErr2 | (OutElem2 extends Types.unassigned ? X : never),
     OutDone | OutDone1 | OutDone2,
     InElem & InElem1 & InElem2,
     InErr & InErr1 & InErr2,
@@ -4482,8 +4824,8 @@ export const catchFilter: {
     InErr1,
     InDone1,
     Env1,
-    OutElem2 = never,
-    OutErr2 = X,
+    OutElem2 = Types.unassigned,
+    OutErr2 = never,
     OutDone2 = never,
     InElem2 = unknown,
     InErr2 = unknown,
@@ -4499,8 +4841,8 @@ export const catchFilter: {
       ) => Channel<OutElem2, OutErr2, OutDone2, InElem2, InErr2, InDone2, Env2>)
       | undefined
   ): Channel<
-    OutElem | OutElem1 | OutElem2,
-    OutErr1 | OutErr2,
+    OutElem | OutElem1 | Exclude<OutElem2, Types.unassigned>,
+    OutErr1 | OutErr2 | (OutElem2 extends Types.unassigned ? X : never),
     OutDone | OutDone1 | OutDone2,
     InElem & InElem1 & InElem2,
     InErr & InErr1 & InErr2,
@@ -4570,8 +4912,16 @@ export const catchFilter: {
   ))
 
 /**
+ * Recovers from tagged channel errors whose `_tag` matches one or more tags.
+ *
+ * **Details**
+ *
+ * Matching tagged errors are handled by the recovery function. Non-matching
+ * errors are handled by `orElse` when provided. Without `orElse`,
+ * non-matching errors are re-failed.
+ *
+ * @category error handling
  * @since 4.0.0
- * @category Error handling
  */
 export const catchTag: {
   <
@@ -4584,8 +4934,8 @@ export const catchTag: {
     InErr1,
     InDone1,
     Env1,
-    OutElem2 = never,
-    OutErr2 = Types.ExcludeTag<OutErr, K extends Arr.NonEmptyReadonlyArray<string> ? K[number] : K>,
+    OutElem2 = Types.unassigned,
+    OutErr2 = never,
     OutDone2 = never,
     InElem2 = unknown,
     InErr2 = unknown,
@@ -4609,8 +4959,12 @@ export const catchTag: {
     InDone,
     Env
   >(self: Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>) => Channel<
-    OutElem | OutElem1 | OutElem2,
-    OutErr1 | OutErr2,
+    OutElem | OutElem1 | Exclude<OutElem2, Types.unassigned>,
+    | OutErr1
+    | OutErr2
+    | (OutElem2 extends Types.unassigned
+      ? Types.ExcludeTag<OutErr, K extends Arr.NonEmptyReadonlyArray<string> ? K[number] : K>
+      : never),
     OutDone | OutDone1 | OutDone2,
     InElem & InElem1 & InElem2,
     InErr & InErr1 & InErr2,
@@ -4633,8 +4987,8 @@ export const catchTag: {
     InErr1,
     InDone1,
     Env1,
-    OutElem2 = never,
-    OutErr2 = Types.ExcludeTag<OutErr, K extends Arr.NonEmptyReadonlyArray<string> ? K[number] : K>,
+    OutElem2 = Types.unassigned,
+    OutErr2 = never,
     OutDone2 = never,
     InElem2 = unknown,
     InErr2 = unknown,
@@ -4652,8 +5006,12 @@ export const catchTag: {
       ) => Channel<OutElem2, OutErr2, OutDone2, InElem2, InErr2, InDone2, Env2>)
       | undefined
   ): Channel<
-    OutElem | OutElem1 | OutElem2,
-    OutErr1 | OutErr2,
+    OutElem | OutElem1 | Exclude<OutElem2, Types.unassigned>,
+    | OutErr1
+    | OutErr2
+    | (OutElem2 extends Types.unassigned
+      ? Types.ExcludeTag<OutErr, K extends Arr.NonEmptyReadonlyArray<string> ? K[number] : K>
+      : never),
     OutDone | OutDone1 | OutDone2,
     InElem & InElem1 & InElem2,
     InErr & InErr1 & InErr2,
@@ -4712,7 +5070,8 @@ export const catchTag: {
 /**
  * Catches a specific reason within a tagged error.
  *
- * @example
+ * **Example** (Recovering from nested reasons)
+ *
  * ```ts
  * import { Channel, Data } from "effect"
  *
@@ -4739,8 +5098,8 @@ export const catchTag: {
  * )
  * ```
  *
+ * @category error handling
  * @since 4.0.0
- * @category Error handling
  */
 export const catchReason: {
   <
@@ -4785,7 +5144,10 @@ export const catchReason: {
     self: Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>
   ) => Channel<
     OutElem | OutElem1 | Exclude<OutElem2, Types.unassigned>,
-    (OutElem2 extends Types.unassigned ? OutErr : Types.ExcludeTag<OutErr, K>) | OutErr1 | OutErr2,
+    | Types.ExcludeTag<OutErr, K>
+    | OutErr1
+    | OutErr2
+    | (OutElem2 extends Types.unassigned ? Types.ExtractTag<OutErr, K> : never),
     OutDone | OutDone1 | OutDone2,
     InElem & InElem1 & InElem2,
     InErr & InErr1 & InErr2,
@@ -4832,7 +5194,10 @@ export const catchReason: {
       | undefined
   ): Channel<
     OutElem | OutElem1 | Exclude<OutElem2, Types.unassigned>,
-    (OutElem2 extends Types.unassigned ? OutErr : Types.ExcludeTag<OutErr, K>) | OutErr1 | OutErr2,
+    | Types.ExcludeTag<OutErr, K>
+    | OutErr1
+    | OutErr2
+    | (OutElem2 extends Types.unassigned ? Types.ExtractTag<OutErr, K> : never),
     OutDone | OutDone1 | OutDone2,
     InElem & InElem1 & InElem2,
     InErr & InErr1 & InErr2,
@@ -4879,7 +5244,10 @@ export const catchReason: {
     | undefined
 ): Channel<
   OutElem | OutElem1 | Exclude<OutElem2, Types.unassigned>,
-  (OutElem2 extends Types.unassigned ? OutErr : Types.ExcludeTag<OutErr, K>) | OutErr1 | OutErr2,
+  | Types.ExcludeTag<OutErr, K>
+  | OutErr1
+  | OutErr2
+  | (OutElem2 extends Types.unassigned ? Types.ExtractTag<OutErr, K> : never),
   OutDone | OutDone1 | OutDone2,
   InElem & InElem1 & InElem2,
   InErr & InErr1 & InErr2,
@@ -4911,8 +5279,8 @@ export const catchReason: {
 /**
  * Catches multiple reasons within a tagged error using an object of handlers.
  *
+ * @category error handling
  * @since 4.0.0
- * @category Error handling
  */
 export const catchReasons: {
   <
@@ -4949,8 +5317,9 @@ export const catchReasons: {
       [RK in keyof Cases]: Cases[RK] extends
         (...args: Array<any>) => Channel<infer OutElem1, any, any, any, any, any, any> ? OutElem1 : never
     }[keyof Cases],
-    | (OutElem2 extends Types.unassigned ? OutErr : Types.ExcludeTag<OutErr, K>)
+    | Types.ExcludeTag<OutErr, K>
     | OutErr2
+    | (OutElem2 extends Types.unassigned ? Types.ExtractTag<OutErr, K> : never)
     | {
       [RK in keyof Cases]: Cases[RK] extends
         (...args: Array<any>) => Channel<any, infer OutErr1, any, any, any, any, any> ? OutErr1 : never
@@ -5025,8 +5394,9 @@ export const catchReasons: {
       [RK in keyof Cases]: Cases[RK] extends
         (...args: Array<any>) => Channel<infer OutElem1, any, any, any, any, any, any> ? OutElem1 : never
     }[keyof Cases],
-    | (OutElem2 extends Types.unassigned ? OutErr : Types.ExcludeTag<OutErr, K>)
+    | Types.ExcludeTag<OutErr, K>
     | OutErr2
+    | (OutElem2 extends Types.unassigned ? Types.ExtractTag<OutErr, K> : never)
     | {
       [RK in keyof Cases]: Cases[RK] extends
         (...args: Array<any>) => Channel<any, infer OutErr1, any, any, any, any, any> ? OutErr1 : never
@@ -5085,7 +5455,8 @@ export const catchReasons: {
 /**
  * Promotes nested reason errors into the channel error, replacing the parent error.
  *
- * @example
+ * **Example** (Promoting nested reasons)
+ *
  * ```ts
  * import { Channel, Data } from "effect"
  *
@@ -5108,8 +5479,8 @@ export const catchReasons: {
  * const unwrapped = channel.pipe(Channel.unwrapReason("AiError"))
  * ```
  *
+ * @category error handling
  * @since 4.0.0
- * @category Error handling
  */
 export const unwrapReason: {
   <
@@ -5182,8 +5553,8 @@ export const unwrapReason: {
  * value of the returned channel is created by applying the specified function
  * to the failure value of this channel.
  *
+ * @category error handling
  * @since 2.0.0
- * @category Error handling
  */
 export const mapError: {
   <OutErr, OutErr2>(
@@ -5204,7 +5575,8 @@ export const mapError: {
  * Converts all errors in the channel to defects (unrecoverable failures).
  * This is useful when you want to treat errors as programming errors.
  *
- * @example
+ * **Example** (Converting failures to defects)
+ *
  * ```ts
  * import { Channel, Data } from "effect"
  *
@@ -5221,8 +5593,8 @@ export const mapError: {
  * // Any failure will now become a defect (uncaught exception)
  * ```
  *
- * @since 4.0.0
- * @category Error handling
+ * @category error handling
+ * @since 2.0.0
  */
 export const orDie = <
   OutElem,
@@ -5239,10 +5611,12 @@ export const orDie = <
 /**
  * Ignores all errors in the channel, converting them to an empty channel.
  *
+ * **Details**
+ *
  * Use the `log` option to emit the full {@link Cause} when the channel fails.
  *
+ * @category error handling
  * @since 4.0.0
- * @category Error handling
  */
 export const ignore: <
   Arg extends Channel<any, any, any, any, any, any, any> | {
@@ -5294,10 +5668,17 @@ const ignoreCause_ = <
 /**
  * Ignores all errors in the channel including defects, converting them to an empty channel.
  *
+ * **When to use**
+ *
+ * Use when a channel should become best-effort and all failure causes, including
+ * defects and interruptions, can be converted to empty output.
+ *
+ * **Details**
+ *
  * Use the `log` option to emit the full {@link Cause} when the channel fails.
  *
+ * @category error handling
  * @since 4.0.0
- * @category Error handling
  */
 export const ignoreCause: <
   Arg extends Channel<any, any, any, any, any, any, any> | {
@@ -5331,8 +5712,8 @@ export const ignoreCause: <
  * Returns a new channel that retries this channel according to the specified
  * schedule whenever it fails.
  *
+ * @category error handling
  * @since 4.0.0
- * @category utils
  */
 export const retry: {
   <SO, OutErr, SE, SR>(
@@ -5399,13 +5780,17 @@ export const retry: {
   }))
 
 /**
- * Returns a new channel, which sequentially combines this channel, together
- * with the provided factory function, which creates a second channel based on
- * the output values of this channel. The result is a channel that will first
- * perform the functions of this channel, before performing the functions of
- * the created channel (including yielding its terminal value).
+ * Maps each output element to a channel and emits values from the most recent
+ * active child channels.
  *
- * @example
+ * **Details**
+ *
+ * With the default concurrency of `1`, starting a new child channel interrupts
+ * the previous child channel. Use `options.concurrency` to allow more active
+ * child channels. The source channel's done value is preserved.
+ *
+ * **Example** (Switching mapped channels)
+ *
  * ```ts
  * import { Channel, Data } from "effect"
  *
@@ -5425,8 +5810,8 @@ export const retry: {
  * // Outputs: "value-1", "value-2", "value-3"
  * ```
  *
- * @since 2.0.0
  * @category sequencing
+ * @since 4.0.0
  */
 export const switchMap: {
   <OutElem, OutElem1, OutErr1, OutDone1, InElem1, InErr1, InDone1, Env1>(
@@ -5523,7 +5908,13 @@ export const switchMap: {
 /**
  * Merges multiple channels with specified concurrency and buffering options.
  *
- * @example
+ * **When to use**
+ *
+ * Use when channel outputs are themselves channels and multiple inner channels
+ * should run with configured concurrency and buffering.
+ *
+ * **Example** (Merging nested channels)
+ *
  * ```ts
  * import { Channel, Data } from "effect"
  *
@@ -5547,8 +5938,8 @@ export const switchMap: {
  * // Outputs: 1, 2, 3, 4, 5, 6 (order may vary due to concurrency)
  * ```
  *
+ * @category combining
  * @since 2.0.0
- * @category utils
  */
 export const mergeAll: {
   (options: {
@@ -5690,7 +6081,8 @@ export const mergeAll: {
 /**
  * Represents strategies for halting merged channels when one completes or fails.
  *
- * @example
+ * **Example** (Choosing merge halt strategies)
+ *
  * ```ts
  * import type { Channel } from "effect"
  *
@@ -5701,8 +6093,8 @@ export const mergeAll: {
  * const either: Channel.HaltStrategy = "either" // Stop when either channel halts
  * ```
  *
- * @since 2.0.0
  * @category models
+ * @since 4.0.0
  */
 export type HaltStrategy = "left" | "right" | "both" | "either"
 
@@ -5710,7 +6102,8 @@ export type HaltStrategy = "left" | "right" | "both" | "either"
  * Returns a new channel, which is the merge of this channel and the specified
  * channel.
  *
- * @example
+ * **Example** (Merging channels)
+ *
  * ```ts
  * import { Channel, Data } from "effect"
  *
@@ -5731,8 +6124,8 @@ export type HaltStrategy = "left" | "right" | "both" | "either"
  * // Order may vary: 1, "a", 2, "b", 3, "c"
  * ```
  *
- * @since 2.0.0
- * @category utils
+ * @category combining
+ * @since 4.0.0
  */
 export const merge: {
   <OutElem1, OutErr1, OutDone1, InElem1, InErr1, InDone1, Env1>(
@@ -5871,8 +6264,21 @@ export const merge: {
   })))
 
 /**
+ * Runs an effect concurrently with a channel while emitting only the channel's
+ * output elements.
+ *
+ * **When to use**
+ *
+ * Use when a side effect should run for the lifetime of a channel and only the
+ * channel's output elements should be emitted.
+ *
+ * **Details**
+ *
+ * The effect's successful value is ignored. If the effect fails while the
+ * channel is running, the returned channel fails with that error.
+ *
+ * @category combining
  * @since 4.0.0
- * @category utils
  */
 export const mergeEffect: {
   <X, E, R>(
@@ -5895,8 +6301,33 @@ export const mergeEffect: {
   ) as any)
 
 /**
- * @since 2.0.0
+ * Splits upstream string chunks into lines, recognizing `\n`, `\r\n`, and
+ * standalone `\r` as line terminators. The behavior matches
+ * `String.linesIterator` regardless of how the input is chunked.
+ *
+ * **Details**
+ *
+ * A line terminator at the very end of the stream does **not** produce a
+ * trailing empty line (consistent with `String.linesIterator`). Conversely,
+ * if the stream ends without a terminator the final partial line is still
+ * emitted.
+ *
+ * **Example** (Splitting string chunks into lines)
+ *
+ * ```ts
+ * import { Effect, Stream } from "effect"
+ *
+ * Effect.runPromise(Effect.gen(function*() {
+ *   const result = yield* Stream.runCollect(
+ *     Stream.splitLines(Stream.make("hel", "lo\r\nwor", "ld\n"))
+ *   )
+ *   console.log(result)
+ *   // [ 'hello', 'world' ]
+ * }))
+ * ```
+ *
  * @category String manipulation
+ * @since 2.0.0
  */
 export const splitLines = <Err, Done>(): Channel<
   Arr.NonEmptyReadonlyArray<string>,
@@ -5908,11 +6339,30 @@ export const splitLines = <Err, Done>(): Channel<
 > =>
   fromTransform((upstream, _scope) =>
     Effect.sync(() => {
+      // Accumulates text that has not yet been terminated by a line break.
+      // Content is carried across chunks until a terminator is found.
       let stringBuilder = ""
+      // Set when a chunk ends with \r so the next chunk can check whether
+      // the following character is \n (completing a \r\n pair) or not
+      // (standalone \r, which is itself a line terminator).
       let midCRLF = false
+      // Remembers the upstream Done value after the first time the upstream
+      // signals completion, so subsequent pulls return Done immediately
+      // without pulling upstream again.
+      let done = Option.none<Done>()
 
-      const splitLinesArray = (chunk: Arr.NonEmptyReadonlyArray<string>): Arr.NonEmptyReadonlyArray<string> | null => {
+      function splitLinesArray(chunk: Arr.NonEmptyReadonlyArray<string>): Arr.NonEmptyReadonlyArray<string> | null {
         const chunkBuilder: Array<string> = []
+
+        function pushLine(segment: string): void {
+          if (stringBuilder.length === 0) {
+            chunkBuilder.push(segment)
+          } else {
+            chunkBuilder.push(stringBuilder + segment)
+            stringBuilder = ""
+          }
+        }
+
         for (let i = 0; i < chunk.length; i++) {
           const str = chunk[i]
           if (str.length !== 0) {
@@ -5921,23 +6371,17 @@ export const splitLines = <Err, Done>(): Channel<
             let indexOfLF = str.indexOf("\n")
             if (midCRLF) {
               if (indexOfLF === 0) {
-                chunkBuilder.push(stringBuilder)
-                stringBuilder = ""
+                pushLine("")
                 from = 1
                 indexOfLF = str.indexOf("\n", from)
               } else {
-                stringBuilder = stringBuilder + "\r"
+                pushLine("")
               }
               midCRLF = false
             }
             while (indexOfCR !== -1 || indexOfLF !== -1) {
               if (indexOfCR === -1 || (indexOfLF !== -1 && indexOfLF < indexOfCR)) {
-                if (stringBuilder.length === 0) {
-                  chunkBuilder.push(str.substring(from, indexOfLF))
-                } else {
-                  chunkBuilder.push(stringBuilder + str.substring(from, indexOfLF))
-                  stringBuilder = ""
-                }
+                pushLine(str.substring(from, indexOfLF))
                 from = indexOfLF + 1
                 indexOfLF = str.indexOf("\n", from)
               } else {
@@ -5945,46 +6389,59 @@ export const splitLines = <Err, Done>(): Channel<
                   midCRLF = true
                   indexOfCR = -1
                 } else {
-                  if (indexOfLF === indexOfCR + 1) {
-                    if (stringBuilder.length === 0) {
-                      chunkBuilder.push(str.substring(from, indexOfCR))
-                    } else {
-                      stringBuilder = stringBuilder + str.substring(from, indexOfCR)
-                      chunkBuilder.push(stringBuilder)
-                      stringBuilder = ""
-                    }
-                    from = indexOfCR + 2
-                    indexOfCR = str.indexOf("\r", from)
-                    indexOfLF = str.indexOf("\n", from)
-                  } else {
-                    indexOfCR = str.indexOf("\r", indexOfCR + 1)
-                  }
+                  pushLine(str.substring(from, indexOfCR))
+                  from = indexOfCR + (indexOfLF === indexOfCR + 1 ? 2 : 1)
+                  indexOfCR = str.indexOf("\r", from)
+                  indexOfLF = str.indexOf("\n", from)
                 }
               }
             }
-            if (midCRLF) {
-              stringBuilder = stringBuilder + str.substring(from, str.length - 1)
-            } else {
-              stringBuilder = stringBuilder + str.substring(from, str.length)
-            }
+            stringBuilder = stringBuilder + str.substring(from, str.length - (midCRLF ? 1 : 0))
           }
         }
         return Arr.isReadonlyArrayNonEmpty(chunkBuilder) ? chunkBuilder : null
       }
 
-      return Effect.flatMap(
-        upstream,
-        function loop(chunk): Pull.Pull<Arr.NonEmptyReadonlyArray<string>, Err, Done> {
-          const lines = splitLinesArray(chunk)
-          return lines !== null ? Effect.succeed(lines) : Effect.flatMap(upstream, loop)
+      const pullOrFlush: Pull.Pull<Arr.NonEmptyReadonlyArray<string>, Err, Done> = Effect.suspend(() => {
+        if (done._tag === "Some") {
+          return Cause.done(done.value)
         }
-      )
+        return Pull.matchEffect(upstream, {
+          onSuccess: loop,
+          onFailure: Effect.failCause,
+          onDone: (leftover) => {
+            done = Option.some(leftover)
+            if (stringBuilder.length > 0 || midCRLF) {
+              const last = stringBuilder
+              stringBuilder = ""
+              midCRLF = false
+              return Effect.succeed([last] as Arr.NonEmptyReadonlyArray<string>)
+            }
+            return Cause.done(leftover)
+          }
+        })
+      })
+
+      function loop(chunk: Arr.NonEmptyReadonlyArray<string>): Pull.Pull<Arr.NonEmptyReadonlyArray<string>, Err, Done> {
+        const lines = splitLinesArray(chunk)
+        return lines !== null ? Effect.succeed(lines) : pullOrFlush
+      }
+
+      return pullOrFlush
     })
   )
 
 /**
- * @since 4.0.0
+ * Decodes incoming `Uint8Array` chunks into strings using `TextDecoder`.
+ *
+ * **Details**
+ *
+ * Input chunks are decoded with streaming enabled so multi-byte characters may
+ * span `Uint8Array` boundaries. The optional `encoding` and `options` are
+ * passed to `TextDecoder`.
+ *
  * @category String manipulation
+ * @since 4.0.0
  */
 export const decodeText = <Err, Done>(encoding?: string, options?: TextDecoderOptions): Channel<
   Arr.NonEmptyReadonlyArray<string>,
@@ -5997,13 +6454,20 @@ export const decodeText = <Err, Done>(encoding?: string, options?: TextDecoderOp
   fromTransform((upstream, _scope) =>
     Effect.sync(() => {
       const decoder = new TextDecoder(encoding, options)
-      return Effect.map(upstream, Arr.map((line) => decoder.decode(line)))
+      const streamOptions = { stream: true }
+      return Effect.map(upstream, Arr.map((line) => decoder.decode(line, streamOptions)))
     })
   )
 
 /**
- * @since 4.0.0
+ * Encodes incoming string chunks into `Uint8Array` values using `TextEncoder`.
+ *
+ * **Details**
+ *
+ * Each string inside an emitted array is encoded independently.
+ *
  * @category String manipulation
+ * @since 4.0.0
  */
 export const encodeText = <Err, Done>(): Channel<
   Arr.NonEmptyReadonlyArray<Uint8Array>,
@@ -6026,7 +6490,8 @@ export const encodeText = <Err, Done>(): Channel<
  * and the output type of the specified channel, terminating with the value of
  * the specified channel.
  *
- * @example
+ * **Example** (Piping one channel into another)
+ *
  * ```ts
  * import { Channel, Data } from "effect"
  *
@@ -6044,8 +6509,8 @@ export const encodeText = <Err, Done>(): Channel<
  * // Outputs: 2, 4, 6
  * ```
  *
+ * @category sequencing
  * @since 2.0.0
- * @category utils
  */
 export const pipeTo: {
   <OutElem2, OutErr2, OutDone2, OutElem, OutErr, OutDone, Env2>(
@@ -6073,7 +6538,8 @@ export const pipeTo: {
  * specified channel and preserves this channel's failures without providing
  * them to the other channel for observation.
  *
- * @example
+ * **Example** (Piping while preserving failures)
+ *
  * ```ts
  * import { Channel, Data } from "effect"
  *
@@ -6091,8 +6557,8 @@ export const pipeTo: {
  * // Source errors are preserved and not sent to transform channel
  * ```
  *
+ * @category sequencing
  * @since 2.0.0
- * @category utils
  */
 export const pipeToOrFail: {
   <OutElem2, OutErr2, OutDone2, OutElem, OutDone, Env2>(
@@ -6134,7 +6600,8 @@ export const pipeToOrFail: {
  * Constructs a `Channel` from a scoped effect that will result in a
  * `Channel` if successful.
  *
- * @example
+ * **Example** (Unwrapping channel effects)
+ *
  * ```ts
  * import { Channel, Data, Effect } from "effect"
  *
@@ -6153,8 +6620,8 @@ export const pipeToOrFail: {
  * // The resulting channel outputs: 1, 2, 3
  * ```
  *
- * @since 2.0.0
  * @category constructors
+ * @since 2.0.0
  */
 export const unwrap = <OutElem, OutErr, OutDone, InElem, InErr, InDone, R2, E, R>(
   channel: Effect.Effect<Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, R2>, E, R>
@@ -6172,37 +6639,55 @@ export const unwrap = <OutElem, OutErr, OutDone, InElem, InErr, InDone, R2, E, R
   })
 
 /**
+ * Runs a channel with a scope provided for the duration of the channel
+ * execution, removing the channel's `Scope` requirement.
+ *
+ * @category resource management
  * @since 2.0.0
- * @category utils
  */
 export const scoped = <OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>(
   self: Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>
 ): Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Exclude<Env, Scope.Scope>> =>
-  fromTransformBracket((upstream, scope, forkedScope) => Scope.provide(toTransform(self)(upstream, scope), forkedScope))
+  fromTransformBracket((upstream, scope, forkedScope) =>
+    Effect.map(
+      Scope.provide(toTransform(self)(upstream, scope), forkedScope),
+      Scope.provide(forkedScope)
+    )
+  )
 
 /**
- * Returns a new channel which embeds the given input handler into a Channel.
+ * Runs an input handler against the upstream pull while the wrapped channel
+ * runs without receiving upstream input directly.
  *
- * @example
+ * **Details**
+ *
+ * The input handler is forked in the channel scope. The wrapped channel is run
+ * with an already-completed input.
+ *
+ * **Example** (Embedding custom input handling)
+ *
  * ```ts
- * import { Channel, Data, Effect } from "effect"
- *
- * class EmbedError extends Data.TaggedError("EmbedError")<{
- *   readonly stage: string
- * }> {}
+ * import { Channel, Effect } from "effect"
  *
  * // Create a base channel
  * const baseChannel = Channel.fromIterable([1, 2, 3])
  *
- * // Embed input handling - simplified example
+ * // Drain the embedded input while the base channel runs
  * const embeddedChannel = Channel.embedInput(
  *   baseChannel,
- *   (_upstream) => Effect.void
+ *   (upstream) =>
+ *     upstream.pipe(
+ *       Effect.tap((message) =>
+ *         Effect.sync(() => console.log(message))
+ *       ),
+ *       Effect.forever,
+ *       Effect.ignore
+ *     )
  * )
  * ```
  *
+ * @category sequencing
  * @since 2.0.0
- * @category utils
  */
 export const embedInput: {
   <InElem, InErr, InDone, R>(
@@ -6235,11 +6720,29 @@ export const embedInput: {
 )
 
 /**
- * Allows a faster producer to progress independently of a slower consumer by
- * buffering up to `capacity` elements in a queue.
+ * Buffers individual output elements in a queue with the configured `capacity`
+ * so a faster producer can progress independently of a slower consumer.
  *
- * @since 2.0.0
+ * **When to use**
+ *
+ * Use when output elements can be decoupled from downstream demand and the
+ * configured backpressure or loss strategy is acceptable.
+ *
+ * **Details**
+ *
+ * Finite queues use the `strategy` option. The default `"suspend"` strategy
+ * applies backpressure, while `"dropping"` and `"sliding"` can discard output
+ * elements when the queue is full. `"unbounded"` capacity does not use a finite
+ * capacity strategy.
+ *
+ * **Gotchas**
+ *
+ * Dropping and sliding strategies can lose output elements under backpressure.
+ *
+ * @see {@link bufferArray} for buffering elements from array outputs
+ *
  * @category Buffering
+ * @since 2.0.0
  */
 export const buffer: {
   (
@@ -6281,11 +6784,31 @@ export const buffer: {
   })))
 
 /**
- * Allows a faster producer to progress independently of a slower consumer by
- * buffering up to `capacity` elements in a queue.
+ * Buffers array output elements in a queue with the configured `capacity` so a
+ * faster producer can progress independently of a slower consumer.
  *
- * @since 2.0.0
+ * **When to use**
+ *
+ * Use when emitted arrays are batches of elements and it is acceptable for
+ * buffering to flatten and rebuild those batches.
+ *
+ * **Details**
+ *
+ * Finite queues use the `strategy` option. The default `"suspend"` strategy
+ * applies backpressure, while `"dropping"` and `"sliding"` can discard output
+ * elements when the queue is full. `"unbounded"` capacity does not use a finite
+ * capacity strategy.
+ *
+ * **Gotchas**
+ *
+ * Input arrays are offered to the queue element-by-element and outputs are
+ * rebuilt from the currently available queued elements, so upstream array
+ * boundaries are not preserved.
+ *
+ * @see {@link buffer} for buffering output elements without flattening arrays
+ *
  * @category Buffering
+ * @since 4.0.0
  */
 export const bufferArray: {
   (
@@ -6327,16 +6850,21 @@ export const bufferArray: {
   })))
 
 /**
- * Returns a new channel, which is the same as this one, except it will be
- * interrupted when the specified effect completes. If the effect completes
- * successfully before the underlying channel is done, then the returned
- * channel will yield the success value of the effect as its terminal value.
- * On the other hand, if the underlying channel finishes first, then the
- * returned channel will yield the success value of the underlying channel as
- * its terminal value.
+ * Interrupts a channel when another effect completes.
  *
+ * **When to use**
+ *
+ * Use to race channel execution against an external effect whose success can
+ * become the channel's done value.
+ *
+ * **Details**
+ *
+ * If the effect completes first, its success value becomes the returned
+ * channel's done value. If the channel completes first, the original channel's
+ * done value is preserved.
+ *
+ * @category interruption
  * @since 2.0.0
- * @category utils
  */
 export const interruptWhen: {
   <OutDone2, OutErr2, Env2>(
@@ -6359,8 +6887,17 @@ export const interruptWhen: {
   ))
 
 /**
+ * Stops a channel when the specified effect completes or fails.
+ *
+ * **Details**
+ *
+ * If the effect completes before the channel is done, its success value becomes
+ * the returned channel's done value. If the effect fails, the returned channel
+ * fails with that error. If the channel completes first, the channel's done
+ * value is preserved.
+ *
+ * @category interruption
  * @since 4.0.0
- * @category utils
  */
 export const haltWhen: {
   <OutDone2, OutErr2, Env2>(
@@ -6392,8 +6929,15 @@ export const haltWhen: {
   })))
 
 /**
+ * Attaches a finalizer that runs only when the channel exits with failure.
+ *
+ * **Details**
+ *
+ * The finalizer receives the failure `Cause`. The original channel failure is
+ * preserved. The finalizer itself must not fail.
+ *
+ * @category error handling
  * @since 4.0.0
- * @category utils
  */
 export const onError: {
   <OutDone, OutErr, Env2>(
@@ -6412,11 +6956,11 @@ export const onError: {
   onExit(self, (exit) => Exit.isFailure(exit) ? finalizer(exit.cause) : Effect.void))
 
 /**
- * Returns a new channel with an attached finalizer. The finalizer is
- * guaranteed to be executed so long as the channel begins execution (and
- * regardless of whether or not it completes).
+ * Returns a channel with an exit-aware finalizer that is guaranteed to run once
+ * the channel begins execution, whether it succeeds or fails.
  *
- * @example
+ * **Example** (Running exit finalizers)
+ *
  * ```ts
  * import { Channel, Console, Data, Exit } from "effect"
  *
@@ -6437,8 +6981,8 @@ export const onError: {
  * })
  * ```
  *
+ * @category resource management
  * @since 4.0.0
- * @category utils
  */
 export const onExit: {
   <OutDone, OutErr, Env2>(
@@ -6461,8 +7005,15 @@ export const onExit: {
   ))
 
 /**
+ * Runs an effect before the channel starts.
+ *
+ * **Details**
+ *
+ * The effect's successful value is ignored. If the effect fails, the returned
+ * channel fails before running the source channel.
+ *
+ * @category hooks
  * @since 4.0.0
- * @category utils
  */
 export const onStart: {
   <A, E, R>(
@@ -6480,8 +7031,21 @@ export const onStart: {
 ): Channel<OutElem, OutErr | E, OutDone, InElem, InErr, InDone, Env | R> => unwrap(Effect.as(onStart, self)))
 
 /**
+ * Runs an effect the first time the channel emits an output element.
+ *
+ * **When to use**
+ *
+ * Use when initialization depends on the first output element rather than only
+ * on channel startup.
+ *
+ * **Details**
+ *
+ * The effect receives the first emitted element. The first element is still
+ * emitted unchanged. The effect is not run if the channel completes without
+ * emitting an element.
+ *
+ * @category hooks
  * @since 4.0.0
- * @category utils
  */
 export const onFirst: {
   <OutElem, A, E, R>(
@@ -6508,8 +7072,16 @@ export const onFirst: {
     })))
 
 /**
+ * Runs an effect when the channel completes successfully.
+ *
+ * **Details**
+ *
+ * The effect runs before the original done value is propagated. The effect is
+ * not run when the channel fails. If the effect fails, the returned channel
+ * fails with that error.
+ *
+ * @category hooks
  * @since 4.0.0
- * @category utils
  */
 export const onEnd: {
   <A, E, R>(
@@ -6532,11 +7104,11 @@ export const onEnd: {
     ))))
 
 /**
- * Returns a new channel with an attached finalizer. The finalizer is
- * guaranteed to be executed so long as the channel begins execution (and
- * regardless of whether or not it completes).
+ * Returns a channel with a finalizer effect that is guaranteed to run once the
+ * channel begins execution, whether it succeeds or fails.
  *
- * @example
+ * **Example** (Ensuring cleanup runs)
+ *
  * ```ts
  * import { Channel, Console, Data } from "effect"
  *
@@ -6554,8 +7126,8 @@ export const onEnd: {
  * )
  * ```
  *
+ * @category resource management
  * @since 2.0.0
- * @category utils
  */
 export const ensuring: {
   <Env2>(
@@ -6596,66 +7168,68 @@ const runWith = <
   })
 
 /**
- * Create a channel from the specified services.
+ * Creates a channel from the specified services.
  *
+ * @category services
  * @since 2.0.0
- * @category Services
  */
-export const servicesWith = <Env, OutElem, OutErr, OutDone, InElem, InErr, InDone, Env2>(
-  f: (services: ServiceMap.ServiceMap<Env>) => Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Env2>
+export const contextWith = <Env, OutElem, OutErr, OutDone, InElem, InErr, InDone, Env2>(
+  f: (context: Context.Context<Env>) => Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Env2>
 ): Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Env | Env2> =>
   fromTransform((upstream, scope) =>
-    Effect.servicesWith((services: ServiceMap.ServiceMap<Env>) => toTransform(f(services))(upstream, scope))
+    Effect.contextWith((context: Context.Context<Env>) => toTransform(f(context))(upstream, scope))
   )
 
 /**
- * Provides a layer or service map to the channel, removing the corresponding
- * service requirements. Use `options.local` to build the layer every time; by
- * default, layers are shared between provide calls.
+ * Provides a `Context` to the channel, removing the corresponding service
+ * requirements from the returned channel.
  *
- * @since 4.0.0
- * @category Services
+ * @category services
+ * @since 2.0.0
  */
-export const provideServices: {
+export const provideContext: {
   <R2>(
-    services: ServiceMap.ServiceMap<R2>
+    context: Context.Context<R2>
   ): <OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>(
     self: Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>
   ) => Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Exclude<Env, R2>>
   <OutElem, OutErr, OutDone, InElem, InErr, InDone, Env, R2>(
     self: Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>,
-    services: ServiceMap.ServiceMap<R2>
+    context: Context.Context<R2>
   ): Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Exclude<Env, R2>>
 } = dual(2, <OutElem, OutErr, OutDone, InElem, InErr, InDone, Env, R2>(
   self: Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>,
-  services: ServiceMap.ServiceMap<R2>
+  context: Context.Context<R2>
 ): Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Exclude<Env, R2>> =>
   fromTransform((upstream, scope) =>
     Effect.map(
-      Effect.provideServices(toTransform(self)(upstream, scope), services),
-      Effect.provideServices(services)
+      Effect.provideContext(toTransform(self)(upstream, scope), context),
+      Effect.provideContext(context)
     )
   ))
 
 /**
- * @since 4.0.0
- * @category Services
+ * Provides a concrete service for a context key, removing that service
+ * requirement from the returned channel.
+ *
+ * @category services
+ * @since 2.0.0
  */
 export const provideService: {
   <I, S>(
-    key: ServiceMap.Key<I, S>,
+    key: Context.Key<I, S>,
     service: NoInfer<S>
   ): <OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>(
     self: Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>
   ) => Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Exclude<Env, I>>
   <OutElem, OutErr, OutDone, InElem, InErr, InDone, Env, I, S>(
     self: Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>,
-    key: ServiceMap.Key<I, S>,
+    key: Context.Key<I, S>,
     service: NoInfer<S>
   ): Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Exclude<Env, I>>
 } = dual(3, <OutElem, OutErr, OutDone, InElem, InErr, InDone, Env, I, S>(
   self: Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>,
-  key: ServiceMap.Key<I, S>,
+  key: Context.Key<I, S>,
   service: NoInfer<S>
 ): Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Exclude<Env, I>> =>
   fromTransform((upstream, scope) =>
@@ -6666,24 +7240,36 @@ export const provideService: {
   ))
 
 /**
+ * Provides a service to the channel after obtaining it from an effect.
+ *
+ * **When to use**
+ *
+ * Use to supply a channel dependency when constructing the service itself is
+ * effectful or can fail.
+ *
+ * **Details**
+ *
+ * If the service effect fails, the returned channel fails. The provided service
+ * removes the corresponding service requirement from the returned channel.
+ *
+ * @category services
  * @since 4.0.0
- * @category Services
  */
 export const provideServiceEffect: {
   <I, S, ES, RS>(
-    key: ServiceMap.Key<I, S>,
+    key: Context.Key<I, S>,
     service: Effect.Effect<NoInfer<S>, ES, RS>
   ): <OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>(
     self: Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>
   ) => Channel<OutElem, OutErr | ES, OutDone, InElem, InErr, InDone, Exclude<Env, I> | RS>
   <OutElem, OutErr, OutDone, InElem, InErr, InDone, Env, I, S, ES, RS>(
     self: Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>,
-    key: ServiceMap.Key<I, S>,
+    key: Context.Key<I, S>,
     service: Effect.Effect<NoInfer<S>, ES, RS>
   ): Channel<OutElem, OutErr | ES, OutDone, InElem, InErr, InDone, Exclude<Env, I> | RS>
 } = dual(3, <OutElem, OutErr, OutDone, InElem, InErr, InDone, Env, I, S, ES, RS>(
   self: Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>,
-  key: ServiceMap.Key<I, S>,
+  key: Context.Key<I, S>,
   service: Effect.Effect<NoInfer<S>, ES, RS>
 ): Channel<OutElem, OutErr | ES, OutDone, InElem, InErr, InDone, Exclude<Env, I> | RS> =>
   fromTransform((upstream, scope) =>
@@ -6694,12 +7280,21 @@ export const provideServiceEffect: {
   ))
 
 /**
+ * Provides a `Layer` or `Context` to the channel, removing the corresponding
+ * service requirements.
+ *
+ * **Details**
+ *
+ * Providing a `Context` delegates to `provideContext`. Providing a `Layer`
+ * builds the layer in the channel scope. Use `options.local` to build a fresh
+ * layer instance for this provision.
+ *
+ * @category services
  * @since 4.0.0
- * @category Services
  */
 export const provide: {
   <A, E = never, R = never>(
-    layer: Layer.Layer<A, E, R> | ServiceMap.ServiceMap<A>,
+    layer: Layer.Layer<A, E, R> | Context.Context<A>,
     options?: {
       readonly local?: boolean | undefined
     } | undefined
@@ -6708,87 +7303,109 @@ export const provide: {
   ) => Channel<OutElem, OutErr | E, OutDone, InElem, InErr, InDone, Exclude<Env, A> | R>
   <OutElem, OutErr, OutDone, InElem, InErr, InDone, Env, A, E = never, R = never>(
     self: Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>,
-    layer: Layer.Layer<A, E, R> | ServiceMap.ServiceMap<A>,
+    layer: Layer.Layer<A, E, R> | Context.Context<A>,
     options?: {
       readonly local?: boolean | undefined
     } | undefined
   ): Channel<OutElem, OutErr | E, OutDone, InElem, InErr, InDone, Exclude<Env, A> | R>
 } = dual((args) => isChannel(args[0]), <OutElem, OutErr, OutDone, InElem, InErr, InDone, Env, A, E = never, R = never>(
   self: Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>,
-  layer: Layer.Layer<A, E, R> | ServiceMap.ServiceMap<A>,
+  layer: Layer.Layer<A, E, R> | Context.Context<A>,
   options?: {
     readonly local?: boolean | undefined
   } | undefined
 ): Channel<OutElem, OutErr | E, OutDone, InElem, InErr, InDone, Exclude<Env, A> | R> =>
-  ServiceMap.isServiceMap(layer) ? provideServices(self, layer) : fromTransform((upstream, scope) =>
+  Context.isContext(layer) ? provideContext(self, layer) : fromTransform((upstream, scope) =>
     Effect.flatMap(
       options?.local
         ? Layer.buildWithMemoMap(layer, Layer.makeMemoMapUnsafe(), scope)
         : Layer.buildWithScope(layer, scope),
-      (services) =>
+      (context) =>
         Effect.map(
-          Effect.provideServices(toTransform(self)(upstream, scope), services),
-          Effect.provideServices(services)
+          Effect.provideContext(toTransform(self)(upstream, scope), context),
+          Effect.provideContext(context)
         )
     )
   ))
 
 /**
- * @since 2.0.0
- * @category Services
+ * Transforms the current context before running the channel.
+ *
+ * **Details**
+ *
+ * The function receives the surrounding context and returns the context to
+ * provide to the channel. The returned channel requires the services needed to
+ * build that context.
+ *
+ * @category services
+ * @since 4.0.0
  */
-export const updateServices: {
+export const updateContext: {
   <Env, R2>(
-    f: (services: ServiceMap.ServiceMap<R2>) => ServiceMap.ServiceMap<Env>
+    f: (context: Context.Context<R2>) => Context.Context<Env>
   ): <OutElem, OutErr, OutDone, InElem, InErr, InDone>(
     self: Channel<OutElem, InElem, OutErr, InErr, OutDone, InDone, Env>
   ) => Channel<OutElem, InElem, OutErr, InErr, OutDone, InDone, R2>
   <OutElem, OutErr, OutDone, InElem, InErr, InDone, Env, R2>(
     self: Channel<OutElem, InElem, OutErr, InErr, OutDone, InDone, Env>,
-    f: (services: ServiceMap.ServiceMap<R2>) => ServiceMap.ServiceMap<Env>
+    f: (context: Context.Context<R2>) => Context.Context<Env>
   ): Channel<OutElem, InElem, OutErr, InErr, OutDone, InDone, R2>
 } = dual(2, <OutElem, OutErr, OutDone, InElem, InErr, InDone, Env, R2>(
   self: Channel<OutElem, InElem, OutErr, InErr, OutDone, InDone, Env>,
-  f: (services: ServiceMap.ServiceMap<R2>) => ServiceMap.ServiceMap<Env>
+  f: (context: Context.Context<R2>) => Context.Context<Env>
 ): Channel<OutElem, InElem, OutErr, InErr, OutDone, InDone, R2> =>
   fromTransform((upstream, scope) =>
-    Effect.servicesWith((services) => {
-      const toProvide = f(services)
-      return toTransform(provideServices(self, toProvide))(upstream, scope)
+    Effect.contextWith((context) => {
+      const toProvide = f(context)
+      return toTransform(provideContext(self, toProvide))(upstream, scope)
     })
   ))
 
 /**
+ * Updates a service in the current context before running the channel.
+ *
+ * **Details**
+ *
+ * The existing service is read from the context. The updated service is
+ * provided to the channel under the same key.
+ *
+ * @category services
  * @since 2.0.0
- * @category Services
  */
 export const updateService: {
   <I, S>(
-    key: ServiceMap.Key<I, S>,
+    key: Context.Key<I, S>,
     f: (service: NoInfer<S>) => S
   ): <OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>(
     self: Channel<OutElem, InElem, OutErr, InErr, OutDone, InDone, Env>
   ) => Channel<OutElem, InElem, OutErr, InErr, OutDone, InDone, Env | I>
   <OutElem, OutErr, OutDone, InElem, InErr, InDone, Env, I, S>(
     self: Channel<OutElem, InElem, OutErr, InErr, OutDone, InDone, Env>,
-    service: ServiceMap.Key<I, S>,
+    service: Context.Key<I, S>,
     f: (service: NoInfer<S>) => S
   ): Channel<OutElem, InElem, OutErr, InErr, OutDone, InDone, Env | I>
 } = dual(3, <OutElem, OutErr, OutDone, InElem, InErr, InDone, Env, I, S>(
   self: Channel<OutElem, InElem, OutErr, InErr, OutDone, InDone, Env>,
-  service: ServiceMap.Key<I, S>,
+  service: Context.Key<I, S>,
   f: (service: NoInfer<S>) => S
 ): Channel<OutElem, InElem, OutErr, InErr, OutDone, InDone, Env | I> =>
-  updateServices(self, (services) =>
-    ServiceMap.add(
-      services,
+  updateContext(self, (context) =>
+    Context.add(
+      context,
       service,
-      f(ServiceMap.get(services, service))
+      f(Context.get(context, service))
     )))
 
 /**
- * @since 4.0.0
- * @category Tracing
+ * Runs the channel inside a tracing span with the specified name and options.
+ *
+ * **Details**
+ *
+ * The created span is provided as the current parent span while the channel
+ * runs. The span is ended with the channel's exit value.
+ *
+ * @category tracing
+ * @since 2.0.0
  */
 export const withSpan: {
   (
@@ -6830,8 +7447,10 @@ const withSpanImpl = <OutElem, OutErr, OutDone, InElem, InErr, InDone, R>(
   )
 
 /**
+ * The starting channel for Do notation, emitting an empty object.
+ *
+ * @category do notation
  * @since 4.0.0
- * @category Do notation
  */
 export const Do: Channel<{}> = succeed({})
 
@@ -6875,18 +7494,33 @@ const let_: {
   InErr,
   InDone,
   R
-> => map(self, (elem) => ({ ...elem, [name]: f(elem) }) as any))
+> =>
+  map(self, (elem) => (({
+    ...elem,
+    [name]: f(elem)
+  }) as any)))
 export {
   /**
+   * Adds a computed field to each object emitted by a channel.
+   *
+   * @category do notation
    * @since 4.0.0
-   * @category Do notation
    */
   let_ as let
 }
 
 /**
+ * Adds a field to each object emitted by a channel by running another channel
+ * derived from that object.
+ *
+ * **Details**
+ *
+ * The field name must not already exist on the emitted object. The derived
+ * channel's output becomes the value of the new field. `options.concurrency`
+ * and `options.bufferSize` control how derived channels are flattened.
+ *
+ * @category do notation
  * @since 4.0.0
- * @category Do notation
  */
 export const bind: {
   <N extends string, OutElem extends object, B, OutErr2, OutDone2, InElem2, InErr2, InDone2, Env2>(
@@ -6980,8 +7614,19 @@ export const bind: {
   ))
 
 /**
+ * Wraps each output element in an object under the specified field name.
+ *
+ * **When to use**
+ *
+ * Use when you need to start a Channel Do-notation chain from an existing
+ * output value by assigning that value to a field name.
+ *
+ * @see {@link Do} for starting Do notation from an empty object
+ * @see {@link bind} for adding a field produced by another channel
+ * @see {@link let_ let} for adding a computed field
+ *
+ * @category do notation
  * @since 4.0.0
- * @category Do notation
  */
 export const bindTo: {
   <N extends string>(name: N): <OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>(
@@ -7023,7 +7668,8 @@ export const bindTo: {
 /**
  * Runs a channel and counts the number of elements it outputs.
  *
- * @example
+ * **Example** (Counting channel output)
+ *
  * ```ts
  * import { Channel, Data } from "effect"
  *
@@ -7040,8 +7686,8 @@ export const bindTo: {
  * // Effect.runSync(countEffect) // Returns: 5
  * ```
  *
- * @since 2.0.0
  * @category execution
+ * @since 4.0.0
  */
 export const runCount = <OutElem, OutErr, OutDone, Env>(
   self: Channel<OutElem, OutErr, OutDone, unknown, unknown, unknown, Env>
@@ -7050,7 +7696,8 @@ export const runCount = <OutElem, OutErr, OutDone, Env>(
 /**
  * Runs a channel and discards all output elements, returning only the final result.
  *
- * @example
+ * **Example** (Draining channel output at runtime)
+ *
  * ```ts
  * import { Channel, Data } from "effect"
  *
@@ -7071,8 +7718,8 @@ export const runCount = <OutElem, OutErr, OutDone, Env>(
  * // Effect.runSync(drainEffect) // Returns: "completed"
  * ```
  *
- * @since 2.0.0
  * @category execution
+ * @since 2.0.0
  */
 export const runDrain = <OutElem, OutErr, OutDone, Env>(
   self: Channel<OutElem, OutErr, OutDone, unknown, unknown, unknown, Env>
@@ -7081,7 +7728,8 @@ export const runDrain = <OutElem, OutErr, OutDone, Env>(
 /**
  * Runs a channel and applies an effect to each output element.
  *
- * @example
+ * **Example** (Running effects for each output)
+ *
  * ```ts
  * import { Channel, Console, Data } from "effect"
  *
@@ -7101,8 +7749,8 @@ export const runDrain = <OutElem, OutErr, OutDone, Env>(
  * // Logs: "Processing: 1", "Processing: 2", "Processing: 3"
  * ```
  *
- * @since 2.0.0
  * @category execution
+ * @since 4.0.0
  */
 export const runForEach: {
   <OutElem, EX, RX>(
@@ -7124,8 +7772,16 @@ export const runForEach: {
 )
 
 /**
- * @since 2.0.0
+ * Runs a channel and applies an effectful predicate to each output element
+ * until the predicate returns `false`.
+ *
+ * **Details**
+ *
+ * Returning `true` continues consuming the channel. Returning `false` stops
+ * consumption early. The returned effect completes with `void`.
+ *
  * @category execution
+ * @since 4.0.0
  */
 export const runForEachWhile: {
   <OutElem, EX, RX>(
@@ -7154,7 +7810,8 @@ export const runForEachWhile: {
 /**
  * Runs a channel and collects all output elements into an array.
  *
- * @example
+ * **Example** (Collecting channel output)
+ *
  * ```ts
  * import { Channel, Data } from "effect"
  *
@@ -7171,8 +7828,8 @@ export const runForEachWhile: {
  * // Effect.runSync(collectEffect) // Returns: [1, 2, 3, 4, 5]
  * ```
  *
- * @since 2.0.0
  * @category execution
+ * @since 2.0.0
  */
 export const runCollect = <OutElem, OutErr, OutDone, Env>(
   self: Channel<OutElem, OutErr, OutDone, unknown, unknown, unknown, Env>
@@ -7185,16 +7842,24 @@ export const runCollect = <OutElem, OutErr, OutDone, Env>(
 /**
  * Runs a channel and outputs the done value.
  *
- * @since 4.0.0
  * @category execution
+ * @since 4.0.0
  */
 export const runDone = <OutElem, OutErr, OutDone, Env>(
   self: Channel<OutElem, OutErr, OutDone, unknown, unknown, unknown, Env>
 ): Effect.Effect<OutDone, OutErr, Env> => runWith(self, identity_, Effect.succeed)
 
 /**
- * @since 2.0.0
+ * Runs a channel until the first output element is available, returning it in
+ * an `Option`.
+ *
+ * **Details**
+ *
+ * Returns `Option.some` with the first output element, or `Option.none` if the
+ * channel completes without emitting output.
+ *
  * @category execution
+ * @since 4.0.0
  */
 export const runHead = <OutElem, OutErr, OutDone, Env>(
   self: Channel<OutElem, OutErr, OutDone, unknown, unknown, unknown, Env>
@@ -7212,8 +7877,16 @@ export const runHead = <OutElem, OutErr, OutDone, Env>(
   })
 
 /**
- * @since 2.0.0
+ * Runs a channel to completion and returns the last output element in an
+ * `Option`.
+ *
+ * **Details**
+ *
+ * Returns `Option.some` with the last emitted element, or `Option.none` if the
+ * channel completes without emitting output.
+ *
  * @category execution
+ * @since 4.0.0
  */
 export const runLast = <OutElem, OutErr, OutDone, Env>(
   self: Channel<OutElem, OutErr, OutDone, unknown, unknown, unknown, Env>
@@ -7238,7 +7911,8 @@ export const runLast = <OutElem, OutErr, OutDone, Env>(
 /**
  * Runs a channel and folds over all output elements with an accumulator.
  *
- * @example
+ * **Example** (Folding channel output)
+ *
  * ```ts
  * import { Channel, Data } from "effect"
  *
@@ -7255,8 +7929,8 @@ export const runLast = <OutElem, OutErr, OutDone, Env>(
  * // Effect.runSync(sumEffect) // Returns: 15
  * ```
  *
- * @since 2.0.0
  * @category execution
+ * @since 4.0.0
  */
 export const runFold: {
   <Z, OutElem>(
@@ -7292,8 +7966,21 @@ export const runFold: {
   }))
 
 /**
- * @since 2.0.0
+ * Runs a channel and effectfully folds all output elements with an accumulator.
+ *
+ * **When to use**
+ *
+ * Use when folding channel output needs effects, services, or an additional
+ * failure channel during accumulation.
+ *
+ * **Details**
+ *
+ * The initial accumulator is evaluated lazily. Each output element is passed to
+ * the effectful accumulator function. The returned effect succeeds with the
+ * final accumulator value.
+ *
  * @category execution
+ * @since 4.0.0
  */
 export const runFoldEffect: {
   <OutElem, Z, E, R>(
@@ -7332,9 +8019,16 @@ export const runFoldEffect: {
   }))
 
 /**
- * Converts a channel to a Pull data structure for low-level consumption.
+ * Converts a channel to a scoped `Pull` for low-level consumption.
  *
- * @example
+ * **Details**
+ *
+ * The effect requires a `Scope`. The returned pull should be consumed only
+ * while that scope remains open. Pulls are serialized so only one pull is
+ * evaluated at a time.
+ *
+ * **Example** (Converting channels to pulls)
+ *
  * ```ts
  * import { Channel, Data, Effect } from "effect"
  *
@@ -7353,8 +8047,8 @@ export const runFoldEffect: {
  * // Use the Pull to manually consume elements
  * ```
  *
+ * @category destructors
  * @since 2.0.0
- * @category Destructors
  */
 export const toPull: <OutElem, OutErr, OutDone, Env>(
   self: Channel<OutElem, OutErr, OutDone, unknown, unknown, unknown, Env>
@@ -7367,11 +8061,11 @@ export const toPull: <OutElem, OutErr, OutDone, Env>(
     self: Channel<OutElem, OutErr, OutDone, unknown, unknown, unknown, Env>
   ) {
     const semaphore = Semaphore.makeUnsafe(1)
-    const context = yield* Effect.services<Env | Scope.Scope>()
-    const scope = ServiceMap.get(context, Scope.Scope)
+    const context = yield* Effect.context<Env | Scope.Scope>()
+    const scope = Context.get(context, Scope.Scope)
     const pull = yield* toTransform(self)(Cause.done(), scope)
     return pull.pipe(
-      Effect.provideServices(context),
+      Effect.provideContext(context),
       semaphore.withPermits(1)
     )
   },
@@ -7382,7 +8076,8 @@ export const toPull: <OutElem, OutErr, OutDone, Env>(
 /**
  * Converts a channel to a Pull within an existing scope.
  *
- * @example
+ * **Example** (Converting channels to scoped pulls)
+ *
  * ```ts
  * import { Channel, Data, Effect, Scope } from "effect"
  *
@@ -7401,8 +8096,8 @@ export const toPull: <OutElem, OutErr, OutDone, Env>(
  * })
  * ```
  *
+ * @category destructors
  * @since 4.0.0
- * @category Destructors
  */
 export const toPullScoped = <OutElem, OutErr, OutDone, Env>(
   self: Channel<OutElem, OutErr, OutDone, unknown, unknown, unknown, Env>,
@@ -7410,8 +8105,16 @@ export const toPullScoped = <OutElem, OutErr, OutDone, Env>(
 ): Effect.Effect<Pull.Pull<OutElem, OutErr, OutDone, Env>, never, Env> => toTransform(self)(Cause.done(), scope)
 
 /**
+ * Runs a channel and offers each output element into a queue.
+ *
+ * **Details**
+ *
+ * When the channel completes, the queue is ended. When the channel fails, the
+ * queue is failed with the channel's cause. The returned effect itself
+ * completes with `void`.
+ *
+ * @category destructors
  * @since 4.0.0
- * @category Destructors
  */
 export const runIntoQueue: {
   <OutElem, OutErr>(queue: Queue.Queue<OutElem, OutErr | Cause.Done>): <OutDone, Env>(
@@ -7444,8 +8147,17 @@ export const runIntoQueue: {
 )
 
 /**
+ * Runs a channel that emits non-empty arrays and offers each array element into
+ * a queue.
+ *
+ * **Details**
+ *
+ * When the channel completes, the queue is ended. When the channel fails, the
+ * queue is failed with the channel's cause. The returned effect itself
+ * completes with `void`.
+ *
+ * @category destructors
  * @since 4.0.0
- * @category Destructors
  */
 export const runIntoQueueArray: {
   <OutElem, OutErr>(queue: Queue.Queue<OutElem, OutErr | Cause.Done>): <OutDone, Env>(
@@ -7478,9 +8190,17 @@ export const runIntoQueueArray: {
 )
 
 /**
- * Converts a channel to a queue for concurrent consumption.
+ * Creates a scoped queue and forks the channel to feed it for concurrent
+ * consumption.
  *
- * @example
+ * **Details**
+ *
+ * Output elements are offered to the queue. Channel completion and failure are
+ * signaled through the queue. The queue is shut down when the surrounding scope
+ * closes.
+ *
+ * **Example** (Converting channels to queues)
+ *
  * ```ts
  * import { Channel, Data } from "effect"
  *
@@ -7498,8 +8218,8 @@ export const runIntoQueueArray: {
  * // Multiple consumers can read from the queue
  * ```
  *
- * @since 4.0.0
- * @category Destructors
+ * @category destructors
+ * @since 2.0.0
  */
 export const toQueue: {
   (
@@ -7544,8 +8264,16 @@ export const toQueue: {
 )
 
 /**
+ * Creates a scoped queue and forks an array-emitting channel to feed it.
+ *
+ * **Details**
+ *
+ * Each element inside emitted non-empty arrays is offered to the queue. Channel
+ * completion and failure are signaled through the queue. The queue is shut down
+ * when the surrounding scope closes.
+ *
+ * @category destructors
  * @since 4.0.0
- * @category Destructors
  */
 export const toQueueArray: {
   (
@@ -7592,11 +8320,13 @@ export const toQueueArray: {
 /**
  * Converts a channel to a PubSub for concurrent consumption.
  *
+ * **Details**
+ *
  * `shutdownOnEnd` indicates whether the PubSub should be shut down when the
  * channel ends. By default this is `true`.
  *
- * @since 4.0.0
- * @category Destructors
+ * @category destructors
+ * @since 2.0.0
  */
 export const toPubSub: {
   (
@@ -7650,8 +8380,15 @@ export const toPubSub: {
 )
 
 /**
+ * Runs a channel and publishes each output element to a `PubSub`.
+ *
+ * **Details**
+ *
+ * The channel's output values are published as individual PubSub messages. Use
+ * `options.shutdownOnEnd` to shut down the PubSub when channel execution ends.
+ *
+ * @category destructors
  * @since 4.0.0
- * @category Destructors
  */
 export const runIntoPubSub: {
   <OutElem>(
@@ -7705,13 +8442,17 @@ const makePubSub = <A>(
   )
 
 /**
- * Converts a channel to a PubSub for concurrent consumption.
+ * Converts an array-emitting channel to a scoped `PubSub` for concurrent
+ * consumption.
  *
- * `shutdownOnEnd` indicates whether the PubSub should be shut down when the
- * channel ends. By default this is `true`.
+ * **Details**
  *
+ * Each element inside emitted non-empty arrays is published as an individual
+ * PubSub message. `shutdownOnEnd` indicates whether the PubSub should be shut
+ * down when the channel ends. By default this is `true`.
+ *
+ * @category destructors
  * @since 4.0.0
- * @category Destructors
  */
 export const toPubSubArray: {
   (
@@ -7765,8 +8506,17 @@ export const toPubSubArray: {
 )
 
 /**
+ * Runs an array-emitting channel and publishes each array element to a
+ * `PubSub`.
+ *
+ * **Details**
+ *
+ * Each element inside emitted non-empty arrays is published as an individual
+ * PubSub message. Use `options.shutdownOnEnd` to shut down the PubSub when
+ * channel execution ends.
+ *
+ * @category destructors
  * @since 4.0.0
- * @category Destructors
  */
 export const runIntoPubSubArray: {
   <OutElem>(
@@ -7799,10 +8549,16 @@ export const runIntoPubSubArray: {
 )
 
 /**
- * Converts a channel to a PubSub for concurrent consumption.
+ * Converts a channel to a scoped `PubSub` of `Take` values.
  *
+ * **Details**
+ *
+ * Emitted non-empty arrays are published as output `Take` values. When the
+ * channel ends, its final `Exit` is published so subscribers can observe
+ * completion or failure.
+ *
+ * @category destructors
  * @since 4.0.0
- * @category Destructors
  */
 export const toPubSubTake: {
   (

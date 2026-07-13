@@ -1,5 +1,5 @@
 import { assert, describe, expect, it } from "@effect/vitest"
-import { Effect, FileSystem, Layer, Option, Path, ServiceMap, Stdio } from "effect"
+import { Context, Effect, FileSystem, Layer, Option, Path, Stdio } from "effect"
 import { TestConsole } from "effect/testing"
 import { Argument, CliOutput, Command, Flag, GlobalFlag } from "effect/unstable/cli"
 import { toImpl } from "effect/unstable/cli/internal/command"
@@ -50,8 +50,8 @@ describe("Command", () => {
   describe("annotations", () => {
     it.effect("should expose annotations in help docs", () =>
       Effect.gen(function*() {
-        const Team = ServiceMap.Service<never, string>("effect/test/unstable/cli/Team")
-        const Priority = ServiceMap.Service<never, number>("effect/test/unstable/cli/Priority")
+        const Team = Context.Service<never, string>("effect/test/unstable/cli/Team")
+        const Priority = Context.Service<never, number>("effect/test/unstable/cli/Priority")
         const docs: Array<Parameters<CliOutput.Formatter["formatHelpDoc"]>[0]> = []
 
         const formatter: CliOutput.Formatter = {
@@ -64,7 +64,7 @@ describe("Command", () => {
 
         const command = Command.make("deploy").pipe(
           Command.annotate(Team, "runtime"),
-          Command.annotateMerge(ServiceMap.make(Priority, 2))
+          Command.annotateMerge(Context.make(Priority, 2))
         )
 
         yield* Command.runWith(command, { version: "1.0.0" })(["--help"]).pipe(
@@ -74,13 +74,13 @@ describe("Command", () => {
 
         assert.strictEqual(docs.length, 1)
         const annotations = docs[0].annotations
-        assert.strictEqual(ServiceMap.get(annotations, Team), "runtime")
-        assert.strictEqual(ServiceMap.get(annotations, Priority), 2)
+        assert.strictEqual(Context.get(annotations, Team), "runtime")
+        assert.strictEqual(Context.get(annotations, Priority), 2)
       }))
 
     it.effect("should keep annotations when adding subcommands", () =>
       Effect.gen(function*() {
-        const Scope = ServiceMap.Service<never, string>("effect/test/unstable/cli/Scope")
+        const Scope = Context.Service<never, string>("effect/test/unstable/cli/Scope")
         const docs: Array<Parameters<CliOutput.Formatter["formatHelpDoc"]>[0]> = []
 
         const formatter: CliOutput.Formatter = {
@@ -110,8 +110,8 @@ describe("Command", () => {
         )
 
         assert.strictEqual(docs.length, 2)
-        assert.strictEqual(ServiceMap.get(docs[0].annotations, Scope), "root")
-        assert.strictEqual(ServiceMap.get(docs[1].annotations, Scope), "child")
+        assert.strictEqual(Context.get(docs[0].annotations, Scope), "root")
+        assert.strictEqual(Context.get(docs[1].annotations, Scope), "child")
       }))
   })
 
@@ -334,12 +334,38 @@ describe("Command", () => {
         assert.strictEqual(handlerInvocations, 1)
       }).pipe(Effect.provide(TestLayer)))
 
+    it.effect("should reject explicit values for canonical negated global flags", () =>
+      Effect.gen(function*() {
+        let handlerInvoked = false
+        const Verbose = GlobalFlag.setting("verbose")({
+          flag: Flag.boolean("verbose")
+        })
+
+        const command = Command.make("deploy", {}, () =>
+          Effect.sync(() => {
+            handlerInvoked = true
+          })).pipe(
+            Command.withGlobalFlags([Verbose])
+          )
+
+        const runCommand = Command.runWith(command, {
+          version: "1.0.0"
+        })
+
+        yield* runCommand(["--no-verbose", "false"]).pipe(Effect.catchTag("ShowHelp", () => Effect.void))
+
+        assert.isFalse(handlerInvoked)
+
+        const stderr = yield* TestConsole.errorLines
+        assert.isTrue(stderr.join("\n").includes("use --no-verbose by itself to set --verbose to false"))
+      }).pipe(Effect.provide(TestLayer)))
+
     it.effect("should expose setting global flags in Command.provide APIs", () =>
       Effect.gen(function*() {
         const Region = GlobalFlag.setting("region")({
           flag: Flag.string("region").pipe(Flag.optional)
         })
-        const RegionFromProvide = ServiceMap.Service<never, Option.Option<string>>(
+        const RegionFromProvide = Context.Service<never, Option.Option<string>>(
           "effect/test/unstable/cli/RegionFromProvide"
         )
         const capturedFromProvide: Array<Option.Option<string>> = []
@@ -962,7 +988,7 @@ describe("Command", () => {
       Effect.gen(function*() {
         const messages: Array<string> = []
 
-        const DbUrl = ServiceMap.Service<never, string>("effect/test/unstable/cli/DbUrl")
+        const DbUrl = Context.Service<never, string>("effect/test/unstable/cli/DbUrl")
 
         const root = Command.make("app", {
           dryRun: Flag.boolean("dry-run")
@@ -1075,6 +1101,95 @@ describe("Command", () => {
         yield* runCmd(["--verbose", "0"])
 
         assert.deepStrictEqual(captured, [false, false])
+      }).pipe(Effect.provide(TestLayer)))
+
+    it.effect("should support optional boolean flags and --no-<flag> negation", () =>
+      Effect.gen(function*() {
+        const captured: Array<Option.Option<boolean>> = []
+
+        const cmd = Command.make("tool", {
+          open: Flag.boolean("open").pipe(Flag.optional)
+        }, (config) => Effect.sync(() => captured.push(config.open)))
+
+        const runCmd = Command.runWith(cmd, { version: "1.0.0" })
+
+        yield* runCmd([])
+        yield* runCmd(["--open"])
+        yield* runCmd(["--no-open"])
+
+        assert.deepStrictEqual(captured, [
+          Option.none(),
+          Option.some(true),
+          Option.some(false)
+        ])
+      }).pipe(Effect.provide(TestLayer)))
+
+    it.effect("should prefer canonical negation over conflicting aliases", () =>
+      Effect.gen(function*() {
+        const captured: Array<readonly [boolean, boolean]> = []
+
+        const cmd = Command.make("tool", {
+          prompt: Flag.boolean("prompt"),
+          force: Flag.boolean("force").pipe(Flag.withAlias("no-prompt"))
+        }, (config) => Effect.sync(() => captured.push([config.prompt, config.force] as const)))
+
+        const runCmd = Command.runWith(cmd, { version: "1.0.0" })
+
+        yield* runCmd(["--no-prompt"])
+
+        assert.deepStrictEqual(captured, [[false, false]])
+      }).pipe(Effect.provide(TestLayer)))
+
+    it.effect("should reject explicit values for canonical negated flags", () =>
+      Effect.gen(function*() {
+        let invoked = false
+
+        const cmd = Command.make("tool", {
+          open: Flag.boolean("open")
+        }, () =>
+          Effect.sync(() => {
+            invoked = true
+          }))
+
+        const runCmd = Command.runWith(cmd, { version: "1.0.0" })
+
+        yield* runCmd(["--no-open", "false"]).pipe(Effect.catchTag("ShowHelp", () => Effect.void))
+        yield* runCmd(["--no-open=true"]).pipe(Effect.catchTag("ShowHelp", () => Effect.void))
+
+        assert.isFalse(invoked)
+
+        const stderr = yield* TestConsole.errorLines
+        assert.isTrue(stderr.join("\n").includes("use --no-open by itself to set --open to false"))
+      }).pipe(Effect.provide(TestLayer)))
+
+    it.effect("should not leak a negated flag literal into subcommand parsing", () =>
+      Effect.gen(function*() {
+        let parentInvoked = false
+        let childInvoked = false
+
+        const child = Command.make("child", {}, () =>
+          Effect.sync(() => {
+            childInvoked = true
+          }))
+
+        const root = Command.make("tool", {
+          open: Flag.boolean("open")
+        }, () =>
+          Effect.sync(() => {
+            parentInvoked = true
+          })).pipe(Command.withSubcommands([child]))
+
+        const runCmd = Command.runWith(root, { version: "1.0.0" })
+
+        yield* runCmd(["--no-open", "false", "child"]).pipe(Effect.catchTag("ShowHelp", () => Effect.void))
+
+        assert.isFalse(parentInvoked)
+        assert.isFalse(childInvoked)
+
+        const stderr = yield* TestConsole.errorLines
+        const output = stderr.join("\n")
+        assert.isTrue(output.includes("use --no-open by itself to set --open to false"))
+        assert.isFalse(output.includes("Unknown subcommand \"false\""))
       }).pipe(Effect.provide(TestLayer)))
 
     it.effect("should fail when a required flag value is missing", () =>
@@ -1305,6 +1420,233 @@ describe("Command", () => {
         // Subcommand should NOT have run
         const actions = yield* TestActions.getActions
         assert.strictEqual(actions.length, 0)
+      }).pipe(Effect.provide(TestLayer)))
+
+    it.effect("should let global flags before subcommands override non-shared parent locals", () =>
+      Effect.gen(function*() {
+        const captured: Array<boolean> = []
+        let childInvoked = false
+        const child = Command.make("child", {}, () =>
+          Effect.sync(() => {
+            childInvoked = true
+          }))
+        const command = Command.make("tool", {
+          version: Flag.boolean("version")
+        }, (config) =>
+          Effect.sync(() => {
+            captured.push(config.version)
+          })).pipe(Command.withSubcommands([child]))
+
+        const runCommand = Command.runWith(command, { version: "1.0.0" })
+        yield* runCommand(["--version", "child"])
+
+        assert.deepStrictEqual(captured, [])
+        assert.isFalse(childInvoked)
+
+        const output = yield* TestConsole.logLines
+        assert.isTrue(output.some((line) => String(line).includes("1.0.0")))
+      }).pipe(Effect.provide(TestLayer)))
+
+    it.effect("should keep shared flags before subcommands over globals", () =>
+      Effect.gen(function*() {
+        const captured: Array<boolean> = []
+        const root = Command.make("tool", {}, () => Effect.void).pipe(
+          Command.withSharedFlags({
+            version: Flag.boolean("version")
+          })
+        )
+        const child = Command.make("child", {}, () =>
+          Effect.gen(function*() {
+            const parent = yield* root
+            captured.push(parent.version)
+          }))
+        const command = root.pipe(Command.withSubcommands([child]))
+
+        const runCommand = Command.runWith(command, { version: "1.0.0" })
+        yield* runCommand(["--version", "child"])
+
+        assert.deepStrictEqual(captured, [true])
+
+        const output = yield* TestConsole.logLines
+        assert.isFalse(output.some((line) => String(line).includes("1.0.0")))
+
+        yield* runCommand(["child", "--version"])
+
+        assert.deepStrictEqual(captured, [true, true])
+      }).pipe(Effect.provide(TestLayer)))
+
+    it.effect("should keep root local flags over globals when no subcommand is selected", () =>
+      Effect.gen(function*() {
+        const captured: Array<string> = []
+        const child = Command.make("child", {}, () => Effect.void)
+        const command = Command.make("tool", {
+          version: Flag.string("version")
+        }, (config) =>
+          Effect.sync(() => {
+            captured.push(config.version)
+          })).pipe(Command.withSubcommands([child]))
+
+        const runCommand = Command.runWith(command, { version: "1.0.0" })
+        yield* runCommand(["--version", "canary"])
+
+        assert.deepStrictEqual(captured, ["canary"])
+
+        const output = yield* TestConsole.logLines
+        assert.isFalse(output.some((line) => String(line).includes("1.0.0")))
+      }).pipe(Effect.provide(TestLayer)))
+
+    it.effect("should skip intervening local flag values before selecting subcommands", () =>
+      Effect.gen(function*() {
+        const captured: Array<{ name: string; version: boolean }> = []
+        let childInvoked = false
+        const child = Command.make("child", {}, () =>
+          Effect.sync(() => {
+            childInvoked = true
+          }))
+        const command = Command.make("tool", {
+          name: Flag.string("name"),
+          version: Flag.boolean("version")
+        }, (config) =>
+          Effect.sync(() => {
+            captured.push(config)
+          })).pipe(Command.withSubcommands([child]))
+
+        const runCommand = Command.runWith(command, { version: "1.0.0" })
+        yield* runCommand(["--version", "--name", "child"])
+
+        assert.deepStrictEqual(captured, [{ name: "child", version: true }])
+        assert.isFalse(childInvoked)
+
+        const output = yield* TestConsole.logLines
+        assert.isFalse(output.some((line) => String(line).includes("1.0.0")))
+      }).pipe(Effect.provide(TestLayer)))
+
+    it.effect("should stop looking for subcommands after the first positional argument", () =>
+      Effect.gen(function*() {
+        const captured: Array<{ files: ReadonlyArray<string>; version: boolean }> = []
+        let childInvoked = false
+        const child = Command.make("child", {}, () =>
+          Effect.sync(() => {
+            childInvoked = true
+          }))
+        const command = Command.make("tool", {
+          files: Argument.string("file").pipe(Argument.variadic()),
+          version: Flag.boolean("version")
+        }, (config) =>
+          Effect.sync(() => {
+            captured.push(config)
+          })).pipe(Command.withSubcommands([child]))
+
+        const runCommand = Command.runWith(command, { version: "1.0.0" })
+        yield* runCommand(["--version", "file", "child"])
+
+        assert.deepStrictEqual(captured, [{ files: ["file", "child"], version: true }])
+        assert.isFalse(childInvoked)
+
+        const output = yield* TestConsole.logLines
+        assert.isFalse(output.some((line) => String(line).includes("1.0.0")))
+      }).pipe(Effect.provide(TestLayer)))
+
+    it.effect("should still select subcommands after skipped flag values", () =>
+      Effect.gen(function*() {
+        const captured: Array<{ name: string; version: boolean }> = []
+        let childInvoked = false
+        const child = Command.make("child", {}, () =>
+          Effect.sync(() => {
+            childInvoked = true
+          }))
+        const command = Command.make("tool", {
+          name: Flag.string("name"),
+          version: Flag.boolean("version")
+        }, (config) =>
+          Effect.sync(() => {
+            captured.push(config)
+          })).pipe(Command.withSubcommands([child]))
+
+        const runCommand = Command.runWith(command, { version: "1.0.0" })
+        yield* runCommand(["--version", "--name", "value", "child"])
+
+        assert.deepStrictEqual(captured, [])
+        assert.isFalse(childInvoked)
+
+        const output = yield* TestConsole.logLines
+        assert.isTrue(output.some((line) => String(line).includes("1.0.0")))
+      }).pipe(Effect.provide(TestLayer)))
+
+    it.effect("should let local flags override global flags on the selected command", () =>
+      Effect.gen(function*() {
+        const captured: Array<string> = []
+        const release = Command.make("release", {
+          version: Flag.string("version")
+        }, (config) =>
+          Effect.sync(() => {
+            captured.push(config.version)
+          }))
+        const packageCommand = Command.make("package").pipe(Command.withSubcommands([release]))
+        const command = Command.make("tool").pipe(Command.withSubcommands([packageCommand]))
+
+        const runCommand = Command.runWith(command, { version: "1.0.0" })
+        yield* runCommand(["package", "release", "--version", "canary"])
+
+        assert.deepStrictEqual(captured, ["canary"])
+
+        const output = yield* TestConsole.logLines
+        assert.isFalse(output.some((line) => String(line).includes("1.0.0")))
+      }).pipe(Effect.provide(TestLayer)))
+
+    it.effect("should let local short aliases override global short aliases on the selected command", () =>
+      Effect.gen(function*() {
+        const Output = GlobalFlag.setting("output")({
+          flag: Flag.choice("output", ["pretty", "json", "yaml"] as const).pipe(
+            Flag.withAlias("o"),
+            Flag.withDefault("pretty")
+          )
+        })
+        const captured: Array<"summary" | "json" | "csv"> = []
+        const report = Command.make("report", {
+          output: Flag.choice("output", ["summary", "json", "csv"] as const).pipe(
+            Flag.withAlias("o"),
+            Flag.withDefault("summary")
+          )
+        }, (config) =>
+          Effect.sync(() => {
+            captured.push(config.output)
+          }))
+        const command = Command.make("tool").pipe(
+          Command.withSubcommands([report]),
+          Command.withGlobalFlags([Output])
+        )
+
+        const runCommand = Command.runWith(command, { version: "1.0.0" })
+        yield* runCommand(["report", "-o", "csv"])
+
+        assert.deepStrictEqual(captured, ["csv"])
+      }).pipe(Effect.provide(TestLayer)))
+
+    it.effect("should let local flags override scoped global flags from another command branch", () =>
+      Effect.gen(function*() {
+        const Region = GlobalFlag.setting("region")({
+          flag: Flag.choice("region", ["us", "eu"] as const).pipe(Flag.withDefault("us"))
+        })
+        const captured: Array<string> = []
+        let deployInvoked = false
+        const deploy = Command.make("deploy", {}, () =>
+          Effect.sync(() => {
+            deployInvoked = true
+          })).pipe(Command.withGlobalFlags([Region]))
+        const status = Command.make("status", {
+          region: Flag.string("region")
+        }, (config) =>
+          Effect.sync(() => {
+            captured.push(config.region)
+          }))
+        const command = Command.make("app").pipe(Command.withSubcommands([deploy, status]))
+
+        const runCommand = Command.runWith(command, { version: "1.0.0" })
+        yield* runCommand(["status", "--region", "local"])
+
+        assert.deepStrictEqual(captured, ["local"])
+        assert.isFalse(deployInvoked)
       }).pipe(Effect.provide(TestLayer)))
 
     it.effect("should print help when invoked with no arguments", () =>

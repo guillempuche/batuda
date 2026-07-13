@@ -1,17 +1,24 @@
 /**
+ * Low-level SQL statement and fragment primitives.
+ *
+ * `SqlClient` uses this module to build executable, parameterized SQL from
+ * reusable fragments. A statement can be executed, streamed, run without row
+ * transformation, or compiled to SQL text and parameters for a specific
+ * dialect. The module also contains helpers for identifiers, parameters,
+ * inserts, updates, custom dialect fragments, statement compilation, and row
+ * transformation.
+ *
  * @since 4.0.0
  */
 import { Clock } from "../../Clock.ts"
+import * as Context from "../../Context.ts"
 import * as Effect from "../../Effect.ts"
+import * as Effectable from "../../Effectable.ts"
 import type * as Fiber from "../../Fiber.ts"
 import { constUndefined } from "../../Function.ts"
-import type { Inspectable } from "../../Inspectable.ts"
-import * as core from "../../internal/core.ts"
 import * as internalEffect from "../../internal/effect.ts"
-import type { Pipeable } from "../../Pipeable.ts"
 import { hasProperty } from "../../Predicate.ts"
 import { TracerTimingEnabled } from "../../References.ts"
-import * as ServiceMap from "../../ServiceMap.ts"
 import * as Stream from "../../Stream.ts"
 import type * as Tracer from "../../Tracer.ts"
 import type { Acquirer, Connection, Row } from "./SqlConnection.ts"
@@ -20,7 +27,10 @@ import type { SqlError } from "./SqlError.ts"
 const FragmentTypeId = "~effect/sql/Fragment"
 
 /**
- * @category model
+ * Composable SQL fragment represented as low-level segments that can be
+ * interpolated into statements.
+ *
+ * @category models
  * @since 4.0.0
  */
 export interface Fragment {
@@ -29,6 +39,8 @@ export interface Fragment {
 }
 
 /**
+ * Constructs a SQL `Fragment` from low-level statement segments.
+ *
  * @category constructors
  * @since 4.0.0
  */
@@ -40,20 +52,27 @@ export const fragment = (
 })
 
 /**
- * @category model
+ * Supported SQL dialect identifiers used by statement compilers.
+ *
+ * @category models
  * @since 4.0.0
  */
 export type Dialect = "sqlite" | "pg" | "mysql" | "mssql" | "clickhouse"
 
 /**
- * @category model
+ * Executable SQL statement that is also a `Fragment` and `Effect`, with helpers
+ * for raw execution, streaming, value rows, unprepared execution, no-transform
+ * execution, and compilation.
+ *
+ * @category models
  * @since 4.0.0
  */
-export interface Statement<A> extends Fragment, Effect.Effect<ReadonlyArray<A>, SqlError>, Pipeable, Inspectable {
+export interface Statement<A> extends Fragment, Effect.Effect<ReadonlyArray<A>, SqlError> {
   readonly raw: Effect.Effect<unknown, SqlError>
   readonly withoutTransform: Effect.Effect<ReadonlyArray<A>, SqlError>
   readonly stream: Stream.Stream<A, SqlError>
   readonly values: Effect.Effect<ReadonlyArray<ReadonlyArray<unknown>>, SqlError>
+  readonly valuesUnprepared: Effect.Effect<ReadonlyArray<ReadonlyArray<unknown>>, SqlError>
   readonly unprepared: Effect.Effect<ReadonlyArray<A>, SqlError>
   readonly compile: (withoutTransform?: boolean | undefined) => readonly [
     sql: string,
@@ -62,7 +81,10 @@ export interface Statement<A> extends Fragment, Effect.Effect<ReadonlyArray<A>, 
 }
 
 /**
- * @category model
+ * Hook that can rewrite or wrap a `Statement` before execution, using the
+ * current SQL constructor, fiber, and tracing span.
+ *
+ * @category models
  * @since 4.0.0
  */
 export type Transformer = (
@@ -73,21 +95,28 @@ export type Transformer = (
 ) => Effect.Effect<Statement<unknown>>
 
 /**
+ * Context reference for an optional current SQL statement transformer applied
+ * before statement execution.
+ *
  * @category transformer
  * @since 4.0.0
  */
-export const CurrentTransformer = ServiceMap.Reference<Transformer | undefined>("effect/sql/CurrentTransformer", {
+export const CurrentTransformer = Context.Reference<Transformer | undefined>("effect/sql/CurrentTransformer", {
   defaultValue: constUndefined
 })
 
 /**
- * @category guard
+ * Returns `true` when a value is a SQL `Fragment`.
+ *
+ * @category guards
  * @since 4.0.0
  */
 export const isFragment = (u: unknown): u is Fragment => hasProperty(u, FragmentTypeId)
 
 /**
- * @category guard
+ * Creates a type guard for custom SQL segments with the specified custom kind.
+ *
+ * @category guards
  * @since 4.0.0
  */
 export const isCustom = <A extends Custom<any, any, any, any>>(
@@ -96,7 +125,9 @@ export const isCustom = <A extends Custom<any, any, any, any>>(
 (u: unknown): u is A => hasProperty(u, "_tag") && u._tag === "Custom" && (u as any).kind === kind
 
 /**
- * @category model
+ * Union of low-level segment types that make up a SQL `Fragment`.
+ *
+ * @category models
  * @since 4.0.0
  */
 export type Segment =
@@ -110,7 +141,10 @@ export type Segment =
   | Custom<any, any, any, any>
 
 /**
- * @category model
+ * Raw SQL literal segment. The literal text is inserted directly into the
+ * compiled SQL, while optional `params` are appended as bind parameters.
+ *
+ * @category models
  * @since 4.0.0
  */
 export interface Literal {
@@ -120,6 +154,9 @@ export interface Literal {
 }
 
 /**
+ * Constructs a raw SQL literal segment. The literal text is not escaped, so use
+ * bound parameters for untrusted values.
+ *
  * @category constructors
  * @since 4.0.0
  */
@@ -130,7 +167,9 @@ export const literal = (value: string, params?: ReadonlyArray<unknown> | undefin
 })
 
 /**
- * @category model
+ * SQL identifier segment whose value is escaped by the active dialect compiler.
+ *
+ * @category models
  * @since 4.0.0
  */
 export interface Identifier {
@@ -139,6 +178,9 @@ export interface Identifier {
 }
 
 /**
+ * Constructs a SQL identifier segment that will be escaped by the active
+ * compiler.
+ *
  * @category constructors
  * @since 4.0.0
  */
@@ -148,7 +190,10 @@ export const identifier = (value: string): Identifier => ({
 })
 
 /**
- * @category model
+ * Bound parameter segment whose value is emitted as a dialect-specific
+ * placeholder and bind value.
+ *
+ * @category models
  * @since 4.0.0
  */
 export interface Parameter {
@@ -157,6 +202,8 @@ export interface Parameter {
 }
 
 /**
+ * Constructs a bound parameter segment for a statement value.
+ *
  * @category constructors
  * @since 4.0.0
  */
@@ -166,7 +213,10 @@ export const parameter = (value: unknown): Parameter => ({
 })
 
 /**
- * @category model
+ * Helper segment for compiling an array of values, commonly used to produce
+ * placeholder lists for `IN` clauses.
+ *
+ * @category models
  * @since 4.0.0
  */
 export interface ArrayHelper {
@@ -175,6 +225,8 @@ export interface ArrayHelper {
 }
 
 /**
+ * Constructs an `ArrayHelper` segment for an array of values or fragments.
+ *
  * @category constructors
  * @since 4.0.0
  */
@@ -184,7 +236,10 @@ export const arrayHelper = (value: ReadonlyArray<unknown | Fragment>): ArrayHelp
 })
 
 /**
- * @category model
+ * Helper segment for compiling one or more record objects into an INSERT
+ * column/value clause, with optional returning output.
+ *
+ * @category models
  * @since 4.0.0
  */
 export interface RecordInsertHelper {
@@ -207,6 +262,8 @@ const RecordInsertHelperProto = {
 }
 
 /**
+ * Constructs a `RecordInsertHelper` from one or more row objects.
+ *
  * @category constructors
  * @since 4.0.0
  */
@@ -219,7 +276,10 @@ export const recordInsertHelper = (
   })
 
 /**
- * @category model
+ * Helper segment for compiling multi-row update values with a table alias and
+ * optional returning output.
+ *
+ * @category models
  * @since 4.0.0
  */
 export interface RecordUpdateHelper {
@@ -237,6 +297,9 @@ const RecordUpdateHelperProto = {
 }
 
 /**
+ * Constructs a `RecordUpdateHelper` for multi-row update compilation using the
+ * provided alias.
+ *
  * @category constructors
  * @since 4.0.0
  */
@@ -251,7 +314,10 @@ export const recordUpdateHelper = (
   })
 
 /**
- * @category model
+ * Helper segment for compiling a single record into update assignments,
+ * omitting selected columns and optionally returning output.
+ *
+ * @category models
  * @since 4.0.0
  */
 export interface RecordUpdateHelperSingle {
@@ -269,6 +335,9 @@ const RecordUpdateHelperSingleProto = {
 }
 
 /**
+ * Constructs a `RecordUpdateHelperSingle` from a record and a list of columns
+ * to omit from the update.
+ *
  * @category constructors
  * @since 4.0.0
  */
@@ -283,7 +352,10 @@ export const recordUpdateHelperSingle = (
   })
 
 /**
- * @category model
+ * Custom SQL segment identified by `kind` and interpreted by the compiler's
+ * `onCustom` callback.
+ *
+ * @category models
  * @since 4.0.0
  */
 export interface Custom<
@@ -300,7 +372,10 @@ export interface Custom<
 }
 
 /**
- * @category constructor
+ * Creates a constructor for custom SQL segments of a specific kind handled by
+ * the active compiler.
+ *
+ * @category constructors
  * @since 4.0.0
  */
 export const custom = <C extends Custom<any, any, any, any>>(
@@ -313,7 +388,10 @@ export const custom = <C extends Custom<any, any, any, any>>(
 ): C => ({ _tag: "Custom", kind, paramA, paramB, paramC } as C)
 
 /**
- * @category model
+ * Names the primitive value categories recognized by SQL statement helpers and
+ * `primitiveKind`.
+ *
+ * @category models
  * @since 4.0.0
  */
 export type PrimitiveKind =
@@ -327,7 +405,9 @@ export type PrimitiveKind =
   | "Uint8Array"
 
 /**
- * @category model
+ * Union of helper segment types accepted by the SQL statement constructor.
+ *
+ * @category models
  * @since 4.0.0
  */
 export type Helper =
@@ -339,7 +419,12 @@ export type Helper =
   | Custom
 
 /**
- * @category model
+ * SQL tagged-template constructor and helper API for building parameterized
+ * statements, escaped identifiers, fragments, record helpers, and
+ * dialect-specific branches. Raw helpers such as `unsafe` and `literal` insert
+ * SQL text directly.
+ *
+ * @category models
  * @since 4.0.0
  */
 export interface Constructor {
@@ -379,9 +464,11 @@ export interface Constructor {
   ) => RecordUpdateHelperSingle
 
   /**
-   * Update multiple rows
+   * Update multiple rows.
    *
-   * **Note:** Not supported in sqlite
+   * **Gotchas**
+   *
+   * Not supported in sqlite.
    */
   readonly updateValues: (
     value: ReadonlyArray<Record<string, unknown>>,
@@ -399,9 +486,11 @@ export interface Constructor {
   readonly or: (clauses: ReadonlyArray<string | Fragment>) => Fragment
 
   /**
-   * Create comma seperated values, with an optional prefix
+   * Create comma seperated values, with an optional prefix.
    *
-   * Useful for `ORDER BY` and `GROUP BY` clauses
+   * **When to use**
+   *
+   * Use when `ORDER BY` and `GROUP BY` clauses.
    */
   readonly csv: {
     (values: ReadonlyArray<string | Fragment>): Fragment
@@ -433,7 +522,10 @@ export interface Constructor {
 }
 
 /**
- * @category constructor
+ * Creates a cached SQL statement constructor from a connection acquirer,
+ * compiler, tracing attributes, and optional row transformation function.
+ *
+ * @category constructors
  * @since 4.0.0
  */
 export const make = (
@@ -515,6 +607,10 @@ const constructorCache = {
 }
 
 /**
+ * Builds a `Statement` from template strings and arguments, preserving
+ * fragments and helper segments while converting ordinary interpolated values
+ * into bound parameters.
+ *
  * @category constructors
  * @since 4.0.0
  */
@@ -548,7 +644,11 @@ export const statement = <A = Row>(
 }
 
 /**
- * @category constructor
+ * Creates a helper that joins SQL clauses with a literal separator, optionally
+ * wrapping multiple clauses in parentheses and using a fallback for an empty
+ * list.
+ *
+ * @category constructors
  * @since 4.0.0
  */
 export function join(lit: string, addParens = true, fallback = "") {
@@ -584,19 +684,28 @@ export function join(lit: string, addParens = true, fallback = "") {
 }
 
 /**
- * @category constructor
+ * Combines clauses with `AND`, parenthesizing multiple clauses and returning
+ * `1=1` when the list is empty.
+ *
+ * @category constructors
  * @since 4.0.0
  */
 export const and: (clauses: ReadonlyArray<string | Fragment>) => Fragment = join(" AND ", true, "1=1")
 
 /**
- * @category constructor
+ * Combines clauses with `OR`, parenthesizing multiple clauses and returning
+ * `1=1` when the list is empty.
+ *
+ * @category constructors
  * @since 4.0.0
  */
 export const or: (clauses: ReadonlyArray<string | Fragment>) => Fragment = join(" OR ", true, "1=1")
 
 /**
- * @category constructor
+ * Creates a comma-separated SQL fragment from values, optionally adding a
+ * prefix, and returns an empty fragment when no values are provided.
+ *
+ * @category constructors
  * @since 4.0.0
  */
 export const csv: {
@@ -625,6 +734,9 @@ const csvRaw = join(",", false)
 const emptyFragment = fragment([literal("")])
 
 /**
+ * Dialect-specific compiler that converts a SQL `Fragment` into SQL text and
+ * bind parameters, with a no-transform variant.
+ *
  * @category compiler
  * @since 4.0.0
  */
@@ -638,6 +750,9 @@ export interface Compiler {
 }
 
 /**
+ * Callbacks used by `makeCompiler` to render dialect placeholders,
+ * identifiers, insert helpers, update helpers, and custom SQL segments.
+ *
  * @category compiler
  * @since 4.0.0
  */
@@ -671,6 +786,8 @@ export type CompilerOptions<C extends Custom<any, any, any, any> = any> = {
 }
 
 /**
+ * Creates a dialect-specific SQL `Compiler` from rendering callbacks.
+ *
  * @category compiler
  * @since 4.0.0
  */
@@ -928,6 +1045,9 @@ const CompilerProto = {
 }
 
 /**
+ * Creates a SQLite compiler that uses `?` placeholders and quoted identifiers,
+ * optionally transforming identifier names before escaping.
+ *
  * @category compiler
  * @since 4.0.0
  */
@@ -951,6 +1071,11 @@ export const makeCompilerSqlite = (transform?: ((_: string) => string) | undefin
   })
 
 /**
+ * Creates an identifier escaping function that wraps names in the given
+ * delimiter, doubles delimiter characters, and escapes dots between identifier
+ * parts.
+ *
+ * @category constructors
  * @since 4.0.0
  */
 export function defaultEscape(c: string) {
@@ -963,6 +1088,10 @@ export function defaultEscape(c: string) {
 }
 
 /**
+ * Classifies a JavaScript value as a SQL primitive kind, treating `undefined`
+ * as `null` and defaulting unrecognized objects to `string`.
+ *
+ * @category predicates
  * @since 4.0.0
  */
 export const primitiveKind = (value: unknown): PrimitiveKind => {
@@ -993,6 +1122,10 @@ export const primitiveKind = (value: unknown): PrimitiveKind => {
 }
 
 /**
+ * Builds value, object, and row-array transformers that rename object keys with
+ * the supplied function and optionally recurse into nested object arrays.
+ *
+ * @category transforming
  * @since 4.0.0
  */
 export const defaultTransforms = (
@@ -1120,8 +1253,23 @@ const StatementProto: Omit<
   StatementImpl<any>,
   "segments" | "acquirer" | "compiler" | "spanAttributes" | "transformRows"
 > = {
-  ...core.EffectProto,
-  [core.identifier as any]: "Statement",
+  ...Effectable.Prototype<StatementImpl<any>>({
+    label: "Statement",
+    evaluate(fiber) {
+      const span = internalEffect.makeSpanUnsafe(fiber, "sql.execute", { kind: "client" })
+      const clock = fiber.getRef(Clock)
+      const timingEnabled = fiber.getRef(TracerTimingEnabled)
+      return Effect.onExit(
+        this.withConnectionSpan(
+          "execute",
+          (connection, sql, params) => connection.execute(sql, params, this.transformRows),
+          false,
+          span
+        ),
+        (exit) => internalEffect.endSpan(span, exit, clock, timingEnabled)
+      )
+    }
+  }),
   [FragmentTypeId]: FragmentTypeId,
   withConnection<XA, E>(
     this: StatementImpl<any>,
@@ -1207,6 +1355,16 @@ const StatementProto: Omit<
     return this.withConnection("executeValues", (connection, sql, params) => connection.executeValues(sql, params))
   },
 
+  get valuesUnprepared(): Effect.Effect<
+    ReadonlyArray<ReadonlyArray<unknown>>,
+    SqlError
+  > {
+    return this.withConnection(
+      "executeValuesUnprepared",
+      (connection, sql, params) => connection.executeValuesUnprepared(sql, params)
+    )
+  },
+
   get unprepared(): Effect.Effect<ReadonlyArray<any>, SqlError> {
     const self = this as StatementImpl<any>
     return self.withConnection(
@@ -1220,23 +1378,6 @@ const StatementProto: Omit<
     withoutTransform?: boolean | undefined
   ) {
     return this.compiler.compile(this, withoutTransform ?? false)
-  },
-  [core.evaluate as any](
-    this: StatementImpl<any>,
-    fiber: Fiber.Fiber<any, any>
-  ): Effect.Effect<ReadonlyArray<any>, SqlError> {
-    const span = internalEffect.makeSpanUnsafe(fiber, "sql.execute", { kind: "client" })
-    const clock = fiber.getRef(Clock)
-    const timingEnabled = fiber.getRef(TracerTimingEnabled)
-    return Effect.onExit(
-      this.withConnectionSpan(
-        "execute",
-        (connection, sql, params) => connection.execute(sql, params, this.transformRows),
-        false,
-        span
-      ),
-      (exit) => internalEffect.endSpan(span, exit, clock, timingEnabled)
-    )
   },
   toJSON(this: StatementImpl<any>) {
     const [sql, params] = this.compile()

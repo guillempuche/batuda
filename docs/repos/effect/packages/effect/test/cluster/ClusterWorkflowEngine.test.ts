@@ -1,7 +1,8 @@
 import { assert, describe, expect, it } from "@effect/vitest"
-import { Cause, DateTime, Duration, Effect, Exit, Fiber, Layer, Option, Schema, ServiceMap } from "effect"
+import { Cause, Context, DateTime, Duration, Effect, Exit, Fiber, Layer, Option, Result, Schema } from "effect"
 import { TestClock } from "effect/testing"
 import {
+  ClusterSchema,
   ClusterWorkflowEngine,
   MessageStorage,
   RunnerHealth,
@@ -11,10 +12,10 @@ import {
   ShardingConfig
 } from "effect/unstable/cluster"
 import { Activity, DurableClock, DurableDeferred, Workflow } from "effect/unstable/workflow"
-import { WorkflowInstance } from "effect/unstable/workflow/WorkflowEngine"
+import { WorkflowEngine, WorkflowInstance } from "effect/unstable/workflow/WorkflowEngine"
 
 describe.concurrent("ClusterWorkflowEngine", () => {
-  it.effect("should run a workflow", () =>
+  it.effect("executes, resumes, deduplicates, and polls a suspended workflow", () =>
     Effect.gen(function*() {
       const sharding = yield* Sharding.Sharding
       const driver = yield* MessageStorage.MemoryDriver
@@ -83,7 +84,7 @@ describe.concurrent("ClusterWorkflowEngine", () => {
       expect(yield* EmailWorkflow.poll(executionId)).toEqual(Option.some(new Workflow.Complete({ exit: Exit.void })))
     }).pipe(Effect.provide(TestWorkflowLayer)))
 
-  it.effect("interrupt", () =>
+  it.effect("interrupts a suspended workflow and runs compensation", () =>
     Effect.gen(function*() {
       const sharding = yield* Sharding.Sharding
       const driver = yield* MessageStorage.MemoryDriver
@@ -134,7 +135,7 @@ describe.concurrent("ClusterWorkflowEngine", () => {
       Effect.provide(TestWorkflowLayer)
     ))
 
-  it.effect("Workflow.withCompensation", () =>
+  it.effect("Workflow.withCompensation runs compensation when the workflow fails", () =>
     Effect.gen(function*() {
       yield* TestClock.adjust(1)
 
@@ -156,7 +157,7 @@ describe.concurrent("ClusterWorkflowEngine", () => {
       Effect.provide(TestWorkflowLayer)
     ))
 
-  it.effect("Activity.raceAll", () =>
+  it.effect("Activity.raceAll returns the first activity and interrupts losers", () =>
     Effect.gen(function*() {
       const flags = yield* Flags
       yield* TestClock.adjust(1)
@@ -175,8 +176,9 @@ describe.concurrent("ClusterWorkflowEngine", () => {
       expect(flags.get("interrupt3")).toBeFalsy()
     }).pipe(Effect.provide(TestWorkflowLayer)))
 
-  it.effect("Activity.raceAll durable", () =>
+  it.effect("Activity.raceAll replays the first durable activity", () =>
     Effect.gen(function*() {
+      const flags = yield* Flags
       const sharding = yield* Sharding.Sharding
       yield* TestClock.adjust(1)
 
@@ -186,6 +188,15 @@ describe.concurrent("ClusterWorkflowEngine", () => {
 
       yield* TestClock.adjust(1)
       yield* TestClock.adjust(1000)
+      yield* sharding.pollStorage
+      yield* TestClock.adjust(5000)
+
+      const token = flags.get("durable-race-token")
+      assert(typeof token === "string")
+      yield* DurableDeferred.done(DurableRaceGate, {
+        token: DurableDeferred.Token.make(token),
+        exit: Exit.void
+      })
       yield* sharding.pollStorage
       yield* TestClock.adjust(5000)
 
@@ -220,6 +231,102 @@ describe.concurrent("ClusterWorkflowEngine", () => {
       assert.isTrue(flags.get("child-end"))
     }).pipe(Effect.provide(TestWorkflowLayer)))
 
+  it.effect("routes durable clock wakeups to the workflow shard group", () =>
+    Effect.gen(function*() {
+      const driver = yield* MessageStorage.MemoryDriver
+      const sharding = yield* Sharding.Sharding
+
+      const fiber = yield* ShardedClockWorkflow.execute({
+        id: "sharded-clock"
+      }).pipe(Effect.forkChild({ startImmediately: true }))
+
+      yield* TestClock.adjust(1)
+
+      const envelope = driver.journal.find((envelope) =>
+        envelope._tag === "Request" && envelope.address.entityType === "Workflow/-/DurableClock"
+      )
+      assert(envelope)
+      assert.strictEqual(envelope.address.shardId.group, "workflow")
+
+      yield* TestClock.adjust("10 seconds")
+      yield* sharding.pollStorage
+      yield* TestClock.adjust(5000)
+      yield* Fiber.join(fiber)
+    }).pipe(Effect.provide(TestWorkflowLayer)))
+
+  it.effect("routes durable deferred completions to the workflow shard group after a partial client is cached", () =>
+    Effect.gen(function*() {
+      const driver = yield* MessageStorage.MemoryDriver
+      const engine = yield* WorkflowEngine
+      const executionIdBeforeRegister = yield* ShardedDeferredWorkflow.executionId({ id: "before-register" })
+      const tokenBeforeRegister = DurableDeferred.tokenFromExecutionId(ShardedDeferred, {
+        workflow: ShardedDeferredWorkflow,
+        executionId: executionIdBeforeRegister
+      })
+
+      // Prime the partial client cache without waiting for the unregistered workflow entity.
+      const beforeRegisterDoneFiber = yield* DurableDeferred.done(ShardedDeferred, {
+        token: tokenBeforeRegister,
+        exit: Exit.void
+      }).pipe(Effect.forkChild({ startImmediately: true }))
+      yield* Effect.yieldNow
+      yield* Fiber.interrupt(beforeRegisterDoneFiber)
+
+      yield* engine.register(ShardedDeferredWorkflow, () => Effect.void)
+
+      const executionIdAfterRegister = yield* ShardedDeferredWorkflow.executionId({ id: "after-register" })
+      const tokenAfterRegister = DurableDeferred.tokenFromExecutionId(ShardedDeferred, {
+        workflow: ShardedDeferredWorkflow,
+        executionId: executionIdAfterRegister
+      })
+      const journalLength = driver.journal.length
+      yield* DurableDeferred.done(ShardedDeferred, {
+        token: tokenAfterRegister,
+        exit: Exit.void
+      })
+
+      const envelope = driver.journal.slice(journalLength).find((envelope) =>
+        envelope._tag === "Request" && envelope.address.entityType === "Workflow/ShardedDeferredWorkflow"
+      )
+      assert(envelope)
+      assert.strictEqual(envelope.address.shardId.group, "workflow")
+    }).pipe(Effect.scoped, Effect.provide(TestWorkflowEngine)))
+
+  it.effect("routes activities to the workflow shard group after a partial client is cached", () =>
+    Effect.gen(function*() {
+      const driver = yield* MessageStorage.MemoryDriver
+      const engine = yield* WorkflowEngine
+      const payload = { id: "partial-client-before-execute" }
+      const executionId = yield* ShardedDeferredWorkflow.executionId(payload)
+      const token = DurableDeferred.tokenFromExecutionId(ShardedDeferred, {
+        workflow: ShardedDeferredWorkflow,
+        executionId
+      })
+      // Prime the partial client cache without waiting for the unregistered workflow entity.
+      const doneFiber = yield* DurableDeferred.done(ShardedDeferred, {
+        token,
+        exit: Exit.void
+      }).pipe(Effect.forkChild({ startImmediately: true }))
+      yield* Effect.yieldNow
+      yield* Fiber.interrupt(doneFiber)
+
+      yield* engine.register(ShardedDeferredWorkflow, () =>
+        Activity.make({
+          name: "ShardedActivity",
+          execute: Effect.void
+        }))
+
+      const journalLength = driver.journal.length
+      assert.strictEqual(yield* ShardedDeferredWorkflow.execute(payload), undefined)
+      const envelope = driver.journal.slice(journalLength).find((envelope) =>
+        envelope._tag === "Request" &&
+        envelope.address.entityType === "Workflow/ShardedDeferredWorkflow" &&
+        envelope.tag === "activity"
+      )
+      assert(envelope)
+      assert.strictEqual(envelope.address.shardId.group, "workflow")
+    }).pipe(Effect.scoped, Effect.provide(TestWorkflowEngine)))
+
   it.effect("SuspendOnFailure", () =>
     Effect.gen(function*() {
       const flags = yield* Flags
@@ -248,10 +355,27 @@ describe.concurrent("ClusterWorkflowEngine", () => {
 
       assert.isTrue(flags.get("catch"))
     }).pipe(Effect.provide(TestWorkflowLayer)))
+
+  it.effect("can serialize workflow defects", () =>
+    Effect.gen(function*() {
+      yield* TestClock.adjust(1)
+
+      const exit = yield* ErrorDefectWorkflow.execute({
+        id: "raw-error-defect"
+      }).pipe(Effect.exit)
+
+      assert(Exit.isFailure(exit))
+      const defect = Cause.findDefect(exit.cause)
+      assert(Result.isSuccess(defect))
+      assert(defect.success instanceof Error)
+      assert.strictEqual(defect.success.message, "Batch request error: Request timed out")
+    }).pipe(Effect.provide(TestWorkflowLayer)))
 })
 
 const TestShardingConfig = ShardingConfig.layer({
   shardsPerGroup: 300,
+  availableShardGroups: ["default", "workflow"],
+  assignedShardGroups: ["default", "workflow"],
   entityMailboxCapacity: 10,
   entityTerminationTimeout: 0,
   entityMessagePollInterval: 5000,
@@ -272,8 +396,7 @@ class SendEmailError extends Schema.ErrorClass<SendEmailError>("SendEmailError")
   message: Schema.String
 }) {}
 
-const EmailWorkflow = Workflow.make({
-  name: "EmailWorkflow",
+const EmailWorkflow = Workflow.make("EmailWorkflow", {
   payload: {
     to: Schema.String,
     id: Schema.String
@@ -284,7 +407,7 @@ const EmailWorkflow = Workflow.make({
   }
 })
 
-class Flags extends ServiceMap.Service<Flags>()("Flags", {
+class Flags extends Context.Service<Flags>()("Flags", {
   make: Effect.sync(() => new Map<string, boolean | string>())
 }) {
   static readonly layer = Layer.effect(Flags, this.make)
@@ -311,7 +434,7 @@ const EmailWorkflowLayer = EmailWorkflow.toLayer(Effect.fn(function*(payload) {
         })
       }
     })
-  }).asEffect().pipe(
+  }).pipe(
     EmailWorkflow.withCompensation(Effect.fnUntraced(function*() {
       flags.set("compensation", true)
     })),
@@ -357,8 +480,7 @@ const EmailTrigger = DurableDeferred.make("EmailTrigger", {
   success: Schema.String
 })
 
-const RaceWorkflow = Workflow.make({
-  name: "RaceWorkflow",
+const RaceWorkflow = Workflow.make("RaceWorkflow", {
   payload: {
     id: Schema.String
   },
@@ -406,14 +528,15 @@ const RaceWorkflowLayer = RaceWorkflow.toLayer(Effect.fnUntraced(function*() {
   ])
 }))
 
-const DurableRaceWorkflow = Workflow.make({
-  name: "DurableRaceWorkflow",
+const DurableRaceWorkflow = Workflow.make("DurableRaceWorkflow", {
   payload: {
     id: Schema.String
   },
   success: Schema.String,
   idempotencyKey: ({ id }) => id
 })
+
+const DurableRaceGate = DurableDeferred.make("DurableRaceGate")
 
 const DurableRaceWorkflowLayer = DurableRaceWorkflow.toLayer(Effect.fnUntraced(function*() {
   const flags = yield* Flags
@@ -424,7 +547,7 @@ const DurableRaceWorkflowLayer = DurableRaceWorkflow.toLayer(Effect.fnUntraced(f
     })
   )
 
-  return yield* Activity.raceAll("race", [
+  const result = yield* Activity.raceAll("race", [
     Activity.make({
       name: "Activity1",
       success: Schema.String,
@@ -462,10 +585,12 @@ const DurableRaceWorkflowLayer = DurableRaceWorkflow.toLayer(Effect.fnUntraced(f
       )
     })
   ])
+  flags.set("durable-race-token", yield* DurableDeferred.token(DurableRaceGate))
+  yield* DurableDeferred.await(DurableRaceGate)
+  return result
 }))
 
-const ParentWorkflow = Workflow.make({
-  name: "ParentWorkflow",
+const ParentWorkflow = Workflow.make("ParentWorkflow", {
   payload: {
     id: Schema.String
   },
@@ -474,8 +599,7 @@ const ParentWorkflow = Workflow.make({
   }
 })
 
-const ChildWorkflow = Workflow.make({
-  name: "ChildWorkflow",
+const ChildWorkflow = Workflow.make("ChildWorkflow", {
   payload: {
     id: Schema.String
   },
@@ -504,8 +628,35 @@ const ChildWorkflowLayer = ChildWorkflow.toLayer(Effect.fnUntraced(function*() {
   flags.set("child-end", true)
 }))
 
-const SuspendOnFailureWorkflow = Workflow.make({
-  name: "SuspendOnFailureWorkflow",
+const ShardedClockWorkflow = Workflow.make("ShardedClockWorkflow", {
+  payload: {
+    id: Schema.String
+  },
+  idempotencyKey(payload) {
+    return payload.id
+  }
+}).annotate(ClusterSchema.ShardGroup, () => "workflow")
+
+const ShardedClockWorkflowLayer = ShardedClockWorkflow.toLayer(Effect.fnUntraced(function*() {
+  yield* DurableClock.sleep({
+    name: "ShardedClock",
+    duration: "10 seconds",
+    inMemoryThreshold: Duration.zero
+  })
+}))
+
+const ShardedDeferred = DurableDeferred.make("ShardedDeferred")
+
+const ShardedDeferredWorkflow = Workflow.make("ShardedDeferredWorkflow", {
+  payload: {
+    id: Schema.String
+  },
+  idempotencyKey(payload) {
+    return payload.id
+  }
+}).annotate(ClusterSchema.ShardGroup, () => "workflow")
+
+const SuspendOnFailureWorkflow = Workflow.make("SuspendOnFailureWorkflow", {
   payload: {
     id: Schema.String
   },
@@ -529,8 +680,7 @@ const SuspendOnFailureWorkflowLayer = SuspendOnFailureWorkflow.toLayer(Effect.fn
   })
 }))
 
-const CatchWorkflow = Workflow.make({
-  name: "CatchWorkflow",
+const CatchWorkflow = Workflow.make("CatchWorkflow", {
   payload: {
     id: Schema.String
   },
@@ -544,7 +694,7 @@ const CatchWorkflowLayer = CatchWorkflow.toLayer(Effect.fnUntraced(function*() {
   yield* Activity.make({
     name: "fail",
     execute: Effect.die("boom")
-  }).asEffect().pipe(
+  }).pipe(
     Effect.catchCause((cause) =>
       Activity.make({
         name: "log",
@@ -552,18 +702,45 @@ const CatchWorkflowLayer = CatchWorkflow.toLayer(Effect.fnUntraced(function*() {
           flags.set("catch", true)
           return Effect.log(cause)
         })
-      }).asEffect()
+      })
     )
   )
 }))
+
+const ErrorDefectWorkflow = Workflow.make("ErrorDefectWorkflow", {
+  payload: {
+    id: Schema.String
+  },
+  idempotencyKey(payload) {
+    return payload.id
+  }
+})
+
+const ErrorDefectWorkflowLayer = ErrorDefectWorkflow.toLayer(Effect.fnUntraced(function*() {
+  yield* Activity.make({
+    name: "raw-error-defect",
+    execute: Effect.die(makeBatchRequestError())
+  })
+}))
+
+const makeBatchRequestError = () => {
+  const error = new Error("Batch request error: Request timed out")
+  Object.defineProperty(error, "nonJson", {
+    enumerable: true,
+    value: 1n
+  })
+  return error
+}
 
 const TestWorkflowLayer = EmailWorkflowLayer.pipe(
   Layer.merge(RaceWorkflowLayer),
   Layer.merge(DurableRaceWorkflowLayer),
   Layer.merge(ParentWorkflowLayer),
   Layer.merge(ChildWorkflowLayer),
+  Layer.merge(ShardedClockWorkflowLayer),
   Layer.merge(SuspendOnFailureWorkflowLayer),
   Layer.merge(CatchWorkflowLayer),
+  Layer.merge(ErrorDefectWorkflowLayer),
   Layer.provideMerge(Flags.layer),
   Layer.provideMerge(TestWorkflowEngine)
 )

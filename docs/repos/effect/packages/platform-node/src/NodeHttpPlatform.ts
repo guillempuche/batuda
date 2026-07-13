@@ -1,5 +1,12 @@
 /**
- * @since 1.0.0
+ * Node.js implementation of the Effect HTTP platform service.
+ *
+ * This module connects the portable `HttpPlatform` file response helpers to
+ * Node runtime primitives. It serves local files through Node readable streams,
+ * supports byte ranges, converts Web `File` values to readable streams, and
+ * fills in content type and content length headers when needed.
+ *
+ * @since 4.0.0
  */
 import { pipe } from "effect/Function"
 import * as Layer from "effect/Layer"
@@ -13,8 +20,11 @@ import Mime from "./Mime.ts"
 import * as NodeFileSystem from "./NodeFileSystem.ts"
 
 /**
- * @since 1.0.0
- * @category Constructors
+ * Creates the Node `HttpPlatform`, serving file responses from Node readable
+ * streams and adding MIME type and content-length headers when needed.
+ *
+ * @category constructors
+ * @since 4.0.0
  */
 export const make = Platform.make({
   fileResponse(path, status, statusText, headers, start, end, contentLength) {
@@ -47,8 +57,11 @@ export const make = Platform.make({
 })
 
 /**
- * @since 1.0.0
- * @category Layers
+ * Provides the Node `HttpPlatform` together with the filesystem and ETag
+ * services it needs for file responses.
+ *
+ * @category layers
+ * @since 4.0.0
  */
 export const layer: Layer.Layer<Platform.HttpPlatform> = pipe(
   Layer.effect(Platform.HttpPlatform)(make),

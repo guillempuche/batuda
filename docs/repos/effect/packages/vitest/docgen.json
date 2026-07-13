@@ -2,7 +2,6 @@
   "$schema": "../../node_modules/@effect/docgen/schema.json",
   "srcLink": "https://github.com/Effect-TS/effect/tree/main/packages/vitest/src/",
   "exclude": ["src/internal/**/*.ts"],
-  "tscExecutable": "tsgo",
   "examplesCompilerOptions": {
     "noEmit": true,
     "strict": true,
@@ -16,6 +15,9 @@
     "paths": {
       "effect": ["../../../effect/src/index.js"],
       "effect/*": ["../../../effect/src/*.js"]
-    }
+    },
+    "plugins": [
+      { "name": "@effect/language-service", "includeSuggestionsInTsc": false }
+    ]
   }
 }

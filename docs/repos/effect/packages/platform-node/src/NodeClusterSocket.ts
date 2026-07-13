@@ -1,5 +1,14 @@
 /**
- * @since 1.0.0
+ * Node.js socket layers for Effect Cluster runners.
+ *
+ * The main `layer` builds a sharding layer for socket transport, choosing
+ * serialization, runner health checks, runner storage, message storage, and
+ * optional client-only mode from the supplied options. This module also
+ * re-exports the shared socket client and server protocol layers, and provides
+ * Kubernetes-aware Undici dispatcher and HTTP client layers for runner health
+ * checks.
+ *
+ * @since 4.0.0
  */
 import { layerClientProtocol, layerSocketServer } from "@effect/platform-node-shared/NodeClusterSocket"
 import type { ConfigError } from "effect/Config"
@@ -25,20 +34,30 @@ import * as Undici from "./Undici.ts"
 
 export {
   /**
-   * @since 1.0.0
-   * @category Re-exports
+   * Provides the cluster `RpcClientProtocol` using the shared socket client
+   * implementation.
+   *
+   * @category re-exports
+   * @since 4.0.0
    */
   layerClientProtocol,
   /**
-   * @since 1.0.0
-   * @category Re-exports
+   * Provides the socket server used by Node cluster runners through the shared
+   * socket server implementation.
+   *
+   * @category re-exports
+   * @since 4.0.0
    */
   layerSocketServer
 }
 
 /**
- * @since 1.0.0
- * @category Layers
+ * Builds the Node cluster socket sharding layer, configuring RPC
+ * serialization, message storage, runner health checks, and optional
+ * client-only mode.
+ *
+ * @category layers
+ * @since 4.0.0
  */
 export const layer = <
   const ClientOnly extends boolean = false,
@@ -111,8 +130,12 @@ export const layer = <
 }
 
 /**
- * @since 1.0.0
- * @category Layers
+ * Provides an Undici dispatcher for Kubernetes API calls, using the service
+ * account CA certificate when it is available and falling back to the default
+ * dispatcher otherwise.
+ *
+ * @category layers
+ * @since 4.0.0
  */
 export const layerDispatcherK8s: Layer.Layer<NodeHttpClient.Dispatcher> = Layer.effect(NodeHttpClient.Dispatcher)(
   Effect.gen(function*() {
@@ -140,8 +163,11 @@ export const layerDispatcherK8s: Layer.Layer<NodeHttpClient.Dispatcher> = Layer.
 )
 
 /**
- * @since 1.0.0
- * @category Layers
+ * Provides a `K8sHttpClient` backed by the Undici HTTP client and the
+ * Kubernetes-aware dispatcher.
+ *
+ * @category layers
+ * @since 4.0.0
  */
 export const layerK8sHttpClient: Layer.Layer<K8sHttpClient.K8sHttpClient> = K8sHttpClient.layer.pipe(
   Layer.provide(Layer.fresh(NodeHttpClient.layerUndiciNoDispatcher)),

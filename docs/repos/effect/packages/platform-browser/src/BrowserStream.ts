@@ -1,5 +1,11 @@
 /**
- * @since 1.0.0
+ * Browser DOM event streams.
+ *
+ * This module provides typed constructors that turn `window.addEventListener`
+ * and `document.addEventListener` events into Effect `Stream` values. Both
+ * helpers accept the usual listener options and an optional stream buffer size.
+ *
+ * @since 4.0.0
  */
 
 import * as Stream from "effect/Stream"
@@ -7,11 +13,14 @@ import * as Stream from "effect/Stream"
 /**
  * Creates a `Stream` from `window.addEventListener`.
  *
- * By default, the underlying buffer is unbounded in size. You can customize the
- * buffer size an object as the second argument with the `bufferSize` field.
+ * **Details**
  *
- * @since 1.0.0
- * @category Streams
+ * By default, the underlying buffer is unbounded in size. You can customize the
+ * buffer size by passing an object as the second argument with the `bufferSize`
+ * field.
+ *
+ * @category streams
+ * @since 4.0.0
  */
 export const fromEventListenerWindow = <K extends keyof WindowEventMap>(
   type: K,
@@ -26,11 +35,14 @@ export const fromEventListenerWindow = <K extends keyof WindowEventMap>(
 /**
  * Creates a `Stream` from `document.addEventListener`.
  *
- * By default, the underlying buffer is unbounded in size. You can customize the
- * buffer size an object as the second argument with the `bufferSize` field.
+ * **Details**
  *
- * @since 1.0.0
- * @category Streams
+ * By default, the underlying buffer is unbounded in size. You can customize the
+ * buffer size by passing an object as the second argument with the `bufferSize`
+ * field.
+ *
+ * @category streams
+ * @since 4.0.0
  */
 export const fromEventListenerDocument = <K extends keyof DocumentEventMap>(
   type: K,

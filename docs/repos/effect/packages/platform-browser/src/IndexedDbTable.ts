@@ -1,4 +1,14 @@
 /**
+ * Typed object-store descriptors for the browser IndexedDB integration.
+ *
+ * An {@link IndexedDbTable} is the schema-backed description of one IndexedDB
+ * object store. It carries the store name, row schema, key path, index key
+ * paths, auto-increment mode, and transaction durability used by database
+ * versions, migrations, and typed queries. The `make` constructor also derives
+ * the read, array, and auto-increment write schemas used by the query builder.
+ *
+ * @see {@link make} for constructing table descriptors.
+ *
  * @since 4.0.0
  */
 import { type Pipeable, pipeArguments } from "effect/Pipeable"
@@ -11,8 +21,10 @@ import type * as IndexedDbQueryBuilder from "./IndexedDbQueryBuilder.ts"
 const TypeId = "~@effect/platform-browser/IndexedDbTable"
 
 /**
- * @since 4.0.0
+ * Typed IndexedDB table definition containing its name, schema, key path, indexes, auto-increment setting, and transaction durability.
+ *
  * @category interface
+ * @since 4.0.0
  */
 export interface IndexedDbTable<
   out Name extends string,
@@ -34,19 +46,24 @@ export interface IndexedDbTable<
   readonly keyPath: KeyPath
   readonly indexes: Indexes
   readonly autoIncrement: AutoIncrement
+  readonly durability: IDBTransactionDurability
 }
 
 /**
- * @since 4.0.0
+ * Schema constraint for table schemas that expose struct fields.
+ *
  * @category models
+ * @since 4.0.0
  */
 export type AnySchemaStruct = Schema.Top & {
   readonly fields: Schema.Struct.Fields
 }
 
 /**
- * @since 4.0.0
+ * Type-erased shape of an `IndexedDbTable` used when table type parameters are not needed.
+ *
  * @category models
+ * @since 4.0.0
  */
 export interface Any {
   readonly [TypeId]: typeof TypeId
@@ -61,8 +78,10 @@ export interface Any {
 }
 
 /**
- * @since 4.0.0
+ * Type-erased `IndexedDbTable` retaining the table interface properties with broad type parameters.
+ *
  * @category models
+ * @since 4.0.0
  */
 export type AnyWithProps = IndexedDbTable<
   string,
@@ -73,50 +92,66 @@ export type AnyWithProps = IndexedDbTable<
 >
 
 /**
- * @since 4.0.0
+ * Extracts the table name type from an `IndexedDbTable`.
+ *
  * @category models
+ * @since 4.0.0
  */
 export type TableName<Table extends Any> = Table["tableName"]
 /**
- * @since 4.0.0
+ * Extracts the key-path type from an `IndexedDbTable`.
+ *
  * @category models
+ * @since 4.0.0
  */
 export type KeyPath<Table extends Any> = Table["keyPath"]
 
 /**
- * @since 4.0.0
+ * Extracts the auto-increment flag type from an `IndexedDbTable`.
+ *
  * @category models
+ * @since 4.0.0
  */
 export type AutoIncrement<Table extends Any> = Table["autoIncrement"]
 
 /**
- * @since 4.0.0
+ * Extracts the schema type from an `IndexedDbTable`.
+ *
  * @category models
+ * @since 4.0.0
  */
 export type TableSchema<Table extends Any> = Table["tableSchema"]
 /**
- * @since 4.0.0
+ * Extracts the decoding or encoding service requirements needed by an `IndexedDbTable` schema.
+ *
  * @category models
+ * @since 4.0.0
  */
 export type Context<Table extends Any> =
   | Table["tableSchema"]["DecodingServices"]
   | Table["tableSchema"]["EncodingServices"]
 
 /**
- * @since 4.0.0
+ * Extracts the encoded row type from an `IndexedDbTable` schema.
+ *
  * @category models
+ * @since 4.0.0
  */
 export type Encoded<Table extends Any> = Table["tableSchema"]["Encoded"]
 
 /**
- * @since 4.0.0
+ * Extracts the index definition map from an `IndexedDbTable`.
+ *
  * @category models
+ * @since 4.0.0
  */
 export type Indexes<Table extends Any> = Table["indexes"]
 
 /**
- * @since 4.0.0
+ * Selects the table with the given name from a union of `IndexedDbTable` types.
+ *
  * @category models
+ * @since 4.0.0
  */
 export type WithName<Table extends Any, TableName extends string> = Extract<
   Table,
@@ -131,8 +166,31 @@ const Proto = {
 }
 
 /**
- * @since 4.0.0
+ * Creates a typed IndexedDB table definition from its name, schema, optional key path, indexes, auto-increment flag, and durability.
+ *
+ * **When to use**
+ *
+ * Use to define a typed object-store descriptor for inclusion in an
+ * `IndexedDbVersion` and for migration or query APIs.
+ *
+ * **Details**
+ *
+ * `autoIncrement` defaults to `false` and `durability` defaults to `"relaxed"`.
+ * Tables without a key path get a read schema that includes an out-of-line
+ * `key`, while auto-increment tables use a write schema where the generated key
+ * may be omitted.
+ *
+ * **Gotchas**
+ *
+ * Tables without a key path cannot define a `key` field in their row schema.
+ * Key paths and index paths must point to encoded fields whose values are valid
+ * IndexedDB keys, and declared indexes still need to be created during
+ * database migrations.
+ *
+ * @see `IndexedDbVersion.make` for grouping table definitions into a schema version
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const make = <
   const Name extends string,
@@ -159,6 +217,7 @@ export const make = <
     KeyPath
   > extends true ? AutoIncrement | undefined
     : never
+  readonly durability?: IDBTransactionDurability | undefined
 }): IndexedDbTable<
   Name,
   TableSchema,
@@ -185,6 +244,7 @@ export const make = <
   ;(Table as any).keyPath = options.keyPath
   ;(Table as any).indexes = options.indexes
   ;(Table as any).autoIncrement = options.autoIncrement === true
+  ;(Table as any).durability = options.durability ?? "relaxed"
   return Table as any
 }
 

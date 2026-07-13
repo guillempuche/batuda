@@ -1,7 +1,13 @@
 /**
+ * HTTP client support for talking to the Kubernetes API from code running
+ * inside a cluster. The module builds a `K8sHttpClient` service on top of the
+ * shared HTTP client, points requests at the in-cluster API endpoint, and uses
+ * the mounted service-account token when one is available.
+ *
  * @since 4.0.0
  */
 import type * as v1 from "kubernetes-types/core/v1.d.ts"
+import * as Context from "../../Context.ts"
 import * as Effect from "../../Effect.ts"
 import * as FileSystem from "../../FileSystem.ts"
 import { identity } from "../../Function.ts"
@@ -10,24 +16,33 @@ import * as Option from "../../Option.ts"
 import * as Result from "../../Result.ts"
 import * as Schedule from "../../Schedule.ts"
 import * as Schema from "../../Schema.ts"
-import * as ServiceMap from "../../ServiceMap.ts"
 import * as HttpClient from "../http/HttpClient.ts"
 import * as HttpClientError from "../http/HttpClientError.ts"
 import * as HttpClientRequest from "../http/HttpClientRequest.ts"
 import * as HttpClientResponse from "../http/HttpClientResponse.ts"
 
 /**
+ * Service tag for the HTTP client used to call the Kubernetes API.
+ *
+ * @category services
  * @since 4.0.0
- * @category Tags
  */
-export class K8sHttpClient extends ServiceMap.Service<
+export class K8sHttpClient extends Context.Service<
   K8sHttpClient,
   HttpClient.HttpClient
 >()("effect/cluster/K8sHttpClient") {}
 
 /**
+ * Layer that configures `K8sHttpClient` for the in-cluster Kubernetes API.
+ *
+ * **Details**
+ *
+ * It targets `https://kubernetes.default.svc/api`, adds the service-account
+ * bearer token when available, requires successful HTTP statuses, and retries
+ * transient failures.
+ *
+ * @category layers
  * @since 4.0.0
- * @category Layers
  */
 export const layer: Layer.Layer<
   K8sHttpClient,
@@ -52,8 +67,15 @@ export const layer: Layer.Layer<
 )
 
 /**
+ * Creates a cached effect that fetches running Kubernetes pods.
+ *
+ * **Details**
+ *
+ * The request can be limited by namespace and label selector, and the result is a
+ * map keyed by pod IP address.
+ *
+ * @category constructors
  * @since 4.0.0
- * @category Constructors
  */
 export const makeGetPods: (
   options?: {
@@ -93,8 +115,16 @@ export const makeGetPods: (
 })
 
 /**
+ * Creates a scoped function that ensures a Kubernetes pod exists and waits until
+ * it is ready.
+ *
+ * **Details**
+ *
+ * The pod defaults to the `default` namespace and is deleted when the surrounding
+ * scope closes.
+ *
+ * @category constructors
  * @since 4.0.0
- * @category Constructors
  */
 export const makeCreatePod = Effect.gen(function*() {
   const client = yield* K8sHttpClient
@@ -195,23 +225,31 @@ export const makeCreatePod = Effect.gen(function*() {
 })
 
 /**
+ * Schema for the subset of Kubernetes Pod status used by cluster helpers.
+ *
+ * @category schemas
  * @since 4.0.0
- * @category Schemas
  */
 export class PodStatus extends Schema.Class<PodStatus>("@effect/cluster/K8sHttpClient/PodStatus")({
   phase: Schema.String,
   conditions: Schema.Array(Schema.Struct({
     type: Schema.String,
     status: Schema.String,
-    lastTransitionTime: Schema.String
+    lastTransitionTime: Schema.NullOr(Schema.String)
   })),
   podIP: Schema.String,
   hostIP: Schema.String
 }) {}
 
 /**
+ * Schema for Kubernetes Pod values used by cluster helpers.
+ *
+ * **Details**
+ *
+ * The model exposes readiness helpers derived from the pod status conditions.
+ *
+ * @category schemas
  * @since 4.0.0
- * @category Schemas
  */
 export class Pod extends Schema.Class<Pod>("@effect/cluster/K8sHttpClient/Pod")({
   status: PodStatus
@@ -227,8 +265,8 @@ export class Pod extends Schema.Class<Pod>("@effect/cluster/K8sHttpClient/Pod")(
   }
 
   get isReadyOrInitializing(): boolean {
-    let initializedAt: string | undefined
-    let readyAt: string | undefined
+    let initializedAt: string | null | undefined
+    let readyAt: string | null | undefined
     for (let i = 0; i < this.status.conditions.length; i++) {
       const condition = this.status.conditions[i]
       switch (condition.type) {

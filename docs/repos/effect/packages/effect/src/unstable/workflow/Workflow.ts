@@ -1,22 +1,33 @@
 /**
+ * Defines typed durable workflows.
+ *
+ * A `Workflow` has a stable tag, schemas for payload, success, and failure, and
+ * an idempotency key used to derive execution ids. Workflow definitions can be
+ * executed, discarded, polled, interrupted, resumed, and registered with a
+ * handler layer. This module also includes workflow result types, compensation
+ * and cleanup helpers, suspension support, and settings for defect capture or
+ * failure suspension.
+ *
  * @since 4.0.0
  */
+import * as Arr from "../../Array.ts"
 import * as Cause from "../../Cause.ts"
+import * as Context from "../../Context.ts"
 import * as Data from "../../Data.ts"
 import * as Effect from "../../Effect.ts"
 import * as Exit from "../../Exit.ts"
 import * as Fiber from "../../Fiber.ts"
+import * as Filter from "../../Filter.ts"
 import { constFalse, constTrue, dual, identity } from "../../Function.ts"
 import * as Layer from "../../Layer.ts"
 import * as Option from "../../Option.ts"
 import * as Predicate from "../../Predicate.ts"
 import type * as Schedule from "../../Schedule.ts"
 import * as Schema from "../../Schema.ts"
-import * as Issue from "../../SchemaIssue.ts"
-import * as Parser from "../../SchemaParser.ts"
+import * as SchemaIssue from "../../SchemaIssue.ts"
+import * as SchemaParser from "../../SchemaParser.ts"
 import * as Tranformation from "../../SchemaTransformation.ts"
 import * as Scope from "../../Scope.ts"
-import * as ServiceMap from "../../ServiceMap.ts"
 import type { ExitEncoded } from "../rpc/RpcMessage.ts"
 import { makeHashDigest } from "./internal/crypto.ts"
 import type { WorkflowEngine, WorkflowInstance } from "./WorkflowEngine.ts"
@@ -24,36 +35,44 @@ import type { WorkflowEngine, WorkflowInstance } from "./WorkflowEngine.ts"
 const TypeId = "~effect/workflow/Workflow"
 
 /**
+ * Durable workflow definition with typed payload, success, and error schemas
+ * plus operations for execution, polling, interruption, resumption, and
+ * registration.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
 export interface Workflow<
-  Name extends string,
+  Tag extends string,
   Payload extends AnyStructSchema,
   Success extends Schema.Top,
   Error extends Schema.Top
 > {
+  new(_: never): {}
+
   readonly [TypeId]: typeof TypeId
-  readonly name: Name
+  readonly _tag: Tag
   readonly payloadSchema: Payload
   readonly successSchema: Success
   readonly errorSchema: Error
-  readonly annotations: ServiceMap.ServiceMap<never>
+  readonly annotations: Context.Context<never>
+  readonly idempotencyKey: (payload: Payload["Type"]) => string
+  readonly suspendedRetrySchedule?: Schedule.Schedule<any, unknown> | undefined
 
   /**
    * Add an annotation to the workflow.
    */
   annotate<I, S>(
-    key: ServiceMap.Key<I, S>,
+    key: Context.Key<I, S>,
     value: S
-  ): Workflow<Name, Payload, Success, Error>
+  ): Workflow<Tag, Payload, Success, Error>
 
   /**
    * Merge multiple annotations into the workflow.
    */
   annotateMerge<I>(
-    annotations: ServiceMap.ServiceMap<I>
-  ): Workflow<Name, Payload, Success, Error>
+    annotations: Context.Context<I>
+  ): Workflow<Tag, Payload, Success, Error>
 
   /**
    * Execute the workflow with the given payload.
@@ -73,7 +92,7 @@ export interface Workflow<
   >
 
   /**
-   * Execute the workflow with the given payload.
+   * Poll the current status of a workflow execution.
    */
   readonly poll: (
     executionId: string
@@ -112,7 +131,7 @@ export interface Workflow<
     | WorkflowEngine
     | Exclude<
       R,
-      WorkflowEngine | WorkflowInstance | Execution<Name> | Scope.Scope
+      WorkflowEngine | WorkflowInstance | Execution<Tag> | Scope.Scope
     >
     | Payload["DecodingServices"]
     | Payload["EncodingServices"]
@@ -130,12 +149,15 @@ export interface Workflow<
   ) => Effect.Effect<string>
 
   /**
-   * Add compensation logic to an effect inside a Workflow. The compensation finalizer will be
-   * called if the entire workflow fails, allowing you to perform cleanup or
-   * other actions based on the success value and the cause of the workflow failure.
+   * Add compensation logic to an effect inside a Workflow.
    *
-   * NOTE: Compensation will not work for nested activities. Compensation
-   * finalizers are only registered for top-level effects in the workflow.
+   * **Details**
+   *
+   * The compensation finalizer is called if the entire workflow fails, allowing you to perform cleanup or other actions based on the success value and the cause of the workflow failure.
+   *
+   * **Gotchas**
+   *
+   * Compensation finalizers are only registered for top-level effects in the workflow and do not work for nested activities.
    */
   readonly withCompensation: {
     <A, R2>(
@@ -148,7 +170,7 @@ export interface Workflow<
     ) => Effect.Effect<
       A,
       E,
-      R | R2 | WorkflowInstance | Execution<Name> | Scope.Scope
+      R | R2 | WorkflowInstance | Execution<Tag> | Scope.Scope
     >
     <A, E, R, R2>(
       effect: Effect.Effect<A, E, R>,
@@ -159,12 +181,15 @@ export interface Workflow<
     ): Effect.Effect<
       A,
       E,
-      R | R2 | WorkflowInstance | Execution<Name> | Scope.Scope
+      R | R2 | WorkflowInstance | Execution<Tag> | Scope.Scope
     >
   }
 }
 
 /**
+ * Schema constraint for workflow payload schemas that expose struct fields.
+ *
+ * @category schemas
  * @since 4.0.0
  */
 export interface AnyStructSchema extends Schema.Top {
@@ -172,31 +197,44 @@ export interface AnyStructSchema extends Schema.Top {
 }
 
 /**
+ * Type-level marker for services associated with a specific workflow
+ * execution tag.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
-export interface Execution<Name extends string> {
+export interface Execution<Tag extends string> {
   readonly _: unique symbol
-  readonly name: Name
+  readonly _tag: Tag
 }
 
 /**
+ * Type-erased workflow shape for APIs that operate on workflows without
+ * preserving their specific payload, success, or error types.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
 export interface Any {
+  new(_: never): {}
+
   readonly [TypeId]: typeof TypeId
-  readonly name: string
+  readonly _tag: string
   readonly executionId: (payload: any) => Effect.Effect<string>
   readonly payloadSchema: AnyStructSchema
   readonly successSchema: Schema.Top
   readonly errorSchema: Schema.Top
-  readonly annotations: ServiceMap.ServiceMap<never>
+  readonly annotations: Context.Context<never>
+  readonly idempotencyKey: (payload: any) => string
+  readonly suspendedRetrySchedule?: Schedule.Schedule<any, unknown> | undefined
 }
 
 /**
+ * Type-erased workflow shape that also exposes executable operations needed by
+ * workflow proxy and engine helpers.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
 export interface AnyWithProps extends Any {
   readonly payloadSchema: AnyStructSchema
@@ -212,8 +250,10 @@ export interface AnyWithProps extends Any {
 }
 
 /**
+ * Extracts the payload schema from a `Workflow`.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
 export type PayloadSchema<W> = W extends Workflow<
   infer _Name,
@@ -224,8 +264,11 @@ export type PayloadSchema<W> = W extends Workflow<
   : never
 
 /**
+ * Computes the schema services required by clients that execute or poll
+ * workflows.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
 export type RequirementsClient<Workflows extends Any> = Workflows extends Workflow<
   infer _Name,
@@ -239,8 +282,11 @@ export type RequirementsClient<Workflows extends Any> = Workflows extends Workfl
   : never
 
 /**
+ * Computes the schema services required by handlers that decode workflow
+ * payloads and encode workflow results.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
 export type RequirementsHandler<Workflows extends Any> = Workflows extends Workflow<
   infer _Name,
@@ -256,28 +302,136 @@ export type RequirementsHandler<Workflows extends Any> = Workflows extends Workf
     | _Error["EncodingServices"]
   : never
 
-const EngineTag = ServiceMap.Service<WorkflowEngine, WorkflowEngine["Service"]>(
+const EngineTag = Context.Service<WorkflowEngine, WorkflowEngine["Service"]>(
   "effect/workflow/WorkflowEngine" satisfies typeof WorkflowEngine.key
 )
 
-const InstanceTag = ServiceMap.Service<
+const InstanceTag = Context.Service<
   WorkflowInstance,
   WorkflowInstance["Service"]
 >(
   "effect/workflow/WorkflowEngine/WorkflowInstance" satisfies typeof WorkflowInstance.key
 )
 
+const makeExecutionIdFromPayload = (self: AnyWithProps, payload: unknown) =>
+  makeHashDigest(`${self._tag}-${self.idempotencyKey(payload)}`)
+
+const Proto = {
+  [TypeId]: TypeId,
+  annotate(this: AnyWithProps, tag: Context.Key<any, any>, value: any) {
+    return makeProto({
+      _tag: this._tag,
+      payloadSchema: this.payloadSchema,
+      successSchema: this.successSchema,
+      errorSchema: this.errorSchema,
+      annotations: Context.add(this.annotations, tag, value),
+      idempotencyKey: this.idempotencyKey,
+      suspendedRetrySchedule: this.suspendedRetrySchedule
+    })
+  },
+  annotateMerge(this: AnyWithProps, context: Context.Context<any>) {
+    return makeProto({
+      _tag: this._tag,
+      payloadSchema: this.payloadSchema,
+      successSchema: this.successSchema,
+      errorSchema: this.errorSchema,
+      annotations: Context.merge(this.annotations, context),
+      idempotencyKey: this.idempotencyKey,
+      suspendedRetrySchedule: this.suspendedRetrySchedule
+    })
+  },
+  execute<const Discard extends boolean = false>(
+    this: AnyWithProps,
+    fields: any,
+    opts?: { readonly discard?: Discard } | undefined
+  ) {
+    return Effect.suspend(() => {
+      const payload = this.payloadSchema.make(fields)
+      return Effect.flatMap(
+        EngineTag,
+        (engine) =>
+          Effect.flatMap(makeExecutionIdFromPayload(this, payload), (executionId) =>
+            Effect.andThen(
+              Effect.annotateCurrentSpan({ executionId }),
+              engine.execute(this as any, {
+                executionId,
+                payload,
+                discard: opts?.discard,
+                suspendedRetrySchedule: this.suspendedRetrySchedule
+              })
+            ))
+      )
+    }).pipe(
+      Effect.withSpan(
+        `${this._tag}.execute`,
+        {},
+        { captureStackTrace: false }
+      )
+    ) as any
+  },
+  poll(this: Workflow<string, AnyStructSchema, Schema.Top, Schema.Top>, executionId: string) {
+    return Effect.flatMap(EngineTag, (engine) => engine.poll(this, executionId)).pipe(
+      Effect.withSpan(`${this._tag}.poll`, { attributes: { executionId } }, { captureStackTrace: false })
+    )
+  },
+  interrupt(this: AnyWithProps, executionId: string) {
+    return Effect.flatMap(EngineTag, (engine) => engine.interrupt(this, executionId)).pipe(
+      Effect.withSpan(`${this._tag}.interrupt`, { attributes: { executionId } }, { captureStackTrace: false })
+    )
+  },
+  resume(this: Workflow<string, AnyStructSchema, Schema.Top, Schema.Top>, executionId: string) {
+    return Effect.flatMap(EngineTag, (engine) => engine.resume(this, executionId)).pipe(
+      Effect.withSpan(`${this._tag}.resume`, { attributes: { executionId } }, { captureStackTrace: false })
+    )
+  },
+  toLayer(this: Workflow<string, AnyStructSchema, Schema.Top, Schema.Top>, execute: any) {
+    return Layer.effectDiscard(
+      Effect.flatMap(EngineTag, (engine) => engine.register(this, execute))
+    )
+  },
+  executionId(this: AnyWithProps, payload: any) {
+    return Effect.flatMap(
+      Effect.orDie(this.payloadSchema.makeEffect(payload)),
+      (payload) => makeExecutionIdFromPayload(this, payload)
+    )
+  },
+  withCompensation: ((...args: ReadonlyArray<any>) => (withCompensation as any)(...args))
+}
+
+const makeProto = <
+  const Tag extends string,
+  Payload extends AnyStructSchema,
+  Success extends Schema.Top,
+  Error extends Schema.Top
+>(options: {
+  readonly _tag: Tag
+  readonly payloadSchema: Payload
+  readonly successSchema: Success
+  readonly errorSchema: Error
+  readonly annotations: Context.Context<never>
+  readonly idempotencyKey: (payload: Payload["Type"]) => string
+  readonly suspendedRetrySchedule?: Schedule.Schedule<any, unknown> | undefined
+}): Workflow<Tag, Payload, Success, Error> => {
+  function Workflow() {}
+  Object.setPrototypeOf(Workflow, Proto)
+  Object.assign(Workflow, options)
+  return Workflow as any
+}
+
 /**
+ * Creates a durable workflow definition with schemas, annotations, and
+ * deterministic execution IDs derived from the workflow tag and idempotency
+ * key.
+ *
+ * @category constructors
  * @since 4.0.0
- * @category Constructors
  */
 export const make = <
-  const Name extends string,
+  const Tag extends string,
   Payload extends Schema.Struct.Fields | AnyStructSchema,
   Success extends Schema.Top = Schema.Void,
   Error extends Schema.Top = Schema.Never
->(options: {
-  readonly name: Name
+>(tag: Tag, options: {
   readonly payload: Payload
   readonly idempotencyKey: (
     payload: Payload extends Schema.Struct.Fields ? Schema.Struct.Type<Payload>
@@ -286,132 +440,63 @@ export const make = <
   readonly success?: Success
   readonly error?: Error
   readonly suspendedRetrySchedule?: Schedule.Schedule<any, unknown> | undefined
-  readonly annotations?: ServiceMap.ServiceMap<never>
+  readonly annotations?: Context.Context<never>
 }): Workflow<
-  Name,
+  Tag,
   Payload extends Schema.Struct.Fields ? Schema.Struct<Payload> : Payload,
   Success,
   Error
-> => {
-  const makeExecutionId = (payload: any) => makeHashDigest(`${options.name}-${options.idempotencyKey(payload)}`)
-  const self: Workflow<Name, any, Success, Error> = {
-    [TypeId]: TypeId,
-    name: options.name,
-    payloadSchema: Schema.isSchema(options.payload)
+> =>
+  makeProto<Tag, Payload extends Schema.Struct.Fields ? Schema.Struct<Payload> : Payload, Success, Error>({
+    _tag: tag,
+    payloadSchema: (Schema.isSchema(options.payload)
       ? options.payload
-      : Schema.Struct(options.payload as any),
+      : Schema.Struct(options.payload as any)) as Payload extends Schema.Struct.Fields ? Schema.Struct<Payload>
+        : Payload,
     successSchema: options.success ?? (Schema.Void as any),
     errorSchema: options.error ?? (Schema.Never as any),
-    annotations: options.annotations ?? ServiceMap.empty(),
-    annotate(tag, value) {
-      return make({
-        ...options,
-        annotations: ServiceMap.add(self.annotations, tag, value)
-      })
-    },
-    annotateMerge(context) {
-      return make({
-        ...options,
-        annotations: ServiceMap.merge(self.annotations, context)
-      })
-    },
-    execute: Effect.fnUntraced(
-      function*(fields: any, opts) {
-        const payload = self.payloadSchema.make(fields)
-        const engine = yield* EngineTag
-        const executionId = yield* makeExecutionId(payload)
-        yield* Effect.annotateCurrentSpan({ executionId })
-        return yield* engine.execute(self, {
-          executionId,
-          payload,
-          discard: opts?.discard,
-          suspendedRetrySchedule: options.suspendedRetrySchedule
-        })
-      },
-      Effect.withSpan(
-        `${options.name}.execute`,
-        {},
-        { captureStackTrace: false }
-      )
-    ) as any,
-    poll: Effect.fnUntraced(
-      function*(executionId: string) {
-        const engine = yield* EngineTag
-        return yield* engine.poll(self, executionId)
-      },
-      (effect, executionId) =>
-        Effect.withSpan(effect, `${options.name}.poll`, {
-          captureStackTrace: false,
-          attributes: { executionId }
-        })
-    ),
-    interrupt: Effect.fnUntraced(
-      function*(executionId: string) {
-        const engine = yield* EngineTag
-        yield* engine.interrupt(self, executionId)
-      },
-      (effect, executionId) =>
-        Effect.withSpan(effect, `${options.name}.interrupt`, {
-          captureStackTrace: false,
-          attributes: { executionId }
-        })
-    ),
-    resume: Effect.fnUntraced(
-      function*(executionId: string) {
-        const engine = yield* EngineTag
-        yield* engine.resume(self, executionId)
-      },
-      (effect, executionId) =>
-        Effect.withSpan(effect, `${options.name}.resume`, {
-          captureStackTrace: false,
-          attributes: { executionId }
-        })
-    ),
-    toLayer: (execute) =>
-      Layer.effectDiscard(
-        Effect.gen(function*() {
-          const engine = yield* EngineTag
-          return yield* engine.register(self, execute)
-        })
-      ),
-    executionId: (payload) =>
-      Effect.flatMap(
-        Effect.sync(() => self.payloadSchema.make(payload)),
-        makeExecutionId
-      ),
-    withCompensation
-  }
-
-  return self
-}
+    annotations: options.annotations ?? Context.empty(),
+    idempotencyKey: options.idempotencyKey as any,
+    suspendedRetrySchedule: options.suspendedRetrySchedule
+  })
 
 const ResultTypeId = "~effect/workflow/Workflow/Result"
 
 /**
+ * Returns `true` when a value is a workflow `Result`.
+ *
+ * @category results
  * @since 4.0.0
- * @category Result
  */
 export const isResult = <A = unknown, E = unknown>(
   u: unknown
 ): u is Result<A, E> => Predicate.hasProperty(u, ResultTypeId)
 
 /**
+ * Result of a workflow execution, either a completed exit or a suspended
+ * workflow state.
+ *
+ * @category results
  * @since 4.0.0
- * @category Result
  */
 export type Result<A, E> = Complete<A, E> | Suspended
 
 /**
+ * Encoded representation of a workflow `Result`.
+ *
+ * @category results
  * @since 4.0.0
- * @category Result
  */
 export type ResultEncoded<A, E> =
   | CompleteEncoded<A, E>
   | typeof Suspended.Encoded
 
 /**
+ * Encoded representation of a completed workflow result containing an encoded
+ * `Exit`.
+ *
+ * @category results
  * @since 4.0.0
- * @category Result
  */
 export interface CompleteEncoded<A, E> {
   readonly _tag: "Complete"
@@ -419,11 +504,15 @@ export interface CompleteEncoded<A, E> {
 }
 
 /**
+ * Schema constructor for `Complete` workflow results using the supplied
+ * success and error schemas.
+ *
+ * @category schemas
  * @since 4.0.0
  */
 export interface CompleteSchema<
-  Success extends Schema.Top,
-  Error extends Schema.Top
+  Success extends Schema.Constraint,
+  Error extends Schema.Constraint
 > extends
   Schema.declareConstructor<
     Complete<Success["Type"], Error["Type"]>,
@@ -436,21 +525,27 @@ export interface CompleteSchema<
 }
 
 /**
+ * Represents a completed workflow execution with its success or failure `Exit`.
+ *
+ * @category results
  * @since 4.0.0
- * @category Result
  */
 export class Complete<A, E> extends Data.TaggedClass("Complete")<{
   readonly exit: Exit.Exit<A, E>
 }> {
   /**
+   * Marks this value as a workflow result for runtime guards.
+   *
    * @since 4.0.0
    */
   readonly [ResultTypeId] = ResultTypeId
 
   /**
+   * Builds the schema for completed workflow results from success and error schemas.
+   *
    * @since 4.0.0
    */
-  static Schema<Success extends Schema.Top, Error extends Schema.Top>(options: {
+  static Schema<Success extends Schema.Constraint, Error extends Schema.Constraint>(options: {
     readonly success: Success
     readonly error: Error
   }): CompleteSchema<Success, Error> {
@@ -459,18 +554,18 @@ export class Complete<A, E> extends Data.TaggedClass("Complete")<{
       Complete<Success["Type"], Error["Type"]>,
       Complete<Success["Encoded"], Error["Encoded"]>
     >()(
-      [Schema.Exit(options.success, options.error, Schema.Defect)],
+      [Schema.Exit(options.success, options.error, Schema.Defect())],
       ([exit]) => (input, ast, options) => {
         if (!(isResult(input) && input._tag === "Complete")) {
-          return Effect.fail(new Issue.InvalidType(ast, Option.some(input)))
+          return Effect.fail(new SchemaIssue.InvalidType(ast, Option.some(input)))
         }
         return Effect.mapBothEager(
-          Parser.decodeEffect(exit)(input.exit, options),
+          SchemaParser.decodeEffect(exit)(input.exit, options),
           {
             onSuccess: (exit) => new Complete({ exit }),
             onFailure: (issue) =>
-              new Issue.Composite(ast, Option.some(input), [
-                new Issue.Pointer(["exit"], issue)
+              new SchemaIssue.Composite(ast, Option.some(input), [
+                new SchemaIssue.Pointer(["exit"], issue)
               ])
           }
         )
@@ -485,7 +580,10 @@ export class Complete<A, E> extends Data.TaggedClass("Complete")<{
             }),
             Tranformation.transform({
               decode: (encoded) => new Complete({ exit: encoded.exit }),
-              encode: (result) => ({ _tag: "Complete", exit: result.exit }) as const
+              encode: (result) => (({
+                _tag: "Complete",
+                exit: result.exit
+              }) as const)
             })
           )
       }
@@ -498,28 +596,36 @@ export class Complete<A, E> extends Data.TaggedClass("Complete")<{
 }
 
 /**
+ * Represents a suspended workflow execution, optionally carrying the cause that
+ * triggered suspension.
+ *
+ * @category results
  * @since 4.0.0
- * @category Result
  */
 export class Suspended extends Schema.Class<Suspended>(
   "effect/workflow/Workflow/Suspended"
 )({
   _tag: Schema.tag("Suspended"),
-  cause: Schema.optional(Schema.Cause(Schema.Never, Schema.Defect))
+  cause: Schema.optional(Schema.Cause(Schema.Never, Schema.Defect()))
 }) {
   /**
+   * Marks this value as a workflow result for runtime guards.
+   *
    * @since 4.0.0
    */
   readonly [ResultTypeId] = ResultTypeId
 }
 
 /**
+ * Creates a schema for workflow results using the supplied success and error
+ * schemas.
+ *
+ * @category results
  * @since 4.0.0
- * @category Result
  */
 export const Result = <
-  Success extends Schema.Top,
-  Error extends Schema.Top
+  Success extends Schema.Constraint,
+  Error extends Schema.Constraint
 >(options: {
   readonly success: Success
   readonly error: Error
@@ -528,8 +634,10 @@ export const Result = <
 const AnyOrVoid = Schema.Union([Schema.Any, Schema.Void])
 
 /**
+ * Schema for encoded workflow results with generic success and error payloads.
+ *
+ * @category results
  * @since 4.0.0
- * @category Result
  */
 export const ResultEncoded: Schema.Codec<ResultEncoded<any, any>> = Schema.toEncoded(
   Schema.toCodecJson(
@@ -541,8 +649,12 @@ export const ResultEncoded: Schema.Codec<ResultEncoded<any, any>> = Schema.toEnc
 ) as any
 
 /**
+ * Runs an effect as a workflow execution and converts its outcome into a
+ * `Result`, handling suspension, defect capture, interruption, and workflow
+ * scope finalization.
+ *
+ * @category results
  * @since 4.0.0
- * @category Result
  */
 export const intoResult = <A, E, R>(
   effect: Effect.Effect<A, E, R>
@@ -551,10 +663,10 @@ export const intoResult = <A, E, R>(
   never,
   Exclude<R, Scope.Scope> | WorkflowInstance
 > =>
-  Effect.servicesWith((services: ServiceMap.ServiceMap<WorkflowInstance>) => {
-    const instance = ServiceMap.get(services, InstanceTag)
-    const captureDefects = ServiceMap.get(instance.workflow.annotations, CaptureDefects)
-    const suspendOnFailure = ServiceMap.get(instance.workflow.annotations, SuspendOnFailure)
+  Effect.contextWith((context: Context.Context<WorkflowInstance>) => {
+    const instance = Context.get(context, InstanceTag)
+    const captureDefects = Context.get(instance.workflow.annotations, CaptureDefects)
+    const suspendOnFailure = Context.get(instance.workflow.annotations, SuspendOnFailure)
     return effect.pipe(
       // so we can use external interruption to suspend the workflow
       Effect.forkChild({ startImmediately: true }),
@@ -572,13 +684,20 @@ export const intoResult = <A, E, R>(
       Effect.scoped,
       Effect.matchCauseEffect({
         onSuccess: (value) => Effect.succeed(new Complete({ exit: Exit.succeed(value) })),
-        onFailure: (cause): Effect.Effect<Result<A, E>> =>
-          instance.suspended
+        onFailure: (cause): Effect.Effect<Result<A, E>> => {
+          const [reasons, interrupts] = Arr.partition(
+            cause.reasons,
+            Filter.fromPredicate(Cause.isInterruptReason)
+          )
+          const hasInterruptsOnly = interrupts.length === cause.reasons.length
+          const filtered = reasons.length === 0 ? cause : Cause.fromReasons(reasons)
+          return instance.suspended && hasInterruptsOnly
             ? Effect.succeed(new Suspended({ cause: instance.cause }))
-            : (!instance.interrupted && Cause.hasInterruptsOnly(cause)) ||
+            : (!instance.interrupted && hasInterruptsOnly) ||
                 (!captureDefects && Cause.hasDies(cause))
-            ? Effect.failCause(cause as Cause.Cause<never>)
-            : Effect.succeed(new Complete({ exit: Exit.failCause(cause) }))
+            ? Effect.failCause(filtered as Cause.Cause<never>)
+            : Effect.succeed(new Complete({ exit: Exit.failCause(filtered) }))
+        }
       }),
       (eff) =>
         Effect.onExitPrimitive(eff, (exit) => {
@@ -594,21 +713,19 @@ export const intoResult = <A, E, R>(
   })
 
 /**
+ * Wraps an activity-like effect so workflow suspension waits for currently
+ * running activities to finish or suspend.
+ *
+ * @category results
  * @since 4.0.0
- * @category Result
  */
 export const wrapActivityResult = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
   isSuspend: (value: A) => boolean
 ): Effect.Effect<A, E, R | WorkflowInstance> =>
-  Effect.servicesWith((services: ServiceMap.ServiceMap<WorkflowInstance>) => {
-    const instance = ServiceMap.get(services, InstanceTag)
+  Effect.contextWith((context: Context.Context<WorkflowInstance>) => {
+    const instance = Context.get(context, InstanceTag)
     const state = instance.activityState
-    if (instance.suspended) {
-      return waitForZero(instance).pipe(
-        Effect.andThen(suspend(instance))
-      )
-    }
     if (state.count === 0) state.latch.closeUnsafe()
     state.count++
     return Effect.onExit(effect, (exit) => {
@@ -646,31 +763,25 @@ const waitForZero = Effect.fnUntraced(function*(instance: WorkflowInstance["Serv
 })
 
 /**
- * Accesses the workflow scope.
+ * Accesses the workflow scope, which is only closed when the workflow execution fully completes.
  *
- * The workflow scope is only closed when the workflow execution fully
- * completes.
- *
- * @since 1.0.0
- * @category Scope
+ * @category resource management
+ * @since 4.0.0
  */
 export const scope: Effect.Effect<
   Scope.Scope,
   never,
   WorkflowInstance
 > = Effect.map(
-  InstanceTag.asEffect(),
+  InstanceTag,
   (instance) => instance.scope as Scope.Scope
 )
 
 /**
- * Provides the workflow scope to the given effect.
+ * Provides the workflow scope to the given effect, and closes the scope only when the workflow execution fully completes.
  *
- * The workflow scope is only closed when the workflow execution fully
- * completes.
- *
- * @since 1.0.0
- * @category Scope
+ * @category resource management
+ * @since 4.0.0
  */
 export const provideScope = <A, E, R>(
   effect: Effect.Effect<A, E, R>
@@ -678,8 +789,11 @@ export const provideScope = <A, E, R>(
   Effect.flatMap(scope, (scope) => Scope.provide(effect, scope))
 
 /**
- * @since 1.0.0
- * @category Scope
+ * Adds an exit finalizer to the current workflow scope, preserving the
+ * services available when the finalizer is registered.
+ *
+ * @category resource management
+ * @since 4.0.0
  */
 export const addFinalizer: <R>(
   f: (exit: Exit.Exit<unknown, unknown>) => Effect.Effect<void, never, R>
@@ -691,20 +805,28 @@ export const addFinalizer: <R>(
   f: (exit: Exit.Exit<unknown, unknown>) => Effect.Effect<void, never, R>
 ) {
   const scope = (yield* InstanceTag).scope
-  const services = yield* Effect.services<R>()
-  yield* Scope.addFinalizerExit(scope, (exit) => Effect.provideServices(f(exit), services))
+  const services = yield* Effect.context<R>()
+  yield* Scope.addFinalizerExit(scope, (exit) => Effect.provideContext(f(exit), services))
 })
 
 /**
- * Add compensation logic to an effect inside a Workflow. The compensation finalizer will be
- * called if the entire workflow fails, allowing you to perform cleanup or
- * other actions based on the success value and the cause of the workflow failure.
+ * Adds compensation logic to an effect inside a Workflow.
  *
- * NOTE: Compensation will not work for nested activities. Compensation
- * finalizers are only registered for top-level effects in the workflow.
+ * **When to use**
  *
- * @since 1.0.0
+ * Use when a top-level workflow step needs compensating cleanup if the overall
+ * workflow later fails after the step succeeds.
+ *
+ * **Details**
+ *
+ * The compensation finalizer is called if the entire workflow fails, allowing you to perform cleanup or other actions based on the success value and the cause of the workflow failure.
+ *
+ * **Gotchas**
+ *
+ * Compensation finalizers are only registered for top-level effects in the workflow and do not work for nested activities.
+ *
  * @category Compensation
+ * @since 4.0.0
  */
 export const withCompensation: {
   <A, R2>(
@@ -728,8 +850,11 @@ export const withCompensation: {
   ))
 
 /**
+ * Marks a workflow instance as suspended and interrupts the current fiber to
+ * stop execution until it is resumed.
+ *
+ * @category results
  * @since 4.0.0
- * @category Result
  */
 export const suspend = (instance: WorkflowInstance["Service"]): Effect.Effect<never> =>
   Effect.interruptible(Effect.callback<never>(() => {
@@ -739,15 +864,16 @@ export const suspend = (instance: WorkflowInstance["Service"]): Effect.Effect<ne
   }))
 
 /**
- * If you set this annotation to `true` for a workflow, it will capture defects
- * and include them in the result of the workflow or it's activities.
+ * Captures defects for a workflow and includes them in the result of the workflow or its activities.
  *
- * By default, this is set to `true`, meaning that defects will be captured.
+ * **Details**
  *
+ * By default, this annotation is set to `true`, meaning defects are captured.
+ *
+ * @category annotations
  * @since 4.0.0
- * @category Annotations
  */
-export const CaptureDefects = ServiceMap.Reference<boolean>(
+export const CaptureDefects = Context.Reference<boolean>(
   "effect/workflow/Workflow/CaptureDefects",
   {
     defaultValue: constTrue
@@ -755,16 +881,16 @@ export const CaptureDefects = ServiceMap.Reference<boolean>(
 )
 
 /**
- * If you set this annotation to `true` for a workflow, it will suspend if it
- * encounters any kind of error.
+ * Marks a workflow to suspend when it encounters any error.
  *
- * You can then manually resume the workflow later with
- * `Workflow.resume(executionId)`.
+ * **Details**
  *
+ * The suspended execution can later be resumed with the workflow's `resume` method, for example `MyWorkflow.resume(executionId)`.
+ *
+ * @category annotations
  * @since 4.0.0
- * @category Annotations
  */
-export const SuspendOnFailure = ServiceMap.Reference<boolean>(
+export const SuspendOnFailure = Context.Reference<boolean>(
   "effect/workflow/Workflow/SuspendOnFailure",
   {
     defaultValue: constFalse

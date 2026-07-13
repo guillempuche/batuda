@@ -1,26 +1,44 @@
 /**
+ * Exports Effect log entries over OTLP/HTTP.
+ *
+ * The logger turns Effect log entries into OTLP log records and sends them to a
+ * logs endpoint, such as an OpenTelemetry Collector or vendor OTLP endpoint. It
+ * includes log levels, messages, annotations, causes, fiber ids, optional log
+ * spans, and current trace/span ids when they are present.
+ *
  * @since 4.0.0
  */
 import * as Arr from "../../Array.ts"
 import * as Cause from "../../Cause.ts"
 import { Clock } from "../../Clock.ts"
+import * as Config from "../../Config.ts"
 import * as Duration from "../../Duration.ts"
 import * as Effect from "../../Effect.ts"
-import type * as Layer from "../../Layer.ts"
+import * as Layer from "../../Layer.ts"
 import * as Logger from "../../Logger.ts"
 import type * as LogLevel from "../../LogLevel.ts"
+import * as Option from "../../Option.ts"
 import { CurrentLogAnnotations, CurrentLogSpans } from "../../References.ts"
 import type * as Scope from "../../Scope.ts"
 import type * as Headers from "../http/Headers.ts"
 import type * as HttpClient from "../http/HttpClient.ts"
+import * as OtlpEnv from "./internal/otlpEnv.ts"
 import * as Exporter from "./OtlpExporter.ts"
 import type { AnyValue, Fixed64, KeyValue, Resource } from "./OtlpResource.ts"
 import * as OtlpResource from "./OtlpResource.ts"
 import { OtlpSerialization } from "./OtlpSerialization.ts"
 
 /**
+ * Creates an Effect `Logger` that exports log records through OTLP.
+ *
+ * **Details**
+ *
+ * The logger serializes records with the configured resource, sends them
+ * through the OTLP exporter, and requires `Scope` so pending records can be
+ * flushed on shutdown.
+ *
+ * @category constructors
  * @since 4.0.0
- * @category Constructors
  */
 export const make: (
   options: {
@@ -76,8 +94,14 @@ export const make: (
 })
 
 /**
+ * Layer that installs the OTLP logger created by `make`.
+ *
+ * **Details**
+ *
+ * By default the OTLP logger is merged with any existing loggers.
+ *
+ * @category layers
  * @since 4.0.0
- * @category Layers
  */
 export const layer = (options: {
   readonly url: string
@@ -98,6 +122,61 @@ export const layer = (options: {
   })
 
 /**
+ * Creates an OTLP logs layer from OpenTelemetry configuration.
+ *
+ * @category layers
+ * @since 4.0.0
+ */
+export const layerFromConfig = (options?: {
+  readonly resource?: {
+    readonly serviceName?: string | undefined
+    readonly serviceVersion?: string | undefined
+    readonly attributes?: Record<string, unknown>
+  } | undefined
+  readonly headers?: Headers.Input | undefined
+  readonly excludeLogSpans?: boolean | undefined
+  readonly mergeWithExisting?: boolean | undefined
+}): Layer.Layer<never, never, HttpClient.HttpClient | OtlpSerialization> =>
+  Effect.gen(function*() {
+    const { disabled, endpoint, exporters } = yield* Config.all({
+      disabled: Config.boolean("OTEL_SDK_DISABLED").pipe(Config.withDefault(false)),
+      endpoint: OtlpEnv.endpoint("LOGS"),
+      exporters: OtlpEnv.exporters("LOGS")
+    })
+
+    if (disabled || !endpoint || !exporters.includes("otlp")) {
+      return Layer.empty
+    }
+
+    const { baseTimeout, logsTimeout, exportTimeout, scheduleDelay, maxBatchSize } = yield* Config.all({
+      baseTimeout: Config.option(Config.int("OTEL_EXPORTER_OTLP_TIMEOUT")),
+      logsTimeout: Config.option(Config.int("OTEL_EXPORTER_OTLP_LOGS_TIMEOUT")),
+      exportTimeout: Config.option(Config.int("OTEL_BLRP_EXPORT_TIMEOUT")),
+      scheduleDelay: Config.option(Config.int("OTEL_BLRP_SCHEDULE_DELAY")),
+      maxBatchSize: Config.option(Config.int("OTEL_BLRP_MAX_EXPORT_BATCH_SIZE"))
+    })
+
+    const shutdownTimeout = Option.firstSomeOf([logsTimeout, baseTimeout, exportTimeout]).pipe(
+      Option.map((_) => Duration.millis(_))
+    )
+    const exportInterval = Option.map(scheduleDelay, (_) => Duration.millis(_))
+
+    return layer({
+      url: endpoint.toString(),
+      resource: options?.resource,
+      headers: options?.headers ?? (yield* OtlpEnv.headers("LOGS")),
+      exportInterval: Option.getOrUndefined(exportInterval),
+      maxBatchSize: Option.getOrUndefined(maxBatchSize),
+      shutdownTimeout: Option.getOrUndefined(shutdownTimeout),
+      excludeLogSpans: options?.excludeLogSpans,
+      mergeWithExisting: options?.mergeWithExisting
+    })
+  }).pipe(Effect.orDie, Layer.unwrap)
+
+/**
+ * OTLP logs payload serialized by `OtlpLogger`.
+ *
+ * @category models
  * @since 4.0.0
  */
 export interface LogsData {

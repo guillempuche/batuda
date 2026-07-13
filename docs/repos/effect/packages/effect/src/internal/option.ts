@@ -7,7 +7,8 @@ import * as Hash from "../Hash.ts"
 import { toJson } from "../Inspectable.ts"
 import type * as Option from "../Option.ts"
 import { hasProperty } from "../Predicate.ts"
-import { exitFail, exitSucceed, NoSuchElementError, PipeInspectableProto, YieldableProto } from "./core.ts"
+import { SingleShotGen } from "../Utils.ts"
+import { PipeInspectableProto } from "./core.ts"
 
 const TypeId = "~effect/data/Option"
 
@@ -16,40 +17,44 @@ const CommonProto = {
     _A: (_: never) => _
   },
   ...PipeInspectableProto,
-  ...YieldableProto
+  [Symbol.iterator]() {
+    return new SingleShotGen(this)
+  }
 }
 
-const SomeProto = Object.assign(Object.create(CommonProto), {
-  _tag: "Some",
-  _op: "Some",
-  [Equal.symbol]<A>(this: Option.Some<A>, that: unknown): boolean {
-    return (
-      isOption(that) && isSome(that) && Equal.equals(this.value, that.value)
-    )
-  },
-  [Hash.symbol]<A>(this: Option.Some<A>) {
-    return Hash.combine(Hash.hash(this._tag))(Hash.hash(this.value))
-  },
-  toString<A>(this: Option.Some<A>) {
-    return `some(${format(this.value)})`
-  },
-  toJSON<A>(this: Option.Some<A>) {
-    return {
-      _id: "Option",
-      _tag: this._tag,
-      value: toJson(this.value)
+// `valueOrUndefined` is folded into the initializer (rather than a separate
+// `Object.defineProperty(SomeProto, ...)` statement) so the whole definition
+// is pure-annotated by the build and tree-shakable.
+const SomeProto = Object.defineProperty(
+  Object.assign(Object.create(CommonProto), {
+    _tag: "Some",
+    _op: "Some",
+    [Equal.symbol]<A>(this: Option.Some<A>, that: unknown): boolean {
+      return (
+        isOption(that) && isSome(that) && Equal.equals(this.value, that.value)
+      )
+    },
+    [Hash.symbol]<A>(this: Option.Some<A>) {
+      return Hash.combine(Hash.hash(this._tag))(Hash.hash(this.value))
+    },
+    toString<A>(this: Option.Some<A>) {
+      return `some(${format(this.value)})`
+    },
+    toJSON<A>(this: Option.Some<A>) {
+      return {
+        _id: "Option",
+        _tag: this._tag,
+        value: toJson(this.value)
+      }
     }
-  },
-  asEffect(this: Option.Some<unknown>) {
-    return exitSucceed(this.value)
+  }),
+  "valueOrUndefined",
+  {
+    get() {
+      return this.value
+    }
   }
-})
-
-Object.defineProperty(SomeProto, "valueOrUndefined", {
-  get() {
-    return this.value
-  }
-})
+)
 
 const NoneHash = Hash.hash("None")
 const NoneProto = Object.assign(Object.create(CommonProto), {
@@ -70,9 +75,6 @@ const NoneProto = Object.assign(Object.create(CommonProto), {
       _id: "Option",
       _tag: this._tag
     }
-  },
-  asEffect<A>(this: Option.None<A>) {
-    return exitFail(new NoSuchElementError())
   }
 })
 

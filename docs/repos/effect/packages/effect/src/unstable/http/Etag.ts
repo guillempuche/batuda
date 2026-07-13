@@ -1,22 +1,37 @@
 /**
+ * HTTP entity tag values and metadata-based generator layers.
+ *
+ * ETags are validators for a specific representation of a resource. Servers put
+ * them in `ETag` response headers so clients and intermediaries can revalidate
+ * cached content with `If-None-Match`, or protect writes with preconditions such
+ * as `If-Match`.
+ *
  * @since 4.0.0
  */
+import * as Context from "../../Context.ts"
 import * as Effect from "../../Effect.ts"
 import type * as FileSystem from "../../FileSystem.ts"
 import * as Layer from "../../Layer.ts"
 import * as Option from "../../Option.ts"
-import * as ServiceMap from "../../ServiceMap.ts"
 import type * as Body from "./HttpBody.ts"
 
 /**
- * @since 4.0.0
+ * Represents an HTTP entity tag, either weak or strong.
+ *
  * @category models
+ * @since 4.0.0
  */
 export type Etag = Weak | Strong
 
 /**
- * @since 4.0.0
+ * Weak HTTP entity tag.
+ *
+ * **Details**
+ *
+ * The `value` is the raw tag value without the surrounding quotes or `W/` prefix.
+ *
  * @category models
+ * @since 4.0.0
  */
 export interface Weak {
   readonly _tag: "Weak"
@@ -24,8 +39,14 @@ export interface Weak {
 }
 
 /**
- * @since 4.0.0
+ * Strong HTTP entity tag.
+ *
+ * **Details**
+ *
+ * The `value` is the raw tag value without the surrounding quotes.
+ *
  * @category models
+ * @since 4.0.0
  */
 export interface Strong {
   readonly _tag: "Strong"
@@ -33,8 +54,10 @@ export interface Strong {
 }
 
 /**
+ * Formats an `Etag` as an HTTP header value, including quotes and the `W/` prefix for weak tags.
+ *
+ * @category converting
  * @since 4.0.0
- * @category convertions
  */
 export const toString = (self: Etag): string => {
   switch (self._tag) {
@@ -46,10 +69,12 @@ export const toString = (self: Etag): string => {
 }
 
 /**
- * @since 4.0.0
+ * Service for generating ETags from filesystem file information or Web `File`-like metadata.
+ *
  * @category models
+ * @since 4.0.0
  */
-export class Generator extends ServiceMap.Service<Generator, {
+export class Generator extends Context.Service<Generator, {
   readonly fromFileInfo: (info: FileSystem.File.Info) => Effect.Effect<Etag>
   readonly fromFileWeb: (file: Body.HttpBody.FileLike) => Effect.Effect<Etag>
 }>()("effect/http/Etag/Generator") {}
@@ -67,8 +92,25 @@ const fromFileWeb = (file: Body.HttpBody.FileLike) => {
 }
 
 /**
+ * Layer that provides a `Generator` which produces strong ETags from file size
+ * and modification time metadata.
+ *
+ * **When to use**
+ *
+ * Use when you need the `Generator` service to produce strong ETags and file
+ * size plus modification time reliably change for every byte-level change.
+ *
+ * **Gotchas**
+ *
+ * This layer marks metadata-derived tags as strong. If the underlying storage
+ * can update file contents without changing the recorded size or modification
+ * time, those tags can stop representing byte-for-byte identity.
+ *
+ * @see {@link layerWeak} for weak metadata-derived ETags when byte-for-byte identity is not required
+ * @see {@link Generator} for the service provided by this layer
+ *
+ * @category layers
  * @since 4.0.0
- * @category Layers
  */
 export const layer: Layer.Layer<Generator> = Layer.succeed(
   Generator
@@ -82,8 +124,10 @@ export const layer: Layer.Layer<Generator> = Layer.succeed(
 })
 
 /**
+ * Layer that provides a `Generator` which produces weak ETags from file size and modification time metadata.
+ *
+ * @category layers
  * @since 4.0.0
- * @category Layers
  */
 export const layerWeak: Layer.Layer<Generator> = Layer.succeed(
   Generator

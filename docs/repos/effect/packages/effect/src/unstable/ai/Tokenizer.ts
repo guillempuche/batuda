@@ -1,53 +1,36 @@
 /**
- * The `Tokenizer` module provides tokenization and text truncation capabilities
- * for large language model text processing workflows.
+ * Service for model-specific token counting and prompt truncation. Tokenization
+ * depends on the target provider, model, and encoding rules, so this module
+ * leaves the actual tokenization function to the service implementation.
  *
- * This module offers services for converting text into tokens and truncating
- * prompts based on token limits, essential for managing context length
- * constraints in large language models.
- *
- * @example
- * ```ts
- * import { Effect } from "effect"
- * import { Tokenizer } from "effect/unstable/ai"
- *
- * const tokenizeText = Effect.gen(function*() {
- *   const tokenizer = yield* Tokenizer.Tokenizer
- *   const tokens = yield* tokenizer.tokenize("Hello, world!")
- *   console.log(`Token count: ${tokens.length}`)
- *   return tokens
- * })
- * ```
- *
- * @example
- * ```ts
- * import { Effect } from "effect"
- * import { Tokenizer } from "effect/unstable/ai"
- *
- * // Truncate a prompt to fit within token limits
- * const truncatePrompt = Effect.gen(function*() {
- *   const tokenizer = yield* Tokenizer.Tokenizer
- *   const longPrompt = "This is a very long prompt..."
- *   const truncated = yield* tokenizer.truncate(longPrompt, 100)
- *   return truncated
- * })
- * ```
+ * The `Tokenizer` service can count tokens for raw prompt input and shorten a
+ * prompt to a token limit by keeping the newest messages that fit. This module
+ * defines the service tag, the service interface, and a `make` constructor that
+ * builds a full tokenizer service from a token-counting function.
  *
  * @since 4.0.0
  */
+import * as Context from "../../Context.ts"
 import * as Effect from "../../Effect.ts"
 import * as Predicate from "../../Predicate.ts"
-import * as ServiceMap from "../../ServiceMap.ts"
 import type * as AiError from "./AiError.ts"
 import * as Prompt from "./Prompt.ts"
 
 /**
- * The `Tokenizer` service tag for dependency injection.
+ * Service tag for model tokenization services.
+ *
+ * **When to use**
+ *
+ * Use to access or provide model-specific token counting and prompt truncation
+ * operations.
+ *
+ * **Details**
  *
  * This tag provides access to tokenization functionality throughout your
  * application, enabling token counting and prompt truncation capabilities.
  *
- * @example
+ * **Example** (Accessing the Tokenizer service)
+ *
  * ```ts
  * import { Effect } from "effect"
  * import { Tokenizer } from "effect/unstable/ai"
@@ -59,10 +42,10 @@ import * as Prompt from "./Prompt.ts"
  * })
  * ```
  *
- * @since 4.0.0
  * @category services
+ * @since 4.0.0
  */
-export class Tokenizer extends ServiceMap.Service<Tokenizer, Service>()(
+export class Tokenizer extends Context.Service<Tokenizer, Service>()(
   "effect/ai/Tokenizer"
 ) {}
 
@@ -70,14 +53,17 @@ export class Tokenizer extends ServiceMap.Service<Tokenizer, Service>()(
  * Tokenizer service interface providing text tokenization and truncation
  * operations.
  *
+ * **Details**
+ *
  * This interface defines the core operations for converting text to tokens and
  * managing content length within token limits for AI model compatibility.
  *
- * @example
+ * **Example** (Implementing a custom tokenizer)
+ *
  * ```ts
  * import { Effect } from "effect"
- * import type { Tokenizer } from "effect/unstable/ai"
  * import { Prompt } from "effect/unstable/ai"
+ * import type { Tokenizer } from "effect/unstable/ai"
  *
  * const customTokenizer: Tokenizer.Service = {
  *   tokenize: (input) =>
@@ -87,8 +73,8 @@ export class Tokenizer extends ServiceMap.Service<Tokenizer, Service>()(
  * }
  * ```
  *
- * @since 4.0.0
  * @category models
+ * @since 4.0.0
  */
 export interface Service {
   /**
@@ -118,11 +104,14 @@ export interface Service {
 /**
  * Creates a Tokenizer service implementation from tokenization options.
  *
+ * **Details**
+ *
  * This function constructs a complete Tokenizer service by providing a
  * tokenization function. The service handles both tokenization and
  * truncation operations using the provided tokenizer.
  *
- * @example
+ * **Example** (Creating a word tokenizer)
+ *
  * ```ts
  * import { Effect } from "effect"
  * import { Tokenizer } from "effect/unstable/ai"
@@ -144,8 +133,8 @@ export interface Service {
  * })
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const make = (options: {
   readonly tokenize: (content: Prompt.Prompt) => Effect.Effect<Array<number>, AiError.AiError>

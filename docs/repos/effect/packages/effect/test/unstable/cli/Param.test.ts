@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
-import { Config, ConfigProvider, Effect, FileSystem, Layer, Path } from "effect"
+import { Config, ConfigProvider, Effect, FileSystem, Layer, Option, Path, Ref, Stdio } from "effect"
 import { TestConsole } from "effect/testing"
 import { Argument, CliError, Flag, Prompt } from "effect/unstable/cli"
 import { ChildProcessSpawner } from "effect/unstable/process"
@@ -9,16 +9,48 @@ const ConsoleLayer = TestConsole.layer
 const FileSystemLayer = FileSystem.layerNoop({})
 const PathLayer = Path.layer
 const TerminalLayer = MockTerminal.layer
+const StdioLayer = Stdio.layerTest({})
+const ChildProcessSpawnerLayer = Layer.succeed(
+  ChildProcessSpawner.ChildProcessSpawner,
+  ChildProcessSpawner.make(() => Effect.die("Not implemented"))
+)
 
 const TestLayer = Layer.mergeAll(
   ConsoleLayer,
   FileSystemLayer,
   PathLayer,
   TerminalLayer,
-  Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, ChildProcessSpawner.make(() => Effect.die("Not implemented")))
+  StdioLayer,
+  ChildProcessSpawnerLayer
 )
 
 describe("Param", () => {
+  describe("optional", () => {
+    it.effect("returns none when an optional boolean flag is omitted", () =>
+      Effect.gen(function*() {
+        const flag = Flag.boolean("verbose").pipe(Flag.optional)
+
+        const [, value] = yield* flag.parse({
+          flags: {},
+          arguments: []
+        })
+
+        assert.deepStrictEqual(value, Option.none())
+      }).pipe(Effect.provide(TestLayer)))
+
+    it.effect("returns some when an optional boolean flag is provided", () =>
+      Effect.gen(function*() {
+        const flag = Flag.boolean("verbose").pipe(Flag.optional)
+
+        const [, value] = yield* flag.parse({
+          flags: { verbose: ["false"] },
+          arguments: []
+        })
+
+        assert.deepStrictEqual(value, Option.some(false))
+      }).pipe(Effect.provide(TestLayer)))
+  })
+
   describe("withFallbackPrompt", () => {
     it.effect("prompts for missing flag values and preserves remaining args", () =>
       Effect.gen(function*() {
@@ -65,6 +97,86 @@ describe("Param", () => {
 
         assert.strictEqual(value, "notes.txt")
         assert.deepStrictEqual(remaining, [])
+      }).pipe(Effect.provide(TestLayer)))
+
+    it.effect("builds flag fallback prompts from effects lazily", () =>
+      Effect.gen(function*() {
+        const calls = yield* Ref.make(0)
+        const prompt = Effect.gen(function*() {
+          yield* Ref.update(calls, (n) => n + 1)
+          return Prompt.text({ message: "Name from effect" })
+        })
+
+        const flag = Flag.string("name").pipe(Flag.withFallbackPrompt(prompt))
+
+        const [, provided] = yield* flag.parse({
+          flags: { name: ["Ava"] },
+          arguments: []
+        })
+        assert.strictEqual(provided, "Ava")
+        assert.strictEqual(yield* Ref.get(calls), 0)
+
+        yield* MockTerminal.inputText("Mia")
+        yield* MockTerminal.inputKey("enter")
+
+        const [remaining, prompted] = yield* flag.parse({
+          flags: {},
+          arguments: ["tail"]
+        })
+
+        assert.strictEqual(prompted, "Mia")
+        assert.deepStrictEqual(remaining, ["tail"])
+        assert.strictEqual(yield* Ref.get(calls), 1)
+      }).pipe(Effect.provide(TestLayer)))
+
+    it.effect("builds argument fallback prompts from effects lazily", () =>
+      Effect.gen(function*() {
+        const calls = yield* Ref.make(0)
+        const prompt = Effect.gen(function*() {
+          yield* Ref.update(calls, (n) => n + 1)
+          return Prompt.text({ message: "File from effect" })
+        })
+
+        const argument = Argument.string("file").pipe(Argument.withFallbackPrompt(prompt))
+
+        const [providedRemaining, provided] = yield* argument.parse({
+          flags: {},
+          arguments: ["notes.txt", "tail"]
+        })
+        assert.strictEqual(provided, "notes.txt")
+        assert.deepStrictEqual(providedRemaining, ["tail"])
+        assert.strictEqual(yield* Ref.get(calls), 0)
+
+        yield* MockTerminal.inputText("draft.md")
+        yield* MockTerminal.inputKey("enter")
+
+        const [promptedRemaining, prompted] = yield* argument.parse({
+          flags: {},
+          arguments: []
+        })
+
+        assert.strictEqual(prompted, "draft.md")
+        assert.deepStrictEqual(promptedRemaining, [])
+        assert.strictEqual(yield* Ref.get(calls), 1)
+      }).pipe(Effect.provide(TestLayer)))
+
+    it.effect("propagates errors from effectful fallback prompt creation", () =>
+      Effect.gen(function*() {
+        const failure = new CliError.UserError({
+          cause: "failed to build prompt"
+        })
+        const prompt = Effect.fail(failure)
+
+        const flag = Flag.string("name").pipe(Flag.withFallbackPrompt(prompt))
+
+        const error = yield* Effect.flip(
+          flag.parse({
+            flags: {},
+            arguments: []
+          })
+        )
+
+        assert.strictEqual(error, failure)
       }).pipe(Effect.provide(TestLayer)))
 
     it.effect("prefers defaults over fallback prompts", () =>
@@ -162,7 +274,7 @@ describe("Param", () => {
   })
 
   describe("withFallbackConfig", () => {
-    it.effect("uses config when a flag is missing", () => {
+    it.effect("uses ConfigProvider when a flag is missing", () => {
       const provider = ConfigProvider.fromEnv({
         env: {
           NAME: "Ava"
@@ -186,7 +298,7 @@ describe("Param", () => {
       )
     })
 
-    it.effect("uses flag values over config", () => {
+    it.effect("uses flag values before reading config fallbacks", () => {
       const provider = ConfigProvider.fromEnv({
         env: {
           NAME: "Ava"
@@ -210,7 +322,7 @@ describe("Param", () => {
       )
     })
 
-    it.effect("uses config when an argument is missing", () => {
+    it.effect("uses ConfigProvider when an argument is missing", () => {
       const provider = ConfigProvider.fromEnv({
         env: {
           REPOSITORY: "repo"

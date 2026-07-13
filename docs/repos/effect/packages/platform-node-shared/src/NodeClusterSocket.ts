@@ -1,5 +1,12 @@
 /**
- * @since 1.0.0
+ * Node TCP socket transport for Effect Cluster runner-to-runner RPC.
+ *
+ * This module provides the shared Node layers used by socket-based cluster
+ * transports. `layerClientProtocol` opens TCP sockets to peer runner addresses
+ * and wraps them in the current RPC serialization protocol. `layerSocketServer`
+ * exposes the socket server that receives incoming runner RPC traffic.
+ *
+ * @since 4.0.0
  */
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -14,8 +21,11 @@ import * as NodeSocket from "./NodeSocket.ts"
 import * as NodeSocketServer from "./NodeSocketServer.ts"
 
 /**
- * @since 1.0.0
- * @category Layers
+ * Provides the cluster `RpcClientProtocol` by opening TCP sockets to runner
+ * addresses and using the current RPC serialization service.
+ *
+ * @category layers
+ * @since 4.0.0
  */
 export const layerClientProtocol: Layer.Layer<
   Runners.RpcClientProtocol,
@@ -40,8 +50,11 @@ export const layerClientProtocol: Layer.Layer<
 )
 
 /**
- * @since 1.0.0
- * @category Layers
+ * Provides the socket server used by cluster runners, listening on
+ * `ShardingConfig.runnerListenAddress` or `runnerAddress`.
+ *
+ * @category layers
+ * @since 4.0.0
  */
 export const layerSocketServer: Layer.Layer<
   SocketServer.SocketServer,

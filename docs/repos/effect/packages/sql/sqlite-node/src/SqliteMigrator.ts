@@ -1,5 +1,12 @@
 /**
- * @since 1.0.0
+ * Runs database migrations for Node.js SQLite projects that use Effect SQL.
+ *
+ * This module re-exports the shared migration loaders and errors, then provides
+ * `run` and `layer` helpers that apply pending migration files with the current
+ * `SqlClient`. It does not add Node-specific schema dump support; migration
+ * execution is handled by the shared SQL migrator.
+ *
+ * @since 4.0.0
  */
 import type * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -8,13 +15,15 @@ import type * as Client from "effect/unstable/sql/SqlClient"
 import type { SqlError } from "effect/unstable/sql/SqlError"
 
 /**
- * @since 1.0.0
+ * @since 4.0.0
  */
 export * from "effect/unstable/sql/Migrator"
 
 /**
- * @category constructor
- * @since 1.0.0
+ * Runs SQL migrations for a SQLite database using the shared `Migrator` implementation and the current `SqlClient`.
+ *
+ * @category constructors
+ * @since 4.0.0
  */
 export const run: <R2 = never>(
   options: Migrator.MigratorOptions<R2>
@@ -67,8 +76,10 @@ export const run: <R2 = never>(
 })
 
 /**
- * @category constructor
- * @since 1.0.0
+ * Creates a layer that runs the configured SQLite migrations during layer construction and provides no services.
+ *
+ * @category constructors
+ * @since 4.0.0
  */
 export const layer = <R>(
   options: Migrator.MigratorOptions<R>

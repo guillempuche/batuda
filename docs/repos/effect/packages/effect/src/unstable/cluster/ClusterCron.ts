@@ -1,4 +1,12 @@
 /**
+ * Runs recurring cron jobs through cluster sharding.
+ *
+ * This module turns a `Cron.Cron` schedule into a `Layer` that coordinates one
+ * recurring job across a cluster. It registers a singleton for the initial
+ * scheduling step and a persisted entity message for each run. This is useful
+ * for distributed maintenance work where the job should be owned by the cluster
+ * rather than by every runner independently.
+ *
  * @since 4.0.0
  */
 import * as Cron from "../../Cron.ts"
@@ -21,8 +29,16 @@ import type { Sharding } from "./Sharding.ts"
 import * as Singleton from "./Singleton.ts"
 
 /**
+ * Creates a layer that runs a cron job through the cluster sharding system.
+ *
+ * **Details**
+ *
+ * The job is scheduled as persisted entity messages, with an initial singleton
+ * scheduling step and optional controls for shard group, next-run calculation,
+ * and skipping stale scheduled runs.
+ *
+ * @category constructors
  * @since 4.0.0
- * @category Constructors
  */
 export const make = <E, R>(options: {
   readonly name: string
@@ -35,7 +51,10 @@ export const make = <E, R>(options: {
   readonly shardGroup?: string | undefined
 
   /**
-   * Whether to run the next cron job based from the time of the previous run.
+   * Controls whether the next cron job is based on the time of the previous
+   * run.
+   *
+   * **Details**
    *
    * Defaults to `false`, meaning the next run will be calculated from the
    * current time.
@@ -46,8 +65,11 @@ export const make = <E, R>(options: {
    * If set, the cron job will skip execution if the scheduled time is older
    * than this duration.
    *
-   * This is useful to prevent running jobs that were scheduled too far in the
-   * past.
+   * **When to use**
+   *
+   * Use to prevent running jobs that were scheduled too far in the past.
+   *
+   * **Details**
    *
    * Defaults to "1 day".
    */
@@ -125,9 +147,10 @@ export const make = <E, R>(options: {
   return Layer.merge(InitialRun, EntityLayer)
 }
 
-const retryPolicy = Schedule.exponential(200, 1.5).pipe(
-  Schedule.either(Schedule.spaced("1 minute"))
-)
+const retryPolicy = Schedule.min([
+  Schedule.exponential(200, 1.5),
+  Schedule.spaced("1 minute")
+])
 
 class CronPayload extends Schema.Class<CronPayload>("effect/cluster/ClusterCron/CronPayload")({
   dateTime: Schema.DateTimeUtc

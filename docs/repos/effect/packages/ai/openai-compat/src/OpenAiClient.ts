@@ -1,14 +1,20 @@
 /**
- * @since 1.0.0
+ * The `OpenAiClient` module provides an Effect service for OpenAI-compatible
+ * chat completions and embeddings APIs. It builds on the Effect HTTP client,
+ * adds authentication and OpenAI organization or project headers, and exposes
+ * typed helpers for non-streaming chat completions, streaming chat completions,
+ * and embedding requests.
+ *
+ * @since 4.0.0
  */
 import * as Array from "effect/Array"
 import type * as Config from "effect/Config"
+import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import { identity, pipe } from "effect/Function"
 import * as Layer from "effect/Layer"
 import * as Redacted from "effect/Redacted"
 import * as Schema from "effect/Schema"
-import * as ServiceMap from "effect/ServiceMap"
 import * as Stream from "effect/Stream"
 import type * as AiError from "effect/unstable/ai/AiError"
 import * as Sse from "effect/unstable/encoding/Sse"
@@ -20,8 +26,16 @@ import * as Errors from "./internal/errors.ts"
 import { OpenAiConfig } from "./OpenAiConfig.ts"
 
 /**
- * @since 1.0.0
+ * Effect service interface for OpenAI-compatible chat completions and embeddings.
+ *
+ * **Details**
+ *
+ * Exposes the configured HTTP client plus helpers for non-streaming chat
+ * completions, streaming chat completions, and embeddings. Transport and
+ * schema decoding failures are mapped to `AiError`.
+ *
  * @category models
+ * @since 4.0.0
  */
 export interface Service {
   readonly client: HttpClient.HttpClient
@@ -46,16 +60,35 @@ export interface Service {
 }
 
 /**
- * @since 1.0.0
- * @category service
+ * Service tag for the OpenAI-compatible chat completions and embeddings client.
+ *
+ * **When to use**
+ *
+ * Use when building effects that depend on the low-level OpenAI-compatible
+ * client through context rather than receiving the client as a value.
+ *
+ * **Details**
+ *
+ * The tagged service is the `Service` interface produced by `make` and provided
+ * by `layer` or `layerConfig`.
+ *
+ * @see {@link Service} for the operations provided by the service
+ * @see {@link make} for constructing the service from explicit options
+ * @see {@link layer} for providing the service from explicit options
+ * @see {@link layerConfig} for loading client settings from `Config`
+ *
+ * @category services
+ * @since 4.0.0
  */
-export class OpenAiClient extends ServiceMap.Service<OpenAiClient, Service>()(
+export class OpenAiClient extends Context.Service<OpenAiClient, Service>()(
   "@effect/ai-openai-compat/OpenAiClient"
 ) {}
 
 /**
- * @since 1.0.0
- * @category models
+ * Configuration options used to construct an OpenAI-compatible client.
+ *
+ * @category options
+ * @since 4.0.0
  */
 export type Options = {
   readonly apiKey?: Redacted.Redacted<string> | undefined
@@ -71,8 +104,29 @@ const RedactedOpenAiHeaders = {
 }
 
 /**
- * @since 1.0.0
+ * Constructs an OpenAI-compatible client service from explicit options.
+ *
+ * **When to use**
+ *
+ * Use when you need the OpenAI-compatible client service value inside an effect.
+ *
+ * **Details**
+ *
+ * The returned service uses the current `HttpClient`, prepends `apiUrl` or
+ * `https://api.openai.com/v1`, adds authentication and OpenAI
+ * organization/project headers, accepts JSON responses, and applies
+ * `transformClient` when provided.
+ *
+ * **Gotchas**
+ *
+ * A scoped `OpenAiConfig.withClientTransform` is applied when request helpers
+ * run, after the `transformClient` option supplied to `make`.
+ *
+ * @see {@link layer} for providing this client from explicit options
+ * @see {@link layerConfig} for loading client settings from `Config`
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const make = Effect.fnUntraced(
   function*(options: Options): Effect.fn.Return<Service, never, HttpClient.HttpClient> {
@@ -212,15 +266,42 @@ export const make = Effect.fnUntraced(
 )
 
 /**
- * @since 1.0.0
+ * Creates a layer that provides an OpenAI-compatible client from explicit options.
+ *
+ * **When to use**
+ *
+ * Use to install `OpenAiClient` in an application layer when the client options
+ * are already available as values rather than loaded from `Config`.
+ *
+ * @see {@link make} for constructing the client service effectfully
+ * @see {@link layerConfig} for loading client settings from `Config`
+ *
  * @category layers
+ * @since 4.0.0
  */
 export const layer = (options: Options): Layer.Layer<OpenAiClient, never, HttpClient.HttpClient> =>
   Layer.effect(OpenAiClient, make(options))
 
 /**
- * @since 1.0.0
+ * Creates a layer that loads OpenAI-compatible client settings from `Config`
+ * values before constructing the service.
+ *
+ * **When to use**
+ *
+ * Use when you need client settings for OpenAI-compatible APIs to be read from
+ * Effect `Config` values while providing `OpenAiClient` as a layer.
+ *
+ * **Details**
+ *
+ * Only config values supplied in `options` are loaded. Omitted fields are
+ * passed to `make` as `undefined`, and `transformClient` is forwarded as a
+ * plain option.
+ *
+ * @see {@link make} for constructing the client service effectfully
+ * @see {@link layer} for providing the client from already-resolved options
+ *
  * @category layers
+ * @since 4.0.0
  */
 export const layerConfig = (options?: {
   readonly apiKey?: Config.Config<Redacted.Redacted<string> | undefined> | undefined
@@ -257,7 +338,10 @@ export const layerConfig = (options?: {
 type JsonObject = { readonly [x: string]: Schema.Json }
 
 /**
- * @since 1.0.0
+ * Optional response fields that can be requested with the `include` parameter.
+ *
+ * @category response
+ * @since 4.0.0
  */
 export type IncludeEnum =
   | "message.input_image.image_url"
@@ -265,7 +349,10 @@ export type IncludeEnum =
   | "message.output_text.logprobs"
 
 /**
- * @since 1.0.0
+ * Lifecycle status shared by message, reasoning, and tool-call items.
+ *
+ * @category models
+ * @since 4.0.0
  */
 export type MessageStatus = "in_progress" | "completed" | "incomplete"
 
@@ -290,12 +377,18 @@ type InputFileContent = {
 }
 
 /**
- * @since 1.0.0
+ * Content blocks accepted in input messages.
+ *
+ * @category request
+ * @since 4.0.0
  */
 export type InputContent = InputTextContent | InputImageContent | InputFileContent
 
 /**
- * @since 1.0.0
+ * Text content block used for model-provided reasoning summaries.
+ *
+ * @category response
+ * @since 4.0.0
  */
 export type SummaryTextContent = {
   readonly type: "summary_text"
@@ -354,7 +447,10 @@ type FilePathAnnotation = {
 }
 
 /**
- * @since 1.0.0
+ * Citation and file-path annotations attached to output text content.
+ *
+ * @category response
+ * @since 4.0.0
  */
 export type Annotation =
   | FileCitationAnnotation
@@ -389,7 +485,11 @@ type OutputMessage = {
 }
 
 /**
- * @since 1.0.0
+ * Reasoning output item containing encrypted reasoning content, summaries, and
+ * optional reasoning text.
+ *
+ * @category response
+ * @since 4.0.0
  */
 export type ReasoningItem = {
   readonly type: "reasoning"
@@ -438,7 +538,15 @@ type ItemReference = {
 }
 
 /**
- * @since 1.0.0
+ * Item shapes accepted by a Responses-style `input` field.
+ *
+ * **Details**
+ *
+ * Supports input messages, output messages, tool calls, tool outputs, reasoning
+ * items, custom tool interactions, and item references.
+ *
+ * @category request
+ * @since 4.0.0
  */
 export type InputItem =
   | {
@@ -476,7 +584,10 @@ type CustomToolParam = {
 }
 
 /**
- * @since 1.0.0
+ * Tool definitions that can be supplied to a Responses-style request.
+ *
+ * @category request
+ * @since 4.0.0
  */
 export type Tool =
   | FunctionTool
@@ -501,7 +612,11 @@ type ToolChoice =
   }
 
 /**
- * @since 1.0.0
+ * Text output format configuration for plain text, JSON object, or JSON Schema
+ * responses.
+ *
+ * @category configuration
+ * @since 4.0.0
  */
 export type TextResponseFormatConfiguration =
   | {
@@ -519,7 +634,11 @@ export type TextResponseFormatConfiguration =
   }
 
 /**
- * @since 1.0.0
+ * Request options for creating a Responses-style response with an
+ * OpenAI-compatible provider.
+ *
+ * @category request
+ * @since 4.0.0
  */
 export type CreateResponse = {
   readonly metadata?: Readonly<Record<string, string>> | null | undefined
@@ -556,7 +675,10 @@ export type CreateResponse = {
 }
 
 /**
- * @since 1.0.0
+ * Token accounting reported on Responses-style response objects.
+ *
+ * @category response
+ * @since 4.0.0
  */
 export type ResponseUsage = {
   readonly input_tokens: number
@@ -573,7 +695,11 @@ type OutputItem =
   | CustomToolCall
 
 /**
- * @since 1.0.0
+ * Responses-style response object returned by compatible providers or embedded
+ * in response stream lifecycle events.
+ *
+ * @category response
+ * @since 4.0.0
  */
 export type Response = {
   readonly id: string
@@ -699,7 +825,10 @@ type UnknownResponseStreamEvent = {
 }
 
 /**
- * @since 1.0.0
+ * Server-sent event shapes emitted by Responses-style response streams.
+ *
+ * @category streaming
+ * @since 4.0.0
  */
 export type ResponseStreamEvent =
   | ResponseCreatedEvent
@@ -718,7 +847,16 @@ export type ResponseStreamEvent =
   | UnknownResponseStreamEvent
 
 /**
- * @since 1.0.0
+ * Represents one embedding item returned by an OpenAI-compatible embeddings API.
+ *
+ * **Details**
+ *
+ * The embedding can be returned either as a numeric vector or as a base64-encoded
+ * string. The `index` field identifies the input item that produced this
+ * embedding.
+ *
+ * @category response
+ * @since 4.0.0
  */
 export type Embedding = {
   readonly embedding: ReadonlyArray<number> | string
@@ -727,7 +865,10 @@ export type Embedding = {
 }
 
 /**
- * @since 1.0.0
+ * Request payload for the embeddings endpoint.
+ *
+ * @category request
+ * @since 4.0.0
  */
 export type CreateEmbeddingRequest = {
   readonly input: string | ReadonlyArray<string> | ReadonlyArray<number> | ReadonlyArray<ReadonlyArray<number>>
@@ -738,7 +879,10 @@ export type CreateEmbeddingRequest = {
 }
 
 /**
- * @since 1.0.0
+ * Successful response payload returned by the embeddings endpoint.
+ *
+ * @category response
+ * @since 4.0.0
  */
 export type CreateEmbeddingResponse = {
   readonly data: ReadonlyArray<Embedding>
@@ -751,15 +895,24 @@ export type CreateEmbeddingResponse = {
 }
 
 /**
- * @since 1.0.0
+ * JSON request body accepted by the embeddings endpoint.
+ *
+ * @category request
+ * @since 4.0.0
  */
 export type CreateEmbeddingRequestJson = CreateEmbeddingRequest
 /**
- * @since 1.0.0
+ * Decoded successful embeddings response body.
+ *
+ * @category response
+ * @since 4.0.0
  */
 export type CreateEmbedding200 = CreateEmbeddingResponse
 /**
- * @since 1.0.0
+ * Structured content parts accepted in chat completion messages.
+ *
+ * @category request
+ * @since 4.0.0
  */
 export type ChatCompletionContentPart =
   | {
@@ -774,7 +927,10 @@ export type ChatCompletionContentPart =
     }
   }
 /**
- * @since 1.0.0
+ * Tool call data attached to an assistant chat completion message.
+ *
+ * @category request
+ * @since 4.0.0
  */
 export type ChatCompletionRequestToolCall = {
   readonly id: string
@@ -785,7 +941,10 @@ export type ChatCompletionRequestToolCall = {
   }
 }
 /**
- * @since 1.0.0
+ * Message shapes accepted by the chat completions endpoint.
+ *
+ * @category request
+ * @since 4.0.0
  */
 export type ChatCompletionRequestMessage =
   | {
@@ -799,7 +958,10 @@ export type ChatCompletionRequestMessage =
     readonly content: string
   }
 /**
- * @since 1.0.0
+ * Function tool definition accepted by the chat completions endpoint.
+ *
+ * @category request
+ * @since 4.0.0
  */
 export type ChatCompletionTool = {
   readonly type: "function"
@@ -811,7 +973,10 @@ export type ChatCompletionTool = {
   }
 }
 /**
- * @since 1.0.0
+ * Controls whether the model may call tools and can force a specific function.
+ *
+ * @category configuration
+ * @since 4.0.0
  */
 export type ChatCompletionToolChoice =
   | "none"
@@ -824,7 +989,10 @@ export type ChatCompletionToolChoice =
     }
   }
 /**
- * @since 1.0.0
+ * JSON response format configuration for chat completion requests.
+ *
+ * @category configuration
+ * @since 4.0.0
  */
 export type ChatCompletionResponseFormat =
   | {
@@ -840,7 +1008,10 @@ export type ChatCompletionResponseFormat =
     }
   }
 /**
- * @since 1.0.0
+ * Request payload for the OpenAI-compatible chat completions endpoint.
+ *
+ * @category request
+ * @since 4.0.0
  */
 export type ChatCompletionRequest = {
   readonly model: string
@@ -863,15 +1034,24 @@ export type ChatCompletionRequest = {
   readonly [x: string]: unknown
 }
 /**
- * @since 1.0.0
+ * JSON request body used by this client when creating a chat completion response.
+ *
+ * @category request
+ * @since 4.0.0
  */
 export type CreateResponseRequestJson = ChatCompletionRequest
 /**
- * @since 1.0.0
+ * Decoded successful chat completion response body returned by `createResponse`.
+ *
+ * @category response
+ * @since 4.0.0
  */
 export type CreateResponse200 = ChatCompletionResponse
 /**
- * @since 1.0.0
+ * Decoded server-sent event payload emitted by `createResponseStream`.
+ *
+ * @category streaming
+ * @since 4.0.0
  */
 export type CreateResponse200Sse = ChatCompletionStreamEvent
 
@@ -897,7 +1077,10 @@ const ChatCompletionToolFunction = Schema.Struct({
 })
 
 const ChatCompletionToolFunctionDelta = Schema.Struct({
-  name: Schema.optionalKey(Schema.String),
+  // Some OpenAI-compatible providers (e.g. Fireworks) send `name: null` on
+  // streamed tool-call continuation fragments. `name` must be nullable, else
+  // the whole chunk fails validation and its argument delta is dropped.
+  name: Schema.optionalKey(Schema.NullOr(Schema.String)),
   arguments: Schema.optionalKey(Schema.String)
 })
 
@@ -918,12 +1101,16 @@ const ChatCompletionToolCallDelta = Schema.Struct({
 const ChatCompletionMessage = Schema.Struct({
   role: Schema.optionalKey(Schema.String),
   content: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  reasoning: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  reasoning_content: Schema.optionalKey(Schema.NullOr(Schema.String)),
   tool_calls: Schema.optionalKey(Schema.Array(ChatCompletionToolCall))
 })
 
 const ChatCompletionDelta = Schema.Struct({
   role: Schema.optionalKey(Schema.String),
   content: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  reasoning: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  reasoning_content: Schema.optionalKey(Schema.NullOr(Schema.String)),
   tool_calls: Schema.optionalKey(Schema.Array(ChatCompletionToolCallDelta))
 })
 
@@ -961,31 +1148,53 @@ const ChatCompletionChunk = Schema.Struct({
 })
 
 /**
- * @since 1.0.0
+ * Decoded tool-call object from a chat completion response or streaming chunk.
+ *
+ * @category response
+ * @since 4.0.0
  */
 export type ChatCompletionToolCall = typeof ChatCompletionToolCall.Type
 /**
- * @since 1.0.0
+ * Decoded message object from a non-streaming chat completion choice.
+ *
+ * @category response
+ * @since 4.0.0
  */
 export type ChatCompletionMessage = typeof ChatCompletionMessage.Type
 /**
- * @since 1.0.0
+ * Decoded choice object returned by chat completion responses and chunks.
+ *
+ * @category response
+ * @since 4.0.0
  */
 export type ChatCompletionChoice = typeof ChatCompletionChoice.Type
 /**
- * @since 1.0.0
+ * Decoded token usage summary returned by chat completions.
+ *
+ * @category response
+ * @since 4.0.0
  */
 export type ChatCompletionUsage = typeof ChatCompletionUsage.Type
 /**
- * @since 1.0.0
+ * Decoded successful response from the chat completions endpoint.
+ *
+ * @category response
+ * @since 4.0.0
  */
 export type ChatCompletionResponse = typeof ChatCompletionResponse.Type
 /**
- * @since 1.0.0
+ * Decoded streaming chunk emitted by the chat completions endpoint.
+ *
+ * @category streaming
+ * @since 4.0.0
  */
 export type ChatCompletionChunk = typeof ChatCompletionChunk.Type
 /**
- * @since 1.0.0
+ * Streaming chat completion event, including decoded chunks and the `[DONE]`
+ * sentinel.
+ *
+ * @category streaming
+ * @since 4.0.0
  */
 export type ChatCompletionStreamEvent = ChatCompletionChunk | "[DONE]"
 

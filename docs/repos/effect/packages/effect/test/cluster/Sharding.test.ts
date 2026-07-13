@@ -11,10 +11,18 @@ import {
   ShardingConfig,
   Snowflake
 } from "effect/unstable/cluster"
-import { TestEntity, TestEntityNoState, TestEntityState, User } from "./TestEntity.ts"
+import {
+  CallerId,
+  ContextBleedEntity,
+  ContextBleedLayer,
+  TestEntity,
+  TestEntityNoState,
+  TestEntityState,
+  User
+} from "./TestEntity.ts"
 
 describe.concurrent("Sharding", () => {
-  it.effect("delivers a message", () =>
+  it.effect("delivers volatile requests directly to the entity", () =>
     Effect.gen(function*() {
       yield* TestClock.adjust(1)
       const makeClient = yield* TestEntity.client
@@ -23,7 +31,23 @@ describe.concurrent("Sharding", () => {
       expect(user).toEqual(new User({ id: 1, name: "User 1" }))
     }).pipe(Effect.provide(TestSharding)))
 
-  it.effect("delivers a message via storage", () =>
+  it.effect("does not freeze the first caller's context into the entity server", () =>
+    Effect.gen(function*() {
+      yield* TestClock.adjust(1)
+      const makeClient = yield* ContextBleedEntity.client
+      const client = makeClient("1")
+
+      const first = yield* client.ReadCaller().pipe(Effect.provideService(CallerId, "A"))
+      expect(first).toEqual("A")
+
+      const second = yield* client.ReadCaller()
+      expect(second).toEqual("none")
+
+      const durable = yield* client.ReadCallerPersisted()
+      expect(durable).toEqual("none")
+    }).pipe(Effect.provide(ContextBleedSharding)))
+
+  it.effect("persists durable requests until the entity replies", () =>
     Effect.gen(function*() {
       yield* TestClock.adjust(1)
       const driver = yield* MessageStorage.MemoryDriver
@@ -35,7 +59,7 @@ describe.concurrent("Sharding", () => {
       expect(driver.unprocessed.size).toEqual(0)
     }).pipe(Effect.provide(TestSharding)))
 
-  it.effect("interrupts", () =>
+  it.effect("routes durable interrupts through storage", () =>
     Effect.gen(function*() {
       const driver = yield* MessageStorage.MemoryDriver
       const state = yield* TestEntityState
@@ -159,7 +183,7 @@ describe.concurrent("Sharding", () => {
       assert(reply._tag === "WithExit" && reply.exit._tag === "Failure" && reply.exit.cause[0]._tag === "Die")
     }).pipe(Effect.provide(TestSharding)))
 
-  it.effect("MailboxFull for volatile messages", () =>
+  it.effect("fails volatile requests immediately when the mailbox is full", () =>
     Effect.gen(function*() {
       const makeClient = yield* TestEntity.client
       yield* TestClock.adjust(1)
@@ -248,7 +272,7 @@ describe.concurrent("Sharding", () => {
       assert.deepStrictEqual(Queue.sizeUnsafe(state.interrupts), 2)
     }).pipe(Effect.provide(TestSharding)))
 
-  it.effect("delivers a durable stream", () =>
+  it.effect("delivers durable streams and acknowledges each chunk", () =>
     Effect.gen(function*() {
       const driver = yield* MessageStorage.MemoryDriver
       yield* TestClock.adjust(1)
@@ -316,7 +340,7 @@ describe.concurrent("Sharding", () => {
         assert.strictEqual(driver.journal.length, 13 + 3 + 1)
         assert.strictEqual(driver.replyIds.size, 1 + 4)
       }).pipe(Effect.provide(TestShardingWithoutStorage.pipe(
-        Layer.provideMerge(Layer.effect(MessageStorage.MemoryDriver)(MessageStorage.MemoryDriver.asEffect())),
+        Layer.provideMerge(Layer.effect(MessageStorage.MemoryDriver)(MessageStorage.MemoryDriver)),
         Layer.updateService(MessageStorage.MessageStorage, (storage) => ({
           ...storage,
           unprocessedMessagesById(messageIds) {
@@ -448,7 +472,7 @@ describe.concurrent("Sharding", () => {
       Layer.merge(TestEntityState.layer)
     ))))
 
-  it.effect("client discard option", () =>
+  it.effect("client discard stores durable requests without waiting for replies", () =>
     Effect.gen(function*() {
       yield* TestClock.adjust(1)
       const driver = yield* MessageStorage.MemoryDriver
@@ -461,7 +485,7 @@ describe.concurrent("Sharding", () => {
       expect(driver.unprocessed.size).toEqual(0)
     }).pipe(Effect.provide(TestSharding)))
 
-  it.effect("client discard with Never", () =>
+  it.effect("client discard returns while the durable request keeps processing", () =>
     Effect.gen(function*() {
       yield* TestClock.adjust(1)
       const driver = yield* MessageStorage.MemoryDriver
@@ -475,7 +499,7 @@ describe.concurrent("Sharding", () => {
       expect(driver.unprocessed.size).toEqual(1)
     }).pipe(Effect.provide(TestSharding)))
 
-  it.effect("defect when no MessageStorage", () =>
+  it.effect("defects when a durable request has no MessageStorage", () =>
     Effect.gen(function*() {
       const makeClient = yield* TestEntity.client
       const client = makeClient("1")
@@ -488,7 +512,7 @@ describe.concurrent("Sharding", () => {
       Layer.provide(MessageStorage.layerNoop)
     ))))
 
-  it.effect("restart on defect", () =>
+  it.effect("restarts the entity layer after a handler defect", () =>
     Effect.gen(function*() {
       yield* TestClock.adjust(1)
       const state = yield* TestEntityState
@@ -500,9 +524,30 @@ describe.concurrent("Sharding", () => {
       expect(state.layerBuilds.current).toEqual(2)
     }).pipe(Effect.provide(TestSharding)))
 
+  it.effect("replays in-flight requests when restarting after a defect", () =>
+    Effect.gen(function*() {
+      yield* TestClock.adjust(1)
+      const state = yield* TestEntityState
+      const makeClient = yield* TestEntity.client
+      const client = makeClient("1")
+
+      yield* client.NeverFork().pipe(Effect.forkChild({ startImmediately: true }))
+      yield* TestClock.adjust(1)
+      assert.strictEqual(Queue.sizeUnsafe(state.envelopes), 1)
+
+      MutableRef.set(state.defectTrigger, true)
+      const result = yield* client.GetUser({ id: 123 })
+      assert.deepStrictEqual(result, new User({ id: 123, name: "User 123" }))
+      assert.strictEqual(state.layerBuilds.current, 2)
+
+      yield* TestClock.adjust(1)
+      assert.strictEqual(Queue.sizeUnsafe(state.envelopes), 4)
+    }).pipe(Effect.provide(TestSharding)))
+
   it.effect("WithTransaction is propagated to the entity handler", () =>
     Effect.gen(function*() {
       let isTransaction = false
+      let transactionOpen = false
       yield* Effect.gen(function*() {
         const makeClient = yield* TestEntity.client
         yield* TestClock.adjust(1)
@@ -514,9 +559,20 @@ describe.concurrent("Sharding", () => {
       }).pipe(Effect.provide(TestShardingWithoutStorage.pipe(
         Layer.updateService(MessageStorage.MessageStorage, (storage) => ({
           ...storage,
+          withTransaction(effect) {
+            return Effect.suspend(() => {
+              transactionOpen = true
+              return storage.withTransaction(effect)
+            }).pipe(
+              Effect.ensuring(Effect.sync(() => {
+                transactionOpen = false
+              }))
+            )
+          },
           saveReply(reply) {
             return MessageStorage.MemoryTransaction.use((isTransaction_) => {
               isTransaction = isTransaction_
+              assert.strictEqual(transactionOpen, true)
               return storage.saveReply(reply)
             })
           }
@@ -556,3 +612,5 @@ const TestSharding = TestShardingWithoutStorage.pipe(
   Layer.provideMerge(MessageStorage.layerMemory),
   Layer.provide(TestShardingConfig)
 )
+
+const ContextBleedSharding = ContextBleedLayer.pipe(Layer.provideMerge(TestSharding))

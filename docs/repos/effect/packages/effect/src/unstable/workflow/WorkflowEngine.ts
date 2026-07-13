@@ -1,7 +1,16 @@
 /**
+ * Defines workflow engine services and an in-memory implementation.
+ *
+ * `WorkflowEngine` registers workflow handlers, runs executions, polls results,
+ * resumes suspended runs, executes activities, stores durable deferred results,
+ * and schedules durable clocks. `WorkflowInstance` holds the runtime state for
+ * one workflow run. The in-memory layer is useful for tests and local
+ * development.
+ *
  * @since 4.0.0
  */
 import type * as Cause from "../../Cause.ts"
+import * as Context from "../../Context.ts"
 import * as Effect from "../../Effect.ts"
 import * as Exit from "../../Exit.ts"
 import * as Fiber from "../../Fiber.ts"
@@ -12,17 +21,20 @@ import * as Option from "../../Option.ts"
 import * as Schedule from "../../Schedule.ts"
 import * as Schema from "../../Schema.ts"
 import * as Scope from "../../Scope.ts"
-import * as ServiceMap from "../../ServiceMap.ts"
 import type * as Activity from "./Activity.ts"
 import type { DurableClock } from "./DurableClock.ts"
 import type * as DurableDeferred from "./DurableDeferred.ts"
 import * as Workflow from "./Workflow.ts"
 
 /**
+ * Service that represents workflow runtimes, responsible for registering and
+ * executing workflows and coordinating activities, durable deferreds,
+ * interrupts, resumes, and clocks.
+ *
+ * @category services
  * @since 4.0.0
- * @category Services
  */
-export class WorkflowEngine extends ServiceMap.Service<
+export class WorkflowEngine extends Context.Service<
   WorkflowEngine,
   {
     /**
@@ -87,7 +99,7 @@ export class WorkflowEngine extends ServiceMap.Service<
     >
 
     /**
-     * Execute a registered workflow.
+     * Poll the current status of a registered workflow execution.
      */
     readonly poll: <
       Name extends string,
@@ -112,7 +124,7 @@ export class WorkflowEngine extends ServiceMap.Service<
     ) => Effect.Effect<void>
 
     /**
-     * Unsafely interrupt a registered workflow, potentially ignoring
+     * Interrupts a registered workflow unsafely, potentially ignoring
      * compensation finalizers and orphaning child workflows.
      */
     readonly interruptUnsafe: (
@@ -132,8 +144,8 @@ export class WorkflowEngine extends ServiceMap.Service<
      * Execute an activity from a workflow.
      */
     readonly activityExecute: <
-      Success extends Schema.Top,
-      Error extends Schema.Top,
+      Success extends Schema.Constraint,
+      Error extends Schema.Constraint,
       R
     >(
       activity: Activity.Activity<Success, Error, R>,
@@ -151,8 +163,8 @@ export class WorkflowEngine extends ServiceMap.Service<
      * Try to retrieve the result of an DurableDeferred
      */
     readonly deferredResult: <
-      Success extends Schema.Top,
-      Error extends Schema.Top
+      Success extends Schema.Constraint,
+      Error extends Schema.Constraint
     >(
       deferred: DurableDeferred.DurableDeferred<Success, Error>
     ) => Effect.Effect<
@@ -166,8 +178,8 @@ export class WorkflowEngine extends ServiceMap.Service<
      * workflows.
      */
     readonly deferredDone: <
-      Success extends Schema.Top,
-      Error extends Schema.Top
+      Success extends Schema.Constraint,
+      Error extends Schema.Constraint
     >(
       deferred: DurableDeferred.DurableDeferred<Success, Error>,
       options: {
@@ -196,10 +208,24 @@ export class WorkflowEngine extends ServiceMap.Service<
 >()("effect/workflow/WorkflowEngine") {}
 
 /**
+ * Service that contains workflow runtime state for one execution.
+ *
+ * **When to use**
+ *
+ * Use to read or update workflow execution, suspension, interruption,
+ * lifetime, failure, and activity coordination state inside workflow engine
+ * internals.
+ *
+ * **Details**
+ *
+ * The service stores the execution ID, workflow definition, long-lived scope,
+ * suspension and interruption flags, the stored failure cause, and activity
+ * coordination state for a single workflow run.
+ *
+ * @category services
  * @since 4.0.0
- * @category Services
  */
-export class WorkflowInstance extends ServiceMap.Service<
+export class WorkflowInstance extends Context.Service<
   WorkflowInstance,
   {
     /**
@@ -261,8 +287,11 @@ export class WorkflowInstance extends ServiceMap.Service<
 }
 
 /**
- * @since 4.0.0
+ * Low-level workflow engine contract that works with encoded payloads and
+ * results before `makeUnsafe` adds typed schema decoding and encoding.
+ *
  * @category Encoded
+ * @since 4.0.0
  */
 export interface Encoded {
   readonly register: (
@@ -330,19 +359,31 @@ export interface Encoded {
 }
 
 /**
+ * Builds a typed `WorkflowEngine` service from a low-level encoded
+ * implementation.
+ *
+ * **When to use**
+ *
+ * Use when wiring a trusted low-level workflow engine implementation into the
+ * typed `WorkflowEngine` service.
+ *
+ * **Gotchas**
+ *
+ * The implementation must correctly persist, resume, and encode workflow state.
+ *
+ * @category constructors
  * @since 4.0.0
- * @category Constructors
  */
 export const makeUnsafe = (options: Encoded): WorkflowEngine["Service"] =>
   WorkflowEngine.of({
     register: Effect.fnUntraced(function*(workflow, execute) {
-      const services = yield* Effect.services<WorkflowEngine>()
+      const services = yield* Effect.context<WorkflowEngine>()
       yield* options.register(workflow, (payload, executionId) =>
         Effect.suspend(() =>
           execute(payload, executionId)
         ).pipe(
-          Effect.updateServices(
-            (input) => ServiceMap.merge(services, input) as ServiceMap.ServiceMap<any>
+          Effect.updateContext(
+            (input) => Context.merge(services, input) as Context.Context<any>
           )
         ))
     }),
@@ -380,22 +421,18 @@ export const makeUnsafe = (options: Encoded): WorkflowEngine["Service"] =>
           return options.interrupt(self, executionId)
         })
       }
-
-      if (opts.discard) {
-        yield* options.execute(self, {
-          executionId,
-          payload: payload as object,
-          discard: true
-        })
-        return executionId
-      }
-
       const run = options.execute(self, {
         executionId,
         payload: payload as object,
-        discard: false,
+        discard: opts.discard ?? false,
         parent: Option.getOrUndefined(parentInstance)
-      })
+      }) as Effect.Effect<Workflow.Result<Success["Type"], Error["Type"]>>
+
+      if (opts.discard) {
+        yield* run
+        return executionId
+      }
+
       if (Option.isSome(parentInstance)) {
         const wrapped = yield* Workflow.wrapActivityResult(
           run,
@@ -420,7 +457,7 @@ export const makeUnsafe = (options: Encoded): WorkflowEngine["Service"] =>
         ).pipe(
           Effect.catch(() =>
             Effect.die(
-              `${self.name}.execute: suspendedRetrySchedule exhausted`
+              `${self._tag}.execute: suspendedRetrySchedule exhausted`
             )
           )
         )
@@ -432,8 +469,8 @@ export const makeUnsafe = (options: Encoded): WorkflowEngine["Service"] =>
     interruptUnsafe: options.interruptUnsafe,
     resume: options.resume,
     activityExecute: Effect.fnUntraced(function*<
-      Success extends Schema.Top,
-      Error extends Schema.Top,
+      Success extends Schema.Constraint,
+      Error extends Schema.Constraint,
       R
     >(activity: Activity.Activity<Success, Error, R>, attempt: number) {
       const result = yield* options.activityExecute(activity, attempt)
@@ -441,12 +478,12 @@ export const makeUnsafe = (options: Encoded): WorkflowEngine["Service"] =>
         return result
       }
       const exit = yield* Effect.orDie(
-        Schema.decodeEffect(activity.exitSchema)(toJsonExit(result.exit))
+        Schema.decodeEffect(activity.exitSchemaPartial)(toJsonExit(result.exit))
       )
       return new Workflow.Complete({ exit })
     }),
     deferredResult: Effect.fnUntraced(
-      function*<Success extends Schema.Top, Error extends Schema.Top>(
+      function*<Success extends Schema.Constraint, Error extends Schema.Constraint>(
         deferred: DurableDeferred.DurableDeferred<Success, Error>
       ) {
         const instance = yield* WorkflowInstance
@@ -472,7 +509,7 @@ export const makeUnsafe = (options: Encoded): WorkflowEngine["Service"] =>
       )
     ),
     deferredDone: Effect.fnUntraced(
-      function*<Success extends Schema.Top, Error extends Schema.Top>(
+      function*<Success extends Schema.Constraint, Error extends Schema.Constraint>(
         deferred: DurableDeferred.DurableDeferred<Success, Error>,
         opts: {
           readonly workflowName: string
@@ -515,17 +552,26 @@ export const makeUnsafe = (options: Encoded): WorkflowEngine["Service"] =>
       )
   })
 
-const defaultRetrySchedule = Schedule.exponential(200, 1.5).pipe(
-  Schedule.either(Schedule.spaced(30000))
-)
+const defaultRetrySchedule = Schedule.min([
+  Schedule.exponential(200, 1.5),
+  Schedule.spaced(30000)
+])
 
 /**
- * A in-memory implementation of the WorkflowEngine. This is useful for testing
- * and local development, but is not suitable for production use as it does not
- * provide durability guarantees.
+ * Layer that provides an in-memory `WorkflowEngine`.
  *
+ * **When to use**
+ *
+ * Use to run tests and local development workflows where durability is not
+ * needed.
+ *
+ * **Gotchas**
+ *
+ * This layer keeps state only in memory and is not suitable for production
+ * workflows that require durability.
+ *
+ * @category layers
  * @since 4.0.0
- * @category Layers
  */
 export const layerMemory: Layer.Layer<WorkflowEngine> = Layer.effect(WorkflowEngine)(
   Effect.gen(function*() {
@@ -567,7 +613,7 @@ export const layerMemory: Layer.Layer<WorkflowEngine> = Layer.effect(WorkflowEng
         return
       }
 
-      const entry = workflows.get(state.instance.workflow.name)!
+      const entry = workflows.get(state.instance.workflow._tag)!
       const instance = WorkflowInstance.initial(state.instance.workflow, state.instance.executionId)
       instance.interrupted = state.instance.interrupted
       state.instance = instance
@@ -598,16 +644,16 @@ export const layerMemory: Layer.Layer<WorkflowEngine> = Layer.effect(WorkflowEng
 
     const engine = makeUnsafe({
       register: Effect.fnUntraced(function*(workflow, execute) {
-        workflows.set(workflow.name, {
+        workflows.set(workflow._tag, {
           workflow,
           execute,
           scope: yield* Effect.scope
         })
       }),
       execute: Effect.fnUntraced(function*(workflow, options) {
-        const entry = workflows.get(workflow.name)
+        const entry = workflows.get(workflow._tag)
         if (!entry) {
-          return yield* Effect.orDie(Effect.fail(`Workflow ${workflow.name} is not registered`))
+          return yield* Effect.orDie(Effect.fail(`Workflow ${workflow._tag} is not registered`))
         }
 
         let state = executions.get(options.executionId)
@@ -696,7 +742,7 @@ export const layerMemory: Layer.Layer<WorkflowEngine> = Layer.effect(WorkflowEng
         }),
       scheduleClock: (workflow, options) =>
         engine.deferredDone(options.clock.deferred, {
-          workflowName: workflow.name,
+          workflowName: workflow._tag,
           executionId: options.executionId,
           deferredName: options.clock.deferred.name,
           exit: Exit.void

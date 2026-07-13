@@ -1,9 +1,18 @@
 /**
- * @since 1.0.0
+ * Adapters between Node streams and Effect streams, channels, and readables.
+ *
+ * This module is the stream boundary for Node APIs. It wraps `Readable` and
+ * `Duplex` values as Effect `Stream`s and `Channel`s, pipes Effect streams
+ * through Node duplex streams, exposes an Effect `Stream` back to Node as a
+ * `Readable`, and collects readable payloads into strings, array buffers, or
+ * `Uint8Array`s with optional byte limits.
+ *
+ * @since 4.0.0
  */
 import * as Arr from "effect/Array"
 import * as Cause from "effect/Cause"
 import * as Channel from "effect/Channel"
+import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Fiber from "effect/Fiber"
@@ -13,15 +22,18 @@ import * as Latch from "effect/Latch"
 import * as MutableRef from "effect/MutableRef"
 import * as Pull from "effect/Pull"
 import * as Scope from "effect/Scope"
-import * as ServiceMap from "effect/ServiceMap"
 import * as Stream from "effect/Stream"
 import type { Duplex } from "node:stream"
 import { Readable } from "node:stream"
 import { pullIntoWritable } from "./NodeSink.ts"
 
 /**
+ * Converts a Node readable stream into an Effect `Stream`, reading chunks with
+ * an optional chunk size, mapping stream errors with `onError`, and destroying
+ * the readable on completion unless `closeOnDone` is `false`.
+ *
  * @category constructors
- * @since 1.0.0
+ * @since 4.0.0
  */
 export const fromReadable = <A = Uint8Array, E = Cause.UnknownError>(options: {
   readonly evaluate: LazyArg<Readable | NodeJS.ReadableStream>
@@ -32,8 +44,12 @@ export const fromReadable = <A = Uint8Array, E = Cause.UnknownError>(options: {
 }): Stream.Stream<A, E> => Stream.fromChannel(fromReadableChannel<A, E>(options))
 
 /**
+ * Creates a `Channel` that pulls chunks from a Node readable stream, mapping
+ * errors with `onError` and destroying the readable on completion unless
+ * `closeOnDone` is `false`.
+ *
  * @category constructors
- * @since 1.0.0
+ * @since 4.0.0
  */
 export const fromReadableChannel = <A = Uint8Array, E = Cause.UnknownError>(options: {
   readonly evaluate: LazyArg<Readable | NodeJS.ReadableStream>
@@ -52,8 +68,12 @@ export const fromReadableChannel = <A = Uint8Array, E = Cause.UnknownError>(opti
   )
 
 /**
+ * Creates a `Channel` over a Node `Duplex`, writing upstream chunks with
+ * backpressure while emitting chunks read from the duplex and optionally ending
+ * the writable side when upstream completes.
+ *
  * @category constructors
- * @since 1.0.0
+ * @since 4.0.0
  */
 export const fromDuplex = <IE, I = Uint8Array, O = Uint8Array, E = Cause.UnknownError>(
   options: {
@@ -95,8 +115,11 @@ export const fromDuplex = <IE, I = Uint8Array, O = Uint8Array, E = Cause.Unknown
   })
 
 /**
+ * Pipes an Effect `Stream` through a Node `Duplex`, writing the stream's
+ * chunks to the duplex and emitting chunks read back from it.
+ *
  * @category combinators
- * @since 1.0.0
+ * @since 4.0.0
  */
 export const pipeThroughDuplex: {
   <B = Uint8Array, E2 = Cause.UnknownError>(
@@ -137,8 +160,11 @@ export const pipeThroughDuplex: {
   ))
 
 /**
+ * Pipes a stream of strings or bytes through a Node `Duplex` using default
+ * options and `Cause.UnknownError` for stream failures.
+ *
  * @category combinators
- * @since 1.0.0
+ * @since 4.0.0
  */
 export const pipeThroughSimple: {
   (
@@ -154,28 +180,39 @@ export const pipeThroughSimple: {
 ): Stream.Stream<Uint8Array, Cause.UnknownError | E, R> => pipeThroughDuplex(self, { evaluate: duplex }))
 
 /**
- * @since 1.0.0
- * @category conversions
+ * Converts an Effect `Stream` into a Node `Readable`, using the caller's
+ * Effect context to run the stream and destroying the readable if the stream
+ * fails.
+ *
+ * @category converting
+ * @since 4.0.0
  */
 export const toReadable = <E, R>(stream: Stream.Stream<string | Uint8Array, E, R>): Effect.Effect<Readable, never, R> =>
   Effect.map(
-    Effect.services<R>(),
+    Effect.context<R>(),
     (context) => new StreamAdapter(context, stream)
   )
 
 /**
- * @since 1.0.0
- * @category conversions
+ * Converts a service-free Effect `Stream` into a Node `Readable` using an
+ * empty Effect context.
+ *
+ * @category converting
+ * @since 4.0.0
  */
 export const toReadableNever = <E>(stream: Stream.Stream<string | Uint8Array, E, never>): Readable =>
   new StreamAdapter(
-    ServiceMap.empty(),
+    Context.empty(),
     stream
   )
 
 /**
- * @since 1.0.0
- * @category conversions
+ * Consumes a Node readable stream into a string using the selected encoding,
+ * failing through `onError` on stream errors or when `maxBytes` is exceeded
+ * and destroying the stream on interruption or failure.
+ *
+ * @category converting
+ * @since 4.0.0
  */
 export const toString = <E = Cause.UnknownError>(
   readable: LazyArg<Readable | NodeJS.ReadableStream>,
@@ -223,8 +260,12 @@ export const toString = <E = Cause.UnknownError>(
 }
 
 /**
- * @since 1.0.0
- * @category conversions
+ * Consumes a Node readable stream into an `ArrayBuffer`, failing through
+ * `onError` on stream errors or when `maxBytes` is exceeded and destroying the
+ * stream on interruption or failure.
+ *
+ * @category converting
+ * @since 4.0.0
  */
 export const toArrayBuffer = <E = Cause.UnknownError>(
   readable: LazyArg<Readable | NodeJS.ReadableStream>,
@@ -237,7 +278,7 @@ export const toArrayBuffer = <E = Cause.UnknownError>(
   const onError = options?.onError ?? defaultOnError
   return Effect.callback((resume) => {
     const stream = readable() as Readable
-    let buffer = Buffer.alloc(0)
+    const buffers: Array<Uint8Array> = []
     let bytes = 0
     stream.once("error", (err) => {
       if ("closed" in stream && !stream.closed) {
@@ -246,13 +287,16 @@ export const toArrayBuffer = <E = Cause.UnknownError>(
       resume(Effect.fail(onError(err) as E))
     })
     stream.once("end", () => {
-      if (buffer.buffer.byteLength === buffer.byteLength) {
-        return resume(Effect.succeed(buffer.buffer))
+      const buffer = buffers.length === 1 ? buffers[0] : Buffer.concat(buffers)
+      if (buffer.byteOffset === 0 && buffer.buffer.byteLength === buffer.byteLength) {
+        return resume(Effect.succeed(buffer.buffer as ArrayBuffer))
       }
-      resume(Effect.succeed(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)))
+      resume(
+        Effect.succeed(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer)
+      )
     })
     stream.on("data", (chunk) => {
-      buffer = Buffer.concat([buffer, chunk])
+      buffers.push(chunk)
       bytes += chunk.length
       if (maxBytesNumber && bytes > maxBytesNumber) {
         resume(Effect.fail(onError(new Error("maxBytes exceeded")) as E))
@@ -267,8 +311,11 @@ export const toArrayBuffer = <E = Cause.UnknownError>(
 }
 
 /**
- * @since 1.0.0
- * @category conversions
+ * Consumes a Node readable stream into a `Uint8Array`, using the same error
+ * mapping and `maxBytes` handling as `toArrayBuffer`.
+ *
+ * @category converting
+ * @since 4.0.0
  */
 export const toUint8Array = <E = Cause.UnknownError>(
   readable: LazyArg<Readable | NodeJS.ReadableStream>,
@@ -291,7 +338,6 @@ const readableToPullUnsafe = <A, E>(options: {
   readonly closeOnDone?: boolean | undefined
 }) => {
   const readable = options.readable as Readable
-  if (readable.readableEnded) return Effect.succeed(Cause.done())
 
   const closeOnDone = options.closeOnDone ?? true
   const exit = options.exit ?? MutableRef.make(undefined)
@@ -316,6 +362,9 @@ const readableToPullUnsafe = <A, E>(options: {
     if (item === null) {
       if (exit.current) {
         return exit.current
+      }
+      if (readable.readableEnded) {
+        return Effect.fail(Cause.Done())
       }
       latch.closeUnsafe()
       return Effect.flatMap(latch.await, loop)
@@ -350,7 +399,7 @@ class StreamAdapter<E, R> extends Readable {
   private fiber: Fiber.Fiber<void, E> | undefined = undefined
 
   constructor(
-    context: ServiceMap.ServiceMap<R>,
+    context: Context.Context<R>,
     stream: Stream.Stream<Uint8Array | string, E, R>
   ) {
     super({})
@@ -368,7 +417,7 @@ class StreamAdapter<E, R> extends Readable {
         }
       }))).pipe(
         this.readLatch.whenOpen,
-        Effect.provideServices(context),
+        Effect.provideContext(context),
         Effect.runFork
       )
     this.fiber.addObserver((exit) => {

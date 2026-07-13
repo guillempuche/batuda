@@ -2,7 +2,6 @@
   "$schema": "../../node_modules/@effect/docgen/schema.json",
   "exclude": ["src/internal/**/*.ts", "src/unstable/**/internal/**/*.ts", "src/schema/StandardSchema.ts"],
   "srcLink": "https://github.com/Effect-TS/effect-smol/tree/main/packages/effect/src/",
-  "tscExecutable": "tsgo",
   "examplesCompilerOptions": {
     "noEmit": true,
     "strict": true,
@@ -18,6 +17,21 @@
       "effect/*": ["../../../effect/src/*.js"],
       "@effect/platform-node": ["../../../platform-node/src/index.js"],
       "@effect/platform-node/*": ["../../../platform-node/src/*.js"]
-    }
+    },
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        "includeSuggestionsInTsc": false,
+        "diagnosticSeverity": {
+          "unusedDirective": "off",
+          "floatingEffect": "off",
+          "multipleEffectProvide": "off",
+          "globalErrorInEffectFailure": "off",
+          "unknownInEffectCatch": "off",
+          "globalErrorInEffectCatch": "off",
+          "missingReturnYieldStar": "off"
+        }
+      }
+    ]
   }
 }

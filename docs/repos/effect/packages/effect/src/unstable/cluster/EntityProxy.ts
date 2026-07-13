@@ -1,4 +1,12 @@
 /**
+ * Derives RPC and HTTP API surfaces from clustered entities.
+ *
+ * The generated APIs let callers use ordinary RPC clients or HTTP routes while
+ * the cluster runtime still locates and delivers messages to the entity
+ * instance identified by `entityId`. Each generated operation keeps the
+ * original payload and success schema, adds cluster client errors, and creates
+ * a discard variant for fire-and-forget delivery.
+ *
  * @since 4.0.0
  */
 import * as Schema from "../../Schema.ts"
@@ -19,14 +27,11 @@ const clientErrors = [
 /**
  * Derives an `RpcGroup` from an `Entity`.
  *
+ * **Example** (Deriving RPC endpoints from an entity)
+ *
  * ```ts
  * import { Layer, Schema } from "effect"
- * import {
- *   ClusterSchema,
- *   Entity,
- *   EntityProxy,
- *   EntityProxyServer
- * } from "effect/unstable/cluster"
+ * import { ClusterSchema, Entity, EntityProxy, EntityProxyServer } from "effect/unstable/cluster"
  * import { Rpc, RpcServer } from "effect/unstable/rpc"
  *
  * export const Counter = Entity.make("Counter", [
@@ -47,8 +52,8 @@ const clientErrors = [
  * )
  * ```
  *
+ * @category constructors
  * @since 4.0.0
- * @category Constructors
  */
 export const toRpcGroup = <Type extends string, Rpcs extends Rpc.Any>(
   entity: Entity.Entity<Type, Rpcs>
@@ -82,6 +87,15 @@ export const toRpcGroup = <Type extends string, Rpcs extends Rpc.Any>(
 }
 
 /**
+ * Type-level conversion used by `toRpcGroup`.
+ *
+ * **Details**
+ *
+ * For each entity RPC, this creates a prefixed request RPC and a discard RPC
+ * whose payload includes `entityId`, and whose errors include cluster client
+ * errors.
+ *
+ * @category converting
  * @since 4.0.0
  */
 export type ConvertRpcs<Rpcs extends Rpc.Any, Prefix extends string> = Rpcs extends Rpc.Rpc<
@@ -131,14 +145,11 @@ const entityIdPath = {
 /**
  * Derives an `HttpApiGroup` from an `Entity`.
  *
+ * **Example** (Deriving HTTP API endpoints from an entity)
+ *
  * ```ts
  * import { Layer, Schema } from "effect"
- * import {
- *   ClusterSchema,
- *   Entity,
- *   EntityProxy,
- *   EntityProxyServer
- * } from "effect/unstable/cluster"
+ * import { ClusterSchema, Entity, EntityProxy, EntityProxyServer } from "effect/unstable/cluster"
  * import { HttpApi, HttpApiBuilder } from "effect/unstable/httpapi"
  * import { Rpc } from "effect/unstable/rpc"
  *
@@ -166,8 +177,8 @@ const entityIdPath = {
  * )
  * ```
  *
+ * @category constructors
  * @since 4.0.0
- * @category Constructors
  */
 export const toHttpApiGroup = <const Name extends string, Type extends string, Rpcs extends Rpc.Any>(
   name: Name,
@@ -205,6 +216,15 @@ const tagToPath = (tag: string): string =>
     .toLowerCase()
 
 /**
+ * Type-level conversion used by `toHttpApiGroup`.
+ *
+ * **Details**
+ *
+ * For each entity RPC, this creates a POST endpoint at `/<tag>/:entityId` and a
+ * discard endpoint at `/<tag>/:entityId/discard`, including cluster client
+ * errors.
+ *
+ * @category converting
  * @since 4.0.0
  */
 export type ConvertHttpApi<Rpcs extends Rpc.Any> = Rpcs extends Rpc.Rpc<

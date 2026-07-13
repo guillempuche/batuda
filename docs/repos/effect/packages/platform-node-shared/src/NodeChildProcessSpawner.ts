@@ -1,5 +1,19 @@
 /**
- * Node.js implementation of `ChildProcessSpawner`.
+ * Shared Node.js implementation of the child process spawner service.
+ *
+ * This module adapts `node:child_process.spawn` to the Effect
+ * `ChildProcessSpawner` service. Provide {@link layer} to run `ChildProcess`
+ * commands in Node-compatible runtimes: commands get scoped process handles
+ * with stdin sinks, stdout and stderr streams, exit-code waiting,
+ * interruption-time cleanup, process killing, and custom file-descriptor pipes.
+ *
+ * The implementation sits below the command-building API. It validates and
+ * resolves `cwd` through the Effect `FileSystem` and `Path` services,
+ * translates Node errno failures to `PlatformError`, and uses scopes to
+ * terminate referenced children when the owning effect is interrupted or
+ * finalized. Pipelines are flattened by {@link flattenCommand} and spawned one
+ * process at a time, wiring the selected source stream (`stdout`, `stderr`,
+ * `all`, or `fdN`) to the destination `stdin` or `fdN`.
  *
  * @since 4.0.0
  */
@@ -25,6 +39,7 @@ import {
   ProcessId
 } from "effect/unstable/process/ChildProcessSpawner"
 import * as NodeChildProcess from "node:child_process"
+import { PassThrough } from "node:stream"
 import { handleErrnoException } from "./internal/utils.ts"
 import * as NodeSink from "./NodeSink.ts"
 import * as NodeStream from "./NodeStream.ts"
@@ -206,8 +221,11 @@ const make = Effect.gen(function*() {
           // Create a stream to read from for output file descriptors
           let stream: Stream.Stream<Uint8Array, PlatformError.PlatformError> = Stream.empty
           if (nodeStream && "read" in nodeStream) {
+            const passThrough = new PassThrough()
+            nodeStream.on("error", (error) => passThrough.destroy(error))
+            nodeStream.pipe(passThrough)
             stream = NodeStream.fromReadable({
-              evaluate: () => nodeStream,
+              evaluate: () => passThrough,
               onError: (error) => toPlatformError(`fromReadable(fd${fd})`, toError(error), command)
             })
           }
@@ -267,16 +285,26 @@ const make = Effect.gen(function*() {
     all: Stream.Stream<Uint8Array, PlatformError.PlatformError>
   } => {
     let stdout = childProcess.stdout ?
-      NodeStream.fromReadable({
-        evaluate: () => childProcess.stdout!,
-        onError: (error) => toPlatformError("fromReadable(stdout)", toError(error), command)
-      }) :
+      (() => {
+        const passThrough = new PassThrough()
+        childProcess.stdout!.on("error", (error) => passThrough.destroy(error))
+        childProcess.stdout!.pipe(passThrough)
+        return NodeStream.fromReadable({
+          evaluate: () => passThrough,
+          onError: (error) => toPlatformError("fromReadable(stdout)", toError(error), command)
+        })
+      })() :
       Stream.empty
     let stderr = childProcess.stderr ?
-      NodeStream.fromReadable({
-        evaluate: () => childProcess.stderr!,
-        onError: (error) => toPlatformError("fromReadable(stderr)", toError(error), command)
-      }) :
+      (() => {
+        const passThrough = new PassThrough()
+        childProcess.stderr!.on("error", (error) => passThrough.destroy(error))
+        childProcess.stderr!.pipe(passThrough)
+        return NodeStream.fromReadable({
+          evaluate: () => passThrough,
+          onError: (error) => toPlatformError("fromReadable(stderr)", toError(error), command)
+        })
+      })() :
       Stream.empty
 
     if (Sink.isSink(stdoutConfig.stream)) {
@@ -437,7 +465,6 @@ const make = Effect.gen(function*() {
         const stderrConfig = resolveOutputOption(cmd.options, "stderr")
         const resolvedAdditionalFds = resolveAdditionalFds(cmd.options)
         let isReferenced = true
-        let cleanupOnNonZeroExit = false
 
         const cwd = yield* resolveWorkingDirectory(cmd.options)
         const env = resolveEnvironment(cmd.options)
@@ -481,7 +508,7 @@ const make = Effect.gen(function*() {
 
         const pid = ProcessId(childProcess.pid!)
         childProcess.on("exit", (code) => {
-          if (cleanupOnNonZeroExit && code !== 0 && Predicate.isNotNull(code)) {
+          if (code !== 0 && Predicate.isNotNull(code)) {
             killProcessGroupOnExit(childProcess, cmd.options.killSignal ?? "SIGTERM")
           }
         })
@@ -489,14 +516,12 @@ const make = Effect.gen(function*() {
           if (!isReferenced) {
             childProcess.ref()
             isReferenced = true
-            cleanupOnNonZeroExit = false
           }
         })
         const unref = Effect.sync(() => {
           if (isReferenced) {
             childProcess.unref()
             isReferenced = false
-            cleanupOnNonZeroExit = true
           }
           return reref
         })
@@ -625,10 +650,10 @@ const make = Effect.gen(function*() {
 })
 
 /**
- * Layer providing the `NodeChildProcessSpawner` implementation.
+ * Layer that provides the `NodeChildProcessSpawner` implementation.
  *
+ * @category layers
  * @since 4.0.0
- * @category Layers
  */
 export const layer: Layer.Layer<
   ChildProcessSpawner,
@@ -643,8 +668,8 @@ export const layer: Layer.Layer<
 /**
  * Result of flattening a pipeline of commands.
  *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
 export interface FlattenedPipeline {
   readonly commands: Arr.NonEmptyReadonlyArray<ChildProcess.StandardCommand>
@@ -655,8 +680,8 @@ export interface FlattenedPipeline {
  * Flattens a `Command` into an array of `StandardCommand`s along with pipe
  * options for each connection.
  *
+ * @category transforming
  * @since 4.0.0
- * @category Utilities
  */
 export const flattenCommand = (
   command: ChildProcess.Command

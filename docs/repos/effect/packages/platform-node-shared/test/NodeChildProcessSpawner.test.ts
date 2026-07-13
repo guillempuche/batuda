@@ -4,6 +4,7 @@ import * as NodePath from "@effect/platform-node-shared/NodePath"
 import { assert, describe, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
+import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import * as PlatformError from "effect/PlatformError"
@@ -211,14 +212,19 @@ describe("NodeChildProcessSpawner", () => {
 
         it.effect("should handle array interpolation", () =>
           Effect.gen(function*() {
+            const fs = yield* FileSystem.FileSystem
+            const path = yield* Path.Path
+            const dir = yield* fs.makeTempDirectoryScoped()
+            const file = path.join(dir, "array-interpolation.txt")
             const args = ["-l", "-a"]
-            const handle = yield* ChildProcess.make`ls ${args} /tmp`
+            yield* fs.writeFile(file, new TextEncoder().encode("test"))
+
+            const handle = yield* ChildProcess.make`ls ${args} ${dir}`
             const exitCode = yield* handle.exitCode
             const output = yield* decodeByteStream(handle.stdout)
 
             assert.strictEqual(exitCode, ChildProcessSpawner.ExitCode(0))
-            // Should list files in /tmp with -l -a flags
-            assert.isTrue(output.length > 0)
+            assert.isTrue(output.includes("array-interpolation.txt"))
           }).pipe(Effect.scoped))
 
         it.effect("should handle multiple interpolations", () =>
@@ -612,7 +618,7 @@ describe("NodeChildProcessSpawner", () => {
       it.effect("should fail for invalid command", () =>
         Effect.gen(function*() {
           const exit = yield* Effect.exit(
-            ChildProcess.make("nonexistent-command-12345").asEffect()
+            ChildProcess.make("nonexistent-command-12345")
           )
 
           assert.isTrue(exit._tag === "Failure")
@@ -621,7 +627,7 @@ describe("NodeChildProcessSpawner", () => {
       it.effect("should handle spawn error with invalid cwd", () =>
         Effect.gen(function*() {
           const exit = yield* Effect.exit(
-            ChildProcess.make("echo", ["test"], { cwd: "/nonexistent/directory/path" }).asEffect()
+            ChildProcess.make("echo", ["test"], { cwd: "/nonexistent/directory/path" })
           )
 
           assert.isTrue(exit._tag === "Failure")
@@ -633,7 +639,7 @@ describe("NodeChildProcessSpawner", () => {
           const cwd = path.join(...TEST_BASH_SCRIPTS_PATH)
 
           const command = ChildProcess.make({ cwd })`./no-permissions.sh`
-          const result = yield* Effect.flip(command.asEffect())
+          const result = yield* Effect.flip(command)
 
           assert.deepStrictEqual(
             result,
@@ -899,7 +905,7 @@ describe("NodeChildProcessSpawner", () => {
           assert.strictEqual(exitCode, ChildProcessSpawner.ExitCode(1))
 
           // Allow cleanup to occur
-          yield* TestClock.withLive(Effect.sleep("10 millis"))
+          yield* TestClock.withLive(Effect.sleep("100 millis"))
 
           const afterExitHandle = yield* ChildProcess.make("bash", [
             "-c",
@@ -922,6 +928,7 @@ describe("NodeChildProcessSpawner", () => {
             Effect.provide(NodeServices)
           )
 
+          // @effect-diagnostics-next-line floatingEffect:off
           yield* Scope.provide(scope)(handle.unref).pipe(Effect.provide(NodeServices))
           yield* Scope.close(scope, Exit.void)
           yield* TestClock.withLive(Effect.sleep("100 millis"))
@@ -961,6 +968,7 @@ describe("NodeChildProcessSpawner", () => {
             })
           })).pipe(Effect.provide(NodeServices))
 
+          // @effect-diagnostics-next-line floatingEffect:off
           yield* Scope.provide(scope)(handle.unref).pipe(Effect.provide(NodeServices))
           yield* Scope.close(scope, Exit.void)
 
@@ -978,6 +986,7 @@ describe("NodeChildProcessSpawner", () => {
             return yield* ChildProcess.make({ cwd })`./parent-exits-early.sh`
           })).pipe(Effect.provide(NodeServices))
 
+          // @effect-diagnostics-next-line floatingEffect:off
           yield* Scope.provide(scope)(handle.unref).pipe(Effect.provide(NodeServices))
           yield* Scope.close(scope, Exit.void)
 
@@ -1012,6 +1021,7 @@ describe("NodeChildProcessSpawner", () => {
             )
           })).pipe(Effect.provide(NodeServices))
 
+          // @effect-diagnostics-next-line floatingEffect:off
           yield* Scope.provide(scope)(handle.unref).pipe(Effect.provide(NodeServices))
           yield* Scope.close(scope, Exit.void)
           yield* TestClock.withLive(Effect.sleep("100 millis"))

@@ -1,15 +1,23 @@
 /**
- * @since 1.0.0
+ * libSQL adapter for Effect SQL, backed by `@libsql/client`.
+ *
+ * This module provides a {@link LibsqlClient} and the generic SQL client
+ * service for `@libsql/client`. It uses Effect SQL's SQLite compiler, supports
+ * managed SDK clients or caller-owned live clients, classifies libSQL and
+ * SQLite failures as `SqlError`s, and provides transaction support with
+ * savepoints. Streaming queries are not implemented by this driver.
+ *
+ * @since 4.0.0
  */
 import * as Libsql from "@libsql/client"
 import * as Config from "effect/Config"
+import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Redacted from "effect/Redacted"
 import * as Scope from "effect/Scope"
 import * as Semaphore from "effect/Semaphore"
-import * as ServiceMap from "effect/ServiceMap"
 import * as Stream from "effect/Stream"
 import * as Reactivity from "effect/unstable/reactivity/Reactivity"
 import * as Client from "effect/unstable/sql/SqlClient"
@@ -23,20 +31,26 @@ const classifyError = (cause: unknown, message: string, operation: string) =>
   classifySqliteError(cause, { message, operation })
 
 /**
- * @category type ids
- * @since 1.0.0
+ * Runtime type identifier used to mark `LibsqlClient` values.
+ *
+ * @category type IDs
+ * @since 4.0.0
  */
 export const TypeId: TypeId = "~@effect/sql-libsql/LibsqlClient"
 
 /**
- * @category type ids
- * @since 1.0.0
+ * Type-level identifier used to mark `LibsqlClient` values.
+ *
+ * @category type IDs
+ * @since 4.0.0
  */
 export type TypeId = "~@effect/sql-libsql/LibsqlClient"
 
 /**
+ * libSQL-backed SQL client service, extending `SqlClient` with its runtime type marker and client configuration.
+ *
  * @category models
- * @since 1.0.0
+ * @since 4.0.0
  */
 export interface LibsqlClient extends Client.SqlClient {
   readonly [TypeId]: TypeId
@@ -44,29 +58,40 @@ export interface LibsqlClient extends Client.SqlClient {
 }
 
 /**
- * @category tags
- * @since 1.0.0
+ * Service tag for the libSQL client service.
+ *
+ * **When to use**
+ *
+ * Use to access or provide a libSQL client through the Effect context.
+ *
+ * @category services
+ * @since 4.0.0
  */
-export const LibsqlClient = ServiceMap.Service<LibsqlClient>("@effect/sql-libsql/LibsqlClient")
+export const LibsqlClient = Context.Service<LibsqlClient>("@effect/sql-libsql/LibsqlClient")
 
-const LibsqlTransaction = ServiceMap.Service<readonly [LibsqlConnection, counter: number]>(
+const LibsqlTransaction = Context.Service<readonly [LibsqlConnection, counter: number]>(
   "@effect/sql-libsql/LibsqlClient/LibsqlTransaction"
 )
 
 /**
+ * Configuration for a libSQL client, either by supplying connection options or an existing live libSQL client.
+ *
  * @category models
- * @since 1.0.0
+ * @since 4.0.0
  */
 export type LibsqlClientConfig = LibsqlClientConfig.Full | LibsqlClientConfig.Live
 
 /**
- * @category models
- * @since 1.0.0
+ * Namespace containing the configuration variants for `LibsqlClient`.
+ *
+ * @since 4.0.0
  */
 export declare namespace LibsqlClientConfig {
   /**
+   * Shared libSQL client options for span attributes and query/result name transformations.
+   *
    * @category models
-   * @since 1.0.0
+   * @since 4.0.0
    */
   export interface Base {
     readonly spanAttributes?: Record<string, unknown> | undefined
@@ -75,11 +100,16 @@ export declare namespace LibsqlClientConfig {
   }
 
   /**
+   * Connection-based libSQL configuration used to create a managed client, including URL, credentials, sync, integer mode, TLS, and concurrency options.
+   *
    * @category models
-   * @since 1.0.0
+   * @since 4.0.0
    */
   export interface Full extends Base {
-    /** The database URL.
+    /**
+     * The database URL.
+     *
+     * **Details**
      *
      * The client supports `libsql:`, `http:`/`https:`, `ws:`/`wss:` and `file:` URL. For more infomation,
      * please refer to the project README:
@@ -95,12 +125,18 @@ export declare namespace LibsqlClientConfig {
     readonly syncUrl?: string | URL | undefined
     /** Sync interval in seconds. */
     readonly syncInterval?: number | undefined
-    /** Enables or disables TLS for `libsql:` URLs.
+    /**
+     * Enables or disables TLS for `libsql:` URLs.
+     *
+     * **Details**
      *
      * By default, `libsql:` URLs use TLS. You can set this option to `false` to disable TLS.
      */
     readonly tls?: boolean | undefined
-    /** How to convert SQLite integers to JavaScript values:
+    /**
+     * How to convert SQLite integers to JavaScript values.
+     *
+     * **Details**
      *
      * - `"number"` (default): returns SQLite integers as JavaScript `number`-s (double precision floats).
      * `number` cannot precisely represent integers larger than 2^53-1 in absolute value, so attempting to read
@@ -110,7 +146,10 @@ export declare namespace LibsqlClientConfig {
      * - `"string"`: returns SQLite integers as strings.
      */
     readonly intMode?: "number" | "bigint" | "string" | undefined
-    /** Concurrency limit.
+    /**
+     * Concurrency limit.
+     *
+     * **Details**
      *
      * By default, the client performs up to 20 concurrent requests. You can set this option to a higher
      * number to increase the concurrency limit or set it to 0 to disable concurrency limits completely.
@@ -119,8 +158,10 @@ export declare namespace LibsqlClientConfig {
   }
 
   /**
+   * Configuration that uses an existing libSQL client. The supplied `liveClient` is caller-owned and is not closed by the Effect client.
+   *
    * @category models
-   * @since 1.0.0
+   * @since 4.0.0
    */
   export interface Live extends Base {
     readonly liveClient: Libsql.Client
@@ -134,8 +175,10 @@ interface LibsqlConnection extends Connection {
 }
 
 /**
- * @category constructor
- * @since 1.0.0
+ * Creates a scoped libSQL SQL client with transaction support. When given connection options it creates and closes the SDK client; when given `liveClient`, the caller retains ownership.
+ *
+ * @category constructors
+ * @since 4.0.0
  */
 export const make = (
   options: LibsqlClientConfig
@@ -196,6 +239,9 @@ export const make = (
       }
       executeValues(sql: string, params: ReadonlyArray<unknown>) {
         return Effect.map(this.run(sql, params), (rows) => rows.map((row) => Array.from(row) as Array<any>))
+      }
+      executeValuesUnprepared(sql: string, params: ReadonlyArray<unknown>) {
+        return this.executeValues(sql, params)
       }
       executeUnprepared(
         sql: string,
@@ -300,35 +346,39 @@ export const make = (
   })
 
 /**
+ * Creates a layer from a `Config`-wrapped libSQL client configuration, providing both `LibsqlClient` and `SqlClient`.
+ *
  * @category layers
- * @since 1.0.0
+ * @since 4.0.0
  */
 export const layerConfig: (
   config: Config.Wrap<LibsqlClientConfig>
 ) => Layer.Layer<LibsqlClient | Client.SqlClient, Config.ConfigError> = (
   config: Config.Wrap<LibsqlClientConfig>
 ): Layer.Layer<LibsqlClient | Client.SqlClient, Config.ConfigError> =>
-  Layer.effectServices(
-    Config.unwrap(config).asEffect().pipe(
+  Layer.effectContext(
+    Config.unwrap(config).pipe(
       Effect.flatMap(make),
       Effect.map((client) =>
-        ServiceMap.make(LibsqlClient, client).pipe(
-          ServiceMap.add(Client.SqlClient, client)
+        Context.make(LibsqlClient, client).pipe(
+          Context.add(Client.SqlClient, client)
         )
       )
     )
   ).pipe(Layer.provide(Reactivity.layer))
 
 /**
+ * Creates a layer from a concrete libSQL client configuration, providing both `LibsqlClient` and `SqlClient`.
+ *
  * @category layers
- * @since 1.0.0
+ * @since 4.0.0
  */
 export const layer = (
   config: LibsqlClientConfig
 ): Layer.Layer<LibsqlClient | Client.SqlClient> =>
-  Layer.effectServices(
+  Layer.effectContext(
     Effect.map(make(config), (client) =>
-      ServiceMap.make(LibsqlClient, client).pipe(
-        ServiceMap.add(Client.SqlClient, client)
+      Context.make(LibsqlClient, client).pipe(
+        Context.add(Client.SqlClient, client)
       ))
   ).pipe(Layer.provide(Reactivity.layer))

@@ -1,4 +1,11 @@
 /**
+ * Swagger documentation UI for declarative `HttpApi` contracts.
+ *
+ * This module mounts a browser-based Swagger UI route on an `HttpRouter`. The
+ * page renders the OpenAPI document derived from the supplied `HttpApi`, so a
+ * running application can expose interactive API documentation without writing a
+ * separate OpenAPI file.
+ *
  * @since 4.0.0
  */
 import * as Effect from "../../Effect.ts"
@@ -11,7 +18,7 @@ import * as Html from "./internal/html.ts"
 import * as internal from "./internal/httpApiSwagger.ts"
 import * as OpenApi from "./OpenApi.ts"
 
-const makeHandler = <Id extends string, Groups extends HttpApiGroup.Any>(options: {
+const makeHandler = <Id extends string, Groups extends HttpApiGroup.Constraint>(options: {
   readonly api: HttpApi.HttpApi<Id, Groups>
 }) => {
   const spec = OpenApi.fromApi(options.api)
@@ -43,14 +50,13 @@ const makeHandler = <Id extends string, Groups extends HttpApiGroup.Any>(options
 }
 
 /**
- * Exported layer mounting Swagger/OpenAPI documentation UI.
+ * Mounts Swagger UI for an `HttpApi` at the configured path, defaulting to
+ * `/docs`, using the OpenAPI specification generated from the API.
  *
- * @param options.path Optional mount path (default "/docs").
- *
- * @since 4.0.0
  * @category layers
+ * @since 4.0.0
  */
-export const layer = <Id extends string, Groups extends HttpApiGroup.Any>(
+export const layer = <Id extends string, Groups extends HttpApiGroup.Constraint>(
   api: HttpApi.HttpApi<Id, Groups>,
   options?: {
     readonly path?: `/${string}` | undefined

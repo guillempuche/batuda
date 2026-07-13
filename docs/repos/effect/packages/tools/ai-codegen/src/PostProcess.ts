@@ -1,12 +1,12 @@
 /**
  * Post-processing service for linting and formatting generated code.
  *
- * @since 1.0.0
+ * @since 4.0.0
  */
+import * as Context from "effect/Context"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import * as ServiceMap from "effect/ServiceMap"
 import * as Stream from "effect/Stream"
 import * as ChildProcess from "effect/unstable/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
@@ -14,7 +14,8 @@ import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawne
 /**
  * Error during post-processing (lint or format).
  *
- * @example
+ * **Example** (Creating a post-process error)
+ *
  * ```ts
  * import * as PostProcess from "@effect/ai-codegen/PostProcess"
  *
@@ -29,8 +30,8 @@ import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawne
  * })
  * ```
  *
- * @since 1.0.0
  * @category errors
+ * @since 4.0.0
  */
 export class PostProcessError extends Data.TaggedError("PostProcessError")<{
   readonly step: "lint" | "format"
@@ -62,8 +63,8 @@ export class PostProcessError extends Data.TaggedError("PostProcessError")<{
 /**
  * Service for post-processing generated code.
  *
- * @since 1.0.0
  * @category models
+ * @since 4.0.0
  */
 export interface PostProcessor {
   readonly lint: (filePath: string) => Effect.Effect<void, PostProcessError>
@@ -71,18 +72,20 @@ export interface PostProcessor {
 }
 
 /**
- * @since 1.0.0
- * @category tags
+ * Service tag for linting and formatting generated code.
+ *
+ * @category services
+ * @since 4.0.0
  */
-export const PostProcessor: ServiceMap.Service<PostProcessor, PostProcessor> = ServiceMap.Service(
+export const PostProcessor: Context.Service<PostProcessor, PostProcessor> = Context.Service(
   "@effect/ai-codegen/PostProcessor"
 )
 
 /**
  * Layer providing the PostProcessor service.
  *
- * @since 1.0.0
  * @category layers
+ * @since 4.0.0
  */
 export const layer: Layer.Layer<
   PostProcessor,

@@ -1,5 +1,14 @@
 /**
- * @since 1.0.0
+ * Runs the worker side of the browser SQLite WASM client that stores data in
+ * OPFS.
+ *
+ * This module opens `@effect/wa-sqlite` with the OPFS access-handle VFS, then
+ * listens on a `MessagePort`-compatible port for the protocol used by
+ * `SqliteClient`. It sends a ready message, executes SQL messages, imports and
+ * exports database bytes, forwards update-hook notifications, and closes when
+ * requested. It is meant to run in a dedicated worker or a `SharedWorker`.
+ *
+ * @since 4.0.0
  */
 /// <reference lib="webworker" />
 // oxlint-disable-next-line effect/no-import-from-barrel-package
@@ -14,8 +23,10 @@ const classifyError = (cause: unknown, message: string, operation: string) =>
   classifySqliteError(cause, { message, operation })
 
 /**
+ * Configuration for the SQLite OPFS worker, including the message port used for the client protocol and the OPFS database name to open.
+ *
  * @category models
- * @since 1.0.0
+ * @since 4.0.0
  */
 export interface OpfsWorkerConfig {
   readonly port: EventTarget & Pick<MessagePort, "postMessage" | "close">
@@ -23,8 +34,10 @@ export interface OpfsWorkerConfig {
 }
 
 /**
- * @category constructor
- * @since 1.0.0
+ * Runs the SQLite OPFS worker loop, opening the configured database, posting a ready message, handling query/import/export/update-hook messages, and closing when a close message is received.
+ *
+ * @category constructors
+ * @since 4.0.0
  */
 export const run = (
   options: OpfsWorkerConfig

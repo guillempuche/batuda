@@ -1,4 +1,11 @@
 /**
+ * Converts supported values into HTTP server responses.
+ *
+ * Server-side errors and helper values can implement `Respondable` when they
+ * know which status, headers, cookies, or body should be sent to the client.
+ * This module detects those values and converts them to `HttpServerResponse`
+ * values, with fallback handling for schema errors and missing values.
+ *
  * @since 4.0.0
  */
 import * as Cause from "../../Cause.ts"
@@ -9,22 +16,34 @@ import type { HttpServerResponse } from "./HttpServerResponse.ts"
 import * as Response from "./HttpServerResponse.ts"
 
 /**
+ * Protocol key used by values that can render themselves as
+ * `HttpServerResponse` values.
+ *
+ * @category type IDs
  * @since 4.0.0
- * @category Type IDs
  */
 export const symbol = "~effect/http/HttpServerRespondable"
 
 /**
- * @since 4.0.0
+ * Protocol for values that can be converted into an `HttpServerResponse`.
+ *
+ * **Details**
+ *
+ * Implement the protocol method to describe the response that should be sent for
+ * the value.
+ *
  * @category models
+ * @since 4.0.0
  */
 export interface Respondable {
   [symbol](): Effect.Effect<HttpServerResponse, unknown>
 }
 
 /**
- * @since 4.0.0
+ * Returns `true` when the supplied value implements the `Respondable` protocol.
+ *
  * @category guards
+ * @since 4.0.0
  */
 export const isRespondable = (u: unknown): u is Respondable => hasProperty(u, symbol)
 
@@ -32,8 +51,15 @@ const badRequest = Response.empty({ status: 400 })
 const notFound = Response.empty({ status: 404 })
 
 /**
- * @since 4.0.0
+ * Converts a `Respondable` value into an `HttpServerResponse`.
+ *
+ * **Details**
+ *
+ * If the value is already an HTTP server response it is returned directly; errors
+ * from the response conversion are converted to defects.
+ *
  * @category accessors
+ * @since 4.0.0
  */
 export const toResponse = (self: Respondable): Effect.Effect<HttpServerResponse> => {
   if (Response.isHttpServerResponse(self)) {
@@ -43,8 +69,16 @@ export const toResponse = (self: Respondable): Effect.Effect<HttpServerResponse>
 }
 
 /**
- * @since 4.0.0
+ * Attempts to convert an unknown value into an `HttpServerResponse`, falling back
+ * to the supplied response when no conversion is available.
+ *
+ * **Details**
+ *
+ * `HttpServerResponse` and `Respondable` values are used directly, schema errors
+ * become `400` responses, and no-such-element errors become `404` responses.
+ *
  * @category accessors
+ * @since 4.0.0
  */
 export const toResponseOrElse = (u: unknown, orElse: HttpServerResponse): Effect.Effect<HttpServerResponse> => {
   if (Response.isHttpServerResponse(u)) {
@@ -61,8 +95,15 @@ export const toResponseOrElse = (u: unknown, orElse: HttpServerResponse): Effect
 }
 
 /**
- * @since 4.0.0
+ * Attempts to convert an unknown defect into an `HttpServerResponse`, falling
+ * back to the supplied response when no conversion is available.
+ *
+ * **Details**
+ *
+ * Only `HttpServerResponse` and `Respondable` values receive special handling.
+ *
  * @category accessors
+ * @since 4.0.0
  */
 export const toResponseOrElseDefect = (u: unknown, orElse: HttpServerResponse): Effect.Effect<HttpServerResponse> => {
   if (Response.isHttpServerResponse(u)) {

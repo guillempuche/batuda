@@ -1,11 +1,10 @@
 /**
- * This module provides a re-export of the fast-check library for property-based testing.
- * Fast-check is a property-based testing framework that generates random test cases
- * to validate that properties hold true for a wide range of inputs.
+ * Re-exports `fast-check` for property-based testing.
  *
- * Property-based testing is a testing methodology where you specify properties that
- * should hold true for your functions, and the framework generates many random test
- * cases to try to find counterexamples.
+ * Property-based tests describe a rule that should hold for many inputs, and
+ * `fast-check` generates random examples to look for counterexamples. This
+ * module exposes the library from `effect/testing` so tests can use it alongside
+ * the other Effect testing helpers.
  *
  * @since 3.10.0
  */
@@ -19,9 +18,10 @@
  * true for your functions, rather than writing specific test cases. The library
  * then generates many random inputs to verify these properties.
  *
- * @example
+ * **Example** (Checking an array reversal property)
+ *
  * ```ts
- * import * as FastCheck from "effect/testing/FastCheck"
+ * import { FastCheck } from "effect/testing"
  *
  * // Property: reverse of reverse should equal original
  * const reverseProp = FastCheck.property(
@@ -37,9 +37,10 @@
  * FastCheck.assert(reverseProp)
  * ```
  *
- * @example
+ * **Example** (Checking string concatenation properties)
+ *
  * ```ts
- * import * as FastCheck from "effect/testing/FastCheck"
+ * import { FastCheck } from "effect/testing"
  *
  * // Test string concatenation properties
  * const concatProp = FastCheck.property(
@@ -56,9 +57,10 @@
  * FastCheck.assert(concatProp)
  * ```
  *
- * @example
+ * **Example** (Generating record data for properties)
+ *
  * ```ts
- * import * as FastCheck from "effect/testing/FastCheck"
+ * import { FastCheck } from "effect/testing"
  *
  * // Generate random data for testing
  * const personArbitrary = FastCheck.record({

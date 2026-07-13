@@ -1,5 +1,14 @@
 /**
- * @since 1.0.0
+ * Node.js multipart parsing for HTTP `multipart/form-data` request bodies.
+ *
+ * `NodeMultipart` adapts a Node `Readable` plus incoming HTTP headers into
+ * Effect's shared multipart model. It can expose form parts as a stream or
+ * collect a complete persisted form by writing file uploads to scoped temporary
+ * files through the current `FileSystem` and `Path` services. `fileToReadable`
+ * returns the underlying Node readable stream for file parts produced by this
+ * parser.
+ *
+ * @since 4.0.0
  */
 import * as Effect from "effect/Effect"
 import type * as FileSystem from "effect/FileSystem"
@@ -16,8 +25,12 @@ import * as NodeStreamP from "node:stream/promises"
 import * as NodeStream from "./NodeStream.ts"
 
 /**
- * @since 1.0.0
+ * Parses multipart data from a Node readable request body and headers into a
+ * stream of `Multipart.Part` values, converting parser failures to
+ * `MultipartError`.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const stream = (
   source: Readable,
@@ -39,8 +52,11 @@ export const stream = (
   )
 
 /**
- * @since 1.0.0
+ * Parses multipart data from a Node readable request body and persists file
+ * parts using the current `FileSystem`, `Path`, and `Scope` services.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const persisted = (
   source: Readable,
@@ -57,7 +73,11 @@ export const persisted = (
     }))
 
 /**
- * @since 1.0.0
+ * Returns the underlying Node readable stream for a multipart file produced by
+ * the Node multipart parser.
+ *
+ * @category converting
+ * @since 4.0.0
  */
 export const fileToReadable = (file: Multipart.File): Readable => (file as FileImpl).file
 

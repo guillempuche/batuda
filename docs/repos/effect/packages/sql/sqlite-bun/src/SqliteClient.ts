@@ -1,15 +1,22 @@
 /**
- * @since 1.0.0
+ * Connects Effect SQL to SQLite when running on Bun, using `bun:sqlite`.
+ *
+ * This module opens a SQLite database and exposes it as both `SqliteClient` and
+ * the generic Effect SQL client. It serializes access to the database, enables
+ * WAL mode unless disabled, and supports database export and extension loading.
+ * Streaming queries and `updateValues` are not supported by this driver.
+ *
+ * @since 4.0.0
  */
 import { Database } from "bun:sqlite"
 import * as Config from "effect/Config"
+import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Fiber from "effect/Fiber"
 import { identity } from "effect/Function"
 import * as Layer from "effect/Layer"
 import * as Scope from "effect/Scope"
 import * as Semaphore from "effect/Semaphore"
-import * as ServiceMap from "effect/ServiceMap"
 import * as Stream from "effect/Stream"
 import * as Reactivity from "effect/unstable/reactivity/Reactivity"
 import * as Client from "effect/unstable/sql/SqlClient"
@@ -23,20 +30,26 @@ const classifyError = (cause: unknown, message: string, operation: string) =>
   classifySqliteError(cause, { message, operation })
 
 /**
- * @category type ids
- * @since 1.0.0
+ * Runtime type identifier used to mark Bun `SqliteClient` values.
+ *
+ * @category type IDs
+ * @since 4.0.0
  */
 export const TypeId: TypeId = "~@effect/sql-sqlite-bun/SqliteClient"
 
 /**
- * @category type ids
- * @since 1.0.0
+ * Type-level identifier used to mark Bun `SqliteClient` values.
+ *
+ * @category type IDs
+ * @since 4.0.0
  */
 export type TypeId = "~@effect/sql-sqlite-bun/SqliteClient"
 
 /**
+ * Bun SQLite client service, extending `SqlClient` with database export and extension loading helpers. `updateValues` is not supported.
+ *
  * @category models
- * @since 1.0.0
+ * @since 4.0.0
  */
 export interface SqliteClient extends Client.SqlClient {
   readonly [TypeId]: TypeId
@@ -49,14 +62,22 @@ export interface SqliteClient extends Client.SqlClient {
 }
 
 /**
- * @category tags
- * @since 1.0.0
+ * Service tag for the Bun SQLite client service.
+ *
+ * **When to use**
+ *
+ * Use to access or provide a Bun SQLite client through the Effect context.
+ *
+ * @category services
+ * @since 4.0.0
  */
-export const SqliteClient = ServiceMap.Service<SqliteClient>("@effect/sql-sqlite-bun/Client")
+export const SqliteClient = Context.Service<SqliteClient>("@effect/sql-sqlite-bun/Client")
 
 /**
+ * Configuration for a Bun SQLite client, including filename, open mode flags, WAL behavior, span attributes, and query/result name transforms.
+ *
  * @category models
- * @since 1.0.0
+ * @since 4.0.0
  */
 export interface SqliteClientConfig {
   readonly filename: string
@@ -77,8 +98,10 @@ interface SqliteConnection extends Connection {
 }
 
 /**
- * @category constructor
- * @since 1.0.0
+ * Creates a scoped Bun SQLite client for a database file, enabling WAL by default and serializing access. Streaming queries are not implemented.
+ *
+ * @category constructors
+ * @since 4.0.0
  */
 export const make = (
   options: SqliteClientConfig
@@ -103,17 +126,21 @@ export const make = (
         db.run("PRAGMA journal_mode = WAL;")
       }
 
+      const prepare = (sql: string, useSafeIntegers: boolean) => {
+        const statement = db.query(sql)
+        // @ts-ignore bun-types missing safeIntegers method, fixed in https://github.com/oven-sh/bun/pull/26627
+        statement.safeIntegers(useSafeIntegers)
+        return statement
+      }
+
       const run = (
         sql: string,
         params: ReadonlyArray<unknown> = []
       ) =>
         Effect.withFiber<Array<any>, SqlError>((fiber) => {
-          const statement = db.query(sql)
-          const useSafeIntegers = ServiceMap.get(fiber.services, Client.SafeIntegers)
-          // @ts-ignore bun-types missing safeIntegers method, fixed in https://github.com/oven-sh/bun/pull/26627
-          statement.safeIntegers(useSafeIntegers)
+          const useSafeIntegers = Context.get(fiber.context, Client.SafeIntegers)
           try {
-            return Effect.succeed((statement.all(...(params as any)) ?? []) as Array<any>)
+            return Effect.succeed((prepare(sql, useSafeIntegers).all(...(params as any)) ?? []) as Array<any>)
           } catch (cause) {
             return Effect.fail(new SqlError({ reason: classifyError(cause, "Failed to execute statement", "execute") }))
           }
@@ -124,14 +151,13 @@ export const make = (
         params: ReadonlyArray<unknown> = []
       ) =>
         Effect.withFiber<Array<any>, SqlError>((fiber) => {
-          const statement = db.query(sql)
-          const useSafeIntegers = ServiceMap.get(fiber.services, Client.SafeIntegers)
-          // @ts-ignore bun-types missing safeIntegers method, fixed in https://github.com/oven-sh/bun/pull/26627
-          statement.safeIntegers(useSafeIntegers)
+          const useSafeIntegers = Context.get(fiber.context, Client.SafeIntegers)
           try {
-            return Effect.succeed((statement.values(...(params as any)) ?? []) as Array<any>)
+            return Effect.succeed((prepare(sql, useSafeIntegers).values(...(params as any)) ?? []) as Array<any>)
           } catch (cause) {
-            return Effect.fail(new SqlError({ reason: classifyError(cause, "Failed to execute statement", "execute") }))
+            return Effect.fail(
+              new SqlError({ reason: classifyError(cause, "Failed to execute statement", "executeValues") })
+            )
           }
         })
 
@@ -145,6 +171,9 @@ export const make = (
           return run(sql, params)
         },
         executeValues(sql, params) {
+          return runValues(sql, params)
+        },
+        executeValuesUnprepared(sql, params) {
           return runValues(sql, params)
         },
         executeUnprepared(sql, params, transformRows) {
@@ -172,7 +201,7 @@ export const make = (
     const acquirer = semaphore.withPermits(1)(Effect.succeed(connection))
     const transactionAcquirer = Effect.uninterruptibleMask((restore) => {
       const fiber = Fiber.getCurrent()!
-      const scope = ServiceMap.getUnsafe(fiber.services, Scope.Scope)
+      const scope = Context.getUnsafe(fiber.context, Scope.Scope)
       return Effect.as(
         Effect.tap(
           restore(semaphore.take(1)),
@@ -203,33 +232,37 @@ export const make = (
   })
 
 /**
+ * Creates a layer from a `Config`-wrapped Bun SQLite client configuration, providing both `SqliteClient` and `SqlClient`.
+ *
  * @category layers
- * @since 1.0.0
+ * @since 4.0.0
  */
 export const layerConfig = (
   config: Config.Wrap<SqliteClientConfig>
 ): Layer.Layer<SqliteClient | Client.SqlClient, Config.ConfigError> =>
-  Layer.effectServices(
-    Config.unwrap(config).asEffect().pipe(
+  Layer.effectContext(
+    Config.unwrap(config).pipe(
       Effect.flatMap(make),
       Effect.map((client) =>
-        ServiceMap.make(SqliteClient, client).pipe(
-          ServiceMap.add(Client.SqlClient, client)
+        Context.make(SqliteClient, client).pipe(
+          Context.add(Client.SqlClient, client)
         )
       )
     )
   ).pipe(Layer.provide(Reactivity.layer))
 
 /**
+ * Creates a layer from a concrete Bun SQLite client configuration, providing both `SqliteClient` and `SqlClient`.
+ *
  * @category layers
- * @since 1.0.0
+ * @since 4.0.0
  */
 export const layer = (
   config: SqliteClientConfig
 ): Layer.Layer<SqliteClient | Client.SqlClient> =>
-  Layer.effectServices(
+  Layer.effectContext(
     Effect.map(make(config), (client) =>
-      ServiceMap.make(SqliteClient, client).pipe(
-        ServiceMap.add(Client.SqlClient, client)
+      Context.make(SqliteClient, client).pipe(
+        Context.add(Client.SqlClient, client)
       ))
   ).pipe(Layer.provide(Reactivity.layer))

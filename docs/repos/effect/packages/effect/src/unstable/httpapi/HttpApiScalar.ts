@@ -1,4 +1,11 @@
 /**
+ * Scalar documentation UI for declarative `HttpApi` contracts.
+ *
+ * Use this module to mount a browser-based API reference on an `HttpRouter`
+ * without writing or storing a separate OpenAPI file. The route renders an HTML
+ * page containing the OpenAPI document produced from the supplied `HttpApi` and
+ * boots Scalar in the browser.
+ *
  * @since 4.0.0
  */
 import * as Effect from "../../Effect.ts"
@@ -12,8 +19,10 @@ import * as internal from "./internal/httpApiScalar.ts"
 import * as OpenApi from "./OpenApi.ts"
 
 /**
+ * Theme preset identifier accepted by the Scalar API reference UI.
+ *
+ * @category models
  * @since 4.0.0
- * @category model
  */
 export type ScalarThemeId =
   | "alternate"
@@ -30,10 +39,15 @@ export type ScalarThemeId =
   | "none"
 
 /**
- * @see https://github.com/scalar/scalar/blob/main/documentation/configuration.md
+ * Configuration passed to the embedded Scalar API reference UI.
  *
+ * **Details**
+ *
+ * This configuration follows Scalar's API reference configuration:
+ * https://github.com/scalar/scalar/blob/main/documentation/configuration.md
+ *
+ * @category models
  * @since 4.0.0
- * @category model
  */
 export type ScalarConfig = {
   /** A string to use one of the color presets */
@@ -42,24 +56,26 @@ export type ScalarConfig = {
   layout?: "modern" | "classic"
   /** URL to a request proxy for the API client */
   proxyUrl?: string
+  /** Browser JavaScript function expression used by Scalar for documents and test requests */
+  customFetch?: string
   /** Whether to show the sidebar */
   showSidebar?: boolean
   /**
    * Whether to show models in the sidebar, search, and content.
    *
-   * Default: `false`
+   * @default false
    */
   hideModels?: boolean
   /**
    * Whether to show the "Test Request" button.
    *
-   * Default: `false`
+   * @default false
    */
   hideTestRequestButton?: boolean
   /**
    * Whether to show the sidebar search bar.
    *
-   * Default: `false`
+   * @default false
    */
   hideSearch?: boolean
   /** Whether dark mode is on or off initially (light mode) */
@@ -71,37 +87,56 @@ export type ScalarConfig = {
   /**
    * Path to a favicon image.
    *
-   * Default: `undefined`
-   * Example: "/favicon.svg"
+   * **Example** (Setting a relative favicon)
+   *
+   * ```ts
+   * const favicon = "/favicon.svg"
+   * ```
+   *
+   * @default undefined
    */
   favicon?: string
   /** Custom CSS to be added to the page */
   customCss?: string
   /**
-   * The baseServerURL is used when the spec servers are relative paths and we are using SSR.
-   * On the client we can grab the window.location.origin but on the server we need
-   * to use this prop.
+   * Origin used when the OpenAPI document contains relative server URLs and is
+   * rendered during SSR.
    *
-   * Default: `undefined`
-   * Example: "http://localhost:3000"
+   * **Details**
+   *
+   * Browsers can derive the origin from `window.location.origin`; server
+   * rendering needs this value supplied explicitly.
+   *
+   * **Example** (Setting a local server URL)
+   *
+   * ```ts
+   * const baseServerURL = "http://localhost:3000"
+   * ```
+   *
+   * @default undefined
    */
   baseServerURL?: string
   /**
-   * We use Inter and JetBrains Mono as the default fonts. If you want to use your own fonts, set this to false.
+   * Whether Scalar loads its default Inter and JetBrains Mono fonts.
    *
-   * Default: `true`
+   * **Details**
+   *
+   * Set this to `false` when supplying custom fonts.
+   *
+   * @default true
    */
   withDefaultFonts?: boolean
   /**
-   * By default we only open the relevant tag based on the url, however if you want all the tags open by default then set this configuration option.
+   * Whether all tags are open by default instead of only the tag matching the
+   * current URL.
    *
-   * Default: `false`
+   * @default false
    */
   defaultOpenAllTags?: boolean
   /**
    * Whether to display the operation ID in the operation reference.
    *
-   * Default: `false`
+   * @default false
    */
   showOperationId?: boolean
 }
@@ -116,16 +151,26 @@ type ScalarSource =
     readonly source: string
   }
 
-const makeHandler = <Id extends string, Groups extends HttpApiGroup.Any>(options: {
+const makeHandler = <Id extends string, Groups extends HttpApiGroup.Constraint>(options: {
   readonly api: HttpApi.HttpApi<Id, Groups>
   readonly source: ScalarSource
   readonly scalar: ScalarConfig | undefined
 }) => {
   const spec = OpenApi.fromApi(options.api)
+  const { customFetch, ...scalar } = options.scalar ?? {}
   const scalarConfig = {
     _integration: "html",
-    ...options.scalar
+    ...scalar
   }
+  const scalarScript = options.source._tag === "Cdn"
+    ? `<script src="${
+      Html.escapeAttribute(
+        `https://cdn.jsdelivr.net/npm/@scalar/api-reference@${
+          encodeURIComponent(options.source.version ?? "latest")
+        }/dist/browser/standalone.min.js`
+      )
+    }" crossorigin></script>`
+    : `<script>${options.source.source}</script>`
   const response = HttpServerResponse.html(`<!doctype html>
 <html>
   <head>
@@ -134,41 +179,46 @@ const makeHandler = <Id extends string, Groups extends HttpApiGroup.Any>(options
     ${
     !spec.info.description
       ? ""
-      : `<meta name="description" content="${Html.escape(spec.info.description)}"/>`
+      : `<meta name="description" content="${Html.escapeAttribute(spec.info.description)}"/>`
   }
     ${
     !spec.info.description
       ? ""
-      : `<meta name="og:description" content="${Html.escape(spec.info.description)}"/>`
+      : `<meta name="og:description" content="${Html.escapeAttribute(spec.info.description)}"/>`
   }
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1" />
   </head>
   <body>
-    <script id="api-reference" type="application/json">
-      ${Html.escapeJson(spec)}
-    </script>
+    <div id="api-reference-container"></div>
+    ${scalarScript}
     <script>
-      document.getElementById('api-reference').dataset.configuration = JSON.stringify(${Html.escapeJson(scalarConfig)})
-    </script>
-    ${
-    options.source._tag === "Cdn"
-      ? `<script src="${`https://cdn.jsdelivr.net/npm/@scalar/api-reference@${
-        options.source.version ?? "latest"
-      }/dist/browser/standalone.min.js`}" crossorigin></script>`
-      : `<script>${options.source.source}</script>`
+      window.Scalar.createApiReference(document.getElementById('api-reference-container'), {
+        ...${Html.escapeJson(scalarConfig)},
+        content: ${Html.escapeJson(spec)}${
+    customFetch === undefined ? "" : `,
+        customFetch: ${customFetch}`
   }
+      })
+    </script>
   </body>
 </html>`)
   return Effect.succeed(response)
 }
 
 /**
- * @since 4.0.0
+ * Mounts a Scalar API reference page for an `HttpApi` using the bundled Scalar script.
+ *
+ * **Details**
+ *
+ * The route serves the OpenAPI specification generated from the API at the
+ * configured path, defaulting to `/docs`.
+ *
  * @category layers
+ * @since 4.0.0
  */
-export const layer = <Id extends string, Groups extends HttpApiGroup.Any>(
+export const layer = <Id extends string, Groups extends HttpApiGroup.Constraint>(
   api: HttpApi.HttpApi<Id, Groups>,
   options?: {
     readonly path?: `/${string}` | undefined
@@ -188,10 +238,18 @@ export const layer = <Id extends string, Groups extends HttpApiGroup.Any>(
   }))
 
 /**
- * @since 4.0.0
+ * Mounts a Scalar API reference page for an `HttpApi` that loads Scalar from jsDelivr.
+ *
+ * **Details**
+ *
+ * The route serves the OpenAPI specification generated from the API at the
+ * configured path, defaulting to `/docs`; `version` selects the Scalar package
+ * version loaded from the CDN.
+ *
  * @category layers
+ * @since 4.0.0
  */
-export const layerCdn = <Id extends string, Groups extends HttpApiGroup.Any>(
+export const layerCdn = <Id extends string, Groups extends HttpApiGroup.Constraint>(
   api: HttpApi.HttpApi<Id, Groups>,
   options?: {
     readonly path?: `/${string}` | undefined

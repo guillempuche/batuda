@@ -1,15 +1,16 @@
-/** @effect-diagnostics floatingEffect:skip-file */
+/** @effect-diagnostics floatingEffect:skip-file missingEffectError:skip-file */
 import {
   type Cause,
   type Channel,
+  Context,
   Data,
   Effect,
   Fiber,
+  type Layer,
   type Option,
   pipe,
   Result,
   type Scope,
-  ServiceMap,
   type Sink,
   type Stream,
   type Types,
@@ -58,13 +59,18 @@ declare const sinkStringOrNumber:
 declare const channelStringOrNumber:
   | Channel.Channel<string, "out-err-1", "out-done-1", string, "in-err", "in-done", "dep-1">
   | Channel.Channel<number, "out-err-2", "out-done-2", string, "in-err", "in-done", "dep-2">
+declare const layerStringOrNumber:
+  | Layer.Layer<"out-1", "err-1", "dep-1">
+  | Layer.Layer<"out-2", "err-2", "dep-2">
+declare const optionString: Option.Option<string>
 declare const optionStringOrNumber: Option.Option<string> | Option.Option<number>
 declare const resultStringOrNumber: Result.Result<string, "err-1"> | Result.Result<number, "err-2">
 declare const fiberStringOrNumber: Fiber.Fiber<string, "err-1"> | Fiber.Fiber<number, "err-2">
 declare const stringArray: Array<Effect.Effect<string, "err-3", "dep-3">>
 declare const numberRecord: Record<string, Effect.Effect<number, "err-4", "dep-4">>
+declare const optionalEffect: Option.Option<Effect.Effect<string, "err-1", "dep-1">>
 
-class AcquireReleaseDependency extends ServiceMap.Service<AcquireReleaseDependency, string>()(
+class AcquireReleaseDependency extends Context.Service<AcquireReleaseDependency, string>()(
   "AcquireReleaseDependency"
 ) {}
 
@@ -99,6 +105,42 @@ describe("Types", () => {
     it("returns never for invalid tag", () => {
       expect<Types.ExtractReason<AiError, "Invalid">>().type.toBe<never>()
     })
+  })
+})
+
+describe("Effect.try", () => {
+  it("supports direct-thunk form", () => {
+    const result = Effect.try(() => 1)
+    expect(result).type.toBe<Effect.Effect<number, Cause.UnknownError>>()
+  })
+
+  it("supports options form with typed error mapping", () => {
+    const result = Effect.try({
+      try: () => 1,
+      catch: () => new SimpleError({ code: 1 })
+    })
+    expect(result).type.toBe<Effect.Effect<number, SimpleError>>()
+  })
+})
+
+describe("Effect.tryPromise", () => {
+  it("supports direct-thunk form", () => {
+    const result = Effect.tryPromise((signal) => {
+      expect(signal).type.toBe<AbortSignal>()
+      return Promise.resolve(1)
+    })
+    expect(result).type.toBe<Effect.Effect<number, Cause.UnknownError>>()
+  })
+
+  it("supports options form with typed error mapping", () => {
+    const result = Effect.tryPromise({
+      try: (signal) => {
+        expect(signal).type.toBe<AbortSignal>()
+        return Promise.resolve(1)
+      },
+      catch: () => new SimpleError({ code: 1 })
+    })
+    expect(result).type.toBe<Effect.Effect<number, SimpleError>>()
   })
 })
 
@@ -146,6 +188,64 @@ describe("Effect.catchReason", () => {
       Effect.catchReason("AiError", "RateLimitError", () => Effect.fail(new OtherError({ message: "" })))
     )
     expect(result).type.toBe<Effect.Effect<string, AiError | OtherError>>()
+  })
+
+  // Soundness guard for https://github.com/Effect-TS/effect-smol/issues/2142: a re-failing `orElse`
+  // (success type `never`) must not erase the other unhandled error tags via conditional distribution.
+  it("keeps other error tags when orElse re-fails", () => {
+    const result = pipe(
+      mixedEffect,
+      Effect.catchReason(
+        "AiError",
+        "RateLimitError",
+        () => Effect.succeed("ok"),
+        () => Effect.fail(new SimpleError({ code: 1 }))
+      )
+    )
+    expect(result).type.toBe<Effect.Effect<string, OtherError | SimpleError>>()
+  })
+})
+
+describe("Effect.transposeOption", () => {
+  it("preserves success, error, and requirements", () => {
+    const result = Effect.transposeOption(optionalEffect)
+    expect(result).type.toBe<Effect.Effect<Option.Option<string>, "err-1", "dep-1">>()
+  })
+})
+
+describe("Effect.fromOption", () => {
+  it("uses NoSuchElementError by default", () => {
+    const result = Effect.fromOption(optionString)
+    expect(result).type.toBe<Effect.Effect<string, Cause.NoSuchElementError>>()
+  })
+
+  it("supports a custom error in data-first form", () => {
+    const result = Effect.fromOption(optionString, () => new SimpleError({ code: 1 }))
+    expect(result).type.toBe<Effect.Effect<string, SimpleError>>()
+  })
+
+  it("supports a custom error in data-last form", () => {
+    const result = pipe(
+      optionString,
+      Effect.fromOption(() => new SimpleError({ code: 1 }))
+    )
+    expect(result).type.toBe<Effect.Effect<string, SimpleError>>()
+  })
+
+  it("supports callback usage with the default error", () => {
+    const result = Effect.flatMap(Effect.succeed(optionString), Effect.fromOption)
+    expect(result).type.toBe<Effect.Effect<string, Cause.NoSuchElementError>>()
+  })
+})
+
+describe("Effect.firstSuccessOf", () => {
+  it("infers success, error, and requirements from the effect collection", () => {
+    const result = Effect.firstSuccessOf([
+      string,
+      number
+    ])
+
+    expect(result).type.toBe<Effect.Effect<string | number, "err-1" | "err-2", "dep-1" | "dep-2">>()
   })
 })
 
@@ -234,9 +334,88 @@ describe("Effect.catchReasons", () => {
     )
     expect(result).type.toBe<Effect.Effect<string>>()
   })
+
+  it("keeps other error tags when orElse re-fails", () => {
+    const result = pipe(
+      mixedEffect,
+      Effect.catchReasons(
+        "AiError",
+        { RateLimitError: () => Effect.succeed("ok") },
+        () => Effect.fail(new SimpleError({ code: 1 }))
+      )
+    )
+    expect(result).type.toBe<Effect.Effect<string, OtherError | SimpleError>>()
+  })
+})
+
+describe("Effect.catchTag", () => {
+  it("removes the handled error from the error channel when orElse is omitted", () => {
+    const result = pipe(
+      mixedEffect,
+      Effect.catchTag("AiError", () => Effect.succeed("ok"))
+    )
+    expect(result).type.toBe<Effect.Effect<string, OtherError>>()
+  })
+
+  it("removes the handled error in data-first usage when orElse is omitted", () => {
+    const result = Effect.catchTag(mixedEffect, "AiError", () => Effect.succeed("ok"))
+    expect(result).type.toBe<Effect.Effect<string, OtherError>>()
+  })
+
+  it("handles an array of tags", () => {
+    const result = pipe(
+      mixedEffect,
+      Effect.catchTag(["AiError", "OtherError"], (error) => {
+        expect(error).type.toBe<AiError | OtherError>()
+        return Effect.succeed("ok")
+      })
+    )
+    expect(result).type.toBe<Effect.Effect<string>>()
+  })
+
+  it("supports orElse", () => {
+    const result = pipe(
+      mixedEffect,
+      Effect.catchTag(
+        "AiError",
+        () => Effect.succeed("ok"),
+        (error) => {
+          expect(error).type.toBe<OtherError>()
+          return Effect.fail(new SimpleError({ code: 1 }))
+        }
+      )
+    )
+    expect(result).type.toBe<Effect.Effect<string, SimpleError>>()
+  })
+
+  it("keeps unhandled errors under an explicit annotation (orElse omitted)", () => {
+    // @ts-expect-error is not assignable to type 'Effect<string, SimpleError, never>'
+    const _program: Effect.Effect<string, SimpleError> = pipe(
+      mixedEffect,
+      Effect.catchTag("AiError", () => Effect.fail(new SimpleError({ code: 1 })))
+    )
+    expect(_program).type.toBe<Effect.Effect<string, SimpleError>>()
+  })
 })
 
 describe("Effect.catchTags", () => {
+  it("removes handled errors when orElse is omitted", () => {
+    const result = pipe(
+      mixedEffect,
+      Effect.catchTags({ AiError: () => Effect.succeed("ok") })
+    )
+    expect(result).type.toBe<Effect.Effect<string, OtherError>>()
+  })
+
+  it("keeps unhandled errors under an explicit annotation (orElse omitted)", () => {
+    // @ts-expect-error is not assignable to type 'Effect<string, SimpleError, never>'
+    const _program: Effect.Effect<string, SimpleError> = pipe(
+      mixedEffect,
+      Effect.catchTags({ AiError: () => Effect.fail(new SimpleError({ code: 1 })) })
+    )
+    expect(_program).type.toBe<Effect.Effect<string, SimpleError>>()
+  })
+
   it("supports fallback in data-last usage", () => {
     const result = pipe(
       mixedEffect,
@@ -271,6 +450,88 @@ describe("Effect.catchTags", () => {
   })
 })
 
+describe("Effect.catchIf", () => {
+  it("removes the refined error when orElse is omitted", () => {
+    const result = pipe(
+      mixedEffect,
+      Effect.catchIf((e): e is AiError => e._tag === "AiError", () => Effect.succeed("ok"))
+    )
+    expect(result).type.toBe<Effect.Effect<string, OtherError>>()
+  })
+
+  it("keeps the full error type with a plain predicate", () => {
+    const result = pipe(
+      mixedEffect,
+      Effect.catchIf((e): boolean => e._tag === "AiError", () => Effect.succeed("ok"))
+    )
+    expect(result).type.toBe<Effect.Effect<string, AiError | OtherError>>()
+  })
+
+  it("supports orElse", () => {
+    const result = pipe(
+      mixedEffect,
+      Effect.catchIf(
+        (e): e is AiError => e._tag === "AiError",
+        () => Effect.succeed("ok"),
+        (error) => {
+          expect(error).type.toBe<OtherError>()
+          return Effect.fail(new SimpleError({ code: 1 }))
+        }
+      )
+    )
+    expect(result).type.toBe<Effect.Effect<string, SimpleError>>()
+  })
+
+  it("keeps unhandled errors under an explicit annotation (orElse omitted)", () => {
+    // @ts-expect-error is not assignable to type 'Effect<string, SimpleError, never>'
+    const _program: Effect.Effect<string, SimpleError> = pipe(
+      mixedEffect,
+      Effect.catchIf((e): e is AiError => e._tag === "AiError", () => Effect.fail(new SimpleError({ code: 1 })))
+    )
+    expect(_program).type.toBe<Effect.Effect<string, SimpleError>>()
+  })
+})
+
+describe("Effect.catchFilter", () => {
+  it("removes the matched error when orElse is omitted", () => {
+    const result = pipe(
+      mixedEffect,
+      Effect.catchFilter(
+        (e) => (e._tag === "AiError" ? Result.succeed(e) : Result.fail(e)),
+        () => Effect.succeed("ok")
+      )
+    )
+    expect(result).type.toBe<Effect.Effect<string, OtherError>>()
+  })
+
+  it("supports orElse", () => {
+    const result = pipe(
+      mixedEffect,
+      Effect.catchFilter(
+        (e) => (e._tag === "AiError" ? Result.succeed(e) : Result.fail(e)),
+        () => Effect.succeed("ok"),
+        (error) => {
+          expect(error).type.toBe<OtherError>()
+          return Effect.fail(new SimpleError({ code: 1 }))
+        }
+      )
+    )
+    expect(result).type.toBe<Effect.Effect<string, SimpleError>>()
+  })
+
+  it("keeps unhandled errors under an explicit annotation (orElse omitted)", () => {
+    // @ts-expect-error is not assignable to type 'Effect<string, SimpleError, never>'
+    const _program: Effect.Effect<string, SimpleError> = pipe(
+      mixedEffect,
+      Effect.catchFilter(
+        (e) => (e._tag === "AiError" ? Result.succeed(e) : Result.fail(e)),
+        () => Effect.fail(new SimpleError({ code: 1 }))
+      )
+    )
+    expect(_program).type.toBe<Effect.Effect<string, SimpleError>>()
+  })
+})
+
 describe("Effect.catchNoSuchElement", () => {
   it("removes NoSuchElementError from the error channel", () => {
     const result = pipe(noSuchOrOther, Effect.catchNoSuchElement)
@@ -283,10 +544,10 @@ describe("Effect.catchNoSuchElement", () => {
   })
 })
 
-describe("Effect.services", () => {
+describe("Effect.context", () => {
   it("defaults R to never", () => {
-    const result = Effect.services()
-    expect(result).type.toBe<Effect.Effect<ServiceMap.ServiceMap<never>, never, never>>()
+    const result = Effect.context()
+    expect(result).type.toBe<Effect.Effect<Context.Context<never>, never, never>>()
   })
 })
 
@@ -601,6 +862,11 @@ describe("Unify.unify", () => {
     >()
   })
 
+  it("unifies layer unions", () => {
+    const result = Unify.unify(layerStringOrNumber)
+    expect(result).type.toBe<Layer.Layer<"out-1" | "out-2", "err-1" | "err-2", "dep-1" | "dep-2">>()
+  })
+
   it("unifies option unions", () => {
     const result = Unify.unify(optionStringOrNumber)
     expect(result).type.toBe<Option.Option<string | number>>()
@@ -728,5 +994,53 @@ describe("all", () => {
     expect(Effect.all(numberRecord, { mode: "result", discard: true })).type.toBe<
       Effect.Effect<void, never, "dep-4">
     >()
+  })
+})
+
+describe("Effect.retry", () => {
+  it("while refinement narrows error type without times", () => {
+    const result = Effect.retry(mixedEffect, {
+      while: (e): e is AiError => e._tag === "AiError"
+    })
+    expect(result).type.toBe<Effect.Effect<string, OtherError>>()
+  })
+
+  it("until refinement narrows error type without times", () => {
+    const result = Effect.retry(mixedEffect, {
+      until: (e): e is AiError => e._tag === "AiError"
+    })
+    expect(result).type.toBe<Effect.Effect<string, AiError>>()
+  })
+
+  it("times with while refinement preserves full error type", () => {
+    const result = Effect.retry(mixedEffect, {
+      times: 3,
+      while: (e): e is AiError => e._tag === "AiError"
+    })
+    expect(result).type.toBe<Effect.Effect<string, AiError | OtherError>>()
+  })
+
+  it("times with until refinement preserves full error type", () => {
+    const result = Effect.retry(mixedEffect, {
+      times: 3,
+      until: (e): e is AiError => e._tag === "AiError"
+    })
+    expect(result).type.toBe<Effect.Effect<string, AiError | OtherError>>()
+  })
+
+  it("times alone preserves full error type", () => {
+    const result = Effect.retry(mixedEffect, { times: 3 })
+    expect(result).type.toBe<Effect.Effect<string, AiError | OtherError>>()
+  })
+
+  it("data-last with times and while refinement preserves full error type", () => {
+    const result = pipe(
+      mixedEffect,
+      Effect.retry({
+        times: 3,
+        while: (e): e is AiError => e._tag === "AiError"
+      })
+    )
+    expect(result).type.toBe<Effect.Effect<string, AiError | OtherError>>()
   })
 })

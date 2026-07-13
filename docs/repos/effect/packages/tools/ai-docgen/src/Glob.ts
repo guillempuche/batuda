@@ -1,19 +1,19 @@
 /**
  * Glob pattern matching service.
  *
- * @since 1.0.0
+ * @since 4.0.0
  */
+import * as Context from "effect/Context"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import * as ServiceMap from "effect/ServiceMap"
 import * as GlobLib from "glob"
 
 /**
  * Error during glob pattern matching.
  *
- * @since 1.0.0
  * @category errors
+ * @since 4.0.0
  */
 export class GlobError extends Data.TaggedError("GlobError")<{
   readonly pattern: string | ReadonlyArray<string>
@@ -21,10 +21,12 @@ export class GlobError extends Data.TaggedError("GlobError")<{
 }> {}
 
 /**
- * @since 1.0.0
- * @category tags
+ * Context service for glob pattern matching used by AI docgen tooling.
+ *
+ * @category services
+ * @since 4.0.0
  */
-export class Glob extends ServiceMap.Service<Glob, {
+export class Glob extends Context.Service<Glob, {
   readonly glob: (
     pattern: string | ReadonlyArray<string>,
     options?: GlobLib.GlobOptions
@@ -34,8 +36,8 @@ export class Glob extends ServiceMap.Service<Glob, {
 /**
  * Layer providing the Glob service.
  *
- * @since 1.0.0
  * @category layers
+ * @since 4.0.0
  */
 export const layer: Layer.Layer<Glob> = Layer.succeed(Glob, {
   glob: (pattern, options) =>

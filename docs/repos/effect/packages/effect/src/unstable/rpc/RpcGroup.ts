@@ -1,7 +1,15 @@
 /**
+ * Collects typed RPC definitions and server handlers.
+ *
+ * An `RpcGroup` stores RPC definitions by tag and keeps annotations shared by
+ * the group. This module provides helpers for composing groups, applying
+ * middleware or annotations, deriving handler types, and turning handler objects
+ * into `Context` or `Layer` values used by RPC servers.
+ *
  * @since 4.0.0
  */
 import type * as Cause from "../../Cause.ts"
+import * as Context from "../../Context.ts"
 import * as Effect from "../../Effect.ts"
 import { identity } from "../../Function.ts"
 import * as Layer from "../../Layer.ts"
@@ -9,7 +17,6 @@ import type { Pipeable } from "../../Pipeable.ts"
 import type * as Queue from "../../Queue.ts"
 import type * as Record from "../../Record.ts"
 import type { Scope } from "../../Scope.ts"
-import * as ServiceMap from "../../ServiceMap.ts"
 import * as Stream from "../../Stream.ts"
 import type { Headers } from "../http/Headers.ts"
 import * as Rpc from "./Rpc.ts"
@@ -19,15 +26,18 @@ import type * as RpcMiddleware from "./RpcMiddleware.ts"
 const TypeId = "~effect/rpc/RpcGroup"
 
 /**
- * @since 4.0.0
+ * A collection of RPC definitions that can be composed, annotated, and
+ * converted into server handlers or layers.
+ *
  * @category groups
+ * @since 4.0.0
  */
 export interface RpcGroup<in out R extends Rpc.Any> extends Pipeable {
   new(_: never): {}
 
   readonly [TypeId]: typeof TypeId
   readonly requests: ReadonlyMap<string, R>
-  readonly annotations: ServiceMap.ServiceMap<never>
+  readonly annotations: Context.Context<never>
 
   /**
    * Add one or more procedures to the group.
@@ -42,6 +52,13 @@ export interface RpcGroup<in out R extends Rpc.Any> extends Pipeable {
   merge<const Groups extends ReadonlyArray<Any>>(
     ...groups: Groups
   ): RpcGroup<R | Rpcs<Groups[number]>>
+
+  /**
+   * Omit one or more procedures from the group.
+   */
+  omit<const Tags extends ReadonlyArray<R["_tag"]>>(
+    ...tags: Tags
+  ): RpcGroup<Exclude<R, { readonly _tag: Tags[number] }>>
 
   /**
    * Add middleware to all the procedures added to the group until this point.
@@ -66,7 +83,7 @@ export interface RpcGroup<in out R extends Rpc.Any> extends Pipeable {
       | Handlers
       | Effect.Effect<Handlers, EX, RX>
   ): Effect.Effect<
-    ServiceMap.ServiceMap<Rpc.ToHandler<R>>,
+    Context.Context<Rpc.ToHandler<R>>,
     EX,
     | RX
     | HandlersServices<R, Handlers>
@@ -119,7 +136,7 @@ export interface RpcGroup<in out R extends Rpc.Any> extends Pipeable {
     (
       payload: Rpc.Payload<Extract<R, { readonly _tag: Tag }>>,
       options: {
-        readonly clientId: number
+        readonly client: Rpc.ServerClient
         readonly requestId: RequestId
         readonly headers: Headers
       }
@@ -131,58 +148,73 @@ export interface RpcGroup<in out R extends Rpc.Any> extends Pipeable {
   /**
    * Annotate the group with a value.
    */
-  annotate<I, S>(service: ServiceMap.Key<I, S>, value: S): RpcGroup<R>
+  annotate<I, S>(service: Context.Key<I, S>, value: S): RpcGroup<R>
 
   /**
    * Annotate the Rpc's above this point with a value.
    */
-  annotateRpcs<I, S>(service: ServiceMap.Key<I, S>, value: S): RpcGroup<R>
+  annotateRpcs<I, S>(service: Context.Key<I, S>, value: S): RpcGroup<R>
 
   /**
    * Annotate the group with the provided annotations.
    */
-  annotateMerge<S>(annotations: ServiceMap.ServiceMap<S>): RpcGroup<R>
+  annotateMerge<S>(annotations: Context.Context<S>): RpcGroup<R>
 
   /**
    * Annotate the Rpc's above this point with the provided annotations.
    */
-  annotateRpcsMerge<S>(annotations: ServiceMap.ServiceMap<S>): RpcGroup<R>
+  annotateRpcsMerge<S>(annotations: Context.Context<S>): RpcGroup<R>
 }
 
 /**
- * @since 4.0.0
+ * An erased `RpcGroup` type for APIs that only need to know that a value is an
+ * RPC group.
+ *
  * @category groups
+ * @since 4.0.0
  */
 export interface Any {
   readonly [TypeId]: typeof TypeId
 }
 
 /**
- * @since 4.0.0
+ * Builds the object type of server handler functions required to implement each
+ * RPC in a union.
+ *
  * @category groups
+ * @since 4.0.0
  */
 export type HandlersFrom<Rpc extends Rpc.Any> = {
   readonly [Current in Rpc as Current["_tag"]]: Rpc.ToHandlerFn<Current>
 }
 
 /**
- * @since 4.0.0
+ * Extracts the server handler function type for a specific RPC tag from an RPC
+ * union.
+ *
  * @category groups
+ * @since 4.0.0
  */
 export type HandlerFrom<Rpc extends Rpc.Any, Tag extends Rpc["_tag"]> = Extract<Rpc, { readonly _tag: Tag }> extends
   infer Current ? Current extends Rpc.Any ? Rpc.ToHandlerFn<Current> : never : never
 
 /**
- * @since 4.0.0
+ * Computes the services required by all handlers in a handler object for an RPC
+ * union.
+ *
  * @category groups
+ * @since 4.0.0
  */
 export type HandlersServices<Rpcs extends Rpc.Any, Handlers> = keyof Handlers extends infer K ?
   K extends keyof Handlers & string ? HandlerServices<Rpcs, K, Handlers[K]> : never :
   never
 
 /**
- * @since 4.0.0
+ * Computes the services required by a single RPC handler, excluding services
+ * provided by middleware and `Scope` where the server supplies it.
+ *
  * @category groups
+ * @since 4.0.0
  */
 export type HandlerServices<Rpcs extends Rpc.Any, K extends Rpcs["_tag"], Handler> = true extends
   Rpc.IsStream<Rpcs, K> ? Handler extends (...args: any) =>
@@ -208,8 +240,10 @@ export type HandlerServices<Rpcs extends Rpc.Any, K extends Rpcs["_tag"], Handle
   : never
 
 /**
- * @since 4.0.0
+ * Extracts the union of RPC definitions from an `RpcGroup`.
+ *
  * @category groups
+ * @since 4.0.0
  */
 export type Rpcs<Group> = Group extends RpcGroup<infer R> ? string extends R["_tag"] ? never : R : never
 
@@ -239,7 +273,17 @@ const RpcGroupProto = {
 
     return makeProto({
       requests,
-      annotations: ServiceMap.makeUnsafe(annotations)
+      annotations: Context.makeUnsafe(annotations)
+    })
+  },
+  omit(this: RpcGroup<any>, ...tags: Array<string>) {
+    const requests = new Map(this.requests)
+    for (const tag of tags) {
+      requests.delete(tag)
+    }
+    return makeProto({
+      requests,
+      annotations: this.annotations
     })
   },
   middleware(this: RpcGroup<any>, middleware: RpcMiddleware.AnyService) {
@@ -256,18 +300,17 @@ const RpcGroupProto = {
     // oxlint-disable-next-line no-this-alias
     const self = this
     return Effect.gen(function*() {
-      const services = yield* Effect.services<never>()
+      const services = yield* Effect.context<never>()
       const handlers = Effect.isEffect(build) ? yield* build : build
       const contextMap = new Map<string, unknown>()
-      for (const [tag, handler] of Object.entries(handlers)) {
-        const rpc = self.requests.get(tag)!
+      self.requests.forEach((rpc, tag) => {
         contextMap.set(rpc.key, {
           tag: rpc._tag,
-          handler,
-          services
+          handler: handlers[tag],
+          context: services
         })
-      }
-      return ServiceMap.makeUnsafe(contextMap)
+      })
+      return Context.makeUnsafe(contextMap)
     })
   },
   prefix<const Prefix extends string>(this: RpcGroup<any>, prefix: Prefix) {
@@ -282,57 +325,57 @@ const RpcGroupProto = {
     })
   },
   toLayer(this: RpcGroup<any>, build: Effect.Effect<Record<string, (request: any) => any>>) {
-    return Layer.effectServices(this.toHandlers(build))
+    return Layer.effectContext(this.toHandlers(build))
   },
   of: identity,
   toLayerHandler(this: RpcGroup<any>, service: string, build: Effect.Effect<Record<string, (request: any) => any>>) {
     // oxlint-disable-next-line no-this-alias
     const self = this
-    return Layer.effectServices(Effect.gen(function*() {
-      const services = yield* Effect.services<never>()
+    return Layer.effectContext(Effect.gen(function*() {
+      const services = yield* Effect.context<never>()
       const handler = Effect.isEffect(build) ? yield* build : build
       const contextMap = new Map<string, unknown>()
       const rpc = self.requests.get(service)!
       contextMap.set(rpc.key, {
         handler,
-        services
+        context: services
       })
-      return ServiceMap.makeUnsafe(contextMap)
+      return Context.makeUnsafe(contextMap)
     }))
   },
   accessHandler(this: RpcGroup<any>, service: string) {
-    return Effect.servicesWith((parentServices: ServiceMap.ServiceMap<any>) => {
+    return Effect.contextWith((parentContext: Context.Context<any>) => {
       const rpc = this.requests.get(service)!
-      const { handler, services } = parentServices.mapUnsafe.get(rpc.key) as Rpc.Handler<any>
+      const { handler, context } = parentContext.mapUnsafe.get(rpc.key) as Rpc.Handler<any>
       return Effect.succeed((payload: Rpc.Payload<any>, options: any) => {
         options.rpc = rpc
         const result = handler(payload, options)
         const effectOrStream = Rpc.isWrapper(result) ? result.value : result
         return Effect.isEffect(effectOrStream)
-          ? Effect.provide(effectOrStream, services)
-          : Stream.provideServices(effectOrStream, services)
+          ? Effect.provide(effectOrStream, context)
+          : Stream.provideContext(effectOrStream, context)
       })
     })
   },
-  annotate(this: RpcGroup<any>, service: ServiceMap.Key<any, any>, value: any) {
+  annotate(this: RpcGroup<any>, service: Context.Key<any, any>, value: any) {
     return makeProto({
       requests: this.requests,
-      annotations: ServiceMap.add(this.annotations, service, value)
+      annotations: Context.add(this.annotations, service, value)
     })
   },
-  annotateRpcs(this: RpcGroup<any>, service: ServiceMap.Key<any, any>, value: any) {
-    return this.annotateRpcsMerge(ServiceMap.make(service, value))
+  annotateRpcs(this: RpcGroup<any>, service: Context.Key<any, any>, value: any) {
+    return this.annotateRpcsMerge(Context.make(service, value))
   },
-  annotateMerge(this: RpcGroup<any>, context: ServiceMap.ServiceMap<any>) {
+  annotateMerge(this: RpcGroup<any>, context: Context.Context<any>) {
     return makeProto({
       requests: this.requests,
-      annotations: ServiceMap.merge(this.annotations, context)
+      annotations: Context.merge(this.annotations, context)
     })
   },
-  annotateRpcsMerge(this: RpcGroup<any>, serviceMap: ServiceMap.ServiceMap<any>) {
+  annotateRpcsMerge(this: RpcGroup<any>, context: Context.Context<any>) {
     const requests = new Map<string, any>()
     for (const [tag, rpc] of this.requests) {
-      requests.set(tag, rpc.annotateMerge(ServiceMap.merge(serviceMap, rpc.annotations)))
+      requests.set(tag, rpc.annotateMerge(Context.merge(context, rpc.annotations)))
     }
     return makeProto({
       requests,
@@ -343,7 +386,7 @@ const RpcGroupProto = {
 
 const makeProto = <Rpcs extends Rpc.Any>(options: {
   readonly requests: ReadonlyMap<string, Rpcs>
-  readonly annotations: ServiceMap.ServiceMap<never>
+  readonly annotations: Context.Context<never>
 }): RpcGroup<Rpcs> =>
   Object.assign(function() {}, RpcGroupProto, {
     requests: options.requests,
@@ -351,13 +394,15 @@ const makeProto = <Rpcs extends Rpc.Any>(options: {
   }) as any
 
 /**
- * @since 4.0.0
+ * Creates an `RpcGroup` from one or more RPC definitions.
+ *
  * @category groups
+ * @since 4.0.0
  */
 export const make = <const Rpcs extends ReadonlyArray<Rpc.Any>>(
   ...rpcs: Rpcs
 ): RpcGroup<Rpcs[number]> =>
   makeProto({
     requests: new Map(rpcs.map((rpc) => [rpc._tag, rpc])),
-    annotations: ServiceMap.empty()
+    annotations: Context.empty()
   })
