@@ -3,6 +3,39 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-13 (server-v2026.7.13)
+
+### Features
+
+* replace Spain-only company region with a global country ([210fb17](https://github.com/guillempuche/batuda/commit/210fb17864a85e98dbbeab2b02aaa6bbdd0b7c3b))
+* **research:** add Brave LLM Context as a search vendor ([ce11517](https://github.com/guillempuche/batuda/commit/ce1151704c0da4c85181b02cbd0fc52820a3df1e)), closes [#255](https://github.com/guillempuche/batuda/issues/255)
+* **research:** cap confidence on third-party-sourced values ([e6926de](https://github.com/guillempuche/batuda/commit/e6926de026cb88c4bc45a3a8f4bc9df94c2c01ed)), closes [#255](https://github.com/guillempuche/batuda/issues/255)
+* **research:** cascade an empty search to the next vendor ([8a52676](https://github.com/guillempuche/batuda/commit/8a526769fd4c7ac7b6345b004fa0e4426e4418a4)), closes [#255](https://github.com/guillempuche/batuda/issues/255)
+* **research:** give each contact its own citations ([c1488cc](https://github.com/guillempuche/batuda/commit/c1488ccfeea7ffa03f7a68fac3ea3eabce16f950)), closes [#255](https://github.com/guillempuche/batuda/issues/255)
+* **research:** recover under-filled contacts and firmographics ([9e4fc44](https://github.com/guillempuche/batuda/commit/9e4fc44b4259ee0fb80ae1b2fa96b1671057a373)), closes [#255](https://github.com/guillempuche/batuda/issues/255)
+* **research:** score how many known contacts come back with a title ([67e66af](https://github.com/guillempuche/batuda/commit/67e66af1d0b661ed04b7df0e40461895dd052721))
+* **research:** search in the target's language and read own-site pages first ([610d3db](https://github.com/guillempuche/batuda/commit/610d3db218883bd96aa1081b02f4de9dc89cb902)), closes [#255](https://github.com/guillempuche/batuda/issues/255)
+* **ui:** add PriMenu action-menu primitive ([8bf09a8](https://github.com/guillempuche/batuda/commit/8bf09a8dc819c5c2b1303c86f4212bad5a7cec5f))
+
+### Bug Fixes
+
+* **research:** drop ungrounded fields and read full source pages ([2f5fa52](https://github.com/guillempuche/batuda/commit/2f5fa52b7bfe8663e5f3c63e1960a67e448ad75c))
+* **research:** follow a moved company domain to its new site ([74f43b2](https://github.com/guillempuche/batuda/commit/74f43b208e73186d4c266411464cc8595a3ce7dd))
+* **server:** show the message subject when a thread link has none ([8e35c53](https://github.com/guillempuche/batuda/commit/8e35c534035ee9f5a9c22b5916d57331f5f7a7ab))
+
+### Refactoring
+
+* **research:** remove the extract_structured tool ([5547579](https://github.com/guillempuche/batuda/commit/5547579c982d79f5d17e8c27724cda0d06d5070b))
+
+### CI/CD
+
+* **release:** ui v2026.7.12 ([ddb7645](https://github.com/guillempuche/batuda/commit/ddb76459787d8b231ade3e051827affa0694d4ec))
+* **release:** ui v2026.7.13 ([554e3cb](https://github.com/guillempuche/batuda/commit/554e3cb5461a504581b5b7ff56e9f769cdd25076))
+
+### Chores
+
+* **server:** enable Brave LLM Context search vendor in production ([3f29f0c](https://github.com/guillempuche/batuda/commit/3f29f0c8324a71b0957440d4490e0dce734a791e))
+
 ## 2026-07-12 (server-v2026.7.12-1)
 
 ### Features
