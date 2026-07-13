@@ -1209,7 +1209,23 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								tl.inbox_id,
 								tl.company_id,
 								tl.contact_id,
-								tl.subject,
+								-- Thread links only carry their own subject when the thread
+								-- began outbound. For inbound-first threads that column is
+								-- empty, so fall back to the earliest message's subject to
+								-- avoid showing "(no subject)" when the messages have one.
+								COALESCE(
+									NULLIF(tl.subject, ''),
+									(
+										SELECT sm.subject FROM email_messages sm
+										WHERE sm.organization_id = tl.organization_id
+										  AND (sm.message_id = tl.external_thread_id
+										       OR tl.external_thread_id = ANY(sm."references"))
+										  AND sm.subject IS NOT NULL
+										  AND sm.subject <> ''
+										ORDER BY sm.received_at ASC
+										LIMIT 1
+									)
+								) AS subject,
 								tl.status,
 								tl.last_read_at,
 								tl.created_at,
@@ -1515,7 +1531,23 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								tl.inbox_id,
 								tl.company_id,
 								tl.contact_id,
-								tl.subject,
+								-- Thread links only carry their own subject when the thread
+								-- began outbound. For inbound-first threads that column is
+								-- empty, so fall back to the earliest message's subject to
+								-- avoid showing "(no subject)" when the messages have one.
+								COALESCE(
+									NULLIF(tl.subject, ''),
+									(
+										SELECT sm.subject FROM email_messages sm
+										WHERE sm.organization_id = tl.organization_id
+										  AND (sm.message_id = tl.external_thread_id
+										       OR tl.external_thread_id = ANY(sm."references"))
+										  AND sm.subject IS NOT NULL
+										  AND sm.subject <> ''
+										ORDER BY sm.received_at ASC
+										LIMIT 1
+									)
+								) AS subject,
 								tl.status,
 								tl.last_read_at,
 								tl.created_at,
