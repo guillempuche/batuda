@@ -638,103 +638,105 @@ function EmailsIndexPage() {
 							/>
 						</SearchWrap>
 
-						<StatusFilters role='group' aria-label={t`Filter by status`}>
-							{STATUS_OPTIONS.map(opt => {
-								const current = search.status ?? 'all'
-								const active = current === opt.value
-								const label =
-									opt.labelKey === 'filterAll'
-										? t`All`
-										: opt.labelKey === 'filterOpen'
-											? t`Open`
-											: opt.labelKey === 'filterClosed'
-												? t`Closed`
-												: t`Archived`
-								return (
-									<StatusFilterButton
-										key={opt.value}
-										type='button'
-										$active={active}
-										aria-pressed={active}
-										data-testid={`emails-status-${opt.value}`}
-										onClick={() =>
-											handleStatusFilter(
-												opt.value === 'all' ? undefined : opt.value,
+						<FilterControls>
+							<StatusFilters role='group' aria-label={t`Filter by status`}>
+								{STATUS_OPTIONS.map(opt => {
+									const current = search.status ?? 'all'
+									const active = current === opt.value
+									const label =
+										opt.labelKey === 'filterAll'
+											? t`All`
+											: opt.labelKey === 'filterOpen'
+												? t`Open`
+												: opt.labelKey === 'filterClosed'
+													? t`Closed`
+													: t`Archived`
+									return (
+										<StatusFilterButton
+											key={opt.value}
+											type='button'
+											$active={active}
+											aria-pressed={active}
+											data-testid={`emails-status-${opt.value}`}
+											onClick={() =>
+												handleStatusFilter(
+													opt.value === 'all' ? undefined : opt.value,
+												)
+											}
+										>
+											{label}
+										</StatusFilterButton>
+									)
+								})}
+							</StatusFilters>
+
+							{inboxOptions.length > 0 && (
+								<InboxSelectWrap>
+									<PriSelect.Root
+										value={search.inboxId ?? '__all__'}
+										onValueChange={value =>
+											handleInboxFilter(
+												value === '__all__' ? undefined : String(value),
 											)
 										}
 									>
-										{label}
-									</StatusFilterButton>
-								)
-							})}
-						</StatusFilters>
-
-						{inboxOptions.length > 0 && (
-							<InboxSelectWrap>
-								<PriSelect.Root
-									value={search.inboxId ?? '__all__'}
-									onValueChange={value =>
-										handleInboxFilter(
-											value === '__all__' ? undefined : String(value),
-										)
-									}
-								>
-									<PriSelect.Trigger
-										data-testid='inbox-filter-trigger'
-										aria-label={t`Filter by inbox`}
-									>
-										<PriSelect.Value placeholder={t`All inboxes`} />
-										<PriSelect.Icon>
-											<ChevronRight size={14} aria-hidden />
-										</PriSelect.Icon>
-									</PriSelect.Trigger>
-									<PriSelect.Portal>
-										<PriSelect.Positioner>
-											<PriSelect.Popup>
-												<PriSelect.Item
-													value='__all__'
-													data-testid='inbox-filter-option'
-													data-inbox-email='__all__'
-												>
-													<PriSelect.ItemIndicator>
-														<Check size={12} aria-hidden />
-													</PriSelect.ItemIndicator>
-													<PriSelect.ItemText>{t`All inboxes`}</PriSelect.ItemText>
-												</PriSelect.Item>
-												{inboxOptions.map(inbox => (
+										<PriSelect.Trigger
+											data-testid='inbox-filter-trigger'
+											aria-label={t`Filter by inbox`}
+										>
+											<PriSelect.Value placeholder={t`All inboxes`} />
+											<PriSelect.Icon>
+												<ChevronRight size={14} aria-hidden />
+											</PriSelect.Icon>
+										</PriSelect.Trigger>
+										<PriSelect.Portal>
+											<PriSelect.Positioner>
+												<PriSelect.Popup>
 													<PriSelect.Item
-														key={inbox.id}
-														value={inbox.id}
+														value='__all__'
 														data-testid='inbox-filter-option'
-														data-inbox-email={inbox.email}
+														data-inbox-email='__all__'
 													>
 														<PriSelect.ItemIndicator>
 															<Check size={12} aria-hidden />
 														</PriSelect.ItemIndicator>
-														<PriSelect.ItemText>
-															{inbox.displayName
-																? `${inbox.displayName} <${inbox.email}>`
-																: inbox.email}
-														</PriSelect.ItemText>
+														<PriSelect.ItemText>{t`All inboxes`}</PriSelect.ItemText>
 													</PriSelect.Item>
-												))}
-											</PriSelect.Popup>
-										</PriSelect.Positioner>
-									</PriSelect.Portal>
-								</PriSelect.Root>
-							</InboxSelectWrap>
-						)}
+													{inboxOptions.map(inbox => (
+														<PriSelect.Item
+															key={inbox.id}
+															value={inbox.id}
+															data-testid='inbox-filter-option'
+															data-inbox-email={inbox.email}
+														>
+															<PriSelect.ItemIndicator>
+																<Check size={12} aria-hidden />
+															</PriSelect.ItemIndicator>
+															<PriSelect.ItemText>
+																{inbox.displayName
+																	? `${inbox.displayName} <${inbox.email}>`
+																	: inbox.email}
+															</PriSelect.ItemText>
+														</PriSelect.Item>
+													))}
+												</PriSelect.Popup>
+											</PriSelect.Positioner>
+										</PriSelect.Portal>
+									</PriSelect.Root>
+								</InboxSelectWrap>
+							)}
 
-						{activeFilters && (
-							<PriButton
-								type='button'
-								$variant='outlined'
-								onClick={handleClearFilters}
-							>
-								<X size={14} aria-hidden />
-								<span>{t`Clear filters`}</span>
-							</PriButton>
-						)}
+							{activeFilters && (
+								<PriButton
+									type='button'
+									$variant='outlined'
+									onClick={handleClearFilters}
+								>
+									<X size={14} aria-hidden />
+									<span>{t`Clear filters`}</span>
+								</PriButton>
+							)}
+						</FilterControls>
 					</Filters>
 
 					{isLoading ? (
@@ -1729,6 +1731,15 @@ const Filters = styled.div.withConfig({ displayName: 'EmailsIndexFilters' })`
 	gap: var(--space-sm);
 	padding: var(--space-md);
 	border-radius: var(--shape-2xs);
+`
+
+const FilterControls = styled.div.withConfig({
+	displayName: 'EmailsIndexFilterControls',
+})`
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-sm);
 `
 
 const SearchWrap = styled.div.withConfig({
