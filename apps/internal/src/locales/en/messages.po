@@ -961,6 +961,10 @@ msgstr "Confirm apply {verifiedToApply}"
 msgid "Confirmed"
 msgstr "Confirmed"
 
+#: src/routes/emails/index.tsx
+msgid "Connect a mailbox to start"
+msgstr "Connect a mailbox to start"
+
 #: src/routes/settings/profile/index.tsx
 msgid "Connect AI tools"
 msgstr "Connect AI tools"
@@ -975,6 +979,7 @@ msgid "Connect an email"
 msgstr "Connect an email"
 
 #: src/routes/emails/inboxes.tsx
+#: src/routes/emails/index.tsx
 #: src/routes/emails/index.tsx
 msgid "Connect mailbox"
 msgstr "Connect mailbox"
@@ -2158,6 +2163,10 @@ msgstr "Inbox removed"
 msgid "Inbox updated"
 msgstr "Inbox updated"
 
+#: src/routes/emails/index.tsx
+msgid "Inboxes"
+msgstr "Inboxes"
+
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/findings/prospect-scan-view.tsx
@@ -3040,6 +3049,15 @@ msgstr "Open the org spend dashboard"
 msgid "Open the setup guide, opens in a new tab"
 msgstr "Open the setup guide, opens in a new tab"
 
+#: src/routes/emails/index.tsx
+msgid "Open thread with no subject"
+msgstr "Open thread with no subject"
+
+#. placeholder {0}: thread.subject
+#: src/routes/emails/index.tsx
+msgid "Open thread: {0}"
+msgstr "Open thread: {0}"
+
 #: src/routes/companies/$slug.tsx
 msgid "Open website"
 msgstr "Open website"
@@ -3501,6 +3519,10 @@ msgstr "Read state update failed"
 msgid "Ready to apply"
 msgstr "Ready to apply"
 
+#: src/routes/emails/index.tsx
+msgid "Receive and send email from your own inbox inside Batuda."
+msgstr "Receive and send email from your own inbox inside Batuda."
+
 #: src/routes/tasks/index.tsx
 #: src/routes/tasks/index.tsx
 msgid "Recent changes"
@@ -3872,6 +3894,7 @@ msgstr "See who can access this workspace, invite teammates, and manage pending 
 msgid "Select {0}"
 msgstr "Select {0}"
 
+#: src/routes/emails/index.tsx
 #: src/routes/emails/index.tsx
 msgid "Select all threads on this page"
 msgstr "Select all threads on this page"
@@ -4644,6 +4667,10 @@ msgstr "Unlinked"
 #: src/routes/settings/mcp/connections.tsx
 msgid "Unnamed client"
 msgstr "Unnamed client"
+
+#: src/routes/emails/index.tsx
+msgid "Unread"
+msgstr "Unread"
 
 #: src/routes/emails/index.tsx
 msgid "Untitled"
