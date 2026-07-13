@@ -1,9 +1,10 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Link, useLocation, useNavigate } from '@tanstack/react-router'
+import { Option, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { ArrowRight, Microscope, Search } from 'lucide-react'
-import { type ReactNode, useMemo, useState } from 'react'
+import { type ReactNode, useCallback, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
 import { PriButton, PriInput, usePriToast } from '@batuda/ui/pri'
@@ -33,6 +34,7 @@ import {
 	useProposalResolution,
 } from '#/hooks/use-proposal-resolution'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import { dlgNoId } from '#/lib/dlg-search'
 import { formatMoneyCents } from '#/lib/format-money'
 import {
 	agedPaperSurface,
@@ -66,11 +68,43 @@ function tierOf(p: PendingProposal) {
 	})
 }
 
+// Whether the "Find companies" dialog is open lives in the `?dlg=discovery`
+// URL param — like the other dialogs in the app — so it is deep-linkable and
+// the back button closes it. The route validates this schema; a value outside
+// it decodes to nothing and the dialog stays closed.
+export const researchDlgSchema = dlgNoId('discovery')
+type ResearchDlg = Schema.Schema.Type<typeof researchDlgSchema>
+const decodeResearchDlg = Schema.decodeUnknownOption(researchDlgSchema)
+const DISCOVERY_DLG: ResearchDlg = { kind: 'discovery' }
+
+// Opening pushes a history entry (so Back closes the dialog); closing drops the
+// `dlg` key with `replace` so Back does not reopen it and the URL goes clean.
+// `dlg` is read from the live URL so a close is reflected even when it removes
+// the last search param.
+function useResearchDlg(): readonly [boolean, (next: boolean) => void] {
+	const rawDlg = useLocation({ select: l => l.search?.dlg })
+	const open = useMemo(() => Option.isSome(decodeResearchDlg(rawDlg)), [rawDlg])
+	const navigate = useNavigate()
+	const setOpen = useCallback(
+		(next: boolean) => {
+			// `dlg` is this route's only search param, so open sets it and close
+			// drops it by returning an empty search — nothing else to preserve.
+			void navigate(
+				next
+					? { to: '/research', search: () => ({ dlg: DISCOVERY_DLG }) }
+					: { to: '/research', search: () => ({}), replace: true },
+			)
+		},
+		[navigate],
+	)
+	return [open, setOpen]
+}
+
 export function ResearchInbox() {
 	const { t, i18n } = useLingui()
 	const toast = usePriToast()
 	const navigate = useNavigate()
-	const [discoveryOpen, setDiscoveryOpen] = useState(false)
+	const [discoveryOpen, setDiscoveryOpen] = useResearchDlg()
 
 	const proposalsResult = useAtomValue(inboxPendingProposalsAtom())
 	const refreshProposals = useAtomRefresh(inboxPendingProposalsAtom())
