@@ -5,8 +5,10 @@ import {
 	INBOX_PROPOSAL_LIMIT,
 	inboxPendingProposalsAtom,
 	ResearchInbox,
+	researchDlgSchema,
 } from '#/components/research/inbox/research-inbox'
 import { dehydrateAtom } from '#/lib/atom-hydration'
+import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 
 /**
@@ -30,6 +32,7 @@ async function loadPendingProposalsOnServer() {
 }
 
 export const Route = createFileRoute('/research/')({
+	validateSearch: validateSearchWith({ dlg: researchDlgSchema }),
 	loader: async () => {
 		if (!import.meta.env.SSR) {
 			return { dehydrated: [] as const }
