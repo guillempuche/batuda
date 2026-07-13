@@ -52,7 +52,7 @@ import type {
 	SearchResult,
 } from '../domain/types'
 import { providerListConfig } from './_config'
-import { withFallback } from './_fallback'
+import { withFallback, withFallbackUntil } from './_fallback'
 import {
 	disabledError,
 	noRegistryError,
@@ -276,10 +276,14 @@ const searchLayer = Layer.effect(
 			vendors.map((vendor, slot) => searchInstance(vendor, slot)),
 		)
 		if (instances.length === 1) return instances[0]!
-		const search = withFallback(
+		// Search cascades on an empty result too, not only on error: a firecrawl
+		// zero-hit falls through to the next vendor (e.g. brave-context), which often
+		// has what the first missed.
+		const search = withFallbackUntil(
 			instances,
 			(svc, input: SearchInput): Effect.Effect<SearchResult, ProviderError> =>
 				svc.search(input),
+			result => result.items.length === 0,
 		)
 		return SearchProvider.of({ search })
 	}),
