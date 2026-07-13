@@ -963,7 +963,7 @@ msgstr "Confirmat"
 
 #: src/routes/emails/index.tsx
 msgid "Connect a mailbox to start"
-msgstr ""
+msgstr "Connecta una bústia per començar"
 
 #: src/routes/settings/profile/index.tsx
 msgid "Connect AI tools"
@@ -2165,7 +2165,7 @@ msgstr "Safata actualitzada"
 
 #: src/routes/emails/index.tsx
 msgid "Inboxes"
-msgstr ""
+msgstr "Bústies"
 
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
@@ -3051,12 +3051,12 @@ msgstr "Obre la guia de configuració, s'obre en una pestanya nova"
 
 #: src/routes/emails/index.tsx
 msgid "Open thread with no subject"
-msgstr ""
+msgstr "Obre la conversa sense assumpte"
 
 #. placeholder {0}: thread.subject
 #: src/routes/emails/index.tsx
 msgid "Open thread: {0}"
-msgstr ""
+msgstr "Obre la conversa: {0}"
 
 #: src/routes/companies/$slug.tsx
 msgid "Open website"
@@ -3521,7 +3521,7 @@ msgstr "A punt per aplicar"
 
 #: src/routes/emails/index.tsx
 msgid "Receive and send email from your own inbox inside Batuda."
-msgstr ""
+msgstr "Rep i envia correu des de la teva bústia dins de Batuda."
 
 #: src/routes/tasks/index.tsx
 #: src/routes/tasks/index.tsx
@@ -4670,7 +4670,7 @@ msgstr "Client sense nom"
 
 #: src/routes/emails/index.tsx
 msgid "Unread"
-msgstr ""
+msgstr "No llegit"
 
 #: src/routes/emails/index.tsx
 msgid "Untitled"
