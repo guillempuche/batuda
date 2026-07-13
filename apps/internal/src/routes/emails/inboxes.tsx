@@ -32,6 +32,7 @@ import {
 	PriButton,
 	PriDialog,
 	PriInput,
+	PriMenu,
 	PriSelect,
 	PriTooltip,
 	usePriToast,
@@ -430,39 +431,41 @@ function InboxesPage() {
 								{t`Use ${primarySuggestions[0]?.email ?? ''} as primary`}
 							</PriButton>
 						) : (
-							<PriSelect.Root
-								value=''
-								onValueChange={value => {
-									if (value !== null && value !== '') {
-										void handleSetPrimary(value)
-									}
-								}}
-							>
-								<PriSelect.Trigger aria-label={t`Choose primary inbox`}>
-									<PriSelect.Value placeholder={t`Choose primary inbox`} />
-									<PriSelect.Icon>
-										<ChevronLeft
-											size={14}
-											aria-hidden
-											style={{ transform: 'rotate(-90deg)' }}
-										/>
-									</PriSelect.Icon>
-								</PriSelect.Trigger>
-								<PriSelect.Portal>
-									<PriSelect.Positioner>
-										<PriSelect.Popup>
+							<PriMenu.Root>
+								<PriMenu.Trigger
+									render={props => (
+										<PriButton
+											type='button'
+											$variant='outlined'
+											aria-label={t`Choose primary inbox`}
+											{...props}
+										>
+											<span>{t`Choose primary inbox`}</span>
+											<ChevronLeft
+												size={14}
+												aria-hidden
+												style={{ transform: 'rotate(-90deg)' }}
+											/>
+										</PriButton>
+									)}
+								/>
+								<PriMenu.Portal>
+									<PriMenu.Positioner sideOffset={6}>
+										<PriMenu.Popup>
 											{primarySuggestions.map(row => (
-												<PriSelect.Item key={row.id} value={row.id}>
-													<PriSelect.ItemIndicator>
-														<Check size={12} aria-hidden />
-													</PriSelect.ItemIndicator>
-													<PriSelect.ItemText>{row.email}</PriSelect.ItemText>
-												</PriSelect.Item>
+												<PriMenu.Item
+													key={row.id}
+													onClick={() => {
+														void handleSetPrimary(row.id)
+													}}
+												>
+													{row.email}
+												</PriMenu.Item>
 											))}
-										</PriSelect.Popup>
-									</PriSelect.Positioner>
-								</PriSelect.Portal>
-							</PriSelect.Root>
+										</PriMenu.Popup>
+									</PriMenu.Positioner>
+								</PriMenu.Portal>
+							</PriMenu.Root>
 						)}
 					</PrimaryBannerActions>
 				</PrimaryBanner>
