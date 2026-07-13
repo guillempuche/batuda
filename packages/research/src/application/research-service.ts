@@ -29,6 +29,13 @@ import {
 	groundedCitationTest,
 	validateFindingCitations,
 } from './citation-guard'
+import { bindContactsToEntity } from './contact-entity-guard'
+import {
+	ContactsRescueSchema,
+	contactsRescuePrompt,
+	mergeContacts,
+	needsContactRescue,
+} from './contacts-rescue'
 import {
 	CriticVerdictsSchema,
 	criticPrompt,
@@ -51,6 +58,12 @@ import {
 	isConfirmedRegistryMatch,
 	withRedirectDomain,
 } from './entity-guard'
+import {
+	FirmographicsRescueSchema,
+	firmographicsRescuePrompt,
+	mergeFirmographics,
+	needsFirmographicsRescue,
+} from './firmographics-rescue'
 import { resolvePolicy, type SystemDefaults } from './policy'
 import {
 	AgentLanguageModel,
@@ -1249,6 +1262,9 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 									? `Fetched pages (primary evidence — read these first):\n\n${parts.join('\n\n---\n\n')}\n\n`
 									: ''
 							})()
+							// The full evidence handed to extraction — reused by the focused
+							// contacts rescue below so it reads exactly what the broad pass did.
+							const evidenceBlock = `${pagesSection}Research transcript:\n\n${transcript}`
 							// Cast schema to satisfy generateObject's Encoder constraint.
 							// Registry schemas are all Structs with DecodingServices=never,
 							// but Schema.Top erases that — the cast is safe.
@@ -1260,9 +1276,107 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 								// it will confidently invent phones, tax ids, and emails. Never
 								// emit a schema field's name or a placeholder ("headquarters",
 								// "unknown") as a value; omit a field with no real value instead.
-								prompt: `Produce structured findings STRICTLY from the evidence below (the fetched pages and the research transcript). Only include a value that appears in the evidence; if it does not support a field, omit it or leave it null — never fill a field from prior knowledge, and never put a placeholder or the field's own name as its value.\n\n${citationInstruction}\n\n${pagesSection}Research transcript:\n\n${transcript}`,
+								prompt: `Produce structured findings STRICTLY from the evidence below (the fetched pages and the research transcript). Only include a value that appears in the evidence; if it does not support a field, omit it or leave it null — never fill a field from prior knowledge, and never put a placeholder or the field's own name as its value.\n\n${citationInstruction}\n\n${evidenceBlock}`,
 							})
 							let result = withProposalIds(structuredResponse.value as unknown)
+							let rescueOutputTokens = 0
+							// The company the focused rescue passes below target — the subject's
+							// name + its own domain, so a recovered person or fact is tied to the
+							// right company. Only company_enrichment runs these passes.
+							const rescueSnapshot = subjects[0]?.snapshot as
+								| Record<string, unknown>
+								| undefined
+							const rescueTarget = {
+								name:
+									typeof rescueSnapshot?.['name'] === 'string'
+										? rescueSnapshot['name']
+										: (run as { query: string }).query,
+								domain:
+									(typeof rescueSnapshot?.['website'] === 'string'
+										? rescueSnapshot['website']
+										: undefined) ?? entityTargets?.domains?.[0],
+							}
+							const runsRescue = schemaName === 'company_enrichment_v1'
+							// Contacts rescue: the broad pass reliably drops the people list. If
+							// it came back with at most one contact, run a focused pass that pulls
+							// only named people + titles from the same evidence and fold them in —
+							// before the guard chain, so recovered contacts are guarded like the
+							// rest. Fail-open: a rescue error keeps the broad result.
+							if (runsRescue && needsContactRescue(result)) {
+								const rescue = yield* extractLlm
+									.generateObject({
+										schema: ContactsRescueSchema,
+										prompt: contactsRescuePrompt(rescueTarget, evidenceBlock),
+									})
+									.pipe(
+										Effect.map(r => ({
+											contacts: (r.value as { contacts?: unknown }).contacts,
+											tokens: r.usage.outputTokens.total ?? 0,
+										})),
+										Effect.catchCause(() =>
+											Effect.succeed({ contacts: undefined, tokens: 0 }),
+										),
+									)
+								rescueOutputTokens += rescue.tokens
+								if (
+									Array.isArray(rescue.contacts) &&
+									rescue.contacts.length > 0
+								) {
+									const broadContacts = Array.isArray(
+										(result as { contacts?: unknown }).contacts,
+									)
+										? ((result as { contacts: unknown[] }).contacts as Array<
+												Record<string, unknown>
+											>)
+										: []
+									const merged = mergeContacts(
+										broadContacts,
+										rescue.contacts as Array<Record<string, unknown>>,
+									)
+									result = { ...(result as object), contacts: merged }
+									yield* Effect.logInfo('research.contacts.rescued').pipe(
+										Effect.annotateLogs({
+											research_id: researchId,
+											before: broadContacts.length,
+											after: merged.length,
+										}),
+									)
+								}
+							}
+							// Firmographics rescue: the broad pass also drops the size band and
+							// tooling even when a page states them. When either is empty, a focused
+							// pass fills it in (without overwriting a value the broad pass grounded);
+							// an aggregator-sourced value is capped to medium by the source tier.
+							if (runsRescue && needsFirmographicsRescue(result)) {
+								const fRescue = yield* extractLlm
+									.generateObject({
+										schema: FirmographicsRescueSchema,
+										prompt: firmographicsRescuePrompt(
+											rescueTarget,
+											evidenceBlock,
+										),
+									})
+									.pipe(
+										Effect.map(r => ({
+											enrichment: r.value as unknown,
+											tokens: r.usage.outputTokens.total ?? 0,
+										})),
+										Effect.catchCause(() =>
+											Effect.succeed({ enrichment: undefined, tokens: 0 }),
+										),
+									)
+								rescueOutputTokens += fRescue.tokens
+								const fMerged = mergeFirmographics(result, fRescue.enrichment)
+								if (fMerged.filled > 0) {
+									result = fMerged.findings
+									yield* Effect.logInfo('research.firmographics.rescued').pipe(
+										Effect.annotateLogs({
+											research_id: researchId,
+											filled: fMerged.filled,
+										}),
+									)
+								}
+							}
 							// Drop citations the model invented: keep only source_ids that map
 							// to a page this run actually fetched. A proposed CRM update left
 							// with no valid citation is dropped whole.
@@ -1284,6 +1398,20 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 										research_id: researchId,
 										total: citationCheck.total,
 										kept: citationCheck.kept,
+									}),
+								)
+							}
+							// Contact entity binding: drop a person whose quotes name only a
+							// different company (a client testimonial or a competitor's exec
+							// quoted on the target's own page), so the richer extraction can't
+							// present someone else's leader as this company's contact.
+							const contactBind = bindContactsToEntity(result, entityTargets)
+							result = contactBind.findings
+							if (contactBind.dropped > 0) {
+								yield* Effect.logWarning('research.contacts.wrong_entity').pipe(
+									Effect.annotateLogs({
+										research_id: researchId,
+										dropped: contactBind.dropped,
 									}),
 								)
 							}
@@ -1477,6 +1605,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 								findings: result as unknown,
 								outputTokens:
 									(structuredResponse.usage.outputTokens.total ?? 0) +
+									rescueOutputTokens +
 									critiqued.outputTokens,
 							}
 						}).pipe(
