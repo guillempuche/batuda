@@ -9,8 +9,10 @@ import styled from 'styled-components'
  * overrides strip the implicit roles.
  *
  * Columns are sized inline by the consumer (TanStack Table's
- * `column.getSize()`); cells use `flex: 0 0 <size>px`. A 1024px breakpoint
- * collapses the table into a stacked card for mobile.
+ * `column.getSize()`). By default a cell keeps that width fixed; pass
+ * `$flex="grow"` to fill the free width or `$flex="shrink"` to give way when
+ * the row is narrow. A 1024px breakpoint collapses the table into a stacked
+ * card for mobile.
  */
 
 const Root = styled.table.withConfig({
@@ -65,10 +67,6 @@ const Row = styled.tr.withConfig({
 	border-bottom: 1px solid var(--color-outline-variant);
 	cursor: pointer;
 
-	&:nth-child(even) {
-		background-color: var(--color-surface-container-low);
-	}
-
 	&:hover {
 		background-color: var(--color-surface-container-high);
 	}
@@ -97,12 +95,19 @@ const Row = styled.tr.withConfig({
 	}
 `
 
+const flexFor = (intent?: 'fixed' | 'grow' | 'shrink') =>
+	intent === 'grow' ? '1 1 0' : intent === 'shrink' ? '0 1 auto' : '0 0 auto'
+
 const ColumnHeader = styled.th.withConfig({
 	displayName: 'PriTable.ColumnHeader',
 	shouldForwardProp: prop => !prop.startsWith('$'),
-})<{ $align?: 'left' | 'right' | 'center' }>`
+})<{
+	$align?: 'left' | 'right' | 'center'
+	$flex?: 'fixed' | 'grow' | 'shrink'
+}>`
 	position: relative;
-	flex: 0 0 auto;
+	flex: ${p => flexFor(p.$flex)};
+	min-width: ${p => (p.$flex === 'grow' || p.$flex === 'shrink' ? '0' : 'auto')};
 	box-sizing: border-box;
 	font-family: var(--font-display);
 	text-transform: uppercase;
@@ -123,8 +128,10 @@ const Cell = styled.td.withConfig({
 })<{
 	$align?: 'left' | 'right' | 'center'
 	$numeric?: boolean
+	$flex?: 'fixed' | 'grow' | 'shrink'
 }>`
-	flex: 0 0 auto;
+	flex: ${p => flexFor(p.$flex)};
+	min-width: ${p => (p.$flex === 'grow' || p.$flex === 'shrink' ? '0' : 'auto')};
 	box-sizing: border-box;
 	padding: var(--space-xs) var(--space-sm);
 	vertical-align: top;
@@ -135,6 +142,9 @@ const Cell = styled.td.withConfig({
 
 	@media (max-width: 1024px) {
 		display: block;
+		/* Row sizing sets an inline pixel width per column; in the stacked
+		   card that width would overflow the viewport, so drop it. */
+		width: auto !important;
 		padding: var(--space-3xs) 0;
 	}
 `

@@ -8,7 +8,6 @@ import { useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import {
 	type ColumnDef,
-	type ColumnSizingState,
 	flexRender,
 	getCoreRowModel,
 	getSortedRowModel,
@@ -28,6 +27,7 @@ import {
 	ArrowUpRight,
 	Check,
 	CheckCheck,
+	ChevronDown,
 	ChevronLeft,
 	ChevronRight,
 	Columns,
@@ -55,7 +55,7 @@ import {
 	PriButton,
 	PriCheckbox,
 	PriInput,
-	PriPopover,
+	PriMenu,
 	PriSelect,
 	usePriToast,
 } from '@batuda/ui/pri'
@@ -342,6 +342,13 @@ function EmailsIndexPage() {
 				: [],
 		[inboxesResult],
 	)
+
+	// No inbox connected yet → first-run onboarding instead of an empty list.
+	const showOnboarding =
+		AsyncResult.isSuccess(inboxesResult) &&
+		inboxOptions.length === 0 &&
+		!isMissingActiveOrg
+
 	const companiesById = useMemo<Map<string, CompanyLookup>>(() => {
 		if (!AsyncResult.isSuccess(companiesResult)) return new Map()
 		const map = new Map<string, CompanyLookup>()
@@ -554,326 +561,269 @@ function EmailsIndexPage() {
 	const allSelected = threads.length > 0 && selectedCount === threads.length
 
 	return (
-		<Page>
+		<Page data-sheet-fill>
 			<Intro>
 				<IntroText>
 					<Title>{t`Emails`}</Title>
-					<Subtitle>{total === 1 ? t`1 thread` : t`${total} threads`}</Subtitle>
+					{!showOnboarding && (
+						<Subtitle>
+							{total === 1 ? t`1 thread` : t`${total} threads`}
+						</Subtitle>
+					)}
 				</IntroText>
-				<IntroActions>
-					{/*
-					 * Cross-route dialog opener: a real <Link> (cmd/middle-clickable,
-					 * shareable) that lands on /emails/inboxes with the connect dialog
-					 * already open via the `?dlg=` param. Back returns here.
-					 */}
-					<PriButton
-						$variant='outlined'
-						data-testid='emails-connect-mailbox'
-						render={props => (
-							<Link
-								to='/emails/inboxes'
-								search={{ dlg: { kind: 'create' } }}
-								{...props}
-							/>
-						)}
-					>
-						<Plus size={14} aria-hidden />
-						<span>{t`Connect mailbox`}</span>
-					</PriButton>
-					<PriButton
-						type='button'
-						$variant='outlined'
-						data-testid='emails-manage-inboxes'
-						onClick={() => {
-							void navigate({ to: '/emails/inboxes' })
-						}}
-					>
-						<InboxIcon size={14} aria-hidden />
-						<span>{t`Manage inboxes`}</span>
-					</PriButton>
-					{/*
-					 * `<form action>` instead of a plain onClick so React 19
-					 * queues the submit through TanStack Start's selective
-					 * hydration. A bare onClick can land before the route
-					 * subtree's listeners attach during streaming SSR
-					 * hydration; the form-action path is the same one
-					 * `routes/login.tsx` uses, and Playwright's `.click()`
-					 * dispatches a real submit that React will replay
-					 * post-hydration.
-					 */}
-					<form
-						action={() => {
-							openCompose({ mode: 'new' })
-						}}
-					>
-						<PriButton
-							type='submit'
-							$variant='filled'
-							data-testid='emails-compose'
+				{!showOnboarding && (
+					<IntroActions>
+						<InboxesMenu />
+						{/*
+						 * `<form action>` (not onClick) queues the submit through
+						 * TanStack Start's selective hydration; a bare onClick can
+						 * land before the route subtree's listeners attach during
+						 * streaming SSR hydration.
+						 */}
+						<form
+							action={() => {
+								openCompose({ mode: 'new' })
+							}}
 						>
-							<Pencil size={14} aria-hidden />
-							<span>{t`Compose`}</span>
-						</PriButton>
-					</form>
-				</IntroActions>
+							<PriButton
+								type='submit'
+								$variant='filled'
+								data-testid='emails-compose'
+							>
+								<Pencil size={14} aria-hidden />
+								<span>{t`Compose`}</span>
+							</PriButton>
+						</form>
+					</IntroActions>
+				)}
 			</Intro>
 
-			<Filters role='group' aria-label={t`Filter emails`}>
-				<SearchWrap>
-					<SearchIcon>
-						<Search size={16} aria-hidden />
-					</SearchIcon>
-					<PriInput
-						type='search'
-						data-testid='emails-search'
-						placeholder={t`Search by subject…`}
-						value={searchInput}
-						onChange={event => setSearchInput(event.target.value)}
-						aria-label={t`Search threads`}
-						style={{ paddingLeft: 'calc(var(--space-sm) * 2 + 16px)' }}
-					/>
-				</SearchWrap>
-
-				<StatusFilters role='group' aria-label={t`Filter by status`}>
-					{STATUS_OPTIONS.map(opt => {
-						const current = search.status ?? 'all'
-						const active = current === opt.value
-						const label =
-							opt.labelKey === 'filterAll'
-								? t`All`
-								: opt.labelKey === 'filterOpen'
-									? t`Open`
-									: opt.labelKey === 'filterClosed'
-										? t`Closed`
-										: t`Archived`
-						return (
-							<StatusFilterButton
-								key={opt.value}
-								type='button'
-								$active={active}
-								aria-pressed={active}
-								data-testid={`emails-status-${opt.value}`}
-								onClick={() =>
-									handleStatusFilter(
-										opt.value === 'all' ? undefined : opt.value,
-									)
-								}
-							>
-								{label}
-							</StatusFilterButton>
-						)
-					})}
-				</StatusFilters>
-
-				{inboxOptions.length > 0 && (
-					<InboxSelectWrap>
-						<PriSelect.Root
-							value={search.inboxId ?? '__all__'}
-							onValueChange={value =>
-								handleInboxFilter(
-									value === '__all__' ? undefined : String(value),
-								)
-							}
-						>
-							<PriSelect.Trigger
-								data-testid='inbox-filter-trigger'
-								aria-label={t`Filter by inbox`}
-							>
-								<PriSelect.Value placeholder={t`All inboxes`} />
-								<PriSelect.Icon>
-									<ChevronRight size={14} aria-hidden />
-								</PriSelect.Icon>
-							</PriSelect.Trigger>
-							<PriSelect.Portal>
-								<PriSelect.Positioner>
-									<PriSelect.Popup>
-										<PriSelect.Item
-											value='__all__'
-											data-testid='inbox-filter-option'
-											data-inbox-email='__all__'
-										>
-											<PriSelect.ItemIndicator>
-												<Check size={12} aria-hidden />
-											</PriSelect.ItemIndicator>
-											<PriSelect.ItemText>{t`All inboxes`}</PriSelect.ItemText>
-										</PriSelect.Item>
-										{inboxOptions.map(inbox => (
-											<PriSelect.Item
-												key={inbox.id}
-												value={inbox.id}
-												data-testid='inbox-filter-option'
-												data-inbox-email={inbox.email}
-											>
-												<PriSelect.ItemIndicator>
-													<Check size={12} aria-hidden />
-												</PriSelect.ItemIndicator>
-												<PriSelect.ItemText>
-													{inbox.displayName
-														? `${inbox.displayName} <${inbox.email}>`
-														: inbox.email}
-												</PriSelect.ItemText>
-											</PriSelect.Item>
-										))}
-									</PriSelect.Popup>
-								</PriSelect.Positioner>
-							</PriSelect.Portal>
-						</PriSelect.Root>
-					</InboxSelectWrap>
-				)}
-
-				{activeFilters && (
-					<PriButton
-						type='button'
-						$variant='outlined'
-						onClick={handleClearFilters}
-					>
-						<X size={14} aria-hidden />
-						<span>{t`Clear filters`}</span>
-					</PriButton>
-				)}
-			</Filters>
-
-			{selectedCount > 0 && (
-				<BulkToolbar role='toolbar' aria-label={t`Bulk thread actions`}>
-					<BulkLabel aria-live='polite'>
-						{selectedCount === 1
-							? t`1 thread selected`
-							: t`${selectedCount} threads selected`}
-					</BulkLabel>
-					<PriButton
-						type='button'
-						$variant='outlined'
-						onClick={() => {
-							void applyStatus(Array.from(selected), 'closed')
-							clearSelection()
-						}}
-					>
-						<CheckCheck size={14} aria-hidden />
-						<span>{t`Close`}</span>
-					</PriButton>
-					<PriButton
-						type='button'
-						$variant='outlined'
-						onClick={() => {
-							void applyStatus(Array.from(selected), 'open')
-							clearSelection()
-						}}
-					>
-						<ArchiveRestore size={14} aria-hidden />
-						<span>{t`Reopen`}</span>
-					</PriButton>
-					<PriButton
-						type='button'
-						$variant='outlined'
-						onClick={() => {
-							void applyStatus(Array.from(selected), 'archived')
-							clearSelection()
-						}}
-					>
-						<Archive size={14} aria-hidden />
-						<span>{t`Archive`}</span>
-					</PriButton>
-					<PriButton
-						type='button'
-						$variant='outlined'
-						onClick={() => {
-							void applyRead(Array.from(selected), true)
-							clearSelection()
-						}}
-					>
-						<Eye size={14} aria-hidden />
-						<span>{t`Mark read`}</span>
-					</PriButton>
-					<PriButton type='button' $variant='text' onClick={clearSelection}>
-						<X size={14} aria-hidden />
-						<span>{t`Clear`}</span>
-					</PriButton>
-				</BulkToolbar>
-			)}
-
-			{isLoading ? (
-				<SkeletonRows count={8} height='3.5rem' />
-			) : isMissingActiveOrg ? (
-				<EmptyState
-					title={t`No active organization on this session`}
-					description={t`Pick an organization from the switcher in the header, or sign out and back in. After a recent dev DB reset, existing sessions can point at organization ids that the reset removed.`}
-				/>
-			) : isFailure ? (
-				<EmptyState
-					title={t`Could not load threads`}
-					description={t`Check that the session is valid or try again.`}
-				/>
-			) : threads.length === 0 ? (
+			{showOnboarding ? (
 				<EmptyState
 					icon={Mail}
-					title={
-						activeFilters ? t`No threads match the filters` : t`No threads yet`
+					title={t`Connect a mailbox to start`}
+					description={t`Receive and send email from your own inbox inside Batuda.`}
+					action={
+						<PriButton
+							$variant='filled'
+							data-testid='emails-onboarding-connect'
+							render={props => (
+								<Link
+									to='/emails/inboxes'
+									search={{ dlg: { kind: 'create' } }}
+									{...props}
+								/>
+							)}
+						>
+							<Plus size={14} aria-hidden />
+							<span>{t`Connect mailbox`}</span>
+						</PriButton>
 					}
-					description={
-						activeFilters
-							? t`Try different criteria or clear the filters.`
-							: t`Inbound and outbound emails will pin to this board once a thread exists.`
-					}
-					{...(activeFilters
-						? {
-								action: (
-									<PriButton
-										type='button'
-										$variant='outlined'
-										data-testid='emails-empty-clear-filters'
-										onClick={handleClearFilters}
-									>
-										<X size={14} aria-hidden />
-										<span>{t`Clear filters`}</span>
-									</PriButton>
-								),
-							}
-						: {})}
 				/>
 			) : (
 				<>
-					{drafts.length > 0 && <DraftsResumeStrip drafts={drafts} />}
-					<ThreadsGrid
-						threads={threads}
-						companiesById={companiesById}
-						selected={selected}
-						allSelected={allSelected}
-						toggleSelect={toggleSelect}
-						selectAll={selectAll}
-						clearSelection={clearSelection}
-						applyStatus={applyStatus}
-						applyRead={applyRead}
-					/>
-				</>
-			)}
+					<Filters role='group' aria-label={t`Filter emails`}>
+						<SearchWrap>
+							<SearchIcon>
+								<Search size={16} aria-hidden />
+							</SearchIcon>
+							<PriInput
+								type='search'
+								data-testid='emails-search'
+								placeholder={t`Search by subject…`}
+								value={searchInput}
+								onChange={event => setSearchInput(event.target.value)}
+								aria-label={t`Search threads`}
+								style={{ paddingLeft: 'calc(var(--space-sm) * 2 + 16px)' }}
+							/>
+						</SearchWrap>
 
-			{total > EMAILS_PAGE_SIZE && (
-				<Pagination>
-					<PageLabel>{t`Showing ${firstRow}–${lastRow} of ${total}`}</PageLabel>
-					<PageNav>
-						<PriButton
-							type='button'
-							$variant='outlined'
-							data-testid='emails-page-prev'
-							disabled={page <= 1}
-							onClick={() => handlePage(page - 1)}
-						>
-							<ChevronLeft size={14} aria-hidden />
-							<span>{t`Previous`}</span>
-						</PriButton>
-						<PageIndicator>{t`Page ${page} of ${totalPages}`}</PageIndicator>
-						<PriButton
-							type='button'
-							$variant='outlined'
-							data-testid='emails-page-next'
-							disabled={page >= totalPages}
-							onClick={() => handlePage(page + 1)}
-						>
-							<span>{t`Next`}</span>
-							<ChevronRight size={14} aria-hidden />
-						</PriButton>
-					</PageNav>
-				</Pagination>
+						<StatusFilters role='group' aria-label={t`Filter by status`}>
+							{STATUS_OPTIONS.map(opt => {
+								const current = search.status ?? 'all'
+								const active = current === opt.value
+								const label =
+									opt.labelKey === 'filterAll'
+										? t`All`
+										: opt.labelKey === 'filterOpen'
+											? t`Open`
+											: opt.labelKey === 'filterClosed'
+												? t`Closed`
+												: t`Archived`
+								return (
+									<StatusFilterButton
+										key={opt.value}
+										type='button'
+										$active={active}
+										aria-pressed={active}
+										data-testid={`emails-status-${opt.value}`}
+										onClick={() =>
+											handleStatusFilter(
+												opt.value === 'all' ? undefined : opt.value,
+											)
+										}
+									>
+										{label}
+									</StatusFilterButton>
+								)
+							})}
+						</StatusFilters>
+
+						{inboxOptions.length > 0 && (
+							<InboxSelectWrap>
+								<PriSelect.Root
+									value={search.inboxId ?? '__all__'}
+									onValueChange={value =>
+										handleInboxFilter(
+											value === '__all__' ? undefined : String(value),
+										)
+									}
+								>
+									<PriSelect.Trigger
+										data-testid='inbox-filter-trigger'
+										aria-label={t`Filter by inbox`}
+									>
+										<PriSelect.Value placeholder={t`All inboxes`} />
+										<PriSelect.Icon>
+											<ChevronRight size={14} aria-hidden />
+										</PriSelect.Icon>
+									</PriSelect.Trigger>
+									<PriSelect.Portal>
+										<PriSelect.Positioner>
+											<PriSelect.Popup>
+												<PriSelect.Item
+													value='__all__'
+													data-testid='inbox-filter-option'
+													data-inbox-email='__all__'
+												>
+													<PriSelect.ItemIndicator>
+														<Check size={12} aria-hidden />
+													</PriSelect.ItemIndicator>
+													<PriSelect.ItemText>{t`All inboxes`}</PriSelect.ItemText>
+												</PriSelect.Item>
+												{inboxOptions.map(inbox => (
+													<PriSelect.Item
+														key={inbox.id}
+														value={inbox.id}
+														data-testid='inbox-filter-option'
+														data-inbox-email={inbox.email}
+													>
+														<PriSelect.ItemIndicator>
+															<Check size={12} aria-hidden />
+														</PriSelect.ItemIndicator>
+														<PriSelect.ItemText>
+															{inbox.displayName
+																? `${inbox.displayName} <${inbox.email}>`
+																: inbox.email}
+														</PriSelect.ItemText>
+													</PriSelect.Item>
+												))}
+											</PriSelect.Popup>
+										</PriSelect.Positioner>
+									</PriSelect.Portal>
+								</PriSelect.Root>
+							</InboxSelectWrap>
+						)}
+
+						{activeFilters && (
+							<PriButton
+								type='button'
+								$variant='outlined'
+								onClick={handleClearFilters}
+							>
+								<X size={14} aria-hidden />
+								<span>{t`Clear filters`}</span>
+							</PriButton>
+						)}
+					</Filters>
+
+					{isLoading ? (
+						<SkeletonRows count={8} height='3.5rem' />
+					) : isMissingActiveOrg ? (
+						<EmptyState
+							title={t`No active organization on this session`}
+							description={t`Pick an organization from the switcher in the header, or sign out and back in. After a recent dev DB reset, existing sessions can point at organization ids that the reset removed.`}
+						/>
+					) : isFailure ? (
+						<EmptyState
+							title={t`Could not load threads`}
+							description={t`Check that the session is valid or try again.`}
+						/>
+					) : threads.length === 0 ? (
+						<EmptyState
+							icon={Mail}
+							title={
+								activeFilters
+									? t`No threads match the filters`
+									: t`No threads yet`
+							}
+							description={
+								activeFilters
+									? t`Try different criteria or clear the filters.`
+									: t`Inbound and outbound emails will pin to this board once a thread exists.`
+							}
+							{...(activeFilters
+								? {
+										action: (
+											<PriButton
+												type='button'
+												$variant='outlined'
+												data-testid='emails-empty-clear-filters'
+												onClick={handleClearFilters}
+											>
+												<X size={14} aria-hidden />
+												<span>{t`Clear filters`}</span>
+											</PriButton>
+										),
+									}
+								: {})}
+						/>
+					) : (
+						<>
+							{drafts.length > 0 && <DraftsResumeStrip drafts={drafts} />}
+							<ThreadsGrid
+								threads={threads}
+								companiesById={companiesById}
+								selected={selected}
+								allSelected={allSelected}
+								toggleSelect={toggleSelect}
+								selectAll={selectAll}
+								clearSelection={clearSelection}
+								applyStatus={applyStatus}
+								applyRead={applyRead}
+							/>
+						</>
+					)}
+
+					{total > EMAILS_PAGE_SIZE && (
+						<Pagination>
+							<PageLabel>{t`Showing ${firstRow}–${lastRow} of ${total}`}</PageLabel>
+							<PageNav>
+								<PriButton
+									type='button'
+									$variant='outlined'
+									data-testid='emails-page-prev'
+									disabled={page <= 1}
+									onClick={() => handlePage(page - 1)}
+								>
+									<ChevronLeft size={14} aria-hidden />
+									<span>{t`Previous`}</span>
+								</PriButton>
+								<PageIndicator>{t`Page ${page} of ${totalPages}`}</PageIndicator>
+								<PriButton
+									type='button'
+									$variant='outlined'
+									data-testid='emails-page-next'
+									disabled={page >= totalPages}
+									onClick={() => handlePage(page + 1)}
+								>
+									<span>{t`Next`}</span>
+									<ChevronRight size={14} aria-hidden />
+								</PriButton>
+							</PageNav>
+						</Pagination>
+					)}
+				</>
 			)}
 		</Page>
 	)
@@ -899,7 +849,6 @@ type ThreadsGridProps = {
 	) => Promise<void>
 }
 
-const COLUMN_SIZING_KEY = 'batuda.emails.columnSizing'
 const COLUMN_VISIBILITY_KEY = 'batuda.emails.columnVisibility'
 
 function readLocal<T>(key: string, fallback: T): T {
@@ -937,18 +886,13 @@ function ThreadsGrid({
 }: ThreadsGridProps) {
 	const { t } = useLingui()
 	const navigate = useNavigate({ from: '/emails/' })
+	const selectedCount = selected.size
 
-	const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() =>
-		readLocal<ColumnSizingState>(COLUMN_SIZING_KEY, {}),
-	)
 	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
 		() => readLocal<VisibilityState>(COLUMN_VISIBILITY_KEY, {}),
 	)
 	const [sorting, setSorting] = useState<SortingState>([])
 
-	useEffect(() => {
-		writeLocal(COLUMN_SIZING_KEY, columnSizing)
-	}, [columnSizing])
 	useEffect(() => {
 		writeLocal(COLUMN_VISIBILITY_KEY, columnVisibility)
 	}, [columnVisibility])
@@ -964,7 +908,6 @@ function ThreadsGrid({
 			{
 				id: 'select',
 				size: 44,
-				enableResizing: false,
 				enableHiding: false,
 				enableSorting: false,
 				header: () => (
@@ -997,7 +940,6 @@ function ThreadsGrid({
 				id: 'status',
 				header: '',
 				size: 36,
-				enableResizing: false,
 				enableHiding: false,
 				enableSorting: false,
 				cell: ({ row }) => <StatusCell thread={row.original} />,
@@ -1036,7 +978,6 @@ function ThreadsGrid({
 				id: 'actions',
 				header: '',
 				size: 140,
-				enableResizing: false,
 				enableHiding: false,
 				enableSorting: false,
 				cell: ({ row }) => (
@@ -1064,17 +1005,14 @@ function ThreadsGrid({
 	const table = useReactTable({
 		data: threads as ThreadRow[],
 		columns,
-		state: { columnSizing, columnVisibility, sorting, rowSelection },
+		state: { columnVisibility, sorting, rowSelection },
 		getRowId: r => r.id,
 		enableRowSelection: true,
-		enableColumnResizing: true,
-		columnResizeMode: 'onChange',
-		onColumnSizingChange: setColumnSizing,
 		onColumnVisibilityChange: setColumnVisibility,
 		onSortingChange: setSorting,
 		getCoreRowModel: getCoreRowModel(),
 		getSortedRowModel: getSortedRowModel(),
-		defaultColumn: { minSize: 48, maxSize: 800 },
+		defaultColumn: { minSize: 48 },
 	})
 
 	const scrollRef = useRef<HTMLDivElement>(null)
@@ -1094,39 +1032,116 @@ function ThreadsGrid({
 			</GridToolbar>
 			<GridScroll ref={scrollRef}>
 				<PriTable.Root>
-					<PriTable.Head>
-						{table.getHeaderGroups().map(group => (
-							<PriTable.Row key={group.id}>
-								{group.headers.map(header => (
-									<PriTable.ColumnHeader
-										key={header.id}
-										style={{ width: header.getSize() }}
-										onClick={
-											header.column.getCanSort()
-												? header.column.getToggleSortingHandler()
-												: undefined
-										}
+					{selectedCount > 0 ? (
+						<SelectionHead>
+							<PriTable.Row>
+								<SelectionCell
+									$flex='grow'
+									role='toolbar'
+									aria-label={t`Bulk thread actions`}
+								>
+									<PriCheckbox.Root
+										checked={allSelected}
+										onCheckedChange={checked => {
+											if (checked) selectAll()
+											else clearSelection()
+										}}
+										aria-label={t`Select all threads on this page`}
 									>
-										{header.isPlaceholder
-											? null
-											: flexRender(
-													header.column.columnDef.header,
-													header.getContext(),
-												)}
-										{header.column.getIsSorted() === 'asc' && ' ↑'}
-										{header.column.getIsSorted() === 'desc' && ' ↓'}
-										{header.column.getCanResize() && (
-											<PriTable.Resizer
-												onMouseDown={header.getResizeHandler()}
-												onTouchStart={header.getResizeHandler()}
-												$isResizing={header.column.getIsResizing()}
-											/>
-										)}
-									</PriTable.ColumnHeader>
-								))}
+										<PriCheckbox.Indicator>
+											<Check size={12} aria-hidden />
+										</PriCheckbox.Indicator>
+									</PriCheckbox.Root>
+									<BulkLabel aria-live='polite'>
+										{selectedCount === 1
+											? t`1 thread selected`
+											: t`${selectedCount} threads selected`}
+									</BulkLabel>
+									<PriButton
+										type='button'
+										$variant='outlined'
+										onClick={() => {
+											void applyStatus(Array.from(selected), 'closed')
+											clearSelection()
+										}}
+									>
+										<CheckCheck size={14} aria-hidden />
+										<span>{t`Close`}</span>
+									</PriButton>
+									<PriButton
+										type='button'
+										$variant='outlined'
+										onClick={() => {
+											void applyStatus(Array.from(selected), 'open')
+											clearSelection()
+										}}
+									>
+										<ArchiveRestore size={14} aria-hidden />
+										<span>{t`Reopen`}</span>
+									</PriButton>
+									<PriButton
+										type='button'
+										$variant='outlined'
+										onClick={() => {
+											void applyStatus(Array.from(selected), 'archived')
+											clearSelection()
+										}}
+									>
+										<Archive size={14} aria-hidden />
+										<span>{t`Archive`}</span>
+									</PriButton>
+									<PriButton
+										type='button'
+										$variant='outlined'
+										onClick={() => {
+											void applyRead(Array.from(selected), true)
+											clearSelection()
+										}}
+									>
+										<Eye size={14} aria-hidden />
+										<span>{t`Mark read`}</span>
+									</PriButton>
+									<PriButton
+										type='button'
+										$variant='text'
+										onClick={clearSelection}
+									>
+										<X size={14} aria-hidden />
+										<span>{t`Clear`}</span>
+									</PriButton>
+								</SelectionCell>
 							</PriTable.Row>
-						))}
-					</PriTable.Head>
+						</SelectionHead>
+					) : (
+						<PriTable.Head>
+							{table.getHeaderGroups().map(group => (
+								<PriTable.Row key={group.id}>
+									{group.headers.map(header => (
+										<PriTable.ColumnHeader
+											key={header.id}
+											data-col={header.column.id}
+											$flex={COLUMN_FLEX[header.column.id] ?? 'fixed'}
+											style={{ width: header.getSize() }}
+											onClick={
+												header.column.getCanSort()
+													? header.column.getToggleSortingHandler()
+													: undefined
+											}
+										>
+											{header.isPlaceholder
+												? null
+												: flexRender(
+														header.column.columnDef.header,
+														header.getContext(),
+													)}
+											{header.column.getIsSorted() === 'asc' && ' ↑'}
+											{header.column.getIsSorted() === 'desc' && ' ↓'}
+										</PriTable.ColumnHeader>
+									))}
+								</PriTable.Row>
+							))}
+						</PriTable.Head>
+					)}
 					<PriTable.Body
 						style={{
 							height: virtualizer.getTotalSize(),
@@ -1138,8 +1153,14 @@ function ThreadsGrid({
 							if (row === undefined) return null
 							const thread = row.original
 							return (
-								<PriTable.Row
+								<GridRow
 									key={row.id}
+									// Rows vary in height (the stacked mobile card is taller
+									// than a desktop row), so let the virtualizer measure each
+									// one instead of assuming the estimate — otherwise
+									// absolutely-positioned rows would overlap.
+									ref={virtualizer.measureElement}
+									data-index={vi.index}
 									data-testid={`thread-row-${thread.id}`}
 									data-unread={thread.isUnread ? 'true' : 'false'}
 									data-draft={thread.hasDraft ? 'true' : 'false'}
@@ -1151,16 +1172,38 @@ function ThreadsGrid({
 										right: 0,
 										transform: `translateY(${vi.start}px)`,
 									}}
+									tabIndex={0}
+									aria-label={
+										thread.subject
+											? t`Open thread: ${thread.subject}`
+											: t`Open thread with no subject`
+									}
 									onClick={() => {
 										void navigate({
 											to: '/emails/$threadId',
 											params: { threadId: thread.id },
 										})
 									}}
+									// Enter/Space opens the focused row; ignore keys that
+									// bubbled up from the checkbox or action buttons.
+									onKeyDown={e => {
+										if (
+											(e.key === 'Enter' || e.key === ' ') &&
+											e.target === e.currentTarget
+										) {
+											e.preventDefault()
+											void navigate({
+												to: '/emails/$threadId',
+												params: { threadId: thread.id },
+											})
+										}
+									}}
 								>
 									{row.getVisibleCells().map(cell => (
 										<PriTable.Cell
 											key={cell.id}
+											data-col={cell.column.id}
+											$flex={COLUMN_FLEX[cell.column.id] ?? 'fixed'}
 											style={{ width: cell.column.getSize() }}
 											onClick={
 												cell.column.id === 'select' ||
@@ -1175,7 +1218,7 @@ function ThreadsGrid({
 											)}
 										</PriTable.Cell>
 									))}
-								</PriTable.Row>
+								</GridRow>
 							)
 						})}
 					</PriTable.Body>
@@ -1196,9 +1239,6 @@ function resolveCompany(
 function StatusCell({ thread }: { thread: ThreadRow }) {
 	if (thread.hasDraft) {
 		return <PencilLine size={14} aria-label='Has draft' />
-	}
-	if (thread.isUnread) {
-		return <UnreadDot aria-label='Unread' />
 	}
 	if (thread.status === 'closed') {
 		return <Check size={14} aria-label='Closed' />
@@ -1222,6 +1262,7 @@ function WhoCell({
 	return (
 		<WhoStack>
 			<WhoLine1>
+				{thread.isUnread && <UnreadDot aria-label={t`Unread`} />}
 				<WhoName>{senderLabel}</WhoName>
 				{thread.lastMessageDirection === 'outbound' ? (
 					<ArrowUpRight size={12} aria-label={t`Outbound`} />
@@ -1346,8 +1387,8 @@ function ColumnVisibilityMenu({ table }: { table: TanstackTable<ThreadRow> }) {
 		return id
 	}
 	return (
-		<PriPopover.Root>
-			<PriPopover.Trigger
+		<PriMenu.Root>
+			<PriMenu.Trigger
 				render={props => (
 					<PriButton type='button' $variant='outlined' {...props}>
 						<Columns size={14} aria-hidden />
@@ -1355,39 +1396,82 @@ function ColumnVisibilityMenu({ table }: { table: TanstackTable<ThreadRow> }) {
 					</PriButton>
 				)}
 			/>
-			<PriPopover.Portal>
-				<PriPopover.Positioner>
-					<PriPopover.Popup>
-						<MenuList>
-							{table
-								.getAllLeafColumns()
-								.filter(col => col.getCanHide())
-								.map(col => (
-									<MenuRow key={col.id}>
-										<PriCheckbox.Root
-											checked={col.getIsVisible()}
-											onCheckedChange={() => col.toggleVisibility()}
-										>
-											<PriCheckbox.Indicator>
-												<Check size={12} aria-hidden />
-											</PriCheckbox.Indicator>
-										</PriCheckbox.Root>
-										<MenuLabel>{labelFor(col.id)}</MenuLabel>
-									</MenuRow>
-								))}
-							<MenuDivider />
-							<PriButton
-								type='button'
-								$variant='text'
-								onClick={() => table.resetColumnVisibility()}
-							>
-								{t`Reset`}
-							</PriButton>
-						</MenuList>
-					</PriPopover.Popup>
-				</PriPopover.Positioner>
-			</PriPopover.Portal>
-		</PriPopover.Root>
+			<PriMenu.Portal>
+				<PriMenu.Positioner sideOffset={6} align='end'>
+					<PriMenu.Popup>
+						{table
+							.getAllLeafColumns()
+							.filter(col => col.getCanHide())
+							.map(col => (
+								<PriMenu.CheckboxItem
+									key={col.id}
+									checked={col.getIsVisible()}
+									onCheckedChange={() => col.toggleVisibility()}
+								>
+									<PriMenu.CheckboxItemIndicator>
+										<Check size={12} aria-hidden />
+									</PriMenu.CheckboxItemIndicator>
+									<span>{labelFor(col.id)}</span>
+								</PriMenu.CheckboxItem>
+							))}
+						<PriMenu.Separator />
+						<PriMenu.Item onClick={() => table.resetColumnVisibility()}>
+							{t`Reset`}
+						</PriMenu.Item>
+					</PriMenu.Popup>
+				</PriMenu.Positioner>
+			</PriMenu.Portal>
+		</PriMenu.Root>
+	)
+}
+
+function InboxesMenu() {
+	const { t } = useLingui()
+	// Both options navigate, so they are real links (middle/cmd-clickable);
+	// Connect routes through the inboxes page and opens its create dialog.
+	return (
+		<PriMenu.Root>
+			<PriMenu.Trigger
+				render={props => (
+					<PriButton
+						type='button'
+						$variant='outlined'
+						data-testid='emails-inboxes-menu'
+						{...props}
+					>
+						<InboxIcon size={14} aria-hidden />
+						<span>{t`Inboxes`}</span>
+						<ChevronDown size={14} aria-hidden />
+					</PriButton>
+				)}
+			/>
+			<PriMenu.Portal>
+				<PriMenu.Positioner sideOffset={6} align='end'>
+					<PriMenu.Popup>
+						<PriMenu.LinkItem
+							data-testid='emails-manage-inboxes'
+							render={props => <Link to='/emails/inboxes' {...props} />}
+						>
+							<InboxIcon size={14} aria-hidden />
+							<span>{t`Manage inboxes`}</span>
+						</PriMenu.LinkItem>
+						<PriMenu.LinkItem
+							data-testid='emails-connect-mailbox'
+							render={props => (
+								<Link
+									to='/emails/inboxes'
+									search={{ dlg: { kind: 'create' } }}
+									{...props}
+								/>
+							)}
+						>
+							<Plus size={14} aria-hidden />
+							<span>{t`Connect mailbox`}</span>
+						</PriMenu.LinkItem>
+					</PriMenu.Popup>
+				</PriMenu.Positioner>
+			</PriMenu.Portal>
+		</PriMenu.Root>
 	)
 }
 
@@ -1583,6 +1667,10 @@ const Page = styled.div.withConfig({ displayName: 'EmailsIndexPage' })`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-lg);
+	/* Fill the sheet so the thread list can grow to the available height
+	   instead of collapsing to a fixed max-height. */
+	flex: 1;
+	min-height: 0;
 `
 
 const Intro = styled.div.withConfig({ displayName: 'EmailsIndexIntro' })`
@@ -1599,6 +1687,7 @@ const IntroActions = styled.div.withConfig({
 	displayName: 'EmailsIndexIntroActions',
 })`
 	display: flex;
+	flex-wrap: wrap;
 	gap: var(--space-xs);
 	justify-self: start;
 
@@ -1724,19 +1813,31 @@ const InboxSelectWrap = styled.div.withConfig({
 	display: flex;
 `
 
-const BulkToolbar = styled.div.withConfig({
-	displayName: 'EmailsIndexBulkToolbar',
+// While rows are selected the bulk-action bar takes the header's slot, so it
+// stays pinned to the top of the scroll area. The primitive hides the header
+// below the table breakpoint; keep it visible here so the actions remain
+// reachable on a phone.
+const SelectionHead = styled(PriTable.Head).withConfig({
+	displayName: 'EmailsIndexSelectionHead',
 })`
-	${brushedMetalPlate}
-	position: sticky;
-	top: var(--space-sm);
-	z-index: 3;
+	@media (max-width: 1024px) {
+		display: block;
+	}
+`
+
+const SelectionCell = styled(PriTable.ColumnHeader).withConfig({
+	displayName: 'EmailsIndexSelectionCell',
+})`
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: var(--space-sm);
-	padding: var(--space-sm) var(--space-md);
-	border-radius: var(--shape-2xs);
+	gap: var(--space-xs);
+	width: 100%;
+	padding: var(--space-2xs) var(--space-sm);
+	text-transform: none;
+	letter-spacing: normal;
+	white-space: normal;
+	background: color-mix(in oklab, var(--color-primary) 12%, var(--color-surface));
 `
 
 const BulkLabel = styled.span.withConfig({
@@ -1863,10 +1964,85 @@ const PageIndicator = styled.span.withConfig({
 
 // ── ThreadsGrid styles ────────────────────────────────────────────
 
+// Subject fills the free width and truncates; the sender can give way
+// before it. Every other column keeps its fixed width. Ids not listed
+// stay fixed (the primitive's default).
+const COLUMN_FLEX: Record<string, 'grow' | 'shrink'> = {
+	who: 'shrink',
+	what: 'grow',
+}
+
 const GridShell = styled.div.withConfig({ displayName: 'EmailsGridShell' })`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-xs);
+	/* Grow to fill the page so the scroll area below takes the free height. */
+	flex: 1;
+	min-height: 0;
+`
+
+// Below the table breakpoint each row is a stacked card: checkbox on the
+// left, sender + subject in the middle, time and actions on the right.
+const GridRow = styled(PriTable.Row).withConfig({
+	displayName: 'EmailsGridRow',
+})`
+	&:focus-visible {
+		outline: 2px solid var(--color-primary);
+		outline-offset: -2px;
+	}
+
+	@media (max-width: 1024px) {
+		grid-template-columns: auto 1fr auto;
+		grid-template-areas:
+			'select who  when'
+			'select what what'
+			'select actions actions';
+		align-items: start;
+		column-gap: var(--space-sm);
+		row-gap: var(--space-3xs);
+
+		[data-col='select'] {
+			grid-area: select;
+			align-self: start;
+		}
+		[data-col='status'] {
+			display: none;
+		}
+		[data-col='who'] {
+			grid-area: who;
+		}
+		[data-col='what'] {
+			grid-area: what;
+		}
+		[data-col='when'] {
+			grid-area: when;
+			justify-self: end;
+			text-align: right;
+			white-space: nowrap;
+			color: var(--color-on-surface-variant);
+			font-size: var(--typescale-label-medium-size);
+		}
+		[data-col='actions'] {
+			grid-area: actions;
+			justify-self: end;
+			align-self: end;
+		}
+
+		/* Touch has no hover tooltip to reveal clipped text, so the sender
+		   and subject wrap to full length instead of truncating. */
+		[data-col='who'],
+		[data-col='what'] {
+			white-space: normal;
+			overflow: visible;
+
+			span,
+			div {
+				white-space: normal;
+				overflow: visible;
+				text-overflow: clip;
+			}
+		}
+	}
 `
 
 const GridToolbar = styled.div.withConfig({
@@ -1879,7 +2055,10 @@ const GridToolbar = styled.div.withConfig({
 
 const GridScroll = styled.div.withConfig({ displayName: 'EmailsGridScroll' })`
 	position: relative;
-	max-height: calc(100vh - 22rem);
+	/* Fill the remaining page height (no fixed cap) and scroll the rows
+	   internally; pagination will bound the row count later. */
+	flex: 1;
+	min-height: 0;
 	overflow-y: auto;
 	border: 1px solid var(--color-outline-variant);
 	border-radius: var(--shape-2xs);
@@ -1956,36 +2135,6 @@ const RowActionsRow = styled.div.withConfig({
 	display: flex;
 	gap: var(--space-2xs);
 	justify-content: flex-end;
-`
-
-const MenuList = styled.div.withConfig({ displayName: 'EmailsMenuList' })`
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-2xs);
-	min-width: 12rem;
-`
-
-const MenuRow = styled.label.withConfig({ displayName: 'EmailsMenuRow' })`
-	display: flex;
-	align-items: center;
-	gap: var(--space-2xs);
-	padding: var(--space-2xs);
-	cursor: pointer;
-
-	&:hover {
-		background: color-mix(in oklab, var(--color-primary) 8%, transparent);
-	}
-`
-
-const MenuLabel = styled.span.withConfig({ displayName: 'EmailsMenuLabel' })`
-	font-family: var(--font-body);
-	color: var(--color-on-surface);
-`
-
-const MenuDivider = styled.hr.withConfig({ displayName: 'EmailsMenuDivider' })`
-	border: none;
-	border-top: 1px solid var(--color-outline-variant);
-	margin: var(--space-2xs) 0;
 `
 
 // ── DraftsResumeStrip styles ──────────────────────────────────────

@@ -961,6 +961,10 @@ msgstr "Confirma aplicar-ne {verifiedToApply}"
 msgid "Confirmed"
 msgstr "Confirmat"
 
+#: src/routes/emails/index.tsx
+msgid "Connect a mailbox to start"
+msgstr ""
+
 #: src/routes/settings/profile/index.tsx
 msgid "Connect AI tools"
 msgstr "Connecta eines d'IA"
@@ -975,6 +979,7 @@ msgid "Connect an email"
 msgstr "Connecta un correu"
 
 #: src/routes/emails/inboxes.tsx
+#: src/routes/emails/index.tsx
 #: src/routes/emails/index.tsx
 msgid "Connect mailbox"
 msgstr "Connecta una bústia"
@@ -2158,6 +2163,10 @@ msgstr "Bústia eliminada"
 msgid "Inbox updated"
 msgstr "Safata actualitzada"
 
+#: src/routes/emails/index.tsx
+msgid "Inboxes"
+msgstr ""
+
 #: src/components/companies/about-section.tsx
 #: src/components/research/findings/company-enrichment-view.tsx
 #: src/components/research/findings/prospect-scan-view.tsx
@@ -3040,6 +3049,15 @@ msgstr "Obre el panell de despesa de l'organització"
 msgid "Open the setup guide, opens in a new tab"
 msgstr "Obre la guia de configuració, s'obre en una pestanya nova"
 
+#: src/routes/emails/index.tsx
+msgid "Open thread with no subject"
+msgstr ""
+
+#. placeholder {0}: thread.subject
+#: src/routes/emails/index.tsx
+msgid "Open thread: {0}"
+msgstr ""
+
 #: src/routes/companies/$slug.tsx
 msgid "Open website"
 msgstr "Obre el lloc web"
@@ -3501,6 +3519,10 @@ msgstr "Ha fallat l'actualització de l'estat de lectura"
 msgid "Ready to apply"
 msgstr "A punt per aplicar"
 
+#: src/routes/emails/index.tsx
+msgid "Receive and send email from your own inbox inside Batuda."
+msgstr ""
+
 #: src/routes/tasks/index.tsx
 #: src/routes/tasks/index.tsx
 msgid "Recent changes"
@@ -3872,6 +3894,7 @@ msgstr "Veure qui té accés a aquest espai de treball, convida companys i gesti
 msgid "Select {0}"
 msgstr "Selecciona {0}"
 
+#: src/routes/emails/index.tsx
 #: src/routes/emails/index.tsx
 msgid "Select all threads on this page"
 msgstr "Selecciona tots els fils d'aquesta pàgina"
@@ -4644,6 +4667,10 @@ msgstr "Sense enllaçar"
 #: src/routes/settings/mcp/connections.tsx
 msgid "Unnamed client"
 msgstr "Client sense nom"
+
+#: src/routes/emails/index.tsx
+msgid "Unread"
+msgstr ""
 
 #: src/routes/emails/index.tsx
 msgid "Untitled"
