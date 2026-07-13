@@ -1,6 +1,7 @@
 import type { SchemaAST } from "effect"
 import {
   Brand,
+  Context,
   Effect,
   hole,
   Option,
@@ -8,12 +9,11 @@ import {
   Schema,
   SchemaGetter,
   SchemaTransformation,
-  ServiceMap,
   Struct,
   Tuple
 } from "effect"
 import { immerable, produce } from "immer"
-import { describe, expect, it, when } from "tstyche"
+import { describe, expect, it } from "tstyche"
 
 type Make<In, Out> = (input: In, options?: Schema.MakeOptions | undefined) => Out
 type MakeEffect<In, Out> = (
@@ -306,17 +306,43 @@ describe("Schema", () => {
     })
 
     describe("Class", () => {
+      it("make with void input", () => {
+        class A extends Schema.Class<A>("A")({}) {}
+        expect(A.make).type.toBe<Make<void | {}, A>>()
+      })
+
       it("nested defaulted fields", () => {
         class A extends Schema.Class<A, { readonly brand: unique symbol }>("A")(Schema.Struct({
           a: Schema.Struct({
             b: Schema.Finite.pipe(Schema.withConstructorDefault(Effect.succeed(-1)))
           }).pipe(Schema.withConstructorDefault(Effect.succeed({})))
         })) {}
-        expect(A.make).type.toBe<Make<{ readonly a?: { readonly b?: number } }, A>>()
+        expect(A.make).type.toBe<Make<void | { readonly a?: { readonly b?: number } }, A>>()
         const schema = Schema.Struct({
           a: A
         })
         expect(schema.make).type.toBe<Make<{ readonly a: A }, { readonly a: A }>>()
+      })
+    })
+
+    describe("TaggedClass", () => {
+      it("make with void input", () => {
+        class A extends Schema.TaggedClass<A>()("A", {}) {}
+        expect(A.make).type.toBe<Make<void | { readonly _tag?: "A" }, A>>()
+      })
+    })
+
+    describe("ErrorClass", () => {
+      it("make with void input", () => {
+        class E extends Schema.ErrorClass<E>("E")({}) {}
+        expect(E.make).type.toBe<Make<void | {}, E>>()
+      })
+    })
+
+    describe("TaggedErrorClass", () => {
+      it("make with void input", () => {
+        class E extends Schema.TaggedErrorClass<E>()("E", {}) {}
+        expect(E.make).type.toBe<Make<void | { readonly _tag?: "E" }, E>>()
       })
     })
 
@@ -437,6 +463,7 @@ describe("Schema", () => {
       const schema = Schema.toType(Schema.FiniteFromString)
       expect(Schema.revealCodec(schema)).type.toBe<Schema.Codec<number, number, never, never>>()
       expect(schema).type.toBe<Schema.toType<Schema.FiniteFromString>>()
+      expect(schema.schema).type.toBe<Schema.FiniteFromString>()
       expect(schema.annotate({})).type.toBe<Schema.toType<Schema.FiniteFromString>>()
     })
   })
@@ -451,7 +478,82 @@ describe("Schema", () => {
       const schema = Schema.toEncoded(Schema.FiniteFromString)
       expect(Schema.revealCodec(schema)).type.toBe<Schema.Codec<string, string, never, never>>()
       expect(schema).type.toBe<Schema.toEncoded<Schema.FiniteFromString>>()
+      expect(schema.schema).type.toBe<Schema.FiniteFromString>()
       expect(schema.annotate({})).type.toBe<Schema.toEncoded<Schema.FiniteFromString>>()
+    })
+  })
+
+  describe("toCodecJson", () => {
+    it("ast type", () => {
+      const schema = Schema.toCodecJson(Schema.FiniteFromString)
+      expect(schema.ast).type.toBe<SchemaAST.Number>()
+    })
+
+    it("revealCodec + annotate", () => {
+      const schema = Schema.toCodecJson(Schema.FiniteFromString)
+      expect(Schema.revealCodec(schema)).type.toBe<Schema.Codec<number, Schema.Json, never, never>>()
+      expect(schema).type.toBe<Schema.toCodecJson<Schema.FiniteFromString>>()
+      expect(schema.schema).type.toBe<Schema.FiniteFromString>()
+      expect(schema.annotate({})).type.toBe<Schema.toCodecJson<Schema.FiniteFromString>>()
+    })
+  })
+
+  describe("toCodecStringTree", () => {
+    it("ast type", () => {
+      const schema = Schema.toCodecStringTree(Schema.FiniteFromString)
+      expect(schema.ast).type.toBe<SchemaAST.Number>()
+    })
+
+    it("Array ast type", () => {
+      const schema = Schema.toCodecStringTree(Schema.Array(Schema.FiniteFromString))
+      expect(schema.ast).type.toBe<SchemaAST.Arrays>()
+    })
+
+    it("revealCodec + annotate", () => {
+      const schema = Schema.toCodecStringTree(Schema.FiniteFromString)
+      expect(Schema.revealCodec(schema)).type.toBe<Schema.Codec<number, Schema.StringTree, never, never>>()
+      expect(schema).type.toBe<Schema.toCodecStringTree<Schema.FiniteFromString>>()
+      expect(schema.schema).type.toBe<Schema.FiniteFromString>()
+      expect(schema.annotate({})).type.toBe<Schema.toCodecStringTree<Schema.FiniteFromString>>()
+    })
+  })
+
+  describe("toCodecArrayFromSingle", () => {
+    it("revealCodec + annotate", () => {
+      const stringTree = Schema.toCodecStringTree(Schema.Array(Schema.FiniteFromString))
+      const schema = Schema.toCodecArrayFromSingle(stringTree)
+      expect(Schema.revealCodec(schema)).type.toBe<
+        Schema.Codec<ReadonlyArray<number>, Schema.StringTree, never, never>
+      >()
+      expect(schema).type.toBe<Schema.toCodecArrayFromSingle<typeof stringTree>>()
+      expect(schema.annotate({})).type.toBe<Schema.toCodecArrayFromSingle<typeof stringTree>>()
+    })
+  })
+
+  describe("annotateEncoded", () => {
+    it("non-transforming schema should return Rebuild", () => {
+      const schema = Schema.String.pipe(
+        Schema.annotateEncoded({ title: "encoded" })
+      )
+      expect(schema).type.toBe<Schema.String>()
+    })
+
+    it("transforming schema should return Rebuild", () => {
+      const schema = Schema.NumberFromString.pipe(
+        Schema.annotateEncoded({ title: "encoded" })
+      )
+      expect(schema).type.toBe<Schema.NumberFromString>()
+    })
+
+    it("should constrain annotations to the Encoded type", () => {
+      // NumberFromString has Encoded = string, so string annotations are valid
+      expect(Schema.annotateEncoded<Schema.NumberFromString>).type.toBeCallableWith(
+        { examples: ["a"] }
+      )
+      // number annotations should not be valid for a string-encoded schema
+      expect(Schema.annotateEncoded<Schema.NumberFromString>).type.not.toBeCallableWith(
+        { examples: [1] }
+      )
     })
   })
 
@@ -899,7 +1001,7 @@ describe("Schema", () => {
     it("should allow partial application", () => {
       const f = Schema.decodeTo(Schema.String)
       expect(f).type.toBe<
-        <From extends Schema.Top>(from: From) => Schema.compose<Schema.String, From>
+        <From extends Schema.Constraint>(from: From) => Schema.compose<Schema.String, From>
       >()
 
       expect(f(Schema.Number)).type.toBe<Schema.compose<Schema.String, Schema.Number>>()
@@ -917,12 +1019,11 @@ describe("Schema", () => {
     })
 
     it("E != T", () => {
-      when(Schema.String.pipe).isCalledWith(
-        expect(Schema.decodeTo).type.not.toBeCallableWith(
-          Schema.Number,
-          SchemaTransformation.passthrough()
-        )
-      )
+      Schema.String.pipe(Schema.decodeTo(
+        Schema.Number,
+        // @ts-expect-error Argument of type 'Transformation<never, never, never, never>' is not assignable
+        SchemaTransformation.passthrough()
+      ))
 
       Schema.String.pipe(
         Schema.decodeTo(
@@ -1116,247 +1217,300 @@ describe("Schema", () => {
     })
   })
 
-  describe("Class", () => {
-    it("Fields argument", () => {
-      class A extends Schema.Class<A>("A")({
-        a: Schema.String
-      }) {}
+  describe("Class APIs", () => {
+    describe("Class", () => {
+      it("Fields argument", () => {
+        class A extends Schema.Class<A>("A")({
+          a: Schema.String
+        }) {}
 
-      expect(new A({ a: "a" })).type.toBe<A>()
-      expect(A.make({ a: "a" })).type.toBe<A>()
-      expect(Schema.revealCodec(A)).type.toBe<Schema.Codec<A, { readonly a: string }>>()
-      expect(revealClass(A)).type.toBe<
-        Schema.Class<A, Schema.Struct<{ readonly a: Schema.String }>, A>
-      >()
-      expect(A.fields).type.toBe<{ readonly a: Schema.String }>()
-      expect(A.annotate({})).type.toBe<
-        Schema.decodeTo<
-          Schema.declareConstructor<
-            A,
-            { readonly a: string },
-            readonly [Schema.Struct<{ readonly a: Schema.String }>],
-            { readonly a: string }
-          >,
-          Schema.Struct<{ readonly a: Schema.String }>
-        >
-      >()
-    })
-
-    it("Struct argument", () => {
-      class A extends Schema.Class<A>("A")(Schema.Struct({
-        a: Schema.String
-      })) {}
-
-      expect(new A({ a: "a" })).type.toBe<A>()
-      expect(A.make({ a: "a" })).type.toBe<A>()
-      expect(Schema.revealCodec(A)).type.toBe<Schema.Codec<A, { readonly a: string }>>()
-      expect(revealClass(A)).type.toBe<
-        Schema.Class<A, Schema.Struct<{ readonly a: Schema.String }>, A>
-      >()
-      expect(A.fields).type.toBe<{ readonly a: Schema.String }>()
-    })
-
-    it("mapFields", () => {
-      class A extends Schema.Class<A>("A")({
-        a: Schema.String
-      }) {}
-      const schema = A.mapFields((fields) => ({ ...fields, b: Schema.Number }))
-      expect(schema).type.toBe<Schema.Struct<{ readonly a: Schema.String; readonly b: Schema.Number }>>()
-    })
-
-    it("should reject non existing props", () => {
-      class A extends Schema.Class<A>("A")({
-        a: Schema.String
-      }) {}
-
-      expect(A).type.not.toBeConstructableWith({ a: "a", b: "b" })
-      expect(A.make).type.not.toBeCallableWith({ a: "a", b: "b" })
-    })
-
-    it("should be compatible with `immer`", () => {
-      class A extends Schema.Class<A>("A")({
-        a: Schema.Struct({ b: Schema.FiniteFromString }).pipe(Schema.optional)
-      }) {
-        [immerable] = true
-      }
-
-      const a = new A({ a: { b: 1 } })
-
-      const modified = produce(a, (draft) => {
-        if (draft.a) {
-          draft.a.b = 2
-        }
+        expect(new A({ a: "a" })).type.toBe<A>()
+        expect(A.make({ a: "a" })).type.toBe<A>()
+        expect(Schema.revealCodec(A)).type.toBe<Schema.Codec<A, { readonly a: string }>>()
+        expect(revealClass(A)).type.toBe<
+          Schema.Class<A, Schema.Struct<{ readonly a: Schema.String }>, A>
+        >()
+        expect(A.fields).type.toBe<{ readonly a: Schema.String }>()
+        expect(A.annotate({})).type.toBe<
+          Schema.decodeTo<
+            Schema.declareConstructor<
+              A,
+              { readonly a: string },
+              readonly [Schema.Struct<{ readonly a: Schema.String }>],
+              { readonly a: string }
+            >,
+            Schema.Struct<{ readonly a: Schema.String }>
+          >
+        >()
       })
 
-      expect(modified).type.toBe<A>()
-    })
-
-    it("mutable field", () => {
-      class A extends Schema.Class<A>("A")({
-        a: Schema.String.pipe(Schema.mutableKey)
-      }) {}
-
-      expect(Schema.revealCodec(A)).type.toBe<Schema.Codec<A, { a: string }>>()
-    })
-
-    it("branded (unique symbol)", () => {
-      class A extends Schema.Class<A>("A")({
-        a: Schema.String
-      }) {}
-      class B extends Schema.Class<B>("B")({
-        a: Schema.String
-      }) {}
-
-      const f = (a: A) => a
-
-      f(A.make({ a: "a" }))
-      f(B.make({ a: "a" }))
-
-      class ABranded extends Schema.Class<ABranded, { readonly brand: unique symbol }>("ABranded")({
-        a: Schema.String
-      }) {}
-      class BBranded extends Schema.Class<BBranded, { readonly brand: unique symbol }>("BBranded")({
-        a: Schema.String
-      }) {}
-
-      const fABranded = (a: ABranded) => a
-
-      fABranded(ABranded.make({ a: "a" }))
-      when(fABranded).isCalledWith(expect(BBranded.make).type.not.toBeCallableWith({ a: "a" }))
-
-      const fBBranded = (a: BBranded) => a
-
-      fBBranded(BBranded.make({ a: "a" }))
-      when(fBBranded).isCalledWith(expect(ABranded.make).type.not.toBeCallableWith({ a: "a" }))
-    })
-
-    it("branded (Brand module)", () => {
-      class ABranded extends Schema.Class<ABranded, Brand.Brand<"A">>("ABranded")({
-        a: Schema.String
-      }) {}
-      class BBranded extends Schema.Class<BBranded, Brand.Brand<"B">>("BBranded")({
-        a: Schema.String
-      }) {}
-
-      const fABranded = (a: ABranded) => a
-
-      fABranded(ABranded.make({ a: "a" }))
-      when(fABranded).isCalledWith(expect(BBranded.make).type.not.toBeCallableWith({ a: "a" }))
-
-      const fBBranded = (a: BBranded) => a
-
-      fBBranded(BBranded.make({ a: "a" }))
-      when(fBBranded).isCalledWith(expect(ABranded.make).type.not.toBeCallableWith({ a: "a" }))
-    })
-
-    it("extend & static members", () => {
-      class A extends Schema.Class<A>("A")({
-        a: Schema.String
-      }) {
-        static readonly aStatic = "value"
-      }
-      class B extends A.extend<B, typeof A>("B")({
-        b: Schema.Number
-      }) {}
-      expect(B.aStatic).type.toBe<"value">()
-    })
-
-    it("extend & branded (unique symbol)", () => {
-      class Common extends Schema.Class<Common>("Common")({
-        a: Schema.String
-      }) {}
-      class E1 extends Common.extend<E1, {}, { readonly brand: unique symbol }>("E1")({
-        b: Schema.String
-      }) {}
-      class E2 extends Common.extend<E2, {}, { readonly brand: unique symbol }>("E2")({
-        b: Schema.String
-      }) {}
-
-      const f1 = (e1: E1) => e1
-
-      f1(E1.make({ a: "a", b: "b" }))
-      when(f1).isCalledWith(expect(E2.make).type.not.toBeCallableWith({ a: "a", b: "b" }))
-
-      const f2 = (e2: E2) => e2
-
-      f2(E2.make({ a: "a", b: "b" }))
-      when(f2).isCalledWith(expect(E1.make).type.not.toBeCallableWith({ a: "a", b: "b" }))
-    })
-  })
-
-  describe("TaggedClass", () => {
-    it("Fields argument", () => {
-      class A extends Schema.TaggedClass<A>()("A", {
-        a: Schema.String
-      }) {}
-
-      expect(Schema.revealCodec(A)).type.toBe<Schema.Codec<A, { readonly _tag: "A"; readonly a: string }>>()
-      expect(revealClass(A)).type.toBe<
-        Schema.Class<A, Schema.TaggedStruct<"A", { readonly a: Schema.String }>, A>
-      >()
-      expect(A.fields).type.toBe<{ readonly _tag: Schema.tag<"A">; readonly a: Schema.String }>()
-    })
-
-    it("Struct argument", () => {
-      class A extends Schema.TaggedClass<A>()(
-        "A",
-        Schema.Struct({
+      it("Struct argument", () => {
+        class A extends Schema.Class<A>("A")(Schema.Struct({
           a: Schema.String
+        })) {}
+
+        expect(new A({ a: "a" })).type.toBe<A>()
+        expect(A.make({ a: "a" })).type.toBe<A>()
+        expect(Schema.revealCodec(A)).type.toBe<Schema.Codec<A, { readonly a: string }>>()
+        expect(revealClass(A)).type.toBe<
+          Schema.Class<A, Schema.Struct<{ readonly a: Schema.String }>, A>
+        >()
+        expect(A.fields).type.toBe<{ readonly a: Schema.String }>()
+      })
+
+      it("mapFields", () => {
+        class A extends Schema.Class<A>("A")({
+          a: Schema.String
+        }) {}
+        const schema = A.mapFields((fields) => ({ ...fields, b: Schema.Number }))
+        expect(schema).type.toBe<Schema.Struct<{ readonly a: Schema.String; readonly b: Schema.Number }>>()
+      })
+
+      it("should reject non existing props", () => {
+        class A extends Schema.Class<A>("A")({
+          a: Schema.String
+        }) {}
+
+        expect(A).type.not.toBeConstructableWith({ a: "a", b: "b" })
+        expect(A.make).type.not.toBeCallableWith({ a: "a", b: "b" })
+      })
+
+      it("should be compatible with `immer`", () => {
+        class A extends Schema.Class<A>("A")({
+          a: Schema.Struct({ b: Schema.FiniteFromString }).pipe(Schema.optional)
+        }) {
+          [immerable] = true
+        }
+
+        const a = new A({ a: { b: 1 } })
+
+        const modified = produce(a, (draft) => {
+          if (draft.a) {
+            draft.a.b = 2
+          }
         })
-      ) {}
 
-      expect(Schema.revealCodec(A)).type.toBe<Schema.Codec<A, { readonly _tag: "A"; readonly a: string }>>()
-      expect(revealClass(A)).type.toBe<
-        Schema.Class<A, Schema.Struct<{ readonly _tag: Schema.tag<"A">; readonly a: Schema.String }>, A>
-      >()
-      expect(A.fields).type.toBe<{ readonly _tag: Schema.tag<"A">; readonly a: Schema.String }>()
+        expect(modified).type.toBe<A>()
+      })
+
+      it("mutable field", () => {
+        class A extends Schema.Class<A>("A")({
+          a: Schema.String.pipe(Schema.mutableKey)
+        }) {}
+
+        expect(Schema.revealCodec(A)).type.toBe<Schema.Codec<A, { a: string }>>()
+      })
+
+      it("branded (unique symbol)", () => {
+        class A extends Schema.Class<A>("A")({
+          a: Schema.String
+        }) {}
+        class B extends Schema.Class<B>("B")({
+          a: Schema.String
+        }) {}
+
+        const f = (a: A) => a
+
+        f(A.make({ a: "a" }))
+        f(B.make({ a: "a" }))
+
+        class ABranded extends Schema.Class<ABranded, { readonly brand: unique symbol }>("ABranded")({
+          a: Schema.String
+        }) {}
+        class BBranded extends Schema.Class<BBranded, { readonly brand: unique symbol }>("BBranded")({
+          a: Schema.String
+        }) {}
+
+        const fABranded = (a: ABranded) => a
+
+        fABranded(ABranded.make({ a: "a" }))
+        expect(fABranded).type.not.toBeCallableWith(BBranded.make({ a: "a" }))
+
+        const fBBranded = (a: BBranded) => a
+
+        fBBranded(BBranded.make({ a: "a" }))
+        expect(fBBranded).type.not.toBeCallableWith(ABranded.make({ a: "a" }))
+      })
+
+      it("branded (Brand module)", () => {
+        class ABranded extends Schema.Class<ABranded, Brand.Brand<"A">>("ABranded")({
+          a: Schema.String
+        }) {}
+        class BBranded extends Schema.Class<BBranded, Brand.Brand<"B">>("BBranded")({
+          a: Schema.String
+        }) {}
+
+        const fABranded = (a: ABranded) => a
+
+        fABranded(ABranded.make({ a: "a" }))
+        expect(fABranded).type.not.toBeCallableWith(BBranded.make({ a: "a" }))
+
+        const fBBranded = (a: BBranded) => a
+
+        fBBranded(BBranded.make({ a: "a" }))
+        expect(fBBranded).type.not.toBeCallableWith(ABranded.make({ a: "a" }))
+      })
+
+      it("extend & static members", () => {
+        class A extends Schema.Class<A>("A")({
+          a: Schema.String
+        }) {
+          static readonly aStatic = "value"
+        }
+        class B extends A.extend<B, typeof A>("B")({
+          b: Schema.Number
+        }) {}
+        expect(B.aStatic).type.toBe<"value">()
+      })
+
+      it("extend Struct argument", () => {
+        class A extends Schema.Class<A>("A")({
+          a: Schema.String
+        }) {}
+        const Extension = Schema.Struct({
+          b: Schema.Number
+        }).check(Schema.makeFilter((input) => {
+          expect(input).type.toBe<{ readonly b: number }>()
+          return input.b > 0
+        }))
+        class B extends A.extend<B>("B")(Extension) {}
+
+        expect(new B({ a: "a", b: 1 })).type.toBe<B>()
+        expect(B.make({ a: "a", b: 1 })).type.toBe<B>()
+        expect(Schema.revealCodec(B)).type.toBe<Schema.Codec<B, { readonly a: string; readonly b: number }>>()
+        expect(B.fields).type.toBe<{ readonly a: Schema.String; readonly b: Schema.Number }>()
+      })
+
+      it("extend & branded (unique symbol)", () => {
+        class Common extends Schema.Class<Common>("Common")({
+          a: Schema.String
+        }) {}
+        class E1 extends Common.extend<E1, {}, { readonly brand: unique symbol }>("E1")({
+          b: Schema.String
+        }) {}
+        class E2 extends Common.extend<E2, {}, { readonly brand: unique symbol }>("E2")({
+          b: Schema.String
+        }) {}
+
+        const f1 = (e1: E1) => e1
+
+        f1(E1.make({ a: "a", b: "b" }))
+        expect(f1).type.not.toBeCallableWith(E2.make({ a: "a", b: "b" }))
+
+        const f2 = (e2: E2) => e2
+
+        f2(E2.make({ a: "a", b: "b" }))
+        expect(f2).type.not.toBeCallableWith(E1.make({ a: "a", b: "b" }))
+      })
     })
-  })
 
-  describe("Error", () => {
-    it("extend Fields", () => {
-      class E extends Schema.ErrorClass<E>("E")({
-        a: Schema.String
-      }) {}
+    describe("TaggedClass", () => {
+      it("Fields argument", () => {
+        class A extends Schema.TaggedClass<A>()("A", {
+          a: Schema.String
+        }) {}
 
-      expect(new E({ a: "a" })).type.toBe<E>()
-      expect(E.make({ a: "a" })).type.toBe<E>()
-      expect(Schema.revealCodec(E)).type.toBe<Schema.Codec<E, { readonly a: string }>>()
+        expect(Schema.revealCodec(A)).type.toBe<Schema.Codec<A, { readonly _tag: "A"; readonly a: string }>>()
+        expect(revealClass(A)).type.toBe<
+          Schema.Class<A, Schema.TaggedStruct<"A", { readonly a: Schema.String }>, A>
+        >()
+        expect(A.fields).type.toBe<{ readonly _tag: Schema.tag<"A">; readonly a: Schema.String }>()
+      })
 
-      expect(Effect.gen(function*() {
-        return yield* new E({ a: "a" })
-      })).type.toBe<Effect.Effect<never, E>>()
+      it("Struct argument", () => {
+        class A extends Schema.TaggedClass<A>()(
+          "A",
+          Schema.Struct({
+            a: Schema.String
+          })
+        ) {}
+
+        expect(Schema.revealCodec(A)).type.toBe<Schema.Codec<A, { readonly _tag: "A"; readonly a: string }>>()
+        expect(revealClass(A)).type.toBe<
+          Schema.Class<A, Schema.Struct<{ readonly _tag: Schema.tag<"A">; readonly a: Schema.String }>, A>
+        >()
+        expect(A.fields).type.toBe<{ readonly _tag: Schema.tag<"A">; readonly a: Schema.String }>()
+      })
     })
 
-    it("extend Struct", () => {
-      class E extends Schema.ErrorClass<E>("E")(Schema.Struct({
-        a: Schema.String
-      })) {}
+    describe("Error", () => {
+      it("extend Fields", () => {
+        class E extends Schema.ErrorClass<E>("E")({
+          a: Schema.String
+        }) {}
 
-      expect(new E({ a: "a" })).type.toBe<E>()
-      expect(E.make({ a: "a" })).type.toBe<E>()
-      expect(Schema.revealCodec(E)).type.toBe<Schema.Codec<E, { readonly a: string }>>()
+        expect(new E({ a: "a" })).type.toBe<E>()
+        expect(E.make({ a: "a" })).type.toBe<E>()
+        expect(Schema.revealCodec(E)).type.toBe<Schema.Codec<E, { readonly a: string }>>()
 
-      expect(Effect.gen(function*() {
-        return yield* new E({ a: "a" })
-      })).type.toBe<Effect.Effect<never, E>>()
+        expect(Effect.gen(function*() {
+          return yield* new E({ a: "a" })
+        })).type.toBe<Effect.Effect<never, E>>()
+      })
+
+      it("extend Struct", () => {
+        class E extends Schema.ErrorClass<E>("E")(Schema.Struct({
+          a: Schema.String
+        })) {}
+
+        expect(new E({ a: "a" })).type.toBe<E>()
+        expect(E.make({ a: "a" })).type.toBe<E>()
+        expect(Schema.revealCodec(E)).type.toBe<Schema.Codec<E, { readonly a: string }>>()
+
+        expect(Effect.gen(function*() {
+          return yield* new E({ a: "a" })
+        })).type.toBe<Effect.Effect<never, E>>()
+      })
+
+      it("should reject non existing props", () => {
+        class E extends Schema.ErrorClass<E>("E")({
+          a: Schema.String
+        }) {}
+
+        expect(E).type.not.toBeConstructableWith({ a: "a", b: "b" })
+        expect(E.make).type.not.toBeCallableWith({ a: "a", b: "b" })
+      })
+
+      it("mutable field", () => {
+        class E extends Schema.ErrorClass<E>("E")({
+          a: Schema.String.pipe(Schema.mutableKey)
+        }) {}
+
+        expect(Schema.revealCodec(E)).type.toBe<Schema.Codec<E, { a: string }>>()
+      })
     })
 
-    it("should reject non existing props", () => {
-      class E extends Schema.ErrorClass<E>("E")({
-        a: Schema.String
-      }) {}
+    describe("MissingSelfGeneric", () => {
+      it("Class", () => {
+        expect(Schema.Class("A")({})).type.toBe(
+          "Missing `Self` generic - use `class Self extends Schema.Class<Self>(...)`"
+        )
+      })
 
-      expect(E).type.not.toBeConstructableWith({ a: "a", b: "b" })
-      expect(E.make).type.not.toBeCallableWith({ a: "a", b: "b" })
-    })
+      it("Base.extend", () => {
+        class Base extends Schema.Class<Base>("Base")({}) {}
+        expect(Base.extend("A")({})).type.toBe(
+          "Missing `Self` generic - use `class Self extends Base.extend<Self>(...)`"
+        )
+      })
 
-    it("mutable field", () => {
-      class E extends Schema.ErrorClass<E>("E")({
-        a: Schema.String.pipe(Schema.mutableKey)
-      }) {}
+      it("TaggedClass", () => {
+        expect(Schema.TaggedClass("A")("A", {})).type.toBe(
+          "Missing `Self` generic - use `class Self extends Schema.TaggedClass<Self>(...)`"
+        )
+      })
 
-      expect(Schema.revealCodec(E)).type.toBe<Schema.Codec<E, { a: string }>>()
+      it("ErrorClass", () => {
+        expect(Schema.ErrorClass("A")({})).type.toBe(
+          "Missing `Self` generic - use `class Self extends Schema.ErrorClass<Self>(...)`"
+        )
+      })
+
+      it("TaggedErrorClass", () => {
+        expect(Schema.TaggedErrorClass("A")("A", {})).type.toBe(
+          "Missing `Self` generic - use `class Self extends Schema.TaggedErrorClass<Self>(...)`"
+        )
+      })
     })
   })
 
@@ -1472,7 +1626,7 @@ describe("Schema", () => {
     })
 
     it("effectful", () => {
-      const service = hole<ServiceMap.Service<"Tag", "-">>()
+      const service = hole<Context.Service<"Tag", "-">>()
 
       const schema = Schema.String.pipe(Schema.withConstructorDefault(
         Effect.gen(function*() {
@@ -1524,6 +1678,41 @@ describe("Schema", () => {
         >
       >()
     })
+
+    it("should support symbol keys", () => {
+      const decoded = Symbol.for("decoded")
+      const encoded = Symbol.for("encoded")
+
+      const source = Schema.Struct({
+        [decoded]: Schema.String
+      }).pipe(Schema.encodeKeys({ [decoded]: "decoded" }))
+
+      expect(source).type.toBe<
+        Schema.decodeTo<
+          Schema.Struct<{
+            readonly [decoded]: Schema.String
+          }>,
+          Schema.Struct<{
+            readonly decoded: Schema.toEncoded<Schema.String>
+          }>
+        >
+      >()
+
+      const destination = Schema.Struct({
+        decoded: Schema.String
+      }).pipe(Schema.encodeKeys({ decoded: encoded }))
+
+      expect(destination).type.toBe<
+        Schema.decodeTo<
+          Schema.Struct<{
+            readonly decoded: Schema.String
+          }>,
+          Schema.Struct<{
+            readonly [encoded]: Schema.toEncoded<Schema.String>
+          }>
+        >
+      >()
+    })
   })
 
   it("tag", () => {
@@ -1555,8 +1744,28 @@ describe("Schema", () => {
     >()
   })
 
+  it("withDecodingDefaultTypeKey", () => {
+    const schema = Schema.Struct({
+      a: Schema.FiniteFromString.pipe(Schema.withDecodingDefaultTypeKey(Effect.succeed(1)))
+    })
+
+    expect(Schema.revealCodec(schema)).type.toBe<
+      Schema.Codec<{ readonly a: number }, { readonly a?: string }, never, never>
+    >()
+  })
+
+  it("withDecodingDefaultType", () => {
+    const schema = Schema.Struct({
+      a: Schema.FiniteFromString.pipe(Schema.withDecodingDefaultType(Effect.succeed(1)))
+    })
+
+    expect(Schema.revealCodec(schema)).type.toBe<
+      Schema.Codec<{ readonly a: number }, { readonly a?: string | undefined }, never, never>
+    >()
+  })
+
   it("asStandardSchemaV1 should not be callable with a schema with DecodingServices", () => {
-    class MagicNumber extends ServiceMap.Service<MagicNumber, number>()("MagicNumber") {}
+    class MagicNumber extends Context.Service<MagicNumber, number>()("MagicNumber") {}
     const DepString = Schema.Number.pipe(Schema.decode({
       decode: SchemaGetter.onSome((n) =>
         Effect.gen(function*() {
@@ -1573,7 +1782,7 @@ describe("Schema", () => {
     it("should not be callable with a schema with wrong type", () => {
       type Int = number & Brand.Brand<"Int">
       const Int = Brand.check<Int>(Schema.isInt())
-      when(Schema.String.pipe).isCalledWith(expect(Schema.fromBrand).type.not.toBeCallableWith("Int", Int))
+      expect(Schema.String.pipe).type.not.toBeCallableWith(Schema.fromBrand("Int", Int))
     })
 
     it("single brand", () => {
@@ -1665,6 +1874,34 @@ describe("Schema", () => {
 
       expect(A.decodeUnknownSync("1")).type.toBe<number>()
       expect(A.encodeSync(1)).type.toBe<string>()
+    })
+  })
+
+  describe("OptionFrom", () => {
+    it("preserves concrete wrapper types", () => {
+      const nullOr = Schema.OptionFromNullOr(Schema.FiniteFromString)
+      expect(nullOr).type.toBe<Schema.OptionFromNullOr<typeof Schema.FiniteFromString>>()
+      expect(nullOr.annotate({})).type.toBe<Schema.OptionFromNullOr<typeof Schema.FiniteFromString>>()
+
+      const undefinedOr = Schema.OptionFromUndefinedOr(Schema.FiniteFromString)
+      expect(undefinedOr).type.toBe<Schema.OptionFromUndefinedOr<typeof Schema.FiniteFromString>>()
+      expect(undefinedOr.annotate({})).type.toBe<Schema.OptionFromUndefinedOr<typeof Schema.FiniteFromString>>()
+
+      const nullishOr = Schema.OptionFromNullishOr(Schema.FiniteFromString)
+      expect(nullishOr).type.toBe<Schema.OptionFromNullishOr<typeof Schema.FiniteFromString>>()
+      expect(nullishOr.annotate({})).type.toBe<Schema.OptionFromNullishOr<typeof Schema.FiniteFromString>>()
+
+      const optionalKey = Schema.OptionFromOptionalKey(Schema.FiniteFromString)
+      expect(optionalKey).type.toBe<Schema.OptionFromOptionalKey<typeof Schema.FiniteFromString>>()
+      expect(optionalKey.annotate({})).type.toBe<Schema.OptionFromOptionalKey<typeof Schema.FiniteFromString>>()
+
+      const optional = Schema.OptionFromOptional(Schema.FiniteFromString)
+      expect(optional).type.toBe<Schema.OptionFromOptional<typeof Schema.FiniteFromString>>()
+      expect(optional.annotate({})).type.toBe<Schema.OptionFromOptional<typeof Schema.FiniteFromString>>()
+
+      const optionalNullOr = Schema.OptionFromOptionalNullOr(Schema.FiniteFromString)
+      expect(optionalNullOr).type.toBe<Schema.OptionFromOptionalNullOr<typeof Schema.FiniteFromString>>()
+      expect(optionalNullOr.annotate({})).type.toBe<Schema.OptionFromOptionalNullOr<typeof Schema.FiniteFromString>>()
     })
   })
 

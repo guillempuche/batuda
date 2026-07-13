@@ -1,8 +1,16 @@
 /**
- * @since 1.0.0
+ * Node socket adapters for Effect sockets.
+ *
+ * This module opens `node:net` connections or wraps existing Node `Duplex`
+ * streams and presents them as `Socket.Socket` values, socket channels, or
+ * layers. It also exposes the current underlying `NetSocket` service for code
+ * running inside a socket handler and re-exports the `ws` package namespace.
+ *
+ * @since 4.0.0
  */
 import type { Array } from "effect"
 import * as Channel from "effect/Channel"
+import * as Context from "effect/Context"
 import * as Deferred from "effect/Deferred"
 import type * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
@@ -12,28 +20,41 @@ import { identity } from "effect/Function"
 import * as Latch from "effect/Latch"
 import * as Layer from "effect/Layer"
 import * as Scope from "effect/Scope"
-import * as ServiceMap from "effect/ServiceMap"
 import * as Socket from "effect/unstable/socket/Socket"
 import * as Net from "node:net"
 import type { Duplex } from "node:stream"
 
 /**
- * @since 1.0.0
  * @category re-exports
+ * @since 4.0.0
  */
 export * as NodeWS from "ws"
 
 /**
- * @since 1.0.0
- * @category tags
+ * Service tag for the underlying Node `net.Socket` associated with the current
+ * socket connection.
+ *
+ * @category services
+ * @since 4.0.0
  */
-export class NetSocket extends ServiceMap.Service<NetSocket, Net.Socket>()(
+export class NetSocket extends Context.Service<NetSocket, Net.Socket>()(
   "@effect/platform-node/NodeSocket/NetSocket"
 ) {}
 
 /**
- * @since 1.0.0
+ * Opens a Node TCP connection as an Effect socket.
+ *
+ * **When to use**
+ *
+ * Use to create a scoped `Socket.Socket` from Node `net.createConnection`.
+ *
+ * **Details**
+ *
+ * Supports `openTimeout` and closes or destroys the underlying socket when the
+ * enclosing scope is finalized.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const makeNet = (
   options: Net.NetConnectOpts & {
@@ -41,11 +62,11 @@ export const makeNet = (
   }
 ): Effect.Effect<Socket.Socket> =>
   fromDuplex(
-    Effect.servicesWith((services: ServiceMap.ServiceMap<Scope.Scope>) => {
+    Effect.contextWith((context: Context.Context<Scope.Scope>) => {
       let conn: Net.Socket | undefined
       return Effect.flatMap(
         Scope.addFinalizer(
-          ServiceMap.get(services, Scope.Scope),
+          Context.get(context, Scope.Scope),
           Effect.sync(() => {
             if (!conn) return
             if (conn.closed === false) {
@@ -77,8 +98,12 @@ export const makeNet = (
   )
 
 /**
- * @since 1.0.0
+ * Adapts a Node `Duplex` into a `Socket.Socket`, wiring data events to socket
+ * handlers, providing a scoped writer, and mapping open, read, write, and close
+ * failures to `SocketError`.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const fromDuplex = <RO>(
   open: Effect.Effect<Duplex, Socket.SocketError, RO>,
@@ -89,7 +114,7 @@ export const fromDuplex = <RO>(
   Effect.withFiber<Socket.Socket, never, Exclude<RO, Scope.Scope>>((fiber) => {
     let currentSocket: Duplex | undefined
     const latch = Latch.makeUnsafe(false)
-    const openServices = fiber.services as ServiceMap.ServiceMap<RO>
+    const openServices = fiber.context as Context.Context<RO>
 
     const run = <R, E, _>(handler: (_: Uint8Array) => Effect.Effect<_, E, R> | void, opts?: {
       readonly onOpen?: Effect.Effect<void> | undefined
@@ -166,7 +191,7 @@ export const fromDuplex = <RO>(
           )
         }
       })).pipe(
-        Effect.updateServices((input: ServiceMap.ServiceMap<R>) => ServiceMap.merge(openServices, input)),
+        Effect.updateContext((input: Context.Context<R>) => Context.merge(openServices, input)),
         Effect.onExit(() =>
           Effect.sync(() => {
             latch.closeUnsafe()
@@ -204,8 +229,7 @@ export const fromDuplex = <RO>(
         })
     )
 
-    return Effect.succeed(Socket.Socket.of({
-      [Socket.TypeId]: Socket.TypeId,
+    return Effect.succeed(Socket.make({
       run,
       runRaw: run,
       writer
@@ -213,8 +237,11 @@ export const fromDuplex = <RO>(
   })
 
 /**
- * @since 1.0.0
+ * Creates a `Channel` over a TCP socket, reading arrays of `Uint8Array`
+ * chunks and writing arrays of bytes, strings, or socket close events.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const makeNetChannel = <IE = never>(
   options: Net.NetConnectOpts
@@ -230,8 +257,11 @@ export const makeNetChannel = <IE = never>(
   )
 
 /**
- * @since 1.0.0
+ * Provides a `Socket.Socket` by opening a TCP connection with the supplied
+ * Node `net` connection options.
+ *
  * @category layers
+ * @since 4.0.0
  */
 export const layerNet: (options: Net.NetConnectOpts) => Layer.Layer<
   Socket.Socket,

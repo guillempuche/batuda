@@ -1,4 +1,13 @@
 /**
+ * Controllable `Clock` service for tests.
+ *
+ * Instead of waiting for real time to pass, effects that use `Effect.sleep`,
+ * timeouts, schedules, retries, and other time-based operators can be driven by
+ * advancing the test clock. This makes time-based tests deterministic and fast.
+ * The module also includes helpers for moving test time, temporarily using the
+ * live clock, and warning when a test appears to be waiting on time without
+ * advancing it.
+ *
  * @since 2.0.0
  */
 import * as Arr from "../Array.ts"
@@ -14,16 +23,26 @@ import * as Order from "../Order.ts"
 import * as Semaphore from "../Semaphore.ts"
 
 /**
- * A `TestClock` simplifies deterministically and efficiently testing effects
- * which involve the passage of time.
+ * A `TestClock` simplifies deterministic and efficient testing of effects that
+ * involve the passage of time.
+ *
+ * **Details**
  *
  * Instead of waiting for actual time to pass, `sleep` and methods implemented
- * in terms of it schedule effects to take place at a given clock time. Users
- * can adjust the clock time using the `adjust` and `setTime` methods, and all
- * effects scheduled to take place on or before that time will automatically be
- * run in order.
+ * in terms of it schedule effects to take place at a given clock time. Use
+ * `adjust` and `setTime` to move clock time, and all effects scheduled to take
+ * place on or before that time will automatically run in order.
  *
- * For example, here is how we can test `Effect.timeout` using `TestClock`:
+ * **Gotchas**
+ *
+ * Calls to `sleep` and methods derived from it will semantically block until
+ * the time is set to on or after the time they are scheduled to run. Fork the
+ * effect being tested, then adjust the clock time, and finally verify that the
+ * expected effects have been performed.
+ *
+ * **Example** (Testing timeouts deterministically)
+ *
+ * Tests `Effect.timeout` using `TestClock`.
  *
  * ```ts
  * import { Effect, Fiber, Option, pipe } from "effect"
@@ -42,15 +61,8 @@ import * as Semaphore from "../Semaphore.ts"
  * })
  * ```
  *
- * Note how we forked the fiber that `sleep` was invoked on. Calls to `sleep`
- * and methods derived from it will semantically block until the time is set to
- * on or after the time they are scheduled to run. If we didn't fork the fiber
- * on which we called sleep we would never get to set the time on the line
- * below. Thus, a useful pattern when using `TestClock` is to fork the effect
- * being tested, then adjust the clock time, and finally verify that the
- * expected effects have been performed.
+ * **Example** (Advancing time deterministically)
  *
- * @example
  * ```ts
  * import { Effect } from "effect"
  * import { TestClock } from "effect/testing"
@@ -72,8 +84,8 @@ import * as Semaphore from "../Semaphore.ts"
  * })
  * ```
  *
- * @since 2.0.0
  * @category models
+ * @since 2.0.0
  */
 export interface TestClock extends Clock.Clock {
   /**
@@ -95,7 +107,10 @@ export interface TestClock extends Clock.Clock {
 }
 
 /**
- * @example
+ * Namespace containing `TestClock` configuration and state types.
+ *
+ * **Example** (Configuring a test clock)
+ *
  * ```ts
  * import { Effect } from "effect"
  * import { TestClock } from "effect/testing"
@@ -112,12 +127,16 @@ export interface TestClock extends Clock.Clock {
  * })
  * ```
  *
- * @since 4.0.0
- * @category models
+ * @since 2.0.0
  */
 export declare namespace TestClock {
   /**
-   * @example
+   * Options used when constructing a `TestClock`. `warningDelay` controls how
+   * long the live clock waits before logging a warning when a test uses time
+   * without advancing the test clock.
+   *
+   * **Example** (Configuring the warning delay)
+   *
    * ```ts
    * import { Effect } from "effect"
    * import { TestClock } from "effect/testing"
@@ -133,8 +152,8 @@ export declare namespace TestClock {
    * })
    * ```
    *
+   * @category options
    * @since 4.0.0
-   * @category models
    */
   export interface Options {
     /**
@@ -145,24 +164,12 @@ export declare namespace TestClock {
   }
 
   /**
-   * @example
-   * ```ts
-   * import { Effect } from "effect"
-   * import { TestClock } from "effect/testing"
+   * Represents the state tracked by a `TestClock`, including the current
+   * millisecond timestamp and the sleeps scheduled to resume when the clock
+   * reaches their target time.
    *
-   * const program = Effect.gen(function*() {
-   *   const testClock = yield* TestClock.make()
-   *
-   *   // The state represents the current timestamp and scheduled sleeps
-   *   const timestamp = testClock.currentTimeMillisUnsafe()
-   *   console.log(timestamp) // Current test time
-   *
-   *   // Internal state structure: { timestamp: number, sleeps: Array<[number, Latch.Latch]> }
-   * })
-   * ```
-   *
-   * @since 4.0.0
    * @category models
+   * @since 4.0.0
    */
   export interface State {
     readonly timestamp: number
@@ -190,7 +197,8 @@ const SleepOrder = Order.flip(Order.Struct({
 /**
  * Creates a `TestClock` with optional configuration.
  *
- * @example
+ * **Example** (Creating a test clock)
+ *
  * ```ts
  * import { Effect } from "effect"
  * import { TestClock } from "effect/testing"
@@ -211,8 +219,8 @@ const SleepOrder = Order.flip(Order.Struct({
  * })
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const make = Effect.fnUntraced(function*(
   options?: TestClock.Options
@@ -235,7 +243,7 @@ export const make = Effect.fnUntraced(function*(
   }
 
   function currentTimeNanosUnsafe(): bigint {
-    return BigInt(currentTimestamp * 1000000)
+    return BigInt(Math.floor(currentTimestamp * 1000000))
   }
 
   const currentTimeMillis = Effect.sync(currentTimeMillisUnsafe)
@@ -307,7 +315,7 @@ export const make = Effect.fnUntraced(function*(
 
   const runSemaphore = yield* Semaphore.make(1)
   const run = Effect.fnUntraced(function*(step: (currentTimestamp: number) => number) {
-    yield* Fiber.await(yield* Effect.forkScoped(Effect.yieldNow))
+    yield* Fiber.await(yield* Effect.forkChild(Effect.yieldNow))
     const endTimestamp = step(currentTimestamp)
     while (Arr.isArrayNonEmpty(sleeps)) {
       if (Arr.lastNonEmpty(sleeps).timestamp > endTimestamp) break
@@ -345,7 +353,8 @@ export const make = Effect.fnUntraced(function*(
 /**
  * Creates a `Layer` which constructs a `TestClock`.
  *
- * @example
+ * **Example** (Providing a test clock layer)
+ *
  * ```ts
  * import { Effect } from "effect"
  * import { TestClock } from "effect/testing"
@@ -364,8 +373,8 @@ export const make = Effect.fnUntraced(function*(
  * }).pipe(Effect.provide(testClockLayer))
  * ```
  *
- * @since 4.0.0
  * @category layers
+ * @since 4.0.0
  */
 export const layer: (options?: TestClock.Options) => Layer.Layer<TestClock> = flow(
   make,
@@ -376,7 +385,8 @@ export const layer: (options?: TestClock.Options) => Layer.Layer<TestClock> = fl
  * Retrieves the `TestClock` service for this test and uses it to run the
  * specified workflow.
  *
- * @example
+ * **Example** (Accessing the test clock)
+ *
  * ```ts
  * import { Effect } from "effect"
  * import { TestClock } from "effect/testing"
@@ -394,8 +404,8 @@ export const layer: (options?: TestClock.Options) => Layer.Layer<TestClock> = fl
  * })
  * ```
  *
+ * @category testing
  * @since 2.0.0
- * @category utils
  */
 export const testClockWith = <A, E, R>(
   f: (testClock: TestClock) => Effect.Effect<A, E, R>
@@ -406,7 +416,8 @@ export const testClockWith = <A, E, R>(
  * by the specified duration, running any actions scheduled for on or before
  * the new time in order.
  *
- * @example
+ * **Example** (Advancing the test clock)
+ *
  * ```ts
  * import { Effect } from "effect"
  * import { TestClock } from "effect/testing"
@@ -428,8 +439,8 @@ export const testClockWith = <A, E, R>(
  * })
  * ```
  *
+ * @category testing
  * @since 2.0.0
- * @category utils
  */
 export const adjust = (duration: Duration.Input): Effect.Effect<void> =>
   testClockWith((testClock) => testClock.adjust(duration))
@@ -438,7 +449,8 @@ export const adjust = (duration: Duration.Input): Effect.Effect<void> =>
  * Sets the current clock time to the specified `timestamp`. Any effects that
  * were scheduled to occur on or before the new time will be run in order.
  *
- * @example
+ * **Example** (Setting the test clock time)
+ *
  * ```ts
  * import { Duration, Effect } from "effect"
  * import { TestClock } from "effect/testing"
@@ -461,8 +473,8 @@ export const adjust = (duration: Duration.Input): Effect.Effect<void> =>
  * })
  * ```
  *
+ * @category testing
  * @since 2.0.0
- * @category utils
  */
 export const setTime = (timestamp: number): Effect.Effect<void> =>
   testClockWith((testClock) => testClock.setTime(timestamp))
@@ -471,7 +483,8 @@ export const setTime = (timestamp: number): Effect.Effect<void> =>
  * Executes the specified effect with the live `Clock` instead of the
  * `TestClock`.
  *
- * @example
+ * **Example** (Running with the live clock)
+ *
  * ```ts
  * import { Clock, Effect } from "effect"
  * import { TestClock } from "effect/testing"
@@ -494,8 +507,8 @@ export const setTime = (timestamp: number): Effect.Effect<void> =>
  * })
  * ```
  *
- * @since 2.0.0
- * @category utils
+ * @category testing
+ * @since 4.0.0
  */
 export const withLive = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
   testClockWith((testClock) => testClock.withLive(effect))

@@ -1,9 +1,20 @@
 /**
- * @since 1.0.0
+ * Bun implementation of the Effect `HttpServer`.
+ *
+ * `make` creates a scoped HTTP server from `Bun.serve`, converting Bun
+ * `Request` values into `HttpServerRequest` values and Effect
+ * `HttpServerResponse` values back into Web `Response` values. The server
+ * supports streaming bodies, multipart requests, file responses through
+ * `BunHttpPlatform`, and WebSocket upgrades. This module also provides layers
+ * for the server alone, the Bun HTTP support services, the combined server,
+ * configurable server options, and a test server with an HTTP client.
+ *
+ * @since 4.0.0
  */
 import type { Server as BunServer, ServerWebSocket } from "bun"
 import * as Config from "effect/Config"
 import type { ConfigError } from "effect/Config"
+import * as Context from "effect/Context"
 import * as Deferred from "effect/Deferred"
 import * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
@@ -20,7 +31,6 @@ import type * as Record from "effect/Record"
 import type * as Schema from "effect/Schema"
 import * as Scope from "effect/Scope"
 import * as Semaphore from "effect/Semaphore"
-import * as ServiceMap from "effect/ServiceMap"
 import * as Stream from "effect/Stream"
 import * as Cookies from "effect/unstable/http/Cookies"
 import * as Etag from "effect/unstable/http/Etag"
@@ -44,8 +54,10 @@ import * as BunServices from "./BunServices.ts"
 import * as BunStream from "./BunStream.ts"
 
 /**
- * @since 1.0.0
- * @category Options
+ * Bun serve options accepted by the HTTP server, extended with typed route definitions.
+ *
+ * @category options
+ * @since 4.0.0
  */
 export type ServeOptions<R extends string> =
   & (
@@ -55,8 +67,10 @@ export type ServeOptions<R extends string> =
   & { readonly routes?: Bun.Serve.Routes<WebSocketContext, R> }
 
 /**
- * @since 1.0.0
- * @category Constructors
+ * Creates a scoped Bun `HttpServer` from `Bun.serve` options, stopping the server on scope finalization with optional graceful shutdown settings.
+ *
+ * @category constructors
+ * @since 4.0.0
  */
 export const make = Effect.fnUntraced(
   function*<R extends string>(
@@ -112,8 +126,8 @@ export const make = Effect.fnUntraced(
       address: { _tag: "TcpAddress", port: server.port!, hostname: server.hostname! },
       serve: Effect.fnUntraced(function*(httpApp, middleware) {
         const parent = yield* Effect.fiber
-        const services = parent.services
-        const serveScope = ServiceMap.getUnsafe(services, Scope.Scope)
+        const services = parent.context
+        const serveScope = Context.getUnsafe(services, Scope.Scope)
         const scope = Scope.forkUnsafe(serveScope, "parallel")
 
         const httpEffect = HttpEffect.toHandled(httpApp, (request, response) =>
@@ -128,7 +142,7 @@ export const make = Effect.fnUntraced(
               ServerRequest.HttpServerRequest.key,
               new BunServerRequest(request, resolve, removeHost(request.url), server)
             )
-            const fiber = Fiber.runIn(Effect.runForkWith(ServiceMap.makeUnsafe<any>(map))(httpEffect), scope)
+            const fiber = Fiber.runIn(Effect.runForkWith(Context.makeUnsafe<any>(map))(httpEffect), scope)
             request.signal.addEventListener("abort", () => {
               fiber.interruptUnsafe(parent.id, Error.ClientAbort.annotation)
             }, { once: true })
@@ -150,7 +164,7 @@ export const make = Effect.fnUntraced(
 const makeResponse = (
   request: ServerRequest.HttpServerRequest,
   response: ServerResponse.HttpServerResponse,
-  services: ServiceMap.ServiceMap<never>,
+  context: Context.Context<never>,
   scope: Scope.Scope
 ): Response => {
   const fields: {
@@ -201,7 +215,7 @@ const makeResponse = (
             Fiber.runIn(fiber, scope)
             return Effect.succeed(body.stream)
           })),
-          services
+          context
         ),
         fields
       )
@@ -210,8 +224,10 @@ const makeResponse = (
 }
 
 /**
- * @since 1.0.0
- * @category Layers
+ * Layer that provides only `HttpServer` by constructing a scoped Bun server from the supplied serve options.
+ *
+ * @category layers
+ * @since 4.0.0
  */
 export const layerServer: <R extends string>(
   options: ServeOptions<R> & {
@@ -221,8 +237,10 @@ export const layerServer: <R extends string>(
 ) => Layer.Layer<Server.HttpServer> = flow(make, Layer.effect(Server.HttpServer)) as any
 
 /**
- * @since 1.0.0
- * @category Layers
+ * Layer that provides Bun HTTP support services: `HttpPlatform`, weak ETag generation, and `BunServices`.
+ *
+ * @category layers
+ * @since 4.0.0
  */
 export const layerHttpServices: Layer.Layer<
   | HttpPlatform
@@ -235,8 +253,10 @@ export const layerHttpServices: Layer.Layer<
 )
 
 /**
- * @since 1.0.0
- * @category Layers
+ * Layer that provides a Bun `HttpServer` together with the Bun HTTP platform, ETag generator, and Bun services.
+ *
+ * @category layers
+ * @since 4.0.0
  */
 export const layer = <R extends string>(
   options: ServeOptions<R> & {
@@ -251,8 +271,10 @@ export const layer = <R extends string>(
 > => Layer.mergeAll(layerServer(options), layerHttpServices)
 
 /**
- * @since 1.0.0
- * @category Layers
+ * Layer that starts a Bun HTTP server on an ephemeral port for tests.
+ *
+ * @category layers
+ * @since 4.0.0
  */
 export const layerTest: Layer.Layer<
   Server.HttpServer | HttpPlatform | FileSystem.FileSystem | Etag.Generator | Path.Path | HttpClient
@@ -264,8 +286,10 @@ export const layerTest: Layer.Layer<
 )
 
 /**
- * @since 1.0.0
- * @category Layers
+ * Creates the Bun HTTP server and support-services layer from configurable serve options.
+ *
+ * @category layers
+ * @since 4.0.0
  */
 export const layerConfig = <R extends string>(
   options: Config.Wrap<
@@ -279,7 +303,7 @@ export const layerConfig = <R extends string>(
   ConfigError
 > =>
   Layer.mergeAll(
-    Layer.effect(Server.HttpServer)(Effect.flatMap(Config.unwrap(options).asEffect(), make)),
+    Layer.effect(Server.HttpServer)(Effect.flatMap(Config.unwrap(options), make)),
     layerHttpServices
   )
 
@@ -374,7 +398,7 @@ class BunServerRequest extends Inspectable.Class implements ServerRequest.HttpSe
   get stream(): Stream.Stream<Uint8Array, Error.HttpServerError> {
     return this.source.body
       ? BunStream.fromReadableStream({
-        evaluate: () => this.source.body as any,
+        evaluate: () => this.source.body ?? emptyReadbleStream,
         onError: (cause) =>
           new Error.HttpServerError({
             reason: new Error.RequestParseError({
@@ -483,6 +507,7 @@ class BunServerRequest extends Inspectable.Class implements ServerRequest.HttpSe
           })
       })
     ))
+    this.textEffect = Effect.map(this.arrayBufferEffect, (_) => new TextDecoder().decode(_))
     return this.arrayBufferEffect
   }
 
@@ -550,14 +575,7 @@ class BunServerRequest extends Inspectable.Class implements ServerRequest.HttpSe
           semaphore.withPermits(1)
         )
 
-        const encoder = new TextEncoder()
-        const run = <R, E, _>(handler: (_: Uint8Array) => Effect.Effect<_, E, R> | void, opts?: {
-          readonly onOpen?: Effect.Effect<void> | undefined
-        }) => runRaw((data) => typeof data === "string" ? handler(encoder.encode(data)) : handler(data), opts)
-
-        return Socket.Socket.of({
-          [Socket.TypeId]: Socket.TypeId as typeof Socket.TypeId,
-          run,
+        return Socket.make({
           runRaw,
           writer
         })
@@ -565,6 +583,13 @@ class BunServerRequest extends Inspectable.Class implements ServerRequest.HttpSe
     })
   }
 }
+
+const emptyReadbleStream = new ReadableStream({
+  start(controller) {
+    controller.enqueue(new Uint8Array())
+    controller.close()
+  }
+})
 
 const removeHost = (url: string) => {
   if (url[0] === "/") {

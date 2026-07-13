@@ -5,7 +5,7 @@
  * and pass them to `LanguageModel.generateText`.
  */
 import { OpenAiClient, OpenAiLanguageModel, OpenAiTool } from "@effect/ai-openai"
-import { Config, Effect, Layer, Schema, ServiceMap } from "effect"
+import { Config, Context, Effect, Layer, Schema } from "effect"
 import { AiError, LanguageModel, Tool, Toolkit } from "effect/unstable/ai"
 import { FetchHttpClient } from "effect/unstable/http"
 
@@ -110,7 +110,7 @@ export class ProductAssistantError extends Schema.TaggedErrorClass<ProductAssist
 ) {}
 
 // Wrap tool-enabled generation in a service
-export class ProductAssistant extends ServiceMap.Service<ProductAssistant, {
+export class ProductAssistant extends Context.Service<ProductAssistant, {
   answer(question: string): Effect.Effect<{
     readonly text: string
     readonly toolCallCount: number
@@ -123,7 +123,7 @@ export class ProductAssistant extends ServiceMap.Service<ProductAssistant, {
       const toolkit = yield* ProductToolkit
 
       // Choose a model to use
-      const model = yield* OpenAiLanguageModel.model("gpt-5.2")
+      const model = yield* OpenAiLanguageModel.model("gpt-5.2").captureRequirements
 
       const answer = Effect.fn("ProductAssistant.answer")(
         function*(question: string) {

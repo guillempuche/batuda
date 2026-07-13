@@ -1,5 +1,10 @@
 /**
- * @since 1.0.0
+ * React helpers for creating Atom instances that belong to one component
+ * subtree. `make` returns a scoped atom with a provider, context, and `use`
+ * accessor. Each provider creates its own Atom once, so different subtrees can
+ * use the same scoped atom definition without sharing state.
+ *
+ * @since 4.0.0
  */
 "use client"
 
@@ -7,35 +12,42 @@ import type * as Atom from "effect/unstable/reactivity/Atom"
 import * as React from "react"
 
 /**
- * @since 1.0.0
- * @category Type IDs
+ * Literal type used as the `ScopedAtom` type identifier.
  *
- * Type identifier for ScopedAtom.
+ * **Details**
+ *
+ * Used as the computed property key and marker value stored on `ScopedAtom`
+ * objects.
+ *
+ * @category type IDs
+ * @since 4.0.0
  */
 export type TypeId = "~@effect/atom-react/ScopedAtom"
 
 /**
- * @since 1.0.0
- * @category Type IDs
- *
  * Type identifier for ScopedAtom.
+ *
+ * **Details**
+ *
+ * Used as the computed property key and marker value stored on `ScopedAtom`
+ * objects.
+ *
+ * @category type IDs
+ * @since 4.0.0
  */
 export const TypeId: TypeId = "~@effect/atom-react/ScopedAtom"
 
 /**
- * @since 1.0.0
- * @category models
- *
  * Scoped Atom interface with a provider-backed instance.
  *
- * @example
- * ```ts
- * import * as Atom from "effect/unstable/reactivity/Atom"
- * import * as React from "react"
- * import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
- * import { useAtomValue } from "@effect/atom-react"
+ * **Example** (Providing and reading a scoped atom)
  *
- * const Counter = ScopedAtom.make(() => Atom.make(0))
+ * ```ts
+ * import { make, useAtomValue } from "@effect/atom-react"
+ * import { Atom } from "effect/unstable/reactivity"
+ * import * as React from "react"
+ *
+ * const Counter = make(() => Atom.make(0))
  *
  * function View() {
  *   const atom = Counter.use()
@@ -47,29 +59,45 @@ export const TypeId: TypeId = "~@effect/atom-react/ScopedAtom"
  *   return React.createElement(Counter.Provider, null, React.createElement(View))
  * }
  * ```
+ *
+ * @category models
+ * @since 4.0.0
  */
 export interface ScopedAtom<A extends Atom.Atom<any>, Input = never> {
   readonly [TypeId]: TypeId
   use(): A
-  Provider: Input extends never ? React.FC<{ readonly children?: React.ReactNode | undefined }>
+  Provider: [Input] extends [never] ? React.FC<{ readonly children?: React.ReactNode | undefined }>
     : React.FC<{ readonly children?: React.ReactNode | undefined; readonly value: Input }>
   Context: React.Context<A>
 }
 
 /**
- * @since 1.0.0
- * @category constructors
- *
  * Creates a ScopedAtom from a factory function.
  *
- * @example
- * ```ts
- * import * as Atom from "effect/unstable/reactivity/Atom"
- * import * as React from "react"
- * import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
- * import { useAtomValue } from "@effect/atom-react"
+ * **When to use**
  *
- * const User = ScopedAtom.make((name: string) => Atom.make(name))
+ * Use to create an atom instance that is owned by a React provider and scoped
+ * to a component subtree.
+ *
+ * **Details**
+ *
+ * The returned scoped atom includes a `Provider`, `Context`, and `use`
+ * accessor. The provider creates the atom once for its lifetime, passing the
+ * `value` prop to the factory when the scoped atom expects input.
+ *
+ * **Gotchas**
+ *
+ * `use` must run under the matching provider. Changing the provider `value`
+ * prop after mount does not recreate the atom.
+ *
+ * **Example** (Creating a scoped atom with input)
+ *
+ * ```ts
+ * import { make, useAtomValue } from "@effect/atom-react"
+ * import { Atom } from "effect/unstable/reactivity"
+ * import * as React from "react"
+ *
+ * const User = make((name: string) => Atom.make(name))
  *
  * function UserName() {
  *   const atom = User.use()
@@ -85,6 +113,9 @@ export interface ScopedAtom<A extends Atom.Atom<any>, Input = never> {
  *   )
  * }
  * ```
+ *
+ * @category constructors
+ * @since 4.0.0
  */
 export const make = <A extends Atom.Atom<any>, Input = never>(
   f: (() => A) | ((input: Input) => A)

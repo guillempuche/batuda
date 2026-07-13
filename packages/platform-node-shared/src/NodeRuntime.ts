@@ -1,12 +1,23 @@
 /**
- * @since 1.0.0
+ * Node-compatible process runner for Effect programs.
+ *
+ * This module provides the shared `runMain` implementation used by
+ * Node-compatible platform packages. It runs one Effect as the main process
+ * fiber, interrupts that fiber on `SIGINT` or `SIGTERM`, and delegates final
+ * exit-code handling to the configured teardown.
+ *
+ * @since 4.0.0
  */
 import type { Effect } from "effect/Effect"
 import * as Runtime from "effect/Runtime"
 
 /**
- * @since 1.0.0
- * @category Run main
+ * Runs an Effect as the Node process main program, interrupting the fiber on
+ * `SIGINT` or `SIGTERM` and invoking the configured teardown to determine the
+ * process exit code.
+ *
+ * @category running
+ * @since 4.0.0
  */
 export const runMain: {
   (
@@ -29,10 +40,8 @@ export const runMain: {
   let receivedSignal = false
 
   fiber.addObserver((exit) => {
-    if (!receivedSignal) {
-      process.removeListener("SIGINT", onSigint)
-      process.removeListener("SIGTERM", onSigint)
-    }
+    process.removeListener("SIGINT", onSigint)
+    process.removeListener("SIGTERM", onSigint)
     teardown(exit, (code) => {
       if (receivedSignal || code !== 0) {
         process.exit(code)
@@ -42,8 +51,6 @@ export const runMain: {
 
   function onSigint() {
     receivedSignal = true
-    process.removeListener("SIGINT", onSigint)
-    process.removeListener("SIGTERM", onSigint)
     fiber.interruptUnsafe(fiber.id)
   }
 

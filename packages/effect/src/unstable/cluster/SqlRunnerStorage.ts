@@ -1,4 +1,12 @@
 /**
+ * Stores cluster runner registration and shard ownership in SQL.
+ *
+ * The SQL-backed `RunnerStorage` records runners, health flags, machine ids,
+ * and shard locks so multiple processes can coordinate which runner owns each
+ * shard. This module creates the required runner and lock tables, supports an
+ * optional table prefix, uses advisory locks for PostgreSQL and MySQL when
+ * enabled, and provides constructors and layers for the storage service.
+ *
  * @since 4.0.0
  */
 import * as Arr from "../../Array.ts"
@@ -18,13 +26,39 @@ import * as ShardingConfig from "./ShardingConfig.ts"
 const withTracerDisabled = Effect.withTracerEnabled(false)
 
 /**
+ * Creates a SQL-backed `RunnerStorage` implementation for registered runners and
+ * shard locks, using the configured table prefix and advisory locks where
+ * supported and enabled.
+ *
+ * **When to use**
+ *
+ * Use to create a SQL-backed `RunnerStorage` value directly when building
+ * custom service or layer composition around the storage implementation.
+ *
+ * **Details**
+ *
+ * When `prefix` is omitted, `make` uses the `cluster` prefix, creating
+ * `cluster_runners` and `cluster_locks`. PostgreSQL and MySQL use advisory
+ * locks unless `ShardingConfig.shardLockDisableAdvisory` is enabled; other
+ * dialects use rows in the locks table.
+ *
+ * **Gotchas**
+ *
+ * Changing `prefix` changes both generated table names, so runners using
+ * different prefixes do not share registrations or shard locks.
+ *
+ * @see {@link layer} for the default SQL-backed storage layer
+ * @see {@link layerWith} for a SQL-backed storage layer with a custom table prefix
+ *
+ * @category constructors
  * @since 4.0.0
- * @category Constructors
  */
 export const make = Effect.fnUntraced(function*(options: {
   readonly prefix?: string | undefined
 }) {
   const config = yield* ShardingConfig.ShardingConfig
+  const shardGroups = ShardingConfig.shardGroupConfig(config)
+  const availableShardGroups = Array.from(shardGroups.available)
   const disableAdvisoryLocks = config.shardLockDisableAdvisory
   const sql = (yield* SqlClient.SqlClient).withoutTransforms()
   const prefix = options?.prefix ?? "cluster"
@@ -391,8 +425,8 @@ export const make = Effect.fnUntraced(function*(options: {
 
   const lockNumbers = new Map<string, number>()
   const lockNumbersReverse = new Map<number, string>()
-  for (let i = 0; i < config.shardGroups.length; i++) {
-    const group = config.shardGroups[i]
+  for (let i = 0; i < availableShardGroups.length; i++) {
+    const group = availableShardGroups[i]
     const base = (i + 1) * 1000000
     for (let shard = 1; shard <= config.shardsPerGroup; shard++) {
       const shardId = ShardId.make(group, shard).toString()
@@ -407,8 +441,8 @@ export const make = Effect.fnUntraced(function*(options: {
   const lockNamesReverse = new Map<string, string>()
   {
     let index = 0
-    for (let i = 0; i < config.shardGroups.length; i++) {
-      const group = config.shardGroups[i]
+    for (let i = 0; i < availableShardGroups.length; i++) {
+      const group = availableShardGroups[i]
       for (let shard = 1; shard <= config.shardsPerGroup; shard++) {
         const shardId = ShardId.make(group, shard).toString()
         const lockName = `${prefix}.${shardId}`
@@ -536,7 +570,8 @@ export const make = Effect.fnUntraced(function*(options: {
         shardIds.length > 0 ?
           Effect.andThen(refreshShards(address, shardIds)) :
           Effect.as([]),
-        PersistenceError.refail
+        PersistenceError.refail,
+        withTracerDisabled
       ),
 
     release: sql.onDialectOrElse({
@@ -544,7 +579,8 @@ export const make = Effect.fnUntraced(function*(options: {
         if (disableAdvisoryLocks) {
           return (address: string, shardId: string) =>
             sql`DELETE FROM ${locksTableSql} WHERE address = ${address} AND shard_id = ${shardId}`.pipe(
-              PersistenceError.refail
+              PersistenceError.refail,
+              withTracerDisabled
             )
         }
         return Effect.fnUntraced(
@@ -564,14 +600,16 @@ export const make = Effect.fnUntraced(function*(options: {
           },
           Effect.onError(() => lockConn!.rebuildUnsafe()),
           Effect.asVoid,
-          PersistenceError.refail
+          PersistenceError.refail,
+          withTracerDisabled
         )
       },
       mysql: () => {
         if (disableAdvisoryLocks) {
           return (address: string, shardId: string) =>
             sql`DELETE FROM ${locksTableSql} WHERE address = ${address} AND shard_id = ${shardId}`.pipe(
-              PersistenceError.refail
+              PersistenceError.refail,
+              withTracerDisabled
             )
         }
         return Effect.fnUntraced(
@@ -589,12 +627,14 @@ export const make = Effect.fnUntraced(function*(options: {
           },
           Effect.onError(() => lockConn!.rebuildUnsafe()),
           Effect.asVoid,
-          PersistenceError.refail
+          PersistenceError.refail,
+          withTracerDisabled
         )
       },
       orElse: () => (address, shardId) =>
         sql`DELETE FROM ${locksTableSql} WHERE address = ${address} AND shard_id = ${shardId}`.pipe(
-          PersistenceError.refail
+          PersistenceError.refail,
+          withTracerDisabled
         )
     }),
 
@@ -637,8 +677,10 @@ export const make = Effect.fnUntraced(function*(options: {
 }, withTracerDisabled)
 
 /**
+ * Layer that provides SQL-backed `RunnerStorage` using the default table prefix.
+ *
+ * @category layers
  * @since 4.0.0
- * @category Layers
  */
 export const layer: Layer.Layer<
   RunnerStorage.RunnerStorage,
@@ -647,8 +689,10 @@ export const layer: Layer.Layer<
 > = Layer.effect(RunnerStorage.RunnerStorage)(make({}))
 
 /**
+ * Layer that provides SQL-backed `RunnerStorage` using a custom table prefix.
+ *
+ * @category layers
  * @since 4.0.0
- * @category Layers
  */
 export const layerWith = (options: {
   readonly prefix?: string | undefined

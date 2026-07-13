@@ -4,7 +4,7 @@ import * as HashMap from "effect/HashMap"
 import * as Option from "effect/Option"
 import { describe, expect, it } from "vitest"
 
-describe("Equal - Structural Equality Behavior", () => {
+describe("Equal.equals", () => {
   describe("plain objects", () => {
     it("should return true for structurally identical objects (structural equality)", () => {
       const obj1 = { a: 1, b: 2 }
@@ -1195,6 +1195,12 @@ describe("Equal - Structural Equality Behavior", () => {
 
       // This should not throw due to stack overflow
       expect(() => Equal.equals(arr1, arr2)).not.toThrow()
+      expect(Equal.equals(arr1, arr2)).toBe(true)
+    })
+
+    it("should handle Uint8Array", () => {
+      const arr1: Uint8Array = new Uint8Array([1, 2, 3])
+      const arr2: Uint8Array = new Uint8Array([1, 2, 3])
       expect(Equal.equals(arr1, arr2)).toBe(true)
     })
 

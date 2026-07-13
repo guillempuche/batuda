@@ -1,4 +1,12 @@
 /**
+ * Typed failure model for Effect HTTP client operations.
+ *
+ * HTTP clients wrap request construction, transport, status-code validation, and
+ * response decoding failures in `HttpClientError`. The wrapper keeps the failed
+ * request and the specific failure reason together, so callers can handle client
+ * failures uniformly while still matching on the reason `_tag` for retry
+ * policy, logging, metrics, and user-facing messages.
+ *
  * @since 4.0.0
  */
 import * as Data from "../../Data.ts"
@@ -10,14 +18,18 @@ import type * as ClientResponse from "./HttpClientResponse.ts"
 const TypeId = "~effect/http/HttpClientError"
 
 /**
- * @since 4.0.0
+ * Returns `true` when a value is an `HttpClientError`.
+ *
  * @category guards
+ * @since 4.0.0
  */
 export const isHttpClientError = (u: unknown): u is HttpClientError => hasProperty(u, TypeId)
 
 /**
+ * Error wrapper for HTTP client failures, exposing the failed request and the optional response through its `reason`.
+ *
+ * @category errors
  * @since 4.0.0
- * @category error
  */
 export class HttpClientError extends Data.TaggedError("HttpClientError")<{
   readonly reason: HttpClientErrorReason
@@ -36,11 +48,15 @@ export class HttpClientError extends Data.TaggedError("HttpClientError")<{
   }
 
   /**
+   * Marks this value as an HTTP client error for runtime guards.
+   *
    * @since 4.0.0
    */
   readonly [TypeId] = TypeId
 
   /**
+   * HTTP request associated with the client failure.
+   *
    * @since 4.0.0
    */
   get request(): HttpClientRequest.HttpClientRequest {
@@ -48,6 +64,8 @@ export class HttpClientError extends Data.TaggedError("HttpClientError")<{
   }
 
   /**
+   * HTTP response associated with the client failure, when one was received.
+   *
    * @since 4.0.0
    */
   get response(): ClientResponse.HttpClientResponse | undefined {
@@ -65,8 +83,10 @@ const formatMessage = (reason: string, description: string | undefined, info: st
   description ? `${reason}: ${description} (${info})` : `${reason} error (${info})`
 
 /**
+ * Error describing transport-level failures that occur while sending an HTTP request.
+ *
+ * @category errors
  * @since 4.0.0
- * @category error
  */
 export class TransportError extends Data.TaggedError("TransportError")<{
   readonly request: HttpClientRequest.HttpClientRequest
@@ -74,6 +94,8 @@ export class TransportError extends Data.TaggedError("TransportError")<{
   readonly description?: string
 }> {
   /**
+   * Formats the request method and URL for transport error messages.
+   *
    * @since 4.0.0
    */
   get methodAndUrl() {
@@ -81,6 +103,8 @@ export class TransportError extends Data.TaggedError("TransportError")<{
   }
 
   /**
+   * Builds the transport error message from the optional description and request details.
+   *
    * @since 4.0.0
    */
   override get message() {
@@ -89,8 +113,10 @@ export class TransportError extends Data.TaggedError("TransportError")<{
 }
 
 /**
+ * Error describing failures while encoding an HTTP request body.
+ *
+ * @category errors
  * @since 4.0.0
- * @category error
  */
 export class EncodeError extends Data.TaggedError("EncodeError")<{
   readonly request: HttpClientRequest.HttpClientRequest
@@ -98,6 +124,8 @@ export class EncodeError extends Data.TaggedError("EncodeError")<{
   readonly description?: string
 }> {
   /**
+   * Formats the request method and URL for request encoding error messages.
+   *
    * @since 4.0.0
    */
   get methodAndUrl() {
@@ -105,6 +133,8 @@ export class EncodeError extends Data.TaggedError("EncodeError")<{
   }
 
   /**
+   * Builds the request encoding error message from the optional description and request details.
+   *
    * @since 4.0.0
    */
   override get message() {
@@ -113,8 +143,10 @@ export class EncodeError extends Data.TaggedError("EncodeError")<{
 }
 
 /**
+ * Error describing failures while constructing a URL from an HTTP client request.
+ *
+ * @category errors
  * @since 4.0.0
- * @category error
  */
 export class InvalidUrlError extends Data.TaggedError("InvalidUrlError")<{
   readonly request: HttpClientRequest.HttpClientRequest
@@ -122,6 +154,8 @@ export class InvalidUrlError extends Data.TaggedError("InvalidUrlError")<{
   readonly description?: string
 }> {
   /**
+   * Formats the request method and URL for invalid URL error messages.
+   *
    * @since 4.0.0
    */
   get methodAndUrl() {
@@ -129,6 +163,8 @@ export class InvalidUrlError extends Data.TaggedError("InvalidUrlError")<{
   }
 
   /**
+   * Builds the invalid URL error message from the optional description and request details.
+   *
    * @since 4.0.0
    */
   override get message() {
@@ -137,8 +173,10 @@ export class InvalidUrlError extends Data.TaggedError("InvalidUrlError")<{
 }
 
 /**
+ * Response error for HTTP responses rejected because of their status code.
+ *
+ * @category errors
  * @since 4.0.0
- * @category error
  */
 export class StatusCodeError extends Data.TaggedError("StatusCodeError")<{
   readonly request: HttpClientRequest.HttpClientRequest
@@ -147,6 +185,8 @@ export class StatusCodeError extends Data.TaggedError("StatusCodeError")<{
   readonly description?: string | undefined
 }> {
   /**
+   * Formats the request method and URL for status code error messages.
+   *
    * @since 4.0.0
    */
   get methodAndUrl() {
@@ -154,6 +194,8 @@ export class StatusCodeError extends Data.TaggedError("StatusCodeError")<{
   }
 
   /**
+   * Builds the status code error message from the response status, optional description, and request details.
+   *
    * @since 4.0.0
    */
   override get message() {
@@ -163,8 +205,10 @@ export class StatusCodeError extends Data.TaggedError("StatusCodeError")<{
 }
 
 /**
+ * Response error for failures while decoding an HTTP response body.
+ *
+ * @category errors
  * @since 4.0.0
- * @category error
  */
 export class DecodeError extends Data.TaggedError("DecodeError")<{
   readonly request: HttpClientRequest.HttpClientRequest
@@ -173,6 +217,8 @@ export class DecodeError extends Data.TaggedError("DecodeError")<{
   readonly description?: string | undefined
 }> {
   /**
+   * Formats the request method and URL for response decoding error messages.
+   *
    * @since 4.0.0
    */
   get methodAndUrl() {
@@ -180,6 +226,8 @@ export class DecodeError extends Data.TaggedError("DecodeError")<{
   }
 
   /**
+   * Builds the response decoding error message from the response status, optional description, and request details.
+   *
    * @since 4.0.0
    */
   override get message() {
@@ -189,8 +237,10 @@ export class DecodeError extends Data.TaggedError("DecodeError")<{
 }
 
 /**
+ * Response error for operations that expected a response body but received an empty body.
+ *
+ * @category errors
  * @since 4.0.0
- * @category error
  */
 export class EmptyBodyError extends Data.TaggedError("EmptyBodyError")<{
   readonly request: HttpClientRequest.HttpClientRequest
@@ -199,6 +249,8 @@ export class EmptyBodyError extends Data.TaggedError("EmptyBodyError")<{
   readonly description?: string | undefined
 }> {
   /**
+   * Formats the request method and URL for empty response body error messages.
+   *
    * @since 4.0.0
    */
   get methodAndUrl() {
@@ -206,6 +258,8 @@ export class EmptyBodyError extends Data.TaggedError("EmptyBodyError")<{
   }
 
   /**
+   * Builds the empty body error message from the response status, optional description, and request details.
+   *
    * @since 4.0.0
    */
   override get message() {
@@ -215,26 +269,35 @@ export class EmptyBodyError extends Data.TaggedError("EmptyBodyError")<{
 }
 
 /**
+ * Union of HTTP client errors that occur before a response is available.
+ *
+ * @category errors
  * @since 4.0.0
- * @category error
  */
 export type RequestError = TransportError | EncodeError | InvalidUrlError
 
 /**
+ * Union of HTTP client errors that include an HTTP response.
+ *
+ * @category errors
  * @since 4.0.0
- * @category error
  */
 export type ResponseError = StatusCodeError | DecodeError | EmptyBodyError
 
 /**
+ * Union of all specific failure reasons carried by `HttpClientError`.
+ *
+ * @category errors
  * @since 4.0.0
- * @category error
  */
 export type HttpClientErrorReason = RequestError | ResponseError
 
 /**
+ * Schema for serializable HTTP client errors, preserving the specific error kind
+ * and cause.
+ *
+ * @category schemas
  * @since 4.0.0
- * @category Schema
  */
 export class HttpClientErrorSchema extends Schema.ErrorClass<HttpClientErrorSchema>(TypeId)({
   _tag: Schema.tag("HttpError"),
@@ -248,9 +311,11 @@ export class HttpClientErrorSchema extends Schema.ErrorClass<HttpClientErrorSche
       "EmptyBodyError"
     ] satisfies ReadonlyArray<HttpClientErrorReason["_tag"]>
   ),
-  cause: Schema.optional(Schema.Defect)
+  cause: Schema.optional(Schema.Defect())
 }) {
   /**
+   * Builds the serializable schema representation for an HTTP client error.
+   *
    * @since 4.0.0
    */
   static fromHttpClientError(error: HttpClientError): HttpClientErrorSchema {

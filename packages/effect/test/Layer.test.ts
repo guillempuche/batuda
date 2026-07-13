@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
-import { Fiber, ServiceMap, Stream } from "effect"
+import { Channel, Context, Fiber, Stream, Tracer } from "effect"
 import * as Cause from "effect/Cause"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
@@ -11,13 +11,13 @@ import * as Scope from "effect/Scope"
 describe("Layer", () => {
   it.effect("layers can be acquired in parallel", () =>
     Effect.gen(function*() {
-      const BoolTag = ServiceMap.Service<boolean>("boolean")
+      const BoolTag = Context.Service<boolean>("boolean")
       const latch = Latch.makeUnsafe()
-      const layer1 = Layer.effectServices<never, never, never>(Effect.never)
-      const layer2 = Layer.effectServices(
+      const layer1 = Layer.effectContext<never, never, never>(Effect.never)
+      const layer2 = Layer.effectContext(
         Effect.acquireRelease(
           latch.open.pipe(
-            Effect.map((bool) => ServiceMap.make(BoolTag, bool))
+            Effect.map((bool) => Context.make(BoolTag, bool))
           ),
           () => Effect.void
         )
@@ -44,7 +44,7 @@ describe("Layer", () => {
       const layer = Layer.succeed(Service1Tag)(service1)
       const env = layer.pipe(Layer.merge(layer), Layer.merge(layer), Layer.build)
       const result = yield* env.pipe(
-        Effect.map((context) => ServiceMap.get(context, Service1Tag))
+        Effect.map((context) => Context.get(context, Service1Tag))
       )
       assert.strictEqual(result, service1)
     }))
@@ -121,19 +121,38 @@ describe("Layer", () => {
       assert.deepStrictEqual(arr, [acquire1, release1, acquire2, release2])
     }))
 
+  it.effect("catchCause recovers with a fallback layer and exposes the original cause", () =>
+    Effect.gen(function*() {
+      // Edge case: catchCause should receive the full Cause, not just the typed error,
+      // and the replacement layer should still be built normally.
+      const causes: Array<Cause.Cause<string>> = []
+      const context = yield* Layer.effect(Service1Tag)(Effect.fail("failed!")).pipe(
+        Layer.catchCause((cause) => {
+          causes.push(cause)
+          return Layer.succeed(Service1Tag)(new Service1())
+        }),
+        Layer.build,
+        Effect.scoped
+      )
+
+      assert.strictEqual(yield* Context.get(context, Service1Tag).one(), 1)
+      assert.strictEqual(causes.length, 1)
+      assert.isTrue(Cause.hasFails(causes[0]))
+    }))
+
   it.effect("tap - executes effect with success services and preserves output", () =>
     Effect.gen(function*() {
       const arr: Array<string> = []
       const env = makeLayer1(arr).pipe(
         Layer.tap((context) =>
           Effect.sync(() => {
-            arr.push(`tap:${ServiceMap.get(context, Service1Tag).constructor.name}`)
+            arr.push(`tap:${Context.get(context, Service1Tag).constructor.name}`)
           })
         ),
         Layer.build
       )
       const context = yield* Effect.scoped(env)
-      const service = ServiceMap.get(context, Service1Tag)
+      const service = Context.get(context, Service1Tag)
       assert.strictEqual(yield* service.one(), 1)
       assert.deepStrictEqual(arr, [acquire1, "tap:Service1", release1])
     }))
@@ -333,10 +352,22 @@ describe("Layer", () => {
       assert.strictEqual(arr[5], release1)
     }))
 
+  it.effect("launch keeps the layer open until interrupted and then finalizes", () =>
+    Effect.gen(function*() {
+      // Edge case: launch never completes on its own, so interruption must still
+      // close the layer scope and run finalizers.
+      const arr: Array<string> = []
+      const fiber = yield* Effect.forkChild(Layer.launch(makeLayer1(arr)))
+      yield* Effect.yieldNow
+      assert.deepStrictEqual(arr, [acquire1])
+      yield* Fiber.interrupt(fiber)
+      assert.deepStrictEqual(arr, [acquire1, release1])
+    }))
+
   describe("mock", () => {
     it.effect("allows passing partial service", () =>
       Effect.gen(function*() {
-        class Service1 extends ServiceMap.Service<Service1, {
+        class Service1 extends Context.Service<Service1, {
           one: Effect.Effect<number>
           two(): Effect.Effect<number>
           three: Stream.Stream<number>
@@ -364,7 +395,7 @@ describe("Layer", () => {
 
     it.effect("allows passing partial service in dual form", () =>
       Effect.gen(function*() {
-        class Service1 extends ServiceMap.Service<Service1, {
+        class Service1 extends Context.Service<Service1, {
           one: Effect.Effect<number>
           two(): Effect.Effect<number>
         }>()("Service1") {}
@@ -381,6 +412,41 @@ describe("Layer", () => {
               one: Effect.succeed(123)
             })
           )
+        )
+      }))
+
+    it.effect("missing mock members fail as unimplemented effects and channels", () =>
+      Effect.gen(function*() {
+        // Edge case: missing mock members are represented by a value that can behave
+        // as a function, Effect, Stream, or Channel depending on how it is used.
+        class Service1 extends Context.Service<Service1, {
+          effect(): Effect.Effect<number>
+          channel: Channel.Channel<number, never, void>
+        }>()("Service1") {}
+        yield* Effect.gen(function*() {
+          const service = yield* Service1
+          const effectDefect = yield* service.effect().pipe(
+            Effect.catchDefect(Effect.fail),
+            Effect.flip
+          )
+          assert.strictEqual((effectDefect as Error).name, "UnimplementedError")
+
+          const channelExit = yield* service.channel.pipe(
+            Channel.runDrain,
+            Effect.exit
+          )
+          assert.strictEqual(channelExit._tag, "Failure")
+
+          const transformed = yield* (service.channel as unknown as {
+            transform: () => Effect.Effect<Effect.Effect<never>>
+          }).transform()
+          const transformedDefect = yield* transformed.pipe(
+            Effect.catchDefect(Effect.fail),
+            Effect.flip
+          )
+          assert.strictEqual((transformedDefect as Error).name, "UnimplementedError")
+        }).pipe(
+          Effect.provide(Layer.mock(Service1)({}))
         )
       }))
   })
@@ -448,6 +514,77 @@ describe("Layer", () => {
 
         assert.deepStrictEqual(arr, [acquire1, acquire2, release2, release1])
       }))
+
+    it.effect("forked memo maps reuse parent layers but isolate child layers", () =>
+      Effect.gen(function*() {
+        // Edge case: a child MemoMap should reuse entries already present in the parent,
+        // but entries first built in the child must not be written back to the parent.
+        const arr: Array<string> = []
+        const parent = yield* Layer.makeMemoMap
+        const child = yield* Layer.forkMemoMap(parent)
+        assert.strictEqual((child as any)["~effect/Layer/MemoMap"], "~effect/Layer/MemoMap")
+
+        const scope1 = yield* Scope.make()
+        const scope2 = yield* Scope.make()
+        const parentLayer = makeLayer1(arr)
+        const childLayer = makeLayer2(arr)
+
+        yield* Layer.buildWithMemoMap(parentLayer, parent, scope1)
+        yield* Layer.buildWithMemoMap(parentLayer, child, scope2)
+        yield* Layer.buildWithMemoMap(childLayer, child, scope2)
+        yield* Layer.buildWithMemoMap(childLayer, parent, scope1)
+
+        yield* Scope.close(scope2, Exit.void)
+        yield* Scope.close(scope1, Exit.void)
+
+        assert.deepStrictEqual(arr, [acquire1, acquire2, acquire2, release2, release2, release1])
+      }))
+  })
+
+  describe("tracing", () => {
+    it.effect("withSpan supports data-first usage and runs the onEnd finalizer", () =>
+      Effect.gen(function*() {
+        // Edge case: the data-first overload has separate runtime branching, and onEnd
+        // must run when the layer scope closes.
+        const SpanName = Context.Service<string>("SpanName")
+        const exits: Array<Exit.Exit<unknown, unknown>> = []
+        const scope = yield* Scope.make()
+        const layer = Layer.effect(SpanName)(
+          Effect.map(Tracer.ParentSpan, (span) => span._tag === "Span" ? span.name : span.spanId)
+        )
+        const context = yield* Layer.withSpan(layer, "layer-span", {
+          onEnd: (_span, exit) => Effect.sync(() => exits.push(exit))
+        }).pipe(Layer.buildWithScope(scope))
+
+        assert.strictEqual(Context.get(context, SpanName), "layer-span")
+        assert.deepStrictEqual(exits, [])
+
+        yield* Scope.close(scope, Exit.void)
+
+        assert.strictEqual(exits.length, 1)
+        assert.strictEqual(exits[0]._tag, "Success")
+      }))
+
+    it.effect("withParentSpan supports data-last usage with external spans", () =>
+      Effect.gen(function*() {
+        // Edge case: external spans do not get stack-frame wrapping, but they should
+        // still be installed as the parent span for layer construction.
+        const SpanId = Context.Service<string>("SpanId")
+        const parent = Tracer.externalSpan({
+          spanId: "0000000000000001",
+          traceId: "00000000000000000000000000000001",
+          sampled: true
+        })
+        const context = yield* Layer.effect(SpanId)(
+          Effect.map(Tracer.ParentSpan, (span) => span.spanId)
+        ).pipe(
+          Layer.withParentSpan(parent),
+          Layer.build,
+          Effect.scoped
+        )
+
+        assert.strictEqual(Context.get(context, SpanId), parent.spanId)
+      }))
   })
 })
 
@@ -463,7 +600,7 @@ export class Service1 {
     return Effect.succeed(1)
   }
 }
-const Service1Tag = ServiceMap.Service<Service1>("Service1")
+const Service1Tag = Context.Service<Service1>("Service1")
 const makeLayer1 = (array: Array<string>): Layer.Layer<Service1> => {
   return Layer.effect(Service1Tag)(
     Effect.acquireRelease(
@@ -480,7 +617,7 @@ class Service2 {
     return Effect.succeed(2)
   }
 }
-const Service2Tag = ServiceMap.Service<Service2>("Service2")
+const Service2Tag = Context.Service<Service2>("Service2")
 const makeLayer2 = (array: Array<string>): Layer.Layer<Service2> => {
   return Layer.effect(Service2Tag)(
     Effect.acquireRelease(
@@ -497,7 +634,7 @@ class Service3 {
     return Effect.succeed(3)
   }
 }
-const Service3Tag = ServiceMap.Service<Service3>("Service3")
+const Service3Tag = Context.Service<Service3>("Service3")
 const makeLayer3 = (array: Array<string>): Layer.Layer<Service3> => {
   return Layer.effect(Service3Tag)(
     Effect.acquireRelease(

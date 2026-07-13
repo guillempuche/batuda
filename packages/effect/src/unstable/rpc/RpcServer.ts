@@ -1,8 +1,18 @@
 /**
+ * Runs server-side handlers for RPC groups.
+ *
+ * This module connects typed handlers for an `RpcGroup` to a server `Protocol`.
+ * It receives client messages, decodes request payloads, runs matching handlers
+ * and middleware, tracks in-flight requests, handles acknowledgements and
+ * interrupts, and sends responses back to clients. It also provides constructors
+ * and layers for decoded messages, HTTP, WebSocket, sockets, stdio, and worker
+ * runner protocols.
+ *
  * @since 4.0.0
  */
 import type { NonEmptyReadonlyArray } from "../../Array.ts"
 import * as Cause from "../../Cause.ts"
+import * as Context from "../../Context.ts"
 import * as Deferred from "../../Deferred.ts"
 import * as Effect from "../../Effect.ts"
 import * as Exit from "../../Exit.ts"
@@ -19,7 +29,6 @@ import * as Schedule from "../../Schedule.ts"
 import * as Schema from "../../Schema.ts"
 import * as Scope from "../../Scope.ts"
 import * as Semaphore from "../../Semaphore.ts"
-import * as ServiceMap from "../../ServiceMap.ts"
 import { Stdio } from "../../Stdio.ts"
 import * as Stream from "../../Stream.ts"
 import * as Tracer from "../../Tracer.ts"
@@ -51,17 +60,26 @@ import type { InitialMessage } from "./RpcWorker.ts"
 import { withRun } from "./Utils.ts"
 
 /**
- * @since 4.0.0
+ * The decoded RPC server boundary, accepting client messages for a client id
+ * and allowing that client to be disconnected.
+ *
  * @category server
+ * @since 4.0.0
  */
 export interface RpcServer<A extends Rpc.Any> {
-  readonly write: (clientId: number, message: FromClient<A>) => Effect.Effect<void>
+  readonly write: (clientId: number, message: FromClient<A>, options?: {
+    readonly onRequest?: (<A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>) | undefined
+  }) => Effect.Effect<void>
   readonly disconnect: (clientId: number) => Effect.Effect<void>
 }
 
 /**
- * @since 4.0.0
+ * Creates an RPC server for an already-decoded message channel, running
+ * handlers for a group and sending decoded server responses through
+ * `onFromServer`.
+ *
  * @category server
+ * @since 4.0.0
  */
 export const makeNoSerialization: <Rpcs extends Rpc.Any>(
   group: RpcGroup.RpcGroup<Rpcs>,
@@ -98,8 +116,8 @@ export const makeNoSerialization: <Rpcs extends Rpc.Any>(
   const spanPrefix = options.spanPrefix ?? "RpcServer"
   const concurrency = options.concurrency ?? "unbounded"
   const disableFatalDefects = options.disableFatalDefects ?? false
-  const services = yield* Effect.services<Rpc.ToHandler<Rpcs> | Scope.Scope>()
-  const scope = ServiceMap.get(services, Scope.Scope)
+  const services = yield* Effect.context<Rpc.ToHandler<Rpcs> | Scope.Scope>()
+  const scope = Context.get(services, Scope.Scope)
   const trackFiber = Fiber.runIn(Scope.forkUnsafe(scope, "parallel"))
   const concurrencySemaphore = concurrency === "unbounded"
     ? undefined
@@ -109,6 +127,7 @@ export const makeNoSerialization: <Rpcs extends Rpc.Any>(
     readonly id: number
     readonly latches: Map<RequestId, Latch.Latch>
     readonly fibers: Map<RequestId, Fiber.Fiber<unknown, any>>
+    readonly serverClient: Rpc.ServerClient
     ended: boolean
   }
 
@@ -147,7 +166,7 @@ export const makeNoSerialization: <Rpcs extends Rpc.Any>(
       return Effect.void
     })
 
-  const write = (clientId: number, message: FromClient<Rpcs>): Effect.Effect<void> =>
+  const write: RpcServer<Rpcs>["write"] = (clientId, message, opts) =>
     Effect.catchDefect(
       Effect.withFiber((requestFiber) => {
         if (isShutdown) return Effect.interrupt
@@ -157,7 +176,8 @@ export const makeNoSerialization: <Rpcs extends Rpc.Any>(
             id: clientId,
             latches: new Map(),
             fibers: new Map(),
-            ended: false
+            ended: false,
+            serverClient: new Rpc.ServerClient(clientId)
           }
           clients.set(clientId, client)
         } else if (client.ended) {
@@ -166,7 +186,7 @@ export const makeNoSerialization: <Rpcs extends Rpc.Any>(
 
         switch (message._tag) {
           case "Request": {
-            return handleRequest(requestFiber, client, message)
+            return handleRequest(requestFiber, client, message, opts)
           }
           case "Ack": {
             const latch = client.latches.get(message.requestId)
@@ -213,7 +233,8 @@ export const makeNoSerialization: <Rpcs extends Rpc.Any>(
   const handleRequest = (
     requestFiber: Fiber.Fiber<any, any>,
     client: Client,
-    request: Request<Rpcs>
+    request: Request<Rpcs>,
+    opts: Parameters<RpcServer<Rpcs>["write"]>[2]
   ): Effect.Effect<void> => {
     if (client.fibers.has(request.id)) {
       return Effect.interrupt
@@ -236,7 +257,7 @@ export const makeNoSerialization: <Rpcs extends Rpc.Any>(
     const isStream = RpcSchema.isStreamSchema(rpc.successSchema)
     const metadata = {
       rpc,
-      clientId: client.id,
+      client: client.serverClient,
       requestId: request.id,
       headers: request.headers,
       payload: request.payload
@@ -250,35 +271,55 @@ export const makeNoSerialization: <Rpcs extends Rpc.Any>(
     // unwrap the fork data type
     const streamOrEffect = isWrapper ? result.value : result
     const handler = isStream
-      ? (streamEffect(client, request, streamOrEffect) as Effect.Effect<any>)
-      : (streamOrEffect as Effect.Effect<any>)
+      ? (streamEffect(client, request, streamOrEffect) as Effect.Effect<{} | Deferred.Deferred<any, any>>)
+      : (streamOrEffect as Effect.Effect<{} | Deferred.Deferred<any, any>>)
 
     const withMiddleware = rpc.middlewares.size > 0
       ? applyMiddleware(services, handler, metadata)
       : handler
     let responded = false
     const scope = Scope.makeUnsafe()
+    let deferred: Deferred.Deferred<unknown, unknown> | undefined = undefined
     let effect = Effect.onExit(withMiddleware, (exit) => {
       responded = true
-      const close = Scope.closeUnsafe(scope, exit)
-      const write = exit._tag === "Failure" &&
-          !disableFatalDefects &&
-          Cause.hasDies(exit.cause) &&
-          !Cause.hasInterrupts(exit.cause)
-        ? sendDefect(client, Cause.squash(exit.cause))
-        : options.onFromServer({
+      let write: Effect.Effect<void>
+      if (exit._tag === "Success") {
+        if (Deferred.isDeferred(exit.value)) {
+          deferred = exit.value
+          write = Effect.void
+        } else {
+          write = options.onFromServer({
+            _tag: "Exit",
+            clientId: client.id,
+            requestId: request.id,
+            exit: exit as any
+          })
+        }
+      } else if (
+        !disableFatalDefects &&
+        Cause.hasDies(exit.cause) &&
+        !Cause.hasInterrupts(exit.cause)
+      ) {
+        write = sendDefect(client, Cause.squash(exit.cause))
+      } else {
+        write = options.onFromServer({
           _tag: "Exit",
           clientId: client.id,
           requestId: request.id,
-          exit
+          exit: exit as any
         })
+      }
+      const close = Scope.closeUnsafe(scope, exit)
       if (exit._tag === "Failure") {
         reportCauseUnsafe(Fiber.getCurrent()!, exit.cause)
       }
       return close ? Effect.ensuring(write, close) : write
     })
+    if (opts?.onRequest) {
+      effect = opts.onRequest(effect)
+    }
     if (enableTracing) {
-      const parentSpan = requestFiber.services.mapUnsafe.get(
+      const parentSpan = requestFiber.context.mapUnsafe.get(
         Tracer.ParentSpan.key
       ) as Tracer.AnySpan | undefined
       effect = Effect.withSpan(effect, `${spanPrefix}.${request.tag}`, {
@@ -302,12 +343,12 @@ export const makeNoSerialization: <Rpcs extends Rpc.Any>(
       })
     }
     if (!isFork && concurrencySemaphore) {
-      effect = concurrencySemaphore.withPermits(1)(effect)
+      effect = concurrencySemaphore.withPermit(effect)
     }
-    const serviceMap = new Map(entry.services.mapUnsafe)
-    requestFiber.services.mapUnsafe.forEach((value, key) => serviceMap.set(key, value))
-    serviceMap.set(Scope.Scope.key, scope)
-    const runFork = Effect.runForkWith(ServiceMap.makeUnsafe(serviceMap))
+    const context = new Map(entry.context.mapUnsafe)
+    requestFiber.context.mapUnsafe.forEach((value, key) => context.set(key, value))
+    context.set(Scope.Scope.key, scope)
+    const runFork = Effect.runForkWith(Context.makeUnsafe(context))
     const fiber = trackFiber(
       runFork(
         effect,
@@ -315,7 +356,20 @@ export const makeNoSerialization: <Rpcs extends Rpc.Any>(
       )
     )
     client.fibers.set(request.id, fiber)
-    fiber.addObserver((exit) => {
+    fiber.addObserver(function onExit(exit: Exit.Exit<any, any>): void {
+      if (deferred) {
+        const fiber = trackFiber(runFork(Effect.onExit(Deferred.await(deferred), (exit) =>
+          options.onFromServer({
+            _tag: "Exit",
+            clientId: client.id,
+            requestId: request.id,
+            exit: exit as any
+          }))))
+        client.fibers.set(request.id, fiber)
+        deferred = undefined
+        fiber.addObserver(onExit)
+        return
+      }
       if (!responded && exit._tag === "Failure") {
         trackFiber(
           runFork(
@@ -406,18 +460,18 @@ export const makeNoSerialization: <Rpcs extends Rpc.Any>(
 })
 
 const applyMiddleware = <A, E, R>(
-  services: ServiceMap.ServiceMap<never>,
+  context: Context.Context<never>,
   handler: Effect.Effect<A, E, R>,
   options: {
     readonly rpc: Rpc.AnyWithProps
-    readonly clientId: number
+    readonly client: Rpc.ServerClient
     readonly requestId: RequestId
     readonly headers: Headers.Headers
-    readonly payload: A
+    readonly payload: unknown
   }
 ) => {
   for (const service of options.rpc.middlewares) {
-    const middleware = ServiceMap.getUnsafe(services, service)
+    const middleware = Context.getUnsafe(context, service)
     handler = middleware(handler as any, options) as any
   }
 
@@ -425,8 +479,12 @@ const applyMiddleware = <A, E, R>(
 }
 
 /**
- * @since 4.0.0
+ * Runs an RPC server for a group using the current server `Protocol`, decoding
+ * requests, invoking handlers, encoding responses, and managing in-flight
+ * request lifetime.
+ *
  * @category server
+ * @since 4.0.0
  */
 export const make: <Rpcs extends Rpc.Any>(
   group: RpcGroup.RpcGroup<Rpcs>,
@@ -465,7 +523,7 @@ export const make: <Rpcs extends Rpc.Any>(
     supportsSpanPropagation,
     supportsTransferables
   } = yield* Protocol
-  const services = yield* Effect.services<Rpc.ToHandler<Rpcs> | Rpc.Middleware<Rpcs>>()
+  const services = yield* Effect.context<Rpc.ToHandler<Rpcs> | Rpc.Middleware<Rpcs>>()
   const scope = yield* Scope.make()
 
   const server = yield* makeNoSerialization(group, {
@@ -484,8 +542,8 @@ export const make: <Rpcs extends Rpc.Any>(
             response.requestId,
             schemas.encodeDefect,
             schemas.collector,
-            Effect.provideServices(schemas.encodeChunk(response.values), schemas.services),
-            (values) => ({ _tag: "Chunk", requestId: String(response.requestId), values })
+            Effect.provideContext(schemas.encodeChunk(response.values), schemas.context),
+            (values) => ({ _tag: "Chunk", requestId: response.requestId, values })
           )
         }
         case "Exit": {
@@ -497,8 +555,8 @@ export const make: <Rpcs extends Rpc.Any>(
             response.requestId,
             schemas.encodeDefect,
             schemas.collector,
-            Effect.provideServices(schemas.encodeExit(response.exit), schemas.services),
-            (exit) => ({ _tag: "Exit", requestId: String(response.requestId), exit })
+            Effect.provideContext(schemas.encodeExit(response.exit), schemas.context),
+            (exit) => ({ _tag: "Exit", requestId: response.requestId, exit })
           )
         }
         case "Defect": {
@@ -533,7 +591,7 @@ export const make: <Rpcs extends Rpc.Any>(
     ) => Effect.Effect<NonEmptyReadonlyArray<unknown>, Schema.SchemaError>
     readonly encodeExit: (u: unknown) => Effect.Effect<ResponseExitEncoded["exit"], Schema.SchemaError>
     readonly encodeDefect: (u: unknown) => Effect.Effect<unknown, Schema.SchemaError>
-    readonly services: ServiceMap.ServiceMap<never>
+    readonly context: Context.Context<never>
     readonly collector?: Transferable.Collector["Service"] | undefined
   }
 
@@ -552,7 +610,7 @@ export const make: <Rpcs extends Rpc.Any>(
         ) as any,
         encodeExit: Schema.encodeUnknownEffect(Schema.toCodecJson(Rpc.exitSchema(rpc as any))) as any,
         encodeDefect: Schema.encodeUnknownEffect(Schema.toCodecJson(rpc.defectSchema)) as any,
-        services: entry.services
+        context: entry.context
       }
       schemasCache.set(rpc, schemas)
     }
@@ -595,7 +653,7 @@ export const make: <Rpcs extends Rpc.Any>(
       Effect.flatMap(encodeDefect(defect), (encodedDefect) =>
         send(client.id, {
           _tag: "Exit",
-          requestId: String(requestId),
+          requestId,
           exit: {
             _tag: "Failure",
             cause: [{
@@ -631,13 +689,9 @@ export const make: <Rpcs extends Rpc.Any>(
     switch (request._tag) {
       case "Request": {
         const tag = Predicate.hasProperty(request, "tag") ? (request.tag as string) : ""
-        const rpc = group.requests.get(tag)
-        if (!rpc) {
-          return sendDefect(client, `Unknown request tag: ${tag}`)
-        }
         let requestId: RequestId
         switch (typeof request.id) {
-          case "bigint":
+          case "number":
           case "string": {
             requestId = RequestId(request.id)
             break
@@ -646,9 +700,13 @@ export const make: <Rpcs extends Rpc.Any>(
             return sendDefect(client, `Invalid request id: ${request.id}`)
           }
         }
+        const rpc = group.requests.get(tag)
+        if (!rpc) {
+          return sendRequestDefect(client, requestId, (defect) => Effect.succeed(defect), `Unknown request tag: ${tag}`)
+        }
         const schemas = getSchemas(rpc as any)
         return Effect.matchEffect(
-          Effect.provideServices(schemas.decode(request.payload), schemas.services),
+          Effect.provideContext(schemas.decode(request.payload), schemas.context),
           {
             onFailure: (error) => sendRequestDefect(client, requestId, schemas.encodeDefect, error.issue.toString()),
             onSuccess: (payload) => {
@@ -701,8 +759,11 @@ export const make: <Rpcs extends Rpc.Any>(
 })
 
 /**
- * @since 4.0.0
+ * Provides a scoped layer that starts an RPC server for a group using the
+ * current server `Protocol`.
+ *
  * @category server
+ * @since 4.0.0
  */
 export const layer = <Rpcs extends Rpc.Any>(
   group: RpcGroup.RpcGroup<Rpcs>,
@@ -723,13 +784,15 @@ export const layer = <Rpcs extends Rpc.Any>(
 > => Layer.effectDiscard(Effect.forkScoped(make(group, options)))
 
 /**
- * Create a RPC server that registers a HTTP route with a `HttpRouter`.
+ * Creates a RPC server that registers a HTTP route with a `HttpRouter`.
  *
- * It defaults to using websockets for communication, but can be configured to
- * use HTTP.
+ * **Details**
  *
+ * Defaults to using websockets for communication, but can be configured to use
+ * HTTP.
+ *
+ * @category protocols
  * @since 4.0.0
- * @category protocol
  */
 export const layerHttp = <Rpcs extends Rpc.Any>(options: {
   readonly group: RpcGroup.RpcGroup<Rpcs>
@@ -758,10 +821,19 @@ export const layerHttp = <Rpcs extends Rpc.Any>(options: {
   )
 
 /**
+ * Defines the service interface for an RPC server transport, responsible for receiving
+ * encoded client messages, sending encoded responses, tracking clients, and
+ * declaring transport capabilities.
+ *
+ * **When to use**
+ *
+ * Use to provide the transport boundary for RPC servers over HTTP, WebSocket,
+ * workers, sockets, or custom protocols.
+ *
+ * @category protocols
  * @since 4.0.0
- * @category protocol
  */
-export class Protocol extends ServiceMap.Service<
+export class Protocol extends Context.Service<
   Protocol,
   {
     readonly run: (
@@ -782,14 +854,19 @@ export class Protocol extends ServiceMap.Service<
   }
 >()("effect/rpc/RpcServer/Protocol") {
   /**
+   * Creates a server protocol service from the supplied RPC implementation.
+   *
    * @since 4.0.0
    */
   static make = withRun<Protocol["Service"]>()
 }
 
 /**
+ * Creates a server `Protocol` backed by the current `SocketServer`, accepting
+ * socket connections and routing decoded RPC messages.
+ *
+ * @category protocols
  * @since 4.0.0
- * @category protocol
  */
 export const makeProtocolSocketServer = Effect.gen(function*() {
   const server = yield* SocketServer.SocketServer
@@ -801,10 +878,10 @@ export const makeProtocolSocketServer = Effect.gen(function*() {
 })
 
 /**
- * A rpc protocol that uses `SocketServer` for communication.
+ * RPC protocol that uses `SocketServer` for communication.
  *
+ * @category protocols
  * @since 4.0.0
- * @category protocol
  */
 export const layerProtocolSocketServer: Layer.Layer<
   Protocol,
@@ -813,8 +890,11 @@ export const layerProtocolSocketServer: Layer.Layer<
 > = Layer.effect(Protocol)(makeProtocolSocketServer)
 
 /**
+ * Creates a websocket server `Protocol` together with an HTTP effect that
+ * upgrades the current request to a websocket and attaches it to the protocol.
+ *
+ * @category protocols
  * @since 4.0.0
- * @category protocol
  */
 export const makeProtocolWithHttpEffectWebsocket: Effect.Effect<
   {
@@ -845,8 +925,11 @@ export const makeProtocolWithHttpEffectWebsocket: Effect.Effect<
 })
 
 /**
+ * Creates a websocket server `Protocol` and registers its upgrade handler as a
+ * GET route on the current `HttpRouter`.
+ *
+ * @category protocols
  * @since 4.0.0
- * @category protocol
  */
 export const makeProtocolWebsocket: (options: {
   readonly path: HttpRouter.PathInput
@@ -862,10 +945,10 @@ export const makeProtocolWebsocket: (options: {
 })
 
 /**
- * A rpc protocol that uses websockets for communication.
+ * RPC protocol that uses WebSockets for communication.
  *
+ * @category protocols
  * @since 4.0.0
- * @category protocol
  */
 export const layerProtocolWebsocket = (options: {
   readonly path: HttpRouter.PathInput
@@ -878,8 +961,12 @@ export const layerProtocolWebsocket = (options: {
 }
 
 /**
+ * Creates an HTTP request/response server `Protocol` together with an HTTP
+ * effect that decodes the current request and streams or returns encoded RPC
+ * responses.
+ *
+ * @category protocols
  * @since 4.0.0
- * @category protocol
  */
 export const makeProtocolWithHttpEffect: Effect.Effect<
   {
@@ -920,8 +1007,8 @@ export const makeProtocolWithHttpEffect: Effect.Effect<
     Scope.Scope | HttpServerRequest.HttpServerRequest
   > = Effect.gen(function*() {
     const fiber = Fiber.getCurrent()!
-    const request = ServiceMap.getUnsafe(fiber.services, HttpServerRequest.HttpServerRequest)
-    const scope = ServiceMap.getUnsafe(fiber.services, Scope.Scope)
+    const request = Context.getUnsafe(fiber.context, HttpServerRequest.HttpServerRequest)
+    const scope = Context.getUnsafe(fiber.context, Scope.Scope)
     const requestHeaders = Object.entries(request.headers)
     const data = yield* Effect.orDie<string | Uint8Array, any, never>(
       isBinary ? Effect.map(request.arrayBuffer, (buf) => new Uint8Array(buf)) : request.text
@@ -929,6 +1016,7 @@ export const makeProtocolWithHttpEffect: Effect.Effect<
     const id = clientId++
     const queue = yield* Queue.make<Uint8Array | FromServerEncoded, Cause.Done>()
     const parser = serialization.makeUnsafe()
+    const requestIds: Array<RequestId> = []
 
     const offer = (data: Uint8Array | string) =>
       typeof data === "string" ? Queue.offer(queue, encoder.encode(data)) : Queue.offer(queue, data)
@@ -954,14 +1042,12 @@ export const makeProtocolWithHttpEffect: Effect.Effect<
       if (queue.state._tag === "Done") return Effect.void
       return Effect.forEach(
         requestIds,
-        (requestId) => writeRequest(id, { _tag: "Interrupt", requestId: String(requestId) }),
+        (requestId) => writeRequest(id, { _tag: "Interrupt", requestId }),
         { discard: true }
       )
     })
     clients.set(id, client)
     clientIds.add(id)
-
-    const requestIds: Array<RequestId> = []
 
     // @effect-diagnostics-next-line tryCatchInEffectGen:off
     try {
@@ -1043,8 +1129,11 @@ const mergeUint8Arrays = (arrays: ReadonlyArray<Uint8Array>) => {
 }
 
 /**
+ * Creates an HTTP server `Protocol` and registers its request handler as a POST
+ * route on the current `HttpRouter`.
+ *
+ * @category protocols
  * @since 4.0.0
- * @category protocol
  */
 export const makeProtocolHttp: (options: {
   readonly path: HttpRouter.PathInput
@@ -1060,10 +1149,11 @@ export const makeProtocolHttp: (options: {
 })
 
 /**
- * A rpc protocol that uses websockets for communication.
+ * Provides a server `Protocol` that uses HTTP POST requests for RPC
+ * communication.
  *
+ * @category protocols
  * @since 4.0.0
- * @category protocol
  */
 export const layerProtocolHttp = (options: {
   readonly path: HttpRouter.PathInput
@@ -1072,8 +1162,11 @@ export const layerProtocolHttp = (options: {
 }
 
 /**
- * @since 4.0.0
+ * Starts an RPC server for a group and returns the HTTP request/response effect
+ * that serves the non-websocket HTTP RPC protocol.
+ *
  * @category http app
+ * @since 4.0.0
  */
 export const toHttpEffect: <Rpcs extends Rpc.Any>(
   group: RpcGroup.RpcGroup<Rpcs>,
@@ -1110,8 +1203,11 @@ export const toHttpEffect: <Rpcs extends Rpc.Any>(
 })
 
 /**
- * @since 4.0.0
+ * Starts an RPC server for a group and returns the HTTP effect that upgrades
+ * requests to the websocket RPC protocol.
+ *
  * @category http app
+ * @since 4.0.0
  */
 export const toHttpEffectWebsocket: <Rpcs extends Rpc.Any>(
   group: RpcGroup.RpcGroup<Rpcs>,
@@ -1148,10 +1244,11 @@ export const toHttpEffectWebsocket: <Rpcs extends Rpc.Any>(
 })
 
 /**
- * Create a protocol that uses the provided `Stream` and `Sink` for communication.
+ * Creates a server `Protocol` that reads RPC messages from `Stdio.stdin` and
+ * writes encoded responses to `Stdio.stdout`.
  *
+ * @category protocols
  * @since 4.0.0
- * @category protocol
  */
 export const makeProtocolStdio = Effect.gen(function*() {
   const stdio = yield* Stdio
@@ -1208,10 +1305,11 @@ export const makeProtocolStdio = Effect.gen(function*() {
 })
 
 /**
- * Create a protocol that uses the provided `Stream` and `Sink` for communication.
+ * Provides a server `Protocol` that reads RPC messages from `Stdio.stdin` and
+ * writes encoded responses to `Stdio.stdout`.
  *
+ * @category protocols
  * @since 4.0.0
- * @category protocol
  */
 export const layerProtocolStdio: Layer.Layer<
   Protocol,
@@ -1220,8 +1318,11 @@ export const layerProtocolStdio: Layer.Layer<
 > = Layer.effect(Protocol, makeProtocolStdio)
 
 /**
+ * Creates a server `Protocol` backed by `WorkerRunnerPlatform`, routing worker
+ * messages to the RPC server and server responses back to workers.
+ *
+ * @category protocols
  * @since 4.0.0
- * @category protocol
  */
 export const makeProtocolWorkerRunner: Effect.Effect<
   Protocol["Service"],
@@ -1276,8 +1377,10 @@ export const makeProtocolWorkerRunner: Effect.Effect<
 }))
 
 /**
+ * Provides a server `Protocol` backed by the current `WorkerRunnerPlatform`.
+ *
+ * @category protocols
  * @since 4.0.0
- * @category protocol
  */
 export const layerProtocolWorkerRunner: Layer.Layer<
   Protocol,

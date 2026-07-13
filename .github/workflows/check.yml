@@ -36,7 +36,7 @@ jobs:
       - name: Install dependencies
         uses: ./.github/actions/setup
       - run: pnpm check
-      - run: pnpm test-types --target '>=5.8'
+      - run: pnpm test-types --target '>=5.9'
 
   build:
     name: Build
@@ -65,7 +65,7 @@ jobs:
       - name: Install dependencies
         uses: ./.github/actions/setup
         with:
-          deno-version: v2.6.x
+          deno-version: v2.8.3
       - name: Set strip internals config
         run: |
           sed -i 's/"stripInternal": false/"stripInternal": true/' tsconfig.base.json
@@ -95,8 +95,8 @@ jobs:
           sed -i 's/"stripInternal": false/"stripInternal": true/' base/tsconfig.base.json
       - name: Build
         run: |
-          pnpm build:tsgo &
-          cd base && pnpm install && pnpm build:tsgo &
+          pnpm build &
+          cd base && pnpm install && pnpm build &
           wait
       - name: Compare bundle size
         run: node ./packages/tools/bundle/src/bin.ts compare --base-dir base/packages/tools/bundle/fixtures
@@ -104,7 +104,9 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
         with:
+          name: bundle-stats
           path: stats.txt
+          if-no-files-found: error
 
   test:
     name: Test
@@ -141,37 +143,10 @@ jobs:
         if: matrix.runtime == 'Deno'
         uses: ./.github/actions/setup
         with:
-          deno-version: v2.6.x
+          deno-version: v2.8.3
       - name: Test
         if: matrix.runtime == 'Deno'
         run: deno task test --shard ${{ matrix.shard }}
-
-  jsdoc-analysis:
-    name: JSDoc Analysis
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v6
-      - name: Install node
-        uses: actions/setup-node@v6
-      - name: Generate JSDoc Analysis
-        shell: bash
-        run: |
-          # Run JSDoc analysis and format output for GitHub
-          node scripts/analyze-jsdoc.mjs > jsdoc-analysis.txt 2>&1 || true
-          echo "<!-- JSDoc Analysis PR Report -->" > jsdoc-stats.md
-          echo "" >> jsdoc-stats.md
-          echo "\`\`\`" >> jsdoc-stats.md
-          cat jsdoc-analysis.txt >> jsdoc-stats.md
-          echo "\`\`\`" >> jsdoc-stats.md
-      - name: Upload JSDoc stats artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: jsdoc-stats
-          path: jsdoc-stats.md
 
   docgen:
     name: Documentation Generation

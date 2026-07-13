@@ -1,20 +1,30 @@
 /**
- * @since 1.0.0
+ * Bun Redis integration backed by Bun's built-in `RedisClient`.
+ *
+ * This module creates scoped Bun `RedisClient` connections and exposes them as
+ * both the portable `Redis` service and the Bun-specific `BunRedis` service for
+ * direct access to the raw client. The `layer` helper accepts Redis options
+ * directly, while `layerConfig` reads them from Effect config. Both close the
+ * underlying client when the layer scope finalizes.
+ *
+ * @since 4.0.0
  */
 import { RedisClient, type RedisOptions } from "bun"
 import * as Config from "effect/Config"
+import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Fn from "effect/Function"
 import * as Layer from "effect/Layer"
 import * as Scope from "effect/Scope"
-import * as ServiceMap from "effect/ServiceMap"
 import * as Redis from "effect/unstable/persistence/Redis"
 
 /**
- * @since 1.0.0
- * @category Service
+ * Service tag for Bun Redis integration, exposing the raw `RedisClient` and a `use` helper that maps client promise failures to `RedisError`.
+ *
+ * @category services
+ * @since 4.0.0
  */
-export class BunRedis extends ServiceMap.Service<BunRedis, {
+export class BunRedis extends Context.Service<BunRedis, {
   readonly client: RedisClient
   readonly use: <A>(f: (client: RedisClient) => Promise<A>) => Effect.Effect<A, Redis.RedisError>
 }>()("@effect/platform-bun/BunRedis") {}
@@ -47,28 +57,32 @@ const make = Effect.fnUntraced(function*(
     use
   })
 
-  return ServiceMap.make(BunRedis, bunRedis).pipe(
-    ServiceMap.add(Redis.Redis, redis)
+  return Context.make(BunRedis, bunRedis).pipe(
+    Context.add(Redis.Redis, redis)
   )
 })
 
 /**
- * @since 1.0.0
- * @category Layers
+ * Creates scoped Bun Redis layers for `Redis.Redis` and `BunRedis`, closing the underlying client when the scope finalizes.
+ *
+ * @category layers
+ * @since 4.0.0
  */
 export const layer = (
   options?: ({ readonly url?: string } & RedisOptions) | undefined
-): Layer.Layer<Redis.Redis | BunRedis> => Layer.effectServices(make(options))
+): Layer.Layer<Redis.Redis | BunRedis> => Layer.effectContext(make(options))
 
 /**
- * @since 1.0.0
- * @category Layers
+ * Creates scoped Bun Redis layers from configurable Redis options, closing the underlying client when the scope finalizes.
+ *
+ * @category layers
+ * @since 4.0.0
  */
 export const layerConfig = (
   options: Config.Wrap<{ readonly url?: string } & RedisOptions>
 ): Layer.Layer<Redis.Redis | BunRedis, Config.ConfigError> =>
-  Layer.effectServices(
-    Config.unwrap(options).asEffect().pipe(
+  Layer.effectContext(
+    Config.unwrap(options).pipe(
       Effect.flatMap(make)
     )
   )

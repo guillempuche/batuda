@@ -1,6 +1,6 @@
 import { assertTrue, deepStrictEqual, strictEqual } from "@effect/vitest/utils"
 import type { StandardSchemaV1 } from "@standard-schema/spec"
-import { Effect, Option, Predicate, Schema, SchemaGetter, SchemaIssue, ServiceMap } from "effect"
+import { Context, Effect, Option, Predicate, Schema, SchemaGetter, SchemaIssue } from "effect"
 import { describe, it } from "vitest"
 
 function validate<I, A>(
@@ -102,7 +102,7 @@ const AsyncString = Schema.String.pipe(Schema.decode({
 const AsyncNonEmptyString = AsyncString.check(Schema.isNonEmpty())
 
 describe("toStandardSchemaV1", () => {
-  it("should return a schema", () => {
+  it("should return a Standard Schema V1 schema", () => {
     const schema = Schema.FiniteFromString
     const standardSchema = Schema.toStandardSchemaV1(schema)
     assertTrue(Schema.isSchema(standardSchema))
@@ -151,7 +151,7 @@ describe("toStandardSchemaV1", () => {
   })
 
   describe("missing dependencies", () => {
-    class MagicNumber extends ServiceMap.Service<MagicNumber, number>()("MagicNumber") {}
+    class MagicNumber extends Context.Service<MagicNumber, number>()("MagicNumber") {}
 
     it("sync decoding should throw", () => {
       const DepString = Schema.Number.pipe(Schema.decode({
@@ -173,7 +173,7 @@ describe("toStandardSchemaV1", () => {
       })
     })
 
-    it("async decoding should throw", () => {
+    it("async decoding should report a missing dependency", () => {
       const DepString = Schema.Number.pipe(Schema.decode({
         decode: SchemaGetter.onSome((n) =>
           Effect.gen(function*() {

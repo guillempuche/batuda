@@ -1,9 +1,9 @@
 import { describe, it } from "@effect/vitest"
 import { assertTrue, deepStrictEqual } from "@effect/vitest/utils"
-import { Array, Effect, ExecutionPlan, Exit, Layer, ServiceMap, Stream } from "effect"
+import { Array, Context, Effect, ExecutionPlan, Exit, Layer, Stream } from "effect"
 
 describe("ExecutionPlan", () => {
-  class Service extends ServiceMap.Service<Service>()("Service", {
+  class Service extends Context.Service<Service>()("Service", {
     make: Effect.succeed({
       stream: Stream.fail("A") as Stream.Stream<number, string>
     })
@@ -46,9 +46,9 @@ describe("ExecutionPlan", () => {
   })
 
   describe("Stream.withExecutionPlan", () => {
-    it.effect("fallback", () =>
+    it.effect("falls back through failing layers and records stream attempt metadata", () =>
       Effect.gen(function*() {
-        const stream = Stream.unwrap(Effect.map(Service.asEffect(), (_) => _.stream))
+        const stream = Stream.unwrap(Effect.map(Service, (_) => _.stream))
         const items = Array.empty<number>()
         const metadata = Array.empty<ExecutionPlan.Metadata>()
         const result = yield* stream.pipe(
@@ -78,9 +78,9 @@ describe("ExecutionPlan", () => {
         assertTrue(Exit.isSuccess(result))
       }))
 
-    it.effect("fallback from partial stream", () =>
+    it.effect("falls back after a stream emits partial items by default", () =>
       Effect.gen(function*() {
-        const stream = Stream.unwrap(Effect.map(Service.asEffect(), (_) => _.stream))
+        const stream = Stream.unwrap(Effect.map(Service, (_) => _.stream))
         const items = Array.empty<number>()
         const result = yield* stream.pipe(
           Stream.withExecutionPlan(PlanPartial),
@@ -95,9 +95,9 @@ describe("ExecutionPlan", () => {
         assertTrue(Exit.isSuccess(result))
       }))
 
-    it.effect("preventFallbackOnPartialStream", () =>
+    it.effect("fails on a partial stream when fallback is disabled", () =>
       Effect.gen(function*() {
-        const stream = Stream.unwrap(Effect.map(Service.asEffect(), (_) => _.stream))
+        const stream = Stream.unwrap(Effect.map(Service, (_) => _.stream))
         const items = Array.empty<number>()
         const result = yield* stream.pipe(
           Stream.withExecutionPlan(PlanPartial, {

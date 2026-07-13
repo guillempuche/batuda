@@ -1,6 +1,10 @@
 /**
- * This module provides utility functions and type class instances for working with the `string` type in TypeScript.
- * It includes functions for basic string manipulation.
+ * Works with TypeScript `string` values.
+ *
+ * This module exposes common string operations in a pipe-friendly style. The
+ * helpers cover checks, comparison, concatenation, trimming, casing, slicing,
+ * padding, replacement, normalization, safe character access, search helpers
+ * that return `Option`, and joining strings through a reducer.
  *
  * @since 2.0.0
  */
@@ -18,7 +22,19 @@ import * as predicate from "./Predicate.ts"
 import * as Reducer from "./Reducer.ts"
 
 /**
- * Reference to the global `String` constructor.
+ * Exposes the global string constructor.
+ *
+ * **When to use**
+ *
+ * Use to access native JavaScript string coercion or constructor behavior from
+ * the Effect module namespace.
+ *
+ * **Gotchas**
+ *
+ * Calling `String(value)` returns a primitive string. Calling
+ * `new String(value)` creates a boxed `String` object.
+ *
+ * @see {@link isString} for checking whether a value is a primitive string
  *
  * @category constructors
  * @since 4.0.0
@@ -26,9 +42,10 @@ import * as Reducer from "./Reducer.ts"
 export const String = globalThis.String
 
 /**
- * Tests if a value is a `string`.
+ * Checks whether a value is a `string`.
  *
- * @example
+ * **Example** (Checking for strings)
+ *
  * ```ts
  * import { String } from "effect"
  * import * as assert from "node:assert"
@@ -43,9 +60,11 @@ export const String = globalThis.String
 export const isString: Refinement<unknown, string> = predicate.isString
 
 /**
- * `Order` instance for comparing strings using lexicographic ordering.
+ * Provides an `Order` instance for comparing strings using lexicographic
+ * ordering.
  *
- * @example
+ * **Example** (Comparing strings lexicographically)
+ *
  * ```ts
  * import { String } from "effect"
  *
@@ -60,9 +79,10 @@ export const isString: Refinement<unknown, string> = predicate.isString
 export const Order: order.Order<string> = order.String
 
 /**
- * An `Equivalence` instance for strings using strict equality (`===`).
+ * Provides an `Equivalence` instance for strings using strict equality (`===`).
  *
- * @example
+ * **Example** (Comparing strings for equality)
+ *
  * ```ts
  * import { String } from "effect"
  *
@@ -71,14 +91,19 @@ export const Order: order.Order<string> = order.String
  * ```
  *
  * @category instances
- * @since 4.0.0
+ * @since 2.0.0
  */
 export const Equivalence: Equ.Equivalence<string> = Equ.String
 
 /**
- * The empty string `""`.
+ * Provides the empty string `""`.
  *
- * @example
+ * **When to use**
+ *
+ * Use when you need the canonical empty string value from the `String` module.
+ *
+ * **Example** (Referencing the empty string)
+ *
  * ```ts
  * import { String } from "effect"
  *
@@ -86,7 +111,7 @@ export const Equivalence: Equ.Equivalence<string> = Equ.String
  * console.log(String.isEmpty(String.empty)) // true
  * ```
  *
- * @category constructors
+ * @category constants
  * @since 2.0.0
  */
 export const empty: "" = "" as const
@@ -94,7 +119,8 @@ export const empty: "" = "" as const
 /**
  * Concatenates two strings at the type level.
  *
- * @example
+ * **Example** (Concatenating string literal types)
+ *
  * ```ts
  * import type { String } from "effect"
  *
@@ -110,7 +136,8 @@ export type Concat<A extends string, B extends string> = `${A}${B}`
 /**
  * Concatenates two strings at runtime.
  *
- * @example
+ * **Example** (Concatenating strings)
+ *
  * ```ts
  * import { pipe, String } from "effect"
  *
@@ -121,7 +148,7 @@ export type Concat<A extends string, B extends string> = `${A}${B}`
  * console.log(result2) // "helloworld"
  * ```
  *
- * @category concatenating
+ * @category combining
  * @since 2.0.0
  */
 export const concat: {
@@ -132,7 +159,8 @@ export const concat: {
 /**
  * Converts a string to uppercase.
  *
- * @example
+ * **Example** (Converting strings to uppercase)
+ *
  * ```ts
  * import { pipe, String } from "effect"
  * import * as assert from "node:assert"
@@ -149,7 +177,8 @@ export const toUpperCase = <S extends string>(self: S): Uppercase<S> => self.toU
 /**
  * Converts a string to lowercase.
  *
- * @example
+ * **Example** (Converting strings to lowercase)
+ *
  * ```ts
  * import { pipe, String } from "effect"
  * import * as assert from "node:assert"
@@ -166,7 +195,8 @@ export const toLowerCase = <T extends string>(self: T): Lowercase<T> => self.toL
 /**
  * Capitalizes the first character of a string.
  *
- * @example
+ * **Example** (Capitalizing a string)
+ *
  * ```ts
  * import { pipe, String } from "effect"
  * import * as assert from "node:assert"
@@ -187,7 +217,8 @@ export const capitalize = <T extends string>(self: T): Capitalize<T> => {
 /**
  * Uncapitalizes the first character of a string.
  *
- * @example
+ * **Example** (Uncapitalizing a string)
+ *
  * ```ts
  * import { pipe, String } from "effect"
  * import * as assert from "node:assert"
@@ -206,9 +237,15 @@ export const uncapitalize = <T extends string>(self: T): Uncapitalize<T> => {
 }
 
 /**
- * Replaces the first occurrence of a substring or pattern in a string.
+ * Replaces matches in a string using `String.prototype.replace`.
  *
- * @example
+ * **Details**
+ *
+ * String search values and non-global regular expressions replace the first
+ * match; global regular expressions replace every match.
+ *
+ * **Example** (Replacing a substring)
+ *
  * ```ts
  * import { pipe, String } from "effect"
  * import * as assert from "node:assert"
@@ -229,7 +266,8 @@ export const replace = (searchValue: string | RegExp, replaceValue: string) => (
 /**
  * Type-level representation of trimming whitespace from both ends of a string.
  *
- * @example
+ * **Example** (Trimming whitespace at the type level)
+ *
  * ```ts
  * import type { String } from "effect"
  *
@@ -244,7 +282,8 @@ export type Trim<A extends string> = TrimEnd<TrimStart<A>>
 /**
  * Removes whitespace from both ends of a string.
  *
- * @example
+ * **Example** (Trimming whitespace)
+ *
  * ```ts
  * import { String } from "effect"
  * import * as assert from "node:assert"
@@ -261,7 +300,8 @@ export const trim = <A extends string>(self: A): Trim<A> => self.trim() as Trim<
 /**
  * Type-level representation of trimming whitespace from the start of a string.
  *
- * @example
+ * **Example** (Trimming leading whitespace at the type level)
+ *
  * ```ts
  * import type { String } from "effect"
  *
@@ -276,7 +316,8 @@ export type TrimStart<A extends string> = A extends `${" " | "\n" | "\t" | "\r"}
 /**
  * Removes whitespace from the start of a string.
  *
- * @example
+ * **Example** (Trimming leading whitespace)
+ *
  * ```ts
  * import { String } from "effect"
  * import * as assert from "node:assert"
@@ -293,7 +334,8 @@ export const trimStart = <A extends string>(self: A): TrimStart<A> => self.trimS
 /**
  * Type-level representation of trimming whitespace from the end of a string.
  *
- * @example
+ * **Example** (Trimming trailing whitespace at the type level)
+ *
  * ```ts
  * import type { String } from "effect"
  *
@@ -308,7 +350,8 @@ export type TrimEnd<A extends string> = A extends `${infer B}${" " | "\n" | "\t"
 /**
  * Removes whitespace from the end of a string.
  *
- * @example
+ * **Example** (Trimming trailing whitespace)
+ *
  * ```ts
  * import { String } from "effect"
  * import * as assert from "node:assert"
@@ -325,7 +368,8 @@ export const trimEnd = <A extends string>(self: A): TrimEnd<A> => self.trimEnd()
 /**
  * Extracts a section of a string and returns it as a new string.
  *
- * @example
+ * **Example** (Slicing strings)
+ *
  * ```ts
  * import { pipe, String } from "effect"
  * import * as assert from "node:assert"
@@ -340,9 +384,10 @@ export const trimEnd = <A extends string>(self: A): TrimEnd<A> => self.trimEnd()
 export const slice = (start?: number, end?: number) => (self: string): string => self.slice(start, end)
 
 /**
- * Test whether a `string` is empty.
+ * Checks whether a `string` is empty.
  *
- * @example
+ * **Example** (Checking for empty strings)
+ *
  * ```ts
  * import { String } from "effect"
  * import * as assert from "node:assert"
@@ -357,9 +402,10 @@ export const slice = (start?: number, end?: number) => (self: string): string =>
 export const isEmpty = (self: string): self is "" => self.length === 0
 
 /**
- * Test whether a `string` is non empty.
+ * Checks whether a `string` is non-empty.
  *
- * @example
+ * **Example** (Checking for non-empty strings)
+ *
  * ```ts
  * import { String } from "effect"
  * import * as assert from "node:assert"
@@ -374,9 +420,10 @@ export const isEmpty = (self: string): self is "" => self.length === 0
 export const isNonEmpty = (self: string): boolean => self.length > 0
 
 /**
- * Calculate the number of characters in a `string`.
+ * Returns the JavaScript string length, measured in UTF-16 code units.
  *
- * @example
+ * **Example** (Getting string length)
+ *
  * ```ts
  * import { String } from "effect"
  * import * as assert from "node:assert"
@@ -384,7 +431,7 @@ export const isNonEmpty = (self: string): boolean => self.length > 0
  * assert.deepStrictEqual(String.length("abc"), 3)
  * ```
  *
- * @category utilities
+ * @category getters
  * @since 2.0.0
  */
 export const length = (self: string): number => self.length
@@ -392,7 +439,8 @@ export const length = (self: string): number => self.length
 /**
  * Splits a string into an array of substrings using a separator.
  *
- * @example
+ * **Example** (Splitting strings)
+ *
  * ```ts
  * import { pipe, String } from "effect"
  * import * as assert from "node:assert"
@@ -417,7 +465,8 @@ export const split: {
  * Returns `true` if `searchString` appears as a substring of `self`, at one or more positions that are
  * greater than or equal to `position`; otherwise, returns `false`.
  *
- * @example
+ * **Example** (Checking for substrings)
+ *
  * ```ts
  * import { pipe, String } from "effect"
  * import * as assert from "node:assert"
@@ -435,7 +484,8 @@ export const includes = (searchString: string, position?: number) => (self: stri
 /**
  * Returns `true` if the string starts with the specified search string.
  *
- * @example
+ * **Example** (Checking string prefixes)
+ *
  * ```ts
  * import { pipe, String } from "effect"
  * import * as assert from "node:assert"
@@ -453,7 +503,8 @@ export const startsWith = (searchString: string, position?: number) => (self: st
 /**
  * Returns `true` if the string ends with the specified search string.
  *
- * @example
+ * **Example** (Checking string suffixes)
+ *
  * ```ts
  * import { pipe, String } from "effect"
  * import * as assert from "node:assert"
@@ -469,9 +520,9 @@ export const endsWith = (searchString: string, position?: number) => (self: stri
   self.endsWith(searchString, position)
 
 /**
- * Returns the character code at the specified index, or `None` if the index is out of bounds.
+ * Returns the character code at the specified index safely, or `None` if the index is out of bounds.
  *
- * **Example**
+ * **Example** (Reading character codes)
  *
  * ```ts
  * import { String } from "effect"
@@ -495,7 +546,7 @@ export const charCodeAt: {
 /**
  * Extracts characters from a string between two specified indices.
  *
- * **Example**
+ * **Example** (Extracting substrings)
  *
  * ```ts
  * import { pipe, String } from "effect"
@@ -510,9 +561,9 @@ export const charCodeAt: {
 export const substring = (start: number, end?: number) => (self: string): string => self.substring(start, end)
 
 /**
- * Returns the character at the specified index, or `None` if the index is out of bounds.
+ * Returns the character at the specified relative index safely, or `None` if the index is out of bounds.
  *
- * **Example**
+ * **Example** (Accessing characters safely)
  *
  * ```ts
  * import { pipe, String } from "effect"
@@ -530,9 +581,9 @@ export const at: {
 } = dual(2, (self: string, index: number): Option.Option<string> => Option.fromUndefinedOr(self.at(index)))
 
 /**
- * Returns the character at the specified index, or `None` if the index is out of bounds.
+ * Returns the character at the specified non-negative index safely, or `None` if the index is out of bounds.
  *
- * **Example**
+ * **Example** (Reading characters safely)
  *
  * ```ts
  * import { pipe, String } from "effect"
@@ -553,9 +604,9 @@ export const charAt: {
 )
 
 /**
- * Returns the Unicode code point at the specified index, or `None` if the index is out of bounds.
+ * Returns the Unicode code point at the specified index safely, or `None` if the index is out of bounds.
  *
- * **Example**
+ * **Example** (Reading code points)
  *
  * ```ts
  * import { pipe, String } from "effect"
@@ -573,9 +624,9 @@ export const codePointAt: {
 } = dual(2, (self: string, index: number): Option.Option<number> => Option.fromUndefinedOr(self.codePointAt(index)))
 
 /**
- * Returns the index of the first occurrence of a substring, or `None` if not found.
+ * Returns the index of the first occurrence of a substring safely, or `None` if not found.
  *
- * **Example**
+ * **Example** (Finding the first substring index)
  *
  * ```ts
  * import { pipe, String } from "effect"
@@ -591,9 +642,9 @@ export const indexOf = (searchString: string) => (self: string): Option.Option<n
   Option.filter(Option.some(self.indexOf(searchString)), number.isGreaterThanOrEqualTo(0))
 
 /**
- * Returns the index of the last occurrence of a substring, or `None` if not found.
+ * Returns the index of the last occurrence of a substring safely, or `None` if not found.
  *
- * **Example**
+ * **Example** (Finding the last substring index)
  *
  * ```ts
  * import { pipe, String } from "effect"
@@ -609,9 +660,12 @@ export const lastIndexOf = (searchString: string) => (self: string): Option.Opti
   Option.filter(Option.some(self.lastIndexOf(searchString)), number.isGreaterThanOrEqualTo(0))
 
 /**
- * Compares two strings according to the current locale.
+ * Computes locale-aware ordering for two strings, with optional locales and
+ * collator options, and returns the result as an `Ordering` (`-1`, `0`, or
+ * `1`).
  *
- * @example
+ * **Example** (Comparing strings by locale)
+ *
  * ```ts
  * import { pipe, String } from "effect"
  * import * as assert from "node:assert"
@@ -629,15 +683,21 @@ export const localeCompare =
     number.sign(self.localeCompare(that, locales, options))
 
 /**
- * A `pipe`-able version of the native `match` method.
+ * Matches a string against a pattern safely and returns `Option.some` with the match
+ * array, or `Option.none` when the pattern does not match.
  *
- * **Example**
+ * **Example** (Matching regular expressions)
  *
  * ```ts
- * import { pipe, String } from "effect"
+ * import { Option, pipe, String } from "effect"
  *
- * pipe("hello", String.match(/l+/)) // Option.some(["ll"])
- * pipe("hello", String.match(/x/)) // Option.none()
+ * const match = pipe("hello", String.match(/l+/))
+ *
+ * if (Option.isSome(match)) {
+ *   console.log(`${match.value[0]}@${match.value.index}`) // "ll@2"
+ * }
+ *
+ * console.log(Option.isNone(pipe("hello", String.match(/x/)))) // true
  * ```
  *
  * @category searching
@@ -647,14 +707,18 @@ export const match = (regExp: RegExp | string) => (self: string): Option.Option<
   Option.fromNullOr(self.match(regExp))
 
 /**
- * It is the `pipe`-able version of the native `matchAll` method.
+ * Returns an iterator over all regular expression matches in the string using
+ * native `String.prototype.matchAll` semantics.
  *
- * @example
+ * **Example** (Iterating regular expression matches)
+ *
  * ```ts
  * import { pipe, String } from "effect"
  *
  * const matches = pipe("hello world", String.matchAll(/l/g))
- * console.log(Array.from(matches)) // [["l"], ["l"], ["l"]]
+ * console.log(
+ *   Array.from(matches, (match) => `${match[0]}@${match.index}`).join(", ")
+ * ) // "l@2, l@3, l@9"
  * ```
  *
  * @category searching
@@ -665,7 +729,8 @@ export const matchAll = (regExp: RegExp) => (self: string): IterableIterator<Reg
 /**
  * Normalizes a string according to the specified Unicode normalization form.
  *
- * @example
+ * **Example** (Normalizing Unicode strings)
+ *
  * ```ts
  * import { pipe, String } from "effect"
  * import * as assert from "node:assert"
@@ -689,7 +754,8 @@ export const normalize = (form?: "NFC" | "NFD" | "NFKC" | "NFKD") => (self: stri
 /**
  * Pads the string from the end with a given fill string to a specified length.
  *
- * @example
+ * **Example** (Padding strings at the end)
+ *
  * ```ts
  * import { pipe, String } from "effect"
  * import * as assert from "node:assert"
@@ -707,7 +773,8 @@ export const padEnd = (maxLength: number, fillString?: string) => (self: string)
 /**
  * Pads the string from the start with a given fill string to a specified length.
  *
- * @example
+ * **Example** (Padding strings at the start)
+ *
  * ```ts
  * import { pipe, String } from "effect"
  * import * as assert from "node:assert"
@@ -725,7 +792,8 @@ export const padStart = (maxLength: number, fillString?: string) => (self: strin
 /**
  * Repeats the string the specified number of times.
  *
- * @example
+ * **Example** (Repeating strings)
+ *
  * ```ts
  * import { pipe, String } from "effect"
  * import * as assert from "node:assert"
@@ -742,7 +810,8 @@ export const repeat = (count: number) => (self: string): string => self.repeat(c
 /**
  * Replaces all occurrences of a substring or pattern in a string.
  *
- * @example
+ * **Example** (Replacing all matches)
+ *
  * ```ts
  * import { pipe, String } from "effect"
  * import * as assert from "node:assert"
@@ -758,9 +827,10 @@ export const replaceAll = (searchValue: string | RegExp, replaceValue: string) =
   self.replaceAll(searchValue, replaceValue)
 
 /**
- * Searches for a match between a regular expression and the string.
+ * Returns the index of the first match for a string or regular expression safely, or
+ * `Option.none` when no match is found.
  *
- * **Example**
+ * **Example** (Searching strings)
  *
  * ```ts
  * import { String } from "effect"
@@ -785,7 +855,8 @@ export const search: {
 /**
  * Converts the string to lowercase according to the specified locale.
  *
- * @example
+ * **Example** (Lowercasing strings by locale)
+ *
  * ```ts
  * import { pipe, String } from "effect"
  * import * as assert from "node:assert"
@@ -803,7 +874,8 @@ export const toLocaleLowerCase = (locale?: string | Array<string>) => (self: str
 /**
  * Converts the string to uppercase according to the specified locale.
  *
- * @example
+ * **Example** (Uppercasing strings by locale)
+ *
  * ```ts
  * import { pipe, String } from "effect"
  * import * as assert from "node:assert"
@@ -819,7 +891,9 @@ export const toLocaleUpperCase = (locale?: string | Array<string>) => (self: str
   self.toLocaleUpperCase(locale)
 
 /**
- * Keep the specified number of characters from the start of a string.
+ * Keeps the specified number of characters from the start of a string.
+ *
+ * **Details**
  *
  * If `n` is larger than the available number of characters, the string will
  * be returned whole.
@@ -828,7 +902,8 @@ export const toLocaleUpperCase = (locale?: string | Array<string>) => (self: str
  *
  * If `n` is a float, it will be rounded down to the nearest integer.
  *
- * @example
+ * **Example** (Taking characters from the start)
+ *
  * ```ts
  * import { String } from "effect"
  * import * as assert from "node:assert"
@@ -845,7 +920,9 @@ export const takeLeft: {
 } = dual(2, (self: string, n: number): string => self.slice(0, Math.max(n, 0)))
 
 /**
- * Keep the specified number of characters from the end of a string.
+ * Keeps the specified number of characters from the end of a string.
+ *
+ * **Details**
  *
  * If `n` is larger than the available number of characters, the string will
  * be returned whole.
@@ -854,7 +931,8 @@ export const takeLeft: {
  *
  * If `n` is a float, it will be rounded down to the nearest integer.
  *
- * @example
+ * **Example** (Taking characters from the end)
+ *
  * ```ts
  * import { String } from "effect"
  * import * as assert from "node:assert"
@@ -880,7 +958,8 @@ const LF = 0x0a
  * Returns an `IterableIterator` which yields each line contained within the
  * string, trimming off the trailing newline character.
  *
- * @example
+ * **Example** (Iterating lines without separators)
+ *
  * ```ts
  * import { String } from "effect"
  *
@@ -897,7 +976,8 @@ export const linesIterator = (self: string): LinesIterator => linesSeparated(sel
  * Returns an `IterableIterator` which yields each line contained within the
  * string as well as the trailing newline character.
  *
- * @example
+ * **Example** (Iterating lines with separators)
+ *
  * ```ts
  * import { String } from "effect"
  *
@@ -911,11 +991,11 @@ export const linesIterator = (self: string): LinesIterator => linesSeparated(sel
 export const linesWithSeparators = (s: string): LinesIterator => linesSeparated(s, false)
 
 /**
- * For every line in this string, strip a leading prefix consisting of blanks
- * or control characters followed by the character specified by `marginChar`
- * from the line.
+ * Strips a leading margin prefix from every line using the supplied margin
+ * character.
  *
- * @example
+ * **Example** (Stripping custom margins)
+ *
  * ```ts
  * import { String } from "effect"
  *
@@ -951,10 +1031,10 @@ export const stripMarginWith: {
 })
 
 /**
- * For every line in this string, strip a leading prefix consisting of blanks
- * or control characters followed by the `"|"` character from the line.
+ * Strips a leading `|` margin prefix from every line.
  *
- * @example
+ * **Example** (Stripping pipe margins)
+ *
  * ```ts
  * import { String } from "effect"
  *
@@ -971,7 +1051,8 @@ export const stripMargin = (self: string): string => stripMarginWith(self, "|")
 /**
  * Converts a snake_case string to camelCase.
  *
- * @example
+ * **Example** (Converting snake_case to camelCase)
+ *
  * ```ts
  * import { String } from "effect"
  *
@@ -993,7 +1074,8 @@ export const snakeToCamel = (self: string): string => {
 /**
  * Converts a snake_case string to PascalCase.
  *
- * @example
+ * **Example** (Converting snake_case to PascalCase)
+ *
  * ```ts
  * import { String } from "effect"
  *
@@ -1015,7 +1097,8 @@ export const snakeToPascal = (self: string): string => {
 /**
  * Converts a snake_case string to kebab-case.
  *
- * @example
+ * **Example** (Converting snake_case to kebab-case)
+ *
  * ```ts
  * import { String } from "effect"
  *
@@ -1031,7 +1114,8 @@ export const snakeToKebab = (self: string): string => self.replace(/_/g, "-")
 /**
  * Converts a camelCase string to snake_case.
  *
- * @example
+ * **Example** (Converting camelCase to snake_case)
+ *
  * ```ts
  * import { String } from "effect"
  *
@@ -1047,7 +1131,8 @@ export const camelToSnake = (self: string): string => self.replace(/([A-Z])/g, "
 /**
  * Converts a PascalCase string to snake_case.
  *
- * @example
+ * **Example** (Converting PascalCase to snake_case)
+ *
  * ```ts
  * import { String } from "effect"
  *
@@ -1064,7 +1149,8 @@ export const pascalToSnake = (self: string): string =>
 /**
  * Converts a kebab-case string to snake_case.
  *
- * @example
+ * **Example** (Converting kebab-case to snake_case)
+ *
  * ```ts
  * import { String } from "effect"
  *
@@ -1125,7 +1211,7 @@ class LinesIterator implements IterableIterator<string> {
 }
 
 /**
- * Test if the provided character is a line break character (i.e. either `"\r"`
+ * Checks whether the provided character is a line break character (i.e. either `"\r"`
  * or `"\n"`).
  */
 const isLineBreak = (char: string): boolean => {
@@ -1134,7 +1220,7 @@ const isLineBreak = (char: string): boolean => {
 }
 
 /**
- * Test if the provided characters combine to form a carriage return/line-feed
+ * Checks whether the provided characters combine to form a carriage return/line-feed
  * (i.e. `"\r\n"`).
  */
 const isLineBreak2 = (char0: string, char1: string): boolean => char0.charCodeAt(0) === CR && char1.charCodeAt(0) === LF
@@ -1142,7 +1228,19 @@ const isLineBreak2 = (char0: string, char1: string): boolean => char0.charCodeAt
 const linesSeparated = (self: string, stripped: boolean): LinesIterator => new LinesIterator(self, stripped)
 
 /**
- * Normalize a string to a specific case format
+ * Normalizes a string by splitting it into word parts, transforming each part,
+ * and joining the parts with a configurable delimiter.
+ *
+ * **When to use**
+ *
+ * Use when you need custom word-case output with a delimiter or part transform
+ * that the fixed case helpers do not provide.
+ *
+ * @see {@link pascalCase} for fixed PascalCase output
+ * @see {@link camelCase} for fixed lower-initial camelCase output
+ * @see {@link constantCase} for fixed uppercase underscore-separated output
+ * @see {@link kebabCase} for fixed lowercase hyphen-separated output
+ * @see {@link snakeCase} for fixed lowercase underscore-separated output
  *
  * @category transforming
  * @since 4.0.0
@@ -1168,10 +1266,21 @@ export const noCase: {
 }): string => {
   const delimiter = options?.delimiter ?? " "
   const transform = options?.transform ?? toLowerCase
-  const result = input
-    .replace(SPLIT_REGEXP[0], "$1\0$2")
-    .replace(SPLIT_REGEXP[1], "$1\0$2")
-    .replace(STRIP_REGEXP, "\0")
+  return normalizeCase(input, SPLIT_REGEXP, STRIP_REGEXP, delimiter, transform)
+})
+
+const normalizeCase = (
+  input: string,
+  splitRegExp: ReadonlyArray<RegExp>,
+  stripRegExp: RegExp,
+  delimiter: string,
+  transform: (part: string, index: number, parts: ReadonlyArray<string>) => string
+): string => {
+  let result = input
+  for (const regexp of splitRegExp) {
+    result = result.replace(regexp, "$1\0$2")
+  }
+  result = result.replace(stripRegExp, "\0")
   let start = 0
   let end = result.length
   // Trim the delimiter from around the output string.
@@ -1184,28 +1293,38 @@ export const noCase: {
 
   // Transform each token independently.
   return result.slice(start, end).split("\0").map(transform).join(delimiter)
-})
+}
 
-// Support camel case ("camelCase" -> "camel Case" and "CAMELCase" -> "CAMEL Case").
-const SPLIT_REGEXP = [/([a-z0-9])([A-Z])/g, /([A-Z])([A-Z][a-z])/g]
+// Support camel case ("camelCase" -> "camel Case" and "CAMELCase" -> "CAMEL Case")
+// and digit boundaries ("camel2case" -> "camel 2 case").
+const SPLIT_REGEXP = [/([a-z0-9])([A-Z])/g, /([A-Z])([A-Z][a-z])/g, /([A-Z])([0-9])/gi, /([0-9])([A-Z])/gi]
+
+// Config paths preserve digit groups such as "v2" while still supporting camel case.
+const CONFIG_SPLIT_REGEXP = [/([a-z0-9])([A-Z])/g, /([A-Z])([A-Z][a-z])/g]
 
 // Remove all non-word characters.
 const STRIP_REGEXP = /[^A-Z0-9]+/gi
 
-const pascalCaseTransform = (input: string, index: number): string => {
+const pascalCaseTransform = (input: string): string => {
   const firstChar = input.charAt(0)
   const lowerChars = input.substring(1).toLowerCase()
-  if (index > 0 && firstChar >= "0" && firstChar <= "9") {
-    return `_${firstChar}${lowerChars}`
-  }
   return `${firstChar.toUpperCase()}${lowerChars}`
 }
 
 /**
  * Converts a string to PascalCase.
  *
- * @since 4.0.0
+ * **When to use**
+ *
+ * Use to normalize strings from spaces, separators, or camel/Pascal word
+ * boundaries into PascalCase.
+ *
+ * @see {@link camelCase} for lower-initial camelCase output
+ * @see {@link noCase} for configurable delimiters and part transforms
+ * @see {@link snakeToPascal} for converting known snake_case input only
+ *
  * @category transforming
+ * @since 4.0.0
  */
 export const pascalCase: (self: string) => string = noCase({
   delimiter: "",
@@ -1215,13 +1334,24 @@ export const pascalCase: (self: string) => string = noCase({
 const camelCaseTransform = (input: string, index: number): string =>
   index === 0
     ? input.toLowerCase()
-    : pascalCaseTransform(input, index)
+    : pascalCaseTransform(input)
 
 /**
  * Converts a string to camelCase.
  *
- * @since 4.0.0
+ * **When to use**
+ *
+ * Use to normalize mixed word separators or existing PascalCase/camelCase text
+ * into lower-initial camelCase identifiers.
+ *
+ * @see {@link noCase} for configurable delimiters and part transforms
+ * @see {@link pascalCase} for upper-initial PascalCase output
+ * @see {@link snakeCase} for lowercase underscore-separated output
+ * @see {@link kebabCase} for lowercase hyphen-separated output
+ * @see {@link constantCase} for uppercase underscore-separated output
+ *
  * @category transforming
+ * @since 4.0.0
  */
 export const camelCase: (self: string) => string = noCase({
   delimiter: "",
@@ -1231,8 +1361,20 @@ export const camelCase: (self: string) => string = noCase({
 /**
  * Converts a string to CONSTANT_CASE (uppercase with underscores).
  *
- * @since 4.0.0
+ * **When to use**
+ *
+ * Use to normalize words from mixed input formats into uppercase,
+ * underscore-separated identifiers.
+ *
+ * @see {@link snakeCase} for lowercase underscore-separated output
+ * @see {@link kebabCase} for lowercase hyphen-separated output
+ * @see {@link camelCase} for lower-initial camelCase output
+ * @see {@link pascalCase} for upper-initial PascalCase output
+ * @see {@link configCase} for configuration key casing that preserves numeric word groups
+ * @see {@link noCase} for configurable delimiters and part transforms
+ *
  * @category transforming
+ * @since 4.0.0
  */
 export const constantCase: (self: string) => string = noCase({
   delimiter: "_",
@@ -1240,10 +1382,42 @@ export const constantCase: (self: string) => string = noCase({
 })
 
 /**
+ * Converts a string to CONFIG_CASE (uppercase with underscores) for
+ * configuration keys.
+ *
+ * **When to use**
+ *
+ * Use to normalize configuration path segments into environment-variable-like
+ * keys while preserving numeric word groups such as `v2`.
+ *
+ * **Details**
+ *
+ * Unlike {@link constantCase}, digit-letter boundaries are not split. For
+ * example, `"api-v2 xml"` becomes `"API_V2_XML"`.
+ *
+ * @see {@link constantCase} for standard uppercase underscore-separated output
+ * @category transforming
+ * @since 4.0.0
+ */
+export const configCase: (self: string) => string = (self) =>
+  normalizeCase(self, CONFIG_SPLIT_REGEXP, STRIP_REGEXP, "_", toUpperCase)
+
+/**
  * Converts a string to kebab-case (lowercase with hyphens).
  *
- * @since 4.0.0
+ * **When to use**
+ *
+ * Use to normalize free-form labels, identifiers, or keys into lowercase
+ * hyphen-separated text.
+ *
+ * @see {@link noCase} for configurable delimiters and part transforms
+ * @see {@link snakeCase} for lowercase underscore-separated output
+ * @see {@link constantCase} for uppercase underscore-separated output
+ * @see {@link camelCase} for lower-initial camelCase output
+ * @see {@link pascalCase} for upper-initial PascalCase output
+ *
  * @category transforming
+ * @since 4.0.0
  */
 export const kebabCase: (self: string) => string = noCase({
   delimiter: "-"
@@ -1252,16 +1426,36 @@ export const kebabCase: (self: string) => string = noCase({
 /**
  * Converts a string to snake_case (lowercase with underscores).
  *
- * @since 4.0.0
+ * **When to use**
+ *
+ * Use to normalize mixed-case or separator-delimited text into lowercase words
+ * joined with underscores.
+ *
+ * @see {@link noCase} for configurable lower-level normalization
+ * @see {@link kebabCase} for lowercase hyphen-separated output
+ * @see {@link constantCase} for uppercase underscore-separated output
+ *
  * @category transforming
+ * @since 4.0.0
  */
 export const snakeCase: (self: string) => string = noCase({
   delimiter: "_"
 })
 
 /**
- * A `Reducer` for concatenating `string`s.
+ * Reducer for concatenating `string`s.
  *
+ * **When to use**
+ *
+ * Use to concatenate many strings through APIs that consume a `Reducer`.
+ *
+ * **Details**
+ *
+ * The reducer starts from `""`, so combining an empty collection returns `""`.
+ *
+ * @see {@link concat} for concatenating two strings directly
+ *
+ * @category combining
  * @since 4.0.0
  */
 export const ReducerConcat: Reducer.Reducer<string> = Reducer.make((a, b) => a + b, "")

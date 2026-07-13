@@ -2,6 +2,7 @@ import * as Arr from "../Array.ts"
 import type * as Cause from "../Cause.ts"
 import type * as Clock from "../Clock.ts"
 import type * as Console from "../Console.ts"
+import * as Context from "../Context.ts"
 import * as Duration from "../Duration.ts"
 import type * as Effect from "../Effect.ts"
 import * as Equal from "../Equal.ts"
@@ -28,7 +29,6 @@ import type { StackFrame } from "../References.ts"
 import * as Result from "../Result.ts"
 import * as Scheduler from "../Scheduler.ts"
 import type * as Scope from "../Scope.ts"
-import * as ServiceMap from "../ServiceMap.ts"
 import * as Tracer from "../Tracer.ts"
 import type {
   Concurrency,
@@ -58,7 +58,6 @@ import {
   contA,
   contAll,
   contE,
-  Die,
   evaluate,
   exitDie,
   exitFail,
@@ -97,7 +96,8 @@ import {
   TracerSpanLinks,
   TracerTimingEnabled
 } from "./references.ts"
-import { addSpanStackTrace, type ErrorWithStackTraceLimit, makeStackCleaner } from "./tracer.ts"
+import { getStackTraceLimit, setStackTraceLimit } from "./stackTraceLimit.ts"
+import { addSpanStackTrace, makeStackCleaner } from "./tracer.ts"
 import { version } from "./version.ts"
 
 // ----------------------------------------------------------------------------
@@ -222,12 +222,12 @@ export const hasInterruptsOnly = <E>(self: Cause.Cause<E>): boolean =>
 /** @internal */
 export const reasonAnnotations = <E>(
   self: Cause.Reason<E>
-): ServiceMap.ServiceMap<never> => ServiceMap.makeUnsafe(self.annotations)
+): Context.Context<never> => Context.makeUnsafe(self.annotations)
 
 /** @internal */
 export const causeAnnotations = <E>(
   self: Cause.Cause<E>
-): ServiceMap.ServiceMap<never> => {
+): Context.Context<never> => {
   const map = new Map<string, unknown>()
   for (const f of self.reasons) {
     if (f.annotations.size > 0) {
@@ -236,7 +236,7 @@ export const causeAnnotations = <E>(
       }
     }
   }
-  return ServiceMap.makeUnsafe(map)
+  return Context.makeUnsafe(map)
 }
 
 /** @internal */
@@ -310,14 +310,15 @@ export const causeSquash = <E>(self: Cause.Cause<E>): unknown => {
 }
 
 /** @internal */
-export const causePrettyErrors = <E>(self: Cause.Cause<E>): Array<Error> => {
+export const causePrettyErrors = <E>(self: Cause.Cause<E>, options?: {
+  readonly includeCauseInStack?: boolean | undefined
+}): Array<Error> => {
   const errors: Array<Error> = []
   const interrupts: Array<Cause.Interrupt> = []
   if (self.reasons.length === 0) return errors
 
-  const prevStackLimit = (Error as ErrorWithStackTraceLimit).stackTraceLimit
-  ;(Error as ErrorWithStackTraceLimit)
-    .stackTraceLimit = 1
+  const prevStackLimit = getStackTraceLimit()
+  setStackTraceLimit(1)
 
   for (const failure of self.reasons) {
     if (failure._tag === "Interrupt") {
@@ -327,7 +328,8 @@ export const causePrettyErrors = <E>(self: Cause.Cause<E>): Array<Error> => {
     errors.push(
       causePrettyError(
         failure._tag === "Die" ? failure.defect : failure.error as any,
-        failure.annotations
+        failure.annotations,
+        options
       )
     )
   }
@@ -338,17 +340,20 @@ export const causePrettyErrors = <E>(self: Cause.Cause<E>): Array<Error> => {
     const error = new globalThis.Error("All fibers interrupted without error", { cause })
     error.name = "InterruptError"
     error.stack = `${error.name}: ${error.message}`
-    errors.push(causePrettyError(error, interrupts[0].annotations))
+    errors.push(causePrettyError(error, interrupts[0].annotations, options))
   }
 
-  ;(Error as ErrorWithStackTraceLimit).stackTraceLimit = prevStackLimit
+  setStackTraceLimit(prevStackLimit)
   return errors
 }
 
 /** @internal */
 export const causePrettyError = (
   original: Record<string, unknown> | Error,
-  annotations?: ReadonlyMap<string, unknown>
+  annotations?: ReadonlyMap<string, unknown>,
+  options?: {
+    readonly includeCauseInStack?: boolean | undefined
+  }
 ): Error => {
   const kind = typeof original
   let error: Error
@@ -364,6 +369,9 @@ export const causePrettyError = (
     } else {
       const stack = `${error.name}: ${error.message}`
       error.stack = annotations ? addStackAnnotations(stack, annotations) : stack
+    }
+    if (options?.includeCauseInStack) {
+      error.stack = renderPrettyError(error)!
     }
     for (const key of Object.keys(original)) {
       if (!(key in error)) {
@@ -460,10 +468,10 @@ const currentStackTrace = (frame: StackFrame): string => {
 
 /** @internal */
 export const causePretty = <E>(cause: Cause.Cause<E>): string =>
-  causePrettyErrors<E>(cause).map((e) =>
-    e.cause ? `${e.stack} {\n${renderErrorCause(e.cause as Error, "  ")}\n}` : e.stack
-  )
-    .join("\n")
+  causePrettyErrors<E>(cause).map(renderPrettyError).join("\n")
+
+const renderPrettyError = (e: Error): string | undefined =>
+  e.cause ? `${e.stack} {\n${renderErrorCause(e.cause as Error, "  ")}\n}` : e.stack
 
 const renderErrorCause = (cause: Error, prefix: string) => {
   const lines = cause.stack!.split("\n")
@@ -497,11 +505,11 @@ export const getCurrentFiber = (): Fiber.Fiber<any, any> | undefined => (globalT
 /** @internal */
 export class FiberImpl<A = any, E = any> implements Fiber.Fiber<A, E> {
   constructor(
-    services: ServiceMap.ServiceMap<never>,
+    context: Context.Context<never>,
     interruptible: boolean = true
   ) {
     this[FiberTypeId] = fiberVariance as any
-    this.setServices(services)
+    this.setContext(context)
     this.id = ++fiberIdStore.id
     this.currentOpCount = 0
     this.currentLoopCount = 0
@@ -512,6 +520,7 @@ export class FiberImpl<A = any, E = any> implements Fiber.Fiber<A, E> {
     this._children = undefined
     this._interruptedCause = undefined
     this._yielded = undefined
+    this.runtimeMetrics?.recordFiberStart(this.context)
   }
 
   readonly [FiberTypeId]: Fiber.Fiber.Variance<A, E>
@@ -528,8 +537,8 @@ export class FiberImpl<A = any, E = any> implements Fiber.Fiber<A, E> {
   _interruptedCause: Cause.Cause<never> | undefined
   _yielded: Exit.Exit<any, any> | (() => void) | undefined
 
-  // set in setServices
-  services!: ServiceMap.ServiceMap<never>
+  // set in setContext
+  context!: Context.Context<never>
   currentScheduler!: Scheduler.Scheduler
   currentTracerContext: Tracer.Tracer["context"]
   currentSpan: Tracer.AnySpan | undefined
@@ -545,8 +554,8 @@ export class FiberImpl<A = any, E = any> implements Fiber.Fiber<A, E> {
     return this._dispatcher ??= this.currentScheduler.makeDispatcher()
   }
 
-  getRef<X>(ref: ServiceMap.Reference<X>): X {
-    return ServiceMap.getReferenceUnsafe(this.services, ref)
+  getRef<X>(ref: Context.Reference<X>): X {
+    return Context.getReferenceUnsafe(this.context, ref)
   }
   addObserver(cb: (exit: Exit.Exit<A, E>) => void): () => void {
     if (this._exit) {
@@ -561,13 +570,13 @@ export class FiberImpl<A = any, E = any> implements Fiber.Fiber<A, E> {
       }
     }
   }
-  interruptUnsafe(fiberId?: number | undefined, annotations?: ServiceMap.ServiceMap<never> | undefined): void {
+  interruptUnsafe(fiberId?: number | undefined, annotations?: Context.Context<never> | undefined): void {
     if (this._exit) {
       return
     }
     let cause = causeInterrupt(fiberId)
     if (this.currentStackFrame) {
-      cause = causeAnnotate(cause, ServiceMap.make(CauseStackTrace, this.currentStackFrame))
+      cause = causeAnnotate(cause, Context.make(CauseStackTrace, this.currentStackFrame))
     }
     if (annotations) {
       cause = causeAnnotate(cause, annotations)
@@ -583,7 +592,6 @@ export class FiberImpl<A = any, E = any> implements Fiber.Fiber<A, E> {
     return this._exit
   }
   evaluate(effect: Primitive): void {
-    this.runtimeMetrics?.recordFiberStart(this.services)
     if (this._exit) {
       return
     } else if (this._yielded !== undefined) {
@@ -604,7 +612,7 @@ export class FiberImpl<A = any, E = any> implements Fiber.Fiber<A, E> {
     }
 
     this._exit = exit
-    this.runtimeMetrics?.recordFiberEnd(this.services, this._exit)
+    this.runtimeMetrics?.recordFiberEnd(this.context, this._exit)
     for (let i = 0; i < this._observers.length; i++) {
       this._observers[i](exit)
     }
@@ -678,21 +686,21 @@ export class FiberImpl<A = any, E = any> implements Fiber.Fiber<A, E> {
   pipe() {
     return pipeArguments(this, arguments)
   }
-  setServices(services: ServiceMap.ServiceMap<never>): void {
-    this.services = services
+  setContext(context: Context.Context<never>): void {
+    this.context = context
     const scheduler = this.getRef(Scheduler.Scheduler)
     if (scheduler !== this.currentScheduler) {
       this.currentScheduler = scheduler
       this._dispatcher = undefined
     }
-    this.currentSpan = services.mapUnsafe.get(Tracer.ParentSpanKey)
+    this.currentSpan = context.mapUnsafe.get(Tracer.ParentSpanKey)
     this.currentLogLevel = this.getRef(CurrentLogLevel)
     this.minimumLogLevel = this.getRef(MinimumLogLevel)
-    this.currentStackFrame = services.mapUnsafe.get(CurrentStackFrame.key)
+    this.currentStackFrame = context.mapUnsafe.get(CurrentStackFrame.key)
     this.maxOpsBeforeYield = this.getRef(Scheduler.MaxOpsBeforeYield)
     this.currentPreventYield = this.getRef(Scheduler.PreventSchedulerYield)
-    this.runtimeMetrics = services.mapUnsafe.get(InternalMetric.FiberRuntimeMetricsKey)
-    const currentTracer = services.mapUnsafe.get(Tracer.TracerKey)
+    this.runtimeMetrics = context.mapUnsafe.get(InternalMetric.FiberRuntimeMetricsKey)
+    const currentTracer = context.mapUnsafe.get(Tracer.TracerKey)
     this.currentTracerContext = currentTracer ? currentTracer["context"] : undefined
   }
   get currentSpanLocal(): Tracer.Span | undefined {
@@ -710,7 +718,7 @@ const fiberStackAnnotations = (fiber: Fiber.Fiber<any, any>) => {
   if (!fiber.currentStackFrame) return undefined
   const annotations = new Map<string, unknown>()
   annotations.set(CauseStackTrace.key, fiber.currentStackFrame)
-  return ServiceMap.makeUnsafe(annotations)
+  return Context.makeUnsafe(annotations)
 }
 
 const fiberInterruptChildren = (fiber: FiberImpl) => {
@@ -815,23 +823,23 @@ export const fiberInterrupt = <A, E>(
 export const fiberInterruptAs: {
   (
     fiberId: number | undefined,
-    annotations?: ServiceMap.ServiceMap<never> | undefined
+    annotations?: Context.Context<never> | undefined
   ): <A, E>(self: Fiber.Fiber<A, E>) => Effect.Effect<void>
   <A, E>(
     self: Fiber.Fiber<A, E>,
     fiberId: number | undefined,
-    annotations?: ServiceMap.ServiceMap<never> | undefined
+    annotations?: Context.Context<never> | undefined
   ): Effect.Effect<void>
 } = dual(
   (args) => hasProperty(args[0], FiberTypeId),
   <A, E>(
     self: Fiber.Fiber<A, E>,
     fiberId: number | undefined,
-    annotations?: ServiceMap.ServiceMap<never> | undefined
+    annotations?: Context.Context<never> | undefined
   ): Effect.Effect<void> =>
     withFiber((parent) => {
       let ann = fiberStackAnnotations(parent)
-      ann = ann && annotations ? ServiceMap.merge(ann, annotations) : ann ?? annotations
+      ann = ann && annotations ? Context.merge(ann, annotations) : ann ?? annotations
       self.interruptUnsafe(fiberId, ann)
       return asVoid(fiberAwait(self))
     })
@@ -893,15 +901,24 @@ export const suspend: <A, E, R>(
 })
 
 /** @internal */
-export const fromYieldable = <Self extends Effect.Yieldable.Any, A, E, R>(
-  yieldable: Effect.Yieldable<Self, A, E, R>
-): Effect.Effect<A, E, R> => yieldable.asEffect()
+export const fromOption: <Arg extends Option.Option<unknown> | LazyArg<unknown>, E = Cause.NoSuchElementError>(
+  arg: Arg,
+  ...rest: [Arg] extends [Option.Option<unknown>] ? [onNone?: LazyArg<E>] : []
+) => [Arg] extends [Option.Option<infer A>] ? Effect.Effect<A, E>
+  : [Arg] extends [LazyArg<infer E>] ? <A>(option: Option.Option<A>) => Effect.Effect<A, E>
+  : never = dual(
+    (args) => args.length >= 2 || Option.isOption(args[0]),
+    <A, E>(option: Option.Option<A>, onNone?: LazyArg<E>): Effect.Effect<A, Cause.NoSuchElementError | E> =>
+      Option.isNone(option)
+        ? fail(onNone ? onNone() : new NoSuchElementError("Effect.fromOption: Option.none"))
+        : succeed(option.value)
+  )
 
 /** @internal */
-export const fromOption: <A>(option: Option.Option<A>) => Effect.Effect<A, Cause.NoSuchElementError> = fromYieldable
-
-/** @internal */
-export const fromResult: <A, E>(result: Result.Result<A, E>) => Effect.Effect<A, E> = fromYieldable
+export const fromResult: <A, E>(result: Result.Result<A, E>) => Effect.Effect<A, E> = Result.match({
+  onFailure: fail,
+  onSuccess: succeed
+})
 
 /** @internal */
 export const fromNullishOr = <A>(value: A): Effect.Effect<NonNullable<A>, Cause.NoSuchElementError> =>
@@ -934,6 +951,11 @@ export const succeedNone: Effect.Effect<Option.Option<never>> = succeed(
 )
 
 /** @internal */
+export const transposeOption = <A = never, E = never, R = never>(
+  self: Option.Option<Effect.Effect<A, E, R>>
+): Effect.Effect<Option.Option<A>, E, R> => Option.isNone(self) ? succeedNone : map(self.value, Option.some)
+
+/** @internal */
 export const failCauseSync = <E>(
   evaluate: LazyArg<Cause.Cause<E>>
 ): Effect.Effect<never, E> => suspend(() => failCause(internalCall(evaluate)))
@@ -950,17 +972,24 @@ const void_: Effect.Effect<void> = succeed(void 0)
 export { void_ as void }
 
 /** @internal */
-const try_ = <A, E>(options: {
-  try: LazyArg<A>
-  catch: (error: unknown) => E
-}): Effect.Effect<A, E> =>
-  suspend(() => {
+const try_ = <A, E = Cause.UnknownError>(
+  options: {
+    readonly try: LazyArg<A>
+    readonly catch: (error: unknown) => E
+  } | LazyArg<A>
+): Effect.Effect<A, E> => {
+  const evaluate = typeof options === "function" ? options : options.try
+  const catcher = typeof options === "function"
+    ? ((cause: unknown) => new UnknownError(cause, "An error occurred in Effect.try"))
+    : options.catch
+  return suspend(() => {
     try {
-      return succeed(internalCall(options.try))
+      return succeed(internalCall(evaluate))
     } catch (err) {
-      return fail(internalCall(() => options.catch(err)))
+      return fail(internalCall(() => catcher(err)) as E)
     }
   })
+}
 /** @internal */
 export { try_ as try }
 
@@ -987,15 +1016,22 @@ export const tryPromise = <A, E = Cause.UnknownError>(
     ? ((cause: unknown) => new UnknownError(cause, "An error occurred in Effect.tryPromise"))
     : options.catch
   return callbackOptions<A, E>(function(resume, signal) {
+    const failWithCatch = (cause: unknown) => {
+      try {
+        resume(fail(internalCall(() => catcher(cause)) as E))
+      } catch (err) {
+        resume(die(err))
+      }
+    }
     try {
       internalCall(() => f(signal!)).then(
         (a) => resume(succeed(a)),
-        (e) => resume(fail(internalCall(() => catcher(e)) as E))
+        failWithCatch
       )
     } catch (err) {
-      resume(fail(internalCall(() => catcher(err)) as E))
+      failWithCatch(err)
     }
-  }, eval.length !== 0)
+  }, f.length !== 0)
 }
 
 /** @internal */
@@ -1084,7 +1120,7 @@ export const never: Effect.Effect<never> = callback<never>(constVoid)
 /** @internal */
 export const gen = <
   Self,
-  Eff extends Effect.Yieldable<any, any, any, any>,
+  Eff extends Effect.Effect<any, any, any>,
   AEff
 >(
   ...args:
@@ -1093,10 +1129,10 @@ export const gen = <
 ): Effect.Effect<
   AEff,
   [Eff] extends [never] ? never
-    : [Eff] extends [Effect.Yieldable<infer _A, infer E, infer _R>] ? E
+    : [Eff] extends [Effect.Effect<infer _A, infer E, infer _R>] ? E
     : never,
   [Eff] extends [never] ? never
-    : [Eff] extends [Effect.Yieldable<infer _A, infer _E, infer R>] ? R
+    : [Eff] extends [Effect.Effect<infer _A, infer _E, infer R>] ? R
     : never
 > =>
   suspend(() =>
@@ -1138,10 +1174,10 @@ export const fn: typeof Effect.fn = function() {
   const name = nameFirst ? arguments[0] : "Effect.fn"
   const spanOptions = nameFirst ? arguments[1] : undefined
 
-  const prevLimit = globalThis.Error.stackTraceLimit
-  globalThis.Error.stackTraceLimit = 2
+  const prevLimit = getStackTraceLimit()
+  setStackTraceLimit(2)
   const defError = new globalThis.Error()
-  globalThis.Error.stackTraceLimit = prevLimit
+  setStackTraceLimit(prevLimit)
 
   if (nameFirst) {
     return (body: Function | { readonly self: any }, ...pipeables: Array<Function>) =>
@@ -1181,10 +1217,10 @@ const makeFn = (
     if (!isEffect(result)) {
       return result
     }
-    const prevLimit = globalThis.Error.stackTraceLimit
-    globalThis.Error.stackTraceLimit = 2
+    const prevLimit = getStackTraceLimit()
+    setStackTraceLimit(2)
     const callError = new globalThis.Error()
-    globalThis.Error.stackTraceLimit = prevLimit
+    setStackTraceLimit(prevLimit)
     return updateService(
       addSpan ?
         useSpan(name, spanOptions!, (span) => provideParentSpan(result, span)) :
@@ -1224,7 +1260,7 @@ export const fnUntracedEager: Effect.fn.Untraced = (
   )
 
 const fromIteratorEagerUnsafe = (
-  evaluate: () => Iterator<Effect.Yieldable<any, any, any, any>>
+  evaluate: () => Iterator<Effect.Effect<any, any, any>>
 ): Effect.Effect<any, any, any> => {
   try {
     const iterator = evaluate()
@@ -1238,22 +1274,20 @@ const fromIteratorEagerUnsafe = (
         return succeed(state.value)
       }
 
-      const yieldable = state.value
-      const effect = yieldable.asEffect()
-      const primitive = effect as any
+      const primitive = state.value as any
 
       if (primitive && primitive._tag === "Success") {
         value = primitive.value
         continue
       } else if (primitive && primitive._tag === "Failure") {
-        return effect
+        return state.value
       } else {
         let isFirstExecution = true
 
         return suspend(() => {
           if (isFirstExecution) {
             isFirstExecution = false
-            return flatMap(effect, (value) => fromIteratorUnsafe(iterator, value))
+            return flatMap(state.value, (value) => fromIteratorUnsafe(iterator, value))
           } else {
             return suspend(() => fromIteratorUnsafe(evaluate()))
           }
@@ -1266,7 +1300,7 @@ const fromIteratorEagerUnsafe = (
 }
 
 const fromIteratorUnsafe: (
-  iterator: Iterator<Effect.Yieldable<any, any, any, any>>,
+  iterator: Iterator<Effect.Effect<any, any, any>>,
   initial?: undefined
 ) => Effect.Effect<any, any, any> = makePrimitive({
   op: "Iterator",
@@ -1276,14 +1310,13 @@ const fromIteratorUnsafe: (
     while (true) {
       const state = iter.next(value)
       if (state.done) return succeed(state.value)
-      const eff = state.value.asEffect()
-      if (!effectIsExit(eff)) {
+      if (!effectIsExit(state.value)) {
         fiber._stack.push(this)
-        return eff
-      } else if (eff._tag === "Failure") {
-        return eff
+        return state.value
+      } else if (state.value._tag === "Failure") {
+        return state.value
       }
-      value = eff.value
+      value = state.value.value
     }
   },
   [evaluate](this: any, fiber: FiberImpl) {
@@ -1969,47 +2002,45 @@ export const exitFindErrorOption = <A, E>(self: Exit.Exit<A, E>): Option.Option<
 // ----------------------------------------------------------------------------
 
 /** @internal */
-export const service: {
-  <I, S>(service: ServiceMap.Key<I, S>): Effect.Effect<S, never, I>
-} = fromYieldable as any
+export const service = <I, S>(service: Context.Key<I, S>): Effect.Effect<S, never, I> => service
 
 /** @internal */
 export const serviceOption = <I, S>(
-  service: ServiceMap.Key<I, S>
-): Effect.Effect<Option.Option<S>> => withFiber((fiber) => succeed(ServiceMap.getOption(fiber.services, service)))
+  service: Context.Key<I, S>
+): Effect.Effect<Option.Option<S>> => withFiber((fiber) => succeed(Context.getOption(fiber.context, service)))
 
 /** @internal */
 export const serviceOptional = <I, S>(
-  service: ServiceMap.Key<I, S>
+  service: Context.Key<I, S>
 ): Effect.Effect<S, Cause.NoSuchElementError> =>
   withFiber((fiber) =>
-    fiber.services.mapUnsafe.has(service.key)
-      ? succeed(ServiceMap.getUnsafe(fiber.services, service))
+    fiber.context.mapUnsafe.has(service.key)
+      ? succeed(Context.getUnsafe(fiber.context, service))
       : fail(new NoSuchElementError())
   )
 
 /** @internal */
-export const updateServices: {
+export const updateContext: {
   <R2, R>(
-    f: (services: ServiceMap.ServiceMap<R2>) => ServiceMap.ServiceMap<NoInfer<R>>
+    f: (context: Context.Context<R2>) => Context.Context<NoInfer<R>>
   ): <A, E>(self: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R2>
   <A, E, R, R2>(
     self: Effect.Effect<A, E, R>,
-    f: (services: ServiceMap.ServiceMap<R2>) => ServiceMap.ServiceMap<NoInfer<R>>
+    f: (context: Context.Context<R2>) => Context.Context<NoInfer<R>>
   ): Effect.Effect<A, E, R2>
 } = dual(
   2,
   <A, E, R, R2>(
     self: Effect.Effect<A, E, R>,
-    f: (services: ServiceMap.ServiceMap<R2>) => ServiceMap.ServiceMap<NoInfer<R>>
+    f: (context: Context.Context<R2>) => Context.Context<NoInfer<R>>
   ): Effect.Effect<A, E, R2> =>
     withFiber<A, E, R2>((fiber) => {
-      const prev = fiber.services as ServiceMap.ServiceMap<R2>
-      const nextServices = f(prev)
-      if (prev === nextServices) return self as any
-      fiber.setServices(nextServices)
+      const prevContext = fiber.context as Context.Context<R2>
+      const nextContext = f(prevContext)
+      if (prevContext === nextContext) return self as any
+      fiber.setContext(nextContext)
       return onExitPrimitive(self, () => {
-        fiber.setServices(prev)
+        fiber.setContext(prevContext)
         return undefined
       })
     })
@@ -2018,77 +2049,96 @@ export const updateServices: {
 /** @internal */
 export const updateService: {
   <I, A>(
-    service: ServiceMap.Key<I, A>,
+    service: Context.Key<I, A>,
     f: (value: A) => A
   ): <XA, E, R>(self: Effect.Effect<XA, E, R>) => Effect.Effect<XA, E, R | I>
   <XA, E, R, I, A>(
     self: Effect.Effect<XA, E, R>,
-    service: ServiceMap.Key<I, A>,
+    service: Context.Key<I, A>,
     f: (value: A) => A
   ): Effect.Effect<XA, E, R | I>
 } = dual(
   3,
   <XA, E, R, I, A>(
     self: Effect.Effect<XA, E, R>,
-    service: ServiceMap.Key<I, A>,
+    service: Context.Key<I, A>,
     f: (value: A) => A
   ): Effect.Effect<XA, E, R | I> =>
-    updateServices(self, (s) => {
-      const prev = ServiceMap.getUnsafe(s, service)
+    updateContext(self, (s) => {
+      const prev = Context.getUnsafe(s, service)
       const next = f(prev)
       if (prev === next) return s
-      return ServiceMap.add(s, service, next)
+      return Context.add(s, service, next)
     })
 )
 
 /** @internal */
-export const services = <R = never>(): Effect.Effect<ServiceMap.ServiceMap<R>> => getServiceMap as any
-const getServiceMap = withFiber((fiber) => succeed(fiber.services))
+export const context = <R = never>(): Effect.Effect<Context.Context<R>> => getContext as any
+const getContext = withFiber((fiber) => succeed(fiber.context))
 
 /** @internal */
-export const servicesWith = <R, A, E, R2>(
-  f: (services: ServiceMap.ServiceMap<R>) => Effect.Effect<A, E, R2>
-): Effect.Effect<A, E, R | R2> => withFiber((fiber) => f(fiber.services as ServiceMap.ServiceMap<R>))
+export const contextWith = <R, A, E, R2>(
+  f: (context: Context.Context<R>) => Effect.Effect<A, E, R2>
+): Effect.Effect<A, E, R | R2> => withFiber((fiber) => f(fiber.context as Context.Context<R>))
 
 /** @internal */
-export const provideServices: {
+export const setContext: {
+  <R>(
+    context: Context.Context<R>
+  ): <A, E>(
+    self: Effect.Effect<A, E, R>
+  ) => Effect.Effect<A, E>
+  <A, E, R>(
+    self: Effect.Effect<A, E, R>,
+    context: Context.Context<R>
+  ): Effect.Effect<A, E>
+} = dual(
+  2,
+  <A, E, R>(
+    self: Effect.Effect<A, E, R>,
+    context: Context.Context<R>
+  ): Effect.Effect<A, E> => updateContext(self, constant(context))
+)
+
+/** @internal */
+export const provideContext: {
   <XR>(
-    services: ServiceMap.ServiceMap<XR>
+    context: Context.Context<XR>
   ): <A, E, R>(
     self: Effect.Effect<A, E, R>
   ) => Effect.Effect<A, E, Exclude<R, XR>>
   <A, E, R, XR>(
     self: Effect.Effect<A, E, R>,
-    services: ServiceMap.ServiceMap<XR>
+    context: Context.Context<XR>
   ): Effect.Effect<A, E, Exclude<R, XR>>
 } = dual(
   2,
   <A, E, R, XR>(
     self: Effect.Effect<A, E, R>,
-    services: ServiceMap.ServiceMap<XR>
+    context: Context.Context<XR>
   ): Effect.Effect<A, E, Exclude<R, XR>> => {
     if (effectIsExit(self)) return self as any
-    return updateServices(self, ServiceMap.merge(services)) as any
+    return updateContext(self, Context.merge(context)) as any
   }
 )
 
 /** @internal */
 export const provideService: {
   <I, S>(
-    service: ServiceMap.Key<I, S>
+    service: Context.Key<I, S>
   ): {
     (implementation: S): <A, E, R>(self: Effect.Effect<A, E, R>) => Effect.Effect<A, E, Exclude<R, I>>
     <A, E, R>(self: Effect.Effect<A, E, R>, implementation: S): Effect.Effect<A, E, Exclude<R, I>>
   }
   <I, S>(
-    key: ServiceMap.Key<I, S>,
+    key: Context.Key<I, S>,
     implementation: S
   ): <A, E, R>(
     self: Effect.Effect<A, E, R>
   ) => Effect.Effect<A, E, Exclude<R, I>>
   <A, E, R, I, S>(
     self: Effect.Effect<A, E, R>,
-    service: ServiceMap.Key<I, S>,
+    service: Context.Key<I, S>,
     implementation: S
   ): Effect.Effect<A, E, Exclude<R, I>>
 } = function(this: any) {
@@ -2101,33 +2151,33 @@ export const provideService: {
 
 const provideServiceImpl = <A, E, R, I, S>(
   self: Effect.Effect<A, E, R>,
-  service: ServiceMap.Key<I, S>,
+  service: Context.Key<I, S>,
   implementation: S
 ): Effect.Effect<A, E, Exclude<R, I>> =>
-  updateServices(self, (s) => {
+  updateContext(self, (s) => {
     const prev = s.mapUnsafe.get(service.key)
     if (prev === implementation) return s
-    return ServiceMap.add(s, service, implementation)
+    return Context.add(s, service, implementation)
   }) as any
 
 /** @internal */
 export const provideServiceEffect: {
   <I, S, E2, R2>(
-    service: ServiceMap.Key<I, S>,
+    service: Context.Key<I, S>,
     acquire: Effect.Effect<S, E2, R2>
   ): <A, E, R>(
     self: Effect.Effect<A, E, R>
   ) => Effect.Effect<A, E | E2, Exclude<R, I> | R2>
   <A, E, R, I, S, E2, R2>(
     self: Effect.Effect<A, E, R>,
-    service: ServiceMap.Key<I, S>,
+    service: Context.Key<I, S>,
     acquire: Effect.Effect<S, E2, R2>
   ): Effect.Effect<A, E | E2, Exclude<R, I> | R2>
 } = dual(
   3,
   <A, E, R, I, S, E2, R2>(
     self: Effect.Effect<A, E, R>,
-    service: ServiceMap.Key<I, S>,
+    service: Context.Key<I, S>,
     acquire: Effect.Effect<S, E2, R2>
   ): Effect.Effect<A, E | E2, Exclude<R, I> | R2> =>
     flatMap(acquire, (implementation) => provideService(self, service, implementation))
@@ -2648,28 +2698,40 @@ export const tapDefect: {
 
 /** @internal */
 export const catchIf: {
-  <E, EB extends E, A2, E2, R2, A3 = never, E3 = Exclude<E, EB>, R3 = never>(
+  <E, EB extends E, A2, E2, R2, A3 = unassigned, E3 = never, R3 = never>(
     refinement: Predicate.Refinement<NoInfer<E>, EB>,
     f: (e: EB) => Effect.Effect<A2, E2, R2>,
     orElse?: ((e: Exclude<E, EB>) => Effect.Effect<A3, E3, R3>) | undefined
-  ): <A, R>(self: Effect.Effect<A, E, R>) => Effect.Effect<A | A2 | A3, E2 | E3, R | R2 | R3>
-  <E, A2, E2, R2, A3 = never, E3 = E, R3 = never>(
+  ): <A, R>(
+    self: Effect.Effect<A, E, R>
+  ) => Effect.Effect<
+    A | A2 | Exclude<A3, unassigned>,
+    E2 | E3 | (A3 extends unassigned ? Exclude<E, EB> : never),
+    R | R2 | R3
+  >
+  <E, A2, E2, R2, A3 = unassigned, E3 = never, R3 = never>(
     predicate: Predicate.Predicate<NoInfer<E>>,
     f: (e: NoInfer<E>) => Effect.Effect<A2, E2, R2>,
     orElse?: ((e: NoInfer<E>) => Effect.Effect<A3, E3, R3>) | undefined
-  ): <A, R>(self: Effect.Effect<A, E, R>) => Effect.Effect<A | A2 | A3, E2 | E3, R | R2 | R3>
-  <A, E, R, EB extends E, A2, E2, R2, A3 = never, E3 = Exclude<E, EB>, R3 = never>(
+  ): <A, R>(
+    self: Effect.Effect<A, E, R>
+  ) => Effect.Effect<A | A2 | Exclude<A3, unassigned>, E2 | E3 | (A3 extends unassigned ? E : never), R | R2 | R3>
+  <A, E, R, EB extends E, A2, E2, R2, A3 = unassigned, E3 = never, R3 = never>(
     self: Effect.Effect<A, E, R>,
     refinement: Predicate.Refinement<E, EB>,
     f: (e: EB) => Effect.Effect<A2, E2, R2>,
     orElse?: ((e: Exclude<E, EB>) => Effect.Effect<A3, E3, R3>) | undefined
-  ): Effect.Effect<A | A2 | A3, E2 | E3, R | R2 | R3>
-  <A, E, R, A2, E2, R2, A3 = never, E3 = E, R3 = never>(
+  ): Effect.Effect<
+    A | A2 | Exclude<A3, unassigned>,
+    E2 | E3 | (A3 extends unassigned ? Exclude<E, EB> : never),
+    R | R2 | R3
+  >
+  <A, E, R, A2, E2, R2, A3 = unassigned, E3 = never, R3 = never>(
     self: Effect.Effect<A, E, R>,
     predicate: Predicate.Predicate<E>,
     f: (e: E) => Effect.Effect<A2, E2, R2>,
     orElse?: ((e: E) => Effect.Effect<A3, E3, R3>) | undefined
-  ): Effect.Effect<A | A2 | A3, E2 | E3, R | R2 | R3>
+  ): Effect.Effect<A | A2 | Exclude<A3, unassigned>, E2 | E3 | (A3 extends unassigned ? E : never), R | R2 | R3>
 } = dual(
   (args) => isEffect(args[0]),
   <A, E, R, A2, E2, R2, A3 = never, E3 = E, R3 = never>(
@@ -2690,17 +2752,19 @@ export const catchIf: {
 
 /** @internal */
 export const catchFilter: {
-  <E, EB, A2, E2, R2, X, A3 = never, E3 = X, R3 = never>(
+  <E, EB, A2, E2, R2, X, A3 = unassigned, E3 = never, R3 = never>(
     filter: Filter.Filter<NoInfer<E>, EB, X>,
     f: (e: EB) => Effect.Effect<A2, E2, R2>,
     orElse?: ((e: X) => Effect.Effect<A3, E3, R3>) | undefined
-  ): <A, R>(self: Effect.Effect<A, E, R>) => Effect.Effect<A | A2 | A3, E2 | E3, R | R2 | R3>
-  <A, E, R, EB, A2, E2, R2, X, A3 = never, E3 = X, R3 = never>(
+  ): <A, R>(
+    self: Effect.Effect<A, E, R>
+  ) => Effect.Effect<A | A2 | Exclude<A3, unassigned>, E2 | E3 | (A3 extends unassigned ? X : never), R | R2 | R3>
+  <A, E, R, EB, A2, E2, R2, X, A3 = unassigned, E3 = never, R3 = never>(
     self: Effect.Effect<A, E, R>,
     filter: Filter.Filter<NoInfer<E>, EB, X>,
     f: (e: EB) => Effect.Effect<A2, E2, R2>,
     orElse?: ((e: X) => Effect.Effect<A3, E3, R3>) | undefined
-  ): Effect.Effect<A | A2 | A3, E2 | E3, R | R2 | R3>
+  ): Effect.Effect<A | A2 | Exclude<A3, unassigned>, E2 | E3 | (A3 extends unassigned ? X : never), R | R2 | R3>
 } = dual(
   (args) => isEffect(args[0]),
   <A, E, R, EB, A2, E2, R2, X, A3 = never, E3 = X, R3 = never>(
@@ -2728,8 +2792,8 @@ export const catchTag: {
     A1,
     E1,
     R1,
-    A2 = never,
-    E2 = ExcludeTag<E, K extends Arr.NonEmptyReadonlyArray<string> ? K[number] : K>,
+    A2 = unassigned,
+    E2 = never,
     R2 = never
   >(
     k: K,
@@ -2741,7 +2805,13 @@ export const catchTag: {
       | undefined
   ): <A, R>(
     self: Effect.Effect<A, E, R>
-  ) => Effect.Effect<A | A1 | A2, E1 | E2, R | R1 | R2>
+  ) => Effect.Effect<
+    A | A1 | Exclude<A2, unassigned>,
+    | E1
+    | E2
+    | (A2 extends unassigned ? ExcludeTag<E, K extends Arr.NonEmptyReadonlyArray<string> ? K[number] : K> : never),
+    R | R1 | R2
+  >
   <
     A,
     E,
@@ -2750,8 +2820,8 @@ export const catchTag: {
     R1,
     E1,
     A1,
-    A2 = never,
-    E2 = ExcludeTag<E, K extends Arr.NonEmptyReadonlyArray<string> ? K[number] : K>,
+    A2 = unassigned,
+    E2 = never,
     R2 = never
   >(
     self: Effect.Effect<A, E, R>,
@@ -2760,7 +2830,13 @@ export const catchTag: {
     orElse?:
       | ((e: ExcludeTag<E, K extends Arr.NonEmptyReadonlyArray<string> ? K[number] : K>) => Effect.Effect<A2, E2, R2>)
       | undefined
-  ): Effect.Effect<A | A1 | A2, E1 | E2, R | R1 | R2>
+  ): Effect.Effect<
+    A | A1 | Exclude<A2, unassigned>,
+    | E1
+    | E2
+    | (A2 extends unassigned ? ExcludeTag<E, K extends Arr.NonEmptyReadonlyArray<string> ? K[number] : K> : never),
+    R | R1 | R2
+  >
 } = dual(
   (args) => isEffect(args[0]),
   <
@@ -2797,19 +2873,20 @@ export const catchTags: {
         [K in E["_tag"]]+?: (error: Extract<E, { _tag: K }>) => Effect.Effect<any, any, any>
       } :
       {}),
-    A2 = never,
-    E2 = Exclude<E, { _tag: keyof Cases }>,
+    A2 = unassigned,
+    E2 = never,
     R2 = never
   >(
     cases: Cases,
     orElse?: ((e: Exclude<E, { _tag: keyof Cases }>) => Effect.Effect<A2, E2, R2>) | undefined
   ): <A, R>(self: Effect.Effect<A, E, R>) => Effect.Effect<
     | A
-    | A2
+    | Exclude<A2, unassigned>
     | {
       [K in keyof Cases]: Cases[K] extends ((...args: Array<any>) => Effect.Effect<infer A, any, any>) ? A : never
     }[keyof Cases],
     | E2
+    | (A2 extends unassigned ? Exclude<E, { _tag: keyof Cases }> : never)
     | {
       [K in keyof Cases]: Cases[K] extends ((...args: Array<any>) => Effect.Effect<any, infer E, any>) ? E : never
     }[keyof Cases],
@@ -2827,8 +2904,8 @@ export const catchTags: {
         [K in E["_tag"]]+?: (error: Extract<E, { _tag: K }>) => Effect.Effect<any, any, any>
       } :
       {}),
-    A2 = never,
-    E2 = Exclude<E, { _tag: keyof Cases }>,
+    A2 = unassigned,
+    E2 = never,
     R2 = never
   >(
     self: Effect.Effect<A, E, R>,
@@ -2836,11 +2913,12 @@ export const catchTags: {
     orElse?: ((e: Exclude<E, { _tag: keyof Cases }>) => Effect.Effect<A2, E2, R2>) | undefined
   ): Effect.Effect<
     | A
-    | A2
+    | Exclude<A2, unassigned>
     | {
       [K in keyof Cases]: Cases[K] extends ((...args: Array<any>) => Effect.Effect<infer A, any, any>) ? A : never
     }[keyof Cases],
     | E2
+    | (A2 extends unassigned ? Exclude<E, { _tag: keyof Cases }> : never)
     | {
       [K in keyof Cases]: Cases[K] extends ((...args: Array<any>) => Effect.Effect<any, infer E, any>) ? E : never
     }[keyof Cases],
@@ -2894,7 +2972,7 @@ export const catchReason: {
     self: Effect.Effect<A, E, R>
   ) => Effect.Effect<
     A | A2 | Exclude<A3, unassigned>,
-    (A3 extends unassigned ? E : ExcludeTag<E, K>) | E2 | E3,
+    ExcludeTag<E, K> | E2 | E3 | (A3 extends unassigned ? ExtractTag<E, K> : never),
     R | R2 | R3
   >
   <
@@ -2925,7 +3003,7 @@ export const catchReason: {
       | undefined
   ): Effect.Effect<
     A | A2 | Exclude<A3, unassigned>,
-    (A3 extends unassigned ? E : ExcludeTag<E, K>) | E2 | E3,
+    ExcludeTag<E, K> | E2 | E3 | (A3 extends unassigned ? ExtractTag<E, K> : never),
     R | R2 | R3
   >
 } = dual(
@@ -2955,7 +3033,7 @@ export const catchReason: {
       | undefined
   ): Effect.Effect<
     A | A2 | Exclude<A3, unassigned>,
-    (A3 extends unassigned ? E : ExcludeTag<E, K>) | E2 | E3,
+    ExcludeTag<E, K> | E2 | E3 | (A3 extends unassigned ? ExtractTag<E, K> : never),
     R | R2 | R3
   > =>
     catchIf(
@@ -2998,8 +3076,9 @@ export const catchReasons: {
     | { [RK in keyof Cases]: Cases[RK] extends (...args: Array<any>) => Effect.Effect<infer A, any, any> ? A : never }[
       keyof Cases
     ],
-    | (A2 extends unassigned ? E : ExcludeTag<E, K>)
+    | ExcludeTag<E, K>
     | E2
+    | (A2 extends unassigned ? ExtractTag<E, K> : never)
     | { [RK in keyof Cases]: Cases[RK] extends (...args: Array<any>) => Effect.Effect<any, infer E, any> ? E : never }[
       keyof Cases
     ],
@@ -3039,8 +3118,9 @@ export const catchReasons: {
     | { [RK in keyof Cases]: Cases[RK] extends (...args: Array<any>) => Effect.Effect<infer A, any, any> ? A : never }[
       keyof Cases
     ],
-    | (A2 extends unassigned ? E : ExcludeTag<E, K>)
+    | ExcludeTag<E, K>
     | E2
+    | (A2 extends unassigned ? ExtractTag<E, K> : never)
     | { [RK in keyof Cases]: Cases[RK] extends (...args: Array<any>) => Effect.Effect<any, infer E, any> ? E : never }[
       keyof Cases
     ],
@@ -3111,23 +3191,6 @@ export const unwrapReason: {
 )
 
 /** @internal */
-export const mapErrorCause: {
-  <E, E2>(
-    f: (e: Cause.Cause<E>) => Cause.Cause<E2>
-  ): <A, R>(self: Effect.Effect<A, E, R>) => Effect.Effect<A, E2, R>
-  <A, E, R, E2>(
-    self: Effect.Effect<A, E, R>,
-    f: (e: Cause.Cause<E>) => Cause.Cause<E2>
-  ): Effect.Effect<A, E2, R>
-} = dual(
-  2,
-  <A, E, R, E2>(
-    self: Effect.Effect<A, E, R>,
-    f: (e: Cause.Cause<E>) => Cause.Cause<E2>
-  ): Effect.Effect<A, E2, R> => catchCause(self, (cause) => failCauseSync(() => f(cause)))
-)
-
-/** @internal */
 export const mapError: {
   <E, E2>(
     f: (e: E) => E2
@@ -3183,6 +3246,24 @@ export const orElseSucceed: {
     f: LazyArg<B>
   ): Effect.Effect<A | B, never, R> => catch_(self, (_) => sync(f))
 )
+
+/** @internal */
+export const firstSuccessOf = <Eff extends Effect.Effect<any, any, any>>(
+  effects: Iterable<Eff>
+): Effect.Effect<Effect.Success<Eff>, Effect.Error<Eff>, Effect.Services<Eff>> =>
+  suspend(() => {
+    const iterator = effects[Symbol.iterator]()
+    let state = iterator.next()
+    if (state.done) {
+      return die(new Error("Received an empty collection of effects"))
+    }
+    function loop(current: IteratorYieldResult<Eff>): Eff {
+      const next = iterator.next()
+      if (next.done) return current.value
+      return catch_(current.value, (_) => loop(next)) as any
+    }
+    return loop(state)
+  })
 
 /** @internal */
 export const eventually = <A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effect<A, never, R> =>
@@ -3628,7 +3709,7 @@ export const ScopeTypeId = "~effect/Scope"
 export const ScopeCloseableTypeId = "~effect/Scope/Closeable"
 
 /** @internal */
-export const scopeTag: ServiceMap.Service<Scope.Scope, Scope.Scope> = ServiceMap.Service<Scope.Scope>("effect/Scope")
+export const scopeTag: Context.Service<Scope.Scope, Scope.Scope> = Context.Service<Scope.Scope>("effect/Scope")
 
 /** @internal */
 export const scopeClose = <A, E>(self: Scope.Scope, exit_: Exit.Exit<A, E>) =>
@@ -3750,7 +3831,7 @@ export const scopeMake = (finalizerStrategy?: "sequential" | "parallel"): Effect
   sync(() => scopeMakeUnsafe(finalizerStrategy))
 
 /** @internal */
-export const scope: Effect.Effect<Scope.Scope, never, Scope.Scope> = scopeTag.asEffect()
+export const scope: Effect.Effect<Scope.Scope, never, Scope.Scope> = scopeTag
 
 /** @internal */
 export const provideScope: {
@@ -3761,11 +3842,11 @@ export const provideScope: {
 /** @internal */
 export const scoped = <A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, Scope.Scope>> =>
   withFiber((fiber) => {
-    const prev = fiber.services
+    const prev = fiber.context
     const scope = scopeMakeUnsafe()
-    fiber.setServices(ServiceMap.add(fiber.services, scopeTag, scope))
+    fiber.setContext(Context.add(fiber.context, scopeTag, scope))
     return onExitPrimitive(self, (exit) => {
-      fiber.setServices(prev)
+      fiber.setContext(prev)
       return scopeCloseUnsafe(scope, exit)
     })
   }) as any
@@ -3797,14 +3878,14 @@ export const acquireRelease = <A, E, R, R2>(
   release: (a: A, exit: Exit.Exit<unknown, unknown>) => Effect.Effect<unknown, never, R2>,
   options?: { readonly interruptible?: boolean }
 ): Effect.Effect<A, E, R | R2 | Scope.Scope> =>
-  servicesWith((services: ServiceMap.ServiceMap<R2>) =>
+  contextWith((context: Context.Context<R2>) =>
     uninterruptibleMask((restore) =>
       flatMap(
         scope,
         (scope) =>
           tap(
             options?.interruptible ? restore(acquire) : acquire,
-            (a) => scopeAddFinalizerExit(scope, (exit) => provideServices(release(a, exit), services))
+            (a) => scopeAddFinalizerExit(scope, (exit) => provideContext(release(a, exit), context))
           )
       )
     )
@@ -3817,8 +3898,8 @@ export const addFinalizer = <R>(
   flatMap(
     scope,
     (scope) =>
-      servicesWith((services: ServiceMap.ServiceMap<R>) =>
-        scopeAddFinalizerExit(scope, (exit) => provideServices(finalizer(exit), services))
+      contextWith((context: Context.Context<R>) =>
+        scopeAddFinalizerExit(scope, (exit) => provideContext(finalizer(exit), context))
       )
   )
 
@@ -4036,6 +4117,15 @@ export const acquireUseRelease = <Resource, E, R, A, E2, R2, E3, R3>(
       ))
   )
 
+/** @internal */
+export const acquireDisposable = <A extends AsyncDisposable | Disposable, E, R>(
+  acquire: Effect.Effect<A, E, R>
+): Effect.Effect<A, E, R | Scope.Scope> =>
+  acquireRelease(acquire, (resource) =>
+    hasProperty(resource, Symbol.asyncDispose)
+      ? promise(() => resource[Symbol.asyncDispose]())
+      : sync(() => resource[Symbol.dispose]()))
+
 // ----------------------------------------------------------------------------
 // Caching
 // ----------------------------------------------------------------------------
@@ -4177,6 +4267,15 @@ export const interruptibleMask = <A, E, R>(
     fiber._stack.push(setInterruptibleFalse)
     return f(uninterruptible)
   })
+
+/** @internal */
+export const abortSignal: Effect.Effect<AbortSignal, never, Scope.Scope> = map(
+  acquireRelease(
+    sync(() => new AbortController()),
+    (controller) => sync(() => controller.abort())
+  ),
+  (_) => _.signal
+)
 
 // ========================================================================
 // collecting & elements
@@ -4457,72 +4556,8 @@ export const forEach: {
     const out: Array<B> | undefined = options?.discard
       ? undefined
       : new Array(length)
-    let index = 0
-    const annotations = fiberStackAnnotations(parent)
-
-    return callback((resume) => {
-      const fibers = new Set<Fiber.Fiber<unknown, unknown>>()
-      const failures: Array<Cause.Reason<E>> = []
-      let failed = false
-      let inProgress = 0
-      let doneCount = 0
-      let pumping = false
-      let interrupted = false
-      function pump() {
-        pumping = true
-        while (inProgress < concurrency && index < length) {
-          const currentIndex = index
-          const item = items[currentIndex]
-          index++
-          inProgress++
-          try {
-            const child = forkUnsafe(parent, f(item, currentIndex), true, true, "inherit")
-            fibers.add(child)
-            child.addObserver((exit) => {
-              if (interrupted) {
-                return
-              }
-              fibers.delete(child)
-              if (exit._tag === "Failure") {
-                if (!failed) {
-                  failed = true
-                  length = index
-                  failures.push(...exit.cause.reasons)
-                  fibers.forEach((fiber) => fiber.interruptUnsafe(parent.id, annotations))
-                } else {
-                  for (const f of exit.cause.reasons) {
-                    if (f._tag === "Interrupt") continue
-                    failures.push(f)
-                  }
-                }
-              } else if (out !== undefined) {
-                out[currentIndex] = exit.value
-              }
-              doneCount++
-              inProgress--
-              if (doneCount === length) {
-                resume(failures.length > 0 ? exitFailCause(causeFromReasons(failures)) : succeed(out))
-              } else if (!pumping && !failed && inProgress < concurrency) {
-                pump()
-              }
-            })
-          } catch (err) {
-            failed = true
-            length = index
-            failures.push(new Die(err))
-            fibers.forEach((fiber) => fiber.interruptUnsafe(parent.id, annotations))
-          }
-        }
-        pumping = false
-      }
-      pump()
-
-      return suspend(() => {
-        interrupted = true
-        index = length
-        return fiberInterruptAll(fibers)
-      })
-    })
+    const eff = forEachConcurrent({ f, out }, items, { concurrency })
+    return eff ? as(eff, out as any) : succeed(out as any)
   }))
 
 const forEachSequential = <A, B, E, R>(
@@ -4549,6 +4584,200 @@ const forEachSequential = <A, B, E, R>(
       out
     )
   })
+
+type IterateEagerOptions = {
+  readonly concurrency?: number | undefined
+  readonly start?: number | undefined
+  readonly end?: number | undefined
+  readonly orderedStep?: boolean | undefined
+}
+
+const iterateEagerImpl = <S, A, X, E, R, E2>(options: {
+  readonly onItem: (state: S, item: A, index: number) => Effect.Effect<X, E, R>
+  readonly step: (state: NoInfer<S>, item: A, exit: Exit.Exit<X, E>, index: number) => Exit.Exit<void, E2> | void
+}): (
+  initialState: S,
+  items: ReadonlyArray<A>,
+  options?: IterateEagerOptions
+) => Effect.Effect<void, E | E2, R> | undefined => {
+  const onItem = options.onItem
+  const step = options.step
+
+  return (
+    state: S,
+    items: ReadonlyArray<A>,
+    opts: IterateEagerOptions | undefined
+  ): Effect.Effect<void, E | E2, R> | undefined => {
+    let index = opts?.start ?? 0
+    const end = opts?.end ?? items.length
+    const concurrency = opts?.concurrency ?? 1
+    const orderedStep = opts?.orderedStep === true && concurrency > 1
+    let done = false
+    let parentFiber: Fiber.Fiber<any, any> | undefined
+    let fibers: Set<Fiber.Fiber<any, any>> | undefined
+    let resume: ((effect: Effect.Effect<void, E | E2, R>) => void) | undefined
+    let interrupted = false
+    let terminal: Exit.Exit<void, E | E2> | void
+    let effect: Effect.Effect<X, E, R> | undefined
+    let nextIndex = index
+    const exits: Array<Exit.Exit<X, E> | undefined> | undefined = orderedStep ? new Array(end) : undefined
+
+    const runStep = (item: A, exit: Exit.Exit<X, E>, currentIndex: number): Exit.Exit<void, E | E2> | void => {
+      if (!orderedStep) return step(state, item, exit, currentIndex)
+      if (terminal) return terminal
+      exits![currentIndex] = exit
+      while (nextIndex < end) {
+        const nextExit = exits![nextIndex]
+        if (nextExit === undefined) return
+        exits![nextIndex] = undefined
+        const index = nextIndex++
+        const result = step(state, items[index], nextExit, index)
+        if (result) return result
+      }
+    }
+
+    const go = (): Effect.Effect<void, E | E2, R> | undefined => {
+      let paused = false
+      for (; !terminal && index < end; index++) {
+        const item = items[index]
+        const eff = effect ?? onItem(state, item, index)
+
+        // fast case (already an exit)
+        if (effectIsExit(eff)) {
+          terminal = runStep(item, eff, index)
+          if (terminal) break
+
+          // Use flatMap for concurrency of 1
+        } else if (concurrency === 1) {
+          return flatMap(exit(eff), (exit) => {
+            terminal = runStep(item, exit, index)
+            index++
+            return terminal ?? go() ?? void_
+          })
+
+          // We have an effect, so enter "async" mode
+        } else if (!parentFiber) {
+          return callback((cb) => {
+            parentFiber = getCurrentFiber()!
+            effect = eff
+            resume = cb
+            const result = go()
+            if (result) return cb(result)
+            return suspend(() => {
+              terminal = exitVoid
+              interrupted = true
+              return fibers ? fiberInterruptAll(fibers) : void_
+            })
+          })
+
+          // Fork the effect with concurrency > 1
+        } else {
+          // Clear the temporary effect from capturing the parentFiber
+          effect = undefined
+
+          const fiber = forkUnsafe(parentFiber, eff, true, true, "inherit")
+          if (fiber._exit) {
+            terminal = runStep(item, fiber._exit, index)
+            if (terminal) break
+            continue
+          }
+
+          // Add the fiber to the Set
+          if (fibers) fibers.add(fiber)
+          else fibers = new Set([fiber])
+
+          const currentIndex = index
+          fiber.addObserver((exit) => {
+            fibers!.delete(fiber)
+            if (terminal) {
+              if (!interrupted && exit._tag === "Failure") {
+                for (const reason of exit.cause.reasons) {
+                  if (reason._tag === "Interrupt") continue
+                  else if (terminal._tag === "Failure") {
+                    ;(terminal.cause.reasons as Array<any>).push(reason)
+                  } else {
+                    terminal = exitFailCause(causeFromReasons([reason]))
+                  }
+                }
+              }
+            } else {
+              const result = runStep(item, exit, currentIndex)
+              if (result) {
+                terminal = result._tag === "Failure"
+                  ? exitFailCause(causeFromReasons(result.cause.reasons.slice()))
+                  : result
+                go()
+              }
+            }
+
+            if (paused) {
+              const eff = go()
+              if (eff) resume!(eff)
+            } else if (done && fibers!.size === 0) {
+              resume!(terminal ?? void_)
+            }
+          })
+
+          // Check if we have reached the concurrency limit
+          if (fibers.size < concurrency) continue
+          paused = true
+          index++
+          return
+        }
+      }
+
+      done = true
+
+      if (terminal) {
+        if (fibers && fibers.size > 0) {
+          const annotations = fiberStackAnnotations(parentFiber!)
+          fibers.forEach((f) => f.interruptUnsafe(parentFiber!.id, annotations))
+          return
+        }
+        if (resume || terminal._tag === "Failure") {
+          return terminal
+        }
+      } else if (resume) {
+        if (!fibers) {
+          return exitVoid
+        } else if (fibers.size === 0) {
+          resume(void_)
+        }
+      }
+    }
+
+    return go()
+  }
+}
+
+/** @internal */
+export const iterateEager = <S, A>(): <X, E, R, E2>(options: {
+  readonly onItem: (state: S, item: A, index: number) => Effect.Effect<X, E, R>
+  readonly step: (state: NoInfer<S>, item: A, exit: Exit.Exit<X, E>, index: number) => Exit.Exit<void, E2> | void
+}) => (
+  initialState: S,
+  items: ReadonlyArray<A>,
+  options?: IterateEagerOptions
+) => Effect.Effect<void, E | E2, R> | undefined => iterateEagerImpl
+
+const forEachConcurrent = iterateEagerImpl({
+  onItem(
+    state: {
+      readonly f: (a: any, i: number) => Effect.Effect<any, any, any>
+      readonly out: Array<any> | undefined
+    },
+    item,
+    index
+  ) {
+    return state.f(item, index)
+  },
+  step(state, _, exit, index) {
+    if (exit._tag === "Failure") return exit
+    else if (state.out) {
+      state.out[index] = exit.value
+    }
+  }
+})
 
 /* @internal */
 export const filterOrElse: {
@@ -4862,9 +5091,9 @@ export const forkUnsafe = <FA, FE, A, E, R>(
   immediate = false,
   daemon = false,
   uninterruptible: boolean | "inherit" = false
-): Fiber.Fiber<A, E> => {
+): FiberImpl<A, E> => {
   const interruptible = uninterruptible === "inherit" ? parent.interruptible : !uninterruptible
-  const child = new FiberImpl<A, E>(parent.services, interruptible)
+  const child = new FiberImpl<A, E>(parent.context, interruptible)
   if (immediate) {
     child.evaluate(effect as any)
   } else {
@@ -5004,13 +5233,13 @@ export const forkScoped: {
 // ----------------------------------------------------------------------------
 
 /** @internal */
-export const runForkWith = <R>(services: ServiceMap.ServiceMap<R>) =>
+export const runForkWith = <R>(context: Context.Context<R>) =>
 <A, E>(
   effect: Effect.Effect<A, E, R>,
   options?: Effect.RunOptions | undefined
 ): Fiber.Fiber<A, E> => {
   const fiber = new FiberImpl<A, E>(
-    options?.scheduler ? ServiceMap.add(services, Scheduler.Scheduler, options.scheduler) : services,
+    options?.scheduler ? Context.add(context, Scheduler.Scheduler, options.scheduler) : context,
     options?.uninterruptible !== true
   )
   fiber.evaluate(effect as any)
@@ -5058,11 +5287,11 @@ export const fiberRunIn: {
 export const runFork: <A, E>(
   effect: Effect.Effect<A, E, never>,
   options?: Effect.RunOptions | undefined
-) => Fiber.Fiber<A, E> = runForkWith(ServiceMap.empty())
+) => Fiber.Fiber<A, E> = runForkWith(Context.empty())
 
 /** @internal */
-export const runCallbackWith = <R>(services: ServiceMap.ServiceMap<R>) => {
-  const runFork = runForkWith(services)
+export const runCallbackWith = <R>(context: Context.Context<R>) => {
+  const runFork = runForkWith(context)
   return <A, E>(
     effect: Effect.Effect<A, E, R>,
     options?:
@@ -5082,11 +5311,11 @@ export const runCallbackWith = <R>(services: ServiceMap.ServiceMap<R>) => {
 }
 
 /** @internal */
-export const runCallback = runCallbackWith(ServiceMap.empty())
+export const runCallback = runCallbackWith(Context.empty())
 
 /** @internal */
-export const runPromiseExitWith = <R>(services: ServiceMap.ServiceMap<R>) => {
-  const runFork = runForkWith(services)
+export const runPromiseExitWith = <R>(context: Context.Context<R>) => {
+  const runFork = runForkWith(context)
   return <A, E>(
     effect: Effect.Effect<A, E, R>,
     options?: Effect.RunOptions | undefined
@@ -5099,11 +5328,11 @@ export const runPromiseExitWith = <R>(services: ServiceMap.ServiceMap<R>) => {
 }
 
 /** @internal */
-export const runPromiseExit = runPromiseExitWith(ServiceMap.empty())
+export const runPromiseExit = runPromiseExitWith(Context.empty())
 
 /** @internal */
-export const runPromiseWith = <R>(services: ServiceMap.ServiceMap<R>) => {
-  const runPromiseExit = runPromiseExitWith(services)
+export const runPromiseWith = <R>(context: Context.Context<R>) => {
+  const runPromiseExit = runPromiseExitWith(context)
   return <A, E>(
     effect: Effect.Effect<A, E, R>,
     options?:
@@ -5124,11 +5353,11 @@ export const runPromise: <A, E>(
   options?:
     | Effect.RunOptions
     | undefined
-) => Promise<A> = runPromiseWith(ServiceMap.empty())
+) => Promise<A> = runPromiseWith(Context.empty())
 
 /** @internal */
-export const runSyncExitWith = <R>(services: ServiceMap.ServiceMap<R>) => {
-  const runFork = runForkWith(services)
+export const runSyncExitWith = <R>(context: Context.Context<R>) => {
+  const runFork = runForkWith(context)
   return <A, E>(effect: Effect.Effect<A, E, R>): Exit.Exit<A, E> => {
     if (effectIsExit(effect)) return effect
     const scheduler = new Scheduler.MixedScheduler("sync")
@@ -5140,12 +5369,12 @@ export const runSyncExitWith = <R>(services: ServiceMap.ServiceMap<R>) => {
 
 /** @internal */
 export const runSyncExit: <A, E>(effect: Effect.Effect<A, E>) => Exit.Exit<A, E> = runSyncExitWith(
-  ServiceMap.empty()
+  Context.empty()
 )
 
 /** @internal */
-export const runSyncWith = <R>(services: ServiceMap.ServiceMap<R>) => {
-  const runSyncExit = runSyncExitWith(services)
+export const runSyncWith = <R>(context: Context.Context<R>) => {
+  const runSyncExit = runSyncExitWith(context)
   return <A, E>(effect: Effect.Effect<A, E, R>): A => {
     const exit = runSyncExit(effect)
     if (exit._tag === "Failure") throw causeSquash(exit.cause)
@@ -5154,7 +5383,7 @@ export const runSyncWith = <R>(services: ServiceMap.ServiceMap<R>) => {
 }
 
 /** @internal */
-export const runSync: <A, E>(effect: Effect.Effect<A, E>) => A = runSyncWith(ServiceMap.empty())
+export const runSync: <A, E>(effect: Effect.Effect<A, E>) => A = runSyncWith(Context.empty())
 
 const succeedTrue = succeed(true)
 const succeedFalse = succeed(false)
@@ -5162,10 +5391,10 @@ const succeedFalse = succeed(false)
 class Latch implements _Latch.Latch {
   waiters: Array<(_: Effect.Effect<void>) => void> = []
   scheduled = false
-  private isOpen: boolean
+  private _isOpen: boolean
 
   constructor(isOpen: boolean) {
-    this.isOpen = isOpen
+    this._isOpen = isOpen
   }
 
   private scheduleUnsafe(fiber: Fiber.Fiber<unknown, unknown>) {
@@ -5186,19 +5415,19 @@ class Latch implements _Latch.Latch {
   }
 
   open = withFiber<boolean>((fiber) => {
-    if (this.isOpen) return succeedFalse
-    this.isOpen = true
+    if (this._isOpen) return succeedFalse
+    this._isOpen = true
     return this.scheduleUnsafe(fiber)
   })
-  release = withFiber<boolean>((fiber) => this.open ? succeedFalse : this.scheduleUnsafe(fiber))
+  release = withFiber<boolean>((fiber) => this._isOpen ? succeedFalse : this.scheduleUnsafe(fiber))
   openUnsafe() {
-    if (this.isOpen) return false
-    this.isOpen = true
+    if (this._isOpen) return false
+    this._isOpen = true
     this.flushWaiters()
     return true
   }
   await = callback<void>((resume) => {
-    if (this.isOpen) {
+    if (this._isOpen) {
       return resume(void_)
     }
     this.waiters.push(resume)
@@ -5210,12 +5439,15 @@ class Latch implements _Latch.Latch {
     })
   })
   closeUnsafe() {
-    if (!this.isOpen) return false
-    this.isOpen = false
+    if (!this._isOpen) return false
+    this._isOpen = false
     return true
   }
   close = sync(() => this.closeUnsafe())
   whenOpen = <A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> => flatMap(this.await, () => self)
+  isOpen() {
+    return this._isOpen
+  }
 }
 
 /** @internal */
@@ -5279,12 +5511,12 @@ const NoopSpanProto: Omit<Tracer.Span, "parent" | "name" | "annotations" | "leve
 export const noopSpan = (options: {
   readonly name: string
   readonly parent: Option.Option<Tracer.AnySpan>
-  readonly annotations: ServiceMap.ServiceMap<never>
+  readonly annotations: Context.Context<never>
 }): Tracer.Span => Object.assign(Object.create(NoopSpanProto), options)
 
 const filterDisablePropagation = (span: Tracer.AnySpan | undefined): Option.Option<Tracer.AnySpan> => {
   if (!span) return Option.none()
-  return ServiceMap.get(span.annotations, Tracer.DisablePropagation)
+  return Context.get(span.annotations, Tracer.DisablePropagation)
     ? span._tag === "Span" ? filterDisablePropagation(Option.getOrUndefined(span.parent)) : Option.none()
     : Option.some(span)
 }
@@ -5296,7 +5528,7 @@ export const makeSpanUnsafe = <XA, XE>(
   options: Tracer.SpanOptionsNoTrace | undefined
 ) => {
   const disablePropagation = !fiber.getRef(TracerEnabled) ||
-    (options?.annotations && ServiceMap.get(options.annotations, Tracer.DisablePropagation))
+    (options?.annotations && Context.get(options.annotations, Tracer.DisablePropagation))
   const parent = options?.parent !== undefined
     ? Option.some(options.parent)
     : options?.root
@@ -5309,8 +5541,8 @@ export const makeSpanUnsafe = <XA, XE>(
     span = noopSpan({
       name,
       parent,
-      annotations: ServiceMap.add(
-        options?.annotations ?? ServiceMap.empty(),
+      annotations: Context.add(
+        options?.annotations ?? Context.empty(),
         Tracer.DisablePropagation,
         true
       )
@@ -5330,9 +5562,9 @@ export const makeSpanUnsafe = <XA, XE>(
     span = tracer.span({
       name,
       parent,
-      annotations: options?.annotations ?? ServiceMap.empty(),
+      annotations: options?.annotations ?? Context.empty(),
       links,
-      startTime: timingEnabled ? clock.currentTimeNanosUnsafe() : 0n,
+      startTime: timingEnabled ? clock.currentTimeNanosUnsafe() : BigInt(0),
       kind: options?.kind ?? "internal",
       root: options?.root ?? Option.isNone(parent),
       sampled: options?.sampled ??
@@ -5367,7 +5599,7 @@ export const makeSpanScoped = (
 ): Effect.Effect<Tracer.Span, never, Scope.Scope> =>
   uninterruptible(
     withFiber((fiber) => {
-      const scope = ServiceMap.getUnsafe(fiber.services, scopeTag)
+      const scope = Context.getUnsafe(fiber.context, scopeTag)
       const span = makeSpanUnsafe(fiber, name, options ?? {})
       const clock = fiber.getRef(ClockRef)
       const timingEnabled = fiber.getRef(TracerTimingEnabled)
@@ -5417,10 +5649,10 @@ const provideSpanStackFrame = (name: string, stack: (() => string | undefined) |
 }
 
 /** @internal */
-export const spanAnnotations: Effect.Effect<Readonly<Record<string, unknown>>> = TracerSpanAnnotations.asEffect()
+export const spanAnnotations: Effect.Effect<Readonly<Record<string, unknown>>> = TracerSpanAnnotations
 
 /** @internal */
-export const spanLinks: Effect.Effect<ReadonlyArray<Tracer.SpanLink>> = TracerSpanLinks.asEffect()
+export const spanLinks: Effect.Effect<ReadonlyArray<Tracer.SpanLink>> = TracerSpanLinks
 
 /** @internal */
 export const linkSpans: {
@@ -5599,7 +5831,7 @@ export const currentParentSpan: Effect.Effect<Tracer.AnySpan, Cause.NoSuchElemen
 // ----------------------------------------------------------------------------
 
 /** @internal */
-export const ClockRef = ServiceMap.Reference<Clock.Clock>("effect/Clock", {
+export const ClockRef = Context.Reference<Clock.Clock>("effect/Clock", {
   defaultValue: (): Clock.Clock => new ClockImpl()
 })
 
@@ -5615,11 +5847,16 @@ class ClockImpl implements Clock.Clock {
   }
   readonly currentTimeNanos: Effect.Effect<bigint> = sync(() => this.currentTimeNanosUnsafe())
   sleep(duration: Duration.Duration): Effect.Effect<void> {
-    const millis = Duration.toMillis(duration)
+    return this.sleepMillis(Duration.toMillis(duration))
+  }
+  private sleepMillis(millis: number): Effect.Effect<void> {
     if (millis <= 0) return yieldNow
+    else if (!Number.isFinite(millis)) return never
     return callback((resume) => {
-      if (millis > MAX_TIMER_MILLIS) return
-      const handle = setTimeout(() => resume(void_), millis)
+      const continuation = millis > MAX_TIMER_MILLIS
+        ? this.sleepMillis(millis - MAX_TIMER_MILLIS)
+        : void_
+      const handle = setTimeout(() => resume(continuation), Math.min(millis, MAX_TIMER_MILLIS))
       return sync(() => clearTimeout(handle))
     })
   }
@@ -5629,11 +5866,12 @@ const performanceNowNanos = (function() {
   const bigint1e6 = BigInt(1_000_000)
   if (typeof performance === "undefined" || typeof performance.now === "undefined") {
     return () => BigInt(Date.now()) * bigint1e6
-  } else if (typeof performance.timeOrigin === "number" && performance.timeOrigin === 0) {
-    return () => BigInt(Math.round(performance.now() * 1_000_000))
   }
-  const origin = (BigInt(Date.now()) * bigint1e6) - BigInt(Math.round(performance.now() * 1_000_000))
-  return () => origin + BigInt(Math.round(performance.now() * 1_000_000))
+  let origin: bigint
+  return () => {
+    origin ??= (BigInt(Date.now()) * bigint1e6) - BigInt(Math.round(performance.now() * 1_000_000))
+    return origin + BigInt(Math.round(performance.now() * 1_000_000))
+  }
 })()
 const processOrPerformanceNow = (function() {
   const processHrtime =
@@ -5643,7 +5881,7 @@ const processOrPerformanceNow = (function() {
   if (!processHrtime) {
     return performanceNowNanos
   }
-  const origin = performanceNowNanos() - processHrtime.bigint()
+  const origin = (BigInt(Date.now()) * BigInt(1e6)) - processHrtime.bigint()
   return () => origin + processHrtime.bigint()
 })()
 
@@ -5757,7 +5995,7 @@ export class UnknownError extends TaggedError("UnknownError")<{
 // ----------------------------------------------------------------------------
 
 /** @internal */
-export const ConsoleRef = ServiceMap.Reference<Console.Console>(
+export const ConsoleRef = Context.Reference<Console.Console>(
   "effect/Console/CurrentConsole",
   { defaultValue: (): Console.Console => globalThis.console }
 )
@@ -5799,14 +6037,14 @@ export const isLogLevelGreaterThan = Order.isGreaterThan(LogLevelOrder)
 // ----------------------------------------------------------------------------
 
 /** @internal */
-export const CurrentLoggers = ServiceMap.Reference<
+export const CurrentLoggers = Context.Reference<
   ReadonlySet<Logger.Logger<unknown, any>>
 >("effect/Loggers/CurrentLoggers", {
   defaultValue: () => new Set([defaultLogger, tracerLogger])
 })
 
 /** @internal */
-export const LogToStderr = ServiceMap.Reference<boolean>("effect/Logger/LogToStderr", {
+export const LogToStderr = Context.Reference<boolean>("effect/Logger/LogToStderr", {
   defaultValue: constFalse
 })
 
@@ -5825,8 +6063,8 @@ export const annotateLogsScoped: {
       const [key, value] = entries[i]
       next[key] = value
     }
-    fiber.setServices(ServiceMap.add(fiber.services, CurrentLogAnnotations, next))
-    return scopeAddFinalizerExit(ServiceMap.getUnsafe(fiber.services, scopeTag), (_) => {
+    fiber.setContext(Context.add(fiber.context, CurrentLogAnnotations, next))
+    return scopeAddFinalizerExit(Context.getUnsafe(fiber.context, scopeTag), (_) => {
       const current = fiber.getRef(CurrentLogAnnotations)
       const next = { ...current }
       for (let i = 0; i < entries.length; i++) {
@@ -5838,7 +6076,7 @@ export const annotateLogsScoped: {
           delete next[key]
         }
       }
-      fiber.setServices(ServiceMap.add(fiber.services, CurrentLogAnnotations, next))
+      fiber.setContext(Context.add(fiber.context, CurrentLogAnnotations, next))
       return void_
     })
   }))
@@ -5989,20 +6227,21 @@ const defaultDateFormat = (date: Date): string =>
     date.getSeconds().toString().padStart(2, "0")
   }.${date.getMilliseconds().toString().padStart(3, "0")}`
 
-const hasProcessStdout = typeof process === "object" &&
-  process !== null &&
-  typeof process.stdout === "object" &&
-  process.stdout !== null
-const processStdoutIsTTY = hasProcessStdout &&
-  process.stdout.isTTY === true
-const hasProcessStdoutOrDeno = hasProcessStdout || "Deno" in globalThis
-
 /** @internal */
 export const consolePretty = (options?: {
   readonly colors?: "auto" | boolean | undefined
   readonly formatDate?: ((date: Date) => string) | undefined
   readonly mode?: "browser" | "tty" | "auto" | undefined
 }) => {
+  // evaluated lazily so the module-level bundle stays free of `process`
+  // property accesses, which bundlers must retain as possible side effects
+  const hasProcessStdout = typeof process === "object" &&
+    process !== null &&
+    typeof process.stdout === "object" &&
+    process.stdout !== null
+  const processStdoutIsTTY = hasProcessStdout &&
+    process.stdout.isTTY === true
+  const hasProcessStdoutOrDeno = hasProcessStdout || "Deno" in globalThis
   const mode_ = options?.mode ?? "auto"
   const mode = mode_ === "auto" ? (hasProcessStdoutOrDeno ? "tty" : "browser") : mode_
   const isBrowser = mode === "browser"
@@ -6022,6 +6261,7 @@ const prettyLoggerTty = (options: {
   return loggerMake<unknown, void>(
     ({ cause, date, fiber, logLevel, message: message_ }) => {
       const console = fiber.getRef(ConsoleRef)
+      // oxlint-disable-next-line no-console
       const log = fiber.getRef(LogToStderr) ? console.error : console.log
 
       const message = Array.isArray(message_) ? message_.slice() : [message_]
@@ -6047,6 +6287,7 @@ const prettyLoggerTty = (options: {
       }
 
       log(firstLine)
+      // oxlint-disable-next-line no-console
       if (!processIsBun) console.group()
 
       if (cause.reasons.length > 0) {
@@ -6064,6 +6305,7 @@ const prettyLoggerTty = (options: {
         log(color(`${key}:`, colors.bold, colors.white), redact(value))
       }
 
+      // oxlint-disable-next-line no-console
       if (!processIsBun) console.groupEnd()
     }
   )
@@ -6110,14 +6352,17 @@ const prettyLoggerBrowser = (options: {
         }
       }
 
+      // oxlint-disable-next-line no-console
       console.groupCollapsed(firstLine, ...firstParams)
 
       if (cause.reasons.length > 0) {
+        // oxlint-disable-next-line no-console
         console.error(causePretty(cause))
       }
 
       if (messageIndex < message.length) {
         for (; messageIndex < message.length; messageIndex++) {
+          // oxlint-disable-next-line no-console
           console.log(redact(message[messageIndex]))
         }
       }
@@ -6126,12 +6371,15 @@ const prettyLoggerBrowser = (options: {
       for (const [key, value] of Object.entries(annotations)) {
         const redacted = redact(value)
         if (options.colors) {
+          // oxlint-disable-next-line no-console
           console.log(`%c${key}:`, "color:gray", redacted)
         } else {
+          // oxlint-disable-next-line no-console
           console.log(`${key}:`, redacted)
         }
       }
 
+      // oxlint-disable-next-line no-console
       console.groupEnd()
     }
   )
@@ -6154,6 +6402,7 @@ export const defaultLogger = loggerMake<unknown, void>(({ cause, date, fiber, lo
     message_.push(annotations)
   }
   const console = fiber.getRef(ConsoleRef)
+  // oxlint-disable-next-line no-console
   const log = fiber.getRef(LogToStderr) ? console.error : console.log
   log(`[${defaultDateFormat(date)}] ${logLevel.toUpperCase()} (#${fiber.id})${spanString}:`, ...message_)
 })

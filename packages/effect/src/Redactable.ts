@@ -1,113 +1,128 @@
 /**
+ * Context-aware redaction for sensitive values.
+ *
+ * The `Redactable` module provides a protocol for objects that need to present
+ * alternative representations of themselves depending on the runtime context.
+ * Typical use cases include masking secrets, tokens, or personal data in logs, traces,
+ * and serialized output.
+ *
  * @since 4.0.0
  */
+import type * as Context from "./Context.ts"
 import { pipeArguments } from "./Pipeable.ts"
 import { hasProperty } from "./Predicate.ts"
-import type * as ServiceMap from "./ServiceMap.ts"
 
 /**
- * Symbol used to identify objects that implement redaction capabilities.
+ * Defines the symbol used to identify objects that implement the {@link Redactable}
+ * protocol.
  *
- * @since 4.0.0
- * @category symbol
- */
-export const symbolRedactable: unique symbol = Symbol.for("~effect/Inspectable/redactable")
-
-/**
- * Interface for objects that can provide redacted representations.
+ * **When to use**
  *
- * Redactable objects can provide different representations of themselves based on
- * the current execution context. This is useful for sensitive data that should
- * be hidden or modified in certain environments (like production logs).
+ * Use as the property key when implementing the `Redactable` protocol.
  *
- * @example
+ * **Details**
+ *
+ * Add a method under this key to make an object redactable. The method receives
+ * the current `Context` and must return the replacement value. The symbol is
+ * registered globally via `Symbol.for("~effect/Redactable")`, so it is
+ * identical across multiple copies of the library at runtime.
+ *
+ * **Example** (Masking an API key)
+ *
  * ```ts
- * import type { ServiceMap } from "effect"
- * import { Redactable } from "effect"
+ * import { Context, Redactable } from "effect"
  *
- * class SensitiveData implements Redactable.Redactable {
- *   constructor(private secret: string) {}
+ * class ApiKey {
+ *   constructor(readonly raw: string) {}
  *
- *   [Redactable.symbolRedactable](context: ServiceMap.ServiceMap<never>) {
- *     // In production, hide the actual secret
- *     return { secret: "[REDACTED]" }
+ *   [Redactable.symbolRedactable](_ctx: Context.Context<never>) {
+ *     return this.raw.slice(0, 4) + "..."
  *   }
  * }
- *
- * const data = new SensitiveData("my-secret-key")
- * // The redacted version will be used when converting to JSON in certain contexts
  * ```
  *
- * @since 4.0.0
- * @category Model
+ * @see {@link Redactable} for the interface this symbol belongs to
+ * @see {@link isRedactable} to check whether a value has this symbol
+ * @category symbols
+ * @since 3.10.0
+ */
+export const symbolRedactable: unique symbol = Symbol.for("~effect/Redactable")
+
+/**
+ * Interface for objects that provide context-aware redacted representations.
+ *
+ * **When to use**
+ *
+ * Use to define classes or objects that hold sensitive data and should present
+ * a sanitized form when inspected or logged.
+ *
+ * **Details**
+ *
+ * The `[symbolRedactable]` method receives the current fiber's `Context`. If no
+ * fiber is active, an empty `Context` is provided.
+ *
+ * **Example** (Masking an API key)
+ *
+ * ```ts
+ * import { Context, Redactable } from "effect"
+ *
+ * class ApiKey {
+ *   constructor(readonly raw: string) {}
+ *
+ *   [Redactable.symbolRedactable](_ctx: Context.Context<never>) {
+ *     return this.raw.slice(0, 4) + "..."
+ *   }
+ * }
+ * ```
+ *
+ * @see {@link symbolRedactable} for the symbol key to implement
+ * @see {@link redact} to apply redaction to any value
+ * @see {@link isRedactable} for the type guard for this interface
+ * @category models
+ * @since 3.10.0
  */
 export interface Redactable {
-  readonly [symbolRedactable]: (context: ServiceMap.ServiceMap<never>) => unknown
+  readonly [symbolRedactable]: (context: Context.Context<never>) => unknown
 }
 
 /**
- * Checks if a value implements the `Redactable` interface.
+ * Type guard that checks whether a value implements the {@link Redactable}
+ * interface.
  *
- * This function determines whether a given value has redaction capabilities,
- * meaning it can provide alternative representations based on context.
+ * **When to use**
  *
- * @param u - The value to check
+ * Use to narrow an unknown value before calling redaction-specific helpers.
  *
- * @example
- * ```ts
- * import { Redactable } from "effect"
- *
- * class RedactableSecret {
- *   [Redactable.symbolRedactable]() {
- *     return "[REDACTED]"
- *   }
- * }
- *
- * const secret = new RedactableSecret()
- * const normal = { value: 42 }
- *
- * console.log(Redactable.isRedactable(secret)) // true
- * console.log(Redactable.isRedactable(normal)) // false
- * console.log(Redactable.isRedactable("string")) // false
- * ```
- *
- * @since 4.0.0
- * @category redactable
+ * @see {@link Redactable} for the interface being checked
+ * @see {@link redact} to apply redaction if the value is redactable
+ * @category guards
+ * @since 3.10.0
  */
 export const isRedactable = (u: unknown): u is Redactable => hasProperty(u, symbolRedactable)
 
 /**
- * Applies redaction to a value if it implements the Redactable interface.
+ * Returns a redacted value if it implements {@link Redactable}, otherwise returns it
+ * unchanged.
  *
- * This function checks if the value is redactable and applies the redaction
- * transformation if a current fiber context is available. Otherwise, it returns
- * the value unchanged.
+ * **When to use**
  *
- * @param u - The value to potentially redact
+ * Use as the general-purpose entry point for redaction when the input may
+ * or may not implement the redaction protocol.
  *
- * @example
- * ```ts
- * import { Redactable } from "effect"
+ * **Details**
  *
- * class CreditCard {
- *   constructor(private number: string) {}
+ * This function calls {@link isRedactable} and, when it returns `true`,
+ * delegates to {@link getRedacted}.
  *
- *   [Redactable.symbolRedactable]() {
- *     return {
- *       number: this.number.slice(0, 4) + "****"
- *     }
- *   }
- * }
+ * **Gotchas**
  *
- * const card = new CreditCard("1234567890123456")
- * console.log(Redactable.redact(card)) // { number: "1234****" }
+ * Redaction is not recursive. Nested redactable values inside the returned
+ * object are not automatically redacted.
  *
- * // Non-redactable values are returned unchanged
- * console.log(Redactable.redact("normal string")) // "normal string"
- * console.log(Redactable.redact({ id: 123 })) // { id: 123 }
- * ```
- *
- * @since 4.0.0
+ * @see {@link isRedactable} to check before redacting
+ * @see {@link getRedacted} for the lower-level variant for known redactables
+ * @category destructors
+ * @since 3.10.0
  */
 export function redact(u: unknown): unknown {
   if (isRedactable(u)) return getRedacted(u)
@@ -115,17 +130,37 @@ export function redact(u: unknown): unknown {
 }
 
 /**
+ * Returns the result of calling `[symbolRedactable]` on a value that is
+ * already known to be {@link Redactable}.
+ *
+ * **When to use**
+ *
+ * Use when you need to read the redacted representation from a value already
+ * verified as `Redactable`.
+ *
+ * **Details**
+ *
+ * This function reads the current fiber's `Context` from the global fiber
+ * reference and passes it to the redaction method.
+ *
+ * **Gotchas**
+ *
+ * If no fiber is active, an empty `Context` is passed to the redaction method.
+ *
+ * @see {@link redact} for the higher-level variant that handles non-redactable values
+ * @see {@link isRedactable} for the type guard to verify before calling this
+ * @category destructors
  * @since 4.0.0
  */
 export function getRedacted(redactable: Redactable): unknown {
-  return redactable[symbolRedactable]((globalThis as any)[currentFiberTypeId]?.services ?? emptyServiceMap)
+  return redactable[symbolRedactable]((globalThis as any)[currentFiberTypeId]?.context ?? emptyContext)
 }
 
 /** @internal */
 export const currentFiberTypeId = "~effect/Fiber/currentFiber"
 
-const emptyServiceMap: ServiceMap.ServiceMap<never> = {
-  "~effect/ServiceMap": {} as any,
+const emptyContext: Context.Context<never> = {
+  "~effect/Context": {} as any,
   mapUnsafe: new Map(),
   pipe() {
     return pipeArguments(this, arguments)

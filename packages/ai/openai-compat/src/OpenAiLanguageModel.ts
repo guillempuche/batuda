@@ -1,11 +1,14 @@
 /**
- * OpenAI Language Model implementation.
+ * The `OpenAiLanguageModel` module adapts OpenAI-compatible chat completions
+ * providers to Effect AI's `LanguageModel` service. It builds a model service
+ * from a model id, translates prompts, files, tools, structured output schemas,
+ * and provider-specific options into `OpenAiClient` requests, and maps normal
+ * or streaming chat completion results back into Effect AI response content and
+ * metadata.
  *
- * Provides a LanguageModel implementation for OpenAI's chat completions API,
- * supporting text generation, structured output, tool calling, and streaming.
- *
- * @since 1.0.0
+ * @since 4.0.0
  */
+import * as Context from "effect/Context"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Encoding from "effect/Encoding"
@@ -16,7 +19,6 @@ import * as Predicate from "effect/Predicate"
 import * as Redactable from "effect/Redactable"
 import type * as Schema from "effect/Schema"
 import * as AST from "effect/SchemaAST"
-import * as ServiceMap from "effect/ServiceMap"
 import * as Stream from "effect/Stream"
 import type { Span } from "effect/Tracer"
 import type { DeepMutable, Simplify } from "effect/Types"
@@ -58,53 +60,60 @@ type ImageDetail = "auto" | "low" | "high"
 // Configuration
 // =============================================================================
 
-/**
- * Service definition for OpenAI language model configuration.
- *
- * @since 1.0.0
- * @category context
- */
-export class Config extends ServiceMap.Service<
-  Config,
-  Simplify<
-    & Partial<
-      Omit<
-        CreateResponse,
-        "input" | "tools" | "tool_choice" | "stream" | "text"
-      >
-    >
-    & {
-      /**
-       * File ID prefixes used to identify file IDs in Responses API.
-       * When undefined, all file data is treated as base64 content.
-       *
-       * Examples:
-       * - OpenAI: ['file-'] for IDs like 'file-abc123'
-       * - Azure OpenAI: ['assistant-'] for IDs like 'assistant-abc123'
-       */
-      readonly fileIdPrefixes?: ReadonlyArray<string> | undefined
-      /**
-       * Configuration options for a text response from the model.
-       */
-      readonly text?: {
-        /**
-         * Constrains the verbosity of the model's response. Lower values will
-         * result in more concise responses, while higher values will result in
-         * more verbose responses.
-         *
-         * Defaults to `"medium"`.
-         */
-        readonly verbosity?: "low" | "medium" | "high" | undefined
-      } | undefined
-      /**
-       * Whether to use strict JSON schema validation.
-       *
-       * Defaults to `true`.
-       */
-      readonly strictJsonSchema?: boolean | undefined
-      readonly [x: string]: unknown
-    }
+type ConfigOptions = Simplify<
+  & Partial<
+    Omit<CreateResponse, "input" | "tools" | "tool_choice" | "stream" | "text">
   >
+  & {
+    /**
+     * File ID prefixes used to identify file IDs in Responses API.
+     * When undefined, all file data is treated as base64 content.
+     *
+     * Examples:
+     * - OpenAI: ['file-'] for IDs like 'file-abc123'
+     * - Azure OpenAI: ['assistant-'] for IDs like 'assistant-abc123'
+     */
+    readonly fileIdPrefixes?: ReadonlyArray<string> | undefined
+    /**
+     * Configuration options for a text response from the model.
+     */
+    readonly text?: {
+      /**
+       * Constrains the verbosity of the model's response. Lower values will
+       * result in more concise responses, while higher values will result in
+       * more verbose responses.
+       *
+       * Defaults to `"medium"`.
+       */
+      readonly verbosity?: "low" | "medium" | "high" | undefined
+    } | undefined
+    /**
+     * Whether to use strict JSON schema validation.
+     *
+     * Defaults to `true`.
+     */
+    readonly strictJsonSchema?: boolean | undefined
+  }
+>
+type ModelConfig = Omit<ConfigOptions, "model"> & { readonly [x: string]: unknown }
+
+/**
+ * Context service for OpenAI language model configuration.
+ *
+ * **When to use**
+ *
+ * Use as the context service for OpenAI-compatible language model request
+ * configuration, especially when a scoped operation should override the defaults
+ * supplied to `model`, `make`, or `layer`.
+ *
+ * @see {@link withConfigOverride} for scoping language model request overrides
+ *
+ * @category context
+ * @since 4.0.0
+ */
+export class Config extends Context.Service<
+  Config,
+  ConfigOptions & { readonly [x: string]: unknown }
 >()("@effect/ai-openai-compat/OpenAiLanguageModel/Config") {}
 
 // =============================================================================
@@ -112,7 +121,16 @@ export class Config extends ServiceMap.Service<
 // =============================================================================
 
 declare module "effect/unstable/ai/Prompt" {
+  /**
+   * OpenAI-compatible options for file prompt parts.
+   *
+   * @category request
+   * @since 4.0.0
+   */
   export interface FilePartOptions extends ProviderOptions {
+    /**
+     * Provider-specific file options for OpenAI-compatible APIs.
+     */
     readonly openai?: {
       /**
        * The detail level of the image to be sent to the model. One of `high`, `low`, or `auto`. Defaults to `auto`.
@@ -121,7 +139,16 @@ declare module "effect/unstable/ai/Prompt" {
     } | null
   }
 
+  /**
+   * OpenAI-compatible options for reasoning prompt parts.
+   *
+   * @category request
+   * @since 4.0.0
+   */
   export interface ReasoningPartOptions extends ProviderOptions {
+    /**
+     * Provider-specific reasoning options for OpenAI-compatible APIs.
+     */
     readonly openai?: {
       /**
        * The ID of the item to reference.
@@ -136,40 +163,67 @@ declare module "effect/unstable/ai/Prompt" {
     } | null
   }
 
+  /**
+   * OpenAI-compatible options for assistant tool-call prompt parts.
+   *
+   * @category request
+   * @since 4.0.0
+   */
   export interface ToolCallPartOptions extends ProviderOptions {
+    /**
+     * Provider-specific tool-call options for OpenAI-compatible APIs.
+     */
     readonly openai?: {
       /**
        * The ID of the item to reference.
        */
       readonly itemId?: string | null
       /**
-       * The status of item.
+       * The status to send for the tool-call item.
        */
       readonly status?: MessageStatus | null
     } | null
   }
 
+  /**
+   * OpenAI-compatible options for tool-result prompt parts.
+   *
+   * @category request
+   * @since 4.0.0
+   */
   export interface ToolResultPartOptions extends ProviderOptions {
+    /**
+     * Provider-specific tool-result options for OpenAI-compatible APIs.
+     */
     readonly openai?: {
       /**
        * The ID of the item to reference.
        */
       readonly itemId?: string | null
       /**
-       * The status of item.
+       * The status to send for the tool-result item.
        */
       readonly status?: MessageStatus | null
     } | null
   }
 
+  /**
+   * OpenAI-compatible options for text prompt parts.
+   *
+   * @category request
+   * @since 4.0.0
+   */
   export interface TextPartOptions extends ProviderOptions {
+    /**
+     * Provider-specific text options for OpenAI-compatible APIs.
+     */
     readonly openai?: {
       /**
        * The ID of the item to reference.
        */
       readonly itemId?: string | null
       /**
-       * The status of item.
+       * The status to send for the text item.
        */
       readonly status?: MessageStatus | null
       /**
@@ -181,8 +235,20 @@ declare module "effect/unstable/ai/Prompt" {
 }
 
 declare module "effect/unstable/ai/Response" {
+  /**
+   * OpenAI-compatible metadata attached to a complete text response part.
+   *
+   * @category response
+   * @since 4.0.0
+   */
   export interface TextPartMetadata extends ProviderMetadata {
+    /**
+     * Provider-specific metadata returned for the text part.
+     */
     readonly openai?: {
+      /**
+       * The OpenAI item ID associated with the text part.
+       */
       readonly itemId?: string | null
       /**
        * If the model emits a refusal content part, the refusal explanation
@@ -191,7 +257,7 @@ declare module "effect/unstable/ai/Response" {
        */
       readonly refusal?: string | null
       /**
-       * The status of item.
+       * The status returned for the text item.
        */
       readonly status?: MessageStatus | null
       /**
@@ -201,55 +267,163 @@ declare module "effect/unstable/ai/Response" {
     }
   }
 
+  /**
+   * OpenAI-compatible metadata emitted when a streamed text part starts.
+   *
+   * @category response
+   * @since 4.0.0
+   */
   export interface TextStartPartMetadata extends ProviderMetadata {
+    /**
+     * Provider-specific metadata returned for the streamed text start.
+     */
     readonly openai?: {
+      /**
+       * The OpenAI item ID associated with the streamed text part.
+       */
       readonly itemId?: string | null
     } | null
   }
 
+  /**
+   * OpenAI-compatible metadata emitted when a streamed text part ends.
+   *
+   * @category response
+   * @since 4.0.0
+   */
   export interface TextEndPartMetadata extends ProviderMetadata {
+    /**
+     * Provider-specific metadata returned for the streamed text end.
+     */
     readonly openai?: {
+      /**
+       * The OpenAI item ID associated with the streamed text part.
+       */
       readonly itemId?: string | null
+      /**
+       * The annotations collected for the completed streamed text part.
+       */
       readonly annotations?: ReadonlyArray<Annotation> | null
     } | null
   }
 
+  /**
+   * OpenAI-compatible metadata attached to a complete reasoning response part.
+   *
+   * @category response
+   * @since 4.0.0
+   */
   export interface ReasoningPartMetadata extends ProviderMetadata {
+    /**
+     * Provider-specific metadata returned for the reasoning part.
+     */
     readonly openai?: {
+      /**
+       * The OpenAI item ID associated with the reasoning part.
+       */
       readonly itemId?: string | null
+      /**
+       * Encrypted reasoning content that can be sent back in later requests.
+       */
       readonly encryptedContent?: string | null
     } | null
   }
 
+  /**
+   * OpenAI-compatible metadata emitted when a streamed reasoning part starts.
+   *
+   * @category response
+   * @since 4.0.0
+   */
   export interface ReasoningStartPartMetadata extends ProviderMetadata {
+    /**
+     * Provider-specific metadata returned for the streamed reasoning start.
+     */
     readonly openai?: {
+      /**
+       * The OpenAI item ID associated with the reasoning part.
+       */
       readonly itemId?: string | null
+      /**
+       * Encrypted reasoning content that can be sent back in later requests.
+       */
       readonly encryptedContent?: string | null
     } | null
   }
 
+  /**
+   * OpenAI-compatible metadata emitted for a streamed reasoning delta.
+   *
+   * @category response
+   * @since 4.0.0
+   */
   export interface ReasoningDeltaPartMetadata extends ProviderMetadata {
+    /**
+     * Provider-specific metadata returned for the streamed reasoning delta.
+     */
     readonly openai?: {
+      /**
+       * The OpenAI item ID associated with the reasoning part.
+       */
       readonly itemId?: string | null
     } | null
   }
 
+  /**
+   * OpenAI-compatible metadata emitted when a streamed reasoning part ends.
+   *
+   * @category response
+   * @since 4.0.0
+   */
   export interface ReasoningEndPartMetadata extends ProviderMetadata {
+    /**
+     * Provider-specific metadata returned for the streamed reasoning end.
+     */
     readonly openai?: {
+      /**
+       * The OpenAI item ID associated with the reasoning part.
+       */
       readonly itemId?: string | null
+      /**
+       * Encrypted reasoning content that can be sent back in later requests.
+       */
       readonly encryptedContent?: string
     } | null
   }
 
+  /**
+   * OpenAI-compatible metadata attached to tool-call response parts.
+   *
+   * @category response
+   * @since 4.0.0
+   */
   export interface ToolCallPartMetadata extends ProviderMetadata {
+    /**
+     * Provider-specific metadata returned for the tool call.
+     */
     readonly openai?: {
+      /**
+       * The OpenAI item ID associated with the tool call.
+       */
       readonly itemId?: string | null
     } | null
   }
 
+  /**
+   * OpenAI-compatible metadata attached to document source citations.
+   *
+   * @category response
+   * @since 4.0.0
+   */
   export interface DocumentSourcePartMetadata extends ProviderMetadata {
+    /**
+     * Provider-specific citation metadata for OpenAI-compatible APIs.
+     */
     readonly openai?:
       | {
+        /**
+         * Identifies a citation to an uploaded file.
+         */
         readonly type: "file_citation"
         /**
          * The index of the file in the list of files.
@@ -261,6 +435,9 @@ declare module "effect/unstable/ai/Response" {
         readonly fileId: string
       }
       | {
+        /**
+         * Identifies a citation to a generated file path.
+         */
         readonly type: "file_path"
         /**
          * The index of the file in the list of files.
@@ -272,6 +449,9 @@ declare module "effect/unstable/ai/Response" {
         readonly fileId: string
       }
       | {
+        /**
+         * Identifies a citation to a file inside a container.
+         */
         readonly type: "container_file_citation"
         /**
          * The ID of the file.
@@ -285,8 +465,20 @@ declare module "effect/unstable/ai/Response" {
       | null
   }
 
+  /**
+   * OpenAI-compatible metadata attached to URL source citations.
+   *
+   * @category response
+   * @since 4.0.0
+   */
   export interface UrlSourcePartMetadata extends ProviderMetadata {
+    /**
+     * Provider-specific URL citation metadata for OpenAI-compatible APIs.
+     */
     readonly openai?: {
+      /**
+       * Identifies a citation to a URL.
+       */
       readonly type: "url_citation"
       /**
        * The index of the first character of the URL citation in the message.
@@ -299,8 +491,20 @@ declare module "effect/unstable/ai/Response" {
     } | null
   }
 
+  /**
+   * OpenAI-compatible metadata attached to finish response parts.
+   *
+   * @category response
+   * @since 4.0.0
+   */
   export interface FinishPartMetadata extends ProviderMetadata {
+    /**
+     * Provider-specific metadata returned when generation finishes.
+     */
     readonly openai?: {
+      /**
+       * The service tier reported by the OpenAI-compatible provider.
+       */
       readonly serviceTier?: "default" | "auto" | "flex" | "scale" | "priority" | null
     } | null
   }
@@ -311,18 +515,28 @@ declare module "effect/unstable/ai/Response" {
 // =============================================================================
 
 /**
- * @since 1.0.0
+ * Creates an OpenAI-compatible model descriptor that can be provided with `Effect.provide`.
+ *
+ * **When to use**
+ *
+ * Use when you want an OpenAI-compatible language model value that carries
+ * provider and model metadata and can be supplied directly to an Effect program.
+ *
+ * @see {@link layer} for creating a `LanguageModel.LanguageModel` layer directly
+ * @see {@link make} for constructing the language model service effectfully
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const model = (
   model: string,
-  config?: Omit<typeof Config.Service, "model">
+  config?: ModelConfig
 ): AiModel.Model<"openai", LanguageModel.LanguageModel, OpenAiClient> =>
   AiModel.make("openai", model, layer({ model, config }))
 
 // TODO
 // /**
-//  * @since 1.0.0
+//  * @since 4.0.0
 //  * @category constructors
 //  */
 // export const modelWithTokenizer = (
@@ -332,19 +546,34 @@ export const model = (
 //   AiModel.make("openai", model, layerWithTokenizer({ model, config }))
 
 /**
- * Creates an OpenAI language model service.
+ * Creates an OpenAI-compatible `LanguageModel` service from a model identifier and optional request defaults.
  *
- * @since 1.0.0
+ * **When to use**
+ *
+ * Use to construct an OpenAI-compatible chat-completions language model service
+ * backed by `OpenAiClient`.
+ *
+ * **Details**
+ *
+ * The returned effect requires `OpenAiClient`. Request defaults from the
+ * `config` option are merged with any `Config` service in the context, with
+ * context values taking precedence. The service supports both `generateText` and
+ * `streamText`.
+ *
+ * @see {@link layer} for providing the service as a `Layer`
+ * @see {@link model} for creating a model descriptor for `AiModel.provide`
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const make = Effect.fnUntraced(function*({ model, config: providerConfig }: {
   readonly model: string
-  readonly config?: Omit<typeof Config.Service, "model"> | undefined
+  readonly config?: ModelConfig | undefined
 }): Effect.fn.Return<LanguageModel.Service, never, OpenAiClient> {
   const client = yield* OpenAiClient
 
   const makeConfig = Effect.gen(function*() {
-    const services = yield* Effect.services<never>()
+    const services = yield* Effect.context<never>()
     return { model, ...providerConfig, ...services.mapUnsafe.get(Config.key) }
   })
 
@@ -372,8 +601,9 @@ export const make = Effect.fnUntraced(function*({ model, config: providerConfig 
         config,
         options
       })
+      const { fileIdPrefixes: _fip, strictJsonSchema: _sjs, ...apiConfig } = config
       const request: CreateResponse = {
-        ...config,
+        ...apiConfig,
         input: messages,
         include: include.size > 0 ? Array.from(include) : null,
         text: {
@@ -430,22 +660,43 @@ export const make = Effect.fnUntraced(function*({ model, config: providerConfig 
 })
 
 /**
- * Creates a layer for the OpenAI language model.
+ * Creates a layer for the OpenAI-compatible language model.
  *
- * @since 1.0.0
+ * **When to use**
+ *
+ * Use when composing application layers and you want OpenAI-compatible APIs to
+ * satisfy `LanguageModel.LanguageModel` while supplying `OpenAiClient` from
+ * another layer.
+ *
+ * @see {@link make} for constructing the language model service effectfully
+ * @see {@link model} for creating an AI model descriptor
+ *
  * @category layers
+ * @since 4.0.0
  */
 export const layer = (options: {
   readonly model: string
-  readonly config?: Omit<typeof Config.Service, "model"> | undefined
+  readonly config?: ModelConfig | undefined
 }): Layer.Layer<LanguageModel.LanguageModel, never, OpenAiClient> =>
   Layer.effect(LanguageModel.LanguageModel, make(options))
 
 /**
- * Provides config overrides for OpenAI language model operations.
+ * Provides scoped config overrides for OpenAI-compatible language model operations.
  *
- * @since 1.0.0
+ * **When to use**
+ *
+ * Use to override request configuration for a single language model effect
+ * without changing the defaults supplied to `model`, `make`, or `layer`.
+ *
+ * **Details**
+ *
+ * Existing `Config` values from the Effect context are merged with `overrides`,
+ * and the override values take precedence.
+ *
+ * @see {@link Config} for the configuration shape
+ *
  * @category configuration
+ * @since 4.0.0
  */
 export const withConfigOverride: {
   (overrides: typeof Config.Service): <A, E, R>(self: Effect.Effect<A, E, R>) => Effect.Effect<A, E, Exclude<R, Config>>
@@ -689,7 +940,6 @@ const prepareMessages = Effect.fnUntraced(
                   type: "function_call",
                   name: toolName,
                   call_id: part.id,
-                  // @effect-diagnostics-next-line preferSchemaOverJson:off
                   arguments: JSON.stringify(part.params),
                   ...(Predicate.isNotNull(id) ? { id } : {}),
                   ...(Predicate.isNotNull(status) ? { status } : {})
@@ -735,7 +985,6 @@ const prepareMessages = Effect.fnUntraced(
             messages.push({
               type: "function_call_output",
               call_id: part.id,
-              // @effect-diagnostics-next-line preferSchemaOverJson:off
               output: typeof part.result === "string" ? part.result : JSON.stringify(part.result),
               ...(Predicate.isNotNull(status) ? { status } : {})
             })
@@ -812,6 +1061,11 @@ const makeResponse = Effect.fnUntraced(
     const message = choice?.message
 
     if (message !== undefined) {
+      const reasoning = message.reasoning ?? message.reasoning_content
+      if (Predicate.isNotNullish(reasoning) && reasoning.length > 0) {
+        parts.push({ type: "reasoning", text: reasoning })
+      }
+
       if (
         message.content !== undefined && Predicate.isNotNull(message.content) && message.content.length > 0
       ) {
@@ -885,6 +1139,8 @@ const makeStreamResponse = Effect.fnUntraced(
     let metadataEmitted = false
     let textStarted = false
     let textId = ""
+    let reasoningStarted = false
+    let reasoningId = ""
     let hasToolCalls = false
     const activeToolCalls: Record<number, ActiveToolCall> = {}
 
@@ -893,6 +1149,14 @@ const makeStreamResponse = Effect.fnUntraced(
         const parts: Array<Response.StreamPartEncoded> = []
 
         if (event === "[DONE]") {
+          if (reasoningStarted) {
+            parts.push({
+              type: "reasoning-end",
+              id: reasoningId,
+              metadata: { openai: { ...makeItemIdMetadata(reasoningId) } }
+            })
+          }
+
           if (textStarted) {
             parts.push({
               type: "text-end",
@@ -950,6 +1214,7 @@ const makeStreamResponse = Effect.fnUntraced(
         if (!metadataEmitted) {
           metadataEmitted = true
           textId = `${event.id}_message`
+          reasoningId = `${event.id}_reasoning`
           parts.push({
             type: "response-metadata",
             id: event.id,
@@ -964,7 +1229,29 @@ const makeStreamResponse = Effect.fnUntraced(
           return parts
         }
 
+        const reasoningDelta = choice.delta?.reasoning ?? choice.delta?.reasoning_content
+        if (Predicate.isNotNullish(reasoningDelta) && reasoningDelta.length > 0) {
+          if (!reasoningStarted) {
+            reasoningStarted = true
+            parts.push({
+              type: "reasoning-start",
+              id: reasoningId,
+              metadata: { openai: { ...makeItemIdMetadata(reasoningId) } }
+            })
+          }
+          parts.push({ type: "reasoning-delta", id: reasoningId, delta: reasoningDelta })
+        }
+
         if (choice.delta?.content !== undefined && Predicate.isNotNull(choice.delta.content)) {
+          if (reasoningStarted) {
+            reasoningStarted = false
+            parts.push({
+              type: "reasoning-end",
+              id: reasoningId,
+              metadata: { openai: { ...makeItemIdMetadata(reasoningId) } }
+            })
+          }
+
           if (!textStarted) {
             textStarted = true
             parts.push({
@@ -983,7 +1270,7 @@ const makeStreamResponse = Effect.fnUntraced(
             const activeToolCall = activeToolCalls[toolIndex]
             const toolId = activeToolCall?.id ?? deltaTool.id ?? `${event.id}_tool_${toolIndex}`
             const providerToolName = deltaTool.function?.name
-            const toolName = providerToolName !== undefined
+            const toolName = Predicate.isNotNullish(providerToolName)
               ? toolNameMapper.getCustomName(providerToolName)
               : activeToolCall?.name ?? toolNameMapper.getCustomName("unknown_tool")
             const argumentsDelta = deltaTool.function?.arguments ?? ""
@@ -1104,7 +1391,7 @@ const unsupportedSchemaError = (error: unknown, method: string): AiError.AiError
     })
   })
 
-const tryJsonSchema = <S extends Schema.Top>(schema: S, method: string) =>
+const tryJsonSchema = <S extends Schema.Constraint>(schema: S, method: string) =>
   Effect.try({
     try: () => Tool.getJsonSchemaFromSchema(schema, { transformer: toCodecOpenAI }),
     catch: (error) => unsupportedSchemaError(error, method)
@@ -1424,7 +1711,7 @@ const toAssistantChatMessageContent = (
     readonly type: string
     readonly [x: string]: unknown
   }>
-): string | null => {
+): string => {
   let text = ""
   for (const part of content) {
     if (part.type === "output_text" && typeof part.text === "string") {
@@ -1434,7 +1721,7 @@ const toAssistantChatMessageContent = (
       text += part.refusal
     }
   }
-  return text.length > 0 ? text : null
+  return text
 }
 
 const toChatMessageContent = (

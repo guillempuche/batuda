@@ -1,19 +1,16 @@
 /**
- * The `Request` module provides a way to model requests to external data sources
- * in a functional and composable manner. Requests represent descriptions of
- * operations that can be batched, cached, and executed efficiently.
+ * Typed request values for data loading with `Effect.request`.
  *
- * A `Request<A, E, R>` represents a request that:
- * - Yields a value of type `A` on success
- * - Can fail with an error of type `E`
- * - Requires services of type `R`
- *
- * Requests are primarily used with RequestResolver to implement efficient
- * data fetching patterns, including automatic batching and caching.
+ * A request describes one logical piece of work without performing it. It
+ * records the success type, typed error, service requirements, and fields a
+ * resolver needs to complete the request. Requests are paired with
+ * `RequestResolver`, which performs backend-specific loading and completes each
+ * pending request entry with a success, failure, cause, exit, or effect.
  *
  * @since 2.0.0
  */
 import type * as Cause from "./Cause.ts"
+import type * as Context from "./Context.ts"
 import type * as Effect from "./Effect.ts"
 import * as Equal from "./Equal.ts"
 import type * as Exit from "./Exit.ts"
@@ -21,7 +18,6 @@ import { dual } from "./Function.ts"
 import * as core from "./internal/core.ts"
 import * as internalEffect from "./internal/effect.ts"
 import { hasProperty } from "./Predicate.ts"
-import type * as ServiceMap from "./ServiceMap.ts"
 import type * as Types from "./Types.ts"
 
 const TypeId = "~effect/Request"
@@ -30,7 +26,8 @@ const TypeId = "~effect/Request"
  * A `Request<A, E, R>` is a request from a data source for a value of type `A`
  * that may fail with an `E` and have requirements of type `R`.
  *
- * @example
+ * **Example** (Defining typed requests)
+ *
  * ```ts
  * import type { Request } from "effect"
  *
@@ -46,20 +43,41 @@ const TypeId = "~effect/Request"
  * }
  * ```
  *
- * @since 2.0.0
  * @category models
+ * @since 2.0.0
  */
 export interface Request<out A, out E = never, out R = never> extends Variance<A, E, R> {}
 
 /**
- * @since 2.0.0
+ * Alias for any `Request`, regardless of its success, error, or service
+ * requirements.
+ *
+ * **When to use**
+ *
+ * Use as a generic constraint for APIs that accept any request while preserving
+ * each concrete request's success, error, and service types.
+ *
+ * @see {@link Request} for the request interface
+ * @see {@link Success} for extracting a request's success type
+ * @see {@link Error} for extracting a request's error type
+ * @see {@link Services} for extracting a request's service requirements
+ * @see {@link Result} for the exit type produced by completing a request
+ *
  * @category models
+ * @since 4.0.0
  */
 export type Any = Request<any, any, any>
 
 /**
- * @since 2.0.0
+ * Variance marker carried by every `Request`.
+ *
+ * **Details**
+ *
+ * This marker preserves the success, error, and service requirement types for
+ * Effect's type-level machinery. Users normally get it by extending `Request`.
+ *
  * @category models
+ * @since 2.0.0
  */
 export interface Variance<out A, out E, out R> {
   readonly [TypeId]: {
@@ -70,7 +88,16 @@ export interface Variance<out A, out E, out R> {
 }
 
 /**
- * @example
+ * The constructor type returned by `Request.of` and `Request.tagged`.
+ *
+ * **Details**
+ *
+ * The constructor accepts the request's data fields, excluding request variance
+ * fields and any fields already supplied by the constructor such as `_tag`, and
+ * returns a value of the request type.
+ *
+ * **Example** (Using generated request constructors)
+ *
  * ```ts
  * import { Request } from "effect"
  *
@@ -84,8 +111,8 @@ export interface Variance<out A, out E, out R> {
  * const userRequest = GetUser({ id: 123 })
  * ```
  *
- * @since 2.0.0
  * @category models
+ * @since 2.0.0
  */
 export interface Constructor<R extends Request<any, any, any>, T extends keyof R = never> {
   (args: Types.VoidIfEmpty<Types.Simplify<Omit<R, T | keyof (Variance<any, any, any>)>>>): R
@@ -94,7 +121,8 @@ export interface Constructor<R extends Request<any, any, any>, T extends keyof R
 /**
  * A utility type to extract the error type from a `Request`.
  *
- * @example
+ * **Example** (Extracting a request error type)
+ *
  * ```ts
  * import type { Request } from "effect"
  *
@@ -106,15 +134,16 @@ export interface Constructor<R extends Request<any, any, any>, T extends keyof R
  * type UserError = Request.Error<GetUser> // Error
  * ```
  *
+ * @category utility types
  * @since 2.0.0
- * @category type-level
  */
 export type Error<T extends Request<any, any, any>> = [T] extends [Request<infer _A, infer _E, infer _R>] ? _E : never
 
 /**
  * A utility type to extract the value type from a `Request`.
  *
- * @example
+ * **Example** (Extracting a request success type)
+ *
  * ```ts
  * import type { Request } from "effect"
  *
@@ -127,8 +156,8 @@ export type Error<T extends Request<any, any, any>> = [T] extends [Request<infer
  * type UserSuccess = Request.Success<GetUser> // string
  * ```
  *
+ * @category utility types
  * @since 2.0.0
- * @category type-level
  */
 export type Success<T extends Request<any, any, any>> = [T] extends [Request<infer _A, infer _E, infer _R>] ? _A
   : never
@@ -136,8 +165,8 @@ export type Success<T extends Request<any, any, any>> = [T] extends [Request<inf
 /**
  * A utility type to extract the requirements type from a `Request`.
  *
+ * @category utility types
  * @since 4.0.0
- * @category type-level
  */
 export type Services<T extends Request<any, any, any>> = [T] extends [Request<infer _A, infer _E, infer _R>] ? _R
   : never
@@ -145,7 +174,8 @@ export type Services<T extends Request<any, any, any>> = [T] extends [Request<in
 /**
  * A utility type to extract the result type from a `Request`.
  *
- * @example
+ * **Example** (Extracting a request result type)
+ *
  * ```ts
  * import type { Request } from "effect"
  *
@@ -158,8 +188,8 @@ export type Services<T extends Request<any, any, any>> = [T] extends [Request<in
  * type UserResult = Request.Result<GetUser> // Exit.Exit<string, Error>
  * ```
  *
+ * @category utility types
  * @since 2.0.0
- * @category type-level
  */
 export type Result<T extends Request<any, any, any>> = T extends Request<infer A, infer E, infer _R> ? Exit.Exit<A, E>
   : never
@@ -174,6 +204,16 @@ const requestVariance = Equal.byReferenceUnsafe({
 })
 
 /**
+ * Prototype used by Effect's request constructors.
+ *
+ * **Details**
+ *
+ * This low-level value provides the structural request marker for values
+ * created by `Request.of`, `Request.tagged`, `Request.Class`, and
+ * `Request.TaggedClass`. Most users should use those constructors instead of
+ * interacting with the prototype directly.
+ *
+ * @category prototypes
  * @since 4.0.0
  */
 export const RequestPrototype: Request<any, any, any> = {
@@ -182,9 +222,10 @@ export const RequestPrototype: Request<any, any, any> = {
 }
 
 /**
- * Tests if a value is a `Request`.
+ * Checks whether a value is a `Request`.
  *
- * @example
+ * **Example** (Checking request values)
+ *
  * ```ts
  * import { Request } from "effect"
  *
@@ -212,7 +253,8 @@ export const isRequest = (u: unknown): u is Request<unknown, unknown, unknown> =
 /**
  * Creates a constructor function for a specific Request type.
  *
- * @example
+ * **Example** (Creating untagged request constructors)
+ *
  * ```ts
  * import { Request } from "effect"
  *
@@ -244,7 +286,8 @@ export const of = <R extends Request<any, any, any>>(): Constructor<R> => (args)
  * Creates a constructor function for a tagged Request type. The tag is automatically
  * added to the request, making it useful for discriminated unions.
  *
- * @example
+ * **Example** (Creating tagged request constructors)
+ *
  * ```ts
  * import { Request } from "effect"
  *
@@ -292,7 +335,15 @@ export const tagged = <R extends Request<any, any, any> & { _tag: string }>(
 }
 
 /**
- * @example
+ * Defines request types with TypeScript classes.
+ *
+ * **Details**
+ *
+ * Subclasses pass their data fields to `super`, and instances are marked as
+ * `Request` values while retaining the provided readonly fields.
+ *
+ * **Example** (Defining request classes)
+ *
  * ```ts
  * import { Request } from "effect"
  *
@@ -306,13 +357,13 @@ export const tagged = <R extends Request<any, any, any> & { _tag: string }>(
  * console.log(getUserRequest.id) // 123
  * ```
  *
- * @since 2.0.0
  * @category constructors
+ * @since 2.0.0
  */
-export const Class: new<A extends Record<string, any>, Success, Error = never, ServiceMap = never>(
+export const Class: new<A extends Record<string, any>, Success, Error = never, Context = never>(
   args: Types.Equals<Omit<A, keyof Request<unknown, unknown>>, {}> extends true ? void
     : { readonly [P in keyof A as P extends keyof Request<any, any, any> ? never : P]: A[P] }
-) => Request<Success, Error, ServiceMap> & Readonly<A> = (function() {
+) => Request<Success, Error, Context> & Readonly<A> = (function() {
   function Class(this: any, args: any) {
     if (args) {
       Object.assign(this, args)
@@ -323,7 +374,15 @@ export const Class: new<A extends Record<string, any>, Success, Error = never, S
 })()
 
 /**
- * @example
+ * Creates a class constructor for requests with a fixed `_tag` field.
+ *
+ * **Details**
+ *
+ * Use this when defining class-based request types that should participate in
+ * tagged unions or tag-based request resolvers.
+ *
+ * **Example** (Defining tagged request classes)
+ *
  * ```ts
  * import { Request } from "effect"
  *
@@ -336,8 +395,8 @@ export const Class: new<A extends Record<string, any>, Success, Error = never, S
  * console.log(request.id) // 123
  * ```
  *
- * @since 2.0.0
  * @category constructors
+ * @since 2.0.0
  */
 export const TaggedClass = <Tag extends string>(
   tag: Tag
@@ -351,8 +410,17 @@ export const TaggedClass = <Tag extends string>(
 }
 
 /**
- * Completes a request entry with the provided result. This is typically used
- * within RequestResolver implementations to fulfill pending requests.
+ * Completes a request entry with the provided result.
+ *
+ * **When to use**
+ *
+ * Use when you need to finish a `Request.Entry` with a prebuilt final `Exit`
+ * result.
+ *
+ * @see {@link completeEffect} for completing an entry from an effect that may succeed or fail
+ * @see {@link succeed} for completing an entry with a successful value
+ * @see {@link fail} for completing an entry with a typed failure
+ * @see {@link failCause} for completing an entry with a failure `Cause`
  *
  * @category completion
  * @since 2.0.0
@@ -367,8 +435,29 @@ export const complete: {
 )
 
 /**
- * @since 2.0.0
+ * Completes a request entry with the result of an effect.
+ *
+ * **When to use**
+ *
+ * Use to finish a `Request.Entry` by running an effect whose success or typed
+ * failure should become the request result.
+ *
+ * **Details**
+ *
+ * If the effect succeeds, the entry is completed successfully with its value.
+ * If the effect fails, the entry is completed with that failure.
+ *
+ * **Gotchas**
+ *
+ * The returned effect itself does not fail with the request error.
+ *
+ * @see {@link complete} for completing an entry with a prebuilt `Exit`
+ * @see {@link succeed} for completing an entry with a successful value
+ * @see {@link fail} for completing an entry with a typed failure
+ * @see {@link failCause} for completing an entry with a failure `Cause`
+ *
  * @category completion
+ * @since 2.0.0
  */
 export const completeEffect: {
   <A extends Any, R>(effect: Effect.Effect<Success<A>, Error<A>, R>): (self: Entry<A>) => Effect.Effect<void, never, R>
@@ -383,8 +472,20 @@ export const completeEffect: {
 )
 
 /**
- * @since 2.0.0
+ * Completes a request entry with a typed failure.
+ *
+ * **When to use**
+ *
+ * Use to report a request-specific typed error while implementing a
+ * `RequestResolver`.
+ *
+ * @see {@link failCause} for completing an entry with a full `Cause`
+ * @see {@link complete} for completing an entry with an existing `Exit`
+ * @see {@link completeEffect} for completing an entry from an effect result
+ * @see {@link succeed} for completing an entry successfully
+ *
  * @category completion
+ * @since 2.0.0
  */
 export const fail: {
   <A extends Any>(error: Error<A>): (self: Entry<A>) => Effect.Effect<void>
@@ -395,8 +496,20 @@ export const fail: {
 )
 
 /**
- * @since 2.0.0
+ * Completes a request entry with a failure `Cause`.
+ *
+ * **When to use**
+ *
+ * Use when you need a `RequestResolver` to complete an entry with structured
+ * cause information rather than only the request's typed error value.
+ *
+ * @see {@link fail} for completing an entry with a typed error value
+ * @see {@link complete} for completing an entry with an existing `Exit`
+ * @see {@link completeEffect} for completing an entry from an effect result
+ * @see {@link succeed} for completing an entry successfully
+ *
  * @category completion
+ * @since 2.0.0
  */
 export const failCause: {
   <A extends Any>(cause: Cause.Cause<Error<A>>): (self: Entry<A>) => Effect.Effect<void>
@@ -408,8 +521,20 @@ export const failCause: {
 )
 
 /**
- * @since 2.0.0
+ * Completes a request entry successfully with the supplied value.
+ *
+ * **When to use**
+ *
+ * Use when you need to finish a `Request.Entry` with a successful request
+ * value.
+ *
+ * @see {@link complete} for completing an entry with a prebuilt `Exit`
+ * @see {@link completeEffect} for completing an entry from an effect result
+ * @see {@link fail} for completing an entry with a typed failure
+ * @see {@link failCause} for completing an entry with a failure `Cause`
+ *
  * @category completion
+ * @since 2.0.0
  */
 export const succeed: {
   <A extends Any>(value: Success<A>): (self: Entry<A>) => Effect.Effect<void>
@@ -421,12 +546,20 @@ export const succeed: {
 )
 
 /**
- * @since 2.0.0
+ * A pending request handed to a `RequestResolver`.
+ *
+ * **Details**
+ *
+ * An entry contains the original request, the fiber context needed to run it,
+ * an `uninterruptible` flag used by batching and caching internals, and the
+ * `completeUnsafe` callback used by resolvers to supply the final `Exit`.
+ *
  * @category entry
+ * @since 2.0.0
  */
 export interface Entry<out R> {
   readonly request: R
-  readonly services: ServiceMap.ServiceMap<
+  readonly context: Context.Context<
     [R] extends [Request<infer _A, infer _E, infer _R>] ? _R : never
   >
   uninterruptible: boolean
@@ -439,12 +572,20 @@ export interface Entry<out R> {
 }
 
 /**
- * @since 2.0.0
+ * Creates a `Request.Entry` from its component fields.
+ *
+ * **Details**
+ *
+ * This is a low-level helper for request runtime and resolver infrastructure;
+ * most application code receives entries from a `RequestResolver` instead of
+ * constructing them directly.
+ *
  * @category entry
+ * @since 2.0.0
  */
 export const makeEntry = <R>(options: {
   readonly request: R
-  readonly services: ServiceMap.ServiceMap<
+  readonly context: Context.Context<
     [R] extends [Request<infer _A, infer _E, infer _R>] ? _R : never
   >
   readonly uninterruptible: boolean

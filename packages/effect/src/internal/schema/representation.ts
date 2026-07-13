@@ -1,4 +1,5 @@
 import * as Arr from "../../Array.ts"
+import * as Equal from "../../Equal.ts"
 import { format } from "../../Formatter.ts"
 import { escapeToken } from "../../JsonPointer.ts"
 import type * as JsonSchema from "../../JsonSchema.ts"
@@ -6,25 +7,24 @@ import * as Predicate from "../../Predicate.ts"
 import * as Rec from "../../Record.ts"
 import * as RegEx from "../../RegExp.ts"
 import type * as Schema from "../../Schema.ts"
-import * as AST from "../../SchemaAST.ts"
+import * as SchemaAST from "../../SchemaAST.ts"
 import type * as SchemaRepresentation from "../../SchemaRepresentation.ts"
 import * as InternalAnnotations from "./annotations.ts"
 import * as InternalSchema from "./schema.ts"
-import * as InternalToCodec from "./to-codec.ts"
 
 /** @internal */
-export function fromAST(ast: AST.AST): SchemaRepresentation.Document {
+export function fromAST(ast: SchemaAST.AST): SchemaRepresentation.Document {
   const { references, representations: schemas } = fromASTs([ast])
   return { representation: schemas[0], references }
 }
 
 /** @internal */
-export function fromASTs(asts: readonly [AST.AST, ...Array<AST.AST>]): SchemaRepresentation.MultiDocument {
+export function fromASTs(asts: readonly [SchemaAST.AST, ...Array<SchemaAST.AST>]): SchemaRepresentation.MultiDocument {
   const references: Record<string, SchemaRepresentation.Representation> = {}
 
-  const referenceMap = new Map<AST.AST, string>()
+  const referenceMap = new Map<SchemaAST.AST, string>()
   const uniqueReferences = new Set<string>()
-  const visiting = new Set<AST.AST>()
+  const visiting = new Set<SchemaAST.AST>()
 
   const schemas = Arr.map(asts, (ast) => recur(ast))
 
@@ -33,7 +33,7 @@ export function fromASTs(asts: readonly [AST.AST, ...Array<AST.AST>]): SchemaRep
     references
   }
 
-  function gen(prefix: string = "_"): string {
+  function gen(prefix: string): string {
     let candidate = prefix
     let suffix = 0
 
@@ -45,13 +45,13 @@ export function fromASTs(asts: readonly [AST.AST, ...Array<AST.AST>]): SchemaRep
     return candidate
   }
 
-  function recur(ast: AST.AST, prefix?: string): SchemaRepresentation.Representation {
+  function recur(ast: SchemaAST.AST, prefix?: string): SchemaRepresentation.Representation {
     const found = referenceMap.get(ast)
     if (found !== undefined) {
       return { _tag: "Reference", $ref: found }
     }
 
-    const last = AST.getLastEncoding(ast)
+    const last = SchemaAST.getLastEncoding(ast)
     const identifier = InternalAnnotations.resolveIdentifier(ast) ?? prefix
 
     if (ast !== last) {
@@ -63,6 +63,12 @@ export function fromASTs(asts: readonly [AST.AST, ...Array<AST.AST>]): SchemaRep
       const reference = gen(identifier)
       referenceMap.set(ast, reference)
       const out = on(ast)
+      const found = references[identifier]
+      // Reuse existing references when duplicate identifiers have the same representation
+      if (found !== undefined && Equal.equals(out, found)) {
+        referenceMap.set(ast, identifier)
+        return { _tag: "Reference", $ref: identifier }
+      }
       references[reference] = out
       return { _tag: "Reference", $ref: reference }
     }
@@ -89,17 +95,17 @@ export function fromASTs(asts: readonly [AST.AST, ...Array<AST.AST>]): SchemaRep
     return out
   }
 
-  function getEncodedSchema(last: AST.Declaration): AST.AST {
+  function getEncodedSchema(last: SchemaAST.Declaration): SchemaAST.Declaration | SchemaAST.Null {
     const getLink = last.annotations?.toCodecJson ?? last.annotations?.toCodec
     if (Predicate.isFunction(getLink)) {
-      const tps = last.typeParameters.map((tp) => InternalSchema.make(AST.toEncoded(tp)))
-      const link = getLink(tps)
-      return AST.replaceEncoding(last, [link])
+      return SchemaAST.replaceEncoding(last, [
+        getLink(last.typeParameters.map((tp) => InternalSchema.make(SchemaAST.toEncoded(tp))))
+      ])
     }
-    return AST.null
+    return SchemaAST.null
   }
 
-  function on(last: AST.AST): SchemaRepresentation.Representation {
+  function on(last: SchemaAST.AST): SchemaRepresentation.Representation {
     const annotations = fromASTAnnotations(last.annotations)
     switch (last._tag) {
       case "Declaration": {
@@ -121,6 +127,7 @@ export function fromASTs(asts: readonly [AST.AST, ...Array<AST.AST>]): SchemaRep
       case "Any":
       case "Boolean":
       case "Symbol":
+      case "ObjectKeyword":
         return { _tag: last._tag, ...annotations }
       case "String": {
         const contentMediaType = last.annotations?.contentMediaType
@@ -129,7 +136,7 @@ export function fromASTs(asts: readonly [AST.AST, ...Array<AST.AST>]): SchemaRep
           _tag: last._tag,
           checks: fromASTChecks(last.checks),
           ...annotations,
-          ...(typeof contentMediaType === "string" && AST.isAST(contentSchema)
+          ...(typeof contentMediaType === "string" && SchemaAST.isAST(contentSchema)
             ? { contentSchema: recur(contentSchema) }
             : undefined)
         }
@@ -153,11 +160,6 @@ export function fromASTs(asts: readonly [AST.AST, ...Array<AST.AST>]): SchemaRep
           symbol: last.symbol,
           ...annotations
         }
-      case "ObjectKeyword":
-        return {
-          _tag: last._tag,
-          ...annotations
-        }
       case "Enum":
         return {
           _tag: last._tag,
@@ -174,9 +176,9 @@ export function fromASTs(asts: readonly [AST.AST, ...Array<AST.AST>]): SchemaRep
         return {
           _tag: last._tag,
           elements: last.elements.map((e) => {
-            const last = AST.getLastEncoding(e)
+            const last = SchemaAST.getLastEncoding(e)
             return {
-              isOptional: AST.isOptional(last),
+              isOptional: SchemaAST.isOptional(last),
               type: recur(e),
               ...fromASTAnnotations(last.context?.annotations)
             }
@@ -189,12 +191,12 @@ export function fromASTs(asts: readonly [AST.AST, ...Array<AST.AST>]): SchemaRep
         return {
           _tag: last._tag,
           propertySignatures: last.propertySignatures.map((ps) => {
-            const last = AST.getLastEncoding(ps.type)
+            const last = SchemaAST.getLastEncoding(ps.type)
             return {
               name: ps.name,
               type: recur(ps.type),
-              isOptional: AST.isOptional(last),
-              isMutable: AST.isMutable(last),
+              isOptional: SchemaAST.isOptional(last),
+              isMutable: SchemaAST.isMutable(last),
               ...fromASTAnnotations(last.context?.annotations)
             }
           }),
@@ -206,7 +208,7 @@ export function fromASTs(asts: readonly [AST.AST, ...Array<AST.AST>]): SchemaRep
           ...annotations
         }
       case "Union": {
-        const types = InternalToCodec.jsonReorder(last.types)
+        const types = InternalSchema.jsonReorder(last.types)
         return {
           _tag: last._tag,
           types: types.map((ast) => recur(ast)),
@@ -226,12 +228,12 @@ export function fromASTs(asts: readonly [AST.AST, ...Array<AST.AST>]): SchemaRep
   }
 
   function fromASTChecks(
-    checks: readonly [AST.Check<any>, ...Array<AST.Check<any>>] | undefined
+    checks: readonly [SchemaAST.Check<any>, ...Array<SchemaAST.Check<any>>] | undefined
   ): Array<SchemaRepresentation.Check<any>> {
     if (!checks) return []
     return checks.map(getCheck).filter((c) => c !== undefined)
 
-    function getCheck(c: AST.Check<any>): SchemaRepresentation.Check<any> | undefined {
+    function getCheck(c: SchemaAST.Check<any>): SchemaRepresentation.Check<any> | undefined {
       switch (c._tag) {
         case "Filter": {
           const meta = c.annotations?.meta
@@ -270,14 +272,27 @@ export const fromASTBlacklist: Set<string> = new Set([
   "~structural",
   "~sentinels",
   "meta",
+  "arbitrary",
   "toArbitrary",
-  "toArbitraryConstraint",
   "toEquivalence",
   "toFormatter",
   "toCodec",
   "toCodecJson",
   "toCodecIso",
-  AST.ClassTypeId
+  SchemaAST.ClassTypeId
+])
+
+const standardJsonSchemaAnnotationKeys: ReadonlySet<string> = new Set([
+  "title",
+  "description",
+  "default",
+  "examples",
+  "readOnly",
+  "writeOnly",
+  "format",
+  "contentEncoding",
+  "contentMediaType",
+  "contentSchema"
 ])
 
 function fromASTAnnotations(
@@ -312,6 +327,7 @@ export function toJsonSchemaMultiDocument(
 ): JsonSchema.MultiDocument<"draft-2020-12"> {
   const generateDescriptions = options?.generateDescriptions ?? false
   const additionalProperties = options?.additionalProperties ?? false
+  const includeAnnotationKey = options?.includeAnnotationKey
 
   const definitions = Rec.map(multiDocument.references, (d) => recur(d))
 
@@ -342,8 +358,9 @@ export function toJsonSchemaMultiDocument(
     switch (schema._tag) {
       case "Any":
       case "Unknown":
-      case "ObjectKeyword":
         return {}
+      case "ObjectKeyword":
+        return { anyOf: [{ type: "object" }, { type: "array" }] }
       case "Void":
       case "Undefined":
         return { type: "null" }
@@ -563,21 +580,30 @@ export function toJsonSchemaMultiDocument(
   function collectJsonSchemaAnnotations(
     annotations: Schema.Annotations.Annotations | undefined
   ): JsonSchema.JsonSchema | undefined {
-    if (annotations) {
-      const out: JsonSchema.JsonSchema = {}
-      if (typeof annotations.title === "string") out.title = annotations.title
-      if (typeof annotations.description === "string") out.description = annotations.description
-      else if (generateDescriptions && typeof annotations.expected === "string") out.description = annotations.expected
-      if (annotations.default !== undefined) out.default = annotations.default
-      if (Array.isArray(annotations.examples)) out.examples = annotations.examples
-      if (typeof annotations.readOnly === "boolean") out.readOnly = annotations.readOnly
-      if (typeof annotations.writeOnly === "boolean") out.writeOnly = annotations.writeOnly
-      if (typeof annotations.format === "string") out.format = annotations.format
-      if (typeof annotations.contentEncoding === "string") out.contentEncoding = annotations.contentEncoding
-      if (typeof annotations.contentMediaType === "string") out.contentMediaType = annotations.contentMediaType
+    if (annotations === undefined) return undefined
 
-      if (Object.keys(out).length > 0) return out
+    const out: JsonSchema.JsonSchema = {}
+    if (typeof annotations.title === "string") out.title = annotations.title
+    if (typeof annotations.description === "string") out.description = annotations.description
+    else if (generateDescriptions && typeof annotations.expected === "string") out.description = annotations.expected
+    if (annotations.default !== undefined) out.default = annotations.default
+    if (Array.isArray(annotations.examples)) out.examples = annotations.examples
+    if (typeof annotations.readOnly === "boolean") out.readOnly = annotations.readOnly
+    if (typeof annotations.writeOnly === "boolean") out.writeOnly = annotations.writeOnly
+    if (typeof annotations.format === "string") out.format = annotations.format
+    if (typeof annotations.contentEncoding === "string") out.contentEncoding = annotations.contentEncoding
+    if (typeof annotations.contentMediaType === "string") out.contentMediaType = annotations.contentMediaType
+
+    if (includeAnnotationKey) {
+      for (const [key, value] of Object.entries(annotations)) {
+        if (value === undefined) continue
+        if (standardJsonSchemaAnnotationKeys.has(key)) continue
+        if (!includeAnnotationKey(key)) continue
+        out[key] = value
+      }
     }
+
+    if (Object.keys(out).length > 0) return out
   }
 
   function collectJsonSchemaChecks<M>(
@@ -631,6 +657,7 @@ export function toJsonSchemaMultiDocument(
             ? { allOf: [{ minItems: meta.minimum }, { maxItems: meta.maximum }] }
             : { allOf: [{ minLength: meta.minimum }, { maxLength: meta.maximum }] }
         case "isPattern":
+        case "isGUID":
         case "isULID":
         case "isBase64":
         case "isBase64Url":
@@ -755,9 +782,9 @@ function getPartPattern(part: SchemaRepresentation.Representation): string {
     case "Literal":
       return RegEx.escape(globalThis.String(part.literal))
     case "String":
-      return AST.STRING_PATTERN
+      return SchemaAST.STRING_PATTERN
     case "Number":
-      return AST.FINITE_PATTERN
+      return SchemaAST.FINITE_PATTERN
     case "TemplateLiteral":
       return part.parts.map(getPartPattern).join("")
     case "Union":

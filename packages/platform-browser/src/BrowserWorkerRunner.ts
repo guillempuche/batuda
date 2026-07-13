@@ -1,5 +1,13 @@
 /**
- * @since 1.0.0
+ * Runner-side browser platform for Effect worker handlers.
+ *
+ * `make` builds a `WorkerRunnerPlatform` over a `MessagePort` or `Window`.
+ * `layer` provides the platform from the global worker `self`, and
+ * `layerMessagePort` provides it from an explicit endpoint. The platform
+ * receives parent or client messages, runs Effect handlers, and posts responses
+ * back through the browser messaging channel.
+ *
+ * @since 4.0.0
  */
 import * as Cause from "effect/Cause"
 import * as Deferred from "effect/Deferred"
@@ -22,8 +30,10 @@ if (typeof self !== "undefined" && "onconnect" in self) {
 }
 
 /**
- * @since 1.0.0
- * @category Constructors
+ * Creates a `WorkerRunnerPlatform` service that runs worker handlers over a `MessagePort` or `Window`.
+ *
+ * @category constructors
+ * @since 4.0.0
  */
 export const make = (self: MessagePort | Window): WorkerRunner.WorkerRunnerPlatform["Service"] => ({
   start: Effect.fnUntraced(function*<O = unknown, I = unknown>() {
@@ -44,7 +54,7 @@ export const make = (self: MessagePort | Window): WorkerRunner.WorkerRunnerPlatf
       Effect.scopedWith(Effect.fnUntraced(function*(scope) {
         const closeLatch = Deferred.makeUnsafe<void, WorkerError>()
         const trackFiber = Fiber.runIn(scope)
-        const services = yield* Effect.services<R>()
+        const services = yield* Effect.context<R>()
         const runFork = Effect.runForkWith(services)
         const onExit = (exit: Exit.Exit<any, E>) => {
           if (exit._tag === "Failure" && !Cause.hasInterruptsOnly(exit.cause)) {
@@ -83,7 +93,7 @@ export const make = (self: MessagePort | Window): WorkerRunner.WorkerRunnerPlatf
                 message: "An messageerror event was emitted",
                 cause: error.data
               })
-            }).asEffect()
+            })
           )
         }
         function onError(error: any) {
@@ -94,7 +104,7 @@ export const make = (self: MessagePort | Window): WorkerRunner.WorkerRunnerPlatf
                 message: "An error event was emitted",
                 cause: error.data
               })
-            }).asEffect()
+            })
           )
         }
         function handlePort(port: MessagePort) {
@@ -151,16 +161,39 @@ export const make = (self: MessagePort | Window): WorkerRunner.WorkerRunnerPlatf
 })
 
 /**
- * @since 1.0.0
- * @category Layers
+ * Layer that provides a browser `WorkerRunnerPlatform` using the global `self` worker context.
+ *
+ * **When to use**
+ *
+ * Use when you need a browser worker entry point to use the ambient `self`
+ * object as the worker transport.
+ *
+ * **Details**
+ *
+ * Delegates to `make(self)` and provides the runner-side platform used by
+ * protocols such as `RpcServer.layerProtocolWorkerRunner`.
+ *
+ * **Gotchas**
+ *
+ * This layer depends on the browser worker global `self`. Use
+ * `layerMessagePort` when the transport is an explicit `MessagePort` or
+ * `Window`.
+ *
+ * @see {@link make} for constructing a runner platform from an explicit endpoint
+ * @see {@link layerMessagePort} for providing a platform from an explicit endpoint
+ *
+ * @category layers
+ * @since 4.0.0
  */
 export const layer: Layer.Layer<WorkerRunner.WorkerRunnerPlatform> = Layer.sync(WorkerRunner.WorkerRunnerPlatform)(() =>
   make(self)
 )
 
 /**
- * @since 1.0.0
- * @category Layers
+ * Layer that provides a `WorkerRunnerPlatform` using the supplied `MessagePort` or `Window`.
+ *
+ * @category layers
+ * @since 4.0.0
  */
 export const layerMessagePort = (port: MessagePort | Window): Layer.Layer<WorkerRunner.WorkerRunnerPlatform> =>
   Layer.succeed(WorkerRunner.WorkerRunnerPlatform)(make(port))

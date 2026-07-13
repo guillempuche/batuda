@@ -1,11 +1,19 @@
 /**
+ * Defines the message shapes moved through Effect Cluster.
+ *
+ * Messages carry entity requests and control envelopes between callers, durable
+ * storage, transports, and runner handlers. This module includes incoming and
+ * outgoing variants for encoded stored requests, decoded local requests,
+ * acknowledgements, and interrupts. It also provides helpers for local delivery
+ * and for encoding or decoding request payloads with matching RPC schemas.
+ *
  * @since 4.0.0
  */
+import * as Context from "../../Context.ts"
 import * as Data from "../../Data.ts"
 import * as Effect from "../../Effect.ts"
 import * as Option from "../../Option.ts"
 import * as Schema from "../../Schema.ts"
-import * as ServiceMap from "../../ServiceMap.ts"
 import * as Rpc from "../rpc/Rpc.ts"
 import type { PersistenceError } from "./ClusterError.ts"
 import { MalformedMessage } from "./ClusterError.ts"
@@ -16,27 +24,47 @@ import type * as Reply from "./Reply.ts"
 import type { Snowflake } from "./Snowflake.ts"
 
 /**
- * @since 4.0.0
+ * Message read by a runner from storage or transport.
+ *
+ * **Details**
+ *
+ * An incoming message is either a persisted request with an encoded payload or an
+ * incoming control envelope.
+ *
  * @category incoming
+ * @since 4.0.0
  */
 export type Incoming<R extends Rpc.Any> = IncomingRequest<R> | IncomingEnvelope
 
 /**
- * @since 4.0.0
+ * Locally decoded incoming message for in-process delivery.
+ *
+ * **Details**
+ *
+ * It is either a request with a decoded payload or an incoming control envelope.
+ *
  * @category incoming
+ * @since 4.0.0
  */
 export type IncomingLocal<R extends Rpc.Any> = IncomingRequestLocal<R> | IncomingEnvelope
 
 /**
- * @since 4.0.0
+ * Converts an outgoing message into a locally deliverable incoming message.
+ *
+ * **Details**
+ *
+ * Request messages keep their decoded payload and response callback, while
+ * control envelopes are wrapped as incoming envelopes.
+ *
  * @category incoming
+ * @since 4.0.0
  */
 export const incomingLocalFromOutgoing = <R extends Rpc.Any>(self: Outgoing<R>): IncomingLocal<R> => {
   if (self._tag === "OutgoingEnvelope") {
     return new IncomingEnvelope({ envelope: self.envelope })
   }
   return new IncomingRequestLocal({
-    annotations: ServiceMap.get(self.rpc.annotations, ClusterSchema.Dynamic)(
+    annotations: Context.get(self.rpc.annotations, ClusterSchema.Dynamic)(
       self.rpc.annotations,
       self.envelope as any
     ),
@@ -47,8 +75,16 @@ export const incomingLocalFromOutgoing = <R extends Rpc.Any>(self: Outgoing<R>):
 }
 
 /**
- * @since 4.0.0
+ * Represents an incoming persisted request whose payload has not yet been decoded with the RPC
+ * schema.
+ *
+ * **Details**
+ *
+ * It carries the last reply that was sent and a callback for persisting encoded
+ * replies.
+ *
  * @category incoming
+ * @since 4.0.0
  */
 export class IncomingRequest<R extends Rpc.Any> extends Data.TaggedClass("IncomingRequest")<{
   readonly envelope: Envelope.PartialRequest
@@ -57,19 +93,28 @@ export class IncomingRequest<R extends Rpc.Any> extends Data.TaggedClass("Incomi
 }> {}
 
 /**
+ * Represents an incoming request for local delivery with a decoded payload.
+ *
+ * **Details**
+ *
+ * It includes dynamic annotations, the last sent reply, and a callback for
+ * replying with decoded replies.
+ *
+ * @category incoming
  * @since 4.0.0
- * @category outgoing
  */
 export class IncomingRequestLocal<R extends Rpc.Any> extends Data.TaggedClass("IncomingRequestLocal")<{
   readonly envelope: Envelope.Request<R>
   readonly lastSentReply: Option.Option<Reply.Reply<R>>
   readonly respond: (reply: Reply.Reply<R>) => Effect.Effect<void, MalformedMessage | PersistenceError>
-  readonly annotations: ServiceMap.ServiceMap<never>
+  readonly annotations: Context.Context<never>
 }> {}
 
 /**
- * @since 4.0.0
+ * Represents an incoming control envelope carrying an `AckChunk` or `Interrupt`.
+ *
  * @category incoming
+ * @since 4.0.0
  */
 export class IncomingEnvelope extends Data.TaggedClass("IncomingEnvelope")<{
   readonly _tag: "IncomingEnvelope"
@@ -77,38 +122,62 @@ export class IncomingEnvelope extends Data.TaggedClass("IncomingEnvelope")<{
 }> {}
 
 /**
- * @since 4.0.0
+ * Message produced for storage or transport.
+ *
+ * **Details**
+ *
+ * An outgoing message is either an entity request or a control envelope.
+ *
  * @category outgoing
+ * @since 4.0.0
  */
 export type Outgoing<R extends Rpc.Any> = OutgoingRequest<R> | OutgoingEnvelope
 
 /**
- * @since 4.0.0
+ * Represents an outgoing entity request with decoded payload and RPC metadata.
+ *
+ * **Details**
+ *
+ * It carries the service context used for serialization, the last received reply,
+ * the reply callback, dynamic annotations, and an optional encoded request cache.
+ *
  * @category outgoing
+ * @since 4.0.0
  */
 export class OutgoingRequest<R extends Rpc.Any> extends Data.TaggedClass("OutgoingRequest")<{
   readonly envelope: Envelope.Request<R>
-  readonly services: ServiceMap.ServiceMap<Rpc.Services<R>>
+  readonly context: Context.Context<Rpc.Services<R>>
   readonly lastReceivedReply: Option.Option<Reply.Reply<R>>
   readonly rpc: R
   readonly respond: (reply: Reply.Reply<R>) => Effect.Effect<void>
-  readonly annotations: ServiceMap.ServiceMap<never>
+  readonly annotations: Context.Context<never>
 }> {
   /**
+   * Cached encoded envelope payload reused when sending the request.
+   *
    * @since 4.0.0
    */
   public encodedCache?: Envelope.PartialRequest
 }
 
 /**
- * @since 4.0.0
+ * Represents an outgoing control envelope paired with RPC metadata.
+ *
+ * **When to use**
+ *
+ * Use to construct an interrupt envelope for an
+ * in-flight request.
+ *
  * @category outgoing
+ * @since 4.0.0
  */
 export class OutgoingEnvelope extends Data.TaggedClass("OutgoingEnvelope")<{
   readonly envelope: Envelope.AckChunk | Envelope.Interrupt
   readonly rpc: Rpc.AnyWithProps
 }> {
   /**
+   * Creates an outgoing interrupt envelope for the supplied request.
+   *
    * @since 4.0.0
    */
   static interrupt(options: {
@@ -130,8 +199,15 @@ const neverRpc = Rpc.make("Never", {
 })
 
 /**
+ * Serializes an outgoing message into a partial envelope.
+ *
+ * **Details**
+ *
+ * Control envelopes pass through unchanged. Requests are encoded with their RPC
+ * payload schema, reusing the cached encoded request when available.
+ *
+ * @category serialization
  * @since 4.0.0
- * @category serialization / deserialization
  */
 export const serialize = <Rpc extends Rpc.Any>(
   message: Outgoing<Rpc>
@@ -147,8 +223,14 @@ export const serialize = <Rpc extends Rpc.Any>(
 }
 
 /**
+ * Serializes an outgoing message into its JSON envelope representation.
+ *
+ * **Details**
+ *
+ * Schema encoding failures are converted to `MalformedMessage`.
+ *
+ * @category serialization
  * @since 4.0.0
- * @category serialization / deserialization
  */
 export const serializeEnvelope = <Rpc extends Rpc.Any>(
   message: Outgoing<Rpc>
@@ -159,15 +241,22 @@ export const serializeEnvelope = <Rpc extends Rpc.Any>(
   )
 
 /**
+ * Encodes the payload of an `OutgoingRequest` with the request's RPC payload
+ * schema and service context.
+ *
+ * **Details**
+ *
+ * The result is a `PartialRequest` suitable for storage or transport.
+ *
+ * @category serialization
  * @since 4.0.0
- * @category serialization / deserialization
  */
 export const serializeRequest = <Rpc extends Rpc.Any>(
   self: OutgoingRequest<Rpc>
 ): Effect.Effect<Envelope.PartialRequest, MalformedMessage> => {
   const rpc = self.rpc as any as Rpc.AnyWithProps
   return Schema.encodeEffect(Schema.toCodecJson(rpc.payloadSchema))(self.envelope.payload).pipe(
-    Effect.provideServices(self.services),
+    Effect.provideContext(self.context),
     MalformedMessage.refail,
     Effect.map((payload) => ({
       ...self.envelope,
@@ -177,8 +266,16 @@ export const serializeRequest = <Rpc extends Rpc.Any>(
 }
 
 /**
+ * Decodes a partial envelope back into a locally deliverable incoming message.
+ *
+ * **Details**
+ *
+ * Control envelopes pass through directly. Request envelopes require the original
+ * `OutgoingRequest` so the payload can be decoded with the correct RPC schema and
+ * context.
+ *
+ * @category serialization
  * @since 4.0.0
- * @category serialization / deserialization
  */
 export const deserializeLocal = <Rpc extends Rpc.Any>(
   self: Outgoing<Rpc>,
@@ -196,7 +293,7 @@ export const deserializeLocal = <Rpc extends Rpc.Any>(
   }
   const rpc = self.rpc as any as Rpc.AnyWithProps
   return Schema.decodeEffect(Schema.toCodecJson(rpc.payloadSchema))(encoded.payload).pipe(
-    Effect.provideServices(self.services),
+    Effect.provideContext(self.context),
     MalformedMessage.refail,
     Effect.map((payload) => {
       const envelope = Envelope.makeRequest({
@@ -207,7 +304,7 @@ export const deserializeLocal = <Rpc extends Rpc.Any>(
         envelope,
         lastSentReply: Option.none(),
         respond: self.respond,
-        annotations: ServiceMap.get(rpc.annotations, ClusterSchema.Dynamic)(
+        annotations: Context.get(rpc.annotations, ClusterSchema.Dynamic)(
           rpc.annotations,
           envelope as any
         )

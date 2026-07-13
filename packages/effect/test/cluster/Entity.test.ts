@@ -2,7 +2,7 @@ import { assert, describe, it } from "@effect/vitest"
 import { type Cause, Effect, Queue, Schema, Stream } from "effect"
 import { Entity, ShardingConfig } from "effect/unstable/cluster"
 import { Rpc } from "effect/unstable/rpc/index"
-import { TestEntity, TestEntityLayer, User } from "./TestEntity.ts"
+import { CallerId, ContextBleedEntity, ContextBleedLayer, TestEntity, TestEntityLayer, User } from "./TestEntity.ts"
 
 const StreamEntity = Entity.make("StreamEntity", [
   Rpc.make("Watch", {
@@ -13,17 +13,27 @@ const StreamEntity = Entity.make("StreamEntity", [
 
 describe.concurrent("Entity", () => {
   describe("makeTestClient", () => {
-    it.effect("round trip", () =>
+    it.effect("creates an in-memory client for an entity layer", () =>
       Effect.gen(function*() {
         const makeClient = yield* Entity.makeTestClient(TestEntity, TestEntityLayer)
         const client = yield* makeClient("123")
         const user = yield* client.GetUser({ id: 1 })
         assert.deepEqual(user, new User({ id: 1, name: "User 1" }))
       }).pipe(Effect.provide(TestShardingConfig)))
+
+    it.effect("does not freeze the acquiring fiber's context into the entity server", () =>
+      Effect.gen(function*() {
+        const makeClient = yield* Entity.makeTestClient(ContextBleedEntity, ContextBleedLayer)
+
+        const client = yield* makeClient("1").pipe(Effect.provideService(CallerId, "A"))
+
+        const observed = yield* client.ReadCaller()
+        assert.strictEqual(observed, "none")
+      }).pipe(Effect.provide(TestShardingConfig)))
   })
 
   describe("toLayerQueue", () => {
-    it.effect("streaming RPC with Stream via replier.succeed", () =>
+    it.effect("replies to a streaming RPC with a Stream", () =>
       Effect.gen(function*() {
         const layer = StreamEntity.toLayerQueue((mailbox, replier) =>
           Effect.gen(function*() {
@@ -44,7 +54,7 @@ describe.concurrent("Entity", () => {
         assert.deepEqual(results, [1, 2, 3])
       }).pipe(Effect.provide(TestShardingConfig)))
 
-    it.effect("streaming RPC with Dequeue via replier.succeed", () =>
+    it.effect("replies to a streaming RPC with a Dequeue", () =>
       Effect.gen(function*() {
         const layer = StreamEntity.toLayerQueue((mailbox, replier) =>
           Effect.gen(function*() {

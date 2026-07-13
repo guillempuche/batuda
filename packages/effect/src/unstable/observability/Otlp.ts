@@ -1,4 +1,11 @@
 /**
+ * Configures OpenTelemetry Protocol (OTLP) HTTP export for Effect telemetry.
+ *
+ * This module installs the OTLP logger, metrics exporter, and tracer exporter
+ * from one shared configuration. Use it when an application sends logs, metrics,
+ * and traces to the same OpenTelemetry Collector, vendor OTLP endpoint, or local
+ * development collector.
+ *
  * @since 4.0.0
  */
 import type * as Duration from "../../Duration.ts"
@@ -15,8 +22,15 @@ import * as OtlpSerialization from "./OtlpSerialization.ts"
 import * as OtlpTracer from "./OtlpTracer.ts"
 
 /**
+ * Creates a combined OTLP layer for logs, metrics, and traces.
+ *
+ * **Details**
+ *
+ * The layer sends data to `/v1/logs`, `/v1/metrics`, and `/v1/traces` below
+ * `baseUrl` and requires an `OtlpSerialization` implementation.
+ *
+ * @category layers
  * @since 4.0.0
- * @category Layers
  */
 export const layer = (options: {
   readonly baseUrl: string
@@ -70,8 +84,47 @@ export const layer = (options: {
 }
 
 /**
+ * Creates a combined OTLP layer for logs, metrics, and traces from
+ * OpenTelemetry configuration.
+ *
+ * @category layers
  * @since 4.0.0
- * @category Layers
+ */
+export const layerFromConfig = (options?: {
+  readonly resource?: {
+    readonly serviceName?: string | undefined
+    readonly serviceVersion?: string | undefined
+    readonly attributes?: Record<string, unknown>
+  } | undefined
+  readonly headers?: Headers.Input | undefined
+  readonly tracerContext?: (<X>(primitive: Tracer.EffectPrimitive<X>, span: Tracer.AnySpan) => X) | undefined
+  readonly loggerExcludeLogSpans?: boolean | undefined
+  readonly loggerMergeWithExisting?: boolean | undefined
+}): Layer.Layer<never, never, HttpClient.HttpClient | OtlpSerialization.OtlpSerialization> =>
+  Layer.mergeAll(
+    OtlpLogger.layerFromConfig({
+      resource: options?.resource,
+      headers: options?.headers,
+      excludeLogSpans: options?.loggerExcludeLogSpans,
+      mergeWithExisting: options?.loggerMergeWithExisting
+    }),
+    OtlpMetrics.layerFromConfig({
+      resource: options?.resource,
+      headers: options?.headers
+    }),
+    OtlpTracer.layerFromConfig({
+      resource: options?.resource,
+      headers: options?.headers,
+      context: options?.tracerContext
+    })
+  )
+
+/**
+ * Creates the combined OTLP logs, metrics, and traces layer using JSON
+ * serialization.
+ *
+ * @category layers
+ * @since 4.0.0
  */
 export const layerJson: (options: {
   readonly baseUrl: string
@@ -93,8 +146,11 @@ export const layerJson: (options: {
 }) => Layer.Layer<never, never, HttpClient.HttpClient> = flow(layer, Layer.provide(OtlpSerialization.layerJson))
 
 /**
+ * Creates the combined OTLP logs, metrics, and traces layer using protobuf
+ * serialization.
+ *
+ * @category layers
  * @since 4.0.0
- * @category Layers
  */
 export const layerProtobuf: (options: {
   readonly baseUrl: string

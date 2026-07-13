@@ -1,8 +1,16 @@
 /**
+ * Stores encoded results for `Persistable` requests.
+ *
+ * The `Persistence` service creates scoped stores keyed by each request's
+ * `PrimaryKey`. Stores read and write schema-encoded `Exit` values with
+ * optional TTLs, letting request workflows reuse expensive or idempotent results
+ * across fibers, process restarts, or workers that share a backing store.
+ *
  * @since 4.0.0
  */
 import * as Arr from "../../Array.ts"
 import * as Clock from "../../Clock.ts"
+import * as Context from "../../Context.ts"
 import * as Duration from "../../Duration.ts"
 import * as Effect from "../../Effect.ts"
 import * as Exit from "../../Exit.ts"
@@ -11,7 +19,6 @@ import * as Layer from "../../Layer.ts"
 import * as PrimaryKey from "../../PrimaryKey.ts"
 import * as Schema from "../../Schema.ts"
 import type * as Scope from "../../Scope.ts"
-import * as ServiceMap from "../../ServiceMap.ts"
 import * as SqlClient from "../sql/SqlClient.ts"
 import type { SqlError } from "../sql/SqlError.ts"
 import * as KeyValueStore from "./KeyValueStore.ts"
@@ -21,25 +28,32 @@ import * as Redis from "./Redis.ts"
 const ErrorTypeId = "~effect/persistence/Persistence/PersistenceError" as const
 
 /**
- * @since 4.0.0
+ * Error raised by persistence and backing-store operations.
+ *
  * @category errors
+ * @since 4.0.0
  */
-export class PersistenceError extends Schema.ErrorClass(ErrorTypeId)({
+export class PersistenceError extends Schema.ErrorClass<PersistenceError>(ErrorTypeId)({
   _tag: Schema.tag("PersistenceError"),
   message: Schema.String,
-  cause: Schema.optional(Schema.Defect)
+  cause: Schema.optional(Schema.Defect())
 }) {
   /**
+   * Marks this value as a persistence error for runtime guards.
+   *
    * @since 4.0.0
    */
   readonly [ErrorTypeId]: typeof ErrorTypeId = ErrorTypeId
 }
 
 /**
+ * Service for creating scoped stores of persisted `Persistable` request
+ * results.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
-export class Persistence extends ServiceMap.Service<Persistence, {
+export class Persistence extends Context.Service<Persistence, {
   readonly make: (options: {
     readonly storeId: string
     readonly timeToLive?: (exit: Exit.Exit<unknown, unknown>, key: Persistable.Any) => Duration.Input
@@ -47,48 +61,55 @@ export class Persistence extends ServiceMap.Service<Persistence, {
 }>()("effect/persistence/Persistence") {}
 
 /**
- * @since 4.0.0
+ * Typed store for persisted `Exit` values keyed by `Persistable` requests.
+ *
  * @category models
+ * @since 4.0.0
  */
 export interface PersistenceStore {
-  readonly get: <A extends Schema.Top, E extends Schema.Top>(
+  readonly get: <A extends Schema.Constraint, E extends Schema.Constraint>(
     key: Persistable.Persistable<A, E>
   ) => Effect.Effect<
     Exit.Exit<A["Type"], E["Type"]> | undefined,
     PersistenceError | Schema.SchemaError,
     A["DecodingServices"] | E["DecodingServices"]
   >
-  readonly getMany: <A extends Schema.Top, E extends Schema.Top>(
+  readonly getMany: <A extends Schema.Constraint, E extends Schema.Constraint>(
     keys: Iterable<Persistable.Persistable<A, E>>
   ) => Effect.Effect<
     Array<Exit.Exit<A["Type"], E["Type"]> | undefined>,
     PersistenceError | Schema.SchemaError,
     A["DecodingServices"] | E["DecodingServices"]
   >
-  readonly set: <A extends Schema.Top, E extends Schema.Top>(
+  readonly set: <A extends Schema.Constraint, E extends Schema.Constraint>(
     key: Persistable.Persistable<A, E>,
     value: Exit.Exit<A["Type"], E["Type"]>
   ) => Effect.Effect<void, PersistenceError | Schema.SchemaError, A["EncodingServices"] | E["EncodingServices"]>
-  readonly setMany: <A extends Schema.Top, E extends Schema.Top>(
+  readonly setMany: <A extends Schema.Constraint, E extends Schema.Constraint>(
     entries: Iterable<readonly [Persistable.Persistable<A, E>, Exit.Exit<A["Type"], E["Type"]>]>
   ) => Effect.Effect<void, PersistenceError | Schema.SchemaError, A["EncodingServices"] | E["EncodingServices"]>
-  readonly remove: <A extends Schema.Top, E extends Schema.Top>(
+  readonly remove: <A extends Schema.Constraint, E extends Schema.Constraint>(
     key: Persistable.Persistable<A, E>
   ) => Effect.Effect<void, PersistenceError>
   readonly clear: Effect.Effect<void, PersistenceError>
 }
 
 /**
- * @since 4.0.0
+ * Service for creating raw backing stores for persistence store ids.
+ *
  * @category BackingPersistence
+ * @since 4.0.0
  */
-export class BackingPersistence extends ServiceMap.Service<BackingPersistence, {
+export class BackingPersistence extends Context.Service<BackingPersistence, {
   readonly make: (storeId: string) => Effect.Effect<BackingPersistenceStore, never, Scope.Scope>
 }>()("effect/persistence/BackingPersistence") {}
 
 /**
- * @since 4.0.0
+ * Raw persistence backing store for JSON-compatible objects with optional
+ * TTLs.
+ *
  * @category BackingPersistence
+ * @since 4.0.0
  */
 export interface BackingPersistenceStore {
   readonly get: (key: string) => Effect.Effect<object | undefined, PersistenceError>
@@ -108,8 +129,15 @@ export interface BackingPersistenceStore {
 }
 
 /**
- * @since 4.0.0
+ * Provides `Persistence` from `BackingPersistence`.
+ *
+ * **Details**
+ *
+ * The layer serializes and deserializes `Persistable` exits, applies
+ * per-entry TTLs, and skips writes whose TTL is zero or negative.
+ *
  * @category layers
+ * @since 4.0.0
  */
 export const layer = Layer.effect(Persistence)(Effect.gen(function*() {
   const backing = yield* BackingPersistence
@@ -202,8 +230,14 @@ export const layer = Layer.effect(Persistence)(Effect.gen(function*() {
 }))
 
 /**
- * @since 4.0.0
+ * Provides an in-memory `BackingPersistence` grouped by store id.
+ *
+ * **Details**
+ *
+ * Entries are process-local and expire according to their stored TTL.
+ *
  * @category layers
+ * @since 4.0.0
  */
 export const layerBackingMemory: Layer.Layer<BackingPersistence> = Layer.sync(BackingPersistence)(
   () => {
@@ -249,8 +283,15 @@ export const layerBackingMemory: Layer.Layer<BackingPersistence> = Layer.sync(Ba
 )
 
 /**
- * @since 4.0.0
+ * Provides SQL-backed persistence using one table per store id.
+ *
+ * **Details**
+ *
+ * Each table is created if needed and stores JSON-encoded values with optional
+ * expiration timestamps.
+ *
  * @category layers
+ * @since 4.0.0
  */
 export const layerBackingSqlMultiTable: Layer.Layer<
   BackingPersistence,
@@ -457,8 +498,15 @@ export const layerBackingSqlMultiTable: Layer.Layer<
 }))
 
 /**
- * @since 4.0.0
+ * Provides SQL-backed persistence using a shared `effect_persistence` table.
+ *
+ * **Details**
+ *
+ * Rows are partitioned by `store_id` and store JSON-encoded values with
+ * optional expiration timestamps.
+ *
  * @category layers
+ * @since 4.0.0
  */
 export const layerBackingSql: Layer.Layer<
   BackingPersistence,
@@ -695,8 +743,15 @@ export const layerBackingSql: Layer.Layer<
 }))
 
 /**
- * @since 4.0.0
+ * Provides Redis-backed persistence.
+ *
+ * **Details**
+ *
+ * Each store id is used as a key prefix, values are JSON-encoded, and finite
+ * TTLs are stored with Redis expiration.
+ *
  * @category layers
+ * @since 4.0.0
  */
 export const layerBackingRedis: Layer.Layer<
   BackingPersistence,
@@ -849,8 +904,15 @@ end
 )
 
 /**
- * @since 4.0.0
+ * Provides `BackingPersistence` using a `KeyValueStore`.
+ *
+ * **Details**
+ *
+ * Each store id becomes a key prefix, and values are stored as JSON with
+ * optional expiration timestamps.
+ *
  * @category layers
+ * @since 4.0.0
  */
 export const layerBackingKvs: Layer.Layer<
   BackingPersistence,
@@ -945,46 +1007,64 @@ export const layerBackingKvs: Layer.Layer<
 }))
 
 /**
- * @since 4.0.0
+ * Provides `Persistence` backed by the current `KeyValueStore`.
+ *
  * @category layers
+ * @since 4.0.0
  */
 export const layerKvs: Layer.Layer<Persistence, never, KeyValueStore.KeyValueStore> = layer.pipe(
   Layer.provide(layerBackingKvs)
 )
 
 /**
- * @since 4.0.0
+ * Provides `Persistence` backed by process-local in-memory storage.
+ *
  * @category layers
+ * @since 4.0.0
  */
 export const layerMemory: Layer.Layer<Persistence> = layer.pipe(
   Layer.provide(layerBackingMemory)
 )
 
 /**
- * @since 4.0.0
+ * Provides `Persistence` backed by the current `Redis` service.
+ *
  * @category layers
+ * @since 4.0.0
  */
 export const layerRedis: Layer.Layer<Persistence, never, Redis.Redis> = layer.pipe(
   Layer.provide(layerBackingRedis)
 )
 
 /**
- * @since 4.0.0
+ * Provides `Persistence` backed by SQL with one table per store id.
+ *
  * @category layers
+ * @since 4.0.0
  */
 export const layerSqlMultiTable: Layer.Layer<Persistence, never, SqlClient.SqlClient> = layer.pipe(
   Layer.provide(layerBackingSqlMultiTable)
 )
 
 /**
- * @since 4.0.0
+ * Provides `Persistence` backed by SQL using a shared persistence table.
+ *
  * @category layers
+ * @since 4.0.0
  */
 export const layerSql: Layer.Layer<Persistence, never, SqlClient.SqlClient> = layer.pipe(
   Layer.provide(layerBackingSql)
 )
 
 /**
+ * Converts a TTL to an absolute expiration timestamp in milliseconds.
+ *
+ * **Details**
+ *
+ * Returns `null` for no TTL and uses `clock.currentTimeMillisUnsafe`, so it is
+ * intended for backing-store internals.
+ *
+ * @category converting
  * @since 4.0.0
  */
 export const unsafeTtlToExpires = (clock: Clock.Clock, ttl: Duration.Duration | undefined): number | null =>

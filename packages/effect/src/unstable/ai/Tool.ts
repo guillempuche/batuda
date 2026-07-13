@@ -1,39 +1,25 @@
 /**
- * The `Tool` module provides functionality for defining and managing tools
- * that language models can call to augment their capabilities.
+ * Definitions and helpers for tools that AI models can request during a
+ * workflow.
  *
- * This module enables creation of both user-defined and provider-defined tools,
- * with full schema validation, type safety, and handler support. Tools allow
- * AI models to perform actions like searching databases, calling APIs, or
- * executing code within your application context.
+ * A tool names an operation, describes the parameters it accepts, declares
+ * successful and failed results, and can require approval before execution.
+ * This module supports tools defined by the application, tools built into a
+ * provider, and dynamic tools whose schema is known only at runtime. It also
+ * includes the shared types and conversion helpers needed by language-model
+ * requests, tool handlers, and provider integrations.
  *
- * @example
- * ```ts
- * import { Schema } from "effect"
- * import { Tool } from "effect/unstable/ai"
- *
- * // Define a simple calculator tool
- * const Calculator = Tool.make("Calculator", {
- *   description: "Performs basic arithmetic operations",
- *   parameters: Schema.Struct({
- *     operation: Schema.Literals(["add", "subtract", "multiply", "divide"]),
- *     a: Schema.Number,
- *     b: Schema.Number
- *   }),
- *   success: Schema.Number
- * })
- * ```
- *
- * @since 1.0.0
+ * @since 4.0.0
  */
+import * as Context from "../../Context.ts"
 import type * as Effect from "../../Effect.ts"
 import { constFalse, constTrue, identity } from "../../Function.ts"
+import * as StackTraceLimit from "../../internal/stackTraceLimit.ts"
 import type * as JsonSchema from "../../JsonSchema.ts"
 import { pipeArguments } from "../../Pipeable.ts"
 import * as Predicate from "../../Predicate.ts"
 import * as Schema from "../../Schema.ts"
-import * as AST from "../../SchemaAST.ts"
-import * as ServiceMap from "../../ServiceMap.ts"
+import * as SchemaAST from "../../SchemaAST.ts"
 import type * as Struct from "../../Struct.ts"
 import type * as Types from "../../Types.ts"
 import type * as AiError from "./AiError.ts"
@@ -45,38 +31,66 @@ import type * as Prompt from "./Prompt.ts"
 // =============================================================================
 
 /**
- * @since 1.0.0
- * @category type ids
+ * Runtime type identifier carried by Effect AI tool values.
+ *
+ * **Details**
+ *
+ * The tool type guards use this marker, together with more specific markers,
+ * to distinguish user-defined, provider-defined, and dynamic tools.
+ *
+ * @category type IDs
+ * @since 4.0.0
  */
 export const TypeId: TypeId = "~effect/ai/Tool"
 
 /**
- * @since 1.0.0
- * @category type ids
+ * Type-level representation of the Effect AI tool runtime type identifier.
+ *
+ * @category type IDs
+ * @since 4.0.0
  */
 export type TypeId = "~effect/ai/Tool"
 
 /**
- * @since 1.0.0
- * @category type ids
+ * Runtime type identifier carried by provider-defined tools.
+ *
+ * **Details**
+ *
+ * `isProviderDefined` uses this marker to distinguish tools that are built into
+ * an AI provider from user-defined and dynamic tools.
+ *
+ * @category type IDs
+ * @since 4.0.0
  */
 export const ProviderDefinedTypeId: ProviderDefinedTypeId = "~effect/ai/Tool/ProviderDefined"
 
 /**
- * @since 1.0.0
- * @category type ids
+ * Type-level representation of the provider-defined tool runtime type
+ * identifier.
+ *
+ * @category type IDs
+ * @since 4.0.0
  */
 export type ProviderDefinedTypeId = "~effect/ai/Tool/ProviderDefined"
 
 /**
- * @since 1.0.0
- * @category type ids
+ * Runtime type identifier carried by dynamic tools.
+ *
+ * **Details**
+ *
+ * `isDynamic` uses this marker to distinguish tools whose schema may be
+ * provided at runtime from user-defined and provider-defined tools.
+ *
+ * @category type IDs
+ * @since 4.0.0
  */
 export const DynamicTypeId: DynamicTypeId = "~effect/ai/Tool/Dynamic"
 
 /**
- * @since 1.0.0
- * @category type ids
+ * Type-level representation of the dynamic tool runtime type identifier.
+ *
+ * @category type IDs
+ * @since 4.0.0
  */
 export type DynamicTypeId = "~effect/ai/Tool/Dynamic"
 
@@ -88,14 +102,16 @@ export type DynamicTypeId = "~effect/ai/Tool/Dynamic"
  * The strategy used for handling errors returned from tool call handler
  * execution.
  *
+ * **Details**
+ *
  * If set to `"error"` (the default), errors that occur during tool call handler
  * execution will be returned in the error channel of the calling effect.
  *
  * If set to `"return"`, errors that occur during tool call handler execution
  * will be captured and returned as part of the tool call result.
  *
- * @since 1.0.0
  * @category models
+ * @since 4.0.0
  */
 export type FailureMode = "error" | "return"
 
@@ -103,8 +119,8 @@ export type FailureMode = "error" | "return"
  * Context provided to the `needsApproval` function when dynamically
  * determining if a tool requires user approval.
  *
- * @since 1.0.0
  * @category models
+ * @since 4.0.0
  */
 export interface NeedsApprovalContext {
   /**
@@ -120,10 +136,10 @@ export interface NeedsApprovalContext {
 /**
  * Function type for dynamically determining if a tool requires approval.
  *
- * @since 1.0.0
  * @category models
+ * @since 4.0.0
  */
-export type NeedsApprovalFunction<Params extends Schema.Top> = (
+export type NeedsApprovalFunction<Params extends Schema.Constraint> = (
   params: Params["Type"],
   context: NeedsApprovalContext
 ) => boolean | Effect.Effect<boolean>
@@ -131,25 +147,30 @@ export type NeedsApprovalFunction<Params extends Schema.Top> = (
 /**
  * Specifies whether user approval is required before executing a tool.
  *
+ * **Details**
+ *
  * Can be:
  * - `boolean`: Static approval requirement
  * - `NeedsApprovalFunction`: Dynamic approval based on parameters/context
  *
- * @since 1.0.0
  * @category models
+ * @since 4.0.0
  */
-export type NeedsApproval<Params extends Schema.Top> =
+export type NeedsApproval<Params extends Schema.Constraint> =
   | boolean
   | NeedsApprovalFunction<Params>
 
 /**
  * A user-defined tool that language models can call to perform actions.
  *
+ * **Details**
+ *
  * Tools represent actionable capabilities that large language models can invoke
  * to extend their functionality beyond text generation. Each tool has a defined
  * schema for parameters, results, and failures.
  *
- * @example
+ * **Example** (Defining a weather lookup tool)
+ *
  * ```ts
  * import { Schema } from "effect"
  * import { Tool } from "effect/unstable/ai"
@@ -169,15 +190,15 @@ export type NeedsApproval<Params extends Schema.Top> =
  * })
  * ```
  *
- * @since 1.0.0
  * @category models
+ * @since 4.0.0
  */
 export interface Tool<
   out Name extends string,
   out Config extends {
-    readonly parameters: Schema.Top
-    readonly success: Schema.Top
-    readonly failure: Schema.Top
+    readonly parameters: Schema.Constraint
+    readonly success: Schema.Constraint
+    readonly failure: Schema.Constraint
     readonly failureMode: FailureMode
   },
   out Requirements = never
@@ -204,6 +225,8 @@ export interface Tool<
   /**
    * The strategy used for handling errors returned from tool call handler
    * execution.
+   *
+   * **Details**
    *
    * If set to `"error"` (the default), errors that occur during tool call
    * handler execution will be returned in the error channel of the calling
@@ -232,13 +255,15 @@ export interface Tool<
   readonly failureSchema: Config["failure"]
 
   /**
-   * A `ServiceMap` containing tool annotations which can store metadata about
+   * A `Context` containing tool annotations which can store metadata about
    * the tool.
    */
-  readonly annotations: ServiceMap.ServiceMap<never>
+  readonly annotations: Context.Context<never>
 
   /**
    * Specifies whether user approval is required before executing this tool.
+   *
+   * **Details**
    *
    * - If `undefined` or `false`, the tool executes immediately.
    * - If `true`, the tool always requires approval.
@@ -252,18 +277,20 @@ export interface Tool<
    * Adds a _request-level_ dependency which must be provided before the tool
    * call handler can be executed.
    *
+   * **Details**
+   *
    * This can be useful when you want to enforce that a particular dependency
    * **MUST** be provided to each request to the large language model provider
    * instead of being provided when creating the tool call handler layer.
    */
   addDependency<Identifier, Service>(
-    tag: ServiceMap.Key<Identifier, Service>
+    tag: Context.Key<Identifier, Service>
   ): Tool<Name, Config, Identifier | Requirements>
 
   /**
    * Set the schema to use to validate the result of a tool call when successful.
    */
-  setSuccess<SuccessSchema extends Schema.Top>(
+  setSuccess<SuccessSchema extends Schema.Constraint>(
     schema: SuccessSchema
   ): Tool<
     Name,
@@ -279,7 +306,7 @@ export interface Tool<
   /**
    * Set the schema to use to validate the result of a tool call when it fails.
    */
-  setFailure<FailureSchema extends Schema.Top>(
+  setFailure<FailureSchema extends Schema.Constraint>(
     schema: FailureSchema
   ): Tool<
     Name,
@@ -295,7 +322,7 @@ export interface Tool<
   /**
    * Set the schema to use to validate the parameters of a tool call.
    */
-  setParameters<ParametersSchema extends Schema.Top>(
+  setParameters<ParametersSchema extends Schema.Constraint>(
     schema: ParametersSchema
   ): Tool<
     Name,
@@ -311,23 +338,26 @@ export interface Tool<
   /**
    * Add an annotation to the tool.
    */
-  annotate<I, S>(tag: ServiceMap.Key<I, S>, value: S): Tool<Name, Config, Requirements>
+  annotate<I, S>(tag: Context.Key<I, S>, value: S): Tool<Name, Config, Requirements>
 
   /**
    * Add many annotations to the tool.
    */
-  annotateMerge<I>(context: ServiceMap.ServiceMap<I>): Tool<Name, Config, Requirements>
+  annotateMerge<I>(context: Context.Context<I>): Tool<Name, Config, Requirements>
 }
 
 /**
  * A provider-defined tool is a tool which is built into a large language model
  * provider (e.g. web search, code execution).
  *
+ * **Details**
+ *
  * These tools are executed by the large language model provider rather than
  * by your application. However, they can optionally require custom handlers
  * implemented in your application to process provider generated results.
  *
- * @example
+ * **Example** (Defining a provider-defined web search tool)
+ *
  * ```ts
  * import { Schema } from "effect"
  * import { Tool } from "effect/unstable/ai"
@@ -350,17 +380,17 @@ export interface Tool<
  * })
  * ```
  *
- * @since 1.0.0
  * @category models
+ * @since 4.0.0
  */
 export interface ProviderDefined<
   out Identifier extends `${string}.${string}`,
   out Name extends string,
   out Config extends {
-    readonly args: Schema.Top
-    readonly parameters: Schema.Top
-    readonly success: Schema.Top
-    readonly failure: Schema.Top
+    readonly args: Schema.Constraint
+    readonly parameters: Schema.Constraint
+    readonly success: Schema.Constraint
+    readonly failure: Schema.Constraint
     readonly failureMode: FailureMode
   },
   out RequiresHandler extends boolean = false
@@ -409,6 +439,8 @@ export interface ProviderDefined<
 /**
  * A dynamic tool is a tool where the schema may not be known at compile time.
  *
+ * **Details**
+ *
  * Dynamic tools support two modes:
  * - **Effect Schema mode**: Full type safety with validation (like `Tool.make`)
  * - **JSON Schema mode**: Raw JSON Schema for the model, handler receives `unknown`
@@ -416,7 +448,8 @@ export interface ProviderDefined<
  * This enables scenarios such as MCP tools discovered at runtime, user-defined
  * functions loaded from external sources, or plugin systems.
  *
- * @example
+ * **Example** (Defining dynamic tools)
+ *
  * ```ts
  * import { Schema } from "effect"
  * import { Tool } from "effect/unstable/ai"
@@ -442,15 +475,15 @@ export interface ProviderDefined<
  * })
  * ```
  *
- * @since 1.0.0
  * @category models
+ * @since 4.0.0
  */
 export interface Dynamic<
   out Name extends string,
   out Config extends {
-    readonly parameters: Schema.Top | JsonSchema.JsonSchema
-    readonly success: Schema.Top
-    readonly failure: Schema.Top
+    readonly parameters: Schema.Constraint | JsonSchema.JsonSchema
+    readonly success: Schema.Constraint
+    readonly failure: Schema.Constraint
     readonly failureMode: FailureMode
   },
   out Requirements = never
@@ -458,7 +491,7 @@ export interface Dynamic<
   Tool<
     Name,
     {
-      readonly parameters: Config["parameters"] extends Schema.Top ? Config["parameters"] : typeof Schema.Unknown
+      readonly parameters: Config["parameters"] extends Schema.Constraint ? Config["parameters"] : typeof Schema.Unknown
       readonly success: Config["success"]
       readonly failure: Config["failure"]
       readonly failureMode: Config["failureMode"]
@@ -472,7 +505,7 @@ export interface Dynamic<
    * The raw JSON Schema for parameters. Present when `parameters` was provided
    * as a JSON Schema, `undefined` when an Effect Schema was used.
    */
-  readonly jsonSchema: Config["parameters"] extends Schema.Top ? undefined : JsonSchema.JsonSchema
+  readonly jsonSchema: Config["parameters"] extends Schema.Constraint ? undefined : JsonSchema.JsonSchema
 }
 
 // =============================================================================
@@ -482,7 +515,8 @@ export interface Dynamic<
 /**
  * Type guard to check if a value is a user-defined tool.
  *
- * @example
+ * **Example** (Checking for user-defined tools)
+ *
  * ```ts
  * import { Schema } from "effect"
  * import { Tool } from "effect/unstable/ai"
@@ -517,8 +551,8 @@ export interface Dynamic<
  * console.log(Tool.isUserDefined(ProviderDefinedTool)) // false
  * ```
  *
- * @since 1.0.0
  * @category guards
+ * @since 4.0.0
  */
 export const isUserDefined = (u: unknown): u is Tool<string, any, any> =>
   Predicate.hasProperty(u, TypeId) && !isProviderDefined(u) && !isDynamic(u)
@@ -526,7 +560,8 @@ export const isUserDefined = (u: unknown): u is Tool<string, any, any> =>
 /**
  * Type guard to check if a value is a provider-defined tool.
  *
- * @example
+ * **Example** (Checking for provider-defined tools)
+ *
  * ```ts
  * import { Schema } from "effect"
  * import { Tool } from "effect/unstable/ai"
@@ -557,12 +592,12 @@ export const isUserDefined = (u: unknown): u is Tool<string, any, any> =>
  *   })
  * })
  *
- * console.log(Tool.isUserDefined(UserDefinedTool)) // false
- * console.log(Tool.isUserDefined(ProviderDefinedTool)) // true
+ * console.log(Tool.isProviderDefined(UserDefinedTool)) // false
+ * console.log(Tool.isProviderDefined(ProviderDefinedTool)) // true
  * ```
  *
- * @since 1.0.0
  * @category guards
+ * @since 4.0.0
  */
 export const isProviderDefined = (
   u: unknown
@@ -571,7 +606,8 @@ export const isProviderDefined = (
 /**
  * Type guard to check if a value is a dynamic tool.
  *
- * @example
+ * **Example** (Checking for dynamic tools)
+ *
  * ```ts
  * import { Schema } from "effect"
  * import { Tool } from "effect/unstable/ai"
@@ -589,8 +625,8 @@ export const isProviderDefined = (
  * console.log(Tool.isDynamic(UserDefinedTool)) // false
  * ```
  *
- * @since 1.0.0
  * @category guards
+ * @since 4.0.0
  */
 export const isDynamic = (u: unknown): u is Dynamic<string, any> => Predicate.hasProperty(u, DynamicTypeId)
 
@@ -601,8 +637,8 @@ export const isDynamic = (u: unknown): u is Dynamic<string, any> => Predicate.ha
 /**
  * A type which represents any `Tool`.
  *
- * @since 1.0.0
  * @category utility types
+ * @since 4.0.0
  */
 export interface Any extends
   Tool<any, {
@@ -616,8 +652,8 @@ export interface Any extends
 /**
  * A type which represents any provider-defined `Tool`.
  *
- * @since 1.0.0
  * @category utility types
+ * @since 4.0.0
  */
 export interface AnyProviderDefined extends
   ProviderDefined<any, any, {
@@ -632,8 +668,8 @@ export interface AnyProviderDefined extends
 /**
  * A type which represents any dynamic `Tool`.
  *
- * @since 1.0.0
  * @category utility types
+ * @since 4.0.0
  */
 export interface AnyDynamic extends
   Dynamic<any, {
@@ -645,7 +681,7 @@ export interface AnyDynamic extends
 {}
 
 // /**
-//  * @since 1.0.0
+//  * @since 4.0.0
 //  * @category utility types
 //  */
 // export interface AnyStructSchema extends Schema.Top {
@@ -655,8 +691,8 @@ export interface AnyDynamic extends
 /**
  * A utility type to extract the `Name` type from an `Tool`.
  *
- * @since 1.0.0
  * @category utility types
+ * @since 4.0.0
  */
 export type Name<T> = T extends Tool<
   infer _Name,
@@ -668,8 +704,8 @@ export type Name<T> = T extends Tool<
 /**
  * A utility type to extract the type of the tool call parameters.
  *
- * @since 1.0.0
  * @category utility types
+ * @since 4.0.0
  */
 export type Parameters<T> = T extends Tool<
   infer _Name,
@@ -681,8 +717,8 @@ export type Parameters<T> = T extends Tool<
 /**
  * A utility type to extract the encoded type of the tool call parameters.
  *
- * @since 1.0.0
  * @category utility types
+ * @since 4.0.0
  */
 export type ParametersEncoded<T> = T extends Tool<
   infer _Name,
@@ -695,8 +731,8 @@ export type ParametersEncoded<T> = T extends Tool<
  * A utility type to extract the schema for the parameters which an `Tool`
  * must be called with.
  *
- * @since 1.0.0
  * @category utility types
+ * @since 4.0.0
  */
 export type ParametersSchema<T> = T extends Tool<
   infer _Name,
@@ -708,8 +744,8 @@ export type ParametersSchema<T> = T extends Tool<
 /**
  * A utility type to extract the type of the tool call result when it succeeds.
  *
- * @since 1.0.0
  * @category utility types
+ * @since 4.0.0
  */
 export type Success<T> = T extends Tool<
   infer _Name,
@@ -722,8 +758,8 @@ export type Success<T> = T extends Tool<
  * A utility type to extract the encoded type of the tool call result when
  * it succeeds.
  *
- * @since 1.0.0
  * @category utility types
+ * @since 4.0.0
  */
 export type SuccessEncoded<T> = T extends Tool<
   infer _Name,
@@ -736,8 +772,8 @@ export type SuccessEncoded<T> = T extends Tool<
  * A utility type to extract the schema for the return type of a tool call when
  * the tool call succeeds.
  *
- * @since 1.0.0
  * @category utility types
+ * @since 4.0.0
  */
 export type SuccessSchema<T> = T extends Tool<
   infer _Name,
@@ -749,8 +785,8 @@ export type SuccessSchema<T> = T extends Tool<
 /**
  * A utility type to extract the type of the tool call result when it fails.
  *
- * @since 1.0.0
  * @category utility types
+ * @since 4.0.0
  */
 export type Failure<T> = T extends Tool<
   infer _Name,
@@ -763,8 +799,8 @@ export type Failure<T> = T extends Tool<
  * A utility type to extract the encoded type of the tool call result when
  * it fails.
  *
- * @since 1.0.0
  * @category utility types
+ * @since 4.0.0
  */
 export type FailureEncoded<T> = T extends Tool<
   infer _Name,
@@ -778,8 +814,8 @@ export type FailureEncoded<T> = T extends Tool<
  * When `failureMode` is `"return"`, this includes both user-defined failures
  * and `AiError`.
  *
- * @since 1.0.0
  * @category utility types
+ * @since 4.0.0
  */
 export type FailureResult<T> = T extends Tool<
   infer _Name,
@@ -792,8 +828,8 @@ export type FailureResult<T> = T extends Tool<
 /**
  * The encoded version of `FailureResult`.
  *
- * @since 1.0.0
  * @category utility types
+ * @since 4.0.0
  */
 export type FailureResultEncoded<T> = T extends Tool<
   infer _Name,
@@ -807,10 +843,12 @@ export type FailureResultEncoded<T> = T extends Tool<
  * A utility type to extract the type of the tool call result whether it
  * succeeds or fails.
  *
+ * **Details**
+ *
  * When `failureMode` is `"return"`, the result may also be an `AiError`.
  *
- * @since 1.0.0
  * @category utility types
+ * @since 4.0.0
  */
 export type Result<T> = T extends Tool<
   infer _Name,
@@ -824,10 +862,12 @@ export type Result<T> = T extends Tool<
  * A utility type to extract the encoded type of the tool call result whether
  * it succeeds or fails.
  *
+ * **Details**
+ *
  * When `failureMode` is `"return"`, the result may also be an encoded `AiError`.
  *
- * @since 1.0.0
  * @category utility types
+ * @since 4.0.0
  */
 export type ResultEncoded<T> = T extends Tool<
   infer _Name,
@@ -840,8 +880,8 @@ export type ResultEncoded<T> = T extends Tool<
 /**
  * A utility type to extract the requirements of a `Tool` call handler.
  *
- * @since 1.0.0
  * @category utility types
+ * @since 4.0.0
  */
 export type HandlerServices<T> = T extends Tool<
   infer _Name,
@@ -860,8 +900,8 @@ export type HandlerServices<T> = T extends Tool<
  * A utility type to extract the requirements needed to encode the result of
  * a `Tool` call.
  *
- * @since 1.0.0
  * @category utility types
+ * @since 4.0.0
  */
 export type ResultEncodingServices<T> = T extends Tool<
   infer _Name,
@@ -874,8 +914,8 @@ export type ResultEncodingServices<T> = T extends Tool<
  * A utility type to extract the requirements needed to decode the result of
  * a `Tool` call.
  *
- * @since 1.0.0
  * @category utility types
+ * @since 4.0.0
  */
 export type ResultDecodingServices<T> = T extends Tool<
   infer _Name,
@@ -887,21 +927,21 @@ export type ResultDecodingServices<T> = T extends Tool<
 /**
  * Represents an `Tool` that has been implemented within the application.
  *
- * @since 1.0.0
  * @category models
+ * @since 4.0.0
  */
 export interface Handler<Name extends string> {
   readonly _: unique symbol
   readonly name: Name
-  readonly services: ServiceMap.ServiceMap<never>
+  readonly context: Context.Context<never>
   readonly handler: (params: any, ctx: any) => Effect.Effect<any, any>
 }
 
 /**
  * Represents the result of calling the handler for a particular `Tool`.
  *
- * @since 1.0.0
  * @category models
+ * @since 4.0.0
  */
 export interface HandlerResult<Tool extends Any> {
   /**
@@ -929,13 +969,15 @@ export interface HandlerResult<Tool extends Any> {
 /**
  * Tagged union for incremental handler output.
  *
+ * **Details**
+ *
  * When a tool handler returns a `Stream`, each emitted value is tagged as
  * either:
  * - `Preliminary`: An intermediate result representing progress
  * - `Final`: The last result, which is the authoritative output
  *
- * @since 1.0.0
  * @category models
+ * @since 4.0.0
  */
 export type HandlerOutput<Success> =
   | { readonly _tag: "Preliminary"; readonly value: Success }
@@ -945,8 +987,8 @@ export type HandlerOutput<Success> =
  * A utility type which represents the possible errors that can be raised by
  * a tool call's handler.
  *
- * @since 1.0.0
  * @category utility types
+ * @since 4.0.0
  */
 export type HandlerError<T> = T extends Tool<
   infer _Name,
@@ -960,8 +1002,8 @@ export type HandlerError<T> = T extends Tool<
  * A utility type to create a union of `Handler` types for all tools in a
  * record.
  *
- * @since 1.0.0
  * @category utility types
+ * @since 4.0.0
  */
 export type HandlersFor<Tools extends Record<string, Any>> = {
   [Name in keyof Tools]: RequiresHandler<Tools[Name]> extends true ? Handler<Tools[Name]["name"]>
@@ -972,8 +1014,8 @@ export type HandlersFor<Tools extends Record<string, Any>> = {
  * A utility type to determine if the specified tool requires a user-defined
  * handler to be implemented.
  *
- * @since 1.0.0
  * @category utility types
+ * @since 4.0.0
  */
 export type RequiresHandler<Tool extends Any> = Tool extends ProviderDefined<
   infer _Name,
@@ -994,28 +1036,28 @@ const Proto = {
   addDependency(this: Any) {
     return userDefinedProto({ ...this })
   },
-  setParameters(this: Any, parametersSchema: Schema.Top) {
+  setParameters(this: Any, parametersSchema: Schema.Constraint) {
     return userDefinedProto({
       ...this,
       parametersSchema
     })
   },
-  setSuccess(this: Any, successSchema: Schema.Top) {
+  setSuccess(this: Any, successSchema: Schema.Constraint) {
     return userDefinedProto({ ...this, successSchema })
   },
-  setFailure(this: Any, failureSchema: Schema.Top) {
+  setFailure(this: Any, failureSchema: Schema.Constraint) {
     return userDefinedProto({ ...this, failureSchema })
   },
-  annotate<I, S>(this: Any, tag: ServiceMap.Key<I, S>, value: S) {
+  annotate<I, S>(this: Any, tag: Context.Key<I, S>, value: S) {
     return userDefinedProto({
       ...this,
-      annotations: ServiceMap.add(this.annotations, tag, value)
+      annotations: Context.add(this.annotations, tag, value)
     })
   },
-  annotateMerge<I>(this: Any, context: ServiceMap.ServiceMap<I>) {
+  annotateMerge<I>(this: Any, context: Context.Context<I>) {
     return userDefinedProto({
       ...this,
-      annotations: ServiceMap.merge(this.annotations, context)
+      annotations: Context.merge(this.annotations, context)
     })
   }
 }
@@ -1032,9 +1074,9 @@ const DynamicProto = {
 
 const userDefinedProto = <
   const Name extends string,
-  Parameters extends Schema.Top,
-  Success extends Schema.Top,
-  Failure extends Schema.Top,
+  Parameters extends Schema.Constraint,
+  Success extends Schema.Constraint,
+  Failure extends Schema.Constraint,
   Mode extends FailureMode
 >(options: {
   readonly name: Name
@@ -1042,7 +1084,7 @@ const userDefinedProto = <
   readonly parametersSchema: Parameters
   readonly successSchema: Success
   readonly failureSchema: Failure
-  readonly annotations: ServiceMap.ServiceMap<never>
+  readonly annotations: Context.Context<never>
   readonly failureMode: Mode
   readonly needsApproval?: NeedsApproval<Parameters> | undefined
 }): Tool<
@@ -1062,10 +1104,10 @@ const userDefinedProto = <
 const providerDefinedProto = <
   const Identifier extends `${string}.${string}`,
   const Name extends string,
-  Args extends Schema.Top,
-  Parameters extends Schema.Top,
-  Success extends Schema.Top,
-  Failure extends Schema.Top,
+  Args extends Schema.Constraint,
+  Parameters extends Schema.Constraint,
+  Success extends Schema.Constraint,
+  Failure extends Schema.Constraint,
   RequiresHandler extends boolean,
   Mode extends FailureMode
 >(options: {
@@ -1094,9 +1136,9 @@ const providerDefinedProto = <
 
 const dynamicProto = <
   const Name extends string,
-  Parameters extends Schema.Top | JsonSchema.JsonSchema,
-  Success extends Schema.Top,
-  Failure extends Schema.Top,
+  Parameters extends Schema.Constraint | JsonSchema.JsonSchema,
+  Success extends Schema.Constraint,
+  Failure extends Schema.Constraint,
   Mode extends FailureMode
 >(options: {
   readonly name: Name
@@ -1104,7 +1146,7 @@ const dynamicProto = <
   readonly parametersSchema: Parameters
   readonly successSchema: Success
   readonly failureSchema: Failure
-  readonly annotations: ServiceMap.ServiceMap<never>
+  readonly annotations: Context.Context<never>
   readonly failureMode: Mode
   readonly needsApproval?: NeedsApproval<any> | undefined
   readonly jsonSchema: JsonSchema.JsonSchema | undefined
@@ -1125,6 +1167,8 @@ const dynamicProto = <
 /**
  * Creates a user-defined tool with the specified name and configuration.
  *
+ * **Details**
+ *
  * This is the primary constructor for creating custom tools that AI models
  * can call. The tool definition includes parameter validation, success/failure
  * schemas, and optional service dependencies.
@@ -1132,7 +1176,8 @@ const dynamicProto = <
  * If a tool accepts no parameters but still needs an explicit empty object
  * schema, use {@link EmptyParams}.
  *
- * @example
+ * **Example** (Creating a tool without parameters)
+ *
  * ```ts
  * import { Schema } from "effect"
  * import { Tool } from "effect/unstable/ai"
@@ -1144,16 +1189,16 @@ const dynamicProto = <
  * })
  * ```
  *
- * @since 1.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const make = <
   const Name extends string,
-  Parameters extends Schema.Top = typeof EmptyParams,
-  Success extends Schema.Top = typeof Schema.Void,
-  Failure extends Schema.Top = typeof Schema.Never,
+  Parameters extends Schema.Constraint = typeof EmptyParams,
+  Success extends Schema.Constraint = typeof Schema.Void,
+  Failure extends Schema.Constraint = typeof Schema.Never,
   Mode extends FailureMode | undefined = undefined,
-  Dependencies extends Array<ServiceMap.Key<any, any> | ServiceMap.Key<never, any>> = []
+  Dependencies extends Array<Context.Key<any, any> | Context.Key<never, any>> = []
 >(name: Name, options?: {
   /**
    * An optional description explaining what the tool does.
@@ -1175,6 +1220,8 @@ export const make = <
    * The strategy used for handling errors returned from tool call handler
    * execution.
    *
+   * **Details**
+   *
    * If set to `"error"` (the default), errors that occur during tool call handler
    * execution will be returned in the error channel of the calling effect.
    *
@@ -1188,6 +1235,8 @@ export const make = <
   readonly dependencies?: Dependencies | undefined
   /**
    * Specifies whether user approval is required before executing this tool.
+   *
+   * **Details**
    *
    * - If `undefined` or `false`, the tool executes immediately.
    * - If `true`, the tool always requires approval.
@@ -1203,7 +1252,7 @@ export const make = <
     readonly failure: Failure
     readonly failureMode: Mode extends undefined ? "error" : Mode
   },
-  ServiceMap.Service.Identifier<Dependencies[number]>
+  Context.Service.Identifier<Dependencies[number]>
 > => {
   const successSchema = options?.success ?? Schema.Void
   const failureSchema = options?.failure ?? Schema.Never
@@ -1214,7 +1263,7 @@ export const make = <
     successSchema,
     failureSchema,
     failureMode: options?.failureMode ?? "error",
-    annotations: ServiceMap.empty(),
+    annotations: Context.empty(),
     needsApproval: options?.needsApproval as any
   }) as any
 }
@@ -1223,13 +1272,18 @@ export const make = <
  * Creates a dynamic tool that can accept either an Effect Schema or a raw
  * JSON Schema for its parameters.
  *
- * This is useful for tools where the schema isn't known at compile time,
- * such as MCP tools discovered at runtime or tools from external configurations.
+ * **When to use**
+ *
+ * Use when you do not know a tool schema at compile time, such as MCP tools
+ * discovered at runtime or tools from external configurations.
+ *
+ * **Details**
  *
  * - When `parameters` is an Effect Schema: full type safety with validation
  * - When `parameters` is a JSON Schema: handler receives `unknown`, no validation
  *
- * @example
+ * **Example** (Creating a dynamic tool)
+ *
  * ```ts
  * import { Schema } from "effect"
  * import { Tool } from "effect/unstable/ai"
@@ -1255,17 +1309,17 @@ export const make = <
  * })
  * ```
  *
- * @since 1.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const dynamic: {
   <
     const Name extends string,
     const Options extends {
       readonly description?: string | undefined
-      readonly parameters?: Schema.Top | JsonSchema.JsonSchema | undefined
-      readonly success?: Schema.Top | undefined
-      readonly failure?: Schema.Top | undefined
+      readonly parameters?: Schema.Constraint | JsonSchema.JsonSchema | undefined
+      readonly success?: Schema.Constraint | undefined
+      readonly failure?: Schema.Constraint | undefined
       readonly failureMode?: FailureMode | undefined
       readonly needsApproval?: NeedsApproval<any> | undefined
     }
@@ -1275,12 +1329,14 @@ export const dynamic: {
   ): Dynamic<
     Name,
     {
-      readonly parameters: Options extends { readonly parameters: infer P } ? P extends Schema.Top ? P
+      readonly parameters: Options extends { readonly parameters: infer P } ? P extends Schema.Constraint ? P
         : P extends JsonSchema.JsonSchema ? P
         : typeof Schema.Unknown
         : typeof Schema.Unknown
-      readonly success: Options extends { readonly success: infer S extends Schema.Top } ? S : typeof Schema.Unknown
-      readonly failure: Options extends { readonly failure: infer F extends Schema.Top } ? F : typeof Schema.Never
+      readonly success: Options extends { readonly success: infer S extends Schema.Constraint } ? S
+        : typeof Schema.Unknown
+      readonly failure: Options extends { readonly failure: infer F extends Schema.Constraint } ? F
+        : typeof Schema.Never
       readonly failureMode: Options extends { readonly failureMode: infer M extends FailureMode } ? M : "error"
     }
   >
@@ -1288,9 +1344,9 @@ export const dynamic: {
   const Name extends string,
   const Options extends {
     readonly description?: string | undefined
-    readonly parameters?: Schema.Top | JsonSchema.JsonSchema | undefined
-    readonly success?: Schema.Top | undefined
-    readonly failure?: Schema.Top | undefined
+    readonly parameters?: Schema.Constraint | JsonSchema.JsonSchema | undefined
+    readonly success?: Schema.Constraint | undefined
+    readonly failure?: Schema.Constraint | undefined
     readonly failureMode?: FailureMode | undefined
     readonly needsApproval?: NeedsApproval<any> | undefined
   }
@@ -1308,7 +1364,7 @@ export const dynamic: {
     successSchema,
     failureSchema,
     failureMode: options?.failureMode ?? "error",
-    annotations: ServiceMap.empty(),
+    annotations: Context.empty(),
     needsApproval: options?.needsApproval,
     jsonSchema
   })
@@ -1318,11 +1374,14 @@ export const dynamic: {
  * Creates a provider-defined tool which leverages functionality built into a
  * large language model provider (e.g. web search, code execution).
  *
+ * **Details**
+ *
  * These tools are executed by the large language model provider rather than
  * by your application. However, they can optionally require custom handlers
  * implemented in your application to process provider generated results.
  *
- * @example
+ * **Example** (Creating a provider-defined tool)
+ *
  * ```ts
  * import { Schema } from "effect"
  * import { Tool } from "effect/unstable/ai"
@@ -1345,16 +1404,16 @@ export const dynamic: {
  * })
  * ```
  *
- * @since 1.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const providerDefined = <
   const Identifier extends `${string}.${string}`,
   const Name extends string,
-  Args extends Schema.Top = typeof Schema.Void,
-  Parameters extends Schema.Top = typeof Schema.Void,
-  Success extends Schema.Top = typeof Schema.Void,
-  Failure extends Schema.Top = typeof Schema.Never,
+  Args extends Schema.Constraint = typeof Schema.Void,
+  Parameters extends Schema.Constraint = typeof Schema.Void,
+  Success extends Schema.Constraint = typeof Schema.Void,
+  Failure extends Schema.Constraint = typeof Schema.Never,
   RequiresHandler extends boolean = false
 >(options: {
   /**
@@ -1443,16 +1502,18 @@ export const providerDefined = <
 // =============================================================================
 
 /**
- * A utility which allows mapping between a provider-defined name for a tool
- * and the name given to the tool by the Effect AI SDK.
+ * Maps between a provider-defined tool name and the name given to the tool by
+ * the Effect AI SDK.
+ *
+ * **Details**
  *
  * The custom names used by the Effect AI SDK are to allow for toolkits which
  * contain tools from multiple different providers that would otherwise have
  * naming conflicts (i.e. `"web_search"`) to instead use custom names (i.e.
  * `"OpenAiWebSearch"`).
  *
- * @since 1.0.0
- * @category utilities
+ * @category models
+ * @since 4.0.0
  */
 export class NameMapper<Tools extends ReadonlyArray<Any>> {
   readonly #customToProvider: Map<string, string> = new Map()
@@ -1485,6 +1546,8 @@ export class NameMapper<Tools extends ReadonlyArray<Any>> {
    * Returns the user-specified tool name that corresponds with the provided
    * provider-specified tool name.
    *
+   * **Details**
+   *
    * If the provider-specified tool name was not registered with the name mapper,
    * then the provider-specified tool name is returned.
    */
@@ -1495,6 +1558,8 @@ export class NameMapper<Tools extends ReadonlyArray<Any>> {
   /**
    * Returns the provider-specified tool name that corresponds with the provided
    * user-specified tool name.
+   *
+   * **Details**
    *
    * If the user-specified tool name was not registered with the name mapper,
    * then the user-specified tool name is returned.
@@ -1507,10 +1572,13 @@ export class NameMapper<Tools extends ReadonlyArray<Any>> {
 /**
  * Extracts the description from a tool's metadata.
  *
+ * **Details**
+ *
  * Returns the tool's description if explicitly set, otherwise attempts to
  * extract it from the parameter schema's AST annotations.
  *
- * @example
+ * **Example** (Reading a tool description)
+ *
  * ```ts
  * import { Tool } from "effect/unstable/ai"
  *
@@ -1522,21 +1590,23 @@ export class NameMapper<Tools extends ReadonlyArray<Any>> {
  * console.log(description) // "This is an example tool"
  * ```
  *
- * @since 1.0.0
- * @category utilities
+ * @category getters
+ * @since 4.0.0
  */
 export const getDescription = <Tool extends Any>(tool: Tool): string | undefined => {
   if (tool.description !== undefined) {
     return tool.description
   }
   if (Schema.isSchema(tool.parametersSchema)) {
-    return AST.resolveDescription(tool.parametersSchema.ast)
+    return SchemaAST.resolveDescription(tool.parametersSchema.ast)
   }
   return undefined
 }
 
 /**
  * Generates a JSON Schema for a tool.
+ *
+ * **Details**
  *
  * This function creates a JSON Schema representation that can be used by
  * large language models to indicate the structure and type of the parameters
@@ -1546,7 +1616,8 @@ export const getDescription = <Tool extends Any>(tool: Tool): string | undefined
  * tool parameter schema so that the resultant JSON schema for the tool call
  * parameters are in a format that conforms to any provider-specific constraints.
  *
- * @example
+ * **Example** (Generating a tool JSON schema)
+ *
  * ```ts
  * import { Schema } from "effect"
  * import { Tool } from "effect/unstable/ai"
@@ -1570,8 +1641,8 @@ export const getDescription = <Tool extends Any>(tool: Tool): string | undefined
  * // }
  * ```
  *
- * @since 1.0.0
- * @category utilities
+ * @category getters
+ * @since 4.0.0
  */
 export const getJsonSchema = <Tool extends Any>(tool: Tool, options?: {
   readonly transformer?: CodecTransformer
@@ -1583,10 +1654,19 @@ export const getJsonSchema = <Tool extends Any>(tool: Tool, options?: {
 }
 
 /**
- * @since 1.0.0
- * @category utilities
+ * Generates a JSON Schema from an Effect `Schema`.
+ *
+ * **Details**
+ *
+ * If a `CodecTransformer` is supplied, the transformed schema's JSON Schema is
+ * returned. Otherwise, the schema is converted with
+ * `Schema.toJsonSchemaDocument` and any generated definitions are attached as
+ * `$defs`.
+ *
+ * @category converting
+ * @since 4.0.0
  */
-export const getJsonSchemaFromSchema = <S extends Schema.Top>(schema: S, options?: {
+export const getJsonSchemaFromSchema = <S extends Schema.Constraint>(schema: S, options?: {
   readonly transformer?: CodecTransformer
 }): JsonSchema.JsonSchema => {
   if (Predicate.isNotUndefined(options?.transformer)) {
@@ -1606,7 +1686,8 @@ export const getJsonSchemaFromSchema = <S extends Schema.Top>(schema: S, options
 /**
  * Annotation for providing a human-readable title for tools.
  *
- * @example
+ * **Example** (Annotating a tool title)
+ *
  * ```ts
  * import { Tool } from "effect/unstable/ai"
  *
@@ -1614,30 +1695,38 @@ export const getJsonSchemaFromSchema = <S extends Schema.Top>(schema: S, options
  *   .annotate(Tool.Title, "Tip Calculator")
  * ```
  *
- * @since 1.0.0
  * @category annotations
+ * @since 4.0.0
  */
-export class Title extends ServiceMap.Service<Title, string>()("effect/ai/Tool/Title") {}
+export class Title extends Context.Service<Title, string>()("effect/ai/Tool/Title") {}
 
 /**
  * Annotation for providing tool metadata for MCP.
  *
- * @example
+ * **Example** (Annotating MCP metadata)
+ *
  * ```ts
  * import { Tool } from "effect/unstable/ai"
  *
  * const myCalculatorUi = Tool.make("calculator_ui", {})
  *   .annotate(Tool.Meta, { ui: { resourceUri: "ui://example/calculator-ui" } })
  * ```
- * @since 1.0.0
+ *
  * @category annotations
+ * @since 4.0.0
  */
-export class Meta extends ServiceMap.Service<Meta, Record<string, unknown>>()("effect/ai/Tool/Meta") {}
+export class Meta extends Context.Service<Meta, Record<string, unknown>>()("effect/ai/Tool/Meta") {}
 
 /**
  * Annotation indicating whether a tool only reads data without making changes.
  *
- * @example
+ * **Details**
+ *
+ * This is emitted as the MCP `readOnlyHint`; unannotated tools default to
+ * `false`.
+ *
+ * **Example** (Marking a tool as read-only)
+ *
  * ```ts
  * import { Tool } from "effect/unstable/ai"
  *
@@ -1645,17 +1734,23 @@ export class Meta extends ServiceMap.Service<Meta, Record<string, unknown>>()("e
  *   .annotate(Tool.Readonly, true)
  * ```
  *
- * @since 1.0.0
  * @category annotations
+ * @since 4.0.0
  */
-export const Readonly = ServiceMap.Reference<boolean>("effect/ai/Tool/Readonly", {
+export const Readonly = Context.Reference<boolean>("effect/ai/Tool/Readonly", {
   defaultValue: constFalse
 })
 
 /**
- * Annotation indicating whether a tool performs destructive operations.
+ * Annotation indicating whether a tool may perform destructive operations.
  *
- * @example
+ * **Details**
+ *
+ * This is emitted as the MCP `destructiveHint`; unannotated tools default to
+ * `true`, so annotate safe tools with `false`.
+ *
+ * **Example** (Marking a tool as non-destructive)
+ *
  * ```ts
  * import { Tool } from "effect/unstable/ai"
  *
@@ -1663,17 +1758,24 @@ export const Readonly = ServiceMap.Reference<boolean>("effect/ai/Tool/Readonly",
  *   .annotate(Tool.Destructive, false)
  * ```
  *
- * @since 1.0.0
  * @category annotations
+ * @since 4.0.0
  */
-export const Destructive = ServiceMap.Reference<boolean>("effect/ai/Tool/Destructive", {
+export const Destructive = Context.Reference<boolean>("effect/ai/Tool/Destructive", {
   defaultValue: constTrue
 })
 
 /**
- * Annotation indicating whether a tool can be called multiple times safely.
+ * Annotation indicating whether a tool can be called repeatedly with the same
+ * parameters without changing the result beyond the first call.
  *
- * @example
+ * **Details**
+ *
+ * This is emitted as the MCP `idempotentHint`; unannotated tools default to
+ * `false`.
+ *
+ * **Example** (Marking a tool as idempotent)
+ *
  * ```ts
  * import { Tool } from "effect/unstable/ai"
  *
@@ -1681,17 +1783,24 @@ export const Destructive = ServiceMap.Reference<boolean>("effect/ai/Tool/Destruc
  *   .annotate(Tool.Idempotent, true)
  * ```
  *
- * @since 1.0.0
  * @category annotations
+ * @since 4.0.0
  */
-export const Idempotent = ServiceMap.Reference<boolean>("effect/ai/Tool/Idempotent", {
+export const Idempotent = Context.Reference<boolean>("effect/ai/Tool/Idempotent", {
   defaultValue: constFalse
 })
 
 /**
- * Annotation indicating whether a tool can handle arbitrary external data.
+ * Annotation indicating whether a tool may interact with arbitrary external
+ * data or systems.
  *
- * @example
+ * **Details**
+ *
+ * This is emitted as the MCP `openWorldHint`; unannotated tools default to
+ * `true`.
+ *
+ * **Example** (Disabling open-world access)
+ *
  * ```ts
  * import { Tool } from "effect/unstable/ai"
  *
@@ -1699,15 +1808,17 @@ export const Idempotent = ServiceMap.Reference<boolean>("effect/ai/Tool/Idempote
  *   .annotate(Tool.OpenWorld, false)
  * ```
  *
- * @since 1.0.0
  * @category annotations
+ * @since 4.0.0
  */
-export const OpenWorld = ServiceMap.Reference<boolean>("effect/ai/Tool/OpenWorld", {
+export const OpenWorld = Context.Reference<boolean>("effect/ai/Tool/OpenWorld", {
   defaultValue: constTrue
 })
 
 /**
  * Annotation controlling whether strict JSON schema mode is enabled for a tool.
+ *
+ * **Details**
  *
  * When `true`, providers that support strict mode will send `strict: true` to
  * the model API (e.g. OpenAI's Structured Outputs).
@@ -1717,7 +1828,8 @@ export const OpenWorld = ServiceMap.Reference<boolean>("effect/ai/Tool/OpenWorld
  * When `undefined` (default), the provider's global configuration determines
  * the behavior (e.g. `Config.strictJsonSchema` for OpenAI).
  *
- * @example
+ * **Example** (Disabling strict JSON schema mode)
+ *
  * ```ts
  * import { Tool } from "effect/unstable/ai"
  *
@@ -1725,20 +1837,32 @@ export const OpenWorld = ServiceMap.Reference<boolean>("effect/ai/Tool/OpenWorld
  *   .annotate(Tool.Strict, false)
  * ```
  *
- * @since 1.0.0
  * @category annotations
+ * @since 4.0.0
  */
-export const Strict = ServiceMap.Reference<boolean | undefined>("effect/ai/Tool/Strict", {
+export const Strict = Context.Reference<boolean | undefined>("effect/ai/Tool/Strict", {
   defaultValue: () => undefined
 })
 
 /**
  * Returns the strict mode setting for a tool, or `undefined` if not set.
  *
- * @since 1.0.0
- * @category utilities
+ * **When to use**
+ *
+ * Use to inspect the per-tool strict JSON Schema override attached through
+ * `Tool.Strict`.
+ *
+ * **Gotchas**
+ *
+ * `undefined` means no per-tool override is set. It is distinct from `false`;
+ * provider or global configuration determines the final behavior.
+ *
+ * @see {@link Strict} for the annotation read by this helper
+ *
+ * @category getters
+ * @since 4.0.0
  */
-export const getStrictMode = <T extends Any>(tool: T): boolean | undefined => ServiceMap.get(tool.annotations, Strict)
+export const getStrictMode = <T extends Any>(tool: T): boolean | undefined => Context.get(tool.annotations, Strict)
 
 // Licensed under BSD-3-Clause (below code only)
 // Code adapted from https://github.com/fastify/secure-json-parse/blob/783fcb1b5434709466759847cec974381939673a/index.js
@@ -1817,36 +1941,66 @@ function filter(obj: any) {
 }
 
 /**
- * **Unsafe**: This function will throw an error if an insecure property is
- * found in the parsed JSON or if the provided JSON text is not parseable.
+ * Parses JSON text while rejecting prototype-pollution keys.
  *
- * @since 1.0.0
- * @category utilities
+ * **When to use**
+ *
+ * Use when you need a JSON parser that throws for invalid JSON or unsafe
+ * object shapes.
+ *
+ * **Gotchas**
+ *
+ * Invalid JSON throws through `JSON.parse`. Parsed objects containing an own
+ * `__proto__` property or a dangerous `constructor.prototype` shape throw a
+ * `SyntaxError`.
+ *
+ * @category unsafe
+ * @since 4.0.0
  */
 export const unsafeSecureJsonParse = (text: string): unknown => {
   // Performance optimization, see https://github.com/fastify/secure-json-parse/pull/90
-  const { stackTraceLimit } = Error
-  Error.stackTraceLimit = 0
+  const prevLimit = StackTraceLimit.getStackTraceLimit()
+  StackTraceLimit.setStackTraceLimit(0)
   try {
     return _parse(text)
   } finally {
-    Error.stackTraceLimit = stackTraceLimit
+    StackTraceLimit.setStackTraceLimit(prevLimit)
   }
 }
 
 /**
+ * Type of the `EmptyParams` schema used for tools with no parameters.
+ *
+ * **Details**
+ *
+ * It is a record schema with string keys and `never` values, so the generated
+ * parameter schema accepts an empty object shape with no properties.
+ *
+ * @category schemas
  * @since 4.0.0
  */
 export interface EmptyParams extends Schema.$Record<Schema.String, Schema.Never> {}
 
 /**
- * A schema for tools that accept no parameters.
+ * Schema for tools that accept no parameters.
  *
+ * **When to use**
+ *
+ * Use when you need an explicit no-parameter `parameters` schema for a tool.
+ *
+ * **Details**
+ *
+ * This is `Schema.Record(Schema.String, Schema.Never)`, representing an empty
+ * object parameter shape with no additional properties.
+ *
+ * @see {@link make} for the tool constructor that defaults omitted parameters to this schema
+ *
+ * @category schemas
  * @since 4.0.0
  */
 export const EmptyParams: EmptyParams = Schema.Record(Schema.String, Schema.Never)
 
 /** @internal */
-export function isEmptyParamsRecord(indexSignature: AST.IndexSignature): boolean {
-  return indexSignature.parameter === AST.string && AST.isNever(indexSignature.type)
+export function isEmptyParamsRecord(indexSignature: SchemaAST.IndexSignature): boolean {
+  return indexSignature.parameter === SchemaAST.string && SchemaAST.isNever(indexSignature.type)
 }

@@ -2,6 +2,7 @@ import { addEqualityTesters, afterEach, assert, beforeEach, describe, expect, it
 import {
   Array as Arr,
   Cause,
+  Context,
   Effect,
   Hash,
   Latch,
@@ -9,7 +10,6 @@ import {
   Option,
   Result,
   Schema,
-  ServiceMap,
   Stream,
   SubscriptionRef
 } from "effect"
@@ -217,7 +217,7 @@ describe.sequential("Atom", () => {
   })
 
   it("runtime direct tag", async () => {
-    const counter = counterRuntime.atom(Counter.asEffect())
+    const counter = counterRuntime.atom(Counter)
     const r = AtomRegistry.make()
     const result = r.get(counter)
     assert(AsyncResult.isSuccess(result))
@@ -350,6 +350,39 @@ describe.sequential("Atom", () => {
     expect(rebuilds).toEqual(2)
   })
 
+  it("keeps parent child links when a parent is read more than once", () => {
+    const flag = Atom.make(true)
+    const base = Atom.make(0)
+    const derived = Atom.make((get) => {
+      const value = get(base)
+      if (get(flag)) {
+        get(base)
+      }
+      return value
+    })
+    const registry = AtomRegistry.make()
+    const unsubscribe = registry.subscribe(derived, () => {
+    }, { immediate: true })
+    const nodes = registry.getNodes()
+    const baseNode = nodes.get(base)
+    const derivedNode = nodes.get(derived)
+
+    assert(baseNode !== undefined)
+    assert(derivedNode !== undefined)
+    assert.strictEqual(baseNode.children.has(derivedNode), true)
+    assert.strictEqual(derivedNode.parents.has(baseNode), true)
+
+    registry.set(flag, false)
+
+    assert.strictEqual(baseNode.children.has(derivedNode), true)
+    assert.strictEqual(derivedNode.parents.has(baseNode), true)
+
+    registry.set(base, 1)
+
+    assert.strictEqual(registry.get(derived), 1)
+    unsubscribe()
+  })
+
   it("refresh derived before mount resolves base effect", async () => {
     const baseAtom = Atom.make(
       Effect.succeed("value").pipe(Effect.delay(100))
@@ -408,7 +441,7 @@ describe.sequential("Atom", () => {
   })
 
   it("disposed lifetime apis are no-ops", () => {
-    let context: Atom.Context | undefined
+    let context: Atom.AtomContext | undefined
     const state = Atom.make(0).pipe(Atom.keepAlive)
     const option = Atom.make<Option.Option<number>>(Option.some(1)).pipe(Atom.keepAlive)
     const result = Atom.make<AsyncResult.AsyncResult<number, never>>(AsyncResult.success(1)).pipe(Atom.keepAlive)
@@ -480,12 +513,12 @@ describe.sequential("Atom", () => {
     Effect.gen(function*() {
       vitest.useRealTimers()
 
-      const services = yield* Effect.services<never>()
+      const services = yield* Effect.context<never>()
       const count = Atom.make(
         Stream.range(0, 2).pipe(
-          Stream.tap(() => AtomRegistry.AtomRegistry.asEffect()),
+          Stream.tap(() => AtomRegistry.AtomRegistry),
           Stream.tap((_) => Effect.sleep(50)),
-          Stream.provideServices(services)
+          Stream.provideContext(services)
         )
       )
       const r = AtomRegistry.make()
@@ -2471,6 +2504,12 @@ describe.sequential("Atom", () => {
       expect(result.value).toEqual(42)
       expect(result.waiting).toEqual(false)
       expect(storage.get("test-key")).toEqual(JSON.stringify(42))
+
+      r.set(atom, 24)
+
+      const updated = r.get(atom)
+      assert(AsyncResult.isSuccess(updated))
+      expect(updated.value).toEqual(24)
     })
   })
 })
@@ -2479,7 +2518,7 @@ interface BuildCounter {
   readonly get: Effect.Effect<number>
   readonly inc: Effect.Effect<void>
 }
-const BuildCounter = ServiceMap.Service<BuildCounter>("BuildCounter")
+const BuildCounter = Context.Service<BuildCounter>("BuildCounter")
 const BuildCounterLive = Layer.sync(BuildCounter, () => {
   let count = 0
   return BuildCounter.of({
@@ -2494,7 +2533,7 @@ interface Counter {
   readonly get: Effect.Effect<number>
   readonly inc: Effect.Effect<void>
 }
-const Counter = ServiceMap.Service<Counter>("Counter")
+const Counter = Context.Service<Counter>("Counter")
 const CounterLive = Layer.effect(
   Counter,
   Effect.gen(function*() {
@@ -2532,7 +2571,7 @@ const CounterTest = Layer.effect(
 interface Multiplier {
   readonly times: (n: number) => Effect.Effect<number>
 }
-const Multiplier = ServiceMap.Service<Multiplier>("Multiplier")
+const Multiplier = Context.Service<Multiplier>("Multiplier")
 const MultiplierLive = Layer.effect(
   Multiplier,
   Effect.gen(function*() {

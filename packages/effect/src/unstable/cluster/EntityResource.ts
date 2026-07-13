@@ -1,32 +1,52 @@
 /**
+ * Keeps resources available across cluster entity restarts.
+ *
+ * `EntityResource` is useful for long-lived resources tied to an entity
+ * address, such as external processes, network clients, Kubernetes Pods, or
+ * other handles that should survive routine shard movement. This module
+ * includes the resource wrapper, a close scope that survives normal entity
+ * restarts, a generic resource constructor, and a Kubernetes Pod resource
+ * helper built on `K8sHttpClient`.
+ *
  * @since 4.0.0
  */
 import type * as v1 from "kubernetes-types/core/v1.d.ts"
+import * as Context from "../../Context.ts"
 import * as Duration from "../../Duration.ts"
 import * as Effect from "../../Effect.ts"
 import { identity } from "../../Function.ts"
 import * as RcRef from "../../RcRef.ts"
 import * as Scope from "../../Scope.ts"
-import * as ServiceMap from "../../ServiceMap.ts"
 import * as Entity from "./Entity.ts"
 import * as K8sHttpClient from "./K8sHttpClient.ts"
 import type { Sharding } from "./Sharding.ts"
 
 /**
+ * Type identifier used to brand `EntityResource` values.
+ *
+ * @category type IDs
  * @since 4.0.0
- * @category Type ids
  */
 export const TypeId: TypeId = "~effect/cluster/EntityResource"
 
 /**
+ * Literal type of the `EntityResource` type identifier.
+ *
+ * @category type IDs
  * @since 4.0.0
- * @category Type ids
  */
 export type TypeId = "~effect/cluster/EntityResource"
 
 /**
+ * A resource acquired inside a cluster entity and kept alive across restarts.
+ *
+ * **Details**
+ *
+ * `get` acquires or reuses the resource in the caller's scope, while `close`
+ * invalidates it so its close scope can be released.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
 export interface EntityResource<out A, out E = never> {
   readonly [TypeId]: TypeId
@@ -35,34 +55,50 @@ export interface EntityResource<out A, out E = never> {
 }
 
 /**
- * A `Scope` that is only closed when the resource is explicitly closed.
+ * Context service for a Scope that is only closed when the resource is explicitly closed.
+ *
+ * **When to use**
+ *
+ * Use when a cluster entity resource needs a scope that survives restarts and
+ * closes only through the resource lifecycle.
+ *
+ * **Gotchas**
  *
  * It is not closed during restarts, due to shard movement or node shutdowns.
  *
+ * @category resource management
  * @since 4.0.0
- * @category Scope
  */
-export class CloseScope extends ServiceMap.Service<
+export class CloseScope extends Context.Service<
   CloseScope,
   Scope.Scope
 >()("effect/cluster/EntityResource/CloseScope") {}
 
 /**
- * A `EntityResource` is a resource that can be acquired inside a cluster
- * entity, which will keep the entity alive even across restarts.
+ * Creates an `EntityResource` that can be acquired inside a cluster entity.
+ *
+ * **When to use**
+ *
+ * Use when a cluster entity should lazily share an acquired resource across
+ * messages and release it only on idle timeout or explicit close.
+ *
+ * **Details**
  *
  * The resource will only be fully released when the idle time to live is
  * reached, or when the `close` effect is called.
  *
+ * **Gotchas**
+ *
  * By default, the `idleTimeToLive` is infinite, meaning the resource will only
  * be released when `close` is called.
  *
+ * @category constructors
  * @since 4.0.0
- * @category Constructors
  */
 export const make: <A, E, R>(options: {
   readonly acquire: Effect.Effect<A, E, R>
   readonly idleTimeToLive?: Duration.Input | undefined
+  readonly acquireEagerly?: boolean | undefined
 }) => Effect.Effect<
   EntityResource<A, E>,
   E,
@@ -70,13 +106,14 @@ export const make: <A, E, R>(options: {
 > = Effect.fnUntraced(function*<A, E, R>(options: {
   readonly acquire: Effect.Effect<A, E, R>
   readonly idleTimeToLive?: Duration.Input | undefined
+  readonly acquireEagerly?: boolean | undefined
 }) {
   let shuttingDown = false
 
-  yield* Entity.keepAlive(true)
-
   const ref = yield* RcRef.make({
     acquire: Effect.gen(function*() {
+      yield* Entity.keepAlive(true)
+
       const closeable = yield* Scope.make()
 
       yield* Effect.addFinalizer(
@@ -99,8 +136,10 @@ export const make: <A, E, R>(options: {
     return Effect.void
   })
 
-  // Initialize the resource
-  yield* Effect.scoped(RcRef.get(ref))
+  if (options.acquireEagerly) {
+    // Initialize the resource
+    yield* Effect.scoped(RcRef.get(ref))
+  }
 
   return identity<EntityResource<A, E>>({
     [TypeId]: TypeId,
@@ -110,8 +149,15 @@ export const make: <A, E, R>(options: {
 })
 
 /**
- * @since 4.0.0
+ * Creates an `EntityResource` backed by a Kubernetes Pod.
+ *
+ * **Details**
+ *
+ * The pod is created and waited on through `K8sHttpClient`, and is kept alive
+ * until the resource is closed or its idle time to live expires.
+ *
  * @category Kubernetes
+ * @since 4.0.0
  */
 export const makeK8sPod: (
   spec: v1.Pod,

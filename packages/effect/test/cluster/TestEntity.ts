@@ -1,4 +1,4 @@
-import { type Cause, Effect, Layer, MutableRef, Option, Queue, Schedule, Schema, ServiceMap, Stream } from "effect"
+import { type Cause, Context, Effect, Layer, MutableRef, Option, Queue, Schedule, Schema, Stream } from "effect"
 import type { Envelope } from "effect/unstable/cluster"
 import { ClusterSchema, Entity } from "effect/unstable/cluster"
 import { MemoryTransaction } from "effect/unstable/cluster/MessageStorage"
@@ -41,10 +41,10 @@ export const TestEntity = Entity.make("TestEntity", [
   Rpc.make("WithTransaction", {
     success: Schema.Boolean,
     payload: { id: Schema.Number }
-  }).annotate(ClusterSchema.Dynamic, ServiceMap.add(ClusterSchema.WithTransaction, true))
+  }).annotate(ClusterSchema.Dynamic, Context.add(ClusterSchema.WithTransaction, true))
 ]).annotateRpcs(ClusterSchema.Persisted, true)
 
-export class TestEntityState extends ServiceMap.Service<TestEntityState>()("TestEntityState", {
+export class TestEntityState extends Context.Service<TestEntityState>()("TestEntityState", {
   make: Effect.gen(function*() {
     const messages = yield* Queue.make<void>()
     const streamMessages = yield* Queue.make<void, Cause.Done>()
@@ -123,10 +123,26 @@ export const TestEntityNoState = TestEntity.toLayer(
           Stream.rechunk(1)
         )
       },
-      WithTransaction: () => MemoryTransaction.asEffect()
+      WithTransaction: () => MemoryTransaction
     })
   }),
   { defectRetryPolicy: Schedule.forever }
 )
 
 export const TestEntityLayer = TestEntityNoState.pipe(Layer.provideMerge(TestEntityState.layer))
+
+export const CallerId = Context.Service<never, string>(
+  "effect/test/cluster/CallerId"
+)
+
+export const ContextBleedEntity = Entity.make("ContextBleedEntity", [
+  Rpc.make("ReadCaller", { success: Schema.String }).annotate(ClusterSchema.Persisted, false),
+  Rpc.make("ReadCallerPersisted", { success: Schema.String }).annotate(ClusterSchema.Persisted, true)
+])
+
+const readCaller = () => Effect.map(Effect.serviceOption(CallerId), Option.getOrElse(() => "none"))
+
+export const ContextBleedLayer = ContextBleedEntity.toLayer({
+  ReadCaller: readCaller,
+  ReadCallerPersisted: readCaller
+})

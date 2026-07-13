@@ -1,4 +1,12 @@
 /**
+ * Encodes and decodes MessagePack frames in Effect channels.
+ *
+ * MessagePack is a compact binary serialization format for protocols and
+ * storage layers that expect bytes instead of JSON text, such as RPC
+ * transports, socket streams, caches, or database columns. This module includes
+ * raw channel helpers for values whose shape is already agreed on, and
+ * schema-based helpers for validating and transforming values at the boundary.
+ *
  * @since 4.0.0
  */
 import { Packr, Unpackr } from "msgpackr"
@@ -13,25 +21,36 @@ import * as Option from "../../Option.ts"
 import * as Predicate from "../../Predicate.ts"
 import type * as Pull from "../../Pull.ts"
 import * as Schema from "../../Schema.ts"
-import * as Issue from "../../SchemaIssue.ts"
-import * as Transformation from "../../SchemaTransformation.ts"
+import * as SchemaIssue from "../../SchemaIssue.ts"
+import * as SchemaTransformation from "../../SchemaTransformation.ts"
 
 const MsgPackErrorTypeId = "~effect/encoding/MsgPack/MsgPackError"
 
 /**
- * @since 4.0.0
+ * Error raised when MessagePack encoding or decoding fails.
+ *
+ * **Details**
+ *
+ * The `kind` field identifies whether the failure happened while packing or
+ * unpacking, and `cause` preserves the original error.
+ *
  * @category errors
+ * @since 4.0.0
  */
 export class MsgPackError extends Data.TaggedError("MsgPackError")<{
   readonly kind: "Pack" | "Unpack"
   readonly cause: unknown
 }> {
   /**
+   * Marks this value as a MessagePack encoding or decoding error for runtime guards.
+   *
    * @since 4.0.0
    */
   readonly [MsgPackErrorTypeId] = MsgPackErrorTypeId
 
   /**
+   * Uses the failed MessagePack operation as the public message.
+   *
    * @since 4.0.0
    */
   override get message() {
@@ -40,8 +59,15 @@ export class MsgPackError extends Data.TaggedError("MsgPackError")<{
 }
 
 /**
- * @since 4.0.0
+ * Creates a channel that encodes non-empty chunks of values as MessagePack byte
+ * arrays.
+ *
+ * **Details**
+ *
+ * The channel fails with `MsgPackError` when any value cannot be packed.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const encode = <IE = never, Done = unknown>(): Channel.Channel<
   Arr.NonEmptyReadonlyArray<Uint8Array<ArrayBuffer>>,
@@ -65,10 +91,17 @@ export const encode = <IE = never, Done = unknown>(): Channel.Channel<
   )
 
 /**
- * @since 4.0.0
+ * Creates a MessagePack encoder channel for values of a schema.
+ *
+ * **Details**
+ *
+ * Values are first encoded with the schema and then packed as MessagePack bytes,
+ * so the channel can fail with either schema errors or `MsgPackError`.
+ *
  * @category constructors
+ * @since 4.0.0
  */
-export const encodeSchema = <S extends Schema.Top>(
+export const encodeSchema = <S extends Schema.Constraint>(
   schema: S
 ) =>
 <IE = never, Done = unknown>(): Channel.Channel<
@@ -82,8 +115,15 @@ export const encodeSchema = <S extends Schema.Top>(
 > => Channel.pipeTo(ChannelSchema.encode(schema)(), encode())
 
 /**
- * @since 4.0.0
+ * Creates a channel that decodes MessagePack byte chunks into values.
+ *
+ * **Details**
+ *
+ * Incomplete frames are buffered across chunks, and invalid MessagePack data
+ * fails with `MsgPackError`.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const decode = <IE = never, Done = unknown>(): Channel.Channel<
   Arr.NonEmptyReadonlyArray<unknown>,
@@ -131,10 +171,17 @@ export const decode = <IE = never, Done = unknown>(): Channel.Channel<
   )
 
 /**
- * @since 4.0.0
+ * Creates a MessagePack decoder channel for values of a schema.
+ *
+ * **Details**
+ *
+ * The channel unpacks bytes into unknown values and then decodes each value with
+ * the schema.
+ *
  * @category constructors
+ * @since 4.0.0
  */
-export const decodeSchema = <S extends Schema.Top>(
+export const decodeSchema = <S extends Schema.Constraint>(
   schema: S
 ) =>
 <IE = never, Done = unknown>(): Channel.Channel<
@@ -148,8 +195,15 @@ export const decodeSchema = <S extends Schema.Top>(
 > => Channel.pipeTo(decode<IE, Done>(), ChannelSchema.decodeUnknown(schema)())
 
 /**
- * @since 4.0.0
+ * Wraps a bidirectional byte channel with MessagePack encoding and decoding.
+ *
+ * **Details**
+ *
+ * Outgoing values are packed as MessagePack bytes before reaching the wrapped
+ * channel, and incoming bytes are unpacked into values.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const duplex = <R, IE, OE, OutDone, InDone>(
   self: Channel.Channel<
@@ -176,11 +230,20 @@ export const duplex = <R, IE, OE, OutDone, InDone>(
   )
 
 /**
- * @since 4.0.0
+ * Wraps a bidirectional byte channel with schema-aware MessagePack encoding and
+ * decoding.
+ *
+ * **Details**
+ *
+ * Values sent to the wrapped channel are encoded with `inputSchema` and packed
+ * as MessagePack bytes; bytes received from it are unpacked and decoded with
+ * `outputSchema`.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const duplexSchema: {
-  <In extends Schema.Top, Out extends Schema.Top>(
+  <In extends Schema.Constraint, Out extends Schema.Constraint>(
     options: {
       readonly inputSchema: In
       readonly outputSchema: Out
@@ -204,7 +267,7 @@ export const duplexSchema: {
     InDone,
     R | In["EncodingServices"] | Out["DecodingServices"]
   >
-  <Out extends Schema.Top, In extends Schema.Top, OutErr, OutDone, InErr, InDone, R>(
+  <Out extends Schema.Constraint, In extends Schema.Constraint, OutErr, OutDone, InErr, InDone, R>(
     self: Channel.Channel<
       Arr.NonEmptyReadonlyArray<Uint8Array<ArrayBuffer>>,
       OutErr,
@@ -227,7 +290,7 @@ export const duplexSchema: {
     InDone,
     R | In["EncodingServices"] | Out["DecodingServices"]
   >
-} = dual(2, <Out extends Schema.Top, In extends Schema.Top, OutErr, OutDone, InErr, InDone, R>(
+} = dual(2, <Out extends Schema.Constraint, In extends Schema.Constraint, OutErr, OutDone, InErr, InDone, R>(
   self: Channel.Channel<
     Arr.NonEmptyReadonlyArray<Uint8Array<ArrayBuffer>>,
     OutErr,
@@ -252,25 +315,41 @@ export const duplexSchema: {
 > => ChannelSchema.duplexUnknown(duplex(self), options))
 
 /**
- * @since 4.0.0
+ * Schema type for values encoded as MessagePack bytes.
+ *
+ * **Details**
+ *
+ * It decodes a `Uint8Array` MessagePack payload to the target schema type and
+ * encodes the target type back to bytes.
+ *
  * @category schemas
+ * @since 4.0.0
  */
-export interface schema<S extends Schema.Top> extends Schema.decodeTo<S, Schema.instanceOf<Uint8Array<ArrayBuffer>>> {}
+export interface schema<S extends Schema.Constraint>
+  extends Schema.decodeTo<S, Schema.instanceOf<Uint8Array<ArrayBuffer>>>
+{}
 
 /**
- * @since 4.0.0
+ * Schema for decoding MessagePack bytes into values and encoding values back to
+ * MessagePack bytes.
+ *
+ * **Details**
+ *
+ * MessagePack codec failures are converted to `InvalidValue` schema issues.
+ *
  * @category schemas
+ * @since 4.0.0
  */
-export const transformation: Transformation.Transformation<
+export const transformation: SchemaTransformation.Transformation<
   unknown,
   Uint8Array<ArrayBuffer>
-> = Transformation.transformOrFail({
+> = SchemaTransformation.transformOrFail({
   decode(e, _options) {
     try {
       return Effect.succeed(Msgpackr.decode(e))
     } catch (cause) {
       return Effect.fail(
-        new Issue.InvalidValue(Option.some(e), {
+        new SchemaIssue.InvalidValue(Option.some(e), {
           message: Predicate.hasProperty(cause, "message") ? String(cause.message) : String(cause)
         })
       )
@@ -281,7 +360,7 @@ export const transformation: Transformation.Transformation<
       return Effect.succeed(Msgpackr.encode(t) as Uint8Array<ArrayBuffer>)
     } catch (cause) {
       return Effect.fail(
-        new Issue.InvalidValue(Option.some(t), {
+        new SchemaIssue.InvalidValue(Option.some(t), {
           message: Predicate.hasProperty(cause, "message") ? String(cause.message) : String(cause)
         })
       )
@@ -290,10 +369,17 @@ export const transformation: Transformation.Transformation<
 })
 
 /**
- * @since 4.0.0
+ * Builds a schema that stores values as MessagePack bytes.
+ *
+ * **Details**
+ *
+ * The resulting schema decodes `Uint8Array` payloads with MessagePack and the
+ * provided schema, and encodes values back to MessagePack bytes.
+ *
  * @category schemas
+ * @since 4.0.0
  */
-export const schema = <S extends Schema.Top>(schema: S): schema<S> =>
+export const schema = <S extends Schema.Constraint>(schema: S): schema<S> =>
   (Schema.Uint8Array as Schema.instanceOf<Uint8Array<ArrayBuffer>>).pipe(
     Schema.decodeTo(schema, transformation)
   )

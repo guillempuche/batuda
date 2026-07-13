@@ -1,4 +1,11 @@
 /**
+ * The `TestRunner` module assembles the smallest cluster runtime useful in
+ * tests: `Sharding` backed by in-memory message storage, in-memory runner
+ * storage, no-op runner transport, and always-healthy runner checks. It lets
+ * code that depends on cluster services exercise registration, shard
+ * coordination, and mailbox persistence without starting RPC servers or
+ * external databases.
+ *
  * @since 4.0.0
  */
 import * as Layer from "../../Layer.ts"
@@ -10,13 +17,14 @@ import * as Sharding from "./Sharding.ts"
 import * as ShardingConfig from "./ShardingConfig.ts"
 
 /**
- * An in-memory cluster that can be used for testing purposes.
+ * Layer that provides an in-memory cluster for testing.
  *
- * MessageStorage is backed by an in-memory driver, and RunnerStorage is backed
- * by an in-memory driver.
+ * **Details**
  *
+ * `MessageStorage` and `RunnerStorage` are backed by in-memory drivers.
+ *
+ * @category layers
  * @since 4.0.0
- * @category Layers
  */
 export const layer: Layer.Layer<
   Sharding.Sharding | Runners.Runners | MessageStorage.MessageStorage | MessageStorage.MemoryDriver

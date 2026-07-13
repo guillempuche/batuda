@@ -1,4 +1,11 @@
 /**
+ * Builds OTLP resource metadata shared by exported telemetry.
+ *
+ * An OTLP resource describes the service and other attributes attached to every
+ * exported log, metric, or trace. This module builds resources from explicit
+ * options or OpenTelemetry environment variables and converts JavaScript values
+ * into OTLP attribute values.
+ *
  * @since 4.0.0
  */
 import * as Config from "../../Config.ts"
@@ -7,8 +14,10 @@ import { format } from "../../Formatter.ts"
 import * as Schema from "../../Schema.ts"
 
 /**
+ * OTLP resource metadata attached to exported logs, metrics, and traces.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
 export interface Resource {
   /** Resource attributes */
@@ -18,8 +27,15 @@ export interface Resource {
 }
 
 /**
+ * Creates an OTLP resource from service metadata and additional attributes.
+ *
+ * **Details**
+ *
+ * The resource always includes `service.name`, includes `service.version` when
+ * provided, and converts custom attributes into OTLP attribute values.
+ *
+ * @category constructors
  * @since 4.0.0
- * @category Constructors
  */
 export const make = (options: {
   readonly serviceName: string
@@ -51,8 +67,17 @@ export const make = (options: {
 }
 
 /**
+ * Creates an OTLP resource from explicit options and OpenTelemetry
+ * configuration.
+ *
+ * **Details**
+ *
+ * `OTEL_RESOURCE_ATTRIBUTES`, `OTEL_SERVICE_NAME`, and
+ * `OTEL_SERVICE_VERSION` override explicit options; missing required
+ * configuration is converted to a defect.
+ *
+ * @category constructors
  * @since 4.0.0
- * @category Constructors
  */
 export const fromConfig: (
   options?: {
@@ -65,19 +90,30 @@ export const fromConfig: (
   readonly serviceVersion?: string | undefined
   readonly attributes?: Record<string, unknown> | undefined
 }) {
+  const env = yield* Config.schema(
+    Schema.UndefinedOr(Config.Record(Schema.String, Schema.String)),
+    "OTEL_RESOURCE_ATTRIBUTES"
+  )
+
+  const serviceName = (yield* Config.schema(Schema.UndefinedOr(Schema.String), "OTEL_SERVICE_NAME"))
+    ?? env?.["service.name"] as string | undefined
+    ?? options?.attributes?.["service.name"] as string | undefined
+    ?? options?.serviceName
+    ?? (yield* Config.string("OTEL_SERVICE_NAME"))
+
+  const serviceVersion = (yield* Config.schema(Schema.UndefinedOr(Schema.String), "OTEL_SERVICE_VERSION"))
+    ?? env?.["service.version"] as string | undefined
+    ?? options?.attributes?.["service.version"] as string | undefined
+    ?? options?.serviceVersion
+
   const attributes = {
-    ...yield* Config.schema(
-      Schema.UndefinedOr(Config.Record(Schema.String, Schema.String)),
-      "OTEL_RESOURCE_ATTRIBUTES"
-    ),
-    ...options?.attributes
+    ...options?.attributes,
+    ...env
   }
-  const serviceName = options?.serviceName ?? attributes["service.name"] as string ??
-    (yield* Config.schema(Schema.String, "OTEL_SERVICE_NAME"))
+
   delete attributes["service.name"]
-  const serviceVersion = options?.serviceVersion ?? attributes["service.version"] as string ??
-    (yield* Config.schema(Schema.UndefinedOr(Schema.String), "OTEL_SERVICE_VERSION"))
   delete attributes["service.version"]
+
   return make({
     serviceName,
     serviceVersion,
@@ -86,8 +122,19 @@ export const fromConfig: (
 }, Effect.orDie)
 
 /**
- * @since 4.0.0
+ * Returns the `service.name` attribute from an OTLP resource.
+ *
+ * **When to use**
+ *
+ * Use when an OTLP resource is known to contain a string `service.name` and
+ * throwing is acceptable if that invariant is broken.
+ *
+ * **Gotchas**
+ *
+ * Throws if the resource does not contain a string `service.name` attribute.
+ *
  * @category Attributes
+ * @since 4.0.0
  */
 export const serviceNameUnsafe = (resource: Resource): string => {
   const serviceNameAttribute = resource.attributes.find(
@@ -100,8 +147,10 @@ export const serviceNameUnsafe = (resource: Resource): string => {
 }
 
 /**
- * @since 4.0.0
+ * Converts key/value entries into OTLP `KeyValue` attributes.
+ *
  * @category Attributes
+ * @since 4.0.0
  */
 export const entriesToAttributes = (entries: Iterable<[string, unknown]>): Array<KeyValue> => {
   const attributes: Array<KeyValue> = []
@@ -115,8 +164,15 @@ export const entriesToAttributes = (entries: Iterable<[string, unknown]>): Array
 }
 
 /**
- * @since 4.0.0
+ * Converts an arbitrary JavaScript value into an OTLP `AnyValue`.
+ *
+ * **Details**
+ *
+ * Arrays are converted recursively, primitive values use their matching OTLP
+ * fields, and unsupported values are formatted as strings.
+ *
  * @category Attributes
+ * @since 4.0.0
  */
 export const unknownToAttributeValue = (value: unknown): AnyValue => {
   if (Array.isArray(value)) {
@@ -155,8 +211,10 @@ export const unknownToAttributeValue = (value: unknown): AnyValue => {
 }
 
 /**
+ * An OTLP attribute represented as a string key and typed value.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
 export interface KeyValue {
   /** KeyValue key */
@@ -166,8 +224,10 @@ export interface KeyValue {
 }
 
 /**
+ * OTLP `AnyValue` payload for scalar, array, key/value-list, or byte values.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
 export interface AnyValue {
   /** AnyValue stringValue */
@@ -187,8 +247,10 @@ export interface AnyValue {
 }
 
 /**
+ * OTLP array value containing nested `AnyValue` entries.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
 export interface ArrayValue {
   /** ArrayValue values */
@@ -196,8 +258,10 @@ export interface ArrayValue {
 }
 
 /**
+ * OTLP key/value-list value containing nested attributes.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
 export interface KeyValueList {
   /** KeyValueList values */
@@ -205,8 +269,10 @@ export interface KeyValueList {
 }
 
 /**
+ * Low and high 32-bit parts of a 64-bit integer value.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
 export interface LongBits {
   low: number
@@ -214,7 +280,9 @@ export interface LongBits {
 }
 
 /**
+ * Accepted runtime representations for an OTLP/protobuf fixed 64-bit value.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
 export type Fixed64 = LongBits | string | number

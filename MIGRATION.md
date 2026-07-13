@@ -60,16 +60,20 @@ minimal Effect program bundles to ~6.3 KB (minified + gzipped). With Schema,
 
 ## Migration Guides
 
+### Import and API Rename Maps
+
+- [v3 to v4 Import and API Rename Maps](./migration/v3-to-v4.md)
+
 ### Core
 
-- [Services: `Context.Tag` → `ServiceMap.Service`](./migration/services.md)
+- [Services: `Context.Tag` → `Context.Service`](./migration/services.md)
 - [Cause: Flattened Structure](./migration/cause.md)
 - [Error Handling: `catch*` Renamings](./migration/error-handling.md)
 - [Forking: Renamed Combinators and New Options](./migration/forking.md)
 - [Effect Subtyping → Yieldable](./migration/yieldable.md)
 - [Fiber Keep-Alive: Automatic Process Lifetime Management](./migration/fiber-keep-alive.md)
 - [Layer Memoization Across `Effect.provide` Calls](./migration/layer-memoization.md)
-- [FiberRef: `FiberRef` → `ServiceMap.Reference`](./migration/fiberref.md)
+- [FiberRef: `FiberRef` → `Context.Reference`](./migration/fiberref.md)
 - [Runtime: `Runtime<R>` Removed](./migration/runtime.md)
 - [Scope](./migration/scope.md)
 - [Equality](./migration/equality.md)

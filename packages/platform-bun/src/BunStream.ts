@@ -1,5 +1,13 @@
 /**
- * @since 1.0.0
+ * Bun stream interoperability for Effect streams.
+ *
+ * This module is the Bun entry point for adapting runtime streams into Effect's
+ * streaming model. It re-exports the shared Node stream adapters for Bun's
+ * Node-compatible stream APIs and adds {@link fromReadableStream}, a Web
+ * `ReadableStream` adapter that uses Bun's `readMany` reader method to pull
+ * batches of values into an Effect `Stream`.
+ *
+ * @since 4.0.0
  */
 import * as Arr from "effect/Array"
 import * as Cause from "effect/Cause"
@@ -11,15 +19,16 @@ import * as Scope from "effect/Scope"
 import * as Stream from "effect/Stream"
 
 /**
- * @since 1.0.0
+ * @since 4.0.0
  */
 export * from "@effect/platform-node-shared/NodeStream"
 
 /**
- * An optimized version of `Stream.fromReadableStream` that uses the Bun
- * .readMany API to read multiple values at once from a `ReadableStream`.
+ * Creates a stream from a `ReadableStream` using Bun's optimized `.readMany`
+ * API.
  *
- * @since 1.0.0
+ * @category constructors
+ * @since 4.0.0
  */
 export const fromReadableStream = <A, E>(
   options: {
@@ -34,26 +43,25 @@ export const fromReadableStream = <A, E>(
       scope,
       options.releaseLockOnEnd ? Effect.sync(() => reader.releaseLock()) : Effect.promise(() => reader.cancel())
     )
-    const readMany = Effect.callback<Bun.ReadableStreamDefaultReadManyResult<A>, E>((resume) => {
+    function readMany(): Pull.Pull<Arr.NonEmptyReadonlyArray<A>, E> {
       const result = reader.readMany()
       if ("then" in result) {
-        result.then((_) => resume(Effect.succeed(_)), (e) => resume(Effect.fail(options.onError(e))))
-      } else {
-        resume(Effect.succeed(result))
+        return Effect.callback<Arr.NonEmptyReadonlyArray<A>, E | Cause.Done>((resume) => {
+          result.then((_) => resume(handleResult(_)), (e) => resume(Effect.fail(options.onError(e))))
+        })
       }
-    })
+      return handleResult(result)
+    }
+    function handleResult(
+      result: Bun.ReadableStreamDefaultReadManyResult<A>
+    ): Pull.Pull<Arr.NonEmptyReadonlyArray<A>, E> {
+      if (result.done) {
+        return Cause.done()
+      } else if (!Arr.isReadonlyArrayNonEmpty(result.value)) {
+        return readMany()
+      }
+      return Effect.succeed(result.value)
+    }
     // @effect-diagnostics-next-line returnEffectInGen:off
-    return Effect.flatMap(
-      readMany,
-      function loop(
-        { done, value }
-      ): Pull.Pull<Arr.NonEmptyReadonlyArray<A>, E> {
-        if (done) {
-          return Cause.done()
-        } else if (!Arr.isReadonlyArrayNonEmpty(value)) {
-          return Effect.flatMap(readMany, loop)
-        }
-        return Effect.succeed(value)
-      }
-    )
+    return Effect.suspend(readMany)
   })))

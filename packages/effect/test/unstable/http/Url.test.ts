@@ -1,8 +1,15 @@
 import { describe, it } from "@effect/vitest"
-import { Cause, Redacted } from "effect"
+import { Cause, Redacted, Result } from "effect"
 
 import { Url, UrlParams } from "effect/unstable/http"
-import { assertFailure, assertSuccess, assertTrue, deepStrictEqual, strictEqual } from "../../utils/assert.ts"
+import {
+  assertFailure,
+  assertInstanceOf,
+  assertSuccess,
+  assertTrue,
+  deepStrictEqual,
+  strictEqual
+} from "../../utils/assert.ts"
 
 describe("Url", () => {
   const testURL = new URL("https://example.com/test")
@@ -13,13 +20,33 @@ describe("Url", () => {
     strictEqual(updatedUrl.toString(), expected)
   }
 
+  describe("make", () => {
+    it("appends query parameters and hash", () => {
+      assertSuccess(
+        Url.make(
+          "https://example.com/test?existing=true",
+          UrlParams.fromInput([["foo", "bar"], ["foo", "baz"]]),
+          "section"
+        ),
+        new URL("https://example.com/test?existing=true&foo=bar&foo=baz#section")
+      )
+    })
+
+    it("fails when the URL cannot be constructed", () => {
+      const result = Url.make("http://%", UrlParams.empty, undefined)
+
+      assertTrue(Result.isFailure(result))
+      assertInstanceOf(result.failure, Url.UrlError)
+    })
+  })
+
   describe("fromString", () => {
-    it("success", () => {
+    it("parses absolute URLs", () => {
       const url = Url.fromString(testURL.toString())
       assertSuccess(url, testURL)
     })
 
-    it("failure", () => {
+    it("resolves relative URLs against a base URL", () => {
       const error = Url.fromString("??")
       assertFailure(error, new Cause.IllegalArgumentError("Invalid URL: \"??\""))
     })

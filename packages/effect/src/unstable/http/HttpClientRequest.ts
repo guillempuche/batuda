@@ -1,6 +1,15 @@
 /**
+ * Describes immutable outgoing HTTP client requests.
+ *
+ * `HttpClientRequest` is the request model shared by Effect HTTP clients and
+ * platform adapters. A request stores its method, URL, query parameters, hash,
+ * headers, and body as structured data. This module includes constructors,
+ * helpers for updating requests, body encoders for common payloads, and
+ * conversions to and from Web `Request` values.
+ *
  * @since 4.0.0
  */
+import * as Context from "../../Context.ts"
 import * as Effect from "../../Effect.ts"
 import type * as FileSystem from "../../FileSystem.ts"
 import { dual } from "../../Function.ts"
@@ -15,24 +24,28 @@ import type * as Redacted from "../../Redacted.ts"
 import * as Result from "../../Result.ts"
 import type * as Schema from "../../Schema.ts"
 import type { ParseOptions } from "../../SchemaAST.ts"
-import * as ServiceMap from "../../ServiceMap.ts"
 import * as Stream from "../../Stream.ts"
 import * as Headers from "./Headers.ts"
 import * as HttpBody from "./HttpBody.ts"
 import { hasBody, type HttpMethod } from "./HttpMethod.ts"
+import * as Url from "./Url.ts"
 import * as UrlParams from "./UrlParams.ts"
 
 const TypeId = "~effect/http/HttpClientRequest"
 
 /**
+ * Returns `true` when a value is an `HttpClientRequest`.
+ *
+ * @category guards
  * @since 4.0.0
- * @category Guards
  */
 export const isHttpClientRequest = (u: unknown): u is HttpClientRequest => hasProperty(u, TypeId)
 
 /**
- * @since 4.0.0
+ * Immutable model of an outgoing HTTP client request, including its method, URL components, headers, and body.
+ *
  * @category models
+ * @since 4.0.0
  */
 export interface HttpClientRequest extends Inspectable.Inspectable, Pipeable {
   readonly [TypeId]: typeof TypeId
@@ -45,8 +58,10 @@ export interface HttpClientRequest extends Inspectable.Inspectable, Pipeable {
 }
 
 /**
+ * Options for constructing or modifying an `HttpClientRequest`.
+ *
+ * @category options
  * @since 4.0.0
- * @category models
  */
 export interface Options {
   readonly method?: HttpMethod | undefined
@@ -60,12 +75,16 @@ export interface Options {
 }
 
 /**
+ * Namespace containing option types associated with `HttpClientRequest` construction.
+ *
  * @since 4.0.0
  */
 export declare namespace Options {
   /**
+   * Request options that omit the method and URL for helpers that already receive those values separately.
+   *
+   * @category options
    * @since 4.0.0
-   * @category models
    */
   export interface NoUrl extends Omit<Options, "method" | "url"> {}
 }
@@ -90,13 +109,15 @@ const Proto = {
 }
 
 /**
- * @since 4.0.0
+ * Constructs an `HttpClientRequest` from fully normalized request components.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export function makeWith(
   method: HttpMethod,
   url: string,
-  urlParams: UrlParams.UrlParams,
+  urlParams: UrlParams.Input,
   hash: Option.Option<string>,
   headers: Headers.Headers,
   body: HttpBody.HttpBody
@@ -112,8 +133,10 @@ export function makeWith(
 }
 
 /**
- * @since 4.0.0
+ * An empty `GET` request with no URL, query parameters, hash, headers, or body.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const empty: HttpClientRequest = makeWith(
   "GET",
@@ -125,8 +148,10 @@ export const empty: HttpClientRequest = makeWith(
 )
 
 /**
- * @since 4.0.0
+ * Creates a request constructor for the specified HTTP method.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const make = <M extends HttpMethod>(
   method: M
@@ -142,26 +167,34 @@ export const make = <M extends HttpMethod>(
   })
 
 /**
- * @since 4.0.0
+ * Creates a `GET` request for the specified URL.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const get: (url: string | URL, options?: Options.NoUrl) => HttpClientRequest = make("GET")
 
 /**
- * @since 4.0.0
+ * Creates a `POST` request for the specified URL.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const post: (url: string | URL, options?: Options.NoUrl) => HttpClientRequest = make("POST")
 
 /**
- * @since 4.0.0
+ * Creates a `PATCH` request for the specified URL.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const patch: (url: string | URL, options?: Options.NoUrl) => HttpClientRequest = make("PATCH")
 
 /**
- * @since 4.0.0
+ * Creates a `PUT` request for the specified URL.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const put: (url: string | URL, options?: Options.NoUrl) => HttpClientRequest = make("PUT")
 
@@ -169,33 +202,43 @@ const del: (url: string | URL, options?: Options.NoUrl) => HttpClientRequest = m
 
 export {
   /**
-   * @since 4.0.0
+   * Creates a `DELETE` request for the specified URL.
+   *
    * @category constructors
+   * @since 4.0.0
    */
   del as delete
 }
 
 /**
- * @since 4.0.0
+ * Creates a `HEAD` request for the specified URL.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const head: (url: string | URL, options?: Options.NoUrl) => HttpClientRequest = make("HEAD")
 
 /**
- * @since 4.0.0
+ * Creates an `OPTIONS` request for the specified URL.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const options: (url: string | URL, options?: Options.NoUrl) => HttpClientRequest = make("OPTIONS")
 
 /**
- * @since 4.0.0
+ * Creates a `TRACE` request for the specified URL.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const trace: (url: string | URL, options?: Options.NoUrl) => HttpClientRequest = make("TRACE")
 
 /**
- * @since 4.0.0
+ * Applies request options to an `HttpClientRequest`, returning a new request.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const modify: {
   (options: Options): (self: HttpClientRequest) => HttpClientRequest
@@ -232,8 +275,10 @@ export const modify: {
 })
 
 /**
- * @since 4.0.0
+ * Sets the HTTP method on a request, returning a new request.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const setMethod: {
   (method: HttpMethod): (self: HttpClientRequest) => HttpClientRequest
@@ -245,8 +290,10 @@ export const setMethod: {
 )
 
 /**
- * @since 4.0.0
+ * Sets a single request header, replacing any existing value for that header.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const setHeader: {
   (key: string, value: string): (self: HttpClientRequest) => HttpClientRequest
@@ -262,8 +309,10 @@ export const setHeader: {
   ))
 
 /**
- * @since 4.0.0
+ * Sets multiple request headers from an input collection, replacing existing values with matching names.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const setHeaders: {
   (input: Headers.Input): (self: HttpClientRequest) => HttpClientRequest
@@ -279,8 +328,10 @@ export const setHeaders: {
   ))
 
 /**
- * @since 4.0.0
+ * Sets the `Authorization` header using HTTP Basic authentication credentials.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const basicAuth: {
   (
@@ -303,8 +354,10 @@ export const basicAuth: {
 )
 
 /**
- * @since 4.0.0
+ * Sets the `Authorization` header using a bearer token.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const bearerToken: {
   (token: string | Redacted.Redacted): (self: HttpClientRequest) => HttpClientRequest
@@ -316,8 +369,10 @@ export const bearerToken: {
 )
 
 /**
- * @since 4.0.0
+ * Sets the `Accept` header to the specified media type.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const accept: {
   (mediaType: string): (self: HttpClientRequest) => HttpClientRequest
@@ -325,14 +380,18 @@ export const accept: {
 } = dual(2, (self: HttpClientRequest, mediaType: string): HttpClientRequest => setHeader(self, "Accept", mediaType))
 
 /**
- * @since 4.0.0
+ * Sets the `Accept` header to `application/json`.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const acceptJson: (self: HttpClientRequest) => HttpClientRequest = accept("application/json")
 
 /**
- * @since 4.0.0
+ * Sets the request URL. When given a `URL`, its search parameters and hash are extracted into the request's structured fields.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const setUrl: {
   (url: string | URL): (self: HttpClientRequest) => HttpClientRequest
@@ -364,8 +423,10 @@ export const setUrl: {
 })
 
 /**
- * @since 4.0.0
+ * Prepends a URL segment to the request URL, inserting or trimming one slash as needed.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const prependUrl: {
   (path: string): (self: HttpClientRequest) => HttpClientRequest
@@ -383,8 +444,10 @@ export const prependUrl: {
 })
 
 /**
- * @since 4.0.0
+ * Appends a URL segment to the request URL, inserting or trimming one slash as needed.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const appendUrl: {
   (path: string): (self: HttpClientRequest) => HttpClientRequest
@@ -414,8 +477,10 @@ const joinSegments = (first: string, second: string): string => {
 }
 
 /**
- * @since 4.0.0
+ * Updates the request URL by applying a function to the current URL string.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const updateUrl: {
   (f: (url: string) => string): (self: HttpClientRequest) => HttpClientRequest
@@ -431,8 +496,10 @@ export const updateUrl: {
   ))
 
 /**
- * @since 4.0.0
+ * Sets one query parameter, replacing existing values for that parameter name.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const setUrlParam: {
   (key: string, value: string): (self: HttpClientRequest) => HttpClientRequest
@@ -448,8 +515,10 @@ export const setUrlParam: {
   ))
 
 /**
- * @since 4.0.0
+ * Sets query parameters from an input collection, replacing existing values for matching names.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const setUrlParams: {
   (input: UrlParams.Input): (self: HttpClientRequest) => HttpClientRequest
@@ -465,8 +534,10 @@ export const setUrlParams: {
   ))
 
 /**
- * @since 4.0.0
+ * Appends one query parameter value without removing existing values for the same name.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const appendUrlParam: {
   (key: string, value: string): (self: HttpClientRequest) => HttpClientRequest
@@ -482,8 +553,10 @@ export const appendUrlParam: {
   ))
 
 /**
- * @since 4.0.0
+ * Appends query parameters from an input collection without removing existing values for matching names.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const appendUrlParams: {
   (input: UrlParams.Input): (self: HttpClientRequest) => HttpClientRequest
@@ -499,8 +572,10 @@ export const appendUrlParams: {
   ))
 
 /**
- * @since 4.0.0
+ * Sets the URL fragment on a request without the leading `#`.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const setHash: {
   (hash: string): (self: HttpClientRequest) => HttpClientRequest
@@ -516,8 +591,10 @@ export const setHash: {
   ))
 
 /**
- * @since 4.0.0
+ * Removes the URL fragment from a request.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const removeHash = (self: HttpClientRequest): HttpClientRequest =>
   makeWith(
@@ -530,8 +607,10 @@ export const removeHash = (self: HttpClientRequest): HttpClientRequest =>
   )
 
 /**
- * @since 4.0.0
+ * Sets the request body and updates `Content-Type` and `Content-Length` headers from the body metadata when available.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const setBody: {
   (body: HttpBody.HttpBody): (self: HttpClientRequest) => HttpClientRequest
@@ -559,8 +638,10 @@ export const setBody: {
 })
 
 /**
- * @since 4.0.0
+ * Sets a `Uint8Array` request body with an optional content type.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const bodyUint8Array: {
   (body: Uint8Array, contentType?: string): (self: HttpClientRequest) => HttpClientRequest
@@ -572,8 +653,10 @@ export const bodyUint8Array: {
 )
 
 /**
- * @since 4.0.0
+ * Sets a text request body with an optional content type.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const bodyText: {
   (body: string, contentType?: string): (self: HttpClientRequest) => HttpClientRequest
@@ -585,8 +668,10 @@ export const bodyText: {
 )
 
 /**
- * @since 4.0.0
+ * Encodes a value as a JSON request body and sets it on the request, failing with `HttpBodyError` if encoding fails.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const bodyJson: {
   (body: unknown): (self: HttpClientRequest) => Effect.Effect<HttpClientRequest, HttpBody.HttpBodyError>
@@ -598,8 +683,19 @@ export const bodyJson: {
 )
 
 /**
- * @since 4.0.0
+ * Sets a JSON request body using unsafe JSON encoding.
+ *
+ * **When to use**
+ *
+ * Use when the request body is known to be JSON-serializable and a synchronous
+ * `HttpClientRequest` result is needed.
+ *
+ * **Gotchas**
+ *
+ * JSON encoding may throw instead of failing in the Effect error channel.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const bodyJsonUnsafe: {
   (body: unknown): (self: HttpClientRequest) => HttpClientRequest
@@ -607,10 +703,12 @@ export const bodyJsonUnsafe: {
 } = dual(2, (self: HttpClientRequest, body: unknown): HttpClientRequest => setBody(self, HttpBody.jsonUnsafe(body)))
 
 /**
- * @since 4.0.0
+ * Creates a schema-based JSON body encoder that sets the encoded value on a request.
+ *
  * @category combinators
+ * @since 4.0.0
  */
-export const schemaBodyJson = <S extends Schema.Top>(
+export const schemaBodyJson = <S extends Schema.Constraint>(
   schema: S,
   options?: ParseOptions | undefined
 ): {
@@ -636,8 +734,10 @@ export const schemaBodyJson = <S extends Schema.Top>(
 }
 
 /**
- * @since 4.0.0
+ * Sets an `application/x-www-form-urlencoded` request body from URL parameter input.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const bodyUrlParams: {
   (input: UrlParams.Input): (self: HttpClientRequest) => HttpClientRequest
@@ -649,8 +749,10 @@ export const bodyUrlParams: {
 )
 
 /**
- * @since 4.0.0
+ * Sets a `FormData` request body.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const bodyFormData: {
   (body: FormData): (self: HttpClientRequest) => HttpClientRequest
@@ -658,8 +760,10 @@ export const bodyFormData: {
 } = dual(2, (self: HttpClientRequest, body: FormData): HttpClientRequest => setBody(self, HttpBody.formData(body)))
 
 /**
- * @since 4.0.0
+ * Creates a `FormData` request body from record-style entries and sets it on the request.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const bodyFormDataRecord: {
   (entries: HttpBody.FormDataInput): (self: HttpClientRequest) => HttpClientRequest
@@ -671,8 +775,10 @@ export const bodyFormDataRecord: {
 )
 
 /**
- * @since 4.0.0
+ * Sets a streaming `Uint8Array` request body with optional content type and content length metadata.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const bodyStream: {
   (
@@ -698,8 +804,10 @@ export const bodyStream: {
 )
 
 /**
- * @since 4.0.0
+ * Creates a file-backed request body from a filesystem path and sets it on the request.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const bodyFile: {
   (
@@ -740,11 +848,13 @@ export const bodyFile: {
 )
 
 /**
- * @since 4.0.0
+ * Builds a `URL` from the request URL, query parameters, and hash, returning `Option.none()` if the URL is invalid.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export function toUrl(self: HttpClientRequest): Option.Option<URL> {
-  const r = UrlParams.makeUrl(self.url, self.urlParams, Option.getOrUndefined(self.hash))
+  const r = Url.make(self.url, self.urlParams, Option.getOrUndefined(self.hash))
   if (Result.isSuccess(r)) {
     return Option.some(r.success)
   }
@@ -752,8 +862,10 @@ export function toUrl(self: HttpClientRequest): Option.Option<URL> {
 }
 
 /**
+ * Converts a Web `Request` into an `HttpClientRequest`, preserving method, URL, headers, and supported request bodies.
+ *
+ * @category converting
  * @since 4.0.0
- * @category conversions
  */
 export const fromWeb = (request: globalThis.Request): HttpClientRequest => {
   const method = request.method.toUpperCase() as HttpMethod
@@ -784,14 +896,16 @@ const parseContentLength = (contentLength: string | null): number | undefined =>
 }
 
 /**
+ * Converts an `HttpClientRequest` safely to a Web `Request` as a `Result`, failing when the request URL is invalid.
+ *
+ * @category converting
  * @since 4.0.0
- * @category conversions
  */
 export const toWebResult = (self: HttpClientRequest, options?: {
   readonly signal?: AbortSignal | undefined
-  readonly services?: ServiceMap.ServiceMap<never> | undefined
-}): Result.Result<Request, UrlParams.UrlParamsError> => {
-  const url = UrlParams.makeUrl(self.url, self.urlParams, Option.getOrUndefined(self.hash))
+  readonly context?: Context.Context<never> | undefined
+}): Result.Result<Request, Url.UrlError> => {
+  const url = Url.make(self.url, self.urlParams, Option.getOrUndefined(self.hash))
   if (Result.isFailure(url)) {
     return Result.fail(url.failure)
   }
@@ -823,7 +937,7 @@ export const toWebResult = (self: HttpClientRequest, options?: {
         break
       }
       case "Stream": {
-        requestInit.body = Stream.toReadableStreamWith(self.body.stream, options?.services ?? ServiceMap.empty())
+        requestInit.body = Stream.toReadableStreamWith(self.body.stream, options?.context ?? Context.empty())
         ;(requestInit as any).duplex = "half"
         break
       }
@@ -831,7 +945,7 @@ export const toWebResult = (self: HttpClientRequest, options?: {
   }
   return Result.try({
     try: () => new Request(url.success, requestInit),
-    catch: (cause) => new UrlParams.UrlParamsError({ cause })
+    catch: (cause) => new Url.UrlError({ cause })
   })
 }
 
@@ -839,15 +953,17 @@ const isReadableStream = (u: unknown): u is ReadableStream<Uint8Array> =>
   typeof ReadableStream !== "undefined" && u instanceof ReadableStream
 
 /**
+ * Converts an `HttpClientRequest` to a Web `Request`, failing with `UrlError` when the request URL is invalid.
+ *
+ * @category converting
  * @since 4.0.0
- * @category conversions
  */
 export const toWeb = (self: HttpClientRequest, options?: {
   readonly signal?: AbortSignal | undefined
-}): Effect.Effect<Request, UrlParams.UrlParamsError> =>
-  Effect.servicesWith((services) =>
-    toWebResult(self, {
-      services,
+}): Effect.Effect<Request, Url.UrlError> =>
+  Effect.contextWith((context) =>
+    Effect.fromResult(toWebResult(self, {
+      context: context,
       signal: options?.signal
-    }).asEffect()
+    }))
   )

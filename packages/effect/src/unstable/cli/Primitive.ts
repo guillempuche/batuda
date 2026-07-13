@@ -1,13 +1,12 @@
 /**
- * Primitive types for CLI parameter parsing.
+ * Parses raw command-line strings into typed values.
  *
- * Primitives handle the low-level parsing of string input into typed values.
- * Most users should use the higher-level `Argument` and `Flag` modules instead.
- *
- * This module is primarily useful for:
- * - Creating custom primitive types
- * - Understanding how CLI parsing works internally
- * - Advanced customization of parsing behavior
+ * A `Primitive<A>` receives one string and returns an `Effect` that either
+ * produces an `A` or fails with a parser message. `Argument` and `Flag` build
+ * on these primitives to add names, aliases, defaults, prompts, configuration
+ * fallbacks, repetition, and help metadata. Primitive parsers cover common
+ * scalar values, paths, files, structured config files, schema-decoded input,
+ * redacted values, and key-value pairs.
  *
  * @since 4.0.0
  */
@@ -25,13 +24,15 @@ import * as Schema from "../../Schema.ts"
 import type { Formatter } from "../../SchemaIssue.ts"
 import type * as Struct from "../../Struct.ts"
 import type { Covariant } from "../../Types.ts"
+import type { Environment } from "./Command.ts"
 
 const TypeId = "~effect/cli/Primitive"
 
 /**
  * Represents a primitive type that can parse string input into a typed value.
  *
- * @example
+ * **Example** (Parsing values with primitives)
+ *
  * ```ts
  * import { Effect } from "effect"
  * import { Primitive } from "effect/unstable/cli"
@@ -53,21 +54,25 @@ const TypeId = "~effect/cli/Primitive"
  * })
  * ```
  *
- * @since 4.0.0
  * @category models
+ * @since 4.0.0
  */
 export interface Primitive<out A> extends Primitive.Variance<A> {
   readonly _tag: string
-  readonly parse: (value: string) => Effect.Effect<A, string, FileSystem.FileSystem | Path.Path>
+  readonly parse: (value: string) => Effect.Effect<A, string, Environment>
 }
 
 /**
+ * Namespace containing type-level helpers for `Primitive`.
+ *
  * @since 4.0.0
  */
 export declare namespace Primitive {
   /**
-   * @since 4.0.0
+   * Type-level variance marker for the value parsed by a `Primitive`.
+   *
    * @category models
+   * @since 4.0.0
    */
   export interface Variance<out A> {
     readonly [TypeId]: {
@@ -93,18 +98,16 @@ export const isBoolean = (p: Primitive<unknown>): p is Primitive<boolean> => p._
 
 const makePrimitive = <A>(
   tag: string,
-  parse: (
-    value: string
-  ) => Effect.Effect<A, string, FileSystem.FileSystem | Path.Path>
+  parse: (value: string) => Effect.Effect<A, string, Environment>
 ): Primitive<A> =>
   Object.assign(Object.create(Proto), {
     _tag: tag,
     parse
   })
 
-const makeSchemaPrimitive = <T, E>(
+const makeSchemaPrimitive = <T>(
   tag: string,
-  schema: Schema.Codec<T, E>
+  schema: Schema.ConstraintDecoder<T, Environment>
 ): Primitive<T> => {
   const toCodecStringTree = Schema.toCodecStringTree(schema)
   const decode = Schema.decodeUnknownEffect(toCodecStringTree)
@@ -114,11 +117,14 @@ const makeSchemaPrimitive = <T, E>(
 /**
  * Creates a primitive that parses boolean values from string input.
  *
+ * **Details**
+ *
  * Recognizes various forms of true/false values:
  * - True values: "true", "1", "y", "yes", "on"
  * - False values: "false", "0", "n", "no", "off"
  *
- * @example
+ * **Example** (Parsing boolean values)
+ *
  * ```ts
  * import { Effect } from "effect"
  * import { Primitive } from "effect/unstable/cli"
@@ -138,8 +144,8 @@ const makeSchemaPrimitive = <T, E>(
  * })
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const boolean: Primitive<boolean> = makeSchemaPrimitive(
   "Boolean",
@@ -149,7 +155,8 @@ export const boolean: Primitive<boolean> = makeSchemaPrimitive(
 /**
  * Creates a primitive that parses floating-point numbers from string input.
  *
- * @example
+ * **Example** (Parsing floating-point numbers)
+ *
  * ```ts
  * import { Effect } from "effect"
  * import { Primitive } from "effect/unstable/cli"
@@ -166,8 +173,8 @@ export const boolean: Primitive<boolean> = makeSchemaPrimitive(
  * })
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const float: Primitive<number> = makeSchemaPrimitive(
   "Float",
@@ -177,7 +184,8 @@ export const float: Primitive<number> = makeSchemaPrimitive(
 /**
  * Creates a primitive that parses integer numbers from string input.
  *
- * @example
+ * **Example** (Parsing integer values)
+ *
  * ```ts
  * import { Effect } from "effect"
  * import { Primitive } from "effect/unstable/cli"
@@ -194,8 +202,8 @@ export const float: Primitive<number> = makeSchemaPrimitive(
  * })
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const integer: Primitive<number> = makeSchemaPrimitive(
   "Integer",
@@ -205,7 +213,8 @@ export const integer: Primitive<number> = makeSchemaPrimitive(
 /**
  * Creates a primitive that parses Date objects from string input.
  *
- * @example
+ * **Example** (Parsing date values)
+ *
  * ```ts
  * import { Effect } from "effect"
  * import { Primitive } from "effect/unstable/cli"
@@ -222,8 +231,8 @@ export const integer: Primitive<number> = makeSchemaPrimitive(
  * })
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const date: Primitive<Date> = makeSchemaPrimitive(
   "Date",
@@ -233,7 +242,8 @@ export const date: Primitive<Date> = makeSchemaPrimitive(
 /**
  * Creates a primitive that accepts any string value without validation.
  *
- * @example
+ * **Example** (Parsing string values)
+ *
  * ```ts
  * import { Effect } from "effect"
  * import { Primitive } from "effect/unstable/cli"
@@ -250,15 +260,16 @@ export const date: Primitive<Date> = makeSchemaPrimitive(
  * })
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const string: Primitive<string> = makePrimitive("String", (value) => Effect.succeed(value))
 
 /**
  * Creates a primitive that accepts only specific choice values mapped to custom types.
  *
- * @example
+ * **Example** (Parsing choices)
+ *
  * ```ts
  * import { Effect } from "effect"
  * import { Primitive } from "effect/unstable/cli"
@@ -281,8 +292,8 @@ export const string: Primitive<string> = makePrimitive("String", (value) => Effe
  * })
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const choice = <A>(
   choices: ReadonlyArray<readonly [string, A]>
@@ -301,7 +312,8 @@ export const choice = <A>(
 /**
  * Specifies the type of path validation to perform.
  *
- * @example
+ * **Example** (Choosing path validation)
+ *
  * ```ts
  * import { Primitive } from "effect/unstable/cli"
  *
@@ -315,15 +327,16 @@ export const choice = <A>(
  * const anyPath = Primitive.path("either", false)
  * ```
  *
- * @since 4.0.0
  * @category models
+ * @since 4.0.0
  */
 export type PathType = "file" | "directory" | "either"
 
 /**
  * Creates a primitive that validates and resolves file system paths.
  *
- * @example
+ * **Example** (Parsing file system paths)
+ *
  * ```ts
  * import { Effect } from "effect"
  * import { Primitive } from "effect/unstable/cli"
@@ -346,8 +359,8 @@ export type PathType = "file" | "directory" | "either"
  * })
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const path = (
   pathType: PathType,
@@ -393,9 +406,15 @@ export const path = (
   )
 
 /**
- * Creates a primitive that wraps string input in a redacted type for secure handling.
+ * Creates a primitive that wraps string input in `Redacted`.
  *
- * @example
+ * **Details**
+ *
+ * The wrapped value is hidden when formatted or inspected, while the original
+ * string remains available through the `Redacted` API when explicitly needed.
+ *
+ * **Example** (Parsing redacted values)
+ *
  * ```ts
  * import { Effect, Redacted } from "effect"
  * import { Primitive } from "effect/unstable/cli"
@@ -407,8 +426,8 @@ export const path = (
  * })
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const redacted: Primitive<Redacted.Redacted<string>> = makePrimitive(
   "Redacted",
@@ -418,22 +437,33 @@ export const redacted: Primitive<Redacted.Redacted<string>> = makePrimitive(
 /**
  * Creates a primitive that reads and returns the contents of a file as a string.
  *
- * @example
+ * **Example** (Reading file text)
+ *
  * ```ts
- * import { Effect } from "effect"
+ * import { Effect, Schema } from "effect"
  * import { Primitive } from "effect/unstable/cli"
+ *
+ * const ConfigSchema = Schema.Struct({
+ *   name: Schema.String,
+ *   version: Schema.String,
+ *   port: Schema.Number
+ * })
+ * const decodeConfig = Schema.decodeUnknownEffect(
+ *   Schema.fromJsonString(ConfigSchema)
+ * )
  *
  * const readConfigFile = Effect.gen(function*() {
  *   const content = yield* Primitive.fileText.parse("./config.json")
- *   console.log(content) // File contents as string
+ *   console.log(content) // {"name":"my-app","version":"1.0.0","port":3000}
  *
- *   const parsed = JSON.parse(content)
- *   return parsed
+ *   const config = yield* decodeConfig(content)
+ *   console.log(config) // { name: "my-app", version: "1.0.0", port: 3000 }
+ *   return config
  * })
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const fileText: Primitive<string> = makePrimitive(
   "FileText",
@@ -480,8 +510,8 @@ export const fileText: Primitive<string> = makePrimitive(
  * Represents options which can be provided to methods that deal with parsing
  * file content.
  *
+ * @category options
  * @since 4.0.0
- * @category models
  */
 export type FileParseOptions = {
   readonly format?: "ini" | "json" | "toml" | "yaml"
@@ -496,9 +526,16 @@ const fileParsers: Record<string, (content: string) => unknown> = {
 }
 
 /**
- * Reads and parses file content using the specified schema.
+ * Creates a primitive that reads a file and parses its content as structured
+ * data.
  *
- * @example
+ * **Details**
+ *
+ * The parser is selected from `options.format` when provided, otherwise from
+ * the file extension. Supported formats include INI, JSON, TOML, YAML, and YML.
+ *
+ * **Example** (Parsing file content)
+ *
  * ```ts
  * import { Effect } from "effect"
  * import { Primitive } from "effect/unstable/cli"
@@ -512,8 +549,8 @@ const fileParsers: Record<string, (content: string) => unknown> = {
  * })
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const fileParse = (options?: FileParseOptions): Primitive<unknown> => {
   return makePrimitive(
@@ -537,8 +574,8 @@ export const fileParse = (options?: FileParseOptions): Primitive<unknown> => {
  * Represents options which can be provided to methods that deal with parsing
  * file content and decoding the file content with a `Schema`.
  *
+ * @category options
  * @since 4.0.0
- * @category models
  */
 export type FileSchemaOptions = Struct.Simplify<
   FileParseOptions & {
@@ -549,7 +586,8 @@ export type FileSchemaOptions = Struct.Simplify<
 /**
  * Reads and parses file content using the specified schema.
  *
- * @example
+ * **Example** (Parsing file content with a schema)
+ *
  * ```ts
  * import { Effect, Schema } from "effect"
  * import { Primitive } from "effect/unstable/cli"
@@ -558,7 +596,7 @@ export type FileSchemaOptions = Struct.Simplify<
  *   name: Schema.String,
  *   version: Schema.String,
  *   port: Schema.Number
- * }).pipe(Schema.fromJsonString)
+ * })
  *
  * const jsonConfigPrimitive = Primitive.fileSchema(ConfigSchema, {
  *   format: "json"
@@ -571,11 +609,11 @@ export type FileSchemaOptions = Struct.Simplify<
  * })
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const fileSchema = <A>(
-  schema: Schema.Decoder<A>,
+  schema: Schema.ConstraintDecoder<A, Environment>,
   options?: FileSchemaOptions | undefined
 ): Primitive<A> => {
   const decode = Schema.decodeUnknownEffect(schema)
@@ -594,7 +632,8 @@ export const fileSchema = <A>(
 /**
  * Parses a single `key=value` pair into a record object.
  *
- * @example
+ * **Example** (Parsing key-value pairs)
+ *
  * ```ts
  * import { Effect } from "effect"
  * import { Primitive } from "effect/unstable/cli"
@@ -611,8 +650,8 @@ export const fileSchema = <A>(
  * })
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const keyValuePair: Primitive<Record<string, string>> = makePrimitive(
   "KeyValuePair",
@@ -634,11 +673,14 @@ export const keyValuePair: Primitive<Record<string, string>> = makePrimitive(
 )
 
 /**
- * A sentinel primitive that always fails to parse a value.
+ * Creates a sentinel primitive that always fails to parse a value.
  *
- * Used for flags that don't accept values.
+ * **When to use**
  *
- * @example
+ * Use when you need a CLI primitive for flags that do not accept values.
+ *
+ * **Example** (Rejecting option values)
+ *
  * ```ts
  * import { Effect } from "effect"
  * import { Primitive } from "effect/unstable/cli"
@@ -651,17 +693,21 @@ export const keyValuePair: Primitive<Record<string, string>> = makePrimitive(
  * // The above effect will fail with "This option does not accept values"
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const none: Primitive<never> = makePrimitive("None", () => Effect.fail("This option does not accept values"))
 
 /**
  * Gets a human-readable type name for a primitive.
  *
- * Used for generating help documentation.
+ * **When to use**
  *
- * @example
+ * Use when you need the display type name for a `Primitive`, such as when
+ * generating CLI help documentation.
+ *
+ * **Example** (Getting primitive type names)
+ *
  * ```ts
  * import { Primitive } from "effect/unstable/cli"
  *
@@ -678,8 +724,8 @@ export const none: Primitive<never> = makePrimitive("None", () => Effect.fail("T
  * console.log(Primitive.getTypeName(logLevelChoice)) // "choice"
  * ```
  *
+ * @category getters
  * @since 4.0.0
- * @category utilities
  */
 export const getTypeName = <A>(primitive: Primitive<A>): string => {
   switch (primitive._tag) {

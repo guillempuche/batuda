@@ -1,6 +1,16 @@
 /**
+ * Provides effectful key/value storage for persistence backends.
+ *
+ * `KeyValueStore` is a service for storing string or binary values by key. It
+ * is useful for lightweight durable state, browser storage, local files, SQL
+ * tables, tests, and as a storage building block for higher-level persistence
+ * APIs. This module includes store operations, prefixed views, schema-aware JSON
+ * storage, error values, and layers for memory, filesystem, Web Storage, and
+ * SQL-backed stores.
+ *
  * @since 4.0.0
  */
+import * as Context from "../../Context.ts"
 import * as Data from "../../Data.ts"
 import * as Effect from "../../Effect.ts"
 import * as Encoding from "../../Encoding.ts"
@@ -13,14 +23,17 @@ import type { PlatformError } from "../../PlatformError.ts"
 import * as Predicate from "../../Predicate.ts"
 import * as Result from "../../Result.ts"
 import * as Schema from "../../Schema.ts"
-import * as ServiceMap from "../../ServiceMap.ts"
 import * as UndefinedOr from "../../UndefinedOr.ts"
+import * as SqlClient from "../sql/SqlClient.ts"
+import type { SqlError } from "../sql/SqlError.ts"
 
 const TypeId = "~effect/persistence/KeyValueStore" as const
 
 /**
+ * Effectful key/value store service for string and binary values.
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
  */
 export interface KeyValueStore {
   readonly [TypeId]: typeof TypeId
@@ -76,14 +89,21 @@ export interface KeyValueStore {
   readonly has: (key: string) => Effect.Effect<boolean, KeyValueStoreError>
 
   /**
-   * Checks if the KeyValueStore contains any entries.
+   * Checks whether the KeyValueStore contains any entries.
    */
   readonly isEmpty: Effect.Effect<boolean, KeyValueStoreError>
 }
 
 /**
+ * Implementation callbacks used by `make` to construct a `KeyValueStore`.
+ *
+ * **Details**
+ *
+ * Primitive operations are required, while helpers such as `has`, `isEmpty`,
+ * and `modify` can be supplied to override the defaults.
+ *
+ * @category options
  * @since 4.0.0
- * @category Models
  */
 export type MakeOptions = Partial<KeyValueStore> & {
   /**
@@ -118,8 +138,11 @@ export type MakeOptions = Partial<KeyValueStore> & {
 }
 
 /**
+ * Implementation callbacks for adapting a string-only backing store into a
+ * `KeyValueStore`.
+ *
+ * @category options
  * @since 4.0.0
- * @category Models
  */
 export type MakeStringOptions = Partial<Omit<KeyValueStore, "set">> & {
   /**
@@ -151,8 +174,11 @@ export type MakeStringOptions = Partial<Omit<KeyValueStore, "set">> & {
 const ErrorTypeId = "~effect/persistence/KeyValueStore/KeyValueStoreError" as const
 
 /**
+ * Error raised by key/value store operations, including the failed method,
+ * optional key, message, and cause.
+ *
+ * @category errors
  * @since 4.0.0
- * @category Errors
  */
 export class KeyValueStoreError extends Data.TaggedError("KeyValueStoreError")<{
   message: string
@@ -161,23 +187,39 @@ export class KeyValueStoreError extends Data.TaggedError("KeyValueStoreError")<{
   cause?: unknown
 }> {
   /**
+   * Marks this value as a key-value store error for runtime guards.
+   *
    * @since 4.0.0
    */
   readonly [ErrorTypeId]: typeof ErrorTypeId = ErrorTypeId
 }
 
 /**
+ * Service tag for string and binary key/value storage.
+ *
+ * **When to use**
+ *
+ * Use to access or provide the persistence store used for lightweight durable
+ * state.
+ *
+ * @category services
  * @since 4.0.0
- * @category tags
  */
-export const KeyValueStore: ServiceMap.Service<
+export const KeyValueStore: Context.Service<
   KeyValueStore,
   KeyValueStore
-> = ServiceMap.Service("effect/persistence/KeyValueStore")
+> = Context.Service("effect/persistence/KeyValueStore")
 
 /**
- * @since 4.0.0
+ * Constructs a `KeyValueStore` from primitive store operations.
+ *
+ * **Details**
+ *
+ * Default implementations are derived for `has`, `isEmpty`, `modify`, and
+ * `modifyUint8Array` unless they are provided in the options.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const make = (options: MakeOptions): KeyValueStore =>
   KeyValueStore.of({
@@ -213,8 +255,15 @@ export const make = (options: MakeOptions): KeyValueStore =>
   })
 
 /**
- * @since 4.0.0
+ * Adapts a string-only backing store into a `KeyValueStore`.
+ *
+ * **Details**
+ *
+ * `Uint8Array` values are stored as base64 strings. `getUint8Array` decodes
+ * base64 values and falls back to UTF-8 encoding for non-base64 strings.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const makeStringOnly = (
   options: MakeStringOptions
@@ -239,8 +288,11 @@ export const makeStringOnly = (
 }
 
 /**
- * @since 4.0.0
+ * Returns a view of a `KeyValueStore` that prepends the given prefix to every
+ * key.
+ *
  * @category combinators
+ * @since 4.0.0
  */
 export const prefix: {
   (prefix: string): (self: KeyValueStore) => KeyValueStore
@@ -257,8 +309,10 @@ export const prefix: {
 }))
 
 /**
- * @since 4.0.0
+ * Provides a process-local in-memory `KeyValueStore` backed by a `Map`.
+ *
  * @category layers
+ * @since 4.0.0
  */
 export const layerMemory: Layer.Layer<KeyValueStore> = Layer.sync(KeyValueStore)(() => {
   const store = new Map<string, string | Uint8Array>()
@@ -283,8 +337,14 @@ export const layerMemory: Layer.Layer<KeyValueStore> = Layer.sync(KeyValueStore)
 })
 
 /**
- * @since 4.0.0
+ * Provides a `KeyValueStore` backed by files in the specified directory.
+ *
+ * **Details**
+ *
+ * The directory is created if needed, and each key is encoded as a file name.
+ *
  * @category layers
+ * @since 4.0.0
  */
 export const layerFileSystem = (
   directory: string
@@ -383,13 +443,245 @@ export const layerFileSystem = (
     })
   }))
 
+/**
+ * Options for configuring the SQL-backed `KeyValueStore` layer.
+ *
+ * @category layers
+ * @since 4.0.0
+ */
+export interface LayerSqlOptions {
+  /**
+   * The SQL table name used to store values.
+   *
+   * @default "effect_key_value_store"
+   */
+  readonly table?: string
+}
+
+/**
+ * Provides a SQL-backed `KeyValueStore`.
+ *
+ * **Details**
+ *
+ * The layer creates the configured table if it does not exist and stores both
+ * string and binary values through the current `SqlClient`.
+ *
+ * @category layers
+ * @since 4.0.0
+ */
+export const layerSql = (
+  options: LayerSqlOptions = {}
+): Layer.Layer<KeyValueStore, never, SqlClient.SqlClient> =>
+  Layer.effect(KeyValueStore)(
+    Effect.gen(function*() {
+      const sql = (yield* SqlClient.SqlClient).withoutTransforms()
+      const table = sql(options.table ?? "effect_key_value_store")
+
+      yield* sql.onDialectOrElse({
+        mysql: () =>
+          sql`
+          CREATE TABLE IF NOT EXISTS ${table} (
+            id VARCHAR(191) PRIMARY KEY,
+            value BLOB NOT NULL,
+            value_type SMALLINT NOT NULL
+          )
+        `,
+        pg: () =>
+          sql`
+          CREATE TABLE IF NOT EXISTS ${table} (
+            id TEXT PRIMARY KEY,
+            value BYTEA NOT NULL,
+            value_type SMALLINT NOT NULL
+          )
+        `,
+        mssql: () =>
+          sql`
+          IF NOT EXISTS (SELECT * FROM sysobjects WHERE name=${table} AND xtype='U')
+          CREATE TABLE ${table} (
+            id NVARCHAR(450) PRIMARY KEY,
+            value VARBINARY(MAX) NOT NULL,
+            value_type SMALLINT NOT NULL
+          )
+        `,
+        // sqlite
+        orElse: () =>
+          sql`
+          CREATE TABLE IF NOT EXISTS ${table} (
+            id TEXT PRIMARY KEY,
+            value BLOB NOT NULL,
+            value_type INTEGER NOT NULL
+          )
+        `
+      }).pipe(Effect.orDie)
+
+      type UpsertFn = (entry: {
+        id: string
+        value: Uint8Array
+        value_type: number
+      }) => Effect.Effect<unknown, SqlError>
+
+      const upsert = sql.onDialectOrElse({
+        pg: (): UpsertFn => (entry) =>
+          sql`
+          INSERT INTO ${table} (id, value, value_type) VALUES (${entry.id}, ${entry.value}, ${entry.value_type})
+          ON CONFLICT (id) DO UPDATE SET value=EXCLUDED.value, value_type=EXCLUDED.value_type
+        `.unprepared,
+        mysql: (): UpsertFn => (entry) =>
+          sql`
+          INSERT INTO ${table} (id, value, value_type) VALUES (${entry.id}, ${entry.value}, ${entry.value_type})
+          ON DUPLICATE KEY UPDATE value=VALUES(value), value_type=VALUES(value_type)
+        `,
+        mssql: (): UpsertFn => (entry) =>
+          sql`
+          MERGE ${table} AS target
+          USING (SELECT ${entry.id} AS id, ${entry.value} AS value, ${entry.value_type} AS value_type) AS source
+          ON target.id = source.id
+          WHEN MATCHED THEN UPDATE SET value = source.value, value_type = source.value_type
+          WHEN NOT MATCHED THEN INSERT (id, value, value_type)
+          VALUES (source.id, source.value, source.value_type);
+        `,
+        // sqlite
+        orElse: (): UpsertFn => (entry) =>
+          sql`
+          INSERT INTO ${table} (id, value, value_type) VALUES (${entry.id}, ${entry.value}, ${entry.value_type})
+          ON CONFLICT(id) DO UPDATE SET value=excluded.value, value_type=excluded.value_type
+        `.unprepared
+      })
+
+      const encoder = new TextEncoder()
+      const decoder = new TextDecoder()
+      const ValueTypeString = 0
+      const ValueTypeUint8Array = 1
+
+      type Row = {
+        value: Uint8Array
+        value_type: number
+      }
+
+      return make({
+        get: (key: string) =>
+          sql<Row>`SELECT value, value_type FROM ${table} WHERE id = ${key}`.pipe(
+            Effect.mapError((cause) =>
+              new KeyValueStoreError({
+                method: "get",
+                key,
+                message: `Unable to get item with key ${key}`,
+                cause
+              })
+            ),
+            Effect.flatMap((rows) => {
+              if (rows.length === 0) {
+                return Effect.undefined
+              }
+              const row = rows[0]
+              switch (row.value_type) {
+                case ValueTypeString:
+                  return Effect.succeed(decoder.decode(row.value))
+                case ValueTypeUint8Array:
+                  return Effect.succeed(Encoding.encodeBase64(row.value))
+                default:
+                  return Effect.fail(
+                    new KeyValueStoreError({
+                      method: "get",
+                      key,
+                      message: `Invalid stored value type for key ${key}: ${row.value_type}`
+                    })
+                  )
+              }
+            })
+          ),
+        getUint8Array: (key: string) =>
+          sql<Row>`SELECT value, value_type FROM ${table} WHERE id = ${key}`.pipe(
+            Effect.mapError((cause) =>
+              new KeyValueStoreError({
+                method: "getUint8Array",
+                key,
+                message: `Unable to get item with key ${key}`,
+                cause
+              })
+            ),
+            Effect.flatMap((rows) => {
+              if (rows.length === 0) {
+                return Effect.undefined
+              }
+              const row = rows[0]
+              switch (row.value_type) {
+                case ValueTypeString:
+                  return Effect.succeed(row.value)
+                case ValueTypeUint8Array:
+                  return Effect.succeed(row.value)
+                default:
+                  return Effect.fail(
+                    new KeyValueStoreError({
+                      method: "getUint8Array",
+                      key,
+                      message: `Invalid stored value type for key ${key}: ${row.value_type}`
+                    })
+                  )
+              }
+            })
+          ),
+        set: (key: string, value: string | Uint8Array) =>
+          upsert({
+            id: key,
+            value: typeof value === "string" ? encoder.encode(value) : value,
+            value_type: typeof value === "string" ? ValueTypeString : ValueTypeUint8Array
+          }).pipe(
+            Effect.mapError((cause) =>
+              new KeyValueStoreError({
+                method: "set",
+                key,
+                message: `Unable to set item with key ${key}`,
+                cause
+              })
+            ),
+            Effect.asVoid
+          ),
+        remove: (key: string) =>
+          sql`DELETE FROM ${table} WHERE id = ${key}`.pipe(
+            Effect.mapError((cause) =>
+              new KeyValueStoreError({
+                method: "remove",
+                key,
+                message: `Unable to remove item with key ${key}`,
+                cause
+              })
+            ),
+            Effect.asVoid
+          ),
+        clear: sql`DELETE FROM ${table}`.pipe(
+          Effect.mapError((cause) =>
+            new KeyValueStoreError({
+              method: "clear",
+              message: `Unable to clear storage`,
+              cause
+            })
+          ),
+          Effect.asVoid
+        ),
+        size: sql<{ count: number }>`SELECT COUNT(*) as count FROM ${table}`.pipe(
+          Effect.mapError((cause) =>
+            new KeyValueStoreError({
+              method: "size",
+              message: `Unable to get size`,
+              cause
+            })
+          ),
+          Effect.map((rows) => rows.length === 0 ? 0 : Number(rows[0].count))
+        )
+      })
+    })
+  )
+
 const SchemaStoreTypeId = "~effect/persistence/KeyValueStore/SchemaStore" as const
 
 /**
- * @since 4.0.0
+ * Schema-aware view of a `KeyValueStore` that stores values as encoded JSON.
+ *
  * @category SchemaStore
+ * @since 4.0.0
  */
-export interface SchemaStore<S extends Schema.Top> {
+export interface SchemaStore<S extends Schema.Constraint> {
   readonly [SchemaStoreTypeId]: typeof SchemaStoreTypeId
   /**
    * Returns the value of the specified key if it exists.
@@ -439,16 +731,18 @@ export interface SchemaStore<S extends Schema.Top> {
   readonly has: (key: string) => Effect.Effect<boolean, KeyValueStoreError>
 
   /**
-   * Checks if the KeyValueStore contains any entries.
+   * Checks whether the KeyValueStore contains any entries.
    */
   readonly isEmpty: Effect.Effect<boolean, KeyValueStoreError>
 }
 
 /**
- * @since 4.0.0
+ * Adapts a `KeyValueStore` into a `SchemaStore` using the schema's JSON codec.
+ *
  * @category SchemaStore
+ * @since 4.0.0
  */
-export const toSchemaStore = <S extends Schema.Top>(self: KeyValueStore, schema: S): SchemaStore<S> => {
+export const toSchemaStore = <S extends Schema.Constraint>(self: KeyValueStore, schema: S): SchemaStore<S> => {
   const serializer = Schema.toCodecJson(schema)
   const jsonSchema = Schema.fromJsonString(serializer)
   const decode = Schema.decodeEffect(jsonSchema)
@@ -494,12 +788,16 @@ export const toSchemaStore = <S extends Schema.Top>(self: KeyValueStore, schema:
 }
 
 /**
- * Creates an KeyValueStorage from an instance of the `Storage` api.
+ * Provides a `KeyValueStore` backed by a Web `Storage` instance such as
+ * `localStorage` or `sessionStorage`.
  *
- * @see https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API
+ * **Details**
  *
- * @since 4.0.0
+ * This layer uses the Web Storage API:
+ * https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API
+ *
  * @category layers
+ * @since 4.0.0
  */
 export const layerStorage = (
   evaluate: LazyArg<Storage>
@@ -510,51 +808,56 @@ export const layerStorage = (
       get: (key: string) =>
         Effect.try({
           try: () => storage.getItem(key) ?? undefined,
-          catch: () =>
+          catch: (cause) =>
             new KeyValueStoreError({
               key,
               method: "get",
-              message: `Unable to get item with key ${key}`
+              message: `Unable to get item with key ${key}`,
+              cause
             })
         }),
 
       set: (key: string, value: string) =>
         Effect.try({
           try: () => storage.setItem(key, value),
-          catch: () =>
+          catch: (cause) =>
             new KeyValueStoreError({
               key,
               method: "set",
-              message: `Unable to set item with key ${key}`
+              message: `Unable to set item with key ${key}`,
+              cause
             })
         }),
 
       remove: (key: string) =>
         Effect.try({
           try: () => storage.removeItem(key),
-          catch: () =>
+          catch: (cause) =>
             new KeyValueStoreError({
               key,
               method: "remove",
-              message: `Unable to remove item with key ${key}`
+              message: `Unable to remove item with key ${key}`,
+              cause
             })
         }),
 
       clear: Effect.try({
         try: () => storage.clear(),
-        catch: () =>
+        catch: (cause) =>
           new KeyValueStoreError({
             method: "clear",
-            message: `Unable to clear storage`
+            message: `Unable to clear storage`,
+            cause
           })
       }),
 
       size: Effect.try({
         try: () => storage.length,
-        catch: () =>
+        catch: (cause) =>
           new KeyValueStoreError({
             method: "size",
-            message: `Unable to get size`
+            message: `Unable to get size`,
+            cause
           })
       })
     })

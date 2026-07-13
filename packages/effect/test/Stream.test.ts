@@ -5,6 +5,7 @@ import {
   Array,
   Cause,
   Clock,
+  Context,
   Data,
   Deferred,
   Duration,
@@ -15,14 +16,15 @@ import {
   Logger,
   type LogLevel,
   Option,
+  type Pull,
   Queue,
   Ref,
   References,
   Result,
   Schedule,
-  ServiceMap,
   Sink,
-  Stream
+  Stream,
+  String as Str
 } from "effect"
 import { isReadonlyArrayNonEmpty, type NonEmptyArray } from "effect/Array"
 import { constTrue, constVoid, pipe } from "effect/Function"
@@ -131,8 +133,38 @@ describe("Stream", () => {
       }))
   })
 
+  describe("destructors", () => {
+    it.effect("runForEachWhile continues across chunk boundaries", () =>
+      Effect.gen(function*() {
+        const seen: Array<number> = []
+        yield* Stream.fromArrays([1, 2], [3, 4]).pipe(
+          Stream.runForEachWhile((n) =>
+            Effect.sync(() => {
+              seen.push(n)
+              return true
+            })
+          )
+        )
+        assert.deepStrictEqual(seen, [1, 2, 3, 4])
+      }))
+
+    it.effect("runForEachWhile stops when predicate returns false", () =>
+      Effect.gen(function*() {
+        const seen: Array<number> = []
+        yield* Stream.fromArrays([1, 2, 3], [4, 5]).pipe(
+          Stream.runForEachWhile((n) =>
+            Effect.sync(() => {
+              seen.push(n)
+              return n < 3
+            })
+          )
+        )
+        assert.deepStrictEqual(seen, [1, 2, 3])
+      }))
+  })
+
   describe("constructors", () => {
-    class Greeter extends ServiceMap.Service<Greeter, {
+    class Greeter extends Context.Service<Greeter, {
       readonly greet: (name: string) => string
     }>()("Greeter") {}
 
@@ -201,6 +233,60 @@ describe("Stream", () => {
         )
         assert.deepStrictEqual(result, [[1, 2], [3, 4], [5]])
       }))
+
+    it.effect("scoped - provides scope to fromEffect pull effects", () =>
+      Effect.gen(function*() {
+        const releases = yield* Ref.make(0)
+        const result = yield* Stream.fromEffect(
+          Effect.acquireRelease(
+            Effect.succeed("resource"),
+            () => Ref.update(releases, (n) => n + 1)
+          )
+        ).pipe(
+          Stream.scoped,
+          Stream.runCollect
+        )
+
+        assert.deepStrictEqual(result, ["resource"])
+        assert.strictEqual(yield* Ref.get(releases), 1)
+      }))
+
+    it.effect("scoped - provides scope to sequential mapEffect pull effects", () =>
+      Effect.gen(function*() {
+        const releases = yield* Ref.make(0)
+        const result = yield* Stream.fromIterable([1, 2]).pipe(
+          Stream.mapEffect((n) =>
+            Effect.acquireRelease(
+              Effect.succeed(n * 2),
+              () => Ref.update(releases, (count) => count + 1)
+            )
+          ),
+          Stream.scoped,
+          Stream.runCollect
+        )
+
+        assert.deepStrictEqual(result, [2, 4])
+        assert.strictEqual(yield* Ref.get(releases), 2)
+      }))
+
+    it.effect("fromReadableStream - errored streams fail with the mapped error, not a finalizer defect", () =>
+      Effect.gen(function*() {
+        const exit = yield* Stream.fromReadableStream({
+          evaluate: () =>
+            new ReadableStream<number>({
+              start(controller) {
+                controller.error(new Error("boom"))
+              }
+            }),
+          onError: (error) => new Error(`mapped: ${(error as Error).message}`)
+        }).pipe(Stream.runDrain, Effect.exit)
+
+        assertTrue(Exit.isFailure(exit))
+        if (Exit.isFailure(exit)) {
+          assertTrue(exit.cause.reasons.every(Cause.isFailReason))
+          deepStrictEqual(Cause.squash(exit.cause), new Error("mapped: boom"))
+        }
+      }))
   })
 
   describe("encoding", () => {
@@ -224,6 +310,100 @@ describe("Stream", () => {
         )
         assert.strictEqual(result, "Hello 🌍!")
       }))
+
+    describe("splitLines", () => {
+      const splitLines = (chunks: ReadonlyArray<string>) =>
+        Stream.fromIterable(chunks).pipe(
+          Stream.splitLines,
+          Stream.runCollect
+        )
+
+      it.effect("handles an empty stream", () =>
+        Effect.gen(function*() {
+          const result = yield* splitLines([])
+          assert.deepStrictEqual(result, [])
+        }))
+
+      it.effect("handles empty chunks and repeated line feeds", () =>
+        Effect.gen(function*() {
+          const result = yield* splitLines(["", "a\n\n", "", "b\n", ""])
+          assert.deepStrictEqual(result, ["a", "", "b"])
+        }))
+
+      it.effect("handles line feeds across chunks", () =>
+        Effect.gen(function*() {
+          const result = yield* splitLines(["a\nb", "\nc\n", "d"])
+          assert.deepStrictEqual(result, ["a", "b", "c", "d"])
+        }))
+
+      it.effect("handles carriage return / line feed pairs across chunks", () =>
+        Effect.gen(function*() {
+          const result = yield* splitLines(["a\r", "\nb\r", "\nc"])
+          assert.deepStrictEqual(result, ["a", "b", "c"])
+        }))
+
+      it.effect("emits the final line when the stream does not end with a newline", () =>
+        Effect.gen(function*() {
+          const result = yield* splitLines(["a\nb\nc\n", "d\ne"])
+          assert.deepStrictEqual(result, ["a", "b", "c", "d", "e"])
+        }))
+
+      it.effect("does not pull upstream again after flushing the final line", () =>
+        Effect.gen(function*() {
+          let pulls = 0
+          const stream = Stream.fromPull(Effect.sync(() => {
+            const pull = Effect.suspend(
+              (): Pull.Pull<Array.NonEmptyReadonlyArray<string>, string> => {
+                pulls++
+                switch (pulls) {
+                  case 1:
+                    return Effect.succeed(Array.of("a"))
+                  case 2:
+                    return Cause.done()
+                  default:
+                    return Effect.fail("pulled after done")
+                }
+              }
+            )
+            return pull
+          }))
+
+          const result = yield* stream.pipe(
+            Stream.splitLines,
+            Stream.runCollect
+          )
+
+          assert.deepStrictEqual(result, ["a"])
+          assert.strictEqual(pulls, 2)
+        }))
+
+      it.effect("handles standalone carriage returns within a chunk", () =>
+        Effect.gen(function*() {
+          const result = yield* splitLines(["a\rb\rc"])
+          assert.deepStrictEqual(result, ["a", "b", "c"])
+        }))
+
+      it.effect("handles standalone carriage returns across chunk boundaries", () =>
+        Effect.gen(function*() {
+          const result = yield* splitLines(["a\r", "b\r", "c"])
+          assert.deepStrictEqual(result, ["a", "b", "c"])
+        }))
+
+      it.effect.prop(
+        "matches String.linesIterator regardless of chunk boundaries",
+        {
+          chunks: fc.array(
+            fc.array(fc.constantFrom("a", "b", "\n", "\r"), { maxLength: 8 }).map((chars) => chars.join("")),
+            { maxLength: 8 }
+          )
+        },
+        Effect.fnUntraced(function*({ chunks }) {
+          const result = yield* splitLines(chunks)
+          const expected = globalThis.Array.from(Str.linesIterator(chunks.join("")))
+          assert.deepStrictEqual(result, expected)
+        })
+      )
+    })
   })
 
   describe("filtering", () => {
@@ -4489,6 +4669,36 @@ describe("Stream", () => {
           Effect.runPromise
         )
         deepStrictEqual(result1, result2)
+      })))
+  })
+
+  describe("broadcastN", () => {
+    it.effect("fans out to a fixed number of streams", () =>
+      Effect.scoped(Effect.gen(function*() {
+        const [left, right] = yield* Stream.make(1, 2, 3).pipe(
+          Stream.broadcastN({ n: 2, capacity: 4 })
+        )
+
+        const result = yield* Effect.all([
+          Stream.runCollect(left),
+          Stream.runCollect(right)
+        ], { concurrency: "unbounded" })
+
+        assert.deepStrictEqual(result, [[1, 2, 3], [1, 2, 3]])
+      })))
+
+    it.effect("propagates failures to all downstream streams", () =>
+      Effect.scoped(Effect.gen(function*() {
+        const [left, right] = yield* Stream.fail("boom").pipe(
+          Stream.broadcastN({ n: 2, capacity: 4 })
+        )
+
+        const result = yield* Effect.all([
+          Stream.runCollect(left).pipe(Effect.exit),
+          Stream.runCollect(right).pipe(Effect.exit)
+        ], { concurrency: "unbounded" })
+
+        assert.deepStrictEqual(result, [Exit.fail("boom"), Exit.fail("boom")])
       })))
   })
 })

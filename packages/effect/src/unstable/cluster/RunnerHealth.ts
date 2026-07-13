@@ -1,11 +1,19 @@
 /**
+ * Checks whether cluster runners should be treated as alive.
+ *
+ * `RunnerHealth` is used by sharding when deciding whether assigned shards can
+ * stay on a runner or need to move elsewhere. This module includes the
+ * health-check service, a no-op layer that always reports runners as alive, a
+ * ping-based checker, and a Kubernetes-based checker that looks at pod readiness
+ * for the runner host.
+ *
  * @since 4.0.0
  */
+import * as Context from "../../Context.ts"
 import * as Effect from "../../Effect.ts"
 import * as Layer from "../../Layer.ts"
 import * as Schedule from "../../Schedule.ts"
 import type * as Scope from "../../Scope.ts"
-import * as ServiceMap from "../../ServiceMap.ts"
 import * as K8s from "./K8sHttpClient.ts"
 import type { RunnerAddress } from "./RunnerAddress.ts"
 import * as Runners from "./Runners.ts"
@@ -13,14 +21,16 @@ import * as Runners from "./Runners.ts"
 /**
  * Represents the service used to check if a Runner is healthy.
  *
+ * **Details**
+ *
  * If a Runner is responsive, shards will not be re-assigned because the Runner may
  * still be processing messages. If a Runner is not responsive, then its
  * associated shards can and will be re-assigned to a different Runner.
  *
- * @since 4.0.0
  * @category models
+ * @since 4.0.0
  */
-export class RunnerHealth extends ServiceMap.Service<
+export class RunnerHealth extends Context.Service<
   RunnerHealth,
   {
     readonly isAlive: (address: RunnerAddress) => Effect.Effect<boolean>
@@ -28,20 +38,27 @@ export class RunnerHealth extends ServiceMap.Service<
 >()("effect/cluster/RunnerHealth") {}
 
 /**
- * A layer which will **always** consider a Runner healthy.
+ * Layer that always considers a runner healthy.
  *
- * This is useful for testing.
+ * **When to use**
  *
- * @since 4.0.0
+ * Use when you need a runner-health layer for tests or local development where
+ * active health checks are unnecessary.
+ *
  * @category layers
+ * @since 4.0.0
  */
 export const layerNoop = Layer.succeed(RunnerHealth, {
   isAlive: () => Effect.succeed(true)
 })
 
 /**
+ * Creates a `RunnerHealth` service that pings runners through `Runners`, retrying
+ * failed pings on a short schedule and treating a successful ping within the
+ * timeout as healthy.
+ *
+ * @category constructors
  * @since 4.0.0
- * @category Constructors
  */
 export const makePing: Effect.Effect<
   RunnerHealth["Service"],
@@ -63,10 +80,10 @@ export const makePing: Effect.Effect<
 })
 
 /**
- * A layer which will ping a Runner directly to check if it is healthy.
+ * Layer that pings runners directly to check whether they are healthy.
  *
- * @since 4.0.0
  * @category layers
+ * @since 4.0.0
  */
 export const layerPing: Layer.Layer<
   RunnerHealth,
@@ -75,8 +92,15 @@ export const layerPing: Layer.Layer<
 > = Layer.effect(RunnerHealth, makePing)
 
 /**
+ * Creates a `RunnerHealth` service that checks Kubernetes pod readiness for a
+ * runner host, optionally scoped by namespace and label selector.
+ *
+ * **Gotchas**
+ *
+ * If the Kubernetes API check fails, the runner is treated as healthy.
+ *
+ * @category constructors
  * @since 4.0.0
- * @category Constructors
  */
 export const makeK8s = Effect.fnUntraced(function*(options?: {
   readonly namespace?: string | undefined
@@ -94,16 +118,20 @@ export const makeK8s = Effect.fnUntraced(function*(options?: {
 })
 
 /**
- * A layer which will check the Kubernetes API to see if a Runner is healthy.
+ * Layer that checks Kubernetes pod readiness to determine whether a runner is
+ * healthy.
  *
- * The provided HttpClient will need to add the pod's CA certificate to its
- * trusted root certificates in order to communicate with the Kubernetes API.
+ * **Details**
  *
- * The pod service account will also need to have permissions to list pods in
- * order to use this layer.
+ * The provided `HttpClient` must trust the pod CA certificate and the pod service
+ * account must be allowed to list pods.
  *
- * @since 4.0.0
+ * **Gotchas**
+ *
+ * If the Kubernetes API check fails, the runner is treated as healthy.
+ *
  * @category layers
+ * @since 4.0.0
  */
 export const layerK8s = (
   options?: {

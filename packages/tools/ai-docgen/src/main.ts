@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * @since 1.0.0
+ * @since 4.0.0
  */
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
 import * as NodeServices from "@effect/platform-node/NodeServices"
@@ -60,7 +60,9 @@ Command.make("effect-ai-docgen", { directory, output, watch }).pipe(
 )
 
 const directoryToMarkdown = Effect.fn("directoryToMarkdown")(
-  function*(directory): Effect.fn.Return<string, PlatformError.PlatformError, FileSystem.FileSystem | Path.Path> {
+  function*(
+    directory: string
+  ): Effect.fn.Return<string, PlatformError.PlatformError, FileSystem.FileSystem | Path.Path> {
     const pathService = yield* Path.Path
     const fs = yield* FileSystem.FileSystem
 

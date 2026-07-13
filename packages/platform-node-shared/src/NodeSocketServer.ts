@@ -1,7 +1,17 @@
 /**
- * @since 1.0.0
+ * Node socket server adapters for Effect's unstable socket server API.
+ *
+ * This module turns `node:net` TCP or Unix-domain servers and `ws` WebSocket
+ * servers into scoped `SocketServer.SocketServer` services. Use the TCP
+ * constructors when handlers should receive a `Socket.Socket` backed by a Node
+ * `net.Socket`; use the WebSocket constructors when handlers should receive a
+ * `Socket.Socket` backed by `ws` and have access to the per-connection
+ * WebSocket and `IncomingMessage` services.
+ *
+ * @since 4.0.0
  */
 import type { Cause } from "effect/Cause"
+import * as Context from "effect/Context"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
@@ -11,7 +21,6 @@ import * as Function from "effect/Function"
 import * as Layer from "effect/Layer"
 import * as References from "effect/References"
 import * as Scope from "effect/Scope"
-import * as ServiceMap from "effect/ServiceMap"
 import * as Socket from "effect/unstable/socket/Socket"
 import * as SocketServer from "effect/unstable/socket/SocketServer"
 import type * as Http from "node:http"
@@ -20,17 +29,24 @@ import * as NodeSocket from "./NodeSocket.ts"
 import { NodeWS } from "./NodeSocket.ts"
 
 /**
- * @since 1.0.0
- * @category tags
+ * Service tag for the Node `IncomingMessage` associated with the current
+ * WebSocket server connection.
+ *
+ * @category services
+ * @since 4.0.0
  */
-export class IncomingMessage extends ServiceMap.Service<
+export class IncomingMessage extends Context.Service<
   IncomingMessage,
   Http.IncomingMessage
 >()("@effect/platform-node-shared/NodeSocketServer/IncomingMessage") {}
 
 /**
- * @since 1.0.0
+ * Creates a scoped TCP `SocketServer` from a Node `net.Server`, starts
+ * listening with the supplied options, queues pending connections until `run`
+ * is called, and closes the server when the scope ends.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const make = Effect.fnUntraced(function*(
   options: Net.ServerOpts & Net.ListenOptions
@@ -69,7 +85,7 @@ export const make = Effect.fnUntraced(function*(
 
   const run = Effect.fnUntraced(function*<R, E, _>(handler: (socket: Socket.Socket) => Effect.Effect<_, E, R>) {
     const scope = yield* Scope.make()
-    const services = ServiceMap.omit(Scope.Scope)(yield* Effect.services<R>()) as ServiceMap.ServiceMap<R>
+    const services = Context.omit(Scope.Scope)(yield* Effect.context<R>()) as Context.Context<R>
     const trackFiber = Fiber.runIn(scope)
     const prevOnConnection = onConnection
     onConnection = function(conn: Net.Socket) {
@@ -109,7 +125,7 @@ export const make = Effect.fnUntraced(function*(
         ),
         Effect.flatMap(handler),
         Effect.catchCause(reportUnhandledError),
-        Effect.runForkWith(ServiceMap.add(services, NodeSocket.NetSocket, conn)),
+        Effect.runForkWith(Context.add(services, NodeSocket.NetSocket, conn)),
         trackFiber
       )
     }
@@ -144,8 +160,11 @@ export const make = Effect.fnUntraced(function*(
 })
 
 /**
- * @since 1.0.0
+ * Provides a TCP `SocketServer` by creating and managing a scoped Node
+ * `net.Server` with the supplied server and listen options.
+ *
  * @category layers
+ * @since 4.0.0
  */
 export const layer: (
   options: Net.ServerOpts & Net.ListenOptions
@@ -155,8 +174,12 @@ export const layer: (
 > = Function.flow(make, Layer.effect(SocketServer.SocketServer))
 
 /**
- * @since 1.0.0
+ * Creates a scoped WebSocket `SocketServer` backed by the `ws` package,
+ * providing the WebSocket and its Node `IncomingMessage` to connection
+ * handlers and closing the server when the scope ends.
+ *
  * @category constructors
+ * @since 4.0.0
  */
 export const makeWebSocket: (
   options: NodeWS.ServerOptions<typeof NodeWS.WebSocket, typeof Http.IncomingMessage>
@@ -202,7 +225,7 @@ export const makeWebSocket: (
 
   const run = Effect.fnUntraced(function*<R, E, _>(handler: (socket: Socket.Socket) => Effect.Effect<_, E, R>) {
     const scope = yield* Scope.make()
-    const services = ServiceMap.omit(Scope.Scope)(yield* Effect.services<R>()) as ServiceMap.ServiceMap<R>
+    const services = Context.omit(Scope.Scope)(yield* Effect.context<R>()) as Context.Context<R>
     const trackFiber = Fiber.runIn(scope)
     const prevOnConnection = onConnection
     onConnection = function(conn: globalThis.WebSocket, req: Http.IncomingMessage) {
@@ -221,7 +244,7 @@ export const makeWebSocket: (
         ),
         Effect.flatMap(handler),
         Effect.catchCause(reportUnhandledError),
-        Effect.runForkWith(ServiceMap.makeUnsafe(map)),
+        Effect.runForkWith(Context.makeUnsafe(map)),
         trackFiber
       )
     }
@@ -255,8 +278,11 @@ export const makeWebSocket: (
 })
 
 /**
- * @since 1.0.0
+ * Provides a WebSocket `SocketServer` backed by the `ws` package and managed
+ * with the supplied server options.
+ *
  * @category layers
+ * @since 4.0.0
  */
 export const layerWebSocket: (
   options: NodeSocket.NodeWS.ServerOptions<typeof NodeSocket.NodeWS.WebSocket, typeof Http.IncomingMessage>

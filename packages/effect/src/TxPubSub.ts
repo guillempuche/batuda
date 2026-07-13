@@ -1,9 +1,11 @@
 /**
- * TxPubSub is a transactional publish/subscribe hub that provides Software Transactional Memory
- * (STM) semantics for message broadcasting. Publishers broadcast messages to all current
- * subscribers, with each subscriber receiving its own copy of every published message.
+ * Broadcasts values to subscribers inside Effect transactions.
  *
- * Supports multiple queue strategies: bounded, unbounded, dropping, and sliding.
+ * A `TxPubSub<A>` is a transactional publish/subscribe hub. Each subscriber
+ * owns a `TxQueue`, and each published value is offered to the subscriber
+ * queues that are registered at the time of publication. This module includes
+ * bounded, dropping, sliding, and unbounded hubs, publishing helpers, scoped
+ * subscriptions, shutdown operations, and a guard.
  *
  * @since 4.0.0
  */
@@ -24,7 +26,8 @@ const TypeId = "~effect/transactions/TxPubSub"
  * A TxPubSub represents a transactional publish/subscribe hub that broadcasts messages
  * to all current subscribers using Software Transactional Memory (STM) semantics.
  *
- * @example
+ * **Example** (Subscribing to a transactional pub/sub)
+ *
  * ```ts
  * import { Effect, TxPubSub, TxQueue } from "effect"
  *
@@ -42,8 +45,8 @@ const TypeId = "~effect/transactions/TxPubSub"
  * })
  * ```
  *
- * @since 4.0.0
  * @category models
+ * @since 4.0.0
  */
 export interface TxPubSub<in out A> extends Inspectable, Pipeable {
   readonly [TypeId]: typeof TypeId
@@ -97,7 +100,8 @@ const makeTxPubSub = <A>(
  * Creates a bounded TxPubSub with the specified capacity. When a subscriber's
  * queue is full, the publisher will retry the transaction until space is available.
  *
- * @example
+ * **Example** (Creating a bounded pub/sub)
+ *
  * ```ts
  * import { Effect, TxPubSub, TxQueue } from "effect"
  *
@@ -115,8 +119,8 @@ const makeTxPubSub = <A>(
  * })
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 2.0.0
  */
 export const bounded = <A = never>(capacity: number): Effect.Effect<TxPubSub<A>> =>
   Effect.gen(function*() {
@@ -129,7 +133,8 @@ export const bounded = <A = never>(capacity: number): Effect.Effect<TxPubSub<A>>
  * Creates a dropping TxPubSub with the specified capacity. When a subscriber's
  * queue is full, the message is dropped for that subscriber.
  *
- * @example
+ * **Example** (Creating a dropping pub/sub)
+ *
  * ```ts
  * import { Effect, TxPubSub, TxQueue } from "effect"
  *
@@ -150,8 +155,8 @@ export const bounded = <A = never>(capacity: number): Effect.Effect<TxPubSub<A>>
  * })
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 2.0.0
  */
 export const dropping = <A = never>(capacity: number): Effect.Effect<TxPubSub<A>> =>
   Effect.gen(function*() {
@@ -164,7 +169,8 @@ export const dropping = <A = never>(capacity: number): Effect.Effect<TxPubSub<A>
  * Creates a sliding TxPubSub with the specified capacity. When a subscriber's
  * queue is full, the oldest message in that subscriber's queue is dropped.
  *
- * @example
+ * **Example** (Creating a sliding pub/sub)
+ *
  * ```ts
  * import { Effect, TxPubSub, TxQueue } from "effect"
  *
@@ -184,8 +190,8 @@ export const dropping = <A = never>(capacity: number): Effect.Effect<TxPubSub<A>
  * })
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 2.0.0
  */
 export const sliding = <A = never>(capacity: number): Effect.Effect<TxPubSub<A>> =>
   Effect.gen(function*() {
@@ -197,7 +203,8 @@ export const sliding = <A = never>(capacity: number): Effect.Effect<TxPubSub<A>>
 /**
  * Creates an unbounded TxPubSub with unlimited capacity. Messages are always accepted.
  *
- * @example
+ * **Example** (Creating an unbounded pub/sub)
+ *
  * ```ts
  * import { Effect, TxPubSub, TxQueue } from "effect"
  *
@@ -215,8 +222,8 @@ export const sliding = <A = never>(capacity: number): Effect.Effect<TxPubSub<A>>
  * })
  * ```
  *
- * @since 4.0.0
  * @category constructors
+ * @since 2.0.0
  */
 export const unbounded = <A = never>(): Effect.Effect<TxPubSub<A>> =>
   Effect.gen(function*() {
@@ -232,7 +239,8 @@ export const unbounded = <A = never>(): Effect.Effect<TxPubSub<A>> =>
 /**
  * Returns the capacity of the TxPubSub.
  *
- * @example
+ * **Example** (Reading pub/sub capacity)
+ *
  * ```ts
  * import { Effect, TxPubSub } from "effect"
  *
@@ -242,15 +250,16 @@ export const unbounded = <A = never>(): Effect.Effect<TxPubSub<A>> =>
  * })
  * ```
  *
- * @since 4.0.0
  * @category getters
+ * @since 2.0.0
  */
 export const capacity = <A>(self: TxPubSub<A>): number => self.capacity
 
 /**
  * Returns the current number of messages across all subscriber queues (the max).
  *
- * @example
+ * **Example** (Reading subscriber queue size)
+ *
  * ```ts
  * import { Effect, TxPubSub, TxQueue } from "effect"
  *
@@ -269,8 +278,8 @@ export const capacity = <A>(self: TxPubSub<A>): number => self.capacity
  * })
  * ```
  *
- * @since 4.0.0
  * @category getters
+ * @since 2.0.0
  */
 export const size = <A>(self: TxPubSub<A>): Effect.Effect<number> =>
   Effect.gen(function*() {
@@ -284,9 +293,10 @@ export const size = <A>(self: TxPubSub<A>): Effect.Effect<number> =>
   }).pipe(Effect.tx)
 
 /**
- * Checks if the TxPubSub has no pending messages (all subscriber queues are empty).
+ * Checks whether the TxPubSub has no pending messages (all subscriber queues are empty).
  *
- * @example
+ * **Example** (Checking whether a pub/sub is empty)
+ *
  * ```ts
  * import { Effect, TxPubSub } from "effect"
  *
@@ -297,15 +307,16 @@ export const size = <A>(self: TxPubSub<A>): Effect.Effect<number> =>
  * })
  * ```
  *
- * @since 4.0.0
  * @category getters
+ * @since 2.0.0
  */
 export const isEmpty = <A>(self: TxPubSub<A>): Effect.Effect<boolean> => Effect.map(size(self), (s) => s === 0)
 
 /**
- * Checks if any subscriber queue is at capacity.
+ * Checks whether any subscriber queue is at capacity.
  *
- * @example
+ * **Example** (Checking whether a pub/sub is full)
+ *
  * ```ts
  * import { Effect, TxPubSub } from "effect"
  *
@@ -316,8 +327,8 @@ export const isEmpty = <A>(self: TxPubSub<A>): Effect.Effect<boolean> => Effect.
  * })
  * ```
  *
- * @since 4.0.0
  * @category getters
+ * @since 2.0.0
  */
 export const isFull = <A>(self: TxPubSub<A>): Effect.Effect<boolean> =>
   Effect.gen(function*() {
@@ -330,9 +341,10 @@ export const isFull = <A>(self: TxPubSub<A>): Effect.Effect<boolean> =>
   }).pipe(Effect.tx)
 
 /**
- * Checks if the TxPubSub has been shut down.
+ * Checks whether the TxPubSub has been shut down.
  *
- * @example
+ * **Example** (Checking whether a pub/sub is shut down)
+ *
  * ```ts
  * import { Effect, TxPubSub } from "effect"
  *
@@ -344,8 +356,8 @@ export const isFull = <A>(self: TxPubSub<A>): Effect.Effect<boolean> =>
  * })
  * ```
  *
- * @since 4.0.0
  * @category getters
+ * @since 2.0.0
  */
 export const isShutdown = <A>(self: TxPubSub<A>): Effect.Effect<boolean> => TxRef.get(self.shutdownRef)
 
@@ -356,14 +368,12 @@ export const isShutdown = <A>(self: TxPubSub<A>): Effect.Effect<boolean> => TxRe
 /**
  * Publishes a message to all current subscribers.
  *
- * Returns `true` if the message was delivered to all subscribers, or `false` if
- * the hub is shut down or the message was dropped for any subscriber (dropping strategy).
+ * **Details**
  *
- * For bounded strategy, retries the transaction if any subscriber queue is full.
- * For sliding strategy, drops oldest messages in full subscriber queues.
- * For dropping strategy, drops the message for full subscriber queues and returns `false`.
+ * Returns `true` if the message was delivered to all subscribers, or `false` if the hub is shut down or the message was dropped for any subscriber. For the bounded strategy, the transaction retries if any subscriber queue is full. For the sliding strategy, full subscriber queues drop their oldest messages. For the dropping strategy, full subscriber queues drop the new message and the operation returns `false`.
  *
- * @example
+ * **Example** (Publishing a message to subscribers)
+ *
  * ```ts
  * import { Effect, TxPubSub, TxQueue } from "effect"
  *
@@ -385,8 +395,8 @@ export const isShutdown = <A>(self: TxPubSub<A>): Effect.Effect<boolean> => TxRe
  * })
  * ```
  *
- * @since 4.0.0
  * @category mutations
+ * @since 2.0.0
  */
 export const publish: {
   <A>(value: A): (self: TxPubSub<A>) => Effect.Effect<boolean>
@@ -412,9 +422,12 @@ export const publish: {
 /**
  * Publishes all messages from an iterable to all current subscribers.
  *
+ * **Details**
+ *
  * Returns `true` if all messages were delivered to all subscribers.
  *
- * @example
+ * **Example** (Publishing multiple messages to subscribers)
+ *
  * ```ts
  * import { Effect, TxPubSub, TxQueue } from "effect"
  *
@@ -434,8 +447,8 @@ export const publish: {
  * })
  * ```
  *
- * @since 4.0.0
  * @category mutations
+ * @since 2.0.0
  */
 export const publishAll: {
   <A>(values: Iterable<A>): (self: TxPubSub<A>) => Effect.Effect<boolean>
@@ -456,11 +469,14 @@ export const publishAll: {
 )
 
 /**
- * Subscribes to the TxPubSub, returning a TxQueue that receives all messages
- * published after subscription. The subscription is automatically removed when
- * the scope is closed.
+ * Subscribes to the TxPubSub, returning a scoped `TxQueue` for messages published after subscription.
  *
- * @example
+ * **Details**
+ *
+ * The returned queue uses the hub's capacity strategy: bounded subscriptions backpressure publishers when full, dropping subscriptions may miss new messages when full, and sliding subscriptions may evict older queued messages. The subscription is automatically removed when the scope is closed.
+ *
+ * **Example** (Subscribing multiple queues)
+ *
  * ```ts
  * import { Effect, TxPubSub, TxQueue } from "effect"
  *
@@ -482,8 +498,8 @@ export const publishAll: {
  * })
  * ```
  *
- * @since 4.0.0
  * @category mutations
+ * @since 2.0.0
  */
 export const subscribe = <A>(self: TxPubSub<A>): Effect.Effect<TxQueue.TxQueue<A>, never, Scope.Scope> =>
   Effect.acquireRelease(
@@ -494,12 +510,20 @@ export const subscribe = <A>(self: TxPubSub<A>): Effect.Effect<TxQueue.TxQueue<A
 /**
  * Creates a subscriber queue and registers it with the pub/sub.
  *
- * This is the transactional acquire step of `subscribe`, exposed so that
- * callers can compose it with other Tx operations in a single transaction
- * (e.g. `TxSubscriptionRef.changes`).
+ * **When to use**
  *
- * @since 4.0.0
+ * Use to create and register a subscriber queue inside a larger transaction
+ * when registration must be atomic with other Tx operations.
+ *
+ * **Details**
+ *
+ * This is the transactional acquire step of `subscribe`, exposed so that callers can compose it with other Tx operations in a single transaction, such as `TxSubscriptionRef.changes`.
+ *
+ * @see {@link subscribe} for the scoped acquire and release wrapper when no custom transaction composition is needed
+ * @see {@link releaseSubscriber} to remove and shut down a queue returned by `acquireSubscriber`
+ *
  * @category mutations
+ * @since 4.0.0
  */
 export const acquireSubscriber = <A>(
   self: TxPubSub<A>
@@ -513,11 +537,26 @@ export const acquireSubscriber = <A>(
 /**
  * Removes a subscriber queue from the pub/sub and shuts it down.
  *
- * This is the transactional release step of `subscribe`, exposed so that
- * callers can compose it with other Tx operations in a single transaction.
+ * **When to use**
  *
- * @since 4.0.0
+ * Use to release a manually acquired subscriber queue inside a larger
+ * transaction, removing it from the pub/sub and shutting it down together with
+ * related transactional cleanup.
+ *
+ * **Details**
+ *
+ * This is the transactional release step of `subscribe`, exposed so that callers can compose it with other Tx operations in a single transaction.
+ *
+ * **Gotchas**
+ *
+ * The supplied queue is shut down after being removed, so callers should pass a
+ * queue acquired for this pub/sub.
+ *
+ * @see {@link acquireSubscriber} for the matching transactional acquire step
+ * @see {@link subscribe} for the scoped acquire and release wrapper
+ *
  * @category mutations
+ * @since 4.0.0
  */
 export const releaseSubscriber: {
   <A>(queue: TxQueue.TxQueue<A>): (self: TxPubSub<A>) => Effect.Effect<void, never, Effect.Transaction>
@@ -551,10 +590,18 @@ const makeSubscriberQueue = <A>(
 }
 
 /**
- * Shuts down the TxPubSub and all subscriber queues. Subsequent publish operations
- * will return `false`. Subsequent subscribe operations will receive an already-shutdown queue.
+ * Shuts down the TxPubSub and all subscriber queues registered at the time of shutdown.
  *
- * @example
+ * **Details**
+ *
+ * After shutdown, `publish` and `publishAll` return `false`, and `awaitShutdown` completes. The operation is idempotent.
+ *
+ * **Gotchas**
+ *
+ * Subscribers acquired after shutdown are not automatically shut down by this call.
+ *
+ * **Example** (Shutting down a pub/sub)
+ *
  * ```ts
  * import { Effect, TxPubSub } from "effect"
  *
@@ -570,8 +617,8 @@ const makeSubscriberQueue = <A>(
  * })
  * ```
  *
- * @since 4.0.0
  * @category mutations
+ * @since 2.0.0
  */
 export const shutdown = <A>(self: TxPubSub<A>): Effect.Effect<void> =>
   Effect.gen(function*() {
@@ -588,7 +635,8 @@ export const shutdown = <A>(self: TxPubSub<A>): Effect.Effect<void> =>
 /**
  * Waits for the TxPubSub to be shut down.
  *
- * @example
+ * **Example** (Waiting for shutdown)
+ *
  * ```ts
  * import { Effect, TxPubSub } from "effect"
  *
@@ -601,8 +649,8 @@ export const shutdown = <A>(self: TxPubSub<A>): Effect.Effect<void> =>
  * })
  * ```
  *
- * @since 4.0.0
  * @category mutations
+ * @since 2.0.0
  */
 export const awaitShutdown = <A>(self: TxPubSub<A>): Effect.Effect<void> =>
   Effect.gen(function*() {
@@ -616,9 +664,10 @@ export const awaitShutdown = <A>(self: TxPubSub<A>): Effect.Effect<void> =>
 // =============================================================================
 
 /**
- * Checks if the given value is a TxPubSub.
+ * Checks whether the given value is a TxPubSub.
  *
- * @example
+ * **Example** (Checking for a TxPubSub)
+ *
  * ```ts
  * import { TxPubSub } from "effect"
  *
@@ -629,7 +678,7 @@ export const awaitShutdown = <A>(self: TxPubSub<A>): Effect.Effect<void> =>
  * }
  * ```
  *
- * @since 4.0.0
  * @category guards
+ * @since 4.0.0
  */
 export const isTxPubSub = (u: unknown): u is TxPubSub<unknown> => hasProperty(u, TypeId)

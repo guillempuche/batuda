@@ -1,5 +1,14 @@
 /**
- * @since 1.0.0
+ * Node.js runtime support for workers that serve Effect worker requests.
+ *
+ * `NodeWorkerRunner` supplies the Node implementation of the Effect worker
+ * runner platform. The exported `layer` runs inside a `node:worker_threads`
+ * worker through `parentPort`, or inside a child process through
+ * `process.send`. It listens for parent messages, runs handlers registered with
+ * `WorkerRunner`, sends replies over the same channel, and closes when the
+ * parent sends the close message.
+ *
+ * @since 4.0.0
  */
 import * as Cause from "effect/Cause"
 import * as Deferred from "effect/Deferred"
@@ -12,8 +21,12 @@ import * as WorkerRunner from "effect/unstable/workers/WorkerRunner"
 import * as WorkerThreads from "node:worker_threads"
 
 /**
- * @since 1.0.0
+ * Provides the `WorkerRunnerPlatform` for code running inside a Node worker
+ * thread or child process, routing parent messages to the registered handler
+ * and sending responses back through the parent channel.
+ *
  * @category layers
+ * @since 4.0.0
  */
 export const layer: Layer.Layer<WorkerRunner.WorkerRunnerPlatform> = Layer.succeed(WorkerRunner.WorkerRunnerPlatform)({
   start<O = unknown, I = unknown>() {
@@ -36,7 +49,7 @@ export const layer: Layer.Layer<WorkerRunner.WorkerRunnerPlatform> = Layer.succe
         Effect.scopedWith(Effect.fnUntraced(function*(scope) {
           const closeLatch = Deferred.makeUnsafe<void, WorkerError>()
           const trackFiber = Fiber.runIn(scope)
-          const services = yield* Effect.services<R>()
+          const services = yield* Effect.context<R>()
           const runFork = Effect.runForkWith(services)
           const onExit = (exit: Exit.Exit<any, E>) => {
             if (exit._tag === "Failure" && !Cause.hasInterruptsOnly(exit.cause)) {
@@ -70,7 +83,7 @@ export const layer: Layer.Layer<WorkerRunner.WorkerRunnerPlatform> = Layer.succe
                     message: "received messageerror event",
                     cause
                   })
-                }).asEffect()
+                })
               )
             })
             WorkerThreads.parentPort.on("error", (cause) => {
@@ -81,7 +94,7 @@ export const layer: Layer.Layer<WorkerRunner.WorkerRunnerPlatform> = Layer.succe
                     message: "received messageerror event",
                     cause
                   })
-                }).asEffect()
+                })
               )
             })
           }

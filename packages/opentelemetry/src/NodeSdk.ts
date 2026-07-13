@@ -1,5 +1,14 @@
 /**
- * @since 1.0.0
+ * Node.js OpenTelemetry setup for Effect applications.
+ *
+ * This module exports a `Configuration` type and layers for installing
+ * tracing, metrics, and logging in Node.js. The main `layer` builds the shared
+ * OpenTelemetry resource from environment variables and optional service
+ * metadata, then enables only the signal types that have processors or readers
+ * configured. `layerTracerProvider` creates a scoped Node tracer provider, and
+ * `layerEmpty` provides an empty resource.
+ *
+ * @since 4.0.0
  */
 import type * as Otel from "@opentelemetry/api"
 import type { LoggerProviderConfig, LogRecordProcessor } from "@opentelemetry/sdk-logs"
@@ -12,14 +21,16 @@ import * as Effect from "effect/Effect"
 import { constant, type LazyArg } from "effect/Function"
 import * as Layer from "effect/Layer"
 import { isNonEmpty } from "./internal/utilities.ts"
-import * as Logger from "./Logger.ts"
-import * as Metrics from "./Metrics.ts"
+import * as Logger from "./OtelLogger.ts"
+import * as Metrics from "./OtelMetrics.ts"
+import * as Tracer from "./OtelTracer.ts"
 import * as Resource from "./Resource.ts"
-import * as Tracer from "./Tracer.ts"
 
 /**
- * @since 1.0.0
- * @category Models
+ * Configuration for the Node OpenTelemetry layer, including optional tracing, metrics, logging, resource, and shutdown settings.
+ *
+ * @category models
+ * @since 4.0.0
  */
 export interface Configuration {
   readonly spanProcessor?: SpanProcessor | ReadonlyArray<SpanProcessor> | undefined
@@ -38,8 +49,10 @@ export interface Configuration {
 }
 
 /**
- * @since 1.0.0
- * @category Layers
+ * Creates a scoped Node OpenTelemetry tracer provider from one or more span processors and shuts it down when the layer is released.
+ *
+ * @category layers
+ * @since 4.0.0
  */
 export const layerTracerProvider = (
   processor: SpanProcessor | NonEmptyReadonlyArray<SpanProcessor>,
@@ -71,8 +84,27 @@ export const layerTracerProvider = (
   )
 
 /**
- * @since 1.0.0
- * @category Layers
+ * Creates a Node OpenTelemetry layer from configuration, enabling tracing, metrics, and logging only when their processors or readers are supplied.
+ *
+ * **When to use**
+ *
+ * Use to install OpenTelemetry support for a Node.js Effect application from
+ * one configuration object, enabling tracing, metrics, logging, or any
+ * combination of those signals based on the processors and readers supplied.
+ *
+ * **Details**
+ *
+ * The configuration can be provided lazily or effectfully. The layer always
+ * provides `Resource.Resource`, building it from environment variables and any
+ * explicit resource metadata in the configuration.
+ *
+ * **Gotchas**
+ *
+ * Register Node auto-instrumentations before importing modules that should be
+ * patched, because many Node instrumentations hook module loading.
+ *
+ * @category layers
+ * @since 4.0.0
  */
 export const layer: {
   (evaluate: LazyArg<Configuration>): Layer.Layer<Resource.Resource>
@@ -122,7 +154,9 @@ export const layer: {
   )
 
 /**
+ * Layer that provides an empty OpenTelemetry `Resource`.
+ *
+ * @category layers
  * @since 2.0.0
- * @category layer
  */
 export const layerEmpty: Layer.Layer<Resource.Resource> = Resource.layerEmpty

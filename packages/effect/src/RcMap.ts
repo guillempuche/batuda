@@ -1,8 +1,19 @@
 /**
+ * Shares scoped resources by key and releases them when no one is using them.
+ *
+ * An `RcMap` runs a lookup effect the first time a key is requested, shares the
+ * in-progress or acquired resource with other callers for the same key, and
+ * tracks each caller through its current `Scope`. When the last scope for a key
+ * closes, the resource can be released, kept alive for an idle time, or removed
+ * by capacity limits or explicit invalidation. It is meant for resource
+ * lifecycles such as clients, sessions, and connections, not as a general
+ * mutable cache.
+ *
  * @since 3.5.0
  */
 import * as Cause from "./Cause.ts"
 import { Clock } from "./Clock.ts"
+import * as Context from "./Context.ts"
 import * as Deferred from "./Deferred.ts"
 import * as Duration from "./Duration.ts"
 import * as Effect from "./Effect.ts"
@@ -13,7 +24,6 @@ import * as MutableHashMap from "./MutableHashMap.ts"
 import type { Pipeable } from "./Pipeable.ts"
 import { pipeArguments } from "./Pipeable.ts"
 import * as Scope from "./Scope.ts"
-import * as ServiceMap from "./ServiceMap.ts"
 
 const TypeId = "~effect/RcMap"
 
@@ -22,9 +32,13 @@ const TypeId = "~effect/RcMap"
  * of resources indexed by keys. Resources are lazily acquired and automatically
  * released when no longer in use.
  *
- * @since 3.5.0
- * @category models
- * @example
+ * **When to use**
+ *
+ * Use to share scoped resources by key while automatically releasing them after
+ * their last active reference is gone.
+ *
+ * **Example** (Inspecting a reference-counted map)
+ *
  * ```ts
  * import { Effect, RcMap } from "effect"
  *
@@ -49,11 +63,17 @@ const TypeId = "~effect/RcMap"
  *   console.log(`Capacity: ${dbConnectionMap.capacity}`)
  * }).pipe(Effect.scoped)
  * ```
+ *
+ * @see {@link make} for creating an `RcMap`
+ * @see {@link get} for acquiring or retaining a resource by key
+ *
+ * @category models
+ * @since 3.5.0
  */
 export interface RcMap<in out K, in out A, in out E = never> extends Pipeable {
   readonly [TypeId]: typeof TypeId
   readonly lookup: (key: K) => Effect.Effect<A, E, Scope.Scope>
-  readonly services: ServiceMap.ServiceMap<never>
+  readonly context: Context.Context<never>
   readonly scope: Scope.Scope
   readonly idleTimeToLive: (key: K) => Duration.Duration
   readonly capacity: number
@@ -64,70 +84,42 @@ export interface RcMap<in out K, in out A, in out E = never> extends Pipeable {
  * Represents the internal state of an RcMap, which can be either Open (active)
  * or Closed (shutdown and no longer accepting operations).
  *
+ * **When to use**
+ *
+ * Use when typing code that inspects an `RcMap`'s `state` field and narrows
+ * between open and closed lifecycle states.
+ *
+ * @see {@link RcMap} for the map value that exposes this state
+ * @see {@link State.Open} for the active state with entries
+ * @see {@link State.Closed} for the shutdown state
+ *
+ * @category models
  * @since 4.0.0
- * @category Models
- * @example
- * ```ts
- * import type { RcMap } from "effect"
- *
- * // State is a union type that can be either:
- * declare const openState: RcMap.State.Open<string, number, never>
- * declare const closedState: RcMap.State.Closed
- *
- * // Check the state type
- * declare const state: RcMap.State<string, number, never>
- * if (state._tag === "Open") {
- *   // Access the internal map when open
- *   console.log("Map is open, contains entries")
- * } else {
- *   // State is closed
- *   console.log("Map is closed")
- * }
- * ```
  */
 export type State<K, A, E> = State.Open<K, A, E> | State.Closed
 
 /**
  * Namespace containing the internal state types for RcMap.
  *
+ * **When to use**
+ *
+ * Use when referring to the concrete open, closed, and entry state shapes used
+ * by `RcMap`.
+ *
  * @since 4.0.0
- * @category Models
- * @example
- * ```ts
- * import type { RcMap } from "effect"
- *
- * // The State namespace contains types for RcMap internal state:
- * // - Open: Contains the active resource map
- * // - Closed: Indicates the map is shut down
- * // - Entry: Individual resource entries with metadata
- *
- * declare const openState: RcMap.State.Open<string, number, never>
- * declare const closedState: RcMap.State.Closed
- * declare const entry: RcMap.State.Entry<number, never>
- * ```
  */
 export declare namespace State {
   /**
    * Represents the open/active state of an RcMap, containing the actual
    * resource map that stores entries.
    *
+   * **When to use**
+   *
+   * Use when handling an `RcMap` that can still accept operations and contains
+   * stored entries.
+   *
+   * @category models
    * @since 4.0.0
-   * @category Models
-   * @example
-   * ```ts
-   * import type { RcMap } from "effect"
-   * import * as MutableHashMap from "effect/MutableHashMap"
-   *
-   * // State.Open contains the active resource map
-   * declare const openState: RcMap.State.Open<string, number, never>
-   *
-   * // Access the internal map when state is open
-   * if (openState._tag === "Open") {
-   *   // The map contains Entry objects indexed by keys
-   *   const hasKey = MutableHashMap.has(openState.map, "someKey")
-   *   console.log(`Map contains key: ${hasKey}`)
-   * }
-   * ```
    */
   export interface Open<K, A, E> {
     readonly _tag: "Open"
@@ -138,21 +130,12 @@ export declare namespace State {
    * Represents the closed state of an RcMap, indicating that the map has been
    * shut down and will no longer accept new operations.
    *
+   * **When to use**
+   *
+   * Use when handling an `RcMap` after its owning scope has closed.
+   *
+   * @category models
    * @since 4.0.0
-   * @category Models
-   * @example
-   * ```ts
-   * import type { RcMap } from "effect"
-   *
-   * // State.Closed indicates the RcMap is shut down
-   * declare const closedState: RcMap.State.Closed
-   *
-   * // Check for closed state
-   * if (closedState._tag === "Closed") {
-   *   console.log("RcMap is closed, no operations allowed")
-   *   // Any attempt to get resources will result in interruption
-   * }
-   * ```
    */
   export interface Closed {
     readonly _tag: "Closed"
@@ -162,26 +145,13 @@ export declare namespace State {
    * Represents an individual entry in the RcMap, containing the resource's
    * metadata including reference count, expiration time, and lifecycle management.
    *
+   * **When to use**
+   *
+   * Use when inspecting the stored resource, reference count, and idle lifecycle
+   * metadata for a single key.
+   *
+   * @category models
    * @since 4.0.0
-   * @category Models
-   * @example
-   * ```ts
-   * import type { RcMap } from "effect"
-   *
-   * // Entry contains all metadata for a resource in the map
-   * declare const entry: RcMap.State.Entry<string, never>
-   *
-   * // Entry properties:
-   * // - deferred: Promise-like structure for the resource value
-   * // - scope: Manages the resource's lifecycle
-   * // - finalizer: Effect to run when cleaning up
-   * // - fiber: Optional background fiber for expiration
-   * // - expiresAt: Timestamp when resource expires
-   * // - refCount: Number of active references
-   *
-   * console.log(`Reference count: ${entry.refCount}`)
-   * console.log(`Expires at: ${entry.expiresAt}`)
-   * ```
    */
   export interface Entry<A, E> {
     readonly deferred: Deferred.Deferred<A, E>
@@ -196,14 +166,14 @@ export declare namespace State {
 
 const makeUnsafe = <K, A, E>(options: {
   readonly lookup: (key: K) => Effect.Effect<A, E, Scope.Scope>
-  readonly services: ServiceMap.ServiceMap<never>
+  readonly context: Context.Context<never>
   readonly scope: Scope.Scope
   readonly idleTimeToLive: (key: K) => Duration.Duration
   readonly capacity: number
 }): RcMap<K, A, E> => ({
   [TypeId]: TypeId,
   lookup: options.lookup,
-  services: options.services,
+  context: options.context,
   scope: options.scope,
   idleTimeToLive: options.idleTimeToLive,
   capacity: options.capacity,
@@ -217,20 +187,24 @@ const makeUnsafe = <K, A, E>(options: {
 })
 
 /**
- * An `RcMap` can contain multiple reference counted resources that can be indexed
+ * Creates an `RcMap` that can contain multiple reference counted resources that can be indexed
  * by a key. The resources are lazily acquired on the first call to `get` and
  * released when the last reference is released.
  *
- * Complex keys can extend `Equal` and `Hash` to allow lookups by value.
+ * **When to use**
  *
- * **Options**
+ * Use to create a scoped reference-counted map for resources that should be
+ * acquired once per key and shared while in use.
+ *
+ * **Details**
+ *
+ * Complex keys can extend `Equal` and `Hash` to allow lookups by value.
  *
  * - `capacity`: The maximum number of resources that can be held in the map.
  * - `idleTimeToLive`: When the reference count reaches zero, the resource will be released after this duration.
  *
- * @since 3.5.0
- * @category models
- * @example
+ * **Example** (Creating a reference-counted map)
+ *
  * ```ts
  * import { Effect, RcMap } from "effect"
  *
@@ -251,6 +225,12 @@ const makeUnsafe = <K, A, E>(options: {
  *   )
  * })
  * ```
+ *
+ * @see {@link get} for acquiring or retaining a resource by key
+ * @see {@link invalidate} for removing a resource from the map
+ *
+ * @category models
+ * @since 3.5.0
  */
 export const make: {
   <K, A, E, R>(options: {
@@ -269,11 +249,11 @@ export const make: {
   readonly capacity?: number | undefined
 }) =>
   Effect.withFiber<RcMap<K, A, E>, never, R | Scope.Scope>((fiber) => {
-    const services = fiber.services as ServiceMap.ServiceMap<R | Scope.Scope>
-    const scope = ServiceMap.get(services, Scope.Scope)
+    const context = fiber.context as Context.Context<R | Scope.Scope>
+    const scope = Context.get(context, Scope.Scope)
     const self = makeUnsafe<K, A, E>({
       lookup: options.lookup as any,
-      services,
+      context,
       scope,
       idleTimeToLive: typeof options.idleTimeToLive === "function"
         ? flow(options.idleTimeToLive, Duration.fromInputUnsafe)
@@ -303,13 +283,22 @@ export const make: {
   })
 
 /**
- * Retrieves a value from the RcMap by key. If the resource doesn't exist, it will be
- * acquired using the lookup function. The resource is reference counted and will be
- * released when the scope closes.
+ * Gets the resource for a key, acquiring it with the map's lookup function when
+ * the key is not already cached.
  *
- * @since 3.5.0
- * @category combinators
- * @example
+ * **When to use**
+ *
+ * Use to acquire or retain the resource for a key within the current scope.
+ *
+ * **Details**
+ *
+ * The resource's reference count is incremented for the current `Scope`, and a
+ * release finalizer is added to that scope. When the current scope closes, the
+ * reference is released; the resource is closed when the last reference is
+ * released, subject to the map's idle time-to-live setting.
+ *
+ * **Example** (Acquiring a resource)
+ *
  * ```ts
  * import { Effect, RcMap } from "effect"
  *
@@ -327,6 +316,12 @@ export const make: {
  *   console.log(resource) // "Resource: database"
  * }).pipe(Effect.scoped)
  * ```
+ *
+ * @see {@link make} for creating the reference-counted map
+ * @see {@link invalidate} for removing a resource by key
+ *
+ * @category combinators
+ * @since 3.5.0
  */
 export const get: {
   <K>(key: K): <A, E>(self: RcMap<K, A, E>) => Effect.Effect<A, E, Scope.Scope>
@@ -361,17 +356,17 @@ export const get: {
         }
         ;(entry as any).finalizer = release(self, key, entry)
         MutableHashMap.set(state.map, key, entry)
-        const services = new Map(self.services.mapUnsafe)
-        parent.services.mapUnsafe.forEach((value, key) => {
-          services.set(key, value)
+        const context = new Map(self.context.mapUnsafe)
+        parent.context.mapUnsafe.forEach((value, key) => {
+          context.set(key, value)
         })
-        services.set(Scope.Scope.key, entry.scope)
+        context.set(Scope.Scope.key, entry.scope)
         self.lookup(key).pipe(
-          Effect.runForkWith(ServiceMap.makeUnsafe(services)),
+          Effect.runForkWith(Context.makeUnsafe(context)),
           Fiber.runIn(entry.scope)
         ).addObserver((exit) => Deferred.doneUnsafe(entry.deferred, exit))
       }
-      const scope = ServiceMap.getUnsafe(parent.services, Scope.Scope)
+      const scope = Context.getUnsafe(parent.context, Scope.Scope)
       return Scope.addFinalizer(scope, entry.finalizer).pipe(
         Effect.andThen(restore(Deferred.await(entry.deferred)))
       )
@@ -413,18 +408,25 @@ const release = <K, A, E>(self: RcMap<K, A, E>, key: K, entry: State.Entry<A, E>
       Effect.ensuring(Effect.sync(() => {
         entry.fiber = undefined
       })),
-      Effect.runForkWith(fiber.services),
+      Effect.runForkWith(fiber.context),
       Fiber.runIn(self.scope)
     )
     return Effect.void
   })
 
 /**
- * Returns an array of all keys currently stored in the RcMap.
+ * Returns an iterable of all keys currently stored in the `RcMap`.
  *
- * @since 3.5.0
- * @category combinators
- * @example
+ * **When to use**
+ *
+ * Use to inspect which keys currently have stored resources in an `RcMap`.
+ *
+ * **Details**
+ *
+ * If the `RcMap` has been closed, the effect is interrupted.
+ *
+ * **Example** (Listing keys)
+ *
  * ```ts
  * import { Effect, RcMap } from "effect"
  *
@@ -443,6 +445,11 @@ const release = <K, A, E>(self: RcMap<K, A, E>, key: K, entry: State.Entry<A, E>
  *   console.log(allKeys) // ["foo", "bar", "baz"]
  * }).pipe(Effect.scoped)
  * ```
+ *
+ * @see {@link has} for checking one key without enumerating all keys
+ *
+ * @category combinators
+ * @since 3.8.0
  */
 export const keys = <K, A, E>(self: RcMap<K, A, E>): Effect.Effect<Iterable<K>> => {
   return Effect.suspend(() =>
@@ -454,9 +461,12 @@ export const keys = <K, A, E>(self: RcMap<K, A, E>): Effect.Effect<Iterable<K>> 
  * Invalidates and removes a specific key from the RcMap. If the resource is not
  * currently in use (reference count is 0), it will be immediately released.
  *
- * @since 3.5.0
- * @category combinators
- * @example
+ * **When to use**
+ *
+ * Use to remove a resource by key so the next access performs a fresh lookup.
+ *
+ * **Example** (Invalidating a resource)
+ *
  * ```ts
  * import { Effect, RcMap } from "effect"
  *
@@ -480,6 +490,12 @@ export const keys = <K, A, E>(self: RcMap<K, A, E>): Effect.Effect<Iterable<K>> 
  *   yield* RcMap.get(map, "cache")
  * }).pipe(Effect.scoped)
  * ```
+ *
+ * @see {@link get} for acquiring or retaining the resource for a key
+ * @see {@link touch} for extending the idle lifetime without removing the entry
+ *
+ * @category combinators
+ * @since 3.13.0
  */
 export const invalidate: {
   <K>(key: K): <A, E>(self: RcMap<K, A, E>) => Effect.Effect<void>
@@ -499,8 +515,28 @@ export const invalidate: {
 )
 
 /**
- * @since 3.17.7
+ * Returns whether the `RcMap` currently contains an entry for the specified
+ * key.
+ *
+ * **When to use**
+ *
+ * Use to check whether a key is already present in an `RcMap` without running
+ * the lookup function or acquiring a missing resource.
+ *
+ * **Details**
+ *
+ * This operation only checks the current map state.
+ *
+ * **Gotchas**
+ *
+ * Closed maps return `false`, so `false` does not distinguish a missing key
+ * from a closed map.
+ *
+ * @see {@link get} for acquiring or retaining the resource for a key
+ * @see {@link keys} for enumerating all currently stored keys
+ *
  * @category combinators
+ * @since 3.17.7
  */
 export const has: {
   <K>(key: K): <A, E>(self: RcMap<K, A, E>) => Effect.Effect<boolean>
@@ -519,9 +555,12 @@ export const has: {
  * `idleTimeToLive` configured, calling `touch` will reset the expiration
  * timer for the specified key.
  *
- * @since 3.5.0
- * @category combinators
- * @example
+ * **When to use**
+ *
+ * Use to keep an idle resource alive longer without acquiring a new reference.
+ *
+ * **Example** (Extending resource idle time)
+ *
  * ```ts
  * import { Effect, RcMap } from "effect"
  *
@@ -546,6 +585,11 @@ export const has: {
  *   // from the time it was touched
  * }).pipe(Effect.scoped)
  * ```
+ *
+ * @see {@link invalidate} for removing the resource instead of extending it
+ *
+ * @category combinators
+ * @since 3.13.0
  */
 export const touch: {
   <K>(key: K): <A, E>(self: RcMap<K, A, E>) => Effect.Effect<void>

@@ -1,17 +1,26 @@
 /**
+ * Global flags for Effect CLI command trees. Global flags are parsed outside a
+ * single command's local flags and can apply to a command and its descendants.
+ *
+ * This module defines two kinds of global flags: action flags, which run an
+ * effect and stop normal command execution, and setting flags, which provide a
+ * parsed value to the command handler through the Effect context. It also
+ * defines the built-in help, version, shell-completion, and log-level flags
+ * used by `Command.run` and `Command.runWith`.
+ *
  * @since 4.0.0
  */
 
 import * as Console from "../../Console.ts"
+import * as Context from "../../Context.ts"
 import * as Effect from "../../Effect.ts"
 import type { LogLevel as LogLevelType } from "../../LogLevel.ts"
 import * as Option from "../../Option.ts"
-import * as ServiceMap from "../../ServiceMap.ts"
 import * as CliOutput from "./CliOutput.ts"
 import type * as Command from "./Command.ts"
 import * as Completions_ from "./Completions.ts"
 import * as Flag from "./Flag.ts"
-import * as CommandDescriptor from "./internal/completions/CommandDescriptor.ts"
+import * as CommandDescriptor from "./internal/completions/descriptor.ts"
 import * as HelpInternal from "./internal/help.ts"
 
 /* ========================================================================== */
@@ -21,11 +30,11 @@ import * as HelpInternal from "./internal/help.ts"
 /**
  * Context passed to action handlers.
  *
- * @since 4.0.0
  * @category models
+ * @since 4.0.0
  */
 export interface HandlerContext {
-  readonly command: Command.Command<any, unknown, any, unknown, unknown>
+  readonly command: Command.Command.Any
   readonly commandPath: ReadonlyArray<string>
   readonly version: string
 }
@@ -33,8 +42,8 @@ export interface HandlerContext {
 /**
  * Action flag: side effect + exit (--help, --version, --completions).
  *
- * @since 4.0.0
  * @category models
+ * @since 4.0.0
  */
 export interface Action<A> {
   readonly _tag: "Action"
@@ -48,22 +57,27 @@ export interface Action<A> {
 /**
  * Setting flag: configure command handler's environment (--log-level, --config).
  *
- * @since 4.0.0
  * @category models
+ * @since 4.0.0
  */
-export interface Setting<Id extends string, A> extends ServiceMap.Service<Setting.Identifier<Id>, A> {
+export interface Setting<Id extends string, A> extends Context.Service<Setting.Identifier<Id>, A> {
   readonly _tag: "Setting"
   readonly id: Id
   readonly flag: Flag.Flag<A>
 }
 
 /**
+ * Namespace containing type helpers for global setting flags.
+ *
  * @since 4.0.0
  */
 export declare namespace Setting {
   /**
-   * @since 4.0.0
+   * Type-level service identifier used by `Setting` global flags for the
+   * parsed value associated with a setting id.
+   *
    * @category models
+   * @since 4.0.0
    */
   export type Identifier<Id extends string> = `effect/unstable/cli/GlobalFlag/${Id}`
 }
@@ -71,8 +85,8 @@ export declare namespace Setting {
 /**
  * Global flag discriminated union.
  *
- * @since 4.0.0
  * @category models
+ * @since 4.0.0
  */
 export type GlobalFlag<A> = Action<A> | Setting<any, A>
 
@@ -83,8 +97,8 @@ export type GlobalFlag<A> = Action<A> | Setting<any, A>
 /**
  * Creates an Action flag that performs a side effect and exits.
  *
- * @since 4.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const action = <A>(options: {
   readonly flag: Flag.Flag<A>
@@ -101,8 +115,8 @@ export const action = <A>(options: {
 /**
  * Creates a Setting flag that configures the command handler's environment.
  *
- * @since 4.0.0
  * @category constructors
+ * @since 4.0.0
  */
 export const setting = <const Id extends string>(
   id: Id
@@ -111,7 +125,7 @@ export const setting = <const Id extends string>(
   readonly flag: Flag.Flag<A>
 }): Setting<Id, A> => {
   settingIdCounter += 1
-  const ref = ServiceMap.Service<Setting.Identifier<Id>, A>(
+  const ref = Context.Service<Setting.Identifier<Id>, A>(
     `effect/unstable/cli/GlobalFlag/${id}/${settingIdCounter}`
   )
   return Object.assign(ref, {
@@ -128,73 +142,87 @@ let settingIdCounter = 0
 /* ========================================================================== */
 
 /**
- * The `--help` / `-h` global flag.
- * Shows help documentation for the command.
+ * Defines the `--help` / `-h` global flag, which shows help documentation for the
+ * active command path.
  *
- * @since 4.0.0
+ * @see {@link BuiltIns} for the default list containing this flag
+ * @see {@link action} for defining custom action global flags
+ *
  * @category references
+ * @since 4.0.0
  */
 export const Help: Action<boolean> = action({
   flag: Flag.boolean("help").pipe(
     Flag.withAlias("h"),
     Flag.withDescription("Show help information")
   ),
-  run: (_, { command, commandPath }) =>
-    Effect.gen(function*() {
-      const formatter = yield* CliOutput.Formatter
-      const helpDoc = yield* HelpInternal.getHelpForCommandPath(command, commandPath, BuiltIns)
-      yield* Console.log(formatter.formatHelpDoc(helpDoc))
-    })
+  run: Effect.fnUntraced(function*(_, { command, commandPath }) {
+    const formatter = yield* CliOutput.Formatter
+    const helpDoc = yield* HelpInternal.getHelpForCommandPath(command, commandPath, BuiltIns)
+    yield* Console.log(formatter.formatHelpDoc(helpDoc))
+  })
 })
 
 /**
- * The `--version` global flag.
- * Shows version information for the command.
+ * Defines the global action flag for showing command version information.
  *
- * @since 4.0.0
+ * **When to use**
+ *
+ * Use to add a built-in `--version / -v` flag to a command runner.
+ *
  * @category references
+ * @since 4.0.0
  */
 export const Version: Action<boolean> = action({
   flag: Flag.boolean("version").pipe(
+    Flag.withAlias("v"),
     Flag.withDescription("Show version information")
   ),
-  run: (_, { command, version }) =>
-    Effect.gen(function*() {
-      const formatter = yield* CliOutput.Formatter
-      yield* Console.log(formatter.formatVersion(command.name, version))
-    })
+  run: Effect.fnUntraced(function*(_, { command, version }) {
+    const formatter = yield* CliOutput.Formatter
+    yield* Console.log(formatter.formatVersion(command.name, version))
+  })
 })
 
 /**
- * The `--completions` global flag.
- * Prints shell completion script for the given shell.
+ * Defines the `--completions` global flag, which prints a shell completion script for
+ * the given shell.
  *
- * @since 4.0.0
+ * **Details**
+ *
+ * Accepted values are `bash`, `zsh`, `fish`, and `sh`; `sh` is normalized to
+ * `bash`.
+ *
  * @category references
+ * @since 4.0.0
  */
 export const Completions: Action<Option.Option<"bash" | "zsh" | "fish">> = action({
   flag: Flag.choice("completions", ["bash", "zsh", "fish", "sh"] as const)
     .pipe(
       Flag.optional,
       Flag.map((v) => Option.map(v, (s) => s === "sh" ? "bash" : s)),
+      Flag.withMetavar("<bash|zsh|fish|sh>"),
       Flag.withDescription("Print shell completion script")
     ),
-  run: (shell, { command }) =>
-    Effect.gen(function*() {
-      if (Option.isNone(shell)) return
-      const descriptor = CommandDescriptor.fromCommand(command)
-      yield* Console.log(
-        Completions_.generate(command.name, shell.value, descriptor)
-      )
-    })
+  run: Effect.fnUntraced(function*(shell, { command }) {
+    if (Option.isNone(shell)) return
+    const descriptor = CommandDescriptor.fromCommand(command)
+    yield* Console.log(
+      Completions_.generate(command.name, shell.value, descriptor)
+    )
+  })
 })
 
 /**
- * The `--log-level` global flag.
- * Sets the minimum log level for the command.
+ * Defines the global setting flag for command log level.
  *
- * @since 4.0.0
+ * **When to use**
+ *
+ * Use to add a built-in `--log-level` option that configures the minimum log
+ * level for the command.
+ *
  * @category references
+ * @since 4.0.0
  */
 export const LogLevel: Setting<"log-level", Option.Option<LogLevelType>> = setting("log-level")({
   flag: Flag.choiceWithValue(
@@ -212,7 +240,8 @@ export const LogLevel: Setting<"log-level", Option.Option<LogLevelType>> = setti
     ] as const
   ).pipe(
     Flag.optional,
-    Flag.withDescription("Sets the minimum log level")
+    Flag.withDescription("Sets the minimum log level"),
+    Flag.withMetavar("<all|trace|debug|info|warn|warning|error|fatal|none>")
   )
 })
 
@@ -223,20 +252,33 @@ export const LogLevel: Setting<"log-level", Option.Option<LogLevelType>> = setti
 /**
  * Built-in global flags in default precedence order.
  *
- * @since 4.0.0
- * @category references
- */
-export const BuiltIns: ReadonlyArray<GlobalFlag<any>> = [
-  Help,
-  Version,
-  Completions,
-  LogLevel
-]
-
-/**
- * Built-in setting context identifiers.
+ * **When to use**
  *
+ * Use when extending or inspecting the default global-flag set that
+ * `Command.runWith` prepends before user-defined global flags.
+ *
+ * **Details**
+ *
+ * The built-ins are `Help`, `Version`, `Completions`, and `LogLevel`.
+ * `Command.runWith` prepends these built-ins when collecting and parsing global
+ * flags.
+ *
+ * **Gotchas**
+ *
+ * Action flags are processed in active flag order and the first present action
+ * exits, so this array controls built-in action precedence.
+ *
+ * @see {@link Help} for the help action flag
+ * @see {@link Version} for the version action flag
+ * @see {@link Completions} for the shell-completions action flag
+ * @see {@link LogLevel} for the built-in log-level setting flag
+ *
+ * @category references
  * @since 4.0.0
- * @category models
  */
-export type BuiltInSettingContext = Setting.Identifier<"log-level">
+export const BuiltIns: readonly [
+  Action<boolean>,
+  Action<boolean>,
+  Action<Option.Option<"bash" | "zsh" | "fish">>,
+  Setting<"log-level", Option.Option<LogLevelType>>
+] = [Help, Version, Completions, LogLevel]

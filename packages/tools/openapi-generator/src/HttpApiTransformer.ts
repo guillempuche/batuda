@@ -1,3 +1,14 @@
+/**
+ * Renders parsed OpenAPI operations into generated Effect HttpApi source code.
+ *
+ * This module maps normalized OpenAPI metadata, tags, request bodies,
+ * responses, and security requirements into import declarations, HttpApi
+ * groups, endpoint definitions, schema annotations, and middleware classes.
+ * The rendered TypeScript can be emitted by the OpenAPI generator as an
+ * executable Effect `HttpApi` module.
+ *
+ * @since 4.0.0
+ */
 import type {
   ParsedOpenApi,
   ParsedOpenApiSecurityScheme,
@@ -24,6 +35,18 @@ interface SecurityRenderModel {
 
 const fallbackGroupIdentifier = "default"
 
+/**
+ * Render the import declarations required by generated HttpApi source.
+ *
+ * **Details**
+ *
+ * The schema namespace import is named by the caller so generated code can
+ * avoid collisions with symbols already present in the output module. Multipart
+ * support is included only when the parsed OpenAPI document needs it.
+ *
+ * @category code generation
+ * @since 4.0.0
+ */
 export const imports = (
   importName: string,
   options?: {
@@ -36,6 +59,18 @@ export const imports = (
     `import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiMiddleware, HttpApiSchema, HttpApiSecurity, OpenApi } from "effect/unstable/httpapi"`
   ].join("\n")
 
+/**
+ * Convert a parsed OpenAPI document into Effect HttpApi source code.
+ *
+ * **Details**
+ *
+ * The generated implementation contains security declarations, reusable
+ * middleware classes, HttpApi groups, endpoint definitions, and OpenAPI
+ * annotations derived from the parsed operation metadata.
+ *
+ * @category code generation
+ * @since 4.0.0
+ */
 export const toImplementation = (
   _importName: string,
   name: string,
@@ -259,6 +294,20 @@ const joinSchemas = (schemas: ReadonlyArray<string>): string =>
   schemas.length === 1 ? schemas[0] : `[${schemas.join(", ")}]`
 
 const renderMediaSchema = (media: ParsedOperationMediaTypeSchema): string => {
+  if (media.effectStream === "sse") {
+    const options = media.contentType === "text/event-stream"
+      ? `{ events: ${media.schema}, error: ${media.errorSchema} }`
+      : `{ contentType: ${JSON.stringify(media.contentType)}, events: ${media.schema}, error: ${media.errorSchema} }`
+    return `HttpApiSchema.StreamSse(${options})`
+  }
+
+  if (media.effectStream === "uint8array") {
+    if (media.contentType === "application/octet-stream") {
+      return "HttpApiSchema.StreamUint8Array()"
+    }
+    return `HttpApiSchema.StreamUint8Array({ contentType: ${JSON.stringify(media.contentType)} })`
+  }
+
   switch (media.encoding) {
     case "json": {
       if (media.contentType === "application/json") {
@@ -438,6 +487,10 @@ const renderSecurityScheme = (securityScheme: ParsedOpenApiSecurityScheme): stri
       source = "HttpApiSecurity.bearer"
       break
     }
+    case "http": {
+      source = `HttpApiSecurity.http({ scheme: ${JSON.stringify(securityScheme.scheme!)} })`
+      break
+    }
     case "apiKey": {
       source = `HttpApiSecurity.apiKey({ key: ${JSON.stringify(securityScheme.key!)}, in: ${
         JSON.stringify(securityScheme.in!)
@@ -449,7 +502,9 @@ const renderSecurityScheme = (securityScheme: ParsedOpenApiSecurityScheme): stri
   if (securityScheme.description !== undefined) {
     source += `.pipe(HttpApiSecurity.annotate(OpenApi.Description, ${JSON.stringify(securityScheme.description)}))`
   }
-  if (securityScheme.type === "bearer" && securityScheme.bearerFormat !== undefined) {
+  if (
+    (securityScheme.type === "bearer" || securityScheme.type === "http") && securityScheme.bearerFormat !== undefined
+  ) {
     source += `.pipe(HttpApiSecurity.annotate(OpenApi.Format, ${JSON.stringify(securityScheme.bearerFormat)}))`
   }
 

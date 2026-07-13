@@ -1,5 +1,12 @@
 /**
- * @since 1.0.0
+ * Bun HTTP and WebSocket layers for Effect Cluster runners.
+ *
+ * `layerHttpServer` provides the Bun HTTP server used by cluster runners. The
+ * main `layer` builds a sharding layer for HTTP or WebSocket transport,
+ * choosing serialization, runner health checks, runner storage, message
+ * storage, and optional client-only mode from the supplied options.
+ *
+ * @since 4.0.0
  */
 import type * as Config from "effect/Config"
 import * as Effect from "effect/Effect"
@@ -29,15 +36,19 @@ import * as BunSocket from "./BunSocket.ts"
 
 export {
   /**
-   * @since 1.0.0
-   * @category Re-exports
+   * Layer that provides a Kubernetes HTTP client for runner health checks.
+   *
+   * @category re-exports
+   * @since 4.0.0
    */
   layerK8sHttpClient
 }
 
 /**
- * @since 1.0.0
- * @category Layers
+ * Layer that provides a Bun HTTP server for cluster runners.
+ *
+ * @category layers
+ * @since 4.0.0
  */
 export const layerHttpServer: Layer.Layer<
   | HttpPlatform
@@ -56,8 +67,34 @@ export const layerHttpServer: Layer.Layer<
 }).pipe(Layer.unwrap)
 
 /**
- * @since 1.0.0
- * @category Layers
+ * Creates Bun cluster layers for HTTP or WebSocket transport, configuring serialization, storage, runner health, and optional client-only mode.
+ *
+ * **When to use**
+ *
+ * Use to install the complete Bun HTTP or WebSocket cluster layer, including
+ * client-only cluster access when a process should connect without serving
+ * runner RPCs.
+ *
+ * **Details**
+ *
+ * `serialization` defaults to MessagePack, `runnerHealth` defaults to ping
+ * checks, SQL-backed storage is used by default, and `shardingConfig` is
+ * overlaid on environment-loaded sharding configuration. `local` storage uses
+ * no-op message storage plus in-memory runner storage, while `byo` leaves both
+ * message and runner storage for the caller to provide.
+ *
+ * **Gotchas**
+ *
+ * `clientOnly` does not start the HTTP server or receive shard assignments.
+ * Non-client-only mode listens with `runnerListenAddress` when present, falling
+ * back to `runnerAddress`. HTTP and WebSocket runner RPCs use the default
+ * `HttpRunner` route.
+ *
+ * @see {@link layerHttpServer} for the server layer used by non-client-only transports
+ * @see {@link layerK8sHttpClient} for Kubernetes runner health support
+ *
+ * @category layers
+ * @since 4.0.0
  */
 export const layer = <
   const ClientOnly extends boolean = false,

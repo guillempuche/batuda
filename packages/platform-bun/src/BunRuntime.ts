@@ -1,5 +1,11 @@
 /**
- * @since 1.0.0
+ * Bun process runner for Effect programs.
+ *
+ * This module exports `runMain`, which runs one Effect as the main process
+ * fiber in Bun. It reuses the shared Node runtime runner, including its error
+ * reporting, signal handling, and optional teardown behavior.
+ *
+ * @since 4.0.0
  */
 import * as NodeRuntime from "@effect/platform-node-shared/NodeRuntime"
 import type { Effect } from "effect/Effect"
@@ -7,6 +13,11 @@ import type { Teardown } from "effect/Runtime"
 
 /**
  * Helps you run a main effect with built-in error handling, logging, and signal management.
+ *
+ * **When to use**
+ *
+ * Use to run a Bun application's main Effect with structured error handling,
+ * log management, interrupt support, or advanced teardown capabilities.
  *
  * **Details**
  *
@@ -16,21 +27,13 @@ import type { Teardown } from "effect/Runtime"
  * behaviors can be turned off. You can also provide custom teardown logic to
  * finalize resources or produce different exit codes.
  *
- * **Options**
- *
  * An optional object that can include:
  * - `disableErrorReporting`: Turn off automatic error logging.
  * - `disablePrettyLogger`: Avoid adding the pretty logger.
  * - `teardown`: Provide custom finalization logic.
  *
- * **When to Use**
- *
- * Use this function to run an Effect as your application’s main program, especially
- * when you need structured error handling, log management, interrupt support,
- * or advanced teardown capabilities.
- *
- * @since 1.0.0
- * @category Run main
+ * @category running
+ * @since 4.0.0
  */
 export const runMain: {
   (

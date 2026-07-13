@@ -1,5 +1,13 @@
 /**
- * @since 1.0.0
+ * Bun socket layers for Effect Cluster runners.
+ *
+ * The main `layer` builds a sharding layer for socket transport, choosing
+ * serialization, runner health checks, runner storage, message storage, and
+ * optional client-only mode from the supplied options. This module also
+ * re-exports the shared socket client and server protocol layers and provides
+ * `layerK8sHttpClient` for Kubernetes runner health checks.
+ *
+ * @since 4.0.0
  */
 import { layerClientProtocol, layerSocketServer } from "@effect/platform-node-shared/NodeClusterSocket"
 import type * as Config from "effect/Config"
@@ -24,20 +32,28 @@ import * as BunFileSystem from "./BunFileSystem.ts"
 
 export {
   /**
-   * @since 1.0.0
-   * @category Re-exports
+   * Provides the cluster `RpcClientProtocol` using the shared socket client
+   * implementation.
+   *
+   * @category re-exports
+   * @since 4.0.0
    */
   layerClientProtocol,
   /**
-   * @since 1.0.0
-   * @category Re-exports
+   * Provides the socket server used by Bun cluster runners through the shared
+   * socket server implementation.
+   *
+   * @category re-exports
+   * @since 4.0.0
    */
   layerSocketServer
 }
 
 /**
- * @since 1.0.0
- * @category Layers
+ * Creates Bun socket cluster layers, configuring serialization, storage, runner health, and optional client-only mode.
+ *
+ * @category layers
+ * @since 4.0.0
  */
 export const layer = <
   const ClientOnly extends boolean = false,
@@ -110,8 +126,10 @@ export const layer = <
 }
 
 /**
- * @since 1.0.0
- * @category Layers
+ * Layer that provides `K8sHttpClient`, using the Kubernetes service-account CA certificate when it is available.
+ *
+ * @category layers
+ * @since 4.0.0
  */
 export const layerK8sHttpClient: Layer.Layer<K8sHttpClient.K8sHttpClient> = K8sHttpClient.layer.pipe(
   Layer.provide(Layer.unwrap(Effect.gen(function*() {

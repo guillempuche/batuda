@@ -1,5 +1,13 @@
 /**
- * @since 1.0.0
+ * Runs database migrations for PostgreSQL projects that use Effect SQL.
+ *
+ * This module reuses the shared SQL migrator and connects it to PostgreSQL. It
+ * exposes the common migration helpers and adds `run` and `layer` functions
+ * that apply pending migration files with the current SQL client. When schema
+ * dumps are requested, it uses `pg_dump` and the usual process and filesystem
+ * services.
+ *
+ * @since 4.0.0
  */
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
@@ -14,13 +22,15 @@ import type { SqlError } from "effect/unstable/sql/SqlError"
 import { PgClient } from "./PgClient.ts"
 
 /**
- * @since 1.0.0
+ * @since 4.0.0
  */
 export * from "effect/unstable/sql/Migrator"
 
 /**
- * @category constructor
- * @since 1.0.0
+ * Runs PostgreSQL SQL migrations using the configured clients. Schema dumps use `pg_dump` and require child process, filesystem, and path services.
+ *
+ * @category constructors
+ * @since 4.0.0
  */
 export const run: <R2 = never>(
   options: Migrator.MigratorOptions<R2>
@@ -91,8 +101,10 @@ export const run: <R2 = never>(
 })
 
 /**
+ * Creates a layer that runs PostgreSQL migrations during layer construction, including `pg_dump`-based schema dump support when requested.
+ *
  * @category layers
- * @since 1.0.0
+ * @since 4.0.0
  */
 export const layer = <R>(
   options: Migrator.MigratorOptions<R>
