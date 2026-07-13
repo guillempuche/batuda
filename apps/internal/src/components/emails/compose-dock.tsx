@@ -88,6 +88,14 @@ const DockLayer = styled.div.withConfig({ displayName: 'ComposeDock' })`
 	align-items: flex-end;
 	gap: var(--space-2xs);
 	pointer-events: none;
+
+	/* Below the breakpoint the window becomes an edge-to-edge bottom sheet,
+	   flush to both sides instead of hugging the right with a margin. */
+	@media (max-width: 767px) {
+		left: 0;
+		right: 0;
+		align-items: stretch;
+	}
 `
 
 const OpenStack = styled.div.withConfig({
@@ -122,6 +130,13 @@ const MinimizedTray = styled.div.withConfig({
 	gap: var(--space-2xs);
 	pointer-events: auto;
 	padding-bottom: var(--space-2xs);
+
+	/* On a phone the open draft is a full-height sheet, so a tray of pills
+	   below it would only crowd the bottom-nav. Minimized drafts stay
+	   reachable from the "Resume drafting" strip on the emails page. */
+	@media (max-width: 767px) {
+		display: none;
+	}
 `
 
 const PillButton = styled.button.withConfig({
