@@ -251,7 +251,11 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 		const registry = yield* RegistryRouter
 		const contactDiscovery = yield* ContactDiscovery
 		const budget = yield* Budget
-		const { researchId } = yield* ResearchRunContext
+		const {
+			researchId,
+			language: hintLanguage,
+			location: hintLocation,
+		} = yield* ResearchRunContext
 
 		// Charged against the run before each vendor call (cheap tier for
 		// search/scrape, paid tier for the registry). When the budget
@@ -324,7 +328,11 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 							params.recency_days != null
 								? { days: params.recency_days }
 								: undefined,
-						location: params.location ?? undefined,
+						// Fall back to the run's location hint when the model gives none, and
+						// carry the run's language so the provider searches in the target's
+						// own language rather than defaulting to English.
+						location: params.location ?? hintLocation ?? undefined,
+						languages: hintLanguage ? [hintLanguage] : undefined,
 					})
 				}).pipe(
 					Effect.catchTag('BudgetExceeded', cheapExhausted('web_search')),
