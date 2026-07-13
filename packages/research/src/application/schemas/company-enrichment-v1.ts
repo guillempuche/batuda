@@ -53,6 +53,13 @@ export const CompanyEnrichmentV1Schema = Schema.Struct({
 				role: Schema.optionalKey(Sourced(Schema.String)),
 				email: Schema.optionalKey(Sourced(Schema.String)),
 				phone: Schema.optionalKey(Sourced(Schema.String)),
+				// The page(s) that name this person as the company's own staff, so a
+				// contact can be tied to the target and not confused with a client,
+				// partner, or competitor's executive quoted on the same site.
+				citations: Schema.optionalKey(Schema.Array(Citation)).annotate({
+					description:
+						'Sources naming this person as the company\'s own leader or employee (prefer the company\'s own website). A person described as a client, partner, or "customer testimonial" is not a contact.',
+				}),
 			}),
 		),
 	),

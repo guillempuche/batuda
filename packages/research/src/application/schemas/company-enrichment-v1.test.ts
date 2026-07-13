@@ -44,6 +44,13 @@ describe('CompanyEnrichmentV1Schema', () => {
 							source_id: 'src-2',
 							confidence: null,
 						},
+						citations: [
+							{
+								source_id: 'src-1',
+								quote: 'Ada Lovelace, CTO',
+								confidence: null,
+							},
+						],
 					},
 				],
 			}
@@ -59,6 +66,8 @@ describe('CompanyEnrichmentV1Schema', () => {
 			expect(decoded.enrichment.country?.source_id).toBe('src-2')
 			expect(decoded.contacts?.[0]?.email?.value).toBe('ada@acme.es')
 			expect(decoded.contacts?.[0]?.role?.value).toBe('CTO')
+			// The per-contact citation ties the person to the company's own page.
+			expect(decoded.contacts?.[0]?.citations?.[0]?.source_id).toBe('src-1')
 		})
 	})
 
