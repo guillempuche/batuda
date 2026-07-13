@@ -206,14 +206,20 @@ const driveOne = (
 	defaults: SystemDefaults,
 	golden: GoldenExpectation,
 	schemaName: string,
+	language: string | undefined,
 ) =>
 	Effect.gen(function* () {
 		const svc = yield* ResearchService
+		// Narrow the free-text flag to a supported language, dropping anything else.
+		const lang = (['ca', 'es', 'en'] as const).find(l => l === language)
 		const input: CreateResearchInput = {
 			query: golden.query,
 			schemaName,
 			// Always execute a fresh run; a cached clone would score stale data.
 			forceFresh: true,
+			// Carry the language hint so the search looks in the target's own
+			// language — the seam for testing a non-English company end to end.
+			...(lang ? { context: { hints: { language: lang } } } : {}),
 		}
 		const created = yield* svc.create(user, org, input, defaults)
 		// A single-subject eval never fans out, so it always carries a run id;
@@ -281,6 +287,7 @@ export const researchEval = (opts: {
 	readonly user: string
 	readonly goldenPath: string
 	readonly schemaName: string
+	readonly language: Option.Option<string>
 	readonly concurrency: number
 	readonly runs: number
 	readonly out: Option.Option<string>
@@ -331,6 +338,7 @@ export const researchEval = (opts: {
 						defaults,
 						company,
 						opts.schemaName,
+						Option.getOrUndefined(opts.language),
 					).pipe(
 						Effect.tap(score =>
 							Effect.annotateCurrentSpan(evalSpanAttributes(score)),
