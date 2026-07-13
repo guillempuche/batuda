@@ -1,9 +1,8 @@
 import type { TabsRootState } from './TabsRoot';
-import type { StateAttributesMapping } from '../../utils/getStateAttributesProps';
-import { TabsRootDataAttributes } from './TabsRootDataAttributes';
+import type { StateAttributesMapping } from '../../internals/getStateAttributesProps';
 
 export const tabsStateAttributesMapping: StateAttributesMapping<TabsRootState> = {
   tabActivationDirection: (dir) => ({
-    [TabsRootDataAttributes.activationDirection]: dir,
+    'data-activation-direction': dir,
   }),
 };

@@ -1,9 +1,9 @@
 'use client';
 import * as React from 'react';
-import type { BaseUIComponentProps, NativeButtonProps } from '../../utils/types';
+import type { BaseUIComponentProps, NativeButtonProps } from '../../internals/types';
 import { useToastRootContext } from '../root/ToastRootContext';
-import { useButton } from '../../use-button/useButton';
-import { useRenderElement } from '../../utils/useRenderElement';
+import { useButton } from '../../internals/use-button/useButton';
+import { useRenderElement } from '../../internals/useRenderElement';
 
 /**
  * Performs an action when clicked.
@@ -38,7 +38,8 @@ export const ToastAction = React.forwardRef(function ToastAction(
     type: toast.type,
   };
 
-  const element = useRenderElement('button', componentProps, {
+  return useRenderElement('button', componentProps, {
+    enabled: shouldRender,
     ref: [forwardedRef, buttonRef],
     state,
     props: [
@@ -50,12 +51,6 @@ export const ToastAction = React.forwardRef(function ToastAction(
       },
     ],
   });
-
-  if (!shouldRender) {
-    return null;
-  }
-
-  return element;
 });
 
 export interface ToastActionState {

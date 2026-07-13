@@ -2,23 +2,15 @@
 import * as React from 'react';
 import { useStableCallback } from '@base-ui/utils/useStableCallback';
 import { useControlled } from '@base-ui/utils/useControlled';
-import { useRenderElement } from '../utils/useRenderElement';
-import type { BaseUIComponentProps, HTMLProps, Orientation } from '../utils/types';
-import { CompositeRoot } from '../composite/root/CompositeRoot';
+import { EMPTY_ARRAY } from '@base-ui/utils/empty';
+import { useRenderElement } from '../internals/useRenderElement';
+import type { BaseUIComponentProps, HTMLProps, Orientation } from '../internals/types';
+import { CompositeRoot } from '../internals/composite/root/CompositeRoot';
 import { useToolbarRootContext } from '../toolbar/root/ToolbarRootContext';
+import { useToolbarGroupContext } from '../toolbar/group/ToolbarGroupContext';
 import { ToggleGroupContext } from './ToggleGroupContext';
-import { ToggleGroupDataAttributes } from './ToggleGroupDataAttributes';
-import type { BaseUIChangeEventDetails } from '../utils/createBaseUIEventDetails';
-import { REASONS } from '../utils/reasons';
-
-const stateAttributesMapping = {
-  multiple(value: boolean) {
-    if (value) {
-      return { [ToggleGroupDataAttributes.multiple]: '' } as Record<string, string>;
-    }
-    return null;
-  },
-};
+import type { BaseUIChangeEventDetails } from '../internals/createBaseUIEventDetails';
+import { REASONS } from '../internals/reasons';
 
 /**
  * Provides a shared state to a series of toggle buttons.
@@ -44,25 +36,16 @@ export const ToggleGroup = React.forwardRef(function ToggleGroup<Value extends s
   } = componentProps;
 
   const toolbarContext = useToolbarRootContext(true);
+  const toolbarGroupContext = useToolbarGroupContext();
 
-  const defaultValue = React.useMemo(() => {
-    if (valueProp === undefined) {
-      return defaultValueProp ?? [];
-    }
+  const isValueInitialized = valueProp !== undefined || defaultValueProp !== undefined;
 
-    return undefined;
-  }, [valueProp, defaultValueProp]);
-
-  const isValueInitialized = React.useMemo(
-    () => valueProp !== undefined || defaultValueProp !== undefined,
-    [valueProp, defaultValueProp],
-  );
-
-  const disabled = (toolbarContext?.disabled ?? false) || disabledProp;
+  const disabled =
+    (toolbarContext?.disabled ?? false) || (toolbarGroupContext?.disabled ?? false) || disabledProp;
 
   const [groupValue, setValueState] = useControlled({
     controlled: valueProp,
-    default: defaultValue,
+    default: valueProp === undefined ? (defaultValueProp ?? EMPTY_ARRAY) : undefined,
     name: 'ToggleGroup',
     state: 'value',
   });
@@ -84,15 +67,14 @@ export const ToggleGroup = React.forwardRef(function ToggleGroup<Value extends s
       } else {
         newGroupValue = nextPressed ? [newValue] : [];
       }
-      if (Array.isArray(newGroupValue)) {
-        onValueChange?.(newGroupValue, eventDetails);
 
-        if (eventDetails.isCanceled) {
-          return;
-        }
+      onValueChange?.(newGroupValue, eventDetails);
 
-        setValueState(newGroupValue);
+      if (eventDetails.isCanceled) {
+        return;
       }
+
+      setValueState(newGroupValue);
     },
   );
 
@@ -101,12 +83,11 @@ export const ToggleGroup = React.forwardRef(function ToggleGroup<Value extends s
   const contextValue: ToggleGroupContext<Value> = React.useMemo(
     () => ({
       disabled,
-      orientation,
       setGroupValue,
       value: groupValue,
       isValueInitialized,
     }),
-    [disabled, orientation, setGroupValue, groupValue, isValueInitialized],
+    [disabled, setGroupValue, groupValue, isValueInitialized],
   );
 
   const defaultProps: HTMLProps = {
@@ -118,7 +99,6 @@ export const ToggleGroup = React.forwardRef(function ToggleGroup<Value extends s
     state,
     ref: forwardedRef,
     props: [defaultProps, elementProps],
-    stateAttributesMapping,
   });
 
   return (
@@ -133,9 +113,9 @@ export const ToggleGroup = React.forwardRef(function ToggleGroup<Value extends s
           state={state}
           refs={[forwardedRef]}
           props={[defaultProps, elementProps]}
-          stateAttributesMapping={stateAttributesMapping}
           loopFocus={loopFocus}
           enableHomeAndEndKeys
+          orientation={orientation}
         />
       )}
     </ToggleGroupContext.Provider>
@@ -169,13 +149,13 @@ export interface ToggleGroupProps<Value extends string> extends BaseUIComponentP
   ToggleGroupState
 > {
   /**
-   * The open state of the toggle group represented by an array of
+   * The pressed state of the toggle group represented by an array of
    * the values of all pressed toggle buttons.
    * This is the controlled counterpart of `defaultValue`.
    */
   value?: readonly Value[] | undefined;
   /**
-   * The open state of the toggle group represented by an array of
+   * The pressed state of the toggle group represented by an array of
    * the values of all pressed toggle buttons.
    * This is the uncontrolled counterpart of `value`.
    */

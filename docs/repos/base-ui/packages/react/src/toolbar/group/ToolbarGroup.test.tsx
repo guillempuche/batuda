@@ -2,9 +2,9 @@ import { expect } from 'vitest';
 import { Toolbar } from '@base-ui/react/toolbar';
 import { screen } from '@mui/internal-test-utils';
 import { createRenderer, describeConformance } from '#test-utils';
-import { NOOP } from '../../utils/noop';
+import { NOOP } from '../../internals/noop';
 import { ToolbarRootContext } from '../root/ToolbarRootContext';
-import { CompositeRootContext } from '../../composite/root/CompositeRootContext';
+import { CompositeRootContext } from '../../internals/composite/root/CompositeRootContext';
 
 const testCompositeContext: CompositeRootContext = {
   highlightedIndex: 0,
@@ -16,7 +16,6 @@ const testCompositeContext: CompositeRootContext = {
 const testToolbarContext: ToolbarRootContext = {
   disabled: false,
   orientation: 'horizontal',
-  setItemMap: NOOP,
 };
 
 describe('<Toolbar.Group />', () => {

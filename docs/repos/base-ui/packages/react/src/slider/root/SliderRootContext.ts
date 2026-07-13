@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
-import type { Orientation } from '../../utils/types';
-import type { CompositeMetadata } from '../../composite/list/CompositeList';
+import type { Orientation } from '../../internals/types';
+import type { CompositeMetadata } from '../../internals/composite/list/CompositeList';
 import type { UseFieldValidationReturnValue } from '../../field/root/useFieldValidation';
 import type { ThumbMetadata } from '../thumb/SliderThumb';
 import type { SliderRoot, SliderRootState } from './SliderRoot';
@@ -19,7 +19,10 @@ export interface SliderRootContext {
   dragging: boolean;
   disabled: boolean;
   validation: UseFieldValidationReturnValue;
-  formatOptionsRef: React.RefObject<Intl.NumberFormatOptions | undefined>;
+  /**
+   * Options to format the value.
+   */
+  format: Intl.NumberFormatOptions | undefined;
   handleInputChange: (
     valueInput: number,
     index: number,
@@ -35,7 +38,6 @@ export interface SliderRootContext {
    * @default 10
    */
   largeStep: number;
-  lastChangedValueRef: React.RefObject<number | readonly number[] | null>;
   lastChangeReasonRef: React.RefObject<SliderRoot.ChangeEventReason>;
   /**
    * The locale used by `Intl.NumberFormat` when formatting the value.
@@ -68,7 +70,6 @@ export interface SliderRootContext {
    * @default 'horizontal'
    */
   orientation: Orientation;
-  pressedInputRef: React.RefObject<HTMLInputElement | null>;
   pressedThumbCenterOffsetRef: React.RefObject<number | null>;
   pressedThumbIndexRef: React.RefObject<number>;
   pressedValuesRef: React.RefObject<readonly number[] | null>;
@@ -79,9 +80,11 @@ export interface SliderRootContext {
   setIndicatorPosition: React.Dispatch<React.SetStateAction<(number | undefined)[]>>;
   setLabelId: React.Dispatch<React.SetStateAction<string | undefined>>;
   /**
-   * Callback fired when dragging and invokes onValueChange.
+   * Applies a new value through `onValueChange` for keyboard, input, track-press,
+   * and drag interactions. Returns `true` when the value was applied, or `false`
+   * when it was invalid (NaN), unchanged, or the change was canceled.
    */
-  setValue: (newValue: number | number[], details?: SliderRoot.ChangeEventDetails) => void;
+  setValue: (newValue: number | number[], details?: SliderRoot.ChangeEventDetails) => boolean;
   state: SliderRootState;
   /**
    * The step increment of the slider when incrementing or decrementing. It will snap

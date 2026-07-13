@@ -1,16 +1,19 @@
 'use client';
 import * as React from 'react';
 import { useStableCallback } from '@base-ui/utils/useStableCallback';
-import { useBaseUiId } from '../utils/useBaseUiId';
-import type { BaseUIChangeEventDetails } from '../utils/createBaseUIEventDetails';
-import type { BaseUIEventReasons } from '../utils/reasons';
-
-const EMPTY: string[] = [];
+import { EMPTY_ARRAY } from '@base-ui/utils/empty';
+import { useBaseUiId } from '../internals/useBaseUiId';
+import type { BaseUIChangeEventDetails } from '../internals/createBaseUIEventDetails';
+import type { BaseUIEventReasons } from '../internals/reasons';
 
 export function useCheckboxGroupParent(
   params: UseCheckboxGroupParentParameters,
 ): UseCheckboxGroupParentReturnValue {
-  const { allValues = EMPTY, value = EMPTY, onValueChange: onValueChangeProp } = params;
+  const {
+    allValues = EMPTY_ARRAY as string[],
+    value = EMPTY_ARRAY as string[],
+    onValueChange: onValueChangeProp,
+  } = params;
 
   const uncontrolledStateRef = React.useRef(value);
   const disabledStatesRef = React.useRef(new Map<string, boolean>());
@@ -42,9 +45,7 @@ export function useCheckboxGroupParent(
         // - any that aren't disabled
         // - disabled ones that are checked
         const all = allValues.filter(
-          (v) =>
-            !disabledStatesRef.current.get(v) ||
-            (disabledStatesRef.current.get(v) && uncontrolledState.includes(v)),
+          (v) => !disabledStatesRef.current.get(v) || uncontrolledState.includes(v),
         );
 
         const allOnOrOff =
@@ -59,15 +60,21 @@ export function useCheckboxGroupParent(
           return;
         }
 
+        let nextStatus: 'on' | 'off' | 'mixed' = 'mixed';
+        let nextValue = uncontrolledState;
+
         if (status === 'mixed') {
-          onValueChange(all, eventDetails);
-          setStatus('on');
+          nextStatus = 'on';
+          nextValue = all;
         } else if (status === 'on') {
-          onValueChange(none, eventDetails);
-          setStatus('off');
-        } else if (status === 'off') {
-          onValueChange(uncontrolledState, eventDetails);
-          setStatus('mixed');
+          nextStatus = 'off';
+          nextValue = none;
+        }
+
+        onValueChange(nextValue, eventDetails);
+
+        if (!eventDetails.isCanceled) {
+          setStatus(nextStatus);
         }
       },
     }),
@@ -84,9 +91,13 @@ export function useCheckboxGroupParent(
         } else {
           newValue.splice(newValue.indexOf(childValue), 1);
         }
-        uncontrolledStateRef.current = newValue;
+
         onValueChange(newValue, eventDetails);
-        setStatus('mixed');
+
+        if (!eventDetails.isCanceled) {
+          uncontrolledStateRef.current = newValue;
+          setStatus('mixed');
+        }
       },
     }),
     [onValueChange, value],
@@ -95,12 +106,11 @@ export function useCheckboxGroupParent(
   return React.useMemo(
     () => ({
       id,
-      indeterminate,
       getParentProps,
       getChildProps,
       disabledStatesRef,
     }),
-    [id, indeterminate, getParentProps, getChildProps],
+    [id, getParentProps, getChildProps],
   );
 }
 
@@ -117,7 +127,6 @@ export interface UseCheckboxGroupParentParameters {
 
 export interface UseCheckboxGroupParentReturnValue {
   id: string | undefined;
-  indeterminate: boolean;
   disabledStatesRef: React.RefObject<Map<string, boolean>>;
   getParentProps: () => {
     id: string | undefined;

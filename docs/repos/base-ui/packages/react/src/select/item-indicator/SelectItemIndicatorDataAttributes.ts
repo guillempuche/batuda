@@ -1,8 +1,8 @@
-import { TransitionStatusDataAttributes } from '../../utils/stateAttributesMapping';
+import { TransitionStatusDataAttributes } from '../../internals/stateAttributesMapping';
 
 export enum SelectItemIndicatorDataAttributes {
   /**
-   * Present when the indicator is animating in.
+   * Present when the indicator begins animating in.
    */
   startingStyle = TransitionStatusDataAttributes.startingStyle,
   /**

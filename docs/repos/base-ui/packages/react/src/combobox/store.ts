@@ -1,19 +1,15 @@
 import { Store, createSelector } from '@base-ui/utils/store';
 import type { InteractionType } from '@base-ui/utils/useEnhancedClickHandler';
-import type { TransitionStatus } from '../utils/useTransitionStatus';
-import type { HTMLProps } from '../utils/types';
+import type { TransitionStatus } from '../internals/useTransitionStatus';
+import type { HTMLProps } from '../internals/types';
 import type { Side } from '../utils/useAnchorPositioning';
-import { compareItemEquality } from '../utils/itemEquality';
-import { hasNullItemLabel } from '../utils/resolveValueLabel';
+import { compareItemEquality } from '../internals/itemEquality';
+import { hasNullItemLabel } from '../internals/resolveValueLabel';
 import type { AriaCombobox } from './root/AriaCombobox';
 
 export type State = {
   id: string | undefined;
   labelId: string | undefined;
-
-  query: string;
-
-  filter: (item: any, query: string) => boolean;
 
   items: readonly any[] | undefined;
 
@@ -32,9 +28,11 @@ export type State = {
   popupProps: HTMLProps;
   inputProps: HTMLProps;
   triggerProps: HTMLProps;
+  itemProps: HTMLProps;
 
   positionerElement: HTMLElement | null;
   listElement: HTMLElement | null;
+  popupId: string | undefined;
   triggerElement: HTMLElement | null;
   inputElement: HTMLInputElement | null;
   inputGroupElement: HTMLDivElement | null;
@@ -43,6 +41,7 @@ export type State = {
   openMethod: InteractionType | null;
 
   inputInsidePopup: boolean;
+  inputOwnsFormValue: boolean;
 
   selectionMode: 'single' | 'multiple' | 'none';
 
@@ -57,7 +56,7 @@ export type State = {
   chipsContainerRef: React.RefObject<HTMLDivElement | null>;
   clearRef: React.RefObject<HTMLButtonElement | null>;
   valuesRef: React.RefObject<Array<any>>;
-  allValuesRef: React.RefObject<Array<any>>;
+  pointerDownItemRef: React.RefObject<Element | null>;
   selectionEventRef: React.RefObject<MouseEvent | PointerEvent | KeyboardEvent | null>;
 
   setOpen: (open: boolean, eventDetails: AriaCombobox.ChangeEventDetails) => void;
@@ -68,12 +67,8 @@ export type State = {
     selectedIndex?: number | null | undefined;
     type?: 'keyboard' | 'pointer' | 'none' | undefined;
   }) => void;
-  onItemHighlighted: (item: any, eventDetails: AriaCombobox.HighlightEventDetails) => void;
   forceMount: () => void;
   handleSelection: (event: MouseEvent | PointerEvent | KeyboardEvent, passedValue?: any) => void;
-  getItemProps: (
-    props?: HTMLProps & { active?: boolean | undefined; selected?: boolean | undefined },
-  ) => Record<string, unknown>;
   requestSubmit: () => void;
 
   name: string | undefined;
@@ -82,7 +77,6 @@ export type State = {
   readOnly: boolean;
   required: boolean;
   grid: boolean;
-  isGrouped: boolean;
   virtualized: boolean;
   onOpenChangeComplete: (open: boolean) => void;
   openOnInputClick: boolean;
@@ -148,10 +142,11 @@ export const selectors = {
   popupProps: createSelector((state: State) => state.popupProps),
   inputProps: createSelector((state: State) => state.inputProps),
   triggerProps: createSelector((state: State) => state.triggerProps),
-  getItemProps: createSelector((state: State) => state.getItemProps),
+  itemProps: createSelector((state: State) => state.itemProps),
 
   positionerElement: createSelector((state: State) => state.positionerElement),
   listElement: createSelector((state: State) => state.listElement),
+  popupId: createSelector((state: State) => state.popupId),
   triggerElement: createSelector((state: State) => state.triggerElement),
   inputElement: createSelector((state: State) => state.inputElement),
   inputGroupElement: createSelector((state: State) => state.inputGroupElement),
@@ -160,6 +155,7 @@ export const selectors = {
   openMethod: createSelector((state: State) => state.openMethod),
 
   inputInsidePopup: createSelector((state: State) => state.inputInsidePopup),
+  inputOwnsFormValue: createSelector((state: State) => state.inputOwnsFormValue),
 
   selectionMode: createSelector((state: State) => state.selectionMode),
 
@@ -174,5 +170,4 @@ export const selectors = {
   isItemEqualToValue: createSelector((state: State) => state.isItemEqualToValue),
   modal: createSelector((state: State) => state.modal),
   autoHighlight: createSelector((state: State) => state.autoHighlight),
-  submitOnItemClick: createSelector((state: State) => state.submitOnItemClick),
 };

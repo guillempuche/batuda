@@ -3,13 +3,14 @@ import * as React from 'react';
 import { useTimeout } from '@base-ui/utils/useTimeout';
 import { useStore } from '@base-ui/utils/store';
 import { useIsoLayoutEffect } from '@base-ui/utils/useIsoLayoutEffect';
-import type { BaseUIComponentProps } from '../../utils/types';
+import type { BaseUIComponentProps } from '../../internals/types';
 import { useSelectRootContext } from '../root/SelectRootContext';
 import { useSelectPositionerContext } from '../positioner/SelectPositionerContext';
 import { Side } from '../../utils/useAnchorPositioning';
-import { type TransitionStatus, useTransitionStatus } from '../../utils/useTransitionStatus';
-import { useOpenChangeComplete } from '../../utils/useOpenChangeComplete';
-import { useRenderElement } from '../../utils/useRenderElement';
+import { type TransitionStatus, useTransitionStatus } from '../../internals/useTransitionStatus';
+import { useOpenChangeComplete } from '../../internals/useOpenChangeComplete';
+import { useRenderElement } from '../../internals/useRenderElement';
+import { transitionStatusMapping } from '../../internals/stateAttributesMapping';
 import {
   getMaxScrollOffset,
   normalizeScrollOffset,
@@ -24,14 +25,7 @@ export const SelectScrollArrow = React.forwardRef(function SelectScrollArrow(
   componentProps: SelectScrollArrow.Props,
   forwardedRef: React.ForwardedRef<HTMLDivElement>,
 ) {
-  const {
-    render,
-    className,
-    style,
-    direction,
-    keepMounted = false,
-    ...elementProps
-  } = componentProps;
+  const { render, className, style, direction, keepMounted, ...elementProps } = componentProps;
 
   const isUp = direction === 'up';
 
@@ -51,17 +45,15 @@ export const SelectScrollArrow = React.forwardRef(function SelectScrollArrow(
 
   const scrollArrowRef = isUp ? scrollUpArrowRef : scrollDownArrowRef;
 
-  const { transitionStatus, setMounted } = useTransitionStatus(visible);
+  const { mounted, transitionStatus, setMounted } = useTransitionStatus(visible);
 
   useIsoLayoutEffect(() => {
     scrollArrowsMountedCountRef.current += 1;
-    if (!store.state.hasScrollArrows) {
-      store.set('hasScrollArrows', true);
-    }
+    store.set('hasScrollArrows', true);
 
     return () => {
       scrollArrowsMountedCountRef.current = Math.max(0, scrollArrowsMountedCountRef.current - 1);
-      if (scrollArrowsMountedCountRef.current === 0 && store.state.hasScrollArrows) {
+      if (scrollArrowsMountedCountRef.current === 0) {
         store.set('hasScrollArrows', false);
       }
     };
@@ -151,9 +143,10 @@ export const SelectScrollArrow = React.forwardRef(function SelectScrollArrow(
     ref: [forwardedRef, scrollArrowRef],
     state,
     props: [defaultProps, elementProps],
+    stateAttributesMapping: transitionStatusMapping,
   });
 
-  const shouldRender = visible || keepMounted;
+  const shouldRender = mounted || keepMounted;
   if (!shouldRender) {
     return null;
   }

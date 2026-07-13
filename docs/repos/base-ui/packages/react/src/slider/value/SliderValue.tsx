@@ -1,8 +1,8 @@
 'use client';
 import * as React from 'react';
 import { formatNumber } from '../../utils/formatNumber';
-import type { BaseUIComponentProps } from '../../utils/types';
-import { useRenderElement } from '../../utils/useRenderElement';
+import type { BaseUIComponentProps } from '../../internals/types';
+import { useRenderElement } from '../../internals/useRenderElement';
 import { useSliderRootContext } from '../root/SliderRootContext';
 import { sliderStateAttributesMapping } from '../root/stateAttributesMapping';
 import type { SliderRootState } from '../root/SliderRoot';
@@ -26,33 +26,23 @@ export const SliderValue = React.forwardRef(function SliderValue(
     ...elementProps
   } = componentProps;
 
-  const { thumbMap, state, values, formatOptionsRef, locale } = useSliderRootContext();
+  const { thumbMap, state, values, format, locale } = useSliderRootContext();
 
-  const outputFor = React.useMemo(() => {
-    let htmlFor = '';
-    for (const thumbMetadata of thumbMap.values()) {
-      if (thumbMetadata?.inputId) {
-        htmlFor += `${thumbMetadata.inputId} `;
-      }
+  let htmlFor = '';
+  for (const thumbMetadata of thumbMap.values()) {
+    if (thumbMetadata?.inputId) {
+      htmlFor += `${thumbMetadata.inputId} `;
     }
-    return htmlFor.trim() === '' ? undefined : htmlFor.trim();
-  }, [thumbMap]);
+  }
 
-  const formattedValues = React.useMemo(() => {
-    const arr = [];
-    for (let i = 0; i < values.length; i += 1) {
-      arr.push(formatNumber(values[i], locale, formatOptionsRef.current ?? undefined));
-    }
-    return arr;
-  }, [formatOptionsRef, locale, values]);
+  const outputFor = htmlFor.trim() || undefined;
 
-  const defaultDisplayValue = React.useMemo(() => {
-    const arr = [];
-    for (let i = 0; i < values.length; i += 1) {
-      arr.push(formattedValues[i] || values[i]);
-    }
-    return arr.join(' – ');
-  }, [values, formattedValues]);
+  const formattedValues = React.useMemo(
+    () => values.map((v) => formatNumber(v, locale, format)),
+    [format, locale, values],
+  );
+
+  const defaultDisplayValue = formattedValues.join(' – ');
 
   const element = useRenderElement('output', componentProps, {
     state,

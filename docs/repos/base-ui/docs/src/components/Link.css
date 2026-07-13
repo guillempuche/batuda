@@ -1,3 +1,6 @@
+/* Keep layer order stable when this file is emitted from a client CSS chunk. */
+@layer all, base, theme, components, utilities;
+
 @layer components {
   .Link {
     display: inline;
@@ -11,14 +14,30 @@
     text-underline-offset: 4px;
 
     &:active {
-      background-color: var(--gray-t2, var(--color-foreground));
-      color: var(--gray-s1, var(--color-background));
+      background-color: var(--gray-t2);
+      color: var(--gray-s1);
+    }
+
+    /* stylelint-disable-next-line selector-pseudo-class-disallowed-list */
+    &:has(code) {
+      text-decoration-color: var(--color-blue);
+    }
+
+    /* stylelint-disable-next-line selector-pseudo-class-disallowed-list */
+    &:has(code):active {
+      color: var(--color-background);
+      background-color: var(--color-blue);
+    }
+
+    /* stylelint-disable-next-line selector-pseudo-class-disallowed-list */
+    &:has(code):active * {
+      color: var(--color-background) !important;
     }
 
     &:focus-visible {
       outline: 2px solid currentColor;
       outline-offset: 2px;
-      border-radius: var(--radius-sm);
+      border-radius: var(--radius-4);
     }
 
     .LinkArrowLine {

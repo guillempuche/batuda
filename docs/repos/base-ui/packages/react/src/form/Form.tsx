@@ -1,16 +1,16 @@
 'use client';
 import * as React from 'react';
 import { useStableCallback } from '@base-ui/utils/useStableCallback';
+import { EMPTY_OBJECT } from '@base-ui/utils/empty';
 import {
   createGenericEventDetails,
   type BaseUIGenericEventDetails,
-} from '../utils/createBaseUIEventDetails';
-import { REASONS } from '../utils/reasons';
-import type { BaseUIComponentProps } from '../utils/types';
-import { FormContext } from './FormContext';
-import { useRenderElement } from '../utils/useRenderElement';
-import { EMPTY_OBJECT } from '../utils/constants';
-import { useValueChanged } from '../utils/useValueChanged';
+} from '../internals/createBaseUIEventDetails';
+import { REASONS } from '../internals/reasons';
+import type { BaseUIComponentProps } from '../internals/types';
+import { FormContext } from '../internals/form-context/FormContext';
+import { useRenderElement } from '../internals/useRenderElement';
+import { useValueChanged } from '../internals/useValueChanged';
 
 /**
  * A native form element with consolidated error handling.
@@ -39,14 +39,18 @@ export const Form = React.forwardRef(function Form<
   const submittedRef = React.useRef(false);
   const submitAttemptedRef = React.useRef(false);
 
-  const focusControl = useStableCallback((control: HTMLElement | null) => {
-    if (!control) {
-      return;
+  const focusFirstInvalid = useStableCallback(() => {
+    const invalidField = Array.from(formRef.current.fields.values()).find(
+      (field) => field.validityData.state.valid === false,
+    );
+    const control = invalidField?.controlRef.current;
+    if (control) {
+      control.focus();
+      if (control.tagName === 'INPUT') {
+        (control as HTMLInputElement).select();
+      }
     }
-    control.focus();
-    if (control.tagName === 'INPUT') {
-      (control as HTMLInputElement).select();
-    }
+    return invalidField !== undefined;
   });
 
   const [errors, setErrors] = React.useState(externalErrors);
@@ -61,34 +65,26 @@ export const Form = React.forwardRef(function Form<
     }
 
     submittedRef.current = false;
+    focusFirstInvalid();
+  }, [errors, focusFirstInvalid]);
 
-    const invalidFields = Array.from(formRef.current.fields.values()).filter(
-      (field) => field.validityData.state.valid === false,
-    );
-
-    if (invalidFields.length) {
-      focusControl(invalidFields[0].controlRef.current);
-    }
-  }, [errors, focusControl]);
-
-  const handleImperativeValidate = React.useCallback((fieldName?: string | undefined) => {
-    const values = Array.from(formRef.current.fields.values());
-
-    if (fieldName) {
-      const namedField = values.find((field) => field.name === fieldName);
-      if (namedField) {
-        namedField.validate(false);
-      }
-    } else {
-      values.forEach((field) => {
-        field.validate(false);
-      });
-    }
-  }, []);
-
-  React.useImperativeHandle(actionsRef, () => ({ validate: handleImperativeValidate }), [
-    handleImperativeValidate,
-  ]);
+  React.useImperativeHandle(
+    actionsRef,
+    () => ({
+      validate(fieldName?: string) {
+        if (fieldName) {
+          Array.from(formRef.current.fields.values())
+            .find((field) => field.name === fieldName)
+            ?.validate();
+        } else {
+          formRef.current.fields.forEach((field) => {
+            field.validate();
+          });
+        }
+      },
+    }),
+    [],
+  );
 
   const element = useRenderElement('form', componentProps, {
     ref: forwardedRef,
@@ -98,36 +94,30 @@ export const Form = React.forwardRef(function Form<
         onSubmit(event) {
           submitAttemptedRef.current = true;
 
-          let values = Array.from(formRef.current.fields.values());
-
           // Async validation isn't supported to stop the submit event.
-          values.forEach((field) => {
+          formRef.current.fields.forEach((field) => {
             field.validate();
           });
 
-          values = Array.from(formRef.current.fields.values());
-
-          const invalidFields = values.filter((field) => !field.validityData.state.valid);
-
-          if (invalidFields.length) {
+          if (focusFirstInvalid()) {
             event.preventDefault();
-            focusControl(invalidFields[0].controlRef.current);
-          } else {
-            submittedRef.current = true;
-            onSubmit?.(event as any);
+            return;
+          }
 
-            if (onFormSubmit) {
-              event.preventDefault();
+          submittedRef.current = true;
+          onSubmit?.(event as any);
 
-              const formValues = values.reduce((acc, field) => {
-                if (field.name) {
-                  (acc as Record<string, any>)[field.name] = field.getValue();
-                }
-                return acc;
-              }, {} as FormValues);
+          if (onFormSubmit) {
+            event.preventDefault();
 
-              onFormSubmit(formValues, createGenericEventDetails(REASONS.none, event.nativeEvent));
-            }
+            const formValues = {} as FormValues;
+            formRef.current.fields.forEach((field) => {
+              if (field.name) {
+                (formValues as Record<string, any>)[field.name] = field.getValue();
+              }
+            });
+
+            onFormSubmit(formValues, createGenericEventDetails(REASONS.none, event.nativeEvent));
           }
         },
       },
@@ -136,7 +126,7 @@ export const Form = React.forwardRef(function Form<
   });
 
   const clearErrors = useStableCallback((name: string | undefined) => {
-    if (name && errors && EMPTY_OBJECT.hasOwnProperty.call(errors, name)) {
+    if (name && errors && Object.hasOwn(errors, name)) {
       const nextErrors = { ...errors };
       delete nextErrors[name];
       setErrors(nextErrors);
@@ -176,7 +166,7 @@ export interface FormState {}
 
 export interface FormProps<
   FormValues extends Record<string, any> = Record<string, any>,
-> extends BaseUIComponentProps<'form', FormState> {
+> extends BaseUIComponentProps<'form', FormState, React.ComponentPropsWithRef<'form'>> {
   /**
    * Determines when the form should be validated.
    * The `validationMode` prop on `<Field.Root>` takes precedence over this.
@@ -207,10 +197,10 @@ export interface FormProps<
    * @example
    * ```tsx
    * // validate all fields
-   * actionsRef.current.validate();
+   * actionsRef.current?.validate();
    *
    * // validate one field
-   * actionsRef.current.validate('email');
+   * actionsRef.current?.validate('email');
    * ```
    */
   actionsRef?: React.RefObject<Form.Actions | null> | undefined;

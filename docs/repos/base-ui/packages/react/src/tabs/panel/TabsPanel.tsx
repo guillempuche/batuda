@@ -2,19 +2,18 @@
 import * as React from 'react';
 import { inertValue } from '@base-ui/utils/inertValue';
 import { useIsoLayoutEffect } from '@base-ui/utils/useIsoLayoutEffect';
-import { useBaseUiId } from '../../utils/useBaseUiId';
-import type { StateAttributesMapping } from '../../utils/getStateAttributesProps';
-import { transitionStatusMapping } from '../../utils/stateAttributesMapping';
-import { useOpenChangeComplete } from '../../utils/useOpenChangeComplete';
-import { type TransitionStatus, useTransitionStatus } from '../../utils/useTransitionStatus';
-import { useRenderElement } from '../../utils/useRenderElement';
-import type { BaseUIComponentProps } from '../../utils/types';
-import { useCompositeListItem } from '../../composite/list/useCompositeListItem';
+import { useBaseUiId } from '../../internals/useBaseUiId';
+import type { StateAttributesMapping } from '../../internals/getStateAttributesProps';
+import { transitionStatusMapping } from '../../internals/stateAttributesMapping';
+import { useOpenChangeComplete } from '../../internals/useOpenChangeComplete';
+import { type TransitionStatus, useTransitionStatus } from '../../internals/useTransitionStatus';
+import { useRenderElement } from '../../internals/useRenderElement';
+import type { BaseUIComponentProps } from '../../internals/types';
+import { useCompositeListItem } from '../../internals/composite/list/useCompositeListItem';
 import { tabsStateAttributesMapping } from '../root/stateAttributesMapping';
 import { useTabsRootContext } from '../root/TabsRootContext';
 import type { TabsRootState } from '../root/TabsRoot';
 import type { TabsTab } from '../tab/TabsTab';
-import { TabsPanelDataAttributes } from './TabsPanelDataAttributes';
 
 const stateAttributesMapping: StateAttributesMapping<TabsPanelState> = {
   ...tabsStateAttributesMapping,
@@ -27,7 +26,7 @@ const stateAttributesMapping: StateAttributesMapping<TabsPanelState> = {
  *
  * Documentation: [Base UI Tabs](https://base-ui.com/react/components/tabs)
  */
-export const TabsPanel = React.forwardRef(function TabPanel(
+export const TabsPanel = React.forwardRef(function TabsPanel(
   componentProps: TabsPanel.Props,
   forwardedRef: React.ForwardedRef<HTMLDivElement>,
 ) {
@@ -39,22 +38,11 @@ export const TabsPanel = React.forwardRef(function TabPanel(
     orientation,
     tabActivationDirection,
     registerMountedTabPanel,
-    unregisterMountedTabPanel,
   } = useTabsRootContext();
 
   const id = useBaseUiId();
 
-  const metadata = React.useMemo(
-    () => ({
-      id,
-      value,
-    }),
-    [id, value],
-  );
-
-  const { ref: listItemRef, index } = useCompositeListItem<TabsPanel.Metadata>({
-    metadata,
-  });
+  const { ref: listItemRef, index } = useCompositeListItem();
 
   const open = value === selectedValue;
   const { mounted, transitionStatus, setMounted } = useTransitionStatus(open);
@@ -82,7 +70,8 @@ export const TabsPanel = React.forwardRef(function TabPanel(
         role: 'tabpanel',
         tabIndex: open ? 0 : -1,
         inert: inertValue(!open),
-        [TabsPanelDataAttributes.index as string]: index,
+        // Computed key: a plain literal key fails the DOM-props excess property check.
+        ['data-index' as string]: index,
       },
       elementProps,
     ],
@@ -108,11 +97,8 @@ export const TabsPanel = React.forwardRef(function TabPanel(
       return undefined;
     }
 
-    registerMountedTabPanel(value, id);
-    return () => {
-      unregisterMountedTabPanel(value, id);
-    };
-  }, [hidden, keepMounted, value, id, registerMountedTabPanel, unregisterMountedTabPanel]);
+    return registerMountedTabPanel(value, id);
+  }, [hidden, keepMounted, value, id, registerMountedTabPanel]);
 
   const shouldRender = keepMounted || mounted;
   if (!shouldRender) {

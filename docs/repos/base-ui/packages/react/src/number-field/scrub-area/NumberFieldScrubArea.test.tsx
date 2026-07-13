@@ -1,8 +1,10 @@
 import { expect, vi } from 'vitest';
-import { screen, act } from '@mui/internal-test-utils';
+import { screen, act, fireEvent } from '@mui/internal-test-utils';
 import { NumberField } from '@base-ui/react/number-field';
 import { createRenderer, describeConformance, isJSDOM } from '#test-utils';
-import { isWebKit } from '@base-ui/utils/detectBrowser';
+import { platform } from '@base-ui/utils/platform';
+
+const isWebKit = platform.engine.webkit;
 
 // TODO (@Janpot): Contribute https://github.com/testing-library/user-event/issues/903 and
 // rely on `user.pointer()` instead.
@@ -34,6 +36,28 @@ function createPointerMoveEvent({ movementX = 0, movementY = 0 }) {
 
 describe('<NumberField.ScrubArea />', () => {
   const { render } = createRenderer();
+
+  function createClipboardData(text: string) {
+    return {
+      getData: (type: string) => (type === 'text/plain' ? text : ''),
+    };
+  }
+
+  function pasteText(target: HTMLElement, value: string) {
+    if (isJSDOM) {
+      fireEvent.paste(target, {
+        clipboardData: createClipboardData(value),
+      });
+      return;
+    }
+
+    const pasteEvent = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(pasteEvent, 'clipboardData', {
+      value: createClipboardData(value),
+    });
+
+    fireEvent(target, pasteEvent);
+  }
 
   describeConformance(<NumberField.ScrubArea />, () => ({
     refInstanceof: window.HTMLSpanElement,
@@ -86,6 +110,135 @@ describe('<NumberField.ScrubArea />', () => {
     });
 
     expect(input).toHaveValue('-7');
+  });
+
+  it('tracks visual viewport scale and removes scrub listeners after pointer lock exits', async () => {
+    const visualViewport = window.visualViewport;
+    if (!visualViewport) {
+      throw new Error('Expected visualViewport in a browser test.');
+    }
+
+    let scale = 2;
+    const scaleGetter = vi.spyOn(visualViewport, 'scale', 'get').mockImplementation(() => scale);
+    const addEventListener = vi.spyOn(window, 'addEventListener');
+    const removeEventListener = vi.spyOn(window, 'removeEventListener');
+
+    try {
+      await render(
+        <NumberField.Root defaultValue={0} data-testid="root">
+          <NumberField.Input />
+          <NumberField.ScrubArea data-testid="scrub-area">
+            <NumberField.ScrubAreaCursor data-testid="cursor" />
+          </NumberField.ScrubArea>
+        </NumberField.Root>,
+      );
+
+      const scrubArea = screen.getByTestId('scrub-area');
+      const root = screen.getByTestId('root');
+
+      await act(async () => {
+        scrubArea.dispatchEvent(createPointerDownEvent(scrubArea));
+      });
+
+      const cursor = screen.getByTestId('cursor');
+      expect(cursor.style.transform).toContain('scale(0.5)');
+
+      scale = 4;
+      await act(async () => {
+        window.dispatchEvent(createPointerMoveEvent({ movementX: 4 }));
+      });
+      expect(cursor.style.transform).toContain('scale(0.25)');
+
+      const pointerUpListener = addEventListener.mock.calls.find(([type]) => type === 'pointerup');
+      const pointerMoveListener = addEventListener.mock.calls.find(
+        ([type]) => type === 'pointermove',
+      );
+      expect(pointerUpListener).toBeDefined();
+      expect(pointerMoveListener).toBeDefined();
+
+      await act(async () => {
+        window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+      });
+
+      expect(root).not.toHaveAttribute('data-scrubbing');
+      expect(screen.queryByTestId('cursor')).toBe(null);
+      expect(removeEventListener).toHaveBeenCalledWith('pointerup', pointerUpListener?.[1], true);
+      expect(removeEventListener).toHaveBeenCalledWith(
+        'pointermove',
+        pointerMoveListener?.[1],
+        true,
+      );
+    } finally {
+      scaleGetter.mockRestore();
+      addEventListener.mockRestore();
+      removeEventListener.mockRestore();
+    }
+  });
+
+  it('clears the root scrubbing state when the scrub area unmounts mid-scrub', async () => {
+    function App(props: { scrubAreaMounted: boolean }) {
+      return (
+        <NumberField.Root defaultValue={0} data-testid="root">
+          <NumberField.Input />
+          {props.scrubAreaMounted && (
+            <NumberField.ScrubArea data-testid="scrub-area">
+              <NumberField.ScrubAreaCursor />
+            </NumberField.ScrubArea>
+          )}
+        </NumberField.Root>
+      );
+    }
+
+    const { setProps } = await render(<App scrubAreaMounted />);
+
+    const scrubArea = screen.getByTestId('scrub-area');
+    const root = screen.getByTestId('root');
+
+    await act(async () => {
+      scrubArea.dispatchEvent(createPointerDownEvent(scrubArea));
+      scrubArea.dispatchEvent(createPointerMoveEvent({ movementX: -10 }));
+    });
+
+    expect(root).toHaveAttribute('data-scrubbing');
+
+    // Unmount the scrub area before pointerup; the root must not stay stuck in the scrubbing state.
+    await act(async () => {
+      setProps({ scrubAreaMounted: false });
+    });
+
+    expect(root).not.toHaveAttribute('data-scrubbing');
+  });
+
+  it('syncs the visible input value when scrubbing after pasting', async () => {
+    const onValueChange = vi.fn();
+
+    await render(
+      <NumberField.Root defaultValue={10} onValueChange={onValueChange}>
+        <NumberField.Input />
+        <NumberField.ScrubArea data-testid="scrub-area">
+          <NumberField.ScrubAreaCursor />
+        </NumberField.ScrubArea>
+      </NumberField.Root>,
+    );
+
+    const scrubArea = screen.getByTestId('scrub-area');
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+
+    // Select the existing value so the paste replaces it rather than inserting at the caret.
+    await act(async () => input.focus());
+    input.select();
+    pasteText(input, '20');
+
+    expect(input).toHaveValue('20');
+    expect(onValueChange.mock.lastCall?.[0]).toBe(20);
+
+    await act(async () => {
+      scrubArea.dispatchEvent(createPointerDownEvent(scrubArea));
+      scrubArea.dispatchEvent(createPointerMoveEvent({ movementX: 2 }));
+    });
+
+    expect(onValueChange.mock.lastCall?.[0]).toBe(22);
+    expect(input).toHaveValue('22');
   });
 
   it('calls onValueChange while scrubbing and onValueCommitted on pointerup', async () => {

@@ -4,7 +4,7 @@ import { Combobox } from '@base-ui/react/combobox';
 import { createRenderer, describeConformance, isJSDOM } from '#test-utils';
 import { screen, waitFor } from '@mui/internal-test-utils';
 import { Field } from '@base-ui/react/field';
-import { REASONS } from '../../utils/reasons';
+import { REASONS } from '../../internals/reasons';
 
 describe('<Combobox.Input />', () => {
   const { render } = createRenderer();
@@ -84,6 +84,76 @@ describe('<Combobox.Input />', () => {
 
       const input = screen.getByTestId('input');
       expect(input).toHaveAttribute('disabled');
+    });
+  });
+
+  describe('rendering as a different element', () => {
+    // The injected `type: 'text'` was removed so the input can be rendered as a
+    // `<textarea>` without receiving an attribute that element does not support.
+    it('renders as a <textarea> without an invalid `type` attribute and stays editable', async () => {
+      const { user } = await render(
+        <Combobox.Root items={['apple', 'banana']}>
+          <Combobox.Input data-testid="input" render={<textarea />} />
+          <Combobox.Portal>
+            <Combobox.Positioner>
+              <Combobox.Popup>
+                <Combobox.List>
+                  {(item: string) => (
+                    <Combobox.Item key={item} value={item}>
+                      {item}
+                    </Combobox.Item>
+                  )}
+                </Combobox.List>
+              </Combobox.Popup>
+            </Combobox.Positioner>
+          </Combobox.Portal>
+        </Combobox.Root>,
+      );
+
+      const input = screen.getByTestId<HTMLTextAreaElement>('input');
+      expect(input.tagName).toBe('TEXTAREA');
+      expect(input).not.toHaveAttribute('type');
+
+      await user.type(input, 'app');
+      expect(input.value).toBe('app');
+    });
+
+    // A non-input control only carries the combobox ARIA attributes while the popup
+    // is open; a native <input> exposes them even when closed.
+    it('applies combobox aria attributes to a <textarea> only while the popup is open', async () => {
+      const { user } = await render(
+        <Combobox.Root items={['apple', 'banana']}>
+          <Combobox.Input data-testid="input" render={<textarea />} />
+          <Combobox.Portal>
+            <Combobox.Positioner>
+              <Combobox.Popup>
+                <Combobox.List>
+                  {(item: string) => (
+                    <Combobox.Item key={item} value={item}>
+                      {item}
+                    </Combobox.Item>
+                  )}
+                </Combobox.List>
+              </Combobox.Popup>
+            </Combobox.Positioner>
+          </Combobox.Portal>
+        </Combobox.Root>,
+      );
+
+      const input = screen.getByTestId('input');
+
+      // Closed: combobox semantics are not exposed on a non-input control.
+      expect(input).not.toHaveAttribute('role', 'combobox');
+      expect(input).not.toHaveAttribute('aria-expanded');
+      expect(input).not.toHaveAttribute('aria-controls');
+
+      await user.type(input, 'a');
+      const listbox = await screen.findByRole('listbox');
+
+      // Open: the combobox ARIA contract is applied to the textarea.
+      expect(input).toHaveAttribute('role', 'combobox');
+      expect(input).toHaveAttribute('aria-expanded', 'true');
+      expect(input).toHaveAttribute('aria-controls', listbox.id);
     });
   });
 
@@ -505,6 +575,68 @@ describe('<Combobox.Input />', () => {
       expect(input.value).toBe('abxxxycd');
       expect(input.selectionStart).toBe(6);
       expect(input.selectionEnd).toBe(6);
+    });
+
+    it('removes the last rendered chip when pressing Backspace in an empty input', async () => {
+      const handleValueChange = vi.fn();
+      const { user } = await render(
+        <Combobox.Root
+          multiple
+          defaultValue={['apple', 'banana', 'cherry']}
+          onValueChange={handleValueChange}
+        >
+          <Combobox.Chips>
+            <Combobox.Value>
+              {(value: string[]) => (
+                <React.Fragment>
+                  {value.slice(0, 2).map((item) => (
+                    <Combobox.Chip key={item}>{item}</Combobox.Chip>
+                  ))}
+                  <Combobox.Input data-testid="input" />
+                </React.Fragment>
+              )}
+            </Combobox.Value>
+          </Combobox.Chips>
+        </Combobox.Root>,
+      );
+
+      const input = screen.getByTestId('input');
+
+      await user.click(input);
+      await user.keyboard('{Backspace}');
+
+      expect(handleValueChange.mock.calls.length).toBe(1);
+      expect(handleValueChange.mock.calls[0][0]).toEqual(['apple', 'cherry']);
+    });
+
+    it('removes the last selected value when no chips are rendered', async () => {
+      const handleValueChange = vi.fn();
+      const { user } = await render(
+        <Combobox.Root
+          multiple
+          defaultValue={['apple', 'banana']}
+          onValueChange={handleValueChange}
+        >
+          <Combobox.Chips>
+            <Combobox.Value>
+              {(value: string[]) => (
+                <React.Fragment>
+                  <span>{`+${value.length} selected`}</span>
+                  <Combobox.Input data-testid="input" />
+                </React.Fragment>
+              )}
+            </Combobox.Value>
+          </Combobox.Chips>
+        </Combobox.Root>,
+      );
+
+      const input = screen.getByTestId('input');
+
+      await user.click(input);
+      await user.keyboard('{Backspace}');
+
+      expect(handleValueChange.mock.calls.length).toBe(1);
+      expect(handleValueChange.mock.calls[0][0]).toEqual(['apple']);
     });
 
     it('closes the popup when tabbing out', async () => {

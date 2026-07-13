@@ -1,13 +1,14 @@
 import { expect, vi } from 'vitest';
 import { Toolbar } from '@base-ui/react/toolbar';
 import { NumberField } from '@base-ui/react/number-field';
+import { DirectionProvider } from '@base-ui/react/direction-provider';
 import { screen } from '@mui/internal-test-utils';
 import { createRenderer, describeConformance, isJSDOM } from '#test-utils';
-import { NOOP } from '../../utils/noop';
+import { NOOP } from '../../internals/noop';
 import { ToolbarRootContext } from '../root/ToolbarRootContext';
-import { type Orientation } from '../../utils/types';
-import { CompositeRootContext } from '../../composite/root/CompositeRootContext';
-import { ARROW_UP, ARROW_DOWN, ARROW_LEFT, ARROW_RIGHT } from '../../composite/composite';
+import { type Orientation } from '../../internals/types';
+import { CompositeRootContext } from '../../internals/composite/root/CompositeRootContext';
+import { ARROW_UP, ARROW_DOWN, ARROW_LEFT, ARROW_RIGHT } from '../../internals/composite/composite';
 
 const testCompositeContext: CompositeRootContext = {
   highlightedIndex: 0,
@@ -19,7 +20,6 @@ const testCompositeContext: CompositeRootContext = {
 const testToolbarContext: ToolbarRootContext = {
   disabled: false,
   orientation: 'horizontal',
-  setItemMap: NOOP,
 };
 
 describe('<Toolbar.Input />', () => {
@@ -52,6 +52,53 @@ describe('<Toolbar.Input />', () => {
   });
 
   describe.skipIf(isJSDOM)('keyboard navigation', () => {
+    it.each([
+      ['ltr', ARROW_RIGHT, ARROW_LEFT],
+      ['rtl', ARROW_LEFT, ARROW_RIGHT],
+    ] as const)(
+      'respects caret and selection boundaries in horizontal %s toolbars',
+      async (direction, nextKey, previousKey) => {
+        const { user } = await render(
+          <DirectionProvider direction={direction}>
+            <Toolbar.Root orientation="horizontal">
+              <Toolbar.Button data-testid="before" />
+              <Toolbar.Input defaultValue="abcd" />
+              <Toolbar.Button data-testid="after" />
+            </Toolbar.Root>
+          </DirectionProvider>,
+        );
+        const input = screen.getByRole('textbox') as HTMLInputElement;
+        const before = screen.getByTestId('before');
+        const after = screen.getByTestId('after');
+
+        await user.keyboard('[Tab]');
+        await user.keyboard(`[${nextKey}]`);
+        expect(input).toHaveFocus();
+
+        input.setSelectionRange(1, 3);
+        await user.keyboard(`[${nextKey}]`);
+        expect(input).toHaveFocus();
+
+        input.setSelectionRange(2, 2);
+        await user.keyboard(`[ShiftLeft>][${nextKey}][/ShiftLeft]`);
+        expect(input).toHaveFocus();
+
+        const nextBoundary =
+          direction === 'rtl' || nextKey === ARROW_RIGHT ? input.value.length : 0;
+        input.setSelectionRange(nextBoundary, nextBoundary);
+        await user.keyboard(`[${nextKey}]`);
+        expect(after).toHaveFocus();
+
+        await user.keyboard(`[${previousKey}]`);
+        expect(input).toHaveFocus();
+        const previousBoundary =
+          direction === 'rtl' || previousKey === ARROW_LEFT ? 0 : input.value.length;
+        input.setSelectionRange(previousBoundary, previousBoundary);
+        await user.keyboard(`[${previousKey}]`);
+        expect(before).toHaveFocus();
+      },
+    );
+
     // when navigating through RTL text in real browsers the arrow keys for
     // moving the text insertion cursor is also reversed from LTR but this doesn't
     // work with testing library
@@ -95,6 +142,69 @@ describe('<Toolbar.Input />', () => {
 
         expect(button1).toHaveFocus();
       });
+    });
+  });
+
+  describe.skipIf(isJSDOM)('disabled', () => {
+    it('does not trap keyboard focus when disabled', async () => {
+      const { user } = await render(
+        <div>
+          <Toolbar.Root>
+            <Toolbar.Button data-testid="button" />
+            <Toolbar.Input defaultValue="abcd" disabled />
+          </Toolbar.Root>
+          <button type="button" data-testid="after">
+            after
+          </button>
+        </div>,
+      );
+
+      const button = screen.getByTestId('button');
+      const input = screen.getByRole('textbox');
+      const after = screen.getByTestId('after');
+
+      await user.keyboard('[Tab]');
+      expect(button).toHaveFocus();
+
+      await user.keyboard(`[${ARROW_RIGHT}]`);
+      expect(input).toHaveFocus();
+
+      // Tab must leave the toolbar instead of being trapped on the disabled input
+      await user.keyboard('[Tab]');
+      expect(after).toHaveFocus();
+
+      await user.keyboard('[ShiftLeft>][Tab][/ShiftLeft]');
+      expect(input).toHaveFocus();
+    });
+
+    it('does not block vertical roving focus when disabled', async () => {
+      const { user } = await render(
+        <Toolbar.Root orientation="vertical">
+          <Toolbar.Button data-testid="button1" />
+          <Toolbar.Input defaultValue="abcd" disabled />
+          <Toolbar.Button data-testid="button2" />
+        </Toolbar.Root>,
+      );
+
+      const input = screen.getByRole('textbox');
+      const button1 = screen.getByTestId('button1');
+      const button2 = screen.getByTestId('button2');
+
+      await user.keyboard('[Tab]');
+      expect(button1).toHaveFocus();
+
+      await user.keyboard(`[${ARROW_DOWN}]`);
+      expect(input).toHaveFocus();
+
+      // ArrowDown must move roving focus past the disabled input
+      await user.keyboard(`[${ARROW_DOWN}]`);
+      expect(button2).toHaveFocus();
+
+      await user.keyboard(`[${ARROW_UP}]`);
+      expect(input).toHaveFocus();
+
+      await user.keyboard(`[${ARROW_UP}]`);
+      expect(button1).toHaveFocus();
     });
   });
 
