@@ -14,7 +14,14 @@ import type {
 
 export class ResearchRunContext extends ServiceMap.Service<
 	ResearchRunContext,
-	{ readonly researchId: string }
+	{
+		readonly researchId: string
+		// The run's language + location hints, so a search reaches the provider in
+		// the target's own language instead of defaulting to English — the company's
+		// own pages are rarely in English for a non-English target.
+		readonly language?: string | undefined
+		readonly location?: string | undefined
+	}
 >()('research/ResearchRunContext') {}
 
 // ── Tier-specific LanguageModel services ──

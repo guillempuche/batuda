@@ -1898,7 +1898,13 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						}).pipe(
 							Effect.provide(researchToolkitLayer),
 							Effect.provide(budgetLayer),
-							Effect.provide(Layer.succeed(ResearchRunContext)({ researchId })),
+							Effect.provide(
+								Layer.succeed(ResearchRunContext)({
+									researchId,
+									language: hints?.language,
+									location: hints?.location,
+								}),
+							),
 							Effect.withSpan('research.phase1', {
 								attributes: { 'research.run_id': researchId },
 							}),
@@ -1980,13 +1986,22 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							findings = retryFindings
 							tokensOut += retryExtractTokens
 						} else {
+							// Fill the phase-2 page budget with the company's own
+							// (anchor-seeded) pages first, so if the budget truncates it drops
+							// third-party pages, never the official site the run grounds on.
+							const anchorHashes = new Set(seededAnchorHashes)
+							const anchorFirstCorpus = [...scrapeCorpus].sort(
+								(a, b) =>
+									(anchorHashes.has(a.urlHash) ? 0 : 1) -
+									(anchorHashes.has(b.urlHash) ? 0 : 1),
+							)
 							const extracted = yield* extractStructuredFindings(
 								researchText,
 								[
 									evidenceText,
 									...groundedPageTexts(entityTargets, scrapeCorpus),
 								].join('\n'),
-								groundedPageTexts(entityTargets, scrapeCorpus),
+								groundedPageTexts(entityTargets, anchorFirstCorpus),
 							)
 							findings = extracted.findings
 							tokensOut += extracted.outputTokens
