@@ -1,8 +1,8 @@
-import { TransitionStatusDataAttributes } from '../../utils/stateAttributesMapping';
+import { TransitionStatusDataAttributes } from '../../internals/stateAttributesMapping';
 
 export enum AvatarImageDataAttributes {
   /**
-   * Present when the image is animating in.
+   * Present when the image begins animating in.
    */
   startingStyle = TransitionStatusDataAttributes.startingStyle,
   /**

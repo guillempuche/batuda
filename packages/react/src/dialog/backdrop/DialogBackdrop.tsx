@@ -1,17 +1,10 @@
 'use client';
 import * as React from 'react';
 import { useDialogRootContext } from '../root/DialogRootContext';
-import { useRenderElement } from '../../utils/useRenderElement';
-import { type TransitionStatus } from '../../utils/useTransitionStatus';
-import { type BaseUIComponentProps } from '../../utils/types';
-import { type StateAttributesMapping } from '../../utils/getStateAttributesProps';
-import { popupStateMapping as baseMapping } from '../../utils/popupStateMapping';
-import { transitionStatusMapping } from '../../utils/stateAttributesMapping';
-
-const stateAttributesMapping: StateAttributesMapping<DialogBackdropState> = {
-  ...baseMapping,
-  ...transitionStatusMapping,
-};
+import { useRenderElement } from '../../internals/useRenderElement';
+import { type TransitionStatus } from '../../internals/useTransitionStatus';
+import { type BaseUIComponentProps } from '../../internals/types';
+import { popupTransitionStateMapping } from '../../utils/popupStateMapping';
 
 /**
  * An overlay displayed beneath the popup.
@@ -24,7 +17,8 @@ export const DialogBackdrop = React.forwardRef(function DialogBackdrop(
   forwardedRef: React.ForwardedRef<HTMLDivElement>,
 ) {
   const { render, className, style, forceRender = false, ...elementProps } = componentProps;
-  const { store } = useDialogRootContext();
+
+  const store = useDialogRootContext();
 
   const open = store.useState('open');
   const nested = store.useState('nested');
@@ -39,7 +33,7 @@ export const DialogBackdrop = React.forwardRef(function DialogBackdrop(
   return useRenderElement('div', componentProps, {
     state,
     ref: [store.context.backdropRef, forwardedRef],
-    stateAttributesMapping,
+    stateAttributesMapping: popupTransitionStateMapping,
     props: [
       {
         role: 'presentation',

@@ -14,7 +14,12 @@ export interface DrawerNestedSwipeProgressStore {
 export interface DrawerRootContext {
   swipeDirection: DrawerSwipeDirection;
   /**
-   * Whether snap points can be skipped based on swipe velocity.
+   * Whether `Drawer.SwipeArea` is currently driving an open gesture (writing the popup's
+   * swipe-movement vars imperatively). The viewport reads this to skip resetting them on open.
+   */
+  swipeAreaActiveRef: React.MutableRefObject<boolean>;
+  /**
+   * Whether to disable velocity-based snap skipping.
    */
   snapToSequentialPoints: boolean;
   /**
@@ -48,6 +53,10 @@ export interface DrawerRootContext {
    */
   hasNestedDrawer: boolean;
   /**
+   * Called by the drawer popup to report its own measured height.
+   */
+  onPopupHeightChange: (height: number) => void;
+  /**
    * Whether a nested drawer is currently being swiped.
    */
   nestedSwiping: boolean;
@@ -59,10 +68,6 @@ export interface DrawerRootContext {
    * Called by a nested drawer to report whether it is still present (open or transitioning out).
    */
   onNestedDrawerPresenceChange: (present: boolean) => void;
-  /**
-   * Called by the drawer popup to report its own measured height.
-   */
-  onPopupHeightChange: (height: number) => void;
   /**
    * Called by a nested drawer to report the frontmost height of its own stack.
    */

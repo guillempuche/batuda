@@ -1,21 +1,25 @@
 'use client';
 import * as React from 'react';
+import { fastComponent } from '@base-ui/utils/fastHooks';
 import { useIsoLayoutEffect } from '@base-ui/utils/useIsoLayoutEffect';
-import { useOnFirstRender } from '@base-ui/utils/useOnFirstRender';
-import { useDismiss, useInteractions, FloatingTree } from '../../floating-ui-react';
+import { useDismiss, FloatingTree } from '../../floating-ui-react';
 import { PreviewCardRootContext, usePreviewCardRootContext } from './PreviewCardContext';
 import {
   createChangeEventDetails,
   type BaseUIChangeEventDetails,
-} from '../../utils/createBaseUIEventDetails';
-import { REASONS } from '../../utils/reasons';
+} from '../../internals/createBaseUIEventDetails';
+import { REASONS } from '../../internals/reasons';
 import { PreviewCardStore } from '../store/PreviewCardStore';
 import {
+  FOCUSABLE_POPUP_PROPS,
   PayloadChildRenderFunction,
   useImplicitActiveTrigger,
+  usePopupRootStore,
   useOpenStateTransitions,
+  usePopupInteractionProps,
 } from '../../utils/popups';
 import { PreviewCardHandle } from '../store/PreviewCardHandle';
+import { mergeProps } from '../../merge-props';
 
 function PreviewCardRootComponent<Payload>(props: PreviewCardRoot.Props<Payload>) {
   const {
@@ -30,22 +34,20 @@ function PreviewCardRootComponent<Payload>(props: PreviewCardRoot.Props<Payload>
     children,
   } = props;
 
-  const store = PreviewCardStore.useStore<Payload>(handle?.store, {
-    open: defaultOpen,
-    openProp,
-    activeTriggerId: defaultTriggerIdProp,
-    triggerIdProp,
-  });
-
-  // Support initially open state when uncontrolled
-  useOnFirstRender(() => {
-    if (openProp === undefined && store.state.open === false && defaultOpen === true) {
-      store.update({
-        open: true,
-        activeTriggerId: defaultTriggerIdProp,
-      });
-    }
-  });
+  const store = usePopupRootStore(
+    handle,
+    (floatingId, nested) =>
+      new PreviewCardStore<Payload>(
+        {
+          open: defaultOpen,
+          openProp,
+          activeTriggerId: defaultTriggerIdProp,
+          triggerIdProp,
+        },
+        floatingId,
+        nested,
+      ),
+  );
 
   store.useControlledProp('openProp', openProp);
   store.useControlledProp('triggerIdProp', triggerIdProp);
@@ -54,12 +56,14 @@ function PreviewCardRootComponent<Payload>(props: PreviewCardRoot.Props<Payload>
   store.useContextCallback('onOpenChangeComplete', onOpenChangeComplete);
 
   const open = store.useState('open');
-
   const activeTriggerId = store.useState('activeTriggerId');
+  const mounted = store.useState('mounted');
   const payload = store.useState('payload') as Payload | undefined;
 
-  useImplicitActiveTrigger(store);
-  const { forceUnmount } = useOpenStateTransitions(open, store);
+  useImplicitActiveTrigger(store, { closeOnActiveTriggerUnmount: true });
+  const { forceUnmount } = useOpenStateTransitions(open, store, () => {
+    store.context.inlineRectCoordsRef.current = undefined;
+  });
 
   useIsoLayoutEffect(() => {
     if (open) {
@@ -69,37 +73,43 @@ function PreviewCardRootComponent<Payload>(props: PreviewCardRoot.Props<Payload>
     }
   }, [store, activeTriggerId, open]);
 
-  const handleImperativeClose = React.useCallback(() => {
-    store.setOpen(false, createPreviewCardEventDetails(store, REASONS.imperativeAction));
-  }, [store]);
-
   React.useImperativeHandle(
     actionsRef,
-    () => ({ unmount: forceUnmount, close: handleImperativeClose }),
-    [forceUnmount, handleImperativeClose],
+    () => ({
+      unmount: forceUnmount,
+      close: () => store.setOpen(false, createChangeEventDetails(REASONS.imperativeAction)),
+    }),
+    [forceUnmount, store],
   );
 
-  const floatingRootContext = store.useState('floatingRootContext');
-
-  const dismiss = useDismiss(floatingRootContext);
-
-  const { getReferenceProps, getTriggerProps, getFloatingProps } = useInteractions([dismiss]);
-
-  const activeTriggerProps = React.useMemo(() => getReferenceProps(), [getReferenceProps]);
-  const inactiveTriggerProps = React.useMemo(() => getTriggerProps(), [getTriggerProps]);
-  const popupProps = React.useMemo(() => getFloatingProps(), [getFloatingProps]);
-
-  store.useSyncedValues({
-    activeTriggerProps,
-    inactiveTriggerProps,
-    popupProps,
-  });
+  const shouldRenderInteractions = open || mounted;
 
   return (
     <PreviewCardRootContext.Provider value={store as PreviewCardRootContext}>
+      {shouldRenderInteractions && <PreviewCardInteractions store={store} />}
       {typeof children === 'function' ? children({ payload }) : children}
     </PreviewCardRootContext.Provider>
   );
+}
+
+function PreviewCardInteractions<Payload>({ store }: { store: PreviewCardStore<Payload> }) {
+  const floatingRootContext = store.useState('floatingRootContext');
+
+  const dismiss = useDismiss(floatingRootContext);
+  const popupProps = React.useMemo(
+    () => mergeProps(FOCUSABLE_POPUP_PROPS, dismiss.floating),
+    [dismiss.floating],
+  );
+
+  usePopupInteractionProps(store, {
+    // `enabled` is not passed to `useDismiss`, so its props are always defined,
+    // and `trigger` is the same object as `reference`.
+    activeTriggerProps: dismiss.reference!,
+    inactiveTriggerProps: dismiss.trigger!,
+    popupProps,
+  });
+
+  return null;
 }
 
 /**
@@ -108,7 +118,9 @@ function PreviewCardRootComponent<Payload>(props: PreviewCardRoot.Props<Payload>
  *
  * Documentation: [Base UI Preview Card](https://base-ui.com/react/components/preview-card)
  */
-export function PreviewCardRoot<Payload>(props: PreviewCardRoot.Props<Payload>) {
+export const PreviewCardRoot = fastComponent(function PreviewCardRoot<Payload>(
+  props: PreviewCardRoot.Props<Payload>,
+) {
   if (usePreviewCardRootContext(true)) {
     return <PreviewCardRootComponent {...props} />;
   }
@@ -118,21 +130,7 @@ export function PreviewCardRoot<Payload>(props: PreviewCardRoot.Props<Payload>) 
       <PreviewCardRootComponent {...props} />
     </FloatingTree>
   );
-}
-
-function createPreviewCardEventDetails<Payload>(
-  store: PreviewCardStore<Payload>,
-  reason: PreviewCardRoot.ChangeEventReason,
-) {
-  const details: PreviewCardRoot.ChangeEventDetails =
-    createChangeEventDetails<PreviewCardRoot.ChangeEventReason>(
-      reason,
-    ) as PreviewCardRoot.ChangeEventDetails;
-  details.preventUnmountOnClose = () => {
-    store.set('preventUnmountingOnClose', true);
-  };
-  return details;
-}
+});
 
 export interface PreviewCardRootState {}
 

@@ -1,6 +1,6 @@
 import { expect } from 'vitest';
 import * as React from 'react';
-import { act, screen } from '@mui/internal-test-utils';
+import { act, fireEvent, flushMicrotasks, screen } from '@mui/internal-test-utils';
 import { Tabs } from '@base-ui/react/tabs';
 import { createRenderer, describeConformance } from '#test-utils';
 
@@ -55,6 +55,105 @@ describe('<Tabs.List />', () => {
       expect(tab1).toHaveAttribute('aria-selected', 'true');
       expect(tab2).toHaveAttribute('aria-selected', 'false');
       expect(tab3).toHaveAttribute('aria-selected', 'false');
+    });
+  });
+
+  describe('prop: loopFocus', () => {
+    it('does not wrap focus past the first tab when `loopFocus` is false', async () => {
+      await render(
+        <Tabs.Root value={0}>
+          <Tabs.List loopFocus={false}>
+            <Tabs.Tab value={0} />
+            <Tabs.Tab value={1} />
+            <Tabs.Tab value={2} />
+          </Tabs.List>
+        </Tabs.Root>,
+      );
+
+      const [firstTab, , lastTab] = screen.getAllByRole('tab');
+      await act(async () => {
+        firstTab.focus();
+      });
+
+      fireEvent.keyDown(firstTab, { key: 'ArrowLeft' });
+      await flushMicrotasks();
+
+      expect(firstTab).toHaveFocus();
+      expect(lastTab).not.toHaveFocus();
+    });
+
+    it('does not wrap focus past the last tab when `loopFocus` is false', async () => {
+      await render(
+        <Tabs.Root value={2}>
+          <Tabs.List loopFocus={false}>
+            <Tabs.Tab value={0} />
+            <Tabs.Tab value={1} />
+            <Tabs.Tab value={2} />
+          </Tabs.List>
+        </Tabs.Root>,
+      );
+
+      const [firstTab, , lastTab] = screen.getAllByRole('tab');
+      await act(async () => {
+        lastTab.focus();
+      });
+
+      fireEvent.keyDown(lastTab, { key: 'ArrowRight' });
+      await flushMicrotasks();
+
+      expect(lastTab).toHaveFocus();
+      expect(firstTab).not.toHaveFocus();
+    });
+  });
+
+  describe('keyboard navigation', () => {
+    it('moves focus to a tab disabled with the `disabled` prop', async () => {
+      await render(
+        <Tabs.Root value={0}>
+          <Tabs.List>
+            <Tabs.Tab value={0} />
+            <Tabs.Tab value={1} disabled />
+            <Tabs.Tab value={2} />
+          </Tabs.List>
+        </Tabs.Root>,
+      );
+
+      const [firstTab, disabledTab] = screen.getAllByRole('tab');
+      await act(async () => {
+        firstTab.focus();
+      });
+
+      fireEvent.keyDown(firstTab, { key: 'ArrowRight' });
+      await flushMicrotasks();
+
+      expect(disabledTab).toHaveFocus();
+    });
+
+    it('skips a natively disabled tab in a single keypress', async () => {
+      await render(
+        <Tabs.Root value={0}>
+          <Tabs.List>
+            <Tabs.Tab value={0} />
+            <Tabs.Tab value={1} render={<button type="button" disabled />} />
+            <Tabs.Tab value={2} />
+          </Tabs.List>
+        </Tabs.Root>,
+      );
+
+      const [firstTab, , lastTab] = screen.getAllByRole('tab');
+      await act(async () => {
+        firstTab.focus();
+      });
+
+      fireEvent.keyDown(firstTab, { key: 'ArrowRight' });
+      await flushMicrotasks();
+
+      expect(lastTab).toHaveFocus();
+
+      fireEvent.keyDown(lastTab, { key: 'ArrowLeft' });
+      await flushMicrotasks();
+
+      expect(firstTab).toHaveFocus();
     });
   });
 

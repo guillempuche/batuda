@@ -2,18 +2,16 @@
 import * as React from 'react';
 import { useStableCallback } from '@base-ui/utils/useStableCallback';
 import { useTimeout } from '@base-ui/utils/useTimeout';
-import type { BaseUIComponentProps, HTMLProps } from '../../utils/types';
+import type { BaseUIComponentProps, HTMLProps } from '../../internals/types';
 import { ScrollAreaRootContext } from './ScrollAreaRootContext';
-import { useRenderElement } from '../../utils/useRenderElement';
-import { ScrollAreaRootCssVars } from './ScrollAreaRootCssVars';
+import { useRenderElement } from '../../internals/useRenderElement';
 import { SCROLL_TIMEOUT } from '../constants';
 import { getOffset } from '../utils/getOffset';
-import { ScrollAreaScrollbarDataAttributes } from '../scrollbar/ScrollAreaScrollbarDataAttributes';
 import { styleDisableScrollbar } from '../../utils/styles';
-import { useBaseUiId } from '../../utils/useBaseUiId';
+import { useBaseUiId } from '../../internals/useBaseUiId';
 import { scrollAreaStateAttributesMapping } from './stateAttributes';
-import { contains, getTarget } from '../../floating-ui-react/utils';
-import { useCSPContext } from '../../csp-provider/CSPContext';
+import { contains } from '../../floating-ui-react/utils';
+import { useCSPContext } from '../../internals/csp-context/CSPContext';
 
 const DEFAULT_COORDS = { x: 0, y: 0 };
 const DEFAULT_SIZE = { width: 0, height: 0 };
@@ -43,12 +41,13 @@ export const ScrollAreaRoot = React.forwardRef(function ScrollAreaRoot(
     ...elementProps
   } = componentProps;
 
-  const overflowEdgeThreshold = normalizeOverflowEdgeThreshold(overflowEdgeThresholdProp);
+  const { xStart, xEnd, yStart, yEnd } = normalizeOverflowEdgeThreshold(overflowEdgeThresholdProp);
 
   const rootId = useBaseUiId();
 
   const scrollYTimeout = useTimeout();
   const scrollXTimeout = useTimeout();
+
   const { nonce, disableStyleElements } = useCSPContext();
 
   const [hovering, setHovering] = React.useState(false);
@@ -77,25 +76,28 @@ export const ScrollAreaRoot = React.forwardRef(function ScrollAreaRoot(
   const currentOrientationRef = React.useRef<'vertical' | 'horizontal'>('vertical');
   const scrollPositionRef = React.useRef(DEFAULT_COORDS);
 
+  function startScrolling(vertical: boolean) {
+    const setScrolling = vertical ? setScrollingY : setScrollingX;
+    const timeout = vertical ? scrollYTimeout : scrollXTimeout;
+
+    setScrolling(true);
+    timeout.start(SCROLL_TIMEOUT, () => {
+      setScrolling(false);
+    });
+  }
+
   const handleScroll = useStableCallback((scrollPosition: Coords) => {
     const offsetX = scrollPosition.x - scrollPositionRef.current.x;
     const offsetY = scrollPosition.y - scrollPositionRef.current.y;
+
     scrollPositionRef.current = scrollPosition;
 
     if (offsetY !== 0) {
-      setScrollingY(true);
-
-      scrollYTimeout.start(SCROLL_TIMEOUT, () => {
-        setScrollingY(false);
-      });
+      startScrolling(true);
     }
 
     if (offsetX !== 0) {
-      setScrollingX(true);
-
-      scrollXTimeout.start(SCROLL_TIMEOUT, () => {
-        setScrollingX(false);
-      });
+      startScrolling(false);
     }
   });
 
@@ -107,20 +109,21 @@ export const ScrollAreaRoot = React.forwardRef(function ScrollAreaRoot(
     thumbDraggingRef.current = true;
     startYRef.current = event.clientY;
     startXRef.current = event.clientX;
-    currentOrientationRef.current = event.currentTarget.getAttribute(
-      ScrollAreaScrollbarDataAttributes.orientation,
-    ) as 'vertical' | 'horizontal';
+    // Literal instead of `ScrollAreaScrollbarDataAttributes.orientation`: referencing an
+    // enum member retains its whole object in the bundle, so the strings are inlined and
+    // the enums kept for docs only.
+    currentOrientationRef.current = event.currentTarget.getAttribute('data-orientation') as
+      | 'vertical'
+      | 'horizontal';
 
     if (viewportRef.current) {
       startScrollTopRef.current = viewportRef.current.scrollTop;
       startScrollLeftRef.current = viewportRef.current.scrollLeft;
     }
-    if (thumbYRef.current && currentOrientationRef.current === 'vertical') {
-      thumbYRef.current.setPointerCapture(event.pointerId);
-    }
-    if (thumbXRef.current && currentOrientationRef.current === 'horizontal') {
-      thumbXRef.current.setPointerCapture(event.pointerId);
-    }
+
+    const thumb =
+      currentOrientationRef.current === 'vertical' ? thumbYRef.current : thumbXRef.current;
+    thumb?.setPointerCapture(event.pointerId);
   });
 
   const handlePointerMove = useStableCallback((event: React.PointerEvent) => {
@@ -128,69 +131,54 @@ export const ScrollAreaRoot = React.forwardRef(function ScrollAreaRoot(
       return;
     }
 
-    const deltaY = event.clientY - startYRef.current;
-    const deltaX = event.clientX - startXRef.current;
-
-    if (viewportRef.current) {
-      const scrollableContentHeight = viewportRef.current.scrollHeight;
-      const viewportHeight = viewportRef.current.clientHeight;
-      const scrollableContentWidth = viewportRef.current.scrollWidth;
-      const viewportWidth = viewportRef.current.clientWidth;
-
-      if (
-        thumbYRef.current &&
-        scrollbarYRef.current &&
-        currentOrientationRef.current === 'vertical'
-      ) {
-        const scrollbarYOffset = getOffset(scrollbarYRef.current, 'padding', 'y');
-        const thumbYOffset = getOffset(thumbYRef.current, 'margin', 'y');
-        const thumbHeight = thumbYRef.current.offsetHeight;
-        const maxThumbOffsetY =
-          scrollbarYRef.current.offsetHeight - thumbHeight - scrollbarYOffset - thumbYOffset;
-        const scrollRatioY = deltaY / maxThumbOffsetY;
-        viewportRef.current.scrollTop =
-          startScrollTopRef.current + scrollRatioY * (scrollableContentHeight - viewportHeight);
-        event.preventDefault();
-
-        setScrollingY(true);
-
-        scrollYTimeout.start(SCROLL_TIMEOUT, () => {
-          setScrollingY(false);
-        });
-      }
-
-      if (
-        thumbXRef.current &&
-        scrollbarXRef.current &&
-        currentOrientationRef.current === 'horizontal'
-      ) {
-        const scrollbarXOffset = getOffset(scrollbarXRef.current, 'padding', 'x');
-        const thumbXOffset = getOffset(thumbXRef.current, 'margin', 'x');
-        const thumbWidth = thumbXRef.current.offsetWidth;
-        const maxThumbOffsetX =
-          scrollbarXRef.current.offsetWidth - thumbWidth - scrollbarXOffset - thumbXOffset;
-        const scrollRatioX = deltaX / maxThumbOffsetX;
-        viewportRef.current.scrollLeft =
-          startScrollLeftRef.current + scrollRatioX * (scrollableContentWidth - viewportWidth);
-        event.preventDefault();
-
-        setScrollingX(true);
-
-        scrollXTimeout.start(SCROLL_TIMEOUT, () => {
-          setScrollingX(false);
-        });
-      }
+    const viewportEl = viewportRef.current;
+    if (!viewportEl) {
+      return;
     }
+
+    const vertical = currentOrientationRef.current === 'vertical';
+    const thumbEl = vertical ? thumbYRef.current : thumbXRef.current;
+    const scrollbarEl = vertical ? scrollbarYRef.current : scrollbarXRef.current;
+    if (!thumbEl || !scrollbarEl) {
+      return;
+    }
+
+    const axis = vertical ? 'y' : 'x';
+    const scrollbarOffset = getOffset(scrollbarEl, 'padding', axis);
+    const thumbOffset = getOffset(thumbEl, 'margin', axis);
+    const thumbSizePx = vertical ? thumbEl.offsetHeight : thumbEl.offsetWidth;
+    const trackSize = vertical ? scrollbarEl.offsetHeight : scrollbarEl.offsetWidth;
+    const maxThumbOffset = trackSize - thumbSizePx - scrollbarOffset - thumbOffset;
+    // A short or heavily padded track can drive `maxThumbOffset` to zero or
+    // negative once the thumb hits its `MIN_THUMB_SIZE` floor. Dividing by it
+    // would yield a non-finite (`Infinity`/`NaN`) or inverted scroll position.
+    const delta = vertical ? event.clientY - startYRef.current : event.clientX - startXRef.current;
+    const scrollRatio = maxThumbOffset <= 0 ? 0 : delta / maxThumbOffset;
+
+    const scrollableSize = vertical ? viewportEl.scrollHeight : viewportEl.scrollWidth;
+    const viewportSize = vertical ? viewportEl.clientHeight : viewportEl.clientWidth;
+    const startScroll = vertical ? startScrollTopRef.current : startScrollLeftRef.current;
+    const nextScroll = startScroll + scrollRatio * (scrollableSize - viewportSize);
+
+    if (vertical) {
+      viewportEl.scrollTop = nextScroll;
+    } else {
+      viewportEl.scrollLeft = nextScroll;
+    }
+    event.preventDefault();
+
+    startScrolling(vertical);
   });
 
   const handlePointerUp = useStableCallback((event: React.PointerEvent) => {
     thumbDraggingRef.current = false;
 
-    if (thumbYRef.current && currentOrientationRef.current === 'vertical') {
-      thumbYRef.current.releasePointerCapture(event.pointerId);
-    }
-    if (thumbXRef.current && currentOrientationRef.current === 'horizontal') {
-      thumbXRef.current.releasePointerCapture(event.pointerId);
+    const thumb =
+      currentOrientationRef.current === 'vertical' ? thumbYRef.current : thumbXRef.current;
+    // `pointercancel` releases capture implicitly, so guard against releasing a
+    // capture we no longer hold (which would throw).
+    if (thumb?.hasPointerCapture(event.pointerId)) {
+      thumb.releasePointerCapture(event.pointerId);
     }
   });
 
@@ -202,7 +190,7 @@ export const ScrollAreaRoot = React.forwardRef(function ScrollAreaRoot(
     handleTouchModalityChange(event);
 
     if (event.pointerType !== 'touch') {
-      const isTargetRootChild = contains(rootRef.current, getTarget(event.nativeEvent) as Element);
+      const isTargetRootChild = contains(rootRef.current, event.target as Element);
       setHovering(isTargetRootChild);
     }
   }
@@ -231,8 +219,8 @@ export const ScrollAreaRoot = React.forwardRef(function ScrollAreaRoot(
     },
     style: {
       position: 'relative',
-      [ScrollAreaRootCssVars.scrollAreaCornerHeight as string]: `${cornerSize.height}px`,
-      [ScrollAreaRootCssVars.scrollAreaCornerWidth as string]: `${cornerSize.width}px`,
+      ['--scroll-area-corner-height' as string]: `${cornerSize.height}px`,
+      ['--scroll-area-corner-width' as string]: `${cornerSize.width}px`,
     },
   };
 
@@ -264,7 +252,6 @@ export const ScrollAreaRoot = React.forwardRef(function ScrollAreaRoot(
       hovering,
       setHovering,
       viewportRef,
-      rootRef,
       scrollbarYRef,
       scrollbarXRef,
       thumbYRef,
@@ -275,7 +262,7 @@ export const ScrollAreaRoot = React.forwardRef(function ScrollAreaRoot(
       overflowEdges,
       setOverflowEdges,
       viewportState: state,
-      overflowEdgeThreshold,
+      overflowEdgeThreshold: { xStart, xEnd, yStart, yEnd },
     }),
     [
       handlePointerDown,
@@ -287,16 +274,16 @@ export const ScrollAreaRoot = React.forwardRef(function ScrollAreaRoot(
       hasMeasuredScrollbar,
       touchModality,
       scrollingX,
-      setScrollingX,
       scrollingY,
-      setScrollingY,
       hovering,
-      setHovering,
       rootId,
       hiddenState,
       overflowEdges,
       state,
-      overflowEdgeThreshold,
+      xStart,
+      xEnd,
+      yStart,
+      yEnd,
     ],
   );
 
@@ -368,20 +355,15 @@ export namespace ScrollAreaRoot {
 function normalizeOverflowEdgeThreshold(
   threshold: ScrollAreaRoot.Props['overflowEdgeThreshold'] | undefined,
 ) {
-  if (typeof threshold === 'number') {
-    const value = Math.max(0, threshold);
-    return {
-      xStart: value,
-      xEnd: value,
-      yStart: value,
-      yEnd: value,
-    };
-  }
+  const thresholds =
+    typeof threshold === 'number'
+      ? { xStart: threshold, xEnd: threshold, yStart: threshold, yEnd: threshold }
+      : threshold;
 
   return {
-    xStart: Math.max(0, threshold?.xStart || 0),
-    xEnd: Math.max(0, threshold?.xEnd || 0),
-    yStart: Math.max(0, threshold?.yStart || 0),
-    yEnd: Math.max(0, threshold?.yEnd || 0),
+    xStart: Math.max(0, thresholds?.xStart || 0),
+    xEnd: Math.max(0, thresholds?.xEnd || 0),
+    yStart: Math.max(0, thresholds?.yStart || 0),
+    yEnd: Math.max(0, thresholds?.yEnd || 0),
   };
 }

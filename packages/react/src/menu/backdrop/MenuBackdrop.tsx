@@ -1,19 +1,12 @@
 'use client';
 import * as React from 'react';
 import { useMenuRootContext } from '../root/MenuRootContext';
-import { useRenderElement } from '../../utils/useRenderElement';
-import type { BaseUIComponentProps } from '../../utils/types';
-import { type StateAttributesMapping } from '../../utils/getStateAttributesProps';
-import { popupStateMapping as baseMapping } from '../../utils/popupStateMapping';
-import type { TransitionStatus } from '../../utils/useTransitionStatus';
-import { transitionStatusMapping } from '../../utils/stateAttributesMapping';
+import { useRenderElement } from '../../internals/useRenderElement';
+import type { BaseUIComponentProps } from '../../internals/types';
+import { popupTransitionStateMapping } from '../../utils/popupStateMapping';
+import type { TransitionStatus } from '../../internals/useTransitionStatus';
 import { useContextMenuRootContext } from '../../context-menu/root/ContextMenuRootContext';
-import { REASONS } from '../../utils/reasons';
-
-const stateAttributesMapping: StateAttributesMapping<MenuBackdropState> = {
-  ...baseMapping,
-  ...transitionStatusMapping,
-};
+import { REASONS } from '../../internals/reasons';
 
 /**
  * An overlay displayed beneath the menu popup.
@@ -25,7 +18,7 @@ export const MenuBackdrop = React.forwardRef(function MenuBackdrop(
   componentProps: MenuBackdrop.Props,
   forwardedRef: React.ForwardedRef<HTMLDivElement>,
 ) {
-  const { className, render, style, ...elementProps } = componentProps;
+  const { render, className, style, ...elementProps } = componentProps;
 
   const { store } = useMenuRootContext();
   const open = store.useState('open');
@@ -45,7 +38,7 @@ export const MenuBackdrop = React.forwardRef(function MenuBackdrop(
       ? [forwardedRef, contextMenuContext.backdropRef]
       : forwardedRef,
     state,
-    stateAttributesMapping,
+    stateAttributesMapping: popupTransitionStateMapping,
     props: [
       {
         role: 'presentation',

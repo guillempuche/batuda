@@ -10,7 +10,7 @@ export enum PopoverPopupDataAttributes {
    */
   closed = CommonPopupDataAttributes.closed,
   /**
-   * Present when the popup is animating in.
+   * Present when the popup begins animating in.
    */
   startingStyle = CommonPopupDataAttributes.startingStyle,
   /**
@@ -29,7 +29,7 @@ export enum PopoverPopupDataAttributes {
   align = 'data-align',
   /**
    * Present if animations should be instant.
-   * @type {'click' | 'dismiss'}
+   * @type {'click' | 'dismiss' | 'focus' | 'trigger-change'}
    */
   instant = 'data-instant',
 }

@@ -1,4 +1,4 @@
-import { TransitionStatusDataAttributes } from '../../utils/stateAttributesMapping';
+import { TransitionStatusDataAttributes } from '../../internals/stateAttributesMapping';
 
 export enum FieldErrorDataAttributes {
   /**
@@ -6,11 +6,11 @@ export enum FieldErrorDataAttributes {
    */
   disabled = 'data-disabled',
   /**
-   * Present when the field is in valid state.
+   * Present when the field is in a valid state.
    */
   valid = 'data-valid',
   /**
-   * Present when the field is in invalid state.
+   * Present when the field is in an invalid state.
    */
   invalid = 'data-invalid',
   /**
@@ -30,7 +30,7 @@ export enum FieldErrorDataAttributes {
    */
   focused = 'data-focused',
   /**
-   * Present when the error message is animating in.
+   * Present when the error message begins animating in.
    */
   startingStyle = TransitionStatusDataAttributes.startingStyle,
   /**

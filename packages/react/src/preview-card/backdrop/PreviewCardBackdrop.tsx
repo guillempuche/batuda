@@ -1,20 +1,13 @@
 'use client';
 import * as React from 'react';
 import { usePreviewCardRootContext } from '../root/PreviewCardContext';
-import type { BaseUIComponentProps } from '../../utils/types';
-import { type StateAttributesMapping } from '../../utils/getStateAttributesProps';
-import { popupStateMapping as baseMapping } from '../../utils/popupStateMapping';
-import type { TransitionStatus } from '../../utils/useTransitionStatus';
-import { transitionStatusMapping } from '../../utils/stateAttributesMapping';
-import { useRenderElement } from '../../utils/useRenderElement';
-
-const stateAttributesMapping: StateAttributesMapping<PreviewCardBackdropState> = {
-  ...baseMapping,
-  ...transitionStatusMapping,
-};
+import type { BaseUIComponentProps } from '../../internals/types';
+import { popupTransitionStateMapping } from '../../utils/popupStateMapping';
+import type { TransitionStatus } from '../../internals/useTransitionStatus';
+import { useRenderElement } from '../../internals/useRenderElement';
 
 /**
- * An overlay displayed beneath the popup.
+ * A presentational overlay displayed beneath the popup.
  * Renders a `<div>` element.
  *
  * Documentation: [Base UI Preview Card](https://base-ui.com/react/components/preview-card)
@@ -50,7 +43,7 @@ export const PreviewCardBackdrop = React.forwardRef(function PreviewCardBackdrop
       },
       elementProps,
     ],
-    stateAttributesMapping,
+    stateAttributesMapping: popupTransitionStateMapping,
   });
 
   return element;

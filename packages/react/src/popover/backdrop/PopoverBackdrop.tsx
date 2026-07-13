@@ -1,18 +1,11 @@
 'use client';
 import * as React from 'react';
 import { usePopoverRootContext } from '../root/PopoverRootContext';
-import type { BaseUIComponentProps } from '../../utils/types';
-import { type StateAttributesMapping } from '../../utils/getStateAttributesProps';
-import { popupStateMapping as baseMapping } from '../../utils/popupStateMapping';
-import type { TransitionStatus } from '../../utils/useTransitionStatus';
-import { transitionStatusMapping } from '../../utils/stateAttributesMapping';
-import { useRenderElement } from '../../utils/useRenderElement';
-import { REASONS } from '../../utils/reasons';
-
-const stateAttributesMapping: StateAttributesMapping<PopoverBackdropState> = {
-  ...baseMapping,
-  ...transitionStatusMapping,
-};
+import type { BaseUIComponentProps } from '../../internals/types';
+import { popupTransitionStateMapping } from '../../utils/popupStateMapping';
+import type { TransitionStatus } from '../../internals/useTransitionStatus';
+import { useRenderElement } from '../../internals/useRenderElement';
+import { REASONS } from '../../internals/reasons';
 
 /**
  * An overlay displayed beneath the popover.
@@ -24,9 +17,9 @@ export const PopoverBackdrop = React.forwardRef(function PopoverBackdrop(
   props: PopoverBackdrop.Props,
   forwardedRef: React.ForwardedRef<HTMLDivElement>,
 ) {
-  const { className, render, style, ...elementProps } = props;
+  const { render, className, style, ...elementProps } = props;
 
-  const { store } = usePopoverRootContext();
+  const store = usePopoverRootContext();
 
   const open = store.useState('open');
   const mounted = store.useState('mounted');
@@ -40,7 +33,7 @@ export const PopoverBackdrop = React.forwardRef(function PopoverBackdrop(
 
   const element = useRenderElement('div', props, {
     state,
-    ref: [store.context.backdropRef, forwardedRef],
+    ref: forwardedRef,
     props: [
       {
         role: 'presentation',
@@ -53,7 +46,7 @@ export const PopoverBackdrop = React.forwardRef(function PopoverBackdrop(
       },
       elementProps,
     ],
-    stateAttributesMapping,
+    stateAttributesMapping: popupTransitionStateMapping,
   });
 
   return element;

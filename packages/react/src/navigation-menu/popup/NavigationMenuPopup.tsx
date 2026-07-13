@@ -1,21 +1,15 @@
 'use client';
 import * as React from 'react';
-import type { BaseUIComponentProps } from '../../utils/types';
-import { useRenderElement } from '../../utils/useRenderElement';
+import type { BaseUIComponentProps } from '../../internals/types';
+import { useRenderElement } from '../../internals/useRenderElement';
 import { useNavigationMenuRootContext } from '../root/NavigationMenuRootContext';
-import type { TransitionStatus } from '../../utils/useTransitionStatus';
-import { transitionStatusMapping } from '../../utils/stateAttributesMapping';
-import { useBaseUiId } from '../../utils/useBaseUiId';
+import type { TransitionStatus } from '../../internals/useTransitionStatus';
+import { useBaseUiId } from '../../internals/useBaseUiId';
 import { useNavigationMenuPositionerContext } from '../positioner/NavigationMenuPositionerContext';
-import { useDirection } from '../../direction-provider/DirectionContext';
-import { StateAttributesMapping } from '../../utils/getStateAttributesProps';
-import { popupStateMapping as baseMapping } from '../../utils/popupStateMapping';
+import { useDirection } from '../../internals/direction-context/DirectionContext';
+import { popupTransitionStateMapping } from '../../utils/popupStateMapping';
 import { Align, Side } from '../../utils/useAnchorPositioning';
-
-const stateAttributesMapping: StateAttributesMapping<NavigationMenuPopupState> = {
-  ...baseMapping,
-  ...transitionStatusMapping,
-};
+import { getDisabledMountTransitionStyles } from '../../utils/getDisabledMountTransitionStyles';
 
 /**
  * A container for the navigation menu contents.
@@ -27,7 +21,7 @@ export const NavigationMenuPopup = React.forwardRef(function NavigationMenuPopup
   componentProps: NavigationMenuPopup.Props,
   forwardedRef: React.ForwardedRef<HTMLElement>,
 ) {
-  const { className, render, id: idProp, style, ...elementProps } = componentProps;
+  const { render, className, style, id: idProp, ...elementProps } = componentProps;
 
   const { open, transitionStatus, setPopupElement } = useNavigationMenuRootContext();
   const positioning = useNavigationMenuPositionerContext();
@@ -44,15 +38,13 @@ export const NavigationMenuPopup = React.forwardRef(function NavigationMenuPopup
   };
 
   // Ensure popup size transitions correctly when anchored to `bottom` (side=top) or `right` (side=left).
-  let isOriginSide = positioning.side === 'top';
   let isPhysicalLeft = positioning.side === 'left';
   if (direction === 'rtl') {
-    isOriginSide = isOriginSide || positioning.side === 'inline-end';
     isPhysicalLeft = isPhysicalLeft || positioning.side === 'inline-end';
   } else {
-    isOriginSide = isOriginSide || positioning.side === 'inline-start';
     isPhysicalLeft = isPhysicalLeft || positioning.side === 'inline-start';
   }
+  const isOriginSide = positioning.side === 'top' || isPhysicalLeft;
 
   const element = useRenderElement('nav', componentProps, {
     state,
@@ -69,9 +61,10 @@ export const NavigationMenuPopup = React.forwardRef(function NavigationMenuPopup
             }
           : {},
       },
+      getDisabledMountTransitionStyles(transitionStatus),
       elementProps,
     ],
-    stateAttributesMapping,
+    stateAttributesMapping: popupTransitionStateMapping,
   });
 
   return element;
