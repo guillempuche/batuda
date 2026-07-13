@@ -19,7 +19,7 @@ import { Check, GripVertical, MoveRight } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
-import { PriButton, PriCheckbox, PriSelect, usePriToast } from '@batuda/ui/pri'
+import { PriButton, PriCheckbox, PriMenu, usePriToast } from '@batuda/ui/pri'
 
 import {
 	COMPANIES_PAGE_SIZE,
@@ -471,41 +471,42 @@ function StagePicker({
 }) {
 	const { i18n } = useLinguiBase()
 	return (
-		<PriSelect.Root
-			items={STATUS_ORDER.map(s => ({
-				value: s,
-				label: i18n._(statusLabels[s]),
-			}))}
-			value={value ?? ''}
-			onValueChange={v => {
-				if (typeof v === 'string' && v) onPick(v as CompanyStatus)
-			}}
-		>
-			<MoveTrigger data-testid={testId} aria-label={label}>
-				<MoveRight size={13} aria-hidden />
-				<span>{label}</span>
-			</MoveTrigger>
-			<PriSelect.Portal>
-				<PriSelect.Positioner sideOffset={6}>
-					<PriSelect.Popup>
+		<PriMenu.Root>
+			<PriMenu.Trigger
+				render={props => (
+					<MoveTrigger
+						type='button'
+						$variant='outlined'
+						data-testid={testId}
+						aria-label={label}
+						{...props}
+					>
+						<MoveRight size={13} aria-hidden />
+						<span>{label}</span>
+					</MoveTrigger>
+				)}
+			/>
+			<PriMenu.Portal>
+				<PriMenu.Positioner sideOffset={6}>
+					<PriMenu.Popup>
 						{STATUS_ORDER.map(s => (
-							<PriSelect.Item
+							<PriMenu.Item
 								key={s}
-								value={s}
 								data-testid={`${testId}-option-${s}`}
+								onClick={() => onPick(s)}
 							>
-								<PriSelect.ItemIndicator>
-									<Check size={12} aria-hidden />
-								</PriSelect.ItemIndicator>
-								<PriSelect.ItemText>
-									{i18n._(statusLabels[s])}
-								</PriSelect.ItemText>
-							</PriSelect.Item>
+								<Check
+									size={12}
+									aria-hidden
+									style={{ opacity: value === s ? 1 : 0 }}
+								/>
+								<span>{i18n._(statusLabels[s])}</span>
+							</PriMenu.Item>
 						))}
-					</PriSelect.Popup>
-				</PriSelect.Positioner>
-			</PriSelect.Portal>
-		</PriSelect.Root>
+					</PriMenu.Popup>
+				</PriMenu.Positioner>
+			</PriMenu.Portal>
+		</PriMenu.Root>
 	)
 }
 
@@ -706,7 +707,7 @@ const DragHandle = styled.button.withConfig({
 	}
 `
 
-const MoveTrigger = styled(PriSelect.Trigger).withConfig({
+const MoveTrigger = styled(PriButton).withConfig({
 	displayName: 'PipelineBoardMoveTrigger',
 })`
 	gap: var(--space-3xs);
