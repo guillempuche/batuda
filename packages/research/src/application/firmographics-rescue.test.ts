@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+	firmographicsRescuePrompt,
+	hasHeadcountSignal,
 	mergeFirmographics,
 	needsFirmographicsRescue,
+	needsSizeRescue,
+	sizeRescuePrompt,
 } from './firmographics-rescue'
 
 const sized = (value: string) => ({
@@ -97,6 +101,113 @@ describe('mergeFirmographics', () => {
 			// THEN nothing filled
 			expect(result.filled).toBe(0)
 			expect(result.findings).toBe(findings)
+		})
+	})
+})
+
+describe('hasHeadcountSignal', () => {
+	describe('when the text states a headcount', () => {
+		it('should detect a number next to an employee word', () => {
+			expect(hasHeadcountSignal('The company has 624 employees.')).toBe(true)
+			expect(hasHeadcountSignal('We employ over 500 people worldwide')).toBe(
+				true,
+			)
+			expect(hasHeadcountSignal('a team of 250 across three sites')).toBe(true)
+		})
+
+		it('should detect it in Spanish and Catalan phrasing', () => {
+			expect(hasHeadcountSignal('cuenta con 80 empleados')).toBe(true)
+			expect(hasHeadcountSignal('una plantilla de 120 persones')).toBe(true)
+		})
+	})
+
+	describe('when a number is present but is not a headcount', () => {
+		it('should ignore carrier, customer, and equipment counts', () => {
+			expect(hasHeadcountSignal('300 strategic carriers')).toBe(false)
+			expect(hasHeadcountSignal('serving 5,000 customers')).toBe(false)
+			expect(hasHeadcountSignal('75 power units and 200 trailers')).toBe(false)
+		})
+	})
+
+	describe('when no number sits near an employee word', () => {
+		it('should return false for prose and empty text', () => {
+			expect(hasHeadcountSignal('our dedicated employees deliver')).toBe(false)
+			expect(hasHeadcountSignal('')).toBe(false)
+		})
+	})
+})
+
+describe('firmographicsRescuePrompt', () => {
+	const target = { name: 'Acme', domain: 'acme.com' }
+
+	describe('when a source manifest is supplied', () => {
+		it('should list the exact URLs for the model to cite', () => {
+			const prompt = firmographicsRescuePrompt(
+				target,
+				'evidence here',
+				'https://acme.com/\nhttps://linkedin.com/company/acme',
+			)
+			expect(prompt).toContain('https://linkedin.com/company/acme')
+			expect(prompt).toContain('copied verbatim')
+			expect(prompt).toContain('evidence here')
+			expect(prompt).toContain('size_range')
+		})
+	})
+
+	describe('when no source manifest is supplied', () => {
+		it('should fall back to a generic citation instruction and steer off-homepage', () => {
+			const prompt = firmographicsRescuePrompt(target, 'evidence here')
+			expect(prompt).toContain('the exact source URL it came from')
+			expect(prompt).toContain('third-party')
+		})
+	})
+})
+
+describe('needsSizeRescue', () => {
+	describe('when the size band is missing or blanked', () => {
+		it('should rescue', () => {
+			expect(needsSizeRescue({ enrichment: {} })).toBe(true)
+			expect(needsSizeRescue({})).toBe(true)
+			expect(
+				needsSizeRescue({ enrichment: { size_range: { value: null } } }),
+			).toBe(true)
+			// tools present but size missing still needs the focused size pass
+			expect(
+				needsSizeRescue({ enrichment: { current_tools: sized('SAP TMS') } }),
+			).toBe(true)
+		})
+	})
+
+	describe('when the size band is present', () => {
+		it('should not rescue', () => {
+			expect(
+				needsSizeRescue({ enrichment: { size_range: sized('51-200') } }),
+			).toBe(false)
+		})
+	})
+})
+
+describe('sizeRescuePrompt', () => {
+	const target = { name: 'Acme', domain: 'acme.com' }
+
+	describe('when building the size-only prompt', () => {
+		it('should ask for the headcount alone and cite the manifest', () => {
+			const prompt = sizeRescuePrompt(
+				target,
+				'evidence here',
+				'https://acme.com/\nhttps://linkedin.com/company/acme',
+			)
+			expect(prompt).toContain('how many people it employs')
+			expect(prompt).toContain('size_range')
+			expect(prompt).toContain('https://linkedin.com/company/acme')
+			expect(prompt).toContain('evidence here')
+			// single-purpose: it must NOT ask for tools
+			expect(prompt).not.toContain('current_tools')
+		})
+
+		it('should fall back to a generic citation without a manifest', () => {
+			const prompt = sizeRescuePrompt(target, 'evidence here')
+			expect(prompt).toContain('the exact source URL it came from')
 		})
 	})
 })
