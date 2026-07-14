@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 
 import { NoRegistry, ProviderError, UnsupportedSite } from '../domain/errors'
 import { RegistryRecord, ScrapedPage, SearchResult } from '../domain/types'
-import { StubExtractProvider } from '../infrastructure/stub/extract'
 import { StubRegistryEsProvider } from '../infrastructure/stub/registry-es'
 import { StubScrapeProvider } from '../infrastructure/stub/scrape'
 import { StubSearchProvider } from '../infrastructure/stub/search'
@@ -91,7 +90,6 @@ const webSearchInput = async (params: {
 			}),
 		),
 		StubScrapeProvider,
-		StubExtractProvider,
 		StubRegistryEsProvider,
 	)
 	await Effect.runPromise(
@@ -137,7 +135,6 @@ const registryLookupInput = async (params: {
 		),
 		StubSearchProvider,
 		StubScrapeProvider,
-		StubExtractProvider,
 	)
 	await Effect.runPromise(
 		Effect.gen(function* () {
@@ -174,7 +171,6 @@ const registryLookupResult = async (
 		Layer.succeed(RegistryRouter)(RegistryRouter.of({ lookup })),
 		StubSearchProvider,
 		StubScrapeProvider,
-		StubExtractProvider,
 	)
 	const results = await Effect.runPromise(
 		Effect.gen(function* () {
@@ -208,7 +204,6 @@ const scrapePageResult = async (
 	const ports = Layer.mergeAll(
 		Layer.succeed(ScrapeProvider)(ScrapeProvider.of({ scrape })),
 		StubSearchProvider,
-		StubExtractProvider,
 		StubRegistryEsProvider,
 	)
 	const results = await Effect.runPromise(
@@ -235,7 +230,6 @@ const webSearchResult = async (
 	const ports = Layer.mergeAll(
 		Layer.succeed(SearchProvider)(SearchProvider.of({ search })),
 		StubScrapeProvider,
-		StubExtractProvider,
 		StubRegistryEsProvider,
 	)
 	const results = await Effect.runPromise(
@@ -274,7 +268,6 @@ const scrapeInput = async (params: { url: string }): Promise<ScrapeInput> => {
 			}),
 		),
 		StubSearchProvider,
-		StubExtractProvider,
 		StubRegistryEsProvider,
 	)
 	await Effect.runPromise(
@@ -316,7 +309,6 @@ const discoverContactsInput = async (params: {
 		}),
 		StubSearchProvider,
 		StubScrapeProvider,
-		StubExtractProvider,
 		StubRegistryEsProvider,
 	)
 	await Effect.runPromise(

@@ -54,7 +54,6 @@ const sweep = () =>
 // Unique keys/ids so assertions only see this suite's fixtures.
 const searchKey = `ret-search-${randomUUID()}`
 const llmKey = `ret-llm-${randomUUID()}`
-const extractKey = `ret-extract-${randomUUID()}`
 const runSourceId = `src_run_${randomUUID().replace(/-/g, '').slice(0, 12)}`
 const orphanSourceId = `src_orphan_${randomUUID().replace(/-/g, '').slice(0, 10)}`
 const citedSourceId = `src_cited_${randomUUID().replace(/-/g, '').slice(0, 11)}`
@@ -70,7 +69,7 @@ const seedSource = (id: string, contentRef: string) =>
 beforeAll(async () => {
 	pool = new pg.Pool({ connectionString: DATABASE_URL })
 
-	// Expired caches (search + llm by expires_at, extraction by cached_at).
+	// Expired caches (search + llm by expires_at).
 	await pool.query(
 		`INSERT INTO search_cache (key_hash, provider, query, items, expires_at)
 		 VALUES ($1, 'p', 'q', '[]'::jsonb, now() - interval '1 hour')`,
@@ -80,11 +79,6 @@ beforeAll(async () => {
 		`INSERT INTO llm_cache (key_hash, tier, model, prompt_preview, response, expires_at)
 		 VALUES ($1, 'agent', 'm', 'p', '{}'::jsonb, now() - interval '1 hour')`,
 		[llmKey],
-	)
-	await pool.query(
-		`INSERT INTO extraction_cache (key_hash, content_hash, schema_name, schema_version, model, result, cached_at)
-		 VALUES ($1, 'ch', 's', 1, 'm', '{}'::jsonb, now() - interval '8 days')`,
-		[extractKey],
 	)
 
 	// A completed run with a bulky transcript and a fetched source.
@@ -123,9 +117,6 @@ afterAll(async () => {
 	])
 	await pool.query(`DELETE FROM search_cache WHERE key_hash = $1`, [searchKey])
 	await pool.query(`DELETE FROM llm_cache WHERE key_hash = $1`, [llmKey])
-	await pool.query(`DELETE FROM extraction_cache WHERE key_hash = $1`, [
-		extractKey,
-	])
 	await pool.end()
 })
 
@@ -146,7 +137,6 @@ describe('research retention sweep', () => {
 		// THEN every expired cache row is gone
 		expect(await exists('search_cache', 'key_hash', searchKey)).toBe(false)
 		expect(await exists('llm_cache', 'key_hash', llmKey)).toBe(false)
-		expect(await exists('extraction_cache', 'key_hash', extractKey)).toBe(false)
 
 		// AND the old run keeps its row but sheds its bulky transcript
 		const run = await pool.query<{

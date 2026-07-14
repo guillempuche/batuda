@@ -17,8 +17,9 @@ import {
 
 import { PgLive } from '../db/client.js'
 
-// Provider quota gates the research-web MCP tool: usage is read from
-// `provider_usage`, the ceiling from `provider_quotas`. Because the SQL client
+// Provider quota gates a research run's provider calls (start_research /
+// research_sync): usage is read from `provider_usage`, the ceiling from
+// `provider_quotas`. Because the SQL client
 // camelCases result keys, reading those rows must use the camelCase names — the
 // snake_case spelling reads back undefined, which silently reports zero usage
 // and an undefined ceiling, so the gate never fires. These tests prove the

@@ -47,7 +47,7 @@ One instance, many workspaces. Run it alone, run it for a team, or host several 
 
 ## What's in it today
 
-- **Research as a first-class capability.** Pluggable `SearchProvider`, `ScrapeProvider`, `ExtractProvider`, `DiscoverProvider`, plus three language-model roles (`AgentLanguageModel`, `ExtractLanguageModel`, `WriterLanguageModel`). Brave wired today. Per-user policy in `user_research_policy`, clamped against a system hard ceiling. Hierarchical parent/child runs. Streaming SSE events you can watch live.
+- **Research as a first-class capability.** Pluggable `SearchProvider`, `ScrapeProvider`, plus three language-model roles (`AgentLanguageModel`, `ExtractLanguageModel`, `WriterLanguageModel`). Brave wired today. Per-user policy in `user_research_policy`, clamped against a system hard ceiling. Hierarchical parent/child runs. Streaming SSE events you can watch live.
 - **Five typed result schemas** — `CompanyEnrichmentV1`, `CompetitorScanV1`, `ContactDiscoveryV1`, `ProspectScanV1`, `Freeform`. The agent returns a record, not prose.
 - **Email through your own inbox.** IMAP IDLE in a separate `mail-worker` process. Credentials AES-256-GCM-encrypted per inbox. Outbound via SMTP, footer injection, draft staging.
 - **Pipeline you can read at a glance.** Companies and contacts with status, priority, next action, last-contacted-at. Company-first, not deal-first.

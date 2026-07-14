@@ -23,7 +23,6 @@ import { ResearchLifecycleTools } from './research-lifecycle'
 import { ResearchMcpTools } from './research-mcp'
 import { ResearchRegistryTools } from './research-registry'
 import { ResearchSinkTools } from './research-sink'
-import { ResearchWebTools } from './research-web'
 import { TaskTools } from './tasks'
 import { TimelineTools } from './timeline'
 
@@ -45,7 +44,6 @@ const TOOLKITS = {
 	ResearchMcpTools,
 	ResearchRegistryTools,
 	ResearchSinkTools,
-	ResearchWebTools,
 	TaskTools,
 	TimelineTools,
 }
@@ -57,7 +55,7 @@ const TOOLKITS = {
 const isActionParameterized = (toolName: string): boolean =>
 	toolName.startsWith('manage_') || toolName.startsWith('resolve_')
 
-const READ_ONLY_NAME = /^(list_|get_|search_|find_|lookup_|web_)/
+const READ_ONLY_NAME = /^(list_|get_|search_|find_|lookup_)/
 const DESTRUCTIVE_NAME = /^(delete_|discard_|cancel_)/
 const IDEMPOTENT_NAME =
 	/^(update_|mark_|set_|reschedule_|reopen_|snooze_|complete_)/
@@ -121,7 +119,7 @@ describe('MCP tool annotation coverage', () => {
 					if (READ_ONLY_NAME.test(toolName)) {
 						it('should declare Tool.Readonly = true', () => {
 							// GIVEN a tool whose name matches a read-only convention
-							//       (list_/get_/search_/find_/lookup_/web_)
+							//       (list_/get_/search_/find_/lookup_)
 							// WHEN reading Tool.Readonly from its annotations
 							// THEN the value is exactly true so MCP clients can call
 							//      it without surfacing a write-confirmation prompt

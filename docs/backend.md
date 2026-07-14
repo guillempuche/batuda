@@ -99,7 +99,6 @@ apps/server/src/
 │   │   ├── documents.ts
 │   │   ├── pages.ts
 │   │   ├── pipeline.ts
-│   │   ├── research-web.ts   # web_search, web_read, web_discover
 │   │   ├── research-registry.ts  # lookup_registry
 │   │   ├── research-crm.ts  # crm_lookup
 │   │   ├── research-sink.ts # propose_update, attach_finding, propose_paid_action

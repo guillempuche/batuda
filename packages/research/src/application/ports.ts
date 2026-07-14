@@ -1,4 +1,4 @@
-import { Context, type Effect, type Schema } from 'effect'
+import { Context, type Effect } from 'effect'
 import type { LanguageModel } from 'effect/unstable/ai'
 
 import type { AcceptedCountry } from '../domain/country'
@@ -66,10 +66,8 @@ export class BlobStorage extends Context.Service<
 import type {
 	BudgetSnapshot,
 	CompanyReport,
-	DiscoverResult,
 	EmailVerification,
 	EnrichmentResult,
-	ExternalJobRef,
 	RegistryRecord,
 	ScrapedPage,
 	SearchResult,
@@ -115,49 +113,6 @@ export class ScrapeProvider extends Context.Service<
 		) => Effect.Effect<ScrapedPage, ProviderError | UnsupportedSite>
 	}
 >()('research/ScrapeProvider') {}
-
-// ── Extract ──
-// Returns `unknown`: the raw provider result is handed to the calling model
-// as-is (it reads untyped JSON), not decoded against the requested schema.
-// Generic methods on Context.Service lose type params through the tag.
-
-export interface ExtractInput {
-	readonly url: string
-	readonly schema: Schema.Top
-	readonly prompt?: string | undefined
-	readonly schemaName?: string | undefined
-	readonly schemaVersion?: number | undefined
-}
-
-export class ExtractProvider extends Context.Service<
-	ExtractProvider,
-	{
-		readonly extract: (
-			input: ExtractInput,
-		) => Effect.Effect<unknown, ProviderError>
-	}
->()('research/ExtractProvider') {}
-
-// ── Discover ──
-
-export interface DiscoverInput {
-	readonly prompt: string
-	readonly urls?: string[] | undefined
-	readonly schema?: Schema.Top | undefined
-	readonly maxCostCents?: number | undefined
-}
-
-export class DiscoverProvider extends Context.Service<
-	DiscoverProvider,
-	{
-		readonly discover: (
-			input: DiscoverInput,
-		) => Effect.Effect<DiscoverResult, ProviderError>
-		readonly cancel: (
-			jobRef: ExternalJobRef,
-		) => Effect.Effect<void, ProviderError>
-	}
->()('research/DiscoverProvider') {}
 
 // ── Enrichment (decision-maker name + email discovery, universal) ──
 

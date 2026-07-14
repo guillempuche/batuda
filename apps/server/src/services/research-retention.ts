@@ -7,7 +7,7 @@ import { StorageProvider } from './storage-provider'
  * Prunes research storage that would otherwise grow without bound. Three
  * sweeps, all safe to repeat:
  *
- *  - expired cache rows (search / llm / research / extraction) — their TTL only
+ *  - expired cache rows (search / llm / research) — their TTL only
  *    gates reads today, nothing ever deletes them;
  *  - the bulky transcript (research_text + tool_log) of runs older than the
  *    retention window, while keeping the run row, its sources, and the citation
@@ -38,12 +38,6 @@ export class ResearchRetention extends Context.Service<ResearchRetention>()(
 					yield* sql`DELETE FROM research_cache WHERE expires_at < now()`.pipe(
 						Effect.ignore,
 					)
-					// Extraction rows carry no expiry of their own, so treat anything
-					// older than a week as stale.
-					yield* sql`
-						DELETE FROM extraction_cache
-						WHERE cached_at < now() - interval '7 days'
-					`.pipe(Effect.ignore)
 
 					// Drop the bulky transcript of old runs. The run row, its sources,
 					// and research_links.citations are left intact so provenance holds.

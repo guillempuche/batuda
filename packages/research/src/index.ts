@@ -71,10 +71,8 @@ export {
 	type SystemDefaults,
 } from './application/policy'
 export type {
-	DiscoverInput,
 	EmailVerifyInput,
 	EnrichmentInput,
-	ExtractInput,
 	MxOutcome,
 	RegistryInput,
 	ReportInput,
@@ -86,11 +84,9 @@ export {
 	AgentLanguageModel,
 	BlobStorage,
 	Budget,
-	DiscoverProvider,
 	EmailVerifier,
 	EnrichmentProvider,
 	ExtractLanguageModel,
-	ExtractProvider,
 	MxResolver,
 	ProviderQuota,
 	RegistryRouter,
@@ -147,10 +143,8 @@ export {
 export type {
 	BudgetSnapshot,
 	CompanyReport,
-	DiscoverResult,
 	EmailVerification,
 	EnrichmentResult,
-	ExternalJobRef,
 	RegistryRecord,
 	ResolvedPolicy,
 	ScrapedPage,

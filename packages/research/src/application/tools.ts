@@ -3,8 +3,8 @@
  *
  * The phase-1 agent calls these through `generateText({ toolkit: ... })`.
  * Each handler delegates to a port (`SearchProvider`, `ScrapeProvider`,
- * `ExtractProvider`, `RegistryRouter`) whose cache/harness wrappers are
- * already composed at layer boot — the agent never sees a raw vendor.
+ * `RegistryRouter`) whose cache/harness wrappers are already composed at
+ * layer boot — the agent never sees a raw vendor.
  *
  * `paid_report` is intentionally excluded from the default toolkit. Exposing
  * it requires a confirmation gate (`CreateResearchInput.confirm`) and an

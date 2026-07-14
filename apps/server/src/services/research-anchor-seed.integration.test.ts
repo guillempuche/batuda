@@ -18,7 +18,6 @@ import {
 	ContactDiscovery,
 	type CreateResearchInput,
 	ExtractLanguageModel,
-	ExtractProvider,
 	RegistryRouter,
 	ResearchEventSink,
 	ResearchService,
@@ -197,9 +196,6 @@ const providersLayer = Layer.mergeAll(
 				return Effect.die(`unexpected scrape url: ${input.url}`)
 			},
 		}),
-	),
-	Layer.succeed(ExtractProvider)(
-		ExtractProvider.of({ extract: () => Effect.die(unused) }),
 	),
 	Layer.succeed(RegistryRouter)(
 		RegistryRouter.of({ lookup: () => Effect.die(unused) }),

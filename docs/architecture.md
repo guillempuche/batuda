@@ -143,8 +143,8 @@ The shared builder is why CLI-minted API keys validate against the running serve
 
 Bounded context for company research. Owns the research agent loop, provider port interfaces, budget/quota services, output schemas, and infrastructure implementations. Layered as:
 
-- `domain/` — tagged errors (`ProviderError`, `BudgetExceeded`, `MonthlyCapExceeded`, `QuotaExhausted`, `ApprovalRequired`) + value types (`SearchResult`, `ScrapedPage`, `DiscoverResult`, `RegistryRecord`, `CompanyReport`, etc.)
-- `application/` — ports (`SearchProvider`, `ScrapeProvider`, `ExtractProvider`, `DiscoverProvider`, `RegistryRouter`, `ReportRouter`, `Budget`, `ProviderQuota`), `ResearchService` (fiber-per-run agent loop with PubSub for SSE), policy resolution, output schema registry (freeform, company-enrichment-v1, competitor-scan-v1, contact-discovery-v1, prospect-scan-v1)
+- `domain/` — tagged errors (`ProviderError`, `BudgetExceeded`, `MonthlyCapExceeded`, `QuotaExhausted`, `ApprovalRequired`) + value types (`SearchResult`, `ScrapedPage`, `RegistryRecord`, `CompanyReport`, etc.)
+- `application/` — ports (`SearchProvider`, `ScrapeProvider`, `RegistryRouter`, `ReportRouter`, `Budget`, `ProviderQuota`), `ResearchService` (fiber-per-run agent loop with PubSub for SSE), policy resolution, output schema registry (freeform, company-enrichment-v1, competitor-scan-v1, contact-discovery-v1, prospect-scan-v1)
 - `infrastructure/` — boot-time provider selection (`providers-live.ts` for the capability ports, `llm-live.ts` for LLM inference), stub providers for zero-cost local dev, real providers (Brave Search, Firecrawl, libreBORME, Companies House, Hunter), cached search wrapper, OpenAI-compatible LLM layer via `@effect/ai-openai-compat`
 
 Provider selection uses `Layer.unwrap + Config.schema` — env vars pick the implementation at startup, same pattern as `EmailProviderLive`. Each provider is a `Layer<PortTag, E, R>` with R declaring its dependencies (stubs need nothing, real providers need `HttpClient` + `Config`).

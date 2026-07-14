@@ -12,15 +12,11 @@
 import { Config, Effect, Layer, Schema } from 'effect'
 
 import {
-	type DiscoverInput,
-	DiscoverProvider,
 	EmailVerifier,
 	type EmailVerifyInput,
 	type EnrichmentAttempt,
 	EnrichmentChain,
 	EnrichmentProvider,
-	type ExtractInput,
-	ExtractProvider,
 	type RegistryInput,
 	RegistryRouter,
 	type ReportInput,
@@ -44,9 +40,7 @@ import type {
 } from '../domain/errors'
 import type {
 	CompanyReport,
-	DiscoverResult,
 	EmailVerification,
-	ExternalJobRef,
 	RegistryRecord,
 	ScrapedPage,
 	SearchResult,
@@ -60,11 +54,9 @@ import {
 } from './_shared'
 import { makeBraveLlmContextSearch } from './brave/llm-context'
 import { makeBraveSearch } from './brave/search'
-import { makeCachedExtract } from './cached-extract'
 import { makeCachedScrape } from './cached-scrape'
 import { makeCachedSearch } from './cached-search'
 import { makeCompaniesHouseRegistry } from './companies-house/registry'
-import { makeFirecrawlExtract } from './firecrawl/extract'
 import { makeFirecrawlScrape } from './firecrawl/scrape'
 import { makeFirecrawlSearch } from './firecrawl/search'
 import { makeFullEnrichEnrichment } from './fullenrich/enrichment'
@@ -72,9 +64,7 @@ import { makeHunterEnrichment } from './hunter/enrichment'
 import { makeHunterVerifier } from './hunter/verifier'
 import { makeLibreborRegistry } from './librebor/registry'
 import { MxResolverLive } from './mx-verify'
-import { StubDiscoverProviderInstance } from './stub/discover'
 import { StubEnrichmentProviderInstance } from './stub/enrichment'
-import { StubExtractProviderInstance } from './stub/extract'
 import { StubRegistryEsProviderInstance } from './stub/registry-es'
 import { StubRegistryGbProviderInstance } from './stub/registry-gb'
 import { StubReportEsProviderInstance } from './stub/report-es'
@@ -86,15 +76,11 @@ import { StubEmailVerifierInstance } from './stub/verifier'
 
 const SEARCH_VENDORS = ['stub', 'brave', 'brave-context', 'firecrawl'] as const
 const SCRAPE_VENDORS = ['stub', 'firecrawl', 'local'] as const
-const EXTRACT_VENDORS = ['stub', 'firecrawl', 'local'] as const
-const DISCOVER_VENDORS = ['stub', 'firecrawl', 'anthropic', 'none'] as const
 const ENRICH_VENDORS = ['stub', 'hunter', 'fullenrich', 'none'] as const
 const VERIFY_VENDORS = ['stub', 'hunter', 'none'] as const
 
 type SearchVendor = (typeof SEARCH_VENDORS)[number]
 type ScrapeVendor = (typeof SCRAPE_VENDORS)[number]
-type ExtractVendor = (typeof EXTRACT_VENDORS)[number]
-type DiscoverVendor = (typeof DISCOVER_VENDORS)[number]
 type EnrichVendor = (typeof ENRICH_VENDORS)[number]
 type VerifyVendor = (typeof VERIFY_VENDORS)[number]
 
@@ -123,49 +109,6 @@ const scrapeInstance = (vendor: ScrapeVendor, slot: number) => {
 			return Effect.succeed(
 				ScrapeProvider.of({
 					scrape: () => notYetImplementedError('scrape', 'local'),
-				}),
-			)
-	}
-}
-
-const extractInstance = (vendor: ExtractVendor, slot: number) => {
-	switch (vendor) {
-		case 'stub':
-			return Effect.succeed(StubExtractProviderInstance)
-		case 'firecrawl':
-			return makeFirecrawlExtract(slot)
-		case 'local':
-			return Effect.succeed(
-				ExtractProvider.of({
-					extract: () => notYetImplementedError('extract', 'local'),
-				}),
-			)
-	}
-}
-
-const discoverInstance = (vendor: DiscoverVendor, _slot: number) => {
-	switch (vendor) {
-		case 'stub':
-			return Effect.succeed(StubDiscoverProviderInstance)
-		case 'none':
-			return Effect.succeed(
-				DiscoverProvider.of({
-					discover: () => disabledError('discover'),
-					cancel: () => disabledError('discover'),
-				}),
-			)
-		case 'firecrawl':
-			return Effect.succeed(
-				DiscoverProvider.of({
-					discover: () => notYetImplementedError('discover', 'firecrawl'),
-					cancel: () => notYetImplementedError('discover', 'firecrawl'),
-				}),
-			)
-		case 'anthropic':
-			return Effect.succeed(
-				DiscoverProvider.of({
-					discover: () => notYetImplementedError('discover', 'anthropic'),
-					cancel: () => notYetImplementedError('discover', 'anthropic'),
 				}),
 			)
 	}
@@ -293,8 +236,6 @@ const cachedSearchLayer = makeCachedSearch().pipe(Layer.provide(searchLayer))
 
 const cachedScrapeLayer = makeCachedScrape()
 
-const cachedExtractLayer = makeCachedExtract()
-
 const scrapeLayer = Layer.effect(
 	ScrapeProvider,
 	Effect.gen(function* () {
@@ -318,56 +259,6 @@ const scrapeLayer = Layer.effect(
 				svc.scrape(input),
 		)
 		return ScrapeProvider.of({ scrape })
-	}),
-)
-
-const extractLayer = Layer.effect(
-	ExtractProvider,
-	Effect.gen(function* () {
-		const vendors = yield* providerListConfig(
-			EXTRACT_VENDORS,
-			'RESEARCH_PROVIDER_EXTRACT',
-		)
-		yield* Effect.logInfo(`research.extract: ${vendors.join(',')}`)
-		const instances = yield* Effect.all(
-			vendors.map((vendor, slot) => extractInstance(vendor, slot)),
-		)
-		if (instances.length === 1) return instances[0]!
-		const extract = withFallback(
-			instances,
-			(svc, input: ExtractInput): Effect.Effect<unknown, ProviderError> =>
-				svc.extract(input),
-		)
-		return ExtractProvider.of({ extract })
-	}),
-)
-
-const discoverLayer = Layer.effect(
-	DiscoverProvider,
-	Effect.gen(function* () {
-		const vendors = yield* providerListConfig(
-			DISCOVER_VENDORS,
-			'RESEARCH_PROVIDER_DISCOVER',
-			['none'] as const,
-		)
-		yield* Effect.logInfo(`research.discover: ${vendors.join(',')}`)
-		const instances = yield* Effect.all(
-			vendors.map((vendor, slot) => discoverInstance(vendor, slot)),
-		)
-		if (instances.length === 1) return instances[0]!
-		const discover = withFallback(
-			instances,
-			(
-				svc,
-				input: DiscoverInput,
-			): Effect.Effect<DiscoverResult, ProviderError> => svc.discover(input),
-		)
-		const cancel = withFallback(
-			instances,
-			(svc, jobRef: ExternalJobRef): Effect.Effect<void, ProviderError> =>
-				svc.cancel(jobRef),
-		)
-		return DiscoverProvider.of({ discover, cancel })
 	}),
 )
 
@@ -532,8 +423,6 @@ const reportLayer = Layer.effect(
 export const makeResearchProvidersLive = Layer.mergeAll(
 	cachedSearchLayer,
 	cachedScrapeLayer.pipe(Layer.provide(scrapeLayer)),
-	cachedExtractLayer.pipe(Layer.provide(extractLayer)),
-	discoverLayer,
 	enrichmentLayer,
 	verifierLayer,
 	MxResolverLive,
