@@ -31,6 +31,11 @@ import {
 	groundedCitationTest,
 	validateFindingCitations,
 } from './citation-guard'
+import {
+	ContactVerdictsSchema,
+	contactCriticPrompt,
+	critiqueContactEntities,
+} from './contact-entity-critic'
 import { bindContactsToEntity } from './contact-entity-guard'
 import {
 	ContactsRescueSchema,
@@ -1593,6 +1598,42 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										? targetSnapshot['website']
 										: entityTargets?.domains[0],
 							}
+							// Contact entity critic: before the field critic, judge each
+							// remaining contact as a whole — is this person the company's own
+							// staff, or a client / partner / competitor quoted on its site? The
+							// deterministic contact guard catches only a quote that names
+							// another company; this catches a testimonial that names none. Fail
+							// open, and gentle: it drops only a clear outsider. Runs first so the
+							// field critic never spends a judgement on a contact about to go.
+							const contactCritiqued = yield* critiqueContactEntities(
+								result,
+								claims =>
+									extractLlm
+										.generateObject({
+											schema: ContactVerdictsSchema,
+											prompt: contactCriticPrompt(criticTarget, claims),
+										})
+										.pipe(
+											Effect.map(response => ({
+												verdicts: response.value.verdicts,
+												outputTokens: response.usage.outputTokens.total ?? 0,
+											})),
+											Effect.catchCause(() =>
+												Effect.succeed({ verdicts: [], outputTokens: 0 }),
+											),
+										),
+							)
+							result = contactCritiqued.findings
+							if (contactCritiqued.dropped > 0) {
+								yield* Effect.logWarning(
+									'research.contacts.critic_dropped',
+								).pipe(
+									Effect.annotateLogs({
+										research_id: researchId,
+										dropped: contactCritiqued.dropped,
+									}),
+								)
+							}
 							const critiqued = yield* critiqueFieldSupport(result, claims =>
 								extractLlm
 									.generateObject({
@@ -1642,6 +1683,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								outputTokens:
 									(structuredResponse.usage.outputTokens.total ?? 0) +
 									rescueOutputTokens +
+									contactCritiqued.outputTokens +
 									critiqued.outputTokens,
 							}
 						}).pipe(
