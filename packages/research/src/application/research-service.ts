@@ -177,6 +177,12 @@ const MAX_LOOP_PROMPT_CHARS = 90000
 const MAX_EXTRACTION_PAGE_CHARS = 180000
 const MAX_EXTRACTION_CHARS_PER_PAGE = 40000
 
+// A research id is always a uuid. Checking the shape before a lookup — instead of
+// passing an arbitrary path param straight to a uuid column — turns a bad id (a bot,
+// a stale link) into a clean not-found rather than a 500-level uuid-cast SqlError.
+export const isValidUuid = (id: string): boolean =>
+	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+
 // When the model finishes without the evidence confirming the target company, it
 // gets this many corrective nudges to search harder before the run fails closed.
 const MAX_GROUNDING_RETRIES = 1
@@ -2950,6 +2956,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 				/** Get a research run by id. Groups include children inline. */
 				get: (researchId: string) =>
 					Effect.gen(function* () {
+						// A non-uuid id can match no run; short-circuit to not-found (see isValidUuid)
+						// so a bad path param returns 404 instead of a uuid-cast SqlError (500).
+						if (!isValidUuid(researchId)) return null
 						const [run] = yield* sql`
 							-- A failed run keeps its error text inside findings; lift it out
 							-- so the detail view can show why the run failed.

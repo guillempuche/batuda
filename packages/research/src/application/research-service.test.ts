@@ -9,6 +9,7 @@ import {
 	clampPagination,
 	computeResearchCacheKey,
 	groundedPageTexts,
+	isValidUuid,
 	normalizeResearchQuery,
 	researchCacheTtlDaysFor,
 	schemaVersionFor,
@@ -544,6 +545,25 @@ describe('groundedPageTexts', () => {
 				'CEVA freight',
 				'DHL logistics',
 			])
+		})
+	})
+})
+
+describe('isValidUuid', () => {
+	describe('when the id is a well-formed uuid', () => {
+		it('should accept it in either case', () => {
+			expect(isValidUuid('2a98c669-66d3-4ca4-bc10-ad93f2c3d30a')).toBe(true)
+			expect(isValidUuid('2A98C669-66D3-4CA4-BC10-AD93F2C3D30A')).toBe(true)
+		})
+	})
+
+	describe('when the id is not a uuid', () => {
+		it('should reject the bad path param seen in prod, a partial, and empty', () => {
+			// GIVEN the exact id that 500-ed GET /v1/research/:id in production
+			expect(isValidUuid('web_search_2023_11_24_01')).toBe(false)
+			expect(isValidUuid('')).toBe(false)
+			expect(isValidUuid('2a98c669')).toBe(false)
+			expect(isValidUuid('not-a-uuid-at-all')).toBe(false)
 		})
 	})
 })
