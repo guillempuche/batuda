@@ -227,7 +227,6 @@ jobs:
             -e RESEARCH_API_KEY_SEARCH="${{ secrets.RESEARCH_API_KEY_SEARCH }}"
             -e RESEARCH_API_KEY_SEARCH_2="${{ secrets.RESEARCH_API_KEY_SEARCH_2 }}"
             -e RESEARCH_API_KEY_SCRAPE="${{ secrets.RESEARCH_API_KEY_SCRAPE }}"
-            -e RESEARCH_API_KEY_EXTRACT="${{ secrets.RESEARCH_API_KEY_EXTRACT }}"
             -e RESEARCH_API_KEY_REGISTRY_ES="${{ secrets.RESEARCH_API_KEY_REGISTRY_ES }}"
             -e RESEARCH_API_KEY_ENRICH="${{ secrets.RESEARCH_API_KEY_ENRICH }}"
             -e RESEARCH_API_KEY_ENRICH_2="${{ secrets.RESEARCH_API_KEY_ENRICH_2 }}"
@@ -314,7 +313,6 @@ jobs:
               -e RESEARCH_API_KEY_SEARCH="${{ secrets.RESEARCH_API_KEY_SEARCH }}" \
               -e RESEARCH_API_KEY_SEARCH_2="${{ secrets.RESEARCH_API_KEY_SEARCH_2 }}" \
               -e RESEARCH_API_KEY_SCRAPE="${{ secrets.RESEARCH_API_KEY_SCRAPE }}" \
-              -e RESEARCH_API_KEY_EXTRACT="${{ secrets.RESEARCH_API_KEY_EXTRACT }}" \
               -e RESEARCH_API_KEY_REGISTRY_ES="${{ secrets.RESEARCH_API_KEY_REGISTRY_ES }}" \
               -e RESEARCH_API_KEY_ENRICH="${{ secrets.RESEARCH_API_KEY_ENRICH }}" \
               -e RESEARCH_API_KEY_ENRICH_2="${{ secrets.RESEARCH_API_KEY_ENRICH_2 }}" \

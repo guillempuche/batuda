@@ -1,14 +1,6 @@
 import { createHash } from 'node:crypto'
 
-import {
-	Cause,
-	ConfigProvider,
-	Effect,
-	Exit,
-	Fiber,
-	Option,
-	Schema,
-} from 'effect'
+import { Cause, ConfigProvider, Effect, Exit, Fiber, Option } from 'effect'
 import { TestClock } from 'effect/testing'
 import {
 	HttpClient,
@@ -21,7 +13,6 @@ import { describe, expect, it } from 'vitest'
 
 import type { SearchInput } from '../../application/ports'
 import { ProviderError, UnsupportedSite } from '../../domain/errors'
-import { makeFirecrawlExtract } from './extract'
 import { makeFirecrawlScrape } from './scrape'
 import { makeFirecrawlSearch } from './search'
 
@@ -128,33 +119,6 @@ const runScrape = (
 			Effect.provide(
 				ConfigProvider.layer(
 					ConfigProvider.fromEnv({ env: { RESEARCH_API_KEY_SCRAPE: 'fc_k' } }),
-				),
-			),
-		),
-	)
-	return { exit, log }
-}
-
-const runExtract = (
-	status: number,
-	body: unknown,
-	url = 'https://acme.es/about',
-) => {
-	const log: CallLog = { count: 0, last: undefined }
-	const client = countingClient(log, status, body)
-	const exit = runWithVirtualClock(() =>
-		Effect.gen(function* () {
-			const provider = yield* makeFirecrawlExtract(0)
-			return yield* provider.extract({
-				url,
-				schema: Schema.Struct({ company_name: Schema.String }),
-				prompt: 'extract the company',
-			})
-		}).pipe(
-			Effect.provideService(HttpClient.HttpClient, client),
-			Effect.provide(
-				ConfigProvider.layer(
-					ConfigProvider.fromEnv({ env: { RESEARCH_API_KEY_EXTRACT: 'fc_k' } }),
 				),
 			),
 		),
@@ -350,61 +314,6 @@ describe('makeFirecrawlScrape', () => {
 		const { exit, log } = runScrape(200, { wrong: 'shape' })
 
 		// THEN the decode error is non-recoverable and not retried
-		const resolved = await exit
-		expect(log.count).toBe(1)
-		expect(errorOf(resolved)?.recoverable).toBe(false)
-	})
-})
-
-describe('makeFirecrawlExtract', () => {
-	it('should return the extracted json on a 2xx response', async () => {
-		// GIVEN a Firecrawl json-format response
-		const { exit } = runExtract(200, {
-			data: { json: { company_name: 'Acme S.L.' } },
-		})
-
-		// THEN the structured json surfaces verbatim
-		const resolved = await exit
-		const value = Exit.isSuccess(resolved) ? resolved.value : undefined
-		expect(value).toEqual({ company_name: 'Acme S.L.' })
-	})
-
-	it('should default to an empty object when json is absent', async () => {
-		// GIVEN a 2xx response whose data omits json
-		const { exit } = runExtract(200, { data: {} })
-
-		// THEN an empty object is returned rather than undefined
-		const resolved = await exit
-		const value = Exit.isSuccess(resolved) ? resolved.value : undefined
-		expect(value).toEqual({})
-	})
-
-	it('should request the json format with a schema', async () => {
-		// GIVEN any successful extract
-		const { exit, log } = runExtract(200, { data: { json: {} } })
-		await exit
-
-		// THEN it POSTs to the scrape endpoint with the extract key
-		expect(log.last?.method).toBe('POST')
-		expect(log.last?.url).toContain('api.firecrawl.dev/v2/scrape')
-		expect(log.last?.headers['authorization']).toBe('Bearer fc_k')
-	})
-
-	it('should retry a 5xx as recoverable', async () => {
-		// GIVEN Firecrawl returns 502 on every attempt
-		const { exit, log } = runExtract(502, { error: 'gateway' })
-
-		// THEN it retries to the max and fails recoverably
-		const resolved = await exit
-		expect(log.count).toBe(3)
-		expect(errorOf(resolved)?.recoverable).toBe(true)
-	})
-
-	it('should fail fast on a 400', async () => {
-		// GIVEN a bad-request status
-		const { exit, log } = runExtract(400, { error: 'bad request' })
-
-		// THEN it fails on the first attempt, non-recoverably
 		const resolved = await exit
 		expect(log.count).toBe(1)
 		expect(errorOf(resolved)?.recoverable).toBe(false)

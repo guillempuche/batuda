@@ -39,24 +39,6 @@ export class ScrapedPage extends Schema.Class<ScrapedPage>('ScrapedPage')({
 	units: Schema.Number,
 }) {}
 
-/** Result of an autonomous browsing session (DiscoverProvider). */
-export class DiscoverResult extends Schema.Class<DiscoverResult>(
-	'DiscoverResult',
-)({
-	findings: Schema.String,
-	structuredData: Schema.optional(Schema.Unknown),
-	sourcesVisited: Schema.Array(Schema.String),
-	units: Schema.Number,
-}) {}
-
-/** A reference to an external async job (e.g. Firecrawl agent). */
-export class ExternalJobRef extends Schema.Class<ExternalJobRef>(
-	'ExternalJobRef',
-)({
-	provider: Schema.String,
-	jobId: Schema.String,
-}) {}
-
 /** A company record from a free registry (e.g. libreBORME). */
 export class RegistryRecord extends Schema.Class<RegistryRecord>(
 	'RegistryRecord',
