@@ -58,7 +58,7 @@
 		"react-dom": "^19"
 	},
 	"devDependencies": {
-		"@types/react": "19.2.14",
+		"@types/react": "19.2.17",
 		"tsdown": "^0.21.7",
 		"typescript": "^5.9.3",
 		"vitest": "^4.1.4"
