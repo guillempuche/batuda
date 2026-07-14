@@ -68,8 +68,12 @@ import {
 import {
 	FirmographicsRescueSchema,
 	firmographicsRescuePrompt,
+	hasHeadcountSignal,
 	mergeFirmographics,
 	needsFirmographicsRescue,
+	needsSizeRescue,
+	SizeRescueSchema,
+	sizeRescuePrompt,
 } from './firmographics-rescue'
 import { resolvePolicy, type SystemDefaults } from './policy'
 import {
@@ -181,6 +185,17 @@ const MAX_GROUNDING_RETRIES = 1
 // own site (or its registry) rather than answering from look-alike pages.
 const GROUNDING_RETRY_INSTRUCTION =
 	'You have not yet confirmed this is the right company from its own website. Before giving a final answer, use web_search to find the official website (try the company name together with its city or country), then scrape_page that site — or look up the company in the official registry. Do not answer from the pages you already have if none of them is its own official site.'
+
+// When an enrichment run finishes without having gathered any employee-count
+// signal, it gets this many nudges to search for the headcount before ending — the
+// figure is rarely on the company's homepage, so a run that stops there leaves
+// size_range empty.
+const MAX_HEADCOUNT_RETRIES = 1
+
+// Appended after such a finish: push the model to search for the headcount (its own
+// site rarely states it) rather than concluding the size is unknown.
+const HEADCOUNT_SEARCH_INSTRUCTION =
+	'You have not yet found this company\'s employee headcount, which is rarely on its homepage. Before giving a final answer, use web_search for it — try the company name with "number of employees", or its LinkedIn / ZoomInfo profile — then report the figure with a quote. If after searching you still cannot find it, finish without it; never invent a number.'
 
 // Appended to a re-run's first prompt when a human supplied the correct official
 // domain: point the model straight at that site so it grounds on the right company.
@@ -511,6 +526,7 @@ export const buildResearchSystemPrompt = (args: {
 		'Given a query, produce a thorough research brief with findings, sources, and citations.',
 		'Never fabricate sources. Every claim must be verifiable.',
 		'Confirm key facts (employee count, location, sector) from scraped page content where you can — the company site, LinkedIn, or press — and cite the page. When such a fact appears only in a search result you could not open as a page, still report it and quote the search snippet rather than dropping a real, sourced fact; never invent one that appears nowhere.',
+		'The employee headcount is rarely on a company\'s own homepage. If the site does not state it, search for it (the company name with "number of employees", or its LinkedIn / ZoomInfo profile) before finishing — do not conclude the size is unknown without having searched.',
 		'For a citation to a page you scraped, set source_id to the exact URL you scraped with scrape_page. Never invent an identifier — a made-up source is dropped.',
 		'When you search, use plain keywords, and only add a site: filter for a real domain you know — never a placeholder like site:example.com.',
 		'For discovery or prospecting queries, prefer authoritative sources — business directories, industry association member lists, and sector registries — over social media, forums, or glossary pages.',
@@ -1395,6 +1411,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										prompt: firmographicsRescuePrompt(
 											rescueTarget,
 											evidenceBlock,
+											sourceManifest,
 										),
 									})
 									.pipe(
@@ -1414,6 +1431,41 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										Effect.annotateLogs({
 											research_id: researchId,
 											filled: fMerged.filled,
+										}),
+									)
+								}
+							}
+							// Focused size rescue: when the size band is STILL empty after the combined
+							// pass, one more pass that asks for ONLY the employee headcount recovers it far
+							// more reliably — the combined pass splits attention with tools and often drops
+							// the number even when the evidence states it. Fail-open, enrichment runs only.
+							if (runsRescue && needsSizeRescue(result)) {
+								const sRescue = yield* extractLlm
+									.generateObject({
+										schema: SizeRescueSchema,
+										prompt: sizeRescuePrompt(
+											rescueTarget,
+											evidenceBlock,
+											sourceManifest,
+										),
+									})
+									.pipe(
+										Effect.map(r => ({
+											enrichment: r.value as unknown,
+											tokens: r.usage.outputTokens.total ?? 0,
+										})),
+										Effect.catchCause(() =>
+											Effect.succeed({ enrichment: undefined, tokens: 0 }),
+										),
+									)
+								rescueOutputTokens += sRescue.tokens
+								const sMerged = mergeFirmographics(result, sRescue.enrichment)
+								if (sMerged.filled > 0) {
+									result = sMerged.findings
+									yield* Effect.logInfo('research.size.rescued').pipe(
+										Effect.annotateLogs({
+											research_id: researchId,
+											filled: sMerged.filled,
 										}),
 									)
 								}
@@ -1994,22 +2046,48 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									// target, nudge it to find and read the company's own site before
 									// finishing; bounded so a run that still cannot ground fails closed.
 									let groundingRetries = 0
+									let headcountRetries = 0
 									const shouldContinueAfterFinal = () =>
 										Effect.sync(() => {
-											if (entityTargets === null) return false
-											if (groundingRetries >= MAX_GROUNDING_RETRIES)
-												return false
-											const verdict = classifyEntityMatch(
-												entityTargets,
-												scrapeCorpus.map(page => page.text).join('\n'),
-											)
-											if (verdict === 'strong') return false
-											groundingRetries++
-											prompt = Prompt.concat(
-												prompt,
-												Prompt.make(GROUNDING_RETRY_INSTRUCTION),
-											)
-											return true
+											const corpus = scrapeCorpus
+												.map(page => page.text)
+												.join('\n')
+											const verdict =
+												entityTargets === null
+													? null
+													: classifyEntityMatch(entityTargets, corpus)
+											// Grounding gate: reach the target's own site before answering; bounded
+											// so a run that still cannot ground fails closed rather than looping.
+											if (
+												entityTargets !== null &&
+												verdict !== 'strong' &&
+												groundingRetries < MAX_GROUNDING_RETRIES
+											) {
+												groundingRetries++
+												prompt = Prompt.concat(
+													prompt,
+													Prompt.make(GROUNDING_RETRY_INSTRUCTION),
+												)
+												return true
+											}
+											// Fact-completeness gate: an enrichment run that reached the company but
+											// has gathered no employee-count signal is pushed to search for the
+											// headcount once — it is rarely on the homepage, so a run that stops there
+											// leaves size_range empty. Bounded like the grounding gate above.
+											if (
+												schemaName === 'company_enrichment_v1' &&
+												verdict === 'strong' &&
+												headcountRetries < MAX_HEADCOUNT_RETRIES &&
+												!hasHeadcountSignal(corpus)
+											) {
+												headcountRetries++
+												prompt = Prompt.concat(
+													prompt,
+													Prompt.make(HEADCOUNT_SEARCH_INSTRUCTION),
+												)
+												return true
+											}
+											return false
 										})
 									return yield* runAgentResearchLoop({
 										maxSteps: maxAgentSteps,

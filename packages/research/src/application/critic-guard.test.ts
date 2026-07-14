@@ -168,8 +168,8 @@ describe('critiqueFieldSupport', () => {
 			const findings = {
 				enrichment: {
 					industry: sourced('retail', 'a shop'),
-					size_range: sourced('26-50', 'a look-alike company'),
-					location: sourced('Barcelona'),
+					location: sourced('Barcelona', 'a look-alike company'),
+					country: sourced('ES'),
 				},
 			}
 			const judge: CriticJudge = claims =>
@@ -177,7 +177,7 @@ describe('critiqueFieldSupport', () => {
 					verdicts: claims.map(c => ({
 						id: c.id,
 						verdict:
-							c.id === 'enrichment.size_range' ? 'unsupported' : 'supported',
+							c.id === 'enrichment.location' ? 'unsupported' : 'supported',
 					})),
 					outputTokens: 42,
 				})
@@ -190,9 +190,9 @@ describe('critiqueFieldSupport', () => {
 			// THEN the rejected field is null, the others survive, counters are right
 			const e = (result.findings as { enrichment: Record<string, unknown> })
 				.enrichment
-			expect(e['size_range']).toBeNull()
+			expect(e['location']).toBeNull()
 			expect(e['industry']).toEqual(sourced('retail', 'a shop'))
-			expect(e['location']).toEqual(sourced('Barcelona'))
+			expect(e['country']).toEqual(sourced('ES'))
 			expect(result.criticised).toBe(2)
 			expect(result.dropped).toBe(1)
 			expect(result.flagged).toBe(0)
@@ -206,14 +206,14 @@ describe('critiqueFieldSupport', () => {
 			const findings = {
 				enrichment: {
 					industry: sourced('retail', 'a shop'),
-					size_range: sourced('26-50', 'a vague headcount hint'),
+					location: sourced('Barcelona', 'a vague location hint'),
 				},
 			}
 			const judge: CriticJudge = claims =>
 				Effect.succeed({
 					verdicts: claims.map(c => ({
 						id: c.id,
-						verdict: c.id === 'enrichment.size_range' ? 'unsure' : 'supported',
+						verdict: c.id === 'enrichment.location' ? 'unsure' : 'supported',
 					})),
 					outputTokens: 7,
 				})
@@ -226,8 +226,8 @@ describe('critiqueFieldSupport', () => {
 			// THEN the unsure field survives with the low-confidence stamp; nothing dropped
 			const e = (result.findings as { enrichment: Record<string, unknown> })
 				.enrichment
-			expect(e['size_range']).toEqual({
-				...sourced('26-50', 'a vague headcount hint'),
+			expect(e['location']).toEqual({
+				...sourced('Barcelona', 'a vague location hint'),
 				confidence: CRITIC_UNSURE_CONFIDENCE,
 			})
 			expect(e['industry']).toEqual(sourced('retail', 'a shop'))
@@ -254,6 +254,48 @@ describe('critiqueFieldSupport', () => {
 			expect(judge).not.toHaveBeenCalled()
 			expect(result.findings).toBe(findings)
 			expect(result.outputTokens).toBe(0)
+		})
+	})
+})
+
+describe('collectFieldClaims and CRITIC_SKIP_FIELDS', () => {
+	describe('when a sourced size_range carries a quote', () => {
+		it('should not collect it — a coarse band cannot be quote-matched', () => {
+			// GIVEN size_range (a vocab-mapped band) and industry, both quoted
+			const findings = {
+				enrichment: {
+					industry: sourced('retail', 'a shop'),
+					size_range: sourced('51-200', 'employs 685 people'),
+				},
+			}
+
+			// WHEN claims are collected
+			const claims = collectFieldClaims(findings)
+
+			// THEN only industry is critiqued; the size band is skipped
+			expect(claims.map(c => c.id)).toEqual(['enrichment.industry'])
+		})
+	})
+})
+
+describe('applyCriticVerdicts and CRITIC_SKIP_FIELDS', () => {
+	describe('when a stray verdict targets a skipped size_range', () => {
+		it('should leave it untouched — the critic never drops a size band', () => {
+			// GIVEN a size_range and a verdict that would otherwise blank it
+			const findings = {
+				enrichment: { size_range: sourced('51-200', 'employs 685 people') },
+			}
+
+			// WHEN a hallucinated unsupported verdict for it is applied
+			const result = applyCriticVerdicts(findings, [
+				{ id: 'enrichment.size_range', verdict: 'unsupported' as const },
+			])
+
+			// THEN the size band survives and nothing is counted as dropped
+			const e = (result.findings as { enrichment: Record<string, unknown> })
+				.enrichment
+			expect(e['size_range']).toEqual(sourced('51-200', 'employs 685 people'))
+			expect(result.dropped).toBe(0)
 		})
 	})
 })

@@ -100,6 +100,14 @@ const isSourcedField = (
 // could hold arbitrary { value, source_id }-looking objects).
 const SKIP_KEYS = new Set(['citations', 'proposed_updates'])
 
+// Leaf fields the model-critic must not judge: a vocabulary-mapped coarse code whose
+// quote cannot literally match it. `size_range` is the clear case — its band
+// ("51-200") is checked against a quote citing an exact headcount ("employs 685
+// people"), which the model reads as a contradiction and wrongly drops, though the
+// size mapper and scalar grounding already validated it. The walk still recurses past
+// the field; it just is not turned into a claim.
+const CRITIC_SKIP_FIELDS = new Set(['size_range'])
+
 const childPath = (path: string, key: string): string =>
 	path === '' ? key : `${path}.${key}`
 
@@ -119,11 +127,16 @@ export const collectFieldClaims = (
 			if (SKIP_KEYS.has(key)) continue
 			const p = childPath(path, key)
 			if (isSourcedField(v)) {
-				// Only critique a field that offers a quote to check against; a
-				// quote-less field was already vetted by the deterministic guards, so
-				// leave it rather than spend a judgement guessing.
+				// Only critique a field that offers a quote to check against and that the
+				// critic can meaningfully judge; a quote-less field was already vetted by
+				// the deterministic guards, and a CRITIC_SKIP_FIELDS code cannot be
+				// quote-matched, so leave both rather than misspend a judgement on them.
 				const quote = v.quote
-				if (typeof quote === 'string' && quote.trim() !== '') {
+				if (
+					!CRITIC_SKIP_FIELDS.has(key) &&
+					typeof quote === 'string' &&
+					quote.trim() !== ''
+				) {
 					claims.push({ id: p, field: key, value: v.value, quote })
 				}
 				continue
@@ -168,7 +181,12 @@ export const applyCriticVerdicts = (
 			}
 			const p = childPath(path, key)
 			if (isSourcedField(v)) {
-				if (drop.has(p)) {
+				// A CRITIC_SKIP_FIELDS code was never sent to the judge, so it must not be
+				// changed here either — keep it as-is even if a verdict names it, guarding
+				// against a stray ruling the model returns for an id it was not asked about.
+				if (CRITIC_SKIP_FIELDS.has(key)) {
+					out[key] = v
+				} else if (drop.has(p)) {
 					dropped++
 					out[key] = null
 				} else if (flag.has(p)) {
