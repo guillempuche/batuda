@@ -124,10 +124,10 @@ export const TasksGroup = HttpApiGroup.make('tasks')
 			payload: UpdateTaskInput,
 			headers: IfMatchHeader,
 			success: Task.json,
-			error: Schema.Union([
+			error: [
 				NotFound.pipe(HttpApiSchema.status(404)),
 				Conflict.pipe(HttpApiSchema.status(409)),
-			]),
+			],
 		}),
 	)
 	.add(
@@ -148,10 +148,10 @@ export const TasksGroup = HttpApiGroup.make('tasks')
 		HttpApiEndpoint.post('cancel', '/tasks/:id/cancel', {
 			params: { id: Schema.String },
 			success: Task.json,
-			error: Schema.Union([
+			error: [
 				NotFound.pipe(HttpApiSchema.status(404)),
 				Conflict.pipe(HttpApiSchema.status(409)),
-			]),
+			],
 		}),
 	)
 	.add(
@@ -159,10 +159,10 @@ export const TasksGroup = HttpApiGroup.make('tasks')
 			params: { id: Schema.String },
 			payload: SnoozeInput,
 			success: Task.json,
-			error: Schema.Union([
+			error: [
 				NotFound.pipe(HttpApiSchema.status(404)),
 				BadRequest.pipe(HttpApiSchema.status(400)),
-			]),
+			],
 		}),
 	)
 	.add(

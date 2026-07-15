@@ -169,11 +169,11 @@ export const EmailGroup = HttpApiGroup.make('email')
 				messageId: Schema.String,
 				threadId: Schema.String,
 			}),
-			error: Schema.Union([
+			error: [
 				EmailSuppressed.pipe(HttpApiSchema.status(409)),
 				BadRequest.pipe(HttpApiSchema.status(400)),
 				...InboxOpFailures,
-			]),
+			],
 		}),
 	)
 	.add(
@@ -191,12 +191,12 @@ export const EmailGroup = HttpApiGroup.make('email')
 				messageId: Schema.String,
 				threadId: Schema.String,
 			}),
-			error: Schema.Union([
+			error: [
 				EmailSuppressed.pipe(HttpApiSchema.status(409)),
 				BadRequest.pipe(HttpApiSchema.status(400)),
 				NotFound.pipe(HttpApiSchema.status(404)),
 				...InboxOpFailures,
-			]),
+			],
 		}),
 	)
 	.add(
@@ -363,10 +363,10 @@ export const EmailGroup = HttpApiGroup.make('email')
 		HttpApiEndpoint.post('setPrimaryInbox', '/email/inboxes/:id/primary', {
 			params: { id: Schema.String },
 			success: Inbox.json,
-			error: Schema.Union([
+			error: [
 				NotFound.pipe(HttpApiSchema.status(404)),
 				BadRequest.pipe(HttpApiSchema.status(400)),
-			]),
+			],
 		}),
 	)
 	.add(
@@ -410,10 +410,10 @@ export const EmailGroup = HttpApiGroup.make('email')
 				params: { stagingId: Schema.String },
 				query: { inboxId: Schema.String },
 				success: Schema.Void,
-				error: Schema.Union([
+				error: [
 					NotFound.pipe(HttpApiSchema.status(404)),
 					BadRequest.pipe(HttpApiSchema.status(400)),
-				]),
+				],
 			},
 		),
 	)
@@ -499,10 +499,10 @@ export const EmailGroup = HttpApiGroup.make('email')
 				messageId: Schema.String,
 				threadId: Schema.String,
 			}),
-			error: Schema.Union([
+			error: [
 				EmailSuppressed.pipe(HttpApiSchema.status(409)),
 				BadRequest.pipe(HttpApiSchema.status(400)),
-			]),
+			],
 		}),
 	)
 	// ── Footers ──

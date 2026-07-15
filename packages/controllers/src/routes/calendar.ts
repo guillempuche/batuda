@@ -94,12 +94,12 @@ export const CalendarGroup = HttpApiGroup.make('calendar')
 			params: { id: Schema.String },
 			payload: RsvpEventInput,
 			success: Schema.Unknown,
-			error: Schema.Union([
+			error: [
 				NotFound.pipe(HttpApiSchema.status(404)),
 				Conflict.pipe(HttpApiSchema.status(409)),
 				Forbidden.pipe(HttpApiSchema.status(403)),
 				BadRequest.pipe(HttpApiSchema.status(400)),
-			]),
+			],
 		}),
 	)
 	.add(
