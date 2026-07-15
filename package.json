@@ -48,17 +48,17 @@
 		"setup": "pnpm cli -- setup"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.4.10",
-		"@release-it/bumper": "^7.0.0",
-		"@release-it/conventional-changelog": "^10.0.0",
+		"@biomejs/biome": "2.5.3",
+		"@release-it/bumper": "^7.0.6",
+		"@release-it/conventional-changelog": "^11.0.1",
 		"@secretlint/secretlint-rule-preset-recommend": "^13.0.2",
 		"dprint": "^0.53.1",
-		"lefthook": "^2.1.4",
+		"lefthook": "^2.1.10",
 		"portless": "^0.15.1",
-		"release-it": "^19.0.0",
+		"release-it": "^20.2.1",
 		"secretlint": "^13.0.2",
 		"syncpack": "^14.3.0",
-		"turbo": "^2.9.6",
+		"turbo": "^2.10.5",
 		"typescript": "^5.9.3"
 	},
 	"private": true,
