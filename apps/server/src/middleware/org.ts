@@ -59,7 +59,16 @@ export const enterOrgScope =
 					return yield* Effect.provideService(effect, CurrentOrg, scope.org)
 				}),
 			)
-			.pipe(Effect.orDie) as Effect.Effect<A, never, Exclude<R, CurrentOrg>>
+			// Die only on SqlError: the role/GUC prologue and the commit are
+			// infrastructure, so they must not surface to callers. The wrapped
+			// handler's own declared errors (NotFound, Conflict, …) have to stay
+			// in the channel, otherwise HttpApi can't map them to their real
+			// status.
+			.pipe(Effect.catchTag('SqlError', e => Effect.die(e))) as Effect.Effect<
+			A,
+			Exclude<E, { readonly _tag: 'SqlError' }>,
+			Exclude<R, CurrentOrg>
+		>
 
 /**
  * Enter a per-user scope for reads that span a user's orgs before any single

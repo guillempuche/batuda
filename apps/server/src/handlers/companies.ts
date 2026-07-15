@@ -1,5 +1,4 @@
 import { DateTime, Effect } from 'effect'
-import { HttpServerResponse } from 'effect/unstable/http'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
 import { BatudaApi, NotFound, SessionContext } from '@batuda/controllers'
@@ -23,22 +22,11 @@ export const CompaniesLive = HttpApiBuilder.group(
 				.handle('list', _ => svc.search(_.query).pipe(Effect.orDie))
 				.handle('get', _ =>
 					svc.getWithRelations(_.params.slug).pipe(
-						// Effect.fail(NotFound) is supposed to be picked up by the
-						// route's declared error schema and serialised as 404, but
-						// the v4 Schema.TaggedErrorClass instance doesn't round-
-						// trip through HttpApi's response encoder cleanly (the
-						// orDie at HttpApiBuilder.ts:606 runs because the encoder
-						// rejects the value). Build the HttpServerResponse by
-						// hand for NotFound; everything else dies as a defect.
-						Effect.catchTag('NotFound', e =>
-							Effect.succeed(
-								HttpServerResponse.jsonUnsafe(
-									{ _tag: 'NotFound', entity: e.entity, id: e.id },
-									{ status: 404 },
-								),
-							),
+						// Keep NotFound (mapped to 404 by the route's declared error
+						// schema); die on infrastructure faults (SqlError, decode).
+						Effect.catch(e =>
+							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
 						),
-						Effect.orDie,
 					),
 				)
 				.handle('create', _ =>

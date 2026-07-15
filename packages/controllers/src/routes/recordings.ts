@@ -50,11 +50,11 @@ export const RecordingsGroup = HttpApiGroup.make('recordings')
 				recordingId: Schema.String,
 				interactionId: Schema.String,
 			}),
-			error: Schema.Union([
+			error: [
 				BadRequest.pipe(HttpApiSchema.status(400)),
 				NotFound.pipe(HttpApiSchema.status(404)),
 				Conflict.pipe(HttpApiSchema.status(409)),
-			]),
+			],
 		}),
 	)
 	.add(

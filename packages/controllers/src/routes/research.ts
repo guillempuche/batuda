@@ -98,10 +98,10 @@ export const ResearchGroup = HttpApiGroup.make('research')
 		HttpApiEndpoint.post('create', '/research', {
 			payload: CreateResearchInput,
 			success: Schema.Unknown,
-			error: Schema.Union([
+			error: [
 				InsufficientBudget.pipe(HttpApiSchema.status(409)),
 				ConfirmRequired.pipe(HttpApiSchema.status(409)),
-			]),
+			],
 		}),
 	)
 	// GET /research — list, filter, paginate
