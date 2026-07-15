@@ -3,6 +3,14 @@ import { Tool, Toolkit } from 'effect/unstable/ai'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
+import { TimelineActivity } from '@batuda/domain'
+
+import { ListResult, toItems } from './_result'
+
+const decodeActivities = Schema.decodeUnknownEffect(
+	Schema.Array(TimelineActivity),
+)
+
 const ListTimeline = Tool.make('list_timeline', {
 	description:
 		'List timeline activity for a company or contact. Covers emails, calls, meetings, documents, proposals, research runs. Filter by channel, kind, since (ISO 8601). Max 200 rows.',
@@ -14,7 +22,7 @@ const ListTimeline = Tool.make('list_timeline', {
 		since: Schema.optional(Schema.String),
 		limit: Schema.optional(Schema.Number),
 	}),
-	success: Schema.Unknown,
+	success: ListResult(TimelineActivity.json),
 })
 	.annotate(Tool.Title, 'List Timeline')
 	.annotate(Tool.Readonly, true)
@@ -45,12 +53,13 @@ export const TimelineHandlersLive = TimelineTools.toLayer(
 					const limit = Math.min(params.limit ?? 50, 200)
 					const whereClause =
 						conditions.length > 0 ? sql`WHERE ${sql.and(conditions)}` : sql``
-					return yield* sql`
+					const rows = yield* sql`
 						SELECT * FROM timeline_activity
 						${whereClause}
 						ORDER BY occurred_at DESC
 						LIMIT ${limit}
 					`
+					return toItems(yield* decodeActivities(rows))
 				}).pipe(Effect.orDie),
 		}
 	}),

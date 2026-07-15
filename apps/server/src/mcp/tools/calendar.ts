@@ -3,13 +3,33 @@ import { Tool, Toolkit } from 'effect/unstable/ai'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { CurrentOrg, SessionContext } from '@batuda/controllers'
+import { CurrentOrg, SessionContext, Slot } from '@batuda/controllers'
+import { CalendarEvent, CalendarEventType } from '@batuda/domain'
 
 import { CalendarService } from '../../services/calendar'
 import { dispatchForwardInvitation } from '../../services/calendar-forward-dispatch'
 import { dispatchRsvpReply } from '../../services/calendar-rsvp-dispatch'
 import { EmailService } from '../../services/email'
 import { ListResult, toItems } from './_result'
+
+const decodeEvent = Schema.decodeUnknownEffect(CalendarEvent)
+const decodeEvents = Schema.decodeUnknownEffect(Schema.Array(CalendarEvent))
+const decodeEventTypes = Schema.decodeUnknownEffect(
+	Schema.Array(CalendarEventType),
+)
+// Provider slots arrive as Date objects; read them into DateTime.Utc so the
+// `Slot` wire schema re-encodes them as ISO strings.
+const SlotRow = Schema.Struct({
+	start: Schema.DateTimeUtcFromDate,
+	end: Schema.DateTimeUtcFromDate,
+})
+const decodeSlots = Schema.decodeUnknownEffect(Schema.Array(SlotRow))
+
+// A pending invitation is the event plus this attendee's still-open RSVP.
+const PendingInvitation = Schema.Struct({
+	...CalendarEvent.json.fields,
+	attendeeRsvp: Schema.String,
+})
 
 // Per-request services the dispatcher tools depend on. The MCP HTTP middleware
 // (apps/server/src/mcp/http.ts) provides both alongside CurrentUser, so
@@ -39,7 +59,7 @@ const FindAvailability = Tool.make('find_availability', {
 		from: Schema.String,
 		to: Schema.String,
 	}),
-	success: ListResult(Schema.Unknown),
+	success: ListResult(Slot),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Find Availability')
@@ -61,7 +81,7 @@ const ScheduleMeeting = Tool.make('schedule_meeting', {
 		contact_id: Schema.optional(Schema.NullOr(Schema.String)),
 		metadata: Schema.optional(Schema.NullOr(Schema.Unknown)),
 	}),
-	success: Schema.Unknown,
+	success: CalendarEvent.json,
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Schedule Meeting')
@@ -75,7 +95,7 @@ const RescheduleMeeting = Tool.make('reschedule_meeting', {
 		calendar_event_id: Schema.String,
 		new_start_at: Schema.String,
 	}),
-	success: Schema.Unknown,
+	success: CalendarEvent.json,
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Reschedule Meeting')
@@ -90,7 +110,7 @@ const CancelMeeting = Tool.make('cancel_meeting', {
 		calendar_event_id: Schema.String,
 		reason: Schema.optional(Schema.NullOr(Schema.String)),
 	}),
-	success: Schema.Unknown,
+	success: CalendarEvent.json,
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Cancel Meeting')
@@ -123,7 +143,7 @@ const RsvpPendingInvitations = Tool.make('rsvp_pending_invitations', {
 		attendee_email: Schema.String,
 		limit: Schema.optional(Schema.Number),
 	}),
-	success: ListResult(Schema.Unknown),
+	success: ListResult(PendingInvitation),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Pending Invitations')
@@ -159,7 +179,7 @@ const ListUpcoming = Tool.make('list_upcoming_meetings', {
 		source: Schema.optional(Schema.Literals(['booking', 'email', 'internal'])),
 		limit: Schema.optional(Schema.Number),
 	}),
-	success: ListResult(Schema.Unknown),
+	success: ListResult(CalendarEvent.json),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Upcoming Meetings')
@@ -173,7 +193,7 @@ const ListEventTypes = Tool.make('list_event_types', {
 	parameters: Schema.Struct({
 		active: Schema.optional(Schema.Boolean),
 	}),
-	success: ListResult(Schema.Unknown),
+	success: ListResult(CalendarEventType.json),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Event Types')
@@ -187,7 +207,7 @@ const GetCalendarEvent = Tool.make('get_calendar_event', {
 	parameters: Schema.Struct({
 		id: Schema.String,
 	}),
-	success: Schema.Unknown,
+	success: CalendarEvent.json,
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Get Calendar Event')
@@ -213,7 +233,7 @@ const CreateInternalBlock = Tool.make('create_internal_block', {
 		location_value: Schema.optional(Schema.NullOr(Schema.String)),
 		metadata: Schema.optional(Schema.NullOr(Schema.Unknown)),
 	}),
-	success: Schema.Unknown,
+	success: CalendarEvent.json,
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Create Internal Block')
@@ -262,7 +282,7 @@ export const CalendarHandlersLive = CalendarTools.toLayer(
 						from: new Date(params.from),
 						to: new Date(params.to),
 					})
-					.pipe(Effect.orDie, Effect.map(toItems)),
+					.pipe(Effect.flatMap(decodeSlots), Effect.map(toItems), Effect.orDie),
 			schedule_meeting: params =>
 				svc
 					.scheduleMeeting({
@@ -280,21 +300,21 @@ export const CalendarHandlersLive = CalendarTools.toLayer(
 								? (params.metadata as Record<string, unknown>)
 								: null,
 					})
-					.pipe(Effect.orDie),
+					.pipe(Effect.flatMap(decodeEvent), Effect.orDie),
 			reschedule_meeting: params =>
 				svc
 					.rescheduleMeeting({
 						calendarEventId: params.calendar_event_id,
 						newStartAt: new Date(params.new_start_at),
 					})
-					.pipe(Effect.orDie),
+					.pipe(Effect.flatMap(decodeEvent), Effect.orDie),
 			cancel_meeting: params =>
 				svc
 					.cancelMeeting({
 						calendarEventId: params.calendar_event_id,
 						reason: params.reason ?? null,
 					})
-					.pipe(Effect.orDie),
+					.pipe(Effect.flatMap(decodeEvent), Effect.orDie),
 			respond_to_invitation: params =>
 				dispatchRsvpReply({
 					calendarEventId: params.calendar_event_id,
@@ -338,7 +358,22 @@ export const CalendarHandlersLive = CalendarTools.toLayer(
 						attendeeEmail: params.attendee_email,
 						limit: params.limit ?? 25,
 					})
-					.pipe(Effect.orDie, Effect.map(toItems)),
+					.pipe(
+						// Decode each event, then re-attach its joined RSVP.
+						Effect.flatMap(rows =>
+							Effect.forEach(rows, row =>
+								decodeEvent(row).pipe(
+									Effect.map(event => ({
+										...event,
+										attendeeRsvp: (row as { readonly attendeeRsvp: string })
+											.attendeeRsvp,
+									})),
+								),
+							),
+						),
+						Effect.map(toItems),
+						Effect.orDie,
+					),
 			forward_invitation: params =>
 				dispatchForwardInvitation({
 					calendarEventId: params.calendar_event_id,
@@ -385,31 +420,33 @@ export const CalendarHandlersLive = CalendarTools.toLayer(
 						conditions.push(sql`contact_id = ${params.contact_id}`)
 					if (params.source) conditions.push(sql`source = ${params.source}`)
 					const limit = params.limit ?? 25
-					return yield* sql`
+					const rows = yield* sql`
 						SELECT * FROM calendar_events
 						WHERE ${sql.and(conditions)}
 						ORDER BY start_at ASC
 						LIMIT ${limit}
 					`
-				}).pipe(Effect.orDie, Effect.map(toItems)),
+					return toItems(yield* decodeEvents(rows))
+				}).pipe(Effect.orDie),
 			list_event_types: params =>
 				Effect.gen(function* () {
 					const conditions: Array<Statement.Fragment> = []
 					if (params.active === true) conditions.push(sql`active = true`)
 					if (params.active === false) conditions.push(sql`active = false`)
-					return yield* sql`
+					const rows = yield* sql`
 						SELECT * FROM calendar_event_types
 						${conditions.length > 0 ? sql`WHERE ${sql.and(conditions)}` : sql``}
 						ORDER BY slug
 					`
-				}).pipe(Effect.orDie, Effect.map(toItems)),
+					return toItems(yield* decodeEventTypes(rows))
+				}).pipe(Effect.orDie),
 			get_calendar_event: ({ id }) =>
 				Effect.gen(function* () {
 					const rows =
 						yield* sql`SELECT * FROM calendar_events WHERE id = ${id} LIMIT 1`
 					if (rows.length === 0)
 						return yield* Effect.die(`Calendar event ${id} not found`)
-					return rows[0]
+					return yield* decodeEvent(rows[0])
 				}).pipe(Effect.orDie),
 			create_internal_block: params =>
 				svc
@@ -427,7 +464,7 @@ export const CalendarHandlersLive = CalendarTools.toLayer(
 								? (params.metadata as Record<string, unknown>)
 								: null,
 					})
-					.pipe(Effect.orDie),
+					.pipe(Effect.flatMap(decodeEvent), Effect.orDie),
 			sync_event_types: () => svc.syncEventTypes().pipe(Effect.orDie),
 		}
 	}),

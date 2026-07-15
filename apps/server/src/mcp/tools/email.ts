@@ -2,7 +2,14 @@ import { Config, Effect, Schema } from 'effect'
 import { McpSchema, McpServer, Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { CurrentOrg, SessionContext } from '@batuda/controllers'
+import {
+	CurrentOrg,
+	EmailMessageRecord,
+	EmailThreadDetail,
+	EmailThreadList,
+	SessionContext,
+} from '@batuda/controllers'
+import { EmailDraft, Inbox, InboxFooter } from '@batuda/domain'
 import { EmailBlocks } from '@batuda/email/schema'
 
 import { EmailService } from '../../services/email'
@@ -65,6 +72,11 @@ const SendEmailResult = Schema.Union([
 		reason: Schema.String,
 	}),
 ])
+
+// The delete arm of an action-parameterized tool (manage_email_draft /
+// manage_inbox_footer) returns this tagged marker so its success schema can
+// stay a JSON object (never bare void) alongside the entity/send members.
+const DeletedResult = Schema.Struct({ _tag: Schema.Literal('deleted') })
 
 const ThreadStatus = Schema.Literals(['open', 'closed', 'archived'])
 const InboxPurpose = Schema.Literals(['human', 'agent', 'shared'])
@@ -171,12 +183,7 @@ const ListEmailThreads = Tool.make('list_email_threads', {
 		limit: Schema.optional(Schema.Number),
 		offset: Schema.optional(Schema.Number),
 	}),
-	success: Schema.Struct({
-		items: Schema.Array(Schema.Unknown),
-		total: Schema.Number,
-		limit: Schema.Number,
-		offset: Schema.Number,
-	}),
+	success: EmailThreadList,
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Email Threads')
@@ -190,7 +197,7 @@ const GetEmailThread = Tool.make('get_email_thread', {
 	parameters: Schema.Struct({
 		thread_id: Schema.String,
 	}),
-	success: Schema.Unknown,
+	success: EmailThreadDetail,
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Get Email Thread')
@@ -254,7 +261,7 @@ const ListEmailMessages = Tool.make('list_email_messages', {
 		status: Schema.optional(Schema.String),
 		limit: Schema.optional(Schema.Number),
 	}),
-	success: Schema.Unknown,
+	success: ListResult(EmailMessageRecord),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Email Messages')
@@ -268,7 +275,7 @@ const GetEmailMessage = Tool.make('get_email_message', {
 	parameters: Schema.Struct({
 		message_id: Schema.String,
 	}),
-	success: Schema.Unknown,
+	success: EmailMessageRecord,
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Get Email Message')
@@ -315,7 +322,7 @@ const ListEmailInboxes = Tool.make('list_email_inboxes', {
 		active: Schema.optional(Schema.Boolean),
 		owner_user_id: Schema.optional(Schema.String),
 	}),
-	success: ListResult(Schema.Unknown),
+	success: ListResult(Inbox.json),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Email Inboxes')
@@ -371,7 +378,7 @@ const CreateEmailInbox = Tool.make('create_email_inbox', {
 		smtp_port: Schema.Number,
 		smtp_security: SmtpSecurity,
 	}),
-	success: Schema.Unknown,
+	success: Inbox.json,
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Create Email Inbox')
@@ -398,7 +405,7 @@ const UpdateEmailInbox = Tool.make('update_email_inbox', {
 		username: Schema.optional(Schema.String),
 		password: Schema.optional(Schema.String),
 	}),
-	success: Schema.Unknown,
+	success: Inbox.json,
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Update Email Inbox')
@@ -412,7 +419,7 @@ const TestEmailInbox = Tool.make('test_email_inbox', {
 	parameters: Schema.Struct({
 		id: Schema.String,
 	}),
-	success: Schema.Unknown,
+	success: Inbox.json,
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Test Email Inbox')
@@ -426,7 +433,7 @@ const DeleteEmailInbox = Tool.make('delete_email_inbox', {
 	parameters: Schema.Struct({
 		id: Schema.String,
 	}),
-	success: Schema.Unknown,
+	success: Inbox.json,
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Delete Email Inbox')
@@ -440,7 +447,7 @@ const SetPrimaryEmailInbox = Tool.make('set_primary_email_inbox', {
 	parameters: Schema.Struct({
 		id: Schema.String,
 	}),
-	success: Schema.Unknown,
+	success: Inbox.json,
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Set Primary Email Inbox')
@@ -468,7 +475,9 @@ const ManageEmailDraft = Tool.make('manage_email_draft', {
 		mode: Schema.optional(Schema.String),
 		thread_link_id: Schema.optional(Schema.String),
 	}),
-	success: Schema.Unknown,
+	// create / update return the draft; send returns the send result; delete
+	// returns the deleted marker.
+	success: Schema.Union([EmailDraft.json, SendEmailResult, DeletedResult]),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Manage Email Draft')
@@ -481,7 +490,7 @@ const ListEmailDrafts = Tool.make('list_email_drafts', {
 	parameters: Schema.Struct({
 		inbox_id: Schema.optional(Schema.String),
 	}),
-	success: ListResult(Schema.Unknown),
+	success: ListResult(EmailDraft.json),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Email Drafts')
@@ -496,7 +505,7 @@ const GetEmailDraft = Tool.make('get_email_draft', {
 		inbox_id: Schema.String,
 		draft_id: Schema.String,
 	}),
-	success: Schema.Unknown,
+	success: EmailDraft.json,
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Get Email Draft')
@@ -532,7 +541,7 @@ const ListInboxFooters = Tool.make('list_inbox_footers', {
 	parameters: Schema.Struct({
 		inbox_id: Schema.String,
 	}),
-	success: ListResult(Schema.Unknown),
+	success: ListResult(InboxFooter.json),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Inbox Footers')
@@ -546,7 +555,7 @@ const GetInboxFooter = Tool.make('get_inbox_footer', {
 	parameters: Schema.Struct({
 		id: Schema.String,
 	}),
-	success: Schema.Unknown,
+	success: InboxFooter.json,
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Get Inbox Footer')
@@ -565,7 +574,8 @@ const ManageInboxFooter = Tool.make('manage_inbox_footer', {
 		body_json: Schema.optional(EmailBlocks),
 		is_default: Schema.optional(Schema.Boolean),
 	}),
-	success: Schema.Unknown,
+	// create / update return the footer; delete returns the deleted marker.
+	success: Schema.Union([InboxFooter.json, DeletedResult]),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Manage Inbox Footer')
@@ -862,7 +872,7 @@ export const EmailHandlersLive = EmailTools.toLayer(
 						}),
 						...(params.limit !== undefined && { limit: params.limit }),
 					})
-					.pipe(Effect.orDie),
+					.pipe(Effect.orDie, Effect.map(toItems)),
 			get_email_message: ({ message_id }) =>
 				svc.getMessage(message_id).pipe(Effect.orDie),
 			download_email_attachment: ({ message_id, attachment_id }) =>
@@ -1066,7 +1076,7 @@ export const EmailHandlersLive = EmailTools.toLayer(
 							return dieMissing('draft_id is required to delete a draft')
 						return svc
 							.deleteDraft(params.inbox_id, params.draft_id)
-							.pipe(Effect.orDie)
+							.pipe(Effect.orDie, Effect.as({ _tag: 'deleted' as const }))
 				}
 			},
 			list_email_drafts: params =>
@@ -1117,7 +1127,9 @@ export const EmailHandlersLive = EmailTools.toLayer(
 					case 'delete':
 						if (params.footer_id === undefined)
 							return dieMissing('footer_id is required to delete a footer')
-						return svc.deleteFooter(params.footer_id)
+						return svc
+							.deleteFooter(params.footer_id)
+							.pipe(Effect.as({ _tag: 'deleted' as const }))
 				}
 			},
 		}

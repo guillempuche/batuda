@@ -7,6 +7,7 @@ import { Clock, History, Plus } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 
+import type { Company, Task } from '@batuda/domain'
 import { PriButton, PriDialog, PriInput } from '@batuda/ui/pri'
 
 import { companiesListAtom, openTasksAtom } from '#/atoms/pipeline-atoms'
@@ -80,8 +81,8 @@ type SmartView =
 const completeTaskAtom = BatudaApiAtom.mutation('tasks', 'complete')
 
 async function loadTasksOnServer(): Promise<{
-	tasks: ReadonlyArray<unknown>
-	companies: ReadonlyArray<unknown>
+	tasks: ReadonlyArray<Task>
+	companies: ReadonlyArray<Company>
 }> {
 	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
 		import('effect'),
@@ -921,6 +922,9 @@ function narrowTasks(rows: ReadonlyArray<unknown>): ReadonlyArray<TaskRow> {
 	return out
 }
 
+// Reads the snake- or camel-case form of a field. Typed date fields (dueAt,
+// updatedAt, the event `at`, …) decode to DateTime.Utc on the wire, so convert
+// those back to an ISO string alongside the plain-string form.
 function pickString(
 	r: Record<string, unknown>,
 	snake: string,
@@ -928,8 +932,10 @@ function pickString(
 ): string | null {
 	const snakeV = r[snake]
 	if (typeof snakeV === 'string') return snakeV
+	if (DateTime.isDateTime(snakeV)) return DateTime.formatIso(snakeV)
 	const camelV = r[camel]
 	if (typeof camelV === 'string') return camelV
+	if (DateTime.isDateTime(camelV)) return DateTime.formatIso(camelV)
 	return null
 }
 

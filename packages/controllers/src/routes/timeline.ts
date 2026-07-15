@@ -1,6 +1,8 @@
 import { Schema } from 'effect'
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi'
 
+import { TimelineActivity } from '@batuda/domain'
+
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 
@@ -15,7 +17,7 @@ export const TimelineGroup = HttpApiGroup.make('timeline')
 				since: Schema.optional(Schema.String),
 				limit: Schema.optional(Schema.NumberFromString),
 			},
-			success: Schema.Array(Schema.Unknown),
+			success: Schema.Array(TimelineActivity.json),
 		}),
 	)
 	.middleware(SessionMiddleware)

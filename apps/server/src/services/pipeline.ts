@@ -1,7 +1,32 @@
-import { Effect, Layer, ServiceMap } from 'effect'
+import { Context, Effect, Layer, Schema } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
-export class PipelineService extends ServiceMap.Service<PipelineService>()(
+// The next-steps rows carry raw Date timestamps; read them into DateTime.Utc so
+// the wire schemas (NextSteps) re-encode them as ISO strings.
+const NextStepTaskRow = Schema.Struct({
+	id: Schema.String,
+	title: Schema.String,
+	type: Schema.String,
+	dueAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+	companyId: Schema.String,
+	companyName: Schema.String,
+	companySlug: Schema.String,
+})
+const decodeNextStepTasks = Schema.decodeUnknownEffect(
+	Schema.Array(NextStepTaskRow),
+)
+const NextStepCompanyRow = Schema.Struct({
+	id: Schema.String,
+	slug: Schema.String,
+	name: Schema.String,
+	nextAction: Schema.NullOr(Schema.String),
+	nextActionAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+})
+const decodeNextStepCompanies = Schema.decodeUnknownEffect(
+	Schema.Array(NextStepCompanyRow),
+)
+
+export class PipelineService extends Context.Service<PipelineService>()(
 	'PipelineService',
 	{
 		make: Effect.gen(function* () {
@@ -43,7 +68,11 @@ export class PipelineService extends ServiceMap.Service<PipelineService>()(
 							LIMIT ${limit}
 						`
 
-						return { dueTasks, overdueCompanies }
+						return {
+							dueTasks: yield* decodeNextStepTasks(dueTasks),
+							overdueCompanies:
+								yield* decodeNextStepCompanies(overdueCompanies),
+						}
 					}),
 
 				getPipeline: () =>

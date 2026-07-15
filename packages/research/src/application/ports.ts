@@ -1,4 +1,4 @@
-import { type Effect, type Schema, ServiceMap } from 'effect'
+import { Context, type Effect, type Schema } from 'effect'
 import type { LanguageModel } from 'effect/unstable/ai'
 
 import type { AcceptedCountry } from '../domain/country'
@@ -12,7 +12,7 @@ import type {
 
 // ── Research run context (available inside the LLM tool loop fiber) ──
 
-export class ResearchRunContext extends ServiceMap.Service<
+export class ResearchRunContext extends Context.Service<
 	ResearchRunContext,
 	{
 		readonly researchId: string
@@ -29,17 +29,17 @@ export class ResearchRunContext extends ServiceMap.Service<
 // Phase 1 pins a different model/provider cascade to each phase of the fiber
 // (agent = reasoning + tool loop, extract = structured JSON, writer = brief).
 
-export class AgentLanguageModel extends ServiceMap.Service<
+export class AgentLanguageModel extends Context.Service<
 	AgentLanguageModel,
 	LanguageModel.Service
 >()('research/AgentLanguageModel') {}
 
-export class ExtractLanguageModel extends ServiceMap.Service<
+export class ExtractLanguageModel extends Context.Service<
 	ExtractLanguageModel,
 	LanguageModel.Service
 >()('research/ExtractLanguageModel') {}
 
-export class WriterLanguageModel extends ServiceMap.Service<
+export class WriterLanguageModel extends Context.Service<
 	WriterLanguageModel,
 	LanguageModel.Service
 >()('research/WriterLanguageModel') {}
@@ -51,7 +51,7 @@ export class WriterLanguageModel extends ServiceMap.Service<
 // broken read to a fresh fetch instead of failing — and denying the model the
 // page, which makes it invent facts.
 
-export class BlobStorage extends ServiceMap.Service<
+export class BlobStorage extends Context.Service<
 	BlobStorage,
 	{
 		readonly put: (
@@ -85,7 +85,7 @@ export interface SearchInput {
 	readonly languages?: string[] | undefined
 }
 
-export class SearchProvider extends ServiceMap.Service<
+export class SearchProvider extends Context.Service<
 	SearchProvider,
 	{
 		readonly search: (
@@ -105,7 +105,7 @@ export interface ScrapeInput {
 	readonly location?: string | undefined
 }
 
-export class ScrapeProvider extends ServiceMap.Service<
+export class ScrapeProvider extends Context.Service<
 	ScrapeProvider,
 	{
 		readonly scrape: (
@@ -119,7 +119,7 @@ export class ScrapeProvider extends ServiceMap.Service<
 // ── Extract ──
 // Returns `unknown`: the raw provider result is handed to the calling model
 // as-is (it reads untyped JSON), not decoded against the requested schema.
-// Generic methods on ServiceMap.Service lose type params through the tag.
+// Generic methods on Context.Service lose type params through the tag.
 
 export interface ExtractInput {
 	readonly url: string
@@ -129,7 +129,7 @@ export interface ExtractInput {
 	readonly schemaVersion?: number | undefined
 }
 
-export class ExtractProvider extends ServiceMap.Service<
+export class ExtractProvider extends Context.Service<
 	ExtractProvider,
 	{
 		readonly extract: (
@@ -147,7 +147,7 @@ export interface DiscoverInput {
 	readonly maxCostCents?: number | undefined
 }
 
-export class DiscoverProvider extends ServiceMap.Service<
+export class DiscoverProvider extends Context.Service<
 	DiscoverProvider,
 	{
 		readonly discover: (
@@ -167,7 +167,7 @@ export interface EnrichmentInput {
 	readonly country?: string | undefined
 }
 
-export class EnrichmentProvider extends ServiceMap.Service<
+export class EnrichmentProvider extends Context.Service<
 	EnrichmentProvider,
 	{
 		readonly findPeople: (
@@ -191,7 +191,7 @@ export interface EnrichmentAttempt {
 
 export type EnrichmentMode = 'fallback' | 'union'
 
-export class EnrichmentChain extends ServiceMap.Service<
+export class EnrichmentChain extends Context.Service<
 	EnrichmentChain,
 	{
 		readonly attempts: ReadonlyArray<EnrichmentAttempt>
@@ -205,7 +205,7 @@ export interface EmailVerifyInput {
 	readonly email: string
 }
 
-export class EmailVerifier extends ServiceMap.Service<
+export class EmailVerifier extends Context.Service<
 	EmailVerifier,
 	{
 		readonly verify: (
@@ -218,7 +218,7 @@ export class EmailVerifier extends ServiceMap.Service<
 
 export type MxOutcome = 'has_mx' | 'no_mx' | 'unknown'
 
-export class MxResolver extends ServiceMap.Service<
+export class MxResolver extends Context.Service<
 	MxResolver,
 	{
 		readonly resolve: (domain: string) => Effect.Effect<MxOutcome>
@@ -233,7 +233,7 @@ export interface RegistryInput {
 	readonly taxId?: string | undefined
 }
 
-export class RegistryRouter extends ServiceMap.Service<
+export class RegistryRouter extends Context.Service<
 	RegistryRouter,
 	{
 		readonly lookup: (
@@ -250,7 +250,7 @@ export interface ReportInput {
 	readonly depth: 'basic' | 'financials' | 'full'
 }
 
-export class ReportRouter extends ServiceMap.Service<
+export class ReportRouter extends Context.Service<
 	ReportRouter,
 	{
 		readonly report: (
@@ -265,7 +265,7 @@ export class ReportRouter extends ServiceMap.Service<
 // sink fans out webhooks scoped to the active org). The R channel stays open
 // so callers thread their context — the research-service runs sinks under
 // the same fiber that holds the request's tags.
-export class ResearchEventSink extends ServiceMap.Service<
+export class ResearchEventSink extends Context.Service<
 	ResearchEventSink,
 	{
 		readonly fire: (
@@ -292,13 +292,13 @@ export interface BudgetService {
 	readonly snapshot: () => Effect.Effect<BudgetSnapshot>
 }
 
-export class Budget extends ServiceMap.Service<Budget, BudgetService>()(
+export class Budget extends Context.Service<Budget, BudgetService>()(
 	'research/Budget',
 ) {}
 
 // ── Provider Quota ──
 
-export class ProviderQuota extends ServiceMap.Service<
+export class ProviderQuota extends Context.Service<
 	ProviderQuota,
 	{
 		readonly check: (

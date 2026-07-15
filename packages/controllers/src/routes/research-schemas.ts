@@ -1,9 +1,63 @@
 import { Schema } from 'effect'
 
-// Response shapes for the research review flow. Fields the review UI reads are
-// typed; timestamps stay `Unknown` because the SQL layer returns raw dates that
-// serialize to JSON on their own (the same trade-off the other route groups
-// make), and event payloads stay `Unknown` because they carry varied shapes.
+import { ResearchRun } from '@batuda/domain'
+
+// Response shapes for the research review flow. Date fields encode to ISO
+// strings (via DateTimeUtcFromString) so a raw Postgres `Date` never reaches
+// the JSON encoder; event payloads and JSON aggregates stay `Unknown` because
+// they carry varied shapes and are already plain JSON.
+
+/**
+ * A slim research run for lists: enough to render a row (query, status, cost,
+ * when) without the heavy findings/context blobs. `costCents`/`paidCostCents`
+ * are whole cents. Shared by the run list, a subject's run history, and the
+ * list_research MCP tool.
+ */
+export const ResearchRunSummary = Schema.Struct({
+	id: Schema.String,
+	kind: Schema.String,
+	query: Schema.String,
+	mode: Schema.String,
+	schemaName: Schema.NullOr(Schema.String),
+	status: Schema.String,
+	costCents: Schema.Number,
+	paidCostCents: Schema.Number,
+	createdBy: Schema.String,
+	createdAt: Schema.DateTimeUtcFromString,
+	completedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
+})
+export type ResearchRunSummary = typeof ResearchRunSummary.Type
+
+/**
+ * A full research run plus the extras the detail view reads: the lifted error
+ * text of a failed run, and the run's sources, subject links, and (for a group
+ * run) child runs. The nested aggregates arrive as plain JSON from the SQL
+ * layer, so they stay `Unknown`; only the run's own columns are typed.
+ */
+export const ResearchRunDetail = Schema.Struct({
+	...ResearchRun.json.fields,
+	errorMessage: Schema.NullOr(Schema.String),
+	sources: Schema.Array(Schema.Unknown),
+	links: Schema.Array(Schema.Unknown),
+	children: Schema.Array(Schema.Unknown),
+})
+export type ResearchRunDetail = typeof ResearchRunDetail.Type
+
+/**
+ * A person's research policy: their per-run and paid spend ceilings and the
+ * auto-apply confidence threshold (null = auto-apply off). All amounts are
+ * whole cents. `updatedAt` is null on the computed default returned before any
+ * policy row exists.
+ */
+export const ResearchPolicy = Schema.Struct({
+	budgetCents: Schema.Number,
+	paidBudgetCents: Schema.Number,
+	autoApprovePaidCents: Schema.Number,
+	paidMonthlyCapCents: Schema.Number,
+	autoApplyMinConfidence: Schema.NullOr(Schema.Number),
+	updatedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
+})
+export type ResearchPolicy = typeof ResearchPolicy.Type
 
 /**
  * One pending proposed update in the cross-run review inbox: the run + subject
@@ -17,7 +71,7 @@ export const PendingProposal = Schema.Struct({
 	runKind: Schema.String,
 	runStatus: Schema.String,
 	runQuery: Schema.String,
-	runCreatedAt: Schema.Unknown,
+	runCreatedAt: Schema.DateTimeUtcFromString,
 	runCostCents: Schema.Number,
 	proposedUpdateId: Schema.NullOr(Schema.String),
 	subjectTable: Schema.NullOr(Schema.String),

@@ -1,4 +1,4 @@
-import { Cause, DateTime, Effect, ServiceMap } from 'effect'
+import { Cause, Context, DateTime, Effect } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
@@ -10,20 +10,20 @@ import { Geocoder } from './geocoder'
 /**
  * Drop the ambient transaction connection so a following `withTransaction`
  * opens a fresh top-level transaction instead of a savepoint on the caller's
- * (about-to-commit) connection. `TransactionConnection` is read via
- * `serviceOption` and is never part of `R`, so removing it leaves the
- * requirements unchanged — the assertion only tells the compiler that.
+ * (about-to-commit) connection. Each client owns its transaction connection
+ * under `sql.transactionService`, and `withTransaction` only makes a savepoint
+ * when that key is present, so removing it forces a fresh transaction. The key
+ * is read via `serviceOption` and is never part of `R`, so removing it leaves
+ * the requirements unchanged — the assertion only tells the compiler that.
  */
-const detachFromTransaction = <A, E, R>(
-	self: Effect.Effect<A, E, R>,
-): Effect.Effect<A, E, R> =>
-	Effect.updateServices(
-		self,
-		(services: ServiceMap.ServiceMap<R>) =>
-			ServiceMap.omit(SqlClient.TransactionConnection)(
-				services,
-			) as ServiceMap.ServiceMap<R>,
-	)
+const detachFromTransaction =
+	(sql: SqlClient.SqlClient) =>
+	<A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+		Effect.updateContext(
+			self,
+			(services: Context.Context<R>) =>
+				Context.omit(sql.transactionService)(services) as Context.Context<R>,
+		)
 
 /**
  * Resolve a company's coordinates from the deterministic geocoder and store
@@ -67,7 +67,7 @@ export const geocodeCompany = (id: string) =>
  * could plant a wrong pin, so the old coordinates are left in place instead.
  */
 export const locationWasReplaced = (
-	before: Record<string, unknown> | null,
+	before: { readonly location?: unknown } | null,
 	fields: Record<string, unknown>,
 ): boolean => {
 	if (!Object.hasOwn(fields, 'location')) return false
@@ -96,7 +96,7 @@ export const forkCompanyRegeocode = (id: string) =>
 			// Strip the request's transaction connection so this fork's
 			// `enterOrgScope` opens its own top-level transaction on a fresh pooled
 			// connection, instead of a savepoint on the request's committed one.
-			detachFromTransaction,
+			detachFromTransaction(sql),
 			Effect.catchCause(cause =>
 				Cause.hasInterruptsOnly(cause)
 					? Effect.interrupt

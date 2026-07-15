@@ -1,5 +1,6 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
+import { DateTime } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { useMemo, useState } from 'react'
 import styled from 'styled-components'
@@ -379,6 +380,14 @@ function sourcesFor(
 	})
 }
 
+// Typed date fields decode to DateTime.Utc on the wire; fall back to their
+// string form for anything already an ISO string.
+function dateToIsoOrNull(value: unknown): string | null {
+	if (typeof value === 'string') return value
+	if (DateTime.isDateTime(value)) return DateTime.formatIso(value)
+	return null
+}
+
 function narrowRunContext(raw: unknown): RunContext {
 	if (!raw || typeof raw !== 'object') {
 		return { completedAt: null, sourceById: new Map(), discoveredExisting: [] }
@@ -409,7 +418,7 @@ function narrowRunContext(raw: unknown): RunContext {
 			? (r['findings'] as Record<string, unknown>)
 			: {}
 	return {
-		completedAt: typeof r['completedAt'] === 'string' ? r['completedAt'] : null,
+		completedAt: dateToIsoOrNull(r['completedAt']),
 		sourceById,
 		discoveredExisting: narrowDiscoveredExisting(
 			findings['discoveredExisting'],

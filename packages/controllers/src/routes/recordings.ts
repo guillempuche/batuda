@@ -5,22 +5,37 @@ import {
 	HttpApiSchema,
 } from 'effect/unstable/httpapi'
 
+import { CallRecording, DbNumber } from '@batuda/domain'
+
 import { BadRequest, Conflict, NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 
-const RecordingMetadata = Schema.Struct({
+// List projection: recording metadata joined with its interaction's date,
+// contact, and summary. Dates encode to ISO strings on the wire.
+export const RecordingSummary = Schema.Struct({
 	id: Schema.String,
 	interactionId: Schema.String,
-	companyId: Schema.optional(Schema.String),
-	contactId: Schema.NullOr(Schema.String),
 	storageKey: Schema.String,
 	mimeType: Schema.String,
-	byteSize: Schema.Number,
+	// BIGINT — node-postgres returns it as a string; accept string-or-number.
+	byteSize: DbNumber,
 	durationSec: Schema.NullOr(Schema.Number),
 	transcriptStatus: Schema.NullOr(Schema.String),
-	createdAt: Schema.Unknown,
-	updatedAt: Schema.Unknown,
+	contactId: Schema.NullOr(Schema.String),
+	summary: Schema.NullOr(Schema.String),
+	interactionDate: Schema.NullOr(Schema.DateTimeUtcFromString),
+	createdAt: Schema.DateTimeUtcFromString,
+	updatedAt: Schema.DateTimeUtcFromString,
+})
+
+// Detail: the full recording row plus the same joined interaction fields.
+export const RecordingDetail = Schema.Struct({
+	...CallRecording.json.fields,
+	companyId: Schema.String,
+	contactId: Schema.NullOr(Schema.String),
+	interactionDate: Schema.NullOr(Schema.DateTimeUtcFromString),
+	summary: Schema.NullOr(Schema.String),
 })
 
 export const RecordingsGroup = HttpApiGroup.make('recordings')
@@ -49,13 +64,13 @@ export const RecordingsGroup = HttpApiGroup.make('recordings')
 				limit: Schema.optional(Schema.NumberFromString),
 				offset: Schema.optional(Schema.NumberFromString),
 			},
-			success: Schema.Array(Schema.Unknown),
+			success: Schema.Array(RecordingSummary),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.get('get', '/recordings/:id', {
 			params: { id: Schema.String },
-			success: Schema.Unknown,
+			success: RecordingDetail,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
@@ -79,6 +94,3 @@ export const RecordingsGroup = HttpApiGroup.make('recordings')
 	.middleware(SessionMiddleware)
 	.middleware(OrgMiddleware)
 	.prefix('/v1')
-
-// Re-export for handler reference (matches the existing routes pattern)
-export { RecordingMetadata }

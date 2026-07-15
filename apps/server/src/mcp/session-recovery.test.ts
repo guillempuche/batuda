@@ -1,166 +1,19 @@
-// Pins the recovery that unblocks every MCP client after a server redeploy:
-// McpServer answers a tools/call whose session id it no longer knows with a
-// normal HTTP 200 whose body hides the failure, so recoverUnknownSession swaps
-// that for the MCP spec's 404 (and leaves every other reply alone).
+// Pins the recovery that unblocks every MCP client after a server redeploy: a
+// fresh process has an empty in-memory session table, so a client keeps sending
+// a session id it never minted. McpServer answers that unknown `Mcp-Session-Id`
+// with a 404, and a compliant client drops the session and re-`initialize`s.
 //
-// Two levels of cover: the unit block feeds recoverUnknownSession hand-built
-// replies to exercise every branch; the round-trip block drives a real
-// McpServer over an in-process HTTP server so a future effect release that
-// changes the unknown-session reply's shape or message fails here, not in prod.
+// Drives a real McpServer over an in-process HTTP server so a future effect
+// release that changes the unknown-session reply fails here, not in prod.
 
 import { createServer } from 'node:http'
 
 import { NodeHttpServer } from '@effect/platform-node'
 import { Effect, Layer, ManagedRuntime, Schema } from 'effect'
 import { McpServer, Tool, Toolkit } from 'effect/unstable/ai'
-import {
-	HttpRouter,
-	HttpServer,
-	HttpServerResponse,
-} from 'effect/unstable/http'
+import { HttpRouter, HttpServer } from 'effect/unstable/http'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { recoverUnknownSession } from './http'
-
-// The reply effect's McpServer sends when it does not recognise the request's
-// Mcp-Session-Id: an HTTP 200 with the failure folded into the JSON-RPC error
-// cause as a `Die`. The nested `message` string is McpServer's own; the matcher
-// keys off the structured `data` array, so this is shaped exactly as observed.
-const UNKNOWN_SESSION_REPLY = JSON.stringify({
-	jsonrpc: '2.0',
-	id: 3,
-	error: {
-		_tag: 'Cause',
-		code: 0,
-		message:
-			'[{"_tag":"Die","defect":{"message":"Mcp-Session-Id does not exist","name":"Error"}}]',
-		data: [
-			{
-				_tag: 'Die',
-				defect: { message: 'Mcp-Session-Id does not exist', name: 'Error' },
-			},
-		],
-	},
-})
-
-// Build the same kind of collected-text reply the JSON-RPC transport emits, so
-// recovery sees a byte-array body just as it does in production.
-const jsonReply = (body: string) =>
-	HttpServerResponse.text(body, { contentType: 'application/json' })
-
-const bodyText = (response: HttpServerResponse.HttpServerResponse) =>
-	response.body._tag === 'Uint8Array'
-		? new TextDecoder().decode(response.body.body)
-		: undefined
-
-const run = (response: HttpServerResponse.HttpServerResponse) =>
-	Effect.runPromise(recoverUnknownSession(response))
-
-describe('recoverUnknownSession', () => {
-	describe('when McpServer buries an unknown-session failure in a 200 reply', () => {
-		it('should answer 404 with a JSON-RPC error so the client re-initializes', async () => {
-			// GIVEN McpServer's unknown-session reply (HTTP 200, failure in the body)
-			const response = jsonReply(UNKNOWN_SESSION_REPLY)
-
-			// WHEN recovery inspects it
-			const recovered = await run(response)
-
-			// THEN it becomes a 404 carrying the reinitialize hint, not a 200 or 5xx
-			expect(recovered.status).toBe(404)
-			const body = JSON.parse(bodyText(recovered) ?? '{}') as {
-				error?: { code?: number; message?: string }
-			}
-			expect(body.error?.code).toBe(-32001)
-			expect(body.error?.message).toBe('MCP session expired; reinitialize')
-		})
-
-		it('should also answer 404 when the failure arrives inside a batched array', async () => {
-			// GIVEN the same failure wrapped in a JSON-RPC batch (array of replies)
-			const response = jsonReply(`[${UNKNOWN_SESSION_REPLY}]`)
-
-			// WHEN recovery inspects it
-			const recovered = await run(response)
-
-			// THEN the batch is still recognised and rewritten to 404
-			expect(recovered.status).toBe(404)
-		})
-	})
-
-	describe('when the reply is anything else', () => {
-		it('should pass a healthy tool reply straight through', async () => {
-			// GIVEN a normal tools/call reply (HTTP 200 with a real result)
-			const response = jsonReply(
-				JSON.stringify({
-					jsonrpc: '2.0',
-					id: 2,
-					result: {
-						content: [{ type: 'text', text: '"pong"' }],
-						isError: false,
-					},
-				}),
-			)
-
-			// WHEN recovery inspects it
-			const recovered = await run(response)
-
-			// THEN the original reply is returned untouched (same object, still 200)
-			expect(recovered).toBe(response)
-			expect(recovered.status).toBe(200)
-		})
-
-		it('should not rewrite a tool result that merely echoes the failure phrase', async () => {
-			// GIVEN a successful reply whose text happens to contain the phrase, but
-			// as tool content under `result` — not in McpServer's error cause
-			const response = jsonReply(
-				JSON.stringify({
-					jsonrpc: '2.0',
-					id: 5,
-					result: {
-						content: [
-							{ type: 'text', text: 'log line: Mcp-Session-Id does not exist' },
-						],
-						isError: false,
-					},
-				}),
-			)
-
-			// WHEN recovery inspects it
-			const recovered = await run(response)
-
-			// THEN the cheap phrase gate opens but the structural check rejects it, so
-			// the real result is preserved (no false 404)
-			expect(recovered).toBe(response)
-		})
-
-		it('should pass through a body that carries the phrase but is not valid JSON', async () => {
-			// GIVEN a non-JSON body that still contains the phrase (defensive: the
-			// transport always sends JSON, but a parse failure must never 404)
-			const response = jsonReply('plain text: Mcp-Session-Id does not exist')
-
-			// WHEN recovery inspects it
-			const recovered = await run(response)
-
-			// THEN it is left untouched
-			expect(recovered).toBe(response)
-		})
-
-		it('should pass through a reply whose body is not a readable byte array', async () => {
-			// GIVEN a response with no materialised body for recovery to inspect
-			const response = HttpServerResponse.empty({ status: 200 })
-
-			// WHEN recovery inspects it
-			const recovered = await run(response)
-
-			// THEN it is returned untouched
-			expect(recovered).toBe(response)
-		})
-	})
-})
-
-// Drives a real McpServer wrapped with recoverUnknownSession over a loopback
-// HTTP server, mirroring how the /mcp route wires the recovery. This is the
-// guard against the exact production bug: a session id from before a redeploy is
-// unknown to the fresh process.
 describe('the /mcp route recovering an unknown session end to end', () => {
 	const Ping = Tool.make('ping', { success: Schema.String })
 	const PingTools = Toolkit.make(Ping)
@@ -168,21 +21,7 @@ describe('the /mcp route recovering an unknown session end to end', () => {
 		Effect.succeed({ ping: () => Effect.succeed('pong') }),
 	)
 
-	// Same shape as the /mcp wiring: recoverUnknownSession runs on the McpServer
-	// handler's reply. httpEffect is left un-annotated so its branded middleware
-	// error type is inferred, exactly as the real /mcp middleware does.
-	const RecoveryMiddleware = HttpRouter.middleware(
-		Effect.gen(function* () {
-			return httpEffect =>
-				httpEffect.pipe(Effect.flatMap(recoverUnknownSession))
-		}),
-		{ global: true },
-	)
-
-	const McpHttpLive = Layer.mergeAll(
-		McpServer.toolkit(PingTools),
-		RecoveryMiddleware,
-	).pipe(
+	const McpHttpLive = McpServer.toolkit(PingTools).pipe(
 		Layer.provide(PingHandlersLive),
 		Layer.provide(
 			McpServer.layerHttp({ name: 'test', version: '1.0.0', path: '/mcp' }),
@@ -276,8 +115,6 @@ describe('the /mcp route recovering an unknown session end to end', () => {
 			// THEN the client is told to re-initialize (404), not handed a
 			// hidden-failure 200 or a 5xx
 			expect(res.status).toBe(404)
-			const body = (await res.json()) as { error?: { code?: number } }
-			expect(body.error?.code).toBe(-32001)
 		})
 
 		it('should recover once the client initializes again', async () => {

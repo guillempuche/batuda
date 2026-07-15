@@ -3,13 +3,18 @@ import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
+import { Interaction } from '@batuda/domain'
 
 import {
 	InteractionLogged,
 	TimelineActivityService,
 } from '../../services/timeline-activity'
+import { ListResult, toItems } from './_result'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg]
+
+const decodeInteraction = Schema.decodeUnknownEffect(Interaction)
+const decodeInteractions = Schema.decodeUnknownEffect(Schema.Array(Interaction))
 
 const LogInteraction = Tool.make('log_interaction', {
 	description:
@@ -27,7 +32,7 @@ const LogInteraction = Tool.make('log_interaction', {
 		next_action_at: Schema.optional(Schema.String),
 		duration_min: Schema.optional(Schema.Number),
 	}),
-	success: Schema.Unknown,
+	success: Interaction.json,
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Log Interaction')
@@ -43,7 +48,7 @@ const ListInteractions = Tool.make('list_interactions', {
 		type: Schema.optional(Schema.String),
 		limit: Schema.optional(Schema.Number),
 	}),
-	success: Schema.Unknown,
+	success: ListResult(Interaction.json),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Interactions')
@@ -111,7 +116,7 @@ export const InteractionHandlersLive = InteractionTools.toLayer(
 					const rows = yield* sql`
 						SELECT * FROM interactions WHERE id = ${interactionId} LIMIT 1
 					`
-					return rows[0]
+					return yield* decodeInteraction(rows[0])
 				}).pipe(Effect.orDie),
 			list_interactions: params =>
 				Effect.gen(function* () {
@@ -119,7 +124,9 @@ export const InteractionHandlersLive = InteractionTools.toLayer(
 					if (params.channel) conditions.push(sql`channel = ${params.channel}`)
 					if (params.type) conditions.push(sql`type = ${params.type}`)
 					const limit = params.limit ?? 20
-					return yield* sql`SELECT * FROM interactions WHERE ${sql.and(conditions)} ORDER BY date DESC LIMIT ${limit}`
+					const rows =
+						yield* sql`SELECT * FROM interactions WHERE ${sql.and(conditions)} ORDER BY date DESC LIMIT ${limit}`
+					return toItems(yield* decodeInteractions(rows))
 				}).pipe(Effect.orDie),
 		}
 	}),

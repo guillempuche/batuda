@@ -19,13 +19,19 @@ forceLegacyDeploy: true
 # the workspace → /deploy boundary (`@effect/platform-node-shared` resolved
 # beta.43 → beta.65 on its own, then crashed Node at `effect/dist/Context.js`
 # because the older API name no longer exists in beta.43).
+# INVARIANT: every entry here MUST match the `effect` / `@effect/*` version
+# pinned in the workspace package.json files — bump them together, never one
+# side alone, or the deploy re-resolve reintroduces the boot crash above.
+# `@effect/ai-openai-compat` is listed because it rides into the server
+# unikernel via `@batuda/research`, so it crosses the same deploy boundary.
 overrides:
-  '@effect/platform-node-shared': 4.0.0-beta.43
-  '@effect/platform-node': 4.0.0-beta.43
-  '@effect/platform': 4.0.0-beta.43
-  '@effect/sql-pg': 4.0.0-beta.43
-  '@effect/sql': 4.0.0-beta.43
-  effect: 4.0.0-beta.43
+  '@effect/platform-node-shared': 4.0.0-beta.98
+  '@effect/platform-node': 4.0.0-beta.98
+  '@effect/platform': 4.0.0-beta.98
+  '@effect/sql-pg': 4.0.0-beta.98
+  '@effect/sql': 4.0.0-beta.98
+  '@effect/ai-openai-compat': 4.0.0-beta.98
+  effect: 4.0.0-beta.98
 
 # Trusted install scripts; install fails on any unlisted dep with build scripts.
 allowBuilds:

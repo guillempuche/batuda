@@ -1,6 +1,7 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { DateTime } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import {
 	AlertTriangle,
@@ -115,7 +116,10 @@ type CompanyLookup = {
 	readonly name: string
 }
 
-async function loadThreadOnServer(threadId: string): Promise<unknown> {
+// Return type is inferred from the typed API client so the dehydrated atom
+// value matches the getThread atom's success schema; `narrowDetail` still
+// treats it as unknown.
+async function loadThreadOnServer(threadId: string) {
 	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
 		import('effect'),
 		import('#/lib/batuda-api-server'),
@@ -831,12 +835,15 @@ function toDateString(raw: unknown): string {
 	if (raw instanceof Date) return raw.toISOString()
 	if (typeof raw === 'string') return raw
 	if (typeof raw === 'number') return new Date(raw).toISOString()
+	// Typed date fields decode to DateTime.Utc on the wire.
+	if (DateTime.isDateTime(raw)) return DateTime.formatIso(raw)
 	return new Date().toISOString()
 }
 
 function toDateStringOrNull(raw: unknown): string | null {
 	if (raw instanceof Date) return raw.toISOString()
 	if (typeof raw === 'string' && raw !== '') return raw
+	if (DateTime.isDateTime(raw)) return DateTime.formatIso(raw)
 	return null
 }
 

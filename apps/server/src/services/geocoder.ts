@@ -1,4 +1,4 @@
-import { Effect, Layer, Schema, Semaphore, ServiceMap } from 'effect'
+import { Context, Effect, Layer, Schema, Semaphore } from 'effect'
 import { HttpClient, HttpClientResponse } from 'effect/unstable/http'
 
 const NominatimHit = Schema.Struct({
@@ -14,7 +14,7 @@ export interface GeocodeResult {
 	readonly source: string
 }
 
-export class Geocoder extends ServiceMap.Service<Geocoder>()('Geocoder', {
+export class Geocoder extends Context.Service<Geocoder>()('Geocoder', {
 	make: Effect.gen(function* () {
 		const client = yield* HttpClient.HttpClient
 		// Nominatim ToS allows 1 req/sec absolute. A single-permit semaphore

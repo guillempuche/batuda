@@ -11,7 +11,7 @@ export type ParticipantRole = typeof ParticipantRole.Type
 export class MessageParticipant extends Model.Class<MessageParticipant>(
 	'MessageParticipant',
 )({
-	id: Model.Generated(MessageParticipantId),
+	id: Model.GeneratedByDb(MessageParticipantId),
 	emailMessageId: Schema.String,
 	emailAddress: Schema.String,
 	displayName: Schema.NullOr(Schema.String),

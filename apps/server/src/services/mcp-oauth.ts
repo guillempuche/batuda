@@ -1,4 +1,4 @@
-import { Effect, Layer, ServiceMap } from 'effect'
+import { Context, Effect, Layer } from 'effect'
 import type { PoolClient } from 'pg'
 
 import { Forbidden } from '@batuda/controllers'
@@ -48,7 +48,7 @@ const firstRedirectHost = (redirectUris: unknown): string | null => {
 // reads run on the owner pool but inside an `app_mcp_resolver`-scoped
 // transaction, so RLS confines each one to the caller's own rows — a database
 // backstop behind the explicit `WHERE userId`, in case a future edit drops it.
-export class McpOAuthService extends ServiceMap.Service<McpOAuthService>()(
+export class McpOAuthService extends Context.Service<McpOAuthService>()(
 	'McpOAuthService',
 	{
 		make: Effect.gen(function* () {

@@ -1,7 +1,7 @@
 import { Buffer } from 'node:buffer'
 import { createDecipheriv, hkdfSync } from 'node:crypto'
 
-import { Effect, Layer, Redacted, ServiceMap } from 'effect'
+import { Context, Effect, Layer, Redacted } from 'effect'
 
 import { WorkerEnvVars } from './env.js'
 
@@ -42,7 +42,7 @@ export const decryptWithKey = (
 	return plain.toString('utf8')
 }
 
-export class CredentialDecryptor extends ServiceMap.Service<CredentialDecryptor>()(
+export class CredentialDecryptor extends Context.Service<CredentialDecryptor>()(
 	'CredentialDecryptor',
 	{
 		make: Effect.gen(function* () {

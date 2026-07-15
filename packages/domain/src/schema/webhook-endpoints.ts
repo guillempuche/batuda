@@ -8,7 +8,7 @@ export const WebhookEndpointId = Schema.String.pipe(
 export class WebhookEndpoint extends Model.Class<WebhookEndpoint>(
 	'WebhookEndpoint',
 )({
-	id: Model.Generated(WebhookEndpointId),
+	id: Model.GeneratedByDb(WebhookEndpointId),
 	name: Schema.String,
 	// e.g. "n8n company created", "zapier proposal accepted"
 	url: Schema.String,

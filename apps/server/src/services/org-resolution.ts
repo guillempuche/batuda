@@ -1,4 +1,4 @@
-import { Data, Effect, Layer, ServiceMap } from 'effect'
+import { Context, Data, Effect, Layer } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import type { CalcomWebhookPayload } from './calendar'
@@ -26,7 +26,7 @@ interface OrgScope {
 	readonly slug: string
 }
 
-export class OrgResolution extends ServiceMap.Service<OrgResolution>()(
+export class OrgResolution extends Context.Service<OrgResolution>()(
 	'OrgResolution',
 	{
 		make: Effect.gen(function* () {

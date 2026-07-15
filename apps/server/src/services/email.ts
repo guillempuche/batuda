@@ -1,6 +1,14 @@
 import { randomUUID } from 'node:crypto'
 
-import { Data, DateTime, Effect, Layer, Schedule, ServiceMap } from 'effect'
+import {
+	Context,
+	Data,
+	DateTime,
+	Effect,
+	Layer,
+	Schedule,
+	Schema,
+} from 'effect'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
@@ -8,13 +16,18 @@ import {
 	BadRequest,
 	CurrentOrg,
 	EmailError,
+	EmailMessageRecord,
 	EmailSuppressed,
+	EmailThreadDetail,
+	EmailThreadList,
+	EmailThreadListItem,
 	GrantUnavailable,
 	InboxInactive,
 	NoDefaultInbox,
 	NotFound,
 	SessionContext,
 } from '@batuda/controllers'
+import { EmailDraft, Inbox, InboxFooter } from '@batuda/domain'
 import { renderBlocks, type StagedAttachmentRef } from '@batuda/email/render'
 import type { EmailBlocks } from '@batuda/email/schema'
 
@@ -41,6 +54,55 @@ import { MailTransport } from './mail-transport.js'
 import { StorageProvider } from './storage-provider.js'
 import { EmailSent, TimelineActivityService } from './timeline-activity.js'
 
+// Raw Postgres rows carry Date objects; these decoders read each entity's
+// own columns (dates from a Date → DateTime.Utc) so the wire schema can
+// re-encode them as ISO strings. Domain schemas (Inbox / EmailDraft /
+// InboxFooter) already select from a Date; the projection row schemas
+// below mirror a controller wire schema but override just the date fields
+// to read from a Date instead of a string.
+const decodeInbox = Schema.decodeUnknownEffect(Inbox)
+const decodeInboxes = Schema.decodeUnknownEffect(Schema.Array(Inbox))
+const decodeDraft = Schema.decodeUnknownEffect(EmailDraft)
+const decodeDrafts = Schema.decodeUnknownEffect(Schema.Array(EmailDraft))
+const decodeFooter = Schema.decodeUnknownEffect(InboxFooter)
+const decodeFooters = Schema.decodeUnknownEffect(Schema.Array(InboxFooter))
+
+const EmailMessageRecordRow = Schema.Struct({
+	...EmailMessageRecord.fields,
+	receivedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+	statusUpdatedAt: Schema.DateTimeUtcFromDate,
+	deletedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+	createdAt: Schema.DateTimeUtcFromDate,
+	updatedAt: Schema.DateTimeUtcFromDate,
+})
+const decodeMessage = Schema.decodeUnknownEffect(EmailMessageRecordRow)
+const decodeMessages = Schema.decodeUnknownEffect(
+	Schema.Array(EmailMessageRecordRow),
+)
+
+const EmailThreadDetailRow = Schema.Struct({
+	...EmailThreadDetail.fields,
+	lastReadAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+	createdAt: Schema.DateTimeUtcFromDate,
+	updatedAt: Schema.DateTimeUtcFromDate,
+})
+const decodeThreadDetail = Schema.decodeUnknownEffect(EmailThreadDetailRow)
+
+const EmailThreadListItemRow = Schema.Struct({
+	...EmailThreadListItem.fields,
+	lastReadAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+	createdAt: Schema.DateTimeUtcFromDate,
+	updatedAt: Schema.DateTimeUtcFromDate,
+	lastMessageAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+	lastInboundAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+})
+const decodeThreadList = Schema.decodeUnknownEffect(
+	Schema.Struct({
+		...EmailThreadList.fields,
+		items: Schema.Array(EmailThreadListItemRow),
+	}),
+)
+
 // Typed tag so the handler can die deliberately and the staging sweep
 // claims the orphaned attachment objects instead of leaking on a 500.
 export class SmtpSendFailed extends Data.TaggedError('SmtpSendFailed')<{
@@ -50,7 +112,7 @@ export class SmtpSendFailed extends Data.TaggedError('SmtpSendFailed')<{
 
 // 1 + 3 retries spaced 1s/2s/4s → ~7s worst case before surfacing.
 export const smtpRetrySchedule = Schedule.exponential('1 second', 2).pipe(
-	Schedule.bothLeft(Schedule.recurs(3)),
+	Schedule.upTo({ times: 3 }),
 )
 
 export const retrySmtpSend = <A, E>(
@@ -396,7 +458,7 @@ type InboxRow = {
 	updatedAt: Date
 }
 
-export class EmailService extends ServiceMap.Service<EmailService>()(
+export class EmailService extends Context.Service<EmailService>()(
 	'EmailService',
 	{
 		make: Effect.gen(function* () {
@@ -561,7 +623,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 					if (rows.length === 0) {
 						return yield* new NotFound({ entity: 'Inbox', id })
 					}
-					return rows[0]!
+					return yield* decodeInbox(rows[0]!).pipe(Effect.orDie)
 				})
 
 			const resolveDefaultInboxForCurrentUser = () =>
@@ -1372,7 +1434,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							}
 						})
 
-						return {
+						return yield* decodeThreadDetail({
 							id: link.id,
 							externalThreadId: link.externalThreadId,
 							subject: link.subject,
@@ -1391,7 +1453,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 											purpose: link.inboxPurpose,
 										}
 									: null,
-						}
+						}).pipe(Effect.orDie)
 					}),
 
 				updateThreadStatus: (
@@ -1591,14 +1653,15 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 									ORDER BY m.status_updated_at DESC
 									LIMIT 1
 								) AS last_inbound_classification,
-								(
+								COALESCE(
 									(
 										SELECT MAX(m.status_updated_at) FROM email_messages m
 										WHERE m.organization_id = tl.organization_id
 										  AND (m.message_id = tl.external_thread_id
 										       OR tl.external_thread_id = ANY(m."references"))
 										  AND m.direction = 'inbound'
-									) > COALESCE(tl.last_read_at, 'epoch'::timestamptz)
+									) > COALESCE(tl.last_read_at, 'epoch'::timestamptz),
+									false
 								) AS is_unread,
 								COUNT(*) OVER () AS total
 							FROM email_thread_links tl
@@ -1632,7 +1695,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 										: null,
 							}
 						})
-						return { items, total, limit, offset }
+						return yield* decodeThreadList({ items, total, limit, offset })
 					}).pipe(Effect.orDie),
 
 				listMessages: (filters?: {
@@ -1661,7 +1724,9 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							LIMIT ${filters?.limit ?? 50}
 							OFFSET ${filters?.offset ?? 0}
 						`
-						return rows.map(r => projectAttachmentsForWire(r))
+						return yield* decodeMessages(
+							rows.map(r => projectAttachmentsForWire(r)),
+						)
 					}).pipe(Effect.orDie),
 
 				// `messageId` may be either the local UUID PK or the RFC Message-ID;
@@ -1683,7 +1748,9 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								id: messageId,
 							})
 						}
-						return projectAttachmentsForWire(rows[0] as Record<string, unknown>)
+						return yield* decodeMessage(
+							projectAttachmentsForWire(rows[0] as Record<string, unknown>),
+						).pipe(Effect.orDie)
 					}),
 
 				// ── Inbox CRUD ────────────────────────────────────────────────
@@ -1710,12 +1777,13 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							conditions.push(sql`active = ${filters.active}`)
 						if (filters?.ownerUserId)
 							conditions.push(sql`owner_user_id = ${filters.ownerUserId}`)
-						return yield* sql`
+						const rows = yield* sql`
 							SELECT ${selectInboxColumns}
 							FROM inboxes
 							WHERE ${sql.and(conditions)}
 							ORDER BY is_default DESC, purpose, email
 						`
+						return yield* decodeInboxes(rows)
 					}).pipe(Effect.orDie),
 
 				inboxStatus: () =>
@@ -1874,7 +1942,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								purpose: input.purpose,
 							}),
 						)
-						return rows[0]!
+						return yield* decodeInbox(rows[0]!).pipe(Effect.orDie)
 					}),
 
 				updateInbox: (
@@ -1944,7 +2012,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						}
 
 						if (sets.length === 0) {
-							return existing
+							return yield* decodeInbox(existing).pipe(Effect.orDie)
 						}
 
 						// A credential or transport change is re-probed after the
@@ -1998,7 +2066,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						if (credentialsChanged) {
 							return yield* reprobeInbox(id)
 						}
-						return rows[0]!
+						return yield* decodeInbox(rows[0]!).pipe(Effect.orDie)
 					}),
 
 				deleteInbox: (id: string) =>
@@ -2018,7 +2086,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 						if (rows.length === 0) {
 							return yield* new NotFound({ entity: 'Inbox', id })
 						}
-						return rows[0]!
+						return yield* decodeInbox(rows[0]!).pipe(Effect.orDie)
 					}),
 
 				// Manual re-test of a stored mailbox — decrypt, probe, and write
@@ -2074,7 +2142,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							}),
 						)
 						const refreshed = yield* resolveInbox(id)
-						return refreshed!
+						return yield* decodeInbox(refreshed!).pipe(Effect.orDie)
 					}),
 
 				// Inbound attachment byte stream. For messages whose attachments
@@ -2196,7 +2264,9 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							clientId: context ? encodeClientId(context) : null,
 							bodyJson: params.bodyJson ?? {},
 						})
-						return draftRowToProviderShape(draft)
+						return yield* decodeDraft(draftRowToProviderShape(draft)).pipe(
+							Effect.orDie,
+						)
 					}),
 
 				updateDraft: (
@@ -2230,7 +2300,9 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								bodyJson: params.bodyJson,
 							}),
 						})
-						return draftRowToProviderShape(updated)
+						return yield* decodeDraft(draftRowToProviderShape(updated)).pipe(
+							Effect.orDie,
+						)
 					}),
 
 				deleteDraft: (inboxId: string, draftId: string) =>
@@ -2250,15 +2322,20 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							return yield* new NotFound({ entity: 'Inbox', id: inboxId })
 						}
 						const draft = yield* drafts.get(draftId)
-						return draftRowToProviderShape(draft)
+						return yield* decodeDraft(draftRowToProviderShape(draft)).pipe(
+							Effect.orDie,
+						)
 					}),
 
 				listDrafts: (inboxId?: string) =>
 					Effect.gen(function* () {
 						const list = yield* drafts.list(inboxId)
-						return list
+						// Sort on the raw Date before decoding — DateTime.Utc has no
+						// getTime().
+						const shaped = list
 							.map(draftRowToProviderShape)
 							.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+						return yield* decodeDrafts(shaped).pipe(Effect.orDie)
 					}),
 
 				sendDraft: (inboxId: string, draftId: string) =>
@@ -2414,12 +2491,13 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 				listFooters: (inboxId: string) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
-						return yield* sql`
+						const rows = yield* sql`
 							SELECT * FROM inbox_footers
 							WHERE inbox_id = ${inboxId}
 							  AND organization_id = ${currentOrg.id}
 							ORDER BY is_default DESC, name
 						`
+						return yield* decodeFooters(rows)
 					}).pipe(Effect.orDie),
 
 				getFooter: (id: string) =>
@@ -2437,7 +2515,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								id,
 							})
 						}
-						return rows[0]!
+						return yield* decodeFooter(rows[0]!).pipe(Effect.orDie)
 					}),
 
 				createFooter: (input: {
@@ -2474,7 +2552,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 							})}
 							RETURNING *
 						`
-						return rows[0]!
+						return yield* decodeFooter(rows[0]!).pipe(Effect.orDie)
 					}),
 
 				updateFooter: (
@@ -2524,7 +2602,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 									id,
 								})
 							}
-							return r[0]!
+							return yield* decodeFooter(r[0]!).pipe(Effect.orDie)
 						}
 						sets.push(sql`updated_at = now()`)
 						const rows = yield* sql`
@@ -2540,7 +2618,7 @@ export class EmailService extends ServiceMap.Service<EmailService>()(
 								id,
 							})
 						}
-						return rows[0]!
+						return yield* decodeFooter(rows[0]!).pipe(Effect.orDie)
 					}),
 
 				deleteFooter: (id: string) =>

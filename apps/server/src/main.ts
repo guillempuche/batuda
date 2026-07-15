@@ -424,7 +424,7 @@ const AppLive = Layer.mergeAll(
 // No root layer for it on purpose: `McpServer.toolkit(...)` snapshots the
 // service map at layer-build time (effect/src/unstable/ai/McpServer.ts:610)
 // and re-injects it per tool call via `Effect.provideContext`, where
-// `ServiceMap.merge` lets the snapshot OVERRIDE the request fiber. A
+// `Context.merge` lets the snapshot OVERRIDE the request fiber. A
 // boot-time sentinel would clobber McpAuthMiddleware's real value and
 // return empty/foreign rows from every tool; leaving the tag absent at
 // boot keeps it out of the snapshot so the request value survives.

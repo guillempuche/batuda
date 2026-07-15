@@ -22,11 +22,11 @@
 		"test:watch": "vitest"
 	},
 	"dependencies": {
-		"effect": "4.0.0-beta.43"
+		"effect": "4.0.0-beta.98"
 	},
 	"devDependencies": {
 		"@types/node": "^22.15.0",
-		"tsdown": "^0.21.7",
+		"tsdown": "^0.22.7",
 		"typescript": "^5.9.3",
 		"vitest": "^4.1.4"
 	},

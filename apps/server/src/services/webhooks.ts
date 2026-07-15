@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto'
 
-import { Cause, DateTime, Effect, Layer, ServiceMap } from 'effect'
+import { Cause, Context, DateTime, Effect, Layer } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
@@ -26,7 +26,7 @@ export const matchingEndpoints = (
 ): ReadonlyArray<WebhookEndpoint> =>
 	endpoints.filter(ep => ep.events.includes(event))
 
-export class WebhookService extends ServiceMap.Service<WebhookService>()(
+export class WebhookService extends Context.Service<WebhookService>()(
 	'WebhookService',
 	{
 		make: Effect.gen(function* () {

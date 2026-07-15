@@ -5,6 +5,7 @@ import {
 	HttpApiSchema,
 } from 'effect/unstable/httpapi'
 
+import { EmailDraft, Inbox, InboxFooter } from '@batuda/domain'
 import { EmailBlocks } from '@batuda/email/schema'
 
 import {
@@ -24,6 +25,105 @@ const Recipients = Schema.Union([Schema.String, Schema.Array(Schema.String)])
 
 const ThreadStatus = Schema.Literals(['open', 'closed', 'archived'])
 const InboxPurpose = Schema.Literals(['human', 'agent', 'shared'])
+const InboundClassification = Schema.Literals(['normal', 'spam', 'blocked'])
+const MessageDirection = Schema.Literals(['inbound', 'outbound'])
+
+// Shape of the inbox summary reattached to a thread (list + detail). Only
+// the display-safe fields — never credentials or transport hosts.
+const ThreadInbox = Schema.Struct({
+	email: Schema.String,
+	displayName: Schema.NullOr(Schema.String),
+	purpose: InboxPurpose,
+})
+
+// ── Enriched thread response shapes ─────────────────────────────
+// The thread endpoints join email_thread_links with the inbox and
+// per-message aggregates. Their own date columns encode to ISO strings
+// (DateTimeUtcFromString); the message/participant aggregates arrive from
+// SQL as plain JSON (their inner dates already ISO), so they stay Unknown.
+
+// One row of the thread list: the thread link plus its message rollups and
+// the linked inbox.
+export const EmailThreadListItem = Schema.Struct({
+	id: Schema.String,
+	externalThreadId: Schema.String,
+	inboxId: Schema.NullOr(Schema.String),
+	companyId: Schema.NullOr(Schema.String),
+	contactId: Schema.NullOr(Schema.String),
+	subject: Schema.NullOr(Schema.String),
+	status: Schema.String,
+	lastReadAt: Schema.NullOr(Schema.DateTimeUtcFromString),
+	createdAt: Schema.DateTimeUtcFromString,
+	updatedAt: Schema.DateTimeUtcFromString,
+	messageCount: Schema.Number,
+	lastMessageAt: Schema.NullOr(Schema.DateTimeUtcFromString),
+	lastMessageDirection: Schema.NullOr(MessageDirection),
+	lastInboundAt: Schema.NullOr(Schema.DateTimeUtcFromString),
+	lastInboundClassification: Schema.NullOr(InboundClassification),
+	isUnread: Schema.Boolean,
+	inbox: Schema.NullOr(ThreadInbox),
+})
+export type EmailThreadListItem = typeof EmailThreadListItem.Type
+
+// The paginated envelope returned by listThreads / list_email_threads.
+export const EmailThreadList = Schema.Struct({
+	items: Schema.Array(EmailThreadListItem),
+	total: Schema.Number,
+	limit: Schema.Number,
+	offset: Schema.Number,
+})
+export type EmailThreadList = typeof EmailThreadList.Type
+
+// A full thread: the thread link's own columns plus the flattened message
+// list. Each message is already a plain-JSON object (its timestamps
+// pre-stringified in the service), so `messages` stays Array(Unknown).
+export const EmailThreadDetail = Schema.Struct({
+	id: Schema.String,
+	externalThreadId: Schema.String,
+	subject: Schema.NullOr(Schema.String),
+	status: Schema.String,
+	lastReadAt: Schema.NullOr(Schema.DateTimeUtcFromString),
+	createdAt: Schema.DateTimeUtcFromString,
+	updatedAt: Schema.DateTimeUtcFromString,
+	companyId: Schema.NullOr(Schema.String),
+	contactId: Schema.NullOr(Schema.String),
+	messages: Schema.Array(Schema.Unknown),
+	inbox: Schema.NullOr(ThreadInbox),
+})
+export type EmailThreadDetail = typeof EmailThreadDetail.Type
+
+// A per-message deliverability record (email_messages row). Worker-internal
+// columns (organization_id, raw_rfc822_ref, imap_uid/uidvalidity,
+// search_vector) are intentionally dropped; the jsonb `attachments` /
+// `recipients` are already plain JSON so they stay Unknown.
+export const EmailMessageRecord = Schema.Struct({
+	id: Schema.String,
+	inboxId: Schema.NullOr(Schema.String),
+	messageId: Schema.String,
+	inReplyTo: Schema.NullOr(Schema.String),
+	references: Schema.NullOr(Schema.Array(Schema.String)),
+	direction: MessageDirection,
+	folder: Schema.String,
+	subject: Schema.NullOr(Schema.String),
+	receivedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
+	textPreview: Schema.NullOr(Schema.String),
+	textBody: Schema.NullOr(Schema.String),
+	htmlBody: Schema.NullOr(Schema.String),
+	attachments: Schema.Unknown,
+	companyId: Schema.NullOr(Schema.String),
+	contactId: Schema.NullOr(Schema.String),
+	recipients: Schema.Unknown,
+	status: Schema.Literals(['normal', 'spam', 'blocked', 'bounced']),
+	statusReason: Schema.NullOr(Schema.String),
+	bounceType: Schema.NullOr(Schema.String),
+	bounceSubType: Schema.NullOr(Schema.String),
+	inboundClassification: Schema.NullOr(InboundClassification),
+	statusUpdatedAt: Schema.DateTimeUtcFromString,
+	deletedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
+	createdAt: Schema.DateTimeUtcFromString,
+	updatedAt: Schema.DateTimeUtcFromString,
+})
+export type EmailMessageRecord = typeof EmailMessageRecord.Type
 
 // Outbound attachment reference. The client uploads bytes via the
 // staging endpoint first, then the send payload just names stagingIds.
@@ -110,19 +210,18 @@ export const EmailGroup = HttpApiGroup.make('email')
 				limit: Schema.optional(Schema.NumberFromString),
 				offset: Schema.optional(Schema.NumberFromString),
 			},
-			success: Schema.Struct({
-				items: Schema.Array(Schema.Unknown),
-				total: Schema.Number,
-				limit: Schema.Number,
-				offset: Schema.Number,
-			}),
+			success: EmailThreadList,
 		}),
 	)
 	.add(
 		HttpApiEndpoint.patch('updateThreadStatus', '/email/threads/:threadId', {
 			params: { threadId: Schema.String },
 			payload: Schema.Struct({ status: ThreadStatus }),
-			success: Schema.Unknown,
+			success: Schema.Struct({
+				id: Schema.String,
+				status: ThreadStatus,
+				updatedAt: Schema.String,
+			}),
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
@@ -145,7 +244,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 	.add(
 		HttpApiEndpoint.get('getThread', '/email/threads/:threadId', {
 			params: { threadId: Schema.String },
-			success: Schema.Unknown,
+			success: EmailThreadDetail,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
@@ -158,13 +257,13 @@ export const EmailGroup = HttpApiGroup.make('email')
 				limit: Schema.optional(Schema.NumberFromString),
 				offset: Schema.optional(Schema.NumberFromString),
 			},
-			success: Schema.Array(Schema.Unknown),
+			success: Schema.Array(EmailMessageRecord),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.get('getMessage', '/email/messages/:messageId', {
 			params: { messageId: Schema.String },
-			success: Schema.Unknown,
+			success: EmailMessageRecord,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
@@ -175,7 +274,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 				active: Schema.optional(Schema.Literals(['true', 'false'])),
 				ownerUserId: Schema.optional(Schema.String),
 			},
-			success: Schema.Array(Schema.Unknown),
+			success: Schema.Array(Inbox.json),
 		}),
 	)
 	.add(
@@ -209,7 +308,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 				username: Schema.String,
 				password: Schema.String,
 			}),
-			success: Schema.Unknown,
+			success: Inbox.json,
 			error: BadRequest.pipe(HttpApiSchema.status(400)),
 		}),
 	)
@@ -237,7 +336,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 				username: Schema.optional(Schema.String),
 				password: Schema.optional(Schema.String),
 			}),
-			success: Schema.Unknown,
+			success: Inbox.json,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
@@ -253,7 +352,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 		// grant_last_seen_at and returns the refreshed row.
 		HttpApiEndpoint.post('testInbox', '/email/inboxes/:id/test', {
 			params: { id: Schema.String },
-			success: Schema.Unknown,
+			success: Inbox.json,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
@@ -263,7 +362,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 		// inbox.
 		HttpApiEndpoint.post('setPrimaryInbox', '/email/inboxes/:id/primary', {
 			params: { id: Schema.String },
-			success: Schema.Unknown,
+			success: Inbox.json,
 			error: Schema.Union([
 				NotFound.pipe(HttpApiSchema.status(404)),
 				BadRequest.pipe(HttpApiSchema.status(400)),
@@ -351,7 +450,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 				mode: Schema.optional(Schema.String),
 				threadLinkId: Schema.optional(Schema.String),
 			}),
-			success: Schema.Unknown,
+			success: EmailDraft.json,
 		}),
 	)
 	.add(
@@ -359,14 +458,14 @@ export const EmailGroup = HttpApiGroup.make('email')
 			query: {
 				inboxId: Schema.optional(Schema.String),
 			},
-			success: Schema.Array(Schema.Unknown),
+			success: Schema.Array(EmailDraft.json),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.get('getDraft', '/email/drafts/:draftId', {
 			params: { draftId: Schema.String },
 			query: { inboxId: Schema.String },
-			success: Schema.Unknown,
+			success: EmailDraft.json,
 		}),
 	)
 	.add(
@@ -380,7 +479,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 				subject: Schema.optional(Schema.String),
 				bodyJson: Schema.optional(EmailBlocks),
 			}),
-			success: Schema.Unknown,
+			success: EmailDraft.json,
 		}),
 	)
 	.add(
@@ -410,7 +509,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 	.add(
 		HttpApiEndpoint.get('listFooters', '/email/inboxes/:inboxId/footers', {
 			params: { inboxId: Schema.String },
-			success: Schema.Array(Schema.Unknown),
+			success: Schema.Array(InboxFooter.json),
 		}),
 	)
 	.add(
@@ -421,13 +520,13 @@ export const EmailGroup = HttpApiGroup.make('email')
 				bodyJson: EmailBlocks,
 				isDefault: Schema.optional(Schema.Boolean),
 			}),
-			success: Schema.Unknown,
+			success: InboxFooter.json,
 		}),
 	)
 	.add(
 		HttpApiEndpoint.get('getFooter', '/email/footers/:id', {
 			params: { id: Schema.String },
-			success: Schema.Unknown,
+			success: InboxFooter.json,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
@@ -439,7 +538,7 @@ export const EmailGroup = HttpApiGroup.make('email')
 				bodyJson: Schema.optional(EmailBlocks),
 				isDefault: Schema.optional(Schema.Boolean),
 			}),
-			success: Schema.Unknown,
+			success: InboxFooter.json,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)

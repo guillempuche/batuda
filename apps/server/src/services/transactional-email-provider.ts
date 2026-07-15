@@ -1,4 +1,4 @@
-import { type Effect, ServiceMap } from 'effect'
+import { Context, type Effect } from 'effect'
 
 import type { EmailSendError } from '@batuda/controllers'
 
@@ -39,7 +39,7 @@ export interface InvitationParams {
 	readonly expiresAt: Date
 }
 
-export class TransactionalEmailProvider extends ServiceMap.Service<
+export class TransactionalEmailProvider extends Context.Service<
 	TransactionalEmailProvider,
 	{
 		readonly sendMagicLink: (

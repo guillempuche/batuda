@@ -1,11 +1,11 @@
-import { Config, Effect, Layer, ServiceMap } from 'effect'
+import { Config, Context, Effect, Layer } from 'effect'
 
 // Mail-worker process env. Kept separate from apps/server so the worker
 // can be deployed independently (different machine pool, longer-lived
 // connections, no inbound HTTP). Names are vendor-neutral per the
 // project's env-var convention — STORAGE_* / EMAIL_* describe the
 // capability, not the provider.
-export class WorkerEnvVars extends ServiceMap.Service<WorkerEnvVars>()(
+export class WorkerEnvVars extends Context.Service<WorkerEnvVars>()(
 	'WorkerEnvVars',
 	{
 		make: Effect.gen(function* () {

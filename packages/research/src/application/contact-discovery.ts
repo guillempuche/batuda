@@ -11,7 +11,7 @@
  * transport with no budget plumbing of its own.
  */
 
-import { Config, Effect, Layer, ServiceMap } from 'effect'
+import { Config, Context, Effect, Layer } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { isRegistryCountry, type RegistryCountry } from '../domain/country'
@@ -219,7 +219,7 @@ export const compareContacts = (
 	return (emailB?.confidence ?? 0) - (emailA?.confidence ?? 0)
 }
 
-export class ContactDiscovery extends ServiceMap.Service<ContactDiscovery>()(
+export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 	'ContactDiscovery',
 	{
 		make: Effect.gen(function* () {

@@ -6,7 +6,7 @@ import {
 } from '@effect/atom-react'
 import { useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link, useLocation } from '@tanstack/react-router'
-import { Option, Schema } from 'effect'
+import { DateTime, Option, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import {
 	Check,
@@ -114,7 +114,10 @@ type ProviderPreset = {
 	readonly passwordAuthSupported: boolean
 }
 
-async function loadInboxesOnServer(): Promise<ReadonlyArray<unknown>> {
+// Return type is inferred from the typed API client so the dehydrated atom
+// value matches the listInboxes atom's success schema; `narrowInboxRows`
+// still treats it as unknown.
+async function loadInboxesOnServer() {
 	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
 		import('effect'),
 		import('#/lib/batuda-api-server'),
@@ -1859,7 +1862,13 @@ function narrowInboxRows(rows: unknown): ReadonlyArray<InboxRow> {
 					? 'disabled'
 					: 'connected'
 	const isoString = (v: unknown): string | null =>
-		typeof v === 'string' ? v : v instanceof Date ? v.toISOString() : null
+		typeof v === 'string'
+			? v
+			: v instanceof Date
+				? v.toISOString()
+				: DateTime.isDateTime(v)
+					? DateTime.formatIso(v)
+					: null
 	for (const row of rows) {
 		if (!row || typeof row !== 'object') continue
 		const r = row as Record<string, unknown>

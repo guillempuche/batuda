@@ -1,6 +1,8 @@
 import { Schema } from 'effect'
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi'
 
+import { Interaction } from '@batuda/domain'
+
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 
@@ -27,13 +29,13 @@ export const InteractionsGroup = HttpApiGroup.make('interactions')
 				companyId: Schema.optional(Schema.String),
 				limit: Schema.optional(Schema.NumberFromString),
 			},
-			success: Schema.Array(Schema.Unknown),
+			success: Schema.Array(Interaction.json),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.post('create', '/interactions', {
 			payload: CreateInteractionInput,
-			success: Schema.Unknown,
+			success: Interaction.json,
 		}),
 	)
 	.middleware(SessionMiddleware)

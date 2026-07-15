@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 
-import { DateTime, Effect, Layer, Schedule, ServiceMap } from 'effect'
+import { Context, DateTime, Effect, Layer, Schedule } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { BadRequest, CurrentOrg } from '@batuda/controllers'
@@ -85,7 +85,7 @@ interface StagingRow {
 // Service
 // ────────────────────────────────────────────────────────────────────
 
-export class EmailAttachmentStaging extends ServiceMap.Service<EmailAttachmentStaging>()(
+export class EmailAttachmentStaging extends Context.Service<EmailAttachmentStaging>()(
 	'EmailAttachmentStaging',
 	{
 		make: Effect.gen(function* () {

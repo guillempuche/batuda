@@ -1,9 +1,14 @@
-import { Effect } from 'effect'
+import { Effect, Schema } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { BatudaApi } from '@batuda/controllers'
+import { TimelineActivity } from '@batuda/domain'
+
+const decodeActivities = Schema.decodeUnknownEffect(
+	Schema.Array(TimelineActivity),
+)
 
 export const TimelineLive = HttpApiBuilder.group(
 	BatudaApi,
@@ -30,12 +35,13 @@ export const TimelineLive = HttpApiBuilder.group(
 					const limit = Math.min(_.query.limit ?? 50, 200)
 					const whereClause =
 						conditions.length > 0 ? sql`WHERE ${sql.and(conditions)}` : sql``
-					return yield* sql`
+					const rows = yield* sql`
 						SELECT * FROM timeline_activity
 						${whereClause}
 						ORDER BY occurred_at DESC
 						LIMIT ${limit}
 					`
+					return yield* decodeActivities(rows)
 				}).pipe(Effect.orDie),
 			)
 		}),

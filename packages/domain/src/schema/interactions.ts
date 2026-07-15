@@ -4,7 +4,7 @@ import { Model } from 'effect/unstable/schema'
 export const InteractionId = Schema.String.pipe(Schema.brand('InteractionId'))
 
 export class Interaction extends Model.Class<Interaction>('Interaction')({
-	id: Model.Generated(InteractionId),
+	id: Model.GeneratedByDb(InteractionId),
 	companyId: Schema.String,
 	contactId: Schema.NullOr(Schema.String),
 
@@ -26,8 +26,9 @@ export class Interaction extends Model.Class<Interaction>('Interaction')({
 	//         | meeting_scheduled | proposal_requested
 
 	nextAction: Schema.NullOr(Schema.String),
-	nextActionAt: Schema.NullOr(Schema.String),
-	// date column returns string in format YYYY-MM-DD
+	// A DATE column; node-postgres parses it into a JS Date, so read it as a
+	// date-time and emit an ISO string on the wire.
+	nextActionAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
 
 	metadata: Schema.NullOr(Schema.Unknown),
 	createdAt: Model.DateTimeInsertFromDate,

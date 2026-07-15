@@ -23,6 +23,7 @@ import { BatudaApiAtom } from '#/lib/batuda-api-atom'
  */
 export const companiesListAtom = BatudaApiAtom.query('companies', 'list', {
 	query: { limit: 500 },
+	serializationKey: 'companies:list:500',
 })
 
 /**
@@ -37,6 +38,7 @@ export const companiesListAtom = BatudaApiAtom.query('companies', 'list', {
  */
 export const openTasksAtom = BatudaApiAtom.query('tasks', 'list', {
 	query: { completed: 'false' },
+	serializationKey: 'tasks:open',
 })
 
 /**

@@ -1,6 +1,6 @@
-import { ServiceMap } from 'effect'
+import { Context } from 'effect'
 
-export class CurrentUser extends ServiceMap.Service<
+export class CurrentUser extends Context.Service<
 	CurrentUser,
 	{
 		readonly userId: string

@@ -2,6 +2,7 @@ import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
+import { DateTime } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { FileSignature, Plus, X } from 'lucide-react'
 import { type FormEvent, useMemo, useRef, useState } from 'react'
@@ -100,6 +101,14 @@ const STATUSES: ReadonlyArray<{
 	{ value: 'expired', label: msg`Expired` },
 ]
 
+// Typed date fields decode to DateTime.Utc on the wire; fall back to their
+// string form for anything already an ISO string.
+function dateToIsoOrNull(value: unknown): string | null {
+	if (typeof value === 'string') return value
+	if (DateTime.isDateTime(value)) return DateTime.formatIso(value)
+	return null
+}
+
 function narrowProposals(
 	rows: ReadonlyArray<unknown>,
 ): ReadonlyArray<ProposalRow> {
@@ -115,8 +124,8 @@ function narrowProposals(
 			totalValue: typeof r['totalValue'] === 'string' ? r['totalValue'] : null,
 			currency: typeof r['currency'] === 'string' ? r['currency'] : null,
 			notes: typeof r['notes'] === 'string' ? r['notes'] : null,
-			expiresAt: typeof r['expiresAt'] === 'string' ? r['expiresAt'] : null,
-			updatedAt: typeof r['updatedAt'] === 'string' ? r['updatedAt'] : null,
+			expiresAt: dateToIsoOrNull(r['expiresAt']),
+			updatedAt: dateToIsoOrNull(r['updatedAt']),
 			lineItems: r['lineItems'] ?? null,
 		})
 	}

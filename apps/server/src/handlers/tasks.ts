@@ -1,10 +1,13 @@
-import { DateTime, Effect } from 'effect'
+import { DateTime, Effect, Schema } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { BatudaApi, NotFound, SessionContext } from '@batuda/controllers'
+import { TaskEvent } from '@batuda/domain'
 
 import { TaskService } from '../services/tasks'
+
+const decodeTaskEvents = Schema.decodeUnknownEffect(Schema.Array(TaskEvent))
 
 export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 	Effect.gen(function* () {
@@ -73,10 +76,10 @@ export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 					yield* Effect.logInfo('Task created').pipe(
 						Effect.annotateLogs({
 							event: 'task.created',
-							taskId: (rows[0] as { id: string } | undefined)?.id,
+							taskId: rows[0]?.id,
 						}),
 					)
-					return rows[0]
+					return rows[0] ?? null
 				}).pipe(Effect.orDie),
 			)
 			.handle('update', _ =>
@@ -167,10 +170,11 @@ export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 					`
 					if (exists.length === 0)
 						return yield* new NotFound({ entity: 'task', id: _.params.id })
-					return yield* sql`
+					const events = yield* sql`
 						SELECT * FROM task_events WHERE task_id = ${_.params.id}
 						ORDER BY at DESC LIMIT 100
 					`
+					return yield* decodeTaskEvents(events)
 				}).pipe(
 					Effect.catch(e =>
 						e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),

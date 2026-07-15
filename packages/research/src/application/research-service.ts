@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import {
 	Cause,
 	Config,
+	Context,
 	DateTime,
 	Effect,
 	Fiber,
@@ -14,11 +15,12 @@ import {
 	Ref,
 	Schedule,
 	Schema,
-	ServiceMap,
 	Stream,
 } from 'effect'
 import { Prompt } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
+
+import { ResearchRun } from '@batuda/domain'
 
 import { AcceptedCountry, parseCountryAlpha2 } from '../domain/country'
 import type { ReasonCode, ResolvedPolicy } from '../domain/types'
@@ -87,6 +89,40 @@ import {
 } from './tools'
 import { verifyValueProvenance } from './value-guard'
 import { constrainVocabulary } from './vocabulary-guard'
+
+// Raw Postgres rows carry `Date` timestamp columns; these decoders read each
+// date from a Date (rather than an ISO string) so the decoded value lands as a
+// DateTime.Utc that the wire schemas can re-encode as an ISO string. They
+// mirror the ResearchRunSummary / ResearchPolicy response shapes, overriding
+// only the date columns to their from-Date variant.
+const ResearchRunSummaryRow = Schema.Struct({
+	id: Schema.String,
+	kind: Schema.String,
+	query: Schema.String,
+	mode: Schema.String,
+	schemaName: Schema.NullOr(Schema.String),
+	status: Schema.String,
+	costCents: Schema.Number,
+	paidCostCents: Schema.Number,
+	createdBy: Schema.String,
+	createdAt: Schema.DateTimeUtcFromDate,
+	completedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+})
+const decodeResearchRunSummaries = Schema.decodeUnknownEffect(
+	Schema.Array(ResearchRunSummaryRow),
+)
+
+// The user_research_policy row; `userId` is dropped on decode (internal, not
+// part of the wire shape). `updatedAt` is always present on a real row.
+const ResearchPolicyRow = Schema.Struct({
+	budgetCents: Schema.Number,
+	paidBudgetCents: Schema.Number,
+	autoApprovePaidCents: Schema.Number,
+	paidMonthlyCapCents: Schema.Number,
+	autoApplyMinConfidence: Schema.NullOr(Schema.Number),
+	updatedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+})
+const decodeResearchPolicy = Schema.decodeUnknownEffect(ResearchPolicyRow)
 
 // A finished run is flipped to 'failed' for a real error or an unexpected
 // crash, but NOT when it was simply cancelled or shut down (a pure interrupt) —
@@ -560,7 +596,7 @@ export interface ResolvedInstructions {
 
 // ── ResearchService ──
 
-export class ResearchService extends ServiceMap.Service<ResearchService>()(
+export class ResearchService extends Context.Service<ResearchService>()(
 	'ResearchService',
 	{
 		make: Effect.gen(function* () {
@@ -2850,7 +2886,27 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							FROM research_runs r
 							WHERE r.id = ${researchId} AND r.status != 'deleted'
 						`
-						return run ?? null
+						if (run === undefined) return null
+						// Decode the run's own columns so its `Date` timestamps become
+						// wire-safe DateTime.Utc values; the aggregates (error_message,
+						// sources, links, children) are already plain JSON/text, so keep
+						// them as-is. A decode failure is a server-invariant bug → die.
+						const decoded = yield* Schema.decodeUnknownEffect(ResearchRun)(
+							run,
+						).pipe(Effect.orDie)
+						const extras = run as {
+							readonly errorMessage: string | null
+							readonly sources: ReadonlyArray<unknown>
+							readonly links: ReadonlyArray<unknown>
+							readonly children: ReadonlyArray<unknown>
+						}
+						return {
+							...decoded,
+							errorMessage: extras.errorMessage,
+							sources: extras.sources,
+							links: extras.links,
+							children: extras.children,
+						}
 					}),
 
 				/** List research runs with filters. */
@@ -2889,7 +2945,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							filters.offset,
 						)
 
-						return yield* sql`
+						const rows = yield* sql`
 							SELECT r.id, r.kind, r.query, r.mode, r.schema_name,
 								r.status, r.cost_cents, r.paid_cost_cents,
 								r.created_by, r.created_at, r.completed_at
@@ -2899,6 +2955,7 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 							LIMIT ${limit}
 							OFFSET ${offset}
 						`
+						return yield* decodeResearchRunSummaries(rows).pipe(Effect.orDie)
 					}),
 
 				/** Pending proposed updates across the org, for the review inbox. */
@@ -2913,16 +2970,20 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 
 				/** Get all runs linked to a subject row. */
 				bySubject: (table: string, id: string) =>
-					sql`
-						SELECT r.id, r.kind, r.query, r.mode, r.schema_name,
-							r.status, r.cost_cents, r.created_at, r.completed_at
-						FROM research_runs r
-						JOIN research_links rl ON rl.research_id = r.id
-						WHERE rl.subject_table = ${table}
-						  AND rl.subject_id = ${id}
-						  AND r.status != 'deleted'
-						ORDER BY r.created_at DESC
-					`,
+					Effect.gen(function* () {
+						const rows = yield* sql`
+							SELECT r.id, r.kind, r.query, r.mode, r.schema_name,
+								r.status, r.cost_cents, r.paid_cost_cents,
+								r.created_by, r.created_at, r.completed_at
+							FROM research_runs r
+							JOIN research_links rl ON rl.research_id = r.id
+							WHERE rl.subject_table = ${table}
+							  AND rl.subject_id = ${id}
+							  AND r.status != 'deleted'
+							ORDER BY r.created_at DESC
+						`
+						return yield* decodeResearchRunSummaries(rows).pipe(Effect.orDie)
+					}),
 
 				// Aggregates research_paid_spend rows for the current org.
 				// `range` clamps the time window (defaults to "all"); `groupBy`
@@ -3288,7 +3349,10 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						const [row] = yield* sql`
 							SELECT * FROM user_research_policy WHERE user_id = ${userId}
 						`
-						return row ?? null
+						if (row === undefined) return null
+						// Decode so the row's `updated_at` Date becomes a wire-safe
+						// DateTime.Utc; a decode failure is a server bug → die.
+						return yield* decodeResearchPolicy(row).pipe(Effect.orDie)
 					}),
 
 				/** Update user's research policy. */
@@ -3302,33 +3366,42 @@ export class ResearchService extends ServiceMap.Service<ResearchService>()(
 						autoApplyMinConfidence?: number | null | undefined
 					},
 				) =>
-					sql`
-						INSERT INTO user_research_policy (user_id, budget_cents, paid_budget_cents, auto_approve_paid_cents, paid_monthly_cap_cents, auto_apply_min_confidence, updated_at)
-						VALUES (
-							${userId},
-							${fields.budgetCents ?? 100},
-							${fields.paidBudgetCents ?? 500},
-							${fields.autoApprovePaidCents ?? 200},
-							${fields.paidMonthlyCapCents ?? 2000},
-							${fields.autoApplyMinConfidence ?? null},
-							now()
-						)
-						ON CONFLICT (user_id) DO UPDATE SET
-							budget_cents = COALESCE(${fields.budgetCents ?? null}, user_research_policy.budget_cents),
-							paid_budget_cents = COALESCE(${fields.paidBudgetCents ?? null}, user_research_policy.paid_budget_cents),
-							auto_approve_paid_cents = COALESCE(${fields.autoApprovePaidCents ?? null}, user_research_policy.auto_approve_paid_cents),
-							paid_monthly_cap_cents = COALESCE(${fields.paidMonthlyCapCents ?? null}, user_research_policy.paid_monthly_cap_cents),
-							-- Nullable on purpose: passing null turns auto-apply off, so a
-							-- provided value (even null) is honored while an omitted one keeps
-							-- the current setting.
-							auto_apply_min_confidence = CASE
-								WHEN ${fields.autoApplyMinConfidence !== undefined}
-								THEN ${fields.autoApplyMinConfidence ?? null}
-								ELSE user_research_policy.auto_apply_min_confidence
-							END,
-							updated_at = now()
-						RETURNING *
-					`,
+					Effect.gen(function* () {
+						const [row] = yield* sql`
+							INSERT INTO user_research_policy (user_id, budget_cents, paid_budget_cents, auto_approve_paid_cents, paid_monthly_cap_cents, auto_apply_min_confidence, updated_at)
+							VALUES (
+								${userId},
+								${fields.budgetCents ?? 100},
+								${fields.paidBudgetCents ?? 500},
+								${fields.autoApprovePaidCents ?? 200},
+								${fields.paidMonthlyCapCents ?? 2000},
+								${fields.autoApplyMinConfidence ?? null},
+								now()
+							)
+							ON CONFLICT (user_id) DO UPDATE SET
+								budget_cents = COALESCE(${fields.budgetCents ?? null}, user_research_policy.budget_cents),
+								paid_budget_cents = COALESCE(${fields.paidBudgetCents ?? null}, user_research_policy.paid_budget_cents),
+								auto_approve_paid_cents = COALESCE(${fields.autoApprovePaidCents ?? null}, user_research_policy.auto_approve_paid_cents),
+								paid_monthly_cap_cents = COALESCE(${fields.paidMonthlyCapCents ?? null}, user_research_policy.paid_monthly_cap_cents),
+								-- Nullable on purpose: passing null turns auto-apply off, so a
+								-- provided value (even null) is honored while an omitted one keeps
+								-- the current setting.
+								auto_apply_min_confidence = CASE
+									WHEN ${fields.autoApplyMinConfidence !== undefined}
+									THEN ${fields.autoApplyMinConfidence ?? null}
+									ELSE user_research_policy.auto_apply_min_confidence
+								END,
+								updated_at = now()
+							RETURNING *
+						`
+						// The upsert always affects a row; a missing one means the write
+						// produced nothing, which is a defect worth failing loudly on.
+						if (row === undefined)
+							return yield* Effect.die(
+								new Error('user_research_policy upsert returned no row'),
+							)
+						return yield* decodeResearchPolicy(row).pipe(Effect.orDie)
+					}),
 
 				/** Mark orphaned running + queued rows as failed. */
 				sweepOrphans: (maxAgeSeconds: number) => sweepOrphanRuns(maxAgeSeconds),

@@ -1,6 +1,7 @@
 import { useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Link } from '@tanstack/react-router'
+import { DateTime } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { Mail } from 'lucide-react'
 import { useMemo, useState } from 'react'
@@ -249,6 +250,14 @@ export function ConversationsTab({
 	)
 }
 
+// Typed date fields decode to DateTime.Utc on the wire; fall back to their
+// string form for anything already an ISO string.
+function dateToIsoOrNull(value: unknown): string | null {
+	if (typeof value === 'string') return value
+	if (DateTime.isDateTime(value)) return DateTime.formatIso(value)
+	return null
+}
+
 function narrowCalendar(
 	rows: ReadonlyArray<unknown>,
 ): ReadonlyArray<CalendarRow> {
@@ -258,11 +267,12 @@ function narrowCalendar(
 		const r = row as Record<string, unknown>
 		if (typeof r['id'] !== 'string') continue
 		if (typeof r['title'] !== 'string') continue
-		if (typeof r['startAt'] !== 'string') continue
+		const startAt = dateToIsoOrNull(r['startAt'])
+		if (startAt === null) continue
 		out.push({
 			id: r['id'],
 			title: r['title'],
-			startAt: r['startAt'],
+			startAt,
 			status: typeof r['status'] === 'string' ? r['status'] : 'confirmed',
 		})
 	}

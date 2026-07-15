@@ -1,4 +1,4 @@
-import { Data, Effect, Layer, ServiceMap } from 'effect'
+import { Context, Data, Effect, Layer } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/domain'
@@ -49,7 +49,7 @@ export interface MatchArgs {
 	readonly createPolicy: CreatePolicy
 }
 
-export class ParticipantMatcher extends ServiceMap.Service<ParticipantMatcher>()(
+export class ParticipantMatcher extends Context.Service<ParticipantMatcher>()(
 	'ParticipantMatcher',
 	{
 		make: Effect.gen(function* () {

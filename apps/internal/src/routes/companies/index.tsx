@@ -1,7 +1,7 @@
 import { useAtomValue } from '@effect/atom-react'
 import { useLingui } from '@lingui/react/macro'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { Schema } from 'effect'
+import { DateTime, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import {
 	Check,
@@ -87,9 +87,7 @@ const validateSearch = validateSearchWith({
  * imports the server module so Vite tree-shakes it out of the client
  * bundle.
  */
-async function loadCompaniesOnServer(
-	search: CompaniesSearch,
-): Promise<{ companies: ReadonlyArray<unknown> }> {
+async function loadCompaniesOnServer(search: CompaniesSearch) {
 	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
 		import('effect'),
 		import('#/lib/batuda-api-server'),
@@ -612,6 +610,14 @@ function hasActiveFilters(search: CompaniesSearch): boolean {
 	)
 }
 
+// Typed date fields decode to DateTime.Utc on the wire; fall back to their
+// string form for anything already an ISO string.
+function dateToIsoOrNull(value: unknown): string | null {
+	if (typeof value === 'string') return value
+	if (DateTime.isDateTime(value)) return DateTime.formatIso(value)
+	return null
+}
+
 function narrowCompanies(
 	rows: ReadonlyArray<unknown>,
 ): ReadonlyArray<CompanyRow> {
@@ -632,8 +638,7 @@ function narrowCompanies(
 			location: typeof r['location'] === 'string' ? r['location'] : null,
 			country: typeof r['country'] === 'string' ? r['country'] : null,
 			priority: typeof r['priority'] === 'number' ? r['priority'] : null,
-			lastContactedAt:
-				typeof r['lastContactedAt'] === 'string' ? r['lastContactedAt'] : null,
+			lastContactedAt: dateToIsoOrNull(r['lastContactedAt']),
 			ownerId: typeof r['ownerId'] === 'string' ? r['ownerId'] : null,
 		})
 	}

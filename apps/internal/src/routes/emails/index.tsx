@@ -17,7 +17,7 @@ import {
 	type VisibilityState,
 } from '@tanstack/react-table'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Cause, Option, Schema } from 'effect'
+import { Cause, DateTime, Option, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import {
 	AlertTriangle,
@@ -176,10 +176,10 @@ function toWireSearch(
 	return wire
 }
 
-async function loadThreadsOnServer(wire: EmailsSearch): Promise<{
-	envelope: ListEnvelope
-	inboxes: ReadonlyArray<unknown>
-}> {
+// Return type is inferred from the typed API client so the dehydrated atom
+// values line up with the atoms' success schemas. The runtime `narrow*`
+// guards below still treat the payload as unknown.
+async function loadThreadsOnServer(wire: EmailsSearch) {
 	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
 		import('effect'),
 		import('#/lib/batuda-api-server'),
@@ -1580,6 +1580,15 @@ function narrowEnvelope(value: unknown): ListEnvelope | null {
 	}
 }
 
+// Typed date fields (lastMessageAt / updatedAt) decode to DateTime.Utc on
+// the wire; fall back to their string form for anything already an ISO
+// string.
+function dateToIsoOrNull(value: unknown): string | null {
+	if (typeof value === 'string') return value
+	if (DateTime.isDateTime(value)) return DateTime.formatIso(value)
+	return null
+}
+
 function narrowThreads(rows: ReadonlyArray<unknown>): ReadonlyArray<ThreadRow> {
 	const out: Array<ThreadRow> = []
 	for (const row of rows) {
@@ -1602,8 +1611,7 @@ function narrowThreads(rows: ReadonlyArray<unknown>): ReadonlyArray<ThreadRow> {
 			companyId: typeof r['companyId'] === 'string' ? r['companyId'] : null,
 			messageCount:
 				typeof r['messageCount'] === 'number' ? r['messageCount'] : 0,
-			lastMessageAt:
-				typeof r['lastMessageAt'] === 'string' ? r['lastMessageAt'] : null,
+			lastMessageAt: dateToIsoOrNull(r['lastMessageAt']),
 			lastMessageDirection:
 				direction === 'inbound' || direction === 'outbound' ? direction : null,
 			lastInboundClassification:
@@ -1614,10 +1622,7 @@ function narrowThreads(rows: ReadonlyArray<unknown>): ReadonlyArray<ThreadRow> {
 					: null,
 			isUnread: r['isUnread'] === true,
 			hasDraft: false,
-			updatedAt:
-				typeof r['updatedAt'] === 'string'
-					? r['updatedAt']
-					: new Date(0).toISOString(),
+			updatedAt: dateToIsoOrNull(r['updatedAt']) ?? new Date(0).toISOString(),
 			inbox: narrowInbox(r['inbox']),
 		})
 	}

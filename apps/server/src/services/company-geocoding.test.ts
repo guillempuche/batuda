@@ -2,6 +2,7 @@ import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
 
 import { CurrentOrg } from '@batuda/controllers'
+import type { Company } from '@batuda/domain'
 
 import { CompanyService } from './companies'
 import { geocodeCompany, locationWasReplaced } from './company-geocoding'
@@ -17,15 +18,17 @@ const companyServiceWith = (
 	company: Record<string, unknown> | null,
 	updates: Array<Record<string, unknown>>,
 ) =>
+	// Fixtures stand in for a decoded Company; the test only exercises
+	// geocodeCompany's location read + captured update fields.
 	CompanyService.of({
 		findById: () =>
 			company === null
 				? Effect.die(new Error('company not found'))
-				: Effect.succeed(company),
+				: Effect.succeed(company as unknown as Company),
 		update: (_id: string, data: Record<string, unknown>) =>
 			Effect.sync(() => {
 				updates.push(data)
-				return [{ ...company, ...data }]
+				return [{ ...company, ...data }] as unknown as ReadonlyArray<Company>
 			}),
 		search: () => Effect.die(unused),
 		findBySlug: () => Effect.die(unused),

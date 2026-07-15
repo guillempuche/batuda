@@ -2,14 +2,27 @@ import { DateTime, Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { CurrentOrg } from '@batuda/controllers'
+import { CurrentOrg, DocumentSummary } from '@batuda/controllers'
+import { Document } from '@batuda/domain'
 
 import {
 	DocumentCreated,
 	TimelineActivityService,
 } from '../../services/timeline-activity'
+import { ListResult, toItems } from './_result'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg]
+
+const decodeDocument = Schema.decodeUnknownEffect(Document)
+// The listing query reads the summary columns with the raw Date, so override
+// just the timestamp before decoding into the wire summary shape.
+const DocumentSummaryRow = Schema.Struct({
+	...DocumentSummary.fields,
+	createdAt: Schema.DateTimeUtcFromDate,
+})
+const decodeSummaries = Schema.decodeUnknownEffect(
+	Schema.Array(DocumentSummaryRow),
+)
 
 const GetDocuments = Tool.make('get_documents', {
 	description:
@@ -18,7 +31,7 @@ const GetDocuments = Tool.make('get_documents', {
 		company_id: Schema.String,
 		type: Schema.optional(Schema.String),
 	}),
-	success: Schema.Unknown,
+	success: ListResult(DocumentSummary),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Documents')
@@ -31,7 +44,7 @@ const GetDocument = Tool.make('get_document', {
 	parameters: Schema.Struct({
 		id: Schema.String,
 	}),
-	success: Schema.Unknown,
+	success: Document.json,
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Get Document')
@@ -49,7 +62,7 @@ const CreateDocument = Tool.make('create_document', {
 		title: Schema.optional(Schema.String),
 		content: Schema.String,
 	}),
-	success: Schema.Unknown,
+	success: Document.json,
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Create Document')
@@ -63,7 +76,7 @@ const UpdateDocument = Tool.make('update_document', {
 		title: Schema.optional(Schema.String),
 		content: Schema.optional(Schema.String),
 	}),
-	success: Schema.Unknown,
+	success: Schema.NullOr(Document.json),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Update Document')
@@ -87,7 +100,9 @@ export const DocumentHandlersLive = DocumentTools.toLayer(
 				Effect.gen(function* () {
 					const conditions = [sql`company_id = ${params.company_id}`]
 					if (params.type) conditions.push(sql`type = ${params.type}`)
-					return yield* sql`SELECT id, company_id, type, title, created_at FROM documents WHERE ${sql.and(conditions)}`
+					const rows =
+						yield* sql`SELECT id, company_id, type, title, created_at FROM documents WHERE ${sql.and(conditions)}`
+					return toItems(yield* decodeSummaries(rows))
 				}).pipe(Effect.orDie),
 			get_document: ({ id }) =>
 				Effect.gen(function* () {
@@ -95,7 +110,7 @@ export const DocumentHandlersLive = DocumentTools.toLayer(
 						yield* sql`SELECT * FROM documents WHERE id = ${id} LIMIT 1`
 					const doc = rows[0]
 					if (!doc) return yield* Effect.die(`Document ${id} not found`)
-					return doc
+					return yield* decodeDocument(doc)
 				}).pipe(Effect.orDie),
 			create_document: params =>
 				Effect.gen(function* () {
@@ -128,7 +143,12 @@ export const DocumentHandlersLive = DocumentTools.toLayer(
 					)
 					const full =
 						yield* sql`SELECT * FROM documents WHERE id = ${created.id} LIMIT 1`
-					return full[0]
+					const doc = full[0]
+					if (!doc)
+						return yield* Effect.die(
+							new Error('document vanished after insert'),
+						)
+					return yield* decodeDocument(doc)
 				}).pipe(Effect.orDie),
 			update_document: ({ id, ...fields }) =>
 				Effect.gen(function* () {
@@ -138,7 +158,8 @@ export const DocumentHandlersLive = DocumentTools.toLayer(
 					}
 					const rows =
 						yield* sql`UPDATE documents SET ${sql.update(data, ['id'])} WHERE id = ${id} RETURNING *`
-					return rows[0]
+					const row = rows[0]
+					return row === undefined ? null : yield* decodeDocument(row)
 				}).pipe(Effect.orDie),
 		}
 	}),

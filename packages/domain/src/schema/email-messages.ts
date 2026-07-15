@@ -24,7 +24,7 @@ export const InboundClassification = Schema.Literals([
 export type InboundClassification = typeof InboundClassification.Type
 
 export class EmailMessage extends Model.Class<EmailMessage>('EmailMessage')({
-	id: Model.Generated(EmailMessageId),
+	id: Model.GeneratedByDb(EmailMessageId),
 	provider: Schema.String,
 	providerMessageId: Schema.String,
 	providerThreadId: Schema.String,

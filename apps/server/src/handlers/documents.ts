@@ -1,14 +1,18 @@
-import { DateTime, Effect } from 'effect'
+import { DateTime, Effect, Schema } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { BatudaApi, CurrentOrg, NotFound } from '@batuda/controllers'
+import { Document } from '@batuda/domain'
 
 import {
 	DocumentCreated,
 	TimelineActivityService,
 } from '../services/timeline-activity'
+
+const decodeDocument = Schema.decodeUnknownEffect(Document)
+const decodeDocuments = Schema.decodeUnknownEffect(Schema.Array(Document))
 
 export const DocumentsLive = HttpApiBuilder.group(
 	BatudaApi,
@@ -24,7 +28,9 @@ export const DocumentsLive = HttpApiBuilder.group(
 						if (_.query.companyId)
 							conditions.push(sql`company_id = ${_.query.companyId}`)
 						if (_.query.type) conditions.push(sql`type = ${_.query.type}`)
-						return yield* sql`SELECT * FROM documents WHERE ${sql.and(conditions)}`
+						const rows =
+							yield* sql`SELECT * FROM documents WHERE ${sql.and(conditions)}`
+						return yield* decodeDocuments(rows)
 					}).pipe(Effect.orDie),
 				)
 				.handle('get', _ =>
@@ -37,7 +43,7 @@ export const DocumentsLive = HttpApiBuilder.group(
 								entity: 'document',
 								id: _.params.id,
 							})
-						return doc
+						return yield* decodeDocument(doc)
 					}).pipe(
 						Effect.catch(e =>
 							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
@@ -85,7 +91,12 @@ export const DocumentsLive = HttpApiBuilder.group(
 						)
 						const full =
 							yield* sql`SELECT * FROM documents WHERE id = ${created.id} LIMIT 1`
-						return full[0]
+						const doc = full[0]
+						if (!doc)
+							return yield* Effect.die(
+								new Error('document vanished after insert'),
+							)
+						return yield* decodeDocument(doc)
 					}).pipe(Effect.orDie),
 				)
 				.handle('update', _ =>
@@ -100,7 +111,8 @@ export const DocumentsLive = HttpApiBuilder.group(
 								documentId: _.params.id,
 							}),
 						)
-						return rows[0]
+						const row = rows[0]
+						return row === undefined ? null : yield* decodeDocument(row)
 					}).pipe(Effect.orDie),
 				)
 		}),

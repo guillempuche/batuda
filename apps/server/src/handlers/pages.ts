@@ -54,7 +54,7 @@ export const PagesLive = HttpApiBuilder.group(BatudaApi, 'pages', handlers =>
 							}),
 						),
 					),
-					Effect.map(r => r[0]),
+					Effect.map(r => r[0] ?? null),
 					Effect.orDie,
 				),
 			)
@@ -68,7 +68,7 @@ export const PagesLive = HttpApiBuilder.group(BatudaApi, 'pages', handlers =>
 							}),
 						),
 					),
-					Effect.map(r => r[0]),
+					Effect.map(r => r[0] ?? null),
 					Effect.orDie,
 				),
 			)
@@ -82,7 +82,7 @@ export const PagesLive = HttpApiBuilder.group(BatudaApi, 'pages', handlers =>
 							}),
 						),
 					),
-					Effect.map(r => r[0]),
+					Effect.map(r => r[0] ?? null),
 					Effect.orDie,
 				),
 			)

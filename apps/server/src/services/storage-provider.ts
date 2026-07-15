@@ -1,4 +1,4 @@
-import { type Effect, ServiceMap } from 'effect'
+import { Context, type Effect } from 'effect'
 
 import type { StorageError } from '@batuda/controllers'
 
@@ -21,7 +21,7 @@ export interface HeadResult {
 // dev and Cloudflare R2 in prod via the same path-style S3 API). Keeping
 // the abstraction as a Tag means a future GCS/Azure/local-disk variant is
 // a one-Layer swap, mirroring the EmailProvider pattern.
-export class StorageProvider extends ServiceMap.Service<
+export class StorageProvider extends Context.Service<
 	StorageProvider,
 	{
 		readonly put: (params: PutParams) => Effect.Effect<void, StorageError>

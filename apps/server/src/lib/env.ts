@@ -1,11 +1,4 @@
-import {
-	Config,
-	ConfigProvider,
-	Effect,
-	Layer,
-	Schema,
-	ServiceMap,
-} from 'effect'
+import { Config, ConfigProvider, Context, Effect, Layer, Schema } from 'effect'
 
 import { matchOrigin } from './origin-match'
 import { deriveWorktreeOrigins } from './portless-origins'
@@ -76,7 +69,7 @@ export function mergeWorktreeOrigin(
 	return [worktreeAppOrigin, ...allowedOrigins]
 }
 
-export class EnvVars extends ServiceMap.Service<EnvVars>()('EnvVars', {
+export class EnvVars extends Context.Service<EnvVars>()('EnvVars', {
 	make: Effect.gen(function* () {
 		const DATABASE_URL = yield* Config.redacted('DATABASE_URL')
 		const PORT = yield* Config.int('PORT')

@@ -1,11 +1,13 @@
 import { useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { Schema } from 'effect'
+import { DateTime, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { ExternalLink } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import styled from 'styled-components'
+
+import type { PageSummary } from '@batuda/controllers'
 
 import {
 	canonicalKey,
@@ -45,7 +47,7 @@ const validateSearch = validateSearchWith({
 
 async function loadPagesOnServer(
 	search: PagesSearch,
-): Promise<{ pages: ReadonlyArray<unknown> }> {
+): Promise<{ pages: ReadonlyArray<(typeof PageSummary)['Type']> }> {
 	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
 		import('effect'),
 		import('#/lib/batuda-api-server'),
@@ -192,6 +194,14 @@ function PagesListPage() {
 	)
 }
 
+// Typed date fields decode to DateTime.Utc on the wire; fall back to their
+// string form for anything already an ISO string.
+function dateToIsoOrNull(value: unknown): string | null {
+	if (typeof value === 'string') return value
+	if (DateTime.isDateTime(value)) return DateTime.formatIso(value)
+	return null
+}
+
 function narrowPages(rows: ReadonlyArray<unknown>): ReadonlyArray<PageRow> {
 	const out: Array<PageRow> = []
 	for (const row of rows) {
@@ -208,8 +218,7 @@ function narrowPages(rows: ReadonlyArray<unknown>): ReadonlyArray<PageRow> {
 			status: typeof r['status'] === 'string' ? r['status'] : 'draft',
 			template: typeof r['template'] === 'string' ? r['template'] : null,
 			viewCount: typeof r['viewCount'] === 'number' ? r['viewCount'] : 0,
-			publishedAt:
-				typeof r['publishedAt'] === 'string' ? r['publishedAt'] : null,
+			publishedAt: dateToIsoOrNull(r['publishedAt']),
 			companyId: typeof r['companyId'] === 'string' ? r['companyId'] : null,
 		})
 	}

@@ -1,9 +1,13 @@
-import { Effect } from 'effect'
+import { Effect, Schema } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 
 import { BatudaApi } from '@batuda/controllers'
+import { WebhookEndpoint } from '@batuda/domain'
 
 import { WebhookService } from '../services/webhooks'
+
+const decodeWebhook = Schema.decodeUnknownEffect(WebhookEndpoint)
+const decodeWebhooks = Schema.decodeUnknownEffect(Schema.Array(WebhookEndpoint))
 
 export const WebhooksLive = HttpApiBuilder.group(
 	BatudaApi,
@@ -14,7 +18,8 @@ export const WebhooksLive = HttpApiBuilder.group(
 			return handlers
 				.handle('list', () =>
 					Effect.gen(function* () {
-						return yield* svc.list()
+						const rows = yield* svc.list()
+						return yield* decodeWebhooks(rows)
 					}).pipe(Effect.orDie),
 				)
 				.handle('create', _ =>
@@ -23,13 +28,19 @@ export const WebhooksLive = HttpApiBuilder.group(
 						yield* Effect.logInfo('Webhook endpoint created').pipe(
 							Effect.annotateLogs({ event: 'webhook.created' }),
 						)
-						return rows[0]
+						const created = rows[0]
+						if (created === undefined)
+							return yield* Effect.die(
+								new Error('webhook insert returned no row'),
+							)
+						return yield* decodeWebhook(created)
 					}).pipe(Effect.orDie),
 				)
 				.handle('update', _ =>
 					Effect.gen(function* () {
 						const rows = yield* svc.update(_.params.id, _.payload)
-						return rows[0]
+						const row = rows[0]
+						return row === undefined ? null : yield* decodeWebhook(row)
 					}).pipe(Effect.orDie),
 				)
 				.handle('remove', _ =>

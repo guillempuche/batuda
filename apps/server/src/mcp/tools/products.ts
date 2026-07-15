@@ -3,15 +3,19 @@ import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
+import { Product } from '@batuda/domain'
 
 import { ListResult, toItems } from './_result'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg]
 
+const decodeProduct = Schema.decodeUnknownEffect(Product)
+const decodeProducts = Schema.decodeUnknownEffect(Schema.Array(Product))
+
 const ListProducts = Tool.make('list_products', {
 	description:
-		'List products in the organization. Returns id, slug, name, type, status, default_price, price_type, target_industries, metadata, created_at.',
-	success: ListResult(Schema.Unknown),
+		'List products in the organization, newest first. Each item is the full product record (default_price is a decimal string).',
+	success: ListResult(Product.json),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Products')
@@ -33,7 +37,7 @@ const CreateProduct = Tool.make('create_product', {
 		target_industries: Schema.optional(Schema.Array(Schema.String)),
 		metadata: Schema.optional(Schema.Unknown),
 	}),
-	success: Schema.Unknown,
+	success: Product.json,
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Create Product')
@@ -54,7 +58,7 @@ const UpdateProduct = Tool.make('update_product', {
 		target_industries: Schema.optional(Schema.Array(Schema.String)),
 		metadata: Schema.optional(Schema.Unknown),
 	}),
-	success: Schema.Unknown,
+	success: Schema.NullOr(Product.json),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Update Product')
@@ -73,10 +77,11 @@ export const ProductHandlersLive = ProductTools.toLayer(
 		const sql = yield* SqlClient.SqlClient
 		return {
 			list_products: () =>
-				sql`SELECT id, slug, name, type, status, default_price, price_type, target_industries, metadata, created_at FROM products ORDER BY created_at DESC`.pipe(
-					Effect.orDie,
-					Effect.map(toItems),
-				),
+				Effect.gen(function* () {
+					const rows =
+						yield* sql`SELECT * FROM products ORDER BY created_at DESC`
+					return toItems(yield* decodeProducts(rows))
+				}).pipe(Effect.orDie),
 			create_product: params =>
 				Effect.gen(function* () {
 					const currentOrg = yield* CurrentOrg
@@ -98,7 +103,12 @@ export const ProductHandlersLive = ProductTools.toLayer(
 					if (params.metadata !== undefined) row['metadata'] = params.metadata
 					const rows =
 						yield* sql`INSERT INTO products ${sql.insert(row)} RETURNING *`
-					return rows[0]
+					const created = rows[0]
+					if (created === undefined)
+						return yield* Effect.die(
+							new Error('product insert returned no row'),
+						)
+					return yield* decodeProduct(created)
 				}).pipe(Effect.orDie),
 			update_product: ({ id, ...rest }) =>
 				Effect.gen(function* () {
@@ -120,7 +130,8 @@ export const ProductHandlersLive = ProductTools.toLayer(
 						UPDATE products SET ${sql.update(data, ['id'])}
 						WHERE id = ${id} RETURNING *
 					`
-					return rows[0]
+					const row = rows[0]
+					return row === undefined ? null : yield* decodeProduct(row)
 				}).pipe(Effect.orDie),
 		}
 	}),

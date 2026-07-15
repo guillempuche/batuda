@@ -1,8 +1,9 @@
-import { DateTime, Effect, Layer, ServiceMap } from 'effect'
+import { Context, DateTime, Effect, Layer, Schema } from 'effect'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg, NotFound } from '@batuda/controllers'
+import { Company, Contact, Interaction } from '@batuda/domain'
 
 export interface CompanyFilters {
 	readonly status?: string | undefined
@@ -25,7 +26,7 @@ export interface CompanyFilters {
 	readonly offset?: number | undefined
 }
 
-export class CompanyService extends ServiceMap.Service<CompanyService>()(
+export class CompanyService extends Context.Service<CompanyService>()(
 	'CompanyService',
 	{
 		make: Effect.gen(function* () {
@@ -75,17 +76,16 @@ export class CompanyService extends ServiceMap.Service<CompanyService>()(
 							}
 						})()
 
-						return yield* sql`
-							SELECT id, slug, name, status, industry, country, priority, owner_id,
-								next_action, next_action_at, last_contacted_at, tags,
-								-- NUMERIC comes back as a string over the wire; cast so
-								-- callers get real numbers for the coordinates.
-								latitude::float8 AS latitude, longitude::float8 AS longitude
-							FROM companies
+						const rows = yield* sql`
+							SELECT * FROM companies
 							WHERE ${sql.and(conditions)}
 							ORDER BY ${orderBy}
 							LIMIT ${filters.limit ?? 20} OFFSET ${filters.offset ?? 0}
 						`
+						// Decode to the domain shape so the API encodes dates as ISO strings.
+						return yield* Schema.decodeUnknownEffect(Schema.Array(Company))(
+							rows,
+						)
 					}),
 
 				findBySlug: (slug: string) =>
@@ -102,7 +102,7 @@ export class CompanyService extends ServiceMap.Service<CompanyService>()(
 								entity: 'company',
 								id: slug,
 							})
-						return company
+						return yield* Schema.decodeUnknownEffect(Company)(company)
 					}),
 
 				findById: (id: string) =>
@@ -119,23 +119,30 @@ export class CompanyService extends ServiceMap.Service<CompanyService>()(
 								entity: 'company',
 								id,
 							})
-						return company
+						return yield* Schema.decodeUnknownEffect(Company)(company)
 					}),
 
 				create: (data: Record<string, unknown>) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
-						return yield* sql`INSERT INTO companies ${sql.insert({ ...data, organizationId: currentOrg.id })} RETURNING *`
+						const rows =
+							yield* sql`INSERT INTO companies ${sql.insert({ ...data, organizationId: currentOrg.id })} RETURNING *`
+						return yield* Schema.decodeUnknownEffect(Schema.Array(Company))(
+							rows,
+						)
 					}),
 
 				update: (id: string, data: Record<string, unknown>) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
-						return yield* sql`
+						const rows = yield* sql`
 							UPDATE companies SET ${sql.update({ ...data, updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })}
 							WHERE id = ${id} AND organization_id = ${currentOrg.id}
 							RETURNING *
 						`
+						return yield* Schema.decodeUnknownEffect(Schema.Array(Company))(
+							rows,
+						)
 					}),
 
 				getWithRelations: (slug: string) =>
@@ -146,31 +153,50 @@ export class CompanyService extends ServiceMap.Service<CompanyService>()(
 							WHERE slug = ${slug} AND organization_id = ${currentOrg.id}
 							LIMIT 1
 						`
-						const company = companyRows[0]
-						if (!company)
+						const companyRow = companyRows[0]
+						if (!companyRow)
 							return yield* new NotFound({
 								entity: 'company',
 								id: slug,
 							})
+						const companyId = companyRow['id']
 
-						const contacts = yield* sql`
+						const contactRows = yield* sql`
 							SELECT c.*, COALESCE(
 								(SELECT json_agg(ch ORDER BY ch.is_primary DESC, ch.kind)
 								 FROM contact_channels ch WHERE ch.contact_id = c.id),
 								'[]'::json
 							) AS channels
 							FROM contacts c
-							WHERE c.company_id = ${company['id']}
+							WHERE c.company_id = ${companyId}
 							  AND c.organization_id = ${currentOrg.id}
 						`
 
-						const recentInteractions = yield* sql`
+						const interactionRows = yield* sql`
 							SELECT * FROM interactions
-							WHERE company_id = ${company['id']}
+							WHERE company_id = ${companyId}
 							  AND organization_id = ${currentOrg.id}
 							ORDER BY date DESC
 							LIMIT 5
 						`
+
+						const company =
+							yield* Schema.decodeUnknownEffect(Company)(companyRow)
+						// Decode each contact's own columns; `channels` is already JSON
+						// from json_agg, so keep it as-is.
+						const contacts = yield* Effect.forEach(contactRows, row =>
+							Schema.decodeUnknownEffect(Contact)(row).pipe(
+								Effect.map(c => ({
+									...c,
+									channels: (
+										row as { readonly channels: ReadonlyArray<unknown> }
+									).channels,
+								})),
+							),
+						)
+						const recentInteractions = yield* Schema.decodeUnknownEffect(
+							Schema.Array(Interaction),
+						)(interactionRows)
 
 						return { ...company, contacts, recentInteractions }
 					}),

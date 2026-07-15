@@ -6,10 +6,35 @@ import { SessionMiddleware } from '../middleware/session'
 
 // Pipeline snapshot for the dashboard: a status → count histogram plus the two
 // attention counters. All plain numbers, so the response encoder types it fine.
-const PipelineSnapshot = Schema.Struct({
+export const PipelineSnapshot = Schema.Struct({
 	statusCounts: Schema.Record(Schema.String, Schema.Number),
 	overdueTaskCount: Schema.Number,
 	companiesWithoutNextAction: Schema.Number,
+})
+
+// A task on the daily-planning list, joined with its company for display.
+const NextStepTask = Schema.Struct({
+	id: Schema.String,
+	title: Schema.String,
+	type: Schema.String,
+	dueAt: Schema.NullOr(Schema.DateTimeUtcFromString),
+	companyId: Schema.String,
+	companyName: Schema.String,
+	companySlug: Schema.String,
+})
+
+// A company whose stored next-action date has slipped past now.
+const NextStepCompany = Schema.Struct({
+	id: Schema.String,
+	slug: Schema.String,
+	name: Schema.String,
+	nextAction: Schema.NullOr(Schema.String),
+	nextActionAt: Schema.NullOr(Schema.DateTimeUtcFromString),
+})
+
+export const NextSteps = Schema.Struct({
+	dueTasks: Schema.Array(NextStepTask),
+	overdueCompanies: Schema.Array(NextStepCompany),
 })
 
 export const PipelineGroup = HttpApiGroup.make('pipeline')
@@ -23,10 +48,7 @@ export const PipelineGroup = HttpApiGroup.make('pipeline')
 			query: {
 				limit: Schema.optional(Schema.NumberFromString),
 			},
-			// The rows carry raw timestamps the response encoder can't type as
-			// dates, so keep the payload opaque over the wire and let the client
-			// narrow it (same approach as the companies list).
-			success: Schema.Unknown,
+			success: NextSteps,
 		}),
 	)
 	.middleware(SessionMiddleware)

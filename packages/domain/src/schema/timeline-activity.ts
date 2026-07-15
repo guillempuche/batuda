@@ -46,7 +46,7 @@ export type TimelineDirection = typeof TimelineDirection.Type
 export class TimelineActivity extends Model.Class<TimelineActivity>(
 	'TimelineActivity',
 )({
-	id: Model.Generated(TimelineActivityId),
+	id: Model.GeneratedByDb(TimelineActivityId),
 	kind: TimelineKind,
 	entityType: TimelineEntityType,
 	entityId: Schema.String,

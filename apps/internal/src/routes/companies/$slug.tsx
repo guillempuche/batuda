@@ -8,7 +8,7 @@ import {
 	notFound,
 	stripSearchParams,
 } from '@tanstack/react-router'
-import { Schema } from 'effect'
+import { DateTime, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import {
 	AlertTriangle,
@@ -37,6 +37,11 @@ import { motion } from 'motion/react'
 import { useCallback, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
+import type {
+	CompanyDetail as CompanyDetailResponse,
+	ContactListItem,
+} from '@batuda/controllers'
+import type { Interaction, Task } from '@batuda/domain'
 import { Sidebar, Stack, Switcher } from '@batuda/ui'
 import {
 	PriButton,
@@ -203,10 +208,10 @@ type TaskEntry = {
 }
 
 type DetailPayload = {
-	readonly company: unknown
-	readonly contacts: ReadonlyArray<unknown>
-	readonly interactions: ReadonlyArray<unknown>
-	readonly tasks: ReadonlyArray<unknown>
+	readonly company: (typeof CompanyDetailResponse)['Type']
+	readonly contacts: ReadonlyArray<(typeof ContactListItem)['Type']>
+	readonly interactions: ReadonlyArray<Interaction>
+	readonly tasks: ReadonlyArray<Task>
 }
 
 /**
@@ -651,10 +656,7 @@ function DetailBody({
 				externalThreadId: r['externalThreadId'],
 				subject: typeof r['subject'] === 'string' ? r['subject'] : null,
 				status,
-				updatedAt:
-					typeof r['updatedAt'] === 'string'
-						? r['updatedAt']
-						: new Date(0).toISOString(),
+				updatedAt: dateToIsoOrNull(r['updatedAt']) ?? new Date(0).toISOString(),
 				messageCount:
 					typeof r['messageCount'] === 'number' ? r['messageCount'] : 0,
 			})
@@ -1436,6 +1438,14 @@ function DetailBody({
 
 // ── Narrowers ─────────────────────────────────────────────────────
 
+// Typed date fields decode to DateTime.Utc on the wire; fall back to their
+// string form for anything already an ISO string.
+function dateToIsoOrNull(value: unknown): string | null {
+	if (typeof value === 'string') return value
+	if (DateTime.isDateTime(value)) return DateTime.formatIso(value)
+	return null
+}
+
 function narrowCompany(raw: unknown): CompanyDetail | null {
 	if (!raw || typeof raw !== 'object') return null
 	const r = raw as Record<string, unknown>
@@ -1443,8 +1453,15 @@ function narrowCompany(raw: unknown): CompanyDetail | null {
 	if (typeof r['slug'] !== 'string') return null
 	if (typeof r['name'] !== 'string') return null
 	if (typeof r['status'] !== 'string') return null
-	const str = (key: string) =>
-		typeof r[key] === 'string' ? (r[key] as string) : null
+	// Typed date fields (verifiedAt, lastContactedAt, …) decode to DateTime.Utc
+	// on the wire; convert those back to an ISO string while leaving plain
+	// string fields untouched.
+	const str = (key: string) => {
+		const v = r[key]
+		if (typeof v === 'string') return v
+		if (DateTime.isDateTime(v)) return DateTime.formatIso(v)
+		return null
+	}
 	const num = (key: string) =>
 		typeof r[key] === 'number' ? (r[key] as number) : null
 	// Postgres numeric columns (lat/lng) arrive as strings via the SQL
@@ -1545,8 +1562,7 @@ function narrowContactProvenance(
 		}
 		out.push({
 			runId: r['runId'],
-			runCompletedAt:
-				typeof r['runCompletedAt'] === 'string' ? r['runCompletedAt'] : null,
+			runCompletedAt: dateToIsoOrNull(r['runCompletedAt']),
 			sources,
 		})
 	}
@@ -1602,8 +1618,8 @@ function narrowTimeline(
 		if (typeof r['kind'] !== 'string') continue
 		if (typeof r['entityType'] !== 'string') continue
 		if (typeof r['entityId'] !== 'string') continue
-		const occurredAt = r['occurredAt']
-		if (typeof occurredAt !== 'string') continue
+		const occurredAt = dateToIsoOrNull(r['occurredAt'])
+		if (occurredAt === null) continue
 		const rawChannel = typeof r['channel'] === 'string' ? r['channel'] : null
 		out.push({
 			id: r['id'],
@@ -1635,9 +1651,8 @@ function narrowTasks(rows: ReadonlyArray<unknown>): ReadonlyArray<TaskEntry> {
 			id: r['id'],
 			title: r['title'],
 			type: r['type'],
-			dueAt: typeof r['dueAt'] === 'string' ? r['dueAt'] : null,
-			completedAt:
-				typeof r['completedAt'] === 'string' ? r['completedAt'] : null,
+			dueAt: dateToIsoOrNull(r['dueAt']),
+			completedAt: dateToIsoOrNull(r['completedAt']),
 		})
 	}
 	return out

@@ -1,6 +1,8 @@
 import { Schema } from 'effect'
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi'
 
+import { WebhookEndpoint } from '@batuda/domain'
+
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 
@@ -22,20 +24,20 @@ const UpdateWebhookInput = Schema.Struct({
 export const WebhooksGroup = HttpApiGroup.make('webhooks')
 	.add(
 		HttpApiEndpoint.get('list', '/webhooks', {
-			success: Schema.Array(Schema.Unknown),
+			success: Schema.Array(WebhookEndpoint.json),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.post('create', '/webhooks', {
 			payload: CreateWebhookInput,
-			success: Schema.Unknown,
+			success: WebhookEndpoint.json,
 		}),
 	)
 	.add(
 		HttpApiEndpoint.patch('update', '/webhooks/:id', {
 			params: { id: Schema.String },
 			payload: UpdateWebhookInput,
-			success: Schema.Unknown,
+			success: Schema.NullOr(WebhookEndpoint.json),
 		}),
 	)
 	.add(

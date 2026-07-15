@@ -6,7 +6,7 @@ export const ContactId = Schema.String.pipe(Schema.brand('ContactId'))
 // Reachable addresses (email, phone, linkedin, …) live in `contact_channels`,
 // the single source of truth — `contacts` carries only identity + activity.
 export class Contact extends Model.Class<Contact>('Contact')({
-	id: Model.Generated(ContactId),
+	id: Model.GeneratedByDb(ContactId),
 	companyId: Schema.String,
 
 	name: Schema.String,

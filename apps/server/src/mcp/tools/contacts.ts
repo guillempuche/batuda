@@ -2,13 +2,22 @@ import { DateTime, Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { CurrentOrg } from '@batuda/controllers'
+import {
+	ContactSummary,
+	ContactWithChannels,
+	CurrentOrg,
+} from '@batuda/controllers'
+import { Contact, ContactChannel } from '@batuda/domain'
 
 import {
 	channelsOf,
 	clearEmailSuppression,
 	writeChannels,
 } from '../../services/contact-channels'
+import { ListResult, toItems } from './_result'
+
+const decodeContact = Schema.decodeUnknownEffect(Contact)
+const decodeChannels = Schema.decodeUnknownEffect(Schema.Array(ContactChannel))
 
 // One reachable channel. `kind` is open (email, phone, linkedin, x, website,
 // bluesky, …); only the email channel carries a deliverability `verification`.
@@ -25,7 +34,7 @@ const ListContacts = Tool.make('list_contacts', {
 	parameters: Schema.Struct({
 		company_id: Schema.String,
 	}),
-	success: Schema.Unknown,
+	success: ListResult(ContactSummary),
 })
 	.annotate(Tool.Title, 'List Contacts')
 	.annotate(Tool.Readonly, true)
@@ -42,7 +51,7 @@ const CreateContact = Tool.make('create_contact', {
 		notes: Schema.optional(Schema.String),
 		channels: Schema.optional(Schema.Array(ChannelInput)),
 	}),
-	success: Schema.Unknown,
+	success: ContactWithChannels,
 	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Create Contact')
@@ -60,7 +69,7 @@ const UpdateContact = Tool.make('update_contact', {
 		channels: Schema.optional(Schema.Array(ChannelInput)),
 		clear_email_suppression: Schema.optional(Schema.Boolean),
 	}),
-	success: Schema.Unknown,
+	success: ContactWithChannels,
 	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Update Contact')
@@ -96,16 +105,30 @@ export const ContactHandlersLive = ContactTools.toLayer(
 
 		return {
 			list_contacts: ({ company_id }) =>
-				sql`
-					SELECT c.*, COALESCE(
-						(SELECT json_agg(ch ORDER BY ch.is_primary DESC, ch.kind)
-						 FROM contact_channels ch WHERE ch.contact_id = c.id),
-						'[]'::json
-					) AS channels
-					FROM contacts c
-					WHERE c.company_id = ${company_id}
-					ORDER BY c.name
-				`.pipe(Effect.orDie),
+				Effect.gen(function* () {
+					const rows = yield* sql`
+						SELECT c.*, COALESCE(
+							(SELECT json_agg(ch ORDER BY ch.is_primary DESC, ch.kind)
+							 FROM contact_channels ch WHERE ch.contact_id = c.id),
+							'[]'::json
+						) AS channels
+						FROM contacts c
+						WHERE c.company_id = ${company_id}
+						ORDER BY c.name
+					`
+					// Decode each contact's own columns; `channels` is already JSON
+					// from json_agg, so keep it as-is.
+					const contacts = yield* Effect.forEach(rows, row =>
+						decodeContact(row).pipe(
+							Effect.map(c => ({
+								...c,
+								channels: (row as { readonly channels: ReadonlyArray<unknown> })
+									.channels,
+							})),
+						),
+					)
+					return toItems(contacts)
+				}).pipe(Effect.orDie),
 
 			create_contact: ({ company_id, channels, ...fields }) =>
 				Effect.gen(function* () {
@@ -120,7 +143,9 @@ export const ContactHandlersLive = ContactTools.toLayer(
 						yield* writeChannels(sql, currentOrg.id, contact.id, channels)
 					}
 					const ch = yield* channelsOf(sql, contact.id)
-					return { ...rows[0], channels: ch }
+					const decoded = yield* decodeContact(rows[0])
+					const decodedChannels = yield* decodeChannels(ch)
+					return { ...decoded, channels: decodedChannels }
 				}).pipe(Effect.orDie),
 
 			update_contact: ({ id, channels, clear_email_suppression, ...fields }) =>
@@ -135,7 +160,9 @@ export const ContactHandlersLive = ContactTools.toLayer(
 						yield* writeChannels(sql, currentOrg.id, id, channels)
 					}
 					const ch = yield* channelsOf(sql, id)
-					return { ...rows[0], channels: ch }
+					const decoded = yield* decodeContact(rows[0])
+					const decodedChannels = yield* decodeChannels(ch)
+					return { ...decoded, channels: decodedChannels }
 				}).pipe(Effect.orDie),
 
 			delete_contact: ({ id }) =>

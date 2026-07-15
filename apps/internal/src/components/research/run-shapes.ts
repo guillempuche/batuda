@@ -5,6 +5,8 @@
  * detail page, and the research inbox.
  */
 
+import { DateTime } from 'effect'
+
 export type ResearchRunRow = {
 	readonly id: string
 	readonly query: string
@@ -13,6 +15,12 @@ export type ResearchRunRow = {
 	readonly status: string
 	readonly costCents: number
 	readonly createdAt: string
+}
+
+function dateToIsoOrNull(value: unknown): string | null {
+	if (typeof value === 'string') return value
+	if (DateTime.isDateTime(value)) return DateTime.formatIso(value)
+	return null
 }
 
 export function narrowResearch(
@@ -25,8 +33,10 @@ export function narrowResearch(
 		if (typeof r['id'] !== 'string') continue
 		if (typeof r['query'] !== 'string') continue
 		if (typeof r['status'] !== 'string') continue
-		const createdAt = r['createdAt']
-		if (typeof createdAt !== 'string') continue
+		// Typed date fields decode to DateTime.Utc on the wire; accept that form
+		// alongside an ISO string.
+		const createdAt = dateToIsoOrNull(r['createdAt'])
+		if (createdAt === null) continue
 		out.push({
 			id: r['id'],
 			query: r['query'],

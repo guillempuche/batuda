@@ -1,4 +1,4 @@
-import { Data, DateTime, Effect, Layer, ServiceMap } from 'effect'
+import { Context, Data, DateTime, Effect, Layer } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
@@ -688,7 +688,7 @@ export interface RecordResult {
 	readonly interactionId: string | null
 }
 
-export class TimelineActivityService extends ServiceMap.Service<TimelineActivityService>()(
+export class TimelineActivityService extends Context.Service<TimelineActivityService>()(
 	'TimelineActivityService',
 	{
 		make: Effect.gen(function* () {

@@ -1,14 +1,18 @@
-import { DateTime, Effect } from 'effect'
+import { DateTime, Effect, Schema } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { BatudaApi } from '@batuda/controllers'
+import { Interaction } from '@batuda/domain'
 
 import {
 	InteractionLogged,
 	TimelineActivityService,
 } from '../services/timeline-activity'
+
+const decodeInteraction = Schema.decodeUnknownEffect(Interaction)
+const decodeInteractions = Schema.decodeUnknownEffect(Schema.Array(Interaction))
 
 export const InteractionsLive = HttpApiBuilder.group(
 	BatudaApi,
@@ -23,12 +27,13 @@ export const InteractionsLive = HttpApiBuilder.group(
 						const conditions: Array<Statement.Fragment> = []
 						if (_.query.companyId)
 							conditions.push(sql`company_id = ${_.query.companyId}`)
-						return yield* sql`
+						const rows = yield* sql`
 							SELECT * FROM interactions
 							WHERE ${sql.and(conditions)}
 							ORDER BY date DESC
 							LIMIT ${_.query.limit ?? 20}
 						`
+						return yield* decodeInteractions(rows)
 					}).pipe(Effect.orDie),
 				)
 				.handle('create', _ =>
@@ -106,7 +111,7 @@ export const InteractionsLive = HttpApiBuilder.group(
 							}),
 						)
 
-						return rows[0]
+						return yield* decodeInteraction(rows[0])
 					}).pipe(Effect.orDie),
 				)
 		}),

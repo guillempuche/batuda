@@ -10,11 +10,17 @@ const listCache = new Map<string, ReturnType<typeof makeListAtom>>()
 const detailCache = new Map<string, ReturnType<typeof makeDetailAtom>>()
 
 function makeListAtom(search: PagesSearch) {
-	return BatudaApiAtom.query('pages', 'list', { query: search })
+	return BatudaApiAtom.query('pages', 'list', {
+		query: search,
+		serializationKey: `pages:list:${canonicalKey(search)}`,
+	})
 }
 
 function makeDetailAtom(id: string) {
-	return BatudaApiAtom.query('pages', 'get', { params: { id } })
+	return BatudaApiAtom.query('pages', 'get', {
+		params: { id },
+		serializationKey: `page:${id}`,
+	})
 }
 
 export function pagesSearchAtom(search: PagesSearch) {

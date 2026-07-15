@@ -42,6 +42,7 @@ export const COMPANIES_PAGE_SIZE = 60
 function makeCompaniesSearchAtom(search: CompaniesSearch, limit: number) {
 	return BatudaApiAtom.query('companies', 'list', {
 		query: { ...search, limit },
+		serializationKey: `companies:search:${canonicalSearchKey(search)}::${limit}`,
 	})
 }
 

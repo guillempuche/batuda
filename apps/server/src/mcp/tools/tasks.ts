@@ -2,10 +2,14 @@ import { DateTime, Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { CurrentOrg } from '@batuda/controllers'
+import { BulkCompleteResult, CurrentOrg } from '@batuda/controllers'
+import { Task, TaskEvent } from '@batuda/domain'
 
 import { TaskService } from '../../services/tasks'
 import { ListResult, toItems } from './_result'
+
+const decodeTask = Schema.decodeUnknownEffect(Task)
+const decodeTaskEvents = Schema.decodeUnknownEffect(Schema.Array(TaskEvent))
 
 // MCP writes are agent-driven; task_events records actor_kind='agent' with no
 // individual user id.
@@ -56,7 +60,7 @@ const CreateTask = Tool.make('create_task', {
 		linked_proposal_id: Schema.optional(Schema.NullOr(Schema.String)),
 		metadata: Schema.optional(Schema.NullOr(Schema.Unknown)),
 	}),
-	success: Schema.Unknown,
+	success: Schema.NullOr(Task.json),
 	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Create Task')
@@ -84,7 +88,7 @@ const ListTasks = Tool.make('list_tasks', {
 		limit: Schema.optional(Schema.Number),
 		offset: Schema.optional(Schema.Number),
 	}),
-	success: ListResult(Schema.Unknown),
+	success: ListResult(Task.json),
 	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'List Tasks')
@@ -105,7 +109,7 @@ const SearchTasks = Tool.make('search_tasks', {
 		source: Schema.optional(TaskSource),
 		limit: Schema.optional(Schema.Number),
 	}),
-	success: ListResult(Schema.Unknown),
+	success: ListResult(Task.json),
 	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Search Tasks')
@@ -134,7 +138,7 @@ const UpdateTask = Tool.make('update_task', {
 		linked_proposal_id: Schema.optional(Schema.NullOr(Schema.String)),
 		metadata: Schema.optional(Schema.NullOr(Schema.Unknown)),
 	}),
-	success: Schema.Unknown,
+	success: Schema.NullOr(Task.json),
 })
 	.annotate(Tool.Title, 'Update Task')
 	.annotate(Tool.Destructive, false)
@@ -147,7 +151,7 @@ const CompleteTask = Tool.make('complete_task', {
 	parameters: Schema.Struct({
 		id: Schema.Union([Schema.String, Schema.Array(Schema.String)]),
 	}),
-	success: Schema.Unknown,
+	success: Schema.Union([Task.json, BulkCompleteResult, Schema.Null]),
 	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Complete Task')
@@ -159,7 +163,7 @@ const ReopenTask = Tool.make('reopen_task', {
 	description:
 		'Re-open a done or cancelled task (status=open, completed_at=NULL). Idempotent — re-opening an already-open task leaves the row alone.',
 	parameters: Schema.Struct({ id: Schema.String }),
-	success: Schema.Unknown,
+	success: Schema.NullOr(Task.json),
 	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Reopen Task')
@@ -171,7 +175,7 @@ const CancelTask = Tool.make('cancel_task', {
 	description:
 		'Cancel an open or in-progress task (status=cancelled). Rejects tasks whose status is already done. Use reopen_task first if you need to cancel a completed task.',
 	parameters: Schema.Struct({ id: Schema.String }),
-	success: Schema.Unknown,
+	success: Schema.NullOr(Task.json),
 	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Cancel Task')
@@ -186,7 +190,7 @@ const SnoozeTask = Tool.make('snooze_task', {
 		id: Schema.String,
 		until: Schema.String,
 	}),
-	success: Schema.Unknown,
+	success: Schema.NullOr(Task.json),
 	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Snooze Task')
@@ -201,7 +205,7 @@ const RescheduleTask = Tool.make('reschedule_task', {
 		id: Schema.String,
 		due_at: Schema.NullOr(Schema.String),
 	}),
-	success: Schema.Unknown,
+	success: Schema.NullOr(Task.json),
 	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Reschedule Task')
@@ -213,7 +217,7 @@ const GetTask = Tool.make('get_task', {
 	description:
 		'Get a single task by id. Returns the full row including audit timestamps and link slots; for the activity audit trail use get_task_events.',
 	parameters: Schema.Struct({ id: Schema.String }),
-	success: Schema.Unknown,
+	success: Schema.NullOr(Task.json),
 	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Get Task')
@@ -225,7 +229,7 @@ const GetTaskEvents = Tool.make('get_task_events', {
 	description:
 		'List audit events recorded for a task (created/updated/completed/cancelled/snoozed/rescheduled). Returns up to the 100 most recent events sorted by occurrence time descending.',
 	parameters: Schema.Struct({ id: Schema.String }),
-	success: ListResult(Schema.Unknown),
+	success: ListResult(TaskEvent.json),
 	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Get Task Events')
@@ -286,7 +290,7 @@ export const TaskHandlersLive = TaskTools.toLayer(
 						},
 						AGENT_ACTOR,
 					)
-					return rows[0]
+					return rows[0] ?? null
 				}).pipe(Effect.orDie),
 
 			list_tasks: params =>
@@ -361,7 +365,10 @@ export const TaskHandlersLive = TaskTools.toLayer(
 					if (Object.keys(fields).length === 0) {
 						const existing =
 							yield* sql`SELECT * FROM tasks WHERE id = ${params.id}`
-						return existing[0]
+						const existingRow = existing[0]
+						return existingRow === undefined
+							? null
+							: yield* decodeTask(existingRow)
 					}
 					fields['updated_at'] = DateTime.toDateUtc(DateTime.nowUnsafe())
 					const rows = yield* sql`
@@ -369,7 +376,8 @@ export const TaskHandlersLive = TaskTools.toLayer(
 						WHERE id = ${params.id}
 						RETURNING *
 					`
-					return rows[0]
+					const updatedRow = rows[0]
+					return updatedRow === undefined ? null : yield* decodeTask(updatedRow)
 				}).pipe(Effect.orDie),
 
 			complete_task: ({ id }) => {
@@ -394,12 +402,13 @@ export const TaskHandlersLive = TaskTools.toLayer(
 				Effect.gen(function* () {
 					const exists =
 						yield* sql`SELECT id FROM tasks WHERE id = ${id} LIMIT 1`
-					if (exists.length === 0) return []
-					return yield* sql`
+					if (exists.length === 0) return toItems([])
+					const events = yield* sql`
 						SELECT * FROM task_events WHERE task_id = ${id}
 						ORDER BY at DESC LIMIT 100
 					`
-				}).pipe(Effect.orDie, Effect.map(toItems)),
+					return toItems(yield* decodeTaskEvents(events))
+				}).pipe(Effect.orDie),
 
 			reopen_task: ({ id }) =>
 				taskService.reopen(id, AGENT_ACTOR).pipe(

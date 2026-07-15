@@ -1,10 +1,19 @@
 import { Effect, Schema } from 'effect'
 import { McpSchema, McpServer, Tool, Toolkit } from 'effect/unstable/ai'
 
-import { CurrentOrg } from '@batuda/controllers'
+import { CurrentOrg, PageSummary } from '@batuda/controllers'
+import { Page } from '@batuda/domain'
 import { BlockNode, TiptapDocument } from '@batuda/ui/blocks'
 
 import { PageService } from '../../services/pages'
+import { ListResult, toItems } from './_result'
+
+// `publish_page` returns the published page, or a cancelled marker when the
+// user declines the confirmation elicitation.
+const PublishResult = Schema.Union([
+	Page.json,
+	Schema.Struct({ status: Schema.Literal('cancelled') }),
+])
 
 const CreatePage = Tool.make('create_page', {
 	description:
@@ -17,7 +26,7 @@ const CreatePage = Tool.make('create_page', {
 		title: Schema.String,
 		content: TiptapDocument,
 	}),
-	success: Schema.Unknown,
+	success: Schema.NullOr(Page.json),
 	dependencies: [CurrentOrg],
 })
 	.annotate(Tool.Title, 'Create Page')
@@ -32,7 +41,7 @@ const UpdatePage = Tool.make('update_page', {
 		content: Schema.optional(TiptapDocument),
 		meta: Schema.optional(Schema.Unknown),
 	}),
-	success: Schema.Unknown,
+	success: Schema.NullOr(Page.json),
 })
 	.annotate(Tool.Title, 'Update Page')
 	.annotate(Tool.Destructive, false)
@@ -45,7 +54,7 @@ const PublishPage = Tool.make('publish_page', {
 	parameters: Schema.Struct({
 		id: Schema.String,
 	}),
-	success: Schema.Unknown,
+	success: PublishResult,
 	dependencies: [McpSchema.McpServerClient],
 })
 	.annotate(Tool.Title, 'Publish Page')
@@ -60,7 +69,7 @@ const ListPages = Tool.make('list_pages', {
 		status: Schema.optional(Schema.String),
 		lang: Schema.optional(Schema.String),
 	}),
-	success: Schema.Unknown,
+	success: ListResult(PageSummary),
 })
 	.annotate(Tool.Title, 'List Pages')
 	.annotate(Tool.Readonly, true)
@@ -73,7 +82,7 @@ const GetPage = Tool.make('get_page', {
 		id_or_slug: Schema.String,
 		lang: Schema.optional(Schema.String),
 	}),
-	success: Schema.Unknown,
+	success: Page.json,
 })
 	.annotate(Tool.Title, 'Get Page')
 	.annotate(Tool.Readonly, true)
@@ -92,7 +101,7 @@ const EditPageBlock = Tool.make('edit_page_block', {
 		from: Schema.optional(Schema.Number),
 		to: Schema.optional(Schema.Number),
 	}),
-	success: Schema.Unknown,
+	success: Schema.NullOr(Page.json),
 })
 	.annotate(Tool.Title, 'Edit Page Block')
 	.annotate(Tool.Destructive, false)
@@ -121,7 +130,7 @@ export const PageHandlersLive = PageTools.toLayer(
 						title: params.title,
 						content: params.content,
 					})
-					return rows[0]
+					return rows[0] ?? null
 				}).pipe(Effect.orDie),
 			update_page: ({ id, title, content, meta }) =>
 				Effect.gen(function* () {
@@ -130,7 +139,7 @@ export const PageHandlersLive = PageTools.toLayer(
 					if (content !== undefined) data['content'] = content
 					if (meta !== undefined) data['meta'] = meta
 					const rows = yield* service.update(id, data)
-					return rows[0]
+					return rows[0] ?? null
 				}).pipe(Effect.orDie),
 			publish_page: ({ id }) =>
 				Effect.gen(function* () {
@@ -145,17 +154,21 @@ export const PageHandlersLive = PageTools.toLayer(
 							Effect.succeed({ confirm: 'no' as const }),
 						),
 					)
-					if (confirm === 'no') return { status: 'cancelled' }
+					if (confirm === 'no') return { status: 'cancelled' as const }
 					const rows = yield* service.publish(id)
-					return rows[0]
+					const published = rows[0]
+					if (published === undefined)
+						return yield* Effect.die(new Error('publish returned no row'))
+					return published
 				}).pipe(Effect.orDie),
 			list_pages: params =>
 				Effect.gen(function* () {
-					return yield* service.list({
+					const pages = yield* service.list({
 						companyId: params.company_id,
 						status: params.status,
 						lang: params.lang,
 					})
+					return toItems(pages)
 				}).pipe(Effect.orDie),
 			get_page: ({ id_or_slug, lang }) =>
 				Effect.gen(function* () {
@@ -207,7 +220,7 @@ export const PageHandlersLive = PageTools.toLayer(
 						}
 					})
 					.pipe(
-						Effect.map(r => r[0]),
+						Effect.map(r => r[0] ?? null),
 						Effect.orDie,
 					),
 		}

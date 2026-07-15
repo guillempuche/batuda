@@ -2,6 +2,7 @@ import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
+import { DateTime } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { FileText, Pencil, Plus, X } from 'lucide-react'
 import { type FormEvent, useMemo, useRef, useState } from 'react'
@@ -41,6 +42,14 @@ const DOC_TYPES: ReadonlyArray<{
 	{ value: 'research', label: msg`Research` },
 ]
 
+// Typed date fields decode to DateTime.Utc on the wire; fall back to their
+// string form for anything already an ISO string.
+function dateToIsoOrNull(value: unknown): string | null {
+	if (typeof value === 'string') return value
+	if (DateTime.isDateTime(value)) return DateTime.formatIso(value)
+	return null
+}
+
 function narrowDocs(rows: ReadonlyArray<unknown>): ReadonlyArray<DocRow> {
 	const out: Array<DocRow> = []
 	for (const row of rows) {
@@ -52,7 +61,7 @@ function narrowDocs(rows: ReadonlyArray<unknown>): ReadonlyArray<DocRow> {
 			type: typeof r['type'] === 'string' ? r['type'] : 'general',
 			title: typeof r['title'] === 'string' ? r['title'] : null,
 			content: typeof r['content'] === 'string' ? r['content'] : '',
-			updatedAt: typeof r['updatedAt'] === 'string' ? r['updatedAt'] : null,
+			updatedAt: dateToIsoOrNull(r['updatedAt']),
 		})
 	}
 	return out

@@ -5,9 +5,24 @@ import {
 	HttpApiSchema,
 } from 'effect/unstable/httpapi'
 
+import { Company, Contact, Interaction } from '@batuda/domain'
+
 import { NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
+
+// Company detail: the company plus its contacts (each with the raw json_agg
+// `channels` blob the client parses) and recent interactions.
+export const CompanyDetail = Schema.Struct({
+	...Company.json.fields,
+	contacts: Schema.Array(
+		Schema.Struct({
+			...Contact.json.fields,
+			channels: Schema.Array(Schema.Unknown),
+		}),
+	),
+	recentInteractions: Schema.Array(Interaction.json),
+})
 
 const CreateCompanyInput = Schema.Struct({
 	name: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
@@ -86,33 +101,34 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 				limit: Schema.optional(Schema.NumberFromString),
 				offset: Schema.optional(Schema.NumberFromString),
 			},
-			success: Schema.Array(Schema.Unknown),
+			success: Schema.Array(Company.json),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.get('get', '/companies/:slug', {
 			params: { slug: Schema.String },
-			success: Schema.Unknown,
+			success: CompanyDetail,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.post('create', '/companies', {
 			payload: CreateCompanyInput,
-			success: Schema.Unknown,
+			success: Company.json,
 		}),
 	)
 	.add(
 		HttpApiEndpoint.patch('update', '/companies/:id', {
 			params: { id: Schema.String },
 			payload: UpdateCompanyInput,
-			success: Schema.Unknown,
+			// null when the id doesn't exist.
+			success: Schema.NullOr(Company.json),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.post('geocode', '/companies/:id/geocode', {
 			params: { id: Schema.String },
-			success: Schema.Unknown,
+			success: Company.json,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
@@ -122,7 +138,7 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 		HttpApiEndpoint.post('verify', '/companies/:id/verify', {
 			params: { id: Schema.String },
 			payload: Schema.Struct({ verified: Schema.Boolean }),
-			success: Schema.Unknown,
+			success: Company.json,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)

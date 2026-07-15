@@ -26,7 +26,7 @@ export const TaskPriority = Schema.Literals(['low', 'normal', 'high'])
 export type TaskPriority = typeof TaskPriority.Type
 
 export class Task extends Model.Class<Task>('Task')({
-	id: Model.Generated(TaskId),
+	id: Model.GeneratedByDb(TaskId),
 	companyId: Schema.NullOr(Schema.String),
 	contactId: Schema.NullOr(Schema.String),
 
