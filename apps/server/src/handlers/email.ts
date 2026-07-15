@@ -116,26 +116,30 @@ export const EmailLive = HttpApiBuilder.group(BatudaApi, 'email', handlers =>
 					}),
 				)
 				.handle('getThread', _ =>
-					svc.getThread(_.params.threadId).pipe(
-						Effect.catchTag('NotFound', e =>
-							Effect.succeed(
-								HttpServerResponse.jsonUnsafe(
-									{ _tag: 'NotFound', entity: e.entity, id: e.id },
-									{ status: 404 },
-								),
-							),
-						),
-						Effect.orDie,
-					),
-				)
-				.handle('updateThreadStatus', _ =>
 					svc
-						.updateThreadStatus(_.params.threadId, _.payload.status)
+						.getThread(_.params.threadId)
 						.pipe(
 							Effect.catch(e =>
 								e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
 							),
 						),
+				)
+				.handle('updateThreadStatus', _ =>
+					svc.updateThreadStatus(_.params.threadId, _.payload.status).pipe(
+						// The row's updated_at is a raw Date; hand back an ISO string so
+						// the response encoder never sees a Date (mirrors the MCP tool).
+						Effect.map(r => ({
+							id: r['id'] as string,
+							status: r['status'] as 'open' | 'closed' | 'archived',
+							updatedAt:
+								r['updatedAt'] instanceof Date
+									? r['updatedAt'].toISOString()
+									: String(r['updatedAt']),
+						})),
+						Effect.catch(e =>
+							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+						),
+					),
 				)
 				.handle('markThreadRead', _ => svc.markThreadRead(_.params.threadId))
 				.handle('markThreadUnread', _ =>

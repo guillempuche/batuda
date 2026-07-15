@@ -1,4 +1,4 @@
-import { type Effect, ServiceMap } from 'effect'
+import { Context, type Effect } from 'effect'
 
 import type {
 	CreateBookingInput,
@@ -20,7 +20,7 @@ import type {
  * Google / Microsoft / self-hosted tomorrow). The calendar service only ever
  * sees this surface; no SDK types leak past this boundary.
  */
-export class BookingProvider extends ServiceMap.Service<
+export class BookingProvider extends Context.Service<
 	BookingProvider,
 	{
 		readonly findSlots: (

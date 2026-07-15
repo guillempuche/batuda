@@ -1,4 +1,4 @@
-import { type Effect, ServiceMap } from 'effect'
+import { Context, type Effect } from 'effect'
 
 import type { EmailError, EmailSendError } from '@batuda/controllers'
 
@@ -167,7 +167,7 @@ export interface ProviderDraft extends ProviderDraftItem {
 
 // ── Abstract provider tag ──
 
-export class EmailProvider extends ServiceMap.Service<
+export class EmailProvider extends Context.Service<
 	EmailProvider,
 	{
 		readonly send: (

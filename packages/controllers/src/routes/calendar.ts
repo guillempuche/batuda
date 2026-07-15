@@ -6,10 +6,18 @@ import {
 } from 'effect/unstable/httpapi'
 
 import { CalendarLocationType } from '@batuda/calendar'
+import { CalendarEvent, CalendarEventType } from '@batuda/domain'
 
 import { BadRequest, Conflict, Forbidden, NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
+
+// A free slot returned by the availability lookup. The provider hands back
+// Date objects; on the wire they encode to ISO strings.
+export const Slot = Schema.Struct({
+	start: Schema.DateTimeUtcFromString,
+	end: Schema.DateTimeUtcFromString,
+})
 
 // ── Input schemas ──
 
@@ -44,7 +52,7 @@ export const CalendarGroup = HttpApiGroup.make('calendar')
 			query: {
 				active: Schema.optional(Schema.String),
 			},
-			success: Schema.Array(Schema.Unknown),
+			success: Schema.Array(CalendarEventType.json),
 		}),
 	)
 	.add(
@@ -64,20 +72,20 @@ export const CalendarGroup = HttpApiGroup.make('calendar')
 				limit: Schema.optional(Schema.NumberFromString),
 				offset: Schema.optional(Schema.NumberFromString),
 			},
-			success: Schema.Array(Schema.Unknown),
+			success: Schema.Array(CalendarEvent.json),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.get('getEvent', '/calendar/events/:id', {
 			params: { id: Schema.String },
-			success: Schema.Unknown,
+			success: CalendarEvent.json,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.post('createInternalEvent', '/calendar/events', {
 			payload: CreateInternalEventInput,
-			success: Schema.Unknown,
+			success: CalendarEvent.json,
 			error: BadRequest.pipe(HttpApiSchema.status(400)),
 		}),
 	)
@@ -101,7 +109,7 @@ export const CalendarGroup = HttpApiGroup.make('calendar')
 				from: Schema.String,
 				to: Schema.String,
 			},
-			success: Schema.Array(Schema.Unknown),
+			success: Schema.Array(Slot),
 			error: BadRequest.pipe(HttpApiSchema.status(400)),
 		}),
 	)

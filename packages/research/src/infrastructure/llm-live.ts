@@ -29,7 +29,7 @@
  */
 
 import { OpenAiClient, OpenAiLanguageModel } from '@effect/ai-openai-compat'
-import { Config, type Duration, Effect, Layer, type ServiceMap } from 'effect'
+import { Config, type Context, type Duration, Effect, Layer } from 'effect'
 import type { LanguageModel } from 'effect/unstable/ai'
 import { FetchHttpClient } from 'effect/unstable/http'
 
@@ -107,7 +107,7 @@ const buildSlot = (
 	})
 
 const buildTierLayer = <Self>(
-	Tag: ServiceMap.Key<Self, LanguageModel.Service>,
+	Tag: Context.Key<Self, LanguageModel.Service>,
 	envPrefix: string,
 	tier: LlmTier,
 ) =>

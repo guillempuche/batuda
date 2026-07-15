@@ -1,9 +1,16 @@
 import { randomUUID } from 'node:crypto'
 
-import { DateTime, Effect, Layer, ServiceMap } from 'effect'
+import { Context, DateTime, Effect, Layer, Schema } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { BadRequest, Conflict, CurrentOrg, NotFound } from '@batuda/controllers'
+import {
+	BadRequest,
+	Conflict,
+	CurrentOrg,
+	NotFound,
+	RecordingDetail,
+	RecordingSummary,
+} from '@batuda/controllers'
 
 import { StorageProvider } from './storage-provider.js'
 import {
@@ -27,6 +34,30 @@ export interface IngestResult {
 	readonly interactionId: string
 }
 
+// The raw Postgres rows carry Date objects; these decoders mirror the wire
+// schemas (RecordingSummary/RecordingDetail) but read each date column from a
+// Date rather than a string, so the decoded value lands as DateTime.Utc and
+// the wire schema can re-encode it as an ISO string.
+const RecordingSummaryRow = Schema.Struct({
+	...RecordingSummary.fields,
+	interactionDate: Schema.NullOr(Schema.DateTimeUtcFromDate),
+	createdAt: Schema.DateTimeUtcFromDate,
+	updatedAt: Schema.DateTimeUtcFromDate,
+})
+const decodeSummaries = Schema.decodeUnknownEffect(
+	Schema.Array(RecordingSummaryRow),
+)
+
+const RecordingDetailRow = Schema.Struct({
+	...RecordingDetail.fields,
+	transcribedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+	deletedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+	createdAt: Schema.DateTimeUtcFromDate,
+	updatedAt: Schema.DateTimeUtcFromDate,
+	interactionDate: Schema.NullOr(Schema.DateTimeUtcFromDate),
+})
+const decodeDetail = Schema.decodeUnknownEffect(RecordingDetailRow)
+
 // Tiny mime → extension map for the storage key. We deliberately don't pull
 // in `mime-types` for this — five lookups isn't worth a dep, and the storage
 // key extension is purely cosmetic (the mime_type column is the source of
@@ -45,7 +76,7 @@ const extForMimeType = (mimeType: string): string => {
 	return map[mimeType.toLowerCase()] ?? 'bin'
 }
 
-export class RecordingService extends ServiceMap.Service<RecordingService>()(
+export class RecordingService extends Context.Service<RecordingService>()(
 	'RecordingService',
 	{
 		make: Effect.gen(function* () {
@@ -215,28 +246,31 @@ export class RecordingService extends ServiceMap.Service<RecordingService>()(
 				})
 
 			const listForCompany = (companyId: string, limit = 50, offset = 0) =>
-				sql`
-					SELECT
-						cr.id,
-						cr.interaction_id,
-						cr.storage_key,
-						cr.mime_type,
-						cr.byte_size,
-						cr.duration_sec,
-						cr.transcript_status,
-						cr.created_at,
-						cr.updated_at,
-						i.date AS interaction_date,
-						i.contact_id,
-						i.summary
-					FROM call_recordings cr
-					INNER JOIN interactions i ON i.id = cr.interaction_id
-					WHERE i.company_id = ${companyId}
-					  AND cr.deleted_at IS NULL
-					ORDER BY i.date DESC
-					LIMIT ${limit}
-					OFFSET ${offset}
-				`
+				Effect.gen(function* () {
+					const rows = yield* sql`
+						SELECT
+							cr.id,
+							cr.interaction_id,
+							cr.storage_key,
+							cr.mime_type,
+							cr.byte_size,
+							cr.duration_sec,
+							cr.transcript_status,
+							cr.created_at,
+							cr.updated_at,
+							i.date AS interaction_date,
+							i.contact_id,
+							i.summary
+						FROM call_recordings cr
+						INNER JOIN interactions i ON i.id = cr.interaction_id
+						WHERE i.company_id = ${companyId}
+						  AND cr.deleted_at IS NULL
+						ORDER BY i.date DESC
+						LIMIT ${limit}
+						OFFSET ${offset}
+					`
+					return yield* decodeSummaries(rows).pipe(Effect.orDie)
+				})
 
 			const getById = (recordingId: string) =>
 				Effect.gen(function* () {
@@ -253,13 +287,14 @@ export class RecordingService extends ServiceMap.Service<RecordingService>()(
 						  AND cr.deleted_at IS NULL
 						LIMIT 1
 					`
-					if (rows.length === 0) {
+					const row = rows[0]
+					if (!row) {
 						return yield* new NotFound({
 							entity: 'CallRecording',
 							id: recordingId,
 						})
 					}
-					return rows[0]
+					return yield* decodeDetail(row).pipe(Effect.orDie)
 				})
 
 			const getPlaybackUrl = (recordingId: string) =>

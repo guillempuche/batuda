@@ -1,7 +1,7 @@
 import { Buffer } from 'node:buffer'
 
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
-import { Effect, Layer, Redacted, ServiceMap } from 'effect'
+import { Context, Effect, Layer, Redacted } from 'effect'
 
 import { WorkerEnvVars } from './env.js'
 
@@ -31,7 +31,7 @@ export const attachmentKey = (args: {
 }): string =>
 	`messages/${args.organizationId}/${args.inboxId}/${args.uidValidity}/${args.uid}/attachment-${args.index}.bin`
 
-export class RawMessageStorage extends ServiceMap.Service<RawMessageStorage>()(
+export class RawMessageStorage extends Context.Service<RawMessageStorage>()(
 	'RawMessageStorage',
 	{
 		make: Effect.gen(function* () {

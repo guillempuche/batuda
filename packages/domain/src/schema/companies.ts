@@ -1,6 +1,8 @@
 import { Schema } from 'effect'
 import { Model } from 'effect/unstable/schema'
 
+import { DbNumber } from './_common'
+
 export const CompanyId = Schema.String.pipe(Schema.brand('CompanyId'))
 
 // The CRM's fixed vocabularies for a company's classification. The columns stay
@@ -32,7 +34,7 @@ export const CompanySizeRange = Schema.Literals(COMPANY_SIZE_RANGES)
 export type CompanySizeRange = typeof CompanySizeRange.Type
 
 export class Company extends Model.Class<Company>('Company')({
-	id: Model.Generated(CompanyId),
+	id: Model.GeneratedByDb(CompanyId),
 	slug: Schema.String,
 	name: Schema.String,
 
@@ -91,8 +93,8 @@ export class Company extends Model.Class<Company>('Company')({
 	nextCalendarEventAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
 
 	// Geocoded place (optional — populated via Nominatim or seed)
-	latitude: Schema.NullOr(Schema.Number),
-	longitude: Schema.NullOr(Schema.Number),
+	latitude: Schema.NullOr(DbNumber),
+	longitude: Schema.NullOr(DbNumber),
 	geocodedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
 	geocodeSource: Schema.NullOr(Schema.String),
 

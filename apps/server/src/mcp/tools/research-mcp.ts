@@ -2,7 +2,11 @@ import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { CurrentOrg, SessionContext } from '@batuda/controllers'
+import {
+	CurrentOrg,
+	ResearchRunDetail,
+	SessionContext,
+} from '@batuda/controllers'
 import {
 	type CreateResearchInput,
 	ResearchService,
@@ -23,6 +27,25 @@ import {
 } from './_research-shared'
 
 const REQUEST_DEPENDENCIES = [SessionContext, CurrentOrg]
+
+// A run plus `applied_instructions` (the instruction templates that shaped it).
+// Dates encode to ISO strings via ResearchRunDetail.
+const RunWithInstructions = Schema.Struct({
+	...ResearchRunDetail.fields,
+	applied_instructions: Schema.Array(Schema.String),
+})
+const NotFoundResult = Schema.Struct({ error: Schema.String })
+
+// get_research: the found run, or a not-found marker.
+const GetResearchResult = Schema.Union([RunWithInstructions, NotFoundResult])
+
+// research_sync: the same, plus an instruction clarification when a passed
+// instruction name can't be resolved (the run never starts in that case).
+const ResearchSyncResult = Schema.Union([
+	RunWithInstructions,
+	NotFoundResult,
+	InstructionClarification,
+])
 
 // ── start_research (async) ──
 
@@ -58,7 +81,7 @@ const GetResearch = Tool.make('get_research', {
 	parameters: Schema.Struct({
 		id: Uuid,
 	}),
-	success: Schema.Unknown,
+	success: GetResearchResult,
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Get Research')
@@ -78,7 +101,7 @@ const ResearchSync = Tool.make('research_sync', {
 		instructions: Schema.optional(InstructionsOverride),
 		max_wait_seconds: Schema.optional(Schema.Number),
 	}),
-	success: Schema.Unknown,
+	success: ResearchSyncResult,
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Research (Sync)')
@@ -94,16 +117,16 @@ export const ResearchMcpTools = Toolkit.make(
 )
 
 // Surface the instruction templates a run applied under one consistent field.
-// svc.get returns the persisted column as `templateNames` (PgClient camelCases
-// result keys); normalize it to applied_instructions so sync/poll callers read
-// the same shape start_research returns.
-const withAppliedInstructions = (run: unknown): unknown => {
-	if (run === null || typeof run !== 'object') return run
-	const row = run as Record<string, unknown>
-	const names = row['templateNames'] ?? row['template_names']
+// The run carries the persisted `templateNames` (jsonb, so typed Unknown);
+// normalize it to applied_instructions so sync/poll callers read the same shape
+// start_research returns.
+const withAppliedInstructions = (run: typeof ResearchRunDetail.Type) => {
+	const names = run.templateNames
 	return {
-		...row,
-		applied_instructions: Array.isArray(names) ? names : [],
+		...run,
+		applied_instructions: Array.isArray(names)
+			? names.filter((name): name is string => typeof name === 'string')
+			: [],
 	}
 }
 

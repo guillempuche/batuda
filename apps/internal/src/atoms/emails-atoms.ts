@@ -36,7 +36,10 @@ function makeListAtom(search: EmailsSearch) {
 	}
 	if (search.limit !== undefined) query['limit'] = search.limit
 	if (search.offset !== undefined) query['offset'] = search.offset
-	return BatudaApiAtom.query('email', 'listThreads', { query })
+	return BatudaApiAtom.query('email', 'listThreads', {
+		query,
+		serializationKey: `email:threads:${canonicalKey(search)}`,
+	})
 }
 
 export function emailsSearchAtom(search: EmailsSearch) {
@@ -69,6 +72,7 @@ export function canonicalKey(search: EmailsSearch): string {
 
 export const inboxesListAtom = BatudaApiAtom.query('email', 'listInboxes', {
 	query: {},
+	serializationKey: 'email:inboxes',
 })
 
 /**
@@ -80,6 +84,7 @@ const threadCache = new Map<string, ReturnType<typeof makeThreadAtom>>()
 function makeThreadAtom(threadId: string) {
 	return BatudaApiAtom.query('email', 'getThread', {
 		params: { threadId },
+		serializationKey: `email:thread:${threadId}`,
 	})
 }
 export function threadAtomFor(threadId: string) {

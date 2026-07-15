@@ -1,4 +1,4 @@
-import { Effect, Layer, ServiceMap } from 'effect'
+import { Context, Effect, Layer } from 'effect'
 import type { SqlError } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
@@ -87,7 +87,7 @@ const redactSql = <A>(
 		Effect.catchTag('SqlError', () => Effect.die('internal database error')),
 	)
 
-export class InstructionsService extends ServiceMap.Service<InstructionsService>()(
+export class InstructionsService extends Context.Service<InstructionsService>()(
 	'InstructionsService',
 	{
 		make: Effect.gen(function* () {

@@ -24,7 +24,7 @@ export type EmailStatus = typeof EmailStatus.Type
 export class ContactChannel extends Model.Class<ContactChannel>(
 	'ContactChannel',
 )({
-	id: Model.Generated(ContactChannelId),
+	id: Model.GeneratedByDb(ContactChannelId),
 	contactId: Schema.String,
 	kind: Schema.String,
 	value: Schema.String,

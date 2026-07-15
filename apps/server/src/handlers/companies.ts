@@ -43,15 +43,19 @@ export const CompaniesLive = HttpApiBuilder.group(
 				)
 				.handle('create', _ =>
 					svc.create(_.payload).pipe(
-						Effect.tap(r =>
+						Effect.flatMap(r =>
+							r[0] === undefined
+								? Effect.die(new Error('company insert returned no row'))
+								: Effect.succeed(r[0]),
+						),
+						Effect.tap(c =>
 							Effect.logInfo('Company created').pipe(
 								Effect.annotateLogs({
 									event: 'company.created',
-									slug: r[0]?.['slug'],
+									slug: c.slug,
 								}),
 							),
 						),
-						Effect.map(r => r[0]),
 						Effect.orDie,
 					),
 				)
@@ -126,7 +130,7 @@ export const CompaniesLive = HttpApiBuilder.group(
 								: null,
 							verifiedBy: _.payload.verified ? session.userId : null,
 						})
-						const row = (rows as ReadonlyArray<unknown>)[0]
+						const row = rows[0]
 						if (row === undefined)
 							return yield* new NotFound({
 								entity: 'company',

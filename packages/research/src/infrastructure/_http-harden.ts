@@ -31,16 +31,16 @@ const DEFAULT_MAX_ATTEMPTS = 3
 const integerJitter = <O, I, E, R>(
 	schedule: Schedule.Schedule<O, I, E, R>,
 ): Schedule.Schedule<O, I, E, R> =>
-	Schedule.modifyDelay(schedule, (_, delay) => {
-		const ms = Duration.toMillis(Duration.fromInputUnsafe(delay))
+	Schedule.modifyDelay(schedule, metadata => {
+		const ms = Duration.toMillis(metadata.duration)
 		const jittered = ms * 0.8 + ms * 0.4 * Math.random()
 		return Effect.succeed(Duration.millis(Math.round(jittered)))
 	})
 
 const makeSchedule = (provider: string) =>
 	integerJitter(Schedule.exponential('500 millis')).pipe(
-		Schedule.bothLeft(Schedule.recurs(DEFAULT_MAX_ATTEMPTS - 1)),
-		Schedule.tapOutput(() =>
+		Schedule.upTo({ times: DEFAULT_MAX_ATTEMPTS - 1 }),
+		Schedule.tap(() =>
 			Effect.logInfo('provider.retry').pipe(
 				Effect.annotateLogs({ event: 'provider.retried', provider }),
 			),

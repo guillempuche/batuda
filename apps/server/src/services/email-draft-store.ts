@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-import { DateTime, Effect, Layer, ServiceMap } from 'effect'
+import { Context, DateTime, Effect, Layer } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg, NotFound } from '@batuda/controllers'
@@ -60,7 +60,7 @@ const SELECT_COLUMNS = `
 	body_json, created_at, updated_at
 `
 
-export class DraftStore extends ServiceMap.Service<DraftStore>()('DraftStore', {
+export class DraftStore extends Context.Service<DraftStore>()('DraftStore', {
 	make: Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
 

@@ -6,7 +6,7 @@ import {
 	randomBytes,
 } from 'node:crypto'
 
-import { Effect, Layer, Redacted, ServiceMap } from 'effect'
+import { Context, Effect, Layer, Redacted } from 'effect'
 
 import { EnvVars } from '../lib/env'
 
@@ -64,7 +64,7 @@ export const decryptWithKey = (
 	return plain.toString('utf8')
 }
 
-export class CredentialCrypto extends ServiceMap.Service<CredentialCrypto>()(
+export class CredentialCrypto extends Context.Service<CredentialCrypto>()(
 	'CredentialCrypto',
 	{
 		make: Effect.gen(function* () {

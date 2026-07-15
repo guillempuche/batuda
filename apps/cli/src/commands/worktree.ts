@@ -332,7 +332,11 @@ const mcCapture = (command: string) => execSilent(mcScript(command))
 // The shared containers may have only just started, so give Postgres/MinIO a few
 // seconds to accept connections before the create succeeds.
 const settle = <A, E, R>(self: Effect.Effect<A, E, R>) =>
-	self.pipe(Effect.retry(Schedule.spaced('2 seconds').pipe(Schedule.take(5))))
+	self.pipe(
+		Effect.retry(
+			Schedule.spaced('2 seconds').pipe(Schedule.upTo({ times: 5 })),
+		),
+	)
 
 // Each live worktree's real database + bucket, read from its generated `.env`.
 // Keyed off `.env`, not the branch, so a live worktree whose branch was swapped
@@ -439,7 +443,7 @@ const stackReachableSettled = stackReachable.pipe(
 	Effect.flatMap(ok =>
 		ok ? Effect.succeed(true) : Effect.fail(new Error('not ready')),
 	),
-	Effect.retry(Schedule.spaced('1 second').pipe(Schedule.take(2))),
+	Effect.retry(Schedule.spaced('1 second').pipe(Schedule.upTo({ times: 2 }))),
 	Effect.orElseSucceed(() => false),
 )
 

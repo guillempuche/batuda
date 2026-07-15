@@ -1,7 +1,21 @@
 import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 
+import { RecordingDetail, RecordingSummary } from '@batuda/controllers'
+
 import { RecordingService } from '../../services/recordings'
+import { ListResult, toItems } from './_result'
+
+const PlaybackInfo = Schema.Struct({
+	url: Schema.String,
+	expiresAt: Schema.String,
+})
+// `get_call_recording` returns the detail alone, or the detail plus a
+// short-lived playback URL when the caller asks for one.
+const RecordingWithPlayback = Schema.Struct({
+	...RecordingDetail.fields,
+	playback: PlaybackInfo,
+})
 
 const ListCallRecordings = Tool.make('list_call_recordings', {
 	description:
@@ -11,7 +25,7 @@ const ListCallRecordings = Tool.make('list_call_recordings', {
 		limit: Schema.optional(Schema.Number),
 		offset: Schema.optional(Schema.Number),
 	}),
-	success: Schema.Unknown,
+	success: ListResult(RecordingSummary),
 })
 	.annotate(Tool.Title, 'List Call Recordings')
 	.annotate(Tool.Readonly, true)
@@ -25,7 +39,7 @@ const GetCallRecording = Tool.make('get_call_recording', {
 		recording_id: Schema.String,
 		include_playback_url: Schema.optional(Schema.Boolean),
 	}),
-	success: Schema.Unknown,
+	success: Schema.Union([RecordingDetail, RecordingWithPlayback]),
 })
 	.annotate(Tool.Title, 'Get Call Recording')
 	.annotate(Tool.Readonly, true)
@@ -64,7 +78,7 @@ export const RecordingHandlersLive = RecordingTools.toLayer(
 						params.limit ?? 50,
 						params.offset ?? 0,
 					)
-					.pipe(Effect.orDie),
+					.pipe(Effect.map(toItems), Effect.orDie),
 			get_call_recording: ({ recording_id, include_playback_url }) =>
 				Effect.gen(function* () {
 					const recording = yield* svc.getById(recording_id).pipe(Effect.orDie)
@@ -72,7 +86,7 @@ export const RecordingHandlersLive = RecordingTools.toLayer(
 					const playback = yield* svc
 						.getPlaybackUrl(recording_id)
 						.pipe(Effect.orDie)
-					return { ...(recording as Record<string, unknown>), playback }
+					return { ...recording, playback }
 				}),
 			delete_call_recording: ({ recording_id }) =>
 				Effect.gen(function* () {

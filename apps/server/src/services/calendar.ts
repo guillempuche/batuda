@@ -1,5 +1,6 @@
 import {
 	Cache,
+	Context,
 	Data,
 	DateTime,
 	Duration,
@@ -7,7 +8,6 @@ import {
 	Layer,
 	Option,
 	Schema,
-	ServiceMap,
 } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
@@ -158,7 +158,7 @@ const AVAILABILITY_CACHE_TTL_MS = 60 * 1000
  * and `companies.next_calendar_event_at` stay in lock-step with the
  * `calendar_events` row.
  */
-export class CalendarService extends ServiceMap.Service<CalendarService>()(
+export class CalendarService extends Context.Service<CalendarService>()(
 	'CalendarService',
 	{
 		make: Effect.gen(function* () {

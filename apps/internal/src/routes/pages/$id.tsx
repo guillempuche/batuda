@@ -8,12 +8,13 @@ import {
 } from '@tanstack/react-router'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
-import { Schema } from 'effect'
+import { DateTime, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { ArrowLeft, Eye, Globe, Save } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
+import type { Page as PageModel } from '@batuda/domain'
 import type { TiptapDocument } from '@batuda/ui/blocks'
 import { allBlockExtensions } from '@batuda/ui/blocks'
 import { PriButton, PriTabs, usePriToast } from '@batuda/ui/pri'
@@ -47,7 +48,7 @@ type PageDetail = {
 	readonly viewCount: number
 }
 
-async function loadPageOnServer(id: string): Promise<unknown> {
+async function loadPageOnServer(id: string): Promise<PageModel> {
 	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
 		import('effect'),
 		import('#/lib/batuda-api-server'),
@@ -355,8 +356,15 @@ function narrowPage(raw: unknown): PageDetail | null {
 	if (typeof r['id'] !== 'string') return null
 	if (typeof r['slug'] !== 'string') return null
 	if (typeof r['title'] !== 'string') return null
-	const str = (key: string) =>
-		typeof r[key] === 'string' ? (r[key] as string) : null
+	// Typed date fields (publishedAt) decode to DateTime.Utc on the wire;
+	// convert those back to an ISO string while leaving plain string fields
+	// untouched.
+	const str = (key: string) => {
+		const v = r[key]
+		if (typeof v === 'string') return v
+		if (DateTime.isDateTime(v)) return DateTime.formatIso(v)
+		return null
+	}
 	return {
 		id: r['id'],
 		slug: r['slug'],

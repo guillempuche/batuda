@@ -4,7 +4,7 @@ import { Model } from 'effect/unstable/schema'
 export const ProposalId = Schema.String.pipe(Schema.brand('ProposalId'))
 
 export class Proposal extends Model.Class<Proposal>('Proposal')({
-	id: Model.Generated(ProposalId),
+	id: Model.GeneratedByDb(ProposalId),
 	companyId: Schema.String,
 	contactId: Schema.NullOr(Schema.String),
 

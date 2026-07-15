@@ -1,8 +1,12 @@
-import { DateTime, Effect } from 'effect'
+import { DateTime, Effect, Schema } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { BatudaApi, CurrentOrg } from '@batuda/controllers'
+import { Product } from '@batuda/domain'
+
+const decodeProduct = Schema.decodeUnknownEffect(Product)
+const decodeProducts = Schema.decodeUnknownEffect(Schema.Array(Product))
 
 export const ProductsLive = HttpApiBuilder.group(
 	BatudaApi,
@@ -13,7 +17,8 @@ export const ProductsLive = HttpApiBuilder.group(
 			return handlers
 				.handle('list', () =>
 					Effect.gen(function* () {
-						return yield* sql`SELECT * FROM products`
+						const rows = yield* sql`SELECT * FROM products`
+						return yield* decodeProducts(rows)
 					}).pipe(Effect.orDie),
 				)
 				.handle('create', _ =>
@@ -26,7 +31,12 @@ export const ProductsLive = HttpApiBuilder.group(
 						yield* Effect.logInfo('Product created').pipe(
 							Effect.annotateLogs({ event: 'product.created' }),
 						)
-						return rows[0]
+						const created = rows[0]
+						if (created === undefined)
+							return yield* Effect.die(
+								new Error('product insert returned no row'),
+							)
+						return yield* decodeProduct(created)
 					}).pipe(Effect.orDie),
 				)
 				.handle('update', _ =>
@@ -41,7 +51,8 @@ export const ProductsLive = HttpApiBuilder.group(
 								productId: _.params.id,
 							}),
 						)
-						return rows[0]
+						const row = rows[0]
+						return row === undefined ? null : yield* decodeProduct(row)
 					}).pipe(Effect.orDie),
 				)
 		}),

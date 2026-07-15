@@ -35,7 +35,7 @@ const checkMigrations = Effect.gen(function* () {
 	}
 }).pipe(
 	Effect.provide(Layer.fresh(PgLive)),
-	Effect.retry(Schedule.spaced('1 second').pipe(Schedule.take(4))),
+	Effect.retry(Schedule.spaced('1 second').pipe(Schedule.upTo({ times: 4 }))),
 	Effect.catchCause(() => Effect.void),
 )
 
@@ -58,7 +58,9 @@ const checkMailCatcher = Effect.gen(function* () {
 		}
 	})
 	yield* probe.pipe(
-		Effect.retry(Schedule.spaced('1 second').pipe(Schedule.take(15))),
+		Effect.retry(
+			Schedule.spaced('1 second').pipe(Schedule.upTo({ times: 15 })),
+		),
 	)
 }).pipe(Effect.catchCause(() => Effect.void))
 

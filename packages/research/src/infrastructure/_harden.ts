@@ -174,8 +174,8 @@ const rateLimitRetryAfter = (err: unknown): Duration.Duration | undefined => {
 const integerJitter = <O, I, E, R>(
 	schedule: Schedule.Schedule<O, I, E, R>,
 ): Schedule.Schedule<O, I, E, R> =>
-	Schedule.modifyDelay(schedule, (_, delay) => {
-		const ms = Duration.toMillis(Duration.fromInputUnsafe(delay))
+	Schedule.modifyDelay(schedule, metadata => {
+		const ms = Duration.toMillis(metadata.duration)
 		const jittered = ms * 0.8 + ms * 0.4 * Math.random()
 		return Effect.succeed(Duration.millis(Math.round(jittered)))
 	})
@@ -190,8 +190,8 @@ const integerJitter = <O, I, E, R>(
  */
 const makeRetrySchedule = (provider: string, tier: string | undefined) =>
 	integerJitter(Schedule.exponential('500 millis')).pipe(
-		Schedule.bothLeft(Schedule.recurs(DEFAULT_MAX_ATTEMPTS - 1)),
-		Schedule.tapOutput(() =>
+		Schedule.upTo({ times: DEFAULT_MAX_ATTEMPTS - 1 }),
+		Schedule.tap(() =>
 			Effect.logInfo('llm.retry').pipe(
 				Effect.annotateLogs({
 					event: 'llm.retried',

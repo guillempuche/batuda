@@ -13,6 +13,9 @@ import {
 	PendingProposal,
 	ProposedUpdateResult,
 	ResearchEvents,
+	ResearchPolicy,
+	ResearchRunDetail,
+	ResearchRunSummary,
 } from './research-schemas'
 
 // ── Input schemas ──
@@ -113,14 +116,14 @@ export const ResearchGroup = HttpApiGroup.make('research')
 				limit: Schema.optional(Schema.NumberFromString),
 				offset: Schema.optional(Schema.NumberFromString),
 			},
-			success: Schema.Array(Schema.Unknown),
+			success: Schema.Array(ResearchRunSummary),
 		}),
 	)
 	// GET /research/:id — full row with findings + sources
 	.add(
 		HttpApiEndpoint.get('get', '/research/:id', {
 			params: { id: Schema.String },
-			success: Schema.Unknown,
+			success: ResearchRunDetail,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
@@ -173,7 +176,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 				table: Schema.String,
 				subjectId: Schema.String,
 			},
-			success: Schema.Array(Schema.Unknown),
+			success: Schema.Array(ResearchRunSummary),
 		}),
 	)
 	// Paid action approval workflow
@@ -263,13 +266,13 @@ export const ResearchGroup = HttpApiGroup.make('research')
 	// Policy
 	.add(
 		HttpApiEndpoint.get('getPolicy', '/research/preferences', {
-			success: Schema.Unknown,
+			success: ResearchPolicy,
 		}),
 	)
 	.add(
 		HttpApiEndpoint.put('updatePolicy', '/research/policy', {
 			payload: UpdatePolicyInput,
-			success: Schema.Unknown,
+			success: ResearchPolicy,
 		}),
 	)
 	.add(

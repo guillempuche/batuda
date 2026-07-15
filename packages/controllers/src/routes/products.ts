@@ -1,6 +1,8 @@
 import { Schema } from 'effect'
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi'
 
+import { Product } from '@batuda/domain'
+
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 
@@ -30,20 +32,20 @@ const UpdateProductInput = Schema.Struct({
 export const ProductsGroup = HttpApiGroup.make('products')
 	.add(
 		HttpApiEndpoint.get('list', '/products', {
-			success: Schema.Array(Schema.Unknown),
+			success: Schema.Array(Product.json),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.post('create', '/products', {
 			payload: CreateProductInput,
-			success: Schema.Unknown,
+			success: Product.json,
 		}),
 	)
 	.add(
 		HttpApiEndpoint.patch('update', '/products/:id', {
 			params: { id: Schema.String },
 			payload: UpdateProductInput,
-			success: Schema.Unknown,
+			success: Schema.NullOr(Product.json),
 		}),
 	)
 	.middleware(SessionMiddleware)

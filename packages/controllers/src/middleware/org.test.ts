@@ -5,7 +5,7 @@ import { CurrentOrg, OrgMiddleware } from './org'
 
 describe('CurrentOrg', () => {
 	it('should expose a stable identifier so HTTP and MCP middlewares share one tag', () => {
-		// GIVEN the CurrentOrg ServiceMap.Service tag
+		// GIVEN the CurrentOrg Context.Service tag
 		// WHEN the static key is read
 		// THEN it is the literal string "CurrentOrg"
 		// AND distinct providers in different processes (HTTP vs MCP) collide on

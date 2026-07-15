@@ -294,8 +294,9 @@ export const runInboxSession = (claimed: ClaimedInbox) =>
 		// Reconnect with exponential backoff on transient failure, capped
 		// at 60s so a flaky provider doesn't burn through retries.
 		Effect.retry(
-			Schedule.exponential('1 second', 2).pipe(
-				Schedule.either(Schedule.spaced('60 seconds')),
-			),
+			Schedule.min([
+				Schedule.exponential('1 second', 2),
+				Schedule.spaced('60 seconds'),
+			]),
 		),
 	)

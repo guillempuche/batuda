@@ -135,27 +135,42 @@ const visibleTaskIds = async (org: string): Promise<ReadonlyArray<string>> => {
 	}
 }
 
+// Reads the stored organization_id for a task, under `org`'s GUC. The service
+// return no longer carries organization_id (the API never exposes it), so the
+// stamp is asserted straight from the persisted row.
+const orgIdOf = async (taskId: string, org: string): Promise<string | null> => {
+	const client = await pool.connect()
+	try {
+		await client.query('BEGIN')
+		await client.query('SET LOCAL ROLE app_user')
+		await client.query(`SELECT set_config('app.current_org_id', $1, true)`, [
+			org,
+		])
+		const rows = await client.query<{ organization_id: string }>(
+			`SELECT organization_id FROM tasks WHERE id = $1`,
+			[taskId],
+		)
+		await client.query('ROLLBACK')
+		return rows.rows[0]?.organization_id ?? null
+	} finally {
+		client.release()
+	}
+}
+
 describe('TaskService.create', () => {
 	describe('when invoked as app_user with a matching active org', () => {
 		it('should stamp organization_id from CurrentOrg', async () => {
 			// GIVEN role=app_user pinned to the taller org
 			// WHEN a company-less task is created through the service
-			const rows = (await createWith(
-				tallerOrgId,
-				tallerOrgId,
-			)) as ReadonlyArray<{
-				id: string
-				organizationId: string
-				companyId: string | null
-				title: string
-			}>
+			const rows = await createWith(tallerOrgId, tallerOrgId)
+			const taskId = rows[0]?.id
+			expect(taskId).toBeDefined()
 
 			// THEN the persisted row carries the active org id
-			expect(rows[0]?.organizationId).toBe(tallerOrgId)
+			expect(await orgIdOf(taskId as string, tallerOrgId)).toBe(tallerOrgId)
 			// AND the company-less task persisted with a null company_id
 			expect(rows[0]?.companyId).toBeNull()
 			expect(rows[0]?.title).toBe(FIXTURE_TITLE)
-			// [apps/server/src/services/tasks.ts — sql.insert organizationId]
 		})
 	})
 

@@ -1,12 +1,14 @@
 import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 
+import { NextSteps, PipelineSnapshot } from '@batuda/controllers'
+
 import { PipelineService } from '../../services/pipeline'
 
 const GetPipeline = Tool.make('get_pipeline', {
 	description:
 		'Get pipeline overview: counts by status, overdue tasks, companies without next action.',
-	success: Schema.Unknown,
+	success: PipelineSnapshot,
 })
 	.annotate(Tool.Title, 'Pipeline Overview')
 	.annotate(Tool.Readonly, true)
@@ -19,7 +21,7 @@ const GetNextSteps = Tool.make('get_next_steps', {
 	parameters: Schema.Struct({
 		limit: Schema.optional(Schema.Number),
 	}),
-	success: Schema.Unknown,
+	success: NextSteps,
 })
 	.annotate(Tool.Title, 'Next Steps')
 	.annotate(Tool.Readonly, true)

@@ -1,9 +1,10 @@
-import { DateTime, Effect } from 'effect'
+import { DateTime, Effect, Schema } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { BatudaApi, CurrentOrg } from '@batuda/controllers'
+import { Contact, ContactChannel } from '@batuda/domain'
 
 import {
 	addChannel,
@@ -13,6 +14,10 @@ import {
 	patchChannel,
 	writeChannels,
 } from '../services/contact-channels'
+
+const decodeContact = Schema.decodeUnknownEffect(Contact)
+const decodeChannel = Schema.decodeUnknownEffect(ContactChannel)
+const decodeChannels = Schema.decodeUnknownEffect(Schema.Array(ContactChannel))
 
 export const ContactsLive = HttpApiBuilder.group(
 	BatudaApi,
@@ -31,7 +36,7 @@ export const ContactsLive = HttpApiBuilder.group(
 						// tell a researched contact from a hand-entered one. Row-level
 						// security limits the linked runs to the caller's org; how the
 						// trail is worded is left to the presentation layer.
-						return yield* sql`
+						const rows = yield* sql`
 							SELECT c.*, COALESCE(
 								(SELECT json_agg(ch ORDER BY ch.is_primary DESC, ch.kind)
 								 FROM contact_channels ch WHERE ch.contact_id = c.id),
@@ -55,6 +60,21 @@ export const ContactsLive = HttpApiBuilder.group(
 							WHERE ${sql.and(conditions)}
 							ORDER BY c.name
 						`
+						// Decode each contact's own columns; `channels` and `provenance`
+						// are already JSON from the aggregates, so keep them as-is.
+						return yield* Effect.forEach(rows, row =>
+							decodeContact(row).pipe(
+								Effect.map(c => ({
+									...c,
+									channels: (
+										row as { readonly channels: ReadonlyArray<unknown> }
+									).channels,
+									provenance: (
+										row as { readonly provenance: ReadonlyArray<unknown> }
+									).provenance,
+								})),
+							),
+						)
 					}).pipe(Effect.orDie),
 				)
 				.handle('create', _ =>
@@ -75,7 +95,9 @@ export const ContactsLive = HttpApiBuilder.group(
 								companyId: _.payload.companyId,
 							}),
 						)
-						return { ...rows[0], channels: ch }
+						const decoded = yield* decodeContact(rows[0])
+						const decodedChannels = yield* decodeChannels(ch)
+						return { ...decoded, channels: decodedChannels }
 					}).pipe(Effect.orDie),
 				)
 				.handle('update', _ =>
@@ -95,7 +117,9 @@ export const ContactsLive = HttpApiBuilder.group(
 								contactId: _.params.id,
 							}),
 						)
-						return { ...rows[0], channels: ch }
+						const decoded = yield* decodeContact(rows[0])
+						const decodedChannels = yield* decodeChannels(ch)
+						return { ...decoded, channels: decodedChannels }
 					}).pipe(Effect.orDie),
 				)
 				.handle('remove', _ =>
@@ -112,11 +136,19 @@ export const ContactsLive = HttpApiBuilder.group(
 				.handle('addChannel', _ =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
-						return yield* addChannel(sql, currentOrg.id, _.params.id, _.payload)
+						return yield* addChannel(
+							sql,
+							currentOrg.id,
+							_.params.id,
+							_.payload,
+						).pipe(Effect.flatMap(decodeChannel))
 					}).pipe(Effect.orDie),
 				)
 				.handle('updateChannel', _ =>
-					patchChannel(sql, _.params.channelId, _.payload).pipe(Effect.orDie),
+					patchChannel(sql, _.params.channelId, _.payload).pipe(
+						Effect.flatMap(decodeChannel),
+						Effect.orDie,
+					),
 				)
 				.handle('deleteChannel', _ =>
 					Effect.gen(function* () {
@@ -133,7 +165,8 @@ export const ContactsLive = HttpApiBuilder.group(
 								contactId: _.params.id,
 							}),
 						)
-						return { id: _.params.id, channels: ch }
+						const decodedChannels = yield* decodeChannels(ch)
+						return { id: _.params.id, channels: decodedChannels }
 					}).pipe(Effect.orDie),
 				)
 		}),

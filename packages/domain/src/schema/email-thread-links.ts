@@ -8,7 +8,7 @@ export const EmailThreadLinkId = Schema.String.pipe(
 export class EmailThreadLink extends Model.Class<EmailThreadLink>(
 	'EmailThreadLink',
 )({
-	id: Model.Generated(EmailThreadLinkId),
+	id: Model.GeneratedByDb(EmailThreadLinkId),
 	provider: Schema.String,
 	providerThreadId: Schema.String,
 	providerInboxId: Schema.String,

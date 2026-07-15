@@ -1,5 +1,6 @@
 import { useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
+import { DateTime } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { Calendar, ExternalLink } from 'lucide-react'
 import { useMemo } from 'react'
@@ -116,6 +117,14 @@ export function UpcomingMeetingsCard({
 	)
 }
 
+// Typed date fields decode to DateTime.Utc on the wire; fall back to their
+// string form for anything already an ISO string.
+function dateToIsoOrNull(value: unknown): string | null {
+	if (typeof value === 'string') return value
+	if (DateTime.isDateTime(value)) return DateTime.formatIso(value)
+	return null
+}
+
 function narrowEvents(rows: ReadonlyArray<unknown>): ReadonlyArray<EventRow> {
 	const out: Array<EventRow> = []
 	for (const row of rows) {
@@ -123,8 +132,10 @@ function narrowEvents(rows: ReadonlyArray<unknown>): ReadonlyArray<EventRow> {
 		const r = row as Record<string, unknown>
 		if (typeof r['id'] !== 'string') continue
 		if (typeof r['title'] !== 'string') continue
-		if (typeof r['startAt'] !== 'string') continue
-		if (typeof r['endAt'] !== 'string') continue
+		const startAt = dateToIsoOrNull(r['startAt'])
+		if (startAt === null) continue
+		const endAt = dateToIsoOrNull(r['endAt'])
+		if (endAt === null) continue
 		const attendees = Array.isArray(r['attendees']) ? r['attendees'] : []
 		const meta = (r['metadata'] ?? null) as Record<string, unknown> | null
 		const url =
@@ -136,8 +147,8 @@ function narrowEvents(rows: ReadonlyArray<unknown>): ReadonlyArray<EventRow> {
 		out.push({
 			id: r['id'],
 			title: r['title'],
-			startAt: r['startAt'],
-			endAt: r['endAt'],
+			startAt,
+			endAt,
 			attendeeCount: Math.max(1, attendees.length),
 			url,
 		})

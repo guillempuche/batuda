@@ -4,7 +4,7 @@ import { Model } from 'effect/unstable/schema'
 export const DocumentId = Schema.String.pipe(Schema.brand('DocumentId'))
 
 export class Document extends Model.Class<Document>('Document')({
-	id: Model.Generated(DocumentId),
+	id: Model.GeneratedByDb(DocumentId),
 	companyId: Schema.String,
 	interactionId: Schema.NullOr(Schema.String),
 	// links prenote/postnote to a specific meeting

@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer'
 
-import { Effect, Layer, ServiceMap } from 'effect'
+import { Context, Effect, Layer } from 'effect'
 import { ImapFlow } from 'imapflow'
 import nodemailer from 'nodemailer'
 
@@ -141,7 +141,7 @@ const openImapClient = (creds: DecryptedCreds): ImapFlow =>
 
 // ── Tag ───────────────────────────────────────────────────────
 
-export class MailTransport extends ServiceMap.Service<MailTransport>()(
+export class MailTransport extends Context.Service<MailTransport>()(
 	'MailTransport',
 	{
 		make: Effect.sync(() => {

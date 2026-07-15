@@ -1,4 +1,4 @@
-import { Effect, Layer, ServiceMap } from 'effect'
+import { Context, Effect, Layer } from 'effect'
 
 import { NotFound } from '@batuda/controllers'
 
@@ -88,7 +88,7 @@ const SELECT_COLS =
 // pool: `app_user` has no grants on the `apikey` table (migrations/0005), and
 // the table has no org column to RLS-scope — isolation is enforced here by the
 // per-org `referenceId` predicate on every query.
-export class ApiKeyService extends ServiceMap.Service<ApiKeyService>()(
+export class ApiKeyService extends Context.Service<ApiKeyService>()(
 	'ApiKeyService',
 	{
 		make: Effect.gen(function* () {

@@ -13,7 +13,7 @@ import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 export const calendarEventTypesAtom = BatudaApiAtom.query(
 	'calendar',
 	'listEventTypes',
-	{ query: { active: 'true' } },
+	{ query: { active: 'true' }, serializationKey: 'calendar:event-types' },
 )
 
 /**
@@ -27,6 +27,7 @@ export const calendarEventsAtom = BatudaApiAtom.query(
 	'listEvents',
 	{
 		query: { limit: 500 },
+		serializationKey: 'calendar:events',
 	},
 )
 

@@ -1,6 +1,8 @@
 import { Schema } from 'effect'
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi'
 
+import { Contact, ContactChannel } from '@batuda/domain'
+
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 
@@ -49,26 +51,53 @@ const PatchChannelInput = Schema.Struct({
 	is_primary: Schema.optional(Schema.Boolean),
 })
 
+// A contact plus its reachable channels. `channels` stays open (`Unknown`) here
+// because the list query builds it with `json_agg`, whose JSON keeps the raw
+// snake_case column names — the send path reads it by key, not by decoding.
+export const ContactSummary = Schema.Struct({
+	...Contact.json.fields,
+	channels: Schema.Array(Schema.Unknown),
+})
+
+// The list response also carries the research provenance trail (which runs and
+// sources wrote the contact), left open for the presentation layer to render.
+export const ContactListItem = Schema.Struct({
+	...ContactSummary.fields,
+	provenance: Schema.Array(Schema.Unknown),
+})
+
+// The create/update/reset responses return channels decoded from their own
+// rows, so they carry the fully-typed channel shape.
+export const ContactWithChannels = Schema.Struct({
+	...Contact.json.fields,
+	channels: Schema.Array(ContactChannel.json),
+})
+
+const SuppressionCleared = Schema.Struct({
+	id: Schema.String,
+	channels: Schema.Array(ContactChannel.json),
+})
+
 export const ContactsGroup = HttpApiGroup.make('contacts')
 	.add(
 		HttpApiEndpoint.get('list', '/contacts', {
 			query: {
 				companyId: Schema.optional(Schema.String),
 			},
-			success: Schema.Array(Schema.Unknown),
+			success: Schema.Array(ContactListItem),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.post('create', '/contacts', {
 			payload: CreateContactInput,
-			success: Schema.Unknown,
+			success: ContactWithChannels,
 		}),
 	)
 	.add(
 		HttpApiEndpoint.patch('update', '/contacts/:id', {
 			params: { id: Schema.String },
 			payload: UpdateContactInput,
-			success: Schema.Unknown,
+			success: ContactWithChannels,
 		}),
 	)
 	.add(
@@ -81,7 +110,7 @@ export const ContactsGroup = HttpApiGroup.make('contacts')
 		HttpApiEndpoint.post('addChannel', '/contacts/:id/channels', {
 			params: { id: Schema.String },
 			payload: AddChannelInput,
-			success: Schema.Unknown,
+			success: ContactChannel.json,
 		}),
 	)
 	.add(
@@ -91,7 +120,7 @@ export const ContactsGroup = HttpApiGroup.make('contacts')
 			{
 				params: { id: Schema.String, channelId: Schema.String },
 				payload: PatchChannelInput,
-				success: Schema.Unknown,
+				success: ContactChannel.json,
 			},
 		),
 	)
@@ -114,7 +143,7 @@ export const ContactsGroup = HttpApiGroup.make('contacts')
 			'/contacts/:id/email-suppression/clear',
 			{
 				params: { id: Schema.String },
-				success: Schema.Unknown,
+				success: SuppressionCleared,
 			},
 		),
 	)

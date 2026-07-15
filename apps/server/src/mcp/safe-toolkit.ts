@@ -1,4 +1,4 @@
-import { Cause, Effect, Layer, Option, ServiceMap, Sink, Stream } from 'effect'
+import { Cause, Context, Effect, Layer, Option, Sink, Stream } from 'effect'
 import { McpSchema, McpServer, Tool, type Toolkit } from 'effect/unstable/ai'
 
 // The MCP bridge that turns a tool handler's return value into a client
@@ -84,7 +84,7 @@ const registerToolkitSafe = <Tools extends Record<string, Tool.Any>>(
 			never,
 			Exclude<Tool.HandlersFor<Tools>, McpSchema.McpServerClient>
 		>
-		const services = yield* Effect.services<never>()
+		const services = yield* Effect.context<never>()
 		for (const tool of Object.values(built.tools)) {
 			const annotations = tool.annotations
 			const mcpTool = new McpSchema.Tool({
@@ -93,17 +93,16 @@ const registerToolkitSafe = <Tools extends Record<string, Tool.Any>>(
 				inputSchema: Tool.getJsonSchema(tool),
 				annotations: {
 					...Option.getOrUndefined(
-						Option.map(
-							ServiceMap.getOption(annotations, Tool.Title),
-							title => ({ title }),
-						),
+						Option.map(Context.getOption(annotations, Tool.Title), title => ({
+							title,
+						})),
 					),
-					readOnlyHint: ServiceMap.get(annotations, Tool.Readonly),
-					destructiveHint: ServiceMap.get(annotations, Tool.Destructive),
-					idempotentHint: ServiceMap.get(annotations, Tool.Idempotent),
-					openWorldHint: ServiceMap.get(annotations, Tool.OpenWorld),
+					readOnlyHint: Context.get(annotations, Tool.Readonly),
+					destructiveHint: Context.get(annotations, Tool.Destructive),
+					idempotentHint: Context.get(annotations, Tool.Idempotent),
+					openWorldHint: Context.get(annotations, Tool.OpenWorld),
 				},
-				_meta: ServiceMap.getOrUndefined(annotations, Tool.Meta),
+				_meta: Context.getOrUndefined(annotations, Tool.Meta),
 			})
 			yield* registry.addTool({
 				tool: mcpTool,
@@ -113,7 +112,7 @@ const registerToolkitSafe = <Tools extends Record<string, Tool.Any>>(
 						Stream.unwrap,
 						Stream.run(Sink.last()),
 						Effect.flatMap(Effect.fromOption),
-						Effect.provideServices(services as ServiceMap.ServiceMap<never>),
+						Effect.provide(services as Context.Context<never>),
 						Effect.matchCause({
 							onFailure: cause =>
 								new McpSchema.CallToolResult({

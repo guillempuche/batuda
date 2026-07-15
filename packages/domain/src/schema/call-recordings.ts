@@ -1,6 +1,8 @@
 import { Schema } from 'effect'
 import { Model } from 'effect/unstable/schema'
 
+import { DbNumber } from './_common'
+
 export const CallRecordingId = Schema.String.pipe(
 	Schema.brand('CallRecordingId'),
 )
@@ -13,7 +15,7 @@ export const TranscriptStatus = Schema.Literals(['pending', 'done', 'failed'])
 export type TranscriptStatus = typeof TranscriptStatus.Type
 
 export class CallRecording extends Model.Class<CallRecording>('CallRecording')({
-	id: Model.Generated(CallRecordingId),
+	id: Model.GeneratedByDb(CallRecordingId),
 	// 1:1 with the interactions row that represents this touchpoint. The
 	// UNIQUE constraint at the DB level ensures a given interaction can have
 	// at most one recording attached.
@@ -22,7 +24,8 @@ export class CallRecording extends Model.Class<CallRecording>('CallRecording')({
 	// Object storage location — `recordings/<companyId>/<ulid>.<ext>` shape.
 	storageKey: Schema.String,
 	mimeType: Schema.String,
-	byteSize: Schema.Number,
+	// BIGINT — node-postgres returns it as a string; accept string-or-number.
+	byteSize: DbNumber,
 	// Optional — populated when the upload includes a duration hint or once
 	// transcription extracts it. Audio files alone don't always carry it.
 	durationSec: Schema.NullOr(Schema.Number),

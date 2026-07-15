@@ -5,11 +5,26 @@ import {
 	HttpApiSchema,
 } from 'effect/unstable/httpapi'
 
+import { Page } from '@batuda/domain'
 import { TiptapDocument } from '@batuda/ui/blocks'
 
 import { NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
+
+// Listing projection: page metadata without the Tiptap `content`/`meta` blobs,
+// so a company's page index stays light.
+export const PageSummary = Schema.Struct({
+	id: Page.json.fields.id,
+	companyId: Page.json.fields.companyId,
+	slug: Page.json.fields.slug,
+	lang: Page.json.fields.lang,
+	title: Page.json.fields.title,
+	status: Page.json.fields.status,
+	template: Page.json.fields.template,
+	viewCount: Page.json.fields.viewCount,
+	publishedAt: Page.json.fields.publishedAt,
+})
 
 const CreatePageInput = Schema.Struct({
 	companyId: Schema.optional(Schema.String),
@@ -39,33 +54,33 @@ export const PagesGroup = HttpApiGroup.make('pages')
 				status: Schema.optional(Schema.String),
 				lang: Schema.optional(Schema.String),
 			},
-			success: Schema.Array(Schema.Unknown),
+			success: Schema.Array(PageSummary),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.get('get', '/v1/pages/:id', {
 			params: { id: Schema.String },
-			success: Schema.Unknown,
+			success: Page.json,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.post('create', '/v1/pages', {
 			payload: CreatePageInput,
-			success: Schema.Unknown,
+			success: Schema.NullOr(Page.json),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.patch('update', '/v1/pages/:id', {
 			params: { id: Schema.String },
 			payload: UpdatePageInput,
-			success: Schema.Unknown,
+			success: Schema.NullOr(Page.json),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.patch('publish', '/v1/pages/:id/publish', {
 			params: { id: Schema.String },
-			success: Schema.Unknown,
+			success: Schema.NullOr(Page.json),
 		}),
 	)
 	.middleware(SessionMiddleware)
@@ -77,7 +92,7 @@ export const PagesGroup = HttpApiGroup.make('pages')
 			query: {
 				lang: Schema.optional(Schema.String),
 			},
-			success: Schema.Unknown,
+			success: Page.json,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)

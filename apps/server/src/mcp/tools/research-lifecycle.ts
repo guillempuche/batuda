@@ -2,7 +2,12 @@ import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { CurrentOrg, SessionContext } from '@batuda/controllers'
+import {
+	CurrentOrg,
+	ResearchPolicy as ResearchPolicySchema,
+	ResearchRunSummary,
+	SessionContext,
+} from '@batuda/controllers'
 import { ResearchService } from '@batuda/research'
 
 import { CompanyService } from '../../services/companies'
@@ -30,7 +35,7 @@ const ListResearch = Tool.make('list_research', {
 		limit: Schema.optional(Schema.Number),
 		offset: Schema.optional(Schema.Number),
 	}),
-	success: ListResult(Schema.Unknown),
+	success: ListResult(ResearchRunSummary),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Research')
@@ -155,7 +160,12 @@ const ResearchPolicy = Tool.make('research_policy', {
 		auto_approve_paid_cents: Schema.optional(Schema.Number),
 		paid_monthly_cap_cents: Schema.optional(Schema.Number),
 	}),
-	success: Schema.Unknown,
+	// get → the policy wrapped in an object (a bare null isn't valid MCP output);
+	// set → the upserted policy directly.
+	success: Schema.Union([
+		Schema.Struct({ policy: Schema.NullOr(ResearchPolicySchema) }),
+		ResearchPolicySchema,
+	]),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Research Policy')
@@ -287,14 +297,12 @@ export const ResearchLifecycleHandlersLive = ResearchLifecycleTools.toLayer(
 						// MCP contract rejects a bare `null` as structured output.
 						return { policy: policy ?? null }
 					}
-					return yield* svc
-						.updatePolicy(userId, {
-							budgetCents: params.budget_cents,
-							paidBudgetCents: params.paid_budget_cents,
-							autoApprovePaidCents: params.auto_approve_paid_cents,
-							paidMonthlyCapCents: params.paid_monthly_cap_cents,
-						})
-						.pipe(Effect.map(rows => rows[0]))
+					return yield* svc.updatePolicy(userId, {
+						budgetCents: params.budget_cents,
+						paidBudgetCents: params.paid_budget_cents,
+						autoApprovePaidCents: params.auto_approve_paid_cents,
+						paidMonthlyCapCents: params.paid_monthly_cap_cents,
+					})
 				}).pipe(redactDbErrors),
 			get_research_spend: ({ range, group_by }) =>
 				svc

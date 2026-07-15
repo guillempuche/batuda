@@ -2,7 +2,7 @@
 // annotation hygiene. Imports every toolkit, walks its tools, and asserts
 // the contract every MCP client relies on. New invariants belong here.
 
-import { ServiceMap } from 'effect'
+import { Context } from 'effect'
 import { Tool } from 'effect/unstable/ai'
 import { describe, expect, it } from 'vitest'
 
@@ -73,10 +73,7 @@ describe('MCP tool annotation coverage', () => {
 						// THEN the value is a non-empty string (every MCP client
 						//      surfaces this as the visible action label)
 						// [tools/${toolkitName} — Tool.Title invariant]
-						const title = ServiceMap.getOrUndefined(
-							tool.annotations,
-							Tool.Title,
-						)
+						const title = Context.getOrUndefined(tool.annotations, Tool.Title)
 						expect(title, `${toolName} missing Tool.Title`).toBeDefined()
 						expect(
 							typeof title === 'string' && title.length > 0,
@@ -129,7 +126,7 @@ describe('MCP tool annotation coverage', () => {
 							// THEN the value is exactly true so MCP clients can call
 							//      it without surfacing a write-confirmation prompt
 							// [tools/${toolkitName} — read-only naming invariant]
-							const readonly = ServiceMap.getOrUndefined(
+							const readonly = Context.getOrUndefined(
 								tool.annotations,
 								Tool.Readonly,
 							)
@@ -148,7 +145,7 @@ describe('MCP tool annotation coverage', () => {
 							// THEN the value is exactly true so MCP clients can prompt
 							//      the user before executing
 							// [tools/${toolkitName} — destructive naming invariant]
-							const destructive = ServiceMap.getOrUndefined(
+							const destructive = Context.getOrUndefined(
 								tool.annotations,
 								Tool.Destructive,
 							)
@@ -171,7 +168,7 @@ describe('MCP tool annotation coverage', () => {
 							// THEN the value is exactly true so MCP clients can retry
 							//      on transient failure without duplicating side effects
 							// [tools/${toolkitName} — idempotent naming invariant]
-							const idempotent = ServiceMap.getOrUndefined(
+							const idempotent = Context.getOrUndefined(
 								tool.annotations,
 								Tool.Idempotent,
 							)

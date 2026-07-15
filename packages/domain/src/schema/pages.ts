@@ -4,7 +4,7 @@ import { Model } from 'effect/unstable/schema'
 export const PageId = Schema.String.pipe(Schema.brand('PageId'))
 
 export class Page extends Model.Class<Page>('Page')({
-	id: Model.Generated(PageId),
+	id: Model.GeneratedByDb(PageId),
 	companyId: Schema.NullOr(Schema.String),
 	// nullable — for generic pages not tied to a prospect
 

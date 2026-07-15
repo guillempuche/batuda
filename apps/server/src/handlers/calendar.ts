@@ -1,4 +1,4 @@
-import { Cache, DateTime, Duration, Effect, Option } from 'effect'
+import { Cache, DateTime, Duration, Effect, Option, Schema } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
@@ -13,8 +13,22 @@ import {
 	NotFound,
 	SessionContext,
 } from '@batuda/controllers'
+import { CalendarEvent, CalendarEventType } from '@batuda/domain'
 
 import { dispatchRsvpReply } from '../services/calendar-rsvp-dispatch.js'
+
+const decodeEventTypes = Schema.decodeUnknownEffect(
+	Schema.Array(CalendarEventType),
+)
+const decodeEvent = Schema.decodeUnknownEffect(CalendarEvent)
+const decodeEvents = Schema.decodeUnknownEffect(Schema.Array(CalendarEvent))
+// The provider hands back Date slots; read them into DateTime.Utc so the
+// `Slot` wire schema re-encodes them as ISO strings.
+const SlotRow = Schema.Struct({
+	start: Schema.DateTimeUtcFromDate,
+	end: Schema.DateTimeUtcFromDate,
+})
+const decodeSlots = Schema.decodeUnknownEffect(Schema.Array(SlotRow))
 
 type EventTypeRow = {
 	readonly id: string
@@ -64,11 +78,12 @@ export const CalendarLive = HttpApiBuilder.group(
 						if (_.query.active === 'true') conditions.push(sql`active = true`)
 						else if (_.query.active === 'false')
 							conditions.push(sql`active = false`)
-						return yield* sql`
+						const rows = yield* sql`
 							SELECT * FROM calendar_event_types
 							${conditions.length > 0 ? sql`WHERE ${sql.and(conditions)}` : sql``}
 							ORDER BY slug
 						`
+						return yield* decodeEventTypes(rows)
 					}).pipe(Effect.orDie),
 				)
 				.handle('syncEventTypes', () =>
@@ -100,12 +115,13 @@ export const CalendarLive = HttpApiBuilder.group(
 						if (_.query.status) conditions.push(sql`status = ${_.query.status}`)
 						const limit = _.query.limit ?? 100
 						const offset = _.query.offset ?? 0
-						return yield* sql`
+						const rows = yield* sql`
 							SELECT * FROM calendar_events
 							${conditions.length > 0 ? sql`WHERE ${sql.and(conditions)}` : sql``}
 							ORDER BY start_at ASC
 							LIMIT ${limit} OFFSET ${offset}
 						`
+						return yield* decodeEvents(rows)
 					}).pipe(Effect.orDie),
 				)
 				.handle('getEvent', _ =>
@@ -118,7 +134,7 @@ export const CalendarLive = HttpApiBuilder.group(
 								entity: 'calendar_event',
 								id: _.params.id,
 							})
-						return rows[0]
+						return yield* decodeEvent(rows[0])
 					}).pipe(
 						Effect.catch(e =>
 							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
@@ -161,7 +177,12 @@ export const CalendarLive = HttpApiBuilder.group(
 								raw_ics: null,
 							})} RETURNING *
 						`
-						return rows[0]
+						const created = rows[0]
+						if (created === undefined)
+							return yield* Effect.die(
+								new Error('calendar event insert returned no row'),
+							)
+						return yield* decodeEvent(created)
 					}).pipe(
 						Effect.catch(e =>
 							e._tag === 'BadRequest' ? Effect.fail(e) : Effect.die(e),
@@ -227,7 +248,7 @@ export const CalendarLive = HttpApiBuilder.group(
 							})
 						const key = cacheKey(_.query.eventTypeId, _.query.from, _.query.to)
 						const cached = yield* Cache.getOption(slotCache, key)
-						if (Option.isSome(cached)) return cached.value
+						if (Option.isSome(cached)) return yield* decodeSlots(cached.value)
 
 						const slots = yield* provider
 							.findSlots({
@@ -244,7 +265,7 @@ export const CalendarLive = HttpApiBuilder.group(
 								),
 							)
 						yield* Cache.set(slotCache, key, slots)
-						return slots
+						return yield* decodeSlots(slots)
 					}).pipe(
 						Effect.catch(e =>
 							e._tag === 'BadRequest' ? Effect.fail(e) : Effect.die(e),

@@ -1,10 +1,13 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute } from '@tanstack/react-router'
+import { DateTime } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { motion } from 'motion/react'
 import { useCallback, useMemo } from 'react'
 import styled from 'styled-components'
+
+import type { Company, Task } from '@batuda/domain'
 
 import {
 	companiesListAtom,
@@ -29,9 +32,9 @@ import { getServerCookieHeader } from '#/lib/server-cookie'
 import { rulerUnderRule, stenciledTitle } from '#/lib/workshop-mixins'
 
 /**
- * Narrow shapes the dashboard needs. The server API currently encodes
- * responses as `Schema.Unknown`, so we perform runtime narrowing at the
- * boundary. Promoting these to a shared typed schema is a follow-up.
+ * Flat shapes the dashboard renders. The company/task atoms carry the full
+ * domain models (dates as `DateTime.Utc`); we narrow them to the handful of
+ * fields this view needs, coercing dates back to ISO strings at the boundary.
  */
 type DashboardCompany = {
 	readonly id: string
@@ -57,8 +60,8 @@ type DashboardTask = {
 }
 
 type PipelineData = {
-	readonly companies: ReadonlyArray<unknown>
-	readonly openTasks: ReadonlyArray<unknown>
+	readonly companies: ReadonlyArray<Company>
+	readonly openTasks: ReadonlyArray<Task>
 }
 
 /**
@@ -555,6 +558,14 @@ function isSameDay(isoString: string, reference: number): boolean {
 	)
 }
 
+// Typed date fields decode to DateTime.Utc on the wire; fall back to their
+// string form for anything already an ISO string.
+function dateToIsoOrNull(value: unknown): string | null {
+	if (typeof value === 'string') return value
+	if (DateTime.isDateTime(value)) return DateTime.formatIso(value)
+	return null
+}
+
 function narrowCompanies(
 	rows: ReadonlyArray<unknown>,
 ): ReadonlyArray<DashboardCompany> {
@@ -575,11 +586,9 @@ function narrowCompanies(
 			location: typeof r['location'] === 'string' ? r['location'] : null,
 			country: typeof r['country'] === 'string' ? r['country'] : null,
 			priority: typeof r['priority'] === 'number' ? r['priority'] : null,
-			lastContactedAt:
-				typeof r['lastContactedAt'] === 'string' ? r['lastContactedAt'] : null,
+			lastContactedAt: dateToIsoOrNull(r['lastContactedAt']),
 			nextAction: typeof r['nextAction'] === 'string' ? r['nextAction'] : null,
-			nextActionAt:
-				typeof r['nextActionAt'] === 'string' ? r['nextActionAt'] : null,
+			nextActionAt: dateToIsoOrNull(r['nextActionAt']),
 		})
 	}
 	return out
@@ -601,9 +610,8 @@ function narrowTasks(
 			companyId: r['companyId'],
 			type: r['type'],
 			title: r['title'],
-			dueAt: typeof r['dueAt'] === 'string' ? r['dueAt'] : null,
-			completedAt:
-				typeof r['completedAt'] === 'string' ? r['completedAt'] : null,
+			dueAt: dateToIsoOrNull(r['dueAt']),
+			completedAt: dateToIsoOrNull(r['completedAt']),
 		})
 	}
 	return out

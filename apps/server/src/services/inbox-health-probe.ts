@@ -1,4 +1,4 @@
-import { Cause, Config, Effect, Layer, Schedule, ServiceMap } from 'effect'
+import { Cause, Config, Context, Effect, Layer, Schedule } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CredentialCrypto } from './credential-crypto.js'
@@ -27,7 +27,7 @@ type GrantState = 'connected' | 'auth_failed' | 'connect_failed'
 const stateForFailure = (tag: string): Exclude<GrantState, 'connected'> =>
 	tag === 'GrantAuthFailed' ? 'auth_failed' : 'connect_failed'
 
-export class InboxHealthProbe extends ServiceMap.Service<InboxHealthProbe>()(
+export class InboxHealthProbe extends Context.Service<InboxHealthProbe>()(
 	'InboxHealthProbe',
 	{
 		make: Effect.gen(function* () {

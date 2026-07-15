@@ -34,30 +34,37 @@ const companyTasksCache = new Map<
 const timelineCache = new Map<string, ReturnType<typeof makeTimelineAtom>>()
 
 function makeCompanyAtom(slug: string) {
-	return BatudaApiAtom.query('companies', 'get', { params: { slug } })
+	return BatudaApiAtom.query('companies', 'get', {
+		params: { slug },
+		serializationKey: `company:${slug}`,
+	})
 }
 
 function makeContactsAtom(companyId: string) {
 	return BatudaApiAtom.query('contacts', 'list', {
 		query: { companyId },
+		serializationKey: `contacts:${companyId}`,
 	})
 }
 
 function makeInteractionsAtom(companyId: string) {
 	return BatudaApiAtom.query('interactions', 'list', {
 		query: { companyId, limit: 20 },
+		serializationKey: `interactions:${companyId}`,
 	})
 }
 
 function makeCompanyTasksAtom(companyId: string) {
 	return BatudaApiAtom.query('tasks', 'list', {
 		query: { companyId },
+		serializationKey: `company-tasks:${companyId}`,
 	})
 }
 
 function makeTimelineAtom(companyId: string) {
 	return BatudaApiAtom.query('timeline', 'list', {
 		query: { companyId, limit: 50 },
+		serializationKey: `timeline:${companyId}`,
 	})
 }
 

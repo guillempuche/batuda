@@ -21,7 +21,10 @@ function makeListAtom(params: ResearchListParams) {
 	if (params.status !== undefined) query['status'] = params.status
 	if (params.limit !== undefined) query['limit'] = params.limit
 	if (params.offset !== undefined) query['offset'] = params.offset
-	return BatudaApiAtom.query('research', 'list', { query })
+	return BatudaApiAtom.query('research', 'list', {
+		query,
+		serializationKey: `research:list:${listKey(params)}`,
+	})
 }
 
 function listKey(params: ResearchListParams): string {
@@ -48,6 +51,7 @@ const detailCache = new Map<string, ReturnType<typeof makeDetailAtom>>()
 function makeDetailAtom(researchId: string) {
 	return BatudaApiAtom.query('research', 'get', {
 		params: { id: researchId },
+		serializationKey: `research:${researchId}`,
 	})
 }
 
@@ -67,6 +71,7 @@ const runProposalsCache = new Map<
 function makeRunProposalsAtom(researchId: string) {
 	return BatudaApiAtom.query('research', 'listProposedUpdates', {
 		params: { id: researchId },
+		serializationKey: `research:proposed-updates:${researchId}`,
 	})
 }
 
@@ -154,7 +159,10 @@ function makePendingProposalsAtom(params: PendingProposalsParams) {
 	}
 	if (params.limit !== undefined) query['limit'] = params.limit
 	if (params.offset !== undefined) query['offset'] = params.offset
-	return BatudaApiAtom.query('research', 'listPendingProposals', { query })
+	return BatudaApiAtom.query('research', 'listPendingProposals', {
+		query,
+		serializationKey: `research:pending-proposals:${pendingProposalsKey(params)}`,
+	})
 }
 
 function pendingProposalsKey(params: PendingProposalsParams): string {

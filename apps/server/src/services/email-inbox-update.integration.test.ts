@@ -11,6 +11,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import {
 	CurrentOrg,
+	type EmailThreadList,
 	GrantAuthFailed,
 	SessionContext,
 } from '@batuda/controllers'
@@ -459,6 +460,94 @@ describe('EmailService.updateInbox re-probe — real credential round-trip', () 
 			expect(probeCalls).toHaveLength(1)
 			expect(probeCalls[0]?.password).toBe(ORIGINAL_PW)
 			expect(probeCalls[0]?.imapHost).toBe('imap.rotated.example')
+		})
+	})
+})
+
+describe('EmailService.listThreads unread flag', () => {
+	let inboxId: string
+	const inboxEmail = `threads-${randomUUID()}@test.local`
+	const externalThreadId = `outbound-only-${randomUUID()}`
+
+	const seed = Effect.gen(function* () {
+		const sql = yield* SqlClient.SqlClient
+		const placeholder = new Uint8Array([0])
+		const inbox = yield* sql<{ id: string }>`
+			INSERT INTO inboxes (
+				organization_id, email, display_name, purpose, owner_user_id,
+				imap_host, imap_port, imap_security,
+				smtp_host, smtp_port, smtp_security,
+				username, password_ciphertext, password_nonce, password_tag,
+				active, grant_status
+			) VALUES (
+				${TEST_ORG}, ${inboxEmail}, 'Threads', 'human', ${TEST_USER},
+				'imap.test.local', 993, 'tls',
+				'smtp.test.local', 587, 'starttls',
+				${inboxEmail}, ${placeholder}, ${placeholder}, ${placeholder},
+				true, 'connected'
+			)
+			RETURNING id
+		`
+		const id = inbox[0]!.id
+		yield* sql`
+			INSERT INTO email_thread_links
+				(organization_id, external_thread_id, inbox_id, subject)
+			VALUES (${TEST_ORG}, ${externalThreadId}, ${id}, 'Proposal sent')
+		`
+		// One OUTBOUND message, no inbound reply — the case where the unread
+		// computation's inner MAX over inbound messages is SQL NULL.
+		yield* sql`
+			INSERT INTO email_messages
+				(organization_id, inbox_id, message_id, direction, folder,
+				 raw_rfc822_ref, subject, status, imap_uid, imap_uidvalidity)
+			VALUES
+				(${TEST_ORG}, ${id}, ${externalThreadId}, 'outbound', 'Sent',
+				 'sentinel', 'Proposal sent', 'normal',
+				 ${Math.floor(Math.random() * 1_000_000_000)}, 100)
+		`
+		return id
+	})
+
+	beforeAll(async () => {
+		inboxId = await Effect.runPromise(
+			seed.pipe(Effect.provide(PgLive)) as Effect.Effect<string, never, never>,
+		)
+	})
+
+	afterAll(async () => {
+		if (!inboxId) return
+		await Effect.runPromise(
+			Effect.gen(function* () {
+				const sql = yield* SqlClient.SqlClient
+				yield* sql`DELETE FROM email_messages WHERE inbox_id = ${inboxId}`
+				yield* sql`DELETE FROM email_thread_links WHERE inbox_id = ${inboxId}`
+				yield* sql`DELETE FROM inboxes WHERE id = ${inboxId}`
+			}).pipe(Effect.provide(PgLive)) as Effect.Effect<void, never, never>,
+		)
+	})
+
+	describe('when a thread has only outbound messages (a sent email awaiting a reply)', () => {
+		it('should return the thread with isUnread false instead of failing to decode a NULL', async () => {
+			// GIVEN a thread whose only message is outbound, so the unread flag's
+			//   inner MAX over inbound messages evaluates to SQL NULL
+			// WHEN the thread list is loaded through the service (which decodes
+			//   every row against the wire schema)
+			const result = await Effect.runPromise(
+				Effect.gen(function* () {
+					const svc = yield* EmailService
+					return yield* svc.listThreads({ inboxId })
+				}).pipe(
+					Effect.provide(serviceLayer(() => Effect.void)),
+					Effect.provide(orgContext),
+					Effect.provide(sessionContext),
+				) as Effect.Effect<(typeof EmailThreadList)['Type'], never, never>,
+			)
+			// THEN the NULL flag decodes as a concrete boolean rather than 500-ing
+			const thread = result.items.find(
+				t => t.externalThreadId === externalThreadId,
+			)
+			expect(thread).toBeDefined()
+			expect(thread?.isUnread).toBe(false)
 		})
 	})
 })

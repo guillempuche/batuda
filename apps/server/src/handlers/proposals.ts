@@ -1,14 +1,18 @@
-import { DateTime, Effect } from 'effect'
+import { DateTime, Effect, Schema } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { BatudaApi, CurrentOrg, NotFound } from '@batuda/controllers'
+import { Proposal } from '@batuda/domain'
 
 import {
 	ProposalEvent,
 	TimelineActivityService,
 } from '../services/timeline-activity'
+
+const decodeProposal = Schema.decodeUnknownEffect(Proposal)
+const decodeProposals = Schema.decodeUnknownEffect(Schema.Array(Proposal))
 
 type ProposalEventKind = 'sent' | 'viewed' | 'responded'
 
@@ -40,7 +44,9 @@ export const ProposalsLive = HttpApiBuilder.group(
 						const conditions: Array<Statement.Fragment> = []
 						if (_.query.companyId)
 							conditions.push(sql`company_id = ${_.query.companyId}`)
-						return yield* sql`SELECT * FROM proposals WHERE ${sql.and(conditions)}`
+						const rows =
+							yield* sql`SELECT * FROM proposals WHERE ${sql.and(conditions)}`
+						return yield* decodeProposals(rows)
 					}).pipe(Effect.orDie),
 				)
 				.handle('get', _ =>
@@ -53,7 +59,7 @@ export const ProposalsLive = HttpApiBuilder.group(
 								entity: 'proposal',
 								id: _.params.id,
 							})
-						return proposal
+						return yield* decodeProposal(proposal)
 					}).pipe(
 						Effect.catch(e =>
 							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
@@ -73,7 +79,12 @@ export const ProposalsLive = HttpApiBuilder.group(
 								companyId: _.payload.companyId,
 							}),
 						)
-						return rows[0]
+						const created = rows[0]
+						if (created === undefined)
+							return yield* Effect.die(
+								new Error('proposal insert returned no row'),
+							)
+						return yield* decodeProposal(created)
 					}).pipe(Effect.orDie),
 				)
 				.handle('update', _ =>
@@ -132,7 +143,8 @@ export const ProposalsLive = HttpApiBuilder.group(
 								proposalId: _.params.id,
 							}),
 						)
-						return rows[0]
+						const row = rows[0]
+						return row === undefined ? null : yield* decodeProposal(row)
 					}).pipe(Effect.orDie),
 				)
 		}),

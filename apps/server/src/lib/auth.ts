@@ -10,7 +10,7 @@ import {
 	organization,
 } from 'better-auth/plugins'
 import { adminAc, defaultAc } from 'better-auth/plugins/admin/access'
-import { Effect, Layer, Redacted, ServiceMap } from 'effect'
+import { Context, Effect, Layer, Redacted } from 'effect'
 import pg from 'pg'
 
 import { buildBetterAuthConfig } from '@batuda/auth'
@@ -21,7 +21,7 @@ import { TransactionalEmailProvider } from '../services/transactional-email-prov
 import { TransactionalEmailProviderLive } from '../services/transactional-email-provider-live'
 import { buildInvitationCallbackURL, EnvVars } from './env'
 
-export class Auth extends ServiceMap.Service<Auth>()('Auth', {
+export class Auth extends Context.Service<Auth>()('Auth', {
 	make: Effect.gen(function* () {
 		const env = yield* EnvVars
 		const transactional = yield* TransactionalEmailProvider
@@ -35,7 +35,7 @@ export class Auth extends ServiceMap.Service<Auth>()('Auth', {
 		// those callbacks can fork log effects onto the real runtime — routing
 		// Better Auth's internal errors (adapter, OAuth/OIDC) through OTLP like
 		// every other log instead of leaving them console-only.
-		const services = yield* Effect.services<never>()
+		const services = yield* Effect.context<never>()
 		const forkLog = (effect: Effect.Effect<void, never, never>): void => {
 			Effect.runForkWith(services)(effect)
 		}

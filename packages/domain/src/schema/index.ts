@@ -1,4 +1,11 @@
+export { DbNumber } from './_common'
 export { ApiKey, ApiKeyId } from './api-keys'
+export {
+	CalendarEvent,
+	CalendarEventId,
+	CalendarEventType,
+	CalendarEventTypeId,
+} from './calendar-events'
 export {
 	CallRecording,
 	CallRecordingId,
@@ -19,6 +26,7 @@ export {
 } from './contact-channels'
 export { Contact, ContactId } from './contacts'
 export { Document, DocumentId } from './documents'
+export { EmailDraft, EmailDraftId } from './email-drafts'
 export {
 	EmailDirection,
 	EmailMessage,
@@ -27,6 +35,14 @@ export {
 	InboundClassification,
 } from './email-messages'
 export { EmailThreadLink, EmailThreadLinkId } from './email-thread-links'
+export { InboxFooter, InboxFooterId } from './inbox-footers'
+export {
+	Inbox,
+	InboxGrantStatus,
+	InboxId,
+	InboxPurpose,
+	InboxTransportSecurity,
+} from './inboxes'
 export { Interaction, InteractionId } from './interactions'
 export {
 	MessageParticipant,
@@ -36,6 +52,7 @@ export {
 export { Page, PageId } from './pages'
 export { Product, ProductId } from './products'
 export { Proposal, ProposalId } from './proposals'
+export { ResearchRun, ResearchRunId } from './research-runs'
 export { TaskActorKind, TaskEvent, TaskEventId } from './task-events'
 export {
 	Task,

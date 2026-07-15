@@ -1,4 +1,4 @@
-import { Config, Effect, Layer, Schedule, ServiceMap } from 'effect'
+import { Config, Context, Effect, Layer, Schedule } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { StorageProvider } from './storage-provider'
@@ -15,7 +15,7 @@ import { StorageProvider } from './storage-provider'
  *  - scrape blobs whose source no surviving run fetches and no applied contact
  *    cites — the blob and its global source row are removed together.
  */
-export class ResearchRetention extends ServiceMap.Service<ResearchRetention>()(
+export class ResearchRetention extends Context.Service<ResearchRetention>()(
 	'ResearchRetention',
 	{
 		make: Effect.gen(function* () {

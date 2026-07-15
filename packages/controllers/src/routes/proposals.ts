@@ -5,6 +5,8 @@ import {
 	HttpApiSchema,
 } from 'effect/unstable/httpapi'
 
+import { Proposal } from '@batuda/domain'
+
 import { NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
@@ -38,27 +40,27 @@ export const ProposalsGroup = HttpApiGroup.make('proposals')
 			query: {
 				companyId: Schema.optional(Schema.String),
 			},
-			success: Schema.Array(Schema.Unknown),
+			success: Schema.Array(Proposal.json),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.get('get', '/proposals/:id', {
 			params: { id: Schema.String },
-			success: Schema.Unknown,
+			success: Proposal.json,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.post('create', '/proposals', {
 			payload: CreateProposalInput,
-			success: Schema.Unknown,
+			success: Proposal.json,
 		}),
 	)
 	.add(
 		HttpApiEndpoint.patch('update', '/proposals/:id', {
 			params: { id: Schema.String },
 			payload: UpdateProposalInput,
-			success: Schema.Unknown,
+			success: Schema.NullOr(Proposal.json),
 		}),
 	)
 	.middleware(SessionMiddleware)

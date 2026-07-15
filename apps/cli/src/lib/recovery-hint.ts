@@ -39,6 +39,9 @@ export const recoveryHint = (e: unknown): string | undefined => {
 	if (code === '23502') {
 		return 'NOT NULL constraint violated — a required column received null'
 	}
+	if (t === 'UniqueViolation') {
+		return 'Unique constraint violated — duplicate data. Run: pnpm cli db reset && pnpm cli seed'
+	}
 	if (t === 'ConstraintError') {
 		return 'Constraint violated. Run: pnpm cli db reset && pnpm cli seed'
 	}

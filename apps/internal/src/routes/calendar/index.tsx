@@ -7,6 +7,7 @@ import { CalendarPlus, Check, CircleHelp, X } from 'lucide-react'
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
+import type { CalendarEvent, CalendarEventType, Company } from '@batuda/domain'
 import { PriButton, PriDialog } from '@batuda/ui/pri'
 
 import {
@@ -57,9 +58,9 @@ type CompanyLookup = {
 const ScheduleGrid = lazy(() => import('#/components/calendar/schedule-grid'))
 
 async function loadCalendarOnServer(): Promise<{
-	events: ReadonlyArray<unknown>
-	eventTypes: ReadonlyArray<unknown>
-	companies: ReadonlyArray<unknown>
+	events: ReadonlyArray<CalendarEvent>
+	eventTypes: ReadonlyArray<CalendarEventType>
+	companies: ReadonlyArray<Company>
 }> {
 	const [{ Effect }, { makeBatudaApiServer }, cookie] = await Promise.all([
 		import('effect'),
@@ -375,6 +376,15 @@ function EventDetailDialog({
 
 // ── Row → domain adapters ──────────────────────────────────────────
 
+// Typed date fields decode to DateTime.Utc on the wire; convert those to an
+// ISO string (the row shape downstream feeds `new Date(...)`), falling back to
+// the plain-string form for anything already an ISO string.
+function toIsoString(value: unknown): string {
+	if (typeof value === 'string') return value
+	if (DateTime.isDateTime(value)) return DateTime.formatIso(value)
+	return ''
+}
+
 function toEventRow(raw: unknown): CalendarEventRow {
 	const r = raw as Record<string, unknown>
 	return {
@@ -382,8 +392,8 @@ function toEventRow(raw: unknown): CalendarEventRow {
 		title: String(r['title'] ?? ''),
 		source: (r['source'] as CalendarEventRow['source']) ?? 'internal',
 		status: (r['status'] as CalendarEventRow['status']) ?? 'confirmed',
-		startAt: String(r['start_at'] ?? r['startAt'] ?? ''),
-		endAt: String(r['end_at'] ?? r['endAt'] ?? ''),
+		startAt: toIsoString(r['start_at'] ?? r['startAt']),
+		endAt: toIsoString(r['end_at'] ?? r['endAt']),
 		companyId: (r['company_id'] ?? r['companyId'] ?? null) as string | null,
 		contactId: (r['contact_id'] ?? r['contactId'] ?? null) as string | null,
 		locationType: (r['location_type'] ??

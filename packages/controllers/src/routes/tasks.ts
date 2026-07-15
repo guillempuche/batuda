@@ -5,11 +5,23 @@ import {
 	HttpApiSchema,
 } from 'effect/unstable/httpapi'
 
-import { TaskPriority, TaskSource, TaskStatus } from '@batuda/domain'
+import {
+	Task,
+	TaskEvent,
+	TaskPriority,
+	TaskSource,
+	TaskStatus,
+} from '@batuda/domain'
 
 import { BadRequest, Conflict, NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
+
+// bulkComplete reports how many of the requested ids it actually closed.
+export const BulkCompleteResult = Schema.Struct({
+	completed: Schema.Number,
+	ids: Schema.Array(Schema.String),
+})
 
 // ── Input schemas ──
 
@@ -89,20 +101,20 @@ export const TasksGroup = HttpApiGroup.make('tasks')
 				limit: Schema.optional(Schema.NumberFromString),
 				offset: Schema.optional(Schema.NumberFromString),
 			},
-			success: Schema.Array(Schema.Unknown),
+			success: Schema.Array(Task.json),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.get('get', '/tasks/:id', {
 			params: { id: Schema.String },
-			success: Schema.Unknown,
+			success: Task.json,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.post('create', '/tasks', {
 			payload: CreateTaskInput,
-			success: Schema.Unknown,
+			success: Schema.NullOr(Task.json),
 			error: BadRequest.pipe(HttpApiSchema.status(400)),
 		}),
 	)
@@ -111,7 +123,7 @@ export const TasksGroup = HttpApiGroup.make('tasks')
 			params: { id: Schema.String },
 			payload: UpdateTaskInput,
 			headers: IfMatchHeader,
-			success: Schema.Unknown,
+			success: Task.json,
 			error: Schema.Union([
 				NotFound.pipe(HttpApiSchema.status(404)),
 				Conflict.pipe(HttpApiSchema.status(409)),
@@ -121,21 +133,21 @@ export const TasksGroup = HttpApiGroup.make('tasks')
 	.add(
 		HttpApiEndpoint.post('complete', '/tasks/:id/complete', {
 			params: { id: Schema.String },
-			success: Schema.Unknown,
+			success: Task.json,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.post('reopen', '/tasks/:id/reopen', {
 			params: { id: Schema.String },
-			success: Schema.Unknown,
+			success: Task.json,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.post('cancel', '/tasks/:id/cancel', {
 			params: { id: Schema.String },
-			success: Schema.Unknown,
+			success: Task.json,
 			error: Schema.Union([
 				NotFound.pipe(HttpApiSchema.status(404)),
 				Conflict.pipe(HttpApiSchema.status(409)),
@@ -146,7 +158,7 @@ export const TasksGroup = HttpApiGroup.make('tasks')
 		HttpApiEndpoint.post('snooze', '/tasks/:id/snooze', {
 			params: { id: Schema.String },
 			payload: SnoozeInput,
-			success: Schema.Unknown,
+			success: Task.json,
 			error: Schema.Union([
 				NotFound.pipe(HttpApiSchema.status(404)),
 				BadRequest.pipe(HttpApiSchema.status(400)),
@@ -157,20 +169,20 @@ export const TasksGroup = HttpApiGroup.make('tasks')
 		HttpApiEndpoint.post('reschedule', '/tasks/:id/reschedule', {
 			params: { id: Schema.String },
 			payload: RescheduleInput,
-			success: Schema.Unknown,
+			success: Task.json,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.post('bulkComplete', '/tasks/bulk/complete', {
 			payload: BulkCompleteInput,
-			success: Schema.Unknown,
+			success: BulkCompleteResult,
 		}),
 	)
 	.add(
 		HttpApiEndpoint.get('events', '/tasks/:id/events', {
 			params: { id: Schema.String },
-			success: Schema.Array(Schema.Unknown),
+			success: Schema.Array(TaskEvent.json),
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)

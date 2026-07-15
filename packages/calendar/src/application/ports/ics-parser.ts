@@ -1,4 +1,4 @@
-import { type Effect, ServiceMap } from 'effect'
+import { Context, type Effect } from 'effect'
 
 import type {
 	CalendarAttendeeRsvp,
@@ -51,7 +51,7 @@ export interface BuildReplyInput {
  * and a future Effect-native implementation without touching the calendar
  * service.
  */
-export class IcsParser extends ServiceMap.Service<
+export class IcsParser extends Context.Service<
 	IcsParser,
 	{
 		readonly parse: (raw: Uint8Array) => Effect.Effect<ParsedIcs, InvalidIcs>

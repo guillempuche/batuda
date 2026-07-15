@@ -7,7 +7,7 @@ export const TaskActorKind = Schema.Literals(['user', 'agent'])
 export type TaskActorKind = typeof TaskActorKind.Type
 
 export class TaskEvent extends Model.Class<TaskEvent>('TaskEvent')({
-	id: Model.Generated(TaskEventId),
+	id: Model.GeneratedByDb(TaskEventId),
 	taskId: Schema.String,
 	at: Schema.DateTimeUtcFromDate,
 	actorId: Schema.NullOr(Schema.String),

@@ -2,7 +2,8 @@ import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { CurrentOrg } from '@batuda/controllers'
+import { CompanyDetail, CurrentOrg } from '@batuda/controllers'
+import { Company } from '@batuda/domain'
 
 import { CompanyService } from '../../services/companies'
 import {
@@ -12,6 +13,7 @@ import {
 import { recordStageChange } from '../../services/company-stage-change'
 import { Geocoder } from '../../services/geocoder'
 import { TimelineActivityService } from '../../services/timeline-activity'
+import { ListResult, toItems } from './_result'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg]
 
@@ -31,7 +33,7 @@ const SearchCompanies = Tool.make('search_companies', {
 		max_lng: Schema.optional(Schema.Number),
 		limit: Schema.optional(Schema.Number),
 	}),
-	success: Schema.Unknown,
+	success: ListResult(Company.json),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Search Companies')
@@ -45,7 +47,7 @@ const GetCompany = Tool.make('get_company', {
 	parameters: Schema.Struct({
 		id_or_slug: Schema.String,
 	}),
-	success: Schema.Unknown,
+	success: Schema.Union([CompanyDetail, Company.json]),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Get Company')
@@ -84,7 +86,7 @@ const CreateCompany = Tool.make('create_company', {
 		geocodeSource: Schema.optional(Schema.String),
 		metadata: Schema.optional(Schema.Unknown),
 	}),
-	success: Schema.Unknown,
+	success: Company.json,
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Create Company')
@@ -122,7 +124,7 @@ const UpdateCompany = Tool.make('update_company', {
 		geocodeSource: Schema.optional(Schema.String),
 		metadata: Schema.optional(Schema.Unknown),
 	}),
-	success: Schema.Unknown,
+	success: Schema.NullOr(Company.json),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Update Company')
@@ -136,7 +138,7 @@ const GeocodeCompany = Tool.make('geocode_company', {
 	parameters: Schema.Struct({
 		id: Schema.String,
 	}),
-	success: Schema.Unknown,
+	success: Schema.NullOr(Company.json),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Geocode Company')
@@ -164,7 +166,7 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 		return {
 			search_companies: params =>
 				Effect.gen(function* () {
-					return yield* service.search({
+					const companies = yield* service.search({
 						status: params.status,
 						country: params.country,
 						industry: params.industry,
@@ -177,6 +179,7 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 						maxLng: params.max_lng,
 						limit: params.limit,
 					})
+					return toItems(companies)
 				}).pipe(Effect.orDie),
 			get_company: ({ id_or_slug }) =>
 				service.getWithRelations(id_or_slug).pipe(
@@ -186,7 +189,12 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 			create_company: params =>
 				Effect.gen(function* () {
 					const rows = yield* service.create(params)
-					return rows[0]
+					const created = rows[0]
+					if (created === undefined)
+						return yield* Effect.die(
+							new Error('company insert returned no row'),
+						)
+					return created
 				}).pipe(Effect.orDie),
 			update_company: ({ id, ...fields }) =>
 				Effect.gen(function* () {

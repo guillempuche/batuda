@@ -4,7 +4,7 @@ import { Model } from 'effect/unstable/schema'
 export const ApiKeyId = Schema.String.pipe(Schema.brand('ApiKeyId'))
 
 export class ApiKey extends Model.Class<ApiKey>('ApiKey')({
-	id: Model.Generated(ApiKeyId),
+	id: Model.GeneratedByDb(ApiKeyId),
 	name: Schema.String,
 	// e.g. "n8n local", "zapier prod", "claude-code"
 	keyHash: Schema.String,

@@ -3,6 +3,7 @@ import { Tool, Toolkit } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
+import { Proposal } from '@batuda/domain'
 
 import {
 	ProposalEvent,
@@ -11,6 +12,9 @@ import {
 import { ListResult, toItems } from './_result'
 
 const REQUEST_DEPENDENCIES = [CurrentOrg]
+
+const decodeProposal = Schema.decodeUnknownEffect(Proposal)
+const decodeProposals = Schema.decodeUnknownEffect(Schema.Array(Proposal))
 
 // Only sent/viewed/responded project onto the timeline; draft, expired,
 // declined and accepted update the proposal row silently.
@@ -34,7 +38,7 @@ const ListProposals = Tool.make('list_proposals', {
 	parameters: Schema.Struct({
 		company_id: Schema.optional(Schema.String),
 	}),
-	success: ListResult(Schema.Unknown),
+	success: ListResult(Proposal.json),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'List Proposals')
@@ -56,7 +60,7 @@ const CreateProposal = Tool.make('create_proposal', {
 		notes: Schema.optional(Schema.String),
 		metadata: Schema.optional(Schema.Unknown),
 	}),
-	success: Schema.Unknown,
+	success: Proposal.json,
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Create Proposal')
@@ -75,7 +79,7 @@ const UpdateProposal = Tool.make('update_proposal', {
 		notes: Schema.optional(Schema.String),
 		metadata: Schema.optional(Schema.Unknown),
 	}),
-	success: Schema.Unknown,
+	success: Schema.NullOr(Proposal.json),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Update Proposal')
@@ -96,11 +100,11 @@ export const ProposalHandlersLive = ProposalTools.toLayer(
 		return {
 			list_proposals: ({ company_id }) =>
 				Effect.gen(function* () {
-					if (company_id) {
-						return yield* sql`SELECT * FROM proposals WHERE company_id = ${company_id} ORDER BY created_at DESC`
-					}
-					return yield* sql`SELECT * FROM proposals ORDER BY created_at DESC`
-				}).pipe(Effect.orDie, Effect.map(toItems)),
+					const rows = company_id
+						? yield* sql`SELECT * FROM proposals WHERE company_id = ${company_id} ORDER BY created_at DESC`
+						: yield* sql`SELECT * FROM proposals ORDER BY created_at DESC`
+					return toItems(yield* decodeProposals(rows))
+				}).pipe(Effect.orDie),
 			create_proposal: params =>
 				Effect.gen(function* () {
 					const currentOrg = yield* CurrentOrg
@@ -121,7 +125,12 @@ export const ProposalHandlersLive = ProposalTools.toLayer(
 					if (params.metadata !== undefined) row['metadata'] = params.metadata
 					const rows =
 						yield* sql`INSERT INTO proposals ${sql.insert(row)} RETURNING *`
-					return rows[0]
+					const created = rows[0]
+					if (created === undefined)
+						return yield* Effect.die(
+							new Error('proposal insert returned no row'),
+						)
+					return yield* decodeProposal(created)
 				}).pipe(Effect.orDie),
 			update_proposal: ({ id, ...rest }) =>
 				Effect.gen(function* () {
@@ -175,7 +184,8 @@ export const ProposalHandlersLive = ProposalTools.toLayer(
 						)
 					}
 
-					return rows[0]
+					const row = rows[0]
+					return row === undefined ? null : yield* decodeProposal(row)
 				}).pipe(Effect.orDie),
 		}
 	}),

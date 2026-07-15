@@ -1,4 +1,4 @@
-import { DateTime, Effect, Stream } from 'effect'
+import { DateTime, Effect, Schema, Stream } from 'effect'
 import { HttpApiBuilder } from 'effect/unstable/httpapi'
 import { SqlClient } from 'effect/unstable/sql'
 
@@ -7,6 +7,7 @@ import {
 	ConfirmRequired,
 	CurrentOrg,
 	NotFound,
+	PendingProposal,
 	SessionContext,
 } from '@batuda/controllers'
 import { resolveInstructions } from '@batuda/instructions'
@@ -24,6 +25,17 @@ import {
 	resolveResearchProposedUpdatesBatch,
 } from '../services/research-apply'
 import { TimelineActivityService } from '../services/timeline-activity'
+
+// The pending-proposals query returns each run's `created_at` as a raw Date;
+// decode it from a Date so it lands as a wire-safe DateTime.Utc, mirroring the
+// PendingProposal response shape and overriding only that column.
+const PendingProposalRow = Schema.Struct({
+	...PendingProposal.fields,
+	runCreatedAt: Schema.DateTimeUtcFromDate,
+})
+const decodePendingProposals = Schema.decodeUnknownEffect(
+	Schema.Array(PendingProposalRow),
+)
 
 export const ResearchLive = HttpApiBuilder.group(
 	BatudaApi,
@@ -172,15 +184,19 @@ export const ResearchLive = HttpApiBuilder.group(
 								'no_reliable_data',
 							].includes(status)
 						) {
+							// completedAt decodes to a DateTime.Utc (or null); emit it as an
+							// ISO string so the event payload stays plain JSON.
+							const completedAtIso =
+								run.completedAt !== null
+									? DateTime.formatIso(run.completedAt)
+									: DateTime.formatIso(DateTime.nowUnsafe())
 							return {
 								status,
 								events: [
 									{
 										type: `run.${status}`,
 										researchId: _.params.id,
-										timestamp:
-											(run as { completedAt: string | null }).completedAt ??
-											DateTime.formatIso(DateTime.nowUnsafe()),
+										timestamp: completedAtIso,
 										data: {},
 									},
 								],
@@ -352,7 +368,7 @@ export const ResearchLive = HttpApiBuilder.group(
 						// Org scope is enforced by RLS; the boolean filter arrives as a
 						// query string, so map it back to a tri-state (unset = either).
 						const mc = _.query.machine_checkable
-						return yield* svc.listPendingProposals({
+						const rows = yield* svc.listPendingProposals({
 							subjectTable: _.query.subject_table,
 							status: _.query.status,
 							minConfidence: _.query.min_confidence,
@@ -361,6 +377,7 @@ export const ResearchLive = HttpApiBuilder.group(
 							limit: _.query.limit,
 							offset: _.query.offset,
 						})
+						return yield* decodePendingProposals(rows).pipe(Effect.orDie)
 					}).pipe(Effect.orDie),
 				)
 				.handle('listProposedUpdates', _ =>
@@ -428,13 +445,17 @@ export const ResearchLive = HttpApiBuilder.group(
 					Effect.gen(function* () {
 						const { userId } = yield* SessionContext
 						const policy = yield* svc.getPolicy(userId)
+						// No saved row yet → the effective limits are the system
+						// defaults; there's no timestamp, so updatedAt is null. Same
+						// shape as a decoded row so the response type stays uniform.
 						return (
 							policy ?? {
-								budget_cents: systemDefaults.budgetCents,
-								paid_budget_cents: systemDefaults.paidBudgetCents,
-								auto_approve_paid_cents: systemDefaults.autoApprovePaidCents,
-								paid_monthly_cap_cents: systemDefaults.paidMonthlyCapCents,
-								auto_apply_min_confidence: null,
+								budgetCents: systemDefaults.budgetCents,
+								paidBudgetCents: systemDefaults.paidBudgetCents,
+								autoApprovePaidCents: systemDefaults.autoApprovePaidCents,
+								paidMonthlyCapCents: systemDefaults.paidMonthlyCapCents,
+								autoApplyMinConfidence: null,
+								updatedAt: null,
 							}
 						)
 					}).pipe(Effect.orDie),
@@ -449,10 +470,7 @@ export const ResearchLive = HttpApiBuilder.group(
 							paidMonthlyCapCents: _.payload.paid_monthly_cap_cents,
 							autoApplyMinConfidence: _.payload.auto_apply_min_confidence,
 						})
-					}).pipe(
-						Effect.map(rows => rows[0]),
-						Effect.orDie,
-					),
+					}).pipe(Effect.orDie),
 				)
 				.handle('spend', _ =>
 					svc
