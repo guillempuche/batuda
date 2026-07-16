@@ -112,11 +112,12 @@ const ToolResultSchema = Schema.Unknown
 
 // ── Tool definitions ──
 
-// A failed fetch (a dead URL, a provider 4xx) comes back to the model as a tool
-// result instead of aborting the run, so one unreachable page or a forbidden
-// extraction can't sink a whole research pass — the model reads the error and
-// moves on to another source. All three web-fetch tools (search, scrape, extract)
-// opt in; budget and registry failures stay fatal.
+// A failed call — a dead URL, a provider 4xx, or a register that is unreachable
+// or out of credit — comes back to the model as a tool result instead of aborting
+// the run, so one bad page or lookup can't sink a whole research pass: the model
+// reads the error and moves on. The web search, page fetch, and register lookup
+// opt in; the register's budget hints only reach the model this way, and turning a
+// register off becomes a safe setting rather than one that fails every run.
 export const WebSearchTool = Tool.make('web_search', {
 	description:
 		'Search the public web for URLs relevant to a query. Returns a list of (url, title, snippet). Prefer this over scrape_page when you do not yet have a specific URL.',
@@ -138,6 +139,7 @@ export const RegistryLookupTool = Tool.make('registry_lookup', {
 		'Look up a company in its national business registry. Accepts any ISO country; one without a national registry returns {status:"no_registry"} — use discover_contacts for contact enrichment there. Metered (~€0.29/lookup), so use it to confirm a specific company rather than browsing. Returns legal name, tax id, status, and (when available) directors.',
 	parameters: RegistryLookupParams,
 	success: ToolResultSchema,
+	failureMode: 'return',
 })
 
 export const DiscoverContactsTool = Tool.make('discover_contacts', {

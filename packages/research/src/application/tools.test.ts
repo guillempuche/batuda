@@ -165,14 +165,15 @@ const registryLookupInput = async (params: {
 	return captured
 }
 
-// Drive registry_lookup with a custom router and return the tool's final result
-// value — asserts what the model receives, not what the router was handed.
+// Drive registry_lookup with a custom router and return the tool's final stream
+// element — asserts what the model receives (its value and whether it is a
+// failure), not what the router was handed.
 const registryLookupResult = async (
 	lookup: (
 		input: RegistryInput,
 	) => Effect.Effect<RegistryRecord, ProviderError | NoRegistry>,
 	params: { country: string; query?: string | null; tax_id?: string | null },
-): Promise<unknown> => {
+): Promise<{ result: unknown; isFailure: boolean }> => {
 	const ports = Layer.mergeAll(
 		Layer.succeed(RegistryRouter)(RegistryRouter.of({ lookup })),
 		StubSearchProvider,
@@ -195,7 +196,8 @@ const registryLookupResult = async (
 			),
 		),
 	)
-	return results[results.length - 1]?.result
+	const last = results[results.length - 1]
+	return { result: last?.result, isFailure: last?.isFailure ?? false }
 }
 
 // Drive a web-fetch tool with a failing provider and return the final stream
@@ -478,7 +480,7 @@ describe('researchToolkit tool params — null and quoted numbers are read, not 
 			it('should hand back a no_registry result, not a tool error', async () => {
 				// GIVEN a router that reports no registry for the country
 				// WHEN registry_lookup is handled
-				const result = await registryLookupResult(
+				const { result } = await registryLookupResult(
 					() => Effect.fail(new NoRegistry({ country: 'US' })),
 					{ country: 'US' },
 				)
@@ -489,6 +491,29 @@ describe('researchToolkit tool params — null and quoted numbers are read, not 
 					country: 'US',
 					message: expect.stringContaining('discover_contacts'),
 				})
+			})
+		})
+
+		describe('when the register is unreachable or out of credit', () => {
+			it('should return the failure to the model instead of aborting the run', async () => {
+				// GIVEN the shape an unfunded register takes — a 402 mapped to a
+				// non-recoverable provider failure
+				// WHEN registry_lookup is handled
+				const { isFailure } = await registryLookupResult(
+					() =>
+						Effect.fail(
+							new ProviderError({
+								provider: 'librebor',
+								message: 'registry lookup failed: HTTP 402',
+								recoverable: false,
+							}),
+						),
+					{ country: 'ES' },
+				)
+
+				// THEN the model sees the failure and the run carries on, rather than the
+				// whole pass being torn down over one lookup it can skip
+				expect(isFailure).toBe(true)
 			})
 		})
 	})
