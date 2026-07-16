@@ -36,6 +36,7 @@ import {
 	ScrapeProvider,
 	SearchProvider,
 } from './ports'
+import { describedLenientNumber } from './schemas/_shared'
 import {
 	REGISTRY_LOOKUP_COST_CENTS,
 	SCRAPE_COST_CENTS,
@@ -50,23 +51,25 @@ const SCRAPE_MARKDOWN_MAX_CHARS = 8000
 // ── Tool parameter schemas ──
 // Optional params are required + nullable (`Schema.NullOr(...)`), not
 // `optionalKey`: a model not using one sends an explicit `null`, which the
-// handlers treat as "not provided". This shape also serializes to a single,
-// non-nested union — `optionalKey` wraps the value in a second nullable layer,
-// and a bare `Schema.Number` adds a NaN/Infinity string branch; either nesting
-// makes a stricter provider (groq, fireworks) reject the whole tool schema. So
-// numerics use `Schema.Finite`, which serializes to a plain number.
+// handlers treat as "not provided". This shape also keeps each param a single,
+// flat list of allowed types — `optionalKey` wraps the value in a second
+// nullable layer, and a bare `Schema.Number` adds a NaN/Infinity string branch;
+// either nesting makes a stricter provider (groq, fireworks) reject the whole
+// toolkit. The count of allowed types is not what matters; the nesting is.
+//
+// A numeric param also takes the number written as text ("7"), read back as the
+// number — or as "no value" when the text names none. Models quote their numbers
+// regularly, and a provider that holds their arguments to the declared types
+// refuses the call outright, losing a whole run over a quoted digit.
 
 const WebSearchParams = Schema.Struct({
 	query: Schema.String.annotate({
 		description: 'Search query; concise keywords work best',
 	}),
-	limit: Schema.NullOr(Schema.Finite).annotate({
-		description: 'Max results to return (default 10)',
-	}),
-	recency_days: Schema.NullOr(Schema.Finite).annotate({
-		description:
-			'Restrict to results published within the last N days. Null for no filter.',
-	}),
+	limit: describedLenientNumber('Max results to return (default 10)'),
+	recency_days: describedLenientNumber(
+		'Restrict to results published within the last N days. Null for no filter.',
+	),
 	location: Schema.NullOr(Schema.String).annotate({
 		description: 'Geographic locale hint (e.g. "ES", "es-ES")',
 	}),
