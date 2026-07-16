@@ -11,10 +11,10 @@ describe('mapIndustry', () => {
 		it('should map an English, Catalan, or Spanish label to the CRM code', () => {
 			// GIVEN labels a page might use in English, Catalan, or Spanish
 			// THEN each folds onto the same code
-			expect(mapIndustry('Bicycle Manufacturing Ltd')).toBe('manufactura')
-			expect(mapIndustry('restauració')).toBe('restauració')
+			expect(mapIndustry('Bicycle Manufacturing Ltd')).toBe('manufacturing')
+			expect(mapIndustry('restaurants')).toBe('restaurants')
 			expect(mapIndustry('empresa de logística')).toBe('transport')
-			expect(mapIndustry('digital banking')).toBe('serveis')
+			expect(mapIndustry('digital banking')).toBe('services')
 			expect(mapIndustry('activewear & apparel')).toBe('retail')
 		})
 	})

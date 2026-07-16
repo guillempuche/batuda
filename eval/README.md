@@ -65,7 +65,7 @@ A JSON array of rows. Copy `golden.example.json` to your own `golden.json` and r
 
 Match the CRM's own vocabulary, or the value can never match what the pipeline extracts:
 
-- `industry` — `restauració` · `construcció` · `retail` · `manufactura` · `serveis` · `hostaleria` · `distribució` · `transport` · `other`
+- `industry` — `restaurants` · `construction` · `retail` · `manufacturing` · `services` · `hospitality` · `distribution` · `transport` · `other`
 - `size_range` — `1-5` · `6-10` · `11-25` · `26-50` · `51-200`
 - `country` — ISO 3166-1 alpha-2 code (e.g. `GB` · `ES` · `US`)
 - `location` — free text (matched by containment, so formatting differences are tolerated)

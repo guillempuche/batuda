@@ -5,13 +5,13 @@
 // apart.
 
 export const CRM_INDUSTRIES = [
-	'restauració',
-	'construcció',
+	'restaurants',
+	'construction',
 	'retail',
-	'manufactura',
-	'serveis',
-	'hostaleria',
-	'distribució',
+	'manufacturing',
+	'services',
+	'hospitality',
+	'distribution',
 	'transport',
 	'other',
 ] as const

@@ -5,7 +5,7 @@
 		"expectedOutput": {
 			"officialDomain": "brompton.com",
 			"fields": {
-				"industry": "manufactura",
+				"industry": "manufacturing",
 				"country": "GB",
 				"location": "London"
 			},
@@ -21,7 +21,8 @@
 				"industry": "retail",
 				"country": "GB",
 				"location": "Solihull"
-			}
+			},
+			"contacts": ["Ben Francis", "Noel Mack", "John Douglas"]
 		}
 	},
 	{
@@ -29,7 +30,12 @@
 		"query": "Monzo Bank, London",
 		"expectedOutput": {
 			"officialDomain": "monzo.com",
-			"fields": { "industry": "serveis", "country": "GB", "location": "London" }
+			"fields": {
+				"industry": "services",
+				"country": "GB",
+				"location": "London"
+			},
+			"contacts": ["Diana Layfield"]
 		}
 	},
 	{
@@ -39,10 +45,11 @@
 			"officialDomain": "dyson.com",
 			"altDomains": ["dyson.co.uk"],
 			"fields": {
-				"industry": "manufactura",
+				"industry": "manufacturing",
 				"country": "GB",
 				"location": "Malmesbury"
-			}
+			},
+			"contacts": ["James Dyson"]
 		}
 	},
 	{
@@ -52,10 +59,11 @@
 			"officialDomain": "jcb.com",
 			"altDomains": ["jcb.co.uk"],
 			"fields": {
-				"industry": "manufactura",
+				"industry": "manufacturing",
 				"country": "GB",
 				"location": "Rocester"
-			}
+			},
+			"contacts": ["Anthony Bamford"]
 		}
 	},
 	{
@@ -65,7 +73,7 @@
 			"officialDomain": "nandos.co.uk",
 			"altDomains": ["nandos.com"],
 			"fields": {
-				"industry": "restauració",
+				"industry": "restaurants",
 				"country": "GB",
 				"location": "London"
 			}
@@ -77,7 +85,11 @@
 		"expectedOutput": {
 			"officialDomain": "greggs.co.uk",
 			"altDomains": ["greggs.com"],
-			"fields": { "country": "GB", "location": "Newcastle" }
+			"fields": {
+				"country": "GB",
+				"location": "Newcastle"
+			},
+			"contacts": ["Roisin Currie", "Matt Davies", "Richard Hutton"]
 		}
 	},
 	{
@@ -86,7 +98,10 @@
 		"expectedOutput": {
 			"officialDomain": "deliveroo.co.uk",
 			"altDomains": ["deliveroo.com"],
-			"fields": { "country": "GB", "location": "London" }
+			"fields": {
+				"country": "GB",
+				"location": "London"
+			}
 		}
 	},
 	{
@@ -95,7 +110,11 @@
 		"expectedOutput": {
 			"officialDomain": "ocado.com",
 			"altDomains": ["ocadogroup.com", "ocado.co.uk"],
-			"fields": { "country": "GB", "location": "Hatfield" }
+			"fields": {
+				"country": "GB",
+				"location": "Hatfield"
+			},
+			"contacts": ["Tim Steiner"]
 		}
 	},
 	{
@@ -104,7 +123,7 @@
 		"expectedOutput": {
 			"officialDomain": "enganchesaragon.com",
 			"fields": {
-				"industry": "manufactura",
+				"industry": "manufacturing",
 				"size_range": "51-200",
 				"country": "ES",
 				"location": "Zaragoza"
@@ -117,7 +136,7 @@
 		"expectedOutput": {
 			"officialDomain": "cohitech.net",
 			"fields": {
-				"industry": "manufactura",
+				"industry": "manufacturing",
 				"size_range": "51-200",
 				"country": "ES",
 				"location": "Balsareny"
@@ -130,7 +149,7 @@
 		"expectedOutput": {
 			"officialDomain": "pronimetal.com",
 			"fields": {
-				"industry": "manufactura",
+				"industry": "manufacturing",
 				"size_range": "51-200",
 				"country": "ES",
 				"location": "Alagón"
@@ -143,7 +162,7 @@
 		"expectedOutput": {
 			"officialDomain": "pcexautomotive.com",
 			"fields": {
-				"industry": "distribució",
+				"industry": "distribution",
 				"size_range": "11-25",
 				"country": "ES",
 				"location": "Alicante"
@@ -155,7 +174,10 @@
 		"query": "Canteras La Ponderosa, Alcover",
 		"expectedOutput": {
 			"officialDomain": "canteralaponderosa.com",
-			"fields": { "country": "ES", "location": "Alcover" }
+			"fields": {
+				"country": "ES",
+				"location": "Alcover"
+			}
 		}
 	},
 	{
@@ -180,6 +202,89 @@
 				"country": "US",
 				"location": "Belleville"
 			}
+		}
+	},
+	{
+		"id": "europa-worldwide",
+		"query": "Europa Worldwide, Dartford",
+		"expectedOutput": {
+			"officialDomain": "europa-worldwide.com",
+			"fields": {
+				"industry": "transport",
+				"country": "GB",
+				"location": "Dartford"
+			},
+			"contacts": [
+				"Andrew Baxter",
+				"Dionne Redpath",
+				"Rob Jones",
+				"Kirsty Dean",
+				"Jack Baxter",
+				"Adrian Redmile",
+				"Tom Jenkins",
+				"Angus Hind"
+			]
+		}
+	},
+	{
+		"id": "lectra",
+		"query": "Lectra, Paris",
+		"expectedOutput": {
+			"officialDomain": "lectra.com",
+			"fields": {
+				"country": "FR",
+				"location": "Paris"
+			},
+			"contacts": [
+				"Daniel Harari",
+				"Maximilien Abadie",
+				"Anne Borfiga",
+				"John Brearley",
+				"Antonella Capelli",
+				"Thierry Caye",
+				"Olivier du Chesnay",
+				"Javier Garcia"
+			]
+		}
+	},
+	{
+		"id": "beckhoff",
+		"query": "Beckhoff Automation, Verl",
+		"expectedOutput": {
+			"officialDomain": "beckhoff.com",
+			"fields": {
+				"industry": "manufacturing",
+				"country": "DE",
+				"location": "Verl"
+			},
+			"contacts": ["Hans Beckhoff"]
+		}
+	},
+	{
+		"id": "vollrath",
+		"query": "The Vollrath Company, Sheboygan",
+		"expectedOutput": {
+			"officialDomain": "vollrathcompany.com",
+			"altDomains": ["vollrathfoodservice.com"],
+			"fields": {
+				"industry": "manufacturing",
+				"country": "US",
+				"location": "Sheboygan"
+			},
+			"contacts": [
+				"Erik Lampe",
+				"Daniel Domenech",
+				"Brent Hoag",
+				"Chris Kelm",
+				"Tina Kreidler",
+				"Jeff Madson",
+				"Brad Nye",
+				"Pete Roever",
+				"Jon Ropella",
+				"Amanda Schneider",
+				"Sergio Romero",
+				"Christina Wegner"
+			]
 		}
 	}
 ]

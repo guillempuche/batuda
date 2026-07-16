@@ -61,20 +61,20 @@ const INDUSTRY_RULES: ReadonlyArray<
 		],
 	],
 	[
-		'hostaleria',
+		'hospitality',
 		['hotel', 'hostal', 'allotjament', 'alojamiento', 'hospitality', 'turis'],
 	],
-	['restauració', ['restaur', 'cuina', 'cocina', 'dining', 'catering', 'cafe']],
+	['restaurants', ['restaur', 'cuina', 'cocina', 'dining', 'catering', 'cafe']],
 	[
-		'construcció',
+		'construction',
 		['constru', 'obra', 'building', 'contractor', 'builder', 'reforma'],
 	],
 	[
-		'manufactura',
+		'manufacturing',
 		['manufactur', 'fabric', 'factory', 'producc', 'industrial', 'maker'],
 	],
 	[
-		'distribució',
+		'distribution',
 		['distribu', 'majorista', 'mayorista', 'wholesale', 'supplier'],
 	],
 	[
@@ -94,7 +94,7 @@ const INDUSTRY_RULES: ReadonlyArray<
 		],
 	],
 	[
-		'serveis',
+		'services',
 		[
 			'servei',
 			'servic',

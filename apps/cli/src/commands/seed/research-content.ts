@@ -400,7 +400,7 @@ export const RICH_PROSPECTS_GIRONA = [
 	{
 		name: 'Cal Forn de Banyoles',
 		website: 'https://calforn-banyoles.cat',
-		industry: 'restauració',
+		industry: 'restaurants',
 		country: 'ES',
 		why_relevant:
 			'Family restaurant in Banyoles with 40 covers; phone-only reservations; recently posted on Instagram about "no donar a l\'abast els caps de setmana".',
@@ -410,7 +410,7 @@ export const RICH_PROSPECTS_GIRONA = [
 	{
 		name: 'Hostal Empordà',
 		website: 'https://hostalemporda.cat',
-		industry: 'hostaleria',
+		industry: 'hospitality',
 		country: 'ES',
 		why_relevant:
 			'12-room hostal in Figueres; rate-parity clause friction with Booking.com; identical pattern to Hostal del Pirineu.',
@@ -419,7 +419,7 @@ export const RICH_PROSPECTS_GIRONA = [
 	},
 	{
 		name: 'Botiga del Pa',
-		industry: 'restauració',
+		industry: 'restaurants',
 		country: 'ES',
 		why_relevant:
 			'Artisan bakery chain (3 locations) in Girona. Sell-out by 11:00 every Saturday; preorder via WhatsApp is unmanageable for them.',
@@ -429,7 +429,7 @@ export const RICH_PROSPECTS_GIRONA = [
 	{
 		name: 'Mas Silencis',
 		website: 'https://massilencis.cat',
-		industry: 'hostaleria',
+		industry: 'hospitality',
 		country: 'ES',
 		why_relevant:
 			'Boutique 6-room agroturisme; growing French customer base; no FR localisation today.',
@@ -895,7 +895,7 @@ export const RICH_PROSPECTS_ELECTRICAL = [
 	{
 		name: 'Instal·lacions Bages',
 		website: 'https://instalbages.cat',
-		industry: 'manufactura',
+		industry: 'manufacturing',
 		country: 'ES',
 		why_relevant:
 			'Bages-area electrical contractor; pulled three Google ads for "electricista urgent" — paying for leads they can\'t qualify.',
@@ -904,7 +904,7 @@ export const RICH_PROSPECTS_ELECTRICAL = [
 	},
 	{
 		name: 'Electricitat Osona',
-		industry: 'manufactura',
+		industry: 'manufacturing',
 		country: 'ES',
 		why_relevant:
 			'Vic-based; similar size to Electricitat del Vallès; weak digital posture.',
@@ -914,7 +914,7 @@ export const RICH_PROSPECTS_ELECTRICAL = [
 	{
 		name: 'Electrosolucions Penedès',
 		website: 'https://electroso-penedes.cat',
-		industry: 'manufactura',
+		industry: 'manufacturing',
 		country: 'ES',
 		why_relevant: 'New entrant; has a fast site but no booking flow.',
 		pain_indicators: ['no-booking'],
@@ -925,7 +925,7 @@ export const RICH_PROSPECTS_ELECTRICAL = [
 export const RICH_PROSPECTS_FANTASMA = [
 	{
 		name: 'Magatzem Bages',
-		industry: 'distribució',
+		industry: 'distribution',
 		country: 'ES',
 		why_relevant:
 			"Small distributor in same Manresa industrial belt. Same low-signal profile as L'Ànec d'Or; worth a postal-mail touch.",
@@ -934,7 +934,7 @@ export const RICH_PROSPECTS_FANTASMA = [
 	},
 	{
 		name: 'Distribució Cardona',
-		industry: 'distribució',
+		industry: 'distribution',
 		country: 'ES',
 		why_relevant:
 			'Family distributor; runs on phone + paper. Postal mail and a cold visit may unlock dialogue.',

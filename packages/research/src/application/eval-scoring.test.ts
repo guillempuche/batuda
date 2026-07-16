@@ -163,24 +163,24 @@ describe('scoreRun', () => {
 			// GIVEN the golden holds the CRM code and the run reports English free text
 			// WHEN their Latin stems line up — THEN the field counts as correct
 			expect(
-				withIndustry('manufactura', 'Bike Manufacturing Ltd').fieldsCorrect,
+				withIndustry('manufacturing', 'Bike Manufacturing Ltd').fieldsCorrect,
 			).toBe(1)
 			expect(
-				withIndustry('serveis', 'financial services provider').fieldsCorrect,
+				withIndustry('services', 'financial services provider').fieldsCorrect,
 			).toBe(1)
 		})
 
 		it('should match across accents', () => {
 			// GIVEN an accented code and its un-accented English cognate
 			expect(
-				withIndustry('construcció', 'construction company').fieldsCorrect,
+				withIndustry('construction', 'construction company').fieldsCorrect,
 			).toBe(1)
 		})
 
 		it('should still miss a genuine categorization gap', () => {
-			// GIVEN a bank the run labels "banking" while the CRM codes it "serveis"
+			// GIVEN a bank the run labels "banking" while the CRM codes it "services"
 			// WHEN no stem is shared — THEN it counts as wrong, the signal the eval wants
-			expect(withIndustry('serveis', 'banking').fieldsCorrect).toBe(0)
+			expect(withIndustry('services', 'banking').fieldsCorrect).toBe(0)
 		})
 	})
 
