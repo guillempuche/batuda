@@ -29,7 +29,7 @@ import {
 // model may send either casing, so proposal keys are normalized before the
 // lookup. Excludes identity, coordinates (set by the geocoder), version, and
 // timestamps.
-const COMPANY_FIELDS = new Set([
+export const COMPANY_FIELDS = new Set([
 	'name',
 	'status',
 	'industry',
@@ -52,7 +52,12 @@ const COMPANY_FIELDS = new Set([
 // Reachable addresses (email/phone/whatsapp/linkedin/instagram) live on
 // contact_channels, not on `contacts`, so they are not settable here; only
 // the row's own columns remain.
-const CONTACT_FIELDS = new Set(['name', 'role', 'isDecisionMaker', 'notes'])
+export const CONTACT_FIELDS = new Set([
+	'name',
+	'role',
+	'isDecisionMaker',
+	'notes',
+])
 
 const snakeToCamel = (s: string) =>
 	s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())

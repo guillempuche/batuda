@@ -134,6 +134,8 @@ export {
 	CRM_SIZE_RANGES,
 	type CrmIndustry,
 	type CrmSizeRange,
+	SNAPSHOT_COMPANY_FIELDS,
+	SNAPSHOT_CONTACT_FIELDS,
 } from './domain/crm-vocabulary'
 export {
 	ApprovalRequired,

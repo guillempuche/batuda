@@ -23,6 +23,10 @@ import { SqlClient } from 'effect/unstable/sql'
 import { ResearchRun } from '@batuda/domain'
 
 import { AcceptedCountry, parseCountryAlpha2 } from '../domain/country'
+import {
+	SNAPSHOT_COMPANY_FIELDS,
+	SNAPSHOT_CONTACT_FIELDS,
+} from '../domain/crm-vocabulary'
 import type { ReasonCode, ResolvedPolicy } from '../domain/types'
 import { canAffordAnotherRound, runAgentResearchLoop } from './agent-loop'
 import { filterApplicableProposals } from './applicability-guard'
@@ -260,12 +264,14 @@ export const schemaVersionFor = (schemaName: string): number => {
 }
 
 // Stamp each element of an in-findings review list with an id + pending status,
-// so it can later be addressed and resolved one at a time.
+// so it can later be addressed and resolved one at a time. The id and status are
+// this system's to set, so they are spread last — a model that emitted either of
+// its own never takes their place.
 const withPendingIds = (items: unknown): unknown =>
 	Array.isArray(items)
 		? items.map(item =>
 				typeof item === 'object' && item !== null && !Array.isArray(item)
-					? { id: randomUUID(), status: 'pending', ...item }
+					? { ...item, id: randomUUID(), status: 'pending' }
 					: item,
 			)
 		: items
@@ -546,6 +552,61 @@ export const buildResearchSystemPrompt = (args: {
 }
 
 /**
+ * What a run is told about a company or person it already has on file: which row it
+ * is, the version we read it at, and the values we currently hold. The three
+ * identifying keys are named exactly as a proposed change names them, so the model
+ * copies them across rather than working out the mapping itself — it does not do that
+ * reliably, and a proposal with the wrong id cannot be applied.
+ */
+export interface SubjectForPrompt {
+	readonly subject_table: string
+	readonly subject_id: string
+	readonly expected_version: unknown
+	readonly current: Record<string, unknown>
+}
+
+export const subjectsForPrompt = (
+	subjects: ReadonlyArray<{
+		readonly table: string
+		readonly id: string
+		readonly snapshot: unknown
+		readonly expected_version: unknown
+	}>,
+): ReadonlyArray<SubjectForPrompt> =>
+	subjects.map(subject => {
+		const row = (subject.snapshot ?? {}) as Record<string, unknown>
+		const shownFields =
+			subject.table === 'contacts'
+				? SNAPSHOT_CONTACT_FIELDS
+				: SNAPSHOT_COMPANY_FIELDS
+		const current: Record<string, unknown> = {}
+		for (const key of shownFields) {
+			// A column we hold nothing in tells the model nothing, so leaving it out
+			// keeps the picture to what is actually on file.
+			if (row[key] != null) current[key] = row[key]
+		}
+		return {
+			subject_table: subject.table,
+			subject_id: subject.id,
+			expected_version: subject.expected_version,
+			current,
+		}
+	})
+
+// Told to a run that already holds the company on file, so it offers a correction
+// where the evidence disagrees. Only a disagreement is worth a person's review —
+// repeating back what is already stored is noise — and the stored value is never
+// itself a reason to believe something: it is what we believed before this run went
+// looking.
+const PROPOSE_UPDATES_DIRECTIVE = [
+	'Compare each `current` value above against the evidence. Where the evidence clearly contradicts a value on file, or fills one that is missing, add an entry to `proposed_updates`:',
+	'- copy `subject_table`, `subject_id` and `expected_version` across exactly as written above;',
+	'- put ONLY the fields that change in `fields`, keyed exactly as they are keyed in `current`;',
+	'- give a `reason`, and cite the source that states the new value — an entry with no citation is discarded.',
+	'Do not propose a value that only repeats what `current` already says, and never take a value from `current` itself: it is what is already on file, not evidence. A field the evidence says nothing about is left out.',
+].join('\n')
+
+/**
  * The instruction for the structured-extraction pass: read the gathered evidence
  * and fill the output schema from it.
  *
@@ -557,22 +618,34 @@ export const buildResearchSystemPrompt = (args: {
  * than being invented. The push names only fields a downstream guard can check; the
  * plain-list fields (products, tags) are left out on purpose, since nothing verifies
  * them and pushing there would only invite made-up entries.
+ *
+ * When the run already holds the subjects on file, they are shown to the model with
+ * an instruction to propose a correction wherever the evidence disagrees — the only
+ * way a run turns up an edit for a company it was handed rather than one it found.
  */
 export const buildExtractionPrompt = (args: {
 	readonly citationInstruction: string
 	readonly evidenceBlock: string
-}): string =>
-	[
+	readonly subjects: ReadonlyArray<SubjectForPrompt>
+}): string => {
+	const lines = [
 		'Produce structured findings STRICTLY from the evidence below (the fetched pages and the research transcript).',
 		'',
 		"Read ALL of the evidence to the end — every fetched page and every search result in the transcript — and report every fact it states; the evidence routinely states far more than a first pass returns. In particular: name EVERY person the evidence identifies as this company's own leader or employee, each with the exact job title the evidence gives them; and report the industry, employee-count band, location, country, and the company's own operational software wherever the evidence states them — including on a third-party page rather than the company's own site.",
 		'',
 		"Report ONLY what the evidence states. If it does not support a field, omit it or leave it null — never fill a field from prior knowledge, never guess, and never put a placeholder or the field's own name as its value. Leaving a field empty is always better than inventing a value for it.",
-		'',
-		args.citationInstruction,
-		'',
-		args.evidenceBlock,
-	].join('\n')
+	]
+	if (args.subjects.length > 0) {
+		lines.push(
+			'',
+			`What we already have on file:\n${JSON.stringify(args.subjects, null, 2)}`,
+			'',
+			PROPOSE_UPDATES_DIRECTIVE,
+		)
+	}
+	lines.push('', args.citationInstruction, '', args.evidenceBlock)
+	return lines.join('\n')
+}
 
 // ── Event types for SSE streaming ──
 
@@ -1251,10 +1324,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							if (parentGroupId) yield* rollupParentLocked(parentGroupId)
 						})
 
-					// Build system prompt
+					// Build system prompt. The agent sees the same trimmed on-file view
+					// the extraction pass does, so the two never disagree about what is
+					// already known.
 					const subjectContext =
 						subjects.length > 0
-							? `\n\nSubject data (frozen snapshot):\n${JSON.stringify(subjects, null, 2)}`
+							? `\n\nSubject data (frozen snapshot):\n${JSON.stringify(subjectsForPrompt(subjects), null, 2)}`
 							: ''
 					// The stored hints round-trip through the camelCasing row transform,
 					// so read `recencyDays`, not the request's `recency_days`.
@@ -1367,6 +1442,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								prompt: buildExtractionPrompt({
 									citationInstruction,
 									evidenceBlock,
+									subjects: subjectsForPrompt(subjects),
 								}),
 							})
 							let result = withProposalIds(structuredResponse.value as unknown)
