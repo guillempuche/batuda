@@ -10,13 +10,13 @@ export const CompanyId = Schema.String.pipe(Schema.brand('CompanyId'))
 // maps to and the UI offers. Exported as tuples so both a Schema.Literals and a
 // plain-array membership check read from one source.
 export const COMPANY_INDUSTRIES = [
-	'restauració',
-	'construcció',
+	'restaurants',
+	'construction',
 	'retail',
-	'manufactura',
-	'serveis',
-	'hostaleria',
-	'distribució',
+	'manufacturing',
+	'services',
+	'hospitality',
+	'distribution',
 	'transport',
 	'other',
 ] as const

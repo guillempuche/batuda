@@ -123,7 +123,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		status: 'succeeded',
 		findings: {
 			enrichment: {
-				industry: 'restauració',
+				industry: 'restaurants',
 				size_range: '6-10',
 				pain_points:
 					'Reserves per telèfon, perden walk-ups els caps de setmana.',
@@ -174,7 +174,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		status: 'succeeded',
 		findings: {
 			enrichment: {
-				industry: 'manufactura',
+				industry: 'manufacturing',
 				size_range: '26-50',
 				pain_points:
 					'Factures manuals amb Excel, errors freqüents al tancar mes.',
@@ -419,7 +419,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'Vidres Palafrugell',
 					website: 'https://vidrespalafrugell.cat',
-					industry: 'manufactura',
+					industry: 'manufacturing',
 					country: 'ES',
 					why_relevant:
 						'Sells exclusively in physical store; Instagram catalogue suggests latent online demand.',
@@ -432,7 +432,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				},
 				{
 					name: 'Forja Empordà',
-					industry: 'manufactura',
+					industry: 'manufacturing',
 					country: 'ES',
 					why_relevant:
 						'Wrought-iron workshop next to La Bisbal; potential ecommerce-local fit.',
@@ -497,7 +497,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		status: 'succeeded',
 		findings: {
 			enrichment: {
-				industry: 'distribució',
+				industry: 'distribution',
 				location: 'Manresa',
 				country: 'ES',
 				citations: [
@@ -530,7 +530,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			prospects: [
 				{
 					name: 'Taller Mecànic Jove',
-					industry: 'serveis',
+					industry: 'services',
 					country: 'ES',
 					why_relevant:
 						'Existing prospect — last contact 2025-09. Worth a follow-up DM via Instagram.',
@@ -569,7 +569,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		status: 'succeeded',
 		findings: {
 			enrichment: {
-				industry: 'restauració',
+				industry: 'restaurants',
 				size_range: '6-10',
 				pain_points:
 					'Saturday walk-up loss ~15%; no-show rate 12% on phone bookings.',
@@ -702,7 +702,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'Galvanitzats Penedès',
 					website: 'https://galvanitzatspenedes.cat',
-					industry: 'manufactura',
+					industry: 'manufacturing',
 					country: 'ES',
 					why_relevant:
 						'Posted on LinkedIn about "tancar mes amb errors" — direct match for our automation pitch.',
@@ -711,7 +711,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				},
 				{
 					name: 'Foneria Marina',
-					industry: 'manufactura',
+					industry: 'manufacturing',
 					country: 'ES',
 					why_relevant:
 						'Family foundry north of Mataró. Heavy Contaplus + Excel. No visible IT vendor.',
@@ -720,7 +720,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				},
 				{
 					name: 'Acer Inoxidable Vallès',
-					industry: 'manufactura',
+					industry: 'manufacturing',
 					country: 'ES',
 					why_relevant:
 						'Mid-size stainless-steel fabricator. Existing finance manager publicly looking for ERP help.',
@@ -843,7 +843,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 			prospects: [
 				{
 					name: 'Forn La Coloma',
-					industry: 'restauració',
+					industry: 'restaurants',
 					country: 'ES',
 					why_relevant:
 						'Berguedà obrador, similar size; runs Saturday market in Berga next to Forn Queralt.',
@@ -852,7 +852,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				},
 				{
 					name: 'Pa de Cardona',
-					industry: 'restauració',
+					industry: 'restaurants',
 					country: 'ES',
 					why_relevant:
 						'Bages obrador with Instagram preorder via DM — overwhelmed weekly.',
@@ -944,7 +944,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		status: 'succeeded',
 		findings: {
 			enrichment: {
-				industry: 'hostaleria',
+				industry: 'hospitality',
 				size_range: '6-10',
 				pain_points:
 					'Booking.com 18% commission; rate-parity clause limits direct discounting.',
@@ -1127,7 +1127,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		status: 'succeeded',
 		findings: {
 			enrichment: {
-				industry: 'manufactura',
+				industry: 'manufacturing',
 				size_range: '6-10',
 				pain_points:
 					'Sells only at the workshop and a stall during the Fira de Ceràmica.',
@@ -1542,7 +1542,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		status: 'succeeded',
 		findings: {
 			enrichment: {
-				industry: 'manufactura',
+				industry: 'manufacturing',
 				size_range: '11-25',
 				pain_points:
 					'Lead capture from Google ads goes to a generic Wordpress form; no qualification, no SLA.',
@@ -1670,7 +1670,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		status: 'succeeded',
 		findings: {
 			enrichment: {
-				industry: 'restauració',
+				industry: 'restaurants',
 				size_range: '1-5',
 				pain_points:
 					'Stock-out by 11:00 on Saturdays; preorders managed via WhatsApp.',
@@ -1974,7 +1974,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		status: 'succeeded',
 		findings: {
 			enrichment: {
-				industry: 'serveis',
+				industry: 'services',
 				size_range: '6-10',
 				pain_points:
 					'Incumbent vendor restructuring; landing page stale 5 months.',
@@ -2154,7 +2154,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		status: 'succeeded',
 		findings: {
 			enrichment: {
-				industry: 'manufactura',
+				industry: 'manufacturing',
 				size_range: '6-10',
 				pain_points:
 					'On-site quoting; no follow-up CRM; review responses sporadic.',
@@ -2222,7 +2222,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		status: 'succeeded',
 		findings: {
 			enrichment: {
-				industry: 'serveis',
+				industry: 'services',
 				size_range: '6-10',
 				pain_points:
 					'Lead intake via gmail; proposal-time average 7 h; knowledge dispersed across laptops.',
@@ -2386,7 +2386,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		status: 'succeeded',
 		findings: {
 			enrichment: {
-				industry: 'serveis',
+				industry: 'services',
 				size_range: '6-10',
 				pain_points:
 					'Instagram-driven inbound; no booking flow; brand refresh launching June 2026.',
@@ -2590,7 +2590,7 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 				{
 					name: 'Mecanitzats Sant Boi',
 					website: 'https://mecanitzatssantboi.cat',
-					industry: 'manufactura',
+					industry: 'manufacturing',
 					country: 'ES',
 					why_relevant:
 						'CNC shop in Sant Boi with manual invoicing; not yet contacted.',
@@ -3032,7 +3032,7 @@ export const seedResearchRuns = (
 						context: JSON.stringify({}),
 						findings: JSON.stringify({
 							enrichment: {
-								industry: 'restauració',
+								industry: 'restaurants',
 								size_range: '6-10',
 								pain_points:
 									'Telèfon-only reservations on weekends, ~20% no-show rate.',

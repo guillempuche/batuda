@@ -77,7 +77,7 @@ describe('collectFieldClaims', () => {
 						},
 					},
 				],
-				enrichment: { industry: sourced('serveis', 'a service') },
+				enrichment: { industry: sourced('services', 'a service') },
 			}
 
 			// WHEN collected

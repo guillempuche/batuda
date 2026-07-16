@@ -241,7 +241,7 @@ describe('Sourced', () => {
 		it('should coerce it to null, reusing the shared lenient-number rule', () => {
 			// GIVEN a wrapper whose confidence came back as the literal "NaN"
 			const decoded = decode({
-				value: 'serveis',
+				value: 'services',
 				source_id: 's1',
 				confidence: 'NaN',
 			})

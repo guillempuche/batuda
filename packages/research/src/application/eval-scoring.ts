@@ -175,12 +175,12 @@ const contactNameMatches = (expected: string, actual: string): boolean => {
 }
 
 /**
- * Industry is an open free-text field: the pipeline reports it in the source page's
- * language ("manufacturing") while the golden holds the CRM's own code
- * ("manufactura"). Catalan and English share a Latin stem for most of these codes,
- * so match on that shared stem — a prefix at least half the code's length (min 4
- * chars) that starts some word in the extracted value — instead of an exact string.
- * A real categorization gap (a bank reported as "banking" vs the code "serveis")
+ * Industry is an open free-text field. The golden holds the CRM's own code
+ * ("manufacturing") and the pipeline maps its extracted value to that same code, but
+ * a source page's own wording ("manufacturer", "manufacture") can leave an inflected
+ * variant, so match on a shared stem — a prefix at least half the code's length (min
+ * 4 chars) that starts some word in the extracted value — instead of an exact string.
+ * A real categorization gap (a bank reported as "banking" vs the code "services")
  * still counts as a miss, which is the quality signal the eval wants to keep.
  */
 const industryMatches = (expected: string, actual: string): boolean => {

@@ -89,7 +89,7 @@ export const seedCompanies = ({
 						slug: 'marisqueria-del-port',
 						name: 'Marisqueria del Port',
 						status: 'client',
-						industry: 'restauració',
+						industry: 'restaurants',
 						sizeRange: '6-10',
 						country: 'ES',
 						location: 'Sitges',
