@@ -13,6 +13,18 @@ services:
       POSTGRES_DB: batuda
       POSTGRES_USER: batuda
       POSTGRES_PASSWORD: batuda
+    # `docker compose up --wait db` blocks until this reports healthy, which is
+    # when Postgres actually accepts connections — not merely when the container
+    # has started. CI relies on it so the migrate step never runs against a
+    # database that isn't listening yet. Probes the always-present `batuda`
+    # database, so it stays valid no matter which per-worktree databases exist
+    # alongside it in this one shared container.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U batuda -d batuda"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+      start_period: 5s
     volumes:
       # pg18+ moved the data dir up one level so a single mount can host
       # multiple major versions (enables pg_upgrade --link); see

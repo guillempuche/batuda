@@ -21,11 +21,12 @@ jobs:
     # A draft PR is work in progress, so skip CI until it's marked ready.
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    # The integration phase runs the whole suite against a remote Neon branch,
-    # which is ~15x slower per query than local Postgres; it already sat near the
-    # old 15-minute cap (14m32s–14m52s on passing runs) and grows with the suite,
-    # so give it headroom rather than tip over the ceiling on a slow run.
-    timeout-minutes: 25
+    # The integration phase runs the whole suite against a Postgres container on
+    # the runner itself (the same image dev uses), so every query is a localhost
+    # round-trip instead of an internet hop to a remote database. That removes
+    # the ~15x per-query slowdown that used to push this job toward 15 minutes;
+    # 10 minutes leaves comfortable headroom.
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
@@ -78,58 +79,39 @@ jobs:
 
       # Fast unit suite first — no external services needed. Any test that
       # touches Postgres lives under `*.integration.test.ts` and runs in
-      # the integration phase below against an ephemeral Neon branch.
+      # the integration phase below against the local Postgres container.
       - name: Test (unit)
         run: pnpm test
 
-      # Integration phase: ephemeral Neon branch, MinIO, seed, and the
-      # integration suite. CI runs only on pull requests, so this phase runs
-      # on every CI run.
+      # Integration phase: a local Postgres + MinIO on the runner, seed, and the
+      # integration suite. CI runs only on pull requests, so this phase runs on
+      # every CI run.
       #
-      # Spin up an ephemeral Neon branch for the integration phase.
-      # Outputs are job-scoped + secret-marked per Neon's docs, so
-      # migrations + seed + integration tests all live in this job.
-      # expires_at is a safety net: if the runner is killed before the
-      # delete step runs, Neon auto-cleans the branch after 6 h.
-      - name: Compute Neon branch expiry (6h)
-        id: neon-expiry
-        run: echo "iso=$(date -u -d '+6 hours' +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+      # Bring up Postgres + MinIO from the same docker-compose file dev uses.
+      # `--wait` blocks until `db` reports healthy (its pg_isready healthcheck)
+      # and `storage` is up; `storage-init` is a one-shot mc container that
+      # creates the bucket and exits 0. Running the database on the runner keeps
+      # every query on localhost instead of paying an internet round-trip to a
+      # remote host — the whole reason this phase used to run near 15 minutes.
+      - name: Start Postgres + MinIO via docker compose
+        run: docker compose -f docker/docker-compose.yml up -d --wait db storage storage-init
 
-      - name: Create Neon branch
-        id: neon-branch
-        uses: neondatabase/create-branch-action@fb620d43d4c565abaf088b848a4e28e5c4ea4d9c # 6.3.1
-        with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: ci-${{ github.run_id }}-${{ github.run_attempt }}
-          api_key: ${{ secrets.NEON_API_KEY }}
-          expires_at: ${{ steps.neon-expiry.outputs.iso }}
-          # Our 0001 migration creates app_user + app_service alongside
-          # neondb_owner, so the action's "infer the role" path fails with
-          # "Multiple roles found". Pin neondb_owner — it owns the schema
-          # and integration tests SET LOCAL ROLE to switch into app_user.
-          role: neondb_owner
-
-      - name: Apply migrations to CI branch
+      # The local container above. Its `batuda` superuser owns the schema, and
+      # integration tests SET ROLE into the app_user / app_service roles that the
+      # 0001 migration creates — exactly as every developer's local stack does.
+      - name: Apply migrations
         env:
-          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          DATABASE_URL: postgresql://batuda:batuda@localhost:5433/batuda
         run: pnpm db:migrate
-
-      # Spin up MinIO (S3-compatible storage) via the same docker-compose
-      # file dev uses. `storage-init` is a one-shot mc container that
-      # waits for storage to be reachable and `mb --ignore-existing` the
-      # bucket; `--wait` blocks until both services are healthy or, in
-      # storage-init's case, have exited 0.
-      - name: Start MinIO via docker compose
-        run: docker compose -f docker/docker-compose.yml up -d --wait storage storage-init
 
       # Seed fixtures (notably the `taller` / `restaurant` orgs) that
       # several integration tests rely on. EMAIL_CREDENTIAL_KEY is base64
-      # of 32 zero bytes — fine for a branch that gets deleted at
-      # end-of-run. STORAGE_* points at the MinIO container started
-      # above; the seedDemoEmails stage PUTs raw RFC822 bytes there.
-      - name: Seed CI branch
+      # of 32 zero bytes — fine for a throwaway CI database. STORAGE_*
+      # points at the MinIO container started above; the seedDemoEmails
+      # stage PUTs raw RFC822 bytes there.
+      - name: Seed
         env:
-          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          DATABASE_URL: postgresql://batuda:batuda@localhost:5433/batuda
           BETTER_AUTH_SECRET: ci-only-not-prod-ci-only-not-prod-ci
           EMAIL_CREDENTIAL_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
           STORAGE_ENDPOINT: http://localhost:9000
@@ -150,7 +132,7 @@ jobs:
       # tracked as a follow-up CI-perf slice.
       - name: Test (integration)
         env:
-          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          DATABASE_URL: postgresql://batuda:batuda@localhost:5433/batuda
           BETTER_AUTH_SECRET: ci-only-not-prod-ci-only-not-prod-ci
           EMAIL_CREDENTIAL_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
           STORAGE_ENDPOINT: http://localhost:9000
@@ -164,23 +146,13 @@ jobs:
       # deploy workflow's exact `-e` secret list (dummy values), so a release
       # where the baked config needs a key the deploy never injects fails the
       # build instead of crashing on boot and taking prod down (2026-07-11).
-      # Reuses the Neon branch + MinIO the integration job already stood up.
+      # Reuses the Postgres + MinIO the integration phase already stood up.
       - name: Test (deploy boot parity)
         env:
-          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          DATABASE_URL: postgresql://batuda:batuda@localhost:5433/batuda
           STORAGE_ENDPOINT: http://localhost:9000
           STORAGE_REGION: us-east-1
           STORAGE_ACCESS_KEY_ID: batuda
           STORAGE_SECRET_ACCESS_KEY: batuda-secret
           STORAGE_BUCKET: batuda-assets
         run: pnpm --filter @batuda/server exec vitest run src/main.boot.test.ts --config vitest.boot.config.ts
-
-      # Cleanup runs even on test failure; only skipped if the branch was
-      # never created (e.g. earlier step failed).
-      - name: Delete Neon branch
-        if: always() && steps.neon-branch.outcome == 'success'
-        uses: neondatabase/delete-branch-action@4468d825d5a88ef4012f1705a82f02ec3072f776 # v3.2.1
-        with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch: ci-${{ github.run_id }}-${{ github.run_attempt }}
-          api_key: ${{ secrets.NEON_API_KEY }}
