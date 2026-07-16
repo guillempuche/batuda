@@ -169,6 +169,25 @@ const branchName = execSilent('git', 'rev-parse', '--abbrev-ref', 'HEAD')
 
 const slugForCurrentWorktree = branchName.pipe(Effect.map(slugForBranch))
 
+// The web + API URLs this checkout is actually reached on. The main checkout is
+// served on the bare batuda.localhost / api.batuda.localhost; a linked worktree
+// is on its own <label>.batuda.localhost / <label>.api.batuda.localhost, since
+// portless routes both off the branch's last path segment. `seed` prints these
+// as access hints, so deriving them here — the one place that already knows the
+// worktree's host — stops the hints from naming main's URLs inside a worktree.
+export const accessUrls = Effect.gen(function* () {
+	const { isLinked } = yield* worktreeContext
+	const branch = yield* branchName
+	const suffix = portSuffix()
+	const prefix = isLinked
+		? `${dnsLabel(branchLabel(branch), MAX_DNS_LABEL)}.`
+		: ''
+	return {
+		web: `https://${prefix}batuda.localhost${suffix}`,
+		api: `https://${prefix}api.batuda.localhost${suffix}`,
+	}
+})
+
 // Only the worktree's own database and bucket differ from main; the shared
 // endpoints (Postgres host/port, MinIO, GreenMail) are inherited as-is.
 const envOverridesForNames = (
