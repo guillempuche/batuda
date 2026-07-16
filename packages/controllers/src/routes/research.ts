@@ -42,6 +42,10 @@ const Hints = Schema.Struct({
 	language: Schema.optional(Schema.Literals(['ca', 'es', 'en'])),
 	recency_days: Schema.optional(Schema.Number),
 	location: Schema.optional(Schema.String),
+	// The employee-count band a prospecting request asked for, so a scan can leave
+	// out a company outside it.
+	min_employees: Schema.optional(Schema.Number),
+	max_employees: Schema.optional(Schema.Number),
 })
 
 const ContextInput = Schema.Struct({
