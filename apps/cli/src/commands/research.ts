@@ -42,6 +42,7 @@ import {
 	ResearchEventSink,
 	ResearchService,
 	type RunScore,
+	researchToolkitWireFormat,
 	type SystemDefaults,
 	scoreContactRun,
 	scoreRun,
@@ -70,6 +71,9 @@ const formatProbe = (result: ModelProbeResult): string =>
  * Probe each candidate model on an OpenAI-compatible endpoint for the two features
  * the research tiers depend on — forced tool calling and strict JSON-schema output.
  * The API key defaults to the agent tier's key so it reuses the research setup.
+ *
+ * It probes with the real research tools, so a pass means the model accepts what a
+ * run would actually send it.
  */
 export const researchProbe = (opts: {
 	readonly baseUrl: string
@@ -81,8 +85,9 @@ export const researchProbe = (opts: {
 			onSome: key => Effect.succeed(key),
 			onNone: () => Config.redacted('RESEARCH_LLM_AGENT_API_KEY'),
 		})
+		const tools = researchToolkitWireFormat()
 		yield* Console.log(
-			`Probing ${opts.models.length} model(s) at ${opts.baseUrl}\n`,
+			`Probing ${opts.models.length} model(s) at ${opts.baseUrl} with ${tools.length} research tool(s)\n`,
 		)
 		const results: ModelProbeResult[] = []
 		for (const model of opts.models) {
@@ -90,6 +95,7 @@ export const researchProbe = (opts: {
 				baseUrl: opts.baseUrl,
 				apiKey,
 				model,
+				tools,
 			})
 			results.push(result)
 			yield* Console.log(formatProbe(result))

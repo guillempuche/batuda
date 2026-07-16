@@ -25,6 +25,7 @@ import {
 	RegistryLookupTool,
 	researchToolkit,
 	researchToolkitLayer,
+	researchToolkitWireFormat,
 	ScrapePageTool,
 	scrapeSkipResult,
 	stripPlaceholderSiteFilters,
@@ -879,6 +880,67 @@ describe('stripPlaceholderSiteFilters', () => {
 
 			// THEN the original is preserved rather than searching for nothing
 			expect(result).toBe('site:example.com')
+		})
+	})
+})
+
+describe('researchToolkitWireFormat', () => {
+	describe('when serialising the toolkit for a provider', () => {
+		it('should carry every research tool in the shape sent to a provider', () => {
+			// GIVEN the real toolkit
+			const tools = researchToolkitWireFormat()
+
+			// WHEN written out for the wire
+			const names = tools.map(
+				tool => (tool['function'] as { name: string }).name,
+			)
+
+			// THEN every tool is present, nested under `function` the way the
+			// chat-completions API expects
+			expect(names.sort()).toEqual([
+				'discover_contacts',
+				'registry_lookup',
+				'scrape_page',
+				'web_search',
+			])
+			for (const tool of tools) {
+				expect(tool['type']).toBe('function')
+			}
+		})
+
+		it('should mark every tool strict so a provider checks the schema', () => {
+			// GIVEN the real toolkit
+			const tools = researchToolkitWireFormat()
+
+			// WHEN written out — THEN each tool opts into strict validation, so a
+			// probe reproduces the request a run actually makes
+			for (const tool of tools) {
+				expect((tool['function'] as { strict: boolean }).strict).toBe(true)
+			}
+		})
+
+		it("should carry each tool's real parameters and description, not a stand-in", () => {
+			// GIVEN the real toolkit
+			const tools = researchToolkitWireFormat()
+
+			// WHEN the search tool is read back
+			const search = tools.find(
+				tool => (tool['function'] as { name: string }).name === 'web_search',
+			)?.['function'] as {
+				description: string
+				parameters: { properties: Record<string, unknown>; type: string }
+			}
+
+			// THEN it carries web_search's own arguments — the probe is asking about
+			// the tools we ship, not a simplified copy
+			expect(search.description).toContain('Search the public web')
+			expect(search.parameters.type).toBe('object')
+			expect(Object.keys(search.parameters.properties).sort()).toEqual([
+				'limit',
+				'location',
+				'query',
+				'recency_days',
+			])
 		})
 	})
 })

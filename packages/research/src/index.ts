@@ -122,7 +122,11 @@ export {
 	SchemaNameSchema,
 	schemaRegistry,
 } from './application/schemas/index'
-export { researchToolkit, researchToolkitLayer } from './application/tools'
+export {
+	researchToolkit,
+	researchToolkitLayer,
+	researchToolkitWireFormat,
+} from './application/tools'
 // ── Domain ─────────────────────────────────────────────────────────────────
 export { AcceptedCountry } from './domain/country'
 export {
