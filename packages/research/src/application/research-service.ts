@@ -98,6 +98,7 @@ import {
 } from './tools'
 import { verifyValueProvenance } from './value-guard'
 import { constrainVocabulary } from './vocabulary-guard'
+import { guardCompanyWebsites } from './website-guard'
 
 // Raw Postgres rows carry `Date` timestamp columns; these decoders read each
 // date from a Date (rather than an ISO string) so the decoded value lands as a
@@ -1534,11 +1535,33 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									}),
 								)
 							}
+							// Website sanity: a scanned competitor or prospect sometimes comes
+							// back with a directory's profile page ("cbinsights.com/company/…")
+							// where its own site belongs. Blank that, so a stranger's URL never
+							// lands in the CRM's website field. Deterministic and evidence-free,
+							// so it runs here among the plain checks, ahead of the model critics.
+							const websiteCheck = guardCompanyWebsites(result)
+							result = websiteCheck.findings
+							if (
+								websiteCheck.blankedDirectory > 0 ||
+								websiteCheck.blankedProfilePage > 0
+							) {
+								yield* Effect.logWarning('research.websites.blanked').pipe(
+									Effect.annotateLogs({
+										research_id: researchId,
+										blanked_directory: websiteCheck.blankedDirectory,
+										blanked_profile_page: websiteCheck.blankedProfilePage,
+									}),
+								)
+							}
 							// Grounding telemetry on the phase-2 span, so the share of fields a
 							// run drops for want of a real source is a dashboard, not an anecdote.
 							yield* Effect.annotateCurrentSpan({
 								'research.citations.total': citationCheck.total,
 								'research.citations.kept': citationCheck.kept,
+								'research.websites.blanked':
+									websiteCheck.blankedDirectory +
+									websiteCheck.blankedProfilePage,
 								'research.fields.dropped_placeholder':
 									scalarCheck.droppedPlaceholder,
 								'research.fields.dropped_ungrounded':

@@ -11,7 +11,10 @@ export const ProspectScanV1Schema = Schema.Struct({
 	prospects: Schema.Array(
 		Schema.Struct({
 			name: Schema.String,
-			website: Schema.optionalKey(Schema.String),
+			website: Schema.optionalKey(Schema.String).annotate({
+				description:
+					"The prospect's own official website. It must belong to the named company — not a directory/aggregator profile page and not another company that happened to appear in search results.",
+			}),
 			tax_id: Schema.optionalKey(Schema.String),
 			industry: Schema.optionalKey(Schema.String),
 			country: Schema.optionalKey(

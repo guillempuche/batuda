@@ -105,7 +105,7 @@ const SECOND_LEVEL = new Set([
 // folding the email-guess step uses, so text matches regardless of punctuation,
 // case, or diacritics. Word boundaries are removed too, so a spelled-out name
 // like "Acme Logistics" is found as the contiguous run "acmelogistics".
-const collapse = (value: string): string =>
+export const collapse = (value: string): string =>
 	value
 		.normalize('NFKD')
 		.replace(/\p{Diacritic}/gu, '')
@@ -124,7 +124,7 @@ const foldTokens = (value: string): string[] =>
 // The whole name minus its legal suffix, collapsed — "Acme Logistics S.L." →
 // "acmelogistics". This is the strong-match key: it appears verbatim on the
 // company's own pages but is long enough not to hit by coincidence.
-const nameCore = (name: string): string =>
+export const nameCore = (name: string): string =>
 	foldTokens(name)
 		.filter(t => !LEGAL_SUFFIXES.has(t))
 		.join('')
