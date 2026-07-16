@@ -78,6 +78,115 @@ describe('guardScalarFields', () => {
 		})
 	})
 
+	describe('when a location names no place', () => {
+		it('should drop a value that counts places instead of naming one', () => {
+			// GIVEN the Grupo Sesé case: the extractor answered "where?" with a reach,
+			// backed by a real quote so every other check passes it
+			const findings = {
+				enrichment: {
+					location: {
+						value: '15 countries throughout the world',
+						source_id: 'https://gruposese.com',
+						quote: 'present in 15 countries throughout the world',
+						confidence: null,
+					},
+				},
+			}
+
+			// WHEN grounded against evidence that does contain the quote
+			const result = guardScalarFields(
+				findings,
+				'grupo sese is present in 15 countries throughout the world',
+			)
+
+			// THEN it is dropped as the wrong kind of value, on its own counter
+			expect(enrichment(result.findings).location).toBeNull()
+			expect(result.droppedWrongKind).toBe(1)
+			expect(result.droppedPlaceholder).toBe(0)
+		})
+
+		it('should drop a bare reach word', () => {
+			// GIVEN "worldwide" as the whole location
+			const findings = {
+				enrichment: {
+					location: {
+						value: 'Worldwide',
+						source_id: 'https://acme.com',
+						quote: 'we operate worldwide',
+						confidence: null,
+					},
+				},
+			}
+
+			// WHEN grounded — THEN dropped
+			const result = guardScalarFields(findings, 'acme, we operate worldwide')
+			expect(enrichment(result.findings).location).toBeNull()
+			expect(result.droppedWrongKind).toBe(1)
+		})
+
+		it('should keep a real place, however many words it runs to', () => {
+			// GIVEN a genuine multi-part location
+			const findings = {
+				enrichment: {
+					location: {
+						value: 'Sant Cugat del Vallès, Barcelona, Catalonia, Spain',
+						source_id: 'https://acme.es',
+						quote: 'based in Sant Cugat del Vallès, Barcelona',
+						confidence: null,
+					},
+				},
+			}
+
+			// WHEN grounded — THEN kept, so a long address is not mistaken for a tally
+			const result = guardScalarFields(
+				findings,
+				'acme is based in sant cugat del vallès, barcelona, catalonia, spain',
+			)
+			expect(enrichment(result.findings).location).not.toBeNull()
+			expect(result.droppedWrongKind).toBe(0)
+		})
+
+		it('should keep a reach word that only prefixes a real place', () => {
+			// GIVEN a value whose reach word is not the whole answer
+			const findings = {
+				enrichment: {
+					location: {
+						value: 'Worldwide HQ in Chicago',
+						source_id: 'https://acme.com',
+						quote: 'worldwide hq in chicago',
+						confidence: null,
+					},
+				},
+			}
+
+			// WHEN grounded — THEN kept, since a place is named
+			const result = guardScalarFields(findings, 'acme worldwide hq in chicago')
+			expect(enrichment(result.findings).location).not.toBeNull()
+			expect(result.droppedWrongKind).toBe(0)
+		})
+
+		it('should not judge the shape of a non-location field', () => {
+			// GIVEN "worldwide" in the industry field, where it is not a place claim
+			const findings = {
+				enrichment: {
+					industry: {
+						value: 'worldwide',
+						source_id: 'https://acme.com',
+						quote: 'a worldwide logistics brand',
+						confidence: null,
+					},
+				},
+			}
+
+			// WHEN grounded — THEN the location rule does not touch another field
+			const result = guardScalarFields(
+				findings,
+				'acme is a worldwide logistics brand',
+			)
+			expect(result.droppedWrongKind).toBe(0)
+		})
+	})
+
 	describe('when a field carries no fetched source', () => {
 		it('should drop a bare value with no source_id', () => {
 			// GIVEN the Redwood/ITS shape: a value with provenance but no source_id

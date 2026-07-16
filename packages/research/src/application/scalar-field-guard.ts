@@ -13,6 +13,8 @@
  *
  * For each per-field `Sourced` scalar it drops the whole field (to null) when:
  *  - the value is a placeholder or the field's own name, not a real fact;
+ *  - the value is the wrong kind of thing for its field — a location that names how
+ *    far the company reaches ("15 countries") rather than where it is;
  *  - it carries no fetched source at all — an unsourced fact is treated as absent;
  *  - its quote is largely missing from the gathered evidence (a fabricated quote);
  *  - for a field whose value should read verbatim from the page (location, tools),
@@ -110,6 +112,44 @@ const isPlaceholderValue = (value: string, key: string): boolean => {
 	return n === normalize(key.replace(/_/g, ' '))
 }
 
+// Answers to "where is this company?" that describe how far it reaches, not where
+// it is — true of the business, useless as a place. Matched only as the whole
+// value, so "Worldwide HQ in Chicago" still keeps its real place.
+const REACH_WORDS = new Set([
+	'worldwide',
+	'global',
+	'globally',
+	'international',
+	'internationally',
+	'nationwide',
+	'everywhere',
+])
+
+// A tally of places dressed up as one — "15 countries throughout the world",
+// "operations in 30 cities". A number sitting right before a place word is the tell.
+const PLACE_COUNT_RE =
+	/\b\d[\d.,]*\s+(?:countr|office|location|site|branch|warehouse|facilit|cit(?:y|ies)|continent|market|region|hub|terminal|depot)/i
+
+// A location has to name a place. This rejects the two shapes that answer a
+// different question — how far the company reaches, or how many places it runs —
+// and leaves every real place name alone, however long ("Sant Cugat del Vallès,
+// Barcelona, Catalonia, Spain" is fine).
+const isPlaceValue = (value: string): boolean =>
+	!REACH_WORDS.has(normalize(value)) && !PLACE_COUNT_RE.test(value)
+
+// Fields whose value must be a particular kind of thing, beyond simply "not a
+// placeholder". A location is the clear case; other fields impose no such shape.
+const FIELD_RULES: Record<string, (value: string) => boolean> = {
+	location: isPlaceValue,
+}
+
+// Whether a value is an acceptable kind of thing for its field. A field with no
+// rule accepts anything (its other checks still apply).
+export const valueIsRightKind = (key: string, value: string): boolean => {
+	const rule = FIELD_RULES[key]
+	return rule === undefined || rule(value)
+}
+
 // The quote backs the value when it contains it outright or shares one of its
 // distinctive words. A value with no distinctive words (all short) can't be judged
 // this way, so it is given the benefit of the doubt.
@@ -153,6 +193,8 @@ export interface ScalarFieldGuardResult {
 	readonly findings: unknown
 	/** Fields dropped because the value was a placeholder or the field's own name. */
 	readonly droppedPlaceholder: number
+	/** Fields dropped because the value was the wrong kind of thing (a location that names no place). */
+	readonly droppedWrongKind: number
 	/** Fields dropped because no fetched source backed the value. */
 	readonly droppedUngrounded: number
 	/** Fields dropped because the quote did not support or was absent from evidence. */
@@ -171,6 +213,7 @@ export const guardScalarFields = (
 ): ScalarFieldGuardResult => {
 	const lowerCorpus = corpus.toLowerCase()
 	let droppedPlaceholder = 0
+	let droppedWrongKind = 0
 	let droppedUngrounded = 0
 	let droppedUnsupported = 0
 
@@ -188,6 +231,11 @@ export const guardScalarFields = (
 			if (typeof wrapper.value !== 'string') return value
 			if (isPlaceholderValue(wrapper.value, key)) {
 				droppedPlaceholder++
+				return null
+			}
+			// Not a placeholder, but still the wrong kind of thing for its field.
+			if (!valueIsRightKind(key, wrapper.value)) {
+				droppedWrongKind++
 				return null
 			}
 			// An unsourced fact is treated as absent: the citation guard has already
@@ -228,6 +276,7 @@ export const guardScalarFields = (
 	return {
 		findings: walk(findings, undefined),
 		droppedPlaceholder,
+		droppedWrongKind,
 		droppedUngrounded,
 		droppedUnsupported,
 	}

@@ -147,6 +147,27 @@ describe('verifyValueProvenance', () => {
 			expect(result.droppedProposals).toBe(1)
 		})
 
+		it('should drop a proposal whose location names a reach, not a place', () => {
+			// GIVEN a proposed write moving a company to "15 countries", quoted from a
+			// page so the corpus check alone would pass it
+			const corpus =
+				'Grupo Sesé is present in 15 countries throughout the world.'
+			const findings = {
+				proposed_updates: [
+					{
+						subject_id: 'c1',
+						fields: { location: '15 countries throughout the world' },
+					},
+				],
+			}
+
+			// WHEN checked — THEN the whole proposal is dropped, since a location that
+			// names no place must never reach the CRM
+			const result = verifyValueProvenance(findings, corpus)
+			expect(proposals(result.findings)).toHaveLength(0)
+			expect(result.droppedProposals).toBe(1)
+		})
+
 		it('should not drop a location on a resumed run with no corpus', () => {
 			// GIVEN an empty corpus — a resumed run keeps none of the evidence the
 			// first run gathered — and a proposal carrying a location
