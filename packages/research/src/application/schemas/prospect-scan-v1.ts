@@ -3,8 +3,10 @@ import { Schema } from 'effect'
 import {
 	Citation,
 	DiscoveredExisting,
+	LenientNumber,
 	PendingPaidAction,
 	ProposedUpdate,
+	Sourced,
 } from './_shared'
 
 export const ProspectScanV1Schema = Schema.Struct({
@@ -21,6 +23,14 @@ export const ProspectScanV1Schema = Schema.Struct({
 				Schema.String.annotate({
 					description: 'ISO 3166-1 alpha-2 country code, e.g. US, ES, DE.',
 				}),
+			),
+			employee_estimate: Schema.optionalKey(
+				Sourced(
+					LenientNumber.annotate({
+						description:
+							'How many people work there, as a single whole number, only when a source states it (a page, a profile, a directory entry). Leave it out rather than guessing — a size band is not enough.',
+					}),
+				),
 			),
 			why_relevant: Schema.String,
 			pain_indicators: Schema.optionalKey(Schema.Array(Schema.String)),

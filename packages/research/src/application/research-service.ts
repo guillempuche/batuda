@@ -96,6 +96,10 @@ import {
 	ScrapeProvider,
 	WriterLanguageModel,
 } from './ports'
+import {
+	filterProspectsByCriteria,
+	prospectCriteriaFromHints,
+} from './prospect-criteria-guard'
 import { guardScalarFields } from './scalar-field-guard'
 import { type FreeformSchema, schemaRegistry } from './schemas/index'
 import { urlHashForScrape } from './source-key'
@@ -706,6 +710,8 @@ export interface CreateResearchInput {
 							language?: 'ca' | 'es' | 'en' | undefined
 							recency_days?: number | undefined
 							location?: string | undefined
+							min_employees?: number | undefined
+							max_employees?: number | undefined
 					  }
 					| undefined
 		  }
@@ -1808,6 +1814,36 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										dropped: applicability.dropped,
 									}),
 								)
+							}
+							// Prospect criteria: a scan sometimes returns a company outside the
+							// size or place the request asked for, because the page it came from
+							// was about the right sector. Drop one that states a size or country
+							// the request ruled out — only on a stated conflict, so a thin list is
+							// never emptied. A scan emptied here still earns the refined retry
+							// below, and if it is still all giants, ends honestly instead of green.
+							if (schemaName === 'prospect_scan_v1') {
+								const hintCountry = parseCountryAlpha2(hints?.location)
+								const prospectCriteria = prospectCriteriaFromHints(
+									hints as
+										| { minEmployees?: number; maxEmployees?: number }
+										| undefined,
+									hintCountry ? [hintCountry] : [],
+								)
+								const criteriaCheck = filterProspectsByCriteria(
+									result,
+									prospectCriteria,
+								)
+								result = criteriaCheck.findings
+								if (criteriaCheck.dropped > 0) {
+									yield* Effect.logWarning(
+										'research.prospects.off_criteria',
+									).pipe(
+										Effect.annotateLogs({
+											research_id: researchId,
+											dropped: criteriaCheck.dropped,
+										}),
+									)
+								}
 							}
 							yield* publishEvent(researchId, 'tool.result', {
 								tool: 'llm.generateObject',
