@@ -4,10 +4,12 @@
  *
  * The single broad `generateObject` fills the whole schema at once and reliably
  * drops the contacts list — the evidence names the leaders, but the model's
- * attention is spread across every other field and it returns one contact or none.
- * This runs a narrow pass that does nothing but pull named people and their titles,
- * then folds them into the broad findings. It fires only when the broad pass found
- * at most one contact, so a run that already has its people pays nothing.
+ * attention is spread across every other field and it returns one contact or none,
+ * or a handful of names with no titles. This runs a narrow pass that does nothing
+ * but pull named people and their titles, then folds them into the broad findings.
+ * It fires when the broad pass found at most one contact, OR when any contact it
+ * did find has no title, so a run that already has its people with titles pays
+ * nothing.
  *
  * The recovered contacts flow through the same guard chain as the broad ones
  * (citations, per-contact entity binding, source tier), so nothing here ships
@@ -17,6 +19,7 @@
 
 import { Schema } from 'effect'
 
+import { hasTitle } from './extraction-fill'
 import { Citation, Sourced } from './schemas/_shared'
 
 // The narrow schema the focused pass fills: people only, each with a title and the
@@ -44,27 +47,47 @@ const contactsOf = (findings: unknown): ReadonlyArray<unknown> => {
 	return Array.isArray(contacts) ? contacts : []
 }
 
-/** Whether the broad findings are thin enough on people to justify a focused pass. */
-export const needsContactRescue = (findings: unknown): boolean =>
-	contactsOf(findings).filter(
-		c =>
-			c !== null &&
-			typeof c === 'object' &&
-			typeof (c as { name?: unknown }).name === 'string' &&
-			(c as { name: string }).name.trim() !== '',
-	).length < RESCUE_BELOW_CONTACTS
+const isNamed = (contact: unknown): boolean =>
+	contact !== null &&
+	typeof contact === 'object' &&
+	typeof (contact as { name?: unknown }).name === 'string' &&
+	(contact as { name: string }).name.trim() !== ''
+
+/**
+ * Whether the broad findings are thin enough on people to justify a focused pass:
+ * fewer than a team's worth of named people, or any named person returned without a
+ * title. A titleless contact is as much a miss as a missing one — the whole point is
+ * a decision-maker the CRM can act on — and the focused pass recovers the title the
+ * broad pass left off.
+ */
+export const needsContactRescue = (findings: unknown): boolean => {
+	const named = contactsOf(findings).filter(isNamed)
+	return named.length < RESCUE_BELOW_CONTACTS || named.some(c => !hasTitle(c))
+}
 
 export interface ContactsRescueTarget {
 	readonly name: string
 	readonly domain?: string | undefined
 }
 
-/** The focused-pass prompt: people and titles only, bound to the target, verbatim. */
+/**
+ * The focused-pass prompt: people and titles only, bound to the target, verbatim.
+ *
+ * `sourceManifest` is the run's fetched source URLs, one per line. Handing them to
+ * the model and asking it to copy one back keeps a recovered person's citation to a
+ * URL the run actually fetched — otherwise the model tends to tidy the URL, and the
+ * citation guard, matching against the fetched pages, drops the whole title with it.
+ */
 export const contactsRescuePrompt = (
 	target: ContactsRescueTarget,
 	evidence: string,
-): string =>
-	[
+	sourceManifest?: string,
+): string => {
+	const citationRule =
+		sourceManifest && sourceManifest.trim().length > 0
+			? `For each person's title and citations, use one of these exact fetched source URLs, copied verbatim:\n\n${sourceManifest}`
+			: "For each person's title and citations, use the exact source URL it came from, copied verbatim."
+	return [
 		`From the evidence below, list EVERY named person who is a leader or employee of "${target.name}"${
 			target.domain ? ` (official site ${target.domain})` : ''
 		}, with their exact job title.`,
@@ -73,10 +96,12 @@ export const contactsRescuePrompt = (
 		`- Only ${target.name}'s OWN leaders or staff. IGNORE anyone described as a client, customer, partner, vendor, or testimonial, and anyone who works for a DIFFERENT company — even when they are quoted on this company's own site.`,
 		'- Distinguish current leaders from founders: someone who "co-founded" the company is a founder; give a current role only if the evidence says they still hold it.',
 		'- Copy names and titles verbatim from the evidence; never invent a person, a title, or a source.',
+		citationRule,
 		'',
 		'Evidence:',
 		evidence,
 	].join('\n')
+}
 
 // A person's name reduced to a comparison key: lowercased, accent-folded, stripped
 // of punctuation and collapsed whitespace. Deliberately exact (no initials/nickname
