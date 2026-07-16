@@ -549,17 +549,30 @@ export const buildResearchSystemPrompt = (args: {
  * The instruction for the structured-extraction pass: read the gathered evidence
  * and fill the output schema from it.
  *
- * It is grounding-first — the model may only output a value that appears in the
- * evidence, and must leave an unsupported field empty rather than filling it from
- * prior knowledge, or it will confidently invent phones, tax ids, and emails.
- * It must never emit a schema field's own name or a placeholder ("headquarters",
- * "unknown") as a value; a field with no real value is left out.
+ * Two jobs, in a deliberate order. First, read all of the evidence and report every
+ * fact it states — the model otherwise answers from the first page or two and leaves
+ * the rest of a real profile empty. Second, report ONLY what the evidence states —
+ * the reading push is on how much of the evidence the model uses, never on how many
+ * fields it fills, so a field the evidence does not support still stays empty rather
+ * than being invented. The push names only fields a downstream guard can check; the
+ * plain-list fields (products, tags) are left out on purpose, since nothing verifies
+ * them and pushing there would only invite made-up entries.
  */
 export const buildExtractionPrompt = (args: {
 	readonly citationInstruction: string
 	readonly evidenceBlock: string
 }): string =>
-	`Produce structured findings STRICTLY from the evidence below (the fetched pages and the research transcript). Only include a value that appears in the evidence; if it does not support a field, omit it or leave it null — never fill a field from prior knowledge, and never put a placeholder or the field's own name as its value.\n\n${args.citationInstruction}\n\n${args.evidenceBlock}`
+	[
+		'Produce structured findings STRICTLY from the evidence below (the fetched pages and the research transcript).',
+		'',
+		"Read ALL of the evidence to the end — every fetched page and every search result in the transcript — and report every fact it states; the evidence routinely states far more than a first pass returns. In particular: name EVERY person the evidence identifies as this company's own leader or employee, each with the exact job title the evidence gives them; and report the industry, employee-count band, location, country, and the company's own operational software wherever the evidence states them — including on a third-party page rather than the company's own site.",
+		'',
+		"Report ONLY what the evidence states. If it does not support a field, omit it or leave it null — never fill a field from prior knowledge, never guess, and never put a placeholder or the field's own name as its value. Leaving a field empty is always better than inventing a value for it.",
+		'',
+		args.citationInstruction,
+		'',
+		args.evidenceBlock,
+	].join('\n')
 
 // ── Event types for SSE streaming ──
 

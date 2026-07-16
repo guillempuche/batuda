@@ -343,16 +343,51 @@ describe('buildExtractionPrompt', () => {
 			)
 		})
 
-		it('should carry the anti-fabrication rule the guards depend on', () => {
+		it('should carry the anti-fabrication rules the guards depend on', () => {
 			// GIVEN any extraction prompt
 			const prompt = buildExtractionPrompt({
 				citationInstruction: '',
 				evidenceBlock: '',
 			})
 
-			// THEN it forbids filling a field from prior knowledge — the instruction
-			// that keeps the model from inventing values the evidence never stated
+			// THEN it keeps every rule that holds the model to the evidence — the
+			// push to read more must never loosen these
 			expect(prompt).toContain('never fill a field from prior knowledge')
+			expect(prompt).toContain('never guess')
+			expect(prompt).toContain(
+				'Leaving a field empty is always better than inventing a value',
+			)
+		})
+
+		it('should push the model to read all the evidence and report every fact', () => {
+			// GIVEN any extraction prompt
+			const prompt = buildExtractionPrompt({
+				citationInstruction: '',
+				evidenceBlock: '',
+			})
+
+			// THEN it asks the model to read to the end and report what is there — the
+			// lever against a run that answers from the first page and stops
+			expect(prompt).toContain('Read ALL of the evidence')
+			expect(prompt).toContain('name EVERY person')
+		})
+
+		it('should not push exhaustiveness on the fields no guard can check', () => {
+			// GIVEN any extraction prompt
+			const prompt = buildExtractionPrompt({
+				citationInstruction: '',
+				evidenceBlock: '',
+			})
+
+			// THEN the plain-list fields (products, tags) are absent from the "report
+			// everything" push: nothing downstream verifies them, so urging the model
+			// to fill them would only invite invented entries
+			const push = prompt.slice(
+				prompt.indexOf('Read ALL of the evidence'),
+				prompt.indexOf('Report ONLY'),
+			)
+			expect(push).not.toContain('products')
+			expect(push).not.toContain('tags')
 		})
 	})
 })
