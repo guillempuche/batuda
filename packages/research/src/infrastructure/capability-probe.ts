@@ -1,12 +1,16 @@
 /**
- * Capability probe for an OpenAI-compatible model endpoint (Nebius Token Factory).
+ * Capability probe for any OpenAI-compatible model endpoint.
  *
  * The research pipeline leans on two provider features that not every open-weights
  * model supports: forced tool calling (the agent tier sends `tool_choice`) and
- * strict JSON-schema structured output (the extract tier). Nebius documents
- * `tool_choice: "auto"` and a forced-function form but not `"required"`, and flags
- * JSON-schema support per model card — so before trusting a model in a tier, we
- * check the two round-trips actually work against the live endpoint.
+ * strict JSON-schema structured output (the extract tier). Vendors differ on both —
+ * some document `tool_choice: "auto"` and a forced-function form but not
+ * `"required"`, and flag JSON-schema support per model card — so before trusting a
+ * model in a tier, we check the two round-trips actually work against the live
+ * endpoint. Point it at whichever vendor a tier is configured to use.
+ *
+ * The caller supplies the tools to probe with, so a check can reproduce the request
+ * a research run really makes.
  *
  * The request builders and response classifiers are pure so they can be unit-tested
  * without a network; only `probeModelCapabilities` touches the endpoint, and it maps
@@ -38,36 +42,25 @@ export interface ModelProbeResult {
 const pass = (detail: string): ProbeCheck => ({ ok: true, detail })
 const fail = (detail: string): ProbeCheck => ({ ok: false, detail })
 
-/** The chat-completions body that forces the model to call a tool. */
+/**
+ * The chat-completions body that forces the model to call a tool.
+ *
+ * Pass the tools a research run really sends: a provider can accept a simple
+ * made-up tool and still refuse the real ones, which would report a false pass.
+ */
 export const toolChoiceProbeBody = (
 	model: string,
+	tools: ReadonlyArray<Record<string, unknown>>,
 ): Record<string, unknown> => ({
 	model,
 	messages: [
 		{
 			role: 'user',
 			content:
-				'What is the current weather in Dallas, Texas? Use the available tool.',
+				'Find the official website of Brompton Bicycle, the London bike maker. Use the available tools.',
 		},
 	],
-	tools: [
-		{
-			type: 'function',
-			function: {
-				name: 'get_current_weather',
-				description: 'Get the current weather in a given city',
-				parameters: {
-					type: 'object',
-					properties: {
-						city: { type: 'string' },
-						state: { type: 'string' },
-					},
-					required: ['city', 'state'],
-					additionalProperties: false,
-				},
-			},
-		},
-	],
+	tools,
 	tool_choice: 'required',
 })
 
@@ -191,6 +184,7 @@ export const probeModelCapabilities = (input: {
 	readonly baseUrl: string
 	readonly apiKey: Redacted.Redacted<string>
 	readonly model: string
+	readonly tools: ReadonlyArray<Record<string, unknown>>
 }): Effect.Effect<ModelProbeResult, never, HttpClient.HttpClient> =>
 	Effect.gen(function* () {
 		const client = yield* HttpClient.HttpClient
@@ -199,7 +193,7 @@ export const probeModelCapabilities = (input: {
 			client,
 			url,
 			input.apiKey,
-			toolChoiceProbeBody(input.model),
+			toolChoiceProbeBody(input.model, input.tools),
 			classifyToolChoiceResponse,
 		)
 		const jsonSchema = yield* runCheck(

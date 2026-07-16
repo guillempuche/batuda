@@ -18,7 +18,12 @@
  */
 
 import { Cause, Effect, Schema } from 'effect'
-import { AiError, Tool, Toolkit } from 'effect/unstable/ai'
+import {
+	AiError,
+	OpenAiStructuredOutput,
+	Tool,
+	Toolkit,
+} from 'effect/unstable/ai'
 
 import { AcceptedCountry } from '../domain/country'
 import { noRegistryResult } from '../domain/errors'
@@ -145,6 +150,30 @@ export const researchToolkit = Toolkit.make(
 	RegistryLookupTool,
 	DiscoverContactsTool,
 )
+
+/**
+ * The tool list written out exactly as it is sent to a provider.
+ *
+ * A provider can accept a simple made-up tool and still reject these over a
+ * detail of how one argument is described, so anything asking "would you accept
+ * our tools?" has to ask with the real ones.
+ */
+export const researchToolkitWireFormat = (): ReadonlyArray<
+	Record<string, unknown>
+> =>
+	Object.values(researchToolkit.tools).map(tool => ({
+		type: 'function',
+		function: {
+			name: tool.name,
+			description: Tool.getDescription(tool),
+			parameters: Tool.getJsonSchema(tool, {
+				transformer: OpenAiStructuredOutput.toCodecOpenAI,
+			}),
+			// A provider checks a tool's arguments strictly unless the tool opts
+			// out, and none of these do.
+			strict: Tool.getStrictMode(tool) ?? true,
+		},
+	}))
 
 // ── Handler layer ──
 // Each handler maps port-level ProviderError to AiErrorReason so tool-call

@@ -114,14 +114,33 @@ describe('classifyJsonSchemaResponse', () => {
 
 describe('probe request bodies', () => {
 	describe('toolChoiceProbeBody', () => {
-		it('should force a tool call and carry the model + one function', () => {
-			// GIVEN a target model
-			const body = toolChoiceProbeBody('openai/gpt-oss-120b')
+		describe('when given the tools a run would send', () => {
+			it('should force a tool call and pass those tools through untouched', () => {
+				// GIVEN the caller's own tools
+				const tools = [
+					{ type: 'function', function: { name: 'web_search' } },
+					{ type: 'function', function: { name: 'scrape_page' } },
+				]
 
-			// WHEN built — THEN it forces tool use and names the function
-			expect(body['model']).toBe('openai/gpt-oss-120b')
-			expect(body['tool_choice']).toBe('required')
-			expect(Array.isArray(body['tools'])).toBe(true)
+				// WHEN the probe body is built
+				const body = toolChoiceProbeBody('openai/gpt-oss-120b', tools)
+
+				// THEN it forces tool use and asks with exactly those tools — the
+				// probe must not substitute a simpler stand-in of its own
+				expect(body['model']).toBe('openai/gpt-oss-120b')
+				expect(body['tool_choice']).toBe('required')
+				expect(body['tools']).toEqual(tools)
+			})
+		})
+
+		describe('when given no tools', () => {
+			it('should leave the tool list empty rather than fall back to tools of its own', () => {
+				// GIVEN a caller with an empty toolkit
+				const body = toolChoiceProbeBody('openai/gpt-oss-120b', [])
+
+				// WHEN built — THEN the tool list is empty, not a fabricated default
+				expect(body['tools']).toEqual([])
+			})
 		})
 	})
 
