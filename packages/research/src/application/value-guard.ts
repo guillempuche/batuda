@@ -18,11 +18,16 @@
  *  - a dedicated email or phone field anywhere else holding an unsupported value
  *    is blanked.
  *
- * Only high-precision values are checked (emails, and phone/tax-id digit
- * strings). Free text, structural references (a `company_id`), bookkeeping fields
- * (version, status), and bare short numbers (years, small counts) are too fuzzy
- * or too structural to confirm or refute, so they are left untouched.
+ * Precise values are checked directly (emails, and phone/tax-id digit strings).
+ * Most free text is too fuzzy to confirm or refute and is left untouched — but a
+ * proposed CRM change is a write, so its few fields that are supposed to read off a
+ * page (a place, a tool's name) are also held to the evidence, catching a made-up
+ * address that carries no email or digits to check. Structural references (a
+ * `company_id`), bookkeeping fields (version, status), and bare short numbers
+ * (years, small counts) stay untouched.
  */
+
+import { isInCorpus, PAGE_LITERAL_FIELDS } from './scalar-field-guard'
 
 // A field value that IS exactly an email (used when blanking a dedicated field).
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
@@ -114,19 +119,35 @@ export const verifyValueProvenance = (
 	let droppedProposals = 0
 	let strippedValues = 0
 
-	// A proposal is grounded when every checkable value in its own fields is in
-	// the evidence. Structural keys and non-string fields (e.g. a nested channels
-	// array) are skipped here — channels are cleaned by the walk instead.
+	// One field of a proposed CRM write is grounded when nothing invented can slip
+	// through it. Structural keys and non-string values are references, not facts a
+	// model could fabricate, so they pass untouched.
+	const fieldGrounded = (key: string, raw: unknown): boolean => {
+		if (STRUCTURAL_KEYS.has(key)) return true
+		if (typeof raw !== 'string') return true
+		// Any email, phone, or tax id it carries must appear in the evidence.
+		if (!stringSupported(ev, raw)) return false
+		// A value that is meant to read off a page — a place, a tool's name — carries
+		// no email or digits for the check above to catch, so a made-up one (a wrong
+		// city, a company that never operated there) would otherwise sail through.
+		// Hold its wording to the evidence too. Skipped when there is no evidence to
+		// check against, as on a resumed run, so a real value is never dropped for
+		// want of a corpus.
+		if (PAGE_LITERAL_FIELDS.has(key) && ev.lowerCorpus.length > 0) {
+			return isInCorpus(raw, ev.lowerCorpus)
+		}
+		return true
+	}
+
+	// A proposal is grounded when every field of its own is. `fields` sometimes
+	// arrives as raw prose rather than an object; a nested array (e.g. channels) is
+	// left for the walk to clean.
 	const proposalGrounded = (fields: unknown): boolean => {
-		// Open-weights models sometimes emit `fields` as raw prose, not an object.
 		if (typeof fields === 'string') return stringSupported(ev, fields)
 		if (fields === null || typeof fields !== 'object' || Array.isArray(fields))
 			return true
 		return Object.entries(fields as Record<string, unknown>).every(
-			([key, raw]) =>
-				STRUCTURAL_KEYS.has(key) ||
-				typeof raw !== 'string' ||
-				stringSupported(ev, raw),
+			([key, raw]) => fieldGrounded(key, raw),
 		)
 	}
 

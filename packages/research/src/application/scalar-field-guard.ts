@@ -63,11 +63,16 @@ const SCHEMA_WORDS = new Set([
 ])
 
 // Fields whose value is meant to read straight off the page (a city name, a tool's
-// name), so its supporting quote should actually contain it. Coded or paraphrased
-// fields (industry, size band, the ISO country code) are deliberately excluded —
-// their value is a category, not a span, so a text-overlap test would wrongly
-// reject them.
-const QUOTE_LITERAL_FIELDS = new Set(['location', 'current_tools'])
+// name), so it should actually appear in the evidence. Coded or paraphrased fields
+// (industry, size band, the ISO country code) are deliberately excluded — their
+// value is a category, not a span, so a text-overlap test would wrongly reject
+// them. A proposed CRM change keys the same fields in camelCase, so the value guard
+// can hold those to the page too.
+export const PAGE_LITERAL_FIELDS = new Set([
+	'location',
+	'current_tools',
+	'currentTools',
+])
 
 // Contact channels the value guard already checks against the evidence far more
 // precisely than a text test could, so this guard leaves them alone.
@@ -117,10 +122,11 @@ const quoteSupportsValue = (quote: string, value: string): boolean => {
 	return tokens.some(token => nq.includes(token))
 }
 
-// Most of the quote's distinctive words appear somewhere in the gathered evidence,
-// so it was copied from a real page rather than invented.
-const quoteIsInCorpus = (quote: string, lowerCorpus: string): boolean => {
-	const tokens = salientTokens(quote)
+// Most of a text's distinctive words appear somewhere in the gathered evidence, so
+// it was copied from a real page rather than invented. Used both for a field's
+// supporting quote and for a value that is meant to read off the page.
+export const isInCorpus = (text: string, lowerCorpus: string): boolean => {
+	const tokens = salientTokens(text)
 	if (tokens.length === 0) return true
 	const present = tokens.filter(token => lowerCorpus.includes(token)).length
 	return present / tokens.length >= QUOTE_PRESENCE_THRESHOLD
@@ -197,12 +203,12 @@ export const guardScalarFields = (
 			const quote =
 				typeof wrapper.quote === 'string' ? wrapper.quote.trim() : ''
 			if (quote !== '') {
-				if (corpus !== '' && !quoteIsInCorpus(quote, lowerCorpus)) {
+				if (corpus !== '' && !isInCorpus(quote, lowerCorpus)) {
 					droppedUnsupported++
 					return null
 				}
 				if (
-					QUOTE_LITERAL_FIELDS.has(key) &&
+					PAGE_LITERAL_FIELDS.has(key) &&
 					!quoteSupportsValue(quote, wrapper.value)
 				) {
 					droppedUnsupported++
