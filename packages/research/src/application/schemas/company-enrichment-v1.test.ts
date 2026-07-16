@@ -1,4 +1,5 @@
 import { Schema } from 'effect'
+import { OpenAiStructuredOutput } from 'effect/unstable/ai'
 import { describe, expect, it } from 'vitest'
 
 import { CompanyEnrichmentV1Schema } from './company-enrichment-v1'
@@ -123,6 +124,45 @@ describe('CompanyEnrichmentV1Schema', () => {
 			// trusted as a coordinate source, whatever it emits
 			expect(decoded.enrichment).not.toHaveProperty('latitude')
 			expect(decoded.enrichment).not.toHaveProperty('longitude')
+		})
+	})
+
+	describe('when the model fills nothing, through the real provider codec', () => {
+		it('should decode to an empty enrichment, which is why an empty answer needs its own counter', () => {
+			// GIVEN a model that answered null for every profile field — the schema
+			// forces all keys present, so "nothing" arrives as all-null, decoded the
+			// way production decodes it (not the raw schema, which rejects null)
+			const { codec } = OpenAiStructuredOutput.toCodecOpenAI(
+				CompanyEnrichmentV1Schema,
+			)
+			const decodeJson = Schema.decodeUnknownSync(Schema.fromJsonString(codec))
+			const allNull = {
+				enrichment: {
+					industry: null,
+					size_range: null,
+					pain_points: null,
+					current_tools: null,
+					products_fit: null,
+					tags: null,
+					location: null,
+					country: null,
+				},
+				competitors: null,
+				contacts: null,
+				discovered_existing: null,
+				proposed_updates: null,
+				pending_paid_actions: null,
+			}
+
+			// WHEN it is decoded through the codec
+			const decoded = decodeJson(JSON.stringify(allNull)) as {
+				enrichment: Record<string, unknown>
+			}
+
+			// THEN every null key is stripped and the enrichment is empty — not a lost
+			// write but a faithful decode of "the model said nothing", the failure the
+			// fill counters exist to make visible
+			expect(Object.keys(decoded.enrichment)).toHaveLength(0)
 		})
 	})
 })

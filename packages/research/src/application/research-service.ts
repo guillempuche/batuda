@@ -65,6 +65,7 @@ import {
 	isConfirmedRegistryMatch,
 	withRedirectDomain,
 } from './entity-guard'
+import { contactFill, enrichmentFill } from './extraction-fill'
 import {
 	FirmographicsRescueSchema,
 	firmographicsRescuePrompt,
@@ -1357,9 +1358,27 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							})
 							let result = withProposalIds(structuredResponse.value as unknown)
 							let rescueOutputTokens = 0
+							// Only company_enrichment fills a profile and runs the focused rescue
+							// passes below; the scan and freeform schemas have no profile to
+							// measure or recover.
+							const isEnrichmentRun = schemaName === 'company_enrichment_v1'
+							// How much of the profile the broad pass filled on its own, before any
+							// rescue or guard touched it — the number that shows an all-empty
+							// answer for what it is instead of a clean run.
+							if (isEnrichmentRun) {
+								const broadFill = enrichmentFill(result)
+								const broadContacts = contactFill(result)
+								yield* Effect.annotateCurrentSpan({
+									'research.enrichment.fields_total': broadFill.total,
+									'research.enrichment.filled_broad': broadFill.filled,
+									'research.enrichment.missing_broad': broadFill.missing.length,
+									'research.contacts.named_broad': broadContacts.named,
+									'research.contacts.titled_broad': broadContacts.titled,
+								})
+							}
 							// The focused rescue passes below aim at one company — the subject's
 							// name + its own domain — so a recovered person or fact is tied to
-							// the right company. Only company_enrichment runs these passes.
+							// the right company.
 							const rescueSnapshot = subjects[0]?.snapshot as
 								| Record<string, unknown>
 								| undefined
@@ -1373,13 +1392,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										? rescueSnapshot['website']
 										: undefined) ?? entityTargets?.domains?.[0],
 							}
-							const runsRescue = schemaName === 'company_enrichment_v1'
 							// Contacts rescue: the broad pass reliably drops the people list. If
 							// it came back with at most one contact, run a focused pass that pulls
 							// only named people + titles from the same evidence and fold them in —
 							// before the guard chain, so recovered contacts are guarded like the
 							// rest. Fail-open: a rescue error keeps the broad result.
-							if (runsRescue && needsContactRescue(result)) {
+							if (isEnrichmentRun && needsContactRescue(result)) {
 								const rescue = yield* extractLlm
 									.generateObject({
 										schema: ContactsRescueSchema,
@@ -1424,7 +1442,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// tooling even when a page states them. When either is empty, a focused
 							// pass fills it in (without overwriting a value the broad pass grounded);
 							// an aggregator-sourced value is capped to medium by the source tier.
-							if (runsRescue && needsFirmographicsRescue(result)) {
+							if (isEnrichmentRun && needsFirmographicsRescue(result)) {
 								const fRescue = yield* extractLlm
 									.generateObject({
 										schema: FirmographicsRescueSchema,
@@ -1459,7 +1477,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// pass, one more pass that asks for ONLY the employee headcount recovers it far
 							// more reliably — the combined pass splits attention with tools and often drops
 							// the number even when the evidence states it. Fail-open, enrichment runs only.
-							if (runsRescue && needsSizeRescue(result)) {
+							if (isEnrichmentRun && needsSizeRescue(result)) {
 								const sRescue = yield* extractLlm
 									.generateObject({
 										schema: SizeRescueSchema,
@@ -1489,6 +1507,17 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										}),
 									)
 								}
+							}
+							// How much the rescue passes recovered — the gap between this and
+							// the broad fill above is the recovery those extra calls bought.
+							if (isEnrichmentRun) {
+								const rescuedFill = enrichmentFill(result)
+								const rescuedContacts = contactFill(result)
+								yield* Effect.annotateCurrentSpan({
+									'research.enrichment.filled_rescued': rescuedFill.filled,
+									'research.contacts.named_rescued': rescuedContacts.named,
+									'research.contacts.titled_rescued': rescuedContacts.titled,
+								})
 							}
 							// Drop citations the model invented: keep only source_ids that map
 							// to a page this run actually fetched. A proposed CRM update left
@@ -1775,6 +1804,20 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										capped: sourceTier.capped,
 									}),
 								)
+							}
+							// What actually ships, after every rescue and guard — the number a
+							// reader of the findings sees. The gap from filled_rescued is what
+							// the guards removed; a low value here with a healthy broad fill
+							// points at the guards, a low value everywhere at the model.
+							if (isEnrichmentRun) {
+								const keptFill = enrichmentFill(result)
+								const keptContacts = contactFill(result)
+								yield* Effect.annotateCurrentSpan({
+									'research.enrichment.filled_kept': keptFill.filled,
+									'research.enrichment.missing_kept': keptFill.missing.length,
+									'research.contacts.named_kept': keptContacts.named,
+									'research.contacts.titled_kept': keptContacts.titled,
+								})
 							}
 							return {
 								findings: result as unknown,
