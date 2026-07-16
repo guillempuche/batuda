@@ -35,6 +35,7 @@ import { servicesDown, servicesStatus, servicesUp } from './commands/services'
 import type { EnvFileResult } from './commands/setup'
 import { setup } from './commands/setup'
 import {
+	accessUrls,
 	worktreeDoctor,
 	worktreeDone,
 	worktreeDown,
@@ -69,34 +70,24 @@ const seedCommand = Command.make(
 				yield* Console.log(
 					`Seeded (${preset}): ${counts.products} products, ${counts.companies} companies, ${counts.contacts} contacts, ${counts.interactions} interactions, ${counts.tasks} tasks, ${counts.documents} documents, ${counts.proposals} proposals, ${counts.pages} pages, ${counts.callRecordings} call recordings`,
 				)
+				// Hosts follow this checkout: bare batuda.localhost in the main
+				// checkout, <label>.batuda.localhost inside a worktree — so the hints
+				// name the URL actually being served, not main's.
+				const { web, api } = yield* accessUrls
 				yield* Console.log('')
 				yield* Console.log('─── Access hints ───────────────────────────────')
+				yield* Console.log(`  API server:   pnpm dev:server   → ${api}`)
+				yield* Console.log(`  Batuda web:    pnpm dev:internal → ${web}`)
+				yield* Console.log('')
+				yield* Console.log(`  API docs (Scalar): ${api}/docs`)
+				yield* Console.log(`  OpenAPI spec:      ${api}/openapi.json`)
+				yield* Console.log(`  Auth docs:         ${api}/auth/reference`)
 				yield* Console.log(
-					'  API server:   pnpm dev:server   → https://api.batuda.localhost',
-				)
-				yield* Console.log(
-					'  Batuda web:    pnpm dev:internal → https://batuda.localhost',
+					`  Auth OpenAPI:      ${api}/auth/open-api/generate-schema`,
 				)
 				yield* Console.log('')
-				yield* Console.log(
-					'  API docs (Scalar): https://api.batuda.localhost/docs',
-				)
-				yield* Console.log(
-					'  OpenAPI spec:      https://api.batuda.localhost/openapi.json',
-				)
-				yield* Console.log(
-					'  Auth docs:         https://api.batuda.localhost/auth/reference',
-				)
-				yield* Console.log(
-					'  Auth OpenAPI:      https://api.batuda.localhost/auth/open-api/generate-schema',
-				)
-				yield* Console.log('')
-				yield* Console.log(
-					'  Health check:    curl https://api.batuda.localhost/health',
-				)
-				yield* Console.log(
-					'  List companies:  curl https://api.batuda.localhost/v1/companies',
-				)
+				yield* Console.log(`  Health check:    curl ${api}/health`)
+				yield* Console.log(`  List companies:  curl ${api}/v1/companies`)
 				yield* Console.log(
 					'  Docker DB:       docker exec -it batuda-db psql -U batuda',
 				)
