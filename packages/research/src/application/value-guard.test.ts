@@ -92,6 +92,79 @@ describe('verifyValueProvenance', () => {
 		})
 	})
 
+	describe('when a proposal invents a place the evidence never mentions', () => {
+		it('should drop it — a location must read off a real page', () => {
+			// GIVEN a company the evidence places in Chicago, and a proposal that
+			// would move it to a city named nowhere in the evidence
+			const corpus = 'Redwood Logistics is a Chicago-based logistics provider.'
+			const findings = {
+				proposed_updates: [
+					{ subject_id: 'c1', fields: { location: 'Pittsburgh, PA' } },
+				],
+			}
+
+			// WHEN checked
+			const result = verifyValueProvenance(findings, corpus)
+
+			// THEN the fabricated location is dropped, though it carries no email or
+			// digits for the precise checks to catch
+			expect(proposals(result.findings)).toHaveLength(0)
+			expect(result.droppedProposals).toBe(1)
+		})
+
+		it('should keep a location the evidence does state', () => {
+			// GIVEN a proposal whose location is on the page
+			const corpus = 'Redwood Logistics is headquartered in Chicago, Illinois.'
+			const findings = {
+				proposed_updates: [
+					{ subject_id: 'c1', fields: { location: 'Chicago, IL' } },
+				],
+			}
+
+			// WHEN checked
+			const result = verifyValueProvenance(findings, corpus)
+
+			// THEN it survives, so the check does not over-fire on a real value
+			expect(proposals(result.findings)).toHaveLength(1)
+			expect(result.droppedProposals).toBe(0)
+		})
+
+		it('should hold the camelCase tools field to the page too', () => {
+			// GIVEN a proposal naming a tool the evidence never mentions, keyed the
+			// way a CRM write keys it
+			const corpus = 'The company runs its fleet on an in-house system.'
+			const findings = {
+				proposed_updates: [
+					{ subject_id: 'c1', fields: { currentTools: 'Salesforce CRM' } },
+				],
+			}
+
+			// WHEN checked
+			const result = verifyValueProvenance(findings, corpus)
+
+			// THEN the invented tool is dropped
+			expect(proposals(result.findings)).toHaveLength(0)
+			expect(result.droppedProposals).toBe(1)
+		})
+
+		it('should not drop a location on a resumed run with no corpus', () => {
+			// GIVEN an empty corpus — a resumed run keeps none of the evidence the
+			// first run gathered — and a proposal carrying a location
+			const findings = {
+				proposed_updates: [
+					{ subject_id: 'c1', fields: { location: 'Pittsburgh, PA' } },
+				],
+			}
+
+			// WHEN checked with nothing to check against
+			const result = verifyValueProvenance(findings, '')
+
+			// THEN the value is kept, not dropped for want of a corpus
+			expect(proposals(result.findings)).toHaveLength(1)
+			expect(result.droppedProposals).toBe(0)
+		})
+	})
+
 	describe('when several proposals mix supported and invented values', () => {
 		it('should drop only the unsupported ones', () => {
 			// GIVEN a supported phone, an invented email, and a fuzzy-only proposal
