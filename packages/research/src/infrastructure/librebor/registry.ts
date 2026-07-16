@@ -129,6 +129,7 @@ export const makeLibreborRegistry = (slot: number) =>
 					role: p.role ?? undefined,
 					since: p.date_from ?? undefined,
 				})),
+				sourceUrl: `https://libreborme.net/borme/empresa/${company.nif ?? ''}`,
 				units: 1,
 			})
 

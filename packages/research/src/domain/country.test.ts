@@ -6,6 +6,8 @@ import {
 	isRegistryCountry,
 	parseCountryAlpha2,
 	REGISTRY_COUNTRIES,
+	registryCountryForHost,
+	resolveRegistryCountry,
 } from './country'
 
 const decodeCountry = Schema.decodeUnknownSync(AcceptedCountry)
@@ -128,6 +130,98 @@ describe('parseCountryAlpha2', () => {
 			expect(parseCountryAlpha2('123')).toBeUndefined()
 			expect(parseCountryAlpha2('')).toBeUndefined()
 			expect(parseCountryAlpha2(undefined)).toBeUndefined()
+		})
+	})
+})
+
+describe('registryCountryForHost', () => {
+	describe('when the host ends in a registry country code', () => {
+		it('should map .uk and .co.uk to GB and .es to ES', () => {
+			// GIVEN hosts on a country-code suffix
+			// THEN each resolves to the country whose register we can query
+			expect(registryCountryForHost('acme.co.uk')).toBe('GB')
+			expect(registryCountryForHost('acme.uk')).toBe('GB')
+			expect(registryCountryForHost('empresa.es')).toBe('ES')
+		})
+	})
+
+	describe('when the host is a .com or has no usable suffix', () => {
+		it('should resolve to nothing rather than guess', () => {
+			// GIVEN a .com host — plenty of Spanish and British companies use one
+			expect(registryCountryForHost('gruposese.com')).toBeUndefined()
+			expect(registryCountryForHost(undefined)).toBeUndefined()
+		})
+	})
+})
+
+describe('resolveRegistryCountry', () => {
+	describe('when the company on file records its country', () => {
+		it('should use the stored country over a weaker signal', () => {
+			// GIVEN a company on file in ES, a hint pointing at GB, and a .com site
+			const cc = resolveRegistryCountry({
+				subjectCountry: 'ES',
+				locationHint: 'GB',
+				anchorHost: 'acme.com',
+			})
+
+			// THEN the surest signal — what we already recorded — wins
+			expect(cc).toBe('ES')
+		})
+	})
+
+	describe('when there is no stored country but a place hint', () => {
+		it('should fall back to the hint', () => {
+			// GIVEN no stored country, a GB hint
+			const cc = resolveRegistryCountry({
+				subjectCountry: undefined,
+				locationHint: 'GB',
+				anchorHost: 'acme.com',
+			})
+
+			// THEN the hint routes the lookup
+			expect(cc).toBe('GB')
+		})
+	})
+
+	describe('when only the web address carries a country signal', () => {
+		it('should fall back to the address suffix', () => {
+			// GIVEN nothing but a .es site
+			const cc = resolveRegistryCountry({
+				subjectCountry: undefined,
+				locationHint: undefined,
+				anchorHost: 'empresa.es',
+			})
+
+			// THEN the suffix is the last resort
+			expect(cc).toBe('ES')
+		})
+	})
+
+	describe('when a signal names a country with no register we can query', () => {
+		it('should skip it and try the next signal', () => {
+			// GIVEN a stored country (US) with no adapter, then a usable ES hint
+			const cc = resolveRegistryCountry({
+				subjectCountry: 'US',
+				locationHint: 'ES',
+				anchorHost: undefined,
+			})
+
+			// THEN it passes over the unqueryable country to the one we can look up
+			expect(cc).toBe('ES')
+		})
+	})
+
+	describe('when nothing points at a queryable register', () => {
+		it('should resolve to nothing, so no lookup is forced', () => {
+			// GIVEN a US company on a .com with no hint
+			const cc = resolveRegistryCountry({
+				subjectCountry: 'US',
+				locationHint: undefined,
+				anchorHost: 'acme.com',
+			})
+
+			// THEN no register is consulted rather than guessing one
+			expect(cc).toBeUndefined()
 		})
 	})
 })

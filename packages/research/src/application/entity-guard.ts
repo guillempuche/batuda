@@ -210,6 +210,13 @@ const ENTITY_GROUNDED_SCHEMAS = new Set([
 	'contact_discovery_v1',
 ])
 
+// True when a run's whole job is its own named subject — enrichment and contact
+// discovery — as opposed to a scan that reports third parties. Callers that act on
+// the subject itself (the register lookup) gate on this, so an anchored scan does
+// not trigger subject-only work.
+export const isEntityGroundedSchema = (schemaName: string): boolean =>
+	ENTITY_GROUNDED_SCHEMAS.has(schemaName)
+
 /**
  * Builds the match keys for a run's target, or null when the run should not be
  * entity-gated (a scan/freeform run with no anchored subject, or a target with no
@@ -228,7 +235,7 @@ export const deriveEntityTargets = (args: {
 	anchorDomain?: string | undefined
 }): EntityTargets | null => {
 	const anchored = args.subjects.length > 0
-	if (!ENTITY_GROUNDED_SCHEMAS.has(args.schemaName) && !anchored) return null
+	if (!isEntityGroundedSchema(args.schemaName) && !anchored) return null
 
 	const names = anchored
 		? args.subjects
@@ -310,8 +317,7 @@ export const deriveAnchorHost = (args: {
 		.find((h): h is string => h !== undefined)
 	if (fromSubject !== undefined) return fromSubject
 	const anchored = args.subjects.length > 0
-	if (!ENTITY_GROUNDED_SCHEMAS.has(args.schemaName) && !anchored)
-		return undefined
+	if (!isEntityGroundedSchema(args.schemaName) && !anchored) return undefined
 	return parseQueryDomain(args.query)
 }
 

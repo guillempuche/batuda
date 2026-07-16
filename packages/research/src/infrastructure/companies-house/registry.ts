@@ -191,6 +191,7 @@ export const makeCompaniesHouseRegistry = (slot: number) =>
 								role: o.officer_role ?? undefined,
 								since: o.appointed_on ?? undefined,
 							})),
+							sourceUrl: `https://find-and-update.company-information.service.gov.uk/company/${number}`,
 							units: 1,
 						})
 					}),

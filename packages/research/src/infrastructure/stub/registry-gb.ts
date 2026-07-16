@@ -23,6 +23,8 @@ export const StubRegistryGbProviderInstance = RegistryRouter.of({
 					{ name: 'SMITH, Jane', role: 'director', since: '2014-06-02' },
 					{ name: 'PATEL, Arjun', role: 'director', since: '2018-01-10' },
 				],
+				sourceUrl:
+					'https://find-and-update.company-information.service.gov.uk/company/12345678',
 				units: 0,
 			}),
 		),

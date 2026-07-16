@@ -27,6 +27,7 @@ export const StubRegistryEsProviderInstance = RegistryRouter.of({
 						since: '2005-03-15',
 					},
 				],
+				sourceUrl: 'https://libreborme.net/borme/empresa/B12345678',
 				units: 0,
 			}),
 		),
