@@ -22,7 +22,11 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import { ResearchRun } from '@batuda/domain'
 
-import { AcceptedCountry, parseCountryAlpha2 } from '../domain/country'
+import {
+	AcceptedCountry,
+	parseCountryAlpha2,
+	resolveRegistryCountry,
+} from '../domain/country'
 import {
 	SNAPSHOT_COMPANY_FIELDS,
 	SNAPSHOT_CONTACT_FIELDS,
@@ -67,6 +71,7 @@ import {
 	type EntityTargets,
 	groundedSourceIds,
 	isConfirmedRegistryMatch,
+	isEntityGroundedSchema,
 	withRedirectDomain,
 } from './entity-guard'
 import { contactFill, enrichmentFill } from './extraction-fill'
@@ -1369,6 +1374,14 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// phase-2 extraction reads the official site even if the model never did.
 					const seededAnchorHashes: string[] = []
 					const seededTranscriptParts: string[] = []
+					// A national-register lookup done up front (see below): its source-row
+					// hash to link so a value taken from the register can cite it, and its
+					// rendered text to add to the evidence the extraction is checked against.
+					// Kept out of the entity gate, though: a register entry proves the legal
+					// name is real, not that the pages the run scraped are this company's —
+					// folding it in would let a lookalike's pages clear the right-company check.
+					const seededRegistryHashes: string[] = []
+					const seededEvidenceParts: string[] = []
 					// Findings the discovery-scan retry path extracts under the shared
 					// budget; undefined on every other path (which extracts in phase 2).
 					let retryFindings: unknown
@@ -2022,6 +2035,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							const budget = yield* Budget
 							const toolkit = yield* researchToolkit
 							const scrape = yield* ScrapeProvider
+							const registry = yield* RegistryRouter
 
 							// Anchor: when the caller handed in the company's own domain, fetch
 							// that official site once now so grounding has the right company's
@@ -2090,6 +2104,103 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											Effect.annotateLogs({
 												research_id: researchId,
 												host: anchorHost,
+												cause: Cause.pretty(cause),
+											}),
+										),
+									),
+								)
+							}
+
+							// Register: for a company pinned to a country with a national
+							// register, look it up once now. The register holds the authoritative,
+							// niche facts — the legal name, the tax id, the named directors — that
+							// a thin company website never states, and folds them into the evidence
+							// the extraction reads. Only for a run whose whole job is this one
+							// company — enrichment or contact discovery — never a scan that
+							// happens to be anchored, whose subject is a starting point for
+							// finding other firms, not the thing being looked up.
+							const registrySnapshot = subjects[0]?.snapshot as
+								| Record<string, unknown>
+								| undefined
+							const registryCountry =
+								entityTargets !== null && isEntityGroundedSchema(schemaName)
+									? resolveRegistryCountry({
+											subjectCountry:
+												typeof registrySnapshot?.['country'] === 'string'
+													? registrySnapshot['country']
+													: undefined,
+											locationHint: hints?.location,
+											anchorHost,
+										})
+									: undefined
+							if (registryCountry !== undefined) {
+								const registryQuery =
+									typeof registrySnapshot?.['name'] === 'string'
+										? registrySnapshot['name']
+										: (run as { query: string }).query
+								yield* Effect.gen(function* () {
+									// Charged under this run's registry key. If the agent later looks
+									// the same company up by the same name, that call is free (it
+									// hashes to this key); a lookup by tax id or a different spelling
+									// is charged again, so the register costs at most a small, budget-
+									// capped handful per run rather than exactly once.
+									yield* budget.chargePaid(
+										'registry',
+										REGISTRY_LOOKUP_COST_CENTS,
+										'registry_lookup',
+										`${researchId}:registry:${registryCountry}:${registryQuery}`,
+									)
+									const record = yield* registry.lookup({
+										country: registryCountry,
+										query: registryQuery,
+									})
+									const hash = urlHashForScrape(record.sourceUrl)
+									const domain =
+										domainHost(record.sourceUrl) ??
+										registryCountry.toLowerCase()
+									// A record read from a national register sits in `sources`
+									// alongside the fetched pages, so a value taken from it grounds
+									// the same way a scraped fact does.
+									yield* sql`
+										INSERT INTO sources (id, kind, provider, url, url_hash, domain, title, content_hash, first_fetched_at, last_fetched_at)
+										VALUES (
+											${`src_${hash.slice(0, 16)}`}, 'registry',
+											${`registry-${registryCountry.toLowerCase()}`},
+											${record.sourceUrl}, ${hash}, ${domain}, ${record.legalName},
+											${hash}, now(), now()
+										)
+										ON CONFLICT (url_hash) DO UPDATE SET last_fetched_at = now()
+									`
+									seededRegistryHashes.push(hash)
+									seededTranscriptParts.push(
+										`[registry_lookup] ${boundedToolResult({ url: record.sourceUrl, ...record })}`,
+									)
+									seededEvidenceParts.push(
+										`${record.sourceUrl}\n${JSON.stringify(record)}`,
+									)
+									// A register match on the legal name confirms the run reached the
+									// right company, the same as reaching its own site.
+									if (
+										!registryConfirmed &&
+										isConfirmedRegistryMatch(entityTargets, record)
+									) {
+										registryConfirmed = true
+									}
+									yield* Effect.logInfo('research.registry.seeded').pipe(
+										Effect.annotateLogs({
+											research_id: researchId,
+											country: registryCountry,
+										}),
+									)
+								}).pipe(
+									// The register may be unreachable, out of credit, or simply not
+									// list this company. None of that is a reason to abandon the
+									// research — the run carries on with what the web tells it.
+									Effect.catchCause(cause =>
+										Effect.logWarning('research.registry.seed_skipped').pipe(
+											Effect.annotateLogs({
+												research_id: researchId,
+												country: registryCountry,
 												cause: Cause.pretty(cause),
 											}),
 										),
@@ -2421,12 +2532,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						`
 
 						// Link every page scraped across the loop's rounds — plus the anchor
-						// site seeded before the loop — to the run so findings cite real
-						// sources (a discovery-scan retry may have linked some already —
-						// ON CONFLICT makes the re-link a no-op).
+						// site and any register entry seeded before the loop — to the run so
+						// findings cite real sources (a discovery-scan retry may have linked
+						// some already — ON CONFLICT makes the re-link a no-op).
 						yield* linkRunSources([
 							...loopResult.scrapedUrlHashes,
 							...seededAnchorHashes,
+							...seededRegistryHashes,
 						])
 					}
 
@@ -2467,6 +2579,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								researchText,
 								[
 									evidenceText,
+									...seededEvidenceParts,
 									...groundedPageTexts(entityTargets, scrapeCorpus),
 								].join('\n'),
 								groundedPageTexts(entityTargets, anchorFirstCorpus),

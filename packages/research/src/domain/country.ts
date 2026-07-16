@@ -35,6 +35,43 @@ export const parseCountryAlpha2 = (
 	return region ? region.toUpperCase() : undefined
 }
 
+// A web address whose country-code suffix names a registry country. ".uk" is what
+// British companies use, though the country's own code is GB, so the two are listed
+// side by side rather than one derived from the other.
+const REGISTRY_COUNTRY_BY_TLD: Record<string, RegistryCountry> = {
+	es: 'ES',
+	uk: 'GB',
+	gb: 'GB',
+}
+
+export const registryCountryForHost = (
+	host: string | undefined,
+): RegistryCountry | undefined => {
+	const tld = host?.toLowerCase().split('.').pop()
+	return tld !== undefined ? REGISTRY_COUNTRY_BY_TLD[tld] : undefined
+}
+
+/**
+ * Which national register to consult for a run, from the surest signal to the
+ * weakest. What we already recorded about the company is the best answer — that
+ * field means "the country this company is in", exactly the question. A caller's
+ * place hint comes next: it is about where to search from, which usually but not
+ * always coincides. A web address ending in a country's own suffix is the last
+ * resort, since plenty of Spanish and British companies use a .com. Nothing
+ * recognizable means no lookup rather than a guess.
+ */
+export const resolveRegistryCountry = (args: {
+	readonly subjectCountry: string | undefined
+	readonly locationHint: string | undefined
+	readonly anchorHost: string | undefined
+}): RegistryCountry | undefined => {
+	for (const raw of [args.subjectCountry, args.locationHint]) {
+		const cc = parseCountryAlpha2(raw)
+		if (cc !== undefined && isRegistryCountry(cc)) return cc
+	}
+	return registryCountryForHost(args.anchorHost)
+}
+
 export const REGISTRY_VENDORS_BY_COUNTRY = {
 	ES: ['stub', 'librebor', 'none'] as const,
 	GB: ['stub', 'companies-house', 'none'] as const,

@@ -129,7 +129,12 @@ const registryLookupInput = async (params: {
 				lookup: input => {
 					captured = input
 					return Effect.succeed(
-						new RegistryRecord({ legalName: 'ACME', units: 0 }),
+						new RegistryRecord({
+							legalName: 'ACME',
+							sourceUrl:
+								'https://find-and-update.company-information.service.gov.uk/company/ACME',
+							units: 0,
+						}),
 					)
 				},
 			}),

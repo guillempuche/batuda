@@ -61,6 +61,11 @@ export class RegistryRecord extends Schema.Class<RegistryRecord>(
 			}),
 		),
 	),
+	// The register page this record was read from. Required, because a register
+	// record always comes from somewhere: it is stored as the record's source so a
+	// value taken from the register can cite where it came from, and a person
+	// reviewing the finding can open the register entry themselves.
+	sourceUrl: Schema.String,
 	units: Schema.Number,
 }) {}
 
