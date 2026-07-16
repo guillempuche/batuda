@@ -15,6 +15,7 @@ import {
 	researchCacheTtlDaysFor,
 	schemaVersionFor,
 	shouldMarkRunFailed,
+	subjectsForPrompt,
 	withProposalIds,
 } from './research-service'
 
@@ -330,6 +331,7 @@ describe('buildExtractionPrompt', () => {
 			const prompt = buildExtractionPrompt({
 				citationInstruction: 'CITE-GUIDANCE',
 				evidenceBlock: 'THE-EVIDENCE',
+				subjects: [],
 			})
 
 			// THEN the grounding rule leads, then the citation guidance, then the
@@ -348,6 +350,7 @@ describe('buildExtractionPrompt', () => {
 			const prompt = buildExtractionPrompt({
 				citationInstruction: '',
 				evidenceBlock: '',
+				subjects: [],
 			})
 
 			// THEN it keeps every rule that holds the model to the evidence — the
@@ -364,6 +367,7 @@ describe('buildExtractionPrompt', () => {
 			const prompt = buildExtractionPrompt({
 				citationInstruction: '',
 				evidenceBlock: '',
+				subjects: [],
 			})
 
 			// THEN it asks the model to read to the end and report what is there — the
@@ -377,6 +381,7 @@ describe('buildExtractionPrompt', () => {
 			const prompt = buildExtractionPrompt({
 				citationInstruction: '',
 				evidenceBlock: '',
+				subjects: [],
 			})
 
 			// THEN the plain-list fields (products, tags) are absent from the "report
@@ -388,6 +393,145 @@ describe('buildExtractionPrompt', () => {
 			)
 			expect(push).not.toContain('products')
 			expect(push).not.toContain('tags')
+		})
+	})
+
+	describe('when the run holds a subject on file', () => {
+		it('should show the on-file values and ask for a correction where the evidence disagrees', () => {
+			// GIVEN a company already on file that the run was handed
+			const prompt = buildExtractionPrompt({
+				citationInstruction: '',
+				evidenceBlock: '',
+				subjects: [
+					{
+						subject_table: 'companies',
+						subject_id: 'c-1',
+						expected_version: 3,
+						current: { industry: 'retail', location: 'Madrid' },
+					},
+				],
+			})
+
+			// THEN the on-file values are shown and the model is told to propose an
+			// update — the only way a handed-in company yields an edit
+			expect(prompt).toContain('What we already have on file')
+			expect(prompt).toContain('"industry": "retail"')
+			expect(prompt).toContain('add an entry to `proposed_updates`')
+			// AND it must copy the identifiers, not work out a mapping
+			expect(prompt).toContain('c-1')
+		})
+
+		it('should tell the model the stored value is not itself evidence', () => {
+			// GIVEN any run with a subject on file
+			const prompt = buildExtractionPrompt({
+				citationInstruction: '',
+				evidenceBlock: '',
+				subjects: [
+					{
+						subject_table: 'companies',
+						subject_id: 'c-1',
+						expected_version: 1,
+						current: { industry: 'retail' },
+					},
+				],
+			})
+
+			// THEN it forbids proposing a value that only repeats what is stored, and
+			// forbids treating the stored value as a source
+			expect(prompt).toContain('never take a value from `current` itself')
+		})
+	})
+
+	describe('when the run holds no subject', () => {
+		it('should add no on-file block at all', () => {
+			// GIVEN a run with no subject (a free-text or scan run)
+			const prompt = buildExtractionPrompt({
+				citationInstruction: '',
+				evidenceBlock: '',
+				subjects: [],
+			})
+
+			// THEN there is nothing about proposing updates — a run with nothing on
+			// file has nothing to correct
+			expect(prompt).not.toContain('What we already have on file')
+			expect(prompt).not.toContain('proposed_updates')
+		})
+	})
+})
+
+describe('subjectsForPrompt', () => {
+	describe('when a subject snapshot carries stored values', () => {
+		it('should show only the allowlisted fields and rename the identifiers', () => {
+			// GIVEN a full company row, including columns the run should not read back
+			const projected = subjectsForPrompt([
+				{
+					table: 'companies',
+					id: 'c-1',
+					snapshot: {
+						name: 'Acme',
+						industry: 'retail',
+						nextAction: 'call the CFO',
+						ownerId: 'u-9',
+						priority: 'high',
+					},
+					expected_version: 4,
+				},
+			])
+
+			// THEN the identifiers are keyed as a proposed change keys them, and the
+			// sales working columns are dropped
+			expect(projected[0]).toEqual({
+				subject_table: 'companies',
+				subject_id: 'c-1',
+				expected_version: 4,
+				current: { name: 'Acme', industry: 'retail' },
+			})
+		})
+	})
+
+	describe('when a snapshot column holds nothing', () => {
+		it('should leave it out rather than show an empty value', () => {
+			// GIVEN a row with a null column among the allowlisted ones
+			const projected = subjectsForPrompt([
+				{
+					table: 'companies',
+					id: 'c-1',
+					snapshot: { name: 'Acme', location: null },
+					expected_version: 1,
+				},
+			])
+
+			// THEN the empty column is absent from the on-file picture
+			expect(projected[0]?.current).toEqual({ name: 'Acme' })
+		})
+	})
+
+	describe('when the subject is a contact', () => {
+		it('should project the contact fields, not the company ones', () => {
+			// GIVEN a contact row
+			const projected = subjectsForPrompt([
+				{
+					table: 'contacts',
+					id: 'p-1',
+					snapshot: { name: 'Ada', role: 'CTO', industry: 'ignored' },
+					expected_version: 2,
+				},
+			])
+
+			// THEN only the contact's own fields are shown
+			expect(projected[0]?.current).toEqual({ name: 'Ada', role: 'CTO' })
+		})
+	})
+
+	describe('when the snapshot is missing', () => {
+		it('should yield an empty on-file picture rather than throw', () => {
+			// GIVEN a subject with no snapshot row
+			const projected = subjectsForPrompt([
+				{ table: 'companies', id: 'c-1', snapshot: null, expected_version: 1 },
+			])
+
+			// THEN it projects to an empty current
+			expect(projected[0]?.current).toEqual({})
 		})
 	})
 })

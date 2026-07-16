@@ -25,3 +25,33 @@ export const CRM_SIZE_RANGES = [
 	'51-200',
 ] as const
 export type CrmSizeRange = (typeof CRM_SIZE_RANGES)[number]
+
+// What a research run is shown of a company or contact it already holds, so it can
+// spot a value the evidence contradicts and propose a correction. Deliberately
+// narrower than everything stored: the pipeline stage, who owns the lead, and when
+// it was last contacted are the sales team's own working notes, not something the
+// research should read back. Keys are the camelCase names the row arrives with.
+// Every name here must be one the apply path can write; the sync test in apps/server
+// (the one place that sees both this and the write allowlist) fails otherwise.
+export const SNAPSHOT_COMPANY_FIELDS = [
+	'name',
+	'website',
+	'email',
+	'phone',
+	'linkedin',
+	'instagram',
+	'industry',
+	'sizeRange',
+	'location',
+	'painPoints',
+	'currentTools',
+	'productsFit',
+	'tags',
+] as const
+
+export const SNAPSHOT_CONTACT_FIELDS = [
+	'name',
+	'role',
+	'isDecisionMaker',
+	'notes',
+] as const
