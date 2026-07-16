@@ -1523,6 +1523,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							result = scalarCheck.findings
 							if (
 								scalarCheck.droppedPlaceholder > 0 ||
+								scalarCheck.droppedWrongKind > 0 ||
 								scalarCheck.droppedUngrounded > 0 ||
 								scalarCheck.droppedUnsupported > 0
 							) {
@@ -1530,6 +1531,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									Effect.annotateLogs({
 										research_id: researchId,
 										dropped_placeholder: scalarCheck.droppedPlaceholder,
+										dropped_wrong_kind: scalarCheck.droppedWrongKind,
 										dropped_ungrounded: scalarCheck.droppedUngrounded,
 										dropped_unsupported: scalarCheck.droppedUnsupported,
 									}),
@@ -1564,6 +1566,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									websiteCheck.blankedProfilePage,
 								'research.fields.dropped_placeholder':
 									scalarCheck.droppedPlaceholder,
+								'research.fields.dropped_wrong_kind':
+									scalarCheck.droppedWrongKind,
 								'research.fields.dropped_ungrounded':
 									scalarCheck.droppedUngrounded,
 								'research.fields.dropped_unsupported':
