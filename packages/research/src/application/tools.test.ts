@@ -328,7 +328,7 @@ const discoverContactsInput = async (params: {
 	return captured
 }
 
-describe('researchToolkit tool params — model-emitted null is treated as omitted', () => {
+describe('researchToolkit tool params — null and quoted numbers are read, not refused', () => {
 	describe('web_search handler', () => {
 		describe('when the optional params are explicit null', () => {
 			it('should hand the search provider undefined for limit, recency, and location', async () => {
@@ -530,24 +530,72 @@ describe('researchToolkit tool params — model-emitted null is treated as omitt
 			})
 		})
 
-		describe('when a nullable param has a wrong, non-null type', () => {
-			it('should still reject — null tolerance did not loosen the value type', () => {
-				// GIVEN a string where a number is expected, with the other params set
-				// to null so the rejection is about the value type, not a missing field
-				// THEN decode still fails
+		describe('when the model writes a number as text', () => {
+			it('should read a quoted number back as the number', () => {
+				// GIVEN a model that quoted its numbers — the arguments a real run died on
+				const params = Schema.decodeUnknownSync(WebSearchTool.parametersSchema)(
+					{
+						query: 'acme',
+						limit: '10',
+						recency_days: '7',
+						location: null,
+					},
+				)
+
+				// THEN each is read back as the number it names
+				expect(params.limit).toBe(10)
+				expect(params.recency_days).toBe(7)
+			})
+
+			it('should keep a quoted zero, which is a real value and not "none"', () => {
+				// GIVEN "0" — easy to mistake for "nothing", but a real answer: today only
+				const params = Schema.decodeUnknownSync(WebSearchTool.parametersSchema)(
+					{
+						query: 'acme',
+						limit: null,
+						recency_days: '0',
+						location: null,
+					},
+				)
+
+				// THEN it survives as 0 rather than being folded into "not provided"
+				expect(params.recency_days).toBe(0)
+			})
+
+			it('should treat text naming no number as no value, not as an error', () => {
+				// GIVEN words and a blank where a number was asked for
+				const params = Schema.decodeUnknownSync(WebSearchTool.parametersSchema)(
+					{
+						query: 'acme',
+						limit: 'ten',
+						recency_days: '',
+						location: null,
+					},
+				)
+
+				// THEN the search simply runs without them — one unreadable argument
+				// must never cost the run
+				expect(params.limit).toBeNull()
+				expect(params.recency_days).toBeNull()
+			})
+		})
+
+		describe('when a numeric param is neither a number nor text', () => {
+			it('should still reject — accepting text is not accepting anything', () => {
+				// GIVEN a boolean and an array where a number is expected
 				expect(() =>
 					Schema.decodeUnknownSync(WebSearchTool.parametersSchema)({
 						query: 'acme',
-						limit: null,
-						recency_days: 'soon',
+						limit: true,
+						recency_days: null,
 						location: null,
 					}),
 				).toThrow()
 				expect(() =>
 					Schema.decodeUnknownSync(WebSearchTool.parametersSchema)({
 						query: 'acme',
-						limit: 'ten',
-						recency_days: null,
+						limit: null,
+						recency_days: [],
 						location: null,
 					}),
 				).toThrow()

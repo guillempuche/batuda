@@ -74,6 +74,26 @@ describe('researchToolkit', () => {
 				// fireworks reject, which killed the LLM fallback in prod
 				expect(nestedAnyOfPaths(jsonSchema)).toEqual([])
 			})
+
+			it(`should keep every "${tool.name}" argument's description`, () => {
+				// GIVEN a Phase-1 tool's parameter schema
+				// WHEN serialised through the exact runtime path
+				const jsonSchema = Tool.getJsonSchema(tool, {
+					transformer: OpenAiStructuredOutput.toCodecOpenAI,
+				}) as { properties?: Record<string, { description?: string }> }
+
+				// THEN each argument still explains itself — the model has nothing else
+				// to go on, and a schema that lost a description is still a valid one,
+				// so no other check here would notice
+				for (const [name, property] of Object.entries(
+					jsonSchema.properties ?? {},
+				)) {
+					expect(
+						property.description,
+						`${tool.name}.${name} lost its description`,
+					).toBeTruthy()
+				}
+			})
 		}
 	})
 })

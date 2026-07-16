@@ -51,16 +51,31 @@ const coerceFinite = (value: number | string | null): number | null => {
 	return Number.isFinite(n) ? n : null
 }
 
-export const LenientNumber = Schema.Union([
+const lenientNumberWire = Schema.Union([
 	Schema.Finite,
 	Schema.String,
 	Schema.Null,
-]).pipe(
-	Schema.decodeTo(Schema.NullOr(Schema.Number), {
-		decode: SchemaGetter.transform(coerceFinite),
-		encode: SchemaGetter.transform((n: number | null) => n),
-	}),
-)
+])
+
+const readAsNumber = (wire: typeof lenientNumberWire) =>
+	wire.pipe(
+		Schema.decodeTo(Schema.NullOr(Schema.Number), {
+			decode: SchemaGetter.transform(coerceFinite),
+			encode: SchemaGetter.transform((n: number | null) => n),
+		}),
+	)
+
+export const LenientNumber = readAsNumber(lenientNumberWire)
+
+/**
+ * The same lenient number, carrying a note that explains the field to the model.
+ *
+ * The note goes on the shape a number travels in, not on the finished field:
+ * what the model is told about a field is built from that travelling shape, so
+ * a note put anywhere else is silently dropped from what the model reads.
+ */
+export const describedLenientNumber = (description: string) =>
+	readAsNumber(lenientNumberWire.annotate({ description }))
 
 export const Citation = Schema.Struct({
 	source_id: Schema.String,
