@@ -544,6 +544,22 @@ export const buildResearchSystemPrompt = (args: {
 	].join('\n')
 }
 
+/**
+ * The instruction for the structured-extraction pass: read the gathered evidence
+ * and fill the output schema from it.
+ *
+ * It is grounding-first — the model may only output a value that appears in the
+ * evidence, and must leave an unsupported field empty rather than filling it from
+ * prior knowledge, or it will confidently invent phones, tax ids, and emails.
+ * It must never emit a schema field's own name or a placeholder ("headquarters",
+ * "unknown") as a value; a field with no real value is left out.
+ */
+export const buildExtractionPrompt = (args: {
+	readonly citationInstruction: string
+	readonly evidenceBlock: string
+}): string =>
+	`Produce structured findings STRICTLY from the evidence below (the fetched pages and the research transcript). Only include a value that appears in the evidence; if it does not support a field, omit it or leave it null — never fill a field from prior knowledge, and never put a placeholder or the field's own name as its value.\n\n${args.citationInstruction}\n\n${args.evidenceBlock}`
+
 // ── Event types for SSE streaming ──
 
 export type ResearchEventType =
@@ -1334,13 +1350,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// but Schema.Top erases that — the cast is safe.
 							const structuredResponse = yield* extractLlm.generateObject({
 								schema: outputSchema as typeof FreeformSchema,
-								// Ground the extraction: the model may only output values that
-								// appear in the evidence, and must leave unsupported fields
-								// empty rather than filling them from prior knowledge — otherwise
-								// it will confidently invent phones, tax ids, and emails. Never
-								// emit a schema field's name or a placeholder ("headquarters",
-								// "unknown") as a value; omit a field with no real value instead.
-								prompt: `Produce structured findings STRICTLY from the evidence below (the fetched pages and the research transcript). Only include a value that appears in the evidence; if it does not support a field, omit it or leave it null — never fill a field from prior knowledge, and never put a placeholder or the field's own name as its value.\n\n${citationInstruction}\n\n${evidenceBlock}`,
+								prompt: buildExtractionPrompt({
+									citationInstruction,
+									evidenceBlock,
+								}),
 							})
 							let result = withProposalIds(structuredResponse.value as unknown)
 							let rescueOutputTokens = 0
