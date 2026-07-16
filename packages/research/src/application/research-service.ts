@@ -1392,16 +1392,21 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										? rescueSnapshot['website']
 										: undefined) ?? entityTargets?.domains?.[0],
 							}
-							// Contacts rescue: the broad pass reliably drops the people list. If
-							// it came back with at most one contact, run a focused pass that pulls
-							// only named people + titles from the same evidence and fold them in —
-							// before the guard chain, so recovered contacts are guarded like the
-							// rest. Fail-open: a rescue error keeps the broad result.
+							// Contacts rescue: the broad pass reliably drops the people list. If it
+							// came back with at most one contact, or with named people missing their
+							// titles, run a focused pass that pulls only named people + titles from
+							// the same evidence and fold them in — before the guard chain, so
+							// recovered contacts are guarded like the rest. Fail-open: a rescue error
+							// keeps the broad result.
 							if (isEnrichmentRun && needsContactRescue(result)) {
 								const rescue = yield* extractLlm
 									.generateObject({
 										schema: ContactsRescueSchema,
-										prompt: contactsRescuePrompt(rescueTarget, evidenceBlock),
+										prompt: contactsRescuePrompt(
+											rescueTarget,
+											evidenceBlock,
+											sourceManifest,
+										),
 									})
 									.pipe(
 										Effect.map(r => ({
