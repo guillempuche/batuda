@@ -39,6 +39,7 @@ export const isDiscoveryScanEmpty = (
 
 // Appended to the query for a single refined retry after a discovery scan comes
 // back empty, steering the model toward useful sources and away from the social /
-// glossary noise that empties an open-ended search.
+// glossary noise that empties an open-ended search — while holding it to the
+// request's own size, place, and niche so "refine" widens the wording, not the bar.
 export const REFINE_HINT =
-	'The previous search returned no relevant results. Refine your approach: search business directories, industry association member lists, and sector-specific registries for companies that match the criteria; combine specific location and industry keywords; and ignore social-media posts, forums, and glossary pages. Do not use placeholder site: filters.'
+	'The previous search returned no relevant results. Refine your approach: search business directories, industry association member lists, and sector-specific registries for companies that match the criteria; combine specific location and industry keywords; and ignore social-media posts, forums, and glossary pages. Do not use placeholder site: filters. Keep every qualifier the request made — size, place, and niche: widen the wording, never the criteria. A "top N" or "largest" ranking is not a shortcut past them; it lists the biggest firms in the sector, which is rarely what was asked.'
