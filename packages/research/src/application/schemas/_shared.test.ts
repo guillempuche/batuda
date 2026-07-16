@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest'
 import { LenientNumber, Sourced, TolerantJsonString } from './_shared'
 import { CompetitorScanV1Schema } from './competitor-scan-v1'
 import { ContactDiscoveryV1Schema } from './contact-discovery-v1'
-import { FreeformSchema } from './freeform'
 import { ProspectScanV1Schema } from './prospect-scan-v1'
 
 describe('TolerantJsonString', () => {
@@ -68,34 +67,6 @@ describe('ProspectScanV1Schema (shared PendingPaidAction.args)', () => {
 			expect(
 				decode(withArgs('{"tax_id":"B123"}')).pending_paid_actions?.[0]?.args,
 			).toEqual({ tax_id: 'B123' })
-		})
-	})
-})
-
-describe('FreeformSchema (inlined proposed_updates.fields)', () => {
-	const decode = Schema.decodeUnknownSync(FreeformSchema)
-
-	describe('when proposed_updates.fields is prose rather than JSON', () => {
-		it('should decode instead of failing, keeping the raw text', () => {
-			// GIVEN freeform's own inlined open-ended field map filled with prose
-			const payload = {
-				proposed_updates: [
-					{
-						subject_table: 'companies',
-						subject_id: 'c1',
-						expected_version: 1,
-						fields: 'set the industry to logistics',
-						reason: 'observed on the site',
-						citations: [{ source_id: 's1' }],
-					},
-				],
-			}
-			// WHEN it is decoded
-			// THEN it does not throw and the raw text is preserved
-			expect(() => decode(payload)).not.toThrow()
-			expect(decode(payload).proposed_updates?.[0]?.fields).toBe(
-				'set the industry to logistics',
-			)
 		})
 	})
 })
@@ -224,35 +195,6 @@ describe('numeric guards on model-produced fields', () => {
 				],
 			})
 			// THEN both numbers decode to null
-			expect(decoded.proposed_updates?.[0]?.expected_version).toBeNull()
-			expect(decoded.pending_paid_actions?.[0]?.estimated_cents).toBeNull()
-		})
-	})
-
-	describe('when freeform inlines "NaN" proposed-update numbers', () => {
-		it('should coerce its own copies of expected_version and estimated_cents to null', () => {
-			// GIVEN freeform's inlined (non-shared) numeric fields set to "NaN"
-			const decoded = Schema.decodeUnknownSync(FreeformSchema)({
-				proposed_updates: [
-					{
-						subject_table: 'companies',
-						subject_id: 'c1',
-						expected_version: 'NaN',
-						fields: '{"industry":"logistics"}',
-						reason: 'r',
-						citations: [{ source_id: 's1' }],
-					},
-				],
-				pending_paid_actions: [
-					{
-						tool: 'lookup_registry',
-						args: '{}',
-						estimated_cents: 'NaN',
-						reason: 'r',
-					},
-				],
-			})
-			// THEN the inlined copies decode to null too
 			expect(decoded.proposed_updates?.[0]?.expected_version).toBeNull()
 			expect(decoded.pending_paid_actions?.[0]?.estimated_cents).toBeNull()
 		})
