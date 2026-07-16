@@ -25,7 +25,7 @@
  *   RESEARCH_LLM_<TIER>_API_KEY=…                        (slot 0)
  *   RESEARCH_LLM_<TIER>_API_KEY_2=…                      (slot 1 via keyForSlot)
  *   RESEARCH_LLM_<TIER>_BASE_URL=…                       (custom vendor only)
- *   RESEARCH_LLM_<TIER>_TIMEOUT_SEC=60                   (per-call; default 60/90/60)
+ *   RESEARCH_LLM_<TIER>_TIMEOUT_SEC=90                   (per-call; default 90)
  */
 
 import { OpenAiClient, OpenAiLanguageModel } from '@effect/ai-openai-compat'
@@ -66,13 +66,14 @@ const LLM_BASE_URLS = {
 	sambanova: 'https://api.sambanova.ai/v1',
 } as const satisfies Record<Exclude<LlmVendor, 'stub' | 'custom'>, string>
 
-// Per-call timeout defaults by tier. Extract runs the largest model (structured
-// JSON over a 235B) so it gets a longer leash than the agent / writer tiers;
-// each is overridable via `RESEARCH_LLM_<TIER>_TIMEOUT_SEC`.
+// How long one model call may take before it is given up on, per tier. The
+// models these tiers run routinely think for the better part of a minute, so a
+// shorter leash cuts off answers that were on their way rather than catching a
+// stuck endpoint. Each is overridable via `RESEARCH_LLM_<TIER>_TIMEOUT_SEC`.
 const DEFAULT_TIMEOUT_SEC: Record<LlmTier, number> = {
-	agent: 60,
+	agent: 90,
 	extract: 90,
-	writer: 60,
+	writer: 90,
 }
 
 const buildSlot = (
