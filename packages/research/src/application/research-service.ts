@@ -32,6 +32,7 @@ import {
 	SNAPSHOT_CONTACT_FIELDS,
 } from '../domain/crm-vocabulary'
 import type { ReasonCode, ResolvedPolicy } from '../domain/types'
+import { aboutPageCandidates } from './about-pages'
 import { canAffordAnotherRound, runAgentResearchLoop } from './agent-loop'
 import { filterApplicableProposals } from './applicability-guard'
 import { makeBudgetLayer } from './budget'
@@ -195,6 +196,11 @@ const MAX_EXTRACTION_CHARS_PER_PAGE = 40000
 // Cap how many per-field grounding drops a run logs in detail, so a pathological
 // extraction can't flood the log; the aggregate counts still cover the rest.
 const MAX_LOGGED_FIELD_DROPS = 20
+
+// How many about/contact/team pages to fetch up front from the anchor site's own
+// links. Small on purpose — these carry the location and named leaders a homepage
+// omits, but each is a paid scrape, so a handful is enough.
+const MAX_ABOUT_PAGES = 3
 
 // A research id is always a uuid. Checking the shape before a lookup — instead of
 // passing an arbitrary path param straight to a uuid column — turns a bad id (a bot,
@@ -2140,7 +2146,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									yield* budget.chargeCheap('scrape', SCRAPE_COST_CENTS)
 									const page = yield* scrape.scrape({
 										url: `https://${anchorHost}`,
-										formats: ['markdown'],
+										formats: ['markdown', 'links'],
 									})
 									if (
 										page.markdown !== undefined &&
@@ -2186,6 +2192,59 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													? { resolved_host: destHost }
 													: {}),
 											}),
+										)
+									}
+									// About / contact / team pages carry the location and the named leaders a homepage
+									// rarely spells; fetch a few, chosen from the homepage's own links so no path is
+									// guessed, and let own-host grounding keep what they hold. Each fetch is isolated
+									// so one failure never sinks the rest, and bounded by MAX_ABOUT_PAGES.
+									const seedHost =
+										domainHost(page.resolvedUrl ?? page.url) ?? anchorHost
+									for (const aboutUrl of aboutPageCandidates(
+										page.links ?? [],
+										seedHost,
+										MAX_ABOUT_PAGES,
+									)) {
+										if (isUnsupportedScrapeUrl(aboutUrl)) continue
+										yield* Effect.gen(function* () {
+											yield* budget.chargeCheap('scrape', SCRAPE_COST_CENTS)
+											const about = yield* scrape.scrape({
+												url: aboutUrl,
+												formats: ['markdown'],
+											})
+											if (
+												about.markdown !== undefined &&
+												about.markdown.trim().length > 0
+											) {
+												const aboutHash = urlHashForScrape(about.url)
+												scrapeCorpus.push({
+													urlHash: aboutHash,
+													text: about.markdown,
+													host: domainHost(about.resolvedUrl ?? about.url),
+												})
+												seededAnchorHashes.push(aboutHash)
+												seededTranscriptParts.push(
+													`[scrape_page] ${boundedToolResult({ url: about.url, markdown: about.markdown })}`,
+												)
+												yield* Effect.logInfo(
+													'research.anchor.about_seeded',
+												).pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														url: aboutUrl,
+													}),
+												)
+											}
+										}).pipe(
+											Effect.catchCause(cause =>
+												Effect.logWarning('research.anchor.about_skipped').pipe(
+													Effect.annotateLogs({
+														research_id: researchId,
+														url: aboutUrl,
+														cause: Cause.pretty(cause),
+													}),
+												),
+											),
 										)
 									}
 								}).pipe(
