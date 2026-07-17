@@ -103,6 +103,7 @@ export {
 } from './application/provider-quota'
 export {
 	type CreateResearchInput,
+	cloneCacheHitRun,
 	type PendingProposalRow,
 	queryPendingProposals,
 	type ResearchEvent,
