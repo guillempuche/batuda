@@ -121,6 +121,84 @@ describe('scoreRun', () => {
 		})
 	})
 
+	describe('when an ungrounded run returned the known-correct company', () => {
+		it('should not flag wrong-company when it recovered a known person', () => {
+			// GIVEN a run that never reached the official site but returned a golden
+			// contact by name (identity proof) from a third-party page
+			const withContact: GoldenExpectation = {
+				...acme,
+				contacts: [{ name: 'Andrew Smith' }],
+			}
+			const result = scoreRun(
+				withContact,
+				outcome({
+					reachedDomains: ['en.wikipedia.org'],
+					fields: { industry: 'transport' },
+					contacts: [{ name: 'Andrew Smith', role: 'CEO' }],
+				}),
+			)
+
+			// THEN a matched known person proves it found the right company
+			expect(result.grounded).toBe(false)
+			expect(result.wrongCompany).toBe(false)
+		})
+
+		it('should not flag wrong-company on a specific (non-megacity) location match', () => {
+			// GIVEN a small-town golden and an ungrounded run that matched the town
+			const inAlcover: GoldenExpectation = {
+				...acme,
+				fields: { location: 'Alcover' },
+			}
+			const result = scoreRun(
+				inAlcover,
+				outcome({
+					reachedDomains: ['datoscif.es'],
+					fields: { location: 'Alcover, Tarragona, Spain' },
+				}),
+			)
+
+			// THEN a distinctive place identifies the company even off its own site
+			expect(result.grounded).toBe(false)
+			expect(result.wrongCompany).toBe(false)
+		})
+
+		it('should still flag wrong-company for a generic-city match with no contact', () => {
+			// GIVEN a megacity golden with no known contacts, and an ungrounded run
+			const inLondon: GoldenExpectation = {
+				...acme,
+				fields: { location: 'London' },
+			}
+			const result = scoreRun(
+				inLondon,
+				outcome({
+					reachedDomains: ['doordash.com'],
+					fields: { location: 'London, United Kingdom' },
+				}),
+			)
+
+			// THEN a global capital is too generic to confirm identity: still flagged
+			expect(result.wrongCompany).toBe(true)
+		})
+
+		it('should still flag wrong-company when a specific location does not match', () => {
+			// GIVEN a small-town golden and an ungrounded run reporting a different town
+			const inAlcover: GoldenExpectation = {
+				...acme,
+				fields: { location: 'Alcover' },
+			}
+			const result = scoreRun(
+				inAlcover,
+				outcome({
+					reachedDomains: ['some-directory.com'],
+					fields: { location: 'Valencia' },
+				}),
+			)
+
+			// THEN mismatched data is still the look-alike failure
+			expect(result.wrongCompany).toBe(true)
+		})
+	})
+
 	describe('when the run failed to confirm the company', () => {
 		it('should be empty and never wrong-company', () => {
 			// GIVEN a run that failed closed with no fields
@@ -298,6 +376,40 @@ describe('scoreRun', () => {
 
 			// WHEN scored — THEN token-subset + accent-folding match both people
 			expect(result.contactsFound).toBe(2)
+		})
+
+		it('should match a name carrying an honorific prefix', () => {
+			// GIVEN the run returns the same person with a "Sir" title prefix
+			const withDyson: GoldenExpectation = {
+				...acme,
+				contacts: [{ name: 'James Dyson' }],
+			}
+			const result = scoreRun(
+				withDyson,
+				outcome({
+					contacts: [{ name: 'Sir James Dyson', role: 'Founder' }],
+				}),
+			)
+
+			// THEN the honorific is dropped before matching, so the person is found
+			expect(result.contactsFound).toBe(1)
+		})
+
+		it('should match an everyday nickname against the published formal name', () => {
+			// GIVEN the golden lists a nickname and the run returns the formal name
+			const withPete: GoldenExpectation = {
+				...acme,
+				contacts: [{ name: 'Pete Roever' }],
+			}
+			const result = scoreRun(
+				withPete,
+				outcome({
+					contacts: [{ name: 'Peter Roever', role: 'VP Sales' }],
+				}),
+			)
+
+			// THEN "Pete" folds to "Peter" so the same person matches
+			expect(result.contactsFound).toBe(1)
 		})
 
 		it('should not match a different person who shares one name token', () => {

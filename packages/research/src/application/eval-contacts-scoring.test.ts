@@ -75,6 +75,18 @@ describe('scoreContactRun', () => {
 			// THEN a lone token is too weak to confirm the person
 			expect(score.contactsMatched).toBe(0)
 		})
+
+		it('should match a nickname or honorific via the shared matcher', () => {
+			// GIVEN a golden nickname and a returned honorific-prefixed formal name
+			const score = scoreContactRun(
+				golden([{ name: 'Pete Roever' }, { name: 'James Dyson' }]),
+				outcome({
+					contacts: [returned('Peter Roever'), returned('Sir James Dyson')],
+				}),
+			)
+			// THEN both fold to the same person the enrichment eval would match
+			expect(score.contactsMatched).toBe(2)
+		})
 	})
 
 	describe('decision-maker recall', () => {

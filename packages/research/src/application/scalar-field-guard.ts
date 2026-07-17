@@ -189,6 +189,26 @@ const isSourcedField = (
 	'value' in v &&
 	('source_id' in v || 'quote' in v || 'confidence' in v)
 
+/** Why a per-field scalar was dropped, for the run's grounding trace. */
+export type FieldDropReason =
+	| 'placeholder'
+	| 'wrong_kind'
+	| 'ungrounded'
+	| 'unsupported'
+
+/**
+ * One dropped scalar, recorded so a run can show exactly which field it nulled and
+ * why — the signal that turns "location came back empty" into a diagnosable reason
+ * instead of a silent blank.
+ */
+export interface FieldDrop {
+	readonly field: string
+	readonly reason: FieldDropReason
+	/** The dropped value, bounded so a stray long string can't bloat a log line. */
+	readonly value: string
+	readonly sourceId: string | null
+}
+
 export interface ScalarFieldGuardResult {
 	readonly findings: unknown
 	/** Fields dropped because the value was a placeholder or the field's own name. */
@@ -199,7 +219,14 @@ export interface ScalarFieldGuardResult {
 	readonly droppedUngrounded: number
 	/** Fields dropped because the quote did not support or was absent from evidence. */
 	readonly droppedUnsupported: number
+	/** Each drop with its field, reason, value, and source — for the grounding trace. */
+	readonly drops: ReadonlyArray<FieldDrop>
 }
+
+// A dropped value is short (a place, an industry code); cap it anyway so a runaway
+// string in the value slot can never bloat the per-drop log the guard emits.
+const truncateDropValue = (value: string): string =>
+	value.length > 120 ? `${value.slice(0, 120)}…` : value
 
 /**
  * Enforce the grounded-or-absent contract on every per-field `Sourced` scalar in a
@@ -212,10 +239,24 @@ export const guardScalarFields = (
 	corpus: string,
 ): ScalarFieldGuardResult => {
 	const lowerCorpus = corpus.toLowerCase()
-	let droppedPlaceholder = 0
-	let droppedWrongKind = 0
-	let droppedUngrounded = 0
-	let droppedUnsupported = 0
+	const drops: FieldDrop[] = []
+	// Record a drop and return null (the walk replaces the field with null). The
+	// four per-reason counts below are read back off this list, so they can never
+	// drift from what was actually dropped.
+	const drop = (
+		field: string,
+		reason: FieldDropReason,
+		value: string,
+		sourceId: unknown,
+	): null => {
+		drops.push({
+			field,
+			reason,
+			value: truncateDropValue(value),
+			sourceId: typeof sourceId === 'string' ? sourceId : null,
+		})
+		return null
+	}
 
 	const walk = (value: unknown, key: string | undefined): unknown => {
 		if (Array.isArray(value)) return value.map(item => walk(item, undefined))
@@ -230,13 +271,11 @@ export const guardScalarFields = (
 			// Only text scalars are judged here; a non-string value is left as-is.
 			if (typeof wrapper.value !== 'string') return value
 			if (isPlaceholderValue(wrapper.value, key)) {
-				droppedPlaceholder++
-				return null
+				return drop(key, 'placeholder', wrapper.value, wrapper.source_id)
 			}
 			// Not a placeholder, but still the wrong kind of thing for its field.
 			if (!valueIsRightKind(key, wrapper.value)) {
-				droppedWrongKind++
-				return null
+				return drop(key, 'wrong_kind', wrapper.value, wrapper.source_id)
 			}
 			// An unsourced fact is treated as absent: the citation guard has already
 			// stripped every fabricated source_id, so a field with none left never
@@ -245,22 +284,19 @@ export const guardScalarFields = (
 				typeof wrapper.source_id !== 'string' ||
 				wrapper.source_id.trim() === ''
 			) {
-				droppedUngrounded++
-				return null
+				return drop(key, 'ungrounded', wrapper.value, null)
 			}
 			const quote =
 				typeof wrapper.quote === 'string' ? wrapper.quote.trim() : ''
 			if (quote !== '') {
 				if (corpus !== '' && !isInCorpus(quote, lowerCorpus)) {
-					droppedUnsupported++
-					return null
+					return drop(key, 'unsupported', wrapper.value, wrapper.source_id)
 				}
 				if (
 					PAGE_LITERAL_FIELDS.has(key) &&
 					!quoteSupportsValue(quote, wrapper.value)
 				) {
-					droppedUnsupported++
-					return null
+					return drop(key, 'unsupported', wrapper.value, wrapper.source_id)
 				}
 			}
 			return value
@@ -273,11 +309,15 @@ export const guardScalarFields = (
 		)
 	}
 
+	const guardedFindings = walk(findings, undefined)
+	const countReason = (reason: FieldDropReason): number =>
+		drops.filter(d => d.reason === reason).length
 	return {
-		findings: walk(findings, undefined),
-		droppedPlaceholder,
-		droppedWrongKind,
-		droppedUngrounded,
-		droppedUnsupported,
+		findings: guardedFindings,
+		droppedPlaceholder: countReason('placeholder'),
+		droppedWrongKind: countReason('wrong_kind'),
+		droppedUngrounded: countReason('ungrounded'),
+		droppedUnsupported: countReason('unsupported'),
+		drops,
 	}
 }

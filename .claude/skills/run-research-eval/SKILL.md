@@ -28,6 +28,7 @@ The keys being present does **not** mean the eval will run. The pipeline also ne
   infisical run --env=<env> -- sh -c 'for v in RESEARCH_LLM_AGENT_PROVIDERS RESEARCH_LLM_AGENT_MODEL RESEARCH_PROVIDER_SCRAPE; do eval "x=\$$v"; echo "$v=${x:-<ABSENT>}"; done'
   ```
 - **Do NOT guess vendors/models.** They live in the Infisical env (or must be added there); prior-session memory drifts. If the env lacks routing, ask the user for `vendor` + `model` per tier, or have them add `RESEARCH_LLM_*_{PROVIDERS,MODEL}` to the env. Named vendors (`groq`, `fireworks`, `nebius`) carry their own endpoint — a tier needs only `PROVIDERS` + `MODEL`; only `custom` also needs `_BASE_URL`.
+- **Run the two-slot cascade prod runs.** Production routes each tier `custom,<fallback>` (`apps/server/config.production.json`: `custom,groq` for agent/writer, `custom,fireworks` for extract). Measure with the same cascade so a vendor blip falls back instead of failing the run — a single-slot eval under load misreads a transient 4xx as a quality drop. Keep run concurrency at 1 regardless.
 - **Never pass a key on the command line.** Keys inject from the Infisical env. A provider name or model id is fine to pass inline; an API key is not (`pnpm` echoes its argv — a key there leaks).
 
 ## Infra stays local, never cloud
