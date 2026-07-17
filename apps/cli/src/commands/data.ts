@@ -17,6 +17,8 @@ export const ENTITY_NAMES = [
 	'inboxes',
 	'tasks',
 	'pages',
+	'research',
+	'spend',
 ] as const
 
 export type EntityName = (typeof ENTITY_NAMES)[number]
@@ -139,6 +141,51 @@ export const dataInspect = (entity: Option.Option<EntityName>, json: boolean) =>
 					SELECT o.slug AS org, p.slug, p.lang, p.status
 					FROM pages p JOIN organization o ON o.id = p.organization_id
 					ORDER BY o.slug, p.slug`,
+			},
+			// Cost columns (cost = cheap search/scrape/model tier, paid = the
+			// research_paid_spend ledger sum) so a paid run's spend is visible
+			// at a glance next to the `spend` ledger below.
+			research: {
+				columns: [
+					col('Org', 12, 'org'),
+					col('Company', 25, 'company'),
+					col('Schema', 23, 'schema'),
+					col('Status', 15, 'status'),
+					col('Kind', 11, 'kind'),
+					col('Cost', 6, 'costCents'),
+					col('Paid', 0, 'paidCostCents'),
+				],
+				rows: () => sql<Row>`
+					SELECT o.slug AS org, co.slug AS company,
+						r.schema_name AS schema, r.status, r.kind,
+						r.cost_cents, r.paid_cost_cents
+					FROM research_runs r
+					JOIN organization o ON o.id = r.organization_id
+					LEFT JOIN research_links rl
+						ON rl.research_id = r.id
+						AND rl.link_kind = 'input'
+						AND rl.subject_table = 'companies'
+					LEFT JOIN companies co ON co.id = rl.subject_id
+					WHERE r.status != 'deleted'
+					ORDER BY o.slug, r.created_at DESC`,
+			},
+			// The per-provider paid ledger — cross-check that a run's Paid above
+			// equals the sum of its rows here.
+			spend: {
+				columns: [
+					col('Org', 12, 'org'),
+					col('Provider', 12, 'provider'),
+					col('Tool', 18, 'tool'),
+					col('Cents', 6, 'amountCents'),
+					col('Approved', 9, 'autoApproved'),
+					col('Run', 0, 'researchId'),
+				],
+				rows: () => sql<Row>`
+					SELECT o.slug AS org, s.provider, s.tool, s.amount_cents,
+						s.auto_approved, s.research_id
+					FROM research_paid_spend s
+					JOIN organization o ON o.id = s.organization_id
+					ORDER BY o.slug, s.at DESC`,
 			},
 		}
 
