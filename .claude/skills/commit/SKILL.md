@@ -48,7 +48,11 @@ type(scope): subject in imperative mood
 
 - Body bullet in past tense with period.
 - Another change description.
+
+Closes #123
 ```
+
+The `Closes #123` trailer is optional — include it only when this single commit is the complete fix for a tracked issue (see Rule 9).
 
 ## Types
 
@@ -138,6 +142,7 @@ If ALL changed files match `ai` patterns → use `ai` type. If mixed with non-AI
 6. **Plain language for everyone**: Write the subject and body so a non-technical reader and a brand-new contributor can follow the change without prior context. Lead with the everyday-terms "what changed and why it matters," spell out an acronym or internal name (a table, a service, a flag) the first time it appears, and don't lean on unstated background. Keep the precise technical terms — add the plain-language point on top, don't drop it. (Commit messages outlive their context: they're read in `git blame`, changelogs, and release notes long after the surrounding work is forgotten.)
 7. **No tautology**: The subject must not repeat the type as a verb. The type already conveys the action — e.g., `fix: fix the login` → `fix: resolve login failure`, `refactor: refactor auth` → `refactor: simplify auth flow`
 8. **No bare `#` tokens in the body**: The changelog generator reads `#<token>` as a GitHub issue reference and renders it as a "closes" link, so a hex color or fragment becomes a broken issue link in the release notes — write `b05220 → 95400f`, not `#b05220 → #95400f`
+9. **Issue-closing trailer**: When one commit is the *complete* fix for a tracked issue, add a `Closes #<issue>` line as the last line, after a blank line — GitHub auto-closes the issue when the commit lands on the default branch (`Fixes`/`Resolves` are equivalent keywords). This deliberate reference is the one sanctioned exception to Rule 8: a `Closes #<issue>` trailer is fine; a bare `#<token>` anywhere else is not. Only tag the commit that finishes the issue — if the fix spans several commits, leave the trailer off each partial commit and put `Closes #<issue>` in the PR description instead, so the issue closes once on merge, not on the first partial commit. Skip it entirely for a commit that touches no tracked issue.
 
 ## Body sizing
 
@@ -176,6 +181,7 @@ Run this checklist on every message **before** returning the preview:
 4. **Mood**: Subject uses imperative ("add", "fix", "migrate") — not past tense ("added", "fixed")
 5. **Body**: Every bullet starts with a capital letter, uses past tense, ends with a period
 6. **Body wrapping**: Each bullet is a single physical line — no hard wrap mid-sentence
+7. **Issue trailer**: If this one commit fully closes a tracked issue, confirm a `Closes #<issue>` trailer sits on its own last line; if the fix spans commits, confirm the trailer is absent (it belongs in the PR body)
 
 ## Examples
 
