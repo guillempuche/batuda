@@ -167,8 +167,8 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 		const service = yield* CompanyService
 		const geocoder = yield* Geocoder
 		// The re-geocode fork re-enters org scope on its own connection, so it
-		// needs the SqlClient; resolve it here (like research-sink) and provide
-		// it to the update path, keeping CurrentOrg as the only request service.
+		// needs the SqlClient; resolve it here and provide it to the update
+		// path, keeping CurrentOrg as the only request service.
 		const sql = yield* SqlClient.SqlClient
 		const timeline = yield* TimelineActivityService
 		return {

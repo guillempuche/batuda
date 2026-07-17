@@ -18,11 +18,9 @@ import { PipelineTools } from './pipeline'
 import { ProductTools } from './products'
 import { ProposalTools } from './proposals'
 import { RecordingTools } from './recordings'
-import { ResearchCrmTools } from './research-crm'
 import { ResearchLifecycleTools } from './research-lifecycle'
 import { ResearchMcpTools } from './research-mcp'
 import { ResearchRegistryTools } from './research-registry'
-import { ResearchSinkTools } from './research-sink'
 import { TaskTools } from './tasks'
 import { TimelineTools } from './timeline'
 
@@ -39,11 +37,9 @@ const TOOLKITS = {
 	ProductTools,
 	ProposalTools,
 	RecordingTools,
-	ResearchCrmTools,
 	ResearchLifecycleTools,
 	ResearchMcpTools,
 	ResearchRegistryTools,
-	ResearchSinkTools,
 	TaskTools,
 	TimelineTools,
 }
