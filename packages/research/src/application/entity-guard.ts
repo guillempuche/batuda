@@ -376,14 +376,27 @@ export interface SourceEntityVerdict {
  * Classify each fetched source on its own. A run that reached the target's pages
  * AND a same-named other company's pages can then keep the target's and drop the
  * rest, instead of blurring them into one whole-corpus verdict.
+ *
+ * A page whose own host is one of the target's domains is the company's own page — an
+ * offices, contact, or team page that never spells the full name still belongs to it —
+ * so it is grounded on its host, not on whether its body repeats the name. That keeps a
+ * real own-site page (and the location or people it carries) in the evidence instead of
+ * dropping it for reading nothing but an address.
  */
 export const classifyEntityMatchPerSource = (
 	targets: EntityTargets,
-	sources: ReadonlyArray<{ readonly sourceId: string; readonly text: string }>,
+	sources: ReadonlyArray<{
+		readonly sourceId: string
+		readonly text: string
+		readonly host?: string | undefined
+	}>,
 ): ReadonlyArray<SourceEntityVerdict> =>
 	sources.map(source => ({
 		sourceId: source.sourceId,
-		match: classifyEntityMatch(targets, source.text),
+		match:
+			source.host !== undefined && targets.domains.includes(source.host)
+				? 'strong'
+				: classifyEntityMatch(targets, source.text),
 	}))
 
 /** The sources that concern the target (strong or weak) — the pages worth keeping. */

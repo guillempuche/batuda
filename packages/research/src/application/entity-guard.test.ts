@@ -324,6 +324,23 @@ describe('classifyEntityMatchPerSource', () => {
 			])
 		})
 	})
+
+	describe('when a page is on the target domain but its body omits the name', () => {
+		it('should ground it strongly by host, not text', () => {
+			// GIVEN an offices page on the target's own domain whose body is just an
+			// address — it never spells "Acme Logistics"
+			const verdicts = classifyEntityMatchPerSource(targets!, [
+				{
+					sourceId: 'offices',
+					text: 'Head office: 12 Carrer Gran, 08820 Barcelona',
+					host: 'acme.es',
+				},
+			])
+
+			// WHEN classified — THEN its own host grounds it, so its facts survive
+			expect(verdicts).toEqual([{ sourceId: 'offices', match: 'strong' }])
+		})
+	})
 })
 
 describe('groundedSourceIds', () => {

@@ -747,6 +747,25 @@ describe('groundedPageTexts', () => {
 		})
 	})
 
+	describe('when an own-domain page never names the company', () => {
+		it('should keep it by host so its facts are not starved', () => {
+			// GIVEN an offices page on the target's domain whose body omits the name,
+			// alongside a look-alike page that names a different firm
+			const pages = [
+				{
+					urlHash: 'h1',
+					text: 'Head office: 12 Carrer Gran, Barcelona',
+					host: 'acme.es',
+				},
+				{ urlHash: 'h2', text: 'CEVA is a global freight leader' },
+			]
+			// WHEN filtered — THEN the own-domain page survives on its host alone
+			expect(groundedPageTexts(targets, pages)).toEqual([
+				'Head office: 12 Carrer Gran, Barcelona',
+			])
+		})
+	})
+
 	describe('when no page concerns the target', () => {
 		it('should fall back to every page so extraction is not starved', () => {
 			// GIVEN only unrelated pages, none grounding the target
