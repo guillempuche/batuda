@@ -164,6 +164,10 @@ describe('validateFindingCitations', () => {
 			expect(f.enrichment.country).toBeNull()
 			expect(result.total).toBe(2)
 			expect(result.kept).toBe(1)
+			// AND the drop is recorded so an empty field is diagnosable in the trace
+			expect(result.drops).toEqual([
+				{ field: 'country', value: 'ES', sourceId: 'invented' },
+			])
 		})
 	})
 

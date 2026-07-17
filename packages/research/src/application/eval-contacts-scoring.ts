@@ -18,7 +18,7 @@
  */
 
 import { isDecisionMaker } from './contact-discovery'
-import { foldDiacritics, normalizeText } from './eval-scoring'
+import { contactNameMatches } from './eval-scoring'
 
 export type ContactTerminalStatus =
 	| 'ok'
@@ -88,27 +88,6 @@ export interface ContactEvalSummary {
 	readonly costPerVerifiedContact: number | null
 }
 
-// Diacritic-folded, lower-cased name tokens: "María José García" →
-// ["maria","jose","garcia"], so accents, casing, and extra middle names do not
-// break a match.
-const nameTokens = (name: string): string[] =>
-	foldDiacritics(normalizeText(name))
-		.split(/[^a-z0-9]+/)
-		.filter(token => token.length > 0)
-
-// A golden contact matches a returned one when the shorter name's tokens are all
-// present in the longer — so "Maria Garcia" matches the fuller "Maria Garcia
-// Lopez" but not "Maria Lopez". Requires ≥2 tokens so a lone first name never
-// matches a stranger who happens to share it (a first-name-only return is not
-// enough to confirm the same person).
-const namesMatch = (a: string, b: string): boolean => {
-	const ta = nameTokens(a)
-	const tb = nameTokens(b)
-	const [short, long] = ta.length <= tb.length ? [ta, tb] : [tb, ta]
-	if (short.length < 2) return false
-	return short.every(token => long.includes(token))
-}
-
 const normalizeEmail = (email: string): string => email.trim().toLowerCase()
 
 /** Score one discover_contacts run against a company's known decision-makers. */
@@ -117,7 +96,7 @@ export const scoreContactRun = (
 	outcome: ContactRunOutcome,
 ): ContactRunScore => {
 	const findMatch = (golden: GoldenContact): OutcomeContact | undefined =>
-		outcome.contacts.find(c => namesMatch(golden.name, c.name))
+		outcome.contacts.find(c => contactNameMatches(golden.name, c.name))
 
 	let contactsMatched = 0
 	let decisionMakersExpected = 0

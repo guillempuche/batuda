@@ -10,8 +10,11 @@
  *                        came back *with a title* — contacts sit outside the scorable
  *                        field set, so a run can pass every field yet lose the
  *                        decision-makers' titles, the exact gap this metric watches.
- *   wrong-company rate   did it confidently return data without reaching the target
- *                        (the look-alike failure this harness exists to catch)?
+ *   wrong-company rate   did it confidently return some OTHER company's data (the
+ *                        look-alike failure this harness exists to catch)? A run that
+ *                        returned the known-correct company's data but never reached
+ *                        its official site is a grounding miss, not a look-alike, and
+ *                        is judged against the golden rather than counted here.
  *   empty rate           did it return no usable data at all?
  *
  * Grounding is judged by which pages the run *fetched*, not which its findings cite:
@@ -150,23 +153,95 @@ const isFilled = (value: string | null | undefined): value is string =>
 export const foldDiacritics = (value: string): string =>
 	value.normalize('NFD').replace(/\p{Diacritic}/gu, '')
 
-// A person's name as its accent-folded, lower-cased word tokens. Single-character
-// tokens (a middle initial) are kept, so two people who differ only by initial stay
-// distinct — the same tokenizing the contact-discovery eval uses.
-const nameTokens = (name: string): ReadonlyArray<string> =>
-	foldDiacritics(name)
+// Titles a page prints before a name ("Sir James Dyson", "Dr Jane Roe"): not part of
+// the name, so a leading one is dropped before matching. "Don"/"Doña" are deliberately
+// absent — "Don" is also a real given name (Don Draper), and dropping it would lose a
+// real person. Only stripped when two tokens remain, so a short "Dr Dre" keeps both.
+const HONORIFICS = new Set([
+	'sir',
+	'dame',
+	'lord',
+	'lady',
+	'mr',
+	'mrs',
+	'ms',
+	'miss',
+	'mx',
+	'dr',
+	'prof',
+	'professor',
+	'rev',
+	'reverend',
+	'hon',
+	'madam',
+	'madame',
+])
+
+// Everyday short forms folded to the formal name a company usually publishes, so a
+// golden "Pete Roever" matches a run's "Peter Roever". Kept small and English; since a
+// match still needs the surname too (≥2 tokens), folding a first name can't collapse
+// two genuinely different people.
+const NICKNAMES: Record<string, string> = {
+	pete: 'peter',
+	rob: 'robert',
+	bob: 'robert',
+	robbie: 'robert',
+	bill: 'william',
+	billy: 'william',
+	tony: 'anthony',
+	jim: 'james',
+	jimmy: 'james',
+	mike: 'michael',
+	dave: 'david',
+	tom: 'thomas',
+	tommy: 'thomas',
+	dan: 'daniel',
+	danny: 'daniel',
+	dick: 'richard',
+	rick: 'richard',
+	matt: 'matthew',
+	greg: 'gregory',
+	ben: 'benjamin',
+	ed: 'edward',
+	eddie: 'edward',
+	andy: 'andrew',
+	ron: 'ronald',
+	ken: 'kenneth',
+	joe: 'joseph',
+	steve: 'steven',
+	nick: 'nicholas',
+	tim: 'timothy',
+	charlie: 'charles',
+}
+
+const stripHonorific = (
+	tokens: ReadonlyArray<string>,
+): ReadonlyArray<string> =>
+	tokens.length > 2 && HONORIFICS.has(tokens[0] ?? '')
+		? tokens.slice(1)
+		: tokens
+
+// A person's name as its accent-folded, lower-cased word tokens, with a leading
+// honorific dropped and each token folded to its formal form. Single-character tokens
+// (a middle initial) are kept, so two people who differ only by initial stay distinct.
+const nameTokens = (name: string): ReadonlyArray<string> => {
+	const rawTokens = foldDiacritics(name)
 		.toLowerCase()
 		.split(/[^a-z0-9]+/)
 		.filter(token => token.length > 0)
+	return stripHonorific(rawTokens).map(token => NICKNAMES[token] ?? token)
+}
 
 // Two names refer to the same person when the shorter one's tokens are all in the
 // longer's — so "Andrew Smith" matches "Andrew J. Smith" without matching a
 // different Smith. A lone shared token (just a first name) is too weak to confirm
-// the same person, so the shorter name must carry at least two tokens — the same
-// rule the contact-discovery eval uses, so both agree on what "same person" means.
-// Conservative on purpose: an unmatched real person is a miss the eval should show,
-// not paper over.
-const contactNameMatches = (expected: string, actual: string): boolean => {
+// the same person, so the shorter name must carry at least two tokens. Shared with
+// the contact-discovery eval, so both agree on what "same person" means. Conservative
+// on purpose: an unmatched real person is a miss the eval should show, not paper over.
+export const contactNameMatches = (
+	expected: string,
+	actual: string,
+): boolean => {
 	const e = nameTokens(expected)
 	const a = nameTokens(actual)
 	const [small, big] = e.length <= a.length ? [e, new Set(a)] : [a, new Set(e)]
@@ -224,6 +299,63 @@ const fieldMatches = (
 	return normalizedActual === normalizedExpected
 }
 
+// Global cities so common that a company being there says little about which company
+// it is — a location match on one of these is too weak to confirm the run reached the
+// right company. Normalized once so lookups match the folded field value.
+const MEGACITIES = new Set(
+	[
+		'london',
+		'paris',
+		'madrid',
+		'barcelona',
+		'berlin',
+		'milan',
+		'rome',
+		'new york',
+		'new york city',
+		'nyc',
+		'los angeles',
+		'chicago',
+		'san francisco',
+		'boston',
+		'dublin',
+		'amsterdam',
+		'lisbon',
+		'tokyo',
+		'singapore',
+		'hong kong',
+		'shanghai',
+		'beijing',
+		'mumbai',
+		'delhi',
+		'mexico city',
+		'sao paulo',
+		'buenos aires',
+		'toronto',
+		'sydney',
+	].map(normalizeText),
+)
+
+// Whether the run's location matches the golden's AND that location is specific enough
+// to identify the company (not a global capital). Used only to judge that a run
+// reached the right company when it never touched the official domain — a stronger
+// signal than a coarse industry code, which is shared by many firms.
+const specificLocationAgrees = (
+	expected: GoldenExpectation,
+	outcome: RunOutcome,
+): boolean => {
+	const goldenLocation = expected.fields.location
+	const actual = outcome.fields.location
+	if (goldenLocation === undefined || !isFilled(actual)) return false
+	// Judge the city (the part before any region/country) against the megacity list,
+	// so "London, UK" is recognised as generic just as bare "London" is.
+	const goldenCity = normalizeText(
+		goldenLocation.split(',')[0] ?? goldenLocation,
+	)
+	if (MEGACITIES.has(goldenCity)) return false
+	return fieldMatches('location', goldenLocation, actual)
+}
+
 /** Score one run against its golden expectation. */
 export const scoreRun = (
 	expected: GoldenExpectation,
@@ -266,22 +398,35 @@ export const scoreRun = (
 		isFilled(outcome.fields[field]),
 	)
 	const empty = outcome.status !== 'succeeded' || !anyFilled
-	// Confident (succeeded, non-empty) yet it never reached the target's own site =
-	// the look-alike bug: it returned some other company's data as a success.
-	const wrongCompany = outcome.status === 'succeeded' && !empty && !grounded
 
 	// Contact recall: of the people we know the company publishes, how many the run
 	// returned WITH a title — a named person with no title doesn't count, since a
-	// titleless contact is the gap the focused pass exists to close.
+	// titleless contact is the gap the focused pass exists to close. A name match
+	// WITHOUT a title still proves the run reached the right company, so track that
+	// separately to judge wrong-company below.
 	const expectedContacts = expected.contacts ?? []
 	let contactsFound = 0
+	let anyContactMatched = false
 	for (const person of expectedContacts) {
-		const match = outcome.contacts.some(
-			found =>
-				isFilled(found.role) && contactNameMatches(person.name, found.name),
+		const matches = outcome.contacts.filter(found =>
+			contactNameMatches(person.name, found.name),
 		)
-		if (match) contactsFound++
+		if (matches.length === 0) continue
+		anyContactMatched = true
+		if (matches.some(found => isFilled(found.role))) contactsFound++
 	}
+
+	// "Wrong company" is the look-alike bug: a confident run that shipped some OTHER
+	// company's data. A run that returned the known-correct company's data yet never
+	// reached its official site is a grounding-proxy miss, not a look-alike, so it is
+	// excused here. The agreement bar is deliberately high — a matched known person, or
+	// a location specific enough to identify the company — so a real look-alike (a
+	// different person in a different place) is still caught; a coarse industry code or
+	// a global capital is too generic to qualify.
+	const agreesWithGolden =
+		anyContactMatched || specificLocationAgrees(expected, outcome)
+	const wrongCompany =
+		outcome.status === 'succeeded' && !empty && !grounded && !agreesWithGolden
 
 	return {
 		id: expected.id,

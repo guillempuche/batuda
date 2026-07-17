@@ -15,11 +15,30 @@
 
 import { canonicalizeUrl, hostOf } from './source-key'
 
+/**
+ * A per-field scalar nulled because its cited source was not among the run's fetched
+ * pages — recorded so the grounding trace can tell a citation-guard drop apart from a
+ * scalar-guard one when a field comes back empty.
+ */
+export interface CitationDrop {
+	readonly field: string
+	readonly value: string
+	readonly sourceId: string
+}
+
 export interface CitationValidation {
 	readonly findings: unknown
 	/** How many citations were seen and how many survived, for observability. */
 	readonly total: number
 	readonly kept: number
+	/** Per-field scalars dropped because their cited source was never fetched. */
+	readonly drops: ReadonlyArray<CitationDrop>
+}
+
+// Bound a dropped value so a long string in the value slot can't bloat a log line.
+const boundDropValue = (value: unknown): string => {
+	const text = typeof value === 'string' ? value : JSON.stringify(value)
+	return text.length > 120 ? `${text.slice(0, 120)}…` : text
 }
 
 /**
@@ -64,6 +83,7 @@ export const validateFindingCitations = (
 ): CitationValidation => {
 	let total = 0
 	let kept = 0
+	const drops: CitationDrop[] = []
 
 	const walk = (value: unknown, key?: string): unknown => {
 		if (Array.isArray(value)) {
@@ -97,6 +117,11 @@ export const validateFindingCitations = (
 					kept++
 					return value
 				}
+				drops.push({
+					field: key ?? 'field',
+					value: boundDropValue(record.value),
+					sourceId: record.source_id,
+				})
 				return null
 			}
 			return Object.fromEntries(
@@ -108,5 +133,5 @@ export const validateFindingCitations = (
 		return value
 	}
 
-	return { findings: walk(findings), total, kept }
+	return { findings: walk(findings), total, kept, drops }
 }

@@ -194,6 +194,10 @@ const MAX_LOOP_PROMPT_CHARS = 90000
 const MAX_EXTRACTION_PAGE_CHARS = 180000
 const MAX_EXTRACTION_CHARS_PER_PAGE = 40000
 
+// Cap how many per-field grounding drops a run logs in detail, so a pathological
+// extraction can't flood the log; the aggregate counts still cover the rest.
+const MAX_LOGGED_FIELD_DROPS = 20
+
 // A research id is always a uuid. Checking the shape before a lookup — instead of
 // passing an arbitrary path param straight to a uuid column — turns a bad id (a bot,
 // a stale link) into a clean not-found rather than a 500-level uuid-cast SqlError.
@@ -1897,6 +1901,23 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									}),
 								)
 							}
+							// Per-field detail: which scalar the citation guard nulled and the
+							// unfetched source it was cited to, so an empty field is diagnosable.
+							for (const fieldDrop of citationCheck.drops.slice(
+								0,
+								MAX_LOGGED_FIELD_DROPS,
+							)) {
+								yield* Effect.logInfo('research.field.dropped').pipe(
+									Effect.annotateLogs({
+										research_id: researchId,
+										guard: 'citation',
+										field: fieldDrop.field,
+										reason: 'citation_ungrounded',
+										value: fieldDrop.value,
+										source_id: fieldDrop.sourceId,
+									}),
+								)
+							}
 							// Contact entity binding: drop a person whose quotes name only a
 							// different company (a client testimonial or a competitor's exec
 							// quoted on the target's own page), so the richer extraction can't
@@ -1930,6 +1951,24 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										dropped_wrong_kind: scalarCheck.droppedWrongKind,
 										dropped_ungrounded: scalarCheck.droppedUngrounded,
 										dropped_unsupported: scalarCheck.droppedUnsupported,
+									}),
+								)
+							}
+							// Per-field detail for the scalar guard, so an empty field can be traced to
+							// why it was nulled — an on-page value wrongly dropped (a guard bug) versus
+							// one that was genuinely absent.
+							for (const fieldDrop of scalarCheck.drops.slice(
+								0,
+								MAX_LOGGED_FIELD_DROPS,
+							)) {
+								yield* Effect.logInfo('research.field.dropped').pipe(
+									Effect.annotateLogs({
+										research_id: researchId,
+										guard: 'scalar',
+										field: fieldDrop.field,
+										reason: fieldDrop.reason,
+										value: fieldDrop.value,
+										source_id: fieldDrop.sourceId ?? '',
 									}),
 								)
 							}

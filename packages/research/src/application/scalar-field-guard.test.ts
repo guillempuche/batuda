@@ -495,6 +495,17 @@ describe('guardScalarFields', () => {
 			expect(enrichment(result.findings).country).toBeNull()
 			expect(result.droppedPlaceholder).toBe(1)
 			expect(result.droppedUngrounded).toBe(1)
+			// AND each drop is recorded with its field, reason, value, and source, so
+			// an empty field can be traced to why the guard nulled it
+			expect(result.drops).toEqual([
+				{
+					field: 'location',
+					reason: 'placeholder',
+					value: 'headquarters',
+					sourceId: 'https://acme.es',
+				},
+				{ field: 'country', reason: 'ungrounded', value: 'ES', sourceId: null },
+			])
 		})
 	})
 })
