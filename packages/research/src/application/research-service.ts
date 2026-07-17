@@ -351,6 +351,29 @@ export const clampPagination = (
 	}
 }
 
+// Roll the run's real spend onto its own row. paid_cost_cents comes from the
+// paid-spend ledger and is authoritative — the run's connection bypasses
+// row-level security and a research_id belongs to one run, so the sum sees
+// every paid row for it. cost_cents holds the cheap search/scrape/model tally
+// the caller measured. Both columns start at 0 and nothing else fills them, so
+// without this a run that spent money still shows up as free.
+export const stampRunCostFromLedger = (
+	sql: SqlClient.SqlClient,
+	researchId: string,
+	cheapCents: number,
+) =>
+	sql`
+		UPDATE research_runs
+		SET cost_cents = ${cheapCents},
+			paid_cost_cents = COALESCE(
+				(SELECT SUM(amount_cents)::int FROM research_paid_spend
+					WHERE research_id = ${researchId}),
+				0
+			),
+			updated_at = now()
+		WHERE id = ${researchId}
+	`
+
 export interface PendingProposalRow {
 	readonly researchId: string
 	readonly runKind: string
@@ -953,6 +976,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							FROM research_runs WHERE parent_id = ${parentId} AND status != 'deleted') = 0
 						THEN now() ELSE completed_at
 					END,
+					-- A group spends nothing on its own row; its cost is the sum of
+					-- its children (each child stamps its own cost before rolling up).
+					cost_cents = COALESCE((SELECT SUM(cost_cents)::int
+						FROM research_runs WHERE parent_id = ${parentId} AND status != 'deleted'), 0),
+					paid_cost_cents = COALESCE((SELECT SUM(paid_cost_cents)::int
+						FROM research_runs WHERE parent_id = ${parentId} AND status != 'deleted'), 0),
 					updated_at = now()
 					WHERE id = ${parentId}
 				`
@@ -1052,6 +1081,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								WHERE id = ${researchId} AND status = 'running'
 							`
 							yield* publishEvent(researchId, 'run.failed', { error })
+							// A follow-up may have charged a paid lookup before failing;
+							// record it. Follow-ups do no cheap search/scrape, so cost_cents
+							// is 0.
+							yield* stampRunCostFromLedger(sql, researchId, 0)
 						})
 
 					if (!originId)
@@ -1123,6 +1156,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							completed_at = now(), updated_at = now()
 						WHERE id = ${researchId} AND status = 'running'
 					`
+					// Record the paid registry lookup this follow-up charged. It does no
+					// cheap search/scrape, so cost_cents is 0.
+					yield* stampRunCostFromLedger(sql, researchId, 0)
 					yield* publishEvent(researchId, 'run.succeeded', {})
 				})
 
@@ -1330,6 +1366,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								reason: verdict === 'weak' ? 'entity_weak' : 'entity_mismatch',
 								entityMatch: verdict,
 							})
+							// Stamp this run's cost before the group rolls up, so the parent
+							// sums a child that already knows what it spent.
+							yield* stampRunCostFromLedger(sql, researchId, cheapSpentCents)
 							const parentGroupId = (run as { parentId: string | null })
 								.parentId
 							if (parentGroupId) yield* rollupParentLocked(parentGroupId)
@@ -1392,6 +1431,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// budget; undefined on every other path (which extracts in phase 2).
 					let retryFindings: unknown
 					let retryExtractTokens = 0
+					// The cheap search/scrape/model spend this run tallied, read off the
+					// budget once phase 1 ends and stamped onto the run as cost_cents. Stays
+					// 0 on a resume that skips phase 1 — the budget only counts this attempt.
+					let cheapSpentCents = 0
 
 					// Phase-2 extraction + every grounding guard, shared so both the
 					// normal path and the discovery-scan retry run the same logic. Returns
@@ -2509,7 +2552,16 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								}
 							}
 
-							return { loop, findings, refined, extractOutputTokens }
+							// Read the cheap-tier tally before the budget layer goes out of
+							// scope, so the terminal transitions below can stamp it.
+							const cheapCents = (yield* budget.snapshot()).cheapSpent
+							return {
+								loop,
+								findings,
+								refined,
+								extractOutputTokens,
+								cheapCents,
+							}
 						}).pipe(
 							Effect.provide(researchToolkitLayer),
 							Effect.provide(budgetLayer),
@@ -2536,6 +2588,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						tokensOut = loopResult.tokensOut
 						retryFindings = phaseOutcome.findings
 						retryExtractTokens = phaseOutcome.extractOutputTokens
+						cheapSpentCents = phaseOutcome.cheapCents
 
 						// Entity grounding gate: from the fetched evidence alone (never the
 						// model's prose), classify how strongly the pages concern the
@@ -2709,6 +2762,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						yield* publishEvent(researchId, 'run.no_reliable_data', {
 							sourceCount: sources?.n ?? 0,
 						})
+						yield* stampRunCostFromLedger(sql, researchId, cheapSpentCents)
 						const parentGroupId = (run as { parentId: string | null }).parentId
 						if (parentGroupId) yield* rollupParentLocked(parentGroupId)
 						return
@@ -2740,6 +2794,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						yield* publishEvent(researchId, 'run.no_reliable_data', {
 							reason: 'no_results',
 						})
+						yield* stampRunCostFromLedger(sql, researchId, cheapSpentCents)
 						const parentGroupId = (run as { parentId: string | null }).parentId
 						if (parentGroupId) yield* rollupParentLocked(parentGroupId)
 						return
@@ -2766,6 +2821,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							updated_at = now()
 						WHERE id = ${researchId} AND status = 'running'
 					`
+
+					// Stamp the run's cost before the parent group rolls up below.
+					yield* stampRunCostFromLedger(sql, researchId, cheapSpentCents)
 
 					// ── Write to research_cache so identical requests can skip the fiber ──
 					const cacheKey = computeResearchCacheKey({
@@ -2830,7 +2888,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						if (shouldMarkRunFailed(cause)) {
 							return Effect.gen(function* () {
 								const detail = Cause.pretty(cause)
-								yield* sql`
+								const [failedRun] = yield* sql<{ id: string }>`
 									UPDATE research_runs
 									SET status = 'failed',
 										reason_code = ${'internal_error' satisfies ReasonCode},
@@ -2838,10 +2896,18 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										completed_at = now(),
 										updated_at = now()
 									WHERE id = ${researchId} AND status = 'running'
+									RETURNING id
 								`
 								yield* publishEvent(researchId, 'run.failed', {
 									error: detail,
 								})
+								// Record any paid spend before the group rolls up, but only
+								// when this actually flipped the run to failed — an error after
+								// the run already succeeded leaves that row's real cost_cents
+								// alone. The cheap tally isn't reachable here (the budget went
+								// out of scope with the run body), so cost_cents is best-effort
+								// 0; the paid ledger is authoritative regardless.
+								if (failedRun) yield* stampRunCostFromLedger(sql, researchId, 0)
 								// If this leaf belongs to a group, roll the parent up now so
 								// an all-failed group resolves instead of hanging in 'running'.
 								const [failedParent] = yield* sql<{
@@ -3510,6 +3576,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						`
 						const flipped = cancelled !== undefined
 						if (flipped) {
+							// A cancelled run may have spent before it stopped; record it.
+							// The cheap tally isn't reachable from here, so cost_cents is
+							// best-effort 0 while the paid ledger stays authoritative.
+							yield* stampRunCostFromLedger(sql, researchId, 0)
 							yield* publishEvent(researchId, 'run.cancelled', {})
 							return { outcome: cancelOutcome(true, true) }
 						}
