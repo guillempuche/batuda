@@ -1331,10 +1331,15 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						0) as number
 					const cachedResearchText = (run as { researchText?: string | null })
 						.researchText
-					const existingFindings = run['findings'] as Record<
-						string,
-						unknown
-					> | null
+					// Read findings as raw text so a resumed run keeps the snake_case keys
+					// it was stored with; a plain SELECT would camelCase every nested key
+					// and change the findings shape when it is re-persisted on success.
+					const [findingsRow] = yield* sql<{ findings: string | null }>`
+						SELECT findings::text AS findings FROM research_runs WHERE id = ${researchId}
+					`
+					const existingFindings = (
+						findingsRow?.findings ? JSON.parse(findingsRow.findings) : null
+					) as Record<string, unknown> | null
 					const existingFindingsHasValue =
 						existingFindings !== null &&
 						typeof existingFindings === 'object' &&

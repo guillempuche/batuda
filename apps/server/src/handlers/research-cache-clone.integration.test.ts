@@ -157,3 +157,48 @@ describe('cloneCacheHitRun', () => {
 		})
 	})
 })
+
+// The gotcha the resume-path fix (research-service.ts) turns on: a plain
+// `SELECT findings` through the SQL client camelCases every nested jsonb key,
+// while `SELECT findings::text` returns the raw bytes unchanged.
+describe('reading findings through the SQL client', () => {
+	describe('when the stored findings use snake_case keys', () => {
+		it('should camelCase a plain SELECT but preserve snake_case via ::text', async () => {
+			const result = await Effect.runPromise(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* Effect.gen(function* () {
+						yield* enterOrgScope
+						const id = yield* seedSourceRun(JSON.stringify(SNAKE_FINDINGS))
+						// A plain select — the client parses + camelCases the jsonb.
+						const [plain] = yield* sql<{
+							findings: Record<string, unknown>
+						}>`SELECT findings FROM research_runs WHERE id = ${id}`
+						// A ::text select — the value comes back as raw JSON text.
+						const [raw] = yield* sql<{
+							findings: string
+						}>`SELECT findings::text AS findings FROM research_runs WHERE id = ${id}`
+						return {
+							plain: plain?.findings ?? null,
+							rawText: raw?.findings ?? null,
+						}
+					}).pipe(sql.withTransaction)
+				}).pipe(Effect.provide(PgLive)),
+			)
+
+			// GIVEN snake_case findings, WHEN read plainly THEN keys are camelCased
+			expect(result.plain).not.toBeNull()
+			expect(result.plain).toHaveProperty('proposedUpdates')
+			expect(result.plain).not.toHaveProperty('proposed_updates')
+
+			// WHEN read as ::text THEN the raw snake_case bytes survive
+			expect(result.rawText).not.toBeNull()
+			const parsed = JSON.parse(result.rawText as string) as Record<
+				string,
+				unknown
+			>
+			expect(parsed).toHaveProperty('proposed_updates')
+			expect(parsed).not.toHaveProperty('proposedUpdates')
+		})
+	})
+})
