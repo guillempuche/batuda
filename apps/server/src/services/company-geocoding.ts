@@ -2,10 +2,23 @@ import { Cause, Context, DateTime, Effect } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
+import type { Company } from '@batuda/domain'
 
 import { enterOrgScope } from '../middleware/org'
 import { CompanyService } from './companies'
-import { Geocoder } from './geocoder'
+import { type GeocodeResult, Geocoder } from './geocoder'
+
+/**
+ * What geocoding a company came to. `geocoded` carries the row with fresh
+ * coordinates; the rest say why none were written, kept apart so a caller can
+ * tell success from each kind of silence: the company had nothing to search on,
+ * the geocoder had no place for it, or the geocoder could not be reached.
+ */
+export type GeocodeCompanyResult =
+	| { readonly _tag: 'geocoded'; readonly company: Company }
+	| { readonly _tag: 'no_match' }
+	| { readonly _tag: 'nothing_to_search' }
+	| { readonly _tag: 'lookup_failed' }
 
 /**
  * Drop the ambient transaction connection so a following `withTransaction`
@@ -27,15 +40,21 @@ const detachFromTransaction =
 
 /**
  * Resolve a company's coordinates from the deterministic geocoder and store
- * them. Builds the lookup from the company's name and location, and on a match
- * writes latitude/longitude/geocoded_at/geocode_source, returning the updated
- * row. Returns null when there is nothing to store — the company has no
- * name/location to search on, or the geocoder found no match.
+ * them. It first asks for the company's "name, location" together — the name is
+ * kept in the query on purpose, since a bare place name can plant a pin on the
+ * wrong same-named town. When that finds nothing it retries with the location
+ * on its own, because prepending a company name (not a geographic word) often
+ * defeats an otherwise easy match. On a hit it writes
+ * latitude/longitude/geocoded_at/geocode_source and returns the updated row.
  *
- * This is the one place the coordinate columns and the "name, location" lookup
- * are defined. The geocode_company tool, the HTTP geocode endpoint, and the
- * post-enrichment research sink all go through here, so coordinates always come
- * from the geocoder and never from a language model.
+ * The result says which of four things happened, so callers can tell a real
+ * geocode from each kind of silence: nothing to search on, no place found, or
+ * the geocoder unreachable (see {@link GeocodeCompanyResult}).
+ *
+ * This is the one place the coordinate columns and that lookup are defined. The
+ * geocode_company tool, the HTTP geocode endpoint, and the post-enrichment
+ * research sink all go through here, so coordinates always come from the
+ * geocoder and never from a language model.
  */
 export const geocodeCompany = (id: string) =>
 	Effect.gen(function* () {
@@ -45,20 +64,44 @@ export const geocodeCompany = (id: string) =>
 
 		const name = company['name'] as string | null
 		const location = company['location'] as string | null
-		const query = [name, location].filter(Boolean).join(', ')
-		if (!query) return null
+		const primaryQuery = [name, location].filter(Boolean).join(', ')
+		if (!primaryQuery) return { _tag: 'nothing_to_search' } as const
 
-		const hit = yield* geocoder.lookup(query)
-		if (!hit) return null
+		// Write the coordinates and hand back the fresh row; a race that removed
+		// the company between lookup and write leaves nothing to return.
+		const persist = (hit: GeocodeResult) =>
+			Effect.gen(function* () {
+				const rows = yield* service.update(id, {
+					latitude: hit.latitude,
+					longitude: hit.longitude,
+					geocodedAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
+					geocodeSource: hit.source,
+				})
+				const updated = rows[0]
+				return updated
+					? ({ _tag: 'geocoded', company: updated } as const)
+					: ({ _tag: 'no_match' } as const)
+			})
 
-		const rows = yield* service.update(id, {
-			latitude: hit.latitude,
-			longitude: hit.longitude,
-			geocodedAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
-			geocodeSource: hit.source,
-		})
-		return rows[0] ?? null
-	})
+		const primaryHit = yield* geocoder.lookup(primaryQuery)
+		if (primaryHit) return yield* persist(primaryHit)
+
+		// The name-prefixed query resolves to no place for many companies, so fall
+		// back to the bare location before giving up — only when it differs from
+		// the query already tried (i.e. a name was part of it).
+		if (location && location !== primaryQuery) {
+			const locationHit = yield* geocoder.lookup(location)
+			if (locationHit) return yield* persist(locationHit)
+		}
+
+		return { _tag: 'no_match' } as const
+	}).pipe(
+		// A geocoder that could not be reached is not a no-match: report it as its
+		// own outcome instead of folding it into "no place found".
+		Effect.catchTag('GeocodeLookupError', () =>
+			Effect.succeed({ _tag: 'lookup_failed' } as const),
+		),
+	)
 
 /**
  * Whether an update replaced a company's location with a new, non-empty place —

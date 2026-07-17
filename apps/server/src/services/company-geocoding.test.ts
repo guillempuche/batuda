@@ -6,7 +6,7 @@ import type { Company } from '@batuda/domain'
 
 import { CompanyService } from './companies'
 import { geocodeCompany, locationWasReplaced } from './company-geocoding'
-import { Geocoder } from './geocoder'
+import { GeocodeLookupError, type GeocodeResult, Geocoder } from './geocoder'
 
 const unused = new Error('method not used in this test')
 const currentOrg = { id: 'org-1', name: 'fixture', slug: 'fixture' }
@@ -36,81 +36,168 @@ const companyServiceWith = (
 		getWithRelations: () => Effect.die(unused),
 	})
 
-const geocoderReturning = (
-	hit: { latitude: number; longitude: number; source: string } | null,
-) => Geocoder.of({ lookup: () => Effect.succeed(hit) })
+// A geocoder that answers each query from a fixed map — a GeocodeResult for a
+// hit, the string 'error' to simulate an unreachable geocoder, and null (any
+// unlisted query) for a genuine no-match. Every query it is asked is pushed to
+// `asked`, so a test can prove the primary and the location-only fallback both
+// (or neither) ran.
+const geocoderFrom = (
+	answers: Record<string, GeocodeResult | 'error'>,
+	asked: Array<string>,
+) =>
+	Geocoder.of({
+		lookup: (query: string) => {
+			asked.push(query)
+			const answer = answers[query] ?? null
+			return answer === 'error'
+				? Effect.fail(new GeocodeLookupError({ query, cause: 'unreachable' }))
+				: Effect.succeed(answer)
+		},
+	})
 
 const run = (
 	company: Record<string, unknown> | null,
-	hit: { latitude: number; longitude: number; source: string } | null,
+	answers: Record<string, GeocodeResult | 'error'>,
 	updates: Array<Record<string, unknown>>,
+	asked: Array<string> = [],
 ) =>
 	geocodeCompany('c-1').pipe(
 		Effect.provideService(CompanyService, companyServiceWith(company, updates)),
-		Effect.provideService(Geocoder, geocoderReturning(hit)),
+		Effect.provideService(Geocoder, geocoderFrom(answers, asked)),
 		Effect.provideService(CurrentOrg, currentOrg),
 		Effect.runPromise,
 	)
 
 describe('geocodeCompany', () => {
-	describe('when the geocoder returns a match', () => {
-		it('should store latitude, longitude and the geocode source', async () => {
-			// GIVEN a company with a location and a geocoder that resolves it
+	describe('when the name-and-location query resolves', () => {
+		it('should store the coordinates and report the geocoded row', async () => {
+			// GIVEN a company whose "name, location" query the geocoder resolves
 			const updates: Array<Record<string, unknown>> = []
+			const asked: Array<string> = []
 
 			// WHEN the company is geocoded
 			const result = await run(
 				{ name: 'Sunset Transportation', location: 'St. Louis, MO' },
-				{ latitude: 38.627, longitude: -90.199, source: 'nominatim' },
+				{
+					'Sunset Transportation, St. Louis, MO': {
+						latitude: 38.627,
+						longitude: -90.199,
+						source: 'nominatim',
+					},
+				},
 				updates,
+				asked,
 			)
 
-			// THEN exactly the four coordinate columns are written, and the
-			// updated row comes back
+			// THEN only the primary query is asked, the four coordinate columns are
+			// written, and the outcome carries the updated row
+			expect(asked).toEqual(['Sunset Transportation, St. Louis, MO'])
 			expect(updates).toHaveLength(1)
 			expect(updates[0]).toMatchObject({
 				latitude: 38.627,
 				longitude: -90.199,
 				geocodeSource: 'nominatim',
 			})
-			expect(result).not.toBeNull()
+			expect(result).toMatchObject({ _tag: 'geocoded' })
 		})
 	})
 
-	describe('when the geocoder finds no match', () => {
-		it('should store nothing and return null', async () => {
-			// GIVEN a company whose location the geocoder cannot resolve
+	describe('when the name-prefixed query misses but the bare location resolves', () => {
+		it('should fall back to a location-only lookup and geocode', async () => {
+			// GIVEN a company whose "name, location" query resolves to no place,
+			// while the location on its own does resolve
 			const updates: Array<Record<string, unknown>> = []
+			const asked: Array<string> = []
+
+			// WHEN the company is geocoded
+			const result = await run(
+				{ name: 'Circle Logistics', location: 'Detroit, MI' },
+				{
+					'Detroit, MI': {
+						latitude: 42.331,
+						longitude: -83.045,
+						source: 'nominatim',
+					},
+				},
+				updates,
+				asked,
+			)
+
+			// THEN the primary query is tried first, then the location alone, and the
+			// fallback hit is persisted
+			expect(asked).toEqual(['Circle Logistics, Detroit, MI', 'Detroit, MI'])
+			expect(updates).toHaveLength(1)
+			expect(updates[0]).toMatchObject({
+				latitude: 42.331,
+				longitude: -83.045,
+				geocodeSource: 'nominatim',
+			})
+			expect(result).toMatchObject({ _tag: 'geocoded' })
+		})
+	})
+
+	describe('when neither the name-and-location nor the location resolves', () => {
+		it('should write nothing and report no_match', async () => {
+			// GIVEN a company no query resolves, primary or fallback
+			const updates: Array<Record<string, unknown>> = []
+			const asked: Array<string> = []
 
 			// WHEN the company is geocoded
 			const result = await run(
 				{ name: 'Nowhere Ltd', location: 'Atlantis' },
-				null,
+				{},
 				updates,
+				asked,
 			)
 
-			// THEN no coordinates are written and the caller learns nothing was stored
+			// THEN both queries were attempted, nothing was written, and the caller
+			// learns it was a genuine no-match
+			expect(asked).toEqual(['Nowhere Ltd, Atlantis', 'Atlantis'])
 			expect(updates).toHaveLength(0)
-			expect(result).toBeNull()
+			expect(result).toEqual({ _tag: 'no_match' })
 		})
 	})
 
 	describe('when the company has no name or location to search on', () => {
-		it('should never send an empty query and return null', async () => {
+		it('should never call the geocoder and report nothing_to_search', async () => {
 			// GIVEN a company with neither a name nor a location, but a geocoder
 			// that would happily return a hit if it were asked
 			const updates: Array<Record<string, unknown>> = []
+			const asked: Array<string> = []
 
 			// WHEN the company is geocoded
 			const result = await run(
 				{},
-				{ latitude: 1, longitude: 2, source: 'nominatim' },
+				{ Anywhere: { latitude: 1, longitude: 2, source: 'nominatim' } },
 				updates,
+				asked,
 			)
 
-			// THEN the lookup is skipped entirely — no write, nothing stored
+			// THEN the geocoder is never asked, nothing is written
+			expect(asked).toEqual([])
 			expect(updates).toHaveLength(0)
-			expect(result).toBeNull()
+			expect(result).toEqual({ _tag: 'nothing_to_search' })
+		})
+	})
+
+	describe('when the geocoder cannot be reached', () => {
+		it('should report lookup_failed, kept apart from a no-match', async () => {
+			// GIVEN a company whose lookup errors instead of returning a result
+			const updates: Array<Record<string, unknown>> = []
+			const asked: Array<string> = []
+
+			// WHEN the company is geocoded
+			const result = await run(
+				{ name: 'Acme', location: 'Berlin' },
+				{ 'Acme, Berlin': 'error' },
+				updates,
+				asked,
+			)
+
+			// THEN no coordinates are written and the outage is its own outcome,
+			// distinct from "no place found"
+			expect(updates).toHaveLength(0)
+			expect(result).toEqual({ _tag: 'lookup_failed' })
 		})
 	})
 })

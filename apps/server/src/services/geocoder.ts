@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Schema, Semaphore } from 'effect'
+import { Context, Data, Effect, Layer, Schema, Semaphore } from 'effect'
 import { HttpClient, HttpClientResponse } from 'effect/unstable/http'
 
 const NominatimHit = Schema.Struct({
@@ -14,6 +14,17 @@ export interface GeocodeResult {
 	readonly source: string
 }
 
+/**
+ * The geocoder could not be reached or its answer could not be read — a
+ * network, HTTP, or parse fault, as opposed to the geocoder plainly having no
+ * place for the query. Callers use this to tell an outage apart from a genuine
+ * no-match instead of treating both as "nothing found".
+ */
+export class GeocodeLookupError extends Data.TaggedError('GeocodeLookupError')<{
+	readonly query: string
+	readonly cause: string
+}> {}
+
 export class Geocoder extends Context.Service<Geocoder>()('Geocoder', {
 	make: Effect.gen(function* () {
 		const client = yield* HttpClient.HttpClient
@@ -22,7 +33,9 @@ export class Geocoder extends Context.Service<Geocoder>()('Geocoder', {
 		// section spaces them out so the next request can't fire too soon.
 		const semaphore = yield* Semaphore.make(1)
 
-		const lookup = (query: string): Effect.Effect<GeocodeResult | null> =>
+		const lookup = (
+			query: string,
+		): Effect.Effect<GeocodeResult | null, GeocodeLookupError> =>
 			semaphore.withPermits(1)(
 				client
 					.get('https://nominatim.openstreetmap.org/search', {
@@ -57,6 +70,9 @@ export class Geocoder extends Context.Service<Geocoder>()('Geocoder', {
 							}
 						}),
 						Effect.tap(() => Effect.sleep('1 seconds')),
+						// A fault reaching the geocoder or reading its answer is not the
+						// same as the geocoder having no place for the query: fail with a
+						// typed error so the caller can tell an outage from a no-match.
 						Effect.catch((err: unknown) =>
 							Effect.logWarning('Geocode lookup failed')
 								.pipe(
@@ -66,7 +82,13 @@ export class Geocoder extends Context.Service<Geocoder>()('Geocoder', {
 										cause: String(err),
 									}),
 								)
-								.pipe(Effect.as(null)),
+								.pipe(
+									Effect.andThen(
+										Effect.fail(
+											new GeocodeLookupError({ query, cause: String(err) }),
+										),
+									),
+								),
 						),
 					),
 			)
