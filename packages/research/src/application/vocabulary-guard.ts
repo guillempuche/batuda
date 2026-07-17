@@ -1,5 +1,5 @@
 /**
- * Rewrites a run's extracted industry / size to the CRM's fixed codes.
+ * Rewrites a run's extracted industry / size / country to the CRM's fixed codes.
  *
  * The extractor emits these fields in whatever words the source page used
  * ("manufacturing", "50 employees"), but the CRM stores a fixed set of codes.
@@ -147,8 +147,93 @@ export const mapSizeRange = (raw: string): CrmSizeRange | null => {
 	return '51-200'
 }
 
+// Common country names → ISO 3166-1 alpha-2, so the extractor's "France" / "United
+// Kingdom" become the FR / GB the CRM stores and the golden set scores against. Keys
+// are accent-folded and lowercased (matching `normalize`). Not exhaustive on purpose;
+// extend as new targets appear.
+const COUNTRY_NAME_TO_ALPHA2: Record<string, string> = {
+	france: 'FR',
+	'united kingdom': 'GB',
+	uk: 'GB',
+	'great britain': 'GB',
+	britain: 'GB',
+	england: 'GB',
+	scotland: 'GB',
+	wales: 'GB',
+	spain: 'ES',
+	espana: 'ES',
+	'united states': 'US',
+	'united states of america': 'US',
+	usa: 'US',
+	germany: 'DE',
+	deutschland: 'DE',
+	italy: 'IT',
+	italia: 'IT',
+	portugal: 'PT',
+	netherlands: 'NL',
+	'the netherlands': 'NL',
+	holland: 'NL',
+	belgium: 'BE',
+	switzerland: 'CH',
+	austria: 'AT',
+	ireland: 'IE',
+	sweden: 'SE',
+	norway: 'NO',
+	denmark: 'DK',
+	finland: 'FI',
+	poland: 'PL',
+	'czech republic': 'CZ',
+	czechia: 'CZ',
+	greece: 'GR',
+	hungary: 'HU',
+	romania: 'RO',
+	canada: 'CA',
+	mexico: 'MX',
+	brazil: 'BR',
+	brasil: 'BR',
+	argentina: 'AR',
+	chile: 'CL',
+	colombia: 'CO',
+	peru: 'PE',
+	paraguay: 'PY',
+	uruguay: 'UY',
+	ecuador: 'EC',
+	australia: 'AU',
+	'new zealand': 'NZ',
+	japan: 'JP',
+	china: 'CN',
+	india: 'IN',
+	singapore: 'SG',
+	'hong kong': 'HK',
+	'south korea': 'KR',
+	korea: 'KR',
+	'united arab emirates': 'AE',
+	uae: 'AE',
+	'saudi arabia': 'SA',
+	israel: 'IL',
+	turkey: 'TR',
+	turkiye: 'TR',
+	'south africa': 'ZA',
+	morocco: 'MA',
+	egypt: 'EG',
+	russia: 'RU',
+}
+
+// Fold the model's country to an ISO alpha-2 code: keep a code it already emitted,
+// map a known country name, and leave anything else untouched (never dropping a real
+// value we simply don't have a code for). Hard junk — a URL, an email, a placeholder —
+// is blanked like the other fields.
+export const mapCountry = (raw: string): string | null => {
+	const n = normalize(raw)
+	if (isHardJunk(n)) return null
+	if (/^[a-z]{2}$/.test(n)) return n.toUpperCase()
+	const iso = COUNTRY_NAME_TO_ALPHA2[n]
+	return iso ?? raw
+}
+
 const MAPPERS: Record<string, (raw: string) => string | null> = {
 	industry: mapIndustry,
+	country: mapCountry,
 	// Match the size key in either casing: findings may carry it snake_cased
 	// (`size_range`) or camelCased (`sizeRange`).
 	size_range: mapSizeRange,
