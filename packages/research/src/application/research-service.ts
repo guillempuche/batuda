@@ -1636,6 +1636,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						// when its body never spells the company name (an offices/team page).
 						host: string | undefined
 					}> = []
+					// Hosts of the search results this run surfaced. The extraction prompt
+					// tells the model to cite a result's URL for a fact seen only in its
+					// snippet, so a citation to one of these grounds even when the page itself
+					// was never fetched — the scalar/value guards still hold each value to the
+					// gathered evidence, so this recovers real facts without loosening truth.
+					const searchResultHosts = new Set<string>()
 					// The anchor site fetched up front (see below): its url hash to link as
 					// a source, and its capped rendered text to prepend to the transcript so
 					// phase-2 extraction reads the official site even if the model never did.
@@ -1909,7 +1915,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							`
 							const citationCheck = validateFindingCitations(
 								result,
-								groundedCitationTest(groundedRows),
+								groundedCitationTest(groundedRows, [...searchResultHosts]),
 							)
 							result = citationCheck.findings
 							if (citationCheck.total > citationCheck.kept) {
@@ -2666,8 +2672,14 @@ export class ResearchService extends Context.Service<ResearchService>()(
 															url?: unknown
 															content?: unknown
 														}
+														if (typeof item.url !== 'string') continue
+														// Every result the run surfaced counts as seen, so a
+														// value the model cites to its URL grounds even when
+														// only the snippet — not the full page — was read.
+														const resultHost = domainHost(item.url)
+														if (resultHost !== undefined)
+															searchResultHosts.add(resultHost)
 														if (
-															typeof item.url === 'string' &&
 															typeof item.content === 'string' &&
 															item.content.trim().length > 0
 														) {

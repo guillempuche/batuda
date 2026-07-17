@@ -215,4 +215,21 @@ describe('groundedCitationTest', () => {
 			expect(grounded('made up text')).toBe(false)
 		})
 	})
+
+	describe('when a citation points at a surfaced search result', () => {
+		it('should accept a host the run saw in search but never fetched', () => {
+			// GIVEN the fetched source plus a search result the run surfaced
+			const withSearch = groundedCitationTest(
+				[{ localRef: 'https://acme.es/about', sourceId: 'src_abc' }],
+				['https://directory.example.com/acme'],
+			)
+
+			// THEN a citation to that result's site is accepted (the model was told to
+			// cite it), while a host the run never saw at all is still rejected
+			expect(withSearch('https://directory.example.com/acme-profile')).toBe(
+				true,
+			)
+			expect(withSearch('https://never-seen.example.org')).toBe(false)
+		})
+	})
 })
