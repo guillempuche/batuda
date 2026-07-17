@@ -235,12 +235,20 @@ const ANCHOR_DOMAIN_INSTRUCTION = (host: string): string =>
 // matched only through a search snippet still has something to extract from.
 export const groundedPageTexts = (
 	targets: EntityTargets | null,
-	pages: ReadonlyArray<{ readonly urlHash: string; readonly text: string }>,
+	pages: ReadonlyArray<{
+		readonly urlHash: string
+		readonly text: string
+		readonly host?: string | undefined
+	}>,
 ): ReadonlyArray<string> => {
 	if (targets === null) return pages.map(page => page.text)
 	const verdicts = classifyEntityMatchPerSource(
 		targets,
-		pages.map(page => ({ sourceId: page.urlHash, text: page.text })),
+		pages.map(page => ({
+			sourceId: page.urlHash,
+			text: page.text,
+			host: page.host,
+		})),
 	)
 	const keep = new Set(groundedSourceIds(verdicts))
 	const grounded = pages.filter(page => keep.has(page.urlHash))
@@ -1615,7 +1623,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// Full scraped page content gathered this run — the corpus the value
 					// guard checks findings against. Kept separate from the model-facing
 					// transcript (capped per page); empty on a resume that skips phase 1.
-					const scrapeCorpus: Array<{ urlHash: string; text: string }> = []
+					const scrapeCorpus: Array<{
+						urlHash: string
+						text: string
+						// The page's own host, so an own-domain page grounds on its host even
+						// when its body never spells the company name (an offices/team page).
+						host: string | undefined
+					}> = []
 					// The anchor site fetched up front (see below): its url hash to link as
 					// a source, and its capped rendered text to prepend to the transcript so
 					// phase-2 extraction reads the official site even if the model never did.
@@ -2393,6 +2407,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											text: followedRedirect
 												? `${resolvedUrl}\n${page.markdown}`
 												: page.markdown,
+											host: destHost,
 										})
 										if (followedRedirect && entityTargets !== null) {
 											entityTargets = withRedirectDomain(
@@ -2575,6 +2590,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														scrapeCorpus.push({
 															urlHash: urlHashForScrape(page.url),
 															text: page.markdown,
+															host: domainHost(page.url),
 														})
 													}
 												} else if (tr.name === 'web_search') {
@@ -2600,6 +2616,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 															scrapeCorpus.push({
 																urlHash: urlHashForScrape(item.url),
 																text: item.content,
+																host: domainHost(item.url),
 															})
 														}
 													}
