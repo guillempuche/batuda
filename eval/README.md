@@ -38,6 +38,12 @@ infisical run --env=<dev-env> -- pnpm cli research eval --org <org-id> --user <u
 
 If an environment already carries a `DATABASE_URL`, pin it back to local with a leading `env DATABASE_URL="postgresql://batuda:batuda@localhost:5433/<local-db>"` before `pnpm`.
 
+**Routing, not just keys.** The keys alone don't run anything — the pipeline also needs the *routing*: `RESEARCH_LLM_<TIER>_PROVIDERS` + `_MODEL` for each of the three tiers, and the `RESEARCH_PROVIDER_SEARCH` / `_SCRAPE` / `_REGISTRY_GB` selectors. If those are missing from the run environment every provider silently falls back to `stub` and the eval reports a 100% empty rate over canned data — the keys being present is not enough. Unlike `DATABASE_URL`/`STORAGE_*`, this routing is **not secret** and is the *same* across worktrees, so it belongs in the Infisical env right next to the keys (never pass a key inline on the command; a provider name or model id is fine to pass inline, a key is not). Named vendors (`groq`, `fireworks`, `nebius`) carry their own endpoint, so a tier needs only its `PROVIDERS` name + `MODEL`; only a `custom` vendor also needs `_BASE_URL`.
+
+**Storage is local too.** Like the database, `STORAGE_*` must resolve to the worktree's own bucket (provisioned by `pnpm cli worktree up`), never the cloud one — a run has no business writing its scrape cache to prod. The dev Infisical env carries neither `DATABASE_URL` nor `STORAGE_*`, so a dev-env run picks up both from the worktree automatically.
+
+**Validate one company before the billable pass.** The full set is ~$10–15 and a few hours of live scraping and LLM calls, so first run a one-row golden with `--runs 1` (a few cents). A wrong vendor/model, an expired key, or a network-blocked provider fails in seconds and shows up as a 100% empty rate — the cheap early signal that the routing is wrong before you spend on all 20 companies.
+
 ## The golden file
 
 A JSON array of rows. Copy `golden.example.json` to your own `golden.json` and replace every row with a real, **verified** company — a wrong "correct answer" silently poisons every number the harness reports, so never invent field values.
