@@ -87,22 +87,32 @@ export const CompaniesLive = HttpApiBuilder.group(
 					geocodeCompany(_.params.id).pipe(
 						Effect.provideService(CompanyService, svc),
 						Effect.provideService(Geocoder, geocoder),
-						// The helper returns null when there's no address to search on or
-						// the geocoder found no match; the endpoint reports both as a
-						// 404 the Where panel renders as "no match".
-						Effect.flatMap(row =>
-							row === null
-								? Effect.fail(
-										new NotFound({ entity: 'geocode-miss', id: _.params.id }),
-									)
-								: Effect.logInfo('Company geocoded').pipe(
+						// A resolvable location returns the row. No match, or nothing to
+						// search on, is the 404 the Where panel renders as "no match". A
+						// geocoder that could not be reached is a server fault, kept apart
+						// from "no match" so it surfaces as a 500, not a 404.
+						Effect.flatMap(result => {
+							switch (result._tag) {
+								case 'geocoded':
+									return Effect.logInfo('Company geocoded').pipe(
 										Effect.annotateLogs({
 											event: 'company.geocoded',
 											companyId: _.params.id,
 										}),
-										Effect.as(row),
-									),
-						),
+										Effect.as(result.company),
+									)
+								case 'lookup_failed':
+									return Effect.die(
+										new Error(
+											`geocoder unreachable for company ${_.params.id}`,
+										),
+									)
+								default:
+									return Effect.fail(
+										new NotFound({ entity: 'geocode-miss', id: _.params.id }),
+									)
+							}
+						}),
 						Effect.catch(e =>
 							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
 						),

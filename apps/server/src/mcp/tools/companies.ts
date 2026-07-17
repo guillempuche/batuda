@@ -134,11 +134,19 @@ const UpdateCompany = Tool.make('update_company', {
 
 const GeocodeCompany = Tool.make('geocode_company', {
 	description:
-		'Resolve a company to latitude/longitude via the configured geocoder (Nominatim). Persists lat/lng/geocoded_at/geocode_source and returns the updated row. Rate-limited to 1 req/sec.',
+		'Resolve a company to latitude/longitude via the configured geocoder (Nominatim). On a match, persists lat/lng/geocoded_at/geocode_source. Returns { outcome, company }: outcome is "geocoded" (company is the updated row), "no_match" (nothing resolved for the location), "nothing_to_search" (company has no name or location), or "lookup_failed" (the geocoder could not be reached). Rate-limited to 1 req/sec.',
 	parameters: Schema.Struct({
 		id: Schema.String,
 	}),
-	success: Schema.NullOr(Company.json),
+	success: Schema.Struct({
+		outcome: Schema.Literals([
+			'geocoded',
+			'no_match',
+			'nothing_to_search',
+			'lookup_failed',
+		]),
+		company: Schema.NullOr(Company.json),
+	}),
 	dependencies: REQUEST_DEPENDENCIES,
 })
 	.annotate(Tool.Title, 'Geocode Company')
@@ -226,6 +234,10 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 				geocodeCompany(id).pipe(
 					Effect.provideService(CompanyService, service),
 					Effect.provideService(Geocoder, geocoder),
+					Effect.map(result => ({
+						outcome: result._tag,
+						company: result._tag === 'geocoded' ? result.company : null,
+					})),
 					Effect.orDie,
 				),
 		}
