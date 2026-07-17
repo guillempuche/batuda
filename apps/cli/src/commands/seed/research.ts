@@ -87,7 +87,6 @@ type RunSpec = {
 	readonly budgetCents: number
 	readonly paidBudgetCents?: number
 	readonly costCents: number
-	readonly paidCostCents?: number
 	readonly tokensIn: number
 	readonly tokensOut: number
 	readonly startedAt?: Date
@@ -151,18 +150,9 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		tokensOut: 3200,
 		startedAt: new Date('2026-02-08T10:00:00Z'),
 		completedAt: new Date('2026-02-08T10:02:30Z'),
+		// Firecrawl scrape is a cheap-tier charge, so it lands in cost_cents, not
+		// the paid ledger — no paidSpend row here.
 		attachSources: [{ sourceId: 'src_firecrawl_001', costCents: 5 }],
-		paidSpend: [
-			{
-				provider: 'firecrawl',
-				tool: 'scrape',
-				amountCents: 5,
-				quotaUnits: 1,
-				quotaUnit: 'credits',
-				sourceId: 'src_firecrawl_001',
-				autoApproved: true,
-			},
-		],
 	},
 	{
 		key: 'enrichment',
@@ -202,7 +192,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		budgetCents: 100,
 		paidBudgetCents: 200,
 		costCents: 28,
-		paidCostCents: 150,
 		tokensIn: 18900,
 		tokensOut: 4400,
 		startedAt: new Date('2026-02-12T09:30:00Z'),
@@ -554,6 +543,60 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		findingLinks: [{ table: 'companies', companySlug: 'bright-lane-boutique' }],
 	},
 
+	// A decision-maker email hunt: one enrich plus a fan of verifies, so the
+	// paid tier sums many small ledger rows (5¢ + 6×1¢ = 11¢) rather than the
+	// single-row shape the other paid runs use.
+	{
+		key: 'decision-maker-emails',
+		companySlug: 'bright-lane-boutique',
+		query: 'Bright Lane Boutique — verified decision-maker emails',
+		mode: 'deep',
+		schemaName: 'contact_discovery_v1',
+		kind: 'leaf',
+		status: 'succeeded',
+		findings: {
+			contacts: [
+				{
+					name: 'Laura Mas',
+					role: 'Founder',
+					email: 'laura@brightlane.cat',
+					is_decision_maker: true,
+					notes:
+						'Hunter-verified deliverable; six catch-all guesses ruled out.',
+					citations: [{ source_id: 'src_exa_002', confidence: 0.9 }],
+				},
+			],
+		},
+		briefMd:
+			'## Bright Lane — verified emails\nHunter confirmed laura@brightlane.cat as deliverable. Six pattern guesses were verified to rule them out before landing on the founder address.',
+		budgetCents: 60,
+		paidBudgetCents: 200,
+		costCents: 18,
+		tokensIn: 6200,
+		tokensOut: 1400,
+		startedAt: new Date('2026-05-06T10:00:00Z'),
+		completedAt: new Date('2026-05-06T10:02:12Z'),
+		attachSources: [{ sourceId: 'src_exa_002', costCents: 4 }],
+		paidSpend: [
+			{
+				provider: 'hunter',
+				tool: 'hunter_enrich',
+				amountCents: 5,
+				quotaUnits: 1,
+				quotaUnit: 'requests',
+				autoApproved: true,
+			},
+			...Array.from({ length: 6 }, () => ({
+				provider: 'hunter',
+				tool: 'hunter_verify',
+				amountCents: 1,
+				quotaUnits: 1,
+				quotaUnit: 'verifications',
+				autoApproved: true,
+			})),
+		],
+	},
+
 	// ── Long-form / multi-run coverage ────────────────────────
 	// More runs per company so the run-list view has volume; long
 	// briefs + rich findings exercise the structured findings views
@@ -898,7 +941,6 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		budgetCents: 100,
 		paidBudgetCents: 200,
 		costCents: 38,
-		paidCostCents: 150,
 		tokensIn: 12100,
 		tokensOut: 3200,
 		startedAt: new Date('2026-05-02T08:00:00Z'),
@@ -2809,7 +2851,9 @@ export const seedResearchRuns = (
 			budgetCents: s.budgetCents,
 			paidBudgetCents: s.paidBudgetCents ?? 0,
 			costCents: s.costCents,
-			paidCostCents: s.paidCostCents ?? 0,
+			// The run's paid tier is exactly what its ledger rows sum to, so the
+			// mock data can never drift from the paid_cost_cents invariant.
+			paidCostCents: s.paidSpend?.reduce((n, p) => n + p.amountCents, 0) ?? 0,
 			tokensIn: s.tokensIn,
 			tokensOut: s.tokensOut,
 			toolLog: JSON.stringify(s.toolLog ?? []),
@@ -2847,6 +2891,8 @@ export const seedResearchRuns = (
 						'## Catalonia scan rollup\n45 restaurants without web + 18 retail-on-Instagram. Top quartile by location density: Barcelona + Garraf.',
 					budgetCents: 100,
 					costCents: 47,
+					// Rolls up its children: cost 25 + 22, paid 8 + 5.
+					paidCostCents: 13,
 					tokensIn: 16900,
 					tokensOut: 4000,
 					toolLog: JSON.stringify([]),
@@ -2857,7 +2903,9 @@ export const seedResearchRuns = (
 			])[0]!,
 		])} RETURNING id`
 		const groupRunId = groupRunInsert[0]!.id
-		yield* sql`INSERT INTO research_runs ${sql.insert(
+		const groupChildInsert = yield* sql<{
+			id: string
+		}>`INSERT INTO research_runs ${sql.insert(
 			normalizeRows([
 				{
 					organizationId: tallerOrgId,
@@ -2874,6 +2922,7 @@ export const seedResearchRuns = (
 					briefMd: '45 restaurants in Catalonia without a public web site.',
 					budgetCents: 50,
 					costCents: 25,
+					paidCostCents: 8,
 					tokensIn: 9000,
 					tokensOut: 2200,
 					toolLog: JSON.stringify([]),
@@ -2897,6 +2946,7 @@ export const seedResearchRuns = (
 						'18 retail shops selling only via Instagram DM in Barcelona.',
 					budgetCents: 50,
 					costCents: 22,
+					paidCostCents: 5,
 					tokensIn: 7900,
 					tokensOut: 1800,
 					toolLog: JSON.stringify([]),
@@ -2905,8 +2955,53 @@ export const seedResearchRuns = (
 					completedAt: new Date('2026-02-05T09:05:00Z'),
 				},
 			]),
-		)}`
+		)} RETURNING id`
 		yield* Effect.logInfo('  + 1 group with 2 children')
+
+		// Back the children's paid_cost_cents (8 + 5) with real ledger rows, so
+		// the group's rolled-up paid total is consistent with the paid-spend
+		// table. Guarded on testUser because research_paid_spend needs a user id.
+		if (testUser) {
+			const [restaurantsChild, retailChild] = groupChildInsert
+			yield* sql`INSERT INTO research_paid_spend ${sql.insert(
+				normalizeRows([
+					{
+						organizationId: tallerOrgId,
+						researchId: restaurantsChild!.id,
+						userId: testUser.id,
+						provider: 'einforma',
+						tool: 'registry_lookup',
+						idempotencyKey: `seed_paid_${restaurantsChild!.id}_registry`,
+						amountCents: 8,
+						quotaUnits: 1,
+						quotaUnit: 'lookups',
+						args: JSON.stringify({}),
+						resultHash: null,
+						resultData: null,
+						sourceId: null,
+						autoApproved: true,
+						approvedBy: null,
+					},
+					{
+						organizationId: tallerOrgId,
+						researchId: retailChild!.id,
+						userId: testUser.id,
+						provider: 'hunter',
+						tool: 'hunter_enrich',
+						idempotencyKey: `seed_paid_${retailChild!.id}_enrich`,
+						amountCents: 5,
+						quotaUnits: 1,
+						quotaUnit: 'requests',
+						args: JSON.stringify({}),
+						resultHash: null,
+						resultData: null,
+						sourceId: null,
+						autoApproved: true,
+						approvedBy: null,
+					},
+				]),
+			)}`
+		}
 
 		// Without research_links the company-detail Research card
 		// is empty — the API filters via EXISTS on this table.
