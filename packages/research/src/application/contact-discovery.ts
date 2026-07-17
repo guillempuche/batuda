@@ -182,6 +182,14 @@ export type DiscoverContactsOutcome =
 	  }
 	| { readonly status: 'no_reliable_contact'; readonly researchId: string }
 	| { readonly status: 'budget_exceeded'; readonly researchId: string }
+	// A paid step would spend past the caller's auto-approve limit: no charge
+	// was made, and the model records it as a pending paid action to approve.
+	| {
+			readonly status: 'approval_required'
+			readonly researchId: string
+			readonly tool: string
+			readonly estimatedCents: number
+	  }
 
 export interface DiscoverContactsInput {
 	readonly companyName: string
@@ -502,6 +510,16 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 								Effect.succeed({
 									status: 'budget_exceeded' as const,
 									researchId,
+								}),
+							// A paid step over the auto-approve limit (in-run budgets only):
+							// return the gate as an outcome so the run keeps its findings
+							// and the model can propose the action for approval.
+							ApprovalRequired: e =>
+								Effect.succeed({
+									status: 'approval_required' as const,
+									researchId,
+									tool: e.tool,
+									estimatedCents: e.estimatedCents,
 								}),
 						}),
 					)

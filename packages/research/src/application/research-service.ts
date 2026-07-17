@@ -2161,6 +2161,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							researchId,
 							policy,
 							systemCeiling: monthlyCapHardCeilingCents,
+							// A run's own paid tool calls can't spend past the user's
+							// auto-approve limit without an approval gate — the agent turns
+							// a refusal into a pending paid action instead of charging.
+							enforceAutoApprove: true,
 						}).pipe(Layer.provide(Layer.succeed(SqlClient.SqlClient)(sql)))
 
 						// One tool-log + SSE pair per round, so a multi-round run is

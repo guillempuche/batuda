@@ -3,6 +3,7 @@ import type { LanguageModel } from 'effect/unstable/ai'
 
 import type { AcceptedCountry } from '../domain/country'
 import type {
+	ApprovalRequired,
 	BudgetExceeded,
 	MonthlyCapExceeded,
 	NoRegistry,
@@ -243,7 +244,10 @@ export interface BudgetService {
 		cents: number,
 		tool: string,
 		idempotencyKey?: string,
-	) => Effect.Effect<void, BudgetExceeded | MonthlyCapExceeded>
+	) => Effect.Effect<
+		void,
+		BudgetExceeded | MonthlyCapExceeded | ApprovalRequired
+	>
 	readonly snapshot: () => Effect.Effect<BudgetSnapshot>
 }
 

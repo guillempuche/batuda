@@ -1,7 +1,11 @@
 import { Effect, Layer, Ref } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { BudgetExceeded, MonthlyCapExceeded } from '../domain/errors'
+import {
+	ApprovalRequired,
+	BudgetExceeded,
+	MonthlyCapExceeded,
+} from '../domain/errors'
 import type { BudgetSnapshot, ResolvedPolicy } from '../domain/types'
 import { Budget } from './ports'
 
@@ -76,6 +80,14 @@ export interface BudgetConfig {
 	readonly researchId: string
 	readonly policy: ResolvedPolicy
 	readonly systemCeiling: number
+	// When true, a paid charge that would push this run's paid spend past the
+	// caller's auto-approve limit is refused with ApprovalRequired instead of
+	// charged — so an agent tool call above the limit surfaces an approval gate
+	// rather than spending silently. Off by default (the per-run paid budget is
+	// the only ceiling): set it on the in-run agent budget, but not on the
+	// standalone tool (which gates interactively) or a follow-up run that is
+	// executing an already-approved paid action.
+	readonly enforceAutoApprove?: boolean
 }
 
 export const makeBudgetLayer = (config: BudgetConfig) =>
@@ -145,6 +157,21 @@ export const makeBudgetLayer = (config: BudgetConfig) =>
 								tier: 'paid-run',
 								needed: cents,
 								remaining: state.remaining,
+							})
+						}
+
+						// Stop before spending past the caller's auto-approve limit:
+						// hand back an approval gate the agent surfaces as a pending
+						// paid action for the user to approve, rather than charging.
+						// Only when enforced (the in-run agent budget) — the standalone
+						// tool gates interactively and an approved follow-up must charge.
+						if (
+							config.enforceAutoApprove &&
+							state.spent + cents > config.policy.autoApprovePaidCents
+						) {
+							return yield* new ApprovalRequired({
+								tool,
+								estimatedCents: cents,
 							})
 						}
 

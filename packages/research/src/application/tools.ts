@@ -26,7 +26,7 @@ import {
 } from 'effect/unstable/ai'
 
 import { AcceptedCountry } from '../domain/country'
-import { noRegistryResult } from '../domain/errors'
+import { approvalRequiredResult, noRegistryResult } from '../domain/errors'
 import { ScrapedPage } from '../domain/types'
 import { ContactDiscovery } from './contact-discovery'
 import {
@@ -447,6 +447,11 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 						mapToolError('registry_lookup')(
 							`monthly paid cap reached (${e.spentCents}/${e.capCents}¢) — stop using registry_lookup`,
 						),
+					),
+					// Over the auto-approve limit: hand back the gate as a result so the
+					// model records a pending paid action instead of retrying the charge.
+					Effect.catchTag('ApprovalRequired', e =>
+						Effect.succeed(approvalRequiredResult(e.tool, e.estimatedCents)),
 					),
 					Effect.catchCause(cause => mapToolError('registry_lookup')(cause)),
 				),

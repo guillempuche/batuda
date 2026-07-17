@@ -44,7 +44,11 @@ export class QuotaExhausted extends Schema.TaggedErrorClass<QuotaExhausted>()(
 	},
 ) {}
 
-/** Paid call above auto-approve threshold. LLM should call propose_paid_action. */
+/**
+ * A paid call whose cost is over the user's auto-approve limit. Raised in-run
+ * instead of spending; the model records it under findings.pending_paid_actions
+ * for the user to approve (resolve_research_paid_action) rather than retrying.
+ */
 export class ApprovalRequired extends Schema.TaggedErrorClass<ApprovalRequired>()(
 	'ApprovalRequired',
 	{
@@ -52,6 +56,17 @@ export class ApprovalRequired extends Schema.TaggedErrorClass<ApprovalRequired>(
 		estimatedCents: Schema.Number,
 	},
 ) {}
+
+/** The approval gate rendered as a plain result value the model can act on. */
+export const approvalRequiredResult = (
+	tool: string,
+	estimatedCents: number,
+) => ({
+	status: 'approval_required' as const,
+	tool,
+	estimated_cents: estimatedCents,
+	message: `Paid ${tool} (~${estimatedCents}¢) is over the auto-approve limit — record it under pending_paid_actions for the user to approve instead of retrying.`,
+})
 
 /**
  * The requested country has no national business registry — a routing outcome,
