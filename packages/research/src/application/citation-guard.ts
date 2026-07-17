@@ -42,20 +42,26 @@ const boundDropValue = (value: unknown): string => {
 }
 
 /**
- * Builds the "is this citation backed by a fetched source" test for a run from its
- * linked sources. A citation is accepted when its URL matches a fetched source
- * exactly (canonical URL or the opaque source id) OR when its site (host) matches
- * one a fetched source belongs to — so a model that tidied the URL (dropped the
- * path, added `www.`, cited the homepage) is still credited to the page it read,
- * while an off-site (aggregator or fabricated) citation is still rejected. Judging
- * grounding by site matches what the eval measures; per-value truth is unaffected,
- * since the value-provenance guard checks each value against the evidence separately.
+ * Builds the "is this citation backed by a source the run actually saw" test, from a
+ * run's linked (fetched) sources plus the hosts of the search results it surfaced. A
+ * citation is accepted when its URL matches a fetched source exactly (canonical URL or
+ * the opaque source id) OR when its site (host) matches one a fetched source belongs to
+ * — so a model that tidied the URL (dropped the path, added `www.`, cited the homepage)
+ * is still credited to the page it read.
+ *
+ * `searchHosts` adds the sites of the search results the run pulled up. The extraction
+ * prompt tells the model to cite a result's URL for a fact it saw only in that result's
+ * snippet, so those hosts must count as seen too — otherwise a real value the run
+ * genuinely found is nulled just because its page was never fully fetched. An off-site
+ * citation the run never saw at all is still rejected, and per-value truth is unaffected:
+ * the scalar and value guards check each value against the gathered evidence separately.
  */
 export const groundedCitationTest = (
 	sources: ReadonlyArray<{
 		readonly localRef: string
 		readonly sourceId: string
 	}>,
+	searchHosts: ReadonlyArray<string> = [],
 ): ((sourceId: string) => boolean) => {
 	const keys = new Set<string>()
 	const hosts = new Set<string>()
@@ -63,6 +69,10 @@ export const groundedCitationTest = (
 		keys.add(canonicalizeUrl(source.localRef))
 		keys.add(source.sourceId)
 		const host = hostOf(source.localRef)
+		if (host !== null) hosts.add(host)
+	}
+	for (const searchHost of searchHosts) {
+		const host = hostOf(searchHost)
 		if (host !== null) hosts.add(host)
 	}
 	return sourceId => {
