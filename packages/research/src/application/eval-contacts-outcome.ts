@@ -10,7 +10,11 @@
  */
 
 import { type DiscoverContactsOutcome, emailChannel } from './contact-discovery'
-import type { ContactRunOutcome, OutcomeContact } from './eval-contacts-scoring'
+import type {
+	ContactRunOutcome,
+	ContactTerminalStatus,
+	OutcomeContact,
+} from './eval-contacts-scoring'
 
 export const outcomeFromContactRun = (
 	outcome: DiscoverContactsOutcome,
@@ -38,5 +42,10 @@ export const outcomeFromContactRun = (
 				})
 			: []
 
-	return { status: outcome.status, contacts, spendCents: meta.spendCents }
+	// An approval-gated run delivered no contacts because a paid step hit the
+	// spend limit — the same "spend-stopped, empty" bucket as budget_exceeded for
+	// the purpose of scoring contact quality.
+	const status: ContactTerminalStatus =
+		outcome.status === 'approval_required' ? 'budget_exceeded' : outcome.status
+	return { status, contacts, spendCents: meta.spendCents }
 }
