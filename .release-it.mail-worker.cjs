@@ -8,7 +8,7 @@ const {
 module.exports = {
 	extends: './.release-it.base.json',
 	git: {
-		commitsPath: 'apps/mail-worker',
+		commitsPath: getCommitPathsArray('apps/mail-worker').join(' '),
 		commitMessage: 'cicd(release): mail-worker v${version}',
 		tagAnnotation: 'Mail-worker Release v${version}',
 		tagMatch: 'mail-worker-v[0-9]*.[0-9]*.[0-9]*',

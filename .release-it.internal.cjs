@@ -8,7 +8,7 @@ const {
 module.exports = {
 	extends: './.release-it.base.json',
 	git: {
-		commitsPath: 'apps/internal',
+		commitsPath: getCommitPathsArray('apps/internal').join(' '),
 		commitMessage: 'cicd(release): internal v${version}',
 		tagAnnotation: 'Internal Release v${version}',
 		tagMatch: 'internal-v[0-9]*.[0-9]*.[0-9]*',
