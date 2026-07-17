@@ -78,9 +78,19 @@ export const companiesBackfillGeocode = (dryRun: boolean) =>
 				continue
 			}
 
-			const hit = yield* lookup(query)
+			let hit = yield* lookup(query)
 			// Pause between calls to respect Nominatim's ~1 request/second limit.
 			yield* Effect.sleep('1 seconds')
+			let matchedQuery = query
+
+			// The name-prefixed query resolves to no place for many companies, so
+			// fall back to the bare location before giving up — only when it differs
+			// from the query already tried (i.e. a name was part of it).
+			if (!hit && company.location && company.location !== query) {
+				hit = yield* lookup(company.location)
+				yield* Effect.sleep('1 seconds')
+				matchedQuery = company.location
+			}
 
 			if (!hit) {
 				missed++
@@ -100,7 +110,9 @@ export const companiesBackfillGeocode = (dryRun: boolean) =>
 				`
 			}
 			geocoded++
-			yield* Console.log(`  ✓ ${query} → ${hit.latitude}, ${hit.longitude}`)
+			yield* Console.log(
+				`  ✓ ${matchedQuery} → ${hit.latitude}, ${hit.longitude}`,
+			)
 		}
 
 		yield* Console.log(
