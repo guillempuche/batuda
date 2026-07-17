@@ -8,7 +8,7 @@ const {
 module.exports = {
 	extends: './.release-it.base.json',
 	git: {
-		commitsPath: 'packages/ui',
+		commitsPath: getCommitPathsArray('packages/ui').join(' '),
 		commitMessage: 'cicd(release): ui v${version}',
 		tagAnnotation: 'UI Release v${version}',
 		tagMatch: 'ui-v[0-9]*.[0-9]*.[0-9]*',

@@ -33,25 +33,34 @@ Otherwise, use `AskUserQuestion`:
 
 ## Step 3: Check Commits Exist
 
+Count commits touching the target's app dir **and every workspace dependency it bundles** — the
+exact paths `scripts/release-utils.cjs` resolves, which is what the release gate itself now uses.
+Get the latest tag with `git describe`, then substitute it for `<tag>`. The paths are resolved
+inline via command substitution (not a `$paths` variable — zsh does not word-split an unquoted
+variable, so it would collapse to one bogus pathspec):
+
 ```bash
 # Server
 git describe --tags --match='server-v[0-9]*.[0-9]*.[0-9]*' --abbrev=0 2>/dev/null || echo "no-tag"
-git rev-list <tag>..HEAD --count -- apps/server packages/
+git rev-list <tag>..HEAD --count -- $(node -e "process.stdout.write(require('./scripts/release-utils.cjs').getCommitPathsArray('apps/server').join(' '))")
 
 # Internal
 git describe --tags --match='internal-v[0-9]*.[0-9]*.[0-9]*' --abbrev=0 2>/dev/null || echo "no-tag"
-git rev-list <tag>..HEAD --count -- apps/internal packages/
+git rev-list <tag>..HEAD --count -- $(node -e "process.stdout.write(require('./scripts/release-utils.cjs').getCommitPathsArray('apps/internal').join(' '))")
 
 # UI
 git describe --tags --match='ui-v[0-9]*.[0-9]*.[0-9]*' --abbrev=0 2>/dev/null || echo "no-tag"
-git rev-list <tag>..HEAD --count -- packages/ui
+git rev-list <tag>..HEAD --count -- $(node -e "process.stdout.write(require('./scripts/release-utils.cjs').getCommitPathsArray('packages/ui').join(' '))")
 
 # Mail-worker
 git describe --tags --match='mail-worker-v[0-9]*.[0-9]*.[0-9]*' --abbrev=0 2>/dev/null || echo "no-tag"
-git rev-list <tag>..HEAD --count -- apps/mail-worker packages/
+git rev-list <tag>..HEAD --count -- $(node -e "process.stdout.write(require('./scripts/release-utils.cjs').getCommitPathsArray('apps/mail-worker').join(' '))")
 ```
 
-If 0 commits, ask if they want to force with `--no-git.requireCommits`.
+A count of 0 means nothing the deployed artifact bundles has changed since the last tag — there
+is genuinely nothing to release. A dependency-only change (e.g. `packages/research`) counts here
+and releases without `--no-git.requireCommits`, since the gate now resolves the same paths. The
+Step 4 dry run enforces this for real.
 
 ## Step 4: Dry Run
 
