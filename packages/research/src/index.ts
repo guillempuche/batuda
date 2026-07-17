@@ -108,6 +108,7 @@ export {
 	type ResearchEvent,
 	type ResearchEventType,
 	ResearchService,
+	stampRunCostFromLedger,
 	type ToolLogEntry,
 	withProposalIds,
 } from './application/research-service'
