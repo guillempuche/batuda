@@ -759,6 +759,96 @@ export interface ResolvedInstructions {
 	readonly templateNames: ReadonlyArray<string>
 }
 
+// Clone a succeeded run as a `cache_hit` so an identical query skips the fiber.
+// The findings / brief / token columns are copied straight from the source row to
+// the clone inside Postgres (INSERT … SELECT), so `findings` is never read into
+// JS — where the SQL client would camelCase every nested key and change the stored
+// shape. Returns null when the cached run is gone or no longer succeeded, so the
+// caller runs a fresh query instead.
+export const cloneCacheHitRun = (params: {
+	readonly sql: SqlClient.SqlClient
+	readonly cachedId: string
+	readonly organizationId: string
+	readonly userId: string
+	readonly input: CreateResearchInput
+	readonly templateIds: ReadonlyArray<string>
+	readonly templateNames: ReadonlyArray<string>
+	readonly templateFingerprint: string
+}) =>
+	Effect.gen(function* () {
+		const {
+			sql,
+			cachedId,
+			organizationId,
+			userId,
+			input,
+			templateIds,
+			templateNames,
+			templateFingerprint,
+		} = params
+		const clonedRows = yield* sql<{ id: string }>`
+			INSERT INTO research_runs (
+				organization_id,
+				query, mode, schema_name, kind, status, context,
+				findings, brief_md,
+				tokens_in, tokens_out,
+				cost_cents, paid_cost_cents,
+				idempotency_key, created_by,
+				template_ids, template_names, template_fingerprint,
+				started_at, completed_at
+			)
+			SELECT
+				${organizationId},
+				${input.query},
+				${input.mode ?? 'deep'},
+				${input.schemaName ?? null},
+				'cache_hit',
+				'succeeded',
+				${JSON.stringify(input.context ?? {})}::jsonb,
+				src.findings, src.brief_md,
+				src.tokens_in, src.tokens_out,
+				0, 0,
+				${input.idempotencyKey ?? null},
+				${userId},
+				${JSON.stringify(templateIds)}::jsonb, ${JSON.stringify(templateNames)}::jsonb, ${templateFingerprint},
+				now(), now()
+			FROM research_runs src
+			WHERE src.id = ${cachedId} AND src.status = 'succeeded'
+			RETURNING id
+		`
+		const cloned = clonedRows[0]
+		if (!cloned) return null
+		const clonedId = cloned.id
+		// Clone source attributions from the cached run.
+		// research_run_sources / research_links are RLS-checked
+		// against `current_setting('app.current_org_id')`, so the
+		// org id has to be in the row, not just on the parent run.
+		yield* sql`
+			INSERT INTO research_run_sources (organization_id, research_id, source_id, local_ref, fetched_at, cost_cents)
+			SELECT ${organizationId}, ${clonedId}, source_id, local_ref, fetched_at, 0
+			FROM research_run_sources
+			WHERE research_id = ${cachedId}
+			ON CONFLICT DO NOTHING
+		`
+		if (input.context?.subjects) {
+			for (const s of input.context.subjects) {
+				yield* sql`
+					INSERT INTO research_links (organization_id, research_id, subject_table, subject_id, link_kind)
+					VALUES (${organizationId}, ${clonedId}, ${s.table}, ${s.id}, 'input')
+					ON CONFLICT DO NOTHING
+				`
+			}
+		}
+		yield* Effect.logInfo('research.cache_hit').pipe(
+			Effect.annotateLogs({
+				user_id: userId,
+				research_id: clonedId,
+				source_research_id: cachedId,
+			}),
+		)
+		return { id: clonedId }
+	})
+
 // ── ResearchService ──
 
 export class ResearchService extends Context.Service<ResearchService>()(
@@ -3052,81 +3142,18 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								LIMIT 1
 							`
 							if (hits[0]) {
-								const cachedId = hits[0].researchId
-								const [cachedRun] = yield* sql<{
-									findings: unknown
-									briefMd: string | null
-									tokensIn: number
-									tokensOut: number
-								}>`
-									SELECT findings, brief_md, tokens_in, tokens_out
-									FROM research_runs
-									WHERE id = ${cachedId} AND status = 'succeeded'
-									LIMIT 1
-								`
-								if (cachedRun) {
-									const clonedRows = yield* sql<{ id: string }>`
-										INSERT INTO research_runs (
-											organization_id,
-											query, mode, schema_name, kind, status, context,
-											findings, brief_md,
-											tokens_in, tokens_out,
-											cost_cents, paid_cost_cents,
-											idempotency_key, created_by,
-											template_ids, template_names, template_fingerprint,
-											started_at, completed_at
-										) VALUES (
-											${organizationId},
-											${input.query},
-											${input.mode ?? 'deep'},
-											${input.schemaName ?? null},
-											'cache_hit',
-											'succeeded',
-											${JSON.stringify(input.context ?? {})},
-											${JSON.stringify(cachedRun.findings)},
-											${cachedRun.briefMd},
-											${cachedRun.tokensIn},
-											${cachedRun.tokensOut},
-											0, 0,
-											${input.idempotencyKey ?? null},
-											${userId},
-											${JSON.stringify(templateIds)}, ${JSON.stringify(templateNames)}, ${templateFingerprint},
-											now(), now()
-										) RETURNING id
-									`
-									const cloned = clonedRows[0]
-									if (!cloned)
-										return { id: cachedId, status: 'succeeded' as const }
-									const clonedId = cloned.id
-									// Clone source attributions from the cached run.
-									// research_run_sources / research_links are RLS-checked
-									// against `current_setting('app.current_org_id')`, so the
-									// org id has to be in the row, not just on the parent run.
-									yield* sql`
-										INSERT INTO research_run_sources (organization_id, research_id, source_id, local_ref, fetched_at, cost_cents)
-										SELECT ${organizationId}, ${clonedId}, source_id, local_ref, fetched_at, 0
-										FROM research_run_sources
-										WHERE research_id = ${cachedId}
-										ON CONFLICT DO NOTHING
-									`
-									if (input.context?.subjects) {
-										for (const s of input.context.subjects) {
-											yield* sql`
-												INSERT INTO research_links (organization_id, research_id, subject_table, subject_id, link_kind)
-												VALUES (${organizationId}, ${clonedId}, ${s.table}, ${s.id}, 'input')
-												ON CONFLICT DO NOTHING
-											`
-										}
-									}
-									yield* Effect.logInfo('research.cache_hit').pipe(
-										Effect.annotateLogs({
-											user_id: userId,
-											research_id: clonedId,
-											source_research_id: cachedId,
-										}),
-									)
-									return { id: clonedId, status: 'succeeded' as const }
-								}
+								const cloned = yield* cloneCacheHitRun({
+									sql,
+									cachedId: hits[0].researchId,
+									organizationId,
+									userId,
+									input,
+									templateIds,
+									templateNames,
+									templateFingerprint,
+								})
+								if (cloned)
+									return { id: cloned.id, status: 'succeeded' as const }
 							}
 						}
 
