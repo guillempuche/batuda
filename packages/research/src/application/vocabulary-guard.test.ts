@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
 	constrainVocabulary,
+	mapCountry,
 	mapIndustry,
 	mapSizeRange,
 } from './vocabulary-guard'
@@ -98,6 +99,32 @@ describe('mapSizeRange', () => {
 	})
 })
 
+describe('mapCountry', () => {
+	describe('when the value is a full country name or a code', () => {
+		it('should fold a name to its ISO code and keep an existing code', () => {
+			// GIVEN the names an extractor emits instead of the ISO code
+			expect(mapCountry('France')).toBe('FR')
+			expect(mapCountry('United Kingdom')).toBe('GB')
+			expect(mapCountry('España')).toBe('ES')
+			expect(mapCountry('USA')).toBe('US')
+			// AND a code it already emitted is kept, upper-cased
+			expect(mapCountry('de')).toBe('DE')
+			expect(mapCountry('FR')).toBe('FR')
+		})
+	})
+
+	describe('when the country is unknown or junk', () => {
+		it('should keep an unlisted country but blank hard junk', () => {
+			// GIVEN a real country not in the table — kept, never destroyed
+			expect(mapCountry('Andorra')).toBe('Andorra')
+			// AND junk the model emits for a field it could not fill — blanked
+			expect(mapCountry('https://acme.com')).toBeNull()
+			expect(mapCountry('N/A')).toBeNull()
+			expect(mapCountry('')).toBeNull()
+		})
+	})
+})
+
 describe('constrainVocabulary', () => {
 	describe('when an enrichment block holds mappable and junk values', () => {
 		it('should rewrite the mappable ones, drop the junk key, and count both', () => {
@@ -166,6 +193,24 @@ describe('constrainVocabulary', () => {
 			const e = (result.findings as { enrichment: { industry: unknown } })
 				.enrichment
 			expect(e.industry).toEqual({ value: 'retail', source_id: 's1' })
+			expect(result.mapped).toBe(1)
+		})
+	})
+
+	describe('when the enrichment country is a full name in a wrapper', () => {
+		it('should fold it to the ISO code the CRM stores', () => {
+			// GIVEN the Lectra shape: the model emitted "France" with a source
+			const findings = {
+				enrichment: { country: { value: 'France', source_id: 's1' } },
+			}
+
+			// WHEN constrained
+			const result = constrainVocabulary(findings)
+
+			// THEN it becomes FR, keeping its source — the field the eval scores matches
+			const e = (result.findings as { enrichment: { country: unknown } })
+				.enrichment
+			expect(e.country).toEqual({ value: 'FR', source_id: 's1' })
 			expect(result.mapped).toBe(1)
 		})
 	})
