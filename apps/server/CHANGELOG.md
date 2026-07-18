@@ -3,6 +3,70 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-18 (server-v2026.7.18)
+
+### Features
+
+* bump Effect to 4.0.0-beta.98 and give API responses typed schemas ([9365867](https://github.com/guillempuche/batuda/commit/936586718e5de8410e6e33b053b455b517a1ae68))
+* **research:** add a per-contact critic to drop non-staff contacts ([c1e9112](https://github.com/guillempuche/batuda/commit/c1e9112971c33e5363bfb48f3c1fd39e87c62c79))
+* **research:** drop a directory listing posing as a company's website ([c9b1326](https://github.com/guillempuche/batuda/commit/c9b13265b5f6d260526626428b2b44231ee21b6e))
+* **research:** fetch a company's about and team pages up front ([808b251](https://github.com/guillempuche/batuda/commit/808b251cdb81e549ae7f5b2ab08a83881386a3c6)), closes [#286](https://github.com/guillempuche/batuda/issues/286)
+* **research:** leave out prospects that miss the size or place asked for ([fef32e9](https://github.com/guillempuche/batuda/commit/fef32e97fc8887f851131c4116faf2531bb8064b))
+* **research:** look a company up in its national register ([fcc1f4e](https://github.com/guillempuche/batuda/commit/fcc1f4eccdb3439057858693405648942baf5756))
+* **research:** make the eval score honestly and trace dropped fields ([672ea4e](https://github.com/guillempuche/batuda/commit/672ea4ef3caf98dd748adb0b28871c9498e591e6)), closes [#286](https://github.com/guillempuche/batuda/issues/286)
+* **research:** measure how much of a company profile each step fills ([c620461](https://github.com/guillempuche/batuda/commit/c62046175cc4f17855cacbdab806ae961f090c57))
+* **research:** propose CRM corrections from what a run already holds ([efed961](https://github.com/guillempuche/batuda/commit/efed961c8a7933fd6de33399543b464a720aeb37))
+
+### Bug Fixes
+
+* give each git worktree its own integration-test database ([88a1cd1](https://github.com/guillempuche/batuda/commit/88a1cd11feb83cfa5504d11d95a02e478c2a93ab)), closes [#295](https://github.com/guillempuche/batuda/issues/295)
+* **research:** accept a search number the model writes as text ([a20db0a](https://github.com/guillempuche/batuda/commit/a20db0abc063f65115d54a0962d478fbc9b81367))
+* **research:** ask the extraction to read all the evidence, not just the start ([79a256c](https://github.com/guillempuche/batuda/commit/79a256c2166da398d24600711936031013b6224a))
+* **research:** cancel research runs coherently by run kind ([b31a94c](https://github.com/guillempuche/batuda/commit/b31a94c0d2d25a38b7b3a31bd2db991f37067297))
+* **research:** check a model against the tools a run really sends ([aae6d18](https://github.com/guillempuche/batuda/commit/aae6d18c870809b633db7e8b36354ed9b4932746))
+* **research:** enforce the auto-approve limit on in-run paid calls ([fedd3a4](https://github.com/guillempuche/batuda/commit/fedd3a4894875a25c795408643e593bafe6f6cbd)), closes [#279](https://github.com/guillempuche/batuda/issues/279)
+* **research:** give a research model 90 seconds to answer ([0619382](https://github.com/guillempuche/batuda/commit/061938299b902474daf059c0431f8029f525deff))
+* **research:** harden checkpoint writes against cancel and crash ([0c3a068](https://github.com/guillempuche/batuda/commit/0c3a068fb3f19c0748b3c66d8538383fee3bf35e))
+* **research:** hold a proposed CRM change's place to the evidence ([264ae36](https://github.com/guillempuche/batuda/commit/264ae36ad80b3aeaccf1f4290ec4ad0f3af90154))
+* **research:** keep a company's own pages even when they never name it ([3897452](https://github.com/guillempuche/batuda/commit/3897452813221046c17f1f98b422ecf7c085ee85)), closes [#286](https://github.com/guillempuche/batuda/issues/286)
+* **research:** let a register that cannot answer reach the model, not end the run ([8c4d404](https://github.com/guillempuche/batuda/commit/8c4d4044655248f383d5727f382a63d35056c7e8))
+* **research:** make discover_contacts paid-action gates approvable ([d64e57b](https://github.com/guillempuche/batuda/commit/d64e57b1c631dd39bdafbc1db292a6319d9b94a3)), closes [#280](https://github.com/guillempuche/batuda/issues/280)
+* **research:** normalize the extracted country to an ISO code ([607e813](https://github.com/guillempuche/batuda/commit/607e81326654512eecde6b604a981c5bfe28b8f6)), closes [#286](https://github.com/guillempuche/batuda/issues/286)
+* **research:** recover the job titles the extraction drops ([1a89034](https://github.com/guillempuche/batuda/commit/1a89034295615bd135587097082dee253bbc51c7))
+* **research:** reject a location that names no place ([2d41ed8](https://github.com/guillempuche/batuda/commit/2d41ed8f8aa6908c70f97f1a60196663f2308baa))
+* **research:** reliably capture a company's employee headcount ([c26d300](https://github.com/guillempuche/batuda/commit/c26d300cdab3907e982e81a8dbceeb573fda96b4))
+* **research:** return not-found for a non-uuid research id ([d7e44f4](https://github.com/guillempuche/batuda/commit/d7e44f466c3bc62ea197154802db353c212c90d0))
+* **research:** roll run and group cost from the paid-spend ledger ([d1b2649](https://github.com/guillempuche/batuda/commit/d1b2649aabfddc34c6bf6f17aeffdcf8c18e10b2))
+* **research:** stop a resumed run from renaming its findings keys ([8056aae](https://github.com/guillempuche/batuda/commit/8056aaed1a93a5b71f868411315b418ebdfd75c1))
+* **research:** stop cache-hit reuse from renaming findings keys ([d6a957b](https://github.com/guillempuche/batuda/commit/d6a957badd8f389fab12549dbbd1f9429c394297))
+* **research:** stop prospecting from returning the biggest firms in the sector ([7939f16](https://github.com/guillempuche/batuda/commit/7939f163b01947b11d89b30a3fd49e3ec097605d))
+* **research:** trust a value cited to a search result the run surfaced ([f685b0a](https://github.com/guillempuche/batuda/commit/f685b0a1a82d92b3d6040f083a072e703c22c425)), closes [#286](https://github.com/guillempuche/batuda/issues/286)
+* return declared API errors with their real HTTP status ([b5133f9](https://github.com/guillempuche/batuda/commit/b5133f9677b3ac1ede40fa7438b27922ca74cb3a))
+* **server:** extract research fields with gpt-oss-120b, not Qwen ([f84d585](https://github.com/guillempuche/batuda/commit/f84d5851d82b6c806de5a6b1e5616216b60d620a))
+* **server:** fall back to a location-only geocode query ([240a5f8](https://github.com/guillempuche/batuda/commit/240a5f8ea82f09004716b0458b816ff3a8a90168))
+* **server:** make research_sync durable and gate MCP selector fan-out ([e5bce1f](https://github.com/guillempuche/batuda/commit/e5bce1fd0678337d580aa180a3b04a562f7cecbf)), closes [#277](https://github.com/guillempuche/batuda/issues/277) [#278](https://github.com/guillempuche/batuda/issues/278)
+
+### Refactoring
+
+* remove the unwired web tools and extract/discover backend ([7fce393](https://github.com/guillempuche/batuda/commit/7fce3936871e0925864f41a11c79a87d9bda6dca))
+* **research:** give freeform the shared proposed-update shape ([5827769](https://github.com/guillempuche/batuda/commit/5827769b8d2bb0309bad98cceb25af85e1698a10))
+* **research:** name the prompt that turns evidence into findings ([26945ee](https://github.com/guillempuche/batuda/commit/26945ee793a7a2ad0cc831c43fccd98b8f26135f))
+* **server:** share detachFromTransaction from the org middleware ([6b60d04](https://github.com/guillempuche/batuda/commit/6b60d0497426e56bb02bd2051a9d5ab03b9cbc09))
+* use English codes for the CRM industry categories ([44007a3](https://github.com/guillempuche/batuda/commit/44007a35d3387c0c24ae44fb7b6de6c186ca13ec))
+
+### Tests
+
+* **research:** remove stale integration test placeholders ([f02c484](https://github.com/guillempuche/batuda/commit/f02c4848ef27a5a098f7efe4b2ffb2ebb06b7dd0))
+
+### Chores
+
+* bump Base UI to 1.6.0 ([080a353](https://github.com/guillempuche/batuda/commit/080a353031b9375b61617aec9bcffd413fd4faff))
+* bump react/react-dom to 19.2.7 and @types/react to 19.2.17 ([08283e2](https://github.com/guillempuche/batuda/commit/08283e2e4b604b6d0617b0c85b952d640ea2422b))
+
+### AI
+
+* **mcp:** delete the dead research-sink and research-crm toolkits ([f25c977](https://github.com/guillempuche/batuda/commit/f25c977dd99c8e1991e12ce053e6721750ef7ad1))
+
 ## 2026-07-13 (server-v2026.7.13)
 
 ### Features
