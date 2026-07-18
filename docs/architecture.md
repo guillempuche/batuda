@@ -268,7 +268,7 @@ Batuda has three bounded contexts. Each owns its own domain errors and types; de
 
 **Why research is a separate bounded context.** Research has its own domain model (providers, budgets, quotas, schemas), its own error hierarchy (`ProviderError`, `BudgetExceeded`, `QuotaExhausted`), and its own infrastructure concerns (external API keys, LLM inference, cost tracking). It reads CRM data (companies, contacts) but never writes directly — proposed changes go through the `propose_update` tool, reviewed by the outer AI or user before applying. This separation means research provider implementations, pricing models, and LLM providers can evolve independently of the CRM schema.
 
-**Provider selection pattern.** Each research capability (search, scrape, extract, discover, enrich, verify, registry, report) plus LLM inference is configured by an env var (`RESEARCH_PROVIDER_*`) that picks the implementation at boot time. The pattern is `Layer.unwrap(Config.schema(...) → switch → return Layer)` — same as `EmailProviderLive`. Stubs provide zero-cost deterministic data for local dev. Real providers (Brave, Firecrawl, libreBORME, Companies House, Hunter) declare their dependencies (`HttpClient`, `Config`) in the R type, satisfied at the composition root.
+**Provider selection pattern.** Each research capability (search, scrape, enrich, verify, registry, report) plus LLM inference is configured by an env var (`RESEARCH_PROVIDER_*`) that picks the implementation at boot time. The pattern is `Layer.unwrap(Config.schema(...) → switch → return Layer)` — same as `EmailProviderLive`. Stubs provide zero-cost deterministic data for local dev. Real providers (Brave, Firecrawl, libreBORME, Companies House, Hunter) declare their dependencies (`HttpClient`, `Config`) in the R type, satisfied at the composition root.
 
 ---
 
@@ -344,8 +344,7 @@ Most Batuda intelligence is external — the MCP client does the reasoning and g
 Every external capability is a role, not a vendor. Each is a port selected at boot by a `RESEARCH_PROVIDER_*` env var, with a comma-list fallback chain and a zero-cost stub for local dev. The roles:
 
 - **search** — web search (e.g. Firecrawl, Brave)
-- **scrape / extract** — fetch a page as markdown, or as structured JSON against a schema (Firecrawl)
-- **discover** — autonomous multi-page browsing (optional; disabled by default)
+- **scrape** — fetch a page as markdown, or as structured JSON against a schema (Firecrawl)
 - **enrich** — decision-maker name + email discovery for a company (Hunter)
 - **verify** — email deliverability, with a free DNS MX pre-gate in front of it (Hunter)
 - **registry** — company identity + officers, routed by country (libreBORME for Spain, Companies House for the UK)
@@ -392,7 +391,7 @@ Research owns a small set of tables, created together in the `research` migratio
 
 ### Quality — the eval harness
 
-A CLI eval measures the pipeline against a fixed golden set of companies whose correct answers are known, so a change to grounding or extraction shows up as a number rather than a guess. It reports grounding accuracy (did the run reach the target company's own site, or confirm it in a registry?), field precision and recall, and the wrong-company and empty rates — the look-alike failure the harness exists to catch. It runs on demand from the CLI, never in production, and can export each run's scores to the observability board.
+A CLI eval measures the pipeline against a fixed golden set of companies whose correct answers are known, so a change to grounding or extraction shows up as a number rather than a guess. It reports grounding accuracy (did the run reach the target company's own site, or confirm it in a registry?), field precision and recall, titled-contact recall (did it find the company's decision-makers?), and the wrong-company and empty rates — the look-alike failure the harness exists to catch. It runs on demand from the CLI, never in production, and can export each run's scores to the observability board.
 
 ### Observability
 
