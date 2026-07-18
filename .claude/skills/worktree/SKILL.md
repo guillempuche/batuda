@@ -21,7 +21,11 @@ is a *logical tenant* inside it:
   `ui/feature-x` gives `batuda_feature_x` / `batuda-assets-feature-x`, which is what
   `ls`/`doctor` print,
 - a generated `.env` pointing `DATABASE_URL` / `STORAGE_BUCKET` at them; everything else
-  (shared endpoints, secrets) is inherited from the main checkout's `.env`.
+  (shared endpoints, secrets) is inherited from the main checkout's `.env`,
+- a per-worktree **integration-test database** `batuda_it__<slug>` (the main checkout's is
+  `batuda_it`) that the pre-push suite creates/migrates/seeds fresh each run, so parallel
+  worktrees running `test:integration` don't race on one shared DB. Branch slug `it` is
+  reserved — its dev DB would collide with `batuda_it`, so `worktree up` refuses it.
 
 portless serves each worktree on that same last-path-segment label — web
 `https://<label>.batuda.localhost`, server `https://<label>.api.batuda.localhost`, so
@@ -126,6 +130,10 @@ If the directory was removed manually before `worktree down`, run `pnpm cli work
   **URL** then follows the new branch. Run `pnpm cli worktree down` before removing the dir.
 - **`pnpm cli worktree up` re-seeds** (`--preset minimal`) every run, so re-running it resets the
   worktree's seed data — don't re-run it on a worktree whose data you've hand-edited.
+- **The integration-test DB is per-worktree and disposable.** The pre-push suite builds
+  `batuda_it__<slug>` (main: `batuda_it`) fresh each run; `worktree down`/`done` and the
+  `WorktreeRemove` hook drop it alongside the dev DB, and `prune` reaps it for a worktree that's
+  gone. You never manage it by hand — and it never touches another worktree's `batuda_it__…`.
 - **`pnpm cli services down` from a worktree** stops the *shared* stack (every worktree + main),
   so it refuses unless run from the main checkout or given `--force`. To remove just your
   worktree's data, use `worktree down`.

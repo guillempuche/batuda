@@ -60,8 +60,14 @@ const seedCommand = Command.make(
 			),
 			Flag.withDefault('full' as const),
 		),
+		quiet: Flag.boolean('quiet').pipe(
+			Flag.withDescription(
+				'Skip the dev-server access hints — for seeding a disposable integration DB, where nothing is being served',
+			),
+			Flag.withDefault(false),
+		),
 	},
-	({ preset }) =>
+	({ preset, quiet }) =>
 		withDb(
 			Effect.gen(function* () {
 				yield* seedIdentities
@@ -70,6 +76,9 @@ const seedCommand = Command.make(
 				yield* Console.log(
 					`Seeded (${preset}): ${counts.products} products, ${counts.companies} companies, ${counts.contacts} contacts, ${counts.interactions} interactions, ${counts.tasks} tasks, ${counts.documents} documents, ${counts.proposals} proposals, ${counts.pages} pages, ${counts.callRecordings} call recordings`,
 				)
+				// These hints would name the dev server — which serves the dev DB, not the
+				// integration DB just seeded — so skip them for a disposable integration DB.
+				if (quiet) return
 				// Hosts follow this checkout: bare batuda.localhost in the main
 				// checkout, <label>.batuda.localhost inside a worktree — so the hints
 				// name the URL actually being served, not main's.

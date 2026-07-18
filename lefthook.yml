@@ -53,10 +53,11 @@ pre-push:
       # Unit suite AND the live-DB integration suite. `turbo test` alone runs
       # only the default config, which EXCLUDES `*.integration.test.ts`, so
       # schema bugs used to slip straight to CI; `test:integration` closes that.
-      # It runs against a disposable `batuda_it` DB that
-      # scripts/integration-db-setup.ts creates, migrates to HEAD, and seeds, so
-      # local matches CI's fresh schema instead of a stale shared dev DB.
-      # `--concurrency=1` serialises @batuda/server and @batuda/mail-worker,
-      # which share that one DB and TRUNCATE shared tables in beforeAll.
+      # It runs against a disposable integration DB that
+      # scripts/integration-db-setup.ts creates, migrates to HEAD, and seeds —
+      # named per checkout (`batuda_it`, or `batuda_it__<slug>` in a worktree) so
+      # parallel worktrees don't race on one shared DB. `--concurrency=1`
+      # serialises @batuda/server and @batuda/mail-worker, which share this
+      # checkout's integration DB and TRUNCATE shared tables in beforeAll.
       run: |
         pnpm turbo test test:integration --concurrency=1

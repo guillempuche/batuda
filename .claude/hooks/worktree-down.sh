@@ -42,6 +42,12 @@ case "$bucket" in batuda-assets-?*) ;; *) exit 0 ;; esac
 
 docker exec batuda-db psql -U batuda -d postgres \
 	-c "DROP DATABASE IF EXISTS ${db} WITH (FORCE)" >/dev/null 2>&1 || true
+# Drop this worktree's integration-test database too — the pre-push suite creates it
+# lazily (batuda_<slug> -> batuda_it__<slug>; see scripts/integration-db.ts) and never
+# records it in .env. The batuda_?* guard above means $db is the suffixed form, so
+# ${db#batuda_} is <slug> and this can never target the main checkout's batuda_it.
+docker exec batuda-db psql -U batuda -d postgres \
+	-c "DROP DATABASE IF EXISTS batuda_it__${db#batuda_} WITH (FORCE)" >/dev/null 2>&1 || true
 docker run --rm --network batuda_default --entrypoint /bin/sh minio/mc:latest \
 	-c "mc alias set local http://storage:9000 batuda batuda-secret >/dev/null 2>&1 && mc rb --force local/${bucket}" \
 	>/dev/null 2>&1 || true
