@@ -1108,7 +1108,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						WHEN (SELECT COUNT(*) FILTER (WHERE status IN ('queued','running'))
 							FROM research_runs WHERE parent_id = ${parentId} AND status != 'deleted') > 0
 						THEN 'running'
-						WHEN (SELECT COUNT(*) FILTER (WHERE status IN ('failed', 'no_reliable_data'))
+						WHEN (SELECT COUNT(*) FILTER (WHERE status IN ('failed', 'no_reliable_data', 'cancelled'))
 							FROM research_runs WHERE parent_id = ${parentId} AND status != 'deleted') > 0
 						THEN 'failed'
 						ELSE 'succeeded'
@@ -1125,7 +1125,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					paid_cost_cents = COALESCE((SELECT SUM(paid_cost_cents)::int
 						FROM research_runs WHERE parent_id = ${parentId} AND status != 'deleted'), 0),
 					updated_at = now()
-					WHERE id = ${parentId}
+					-- Never overwrite a group that was explicitly cancelled or deleted:
+					-- a stopped group stays stopped even if a straggling child ends later.
+					WHERE id = ${parentId} AND status NOT IN ('cancelled', 'deleted')
 				`
 
 			/** Merge leaf findings into parent group row (advisory-locked). */
@@ -1154,6 +1156,38 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					yield* sql`SELECT pg_advisory_xact_lock(hashtext(${parentId}))`
 					yield* rollupParentStatus(parentId)
 				}).pipe(sql.withTransaction)
+
+			// Cancel every leaf of a group that is still in flight, so cancelling the
+			// group stops the whole fan-out instead of leaving its leaves running and
+			// spending. Interrupt each leaf's fiber before flipping its row: an
+			// interrupted leaf releases its own row lock first, so the flip can't
+			// deadlock against a leaf caught mid-write. The group keeps its own
+			// 'cancelled' status — the rollup guard stops a straggler from reviving it.
+			const cancelGroupLeaves = (groupId: string) =>
+				Effect.gen(function* () {
+					const leaves = yield* sql<{ id: string }>`
+						SELECT id FROM research_runs
+						WHERE parent_id = ${groupId} AND status IN ('queued', 'running')
+					`
+					const fibers = yield* Ref.get(activeFibers)
+					yield* Effect.forEach(leaves, leaf => {
+						const maybeFiber = HashMap.get(fibers, leaf.id)
+						return maybeFiber._tag === 'Some'
+							? Fiber.interrupt(maybeFiber.value)
+							: Effect.void
+					})
+					yield* Effect.forEach(leaves, leaf =>
+						Effect.gen(function* () {
+							yield* sql`
+								UPDATE research_runs
+								SET status = 'cancelled', completed_at = now(), updated_at = now()
+								WHERE id = ${leaf.id} AND status IN ('queued', 'running')
+							`
+							yield* stampRunCostFromLedger(sql, leaf.id, 0)
+							yield* publishEvent(leaf.id, 'run.cancelled', {})
+						}),
+					)
+				})
 
 			// Append a follow-up run's result onto the run that proposed it, under an
 			// advisory lock. Deliberately does NOT recompute the origin's status: the
@@ -3833,12 +3867,18 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						}
 						// RETURNING tells us whether a queued/running row actually
 						// flipped, so the caller can tell a real cancel apart from a
-						// no-op on a missing or already-finished run.
-						const [cancelled] = yield* sql<{ id: string }>`
+						// no-op on a missing or already-finished run. `kind` decides what
+						// else to cancel: a group fans out to its leaves, a leaf rolls its
+						// group up, a follow-up leaves its origin untouched.
+						const [cancelled] = yield* sql<{
+							id: string
+							parentId: string | null
+							kind: string
+						}>`
 							UPDATE research_runs
 							SET status = 'cancelled', completed_at = now(), updated_at = now()
 							WHERE id = ${researchId} AND status IN ('queued', 'running')
-							RETURNING id
+							RETURNING id, parent_id, kind
 						`
 						const flipped = cancelled !== undefined
 						if (flipped) {
@@ -3846,6 +3886,21 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// The cheap tally isn't reachable from here, so cost_cents is
 							// best-effort 0 while the paid ledger stays authoritative.
 							yield* stampRunCostFromLedger(sql, researchId, 0)
+							if (cancelled?.kind === 'group') {
+								// Cancelling a group stops the whole fan-out, not just the
+								// group row: cancel its leaves that are still in flight so
+								// they stop spending. The group keeps its 'cancelled' status.
+								yield* cancelGroupLeaves(researchId)
+							} else if (cancelled?.kind === 'leaf' && cancelled.parentId) {
+								// A group's leaf: recompute the parent now — a group whose
+								// last leaf is cancelled would otherwise sit in 'running'
+								// forever (no fiber left to roll it up, and the orphan sweep
+								// spares a group row that never had a heartbeat of its own).
+								// A follow-up run is excluded on purpose: its parent is the
+								// origin run, which already finished and must not be
+								// recomputed from a follow-up's outcome.
+								yield* rollupParentLocked(cancelled.parentId)
+							}
 							yield* publishEvent(researchId, 'run.cancelled', {})
 							return { outcome: cancelOutcome(true, true) }
 						}

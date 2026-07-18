@@ -222,6 +222,120 @@ const previewSelectorRun = (tag: string) =>
 		never
 	>
 
+// Seed a group with a single in-flight leaf (mimicking a fan-out caught
+// mid-run), cancel that leaf, and read the group's status back. Cancelling the
+// last leaf must roll the group up: a cancelled leaf counts as a non-success,
+// and the cancel itself triggers the roll-up, so the group never hangs in
+// 'running' with no fiber left to resolve it.
+const cancelLeafAndReadGroup = () =>
+	Effect.gen(function* () {
+		const svc = yield* ResearchService
+		const sql = yield* SqlClient.SqlClient
+		const seeded = yield* enterOrgScope(sql, { org: ctx.org, userId })(
+			Effect.gen(function* () {
+				const [group] = yield* sql<{ id: string }>`
+					INSERT INTO research_runs (organization_id, kind, query, status, created_by)
+					VALUES (${ctx.org.id}, 'group', 'cancel-rollup', 'running', ${userId})
+					RETURNING id
+				`
+				const [leaf] = yield* sql<{ id: string }>`
+					INSERT INTO research_runs (organization_id, parent_id, kind, query, status, created_by)
+					VALUES (${ctx.org.id}, ${group?.id}, 'leaf', 'cancel-rollup', 'running', ${userId})
+					RETURNING id
+				`
+				if (!group || !leaf)
+					return yield* Effect.die(new Error('fixture insert returned no row'))
+				return { groupId: group.id, leafId: leaf.id }
+			}),
+		)
+		groupIds.push(seeded.groupId)
+		yield* enterOrgScope(sql, { org: ctx.org, userId })(
+			svc.cancel(seeded.leafId),
+		)
+		const group = (yield* svc.get(seeded.groupId).pipe(Effect.orDie)) as {
+			status?: string
+		} | null
+		return group?.status ?? 'unknown'
+	}).pipe(Effect.provide(ResearchLive)) as Effect.Effect<string, never, never>
+
+// Seed a group with two in-flight leaves, cancel the group itself, and read the
+// group's and every leaf's status back. Cancelling a group must stop the whole
+// fan-out: the group and all its leaves end cancelled, none left running.
+const cancelGroupAndReadStatuses = () =>
+	Effect.gen(function* () {
+		const svc = yield* ResearchService
+		const sql = yield* SqlClient.SqlClient
+		const groupId = yield* enterOrgScope(sql, { org: ctx.org, userId })(
+			Effect.gen(function* () {
+				const [group] = yield* sql<{ id: string }>`
+					INSERT INTO research_runs (organization_id, kind, query, status, created_by)
+					VALUES (${ctx.org.id}, 'group', 'group-cancel', 'running', ${userId})
+					RETURNING id
+				`
+				if (!group)
+					return yield* Effect.die(new Error('group insert returned no row'))
+				yield* sql`
+					INSERT INTO research_runs (organization_id, parent_id, kind, query, status, created_by)
+					VALUES
+						(${ctx.org.id}, ${group.id}, 'leaf', 'group-cancel', 'running', ${userId}),
+						(${ctx.org.id}, ${group.id}, 'leaf', 'group-cancel', 'running', ${userId})
+				`
+				return group.id
+			}),
+		)
+		groupIds.push(groupId)
+		yield* enterOrgScope(sql, { org: ctx.org, userId })(svc.cancel(groupId))
+		const rows = yield* enterOrgScope(sql, { org: ctx.org, userId })(
+			sql<{ status: string; kind: string }>`
+				SELECT status, kind FROM research_runs
+				WHERE id = ${groupId} OR parent_id = ${groupId}
+			`,
+		)
+		return rows.map(row => `${row.kind}:${row.status}`)
+	}).pipe(Effect.provide(ResearchLive)) as Effect.Effect<
+		Array<string>,
+		never,
+		never
+	>
+
+// A paid follow-up run hangs off its origin run via parent_id, but the origin
+// already finished — cancelling the follow-up must not recompute the origin's
+// status the way cancelling a group's leaf recomputes the group.
+const cancelFollowupAndReadOrigin = () =>
+	Effect.gen(function* () {
+		const svc = yield* ResearchService
+		const sql = yield* SqlClient.SqlClient
+		const seeded = yield* enterOrgScope(sql, { org: ctx.org, userId })(
+			Effect.gen(function* () {
+				const [origin] = yield* sql<{ id: string }>`
+					INSERT INTO research_runs (organization_id, kind, query, status, created_by)
+					VALUES (${ctx.org.id}, 'leaf', 'origin', 'succeeded', ${userId})
+					RETURNING id
+				`
+				if (!origin)
+					return yield* Effect.die(new Error('origin insert returned no row'))
+				const [followup] = yield* sql<{ id: string }>`
+					INSERT INTO research_runs (organization_id, parent_id, kind, query, status, created_by)
+					VALUES (${ctx.org.id}, ${origin.id}, 'followup', 'paid follow-up', 'running', ${userId})
+					RETURNING id
+				`
+				if (!followup)
+					return yield* Effect.die(new Error('followup insert returned no row'))
+				return { originId: origin.id, followupId: followup.id }
+			}),
+		)
+		groupIds.push(seeded.originId)
+		yield* enterOrgScope(sql, { org: ctx.org, userId })(
+			svc.cancel(seeded.followupId),
+		)
+		const [origin] = yield* enterOrgScope(sql, { org: ctx.org, userId })(
+			sql<{ status: string }>`
+				SELECT status FROM research_runs WHERE id = ${seeded.originId}
+			`,
+		)
+		return origin?.status ?? 'unknown'
+	}).pipe(Effect.provide(ResearchLive)) as Effect.Effect<string, never, never>
+
 beforeAll(async () => {
 	const seed = await Effect.runPromise(
 		Effect.gen(function* () {
@@ -280,6 +394,46 @@ describe('selector fan-out', () => {
 			// leaf ended no_reliable_data under the stub) — the rollup fired on a
 			// non-success terminal, not only on success.
 			expect(result.status).toBe('failed')
+		})
+	})
+
+	describe("when a group's last leaf is cancelled", () => {
+		it('should roll the group up to failed rather than leave it hanging in running', async () => {
+			// GIVEN a group whose single leaf is still in flight
+			// WHEN that leaf is cancelled
+			const status = await Effect.runPromise(cancelLeafAndReadGroup())
+
+			// THEN the group resolves to a terminal failed state — 'running' would
+			// mean the cancel never rolled the parent up, 'succeeded' would mean a
+			// cancelled leaf was miscounted as a success.
+			expect(status).toBe('failed')
+		})
+	})
+
+	describe('when a whole group is cancelled', () => {
+		it('should cancel the group and all its in-flight leaves, leaving none running', async () => {
+			// GIVEN a group with two leaves still in flight
+			// WHEN the group itself is cancelled
+			const statuses = await Effect.runPromise(cancelGroupAndReadStatuses())
+
+			// THEN the group and every leaf end cancelled — the fan-out stops as a
+			// whole, and no leaf is left running to spend or to revive the group.
+			expect(statuses).toHaveLength(3)
+			expect(statuses.every(s => s.endsWith(':cancelled'))).toBe(true)
+		})
+	})
+
+	describe('when a paid follow-up run is cancelled', () => {
+		it('should leave its origin run untouched rather than recomputing it', async () => {
+			// GIVEN a finished (succeeded) origin run with a follow-up still running
+			// WHEN the follow-up is cancelled
+			const originStatus = await Effect.runPromise(
+				cancelFollowupAndReadOrigin(),
+			)
+
+			// THEN the origin keeps its succeeded status — a follow-up's outcome must
+			// never roll the origin up the way a group's leaf rolls up its group.
+			expect(originStatus).toBe('succeeded')
 		})
 	})
 
