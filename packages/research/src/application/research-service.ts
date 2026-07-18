@@ -39,6 +39,7 @@ import {
 	groundedCitationTest,
 	validateFindingCitations,
 } from './citation-guard'
+import { ContactDiscovery } from './contact-discovery'
 import {
 	ContactVerdictsSchema,
 	contactCriticPrompt,
@@ -85,6 +86,7 @@ import {
 	SizeRescueSchema,
 	sizeRescuePrompt,
 } from './firmographics-rescue'
+import { normalizePaidActionTool } from './paid-action-tool'
 import { resolvePolicy, type SystemDefaults } from './policy'
 import {
 	AgentLanguageModel,
@@ -275,15 +277,37 @@ export const schemaVersionFor = (schemaName: string): number => {
 // Stamp each element of an in-findings review list with an id + pending status,
 // so it can later be addressed and resolved one at a time. The id and status are
 // this system's to set, so they are spread last — a model that emitted either of
-// its own never takes their place.
-const withPendingIds = (items: unknown): unknown =>
+// its own never takes their place. An optional per-item transform runs first, so
+// a list can also clean up a field before it is stored (paid actions coerce their
+// tool name below).
+const withPendingIds = (
+	items: unknown,
+	transform?: (item: Record<string, unknown>) => Record<string, unknown>,
+): unknown =>
 	Array.isArray(items)
 		? items.map(item =>
 				typeof item === 'object' && item !== null && !Array.isArray(item)
-					? { ...item, id: randomUUID(), status: 'pending' }
+					? {
+							...(transform
+								? transform(item as Record<string, unknown>)
+								: item),
+							id: randomUUID(),
+							status: 'pending',
+						}
 					: item,
 			)
 		: items
+
+// Rewrite a paid action's tool to the real tool it names before storing, so a
+// stored action a human later approves points at a tool a follow-up can run. A
+// name that matches nothing real is left as the model wrote it — visible to the
+// user, and reported as unsupported at approval time.
+const coercePaidActionTool = (
+	item: Record<string, unknown>,
+): Record<string, unknown> => {
+	const canonical = normalizePaidActionTool(item['tool'])
+	return canonical ? { ...item, tool: canonical } : item
+}
 
 /**
  * Give each entry in the two human-reviewed findings lists — the proposed CRM
@@ -309,7 +333,12 @@ export const withProposalIds = (findings: unknown): unknown => {
 			? { proposed_updates: withPendingIds(record['proposed_updates']) }
 			: {}),
 		...(hasPaidActions
-			? { pending_paid_actions: withPendingIds(record['pending_paid_actions']) }
+			? {
+					pending_paid_actions: withPendingIds(
+						record['pending_paid_actions'],
+						coercePaidActionTool,
+					),
+				}
 			: {}),
 	}
 }
@@ -859,6 +888,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 			const agentLlm = yield* AgentLanguageModel
 			const extractLlm = yield* ExtractLanguageModel
 			const writerLlm = yield* WriterLanguageModel
+			// An approved `discover_contacts` follow-up runs the same contact
+			// discovery the in-loop tool does, so the service is resolved here and
+			// reused in `runFollowup`. Already ambient (the in-loop tool needs it),
+			// so this adds no new dependency to the layer.
+			const contactDiscovery = yield* ContactDiscovery
 			// The toolkit handlers are resolved per-run inside `runFiber` (not
 			// here) so each run's paid tools charge that run's Budget. Resolving
 			// them there discharges `HandlersFor<Tools>` inside the fiber, so it
@@ -1123,11 +1157,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					`
 				}).pipe(sql.withTransaction)
 
-			// Run one approved paid action in a follow-up run. Only a registry lookup
-			// runs automatically — anything else is refused so an unrecognized action
-			// can never spend. Its arguments are validated, the run's budget + monthly
-			// cap are charged (fail-closed with no spend when over cap), and the result
-			// is merged back onto the origin run.
+			// Run one approved paid action in a follow-up run. Only the two real paid
+			// tools run — a registry lookup or a contact discovery — and anything else
+			// is refused so an unrecognized action can never spend. Arguments are
+			// validated, the run's budget + monthly cap are charged (fail-closed with
+			// no spend when over cap), and the result is merged back onto the origin
+			// run.
 			const runFollowup = (researchId: string, run: Record<string, unknown>) =>
 				Effect.gen(function* () {
 					// Read the context as raw text so its keys keep the snake_case they
@@ -1150,7 +1185,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						typeof paidAction?.origin_run_id === 'string'
 							? paidAction.origin_run_id
 							: null
-					const tool = paidAction?.tool
+					// Approve already coerces the tool to a real name before spawning this
+					// run; coercing again keeps the follow-up correct on its own terms.
+					const tool = normalizePaidActionTool(paidAction?.tool)
 
 					const finishFailed = (error: string) =>
 						Effect.gen(function* () {
@@ -1159,7 +1196,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// the origin write is durable before the followup reports done.
 							if (originId)
 								yield* mergeFollowupToOrigin(originId, {
-									tool: typeof tool === 'string' ? tool : null,
+									tool: tool ?? null,
 									error,
 								})
 							yield* sql`
@@ -1179,9 +1216,88 @@ export class ResearchService extends Context.Service<ResearchService>()(
 
 					if (!originId)
 						return yield* finishFailed('follow-up run has no origin')
-					if (tool !== 'registry_lookup')
-						return yield* finishFailed(`unsupported paid tool: ${String(tool)}`)
+					if (tool === null)
+						return yield* finishFailed(
+							`unsupported paid tool: ${String(paidAction?.tool)}`,
+						)
 
+					// A fresh per-call budget on the origin's frozen policy. Its
+					// auto-approve gate is off (the default), since the user already
+					// approved this specific action — the charge must not gate again.
+					const organizationId = (run as { organizationId: string })
+						.organizationId
+					const createdBy =
+						(run as { createdBy: string | null }).createdBy ?? ''
+					const policy = (run as { paidPolicy: ResolvedPolicy }).paidPolicy
+					const budgetLayer = makeBudgetLayer({
+						organizationId,
+						userId: createdBy,
+						researchId,
+						policy,
+						systemCeiling: monthlyCapHardCeilingCents,
+					}).pipe(Layer.provide(Layer.succeed(SqlClient.SqlClient)(sql)))
+
+					if (tool === 'discover_contacts') {
+						const args = (paidAction?.args ?? {}) as {
+							company_name?: unknown
+							domain?: unknown
+							country?: unknown
+						}
+						const companyName =
+							typeof args.company_name === 'string'
+								? args.company_name
+								: undefined
+						const domain =
+							typeof args.domain === 'string' ? args.domain : undefined
+						const country =
+							typeof args.country === 'string' ? args.country : undefined
+						if (!companyName || !domain)
+							return yield* finishFailed(
+								'discover_contacts requires company_name and domain',
+							)
+
+						// Reuse this follow-up's id + budget so the enrichment/verify spend
+						// lands on the run and its cap applies — the same in-loop path the
+						// discover_contacts tool takes, just driven by an approved action.
+						const result = yield* Effect.gen(function* () {
+							const budget = yield* Budget
+							return yield* contactDiscovery.discover({
+								companyName,
+								domain,
+								country,
+								runContext: { researchId, budget },
+							})
+						}).pipe(Effect.provide(budgetLayer))
+
+						// Spend refused mid-discovery leaves nothing to merge — fail closed
+						// so the terminal status reflects it. (approval_required cannot
+						// happen: this budget does not enforce the auto-approve gate.)
+						if (result.status === 'budget_exceeded')
+							return yield* finishFailed('paid budget exhausted')
+						if (result.status === 'approval_required')
+							return yield* finishFailed(`approval required for ${result.tool}`)
+
+						// Merge onto the origin before marking this run terminal, so a
+						// caller that sees 'succeeded' also sees the contacts recorded.
+						yield* mergeFollowupToOrigin(originId, {
+							tool: 'discover_contacts',
+							result,
+						})
+						yield* sql`
+							UPDATE research_runs
+							SET status = 'succeeded',
+								findings = ${JSON.stringify({ paid_action_result: result })},
+								completed_at = now(), updated_at = now()
+							WHERE id = ${researchId} AND status = 'running'
+						`
+						// Record the paid enrichment/verify charges from the ledger. The
+						// follow-up does no cheap search/scrape, so cost_cents is 0.
+						yield* stampRunCostFromLedger(sql, researchId, 0)
+						yield* publishEvent(researchId, 'run.succeeded', {})
+						return
+					}
+
+					// registry_lookup
 					const args = (paidAction?.args ?? {}) as {
 						country?: unknown
 						tax_id?: unknown
@@ -1197,19 +1313,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					const taxId =
 						typeof args.tax_id === 'string' ? args.tax_id : undefined
 					const query = typeof args.query === 'string' ? args.query : undefined
-
-					const organizationId = (run as { organizationId: string })
-						.organizationId
-					const createdBy =
-						(run as { createdBy: string | null }).createdBy ?? ''
-					const policy = (run as { paidPolicy: ResolvedPolicy }).paidPolicy
-					const budgetLayer = makeBudgetLayer({
-						organizationId,
-						userId: createdBy,
-						researchId,
-						policy,
-						systemCeiling: monthlyCapHardCeilingCents,
-					}).pipe(Layer.provide(Layer.succeed(SqlClient.SqlClient)(sql)))
 
 					const outcome = yield* Effect.gen(function* () {
 						const budget = yield* Budget
@@ -3805,12 +3908,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					Effect.gen(function* () {
 						const [origin] = yield* sql<{
 							findings: string | null
+							context: string | null
 							organizationId: string
 							paidPolicy: string | null
 							createdBy: string | null
 						}>`
-							SELECT findings::text AS findings, organization_id,
-								paid_policy::text AS paid_policy, created_by
+							SELECT findings::text AS findings, context::text AS context,
+								organization_id, paid_policy::text AS paid_policy, created_by
 							FROM research_runs WHERE id = ${runId}
 						`
 						if (!origin) return { status: 'run_not_found' as const }
@@ -3828,8 +3932,64 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							return { status: 'approved' as const, followup_run_id: existing }
 						if (action['status'] !== 'pending')
 							return { status: 'not_pending' as const }
-						if (action['tool'] !== 'registry_lookup')
-							return { status: 'unsupported_tool' as const }
+						// Coerce the model-written tool to a real paid tool; a name that
+						// matches none can only be skipped, so it stays unsupported.
+						const tool = normalizePaidActionTool(action['tool'])
+						if (tool === null) return { status: 'unsupported_tool' as const }
+
+						// A discover_contacts gate whose args carry neither the company
+						// name nor its domain can't be run as written. When the run is
+						// about a single company, fill both from that company (its name +
+						// its website's bare domain) so the approve still discovers the
+						// run's own company. A gate that named some other company (its args
+						// are present) is used as written, and a run about several companies
+						// is left to fail rather than guess which one was meant.
+						const rawArgs = (action['args'] ?? {}) as Record<string, unknown>
+						let resolvedArgs: Record<string, unknown> = rawArgs
+						if (tool === 'discover_contacts') {
+							const hasName =
+								typeof rawArgs['company_name'] === 'string' &&
+								rawArgs['company_name'].trim() !== ''
+							const hasDomain =
+								typeof rawArgs['domain'] === 'string' &&
+								rawArgs['domain'].trim() !== ''
+							if (!hasName && !hasDomain) {
+								const context = (
+									origin.context ? JSON.parse(origin.context) : null
+								) as { subjects?: unknown } | null
+								const subjects = Array.isArray(context?.subjects)
+									? context.subjects
+									: []
+								const companies = subjects.filter(
+									(s): s is { table: string; id: string } =>
+										typeof s === 'object' &&
+										s !== null &&
+										(s as { table?: unknown }).table === 'companies' &&
+										typeof (s as { id?: unknown }).id === 'string',
+								)
+								const subject =
+									companies.length === 1 ? companies[0] : undefined
+								if (subject) {
+									const [row] = yield* sql<{
+										name: string | null
+										website: string | null
+									}>`
+										SELECT name, website FROM companies
+										WHERE id = ${subject.id} AND deleted_at IS NULL
+										LIMIT 1
+									`
+									const domain = row?.website
+										? domainHost(row.website)
+										: undefined
+									if (row?.name && domain)
+										resolvedArgs = {
+											...rawArgs,
+											company_name: row.name,
+											domain,
+										}
+								}
+							}
+						}
 
 						const paidPolicy = origin.paidPolicy
 							? (JSON.parse(origin.paidPolicy) as {
@@ -3839,8 +3999,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							: {}
 						const followupContext = {
 							paid_action: {
-								tool: action['tool'],
-								args: action['args'] ?? {},
+								tool,
+								args: resolvedArgs,
 								origin_run_id: runId,
 								action_id: paId,
 							},

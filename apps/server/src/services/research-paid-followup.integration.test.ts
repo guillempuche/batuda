@@ -27,11 +27,14 @@ import {
 
 import { PgLive } from '../db/client'
 
-// Approving a pending paid action spawns a follow-up run that performs one
-// whitelisted paid call, charges the budget once, and merges the result back
-// onto the origin run — and fails closed (no spend) when over the monthly cap
-// or when the tool isn't one we execute. The RegistryRouter is stubbed to a
-// fixed record so no real vendor is called; the money movement is real DB
+// Approving a pending paid action spawns a follow-up run that performs one real
+// paid tool — a registry lookup or a contact discovery — charges the budget once,
+// and merges the result back onto the origin run. It fails closed (no spend) when
+// over the monthly cap, and refuses a tool that names no real capability (after
+// coercing the aliases the model invents, e.g. email_finder → discover_contacts).
+// A discover_contacts gate with no company in its args is backfilled from the
+// origin run's sole company subject. RegistryRouter and ContactDiscovery are
+// stubbed so no real vendor is called; the registry money movement is real DB
 // writes to research_paid_spend.
 
 const stubResponse = {
@@ -60,6 +63,15 @@ const stubLlm: LanguageModel.Service = {
 }
 
 let registryCalls = 0
+// What each approved discover follow-up asked ContactDiscovery for, so a test can
+// assert the follow-up reused the run's id + budget rather than opening a new one.
+interface DiscoverCall {
+	companyName: string
+	domain: string
+	country: string | undefined
+	runContextResearchId: string | undefined
+}
+const discoverCalls: DiscoverCall[] = []
 const die = 'provider not exercised'
 const providersLayer = Layer.mergeAll(
 	Layer.succeed(SearchProvider)(
@@ -88,10 +100,33 @@ const ResearchLive = ResearchService.layer.pipe(
 	Layer.provide(providersLayer),
 	Layer.provide(
 		Layer.succeed(ContactDiscovery)({
-			discover: () =>
-				Effect.succeed({
-					status: 'no_reliable_contact' as const,
-					researchId: 'test',
+			discover: input =>
+				Effect.sync(() => {
+					discoverCalls.push({
+						companyName: input.companyName,
+						domain: input.domain,
+						country: input.country,
+						runContextResearchId: input.runContext?.researchId,
+					})
+					return {
+						status: 'ok' as const,
+						researchId: input.runContext?.researchId ?? 'test',
+						contacts: [
+							{
+								name: 'Dana Director',
+								role: 'CEO',
+								is_decision_maker: true,
+								channels: [
+									{
+										kind: 'email',
+										value: `dana@${input.domain}`,
+										verification: 'deliverable',
+										is_primary: true,
+									},
+								],
+							},
+						],
+					}
 				}),
 		}),
 	),
@@ -128,16 +163,29 @@ const seedOrigin = async (
 	user: string,
 	actions: Array<Record<string, unknown>>,
 	paidPolicy: Record<string, unknown> = policy({}),
+	context: Record<string, unknown> | null = null,
 ): Promise<string> => {
 	const r = await pool.query<{ id: string }>(
-		`INSERT INTO research_runs (organization_id, query, status, created_by, findings, paid_policy)
-		 VALUES ($1, 'origin', 'succeeded', $2, $3::jsonb, $4::jsonb) RETURNING id`,
+		`INSERT INTO research_runs (organization_id, query, status, created_by, findings, paid_policy, context)
+		 VALUES ($1, 'origin', 'succeeded', $2, $3::jsonb, $4::jsonb, $5::jsonb) RETURNING id`,
 		[
 			ORG,
 			user,
 			JSON.stringify({ pending_paid_actions: actions }),
 			JSON.stringify(paidPolicy),
+			JSON.stringify(context ?? {}),
 		],
+	)
+	return r.rows[0]!.id
+}
+
+// A company the origin run can point at as its subject, so an approve can read
+// the company's name + website back when a gate's own args carry neither.
+const seedCompany = async (name: string, website: string): Promise<string> => {
+	const r = await pool.query<{ id: string }>(
+		`INSERT INTO companies (organization_id, slug, name, website)
+		 VALUES ($1, $2, $3, $4) RETURNING id`,
+		[ORG, `c-${randomUUID()}`, name, website],
 	)
 	return r.rows[0]!.id
 }
@@ -218,6 +266,7 @@ afterAll(async () => {
 		`DELETE FROM research_paid_spend WHERE organization_id = $1`,
 		[ORG],
 	)
+	await pool.query(`DELETE FROM companies WHERE organization_id = $1`, [ORG])
 	await runtime.dispose()
 	await pool.end()
 })
@@ -257,6 +306,173 @@ describe('paid-action follow-up', () => {
 			expect(findings.pending_paid_actions?.[0]?.['followup_run_id']).toBe(
 				followupId,
 			)
+		})
+	})
+
+	describe('when a discover_contacts lookup is approved', () => {
+		it('should run a follow-up that discovers contacts and merges them back', async () => {
+			// GIVEN an origin run with one pending contact-discovery action
+			const user = `u-disc-${randomUUID()}`
+			const before = discoverCalls.length
+			const origin = await seedOrigin(user, [
+				{
+					id: 'pa1',
+					status: 'pending',
+					tool: 'discover_contacts',
+					args: { company_name: 'Acme', domain: 'acme.com' },
+				},
+			])
+
+			// WHEN it is approved and the follow-up run completes
+			const result = await approve(origin, 'pa1', user)
+			expect(result.status).toBe('approved')
+			const followupId =
+				result.status === 'approved' ? result.followup_run_id : ''
+			expect(await pollRun(followupId)).toBe('succeeded')
+
+			// THEN discovery ran once, reusing the follow-up run's own id + budget
+			// (not a fresh anchor run)
+			expect(discoverCalls.length).toBe(before + 1)
+			expect(discoverCalls.at(-1)).toEqual({
+				companyName: 'Acme',
+				domain: 'acme.com',
+				country: undefined,
+				runContextResearchId: followupId,
+			})
+
+			// AND the discovered contacts are recorded on the origin run
+			const findings = await originFindings(origin)
+			expect(findings.followup_results?.length).toBe(1)
+			const merged = findings.followup_results?.[0] as {
+				tool: string
+				result: { status: string; contacts: unknown[] }
+			}
+			expect(merged.tool).toBe('discover_contacts')
+			expect(merged.result.status).toBe('ok')
+			expect(merged.result.contacts.length).toBe(1)
+			expect(findings.pending_paid_actions?.[0]?.['status']).toBe('approved')
+		})
+	})
+
+	describe('when the action names an invented contact tool', () => {
+		it('should coerce email_finder to discover_contacts and approve it', async () => {
+			// GIVEN the exact failure from production: the model wrote a hallucinated
+			// tool name for what contact discovery does
+			const user = `u-alias-${randomUUID()}`
+			const before = discoverCalls.length
+			const origin = await seedOrigin(user, [
+				{
+					id: 'pa1',
+					status: 'pending',
+					tool: 'email_finder',
+					args: { company_name: 'Acme', domain: 'acme.com' },
+				},
+			])
+
+			// WHEN it is approved
+			const result = await approve(origin, 'pa1', user)
+
+			// THEN the name is coerced to the real tool and the follow-up runs it
+			expect(result.status).toBe('approved')
+			const followupId =
+				result.status === 'approved' ? result.followup_run_id : ''
+			expect(await pollRun(followupId)).toBe('succeeded')
+			expect(discoverCalls.length).toBe(before + 1)
+			const findings = await originFindings(origin)
+			const merged = findings.followup_results?.[0] as { tool: string }
+			expect(merged.tool).toBe('discover_contacts')
+		})
+	})
+
+	describe('when a discover_contacts action is missing its domain', () => {
+		it('should fail the follow-up closed rather than guess', async () => {
+			// GIVEN a contact-discovery action whose args carry no domain to search
+			const user = `u-nodom-${randomUUID()}`
+			const before = discoverCalls.length
+			const origin = await seedOrigin(user, [
+				{
+					id: 'pa1',
+					status: 'pending',
+					tool: 'discover_contacts',
+					args: { company_name: 'Acme' },
+				},
+			])
+
+			// WHEN it is approved and the follow-up runs
+			const result = await approve(origin, 'pa1', user)
+			const followupId =
+				result.status === 'approved' ? result.followup_run_id : ''
+			expect(await pollRun(followupId)).toBe('failed')
+
+			// THEN discovery was never called and the origin records the failure
+			expect(discoverCalls.length).toBe(before)
+			const findings = await originFindings(origin)
+			expect(findings.followup_results?.length).toBe(1)
+		})
+	})
+
+	describe('when a discover_contacts action carries no company at all', () => {
+		it('should backfill it from the origin run single company subject', async () => {
+			// GIVEN a run about one company and a gate whose args are empty
+			const user = `u-backfill-${randomUUID()}`
+			const before = discoverCalls.length
+			const companyId = await seedCompany(
+				'Backfill Co',
+				'https://www.backfillco.com/',
+			)
+			const origin = await seedOrigin(
+				user,
+				[{ id: 'pa1', status: 'pending', tool: 'discover_contacts', args: {} }],
+				policy({}),
+				{ subjects: [{ table: 'companies', id: companyId }] },
+			)
+
+			// WHEN it is approved and the follow-up runs
+			const result = await approve(origin, 'pa1', user)
+			expect(result.status).toBe('approved')
+			const followupId =
+				result.status === 'approved' ? result.followup_run_id : ''
+			expect(await pollRun(followupId)).toBe('succeeded')
+
+			// THEN discovery ran for that company, its website reduced to a bare
+			// domain
+			expect(discoverCalls.length).toBe(before + 1)
+			expect(discoverCalls.at(-1)).toEqual({
+				companyName: 'Backfill Co',
+				domain: 'backfillco.com',
+				country: undefined,
+				runContextResearchId: followupId,
+			})
+		})
+	})
+
+	describe('when a gate has no company and the run spans several', () => {
+		it('should fail rather than guess which company was meant', async () => {
+			// GIVEN a gate with empty args on a run linked to two companies
+			const user = `u-multi-${randomUUID()}`
+			const before = discoverCalls.length
+			const one = await seedCompany('One Co', 'https://one.com')
+			const two = await seedCompany('Two Co', 'https://two.com')
+			const origin = await seedOrigin(
+				user,
+				[{ id: 'pa1', status: 'pending', tool: 'discover_contacts', args: {} }],
+				policy({}),
+				{
+					subjects: [
+						{ table: 'companies', id: one },
+						{ table: 'companies', id: two },
+					],
+				},
+			)
+
+			// WHEN it is approved and the follow-up runs
+			const result = await approve(origin, 'pa1', user)
+			const followupId =
+				result.status === 'approved' ? result.followup_run_id : ''
+			expect(await pollRun(followupId)).toBe('failed')
+
+			// THEN no company was assumed and discovery never ran
+			expect(discoverCalls.length).toBe(before)
 		})
 	})
 
