@@ -2972,26 +2972,34 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							return
 						}
 
-						yield* sql`
-							UPDATE research_runs
-							SET phase = 1,
-								research_text = ${researchText},
-								entity_match = ${entityMatch},
-								tokens_in = ${tokensIn},
-								tokens_out = ${tokensOut},
-								updated_at = now()
-							WHERE id = ${researchId}
-						`
+						// Commit the phase-1 checkpoint and its source links together, so a
+						// crash between them can't leave a resumed run citing sources it
+						// never recorded. The status guard mirrors the terminal writes: a
+						// run cancelled mid-loop keeps its 'cancelled' row rather than
+						// having this checkpoint overwrite it with partial progress.
+						yield* Effect.gen(function* () {
+							yield* sql`
+								UPDATE research_runs
+								SET phase = 1,
+									research_text = ${researchText},
+									entity_match = ${entityMatch},
+									tokens_in = ${tokensIn},
+									tokens_out = ${tokensOut},
+									updated_at = now()
+								WHERE id = ${researchId} AND status = 'running'
+							`
 
-						// Link every page scraped across the loop's rounds — plus the anchor
-						// site and any register entry seeded before the loop — to the run so
-						// findings cite real sources (a discovery-scan retry may have linked
-						// some already — ON CONFLICT makes the re-link a no-op).
-						yield* linkRunSources([
-							...loopResult.scrapedUrlHashes,
-							...seededAnchorHashes,
-							...seededRegistryHashes,
-						])
+							// Link every page scraped across the loop's rounds — plus the
+							// anchor site and any register entry seeded before the loop — to
+							// the run so findings cite real sources (a discovery-scan retry
+							// may have linked some already — ON CONFLICT makes the re-link a
+							// no-op).
+							yield* linkRunSources([
+								...loopResult.scrapedUrlHashes,
+								...seededAnchorHashes,
+								...seededRegistryHashes,
+							])
+						}).pipe(sql.withTransaction)
 					}
 
 					// The phase-1 entity gate is skipped when a run resumes from a checkpoint
@@ -3048,13 +3056,15 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								output: { schema: schemaName },
 							},
 						])
+						// Skip this write if the run was cancelled during phase 2, so a
+						// stopped run keeps its 'cancelled' state instead of gaining findings.
 						yield* sql`
 							UPDATE research_runs
 							SET phase = 2,
 								findings = ${JSON.stringify(findings)},
 								tokens_out = ${tokensOut},
 								updated_at = now()
-							WHERE id = ${researchId}
+							WHERE id = ${researchId} AND status = 'running'
 						`
 					}
 
