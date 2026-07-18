@@ -679,41 +679,6 @@ describe('attachOutcome', () => {
 	})
 })
 
-// ── Fiber-level behaviors (integration) ──
-// These exercise runFiber against stub providers + real Postgres. They require
-// `pnpm cli services up`, the 0001 migration applied, and the three tier-LLM
-// stubs wired through the layer composition. Scaffolded here so the BDD intent
-// stays visible — wire up fixtures in the integration-test harness.
-describe('research fiber (integration)', () => {
-	it.todo(
-		'should complete all three phases on the happy path with stub providers',
-	)
-	it.todo(
-		'should set status to cancelled when the fiber is interrupted mid-phase',
-	)
-	it.todo(
-		'should resume from checkpoint after a mid-phase restart (phase=1, research_text seeded)',
-	)
-	it.todo(
-		'should short-circuit identical create() calls via research_cache (kind=cache_hit, cost_cents=0)',
-	)
-})
-
-// ── Lifecycle guards (integration) ──
-// Exercise the not-found / existence checks against real Postgres. Scaffolded
-// so the BDD intent stays visible — wire fixtures in the integration harness.
-describe('research lifecycle (integration)', () => {
-	it.todo(
-		'should report outcome=not_found when cancelling a run id with no queued/running row',
-	)
-	it.todo(
-		'should report outcome=already_terminal when cancelling a run that already finished',
-	)
-	it.todo(
-		'should refuse to attach a run to a company or contact that does not exist, writing no research_links row',
-	)
-})
-
 describe('groundedPageTexts', () => {
 	const targets: EntityTargets = {
 		cores: ['acmelogistics'],
