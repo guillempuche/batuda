@@ -93,6 +93,26 @@ const slugForBranch = (branch: string) =>
 const dbName = (slug: string) => `batuda_${slug.replace(/-/g, '_')}`
 const bucketName = (slug: string) => `batuda-assets-${slug}`
 
+// The disposable integration-test database that belongs to a dev database:
+// `batuda` -> `batuda_it`, `batuda_<slug>` -> `batuda_it__<slug>`. Kept in sync
+// with scripts/integration-db.ts (the canonical rule the pre-push suite builds
+// from; a pure string transform can't be shared across the CLI/scripts type-check
+// boundary). The double underscore keeps it out of the dev-database namespace — a
+// dev name never contains `__` because `dnsLabel` collapses runs of `-` before
+// `dbName` maps `-` to `_` — so `down`/`prune` can drop and protect it without ever
+// colliding with real dev data.
+const integrationDbFromDevDb = (db: string): string =>
+	db === 'batuda' ? 'batuda_it' : db.replace(/^batuda_/, 'batuda_it__')
+
+// Last path segment of a `.env` DATABASE_URL — the database name, any `?sslmode=…`
+// query stripped. The one place worktree.ts parses that URL; `identityFromEnv` and
+// `dbFromEnv` share it (and scripts/integration-db.ts mirrors it) so the name the
+// pre-push suite CREATEs and the one teardown DROPs can't drift.
+const dbFromEnvBody = (body: string): string | undefined => {
+	const url = body.match(/^DATABASE_URL=(.+)$/m)?.[1]?.trim()
+	return url?.match(/\/([^/?]+)(?:\?|$)/)?.[1]
+}
+
 // A worktree's real database + bucket, read from the `.env` it generated at
 // provision time. That file is the stable record of what `up` actually created;
 // the live branch is not, because `gh pr merge --delete-branch` checks `main`
@@ -105,18 +125,28 @@ const identityFromEnv = (
 ): { db: string; bucket: string } | null => {
 	if (!existsSync(envPath)) return null
 	const body = readFileSync(envPath, 'utf-8')
-	const url = body.match(/^DATABASE_URL=(.+)$/m)?.[1]?.trim()
+	const db = dbFromEnvBody(body)
 	const bucket = body.match(/^STORAGE_BUCKET=(.+)$/m)?.[1]?.trim()
-	// Last path segment of the DB URL, with any `?sslmode=…` query stripped.
-	const db = url?.match(/\/([^/?]+)(?:\?|$)/)?.[1]
 	return db && bucket ? { db, bucket } : null
+}
+
+// Just the dev database from a checkout's `.env`, without requiring STORAGE_BUCKET
+// — so `prune` can keep this checkout's integration-test database owned (and safe
+// from reaping) even when the `.env` is missing its bucket key.
+const dbFromEnv = (envPath: string): string | null => {
+	if (!existsSync(envPath)) return null
+	return dbFromEnvBody(readFileSync(envPath, 'utf-8')) ?? null
 }
 
 // Guard for destructive ops: only a suffixed `batuda_<slug>` / `batuda-assets-<slug>`
 // pair belongs to a worktree. The main checkout's bare `batuda` / `batuda-assets`
-// must never be dropped, so anything without the suffix is refused.
+// must never be dropped, so anything without the suffix is refused — and `batuda_it`
+// (the main checkout's integration-test database) is excluded too, so a stray `.env`
+// naming it can't make teardown drop it.
 const isWorktreeOwned = (db: string, bucket: string) =>
-	db.startsWith('batuda_') && bucket.startsWith('batuda-assets-')
+	db.startsWith('batuda_') &&
+	db !== 'batuda_it' &&
+	bucket.startsWith('batuda-assets-')
 
 // The shared `.git` is identical from any worktree, so its parent is the main
 // checkout — where the real .env (the values to inherit) lives.
@@ -371,11 +401,18 @@ const liveOwnedResources = execSilent(
 		const dbs = new Set<string>()
 		const buckets = new Set<string>()
 		for (const entry of parseWorktrees(out)) {
-			const id = identityFromEnv(resolve(entry.path, '.env'))
+			const envPath = resolve(entry.path, '.env')
+			const id = identityFromEnv(envPath)
 			if (id) {
 				dbs.add(id.db)
 				buckets.add(id.bucket)
 			}
+			// Own this checkout's integration-test database (`batuda_it` for main,
+			// `batuda_it__<slug>` for a worktree) so `prune` never reaps a live one.
+			// Keyed off the dev database alone — a `.env` missing STORAGE_BUCKET makes
+			// `identityFromEnv` null, but the integration sibling must stay owned.
+			const devDb = dbFromEnv(envPath)
+			if (devDb?.startsWith('batuda')) dbs.add(integrationDbFromDevDb(devDb))
 		}
 		return { dbs, buckets }
 	}),
@@ -574,6 +611,18 @@ export const worktreeUp = Effect.gen(function* () {
 	}
 	const slug = yield* slugForCurrentWorktree
 
+	// `batuda_it` is reserved for the main checkout's integration-test database, so
+	// a branch whose slug is exactly `it` would share that name — and the pre-push
+	// suite's `db reset` would wipe this worktree's dev data. Refuse it (the only
+	// reserved branch name, like `main`).
+	if (dbName(slug) === 'batuda_it') {
+		return yield* Effect.fail(
+			new Error(
+				'Branch slug `it` is reserved — its database would collide with the integration-test database `batuda_it`. Rename the branch.',
+			),
+		)
+	}
+
 	yield* Effect.logInfo('Ensuring the shared stack is up…')
 	yield* ensureSharedStack
 
@@ -659,6 +708,9 @@ export const worktreeDown = Effect.gen(function* () {
 	yield* stopWorktreeDevServers(ROOT)
 	yield* Effect.logInfo(`Dropping database ${db} + bucket ${bucket}…`)
 	yield* dropDatabase(db)
+	// Drop this worktree's integration-test database too — the pre-push suite creates
+	// it lazily (never recorded in `.env`); `IF EXISTS` no-ops if it never ran here.
+	yield* dropDatabase(integrationDbFromDevDb(db))
 	// The bucket may already be gone (or never created) — don't fail teardown on it.
 	yield* mc(`mc rb --force local/${bucket}`).pipe(
 		Effect.catch(() => Effect.void),

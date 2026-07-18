@@ -52,7 +52,8 @@
 				"$TURBO_DEFAULT$",
 				"src/**/*",
 				"**/*.integration.test.*",
-				"../../scripts/integration-db-setup.ts"
+				"../../scripts/integration-db-setup.ts",
+				"../../scripts/integration-db.ts"
 			],
 			"outputs": ["coverage/**/*"],
 			"cache": true
