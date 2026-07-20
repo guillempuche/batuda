@@ -9,9 +9,9 @@ import type { EmailError, EmailSendError } from '@batuda/controllers'
 // URLs through so the provider contract stays one-shaped.
 //
 // `disposition` is explicit so the provider MIME builder can set
-// `Content-Disposition: inline` on cid-referenced images — without it
-// AgentMail defaults to `attachment`, and the `<img src="cid:…">` in
-// the body wouldn't resolve against the MIME part.
+// `Content-Disposition: inline` on cid-referenced images — a provider left
+// to its own default may mark them as attachments, and the
+// `<img src="cid:…">` in the body then wouldn't resolve against the MIME part.
 export interface SendAttachmentInput {
 	readonly filename: string
 	readonly contentType: string
