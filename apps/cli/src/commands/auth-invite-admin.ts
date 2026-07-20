@@ -67,6 +67,10 @@ export const authInviteAdmin = (input: AuthInviteAdminInput) =>
 				orgName: input.orgName,
 				orgSlug: input.orgSlug,
 				allowExistingOrg: input.allowExistingOrg,
+				// Only local runs can show the link. Against a deployment the
+				// running server sends it, so issuing one here would write a
+				// sign-in credential that reaches nobody.
+				sendMagicLink: target === 'local',
 			},
 		)
 
