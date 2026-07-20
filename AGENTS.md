@@ -246,7 +246,7 @@ Env vars name the **capability**, not the vendor. Swapping from one vendor to an
 
 **Anti-patterns (don't do):**
 
-- `BRAVE_SEARCH_API_KEY`, `FIRECRAWL_API_KEY`, `AGENTMAIL_API_KEY`, `R2_ACCESS_KEY_ID` — vendor in the name. Swapping Brave → something else now requires a secret rename in every deployment.
+- `BRAVE_SEARCH_API_KEY`, `FIRECRAWL_API_KEY`, `RESEND_API_KEY`, `R2_ACCESS_KEY_ID` — vendor in the name. Swapping Brave → something else now requires a secret rename in every deployment.
 - `SEARCH_PROVIDER` (capability first) — breaks "grep by role" because `RESEARCH_PROVIDER_*` across all capabilities no longer clusters.
 - `RESEARCH_PROVIDER_SEARCH_FIRECRAWL` — vendor as a suffix. The vendor goes in the **value**, never the key.
 
