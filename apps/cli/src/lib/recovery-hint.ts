@@ -32,6 +32,13 @@ export const recoveryHint = (e: unknown): string | undefined => {
 	const code = pgCode(e) ?? pgCode((e as { reason?: unknown })?.reason)
 	const message = msg(e)
 
+	// Refused before touching anything — say which database it saw, since the
+	// usual cause is a leftover DATABASE_URL export or an `infisical run` wrapper.
+	if (t === 'RemoteDatabaseRefused') {
+		const host = (e as { host?: unknown })?.host
+		return `Refused: this command only runs against a database on this machine, and DATABASE_URL points at ${String(host ?? 'an unknown host')}. Unset it or drop the \`infisical run\` wrapper.`
+	}
+
 	// Constraint violations (unique, not-null, check, FK)
 	if (code === '23505') {
 		return 'Unique constraint violated — duplicate data. Run: pnpm cli db reset && pnpm cli seed'

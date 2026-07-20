@@ -11,6 +11,7 @@ export interface AuthBootstrapOrgInput {
 	readonly password: string
 	readonly orgName: string
 	readonly orgSlug: string
+	readonly confirmHost: string | undefined
 }
 
 /**
@@ -24,7 +25,7 @@ export interface AuthBootstrapOrgInput {
  */
 export const authBootstrapOrg = (input: AuthBootstrapOrgInput) =>
 	Effect.gen(function* () {
-		yield* confirmCloud('auth bootstrap-org')
+		yield* confirmCloud('auth bootstrap-org', input.confirmHost)
 
 		const { users, organizations } = yield* acquireAuthAdapter()
 
