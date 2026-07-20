@@ -63,7 +63,7 @@ const findEnvExamples = (): string[] => {
 }
 
 const envFileCheck = (example: string, inWorktree: boolean): Check => {
-	// `.env.example` → `.env`; `.env.example.cloud` → `.env.cloud`.
+	// `.env.example` → `.env`; `.env.example.github` → `.env.github`.
 	const target = example.replace('.example', '')
 	const optional = !example.endsWith('.env.example')
 	return {
@@ -100,15 +100,6 @@ const envFileCheck = (example: string, inWorktree: boolean): Check => {
 		}),
 	}
 }
-
-const fileCheck = (rel: string, label: string): Check => ({
-	name: label,
-	run: Effect.succeed(
-		existsSync(resolve(ROOT, rel))
-			? ok('found')
-			: fail('missing → run `pnpm cli setup`'),
-	),
-})
 
 const dockerCheck: Check = {
 	name: 'Docker',
@@ -322,15 +313,32 @@ const mailWorkerCheck: Check = {
 	),
 }
 
+// Cloud credentials are injected by `infisical run`, never read from a file,
+// so the CLI being present is what makes the documented invocation work.
+const infisicalCheck: Check = {
+	name: 'Infisical CLI',
+	run: execSilent('infisical', '--version').pipe(
+		Effect.map(() => ok('available')),
+		Effect.catch(() =>
+			Effect.succeed(
+				fail('not found → cloud secrets are injected by `infisical run`'),
+			),
+		),
+	),
+}
+
 const cloudDbHostCheck: Check = {
 	name: 'Cloud DB host',
 	run: Effect.sync(() => {
 		const url = process.env['DATABASE_URL'] ?? ''
-		if (!url) return fail('DATABASE_URL missing')
+		if (!url)
+			return fail(
+				'DATABASE_URL missing → run under `infisical run --env=prod -- …`',
+			)
 		try {
 			const host = new URL(url).hostname
 			if (host === 'localhost' || host === '127.0.0.1') {
-				return fail(`points to ${host} — local value in cloud env file?`)
+				return fail(`points to ${host} — the dev default leaked through?`)
 			}
 			return ok(host)
 		} catch {
@@ -369,7 +377,7 @@ const localChecks = (inWorktree: boolean): Check[] => [
 ]
 
 const cloudChecks: Check[] = [
-	fileCheck('.env.cloud', '.env.cloud file'),
+	infisicalCheck,
 	cloudDbHostCheck,
 	cloudAuthUrlCheck,
 	dbConnectionCheck,

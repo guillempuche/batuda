@@ -1,15 +1,14 @@
-import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { config as dotenvConfig, parse as dotenvParse } from 'dotenv'
+import { parse as dotenvParse } from 'dotenv'
 
 const ROOT = resolve(import.meta.dirname, '../../../..')
 
-// The CLI is single-repo; hardcoded so `gh variable list` doesn't depend on
-// the caller's git remote being correct (worktrees, forks, dirty checkouts).
-const GH_REPO = 'guillempuche/batuda'
-const GH_ENV = 'production'
+// The non-secret settings the deployed server runs on, committed and baked
+// into its image. Cloud mode drives that same deployment, so it reads the
+// server's own file rather than keeping a second copy in step.
+const CLOUD_CONFIG_FILE = resolve(ROOT, 'apps/server/config.production.json')
 
 export type EnvTarget = 'local' | 'cloud'
 
@@ -42,124 +41,64 @@ const stripPnpmSeparator = (argv: string[]): void => {
 }
 
 /**
- * Fetch non-secret repo variables from the GitHub Actions `production` env
- * and merge them into process.env. Only fills keys not already set — values
- * loaded from `.env.cloud` (or the shell) win.
+ * Read the deployed server's non-secret settings as a flat key→value map.
  *
- * Why: GitHub Secrets are write-only by design, so credentials must live in
- * `.env.cloud`; but Variables (BETTER_AUTH_BASE_URL, STORAGE_*, …) are
- * readable. Fetching them removes the duplicate-copy hazard between GH and
- * the local file. Non-fatal — if `gh` is missing, unauthed, or offline, the
- * function emits a hint and returns; downstream Config reads will surface
- * specific failures at the usage site.
+ * A missing or unreadable file is fatal rather than a warning: without it the
+ * CLI would keep the dev defaults from `.env` — a localhost API URL, the dev
+ * bucket — while holding real production credentials, and point them at the
+ * wrong place. Failing here is louder and safer than that.
  *
- * Leak-safety: no fetched name or value ever reaches stdout/stderr. Errors
- * print only the `gh` command's own diagnostic (which doesn't include
- * variable values), bounded to a short summary.
+ * Values are returned exactly as written (every one a JSON string, e.g.
+ * `"600"`, `"false"`) so the config readers downstream parse them themselves.
  */
-const fetchGhVariables = (): void => {
-	let stdout: string
-	try {
-		const buf = execFileSync(
-			'gh',
-			[
-				'variable',
-				'list',
-				'--env',
-				GH_ENV,
-				'-R',
-				GH_REPO,
-				'--json',
-				'name,value',
-			],
-			{ encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+const readCloudConfig = (): Record<string, string> => {
+	if (!existsSync(CLOUD_CONFIG_FILE))
+		throw new Error(
+			`Missing ${CLOUD_CONFIG_FILE}: --env cloud reads the deployed server's non-secret config from this file.`,
 		)
-		stdout = buf.toString()
-	} catch (err) {
-		const code = (err as NodeJS.ErrnoException).code
-		if (code === 'ENOENT') {
-			process.stderr.write(
-				'⚠  cloud env: `gh` CLI not found → install with `brew install gh` (or see https://cli.github.com), then run `gh auth login`. Falling back to .env.cloud only.\n',
-			)
-			return
-		}
-		const stderrBuf = (err as { stderr?: Buffer | string })?.stderr
-		// gh's stderr is a short diagnostic ("HTTP 401: …", "no such repo",
-		// "dial tcp: lookup …"); we still cap to a single 200-char line so a
-		// verbose mode or future change can't accidentally dump anything
-		// that looks like a value.
-		const detail = (stderrBuf ? String(stderrBuf) : (err as Error).message)
-			.replace(/\s+/g, ' ')
-			.trim()
-			.slice(0, 200)
-		process.stderr.write(
-			`⚠  cloud env: \`gh variable list\` failed → ${detail}. Try \`gh auth status\` to verify; falling back to .env.cloud only.\n`,
-		)
-		return
-	}
 
 	let parsed: unknown
 	try {
-		parsed = JSON.parse(stdout)
-	} catch {
-		// Don't echo the body — it would dump every variable value.
-		process.stderr.write(
-			'⚠  cloud env: could not parse `gh variable list` JSON. Falling back to .env.cloud only.\n',
-		)
-		return
+		parsed = JSON.parse(readFileSync(CLOUD_CONFIG_FILE, 'utf8'))
+	} catch (cause) {
+		throw new Error(`Invalid JSON in ${CLOUD_CONFIG_FILE}`, { cause })
 	}
 
-	if (!Array.isArray(parsed)) return
-	let merged = 0
-	for (const entry of parsed) {
-		if (
-			!entry ||
-			typeof entry !== 'object' ||
-			typeof (entry as { name?: unknown }).name !== 'string' ||
-			typeof (entry as { value?: unknown }).value !== 'string'
+	if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed))
+		throw new Error(
+			`Expected ${CLOUD_CONFIG_FILE} to hold a flat object of settings.`,
 		)
-			continue
-		const { name, value } = entry as { name: string; value: string }
-		// Always override in cloud mode: gh is authoritative for non-secret
-		// variables. The local `.env` baseline often carries dev defaults
-		// (e.g. `BETTER_AUTH_BASE_URL=https://api.batuda.localhost`); without
-		// this override the CLI would silently use the dev value against
-		// prod credentials. `.env.cloud` still wins because it loads after
-		// this function returns (see `loadEnv`).
-		process.env[name] = value
-		merged++
-	}
-	if (merged > 0) {
-		// Count-only — never log names or values, even on success.
-		process.stderr.write(
-			`cloud env: merged ${merged} variable(s) from gh (env=${GH_ENV})\n`,
-		)
-	}
+
+	const settings: Record<string, string> = {}
+	for (const [key, value] of Object.entries(parsed))
+		if (typeof value === 'string') settings[key] = value
+	return settings
 }
 
 /**
  * Parse `--env local|cloud` from argv (default `local`), strip the flag so
- * Effect CLI never sees it, and load `.env` files via dotenv in precedence
- * order (later wins):
+ * Effect CLI never sees it, and populate process.env in precedence order
+ * (later wins):
  *
- *   1. `<repo>/.env`                      (local-dev baseline)
- *   2. `<repo>/apps/cli/.env`             (per-app baseline)
- *   3. gh `variable list` (cloud only)    (authoritative cloud variables)
- *   4. `<repo>/.env.cloud`                (cloud only — secrets + overrides)
- *   5. `<repo>/apps/cli/.env.cloud`       (cloud only)
+ *   1. `<repo>/.env`                             (local-dev baseline)
+ *   2. `<repo>/apps/cli/.env`                    (per-app baseline)
+ *   3. `apps/server/config.production.json`      (cloud only — non-secrets)
  *
- * A value the caller already exported into the environment wins over the
- * baseline files, and a blank entry (`KEY=`) never overwrites a value another
- * file provided. Both matter for the integration db-setup, which exports
- * `DATABASE_URL` for a throwaway test DB and shells out to the CLI: a stray
- * empty `apps/cli/.env` line must not blank that out, and the baseline dev URL
- * must not shadow it (that would point `db reset` at the wrong database).
+ * Anything the caller already exported outranks all three. That is the whole
+ * mechanism behind cloud secrets: there is no secret file to read, because
+ * `infisical run --env=prod -- pnpm cli …` puts the credentials into the
+ * environment before the CLI starts, and nothing here overwrites them. It also
+ * covers the integration db-setup, which exports `DATABASE_URL` for a
+ * throwaway test database and shells out to the CLI — the baseline dev URL
+ * must not shadow it, or `db reset` would wipe the wrong database.
  *
- * Why gh fetch runs *between* the baselines and `.env.cloud`: the baseline
- * usually carries dev defaults like `BETTER_AUTH_BASE_URL=…localhost`, and
- * cloud mode must not inherit those. `.env.cloud` is reserved for secrets
- * (which gh can't expose) and rare local overrides — putting it last, and
- * still authoritative, keeps those overrides in charge.
+ * A blank entry (`KEY=`) never overwrites a value another source provided, so
+ * a stray empty line in `apps/cli/.env` cannot blank out a real value.
+ *
+ * Cloud settings load after the baselines because the baselines carry dev
+ * defaults — `BETTER_AUTH_BASE_URL=https://api.batuda.localhost` and the like.
+ * Inheriting those while holding production credentials is precisely the
+ * mix-up this ordering prevents.
  *
  * Must run before `NodeRuntime.runMain` / any Effect Config resolution so
  * process.env is populated before the layer stack is built.
@@ -170,49 +109,31 @@ export const loadEnv = (): EnvTarget => {
 	stripPnpmSeparator(argv)
 
 	const baselineFiles = [resolve(ROOT, '.env'), resolve(ROOT, 'apps/cli/.env')]
-	const cloudOverrideFiles = [
-		resolve(ROOT, '.env.cloud'),
-		resolve(ROOT, 'apps/cli/.env.cloud'),
-	]
 
-	// Keys the caller exported before invoking the CLI. The baseline files must
-	// not overwrite these, so an explicit `DATABASE_URL=…` stays authoritative.
+	// Keys the caller exported before invoking the CLI — including everything
+	// `infisical run` injects. No file may overwrite these.
 	const callerProvided = new Set(
 		Object.entries(process.env)
 			.filter(([, value]) => value !== undefined && value !== '')
 			.map(([key]) => key),
 	)
 
-	// Baseline load: later file wins, but skip blank entries and keys the caller
-	// already set, so neither an empty line nor a dev default can shadow them.
-	const loadBaseline = (file: string): void => {
-		if (!existsSync(file)) return
-		for (const [key, value] of Object.entries(
-			dotenvParse(readFileSync(file)),
-		)) {
+	// Later sources win over earlier ones, but never over the caller, and a
+	// blank value never wins over anything.
+	const mergeIntoEnv = (settings: Record<string, string>): void => {
+		for (const [key, value] of Object.entries(settings)) {
 			if (value === '' || callerProvided.has(key)) continue
 			process.env[key] = value
 		}
 	}
 
-	// Cloud overrides are authoritative for secrets and rare local overrides, so
-	// they replace whatever the baselines or gh set.
-	const loadCloudOverride = (file: string): void => {
-		if (existsSync(file)) {
-			dotenvConfig({ path: file, override: true, quiet: true })
-		}
-	}
+	for (const file of baselineFiles)
+		if (existsSync(file)) mergeIntoEnv(dotenvParse(readFileSync(file)))
 
-	for (const file of baselineFiles) loadBaseline(file)
-	if (target === 'cloud') {
-		fetchGhVariables()
-		for (const file of cloudOverrideFiles) loadCloudOverride(file)
-	}
+	if (target === 'cloud') mergeIntoEnv(readCloudConfig())
 
 	resolvedTarget = target
 	return target
 }
 
 export const getTarget = (): EnvTarget => resolvedTarget
-
-export const isCloud = (): boolean => resolvedTarget === 'cloud'
