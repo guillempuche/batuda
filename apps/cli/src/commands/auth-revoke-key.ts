@@ -7,6 +7,7 @@ import { confirmCloud } from '../lib/confirm-cloud'
 
 export interface AuthRevokeKeyInput {
 	readonly keyId: string
+	readonly confirmHost: string | undefined
 }
 
 /**
@@ -19,7 +20,7 @@ export interface AuthRevokeKeyInput {
  */
 export const authRevokeKey = (input: AuthRevokeKeyInput) =>
 	Effect.gen(function* () {
-		yield* confirmCloud('auth revoke-key')
+		yield* confirmCloud('auth revoke-key', input.confirmHost)
 
 		const { keys } = yield* acquireAuthAdapter()
 

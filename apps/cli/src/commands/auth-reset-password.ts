@@ -8,6 +8,7 @@ import { confirmCloud } from '../lib/confirm-cloud'
 export interface AuthResetPasswordInput {
 	readonly email: string
 	readonly password: string
+	readonly confirmHost: string | undefined
 }
 
 /**
@@ -18,7 +19,7 @@ export interface AuthResetPasswordInput {
  */
 export const authResetPassword = (input: AuthResetPasswordInput) =>
 	Effect.gen(function* () {
-		yield* confirmCloud('auth reset-password')
+		yield* confirmCloud('auth reset-password', input.confirmHost)
 
 		const { users } = yield* acquireAuthAdapter()
 

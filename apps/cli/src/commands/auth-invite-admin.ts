@@ -16,6 +16,7 @@ export interface AuthInviteAdminInput {
 	readonly orgName: string
 	readonly orgSlug: string
 	readonly allowExistingOrg: boolean
+	readonly confirmHost: string | undefined
 }
 
 export class MagicLinkNotCaptured extends Data.TaggedError(
@@ -36,7 +37,7 @@ export class MagicLinkNotCaptured extends Data.TaggedError(
  */
 export const authInviteAdmin = (input: AuthInviteAdminInput) =>
 	Effect.gen(function* () {
-		yield* confirmCloud('auth invite-admin')
+		yield* confirmCloud('auth invite-admin', input.confirmHost)
 
 		const target = getTarget()
 

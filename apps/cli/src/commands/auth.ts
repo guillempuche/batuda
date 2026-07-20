@@ -10,6 +10,7 @@ export interface AuthCreateKeyInput {
 	readonly name: string
 	readonly prefix: string
 	readonly expiresIn: number | undefined
+	readonly confirmHost: string | undefined
 }
 
 /**
@@ -19,7 +20,7 @@ export interface AuthCreateKeyInput {
  */
 export const authCreateKey = (input: AuthCreateKeyInput) =>
 	Effect.gen(function* () {
-		yield* confirmCloud('auth create-key')
+		yield* confirmCloud('auth create-key', input.confirmHost)
 		yield* Effect.logInfo(`Creating API key for ${input.email}...`)
 
 		const { keys } = yield* acquireAuthAdapter()

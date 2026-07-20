@@ -45,6 +45,7 @@ import {
 	worktreeWatch,
 } from './commands/worktree'
 import { withDb } from './db'
+import { requireLocalDatabase } from './lib/confirm-cloud'
 import { appendEnvKeys, resetEnvFile } from './lib/env-file'
 import { loadEnv } from './lib/load-env'
 import { recoveryHint } from './lib/recovery-hint'
@@ -68,40 +69,45 @@ const seedCommand = Command.make(
 		),
 	},
 	({ preset, quiet }) =>
-		withDb(
-			Effect.gen(function* () {
-				yield* seedIdentities
-				const counts = yield* seed(preset)
-				yield* Console.log('')
-				yield* Console.log(
-					`Seeded (${preset}): ${counts.products} products, ${counts.companies} companies, ${counts.contacts} contacts, ${counts.interactions} interactions, ${counts.tasks} tasks, ${counts.documents} documents, ${counts.proposals} proposals, ${counts.pages} pages, ${counts.callRecordings} call recordings`,
-				)
-				// These hints would name the dev server — which serves the dev DB, not the
-				// integration DB just seeded — so skip them for a disposable integration DB.
-				if (quiet) return
-				// Hosts follow this checkout: bare batuda.localhost in the main
-				// checkout, <label>.batuda.localhost inside a worktree — so the hints
-				// name the URL actually being served, not main's.
-				const { web, api } = yield* accessUrls
-				yield* Console.log('')
-				yield* Console.log('─── Access hints ───────────────────────────────')
-				yield* Console.log(`  API server:   pnpm dev:server   → ${api}`)
-				yield* Console.log(`  Batuda web:    pnpm dev:internal → ${web}`)
-				yield* Console.log('')
-				yield* Console.log(`  API docs (Scalar): ${api}/docs`)
-				yield* Console.log(`  OpenAPI spec:      ${api}/openapi.json`)
-				yield* Console.log(`  Auth docs:         ${api}/auth/reference`)
-				yield* Console.log(
-					`  Auth OpenAPI:      ${api}/auth/open-api/generate-schema`,
-				)
-				yield* Console.log('')
-				yield* Console.log(`  Health check:    curl ${api}/health`)
-				yield* Console.log(`  List companies:  curl ${api}/v1/companies`)
-				yield* Console.log(
-					'  Docker DB:       docker exec -it batuda-db psql -U batuda',
-				)
-				yield* Console.log('────────────────────────────────────────────────')
-			}),
+		// Ahead of `withDb` so the check lands before `seedIdentities` writes
+		// its first user, not between that and the rest of the seed.
+		Effect.andThen(
+			requireLocalDatabase('seed'),
+			withDb(
+				Effect.gen(function* () {
+					yield* seedIdentities
+					const counts = yield* seed(preset)
+					yield* Console.log('')
+					yield* Console.log(
+						`Seeded (${preset}): ${counts.products} products, ${counts.companies} companies, ${counts.contacts} contacts, ${counts.interactions} interactions, ${counts.tasks} tasks, ${counts.documents} documents, ${counts.proposals} proposals, ${counts.pages} pages, ${counts.callRecordings} call recordings`,
+					)
+					// These hints would name the dev server — which serves the dev DB, not the
+					// integration DB just seeded — so skip them for a disposable integration DB.
+					if (quiet) return
+					// Hosts follow this checkout: bare batuda.localhost in the main
+					// checkout, <label>.batuda.localhost inside a worktree — so the hints
+					// name the URL actually being served, not main's.
+					const { web, api } = yield* accessUrls
+					yield* Console.log('')
+					yield* Console.log('─── Access hints ───────────────────────────────')
+					yield* Console.log(`  API server:   pnpm dev:server   → ${api}`)
+					yield* Console.log(`  Batuda web:    pnpm dev:internal → ${web}`)
+					yield* Console.log('')
+					yield* Console.log(`  API docs (Scalar): ${api}/docs`)
+					yield* Console.log(`  OpenAPI spec:      ${api}/openapi.json`)
+					yield* Console.log(`  Auth docs:         ${api}/auth/reference`)
+					yield* Console.log(
+						`  Auth OpenAPI:      ${api}/auth/open-api/generate-schema`,
+					)
+					yield* Console.log('')
+					yield* Console.log(`  Health check:    curl ${api}/health`)
+					yield* Console.log(`  List companies:  curl ${api}/v1/companies`)
+					yield* Console.log(
+						'  Docker DB:       docker exec -it batuda-db psql -U batuda',
+					)
+					yield* Console.log('────────────────────────────────────────────────')
+				}),
+			),
 		),
 ).pipe(
 	Command.withShortDescription('Insert sample data'),
@@ -234,7 +240,11 @@ const dbMigrateCommand = Command.make('migrate', {}, () => dbMigrate).pipe(
 	Command.withDescription('Run database migrations'),
 )
 
-const dbResetCommand = Command.make('reset', {}, () => withDb(dbReset)).pipe(
+// The check sits outside `withDb` on purpose: providing the SQL layer opens the
+// connection, so checking inside would already be talking to the database.
+const dbResetCommand = Command.make('reset', {}, () =>
+	Effect.andThen(requireLocalDatabase('db reset'), withDb(dbReset)),
+).pipe(
 	Command.withShortDescription('Drop schema + re-run migrations'),
 	Command.withDescription(
 		'Drop the public schema, re-run migrations, and purge the mail catcher (no seed; chain `seed` for sample data)',
@@ -247,6 +257,15 @@ const dbCommand = Command.make('db').pipe(
 )
 
 // ── Auth ───────────────────────────────────────────────────
+
+// Shared by every auth command that writes, so a script or agent can run them
+// without a terminal to answer the confirm.
+const confirmHostFlag = Flag.string('confirm-host').pipe(
+	Flag.withDescription(
+		'Database host this command should run against (e.g. the value shown by `doctor --env cloud`). Replaces the interactive confirm; refuses if it disagrees with DATABASE_URL',
+	),
+	Flag.optional,
+)
 
 const authCreateKeyCommand = Command.make(
 	'create-key',
@@ -267,13 +286,15 @@ const authCreateKeyCommand = Command.make(
 			Flag.withDescription('Expiration in seconds (omit for no expiry)'),
 			Flag.optional,
 		),
+		confirmHost: confirmHostFlag,
 	},
-	({ email, name, prefix, expiresIn }) =>
+	({ email, name, prefix, expiresIn, confirmHost }) =>
 		authCreateKey({
 			email,
 			name,
 			prefix,
 			expiresIn: Option.getOrUndefined(expiresIn),
+			confirmHost: Option.getOrUndefined(confirmHost),
 		}),
 ).pipe(
 	Command.withShortDescription('Create an API key for a user'),
@@ -297,12 +318,14 @@ const authBootstrapCommand = Command.make(
 			Flag.withDescription('Admin password (prompted if omitted)'),
 			Flag.withFallbackPrompt(Prompt.hidden({ message: 'Admin password:' })),
 		),
+		confirmHost: confirmHostFlag,
 	},
-	({ email, name, password }) =>
+	({ email, name, password, confirmHost }) =>
 		authBootstrap({
 			email,
 			name,
 			password: Redacted.value(password),
+			confirmHost: Option.getOrUndefined(confirmHost),
 		}),
 ).pipe(
 	Command.withShortDescription('Create the first admin user'),
@@ -326,8 +349,15 @@ const authInviteCommand = Command.make(
 			Flag.withDescription('Role to grant'),
 			Flag.withDefault('user' as const),
 		),
+		confirmHost: confirmHostFlag,
 	},
-	({ email, name, role }) => authInvite({ email, name, role }),
+	({ email, name, role, confirmHost }) =>
+		authInvite({
+			email,
+			name,
+			role,
+			confirmHost: Option.getOrUndefined(confirmHost),
+		}),
 ).pipe(
 	Command.withShortDescription('Create a passwordless user + magic link'),
 	Command.withDescription(
@@ -358,14 +388,16 @@ const authBootstrapOrgCommand = Command.make(
 			Flag.withDescription('Organization URL slug (lowercase, kebab-case)'),
 			Flag.withFallbackPrompt(Prompt.text({ message: 'Organization slug:' })),
 		),
+		confirmHost: confirmHostFlag,
 	},
-	({ email, name, password, orgName, orgSlug }) =>
+	({ email, name, password, orgName, orgSlug, confirmHost }) =>
 		authBootstrapOrg({
 			email,
 			name,
 			password: Redacted.value(password),
 			orgName,
 			orgSlug,
+			confirmHost: Option.getOrUndefined(confirmHost),
 		}),
 ).pipe(
 	Command.withShortDescription('Create the first admin and their org'),
@@ -399,14 +431,16 @@ const authInviteAdminCommand = Command.make(
 			),
 			Flag.withDefault(false),
 		),
+		confirmHost: confirmHostFlag,
 	},
-	({ email, name, orgName, orgSlug, allowExistingOrg }) =>
+	({ email, name, orgName, orgSlug, allowExistingOrg, confirmHost }) =>
 		authInviteAdmin({
 			email,
 			name,
 			orgName,
 			orgSlug,
 			allowExistingOrg,
+			confirmHost: Option.getOrUndefined(confirmHost),
 		}),
 ).pipe(
 	Command.withShortDescription('Create an org and its first admin'),
@@ -446,8 +480,14 @@ const authPromoteCommand = Command.make(
 			Flag.withDescription('Target role'),
 			Flag.withDefault('admin' as const),
 		),
+		confirmHost: confirmHostFlag,
 	},
-	({ email, role }) => authPromote({ email, role }),
+	({ email, role, confirmHost }) =>
+		authPromote({
+			email,
+			role,
+			confirmHost: Option.getOrUndefined(confirmHost),
+		}),
 ).pipe(
 	Command.withShortDescription("Set a user's platform role"),
 	Command.withDescription("Change a user's role (admin|user)"),
@@ -460,8 +500,14 @@ const authDemoteCommand = Command.make(
 			Flag.withDescription('User to demote'),
 			Flag.withFallbackPrompt(Prompt.text({ message: 'Email:' })),
 		),
+		confirmHost: confirmHostFlag,
 	},
-	({ email }) => authPromote({ email, role: 'user' }),
+	({ email, confirmHost }) =>
+		authPromote({
+			email,
+			role: 'user',
+			confirmHost: Option.getOrUndefined(confirmHost),
+		}),
 ).pipe(
 	Command.withShortDescription("Demote a user to 'user' role"),
 	Command.withDescription(
@@ -476,8 +522,10 @@ const authRevokeKeyCommand = Command.make(
 			Flag.withDescription('The id of the API key to revoke'),
 			Flag.withFallbackPrompt(Prompt.text({ message: 'Key id:' })),
 		),
+		confirmHost: confirmHostFlag,
 	},
-	({ keyId }) => authRevokeKey({ keyId }),
+	({ keyId, confirmHost }) =>
+		authRevokeKey({ keyId, confirmHost: Option.getOrUndefined(confirmHost) }),
 ).pipe(
 	Command.withShortDescription('Disable an API key'),
 	Command.withDescription('Disable an API key (enabled=false)'),
@@ -494,9 +542,14 @@ const authResetPasswordCommand = Command.make(
 			Flag.withDescription('New password (prompted if omitted)'),
 			Flag.withFallbackPrompt(Prompt.hidden({ message: 'New password:' })),
 		),
+		confirmHost: confirmHostFlag,
 	},
-	({ email, password }) =>
-		authResetPassword({ email, password: Redacted.value(password) }),
+	({ email, password, confirmHost }) =>
+		authResetPassword({
+			email,
+			password: Redacted.value(password),
+			confirmHost: Option.getOrUndefined(confirmHost),
+		}),
 ).pipe(
 	Command.withShortDescription("Overwrite a user's password"),
 	Command.withDescription("Overwrite a user's credential in the account table"),

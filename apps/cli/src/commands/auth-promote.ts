@@ -8,6 +8,7 @@ import { confirmCloud } from '../lib/confirm-cloud'
 export interface AuthPromoteInput {
 	readonly email: string
 	readonly role: Role
+	readonly confirmHost: string | undefined
 }
 
 /**
@@ -19,7 +20,7 @@ export interface AuthPromoteInput {
  */
 export const authPromote = (input: AuthPromoteInput) =>
 	Effect.gen(function* () {
-		yield* confirmCloud('auth promote')
+		yield* confirmCloud('auth promote', input.confirmHost)
 
 		const { users } = yield* acquireAuthAdapter()
 

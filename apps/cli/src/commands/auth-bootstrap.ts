@@ -9,6 +9,7 @@ export interface AuthBootstrapInput {
 	readonly email: string
 	readonly name: string
 	readonly password: string
+	readonly confirmHost: string | undefined
 }
 
 /**
@@ -19,7 +20,7 @@ export interface AuthBootstrapInput {
  */
 export const authBootstrap = (input: AuthBootstrapInput) =>
 	Effect.gen(function* () {
-		yield* confirmCloud('auth bootstrap')
+		yield* confirmCloud('auth bootstrap', input.confirmHost)
 
 		const { users } = yield* acquireAuthAdapter()
 

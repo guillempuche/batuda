@@ -15,6 +15,7 @@ export interface AuthInviteInput {
 	readonly email: string
 	readonly name: string
 	readonly role: Role
+	readonly confirmHost: string | undefined
 }
 
 export class MagicLinkNotCaptured extends Data.TaggedError(
@@ -34,7 +35,7 @@ export class MagicLinkNotCaptured extends Data.TaggedError(
  */
 export const authInvite = (input: AuthInviteInput) =>
 	Effect.gen(function* () {
-		yield* confirmCloud('auth invite')
+		yield* confirmCloud('auth invite', input.confirmHost)
 
 		const target = getTarget()
 
