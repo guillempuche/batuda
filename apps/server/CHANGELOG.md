@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-20 (server-v2026.7.20)
+
+### Features
+
+* **research:** recover more company data and reject look-alike matches ([52af91f](https://github.com/guillempuche/batuda/commit/52af91f59836ebb5db25e1460464624ccdc2dde3))
+
+### Bug Fixes
+
+* stop issuing sign-in links that cannot be delivered ([4e6a745](https://github.com/guillempuche/batuda/commit/4e6a74529f9e25a84dd2ca3f1c821ba56496c46d))
+
+### Documentation
+
+* correct first-run setup, cloud secrets, and magic-link delivery ([df6f617](https://github.com/guillempuche/batuda/commit/df6f617ca4e6210f6832bf0328b201817640b540))
+
 ## 2026-07-18 (server-v2026.7.18)
 
 ### Features
