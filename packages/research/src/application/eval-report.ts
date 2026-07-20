@@ -10,6 +10,7 @@
 
 import {
 	type EvalSummary,
+	groupSummaries,
 	type RunScore,
 	summarizeScores,
 } from './eval-scoring'
@@ -90,10 +91,14 @@ export const scorePayloadsForRun = (score: RunScore): ScorePayload[] => {
 	return payloads
 }
 
-/** The offline baseline report: the aggregate rates plus every run's raw score. */
+/** The offline baseline report: the aggregate rates plus every run's raw score,
+ * and the same rates broken out by size/reach bucket and by country so a
+ * regression confined to one segment is visible rather than averaged away. */
 export interface EvalReport {
 	readonly summary: EvalSummary
 	readonly runs: ReadonlyArray<RunScore>
+	readonly byBucket: Record<string, EvalSummary>
+	readonly byCountry: Record<string, EvalSummary>
 }
 
 export const buildEvalReport = (
@@ -101,6 +106,8 @@ export const buildEvalReport = (
 ): EvalReport => ({
 	summary: summarizeScores(scores),
 	runs: scores,
+	byBucket: groupSummaries(scores, score => score.bucket ?? 'untagged'),
+	byCountry: groupSummaries(scores, score => score.country ?? 'unknown'),
 })
 
 /**
@@ -124,6 +131,8 @@ export const evalSpanAttributes = (
 		'eval.contacts_expected': score.contactsExpected,
 		'eval.contacts_found': score.contactsFound,
 	}
+	if (score.bucket !== undefined) attributes['eval.bucket'] = score.bucket
+	if (score.country !== undefined) attributes['eval.country'] = score.country
 	if (score.fieldsScored > 0) {
 		attributes['eval.field_precision'] =
 			score.fieldsCorrect / score.fieldsScored

@@ -12,6 +12,8 @@
  */
 
 import {
+	GOLDEN_BUCKETS,
+	type GoldenBucket,
 	type GoldenExpectation,
 	SCORABLE_FIELDS,
 	type ScorableField,
@@ -117,6 +119,19 @@ export const parseGoldenRow = (row: RawGoldenRow): GoldenParseResult => {
 		}
 	}
 
+	// Size/reach bucket, so the harness can report quality per segment. Optional,
+	// but a value that is not a known bucket fails loudly like any other typo.
+	const rawBucket = answer['bucket']
+	if (
+		rawBucket !== undefined &&
+		!GOLDEN_BUCKETS.includes(rawBucket as GoldenBucket)
+	) {
+		return {
+			ok: false,
+			error: `unknown bucket "${String(rawBucket)}" (allowed: ${GOLDEN_BUCKETS.join(', ')})`,
+		}
+	}
+
 	return {
 		ok: true,
 		value: {
@@ -126,6 +141,7 @@ export const parseGoldenRow = (row: RawGoldenRow): GoldenParseResult => {
 			...(rawAltDomains !== undefined ? { altDomains: rawAltDomains } : {}),
 			fields,
 			...(contacts.length > 0 ? { contacts } : {}),
+			...(rawBucket !== undefined ? { bucket: rawBucket as GoldenBucket } : {}),
 		},
 	}
 }

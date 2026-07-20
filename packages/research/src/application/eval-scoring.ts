@@ -40,6 +40,17 @@ export const SCORABLE_FIELDS = [
 
 export type ScorableField = (typeof SCORABLE_FIELDS)[number]
 
+/**
+ * Size/reach buckets a golden company can be tagged with, so a regression that
+ * hits only one segment (a niche or small company, the hardest to research) shows
+ * up in a per-bucket breakdown instead of being averaged away. `big` = a
+ * household name; `small` = an SMB with a light web presence; `niche` = a
+ * specialist with little third-party coverage.
+ */
+export const GOLDEN_BUCKETS = ['big', 'small', 'niche'] as const
+
+export type GoldenBucket = (typeof GOLDEN_BUCKETS)[number]
+
 /** The run outcomes that end a run; a run in any of these is what the eval scores. */
 export type TerminalStatus =
 	| 'succeeded'
@@ -65,6 +76,8 @@ export interface GoldenExpectation {
 	/** People the company is known to publish; scores whether the run recovered them
 	 * *with a title* — the recall the focused contacts pass exists to lift. */
 	readonly contacts?: ReadonlyArray<{ readonly name: string }>
+	/** Size/reach segment, so quality can be reported per bucket, not just overall. */
+	readonly bucket?: GoldenBucket
 }
 
 /**
@@ -113,6 +126,10 @@ export interface RunScore {
 	readonly contactsExpected: number
 	/** Of those, how many the run returned *with a title* (contact recall's numerator). */
 	readonly contactsFound: number
+	/** The golden row's size/reach bucket, carried through so scores can be grouped. */
+	readonly bucket?: GoldenBucket
+	/** The golden row's expected country (ISO alpha-2), for a by-country breakdown. */
+	readonly country?: string
 }
 
 export interface EvalSummary {
@@ -438,6 +455,10 @@ export const scoreRun = (
 		fieldsCorrect,
 		contactsExpected: expectedContacts.length,
 		contactsFound,
+		...(expected.bucket !== undefined ? { bucket: expected.bucket } : {}),
+		...(expected.fields.country !== undefined
+			? { country: expected.fields.country }
+			: {}),
 	}
 }
 
@@ -489,4 +510,27 @@ export const summarizeScores = (
 				? null
 				: totalContactsFound / totalContactsExpected,
 	}
+}
+
+/**
+ * Group scores by a key (a bucket, a country) and summarize each group, so a
+ * regression confined to one segment is visible instead of averaged into the
+ * whole-set numbers. Keys are returned in first-seen order.
+ */
+export const groupSummaries = (
+	scores: ReadonlyArray<RunScore>,
+	keyOf: (score: RunScore) => string,
+): Record<string, EvalSummary> => {
+	const groups = new Map<string, RunScore[]>()
+	for (const score of scores) {
+		const key = keyOf(score)
+		const group = groups.get(key)
+		if (group) group.push(score)
+		else groups.set(key, [score])
+	}
+	const summaries: Record<string, EvalSummary> = {}
+	for (const [key, group] of groups) {
+		summaries[key] = summarizeScores(group)
+	}
+	return summaries
 }

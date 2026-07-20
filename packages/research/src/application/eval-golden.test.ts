@@ -259,3 +259,46 @@ describe('parseGoldenSet', () => {
 		})
 	})
 })
+
+describe('parseGoldenRow — bucket', () => {
+	describe('when the expected output carries a known bucket', () => {
+		it('should carry it through onto the expectation', () => {
+			// GIVEN an answer tagged with a valid size/reach bucket
+			const result = parseGoldenRow(
+				row({ expectedOutput: { officialDomain: 'acme.es', bucket: 'niche' } }),
+			)
+			// WHEN parsed — THEN the bucket is on the expectation
+			expect(result).toEqual({
+				ok: true,
+				value: {
+					id: 'acme',
+					query: 'Acme Logistics, Barcelona',
+					officialDomain: 'acme.es',
+					fields: {},
+					bucket: 'niche',
+				},
+			})
+		})
+	})
+
+	describe('when the bucket is not a known value', () => {
+		it('should reject the row loudly, like any other typo', () => {
+			// GIVEN an answer tagged with a bucket that is not big/small/niche
+			const result = parseGoldenRow(
+				row({ expectedOutput: { officialDomain: 'acme.es', bucket: 'huge' } }),
+			)
+			// WHEN parsed — THEN it fails rather than silently ignoring the tag
+			expect(result.ok).toBe(false)
+		})
+	})
+
+	describe('when no bucket is given', () => {
+		it('should omit the bucket key entirely', () => {
+			// GIVEN an untagged row
+			const result = parseGoldenRow(row({}))
+			// WHEN parsed — THEN there is no bucket key (not an undefined one)
+			expect(result.ok).toBe(true)
+			if (result.ok) expect('bucket' in result.value).toBe(false)
+		})
+	})
+})

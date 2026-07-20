@@ -684,6 +684,7 @@ describe('groundedPageTexts', () => {
 		cores: ['acmelogistics'],
 		words: ['acme'],
 		domains: ['acme.es'],
+		places: [],
 	}
 
 	describe('when the run has no entity target', () => {

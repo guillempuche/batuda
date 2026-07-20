@@ -16,6 +16,8 @@ pnpm cli research eval --org <org-id> --user <user-id> --golden eval/golden.json
 
 `eval` prints the metrics — grounding accuracy, field precision, field recall, titled-contact recall, wrong-company rate, empty rate — and writes a full per-run report with `--out`.
 
+Add `--by-bucket` to also print those metrics broken out by the golden rows' size/reach `bucket` (big / small / niche) and by `country`, so a regression that only hits, say, niche companies or one country is visible instead of averaged into the whole-set numbers. The same per-bucket and per-country summaries are always written to the `--out` report as `byBucket` / `byCountry`, and each run's span carries `eval.bucket` / `eval.country` for grouping on the monitoring board.
+
 Titled-contact recall answers a gap the four scalar fields miss: of the people a company is known to publish, how many the run returned **with a title**. Contacts sit outside the scored field set, so a run can pass every field yet hand back the decision-makers with no title — the exact symptom this metric watches. It only appears (else `n/a`) for rows that list expected `contacts`.
 
 ## Reading a change that targets under-filling
@@ -57,6 +59,7 @@ A JSON array of rows. Copy `golden.example.json` to your own `golden.json` and r
   "expectedOutput": {
     "officialDomain": "company.com",
     "altDomains": ["a-registry-profile.example"],
+    "bucket": "small",
     "fields": { "industry": "…", "size_range": "…", "country": "…", "location": "…" },
     "contacts": ["Ada Lovelace", { "name": "Alan Turing" }]
   }
@@ -66,6 +69,7 @@ A JSON array of rows. Copy `golden.example.json` to your own `golden.json` and r
 - `query` — what the pipeline is asked to research (add the city for a generic name).
 - `officialDomain` — the company's own website host; the primary proof the run reached the target. **Required.**
 - `altDomains` — other hosts that also prove the target was reached (a registry profile, a known subsidiary). Optional.
+- `bucket` — the company's size/reach segment: `big` (a household name, easy to research), `small` (an SMB with a light web presence), or `niche` (a specialist with little third-party coverage, the hardest). Optional, but an unknown value is rejected loudly; drives the `--by-bucket` breakdown so a regression that hits only one segment is not averaged away.
 - `fields` — the known-correct values. Only these four keys are scored, and a misspelled key is rejected loudly. All optional — score only the fields you can verify.
 - `contacts` — people the company is known to publish, each a name string or a `{ "name": "…" }` object. They score titled-contact recall: how many came back with a title. Name matching folds accents and tolerates a middle name/initial, but it tokenizes on Latin letters — a name written only in a non-Latin script (CJK, Cyrillic, Greek, Arabic) won't match, so romanize it in the golden row. Optional; a fabricated name skews the metric exactly as a wrong field value does, so list only real, verifiable people. No `role` here — the metric checks that the run supplied *some* title, not which one.
 

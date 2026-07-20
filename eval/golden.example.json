@@ -4,6 +4,7 @@
 		"query": "Brompton Bicycle, London",
 		"expectedOutput": {
 			"officialDomain": "brompton.com",
+			"bucket": "big",
 			"fields": {
 				"industry": "manufacturing",
 				"country": "GB",
@@ -17,6 +18,7 @@
 		"query": "Gymshark, Solihull",
 		"expectedOutput": {
 			"officialDomain": "gymshark.com",
+			"bucket": "big",
 			"fields": {
 				"industry": "retail",
 				"country": "GB",
@@ -30,6 +32,7 @@
 		"query": "Monzo Bank, London",
 		"expectedOutput": {
 			"officialDomain": "monzo.com",
+			"bucket": "big",
 			"fields": {
 				"industry": "services",
 				"country": "GB",
@@ -44,6 +47,7 @@
 		"expectedOutput": {
 			"officialDomain": "dyson.com",
 			"altDomains": ["dyson.co.uk"],
+			"bucket": "big",
 			"fields": {
 				"industry": "manufacturing",
 				"country": "GB",
@@ -58,6 +62,7 @@
 		"expectedOutput": {
 			"officialDomain": "jcb.com",
 			"altDomains": ["jcb.co.uk"],
+			"bucket": "big",
 			"fields": {
 				"industry": "manufacturing",
 				"country": "GB",
@@ -72,6 +77,7 @@
 		"expectedOutput": {
 			"officialDomain": "nandos.co.uk",
 			"altDomains": ["nandos.com"],
+			"bucket": "big",
 			"fields": {
 				"industry": "restaurants",
 				"country": "GB",
@@ -85,6 +91,7 @@
 		"expectedOutput": {
 			"officialDomain": "greggs.co.uk",
 			"altDomains": ["greggs.com"],
+			"bucket": "big",
 			"fields": {
 				"country": "GB",
 				"location": "Newcastle"
@@ -98,6 +105,7 @@
 		"expectedOutput": {
 			"officialDomain": "deliveroo.co.uk",
 			"altDomains": ["deliveroo.com"],
+			"bucket": "big",
 			"fields": {
 				"country": "GB",
 				"location": "London"
@@ -110,6 +118,7 @@
 		"expectedOutput": {
 			"officialDomain": "ocado.com",
 			"altDomains": ["ocadogroup.com", "ocado.co.uk"],
+			"bucket": "big",
 			"fields": {
 				"country": "GB",
 				"location": "Hatfield"
@@ -122,6 +131,7 @@
 		"query": "Enganches Aragón, Zaragoza",
 		"expectedOutput": {
 			"officialDomain": "enganchesaragon.com",
+			"bucket": "small",
 			"fields": {
 				"industry": "manufacturing",
 				"size_range": "51-200",
@@ -135,6 +145,7 @@
 		"query": "Cohitech, Balsareny",
 		"expectedOutput": {
 			"officialDomain": "cohitech.net",
+			"bucket": "small",
 			"fields": {
 				"industry": "manufacturing",
 				"size_range": "51-200",
@@ -148,6 +159,7 @@
 		"query": "Pronimetal, Alagón",
 		"expectedOutput": {
 			"officialDomain": "pronimetal.com",
+			"bucket": "small",
 			"fields": {
 				"industry": "manufacturing",
 				"size_range": "51-200",
@@ -161,6 +173,7 @@
 		"query": "PCEX Automotive, Alicante",
 		"expectedOutput": {
 			"officialDomain": "pcexautomotive.com",
+			"bucket": "small",
 			"fields": {
 				"industry": "distribution",
 				"size_range": "11-25",
@@ -175,6 +188,7 @@
 		"expectedOutput": {
 			"officialDomain": "canteralaponderosa.com",
 			"altDomains": ["ponderosa.es"],
+			"bucket": "niche",
 			"fields": {
 				"country": "ES",
 				"location": "Alcover"
@@ -186,6 +200,7 @@
 		"query": "Arrive Logistics, Austin",
 		"expectedOutput": {
 			"officialDomain": "arrivelogistics.com",
+			"bucket": "small",
 			"fields": {
 				"size_range": "51-200",
 				"country": "US",
@@ -199,6 +214,7 @@
 		"expectedOutput": {
 			"officialDomain": "ascentlogistics.com",
 			"altDomains": ["ascentgl.com"],
+			"bucket": "small",
 			"fields": {
 				"country": "US",
 				"location": "Belleville"
@@ -210,6 +226,7 @@
 		"query": "Europa Worldwide, Dartford",
 		"expectedOutput": {
 			"officialDomain": "europa-worldwide.com",
+			"bucket": "big",
 			"fields": {
 				"industry": "transport",
 				"country": "GB",
@@ -232,6 +249,7 @@
 		"query": "Lectra, Paris",
 		"expectedOutput": {
 			"officialDomain": "lectra.com",
+			"bucket": "niche",
 			"fields": {
 				"country": "FR",
 				"location": "Paris"
@@ -253,6 +271,7 @@
 		"query": "Beckhoff Automation, Verl",
 		"expectedOutput": {
 			"officialDomain": "beckhoff.com",
+			"bucket": "big",
 			"fields": {
 				"industry": "manufacturing",
 				"country": "DE",
@@ -267,6 +286,7 @@
 		"expectedOutput": {
 			"officialDomain": "vollrathcompany.com",
 			"altDomains": ["vollrathfoodservice.com"],
+			"bucket": "big",
 			"fields": {
 				"industry": "manufacturing",
 				"country": "US",
