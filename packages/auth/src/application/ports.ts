@@ -92,9 +92,8 @@ export interface SessionRepository {
 	) => Effect.Effect<ReadonlyArray<SessionRecord>, AuthConfigError>
 }
 
-// Sends the magic link via whatever transport the caller has wired — dev
-// catcher in local, AgentMail in cloud. Use cases never touch email state
-// directly.
+// Sends the magic link via whatever transport the caller has wired. Use cases
+// never touch email state directly.
 export interface MagicLinkSender {
 	readonly send: (email: string) => Effect.Effect<void, MagicLinkFailed>
 }

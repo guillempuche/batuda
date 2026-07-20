@@ -9,7 +9,7 @@ import {
 
 import { acquireAuthAdapter } from '../lib/auth-adapter'
 import { confirmCloud } from '../lib/confirm-cloud'
-import { getTarget } from '../lib/load-env'
+import { isLocalDatabase } from '../lib/database-host'
 
 export interface AuthInviteInput {
 	readonly email: string
@@ -27,17 +27,19 @@ export class MagicLinkNotCaptured extends Data.TaggedError(
 /**
  * `pnpm cli auth invite` — create a passwordless user and issue a magic link.
  *
- * Local mode uses an in-process Better-Auth instance with a capturing sender:
- * the generated URL is printed to stdout directly and the user opens it in
- * their browser while the server is running. In cloud the URL is routed
- * through AgentMail by the server process, so this command prints a pointer
- * to the HTTP endpoint instead of dispatching the email itself.
+ * When the database is on this machine, the link is generated in-process by a
+ * capturing sender and printed to stdout, for the person to open in a browser
+ * while the server runs. Against any other database the command creates the
+ * account only and prints the request that makes the running server send the
+ * link, since email leaves from the server rather than from here.
  */
 export const authInvite = (input: AuthInviteInput) =>
 	Effect.gen(function* () {
 		yield* confirmCloud('auth invite', input.confirmHost)
 
-		const target = getTarget()
+		// Whether this run can show the link itself, decided by the database it
+		// reached rather than by a flag someone may have left off.
+		const canDeliverHere = isLocalDatabase()
 
 		const baseURL = yield* Config.string('BETTER_AUTH_BASE_URL').pipe(
 			Config.withDefault('https://api.batuda.localhost'),
@@ -53,7 +55,10 @@ export const authInvite = (input: AuthInviteInput) =>
 			magicLinkSender: sender,
 		})
 
-		const user = yield* inviteUser(users, magicLink, input)
+		const user = yield* inviteUser(users, magicLink, {
+			...input,
+			sendMagicLink: canDeliverHere,
+		})
 
 		yield* Console.log('')
 		yield* Console.log('┌─── User invited ───────────────────────────┐')
@@ -63,9 +68,9 @@ export const authInvite = (input: AuthInviteInput) =>
 		yield* Console.log('└────────────────────────────────────────────┘')
 		yield* Console.log('')
 
-		if (target === 'cloud') {
+		if (!canDeliverHere) {
 			yield* Console.log(
-				'(cloud) Magic-link delivery is performed by the running server via AgentMail.',
+				'Magic-link delivery is performed by the running server.',
 			)
 			yield* Console.log('  Trigger it with:')
 			yield* Console.log(
