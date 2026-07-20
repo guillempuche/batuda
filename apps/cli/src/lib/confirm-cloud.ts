@@ -2,7 +2,7 @@ import { appendFileSync, mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 
 import * as p from '@clack/prompts'
-import { Data, Effect } from 'effect'
+import { Data, DateTime, Effect, Option } from 'effect'
 
 import { ROOT } from '../shell'
 import { isLocalDatabaseHost, resolveDatabaseHost } from './database-host'
@@ -21,11 +21,14 @@ export class RemoteDatabaseRefused extends Data.TaggedError(
 	'RemoteDatabaseRefused',
 )<{
 	readonly command: string
-	readonly host: string
+	// Absent when the connection string could not be read at all.
+	readonly host: string | null
 }> {
 	// The TUI prints `error.message` directly, so the reason has to live here.
 	override get message(): string {
-		return `Refused to run \`${this.command}\` against ${this.host} — it is not a database on this machine.`
+		return this.host === null
+			? `Refused to run \`${this.command}\`: DATABASE_URL could not be read, so there is no telling which database it would reach.`
+			: `Refused to run \`${this.command}\` against ${this.host} — it is not a database on this machine.`
 	}
 }
 
@@ -52,12 +55,15 @@ const appendAudit = (line: string): void => {
  */
 export const requireLocalDatabase = (command: string) =>
 	Effect.gen(function* () {
-		const host = resolveDatabaseHost(process.env['DATABASE_URL'] ?? '')
-		if (isLocalDatabaseHost(host)) return
+		const resolved = resolveDatabaseHost(process.env['DATABASE_URL'] ?? '')
+		if (Option.isSome(resolved) && isLocalDatabaseHost(resolved.value)) return
 
-		const timestamp = new Date().toISOString()
+		const host = Option.getOrNull(resolved)
+		const timestamp = DateTime.formatIso(DateTime.nowUnsafe())
 		const user = process.env['USER'] ?? 'unknown'
-		appendAudit(`${timestamp}\t${command}\tBLOCKED\thost=${host}\tuser=${user}`)
+		appendAudit(
+			`${timestamp}\t${command}\tBLOCKED\thost=${host ?? 'unreadable'}\tuser=${user}`,
+		)
 
 		return yield* Effect.fail(new RemoteDatabaseRefused({ command, host }))
 	})
@@ -88,21 +94,30 @@ export const confirmCloud = (
 	confirmHost?: string | undefined,
 ) =>
 	Effect.gen(function* () {
-		const expectedHost = resolveDatabaseHost(process.env['DATABASE_URL'] ?? '')
-		const isLocal = isLocalDatabaseHost(expectedHost)
-		const timestamp = new Date().toISOString()
+		const resolved = resolveDatabaseHost(process.env['DATABASE_URL'] ?? '')
+		const isLocal =
+			Option.isSome(resolved) && isLocalDatabaseHost(resolved.value)
+		// What prompts and audit lines call the target, including when the
+		// connection string gave us no host to name.
+		const hostLabel = Option.getOrElse(resolved, () => 'unreadable')
+		const timestamp = DateTime.formatIso(DateTime.nowUnsafe())
 		const user = process.env['USER'] ?? 'unknown'
 
 		// Checked before the local shortcut: a caller that believes it reached
 		// production but landed elsewhere would report success for work that
 		// never happened.
-		if (confirmHost !== undefined && confirmHost !== expectedHost) {
+		if (
+			confirmHost !== undefined &&
+			!(Option.isSome(resolved) && confirmHost === resolved.value)
+		) {
 			appendAudit(
-				`${timestamp}\t${command}\tMISMATCH\thost=${expectedHost}\tuser=${user}`,
+				`${timestamp}\t${command}\tMISMATCH\thost=${hostLabel}\tuser=${user}`,
 			)
 			return yield* Effect.fail(
 				new CloudRefused({
-					reason: `--confirm-host named "${confirmHost}" but DATABASE_URL resolves to "${expectedHost}".`,
+					reason: Option.isSome(resolved)
+						? `--confirm-host named "${confirmHost}" but DATABASE_URL resolves to "${resolved.value}".`
+						: `--confirm-host named "${confirmHost}" but DATABASE_URL could not be read.`,
 				}),
 			)
 		}
@@ -112,11 +127,11 @@ export const confirmCloud = (
 		// cloud and landing on this machine is a contradiction, not a default.
 		if (getTarget() === 'cloud' && isLocal) {
 			appendAudit(
-				`${timestamp}\t${command}\tLOCAL_IN_CLOUD_MODE\thost=${expectedHost}\tuser=${user}`,
+				`${timestamp}\t${command}\tLOCAL_IN_CLOUD_MODE\thost=${hostLabel}\tuser=${user}`,
 			)
 			return yield* Effect.fail(
 				new CloudRefused({
-					reason: `--env cloud was passed, but DATABASE_URL resolves to "${expectedHost}" on this machine. Wrap the command in \`infisical run --env=prod --\` so the production credentials are injected.`,
+					reason: `--env cloud was passed, but DATABASE_URL resolves to "${hostLabel}" on this machine. Wrap the command in \`infisical run --env=prod --\` so the production credentials are injected.`,
 				}),
 			)
 		}
@@ -128,14 +143,14 @@ export const confirmCloud = (
 		// copied into the wrong environment stops instead of going through.
 		if (confirmHost !== undefined) {
 			appendAudit(
-				`${timestamp}\t${command}\tOK\thost=${expectedHost}\tuser=${user}\tvia=confirm-host`,
+				`${timestamp}\t${command}\tOK\thost=${hostLabel}\tuser=${user}\tvia=confirm-host`,
 			)
 			return
 		}
 
 		const answer = yield* Effect.promise(() =>
 			p.confirm({
-				message: `⚠  Run \`${command}\` against ${expectedHost}?`,
+				message: `⚠  Run \`${command}\` against ${hostLabel}?`,
 				initialValue: false,
 			}),
 		)
@@ -145,18 +160,16 @@ export const confirmCloud = (
 
 		if (!confirmed) {
 			appendAudit(
-				`${timestamp}\t${command}\tREFUSED\thost=${expectedHost}\tanswer=${isCancelled ? '<cancelled>' : 'no'}\tuser=${user}`,
+				`${timestamp}\t${command}\tREFUSED\thost=${hostLabel}\tanswer=${isCancelled ? '<cancelled>' : 'no'}\tuser=${user}`,
 			)
 			return yield* Effect.fail(
 				new CloudRefused({
 					reason: isCancelled
 						? 'Cancelled by user.'
-						: `Declined the y/N confirm for host "${expectedHost}".`,
+						: `Declined the y/N confirm for host "${hostLabel}".`,
 				}),
 			)
 		}
 
-		appendAudit(
-			`${timestamp}\t${command}\tOK\thost=${expectedHost}\tuser=${user}`,
-		)
+		appendAudit(`${timestamp}\t${command}\tOK\thost=${hostLabel}\tuser=${user}`)
 	})

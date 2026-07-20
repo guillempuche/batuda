@@ -1,3 +1,4 @@
+import { Option } from 'effect'
 import { describe, expect, it } from 'vitest'
 
 import { isLocalDatabaseHost, resolveDatabaseHost } from './database-host'
@@ -14,7 +15,7 @@ describe('resolveDatabaseHost', () => {
 			// GIVEN a connection string with the host in the usual place
 			// WHEN the host is resolved
 			// THEN it matches the address
-			expect(resolveDatabaseHost(url)).toBe(expected)
+			expect(resolveDatabaseHost(url)).toStrictEqual(Option.some(expected))
 		})
 	})
 
@@ -30,8 +31,10 @@ describe('resolveDatabaseHost', () => {
 			const host = resolveDatabaseHost(url)
 
 			// THEN the remote host wins, not the reassuring-looking address
-			expect(host).toBe('ep-prod.eu-central-1.aws.neon.tech')
-			expect(isLocalDatabaseHost(host)).toBe(false)
+			expect(host).toStrictEqual(
+				Option.some('ep-prod.eu-central-1.aws.neon.tech'),
+			)
+			expect(Option.isSome(host) && isLocalDatabaseHost(host.value)).toBe(false)
 		})
 
 		it('should treat a socket path as a database on this machine', () => {
@@ -42,8 +45,8 @@ describe('resolveDatabaseHost', () => {
 			const host = resolveDatabaseHost(url)
 
 			// THEN it stays local, since a socket file cannot be anywhere else
-			expect(host).toBe('/var/run/postgresql')
-			expect(isLocalDatabaseHost(host)).toBe(true)
+			expect(host).toStrictEqual(Option.some('/var/run/postgresql'))
+			expect(Option.isSome(host) && isLocalDatabaseHost(host.value)).toBe(true)
 		})
 	})
 
@@ -54,12 +57,12 @@ describe('resolveDatabaseHost', () => {
 			['empty', ''],
 			['not a URL', 'not-a-url'],
 			['host-less', 'postgresql:///batuda'],
-		])('should report %s as unknown', (_label, url) => {
+		])('should resolve %s to nothing', (_label, url) => {
 			// GIVEN a connection string with no usable host
 			// WHEN the host is resolved
-			// THEN it is unknown, which no caller treats as local
-			expect(resolveDatabaseHost(url)).toBe('unknown')
-			expect(isLocalDatabaseHost(resolveDatabaseHost(url))).toBe(false)
+			// THEN there is no host at all, rather than a placeholder that could
+			// be mistaken for one
+			expect(resolveDatabaseHost(url)).toStrictEqual(Option.none())
 		})
 	})
 })
@@ -85,7 +88,6 @@ describe('isLocalDatabaseHost', () => {
 		// errs toward refusing rather than guessing.
 		it.each([
 			'db.example.com',
-			'unknown',
 			'',
 			'127.1',
 			'2130706433',

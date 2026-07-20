@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { request } from 'node:https'
 import { join, resolve } from 'node:path'
 
-import { Config, Effect } from 'effect'
+import { Config, Effect, Option } from 'effect'
 import type { ChildProcessSpawner } from 'effect/unstable/process'
 import { SqlClient } from 'effect/unstable/sql'
 
@@ -338,8 +338,9 @@ const cloudDbHostCheck: Check = {
 			)
 		// Report the host the connection will actually dial, which is not always
 		// the address the connection string appears to name.
-		const host = resolveDatabaseHost(url)
-		if (host === 'unknown') return fail('DATABASE_URL is not a valid URL')
+		const resolved = resolveDatabaseHost(url)
+		if (Option.isNone(resolved)) return fail('DATABASE_URL is not a valid URL')
+		const host = resolved.value
 		if (isLocalDatabaseHost(host))
 			return fail(`points to ${host} — the dev default leaked through?`)
 		return ok(host)

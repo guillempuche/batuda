@@ -11,6 +11,15 @@ vi.mock('node:fs', () => ({
 	mkdirSync: () => undefined,
 }))
 
+// The prompt needs a terminal, so stand in for it and drive each answer a
+// person could give: yes, no, and pressing Ctrl-C.
+let promptAnswer: boolean | symbol = false
+const CANCEL = Symbol('cancel')
+vi.mock('@clack/prompts', () => ({
+	confirm: async () => promptAnswer,
+	isCancel: (value: unknown) => value === CANCEL,
+}))
+
 // `getTarget` reads module state that only `loadEnv` sets, and loading env
 // files mid-test would trample process.env. Drive it directly instead.
 let target: 'local' | 'cloud' = 'local'
@@ -27,6 +36,10 @@ const {
 
 const runExit = <A, E>(effect: Effect.Effect<A, E>) =>
 	Effect.runSyncExit(effect as Effect.Effect<A, E, never>)
+
+// The prompt path awaits, so it cannot run through the synchronous runner.
+const runExitAsync = <A, E>(effect: Effect.Effect<A, E>) =>
+	Effect.runPromiseExit(effect as Effect.Effect<A, E, never>)
 
 // Both guard errors extend Error, so the caller reads `.message` directly —
 // the classes arrive via a dynamic import and so exist only as values here.
@@ -211,6 +224,55 @@ describe('confirmCloud', () => {
 			expect(error).toBeInstanceOf(CloudRefused)
 			expect(error.message).toContain('infisical run')
 			expect(auditLines[0]).toContain('\tLOCAL_IN_CLOUD_MODE\t')
+		})
+	})
+
+	describe('when a person is asked to confirm', () => {
+		beforeEach(() => {
+			process.env['DATABASE_URL'] = 'postgresql://u:p@db.example.com:5432/x'
+		})
+
+		it('should proceed when they agree, and record it', async () => {
+			// GIVEN a remote database and a person who answers yes
+			promptAnswer = true
+
+			// WHEN the guard runs with no host stated
+			const exit = await runExitAsync(confirmCloud('auth promote'))
+
+			// THEN it proceeds, and the audit shows an approval that was not the flag
+			expect(Exit.isSuccess(exit)).toBe(true)
+			expect(auditLines[0]).toContain('\tOK\t')
+			expect(auditLines[0]).not.toContain('via=confirm-host')
+		})
+
+		// Default-no is what keeps a stray Enter from running a production job.
+		it('should refuse when they decline', async () => {
+			// GIVEN a remote database and a person who answers no
+			promptAnswer = false
+
+			// WHEN the guard runs
+			const exit = await runExitAsync(confirmCloud('auth promote'))
+
+			// THEN it refuses and the refusal is recorded
+			const error = failureOf(exit)
+			expect(error).toBeInstanceOf(CloudRefused)
+			expect(error.message).toContain('db.example.com')
+			expect(auditLines[0]).toContain('\tREFUSED\t')
+			expect(auditLines[0]).toContain('answer=no')
+		})
+
+		it('should refuse when they cancel', async () => {
+			// GIVEN a remote database and a person who presses Ctrl-C
+			promptAnswer = CANCEL
+
+			// WHEN the guard runs
+			const exit = await runExitAsync(confirmCloud('auth promote'))
+
+			// THEN it refuses, distinguishing a cancel from a plain no
+			const error = failureOf(exit)
+			expect(error).toBeInstanceOf(CloudRefused)
+			expect(auditLines[0]).toContain('\tREFUSED\t')
+			expect(auditLines[0]).toContain('answer=<cancelled>')
 		})
 	})
 
