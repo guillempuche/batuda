@@ -43,9 +43,9 @@ export interface InviteAdminResult {
  *
  * Idempotent on user creation only — slug reuse without `allowExistingOrg`
  * is the explicit guard against accidentally piggy-backing on someone
- * else's org. The magic link is delivered via whatever transport the
- * caller wired into `magicLink.send` (dev catcher in local, Resend in
- * cloud); the use case never inspects the URL itself.
+ * else's org. The magic link goes to whatever transport the caller wired
+ * into `magicLink.send`, and the use case never inspects the URL itself, so
+ * the caller alone decides whether the link is delivered or just held.
  */
 export const inviteAdmin = (
 	users: UserRepository,
