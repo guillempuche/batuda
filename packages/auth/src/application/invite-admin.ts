@@ -26,11 +26,15 @@ export interface InviteAdminInput {
 	// `OrgSlugTaken` so a typo doesn't bolt the new admin onto someone
 	// else's org.
 	readonly allowExistingOrg?: boolean
+	// Defaults to true. Set false when the caller has no way to deliver the
+	// link, so no sign-in credential is minted that nobody can receive.
+	readonly sendMagicLink?: boolean
 }
 
 export interface InviteAdminResult {
 	readonly user: AuthUser
 	readonly organizationId: string
+	// Whether a sign-in link was actually handed to the sender on this call.
 	readonly magicLinkSent: boolean
 	// 'owner' when this call created the org (Better Auth's creatorRole),
 	// 'admin' when joining a pre-existing org under `allowExistingOrg`.
@@ -45,7 +49,9 @@ export interface InviteAdminResult {
  * is the explicit guard against accidentally piggy-backing on someone
  * else's org. The magic link goes to whatever transport the caller wired
  * into `magicLink.send`, and the use case never inspects the URL itself, so
- * the caller alone decides whether the link is delivered or just held.
+ * the caller alone decides whether the link is delivered or just held. A
+ * caller with no transport should set `sendMagicLink: false` rather than
+ * discard the link, since issuing one writes a usable sign-in credential.
  */
 export const inviteAdmin = (
 	users: UserRepository,
@@ -118,12 +124,15 @@ export const inviteAdmin = (
 			assignedRole = 'owner'
 		}
 
-		yield* magicLink.send(input.email)
+		// Sending mints a real sign-in credential, so skip it when the caller
+		// said it cannot deliver one — an unclaimable link is still a live link.
+		const sendMagicLink = input.sendMagicLink ?? true
+		if (sendMagicLink) yield* magicLink.send(input.email)
 
 		return {
 			user,
 			organizationId,
-			magicLinkSent: true,
+			magicLinkSent: sendMagicLink,
 			assignedRole,
 		}
 	})

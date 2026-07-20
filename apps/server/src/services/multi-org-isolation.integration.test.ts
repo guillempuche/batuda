@@ -1093,6 +1093,38 @@ describe('multi-org isolation', () => {
 			expect(after.rows[0]?.count).toBe(before.rows[0]?.count)
 		})
 
+		it('creates the org and user but issues no link when sendMagicLink=false', async () => {
+			// GIVEN a caller with no way to deliver a sign-in link
+			// WHEN inviteAdmin runs with sendMagicLink=false
+			// THEN the org, user and membership are created as usual
+			// AND no link is issued, so no unclaimable sign-in credential exists
+			await resetAuth()
+			let captured = 0
+			const result = await Effect.runPromise(
+				inviteAdmin(
+					ctx.adapter.users,
+					ctx.adapter.organizations,
+					ctx.adapter.members,
+					{ send: () => Effect.sync(() => void captured++) },
+					{
+						email: 'undelivered@x.com',
+						name: 'Undelivered',
+						orgName: 'Undelivered Co',
+						orgSlug: 'undelivered',
+						sendMagicLink: false,
+					},
+				),
+			)
+			expect(captured).toBe(0)
+			expect(result.magicLinkSent).toBe(false)
+			expect(result.assignedRole).toBe('owner')
+			const membership = await ctx.pool.query<{ role: string }>(
+				`SELECT role FROM "member" WHERE "organizationId" = $1 AND "userId" = $2`,
+				[result.organizationId, result.user.id],
+			)
+			expect(membership.rows[0]?.role).toBe('owner')
+		})
+
 		it('attaches as admin (not owner) when allowExistingOrg=true and slug exists', async () => {
 			// GIVEN slug='restaurant' already exists with bob as owner
 			// WHEN inviteAdmin runs with that slug + a brand-new email + allowExistingOrg=true
