@@ -173,6 +173,44 @@ const QUOTED_NAME = /["“]([^"”]{2,80})["”]/
 const queryName = (query: string): string =>
 	query.match(QUOTED_NAME)?.[1] ?? query.split(',')[0] ?? query
 
+// Administrative words that name no particular place — dropped so only the
+// distinctive part of a location ("louis" from "St. Louis city") is kept.
+const GEO_STOPWORDS = new Set([
+	'city',
+	'town',
+	'area',
+	'region',
+	'province',
+	'county',
+	'district',
+	'greater',
+	'metropolitan',
+])
+
+// The part of a free-text query after the first comma, where the convention
+// "Company Name, City" puts the location ("St. Louis MO" from
+// "Sunset Transportation, St. Louis MO"); empty when the query has no comma.
+const queryTail = (query: string): string => {
+	const comma = query.indexOf(',')
+	return comma >= 0 ? query.slice(comma + 1) : ''
+}
+
+// The distinctive place words a caller supplied — the query's post-comma tail
+// plus any location hint — each ≥4 chars and not a generic administrative word.
+// These let a run tell "the target, in the queried city" from a same-named
+// company (or a stale mention) somewhere else. Empty when no location was given,
+// which is what makes the city check below fail open.
+export const queryPlaces = (
+	query: string,
+	location?: string | undefined,
+): ReadonlyArray<string> => [
+	...new Set(
+		foldTokens(`${queryTail(query)} ${location ?? ''}`).filter(
+			t => t.length >= 4 && !GEO_STOPWORDS.has(t),
+		),
+	),
+]
+
 // A domain-shaped token inside free text: one or more dot-separated labels then a
 // 2–24 letter top-level part. The letters-only tail keeps decimals ("3.5") and
 // abbreviations ("e.g", "U.S.A") from matching.
@@ -200,6 +238,9 @@ export interface EntityTargets {
 	readonly words: ReadonlyArray<string>
 	/** Registrable hosts — strong-match keys (checked against the raw corpus). */
 	readonly domains: ReadonlyArray<string>
+	/** Distinctive place words from the query/location — corroboration keys used
+	 * only to fail closed when a name-only match names no reachable official site. */
+	readonly places: ReadonlyArray<string>
 }
 
 // Only these schemas make a claim about their OWN named subject. A scan playbook
@@ -233,6 +274,9 @@ export const deriveEntityTargets = (args: {
 	 * website was null or wrong. An unparseable value is ignored.
 	 */
 	anchorDomain?: string | undefined
+	/** The run's location hint, folded into the place keys alongside the query's
+	 * own "…, City" tail. */
+	location?: string | undefined
 }): EntityTargets | null => {
 	const anchored = args.subjects.length > 0
 	if (!isEntityGroundedSchema(args.schemaName) && !anchored) return null
@@ -268,7 +312,8 @@ export const deriveEntityTargets = (args: {
 
 	if (cores.length === 0 && words.length === 0 && domains.length === 0)
 		return null
-	return { cores, words, domains }
+	const places = queryPlaces(args.query, args.location)
+	return { cores, words, domains, places }
 }
 
 /**
@@ -291,6 +336,7 @@ export const withRedirectDomain = (
 			label != null && !targets.words.includes(label)
 				? [...targets.words, label]
 				: targets.words,
+		places: targets.places,
 	}
 }
 
@@ -343,6 +389,63 @@ export const classifyEntityMatch = (
 	// the run never clearly landed on it.
 	const weak = targets.words.some(word => collapsed.includes(word))
 	return weak ? 'weak' : 'absent'
+}
+
+/** Whether the evidence mentions any of the queried location's distinctive place
+ * words — the queried company "in that city", not a same-named company elsewhere.
+ * Always false when no location was supplied, so the city check fails open. */
+export const placesCorroborate = (
+	targets: EntityTargets,
+	corpus: string,
+): boolean => {
+	if (targets.places.length === 0) return false
+	const collapsed = collapse(corpus)
+	return targets.places.some(place => collapsed.includes(place))
+}
+
+/** Whether the run actually reached the company's own site — a fetched page whose
+ * host is a target domain, or whose registrable label is (part of) the company's
+ * name. A name written only on third-party pages (news, directories) is not an
+ * own-site reach. */
+export const reachedOwnSite = (
+	targets: EntityTargets,
+	pages: ReadonlyArray<{ readonly host?: string | undefined }>,
+): boolean =>
+	pages.some(page => {
+		if (page.host === undefined) return false
+		if (targets.domains.includes(page.host)) return true
+		const label = domainLabelOf(page.host)
+		if (label === undefined) return false
+		const folded = collapse(label)
+		return (
+			targets.words.includes(label) ||
+			targets.cores.some(core => core.includes(folded) || folded.includes(core))
+		)
+	})
+
+/**
+ * Tightens a name-only strong match with the queried location. A page that merely
+ * spells the company name reads as 'strong' even when it is about a different
+ * company sharing the name, or a stale mention of one that has since been renamed
+ * or acquired. When the caller gave a city, the run reached no official site, and
+ * no register confirmed the company, require that city to appear in the evidence
+ * too — otherwise downgrade so the run fails closed rather than shipping a
+ * lookalike's profile. Fails open (keeps) whenever a city was not supplied, an
+ * own site was reached, or a register confirmed the match, so it never costs a
+ * genuinely-grounded run.
+ */
+export const cityGate = (args: {
+	targets: EntityTargets
+	corpus: string
+	pages: ReadonlyArray<{ readonly host?: string | undefined }>
+	registryConfirmed: boolean
+}): 'keep' | 'downgrade' => {
+	const { targets, corpus, pages, registryConfirmed } = args
+	if (targets.places.length === 0) return 'keep'
+	if (registryConfirmed) return 'keep'
+	if (reachedOwnSite(targets, pages)) return 'keep'
+	if (placesCorroborate(targets, corpus)) return 'keep'
+	return 'downgrade'
 }
 
 /**

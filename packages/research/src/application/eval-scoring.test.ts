@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
 	type GoldenExpectation,
+	groupSummaries,
 	type RunOutcome,
 	type RunScore,
 	scoreRun,
@@ -556,6 +557,60 @@ describe('summarizeScores', () => {
 
 			// WHEN summarized — THEN there was nothing to recall, so the rate is absent
 			expect(summary.contactRecall).toBeNull()
+		})
+	})
+})
+
+describe('scoreRun — bucket and country', () => {
+	describe('when the golden row is tagged with a bucket', () => {
+		it('should carry the bucket and expected country onto the score', () => {
+			// GIVEN a golden row tagged niche (its country is ES)
+			const result = scoreRun({ ...acme, bucket: 'niche' }, outcome({}))
+			// WHEN scored — THEN both are carried through for grouping
+			expect(result.bucket).toBe('niche')
+			expect(result.country).toBe('ES')
+		})
+	})
+
+	describe('when the golden row has no bucket', () => {
+		it('should leave the bucket undefined', () => {
+			// GIVEN an untagged golden row
+			const result = scoreRun(acme, outcome({}))
+			// WHEN scored — THEN there is no bucket, but the country still rides along
+			expect(result.bucket).toBeUndefined()
+			expect(result.country).toBe('ES')
+		})
+	})
+})
+
+describe('groupSummaries', () => {
+	describe('when scores span several buckets', () => {
+		it('should summarize each bucket independently', () => {
+			// GIVEN a grounded big-bucket run and an empty niche-bucket run
+			const scores: RunScore[] = [
+				scoreRun(
+					{ ...acme, bucket: 'big' },
+					outcome({
+						reachedDomains: ['acme.es'],
+						fields: { industry: 'transport' },
+					}),
+				),
+				scoreRun(
+					{ ...acme, id: 'other', bucket: 'niche' },
+					outcome({
+						status: 'no_reliable_data',
+						reachedDomains: [],
+						fields: {},
+					}),
+				),
+			]
+			// WHEN grouped by bucket
+			const byBucket = groupSummaries(scores, s => s.bucket ?? 'untagged')
+			// THEN each bucket is summarized on its own
+			expect(Object.keys(byBucket).sort()).toEqual(['big', 'niche'])
+			expect(byBucket['big']?.runs).toBe(1)
+			expect(byBucket['big']?.emptyRate).toBe(0)
+			expect(byBucket['niche']?.emptyRate).toBe(1)
 		})
 	})
 })

@@ -293,6 +293,27 @@ const formatSummary = (summary: EvalSummary): string =>
 		`Empty rate:             ${pct(summary.emptyRate)}`,
 	].join('\n')
 
+// One compact line per group (a bucket, a country), so a segment that regressed
+// stands out against the whole-set numbers above.
+const formatGroups = (
+	title: string,
+	groups: Record<string, EvalSummary>,
+): string =>
+	[
+		'',
+		`── ${title} ──`,
+		...Object.entries(groups)
+			.sort(([a], [b]) => a.localeCompare(b))
+			.map(
+				([key, s]) =>
+					`${key.padEnd(10)} runs ${String(s.runs).padStart(3)}  ground ${pct(
+						s.groundingAccuracy,
+					)}  prec ${pct(s.fieldPrecision)}  recall ${pct(
+						s.fieldRecall,
+					)}  wrong ${pct(s.wrongCompanyRate)}  empty ${pct(s.emptyRate)}`,
+			),
+	].join('\n')
+
 /**
  * Run the golden set through the live research pipeline and report the four quality
  * metrics. This drives real runs (LLM + providers + DB), so it needs the research
@@ -308,6 +329,7 @@ export const researchEval = (opts: {
 	readonly concurrency: number
 	readonly runs: number
 	readonly out: Option.Option<string>
+	readonly byBucket: boolean
 }) =>
 	Effect.gen(function* () {
 		const raw = yield* Effect.tryPromise({
@@ -385,6 +407,10 @@ export const researchEval = (opts: {
 
 		const report = buildEvalReport(scores)
 		yield* Console.log(formatSummary(report.summary))
+		if (opts.byBucket) {
+			yield* Console.log(formatGroups('By bucket', report.byBucket))
+			yield* Console.log(formatGroups('By country', report.byCountry))
+		}
 		yield* Effect.annotateCurrentSpan(evalSummaryAttributes(report.summary))
 		yield* Option.match(opts.out, {
 			onNone: () => Effect.void,

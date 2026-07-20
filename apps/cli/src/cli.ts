@@ -907,8 +907,13 @@ const researchEvalCommand = Command.make(
 			Flag.withDescription('Write the full JSON report to this path'),
 			Flag.optional,
 		),
+		byBucket: Flag.boolean('by-bucket').pipe(
+			Flag.withDescription(
+				'Also print the metrics broken out by size/reach bucket and by country, so a regression in one segment is not averaged away',
+			),
+		),
 	},
-	({ org, user, golden, schema, language, concurrency, runs, out }) =>
+	({ org, user, golden, schema, language, concurrency, runs, out, byBucket }) =>
 		researchEval({
 			org,
 			user,
@@ -918,6 +923,7 @@ const researchEvalCommand = Command.make(
 			concurrency,
 			runs,
 			out,
+			byBucket,
 		}),
 ).pipe(
 	Command.withShortDescription(

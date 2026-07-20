@@ -64,6 +64,7 @@ import {
 	REFINE_HINT,
 } from './discovery-scan'
 import {
+	cityGate,
 	classifyEntityMatch,
 	classifyEntityMatchPerSource,
 	deriveAnchorHost,
@@ -74,6 +75,7 @@ import {
 	groundedSourceIds,
 	isConfirmedRegistryMatch,
 	isEntityGroundedSchema,
+	reachedOwnSite,
 	withRedirectDomain,
 } from './entity-guard'
 import { contactFill, enrichmentFill } from './extraction-fill'
@@ -87,7 +89,14 @@ import {
 	SizeRescueSchema,
 	sizeRescuePrompt,
 } from './firmographics-rescue'
+import { harvestGenericEmails } from './generic-emails'
 import { normalizePaidActionTool } from './paid-action-tool'
+import {
+	MAX_PER_FIELD_SEARCHES,
+	mergePerFieldSearch,
+	needsPerFieldSearch,
+	perFieldSearchQuery,
+} from './per-field-search'
 import { resolvePolicy, type SystemDefaults } from './policy'
 import {
 	AgentLanguageModel,
@@ -97,6 +106,7 @@ import {
 	ResearchEventSink,
 	ResearchRunContext,
 	ScrapeProvider,
+	SearchProvider,
 	WriterLanguageModel,
 } from './ports'
 import {
@@ -1520,6 +1530,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								typeof row['website'] === 'string' ? row['website'] : undefined,
 						}
 					})
+					// The caller's location hint, folded into the entity targets' place keys
+					// so the city verification below can tell the queried company "in that
+					// city" from a same-named company (or a stale mention) elsewhere.
+					const hintLocation = (
+						context?.hints as { location?: string } | undefined
+					)?.location
 					// `let`, not `const`: when the seeded anchor domain redirects to a
 					// different host (a rebrand), the seed below folds that destination
 					// in as a strong-match key so the run grounds on the live site.
@@ -1528,6 +1544,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						anchorDomain: context?.anchorDomain,
 						query: (run as { query: string }).query,
 						subjects: subjectTargets,
+						location: hintLocation,
 					})
 					let entityMatch: EntityMatch | null =
 						(run as { entityMatch?: EntityMatch | null }).entityMatch ?? null
@@ -2959,14 +2976,37 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						// glancing mention of it ('weak'), fails closed now — before phase 2
 						// extraction can turn a lookalike's pages into a confident profile.
 						// Only a strong match proceeds.
+						const entityCorpus = [
+							evidenceText,
+							...scrapeCorpus.map(page => page.text),
+						].join('\n')
 						entityMatch = entityTargets
-							? classifyEntityMatch(
-									entityTargets,
-									[evidenceText, ...scrapeCorpus.map(page => page.text)].join(
-										'\n',
-									),
-								)
+							? classifyEntityMatch(entityTargets, entityCorpus)
 							: null
+						// A page that merely spells the company name reads as 'strong' even
+						// for a different same-named company, or a stale mention of one since
+						// renamed or acquired. When a city was queried but the run reached no
+						// official site and no register confirmed the match, require that city
+						// in the evidence too — otherwise fail closed rather than profile a
+						// lookalike.
+						if (
+							entityMatch === 'strong' &&
+							entityTargets &&
+							cityGate({
+								targets: entityTargets,
+								corpus: entityCorpus,
+								pages: scrapeCorpus,
+								registryConfirmed,
+							}) === 'downgrade'
+						) {
+							yield* Effect.annotateCurrentSpan({
+								'research.entity.city_downgraded': true,
+							})
+							yield* Effect.logInfo('research.entity.city_downgraded').pipe(
+								Effect.annotateLogs({ research_id: researchId }),
+							)
+							entityMatch = 'absent'
+						}
 						if (entityMatch === 'absent' || entityMatch === 'weak') {
 							yield* failClosedOnEntity(entityMatch)
 							return
@@ -3046,6 +3086,137 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							)
 							findings = extracted.findings
 							tokensOut += extracted.outputTokens
+							// Per-field web search: for each high-value firmographic the broad
+							// pass and the focused rescues still left empty, fire one focused
+							// web search and re-extract over the enlarged evidence — a backstop
+							// for a fact (country, sector, city, size) that was on no page the
+							// run reached. Fail-open and capped: a complete run fires none, and
+							// a re-extraction that recovers nothing leaves findings unchanged.
+							const perFieldMissing = needsPerFieldSearch(findings).slice(
+								0,
+								MAX_PER_FIELD_SEARCHES,
+							)
+							if (perFieldMissing.length > 0) {
+								const search = yield* SearchProvider
+								const perFieldTargetName =
+									(run as { query: string }).query.split(',')[0]?.trim() ||
+									(run as { query: string }).query
+								const perFieldHashes: string[] = []
+								let perFieldFired = 0
+								// Phase-2 runs outside the loop's Budget scope, and the focused
+								// rescues here are unbudgeted too; the per-field cap above bounds
+								// the extra spend instead of a per-search charge.
+								for (const field of perFieldMissing) {
+									perFieldFired++
+									const searched = yield* search
+										.search({
+											query: perFieldSearchQuery(
+												perFieldTargetName,
+												hintLocation,
+												field,
+											),
+											limit: 3,
+											location: hintLocation,
+										})
+										.pipe(Effect.catchCause(() => Effect.succeed(null)))
+									for (const item of searched?.items ?? []) {
+										const host = domainHost(item.url)
+										if (host !== undefined) searchResultHosts.add(host)
+										if (item.content && item.content.trim().length > 0) {
+											const hash = urlHashForScrape(item.url)
+											perFieldHashes.push(hash)
+											scrapeCorpus.push({
+												urlHash: hash,
+												text: item.content,
+												host,
+											})
+										}
+									}
+								}
+								if (perFieldHashes.length > 0) {
+									yield* linkRunSources(perFieldHashes)
+									const perFieldAnchorFirst = [...scrapeCorpus].sort(
+										(a, b) =>
+											(anchorHashes.has(a.urlHash) ? 0 : 1) -
+											(anchorHashes.has(b.urlHash) ? 0 : 1),
+									)
+									const refreshed = yield* extractStructuredFindings(
+										researchText,
+										[
+											evidenceText,
+											...seededEvidenceParts,
+											...groundedPageTexts(entityTargets, scrapeCorpus),
+										].join('\n'),
+										groundedPageTexts(entityTargets, perFieldAnchorFirst),
+									)
+									tokensOut += refreshed.outputTokens
+									const merged = mergePerFieldSearch(
+										findings,
+										refreshed.findings,
+									)
+									findings = merged.findings
+									yield* Effect.annotateCurrentSpan({
+										'research.per_field_search.fired': perFieldFired,
+										'research.per_field_search.filled': merged.filled,
+									})
+									if (merged.filled > 0) {
+										yield* Effect.logInfo('research.per_field_search').pipe(
+											Effect.annotateLogs({
+												research_id: researchId,
+												fired: perFieldFired,
+												filled: merged.filled,
+											}),
+										)
+									}
+								}
+							}
+						}
+						// Published role mailboxes (info@, sales@, hola@): read verbatim
+						// from the company's own pages, they are often the only actionable
+						// channel for a thin-web company with no named executive. Added after
+						// the guard chain — grounded by construction (a known role word at one
+						// of the company's own domains) — so the guards never see, and so never
+						// strip, them. Skipped on resume when nothing was re-fetched, leaving
+						// any addresses from the pre-crash pass in place.
+						if (schemaName === 'company_enrichment_v1' && entityTargets) {
+							// Bind to a const so the null-narrowing survives the closures
+							// below (`entityTargets` is a reassignable `let`).
+							const emailTargets = entityTargets
+							const emailVerdicts = classifyEntityMatchPerSource(
+								emailTargets,
+								scrapeCorpus.map(page => ({
+									sourceId: page.urlHash,
+									text: page.text,
+									host: page.host,
+								})),
+							)
+							const emailKeep = new Set(groundedSourceIds(emailVerdicts))
+							const groundedForEmail = scrapeCorpus.filter(page =>
+								emailKeep.has(page.urlHash),
+							)
+							const ownHosts = [
+								...emailTargets.domains,
+								...groundedForEmail
+									.map(page => page.host)
+									.filter(
+										(host): host is string =>
+											host !== undefined &&
+											reachedOwnSite(emailTargets, [{ host }]),
+									),
+							]
+							const genericEmails = harvestGenericEmails(
+								groundedForEmail,
+								ownHosts,
+							)
+							if (genericEmails.length > 0) {
+								findings = {
+									...(findings as object),
+									generic_emails: genericEmails,
+								}
+								yield* Effect.annotateCurrentSpan({
+									'research.generic_emails.found': genericEmails.length,
+								})
+							}
 						}
 						yield* Ref.update(toolLog, log => [
 							...log,

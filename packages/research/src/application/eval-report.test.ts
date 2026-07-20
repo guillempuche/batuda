@@ -208,4 +208,30 @@ describe('buildEvalReport', () => {
 			expect(report.runs).toHaveLength(2)
 		})
 	})
+
+	describe('when the scores carry buckets and countries', () => {
+		it('should break the summary out by bucket and by country', () => {
+			// GIVEN a grounded big/GB run and an empty niche/FR run
+			const runs = [
+				score({ bucket: 'big', country: 'GB', grounded: true }),
+				score({ bucket: 'niche', country: 'FR', grounded: false, empty: true }),
+			]
+			// WHEN a report is built
+			const report = buildEvalReport(runs)
+			// THEN each segment is summarized on its own
+			expect(Object.keys(report.byBucket).sort()).toEqual(['big', 'niche'])
+			expect(Object.keys(report.byCountry).sort()).toEqual(['FR', 'GB'])
+			expect(report.byBucket['big']?.groundingAccuracy).toBe(1)
+			expect(report.byBucket['niche']?.emptyRate).toBe(1)
+		})
+
+		it('should bucket untagged and country-less scores under fallback keys', () => {
+			// GIVEN a score with neither a bucket nor a country
+			const report = buildEvalReport([score({})])
+			// WHEN a report is built
+			// THEN it falls into the explicit fallback groups, never dropped
+			expect(Object.keys(report.byBucket)).toEqual(['untagged'])
+			expect(Object.keys(report.byCountry)).toEqual(['unknown'])
+		})
+	})
 })

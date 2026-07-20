@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+	cityGate,
 	classifyEntityMatch,
 	classifyEntityMatchPerSource,
 	deriveAnchorHost,
@@ -10,6 +11,9 @@ import {
 	groundedSourceIds,
 	isConfirmedRegistryMatch,
 	parseQueryDomain,
+	placesCorroborate,
+	queryPlaces,
+	reachedOwnSite,
 	withRedirectDomain,
 } from './entity-guard'
 
@@ -113,6 +117,7 @@ describe('withRedirectDomain', () => {
 		cores: ['ascentgloballogistics'],
 		words: ['ascent'],
 		domains: ['ascentgl.com'],
+		places: [],
 	}
 
 	describe('when the anchor domain redirected to a new host', () => {
@@ -155,6 +160,7 @@ describe('classifyEntityMatch', () => {
 		cores: ['acmelogistics'],
 		words: ['acme'],
 		domains: ['acme.com'],
+		places: [],
 	}
 
 	describe('when the evidence names the target strongly', () => {
@@ -539,6 +545,201 @@ describe('domainHost', () => {
 			// GIVEN text with no dot, or too short to be a host
 			expect(domainHost('localhost')).toBeUndefined()
 			expect(domainHost('a.b')).toBeUndefined()
+		})
+	})
+})
+
+describe('queryPlaces', () => {
+	describe('when the query carries a "Name, City" tail', () => {
+		it('should keep the distinctive place words after the first comma', () => {
+			// GIVEN the convention "Company Name, City" in a free-text query
+			// WHEN the places are parsed
+			// THEN only the location tail is read, not the company name
+			expect(queryPlaces('Deliveroo, London')).toEqual(['london'])
+		})
+
+		it('should drop short tokens and generic administrative words', () => {
+			// GIVEN a location with a short state code and an admin word
+			// WHEN parsed
+			// THEN "st"/"mo" (too short) and "city" (generic) are dropped
+			expect(queryPlaces('Sunset Transportation, St. Louis MO')).toEqual([
+				'louis',
+			])
+			expect(queryPlaces('Acme, Kansas City')).toEqual(['kansas'])
+		})
+	})
+
+	describe('when a location hint is supplied', () => {
+		it('should fold the hint in alongside the query tail and dedupe', () => {
+			// GIVEN both a query tail and a separate location hint
+			// WHEN parsed
+			// THEN both contribute place words, with duplicates collapsed
+			expect(queryPlaces('Acme, Barcelona', 'Barcelona, Spain')).toEqual([
+				'barcelona',
+				'spain',
+			])
+		})
+	})
+
+	describe('when no location is present', () => {
+		it('should return empty for a bare name so the city check fails open', () => {
+			// GIVEN a plain company name with no comma and no hint
+			// WHEN parsed
+			// THEN there are no place words to require
+			expect(queryPlaces('Dyson')).toEqual([])
+		})
+	})
+})
+
+describe('placesCorroborate', () => {
+	const deliveroo: EntityTargets = {
+		cores: ['deliveroo'],
+		words: ['deliveroo'],
+		domains: [],
+		places: ['london'],
+	}
+
+	describe('when the evidence names the queried place', () => {
+		it('should return true regardless of case and punctuation', () => {
+			// GIVEN a corpus that mentions the queried city
+			// WHEN checked
+			// THEN the place corroborates (folding matches "London." to "london")
+			expect(placesCorroborate(deliveroo, 'Head office in London.')).toBe(true)
+		})
+	})
+
+	describe('when the evidence names a different place', () => {
+		it('should return false', () => {
+			// GIVEN a corpus that names only another city
+			expect(placesCorroborate(deliveroo, 'Now operating from New York')).toBe(
+				false,
+			)
+		})
+	})
+
+	describe('when no place was queried', () => {
+		it('should return false', () => {
+			// GIVEN targets with no place keys
+			// THEN there is nothing to corroborate
+			expect(placesCorroborate({ ...deliveroo, places: [] }, 'London')).toBe(
+				false,
+			)
+		})
+	})
+})
+
+describe('reachedOwnSite', () => {
+	const targets: EntityTargets = {
+		cores: ['deliveroo'],
+		words: ['deliveroo'],
+		domains: ['deliveroo.com'],
+		places: ['london'],
+	}
+
+	describe('when a fetched page is the company site', () => {
+		it('should return true for a page whose host is a target domain', () => {
+			// GIVEN a page fetched from the target's own domain
+			expect(reachedOwnSite(targets, [{ host: 'deliveroo.com' }])).toBe(true)
+		})
+
+		it('should return true for a page whose host label matches the name', () => {
+			// GIVEN a page on a country domain the caller never supplied
+			// THEN the "deliveroo" label still identifies the company's own site
+			expect(reachedOwnSite(targets, [{ host: 'deliveroo.co.uk' }])).toBe(true)
+		})
+	})
+
+	describe('when the fetched pages are all third-party', () => {
+		it('should return false for an unrelated host', () => {
+			// GIVEN only a page on a different company's domain
+			expect(reachedOwnSite(targets, [{ host: 'doordash.com' }])).toBe(false)
+		})
+
+		it('should return false for a page with no host', () => {
+			// GIVEN a corpus entry carrying no host (e.g. a tool result)
+			expect(reachedOwnSite(targets, [{ host: undefined }])).toBe(false)
+		})
+	})
+})
+
+describe('cityGate', () => {
+	const targets: EntityTargets = {
+		cores: ['deliveroo'],
+		words: ['deliveroo'],
+		domains: [],
+		places: ['london'],
+	}
+
+	describe('when a name-only match names no reachable site in the queried city', () => {
+		it('should downgrade so the run fails closed', () => {
+			// GIVEN the name appears on third-party pages, no own site was reached,
+			// no register confirmed it, and the queried city is absent
+			// WHEN the city gate runs
+			// THEN it downgrades — a lookalike or stale mention, not the target
+			expect(
+				cityGate({
+					targets,
+					corpus: 'Deliveroo was acquired; operations moved to New York.',
+					pages: [{ host: 'doordash.com' }],
+					registryConfirmed: false,
+				}),
+			).toBe('downgrade')
+		})
+	})
+
+	describe('when the queried city is corroborated', () => {
+		it('should keep the match', () => {
+			// GIVEN the evidence names both the company and the queried city
+			expect(
+				cityGate({
+					targets,
+					corpus: 'Deliveroo, headquartered in London.',
+					pages: [{ host: 'news.example.com' }],
+					registryConfirmed: false,
+				}),
+			).toBe('keep')
+		})
+	})
+
+	describe('when the run reached the company own site', () => {
+		it('should keep even if the city is not spelled out', () => {
+			// GIVEN a page on the company's own domain (the homepage rarely names its city)
+			expect(
+				cityGate({
+					targets,
+					corpus: 'Deliveroo — order food you love.',
+					pages: [{ host: 'deliveroo.co.uk' }],
+					registryConfirmed: false,
+				}),
+			).toBe('keep')
+		})
+	})
+
+	describe('when a register confirmed the company', () => {
+		it('should keep regardless of the city', () => {
+			// GIVEN a registry lookup confirmed the legal entity
+			expect(
+				cityGate({
+					targets,
+					corpus: 'Deliveroo mentioned in a directory.',
+					pages: [{ host: 'directory.example.com' }],
+					registryConfirmed: true,
+				}),
+			).toBe('keep')
+		})
+	})
+
+	describe('when no city was queried', () => {
+		it('should keep so a location-less query is never tightened', () => {
+			// GIVEN targets with no place keys (the caller gave only a name)
+			expect(
+				cityGate({
+					targets: { ...targets, places: [] },
+					corpus: 'Deliveroo somewhere.',
+					pages: [{ host: 'doordash.com' }],
+					registryConfirmed: false,
+				}),
+			).toBe('keep')
 		})
 	})
 })
