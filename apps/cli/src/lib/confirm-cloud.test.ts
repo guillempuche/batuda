@@ -99,6 +99,23 @@ describe('requireLocalDatabase', () => {
 			expect(auditLines[0]).toContain('host=db.example.com')
 		})
 
+		// A connection string can name its real host in a query parameter, and
+		// the guard has to follow the driver rather than the reassuring address.
+		it('should refuse when a query parameter points the driver elsewhere', () => {
+			// GIVEN an address of localhost but a query parameter naming production
+			process.env['DATABASE_URL'] =
+				'postgresql://u:p@localhost:5432/db?host=ep-prod.neon.tech'
+
+			// WHEN the guard runs
+			const exit = runExit(requireLocalDatabase('db reset'))
+
+			// THEN it refuses, naming the host the connection would really reach
+			const error = failureOf(exit)
+			expect(error).toBeInstanceOf(RemoteDatabaseRefused)
+			expect(error.message).toContain('ep-prod.neon.tech')
+			expect(auditLines[0]).toContain('\tBLOCKED\t')
+		})
+
 		// A guard that can't tell what it is about to wipe must not wipe it.
 		it.each([
 			['unset', undefined],

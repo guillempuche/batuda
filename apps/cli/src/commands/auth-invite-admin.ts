@@ -8,7 +8,7 @@ import {
 
 import { acquireAuthAdapter } from '../lib/auth-adapter'
 import { confirmCloud } from '../lib/confirm-cloud'
-import { getTarget } from '../lib/load-env'
+import { isLocalDatabase } from '../lib/database-host'
 
 export interface AuthInviteAdminInput {
 	readonly email: string
@@ -29,17 +29,20 @@ export class MagicLinkNotCaptured extends Data.TaggedError(
  * `pnpm cli auth invite-admin` — subsequent invites: create-or-find the
  * org, create-or-find the user, attach as admin, and issue a magic link.
  *
- * Local mode runs Better Auth in-process with a capturing sender so the
- * magic-link URL is printed to stdout for the developer to click. Cloud
- * mode prints a curl recipe pointing at the running server's
- * `/auth/sign-in/magic-link` endpoint, since email delivery is the
- * server's responsibility there.
+ * Against a database on this machine it runs Better Auth in-process with a
+ * capturing sender, so the magic-link URL is printed to stdout for the
+ * developer to click. Against a deployment it prints a curl recipe pointing at
+ * the running server's `/auth/sign-in/magic-link` endpoint, since email
+ * delivery is the server's responsibility there.
  */
 export const authInviteAdmin = (input: AuthInviteAdminInput) =>
 	Effect.gen(function* () {
 		yield* confirmCloud('auth invite-admin', input.confirmHost)
 
-		const target = getTarget()
+		// Only a database on this machine means this command can hand the link over
+		// itself; a deployment has a running server that sends it, so a link issued
+		// here would reach nobody.
+		const canDeliverHere = isLocalDatabase()
 
 		const baseURL = yield* Config.string('BETTER_AUTH_BASE_URL').pipe(
 			Config.withDefault('https://api.batuda.localhost'),
@@ -67,10 +70,7 @@ export const authInviteAdmin = (input: AuthInviteAdminInput) =>
 				orgName: input.orgName,
 				orgSlug: input.orgSlug,
 				allowExistingOrg: input.allowExistingOrg,
-				// Only local runs can show the link. Against a deployment the
-				// running server sends it, so issuing one here would write a
-				// sign-in credential that reaches nobody.
-				sendMagicLink: target === 'local',
+				sendMagicLink: canDeliverHere,
 			},
 		)
 
@@ -87,9 +87,9 @@ export const authInviteAdmin = (input: AuthInviteAdminInput) =>
 		yield* Console.log('└────────────────────────────────────────────┘')
 		yield* Console.log('')
 
-		if (target === 'cloud') {
+		if (!canDeliverHere) {
 			yield* Console.log(
-				'(cloud) Magic-link delivery is performed by the running server.',
+				'Magic-link delivery is performed by the running server.',
 			)
 			yield* Console.log('  Trigger it with:')
 			yield* Console.log(

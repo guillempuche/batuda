@@ -5,6 +5,7 @@ import * as p from '@clack/prompts'
 import { Data, Effect } from 'effect'
 
 import { ROOT } from '../shell'
+import { isLocalDatabaseHost, resolveDatabaseHost } from './database-host'
 import { getTarget } from './load-env'
 
 export class CloudRefused extends Data.TaggedError('CloudRefused')<{
@@ -30,19 +31,6 @@ export class RemoteDatabaseRefused extends Data.TaggedError(
 
 const AUDIT_LOG = resolve(ROOT, 'cloud-audit.log')
 
-// Hosts that mean "a database on this machine": plain local dev, a worktree's
-// own database, and CI, which all run Postgres on localhost.
-const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1'])
-
-const parseHost = (url: string): string => {
-	try {
-		// IPv6 hostnames come back bracketed (`[::1]`); compare them unwrapped.
-		return new URL(url).hostname.replace(/^\[|\]$/g, '')
-	} catch {
-		return 'unknown'
-	}
-}
-
 const appendAudit = (line: string): void => {
 	try {
 		mkdirSync(dirname(AUDIT_LOG), { recursive: true })
@@ -64,8 +52,8 @@ const appendAudit = (line: string): void => {
  */
 export const requireLocalDatabase = (command: string) =>
 	Effect.gen(function* () {
-		const host = parseHost(process.env['DATABASE_URL'] ?? '')
-		if (LOCAL_HOSTS.has(host)) return
+		const host = resolveDatabaseHost(process.env['DATABASE_URL'] ?? '')
+		if (isLocalDatabaseHost(host)) return
 
 		const timestamp = new Date().toISOString()
 		const user = process.env['USER'] ?? 'unknown'
@@ -100,8 +88,8 @@ export const confirmCloud = (
 	confirmHost?: string | undefined,
 ) =>
 	Effect.gen(function* () {
-		const expectedHost = parseHost(process.env['DATABASE_URL'] ?? '')
-		const isLocal = LOCAL_HOSTS.has(expectedHost)
+		const expectedHost = resolveDatabaseHost(process.env['DATABASE_URL'] ?? '')
+		const isLocal = isLocalDatabaseHost(expectedHost)
 		const timestamp = new Date().toISOString()
 		const user = process.env['USER'] ?? 'unknown'
 

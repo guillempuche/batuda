@@ -7,6 +7,7 @@ import type { ChildProcessSpawner } from 'effect/unstable/process'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { SqlLive } from '../db'
+import { isLocalDatabaseHost, resolveDatabaseHost } from '../lib/database-host'
 import { parseEnvKeys } from '../lib/env-file'
 import { getTarget } from '../lib/load-env'
 import { execSilent, ROOT } from '../shell'
@@ -335,15 +336,13 @@ const cloudDbHostCheck: Check = {
 			return fail(
 				'DATABASE_URL missing → run under `infisical run --env=prod -- …`',
 			)
-		try {
-			const host = new URL(url).hostname
-			if (host === 'localhost' || host === '127.0.0.1') {
-				return fail(`points to ${host} — the dev default leaked through?`)
-			}
-			return ok(host)
-		} catch {
-			return fail('DATABASE_URL is not a valid URL')
-		}
+		// Report the host the connection will actually dial, which is not always
+		// the address the connection string appears to name.
+		const host = resolveDatabaseHost(url)
+		if (host === 'unknown') return fail('DATABASE_URL is not a valid URL')
+		if (isLocalDatabaseHost(host))
+			return fail(`points to ${host} — the dev default leaked through?`)
+		return ok(host)
 	}),
 }
 
