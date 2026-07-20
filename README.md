@@ -97,7 +97,7 @@ pnpm install                # install dependencies
 pnpm cli setup              # copy .env files from .env.example
 pnpm cli services up        # start Postgres + MinIO via Docker
 pnpm cli db migrate         # create CRM + auth tables
-pnpm cli auth bootstrap     # create first admin (interactive)
+pnpm cli auth bootstrap-org # create first admin + their org (interactive)
 pnpm cli doctor             # verify everything is healthy
 # in 2 terminals:
 pnpm dev:server             # API + MCP server

@@ -75,23 +75,31 @@ Runs every CRM migration plus Better Auth's built-in migrations. After this, `do
 - **Auth tables**: `user`, `session`, `account`, `verification`, `apiKey`
 - **CRM tables**: `company`, `contact`, `interaction`, `task`, `document`, `proposal`, `page`, …
 
-## 5. Bootstrap the first admin
+## 5. Bootstrap the first admin and their organization
 
 ```bash
-pnpm cli auth bootstrap
+pnpm cli auth bootstrap-org
 ```
 
-Interactively prompts for email, display name, and password. The command **refuses** if any row already exists in `"user"`, so running it twice on the same database fails loudly with `UsersAlreadyExist` instead of silently creating a second admin.
+Interactively prompts for email, display name, password, organization name, and organization slug. The command **refuses** if any row already exists in `"user"`, so running it twice on the same database fails loudly with `UsersAlreadyExist` instead of silently creating a second admin.
+
+Creating the organization alongside the user is the point. Every CRM table is row-level-security scoped to an organization, so an admin without one signs in successfully and then gets 403 on every read. `pnpm cli auth bootstrap` (no `-org`) still exists and still works, but it stops at the user — reach for it only when you intend to attach the organization yourself.
 
 Keep the password you set — the dev loop uses it for every web login.
 
-## 6. (Optional) Invite another user
+## 6. (Optional) Invite another admin
 
 ```bash
-pnpm cli auth invite alice@example.com --name "Alice"
+pnpm cli auth invite-admin \
+  --email you@example.com --name "Your Name" \
+  --org-name "Acme" --org-slug acme
 ```
 
-Creates a passwordless user and immediately issues a magic link. **Locally**, the CLI captures the URL in-process and prints it to stdout; the server's dev inbox at `apps/server/.dev-inbox/` also catches a Markdown copy of the message. Paste the URL into a browser while `pnpm dev:server` is running to complete sign-in.
+Creates the organization if the slug is free, creates the user, attaches them, and issues a magic link. The role follows the organization: creating one makes you `owner`, joining an existing one makes you `admin`.
+
+Pass `--allow-existing-org` to join an organization that already exists. Without it a slug collision aborts with `OrgSlugTaken` — the guard that stops a mistyped slug from attaching your new admin to somebody else's tenant.
+
+**Locally**, the CLI captures the magic-link URL in-process and prints it to stdout; the server's dev inbox at `apps/server/.dev-inbox/` also catches a Markdown copy of the message. Paste the URL into a browser while `pnpm dev:server` is running to complete sign-in. Under `--env cloud` the running server owns delivery, so the CLI prints a `curl` recipe against `/auth/sign-in/magic-link` instead of the URL itself.
 
 Other useful commands in the same family:
 
@@ -153,11 +161,23 @@ portless serves the worktree at the branch's **last path segment** — `ui/foo` 
 Every CLI command accepts `--env local|cloud` (default `local`).
 
 - `--env local` loads `.env` + `apps/cli/.env` + `.env.local` + `apps/cli/.env.local`. This is always safe.
-- `--env cloud` loads the same baseline plus `.env.cloud` and `apps/cli/.env.cloud` (gitignored — they hold prod secrets). Non-secret GitHub Actions Variables are fetched on startup via `gh variable list --env production`, so `.env.cloud` only needs to carry secrets (which GitHub never exposes via the API). Commands that mutate state — DB writes, seeds, resets, auth user / key / session writes (e.g. `db reset`, `auth bootstrap`, `auth invite-admin`) — are gated behind a `y/N` confirm (default no) that shows the parsed DB hostname. Decline / Ctrl-C aborts and appends a `REFUSED` line to `cloud-audit.log`; confirming appends an `OK` line. Pure inspections (e.g. `doctor`, `auth list-*`, `auth sessions`) skip the gate; whether any given command calls `confirmCloud` is settled in `apps/cli/src/commands/*.ts`, so `pnpm cli <group> --help` plus a quick read of the command file is the authoritative reference.
+- `--env cloud` loads the same baseline plus the deployed server's non-secret settings from `apps/server/config.production.json` — the same committed file the production server boots on, so the CLI and the deployment cannot drift apart on things like the API base URL or the storage bucket. Secrets are never read from a file: they come from Infisical, injected into the environment by wrapping the command, and anything already in the environment outranks every file the loader touches.
+
+```bash
+infisical run --env=prod -- pnpm cli auth invite-admin --env cloud …
+```
+
+- `db reset` and `seed` **refuse** to run against anything but a database on this machine. There is no prompt and no override: both rebuild a database from empty, so reaching a real one is never the intent, and a confirm would still let a mistyped keystroke through. The attempt is recorded as a `BLOCKED` line in `cloud-audit.log`.
+
+- The `auth` user / key / session writes do run against production — that is what they are for — so they ask first: a `y/N` confirm (default no) showing the parsed DB hostname. Decline or Ctrl-C appends `REFUSED` to `cloud-audit.log`; confirming appends `OK`.
+
+- Without a terminal to answer that confirm, pass `--confirm-host <hostname>` naming the database the command should reach; `pnpm cli doctor --env cloud` prints the value. It is deliberately not a bare `--yes`: the value belongs to one specific database, so a command copied into another environment fails with `CloudRefused` and a `MISMATCH` audit line instead of quietly running. Treat the hostname as infrastructure detail — it is not a credential, but it names a reachable endpoint, so keep it out of shared logs and public snippets.
+
+- Both checks read the host out of the resolved `DATABASE_URL` rather than trusting `--env cloud`, because credentials arrive through the environment and a forgotten flag must not be the difference between a prompt and a dropped schema. A connection string that won't parse counts as remote. Pure inspections (`doctor`, `auth list-*`, `auth sessions`) never prompt, and nothing pointed at localhost does either — so ordinary local dev and CI are untouched.
 
 The interactive TUI (`pnpm cli:tui`) shows a coloured `LOCAL` / `CLOUD` badge in its header so you always know which database is at risk. Its menu is auto-generated from the CLI command tree, so every new `pnpm cli` subcommand appears in the TUI (and in `pnpm cli --help`) with no extra wiring.
 
-Cloud env requires `gh` authenticated locally (`gh auth status`). If `gh` is missing or unauthed the CLI prints a one-line install hint and falls back to whatever is in `.env.cloud`; any still-missing var will fail loudly at its specific Config read site.
+Cloud env requires the Infisical CLI (pinned in `flake.nix`, so the Nix shell already has it) and a logged-in session — `infisical login`. Run `pnpm cli doctor --env cloud` to check the wiring: it reports whether the CLI is available and whether the resolved database host is actually remote. A run without `infisical run` still starts, but every secret falls back to the local baseline, which the DB-host check flags rather than letting it pass silently.
 
 ## Troubleshooting
 
@@ -169,11 +189,11 @@ Cloud env requires `gh` authenticated locally (`gh auth status`). If `gh` is mis
 
 **A worktree host won't load at all** (`ERR_CONNECTION_CLOSED`, no cert prompt). A long-running portless proxy can lack certs for worktree subdomains created after it started — restart the proxy so it re-mints them.
 
-**`pnpm cli auth bootstrap` says `UsersAlreadyExist`.** Someone already bootstrapped. If you don't know the credentials, run `pnpm cli auth reset-password --email <their-email>` to overwrite the password instead.
+**`pnpm cli auth bootstrap-org` says `UsersAlreadyExist`.** Someone already bootstrapped. Use `pnpm cli auth invite-admin --allow-existing-org` to add yourself to the organization that already exists, or `pnpm cli auth reset-password --email <their-email>` to take over the original account.
 
 **I lost my admin password.** `pnpm cli auth reset-password --email <my-email>`. The CLI prompts for the new password and hashes it directly into `"account"`.
 
-**Magic link URL never prints.** Make sure you are on `--env local`. Cloud runs dispatch through the transactional email provider (Resend) and intentionally do not leak the URL to stdout.
+**Magic link URL never prints.** Make sure you are on `--env local`. Cloud runs leave delivery to the running server — `auth invite-admin` prints a `curl` recipe instead, and `auth invite` dispatches through the transactional email provider (Resend) — so neither leaks the URL to stdout. Treat the URL as a credential wherever it does appear: it signs whoever holds it straight in.
 
 **Server logs look empty.** Effect logs persist to `apps/server/server.log` across `node --watch` reloads. `grep event apps/server/server.log | tail -n 20` is the fastest way to catch the last structured log lines.
 
