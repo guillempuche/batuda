@@ -316,6 +316,39 @@ test.describe('adding a member', () => {
 		})
 	})
 
+	test.describe('when two people add the same person at the same moment', () => {
+		test('should end with one membership and the account intact', async ({
+			page,
+		}) => {
+			// GIVEN an address nobody has yet, and an owner's session
+			const recipient = freshEmail('race')
+			await page.goto('/settings/organization/members', {
+				waitUntil: 'networkidle',
+			})
+			const send = () =>
+				page.request.post(`${BASE_URL}/v1/members`, {
+					headers: { origin: BASE_URL, 'content-type': 'application/json' },
+					data: { email: recipient, role: 'member', locale: 'en' },
+				})
+
+			// WHEN both requests go out together, so both see "no such account"
+			// before either has written one
+			const [first, second] = await Promise.all([send(), send()])
+			const statuses = [first.status(), second.status()].sort()
+
+			// THEN exactly one creates the membership and the other is told it
+			// already exists — never two memberships, never two accounts
+			expect(statuses).toEqual([200, 409])
+
+			// AND the person survives. The loser tidies up after itself, and the
+			// account it must not touch is the winner's — deleting that would
+			// cascade the membership away and leave the winning caller holding a
+			// success response for a member who no longer exists.
+			await page.reload({ waitUntil: 'networkidle' })
+			await expect(memberRow(page, recipient)).toHaveCount(1)
+		})
+	})
+
 	// The UI hides the add controls from a regular member, but hiding a button
 	// is not authorization — anyone can post to the endpoint directly. These
 	// probe the server the way someone bypassing the page would.

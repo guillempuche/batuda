@@ -57,7 +57,7 @@ export class MemberService extends Context.Service<MemberService>()(
 			const findUser = (email: string) =>
 				Effect.tryPromise(() =>
 					auth.pool.query<UserRow>(
-						'SELECT id, name, locale FROM "user" WHERE lower(email) = lower($1) LIMIT 1',
+						'SELECT id, name, locale FROM "user" WHERE lower(email) = lower($1) ORDER BY "createdAt" ASC LIMIT 1',
 						[email],
 					),
 				).pipe(
@@ -142,6 +142,12 @@ export class MemberService extends Context.Service<MemberService>()(
 						}
 
 						const existingUser = yield* findUser(input.email)
+						// True only when *this* request is the one that created the
+						// account. Whether it existed a moment ago is not the same
+						// question: another add of the same address can win the race
+						// between the read above and the write below, and that account
+						// belongs to them.
+						let createdHere = false
 						if (existingUser === null) {
 							// No headers on purpose: that makes the admin endpoint skip
 							// its own permission check, which the role check above has
@@ -149,7 +155,7 @@ export class MemberService extends Context.Service<MemberService>()(
 							// outright — they are an admin of this organization, not of
 							// the whole install. Fields under `data` land on the
 							// account's own columns.
-							yield* Effect.tryPromise({
+							createdHere = yield* Effect.tryPromise({
 								try: () =>
 									auth.instance.api.createUser({
 										body: {
@@ -160,16 +166,18 @@ export class MemberService extends Context.Service<MemberService>()(
 									}),
 								catch: cause => cause,
 							}).pipe(
+								Effect.as(true),
 								Effect.catch(cause => {
 									const code = errorCode(cause)
 									// The account already exists — either it did before, or a
 									// concurrent add just created it. Either way the re-read
-									// below settles which row we are working with.
+									// below settles which row we are working with, and it is
+									// not one this request may remove.
 									if (
 										(code !== null && ACCOUNT_EXISTS.has(code)) ||
 										isDuplicateRow(cause)
 									) {
-										return Effect.void
+										return Effect.succeed(false)
 									}
 									// Better Auth rejected the address itself, which is the
 									// caller's mistake and worth telling them about.
@@ -207,12 +215,16 @@ export class MemberService extends Context.Service<MemberService>()(
 
 						// Creating the account and granting the membership are two
 						// separate writes owned by Better Auth, so they cannot share a
-						// transaction. If the second fails on an account we made moments
-						// ago, remove it: an account with no memberships can still request
-						// a sign-in link and land in an app with nothing in it. An account
-						// that existed beforehand is left alone — it is not ours to delete.
-						const accountIsNew = existingUser === null
-						const undoAccount = accountIsNew
+						// transaction. If the second fails on an account this request
+						// created, remove it: an account with no memberships can still
+						// ask for a sign-in link and land in an app with nothing in it.
+						//
+						// Only ever an account created here. Deleting on the weaker test
+						// of "did not exist a moment ago" would let the loser of a race
+						// delete the winner's account — and `member.userId` cascades, so
+						// the membership the winner just reported as created would go
+						// with it.
+						const undoAccount = createdHere
 							? Effect.tryPromise(() =>
 									auth.pool.query('DELETE FROM "user" WHERE id = $1', [
 										user.id,
@@ -233,7 +245,15 @@ export class MemberService extends Context.Service<MemberService>()(
 						}).pipe(
 							Effect.catch(cause => {
 								const code = errorCode(cause)
-								if (code === 'USER_IS_ALREADY_A_MEMBER_OF_THIS_ORGANIZATION') {
+								// Better Auth checks for an existing membership before it
+								// inserts, so a simultaneous add gets past that check and is
+								// stopped by the unique index instead. That arrives as a raw
+								// database error rather than a coded one, and it means the
+								// same thing: they are already in.
+								if (
+									code === 'USER_IS_ALREADY_A_MEMBER_OF_THIS_ORGANIZATION' ||
+									isDuplicateRow(cause)
+								) {
 									return undoAccount.pipe(
 										Effect.andThen(
 											Effect.fail(
