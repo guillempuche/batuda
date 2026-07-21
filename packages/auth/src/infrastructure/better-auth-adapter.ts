@@ -281,6 +281,12 @@ export const makeBetterAuthAdapter = (
 							email: input.email,
 							name: input.name,
 							role: input.role,
+							// `data` carries the columns beyond Better Auth's own. Omitted
+							// entirely when no language is known, so the account keeps a
+							// null rather than being pinned to a guess.
+							...(input.locale === undefined
+								? {}
+								: { data: { locale: input.locale } }),
 						},
 					}),
 				catch: cause => mapCreateUserError(input.email, cause),

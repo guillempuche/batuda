@@ -16,6 +16,9 @@ export interface InviteUserInput {
 	// link: issuing one creates a working way into the account, so an
 	// undeliverable link is a credential left lying around.
 	readonly sendMagicLink?: boolean
+	// The language this person reads, when the caller knows it. Left unset, the
+	// account carries no preference.
+	readonly locale?: string
 }
 
 /**
@@ -39,6 +42,7 @@ export const inviteUser = (
 			email: input.email,
 			name: input.name,
 			role: input.role,
+			...(input.locale === undefined ? {} : { locale: input.locale }),
 		})
 		if (input.sendMagicLink ?? true) yield* magicLink.send(input.email)
 		return user
