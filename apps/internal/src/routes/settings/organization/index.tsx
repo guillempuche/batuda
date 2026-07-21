@@ -18,8 +18,8 @@ import {
 
 /**
  * Active-organization landing page. Shows the org's display name + slug,
- * plus a link to the members list — which is where members are invited,
- * listed, and removed and pending invitations are managed.
+ * plus a link to the members list — which is where people are added,
+ * listed, and removed.
  *
  * Aesthetic matches the Profile page: brushed-metal card, stenciled
  * heading, ruler-underline intro. Uses the Better Auth `organizationClient`
@@ -96,8 +96,7 @@ function OrganizationSettingsPage() {
 						</NavRowLabel>
 						<NavRowDescription>
 							<Trans>
-								See who can access this workspace, invite teammates, and manage
-								pending invitations.
+								See who can access this workspace, and add or remove people.
 							</Trans>
 						</NavRowDescription>
 					</NavRow>

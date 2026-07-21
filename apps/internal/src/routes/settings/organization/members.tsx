@@ -4,9 +4,7 @@ import {
 	ArrowLeft,
 	Check,
 	ChevronsUpDown,
-	Clock,
 	Mail,
-	RotateCcw,
 	Send,
 	Trash2,
 	UserCircle2,
@@ -16,15 +14,13 @@ import {
 import { useState } from 'react'
 import styled from 'styled-components'
 
+import { isLangCode, type LangCode } from '@batuda/domain'
 import { PriButton, PriInput, PriSelect } from '@batuda/ui/pri'
 
-import { RelativeDate } from '#/components/shared/relative-date'
+import { langSelectItems } from '#/i18n/lang-labels'
+import { useLang } from '#/i18n/lang-provider'
+import { apiBaseUrl } from '#/lib/api-base'
 import { authClient } from '#/lib/auth-client'
-import {
-	type InvitationLike,
-	invitationDisplayStatus,
-	selectPendingInvitations,
-} from '#/lib/invitation-status'
 import {
 	brushedMetalPlate,
 	rulerUnderRule,
@@ -32,22 +28,18 @@ import {
 } from '#/lib/workshop-mixins'
 
 /**
- * Active-organization membership page. One place for the whole lifecycle:
- * active members (with remove), pending invitations (with cancel + resend),
- * and an inline "Invite member" panel.
+ * Active-organization membership page: who is in the workspace, with an inline
+ * panel for adding someone. Adding puts them in straight away — there is no
+ * pending state to track and nothing for them to accept. The email they get
+ * says so and carries no way into the account; they sign in themselves and ask
+ * for their own link.
  *
- * Everything reads from Better Auth's `useActiveOrganization` atom — its
- * `/get-full-organization` payload carries both `members` and every
- * `invitations` row, and the atom auto-refetches after any `/organization/*`
- * call (invite, cancel, remove), so sending or canceling an invitation
- * refreshes the lists without manual invalidation.
- *
- * Owners/admins manage; regular members get a read-only view (the invite CTA
- * and the remove/cancel/resend controls are hidden), mirroring how the
- * inboxes page hides destructive controls for roles that can't act.
+ * Owners and admins manage; regular members get a read-only view (the add CTA
+ * and the remove controls are hidden), mirroring how the inboxes page hides
+ * destructive controls for roles that can't act.
  */
 
-interface MemberRow {
+interface OrgMember {
 	readonly id: string
 	readonly userId: string
 	readonly role: string
@@ -58,8 +50,6 @@ interface MemberRow {
 	}
 }
 
-type InvitationRow = InvitationLike
-
 type Role = 'member' | 'admin'
 
 export const Route = createFileRoute('/settings/organization/members')({
@@ -69,42 +59,39 @@ export const Route = createFileRoute('/settings/organization/members')({
 
 function MembersPage() {
 	const { t } = useLingui()
-	// `useActiveOrganization` returns the full org payload — members AND
-	// invitations — and is signal-backed so it auto-refetches when the
-	// active-org cookie changes or any /organization/* call lands. Saves us a
-	// separate list-members / list-invitations fetch on every page load.
+	// `useActiveOrganization` returns the full org payload and is signal-backed,
+	// so it auto-refetches when the active-org cookie changes or any
+	// /organization/* call lands. Saves a separate list-members fetch on every
+	// page load.
 	const active = authClient.useActiveOrganization()
 	const activeMember = authClient.useActiveMember()
+	const activeLang = useLang()
 
 	const [removingId, setRemovingId] = useState<string | null>(null)
 	const [error, setError] = useState<string | null>(null)
-	const [showInvite, setShowInvite] = useState(false)
-	const [inviteEmail, setInviteEmail] = useState('')
-	const [inviteRole, setInviteRole] = useState<Role>('member')
-	const [inviteSubmitting, setInviteSubmitting] = useState(false)
-	const [inviteError, setInviteError] = useState<string | null>(null)
-	const [sentEmail, setSentEmail] = useState<string | null>(null)
-	const [busyInvitationId, setBusyInvitationId] = useState<string | null>(null)
-	const [invitationNotice, setInvitationNotice] = useState<{
-		readonly kind: 'canceled' | 'resent'
-		readonly email: string
-	} | null>(null)
+	const [showAddPanel, setShowAddPanel] = useState(false)
+	const [newMemberEmail, setNewMemberEmail] = useState('')
+	const [newMemberRole, setNewMemberRole] = useState<Role>('member')
+	// Seeded from the language the admin is reading in, not the app default: an
+	// admin working in Catalan is far more likely to be adding a colleague who
+	// also reads Catalan. Still a plain default they can change.
+	const [newMemberLocale, setNewMemberLocale] = useState<LangCode>(activeLang)
+	const [adding, setAdding] = useState(false)
+	const [addError, setAddError] = useState<string | null>(null)
+	const [addedEmail, setAddedEmail] = useState<string | null>(null)
 
-	const members = (active.data?.members ?? []) as ReadonlyArray<MemberRow>
-	const allInvitations: ReadonlyArray<InvitationRow> =
-		active.data?.invitations ?? []
-	const pendingInvitations = selectPendingInvitations(allInvitations)
+	const members = (active.data?.members ?? []) as ReadonlyArray<OrgMember>
 
 	const myRole = activeMember.data?.role ?? null
 	const canManage = myRole === 'owner' || myRole === 'admin'
 
 	// Inline so Lingui's macro extractor sees each `t` call.
-	const ROLE_LABELS: Record<string, string> = {
+	const roleLabels: Record<string, string> = {
 		owner: t`Owner`,
 		admin: t`Admin`,
 		member: t`Member`,
 	}
-	const ROLE_ITEMS: ReadonlyArray<{ value: Role; label: string }> = [
+	const roleItems: ReadonlyArray<{ value: Role; label: string }> = [
 		{ value: 'member', label: t`Member` },
 		{ value: 'admin', label: t`Admin` },
 	]
@@ -130,91 +117,62 @@ function MembersPage() {
 		}
 	}
 
-	const handleInvite = async (event: React.FormEvent<HTMLFormElement>) => {
+	const handleAdd = async (event: React.FormEvent<HTMLFormElement>) => {
 		event.preventDefault()
-		const trimmed = inviteEmail.trim().toLowerCase()
+		const trimmed = newMemberEmail.trim().toLowerCase()
 		if (!trimmed) {
-			setInviteError(t`Enter an email address.`)
+			setAddError(t`Enter an email address.`)
 			return
 		}
-		setInviteSubmitting(true)
-		setInviteError(null)
+		setAdding(true)
+		setAddError(null)
 		try {
-			const result = await authClient.organization.inviteMember({
-				email: trimmed,
-				role: inviteRole,
-				// Let people re-invite someone who hasn't accepted yet: reuse
-				// the open invitation (the link already in their inbox keeps
-				// working) instead of erroring on the second try.
-				resend: true,
+			const response = await fetch(`${apiBaseUrl()}/v1/members`, {
+				method: 'POST',
+				credentials: 'include',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					email: trimmed,
+					role: newMemberRole,
+					locale: newMemberLocale,
+				}),
 			})
-			if (result.error) {
-				// Remaining errors (already a member, no inviter, etc.) come
-				// back with a human-readable message, so we show it as-is.
-				setInviteError(
-					result.error.message ??
-						t`Could not send the invitation. Please try again.`,
+			if (!response.ok) {
+				// The server names what went wrong; the wording lives here so it
+				// can be translated.
+				const body = (await response.json().catch(() => null)) as {
+					_tag?: string
+				} | null
+				setAddError(
+					body?._tag === 'Conflict'
+						? t`${trimmed} is already in this organization.`
+						: body?._tag === 'Forbidden'
+							? t`Only an owner or an admin can add members.`
+							: body?._tag === 'BadRequest'
+								? t`That email address can't be used.`
+								: // A session that lapsed while the panel was open. Without
+									// this the message says "try again", which never works
+									// however many times they do.
+									response.status === 401
+									? t`Your session has expired. Sign in again to continue.`
+									: t`Could not add ${trimmed}. Please try again.`,
 				)
 				return
 			}
-			setSentEmail(trimmed)
-			setInviteEmail('')
+			setAddedEmail(trimmed)
+			setNewMemberEmail('')
+			// The list is backed by Better Auth's atom, which refreshes after its
+			// own `/organization/*` calls. This add went through Batuda's endpoint,
+			// so nudge it with a read the atom does listen for.
+			await authClient.organization.getFullOrganization()
 		} catch {
-			setInviteError(
-				t`No connection to the server. Try again in a few seconds.`,
-			)
+			setAddError(t`No connection to the server. Try again in a few seconds.`)
 		} finally {
-			setInviteSubmitting(false)
+			setAdding(false)
 		}
 	}
 
-	const handleCancel = async (invitationId: string, email: string) => {
-		setBusyInvitationId(invitationId)
-		setError(null)
-		try {
-			const result = await authClient.organization.cancelInvitation({
-				invitationId,
-			})
-			if (result.error) {
-				setError(
-					t`Could not cancel the invitation to ${email}. Please try again.`,
-				)
-				return
-			}
-			setInvitationNotice({ kind: 'canceled', email })
-		} catch {
-			setError(t`No connection to the server. Try again in a few seconds.`)
-		} finally {
-			setBusyInvitationId(null)
-		}
-	}
-
-	const handleResend = async (invitation: InvitationRow) => {
-		setBusyInvitationId(invitation.id)
-		setError(null)
-		try {
-			// `resend: true` refreshes the existing invite's expiry and re-fires
-			// sendInvitationEmail — no new row, same id.
-			const result = await authClient.organization.inviteMember({
-				email: invitation.email,
-				role: invitation.role as Role,
-				resend: true,
-			})
-			if (result.error) {
-				setError(
-					t`Could not resend the invitation to ${invitation.email}. Please try again.`,
-				)
-				return
-			}
-			setInvitationNotice({ kind: 'resent', email: invitation.email })
-		} catch {
-			setError(t`No connection to the server. Try again in a few seconds.`)
-		} finally {
-			setBusyInvitationId(null)
-		}
-	}
-
-	const panelOpen = canManage && showInvite
+	const panelOpen = canManage && showAddPanel
 
 	return (
 		<Page>
@@ -241,64 +199,47 @@ function MembersPage() {
 					<PriButton
 						type='button'
 						$variant='filled'
-						data-testid='invite-open'
-						aria-expanded={showInvite}
+						data-testid='add-member-open'
+						aria-expanded={showAddPanel}
 						onClick={() => {
-							setShowInvite(open => !open)
+							// Drop any previous failure with the panel — otherwise
+							// reopening it shows an error about the last address above
+							// an empty form.
+							setAddError(null)
+							setShowAddPanel(open => !open)
 						}}
 					>
 						<UserPlus size={16} aria-hidden />
-						<span>{showInvite ? t`Close invite` : t`Invite member`}</span>
+						<span>{showAddPanel ? t`Close` : t`Add member`}</span>
 					</PriButton>
 				) : null}
 			</HeaderRow>
 
 			{error ? <ErrorBanner role='alert'>{error}</ErrorBanner> : null}
 
-			{sentEmail ? (
-				<SuccessBanner role='status' data-testid='invite-success'>
-					<Mail size={14} aria-hidden />
-					<span>
-						<Trans>Invitation sent to {sentEmail}.</Trans>
-					</span>
-					<DismissButton
-						type='button'
-						aria-label={t`Dismiss`}
-						onClick={() => {
-							setSentEmail(null)
-						}}
-					>
-						<X size={14} aria-hidden />
-					</DismissButton>
-				</SuccessBanner>
-			) : null}
-
-			{invitationNotice ? (
-				<SuccessBanner
-					role='status'
-					data-testid={
-						invitationNotice.kind === 'canceled'
-							? 'invitation-cancel-confirm'
-							: 'invitation-resend-confirm'
-					}
-				>
-					<Mail size={14} aria-hidden />
-					<span>
-						{invitationNotice.kind === 'canceled'
-							? t`Invitation to ${invitationNotice.email} canceled.`
-							: t`Invitation to ${invitationNotice.email} re-sent.`}
-					</span>
-					<DismissButton
-						type='button'
-						aria-label={t`Dismiss`}
-						onClick={() => {
-							setInvitationNotice(null)
-						}}
-					>
-						<X size={14} aria-hidden />
-					</DismissButton>
-				</SuccessBanner>
-			) : null}
+			{/* The live region stays mounted and empty. A region that appears at
+			    the same moment as its text is often missed entirely — screen
+			    readers announce changes *within* a region they were already
+			    watching. `display: contents` keeps it out of the layout. */}
+			<LiveRegion role='status' aria-live='polite'>
+				{addedEmail ? (
+					<SuccessBanner data-testid='add-member-success'>
+						<Mail size={14} aria-hidden />
+						<span>
+							<Trans>{addedEmail} is now a member. They've been emailed.</Trans>
+						</span>
+						<DismissButton
+							type='button'
+							aria-label={t`Dismiss`}
+							onClick={() => {
+								setAddedEmail(null)
+							}}
+						>
+							<X size={14} aria-hidden />
+						</DismissButton>
+					</SuccessBanner>
+				) : null}
+			</LiveRegion>
 
 			<Layout $open={panelOpen}>
 				<Main>
@@ -341,7 +282,7 @@ function MembersPage() {
 												$role={member.role}
 											>
 												<UserCircle2 size={12} aria-hidden />
-												<span>{ROLE_LABELS[member.role] ?? member.role}</span>
+												<span>{roleLabels[member.role] ?? member.role}</span>
 											</RoleBadge>
 											{canManage ? (
 												<PriButton
@@ -363,125 +304,21 @@ function MembersPage() {
 							})}
 						</MemberList>
 					)}
-
-					<Section data-testid='invitations-section'>
-						<SectionHeading>
-							<Trans>Pending invitations</Trans>
-						</SectionHeading>
-
-						{active.isPending && !active.data ? (
-							<EmptyCard data-testid='invitations-loading'>
-								<Subtitle>
-									<Trans>Loading…</Trans>
-								</Subtitle>
-							</EmptyCard>
-						) : pendingInvitations.length === 0 ? (
-							<EmptyCard data-testid='invitations-empty'>
-								<Subtitle>
-									<Trans>No pending invitations.</Trans>
-								</Subtitle>
-							</EmptyCard>
-						) : (
-							<InvitationList>
-								{pendingInvitations.map(invitation => {
-									const expired =
-										invitationDisplayStatus(invitation.expiresAt) === 'expired'
-									const isBusy = busyInvitationId === invitation.id
-									return (
-										<InvitationItem
-											key={invitation.id}
-											data-testid={`invitation-row-${invitation.id}`}
-										>
-											<InvitationInfo>
-												<InvitationEmail
-													data-testid={`invitation-email-${invitation.id}`}
-												>
-													<Mail size={12} aria-hidden />
-													<span>{invitation.email}</span>
-												</InvitationEmail>
-												<InvitationMeta>
-													<MetaItem>
-														<MetaKey>
-															<Trans>Sent</Trans>
-														</MetaKey>
-														<RelativeDate value={invitation.createdAt} />
-													</MetaItem>
-													<MetaItem>
-														<MetaKey>
-															<Trans>Expires</Trans>
-														</MetaKey>
-														<RelativeDate value={invitation.expiresAt} />
-													</MetaItem>
-												</InvitationMeta>
-											</InvitationInfo>
-
-											<InvitationBadges>
-												<RoleBadge
-													data-testid={`invitation-role-${invitation.id}`}
-													$role={invitation.role}
-												>
-													<UserCircle2 size={12} aria-hidden />
-													<span>
-														{ROLE_LABELS[invitation.role] ?? invitation.role}
-													</span>
-												</RoleBadge>
-												<StatusBadge
-													data-testid={`invitation-status-${invitation.id}`}
-													$expired={expired}
-												>
-													<Clock size={12} aria-hidden />
-													<span>{expired ? t`Expired` : t`Pending`}</span>
-												</StatusBadge>
-											</InvitationBadges>
-
-											{canManage ? (
-												<InvitationActions>
-													<PriButton
-														type='button'
-														$variant='outlined'
-														data-testid={`invitation-resend-${invitation.id}`}
-														disabled={isBusy}
-														onClick={() => {
-															void handleResend(invitation)
-														}}
-													>
-														<RotateCcw size={14} aria-hidden />
-														<span>{isBusy ? t`Working…` : t`Resend`}</span>
-													</PriButton>
-													<PriButton
-														type='button'
-														$variant='outlined'
-														data-testid={`invitation-cancel-${invitation.id}`}
-														disabled={isBusy}
-														onClick={() => {
-															void handleCancel(invitation.id, invitation.email)
-														}}
-													>
-														<X size={14} aria-hidden />
-														<span>{t`Cancel`}</span>
-													</PriButton>
-												</InvitationActions>
-											) : null}
-										</InvitationItem>
-									)
-								})}
-							</InvitationList>
-						)}
-					</Section>
 				</Main>
 
 				{panelOpen ? (
 					<Aside>
-						<InvitePanel>
+						<AddPanel>
 							<PanelHeader>
 								<PanelTitle>
-									<Trans>Invite a member</Trans>
+									<Trans>Add a member</Trans>
 								</PanelTitle>
 								<DismissButton
 									type='button'
 									aria-label={t`Close`}
 									onClick={() => {
-										setShowInvite(false)
+										setAddError(null)
+										setShowAddPanel(false)
 									}}
 								>
 									<X size={16} aria-hidden />
@@ -490,54 +327,54 @@ function MembersPage() {
 
 							<PanelSubtitle>
 								<Trans>
-									Send a one-click invitation. The recipient signs in via the
-									link in the email — no password to share.
+									They join straight away and get an email telling them so. It
+									carries no password and no link to sign in with.
 								</Trans>
 							</PanelSubtitle>
 
-							{inviteError ? (
-								<ErrorBanner role='alert' data-testid='invite-error'>
-									{inviteError}
+							{addError ? (
+								<ErrorBanner role='alert' data-testid='add-member-error'>
+									{addError}
 								</ErrorBanner>
 							) : null}
 
-							<Form onSubmit={handleInvite} data-testid='invite-form'>
+							<Form onSubmit={handleAdd} data-testid='add-member-form'>
 								<Field>
-									<Label htmlFor='invite-email'>
+									<Label htmlFor='add-member-email'>
 										<Trans>Email</Trans>
 									</Label>
 									<PriInput
-										id='invite-email'
+										id='add-member-email'
 										name='email'
 										type='email'
 										autoComplete='email'
 										required
-										disabled={inviteSubmitting}
-										value={inviteEmail}
+										disabled={adding}
+										value={newMemberEmail}
 										onChange={e => {
-											setInviteEmail(e.currentTarget.value)
+											setNewMemberEmail(e.currentTarget.value)
 										}}
-										data-testid='invite-email'
+										data-testid='add-member-email'
 									/>
 								</Field>
 
 								<Field>
-									<Label htmlFor='invite-role'>
+									<Label htmlFor='add-member-role'>
 										<Trans>Role</Trans>
 									</Label>
 									<PriSelect.Root
-										items={ROLE_ITEMS}
-										value={inviteRole}
+										items={roleItems}
+										value={newMemberRole}
 										onValueChange={value => {
 											if (value === 'member' || value === 'admin') {
-												setInviteRole(value)
+												setNewMemberRole(value)
 											}
 										}}
 									>
 										<PriSelect.Trigger
-											id='invite-role'
-											data-testid='invite-role-trigger'
-											disabled={inviteSubmitting}
+											id='add-member-role'
+											data-testid='add-member-role-trigger'
+											disabled={adding}
 										>
 											<PriSelect.Value />
 											<PriSelect.Icon>
@@ -545,13 +382,63 @@ function MembersPage() {
 											</PriSelect.Icon>
 										</PriSelect.Trigger>
 										<PriSelect.Portal>
-											<PriSelect.Positioner sideOffset={6}>
+											<PriSelect.Positioner
+												alignItemWithTrigger={false}
+												sideOffset={6}
+											>
 												<PriSelect.Popup>
-													{ROLE_ITEMS.map(item => (
+													{roleItems.map(item => (
 														<PriSelect.Item
 															key={item.value}
 															value={item.value}
-															data-testid={`invite-role-option-${item.value}`}
+															data-testid={`add-member-role-option-${item.value}`}
+														>
+															<PriSelect.ItemIndicator>
+																<Check size={12} aria-hidden />
+															</PriSelect.ItemIndicator>
+															<PriSelect.ItemText>
+																{item.label}
+															</PriSelect.ItemText>
+														</PriSelect.Item>
+													))}
+												</PriSelect.Popup>
+											</PriSelect.Positioner>
+										</PriSelect.Portal>
+									</PriSelect.Root>
+								</Field>
+
+								<Field>
+									<Label htmlFor='add-member-locale'>
+										<Trans>Language</Trans>
+									</Label>
+									<PriSelect.Root
+										items={langSelectItems}
+										value={newMemberLocale}
+										onValueChange={value => {
+											if (isLangCode(value)) setNewMemberLocale(value)
+										}}
+									>
+										<PriSelect.Trigger
+											id='add-member-locale'
+											data-testid='add-member-locale-trigger'
+											disabled={adding}
+										>
+											<PriSelect.Value />
+											<PriSelect.Icon>
+												<ChevronsUpDown size={14} aria-hidden />
+											</PriSelect.Icon>
+										</PriSelect.Trigger>
+										<PriSelect.Portal>
+											<PriSelect.Positioner
+												alignItemWithTrigger={false}
+												sideOffset={6}
+											>
+												<PriSelect.Popup>
+													{langSelectItems.map(item => (
+														<PriSelect.Item
+															key={item.value}
+															value={item.value}
+															data-testid={`add-member-locale-option-${item.value}`}
 														>
 															<PriSelect.ItemIndicator>
 																<Check size={12} aria-hidden />
@@ -570,13 +457,11 @@ function MembersPage() {
 								<PriButton
 									type='submit'
 									$variant='filled'
-									disabled={inviteSubmitting}
-									data-testid='invite-submit'
+									disabled={adding}
+									data-testid='add-member-submit'
 								>
 									<Send size={16} aria-hidden />
-									<span>
-										{inviteSubmitting ? t`Sending…` : t`Send invitation`}
-									</span>
+									<span>{adding ? t`Adding…` : t`Add member`}</span>
 								</PriButton>
 							</Form>
 
@@ -584,11 +469,12 @@ function MembersPage() {
 								<UserPlus size={14} aria-hidden />
 								<span>
 									<Trans>
-										The invitee gets a 48-hour link. They can accept it once.
+										They sign in at the sign-in page with this address and ask
+										for their own link, so nothing sent here can expire.
 									</Trans>
 								</span>
 							</Hint>
-						</InvitePanel>
+						</AddPanel>
 					</Aside>
 				) : null}
 			</Layout>
@@ -661,6 +547,15 @@ const ErrorBanner = styled.p.withConfig({ displayName: 'MembersErrorBanner' })`
 	color: var(--color-error);
 `
 
+// Wrapper only — it exists so the live region is in the DOM before there is
+// anything to announce. `display: contents` means it adds no box of its own,
+// so the banner still sits directly in the page's flex flow.
+const LiveRegion = styled.div.withConfig({
+	displayName: 'MembersLiveRegion',
+})`
+	display: contents;
+`
+
 const SuccessBanner = styled.p.withConfig({
 	displayName: 'MembersSuccessBanner',
 })`
@@ -721,8 +616,8 @@ const Main = styled.div.withConfig({ displayName: 'MembersMain' })`
 	min-width: 0;
 `
 
-// On a phone the invite panel reads as an inline form right under the header
-// CTA; on a wide screen it sits as a sticky side panel beside the lists.
+// On a phone the add-member panel reads as an inline form right under the
+// header CTA; on a wide screen it sits as a sticky side panel beside the list.
 const Aside = styled.aside.withConfig({ displayName: 'MembersAside' })`
 	order: -1;
 
@@ -732,23 +627,6 @@ const Aside = styled.aside.withConfig({ displayName: 'MembersAside' })`
 		top: var(--space-md);
 		align-self: start;
 	}
-`
-
-const Section = styled.section.withConfig({ displayName: 'MembersSection' })`
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-sm);
-`
-
-const SectionHeading = styled.h3.withConfig({
-	displayName: 'MembersSectionHeading',
-})`
-	${stenciledTitle}
-	${rulerUnderRule}
-	font-size: var(--typescale-title-large-size);
-	line-height: var(--typescale-title-large-line);
-	margin: 0;
-	padding-bottom: var(--space-2xs);
 `
 
 const EmptyCard = styled.div.withConfig({ displayName: 'MembersEmptyCard' })`
@@ -842,93 +720,6 @@ const MemberMeta = styled.p.withConfig({ displayName: 'MembersMeta' })`
 	text-overflow: ellipsis;
 `
 
-const InvitationList = styled.ul.withConfig({
-	displayName: 'MembersInvitationList',
-})`
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-sm);
-	margin: 0;
-	padding: 0;
-	list-style: none;
-`
-
-// Wraps so the badges + actions drop below the email/meta column on a phone.
-const InvitationItem = styled.li.withConfig({
-	displayName: 'MembersInvitationItem',
-})`
-	${brushedMetalPlate}
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: var(--space-sm);
-	padding: var(--space-sm) var(--space-md);
-	border-radius: var(--shape-2xs);
-`
-
-const InvitationInfo = styled.div.withConfig({
-	displayName: 'MembersInvitationInfo',
-})`
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-3xs);
-	flex: 1;
-	min-width: 12rem;
-`
-
-const InvitationEmail = styled.p.withConfig({
-	displayName: 'MembersInvitationEmail',
-})`
-	${stenciledTitle}
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-2xs);
-	font-size: var(--typescale-title-small-size);
-	margin: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-`
-
-const InvitationMeta = styled.p.withConfig({
-	displayName: 'MembersInvitationMeta',
-})`
-	display: inline-flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: var(--space-2xs) var(--space-md);
-	margin: 0;
-`
-
-const MetaItem = styled.span.withConfig({ displayName: 'MembersMetaItem' })`
-	display: inline-flex;
-	align-items: baseline;
-	gap: var(--space-2xs);
-`
-
-const MetaKey = styled.span.withConfig({ displayName: 'MembersMetaKey' })`
-	${stenciledTitle}
-	font-size: var(--typescale-label-small-size);
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-	color: var(--color-on-surface-variant);
-`
-
-const InvitationBadges = styled.div.withConfig({
-	displayName: 'MembersInvitationBadges',
-})`
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-2xs);
-`
-
-const InvitationActions = styled.div.withConfig({
-	displayName: 'MembersInvitationActions',
-})`
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-2xs);
-`
-
 const RoleBadge = styled.span.withConfig({
 	displayName: 'MembersRoleBadge',
 	shouldForwardProp: prop => prop !== '$role',
@@ -960,36 +751,8 @@ const RoleBadge = styled.span.withConfig({
 				: 'var(--color-outline)'};
 `
 
-// Amber while the link is still good, error-tinted once it has lapsed.
-const StatusBadge = styled.span.withConfig({
-	displayName: 'MembersStatusBadge',
-	shouldForwardProp: prop => prop !== '$expired',
-})<{ $expired: boolean }>`
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-3xs);
-	padding: var(--space-3xs) var(--space-2xs);
-	border-radius: var(--shape-3xs);
-	font-family: var(--font-display);
-	font-size: var(--typescale-label-small-size);
-	font-weight: var(--font-weight-bold);
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-	background: ${({ $expired }) =>
-		$expired
-			? 'color-mix(in srgb, var(--color-error) 8%, transparent)'
-			: 'color-mix(in srgb, var(--color-status-prospect) 12%, transparent)'};
-	color: ${({ $expired }) =>
-		$expired ? 'var(--color-error)' : 'var(--color-status-prospect)'};
-	border: 1px dashed
-		${({ $expired }) =>
-			$expired
-				? 'color-mix(in srgb, var(--color-error) 40%, transparent)'
-				: 'color-mix(in srgb, var(--color-status-prospect) 40%, transparent)'};
-`
-
-const InvitePanel = styled.div.withConfig({
-	displayName: 'MembersInvitePanel',
+const AddPanel = styled.div.withConfig({
+	displayName: 'MembersAddPanel',
 })`
 	${brushedMetalPlate}
 	display: flex;
@@ -1026,26 +789,26 @@ const PanelSubtitle = styled.p.withConfig({
 	margin: 0;
 `
 
-const Form = styled.form.withConfig({ displayName: 'MembersInviteForm' })`
+const Form = styled.form.withConfig({ displayName: 'MembersAddForm' })`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
 `
 
-const Field = styled.div.withConfig({ displayName: 'MembersInviteField' })`
+const Field = styled.div.withConfig({ displayName: 'MembersAddField' })`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2xs);
 `
 
-const Label = styled.label.withConfig({ displayName: 'MembersInviteLabel' })`
+const Label = styled.label.withConfig({ displayName: 'MembersAddLabel' })`
 	${stenciledTitle}
 	font-size: var(--typescale-label-medium-size);
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
 `
 
-const Hint = styled.p.withConfig({ displayName: 'MembersInviteHint' })`
+const Hint = styled.p.withConfig({ displayName: 'MembersAddHint' })`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2xs);

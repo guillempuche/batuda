@@ -1,19 +1,17 @@
-import { readdir, readFile } from 'node:fs/promises'
-import { join } from 'node:path'
-
 import { type BrowserContext, expect, type Page, test } from '@playwright/test'
 
-import { openInvitePanel } from './helpers/invite-panel'
+import { openAddMemberPanel } from './helpers/add-member-panel'
+import { findLatestEmail, findLatestMessage } from './helpers/dev-inbox'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // End-to-end set/change password from /profile. The flow under test:
 //
-//   1. Alice invites a fresh user → org plugin's sendInvitationEmail
-//      pre-creates them without a password and ships a magic-link
-//      sign-in URL to apps/server/.dev-inbox/.
-//   2. A fresh browser context opens the URL: BA's magic-link verify
-//      signs the new user in. Their `account` table has no credential
-//      row, so `fetchSecurityState` derives `hasPassword: false`.
+//   1. Alice adds a fresh person → they are a member immediately, created
+//      without a password, and emailed a note that carries no way in.
+//   2. In a separate browser context that person signs in the way anyone
+//      does: they ask for their own link from /login and follow it. Their
+//      `account` table has no credential row, so `fetchSecurityState`
+//      derives `hasPassword: false`.
 //   3. /profile renders the "Set a password" form (the three-state card's
 //      `!hasPassword && !passwordOptOut` branch).
 //   4. Submitting the form hits POST /auth/set-password (the thin BA
@@ -29,63 +27,15 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 //   apps/server/src/plugins/set-password-route.ts
 //   apps/internal/src/lib/security-state.ts
 
-const INBOX_DIR = join(process.cwd(), '..', 'server', '.dev-inbox')
+const BASE_URL = process.env['E2E_BASE_URL'] ?? 'https://batuda.localhost'
 
 const NEW_PASSWORD = 'first-real-password-1234'
 
-interface InvitationMail {
-	readonly file: string
-	readonly url: string
-}
-
-// Polls .dev-inbox/ for an `invitation`-labelled .md whose filename
-// contains the recipient slug, then extracts the magic-link URL. Same
-// pattern as invite.test.ts:44-89 — the file appears asynchronously
-// after the API responds.
-async function pollInvitationMail(
-	recipient: string,
-	timeoutMs: number,
-): Promise<InvitationMail> {
-	const slug = recipient.split('@')[0]!
-	const deadline = Date.now() + timeoutMs
-	let lastErr: unknown
-	while (Date.now() < deadline) {
-		try {
-			const files = await readdir(INBOX_DIR)
-			const match = files
-				.filter(name => name.includes(slug) && name.endsWith('.md'))
-				.sort()
-				.pop()
-			if (match) {
-				const body = await readFile(join(INBOX_DIR, match), 'utf8')
-				if (!body.includes('labels:') || !body.includes('invitation')) {
-					await new Promise(r => {
-						setTimeout(r, 200)
-					})
-					continue
-				}
-				const urlMatch = body.match(
-					/https?:\/\/[^\s]*\/auth\/magic-link\/verify[^\s]*/,
-				)
-				if (urlMatch) return { file: match, url: urlMatch[0] }
-			}
-		} catch (e) {
-			lastErr = e
-		}
-		await new Promise(r => {
-			setTimeout(r, 200)
-		})
-	}
-	throw new Error(
-		`invitation .md for ${recipient} did not appear within ${timeoutMs}ms (last error: ${String(lastErr)})`,
-	)
-}
-
-// Mints a fresh passwordless user via the invitation flow and returns a
-// BrowserContext + Page authenticated as that user. Two contexts are
-// required: Alice's session sends the invite, and a separate context
-// follows the magic link so we end up authed as the invitee, not Alice.
-async function bootPasswordlessInvitee(
+// Adds a fresh passwordless person and returns a BrowserContext + Page
+// authenticated as them. Two contexts are required: Alice's session does the
+// adding, and a separate one signs in so we end up as the new member, not
+// Alice.
+async function bootPasswordlessMember(
 	alicePage: Page,
 	browser: import('@playwright/test').Browser,
 	emailHint: string,
@@ -95,26 +45,75 @@ async function bootPasswordlessInvitee(
 	page: Page
 }> {
 	const email = `${emailHint}-${Date.now()}@example.com`
+	const startedAt = Date.now()
 
-	// Invites now live inline on the members page behind the "Invite member"
-	// CTA; role defaults to member, so no role interaction is needed here.
-	await openInvitePanel(alicePage)
-	await alicePage.getByTestId('invite-email').fill(email)
-	await alicePage.getByTestId('invite-submit').click()
-	await expect(alicePage.getByTestId('invite-success')).toBeVisible({
+	// The panel is inline on the members page behind the "Add member" CTA;
+	// role and language both default, so no extra interaction is needed.
+	await openAddMemberPanel(alicePage)
+	await alicePage.getByTestId('add-member-email').fill(email)
+	await alicePage.getByTestId('add-member-submit').click()
+	await expect(alicePage.getByTestId('add-member-success')).toBeVisible({
 		timeout: 10_000,
 	})
 
-	const mail = await pollInvitationMail(email, 5_000)
-	const inviteeContext = await browser.newContext({ ignoreHTTPSErrors: true })
-	const inviteePage = await inviteeContext.newPage()
-	await inviteePage.goto(mail.url, { waitUntil: 'networkidle' })
-	await expect(
-		inviteePage.getByTestId('accept-invitation-success'),
-	).toBeVisible({ timeout: 15_000 })
+	// They are already a member; this mail only tells them so. Asserting it has
+	// no sign-in link is the point — that is what makes it safe to sit unread.
+	const welcome = await findLatestMessage({
+		recipient: email,
+		label: 'member-added',
+		sinceMs: startedAt,
+		maxWaitMs: 10_000,
+	})
+	expect(welcome.body).not.toMatch(/\/auth\/magic-link\/verify/)
 
-	return { email, context: inviteeContext, page: inviteePage }
+	// So they sign in the ordinary way, asking for their own link. `baseURL` is
+	// explicit because a context built straight off the browser does not inherit
+	// the project's, and every navigation below is relative.
+	// Empty storageState on purpose: the authed project injects Alice's cookie,
+	// which would land this context on the dashboard already signed in as her —
+	// /login would redirect away and the form would never render.
+	const memberContext = await browser.newContext({
+		ignoreHTTPSErrors: true,
+		baseURL: BASE_URL,
+		storageState: { cookies: [], origins: [] },
+	})
+	const memberPage = await memberContext.newPage()
+	// Ask for the link exactly as the sign-in page does — same endpoint, same
+	// origin, same cookie jar. Driving the button instead would make every
+	// scenario here depend on the login screen, which is not what this file is
+	// about; `members.test.ts` covers that surface.
+	const requested = await memberContext.request.post(
+		`${BASE_URL}/auth/sign-in/magic-link`,
+		{
+			headers: { origin: BASE_URL, 'content-type': 'application/json' },
+			data: {
+				email,
+				callbackURL: `${BASE_URL}/`,
+				errorCallbackURL: `${BASE_URL}/login`,
+			},
+		},
+	)
+	expect(
+		requested.ok(),
+		`sign-in link request failed: ${requested.status()}`,
+	).toBe(true)
+
+	const signIn = await findLatestEmail({
+		recipient: email,
+		label: 'magic-link',
+		sinceMs: startedAt,
+		maxWaitMs: 10_000,
+	})
+	await memberPage.goto(signIn.url, { waitUntil: 'networkidle' })
+
+	return { email, context: memberContext, page: memberPage }
 }
+
+// Each scenario boots a person from scratch: add them, wait for the welcome
+// mail, sign them in, wait for the sign-in mail. Two inbox round-trips put it
+// past the default budget on a cold run, and the work is real rather than a
+// hang — so give it room instead of trimming the flow.
+test.describe.configure({ timeout: 90_000 })
 
 test.describe('setting a first password from /profile', () => {
 	test.beforeEach(async ({ page }) => {
@@ -129,9 +128,9 @@ test.describe('setting a first password from /profile', () => {
 			page,
 			browser,
 		}) => {
-			// GIVEN a freshly invited user with no credential row
+			// GIVEN a freshly added person with no credential row
 			//   [profile/index.tsx — `!hasPassword && !passwordOptOut` branch]
-			const bob = await bootPasswordlessInvitee(page, browser, 'pwd-set')
+			const bob = await bootPasswordlessMember(page, browser, 'pwd-set')
 
 			// WHEN Bob opens the settings profile page
 			await bob.page.goto('/settings/profile', { waitUntil: 'networkidle' })
@@ -148,6 +147,12 @@ test.describe('setting a first password from /profile', () => {
 
 			// WHEN Bob fills both password fields and submits
 			//   [set-password-route.ts — credential row written branch]
+			// Wait for the submit control to go live first: the fields are
+			// uncontrolled and read on submit, so typing into them before React
+			// has finished hydrating is silently discarded.
+			await expect(bob.page.getByTestId('set-password-submit')).toBeEnabled({
+				timeout: 10_000,
+			})
 			await bob.page.getByTestId('set-password-new').fill(NEW_PASSWORD)
 			await bob.page.getByTestId('set-password-confirm').fill(NEW_PASSWORD)
 
@@ -191,9 +196,9 @@ test.describe('setting a first password from /profile', () => {
 			page,
 			browser,
 		}) => {
-			// GIVEN a passwordless invitee on /profile
+			// GIVEN a passwordless member on /profile
 			//   [profile/index.tsx — `passwordless-only-toggle` button]
-			const bob = await bootPasswordlessInvitee(page, browser, 'pwd-optout')
+			const bob = await bootPasswordlessMember(page, browser, 'pwd-optout')
 			await bob.page.goto('/settings/profile', { waitUntil: 'networkidle' })
 			await expect(bob.page.getByTestId('set-password-form')).toBeVisible({
 				timeout: 10_000,

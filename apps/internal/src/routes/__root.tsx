@@ -59,29 +59,32 @@ export const Route = createRootRoute({
 		} else if (typeof document !== 'undefined') {
 			cookieHeader = document.cookie
 		}
-		const lang: LangCode = readLangCookieFromHeader(cookieHeader) ?? defaultLang
+		// An explicit choice from the language switcher, if one was ever made.
+		// It outranks the account's language: someone who switches is telling us
+		// what they want right now.
+		const chosenLang = readLangCookieFromHeader(cookieHeader)
 
-		// `/accept-invitation/<id>` is whitelisted alongside `/login`: the
-		// route renders its own auth-aware UI (magic-link redirect lands the
-		// user already authed; a stale-link visitor sees a "sign in to
-		// continue" CTA). Without this carve-out, the gate would force a
-		// /login redirect that bounces back via `returnTo`, which is
-		// jankier than letting the page render its own message.
 		const isPublicPath =
 			location.pathname === '/login' ||
 			location.pathname === '/forgot-password' ||
-			location.pathname === '/reset-password' ||
-			location.pathname.startsWith('/accept-invitation/')
-		if (!isPublicPath) {
-			const user = await fetchSession(cookieHeader ?? undefined)
-			if (!user) {
-				throw redirect({
-					to: '/login',
-					search: { returnTo: location.href },
-				})
-			}
+			location.pathname === '/reset-password'
+
+		// Sign-in pages have no session to read a language from, so they keep
+		// the cookie-or-default path.
+		if (isPublicPath) return { lang: chosenLang ?? defaultLang }
+
+		const user = await fetchSession(cookieHeader ?? undefined)
+		if (!user) {
+			throw redirect({
+				to: '/login',
+				search: { returnTo: location.href },
+			})
 		}
-		return { lang }
+		// Falls back to the account's language so someone an admin just added
+		// lands in their own language on the very first page, before they have
+		// touched any setting. Route context is serialized across SSR, so only
+		// the plain language code crosses — never the session itself.
+		return { lang: chosenLang ?? user.locale ?? defaultLang }
 	},
 	loader: ({ context }) => ({ lang: context.lang }),
 	head: ({ loaderData }) => {
@@ -149,16 +152,14 @@ function RootComponent() {
 		return data?.dehydrated ?? []
 	})
 
-	// The login + accept-invitation pages render standalone — no sidebar,
-	// no top bar, no Quick Capture dialog. They're either pre-auth (login)
-	// or auth-transition (the accept page may run before the active org
-	// has been picked, so the AppShell's org-aware chrome would render
-	// empty). Everything else runs inside the full authenticated shell.
+	// The sign-in pages render standalone — no sidebar, no top bar, no Quick
+	// Capture dialog — because they run before there is an account or an
+	// active org for that chrome to describe. Everything else runs inside the
+	// full authenticated shell.
 	const isAuthChrome =
 		location.pathname === '/login' ||
 		location.pathname === '/forgot-password' ||
 		location.pathname === '/reset-password' ||
-		location.pathname.startsWith('/accept-invitation/') ||
 		// The OAuth consent screen runs mid-flow (authed, but handing access to
 		// an MCP client) — render it focused, without the org-aware chrome.
 		location.pathname === '/oauth/consent'

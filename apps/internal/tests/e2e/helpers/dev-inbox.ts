@@ -13,11 +13,16 @@ const INBOX_DIR = join(process.cwd(), '..', 'server', '.dev-inbox')
  * Labels the local provider stamps on each .md. Filtering by label
  * avoids collisions when several tests share the inbox in sequence.
  */
-export type DevInboxLabel = 'invitation' | 'magic-link' | 'password-reset'
+export type DevInboxLabel = 'member-added' | 'magic-link' | 'password-reset'
 
 export interface FoundEmail {
 	readonly file: string
 	readonly url: string
+	readonly body: string
+}
+
+export interface FoundMessage {
+	readonly file: string
 	readonly body: string
 }
 
@@ -40,12 +45,15 @@ interface FindLatestOptions {
 
 /**
  * Polls the dev-inbox directory for the newest `.md` matching all three
- * filters (recipient slug + label + mtime), and pulls out the first
- * URL pointing at an auth-related endpoint we care about.
+ * filters (recipient slug + label + mtime). `requireUrl` decides whether a
+ * message without an auth URL counts as a match: sign-in and reset mail must
+ * carry one, while the note telling someone they were added deliberately does
+ * not — so waiting for a URL there would spin until the timeout.
  */
-export async function findLatestEmail(
+async function pollInbox(
 	options: FindLatestOptions,
-): Promise<FoundEmail> {
+	requireUrl: boolean,
+): Promise<FoundEmail | FoundMessage> {
 	const { recipient, label, sinceMs, maxWaitMs = 5_000 } = options
 	const slug = recipient.split('@')[0]!
 	const deadline = Date.now() + maxWaitMs
@@ -72,6 +80,7 @@ export async function findLatestEmail(
 				const body = await readFile(join(INBOX_DIR, entry.name), 'utf8')
 				if (!body.includes('labels:')) continue
 				if (!body.includes(label)) continue
+				if (!requireUrl) return { file: entry.name, body }
 				const url = body.match(
 					/https?:\/\/[^\s]*\/auth\/(?:magic-link|reset-password)[^\s]*/,
 				)?.[0]
@@ -90,4 +99,21 @@ export async function findLatestEmail(
 	throw new Error(
 		`No ${label} email for ${recipient} appeared in ${INBOX_DIR} within ${maxWaitMs}ms (last error: ${String(lastError)})`,
 	)
+}
+
+/** Waits for mail that carries a link to follow — sign-in, password reset. */
+export async function findLatestEmail(
+	options: FindLatestOptions,
+): Promise<FoundEmail> {
+	return (await pollInbox(options, true)) as FoundEmail
+}
+
+/**
+ * Waits for mail and returns only its body. Use for messages that carry no
+ * link — the absence of one is usually the thing worth asserting.
+ */
+export async function findLatestMessage(
+	options: FindLatestOptions,
+): Promise<FoundMessage> {
+	return await pollInbox(options, false)
 }
