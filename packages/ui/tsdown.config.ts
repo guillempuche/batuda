@@ -9,5 +9,4 @@ export default defineConfig({
 	},
 	format: ['esm'],
 	dts: true,
-	copy: ['src/tokens.css', 'src/tailwind.css'],
 })
