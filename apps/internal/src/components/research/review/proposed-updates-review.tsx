@@ -583,7 +583,7 @@ const ChannelKind = styled.span`
 `
 
 const ChannelValue = styled.span`
-	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+	font-family: var(--font-mono);
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface);
 `

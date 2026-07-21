@@ -253,7 +253,7 @@ const ModeRow = styled.div`
 	align-self: flex-start;
 	gap: var(--space-3xs);
 	padding: var(--space-3xs);
-	border: 1px solid rgba(0, 0, 0, 0.18);
+	border: 1px solid var(--color-metal-edge-muted);
 	border-radius: var(--shape-2xs);
 `
 

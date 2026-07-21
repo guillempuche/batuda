@@ -64,12 +64,12 @@ const Rivet = styled.span.withConfig({
 		var(--color-metal) 55%,
 		var(--color-metal-deep) 100%
 	);
-	border: 1px solid rgba(0, 0, 0, 0.45);
+	border: 1px solid var(--color-metal-edge-strong);
 	box-shadow:
-		inset 0 -1px 0 rgba(0, 0, 0, 0.35),
-		inset 0 1px 0 rgba(255, 255, 255, 0.35),
+		inset 0 -1px 0 var(--shadow-color-deep),
+		inset 0 1px 0 var(--highlight-inset-strong),
 		${p =>
 			p.$priority === 1
-				? '0 0 6px 0 var(--color-error), 0 0 0 1px rgba(233, 84, 32, 0.5)'
-				: '0 1px 2px rgba(0, 0, 0, 0.3)'};
+				? '0 0 6px 0 var(--color-error), 0 0 0 1px var(--color-priority-urgent-glow)'
+				: '0 1px 2px var(--shadow-color-deep)'};
 `

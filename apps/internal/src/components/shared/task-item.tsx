@@ -542,8 +542,8 @@ const DueDateInput = styled.input.withConfig({
 	displayName: 'TaskItemDueDateInput',
 })`
 	padding: var(--space-2xs) var(--space-xs);
-	background: #f0e8d0;
-	border: 1px solid rgba(0, 0, 0, 0.35);
+	background: var(--color-paper-aged);
+	border: 1px solid var(--color-metal-edge);
 	border-radius: var(--shape-2xs);
 	color: var(--color-on-surface);
 	font-family: var(--font-body);
@@ -587,16 +587,16 @@ const PriorityRivet = styled.span.withConfig({
 		var(--color-metal) 55%,
 		var(--color-metal-deep) 100%
 	);
-	border: 1px solid rgba(0, 0, 0, 0.45);
+	border: 1px solid var(--color-metal-edge-strong);
 	box-shadow:
-		inset 0 -1px 0 rgba(0, 0, 0, 0.35),
-		inset 0 1px 0 rgba(255, 255, 255, 0.35),
+		inset 0 -1px 0 var(--shadow-color-deep),
+		inset 0 1px 0 var(--highlight-inset-strong),
 		${p =>
 			p.$priority === 'high'
-				? '0 0 6px 0 var(--color-error), 0 0 0 1px rgba(233, 84, 32, 0.5)'
+				? '0 0 6px 0 var(--color-error), 0 0 0 1px var(--color-priority-urgent-glow)'
 				: p.$priority === 'low'
-					? '0 1px 2px rgba(0, 0, 0, 0.15)'
-					: '0 1px 2px rgba(0, 0, 0, 0.3)'};
+					? '0 1px 2px var(--shadow-color-medium)'
+					: '0 1px 2px var(--shadow-color-deep)'};
 	opacity: ${p => (p.$priority === 'low' ? 0.55 : 1)};
 `
 

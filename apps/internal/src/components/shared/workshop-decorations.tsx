@@ -45,7 +45,7 @@ export const ScrewDot = styled.span.withConfig({
 		var(--color-metal-light),
 		var(--color-metal-deep)
 	);
-	box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+	box-shadow: inset 0 -1px 0 var(--shadow-color-deep);
 	pointer-events: none;
 	z-index: 2;
 

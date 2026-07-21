@@ -12,7 +12,7 @@ const TONE_ACCENT: Record<Tone, string> = {
 	positive: 'var(--color-secondary)',
 	info: 'var(--color-secondary)',
 	caution: 'var(--color-primary)',
-	negative: 'var(--color-error, #c6664b)',
+	negative: 'var(--color-error)',
 	neutral: 'var(--color-on-surface-variant)',
 }
 

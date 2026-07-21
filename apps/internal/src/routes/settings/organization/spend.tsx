@@ -422,7 +422,7 @@ const BarRow = styled.div`
 `
 
 const BarLabel = styled.span`
-	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+	font-family: var(--font-mono);
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface);
 	overflow: hidden;
@@ -443,7 +443,7 @@ const BarFill = styled.div`
 `
 
 const BarAmount = styled.span`
-	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+	font-family: var(--font-mono);
 	font-size: var(--typescale-body-small-size);
 	font-variant-numeric: tabular-nums;
 	color: var(--color-on-surface);

@@ -276,7 +276,7 @@ const AddForm = styled.form`
 
 const KindSelect = styled.select`
 	padding: var(--space-xs) var(--space-sm);
-	background: #f0e8d0;
+	background: var(--color-paper-aged);
 	color: var(--color-on-surface);
 	border: none;
 	border-bottom: 2px solid var(--color-outline);

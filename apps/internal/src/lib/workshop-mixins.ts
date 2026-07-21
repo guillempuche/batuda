@@ -53,7 +53,7 @@ export const brushedMetalPlate = css`
 		var(--color-metal) 55%,
 		var(--color-metal-dark) 100%
 	);
-	border: 1px solid rgba(0, 0, 0, 0.35);
+	border: 1px solid var(--color-metal-edge);
 	box-shadow: var(--elevation-workshop-sm);
 	overflow: hidden;
 	isolation: isolate;
@@ -82,10 +82,10 @@ export const brushedMetalBezel = css`
 		var(--color-metal) 55%,
 		var(--color-metal-dark) 100%
 	);
-	border: 1px solid rgba(0, 0, 0, 0.4);
+	border: 1px solid var(--color-metal-edge-strong);
 	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.5),
-		0 2px 4px rgba(0, 0, 0, 0.25);
+		inset 0 1px 0 var(--highlight-inset-bright),
+		0 2px 4px var(--shadow-color-deep);
 	overflow: hidden;
 
 	&::before {
@@ -133,11 +133,11 @@ export const maskingTapeCorner = css`
 	height: 22px;
 	background: linear-gradient(
 		180deg,
-		rgba(230, 210, 165, 0.82) 0%,
-		rgba(210, 185, 130, 0.9) 100%
+		var(--color-tape-light) 0%,
+		var(--color-tape) 100%
 	);
-	border: 1px solid rgba(160, 130, 70, 0.3);
-	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+	border: 1px solid var(--color-tape-edge);
+	box-shadow: 0 1px 2px var(--shadow-color-medium);
 	transform: rotate(-3deg);
 	pointer-events: none;
 `

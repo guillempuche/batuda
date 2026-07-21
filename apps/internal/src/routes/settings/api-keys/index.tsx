@@ -677,7 +677,7 @@ const KeyMeta = styled.div.withConfig({ displayName: 'ApiKeysKeyMeta' })`
 const MaskedPrefix = styled.code.withConfig({
 	displayName: 'ApiKeysMaskedPrefix',
 })`
-	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+	font-family: var(--font-mono);
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface);
 `
@@ -724,7 +724,7 @@ const SecretValue = styled.code.withConfig({
 	background-color: var(--color-paper-aged);
 	border: 1px dashed var(--color-outline);
 	border-radius: var(--shape-3xs);
-	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+	font-family: var(--font-mono);
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface);
 	word-break: break-all;

@@ -2037,7 +2037,7 @@ const TableHead = styled.div.withConfig({ displayName: 'InboxesTableHead' })`
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
 	text-shadow: var(--text-shadow-emboss);
-	border-bottom: 1px solid rgba(0, 0, 0, 0.25);
+	border-bottom: 1px solid var(--color-metal-edge);
 
 	@media (max-width: 767px) {
 		display: none;
@@ -2129,9 +2129,9 @@ const PrivacyTag = styled.span.withConfig({ displayName: 'InboxesPrivacyTag' })`
 	font-size: var(--typescale-label-small-size);
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
-	background: color-mix(in oklab, #6366f1 10%, transparent);
-	color: color-mix(in oklab, #4338ca 80%, black);
-	border: 1px solid color-mix(in oklab, #6366f1 35%, transparent);
+	background: color-mix(in oklab, var(--color-on-surface-variant) 10%, transparent);
+	color: var(--color-on-surface);
+	border: 1px solid color-mix(in oklab, var(--color-on-surface-variant) 35%, transparent);
 `
 
 const StatusBadge = styled.span.withConfig({
@@ -2150,9 +2150,9 @@ const StatusBadge = styled.span.withConfig({
 	${p =>
 		p.$status === 'connected'
 			? css`
-					background: color-mix(in oklab, #16a34a 14%, transparent);
-					color: #0f5c29;
-					border: 1px solid color-mix(in oklab, #16a34a 40%, transparent);
+					background: color-mix(in oklab, var(--color-secondary) 14%, transparent);
+					color: var(--color-on-secondary-container);
+					border: 1px solid color-mix(in oklab, var(--color-secondary) 40%, transparent);
 				`
 			: p.$status === 'auth_failed'
 				? css`
@@ -2163,9 +2163,9 @@ const StatusBadge = styled.span.withConfig({
 					`
 				: p.$status === 'connect_failed'
 					? css`
-							background: color-mix(in oklab, #f59e0b 18%, transparent);
-							color: color-mix(in oklab, #b45309 80%, black);
-							border: 1px solid color-mix(in oklab, #f59e0b 45%, transparent);
+							background: color-mix(in oklab, var(--color-warning) 18%, transparent);
+							color: color-mix(in oklab, var(--color-warning-strong) 80%, black);
+							border: 1px solid color-mix(in oklab, var(--color-warning) 45%, transparent);
 						`
 					: css`
 							background: transparent;
@@ -2359,9 +2359,9 @@ const PurposeBadge = styled.span.withConfig({
 				`
 			: p.$purpose === 'agent'
 				? css`
-						background: color-mix(in oklab, #6366f1 16%, transparent);
-						color: color-mix(in oklab, #4338ca 80%, black);
-						border: 1px solid color-mix(in oklab, #6366f1 45%, transparent);
+						background: color-mix(in oklab, var(--color-on-surface-variant) 16%, transparent);
+						color: var(--color-on-surface);
+						border: 1px solid color-mix(in oklab, var(--color-on-surface-variant) 45%, transparent);
 					`
 				: css`
 						background: transparent;

@@ -329,13 +329,13 @@ export const Pill = styled.span`
 `
 
 export const SubjectId = styled.span`
-	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+	font-family: var(--font-mono);
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface-variant);
 `
 
 export const Cost = styled.span`
-	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+	font-family: var(--font-mono);
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface-variant);
 `
@@ -423,7 +423,7 @@ const CitationLi = styled.li`
 `
 
 const CitationKey = styled.span`
-	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+	font-family: var(--font-mono);
 `
 
 const CitationQuote = styled.span`
@@ -435,8 +435,8 @@ const CitationConfidence = styled.span<{ $low?: boolean }>`
 	align-items: center;
 	gap: var(--space-3xs);
 	font-variant-numeric: tabular-nums;
-	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
-	color: ${p => (p.$low ? 'var(--color-error, #c6664b)' : 'var(--color-primary)')};
+	font-family: var(--font-mono);
+	color: ${p => (p.$low ? 'var(--color-error)' : 'var(--color-primary)')};
 `
 
 const DiscoveredList = styled.ul`

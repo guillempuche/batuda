@@ -102,7 +102,7 @@ const SourceList = styled.span`
 `
 
 const SourceLink = styled.a`
-	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+	font-family: var(--font-mono);
 	color: var(--color-primary);
 	/* Persistent underline so a source link is distinguishable from the
 	 * italic trail text without relying on colour alone. */

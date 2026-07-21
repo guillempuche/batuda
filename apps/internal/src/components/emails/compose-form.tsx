@@ -748,9 +748,9 @@ const SuppressionBanner = styled.div.withConfig({
 	gap: var(--space-2xs);
 	padding: var(--space-2xs) var(--space-sm);
 	border: 1px solid
-		color-mix(in oklab, var(--color-error, #c6664b) 40%, transparent);
-	background: color-mix(in oklab, var(--color-error, #c6664b) 8%, transparent);
-	color: var(--color-error, #c6664b);
+		color-mix(in oklab, var(--color-error) 40%, transparent);
+	background: color-mix(in oklab, var(--color-error) 8%, transparent);
+	color: var(--color-error);
 	border-radius: var(--shape-xs);
 	font-size: var(--typescale-body-small-size);
 
@@ -789,9 +789,9 @@ const ErrorBanner = styled.div.withConfig({
 	gap: var(--space-2xs);
 	padding: var(--space-2xs) var(--space-sm);
 	border: 1px solid
-		color-mix(in oklab, var(--color-error, #c6664b) 40%, transparent);
-	background: color-mix(in oklab, var(--color-error, #c6664b) 8%, transparent);
-	color: var(--color-error, #c6664b);
+		color-mix(in oklab, var(--color-error) 40%, transparent);
+	background: color-mix(in oklab, var(--color-error) 8%, transparent);
+	color: var(--color-error);
 	border-radius: var(--shape-xs);
 	font-size: var(--typescale-body-small-size);
 `

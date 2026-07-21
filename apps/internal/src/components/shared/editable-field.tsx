@@ -422,7 +422,7 @@ const TextArea = styled.textarea.withConfig({
 })`
 	width: 100%;
 	padding: var(--space-xs) var(--space-sm);
-	background: #f0e8d0;
+	background: var(--color-paper-aged);
 	color: var(--color-on-surface);
 	border: none;
 	border-bottom: 2px solid var(--color-outline);
@@ -432,7 +432,7 @@ const TextArea = styled.textarea.withConfig({
 	line-height: var(--typescale-body-medium-line);
 	letter-spacing: var(--typescale-body-medium-tracking);
 	resize: vertical;
-	box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+	box-shadow: inset 0 1px 2px var(--shadow-color-subtle);
 	transition: border-color 160ms ease, background 160ms ease;
 
 	&::placeholder {
@@ -445,7 +445,7 @@ const TextArea = styled.textarea.withConfig({
 	&:focus-visible {
 		outline: none;
 		border-bottom-color: var(--color-primary);
-		background: #f5ecd6;
+		background: var(--color-paper-aged-bright);
 	}
 
 	&:disabled {

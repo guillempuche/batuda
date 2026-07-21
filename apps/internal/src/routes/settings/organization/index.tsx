@@ -226,9 +226,9 @@ const IconPlate = styled.div.withConfig({
 	);
 	border: 2px solid color-mix(in oklab, var(--color-primary) 60%, black);
 	box-shadow:
-		inset 0 2px 4px rgba(255, 255, 255, 0.35),
-		inset 0 -2px 4px rgba(0, 0, 0, 0.2),
-		0 2px 6px rgba(0, 0, 0, 0.25);
+		inset 0 2px 4px var(--highlight-inset-strong),
+		inset 0 -2px 4px var(--shadow-color-strong),
+		0 2px 6px var(--shadow-color-deep);
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -281,7 +281,7 @@ const MetaLabel = styled.span.withConfig({
 const SlugText = styled.span.withConfig({
 	displayName: 'OrganizationSettingsSlugText',
 })`
-	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+	font-family: var(--font-mono);
 `
 
 const NavRow = styled(Link).withConfig({
@@ -296,7 +296,7 @@ const NavRow = styled(Link).withConfig({
 	color: var(--color-on-surface);
 	text-decoration: none;
 	transition: border-color 160ms ease, box-shadow 160ms ease;
-	border: 1px solid rgba(0, 0, 0, 0.18);
+	border: 1px solid var(--color-metal-edge-muted);
 
 	&:hover {
 		border-color: var(--color-primary);

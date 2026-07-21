@@ -341,7 +341,7 @@ const ClientName = styled.span.withConfig({
 `
 
 const Where = styled.code.withConfig({ displayName: 'McpSetupWhere' })`
-	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+	font-family: var(--font-mono);
 	font-size: var(--typescale-label-small-size);
 	color: var(--color-on-surface-variant);
 `
@@ -358,7 +358,7 @@ const Pre = styled.pre.withConfig({ displayName: 'McpSetupPre' })`
 	background: color-mix(in oklab, var(--color-on-surface) 6%, transparent);
 	border: 1px solid color-mix(in oklab, var(--color-on-surface) 10%, transparent);
 	overflow-x: auto;
-	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+	font-family: var(--font-mono);
 	font-size: var(--typescale-body-small-size);
 	line-height: 1.5;
 	color: var(--color-on-surface);
@@ -400,7 +400,7 @@ const Strong = styled.strong.withConfig({ displayName: 'McpSetupStrong' })`
 `
 
 const Mono = styled.code.withConfig({ displayName: 'McpSetupMono' })`
-	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+	font-family: var(--font-mono);
 	font-size: 0.92em;
 	padding: 0 var(--space-3xs);
 	border-radius: var(--shape-3xs);

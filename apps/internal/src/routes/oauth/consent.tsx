@@ -325,7 +325,7 @@ const ClientLabel = styled.span.withConfig({
 `
 
 const ClientId = styled.code.withConfig({ displayName: 'ConsentClientId' })`
-	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+	font-family: var(--font-mono);
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface);
 	word-break: break-all;
@@ -347,7 +347,7 @@ const ScopeList = styled.ul.withConfig({ displayName: 'ConsentScopeList' })`
 `
 
 const ScopeItem = styled.li.withConfig({ displayName: 'ConsentScopeItem' })`
-	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+	font-family: var(--font-mono);
 	font-size: var(--typescale-label-small-size);
 	padding: var(--space-3xs) var(--space-2xs);
 	border-radius: var(--shape-3xs);

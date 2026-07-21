@@ -1841,7 +1841,7 @@ const ExternalLinkButton = styled.a.withConfig({
 	& svg {
 		position: relative;
 		z-index: 1;
-		filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.4));
+		filter: drop-shadow(0 1px 0 var(--highlight-inset-bright));
 	}
 
 	&:hover {
@@ -1959,15 +1959,15 @@ const ContactCard = styled.li.withConfig({
 		right: 18px;
 		width: 14px;
 		height: 28px;
-		border: 2px solid rgba(120, 110, 95, 0.65);
-		border-top-color: rgba(120, 110, 95, 0.9);
+		border: 2px solid color-mix(in oklab, var(--color-outline) 65%, transparent);
+		border-top-color: color-mix(in oklab, var(--color-outline) 90%, transparent);
 		border-radius: 6px 6px 3px 3px;
 		background: linear-gradient(
 			180deg,
-			rgba(220, 210, 190, 0.4) 0%,
-			rgba(180, 170, 150, 0.25) 100%
+			color-mix(in oklab, var(--color-metal-light) 40%, transparent) 0%,
+			color-mix(in oklab, var(--color-metal-dark) 25%, transparent) 100%
 		);
-		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+		box-shadow: 0 1px 2px var(--shadow-color-strong);
 		pointer-events: none;
 	}
 `

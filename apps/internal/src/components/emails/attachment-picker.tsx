@@ -236,12 +236,11 @@ const Chip = styled.div.withConfig({
 	border: 1px solid
 		${p =>
 			p.$state === 'error'
-				? 'color-mix(in oklab, var(--color-error, #c6664b) 40%, transparent)'
+				? 'color-mix(in oklab, var(--color-error) 40%, transparent)'
 				: 'var(--color-outline)'};
 	border-radius: var(--shape-2xs);
 	background: var(--color-surface);
-	color: ${p =>
-		p.$state === 'error' ? 'var(--color-error, #c6664b)' : 'inherit'};
+	color: ${p => (p.$state === 'error' ? 'var(--color-error)' : 'inherit')};
 	max-width: 220px;
 `
 

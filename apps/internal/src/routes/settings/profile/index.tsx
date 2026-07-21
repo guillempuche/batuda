@@ -624,13 +624,13 @@ const AvatarPlate = styled.div.withConfig({
 	);
 	border: 2px solid color-mix(in oklab, var(--color-status-prospect) 60%, black);
 	box-shadow:
-		inset 0 2px 4px rgba(255, 255, 255, 0.35),
-		inset 0 -2px 4px rgba(0, 0, 0, 0.2),
-		0 2px 6px rgba(0, 0, 0, 0.25);
+		inset 0 2px 4px var(--highlight-inset-strong),
+		inset 0 -2px 4px var(--shadow-color-strong),
+		0 2px 6px var(--shadow-color-deep);
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	color: #fff;
+	color: var(--color-on-primary);
 	flex-shrink: 0;
 `
 
@@ -638,8 +638,8 @@ const Initial = styled.span.withConfig({ displayName: 'ProfileInitial' })`
 	${stenciledTitle}
 	font-size: var(--typescale-headline-small-size);
 	line-height: 1;
-	color: #fff;
-	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+	color: var(--color-on-primary);
+	text-shadow: 0 1px 2px var(--shadow-color-deep);
 `
 
 const Info = styled.div.withConfig({ displayName: 'ProfileInfo' })`
@@ -671,7 +671,7 @@ const MetaRow = styled.p.withConfig({ displayName: 'ProfileMetaRow' })`
 `
 
 const IdText = styled.span.withConfig({ displayName: 'ProfileIdText' })`
-	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+	font-family: var(--font-mono);
 	font-size: var(--typescale-body-small-size);
 	overflow: hidden;
 	text-overflow: ellipsis;

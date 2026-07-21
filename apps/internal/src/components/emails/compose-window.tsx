@@ -121,7 +121,7 @@ const Shell = styled.div.withConfig({
 	pointer-events: auto;
 	border-radius: var(--shape-sm);
 	overflow: hidden;
-	box-shadow: var(--elevation-workshop-lg, 0 18px 40px rgba(0, 0, 0, 0.28));
+	box-shadow: var(--elevation-workshop-lg, 0 18px 40px var(--shadow-color-deep));
 
 	${p =>
 		p.$fullscreen
@@ -233,7 +233,7 @@ const ChromeButton = styled.button.withConfig({
 
 	&:hover {
 		background: color-mix(in oklab, var(--color-on-surface) 12%, transparent);
-		border-color: rgba(0, 0, 0, 0.25);
+		border-color: var(--color-metal-edge);
 	}
 
 	&:focus-visible {
