@@ -207,7 +207,7 @@ Brand palette + WCAG rationale live in
 [`docs/brand-visual.md`](brand-visual.md); canonical values in
 `packages/ui/src/tokens.css`. The summary below is a pointer, not a duplicate.
 
-- **Primary** — terracotta (`--color-primary: #B05220`); `--color-on-primary` is white.
+- **Primary** — terracotta (`--color-primary: #95400F`); `--color-on-primary` is white.
 - **Secondary** — olive green (`--color-secondary: #2E6B4F`); `--color-on-secondary` is white.
 - **Surface system** — warm cream, not cool grey. `--color-surface` is `#F5F0E8`; the full ramp goes through `--color-surface-dim/container-low/container/container-high/container-highest`.
 - **On-surface** — warm graphite `--color-on-surface: #2D2A24`, with `--color-on-surface-variant` for secondary text.
