@@ -10,7 +10,7 @@ A linear walkthrough for a fresh clone of Batuda. Every command here assumes you
 - [3. Start Docker services](#3-start-docker-services)
 - [4. Migrate the database](#4-migrate-the-database)
 - [5. Bootstrap the first admin](#5-bootstrap-the-first-admin)
-- [6. (Optional) Invite another user](#6-optional-invite-another-user)
+- [6. (Optional) Add another admin](#6-optional-add-another-admin)
 - [7. Run the health check](#7-run-the-health-check)
 - [8. Start the dev servers](#8-start-the-dev-servers)
 - [Env targets: `--env local|cloud`](#env-targets---env-localcloud)
@@ -87,7 +87,7 @@ Creating the organization alongside the user is the point. Every CRM table is ro
 
 Keep the password you set — the dev loop uses it for every web login.
 
-## 6. (Optional) Invite another admin
+## 6. (Optional) Add another admin
 
 ```bash
 pnpm cli auth invite-admin \
@@ -95,11 +95,13 @@ pnpm cli auth invite-admin \
   --org-name "Acme" --org-slug acme
 ```
 
-Creates the organization if the slug is free, creates the user, attaches them, and issues a magic link. The role follows the organization: creating one makes you `owner`, joining an existing one makes you `admin`.
+Creates the organization if the slug is free, creates the user, and attaches them. They are a member immediately — there is no invitation to accept. The role follows the organization: creating one makes you `owner`, joining an existing one makes you `admin`.
 
 Pass `--allow-existing-org` to join an organization that already exists. Without it a slug collision aborts with `OrgSlugTaken` — the guard that stops a mistyped slug from attaching your new admin to somebody else's tenant.
 
-**Locally**, the CLI captures the magic-link URL in-process and prints it to stdout; the server's dev inbox at `apps/server/.dev-inbox/` also catches a Markdown copy of the message. Paste the URL into a browser while `pnpm dev:server` is running to complete sign-in. Under `--env cloud` the running server owns delivery, so the CLI prints a `curl` recipe against `/auth/sign-in/magic-link` instead of the URL itself.
+**Locally**, the CLI captures the magic-link URL in-process and prints it to stdout; the server's dev inbox at `apps/server/.dev-inbox/` also catches a Markdown copy of the message. Paste the URL into a browser while `pnpm dev:server` is running to complete sign-in.
+
+Against a database that is not on this machine, nothing is emailed and no link is printed. The account exists, and the CLI tells you where the person should sign in — they go to `/login`, enter their address, and get their own link that lasts five minutes from the moment they ask. Minting one here instead would leave a working way into the account sitting in a mailbox until they happened to read it.
 
 Other useful commands in the same family:
 
@@ -193,7 +195,7 @@ Cloud env requires the Infisical CLI (pinned in `flake.nix`, so the Nix shell al
 
 **I lost my admin password.** `pnpm cli auth reset-password --email <my-email>`. The CLI prompts for the new password and hashes it directly into `"account"`.
 
-**Magic link URL never prints.** Make sure you are on `--env local`. Cloud runs leave delivery to the running server — `auth invite-admin` prints a `curl` recipe instead, and `auth invite` dispatches through the transactional email provider (Resend) — so neither leaks the URL to stdout. Treat the URL as a credential wherever it does appear: it signs whoever holds it straight in.
+**Magic link URL never prints.** That is deliberate against any database that is not on this machine. A link minted by the CLI would sit in a mailbox being a working way into the account until someone happened to read it, so both `auth invite` and `auth invite-admin` print where to sign in instead — the person goes there and asks for their own link, which then lasts five minutes from the moment they ask. Locally the link is printed, because you are standing there and will open it now. Treat the URL as a credential wherever it does appear: it signs whoever holds it straight in.
 
 **Server logs look empty.** Effect logs persist to `apps/server/server.log` across `node --watch` reloads. `grep event apps/server/server.log | tail -n 20` is the fastest way to catch the last structured log lines.
 

@@ -565,7 +565,9 @@ api_key             — hashed API keys (referenceId, configId, quotas, per-key
                       for org-scoped /mcp keys)
 organization        — tenant root; users belong via member rows
 member              — (organization_id, user_id) plus primary_inbox_id additionalField
-invitation          — pending invites by email
+invitation          — created by Better Auth's schema, unused by Batuda:
+                      people are added straight to an org, never invited.
+                      Kept RLS-policied so the live table is never unguarded.
 ```
 
 ### Email tables (per-org, RLS-enforced)
