@@ -13,6 +13,10 @@
 		"./domain/types": {
 			"types": "./src/domain/types.ts",
 			"import": "./src/domain/types.ts"
+		},
+		"./application/paid-action-tool": {
+			"types": "./src/application/paid-action-tool.ts",
+			"import": "./src/application/paid-action-tool.ts"
 		}
 	},
 	"scripts": {
