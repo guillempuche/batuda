@@ -122,6 +122,16 @@ export const seedUuid = (namespace: string, name: string): string => {
 }
 
 /**
+ * The ids the CRM seed gives companies and contacts. Anything that needs to
+ * point at a seeded company or person derives it through these rather than
+ * rebuilding the key by hand, so a change to the format can only happen once.
+ */
+export const seedCompanyId = (slug: string): string => seedUuid('company', slug)
+
+export const seedContactId = (companyId: string, name: string): string =>
+	seedUuid('contact', `${companyId}:${name}`)
+
+/**
  * Give a batch of rows stable ids. `key` should return something that
  * identifies the row by what it *is* — a slug, a natural key — falling back to
  * its position when the batch is a fixed hand-written list.
