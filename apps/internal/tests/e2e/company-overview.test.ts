@@ -116,12 +116,21 @@ test.describe('company-detail Overview tab', () => {
 			// AND the panel content is not visible before the trigger is clicked
 			await expect(page.getByTestId('company-about-panel')).toBeHidden()
 
-			// WHEN the user clicks the About trigger
-			await trigger.click()
+			// WHEN the user clicks the About trigger.
+			// The header runs a shared-layout animation and the dev server applies
+			// styles after first paint, so the trigger slides roughly 900px over the
+			// first second and a click sent mid-flight lands on empty space. Retry
+			// until it lands, and only while still closed so a click that did
+			// register is never undone by the next attempt.
+			const panel = page.getByTestId('company-about-panel')
+			await expect(async () => {
+				if ((await trigger.getAttribute('aria-expanded')) !== 'true') {
+					await trigger.click()
+				}
+				await expect(panel).toBeVisible({ timeout: 1_000 })
+			}).toPass({ timeout: 15_000 })
 
 			// THEN the panel becomes visible
-			const panel = page.getByTestId('company-about-panel')
-			await expect(panel).toBeVisible()
 
 			// AND every grouped field label is reachable inside the panel
 			//   Sales context (5)
