@@ -1,10 +1,10 @@
 # Dark + high-contrast-dark themes
 
-Status: **Slices 0–4 and 6–8 committed on `claude/dark-themes-tokens`, not pushed (2026-07-21).** Adds two themes — `dark` and `dark-hc` — alongside the current light-only system. The dark aesthetic is **work-lamp on unlit metal**: near-black warm charcoal ground, desaturated low-key metal lit from above-left only, dim ochre paper, terracotta and olive kept as the lit accents, bevels in the same direction at much lower contrast. Shipping as one PR from the `claude/dark-themes-tokens` worktree, one commit per area.
+Status: **All slices committed on `claude/dark-themes-tokens`, not pushed (2026-07-21).** Adds two themes — `dark` and `dark-hc` — alongside the current light-only system. The dark aesthetic is **work-lamp on unlit metal**: near-black warm charcoal ground, desaturated low-key metal lit from above-left only, dim ochre paper, terracotta and olive kept as the lit accents, bevels in the same direction at much lower contrast. Shipping as one PR from the `claude/dark-themes-tokens` worktree, one commit per area.
 
 Both themes now work end to end: pick one under Settings → Profile → Appearance and it survives a reload, because the server reads the cookie before drawing the page. Verified against the running app — choosing high contrast writes the cookie and localStorage, and the reload comes back server-rendered with no flash.
 
-Remaining: Slice 5 (map tiles, sender-authored email HTML, favicons, `theme-color`), Slice 9 (make the contrast check a repo script plus an end-to-end test), Slice 10 (a §Theming section in frontend.md and the 20 remaining phantom token references).
+Nothing outstanding. The contrast tables are now enforced by `pnpm --filter @batuda/ui check-contrast` on pre-push, and frontend.md carries a §Theming section describing the attribute, the preference/resolved split, and the surfaces the palette cannot reach.
 
 For frontend context see [frontend.md](../frontend.md); for the visual language see [brand-visual.md](../brand-visual.md). Counts below are as-measured; where a slice has landed, the "after" number is recorded with it.
 

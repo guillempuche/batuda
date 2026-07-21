@@ -15,7 +15,7 @@ Deployed at `batuda.co`. Tenant marketing sites live in their own repos (e.g. th
 - **styled-components** — CSS-in-JS for dynamic/stateful styles (transient props, runtime interpolation)
 - **BaseUI** — headless, accessible components (styled with Tailwind classes + styled-components)
 - **Motion + Motion Plus** — animations (`motion/react` for layout/transitions, `motion-plus/react` for premium components)
-- **react-map-gl + MapLibre** — interactive map with company markers and clustering
+- **react-leaflet + Leaflet** — interactive map showing a company's location
 - **Tiptap** — rich text editor for documents and proposals
 
 ---
@@ -51,6 +51,13 @@ Same `moduleResolution: bundler` as the server — no `.js` in imports, `import 
 "development": "./src/...",   // workspace consumers
 "import":      "./dist/..."   // npm consumers
 ```
+
+The **stylesheets are exempt** — `./tokens.css` and `./tailwind.css` point at
+`./src/*.css` for everyone. They used to be copied into `dist/` and served from
+there, which meant editing the source changed nothing until the package was
+rebuilt: a stale copy silently beat the real file. The copies were byte-identical,
+so they bought nothing. Tailwind's `@import` resolver does not consult
+`resolve.conditions` either, so a condition-based split would not have helped.
 
 `'development'` must appear in BOTH `resolve.conditions` and
 `ssr.resolve.conditions` so SSR and client load the same build. Otherwise
@@ -188,18 +195,18 @@ import styled from 'styled-components'
 
 const Card = styled.div`
   background: var(--color-surface);
-  border-radius: var(--shape-medium);
-  padding: var(--space-4);
+  border-radius: var(--shape-md);
+  padding: var(--space-sm);
   box-shadow: var(--elevation-1);
 `
 
 // Tailwind for grid layout, styled-components for card visuals
-<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[var(--space-4)]">
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[var(--space-sm)]">
   <Card>{children}</Card>
 </div>
 ```
 
-For Tailwind spacing in layout, use arbitrary values with token references: `gap-[var(--space-4)]`, `p-[var(--page-gutter)]`.
+For Tailwind spacing in layout, use arbitrary values with token references: `gap-[var(--space-sm)]`, `p-[var(--page-gutter)]`.
 
 ### Color tokens — Mediterranean industrial
 
@@ -213,7 +220,7 @@ Brand palette + WCAG rationale live in
 - **On-surface** — warm graphite `--color-on-surface: #2D2A24`, with `--color-on-surface-variant` for secondary text.
 - **Outline** — `--color-outline` for visible borders, `--color-outline-variant` for subtle dividers.
 - **No tertiary, no fixed accents.** Two-accent system by design (terracotta + olive).
-- **No dark mode** at this writing — light only.
+- **Three themes** — light, `dark`, and `dark-hc` (high contrast). See §Theming below.
 
 The workshop visual language layers a second palette on top — metal, paper,
 ledger lines — covered in the §Workshop tokens section below.
@@ -260,6 +267,61 @@ Workshop tokens (metal palette, paper colours, elevation-workshop shadows,
 brushed-metal texture) live in `packages/ui/src/tokens.css` §Workshop. Use
 them via `var(--color-metal-*)`, `var(--color-paper-*)`, etc. — never
 hardcode metal greys.
+
+## Theming
+
+Three themes: light (the bare `:root` block), `dark`, and `dark-hc` (high contrast). The palettes and their WCAG tables live in [`docs/brand-visual.md`](brand-visual.md) §Dark Workshop; canonical values in `packages/ui/src/tokens.css`.
+
+### The attribute is the single source of truth
+
+The active theme is a `data-theme` attribute on `<html>`. CSS never reads `prefers-color-scheme` directly — the media query only feeds the initial resolution in JS. Reading it in both places is how a theme system ends up disagreeing with itself, with CSS following the device while JS follows an explicit choice.
+
+```
+:root                        → light (also the fallback when the attribute is absent)
+:root[data-theme='dark']     ┐ shared dark structure
+:root[data-theme='dark-hc']  ┘
+:root[data-theme='dark-hc']  → high-contrast palette + flattening, later so it wins
+```
+
+**It must be on `<html>`, not on a wrapper.** Every Base UI popup — dialog, popover, menu, tooltip, preview card, combobox, navigation menu — portals into `document.body`, and its `Portal` part is mandatory (the positioner throws without it). A `data-theme` on a wrapper inside the app root would leave every one of those resolving custom properties against `:root`, so popups would silently stay light. `<html>` is the only ancestor enclosing both the app root and `document.body`.
+
+### Preference versus resolved theme
+
+These are different values and conflating them is a real bug:
+
+- The **preference** is `light | dark | dark-hc | system`, stored in the `batuda.theme` cookie and mirrored to localStorage.
+- The **attribute** always holds a resolved theme and never `system`.
+
+If the pre-paint script wrote its resolved value back into the preference cookie, a reader following the system would be silently converted to a fixed choice with no way back. The cookie stores only what was explicitly chosen.
+
+Resolution order, mirroring the `lang` flow in `__root.tsx`:
+
+1. `beforeLoad` reads the cookie — SSR from the request header, client from `document.cookie`.
+2. A concrete preference renders straight into `<html data-theme>`. No script, no flash.
+3. `system` or no cookie renders `light` and emits a `ScriptOnce` that corrects the attribute from `matchMedia` while the page is still parsing. `<html>` carries `suppressHydrationWarning` because that script mutates it before React hydrates.
+4. `ThemeProvider` reconciles against localStorage on mount, and — for `system` only — listens for OS changes so the page keeps up live.
+
+`theme-color` is emitted from the resolved theme rather than a media query, so an explicit choice also tints the mobile browser chrome. `color-scheme` does not do this.
+
+### High contrast is a distinct theme
+
+`dark-hc` inherits dark's structure, then removes what is contrast *noise* rather than depth: `--texture-brushed-metal` goes `none`, gradients flatten, the amber `--glow-active` halo becomes a solid ring, the emboss/engrave text shadows and inset highlights go off, and every divider is held visible. Text targets AAA rather than AA.
+
+OS forced-colors mode is a separate, independent axis. Base UI has no handling for it, and in that mode the user agent overrides author colours regardless of theme — `dark-hc` neither implements nor substitutes for it.
+
+### Surfaces the palette cannot reach
+
+Three things need explicit handling because the colour is not ours:
+
+- **Map tiles** are images of a light map from a third party. The tile layer is inverted and hue-corrected in dark themes, and Leaflet's own popups and controls are restyled from tokens.
+- **Sender-authored email HTML** keeps its own white sheet in every theme. Recolouring arbitrary markup would wreck logos and quoted screenshots, so the message reads as a printout.
+- **The calendar's event palette** carries its own light/dark pairs and is deliberately left alone — forcing brand tokens on it would flatten the category distinctions it exists to draw.
+
+### Checking contrast
+
+`pnpm --filter @batuda/ui check-contrast` reads `tokens.css` and fails if any text pairing drops below its target. It runs on pre-push. The tables in brand-visual.md had already drifted from the code once — this makes them a check rather than a claim.
+
+---
 
 ### Elevation tokens
 
@@ -359,7 +421,7 @@ const variants = {
 const PriButton = styled(Button.Root)<{ $variant?: keyof typeof variants }>`
   font-size: var(--typescale-label-large-size);
   font-weight: var(--typescale-label-large-weight);
-  padding: var(--space-2) var(--space-6);
+  padding: var(--space-2xs) var(--space-md);
   border-radius: var(--shape-full);
   cursor: pointer;
   border: none;
@@ -378,7 +440,7 @@ Dynamic data-driven styles:
 const StatusBadge = styled.span<{ $status: string }>`
   background: var(--color-status-${p => p.$status});
   border-radius: var(--shape-full);
-  padding: var(--space-1) var(--space-3);
+  padding: var(--space-3xs) var(--space-xs);
   font-size: var(--typescale-label-small-size);
 `
 
@@ -419,8 +481,8 @@ import styled from 'styled-components'
 
 const AnimatedCard = styled(motion.div)`
   background: var(--color-surface);
-  border-radius: var(--shape-medium);
-  padding: var(--space-4);
+  border-radius: var(--shape-md);
+  padding: var(--space-sm);
   box-shadow: var(--elevation-1);
 `
 
@@ -432,8 +494,8 @@ const AnimatedCard = styled(motion.div)`
 // Enter/exit transitions
 const Panel = styled(motion.div)`
   background: var(--color-surface-container);
-  border-radius: var(--shape-large);
-  padding: var(--space-6);
+  border-radius: var(--shape-lg);
+  padding: var(--space-md);
 `
 
 <AnimatePresence>
@@ -496,8 +558,8 @@ const AnimatedBadge = styled(motion.span)<{ $status: string }>`
 // Option 2: motion on styled element
 const HoverCard = styled(motion.div)`
   background: var(--color-surface);
-  border-radius: var(--shape-medium);
-  padding: var(--space-4);
+  border-radius: var(--shape-md);
+  padding: var(--space-sm);
   box-shadow: var(--elevation-1);
   cursor: pointer;
 `
@@ -554,7 +616,7 @@ const TiptapStyles = createGlobalStyle`
     font-size: var(--typescale-body-large-size);
     line-height: var(--typescale-body-large-line);
     color: var(--color-on-surface);
-    padding: var(--space-4);
+    padding: var(--space-sm);
     min-height: 12rem;
     outline: none;
   }
@@ -577,69 +639,22 @@ For read-only display, render the stored HTML directly (no editor instance neede
 
 ---
 
-## Map — react-map-gl + MapLibre
+## Map — react-leaflet + Leaflet
 
-Company locations are displayed on an interactive map with clustering using [react-map-gl](https://visgl.github.io/react-map-gl/) + [MapLibre GL JS](https://maplibre.org/).
+A company's saved coordinates are shown on a small map in the Where panel, using [react-leaflet](https://react-leaflet.js.org/) over [Leaflet](https://leafletjs.com/). Tiles are raster images from OpenStreetMap; there is no vector renderer, no tile key, and no clustering — one marker per company detail page.
 
-### Installation
-
-Scaffolded via `apps/internal/package.json`:
-
-- `react-map-gl` — React wrapper for MapLibre
-- `maplibre-gl` — open-source WebGL map renderer
-- `supercluster` — fast marker clustering
+Installed via `apps/internal/package.json`: `react-leaflet`, `leaflet`, `@types/leaflet`.
 
 ### Usage pattern
 
-```tsx
-import Map, { Marker, Popup } from 'react-map-gl/maplibre'
-import 'maplibre-gl/dist/maplibre-gl.css'
-import styled from 'styled-components'
+`apps/internal/src/components/companies/where-panel-client.client.tsx` holds the whole map. It is a `.client.tsx` module because Leaflet needs `window`, so it never runs during SSR.
 
-const Pin = styled.div<{ $status: string }>`
-  width: 12px;
-  height: 12px;
-  border-radius: var(--shape-full);
-  background: var(--color-status-${p => p.$status});
-  border: 2px solid var(--color-on-primary);
-`
+Two things are worth knowing before editing it:
 
-function CompanyMap({ companies }: { companies: CompanySummary[] }) {
-  return (
-    <Map
-      initialViewState={{ longitude: 1.52, latitude: 41.39, zoom: 7 }}
-      style={{ height: 500 }}
-      mapStyle={`https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_KEY}`}
-    >
-      {companies.map(c => (
-        <Marker key={c.id} longitude={c.lng} latitude={c.lat}>
-          <Pin $status={c.status} />
-        </Marker>
-      ))}
-    </Map>
-  )
-}
-```
+- **Marker images come from a CDN.** Leaflet ships its default icons through CSS `url()` that Vite cannot resolve without extra plumbing, so `icon({ iconUrl: … })` points at the unpkg-hosted assets instead.
+- **Leaflet brings its own stylesheet** (`leaflet/dist/leaflet.css`), which styles popups, zoom buttons and the attribution line in its own light palette. Those are overridden from tokens in the map frame — see §Theming for why the tiles themselves are filtered rather than restyled.
 
-### SSR
-
-MapLibre requires `window`/WebGL — it cannot render server-side. Lazy-load the map client-only:
-
-```tsx
-import { lazy, Suspense } from 'react'
-const CompanyMap = lazy(() => import('../components/CompanyMap'))
-
-// In route component:
-<Suspense fallback={<div style={{ height: 500 }} />}>
-  <CompanyMap companies={companies} />
-</Suspense>
-```
-
-### Tiles
-
-Use [MapTiler](https://www.maptiler.com/) free tier (100K tile requests/month). Set `MAPTILER_KEY` env var.
-
----
+Attribution to OpenStreetMap contributors is required and is rendered by the `TileLayer`.
 
 ## Breakpoints
 
@@ -647,7 +662,7 @@ Mobile-first. Breakpoints are defined in `@theme` (sm: 640px, md: 768px, lg: 102
 
 ```html
 <!-- Tailwind for responsive layout -->
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[var(--space-4)]">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[var(--space-sm)]">
   ...
 </div>
 ```
@@ -658,7 +673,7 @@ Or `@media` in styled-components for responsive visual changes:
 const PipelineGrid = styled.div`
   display: grid;
   grid-template-columns: 1fr;
-  gap: var(--space-4);
+  gap: var(--space-sm);
 
   @media (min-width: 768px) {
     grid-template-columns: repeat(2, 1fr);
@@ -744,8 +759,8 @@ import styled from 'styled-components'
 
 const Card = styled.div`
   background: var(--color-surface);
-  border-radius: var(--shape-medium);
-  padding: var(--space-4);
+  border-radius: var(--shape-md);
+  padding: var(--space-sm);
   box-shadow: var(--elevation-1);
 `
 
@@ -768,7 +783,7 @@ function CompanyCard({ company }: { company: Company }) {
 
 ```tsx
 // Grid layout via Tailwind, card visuals via styled-components
-<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[var(--space-4)]">
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[var(--space-sm)]">
   {companies.map(c => <CompanyCard key={c.id} company={c} />)}
 </div>
 
