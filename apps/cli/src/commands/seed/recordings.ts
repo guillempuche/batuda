@@ -1,9 +1,14 @@
-import { randomUUID } from 'node:crypto'
-
+/** biome-ignore-all lint/style/noNonNullAssertion: seed data */
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { Config, Effect, Redacted } from 'effect'
 
-import { normalizeRows, type SeedCtx, silentWav } from './shared'
+import {
+	normalizeRows,
+	type SeedCtx,
+	seedUuid,
+	silentWav,
+	withSeedIds,
+} from './shared'
 
 type RecordingSpec = {
 	subject: string
@@ -143,7 +148,7 @@ export const seedRecordings = (
 			const interactionId = idBySubject.get(spec.subject)
 			if (!interactionId) continue
 			const companyId = companyMap.get(spec.companySlug)!
-			const storageKey = `recordings/${companyId}/${randomUUID()}.wav`
+			const storageKey = `recordings/${companyId}/${seedUuid('recording-blob', `${companyId}:${spec.subject}`)}.wav`
 			if (spec.upload) {
 				yield* Effect.tryPromise(() =>
 					s3.send(
@@ -185,7 +190,13 @@ export const seedRecordings = (
 
 		if (recordingRows.length > 0) {
 			yield* sql`INSERT INTO call_recordings ${sql.insert(
-				normalizeRows(stamp(recordingRows)),
+				normalizeRows(
+					stamp(
+						withSeedIds('recording', recordingRows, (_, index) =>
+							String(index),
+						),
+					),
+				),
 			)}`
 			yield* Effect.logInfo(
 				`  ${recordingRows.length} recordings (${uploadedCount} uploaded, ${recordingRows.length - uploadedCount} missing/deleted)`,

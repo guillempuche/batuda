@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 
 import { Effect } from 'effect'
 
-import { normalizeRows, type SeedCtx } from './shared'
+import { normalizeRows, type SeedCtx, withSeedIds } from './shared'
 
 // Standing instruction templates + per-agent default stacks for local dev.
 // owner_user_id NULL = org-owned (admin-managed, every member reads it); a set
@@ -134,7 +134,13 @@ export const seedInstructions = ({
 				: []),
 		]
 		const insertedTemplates = yield* sql<{ id: string; name: string }>`
-			INSERT INTO instruction_templates ${sql.insert(normalizeRows(templateRows))}
+			INSERT INTO instruction_templates ${sql.insert(
+				normalizeRows(
+					withSeedIds('instruction-template', templateRows, (r, i) =>
+						String(r.name ?? i),
+					),
+				),
+			)}
 			RETURNING id, name
 		`
 		const templateIdByName = new Map(insertedTemplates.map(t => [t.name, t.id]))
@@ -179,7 +185,11 @@ export const seedInstructions = ({
 			ownerUserId: string | null
 			organizationId: string
 		}>`
-			INSERT INTO agent_default_stacks ${sql.insert(normalizeRows(stackRows))}
+			INSERT INTO agent_default_stacks ${sql.insert(
+				normalizeRows(
+					withSeedIds('agent-stack', stackRows, (_, i) => String(i)),
+				),
+			)}
 			RETURNING id, owner_user_id, organization_id
 		`
 		const tallerOrgStackId = insertedStacks.find(
@@ -259,7 +269,11 @@ export const seedInstructions = ({
 					]
 				: []),
 		]
-		yield* sql`INSERT INTO agent_default_stack_items ${sql.insert(normalizeRows(itemRows))}`
+		yield* sql`INSERT INTO agent_default_stack_items ${sql.insert(
+			normalizeRows(
+				withSeedIds('agent-stack-item', itemRows, (_, i) => String(i)),
+			),
+		)}`
 
 		// A member's pending donation drives the org admin's review queue; an
 		// already-accepted one shows the resolved side of the same flow. The row
@@ -290,7 +304,11 @@ export const seedInstructions = ({
 				resolvedAt: new Date('2026-05-01'),
 			},
 		]
-		yield* sql`INSERT INTO instruction_template_donations ${sql.insert(normalizeRows(donationRows))}`
+		yield* sql`INSERT INTO instruction_template_donations ${sql.insert(
+			normalizeRows(
+				withSeedIds('template-donation', donationRows, (_, i) => String(i)),
+			),
+		)}`
 
 		yield* Effect.logInfo(
 			`  templates: ${insertedTemplates.length}, stacks: ${insertedStacks.length}, items: ${itemRows.length}, donations: ${donationRows.length}`,

@@ -1,8 +1,6 @@
-import { randomUUID } from 'node:crypto'
-
 import { Effect } from 'effect'
 
-import type { SeedCtx } from './shared'
+import { SEED_REFERENCE, type SeedCtx, seedUuid } from './shared'
 
 // Seeds mock MCP OAuth connections so the /settings/mcp/connections page has
 // something to render during local dev and the /debug-apps flow. Without this,
@@ -59,13 +57,13 @@ export const seedMcpOAuth = (ctx: SeedCtx) =>
 			// Register the mock OAuth client.
 			yield* sql`
 				INSERT INTO "oauthClient" (id, "clientId", "redirectUris", name, "createdAt", "updatedAt")
-				VALUES (${randomUUID()}, ${client.clientId}, ${redirectUrisJson}::jsonb, ${client.name}, now(), now())
+				VALUES (${seedUuid('oauth-client', client.clientId)}, ${client.clientId}, ${redirectUrisJson}::jsonb, ${client.name}, ${SEED_REFERENCE}, ${SEED_REFERENCE})
 			`
 
 			// Record consent (Alice approved this client).
 			yield* sql`
 				INSERT INTO "oauthConsent" (id, "clientId", "userId", scopes, "createdAt", "updatedAt")
-				VALUES (${randomUUID()}, ${client.clientId}, ${aliceId}, '["openid"]'::jsonb, now(), now())
+				VALUES (${seedUuid('oauth-consent', client.clientId)}, ${client.clientId}, ${aliceId}, '["openid"]'::jsonb, ${SEED_REFERENCE}, ${SEED_REFERENCE})
 			`
 		}
 
@@ -73,15 +71,15 @@ export const seedMcpOAuth = (ctx: SeedCtx) =>
 		yield* sql`
 			INSERT INTO mcp_oauth_org_membership (user_id, client_id, organization_id, updated_at)
 			VALUES
-				(${aliceId}, 'mock-chatgpt-client', ${tallerOrgId}, now()),
-				(${aliceId}, 'mock-chatgpt-client', ${restaurantOrgId}, now())
+				(${aliceId}, 'mock-chatgpt-client', ${tallerOrgId}, ${SEED_REFERENCE}),
+				(${aliceId}, 'mock-chatgpt-client', ${restaurantOrgId}, ${SEED_REFERENCE})
 			ON CONFLICT (user_id, client_id, organization_id) DO NOTHING
 		`
 
 		// Claude → authorized for only taller (single-org-per-connection case).
 		yield* sql`
 			INSERT INTO mcp_oauth_org_membership (user_id, client_id, organization_id, updated_at)
-			VALUES (${aliceId}, 'mock-claude-client', ${tallerOrgId}, now())
+			VALUES (${aliceId}, 'mock-claude-client', ${tallerOrgId}, ${SEED_REFERENCE})
 			ON CONFLICT (user_id, client_id, organization_id) DO NOTHING
 		`
 

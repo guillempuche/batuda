@@ -1,4 +1,6 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: seed data */
+import { createHash } from 'node:crypto'
+
 import type { SqlClient } from 'effect/unstable/sql'
 
 /** Align row shapes within a batch — sql.insert requires uniform keys. */
@@ -69,6 +71,72 @@ export const TINY_PDF = Buffer.from(
 	].join('\n'),
 	'utf8',
 )
+
+// ── Determinism ───────────────────────────────────────────
+
+/**
+ * The single "now" the whole seed is written against. Fixing it means two
+ * seed runs produce byte-identical data, which is what lets tests assert on
+ * dates and screenshots compare cleanly. Override with SEED_REFERENCE_DATE
+ * when you want the demo data to look freshly dated instead.
+ */
+export const SEED_REFERENCE: Date = (() => {
+	const override = process.env['SEED_REFERENCE_DATE']
+	if (override === undefined || override === '') {
+		return new Date('2026-06-15T09:00:00.000Z')
+	}
+	const parsed = new Date(override)
+	if (Number.isNaN(parsed.getTime())) {
+		throw new Error(
+			`SEED_REFERENCE_DATE is not a valid date: ${override}. Use an ISO timestamp such as 2026-06-15T09:00:00Z.`,
+		)
+	}
+	return parsed
+})()
+
+/**
+ * Stable id for a seeded row, derived from what the row *is* rather than
+ * assigned at random by the database. Two seed runs give a company the same
+ * id, so URLs stay put across runs — screenshots and saved links keep working.
+ *
+ * This is a name-based UUID (the RFC 4122 version 5 layout): SHA-1 over a
+ * namespace plus a name, with the version and variant bits forced.
+ */
+export const seedUuid = (namespace: string, name: string): string => {
+	const hash = createHash('sha1')
+		.update(`batuda-seed:${namespace}:${name}`)
+		.digest()
+	const bytes = Buffer.from(hash.subarray(0, 16))
+	// Mark it as a name-based (v5) UUID with the standard variant, so
+	// Postgres and any UUID parser treat it as well-formed.
+	bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x50
+	bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80
+	const hex = bytes.toString('hex')
+	return [
+		hex.slice(0, 8),
+		hex.slice(8, 12),
+		hex.slice(12, 16),
+		hex.slice(16, 20),
+		hex.slice(20, 32),
+	].join('-')
+}
+
+/**
+ * Give a batch of rows stable ids. `key` should return something that
+ * identifies the row by what it *is* — a slug, a natural key — falling back to
+ * its position when the batch is a fixed hand-written list.
+ */
+export const withSeedIds = <T extends Record<string, unknown>>(
+	namespace: string,
+	rows: ReadonlyArray<T>,
+	key: (row: T, index: number) => string,
+): Array<T & { id: string }> =>
+	rows.map((row, index) => ({
+		...row,
+		// Last, so a row that already carries an `id` cannot quietly override
+		// the deterministic one and reintroduce a random value.
+		id: seedUuid(namespace, key(row, index)),
+	}))
 
 // ── Presets ───────────────────────────────────────────────
 

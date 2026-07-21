@@ -1,11 +1,9 @@
-import { randomUUID } from 'node:crypto'
-
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { Config, Effect, Redacted } from 'effect'
 import type { SqlClient } from 'effect/unstable/sql'
 
 import type { SeededInbox } from './inboxes'
-import { ONE_PIXEL_PNG, TINY_PDF } from './shared'
+import { ONE_PIXEL_PNG, SEED_REFERENCE, seedUuid, TINY_PDF } from './shared'
 
 // Direct INSERTs keep the seed fast and deterministic — no SMTP round-trip or
 // worker IMAP tick needed to materialize fixtures.
@@ -74,6 +72,7 @@ export const seedDemoEmails = (
 			Effect.gen(function* () {
 				yield* sql`
 					INSERT INTO email_thread_links ${sql.insert({
+						id: seedUuid('email-thread', args.threadRootMessageId),
 						organizationId: args.inbox.orgId,
 						inboxId: args.inbox.id,
 						externalThreadId: args.threadRootMessageId,
@@ -137,7 +136,7 @@ export const seedDemoEmails = (
 					folder: args.folder ?? 'INBOX',
 					rawRfc822Ref,
 					subject: args.subject,
-					receivedAt: args.receivedAt ?? new Date(),
+					receivedAt: args.receivedAt ?? SEED_REFERENCE,
 					textBody: args.textBody ?? null,
 					htmlBody: args.htmlBody ?? null,
 					textPreview:
@@ -157,7 +156,10 @@ export const seedDemoEmails = (
 					inboundClassification: args.inboundClassification ?? null,
 				}
 				const insertedRows = yield* sql<{ id: string }>`
-					INSERT INTO email_messages ${sql.insert(dbMessageRow)}
+					INSERT INTO email_messages ${sql.insert({
+						id: seedUuid('email-message', String(dbMessageRow['messageId'])),
+						...dbMessageRow,
+					})}
 					RETURNING id
 				`
 				const inserted = insertedRows[0]
@@ -186,7 +188,15 @@ export const seedDemoEmails = (
 					})),
 				]
 				yield* sql`
-					INSERT INTO message_participants ${sql.insert(participants)}
+					INSERT INTO message_participants ${sql.insert(
+						participants.map(pt => ({
+							id: seedUuid(
+								'message-participant',
+								`${pt.emailMessageId}:${pt.role}:${pt.emailAddress}`,
+							),
+							...pt,
+						})),
+					)}
 					ON CONFLICT DO NOTHING
 				`
 			})
@@ -229,10 +239,10 @@ export const seedDemoEmails = (
 			const m2Id = '<m2-quote-followup@calpepfonda.cat>'
 			const m3Id = '<m3-kickoff@ferrosbl.com>'
 			const m8Id = '<m8-vendor-quote@example.com>'
-			const m9Id = `<m9-${randomUUID()}@taller.cat>`
-			const m12Id = `<m12-${randomUUID()}@scam.example>`
-			const m13Id = `<m13-${randomUUID()}@promo.example>`
-			const m14Id = `<m14-${randomUUID()}@malware.example>`
+			const m9Id = `<m9-seed@taller.cat>`
+			const m12Id = `<m12-seed@scam.example>`
+			const m13Id = `<m13-seed@promo.example>`
+			const m14Id = `<m14-seed@malware.example>`
 
 			yield* insertSeedMessage({
 				inbox: tallerHuman,
@@ -397,7 +407,7 @@ export const seedDemoEmails = (
 			const m1ThreadLinkId = threadLinkRows[0]?.id ?? null
 			yield* sql`
 				INSERT INTO email_drafts ${sql.insert({
-					draftId: `draft_seed-${randomUUID()}`,
+					draftId: 'draft_seed-fixed',
 					organizationId: tallerHuman.orgId,
 					inboxId: tallerHuman.id,
 					mode: 'reply',

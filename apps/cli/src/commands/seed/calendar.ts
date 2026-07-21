@@ -1,10 +1,13 @@
-import { randomUUID } from 'node:crypto'
-
 import { Effect } from 'effect'
 
 import type { TaskRow } from './crm'
 import { TEST_USER } from './fixtures'
-import { normalizeRows, type SeedCtx } from './shared'
+import {
+	normalizeRows,
+	SEED_REFERENCE,
+	type SeedCtx,
+	withSeedIds,
+} from './shared'
 
 export const seedCalendar = (
 	{ sql, tallerOrgId, stamp }: SeedCtx,
@@ -97,7 +100,7 @@ export const seedCalendar = (
 			LIMIT 1
 		`
 		const calDay = 24 * 60 * 60 * 1000
-		const now = Date.now()
+		const now = SEED_REFERENCE.getTime()
 		const calcomCompany = companyMap.get('cal-pep-fonda')
 		const ferrosCompany = companyMap.get('ferros-baix-llobregat')
 		const hostalCompany = companyMap.get('hostal-pirineu')
@@ -212,7 +215,7 @@ export const seedCalendar = (
 				source: 'internal',
 				provider: 'internal',
 				providerBookingId: null,
-				icalUid: `internal-seed-1-${randomUUID()}@calendar.batuda`,
+				icalUid: 'internal-seed-1@calendar.batuda',
 				icalSequence: 0,
 				eventTypeId: internalType?.id ?? null,
 				startAt: new Date(now + 1 * calDay),
@@ -235,7 +238,15 @@ export const seedCalendar = (
 			source: string
 			title: string
 		}>`
-			INSERT INTO calendar_events ${sql.insert(normalizeRows(stamp(calendarEventSeeds)))}
+			INSERT INTO calendar_events ${sql.insert(
+				normalizeRows(
+					stamp(
+						withSeedIds('calendar-event', calendarEventSeeds, (_, index) =>
+							String(index),
+						),
+					),
+				),
+			)}
 			RETURNING id, source, title
 		`
 		const attendeeRows = insertedCalendarEvents
@@ -265,7 +276,15 @@ export const seedCalendar = (
 			])
 		if (attendeeRows.length > 0) {
 			yield* sql`
-				INSERT INTO calendar_event_attendees ${sql.insert(normalizeRows(stamp(attendeeRows)))}
+				INSERT INTO calendar_event_attendees ${sql.insert(
+					normalizeRows(
+						stamp(
+							withSeedIds('calendar-attendee', attendeeRows, (_, i) =>
+								String(i),
+							),
+						),
+					),
+				)}
 			`
 		}
 		const taskEventRows = insertedTasks.slice(0, 3).map(t => ({
@@ -275,7 +294,11 @@ export const seedCalendar = (
 			change: { kind: 'created', snapshot: { title: t.title } },
 		}))
 		if (taskEventRows.length > 0) {
-			yield* sql`INSERT INTO task_events ${sql.insert(normalizeRows(stamp(taskEventRows)))}`
+			yield* sql`INSERT INTO task_events ${sql.insert(
+				normalizeRows(
+					stamp(withSeedIds('task-event', taskEventRows, (_, i) => String(i))),
+				),
+			)}`
 		}
 		yield* Effect.logInfo(
 			`  ${insertedCalendarEvents.length} events, ${attendeeRows.length} attendees, ${taskEventRows.length} task events`,

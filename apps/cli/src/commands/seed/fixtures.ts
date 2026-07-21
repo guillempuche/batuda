@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: seed data */
 
-import type { Preset } from './shared'
+import { type Preset, SEED_REFERENCE } from './shared'
 
 export const DEMO_ORGS = [
 	{ slug: 'taller', name: 'Taller Demo' },
@@ -157,7 +157,7 @@ export const COMPANIES = [
 		nextAction: 'Enviar factura mensual',
 		latitude: 41.2241,
 		longitude: 1.7254,
-		geocodedAt: new Date(),
+		geocodedAt: SEED_REFERENCE,
 		geocodeSource: 'seed',
 	},
 	{
@@ -181,7 +181,7 @@ export const COMPANIES = [
 		nextAction: 'Presentar proposta automatització',
 		latitude: 41.3526,
 		longitude: 2.0715,
-		geocodedAt: new Date(),
+		geocodedAt: SEED_REFERENCE,
 		geocodeSource: 'seed',
 	},
 	{
@@ -204,7 +204,7 @@ export const COMPANIES = [
 		nextAction: 'Schedule ecommerce demo',
 		latitude: 41.3874,
 		longitude: 2.1686,
-		geocodedAt: new Date(),
+		geocodedAt: SEED_REFERENCE,
 		geocodeSource: 'seed',
 	},
 	{
@@ -261,7 +261,7 @@ export const COMPANIES = [
 		nextAction: 'Follow-up call',
 		latitude: 41.5388,
 		longitude: 2.4449,
-		geocodedAt: new Date(),
+		geocodedAt: SEED_REFERENCE,
 		geocodeSource: 'seed',
 	},
 	{
@@ -358,7 +358,7 @@ export const COMPANIES = [
 		lastContactedAt: new Date('2026-03-28'),
 		latitude: 41.2371,
 		longitude: 1.811,
-		geocodedAt: new Date(),
+		geocodedAt: SEED_REFERENCE,
 		geocodeSource: 'seed',
 	},
 	{

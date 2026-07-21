@@ -1,6 +1,6 @@
 import { Effect } from 'effect'
 
-import { normalizeRows, type SeedCtx } from './shared'
+import { normalizeRows, type SeedCtx, withSeedIds } from './shared'
 
 export const seedPages = (
 	{ sql, stamp }: SeedCtx,
@@ -718,5 +718,15 @@ export const seedPages = (
 				viewCount: 0,
 			},
 		]
-		yield* sql`INSERT INTO pages ${sql.insert(normalizeRows(stamp(pageRows)))}`
+		yield* sql`INSERT INTO pages ${sql.insert(
+			normalizeRows(
+				stamp(
+					withSeedIds(
+						'page',
+						pageRows,
+						r => `${String(r.slug)}:${String(r.lang)}`,
+					),
+				),
+			),
+		)}`
 	})

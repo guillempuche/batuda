@@ -16,6 +16,7 @@ import { linkRunProvenance, seedInstructions } from './seed/instructions'
 import { seedMcpOAuth } from './seed/mcp-oauth'
 import { seedPages } from './seed/pages'
 import { seedPersonaActivity } from './seed/personas'
+import { pinTimestamps } from './seed/pin-timestamps'
 import { seedProposals } from './seed/proposals'
 import { seedRecordings } from './seed/recordings'
 import {
@@ -74,10 +75,20 @@ export const seed = (preset: Preset) =>
 				}
 
 				const insertedProducts = yield* seedProducts(ctx)
-				const { insertedCompanies, companyMap } = yield* seedCompanies(ctx)
+				const {
+					insertedCompanies,
+					companyMap,
+					generated,
+					restaurantGenerated,
+					restaurantCompanyMap,
+				} = yield* seedCompanies(
+					ctx,
+					insertedProducts.map(p => p.slug),
+				)
 				const { insertedContacts, contactMap } = yield* seedContacts(
 					ctx,
 					companyMap,
+					{ generated, restaurantGenerated, restaurantCompanyMap },
 				)
 				const { insertedInteractions, dataWithContacts } =
 					yield* seedInteractions(ctx, companyMap, contactMap)
@@ -99,7 +110,17 @@ export const seed = (preset: Preset) =>
 					yield* linkRunProvenance(ctx, instructionTemplateIds)
 				}
 
+				// Pinned before the persona pass because that pass copies task and
+				// proposal timestamps into the activity feed — reading them while
+				// they still held the database clock is what made the feed differ
+				// between runs.
+				yield* pinTimestamps(ctx)
+
 				yield* seedPersonaActivity(ctx)
+
+				// Again for the rows the persona pass inserted — scoped to the one
+				// table it writes to, rather than walking the whole schema twice.
+				yield* pinTimestamps(ctx, ['timeline_activity'])
 
 				const counts = {
 					products: insertedProducts.length,
