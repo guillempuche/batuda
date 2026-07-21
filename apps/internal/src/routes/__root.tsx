@@ -4,6 +4,7 @@ import {
 	HeadContent,
 	Outlet,
 	redirect,
+	ScriptOnce,
 	Scripts,
 	useLocation,
 	useMatches,
@@ -26,6 +27,14 @@ import { translatedHead } from '#/i18n/lingui'
 import type { DehydratedAtomValue } from '#/lib/atom-hydration'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import { fetchSession } from '#/lib/session-check'
+import { readThemeCookieFromHeader } from '#/theme/cookie'
+import {
+	defaultTheme,
+	defaultThemePreference,
+	type ThemeCode,
+	type ThemePreference,
+} from '#/theme/index'
+import { ThemeProvider } from '#/theme/theme-provider'
 import appCss from '../styles.css?url'
 
 /**
@@ -64,6 +73,18 @@ export const Route = createRootRoute({
 		// what they want right now.
 		const chosenLang = readLangCookieFromHeader(cookieHeader)
 
+		// The appearance is cookie-only — it belongs to the device, not the
+		// account, so a dark-at-night laptop does not follow you to a bright
+		// office machine. Resolved before the sign-in branch so the sign-in
+		// pages are themed too.
+		const themePreference: ThemePreference =
+			readThemeCookieFromHeader(cookieHeader) ?? defaultThemePreference
+		/* The server cannot know what the operating system wants, so a
+		 * "system" preference renders light and the script below corrects it
+		 * before anything is painted. */
+		const theme: ThemeCode =
+			themePreference === 'system' ? defaultTheme : themePreference
+
 		const isPublicPath =
 			location.pathname === '/login' ||
 			location.pathname === '/forgot-password' ||
@@ -71,7 +92,8 @@ export const Route = createRootRoute({
 
 		// Sign-in pages have no session to read a language from, so they keep
 		// the cookie-or-default path.
-		if (isPublicPath) return { lang: chosenLang ?? defaultLang }
+		if (isPublicPath)
+			return { lang: chosenLang ?? defaultLang, themePreference, theme }
 
 		const user = await fetchSession(cookieHeader ?? undefined)
 		if (!user) {
@@ -84,9 +106,17 @@ export const Route = createRootRoute({
 		// lands in their own language on the very first page, before they have
 		// touched any setting. Route context is serialized across SSR, so only
 		// the plain language code crosses — never the session itself.
-		return { lang: chosenLang ?? user.locale ?? defaultLang }
+		return {
+			lang: chosenLang ?? user.locale ?? defaultLang,
+			themePreference,
+			theme,
+		}
 	},
-	loader: ({ context }) => ({ lang: context.lang }),
+	loader: ({ context }) => ({
+		lang: context.lang,
+		themePreference: context.themePreference,
+		theme: context.theme,
+	}),
 	head: ({ loaderData }) => {
 		const lang: LangCode = loaderData?.lang ?? defaultLang
 		const { title, description } = translatedHead[lang]
@@ -144,7 +174,7 @@ function RootComponent() {
 	// harmless.
 	const matches = useMatches()
 	const location = useLocation()
-	const { lang } = Route.useLoaderData()
+	const { lang, themePreference, theme } = Route.useLoaderData()
 	const dehydrated = matches.flatMap(m => {
 		const data = m.loaderData as
 			| { dehydrated?: ReadonlyArray<DehydratedAtomValue> }
@@ -177,48 +207,69 @@ function RootComponent() {
 	}, [isAuthChrome])
 
 	return (
-		<RootDocument lang={lang}>
-			<LangProvider initialLang={lang}>
-				<RegistryProvider>
-					<HydrationBoundary state={dehydrated}>
-						<BatudaMotionConfig>
-							<LayoutGroup>
-								<PriToast.Provider>
-									{isAuthChrome ? (
-										<Outlet />
-									) : (
-										<QuickCaptureProvider>
-											<ComposeEmailProvider>
-												<AppShell>
-													<Outlet />
-												</AppShell>
-												<QuickCaptureDialog />
-												<ComposeDock />
-											</ComposeEmailProvider>
-										</QuickCaptureProvider>
-									)}
-									<PriToast.Viewport />
-								</PriToast.Provider>
-							</LayoutGroup>
-						</BatudaMotionConfig>
-					</HydrationBoundary>
-				</RegistryProvider>
-			</LangProvider>
+		<RootDocument lang={lang} theme={theme} preference={themePreference}>
+			<ThemeProvider initialPreference={themePreference} initialTheme={theme}>
+				<LangProvider initialLang={lang}>
+					<RegistryProvider>
+						<HydrationBoundary state={dehydrated}>
+							<BatudaMotionConfig>
+								<LayoutGroup>
+									<PriToast.Provider>
+										{isAuthChrome ? (
+											<Outlet />
+										) : (
+											<QuickCaptureProvider>
+												<ComposeEmailProvider>
+													<AppShell>
+														<Outlet />
+													</AppShell>
+													<QuickCaptureDialog />
+													<ComposeDock />
+												</ComposeEmailProvider>
+											</QuickCaptureProvider>
+										)}
+										<PriToast.Viewport />
+									</PriToast.Provider>
+								</LayoutGroup>
+							</BatudaMotionConfig>
+						</HydrationBoundary>
+					</RegistryProvider>
+				</LangProvider>
+			</ThemeProvider>
 		</RootDocument>
 	)
 }
 
+/* Runs while the browser is still parsing the page, before anything is drawn.
+ * Only needed when the stored choice is "follow the system": the server has no
+ * way to know what the system wants, so it renders the light theme and this
+ * corrects the attribute in place. Without it, every such visit would flash
+ * light before settling. */
+const followSystemScript = `(function(){try{
+var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches
+if(d)document.documentElement.setAttribute('data-theme','dark')
+}catch(e){}})()`
+
 function RootDocument({
 	lang,
+	theme,
+	preference,
 	children,
 }: {
 	lang: LangCode
+	theme: ThemeCode
+	preference: ThemePreference
 	children: React.ReactNode
 }) {
 	return (
-		<html lang={htmlLang[lang]}>
+		/* The script above may change this attribute before React hydrates, which
+		 * React would otherwise report as a mismatch. */
+		<html lang={htmlLang[lang]} data-theme={theme} suppressHydrationWarning>
 			<head>
 				<HeadContent />
+				{preference === 'system' ? (
+					<ScriptOnce>{followSystemScript}</ScriptOnce>
+				) : null}
 			</head>
 			<body>
 				{children}
