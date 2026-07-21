@@ -1059,6 +1059,10 @@ const CompanyLinkWrap = styled.div.withConfig({
 	}
 `
 
+/* Each badge is its accent at low opacity with a darker text tone on top. The
+ * text is deliberately darker than the tint it sits on — matching them (text and
+ * background the same colour) leaves too little contrast to read at label size.
+ * "Shared" is neutral rather than a third accent: the palette has exactly two. */
 const inboxTone = (purpose: 'human' | 'agent' | 'shared') => {
 	if (purpose === 'human')
 		return css`
@@ -1068,11 +1072,11 @@ const inboxTone = (purpose: 'human' | 'agent' | 'shared') => {
 	if (purpose === 'agent')
 		return css`
 			background: color-mix(in oklab, var(--color-secondary) 14%, transparent);
-			color: var(--color-secondary);
+			color: var(--color-on-secondary-container);
 		`
 	return css`
-		background: color-mix(in oklab, var(--color-tertiary) 12%, transparent);
-		color: var(--color-tertiary);
+		background: color-mix(in oklab, var(--color-on-surface-variant) 12%, transparent);
+		color: var(--color-on-surface-variant);
 	`
 }
 
