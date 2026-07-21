@@ -16,6 +16,7 @@ export interface AuthInviteAdminInput {
 	readonly orgName: string
 	readonly orgSlug: string
 	readonly allowExistingOrg: boolean
+	readonly locale: string | undefined
 	readonly confirmHost: string | undefined
 }
 
@@ -26,14 +27,15 @@ export class MagicLinkNotCaptured extends Data.TaggedError(
 }> {}
 
 /**
- * `pnpm cli auth invite-admin` — subsequent invites: create-or-find the
- * org, create-or-find the user, attach as admin, and issue a magic link.
+ * `pnpm cli auth invite-admin` — create-or-find the org, create-or-find the
+ * person, and attach them as an admin. They are a member immediately; there is
+ * nothing for them to accept.
  *
  * Against a database on this machine it runs Better Auth in-process with a
- * capturing sender, so the magic-link URL is printed to stdout for the
- * developer to click. Against a deployment it prints a curl recipe pointing at
- * the running server's `/auth/sign-in/magic-link` endpoint, since email
- * delivery is the server's responsibility there.
+ * capturing sender and prints the sign-in link, because the developer is
+ * standing right there and will open it now. Against any other database it
+ * prints where to sign in instead: a link minted here would sit in a mailbox
+ * being a working way into the account until someone happened to read it.
  */
 export const authInviteAdmin = (input: AuthInviteAdminInput) =>
 	Effect.gen(function* () {
@@ -46,6 +48,10 @@ export const authInviteAdmin = (input: AuthInviteAdminInput) =>
 
 		const baseURL = yield* Config.string('BETTER_AUTH_BASE_URL').pipe(
 			Config.withDefault('https://api.batuda.localhost'),
+		)
+		// Where the person actually signs in — the app, not the API.
+		const appUrl = yield* Config.string('APP_PUBLIC_URL').pipe(
+			Config.withDefault('https://batuda.localhost'),
 		)
 
 		let captured: MagicLinkCallbackInput | null = null
@@ -71,6 +77,7 @@ export const authInviteAdmin = (input: AuthInviteAdminInput) =>
 				orgSlug: input.orgSlug,
 				allowExistingOrg: input.allowExistingOrg,
 				sendMagicLink: canDeliverHere,
+				...(input.locale === undefined ? {} : { locale: input.locale }),
 			},
 		)
 
@@ -88,15 +95,21 @@ export const authInviteAdmin = (input: AuthInviteAdminInput) =>
 		yield* Console.log('')
 
 		if (!canDeliverHere) {
+			yield* Console.log('The admin exists. Nothing was sent from here.')
+			yield* Console.log('')
+			yield* Console.log('  Tell them to sign in at:')
+			yield* Console.log(`    ${appUrl}/login`)
+			yield* Console.log('')
 			yield* Console.log(
-				'Magic-link delivery is performed by the running server.',
+				'  They enter this address and get their own link, good for 5',
 			)
-			yield* Console.log('  Trigger it with:')
 			yield* Console.log(
-				`    curl -X POST ${baseURL}/auth/sign-in/magic-link \\`,
+				'  minutes from the moment they ask for it. Sending one from here',
 			)
-			yield* Console.log("      -H 'content-type: application/json' \\")
-			yield* Console.log(`      -d '{"email":"${result.user.email}"}'`)
+			yield* Console.log(
+				'  instead would put a working way into the account in a mailbox,',
+			)
+			yield* Console.log('  waiting for whenever they happened to read it.')
 			yield* Console.log('')
 			return result
 		}
@@ -108,7 +121,7 @@ export const authInviteAdmin = (input: AuthInviteAdminInput) =>
 			)
 		}
 
-		yield* Console.log('Magic link (valid for a short time):')
+		yield* Console.log('Magic link (valid for 5 minutes):')
 		yield* Console.log('')
 		yield* Console.log(`  ${link.url}`)
 		yield* Console.log('')

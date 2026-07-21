@@ -26,6 +26,9 @@ export interface InviteAdminInput {
 	// `OrgSlugTaken` so a typo doesn't bolt the new admin onto someone
 	// else's org.
 	readonly allowExistingOrg?: boolean
+	// The language this person reads, when the caller knows it. Only applied to
+	// an account being created — someone who already exists keeps theirs.
+	readonly locale?: string
 	// Defaults to true. Set false when the caller has no way to deliver the
 	// link, so no sign-in credential is minted that nobody can receive.
 	readonly sendMagicLink?: boolean
@@ -94,6 +97,7 @@ export const inviteAdmin = (
 						email: input.email,
 						name: input.name,
 						role: 'admin', // Platform-level role; org membership role is separate.
+						...(input.locale === undefined ? {} : { locale: input.locale }),
 					})
 
 		// New org → creator becomes 'owner' atomically via Better Auth's

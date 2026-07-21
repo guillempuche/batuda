@@ -27,6 +27,16 @@ export interface NewUserInput {
 	readonly email: string
 	readonly name: string
 	readonly role: Role
+	/**
+	 * The language this person reads, when it is known at creation time. Their
+	 * email is written in it, and their first visit renders in it. Left unset,
+	 * the account has no preference and whatever reads it falls back.
+	 *
+	 * Typed as a plain string because this package deliberately shares nothing
+	 * with the domain package — callers that have the language list validate
+	 * before handing a value over.
+	 */
+	readonly locale?: string
 }
 
 export interface NewUserWithPasswordInput extends NewUserInput {

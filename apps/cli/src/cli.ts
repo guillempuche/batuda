@@ -1,8 +1,10 @@
 import { fileURLToPath } from 'node:url'
 
 import { NodeRuntime, NodeServices } from '@effect/platform-node'
-import { Console, Effect, Option, Redacted } from 'effect'
+import { Console, Data, Effect, Option, Redacted } from 'effect'
 import { Argument, Command, Flag, Prompt } from 'effect/unstable/cli'
+
+import { isLangCode, LANG_CODES, type LangCode } from '@batuda/domain'
 
 import { authCreateKey } from './commands/auth'
 import { authBootstrap } from './commands/auth-bootstrap'
@@ -267,6 +269,33 @@ const confirmHostFlag = Flag.string('confirm-host').pipe(
 	Flag.optional,
 )
 
+export class InvalidLocale extends Data.TaggedError('InvalidLocale')<{
+	readonly value: string
+}> {}
+
+// The language the new account reads in. Validated here because the list of
+// languages lives in the domain package, which `@batuda/auth` deliberately
+// does not depend on — so this edge is the last place that can check it.
+const localeFlag = Flag.string('locale').pipe(
+	Flag.withDescription(
+		`Language for their email and first sign-in (${LANG_CODES.join(' | ')}). Omitted leaves it unset.`,
+	),
+	Flag.optional,
+)
+
+const readLocaleFlag = (
+	flag: Option.Option<string>,
+): Effect.Effect<LangCode | undefined, InvalidLocale> => {
+	const value = Option.getOrUndefined(flag)
+	if (value === undefined) return Effect.succeed(undefined)
+	if (isLangCode(value)) return Effect.succeed(value)
+	// Say what would have worked. The tagged error alone shows the rejected
+	// value but not the alternatives, which is the part the caller needs.
+	return Console.error(
+		`Unknown language '${value}'. Valid values: ${LANG_CODES.join(', ')}.`,
+	).pipe(Effect.andThen(Effect.fail(new InvalidLocale({ value }))))
+}
+
 const authCreateKeyCommand = Command.make(
 	'create-key',
 	{
@@ -349,14 +378,19 @@ const authInviteCommand = Command.make(
 			Flag.withDescription('Role to grant'),
 			Flag.withDefault('user' as const),
 		),
+		locale: localeFlag,
 		confirmHost: confirmHostFlag,
 	},
-	({ email, name, role, confirmHost }) =>
-		authInvite({
-			email,
-			name,
-			role,
-			confirmHost: Option.getOrUndefined(confirmHost),
+	({ email, name, role, locale, confirmHost }) =>
+		Effect.gen(function* () {
+			const validated = yield* readLocaleFlag(locale)
+			return yield* authInvite({
+				email,
+				name,
+				role,
+				locale: validated,
+				confirmHost: Option.getOrUndefined(confirmHost),
+			})
 		}),
 ).pipe(
 	Command.withShortDescription('Create a passwordless user + magic link'),
@@ -431,16 +465,21 @@ const authInviteAdminCommand = Command.make(
 			),
 			Flag.withDefault(false),
 		),
+		locale: localeFlag,
 		confirmHost: confirmHostFlag,
 	},
-	({ email, name, orgName, orgSlug, allowExistingOrg, confirmHost }) =>
-		authInviteAdmin({
-			email,
-			name,
-			orgName,
-			orgSlug,
-			allowExistingOrg,
-			confirmHost: Option.getOrUndefined(confirmHost),
+	({ email, name, orgName, orgSlug, allowExistingOrg, locale, confirmHost }) =>
+		Effect.gen(function* () {
+			const validated = yield* readLocaleFlag(locale)
+			return yield* authInviteAdmin({
+				email,
+				name,
+				orgName,
+				orgSlug,
+				allowExistingOrg,
+				locale: validated,
+				confirmHost: Option.getOrUndefined(confirmHost),
+			})
 		}),
 ).pipe(
 	Command.withShortDescription('Create an org and its first admin'),

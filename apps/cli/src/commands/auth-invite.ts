@@ -15,6 +15,7 @@ export interface AuthInviteInput {
 	readonly email: string
 	readonly name: string
 	readonly role: Role
+	readonly locale: string | undefined
 	readonly confirmHost: string | undefined
 }
 
@@ -44,6 +45,10 @@ export const authInvite = (input: AuthInviteInput) =>
 		const baseURL = yield* Config.string('BETTER_AUTH_BASE_URL').pipe(
 			Config.withDefault('https://api.batuda.localhost'),
 		)
+		// Where the person actually signs in — the app, not the API.
+		const appUrl = yield* Config.string('APP_PUBLIC_URL').pipe(
+			Config.withDefault('https://batuda.localhost'),
+		)
 
 		let captured: MagicLinkCallbackInput | null = null
 		const sender: MagicLinkCallback = async data => {
@@ -55,9 +60,14 @@ export const authInvite = (input: AuthInviteInput) =>
 			magicLinkSender: sender,
 		})
 
+		// `locale` is pulled out of the spread so it is omitted entirely when
+		// unset, rather than passed as an explicit `undefined` — the account then
+		// keeps a null instead of being pinned to a guess.
+		const { locale, ...rest } = input
 		const user = yield* inviteUser(users, magicLink, {
-			...input,
+			...rest,
 			sendMagicLink: canDeliverHere,
+			...(locale === undefined ? {} : { locale }),
 		})
 
 		yield* Console.log('')
@@ -69,15 +79,21 @@ export const authInvite = (input: AuthInviteInput) =>
 		yield* Console.log('')
 
 		if (!canDeliverHere) {
+			yield* Console.log('The account exists. Nothing was sent from here.')
+			yield* Console.log('')
+			yield* Console.log('  Tell them to sign in at:')
+			yield* Console.log(`    ${appUrl}/login`)
+			yield* Console.log('')
 			yield* Console.log(
-				'Magic-link delivery is performed by the running server.',
+				'  They enter this address and get their own link, good for 5',
 			)
-			yield* Console.log('  Trigger it with:')
 			yield* Console.log(
-				`    curl -X POST ${baseURL}/auth/sign-in/magic-link \\`,
+				'  minutes from the moment they ask for it. Sending one from here',
 			)
-			yield* Console.log("      -H 'content-type: application/json' \\")
-			yield* Console.log(`      -d '{"email":"${user.email}"}'`)
+			yield* Console.log(
+				'  instead would put a working way into the account in a mailbox,',
+			)
+			yield* Console.log('  waiting for whenever they happened to read it.')
 			yield* Console.log('')
 			return user
 		}
@@ -87,7 +103,7 @@ export const authInvite = (input: AuthInviteInput) =>
 			return yield* Effect.fail(new MagicLinkNotCaptured({ email: user.email }))
 		}
 
-		yield* Console.log('Magic link (valid for a short time):')
+		yield* Console.log('Magic link (valid for 5 minutes):')
 		yield* Console.log('')
 		yield* Console.log(`  ${link.url}`)
 		yield* Console.log('')
