@@ -21,31 +21,21 @@
 	--color-status-closed: #9e9e9e; /* neutral grey, archived       */
 	--color-status-dead: #ba1a1a; /* error red                    */
 
-	/* Contrast pair for text-on-status (used by StatusBadge).
-	   Every tone above has enough contrast for white text at 14px/500. */
-	--color-on-status: #ffffff;
+	/* Accents only — a rule, a cap, a dot, always beside a text label, so the
+	   colour reinforces the status rather than carrying it alone. Several are
+	   too light to take white text, so anything placing text on one must choose
+	   its own foreground and check the contrast. */
 
-	/* ═══ Workshop surfaces — Forja chrome palette ════════════════ */
-	/*    Repeated in enough styled-components that renaming them in  */
-	/*    lockstep becomes the dominant cost; kept here (vs the       */
-	/*    shared token file) because marketing does not consume them  */
-	/*    — its metal plates sit on different base surfaces.          */
+	/* ═══ Warning — amber ══════════════════════════════════════ */
+	/*    Attention without alarm: a setting that needs review,   */
+	/*    an inbox that stopped syncing. Distinct from --color-   */
+	/*    error, which means something already broke.             */
 
-	--color-paper-aged: #f0e8d0;
-	--color-paper-aged-hover: #ede2c6;
-	--color-pegboard: #b8a88c;
-	--color-leather-dark: #3e2723;
+	--color-warning: #f59e0b;
+	--color-warning-strong: #b45309;
+	--color-on-warning-container: #92400e;
 
-	/* Ruled-ledger line tones (rgba — need alpha for overlay effect) */
-	--color-ledger-line-soft: rgba(120, 95, 60, 0.25);
-	--color-ledger-line: rgba(120, 95, 60, 0.3);
-	--color-ledger-line-strong: rgba(120, 95, 60, 0.5);
-
-	/* Paper fibre warm accent — used under radial-gradient for page grain */
-	--color-paper-fibre-a: rgba(180, 155, 120, 0.06);
-	--color-paper-fibre-b: rgba(180, 155, 120, 0.05);
-
-	/* Aged-paper inset/outer shadows (depth cue for file cards). */
-	--shadow-paper-inset: 0 1px 0 rgba(255, 255, 255, 0.55) inset;
-	--shadow-paper-card: 0 2px 6px rgba(0, 0, 0, 0.12);
+	/* Halo around an urgent task or top-priority dot — brighter than
+	   --color-error so it reads as a lit edge rather than a fill. */
+	--color-priority-urgent-glow: rgba(233, 84, 32, 0.5);
 }
