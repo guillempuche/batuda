@@ -441,6 +441,11 @@ msgstr "Qualsevol prioritat"
 msgid "API keys"
 msgstr "Claus d'API"
 
+#: src/components/profile/theme-select.tsx
+#: src/routes/settings/profile/index.tsx
+msgid "Appearance"
+msgstr "Aparença"
+
 #: src/components/research/proposal-outcome.tsx
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Applied"
@@ -1470,6 +1475,14 @@ msgstr "La contrasenya actual no és correcta."
 msgid "Current tools"
 msgstr "Eines actuals"
 
+#: src/components/profile/theme-select.tsx
+msgid "Dark"
+msgstr "Fosc"
+
+#: src/components/profile/theme-select.tsx
+msgid "Dark, high contrast"
+msgstr "Fosc, alt contrast"
+
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Date"
 msgstr "Data"
@@ -2271,6 +2284,10 @@ msgstr "Última visita"
 msgid "Later"
 msgstr "Més tard"
 
+#: src/components/profile/theme-select.tsx
+msgid "Light"
+msgstr "Clar"
+
 #: src/components/companies/proposals-panel.tsx
 msgid "Line items"
 msgstr "Línies"
@@ -2451,6 +2468,10 @@ msgstr "Marcada com a oportunitat verificada"
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Market summary"
 msgstr "Resum de mercat"
+
+#: src/components/profile/theme-select.tsx
+msgid "Match device"
+msgstr "Segons el dispositiu"
 
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Maturity"

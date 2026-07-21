@@ -441,6 +441,11 @@ msgstr "Any priority"
 msgid "API keys"
 msgstr "API keys"
 
+#: src/components/profile/theme-select.tsx
+#: src/routes/settings/profile/index.tsx
+msgid "Appearance"
+msgstr "Appearance"
+
 #: src/components/research/proposal-outcome.tsx
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "Applied"
@@ -1470,6 +1475,14 @@ msgstr "Current password is incorrect."
 msgid "Current tools"
 msgstr "Current tools"
 
+#: src/components/profile/theme-select.tsx
+msgid "Dark"
+msgstr "Dark"
+
+#: src/components/profile/theme-select.tsx
+msgid "Dark, high contrast"
+msgstr "Dark, high contrast"
+
 #: src/components/interactions/quick-capture-dialog.tsx
 msgid "Date"
 msgstr "Date"
@@ -2271,6 +2284,10 @@ msgstr "Last meet"
 msgid "Later"
 msgstr "Later"
 
+#: src/components/profile/theme-select.tsx
+msgid "Light"
+msgstr "Light"
+
 #: src/components/companies/proposals-panel.tsx
 msgid "Line items"
 msgstr "Line items"
@@ -2451,6 +2468,10 @@ msgstr "Marked as a verified lead"
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Market summary"
 msgstr "Market summary"
+
+#: src/components/profile/theme-select.tsx
+msgid "Match device"
+msgstr "Match device"
 
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Maturity"

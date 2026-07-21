@@ -22,6 +22,7 @@ import { PriButton } from '@batuda/ui/pri'
 
 import { PriPasswordInput } from '#/components/primitives/pri-password-input'
 import { LanguageSelect } from '#/components/profile/language-select'
+import { ThemeSelect } from '#/components/profile/theme-select'
 import { apiBaseUrl } from '#/lib/api-base'
 import { authClient } from '#/lib/auth-client'
 import {
@@ -175,6 +176,13 @@ function ProfilePage() {
 					<Trans>Language</Trans>
 				</LanguageRowLabel>
 				<LanguageSelect />
+			</LanguageRow>
+
+			<LanguageRow data-testid='profile-appearance'>
+				<LanguageRowLabel>
+					<Trans>Appearance</Trans>
+				</LanguageRowLabel>
+				<ThemeSelect />
 			</LanguageRow>
 
 			{securityState ? <PasswordCard state={securityState} /> : null}
