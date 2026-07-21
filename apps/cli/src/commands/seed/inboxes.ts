@@ -1,8 +1,8 @@
-import { createCipheriv, hkdfSync, randomBytes } from 'node:crypto'
+import { createCipheriv, createHash, hkdfSync } from 'node:crypto'
 
 import { Config, Effect } from 'effect'
 
-import type { SeedCtx } from './shared'
+import { type SeedCtx, seedUuid } from './shared'
 
 interface InboxSpec {
 	readonly email: string
@@ -160,7 +160,17 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 					32,
 				),
 			)
-			const nonce = randomBytes(12)
+			// SEED DATA ONLY — never copy this into anything that stores a real
+			// secret. A fixed nonce is normally a serious mistake, because
+			// encrypting two different messages under one key and nonce leaks
+			// both. It is safe only in this exact situation: the key is derived
+			// per inbox just above, and the one thing ever encrypted with it is
+			// the same fake password. Deriving it instead of drawing it at
+			// random is what lets two seed runs produce identical rows.
+			const nonce = createHash('sha256')
+				.update(`batuda-seed-nonce:${inboxId}`)
+				.digest()
+				.subarray(0, 12)
 			const cipher = createCipheriv('aes-256-gcm', subkey, nonce)
 			const ciphertext = Buffer.concat([
 				cipher.update('demo-imap-password', 'utf8'),
@@ -193,6 +203,7 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 			`
 			yield* sql`
 				INSERT INTO inbox_footers ${sql.insert({
+					id: seedUuid('inbox-footer', String(inboxId)),
 					organizationId: spec.orgId,
 					inboxId,
 					name: 'default',

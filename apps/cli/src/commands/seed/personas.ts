@@ -30,7 +30,7 @@ export const seedPersonaActivity = ({
 			UPDATE tasks SET assignee_id = ${carol}
 			WHERE id IN (
 				SELECT id FROM tasks WHERE organization_id = ${tallerOrgId}
-				ORDER BY created_at LIMIT 3
+				ORDER BY created_at, id LIMIT 3
 			)
 		`
 		yield* sql`
@@ -38,21 +38,21 @@ export const seedPersonaActivity = ({
 			WHERE id IN (
 				SELECT id FROM tasks
 				WHERE organization_id = ${tallerOrgId} AND assignee_id IS NULL
-				ORDER BY created_at LIMIT 2
+				ORDER BY created_at, id LIMIT 2
 			)
 		`
 		yield* sql`
 			UPDATE research_runs SET created_by = ${carol}
 			WHERE id IN (
 				SELECT id FROM research_runs WHERE organization_id = ${tallerOrgId}
-				ORDER BY created_at LIMIT 4
+				ORDER BY created_at, id LIMIT 4
 			)
 		`
 		yield* sql`
 			UPDATE research_runs SET created_by = ${bea}
 			WHERE id IN (
 				SELECT id FROM research_runs WHERE organization_id = ${tallerOrgId}
-				ORDER BY created_at DESC LIMIT 3
+				ORDER BY created_at DESC, id LIMIT 3
 			)
 		`
 		if (bob && restaurantOrgId !== null) {
@@ -80,19 +80,19 @@ export const seedPersonaActivity = ({
 		// Project task and proposal activity so the feed shows kinds beyond
 		// call_logged / system_event (which the interaction projection emits).
 		yield* sql`
-			INSERT INTO timeline_activity (organization_id, kind, entity_type, entity_id, company_id, contact_id, occurred_at, summary, actor_user_id)
-			SELECT ${tallerOrgId}, 'task_created', 'task', id, company_id, contact_id, created_at, 'Task created: ' || title, ${carol}
-			FROM tasks WHERE organization_id = ${tallerOrgId} ORDER BY created_at LIMIT 4
+			INSERT INTO timeline_activity (id, organization_id, kind, entity_type, entity_id, company_id, contact_id, occurred_at, summary, actor_user_id)
+			SELECT md5('batuda-seed:timeline:task_created:' || id::text)::uuid, ${tallerOrgId}, 'task_created', 'task', id, company_id, contact_id, created_at, 'Task created: ' || title, ${carol}
+			FROM tasks WHERE organization_id = ${tallerOrgId} ORDER BY created_at, id LIMIT 4
 		`
 		yield* sql`
-			INSERT INTO timeline_activity (organization_id, kind, entity_type, entity_id, company_id, contact_id, occurred_at, summary, actor_user_id)
-			SELECT ${tallerOrgId}, 'task_completed', 'task', id, company_id, contact_id, completed_at, 'Task completed: ' || title, ${carol}
+			INSERT INTO timeline_activity (id, organization_id, kind, entity_type, entity_id, company_id, contact_id, occurred_at, summary, actor_user_id)
+			SELECT md5('batuda-seed:timeline:task_completed:' || id::text)::uuid, ${tallerOrgId}, 'task_completed', 'task', id, company_id, contact_id, completed_at, 'Task completed: ' || title, ${carol}
 			FROM tasks WHERE organization_id = ${tallerOrgId} AND status = 'done'
 		`
 		yield* sql`
-			INSERT INTO timeline_activity (organization_id, kind, entity_type, entity_id, company_id, occurred_at, summary, actor_user_id)
-			SELECT ${tallerOrgId}, 'proposal_sent', 'proposal', id, company_id, COALESCE(sent_at, created_at), 'Proposal sent: ' || title, ${bea}
-			FROM proposals WHERE organization_id = ${tallerOrgId} AND status IN ('sent', 'viewed', 'accepted', 'negotiating') ORDER BY created_at LIMIT 3
+			INSERT INTO timeline_activity (id, organization_id, kind, entity_type, entity_id, company_id, occurred_at, summary, actor_user_id)
+			SELECT md5('batuda-seed:timeline:proposal_sent:' || id::text)::uuid, ${tallerOrgId}, 'proposal_sent', 'proposal', id, company_id, COALESCE(sent_at, created_at), 'Proposal sent: ' || title, ${bea}
+			FROM proposals WHERE organization_id = ${tallerOrgId} AND status IN ('sent', 'viewed', 'accepted', 'negotiating') ORDER BY created_at, id LIMIT 3
 		`
 
 		yield* Effect.logInfo(

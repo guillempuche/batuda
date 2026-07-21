@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/style/noNonNullAssertion: seed data */
 import { Effect } from 'effect'
 
 import { TEST_USER } from './fixtures'
@@ -33,7 +34,13 @@ import {
 	TOOL_LOG_PHONE_INTERVIEW,
 	TOOL_LOG_WITH_RETRY,
 } from './research-content'
-import { normalizeRows, type SeedCtx } from './shared'
+import {
+	normalizeRows,
+	SEED_REFERENCE,
+	type SeedCtx,
+	seedUuid,
+	withSeedIds,
+} from './shared'
 
 // Findings keys stay snake_case here; Pg camelizes jsonb on read,
 // so the React layer sees camelCase end-to-end.
@@ -2865,7 +2872,9 @@ export const seedResearchRuns = (
 		const insertedRuns = yield* sql<{
 			id: string
 		}>`INSERT INTO research_runs ${sql.insert(
-			normalizeRows(flatRunRows),
+			normalizeRows(
+				withSeedIds('research-run', flatRunRows, r => String(r.idempotencyKey)),
+			),
 		)} RETURNING id`
 		yield* Effect.logInfo(`  ${insertedRuns.length} per-company runs`)
 
@@ -2874,6 +2883,7 @@ export const seedResearchRuns = (
 		}>`INSERT INTO research_runs ${sql.insert([
 			normalizeRows([
 				{
+					id: seedUuid('research-run', 'group:discovery-scan'),
 					organizationId: tallerOrgId,
 					kind: 'group',
 					query: 'Catalonia small businesses — discovery scan',
@@ -2906,55 +2916,61 @@ export const seedResearchRuns = (
 		const groupChildInsert = yield* sql<{
 			id: string
 		}>`INSERT INTO research_runs ${sql.insert(
-			normalizeRows([
-				{
-					organizationId: tallerOrgId,
-					parentId: groupRunId,
-					kind: 'leaf',
-					query: 'restaurants Catalonia without websites',
-					mode: 'deep',
-					schemaName: 'prospect_scan_v1',
-					status: 'succeeded',
-					findings: JSON.stringify({
-						prospects: [],
-						market_summary: { total_competitors_found: 45 },
-					}),
-					briefMd: '45 restaurants in Catalonia without a public web site.',
-					budgetCents: 50,
-					costCents: 25,
-					paidCostCents: 8,
-					tokensIn: 9000,
-					tokensOut: 2200,
-					toolLog: JSON.stringify([]),
-					createdBy: testUser?.id ?? 'seed',
-					startedAt: new Date('2026-02-05T09:00:30Z'),
-					completedAt: new Date('2026-02-05T09:03:00Z'),
-				},
-				{
-					organizationId: tallerOrgId,
-					parentId: groupRunId,
-					kind: 'followup',
-					query: 'retail shops Barcelona Instagram-only',
-					mode: 'deep',
-					schemaName: 'prospect_scan_v1',
-					status: 'succeeded',
-					findings: JSON.stringify({
-						prospects: [],
-						market_summary: { total_competitors_found: 18 },
-					}),
-					briefMd:
-						'18 retail shops selling only via Instagram DM in Barcelona.',
-					budgetCents: 50,
-					costCents: 22,
-					paidCostCents: 5,
-					tokensIn: 7900,
-					tokensOut: 1800,
-					toolLog: JSON.stringify([]),
-					createdBy: testUser?.id ?? 'seed',
-					startedAt: new Date('2026-02-05T09:03:00Z'),
-					completedAt: new Date('2026-02-05T09:05:00Z'),
-				},
-			]),
+			normalizeRows(
+				withSeedIds(
+					'research-run',
+					[
+						{
+							organizationId: tallerOrgId,
+							parentId: groupRunId,
+							kind: 'leaf',
+							query: 'restaurants Catalonia without websites',
+							mode: 'deep',
+							schemaName: 'prospect_scan_v1',
+							status: 'succeeded',
+							findings: JSON.stringify({
+								prospects: [],
+								market_summary: { total_competitors_found: 45 },
+							}),
+							briefMd: '45 restaurants in Catalonia without a public web site.',
+							budgetCents: 50,
+							costCents: 25,
+							paidCostCents: 8,
+							tokensIn: 9000,
+							tokensOut: 2200,
+							toolLog: JSON.stringify([]),
+							createdBy: testUser?.id ?? 'seed',
+							startedAt: new Date('2026-02-05T09:00:30Z'),
+							completedAt: new Date('2026-02-05T09:03:00Z'),
+						},
+						{
+							organizationId: tallerOrgId,
+							parentId: groupRunId,
+							kind: 'followup',
+							query: 'retail shops Barcelona Instagram-only',
+							mode: 'deep',
+							schemaName: 'prospect_scan_v1',
+							status: 'succeeded',
+							findings: JSON.stringify({
+								prospects: [],
+								market_summary: { total_competitors_found: 18 },
+							}),
+							briefMd:
+								'18 retail shops selling only via Instagram DM in Barcelona.',
+							budgetCents: 50,
+							costCents: 22,
+							paidCostCents: 5,
+							tokensIn: 7900,
+							tokensOut: 1800,
+							toolLog: JSON.stringify([]),
+							createdBy: testUser?.id ?? 'seed',
+							startedAt: new Date('2026-02-05T09:03:00Z'),
+							completedAt: new Date('2026-02-05T09:05:00Z'),
+						},
+					],
+					(_, index) => `group-child:${index}`,
+				),
+			),
 		)} RETURNING id`
 		yield* Effect.logInfo('  + 1 group with 2 children')
 
@@ -2964,42 +2980,48 @@ export const seedResearchRuns = (
 		if (testUser) {
 			const [restaurantsChild, retailChild] = groupChildInsert
 			yield* sql`INSERT INTO research_paid_spend ${sql.insert(
-				normalizeRows([
-					{
-						organizationId: tallerOrgId,
-						researchId: restaurantsChild!.id,
-						userId: testUser.id,
-						provider: 'einforma',
-						tool: 'registry_lookup',
-						idempotencyKey: `seed_paid_${restaurantsChild!.id}_registry`,
-						amountCents: 8,
-						quotaUnits: 1,
-						quotaUnit: 'lookups',
-						args: JSON.stringify({}),
-						resultHash: null,
-						resultData: null,
-						sourceId: null,
-						autoApproved: true,
-						approvedBy: null,
-					},
-					{
-						organizationId: tallerOrgId,
-						researchId: retailChild!.id,
-						userId: testUser.id,
-						provider: 'hunter',
-						tool: 'hunter_enrich',
-						idempotencyKey: `seed_paid_${retailChild!.id}_enrich`,
-						amountCents: 5,
-						quotaUnits: 1,
-						quotaUnit: 'requests',
-						args: JSON.stringify({}),
-						resultHash: null,
-						resultData: null,
-						sourceId: null,
-						autoApproved: true,
-						approvedBy: null,
-					},
-				]),
+				normalizeRows(
+					withSeedIds(
+						'paid-spend',
+						[
+							{
+								organizationId: tallerOrgId,
+								researchId: restaurantsChild!.id,
+								userId: testUser.id,
+								provider: 'einforma',
+								tool: 'registry_lookup',
+								idempotencyKey: `seed_paid_${restaurantsChild!.id}_registry`,
+								amountCents: 8,
+								quotaUnits: 1,
+								quotaUnit: 'lookups',
+								args: JSON.stringify({}),
+								resultHash: null,
+								resultData: null,
+								sourceId: null,
+								autoApproved: true,
+								approvedBy: null,
+							},
+							{
+								organizationId: tallerOrgId,
+								researchId: retailChild!.id,
+								userId: testUser.id,
+								provider: 'hunter',
+								tool: 'hunter_enrich',
+								idempotencyKey: `seed_paid_${retailChild!.id}_enrich`,
+								amountCents: 5,
+								quotaUnits: 1,
+								quotaUnit: 'requests',
+								args: JSON.stringify({}),
+								resultHash: null,
+								resultData: null,
+								sourceId: null,
+								autoApproved: true,
+								approvedBy: null,
+							},
+						],
+						r => String(r.idempotencyKey),
+					),
+				),
 			)}`
 		}
 
@@ -3097,7 +3119,11 @@ export const seedResearchRuns = (
 			}
 			if (paidSpendRows.length > 0) {
 				yield* sql`INSERT INTO research_paid_spend ${sql.insert(
-					normalizeRows(paidSpendRows),
+					normalizeRows(
+						withSeedIds('paid-spend', paidSpendRows, r =>
+							String(r['idempotencyKey']),
+						),
+					),
 				)}`
 				yield* Effect.logInfo(
 					`  ${paidSpendRows.length} research_paid_spend rows`,
@@ -3198,7 +3224,13 @@ export const seedResearchRuns = (
 				const restaurantRuns = yield* sql<{
 					id: string
 				}>`INSERT INTO research_runs ${sql.insert(
-					normalizeRows(restaurantRunRows),
+					normalizeRows(
+						withSeedIds(
+							'research-run',
+							restaurantRunRows,
+							(_, index) => `restaurant:${index}`,
+						),
+					),
 				)} RETURNING id`
 				const restaurantLinks = restaurantRuns.map(r => ({
 					organizationId: restaurantOrgId,
@@ -3228,7 +3260,7 @@ export const seedProviderQuotas = (
 		// (date_trunc('month', now()) in provider-quota.ts), so the warn
 		// state is only reachable from a row anchored to *this* month.
 		// Computed at seed time so it stays current whenever the seed runs.
-		const now = new Date()
+		const now = SEED_REFERENCE
 		const currentPeriodStart = `${now.getUTCFullYear()}-${String(
 			now.getUTCMonth() + 1,
 		).padStart(2, '0')}-01`
