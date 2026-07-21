@@ -178,6 +178,8 @@ Use `agent-browser` (Playwright-based CLI) to test the app as a real user. Ensur
 
 For the full command reference (login flow, navigation, interaction, network inspection), consult `references/agent-browser.md`.
 
+A click on an element below the fold does nothing and still prints `✓ Done`, which looks identical to a broken handler — scroll it into view first. Before reporting any button as broken, verify the click actually landed; see the interaction section of `references/agent-browser.md` for the recipe.
+
 Quick login test:
 
 ```bash

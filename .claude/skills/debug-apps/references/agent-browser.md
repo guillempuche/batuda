@@ -79,6 +79,28 @@ agent-browser scroll down 300
 agent-browser scrollintoview ".task-list"
 ```
 
+**A click on an off-screen element silently does nothing — and still prints `✓ Done`.** The element is found, the command reports success, and no click event is ever dispatched. Anything below the fold is affected: error states at the bottom of a list, footer actions, panels far down a detail page. This reads exactly like a broken handler, and has cost real debugging time chasing an app bug that did not exist.
+
+Both `click "<selector>"` and `find … click` have been observed failing this way, so don't trust either on a target that may be below the fold. What reliably works is scrolling in the page itself, then clicking:
+
+```bash
+agent-browser eval "document.querySelector('[data-testid=pages-retry]').scrollIntoView({block:'center'})"
+agent-browser wait 500
+agent-browser click "[data-testid='pages-retry']"
+```
+
+Never conclude from a silent button that the handler is broken. Count the clicks the element actually receives:
+
+```bash
+agent-browser eval "(()=>{window.__c=0;
+  document.querySelector('[data-testid=pages-retry]')
+    .addEventListener('click',()=>window.__c++); return 'ready'})()"
+agent-browser click "[data-testid='pages-retry']"
+agent-browser eval "window.__c"        # 0 → the click never landed, retry with a scroll
+```
+
+The same caution applies to `network unroute`: a request fired immediately after it can still be aborted by the rule being torn down. An aborted request shows in `network requests` with **no status code** — if you see that, wait a beat and repeat the action rather than assuming the feature is broken.
+
 ## Find elements by role/text
 
 ```bash
