@@ -4,7 +4,7 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { DateTime, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { ExternalLink } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
 import type { PageSummary } from '@batuda/controllers'
@@ -103,6 +103,13 @@ function PagesListPage() {
 	const isFailure = AsyncResult.isFailure(result)
 
 	const [statusFilter, setStatusFilter] = useState(search.status ?? '')
+
+	// Keeps the dropdown in step with the address bar, since going back or
+	// forward in the browser changes the status in the URL but not the
+	// dropdown's own state.
+	useEffect(() => {
+		setStatusFilter(search.status ?? '')
+	}, [search.status])
 
 	return (
 		<Page>
