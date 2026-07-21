@@ -66,9 +66,9 @@ describe('transactional email templates', () => {
 
 				// THEN every part is present, carries the link, and says nothing
 				// is left `undefined` by a missing interpolation
-				expect(rendered.subject.length).toBeGreaterThan(0)
-				expect(rendered.text).toContain(LINK_URL)
-				expect(rendered.html).toContain(LINK_URL)
+				expect(rendered.subject.length, `${lang} subject`).toBeGreaterThan(0)
+				expect(rendered.text, `${lang} body`).toContain(LINK_URL)
+				expect(rendered.html, `${lang} html`).toContain(LINK_URL)
 				expect(rendered.subject).not.toContain('undefined')
 				expect(rendered.text).not.toContain('undefined')
 			}
@@ -81,9 +81,11 @@ describe('transactional email templates', () => {
 				const rendered = resetPasswordEmail[lang](LINK_URL, EXPIRES_AT)
 
 				// THEN it carries the link and the deadline the reader needs
-				expect(rendered.subject.length).toBeGreaterThan(0)
-				expect(rendered.text).toContain(LINK_URL)
-				expect(rendered.text).toContain(EXPIRES_AT.toISOString())
+				expect(rendered.subject.length, `${lang} subject`).toBeGreaterThan(0)
+				expect(rendered.text, `${lang} body`).toContain(LINK_URL)
+				expect(rendered.text, `${lang} expiry`).toContain(
+					EXPIRES_AT.toISOString(),
+				)
 				expect(rendered.html).toContain(LINK_URL)
 				expect(rendered.text).not.toContain('undefined')
 			}
@@ -100,9 +102,9 @@ describe('transactional email templates', () => {
 				})
 
 				// THEN it names who added them and where to sign in
-				expect(rendered.subject).toContain('Taller Demo')
-				expect(rendered.text).toContain('Alice Admin')
-				expect(rendered.text).toContain(SIGN_IN_URL)
+				expect(rendered.subject, `${lang} subject`).toContain('Taller Demo')
+				expect(rendered.text, `${lang} body`).toContain('Alice Admin')
+				expect(rendered.text, `${lang} sign-in link`).toContain(SIGN_IN_URL)
 				expect(rendered.text).not.toContain('undefined')
 			}
 		})

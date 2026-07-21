@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+import { waitForInteractive } from './helpers/hydration'
+
 // Sign-in golden path. Selectors are verified against
 // apps/internal/src/routes/login.tsx (login-form, login-email,
 // login-password, login-submit, login-error). Personas come from
@@ -26,6 +28,9 @@ test.describe('sign-in', () => {
 			// WHEN Alice fills the form and clicks submit
 			await page.getByTestId('login-email').fill('admin@taller.cat')
 			await page.getByTestId('login-password').fill('batuda-dev-2026')
+			// The form submits through a handler that only exists once the page
+			// is live; before then, clicking quietly does nothing.
+			await waitForInteractive(page, 'login-submit')
 			await page.getByTestId('login-submit').click()
 
 			// THEN the action navigates to / (login.tsx — useActionState
@@ -51,6 +56,9 @@ test.describe('sign-in', () => {
 			// WHEN Alice submits valid creds
 			await page.getByTestId('login-email').fill('admin@taller.cat')
 			await page.getByTestId('login-password').fill('batuda-dev-2026')
+			// The form submits through a handler that only exists once the page
+			// is live; before then, clicking quietly does nothing.
+			await waitForInteractive(page, 'login-submit')
 			await page.getByTestId('login-submit').click()
 
 			// THEN the URL becomes /settings/profile, not /
@@ -72,6 +80,9 @@ test.describe('sign-in', () => {
 			// WHEN Alice submits valid creds
 			await page.getByTestId('login-email').fill('admin@taller.cat')
 			await page.getByTestId('login-password').fill('batuda-dev-2026')
+			// The form submits through a handler that only exists once the page
+			// is live; before then, clicking quietly does nothing.
+			await waitForInteractive(page, 'login-submit')
 			await page.getByTestId('login-submit').click()
 
 			// THEN the URL becomes / (NOT //evil.example/) — the open-redirect
@@ -95,6 +106,9 @@ test.describe('sign-in', () => {
 			// WHEN Alice submits with the wrong password
 			await page.getByTestId('login-email').fill('admin@taller.cat')
 			await page.getByTestId('login-password').fill('wrong-password')
+			// The form submits through a handler that only exists once the page
+			// is live; before then, clicking quietly does nothing.
+			await waitForInteractive(page, 'login-submit')
 			await page.getByTestId('login-submit').click()
 
 			// THEN login-error is visible (Better Auth's 401 maps to the
@@ -116,6 +130,9 @@ test.describe('sign-in', () => {
 			// WHEN she submits credentials for an email that has no account
 			await page.getByTestId('login-email').fill('ghost@nowhere.test')
 			await page.getByTestId('login-password').fill('whatever')
+			// The form submits through a handler that only exists once the page
+			// is live; before then, clicking quietly does nothing.
+			await waitForInteractive(page, 'login-submit')
 			await page.getByTestId('login-submit').click()
 
 			// THEN login-error is visible and the URL stays on /login. Better

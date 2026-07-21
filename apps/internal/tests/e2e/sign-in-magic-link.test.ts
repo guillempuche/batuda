@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 import { findLatestEmail } from './helpers/dev-inbox'
+import { waitForInteractive } from './helpers/hydration'
 
 // Magic-link sign-in golden + recovery paths. Selectors are verified
 // against apps/internal/src/routes/login.tsx and apps/server/src/lib/auth.ts
@@ -27,6 +28,9 @@ test.describe('magic-link sign-in from /login', () => {
 			// WHEN Alice types her email and clicks "Email me a sign-in link"
 			// [routes/login.tsx — magic-link trigger fires requestMagicLink()]
 			await page.getByTestId('login-email').fill(SEED_USER_EMAIL)
+			// The button calls a handler rather than submitting the form, so it
+			// does nothing until the page is live.
+			await waitForInteractive(page, 'login-magic-link-trigger')
 			await page.getByTestId('login-magic-link-trigger').click()
 
 			// THEN the form unmounts and the inbox panel renders with the
@@ -81,6 +85,9 @@ test.describe('magic-link sign-in from /login', () => {
 			// WHEN the user submits the magic-link request
 			// [apps/server/src/lib/auth.ts — sendMagicLink existence pre-check]
 			await page.getByTestId('login-email').fill(unknownEmail)
+			// The button calls a handler rather than submitting the form, so it
+			// does nothing until the page is live.
+			await waitForInteractive(page, 'login-magic-link-trigger')
 			await page.getByTestId('login-magic-link-trigger').click()
 
 			// THEN the UI shows the same inbox panel — the response shape
@@ -113,6 +120,9 @@ test.describe('magic-link sign-in from /login', () => {
 			// GIVEN the inbox panel is rendered after a successful magic-link send
 			await page.goto('/login')
 			await page.getByTestId('login-email').fill(SEED_USER_EMAIL)
+			// The button calls a handler rather than submitting the form, so it
+			// does nothing until the page is live.
+			await waitForInteractive(page, 'login-magic-link-trigger')
 			await page.getByTestId('login-magic-link-trigger').click()
 			await expect(page.getByTestId('magic-link-sent-panel')).toBeVisible({
 				timeout: 10_000,

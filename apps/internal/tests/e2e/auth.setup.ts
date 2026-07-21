@@ -1,5 +1,6 @@
 import { expect, test as setup } from '@playwright/test'
 
+import { waitForInteractive } from './helpers/hydration'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // Authenticate once for the suite. Tests that depend on a signed-in
@@ -19,6 +20,9 @@ setup('sign in as Alice and persist storage state', async ({ page }) => {
 	await expect(page.getByTestId('login-form')).toBeVisible()
 
 	// WHEN Alice signs in with seeded credentials
+	// The form submits through a handler that only exists once the page is
+	// live, so submitting before then quietly does nothing at all.
+	await waitForInteractive(page, 'login-submit')
 	await page.getByTestId('login-email').fill('admin@taller.cat')
 	await page.getByTestId('login-password').fill('batuda-dev-2026')
 	await page.getByTestId('login-submit').click()
