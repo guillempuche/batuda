@@ -44,6 +44,7 @@ export {
 	InboxTransportSecurity,
 } from './inboxes'
 export { Interaction, InteractionId } from './interactions'
+export { isLangCode, LANG_CODES, LangCode } from './locales'
 export {
 	MessageParticipant,
 	MessageParticipantId,

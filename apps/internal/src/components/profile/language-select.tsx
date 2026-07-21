@@ -4,18 +4,9 @@ import styled from 'styled-components'
 
 import { PriSelect } from '@batuda/ui/pri'
 
-import { type LangCode, langCodes } from '#/i18n/index'
+import type { LangCode } from '#/i18n/index'
+import { langSelectItems } from '#/i18n/lang-labels'
 import { useLang, useSetLang } from '#/i18n/lang-provider'
-
-/* Native endonyms so each option is self-describing regardless of which
- * locale is currently active — `Català` reads as Catalan whether the
- * surrounding UI is English or Catalan. */
-const LANG_LABELS: Record<LangCode, string> = {
-	en: 'English',
-	ca: 'Català',
-}
-
-const items = langCodes.map(code => ({ value: code, label: LANG_LABELS[code] }))
 
 export function LanguageSelect() {
 	const lang = useLang()
@@ -24,7 +15,7 @@ export function LanguageSelect() {
 	return (
 		<Field>
 			<PriSelect.Root
-				items={items}
+				items={langSelectItems}
 				value={lang}
 				onValueChange={value => {
 					if (typeof value === 'string') setLang(value as LangCode)
@@ -44,7 +35,7 @@ export function LanguageSelect() {
 					<PriSelect.Positioner alignItemWithTrigger={false} sideOffset={6}>
 						<MetalPopup>
 							<PriSelect.List>
-								{items.map(item => (
+								{langSelectItems.map(item => (
 									<MetalItem key={item.value} value={item.value}>
 										<PriSelect.ItemIndicator>
 											<Check size={12} />
