@@ -1328,7 +1328,7 @@ const MessageBody = styled.div.withConfig({
 	word-break: break-word;
 	font-size: var(--typescale-body-medium-size);
 	line-height: 1.55;
-	color: var(--color-on-surface);
+	color: var(--color-on-sheet);
 
 	/* A sender's own HTML carries its own colours, usually dark text assuming a
 	 * white page. On a dark page that becomes black-on-black, and there is no
@@ -1338,12 +1338,12 @@ const MessageBody = styled.div.withConfig({
 	${p =>
 		p.$rich
 			? `
-		background: #ffffff;
-		color: #1a1a1a;
+		background: var(--color-sheet);
+		color: var(--color-on-sheet);
 		color-scheme: light;
 		padding: var(--space-sm);
 		border-radius: var(--shape-2xs);
-		border: 1px solid var(--color-outline-variant);
+		border: 1px solid var(--color-sheet-outline);
 	`
 			: ''}
 
@@ -1363,7 +1363,7 @@ const MessageBody = styled.div.withConfig({
 						font-family: var(--font-display);
 						line-height: 1.25;
 						margin: var(--space-xs) 0 var(--space-2xs);
-						color: var(--color-on-surface);
+						color: var(--color-on-sheet);
 					}
 
 					h1 {
@@ -1390,8 +1390,8 @@ const MessageBody = styled.div.withConfig({
 					blockquote {
 						margin: 0 0 var(--space-2xs);
 						padding: var(--space-2xs) var(--space-sm);
-						border-left: 3px solid var(--color-outline);
-						color: var(--color-on-surface-variant);
+						border-left: 3px solid var(--color-sheet-outline);
+						color: var(--color-on-sheet-variant);
 						font-style: italic;
 					}
 
@@ -1402,7 +1402,7 @@ const MessageBody = styled.div.withConfig({
 						border-radius: var(--shape-2xs);
 						background: color-mix(
 							in oklab,
-							var(--color-on-surface) 8%,
+							var(--color-on-sheet) 8%,
 							transparent
 						);
 					}
@@ -1415,7 +1415,7 @@ const MessageBody = styled.div.withConfig({
 						border-radius: var(--shape-xs);
 						background: color-mix(
 							in oklab,
-							var(--color-on-surface) 6%,
+							var(--color-on-sheet) 6%,
 							transparent
 						);
 						overflow-x: auto;
@@ -1430,12 +1430,12 @@ const MessageBody = styled.div.withConfig({
 
 					hr {
 						border: 0;
-						border-top: 1px dashed var(--color-outline);
+						border-top: 1px dashed var(--color-sheet-outline);
 						margin: var(--space-sm) 0;
 					}
 
 					a {
-						color: var(--color-primary);
+						color: var(--color-sheet-link);
 						text-decoration: underline;
 						text-underline-offset: 2px;
 					}
@@ -1453,7 +1453,7 @@ const MessageBody = styled.div.withConfig({
 
 					th,
 					td {
-						border: 1px solid var(--color-outline);
+						border: 1px solid var(--color-sheet-outline);
 						padding: var(--space-3xs) var(--space-2xs);
 						text-align: left;
 					}

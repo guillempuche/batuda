@@ -64,8 +64,20 @@
 	--color-inverse-on-surface: #f5f0e8;
 	--color-inverse-primary: #ffb68e;
 
+	/* --- A sheet that deliberately ignores the theme.
+	   Someone else's HTML (an email body) carries its own colours, almost always
+	   assuming a white page. Recolouring arbitrary markup would wreck logos and
+	   quoted screenshots, so it keeps a light sheet in every theme and reads as a
+	   printout. Anything drawn inside such a sheet must use these, never the
+	   surface tokens, which invert underneath it. --- */
+	--color-sheet: #ffffff;
+	--color-on-sheet: #1a1a1a;
+	--color-on-sheet-variant: #55524d;
+	--color-sheet-outline: #8f8a80;
+	--color-sheet-link: #95400f;
+
 	/* --- Scrim — the dimmed backdrop behind a modal. --- */
-	--color-scrim: rgba(26, 22, 18, 0.7);
+	--color-scrim: color-mix(in oklab, #1a1612 70%, transparent);
 
 	/* --- The colour shadows are cast in, and the tint a raised surface takes
 	   on as it rises. The workshop ramps below build on the shadow colour. --- */
@@ -450,7 +462,7 @@
 	--color-inverse-on-surface: #33302a;
 	--color-inverse-primary: #95400f;
 
-	--color-scrim: rgba(0, 0, 0, 0.75);
+	--color-scrim: color-mix(in oklab, #000000 75%, transparent);
 
 	/* --- Workshop surfaces — unlit metal on a dark board. --- */
 	--color-metal-light: #4a443b;
@@ -549,7 +561,7 @@
 	--color-outline: #c9bfaf;
 	--color-outline-variant: #8a8276;
 
-	--color-scrim: rgba(0, 0, 0, 0.9);
+	--color-scrim: color-mix(in oklab, #000000 90%, transparent);
 
 	/* Plates read as flat fills — the metal ramp collapses so gradients
 	   built from it stop banding across a high-contrast surface. */
