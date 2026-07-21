@@ -55,7 +55,7 @@ The site IS a **taller mecànic** (mechanical workshop) where business processes
 
 PostHog uses warm earth tones. We go **industrial Mediterranean** — structured as Material Design 3 color roles.
 
-Terracotta `#B05220` was selected via automated WCAG optimization: it's the warmest hue that passes AA (4.5:1) for both white-on-button AND color-on-background simultaneously.
+Terracotta `#95400F` was selected via automated WCAG optimization: it's the warmest hue that passes AA (4.5:1) for both white-on-button AND color-on-background simultaneously. It clears that bar with room to spare — 6.96:1 and 6.13:1 — which is what lets the same hue carry into the dark themes without a second brand colour.
 
 > **MD3 compliance**: All 29 standard color roles covered except **tertiary** (intentionally omitted — two-accent system: terracotta + olive). Fixed accent colors also omitted (multi-theme feature). Token names follow official MD3 naming exactly, prefixed with `--color-`.
 
@@ -64,7 +64,7 @@ Terracotta `#B05220` was selected via automated WCAG optimization: it's the warm
 The main brand color. Buttons, links, active states.
 
 ```css
---color-primary:               #B05220;   /* terracotta — CTA, links, interactive */
+--color-primary:               #95400F;   /* terracotta — CTA, links, interactive */
 --color-on-primary:            #FFFFFF;   /* white text on primary buttons */
 --color-primary-container:     #FFDBC8;   /* soft terracotta tint — cards, badges */
 --color-on-primary-container:  #3B1500;   /* dark brown text on container */
@@ -72,8 +72,8 @@ The main brand color. Buttons, links, active states.
 
 | Pairing                                       | Ratio   | Grade |
 | --------------------------------------------- | ------- | ----- |
-| `on-primary` on `primary` (white on button)   | 5.15:1  | AA    |
-| `primary` on `surface` (link on page)         | 4.54:1  | AA    |
+| `on-primary` on `primary` (white on button)   | 6.96:1  | AAA   |
+| `primary` on `surface` (link on page)         | 6.13:1  | AA    |
 | `on-primary-container` on `primary-container` | 12.54:1 | AAA   |
 
 #### Secondary — Olive Green
@@ -83,15 +83,15 @@ Less prominent actions, chips, secondary buttons, success states.
 ```css
 --color-secondary:               #2E6B4F;   /* olive green */
 --color-on-secondary:            #FFFFFF;
---color-secondary-container:     #C8EDD9;   /* soft green tint */
---color-on-secondary-container:  #002114;
+--color-secondary-container:     #D8E4D0;   /* soft green tint */
+--color-on-secondary-container:  #1E3524;
 ```
 
 | Pairing                                            | Ratio   | Grade |
 | -------------------------------------------------- | ------- | ----- |
 | `on-secondary` on `secondary` (white on olive btn) | 6.30:1  | AA    |
 | `secondary` on `surface` (olive text on page)      | 5.56:1  | AA    |
-| `on-secondary-container` on `secondary-container`  | 13.50:1 | AAA   |
+| `on-secondary-container` on `secondary-container`  | 10.02:1 | AAA   |
 
 #### Error
 
@@ -280,6 +280,176 @@ The specific aesthetic vocabulary shared across Batuda surfaces and tenant marke
 - **Card hover** — cards have slight alternating rotation (`nth-child` ±0.3–0.6deg), straighten to 0deg on hover.
 - **Stamped metal buttons** — primary CTA uses terracotta gradient with `--elevation-workshop-md` and `--text-shadow-engrave`. Press effect via `:active { transform: translateY(1px) }`.
 - **Stencil outline buttons** — secondary CTA uses `border: 2px dashed`, no background, uppercase. Hover highlights in terracotta.
+
+---
+
+## Dark Workshop
+
+The workshop at night, lit by one work-lamp rather than by daylight.
+
+This is a *reinterpretation* of the workshop metaphor, not an inversion of the light palette. Inverting cream surfaces yields mud, because the whole system assumes a lit-from-above cream ground. Instead the ground goes near-black warm charcoal, the metal desaturates and drops to low key, and the paper dims from cream to ochre. Terracotta and olive stay as the accents — they are what the lamp *lands on*, so they remain the brightest things on screen and keep their brand role rather than receding.
+
+**The light model is the load-bearing decision.** The lamp stays above-left, so bevels keep their direction and only lose contrast. Inset highlights dim toward a warm low-alpha tint rather than flipping to shadow, and outer shadows deepen because a dark ground swallows a 12%-black shadow. This is why `--elevation-workshop-*`, `--text-shadow-emboss` and the metal gradients survive into dark with new values instead of being rebuilt — the geometry is unchanged, only the tone.
+
+Two themes are defined here: `dark` (WCAG AA) and `dark-hc` (high contrast, WCAG AAA). There is no light-high-contrast theme. All ratios below are computed, not estimated.
+
+### Dark — surface system
+
+The ramp climbs with elevation, per MD3 dark convention: higher surfaces are lighter, the reverse of the light theme.
+
+```css
+--color-surface:                   #17140F;   /* page ground — unlit charcoal */
+--color-surface-bright:            #3A342B;   /* elevated/modal */
+--color-surface-dim:               #100E0A;   /* recessed */
+--color-surface-container-lowest:  #0B0908;   /* dropdowns */
+--color-surface-container-low:     #1F1B15;   /* cards */
+--color-surface-container:         #23201A;   /* inputs, wells */
+--color-surface-container-high:    #2E2A22;   /* selected rows */
+--color-surface-container-highest: #39342B;   /* nav bars */
+--color-on-surface:                #EDE6DA;   /* primary text — warm off-white */
+--color-on-surface-variant:        #CBC2B2;   /* secondary text */
+```
+
+| Pairing                                             | Ratio   | Grade |
+| --------------------------------------------------- | ------- | ----- |
+| `on-surface` on `surface` (body text)               | 14.81:1 | AAA   |
+| `on-surface` on `surface-bright`                    | 9.93:1  | AAA   |
+| `on-surface` on `surface-container-lowest`          | 16.02:1 | AAA   |
+| `on-surface` on `surface-container-low`             | 13.81:1 | AAA   |
+| `on-surface` on `surface-container`                 | 13.10:1 | AAA   |
+| `on-surface` on `surface-container-high`            | 11.51:1 | AAA   |
+| `on-surface` on `surface-container-highest`         | 9.96:1  | AAA   |
+| `on-surface-variant` on `surface`                   | 10.41:1 | AAA   |
+| `on-surface-variant` on `surface-bright`            | 6.97:1  | AA    |
+| `on-surface-variant` on `surface-container-lowest`  | 11.26:1 | AAA   |
+| `on-surface-variant` on `surface-container-low`     | 9.71:1  | AAA   |
+| `on-surface-variant` on `surface-container`         | 9.20:1  | AAA   |
+| `on-surface-variant` on `surface-container-high`    | 8.09:1  | AAA   |
+| `on-surface-variant` on `surface-container-highest` | 7.00:1  | AAA   |
+
+### Dark — accents
+
+Terracotta and olive lighten to carry on a dark ground. These are the lamp-lit colors.
+
+```css
+--color-primary:               #F2A578;   /* lit terracotta */
+--color-on-primary:            #4A1B00;
+--color-primary-container:     #6B2E0A;
+--color-on-primary-container:  #FFDBC8;
+
+--color-secondary:               #8ECFA8;   /* lit olive */
+--color-on-secondary:            #003821;
+--color-secondary-container:     #1F5038;
+--color-on-secondary-container:  #C8EDD9;
+
+--color-error:               #FFB4AB;
+--color-on-error:            #690005;
+--color-error-container:     #93000A;
+--color-on-error-container:  #FFDAD6;
+
+--color-outline:          #9A9082;   /* visible borders */
+--color-outline-variant:  #4C463E;   /* subtle dividers */
+```
+
+| Pairing                                           | Ratio   | Grade       |
+| ------------------------------------------------- | ------- | ----------- |
+| `on-primary` on `primary`                         | 7.20:1  | AAA         |
+| `primary` on `surface`                            | 9.12:1  | AAA         |
+| `on-primary-container` on `primary-container`     | 8.03:1  | AAA         |
+| `on-secondary` on `secondary`                     | 7.33:1  | AAA         |
+| `secondary` on `surface`                          | 10.18:1 | AAA         |
+| `on-secondary-container` on `secondary-container` | 7.32:1  | AAA         |
+| `on-error` on `error`                             | 7.72:1  | AAA         |
+| `error` on `surface`                              | 10.82:1 | AAA         |
+| `on-error-container` on `error-container`         | 7.24:1  | AAA         |
+| `outline` on `surface`                            | 5.85:1  | 3:1 UI pass |
+| `outline` on `surface-container-low`              | 5.45:1  | 3:1 UI pass |
+
+`outline-variant` is a decorative divider and never the sole carrier of meaning, so WCAG 1.4.11 does not apply — it sits at 1.97:1 on `surface` here, against 1.51:1 in the light theme. The high-contrast theme holds it to 3:1 anyway.
+
+### Dark — workshop surfaces
+
+```css
+/* Ground — the unlit workshop */
+--color-pegboard:      #14120F;
+--color-leather-dark:  #241A16;
+
+/* Metal — same 4-anchor ramp, desaturated and compressed */
+--color-metal-light:  #4A443B;
+--color-metal:        #3B362E;
+--color-metal-dark:   #2C2821;
+--color-metal-deep:   #1E1B16;
+
+/* Paper — dim ochre, not cream */
+--color-paper-aged:        #2A2318;
+--color-paper-aged-hover:  #332B1F;
+
+/* The lamp is still above-left, so the highlight stays on top of the bevel —
+   dimmed and warmed rather than removed or flipped. Shadows deepen because a
+   dark ground swallows the light theme's 12%-black. */
+--highlight-inset:         rgba(255, 226, 190, 0.07);   /* light: rgba(255,255,255,0.2) */
+--highlight-inset-strong:  rgba(255, 226, 190, 0.11);   /* light: rgba(255,255,255,0.3) */
+--shadow-color:            rgba(0, 0, 0, 0.55);         /* light: rgba(0,0,0,0.12) */
+--shadow-color-strong:     rgba(0, 0, 0, 0.72);         /* light: rgba(0,0,0,0.2)  */
+```
+
+### High contrast dark
+
+`dark-hc` inherits dark's structure and then removes what is contrast *noise* rather than depth. It is a distinct theme, not a darker dark — the texture and glow that make the workshop legible in the other two themes actively harm legibility here.
+
+Removed: `--texture-brushed-metal` goes `none`; metal and popup gradients flatten to solid fills; the amber `--glow-active` halo is replaced by a solid high-contrast focus ring; `--text-shadow-emboss` and `--text-shadow-engrave` go `none`; `--highlight-inset` goes `transparent`. Borders become solid and every divider is held to 3:1, including `outline-variant`.
+
+```css
+--color-surface:                   #0A0908;
+--color-surface-bright:            #332E27;
+--color-surface-dim:               #000000;
+--color-surface-container-lowest:  #000000;
+--color-surface-container-low:     #121010;
+--color-surface-container:         #17150F;
+--color-surface-container-high:    #222019;
+--color-surface-container-highest: #2C2921;
+--color-on-surface:                #FFFBF5;
+--color-on-surface-variant:        #E8DFD0;
+
+--color-primary:               #FFC9A6;
+--color-on-primary:            #2E0F00;
+--color-primary-container:     #5A2400;
+--color-on-primary-container:  #FFEDE2;
+
+--color-secondary:               #B6E8C9;
+--color-on-secondary:            #002515;
+--color-secondary-container:     #113D28;
+--color-on-secondary-container:  #E2F6EA;
+
+--color-error:               #FFD2CC;
+--color-on-error:            #4A0002;
+--color-error-container:     #7A0006;
+--color-on-error-container:  #FFF0EE;
+
+--color-outline:          #C9BFAF;
+--color-outline-variant:  #8A8276;
+```
+
+Every text pairing clears AAA; the lowest is `on-surface-variant` on `surface-bright` at 10.18:1, and `outline-variant` on `surface` reaches 5.24:1.
+
+| Pairing                                       | Ratio   | Grade |
+| --------------------------------------------- | ------- | ----- |
+| `on-surface` on `surface`                     | 19.30:1 | AAA   |
+| `on-surface-variant` on `surface`             | 15.06:1 | AAA   |
+| `on-primary` on `primary`                     | 11.95:1 | AAA   |
+| `primary` on `surface`                        | 13.41:1 | AAA   |
+| `on-primary-container` on `primary-container` | 10.94:1 | AAA   |
+| `on-secondary` on `secondary`                 | 12.05:1 | AAA   |
+| `secondary` on `surface`                      | 14.57:1 | AAA   |
+| `on-error` on `error`                         | 11.87:1 | AAA   |
+| `error` on `surface`                          | 14.54:1 | AAA   |
+| `outline` on `surface`                        | 10.95:1 | AAA   |
+
+OS forced-colors mode (Windows High Contrast) is a **separate, independent axis**. In that mode the user agent overrides author colors regardless of which theme is active, so `dark-hc` neither implements nor substitutes for it.
+
+### What does not change across themes
+
+Type scale, spacing, shape, and every geometric value are theme-invariant. So is the light *direction* — above-left in all three themes. Only tone changes. A component that hardcodes a color cannot participate in any of this, which is why the token rule in [frontend.md](frontend.md) is load-bearing rather than stylistic.
 
 ---
 
