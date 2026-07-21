@@ -21,7 +21,7 @@ import { PriButton, PriTabs, usePriToast } from '@batuda/ui/pri'
 
 import { pageAtomFor } from '#/atoms/pages-atoms'
 import { useSetDocumentTitle } from '#/components/layout/top-bar-title'
-import { EmptyState } from '#/components/shared/empty-state'
+import { ErrorState } from '#/components/shared/error-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
@@ -116,6 +116,7 @@ function PageEditorPage() {
 	const { id } = Route.useParams()
 	const atom = useMemo(() => pageAtomFor(id), [id])
 	const result = useAtomValue(atom)
+	const refreshPage = useAtomRefresh(atom)
 
 	const page = useMemo<PageDetail | null>(
 		() => (AsyncResult.isSuccess(result) ? narrowPage(result.value) : null),
@@ -130,12 +131,27 @@ function PageEditorPage() {
 		)
 	}
 
-	if (AsyncResult.isFailure(result) || page === null) {
+	if (AsyncResult.isFailure(result)) {
 		return (
 			<Page>
-				<EmptyState
+				<ErrorState
+					data-testid='page-error'
 					title={t`Could not load this page`}
-					description={t`Check that the session is valid or try again.`}
+					description={t`The page could not be fetched. Check that the session is valid, then try again.`}
+					onRetry={refreshPage}
+				/>
+			</Page>
+		)
+	}
+
+	// The request succeeded but the page came back in a shape we don't
+	// recognise, so asking again would only return the same thing.
+	if (page === null) {
+		return (
+			<Page>
+				<ErrorState
+					data-testid='page-shape-error'
+					title={t`Page shape unrecognised`}
 				/>
 			</Page>
 		)

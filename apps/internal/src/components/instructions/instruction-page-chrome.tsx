@@ -132,17 +132,6 @@ export const Empty = styled.p`
 	margin: 0;
 `
 
-// Inline error notice for a failed load or save (pair with role='alert').
-export const Notice = styled.p`
-	font-family: var(--font-body);
-	font-size: var(--typescale-body-small-size);
-	color: var(--color-error);
-	padding: var(--space-2xs) var(--space-sm);
-	border-left: 3px solid var(--color-error);
-	background: color-mix(in srgb, var(--color-error) 6%, transparent);
-	margin: 0;
-`
-
 export const DialogActions = styled.div`
 	display: flex;
 	gap: var(--space-sm);

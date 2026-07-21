@@ -28,7 +28,7 @@ import {
 	companiesSearchAtom,
 } from '#/atoms/companies-atoms'
 import { pipelineAtom } from '#/atoms/pipeline-atoms'
-import { EmptyState } from '#/components/shared/empty-state'
+import { ErrorState } from '#/components/shared/error-state'
 import { PriorityDot } from '#/components/shared/priority-dot'
 import {
 	type CompanyStatus,
@@ -203,9 +203,11 @@ export function PipelineBoard({
 
 	if (AsyncResult.isFailure(pipelineResult)) {
 		return (
-			<EmptyState
+			<ErrorState
+				data-testid='pipeline-error'
 				title={t`Could not load the board`}
-				description={t`Check that your session is valid or try again.`}
+				description={t`The board could not be fetched. Check that the session is valid, then try again.`}
+				onRetry={refreshPipeline}
 			/>
 		)
 	}

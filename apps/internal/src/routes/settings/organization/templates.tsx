@@ -36,7 +36,6 @@ import {
 	Empty,
 	Heading,
 	Intro,
-	Notice,
 	Page,
 	RowActions,
 	Section,
@@ -63,6 +62,7 @@ import {
 	type TemplateDraft,
 	TemplateEditorDialog,
 } from '#/components/instructions/template-editor-dialog'
+import { ErrorState } from '#/components/shared/error-state'
 import { authClient } from '#/lib/auth-client'
 import { ruledLedgerRow } from '#/lib/workshop-mixins'
 
@@ -389,9 +389,12 @@ function OrgTemplateAdmin({
 					</Trans>
 				</Hint>
 				{stacksFailed ? (
-					<Notice role='alert'>
-						<Trans>Couldn't load the org default. Refresh to try again.</Trans>
-					</Notice>
+					<ErrorState
+						variant='inline'
+						data-testid='org-stacks-error'
+						title={t`Couldn't load the org default.`}
+						onRetry={refreshStacks}
+					/>
 				) : orgTemplates.length === 0 ? (
 					<Empty>
 						<Trans>Add an org template first.</Trans>

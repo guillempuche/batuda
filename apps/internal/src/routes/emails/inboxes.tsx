@@ -58,6 +58,7 @@ import {
 	inboxDraftAtom,
 } from '#/atoms/inbox-draft-atoms'
 import { EmptyState } from '#/components/shared/empty-state'
+import { ErrorState } from '#/components/shared/error-state'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { SkeletonRows } from '#/components/shared/skeleton-row'
 import { dehydrateAtom } from '#/lib/atom-hydration'
@@ -477,9 +478,11 @@ function InboxesPage() {
 			{isLoading ? (
 				<SkeletonRows count={5} height='3rem' />
 			) : isFailure ? (
-				<EmptyState
+				<ErrorState
+					data-testid='inboxes-error'
 					title={t`Could not load inboxes`}
-					description={t`Check the session or try again.`}
+					description={t`The inboxes could not be fetched. Check that the session is valid, then try again.`}
+					onRetry={refreshInboxes}
 				/>
 			) : rows.length === 0 ? (
 				<EmptyState

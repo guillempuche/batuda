@@ -26,6 +26,7 @@ import { ProposedUpdatesReview } from '#/components/research/review/proposed-upd
 import { RunActions } from '#/components/research/run-actions'
 import { RunProgress } from '#/components/research/run-progress'
 import { TargetCorrection } from '#/components/research/target-correction'
+import { ErrorState } from '#/components/shared/error-state'
 import { useResearchEvents } from '#/hooks/use-research-events'
 import {
 	brushedMetalPlate,
@@ -70,6 +71,7 @@ type ResearchRunDetail = {
 }
 
 export function RunDetail({ researchId }: { readonly researchId: string }) {
+	const { t } = useLingui()
 	const result = useAtomValue(researchDetailAtom(researchId))
 	const refreshRun = useAtomRefresh(researchDetailAtom(researchId))
 
@@ -94,9 +96,12 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 	if (AsyncResult.isFailure(result)) {
 		return (
 			<Panel data-testid='research-run-detail'>
-				<ErrorBlock role='alert'>
-					<Trans>Could not load this run.</Trans>
-				</ErrorBlock>
+				<ErrorState
+					variant='inline'
+					data-testid='research-run-error'
+					title={t`Could not load this run.`}
+					onRetry={refreshRun}
+				/>
 			</Panel>
 		)
 	}
@@ -104,9 +109,11 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 	if (run === null) {
 		return (
 			<Panel data-testid='research-run-detail'>
-				<ErrorBlock role='alert'>
-					<Trans>Run shape unrecognised.</Trans>
-				</ErrorBlock>
+				<ErrorState
+					variant='inline'
+					data-testid='research-run-shape-error'
+					title={t`Run shape unrecognised.`}
+				/>
 			</Panel>
 		)
 	}

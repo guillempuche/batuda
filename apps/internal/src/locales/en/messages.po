@@ -794,17 +794,17 @@ msgstr "ChatGPT and Claude.ai can't send a key, so they connect over OAuth. Add 
 #: src/routes/companies/$slug.tsx
 #: src/routes/emails/index.tsx
 #: src/routes/pages/$id.tsx
-msgid "Check that the session is valid or try again."
-msgstr "Check that the session is valid or try again."
+#~ msgid "Check that the session is valid or try again."
+#~ msgstr "Check that the session is valid or try again."
 
 #: src/components/companies/pipeline-board.tsx
 #: src/routes/companies/index.tsx
-msgid "Check that your session is valid or try again."
-msgstr "Check that your session is valid or try again."
+#~ msgid "Check that your session is valid or try again."
+#~ msgstr "Check that your session is valid or try again."
 
 #: src/routes/emails/inboxes.tsx
-msgid "Check the session or try again."
-msgstr "Check the session or try again."
+#~ msgid "Check the session or try again."
+#~ msgstr "Check the session or try again."
 
 #: src/routes/forgot-password.tsx
 #: src/routes/login.tsx
@@ -931,6 +931,10 @@ msgstr "Company"
 #: src/components/research/research-dialog.tsx
 msgid "Company enrichment"
 msgstr "Company enrichment"
+
+#: src/routes/companies/$slug.tsx
+msgid "Company shape unrecognised"
+msgstr "Company shape unrecognised"
 
 #: src/components/research/research-dialog.tsx
 msgid "Competitor scan"
@@ -1161,6 +1165,10 @@ msgstr "Could not load companies"
 msgid "Could not load inboxes"
 msgstr "Could not load inboxes"
 
+#: src/routes/pages/index.tsx
+msgid "Could not load pages"
+msgstr "Could not load pages"
+
 #: src/components/companies/pipeline-board.tsx
 msgid "Could not load the board"
 msgstr "Could not load the board"
@@ -1186,12 +1194,20 @@ msgid "Could not load threads"
 msgstr "Could not load threads"
 
 #: src/routes/settings/mcp/connections.tsx
-msgid "Could not load your connections. Refresh to try again."
-msgstr "Could not load your connections. Refresh to try again."
+msgid "Could not load your connections."
+msgstr "Could not load your connections."
+
+#: src/routes/settings/mcp/connections.tsx
+#~ msgid "Could not load your connections. Refresh to try again."
+#~ msgstr "Could not load your connections. Refresh to try again."
 
 #: src/routes/settings/api-keys/index.tsx
-msgid "Could not load your keys. Refresh to try again."
-msgstr "Could not load your keys. Refresh to try again."
+msgid "Could not load your keys."
+msgstr "Could not load your keys."
+
+#: src/routes/settings/api-keys/index.tsx
+#~ msgid "Could not load your keys. Refresh to try again."
+#~ msgstr "Could not load your keys. Refresh to try again."
 
 #: src/components/research/run-list.tsx
 msgid "Could not load your runs."
@@ -1335,16 +1351,28 @@ msgid "Couldn't delete the template. Please try again."
 msgstr "Couldn't delete the template. Please try again."
 
 #: src/routes/settings/organization/templates.tsx
-msgid "Couldn't load the org default. Refresh to try again."
-msgstr "Couldn't load the org default. Refresh to try again."
+msgid "Couldn't load the org default."
+msgstr "Couldn't load the org default."
+
+#: src/routes/settings/organization/templates.tsx
+#~ msgid "Couldn't load the org default. Refresh to try again."
+#~ msgstr "Couldn't load the org default. Refresh to try again."
 
 #: src/routes/settings/profile/templates.tsx
-msgid "Couldn't load your default. Refresh to try again."
-msgstr "Couldn't load your default. Refresh to try again."
+msgid "Couldn't load your default."
+msgstr "Couldn't load your default."
 
 #: src/routes/settings/profile/templates.tsx
-msgid "Couldn't load your templates. Refresh to try again."
-msgstr "Couldn't load your templates. Refresh to try again."
+#~ msgid "Couldn't load your default. Refresh to try again."
+#~ msgstr "Couldn't load your default. Refresh to try again."
+
+#: src/routes/settings/profile/templates.tsx
+msgid "Couldn't load your templates."
+msgstr "Couldn't load your templates."
+
+#: src/routes/settings/profile/templates.tsx
+#~ msgid "Couldn't load your templates. Refresh to try again."
+#~ msgstr "Couldn't load your templates. Refresh to try again."
 
 #: src/routes/settings/organization/templates.tsx
 msgid "Couldn't save"
@@ -3145,6 +3173,10 @@ msgid "Page saved"
 msgstr "Page saved"
 
 #: src/routes/pages/$id.tsx
+msgid "Page shape unrecognised"
+msgstr "Page shape unrecognised"
+
+#: src/routes/pages/$id.tsx
 msgid "Page title"
 msgstr "Page title"
 
@@ -3703,7 +3735,7 @@ msgstr "Resume drafting (1)"
 msgid "Resume syncing"
 msgstr "Resume syncing"
 
-#: src/components/research/inbox/research-inbox.tsx
+#: src/components/shared/error-state.tsx
 msgid "Retry"
 msgstr "Retry"
 
@@ -4348,14 +4380,31 @@ msgstr "The 20 most recently edited open tasks. Click one to reopen it."
 msgid "The API key can no longer be used."
 msgstr "The API key can no longer be used."
 
+#: src/components/companies/pipeline-board.tsx
+msgid "The board could not be fetched. Check that the session is valid, then try again."
+msgstr "The board could not be fetched. Check that the session is valid, then try again."
+
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/routes/companies/$slug.tsx
 msgid "The change didn't go through. Try again."
 msgstr "The change didn't go through. Try again."
 
+#: src/routes/companies/$slug.tsx
+msgid "The company could not be fetched. Check that the session is valid, then try again."
+msgstr "The company could not be fetched. Check that the session is valid, then try again."
+
 #: src/components/companies/where-panel-client.client.tsx
 msgid "The geocoder did not return a match. Try editing the location field."
 msgstr "The geocoder did not return a match. Try editing the location field."
+
+#: src/routes/emails/inboxes.tsx
+msgid "The inboxes could not be fetched. Check that the session is valid, then try again."
+msgstr "The inboxes could not be fetched. Check that the session is valid, then try again."
+
+#: src/routes/companies/index.tsx
+#: src/routes/pages/index.tsx
+msgid "The list could not be fetched. Check that the session is valid, then try again."
+msgstr "The list could not be fetched. Check that the session is valid, then try again."
 
 #: src/routes/emails/inboxes.tsx
 msgid "The mailbox is ready."
@@ -4364,6 +4413,10 @@ msgstr "The mailbox is ready."
 #: src/components/research/run-detail.tsx
 msgid "The name matched too many companies to tell them apart."
 msgstr "The name matched too many companies to tell them apart."
+
+#: src/routes/pages/$id.tsx
+msgid "The page could not be fetched. Check that the session is valid, then try again."
+msgstr "The page could not be fetched. Check that the session is valid, then try again."
 
 #: src/routes/pages/$id.tsx
 msgid "The page is now live."
@@ -4384,6 +4437,10 @@ msgstr "The thread exists but the provider returned no messages."
 #: src/routes/emails/$threadId.tsx
 msgid "The thread may have been archived upstream or the link is stale."
 msgstr "The thread may have been archived upstream or the link is stale."
+
+#: src/routes/emails/index.tsx
+msgid "The threads could not be fetched. Check that the session is valid, then try again."
+msgstr "The threads could not be fetched. Check that the session is valid, then try again."
 
 #: src/routes/reset-password.tsx
 msgid "The token expired or was already used. Request a fresh link."
