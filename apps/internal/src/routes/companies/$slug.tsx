@@ -2272,8 +2272,10 @@ const PageStatusBadge = styled.span.withConfig({
 		p.$published
 			? 'color-mix(in oklab, var(--color-status-client) 20%, transparent)'
 			: 'color-mix(in oklab, var(--color-status-prospect) 20%, transparent)'};
+	/* Published needs a darker green than the tint behind it — the status green
+	 * on its own 20% tint is too faint to read at this size. */
 	color: ${p =>
 		p.$published
-			? 'var(--color-status-client)'
+			? 'var(--color-on-secondary-container)'
 			: 'var(--color-on-surface-variant)'};
 `

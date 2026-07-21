@@ -218,7 +218,7 @@ const Title = styled.h3`
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-xs);
-	font-size: var(--font-size-md);
+	font-size: var(--typescale-body-medium-size);
 	margin: 0;
 `
 
@@ -227,18 +227,18 @@ const ExternalLinkButton = styled.button`
 	align-items: center;
 	gap: var(--space-xs);
 	padding: var(--space-xs) var(--space-sm);
-	border-radius: var(--radius-sm);
+	border-radius: var(--shape-sm);
 	background: transparent;
-	border: 1px solid var(--color-ink-hairline);
-	color: var(--color-ink-strong);
+	border: 1px solid var(--color-outline-variant);
+	color: var(--color-on-surface);
 	font: inherit;
-	font-size: var(--font-size-sm);
+	font-size: var(--typescale-body-small-size);
 	cursor: pointer;
 	text-decoration: none;
 	transition: background 0.15s ease;
 
 	&:hover {
-		background: var(--color-surface-raised);
+		background: var(--color-surface-container-low);
 	}
 `
 
@@ -248,7 +248,7 @@ const MapFrame = styled.div.withConfig({
 	${brushedMetalPlate};
 	width: 100%;
 	height: ${p => (p.$compact ? '180px' : '320px')};
-	border-radius: var(--radius-md);
+	border-radius: var(--shape-md);
 
 	& > div,
 	& .leaflet-container {
@@ -265,7 +265,7 @@ const EmptyFrame = styled.div`
 	align-items: flex-start;
 	gap: var(--space-md);
 	padding: var(--space-lg);
-	border-radius: var(--radius-md);
+	border-radius: var(--shape-md);
 `
 
 const EmptyCopy = styled.div`
@@ -275,11 +275,11 @@ const EmptyCopy = styled.div`
 `
 
 const EmptyLocation = styled.span`
-	color: var(--color-ink-strong);
+	color: var(--color-on-surface);
 	font-weight: 500;
 `
 
 const EmptyHint = styled.span`
-	color: var(--color-ink-soft);
-	font-size: var(--font-size-sm);
+	color: var(--color-on-surface-variant);
+	font-size: var(--typescale-body-small-size);
 `

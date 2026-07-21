@@ -443,13 +443,13 @@ const HeaderTitle = styled.h1.withConfig({
 })`
 	${stenciledTitle}
 	font-size: var(--typescale-title-large-size);
-	color: var(--color-on-metal);
+	color: var(--color-on-surface);
 	margin: 0;
 `
 
 const HeaderSub = styled.p.withConfig({ displayName: 'CalendarHeaderSub' })`
 	margin: var(--space-3xs) 0 0;
-	color: var(--color-on-metal-muted);
+	color: var(--color-on-surface-variant);
 	font-size: var(--typescale-body-small-size);
 `
 
@@ -488,7 +488,7 @@ const DetailLabel = styled.dt.withConfig({
 	displayName: 'CalendarDetailLabel',
 })`
 	font-size: var(--typescale-label-small-size);
-	color: var(--color-on-surface-muted);
+	color: var(--color-on-surface-variant);
 	text-transform: uppercase;
 	letter-spacing: 0.08em;
 `
@@ -519,12 +519,12 @@ const RsvpRow = styled.div.withConfig({ displayName: 'CalendarRsvpRow' })`
 	gap: var(--space-2xs);
 	margin-top: var(--space-md);
 	padding: var(--space-sm);
-	border-top: 1px dashed var(--color-border-subtle);
+	border-top: 1px dashed var(--color-outline-variant);
 `
 
 const RsvpHint = styled.span.withConfig({ displayName: 'CalendarRsvpHint' })`
-	font-size: var(--font-size-xs);
-	color: var(--color-ink-muted);
+	font-size: var(--typescale-label-small-size);
+	color: var(--color-on-surface-variant);
 `
 
 const RsvpButtons = styled.div.withConfig({
