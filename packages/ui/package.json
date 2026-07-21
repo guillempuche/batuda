@@ -31,7 +31,8 @@
 	"scripts": {
 		"build": "tsdown",
 		"dev": "tsdown --watch",
-		"check-types": "tsc --noEmit"
+		"check-types": "tsc --noEmit",
+		"check-contrast": "tsx scripts/check-contrast.ts"
 	},
 	"dependencies": {
 		"@base-ui/react": "1.6.0",

@@ -40,6 +40,13 @@ pre-commit:
 
 pre-push:
   commands:
+    contrast:
+      # The themes' contrast tables in docs/brand-visual.md drifted from the
+      # code once already. This reads the real token file, so a colour that
+      # slips below its WCAG target fails here instead of shipping.
+      run: |
+        pnpm --filter @batuda/ui check-contrast
+
     secrets:
       # Scan for leaked secrets before publishing to the PUBLIC repo.
       # GitHub push protection catches known token formats server-side;
