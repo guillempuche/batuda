@@ -4510,6 +4510,10 @@ msgstr "This run found no changes to review."
 msgid "This runs research on {0} companies, up to about {1} in paid data. Start the batch?"
 msgstr "This runs research on {0} companies, up to about {1} in paid data. Start the batch?"
 
+#: src/components/research/findings/shared.tsx
+msgid "This tool isn't available, so it can only be skipped."
+msgstr "This tool isn't available, so it can only be skipped."
+
 #: src/routes/index.tsx
 #: src/routes/tasks/index.tsx
 msgid "This week"

@@ -1,9 +1,10 @@
 import { useAtomRefresh, useAtomSet } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { AlertTriangle } from 'lucide-react'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import styled from 'styled-components'
 
+import { normalizePaidActionTool } from '@batuda/research/application/paid-action-tool'
 import { PriButton, usePriToast } from '@batuda/ui/pri'
 
 import {
@@ -151,11 +152,15 @@ function PaidActionRow({ action }: { readonly action: PendingPaidAction }) {
 	// run; refresh only ever fires after a resolve, which requires a real id.
 	const refreshRun = useAtomRefresh(researchDetailAtom(runId ?? '__no_run__'))
 	const [busy, setBusy] = useState(false)
+	const unavailableId = useId()
 
-	const canResolve =
-		runId !== null &&
-		action.id !== undefined &&
-		(action.status === undefined || action.status === 'pending')
+	const isPending = action.status === undefined || action.status === 'pending'
+	const canResolve = runId !== null && action.id !== undefined && isPending
+	// Approving runs a follow-up, and only two tools can actually be run. The
+	// model writes this name itself, so it can name something that does not
+	// exist — offering Approve there would fail once the request reached the
+	// server. Skipping always works, whatever the name says.
+	const canApprove = canResolve && normalizePaidActionTool(action.tool) !== null
 
 	const resolve = async (decision: 'approve' | 'skip') => {
 		if (runId === null || action.id === undefined) return
@@ -197,20 +202,32 @@ function PaidActionRow({ action }: { readonly action: PendingPaidAction }) {
 			{action.reason !== undefined ? <Reason>{action.reason}</Reason> : null}
 			{canResolve ? (
 				<PaidActions>
-					<PriButton
-						type='button'
-						$variant='filled'
-						data-testid='paid-action-approve'
-						disabled={busy}
-						onClick={() => void resolve('approve')}
-					>
-						<Trans>Approve</Trans>
-					</PriButton>
+					{canApprove ? (
+						<PriButton
+							type='button'
+							$variant='filled'
+							data-testid='paid-action-approve'
+							disabled={busy}
+							onClick={() => void resolve('approve')}
+						>
+							<Trans>Approve</Trans>
+						</PriButton>
+					) : (
+						<UnavailableNote
+							id={unavailableId}
+							data-testid='paid-action-unavailable'
+						>
+							<Trans>
+								This tool isn't available, so it can only be skipped.
+							</Trans>
+						</UnavailableNote>
+					)}
 					<PriButton
 						type='button'
 						$variant='text'
 						data-testid='paid-action-skip'
 						disabled={busy}
+						{...(canApprove ? {} : { 'aria-describedby': unavailableId })}
 						onClick={() => void resolve('skip')}
 					>
 						<Trans>Skip</Trans>
@@ -338,6 +355,15 @@ export const Cost = styled.span`
 	font-family: var(--font-mono);
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface-variant);
+`
+
+const UnavailableNote = styled.p`
+	margin: 0;
+	font-family: var(--font-body);
+	font-size: var(--typescale-body-small-size);
+	font-style: italic;
+	color: var(--color-on-surface-variant);
+	align-self: center;
 `
 
 export const Reason = styled.p`
