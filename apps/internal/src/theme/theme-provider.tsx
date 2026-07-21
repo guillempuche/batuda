@@ -14,12 +14,7 @@ import {
 	watchSystemTheme,
 	writeStoredTheme,
 } from './detect-theme'
-import {
-	defaultThemePreference,
-	resolveTheme,
-	type ThemeCode,
-	type ThemePreference,
-} from './index'
+import { resolveTheme, type ThemeCode, type ThemePreference } from './index'
 
 type ThemeContextValue = {
 	/* What the user picked, which may be "system". */
@@ -29,11 +24,30 @@ type ThemeContextValue = {
 	setPreference: (next: ThemePreference) => void
 }
 
-const ThemeContext = createContext<ThemeContextValue>({
-	preference: defaultThemePreference,
-	theme: 'light',
-	setPreference: () => {},
-})
+/* Points the browser's own chrome at whatever the page is actually painted in.
+ * The value is read back from the stylesheet rather than repeated here, so it
+ * cannot drift from the theme it is meant to match. */
+function syncBrowserChromeTint(): void {
+	const meta = document.querySelector('meta[name="theme-color"]')
+	if (!meta) return
+	const surface = getComputedStyle(document.documentElement)
+		.getPropertyValue('--color-surface')
+		.trim()
+	if (surface) meta.setAttribute('content', surface)
+}
+
+/* No default value: a component reading this outside the provider would
+ * otherwise be told the theme is light and handed a setter that does nothing,
+ * so it would look fine on a dark page and silently ignore every change. */
+const ThemeContext = createContext<ThemeContextValue | null>(null)
+
+function useThemeContext(): ThemeContextValue {
+	const value = use(ThemeContext)
+	if (!value) {
+		throw new Error('Theme hooks need a <ThemeProvider> above them.')
+	}
+	return value
+}
 
 /* Owns the active theme for the whole app. `initialPreference` comes from the
  * root route context (server-parsed cookie), so SSR and the first client render
@@ -61,6 +75,7 @@ export function ThemeProvider({
 		setTheme(resolved)
 		if (typeof document !== 'undefined') {
 			document.documentElement.setAttribute('data-theme', resolved)
+			syncBrowserChromeTint()
 		}
 	}, [])
 
@@ -73,10 +88,18 @@ export function ThemeProvider({
 		[apply],
 	)
 
+	/* Reconcile against localStorage, which the server could not read. When the
+	 * two disagree the cookie is rewritten too — applying the stored value
+	 * without it would leave the server painting the other theme on every
+	 * later load, flashing forever. */
 	// biome-ignore lint/correctness/useExhaustiveDependencies: intentional mount-only reconcile against localStorage
 	useEffect(() => {
-		const stored = readStoredTheme() ?? preference
-		apply(stored, prefersDarkNow())
+		const stored = readStoredTheme()
+		if (stored && stored !== preference) {
+			setPreference(stored)
+			return
+		}
+		apply(preference, prefersDarkNow())
 	}, [])
 
 	/* Only a system-following page cares when the operating system flips. */
@@ -93,13 +116,13 @@ export function ThemeProvider({
 }
 
 export function useTheme(): ThemeCode {
-	return use(ThemeContext).theme
+	return useThemeContext().theme
 }
 
 export function useThemePreference(): ThemePreference {
-	return use(ThemeContext).preference
+	return useThemeContext().preference
 }
 
 export function useSetThemePreference(): (next: ThemePreference) => void {
-	return use(ThemeContext).setPreference
+	return useThemeContext().setPreference
 }

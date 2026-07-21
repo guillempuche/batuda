@@ -120,8 +120,12 @@ export const Route = createRootRoute({
 	head: ({ loaderData }) => {
 		const lang: LangCode = loaderData?.lang ?? defaultLang
 		const { title, description } = translatedHead[lang]
-		/* Tints the browser chrome on mobile. Keyed to the theme actually
-		 * painted rather than to the device setting, so an explicit choice wins. */
+		/* Tints the browser chrome on mobile, and the one place a colour is
+		 * written outside the stylesheet: the server has to name it before any
+		 * CSS is parsed. Each value is the theme's own --color-surface, and the
+		 * contrast check fails the build if they stop matching. Once the page is
+		 * live the provider re-reads the real value, so this only has to be
+		 * right for the first paint. */
 		const themeColor =
 			loaderData?.theme === 'dark-hc'
 				? '#0a0908'
@@ -253,10 +257,15 @@ function RootComponent() {
  * Only needed when the stored choice is "follow the system": the server has no
  * way to know what the system wants, so it renders the light theme and this
  * corrects the attribute in place. Without it, every such visit would flash
- * light before settling. */
+ * light before settling. It re-tints the browser chrome from the stylesheet at
+ * the same time, so the address bar does not stay light on a dark page. */
 const followSystemScript = `(function(){try{
-var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches
-if(d)document.documentElement.setAttribute('data-theme','dark')
+if(!(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches))return
+var r=document.documentElement
+r.setAttribute('data-theme','dark')
+var m=document.querySelector('meta[name="theme-color"]')
+var s=getComputedStyle(r).getPropertyValue('--color-surface').trim()
+if(m&&s)m.setAttribute('content',s)
 }catch(e){}})()`
 
 function RootDocument({

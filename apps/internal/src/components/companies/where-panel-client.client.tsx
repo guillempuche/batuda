@@ -107,6 +107,7 @@ export function WherePanel({
 						latitude={company.latitude as number}
 						longitude={company.longitude as number}
 						label={company.name}
+						dark={theme !== 'light'}
 					/>
 				</MapFrame>
 			) : (
@@ -168,10 +169,12 @@ function LeafletMap({
 	latitude,
 	longitude,
 	label,
+	dark,
 }: {
 	readonly latitude: number
 	readonly longitude: number
 	readonly label: string
+	readonly dark: boolean
 }) {
 	// Leaflet ships its marker images via CSS (url()) that vite can't
 	// resolve without extra plumbing, so point the default icon at the
@@ -196,8 +199,16 @@ function LeafletMap({
 			style={{ width: '100%', height: '100%' }}
 		>
 			<TileLayer
-				attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-				url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+				attribution={
+					dark
+						? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+						: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+				}
+				url={
+					dark
+						? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+						: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+				}
 			/>
 			<Marker position={[latitude, longitude]} icon={defaultIcon}>
 				<Popup>{label}</Popup>
@@ -256,15 +267,9 @@ const MapFrame = styled.div.withConfig({
 	height: ${p => (p.$compact ? '180px' : '320px')};
 	border-radius: var(--shape-md);
 
-	/* The map tiles are photographs of a light map served by someone else, so
-	 * no colour token reaches them. On a dark page they would glare, so the
-	 * whole tile layer is inverted and hue-corrected back to plausible colours.
-	 * Leaflet's own popups, buttons and credit line ship their own light CSS
-	 * and are restyled to match the page. */
-	&[data-map-theme='dark'] .leaflet-tile-pane {
-		filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9);
-	}
-
+	/* The tiles themselves come from a dark basemap in the dark themes, so they
+	 * need no correction here. Leaflet's own popups, buttons and credit line
+	 * ship their own light CSS and are restyled to match the page. */
 	&[data-map-theme='dark'] .leaflet-popup-content-wrapper,
 	&[data-map-theme='dark'] .leaflet-popup-tip,
 	&[data-map-theme='dark'] .leaflet-bar a {
