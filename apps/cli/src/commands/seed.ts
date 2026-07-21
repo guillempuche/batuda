@@ -74,6 +74,16 @@ export const seed = (preset: Preset) =>
 					stamp,
 				}
 
+				// Counted from the database rather than hardcoded, so the summary
+				// can never drift from what was actually inserted.
+				const tally = (table: string) =>
+					Effect.map(
+						sql<{
+							n: string
+						}>`SELECT count(*)::text AS n FROM ${sql.literal(table)}`,
+						rows => Number(rows[0]?.n ?? 0),
+					)
+
 				const insertedProducts = yield* seedProducts(ctx)
 				const {
 					insertedCompanies,
@@ -130,14 +140,14 @@ export const seed = (preset: Preset) =>
 					interactions: insertedInteractions.length,
 					tasks: insertedTasks.length,
 					researchPolicy: testUser ? 1 : 0,
-					documents: preset === 'full' ? 6 : 0,
-					proposals: preset === 'full' ? 7 : 0,
-					pages: preset === 'full' ? 14 : 0,
-					emailThreads: preset === 'full' ? 12 : 0,
-					emailMessages: preset === 'full' ? 16 : 0,
-					researchRuns: preset === 'full' ? 73 : 0,
-					sources: preset === 'full' ? 8 : 0,
-					callRecordings: preset === 'full' ? 6 : 0,
+					documents: yield* tally('documents'),
+					proposals: yield* tally('proposals'),
+					pages: yield* tally('pages'),
+					emailThreads: yield* tally('email_thread_links'),
+					emailMessages: yield* tally('email_messages'),
+					researchRuns: yield* tally('research_runs'),
+					sources: yield* tally('sources'),
+					callRecordings: yield* tally('call_recordings'),
 				}
 
 				yield* Effect.logInfo('Seed complete!')
