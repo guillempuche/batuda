@@ -28,6 +28,7 @@ import {
 } from '#/components/research/run-labels'
 import { narrowResearch } from '#/components/research/run-shapes'
 import { TrustBadge } from '#/components/research/trust-badge'
+import { ErrorState } from '#/components/shared/error-state'
 import {
 	type ResolveDecision,
 	type ResolveOutcome,
@@ -419,17 +420,12 @@ export function ResearchInbox() {
 					))}
 				</SkeletonList>
 			) : isFailure ? (
-				<FailureBox role='alert'>
-					<Trans>Could not load the review queue.</Trans>
-					<PriButton
-						type='button'
-						$variant='outlined'
-						data-testid='research-inbox-retry'
-						onClick={() => refreshProposals()}
-					>
-						<Trans>Retry</Trans>
-					</PriButton>
-				</FailureBox>
+				<ErrorState
+					variant='inline'
+					data-testid='research-inbox-error'
+					title={t`Could not load the review queue.`}
+					onRetry={refreshProposals}
+				/>
 			) : (
 				<>
 					{attention.length > 0 ? (
@@ -1046,16 +1042,6 @@ const Empty = styled.p`
 	font-style: italic;
 	color: var(--color-on-surface-variant);
 	margin: 0;
-`
-
-const FailureBox = styled.div`
-	display: flex;
-	flex-direction: column;
-	align-items: flex-start;
-	gap: var(--space-sm);
-	font-family: var(--font-body);
-	font-size: var(--typescale-body-medium-size);
-	color: var(--color-on-surface-variant);
 `
 
 const SkeletonList = styled.div`

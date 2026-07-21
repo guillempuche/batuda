@@ -30,7 +30,15 @@ export function RelativeDate({
 
 	const label = formatRelative(date)
 	return (
-		<Time dateTime={date.toISOString()} title={date.toLocaleString('en')}>
+		// The server sits in UTC and the reader's browser does not, so the
+		// spelled-out time and the "5 months ago" wording are both allowed to
+		// differ between the two. Saying so keeps React from giving up on this
+		// part of the page, which would leave nearby buttons unclickable.
+		<Time
+			suppressHydrationWarning
+			dateTime={date.toISOString()}
+			title={date.toLocaleString('en')}
+		>
 			{label}
 		</Time>
 	)

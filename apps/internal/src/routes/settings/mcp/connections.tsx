@@ -8,6 +8,7 @@ import styled from 'styled-components'
 
 import { PriButton, usePriToast } from '@batuda/ui/pri'
 
+import { ErrorState } from '#/components/shared/error-state'
 import { authClient } from '#/lib/auth-client'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import {
@@ -168,11 +169,12 @@ function ConnectionsPage() {
 						<Trans>Loading…</Trans>
 					</Empty>
 				) : isFailure ? (
-					<Empty role='alert'>
-						<Trans>
-							Could not load your connections. Refresh to try again.
-						</Trans>
-					</Empty>
+					<ErrorState
+						variant='inline'
+						data-testid='mcp-connections-error'
+						title={t`Could not load your connections.`}
+						onRetry={refreshList}
+					/>
 				) : rows.length === 0 ? (
 					<Empty data-testid='mcp-connections-empty'>
 						<Trans>

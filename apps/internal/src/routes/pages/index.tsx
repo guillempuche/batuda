@@ -1,4 +1,4 @@
-import { useAtomValue } from '@effect/atom-react'
+import { useAtomRefresh, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { DateTime, Schema } from 'effect'
@@ -15,6 +15,7 @@ import {
 	pagesSearchAtom,
 } from '#/atoms/pages-atoms'
 import { EmptyState } from '#/components/shared/empty-state'
+import { ErrorState } from '#/components/shared/error-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { dehydrateAtom } from '#/lib/atom-hydration'
@@ -92,12 +93,14 @@ function PagesListPage() {
 	const searchKey = canonicalKey(search)
 	const atom = useMemo(() => pagesSearchAtom(search), [searchKey])
 	const result = useAtomValue(atom)
+	const refreshPages = useAtomRefresh(atom)
 
 	const pages = useMemo<ReadonlyArray<PageRow>>(
 		() => (AsyncResult.isSuccess(result) ? narrowPages(result.value) : []),
 		[result],
 	)
 	const isLoading = AsyncResult.isInitial(result)
+	const isFailure = AsyncResult.isFailure(result)
 
 	const [statusFilter, setStatusFilter] = useState(search.status ?? '')
 
@@ -134,6 +137,13 @@ function PagesListPage() {
 
 			{isLoading ? (
 				<LoadingSpinner />
+			) : isFailure ? (
+				<ErrorState
+					data-testid='pages-error'
+					title={t`Could not load pages`}
+					description={t`The list could not be fetched. Check that the session is valid, then try again.`}
+					onRetry={refreshPages}
+				/>
 			) : pages.length === 0 ? (
 				<EmptyState
 					title={t`No pages yet`}

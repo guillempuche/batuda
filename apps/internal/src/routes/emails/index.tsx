@@ -74,6 +74,7 @@ import {
 import { companiesListAtom } from '#/atoms/pipeline-atoms'
 import { PriTable } from '#/components/primitives/pri-table'
 import { EmptyState } from '#/components/shared/empty-state'
+import { ErrorState } from '#/components/shared/error-state'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { SkeletonRows } from '#/components/shared/skeleton-row'
 import { useComposeEmail } from '#/context/compose-email-context'
@@ -747,9 +748,11 @@ function EmailsIndexPage() {
 							description={t`Pick an organization from the switcher in the header, or sign out and back in. After a recent dev DB reset, existing sessions can point at organization ids that the reset removed.`}
 						/>
 					) : isFailure ? (
-						<EmptyState
+						<ErrorState
+							data-testid='emails-error'
 							title={t`Could not load threads`}
-							description={t`Check that the session is valid or try again.`}
+							description={t`The threads could not be fetched. Check that the session is valid, then try again.`}
+							onRetry={refreshList}
 						/>
 					) : threads.length === 0 ? (
 						<EmptyState

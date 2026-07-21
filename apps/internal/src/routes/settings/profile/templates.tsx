@@ -26,7 +26,6 @@ import {
 	Empty,
 	Heading,
 	Intro,
-	Notice,
 	Page,
 	RowActions,
 	Section,
@@ -50,6 +49,7 @@ import {
 	type TemplateDraft,
 	TemplateEditorDialog,
 } from '#/components/instructions/template-editor-dialog'
+import { ErrorState } from '#/components/shared/error-state'
 import { authClient } from '#/lib/auth-client'
 import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
 
@@ -222,9 +222,12 @@ function TemplatesPage() {
 				</SectionHead>
 
 				{templatesFailed ? (
-					<Notice role='alert'>
-						<Trans>Couldn't load your templates. Refresh to try again.</Trans>
-					</Notice>
+					<ErrorState
+						variant='inline'
+						data-testid='profile-templates-error'
+						title={t`Couldn't load your templates.`}
+						onRetry={refreshTemplates}
+					/>
 				) : templates.length === 0 ? (
 					<Empty>
 						<Trans>
@@ -297,9 +300,12 @@ function TemplatesPage() {
 				</SectionHead>
 
 				{stacksFailed ? (
-					<Notice role='alert'>
-						<Trans>Couldn't load your default. Refresh to try again.</Trans>
-					</Notice>
+					<ErrorState
+						variant='inline'
+						data-testid='profile-stacks-error'
+						title={t`Couldn't load your default.`}
+						onRetry={refreshStacks}
+					/>
 				) : templates.length === 0 ? (
 					<EmptyDefault>
 						<EmptyDefaultTitle>

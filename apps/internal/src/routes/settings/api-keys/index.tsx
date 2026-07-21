@@ -1,4 +1,4 @@
-import { useAtomSet, useAtomValue } from '@effect/atom-react'
+import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
@@ -15,6 +15,7 @@ import {
 	usePriToast,
 } from '@batuda/ui/pri'
 
+import { ErrorState } from '#/components/shared/error-state'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import {
 	brushedMetalPlate,
@@ -73,6 +74,7 @@ function ApiKeysPage() {
 	const toastManager = usePriToast()
 
 	const listResult = useAtomValue(apiKeysListAtom)
+	const refreshList = useAtomRefresh(apiKeysListAtom)
 
 	const createKey = useAtomSet(BatudaApiAtom.mutation('apiKeys', 'create'), {
 		mode: 'promiseExit',
@@ -278,9 +280,12 @@ function ApiKeysPage() {
 						<Trans>Loading…</Trans>
 					</Empty>
 				) : isFailure ? (
-					<Empty role='alert'>
-						<Trans>Could not load your keys. Refresh to try again.</Trans>
-					</Empty>
+					<ErrorState
+						variant='inline'
+						data-testid='api-keys-error'
+						title={t`Could not load your keys.`}
+						onRetry={refreshList}
+					/>
 				) : rows.length === 0 ? (
 					<Empty data-testid='api-keys-empty'>
 						<Trans>No keys yet. Create one above to connect an agent.</Trans>

@@ -1,4 +1,4 @@
-import { useAtomValue } from '@effect/atom-react'
+import { useAtomRefresh, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
@@ -9,6 +9,7 @@ import styled from 'styled-components'
 import { PriButton } from '@batuda/ui/pri'
 
 import { researchListAtom } from '#/atoms/research-atoms'
+import { ErrorState } from '#/components/shared/error-state'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { formatMoneyCents } from '#/lib/format-money'
 import { stenciledTitle } from '#/lib/workshop-mixins'
@@ -25,10 +26,11 @@ export function researchRunsAtom() {
 }
 
 export function ResearchRuns() {
-	const { i18n } = useLingui()
+	const { t, i18n } = useLingui()
 	const navigate = useNavigate()
 	const [dialogOpen, setDialogOpen] = useState(false)
 	const result = useAtomValue(researchRunsAtom())
+	const refreshRuns = useAtomRefresh(researchRunsAtom())
 	const runs = AsyncResult.isSuccess(result) ? narrowResearch(result.value) : []
 
 	return (
@@ -58,9 +60,12 @@ export function ResearchRuns() {
 					<Trans>Loading runs…</Trans>
 				</Empty>
 			) : AsyncResult.isFailure(result) ? (
-				<Empty role='alert'>
-					<Trans>Could not load your runs.</Trans>
-				</Empty>
+				<ErrorState
+					variant='inline'
+					data-testid='research-runs-error'
+					title={t`Could not load your runs.`}
+					onRetry={refreshRuns}
+				/>
 			) : runs.length === 0 ? (
 				<Empty data-testid='runs-empty'>
 					<Trans>No research runs yet. Find companies to get started.</Trans>

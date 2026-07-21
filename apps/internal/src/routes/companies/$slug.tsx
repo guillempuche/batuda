@@ -94,6 +94,7 @@ import {
 } from '#/components/research/run-shapes'
 import { TrustBadge } from '#/components/research/trust-badge'
 import { EmptyState } from '#/components/shared/empty-state'
+import { ErrorState } from '#/components/shared/error-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { PriorityDot } from '#/components/shared/priority-dot'
 import { RelativeDate } from '#/components/shared/relative-date'
@@ -380,12 +381,30 @@ function CompanyDetailPage() {
 		)
 	}
 
-	if (AsyncResult.isFailure(companyResult) || company === null) {
+	if (AsyncResult.isFailure(companyResult)) {
 		return (
 			<Page>
-				<EmptyState
+				<ErrorState
+					data-testid='company-error'
+					headingLevel={1}
 					title={t`Could not load this company`}
-					description={t`Check that the session is valid or try again.`}
+					description={t`The company could not be fetched. Check that the session is valid, then try again.`}
+					onRetry={refreshCompany}
+				/>
+			</Page>
+		)
+	}
+
+	// The request succeeded but the company came back in a shape we don't
+	// recognise, so asking again would only return the same thing.
+	if (company === null) {
+		return (
+			<Page>
+				<ErrorState
+					data-testid='company-shape-error'
+					headingLevel={1}
+					title={t`This company can't be displayed`}
+					description={t`The details arrived in a form this page cannot read, so there is nothing to show. Go back to the list and open the company again; report it if it keeps happening.`}
 				/>
 			</Page>
 		)

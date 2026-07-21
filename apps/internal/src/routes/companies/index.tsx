@@ -1,4 +1,4 @@
-import { useAtomValue } from '@effect/atom-react'
+import { useAtomRefresh, useAtomValue } from '@effect/atom-react'
 import { useLingui } from '@lingui/react/macro'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { DateTime, Schema } from 'effect'
@@ -25,6 +25,7 @@ import {
 } from '#/atoms/companies-atoms'
 import { CompanyCard } from '#/components/shared/company-card'
 import { EmptyState } from '#/components/shared/empty-state'
+import { ErrorState } from '#/components/shared/error-state'
 import { KpiCounter } from '#/components/shared/kpi-counter'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import {
@@ -173,6 +174,7 @@ function CompaniesListPage() {
 		[searchKey, visibleLimit],
 	)
 	const result = useAtomValue(atom)
+	const refreshCompanies = useAtomRefresh(atom)
 
 	const companies = useMemo<ReadonlyArray<CompanyRow>>(
 		() => (AsyncResult.isSuccess(result) ? narrowCompanies(result.value) : []),
@@ -411,9 +413,11 @@ function CompaniesListPage() {
 			{isLoading ? (
 				<LoadingSpinner label={t`Loading companies…`} />
 			) : isFailure ? (
-				<EmptyState
+				<ErrorState
+					data-testid='companies-error'
 					title={t`Could not load companies`}
-					description={t`Check that your session is valid or try again.`}
+					description={t`The list could not be fetched. Check that the session is valid, then try again.`}
+					onRetry={refreshCompanies}
 				/>
 			) : companies.length === 0 ? (
 				<EmptyState
