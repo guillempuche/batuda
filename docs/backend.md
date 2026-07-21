@@ -638,12 +638,15 @@ The web app and the API are different origins. In dev, portless serves the app a
 
 Public signup is disabled: `emailAndPassword.disableSignUp = true` in `src/lib/auth.ts`. The `/auth/sign-up/email` endpoint returns `400 Email and password sign up is not enabled` (see `sign-up.ts:181-187` in the vendored better-auth source). The browser has no path to create accounts on its own.
 
-New users are created server-side via the admin plugin's `auth.api.createUser` endpoint, which bypasses the `disableSignUp` gate entirely. There are two ways to reach it:
+New users are created server-side via the admin plugin's `auth.api.createUser` endpoint, which bypasses the `disableSignUp` gate entirely. Batuda reaches it from in-process server code only, and always **headerless**.
 
-1. **From an authenticated admin session** — a logged-in user with `role: 'admin'` calls `POST /auth/admin/create-user` from any client. This is how a future "invite teammate" UI will work.
-2. **From a trusted server caller using an API key** — a script or MCP tool provisions an API key via `auth.api.createApiKey(...)`, then calls `auth.api.createUser({ body, headers: { 'x-api-key': <key> } })`. Because the `apiKey` plugin is configured with `enableSessionForAPIKeys: true`, an API key presented on a request opens a session carrying the owner's role — so the key must belong to a user with `role: 'admin'` for `createUser` to pass the admin plugin's access check.
+That last detail is load-bearing. `createUser` belongs to the admin plugin: given a request context it demands a session whose *platform* role is in `adminRoles` (`['admin', 'app_service']`). Org owners and admins hold the platform role `user`, so forwarding a caller's headers makes the call fail for exactly the people who should be allowed to add someone. Passing an empty `Headers()` fails too — the guard fires on the header object being present at all. Called with no request context, both guards are skipped, which is correct because the caller has already decided. See `apps/server/src/services/api-keys.ts` and `apps/server/src/services/members.ts` for the two places that do this.
 
-**Reference implementation**: `apps/cli/src/commands/seed.ts` uses direct `auth.api.createUser` inside the seed (the CLI has the DB directly, no HTTP) to provision the dev user `admin@taller.cat`. This is the template to copy when writing the production invite flow — same `createUser` call, different caller context (HTTP with API key instead of in-process DB).
+**How people join an organization.** An owner or admin adds them from Settings → Organization → Members, which posts to `POST /v1/members` (`packages/controllers/src/routes/members.ts` → `apps/server/src/handlers/members.ts` → `MemberService`). The handler resolves the organization from `OrgMiddleware` — never from the request body — checks the caller is an `owner` or `admin` of it, creates the account passwordless if it does not exist, and adds the membership. **That role check is the only authorization on the path**: Better Auth's `addMember` performs none of its own and is safe upstream only because it is declared without a path, so `better-call` never registers it as a route.
+
+There is no invitation and nothing to accept. The person is a member the moment the form is submitted, and the email they receive carries no link that signs them in — they go to `/login` and request their own short-lived link. That keeps the only credential-bearing email one the recipient asked for seconds earlier.
+
+**Reference implementation**: `apps/cli/src/commands/seed.ts` uses direct `auth.api.createUser` inside the seed (the CLI has the DB directly, no HTTP) to provision the dev user `admin@taller.cat`.
 
 Sign-in is unaffected: `POST /auth/sign-in/email` still works for any existing user with `emailAndPassword` credentials. Only the `sign-up/email` path is closed.
 
