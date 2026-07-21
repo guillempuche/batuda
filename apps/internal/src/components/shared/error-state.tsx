@@ -1,5 +1,5 @@
 import { Trans } from '@lingui/react/macro'
-import type { ReactNode } from 'react'
+import { type ReactNode, useId } from 'react'
 import styled from 'styled-components'
 
 import { PriButton } from '@batuda/ui/pri'
@@ -10,31 +10,54 @@ import { agedPaperSurface } from '#/lib/workshop-mixins'
  * Tells the reader something broke while loading, so a failed fetch is never
  * mistaken for "you have no data". Omit `onRetry` when trying again cannot
  * help — a button that does nothing is worse than no button.
+ *
+ * `headingLevel` should match where the message sits in the page outline: 1
+ * when the error replaces the whole page, 2 when it sits under a page title.
  */
 export function ErrorState({
 	title,
 	description,
 	onRetry,
 	variant = 'card',
+	headingLevel = 2,
 	'data-testid': testId,
 }: {
 	title: string
 	description?: ReactNode
 	onRetry?: () => void
 	variant?: 'card' | 'inline'
+	headingLevel?: 1 | 2 | 3
 	'data-testid'?: string
 }) {
+	const titleId = useId()
+
+	// Naming the message keeps several Retry buttons on one page apart: a
+	// screen reader reads "Retry, could not load your templates" rather than
+	// an indistinguishable list of "Retry".
 	const retryButton = onRetry && (
-		<PriButton type='button' $variant='outlined' onClick={() => onRetry()}>
+		<PriButton
+			type='button'
+			$variant='outlined'
+			aria-describedby={titleId}
+			onClick={() => onRetry()}
+		>
 			<Trans>Retry</Trans>
 		</PriButton>
 	)
 
 	if (variant === 'inline') {
 		return (
-			<InlineWrapper role='alert' data-testid={testId}>
-				<InlineText>
-					<InlineTitle>{title}</InlineTitle>
+			<InlineWrapper
+				role='group'
+				aria-labelledby={titleId}
+				data-testid={testId}
+			>
+				{/* Announced politely: something that failed to load is not
+				    urgent enough to cut off whatever is being read. The Retry
+				    button stays outside the announced part so it is offered as a
+				    button to press, not read out as part of the sentence. */}
+				<InlineText role='status'>
+					<InlineTitle id={titleId}>{title}</InlineTitle>
 					{description && <InlineDescription>{description}</InlineDescription>}
 				</InlineText>
 				{retryButton && <InlineActions>{retryButton}</InlineActions>}
@@ -43,9 +66,13 @@ export function ErrorState({
 	}
 
 	return (
-		<CardWrapper role='alert' data-testid={testId}>
-			<CardTitle>{title}</CardTitle>
-			{description && <CardDescription>{description}</CardDescription>}
+		<CardWrapper role='group' aria-labelledby={titleId} data-testid={testId}>
+			<CardText role='status'>
+				<CardTitle as={`h${headingLevel}`} id={titleId}>
+					{title}
+				</CardTitle>
+				{description && <CardDescription>{description}</CardDescription>}
+			</CardText>
 			{retryButton && <CardActions>{retryButton}</CardActions>}
 		</CardWrapper>
 	)
@@ -62,8 +89,15 @@ const CardWrapper = styled.div.withConfig({ displayName: 'ErrorState' })`
 	margin: var(--space-md) auto;
 	max-width: 32rem;
 	text-align: center;
-	border-left: 4px solid var(--color-error);
+	border-inline-start: 4px solid var(--color-error);
 	color: var(--color-on-surface);
+`
+
+const CardText = styled.div.withConfig({ displayName: 'ErrorStateText' })`
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--space-sm);
 `
 
 const CardTitle = styled.p.withConfig({ displayName: 'ErrorStateTitle' })`
@@ -104,8 +138,8 @@ const InlineWrapper = styled.div.withConfig({
 	gap: var(--space-sm);
 	flex-wrap: wrap;
 	padding: var(--space-2xs) var(--space-sm);
-	border-left: 3px solid var(--color-error);
-	background: color-mix(in srgb, var(--color-error) 6%, transparent);
+	border-inline-start: 3px solid var(--color-error);
+	background: var(--color-error-container);
 `
 
 const InlineText = styled.div.withConfig({
@@ -122,7 +156,7 @@ const InlineTitle = styled.p.withConfig({
 	margin: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
-	color: var(--color-error);
+	color: var(--color-on-error-container);
 `
 
 const InlineDescription = styled.div.withConfig({
@@ -131,7 +165,8 @@ const InlineDescription = styled.div.withConfig({
 	margin: 0;
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
-	color: var(--color-on-surface-variant);
+	color: var(--color-on-error-container);
+	opacity: 0.85;
 `
 
 const InlineActions = styled.div.withConfig({

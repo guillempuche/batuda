@@ -791,21 +791,6 @@ msgstr "Chat interfaces (OAuth)"
 msgid "ChatGPT and Claude.ai can't send a key, so they connect over OAuth. Add this server by URL, approve it, and it appears under your connections."
 msgstr "ChatGPT and Claude.ai can't send a key, so they connect over OAuth. Add this server by URL, approve it, and it appears under your connections."
 
-#: src/routes/companies/$slug.tsx
-#: src/routes/emails/index.tsx
-#: src/routes/pages/$id.tsx
-#~ msgid "Check that the session is valid or try again."
-#~ msgstr "Check that the session is valid or try again."
-
-#: src/components/companies/pipeline-board.tsx
-#: src/routes/companies/index.tsx
-#~ msgid "Check that your session is valid or try again."
-#~ msgstr "Check that your session is valid or try again."
-
-#: src/routes/emails/inboxes.tsx
-#~ msgid "Check the session or try again."
-#~ msgstr "Check the session or try again."
-
 #: src/routes/forgot-password.tsx
 #: src/routes/login.tsx
 msgid "Check your inbox"
@@ -931,10 +916,6 @@ msgstr "Company"
 #: src/components/research/research-dialog.tsx
 msgid "Company enrichment"
 msgstr "Company enrichment"
-
-#: src/routes/companies/$slug.tsx
-msgid "Company shape unrecognised"
-msgstr "Company shape unrecognised"
 
 #: src/components/research/research-dialog.tsx
 msgid "Competitor scan"
@@ -1197,17 +1178,9 @@ msgstr "Could not load threads"
 msgid "Could not load your connections."
 msgstr "Could not load your connections."
 
-#: src/routes/settings/mcp/connections.tsx
-#~ msgid "Could not load your connections. Refresh to try again."
-#~ msgstr "Could not load your connections. Refresh to try again."
-
 #: src/routes/settings/api-keys/index.tsx
 msgid "Could not load your keys."
 msgstr "Could not load your keys."
-
-#: src/routes/settings/api-keys/index.tsx
-#~ msgid "Could not load your keys. Refresh to try again."
-#~ msgstr "Could not load your keys. Refresh to try again."
 
 #: src/components/research/run-list.tsx
 msgid "Could not load your runs."
@@ -1354,25 +1327,13 @@ msgstr "Couldn't delete the template. Please try again."
 msgid "Couldn't load the org default."
 msgstr "Couldn't load the org default."
 
-#: src/routes/settings/organization/templates.tsx
-#~ msgid "Couldn't load the org default. Refresh to try again."
-#~ msgstr "Couldn't load the org default. Refresh to try again."
-
 #: src/routes/settings/profile/templates.tsx
 msgid "Couldn't load your default."
 msgstr "Couldn't load your default."
 
 #: src/routes/settings/profile/templates.tsx
-#~ msgid "Couldn't load your default. Refresh to try again."
-#~ msgstr "Couldn't load your default. Refresh to try again."
-
-#: src/routes/settings/profile/templates.tsx
 msgid "Couldn't load your templates."
 msgstr "Couldn't load your templates."
-
-#: src/routes/settings/profile/templates.tsx
-#~ msgid "Couldn't load your templates. Refresh to try again."
-#~ msgstr "Couldn't load your templates. Refresh to try again."
 
 #: src/routes/settings/organization/templates.tsx
 msgid "Couldn't save"
@@ -3173,10 +3134,6 @@ msgid "Page saved"
 msgstr "Page saved"
 
 #: src/routes/pages/$id.tsx
-msgid "Page shape unrecognised"
-msgstr "Page shape unrecognised"
-
-#: src/routes/pages/$id.tsx
 msgid "Page title"
 msgstr "Page title"
 
@@ -3784,10 +3741,6 @@ msgstr "Run new research"
 msgid "Run not found"
 msgstr "Run not found"
 
-#: src/components/research/run-detail.tsx
-msgid "Run shape unrecognised."
-msgstr "Run shape unrecognised."
-
 #: src/components/research/run-labels.ts
 msgid "Running"
 msgstr "Running"
@@ -4393,6 +4346,14 @@ msgstr "The change didn't go through. Try again."
 msgid "The company could not be fetched. Check that the session is valid, then try again."
 msgstr "The company could not be fetched. Check that the session is valid, then try again."
 
+#: src/routes/pages/$id.tsx
+msgid "The content arrived in a form the editor cannot read, so there is nothing to edit. Go back to the list and open the page again; report it if it keeps happening."
+msgstr "The content arrived in a form the editor cannot read, so there is nothing to edit. Go back to the list and open the page again; report it if it keeps happening."
+
+#: src/routes/companies/$slug.tsx
+msgid "The details arrived in a form this page cannot read, so there is nothing to show. Go back to the list and open the company again; report it if it keeps happening."
+msgstr "The details arrived in a form this page cannot read, so there is nothing to show. Go back to the list and open the company again; report it if it keeps happening."
+
 #: src/components/companies/where-panel-client.client.tsx
 msgid "The geocoder did not return a match. Try editing the location field."
 msgstr "The geocoder did not return a match. Try editing the location field."
@@ -4425,6 +4386,10 @@ msgstr "The page is now live."
 #: src/components/research/run-detail.tsx
 msgid "The pages I found were about a different company, so I didn't save anything."
 msgstr "The pages I found were about a different company, so I didn't save anything."
+
+#: src/components/research/run-detail.tsx
+msgid "The run arrived in a form this page cannot read. Go back to the run list and open it again; report it if it keeps happening."
+msgstr "The run arrived in a form this page cannot read. Go back to the run list and open it again; report it if it keeps happening."
 
 #: src/components/research/findings/freeform-view.tsx
 msgid "The run finished without proposed updates or paid actions."
@@ -4498,6 +4463,10 @@ msgstr "They responded — set the next action to keep it warm."
 msgid "They sign in at the sign-in page with this address and ask for their own link, so nothing sent here can expire."
 msgstr "They sign in at the sign-in page with this address and ask for their own link, so nothing sent here can expire."
 
+#: src/routes/companies/$slug.tsx
+msgid "This company can't be displayed"
+msgstr "This company can't be displayed"
+
 #: src/routes/settings/mcp/connections.tsx
 msgid "This connection is unbound. Bind an org to use it."
 msgstr "This connection is unbound. Bind an org to use it."
@@ -4519,9 +4488,17 @@ msgstr "This month"
 msgid "This overrides the site I auto-detected and re-runs the research locked onto the company at that domain."
 msgstr "This overrides the site I auto-detected and re-runs the research locked onto the company at that domain."
 
+#: src/routes/pages/$id.tsx
+msgid "This page can't be displayed"
+msgstr "This page can't be displayed"
+
 #: src/routes/oauth/consent.tsx
 msgid "This page opens when an AI assistant asks to connect. Start the connection from your assistant."
 msgstr "This page opens when an AI assistant asks to connect. Start the connection from your assistant."
+
+#: src/components/research/run-detail.tsx
+msgid "This run can't be displayed."
+msgstr "This run can't be displayed."
 
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "This run found no changes to review."

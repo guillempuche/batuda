@@ -112,7 +112,8 @@ export function RunDetail({ researchId }: { readonly researchId: string }) {
 				<ErrorState
 					variant='inline'
 					data-testid='research-run-shape-error'
-					title={t`Run shape unrecognised.`}
+					title={t`This run can't be displayed.`}
+					description={t`The run arrived in a form this page cannot read. Go back to the run list and open it again; report it if it keeps happening.`}
 				/>
 			</Panel>
 		)

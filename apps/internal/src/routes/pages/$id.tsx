@@ -136,6 +136,7 @@ function PageEditorPage() {
 			<Page>
 				<ErrorState
 					data-testid='page-error'
+					headingLevel={1}
 					title={t`Could not load this page`}
 					description={t`The page could not be fetched. Check that the session is valid, then try again.`}
 					onRetry={refreshPage}
@@ -151,7 +152,9 @@ function PageEditorPage() {
 			<Page>
 				<ErrorState
 					data-testid='page-shape-error'
-					title={t`Page shape unrecognised`}
+					headingLevel={1}
+					title={t`This page can't be displayed`}
+					description={t`The content arrived in a form the editor cannot read, so there is nothing to edit. Go back to the list and open the page again; report it if it keeps happening.`}
 				/>
 			</Page>
 		)

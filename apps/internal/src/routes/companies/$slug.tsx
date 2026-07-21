@@ -386,6 +386,7 @@ function CompanyDetailPage() {
 			<Page>
 				<ErrorState
 					data-testid='company-error'
+					headingLevel={1}
 					title={t`Could not load this company`}
 					description={t`The company could not be fetched. Check that the session is valid, then try again.`}
 					onRetry={refreshCompany}
@@ -401,7 +402,9 @@ function CompanyDetailPage() {
 			<Page>
 				<ErrorState
 					data-testid='company-shape-error'
-					title={t`Company shape unrecognised`}
+					headingLevel={1}
+					title={t`This company can't be displayed`}
+					description={t`The details arrived in a form this page cannot read, so there is nothing to show. Go back to the list and open the company again; report it if it keeps happening.`}
 				/>
 			</Page>
 		)

@@ -791,21 +791,6 @@ msgstr "Interfícies de xat (OAuth)"
 msgid "ChatGPT and Claude.ai can't send a key, so they connect over OAuth. Add this server by URL, approve it, and it appears under your connections."
 msgstr "ChatGPT i Claude.ai no poden enviar una clau, així que es connecten amb OAuth. Afegeix aquest servidor per URL, aprova'l i apareixerà a les teves connexions."
 
-#: src/routes/companies/$slug.tsx
-#: src/routes/emails/index.tsx
-#: src/routes/pages/$id.tsx
-#~ msgid "Check that the session is valid or try again."
-#~ msgstr "Comprova que la sessió sigui vàlida o torna-ho a provar."
-
-#: src/components/companies/pipeline-board.tsx
-#: src/routes/companies/index.tsx
-#~ msgid "Check that your session is valid or try again."
-#~ msgstr "Comprova que la teva sessió sigui vàlida o torna-ho a provar."
-
-#: src/routes/emails/inboxes.tsx
-#~ msgid "Check the session or try again."
-#~ msgstr "Comprova la sessió o torna-ho a provar."
-
 #: src/routes/forgot-password.tsx
 #: src/routes/login.tsx
 msgid "Check your inbox"
@@ -931,10 +916,6 @@ msgstr "Empresa"
 #: src/components/research/research-dialog.tsx
 msgid "Company enrichment"
 msgstr "Enriquiment d'empresa"
-
-#: src/routes/companies/$slug.tsx
-msgid "Company shape unrecognised"
-msgstr "Format d'empresa no reconegut"
 
 #: src/components/research/research-dialog.tsx
 msgid "Competitor scan"
@@ -1197,17 +1178,9 @@ msgstr "No s'han pogut carregar els fils"
 msgid "Could not load your connections."
 msgstr "No s'han pogut carregar les teves connexions."
 
-#: src/routes/settings/mcp/connections.tsx
-#~ msgid "Could not load your connections. Refresh to try again."
-#~ msgstr "No s'han pogut carregar les connexions. Actualitza per tornar-ho a provar."
-
 #: src/routes/settings/api-keys/index.tsx
 msgid "Could not load your keys."
 msgstr "No s'han pogut carregar les teves claus."
-
-#: src/routes/settings/api-keys/index.tsx
-#~ msgid "Could not load your keys. Refresh to try again."
-#~ msgstr "No s'han pogut carregar les teves claus. Actualitza per tornar-ho a provar."
 
 #: src/components/research/run-list.tsx
 msgid "Could not load your runs."
@@ -1354,25 +1327,13 @@ msgstr "No s'ha pogut eliminar la plantilla. Torna-ho a provar."
 msgid "Couldn't load the org default."
 msgstr "No s'ha pogut carregar el valor per defecte de l'organització."
 
-#: src/routes/settings/organization/templates.tsx
-#~ msgid "Couldn't load the org default. Refresh to try again."
-#~ msgstr "No s'ha pogut carregar el valor per defecte de l'organització. Actualitza per tornar-ho a provar."
-
 #: src/routes/settings/profile/templates.tsx
 msgid "Couldn't load your default."
 msgstr "No s'ha pogut carregar el teu valor per defecte."
 
 #: src/routes/settings/profile/templates.tsx
-#~ msgid "Couldn't load your default. Refresh to try again."
-#~ msgstr "No s'ha pogut carregar el teu valor per defecte. Actualitza per tornar-ho a provar."
-
-#: src/routes/settings/profile/templates.tsx
 msgid "Couldn't load your templates."
 msgstr "No s'han pogut carregar les teves plantilles."
-
-#: src/routes/settings/profile/templates.tsx
-#~ msgid "Couldn't load your templates. Refresh to try again."
-#~ msgstr "No s'han pogut carregar les teves plantilles. Actualitza per tornar-ho a provar."
 
 #: src/routes/settings/organization/templates.tsx
 msgid "Couldn't save"
@@ -3173,10 +3134,6 @@ msgid "Page saved"
 msgstr "Pàgina desada"
 
 #: src/routes/pages/$id.tsx
-msgid "Page shape unrecognised"
-msgstr "Format de pàgina no reconegut"
-
-#: src/routes/pages/$id.tsx
 msgid "Page title"
 msgstr "Títol de la pàgina"
 
@@ -3784,10 +3741,6 @@ msgstr "Inicia una recerca"
 msgid "Run not found"
 msgstr "Execució no trobada"
 
-#: src/components/research/run-detail.tsx
-msgid "Run shape unrecognised."
-msgstr "Format d'execució no reconegut."
-
 #: src/components/research/run-labels.ts
 msgid "Running"
 msgstr "En execució"
@@ -4393,6 +4346,14 @@ msgstr "El canvi no s'ha completat. Torna-ho a provar."
 msgid "The company could not be fetched. Check that the session is valid, then try again."
 msgstr "No s'ha pogut carregar l'empresa. Comprova que la sessió sigui vàlida i torna-ho a provar."
 
+#: src/routes/pages/$id.tsx
+msgid "The content arrived in a form the editor cannot read, so there is nothing to edit. Go back to the list and open the page again; report it if it keeps happening."
+msgstr "El contingut ha arribat en un format que l'editor no pot llegir, així que no hi ha res per editar. Torna a la llista i obre la pàgina de nou; informa-ho si continua passant."
+
+#: src/routes/companies/$slug.tsx
+msgid "The details arrived in a form this page cannot read, so there is nothing to show. Go back to the list and open the company again; report it if it keeps happening."
+msgstr "Les dades han arribat en un format que aquesta pàgina no pot llegir, així que no hi ha res per mostrar. Torna a la llista i obre l'empresa de nou; informa-ho si continua passant."
+
 #: src/components/companies/where-panel-client.client.tsx
 msgid "The geocoder did not return a match. Try editing the location field."
 msgstr "El geocodificador no ha trobat cap coincidència. Prova d'editar el camp d'ubicació."
@@ -4425,6 +4386,10 @@ msgstr "La pàgina ja està publicada."
 #: src/components/research/run-detail.tsx
 msgid "The pages I found were about a different company, so I didn't save anything."
 msgstr "Les pàgines que he trobat eren d'una altra empresa, així que no he desat res."
+
+#: src/components/research/run-detail.tsx
+msgid "The run arrived in a form this page cannot read. Go back to the run list and open it again; report it if it keeps happening."
+msgstr "L'execució ha arribat en un format que aquesta pàgina no pot llegir. Torna a la llista d'execucions i obre-la de nou; informa-ho si continua passant."
 
 #: src/components/research/findings/freeform-view.tsx
 msgid "The run finished without proposed updates or paid actions."
@@ -4498,6 +4463,10 @@ msgstr "Han respost — defineix la següent acció per mantenir-ho actiu."
 msgid "They sign in at the sign-in page with this address and ask for their own link, so nothing sent here can expire."
 msgstr "La persona inicia la sessió a la pàgina d'inici de sessió amb aquesta adreça i demana el seu propi enllaç, de manera que res del que s'enviï des d'aquí no pot caducar."
 
+#: src/routes/companies/$slug.tsx
+msgid "This company can't be displayed"
+msgstr "Aquesta empresa no es pot mostrar"
+
 #: src/routes/settings/mcp/connections.tsx
 msgid "This connection is unbound. Bind an org to use it."
 msgstr "Aquesta connexió no està vinculada. Vincula una organització per fer-la servir."
@@ -4519,9 +4488,17 @@ msgstr "Aquest mes"
 msgid "This overrides the site I auto-detected and re-runs the research locked onto the company at that domain."
 msgstr "Això substitueix el lloc que he detectat automàticament i torna a executar la recerca fixada en l'empresa d'aquest domini."
 
+#: src/routes/pages/$id.tsx
+msgid "This page can't be displayed"
+msgstr "Aquesta pàgina no es pot mostrar"
+
 #: src/routes/oauth/consent.tsx
 msgid "This page opens when an AI assistant asks to connect. Start the connection from your assistant."
 msgstr "Aquesta pàgina s'obre quan un assistent d'IA demana connectar-se. Inicia la connexió des del teu assistent."
+
+#: src/components/research/run-detail.tsx
+msgid "This run can't be displayed."
+msgstr "Aquesta execució no es pot mostrar."
 
 #: src/components/research/review/proposed-updates-review.tsx
 msgid "This run found no changes to review."
