@@ -120,10 +120,19 @@ export const Route = createRootRoute({
 	head: ({ loaderData }) => {
 		const lang: LangCode = loaderData?.lang ?? defaultLang
 		const { title, description } = translatedHead[lang]
+		/* Tints the browser chrome on mobile. Keyed to the theme actually
+		 * painted rather than to the device setting, so an explicit choice wins. */
+		const themeColor =
+			loaderData?.theme === 'dark-hc'
+				? '#0a0908'
+				: loaderData?.theme === 'dark'
+					? '#17140f'
+					: '#f5f0e8'
 		return {
 			meta: [
 				{ charSet: 'utf-8' },
 				{ name: 'viewport', content: 'width=device-width, initial-scale=1' },
+				{ name: 'theme-color', content: themeColor },
 				{ title },
 				{
 					name: 'description',

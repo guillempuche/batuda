@@ -18,6 +18,8 @@ import {
 
 import 'leaflet/dist/leaflet.css'
 
+import { useTheme } from '#/theme/theme-provider'
+
 type WherePanelCompany = {
 	readonly id: string
 	readonly slug: string
@@ -37,6 +39,7 @@ export function WherePanel({
 	readonly compact?: boolean
 }) {
 	const { t } = useLingui()
+	const theme = useTheme()
 	const toast = usePriToast()
 	const refresh = useAtomRefresh(companyAtomFor(company.slug))
 	const geocode = useAtomSet(BatudaApiAtom.mutation('companies', 'geocode'), {
@@ -96,7 +99,10 @@ export function WherePanel({
 				) : null}
 			</Header>
 			{hasCoords ? (
-				<MapFrame $compact={compact}>
+				<MapFrame
+					$compact={compact}
+					data-map-theme={theme === 'light' ? 'light' : 'dark'}
+				>
 					<LeafletMap
 						latitude={company.latitude as number}
 						longitude={company.longitude as number}
@@ -249,6 +255,35 @@ const MapFrame = styled.div.withConfig({
 	width: 100%;
 	height: ${p => (p.$compact ? '180px' : '320px')};
 	border-radius: var(--shape-md);
+
+	/* The map tiles are photographs of a light map served by someone else, so
+	 * no colour token reaches them. On a dark page they would glare, so the
+	 * whole tile layer is inverted and hue-corrected back to plausible colours.
+	 * Leaflet's own popups, buttons and credit line ship their own light CSS
+	 * and are restyled to match the page. */
+	&[data-map-theme='dark'] .leaflet-tile-pane {
+		filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9);
+	}
+
+	&[data-map-theme='dark'] .leaflet-popup-content-wrapper,
+	&[data-map-theme='dark'] .leaflet-popup-tip,
+	&[data-map-theme='dark'] .leaflet-bar a {
+		background: var(--color-surface-container-high);
+		color: var(--color-on-surface);
+	}
+
+	&[data-map-theme='dark'] .leaflet-bar a {
+		border-bottom-color: var(--color-outline-variant);
+	}
+
+	&[data-map-theme='dark'] .leaflet-control-attribution {
+		background: color-mix(in oklab, var(--color-surface) 80%, transparent);
+		color: var(--color-on-surface-variant);
+	}
+
+	&[data-map-theme='dark'] .leaflet-control-attribution a {
+		color: var(--color-primary);
+	}
 
 	& > div,
 	& .leaflet-container {

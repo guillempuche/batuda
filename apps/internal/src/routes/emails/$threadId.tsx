@@ -1330,6 +1330,23 @@ const MessageBody = styled.div.withConfig({
 	line-height: 1.55;
 	color: var(--color-on-surface);
 
+	/* A sender's own HTML carries its own colours, usually dark text assuming a
+	 * white page. On a dark page that becomes black-on-black, and there is no
+	 * safe way to recolour someone else's markup — inverting it would wreck
+	 * logos and quoted screenshots. So the rich body keeps its own light sheet
+	 * whatever the page is doing, and reads as a printout of the message. */
+	${p =>
+		p.$rich
+			? `
+		background: #ffffff;
+		color: #1a1a1a;
+		color-scheme: light;
+		padding: var(--space-sm);
+		border-radius: var(--shape-2xs);
+		border: 1px solid var(--color-outline-variant);
+	`
+			: ''}
+
 	${p =>
 		p.$rich
 			? css`
