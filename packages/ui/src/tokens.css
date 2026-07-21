@@ -27,6 +27,8 @@
 	   paper through the darkest container) and keeps ≥6:1 for white-on-primary. */
 	--color-primary: #95400f;
 	--color-on-primary: #ffffff;
+	--color-primary-container: #ffdbc8;
+	--color-on-primary-container: #3b1500;
 
 	/* --- Secondary — Olive Green --- */
 	--color-secondary: #2e6b4f;
@@ -37,10 +39,14 @@
 	/* --- Error --- */
 	--color-error: #ba1a1a;
 	--color-on-error: #ffffff;
+	--color-error-container: #ffdad6;
+	--color-on-error-container: #410002;
 
 	/* --- Surface system — warm cream --- */
 	--color-surface: #f5f0e8;
+	--color-surface-bright: #fdfaf4;
 	--color-surface-dim: #ded7c7;
+	--color-surface-container-lowest: #f8f3eb;
 	--color-surface-container-low: #ede6d6;
 	--color-surface-container: #e7e0d0;
 	--color-surface-container-high: #dfd8c8;
@@ -52,6 +58,20 @@
 	--color-outline: #847d71;
 	--color-outline-variant: #ccc5b5;
 
+	/* --- Inverse — surfaces that flip against the current theme, for
+	   tooltips and snackbars that must stand out from the page. --- */
+	--color-inverse-surface: #33302a;
+	--color-inverse-on-surface: #f5f0e8;
+	--color-inverse-primary: #ffb68e;
+
+	/* --- Scrim — the dimmed backdrop behind a modal. --- */
+	--color-scrim: rgba(26, 22, 18, 0.7);
+
+	/* --- The colour shadows are cast in, and the tint a raised surface takes
+	   on as it rises. The workshop ramps below build on the shadow colour. --- */
+	--color-shadow: #000000;
+	--color-surface-tint: var(--color-primary);
+
 	/* ═══ Workshop — metal surfaces (shared) ═══════════════════ */
 
 	/* --- Metal palette — workshop surfaces --- */
@@ -59,12 +79,50 @@
 	--color-metal: #d0c8b8;
 	--color-metal-dark: #b8b0a0;
 	--color-metal-deep: #908878;
+	/* Darker than the ramp — the shadowed core of a scrollbar thumb. */
+	--color-metal-deepest: #4a433a;
+
+	/* --- Paper + board — the surfaces the metal is mounted on --- */
+	--color-paper-aged: #f0e8d0;
+	--color-paper-aged-hover: #ede2c6;
+	/* Lit paper — a focused input, brighter than the sheet around it. */
+	--color-paper-aged-bright: #f5ecd6;
+
+	/* Masking tape — translucent strips holding paper to the board. */
+	--color-tape-light: rgba(244, 232, 196, 0.92);
+	--color-tape: rgba(226, 210, 166, 0.92);
+	--color-tape-edge: rgba(160, 130, 70, 0.3);
+
+	/* The board itself — the wall everything else is mounted on. */
+	--color-pegboard: #b8a88c;
+	--color-leather-dark: #3e2723;
+	/* Pegboard ruling — the dot grid and panel edges bitten into the board.
+	   Warmer than the metal edges, which sit on plates rather than the wall. */
+	--color-board-line: rgba(80, 65, 45, 0.25);
+
+	/* Blueprint sheet — the drafting grid printed on the paper. Grid is the
+	   fine mesh, rule the heavier lines that divide the sheet into sections. */
+	--color-blueprint-grid: rgba(120, 110, 90, 0.08);
+	--color-blueprint-grid-strong: rgba(120, 110, 90, 0.15);
+	--color-blueprint-rule: rgba(100, 90, 70, 0.25);
+	--color-blueprint-rule-strong: rgba(100, 90, 70, 0.35);
+
+	/* Ruled-ledger line tones (need alpha to sit over paper grain) */
+	--color-ledger-line-soft: rgba(120, 95, 60, 0.25);
+	--color-ledger-line: rgba(120, 95, 60, 0.3);
+	--color-ledger-line-strong: rgba(120, 95, 60, 0.5);
+
+	/* Paper fibre warm accent — used under radial-gradient for page grain */
+	--color-paper-fibre-a: rgba(180, 155, 120, 0.06);
+	--color-paper-fibre-b: rgba(180, 155, 120, 0.05);
 
 	/* ═══ Core — typography (Barlow, Barlow Condensed) ═════════ */
 
 	/* Font families */
 	--font-display: "Barlow Condensed", system-ui, -apple-system, sans-serif;
 	--font-body: "Barlow", system-ui, -apple-system, sans-serif;
+	/* Monospace — IDs, hashes, and scores that must align in a column. */
+	--font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 
 	/* Font weight ladder — numeric axis, orthogonal to typescale role weights */
 	--font-weight-regular: 400;
@@ -83,23 +141,35 @@
 
 	--typescale-display-medium-size: clamp(2rem, 1.77rem + 1.16vw, 2.8125rem);
 	--typescale-display-medium-line: clamp(2.5rem, 2.29rem + 1.07vw, 3.25rem);
+	--typescale-display-medium-weight: 700;
+	--typescale-display-medium-tracking: 0;
 
 	--typescale-display-small-size: clamp(1.75rem, 1.61rem + 0.71vw, 2.25rem);
 	--typescale-display-small-line: clamp(2.25rem, 2.11rem + 0.71vw, 2.75rem);
+	--typescale-display-small-weight: 700;
+	--typescale-display-small-tracking: 0;
 
 	/* Headline */
 	--typescale-headline-large-size: clamp(1.5rem, 1.36rem + 0.71vw, 2rem);
 	--typescale-headline-large-line: clamp(2rem, 1.86rem + 0.71vw, 2.5rem);
+	--typescale-headline-large-weight: 700;
+	--typescale-headline-large-tracking: 0;
 
 	--typescale-headline-medium-size: clamp(1.375rem, 1.27rem + 0.54vw, 1.75rem);
 	--typescale-headline-medium-line: clamp(1.75rem, 1.61rem + 0.71vw, 2.25rem);
+	--typescale-headline-medium-weight: 700;
+	--typescale-headline-medium-tracking: 0;
 
 	--typescale-headline-small-size: clamp(1.25rem, 1.18rem + 0.36vw, 1.5rem);
 	--typescale-headline-small-line: clamp(1.625rem, 1.52rem + 0.54vw, 2rem);
+	--typescale-headline-small-weight: 700;
+	--typescale-headline-small-tracking: 0;
 
 	/* Title */
 	--typescale-title-large-size: 1.375rem;
 	--typescale-title-large-line: 1.75rem;
+	--typescale-title-large-weight: 700;
+	--typescale-title-large-tracking: 0;
 
 	--typescale-title-medium-size: 1rem;
 	--typescale-title-medium-line: 1.5rem;
@@ -115,28 +185,34 @@
 	--typescale-body-large-size: 1rem;
 	--typescale-body-large-line: 1.5rem;
 	--typescale-body-large-tracking: 0.031rem;
+	--typescale-body-large-weight: 400;
 
 	--typescale-body-medium-size: 0.875rem;
 	--typescale-body-medium-line: 1.25rem;
 	--typescale-body-medium-tracking: 0.016rem;
+	--typescale-body-medium-weight: 400;
 
 	--typescale-body-small-size: 0.75rem;
 	--typescale-body-small-line: 1rem;
 	--typescale-body-small-tracking: 0.025rem;
+	--typescale-body-small-weight: 400;
 
 	/* Prose — long-form reading (marketing/content). Fluid sizes + generous
 	 * leading, distinct from the compact fixed Body scale used in dense UI. */
 	--typescale-prose-large-size: clamp(1rem, 0.96rem + 0.21vw, 1.125rem);
 	--typescale-prose-large-line: clamp(1.5rem, 1.44rem + 0.3vw, 1.75rem);
 	--typescale-prose-large-tracking: 0rem;
+	--typescale-prose-large-weight: 400;
 
 	--typescale-prose-medium-size: clamp(0.9375rem, 0.9rem + 0.19vw, 1rem);
 	--typescale-prose-medium-line: clamp(1.4rem, 1.34rem + 0.28vw, 1.55rem);
 	--typescale-prose-medium-tracking: 0rem;
+	--typescale-prose-medium-weight: 400;
 
 	--typescale-prose-small-size: clamp(0.875rem, 0.85rem + 0.13vw, 0.9375rem);
 	--typescale-prose-small-line: clamp(1.3rem, 1.26rem + 0.2vw, 1.4rem);
 	--typescale-prose-small-tracking: 0rem;
+	--typescale-prose-small-weight: 400;
 
 	/* Label */
 	--typescale-label-large-size: 0.875rem;
@@ -231,22 +307,77 @@
 
 	/* ═══ Core — shape (border radius) ═════════════════════════ */
 
+	--shape-3xs: 0.125rem;
 	--shape-2xs: 0.25rem;
 	--shape-xs: 0.5rem;
 	--shape-sm: 0.75rem;
 	--shape-md: 1rem;
 	--shape-lg: 1.75rem;
+	--shape-xl: 2.5rem;
 	--shape-full: 999px;
 
 	/* ═══ Workshop — elevation (shared) ════════════════════════ */
 	/*    Top-lit metal with inset highlight                     */
 
+	/* The two halves of every workshop shadow: the highlight is the lamp
+	   catching a top edge, the shadow is what falls underneath. Named
+	   separately so both can be tuned in one place.
+	   Lightest to heaviest: faint, soft, base, strong, bright.
+	   Softest to darkest:   subtle, base, medium, strong, deep. */
+	--highlight-inset-faint: rgba(255, 255, 255, 0.05);
+	--highlight-inset-soft: rgba(255, 255, 255, 0.15);
+	--highlight-inset: rgba(255, 255, 255, 0.2);
+	--highlight-inset-strong: rgba(255, 255, 255, 0.3);
+	--highlight-inset-bright: rgba(255, 255, 255, 0.5);
+
+	--shadow-color-subtle: rgba(0, 0, 0, 0.04);
+	--shadow-color: rgba(0, 0, 0, 0.12);
+	--shadow-color-medium: rgba(0, 0, 0, 0.15);
+	--shadow-color-strong: rgba(0, 0, 0, 0.2);
+	--shadow-color-deep: rgba(0, 0, 0, 0.35);
+
+	/* Cut edges of a metal plate — darker than the plate, so they read as a
+	   machined bevel rather than a drawn border. Kept apart from the shadow
+	   ramp so edges and drop shadows can be tuned independently.
+	   Faintest to darkest: soft, muted, base, strong. */
+	--color-metal-edge-soft: rgba(0, 0, 0, 0.08);
+	--color-metal-edge-muted: rgba(0, 0, 0, 0.2);
+	--color-metal-edge: rgba(0, 0, 0, 0.35);
+	--color-metal-edge-strong: rgba(0, 0, 0, 0.4);
+
+	/* Warm amber wash behind a highlighted menu row — the same accent as
+	   --glow-active, at the weight a fill needs rather than a ring. */
+	--color-highlight-amber: rgba(245, 158, 11, 0.28);
+	/* The lit halo around an engaged machine button. */
+	--color-highlight-amber-strong: rgba(245, 158, 11, 0.45);
+
 	--elevation-workshop-sm:
-		inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 3px rgba(0, 0, 0, 0.12);
+		inset 0 1px 0 var(--highlight-inset), 0 1px 3px var(--shadow-color);
 	--elevation-workshop-md:
-		inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 4px rgba(0, 0, 0, 0.15);
+		inset 0 1px 0 var(--highlight-inset-strong),
+		0 2px 4px var(--shadow-color-medium);
 	--elevation-workshop-lg:
-		inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 6px rgba(0, 0, 0, 0.2);
+		inset 0 1px 0 var(--highlight-inset-strong),
+		0 2px 6px var(--shadow-color-strong);
+
+	/* Plain drop shadows for surfaces that are not workshop chrome (generic
+	   cards, floating panels). The workshop ramp above is the house default;
+	   reach for these only when a surface should read as flat
+	   rather than as a metal plate. */
+	--elevation-0: none;
+	--elevation-1:
+		0 1px 2px var(--shadow-color-strong),
+		0 1px 3px 1px var(--shadow-color-medium);
+	--elevation-2:
+		0 1px 2px var(--shadow-color-strong),
+		0 2px 6px 2px var(--shadow-color-medium);
+	--elevation-3:
+		0 1px 3px var(--shadow-color-strong),
+		0 4px 8px 3px var(--shadow-color-medium);
+
+	/* Aged-paper depth cue — a thin lit top edge plus a soft drop. */
+	--shadow-paper-inset: 0 1px 0 rgba(255, 255, 255, 0.55) inset;
+	--shadow-paper-card: 0 2px 6px var(--shadow-color);
 
 	/* ═══ Workshop — effects (shared) ══════════════════════════ */
 	/*    Text shadows & surface textures                        */
