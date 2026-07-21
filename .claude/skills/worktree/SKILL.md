@@ -149,7 +149,7 @@ If the directory was removed manually before `worktree down`, run `pnpm cli work
 The **server derives its canonical origins from `PORTLESS_URL`** and merges the worktree's
 `<label>.batuda.localhost:<port>` origin into the trusted set; the session cookie spans
 `batuda.localhost`; and the client derives its `<label>.api.batuda.localhost` API host the same
-way — so login, `/v1` data, API calls, and minted links (invitations, auth redirects) all target
+way — so login, `/v1` data, API calls, and minted links (sign-in, auth redirects) all target
 the *worktree's* host automatically. `ALLOWED_ORIGINS` is literal-only (no `*.batuda.localhost`
 wildcard). Each worktree's own database keeps sessions/data isolated.
 
