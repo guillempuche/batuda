@@ -113,7 +113,7 @@ ls apps/server/.dev-inbox/                    # list caught emails
 cat apps/server/.dev-inbox/*.md | head -30    # read frontmatter + body
 ```
 
-Magic-link emails (from invite flow) are tagged with `labels: magic-link` in frontmatter. To find a sign-in link: `grep -l "magic-link" apps/server/.dev-inbox/*.md`.
+Magic-link emails are tagged with `labels: magic-link` in frontmatter. To find a sign-in link: `grep -l "magic-link" apps/server/.dev-inbox/*.md`.
 
 If no emails appear, verify `EMAIL_PROVIDER=local-inbox` in `.env` and check `apps/server/server.log` for `"email provider: local-inbox"`.
 
@@ -144,7 +144,7 @@ Verify: `curl -sk https://<label>.api.batuda.localhost:$P/health` and drive
 `agent-browser` against `https://<label>.batuda.localhost` (use the full URL
 `pnpm cli worktree doctor` prints — host plus portless's port).
 The server derives its own auth/app origins from
-`PORTLESS_URL`, so login, API calls, and minted links (invitations, auth redirects)
+`PORTLESS_URL`, so login, API calls, and minted links (sign-in, auth redirects)
 all target the worktree's host automatically — no per-worktree `.env` edits. If the
 server won't boot with `ALLOWED_ORIGINS does not accept wildcard patterns`, a `.env`
 (main or worktree) still lists `https://*.batuda.localhost` — remove it; the worktree
