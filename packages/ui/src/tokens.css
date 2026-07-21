@@ -396,3 +396,209 @@
 	   focus rings on metal surfaces, and stencil highlights. */
 	--glow-active: 0 0 0 3px rgba(245, 158, 11, 0.35);
 }
+
+/* ============================================================
+   Dark themes
+
+   Structure shared by both dark themes lives in the first block;
+   the high-contrast one then overrides the palette and strips the
+   texture and glow that help in the other themes but hurt here.
+
+   Palette and contrast tables: docs/brand-visual.md §Dark Workshop.
+   The attribute always holds a resolved theme, never "system".
+   ============================================================ */
+
+:root[data-theme="dark"],
+:root[data-theme="dark-hc"] {
+	color-scheme: dark;
+
+	/* --- Ground — the workshop lit by one lamp instead of daylight.
+	   The ramp climbs with elevation, the reverse of the light theme. --- */
+	--color-surface: #17140f;
+	--color-surface-bright: #3a342b;
+	--color-surface-dim: #100e0a;
+	--color-surface-container-lowest: #0b0908;
+	--color-surface-container-low: #1f1b15;
+	--color-surface-container: #23201a;
+	--color-surface-container-high: #2e2a22;
+	--color-surface-container-highest: #39342b;
+	--color-on-surface: #ede6da;
+	--color-on-surface-variant: #cbc2b2;
+
+	/* --- Accents — what the lamp lands on, so they stay the brightest
+	   things on screen and keep their brand role. --- */
+	--color-primary: #f2a578;
+	--color-on-primary: #4a1b00;
+	--color-primary-container: #6b2e0a;
+	--color-on-primary-container: #ffdbc8;
+
+	--color-secondary: #8ecfa8;
+	--color-on-secondary: #003821;
+	--color-secondary-container: #1f5038;
+	--color-on-secondary-container: #c8edd9;
+
+	--color-error: #ffb4ab;
+	--color-on-error: #690005;
+	--color-error-container: #93000a;
+	--color-on-error-container: #ffdad6;
+
+	--color-outline: #9a9082;
+	--color-outline-variant: #4c463e;
+
+	/* Inverse turns light here, so a tooltip still separates from the page. */
+	--color-inverse-surface: #ede6da;
+	--color-inverse-on-surface: #33302a;
+	--color-inverse-primary: #95400f;
+
+	--color-scrim: rgba(0, 0, 0, 0.75);
+
+	/* --- Workshop surfaces — unlit metal on a dark board. --- */
+	--color-metal-light: #4a443b;
+	--color-metal: #3b362e;
+	--color-metal-dark: #2c2821;
+	--color-metal-deep: #1e1b16;
+	--color-metal-deepest: #14110d;
+
+	--color-paper-aged: #2a2318;
+	--color-paper-aged-hover: #332b1f;
+	--color-paper-aged-bright: #3a3122;
+
+	--color-pegboard: #14120f;
+	--color-leather-dark: #241a16;
+
+	--color-tape-light: rgba(120, 104, 72, 0.55);
+	--color-tape: rgba(96, 82, 54, 0.55);
+	--color-tape-edge: rgba(60, 48, 26, 0.5);
+
+	--color-board-line: rgba(0, 0, 0, 0.45);
+
+	/* Ruling and grain lighten instead of darkening — ink on a dark sheet
+	   would vanish, so these read as scored lines catching the lamp. */
+	--color-blueprint-grid: rgba(200, 186, 150, 0.05);
+	--color-blueprint-grid-strong: rgba(200, 186, 150, 0.09);
+	--color-blueprint-rule: rgba(200, 186, 150, 0.14);
+	--color-blueprint-rule-strong: rgba(200, 186, 150, 0.2);
+
+	--color-ledger-line-soft: rgba(200, 186, 150, 0.12);
+	--color-ledger-line: rgba(200, 186, 150, 0.16);
+	--color-ledger-line-strong: rgba(200, 186, 150, 0.26);
+
+	--color-paper-fibre-a: rgba(200, 186, 150, 0.04);
+	--color-paper-fibre-b: rgba(200, 186, 150, 0.03);
+
+	/* A machined edge catches no lamp, so it goes darker than the plate. */
+	--color-metal-edge-soft: rgba(0, 0, 0, 0.3);
+	--color-metal-edge-muted: rgba(0, 0, 0, 0.45);
+	--color-metal-edge: rgba(0, 0, 0, 0.6);
+	--color-metal-edge-strong: rgba(0, 0, 0, 0.7);
+
+	/* The lamp catching a top edge — warm rather than white, and much
+	   dimmer, but still on top: the light has not moved. */
+	--highlight-inset-faint: rgba(255, 226, 190, 0.03);
+	--highlight-inset-soft: rgba(255, 226, 190, 0.05);
+	--highlight-inset: rgba(255, 226, 190, 0.07);
+	--highlight-inset-strong: rgba(255, 226, 190, 0.11);
+	--highlight-inset-bright: rgba(255, 226, 190, 0.16);
+
+	/* Deeper across the board — a dark ground swallows a 12%-black shadow. */
+	--shadow-color-subtle: rgba(0, 0, 0, 0.3);
+	--shadow-color: rgba(0, 0, 0, 0.55);
+	--shadow-color-medium: rgba(0, 0, 0, 0.62);
+	--shadow-color-strong: rgba(0, 0, 0, 0.72);
+	--shadow-color-deep: rgba(0, 0, 0, 0.85);
+
+	--shadow-paper-inset: 0 1px 0 rgba(255, 226, 190, 0.09) inset;
+
+	--color-highlight-amber: rgba(245, 158, 11, 0.22);
+	--color-highlight-amber-strong: rgba(245, 158, 11, 0.4);
+
+	--text-shadow-emboss: 0 1px 0 rgba(255, 226, 190, 0.08);
+	--text-shadow-engrave: 0 -1px 0 rgba(0, 0, 0, 0.55);
+}
+
+/* High contrast — a distinct theme, not a darker dark. Texture and glow
+   are contrast noise here, so they come off entirely and every divider is
+   held visible. Text pairings clear AAA rather than AA. */
+:root[data-theme="dark-hc"] {
+	--color-surface: #0a0908;
+	--color-surface-bright: #332e27;
+	--color-surface-dim: #000000;
+	--color-surface-container-lowest: #000000;
+	--color-surface-container-low: #121010;
+	--color-surface-container: #17150f;
+	--color-surface-container-high: #222019;
+	--color-surface-container-highest: #2c2921;
+	--color-on-surface: #fffbf5;
+	--color-on-surface-variant: #e8dfd0;
+
+	--color-primary: #ffc9a6;
+	--color-on-primary: #2e0f00;
+	--color-primary-container: #5a2400;
+	--color-on-primary-container: #ffede2;
+
+	--color-secondary: #b6e8c9;
+	--color-on-secondary: #002515;
+	--color-secondary-container: #113d28;
+	--color-on-secondary-container: #e2f6ea;
+
+	--color-error: #ffd2cc;
+	--color-on-error: #4a0002;
+	--color-error-container: #7a0006;
+	--color-on-error-container: #fff0ee;
+
+	--color-outline: #c9bfaf;
+	--color-outline-variant: #8a8276;
+
+	--color-scrim: rgba(0, 0, 0, 0.9);
+
+	/* Plates read as flat fills — the metal ramp collapses so gradients
+	   built from it stop banding across a high-contrast surface. */
+	--color-metal-light: #2c2921;
+	--color-metal: #2c2921;
+	--color-metal-dark: #222019;
+	--color-metal-deep: #17150f;
+	--color-metal-deepest: #0a0908;
+
+	--color-paper-aged: #17150f;
+	--color-paper-aged-hover: #222019;
+	--color-paper-aged-bright: #2c2921;
+
+	--color-pegboard: #000000;
+
+	/* Every edge and divider stays visible rather than suggested. */
+	--color-metal-edge-soft: #8a8276;
+	--color-metal-edge-muted: #a89e90;
+	--color-metal-edge: #c9bfaf;
+	--color-metal-edge-strong: #e8dfd0;
+
+	--color-board-line: #8a8276;
+	--color-blueprint-grid: rgba(232, 223, 208, 0.16);
+	--color-blueprint-grid-strong: rgba(232, 223, 208, 0.28);
+	--color-blueprint-rule: rgba(232, 223, 208, 0.4);
+	--color-blueprint-rule-strong: rgba(232, 223, 208, 0.55);
+	--color-ledger-line-soft: rgba(232, 223, 208, 0.3);
+	--color-ledger-line: rgba(232, 223, 208, 0.42);
+	--color-ledger-line-strong: rgba(232, 223, 208, 0.6);
+
+	/* Texture, bevel and glow all come off: at this contrast they read as
+	   dirt on the screen rather than as depth. */
+	--texture-brushed-metal: none;
+	--color-paper-fibre-a: transparent;
+	--color-paper-fibre-b: transparent;
+	--highlight-inset-faint: transparent;
+	--highlight-inset-soft: transparent;
+	--highlight-inset: transparent;
+	--highlight-inset-strong: transparent;
+	--highlight-inset-bright: transparent;
+	--shadow-paper-inset: none;
+	--text-shadow-emboss: none;
+	--text-shadow-engrave: none;
+	--color-tape-light: #2c2921;
+	--color-tape: #222019;
+	--color-tape-edge: #8a8276;
+
+	/* A solid ring rather than a soft halo — a blur is unreadable here. */
+	--glow-active: 0 0 0 3px #ffc9a6;
+	--color-highlight-amber: rgba(255, 201, 166, 0.3);
+	--color-highlight-amber-strong: rgba(255, 201, 166, 0.45);
+}

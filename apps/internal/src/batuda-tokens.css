@@ -39,3 +39,42 @@
 	   --color-error so it reads as a lit edge rather than a fill. */
 	--color-priority-urgent-glow: rgba(233, 84, 32, 0.5);
 }
+
+/* Dark themes — the status tones and the warning ramp lighten so they still
+   register against a dark ground. Shared tokens are handled in @batuda/ui. */
+:root[data-theme="dark"],
+:root[data-theme="dark-hc"] {
+	--color-status-prospect: #a9b6b8;
+	--color-status-contacted: #90c2f5;
+	--color-status-responded: #b39ddb;
+	--color-status-meeting: #f7b73d;
+	--color-status-proposal: #ffab8f;
+	--color-status-client: #8ecfa8;
+	--color-status-closed: #bdbdbd;
+	--color-status-dead: #ffb4ab;
+
+	--color-warning: #f7b73d;
+	--color-warning-strong: #f59e0b;
+	--color-on-warning-container: #ffd9a3;
+
+	--color-priority-urgent-glow: rgba(255, 138, 96, 0.55);
+}
+
+/* High contrast pushes the same tones further, since here they carry meaning
+   on a near-black ground rather than on a lit one. */
+:root[data-theme="dark-hc"] {
+	--color-status-prospect: #cdd6d8;
+	--color-status-contacted: #b8d8fa;
+	--color-status-responded: #d0c0ec;
+	--color-status-meeting: #ffd066;
+	--color-status-proposal: #ffc7b3;
+	--color-status-client: #b6e8c9;
+	--color-status-closed: #dcdcdc;
+	--color-status-dead: #ffd2cc;
+
+	--color-warning: #ffd066;
+	--color-warning-strong: #f7b73d;
+	--color-on-warning-container: #ffeccc;
+
+	--color-priority-urgent-glow: rgba(255, 199, 179, 0.7);
+}

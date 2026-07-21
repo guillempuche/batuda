@@ -1,6 +1,6 @@
 # Dark + high-contrast-dark themes
 
-Status: **Slices 0–4 built, not yet committed (2026-07-21).** Adds two themes — `dark` and `dark-hc` — alongside the current light-only system. The dark aesthetic is **work-lamp on unlit metal**: near-black warm charcoal ground, desaturated low-key metal lit from above-left only, dim ochre paper, terracotta and olive kept as the lit accents, bevels in the same direction at much lower contrast. Shipping as one PR from the `claude/dark-themes-tokens` worktree, one commit per area.
+Status: **Slices 0–4 committed on `claude/dark-themes-tokens`, not pushed (2026-07-21).** Adds two themes — `dark` and `dark-hc` — alongside the current light-only system. The dark aesthetic is **work-lamp on unlit metal**: near-black warm charcoal ground, desaturated low-key metal lit from above-left only, dim ochre paper, terracotta and olive kept as the lit accents, bevels in the same direction at much lower contrast. Shipping as one PR from the `claude/dark-themes-tokens` worktree, one commit per area.
 
 Done so far: the palette and its contrast tables live in [brand-visual.md](../brand-visual.md) §Dark Workshop; the token system is reconciled, restructured, and complete; and every colour literal outside one file is now a token. **No theme blocks or switching yet** — that starts at Slice 6. The light theme is what currently renders, and it was verified against the running app.
 
@@ -265,7 +265,8 @@ The app was then run and walked — Pipeline, Companies, Tasks, Emails, Inboxes,
 
 Two process notes for whoever picks this up:
 
-- **`pnpm install --ignore-scripts` skips the `prepare` hook that builds `packages/ui/dist`.** The web app doesn't care — it resolves `@batuda/ui` through the `development` condition to `src/` — but `apps/server` imports from `dist/` and dies at boot with `ERR_MODULE_NOT_FOUND`. Run `pnpm --filter @batuda/ui build` after provisioning a worktree.
+- **`pnpm install --ignore-scripts` skips the `prepare` hook that builds `packages/ui/dist`.** `apps/server` imports from `dist/` and dies at boot with `ERR_MODULE_NOT_FOUND`. Run `pnpm --filter @batuda/ui build` after provisioning a worktree.
+- **CSS resolves to `dist/`, not `src/` — unlike JS.** `packages/ui/package.json` maps `./tokens.css` to `development` → `src` and `default` → `dist`, but the CSS `@import` chain takes `default`, so the app serves `dist/tokens.css`. Editing `src/tokens.css` therefore changes nothing on screen until `pnpm --filter @batuda/ui build` runs *and* the dev server restarts (Vite caches the stylesheet at boot; clearing `apps/internal/node_modules/.vite` makes it reliable). This cost an hour: the theme blocks were correct, the attribute was on `<html>`, the selectors matched — and a stale `dist/tokens.css` from an earlier build was being served. Worth fixing properly in a later slice, since it means a stale build silently wins over source.
 - Do not pipe `pnpm dev` into `tail`; it buffers the whole boot, so a crash reports nothing.
 
 A method note worth carrying into the remaining slices: reading colour off a screenshot produced a false regression report (a badge looked wrong; the source showed the component I had changed was a different one, and the suspect had always been terracotta). Screenshots are for catching what you did not think to check — the source and computed contrast are what settle whether a specific colour is right.
