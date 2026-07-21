@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-	buildInvitationCallbackURL,
 	findPublicUrlNotAllowed,
 	findWildcardOrigin,
 	mergeWorktreeOrigin,
@@ -84,45 +83,9 @@ describe('findWildcardOrigin', () => {
 	})
 })
 
-// The invitation callback URL is built from APP_PUBLIC_URL, not
-// ALLOWED_ORIGINS[0] — so reordering the trusted-origins list can't silently
-// retarget invite links. These lock the host the link points at.
-describe('buildInvitationCallbackURL', () => {
-	describe('with a public URL and an invitation id', () => {
-		it('should build an absolute accept-invitation URL', () => {
-			// GIVEN the canonical app origin and an invitation id
-			// WHEN the callback URL is built
-			// THEN it is <origin>/accept-invitation/<id>
-			// [lib/env.ts — buildInvitationCallbackURL]
-			expect(buildInvitationCallbackURL('https://batuda.co', 'inv-1')).toBe(
-				'https://batuda.co/accept-invitation/inv-1',
-			)
-		})
-
-		it('should trim a trailing slash on the origin', () => {
-			// GIVEN a public URL with a trailing slash
-			// WHEN the callback URL is built
-			// THEN the slash is collapsed so the path isn't doubled
-			// [lib/env.ts — replace(/\/$/, '')]
-			expect(buildInvitationCallbackURL('https://batuda.co/', 'inv-2')).toBe(
-				'https://batuda.co/accept-invitation/inv-2',
-			)
-		})
-
-		it('should target the given origin regardless of any origins order', () => {
-			// GIVEN the builder takes the origin directly (not ALLOWED_ORIGINS[0])
-			// WHEN called with a second-listed product origin
-			// THEN the link targets exactly that origin — reordering can't move it
-			// [lib/env.ts — origin is a parameter, not positional]
-			expect(buildInvitationCallbackURL('https://app.batuda.co', 'inv-3')).toBe(
-				'https://app.batuda.co/accept-invitation/inv-3',
-			)
-		})
-	})
-})
-
 // APP_PUBLIC_URL must be one of ALLOWED_ORIGINS (matched exactly) or the server
-// refuses to boot, so an invite can't point at a host the app doesn't trust. A
+// refuses to boot, so a link the server mints can't point at a host the app
+// doesn't trust. A
 // portless-derived worktree origin passes because it was merged into the list
 // literally — there is no wildcard widening.
 describe('findPublicUrlNotAllowed', () => {
