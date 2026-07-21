@@ -127,6 +127,16 @@ export const buildBetterAuthConfig = <Plugins extends BetterAuthPlugin[]>(
 					required: false,
 					defaultValue: false,
 				},
+				// The language this person reads, chosen by whoever added them.
+				// Their email is written in it. `input: false` keeps it out of
+				// `/auth/update-user`, which would otherwise accept any string:
+				// the value picks which translation to load, so it has to stay
+				// one of the languages that actually exist.
+				locale: {
+					type: 'string' as const,
+					required: false,
+					input: false,
+				},
 				// User has chosen to stay passwordless; gates the "set a password"
 				// nudge so we stop asking. Toggled via `/auth/update-user`.
 				passwordOptOut: {
