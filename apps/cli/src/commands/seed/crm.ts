@@ -11,6 +11,8 @@ import {
 	normalizeRows,
 	SEED_REFERENCE,
 	type SeedCtx,
+	seedCompanyId,
+	seedContactId,
 	seedUuid,
 	withSeedIds,
 } from './shared'
@@ -134,7 +136,7 @@ export const seedCompanies = (
 		const companies = assignOwners(
 			[...handWritten, ...generated],
 			[alice, alice, carol, bea],
-		).map(c => ({ ...c, id: seedUuid('company', c.slug) }))
+		).map(c => ({ ...c, id: seedCompanyId(c.slug) }))
 
 		yield* Effect.logInfo(`Seeding companies (${preset})...`)
 		const insertedCompanies =
@@ -193,7 +195,7 @@ export const seedCompanies = (
 				[bob, bob, bea],
 			).map(r => ({
 				...r,
-				id: seedUuid('company', r.slug),
+				id: seedCompanyId(r.slug),
 				organizationId: restaurantOrgId,
 			}))
 
@@ -327,7 +329,7 @@ export const seedContacts = (
 				normalizeRows(
 					stamp(
 						contacts.map(c => ({
-							id: seedUuid('contact', `${c.companyId}:${c.name}`),
+							id: seedContactId(c.companyId, c.name),
 							companyId: c.companyId,
 							name: c.name,
 							role: c.role ?? null,
@@ -360,7 +362,7 @@ export const seedContacts = (
 				yield* sql<ContactRow>`INSERT INTO contacts ${sql.insert(
 					normalizeRows(
 						restaurantContacts.map(c => ({
-							id: seedUuid('contact', `${c.companyId}:${c.name}`),
+							id: seedContactId(c.companyId, c.name),
 							organizationId: restaurantOrgId,
 							companyId: c.companyId,
 							name: c.name,

@@ -38,6 +38,8 @@ import {
 	normalizeRows,
 	SEED_REFERENCE,
 	type SeedCtx,
+	seedCompanyId,
+	seedContactId,
 	seedUuid,
 	withSeedIds,
 } from './shared'
@@ -208,6 +210,56 @@ const withSourcedFields = (
 	}
 	return next
 }
+
+// Subjects the proposals below point at. Derived the same way the CRM seed
+// derives them, so the two always agree without hardcoding a uuid here.
+const CAL_PEP_ID = seedCompanyId('cal-pep-fonda')
+const FERROS_ID = seedCompanyId('ferros-baix-llobregat')
+const HOSTAL_ID = seedCompanyId('hostal-pirineu')
+const PEP_CASALS_ID = seedContactId(CAL_PEP_ID, 'Pep Casals')
+
+/** One channel on a proposed contact, in the stored shape the inbox reads. */
+const channel = (
+	kind: string,
+	value: string,
+	verification: string | null,
+	confidence: number | null,
+) => ({
+	kind,
+	value,
+	...(verification === null ? {} : { verification }),
+	...(confidence === null ? {} : { confidence }),
+	isPrimary: kind === 'email',
+})
+
+const proposal = (options: {
+	key: string
+	subjectTable: 'companies' | 'contacts'
+	operation: 'create' | 'update'
+	subjectId?: string
+	reason: string
+	fields: Record<string, unknown>
+	/** What this particular claim was read from. */
+	citation: { sourceId: string; quote: string; confidence: number }
+}) => ({
+	id: seedUuid('proposal', options.key),
+	status: 'pending',
+	subject_table: options.subjectTable,
+	operation: options.operation,
+	...(options.subjectId === undefined ? {} : { subject_id: options.subjectId }),
+	// Seeded subjects are untouched, so their version is 0. Claiming anything
+	// else makes the apply fail as a conflict instead of going through.
+	expected_version: options.operation === 'update' ? 0 : null,
+	reason: options.reason,
+	fields: options.fields,
+	citations: [
+		{
+			source_id: options.citation.sourceId,
+			quote: options.citation.quote,
+			confidence: options.citation.confidence,
+		},
+	],
+})
 
 const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 	{
@@ -2957,6 +3009,309 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		tokensOut: 350,
 		startedAt: new Date('2026-05-21T09:00:00Z'),
 		completedAt: new Date('2026-05-21T09:00:50Z'),
+	},
+
+	// ── Proposals across every tier the review inbox sorts into ──
+	// "Ready to apply" needs a checkable email channel, a deliverable verdict
+	// and enough confidence; everything else lands in "Needs your review".
+	{
+		key: 'proposals-trusted',
+		companySlug: 'cal-pep-fonda',
+		query: 'find the people to contact at Cal Pep Fonda',
+		mode: 'deep',
+		schemaName: 'contact_discovery_v1',
+		kind: 'leaf',
+		status: 'succeeded',
+		findings: {
+			proposed_updates: [
+				proposal({
+					key: 'trusted-fraction',
+					citation: {
+						sourceId: 'src_firecrawl_001',
+						quote: 'Rosa Bertran, cap de cuina',
+						confidence: 0.88,
+					},
+					subjectTable: 'contacts',
+					operation: 'create',
+					reason: 'Listed as head chef on the team page',
+					fields: {
+						name: 'Rosa Bertran',
+						company_id: CAL_PEP_ID,
+						channels: [
+							channel('email', 'rosa@calpepfonda.cat', 'deliverable', 0.92),
+							channel('phone', '+34 938 123 460', null, null),
+						],
+					},
+				}),
+				proposal({
+					key: 'trusted-percent',
+					citation: {
+						sourceId: 'src_firecrawl_001',
+						quote: 'Esdeveniments: Ignasi Mora',
+						confidence: 0.9,
+					},
+					subjectTable: 'contacts',
+					operation: 'create',
+					reason: 'Named as the events contact, verified by the provider',
+					fields: {
+						name: 'Ignasi Mora',
+						company_id: CAL_PEP_ID,
+						// Same confidence expressed the other way round: vendors report
+						// 0-100 where the model reports 0-1, and both must read as 88%.
+						channels: [
+							channel('email', 'ignasi@calpepfonda.cat', 'deliverable', 88),
+						],
+					},
+				}),
+				proposal({
+					key: 'low-confidence',
+					citation: {
+						sourceId: 'src_exa_001',
+						quote: 'Adreces del tipus nom@calpepfonda.cat',
+						confidence: 0.35,
+					},
+					subjectTable: 'contacts',
+					operation: 'create',
+					reason: 'Guessed from the address pattern of colleagues',
+					fields: {
+						name: 'Nil Aguiló',
+						company_id: CAL_PEP_ID,
+						channels: [
+							channel('email', 'nil@calpepfonda.cat', 'deliverable', 0.4),
+						],
+					},
+				}),
+			],
+		},
+		briefMd:
+			'## Cal Pep Fonda — people\nThree candidate contacts, one of them only a guess.',
+		budgetCents: 60,
+		costCents: 30,
+		tokensIn: 8200,
+		tokensOut: 2400,
+		startedAt: new Date('2026-05-22T09:00:00Z'),
+		completedAt: new Date('2026-05-22T09:02:00Z'),
+	},
+	{
+		key: 'proposals-verdicts',
+		companySlug: 'cal-pep-fonda',
+		query: 'verify the addresses found for Cal Pep Fonda',
+		mode: 'deep',
+		schemaName: 'contact_discovery_v1',
+		kind: 'leaf',
+		status: 'succeeded',
+		findings: {
+			proposed_updates: [
+				proposal({
+					key: 'verdict-risky',
+					citation: {
+						sourceId: 'src_exa_001',
+						quote: 'Contacte: berta@calpepfonda.cat',
+						confidence: 0.7,
+					},
+					subjectTable: 'contacts',
+					operation: 'create',
+					reason: 'Address accepted mail but the provider flags it as risky',
+					fields: {
+						name: 'Berta Ollé',
+						company_id: CAL_PEP_ID,
+						channels: [
+							channel('email', 'berta@calpepfonda.cat', 'risky', 0.75),
+						],
+					},
+				}),
+				proposal({
+					key: 'verdict-catch-all',
+					citation: {
+						sourceId: 'src_exa_001',
+						quote: 'El domini accepta qualsevol adreça',
+						confidence: 0.5,
+					},
+					subjectTable: 'contacts',
+					operation: 'create',
+					reason: 'Domain accepts everything, so the address proves nothing',
+					fields: {
+						name: 'Quim Vallès',
+						company_id: CAL_PEP_ID,
+						channels: [
+							channel('email', 'quim@calpepfonda.cat', 'catch_all', 0.6),
+						],
+					},
+				}),
+				proposal({
+					key: 'verdict-undeliverable',
+					citation: {
+						sourceId: 'src_archive_001',
+						quote: 'Fitxa antiga amb ona@calpepfonda.cat',
+						confidence: 0.6,
+					},
+					subjectTable: 'contacts',
+					operation: 'create',
+					reason: 'Mail to this address bounced during verification',
+					fields: {
+						name: 'Ona Prims',
+						company_id: CAL_PEP_ID,
+						channels: [
+							channel('email', 'ona@calpepfonda.cat', 'undeliverable', 0.9),
+						],
+					},
+				}),
+				proposal({
+					key: 'verdict-unknown',
+					citation: {
+						sourceId: 'src_exa_002',
+						quote: 'Guiu Roset apareix al peu de pàgina',
+						confidence: 0.5,
+					},
+					subjectTable: 'contacts',
+					operation: 'create',
+					reason: 'The provider could not reach the mail server to check',
+					fields: {
+						name: 'Guiu Roset',
+						company_id: HOSTAL_ID,
+						channels: [
+							channel('email', 'guiu@calpepfonda.cat', 'unknown', 0.55),
+						],
+					},
+				}),
+				proposal({
+					key: 'no-channels',
+					citation: {
+						sourceId: 'src_firecrawl_001',
+						quote: 'Reserves gestionades amb Cover Manager',
+						confidence: 0.82,
+					},
+					subjectTable: 'companies',
+					operation: 'update',
+					subjectId: FERROS_ID,
+					reason: 'Opening hours changed, no address involved',
+					// Nothing machine-checkable here, so this one carries no score at
+					// all and disappears the moment a minimum confidence is set.
+					fields: { current_tools: 'Cover Manager' },
+				}),
+			],
+		},
+		briefMd:
+			'## Cal Pep Fonda — address checks\nEvery verification verdict, plus one change with nothing to verify.',
+		budgetCents: 60,
+		costCents: 26,
+		tokensIn: 7400,
+		tokensOut: 2100,
+		startedAt: new Date('2026-05-22T10:00:00Z'),
+		completedAt: new Date('2026-05-22T10:01:40Z'),
+	},
+	{
+		key: 'proposals-existing-subject',
+		companySlug: 'cal-pep-fonda',
+		query: 'update what we know about Pep Casals',
+		mode: 'deep',
+		schemaName: 'contact_discovery_v1',
+		kind: 'leaf',
+		status: 'succeeded',
+		findings: {
+			proposed_updates: [
+				proposal({
+					key: 'update-existing-contact',
+					citation: {
+						sourceId: 'src_firecrawl_001',
+						quote: 'Telèfon directe 938 123 999',
+						confidence: 0.93,
+					},
+					subjectTable: 'contacts',
+					operation: 'update',
+					subjectId: PEP_CASALS_ID,
+					reason: 'Direct line published on the contact page',
+					fields: {
+						channels: [
+							channel('phone', '+34 938 123 999', null, 0.8),
+							channel('email', 'pep@calpepfonda.cat', 'deliverable', 0.95),
+						],
+					},
+				}),
+			],
+		},
+		briefMd: '## Pep Casals — new direct line',
+		budgetCents: 30,
+		costCents: 11,
+		tokensIn: 3200,
+		tokensOut: 900,
+		startedAt: new Date('2026-05-22T11:00:00Z'),
+		completedAt: new Date('2026-05-22T11:00:40Z'),
+	},
+
+	// ── Paid actions awaiting a decision ─────────────────────────
+	// Only registry_lookup and discover_contacts can be approved; anything
+	// else can only be skipped, and actions predating the id stamp are
+	// read-only. All four shapes appear here so the row renders every way.
+	{
+		key: 'paid-actions',
+		companySlug: 'ferros-baix-llobregat',
+		query: 'find decision makers at Ferros Baix Llobregat',
+		mode: 'deep',
+		schemaName: 'contact_discovery_v1',
+		kind: 'leaf',
+		status: 'succeeded',
+		findings: {
+			pending_paid_actions: [
+				{
+					id: seedUuid('paid-action', 'pending-discover'),
+					status: 'pending',
+					tool: 'discover_contacts',
+					args: {
+						company_name: 'Ferros Baix Llobregat',
+						domain: 'ferrosbl.com',
+					},
+					estimated_cents: 45,
+					reason: 'No public addresses on the site; a lookup would find them.',
+				},
+				{
+					id: seedUuid('paid-action', 'approved-registry'),
+					status: 'approved',
+					followup_run_id: seedUuid(
+						'research-run',
+						'seed:run:ferros-baix-llobregat:enrichment',
+					),
+					tool: 'registry_lookup',
+					args: { company_name: 'Ferros Baix Llobregat' },
+					estimated_cents: 150,
+					reason: 'Directors and share capital come from the company register.',
+				},
+				{
+					id: seedUuid('paid-action', 'skipped-discover'),
+					status: 'skipped',
+					tool: 'discover_contacts',
+					args: { company_name: 'Ferros Baix Llobregat' },
+					estimated_cents: 45,
+					reason:
+						'Already have a named contact, so this was not worth paying for.',
+				},
+				{
+					id: seedUuid('paid-action', 'unsupported-tool'),
+					status: 'pending',
+					tool: 'exotic_scraper',
+					args: { target: 'ferrosbl.com' },
+					estimated_cents: 20,
+					reason: 'A tool nothing knows how to run, so it can only be skipped.',
+				},
+				{
+					// No id: written before actions carried one, so it can only be read.
+					status: 'pending',
+					tool: 'discover_contacts',
+					args: { company_name: 'Ferros Baix Llobregat' },
+					estimated_cents: 45,
+					reason: 'An older action with nothing to act on it by.',
+				},
+			],
+		},
+		briefMd:
+			'## Ferros BL — paid steps\nOne waiting on a decision, one already approved, one skipped, one nothing can run.',
+		budgetCents: 80,
+		paidBudgetCents: 400,
+		costCents: 18,
+		tokensIn: 5200,
+		tokensOut: 1500,
+		startedAt: new Date('2026-05-23T09:00:00Z'),
+		completedAt: new Date('2026-05-23T09:01:20Z'),
 	},
 ]
 
