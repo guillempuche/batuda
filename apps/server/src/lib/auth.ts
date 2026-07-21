@@ -19,7 +19,17 @@ import { oauthClientGc } from '../plugins/oauth-client-gc'
 import { setPasswordRoute } from '../plugins/set-password-route'
 import { TransactionalEmailProvider } from '../services/transactional-email-provider'
 import { TransactionalEmailProviderLive } from '../services/transactional-email-provider-live'
-import { buildInvitationCallbackURL, EnvVars } from './env'
+import { EnvVars } from './env'
+
+// Better Auth's callback types describe its own columns, not the ones Batuda
+// added, so the reader's language arrives untyped. Narrow it here instead of
+// asserting a shape: a row written before the column existed has none, and the
+// template layer treats anything missing as "no preference".
+const readLocale = (user: unknown): string | null => {
+	if (typeof user !== 'object' || user === null) return null
+	const value = (user as { locale?: unknown }).locale
+	return typeof value === 'string' ? value : null
+}
 
 export class Auth extends Context.Service<Auth>()('Auth', {
 	make: Effect.gen(function* () {
@@ -87,37 +97,6 @@ export class Auth extends Context.Service<Auth>()('Auth', {
 		// public `/auth/sign-up/email` endpoint. New users are created via
 		// `auth.api.createUser` (admin plugin escape hatch) — see
 		// `pnpm cli auth bootstrap` for the production path.
-		//
-		// Forward declaration so the org plugin's `sendInvitationEmail`
-		// callback can call back into auth.api (createUser + signInMagicLink)
-		// without a circular initialization. The callback only fires at
-		// request time, by which point the assignment below has happened.
-		// Typed against the BA endpoints we actually use — the full inferred
-		// `instance.api` type can't be referenced before `instance` exists.
-		let authHandle:
-			| {
-					readonly api: {
-						readonly createUser: (req: {
-							body: {
-								email: string
-								name: string
-								// Optional: omitting leaves the invitee passwordless.
-								password?: string
-							}
-							headers?: Headers
-						}) => Promise<unknown>
-						readonly signInMagicLink: (req: {
-							body: {
-								email: string
-								callbackURL?: string
-								metadata?: Record<string, unknown>
-							}
-							headers?: Headers
-						}) => Promise<unknown>
-					}
-			  }
-			| undefined
-
 		const instance = betterAuth(
 			buildBetterAuthConfig({
 				env: {
@@ -141,6 +120,7 @@ export class Auth extends Context.Service<Auth>()('Auth', {
 							email: data.user.email,
 							url: data.url,
 							expiresAt,
+							locale: readLocale(data.user),
 						}),
 					)
 				},
@@ -180,75 +160,6 @@ export class Auth extends Context.Service<Auth>()('Auth', {
 									},
 								},
 							},
-						},
-						sendInvitationEmail: async (data, request) => {
-							// callbackURL must be absolute and point at the
-							// frontend host: BA resolves a relative URL against
-							// `baseURL` (the API host), and the magic-link verify
-							// endpoint then redirects to that resolved URL — so a
-							// `/accept-invitation/...` relative path would land on
-							// `https://api.batuda.localhost/...` which the
-							// frontend can't serve. APP_PUBLIC_URL is the canonical
-							// app origin, validated ∈ ALLOWED_ORIGINS at boot.
-							const callbackURL = buildInvitationCallbackURL(
-								env.APP_PUBLIC_URL,
-								data.id,
-							)
-
-							if (!authHandle) {
-								throw new Error(
-									'Better Auth is not yet initialized; refusing to send invitation.',
-								)
-							}
-							// Pre-create the invitee because magic-link verify refuses
-							// to create users while `disableSignUp` is on. Omitting
-							// `password` keeps invitees passwordless — admin createUser
-							// only writes a credential row when one is provided.
-							// Second-org invitations fall through the catch arm:
-							// `USER_ALREADY_EXISTS` is non-fatal here.
-							try {
-								await authHandle.api.createUser({
-									body: {
-										email: data.email,
-										name: data.email.split('@')[0] ?? data.email,
-									},
-									headers: request?.headers ?? new Headers(),
-								})
-							} catch (cause) {
-								// Match by code, not message — locale shifts would
-								// silently break a substring predicate.
-								const code = (cause as { body?: { code?: string } })?.body?.code
-								if (
-									code !== 'USER_ALREADY_EXISTS' &&
-									code !== 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL'
-								) {
-									throw cause
-								}
-							}
-							// Mint a magic-link sign-in URL. The URL is delivered
-							// to *our* sendMagicLink callback below; we route it to
-							// transactional.sendInvitation (rather than the magic-
-							// link template) when metadata.kind === 'invitation'.
-							await authHandle.api.signInMagicLink({
-								body: {
-									email: data.email,
-									callbackURL,
-									metadata: {
-										kind: 'invitation',
-										invitationId: data.id,
-										inviterName:
-											data.inviter.user.name ?? data.inviter.user.email,
-										organizationName: data.organization.name,
-										expiresAt: data.invitation.expiresAt.toISOString(),
-									},
-								},
-								// signInMagicLink declares `requireHeaders: true`;
-								// passing the inbound request's headers (or an empty
-								// Headers when called outside a request context) is
-								// the documented way to satisfy the gate from
-								// inside a server-internal handler.
-								headers: request?.headers ?? new Headers(),
-							})
 						},
 					}),
 					// enableMetadata: org-owned keys carry { organizationId } so the
@@ -315,10 +226,11 @@ export class Auth extends Context.Service<Auth>()('Auth', {
 						// users so verify always has a row to sign in to.
 						disableSignUp: true,
 						sendMagicLink: async (data, ctx) => {
+							let locale: string | null = null
 							// Silently no-op for unknown emails so /sign-in/magic-link
 							// can't be used to spam strangers or enumerate membership.
-							// Invitations pre-create the invitee, so this is a no-op
-							// for that path.
+							// Everyone who can sign in was added by an admin first, so
+							// no match here means the address belongs to nobody.
 							if (ctx?.context.internalAdapter) {
 								const found = await ctx.context.internalAdapter.findUserByEmail(
 									data.email,
@@ -326,38 +238,16 @@ export class Auth extends Context.Service<Auth>()('Auth', {
 								if (!found?.user) {
 									return
 								}
-							}
-							// Branch on metadata.kind so a magic-link minted from
-							// inside `sendInvitationEmail` ships the invitation
-							// template instead of the generic sign-in template.
-							const meta = data.metadata as
-								| {
-										kind?: string
-										inviterName?: string
-										organizationName?: string
-										expiresAt?: string
-								  }
-								| undefined
-							if (meta?.kind === 'invitation') {
-								await Effect.runPromise(
-									transactional.sendInvitation({
-										email: data.email,
-										inviterName: meta.inviterName ?? 'A teammate',
-										organizationName:
-											meta.organizationName ?? 'your organization',
-										inviteUrl: data.url,
-										expiresAt: meta.expiresAt
-											? new Date(meta.expiresAt)
-											: new Date(Date.now() + 1000 * 60 * 60 * 48),
-									}),
-								)
-								return
+								// The guard above already fetched the row, so writing the
+								// mail in their language costs no second query.
+								locale = readLocale(found.user)
 							}
 							await Effect.runPromise(
 								transactional.sendMagicLink({
 									email: data.email,
 									url: data.url,
 									token: data.token,
+									locale,
 								}),
 							)
 						},
@@ -365,7 +255,6 @@ export class Auth extends Context.Service<Auth>()('Auth', {
 				],
 			}),
 		)
-		authHandle = instance as unknown as typeof authHandle
 
 		// `pool` connects as the DB owner (never SET ROLE app_user), so it is
 		// the only path that can read/write the `apikey` table — app_user has

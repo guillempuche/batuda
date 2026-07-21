@@ -21,19 +21,6 @@ export function findWildcardOrigin(
 }
 
 /**
- * Builds the absolute accept-invitation URL Better Auth redirects to after a
- * magic-link verify. Takes the public origin explicitly so it can't drift
- * with ALLOWED_ORIGINS ordering — reordering that list never retargets an
- * invite link at the wrong product.
- */
-export function buildInvitationCallbackURL(
-	publicUrl: string,
-	invitationId: string,
-): string {
-	return `${publicUrl.replace(/\/$/, '')}/accept-invitation/${invitationId}`
-}
-
-/**
  * Returns an explanatory message if `publicUrl` is not trusted by
  * `allowedOrigins`, else `null`. APP_PUBLIC_URL must be a trusted origin so the
  * links the server mints can't point at a host it won't serve. Matched the same
