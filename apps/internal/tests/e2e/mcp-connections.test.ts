@@ -14,20 +14,34 @@ test.beforeEach(async ({ page }) => {
 })
 
 test.describe('settings — MCP connections', () => {
-	test('should reach the connections page from the settings nav and show the empty state', async ({
+	test('should reach the connections page from the settings nav and list the authorized clients', async ({
 		page,
 	}) => {
 		// GIVEN the Settings hub, which lands on the profile page
 		await page.goto('/settings', { waitUntil: 'networkidle' })
 		await expect(page).toHaveURL(/\/settings\/profile$/)
 
-		// WHEN she follows the Connections link
-		await page.getByTestId('settings-nav-mcp-connections').click()
+		// WHEN she follows the Connections link. On a cold dev server the route
+		// is still compiling, so a first click can land before the link is
+		// interactive; clicking a link is idempotent, so retry until it moves.
+		await expect(async () => {
+			await page.getByTestId('settings-nav-mcp-connections').click()
+			await expect(page).toHaveURL(/\/settings\/mcp\/connections$/, {
+				timeout: 2_000,
+			})
+		}).toPass({ timeout: 15_000 })
 
-		// THEN the connections page loads and shows the empty state (no clients
-		// authorized yet)
-		await expect(page).toHaveURL(/\/settings\/mcp\/connections$/)
-		await expect(page.getByTestId('mcp-connections-empty')).toBeVisible()
+		// THEN the page lists the clients the seed authorized for her — ChatGPT
+		// across two organizations and Claude across one, which is what the page
+		// exists to show. Asserting an empty state here would contradict the
+		// seed, whose whole purpose is to give this page something to render.
+		await expect(page.getByTestId('mcp-connection-row')).toHaveCount(2)
+		await expect(
+			page.getByTestId('mcp-connection-name').filter({ hasText: 'ChatGPT' }),
+		).toBeVisible()
+		await expect(
+			page.getByTestId('mcp-connection-name').filter({ hasText: 'Claude' }),
+		).toBeVisible()
 	})
 })
 
