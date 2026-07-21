@@ -27,7 +27,7 @@ const PriPopup = styled(Popover.Popup).withConfig({
 		var(--color-metal-dark) 100%
 	);
 	color: var(--color-on-surface);
-	border: 1px solid rgba(0, 0, 0, 0.35);
+	border: 1px solid var(--color-metal-edge);
 	border-radius: var(--shape-2xs);
 	box-shadow: var(--elevation-workshop-md);
 	transform-origin: var(--transform-origin);
@@ -64,7 +64,7 @@ const PriPopup = styled(Popover.Popup).withConfig({
 			var(--color-metal-deep)
 		);
 		box-shadow:
-			inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+			inset 0 -1px 0 var(--shadow-color-deep),
 			calc(100% - 5px) 0 0 0
 				color-mix(in srgb, var(--color-metal-deep) 100%, transparent);
 	}
@@ -82,7 +82,7 @@ const PriArrow = styled(Popover.Arrow).withConfig({
 	width: 10px;
 	height: 10px;
 	background: var(--color-metal);
-	border: 1px solid rgba(0, 0, 0, 0.35);
+	border: 1px solid var(--color-metal-edge);
 	border-top: none;
 	border-left: none;
 	transform: rotate(45deg);

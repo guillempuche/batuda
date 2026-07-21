@@ -20,13 +20,13 @@ const PriTrigger = styled(Collapsible.Trigger).withConfig({
 	padding: var(--space-xs) var(--space-lg);
 	background: linear-gradient(
 		180deg,
-		rgba(244, 232, 196, 0.92) 0%,
-		rgba(226, 210, 166, 0.92) 100%
+		var(--color-tape-light) 0%,
+		var(--color-tape) 100%
 	);
 	color: var(--color-on-surface);
-	border: 1px solid rgba(0, 0, 0, 0.08);
+	border: 1px solid var(--color-metal-edge-soft);
 	border-radius: 0;
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+	box-shadow: 0 1px 3px var(--shadow-color);
 	font-family: var(--font-display);
 	font-size: var(--typescale-title-small-size);
 	font-weight: var(--font-weight-bold);
@@ -42,7 +42,7 @@ const PriTrigger = styled(Collapsible.Trigger).withConfig({
 
 	&:hover {
 		transform: rotate(-1deg) translateY(-1px);
-		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+		box-shadow: 0 2px 6px var(--shadow-color-strong);
 	}
 
 	&:focus-visible {

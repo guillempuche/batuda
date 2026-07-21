@@ -19,7 +19,7 @@ const PriTrigger = styled(Select.Trigger).withConfig({
 		var(--color-metal) 50%,
 		var(--color-metal-dark) 100%
 	);
-	border: 1px solid rgba(0, 0, 0, 0.3);
+	border: 1px solid var(--color-metal-edge);
 	border-radius: var(--shape-2xs);
 	box-shadow: var(--elevation-workshop-sm);
 	font-family: var(--font-display);
@@ -79,7 +79,7 @@ const PriPopup = styled(Select.Popup).withConfig({
 			var(--color-metal) 55%,
 			var(--color-metal-dark) 100%
 		);
-	border: 1px solid rgba(0, 0, 0, 0.35);
+	border: 1px solid var(--color-metal-edge);
 	border-radius: var(--shape-2xs);
 	padding: var(--space-2xs);
 	box-shadow: var(--elevation-workshop-lg);
@@ -101,7 +101,7 @@ const PriPopup = styled(Select.Popup).withConfig({
 			var(--color-metal-light),
 			var(--color-metal-deep)
 		);
-		box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.35);
+		box-shadow: inset 0 -1px 0 var(--shadow-color-deep);
 		pointer-events: none;
 	}
 
@@ -118,7 +118,7 @@ const PriPopup = styled(Select.Popup).withConfig({
 			var(--color-metal-light),
 			var(--color-metal-deep)
 		);
-		box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.35);
+		box-shadow: inset 0 -1px 0 var(--shadow-color-deep);
 		pointer-events: none;
 	}
 
@@ -155,7 +155,7 @@ const PriItem = styled(Select.Item).withConfig({
 	white-space: nowrap;
 
 	&[data-highlighted] {
-		background: color-mix(in srgb, rgba(245, 158, 11, 0.28), transparent);
+		background: color-mix(in srgb, var(--color-highlight-amber), transparent);
 		box-shadow: var(--glow-active);
 	}
 `

@@ -19,8 +19,8 @@ const PriGroup = styled(NumberField.Group).withConfig({
 	display: inline-flex;
 	align-items: stretch;
 	border-bottom: 2px solid var(--color-outline);
-	background: #f0e8d0;
-	box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+	background: var(--color-paper-aged);
+	box-shadow: inset 0 1px 2px var(--shadow-color-subtle);
 
 	&:focus-within {
 		border-bottom-color: var(--color-primary);
@@ -61,7 +61,7 @@ const stepperCss = `
 		var(--color-metal) 55%,
 		var(--color-metal-dark) 100%
 	);
-	border: 1px solid rgba(0, 0, 0, 0.3);
+	border: 1px solid var(--color-metal-edge);
 	border-radius: 0;
 	color: var(--color-on-surface);
 	font-family: var(--font-display);
@@ -81,7 +81,7 @@ const stepperCss = `
 	}
 
 	&:active:not(:disabled) {
-		box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
+		box-shadow: inset 0 1px 2px var(--shadow-color-deep);
 	}
 
 	&:disabled {

@@ -26,11 +26,11 @@ const PriRoot = styled(Avatar.Root).withConfig({
 		var(--color-metal) 55%,
 		var(--color-metal-dark) 100%
 	);
-	border: 1px solid rgba(0, 0, 0, 0.3);
+	border: 1px solid var(--color-metal-edge);
 	padding: 3px;
 	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.5),
-		0 1px 2px rgba(0, 0, 0, 0.2);
+		inset 0 1px 0 var(--highlight-inset-bright),
+		0 1px 2px var(--shadow-color-strong);
 	overflow: hidden;
 
 	&::before {

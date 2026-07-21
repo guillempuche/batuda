@@ -32,16 +32,16 @@ const PriRoot = styled(Toast.Root).withConfig({
 	background:
 		radial-gradient(
 			ellipse 60px 40px at 18% 32%,
-			rgba(180, 155, 120, 0.08) 0%,
+			var(--color-paper-fibre-a) 0%,
 			transparent 100%
 		),
-		#f0e8d0;
+		var(--color-paper-aged);
 	color: var(--color-on-surface);
-	border: 1px solid rgba(132, 125, 113, 0.4);
+	border: 1px solid color-mix(in oklab, var(--color-outline) 40%, transparent);
 	border-radius: 2px;
 	box-shadow:
-		0 2px 0 rgba(255, 255, 255, 0.35) inset,
-		0 4px 12px rgba(0, 0, 0, 0.2);
+		0 2px 0 var(--highlight-inset-strong) inset,
+		0 4px 12px var(--shadow-color-strong);
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
@@ -50,8 +50,8 @@ const PriRoot = styled(Toast.Root).withConfig({
 	&[data-type='success'] {
 		box-shadow:
 			0 0 0 1px color-mix(in srgb, var(--color-secondary) 40%, transparent),
-			0 2px 0 rgba(255, 255, 255, 0.35) inset,
-			0 4px 12px rgba(0, 0, 0, 0.2);
+			0 2px 0 var(--highlight-inset-strong) inset,
+			0 4px 12px var(--shadow-color-strong);
 	}
 
 	&[data-type='error'] {
@@ -68,12 +68,12 @@ const PriRoot = styled(Toast.Root).withConfig({
 		height: 18px;
 		background: linear-gradient(
 			180deg,
-			rgba(244, 232, 196, 0.88) 0%,
-			rgba(226, 210, 166, 0.85) 100%
+			var(--color-tape-light) 0%,
+			var(--color-tape) 100%
 		);
-		border: 1px solid rgba(0, 0, 0, 0.08);
+		border: 1px solid var(--color-metal-edge-soft);
 		transform: rotate(-4deg);
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+		box-shadow: 0 1px 3px var(--shadow-color);
 		pointer-events: none;
 	}
 

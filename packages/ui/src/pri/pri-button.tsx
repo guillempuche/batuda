@@ -22,7 +22,7 @@ const filled = css`
 		var(--color-metal-dark) 100%
 	);
 	color: var(--color-on-surface);
-	border-color: rgba(0, 0, 0, 0.25);
+	border-color: var(--color-metal-edge);
 	box-shadow: var(--elevation-workshop-md);
 	text-shadow: var(--text-shadow-emboss);
 	letter-spacing: 0.06em;

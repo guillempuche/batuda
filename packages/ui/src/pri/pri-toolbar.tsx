@@ -26,7 +26,7 @@ const PriRoot = styled(Toolbar.Root).withConfig({
 		var(--color-metal) 50%,
 		var(--color-metal-dark) 100%
 	);
-	border: 1px solid rgba(0, 0, 0, 0.3);
+	border: 1px solid var(--color-metal-edge);
 	border-radius: var(--shape-2xs);
 	box-shadow: var(--elevation-workshop-sm);
 	min-height: 2.75rem;
@@ -69,12 +69,12 @@ const PriButton = styled(Toolbar.Button).withConfig({
 		border-color 120ms ease;
 
 	&:hover:not(:disabled) {
-		background: rgba(255, 255, 255, 0.2);
-		border-color: rgba(0, 0, 0, 0.2);
+		background: var(--highlight-inset);
+		border-color: var(--color-metal-edge);
 	}
 
 	&:active:not(:disabled) {
-		background: rgba(0, 0, 0, 0.08);
+		background: var(--shadow-color-subtle);
 	}
 
 	&:focus-visible {
@@ -96,7 +96,7 @@ const PriSeparator = styled(Toolbar.Separator).withConfig({
 	margin: var(--space-2xs) var(--space-2xs);
 	background: repeating-linear-gradient(
 		180deg,
-		rgba(0, 0, 0, 0.35) 0 4px,
+		var(--shadow-color-deep) 0 4px,
 		transparent 4px 8px
 	);
 `
@@ -105,7 +105,7 @@ const PriInput = styled(Toolbar.Input).withConfig({
 	displayName: 'PriToolbarInput',
 })`
 	padding: var(--space-2xs) var(--space-sm);
-	background: #f0e8d0;
+	background: var(--color-paper-aged);
 	border: none;
 	border-bottom: 2px solid var(--color-outline);
 	border-radius: 0;

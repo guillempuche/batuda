@@ -54,8 +54,8 @@ const baseToggle = css`
 		border-color: color-mix(in oklab, var(--color-primary) 70%, black);
 		text-shadow: var(--text-shadow-engrave);
 		box-shadow:
-			inset 0 1px 3px rgba(0, 0, 0, 0.25),
-			0 1px 0 rgba(255, 255, 255, 0.15);
+			inset 0 1px 3px var(--shadow-color-deep),
+			0 1px 0 var(--highlight-inset-soft);
 	}
 
 	&:disabled {

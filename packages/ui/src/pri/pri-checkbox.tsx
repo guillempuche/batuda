@@ -26,11 +26,11 @@ const PriRoot = styled(Checkbox.Root).withConfig({
 		var(--color-metal) 55%,
 		var(--color-metal-dark) 100%
 	);
-	border: 1px solid rgba(0, 0, 0, 0.3);
+	border: 1px solid var(--color-metal-edge);
 	border-radius: 50%;
 	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.45),
-		0 1px 2px rgba(0, 0, 0, 0.2);
+		inset 0 1px 0 var(--highlight-inset-bright),
+		0 1px 2px var(--shadow-color-strong);
 	cursor: pointer;
 	transition:
 		background 160ms ease,
@@ -48,8 +48,8 @@ const PriRoot = styled(Checkbox.Root).withConfig({
 
 	&:hover:not(:disabled) {
 		box-shadow:
-			inset 0 1px 0 rgba(255, 255, 255, 0.55),
-			0 2px 3px rgba(0, 0, 0, 0.25);
+			inset 0 1px 0 var(--highlight-inset-bright),
+			0 2px 3px var(--shadow-color-deep);
 	}
 
 	&[data-checked],
@@ -71,7 +71,7 @@ const PriRoot = styled(Checkbox.Root).withConfig({
 	&:focus-visible {
 		outline: none;
 		box-shadow:
-			inset 0 1px 0 rgba(255, 255, 255, 0.45),
+			inset 0 1px 0 var(--highlight-inset-bright),
 			var(--glow-active);
 	}
 `
@@ -86,7 +86,7 @@ const PriIndicator = styled(Checkbox.Indicator).withConfig({
 	pointer-events: none;
 	position: relative;
 	z-index: 1;
-	filter: drop-shadow(0 -1px 0 rgba(0, 0, 0, 0.25));
+	filter: drop-shadow(0 -1px 0 var(--shadow-color-deep));
 `
 
 export const PriCheckbox = {
