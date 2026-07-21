@@ -35,6 +35,7 @@ import { HealthLive } from './handlers/health'
 import { InstructionsLive } from './handlers/instructions'
 import { InteractionsLive } from './handlers/interactions'
 import { McpOAuthLive } from './handlers/mcp-oauth'
+import { MembersLive } from './handlers/members'
 import { PagesLive } from './handlers/pages'
 import { PipelineLive } from './handlers/pipeline'
 import { ProductsLive } from './handlers/products'
@@ -71,6 +72,7 @@ import { InboxHealthProbe } from './services/inbox-health-probe'
 import { InstructionsService } from './services/instructions'
 import { MailTransport } from './services/mail-transport'
 import { McpOAuthService } from './services/mcp-oauth'
+import { MemberService } from './services/members'
 import { OrgResolution } from './services/org-resolution'
 import { PageService } from './services/pages'
 import { PipelineService } from './services/pipeline'
@@ -92,6 +94,7 @@ const ApiLive = HttpApiBuilder.layer(BatudaApi).pipe(
 		AuthHandlerLive,
 		ApiKeysLive,
 		McpOAuthLive,
+		MembersLive,
 		CompaniesLive,
 		PipelineLive,
 		ContactsLive,
@@ -308,6 +311,7 @@ const ResearchEventSinkLive = Layer.effect(
 const ServicesLive = Layer.mergeAll(
 	ApiKeyService.layer,
 	McpOAuthService.layer,
+	MemberService.layer,
 	CompanyService.layer,
 	TaskService.layer,
 	PipelineService.layer,
