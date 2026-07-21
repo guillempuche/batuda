@@ -2,17 +2,22 @@ import { Context, type Effect } from 'effect'
 
 import type { EmailSendError } from '@batuda/controllers'
 
-// System-originated transactional email — magic links, password resets,
-// and org invitations. Kept separate from the BYO-mailbox `EmailProvider`
-// because the deployment shape, reliability requirements, and operational
-// tooling (DKIM/SPF on Batuda's domain vs the user's) don't overlap. CRM
-// mailbox outage = one user complaining; transactional outage = nobody
-// can log in.
+// System-originated transactional email — sign-in links, password resets, and
+// the note telling someone they've been added to an organization. Kept
+// separate from the BYO-mailbox `EmailProvider` because the deployment shape,
+// reliability requirements, and operational tooling (DKIM/SPF on Batuda's
+// domain vs the user's) don't overlap. CRM mailbox outage = one user
+// complaining; transactional outage = nobody can log in.
+//
+// Every message carries the reader's stored language. It arrives as plain text
+// because the column can hold anything; the template layer narrows it and
+// falls back when it doesn't recognise the value.
 
 export interface MagicLinkParams {
 	readonly email: string
 	readonly url: string
 	readonly token: string
+	readonly locale: string | null
 }
 
 // Reset-password URL bounces through BA's `/auth/reset-password/:token`
@@ -24,19 +29,19 @@ export interface ResetPasswordParams {
 	readonly email: string
 	readonly url: string
 	readonly expiresAt: Date
+	readonly locale: string | null
 }
 
-// Org invitation. `inviteUrl` is the magic-link URL minted by the BA
-// `sendInvitationEmail` callback (per the Slice 5 plan), so a single
-// click signs the invitee in AND lands them on /accept-invitation/<id>
-// already authenticated. `expiresAt` is the invitation's expiry — the
-// template surfaces it so the recipient knows by when they have to act.
-export interface InvitationParams {
+// Sent when an admin adds someone to an organization. `signInUrl` points at
+// the sign-in page, not at a link that authenticates: the reader signs in
+// themselves and requests their own short-lived link. Nothing here expires, so
+// there is no deadline to quote.
+export interface MemberAddedParams {
 	readonly email: string
-	readonly inviterName: string
+	readonly addedByName: string
 	readonly organizationName: string
-	readonly inviteUrl: string
-	readonly expiresAt: Date
+	readonly signInUrl: string
+	readonly locale: string | null
 }
 
 export class TransactionalEmailProvider extends Context.Service<
@@ -45,8 +50,8 @@ export class TransactionalEmailProvider extends Context.Service<
 		readonly sendMagicLink: (
 			params: MagicLinkParams,
 		) => Effect.Effect<void, EmailSendError>
-		readonly sendInvitation: (
-			params: InvitationParams,
+		readonly sendMemberAdded: (
+			params: MemberAddedParams,
 		) => Effect.Effect<void, EmailSendError>
 		readonly sendResetPassword: (
 			params: ResetPasswordParams,

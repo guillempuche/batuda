@@ -51,54 +51,110 @@ describe('TransactionalEmailProvider — Local (integration)', () => {
 			effect.pipe(Effect.provide(LocalTransactionalProviderLive)),
 		)
 
-	describe('sendInvitation', () => {
+	describe('sendMemberAdded', () => {
+		const readInbox = async (recipient: string) => {
+			const inbox = join(__dirname, '..', '..', '.dev-inbox')
+			const files = await readdir(inbox)
+			const match = files.find(name => name.includes(recipient.split('@')[0]!))
+			expect(match, 'expected a file matching the recipient slug').toBeTruthy()
+			const body = await readFile(join(inbox, match!), 'utf8')
+			return { body, cleanup: () => rm(join(inbox, match!), { force: true }) }
+		}
+
 		describe('when called with valid params', () => {
-			it('should write a .md file under apps/server/.dev-inbox/ with labels: invitation', async () => {
+			it('should write a .md file under apps/server/.dev-inbox/ with labels: member-added', async () => {
 				// GIVEN the local transactional provider
 				// AND a unique recipient address scoped to this test
-				const recipient = `it-invitation-${Date.now()}@example.com`
-				const expiresAt = new Date('2026-06-01T00:00:00Z')
+				const recipient = `it-member-added-${Date.now()}@example.com`
 
-				// WHEN we send an invitation
+				// WHEN we tell someone they were added to an organization
 				await program(
 					Effect.gen(function* () {
 						const provider = yield* TransactionalEmailProvider
-						yield* provider.sendInvitation({
+						yield* provider.sendMemberAdded({
 							email: recipient,
-							inviterName: 'Alice Admin',
+							addedByName: 'Alice Admin',
 							organizationName: 'Taller Demo',
-							inviteUrl:
-								'https://api.batuda.localhost/auth/magic-link/verify?token=abc&callbackURL=/accept-invitation/inv-1',
-							expiresAt,
+							signInUrl: 'https://batuda.localhost/login',
+							locale: 'en',
 						})
 					}),
 				)
 
-				// THEN a .md file should appear in the dev-inbox dir
-				const inbox = join(__dirname, '..', '..', '.dev-inbox')
-				const files = await readdir(inbox)
-				const match = files.find(name =>
-					name.includes(recipient.split('@')[0]!),
-				)
-				expect(
-					match,
-					'expected a file matching the recipient slug',
-				).toBeTruthy()
+				// THEN the frontmatter should carry labels: ['member-added']
+				const { body, cleanup } = await readInbox(recipient)
+				expect(body).toMatch(/labels:\s*\n\s+- member-added/)
 
-				// AND the frontmatter should carry labels: ['invitation']
-				const body = await readFile(join(inbox, match!), 'utf8')
-				expect(body).toMatch(/labels:\s*\n\s+- invitation/)
-
-				// AND the body should include the inviter name, org name, and URL
+				// AND the body should name who added them, the org, and where to sign in
 				expect(body).toContain('Alice Admin')
 				expect(body).toContain('Taller Demo')
-				expect(body).toContain('/accept-invitation/inv-1')
+				expect(body).toContain('https://batuda.localhost/login')
 
-				// AND the expiry date should be surfaced so the recipient knows by when
-				expect(body).toContain(expiresAt.toISOString())
+				// AND it should carry no way into the account — nothing to expire and
+				// nothing an intercepted mailbox could replay
+				expect(body).not.toMatch(/\/auth\/magic-link\/verify/)
+				expect(body).not.toMatch(/token=/)
 
 				// Cleanup so subsequent runs don't accumulate test inbox noise.
-				await rm(join(inbox, match!), { force: true })
+				await cleanup()
+			})
+		})
+
+		describe('when the recipient reads Catalan', () => {
+			it('should write the Catalan wording', async () => {
+				// GIVEN a recipient whose stored language is Catalan
+				const recipient = `it-member-added-ca-${Date.now()}@example.com`
+
+				// WHEN we tell them they were added
+				await program(
+					Effect.gen(function* () {
+						const provider = yield* TransactionalEmailProvider
+						yield* provider.sendMemberAdded({
+							email: recipient,
+							addedByName: 'Alice Admin',
+							organizationName: 'Taller Demo',
+							signInUrl: 'https://batuda.localhost/login',
+							locale: 'ca',
+						})
+					}),
+				)
+
+				// THEN the wording should be Catalan, not the English default
+				const { body, cleanup } = await readInbox(recipient)
+				expect(body).toContain('t’ha afegit a')
+				expect(body).toContain('Inicia la sessió')
+				expect(body).not.toContain('added you to')
+
+				await cleanup()
+			})
+		})
+
+		describe('when the stored language is not one we serve', () => {
+			it('should fall back to English rather than render nothing', async () => {
+				// GIVEN a stored value that is not a language — an older row, or a key
+				// that would otherwise resolve to something that is not a template
+				const recipient = `it-member-added-bad-${Date.now()}@example.com`
+
+				// WHEN we tell them they were added
+				await program(
+					Effect.gen(function* () {
+						const provider = yield* TransactionalEmailProvider
+						yield* provider.sendMemberAdded({
+							email: recipient,
+							addedByName: 'Alice Admin',
+							organizationName: 'Taller Demo',
+							signInUrl: 'https://batuda.localhost/login',
+							locale: '__proto__',
+						})
+					}),
+				)
+
+				// THEN the English wording should be used and the subject intact
+				const { body, cleanup } = await readInbox(recipient)
+				expect(body).toContain('added you to')
+				expect(body).not.toContain('undefined')
+
+				await cleanup()
 			})
 		})
 	})
@@ -119,6 +175,7 @@ describe('TransactionalEmailProvider — Local (integration)', () => {
 							email: recipient,
 							url: 'https://api.batuda.localhost/auth/reset-password/tok-1?callbackURL=https://batuda.localhost/reset-password',
 							expiresAt,
+							locale: 'en',
 						})
 					}),
 				)
@@ -149,7 +206,7 @@ describe('TransactionalEmailProvider — Local (integration)', () => {
 		})
 	})
 
-	describe('sendMagicLink (regression — must still work after sendInvitation lands)', () => {
+	describe('sendMagicLink', () => {
 		describe('when called with valid params', () => {
 			it('should write a .md file with labels: magic-link', async () => {
 				// GIVEN the same provider used for invitations
@@ -163,6 +220,7 @@ describe('TransactionalEmailProvider — Local (integration)', () => {
 							email: recipient,
 							url: 'https://example.com/magic',
 							token: 'tok_test',
+							locale: 'en',
 						})
 					}),
 				)
@@ -210,9 +268,9 @@ describe('TransactionalEmailProvider — Resend (unit, stubbed fetch)', () => {
 		)
 	}
 
-	describe('sendInvitation', () => {
+	describe('sendMemberAdded', () => {
 		describe('when Resend returns 200', () => {
-			it('should POST the invitation template to /emails with the configured From', async () => {
+			it('should POST the member-added template to /emails with the configured From', async () => {
 				// GIVEN the stub captures the request shape
 				const captured: { url?: string; init?: RequestInit } = {}
 				const stub: typeof fetch = async (input, init) => {
@@ -221,17 +279,17 @@ describe('TransactionalEmailProvider — Resend (unit, stubbed fetch)', () => {
 					return new Response('{}', { status: 200 })
 				}
 
-				// WHEN we send an invitation
+				// WHEN we tell someone they were added
 				const exit = await runWith(
 					stub,
 					Effect.gen(function* () {
 						const provider = yield* TransactionalEmailProvider
-						yield* provider.sendInvitation({
-							email: 'invitee@example.com',
-							inviterName: 'Alice Admin',
+						yield* provider.sendMemberAdded({
+							email: 'newcomer@example.com',
+							addedByName: 'Alice Admin',
 							organizationName: 'Taller Demo',
-							inviteUrl: 'https://example.com/accept-invitation/inv-1',
-							expiresAt: new Date('2026-06-01T00:00:00Z'),
+							signInUrl: 'https://batuda.co/login',
+							locale: 'en',
 						})
 					}),
 				)
@@ -240,28 +298,27 @@ describe('TransactionalEmailProvider — Resend (unit, stubbed fetch)', () => {
 				// THEN the URL should be Resend's /emails endpoint
 				expect(captured.url).toBe('https://api.resend.com/emails')
 
-				// AND the body should carry invitation HTML/text + recipient + From
+				// AND the body should carry the HTML/text + recipient + From
 				const body = JSON.parse(String(captured.init?.body))
 				expect(body.from).toBe('no-reply@batuda.local')
-				expect(body.to).toEqual(['invitee@example.com'])
+				expect(body.to).toEqual(['newcomer@example.com'])
 				expect(body.subject).toContain('Taller Demo')
 				expect(body.text).toContain('Alice Admin')
-				expect(body.text).toContain(
-					'https://example.com/accept-invitation/inv-1',
-				)
+				expect(body.text).toContain('https://batuda.co/login')
 				expect(body.html).toContain('Taller Demo')
-				expect(body.html).toContain(
-					'href="https://example.com/accept-invitation/inv-1"',
-				)
+				expect(body.html).toContain('href="https://batuda.co/login"')
+
+				// AND it should carry no credential of any kind
+				expect(body.text).not.toContain('token=')
+				expect(body.html).not.toContain('magic-link/verify')
 			})
 		})
 
-		describe('when the inviter or org name contains HTML control chars', () => {
+		describe('when the adder or org name contains HTML control chars', () => {
 			it('should escape HTML in subject + html body but leave text body raw', async () => {
-				// GIVEN an inviter and org whose names contain HTML — the
-				// inviter's profile name and the org's display name are
-				// both user-editable, and email clients (Gmail/Outlook web)
-				// render basic tags in HTML bodies.
+				// GIVEN an adder and org whose names contain HTML — a profile name
+				// and an org's display name are both user-editable, and email
+				// clients (Gmail/Outlook web) render basic tags in HTML bodies.
 				const captured: { url?: string; init?: RequestInit } = {}
 				const stub: typeof fetch = async (input, init) => {
 					captured.url = input.toString()
@@ -269,17 +326,17 @@ describe('TransactionalEmailProvider — Resend (unit, stubbed fetch)', () => {
 					return new Response('{}', { status: 200 })
 				}
 
-				// WHEN we send an invitation
+				// WHEN we tell someone they were added
 				const exit = await runWith(
 					stub,
 					Effect.gen(function* () {
 						const provider = yield* TransactionalEmailProvider
-						yield* provider.sendInvitation({
-							email: 'invitee@example.com',
-							inviterName: 'Mallory <img src=x onerror=alert(1)>',
+						yield* provider.sendMemberAdded({
+							email: 'newcomer@example.com',
+							addedByName: 'Mallory <img src=x onerror=alert(1)>',
 							organizationName: '</p><a href="https://evil">click</a>',
-							inviteUrl: 'https://example.com/accept-invitation/inv-1',
-							expiresAt: new Date('2026-06-01T00:00:00Z'),
+							signInUrl: 'https://batuda.co/login',
+							locale: 'en',
 						})
 					}),
 				)
@@ -311,17 +368,17 @@ describe('TransactionalEmailProvider — Resend (unit, stubbed fetch)', () => {
 						statusText: 'Unprocessable Entity',
 					})
 
-				// WHEN sendInvitation runs
+				// WHEN sendMemberAdded runs
 				const exit = await runWith(
 					stub,
 					Effect.gen(function* () {
 						const provider = yield* TransactionalEmailProvider
-						yield* provider.sendInvitation({
+						yield* provider.sendMemberAdded({
 							email: 'bounced@example.com',
-							inviterName: 'Alice',
+							addedByName: 'Alice',
 							organizationName: 'Taller',
-							inviteUrl: 'https://example.com/accept-invitation/x',
-							expiresAt: new Date(),
+							signInUrl: 'https://batuda.co/login',
+							locale: 'en',
 						})
 					}),
 				)
@@ -345,17 +402,17 @@ describe('TransactionalEmailProvider — Resend (unit, stubbed fetch)', () => {
 						statusText: 'Internal Server Error',
 					})
 
-				// WHEN sendInvitation runs
+				// WHEN sendMemberAdded runs
 				const exit = await runWith(
 					stub,
 					Effect.gen(function* () {
 						const provider = yield* TransactionalEmailProvider
-						yield* provider.sendInvitation({
+						yield* provider.sendMemberAdded({
 							email: 'test@example.com',
-							inviterName: 'Alice',
+							addedByName: 'Alice',
 							organizationName: 'Taller',
-							inviteUrl: 'https://example.com/accept-invitation/x',
-							expiresAt: new Date(),
+							signInUrl: 'https://batuda.co/login',
+							locale: 'en',
 						})
 					}),
 				)
@@ -390,6 +447,7 @@ describe('TransactionalEmailProvider — Resend (unit, stubbed fetch)', () => {
 							email: 'pwd-reset@example.com',
 							url: 'https://api.batuda.localhost/auth/reset-password/tok-1?callbackURL=https://batuda.localhost/reset-password',
 							expiresAt,
+							locale: 'en',
 						})
 					}),
 				)
@@ -414,17 +472,17 @@ describe('TransactionalEmailProvider — Resend (unit, stubbed fetch)', () => {
 					throw new Error('connect ECONNREFUSED 127.0.0.1:443')
 				}
 
-				// WHEN sendInvitation runs
+				// WHEN sendMemberAdded runs
 				const exit = await runWith(
 					stub,
 					Effect.gen(function* () {
 						const provider = yield* TransactionalEmailProvider
-						yield* provider.sendInvitation({
+						yield* provider.sendMemberAdded({
 							email: 'test@example.com',
-							inviterName: 'Alice',
+							addedByName: 'Alice',
 							organizationName: 'Taller',
-							inviteUrl: 'https://example.com/accept-invitation/x',
-							expiresAt: new Date(),
+							signInUrl: 'https://batuda.co/login',
+							locale: 'en',
 						})
 					}),
 				)
