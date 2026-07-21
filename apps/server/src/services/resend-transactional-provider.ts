@@ -3,11 +3,18 @@ import { Config, Effect, Layer, Redacted } from 'effect'
 import { EmailSendError } from '@batuda/controllers'
 
 import {
-	type InvitationParams,
 	type MagicLinkParams,
+	type MemberAddedParams,
 	type ResetPasswordParams,
 	TransactionalEmailProvider,
 } from './transactional-email-provider.js'
+import {
+	magicLinkEmail,
+	memberAddedEmail,
+	type RenderedEmail,
+	resetPasswordEmail,
+	resolveLang,
+} from './transactional-email-templates.js'
 
 // Resend's `POST /emails` is the entire transactional surface we need.
 // Documented at https://resend.com/docs/api-reference/emails/send-email.
@@ -21,84 +28,17 @@ interface ResendBody {
 	readonly html: string
 }
 
-const buildMagicLinkBody = (
-	params: MagicLinkParams,
+const toBody = (
+	rendered: RenderedEmail,
+	to: string,
 	from: string,
 ): ResendBody => ({
 	from,
-	to: [params.email],
-	subject: 'Sign in to Batuda',
-	text: `Click the link below to sign in:\n\n${params.url}\n\nThis link will expire shortly.`,
-	html: `<p>Click the link below to sign in:</p><p><a href="${params.url}">${params.url}</a></p><p>This link will expire shortly.</p>`,
+	to: [to],
+	subject: rendered.subject,
+	text: rendered.text,
+	html: rendered.html,
 })
-
-// Inviter/org names are user-editable; inviteUrl is config-driven.
-// Escape for fields that mail clients parse as markup (html, subject).
-const escapeHtml = (value: string): string =>
-	value
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-		.replace(/'/g, '&#39;')
-
-const buildInvitationBody = (
-	params: InvitationParams,
-	from: string,
-): ResendBody => {
-	const expiry = params.expiresAt.toISOString()
-	const inviter = escapeHtml(params.inviterName)
-	const org = escapeHtml(params.organizationName)
-	const url = escapeHtml(params.inviteUrl)
-	return {
-		from,
-		subject: `${inviter} invited you to ${org} on Batuda`,
-		to: [params.email],
-		text: [
-			`${params.inviterName} invited you to join ${params.organizationName} on Batuda.`,
-			'',
-			'Click the link below to accept. The link signs you in automatically — no password needed:',
-			'',
-			params.inviteUrl,
-			'',
-			`This invitation expires on ${expiry}.`,
-		].join('\n'),
-		html: [
-			`<p>${inviter} invited you to join <strong>${org}</strong> on Batuda.</p>`,
-			'<p>Click the link below to accept. The link signs you in automatically — no password needed.</p>',
-			`<p><a href="${url}">${url}</a></p>`,
-			`<p style="color:#666">This invitation expires on ${expiry}.</p>`,
-		].join(''),
-	}
-}
-
-const buildResetPasswordBody = (
-	params: ResetPasswordParams,
-	from: string,
-): ResendBody => {
-	const expiry = params.expiresAt.toISOString()
-	const url = escapeHtml(params.url)
-	return {
-		from,
-		to: [params.email],
-		subject: 'Reset your Batuda password',
-		text: [
-			'Someone (hopefully you) asked to reset your Batuda password.',
-			'',
-			'Click the link below to choose a new one:',
-			'',
-			params.url,
-			'',
-			`This link expires at ${expiry}. If you didn't request a reset, you can ignore this email.`,
-		].join('\n'),
-		html: [
-			'<p>Someone (hopefully you) asked to reset your Batuda password.</p>',
-			'<p>Click the link below to choose a new one:</p>',
-			`<p><a href="${url}">${url}</a></p>`,
-			`<p style="color:#666">This link expires at ${expiry}. If you didn't request a reset, you can ignore this email.</p>`,
-		].join(''),
-	}
-}
 
 // Sends via the Resend REST API. Raw `fetch` keeps this layer dependency-free
 // (no SDK transitives) — every template is one POST, one JSON body.
@@ -151,14 +91,42 @@ export const ResendTransactionalProviderLive = Layer.effect(
 			})
 
 		const sendMagicLink = (params: MagicLinkParams) =>
-			post(buildMagicLinkBody(params, from), params.email)
+			post(
+				toBody(
+					magicLinkEmail[resolveLang(params.locale)](params.url),
+					params.email,
+					from,
+				),
+				params.email,
+			)
 
-		const sendInvitation = (params: InvitationParams) =>
-			post(buildInvitationBody(params, from), params.email)
+		const sendMemberAdded = (params: MemberAddedParams) =>
+			post(
+				toBody(
+					memberAddedEmail[resolveLang(params.locale)]({
+						addedByName: params.addedByName,
+						organizationName: params.organizationName,
+						signInUrl: params.signInUrl,
+					}),
+					params.email,
+					from,
+				),
+				params.email,
+			)
 
 		const sendResetPassword = (params: ResetPasswordParams) =>
-			post(buildResetPasswordBody(params, from), params.email)
+			post(
+				toBody(
+					resetPasswordEmail[resolveLang(params.locale)](
+						params.url,
+						params.expiresAt,
+					),
+					params.email,
+					from,
+				),
+				params.email,
+			)
 
-		return { sendMagicLink, sendInvitation, sendResetPassword } as const
+		return { sendMagicLink, sendMemberAdded, sendResetPassword } as const
 	}),
 )

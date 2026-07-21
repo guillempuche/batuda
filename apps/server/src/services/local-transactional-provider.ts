@@ -7,11 +7,17 @@ import { DateTime, Effect, Layer } from 'effect'
 import { EmailSendError } from '@batuda/controllers'
 
 import {
-	type InvitationParams,
 	type MagicLinkParams,
+	type MemberAddedParams,
 	type ResetPasswordParams,
 	TransactionalEmailProvider,
 } from './transactional-email-provider.js'
+import {
+	magicLinkEmail,
+	memberAddedEmail,
+	resetPasswordEmail,
+	resolveLang,
+} from './transactional-email-templates.js'
 
 // Anchor relative to this file so the inbox dir is the same one the
 // `LocalInboxProvider` reader scans, regardless of cwd.
@@ -43,7 +49,7 @@ const formatList = (items: readonly string[], indent = '  '): string => {
 // On-disk format mirrors `local-inbox-provider.ts`'s writer so the same
 // reader (frontmatter parser + `labels:` filter) surfaces transactional
 // mail in the dev inbox without provider-specific glue. The label is
-// what the dev-inbox UI keys on (magic-link, invitation, …).
+// what the dev-inbox UI keys on (magic-link, member-added, …).
 const formatTransactional = (args: {
 	readonly sentAt: Date
 	readonly messageId: string
@@ -85,7 +91,7 @@ const ensureInboxDir = Effect.tryPromise({
 // Writes a transactional `.md` file under `apps/server/.dev-inbox/` so a
 // developer can pick the URL up locally without sending real mail. The
 // `labels:` value is what the dev-inbox reader keys on
-// (magic-link, invitation, …) — keep these strings stable.
+// (magic-link, member-added, …) — keep these strings stable.
 export const LocalTransactionalProviderLive = Layer.effect(
 	TransactionalEmailProvider,
 	Effect.gen(function* () {
@@ -124,53 +130,45 @@ export const LocalTransactionalProviderLive = Layer.effect(
 				yield* Effect.logInfo(`local-transactional: wrote ${filename}`)
 			})
 
-		const sendMagicLink = (params: MagicLinkParams) =>
-			writeMd({
-				to: params.email,
-				subject: 'Sign in to Batuda',
-				bodyText: `Click the link below to sign in:\n\n${params.url}\n\nThis link will expire shortly.\n\nToken: ${params.token}`,
-				label: 'magic-link',
-			})
-
-		const sendResetPassword = (params: ResetPasswordParams) => {
-			const expiry = params.expiresAt.toISOString()
-			const bodyText = [
-				'Someone (hopefully you) asked to reset your Batuda password.',
-				'',
-				'Click the link below to choose a new one:',
-				'',
-				params.url,
-				'',
-				`This link expires at ${expiry}. If you didn't request a reset, you can ignore this email.`,
-			].join('\n')
+		const sendMagicLink = (params: MagicLinkParams) => {
+			const rendered = magicLinkEmail[resolveLang(params.locale)](params.url)
 			return writeMd({
 				to: params.email,
-				subject: 'Reset your Batuda password',
-				bodyText,
+				subject: rendered.subject,
+				// The raw token is dev-only sugar — it saves picking it back out of
+				// the URL when poking at the auth endpoints by hand.
+				bodyText: `${rendered.text}\n\nToken: ${params.token}`,
+				label: 'magic-link',
+			})
+		}
+
+		const sendResetPassword = (params: ResetPasswordParams) => {
+			const rendered = resetPasswordEmail[resolveLang(params.locale)](
+				params.url,
+				params.expiresAt,
+			)
+			return writeMd({
+				to: params.email,
+				subject: rendered.subject,
+				bodyText: rendered.text,
 				label: 'password-reset',
 			})
 		}
 
-		const sendInvitation = (params: InvitationParams) => {
-			const expiry = params.expiresAt.toISOString()
-			const subject = `${params.inviterName} invited you to ${params.organizationName} on Batuda`
-			const bodyText = [
-				`${params.inviterName} invited you to join ${params.organizationName} on Batuda.`,
-				'',
-				'Click the link below to accept the invitation. The link signs you in automatically — no password needed:',
-				'',
-				params.inviteUrl,
-				'',
-				`This invitation expires on ${expiry}.`,
-			].join('\n')
+		const sendMemberAdded = (params: MemberAddedParams) => {
+			const rendered = memberAddedEmail[resolveLang(params.locale)]({
+				addedByName: params.addedByName,
+				organizationName: params.organizationName,
+				signInUrl: params.signInUrl,
+			})
 			return writeMd({
 				to: params.email,
-				subject,
-				bodyText,
-				label: 'invitation',
+				subject: rendered.subject,
+				bodyText: rendered.text,
+				label: 'member-added',
 			})
 		}
 
-		return { sendMagicLink, sendInvitation, sendResetPassword } as const
+		return { sendMagicLink, sendMemberAdded, sendResetPassword } as const
 	}),
 )
