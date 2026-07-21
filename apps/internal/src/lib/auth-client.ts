@@ -8,10 +8,12 @@ import { apiBaseUrl } from './api-base'
 // shape of session.activeOrganizationId, organization payloads, member
 // fields, etc.
 //
-// `magicLinkClient` exists for the invitation round-trip;
-// `organizationClient` exposes auth.organization.{setActive, listMembers,
-// getFullOrganization, inviteMember, acceptInvitation, ...} in the
-// browser without re-implementing them against the raw fetch.
+// `magicLinkClient` backs sign-in — someone asks for their own link from
+// /login and follows it. `organizationClient` exposes
+// auth.organization.{setActive, listMembers, getFullOrganization,
+// removeMember, ...} in the browser without re-implementing them against the
+// raw fetch. Adding a member goes through Batuda's own `POST /v1/members`
+// instead, because that path needs a role check Better Auth does not do.
 //
 // Base URL resolution lives in `api-base.ts` — empty in dev (same-origin
 // via Vite proxy keeps the session cookie reachable), absolute API

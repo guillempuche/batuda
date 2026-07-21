@@ -29,7 +29,6 @@ import { Route as EmailsInboxesRouteImport } from './routes/emails/inboxes'
 import { Route as EmailsThreadIdRouteImport } from './routes/emails/$threadId'
 import { Route as CompaniesBoardRouteImport } from './routes/companies/board'
 import { Route as CompaniesSlugRouteImport } from './routes/companies/$slug'
-import { Route as AcceptInvitationIdRouteImport } from './routes/accept-invitation.$id'
 import { Route as SettingsProfileIndexRouteImport } from './routes/settings/profile/index'
 import { Route as SettingsOrganizationIndexRouteImport } from './routes/settings/organization/index'
 import { Route as SettingsMcpIndexRouteImport } from './routes/settings/mcp/index'
@@ -141,11 +140,6 @@ const CompaniesSlugRoute = CompaniesSlugRouteImport.update({
   path: '/companies/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AcceptInvitationIdRoute = AcceptInvitationIdRouteImport.update({
-  id: '/accept-invitation/$id',
-  path: '/accept-invitation/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SettingsProfileIndexRoute = SettingsProfileIndexRouteImport.update({
   id: '/settings/profile/',
   path: '/settings/profile/',
@@ -208,7 +202,6 @@ export interface FileRoutesByFullPath {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/accept-invitation/$id': typeof AcceptInvitationIdRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/companies/board': typeof CompaniesBoardRoute
   '/emails/$threadId': typeof EmailsThreadIdRoute
@@ -241,7 +234,6 @@ export interface FileRoutesByTo {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/accept-invitation/$id': typeof AcceptInvitationIdRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/companies/board': typeof CompaniesBoardRoute
   '/emails/$threadId': typeof EmailsThreadIdRoute
@@ -275,7 +267,6 @@ export interface FileRoutesById {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/accept-invitation/$id': typeof AcceptInvitationIdRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/companies/board': typeof CompaniesBoardRoute
   '/emails/$threadId': typeof EmailsThreadIdRoute
@@ -310,7 +301,6 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/reset-password'
-    | '/accept-invitation/$id'
     | '/companies/$slug'
     | '/companies/board'
     | '/emails/$threadId'
@@ -343,7 +333,6 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/reset-password'
-    | '/accept-invitation/$id'
     | '/companies/$slug'
     | '/companies/board'
     | '/emails/$threadId'
@@ -376,7 +365,6 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/reset-password'
-    | '/accept-invitation/$id'
     | '/companies/$slug'
     | '/companies/board'
     | '/emails/$threadId'
@@ -410,7 +398,6 @@ export interface RootRouteChildren {
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
-  AcceptInvitationIdRoute: typeof AcceptInvitationIdRoute
   CompaniesSlugRoute: typeof CompaniesSlugRoute
   CompaniesBoardRoute: typeof CompaniesBoardRoute
   EmailsThreadIdRoute: typeof EmailsThreadIdRoute
@@ -581,13 +568,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CompaniesSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/accept-invitation/$id': {
-      id: '/accept-invitation/$id'
-      path: '/accept-invitation/$id'
-      fullPath: '/accept-invitation/$id'
-      preLoaderRoute: typeof AcceptInvitationIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/settings/profile/': {
       id: '/settings/profile/'
       path: '/settings/profile'
@@ -666,7 +646,6 @@ const rootRouteChildren: RootRouteChildren = {
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
   ResetPasswordRoute: ResetPasswordRoute,
-  AcceptInvitationIdRoute: AcceptInvitationIdRoute,
   CompaniesSlugRoute: CompaniesSlugRoute,
   CompaniesBoardRoute: CompaniesBoardRoute,
   EmailsThreadIdRoute: EmailsThreadIdRoute,
