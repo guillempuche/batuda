@@ -150,6 +150,31 @@ for (const [name, { tokens, text }] of Object.entries(themes)) {
 	)
 }
 
+/* The server has to name the browser-chrome tint before any stylesheet is
+ * parsed, so those three values are repeated in the app's root route. They are
+ * the one place a colour lives twice; check them rather than trust them. */
+const CHROME_TINT_SOURCE = fileURLToPath(
+	new URL('../../../apps/internal/src/routes/__root.tsx', import.meta.url),
+)
+try {
+	const root = readFileSync(CHROME_TINT_SOURCE, 'utf8')
+	const expected: Array<[string, string]> = [
+		['light', themes.light.tokens['--color-surface'] as string],
+		['dark', themes.dark.tokens['--color-surface'] as string],
+		['dark-hc', themes['dark-hc'].tokens['--color-surface'] as string],
+	]
+	for (const [name, value] of expected) {
+		if (!root.includes(value)) {
+			failures++
+			console.error(
+				`  FAIL chrome tint for ${name} is not ${value} in __root.tsx — it no longer matches --color-surface`,
+			)
+		}
+	}
+} catch {
+	/* Running outside the monorepo (a published consumer) — nothing to check. */
+}
+
 if (failures > 0) {
 	console.error(`\n${failures} pairing(s) below target`)
 	process.exit(1)

@@ -77,6 +77,11 @@ jobs:
       - name: Type check
         run: pnpm check-types
 
+      # Themes are only as good as their contrast. The local pre-push hook runs
+      # this too, but a hook can be skipped and CI cannot.
+      - name: Check theme contrast
+        run: pnpm --filter @batuda/ui check-contrast
+
       # Fast unit suite first — no external services needed. Any test that
       # touches Postgres lives under `*.integration.test.ts` and runs in
       # the integration phase below against the local Postgres container.
