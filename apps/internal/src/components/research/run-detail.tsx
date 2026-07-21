@@ -7,11 +7,14 @@ import { RefreshCw } from 'lucide-react'
 import type { ComponentType } from 'react'
 import styled from 'styled-components'
 
+import type { SchemaName } from '@batuda/research'
+// Straight from the domain file rather than the package entry point: that entry
+// point also reaches the services that talk to the database and the outside
+// world, and pulling those into the browser breaks this page outright.
 import {
 	RESEARCH_REASON_CODES,
 	type ReasonCode,
-	type SchemaName,
-} from '@batuda/research'
+} from '@batuda/research/domain/types'
 import { PriButton } from '@batuda/ui/pri'
 
 import { researchDetailAtom } from '#/atoms/research-atoms'
