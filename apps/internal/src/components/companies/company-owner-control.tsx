@@ -145,7 +145,7 @@ const Avatar = styled.span.withConfig({ displayName: 'CompanyOwnerAvatar' })`
 		color-mix(in oklab, var(--color-status-prospect) 68%, black) 100%
 	);
 	border: 1px solid color-mix(in oklab, var(--color-status-prospect) 60%, black);
-	color: #fff;
+	color: var(--color-on-primary);
 	font-size: 0.62rem;
 	font-weight: var(--font-weight-bold);
 	flex-shrink: 0;

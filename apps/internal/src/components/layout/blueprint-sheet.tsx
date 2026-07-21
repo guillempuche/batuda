@@ -105,70 +105,70 @@ const Sheet = styled.div`
 	min-height: 0;
 	position: relative;
 
-	background-color: #ede5d0;
+	background-color: var(--color-paper-aged);
 	background-image:
 		radial-gradient(
 			ellipse 40px 35px at 15% 30%,
-			rgba(180, 155, 120, 0.06) 0%,
+			var(--color-paper-fibre-a) 0%,
 			transparent 100%
 		),
 		radial-gradient(
 			ellipse 25px 30px at 78% 55%,
-			rgba(170, 145, 110, 0.05) 0%,
+			var(--color-paper-fibre-b) 0%,
 			transparent 100%
 		),
 		radial-gradient(
 			ellipse 35px 20px at 45% 80%,
-			rgba(175, 150, 115, 0.04) 0%,
+			var(--color-paper-fibre-b) 0%,
 			transparent 100%
 		),
 		repeating-linear-gradient(
 			0deg,
-			rgba(120, 110, 90, 0.08) 0,
-			rgba(120, 110, 90, 0.08) 0.5px,
+			var(--color-blueprint-grid) 0,
+			var(--color-blueprint-grid) 0.5px,
 			transparent 0.5px,
 			transparent 24px
 		),
 		repeating-linear-gradient(
 			90deg,
-			rgba(120, 110, 90, 0.08) 0,
-			rgba(120, 110, 90, 0.08) 0.5px,
+			var(--color-blueprint-grid) 0,
+			var(--color-blueprint-grid) 0.5px,
 			transparent 0.5px,
 			transparent 24px
 		);
 	box-shadow:
-		0 0 0 1px rgba(0, 0, 0, 0.04),
-		0 2px 8px rgba(0, 0, 0, 0.1);
+		0 0 0 1px var(--shadow-color-subtle),
+		0 2px 8px var(--shadow-color);
 
 	@media (min-width: 768px) {
 		background-image:
 			repeating-linear-gradient(
 				37deg,
-				rgba(160, 145, 120, 0.03) 0,
-				rgba(160, 145, 120, 0.03) 2px,
+				var(--color-paper-fibre-b) 0,
+				var(--color-paper-fibre-b) 2px,
 				transparent 2px,
 				transparent 7px
 			),
 			repeating-linear-gradient(
 				0deg,
-				rgba(120, 110, 90, 0.15) 0,
-				rgba(120, 110, 90, 0.15) 0.5px,
+				var(--color-blueprint-grid-strong) 0,
+				var(--color-blueprint-grid-strong) 0.5px,
 				transparent 0.5px,
 				transparent 24px
 			),
 			repeating-linear-gradient(
 				90deg,
-				rgba(120, 110, 90, 0.15) 0,
-				rgba(120, 110, 90, 0.15) 0.5px,
+				var(--color-blueprint-grid-strong) 0,
+				var(--color-blueprint-grid-strong) 0.5px,
 				transparent 0.5px,
 				transparent 24px
 			);
 		border: none;
 		box-shadow:
-			0 1px 2px rgba(0, 0, 0, 0.1),
-			0 4px 12px rgba(0, 0, 0, 0.12),
-			0 8px 24px rgba(0, 0, 0, 0.1);
-		outline: 1px solid rgba(0, 0, 0, 0.04);
+			0 1px 2px var(--shadow-color),
+			0 4px 12px var(--shadow-color),
+			0 8px 24px var(--shadow-color);
+		outline: 1px solid var(--color-metal-edge-soft);
 	}
 `
 
@@ -185,13 +185,13 @@ const TopRuler = styled(motion.div)`
 		z-index: 1;
 		background: repeating-linear-gradient(
 			90deg,
-			rgba(100, 90, 70, 0.35) 0,
-			rgba(100, 90, 70, 0.35) 0.5px,
+			var(--color-blueprint-rule-strong) 0,
+			var(--color-blueprint-rule-strong) 0.5px,
 			transparent 0.5px,
 			transparent 24px
 		);
 		background-repeat: repeat;
-		border-bottom: 1px solid rgba(100, 90, 70, 0.25);
+		border-bottom: 1px solid var(--color-blueprint-rule);
 		will-change: background-position;
 	}
 `
@@ -209,13 +209,13 @@ const LeftRuler = styled(motion.div)`
 		z-index: 1;
 		background: repeating-linear-gradient(
 			0deg,
-			rgba(100, 90, 70, 0.35) 0,
-			rgba(100, 90, 70, 0.35) 0.5px,
+			var(--color-blueprint-rule-strong) 0,
+			var(--color-blueprint-rule-strong) 0.5px,
 			transparent 0.5px,
 			transparent 24px
 		);
 		background-repeat: repeat;
-		border-right: 1px solid rgba(100, 90, 70, 0.25);
+		border-right: 1px solid var(--color-blueprint-rule);
 		will-change: background-position;
 	}
 `
@@ -229,15 +229,15 @@ const Tape = styled.span<{ $right?: boolean }>`
 	height: ${p => (p.$right ? '17px' : '18px')};
 	background: linear-gradient(
 		${p => (p.$right ? '97deg' : '84deg')},
-		#d8d0b8 0%,
-		#e2dac4 30%,
-		#d5cdb5 60%,
-		#ddd5bd 100%
+		var(--color-tape) 0%,
+		var(--color-tape-light) 30%,
+		var(--color-tape) 60%,
+		var(--color-tape-light) 100%
 	);
-	border: 1px solid rgba(160, 150, 130, 0.4);
+	border: 1px solid color-mix(in oklab, var(--color-outline) 40%, transparent);
 	box-shadow:
-		0 1px 3px rgba(0, 0, 0, 0.12),
-		0 0 0 0.5px rgba(0, 0, 0, 0.04);
+		0 1px 3px var(--shadow-color),
+		0 0 0 0.5px var(--shadow-color-subtle);
 	transform: rotate(${p => (p.$right ? '1.6deg' : '-2.3deg')});
 	z-index: 5;
 
@@ -260,7 +260,7 @@ const Vignette = styled.div`
 		background: radial-gradient(
 			ellipse at center,
 			transparent 50%,
-			rgba(140, 125, 100, 0.06) 100%
+			var(--color-paper-fibre-a) 100%
 		);
 	}
 `

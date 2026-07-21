@@ -69,16 +69,16 @@ const Aside = styled.aside.withConfig({ displayName: 'SideNavAside' })`
 		background-image:
 			radial-gradient(
 				circle at 2px 2px,
-				rgba(0, 0, 0, 0.18) 1.5px,
+				var(--shadow-color-strong) 1.5px,
 				transparent 2px
 			),
 			radial-gradient(
 				circle at 14px 14px,
-				rgba(255, 255, 255, 0.05) 1px,
+				var(--highlight-inset-faint) 1px,
 				transparent 1.5px
 			);
 		background-size: 24px 24px;
-		box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.12);
+		box-shadow: inset -1px 0 0 var(--shadow-color);
 	}
 `
 
@@ -126,13 +126,13 @@ const NavList = styled.ul.withConfig({ displayName: 'SideNavList' })`
 	overflow-y: auto;
 	overflow-x: hidden;
 	scrollbar-width: thin;
-	scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
+	scrollbar-color: var(--shadow-color-deep) transparent;
 
 	&::-webkit-scrollbar {
 		width: 6px;
 	}
 	&::-webkit-scrollbar-thumb {
-		background-color: rgba(0, 0, 0, 0.25);
+		background-color: var(--shadow-color-deep);
 		border-radius: var(--shape-full);
 	}
 `

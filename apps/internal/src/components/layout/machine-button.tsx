@@ -85,19 +85,24 @@ const Housing = styled.span.withConfig({
 	width: ${p => SIZE[p.$size].housing}px;
 	height: ${p => SIZE[p.$size].housing}px;
 	border-radius: var(--shape-full);
-	background: linear-gradient(145deg, #9a9080 0%, #b0a690 40%, #8a8070 100%);
-	border: 2px solid rgba(0, 0, 0, 0.2);
+	background: linear-gradient(
+		145deg,
+		var(--color-metal-deep) 0%,
+		var(--color-metal-dark) 40%,
+		var(--color-metal-deep) 100%
+	);
+	border: 2px solid var(--color-metal-edge);
 	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.2),
+		inset 0 1px 0 var(--highlight-inset),
 		${p =>
 			p.$size === 'compact'
-				? '0 2px 4px rgba(0, 0, 0, 0.25)'
-				: '0 2px 6px rgba(0, 0, 0, 0.25)'}
+				? '0 2px 4px var(--shadow-color-deep)'
+				: '0 2px 6px var(--shadow-color-deep)'}
 			${p =>
 				p.$active
 					? p.$size === 'compact'
-						? ', 0 0 14px 3px rgba(245, 158, 11, 0.45)'
-						: ', 0 0 18px 4px rgba(245, 158, 11, 0.45)'
+						? ', 0 0 14px 3px var(--color-highlight-amber-strong)'
+						: ', 0 0 18px 4px var(--color-highlight-amber-strong)'
 					: ''};
 	display: flex;
 	align-items: center;
@@ -120,7 +125,7 @@ const Housing = styled.span.withConfig({
 					var(--color-metal-dark),
 					var(--color-metal-deep)
 				);
-				border: 1px solid rgba(0, 0, 0, 0.15);
+				border: 1px solid var(--color-metal-edge-muted);
 			}
 			&::before {
 				top: -1px;
@@ -146,14 +151,14 @@ const Cap = styled(motion.span).withConfig({
 	);
 	border: 1px solid color-mix(in oklab, ${p => p.$color} 60%, black);
 	box-shadow:
-		inset 0 2px 4px rgba(255, 255, 255, ${p => (p.$active ? 0.5 : 0.3)}),
-		inset 0 -2px 4px rgba(0, 0, 0, 0.2),
-		0 2px 4px rgba(0, 0, 0, 0.25);
+		inset 0 2px 4px ${p => (p.$active ? 'var(--highlight-inset-bright)' : 'var(--highlight-inset-strong)')},
+		inset 0 -2px 4px var(--shadow-color-strong),
+		0 2px 4px var(--shadow-color-deep);
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	color: #fff;
-	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+	color: var(--color-on-primary);
+	text-shadow: 0 1px 2px var(--shadow-color-deep);
 	filter: ${p =>
 		p.$active ? 'brightness(1.18) saturate(1.1)' : 'saturate(0.85)'};
 	transition: filter 240ms ease;

@@ -1279,13 +1279,13 @@ const deliveryTone = (tone: 'ok' | 'warn' | 'error') => {
 			background: transparent;
 		`
 	return css`
-		color: var(--color-error, #c6664b);
+		color: var(--color-error);
 		border-color: color-mix(
 			in oklab,
-			var(--color-error, #c6664b) 40%,
+			var(--color-error) 40%,
 			transparent
 		);
-		background: color-mix(in oklab, var(--color-error, #c6664b) 8%, transparent);
+		background: color-mix(in oklab, var(--color-error) 8%, transparent);
 	`
 }
 
@@ -1313,9 +1313,9 @@ const SuspiciousBanner = styled.div.withConfig({
 	align-items: center;
 	gap: var(--space-2xs);
 	padding: var(--space-2xs) var(--space-sm);
-	border: 1px solid color-mix(in oklab, #e2a24b 50%, transparent);
-	background: color-mix(in oklab, #e2a24b 12%, transparent);
-	color: #8a5a1e;
+	border: 1px solid color-mix(in oklab, var(--color-warning) 50%, transparent);
+	background: color-mix(in oklab, var(--color-warning) 12%, transparent);
+	color: var(--color-on-warning-container);
 	border-radius: var(--shape-xs);
 	font-size: var(--typescale-body-small-size);
 `

@@ -77,7 +77,7 @@ export function TrustBadge({
 }
 
 const Confidence = styled.span`
-	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+	font-family: var(--font-mono);
 	font-variant-numeric: tabular-nums;
 	opacity: 0.85;
 `

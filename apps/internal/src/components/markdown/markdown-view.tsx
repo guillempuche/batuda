@@ -62,7 +62,7 @@ const Wrapper = styled.div.withConfig({ displayName: 'MarkdownView' })`
 	}
 
 	code {
-		font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+		font-family: var(--font-mono);
 		font-size: 0.9em;
 		background: color-mix(in oklab, var(--color-surface) 60%, black 4%);
 		padding: 0 var(--space-3xs);
@@ -70,7 +70,7 @@ const Wrapper = styled.div.withConfig({ displayName: 'MarkdownView' })`
 	}
 
 	pre {
-		font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+		font-family: var(--font-mono);
 		background: color-mix(in oklab, var(--color-surface) 60%, black 6%);
 		padding: var(--space-sm);
 		border-radius: var(--shape-2xs);

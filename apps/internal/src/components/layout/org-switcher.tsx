@@ -141,7 +141,7 @@ const TriggerButton = styled.button.withConfig({
 	align-items: center;
 	gap: var(--space-2xs);
 	padding: var(--space-2xs) var(--space-sm);
-	border: 1px solid rgba(0, 0, 0, 0.18);
+	border: 1px solid var(--color-metal-edge-muted);
 	border-radius: var(--shape-2xs);
 	color: var(--color-on-surface);
 	cursor: pointer;
@@ -170,7 +170,7 @@ const ReadOnlyChip = styled.div.withConfig({
 	align-items: center;
 	gap: var(--space-2xs);
 	padding: var(--space-2xs) var(--space-sm);
-	border: 1px solid rgba(0, 0, 0, 0.18);
+	border: 1px solid var(--color-metal-edge-muted);
 	border-radius: var(--shape-2xs);
 	color: var(--color-on-surface);
 `

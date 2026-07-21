@@ -71,11 +71,11 @@ const Bar = styled.nav.withConfig({ displayName: 'BottomNavBar' })`
 	 * texture still bleeds through but text and icons remain legible. Matches
 	 * marketing's ToolBelt so the shadow-board reads as one surface across
 	 * apps. */
-	background: rgba(184, 168, 140, 0.72);
+	background: color-mix(in oklab, var(--color-pegboard) 72%, transparent);
 	backdrop-filter: blur(14px) saturate(1.4);
 	-webkit-backdrop-filter: blur(14px) saturate(1.4);
-	border-top: 1px solid rgba(80, 65, 45, 0.25);
-	box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
+	border-top: 1px solid var(--color-board-line);
+	box-shadow: 0 -4px 16px var(--shadow-color);
 
 	a {
 		display: flex;

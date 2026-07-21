@@ -634,7 +634,7 @@ const Page = styled.div.withConfig({ displayName: 'LoginPage' })`
 	background-image:
 		radial-gradient(
 			circle,
-			rgba(80, 60, 40, 0.18) 1px,
+			var(--color-board-line) 1px,
 			transparent 1px
 		);
 	background-size: 24px 24px;
@@ -649,7 +649,7 @@ const Card = styled.div.withConfig({ displayName: 'LoginCard' })`
 	background-image:
 		radial-gradient(
 			ellipse 80px 60px at 15% 20%,
-			rgba(180, 155, 120, 0.08) 0%,
+			var(--color-paper-fibre-a) 0%,
 			transparent 100%
 		),
 		radial-gradient(
@@ -657,10 +657,10 @@ const Card = styled.div.withConfig({ displayName: 'LoginCard' })`
 			var(--color-paper-fibre-a) 0%,
 			transparent 100%
 		);
-	border: 1px solid rgba(120, 95, 60, 0.45);
+	border: 1px solid var(--color-ledger-line-strong);
 	box-shadow:
 		var(--shadow-paper-inset),
-		0 6px 20px rgba(0, 0, 0, 0.28);
+		0 6px 20px var(--shadow-color-deep);
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
@@ -675,12 +675,12 @@ const Card = styled.div.withConfig({ displayName: 'LoginCard' })`
 		height: 22px;
 		background: linear-gradient(
 			180deg,
-			rgba(244, 232, 196, 0.88) 0%,
-			rgba(226, 210, 166, 0.85) 100%
+			var(--color-tape-light) 0%,
+			var(--color-tape) 100%
 		);
-		border: 1px solid rgba(0, 0, 0, 0.08);
+		border: 1px solid var(--color-metal-edge-soft);
 		transform: rotate(-4deg);
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+		box-shadow: 0 1px 3px var(--shadow-color-medium);
 		pointer-events: none;
 	}
 `

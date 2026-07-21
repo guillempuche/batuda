@@ -1809,8 +1809,8 @@ const StatusFilterButton = styled.button.withConfig({
 		css`
 			text-shadow: var(--text-shadow-engrave);
 			box-shadow:
-				inset 0 1px 3px rgba(0, 0, 0, 0.25),
-				0 1px 0 rgba(255, 255, 255, 0.15);
+				inset 0 1px 3px var(--shadow-color-deep),
+				0 1px 0 var(--highlight-inset-soft);
 		`}
 
 	&:hover:not(:disabled) {
@@ -1927,9 +1927,9 @@ const SuspiciousTag = styled.span.withConfig({
 	align-items: center;
 	gap: 4px;
 	padding: 2px var(--space-2xs);
-	background: color-mix(in oklab, #f59e0b 22%, transparent);
-	color: color-mix(in oklab, #92400e 80%, black);
-	border: 1px dashed color-mix(in oklab, #b45309 55%, transparent);
+	background: color-mix(in oklab, var(--color-warning) 22%, transparent);
+	color: color-mix(in oklab, var(--color-on-warning-container) 80%, black);
+	border: 1px dashed color-mix(in oklab, var(--color-warning-strong) 55%, transparent);
 	border-radius: var(--shape-2xs);
 	font-family: var(--font-display);
 	font-size: var(--typescale-label-small-size);

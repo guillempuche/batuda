@@ -681,15 +681,15 @@ const AvatarPlate = styled.div.withConfig({
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	color: #fff;
+	color: var(--color-on-primary);
 	flex-shrink: 0;
 `
 
 const Initial = styled.span.withConfig({ displayName: 'MembersInitial' })`
 	${stenciledTitle}
 	font-size: var(--typescale-title-medium-size);
-	color: #fff;
-	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+	color: var(--color-on-primary);
+	text-shadow: 0 1px 2px var(--shadow-color-deep);
 `
 
 const MemberInfo = styled.div.withConfig({ displayName: 'MembersInfo' })`

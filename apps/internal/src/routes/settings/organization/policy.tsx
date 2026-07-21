@@ -433,7 +433,7 @@ const ThresholdLabel = styled.span`
 `
 
 const ThresholdValue = styled.span`
-	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+	font-family: var(--font-mono);
 	font-variant-numeric: tabular-nums;
 	min-width: 3ch;
 	color: var(--color-on-surface);

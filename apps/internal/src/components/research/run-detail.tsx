@@ -344,13 +344,11 @@ const StatusText = styled.span.withConfig({
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
 	color: ${p =>
-		p.$status === 'failed'
-			? 'var(--color-error, #c6664b)'
-			: 'var(--color-on-surface)'};
+		p.$status === 'failed' ? 'var(--color-error)' : 'var(--color-on-surface)'};
 `
 
 const SchemaText = styled.span`
-	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+	font-family: var(--font-mono);
 `
 
 const ErrorBlock = styled.div`
@@ -358,9 +356,9 @@ const ErrorBlock = styled.div`
 	flex-direction: column;
 	gap: var(--space-3xs);
 	padding: var(--space-sm);
-	border: 1px solid var(--color-error, #c6664b);
+	border: 1px solid var(--color-error);
 	border-radius: var(--shape-2xs);
-	color: var(--color-error, #c6664b);
+	color: var(--color-error);
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 `
@@ -408,7 +406,7 @@ const EmptyHint = styled.p`
 `
 
 const Pre = styled.pre`
-	font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+	font-family: var(--font-mono);
 	font-size: var(--typescale-body-small-size);
 	white-space: pre-wrap;
 	word-wrap: break-word;

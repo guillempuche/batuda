@@ -107,6 +107,6 @@ const MetalItem = styled(PriSelect.Item)`
 	text-transform: uppercase;
 
 	&[data-highlighted] {
-		background: rgba(184, 90, 40, 0.18);
+		background: color-mix(in oklab, var(--color-primary) 18%, transparent);
 	}
 `

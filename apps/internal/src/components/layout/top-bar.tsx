@@ -83,7 +83,7 @@ const Bar = styled.header.withConfig({ displayName: 'TopBar' })`
 	min-height: var(--top-bar-height);
 	padding: 0 var(--space-md);
 	border: none;
-	border-bottom: 1px solid rgba(0, 0, 0, 0.18);
+	border-bottom: 1px solid var(--color-metal-edge-muted);
 
 	@media (min-width: 768px) {
 		gap: var(--space-md);

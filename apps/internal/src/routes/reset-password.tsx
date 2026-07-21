@@ -262,11 +262,11 @@ const Card = styled.div.withConfig({ displayName: 'ResetPasswordCard' })`
 	max-width: 26rem;
 	padding: var(--space-xl);
 	background-color: var(--color-paper-aged);
-	border: 1px solid rgba(120, 95, 60, 0.45);
+	border: 1px solid var(--color-ledger-line-strong);
 	border-radius: var(--shape-2xs);
 	box-shadow:
 		var(--shadow-paper-inset),
-		0 6px 20px rgba(0, 0, 0, 0.18);
+		0 6px 20px var(--shadow-color-strong);
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
