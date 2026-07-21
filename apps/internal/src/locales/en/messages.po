@@ -229,6 +229,11 @@ msgstr "Active companies"
 msgid "Active organization"
 msgstr "Active organization"
 
+#. placeholder {0}: visibleTimeline.length
+#: src/routes/companies/$slug.tsx
+msgid "Activity loaded: {0}"
+msgstr "Activity loaded: {0}"
+
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/routes/tasks/index.tsx
 msgid "Add"
@@ -1043,6 +1048,11 @@ msgstr "Contacts"
 msgid "Contacts found"
 msgstr "Contacts found"
 
+#. placeholder {0}: contacts.length
+#: src/routes/companies/$slug.tsx
+msgid "Contacts loaded: {0}"
+msgstr "Contacts loaded: {0}"
+
 #: src/routes/emails/inboxes.tsx
 msgid "Content"
 msgstr "Content"
@@ -1138,14 +1148,23 @@ msgstr "Could not delete the key. Please try again."
 msgid "Could not delete the run"
 msgstr "Could not delete the run"
 
+#: src/routes/companies/$slug.tsx
+msgid "Could not load activity"
+msgstr "Could not load activity"
+
 #: src/routes/companies/index.tsx
 msgid "Could not load companies"
 msgstr "Could not load companies"
+
+#: src/routes/companies/$slug.tsx
+msgid "Could not load contacts"
+msgstr "Could not load contacts"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Could not load inboxes"
 msgstr "Could not load inboxes"
 
+#: src/routes/companies/$slug.tsx
 #: src/routes/pages/index.tsx
 msgid "Could not load pages"
 msgstr "Could not load pages"
@@ -3144,6 +3163,11 @@ msgstr "Page title"
 msgid "Pages"
 msgstr "Pages"
 
+#. placeholder {0}: companyPages.length
+#: src/routes/companies/$slug.tsx
+msgid "Pages loaded: {0}"
+msgstr "Pages loaded: {0}"
+
 #: src/components/research/findings/shared.tsx
 msgid "Paid action approved"
 msgstr "Paid action approved"
@@ -4329,6 +4353,10 @@ msgstr "That link is no longer valid. Request a fresh one below."
 msgid "The 20 most recently edited open tasks. Click one to reopen it."
 msgstr "The 20 most recently edited open tasks. Click one to reopen it."
 
+#: src/routes/companies/$slug.tsx
+msgid "The activity for this company could not be fetched. Check that the session is valid, then try again."
+msgstr "The activity for this company could not be fetched. Check that the session is valid, then try again."
+
 #: src/routes/settings/api-keys/index.tsx
 msgid "The API key can no longer be used."
 msgstr "The API key can no longer be used."
@@ -4383,9 +4411,17 @@ msgstr "The page could not be fetched. Check that the session is valid, then try
 msgid "The page is now live."
 msgstr "The page is now live."
 
+#: src/routes/companies/$slug.tsx
+msgid "The pages for this company could not be fetched. Check that the session is valid, then try again."
+msgstr "The pages for this company could not be fetched. Check that the session is valid, then try again."
+
 #: src/components/research/run-detail.tsx
 msgid "The pages I found were about a different company, so I didn't save anything."
 msgstr "The pages I found were about a different company, so I didn't save anything."
+
+#: src/routes/companies/$slug.tsx
+msgid "The people at this company could not be fetched. Check that the session is valid, then try again."
+msgstr "The people at this company could not be fetched. Check that the session is valid, then try again."
 
 #: src/components/research/run-detail.tsx
 msgid "The run arrived in a form this page cannot read. Go back to the run list and open it again; report it if it keeps happening."
@@ -4578,6 +4614,12 @@ msgstr "Total competitors"
 #: src/routes/emails/index.tsx
 msgid "Try different criteria or clear the filters."
 msgstr "Try different criteria or clear the filters."
+
+#: src/routes/companies/$slug.tsx
+#: src/routes/companies/$slug.tsx
+#: src/routes/companies/$slug.tsx
+msgid "Trying again…"
+msgstr "Trying again…"
 
 #: src/components/companies/documents-panel.tsx
 #: src/components/interactions/quick-capture-dialog.tsx

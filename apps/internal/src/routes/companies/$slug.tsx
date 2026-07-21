@@ -98,6 +98,7 @@ import { ErrorState } from '#/components/shared/error-state'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { PriorityDot } from '#/components/shared/priority-dot'
 import { RelativeDate } from '#/components/shared/relative-date'
+import { SrOnly } from '#/components/shared/sr-only'
 import {
 	asCompanyStatus,
 	StatusBadge,
@@ -483,6 +484,24 @@ function DetailBody({
 	const refreshTimeline = useAtomRefresh(timelineAtom)
 	const refreshContacts = useAtomRefresh(contactsAtom)
 	const refreshTasks = useAtomRefresh(tasksAtom)
+	const refreshPages = useAtomRefresh(companyPagesAtom)
+
+	// Each of these lists falls back to empty whenever it has not succeeded, so
+	// without telling the three states apart a panel says "nothing here" both
+	// while its data is still arriving and when the request failed outright.
+	const contactsFailed = AsyncResult.isFailure(contactsResult)
+	const timelineFailed = AsyncResult.isFailure(timelineResult)
+	const pagesFailed = AsyncResult.isFailure(pagesResult)
+	const contactsLoading = AsyncResult.isInitial(contactsResult)
+	const timelineLoading = AsyncResult.isInitial(timelineResult)
+	const pagesLoading = AsyncResult.isInitial(pagesResult)
+	// A retry keeps the failed value and only marks it waiting, so this is the
+	// only way to tell that pressing Retry actually started something.
+	const contactsRetrying =
+		contactsFailed && AsyncResult.isWaiting(contactsResult)
+	const timelineRetrying =
+		timelineFailed && AsyncResult.isWaiting(timelineResult)
+	const pagesRetrying = pagesFailed && AsyncResult.isWaiting(pagesResult)
 	const [followupOpen, setFollowupOpen] = useState(false)
 
 	const toast = usePriToast()
@@ -1117,7 +1136,28 @@ function DetailBody({
 															<Trans>Show system events</Trans>
 														</SystemEventsToggle>
 													</TimelineToolbar>
-													{visibleTimeline.length === 0 ? (
+													{/* Mounted whatever the state, because a live region that appears
+													    together with its text is announced unreliably. */}
+													<SrOnly role='status'>
+														{timelineLoading
+															? ''
+															: timelineRetrying
+																? t`Trying again…`
+																: timelineFailed
+																	? ''
+																	: t`Activity loaded: ${visibleTimeline.length}`}
+													</SrOnly>
+													{timelineLoading ? (
+														<LoadingSpinner />
+													) : timelineFailed ? (
+														<ErrorState
+															data-testid='company-timeline-error'
+															variant='inline'
+															title={t`Could not load activity`}
+															description={t`The activity for this company could not be fetched. Check that the session is valid, then try again.`}
+															onRetry={refreshTimeline}
+														/>
+													) : visibleTimeline.length === 0 ? (
 														<EmptyState
 															title={t`No activity yet`}
 															description={t`Emails, calls, documents, and proposals will appear here as they happen.`}
@@ -1184,7 +1224,28 @@ function DetailBody({
 								<Trans>Add contact</Trans>
 							</PriButton>
 						</PeopleHeader>
-						{contacts.length === 0 ? (
+						{/* Mounted whatever the state, because a live region that appears
+						    together with its text is announced unreliably. */}
+						<SrOnly role='status'>
+							{contactsLoading
+								? ''
+								: contactsRetrying
+									? t`Trying again…`
+									: contactsFailed
+										? ''
+										: t`Contacts loaded: ${contacts.length}`}
+						</SrOnly>
+						{contactsLoading ? (
+							<LoadingSpinner />
+						) : contactsFailed ? (
+							<ErrorState
+								data-testid='company-contacts-error'
+								variant='inline'
+								title={t`Could not load contacts`}
+								description={t`The people at this company could not be fetched. Check that the session is valid, then try again.`}
+								onRetry={refreshContacts}
+							/>
+						) : contacts.length === 0 ? (
 							<EmptyState
 								title={t`No contacts yet`}
 								description={t`Add the first decision-maker to keep track of who to reach.`}
@@ -1373,7 +1434,28 @@ function DetailBody({
 								<FilesGroupTitle>
 									<Trans>Pages</Trans>
 								</FilesGroupTitle>
-								{companyPages.length === 0 ? (
+								{/* Mounted whatever the state, because a live region that appears
+								    together with its text is announced unreliably. */}
+								<SrOnly role='status'>
+									{pagesLoading
+										? ''
+										: pagesRetrying
+											? t`Trying again…`
+											: pagesFailed
+												? ''
+												: t`Pages loaded: ${companyPages.length}`}
+								</SrOnly>
+								{pagesLoading ? (
+									<LoadingSpinner />
+								) : pagesFailed ? (
+									<ErrorState
+										data-testid='company-pages-error'
+										variant='inline'
+										title={t`Could not load pages`}
+										description={t`The pages for this company could not be fetched. Check that the session is valid, then try again.`}
+										onRetry={refreshPages}
+									/>
+								) : companyPages.length === 0 ? (
 									<EmptyState
 										icon={FileText}
 										title={t`No pages yet`}

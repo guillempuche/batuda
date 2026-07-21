@@ -229,6 +229,11 @@ msgstr "Empreses actives"
 msgid "Active organization"
 msgstr "Organització activa"
 
+#. placeholder {0}: visibleTimeline.length
+#: src/routes/companies/$slug.tsx
+msgid "Activity loaded: {0}"
+msgstr "Activitat carregada: {0}"
+
 #: src/components/contacts/manage-channels-dialog.tsx
 #: src/routes/tasks/index.tsx
 msgid "Add"
@@ -1043,6 +1048,11 @@ msgstr "Contactes"
 msgid "Contacts found"
 msgstr "Contactes trobats"
 
+#. placeholder {0}: contacts.length
+#: src/routes/companies/$slug.tsx
+msgid "Contacts loaded: {0}"
+msgstr "Contactes carregats: {0}"
+
 #: src/routes/emails/inboxes.tsx
 msgid "Content"
 msgstr "Contingut"
@@ -1138,14 +1148,23 @@ msgstr "No s'ha pogut eliminar la clau. Torna-ho a provar."
 msgid "Could not delete the run"
 msgstr "No s'ha pogut eliminar l'execució"
 
+#: src/routes/companies/$slug.tsx
+msgid "Could not load activity"
+msgstr "No s'ha pogut carregar l'activitat"
+
 #: src/routes/companies/index.tsx
 msgid "Could not load companies"
 msgstr "No s'han pogut carregar les empreses"
+
+#: src/routes/companies/$slug.tsx
+msgid "Could not load contacts"
+msgstr "No s'han pogut carregar els contactes"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Could not load inboxes"
 msgstr "No s'han pogut carregar les safates"
 
+#: src/routes/companies/$slug.tsx
 #: src/routes/pages/index.tsx
 msgid "Could not load pages"
 msgstr "No s'han pogut carregar les pàgines"
@@ -3144,6 +3163,11 @@ msgstr "Títol de la pàgina"
 msgid "Pages"
 msgstr "Pàgines"
 
+#. placeholder {0}: companyPages.length
+#: src/routes/companies/$slug.tsx
+msgid "Pages loaded: {0}"
+msgstr "Pàgines carregades: {0}"
+
 #: src/components/research/findings/shared.tsx
 msgid "Paid action approved"
 msgstr "Acció de pagament aprovada"
@@ -4329,6 +4353,10 @@ msgstr "L'enllaç ja no és vàlid. Demana'n un de nou a sota."
 msgid "The 20 most recently edited open tasks. Click one to reopen it."
 msgstr "Les 20 tasques obertes editades més recentment. Fes-hi clic per reobrir-ne una."
 
+#: src/routes/companies/$slug.tsx
+msgid "The activity for this company could not be fetched. Check that the session is valid, then try again."
+msgstr "No s'ha pogut recuperar l'activitat d'aquesta empresa. Comprova que la sessió sigui vàlida i torna-ho a provar."
+
 #: src/routes/settings/api-keys/index.tsx
 msgid "The API key can no longer be used."
 msgstr "La clau d'API ja no es pot fer servir."
@@ -4383,9 +4411,17 @@ msgstr "No s'ha pogut carregar la pàgina. Comprova que la sessió sigui vàlida
 msgid "The page is now live."
 msgstr "La pàgina ja està publicada."
 
+#: src/routes/companies/$slug.tsx
+msgid "The pages for this company could not be fetched. Check that the session is valid, then try again."
+msgstr "No s'han pogut recuperar les pàgines d'aquesta empresa. Comprova que la sessió sigui vàlida i torna-ho a provar."
+
 #: src/components/research/run-detail.tsx
 msgid "The pages I found were about a different company, so I didn't save anything."
 msgstr "Les pàgines que he trobat eren d'una altra empresa, així que no he desat res."
+
+#: src/routes/companies/$slug.tsx
+msgid "The people at this company could not be fetched. Check that the session is valid, then try again."
+msgstr "No s'han pogut recuperar les persones d'aquesta empresa. Comprova que la sessió sigui vàlida i torna-ho a provar."
 
 #: src/components/research/run-detail.tsx
 msgid "The run arrived in a form this page cannot read. Go back to the run list and open it again; report it if it keeps happening."
@@ -4578,6 +4614,12 @@ msgstr "Total competidors"
 #: src/routes/emails/index.tsx
 msgid "Try different criteria or clear the filters."
 msgstr "Prova amb criteris diferents o neteja els filtres."
+
+#: src/routes/companies/$slug.tsx
+#: src/routes/companies/$slug.tsx
+#: src/routes/companies/$slug.tsx
+msgid "Trying again…"
+msgstr "S'està tornant a provar…"
 
 #: src/components/companies/documents-panel.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
