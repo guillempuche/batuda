@@ -29,7 +29,7 @@ const PriPopup = styled(Tooltip.Popup).withConfig({
 		var(--color-metal-dark) 100%
 	);
 	color: var(--color-on-surface);
-	border: 1px solid rgba(0, 0, 0, 0.35);
+	border: 1px solid var(--color-metal-edge);
 	border-radius: 2px;
 	box-shadow: var(--elevation-workshop-sm);
 	font-family: var(--font-display);
@@ -52,7 +52,7 @@ const PriPopup = styled(Tooltip.Popup).withConfig({
 		width: 3px;
 		height: 3px;
 		border-radius: 50%;
-		background: radial-gradient(circle, #1a1612 40%, transparent 70%);
+		background: radial-gradient(circle, var(--color-on-surface) 40%, transparent 70%);
 	}
 
 	&[data-starting-style],
@@ -68,7 +68,7 @@ const PriArrow = styled(Tooltip.Arrow).withConfig({
 	width: 8px;
 	height: 8px;
 	background: var(--color-metal);
-	border: 1px solid rgba(0, 0, 0, 0.35);
+	border: 1px solid var(--color-metal-edge);
 	border-top: none;
 	border-left: none;
 	transform: rotate(45deg);

@@ -54,17 +54,17 @@ const PriScrollbar = styled(ScrollArea.Scrollbar).withConfig({
 	background:
 		linear-gradient(
 			90deg,
-			rgba(0, 0, 0, 0.25) 0%,
-			rgba(0, 0, 0, 0.08) 50%,
-			rgba(0, 0, 0, 0.25) 100%
+			var(--shadow-color-deep) 0%,
+			var(--shadow-color-subtle) 50%,
+			var(--shadow-color-deep) 100%
 		),
 		linear-gradient(
 			180deg,
 			var(--color-metal-deep) 0%,
-			#4a433a 50%,
+			var(--color-metal-deepest) 50%,
 			var(--color-metal-deep) 100%
 		);
-	border-left: 1px solid rgba(0, 0, 0, 0.4);
+	border-left: 1px solid var(--color-metal-edge-strong);
 	transition:
 		width 160ms ease,
 		background 160ms ease;
@@ -102,11 +102,11 @@ const PriThumb = styled(ScrollArea.Thumb).withConfig({
 		var(--color-metal) 50%,
 		var(--color-metal-dark) 100%
 	);
-	border: 1px solid rgba(0, 0, 0, 0.4);
+	border: 1px solid var(--color-metal-edge-strong);
 	border-radius: 2px;
 	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.5),
-		0 1px 2px rgba(0, 0, 0, 0.25);
+		inset 0 1px 0 var(--highlight-inset-bright),
+		0 1px 2px var(--shadow-color-deep);
 
 	&::before,
 	&::after {
@@ -122,7 +122,7 @@ const PriThumb = styled(ScrollArea.Thumb).withConfig({
 			var(--color-metal-light),
 			var(--color-metal-deep)
 		);
-		box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.35);
+		box-shadow: inset 0 -1px 0 var(--shadow-color-deep);
 	}
 
 	&::before {

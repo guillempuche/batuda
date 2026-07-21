@@ -34,7 +34,7 @@ const PriPopup = styled(Menu.Popup).withConfig({
 		var(--color-metal-dark) 100%
 	);
 	color: var(--color-on-surface);
-	border: 1px solid rgba(0, 0, 0, 0.35);
+	border: 1px solid var(--color-metal-edge);
 	border-radius: var(--shape-2xs);
 	box-shadow: var(--elevation-workshop-lg);
 	transform-origin: var(--transform-origin);
@@ -84,7 +84,7 @@ const itemStyles = `
 	white-space: nowrap;
 
 	&[data-highlighted] {
-		background: color-mix(in srgb, rgba(245, 158, 11, 0.28), transparent);
+		background: color-mix(in srgb, var(--color-highlight-amber), transparent);
 		box-shadow: var(--glow-active);
 	}
 

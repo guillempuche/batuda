@@ -11,7 +11,7 @@ const PriBackdrop = styled(Dialog.Backdrop).withConfig({
 })`
 	position: fixed;
 	inset: 0;
-	background: color-mix(in oklab, #1a1612 70%, transparent);
+	background: var(--color-scrim);
 	backdrop-filter: blur(2px);
 	transition: opacity 240ms ease;
 
@@ -35,32 +35,32 @@ const PriPopup = styled(Dialog.Popup).withConfig({
 	background:
 		linear-gradient(
 			180deg,
-			rgba(0, 0, 0, 0.04) 0%,
+			var(--shadow-color-subtle) 0%,
 			transparent 24px,
 			transparent 100%
 		),
 		repeating-linear-gradient(
 			45deg,
-			rgba(176, 82, 32, 0.03) 0 1px,
+			color-mix(in oklab, var(--color-primary) 3%, transparent) 0 1px,
 			transparent 1px 12px
 		),
 		repeating-linear-gradient(
 			-45deg,
-			rgba(46, 107, 79, 0.03) 0 1px,
+			color-mix(in oklab, var(--color-secondary) 3%, transparent) 0 1px,
 			transparent 1px 12px
 		),
-		#f0e8d0;
+		var(--color-paper-aged);
 	color: var(--color-on-surface);
-	border: 1px solid rgba(132, 125, 113, 0.5);
+	border: 1px solid color-mix(in oklab, var(--color-outline) 50%, transparent);
 	border-radius: 2px;
 	padding: calc(var(--space-2xl) + 0.25rem) var(--space-xl) var(--space-xl);
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
 	box-shadow:
-		0 2px 0 rgba(255, 255, 255, 0.35) inset,
-		0 6px 18px rgba(0, 0, 0, 0.25),
-		0 24px 60px rgba(0, 0, 0, 0.3);
+		0 2px 0 var(--highlight-inset-strong) inset,
+		0 6px 18px var(--shadow-color-deep),
+		0 24px 60px var(--shadow-color-deep);
 	transform-origin: top center;
 	transition:
 		transform 260ms cubic-bezier(0.22, 1.2, 0.4, 1),
@@ -80,11 +80,11 @@ const PriPopup = styled(Dialog.Popup).withConfig({
 			var(--color-metal) 50%,
 			var(--color-metal-dark) 100%
 		);
-		border: 1px solid rgba(0, 0, 0, 0.35);
+		border: 1px solid var(--color-metal-edge);
 		border-radius: 3px;
 		box-shadow:
-			inset 0 1px 0 rgba(255, 255, 255, 0.5),
-			0 2px 4px rgba(0, 0, 0, 0.25);
+			inset 0 1px 0 var(--highlight-inset-bright),
+			0 2px 4px var(--shadow-color-deep);
 	}
 
 	&::after {
@@ -97,7 +97,7 @@ const PriPopup = styled(Dialog.Popup).withConfig({
 		height: 8px;
 		background: var(--color-metal-deep);
 		border-radius: 0 0 3px 3px;
-		box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+		box-shadow: inset 0 -1px 0 var(--shadow-color-deep);
 	}
 
 	&[data-starting-style],

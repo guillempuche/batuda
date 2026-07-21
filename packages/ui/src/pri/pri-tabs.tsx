@@ -25,7 +25,7 @@ const PriList = styled(Tabs.List).withConfig({
 	flex-wrap: nowrap;
 	gap: 2px;
 	padding: 0 var(--space-sm);
-	border-bottom: 2px solid rgba(0, 0, 0, 0.18);
+	border-bottom: 2px solid var(--color-metal-edge-muted);
 	background: transparent;
 	overflow-x: auto;
 	overflow-y: hidden;
@@ -59,7 +59,7 @@ const PriTab = styled(Tabs.Tab).withConfig({
 	position: relative;
 	flex-shrink: 0;
 	scroll-snap-align: start;
-	background: #e7dec4;
+	background: var(--color-surface-container);
 	border: none;
 	padding: var(--space-sm) var(--space-lg) var(--space-xs);
 	margin-bottom: -2px;
@@ -79,7 +79,7 @@ const PriTab = styled(Tabs.Tab).withConfig({
 	text-transform: uppercase;
 	color: var(--color-on-surface-variant);
 	cursor: pointer;
-	box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.12);
+	box-shadow: inset 0 -2px 0 var(--shadow-color);
 	transition:
 		color 160ms ease,
 		background 160ms ease,
@@ -87,11 +87,11 @@ const PriTab = styled(Tabs.Tab).withConfig({
 
 	&:hover {
 		color: var(--color-on-surface);
-		background: #ede3c8;
+		background: var(--color-paper-aged-hover);
 	}
 
 	&[data-selected] {
-		background: #f0e8d0;
+		background: var(--color-paper-aged);
 		color: var(--color-on-surface);
 		text-shadow: var(--text-shadow-emboss);
 		transform: translateY(-1px);
