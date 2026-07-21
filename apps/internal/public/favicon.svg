@@ -1,5 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <title>Batuda</title>
+  <!-- The olive mark disappears against a dark tab strip, so it lifts to the
+       lighter tone the dark themes use for the same colour. -->
+  <style>@media (prefers-color-scheme: dark) { g { fill: #8ECFA8 } }</style>
   <defs>
     <mask id="h">
       <rect width="32" height="32" fill="white"/>
