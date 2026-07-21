@@ -1,6 +1,7 @@
 import { apiKey } from '@better-auth/api-key'
 import { oauthProvider } from '@better-auth/oauth-provider'
 import { NodeRuntime } from '@effect/platform-node'
+import type { BetterAuthOptions } from 'better-auth'
 import { getMigrations } from 'better-auth/db/migration'
 import { admin, bearer, jwt, openAPI, organization } from 'better-auth/plugins'
 import { Effect } from 'effect'
@@ -9,8 +10,71 @@ import pg from 'pg'
 
 import { MigratorLive } from './migrator'
 
-// Better Auth migration config — keep plugins and user fields
-// in sync with src/lib/auth.ts
+/**
+ * Everything Better Auth reads when working out what its tables should look
+ * like: the extra fields on its own tables, and the plugins that bring tables
+ * of their own. Separate from the connection because the shape is the same on
+ * every run, and because it is compared against the config the running server
+ * builds — see `migrate.test.ts`.
+ *
+ * These fields are declared twice on purpose: here, so the migrator creates the
+ * columns, and in the shared config, so the server knows they exist. Adding one
+ * here alone makes a column nothing reads; adding it there alone makes the
+ * server expect a column that was never created. The test fails on either.
+ */
+export const betterAuthSchemaConfig = {
+	user: {
+		additionalFields: {
+			isAgent: {
+				type: 'boolean',
+				required: false,
+				defaultValue: false,
+			},
+			locale: {
+				type: 'string',
+				required: false,
+				input: false,
+			},
+			passwordOptOut: {
+				type: 'boolean',
+				required: false,
+				defaultValue: false,
+			},
+		},
+	},
+	// `organization()` here so Better Auth generates the `organization` /
+	// `member` / `invitation` tables alongside the rest. `member.primary_inbox_id`
+	// is a Batuda extension recording each member's default From identity.
+	plugins: [
+		openAPI(),
+		bearer(),
+		admin(),
+		organization({
+			schema: {
+				member: {
+					additionalFields: {
+						primaryInboxId: {
+							type: 'string',
+							required: false,
+							fieldName: 'primary_inbox_id',
+						},
+					},
+				},
+			},
+		}),
+		apiKey(),
+		// Generates the OAuth provider tables (oauthClient, oauthAccessToken,
+		// oauthRefreshToken, oauthConsent) plus the jwt plugin's jwks table,
+		// backing the OAuth MCP path. loginPage/consentPage are runtime-only;
+		// the values don't affect schema generation.
+		jwt(),
+		oauthProvider({
+			loginPage: 'http://localhost/login',
+			consentPage: 'http://localhost/consent',
+		}),
+	],
+} satisfies Pick<BetterAuthOptions, 'user' | 'plugins'>
+
 const authMigrate = Effect.promise(async () => {
 	const pool = new pg.Pool({
 		connectionString: process.env['DATABASE_URL'],
@@ -20,58 +84,7 @@ const authMigrate = Effect.promise(async () => {
 			dialect: new PostgresDialect({ pool }),
 			type: 'postgres',
 		},
-		user: {
-			additionalFields: {
-				isAgent: {
-					type: 'boolean',
-					required: false,
-					defaultValue: false,
-				},
-				locale: {
-					type: 'string',
-					required: false,
-					input: false,
-				},
-				passwordOptOut: {
-					type: 'boolean',
-					required: false,
-					defaultValue: false,
-				},
-			},
-		},
-		// `organization()` here so Better Auth's CLI generates the
-		// `organization` / `member` / `invitation` tables alongside the rest.
-		// `member.primary_inbox_id` is a Batuda extension used to record each
-		// member's default From identity in this org.
-		plugins: [
-			openAPI(),
-			bearer(),
-			admin(),
-			organization({
-				schema: {
-					member: {
-						additionalFields: {
-							primaryInboxId: {
-								type: 'string',
-								required: false,
-								fieldName: 'primary_inbox_id',
-							},
-						},
-					},
-				},
-			}),
-			apiKey(),
-			// Generates the OAuth provider tables (oauthClient, oauthAccessToken,
-			// oauthRefreshToken, oauthConsent) plus the jwt plugin's jwks table,
-			// backing the OAuth MCP path. loginPage/consentPage are runtime-only;
-			// the values don't affect schema generation. Keep in sync with
-			// src/lib/auth.ts.
-			jwt(),
-			oauthProvider({
-				loginPage: 'http://localhost/login',
-				consentPage: 'http://localhost/consent',
-			}),
-		],
+		...betterAuthSchemaConfig,
 	})
 	await runMigrations()
 	await pool.end()

@@ -70,11 +70,35 @@ jobs:
             echo "has_migrations=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # Migrations are TypeScript (Effect SqlClient), named NNNN_*.ts — not .sql,
-          # so the old '\.sql$' filter matched nothing and silently skipped every migrate.
+          # Our own migrations are TypeScript (Effect SqlClient), named NNNN_*.ts —
+          # not .sql, so the old '\.sql$' filter matched nothing and silently
+          # skipped every migrate.
           files=$(git diff --name-only "$prev..HEAD" -- apps/server/src/db/migrations/ | grep -E '[0-9]{4}_.*\.(ts|sql)$' || true)
-          if [ -n "$files" ]; then
-            echo "New migrations since $prev:"; echo "$files"
+
+          # Better Auth owns its own tables and generates their DDL at migrate
+          # time from the config it is handed — there is no file under
+          # migrations/ to notice. So a release that adds, say, a column to the
+          # user table changes no migration file at all, and a path-only check
+          # waves it through to a deploy whose code expects a column that does
+          # not exist yet.
+          #
+          # Its schema comes from the plugin list and the additionalFields on
+          # user/session/account/verification (see `getAuthTables`), all of
+          # which reach the generator through migrate.ts, with the shared config
+          # mirroring them for the running server. Watch both.
+          ba_config=$(git diff --name-only "$prev..HEAD" -- \
+            apps/server/src/db/migrate.ts \
+            packages/auth/src/infrastructure/build-better-auth-config.ts || true)
+
+          # A Better Auth upgrade can add columns of its own without anyone here
+          # touching a config file, so a version change gates too.
+          ba_version=$(git diff "$prev..HEAD" -- '*package.json' \
+            | grep -E '^[+-][[:space:]]*"(better-auth|@better-auth/[a-z-]+)":' || true)
+
+          if [ -n "$files" ] || [ -n "$ba_config" ] || [ -n "$ba_version" ]; then
+            [ -n "$files" ] && { echo "New migrations since $prev:"; echo "$files"; }
+            [ -n "$ba_config" ] && { echo "Better Auth schema config changed since $prev:"; echo "$ba_config"; }
+            [ -n "$ba_version" ] && { echo "Better Auth version changed since $prev:"; echo "$ba_version"; }
             echo "has_migrations=true" >> "$GITHUB_OUTPUT"
           else
             echo "No new migrations since $prev — skipping the migrate gate."
