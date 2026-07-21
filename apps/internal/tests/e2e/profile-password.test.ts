@@ -2,6 +2,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test'
 
 import { openAddMemberPanel } from './helpers/add-member-panel'
 import { findLatestEmail, findLatestMessage } from './helpers/dev-inbox'
+import { waitForInteractive } from './helpers/hydration'
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 // End-to-end set/change password from /profile. The flow under test:
@@ -147,12 +148,9 @@ test.describe('setting a first password from /profile', () => {
 
 			// WHEN Bob fills both password fields and submits
 			//   [set-password-route.ts — credential row written branch]
-			// Wait for the submit control to go live first: the fields are
-			// uncontrolled and read on submit, so typing into them before React
-			// has finished hydrating is silently discarded.
-			await expect(bob.page.getByTestId('set-password-submit')).toBeEnabled({
-				timeout: 10_000,
-			})
+			// The fields are uncontrolled and read on submit, so typing into them
+			// before the page is live is silently discarded.
+			await waitForInteractive(bob.page, 'set-password-submit')
 			await bob.page.getByTestId('set-password-new').fill(NEW_PASSWORD)
 			await bob.page.getByTestId('set-password-confirm').fill(NEW_PASSWORD)
 

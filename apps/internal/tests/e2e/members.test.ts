@@ -91,6 +91,10 @@ test.afterAll(async ({ browser }) => {
 // Signs in Carol, a plain member of taller, in her own context. Empty
 // storageState on purpose: the authed project injects Alice's cookie by
 // default, which would make every assertion below run as the owner instead.
+//
+// Signed in over the API rather than through the page: her login is not what
+// any of these tests are about, and loading a cold page for it costs more than
+// everything they actually assert.
 async function signInAsCarol(
 	browser: import('@playwright/test').Browser,
 ): Promise<BrowserContext> {
@@ -99,15 +103,20 @@ async function signInAsCarol(
 		baseURL: BASE_URL,
 		storageState: { cookies: [], origins: [] },
 	})
-	const page = await context.newPage()
-	await page.goto('/login')
-	await expect(page.getByTestId('login-form')).toBeVisible({ timeout: 20_000 })
-	await page.getByTestId('login-email').fill('colleague@taller.cat')
-	await page.getByTestId('login-password').fill('batuda-dev-2026')
-	await page.getByTestId('login-submit').click()
-	await page.waitForURL(/\/$/)
-	await setActiveOrgBySlug(page, 'taller')
-	await page.close()
+	const headers = { origin: BASE_URL, 'content-type': 'application/json' }
+	const signedIn = await context.request.post(
+		`${BASE_URL}/auth/sign-in/email`,
+		{
+			headers,
+			data: { email: 'colleague@taller.cat', password: 'batuda-dev-2026' },
+		},
+	)
+	expect(signedIn.ok(), 'Carol should be able to sign in').toBe(true)
+	const switched = await context.request.post(
+		`${BASE_URL}/auth/organization/set-active`,
+		{ headers, data: { organizationSlug: 'taller' } },
+	)
+	expect(switched.ok(), 'Carol should reach taller').toBe(true)
 	return context
 }
 
@@ -242,8 +251,8 @@ test.describe('adding a member', () => {
 			page,
 			browser,
 		}) => {
-			// An add through the UI, a second admin's session, and an inbox poll —
-			// past a single test's default budget, and all of it real work.
+			// Two adds and an inbox poll — past a single test's default budget,
+			// and all of it real work.
 			test.setTimeout(60_000)
 
 			// GIVEN someone added to taller who reads Catalan
@@ -311,14 +320,10 @@ test.describe('adding a member', () => {
 	// is not authorization — anyone can post to the endpoint directly. These
 	// probe the server the way someone bypassing the page would.
 	test.describe('when a regular member calls the API directly', () => {
-		// Signed in once for the whole block: each probe is a single request, and
-		// repeating a full password sign-in per test costs more than the probes.
+		// One session for the whole block — each probe is a single request.
 		let carolContext: BrowserContext | undefined
 
 		test.beforeAll(async ({ browser }) => {
-			// A cold sign-in — fresh context, a route the authed project never
-			// visits — runs past a single test's budget. Paid once for the block.
-			test.setTimeout(90_000)
 			carolContext = await signInAsCarol(browser)
 		})
 
