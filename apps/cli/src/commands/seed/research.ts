@@ -89,6 +89,17 @@ type RunSpec = {
 		| 'failed'
 		| 'cancelled'
 		| 'deleted'
+		| 'no_reliable_data'
+	/** Why a run gave up. Only meaningful on failed / no_reliable_data. */
+	readonly reasonCode?:
+		| 'entity_mismatch'
+		| 'weak_no_official_site'
+		| 'site_unreadable'
+		| 'name_too_generic'
+		| 'no_sources'
+		| 'internal_error'
+	/** How confident the run was that it found the right company at all. */
+	readonly entityMatch?: 'strong' | 'weak' | 'absent'
 	readonly findings: Record<string, unknown>
 	readonly briefMd: string | null
 	readonly budgetCents: number
@@ -116,6 +127,86 @@ type RunSpec = {
 		sourceId?: string
 		autoApproved: boolean
 	}>
+}
+
+/**
+ * Fields the UI reads as a value plus the source that backs it, rather than a
+ * bare value. Listed here so the fixtures below can be written in the obvious
+ * way — `industry: 'restaurants'` — and still reach the screen correctly.
+ */
+const SOURCED_ENRICHMENT_FIELDS = [
+	'industry',
+	'size_range',
+	'pain_points',
+	'current_tools',
+	'location',
+	'country',
+] as const
+const SOURCED_CONTACT_FIELDS = ['role', 'email', 'phone'] as const
+
+type Citationish = {
+	source_id?: unknown
+	quote?: unknown
+	confidence?: unknown
+}
+
+/**
+ * Attach a finding's source to the individual fields that display it.
+ *
+ * The research schema stores these as `{ value, source_id, quote, confidence }`
+ * and the detail view reads `.value`, so a bare string renders as an empty
+ * row with no citation. Wrapping happens here rather than in every fixture so
+ * the demo data stays readable and no new block can forget it.
+ */
+const withSourcedFields = (
+	findings: Record<string, unknown>,
+): Record<string, unknown> => {
+	const cite = (block: Record<string, unknown>): Citationish => {
+		const citations = block['citations']
+		return Array.isArray(citations) && citations.length > 0
+			? (citations[0] as Citationish)
+			: {}
+	}
+	const wrap = (
+		block: Record<string, unknown>,
+		fields: ReadonlyArray<string>,
+	): Record<string, unknown> => {
+		const source = cite(block)
+		const out: Record<string, unknown> = { ...block }
+		for (const field of fields) {
+			const value = out[field]
+			// Already wrapped, or nothing to wrap.
+			if (value === undefined || value === null) continue
+			if (typeof value === 'object' && !Array.isArray(value)) continue
+			out[field] = {
+				value,
+				source_id: source.source_id ?? null,
+				...(source.quote === undefined ? {} : { quote: source.quote }),
+				...(source.confidence === undefined
+					? {}
+					: { confidence: source.confidence }),
+			}
+		}
+		return out
+	}
+
+	const next: Record<string, unknown> = { ...findings }
+	const enrichment = next['enrichment']
+	if (enrichment !== null && typeof enrichment === 'object') {
+		next['enrichment'] = wrap(
+			enrichment as Record<string, unknown>,
+			SOURCED_ENRICHMENT_FIELDS,
+		)
+	}
+	const contacts = next['contacts']
+	if (Array.isArray(contacts)) {
+		next['contacts'] = contacts.map(c =>
+			c !== null && typeof c === 'object'
+				? wrap(c as Record<string, unknown>, SOURCED_CONTACT_FIELDS)
+				: c,
+		)
+	}
+	return next
 }
 
 const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
@@ -2728,6 +2819,145 @@ const TALLER_RUN_SPECS: ReadonlyArray<RunSpec> = [
 		completedAt: new Date('2026-05-15T09:00:00Z'),
 		toolLog: TOOL_LOG_CACHE_HIT,
 	},
+
+	// ── Runs that gave up, each with its own reason ──────────────
+	// The detail view turns reason_code into a sentence explaining what went
+	// wrong; without these rows that whole explanation path has no data.
+	{
+		key: 'no-data-mismatch',
+		companySlug: 'empresa-fantasma',
+		query: 'enrich Empresa Fantasma from its public web presence',
+		mode: 'deep',
+		schemaName: 'company_enrichment_v1',
+		kind: 'leaf',
+		status: 'no_reliable_data',
+		reasonCode: 'entity_mismatch',
+		entityMatch: 'absent',
+		findings: {},
+		briefMd: null,
+		budgetCents: 50,
+		costCents: 12,
+		tokensIn: 3100,
+		tokensOut: 400,
+		startedAt: new Date('2026-05-20T10:00:00Z'),
+		completedAt: new Date('2026-05-20T10:01:10Z'),
+	},
+	{
+		key: 'no-data-generic-name',
+		companySlug: 'consultoria-beta',
+		query: 'enrich Consultoria Beta',
+		mode: 'deep',
+		schemaName: 'company_enrichment_v1',
+		kind: 'leaf',
+		status: 'no_reliable_data',
+		reasonCode: 'name_too_generic',
+		entityMatch: 'weak',
+		findings: {},
+		briefMd: null,
+		budgetCents: 50,
+		costCents: 8,
+		tokensIn: 2200,
+		tokensOut: 300,
+		startedAt: new Date('2026-05-20T10:05:00Z'),
+		completedAt: new Date('2026-05-20T10:05:40Z'),
+	},
+	{
+		key: 'no-data-no-site',
+		companySlug: 'forn-de-pa-queralt',
+		query: 'enrich Forn de Pa Queralt',
+		mode: 'deep',
+		schemaName: 'company_enrichment_v1',
+		kind: 'leaf',
+		status: 'no_reliable_data',
+		reasonCode: 'weak_no_official_site',
+		entityMatch: 'weak',
+		findings: {},
+		briefMd: null,
+		budgetCents: 50,
+		costCents: 6,
+		tokensIn: 1800,
+		tokensOut: 260,
+		startedAt: new Date('2026-05-20T10:10:00Z'),
+		completedAt: new Date('2026-05-20T10:10:30Z'),
+	},
+	{
+		key: 'failed-unreadable',
+		companySlug: 'ceramiques-emporda',
+		query: 'enrich Ceràmiques Empordà',
+		mode: 'deep',
+		schemaName: 'company_enrichment_v1',
+		kind: 'leaf',
+		status: 'failed',
+		reasonCode: 'site_unreadable',
+		entityMatch: 'strong',
+		findings: {},
+		briefMd: null,
+		budgetCents: 50,
+		costCents: 14,
+		tokensIn: 2600,
+		tokensOut: 320,
+		startedAt: new Date('2026-05-20T10:15:00Z'),
+		completedAt: new Date('2026-05-20T10:16:05Z'),
+	},
+	{
+		key: 'failed-no-sources',
+		companySlug: 'park-stone-design',
+		query: 'enrich Park Stone Design',
+		mode: 'deep',
+		schemaName: 'company_enrichment_v1',
+		kind: 'leaf',
+		status: 'failed',
+		reasonCode: 'no_sources',
+		entityMatch: 'absent',
+		findings: {},
+		briefMd: null,
+		budgetCents: 50,
+		costCents: 4,
+		tokensIn: 900,
+		tokensOut: 120,
+		startedAt: new Date('2026-05-20T10:20:00Z'),
+		completedAt: new Date('2026-05-20T10:20:20Z'),
+	},
+	{
+		key: 'failed-internal',
+		companySlug: 'electricitat-del-valles',
+		query: 'enrich Electricitat del Vallès',
+		mode: 'deep',
+		schemaName: 'company_enrichment_v1',
+		kind: 'leaf',
+		status: 'failed',
+		reasonCode: 'internal_error',
+		entityMatch: 'strong',
+		findings: {},
+		briefMd: null,
+		budgetCents: 50,
+		costCents: 2,
+		tokensIn: 400,
+		tokensOut: 60,
+		startedAt: new Date('2026-05-20T10:25:00Z'),
+		completedAt: new Date('2026-05-20T10:25:05Z'),
+	},
+
+	// A shape nothing knows how to render, so the raw-JSON fallback in the
+	// detail view is reachable.
+	{
+		key: 'unknown-shape',
+		companySlug: 'bright-lane-boutique',
+		query: 'experimental extraction for Bright Lane Boutique',
+		mode: 'deep',
+		schemaName: 'experimental_shape_v9',
+		kind: 'leaf',
+		status: 'succeeded',
+		findings: { anything: { at_all: ['a', 'b'], depth: 2 } },
+		briefMd:
+			'## Bright Lane — experimental\nAn output shape the UI has no view for.',
+		budgetCents: 20,
+		costCents: 9,
+		tokensIn: 1400,
+		tokensOut: 350,
+		startedAt: new Date('2026-05-21T09:00:00Z'),
+		completedAt: new Date('2026-05-21T09:00:50Z'),
+	},
 ]
 
 export const seedResearchRuns = (
@@ -2852,8 +3082,10 @@ export const seedResearchRuns = (
 			mode: s.mode,
 			schemaName: s.schemaName,
 			status: s.status,
+			reasonCode: s.reasonCode ?? null,
+			entityMatch: s.entityMatch ?? null,
 			context: JSON.stringify({}),
-			findings: JSON.stringify(s.findings),
+			findings: JSON.stringify(withSourcedFields(s.findings)),
 			briefMd: s.briefMd,
 			budgetCents: s.budgetCents,
 			paidBudgetCents: s.paidBudgetCents ?? 0,
