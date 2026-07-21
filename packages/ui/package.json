@@ -25,14 +25,8 @@
 			"types": "./dist/pri/index.d.mts",
 			"import": "./dist/pri/index.mjs"
 		},
-		"./tokens.css": {
-			"development": "./src/tokens.css",
-			"default": "./dist/tokens.css"
-		},
-		"./tailwind.css": {
-			"development": "./src/tailwind.css",
-			"default": "./dist/tailwind.css"
-		}
+		"./tokens.css": "./src/tokens.css",
+		"./tailwind.css": "./src/tailwind.css"
 	},
 	"scripts": {
 		"build": "tsdown",
@@ -59,7 +53,9 @@
 	},
 	"private": false,
 	"files": [
-		"dist"
+		"dist",
+		"src/tokens.css",
+		"src/tailwind.css"
 	],
 	"publishConfig": {
 		"access": "public",
