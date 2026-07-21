@@ -1,3 +1,5 @@
+import { isLangCode, type LangCode } from '@batuda/domain'
+
 import { apiBaseUrl } from './api-base'
 
 /**
@@ -34,6 +36,13 @@ export type SessionUser = {
 	readonly id: string
 	readonly email: string
 	readonly name: string
+	/**
+	 * The language stored on the account, when there is one. Someone added by
+	 * an admin has it set from the moment they exist, so their first visit can
+	 * render in it before they have touched any setting. `null` for accounts
+	 * that predate the field, or that never had one chosen.
+	 */
+	readonly locale: LangCode | null
 }
 
 /**
@@ -66,12 +75,19 @@ export async function fetchSession(
 		if (body === null || typeof body !== 'object') return null
 		const maybeUser = (body as { user?: unknown }).user
 		if (!maybeUser || typeof maybeUser !== 'object') return null
-		const u = maybeUser as { id?: unknown; email?: unknown; name?: unknown }
+		const u = maybeUser as {
+			id?: unknown
+			email?: unknown
+			name?: unknown
+			locale?: unknown
+		}
 		if (typeof u.id !== 'string' || typeof u.email !== 'string') return null
 		return {
 			id: u.id,
 			email: u.email,
 			name: typeof u.name === 'string' ? u.name : u.email,
+			// Anything that isn't a language we serve reads as "none chosen".
+			locale: isLangCode(u.locale) ? u.locale : null,
 		}
 	} catch (err) {
 		if (typeof window === 'undefined' && err instanceof TypeError) {

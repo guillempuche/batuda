@@ -27,6 +27,11 @@ const authMigrate = Effect.promise(async () => {
 					required: false,
 					defaultValue: false,
 				},
+				locale: {
+					type: 'string',
+					required: false,
+					input: false,
+				},
 				passwordOptOut: {
 					type: 'boolean',
 					required: false,
