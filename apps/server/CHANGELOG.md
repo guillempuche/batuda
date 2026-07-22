@@ -3,6 +3,46 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-22 (server-v2026.7.22)
+
+### Features
+
+* **auth:** remember which language each person reads ([ddbc59f](https://github.com/guillempuche/batuda/commit/ddbc59f023cc54d69b1c2d0fceb8ec1f8ad248a9))
+* **cli:** choose the language when creating an account ([e28802c](https://github.com/guillempuche/batuda/commit/e28802cb887537142b98d74495f5fe3065584c8c))
+* **domain:** move the list of languages into the shared package ([0bcb7d0](https://github.com/guillempuche/batuda/commit/0bcb7d067af6c6b9f7801871badb319020cb6073))
+* **server:** add people to an organization directly ([efed2b7](https://github.com/guillempuche/batuda/commit/efed2b783853d28d9e165ed0847b5d35dd78e527))
+* **server:** write system email in the reader's language ([0ef4a0d](https://github.com/guillempuche/batuda/commit/0ef4a0d68a11c0898441e52a47830725e92ea586))
+* **ui:** add the dark and high-contrast themes ([d874fae](https://github.com/guillempuche/batuda/commit/d874fae410181a53301b3fc33078c1c09c55e09a))
+
+### Bug Fixes
+
+* **internal:** make the dark themes correct on the surfaces that ignore them ([aa631eb](https://github.com/guillempuche/batuda/commit/aa631eb4d68e89639bb6452736ebb4dace68cbe0))
+* **internal:** only offer to approve a paid step that can be run ([b2814d7](https://github.com/guillempuche/batuda/commit/b2814d7f83f93965f6a42a59d0d7eaefb68feb24))
+* **internal:** show failed loads as errors instead of empty lists ([91fdb99](https://github.com/guillempuche/batuda/commit/91fdb9909398ec2715602c36fa1269d97f8d22b7))
+* **server:** only undo an account this request created ([b2dbc86](https://github.com/guillempuche/batuda/commit/b2dbc867a5228f4d0be9d21fb7d0d3f389e95a2b))
+* stop auth invite issuing sign-in links that cannot be delivered ([55d1554](https://github.com/guillempuche/batuda/commit/55d1554324a6bf16f33b3f7c1a85936daac3cce0))
+* **ui:** serve the design tokens from a single copy ([92e1f5b](https://github.com/guillempuche/batuda/commit/92e1f5b54675bd85ef6bd9e3033a2205cef64b84))
+
+### Refactoring
+
+* **server:** remove the invitation email path ([b5ca1a7](https://github.com/guillempuche/batuda/commit/b5ca1a70e6325bd8cfc81b626cbdaf5e0535a973))
+* **ui:** complete and restructure the design token system ([6cc0243](https://github.com/guillempuche/batuda/commit/6cc0243486d5310cb56c574b4dc7bbe355c4519c))
+* **ui:** draw library primitives from tokens instead of fixed colours ([aef36ab](https://github.com/guillempuche/batuda/commit/aef36ab9d6d965c1fb10c1f012310f2b62d9ce02))
+
+### Documentation
+
+* **server:** explain the attachment disposition without naming a retired vendor ([495d81b](https://github.com/guillempuche/batuda/commit/495d81be9f76397cb943bfc58e1a81f1445f10a9))
+
+### Tests
+
+* **internal:** wait for the page to be live before clicking ([6239336](https://github.com/guillempuche/batuda/commit/62393367d41a99191fe5dad95a85d4c57fd03bb0))
+* **ui:** check theme contrast against the token file before pushing ([103aef4](https://github.com/guillempuche/batuda/commit/103aef4a928dc4d4100ea532e3363b401ce09856))
+
+### CI/CD
+
+* cover Better Auth schema changes before they reach production ([9b52813](https://github.com/guillempuche/batuda/commit/9b52813e7cca1d5478de6cbbf4ab2f03c66c0440))
+* run the theme contrast check where it cannot be skipped ([9198703](https://github.com/guillempuche/batuda/commit/91987035a3f60998586bf8f8b91b1589d272f8f2))
+
 ## 2026-07-20 (server-v2026.7.20)
 
 ### Features
