@@ -1,3 +1,4 @@
+import { useLingui } from '@lingui/react/macro'
 import { Markdown } from '@tiptap/markdown'
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -55,6 +56,7 @@ export function PriRichText({
 	readonly disabled?: boolean
 	readonly testId?: string
 }) {
+	const { t } = useLingui()
 	const [markdown, setMarkdown] = useState(defaultValue ?? '')
 
 	const editor = useEditor({
@@ -70,6 +72,9 @@ export function PriRichText({
 			attributes: {
 				role: 'textbox',
 				'aria-multiline': 'true',
+				// A disabled editor is non-editable; tell assistive tech so it isn't
+				// announced as an editable field that silently rejects input.
+				...(disabled ? { 'aria-readonly': 'true' } : {}),
 				...(id ? { id } : {}),
 				...(ariaLabel ? { 'aria-label': ariaLabel } : {}),
 				...(ariaDescribedby ? { 'aria-describedby': ariaDescribedby } : {}),
@@ -105,30 +110,30 @@ export function PriRichText({
 
 	return (
 		<Shell data-disabled={disabled ? 'true' : undefined}>
-			<EditorToolbar aria-label={ariaLabel}>
+			<EditorToolbar aria-label={t`Text formatting`}>
 				<ToolButton
-					label='Bold'
+					label={t`Bold`}
 					icon={<Bold size={15} aria-hidden />}
 					pressed={active?.bold ?? false}
 					disabled={disabled}
 					onClick={() => editor?.chain().focus().toggleBold().run()}
 				/>
 				<ToolButton
-					label='Italic'
+					label={t`Italic`}
 					icon={<Italic size={15} aria-hidden />}
 					pressed={active?.italic ?? false}
 					disabled={disabled}
 					onClick={() => editor?.chain().focus().toggleItalic().run()}
 				/>
 				<ToolButton
-					label='Strikethrough'
+					label={t`Strikethrough`}
 					icon={<Strikethrough size={15} aria-hidden />}
 					pressed={active?.strike ?? false}
 					disabled={disabled}
 					onClick={() => editor?.chain().focus().toggleStrike().run()}
 				/>
 				<ToolButton
-					label='Heading 1'
+					label={t`Heading 1`}
 					icon={<Heading1 size={15} aria-hidden />}
 					pressed={active?.h1 ?? false}
 					disabled={disabled}
@@ -137,7 +142,7 @@ export function PriRichText({
 					}
 				/>
 				<ToolButton
-					label='Heading 2'
+					label={t`Heading 2`}
 					icon={<Heading2 size={15} aria-hidden />}
 					pressed={active?.h2 ?? false}
 					disabled={disabled}
@@ -146,28 +151,28 @@ export function PriRichText({
 					}
 				/>
 				<ToolButton
-					label='Bullet list'
+					label={t`Bullet list`}
 					icon={<List size={15} aria-hidden />}
 					pressed={active?.bulletList ?? false}
 					disabled={disabled}
 					onClick={() => editor?.chain().focus().toggleBulletList().run()}
 				/>
 				<ToolButton
-					label='Numbered list'
+					label={t`Numbered list`}
 					icon={<ListOrdered size={15} aria-hidden />}
 					pressed={active?.orderedList ?? false}
 					disabled={disabled}
 					onClick={() => editor?.chain().focus().toggleOrderedList().run()}
 				/>
 				<ToolButton
-					label='Quote'
+					label={t`Quote`}
 					icon={<Quote size={15} aria-hidden />}
 					pressed={active?.blockquote ?? false}
 					disabled={disabled}
 					onClick={() => editor?.chain().focus().toggleBlockquote().run()}
 				/>
 				<ToolButton
-					label='Code'
+					label={t`Code`}
 					icon={<Code size={15} aria-hidden />}
 					pressed={active?.code ?? false}
 					disabled={disabled}
