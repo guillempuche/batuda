@@ -32,6 +32,49 @@ overrides:
   '@effect/sql': 4.0.0-beta.98
   '@effect/ai-openai-compat': 4.0.0-beta.98
   effect: 4.0.0-beta.98
+  # Pin the whole @tiptap family to one version. `@tiptap/markdown` (used by
+  # apps/internal's rich-text editor) is published only from 3.28.0 and needs
+  # `@tiptap/core@^3.28.0`, but `@react-email/editor` pulls the rest of the
+  # family at `^3.17.1`. Under the hoisted linker there can be only one
+  # `@tiptap/core`, so mixing versions leaves markdown importing symbols the
+  # older core doesn't export. `@react-email/editor` declares `^3.17.1`, so
+  # 3.28.0 stays within its supported range.
+  # INVARIANT: bump every entry together, never one alone — a split version
+  # reintroduces the missing-export build failure.
+  '@tiptap/core': 3.28.0
+  '@tiptap/pm': 3.28.0
+  '@tiptap/react': 3.28.0
+  '@tiptap/starter-kit': 3.28.0
+  '@tiptap/markdown': 3.28.0
+  '@tiptap/extensions': 3.28.0
+  '@tiptap/html': 3.28.0
+  '@tiptap/suggestion': 3.28.0
+  '@tiptap/extension-blockquote': 3.28.0
+  '@tiptap/extension-bold': 3.28.0
+  '@tiptap/extension-bubble-menu': 3.28.0
+  '@tiptap/extension-bullet-list': 3.28.0
+  '@tiptap/extension-code': 3.28.0
+  '@tiptap/extension-code-block': 3.28.0
+  '@tiptap/extension-document': 3.28.0
+  '@tiptap/extension-dropcursor': 3.28.0
+  '@tiptap/extension-floating-menu': 3.28.0
+  '@tiptap/extension-gapcursor': 3.28.0
+  '@tiptap/extension-hard-break': 3.28.0
+  '@tiptap/extension-heading': 3.28.0
+  '@tiptap/extension-horizontal-rule': 3.28.0
+  '@tiptap/extension-italic': 3.28.0
+  '@tiptap/extension-link': 3.28.0
+  '@tiptap/extension-list': 3.28.0
+  '@tiptap/extension-list-item': 3.28.0
+  '@tiptap/extension-list-keymap': 3.28.0
+  '@tiptap/extension-mention': 3.28.0
+  '@tiptap/extension-ordered-list': 3.28.0
+  '@tiptap/extension-paragraph': 3.28.0
+  '@tiptap/extension-placeholder': 3.28.0
+  '@tiptap/extension-strike': 3.28.0
+  '@tiptap/extension-superscript': 3.28.0
+  '@tiptap/extension-text': 3.28.0
+  '@tiptap/extension-underline': 3.28.0
 
 # Trusted install scripts; install fails on any unlisted dep with build scripts.
 allowBuilds:
