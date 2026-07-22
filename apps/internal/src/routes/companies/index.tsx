@@ -182,6 +182,10 @@ function CompaniesListPage() {
 	)
 	const isLoading = AsyncResult.isInitial(result)
 	const isFailure = AsyncResult.isFailure(result)
+	// The count and the pipeline total describe the loaded list. Until the
+	// list actually loads, an empty array would read as "0 companies" — a
+	// failed or still-loading fetch must not look like an empty pipeline.
+	const hasResult = AsyncResult.isSuccess(result)
 	// A full window came back, so there is probably another page to load.
 	const hasMore = companies.length >= visibleLimit
 
@@ -288,9 +292,11 @@ function CompaniesListPage() {
 			<Intro>
 				<TitleRow>
 					<Title>{t`Companies`}</Title>
-					<Subtitle>{countLabel}</Subtitle>
+					{hasResult && <Subtitle>{countLabel}</Subtitle>}
 				</TitleRow>
-				<KpiCounter value={companies.length} label={t`In pipeline`} />
+				{hasResult && (
+					<KpiCounter value={companies.length} label={t`In pipeline`} />
+				)}
 			</Intro>
 
 			<Filters role='group' aria-label={t`Filter companies`}>
