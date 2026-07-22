@@ -113,9 +113,11 @@ import { useComposeEmail } from '#/context/compose-email-context'
 import { useQuickCapture } from '#/context/quick-capture-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
+import { dlgNoId } from '#/lib/dlg-search'
 import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import { useTabSearchParam } from '#/lib/tab-search'
+import { useDlg } from '#/lib/use-dlg'
 import {
 	agedPaperSurface,
 	brushedMetalBezel,
@@ -272,8 +274,14 @@ function extractCompanyName(raw: unknown): string | null {
 const COMPANY_TABS = ['overview', 'conversations', 'people', 'files'] as const
 type CompanyTab = (typeof COMPANY_TABS)[number]
 
+// The "Run research" dialog lives in `?dlg=research` so it is deep-linkable and
+// Back closes it. The company id comes from the route, so the dialog carries no
+// id of its own.
+const companyDlgSchema = dlgNoId('research')
+
 const validateSearch = validateSearchWith({
 	tab: Schema.Literals(COMPANY_TABS),
+	dlg: companyDlgSchema,
 })
 
 export const Route = createFileRoute('/companies/$slug')({
@@ -627,7 +635,12 @@ function DetailBody({
 				: [],
 		[researchResult],
 	)
-	const [researchDialogOpen, setResearchDialogOpen] = useState(false)
+	const {
+		dlg: researchDlg,
+		open: openResearchDlg,
+		close: closeResearchDlg,
+	} = useDlg(companyDlgSchema)
+	const researchDialogOpen = researchDlg !== undefined
 	const [manageChannelsContactId, setManageChannelsContactId] = useState<
 		string | null
 	>(null)
@@ -1198,7 +1211,7 @@ function DetailBody({
 								<Stack $gap='md'>
 									<ResearchSummaryCard
 										runs={researchRuns}
-										onRunNew={() => setResearchDialogOpen(true)}
+										onRunNew={() => openResearchDlg({ kind: 'research' })}
 									/>
 									<WherePanel company={company} compact />
 									<AboutSection
@@ -1502,7 +1515,9 @@ function DetailBody({
 
 			<ResearchDialog
 				open={researchDialogOpen}
-				onOpenChange={setResearchDialogOpen}
+				onOpenChange={next => {
+					if (!next) closeResearchDlg()
+				}}
 				companyId={company.id}
 				onCreated={() => {
 					refreshResearch()

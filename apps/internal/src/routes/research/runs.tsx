@@ -5,8 +5,10 @@ import {
 	ResearchRuns,
 	RUN_LIST_LIMIT,
 	researchRunsAtom,
+	researchRunsDlgSchema,
 } from '#/components/research/run-list'
 import { dehydrateAtom } from '#/lib/atom-hydration'
+import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 
 /**
@@ -28,6 +30,7 @@ async function loadRunsOnServer() {
 }
 
 export const Route = createFileRoute('/research/runs')({
+	validateSearch: validateSearchWith({ dlg: researchRunsDlgSchema }),
 	loader: async () => {
 		if (!import.meta.env.SSR) {
 			return { dehydrated: [] as const }

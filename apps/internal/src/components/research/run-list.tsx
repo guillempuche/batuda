@@ -3,7 +3,6 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { Search } from 'lucide-react'
-import { useState } from 'react'
 import styled from 'styled-components'
 
 import { PriButton } from '@batuda/ui/pri'
@@ -11,7 +10,9 @@ import { PriButton } from '@batuda/ui/pri'
 import { researchListAtom } from '#/atoms/research-atoms'
 import { ErrorState } from '#/components/shared/error-state'
 import { RelativeDate } from '#/components/shared/relative-date'
+import { dlgNoId } from '#/lib/dlg-search'
 import { formatMoneyCents } from '#/lib/format-money'
+import { useDlg } from '#/lib/use-dlg'
 import { stenciledTitle } from '#/lib/workshop-mixins'
 import { Badge } from './badge'
 import { ResearchDialog } from './research-dialog'
@@ -25,10 +26,16 @@ export function researchRunsAtom() {
 	return researchListAtom({ limit: RUN_LIST_LIMIT })
 }
 
+// The "Find companies" dialog lives in `?dlg=discovery` so it is deep-linkable
+// and Back closes it, matching the review-queue inbox. The route validates this
+// schema; a value outside it decodes to nothing and the dialog stays closed.
+export const researchRunsDlgSchema = dlgNoId('discovery')
+
 export function ResearchRuns() {
 	const { t, i18n } = useLingui()
 	const navigate = useNavigate()
-	const [dialogOpen, setDialogOpen] = useState(false)
+	const { dlg, open, close } = useDlg(researchRunsDlgSchema)
+	const dialogOpen = dlg !== undefined
 	const result = useAtomValue(researchRunsAtom())
 	const refreshRuns = useAtomRefresh(researchRunsAtom())
 	const runs = AsyncResult.isSuccess(result) ? narrowResearch(result.value) : []
@@ -48,7 +55,7 @@ export function ResearchRuns() {
 					type='button'
 					$variant='filled'
 					data-testid='discovery-open'
-					onClick={() => setDialogOpen(true)}
+					onClick={() => open({ kind: 'discovery' })}
 				>
 					<Search size={16} aria-hidden />
 					<Trans>Find companies</Trans>
@@ -110,7 +117,9 @@ export function ResearchRuns() {
 
 			<ResearchDialog
 				open={dialogOpen}
-				onOpenChange={setDialogOpen}
+				onOpenChange={next => {
+					if (!next) close()
+				}}
 				onCreated={id => {
 					void navigate({ to: '/research/$id', params: { id } })
 				}}
