@@ -557,6 +557,12 @@ const Column = styled.div.withConfig({
 	flex-direction: column;
 	gap: var(--space-2xs);
 	flex: 0 0 clamp(15rem, 78vw, 18rem);
+	/* Hold every column to the flex basis. Without this a card whose content
+	 * can't shrink (a long name, the owner control) would push its column
+	 * past the basis — and since the columns don't shrink, that one ends up
+	 * visibly wider than the rest. Flooring at 0 lets the cards truncate
+	 * instead. */
+	min-width: 0;
 	min-height: 8rem;
 	scroll-snap-align: start;
 	padding: var(--space-2xs);
