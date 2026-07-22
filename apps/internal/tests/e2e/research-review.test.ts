@@ -2,6 +2,9 @@ import { execSync } from 'node:child_process'
 
 import { expect, test } from '@playwright/test'
 
+import { waitForInteractive } from './helpers/hydration'
+import { setActiveOrgBySlug } from './helpers/set-active-org'
+
 // Exercises the research review flow on /research (inbox) and
 // /research/$id (per-run review): trust badges, provenance, single
 // apply/reject, and a bulk "apply all verified" whose batch contains a
@@ -40,6 +43,14 @@ test.beforeAll(() => {
 	pepContactId = psql(
 		`select id from contacts where company_id='${companyId}' and name='Pep Casals' limit 1`,
 	)
+})
+
+// The run is seeded under `taller`, and RLS scopes it to the active org. A
+// sibling suite may have left Alice on Restaurant, which would render /research
+// empty here, so pin the org before each test the way the other authed specs do.
+test.beforeEach(async ({ page }) => {
+	await page.goto('/', { waitUntil: 'commit' })
+	await setActiveOrgBySlug(page, 'taller')
 })
 
 // Reset to a clean, all-pending fixture and remove any contacts a prior run
@@ -173,24 +184,48 @@ test.describe('research review', () => {
 		test('should apply a single proposal and show its outcome', async ({
 			page,
 		}) => {
-			// GIVEN the review screen
+			// GIVEN the review screen, interactive so the click reaches a live
+			// handler rather than an inert server-rendered button
 			await page.goto(`/research/${RUN_ID}`, { waitUntil: 'networkidle' })
+			await waitForInteractive(page, 'research-review-apply')
 			const needsReviewCard = page.getByTestId('research-review-card').filter({
 				hasText: 'Jordi Garcia',
 			})
 			const badge = needsReviewCard.getByTestId('research-outcome-badge')
 
-			// WHEN the reviewer applies the needs-review proposal (retry the click
-			// until the outcome lands — the handler may attach a beat after
-			// hydration, and a resolved row can't be applied twice)
-			await expect(async () => {
-				if ((await badge.count()) === 0) {
-					await needsReviewCard.getByTestId('research-review-apply').click()
-				}
-				await expect(badge).toBeVisible({ timeout: 2000 })
-			}).toPass()
+			// WHEN the reviewer applies the needs-review proposal. Its write is held
+			// for a short undo window before it reaches the server, so the outcome
+			// lands a few seconds after the click.
+			await needsReviewCard.getByTestId('research-review-apply').click()
 
-			// THEN it enters the CRM (created, or merged if it already existed)
+			// THEN it enters the CRM (created, or merged if it already existed) and
+			// the card shows the outcome the run now stores
+			await expect(badge).toBeVisible({ timeout: 15_000 })
+			await expect(badge).toHaveAttribute(
+				'data-outcome',
+				/created|duplicate|applied/,
+			)
+		})
+
+		test('should keep an applied proposal outcome after a reload', async ({
+			page,
+		}) => {
+			// GIVEN a proposal that has just been applied and shows its outcome
+			await page.goto(`/research/${RUN_ID}`, { waitUntil: 'networkidle' })
+			await waitForInteractive(page, 'research-review-apply')
+			const card = page
+				.getByTestId('research-review-card')
+				.filter({ hasText: 'Jordi Garcia' })
+			const badge = card.getByTestId('research-outcome-badge')
+			await card.getByTestId('research-review-apply').click()
+			await expect(badge).toBeVisible({ timeout: 15_000 })
+
+			// WHEN the page is reloaded, dropping every in-memory reply
+			await page.reload({ waitUntil: 'networkidle' })
+
+			// THEN the card still shows the outcome, read back from the stored run
+			// rather than from this session's now-discarded reply
+			await expect(badge).toBeVisible()
 			await expect(badge).toHaveAttribute(
 				'data-outcome',
 				/created|duplicate|applied/,
@@ -200,8 +235,10 @@ test.describe('research review', () => {
 		test('should apply all verified without aborting on a conflict', async ({
 			page,
 		}) => {
-			// GIVEN a batch whose verified set includes a stale-version update
+			// GIVEN a batch whose verified set includes a stale-version update, on a
+			// screen that is interactive so the bulk action reaches a live handler
 			await page.goto(`/research/${RUN_ID}`, { waitUntil: 'networkidle' })
+			await waitForInteractive(page, 'research-review-apply-all')
 
 			const created = page
 				.getByTestId('research-review-card')
@@ -213,18 +250,13 @@ test.describe('research review', () => {
 				.filter({ hasText: 'Head Chef' })
 				.getByTestId('research-outcome-badge')
 
-			// WHEN the reviewer applies every verified proposal in one batch
-			// (retry the click until the outcomes land — the button's handler may
-			// attach a beat after hydration; the batch is idempotent to re-click
-			// because resolved rows no longer sit in the verified set)
-			await expect(async () => {
-				if ((await created.count()) === 0) {
-					await page.getByTestId('research-review-apply-all').click()
-				}
-				await expect(created).toBeVisible({ timeout: 2000 })
-			}).toPass()
+			// WHEN the reviewer applies every verified proposal in one batch. The
+			// bulk write is guarded by a confirm step, so it takes two clicks.
+			await page.getByTestId('research-review-apply-all').click()
+			await page.getByTestId('research-review-apply-all-confirm').click()
 
 			// THEN the fresh create succeeds
+			await expect(created).toBeVisible({ timeout: 15_000 })
 			await expect(created).toHaveAttribute('data-outcome', /created|duplicate/)
 
 			// AND the stale update reports a conflict rather than aborting the batch
