@@ -629,6 +629,10 @@ msgstr "Bloquejat pel proveïdor. El cos es mostra només per revisar-lo."
 msgid "Board"
 msgstr "Tauler"
 
+#: src/components/primitives/pri-rich-text.tsx
+msgid "Bold"
+msgstr ""
+
 #: src/routes/calendar/index.tsx
 msgid "Book a meeting from a company page or forward an invitation to your inbox to see it here."
 msgstr "Reserva una reunió des d'una pàgina d'empresa o reenvia una invitació a la teva safata per veure-la aquí."
@@ -657,6 +661,10 @@ msgstr "Accions massives"
 #: src/routes/emails/index.tsx
 msgid "Bulk thread actions"
 msgstr "Accions massives de fils"
+
+#: src/components/primitives/pri-rich-text.tsx
+msgid "Bullet list"
+msgstr ""
 
 #: src/routes/settings/api-keys/index.tsx
 msgid "by {creatorName}"
@@ -869,6 +877,10 @@ msgstr "Tancat"
 #: src/components/shared/status-badge.tsx
 msgid "Closed — won or lost"
 msgstr "Tancat — guanyat o perdut"
+
+#: src/components/primitives/pri-rich-text.tsx
+msgid "Code"
+msgstr ""
 
 #: src/routes/settings/mcp/index.tsx
 msgid "Coding tools (API key)"
@@ -1607,8 +1619,13 @@ msgid "Disabled"
 msgstr "Desactivada"
 
 #: src/components/emails/compose-form.tsx
+#: src/components/instructions/template-editor-dialog.tsx
 msgid "Discard"
 msgstr "Descarta"
+
+#: src/components/instructions/template-editor-dialog.tsx
+msgid "Discard your unsaved changes?"
+msgstr ""
 
 #: src/components/companies/about-section.tsx
 msgid "Discovery"
@@ -2058,6 +2075,14 @@ msgstr "Ves a iniciar sessió"
 msgid "Hard limit on paid research spend each month."
 msgstr "Límit màxim de despesa de recerca de pagament cada mes."
 
+#: src/components/primitives/pri-rich-text.tsx
+msgid "Heading 1"
+msgstr ""
+
+#: src/components/primitives/pri-rich-text.tsx
+msgid "Heading 2"
+msgstr ""
+
 #: src/routes/emails/inboxes.tsx
 msgid "Hide advanced settings"
 msgstr "Amaga la configuració avançada"
@@ -2207,6 +2232,7 @@ msgid "Instruction templates"
 msgstr "Plantilles d'instruccions"
 
 #: src/components/instructions/template-editor-dialog.tsx
+#: src/components/instructions/template-editor-dialog.tsx
 msgid "Instructions"
 msgstr "Instruccions"
 
@@ -2230,9 +2256,17 @@ msgstr "No vàlid"
 msgid "It expires in {MAGIC_LINK_EXPIRY_MINUTES} minutes. Not seeing it? Check spam."
 msgstr "Caduca en {MAGIC_LINK_EXPIRY_MINUTES} minuts. No el veus? Mira el correu brossa."
 
+#: src/components/primitives/pri-rich-text.tsx
+msgid "Italic"
+msgstr ""
+
 #: src/routes/calendar/index.tsx
 msgid "Join video call"
 msgstr "Uneix-te a la videotrucada"
+
+#: src/components/instructions/template-editor-dialog.tsx
+msgid "Keep editing"
+msgstr ""
 
 #: src/routes/settings/organization/spend.tsx
 msgid "Key"
@@ -2946,6 +2980,10 @@ msgstr "Ara mateix no hi ha res per revisar."
 msgid "Nothing to show in this range."
 msgstr "Res a mostrar en aquest interval."
 
+#: src/components/primitives/pri-rich-text.tsx
+msgid "Numbered list"
+msgstr ""
+
 #: src/routes/emails/$threadId.tsx
 msgid "On {date}, {who} wrote:"
 msgstr "El {date}, {who} va escriure:"
@@ -3479,6 +3517,10 @@ msgstr "Afegeix tasca ràpidament"
 #: src/routes/tasks/index.tsx
 msgid "Quick add: \"Call Acme tomorrow #high\""
 msgstr "Afegeix ràpid: «Truca a Acme demà #high»"
+
+#: src/components/primitives/pri-rich-text.tsx
+msgid "Quote"
+msgstr ""
 
 #: src/components/research/target-correction.tsx
 msgid "Re-run with this domain"
@@ -4228,6 +4270,10 @@ msgstr "Es desa xifrada amb AES-256-GCM."
 msgid "Strengths"
 msgstr "Punts forts"
 
+#: src/components/primitives/pri-rich-text.tsx
+msgid "Strikethrough"
+msgstr ""
+
 #: src/components/research/run-progress.tsx
 msgid "Structuring the findings"
 msgstr "Estructurant les conclusions"
@@ -4323,6 +4369,10 @@ msgstr "Prova fallida"
 #: src/routes/emails/inboxes.tsx
 msgid "Testing connection…"
 msgstr "Provant la connexió…"
+
+#: src/components/primitives/pri-rich-text.tsx
+msgid "Text formatting"
+msgstr ""
 
 #: src/routes/login.tsx
 msgid "That connection request expired. Start it again from your AI assistant."
@@ -4677,6 +4727,10 @@ msgstr "Client sense nom"
 #: src/routes/emails/index.tsx
 msgid "Unread"
 msgstr "No llegit"
+
+#: src/components/instructions/template-editor-dialog.tsx
+msgid "Unsaved changes"
+msgstr ""
 
 #: src/routes/emails/index.tsx
 msgid "Untitled"

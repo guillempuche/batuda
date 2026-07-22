@@ -40,7 +40,19 @@ export function TemplateDeleteConfirm({
 				<PriDialog.Popup mobile='action-sheet' data-testid={testId}>
 					<PriDialog.Title>{title}</PriDialog.Title>
 					<PriDialog.Description>{description}</PriDialog.Description>
+					{/* Cancel is first in the DOM so the safe action is the default target
+					    (keyboard order, and initial focus once dialogs focus in). The
+					    reversed column below keeps the destructive button visually on top. */}
 					<SheetActions>
+						<PriButton
+							type='button'
+							$variant='text'
+							onClick={() => {
+								if (!deleting) onClose()
+							}}
+						>
+							<Trans>Cancel</Trans>
+						</PriButton>
 						{/* Confirm button gets its own selector so tests can click it apart from the popup. */}
 						<PriButton
 							type='button'
@@ -51,13 +63,6 @@ export function TemplateDeleteConfirm({
 						>
 							{deleting ? <Trans>Deleting…</Trans> : <Trans>Delete</Trans>}
 						</PriButton>
-						<PriDialog.Close
-							render={props => (
-								<PriButton type='button' $variant='text' {...props}>
-									<Trans>Cancel</Trans>
-								</PriButton>
-							)}
-						/>
 					</SheetActions>
 				</PriDialog.Popup>
 			</PriDialog.Portal>
@@ -65,11 +70,12 @@ export function TemplateDeleteConfirm({
 	)
 }
 
-// On the phone action sheet the buttons stack full-width in the thumb zone;
-// Cancel sits at the bottom (most reachable) as the safe default.
+// On the phone action sheet the buttons stack full-width in the thumb zone.
+// column-reverse puts the destructive Delete on top and Cancel at the bottom
+// (most reachable, the safe default) while Cancel stays first in the DOM.
 const SheetActions = styled(DialogActions)`
 	@media (max-width: 40rem) {
-		flex-direction: column;
+		flex-direction: column-reverse;
 		align-items: stretch;
 		gap: var(--space-xs);
 

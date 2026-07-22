@@ -49,6 +49,7 @@ export function TemplateEditorDialog({
 	// has typed something, so a stray navigation can't drop their draft.
 	const dirtyRef = useRef(false)
 	const [confirmDiscard, setConfirmDiscard] = useState(false)
+	const keepEditingRef = useRef<HTMLButtonElement>(null)
 
 	// Reseed guard state whenever the dialog reopens or retargets a row. `editing`
 	// and `open` gate the reset but aren't read in the body, so Biome can't infer
@@ -62,6 +63,13 @@ export function TemplateEditorDialog({
 		// otherwise the reopened dialog shows a disabled "Saving…" button.
 		setSubmitting(false)
 	}, [editing, open])
+
+	// The discard prompt is a blocking alert; move focus to the safe choice so
+	// keyboard and screen-reader users land on it — and don't lose focus to the
+	// body when the Cancel button that opened it unmounts.
+	useEffect(() => {
+		if (confirmDiscard) keepEditingRef.current?.focus()
+	}, [confirmDiscard])
 
 	const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
 		event.preventDefault()
@@ -209,12 +217,17 @@ export function TemplateEditorDialog({
 						) : null}
 
 						{confirmDiscard ? (
-							<DiscardBar role='alertdialog' aria-label={t`Unsaved changes`}>
-								<DiscardText>
+							<DiscardBar
+								role='alertdialog'
+								aria-label={t`Unsaved changes`}
+								aria-describedby='template-discard-desc'
+							>
+								<DiscardText id='template-discard-desc'>
 									<Trans>Discard your unsaved changes?</Trans>
 								</DiscardText>
 								<DiscardActions>
 									<PriButton
+										ref={keepEditingRef}
 										type='button'
 										$variant='text'
 										onClick={() => setConfirmDiscard(false)}
@@ -292,6 +305,12 @@ const CloseButton = styled.button`
 	width: 1.75rem;
 	height: 1.75rem;
 	padding: 0;
+
+	/* Bigger tap target on touch, matching the editor toolbar. */
+	@media (pointer: coarse) {
+		width: 2.75rem;
+		height: 2.75rem;
+	}
 	border: none;
 	border-radius: var(--shape-2xs);
 	background: transparent;
