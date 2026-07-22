@@ -173,6 +173,28 @@ const StyledPopup = styled(Dialog.Popup).withConfig({
 			}
 		}
 	}
+
+	/*
+	 * Motion-sensitive users get the fade without the slide/scale: pin the
+	 * enter/leave transform to each layout's resting position so only opacity
+	 * animates.
+	 */
+	@media (prefers-reduced-motion: reduce) {
+		&[data-starting-style],
+		&[data-ending-style] {
+			transform: translate(-50%, -50%);
+		}
+
+		&[data-mobile='sheet'],
+		&[data-mobile='action-sheet'] {
+			@media (max-width: 40rem) {
+				&[data-starting-style],
+				&[data-ending-style] {
+					transform: none;
+				}
+			}
+		}
+	}
 `
 
 const PriTitle = styled(Dialog.Title).withConfig({
