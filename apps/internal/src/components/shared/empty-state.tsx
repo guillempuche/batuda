@@ -12,17 +12,24 @@ import {
  * via a beige masking-tape strip rotated at the top-left corner, and
  * the icon slot sits inside a brushed-metal bezel so it reads as a
  * tool pinned to the paper.
+ *
+ * `headingLevel` should match where the note sits in the page outline: 1
+ * when the empty state replaces the whole page, 2 when it sits under a
+ * page or section title. The title looks like a heading, so it is marked
+ * up as one — otherwise it is skipped by heading navigation.
  */
 export function EmptyState({
 	icon: Icon,
 	title,
 	description,
 	action,
+	headingLevel = 2,
 }: {
 	icon?: ComponentType<{ size?: number | string; 'aria-hidden'?: boolean }>
 	title: string
 	description?: ReactNode
 	action?: ReactNode
+	headingLevel?: 1 | 2 | 3
 }) {
 	return (
 		<Wrapper>
@@ -32,7 +39,7 @@ export function EmptyState({
 					<Icon size={30} aria-hidden />
 				</Bezel>
 			)}
-			<Title>{title}</Title>
+			<Title as={`h${headingLevel}`}>{title}</Title>
 			{description && <Description>{description}</Description>}
 			{action && <Actions>{action}</Actions>}
 		</Wrapper>
