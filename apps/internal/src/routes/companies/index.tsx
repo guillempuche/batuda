@@ -661,6 +661,19 @@ const Page = styled.div.withConfig({ displayName: 'CompaniesListPage' })`
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-lg);
+
+	/* Cap the reading column and centre it so the header, filters, and card
+	 * grid don't stretch edge-to-edge on wide monitors — matching the
+	 * research list convention. */
+	width: 100%;
+	max-width: 64rem;
+	margin-inline: auto;
+
+	/* Measure children against this element's own width, not the window's.
+	 * The card list keys its column count off the space it actually has —
+	 * the capped column here, narrowed further by the fixed side rail —
+	 * instead of the raw viewport. */
+	container-type: inline-size;
 `
 
 const Intro = styled.div.withConfig({ displayName: 'CompaniesListIntro' })`
@@ -789,15 +802,20 @@ const Grid = styled(motion.div).withConfig({
 	displayName: 'CompaniesListGrid',
 })`
 	display: grid;
-	grid-template-columns: 1fr;
+	/* minmax(0, …) not a bare 1fr: a plain 1fr track keeps its default
+	 * auto minimum, which is the card's min-content width (the status
+	 * badge + last-contact row can't shrink). On a narrow phone that
+	 * min-content is wider than the column, so the track grows past the
+	 * sheet and the whole list scrolls sideways. Flooring the track at 0
+	 * lets the card shrink and its own text ellipsis take over instead. */
+	grid-template-columns: minmax(0, 1fr);
 	gap: var(--space-md);
 
-	@media (min-width: 768px) {
-		grid-template-columns: 1fr 1fr;
-	}
-
-	@media (min-width: 1024px) {
-		grid-template-columns: 1fr 1fr 1fr;
+	/* Two columns once the list's own width — not the window's — has room
+	 * for them; a single card fills a desktop sheet comfortably at two, so
+	 * the list tops out there rather than cramming a third. */
+	@container (min-width: 40rem) {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 
 	/* Micro-rotation to break grid rhythm. See CompanyCard for the
