@@ -1,4 +1,5 @@
 import { Dialog } from '@base-ui/react/dialog'
+import { type ComponentProps, type RefObject, useEffect, useRef } from 'react'
 import styled from 'styled-components'
 
 /**
@@ -21,7 +22,7 @@ const PriBackdrop = styled(Dialog.Backdrop).withConfig({
 	}
 `
 
-const PriPopup = styled(Dialog.Popup).withConfig({
+const StyledPopup = styled(Dialog.Popup).withConfig({
 	displayName: 'PriDialogPopup',
 })`
 	position: fixed;
@@ -105,6 +106,73 @@ const PriPopup = styled(Dialog.Popup).withConfig({
 		opacity: 0;
 		transform: translate(-50%, calc(-50% - 18px)) rotate(-0.6deg);
 	}
+
+	/*
+	 * Opt-in full-screen sheet for phones (mobile="sheet"). The dialog fills the
+	 * screen so the content — not the chrome — owns the viewport, and its height
+	 * tracks the visual viewport (--pri-dialog-vh, set from window.visualViewport)
+	 * so the on-screen keyboard shrinks the sheet instead of hiding the footer.
+	 * 40rem is the app's phone breakpoint.
+	 */
+	&[data-mobile='sheet'] {
+		@media (max-width: 40rem) {
+			top: 0;
+			left: 0;
+			transform: none;
+			width: 100%;
+			max-width: none;
+			height: var(--pri-dialog-vh, 100dvh);
+			max-height: var(--pri-dialog-vh, 100dvh);
+			border-radius: 0;
+			overflow: hidden;
+			padding: calc(env(safe-area-inset-top, 0px) + var(--space-lg))
+				var(--space-lg)
+				calc(env(safe-area-inset-bottom, 0px) + var(--space-md));
+
+			/* No binder-clip on a full-bleed sheet. */
+			&::before,
+			&::after {
+				display: none;
+			}
+
+			&[data-starting-style],
+			&[data-ending-style] {
+				opacity: 0;
+				transform: translateY(2rem);
+			}
+		}
+	}
+
+	/*
+	 * Opt-in bottom action sheet for phones (mobile="action-sheet"). Anchored to
+	 * the bottom, auto-height, sliding up — a reachable spot for a confirm or
+	 * menu. Rounded only at the top; no binder-clip.
+	 */
+	&[data-mobile='action-sheet'] {
+		@media (max-width: 40rem) {
+			top: auto;
+			bottom: 0;
+			left: 0;
+			transform: none;
+			width: 100%;
+			max-width: none;
+			max-height: 85dvh;
+			border-radius: var(--shape-md) var(--shape-md) 0 0;
+			padding: var(--space-xl) var(--space-lg)
+				calc(env(safe-area-inset-bottom, 0px) + var(--space-lg));
+
+			&::before,
+			&::after {
+				display: none;
+			}
+
+			&[data-starting-style],
+			&[data-ending-style] {
+				opacity: 0;
+				transform: translateY(100%);
+			}
+		}
+	}
 `
 
 const PriTitle = styled(Dialog.Title).withConfig({
@@ -132,6 +200,58 @@ const PriDescription = styled(Dialog.Description).withConfig({
 	margin: 0;
 	font-style: italic;
 `
+
+// While the sheet is open, mirror the visual viewport's height onto the popup so
+// the sheet shrinks with the on-screen keyboard (keeping the footer + caret
+// visible) instead of being overlapped by it. No-op off `sheet` and on servers.
+function useSheetViewportHeight(
+	ref: RefObject<HTMLElement | null>,
+	enabled: boolean,
+) {
+	useEffect(() => {
+		const viewport =
+			typeof window === 'undefined' ? undefined : window.visualViewport
+		const el = ref.current
+		if (!enabled || !viewport || !el) return
+		const apply = () => {
+			el.style.setProperty('--pri-dialog-vh', `${viewport.height}px`)
+			// The keyboard eats a big chunk of the layout viewport; flag it so the
+			// sheet can drop secondary chrome (description) and give the editor the
+			// reclaimed room.
+			if (window.innerHeight - viewport.height > 120) {
+				el.setAttribute('data-keyboard', 'open')
+			} else {
+				el.removeAttribute('data-keyboard')
+			}
+		}
+		apply()
+		viewport.addEventListener('resize', apply)
+		viewport.addEventListener('scroll', apply)
+		return () => {
+			viewport.removeEventListener('resize', apply)
+			viewport.removeEventListener('scroll', apply)
+			el.style.removeProperty('--pri-dialog-vh')
+			el.removeAttribute('data-keyboard')
+		}
+	}, [enabled, ref])
+}
+
+// `mobile` opts the dialog into a phone-specific layout: "sheet" is a
+// full-screen, keyboard-aware editor surface; "action-sheet" is a bottom-
+// anchored, auto-height panel for confirmations and menus (buttons in the
+// thumb zone). Omit it and the dialog stays a centered modal on every screen.
+function PriPopup({
+	mobile,
+	...props
+}: ComponentProps<typeof StyledPopup> & {
+	readonly mobile?: 'sheet' | 'action-sheet'
+}) {
+	const ref = useRef<HTMLDivElement>(null)
+	// Only the full-screen sheet tracks the keyboard; an action sheet is short
+	// and bottom-anchored, so it needs no viewport binding.
+	useSheetViewportHeight(ref, mobile === 'sheet')
+	return <StyledPopup ref={ref} data-mobile={mobile} {...props} />
+}
 
 export const PriDialog = {
 	Root: Dialog.Root,

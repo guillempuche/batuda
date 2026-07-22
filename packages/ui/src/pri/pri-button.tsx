@@ -2,17 +2,19 @@ import { Button } from '@base-ui/react/button'
 import styled, { css } from 'styled-components'
 
 /**
- * Workshop button primitive. Three variants:
- *   - filled:   stamped-metal plate (brushed gradient + engraved label)
- *   - outlined: stencil (dashed outline, uppercase, no fill)
- *   - text:     underlined display-font link
+ * Workshop button primitive. Four variants:
+ *   - filled:      stamped-metal plate (brushed gradient + engraved label)
+ *   - outlined:    stencil (dashed outline, uppercase, no fill)
+ *   - text:        underlined display-font link
+ *   - destructive: filled in the error colour, for irreversible actions
  *
  * Usage:
  *   <PriButton $variant="filled">Desa</PriButton>
  *   <PriButton $variant="outlined">Cancel·la</PriButton>
  *   <PriButton $variant="text">Descarta</PriButton>
+ *   <PriButton $variant="destructive">Elimina</PriButton>
  */
-export type PriButtonVariant = 'filled' | 'outlined' | 'text'
+export type PriButtonVariant = 'filled' | 'outlined' | 'text' | 'destructive'
 
 const filled = css`
 	background: linear-gradient(
@@ -69,6 +71,24 @@ const outlined = css`
 
 	&:active:not(:disabled) {
 		background: color-mix(in srgb, var(--color-primary) 16%, transparent);
+	}
+`
+
+const destructive = css`
+	background: var(--color-error);
+	color: var(--color-on-error);
+	border-color: color-mix(in oklab, var(--color-error) 65%, black);
+	box-shadow: var(--elevation-workshop-sm);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	font-weight: var(--font-weight-bold);
+
+	&:hover:not(:disabled) {
+		background: color-mix(in oklab, var(--color-error) 88%, black);
+	}
+
+	&:active:not(:disabled) {
+		background: color-mix(in oklab, var(--color-error) 80%, black);
 	}
 `
 
@@ -143,6 +163,8 @@ export const PriButton = styled(Button).withConfig({
 				return outlined
 			case 'text':
 				return text
+			case 'destructive':
+				return destructive
 			default:
 				return filled
 		}
