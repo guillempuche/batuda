@@ -1,9 +1,10 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute } from '@tanstack/react-router'
+import { Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { ArrowLeft, Gift, Pencil, Plus, ScrollText, Trash2 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
 import type { Agent } from '@batuda/instructions/domain'
@@ -51,9 +52,18 @@ import {
 } from '#/components/instructions/template-editor-dialog'
 import { ErrorState } from '#/components/shared/error-state'
 import { authClient } from '#/lib/auth-client'
+import { dlgNoId, dlgWithId } from '#/lib/dlg-search'
+import { validateSearchWith } from '#/lib/search-schema'
+import { useDlg } from '#/lib/use-dlg'
 import { brushedMetalPlate, stenciledTitle } from '#/lib/workshop-mixins'
 
+// The create/edit dialogs live in the `?dlg=` param so they are deep-linkable
+// and the browser Back button closes them — `create` opens on its own, `edit`
+// targets a template by id.
+const templatesDlgSchema = Schema.Union([dlgNoId('create'), dlgWithId('edit')])
+
 export const Route = createFileRoute('/settings/profile/templates')({
+	validateSearch: validateSearchWith({ dlg: templatesDlgSchema }),
 	head: () => ({ meta: [{ title: 'Instruction templates — Batuda' }] }),
 	component: TemplatesPage,
 })
@@ -105,22 +115,36 @@ function TemplatesPage() {
 		[templates],
 	)
 
-	const [dialogOpen, setDialogOpen] = useState(false)
-	const [editing, setEditing] = useState<TemplateDraft | null>(null)
+	const { dlg, open: openDlg, close: closeDlg } = useDlg(templatesDlgSchema)
 	const [confirmTarget, setConfirmTarget] = useState<{
 		readonly id: string
 		readonly name: string
 	} | null>(null)
 	const [deleting, setDeleting] = useState(false)
 
-	const openCreate = () => {
-		setEditing(null)
-		setDialogOpen(true)
-	}
-	const openEdit = (row: TemplateShape) => {
-		setEditing({ id: row.id, name: row.name, body: row.body })
-		setDialogOpen(true)
-	}
+	// The edit dialog resolves its target from the loaded list, so a deep link
+	// (?dlg=edit&id=…) reopens the right template on refresh.
+	const editingRow =
+		dlg?.kind === 'edit'
+			? (templates.find(row => row.id === dlg.id) ?? null)
+			: null
+	const editing: TemplateDraft | null = editingRow
+		? { id: editingRow.id, name: editingRow.name, body: editingRow.body }
+		: null
+	const dialogOpen =
+		dlg?.kind === 'create' || (dlg?.kind === 'edit' && editingRow !== null)
+
+	// A deep link to a template that no longer exists (deleted, or not visible)
+	// drops itself from the URL once the list has loaded.
+	const templatesLoaded = AsyncResult.isSuccess(templatesResult)
+	useEffect(() => {
+		if (dlg?.kind === 'edit' && templatesLoaded && editingRow === null) {
+			closeDlg()
+		}
+	}, [dlg, templatesLoaded, editingRow, closeDlg])
+
+	const openCreate = () => openDlg({ kind: 'create' })
+	const openEdit = (row: TemplateShape) => openDlg({ kind: 'edit', id: row.id })
 
 	const confirmDelete = async () => {
 		const target = confirmTarget
@@ -334,7 +358,9 @@ function TemplatesPage() {
 
 			<TemplateEditorDialog
 				open={dialogOpen}
-				onOpenChange={setDialogOpen}
+				onOpenChange={next => {
+					if (!next) closeDlg()
+				}}
 				editing={editing}
 				onSaved={() => {
 					refreshTemplates()
