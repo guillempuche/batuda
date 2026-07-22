@@ -1,5 +1,6 @@
 import { Trans } from '@lingui/react/macro'
 import type { ReactNode } from 'react'
+import styled from 'styled-components'
 
 import { PriButton, PriDialog } from '@batuda/ui/pri'
 
@@ -36,14 +37,14 @@ export function TemplateDeleteConfirm({
 		>
 			<PriDialog.Portal>
 				<PriDialog.Backdrop />
-				<PriDialog.Popup data-testid={testId}>
+				<PriDialog.Popup mobile='action-sheet' data-testid={testId}>
 					<PriDialog.Title>{title}</PriDialog.Title>
 					<PriDialog.Description>{description}</PriDialog.Description>
-					<DialogActions>
+					<SheetActions>
 						{/* Confirm button gets its own selector so tests can click it apart from the popup. */}
 						<PriButton
 							type='button'
-							$variant='filled'
+							$variant='destructive'
 							data-testid={`${testId}-button`}
 							disabled={deleting}
 							onClick={onConfirm}
@@ -57,9 +58,23 @@ export function TemplateDeleteConfirm({
 								</PriButton>
 							)}
 						/>
-					</DialogActions>
+					</SheetActions>
 				</PriDialog.Popup>
 			</PriDialog.Portal>
 		</PriDialog.Root>
 	)
 }
+
+// On the phone action sheet the buttons stack full-width in the thumb zone;
+// Cancel sits at the bottom (most reachable) as the safe default.
+const SheetActions = styled(DialogActions)`
+	@media (max-width: 40rem) {
+		flex-direction: column;
+		align-items: stretch;
+		gap: var(--space-xs);
+
+		& > * {
+			width: 100%;
+		}
+	}
+`
