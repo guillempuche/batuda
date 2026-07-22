@@ -3,14 +3,7 @@ import { useLingui } from '@lingui/react/macro'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { DateTime, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
-import {
-	Check,
-	ChevronsUpDown,
-	Columns3,
-	LayoutGrid,
-	Search,
-	X,
-} from 'lucide-react'
+import { Check, ChevronsUpDown, Search, X } from 'lucide-react'
 import { LayoutGroup, motion } from 'motion/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
@@ -23,10 +16,10 @@ import {
 	canonicalSearchKey,
 	companiesSearchAtom,
 } from '#/atoms/companies-atoms'
+import { CompaniesHeader } from '#/components/companies/companies-header'
 import { CompanyCard } from '#/components/shared/company-card'
 import { EmptyState } from '#/components/shared/empty-state'
 import { ErrorState } from '#/components/shared/error-state'
-import { KpiCounter } from '#/components/shared/kpi-counter'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import {
 	type CompanyStatus,
@@ -38,11 +31,7 @@ import { dehydrateAtom } from '#/lib/atom-hydration'
 import { useOrgMembers } from '#/lib/org-members'
 import { validateSearchWith } from '#/lib/search-schema'
 import { getServerCookieHeader } from '#/lib/server-cookie'
-import {
-	brushedMetalPlate,
-	rulerUnderRule,
-	stenciledTitle,
-} from '#/lib/workshop-mixins'
+import { brushedMetalPlate } from '#/lib/workshop-mixins'
 
 /**
  * Narrow row shape for the list view. The server returns `Schema.Unknown`
@@ -289,51 +278,34 @@ function CompaniesListPage() {
 
 	return (
 		<Page>
-			<Intro>
-				<TitleRow>
-					<Title>{t`Companies`}</Title>
-					{hasResult && <Subtitle>{countLabel}</Subtitle>}
-				</TitleRow>
-				{hasResult && (
-					<KpiCounter value={companies.length} label={t`In pipeline`} />
-				)}
-			</Intro>
+			<CompaniesHeader
+				view='list'
+				title={t`Companies`}
+				listHref='/companies'
+				boardHref={boardHref(boardSearch(search))}
+				{...(hasResult
+					? {
+							subtitle: countLabel,
+							kpi: { value: companies.length, label: t`In pipeline` },
+						}
+					: {})}
+			/>
 
 			<Filters role='group' aria-label={t`Filter companies`}>
-				<TopRow>
-					<SearchWrap>
-						<SearchIcon>
-							<Search size={16} aria-hidden />
-						</SearchIcon>
-						<PriInput
-							type='search'
-							placeholder={t`Search by name, industry, or location…`}
-							value={searchInput}
-							onChange={event => setSearchInput(event.target.value)}
-							aria-label={t`Search companies`}
-							style={{ paddingLeft: 'calc(var(--space-sm) * 2 + 16px)' }}
-							data-testid='companies-search'
-						/>
-					</SearchWrap>
-					<ViewToggle role='group' aria-label={t`Switch view`}>
-						<ViewLink
-							$active
-							href='/companies'
-							data-testid='companies-view-list'
-							aria-current='page'
-						>
-							<LayoutGrid size={14} aria-hidden />
-							<span>{t`List`}</span>
-						</ViewLink>
-						<ViewLink
-							href={boardHref(boardSearch(search))}
-							data-testid='companies-view-board'
-						>
-							<Columns3 size={14} aria-hidden />
-							<span>{t`Board`}</span>
-						</ViewLink>
-					</ViewToggle>
-				</TopRow>
+				<SearchWrap>
+					<SearchIcon>
+						<Search size={16} aria-hidden />
+					</SearchIcon>
+					<PriInput
+						type='search'
+						placeholder={t`Search by name, industry, or location…`}
+						value={searchInput}
+						onChange={event => setSearchInput(event.target.value)}
+						aria-label={t`Search companies`}
+						style={{ paddingLeft: 'calc(var(--space-sm) * 2 + 16px)' }}
+						data-testid='companies-search'
+					/>
+				</SearchWrap>
 
 				<StatusFilters role='group' aria-label={t`Filter by status`}>
 					<StatusFilterButton
@@ -676,43 +648,6 @@ const Page = styled.div.withConfig({ displayName: 'CompaniesListPage' })`
 	container-type: inline-size;
 `
 
-const Intro = styled.div.withConfig({ displayName: 'CompaniesListIntro' })`
-	display: grid;
-	gap: var(--space-md);
-	align-items: end;
-
-	@media (min-width: 768px) {
-		grid-template-columns: 1fr auto;
-	}
-`
-
-const TitleRow = styled.div.withConfig({
-	displayName: 'CompaniesListTitleRow',
-})`
-	${rulerUnderRule}
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-2xs);
-	padding-bottom: var(--space-sm);
-`
-
-const Title = styled.h2.withConfig({ displayName: 'CompaniesListTitle' })`
-	${stenciledTitle}
-	margin: 0;
-	font-size: var(--typescale-headline-large-size);
-	line-height: var(--typescale-headline-large-line);
-`
-
-const Subtitle = styled.p.withConfig({ displayName: 'CompaniesListSubtitle' })`
-	margin: 0;
-	font-family: var(--font-body);
-	font-size: var(--typescale-body-large-size);
-	line-height: var(--typescale-body-large-line);
-	letter-spacing: var(--typescale-body-large-tracking);
-	color: var(--color-on-surface-variant);
-	font-style: italic;
-`
-
 const Filters = styled.div.withConfig({ displayName: 'CompaniesListFilters' })`
 	${brushedMetalPlate}
 	display: flex;
@@ -831,63 +766,6 @@ const Grid = styled(motion.div).withConfig({
 	}
 	& > :nth-child(3n + 3) {
 		--card-rotate: -0.15deg;
-	}
-`
-
-const TopRow = styled.div.withConfig({ displayName: 'CompaniesListTopRow' })`
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: var(--space-sm);
-
-	@media (min-width: 640px) {
-		flex-wrap: nowrap;
-	}
-
-	& > :first-child {
-		flex: 1 1 12rem;
-	}
-`
-
-const ViewToggle = styled.div.withConfig({
-	displayName: 'CompaniesListViewToggle',
-})`
-	display: inline-flex;
-	align-items: stretch;
-	border: 2px solid var(--color-outline);
-	border-radius: var(--shape-2xs);
-	overflow: hidden;
-	flex-shrink: 0;
-`
-
-const ViewLink = styled.a.withConfig({
-	displayName: 'CompaniesListViewLink',
-	shouldForwardProp: prop => prop !== '$active',
-})<{ $active?: boolean }>`
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-2xs);
-	padding: var(--space-2xs) var(--space-sm);
-	font-family: var(--font-display);
-	font-size: var(--typescale-label-small-size);
-	font-weight: var(--font-weight-bold);
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-	text-decoration: none;
-	background: ${p => (p.$active ? 'var(--color-primary)' : 'transparent')};
-	color: ${p => (p.$active ? 'var(--color-on-primary)' : 'var(--color-on-surface)')};
-
-	& + & {
-		border-left: 2px solid var(--color-outline);
-	}
-
-	&:hover {
-		color: ${p => (p.$active ? 'var(--color-on-primary)' : 'var(--color-primary)')};
-	}
-
-	&:focus-visible {
-		outline: none;
-		box-shadow: var(--glow-active);
 	}
 `
 

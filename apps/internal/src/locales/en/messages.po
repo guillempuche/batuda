@@ -625,8 +625,7 @@ msgstr "Blocked"
 msgid "Blocked by the provider. The body is shown for review only."
 msgstr "Blocked by the provider. The body is shown for review only."
 
-#: src/routes/companies/board.tsx
-#: src/routes/companies/index.tsx
+#: src/components/companies/companies-header.tsx
 msgid "Board"
 msgstr "Board"
 
@@ -2304,8 +2303,7 @@ msgstr "Line items"
 msgid "LinkedIn"
 msgstr "LinkedIn"
 
-#: src/routes/companies/board.tsx
-#: src/routes/companies/index.tsx
+#: src/components/companies/companies-header.tsx
 msgid "List"
 msgstr "List"
 
@@ -4251,8 +4249,7 @@ msgstr "Summary"
 msgid "Switch organization"
 msgstr "Switch organization"
 
-#: src/routes/companies/board.tsx
-#: src/routes/companies/index.tsx
+#: src/components/companies/companies-header.tsx
 msgid "Switch view"
 msgstr "Switch view"
 

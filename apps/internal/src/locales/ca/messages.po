@@ -625,8 +625,7 @@ msgstr "Bloquejat"
 msgid "Blocked by the provider. The body is shown for review only."
 msgstr "Bloquejat pel proveïdor. El cos es mostra només per revisar-lo."
 
-#: src/routes/companies/board.tsx
-#: src/routes/companies/index.tsx
+#: src/components/companies/companies-header.tsx
 msgid "Board"
 msgstr "Tauler"
 
@@ -2304,8 +2303,7 @@ msgstr "Línies"
 msgid "LinkedIn"
 msgstr "LinkedIn"
 
-#: src/routes/companies/board.tsx
-#: src/routes/companies/index.tsx
+#: src/components/companies/companies-header.tsx
 msgid "List"
 msgstr "Llista"
 
@@ -4251,8 +4249,7 @@ msgstr "Resum"
 msgid "Switch organization"
 msgstr "Canvia d'organització"
 
-#: src/routes/companies/board.tsx
-#: src/routes/companies/index.tsx
+#: src/components/companies/companies-header.tsx
 msgid "Switch view"
 msgstr "Canvia de vista"
 
