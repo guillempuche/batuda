@@ -3,6 +3,53 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-07-22 (mail-worker-v2026.7.22)
+
+### Features
+
+* add pipeline board and book-of-business views ([#225](https://github.com/guillempuche/batuda/issues/225)) ([efa50ad](https://github.com/guillempuche/batuda/commit/efa50ad2a61641fd4336cdae750b38a43fc01529))
+* bump Effect to 4.0.0-beta.98 and give API responses typed schemas ([9365867](https://github.com/guillempuche/batuda/commit/936586718e5de8410e6e33b053b455b517a1ae68))
+* **controllers:** add the anchored re-run endpoint ([3f79160](https://github.com/guillempuche/batuda/commit/3f791607c52c108d053cfdc38f1b86b942fe5fe7))
+* **domain:** add company classification vocabularies ([dcc709c](https://github.com/guillempuche/batuda/commit/dcc709cac76703731efe0f3f81a05e44c46aebca))
+* **domain:** move the list of languages into the shared package ([0bcb7d0](https://github.com/guillempuche/batuda/commit/0bcb7d067af6c6b9f7801871badb319020cb6073))
+* let a human mark a company as a verified lead ([ba42040](https://github.com/guillempuche/batuda/commit/ba42040d9bcb6d44a5adcba9b623378c2b3724ff))
+* make the research review inbox filterable and readable ([11e3dfe](https://github.com/guillempuche/batuda/commit/11e3dfec26f8ef910b156e8240149fb393ad03ab))
+* replace Spain-only company region with a global country ([210fb17](https://github.com/guillempuche/batuda/commit/210fb17864a85e98dbbeab2b02aaa6bbdd0b7c3b))
+* **research:** leave out prospects that miss the size or place asked for ([fef32e9](https://github.com/guillempuche/batuda/commit/fef32e97fc8887f851131c4116faf2531bb8064b))
+* **server:** add people to an organization directly ([efed2b7](https://github.com/guillempuche/batuda/commit/efed2b783853d28d9e165ed0847b5d35dd78e527))
+* **ui:** add PriMenu action-menu primitive ([8bf09a8](https://github.com/guillempuche/batuda/commit/8bf09a8dc819c5c2b1303c86f4212bad5a7cec5f))
+* **ui:** add the dark and high-contrast themes ([d874fae](https://github.com/guillempuche/batuda/commit/d874fae410181a53301b3fc33078c1c09c55e09a))
+
+### Bug Fixes
+
+* give each git worktree its own integration-test database ([88a1cd1](https://github.com/guillempuche/batuda/commit/88a1cd11feb83cfa5504d11d95a02e478c2a93ab)), closes [#295](https://github.com/guillempuche/batuda/issues/295)
+* **internal:** make the dark themes correct on the surfaces that ignore them ([aa631eb](https://github.com/guillempuche/batuda/commit/aa631eb4d68e89639bb6452736ebb4dace68cbe0))
+* return declared API errors with their real HTTP status ([b5133f9](https://github.com/guillempuche/batuda/commit/b5133f9677b3ac1ede40fa7438b27922ca74cb3a))
+* **ui:** serve the design tokens from a single copy ([92e1f5b](https://github.com/guillempuche/batuda/commit/92e1f5b54675bd85ef6bd9e3033a2205cef64b84))
+* unbreak proposal creation and stamp its lifecycle dates ([dea55e2](https://github.com/guillempuche/batuda/commit/dea55e2fbb386f0f337088b5d45fe3eae90f02ee))
+
+### Refactoring
+
+* **ui:** complete and restructure the design token system ([6cc0243](https://github.com/guillempuche/batuda/commit/6cc0243486d5310cb56c574b4dc7bbe355c4519c))
+* **ui:** draw library primitives from tokens instead of fixed colours ([aef36ab](https://github.com/guillempuche/batuda/commit/aef36ab9d6d965c1fb10c1f012310f2b62d9ce02))
+* use English codes for the CRM industry categories ([44007a3](https://github.com/guillempuche/batuda/commit/44007a35d3387c0c24ae44fb7b6de6c186ca13ec))
+
+### Tests
+
+* **ui:** check theme contrast against the token file before pushing ([103aef4](https://github.com/guillempuche/batuda/commit/103aef4a928dc4d4100ea532e3363b401ce09856))
+
+### CI/CD
+
+* **release:** ui v2026.7.12 ([ddb7645](https://github.com/guillempuche/batuda/commit/ddb76459787d8b231ade3e051827affa0694d4ec))
+* **release:** ui v2026.7.13 ([554e3cb](https://github.com/guillempuche/batuda/commit/554e3cb5461a504581b5b7ff56e9f769cdd25076))
+* **release:** ui v2026.7.22 ([ffc3330](https://github.com/guillempuche/batuda/commit/ffc333012bde23f2f0daeb96761c23aa6ae9c63d))
+* run the theme contrast check where it cannot be skipped ([9198703](https://github.com/guillempuche/batuda/commit/91987035a3f60998586bf8f8b91b1589d272f8f2))
+
+### Chores
+
+* bump Base UI to 1.6.0 ([080a353](https://github.com/guillempuche/batuda/commit/080a353031b9375b61617aec9bcffd413fd4faff))
+* bump react/react-dom to 19.2.7 and @types/react to 19.2.17 ([08283e2](https://github.com/guillempuche/batuda/commit/08283e2e4b604b6d0617b0c85b952d640ea2422b))
+
 ## 2026-07-10 (mail-worker-v2026.7.10)
 
 ## 2026-07-09 (mail-worker-v2026.7.9-1)
