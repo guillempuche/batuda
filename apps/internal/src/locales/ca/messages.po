@@ -452,7 +452,6 @@ msgid "Appearance"
 msgstr "Aparença"
 
 #: src/components/research/proposal-outcome.tsx
-#: src/components/research/review/proposed-updates-review.tsx
 msgid "Applied"
 msgstr "Aplicat"
 
@@ -3557,7 +3556,6 @@ msgstr "Rebutja {subjectLabel}"
 
 #: src/components/companies/proposals-panel.tsx
 #: src/components/research/proposal-outcome.tsx
-#: src/components/research/review/proposed-updates-review.tsx
 msgid "Rejected"
 msgstr "Rebutjat"
 

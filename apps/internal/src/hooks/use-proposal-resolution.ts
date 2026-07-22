@@ -20,8 +20,16 @@ export const UNDO_WINDOW_MS = 5000
  * an accidental Apply or Reject changes nothing. A resolution still inside its
  * window is flushed if the reviewer leaves the page, so nothing is silently
  * dropped.
+ *
+ * `onResolved` runs once each write reaches the server, whether or not the
+ * surface is still on screen. The per-run review passes it to re-read the run's
+ * saved proposals, so the outcome is drawn from what is stored rather than only
+ * from this reply — that is what keeps the outcome visible when the page settles
+ * and swaps the card out from under an in-flight write.
  */
-export function useProposalResolution() {
+export function useProposalResolution(options?: {
+	readonly onResolved?: () => void
+}) {
 	const apply = useAtomSet(applyProposalAtom, { mode: 'promiseExit' })
 	const reject = useAtomSet(rejectProposalAtom, { mode: 'promiseExit' })
 	// Committed outcomes, keyed by the caller's row key.
@@ -35,6 +43,10 @@ export function useProposalResolution() {
 		>(),
 	)
 	const mounted = useRef(true)
+	// Held in a ref so the callback can change between renders without rebuilding
+	// the mutation, and so the flush that fires on unmount still reaches it.
+	const onResolvedRef = useRef(options?.onResolved)
+	onResolvedRef.current = options?.onResolved
 
 	const runMutation = useCallback(
 		async (
@@ -48,6 +60,10 @@ export function useProposalResolution() {
 			held.current.delete(key)
 			const run = decision === 'apply' ? apply : reject
 			const exit = await run({ params: { id: researchId, puId } })
+			// The write has landed. Re-read the stored proposals now, before the
+			// mounted check, so a card swapped in by the settling page still shows
+			// the outcome even though the card that fired the write has gone.
+			onResolvedRef.current?.()
 			// The reviewer may have left while the write was in flight; it still
 			// landed, so only the on-screen updates below are skipped.
 			if (!mounted.current) return

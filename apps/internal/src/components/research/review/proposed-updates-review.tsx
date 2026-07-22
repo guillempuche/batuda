@@ -69,7 +69,7 @@ export function ProposedUpdatesReview({
 		resolve,
 		undo,
 		setResults,
-	} = useProposalResolution()
+	} = useProposalResolution({ onResolved: refreshProposals })
 
 	const [confirmingBatch, setConfirmingBatch] = useState(false)
 	const [batchBusy, setBatchBusy] = useState(false)
@@ -145,6 +145,9 @@ export function ProposedUpdatesReview({
 				}
 				return next
 			})
+			// Re-read so each applied row now carries its saved status, keeping the
+			// outcome after a reload or a remount rather than only in this reply.
+			refreshProposals()
 		} else {
 			toast.add({ title: t`Could not apply the batch.`, type: 'error' })
 		}
@@ -264,8 +267,19 @@ function ProposalCard({
 }) {
 	const { t } = useLingui()
 	const trust = strongestChannelTrust(proposal.channels)
-	const alreadyResolved = proposal.status !== 'pending'
 	const cardLabel = proposal.name ?? proposal.subjectTable ?? proposal.id
+
+	// The outcome to show: this session's fresh reply if we have it, otherwise
+	// the run's own saved status. Deriving from the stored status is what makes
+	// an applied or rejected proposal keep its badge across a reload, a remount,
+	// or a second reviewer — the reply alone would not survive any of those.
+	const shownOutcome: ResolveOutcome | null =
+		result ??
+		(proposal.status === 'applied'
+			? { outcome: 'applied', reason: null }
+			: proposal.status === 'rejected'
+				? { outcome: 'rejected', reason: null }
+				: null)
 
 	return (
 		<Card data-testid='research-review-card' data-proposal-id={proposal.id}>
@@ -315,10 +329,10 @@ function ProposalCard({
 			<Provenance date={completedAt} sources={sources} />
 
 			<CardActions>
-				{result !== undefined ? (
+				{shownOutcome !== null ? (
 					<OutcomeBadge
-						outcome={result.outcome as ProposalOutcome}
-						reason={result.reason}
+						outcome={shownOutcome.outcome as ProposalOutcome}
+						reason={shownOutcome.reason}
 					/>
 				) : pending !== undefined ? (
 					<PendingResolve data-testid='research-review-pending'>
@@ -333,14 +347,6 @@ function ProposalCard({
 							<Trans>Undo</Trans>
 						</UndoButton>
 					</PendingResolve>
-				) : alreadyResolved ? (
-					<ResolvedNote>
-						{proposal.status === 'applied' ? (
-							<Trans>Applied</Trans>
-						) : (
-							<Trans>Rejected</Trans>
-						)}
-					</ResolvedNote>
 				) : (
 					<>
 						<PriButton
@@ -593,14 +599,6 @@ const CardActions = styled.div`
 	align-items: center;
 	gap: var(--space-2xs);
 	margin-top: var(--space-3xs);
-`
-
-const ResolvedNote = styled.span`
-	font-family: var(--font-display);
-	font-size: var(--typescale-label-small-size);
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-	color: var(--color-on-surface-variant);
 `
 
 const PendingResolve = styled.div`
