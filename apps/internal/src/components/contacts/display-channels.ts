@@ -1,7 +1,6 @@
 // Pure helpers for rendering a contact's channels. Channels are the single
 // source of truth for reachable addresses; the API ships them as a json_agg
-// array whose keys stay snake_case (the pg camelCase transform only touches
-// top-level columns, not nested json), so the narrower reads snake_case.
+// array that the narrower turns into a typed list.
 
 export type EmailChannelStatus = 'unknown' | 'valid' | 'bounced' | 'complained'
 
@@ -39,10 +38,15 @@ export function narrowChannels(raw: unknown): ReadonlyArray<DisplayChannel> {
 			verification:
 				typeof r['verification'] === 'string' ? r['verification'] : null,
 			confidence: typeof r['confidence'] === 'number' ? r['confidence'] : null,
-			isPrimary: r['is_primary'] === true,
+			// The API carries these channels as a json_agg blob, and the database
+			// layer camelCases the keys inside it too — so read `isPrimary` /
+			// `statusReason`, not the raw `is_primary` / `status_reason` column
+			// names. The snake_case form comes back empty and silently hides every
+			// contact's suppression reason on the company page.
+			isPrimary: r['isPrimary'] === true,
 			status: asEmailStatus(r['status']),
 			statusReason:
-				typeof r['status_reason'] === 'string' ? r['status_reason'] : null,
+				typeof r['statusReason'] === 'string' ? r['statusReason'] : null,
 		})
 	}
 	return out
