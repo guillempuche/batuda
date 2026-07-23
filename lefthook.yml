@@ -77,6 +77,10 @@ pre-push:
       # push) when the dev stack isn't reachable or Chromium isn't installed.
       # `portless get batuda` resolves the right origin whether this is the main
       # checkout (batuda.localhost) or a worktree (<label>.batuda.localhost).
+      # The tests read seeded rows straight from the database to assert against
+      # what the page renders, so they need THIS checkout's database — a
+      # worktree has its own, and without it the assertions compare the main
+      # checkout's data to the worktree's screen.
       run: |
         url="$(pnpm exec portless get batuda 2>/dev/null)"
         if [ -z "$url" ] || ! curl -skf --max-time 3 -o /dev/null "$url/login"; then
@@ -88,4 +92,8 @@ pre-push:
           echo "skip: e2e smoke — Chromium not installed (run 'pnpm --filter @batuda/internal exec playwright install chromium'); CI will run it"
           exit 0
         fi
-        E2E_BASE_URL="$url" pnpm --filter @batuda/internal exec playwright test --grep @smoke
+        if [ -z "$E2E_DATABASE_URL" ] && [ -f .env ]; then
+          E2E_DATABASE_URL="$(grep -m1 '^DATABASE_URL=' .env | cut -d= -f2- | tr -d '"'"'"'"')"
+        fi
+        E2E_BASE_URL="$url" E2E_DATABASE_URL="$E2E_DATABASE_URL" \
+          pnpm --filter @batuda/internal exec playwright test --grep @smoke
