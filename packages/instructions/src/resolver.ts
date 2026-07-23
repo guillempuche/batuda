@@ -2,30 +2,37 @@ import { Effect } from 'effect'
 import type { SqlError } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
-import type { Agent } from './domain'
+import type { Agent, StackComposition } from './domain'
 import { fingerprintTemplates } from './fingerprint'
+
+// Re-exported so callers that only import from the resolver still see it.
+export type { StackComposition } from './domain'
 
 // ── Pure resolution helpers (unit-tested) ─────────────────────────────────
 
 // The stack that applies to a run, in precedence order:
-//   per-run override  >  the user's own default stack  >  the org default
+//   an explicitly named stack  >  ad-hoc override templates  >  the user's own
+//   default stack  >  the org default
 // A user's own default replaces the org's (no merge); an explicit per-run pick
 // replaces both. `none` means no templates applied — the run uses only the
 // surface's own built-in prompt.
-export type StackSource = 'override' | 'user' | 'org' | 'none'
+export type StackSource = 'stack' | 'override' | 'user' | 'org' | 'none'
 
 export const pickStackSource = (args: {
-	readonly hasOverride: boolean
+	readonly hasStackOverride: boolean
+	readonly hasTemplateOverride: boolean
 	readonly hasUserStack: boolean
 	readonly hasOrgStack: boolean
 }): StackSource =>
-	args.hasOverride
-		? 'override'
-		: args.hasUserStack
-			? 'user'
-			: args.hasOrgStack
-				? 'org'
-				: 'none'
+	args.hasStackOverride
+		? 'stack'
+		: args.hasTemplateOverride
+			? 'override'
+			: args.hasUserStack
+				? 'user'
+				: args.hasOrgStack
+					? 'org'
+					: 'none'
 
 // Turn the resolved templates into ordered prompt segments — one trimmed
 // segment per template body, in stack order. Blank bodies are dropped so an
@@ -34,10 +41,6 @@ export const assembleSegments = (
 	templates: ReadonlyArray<{ readonly body: string }>,
 ): ReadonlyArray<string> =>
 	templates.map(t => t.body.trim()).filter(body => body.length > 0)
-
-// A user's default stack either replaces the org default or extends it (the org
-// default, live, followed by the user's own additions).
-export type StackComposition = 'replace' | 'extend'
 
 // Keep the first occurrence of each id, preserving order. When an "extend" user
 // stack is appended after the org default, a template already in the org block
@@ -145,13 +148,16 @@ export const classifyInstructionRefs = (args: {
 		: { ok: true, templateIds: dedupeKeepFirst(templateIds) }
 }
 
-// ── DB resolution (exercised end-to-end when research is wired) ────────────
+// ── DB resolution (exercised end-to-end when a run resolves its prompt) ────
 
 export interface ResolveInstructionsArgs {
 	readonly organizationId: string
 	readonly userId: string
 	readonly agent: Agent
 	readonly overrideTemplateIds?: ReadonlyArray<string> | undefined
+	// A specific named stack picked for this run. Callers pre-validate the ref
+	// with resolveStackRef, so this is already a real, readable stack id.
+	readonly overrideStackId?: string | undefined
 }
 
 export interface ResolvedInstructions {
@@ -186,17 +192,39 @@ const readStackTemplateIds = (
 	Effect.map(
 		sql<{ templateId: string }>`
 			SELECT template_id
-			FROM agent_default_stack_items
+			FROM instruction_stack_items
 			WHERE stack_id = ${stackId}
 			ORDER BY position ASC
 		`,
 		rows => rows.map(row => row.templateId),
 	)
 
+// The org default stack's template ids, in order — the base a personal "extend"
+// stack layers on. Read as one join so a stack that extends the org default gets
+// the current org items even when it is a named (non-default) stack.
+const readOrgDefaultItemIds = (
+	sql: SqlClient.SqlClient,
+	organizationId: string,
+	agent: Agent,
+): Effect.Effect<ReadonlyArray<string>, SqlError.SqlError> =>
+	Effect.map(
+		sql<{ templateId: string }>`
+			SELECT i.template_id
+			FROM instruction_stack_items i
+			JOIN instruction_stacks s ON s.id = i.stack_id
+			WHERE s.organization_id = ${organizationId}
+				AND s.agent = ${agent}
+				AND s.owner_user_id IS NULL
+				AND s.is_default
+			ORDER BY i.position ASC
+		`,
+		rows => rows.map(row => row.templateId),
+	)
+
 // Resolve the effective instruction prompt for one agent run. Must run inside
 // the request transaction: it reads through RLS, so the org/user GUCs have to
-// be set. (Research's run fiber is forked outside the tx — which is exactly why
-// resolution happens here and the result is threaded in.)
+// be set. (A caller's run fiber may be forked outside the tx — which is exactly
+// why resolution happens here and the result is threaded in.)
 export const resolveInstructions = (
 	args: ResolveInstructionsArgs,
 ): Effect.Effect<
@@ -207,48 +235,65 @@ export const resolveInstructions = (
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
 		const override = args.overrideTemplateIds ?? []
+		const stackId = args.overrideStackId
 
-		// Candidate default stacks visible to this actor: their own + the org's.
-		// Skipped entirely when a per-run override is given.
-		const stacks = yield* override.length > 0
-			? Effect.succeed<ReadonlyArray<StackRow>>([])
-			: sql<StackRow>`
-					SELECT id, owner_user_id, composition
-					FROM agent_default_stacks
-					WHERE organization_id = ${args.organizationId}
-						AND agent = ${args.agent}
-						AND (owner_user_id = ${args.userId} OR owner_user_id IS NULL)
-				`
-		const userStack = stacks.find(s => s.ownerUserId === args.userId)
-		const orgStack = stacks.find(s => s.ownerUserId === null)
+		let source: StackSource
+		let orderedIds: ReadonlyArray<string>
 
-		const source = pickStackSource({
-			hasOverride: override.length > 0,
-			hasUserStack: userStack !== undefined,
-			hasOrgStack: orgStack !== undefined,
-		})
-		const chosenStack =
-			source === 'user' ? userStack : source === 'org' ? orgStack : undefined
-
-		// An "extend" user stack resolves to the live org default followed by the
-		// user's own additions (deduped, with the org keeping its position).
-		// Every other case reads a single chosen stack, as before.
-		const isExtend = source === 'user' && userStack?.composition === 'extend'
-		const orderedIds = yield* source === 'override'
-			? Effect.succeed<ReadonlyArray<string>>(override)
-			: isExtend
-				? Effect.gen(function* () {
-						const orgIds = orgStack
-							? yield* readStackTemplateIds(sql, orgStack.id)
-							: []
-						const userIds = userStack
+		if (stackId !== undefined) {
+			// A run named a specific stack. Read it (RLS may hide it, leaving an
+			// empty prompt — callers validate the ref first, so that only happens on
+			// a race). A personal "extend" stack layers on the live org default; any
+			// ad-hoc override templates append after the stack, all deduped.
+			source = 'stack'
+			const rows = yield* sql<StackRow>`
+				SELECT id, owner_user_id, composition
+				FROM instruction_stacks WHERE id = ${stackId}
+			`
+			const stack = rows[0]
+			const baseIds =
+				stack && stack.ownerUserId !== null && stack.composition === 'extend'
+					? yield* readOrgDefaultItemIds(sql, args.organizationId, args.agent)
+					: []
+			const stackIds = stack ? yield* readStackTemplateIds(sql, stack.id) : []
+			orderedIds = dedupeKeepFirst([...baseIds, ...stackIds, ...override])
+		} else if (override.length > 0) {
+			source = 'override'
+			orderedIds = dedupeKeepFirst(override)
+		} else {
+			// Default resolution: the actor's own default stack, else the org's.
+			const stacks = yield* sql<StackRow>`
+				SELECT id, owner_user_id, composition
+				FROM instruction_stacks
+				WHERE organization_id = ${args.organizationId}
+					AND agent = ${args.agent}
+					AND is_default
+					AND (owner_user_id = ${args.userId} OR owner_user_id IS NULL)
+			`
+			const userStack = stacks.find(s => s.ownerUserId === args.userId)
+			const orgStack = stacks.find(s => s.ownerUserId === null)
+			source = pickStackSource({
+				hasStackOverride: false,
+				hasTemplateOverride: false,
+				hasUserStack: userStack !== undefined,
+				hasOrgStack: orgStack !== undefined,
+			})
+			const chosenStack =
+				source === 'user' ? userStack : source === 'org' ? orgStack : undefined
+			// An "extend" user default resolves to the live org default followed by
+			// the user's own additions (deduped, org keeping its position).
+			const isExtend = source === 'user' && userStack?.composition === 'extend'
+			orderedIds = isExtend
+				? dedupeKeepFirst([
+						...(orgStack ? yield* readStackTemplateIds(sql, orgStack.id) : []),
+						...(userStack
 							? yield* readStackTemplateIds(sql, userStack.id)
-							: []
-						return dedupeKeepFirst([...orgIds, ...userIds])
-					})
+							: []),
+					])
 				: chosenStack
-					? readStackTemplateIds(sql, chosenStack.id)
-					: Effect.succeed<ReadonlyArray<string>>([])
+					? yield* readStackTemplateIds(sql, chosenStack.id)
+					: []
+		}
 
 		if (orderedIds.length === 0) {
 			return {
@@ -310,4 +355,110 @@ export const resolveInstructionRefs = (
 						WHERE name IN ${sql.in(names)}
 					`
 		return classifyInstructionRefs({ refs, found })
+	})
+
+// ── Per-run stack ref (name or id) ─────────────────────────────────────────
+
+// A run may name a whole stack instead of listing templates. Like a template
+// ref, it accepts a human name OR an id, scoped by RLS to the org's stacks plus
+// the caller's own. A name is matched within the run's agent; an id must both
+// exist and belong to that agent (a stack id from another agent is treated as
+// unknown, not silently applied). A name shared by a personal and an org stack
+// is ambiguous — its candidates come back with their scope so the caller can
+// re-ask with the exact id.
+
+export interface StackCandidate {
+	readonly id: string
+	readonly name: string
+	readonly agent: Agent
+	readonly scope: 'personal' | 'org'
+}
+
+export type ResolveStackRefResult =
+	| { readonly ok: true; readonly stackId: string }
+	| {
+			readonly ok: false
+			readonly unknown: ReadonlyArray<string>
+			readonly ambiguous: ReadonlyArray<{
+				readonly query: string
+				readonly candidates: ReadonlyArray<StackCandidate>
+			}>
+	  }
+
+// Pure classification: given the ref, the run's agent, and the stacks found by
+// the lookup, resolve to a single stack id or record why it couldn't.
+export const classifyStackRef = (args: {
+	readonly ref: string
+	readonly agent: Agent
+	readonly found: ReadonlyArray<{
+		readonly id: string
+		readonly name: string
+		readonly agent: string
+		readonly ownerUserId: string | null
+	}>
+}): ResolveStackRefResult => {
+	if (isUuidRef(args.ref)) {
+		const match = args.found.find(
+			row => row.id === args.ref && row.agent === args.agent,
+		)
+		return match
+			? { ok: true, stackId: match.id }
+			: { ok: false, unknown: [args.ref], ambiguous: [] }
+	}
+	const candidates: Array<StackCandidate> = args.found
+		.filter(row => row.name === args.ref && row.agent === args.agent)
+		.map(row => ({
+			id: row.id,
+			name: row.name,
+			agent: args.agent,
+			scope:
+				row.ownerUserId === null ? ('org' as const) : ('personal' as const),
+		}))
+	const [first] = candidates
+	if (!first) return { ok: false, unknown: [args.ref], ambiguous: [] }
+	if (candidates.length === 1) return { ok: true, stackId: first.id }
+	return {
+		ok: false,
+		unknown: [],
+		ambiguous: [{ query: args.ref, candidates }],
+	}
+}
+
+// Resolve a caller's stack ref (name or id) to a stack id. Must run inside the
+// request transaction: the lookup reads through RLS, so an actor only ever
+// matches the org's stacks and their own. Returns the id on success, or the
+// unresolved ref so the caller can re-ask (a typo / wrong agent) or disambiguate
+// (a name shared by two stacks) before any run starts.
+export const resolveStackRef = (
+	agent: Agent,
+	ref: string,
+): Effect.Effect<
+	ResolveStackRefResult,
+	SqlError.SqlError,
+	SqlClient.SqlClient
+> =>
+	Effect.gen(function* () {
+		const sql = yield* SqlClient.SqlClient
+		// An id ref is looked up by id (agent checked in classify, so a wrong-agent
+		// id reads as unknown); a name ref is scoped to the run's agent up front.
+		const found = isUuidRef(ref)
+			? yield* sql<{
+					id: string
+					name: string
+					agent: string
+					ownerUserId: string | null
+				}>`
+					SELECT id, name, agent, owner_user_id
+					FROM instruction_stacks WHERE id = ${ref}
+				`
+			: yield* sql<{
+					id: string
+					name: string
+					agent: string
+					ownerUserId: string | null
+				}>`
+					SELECT id, name, agent, owner_user_id
+					FROM instruction_stacks WHERE agent = ${agent} AND name = ${ref}
+				`
+		return classifyStackRef({ ref, agent, found })
 	})

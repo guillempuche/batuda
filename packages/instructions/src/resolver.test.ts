@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
 	assembleSegments,
 	classifyInstructionRefs,
+	classifyStackRef,
 	dedupeKeepFirst,
 	isUuidRef,
 	personalTemplatesInOrgStack,
@@ -13,24 +14,40 @@ const UUID_A = '11111111-1111-4111-8111-111111111111'
 const UUID_B = '22222222-2222-4222-8222-222222222222'
 
 describe('pickStackSource', () => {
-	describe('when a per-run override is present', () => {
-		it('should choose the override even when both defaults exist', () => {
-			// GIVEN an override alongside a user and an org stack [resolver.ts:16]
+	describe('when a named stack is picked for the run', () => {
+		it('should choose the stack over every default and a template override', () => {
+			// GIVEN a named stack alongside a template override and both defaults
 			const source = pickStackSource({
-				hasOverride: true,
+				hasStackOverride: true,
+				hasTemplateOverride: true,
 				hasUserStack: true,
 				hasOrgStack: true,
 			})
-			// THEN the override wins
+			// THEN the explicitly named stack wins
+			expect(source).toBe('stack')
+		})
+	})
+
+	describe('when ad-hoc override templates are given without a stack', () => {
+		it('should choose the override even when both defaults exist', () => {
+			// GIVEN a template override alongside a user and an org stack
+			const source = pickStackSource({
+				hasStackOverride: false,
+				hasTemplateOverride: true,
+				hasUserStack: true,
+				hasOrgStack: true,
+			})
+			// THEN the override wins over the defaults
 			expect(source).toBe('override')
 		})
 	})
 
-	describe('when there is no override but the user has their own stack', () => {
+	describe('when there is no override but the user has their own default', () => {
 		it('should choose the user stack over the org default', () => {
-			// GIVEN a user stack and an org default [resolver.ts:16]
+			// GIVEN a user default and an org default
 			const source = pickStackSource({
-				hasOverride: false,
+				hasStackOverride: false,
+				hasTemplateOverride: false,
 				hasUserStack: true,
 				hasOrgStack: true,
 			})
@@ -41,9 +58,10 @@ describe('pickStackSource', () => {
 
 	describe('when only the org default exists', () => {
 		it('should fall back to the org stack', () => {
-			// GIVEN only an org default [resolver.ts:16]
+			// GIVEN only an org default
 			const source = pickStackSource({
-				hasOverride: false,
+				hasStackOverride: false,
+				hasTemplateOverride: false,
 				hasUserStack: false,
 				hasOrgStack: true,
 			})
@@ -54,14 +72,108 @@ describe('pickStackSource', () => {
 
 	describe('when nothing applies', () => {
 		it('should resolve to none so the run uses only the built-in prompt', () => {
-			// GIVEN no override, no user stack, no org stack [resolver.ts:16]
+			// GIVEN no override and no default stacks
 			const source = pickStackSource({
-				hasOverride: false,
+				hasStackOverride: false,
+				hasTemplateOverride: false,
 				hasUserStack: false,
 				hasOrgStack: false,
 			})
 			// THEN nothing is layered in
 			expect(source).toBe('none')
+		})
+	})
+})
+
+describe('classifyStackRef', () => {
+	describe('when the ref is an id belonging to the run agent', () => {
+		it('should pass the stack id through', () => {
+			// GIVEN a UUID ref whose stack matches the agent
+			const result = classifyStackRef({
+				ref: UUID_A,
+				agent: 'research',
+				found: [
+					{ id: UUID_A, name: 'latam', agent: 'research', ownerUserId: null },
+				],
+			})
+			// THEN the id resolves
+			expect(result).toEqual({ ok: true, stackId: UUID_A })
+		})
+	})
+
+	describe('when the ref is an id from a different agent', () => {
+		it('should treat it as unknown rather than applying the wrong agent stack', () => {
+			// GIVEN a UUID ref whose stack belongs to the email agent
+			const result = classifyStackRef({
+				ref: UUID_A,
+				agent: 'research',
+				found: [
+					{ id: UUID_A, name: 'formal', agent: 'email', ownerUserId: null },
+				],
+			})
+			// THEN it does not resolve
+			expect(result).toEqual({ ok: false, unknown: [UUID_A], ambiguous: [] })
+		})
+	})
+
+	describe('when a name matches one stack for the agent', () => {
+		it('should resolve the name to that stack id', () => {
+			// GIVEN a single research stack found by name
+			const result = classifyStackRef({
+				ref: 'latam',
+				agent: 'research',
+				found: [
+					{ id: UUID_A, name: 'latam', agent: 'research', ownerUserId: null },
+				],
+			})
+			// THEN the name resolves
+			expect(result).toEqual({ ok: true, stackId: UUID_A })
+		})
+	})
+
+	describe('when a name matches nothing', () => {
+		it('should report it as unknown', () => {
+			// GIVEN a name with no matching stack
+			const result = classifyStackRef({
+				ref: 'ghost',
+				agent: 'research',
+				found: [],
+			})
+			// THEN the ref is unknown
+			expect(result).toEqual({ ok: false, unknown: ['ghost'], ambiguous: [] })
+		})
+	})
+
+	describe('when a name matches both a personal and an org stack', () => {
+		it('should report the candidates with their scope so the caller re-asks by id', () => {
+			// GIVEN one name shared by an org and a personal stack
+			const result = classifyStackRef({
+				ref: 'formal',
+				agent: 'email',
+				found: [
+					{ id: UUID_A, name: 'formal', agent: 'email', ownerUserId: null },
+					{ id: UUID_B, name: 'formal', agent: 'email', ownerUserId: 'user_1' },
+				],
+			})
+			// THEN both candidates come back with their scope
+			expect(result).toEqual({
+				ok: false,
+				unknown: [],
+				ambiguous: [
+					{
+						query: 'formal',
+						candidates: [
+							{ id: UUID_A, name: 'formal', agent: 'email', scope: 'org' },
+							{
+								id: UUID_B,
+								name: 'formal',
+								agent: 'email',
+								scope: 'personal',
+							},
+						],
+					},
+				],
+			})
 		})
 	})
 })

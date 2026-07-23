@@ -107,11 +107,12 @@ const ResearchSyncResult = Schema.Union([
 
 const StartResearch = Tool.make('start_research', {
 	description:
-		"Start a research run; returns {_tag:'started', id, status, applied_instructions} immediately — poll get_research for results. applied_instructions lists the instruction templates that shaped the run. The user's default research instructions apply automatically; pass `instructions` (template names or ids) to override them for this run. An unknown or ambiguous name returns {_tag:'instruction_clarification'} with candidates instead of starting. A `context.selector` — shaped `{ table: \"companies\", filter: { status?, industry?, country?, tags? } }` — researches every matching company (one run each); without `confirm:true` it returns {_tag:'confirm_required', subject_count, estimated_cost_cents} first so you can preview the scale — re-submit with confirm:true to launch (or narrow the filter). A malformed context returns {_tag:'invalid_context', error} without starting a run. If the user states a new standing preference, save it with manage_instruction_template.",
+		"Start a research run; returns {_tag:'started', id, status, applied_instructions} immediately — poll get_research for results. applied_instructions lists the instruction templates that shaped the run. The user's default research instructions apply automatically; pass `stack` (a named stack, by name or id) to run a specific saved stack, and/or `instructions` (template names or ids) to layer extra templates after it for this run. An unknown or ambiguous `stack`/`instructions` ref returns {_tag:'instruction_clarification'} with candidates instead of starting. A `context.selector` — shaped `{ table: \"companies\", filter: { status?, industry?, country?, tags? } }` — researches every matching company (one run each); without `confirm:true` it returns {_tag:'confirm_required', subject_count, estimated_cost_cents} first so you can preview the scale — re-submit with confirm:true to launch (or narrow the filter). A malformed context returns {_tag:'invalid_context', error} without starting a run. If the user states a new standing preference, save it with manage_instructions.",
 	parameters: Schema.Struct({
 		query: ResearchQuery,
 		context: Schema.optional(Schema.Unknown),
 		schema_name: Schema.optional(SchemaNameParam),
+		stack: Schema.optional(Schema.String),
 		instructions: Schema.optional(InstructionsOverride),
 		confirm: Schema.optional(Schema.Boolean),
 	}),
@@ -157,11 +158,12 @@ const GetResearch = Tool.make('get_research', {
 
 const ResearchSync = Tool.make('research_sync', {
 	description:
-		"Run research and return full findings inline when it finishes quickly; best for short or cached research. Blocks up to ~45s (the transport's limit): a short/cached run returns completed findings; a longer one returns the run still 'running' for you to poll get_research — the run keeps going regardless and is never lost. The returned run includes applied_instructions — the instruction templates that shaped it. The user's default research instructions apply automatically; pass `instructions` (template names or ids) to override them for this run. An unknown or ambiguous name returns {_tag:'instruction_clarification'} with candidates instead of running. A `context.selector` — shaped `{ table: \"companies\", filter: { status?, industry?, country?, tags? } }` — fans out one run per matching company; without `confirm:true` it returns {_tag:'confirm_required', subject_count, estimated_cost_cents} first. A malformed context returns {_tag:'invalid_context', error} without starting a run.",
+		"Run research and return full findings inline when it finishes quickly; best for short or cached research. Blocks up to ~45s (the transport's limit): a short/cached run returns completed findings; a longer one returns the run still 'running' for you to poll get_research — the run keeps going regardless and is never lost. The returned run includes applied_instructions — the instruction templates that shaped it. The user's default research instructions apply automatically; pass `stack` (a named stack, by name or id) to run a specific saved stack, and/or `instructions` (template names or ids) to layer extra templates after it for this run. An unknown or ambiguous `stack`/`instructions` ref returns {_tag:'instruction_clarification'} with candidates instead of running. A `context.selector` — shaped `{ table: \"companies\", filter: { status?, industry?, country?, tags? } }` — fans out one run per matching company; without `confirm:true` it returns {_tag:'confirm_required', subject_count, estimated_cost_cents} first. A malformed context returns {_tag:'invalid_context', error} without starting a run.",
 	parameters: Schema.Struct({
 		query: ResearchQuery,
 		context: Schema.optional(Schema.Unknown),
 		schema_name: Schema.optional(SchemaNameParam),
+		stack: Schema.optional(Schema.String),
 		instructions: Schema.optional(InstructionsOverride),
 		max_wait_seconds: Schema.optional(Schema.Number),
 		confirm: Schema.optional(Schema.Boolean),
@@ -220,12 +222,14 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 			hardCeiling: env.RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS,
 		}
 
-		// Resolve a per-run override (names or ids) to the effective instruction
-		// stack, or a clarification to hand straight back when a name can't resolve.
+		// Resolve a per-run override (an optional named stack, plus template names
+		// or ids) to the effective instruction stack, or a clarification to hand
+		// straight back when a ref can't resolve.
 		const resolveForRun = (
 			orgId: string,
 			userId: string,
 			refs: ReadonlyArray<string>,
+			stackRef: string | undefined,
 		) =>
 			resolveInstructionOverride({
 				sql,
@@ -233,6 +237,7 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 				userId,
 				agent: 'research',
 				refs,
+				stackRef,
 			})
 
 		return {
@@ -247,6 +252,7 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 						orgId,
 						userId,
 						params.instructions ?? [],
+						params.stack,
 					)
 					if (!resolved.ok) return resolved.clarification
 					const context = yield* readContext(params.context)
@@ -301,6 +307,7 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 						org.id,
 						userId,
 						params.instructions ?? [],
+						params.stack,
 					)
 					if (!resolved.ok) return resolved.clarification
 					const context = yield* readContext(params.context)

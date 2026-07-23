@@ -95,17 +95,21 @@ export const dataInspect = (entity: Option.Option<EntityName>, json: boolean) =>
 				columns: [
 					col('Org', 14, 'org'),
 					col('Scope', 8, 'scope'),
-					col('Agent', 12, 'agent'),
-					col('Composition', 14, 'composition'),
+					col('Agent', 10, 'agent'),
+					col('Name', 18, 'name'),
+					col('Default', 8, 'isDefault'),
+					col('Composition', 12, 'composition'),
 					col('Items', 0, 'items'),
 				],
 				rows: () => sql<Row>`
 					SELECT o.slug AS org,
 						CASE WHEN s.owner_user_id IS NULL THEN 'org' ELSE 'user' END AS scope,
-						s.agent, s.composition,
-						(SELECT count(*) FROM agent_default_stack_items i WHERE i.stack_id = s.id) AS items
-					FROM agent_default_stacks s JOIN organization o ON o.id = s.organization_id
-					ORDER BY o.slug, scope, s.agent`,
+						s.agent, s.name,
+						CASE WHEN s.is_default THEN 'yes' ELSE '' END AS "isDefault",
+						s.composition,
+						(SELECT count(*) FROM instruction_stack_items i WHERE i.stack_id = s.id) AS items
+					FROM instruction_stacks s JOIN organization o ON o.id = s.organization_id
+					ORDER BY o.slug, scope, s.agent, s.is_default DESC, s.name`,
 			},
 			inboxes: {
 				columns: [

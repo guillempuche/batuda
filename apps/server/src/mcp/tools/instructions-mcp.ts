@@ -1,77 +1,84 @@
 import { Effect, Schema } from 'effect'
 import { Tool, Toolkit } from 'effect/unstable/ai'
+import type { SqlError } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { CurrentOrg, SessionContext } from '@batuda/controllers'
-import { type Agent, AgentSchema } from '@batuda/instructions'
+import {
+	type Agent,
+	AgentSchema,
+	type ResolveStackRefResult,
+	resolveInstructionRefs,
+	resolveStackRef,
+} from '@batuda/instructions'
 
 import { InstructionsService } from '../../services/instructions'
+import { buildClarification } from './_instructions-shared'
 import { Uuid } from './_research-shared'
 import { toItems } from './_result'
 
-// Consolidated, action-based management tools so the MCP surface gains the
-// instruction-template controls without ~16 individual tools. Each acts as the
-// attributed user; scope=org writes are admin-gated inside InstructionsService.
-// Outcomes (including admin/validation rejections) come back in the result body.
+// One consolidated, action-based tool for the whole instruction surface —
+// templates (reusable prompt blocks) and named stacks (ordered lists of
+// templates per agent). Each acts as the attributed user; scope=org writes are
+// admin-gated inside InstructionsService, and every outcome (including admin /
+// validation rejections and unresolved refs) comes back in the result body.
 
 const REQUEST_DEPENDENCIES = [SessionContext, CurrentOrg]
 const Scope = Schema.Literals(['personal', 'org'])
 
-const ManageTemplate = Tool.make('manage_instruction_template', {
+const ManageInstructions = Tool.make('manage_instructions', {
 	description:
-		'List, create, update, delete, or transfer instruction templates for the active org. scope=org targets an org-owned template (admin only); scope=personal targets your own. Editing an org template as a non-admin forks a personal copy. transfer hands a personal template you own to another member (target_user_id).',
+		'Manage instruction templates and named instruction stacks for the active org. Templates are reusable blocks of prompt text; stacks are named, ordered lists of templates per agent (research, email), with at most one default per scope. scope=org targets org-owned rows (admin only); scope=personal targets your own. Editing an org template as a non-admin forks a personal copy; transfer_template hands a personal template you own to another member. `stack` accepts a stack name or id and `templates` accepts template names or ids — an unknown or ambiguous ref returns {_tag:"instruction_clarification"} with candidates instead of acting. A personal stack with composition=extend layers its templates on the live org default. set_default_stack makes a stack the default for its agent and scope; clear_default_stack unsets the default (personal: you inherit the org default; org, admin-only: the agent runs with no org default).',
 	parameters: Schema.Struct({
-		action: Schema.Literals(['list', 'create', 'update', 'delete', 'transfer']),
+		action: Schema.Literals([
+			'list_templates',
+			'get_template',
+			'create_template',
+			'update_template',
+			'delete_template',
+			'transfer_template',
+			'list_stacks',
+			'get_stack',
+			'create_stack',
+			'update_stack',
+			'delete_stack',
+			'set_default_stack',
+			'clear_default_stack',
+		]),
+		// A template id (for the *_template actions).
 		id: Schema.optional(Uuid),
+		// A stack name or id (for the *_stack actions that target one stack).
+		stack: Schema.optional(Schema.String),
+		agent: Schema.optional(Schema.String),
+		scope: Schema.optional(Scope),
 		name: Schema.optional(Schema.String),
 		body: Schema.optional(Schema.String),
-		scope: Schema.optional(Scope),
+		// Template names or ids that make up a stack.
+		templates: Schema.optional(Schema.Array(Schema.String)),
+		composition: Schema.optional(Schema.Literals(['replace', 'extend'])),
+		is_default: Schema.optional(Schema.Boolean),
 		target_user_id: Schema.optional(Schema.String),
 	}),
 	success: Schema.Unknown,
 	dependencies: REQUEST_DEPENDENCIES,
 })
-	.annotate(Tool.Title, 'Manage Instruction Templates')
+	.annotate(Tool.Title, 'Manage Instructions')
 	.annotate(Tool.OpenWorld, false)
 
-const ManageDefaultStack = Tool.make('manage_instruction_default_stack', {
-	description:
-		'Get, set, or clear the default instruction stack for an agent. scope=org sets the org default (admin only); scope=personal sets your own; clear removes your own so you inherit the org default. composition=extend (personal scope) layers your templates on the live org default instead of replacing it.',
-	parameters: Schema.Struct({
-		action: Schema.Literals(['get', 'set', 'clear']),
-		agent: Schema.String,
-		scope: Schema.optional(Scope),
-		template_ids: Schema.optional(Schema.Array(Uuid)),
-		composition: Schema.optional(Schema.Literals(['replace', 'extend'])),
-	}),
-	success: Schema.Unknown,
-	dependencies: REQUEST_DEPENDENCIES,
+export const InstructionsMcpTools = Toolkit.make(ManageInstructions)
+
+// A stack ref that didn't resolve comes back in the same clarification shape as
+// a template ref, so every surface reports collisions the same way (the stack
+// candidates additionally carry their agent).
+const buildStackClarification = (
+	result: Extract<ResolveStackRefResult, { ok: false }>,
+) => ({
+	_tag: 'instruction_clarification' as const,
+	message:
+		'The stack reference could not be resolved, so nothing was done. For an unknown name, fix the spelling or create the stack first; for an ambiguous name, pass the exact id from the listed candidates.',
+	unknown: result.unknown,
+	ambiguous: result.ambiguous,
 })
-	.annotate(Tool.Title, 'Manage Instruction Default Stack')
-	.annotate(Tool.OpenWorld, false)
-
-const ManageDonation = Tool.make('manage_instruction_donation', {
-	description:
-		'Donate a personal instruction template to the org for shared use, or review pending donations. propose submits a personal template you own (template_id) for admin review; list returns donations (optionally filtered by status); accept (admin only) creates a fresh org template from the proposal; reject (admin only) closes it. Accepting reads only the snapshot taken when the donation was proposed, never the proposer’s still-personal template.',
-	parameters: Schema.Struct({
-		action: Schema.Literals(['propose', 'list', 'accept', 'reject']),
-		template_id: Schema.optional(Uuid),
-		id: Schema.optional(Uuid),
-		status: Schema.optional(
-			Schema.Literals(['pending', 'accepted', 'rejected']),
-		),
-	}),
-	success: Schema.Unknown,
-	dependencies: REQUEST_DEPENDENCIES,
-})
-	.annotate(Tool.Title, 'Manage Instruction Donations')
-	.annotate(Tool.OpenWorld, false)
-
-export const InstructionsMcpTools = Toolkit.make(
-	ManageTemplate,
-	ManageDefaultStack,
-	ManageDonation,
-)
 
 export const InstructionsMcpHandlersLive = InstructionsMcpTools.toLayer(
 	Effect.gen(function* () {
@@ -81,34 +88,45 @@ export const InstructionsMcpHandlersLive = InstructionsMcpTools.toLayer(
 		// client so the per-call handler requirement stays clean.
 		const run = <A>(eff: Effect.Effect<A, never, SqlClient.SqlClient>) =>
 			eff.pipe(Effect.provideService(SqlClient.SqlClient, sql))
+		// Ref resolution keeps SqlError in its channel; a fault there is a defect,
+		// not a caller error, so die rather than leak it.
+		const runRefs = <A>(
+			eff: Effect.Effect<A, SqlError.SqlError, SqlClient.SqlClient>,
+		) => eff.pipe(Effect.orDie, Effect.provideService(SqlClient.SqlClient, sql))
 		const parseAgent = (raw: string): Agent | null =>
 			Schema.is(AgentSchema)(raw) ? raw : null
 
 		return {
-			manage_instruction_template: params =>
+			manage_instructions: params =>
 				Effect.gen(function* () {
 					const org = yield* CurrentOrg
 					const { userId } = yield* SessionContext
+
 					switch (params.action) {
-						case 'list':
+						// ── Templates ──────────────────────────────────────────────
+						case 'list_templates':
 							// Wrap the row list in an object — a bare array is not valid
 							// MCP structured output and strict clients reject it.
 							return toItems(yield* run(svc.listTemplates()))
-						case 'create':
-							if (
-								params.name === undefined ||
-								params.body === undefined ||
-								params.scope === undefined
+						case 'get_template':
+							if (params.id === undefined)
+								return { error: 'id is required to get a template' }
+							return (
+								(yield* run(svc.getTemplate(params.id))) ?? {
+									error: 'not_found',
+								}
 							)
-								return { error: 'name, body, and scope are required to create' }
+						case 'create_template':
+							if (params.name === undefined || params.body === undefined)
+								return { error: 'name and body are required to create' }
 							return yield* run(
 								svc.create(org.id, userId, {
 									name: params.name,
 									body: params.body,
-									scope: params.scope,
+									scope: params.scope ?? 'personal',
 								}),
 							)
-						case 'update':
+						case 'update_template':
 							if (params.id === undefined)
 								return { error: 'id is required to update' }
 							return yield* run(
@@ -117,11 +135,11 @@ export const InstructionsMcpHandlersLive = InstructionsMcpTools.toLayer(
 									body: params.body,
 								}),
 							)
-						case 'delete':
+						case 'delete_template':
 							if (params.id === undefined)
 								return { error: 'id is required to delete' }
 							return yield* run(svc.remove(userId, params.id))
-						case 'transfer':
+						case 'transfer_template':
 							if (
 								params.id === undefined ||
 								params.target_user_id === undefined
@@ -132,56 +150,90 @@ export const InstructionsMcpHandlersLive = InstructionsMcpTools.toLayer(
 							return yield* run(
 								svc.transfer(org.id, userId, params.id, params.target_user_id),
 							)
-					}
-				}),
 
-			manage_instruction_default_stack: params =>
-				Effect.gen(function* () {
-					const org = yield* CurrentOrg
-					const { userId } = yield* SessionContext
-					const agent = parseAgent(params.agent)
-					if (!agent) return { error: 'unknown agent' }
-					switch (params.action) {
-						case 'get':
-							return yield* run(svc.getDefaultStacks(org.id, userId, agent))
-						case 'clear':
-							return yield* run(svc.clearUserStack(org.id, userId, agent))
-						case 'set':
-							if (params.template_ids === undefined)
-								return { error: 'template_ids is required to set' }
-							return yield* run(
-								params.scope === 'org'
-									? svc.setOrgStack(org.id, userId, agent, params.template_ids)
-									: svc.setUserStack(
-											org.id,
-											userId,
-											agent,
-											params.template_ids,
-											params.composition ?? 'replace',
-										),
+						// ── Stacks ─────────────────────────────────────────────────
+						case 'list_stacks': {
+							const agent =
+								params.agent === undefined
+									? undefined
+									: parseAgent(params.agent)
+							if (params.agent !== undefined && agent === null)
+								return { error: 'unknown agent' }
+							return toItems(yield* run(svc.listStacks(agent ?? undefined)))
+						}
+						case 'get_stack':
+						case 'update_stack':
+						case 'delete_stack':
+						case 'set_default_stack': {
+							if (params.stack === undefined || params.agent === undefined)
+								return { error: 'stack and agent are required' }
+							const agent = parseAgent(params.agent)
+							if (!agent) return { error: 'unknown agent' }
+							const refResult = yield* runRefs(
+								resolveStackRef(agent, params.stack),
 							)
-					}
-				}),
-
-			manage_instruction_donation: params =>
-				Effect.gen(function* () {
-					const org = yield* CurrentOrg
-					const { userId } = yield* SessionContext
-					switch (params.action) {
-						case 'list':
-							return yield* run(svc.listDonations(params.status))
-						case 'propose':
-							if (params.template_id === undefined)
-								return { error: 'template_id is required to propose' }
-							return yield* run(svc.propose(org.id, userId, params.template_id))
-						case 'accept':
-							if (params.id === undefined)
-								return { error: 'id is required to accept' }
-							return yield* run(svc.accept(userId, params.id))
-						case 'reject':
-							if (params.id === undefined)
-								return { error: 'id is required to reject' }
-							return yield* run(svc.reject(userId, params.id))
+							if (!refResult.ok) return buildStackClarification(refResult)
+							const stackId = refResult.stackId
+							if (params.action === 'get_stack')
+								return (
+									(yield* run(svc.getStack(stackId))) ?? {
+										error: 'not_found',
+									}
+								)
+							if (params.action === 'delete_stack')
+								return yield* run(svc.deleteStack(userId, stackId))
+							if (params.action === 'set_default_stack')
+								return yield* run(svc.setDefault(userId, stackId))
+							// update_stack: resolve any template refs before writing.
+							const refs = params.templates
+							let templateIds: ReadonlyArray<string> | undefined
+							if (refs !== undefined) {
+								const resolved = yield* runRefs(resolveInstructionRefs(refs))
+								if (!resolved.ok) return buildClarification(resolved)
+								templateIds = resolved.templateIds
+							}
+							return yield* run(
+								svc.updateStack(userId, stackId, {
+									name: params.name,
+									templateIds,
+									composition: params.composition,
+								}),
+							)
+						}
+						case 'create_stack': {
+							if (params.agent === undefined || params.name === undefined)
+								return { error: 'agent and name are required to create' }
+							const agent = parseAgent(params.agent)
+							if (!agent) return { error: 'unknown agent' }
+							const resolved = yield* runRefs(
+								resolveInstructionRefs(params.templates ?? []),
+							)
+							if (!resolved.ok) return buildClarification(resolved)
+							return yield* run(
+								svc.createStack(org.id, userId, {
+									scope: params.scope ?? 'personal',
+									agent,
+									name: params.name,
+									templateIds: resolved.templateIds,
+									composition: params.composition,
+									isDefault: params.is_default ?? false,
+								}),
+							)
+						}
+						case 'clear_default_stack': {
+							if (params.agent === undefined)
+								return { error: 'agent is required' }
+							const agent = parseAgent(params.agent)
+							if (!agent) return { error: 'unknown agent' }
+							return yield* run(
+								svc.clearDefault(
+									org.id,
+									userId,
+									agent,
+									params.scope ?? 'personal',
+								),
+							)
+						}
 					}
 				}),
 		}

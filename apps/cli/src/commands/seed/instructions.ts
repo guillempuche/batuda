@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: seed data */
-import { createHash } from 'node:crypto'
-
 import { Effect } from 'effect'
+
+import { fingerprintTemplates } from '@batuda/instructions'
 
 import { normalizeRows, type SeedCtx, withSeedIds } from './shared'
 
@@ -48,6 +48,13 @@ const CAROL_TEMPLATES = [
 const RESTAURANT_ORG_TEMPLATE = {
 	name: '[org] Restaurant context',
 	body: 'I run a seafood restaurant in Sitges. When you research suppliers, partners, or competitors, focus on local sourcing, demand for event and group catering, and anything that would help fill tables midweek.',
+} as const
+
+// The email agent's first seed content — an org template plus a default email
+// stack, so the email surface has a stack to resolve like research does.
+const EMAIL_ORG_TEMPLATE = {
+	name: '[email] Formal sign-off',
+	body: 'Write in a warm but professional register. Open with the contact’s first name, keep paragraphs short, and close with “Salut, Guillem”. Never use exclamation marks or emoji.',
 } as const
 
 export const seedInstructions = ({
@@ -101,6 +108,14 @@ export const seedInstructions = ({
 						body: t.body,
 					}))
 				: []),
+			// An org-owned email template so the email agent has seed content too.
+			{
+				organizationId: tallerOrgId,
+				ownerUserId: null,
+				createdBy: alice,
+				name: EMAIL_ORG_TEMPLATE.name,
+				body: EMAIL_ORG_TEMPLATE.body,
+			},
 			...(restaurantOrgId !== null && bob
 				? [
 						{
@@ -146,17 +161,41 @@ export const seedInstructions = ({
 		const templateIdByName = new Map(insertedTemplates.map(t => [t.name, t.id]))
 		const templateId = (name: string) => templateIdByName.get(name)!
 
+		// Each scope+agent has one default stack (is_default), plus a couple of
+		// named non-default stacks so the multiple-stacks feature is exercisable:
+		// an org research variant for the Spanish hospitality market, and the org's
+		// default email stack.
 		const stackRows = [
 			{
 				organizationId: tallerOrgId,
 				ownerUserId: null,
 				agent: 'research',
+				name: 'default',
+				isDefault: true,
+				composition: 'replace',
+			},
+			{
+				organizationId: tallerOrgId,
+				ownerUserId: null,
+				agent: 'research',
+				name: 'hospitality-es',
+				isDefault: false,
+				composition: 'replace',
+			},
+			{
+				organizationId: tallerOrgId,
+				ownerUserId: null,
+				agent: 'email',
+				name: 'default',
+				isDefault: true,
 				composition: 'replace',
 			},
 			{
 				organizationId: tallerOrgId,
 				ownerUserId: alice,
 				agent: 'research',
+				name: 'default',
+				isDefault: true,
 				composition: 'replace',
 			},
 			...(carol
@@ -165,6 +204,8 @@ export const seedInstructions = ({
 							organizationId: tallerOrgId,
 							ownerUserId: carol,
 							agent: 'research',
+							name: 'default',
+							isDefault: true,
 							composition: 'extend',
 						},
 					]
@@ -175,6 +216,8 @@ export const seedInstructions = ({
 							organizationId: restaurantOrgId,
 							ownerUserId: null,
 							agent: 'research',
+							name: 'default',
+							isDefault: true,
 							composition: 'replace',
 						},
 					]
@@ -184,25 +227,48 @@ export const seedInstructions = ({
 			id: string
 			ownerUserId: string | null
 			organizationId: string
+			agent: string
+			name: string
 		}>`
-			INSERT INTO agent_default_stacks ${sql.insert(
+			INSERT INTO instruction_stacks ${sql.insert(
 				normalizeRows(
-					withSeedIds('agent-stack', stackRows, (_, i) => String(i)),
+					// Keyed by org+scope+agent+name so adding a stack never reshuffles
+					// the deterministic ids of the existing ones (and two orgs' "default"
+					// stacks never collide).
+					withSeedIds(
+						'instruction-stack',
+						stackRows,
+						r =>
+							`${r.organizationId}:${r.agent}:${r.ownerUserId ?? 'org'}:${r.name}`,
+					),
 				),
 			)}
-			RETURNING id, owner_user_id, organization_id
+			RETURNING id, owner_user_id, organization_id, agent, name
 		`
-		const tallerOrgStackId = insertedStacks.find(
-			s => s.organizationId === tallerOrgId && s.ownerUserId === null,
-		)!.id
-		const carolStackId = insertedStacks.find(s => s.ownerUserId === carol)?.id
-		const aliceStackId = insertedStacks.find(s => s.ownerUserId === alice)?.id
-		const restaurantStackId = insertedStacks.find(
-			s =>
-				restaurantOrgId !== null &&
-				s.organizationId === restaurantOrgId &&
-				s.ownerUserId === null,
-		)?.id
+		const stackId = (
+			ownerUserId: string | null,
+			agent: string,
+			name: string,
+			organizationId = tallerOrgId,
+		) =>
+			insertedStacks.find(
+				s =>
+					s.organizationId === organizationId &&
+					s.ownerUserId === ownerUserId &&
+					s.agent === agent &&
+					s.name === name,
+			)?.id
+		const tallerOrgStackId = stackId(null, 'research', 'default')!
+		const hospitalityStackId = stackId(null, 'research', 'hospitality-es')!
+		const emailStackId = stackId(null, 'email', 'default')!
+		const aliceStackId = stackId(alice, 'research', 'default')
+		const carolStackId = carol
+			? stackId(carol, 'research', 'default')
+			: undefined
+		const restaurantStackId =
+			restaurantOrgId !== null
+				? stackId(null, 'research', 'default', restaurantOrgId)
+				: undefined
 
 		// An org stack may reference org-owned templates ONLY: a personal template
 		// inside it would be hidden by RLS from other members and silently dropped
@@ -219,6 +285,21 @@ export const seedInstructions = ({
 				stackId: tallerOrgStackId,
 				templateId: templateId('[org] Qualification rubric'),
 				position: 1,
+			},
+			// The named research variant reuses the company context, framed for the
+			// Spanish hospitality market.
+			{
+				organizationId: tallerOrgId,
+				stackId: hospitalityStackId,
+				templateId: templateId('[org] Company context'),
+				position: 0,
+			},
+			// The org's default email stack.
+			{
+				organizationId: tallerOrgId,
+				stackId: emailStackId,
+				templateId: templateId('[email] Formal sign-off'),
+				position: 0,
 			},
 			...(carolStackId
 				? [
@@ -269,49 +350,14 @@ export const seedInstructions = ({
 					]
 				: []),
 		]
-		yield* sql`INSERT INTO agent_default_stack_items ${sql.insert(
+		yield* sql`INSERT INTO instruction_stack_items ${sql.insert(
 			normalizeRows(
-				withSeedIds('agent-stack-item', itemRows, (_, i) => String(i)),
-			),
-		)}`
-
-		// A member's pending donation drives the org admin's review queue; an
-		// already-accepted one shows the resolved side of the same flow. The row
-		// snapshots the template's name and body, which is what lets an admin
-		// review a proposal they otherwise couldn't read (RLS hides the still-
-		// personal source template from them).
-		const donationRows = [
-			{
-				organizationId: tallerOrgId,
-				sourceTemplateId: templateId('[research] Spain hospitality ICP'),
-				createdTemplateId: null,
-				name: '[research] Spain hospitality ICP',
-				body: CAROL_TEMPLATES[0].body,
-				proposedBy: carol ?? alice,
-				status: 'pending',
-				resolvedBy: null,
-				resolvedAt: null,
-			},
-			{
-				organizationId: tallerOrgId,
-				sourceTemplateId: null,
-				createdTemplateId: templateId('[org] Qualification rubric'),
-				name: '[org] Qualification rubric',
-				body: TALLER_ORG_TEMPLATES[1].body,
-				proposedBy: carol ?? alice,
-				status: 'accepted',
-				resolvedBy: alice,
-				resolvedAt: new Date('2026-05-01'),
-			},
-		]
-		yield* sql`INSERT INTO instruction_template_donations ${sql.insert(
-			normalizeRows(
-				withSeedIds('template-donation', donationRows, (_, i) => String(i)),
+				withSeedIds('instruction-stack-item', itemRows, (_, i) => String(i)),
 			),
 		)}`
 
 		yield* Effect.logInfo(
-			`  templates: ${insertedTemplates.length}, stacks: ${insertedStacks.length}, items: ${itemRows.length}, donations: ${donationRows.length}`,
+			`  templates: ${insertedTemplates.length}, stacks: ${insertedStacks.length}, items: ${itemRows.length}`,
 		)
 		return templateIdByName
 	})
@@ -355,10 +401,20 @@ export const linkRunProvenance = (
 		) =>
 			Effect.gen(function* () {
 				const ids = templates.map(t => t.id)
-				const fingerprint = createHash('sha256')
-					.update(ids.join('|'))
-					.digest('hex')
-					.slice(0, 32)
+				// Match the runtime fingerprint (id@updatedAt in order) so seeded
+				// provenance is what a real run would record — read each template's
+				// updated_at as epoch text, exactly as the resolver does.
+				const stamped =
+					ids.length === 0
+						? []
+						: yield* sql<{ id: string; updatedAt: string }>`
+								SELECT id, EXTRACT(EPOCH FROM updated_at)::text AS updated_at
+								FROM instruction_templates WHERE id IN ${sql.in(ids)}
+							`
+				const byId = new Map(stamped.map(row => [row.id, row.updatedAt]))
+				const fingerprint = fingerprintTemplates(
+					ids.map(id => ({ id, updatedAt: byId.get(id) ?? '' })),
+				)
 				yield* sql`
 					UPDATE research_runs
 					SET template_ids = ${JSON.stringify(ids)},

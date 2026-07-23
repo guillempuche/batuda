@@ -1,10 +1,10 @@
 // Exercises the instruction MCP tools end-to-end against a real Postgres:
-// transfer (template ownership) and the donation lifecycle (propose → list →
-// accept/reject), driven through the real toolkit handlers the way a `tools/call`
-// would, inside the same org RLS scope (`enterOrgScope`) the /mcp middleware
-// applies. Asserts both the discriminated `{ outcome }` bodies and the resulting
-// DB state. Uses the seeded `taller` org: its `owner` acts as the admin gate, its
-// plain `member` as the proposer / transfer target. Requires $DATABASE_URL.
+// template transfer (ownership handoff), driven through the real toolkit handlers
+// the way a `tools/call` would, inside the same org RLS scope (`enterOrgScope`)
+// the /mcp middleware applies. Asserts both the discriminated `{ outcome }` bodies
+// and the resulting DB state. Uses the seeded `taller` org: its `owner` acts as
+// the admin gate, its plain `member` as the transfer target. Requires
+// $DATABASE_URL.
 
 import { randomUUID } from 'node:crypto'
 
@@ -15,15 +15,12 @@ import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { SessionContext } from '@batuda/controllers'
-import type { Donation } from '@batuda/instructions'
 
 import { PgLive } from '../../db/client'
 import { EnvVars } from '../../lib/env'
 import { enterOrgScope } from '../../middleware/org'
 import type {
 	CreateOutcome,
-	DonateOutcome,
-	ResolveDonationOutcome,
 	TransferOutcome,
 } from '../../services/instructions'
 import { InstructionsService } from '../../services/instructions'
@@ -82,10 +79,11 @@ const memberWithRole = async (orgId: string, role: string): Promise<string> => {
 }
 
 const cleanup = async () => {
-	await pool.query(
-		'DELETE FROM instruction_template_donations WHERE name LIKE $1',
-		[`${MARKER}%`],
-	)
+	// Stacks first (CASCADE drops their items, which RESTRICT-reference the
+	// templates deleted next).
+	await pool.query('DELETE FROM instruction_stacks WHERE name LIKE $1', [
+		`${MARKER}%`,
+	])
 	await pool.query('DELETE FROM instruction_templates WHERE name LIKE $1', [
 		`${MARKER}%`,
 	])
@@ -125,8 +123,8 @@ const createPersonalTemplate = async (
 	actorId: string,
 	label: string,
 ): Promise<string> => {
-	const created = (await callTool(actorId, 'manage_instruction_template', {
-		action: 'create',
+	const created = (await callTool(actorId, 'manage_instructions', {
+		action: 'create_template',
 		name: `${MARKER}${label}`,
 		body: 'verification body',
 		scope: 'personal',
@@ -177,14 +175,14 @@ describe('MCP instruction tools against live Postgres', () => {
 			const id = await createPersonalTemplate(memberId, 'transfer')
 
 			// WHEN the member transfers it to the owner
-			const moved = (await callTool(memberId, 'manage_instruction_template', {
-				action: 'transfer',
+			const moved = (await callTool(memberId, 'manage_instructions', {
+				action: 'transfer_template',
 				id,
 				target_user_id: ownerId,
 			})) as TransferOutcome
 
 			// THEN the outcome is transferred and the row's owner flips
-			// [instructions-mcp.ts manage_instruction_template:transfer]
+			// [instructions-mcp.ts transfer_template]
 			expect(moved.outcome).toBe('transferred')
 			const row = await pool.query<{ owner_user_id: string }>(
 				'SELECT owner_user_id FROM instruction_templates WHERE id = $1',
@@ -198,135 +196,15 @@ describe('MCP instruction tools against live Postgres', () => {
 			const id = await createPersonalTemplate(memberId, 'transfer-bad')
 
 			// WHEN transfer is called without target_user_id
-			const res = await callTool(memberId, 'manage_instruction_template', {
-				action: 'transfer',
+			const res = await callTool(memberId, 'manage_instructions', {
+				action: 'transfer_template',
 				id,
 			})
 
 			// THEN the handler reports the missing parameter, untouched
-			// [instructions-mcp.ts manage_instruction_template:transfer guard]
+			// [instructions-mcp.ts transfer_template guard]
 			expect(res).toMatchObject({
 				error: expect.stringContaining('target_user_id'),
-			})
-		})
-	})
-
-	describe('when a member donates a template the org reviews', () => {
-		it('should let an admin accept it into a fresh org template', async () => {
-			// GIVEN the member proposes a personal template to the org
-			const templateId = await createPersonalTemplate(memberId, 'donate-accept')
-			const proposed = (await callTool(
-				memberId,
-				'manage_instruction_donation',
-				{
-					action: 'propose',
-					template_id: templateId,
-				},
-			)) as DonateOutcome
-			if (proposed.outcome !== 'proposed')
-				throw new Error(`propose failed: ${JSON.stringify(proposed)}`)
-			const donationId = proposed.donation.id
-
-			// WHEN the owner lists pending donations
-			// [instructions-mcp.ts manage_instruction_donation:list]
-			const pending = (await callTool(ownerId, 'manage_instruction_donation', {
-				action: 'list',
-				status: 'pending',
-			})) as ReadonlyArray<Donation>
-			expect(pending.some(d => d.id === donationId)).toBe(true)
-
-			// AND the owner accepts it
-			const accepted = (await callTool(ownerId, 'manage_instruction_donation', {
-				action: 'accept',
-				id: donationId,
-			})) as ResolveDonationOutcome
-
-			// THEN a fresh org-owned template is created and the donation closes
-			// [instructions-mcp.ts manage_instruction_donation:accept]
-			if (accepted.outcome !== 'accepted')
-				throw new Error(`accept failed: ${JSON.stringify(accepted)}`)
-			const orgTemplate = await pool.query<{ owner_user_id: string | null }>(
-				'SELECT owner_user_id FROM instruction_templates WHERE id = $1',
-				[accepted.template.id],
-			)
-			expect(orgTemplate.rows[0]?.owner_user_id).toBeNull()
-			const donation = await pool.query<{ status: string }>(
-				'SELECT status FROM instruction_template_donations WHERE id = $1',
-				[donationId],
-			)
-			expect(donation.rows[0]?.status).toBe('accepted')
-		})
-
-		it('should let an admin reject a pending donation', async () => {
-			// GIVEN a pending donation
-			const templateId = await createPersonalTemplate(memberId, 'donate-reject')
-			const proposed = (await callTool(
-				memberId,
-				'manage_instruction_donation',
-				{
-					action: 'propose',
-					template_id: templateId,
-				},
-			)) as DonateOutcome
-			if (proposed.outcome !== 'proposed')
-				throw new Error(`propose failed: ${JSON.stringify(proposed)}`)
-
-			// WHEN the owner rejects it
-			const rejected = (await callTool(ownerId, 'manage_instruction_donation', {
-				action: 'reject',
-				id: proposed.donation.id,
-			})) as ResolveDonationOutcome
-
-			// THEN the proposal closes as rejected
-			// [instructions-mcp.ts manage_instruction_donation:reject]
-			expect(rejected.outcome).toBe('rejected')
-			const donation = await pool.query<{ status: string }>(
-				'SELECT status FROM instruction_template_donations WHERE id = $1',
-				[proposed.donation.id],
-			)
-			expect(donation.rows[0]?.status).toBe('rejected')
-		})
-
-		it('should forbid a non-admin from accepting', async () => {
-			// GIVEN a pending donation
-			const templateId = await createPersonalTemplate(memberId, 'donate-forbid')
-			const proposed = (await callTool(
-				memberId,
-				'manage_instruction_donation',
-				{
-					action: 'propose',
-					template_id: templateId,
-				},
-			)) as DonateOutcome
-			if (proposed.outcome !== 'proposed')
-				throw new Error(`propose failed: ${JSON.stringify(proposed)}`)
-
-			// WHEN the plain member tries to accept it
-			const res = (await callTool(memberId, 'manage_instruction_donation', {
-				action: 'accept',
-				id: proposed.donation.id,
-			})) as ResolveDonationOutcome
-
-			// THEN the admin gate forbids it and the donation stays pending
-			// [instructions-mcp.ts manage_instruction_donation:accept admin gate]
-			expect(res.outcome).toBe('forbidden')
-			const donation = await pool.query<{ status: string }>(
-				'SELECT status FROM instruction_template_donations WHERE id = $1',
-				[proposed.donation.id],
-			)
-			expect(donation.rows[0]?.status).toBe('pending')
-		})
-
-		it('should reject a propose that omits the template', async () => {
-			// WHEN propose is called without template_id
-			const res = await callTool(memberId, 'manage_instruction_donation', {
-				action: 'propose',
-			})
-
-			// THEN the handler reports the missing parameter
-			// [instructions-mcp.ts manage_instruction_donation:propose guard]
-			expect(res).toMatchObject({
-				error: expect.stringContaining('template_id'),
 			})
 		})
 	})
@@ -337,9 +215,9 @@ describe('MCP instruction tools against live Postgres', () => {
 			const id = await createPersonalTemplate(memberId, 'list-shape')
 
 			// WHEN the agent lists templates
-			// [instructions-mcp.ts manage_instruction_template:list]
-			const res = await callTool(memberId, 'manage_instruction_template', {
-				action: 'list',
+			// [instructions-mcp.ts list_templates]
+			const res = await callTool(memberId, 'manage_instructions', {
+				action: 'list_templates',
 			})
 
 			// THEN the result is an object under `items`, not a bare array — a bare
@@ -348,6 +226,55 @@ describe('MCP instruction tools against live Postgres', () => {
 			expect(res).toMatchObject({ items: expect.any(Array) })
 			const { items } = res as { items: ReadonlyArray<{ id: string }> }
 			expect(items.some(t => t.id === id)).toBe(true)
+		})
+	})
+
+	describe('when a member manages named stacks through one tool', () => {
+		it('should create a stack from a template name, list it, and make it default', async () => {
+			// GIVEN the member owns a template to put in a stack
+			const label = `stack-${randomUUID().slice(0, 8)}`
+			const templateName = `${MARKER}${label}`
+			await createPersonalTemplate(memberId, label)
+
+			// WHEN they create a personal research stack referencing it by name
+			const stackName = `${MARKER}s-${randomUUID().slice(0, 8)}`
+			const created = (await callTool(memberId, 'manage_instructions', {
+				action: 'create_stack',
+				agent: 'research',
+				scope: 'personal',
+				name: stackName,
+				templates: [templateName],
+				is_default: true,
+			})) as { outcome: string; stack: { id: string; name: string } }
+			expect(created.outcome).toBe('created')
+
+			// THEN it shows up in list_stacks and is the resolved default
+			const listed = (await callTool(memberId, 'manage_instructions', {
+				action: 'list_stacks',
+				agent: 'research',
+			})) as { items: ReadonlyArray<{ id: string; name: string }> }
+			expect(listed.items.some(s => s.id === created.stack.id)).toBe(true)
+
+			// AND get_stack resolves it by name for the research agent
+			const fetched = (await callTool(memberId, 'manage_instructions', {
+				action: 'get_stack',
+				agent: 'research',
+				stack: stackName,
+			})) as { id: string }
+			expect(fetched.id).toBe(created.stack.id)
+		})
+
+		it('should return a clarification for an unknown stack name instead of acting', async () => {
+			// WHEN the member references a stack that does not exist
+			const res = (await callTool(memberId, 'manage_instructions', {
+				action: 'get_stack',
+				agent: 'research',
+				stack: `${MARKER}nope-${randomUUID().slice(0, 8)}`,
+			})) as { _tag?: string; unknown?: ReadonlyArray<string> }
+
+			// THEN it comes back as an instruction_clarification, nothing resolved
+			expect(res._tag).toBe('instruction_clarification')
+			expect(res.unknown?.length).toBe(1)
 		})
 	})
 

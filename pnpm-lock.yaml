@@ -102,6 +102,9 @@ importers:
       '@batuda/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@batuda/instructions':
+        specifier: workspace:*
+        version: link:../../packages/instructions
       '@batuda/observability':
         specifier: workspace:*
         version: link:../../packages/observability

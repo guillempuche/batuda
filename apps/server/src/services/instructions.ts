@@ -4,24 +4,25 @@ import { SqlClient } from 'effect/unstable/sql'
 
 import {
 	type Agent,
-	acceptDonation,
-	clearUserDefaultStack,
+	clearDefaultStack,
+	createStack,
 	createTemplate,
-	type Donation,
 	decideTemplateEdit,
+	deleteStack,
 	deleteTemplate,
 	forkTemplate,
 	getDefaultStacks,
+	getStack,
 	getTemplate,
 	type InstructionTemplate,
-	listDonations,
+	listStacks,
 	listTemplates,
-	proposeDonation,
-	rejectDonation,
 	type StackComposition,
-	type StackView,
+	type StackSummary,
+	type StackWriteResult,
 	setDefaultStack,
 	transferTemplateToUser,
+	updateStack,
 	updateTemplateFields,
 } from '@batuda/instructions'
 
@@ -54,9 +55,20 @@ export type TransferOutcome =
 	| { readonly outcome: 'invalid_target' }
 	| { readonly outcome: 'not_found' }
 
-export type SetStackOutcome =
-	| { readonly outcome: 'set'; readonly stackId: string }
+// Every stack write funnels through one outcome union: the successful shape
+// depends on the action ('created'/'updated' carry the stack; 'set'/'cleared'/
+// 'deleted' don't), the gates add 'forbidden'/'not_found', and the validation
+// failures ('duplicate_name'/'unknown_template'/'personal_in_org_stack') come
+// straight from the package.
+export type StackOutcome =
+	| { readonly outcome: 'created'; readonly stack: StackSummary }
+	| { readonly outcome: 'updated'; readonly stack: StackSummary }
+	| { readonly outcome: 'deleted' }
+	| { readonly outcome: 'set' }
+	| { readonly outcome: 'cleared' }
 	| { readonly outcome: 'forbidden' }
+	| { readonly outcome: 'not_found' }
+	| { readonly outcome: 'duplicate_name' }
 	| {
 			readonly outcome: 'unknown_template'
 			readonly missing: ReadonlyArray<string>
@@ -66,17 +78,19 @@ export type SetStackOutcome =
 			readonly offending: ReadonlyArray<string>
 	  }
 
-export type DonateOutcome =
-	| { readonly outcome: 'proposed'; readonly donation: Donation }
-	| { readonly outcome: 'forbidden' }
-	| { readonly outcome: 'not_found' }
-
-export type ResolveDonationOutcome =
-	| { readonly outcome: 'accepted'; readonly template: InstructionTemplate }
-	| { readonly outcome: 'rejected' }
-	| { readonly outcome: 'forbidden' }
-	| { readonly outcome: 'not_found' }
-	| { readonly outcome: 'not_pending' }
+// Map a package write result to the service outcome. The success tag differs by
+// action ('created' vs 'updated'); the failure reasons pass straight through.
+const toStackOutcome = (
+	result: StackWriteResult,
+	success: 'created' | 'updated',
+): StackOutcome =>
+	result.ok
+		? { outcome: success, stack: result.stack }
+		: result.reason === 'unknown_template'
+			? { outcome: 'unknown_template', missing: result.missing }
+			: result.reason === 'personal_in_org_stack'
+				? { outcome: 'personal_in_org_stack', offending: result.offending }
+				: { outcome: 'duplicate_name' }
 
 // Collapse a SQL fault to a generic defect so neither the HTTP nor the MCP
 // transport leaks the driver error (statement, connection) to a client.
@@ -209,131 +223,118 @@ export class InstructionsService extends Context.Service<InstructionsService>()(
 							: { outcome: 'not_found' as const }
 					}).pipe(redactSql),
 
+				// Read views kept for the resource + resolution surfaces.
 				getDefaultStacks: (
 					organizationId: string,
 					userId: string,
 					agent: Agent,
 				): Effect.Effect<
-					{ readonly org: StackView | null; readonly user: StackView | null },
+					{
+						readonly org: StackSummary | null
+						readonly user: StackSummary | null
+					},
 					never,
 					SqlClient.SqlClient
 				> => getDefaultStacks(organizationId, userId, agent).pipe(redactSql),
 
-				setUserStack: (
+				listStacks: (agent?: Agent) => listStacks(agent).pipe(redactSql),
+
+				getStack: (id: string) => getStack(id).pipe(redactSql),
+
+				createStack: (
+					organizationId: string,
+					userId: string,
+					input: {
+						readonly scope: Scope
+						readonly agent: Agent
+						readonly name: string
+						readonly templateIds: ReadonlyArray<string>
+						readonly composition?: StackComposition | undefined
+						readonly isDefault: boolean
+					},
+				): Effect.Effect<StackOutcome, never, SqlClient.SqlClient> =>
+					Effect.gen(function* () {
+						if (input.scope === 'org' && !(yield* isAdmin(userId)))
+							return { outcome: 'forbidden' as const }
+						const result = yield* createStack({
+							organizationId,
+							ownerUserId: input.scope === 'org' ? null : userId,
+							agent: input.agent,
+							name: input.name,
+							templateIds: input.templateIds,
+							// Org stacks are the base of any extend, so they always replace.
+							composition:
+								input.scope === 'org'
+									? 'replace'
+									: (input.composition ?? 'replace'),
+							isDefault: input.isDefault,
+						})
+						return toStackOutcome(result, 'created')
+					}).pipe(redactSql),
+
+				// Org-owned stacks are admin-gated; a member's own passes. RLS hides
+				// another member's personal stack, so an unreadable id is not_found.
+				updateStack: (
+					userId: string,
+					id: string,
+					fields: {
+						readonly name?: string | undefined
+						readonly templateIds?: ReadonlyArray<string> | undefined
+						readonly composition?: StackComposition | undefined
+					},
+				): Effect.Effect<StackOutcome, never, SqlClient.SqlClient> =>
+					Effect.gen(function* () {
+						const existing = yield* getStack(id)
+						if (!existing) return { outcome: 'not_found' as const }
+						if (existing.ownerUserId === null && !(yield* isAdmin(userId)))
+							return { outcome: 'forbidden' as const }
+						const result = yield* updateStack(id, fields)
+						return result === 'not_found'
+							? { outcome: 'not_found' as const }
+							: toStackOutcome(result, 'updated')
+					}).pipe(redactSql),
+
+				deleteStack: (
+					userId: string,
+					id: string,
+				): Effect.Effect<StackOutcome, never, SqlClient.SqlClient> =>
+					Effect.gen(function* () {
+						const existing = yield* getStack(id)
+						if (!existing) return { outcome: 'not_found' as const }
+						if (existing.ownerUserId === null && !(yield* isAdmin(userId)))
+							return { outcome: 'forbidden' as const }
+						const result = yield* deleteStack(id)
+						return { outcome: result }
+					}).pipe(redactSql),
+
+				setDefault: (
+					userId: string,
+					id: string,
+				): Effect.Effect<StackOutcome, never, SqlClient.SqlClient> =>
+					Effect.gen(function* () {
+						const existing = yield* getStack(id)
+						if (!existing) return { outcome: 'not_found' as const }
+						if (existing.ownerUserId === null && !(yield* isAdmin(userId)))
+							return { outcome: 'forbidden' as const }
+						const result = yield* setDefaultStack(id)
+						return { outcome: result }
+					}).pipe(redactSql),
+
+				clearDefault: (
 					organizationId: string,
 					userId: string,
 					agent: Agent,
-					templateIds: ReadonlyArray<string>,
-					composition: StackComposition,
-				): Effect.Effect<SetStackOutcome, never, SqlClient.SqlClient> =>
+					scope: Scope,
+				): Effect.Effect<StackOutcome, never, SqlClient.SqlClient> =>
 					Effect.gen(function* () {
-						const result = yield* setDefaultStack({
+						if (scope === 'org' && !(yield* isAdmin(userId)))
+							return { outcome: 'forbidden' as const }
+						const result = yield* clearDefaultStack(
 							organizationId,
-							ownerUserId: userId,
+							scope === 'org' ? null : userId,
 							agent,
-							templateIds,
-							composition,
-						})
-						return result.ok
-							? { outcome: 'set' as const, stackId: result.stackId }
-							: result.reason === 'unknown_template'
-								? {
-										outcome: 'unknown_template' as const,
-										missing: result.missing,
-									}
-								: {
-										outcome: 'personal_in_org_stack' as const,
-										offending: result.offending,
-									}
-					}).pipe(redactSql),
-
-				setOrgStack: (
-					organizationId: string,
-					userId: string,
-					agent: Agent,
-					templateIds: ReadonlyArray<string>,
-				): Effect.Effect<SetStackOutcome, never, SqlClient.SqlClient> =>
-					Effect.gen(function* () {
-						if (!(yield* isAdmin(userId)))
-							return { outcome: 'forbidden' as const }
-						const result = yield* setDefaultStack({
-							organizationId,
-							ownerUserId: null,
-							agent,
-							templateIds,
-							// The org default is always the base of any extend.
-							composition: 'replace',
-						})
-						return result.ok
-							? { outcome: 'set' as const, stackId: result.stackId }
-							: result.reason === 'unknown_template'
-								? {
-										outcome: 'unknown_template' as const,
-										missing: result.missing,
-									}
-								: {
-										outcome: 'personal_in_org_stack' as const,
-										offending: result.offending,
-									}
-					}).pipe(redactSql),
-
-				clearUserStack: (
-					organizationId: string,
-					userId: string,
-					agent: Agent,
-				) =>
-					clearUserDefaultStack(organizationId, userId, agent).pipe(
-						Effect.orDie,
-					),
-
-				listDonations: (status?: Donation['status'] | undefined) =>
-					listDonations(status).pipe(redactSql),
-
-				propose: (
-					organizationId: string,
-					userId: string,
-					templateId: string,
-				): Effect.Effect<DonateOutcome, never, SqlClient.SqlClient> =>
-					Effect.gen(function* () {
-						const template = yield* getTemplate(templateId)
-						if (!template) return { outcome: 'not_found' as const }
-						// Only a personal template you own can be donated to the org.
-						if (template.ownerUserId !== userId)
-							return { outcome: 'forbidden' as const }
-						const donation = yield* proposeDonation({
-							organizationId,
-							sourceTemplateId: templateId,
-							name: template.name,
-							body: template.body,
-							proposedBy: userId,
-						})
-						return { outcome: 'proposed' as const, donation }
-					}).pipe(redactSql),
-
-				accept: (
-					userId: string,
-					donationId: string,
-				): Effect.Effect<ResolveDonationOutcome, never, SqlClient.SqlClient> =>
-					Effect.gen(function* () {
-						if (!(yield* isAdmin(userId)))
-							return { outcome: 'forbidden' as const }
-						const result = yield* acceptDonation(donationId, userId)
-						return result.ok
-							? { outcome: 'accepted' as const, template: result.template }
-							: { outcome: result.reason }
-					}).pipe(redactSql),
-
-				reject: (
-					userId: string,
-					donationId: string,
-				): Effect.Effect<ResolveDonationOutcome, never, SqlClient.SqlClient> =>
-					Effect.gen(function* () {
-						if (!(yield* isAdmin(userId)))
-							return { outcome: 'forbidden' as const }
-						const result = yield* rejectDonation(donationId, userId)
-						return result === 'rejected'
-							? { outcome: 'rejected' as const }
-							: { outcome: result }
+						)
+						return { outcome: result }
 					}).pipe(redactSql),
 			}
 		}),

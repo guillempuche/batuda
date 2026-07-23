@@ -67,6 +67,9 @@ const CreateResearchInput = Schema.Struct({
 	paid_budget_cents: Schema.optional(Schema.Number),
 	auto_approve_paid_cents: Schema.optional(Schema.Number),
 	confirm: Schema.optional(Schema.Boolean),
+	// A saved stack (id) and/or ad-hoc extra templates for this run. The UI holds
+	// ids, so only ids are accepted here (the MCP surface resolves names).
+	stack_id: Schema.optional(Schema.String),
 	template_ids: Schema.optional(Schema.Array(Schema.String)),
 })
 
