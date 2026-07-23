@@ -14,6 +14,17 @@ export const OwnerBadge = styled.span`
 	color: var(--color-on-surface-variant);
 `
 
+// "Default" tag on a stack row. Same stencilled label as OwnerBadge, but in the
+// primary colour so the one stack a run follows by default stands out at a
+// glance — the word carries the meaning, the colour only reinforces it.
+export const DefaultBadge = styled.span`
+	font-family: var(--font-display);
+	font-size: var(--typescale-label-small-size);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--color-primary);
+`
+
 // Square icon-only button (edit / delete / move / remove). Carries its own
 // focus-visible ring so keyboard focus stays legible on every surface,
 // including the dark brushed-metal rows where the browser default is faint.

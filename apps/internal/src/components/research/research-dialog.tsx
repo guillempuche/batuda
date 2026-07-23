@@ -6,15 +6,25 @@ import { msg } from '@lingui/core/macro'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Link } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
-import { X } from 'lucide-react'
+import { Check, ChevronsUpDown, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
 
 import type { SchemaName } from '@batuda/research'
-import { PriButton, PriDialog, PriInput, PriTextarea } from '@batuda/ui/pri'
+import {
+	PriButton,
+	PriDialog,
+	PriInput,
+	PriSelect,
+	PriTextarea,
+} from '@batuda/ui/pri'
 
-import { instructionTemplatesAtom } from '#/atoms/instruction-atoms'
+import {
+	instructionStacksAtom,
+	instructionTemplatesAtom,
+} from '#/atoms/instruction-atoms'
 import { createResearchAtom } from '#/atoms/research-atoms'
+import { narrowStacks } from '#/components/instructions/instruction-shapes'
 import {
 	type StackOption,
 	StackPicker,
@@ -99,6 +109,8 @@ export function ResearchDialog({
 	const [submitting, setSubmitting] = useState(false)
 	const [errorMessage, setErrorMessage] = useState<string | null>(null)
 	const [templateIds, setTemplateIds] = useState<ReadonlyArray<string>>([])
+	// '' = the actor's own default stack; otherwise a chosen stack's id.
+	const [stackId, setStackId] = useState('')
 	// Discovery-only scope fields: hints steer a net-new search, the selector
 	// filters fan the run out over existing companies.
 	const [location, setLocation] = useState('')
@@ -121,6 +133,32 @@ export function ResearchDialog({
 				: [],
 		[templatesResult],
 	)
+	// Research runs pick from research stacks; the run's own agent is fixed.
+	const stacksResult = useAtomValue(instructionStacksAtom('research'))
+	const stackItems = useMemo(() => {
+		const stacks = AsyncResult.isSuccess(stacksResult)
+			? narrowStacks(stacksResult.value).filter(s => s.agent === 'research')
+			: []
+		const label = (name: string, isDefault: boolean, mine: boolean) => {
+			const scoped = mine ? t`Mine — ${name}` : t`Org — ${name}`
+			return isDefault ? t`${scoped} (default)` : scoped
+		}
+		return [
+			{ value: '', label: t`My default` },
+			...stacks
+				.filter(s => s.scope === 'personal')
+				.map(s => ({
+					value: s.id,
+					label: label(s.name, s.isDefault, true),
+				})),
+			...stacks
+				.filter(s => s.scope === 'org')
+				.map(s => ({
+					value: s.id,
+					label: label(s.name, s.isDefault, false),
+				})),
+		]
+	}, [stacksResult, t])
 
 	useEffect(() => {
 		if (!open) return
@@ -129,6 +167,7 @@ export function ResearchDialog({
 		setSubmitting(false)
 		setErrorMessage(null)
 		setTemplateIds([])
+		setStackId('')
 		setLocation('')
 		setLanguage('')
 		setFilterStatus('')
@@ -185,6 +224,7 @@ export function ResearchDialog({
 					query: query.trim(),
 					schema_name: schema,
 					...(context ? { context } : {}),
+					...(stackId ? { stack_id: stackId } : {}),
 					...(templateIds.length > 0 ? { template_ids: templateIds } : {}),
 					...(confirm ? { confirm: true } : {}),
 				},
@@ -229,6 +269,7 @@ export function ResearchDialog({
 			createResearch,
 			query,
 			schema,
+			stackId,
 			templateIds,
 			onCreated,
 			onOpenChange,
@@ -442,15 +483,56 @@ export function ResearchDialog({
 
 						<Field>
 							<Label as='div'>
-								<Trans>Instructions for this run (optional)</Trans>
+								<Trans>Instructions stack</Trans>
+							</Label>
+							<HelpText>
+								<Trans>Pick a saved stack, or use your default.</Trans>
+							</HelpText>
+							<PriSelect.Root
+								items={stackItems}
+								value={stackId}
+								onValueChange={value => {
+									if (typeof value === 'string') setStackId(value)
+								}}
+							>
+								<PriSelect.Trigger data-testid='research-dialog-stack'>
+									<PriSelect.Value />
+									<PriSelect.Icon>
+										<ChevronsUpDown size={12} aria-hidden />
+									</PriSelect.Icon>
+								</PriSelect.Trigger>
+								<PriSelect.Portal>
+									<PriSelect.Positioner
+										alignItemWithTrigger={false}
+										sideOffset={6}
+									>
+										<PriSelect.Popup>
+											<PriSelect.List>
+												{stackItems.map(item => (
+													<PriSelect.Item key={item.value} value={item.value}>
+														<PriSelect.ItemIndicator>
+															<Check size={12} aria-hidden />
+														</PriSelect.ItemIndicator>
+														<PriSelect.ItemText>
+															{item.label}
+														</PriSelect.ItemText>
+													</PriSelect.Item>
+												))}
+											</PriSelect.List>
+										</PriSelect.Popup>
+									</PriSelect.Positioner>
+								</PriSelect.Portal>
+							</PriSelect.Root>
+						</Field>
+
+						<Field>
+							<Label as='div'>
+								<Trans>Extra templates for this run</Trans>
 							</Label>
 							{templateOptions.length > 0 ? (
 								<>
 									<HelpText>
-										<Trans>
-											Pick templates to use just for this run. Leave empty to
-											use your default.
-										</Trans>
+										<Trans>Layered after the stack, in order.</Trans>
 									</HelpText>
 									<StackPicker
 										options={templateOptions}

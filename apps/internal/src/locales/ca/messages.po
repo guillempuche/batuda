@@ -24,11 +24,6 @@ msgstr "—"
 msgid "— Select a company —"
 msgstr "— Tria una empresa —"
 
-#. placeholder {0}: row.name
-#: src/routes/settings/profile/templates.tsx
-msgid "\"{0}\" is waiting for an admin to add it to the organization."
-msgstr "«{0}» espera que un administrador l'afegeixi a l'organització."
-
 #. placeholder {0}: confirmTarget?.name ?? ''
 #: src/routes/settings/organization/templates.tsx
 msgid "\"{0}\" will be removed for everyone in the organization. This can't be undone."
@@ -39,9 +34,15 @@ msgstr "S'eliminarà «{0}» per a tothom de l'organització. Això no es pot de
 msgid "\"{0}\" will be removed for good. This can't be undone."
 msgstr "S'eliminarà «{0}» per sempre. Això no es pot desfer."
 
+#. placeholder {0}: confirmStack?.name ?? ''
 #: src/routes/settings/organization/templates.tsx
-msgid "\"{name}\" is now an org template."
-msgstr "«{name}» ja és una plantilla de l'organització."
+msgid "\"{0}\" will be removed for the organization. The templates stay; only this grouping goes."
+msgstr "S'eliminarà «{0}» per a l'organització. Les plantilles es mantenen; només desapareix aquesta agrupació."
+
+#. placeholder {0}: confirmStack?.name ?? ''
+#: src/routes/settings/profile/templates.tsx
+msgid "\"{0}\" will be removed. Your templates stay; only this grouping goes."
+msgstr "S'eliminarà «{0}». Les teves plantilles es mantenen; només desapareix aquesta agrupació."
 
 #: src/components/companies/conversations-tab.tsx
 #: src/routes/emails/$threadId.tsx
@@ -52,6 +53,11 @@ msgstr "(sense assumpte)"
 #: src/components/companies/conversations-tab.tsx
 msgid "(no summary)"
 msgstr "(sense resum)"
+
+#. placeholder {0}: stack.templateIds.length
+#: src/components/instructions/stack-list.tsx
+msgid "{0, plural, one {# template} other {# templates}}"
+msgstr "{0, plural, one {# plantilla} other {# plantilles}}"
 
 #. placeholder {0}: ev.attendeeCount
 #: src/components/companies/upcoming-meetings-card.tsx
@@ -72,13 +78,6 @@ msgstr "{0} empreses"
 #: src/routes/companies/index.tsx
 msgid "{0} companies with filters applied"
 msgstr "{0} empreses amb filtres aplicats"
-
-#. placeholder {0}: quality.fieldsGrounded ?? 0
-#. placeholder {1}: quality.sourcesMatched ?? 0
-#. placeholder {2}: quality.rounds ?? 0
-#: src/components/research/findings/company-enrichment-view.tsx
-msgid "{0} fields grounded · {1} own-domain sources · {2} rounds"
-msgstr "{0} camps documentats · {1} fonts del domini propi · {2} rondes"
 
 #. placeholder {0}: thread.messageCount
 #: src/routes/emails/index.tsx
@@ -118,6 +117,10 @@ msgstr "{addedEmail} ja és membre. Se li ha enviat un correu."
 #: src/components/layout/nav-group-knob.tsx
 msgid "{groupLabel} sections"
 msgstr "Seccions de {groupLabel}"
+
+#: src/components/research/research-dialog.tsx
+msgid "{scoped} (default)"
+msgstr "{scoped} (per defecte)"
 
 #: src/routes/emails/index.tsx
 msgid "{selectedCount} threads selected"
@@ -191,6 +194,10 @@ msgstr "90%+"
 msgid "A short label. Start it with a [tag] like [research] to group related templates if you like — the brackets are just part of the name."
 msgstr "Una etiqueta curta. Si vols, comença-la amb un [tag] com ara [research] per agrupar plantilles relacionades; els claudàtors només formen part del nom."
 
+#: src/components/instructions/stack-editor.tsx
+msgid "A stack with that name already exists."
+msgstr "Ja existeix una pila amb aquest nom."
+
 #: src/components/companies/about-section.tsx
 msgid "About"
 msgstr "Sobre l'empresa"
@@ -206,11 +213,6 @@ msgstr "Acceptada"
 #: src/routes/oauth/consent.tsx
 msgid "Access"
 msgstr "Accés"
-
-#: src/components/companies/account-brief-section.tsx
-#: src/components/companies/account-brief-section.tsx
-msgid "Account brief"
-msgstr "Resum del compte"
 
 #: src/components/research/target-correction.tsx
 msgid "acme.com"
@@ -284,13 +286,9 @@ msgstr "Afegeix primer una plantilla de l'organització."
 msgid "Add as lead"
 msgstr "Afegeix com a oportunitat"
 
-#: src/components/instructions/default-stack-editor.tsx
-msgid "Add at least one template before saving a default."
-msgstr "Afegeix almenys una plantilla abans de desar un valor per defecte."
-
-#: src/components/instructions/default-stack-editor.tsx
-msgid "Add at least one template to layer on the org default."
-msgstr "Afegeix almenys una plantilla per posar-la sobre el valor per defecte de l'organització."
+#: src/components/instructions/stack-editor.tsx
+msgid "Add at least one template before saving."
+msgstr "Afegeix almenys una plantilla abans de desar."
 
 #: src/components/emails/attachment-picker.tsx
 msgid "Add attachment"
@@ -331,11 +329,7 @@ msgstr "Afegeix tasca"
 msgid "Add the first decision-maker to keep track of who to reach."
 msgstr "Afegeix el primer responsable de decisió per saber a qui adreçar-te."
 
-#: src/routes/settings/organization/templates.tsx
-msgid "Add to org"
-msgstr "Afegeix a l'organització"
-
-#: src/components/instructions/default-stack-editor.tsx
+#: src/components/instructions/stack-editor.tsx
 msgid "Add to the org default"
 msgstr "Amplia el valor per defecte de l'organització"
 
@@ -347,10 +341,6 @@ msgstr "Afegit"
 #: src/components/research/findings/prospect-scan-view.tsx
 msgid "Added as a verified lead"
 msgstr "Afegit com a oportunitat verificada"
-
-#: src/routes/settings/organization/templates.tsx
-msgid "Added to the org"
-msgstr "Afegida a l'organització"
 
 #: src/components/research/findings/prospect-scan-view.tsx
 #: src/routes/settings/organization/members.tsx
@@ -433,14 +423,13 @@ msgstr "Ja al CRM"
 msgid "Already resolved"
 msgstr "Ja resolt"
 
-#. placeholder {0}: conflict.value
-#: src/components/companies/company-fit-section.tsx
-msgid "also reported as {0}"
-msgstr "també indicat com a {0}"
-
 #: src/routes/oauth/consent.tsx
 msgid "An AI assistant wants to connect to your Batuda account over MCP and act on your behalf. Only approve assistants you trust."
 msgstr "Un assistent d'IA vol connectar-se al teu compte de Batuda per MCP i actuar en nom teu. Aprova només els assistents en qui confiïs."
+
+#: src/routes/settings/organization/templates.tsx
+msgid "An org stack runs for every member who hasn't set their own. The one marked default applies to a run that names none. Only org templates can go in an org stack."
+msgstr "Una pila de l'organització s'aplica a tots els membres que no n'han definit una de pròpia. La marcada per defecte s'aplica quan una execució no n'anomena cap. En una pila de l'organització només hi poden anar plantilles de l'organització."
 
 #: src/components/research/research-dialog.tsx
 msgid "Any"
@@ -681,7 +670,7 @@ msgstr "Accions massives de fils"
 
 #: src/components/primitives/pri-rich-text.tsx
 msgid "Bullet list"
-msgstr "Llista de pics"
+msgstr "Llista de punts"
 
 #: src/routes/settings/api-keys/index.tsx
 msgid "by {creatorName}"
@@ -727,11 +716,11 @@ msgstr "Truca al telèfon"
 msgid "Calls"
 msgstr "Crides"
 
-#: src/components/companies/account-brief-section.tsx
 #: src/components/companies/documents-panel.tsx
 #: src/components/companies/followup-dialog.tsx
 #: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
+#: src/components/instructions/stack-editor.tsx
 #: src/components/instructions/template-delete-confirm.tsx
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/components/interactions/quick-capture-dialog.tsx
@@ -1348,10 +1337,6 @@ msgstr "No s'ha pogut actualitzar l'acció de pagament"
 msgid "Could not update verification"
 msgstr "No s'ha pogut actualitzar la verificació"
 
-#: src/routes/settings/organization/templates.tsx
-msgid "Couldn't add it"
-msgstr "No s'ha pogut afegir"
-
 #: src/routes/emails/inboxes.tsx
 msgid "Couldn't connect"
 msgstr "No s'ha pogut connectar"
@@ -1361,8 +1346,9 @@ msgid "Couldn't copy"
 msgstr "No s'ha pogut copiar"
 
 #: src/routes/settings/organization/templates.tsx
-msgid "Couldn't decline it"
-msgstr "No s'ha pogut rebutjar"
+#: src/routes/settings/profile/templates.tsx
+msgid "Couldn't delete the stack. Please try again."
+msgstr "No s'ha pogut eliminar la pila. Torna-ho a provar."
 
 #: src/routes/settings/organization/templates.tsx
 #: src/routes/settings/profile/templates.tsx
@@ -1371,28 +1357,39 @@ msgid "Couldn't delete the template. Please try again."
 msgstr "No s'ha pogut eliminar la plantilla. Torna-ho a provar."
 
 #: src/routes/settings/organization/templates.tsx
-msgid "Couldn't load the org default."
-msgstr "No s'ha pogut carregar el valor per defecte de l'organització."
+#: src/routes/settings/organization/templates.tsx
+msgid "Couldn't load the org stacks."
+msgstr "No s'han pogut carregar les piles de l'organització."
 
 #: src/routes/settings/profile/templates.tsx
-msgid "Couldn't load your default."
-msgstr "No s'ha pogut carregar el teu valor per defecte."
+msgid "Couldn't load your stacks."
+msgstr "No s'han pogut carregar les teves piles."
 
 #: src/routes/settings/profile/templates.tsx
 msgid "Couldn't load your templates."
 msgstr "No s'han pogut carregar les teves plantilles."
 
-#: src/routes/settings/organization/templates.tsx
+#: src/components/instructions/stack-editor.tsx
+#: src/components/instructions/stack-editor.tsx
 msgid "Couldn't save"
 msgstr "No s'ha pogut desar"
 
+#: src/components/instructions/stack-editor.tsx
+msgid "Couldn't save the stack. Please try again."
+msgstr "No s'ha pogut desar la pila. Torna-ho a provar."
+
+#: src/routes/settings/organization/templates.tsx
 #: src/routes/settings/profile/templates.tsx
-msgid "Couldn't send it"
-msgstr "No s'ha pogut enviar"
+msgid "Couldn't set the default"
+msgstr "No s'ha pogut definir per defecte"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Couldn't sign in"
 msgstr "No s'ha pogut iniciar la sessió"
+
+#: src/routes/settings/profile/templates.tsx
+msgid "Couldn't switch"
+msgstr "No s'ha pogut canviar"
 
 #: src/routes/settings/profile/index.tsx
 msgid "Couldn't update your preference. Try again."
@@ -1430,8 +1427,8 @@ msgid "Create a prospect landing page to share with this company."
 msgstr "Crea una pàgina d'aterratge per a un prospecte per compartir amb aquesta empresa."
 
 #: src/routes/settings/profile/templates.tsx
-msgid "Create a template above first, then pick which ones run by default."
-msgstr "Crea primer una plantilla a dalt i després tria quines s'executen per defecte."
+msgid "Create a template above first, then group templates into a stack."
+msgstr "Crea primer una plantilla a dalt i després agrupa plantilles en una pila."
 
 #: src/routes/settings/mcp/index.tsx
 msgid "Create an API key"
@@ -1494,10 +1491,6 @@ msgstr "Creada per agent"
 msgid "Creating…"
 msgstr "Creant…"
 
-#: src/components/companies/company-fit-section.tsx
-msgid "Criteria"
-msgstr "Criteris"
-
 #: src/components/companies/proposals-panel.tsx
 msgid "Currency"
 msgstr "Moneda"
@@ -1542,18 +1535,10 @@ msgstr "Responsable de decisió"
 msgid "Decline"
 msgstr "Rebutja"
 
-#. placeholder {0}: d.name
-#: src/routes/settings/organization/templates.tsx
-msgid "Decline {0}"
-msgstr "Rebutja {0}"
-
+#: src/components/instructions/stack-list.tsx
 #: src/routes/emails/inboxes.tsx
 msgid "Default"
 msgstr "Per defecte"
-
-#: src/routes/settings/profile/templates.tsx
-msgid "Default instructions"
-msgstr "Instruccions per defecte"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Defaults to the email address."
@@ -1571,6 +1556,8 @@ msgid "Delete"
 msgstr "Elimina"
 
 #. placeholder {0}: row.name
+#. placeholder {0}: stack.name
+#: src/components/instructions/stack-list.tsx
 #: src/routes/settings/organization/templates.tsx
 #: src/routes/settings/profile/templates.tsx
 msgid "Delete {0}"
@@ -1580,6 +1567,8 @@ msgstr "Elimina {0}"
 #: src/routes/emails/inboxes.tsx
 #: src/routes/settings/api-keys/index.tsx
 #: src/routes/settings/organization/templates.tsx
+#: src/routes/settings/organization/templates.tsx
+#: src/routes/settings/profile/templates.tsx
 #: src/routes/settings/profile/templates.tsx
 #: src/routes/settings/profile/templates.tsx
 msgid "Delete failed"
@@ -1603,8 +1592,16 @@ msgid "Delete this key?"
 msgstr "Vols eliminar aquesta clau?"
 
 #: src/routes/settings/organization/templates.tsx
+msgid "Delete this org stack?"
+msgstr "Vols eliminar aquesta pila de l'organització?"
+
+#: src/routes/settings/organization/templates.tsx
 msgid "Delete this org template?"
 msgstr "Vols eliminar aquesta plantilla de l'organització?"
+
+#: src/routes/settings/profile/templates.tsx
+msgid "Delete this stack?"
+msgstr "Vols eliminar aquesta pila?"
 
 #: src/routes/settings/profile/templates.tsx
 msgid "Delete this template?"
@@ -1647,7 +1644,7 @@ msgstr "Descarta"
 
 #: src/components/instructions/template-editor-dialog.tsx
 msgid "Discard your unsaved changes?"
-msgstr "Voleu descartar els canvis no desats?"
+msgstr "Vols descartar els canvis sense desar?"
 
 #: src/components/companies/about-section.tsx
 msgid "Discovery"
@@ -1669,11 +1666,6 @@ msgstr "Document"
 #: src/routes/companies/$slug.tsx
 msgid "Documents"
 msgstr "Documents"
-
-#. placeholder {0}: row.name
-#: src/routes/settings/profile/templates.tsx
-msgid "Donate {0} to your organization"
-msgstr "Dona {0} a la teva organització"
 
 #: src/routes/settings/api-keys/index.tsx
 msgid "Done"
@@ -1731,6 +1723,10 @@ msgstr "p. ex. Catalunya"
 msgid "e.g. Claude Desktop"
 msgstr "p. ex. Claude Desktop"
 
+#: src/components/instructions/stack-editor.tsx
+msgid "e.g. Cold outreach"
+msgstr "p. ex. Contacte en fred"
+
 #: src/routes/emails/inboxes.tsx
 msgid "e.g. Company signature"
 msgstr "p. ex. Signatura de l'empresa"
@@ -1767,7 +1763,6 @@ msgstr "p. ex. Tarifa d'instal·lació"
 msgid "e.g. vip, warm"
 msgstr "p. ex. vip, càlid"
 
-#: src/components/companies/account-brief-section.tsx
 #: src/components/companies/documents-panel.tsx
 #: src/routes/companies/$slug.tsx
 #: src/routes/emails/inboxes.tsx
@@ -1775,6 +1770,8 @@ msgid "Edit"
 msgstr "Edita"
 
 #. placeholder {0}: row.name
+#. placeholder {0}: stack.name
+#: src/components/instructions/stack-list.tsx
 #: src/routes/settings/organization/templates.tsx
 #: src/routes/settings/profile/templates.tsx
 msgid "Edit {0}"
@@ -1809,6 +1806,10 @@ msgstr "Edita la proposta"
 msgid "Edit settings"
 msgstr "Edita la configuració"
 
+#: src/components/instructions/stack-editor.tsx
+msgid "Edit stack"
+msgstr "Edita la pila"
+
 #: src/components/shared/task-item.tsx
 msgid "Edit task title"
 msgstr "Edita el títol de la tasca"
@@ -1816,14 +1817,6 @@ msgstr "Edita el títol de la tasca"
 #: src/components/instructions/template-editor-dialog.tsx
 msgid "Edit template"
 msgstr "Edita la plantilla"
-
-#: src/components/companies/account-brief-section.tsx
-msgid "Edited by hand <0/>. Research adds below your text."
-msgstr "Editat a mà <0/>. La recerca afegeix sota el teu text."
-
-#: src/components/companies/account-brief-section.tsx
-msgid "Edited by hand. Research adds below your text."
-msgstr "Editat a mà. La recerca afegeix sota el teu text."
 
 #: src/routes/pages/$id.tsx
 #: src/routes/pages/$id.tsx
@@ -1946,17 +1939,17 @@ msgstr "Caduca d'aquí a (dies)"
 msgid "Expiry must be a number of days greater than zero."
 msgstr "La caducitat ha de ser un nombre de dies més gran que zero."
 
-#: src/components/instructions/default-stack-editor.tsx
-msgid "Extending the org default"
-msgstr "S'amplia el valor per defecte de l'organització"
+#: src/components/instructions/stack-list.tsx
+msgid "Extends org default"
+msgstr "Amplia el valor per defecte de l'organització"
+
+#: src/components/research/research-dialog.tsx
+msgid "Extra templates for this run"
+msgstr "Plantilles addicionals per a aquesta execució"
 
 #: src/components/research/run-progress.tsx
 msgid "Extracting findings"
 msgstr "Extraient conclusions"
-
-#: src/components/research/findings/company-enrichment-view.tsx
-msgid "Fail"
-msgstr "No compleix"
 
 #: src/components/research/run-labels.ts
 #: src/routes/emails/$threadId.tsx
@@ -2024,11 +2017,6 @@ msgstr "Troballes"
 msgid "First outreach sent"
 msgstr "Primer contacte enviat"
 
-#: src/components/companies/company-fit-section.tsx
-#: src/components/research/findings/company-enrichment-view.tsx
-msgid "Fit"
-msgstr "Encaix"
-
 #: src/routes/emails/$threadId.tsx
 msgid "Flagged as spam by the provider. The body is shown for review only."
 msgstr "El proveïdor l'ha marcat com a brossa. El cos es mostra només per revisar-lo."
@@ -2079,7 +2067,7 @@ msgstr "Del correu"
 msgid "From webhook"
 msgstr "Del webhook"
 
-#: src/components/instructions/default-stack-editor.tsx
+#: src/components/instructions/stack-editor.tsx
 msgid "From your organization, applied first"
 msgstr "De la teva organització, s'aplica primer"
 
@@ -2149,9 +2137,9 @@ msgstr "Prioritat alta"
 msgid "Hot"
 msgstr "Calent"
 
-#: src/components/instructions/default-stack-editor.tsx
-msgid "How your default uses the org default"
-msgstr "Com es relaciona el teu valor per defecte amb el de l'organització"
+#: src/components/instructions/stack-editor.tsx
+msgid "How this stack uses the org default"
+msgstr "Com fa servir aquesta pila el valor per defecte de l'organització"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Human"
@@ -2277,8 +2265,8 @@ msgid "Instructions"
 msgstr "Instruccions"
 
 #: src/components/research/research-dialog.tsx
-msgid "Instructions for this run (optional)"
-msgstr "Instruccions per a aquesta recerca (opcional)"
+msgid "Instructions stack"
+msgstr "Pila d'instruccions"
 
 #: src/components/companies/conversations-tab.tsx
 msgid "Interaction"
@@ -2363,6 +2351,10 @@ msgstr "Última visita"
 #: src/routes/tasks/index.tsx
 msgid "Later"
 msgstr "Més tard"
+
+#: src/components/research/research-dialog.tsx
+msgid "Layered after the stack, in order."
+msgstr "S'apliquen després de la pila, en ordre."
 
 #: src/components/profile/theme-select.tsx
 msgid "Light"
@@ -2483,6 +2475,11 @@ msgstr "Baixa"
 msgid "Low priority"
 msgstr "Prioritat baixa"
 
+#. placeholder {0}: stack.name
+#: src/components/instructions/stack-list.tsx
+msgid "Make {0} the default"
+msgstr "Fes que {0} sigui la predeterminada"
+
 #. placeholder {0}: row.email
 #: src/routes/emails/inboxes.tsx
 msgid "Make {0} the primary sender"
@@ -2491,6 +2488,14 @@ msgstr "Fes que {0} sigui el remitent principal"
 #: src/components/contacts/manage-channels-dialog.tsx
 msgid "Make primary"
 msgstr "Fes-lo principal"
+
+#: src/components/instructions/stack-editor.tsx
+msgid "Make this my default"
+msgstr "Fes que sigui la meva predeterminada"
+
+#: src/components/instructions/stack-editor.tsx
+msgid "Make this the org default"
+msgstr "Fes que sigui la predeterminada de l'organització"
 
 #: src/routes/companies/$slug.tsx
 msgid "Manage channels"
@@ -2600,10 +2605,6 @@ msgstr "Reunions des de reserves, invitacions per correu i blocs interns."
 msgid "Member"
 msgstr "Membre"
 
-#: src/routes/settings/organization/templates.tsx
-msgid "Member proposals"
-msgstr "Propostes dels membres"
-
 #: src/routes/settings/organization/index.tsx
 #: src/routes/settings/organization/members.tsx
 msgid "Members"
@@ -2634,6 +2635,10 @@ msgstr "Meta"
 msgid "Mine"
 msgstr "Meva"
 
+#: src/components/research/research-dialog.tsx
+msgid "Mine — {name}"
+msgstr "Meva — {name}"
+
 #: src/components/emails/compose-window.tsx
 msgid "Minimize"
 msgstr "Minimitza"
@@ -2659,11 +2664,20 @@ msgstr "Mou"
 msgid "Move to…"
 msgstr "Mou a…"
 
+#: src/components/research/research-dialog.tsx
+msgid "My default"
+msgstr "La meva predeterminada"
+
 #: src/routes/companies/index.tsx
 msgid "My leads"
 msgstr "Els meus leads"
 
+#: src/routes/settings/profile/templates.tsx
+msgid "My stacks"
+msgstr "Les meves piles"
+
 #: src/components/contacts/contact-edit-dialog.tsx
+#: src/components/instructions/stack-editor.tsx
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/routes/companies/index.tsx
 #: src/routes/emails/inboxes.tsx
@@ -2686,10 +2700,6 @@ msgstr "Necessita acció"
 #: src/routes/index.tsx
 msgid "Needs attention"
 msgstr "Necessita atenció"
-
-#: src/components/research/run-labels.ts
-msgid "Needs review"
-msgstr "Cal revisió"
 
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Needs your review"
@@ -2731,6 +2741,10 @@ msgstr "Nou seguiment"
 msgid "New org template"
 msgstr "Nova plantilla d'organització"
 
+#: src/routes/settings/organization/templates.tsx
+msgid "New org template stack"
+msgstr "Nova pila de plantilles de l'organització"
+
 #: src/routes/reset-password.tsx
 #: src/routes/settings/profile/index.tsx
 #: src/routes/settings/profile/index.tsx
@@ -2745,6 +2759,11 @@ msgstr "Contrasenya nova o d'aplicació"
 #: src/components/companies/proposals-panel.tsx
 msgid "New proposal"
 msgstr "Nova proposta"
+
+#: src/components/instructions/stack-editor.tsx
+#: src/routes/settings/profile/templates.tsx
+msgid "New stack"
+msgstr "Nova pila"
 
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/routes/settings/profile/templates.tsx
@@ -2785,10 +2804,6 @@ msgstr "Sense organització activa. Tria'n una al selector de la barra superior.
 #: src/routes/companies/$slug.tsx
 msgid "No activity yet"
 msgstr "Encara no hi ha activitat"
-
-#: src/components/companies/account-brief-section.tsx
-msgid "No brief yet. Research writes one here, or you can start it yourself."
-msgstr "Encara no hi ha resum. La recerca n'escriu un aquí, o el pots començar tu."
 
 #: src/routes/calendar/index.tsx
 msgid "No calendar events yet"
@@ -2857,10 +2872,6 @@ msgstr "sense data de venciment"
 msgid "No due date"
 msgstr "Sense data de venciment"
 
-#: src/components/research/findings/company-enrichment-view.tsx
-msgid "No fit"
-msgstr "Sense encaix"
-
 #: src/routes/emails/inboxes.tsx
 msgid "No footers"
 msgstr "Sense peus de pàgina"
@@ -2890,12 +2901,20 @@ msgid "No open tasks."
 msgstr "Cap tasca oberta."
 
 #: src/routes/settings/organization/templates.tsx
+msgid "No org stacks yet."
+msgstr "Encara no hi ha piles de l'organització."
+
+#: src/routes/settings/organization/templates.tsx
+msgid "No org stacks yet. Create one to get started."
+msgstr "Encara no hi ha piles de l'organització. Crea'n una per començar."
+
+#: src/routes/settings/organization/templates.tsx
 msgid "No org templates yet."
 msgstr "Encara no hi ha plantilles d'organització."
 
 #: src/routes/settings/organization/templates.tsx
-msgid "No org templates yet. Create one or accept a member's proposal."
-msgstr "Encara no hi ha plantilles d'organització. Crea'n una o accepta una proposta d'un membre."
+msgid "No org templates yet. Create one to get started."
+msgstr "Encara no hi ha plantilles de l'organització. Crea'n una per començar."
 
 #: src/routes/settings/mcp/connections.tsx
 msgid "No organization selected"
@@ -2922,10 +2941,6 @@ msgstr "No hi ha cap bústia principal."
 msgid "No products linked yet"
 msgstr "Encara sense productes vinculats"
 
-#: src/routes/settings/organization/templates.tsx
-msgid "No proposals waiting for review."
-msgstr "No hi ha cap proposta pendent de revisió."
-
 #: src/components/companies/proposals-panel.tsx
 msgid "No proposals yet."
 msgstr "Encara no hi ha propostes."
@@ -2950,6 +2965,10 @@ msgstr "Encara no hi ha execucions de recerca. Cerca empreses per començar."
 #: src/components/companies/research-summary-card.tsx
 msgid "No research yet."
 msgstr "Encara sense recerca."
+
+#: src/routes/settings/profile/templates.tsx
+msgid "No stacks yet. Create one to group your templates."
+msgstr "Encara no hi ha piles. Crea'n una per agrupar les teves plantilles."
 
 #: src/components/research/run-detail.tsx
 #: src/components/research/run-detail.tsx
@@ -2995,10 +3014,6 @@ msgstr "cap planificat"
 #: src/components/shared/task-item.tsx
 msgid "Normal priority"
 msgstr "Prioritat normal"
-
-#: src/components/companies/company-fit-section.tsx
-msgid "Not a fit"
-msgstr "No encaixa"
 
 #: src/components/research/research-dialog.tsx
 msgid "Not enough research budget for this run. Raise the budget or narrow the search."
@@ -3151,13 +3166,22 @@ msgstr "Obert"
 msgid "Org"
 msgstr "Org"
 
-#: src/routes/settings/organization/templates.tsx
-msgid "Org default saved"
-msgstr "Valor per defecte de l'organització desat"
+#: src/components/research/research-dialog.tsx
+msgid "Org — {name}"
+msgstr "Organització — {name}"
 
 #: src/routes/settings/organization/templates.tsx
 msgid "Org instruction templates"
 msgstr "Plantilles d'instruccions de l'organització"
+
+#: src/routes/settings/organization/templates.tsx
+#: src/routes/settings/organization/templates.tsx
+msgid "Org stacks"
+msgstr "Piles de l'organització"
+
+#: src/components/instructions/stack-editor.tsx
+msgid "Org stacks can only use org templates."
+msgstr "Les piles de l'organització només poden fer servir plantilles de l'organització."
 
 #: src/routes/settings/organization/templates.tsx
 msgid "Org templates"
@@ -3168,10 +3192,6 @@ msgstr "Plantilles de l'organització"
 #: src/routes/settings/profile/index.tsx
 msgid "Organization"
 msgstr "Organització"
-
-#: src/routes/settings/organization/templates.tsx
-msgid "Organization default"
-msgstr "Valor per defecte de l'organització"
 
 #: src/routes/settings/mcp/connections.tsx
 msgid "Organization removed"
@@ -3296,10 +3316,6 @@ msgstr "Indicadors de dolor"
 msgid "Pain points"
 msgstr "Punts febles"
 
-#: src/components/research/findings/company-enrichment-view.tsx
-msgid "Pass"
-msgstr "Compleix"
-
 #: src/routes/login.tsx
 msgid "Password"
 msgstr "Contrasenya"
@@ -3389,6 +3405,10 @@ msgstr "Tria una contrasenya que recordis. Mínim 8 caràcters."
 msgid "Pick a provider"
 msgstr "Tria un proveïdor"
 
+#: src/components/research/research-dialog.tsx
+msgid "Pick a saved stack, or use your default."
+msgstr "Tria una pila desada o fes servir la teva predeterminada."
+
 #: src/routes/emails/index.tsx
 msgid "Pick an organization from the switcher in the header, or sign out and back in. After a recent dev DB reset, existing sessions can point at organization ids that the reset removed."
 msgstr "Tria una organització al selector de la barra superior, o tanca la sessió i torna a entrar. Després d'un reset recent de la base de dades de dev, les sessions existents poden apuntar a identificadors d'organització que el reset ha esborrat."
@@ -3400,10 +3420,6 @@ msgstr "Tria'n una o més. L'assistent demanarà quina fer servir en cada petici
 #: src/routes/emails/inboxes.tsx
 msgid "Pick one to use as your default sender."
 msgstr "Tria'n una com a remitent per defecte."
-
-#: src/components/research/research-dialog.tsx
-msgid "Pick templates to use just for this run. Leave empty to use your default."
-msgstr "Tria les plantilles per fer servir només en aquesta recerca. Deixa-ho buit per utilitzar el valor per defecte."
 
 #: src/routes/emails/inboxes.tsx
 msgid "Pick your email provider"
@@ -3424,16 +3440,10 @@ msgid "Plain"
 msgstr "Sense xifrar"
 
 #: src/routes/settings/organization/templates.tsx
-#: src/routes/settings/organization/templates.tsx
-#: src/routes/settings/organization/templates.tsx
+#: src/routes/settings/profile/templates.tsx
 #: src/routes/settings/profile/templates.tsx
 msgid "Please try again."
 msgstr "Torna-ho a provar."
-
-#: src/components/companies/company-fit-section.tsx
-#: src/components/research/findings/company-enrichment-view.tsx
-msgid "Possible fit"
-msgstr "Encaix possible"
 
 #: src/routes/calendar/index.tsx
 msgid "Preparing calendar view…"
@@ -3485,6 +3495,7 @@ msgid "Private inbox"
 msgstr "Bústia privada"
 
 #: src/components/companies/about-section.tsx
+#: src/components/research/findings/company-enrichment-view.tsx
 msgid "Products fit"
 msgstr "Encaix de productes"
 
@@ -3497,10 +3508,6 @@ msgstr "Perfil"
 #: src/routes/companies/$slug.tsx
 msgid "Proposal"
 msgstr "Proposta"
-
-#: src/routes/settings/organization/templates.tsx
-msgid "Proposal declined"
-msgstr "Proposta rebutjada"
 
 #: src/components/shared/status-badge.tsx
 msgid "Proposal in review"
@@ -3561,10 +3568,6 @@ msgstr "Propòsit"
 msgid "Qty"
 msgstr "Quant."
 
-#: src/components/research/findings/company-enrichment-view.tsx
-msgid "Quality"
-msgstr "Qualitat"
-
 #: src/components/companies/proposals-panel.tsx
 msgid "Quantity"
 msgstr "Quantitat"
@@ -3618,11 +3621,6 @@ msgstr "Canvis recents"
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Recent runs"
 msgstr "Execucions recents"
-
-#: src/components/companies/account-brief-section.tsx
-#: src/components/companies/research-summary-card.tsx
-msgid "recently"
-msgstr "fa poc"
 
 #: src/routes/companies/index.tsx
 msgid "Recently contacted"
@@ -3688,13 +3686,9 @@ msgstr "Elimina"
 
 #. placeholder {0}: target.name
 #: src/routes/settings/organization/templates.tsx
-msgid "Remove \"{0}\" from the org default first, then delete it."
-msgstr "Treu «{0}» del valor per defecte de l'organització primer i després elimina-la."
-
-#. placeholder {0}: target.name
 #: src/routes/settings/profile/templates.tsx
-msgid "Remove \"{0}\" from your default first, then delete it."
-msgstr "Treu «{0}» del teu valor per defecte primer i després elimina-la."
+msgid "Remove \"{0}\" from the stacks that use it first, then delete it."
+msgstr "Treu «{0}» de les piles que la fan servir abans d'eliminar-la."
 
 #. placeholder {0}: att.filename
 #. placeholder {0}: o.name
@@ -3741,7 +3735,7 @@ msgstr "Reobre el fil"
 msgid "Repeat new password"
 msgstr "Repeteix la contrasenya nova"
 
-#: src/components/instructions/default-stack-editor.tsx
+#: src/components/instructions/stack-editor.tsx
 msgid "Replace the org default"
 msgstr "Substitueix el valor per defecte de l'organització"
 
@@ -3851,10 +3845,6 @@ msgstr "Rol"
 msgid "Role (optional)"
 msgstr "Càrrec (opcional)"
 
-#: src/components/companies/company-fit-section.tsx
-msgid "run"
-msgstr "execució"
-
 #: src/components/research/run-actions.tsx
 msgid "Run again"
 msgstr "Torna a executar"
@@ -3888,7 +3878,6 @@ msgstr "En execució"
 msgid "Sales context"
 msgstr "Context comercial"
 
-#: src/components/companies/account-brief-section.tsx
 #: src/components/companies/documents-panel.tsx
 #: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
@@ -3899,10 +3888,6 @@ msgstr "Context comercial"
 msgid "Save"
 msgstr "Desa"
 
-#: src/components/instructions/default-stack-editor.tsx
-msgid "Save as my default"
-msgstr "Desa com el meu valor per defecte"
-
 #: src/routes/settings/organization/policy.tsx
 msgid "Save budget"
 msgstr "Desa el pressupost"
@@ -3910,10 +3895,6 @@ msgstr "Desa el pressupost"
 #: src/routes/pages/$id.tsx
 msgid "Save failed"
 msgstr "Ha fallat el desament"
-
-#: src/components/instructions/default-stack-editor.tsx
-msgid "Save my additions"
-msgstr "Desa les meves aportacions"
 
 #: src/routes/reset-password.tsx
 msgid "Save new password"
@@ -3923,14 +3904,15 @@ msgstr "Desa la nova contrasenya"
 msgid "Save password"
 msgstr "Desa la contrasenya"
 
-#: src/routes/settings/organization/templates.tsx
-msgid "Save the org default"
-msgstr "Desa el valor per defecte de l'organització"
+#: src/components/instructions/stack-editor.tsx
+msgid "Save stack"
+msgstr "Desa la pila"
 
 #: src/components/companies/documents-panel.tsx
 #: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
 #: src/components/emails/compose-form.tsx
+#: src/components/instructions/stack-editor.tsx
 #: src/components/instructions/template-editor-dialog.tsx
 #: src/routes/emails/inboxes.tsx
 #: src/routes/pages/$id.tsx
@@ -4044,10 +4026,6 @@ msgstr "T'envia a {0}"
 msgid "Sent"
 msgstr "Enviat"
 
-#: src/routes/settings/profile/templates.tsx
-msgid "Sent to your admins"
-msgstr "Enviada als administradors"
-
 #: src/routes/settings/mcp/index.tsx
 msgid "server URL"
 msgstr "l'URL del servidor"
@@ -4108,8 +4086,8 @@ msgid "Shared guidance and the org research default."
 msgstr "Orientació compartida i la recerca per defecte de l'organització."
 
 #: src/routes/settings/organization/templates.tsx
-msgid "Shared guidance every member's agents can use, plus the organization's default."
-msgstr "Orientació compartida que poden fer servir els agents de cada membre, més el valor per defecte de l'organització."
+msgid "Shared guidance every member's agents can use, plus the organization's stacks."
+msgstr "Orientació compartida que poden fer servir els agents de tots els membres, més les piles de l'organització."
 
 #: src/components/instructions/template-editor-dialog.tsx
 msgid "Shared with everyone in your organization — their research agent follows it on every run."
@@ -4226,11 +4204,6 @@ msgstr "Alguna cosa ha fallat. Prova-ho de nou."
 msgid "Sort"
 msgstr "Ordena"
 
-#: src/components/companies/company-fit-section.tsx
-#: src/components/companies/company-fit-section.tsx
-msgid "source"
-msgstr "font"
-
 #: src/components/companies/about-section.tsx
 #: src/routes/calendar/index.tsx
 #: src/routes/tasks/index.tsx
@@ -4244,11 +4217,6 @@ msgstr "Obtingut de la recerca"
 #: src/components/research/provenance.tsx
 msgid "Sourced from research on {dateLabel}"
 msgstr "Obtingut de la recerca el {dateLabel}"
-
-#: src/components/companies/company-fit-section.tsx
-#: src/components/research/findings/company-enrichment-view.tsx
-msgid "Sources disagree"
-msgstr "Les fonts no coincideixen"
 
 #: src/components/research/research-dialog.tsx
 msgid "Sources language"
@@ -4280,6 +4248,16 @@ msgstr "Límits de despesa i la confiança necessària per aplicar automàticame
 #: src/routes/settings/organization/policy.tsx
 msgid "Spend ceilings for research and how confident a finding must be to apply on its own."
 msgstr "Límits de despesa per a la recerca i quina confiança ha de tenir una conclusió per aplicar-se sola."
+
+#: src/routes/settings/organization/templates.tsx
+#: src/routes/settings/profile/templates.tsx
+msgid "Stack deleted"
+msgstr "Pila eliminada"
+
+#: src/components/instructions/stack-editor.tsx
+#: src/components/instructions/stack-editor.tsx
+msgid "Stack saved"
+msgstr "Pila desada"
 
 #: src/routes/companies/$slug.tsx
 msgid "Stage changed"
@@ -4360,12 +4338,7 @@ msgstr "Punts forts"
 
 #: src/components/primitives/pri-rich-text.tsx
 msgid "Strikethrough"
-msgstr "Barrat"
-
-#: src/components/companies/company-fit-section.tsx
-#: src/components/research/findings/company-enrichment-view.tsx
-msgid "Strong fit"
-msgstr "Encaix fort"
+msgstr "Ratllat"
 
 #: src/components/research/run-progress.tsx
 msgid "Structuring the findings"
@@ -4465,7 +4438,7 @@ msgstr "Provant la connexió…"
 
 #: src/components/primitives/pri-rich-text.tsx
 msgid "Text formatting"
-msgstr "Format de text"
+msgstr "Format del text"
 
 #: src/routes/login.tsx
 msgid "That connection request expired. Start it again from your AI assistant."
@@ -4608,18 +4581,6 @@ msgstr "El taller ha rebutjat el canvi. Torna-ho a provar."
 #: src/routes/settings/organization/index.tsx
 msgid "The workspace your CRM data lives in."
 msgstr "L'espai de treball on viuen les dades del CRM."
-
-#: src/components/instructions/default-stack-editor.tsx
-msgid "These come from your organization. Saving keeps your own copy, so your runs stop following later changes to the org default."
-msgstr "Aquestes vénen de la teva organització. Si les deses, en guardes una còpia pròpia i les teves recerques deixen de seguir els canvis posteriors del valor per defecte de l'organització."
-
-#: src/routes/settings/organization/templates.tsx
-msgid "These templates run for every member who hasn't set their own — in order. Only org templates can go here."
-msgstr "Aquestes plantilles s'apliquen, en ordre, a cada membre que no n'hagi triat de pròpies. Aquí només hi poden anar plantilles de l'organització."
-
-#: src/components/instructions/default-stack-editor.tsx
-msgid "These templates shape every run, in order — unless you pick different ones for a single run."
-msgstr "Aquestes plantilles configuren cada execució, en ordre, llevat que en triïs d'altres per a una sola execució."
 
 #: src/routes/settings/organization/members.tsx
 msgid "They join straight away and get an email telling them so. It carries no password and no link to sign in with."
@@ -4801,7 +4762,6 @@ msgstr "Preu unitari"
 msgid "unknown"
 msgstr "desconegut"
 
-#: src/components/research/findings/company-enrichment-view.tsx
 #: src/routes/emails/index.tsx
 msgid "Unknown"
 msgstr "Desconegut"
@@ -4824,7 +4784,7 @@ msgstr "No llegit"
 
 #: src/components/instructions/template-editor-dialog.tsx
 msgid "Unsaved changes"
-msgstr "Canvis no desats"
+msgstr "Canvis sense desar"
 
 #: src/routes/emails/index.tsx
 msgid "Untitled"
@@ -4855,10 +4815,6 @@ msgstr "Actualitza"
 #: src/routes/emails/inboxes.tsx
 msgid "Update failed"
 msgstr "Ha fallat l'actualització"
-
-#: src/components/companies/research-summary-card.tsx
-msgid "updated <0/>"
-msgstr "actualitzat <0/>"
 
 #: src/components/emails/attachment-picker.tsx
 msgid "Upload failed"
@@ -4893,9 +4849,9 @@ msgstr "Usa com a per defecte per a aquest propòsit"
 msgid "Use password instead"
 msgstr "Fes servir contrasenya"
 
-#: src/components/instructions/default-stack-editor.tsx
-msgid "Use the org default"
-msgstr "Utilitza el valor per defecte de l'organització"
+#: src/routes/settings/profile/templates.tsx
+msgid "Use the org default instead"
+msgstr "Fes servir la predeterminada de l'organització"
 
 #: src/routes/emails/inboxes.tsx
 msgid "Use your email provider's app-specific password — not your normal login password."
@@ -4910,7 +4866,7 @@ msgstr "S'utilitza per a"
 msgid "Username"
 msgstr "Nom d'usuari"
 
-#: src/components/instructions/default-stack-editor.tsx
+#: src/routes/settings/profile/templates.tsx
 msgid "Using the org default"
 msgstr "S'utilitza el valor per defecte de l'organització"
 
@@ -4967,11 +4923,6 @@ msgstr "No reconeixem aquest correu. Demana a un administrador que t'inviti."
 msgid "We sent a sign-in link to"
 msgstr "S'ha enviat un enllaç d'inici de sessió a"
 
-#: src/components/companies/company-fit-section.tsx
-#: src/components/research/findings/company-enrichment-view.tsx
-msgid "Weak fit"
-msgstr "Encaix feble"
-
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Weaknesses"
 msgstr "Punts febles"
@@ -5023,10 +4974,6 @@ msgstr "Quan"
 msgid "Where"
 msgstr "On"
 
-#: src/components/companies/company-fit-section.tsx
-msgid "Where each fact came from"
-msgstr "D'on ve cada dada"
-
 #: src/components/research/research-dialog.tsx
 msgid "Where to look (optional)"
 msgstr "On cercar (opcional)"
@@ -5057,10 +5004,6 @@ msgstr "Escriu el teu missatge…"
 msgid "Writing the brief"
 msgstr "Redactant l'informe"
 
-#: src/components/companies/account-brief-section.tsx
-msgid "Written by research. Editing it makes it yours."
-msgstr "Escrit per la recerca. Si l'edites, passa a ser teu."
-
 #: src/components/research/target-correction.tsx
 msgid "Wrong company? Enter its official website"
 msgstr "Empresa equivocada? Introdueix el seu lloc web oficial"
@@ -5086,6 +5029,10 @@ msgstr "Potser no ets membre d'aquesta organització. Torna-ho a provar."
 msgid "You sign in from email links. I won't bring it up again."
 msgstr "Entres des d'enllaços al correu. No t'ho tornaré a esmentar."
 
+#: src/routes/settings/profile/templates.tsx
+msgid "You're following one of your own stacks."
+msgstr "Estàs seguint una de les teves piles."
+
 #: src/routes/emails/inboxes.tsx
 msgid "you@example.com"
 msgstr "tu@exemple.com"
@@ -5098,11 +5045,6 @@ msgstr "La teva identitat al banc de Batuda."
 #: src/routes/settings/mcp/index.tsx
 msgid "Your connections"
 msgstr "Les teves connexions"
-
-#: src/components/instructions/default-stack-editor.tsx
-#: src/routes/settings/profile/templates.tsx
-msgid "Your default"
-msgstr "El teu valor per defecte"
 
 #: src/routes/emails/inboxes.tsx
 #: src/routes/emails/inboxes.tsx
@@ -5117,17 +5059,17 @@ msgstr "El correu encara no està verificat. Fes servir l'enllaç de sessió."
 msgid "Your keys"
 msgstr "Les teves claus"
 
-#: src/components/instructions/default-stack-editor.tsx
+#: src/components/instructions/stack-editor.tsx
 msgid "Your organization has no default yet."
 msgstr "La teva organització encara no té cap valor per defecte."
 
-#: src/routes/settings/organization/templates.tsx
-msgid "Your organization's admins manage these templates. You can use any of them in your own default or per run."
-msgstr "Els administradors de la teva organització gestionen aquestes plantilles. En pots fer servir qualsevol al teu valor per defecte o en cada recerca."
+#: src/routes/settings/profile/templates.tsx
+msgid "Your organization has no default yet. Make a stack your default to steer every run."
+msgstr "La teva organització encara no té cap predeterminada. Marca una pila com a predeterminada per guiar totes les execucions."
 
-#: src/components/instructions/default-stack-editor.tsx
-msgid "Your own"
-msgstr "Pròpia"
+#: src/routes/settings/organization/templates.tsx
+msgid "Your organization's admins manage these templates. You can use any of them in your own stacks or per run."
+msgstr "Els administradors de la teva organització gestionen aquestes plantilles. Pots fer servir-ne qualsevol en les teves piles o per execució."
 
 #: src/routes/settings/organization/members.tsx
 msgid "Your session has expired. Sign in again to continue."

@@ -1,16 +1,10 @@
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 
-// Read atoms (RLS scopes templates/donations to the active org + actor).
+// Read atoms (RLS scopes templates to the active org + actor).
 export const instructionTemplatesAtom = BatudaApiAtom.query(
 	'instructions',
 	'listTemplates',
 	{},
-)
-
-export const instructionDonationsAtom = BatudaApiAtom.query(
-	'instructions',
-	'listDonations',
-	{ query: {} },
 )
 
 const detailCache = new Map<string, ReturnType<typeof makeDetailAtom>>()
@@ -27,15 +21,31 @@ export function instructionTemplateAtom(id: string) {
 
 const stacksCache = new Map<string, ReturnType<typeof makeStacksAtom>>()
 function makeStacksAtom(agent: string) {
-	return BatudaApiAtom.query('instructions', 'getDefaultStacks', {
-		params: { agent },
-	})
+	return BatudaApiAtom.query('instructions', 'listStacks', { query: { agent } })
 }
-export function defaultStacksAtom(agent: string) {
+// Every stack for an agent (both scopes) in one query, cached per agent so the
+// same list backs the personal and org surfaces.
+export function instructionStacksAtom(agent: string) {
 	const existing = stacksCache.get(agent)
 	if (existing !== undefined) return existing
 	const atom = makeStacksAtom(agent)
 	stacksCache.set(agent, atom)
+	return atom
+}
+
+const resolutionCache = new Map<string, ReturnType<typeof makeResolutionAtom>>()
+function makeResolutionAtom(agent: string) {
+	return BatudaApiAtom.query('instructions', 'getResolution', {
+		params: { agent },
+	})
+}
+// Which default applies for an agent right now, plus the org and user defaults
+// behind it — read by the inherit banner.
+export function instructionResolutionAtom(agent: string) {
+	const existing = resolutionCache.get(agent)
+	if (existing !== undefined) return existing
+	const atom = makeResolutionAtom(agent)
+	resolutionCache.set(agent, atom)
 	return atom
 }
 
@@ -56,27 +66,23 @@ export const transferTemplateAtom = BatudaApiAtom.mutation(
 	'instructions',
 	'transferTemplate',
 )
-export const donateTemplateAtom = BatudaApiAtom.mutation(
+export const createStackAtom = BatudaApiAtom.mutation(
 	'instructions',
-	'donateTemplate',
+	'createStack',
 )
-export const setUserStackAtom = BatudaApiAtom.mutation(
+export const updateStackAtom = BatudaApiAtom.mutation(
 	'instructions',
-	'setUserStack',
+	'updateStack',
 )
-export const setOrgStackAtom = BatudaApiAtom.mutation(
+export const deleteStackAtom = BatudaApiAtom.mutation(
 	'instructions',
-	'setOrgStack',
+	'deleteStack',
 )
-export const clearUserStackAtom = BatudaApiAtom.mutation(
+export const setDefaultStackAtom = BatudaApiAtom.mutation(
 	'instructions',
-	'clearUserStack',
+	'setDefaultStack',
 )
-export const acceptDonationAtom = BatudaApiAtom.mutation(
+export const clearDefaultStackAtom = BatudaApiAtom.mutation(
 	'instructions',
-	'acceptDonation',
-)
-export const rejectDonationAtom = BatudaApiAtom.mutation(
-	'instructions',
-	'rejectDonation',
+	'clearDefaultStack',
 )
