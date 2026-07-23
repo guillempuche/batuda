@@ -286,9 +286,15 @@ export class InstructionsService extends Context.Service<InstructionsService>()(
 					Effect.gen(function* () {
 						const existing = yield* getStack(id)
 						if (!existing) return { outcome: 'not_found' as const }
-						if (existing.ownerUserId === null && !(yield* isAdmin(userId)))
+						const isOrgOwned = existing.ownerUserId === null
+						if (isOrgOwned && !(yield* isAdmin(userId)))
 							return { outcome: 'forbidden' as const }
-						const result = yield* updateStack(id, fields)
+						const result = yield* updateStack(id, {
+							...fields,
+							// An org stack is the base every extend layers on, so it can
+							// only ever replace — ignore a composition aimed at one.
+							composition: isOrgOwned ? 'replace' : fields.composition,
+						})
 						return result === 'not_found'
 							? { outcome: 'not_found' as const }
 							: toStackOutcome(result, 'updated')

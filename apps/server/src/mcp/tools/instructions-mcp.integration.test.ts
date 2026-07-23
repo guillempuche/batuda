@@ -134,6 +134,44 @@ const createPersonalTemplate = async (
 	return created.template.id
 }
 
+// Creates a personal research stack (and the template it groups) for `actorId`,
+// returning the names the tool addresses them by plus the template's id.
+const createStackFor = async (
+	actorId: string,
+	opts: { readonly isDefault?: boolean } = {},
+): Promise<{
+	readonly stackName: string
+	readonly templateName: string
+	readonly templateId: string
+}> => {
+	const label = `st-${randomUUID().slice(0, 8)}`
+	const templateId = await createPersonalTemplate(actorId, label)
+	const templateName = `${MARKER}${label}`
+	const stackName = `${MARKER}s-${randomUUID().slice(0, 8)}`
+	const created = (await callTool(actorId, 'manage_instructions', {
+		action: 'create_stack',
+		agent: 'research',
+		scope: 'personal',
+		name: stackName,
+		templates: [templateName],
+		...(opts.isDefault === true ? { is_default: true } : {}),
+	})) as { outcome: string }
+	if (created.outcome !== 'created')
+		throw new Error(`stack create failed: ${JSON.stringify(created)}`)
+	return { stackName, templateName, templateId }
+}
+
+// The is_default flag of every stack this suite created for `actorId`, keyed by
+// name — read straight from the table so the assertions see stored state.
+const defaultFlags = async (actorId: string): Promise<Map<string, boolean>> => {
+	const rows = await pool.query<{ name: string; is_default: boolean }>(
+		`SELECT name, is_default FROM instruction_stacks
+		 WHERE owner_user_id = $1 AND name LIKE $2`,
+		[actorId, `${MARKER}%`],
+	)
+	return new Map(rows.rows.map(r => [r.name, r.is_default]))
+}
+
 // Calls the privileged transfer function directly in the actor's app_user scope,
 // bypassing the service's own checks, to prove the function re-enforces them.
 const callTransferFn = (
@@ -275,6 +313,136 @@ describe('MCP instruction tools against live Postgres', () => {
 			// THEN it comes back as an instruction_clarification, nothing resolved
 			expect(res._tag).toBe('instruction_clarification')
 			expect(res.unknown?.length).toBe(1)
+		})
+
+		it('should rename a stack and replace its templates', async () => {
+			// GIVEN a personal stack with one template
+			const { stackName, templateName } = await createStackFor(memberId)
+			const renamed = `${MARKER}r-${randomUUID().slice(0, 8)}`
+
+			// WHEN the member renames it and re-lists the same template
+			const updated = (await callTool(memberId, 'manage_instructions', {
+				action: 'update_stack',
+				agent: 'research',
+				stack: stackName,
+				name: renamed,
+				templates: [templateName],
+			})) as { outcome: string; stack: { name: string } }
+
+			// THEN the new name is stored and the old one no longer resolves
+			expect(updated.outcome).toBe('updated')
+			expect(updated.stack.name).toBe(renamed)
+			const gone = (await callTool(memberId, 'manage_instructions', {
+				action: 'get_stack',
+				agent: 'research',
+				stack: stackName,
+			})) as { _tag?: string }
+			expect(gone._tag).toBe('instruction_clarification')
+		})
+
+		it('should refuse a blank stack name rather than failing on the database check', async () => {
+			// WHEN a stack is created with a name of only spaces
+			const res = await callTool(memberId, 'manage_instructions', {
+				action: 'create_stack',
+				agent: 'research',
+				name: '   ',
+			})
+
+			// THEN the caller gets an actionable message, not an internal error
+			expect(res).toMatchObject({ error: expect.stringContaining('blank') })
+		})
+
+		it('should move the default flag between stacks and clear it on request', async () => {
+			// GIVEN two personal stacks, the first of them the default
+			const first = await createStackFor(memberId, { isDefault: true })
+			const second = await createStackFor(memberId)
+
+			// WHEN the second is promoted
+			const promoted = (await callTool(memberId, 'manage_instructions', {
+				action: 'set_default_stack',
+				agent: 'research',
+				stack: second.stackName,
+			})) as { outcome: string }
+			expect(promoted.outcome).toBe('set')
+
+			// THEN exactly the second one carries the flag
+			const flags = await defaultFlags(memberId)
+			expect(flags.get(second.stackName)).toBe(true)
+			expect(flags.get(first.stackName)).toBe(false)
+
+			// AND clearing leaves both stacks in place with no default
+			const cleared = (await callTool(memberId, 'manage_instructions', {
+				action: 'clear_default_stack',
+				agent: 'research',
+			})) as { outcome: string }
+			expect(cleared.outcome).toBe('cleared')
+			const afterClear = await defaultFlags(memberId)
+			expect(afterClear.get(second.stackName)).toBe(false)
+			expect(afterClear.size).toBe(flags.size)
+		})
+
+		it('should delete a stack without touching the templates it grouped', async () => {
+			// GIVEN a personal stack built from a template
+			const { stackName, templateId } = await createStackFor(memberId)
+
+			// WHEN the stack is deleted
+			const deleted = (await callTool(memberId, 'manage_instructions', {
+				action: 'delete_stack',
+				agent: 'research',
+				stack: stackName,
+			})) as { outcome: string }
+
+			// THEN the stack is gone and the template it referenced survives
+			expect(deleted.outcome).toBe('deleted')
+			const template = await pool.query<{ id: string }>(
+				'SELECT id FROM instruction_templates WHERE id = $1',
+				[templateId],
+			)
+			expect(template.rows).toHaveLength(1)
+		})
+
+		it('should forbid a plain member from changing an org stack', async () => {
+			// GIVEN an org stack the admin created from an org template
+			const orgTemplate = `${MARKER}orgtpl-${randomUUID().slice(0, 8)}`
+			const created = (await callTool(ownerId, 'manage_instructions', {
+				action: 'create_template',
+				name: orgTemplate,
+				body: 'org body',
+				scope: 'org',
+			})) as CreateOutcome
+			if (created.outcome !== 'created')
+				throw new Error(`org template create failed: ${created.outcome}`)
+			const orgStack = `${MARKER}orgstack-${randomUUID().slice(0, 8)}`
+			const stack = (await callTool(ownerId, 'manage_instructions', {
+				action: 'create_stack',
+				agent: 'research',
+				scope: 'org',
+				name: orgStack,
+				templates: [orgTemplate],
+			})) as { outcome: string }
+			expect(stack.outcome).toBe('created')
+
+			// WHEN the plain member tries to rename it and to delete it
+			const renamed = (await callTool(memberId, 'manage_instructions', {
+				action: 'update_stack',
+				agent: 'research',
+				stack: orgStack,
+				name: `${MARKER}hijack`,
+			})) as { outcome: string }
+			const removed = (await callTool(memberId, 'manage_instructions', {
+				action: 'delete_stack',
+				agent: 'research',
+				stack: orgStack,
+			})) as { outcome: string }
+
+			// THEN both are refused and the org stack is untouched
+			expect(renamed.outcome).toBe('forbidden')
+			expect(removed.outcome).toBe('forbidden')
+			const row = await pool.query<{ name: string }>(
+				'SELECT name FROM instruction_stacks WHERE name = $1',
+				[orgStack],
+			)
+			expect(row.rows).toHaveLength(1)
 		})
 	})
 

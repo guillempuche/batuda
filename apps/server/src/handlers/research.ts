@@ -11,7 +11,7 @@ import {
 	SessionContext,
 } from '@batuda/controllers'
 import { isTerminalResearchStatus } from '@batuda/domain'
-import { resolveInstructions } from '@batuda/instructions'
+import { resolveInstructions, resolveStackRef } from '@batuda/instructions'
 import {
 	type CreateResearchInput,
 	ResearchService,
@@ -103,11 +103,20 @@ export const ResearchLive = HttpApiBuilder.group(
 							autoApprovePaidCents: _.payload.auto_approve_paid_cents,
 							confirm: _.payload.confirm,
 						}
+						// A stack picked for this run has to belong to the research
+						// agent and be readable, or the run would quietly take another
+						// agent's instructions (or none at all) while reporting that a
+						// stack applied. Reject it before any work starts.
+						const stackId = _.payload.stack_id
+						if (stackId !== undefined) {
+							const picked = yield* resolveStackRef('research', stackId)
+							if (!picked.ok) return { error: 'unknown_stack', stack: stackId }
+						}
 						const instructions = yield* resolveInstructions({
 							organizationId: currentOrg.id,
 							userId,
 							agent: 'research',
-							overrideStackId: _.payload.stack_id,
+							overrideStackId: stackId,
 							overrideTemplateIds: _.payload.template_ids,
 						})
 						const result = yield* svc.create(

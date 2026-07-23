@@ -205,20 +205,52 @@ const loadStackItemIds = (
 		rows => rows.map(row => row.templateId),
 	)
 
+const withItems = (
+	row: StackRow,
+	templateIds: ReadonlyArray<string>,
+): StackSummary => ({
+	id: row.id,
+	organizationId: row.organizationId,
+	ownerUserId: row.ownerUserId,
+	agent: row.agent,
+	name: row.name,
+	isDefault: row.isDefault,
+	composition: row.composition,
+	templateIds,
+})
+
 const toSummary = (
 	sql: SqlClient.SqlClient,
 	row: StackRow,
 ): Eff<StackSummary> =>
-	Effect.map(loadStackItemIds(sql, row.id), templateIds => ({
-		id: row.id,
-		organizationId: row.organizationId,
-		ownerUserId: row.ownerUserId,
-		agent: row.agent,
-		name: row.name,
-		isDefault: row.isDefault,
-		composition: row.composition,
-		templateIds,
-	}))
+	Effect.map(loadStackItemIds(sql, row.id), templateIds =>
+		withItems(row, templateIds),
+	)
+
+// The ordered template ids of several stacks at once, keyed by stack id. One
+// round trip for a whole list, instead of one per stack.
+const loadItemsByStack = (
+	sql: SqlClient.SqlClient,
+	stackIds: ReadonlyArray<string>,
+): Eff<Map<string, Array<string>>> =>
+	stackIds.length === 0
+		? Effect.succeed(new Map())
+		: Effect.map(
+				sql<{ stackId: string; templateId: string }>`
+					SELECT stack_id, template_id FROM instruction_stack_items
+					WHERE stack_id IN ${sql.in([...stackIds])}
+					ORDER BY position ASC
+				`,
+				rows => {
+					const byStack = new Map<string, Array<string>>()
+					for (const row of rows) {
+						const list = byStack.get(row.stackId) ?? []
+						list.push(row.templateId)
+						byStack.set(row.stackId, list)
+					}
+					return byStack
+				},
+			)
 
 const STACK_COLUMNS = `id, organization_id, owner_user_id, agent, name, is_default, composition`
 
@@ -244,9 +276,11 @@ export const listStacks = (agent?: Agent): Eff<ReadonlyArray<StackSummary>> =>
 					WHERE agent = ${agent}
 					ORDER BY owner_user_id NULLS FIRST, is_default DESC, name ASC
 				`
-		const out: Array<StackSummary> = []
-		for (const row of rows) out.push(yield* toSummary(sql, row))
-		return out
+		const byStack = yield* loadItemsByStack(
+			sql,
+			rows.map(row => row.id),
+		)
+		return rows.map(row => withItems(row, byStack.get(row.id) ?? []))
 	})
 
 export const getStack = (id: string): Eff<StackSummary | undefined> =>
@@ -280,9 +314,13 @@ export const getDefaultStacks = (
 		`
 		const orgRow = rows.find(s => s.ownerUserId === null)
 		const userRow = rows.find(s => s.ownerUserId === userId)
+		const byStack = yield* loadItemsByStack(
+			sql,
+			rows.map(row => row.id),
+		)
 		return {
-			org: orgRow ? yield* toSummary(sql, orgRow) : null,
-			user: userRow ? yield* toSummary(sql, userRow) : null,
+			org: orgRow ? withItems(orgRow, byStack.get(orgRow.id) ?? []) : null,
+			user: userRow ? withItems(userRow, byStack.get(userRow.id) ?? []) : null,
 		}
 	})
 
