@@ -52,3 +52,19 @@ CI enforces this on every PR: `scripts/check-migration-safety.mjs` fails when a 
 ### Rehearsing and re-running
 
 For a destructive or large change, rehearse on a Neon branch first (branch prod → apply → verify → let the pipeline run it on prod); CI already runs every migration on an ephemeral Neon branch per PR. The migrator is incremental — it records applied migrations and a re-run only applies the pending ones, so a re-run after a partial failure resumes safely.
+
+## End-to-end tests in CI
+
+The Playwright end-to-end suite (`apps/internal/tests/e2e`) drives a real browser against a running stack, so it catches breakages that types, build, and unit tests wave through — a page that crashes only in the browser, a seed that contradicts its own assertion. It runs in three places, and where a failure blocks depends on the place.
+
+**Pre-push (`lefthook.yml`).** A small smoke subset (`--grep @smoke`: sign-in, one read, one write) runs against your live `pnpm dev` stack for fast local feedback, the same way the integration suite runs pre-push. It **skips with a notice rather than failing** when the dev stack isn't reachable or Chromium isn't installed — a hook can be skipped, so it is bonus feedback, not the gate.
+
+**CI on every pull request (`ci.yml`, the `e2e-smoke` job).** The same smoke subset runs in its own parallel job that stands up its own Postgres + seed and serves the app under portless — the exact dev environment, so a pass locally means a pass here. This job is a **required status check: a failure blocks the merge.** It is the un-skippable gate the pre-push hook cannot be.
+
+**CI on push to `main` (`e2e-main.yml`).** The full suite runs post-merge as a non-required workflow (it also brings up GreenMail + a mail-worker for the email round-trip specs). It **reports a failure on the commit without gating any pull request** — a backstop that tells you a break landed, not a merge gate.
+
+### When an end-to-end test is flaky
+
+Smoke runs with `retries: 1` in CI (`playwright.config.ts`) so a single transient blip does not fail a PR; a test that only passes on retry still shows in the run and is triaged, not ignored.
+
+A test that fails or flakes repeatedly is **quarantined** — marked `test.fixme` with a tracking issue that names the cause — never left silently red. A quarantined test is off the gate but on the record, so a green run means every non-quarantined test passed and the quarantine list is the honest backlog.

@@ -1,0 +1,112 @@
+name: E2E stack
+description: >-
+  Stand up the app the way `pnpm dev` does — a local Postgres + MinIO, migrate,
+  seed, then the server and web served under portless — and run Playwright
+  against it. The browser hits the exact dev environment the suite was written
+  for (batuda.localhost over portless's TLS), so a pass locally is a pass here.
+
+inputs:
+  grep:
+    description: 'Playwright --grep filter (e.g. "@smoke"). Empty runs the full suite.'
+    required: false
+    default: ''
+  with-mail:
+    description: 'Start GreenMail (mail-catcher) + the mail-worker for the email round-trip specs.'
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Setup pnpm
+      uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+
+    - name: Setup Node.js
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      with:
+        node-version: "24"
+        cache: "pnpm"
+
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile
+
+    # The dev server runs from TS source via tsx and imports several workspace
+    # packages (notably @batuda/ui) from their built `dist/`, so build first.
+    - name: Build
+      shell: bash
+      run: pnpm build
+
+    # The committed template is the full local env (dummy secrets, everything
+    # `stub`/`local`, and DATABASE_URL/STORAGE_* already pointed at the compose
+    # services below). The dev server reads it via `--env-file`; we source it
+    # for the migrate/seed steps too so every process shares one BETTER_AUTH_SECRET.
+    - name: Local env from the committed template
+      shell: bash
+      run: |
+        cp .env.example .env
+        # otel-tui isn't running on the runner — silence the per-tick exporter error.
+        printf '\nOTEL_EXPORTER_OTLP_ENDPOINT=\n' >> .env
+
+    - name: Start Postgres + MinIO (+ GreenMail when with-mail)
+      shell: bash
+      env:
+        WITH_MAIL: ${{ inputs.with-mail }}
+      run: |
+        services="db storage storage-init"
+        if [ "$WITH_MAIL" = "true" ]; then services="$services mail-catcher"; fi
+        docker compose -f docker/docker-compose.yml up -d --wait $services
+
+    - name: Migrate + seed
+      shell: bash
+      run: |
+        set -a; . ./.env; set +a
+        pnpm db:migrate
+        pnpm cli seed
+
+    - name: Install Playwright browser
+      shell: bash
+      run: pnpm --filter @batuda/internal exec playwright install --with-deps chromium
+
+    # Serve the stack under portless. A plain `actions/checkout` is not a linked
+    # worktree, so portless serves the bare `batuda.localhost` /
+    # `api.batuda.localhost` hosts; the proxy port ends up in
+    # ~/.portless/proxy.port, which playwright.config.ts reads to build BASE_URL.
+    - name: Serve under portless + run Playwright
+      shell: bash
+      env:
+        WITH_MAIL: ${{ inputs.with-mail }}
+        GREP: ${{ inputs.grep }}
+      run: |
+        set -a; . ./.env; set +a
+
+        # Start the proxy explicitly on an unprivileged port. On a runner there
+        # is no TTY for the sudo that binding :443 needs, and `portless run`
+        # errors instead of falling back — so bind a high port up front; the
+        # dev servers below then reuse this already-running proxy.
+        pnpm exec portless proxy start --port 1355 --https
+
+        pnpm --filter @batuda/server dev  > /tmp/e2e-server.log 2>&1 &
+        pnpm --filter @batuda/internal dev > /tmp/e2e-web.log 2>&1 &
+        if [ "$WITH_MAIL" = "true" ]; then
+          pnpm --filter @batuda/mail-worker dev > /tmp/e2e-mail-worker.log 2>&1 &
+        fi
+
+        echo "Waiting for the API health probe through portless…"
+        ready=""
+        for i in $(seq 1 60); do
+          port="$(cat "$HOME/.portless/proxy.port" 2>/dev/null || echo 443)"
+          code="$(curl -sk -o /dev/null -w '%{http_code}' "https://api.batuda.localhost:${port}/health" 2>/dev/null || true)"
+          if [ "$code" = "200" ]; then ready="1"; echo "Stack healthy on :${port} after ~$((i*3))s"; break; fi
+          sleep 3
+        done
+        if [ -z "$ready" ]; then
+          echo "::error::The dev stack never reported healthy."
+          echo "─── server log ───"; tail -60 /tmp/e2e-server.log || true
+          echo "─── web log ───";    tail -30 /tmp/e2e-web.log || true
+          exit 1
+        fi
+
+        grep_arg=""
+        if [ -n "$GREP" ]; then grep_arg="--grep $GREP"; fi
+        pnpm --filter @batuda/internal exec playwright test $grep_arg
