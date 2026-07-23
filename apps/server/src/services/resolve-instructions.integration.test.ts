@@ -21,6 +21,7 @@ import {
 	createStack,
 	getDefaultStacks,
 	resolveInstructions,
+	resolveStackRef,
 	setDefaultStack,
 	updateStack,
 } from '@batuda/instructions'
@@ -432,6 +433,42 @@ describe('resolveInstructions (live RLS)', () => {
 			expect(result.source).toBe('stack')
 			expect(result.templateIds).toEqual([stackTplA, stackTplB])
 			expect(result.segments).toEqual(['stack a body', 'stack b body'])
+		})
+
+		it('should refuse a stack id that belongs to another agent', async () => {
+			// GIVEN an email stack — the resolver itself does not filter by agent,
+			// so this ref check is what stops an email stack shaping a research run
+			const emailStack = await runRoot(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* enterOrgScope(sql, { org: ORG_OBJ, userId: U1 })(
+						createStack({
+							organizationId: ORG,
+							ownerUserId: null,
+							agent: 'email',
+							name: `mail-${randomUUID().slice(0, 8)}`,
+							templateIds: [stackTplA],
+							composition: 'replace',
+							isDefault: false,
+						}),
+					)
+				}),
+			)
+			if (!emailStack.ok) throw new Error('stack create failed')
+
+			// WHEN a research run tries to use it by id
+			const picked = await runRoot(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* enterOrgScope(sql, { org: ORG_OBJ, userId: U1 })(
+						resolveStackRef('research', emailStack.stack.id),
+					)
+				}),
+			)
+
+			// THEN it does not resolve, so the run never starts with it
+			expect(picked.ok).toBe(false)
+			if (!picked.ok) expect(picked.unknown).toEqual([emailStack.stack.id])
 		})
 	})
 

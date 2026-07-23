@@ -3119,6 +3119,10 @@ msgstr "On {date}, {who} wrote:"
 msgid "Once it's connected, I can send and receive email for you right here — no switching tabs."
 msgstr "Once it's connected, I can send and receive email for you right here — no switching tabs."
 
+#: src/components/instructions/stack-editor.tsx
+msgid "Only an organization admin can change this stack."
+msgstr "Only an organization admin can change this stack."
+
 #: src/routes/settings/organization/members.tsx
 msgid "Only an owner or an admin can add members."
 msgstr "Only an owner or an admin can add members."
@@ -3986,6 +3990,10 @@ msgstr "Save password"
 msgid "Save stack"
 msgstr "Save stack"
 
+#: src/components/instructions/stack-editor.tsx
+msgid "Saved, but not made the default"
+msgstr "Saved, but not made the default"
+
 #: src/components/companies/documents-panel.tsx
 #: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
@@ -4737,6 +4745,10 @@ msgstr "This run found no changes to review."
 #: src/components/research/research-dialog.tsx
 msgid "This runs research on {0} companies, up to about {1} in paid data. Start the batch?"
 msgstr "This runs research on {0} companies, up to about {1} in paid data. Start the batch?"
+
+#: src/components/instructions/stack-editor.tsx
+msgid "This stack no longer exists."
+msgstr "This stack no longer exists."
 
 #: src/components/research/findings/shared.tsx
 msgid "This tool isn't available, so it can only be skipped."

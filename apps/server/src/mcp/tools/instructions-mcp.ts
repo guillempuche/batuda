@@ -7,13 +7,15 @@ import { CurrentOrg, SessionContext } from '@batuda/controllers'
 import {
 	type Agent,
 	AgentSchema,
-	type ResolveStackRefResult,
 	resolveInstructionRefs,
 	resolveStackRef,
 } from '@batuda/instructions'
 
 import { InstructionsService } from '../../services/instructions'
-import { buildClarification } from './_instructions-shared'
+import {
+	buildClarification,
+	buildStackClarification,
+} from './_instructions-shared'
 import { Uuid } from './_research-shared'
 import { toItems } from './_result'
 
@@ -67,19 +69,6 @@ const ManageInstructions = Tool.make('manage_instructions', {
 
 export const InstructionsMcpTools = Toolkit.make(ManageInstructions)
 
-// A stack ref that didn't resolve comes back in the same clarification shape as
-// a template ref, so every surface reports collisions the same way (the stack
-// candidates additionally carry their agent).
-const buildStackClarification = (
-	result: Extract<ResolveStackRefResult, { ok: false }>,
-) => ({
-	_tag: 'instruction_clarification' as const,
-	message:
-		'The stack reference could not be resolved, so nothing was done. For an unknown name, fix the spelling or create the stack first; for an ambiguous name, pass the exact id from the listed candidates.',
-	unknown: result.unknown,
-	ambiguous: result.ambiguous,
-})
-
 export const InstructionsMcpHandlersLive = InstructionsMcpTools.toLayer(
 	Effect.gen(function* () {
 		const svc = yield* InstructionsService
@@ -95,6 +84,10 @@ export const InstructionsMcpHandlersLive = InstructionsMcpTools.toLayer(
 		) => eff.pipe(Effect.orDie, Effect.provideService(SqlClient.SqlClient, sql))
 		const parseAgent = (raw: string): Agent | null =>
 			Schema.is(AgentSchema)(raw) ? raw : null
+		// A stack name must carry at least one visible character. The database
+		// enforces this too, but a constraint failure surfaces as an opaque
+		// internal error the caller can't act on — so say what's wrong here.
+		const isBlank = (value: string) => value.trim().length === 0
 
 		return {
 			manage_instructions: params =>
@@ -185,6 +178,8 @@ export const InstructionsMcpHandlersLive = InstructionsMcpTools.toLayer(
 							if (params.action === 'set_default_stack')
 								return yield* run(svc.setDefault(userId, stackId))
 							// update_stack: resolve any template refs before writing.
+							if (params.name !== undefined && isBlank(params.name))
+								return { error: 'name cannot be blank' }
 							const refs = params.templates
 							let templateIds: ReadonlyArray<string> | undefined
 							if (refs !== undefined) {
@@ -203,6 +198,7 @@ export const InstructionsMcpHandlersLive = InstructionsMcpTools.toLayer(
 						case 'create_stack': {
 							if (params.agent === undefined || params.name === undefined)
 								return { error: 'agent and name are required to create' }
+							if (isBlank(params.name)) return { error: 'name cannot be blank' }
 							const agent = parseAgent(params.agent)
 							if (!agent) return { error: 'unknown agent' }
 							const resolved = yield* runRefs(

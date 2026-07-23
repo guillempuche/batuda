@@ -53,7 +53,7 @@ export const buildClarification = (
 	ambiguous: result.ambiguous,
 })
 
-const buildStackClarification = (
+export const buildStackClarification = (
 	result: Extract<ResolveStackRefResult, { readonly ok: false }>,
 ) => ({
 	_tag: 'instruction_clarification' as const,

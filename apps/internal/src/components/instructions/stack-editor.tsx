@@ -87,6 +87,9 @@ export function StackEditor({
 			return t`A stack with that name already exists.`
 		if (outcome === 'personal_in_org_stack')
 			return t`Org stacks can only use org templates.`
+		if (outcome === 'forbidden')
+			return t`Only an organization admin can change this stack.`
+		if (outcome === 'not_found') return t`This stack no longer exists.`
 		return t`Couldn't save the stack. Please try again.`
 	}
 
@@ -140,9 +143,23 @@ export function StackEditor({
 			return
 		}
 		// Promote to default only when it isn't already — the box is disabled once
-		// it is, so this fires just for a newly-ticked default.
+		// it is, so this fires just for a newly-ticked default. The edit itself is
+		// already saved, so a rejected promotion is reported on its own rather than
+		// swallowed behind a success message.
 		if (makeDefault && !isCurrentDefault) {
-			await setDefaultStack({ params: { id: stack.id } } as never)
+			const promoted = await setDefaultStack({
+				params: { id: stack.id },
+			} as never)
+			if (outcomeOf(promoted) !== 'set') {
+				setSaving(false)
+				toast.add({
+					title: t`Saved, but not made the default`,
+					description: errorForOutcome(outcomeOf(promoted)),
+					type: 'error',
+				})
+				onDone()
+				return
+			}
 		}
 		setSaving(false)
 		toast.add({ title: t`Stack saved`, type: 'success' })
