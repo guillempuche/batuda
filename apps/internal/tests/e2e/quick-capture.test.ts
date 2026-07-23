@@ -25,18 +25,24 @@ test.describe('quick capture', () => {
 			tag: '@smoke',
 		}, async ({ page }) => {
 			// GIVEN Alice is on the dashboard (cookie injected by setup)
-			// AND the page has reached networkidle so React has had time
-			// to hydrate the TopBar — the Log button uses a plain onClick
-			// (no form action), so a click before hydration would no-op
 			await page.goto('/', { waitUntil: 'networkidle' })
 
 			// WHEN she opens the QuickCapture dialog from the TopBar
 			// (testid disambiguates from per-task "Log an interaction"
-			// buttons that share the accessible name "Log")
-			await page.getByTestId('topbar-log-trigger').click()
+			// buttons that share the accessible name "Log").
+			// The Log button opens the dialog from a plain onClick, so a click
+			// that lands before React has wired it up is swallowed with no
+			// trace — and "the page stopped requesting things" is not the same
+			// moment as "the button works", especially on a loaded CI machine.
+			// Keep clicking until the dialog actually opens.
+			await expect(async () => {
+				await page.getByTestId('topbar-log-trigger').click()
+				await expect(page.getByTestId('quick-capture')).toBeVisible({
+					timeout: 1_000,
+				})
+			}).toPass({ timeout: 15_000 })
 
 			// THEN the dialog is visible
-			await expect(page.getByTestId('quick-capture')).toBeVisible()
 			await expect(page.getByTestId('quick-capture-form')).toBeVisible()
 
 			// AND when she selects a seeded company and fills subject + summary
