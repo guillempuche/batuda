@@ -19,6 +19,10 @@ import {
 	threadAtomFor,
 	updateDraftAtom,
 } from '#/atoms/emails-atoms'
+import {
+	narrowChannels,
+	primaryEmailChannel,
+} from '#/components/contacts/display-channels'
 import { AttachmentPicker } from '#/components/emails/attachment-picker'
 import { type Draft, useComposeEmail } from '#/context/compose-email-context'
 import type { StagedAttachment } from '#/lib/email-attachments'
@@ -582,8 +586,12 @@ function SuppressionGuard({
 		for (const raw of contacts) {
 			if (raw === null || typeof raw !== 'object') continue
 			const r = raw as Record<string, unknown>
-			const email = typeof r['email'] === 'string' ? r['email'] : null
-			const status = r['emailStatus']
+			// A contact's email and suppression state live on its primary email
+			// channel, not as top-level `email`/`emailStatus` fields, so derive
+			// both from that channel.
+			const primaryEmail = primaryEmailChannel(narrowChannels(r['channels']))
+			const email = primaryEmail?.value ?? null
+			const status = primaryEmail?.status
 			if (email === null) continue
 			if (status !== 'bounced' && status !== 'complained') continue
 			const name = typeof r['name'] === 'string' ? r['name'] : email

@@ -12,26 +12,27 @@ const channel = (over: Partial<Record<string, unknown>> = {}) => ({
 	kind: 'email',
 	value: 'a@b.com',
 	verification: 'deliverable',
-	is_primary: true,
+	isPrimary: true,
 	status: 'unknown',
-	status_reason: null,
+	statusReason: null,
 	...over,
 })
 
 describe('narrowChannels', () => {
 	describe('when given the json_agg channel array', () => {
-		it('should map snake_case json keys to a typed channel', () => {
-			// GIVEN one email channel with snake_case keys (is_primary, status_reason)
+		it('should map the camelCased json_agg keys to a typed channel', () => {
+			// GIVEN one email channel with the camelCased keys PgLive emits
+			// inside the json_agg blob (isPrimary, statusReason)
 			// WHEN narrowed
-			// THEN it reads the snake_case keys into camelCase fields
+			// THEN it reads them into the typed channel fields
 			const [c] = narrowChannels([
 				channel({
 					id: 'x',
 					kind: 'email',
 					value: 'pep@calpepfonda.cat',
-					is_primary: true,
+					isPrimary: true,
 					status: 'bounced',
-					status_reason: 'Permanent',
+					statusReason: 'Permanent',
 				}),
 			])
 			expect(c).toEqual<DisplayChannel>({
@@ -68,10 +69,10 @@ describe('narrowChannels', () => {
 		})
 
 		it('should default missing optional fields', () => {
-			// GIVEN a phone channel with no verification / status / status_reason
+			// GIVEN a phone channel with no verification / status / statusReason
 			// THEN verification + statusReason are null and status is unknown
 			const [c] = narrowChannels([
-				{ id: 'p', kind: 'phone', value: '+34 600', is_primary: false },
+				{ id: 'p', kind: 'phone', value: '+34 600', isPrimary: false },
 			])
 			expect(c).toMatchObject({
 				kind: 'phone',
@@ -113,8 +114,8 @@ describe('primaryEmailChannel', () => {
 			// GIVEN two email channels, one flagged primary
 			// THEN the primary one is chosen
 			const channels = narrowChannels([
-				channel({ id: 'a', value: 'second@x.com', is_primary: false }),
-				channel({ id: 'b', value: 'primary@x.com', is_primary: true }),
+				channel({ id: 'a', value: 'second@x.com', isPrimary: false }),
+				channel({ id: 'b', value: 'primary@x.com', isPrimary: true }),
 			])
 			expect(primaryEmailChannel(channels)?.value).toBe('primary@x.com')
 		})
@@ -123,8 +124,8 @@ describe('primaryEmailChannel', () => {
 			// GIVEN email channels with none marked primary
 			// THEN the first email is chosen
 			const channels = narrowChannels([
-				channel({ id: 'a', value: 'first@x.com', is_primary: false }),
-				channel({ id: 'b', value: 'second@x.com', is_primary: false }),
+				channel({ id: 'a', value: 'first@x.com', isPrimary: false }),
+				channel({ id: 'b', value: 'second@x.com', isPrimary: false }),
 			])
 			expect(primaryEmailChannel(channels)?.value).toBe('first@x.com')
 		})
