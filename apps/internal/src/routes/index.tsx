@@ -29,6 +29,7 @@ import { useQuickCapture } from '#/context/quick-capture-context'
 import { dehydrateAtom } from '#/lib/atom-hydration'
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 import type { PaginatedList } from '#/lib/paginated-list'
+import { countActiveCompanies, countActiveIn } from '#/lib/pipeline-counts'
 import { getServerCookieHeader } from '#/lib/server-cookie'
 import { rulerUnderRule, stenciledTitle } from '#/lib/workshop-mixins'
 
@@ -213,6 +214,12 @@ function PipelinePage() {
 			? (snapshot.statusCounts[status] ?? 0)
 			: (statusCounts.get(status) ?? 0)
 
+	// Every company still in play — same fallback-until-loaded rule as the
+	// counters above.
+	const activeCompanyCount = snapshot?.statusCounts
+		? countActiveCompanies(snapshot.statusCounts)
+		: countActiveIn(companies)
+
 	const overdueTasks = useMemo(
 		() =>
 			openTasks
@@ -293,7 +300,7 @@ function PipelinePage() {
 			<SetPasswordNudge />
 
 			<KpiRow>
-				<KpiCounter value={companies.length} label={t`Active companies`} />
+				<KpiCounter value={activeCompanyCount} label={t`Active companies`} />
 				<KpiCounter value={openTasks.length} label={t`Open tasks`} />
 				<KpiCounter
 					value={snapshot?.overdueTaskCount ?? overdueTasksCount}
