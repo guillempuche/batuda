@@ -33,9 +33,9 @@ test.describe('emails inbox listing', () => {
 	})
 
 	test.describe('when the user opens /emails', () => {
-		test('should render at least one row per seeded thread', async ({
-			page,
-		}) => {
+		test('should render at least one row per seeded thread', {
+			tag: '@smoke',
+		}, async ({ page }) => {
 			// GIVEN the seed produces 4 inbound threads on Taller (M1+M2
 			// share, M3 single, M4 single on agent inbox, M8 single).
 			// Resolve the count from the DB so the assertion stays in
@@ -88,14 +88,19 @@ test.describe('emails inbox listing', () => {
 		})
 	})
 
-	test.describe('when the user clicks a thread row', () => {
+	test.describe('when the user opens a thread row', () => {
 		test('should navigate to /emails/<uuid>', async ({ page }) => {
 			await page.goto('/emails', { waitUntil: 'networkidle' })
 
-			// Click the first row and assert the URL transitions
+			// Open the first row via its keyboard affordance (the row is
+			// tabindex=0 with an "Open thread" aria-label and an Enter/Space
+			// handler). A positional click on row 0 is flaky: Playwright scrolls
+			// it to the top of the grid, where the sticky table header then
+			// intercepts the click. Pressing Enter on the focused row activates
+			// the same navigation without hit-testing under that header.
 			const firstRow = page.locator('[data-testid^="thread-row-"]').first()
 			await expect(firstRow).toBeVisible()
-			await firstRow.click()
+			await firstRow.press('Enter')
 
 			await page.waitForURL(/\/emails\/[0-9a-f-]{36}$/, { timeout: 5_000 })
 		})
