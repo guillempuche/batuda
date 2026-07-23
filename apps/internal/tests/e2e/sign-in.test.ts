@@ -19,7 +19,9 @@ import { waitForInteractive } from './helpers/hydration'
 
 test.describe('sign-in', () => {
 	test.describe('with seeded credentials and no returnTo', () => {
-		test('should land Alice on / and drop the login form', async ({ page }) => {
+		test('should land Alice on / and drop the login form', {
+			tag: '@smoke',
+		}, async ({ page }) => {
 			// GIVEN the dev stack is up and the seed has provisioned alice
 			// AND the browser is at /login with the form rendered
 			await page.goto('/login')
@@ -87,11 +89,14 @@ test.describe('sign-in', () => {
 
 			// THEN the URL becomes / (NOT //evil.example/) — the open-redirect
 			// vector is closed. The host must be batuda.localhost; the optional
-			// port tolerates portless's non-443 dev port without weakening the
+			// leading label tolerates a worktree's `<label>.batuda.localhost`, and
+			// the optional port portless's non-443 dev port, without weakening the
 			// check that an evil host is rejected.
 			// [routes/login.tsx:20-22 — isSafeReturnTo rejects protocol-relative]
 			await page.waitForURL(/\/$/)
-			await expect(page).toHaveURL(/^https:\/\/batuda\.localhost(:\d+)?\/$/)
+			await expect(page).toHaveURL(
+				/^https:\/\/(?:[a-z0-9-]+\.)?batuda\.localhost(:\d+)?\/$/,
+			)
 			await expect(page.getByTestId('login-form')).toHaveCount(0)
 		})
 	})

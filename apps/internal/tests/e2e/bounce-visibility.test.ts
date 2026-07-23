@@ -4,9 +4,9 @@ import { expect, test } from '@playwright/test'
 
 import { setActiveOrgBySlug } from './helpers/set-active-org'
 
-// Bounce visibility on the contact page. Slice 6 wires the suppression
-// banner (and inline badge) on company → Contacts when a contact's
-// `email_status` is bounced or complained.
+// Bounce visibility on the contact page: the suppression banner (and inline
+// badge) render on company → Contacts when a contact's primary email channel
+// carries a `bounced` or `complained` status.
 //
 // We seed the bounced state directly via psql instead of driving the
 // mail-worker's DSN parser end-to-end — the worker is a separate process
@@ -40,17 +40,17 @@ test.describe('contact suppression banner', () => {
 		await page.goto('/', { waitUntil: 'commit' })
 		await setActiveOrgBySlug(page, 'taller')
 
-		// AND the seeded Pep Casals row is forced to bounced state.
+		// AND the seeded Pep Casals email channel is forced to bounced state.
 		psql(
-			`UPDATE contacts SET email_status='bounced', email_status_reason='${TARGET_REASON}', email_status_updated_at=now() WHERE email='${TARGET_EMAIL}'`,
+			`UPDATE contact_channels SET status='bounced', status_reason='${TARGET_REASON}', status_updated_at=now() WHERE kind='email' AND value='${TARGET_EMAIL}'`,
 		)
 	})
 
 	test.afterEach(() => {
-		// Revert the seeded bounce so the row is reusable across runs and
+		// Revert the seeded bounce so the channel is reusable across runs and
 		// other suites that read the same contact don't see leftover state.
 		psql(
-			`UPDATE contacts SET email_status='unknown', email_status_reason=NULL, email_status_updated_at=now(), email_soft_bounce_count=0 WHERE email='${TARGET_EMAIL}'`,
+			`UPDATE contact_channels SET status='unknown', status_reason=NULL, status_updated_at=now(), soft_bounce_count=0 WHERE kind='email' AND value='${TARGET_EMAIL}'`,
 		)
 	})
 
@@ -99,10 +99,10 @@ test.describe('contact suppression banner', () => {
 			page.getByTestId(/^contact-suppression-banner-/).first(),
 		).toBeHidden({ timeout: 10_000 })
 
-		// AND the DB row should reflect email_status='unknown' (the route
+		// AND the channel row should reflect status='unknown' (the route
 		// resets it to that value, not to 'valid').
 		const row = psql(
-			`SELECT email_status FROM contacts WHERE email='${TARGET_EMAIL}'`,
+			`SELECT status FROM contact_channels WHERE kind='email' AND value='${TARGET_EMAIL}'`,
 		)
 		expect(row).toBe('unknown')
 	})

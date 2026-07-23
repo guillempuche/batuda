@@ -14,29 +14,35 @@ import { setActiveOrgBySlug } from './helpers/set-active-org'
 
 const AUTH_FILE = 'tests/e2e/.auth/alice.json'
 
-setup('sign in as Alice and persist storage state', async ({ page }) => {
-	// GIVEN the dev stack is up and the seed has provisioned alice
-	await page.goto('/login')
-	await expect(page.getByTestId('login-form')).toBeVisible()
+// Tagged @smoke: the authed smoke tests depend on this setup project, and
+// `--grep @smoke` filters dependency projects too — so it must match to run.
+setup(
+	'sign in as Alice and persist storage state',
+	{ tag: '@smoke' },
+	async ({ page }) => {
+		// GIVEN the dev stack is up and the seed has provisioned alice
+		await page.goto('/login')
+		await expect(page.getByTestId('login-form')).toBeVisible()
 
-	// WHEN Alice signs in with seeded credentials
-	// The form submits through a handler that only exists once the page is
-	// live, so submitting before then quietly does nothing at all.
-	await waitForInteractive(page, 'login-submit')
-	await page.getByTestId('login-email').fill('admin@taller.cat')
-	await page.getByTestId('login-password').fill('batuda-dev-2026')
-	await page.getByTestId('login-submit').click()
+		// WHEN Alice signs in with seeded credentials
+		// The form submits through a handler that only exists once the page is
+		// live, so submitting before then quietly does nothing at all.
+		await waitForInteractive(page, 'login-submit')
+		await page.getByTestId('login-email').fill('admin@taller.cat')
+		await page.getByTestId('login-password').fill('batuda-dev-2026')
+		await page.getByTestId('login-submit').click()
 
-	// THEN the dashboard route renders (proves the cookie is set)
-	await page.waitForURL(/\/$/)
-	await expect(page.getByTestId('login-form')).toHaveCount(0)
+		// THEN the dashboard route renders (proves the cookie is set)
+		await page.waitForURL(/\/$/)
+		await expect(page.getByTestId('login-form')).toHaveCount(0)
 
-	// AND set the active org to taller so downstream tests start with a
-	// CurrentOrg-resolvable session. Alice belongs to two orgs (taller
-	// owner, restaurant member), so Better Auth's auto-set-active hook
-	// only fires for single-org users — multi-org users have to pick.
-	await setActiveOrgBySlug(page, 'taller')
+		// AND set the active org to taller so downstream tests start with a
+		// CurrentOrg-resolvable session. Alice belongs to two orgs (taller
+		// owner, restaurant member), so Better Auth's auto-set-active hook
+		// only fires for single-org users — multi-org users have to pick.
+		await setActiveOrgBySlug(page, 'taller')
 
-	// AND we persist the resulting cookies for downstream tests
-	await page.context().storageState({ path: AUTH_FILE })
-})
+		// AND we persist the resulting cookies for downstream tests
+		await page.context().storageState({ path: AUTH_FILE })
+	},
+)

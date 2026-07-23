@@ -21,9 +21,9 @@ import { expect, test } from '@playwright/test'
 
 test.describe('quick capture', () => {
 	test.describe('when the authenticated user logs an interaction against a seeded company', () => {
-		test('the interaction is created and the dialog closes', async ({
-			page,
-		}) => {
+		test('the interaction is created and the dialog closes', {
+			tag: '@smoke',
+		}, async ({ page }) => {
 			// GIVEN Alice is on the dashboard (cookie injected by setup)
 			// AND the page has reached networkidle so React has had time
 			// to hydrate the TopBar — the Log button uses a plain onClick

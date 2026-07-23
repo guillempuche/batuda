@@ -35,10 +35,15 @@ test.describe('GET /v1/companies/:slug', () => {
 			// [handlers/companies.ts:18-26 — get success path]
 			const cookies = await page.context().cookies()
 			const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ')
-			const response = await request.get(
-				'https://api.batuda.localhost/v1/companies/cal-pep-fonda',
-				{ headers: { cookie: cookieHeader }, ignoreHTTPSErrors: true },
-			)
+			// Relative to the configured baseURL so this rides the app's `/v1`
+			// proxy on whatever origin/port is serving — bare `batuda.localhost`
+			// in a plain checkout, `<label>.batuda.localhost:<port>` in a
+			// worktree. Hardcoding `https://api.batuda.localhost` assumed portless
+			// had bound :443, which isn't true on a non-privileged fallback port.
+			const response = await request.get('/v1/companies/cal-pep-fonda', {
+				headers: { cookie: cookieHeader },
+				ignoreHTTPSErrors: true,
+			})
 			expect(response.status()).toBe(200)
 			const body = (await response.json()) as { slug?: string }
 			expect(body.slug).toBe('cal-pep-fonda')
@@ -58,10 +63,11 @@ test.describe('GET /v1/companies/:slug', () => {
 			// [routes/companies.ts:88 + handlers/companies.ts:22-24 — Effect.catch maps NotFound]
 			const cookies = await page.context().cookies()
 			const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ')
-			const response = await request.get(
-				'https://api.batuda.localhost/v1/companies/__not-a-real-slug__',
-				{ headers: { cookie: cookieHeader }, ignoreHTTPSErrors: true },
-			)
+			// Relative to baseURL — see the 200 case above for why not a hardcoded host.
+			const response = await request.get('/v1/companies/__not-a-real-slug__', {
+				headers: { cookie: cookieHeader },
+				ignoreHTTPSErrors: true,
+			})
 			expect(response.status()).toBe(404)
 			// The body should at minimum carry the NotFound tag / entity name.
 			// We're permissive on shape because Effect HttpApi's exact JSON

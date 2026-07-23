@@ -37,11 +37,12 @@ const seededIds: string[] = []
 
 test.describe('calendar on company page', () => {
 	test.beforeAll(() => {
-		// GIVEN the seeded `cal-pep-fonda` company has at least one
-		// confirmed upcoming event (the seed inserts "Zoom sync with Cal
-		// Pep" by default). We additionally seed:
-		//   - a cancelled event in the past so D.2's struck-through
-		//     treatment has something to render
+		// GIVEN cal-pep-fonda exists, seed the events this file asserts on so it
+		// owns its fixture rather than depending on the demo seed's date-pinned
+		// "Zoom sync" event, which drifts into the past as real time advances:
+		//   - a confirmed event a few days out (with an attendee) so the
+		//     upcoming-meetings card has a row to render
+		//   - a cancelled event in the past so the cancelled treatment renders
 		const orgId = psql(
 			`SELECT organization_id FROM companies WHERE slug='${COMPANY_SLUG}' LIMIT 1`,
 		)
@@ -50,6 +51,31 @@ test.describe('calendar on company page', () => {
 		)
 		expect(orgId, 'taller seeded').not.toBe('')
 		expect(companyId, 'cal-pep-fonda seeded').not.toBe('')
+
+		const upcomingId = randomUUID()
+		seededIds.push(upcomingId)
+		psql(
+			`INSERT INTO calendar_events (
+				id, organization_id, source, provider, provider_booking_id,
+				ical_uid, ical_sequence, start_at, end_at, status, title,
+				location_type, organizer_email, company_id
+			) VALUES (
+				'${upcomingId}', '${orgId}', 'booking', 'calcom', 'upcoming-fixture-${upcomingId}',
+				'upcoming-fixture-${upcomingId}', 0,
+				now() + interval '3 days',
+				now() + interval '3 days' + interval '30 minutes',
+				'confirmed',
+				'Upcoming sync with Cal Pep',
+				'video', 'organizer@taller.cat', '${companyId}'
+			)`,
+		)
+		psql(
+			`INSERT INTO calendar_event_attendees (
+				id, organization_id, event_id, email, name, rsvp
+			) VALUES (
+				gen_random_uuid(), '${orgId}', '${upcomingId}', 'pep@calpepfonda.cat', 'Pep Casals', 'accepted'
+			)`,
+		)
 
 		const cancelledId = randomUUID()
 		seededIds.push(cancelledId)
@@ -72,6 +98,7 @@ test.describe('calendar on company page', () => {
 
 	test.afterAll(() => {
 		for (const id of seededIds) {
+			psql(`DELETE FROM calendar_event_attendees WHERE event_id='${id}'`)
 			psql(`DELETE FROM calendar_events WHERE id='${id}'`)
 		}
 	})
@@ -91,7 +118,7 @@ test.describe('calendar on company page', () => {
 			})
 
 			// THEN the upcoming-meetings card is visible with at least one
-			// meeting row (the seed includes "Zoom sync with Cal Pep")
+			// meeting row (the confirmed event seeded above)
 			const card = page.getByTestId('company-upcoming-meetings-card')
 			await expect(card).toBeVisible()
 			const rows = card.locator('[data-testid^="company-upcoming-meeting-"]')
