@@ -1,0 +1,36 @@
+name: E2E full suite
+
+# Post-merge backstop: the whole browser suite on every push to main. This is
+# NOT a required check and does NOT run on pull requests — it reports a break on
+# the commit without gating review. The PR gate is the `e2e-smoke` job in
+# ci.yml; this catches whatever the smoke subset doesn't (docs/runbooks.md).
+on:
+  push:
+    branches: [main]
+
+# A newer push supersedes an in-flight full run — the latest commit is what
+# matters for a post-merge backstop.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e-full:
+    name: E2E full suite (Playwright)
+    runs-on: ubuntu-latest
+    # The full 34-spec suite runs sequentially (workers: 1); ~6 min of tests on
+    # top of setup, so 20 leaves comfortable headroom.
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      # with-mail brings up GreenMail + the mail-worker so the email round-trip
+      # specs (send, reply, bounce, magic-link, …) run; no grep = the full suite.
+      - name: Stand up the stack and run the full suite
+        uses: ./.github/actions/e2e-stack
+        with:
+          with-mail: "true"

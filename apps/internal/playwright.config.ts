@@ -51,7 +51,11 @@ export default defineConfig({
 	// from `pnpm cli db reset && pnpm cli seed` between manual runs, not from parallelism.
 	fullyParallel: false,
 	workers: 1,
-	retries: 0,
+	// One retry in CI so a single transient blip (a slow mount, a network
+	// hiccup) doesn't fail a PR on the smoke gate; a test that only passes on
+	// retry still surfaces in the report and gets triaged (docs/runbooks.md).
+	// Zero locally so a flake is loud instead of silently absorbed.
+	retries: process.env['CI'] ? 1 : 0,
 	reporter: [['list']],
 	use: {
 		baseURL: BASE_URL,
