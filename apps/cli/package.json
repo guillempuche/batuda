@@ -15,6 +15,7 @@
 		"@batuda/auth": "workspace:*",
 		"@batuda/calendar": "workspace:*",
 		"@batuda/domain": "workspace:*",
+		"@batuda/instructions": "workspace:*",
 		"@batuda/observability": "workspace:*",
 		"@batuda/research": "workspace:*",
 		"@better-auth/api-key": "1.6.11",

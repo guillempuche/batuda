@@ -25,14 +25,23 @@ export interface InstructionTemplate {
 	readonly updatedAt: string
 }
 
-// A per-(scope, agent) ordered default stack. `ownerUserId` null = the org
-// default (admin-managed); set = a user's own, which replaces the org default
-// for that user.
-export interface AgentDefaultStack {
+// How a personal stack combines with the org default. 'replace' uses the stack
+// alone; 'extend' resolves the live org default's templates first, then the
+// stack's own. Org stacks are always 'replace' (they are the base of an extend).
+export type StackComposition = 'replace' | 'extend'
+
+// A named, ordered stack of templates for one agent, owned by the org
+// (`ownerUserId` null) or a member. `name` is unique within its scope+agent;
+// `isDefault` marks the one stack that applies when a run names none — at most
+// one per scope+agent.
+export interface InstructionStack {
 	readonly id: string
 	readonly organizationId: string
 	readonly ownerUserId: string | null
 	readonly agent: Agent
+	readonly name: string
+	readonly isDefault: boolean
+	readonly composition: StackComposition
 }
 
 // One ordered reference inside a stack. `position` is the add-order; the

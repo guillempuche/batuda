@@ -5,24 +5,25 @@ import { CurrentOrg, SessionContext } from '@batuda/controllers'
 import {
 	AgentSchema,
 	agents,
-	getDefaultStacks,
+	listStacks,
 	listTemplates,
 	resolveInstructions,
 } from '@batuda/instructions'
 
 const agentParam = McpSchema.param('agent', Schema.String)
 
-// A read-only menu of instruction templates plus the active default stack for an
-// agent, so a capable client can read the user's standing rules before composing
-// (research findings, an email body) without a tool round-trip. Reads run inside
-// the request's org scope, so templates and stacks are already RLS-scoped to this
-// org plus the caller's own. The agent param is validated against the code set
-// (research, email); an unknown agent returns the valid list rather than failing.
+// A read-only menu of instruction templates plus the named stacks for an agent
+// and what resolves today, so a capable client can read the user's standing
+// rules before composing (research findings, an email body) without a tool
+// round-trip. Reads run inside the request's org scope, so templates and stacks
+// are already RLS-scoped to this org plus the caller's own. The agent param is
+// validated against the code set (research, email); an unknown agent returns the
+// valid list rather than failing.
 export const InstructionsResource =
 	McpServer.resource`batuda://instructions/${agentParam}`({
 		name: 'Agent Instructions',
 		description:
-			'Instruction templates readable in this org plus the active default stack for an agent (research, email). Read before composing so output follows the user’s standing rules. For research, override per run with start_research/research_sync `instructions`; for email, follow these when composing. The apply-instruction and save-instruction prompts use and capture them.',
+			'Instruction templates readable in this org plus the named stacks for an agent (research, email) and what resolves by default today. Read before composing so output follows the user’s standing rules. For research, pick a saved stack per run with start_research/research_sync `stack` (or layer extra templates with `instructions`); for email, follow the active stack when composing. Manage templates and stacks with manage_instructions.',
 		mimeType: 'application/json',
 		audience: ['assistant'],
 		completion: {
@@ -41,9 +42,7 @@ export const InstructionsResource =
 			const org = yield* CurrentOrg
 			const { userId } = yield* SessionContext
 			const templates = yield* listTemplates().pipe(Effect.orDie)
-			const stacks = yield* getDefaultStacks(org.id, userId, agent).pipe(
-				Effect.orDie,
-			)
+			const stacks = yield* listStacks(agent).pipe(Effect.orDie)
 			// The effective instructions for a run with no override — what actually
 			// fires today, after the user-replaces-org precedence the resolver applies.
 			const active = yield* resolveInstructions({
@@ -60,7 +59,14 @@ export const InstructionsResource =
 						scope: t.ownerUserId === null ? 'org' : 'personal',
 						body: t.body,
 					})),
-					default_stacks: stacks,
+					stacks: stacks.map(s => ({
+						id: s.id,
+						name: s.name,
+						scope: s.ownerUserId === null ? 'org' : 'personal',
+						is_default: s.isDefault,
+						composition: s.composition,
+						template_ids: s.templateIds,
+					})),
 					active: {
 						source: active.source,
 						names: active.templateNames,

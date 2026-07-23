@@ -74,7 +74,7 @@ export const ApplyInstructionPrompt = McpServer.prompt({
 Instruction:
 ${tpl.body}
 
-To apply it, ${how}. If the user wants this on by default, use manage_instruction_default_stack.`
+To apply it, ${how}. If the user wants this on by default, add it to a stack with manage_instructions (create_stack / set_default_stack).`
 		}),
 })
 
@@ -98,6 +98,6 @@ export const SaveInstructionPrompt = McpServer.prompt({
 		Effect.succeed(`The user wants to save a standing instruction named "${name}" (${scope} scope).
 
 1. Capture the preference the user expressed in this conversation as the instruction body — concise and imperative (e.g. "Always open with the contact's first name").
-2. Create it: call manage_instruction_template with action "create", name "${name}", scope "${scope}", and that body. (scope "org" is admin-only and is rejected for non-admins — save it as "personal" instead if that happens.)
-3. Offer to apply it by default for an agent (research or email) with manage_instruction_default_stack action "set", or per call via the apply-instruction prompt.`),
+2. Create it: call manage_instructions with action "create_template", name "${name}", scope "${scope}", and that body. (scope "org" is admin-only and is rejected for non-admins — save it as "personal" instead if that happens.)
+3. Offer to put it in a stack for an agent (research or email) with manage_instructions action "create_stack" (and "set_default_stack" to make it the default), or apply it per run via the apply-instruction prompt.`),
 })

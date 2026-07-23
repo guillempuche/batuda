@@ -5,37 +5,35 @@
 
 export type {
 	Agent,
-	AgentDefaultStack,
+	InstructionStack,
 	InstructionTemplate,
+	StackComposition,
 	StackItem,
 } from './domain'
 export { AgentSchema, agents } from './domain'
 export { fingerprintTemplates } from './fingerprint'
 export type {
-	AcceptDonationResult,
+	CreateStackInput,
 	CreateTemplateInput,
 	DeleteTemplateResult,
-	Donation,
-	ProposeDonationInput,
-	RejectDonationResult,
-	SetDefaultStackInput,
-	SetDefaultStackResult,
-	StackView,
+	StackSummary,
+	StackWriteResult,
 } from './management'
 export {
-	acceptDonation,
-	clearUserDefaultStack,
+	clearDefaultStack,
+	createStack,
 	createTemplate,
+	deleteStack,
 	deleteTemplate,
 	forkTemplate,
 	getDefaultStacks,
+	getStack,
 	getTemplate,
-	listDonations,
+	listStacks,
 	listTemplates,
-	proposeDonation,
-	rejectDonation,
 	setDefaultStack,
 	transferTemplateToUser,
+	updateStack,
 	updateTemplateFields,
 } from './management'
 export type {
@@ -49,15 +47,18 @@ export type {
 	ResolvedInstructions,
 	ResolveInstructionsArgs,
 	ResolveRefsResult,
-	StackComposition,
+	ResolveStackRefResult,
+	StackCandidate,
 	StackSource,
 } from './resolver'
 export {
 	assembleSegments,
 	classifyInstructionRefs,
+	classifyStackRef,
 	isUuidRef,
 	personalTemplatesInOrgStack,
 	pickStackSource,
 	resolveInstructionRefs,
 	resolveInstructions,
+	resolveStackRef,
 } from './resolver'

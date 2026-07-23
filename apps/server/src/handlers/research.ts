@@ -107,6 +107,7 @@ export const ResearchLive = HttpApiBuilder.group(
 							organizationId: currentOrg.id,
 							userId,
 							agent: 'research',
+							overrideStackId: _.payload.stack_id,
 							overrideTemplateIds: _.payload.template_ids,
 						})
 						const result = yield* svc.create(

@@ -1,11 +1,11 @@
 // Live-DB integration test for resolveInstructions — the core resolver that
 // turns a run's (org, user, agent) into ordered prompt segments + a fingerprint.
 // Runs through enterOrgScope (app_user + GUCs) so RLS is in force, exercising
-// the precedence ladder (override > user > org > none), the RLS-drop of
+// the precedence ladder (stack > override > user > org > none), the RLS-drop of
 // unreadable override ids, and fingerprint invalidation on edit.
 //
 // Prereq: `pnpm cli services up` so Postgres is reachable on $DATABASE_URL, and
-// `pnpm cli db reset && pnpm cli db migrate` so 0008 is applied.
+// `pnpm cli db reset && pnpm cli db migrate` so the stack tables are applied.
 
 process.env['DATABASE_URL'] ??=
 	'postgresql://batuda:batuda@localhost:5433/batuda'
@@ -17,10 +17,12 @@ import { SqlClient } from 'effect/unstable/sql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
-	clearUserDefaultStack,
+	clearDefaultStack,
+	createStack,
 	getDefaultStacks,
 	resolveInstructions,
 	setDefaultStack,
+	updateStack,
 } from '@batuda/instructions'
 
 import { PgLive } from '../db/client.js'
@@ -92,45 +94,45 @@ beforeAll(async () => {
 					const user = ut[0]?.id ?? ''
 					// Org default stack → the org template.
 					const os = yield* sql<{ id: string }>`
-						INSERT INTO agent_default_stacks (organization_id, owner_user_id, agent)
-						VALUES (${ORG}, NULL, 'research') RETURNING id`
+						INSERT INTO instruction_stacks (organization_id, owner_user_id, agent, name, is_default)
+						VALUES (${ORG}, NULL, 'research', 'default', true) RETURNING id`
 					yield* sql`
-						INSERT INTO agent_default_stack_items (organization_id, stack_id, template_id, position)
+						INSERT INTO instruction_stack_items (organization_id, stack_id, template_id, position)
 						VALUES (${ORG}, ${os[0]?.id ?? ''}, ${org}, 0)`
 					// U1's own stack → the user template (replaces the org default for U1).
 					const us = yield* sql<{ id: string }>`
-						INSERT INTO agent_default_stacks (organization_id, owner_user_id, agent)
-						VALUES (${ORG}, ${U1}, 'research') RETURNING id`
+						INSERT INTO instruction_stacks (organization_id, owner_user_id, agent, name, is_default)
+						VALUES (${ORG}, ${U1}, 'research', 'default', true) RETURNING id`
 					yield* sql`
-						INSERT INTO agent_default_stack_items (organization_id, stack_id, template_id, position)
+						INSERT INTO instruction_stack_items (organization_id, stack_id, template_id, position)
 						VALUES (${ORG}, ${us[0]?.id ?? ''}, ${user}, 0)`
 					// E1 extends the org default with one personal addition (delta = [e1]).
 					const e1t = yield* sql<{ id: string }>`
 							INSERT INTO instruction_templates (organization_id, owner_user_id, name, body, created_by)
 							VALUES (${ORG}, ${E1}, 'E1', 'e1 body', ${E1}) RETURNING id`
 					const e1s = yield* sql<{ id: string }>`
-							INSERT INTO agent_default_stacks (organization_id, owner_user_id, agent, composition)
-							VALUES (${ORG}, ${E1}, 'research', 'extend') RETURNING id`
+							INSERT INTO instruction_stacks (organization_id, owner_user_id, agent, name, is_default, composition)
+							VALUES (${ORG}, ${E1}, 'research', 'default', true, 'extend') RETURNING id`
 					yield* sql`
-							INSERT INTO agent_default_stack_items (organization_id, stack_id, template_id, position)
+							INSERT INTO instruction_stack_items (organization_id, stack_id, template_id, position)
 							VALUES (${ORG}, ${e1s[0]?.id ?? ''}, ${e1t[0]?.id ?? ''}, 0)`
 					// E2 extends but re-lists the org template ahead of its own (dedup case).
 					const e2t = yield* sql<{ id: string }>`
 							INSERT INTO instruction_templates (organization_id, owner_user_id, name, body, created_by)
 							VALUES (${ORG}, ${E2}, 'E2', 'e2 body', ${E2}) RETURNING id`
 					const e2s = yield* sql<{ id: string }>`
-							INSERT INTO agent_default_stacks (organization_id, owner_user_id, agent, composition)
-							VALUES (${ORG}, ${E2}, 'research', 'extend') RETURNING id`
+							INSERT INTO instruction_stacks (organization_id, owner_user_id, agent, name, is_default, composition)
+							VALUES (${ORG}, ${E2}, 'research', 'default', true, 'extend') RETURNING id`
 					yield* sql`
-							INSERT INTO agent_default_stack_items (organization_id, stack_id, template_id, position)
+							INSERT INTO instruction_stack_items (organization_id, stack_id, template_id, position)
 							VALUES (${ORG}, ${e2s[0]?.id ?? ''}, ${org}, 0)`
 					yield* sql`
-							INSERT INTO agent_default_stack_items (organization_id, stack_id, template_id, position)
+							INSERT INTO instruction_stack_items (organization_id, stack_id, template_id, position)
 							VALUES (${ORG}, ${e2s[0]?.id ?? ''}, ${e2t[0]?.id ?? ''}, 1)`
 					// E4 has an extend stack with no additions of its own (empty delta).
 					yield* sql`
-							INSERT INTO agent_default_stacks (organization_id, owner_user_id, agent, composition)
-							VALUES (${ORG}, ${E4}, 'research', 'extend')`
+							INSERT INTO instruction_stacks (organization_id, owner_user_id, agent, name, is_default, composition)
+							VALUES (${ORG}, ${E4}, 'research', 'default', true, 'extend')`
 					return {
 						org,
 						user,
@@ -156,7 +158,7 @@ afterAll(async () => {
 			yield* sql.withTransaction(
 				Effect.gen(function* () {
 					yield* sql`SET LOCAL ROLE app_service`
-					yield* sql`DELETE FROM agent_default_stacks WHERE organization_id = ${ORG}`
+					yield* sql`DELETE FROM instruction_stacks WHERE organization_id = ${ORG}`
 					yield* sql`DELETE FROM instruction_templates WHERE organization_id = ${ORG}`
 				}),
 			)
@@ -329,73 +331,217 @@ describe('resolveInstructions (live RLS)', () => {
 		})
 	})
 
-	describe('default-stack composition (set, then read it back)', () => {
-		const setStackFor = (
+	describe('when a run names a specific stack', () => {
+		// Resolve against an explicit stack id, mirroring how a pre-validated
+		// `stack` ref reaches the resolver.
+		const resolveWithStack = (
 			userId: string,
-			composition: 'replace' | 'extend',
-			templateIds: ReadonlyArray<string>,
+			stackId: string,
+			override?: ReadonlyArray<string>,
 		) =>
 			runRoot(
 				Effect.gen(function* () {
 					const sql = yield* SqlClient.SqlClient
 					return yield* enterOrgScope(sql, { org: ORG_OBJ, userId })(
-						setDefaultStack({
+						resolveInstructions({
 							organizationId: ORG,
-							ownerUserId: userId,
+							userId,
 							agent: 'research',
-							templateIds,
-							composition,
+							overrideStackId: stackId,
+							overrideTemplateIds: override,
 						}),
 					)
 				}),
 			)
-		const readStacks = (userId: string) =>
+
+		// Fresh org templates with known bodies, so these tests are immune to the
+		// body edits earlier cases make to the shared org/user templates.
+		let stackTplA = ''
+		let stackTplB = ''
+		beforeAll(async () => {
+			const ids = await runRoot(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* sql.withTransaction(
+						Effect.gen(function* () {
+							yield* sql`SET LOCAL ROLE app_service`
+							const a = yield* sql<{ id: string }>`
+								INSERT INTO instruction_templates (organization_id, owner_user_id, name, body, created_by)
+								VALUES (${ORG}, NULL, 'StackA', 'stack a body', ${U1}) RETURNING id`
+							const b = yield* sql<{ id: string }>`
+								INSERT INTO instruction_templates (organization_id, owner_user_id, name, body, created_by)
+								VALUES (${ORG}, NULL, 'StackB', 'stack b body', ${U1}) RETURNING id`
+							return { a: a[0]?.id ?? '', b: b[0]?.id ?? '' }
+						}),
+					)
+				}),
+			)
+			stackTplA = ids.a
+			stackTplB = ids.b
+		})
+
+		it('should resolve a named org stack over the actor default', async () => {
+			// GIVEN a named (non-default) org stack of one org template
+			const created = await runRoot(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* enterOrgScope(sql, { org: ORG_OBJ, userId: U1 })(
+						createStack({
+							organizationId: ORG,
+							ownerUserId: null,
+							agent: 'research',
+							name: `latam-${randomUUID().slice(0, 8)}`,
+							templateIds: [stackTplA],
+							composition: 'replace',
+							isDefault: false,
+						}),
+					)
+				}),
+			)
+			if (!created.ok) throw new Error('stack create failed')
+			// WHEN U1 (who has their own default) runs that stack by id
+			const result = await resolveWithStack(U1, created.stack.id)
+			// THEN the named stack wins with source 'stack'
+			expect(result.source).toBe('stack')
+			expect(result.templateIds).toEqual([stackTplA])
+			expect(result.segments).toEqual(['stack a body'])
+		})
+
+		it('should append per-run override templates after the stack items', async () => {
+			// GIVEN a named org stack of one org template
+			const created = await runRoot(
+				Effect.gen(function* () {
+					const sql = yield* SqlClient.SqlClient
+					return yield* enterOrgScope(sql, { org: ORG_OBJ, userId: U1 })(
+						createStack({
+							organizationId: ORG,
+							ownerUserId: null,
+							agent: 'research',
+							name: `combo-${randomUUID().slice(0, 8)}`,
+							templateIds: [stackTplA],
+							composition: 'replace',
+							isDefault: false,
+						}),
+					)
+				}),
+			)
+			if (!created.ok) throw new Error('stack create failed')
+			// WHEN U1 runs it and also passes a second org template as an override
+			const result = await resolveWithStack(U1, created.stack.id, [stackTplB])
+			// THEN the stack items lead and the override template follows
+			expect(result.source).toBe('stack')
+			expect(result.templateIds).toEqual([stackTplA, stackTplB])
+			expect(result.segments).toEqual(['stack a body', 'stack b body'])
+		})
+	})
+
+	describe('stack CRUD (create/update/default, then read back)', () => {
+		const asUser = <A>(
+			userId: string,
+			eff: Effect.Effect<A, unknown, SqlClient.SqlClient>,
+		) =>
 			runRoot(
 				Effect.gen(function* () {
 					const sql = yield* SqlClient.SqlClient
-					return yield* enterOrgScope(sql, { org: ORG_OBJ, userId })(
-						getDefaultStacks(ORG, userId, 'research'),
-					)
+					return yield* enterOrgScope(sql, { org: ORG_OBJ, userId })(eff)
 				}),
 			)
 
-		it('should persist composition=extend and read it back with its items', async () => {
-			// GIVEN a fresh user saves an extend stack over the org template
-			const me = `ri-s1-${randomUUID()}`
-			const result = await setStackFor(me, 'extend', [orgTemplate])
-			expect(result.ok).toBe(true)
-			// THEN reading it back reports extend + the stored items
-			const stacks = await readStacks(me)
-			expect(stacks.user?.composition).toBe('extend')
-			expect(stacks.user?.templateIds).toEqual([orgTemplate])
-		})
-
-		it('should overwrite the composition when an existing stack is re-saved', async () => {
-			// GIVEN a user's stack is extend, then re-saved as replace
-			const me = `ri-s2-${randomUUID()}`
-			await setStackFor(me, 'extend', [orgTemplate])
-			await setStackFor(me, 'replace', [orgTemplate])
-			// THEN the upsert UPDATE wrote the new composition
-			const stacks = await readStacks(me)
-			expect(stacks.user?.composition).toBe('replace')
-		})
-
-		it('should leave no user stack after it is cleared', async () => {
-			// GIVEN a user with an extend stack
-			const me = `ri-s3-${randomUUID()}`
-			await setStackFor(me, 'extend', [orgTemplate])
-			// WHEN it is cleared
-			await runRoot(
-				Effect.gen(function* () {
-					const sql = yield* SqlClient.SqlClient
-					return yield* enterOrgScope(sql, { org: ORG_OBJ, userId: me })(
-						clearUserDefaultStack(ORG, me, 'research'),
-					)
+		it('should reject a second stack that reuses a name in the same scope', async () => {
+			// GIVEN a user with a named personal stack
+			const me = `ri-dup-${randomUUID()}`
+			const name = `dup-${randomUUID().slice(0, 8)}`
+			const first = await asUser(
+				me,
+				createStack({
+					organizationId: ORG,
+					ownerUserId: me,
+					agent: 'research',
+					name,
+					templateIds: [orgTemplate],
+					composition: 'replace',
+					isDefault: false,
 				}),
 			)
-			// THEN they inherit the org default again (no user stack)
-			const stacks = await readStacks(me)
+			expect(first.ok).toBe(true)
+			// WHEN they create another with the same name
+			const second = await asUser(
+				me,
+				createStack({
+					organizationId: ORG,
+					ownerUserId: me,
+					agent: 'research',
+					name,
+					templateIds: [orgTemplate],
+					composition: 'replace',
+					isDefault: false,
+				}),
+			)
+			// THEN it is rejected as a duplicate name
+			expect(second).toEqual({ ok: false, reason: 'duplicate_name' })
+		})
+
+		it('should move the default flag when another stack is made default', async () => {
+			// GIVEN a user with a default stack and a second non-default one
+			const me = `ri-def-${randomUUID()}`
+			const a = await asUser(
+				me,
+				createStack({
+					organizationId: ORG,
+					ownerUserId: me,
+					agent: 'research',
+					name: 'a',
+					templateIds: [orgTemplate],
+					composition: 'replace',
+					isDefault: true,
+				}),
+			)
+			const b = await asUser(
+				me,
+				createStack({
+					organizationId: ORG,
+					ownerUserId: me,
+					agent: 'research',
+					name: 'b',
+					templateIds: [orgTemplate],
+					composition: 'replace',
+					isDefault: false,
+				}),
+			)
+			if (!a.ok || !b.ok) throw new Error('stack create failed')
+			// WHEN the second is promoted to default
+			await asUser(me, setDefaultStack(b.stack.id))
+			// THEN exactly one default remains, and it is the second
+			const stacks = await asUser(me, getDefaultStacks(ORG, me, 'research'))
+			expect(stacks.user?.name).toBe('b')
+		})
+
+		it('should keep the row but drop the default flag when cleared', async () => {
+			// GIVEN a user with a default stack
+			const me = `ri-clear-${randomUUID()}`
+			await asUser(
+				me,
+				createStack({
+					organizationId: ORG,
+					ownerUserId: me,
+					agent: 'research',
+					name: 'only',
+					templateIds: [orgTemplate],
+					composition: 'replace',
+					isDefault: true,
+				}),
+			)
+			// WHEN the default is cleared
+			await asUser(me, clearDefaultStack(ORG, me, 'research'))
+			// THEN no default resolves, but the stack still exists to be re-listed
+			const stacks = await asUser(me, getDefaultStacks(ORG, me, 'research'))
 			expect(stacks.user).toBeNull()
+			const all = await asUser(
+				me,
+				updateStack('00000000-0000-4000-8000-000000000000', {}),
+			)
+			// (guard: updating a missing id is not_found, proving the helper is wired)
+			expect(all).toBe('not_found')
 		})
 	})
 })

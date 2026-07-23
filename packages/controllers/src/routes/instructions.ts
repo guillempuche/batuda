@@ -30,11 +30,25 @@ const UpdateTemplateInput = Schema.Struct({
 
 const TransferInput = Schema.Struct({ target_user_id: Schema.String })
 
-const SetStackInput = Schema.Struct({
+const Composition = Schema.Literals(['replace', 'extend'])
+
+const CreateStackInput = Schema.Struct({
+	agent: Schema.String,
+	scope: Scope,
+	name: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
 	template_ids: Schema.Array(Schema.String),
 	// Personal stacks only: 'extend' layers the templates on the live org
 	// default; absent/'replace' uses the stack alone. Ignored for org stacks.
-	composition: Schema.optional(Schema.Literals(['replace', 'extend'])),
+	composition: Schema.optional(Composition),
+	is_default: Schema.optional(Schema.Boolean),
+})
+
+const UpdateStackInput = Schema.Struct({
+	name: Schema.optional(
+		Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
+	),
+	template_ids: Schema.optional(Schema.Array(Schema.String)),
+	composition: Schema.optional(Composition),
 })
 
 // ── Route group ──
@@ -82,66 +96,58 @@ export const InstructionsGroup = HttpApiGroup.make('instructions')
 		),
 	)
 	.add(
-		HttpApiEndpoint.post(
-			'donateTemplate',
-			'/instructions/templates/:id/donate',
-			{ params: { id: Schema.String }, success: Schema.Unknown },
-		),
-	)
-	.add(
-		HttpApiEndpoint.get(
-			'getDefaultStacks',
-			'/instructions/agents/:agent/default-stack',
-			{ params: { agent: Schema.String }, success: Schema.Unknown },
-		),
-	)
-	.add(
-		HttpApiEndpoint.put(
-			'setUserStack',
-			'/instructions/agents/:agent/default-stack',
-			{
-				params: { agent: Schema.String },
-				payload: SetStackInput,
-				success: Schema.Unknown,
-			},
-		),
-	)
-	.add(
-		HttpApiEndpoint.delete(
-			'clearUserStack',
-			'/instructions/agents/:agent/default-stack',
-			{ params: { agent: Schema.String }, success: Schema.Unknown },
-		),
-	)
-	.add(
-		HttpApiEndpoint.put(
-			'setOrgStack',
-			'/instructions/agents/:agent/org-default-stack',
-			{
-				params: { agent: Schema.String },
-				payload: SetStackInput,
-				success: Schema.Unknown,
-			},
-		),
-	)
-	.add(
-		HttpApiEndpoint.get('listDonations', '/instructions/donations', {
-			query: { status: Schema.optional(Schema.String) },
+		HttpApiEndpoint.get('listStacks', '/instructions/stacks', {
+			query: { agent: Schema.optional(Schema.String) },
 			success: Schema.Unknown,
 		}),
 	)
 	.add(
-		HttpApiEndpoint.post(
-			'acceptDonation',
-			'/instructions/donations/:id/accept',
-			{ params: { id: Schema.String }, success: Schema.Unknown },
+		HttpApiEndpoint.post('createStack', '/instructions/stacks', {
+			payload: CreateStackInput,
+			success: Schema.Unknown,
+		}),
+	)
+	.add(
+		HttpApiEndpoint.get('getStack', '/instructions/stacks/:id', {
+			params: { id: Schema.String },
+			success: Schema.Unknown,
+		}),
+	)
+	.add(
+		HttpApiEndpoint.patch('updateStack', '/instructions/stacks/:id', {
+			params: { id: Schema.String },
+			payload: UpdateStackInput,
+			success: Schema.Unknown,
+		}),
+	)
+	.add(
+		HttpApiEndpoint.delete('deleteStack', '/instructions/stacks/:id', {
+			params: { id: Schema.String },
+			success: Schema.Unknown,
+		}),
+	)
+	.add(
+		HttpApiEndpoint.put('setDefaultStack', '/instructions/stacks/:id/default', {
+			params: { id: Schema.String },
+			success: Schema.Unknown,
+		}),
+	)
+	.add(
+		HttpApiEndpoint.delete(
+			'clearDefaultStack',
+			'/instructions/agents/:agent/default',
+			{
+				params: { agent: Schema.String },
+				query: { scope: Schema.optional(Scope) },
+				success: Schema.Unknown,
+			},
 		),
 	)
 	.add(
-		HttpApiEndpoint.post(
-			'rejectDonation',
-			'/instructions/donations/:id/reject',
-			{ params: { id: Schema.String }, success: Schema.Unknown },
+		HttpApiEndpoint.get(
+			'getResolution',
+			'/instructions/agents/:agent/resolution',
+			{ params: { agent: Schema.String }, success: Schema.Unknown },
 		),
 	)
 	.middleware(SessionMiddleware)

@@ -6,8 +6,8 @@ import type { Agent, InstructionTemplate } from './domain'
 import { classifyStackTemplates } from './management-logic'
 import type { StackComposition } from './resolver'
 
-// SQL-only management operations for instruction templates, default stacks, and
-// donations. They run as the request-scoped role, so RLS already limits what
+// SQL-only management operations for instruction templates and default stacks.
+// They run as the request-scoped role, so RLS already limits what
 // each query can see or write; ownership rules that RLS can't express (the
 // admin gate on org-owned writes, fork-on-edit) are composed by the app layer
 // on top of these primitives. Every operation requires SqlClient and fails only
@@ -157,11 +157,10 @@ export type DeleteTemplateResult = 'deleted' | 'in_use' | 'not_found'
 export const deleteTemplate = (id: string): Eff<DeleteTemplateResult> =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
-		// A template referenced by any default stack can't be deleted (FK
-		// RESTRICT); pre-check so the caller gets a clean reason instead of a
-		// driver error.
+		// A template referenced by any stack can't be deleted (FK RESTRICT);
+		// pre-check so the caller gets a clean reason instead of a driver error.
 		const refs = yield* sql<{ one: number }>`
-			SELECT 1 AS one FROM agent_default_stack_items WHERE template_id = ${id} LIMIT 1
+			SELECT 1 AS one FROM instruction_stack_items WHERE template_id = ${id} LIMIT 1
 		`
 		if (refs[0]) return 'in_use'
 		const deleted = yield* sql<{ id: string }>`
@@ -170,11 +169,27 @@ export const deleteTemplate = (id: string): Eff<DeleteTemplateResult> =>
 		return deleted[0] ? 'deleted' : 'not_found'
 	})
 
-// ── Default stacks ───────────────────────────────────────────────────────────
+// ── Stacks ─────────────────────────────────────────────────────────────────
 
-export interface StackView {
+// A stack plus its ordered template ids — the shape every surface renders.
+export interface StackSummary {
 	readonly id: string
+	readonly organizationId: string
+	readonly ownerUserId: string | null
+	readonly agent: Agent
+	readonly name: string
+	readonly isDefault: boolean
+	readonly composition: StackComposition
 	readonly templateIds: ReadonlyArray<string>
+}
+
+interface StackRow {
+	readonly id: string
+	readonly organizationId: string
+	readonly ownerUserId: string | null
+	readonly agent: Agent
+	readonly name: string
+	readonly isDefault: boolean
 	readonly composition: StackComposition
 }
 
@@ -184,60 +199,96 @@ const loadStackItemIds = (
 ): Eff<ReadonlyArray<string>> =>
 	Effect.map(
 		sql<{ templateId: string }>`
-			SELECT template_id FROM agent_default_stack_items
+			SELECT template_id FROM instruction_stack_items
 			WHERE stack_id = ${stackId} ORDER BY position ASC
 		`,
 		rows => rows.map(row => row.templateId),
 	)
 
+const toSummary = (
+	sql: SqlClient.SqlClient,
+	row: StackRow,
+): Eff<StackSummary> =>
+	Effect.map(loadStackItemIds(sql, row.id), templateIds => ({
+		id: row.id,
+		organizationId: row.organizationId,
+		ownerUserId: row.ownerUserId,
+		agent: row.agent,
+		name: row.name,
+		isDefault: row.isDefault,
+		composition: row.composition,
+		templateIds,
+	}))
+
+const STACK_COLUMNS = `id, organization_id, owner_user_id, agent, name, is_default, composition`
+
+// A stack whose name (or default flag) collides with an existing one for the
+// same scope+agent raises a unique violation; the SqlError carries a structured
+// `reason` tagged UniqueViolation, which maps to a clean `duplicate_name` rather
+// than a redacted fault.
+const isUniqueViolation = (err: SqlError.SqlError): boolean =>
+	err.reason._tag === 'UniqueViolation'
+
+// Every stack readable by the actor (RLS: org stacks + their own), optionally
+// filtered to one agent. Ordered so defaults surface first, then by name.
+export const listStacks = (agent?: Agent): Eff<ReadonlyArray<StackSummary>> =>
+	Effect.gen(function* () {
+		const sql = yield* SqlClient.SqlClient
+		const rows = yield* agent === undefined
+			? sql<StackRow>`
+					SELECT ${sql.unsafe(STACK_COLUMNS)} FROM instruction_stacks
+					ORDER BY owner_user_id NULLS FIRST, agent ASC, is_default DESC, name ASC
+				`
+			: sql<StackRow>`
+					SELECT ${sql.unsafe(STACK_COLUMNS)} FROM instruction_stacks
+					WHERE agent = ${agent}
+					ORDER BY owner_user_id NULLS FIRST, is_default DESC, name ASC
+				`
+		const out: Array<StackSummary> = []
+		for (const row of rows) out.push(yield* toSummary(sql, row))
+		return out
+	})
+
+export const getStack = (id: string): Eff<StackSummary | undefined> =>
+	Effect.gen(function* () {
+		const sql = yield* SqlClient.SqlClient
+		const rows = yield* sql<StackRow>`
+			SELECT ${sql.unsafe(STACK_COLUMNS)} FROM instruction_stacks
+			WHERE id = ${id} LIMIT 1
+		`
+		const row = rows[0]
+		return row ? yield* toSummary(sql, row) : undefined
+	})
+
+// The default stack per scope for one agent — what a run with no named stack
+// resolves to. Serves the read-only surfaces that show "what fires today".
 export const getDefaultStacks = (
 	organizationId: string,
 	userId: string,
 	agent: Agent,
-): Eff<{ readonly org: StackView | null; readonly user: StackView | null }> =>
+): Eff<{
+	readonly org: StackSummary | null
+	readonly user: StackSummary | null
+}> =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
-		const stacks = yield* sql<{
-			id: string
-			ownerUserId: string | null
-			composition: StackComposition
-		}>`
-			SELECT id, owner_user_id, composition FROM agent_default_stacks
+		const rows = yield* sql<StackRow>`
+			SELECT ${sql.unsafe(STACK_COLUMNS)} FROM instruction_stacks
 			WHERE organization_id = ${organizationId} AND agent = ${agent}
+				AND is_default
 				AND (owner_user_id = ${userId} OR owner_user_id IS NULL)
 		`
-		const orgRow = stacks.find(s => s.ownerUserId === null)
-		const userRow = stacks.find(s => s.ownerUserId === userId)
-		const org = orgRow
-			? {
-					id: orgRow.id,
-					templateIds: yield* loadStackItemIds(sql, orgRow.id),
-					composition: orgRow.composition,
-				}
-			: null
-		const user = userRow
-			? {
-					id: userRow.id,
-					templateIds: yield* loadStackItemIds(sql, userRow.id),
-					composition: userRow.composition,
-				}
-			: null
-		return { org, user }
+		const orgRow = rows.find(s => s.ownerUserId === null)
+		const userRow = rows.find(s => s.ownerUserId === userId)
+		return {
+			org: orgRow ? yield* toSummary(sql, orgRow) : null,
+			user: userRow ? yield* toSummary(sql, userRow) : null,
+		}
 	})
 
-export interface SetDefaultStackInput {
-	readonly organizationId: string
-	// null = the org default stack; a user id = that user's own.
-	readonly ownerUserId: string | null
-	readonly agent: Agent
-	readonly templateIds: ReadonlyArray<string>
-	// 'extend' layers the items on the live org default; the org default is
-	// always the base, so it passes 'replace'.
-	readonly composition: StackComposition
-}
-
-export type SetDefaultStackResult =
-	| { readonly ok: true; readonly stackId: string }
+export type StackWriteResult =
+	| { readonly ok: true; readonly stack: StackSummary }
+	| { readonly ok: false; readonly reason: 'duplicate_name' }
 	| {
 			readonly ok: false
 			readonly reason: 'unknown_template'
@@ -249,25 +300,26 @@ export type SetDefaultStackResult =
 			readonly offending: ReadonlyArray<string>
 	  }
 
-export const setDefaultStack = (
-	input: SetDefaultStackInput,
-): Eff<SetDefaultStackResult> =>
+// Validate that the referenced templates are readable (RLS) and — for an org
+// stack — all org-owned, so a personal template can't be silently dropped from
+// other members' resolved prompt. Returns the failing result, or null when ok.
+const checkStackTemplates = (
+	templateIds: ReadonlyArray<string>,
+	isOrgStack: boolean,
+): Eff<Extract<StackWriteResult, { ok: false }> | null> =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
-		// Validate the referenced templates are readable (RLS) and — for an org
-		// stack — all org-owned, so a personal template can't be silently dropped
-		// from other members' resolved prompt.
 		const templates =
-			input.templateIds.length === 0
+			templateIds.length === 0
 				? []
 				: yield* sql<{ id: string; ownerUserId: string | null }>`
 						SELECT id, owner_user_id FROM instruction_templates
-						WHERE id IN ${sql.in([...input.templateIds])}
+						WHERE id IN ${sql.in([...templateIds])}
 					`
 		const check = classifyStackTemplates({
-			requestedIds: input.templateIds,
+			requestedIds: templateIds,
 			found: templates.map(t => ({ id: t.id, ownerUserId: t.ownerUserId })),
-			isOrgStack: input.ownerUserId === null,
+			isOrgStack,
 		})
 		if (check.kind === 'unknown')
 			return { ok: false, reason: 'unknown_template', missing: check.missing }
@@ -277,199 +329,190 @@ export const setDefaultStack = (
 				reason: 'personal_in_org_stack',
 				offending: check.offending,
 			}
-
-		// Upsert the stack row (IS NOT DISTINCT FROM matches the null org owner),
-		// then replace its items in order.
-		const existing = yield* sql<{ id: string }>`
-			SELECT id FROM agent_default_stacks
-			WHERE organization_id = ${input.organizationId} AND agent = ${input.agent}
-				AND owner_user_id IS NOT DISTINCT FROM ${input.ownerUserId}
-			LIMIT 1
-		`
-		let stackId: string
-		const existingRow = existing[0]
-		if (existingRow) {
-			stackId = existingRow.id
-			yield* sql`DELETE FROM agent_default_stack_items WHERE stack_id = ${stackId}`
-			yield* sql`UPDATE agent_default_stacks SET composition = ${input.composition}, updated_at = now() WHERE id = ${stackId}`
-		} else {
-			const created = yield* sql<{ id: string }>`
-				INSERT INTO agent_default_stacks (organization_id, owner_user_id, agent, composition)
-				VALUES (${input.organizationId}, ${input.ownerUserId}, ${input.agent}, ${input.composition})
-				RETURNING id
-			`
-			const createdRow = created[0]
-			if (!createdRow)
-				return yield* Effect.die('agent default stack insert returned no row')
-			stackId = createdRow.id
-		}
-		for (const [position, templateId] of input.templateIds.entries()) {
-			yield* sql`
-				INSERT INTO agent_default_stack_items (organization_id, stack_id, template_id, position)
-				VALUES (${input.organizationId}, ${stackId}, ${templateId}, ${position})
-			`
-		}
-		return { ok: true, stackId }
+		return null
 	})
 
-// Drop a user's own default stack so they inherit the org default again. Scoped
-// to the actor's own stack — never the org default.
-export const clearUserDefaultStack = (
+// Clear the current default for a scope+agent, so a new default can be set
+// without tripping the one-default-per-scope unique index.
+const clearScopeDefault = (
+	sql: SqlClient.SqlClient,
 	organizationId: string,
-	userId: string,
+	ownerUserId: string | null,
+	agent: Agent,
+): Eff<void> =>
+	Effect.asVoid(sql`
+		UPDATE instruction_stacks SET is_default = false, updated_at = now()
+		WHERE organization_id = ${organizationId} AND agent = ${agent}
+			AND owner_user_id IS NOT DISTINCT FROM ${ownerUserId}
+			AND is_default
+	`)
+
+const writeItems = (
+	sql: SqlClient.SqlClient,
+	organizationId: string,
+	stackId: string,
+	templateIds: ReadonlyArray<string>,
+): Eff<void> =>
+	Effect.gen(function* () {
+		for (const [position, templateId] of templateIds.entries()) {
+			yield* sql`
+				INSERT INTO instruction_stack_items (organization_id, stack_id, template_id, position)
+				VALUES (${organizationId}, ${stackId}, ${templateId}, ${position})
+			`
+		}
+	})
+
+export interface CreateStackInput {
+	readonly organizationId: string
+	// null = an org stack; a user id = that user's own.
+	readonly ownerUserId: string | null
+	readonly agent: Agent
+	readonly name: string
+	readonly templateIds: ReadonlyArray<string>
+	// 'extend' layers the items on the live org default; org stacks pass 'replace'.
+	readonly composition: StackComposition
+	readonly isDefault: boolean
+}
+
+export const createStack = (input: CreateStackInput): Eff<StackWriteResult> =>
+	Effect.gen(function* () {
+		const sql = yield* SqlClient.SqlClient
+		const invalid = yield* checkStackTemplates(
+			input.templateIds,
+			input.ownerUserId === null,
+		)
+		if (invalid) return invalid
+
+		// Setting a new default first demotes the current one for this scope+agent.
+		if (input.isDefault)
+			yield* clearScopeDefault(
+				sql,
+				input.organizationId,
+				input.ownerUserId,
+				input.agent,
+			)
+		const created = yield* sql<StackRow>`
+			INSERT INTO instruction_stacks
+				(organization_id, owner_user_id, agent, name, is_default, composition)
+			VALUES (
+				${input.organizationId}, ${input.ownerUserId}, ${input.agent},
+				${input.name}, ${input.isDefault}, ${input.composition}
+			)
+			RETURNING ${sql.unsafe(STACK_COLUMNS)}
+		`
+		const row = created[0]
+		if (!row)
+			return yield* Effect.die('instruction stack insert returned no row')
+		yield* writeItems(sql, input.organizationId, row.id, input.templateIds)
+		return { ok: true as const, stack: yield* toSummary(sql, row) }
+	}).pipe(
+		Effect.catchTag('SqlError', err =>
+			isUniqueViolation(err)
+				? Effect.succeed({
+						ok: false as const,
+						reason: 'duplicate_name' as const,
+					})
+				: Effect.fail(err),
+		),
+	)
+
+export const updateStack = (
+	id: string,
+	fields: {
+		readonly name?: string | undefined
+		readonly templateIds?: ReadonlyArray<string> | undefined
+		readonly composition?: StackComposition | undefined
+	},
+): Eff<StackWriteResult | 'not_found'> =>
+	Effect.gen(function* () {
+		const sql = yield* SqlClient.SqlClient
+		const existing = yield* sql<StackRow>`
+			SELECT ${sql.unsafe(STACK_COLUMNS)} FROM instruction_stacks
+			WHERE id = ${id} LIMIT 1
+		`
+		const row = existing[0]
+		if (!row) return 'not_found'
+
+		if (fields.templateIds !== undefined) {
+			const invalid = yield* checkStackTemplates(
+				fields.templateIds,
+				row.ownerUserId === null,
+			)
+			if (invalid) return invalid
+		}
+
+		// COALESCE keeps the current value when a field is omitted; bumping
+		// updated_at is harmless (the fingerprint tracks template edits, not this).
+		yield* sql`
+			UPDATE instruction_stacks
+			SET name = COALESCE(${fields.name ?? null}, name),
+				composition = COALESCE(${fields.composition ?? null}, composition),
+				updated_at = now()
+			WHERE id = ${id}
+		`
+		if (fields.templateIds !== undefined) {
+			yield* sql`DELETE FROM instruction_stack_items WHERE stack_id = ${id}`
+			yield* writeItems(sql, row.organizationId, id, fields.templateIds)
+		}
+		const updated = yield* getStack(id)
+		return updated ? { ok: true as const, stack: updated } : 'not_found'
+	}).pipe(
+		Effect.catchTag('SqlError', err =>
+			isUniqueViolation(err)
+				? Effect.succeed({
+						ok: false as const,
+						reason: 'duplicate_name' as const,
+					})
+				: Effect.fail(err),
+		),
+	)
+
+export const deleteStack = (id: string): Eff<'deleted' | 'not_found'> =>
+	Effect.gen(function* () {
+		const sql = yield* SqlClient.SqlClient
+		// Items CASCADE with the stack; deleting the default simply leaves the
+		// scope+agent with no default.
+		const deleted = yield* sql<{ id: string }>`
+			DELETE FROM instruction_stacks WHERE id = ${id} RETURNING id
+		`
+		return deleted[0] ? 'deleted' : 'not_found'
+	})
+
+// Make a stack the default for its scope+agent, demoting whatever was default.
+export const setDefaultStack = (id: string): Eff<'set' | 'not_found'> =>
+	Effect.gen(function* () {
+		const sql = yield* SqlClient.SqlClient
+		const rows = yield* sql<StackRow>`
+			SELECT ${sql.unsafe(STACK_COLUMNS)} FROM instruction_stacks
+			WHERE id = ${id} LIMIT 1
+		`
+		const row = rows[0]
+		if (!row) return 'not_found'
+		yield* clearScopeDefault(
+			sql,
+			row.organizationId,
+			row.ownerUserId,
+			row.agent,
+		)
+		yield* sql`UPDATE instruction_stacks SET is_default = true, updated_at = now() WHERE id = ${id}`
+		return 'set'
+	})
+
+// Unset the default for a scope+agent — the row is kept, so a personal clear
+// makes the user inherit the org default and an org clear leaves no org default.
+export const clearDefaultStack = (
+	organizationId: string,
+	ownerUserId: string | null,
 	agent: Agent,
 ): Eff<'cleared' | 'not_found'> =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
-		const deleted = yield* sql<{ id: string }>`
-			DELETE FROM agent_default_stacks
-			WHERE organization_id = ${organizationId} AND agent = ${agent}
-				AND owner_user_id = ${userId}
-			RETURNING id
-		`
-		return deleted[0] ? 'cleared' : 'not_found'
-	})
-
-// ── Donations ────────────────────────────────────────────────────────────────
-
-interface DonationRow {
-	readonly id: string
-	readonly organizationId: string
-	readonly sourceTemplateId: string | null
-	readonly createdTemplateId: string | null
-	readonly name: string
-	readonly body: string
-	readonly proposedBy: string
-	readonly status: string
-	readonly resolvedBy: string | null
-	readonly createdAt: string
-	readonly resolvedAt: string | null
-}
-
-export interface Donation {
-	readonly id: string
-	readonly organizationId: string
-	readonly sourceTemplateId: string | null
-	readonly createdTemplateId: string | null
-	readonly name: string
-	readonly body: string
-	readonly proposedBy: string
-	readonly status: 'pending' | 'accepted' | 'rejected'
-	readonly resolvedBy: string | null
-	readonly createdAt: string
-	readonly resolvedAt: string | null
-}
-
-const toDonation = (row: DonationRow): Donation => ({
-	id: row.id,
-	organizationId: row.organizationId,
-	sourceTemplateId: row.sourceTemplateId,
-	createdTemplateId: row.createdTemplateId,
-	name: row.name,
-	body: row.body,
-	proposedBy: row.proposedBy,
-	status: row.status as Donation['status'],
-	resolvedBy: row.resolvedBy,
-	createdAt: row.createdAt,
-	resolvedAt: row.resolvedAt,
-})
-
-export interface ProposeDonationInput {
-	readonly organizationId: string
-	readonly sourceTemplateId: string
-	readonly name: string
-	readonly body: string
-	readonly proposedBy: string
-}
-
-export const proposeDonation = (input: ProposeDonationInput): Eff<Donation> =>
-	Effect.gen(function* () {
-		const sql = yield* SqlClient.SqlClient
-		const rows = yield* sql<DonationRow>`
-			INSERT INTO instruction_template_donations
-				(organization_id, source_template_id, name, body, proposed_by)
-			VALUES (
-				${input.organizationId}, ${input.sourceTemplateId},
-				${input.name}, ${input.body}, ${input.proposedBy}
-			)
-			RETURNING id, organization_id, source_template_id, created_template_id, name, body, proposed_by, status, resolved_by, created_at::text AS created_at, resolved_at::text AS resolved_at
-		`
-		const row = rows[0]
-		if (!row) return yield* Effect.die('donation insert returned no row')
-		return toDonation(row)
-	})
-
-export const listDonations = (
-	status?: Donation['status'] | undefined,
-): Eff<ReadonlyArray<Donation>> =>
-	Effect.gen(function* () {
-		const sql = yield* SqlClient.SqlClient
-		const rows = yield* status === undefined
-			? sql<DonationRow>`
-					SELECT id, organization_id, source_template_id, created_template_id, name, body, proposed_by, status, resolved_by, created_at::text AS created_at, resolved_at::text AS resolved_at
-					FROM instruction_template_donations ORDER BY created_at DESC
-				`
-			: sql<DonationRow>`
-					SELECT id, organization_id, source_template_id, created_template_id, name, body, proposed_by, status, resolved_by, created_at::text AS created_at, resolved_at::text AS resolved_at
-					FROM instruction_template_donations WHERE status = ${status} ORDER BY created_at DESC
-				`
-		return rows.map(toDonation)
-	})
-
-export type AcceptDonationResult =
-	| { readonly ok: true; readonly template: InstructionTemplate }
-	| { readonly ok: false; readonly reason: 'not_found' | 'not_pending' }
-
-// Accept a proposal by creating a fresh org-owned template from its snapshot,
-// then closing the proposal. A new row (not an ownership flip of the proposer's
-// personal template) keeps the accept within the admin's own RLS write scope.
-export const acceptDonation = (
-	id: string,
-	resolvedBy: string,
-): Eff<AcceptDonationResult> =>
-	Effect.gen(function* () {
-		const sql = yield* SqlClient.SqlClient
-		const rows = yield* sql<DonationRow>`
-			SELECT id, organization_id, source_template_id, created_template_id, name, body, proposed_by, status, resolved_by, created_at::text AS created_at, resolved_at::text AS resolved_at
-			FROM instruction_template_donations WHERE id = ${id} LIMIT 1
-		`
-		const donation = rows[0]
-		if (!donation) return { ok: false, reason: 'not_found' }
-		if (donation.status !== 'pending')
-			return { ok: false, reason: 'not_pending' }
-		const template = yield* createTemplate({
-			organizationId: donation.organizationId,
-			ownerUserId: null,
-			name: donation.name,
-			body: donation.body,
-			createdBy: resolvedBy,
-		})
-		yield* sql`
-			UPDATE instruction_template_donations
-			SET status = 'accepted', created_template_id = ${template.id},
-				resolved_by = ${resolvedBy}, resolved_at = now()
-			WHERE id = ${id}
-		`
-		return { ok: true, template }
-	})
-
-export type RejectDonationResult = 'rejected' | 'not_found' | 'not_pending'
-
-export const rejectDonation = (
-	id: string,
-	resolvedBy: string,
-): Eff<RejectDonationResult> =>
-	Effect.gen(function* () {
-		const sql = yield* SqlClient.SqlClient
 		const updated = yield* sql<{ id: string }>`
-			UPDATE instruction_template_donations
-			SET status = 'rejected', resolved_by = ${resolvedBy}, resolved_at = now()
-			WHERE id = ${id} AND status = 'pending'
+			UPDATE instruction_stacks SET is_default = false, updated_at = now()
+			WHERE organization_id = ${organizationId} AND agent = ${agent}
+				AND owner_user_id IS NOT DISTINCT FROM ${ownerUserId}
+				AND is_default
 			RETURNING id
 		`
-		if (updated[0]) return 'rejected'
-		const exists = yield* sql<{ id: string }>`
-			SELECT id FROM instruction_template_donations WHERE id = ${id} LIMIT 1
-		`
-		return exists[0] ? 'not_pending' : 'not_found'
+		return updated[0] ? 'cleared' : 'not_found'
 	})

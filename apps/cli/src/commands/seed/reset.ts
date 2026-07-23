@@ -9,5 +9,5 @@ export const seedReset = Effect.gen(function* () {
 	yield* sql`DELETE FROM mcp_oauth_org_membership WHERE client_id LIKE 'mock-%'`
 	yield* sql`DELETE FROM "oauthConsent" WHERE "clientId" LIKE 'mock-%'`
 	yield* sql`DELETE FROM "oauthClient" WHERE "clientId" LIKE 'mock-%'`
-	yield* sql`TRUNCATE companies, products, pages, research_runs, sources, user_research_policy, provider_quotas, provider_usage, email_thread_links, email_messages, call_recordings, instruction_templates, agent_default_stacks, agent_default_stack_items CASCADE`
+	yield* sql`TRUNCATE companies, products, pages, research_runs, sources, user_research_policy, provider_quotas, provider_usage, email_thread_links, email_messages, call_recordings, instruction_templates, instruction_stacks, instruction_stack_items CASCADE`
 })
