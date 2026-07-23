@@ -2,15 +2,7 @@ import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute } from '@tanstack/react-router'
 import { AsyncResult } from 'effect/unstable/reactivity'
-import {
-	ArrowLeft,
-	Check,
-	Pencil,
-	Plus,
-	ScrollText,
-	Trash2,
-	X,
-} from 'lucide-react'
+import { ArrowLeft, Pencil, Plus, ScrollText, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import styled from 'styled-components'
 
@@ -18,13 +10,11 @@ import type { Agent } from '@batuda/instructions/domain'
 import { PriButton, usePriToast } from '@batuda/ui/pri'
 
 import {
-	acceptDonationAtom,
-	defaultStacksAtom,
+	deleteStackAtom,
 	deleteTemplateAtom,
-	instructionDonationsAtom,
+	instructionStacksAtom,
 	instructionTemplatesAtom,
-	rejectDonationAtom,
-	setOrgStackAtom,
+	setDefaultStackAtom,
 } from '#/atoms/instruction-atoms'
 import { AgentSelector } from '#/components/instructions/agent-selector'
 import {
@@ -47,16 +37,15 @@ import {
 	TemplateRowItem,
 } from '#/components/instructions/instruction-page-chrome'
 import {
-	narrowDonations,
-	narrowStackIds,
+	narrowStacks,
 	narrowTemplates,
 	outcomeOf,
+	type StackShape,
 	type TemplateShape,
 } from '#/components/instructions/instruction-shapes'
-import {
-	type StackOption,
-	StackPicker,
-} from '#/components/instructions/stack-picker'
+import { StackEditor } from '#/components/instructions/stack-editor'
+import { StackList } from '#/components/instructions/stack-list'
+import type { StackOption } from '#/components/instructions/stack-picker'
 import { TemplateDeleteConfirm } from '#/components/instructions/template-delete-confirm'
 import {
 	type TemplateDraft,
@@ -64,7 +53,6 @@ import {
 } from '#/components/instructions/template-editor-dialog'
 import { ErrorState } from '#/components/shared/error-state'
 import { authClient } from '#/lib/auth-client'
-import { ruledLedgerRow } from '#/lib/workshop-mixins'
 
 export const Route = createFileRoute('/settings/organization/templates')({
 	head: () => ({ meta: [{ title: 'Org instruction templates — Batuda' }] }),
@@ -107,7 +95,7 @@ function OrgTemplatesPage() {
 				<Subtitle>
 					<Trans>
 						Shared guidance every member's agents can use, plus the
-						organization's default.
+						organization's stacks.
 					</Trans>
 				</Subtitle>
 			</Intro>
@@ -118,40 +106,99 @@ function OrgTemplatesPage() {
 					refreshTemplates={refreshTemplates}
 				/>
 			) : (
-				<Section>
-					<Hint role='note'>
-						<Trans>
-							Your organization's admins manage these templates. You can use any
-							of them in your own default or per run.
-						</Trans>
-					</Hint>
-					{orgTemplates.length > 0 ? (
-						<TemplateList>
-							{orgTemplates.map(row => (
-								<TemplateRowItem key={row.id} data-testid='org-template-row'>
-									<TemplateName>{row.name}</TemplateName>
-									<OwnerBadge>
-										<Trans>Org</Trans>
-									</OwnerBadge>
-								</TemplateRowItem>
-							))}
-						</TemplateList>
-					) : (
-						<Empty>
-							<Trans>No org templates yet.</Trans>
-						</Empty>
-					)}
-				</Section>
+				<>
+					<Section>
+						<Hint role='note'>
+							<Trans>
+								Your organization's admins manage these templates. You can use
+								any of them in your own stacks or per run.
+							</Trans>
+						</Hint>
+						{orgTemplates.length > 0 ? (
+							<TemplateList>
+								{orgTemplates.map(row => (
+									<TemplateRowItem key={row.id} data-testid='org-template-row'>
+										<TemplateName>{row.name}</TemplateName>
+										<OwnerBadge>
+											<Trans>Org</Trans>
+										</OwnerBadge>
+									</TemplateRowItem>
+								))}
+							</TemplateList>
+						) : (
+							<Empty>
+								<Trans>No org templates yet.</Trans>
+							</Empty>
+						)}
+					</Section>
+					<OrgStacksViewer />
+				</>
 			)}
 		</Page>
 	)
 }
 
-// The admin half of the org templates page: managing org templates, the org
-// default stack, and the donation review queue. It's mounted only for
-// owners/admins, so its donation and stack queries never fire for a regular
-// member — who can't act on that data anyway, since every org write is
-// admin-gated on the server.
+// Read-only org stacks for a regular member: names and badges so they know what
+// the organization has set up, without any controls (every org write is
+// admin-gated on the server).
+function OrgStacksViewer() {
+	const [agent, setAgent] = useState<Agent>('research')
+	const stacksAtom = useMemo(() => instructionStacksAtom(agent), [agent])
+	const stacksResult = useAtomValue(stacksAtom)
+	const refreshStacks = useAtomRefresh(stacksAtom)
+	const { t } = useLingui()
+
+	const stacksFailed = AsyncResult.isFailure(stacksResult)
+	const orgStacks = useMemo<ReadonlyArray<StackShape>>(
+		() =>
+			AsyncResult.isSuccess(stacksResult)
+				? narrowStacks(stacksResult.value).filter(
+						s => s.scope === 'org' && s.agent === agent,
+					)
+				: [],
+		[stacksResult, agent],
+	)
+
+	return (
+		<Section>
+			<SectionHead>
+				<SectionTitle id='org-stacks-surface-view'>
+					<Trans>Org stacks</Trans>
+				</SectionTitle>
+				<AgentSelector
+					agent={agent}
+					onChange={setAgent}
+					labelledBy='org-stacks-surface-view'
+				/>
+			</SectionHead>
+			{stacksFailed ? (
+				<ErrorState
+					variant='inline'
+					data-testid='org-stacks-error'
+					title={t`Couldn't load the org stacks.`}
+					onRetry={refreshStacks}
+				/>
+			) : orgStacks.length > 0 ? (
+				<StackList
+					stacks={orgStacks}
+					readOnly
+					onEdit={() => {}}
+					onSetDefault={() => {}}
+					onDelete={() => {}}
+				/>
+			) : (
+				<Empty>
+					<Trans>No org stacks yet.</Trans>
+				</Empty>
+			)}
+		</Section>
+	)
+}
+
+// The admin half of the org templates page: managing org templates and the org
+// stacks. It's mounted only for owners/admins, so its stack queries never fire
+// for a regular member — who can't act on that data anyway, since every org
+// write is admin-gated on the server.
 function OrgTemplateAdmin({
 	orgTemplates,
 	refreshTemplates,
@@ -162,34 +209,31 @@ function OrgTemplateAdmin({
 	const { t } = useLingui()
 	const toast = usePriToast()
 
-	// Instructions are per surface; this picks which surface's org default the
+	// Instructions are per surface; this picks which surface's org stacks the
 	// section below edits. Org templates themselves are surface-neutral.
 	const [agent, setAgent] = useState<Agent>('research')
 
-	const donationsResult = useAtomValue(instructionDonationsAtom)
-	const refreshDonations = useAtomRefresh(instructionDonationsAtom)
-	const stacksAtom = useMemo(() => defaultStacksAtom(agent), [agent])
+	const stacksAtom = useMemo(() => instructionStacksAtom(agent), [agent])
 	const stacksResult = useAtomValue(stacksAtom)
 	const refreshStacks = useAtomRefresh(stacksAtom)
 
 	const deleteTemplate = useAtomSet(deleteTemplateAtom, { mode: 'promiseExit' })
-	const setOrgStack = useAtomSet(setOrgStackAtom, { mode: 'promiseExit' })
-	const acceptDonation = useAtomSet(acceptDonationAtom, { mode: 'promiseExit' })
-	const rejectDonation = useAtomSet(rejectDonationAtom, { mode: 'promiseExit' })
+	const deleteStack = useAtomSet(deleteStackAtom, { mode: 'promiseExit' })
+	const setDefaultStack = useAtomSet(setDefaultStackAtom, {
+		mode: 'promiseExit',
+	})
 
-	const pendingDonations = useMemo(
+	const stacksFailed = AsyncResult.isFailure(stacksResult)
+	const orgStacks = useMemo<ReadonlyArray<StackShape>>(
 		() =>
-			AsyncResult.isSuccess(donationsResult)
-				? narrowDonations(donationsResult.value).filter(
-						d => d.status === 'pending',
+			AsyncResult.isSuccess(stacksResult)
+				? narrowStacks(stacksResult.value).filter(
+						s => s.scope === 'org' && s.agent === agent,
 					)
 				: [],
-		[donationsResult],
+		[stacksResult, agent],
 	)
-	const stacksFailed = AsyncResult.isFailure(stacksResult)
-	const orgStackIds = AsyncResult.isSuccess(stacksResult)
-		? narrowStackIds(stacksResult.value, 'org')
-		: null
+	const hasOrgDefault = orgStacks.some(s => s.isDefault)
 
 	const stackOptions = useMemo<ReadonlyArray<StackOption>>(
 		() =>
@@ -204,16 +248,19 @@ function OrgTemplateAdmin({
 		readonly name: string
 	} | null>(null)
 	const [deleting, setDeleting] = useState(false)
-	// Seeded from the saved org default; null until the stacks query resolves.
-	const [stackIds, setStackIds] = useState<ReadonlyArray<string> | null>(null)
-	const [savingStack, setSavingStack] = useState(false)
-	const effectiveStack = stackIds ?? orgStackIds ?? []
+	// Local master-detail: null = closed, or a create/edit target for the editor.
+	const [stackEditing, setStackEditing] = useState<
+		| { readonly mode: 'new' }
+		| { readonly mode: 'edit'; readonly stack: StackShape }
+		| null
+	>(null)
+	const [confirmStack, setConfirmStack] = useState<StackShape | null>(null)
+	const [deletingStack, setDeletingStack] = useState(false)
 
-	// Switching surface re-seeds the picker from that surface's saved org default,
-	// dropping any unsaved edits to the previous surface.
+	// Switching surface drops any open editor for the previous surface.
 	const selectAgent = (next: Agent) => {
 		setAgent(next)
-		setStackIds(null)
+		setStackEditing(null)
 	}
 
 	const openCreate = () => {
@@ -236,7 +283,7 @@ function OrgTemplateAdmin({
 		if (outcome === 'in_use') {
 			toast.add({
 				title: t`Still in use`,
-				description: t`Remove "${target.name}" from the org default first, then delete it.`,
+				description: t`Remove "${target.name}" from the stacks that use it first, then delete it.`,
 				type: 'error',
 			})
 			refreshStacks()
@@ -256,63 +303,41 @@ function OrgTemplateAdmin({
 		refreshStacks()
 	}
 
-	const saveStack = async () => {
-		setSavingStack(true)
-		// Drop ids whose template was deleted mid-edit so we never persist a
-		// dangling reference the server would only reject.
-		const ids = effectiveStack.filter(id => stackOptions.some(o => o.id === id))
-		const exit = await setOrgStack({
-			params: { agent },
-			payload: { template_ids: ids },
-		} as never)
-		setSavingStack(false)
-		const outcome = outcomeOf(exit)
-		if (outcome === 'set') {
-			toast.add({ title: t`Org default saved`, type: 'success' })
+	const setDefault = async (s: StackShape) => {
+		const exit = await setDefaultStack({ params: { id: s.id } } as never)
+		if (outcomeOf(exit) === 'set') {
 			refreshStacks()
 			return
 		}
 		toast.add({
-			title: t`Couldn't save`,
+			title: t`Couldn't set the default`,
 			description: t`Please try again.`,
 			type: 'error',
 		})
 	}
 
-	const accept = async (id: string, name: string) => {
-		const exit = await acceptDonation({ params: { id } } as never)
-		const outcome = outcomeOf(exit)
-		if (outcome === 'accepted') {
-			toast.add({
-				title: t`Added to the org`,
-				description: t`"${name}" is now an org template.`,
-				type: 'success',
-			})
-			refreshTemplates()
-			refreshDonations()
+	const confirmDeleteStack = async () => {
+		const target = confirmStack
+		if (!target || deletingStack) return
+		setDeletingStack(true)
+		const exit = await deleteStack({ params: { id: target.id } } as never)
+		setDeletingStack(false)
+		setConfirmStack(null)
+		if (outcomeOf(exit) === 'deleted') {
+			toast.add({ title: t`Stack deleted`, type: 'success' })
+			refreshStacks()
 			return
 		}
 		toast.add({
-			title: t`Couldn't add it`,
-			description: t`Please try again.`,
+			title: t`Delete failed`,
+			description: t`Couldn't delete the stack. Please try again.`,
 			type: 'error',
 		})
-		refreshDonations()
 	}
 
-	const reject = async (id: string) => {
-		const exit = await rejectDonation({ params: { id } } as never)
-		const outcome = outcomeOf(exit)
-		if (outcome === 'rejected') {
-			toast.add({ title: t`Proposal declined`, type: 'success' })
-		} else {
-			toast.add({
-				title: t`Couldn't decline it`,
-				description: t`Please try again.`,
-				type: 'error',
-			})
-		}
-		refreshDonations()
+	const stackSaved = () => {
+		setStackEditing(null)
+		refreshStacks()
 	}
 
 	return (
@@ -335,9 +360,7 @@ function OrgTemplateAdmin({
 
 				{orgTemplates.length === 0 ? (
 					<Empty>
-						<Trans>
-							No org templates yet. Create one or accept a member's proposal.
-						</Trans>
+						<Trans>No org templates yet. Create one to get started.</Trans>
 					</Empty>
 				) : (
 					<TemplateList>
@@ -371,28 +394,29 @@ function OrgTemplateAdmin({
 				)}
 			</Section>
 
-			<Section data-testid='org-default-stack'>
+			<Section data-testid='org-stacks'>
 				<SectionHead>
-					<SectionTitle id='org-default-surface'>
-						<Trans>Organization default</Trans>
+					<SectionTitle id='org-stacks-surface'>
+						<Trans>Org stacks</Trans>
 					</SectionTitle>
 					<AgentSelector
 						agent={agent}
 						onChange={selectAgent}
-						labelledBy='org-default-surface'
+						labelledBy='org-stacks-surface'
 					/>
 				</SectionHead>
 				<Hint>
 					<Trans>
-						These templates run for every member who hasn't set their own — in
-						order. Only org templates can go here.
+						An org stack runs for every member who hasn't set their own. The one
+						marked default applies to a run that names none. Only org templates
+						can go in an org stack.
 					</Trans>
 				</Hint>
 				{stacksFailed ? (
 					<ErrorState
 						variant='inline'
 						data-testid='org-stacks-error'
-						title={t`Couldn't load the org default.`}
+						title={t`Couldn't load the org stacks.`}
 						onRetry={refreshStacks}
 					/>
 				) : orgTemplates.length === 0 ? (
@@ -401,69 +425,45 @@ function OrgTemplateAdmin({
 					</Empty>
 				) : (
 					<>
-						<StackPicker
-							options={stackOptions}
-							selectedIds={effectiveStack}
-							onChange={setStackIds}
-						/>
-						<Actions>
-							<PriButton
-								type='button'
-								$variant='filled'
-								data-testid='org-default-save'
-								disabled={savingStack || effectiveStack.length === 0}
-								onClick={() => {
-									void saveStack()
+						{orgStacks.length > 0 ? (
+							<StackList
+								stacks={orgStacks}
+								onEdit={s => setStackEditing({ mode: 'edit', stack: s })}
+								onSetDefault={s => {
+									void setDefault(s)
 								}}
-							>
-								<Trans>Save the org default</Trans>
-							</PriButton>
-						</Actions>
-					</>
-				)}
-			</Section>
+								onDelete={setConfirmStack}
+							/>
+						) : (
+							<Empty>
+								<Trans>No org stacks yet. Create one to get started.</Trans>
+							</Empty>
+						)}
 
-			<Section>
-				<SectionTitle>
-					<Trans>Member proposals</Trans>
-				</SectionTitle>
-				{pendingDonations.length === 0 ? (
-					<Empty>
-						<Trans>No proposals waiting for review.</Trans>
-					</Empty>
-				) : (
-					<ReviewList>
-						{pendingDonations.map(d => (
-							<ReviewItem key={d.id} data-testid='donation-row'>
-								<ReviewHead>
-									<TemplateName>{d.name}</TemplateName>
-									<ReviewActions>
-										<PriButton
-											type='button'
-											$variant='filled'
-											data-testid='donation-accept'
-											onClick={() => {
-												void accept(d.id, d.name)
-											}}
-										>
-											<Check size={14} aria-hidden />
-											<Trans>Add to org</Trans>
-										</PriButton>
-										<InstructionIconButton
-											type='button'
-											aria-label={t`Decline ${d.name}`}
-											onClick={() => {
-												void reject(d.id)
-											}}
-										>
-											<X size={14} aria-hidden />
-										</InstructionIconButton>
-									</ReviewActions>
-								</ReviewHead>
-								<BodyPreview>{preview(d.body)}</BodyPreview>
-							</ReviewItem>
-						))}
-					</ReviewList>
+						{stackEditing !== null ? (
+							<StackEditor
+								agent={agent}
+								scope='org'
+								stack={stackEditing.mode === 'edit' ? stackEditing.stack : null}
+								options={stackOptions}
+								orgDefaultTemplateIds={[]}
+								hasExistingDefault={hasOrgDefault}
+								onDone={stackSaved}
+							/>
+						) : (
+							<Actions>
+								<PriButton
+									type='button'
+									$variant='filled'
+									data-testid='org-stack-new'
+									onClick={() => setStackEditing({ mode: 'new' })}
+								>
+									<Plus size={16} aria-hidden />
+									<Trans>New org template stack</Trans>
+								</PriButton>
+							</Actions>
+						)}
+					</>
 				)}
 			</Section>
 
@@ -493,53 +493,28 @@ function OrgTemplateAdmin({
 					</Trans>
 				}
 			/>
+
+			<TemplateDeleteConfirm
+				open={confirmStack !== null}
+				deleting={deletingStack}
+				onConfirm={() => {
+					void confirmDeleteStack()
+				}}
+				onClose={() => setConfirmStack(null)}
+				testId='org-stack-delete-confirm'
+				title={<Trans>Delete this org stack?</Trans>}
+				description={
+					<Trans>
+						"{confirmStack?.name ?? ''}" will be removed for the organization.
+						The templates stay; only this grouping goes.
+					</Trans>
+				}
+			/>
 		</>
 	)
 }
 
-function preview(body: string): string {
-	const flat = body.replace(/\s+/g, ' ').trim()
-	return flat.length > 140 ? `${flat.slice(0, 140)}…` : flat
-}
-
 const Hint = styled.p`
-	font-family: var(--font-body);
-	font-size: var(--typescale-body-small-size);
-	color: var(--color-on-surface-variant);
-	margin: 0;
-`
-
-const ReviewList = styled.ul`
-	list-style: none;
-	margin: 0;
-	padding: 0;
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-sm);
-`
-
-const ReviewItem = styled.li`
-	${ruledLedgerRow}
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-2xs);
-	padding-bottom: var(--space-sm);
-`
-
-const ReviewHead = styled.div`
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: var(--space-sm);
-`
-
-const ReviewActions = styled.div`
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-2xs);
-`
-
-const BodyPreview = styled.p`
 	font-family: var(--font-body);
 	font-size: var(--typescale-body-small-size);
 	color: var(--color-on-surface-variant);
