@@ -9,7 +9,7 @@ describe('allowlistFields', () => {
 			// never be written from a suggestion (identity, coordinates, version, and
 			// country — country is stamped from the run's own resolved country, never
 			// taken from the model's per-field suggestions)
-			const kept = allowlistFields('companies', {
+			const { fields: kept } = allowlistFields('companies', {
 				industry: 'logistics',
 				location: 'Sitges',
 				country: 'US',
@@ -27,7 +27,7 @@ describe('allowlistFields', () => {
 	describe('when proposal keys are snake_case', () => {
 		it('should normalize them to the camelCase the SQL client expects', () => {
 			// GIVEN a model that sent snake_case field names
-			const kept = allowlistFields('companies', {
+			const { fields: kept } = allowlistFields('companies', {
 				size_range: '51-200',
 				pain_points: 'slow onboarding',
 			})
@@ -43,7 +43,7 @@ describe('allowlistFields', () => {
 	describe('when the target is a contact', () => {
 		it('should use the contact allowlist, not the company one', () => {
 			// GIVEN a contact proposal that also carries a company-only field
-			const kept = allowlistFields('contacts', {
+			const { fields: kept } = allowlistFields('contacts', {
 				is_decision_maker: true,
 				notes: 'met at fair',
 				industry: 'company-only, should drop',
@@ -51,6 +51,57 @@ describe('allowlistFields', () => {
 
 			// THEN only contact columns survive
 			expect(kept).toEqual({ isDecisionMaker: true, notes: 'met at fair' })
+		})
+	})
+
+	describe('when a value arrives wrapped with the page it came from', () => {
+		it('should write the plain value and keep the source beside it', () => {
+			// GIVEN one sourced value and one bare one
+			const { fields, sources } = allowlistFields('companies', {
+				industry: {
+					value: 'transport',
+					source_id: 'https://acme.es/about',
+					confidence: 0.9,
+					as_of: '2026-07-01',
+				},
+				location: 'Sitges',
+			})
+
+			// THEN the column gets the value, and the source is recorded under it
+			expect(fields).toEqual({ industry: 'transport', location: 'Sitges' })
+			expect(sources).toEqual({
+				industry: {
+					sourceUrl: 'https://acme.es/about',
+					confidence: 0.9,
+					asOf: '2026-07-01',
+				},
+			})
+		})
+	})
+
+	describe('when a wrapped value names no usable page', () => {
+		it('should still write the value, with nothing claimed about its source', () => {
+			// GIVEN a wrapper whose source id is empty
+			const { fields, sources } = allowlistFields('companies', {
+				industry: { value: 'transport', source_id: '' },
+			})
+
+			// THEN the value lands and no source is invented for it
+			expect(fields).toEqual({ industry: 'transport' })
+			expect(sources).toEqual({})
+		})
+	})
+
+	describe('when a dropped field carries a source', () => {
+		it('should record no source for it, since nothing was written', () => {
+			// GIVEN a non-writable column arriving with provenance
+			const { fields, sources } = allowlistFields('companies', {
+				id: { value: 'nope', source_id: 'https://acme.es' },
+			})
+
+			// THEN neither the value nor its source survives
+			expect(fields).toEqual({})
+			expect(sources).toEqual({})
 		})
 	})
 })

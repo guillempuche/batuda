@@ -6,6 +6,7 @@ import { CompanyDetail, CurrentOrg } from '@batuda/controllers'
 import { Company } from '@batuda/domain'
 
 import { CompanyService } from '../../services/companies'
+import { withBriefOwnership } from '../../services/company-brief'
 import {
 	geocodeCompany,
 	updateCompanyRegeocoding,
@@ -13,19 +14,39 @@ import {
 import { recordStageChange } from '../../services/company-stage-change'
 import { Geocoder } from '../../services/geocoder'
 import { TimelineActivityService } from '../../services/timeline-activity'
+import { CurrentUser } from '../current-user'
 import { ListResult, toItems } from './_result'
 
-const REQUEST_DEPENDENCIES = [CurrentOrg]
+const REQUEST_DEPENDENCIES = [CurrentOrg, CurrentUser]
+
+// Slugs from a create-batch that produced no new row: those whose slug already
+// existed, plus every repeat beyond the first within the same call (the unique
+// constraint lets only one of a duplicated slug land, so the rest are skips).
+// Exported for its unit test.
+export const skippedCreateSlugs = (
+	requestedSlugs: ReadonlyArray<string>,
+	landedSlugs: ReadonlySet<string>,
+): string[] => {
+	const accounted = new Set<string>()
+	const skipped: string[] = []
+	for (const slug of requestedSlugs) {
+		if (landedSlugs.has(slug) && !accounted.has(slug)) accounted.add(slug)
+		else skipped.push(slug)
+	}
+	return skipped
+}
 
 const SearchCompanies = Tool.make('search_companies', {
 	description:
-		'Filter companies by status, country (ISO 3166-1 alpha-2, e.g. US/ES/DE), industry, priority, search query, or a geographic bounding box. The box is any subset of min_lat/max_lat/min_lng/max_lng (decimal degrees); each bound is applied independently and only matches companies with stored coordinates. Returns summaries (including latitude/longitude) — call get_company for full details.',
+		'Filter companies by status, country (ISO 3166-1 alpha-2, e.g. US/ES/DE), industry, priority, search query, the research fit verdict (strong_fit / possible_fit / weak_fit / no_fit), a fit criterion the company passed (matched loosely against the criterion text), or a geographic bounding box. The box is any subset of min_lat/max_lat/min_lng/max_lng (decimal degrees); each bound is applied independently and only matches companies with stored coordinates. Returns summaries (including latitude/longitude) — call get_company for full details.',
 	parameters: Schema.Struct({
 		status: Schema.optional(Schema.String),
 		country: Schema.optional(Schema.String),
 		industry: Schema.optional(Schema.String),
 		priority: Schema.optional(Schema.Number),
 		product_fit: Schema.optional(Schema.String),
+		fit_verdict: Schema.optional(Schema.String),
+		fit_criterion_passed: Schema.optional(Schema.String),
 		query: Schema.optional(Schema.String),
 		min_lat: Schema.optional(Schema.Number),
 		max_lat: Schema.optional(Schema.Number),
@@ -55,41 +76,50 @@ const GetCompany = Tool.make('get_company', {
 	.annotate(Tool.Destructive, false)
 	.annotate(Tool.OpenWorld, false)
 
-const CreateCompany = Tool.make('create_company', {
+// The fields a new company carries — one array element of a create_companies call.
+const companyInputFields = {
+	name: Schema.String,
+	slug: Schema.String,
+	status: Schema.optional(Schema.String),
+	industry: Schema.optional(Schema.String),
+	sizeRange: Schema.optional(Schema.String),
+	country: Schema.optional(Schema.String),
+	location: Schema.optional(Schema.String),
+	source: Schema.optional(Schema.String),
+	priority: Schema.optional(Schema.Number),
+	website: Schema.optional(Schema.String),
+	email: Schema.optional(Schema.String),
+	phone: Schema.optional(Schema.String),
+	instagram: Schema.optional(Schema.String),
+	linkedin: Schema.optional(Schema.String),
+	googleMapsUrl: Schema.optional(Schema.String),
+	productsFit: Schema.optional(Schema.Array(Schema.String)),
+	tags: Schema.optional(Schema.Array(Schema.String)),
+	painPoints: Schema.optional(Schema.String),
+	currentTools: Schema.optional(Schema.String),
+	nextAction: Schema.optional(Schema.String),
+	nextActionAt: Schema.optional(Schema.String),
+	latitude: Schema.optional(Schema.Number),
+	longitude: Schema.optional(Schema.Number),
+	geocodedAt: Schema.optional(Schema.String),
+	geocodeSource: Schema.optional(Schema.String),
+	metadata: Schema.optional(Schema.Unknown),
+}
+const CompanyInput = Schema.Struct(companyInputFields)
+
+const CreateCompanies = Tool.make('create_companies', {
 	description:
-		'Create a new company. Slug: unique kebab-case from name. Status: prospect|lead|qualified|proposal|negotiation|client|closed|dead (default: prospect). Priority: 1 (highest) to 5 (lowest, default: 2).',
+		'Create one or more companies in a single call — pass `companies` as an array (a single element to create just one, the whole shortlist to load a batch). Slug: unique kebab-case from name. Status: prospect|lead|qualified|proposal|negotiation|client|closed|dead (default: prospect). Priority: 1 (highest) to 5 (lowest, default: 2). Runs in one transaction; a company whose slug already exists is skipped (not an error), so re-running an overlapping list is safe. Returns { created, skipped_slugs }: the rows that landed, and the slugs that already existed.',
 	parameters: Schema.Struct({
-		name: Schema.String,
-		slug: Schema.String,
-		status: Schema.optional(Schema.String),
-		industry: Schema.optional(Schema.String),
-		sizeRange: Schema.optional(Schema.String),
-		country: Schema.optional(Schema.String),
-		location: Schema.optional(Schema.String),
-		source: Schema.optional(Schema.String),
-		priority: Schema.optional(Schema.Number),
-		website: Schema.optional(Schema.String),
-		email: Schema.optional(Schema.String),
-		phone: Schema.optional(Schema.String),
-		instagram: Schema.optional(Schema.String),
-		linkedin: Schema.optional(Schema.String),
-		googleMapsUrl: Schema.optional(Schema.String),
-		productsFit: Schema.optional(Schema.Array(Schema.String)),
-		tags: Schema.optional(Schema.Array(Schema.String)),
-		painPoints: Schema.optional(Schema.String),
-		currentTools: Schema.optional(Schema.String),
-		nextAction: Schema.optional(Schema.String),
-		nextActionAt: Schema.optional(Schema.String),
-		latitude: Schema.optional(Schema.Number),
-		longitude: Schema.optional(Schema.Number),
-		geocodedAt: Schema.optional(Schema.String),
-		geocodeSource: Schema.optional(Schema.String),
-		metadata: Schema.optional(Schema.Unknown),
+		companies: Schema.Array(CompanyInput),
 	}),
-	success: Company.json,
+	success: Schema.Struct({
+		created: Schema.Array(Company.json),
+		skipped_slugs: Schema.Array(Schema.String),
+	}),
 	dependencies: REQUEST_DEPENDENCIES,
 })
-	.annotate(Tool.Title, 'Create Company')
+	.annotate(Tool.Title, 'Create Companies')
 	.annotate(Tool.Destructive, false)
 	.annotate(Tool.OpenWorld, false)
 
@@ -122,6 +152,12 @@ const UpdateCompany = Tool.make('update_company', {
 		longitude: Schema.optional(Schema.Number),
 		geocodedAt: Schema.optional(Schema.String),
 		geocodeSource: Schema.optional(Schema.String),
+		accountBrief: Schema.optional(
+			Schema.String.annotate({
+				description:
+					"The account's running notes, in markdown. Editing these as a person takes ownership of them, so later research adds to them instead of replacing them.",
+			}),
+		),
 		metadata: Schema.optional(Schema.Unknown),
 	}),
 	success: Schema.NullOr(Company.json),
@@ -157,7 +193,7 @@ const GeocodeCompany = Tool.make('geocode_company', {
 export const CompanyTools = Toolkit.make(
 	SearchCompanies,
 	GetCompany,
-	CreateCompany,
+	CreateCompanies,
 	UpdateCompany,
 	GeocodeCompany,
 )
@@ -180,6 +216,8 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 						industry: params.industry,
 						priority: params.priority,
 						productFit: params.product_fit,
+						fitVerdict: params.fit_verdict,
+						fitCriterionPassed: params.fit_criterion_passed,
 						query: params.query,
 						minLat: params.min_lat,
 						maxLat: params.max_lat,
@@ -194,15 +232,15 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 					Effect.catchTag('NotFound', () => service.findById(id_or_slug)),
 					Effect.orDie,
 				),
-			create_company: params =>
+			create_companies: params =>
 				Effect.gen(function* () {
-					const rows = yield* service.create(params)
-					const created = rows[0]
-					if (created === undefined)
-						return yield* Effect.die(
-							new Error('company insert returned no row'),
-						)
-					return created
+					const created = yield* service.createMany(params.companies)
+					const landed = new Set(created.map(company => company.slug))
+					const skipped_slugs = skippedCreateSlugs(
+						params.companies.map(company => company.slug),
+						landed,
+					)
+					return { created, skipped_slugs }
 				}).pipe(Effect.orDie),
 			update_company: ({ id, ...fields }) =>
 				Effect.gen(function* () {
@@ -217,7 +255,12 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 									),
 									Effect.catch(() => Effect.succeed(null)),
 								)
-					const result = yield* updateCompanyRegeocoding(id, fields).pipe(
+					const actor = yield* CurrentUser
+					// Only a person takes ownership of the notes. An agent may write them,
+					// but leaves the marker alone, so it can never make its own text look
+					// like a person's and freeze out later research.
+					const payload = withBriefOwnership(fields, actor)
+					const result = yield* updateCompanyRegeocoding(id, payload).pipe(
 						Effect.provideService(CompanyService, service),
 						Effect.provideService(Geocoder, geocoder),
 						Effect.provideService(SqlClient.SqlClient, sql),

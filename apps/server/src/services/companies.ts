@@ -2,8 +2,10 @@ import { Context, DateTime, Effect, Layer, Schema } from 'effect'
 import type { Statement } from 'effect/unstable/sql'
 import { SqlClient } from 'effect/unstable/sql'
 
-import { CurrentOrg, NotFound } from '@batuda/controllers'
+import { CompanyResearchRun, CurrentOrg, NotFound } from '@batuda/controllers'
 import { Company, Contact, Interaction } from '@batuda/domain'
+
+import { researchProvenance } from './research-provenance'
 
 export interface CompanyFilters {
 	readonly status?: string | undefined
@@ -11,6 +13,12 @@ export interface CompanyFilters {
 	readonly industry?: string | undefined
 	readonly priority?: number | undefined
 	readonly productFit?: string | undefined
+	// The run's overall judgement of whether this company is worth selling to.
+	readonly fitVerdict?: string | undefined
+	// Narrows to companies whose fit checks marked a matching rule passed, so a
+	// salesperson can ask "who actually meets this criterion?" rather than
+	// trusting the one-word verdict alone.
+	readonly fitCriterionPassed?: string | undefined
 	// Owner id to match, or the literal 'none' to match only unassigned companies.
 	readonly owner?: string | undefined
 	// One of the whitelisted sort keys below; anything else falls back to priority.
@@ -50,6 +58,18 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						if (filters.owner === 'none') conditions.push(sql`owner_id IS NULL`)
 						else if (filters.owner)
 							conditions.push(sql`owner_id = ${filters.owner}`)
+						if (filters.fitVerdict)
+							conditions.push(sql`fit_verdict = ${filters.fitVerdict}`)
+						// A missing or empty fit_checks simply matches nothing, rather than
+						// tripping the element expansion on a null.
+						if (filters.fitCriterionPassed)
+							conditions.push(
+								sql`EXISTS (
+									SELECT 1 FROM jsonb_array_elements(COALESCE(fit_checks, '[]'::jsonb)) fc
+									WHERE fc->>'result' = 'pass'
+										AND fc->>'criterion' ILIKE ${`%${filters.fitCriterionPassed}%`}
+								)`,
+							)
 						if (filters.query)
 							conditions.push(sql`name ILIKE ${`%${filters.query}%`}`)
 						if (filters.minLat !== undefined)
@@ -132,11 +152,37 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						)
 					}),
 
+				// Insert a batch in one transaction, skipping any whose slug already
+				// exists in the org (a duplicate slug is a conflict, not a failure — the
+				// whole batch shouldn't die on one). Returns only the rows that landed,
+				// so the caller can tell which slugs were skipped. Each row inserts its
+				// own columns, so companies with different optional fields batch cleanly.
+				createMany: (items: ReadonlyArray<Record<string, unknown>>) =>
+					Effect.gen(function* () {
+						const currentOrg = yield* CurrentOrg
+						const inserted: Array<unknown> = []
+						for (const data of items) {
+							const rows = yield* sql`
+								INSERT INTO companies ${sql.insert({ ...data, organizationId: currentOrg.id })}
+								ON CONFLICT (organization_id, slug) DO NOTHING
+								RETURNING *
+							`
+							if (rows[0] !== undefined) inserted.push(rows[0])
+						}
+						return yield* Schema.decodeUnknownEffect(Schema.Array(Company))(
+							inserted,
+						)
+					}).pipe(sql.withTransaction),
+
 				update: (id: string, data: Record<string, unknown>) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
+						// Bumping the version on every edit is what lets a research apply notice
+						// that somebody changed the row while the run was thinking, so its findings
+						// can never quietly overwrite a person's edit.
 						const rows = yield* sql`
-							UPDATE companies SET ${sql.update({ ...data, updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })}
+							UPDATE companies SET ${sql.update({ ...data, updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })},
+								version = version + 1
 							WHERE id = ${id} AND organization_id = ${currentOrg.id}
 							RETURNING *
 						`
@@ -198,7 +244,19 @@ export class CompanyService extends Context.Service<CompanyService>()(
 							Schema.Array(Interaction),
 						)(interactionRows)
 
-						return { ...company, contacts, recentInteractions }
+						// The runs that have been applied to this row, newest first, so the
+						// detail can show where its researched facts came from over time.
+						const researchRuns = yield* Schema.decodeUnknownEffect(
+							Schema.Array(CompanyResearchRun),
+						)(
+							yield* researchProvenance(
+								sql,
+								currentOrg.id,
+								'companies',
+								String(companyId),
+							),
+						)
+						return { ...company, contacts, recentInteractions, researchRuns }
 					}),
 			}
 		}),

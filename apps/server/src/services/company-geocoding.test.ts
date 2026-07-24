@@ -33,6 +33,7 @@ const companyServiceWith = (
 		search: () => Effect.die(unused),
 		findBySlug: () => Effect.die(unused),
 		create: () => Effect.die(unused),
+		createMany: () => Effect.die(unused),
 		getWithRelations: () => Effect.die(unused),
 	})
 

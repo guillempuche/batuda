@@ -19,6 +19,7 @@ import {
 	ContactDiscovery,
 	type CreateResearchInput,
 	ExtractLanguageModel,
+	MapProvider,
 	RegistryRouter,
 	ResearchEventSink,
 	ResearchService,
@@ -131,6 +132,7 @@ const providersLayer = Layer.mergeAll(
 	Layer.succeed(SearchProvider)(
 		SearchProvider.of({ search: () => Effect.die(unused) }),
 	),
+	Layer.succeed(MapProvider)(MapProvider.of({ map: () => Effect.die(unused) })),
 	Layer.succeed(ScrapeProvider)(
 		ScrapeProvider.of({ scrape: () => Effect.die(unused) }),
 	),
