@@ -79,6 +79,13 @@ msgstr "{0} empreses"
 msgid "{0} companies with filters applied"
 msgstr "{0} empreses amb filtres aplicats"
 
+#. placeholder {0}: quality.fieldsGrounded ?? 0
+#. placeholder {1}: quality.sourcesMatched ?? 0
+#. placeholder {2}: quality.rounds ?? 0
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "{0} fields grounded · {1} own-domain sources · {2} rounds"
+msgstr "{0} camps documentats · {1} fonts del domini propi · {2} rondes"
+
 #. placeholder {0}: thread.messageCount
 #: src/routes/emails/index.tsx
 msgid "{0} msgs"
@@ -213,6 +220,11 @@ msgstr "Acceptada"
 #: src/routes/oauth/consent.tsx
 msgid "Access"
 msgstr "Accés"
+
+#: src/components/companies/account-brief-section.tsx
+#: src/components/companies/account-brief-section.tsx
+msgid "Account brief"
+msgstr "Resum del compte"
 
 #: src/components/research/target-correction.tsx
 msgid "acme.com"
@@ -422,6 +434,11 @@ msgstr "Ja al CRM"
 #: src/components/research/proposal-outcome.tsx
 msgid "Already resolved"
 msgstr "Ja resolt"
+
+#. placeholder {0}: conflict.value
+#: src/components/companies/company-fit-section.tsx
+msgid "also reported as {0}"
+msgstr "també indicat com a {0}"
 
 #: src/routes/oauth/consent.tsx
 msgid "An AI assistant wants to connect to your Batuda account over MCP and act on your behalf. Only approve assistants you trust."
@@ -716,6 +733,7 @@ msgstr "Truca al telèfon"
 msgid "Calls"
 msgstr "Crides"
 
+#: src/components/companies/account-brief-section.tsx
 #: src/components/companies/documents-panel.tsx
 #: src/components/companies/followup-dialog.tsx
 #: src/components/companies/proposals-panel.tsx
@@ -1491,6 +1509,10 @@ msgstr "Creada per agent"
 msgid "Creating…"
 msgstr "Creant…"
 
+#: src/components/companies/company-fit-section.tsx
+msgid "Criteria"
+msgstr "Criteris"
+
 #: src/components/companies/proposals-panel.tsx
 msgid "Currency"
 msgstr "Moneda"
@@ -1763,6 +1785,7 @@ msgstr "p. ex. Tarifa d'instal·lació"
 msgid "e.g. vip, warm"
 msgstr "p. ex. vip, càlid"
 
+#: src/components/companies/account-brief-section.tsx
 #: src/components/companies/documents-panel.tsx
 #: src/routes/companies/$slug.tsx
 #: src/routes/emails/inboxes.tsx
@@ -1817,6 +1840,14 @@ msgstr "Edita el títol de la tasca"
 #: src/components/instructions/template-editor-dialog.tsx
 msgid "Edit template"
 msgstr "Edita la plantilla"
+
+#: src/components/companies/account-brief-section.tsx
+msgid "Edited by hand <0/>. Research adds below your text."
+msgstr "Editat a mà <0/>. La recerca afegeix sota el teu text."
+
+#: src/components/companies/account-brief-section.tsx
+msgid "Edited by hand. Research adds below your text."
+msgstr "Editat a mà. La recerca afegeix sota el teu text."
 
 #: src/routes/pages/$id.tsx
 #: src/routes/pages/$id.tsx
@@ -1951,6 +1982,10 @@ msgstr "Plantilles addicionals per a aquesta execució"
 msgid "Extracting findings"
 msgstr "Extraient conclusions"
 
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "Fail"
+msgstr "No compleix"
+
 #: src/components/research/run-labels.ts
 #: src/routes/emails/$threadId.tsx
 msgid "Failed"
@@ -2016,6 +2051,11 @@ msgstr "Troballes"
 #: src/components/shared/status-badge.tsx
 msgid "First outreach sent"
 msgstr "Primer contacte enviat"
+
+#: src/components/companies/company-fit-section.tsx
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "Fit"
+msgstr "Encaix"
 
 #: src/routes/emails/$threadId.tsx
 msgid "Flagged as spam by the provider. The body is shown for review only."
@@ -2701,6 +2741,10 @@ msgstr "Necessita acció"
 msgid "Needs attention"
 msgstr "Necessita atenció"
 
+#: src/components/research/run-labels.ts
+msgid "Needs review"
+msgstr "Cal revisió"
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Needs your review"
 msgstr "Necessita la teva revisió"
@@ -2805,6 +2849,10 @@ msgstr "Sense organització activa. Tria'n una al selector de la barra superior.
 msgid "No activity yet"
 msgstr "Encara no hi ha activitat"
 
+#: src/components/companies/account-brief-section.tsx
+msgid "No brief yet. Research writes one here, or you can start it yourself."
+msgstr "Encara no hi ha resum. La recerca n'escriu un aquí, o el pots començar tu."
+
 #: src/routes/calendar/index.tsx
 msgid "No calendar events yet"
 msgstr "Encara no hi ha esdeveniments al calendari"
@@ -2871,6 +2919,10 @@ msgstr "sense data de venciment"
 #: src/routes/tasks/index.tsx
 msgid "No due date"
 msgstr "Sense data de venciment"
+
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "No fit"
+msgstr "Sense encaix"
 
 #: src/routes/emails/inboxes.tsx
 msgid "No footers"
@@ -3014,6 +3066,10 @@ msgstr "cap planificat"
 #: src/components/shared/task-item.tsx
 msgid "Normal priority"
 msgstr "Prioritat normal"
+
+#: src/components/companies/company-fit-section.tsx
+msgid "Not a fit"
+msgstr "No encaixa"
 
 #: src/components/research/research-dialog.tsx
 msgid "Not enough research budget for this run. Raise the budget or narrow the search."
@@ -3320,6 +3376,10 @@ msgstr "Indicadors de dolor"
 msgid "Pain points"
 msgstr "Punts febles"
 
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "Pass"
+msgstr "Compleix"
+
 #: src/routes/login.tsx
 msgid "Password"
 msgstr "Contrasenya"
@@ -3449,6 +3509,11 @@ msgstr "Sense xifrar"
 msgid "Please try again."
 msgstr "Torna-ho a provar."
 
+#: src/components/companies/company-fit-section.tsx
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "Possible fit"
+msgstr "Encaix possible"
+
 #: src/routes/calendar/index.tsx
 msgid "Preparing calendar view…"
 msgstr "S'està preparant la vista del calendari…"
@@ -3499,7 +3564,6 @@ msgid "Private inbox"
 msgstr "Bústia privada"
 
 #: src/components/companies/about-section.tsx
-#: src/components/research/findings/company-enrichment-view.tsx
 msgid "Products fit"
 msgstr "Encaix de productes"
 
@@ -3572,6 +3636,10 @@ msgstr "Propòsit"
 msgid "Qty"
 msgstr "Quant."
 
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "Quality"
+msgstr "Qualitat"
+
 #: src/components/companies/proposals-panel.tsx
 msgid "Quantity"
 msgstr "Quantitat"
@@ -3625,6 +3693,11 @@ msgstr "Canvis recents"
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Recent runs"
 msgstr "Execucions recents"
+
+#: src/components/companies/account-brief-section.tsx
+#: src/components/companies/research-summary-card.tsx
+msgid "recently"
+msgstr "fa poc"
 
 #: src/routes/companies/index.tsx
 msgid "Recently contacted"
@@ -3849,6 +3922,10 @@ msgstr "Rol"
 msgid "Role (optional)"
 msgstr "Càrrec (opcional)"
 
+#: src/components/companies/company-fit-section.tsx
+msgid "run"
+msgstr "execució"
+
 #: src/components/research/run-actions.tsx
 msgid "Run again"
 msgstr "Torna a executar"
@@ -3882,6 +3959,7 @@ msgstr "En execució"
 msgid "Sales context"
 msgstr "Context comercial"
 
+#: src/components/companies/account-brief-section.tsx
 #: src/components/companies/documents-panel.tsx
 #: src/components/companies/proposals-panel.tsx
 #: src/components/contacts/contact-edit-dialog.tsx
@@ -4212,6 +4290,11 @@ msgstr "Alguna cosa ha fallat. Prova-ho de nou."
 msgid "Sort"
 msgstr "Ordena"
 
+#: src/components/companies/company-fit-section.tsx
+#: src/components/companies/company-fit-section.tsx
+msgid "source"
+msgstr "font"
+
 #: src/components/companies/about-section.tsx
 #: src/routes/calendar/index.tsx
 #: src/routes/tasks/index.tsx
@@ -4225,6 +4308,11 @@ msgstr "Obtingut de la recerca"
 #: src/components/research/provenance.tsx
 msgid "Sourced from research on {dateLabel}"
 msgstr "Obtingut de la recerca el {dateLabel}"
+
+#: src/components/companies/company-fit-section.tsx
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "Sources disagree"
+msgstr "Les fonts no coincideixen"
 
 #: src/components/research/research-dialog.tsx
 msgid "Sources language"
@@ -4347,6 +4435,11 @@ msgstr "Punts forts"
 #: src/components/primitives/pri-rich-text.tsx
 msgid "Strikethrough"
 msgstr "Ratllat"
+
+#: src/components/companies/company-fit-section.tsx
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "Strong fit"
+msgstr "Encaix fort"
 
 #: src/components/research/run-progress.tsx
 msgid "Structuring the findings"
@@ -4774,6 +4867,7 @@ msgstr "Preu unitari"
 msgid "unknown"
 msgstr "desconegut"
 
+#: src/components/research/findings/company-enrichment-view.tsx
 #: src/routes/emails/index.tsx
 msgid "Unknown"
 msgstr "Desconegut"
@@ -4827,6 +4921,10 @@ msgstr "Actualitza"
 #: src/routes/emails/inboxes.tsx
 msgid "Update failed"
 msgstr "Ha fallat l'actualització"
+
+#: src/components/companies/research-summary-card.tsx
+msgid "updated <0/>"
+msgstr "actualitzat <0/>"
 
 #: src/components/emails/attachment-picker.tsx
 msgid "Upload failed"
@@ -4935,6 +5033,11 @@ msgstr "No reconeixem aquest correu. Demana a un administrador que t'inviti."
 msgid "We sent a sign-in link to"
 msgstr "S'ha enviat un enllaç d'inici de sessió a"
 
+#: src/components/companies/company-fit-section.tsx
+#: src/components/research/findings/company-enrichment-view.tsx
+msgid "Weak fit"
+msgstr "Encaix feble"
+
 #: src/components/research/findings/competitor-scan-view.tsx
 msgid "Weaknesses"
 msgstr "Punts febles"
@@ -4986,6 +5089,10 @@ msgstr "Quan"
 msgid "Where"
 msgstr "On"
 
+#: src/components/companies/company-fit-section.tsx
+msgid "Where each fact came from"
+msgstr "D'on ve cada dada"
+
 #: src/components/research/research-dialog.tsx
 msgid "Where to look (optional)"
 msgstr "On cercar (opcional)"
@@ -5015,6 +5122,10 @@ msgstr "Escriu el teu missatge…"
 #: src/components/research/run-progress.tsx
 msgid "Writing the brief"
 msgstr "Redactant l'informe"
+
+#: src/components/companies/account-brief-section.tsx
+msgid "Written by research. Editing it makes it yours."
+msgstr "Escrit per la recerca. Si l'edites, passa a ser teu."
 
 #: src/components/research/target-correction.tsx
 msgid "Wrong company? Enter its official website"
